@@ -70,10 +70,14 @@ const DEFAULT_FEATURES: ClientFeatures = {
 // ─── Fetch from Supabase ────────────────────────────────────────────────────
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+// BUG-019: server-side callers (voice/coach/etc.) use the service key so the `clients`
+// read survives strict RLS; client-side callers fall back to anon (upgraded to the session
+// JWT by supabase-fetch-patch). The service key is undefined in the client bundle, so it
+// never ships to the browser.
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 
 // Cache to avoid refetching on every render
-let _cache: Record<string, ClientConfig> = {}
+const _cache: Record<string, ClientConfig> = {}
 let _cacheTime = 0
 const CACHE_TTL = 5 * 60 * 1000 // 5 min
 

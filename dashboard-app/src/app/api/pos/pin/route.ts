@@ -51,23 +51,30 @@ export async function POST(request: NextRequest) {
     }
     const clientId = client_id
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    // BUG-019: pos_staff is now tenant-scoped RLS with NO anon access, so the PIN
-    // lookup must run server-side with the service_role key (bypasses RLS). The
-    // clientId is still enforced explicitly in the query filter below, and the
-    // issued shift token binds the operator to this tenant. Never expose this key
-    // to the client.
-    const sbKey = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    // Clonable path (no per-tenant service key): resolve the PIN under the CALLER'S
+    // Supabase JWT (fs-at cookie / Bearer). BUG-019 RLS scopes pos_staff to the
+    // caller's tenant, so a PIN can only match staff of a tenant the caller belongs
+    // to — the browser-supplied client_id cannot widen it, and the tenant of the
+    // matched row (not the request body) is what binds the shift token. Falls back to
+    // the service_role key only for legacy kiosks that carry no Supabase session.
+    const callerJwt = request.cookies.get('fs-at')?.value
+      || request.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
+    const apiKeyHdr = callerJwt ? anon : (process.env.SUPABASE_SERVICE_KEY || '')
+    const authHdr = callerJwt || process.env.SUPABASE_SERVICE_KEY || ''
+    if (!authHdr) return Response.json({ error: 'Servicio no disponible' }, { status: 503 })
+    const dbHeaders = { apikey: apiKeyHdr, Authorization: `Bearer ${authHdr}` }
 
     // Fingerprint (WebAuthn) login — look up by staff ID, validate active status + tenant
     if (fingerprint_id && typeof fingerprint_id === 'string') {
       const fpRes = await fetch(
-        `${sbUrl}/rest/v1/pos_staff?id=eq.${encodeURIComponent(fingerprint_id)}&active=eq.true&client_id=eq.${encodeURIComponent(clientId)}&select=id,name,role&limit=1`,
-        { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
+        `${sbUrl}/rest/v1/pos_staff?id=eq.${encodeURIComponent(fingerprint_id)}&active=eq.true&client_id=eq.${encodeURIComponent(clientId)}&select=id,name,role,client_id&limit=1`,
+        { headers: dbHeaders, cache: 'no-store' }
       )
       if (fpRes.ok) {
         const rows = await fpRes.json()
         if (Array.isArray(rows) && rows.length > 0) {
-          return respond({ id: rows[0].id, name: rows[0].name, role: rows[0].role }, clientId, rateLimitKey)
+          return respond({ id: rows[0].id, name: rows[0].name, role: rows[0].role }, rows[0].client_id || clientId, rateLimitKey)
         }
       }
       return Response.json({ error: 'Empleado no encontrado o desactivado' }, { status: 401 })
@@ -90,13 +97,13 @@ export async function POST(request: NextRequest) {
     }
 
     const res = await fetch(
-      `${sbUrl}/rest/v1/pos_staff?pin=eq.${encodeURIComponent(pin)}&active=eq.true&client_id=eq.${encodeURIComponent(clientId)}${roleFilter}&select=id,name,role&limit=1`,
-      { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
+      `${sbUrl}/rest/v1/pos_staff?pin=eq.${encodeURIComponent(pin)}&active=eq.true&client_id=eq.${encodeURIComponent(clientId)}${roleFilter}&select=id,name,role,client_id&limit=1`,
+      { headers: dbHeaders, cache: 'no-store' }
     )
     if (res.ok) {
       const rows = await res.json()
       if (Array.isArray(rows) && rows.length > 0) {
-        return respond({ id: rows[0].id, name: rows[0].name, role: rows[0].role }, clientId, rateLimitKey)
+        return respond({ id: rows[0].id, name: rows[0].name, role: rows[0].role }, rows[0].client_id || clientId, rateLimitKey)
       }
     }
 

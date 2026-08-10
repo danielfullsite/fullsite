@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
-import { getClientId } from '@/lib/api-auth'
+import { withPOSAuth, unauthorized } from '@/lib/api-auth'
+import { ownsLegacyWansoft } from '@/lib/wansoft-owner'
 
 // Simple rate limiting — max 15 requests per minute per IP
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>()
@@ -40,8 +41,27 @@ export async function POST(request: NextRequest) {
       return new Response('Agrega GROQ_API_KEY para activar el agente de voz.', { status: 200 })
     }
 
+    // BUG-019: authenticate the caller and resolve the authoritative tenant server-side
+    // (shift token or Supabase session -> client_users). Never trust a browser client_id.
+    // Reads restaurant operational/financial data, so it must be authenticated.
+    const auth = await withPOSAuth(request)
+    if (!auth) return unauthorized()
+
+    // BUG-019: voice is served ONLY to the exact owner of the AMALAY legacy Wansoft dataset
+    // (wansoft_daily/wansoft_waiter_categories have no client_id). Ownership is a server-side
+    // identifier via auth.clientId — never a browser value, never data_source. Any other
+    // tenant (incl. a hypothetical data_source='wansoft' one) is denied. This authorization
+    // runs BEFORE the service-role key is set up or any legacy table is queried.
+    if (!ownsLegacyWansoft(auth.clientId)) {
+      return new Response(JSON.stringify({ error: 'feature_unavailable' }), {
+        status: 403, headers: { 'Content-Type': 'application/json' },
+      })
+    }
+
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    // Privileged server read (survives strict RLS). Fail closed if not configured.
+    const sbKey = process.env.SUPABASE_SERVICE_KEY
+    if (!sbKey) return new Response('server misconfigured', { status: 503 })
 
     const q = message.toLowerCase()
 
@@ -392,7 +412,7 @@ DATOS DIARIOS (ultimos ${recentDays.length} dias).\n${lines.join('\n')}`
     let activeMeserosStr = 'Omar Aguilera, Hector Rodriguez, Brayan Berlanga, Daniela Rico, Julio Cesar Hernandez, Mauricio Rodriguez, Oscar Rios, Alexis Ocampo, Aldo Ruiz, Mariana Salas, Mario Garcia'
     try {
       const staffRes = await fetch(
-        `${sbUrl}/rest/v1/pos_staff?client_id=eq.${encodeURIComponent(getClientId(request))}&active=eq.true&role=in.(mesero,cajero,barra,supervisor)&select=name&order=name.asc`,
+        `${sbUrl}/rest/v1/pos_staff?client_id=eq.${encodeURIComponent(auth.clientId)}&active=eq.true&role=in.(mesero,cajero,barra,supervisor)&select=name&order=name.asc`,
         { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
       )
       if (staffRes.ok) {
@@ -405,7 +425,7 @@ DATOS DIARIOS (ultimos ${recentDays.length} dias).\n${lines.join('\n')}`
 
     // 5. System prompt — voice-optimized, parameterized by client
     const { fetchClientConfig } = await import('@/lib/client-config')
-    const voiceClientConfig = await fetchClientConfig(getClientId(request))
+    const voiceClientConfig = await fetchClientConfig(auth.clientId)
     const voiceRestaurantName = voiceClientConfig.display_name || 'el restaurante'
     const voiceRestaurantCity = voiceClientConfig.city || ''
 

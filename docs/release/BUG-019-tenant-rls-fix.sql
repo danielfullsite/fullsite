@@ -20,7 +20,8 @@
 --   - anon SIN acceso a tablas/views/funciones tenant. El navegador usa el JWT
 --     de sesión (authenticated). Las escrituras del kiosko van por endpoints
 --     server (service_role, bypassa RLS, resuelve tenant con withPOSAuth).
---   - Menú público (QR) vía RPC SECURITY DEFINER get_public_menu().
+--   - Menú público (QR) server-side vía /api/public/menu (service_role, token de
+--     mesa) — SIN RPC anon (BUG-019-B). Cero superficie anon en DB.
 --
 -- IDEMPOTENTE. Transaccional. DINÁMICO (se adapta a las tablas que existan).
 -- ============================================================================
@@ -69,6 +70,34 @@ begin
   end loop;
 end $$;
 
+-- ── 1b. pos_orders: excepción MÍNIMA de turno para borradores QR server-owned ──
+--    BUG-019-C2: la orden pública QR nace 'abierta' con turno_id=NULL, pero el
+--    CHECK prod pos_orders_turno_id_check exige turno NOT NULL. Se reemplaza por la
+--    excepción MÁS ESTRECHA posible: turno puede ser NULL SOLO en un borrador QR
+--    (status='abierta' AND id like 'qr-%'). Las órdenes normales (id uuid) siguen
+--    exigiendo turno; cualquier transición fuera de 'abierta' exige turno válido.
+--    Procedencia NO falsificable: las policies authenticated de pos_orders exigen
+--    turno_id NOT NULL en el with-check → un cliente autenticado NUNCA puede crear
+--    ni persistir una orden turno-null (aunque forje id 'qr-'). Solo service_role
+--    (el endpoint /api/public/qr-order, server) puede insertar el borrador turno-null.
+do $$
+begin
+  if exists (select 1 from information_schema.tables where table_schema='public' and table_name='pos_orders') then
+    alter table public.pos_orders drop constraint if exists pos_orders_turno_id_check;
+    alter table public.pos_orders add constraint pos_orders_turno_id_check
+      check (turno_id is not null or (status = 'abierta' and id like 'qr-%'));
+    -- Endurecer las policies authenticated (reemplazan las genéricas de la §1 para pos_orders):
+    -- INSERT/UPDATE exigen además turno_id NOT NULL. service_role conserva su bypass (§1 svc policy).
+    drop policy if exists pos_orders_ins on public.pos_orders;
+    drop policy if exists pos_orders_upd on public.pos_orders;
+    create policy pos_orders_ins on public.pos_orders for insert to authenticated
+      with check (private.user_has_client_access(client_id) and turno_id is not null);
+    create policy pos_orders_upd on public.pos_orders for update to authenticated
+      using (private.user_has_client_access(client_id))
+      with check (private.user_has_client_access(client_id) and turno_id is not null);
+  end if;
+end $$;
+
 -- ── 2. pos_audit_log INMUTABLE (override): sin update/delete ──────────────────
 drop policy if exists pos_audit_log_upd on public.pos_audit_log;
 drop policy if exists pos_audit_log_del on public.pos_audit_log;
@@ -105,19 +134,21 @@ begin
   end loop;
 end $$;
 
--- ── 5. Funciones SECURITY DEFINER: anon SOLO puede ejecutar get_public_menu ────
---    El resto (r1_save_order, r1_merge_orders, r1_reconcile_*, r1_adjust_market_
---    stock, r1_legacy_sale_deduction, auth_client_id, rls_auto_enable, etc.)
---    bypassan RLS (SECURITY DEFINER) y varias toman client_id como parámetro →
---    anon podía escribir/leer datos de cualquier tenant vía RPC directo. Se
---    revoca EXECUTE a public+anon y se concede solo a authenticated+service_role.
+-- ── 5. Funciones SECURITY DEFINER: NINGUNA ejecutable por anon ─────────────────
+--    r1_save_order, r1_merge_orders, r1_reconcile_*, r1_adjust_market_stock,
+--    r1_legacy_sale_deduction, auth_client_id, rls_auto_enable, etc. bypassan RLS
+--    (SECURITY DEFINER) y varias toman client_id como parámetro → anon podía
+--    escribir/leer datos de cualquier tenant vía RPC directo. Se revoca EXECUTE a
+--    public+anon y se concede solo a authenticated+service_role. Sin excepciones:
+--    el menú público ya NO se sirve por RPC anon (BUG-019-B lo sirve server-side
+--    con service_role; no existe función de menú ejecutable por anon).
 do $$
 declare r record;
 begin
   for r in
     select p.proname, pg_get_function_identity_arguments(p.oid) as args
     from pg_proc p join pg_namespace n on n.oid=p.pronamespace and n.nspname='public'
-    where p.prosecdef and p.proname <> 'get_public_menu'
+    where p.prosecdef
       and has_function_privilege('anon', p.oid, 'execute')
   loop
     execute format('revoke execute on function public.%I(%s) from public, anon', r.proname, r.args);
@@ -125,18 +156,83 @@ begin
   end loop;
 end $$;
 
--- ── 6. Menú público (QR, sin login) — RPC SECURITY DEFINER, único acceso anon ─
-create or replace function public.get_public_menu(p_client_id text)
-returns table (category_id text, category_name text, category_sort int, item_id text, item_name text, item_price numeric, item_active boolean)
-language sql stable security definer set search_path to 'public' as $$
-  select c.id::text, c.name, coalesce(c.sort_order,0), i.id::text, i.name, i.price, coalesce(i.active, true)
-  from public.pos_menu_categories c
-  join public.pos_menu_items i on i.category_id = c.id and i.client_id = c.client_id
-  where c.client_id = p_client_id and coalesce(c.active,true)
-  order by coalesce(c.sort_order,0), i.name
-$$;
-revoke all on function public.get_public_menu(text) from public;
-grant execute on function public.get_public_menu(text) to anon, authenticated;
+-- ── 6. Menú público (QR, sin login) — SIN RPC anon ────────────────────────────
+--    BUG-019-B: el menú público se sirve exclusivamente server-side vía
+--    /api/public/menu (service_role, tenant resuelto por token de mesa). NO se
+--    crea get_public_menu ni ninguna función de menú ejecutable por anon: la
+--    superficie anon en DB queda en cero. Si get_public_menu existía de un ensayo
+--    previo (p.ej. staging), la sección 5 ya le revocó EXECUTE a anon; aquí se
+--    elimina para no dejar SECURITY DEFINER muerto.
+drop function if exists public.get_public_menu(text);
+
+-- ── 7a. Deuda permisiva histórica: tablas legacy SIN client_id NI padre ────────
+--    BUG-019-CD: base tables sin client_id (sección 1 no las tocó) que exponían datos
+--    PRIVADos a anon vía policies `public`/`anon`: finanzas (wansoft_daily/kpis) y PII
+--    (amalay_reservaciones). Son AMALAY-legacy single-tenant sin relación a un padre.
+--    Se revoca anon; lectura solo authenticated + service_role. wansoft_* además queda
+--    detrás del ownership gate server-side de voice/coach (WANSOFT_LEGACY_CLIENT_ID).
+--    content y reviews se dejan públicas a propósito (las lee el sitio de marketing).
+do $$
+declare t text;
+begin
+  foreach t in array array['wansoft_daily','wansoft_kpis','amalay_reservaciones'] loop
+    if exists (select 1 from information_schema.tables where table_schema='public' and table_name=t) then
+      perform private._drop_all_policies(t);
+      execute format('alter table public.%I enable row level security', t);
+      execute format('revoke all on public.%I from anon', t);
+      execute format('grant select on public.%I to authenticated, service_role', t);
+      execute format($p$create policy %1$I_auth_read on public.%1$I for select to authenticated using (true)$p$, t);
+      execute format($p$create policy %1$I_svc on public.%1$I for all to service_role using (true) with check (true)$p$, t);
+    end if;
+  end loop;
+end $$;
+
+-- ── 7b. Tablas HIJAS sin client_id: scope por tenant vía la relación real al PADRE ─
+--    pos_purchase_order_items.order_id      -> pos_purchase_orders.id      (client_id)
+--    pos_sub_recipe_ingredients.sub_recipe_id -> pos_sub_recipes.id        (client_id)
+--    (Sin FK formal en el schema; el join usa la columna de enlace real verificada.)
+--    Un usuario accede a un hijo SOLO si tiene acceso al tenant del padre. USING (lectura/
+--    update/delete) y WITH CHECK (insert/update) impiden leer, insertar o MOVER cross-tenant.
+--    No basta revocar anon ni dejar authenticated general.
+do $$
+declare
+  r record;
+begin
+  for r in
+    select * from (values
+      ('pos_purchase_order_items','order_id','pos_purchase_orders'),
+      ('pos_sub_recipe_ingredients','sub_recipe_id','pos_sub_recipes')
+    ) as v(child, fk_col, parent)
+  loop
+    if exists (select 1 from information_schema.tables where table_schema='public' and table_name=r.child)
+       and exists (select 1 from information_schema.tables where table_schema='public' and table_name=r.parent) then
+      perform private._drop_all_policies(r.child);
+      execute format('alter table public.%I enable row level security', r.child);
+      execute format('revoke all on public.%I from anon', r.child);
+      execute format('grant select, insert, update, delete on public.%I to authenticated', r.child);
+      execute format('grant all on public.%I to service_role', r.child);
+      -- parent-access predicate reused across the 4 authenticated policies
+      execute format(
+        $p$create policy %1$I_sel on public.%1$I for select to authenticated
+             using (exists (select 1 from public.%3$I p where p.id = %1$I.%2$I and private.user_has_client_access(p.client_id)))$p$,
+        r.child, r.fk_col, r.parent);
+      execute format(
+        $p$create policy %1$I_ins on public.%1$I for insert to authenticated
+             with check (exists (select 1 from public.%3$I p where p.id = %1$I.%2$I and private.user_has_client_access(p.client_id)))$p$,
+        r.child, r.fk_col, r.parent);
+      execute format(
+        $p$create policy %1$I_upd on public.%1$I for update to authenticated
+             using (exists (select 1 from public.%3$I p where p.id = %1$I.%2$I and private.user_has_client_access(p.client_id)))
+             with check (exists (select 1 from public.%3$I p where p.id = %1$I.%2$I and private.user_has_client_access(p.client_id)))$p$,
+        r.child, r.fk_col, r.parent);
+      execute format(
+        $p$create policy %1$I_del on public.%1$I for delete to authenticated
+             using (exists (select 1 from public.%3$I p where p.id = %1$I.%2$I and private.user_has_client_access(p.client_id)))$p$,
+        r.child, r.fk_col, r.parent);
+      execute format($p$create policy %1$I_svc on public.%1$I for all to service_role using (true) with check (true)$p$, r.child);
+    end if;
+  end loop;
+end $$;
 
 drop function private._drop_all_policies(text);
 

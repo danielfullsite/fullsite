@@ -41,6 +41,35 @@ export interface POSAuthContext {
   staffName: string
   role: string
   authType: 'shift_token' | 'supabase_session'
+  /**
+   * The caller's Supabase access token (JWT), when available (fs-at cookie or a
+   * Supabase Bearer). Lets POS routes run DB access under the caller's RLS instead
+   * of the service_role key — so a tenant needs NO server-side service key. Absent
+   * for pure-kiosk shift-token requests that carry no Supabase session.
+   */
+  supabaseJwt?: string
+}
+
+/** How a POS route should reach the DB: the caller's JWT (RLS) if present, else the service key. */
+export interface PosDbAuth {
+  url: string
+  apikey: string
+  token: string
+  via: 'user_jwt' | 'service_role'
+}
+
+/**
+ * Resolve the DB credentials a POS route should use. Prefers the caller's Supabase
+ * JWT (RLS-scoped — clonable, no per-tenant service key) and falls back to the
+ * service_role key only when there is no Supabase session (legacy kiosk). Returns
+ * null when neither is available (caller must respond 503, fail-closed).
+ */
+export function posDbAuth(ctx: POSAuthContext | null, request: NextRequest): PosDbAuth | null {
+  const jwt = ctx?.supabaseJwt || request.cookies.get('fs-at')?.value
+  if (jwt) return { url: SB_URL, apikey: SB_ANON, token: jwt, via: 'user_jwt' }
+  const svc = process.env.SUPABASE_SERVICE_KEY
+  if (svc) return { url: SB_URL, apikey: svc, token: svc, via: 'service_role' }
+  return null
 }
 
 /**
@@ -66,6 +95,9 @@ export async function withPOSAuth(request: NextRequest): Promise<POSAuthContext 
       staffName: shift.nam,
       role: shift.rol,
       authType: 'shift_token',
+      // A browser POS terminal carries the Supabase session cookie alongside the
+      // shift token → reuse it for RLS-scoped DB access (no service key needed).
+      supabaseJwt: cookieToken,
     }
   }
 
@@ -73,12 +105,15 @@ export async function withPOSAuth(request: NextRequest): Promise<POSAuthContext 
   const userId = await getSessionUserId(request)
   if (!userId) return null
 
-  // Resolve clientId from client_users — not from user_metadata (user-writable)
-  const sbKey = process.env.SUPABASE_SERVICE_KEY || SB_ANON
+  // The caller's Supabase access token — used both to resolve membership and for
+  // RLS-scoped DB access downstream. Matches what getSessionUserId() validated.
+  const userJwt = cookieToken || bearer
+  // Resolve clientId from client_users UNDER THE CALLER'S JWT (RLS read-own) — never
+  // from user_metadata (user-writable), never with the service key (clonable path).
   try {
     const res = await fetch(
       `${SB_URL}/rest/v1/client_users?user_id=eq.${encodeURIComponent(userId)}&select=client_id,role&limit=1`,
-      { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
+      { headers: { apikey: SB_ANON, Authorization: `Bearer ${userJwt}` }, cache: 'no-store' }
     )
     if (!res.ok) return null
     const rows = await res.json()
@@ -89,6 +124,7 @@ export async function withPOSAuth(request: NextRequest): Promise<POSAuthContext 
       staffName: '',
       role: rows[0].role,
       authType: 'supabase_session',
+      supabaseJwt: userJwt,
     }
   } catch {
     return null

@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
-import { withPOSAuth, unauthorized } from '@/lib/api-auth'
+import { withPOSAuth, unauthorized, posDbAuth } from '@/lib/api-auth'
+import { isQrDraftId, resolveOpenTurno } from '@/lib/turno'
 
 /**
  * R2D1 + R2 Final + R2D — Revision-aware order save + R1 reconciliation boundary
@@ -47,14 +48,17 @@ export async function POST(request: NextRequest) {
     }
 
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const sbKey = process.env.SUPABASE_SERVICE_KEY
-    if (!sbKey) {
-      return Response.json({ ok: false, error: 'SERVER_CONFIG_ERROR' } satisfies SaveResult, { status: 500 })
+    // Clonable path: run DB access under the caller's Supabase JWT (RLS) — falls back
+    // to the service_role key only for legacy kiosks with no Supabase session. The RPCs
+    // (r1_save_order*, r1_reconcile_order) are SECURITY DEFINER granted to authenticated,
+    // and p_client_id is the SERVER-resolved tenant (withPOSAuth), never a browser value.
+    const db = posDbAuth(auth, request)
+    if (!db) {
+      return Response.json({ ok: false, error: 'SERVER_CONFIG_ERROR' } satisfies SaveResult, { status: 503 })
     }
-
+    const readHeaders = { apikey: db.apikey, Authorization: `Bearer ${db.token}` }
     const headers = {
-      'apikey': sbKey,
-      'Authorization': `Bearer ${sbKey}`,
+      ...readHeaders,
       'Content-Type': 'application/json',
       'Prefer': 'return=representation',
     }
@@ -87,6 +91,33 @@ export async function POST(request: NextRequest) {
 
     if (hasOperationId) {
       rpcParams.p_save_operation_id = body.save_operation_id
+    }
+
+    // ── BUG-019-C: server-mediated turno for server-owned QR drafts ──
+    // A QR draft (id 'qr-…') is born turno_id=NULL. The browser controls nothing
+    // authoritative here either: the server resolves the turno, never body.turno_id.
+    // - Transition out of 'abierta' (enviar/cobrar/imprimir/inventario): resolve the
+    //   caller's OPEN turno server-side and assign it atomically in this save. No open
+    //   turno → refuse, so nothing is sent/charged/printed off the books.
+    // - Still 'abierta' (draft edit): keep it turno-null (server-owned draft).
+    // Normal POS orders (uuid id) are unchanged — the DB check already forbids their NULL.
+    if (isQrDraftId(order_id)) {
+      const movingToEffects = typeof body.status === 'string' && body.status !== 'abierta'
+      if (movingToEffects) {
+        const t = await resolveOpenTurno(sbUrl, { apikey: db.apikey, token: db.token }, clientId, auth.staffId)
+        if (!t.ok) {
+          // Fail closed: no open turno, or ambiguous (>1 eligible) — never guess the corte.
+          const [error, status] = t.reason === 'ambiguous'
+            ? ['AMBIGUOUS_TURNO', 409] as const
+            : t.reason === 'error'
+              ? ['TURNO_LOOKUP_FAILED', 502] as const
+              : ['NO_OPEN_TURNO', 409] as const
+          return Response.json({ ok: false, error } satisfies SaveResult, { status })
+        }
+        rpcParams.p_turno_id = t.turnoId
+      } else {
+        rpcParams.p_turno_id = null
+      }
     }
 
     const saveRes = await fetch(`${sbUrl}/rest/v1/rpc/${rpcName}`, {
@@ -134,7 +165,7 @@ export async function POST(request: NextRequest) {
       try {
         const lineageRes = await fetch(
           `${sbUrl}/rest/v1/pos_orders?id=eq.${order_id}&client_id=eq.${clientId}&select=last_inventory_processed_revision`,
-          { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` } }
+          { headers: readHeaders }
         )
         if (lineageRes.ok) {
           const lineageRows = await lineageRes.json()
@@ -197,7 +228,7 @@ export async function POST(request: NextRequest) {
       try {
         const statusRes = await fetch(
           `${sbUrl}/rest/v1/pos_orders?id=eq.${order_id}&client_id=eq.${clientId}&select=last_inventory_processed_revision,last_inventory_complete_revision`,
-          { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` } }
+          { headers: readHeaders }
         )
         if (statusRes.ok) {
           const statusRows = await statusRes.json()

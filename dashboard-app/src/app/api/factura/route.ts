@@ -2,7 +2,7 @@
 // pos_cfdi_requests tiene RLS sin policy de INSERT anon — este route inserta
 // con la service key, con validación server-side de los campos.
 
-import { requireAuth, getClientId } from '@/lib/api-auth'
+import { requireAuth, withPOSAuth, unauthorized } from '@/lib/api-auth'
 import { NextRequest } from 'next/server'
 
 const RFC_RE = /^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/
@@ -21,7 +21,9 @@ export async function GET(request: NextRequest) {
   const authErr = await requireAuth(request)
   if (authErr) return authErr
   try {
-    const clientId = getClientId(request)
+    const auth = await withPOSAuth(request)
+    if (!auth) return unauthorized()
+    const clientId = auth.clientId
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
     const res = await fetch(
       `${sbUrl}/rest/v1/pos_cfdi_requests?client_id=eq.${encodeURIComponent(clientId)}&order=created_at.desc&limit=200`,
@@ -54,7 +56,9 @@ export async function PATCH(req: NextRequest) {
     if (body.folio_fiscal !== undefined) patch.folio_fiscal = String(body.folio_fiscal).trim().slice(0, 64) || null
     if (body.error_msg !== undefined) patch.error_msg = String(body.error_msg).trim().slice(0, 300) || null
 
-    const clientId = getClientId(req)
+    const auth = await withPOSAuth(req)
+    if (!auth) return unauthorized()
+    const clientId = auth.clientId
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
     const res = await fetch(
       `${sbUrl}/rest/v1/pos_cfdi_requests?id=eq.${encodeURIComponent(id)}&client_id=eq.${encodeURIComponent(clientId)}`,

@@ -1,15 +1,28 @@
 import { NextRequest } from 'next/server'
+import { withPOSAuth, unauthorized } from '@/lib/api-auth'
+import { ownsLegacyWansoft } from '@/lib/wansoft-owner'
 
 export async function POST(request: NextRequest) {
   try {
-    const { client_id } = await request.json().catch(() => ({} as { client_id?: string }))
+    // BUG-019: authenticate + resolve authoritative tenant server-side (never a browser
+    // client_id). coach is built entirely on the AMALAY legacy wansoft_daily (no client_id),
+    // so it is served ONLY to the exact dataset owner (server-side identifier). Every other
+    // tenant is denied (403, no data). Authorization runs BEFORE the service-role key/query.
+    const auth = await withPOSAuth(request)
+    if (!auth) return unauthorized()
+    const clientId = auth.clientId
+
+    if (!ownsLegacyWansoft(clientId)) {
+      return Response.json({ error: 'feature_unavailable' }, { status: 403 })
+    }
 
     if (!process.env.GROQ_API_KEY && !process.env.GROQ) {
       return Response.json({ insights: [] }, { status: 200 })
     }
 
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    const sbKey = process.env.SUPABASE_SERVICE_KEY // privileged server read, survives strict RLS
+    if (!sbKey) return Response.json({ error: 'server misconfigured' }, { status: 503 })
     const headers = { apikey: sbKey, Authorization: `Bearer ${sbKey}` }
 
     // Fetch 90 days of daily data
@@ -133,8 +146,8 @@ export async function POST(request: NextRequest) {
 
     // Load client config for AI persona
     const { fetchClientConfig } = await import('@/lib/client-config')
-    const clientConfig = await fetchClientConfig(client_id || '')
-    const restaurantName = clientConfig.display_name || client_id || 'el restaurante'
+    const clientConfig = await fetchClientConfig(clientId)
+    const restaurantName = clientConfig.display_name || clientId || 'el restaurante'
 
     const systemPrompt = `Eres el COACH OPERATIVO de ${restaurantName}. Tu trabajo es observar los datos del restaurante y dar consejos accionables al dueño. NO eres un chatbot — eres un socio que piensa 24/7 en cómo mejorar el negocio.
 

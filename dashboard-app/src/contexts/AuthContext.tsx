@@ -97,9 +97,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const config = await fetchClientConfig(cid)
     setClientConfig(config)
 
-    // Set data source switch (wansoft or fullsite)
+    // Derive the dashboard data source from clients.data_source (clonable — no manual
+    // localStorage). 'wansoft' → wansoft_daily; a Fullsite-POS tenant ('fullsite' or
+    // 'supabase', whose operational data lives in Supabase pos_orders) → pos_orders.
     const ds = config?.data_source
-    if (ds === 'fullsite') {
+    if (ds === 'fullsite' || ds === 'supabase') {
       try { localStorage.setItem('fullsite_data_source', 'fullsite') } catch {}
     } else {
       try { localStorage.setItem('fullsite_data_source', 'wansoft') } catch {}

@@ -444,8 +444,11 @@ export async function getDashboardFromPosOrders(days: number = 30, clientId: str
   const cutoffFecha = cutoffDate.toISOString().slice(0, 10)
   const { utcStart } = getBusinessDayBounds(cutoffFecha, bdCfg.timeZone, bdCfg.boundary)
 
+  // A completed sale is a PAID order: POS finalizes to 'cobrada' (paid) and may later move to
+  // 'cerrada' (closed). Count both so live paid orders show on the dashboard. Single status
+  // field per order → no double count.
   const orders = await sbFetch('pos_orders',
-    `select=mesa,mesero,personas,total,subtotal,iva,descuento,propina,metodo_pago,pagos,items,status,created_at&client_id=eq.${clientId}&status=eq.cerrada&created_at=gte.${encodeURIComponent(utcStart)}&order=created_at.asc&limit=5000`
+    `select=mesa,mesero,personas,total,subtotal,iva,descuento,propina,metodo_pago,pagos,items,status,created_at&client_id=eq.${clientId}&status=in.(cerrada,cobrada)&created_at=gte.${encodeURIComponent(utcStart)}&order=created_at.asc&limit=5000`
   ) as { mesa: number; mesero: string; personas: number; total: number; subtotal: number; iva: number; descuento: number; propina: number; metodo_pago: string; pagos: { metodo: string; monto: number }[] | null; items: { nombre: string; precio: number; cantidad: number }[] | null; status: string; created_at: string }[]
 
   if (orders.length === 0) return []

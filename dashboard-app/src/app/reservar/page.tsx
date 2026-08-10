@@ -163,37 +163,25 @@ export default function ReservarPage() {
   async function handleSubmit() {
     setSubmitting(true)
     try {
-      const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-      const SUPABASE_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      const codigo = 'AMA-' + String(Math.floor(Math.random() * 9000) + 1000)
-
-      const body = {
-        client_id: process.env.NEXT_PUBLIC_DEFAULT_CLIENT_ID || '',
-        codigo_reserva: codigo,
-        nombre: form.nombre,
-        teléfono: form.teléfono,
-        fecha: form.fecha,
-        espacio: form.espacio,
-        horario_inicio: form.horario_inicio,
-        horario_fin: form.horario_fin,
-        guests: form.guests,
-        paquete: form.paquete,
-        pastel: form.postre ? 'Postre incluido' : null,
-        entradas: form.platoFuerte ? [form.platoFuerte] : null,
-        deco: form.deco || null,
-        total: total,
-        status: 'pending',
-      }
-
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/reservaciones`, {
+      // BUG-019-G: server-mediated. No anon key, no browser-chosen client_id — the server
+      // sets client_id (deployment identity) and status server-side.
+      const res = await fetch('/api/public/reservation', {
         method: 'POST',
-        headers: {
-          'apikey': SUPABASE_ANON,
-          'Authorization': `Bearer ${SUPABASE_ANON}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=minimal',
-        },
-        body: JSON.stringify(body),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nombre: form.nombre,
+          telefono: form.teléfono,
+          fecha: form.fecha,
+          espacio: form.espacio,
+          horario_inicio: form.horario_inicio,
+          horario_fin: form.horario_fin,
+          guests: form.guests,
+          paquete: form.paquete,
+          pastel: form.postre ? 'Postre incluido' : null,
+          entradas: form.platoFuerte ? [form.platoFuerte] : null,
+          deco: form.deco || null,
+          total,
+        }),
       })
 
       if (!res.ok) throw new Error('Error al guardar')

@@ -1,0 +1,34 @@
+name: BUG-019 Tenant Isolation (local, ephemeral PG)
+
+# Corre los harnesses de aislamiento full-stack LOCAL contra la migración real,
+# sin red ni credenciales. Gate de regresión: si la migración deja de aislar o
+# el barrido detecta una tabla con client_id sin cubrir, falla el CI.
+
+on:
+  push:
+    paths:
+      - 'docs/release/BUG-019-tenant-rls-fix.sql'
+      - 'scripts/tenant-isolation/local/**'
+      - 'scripts/sql/migrations/010_consolidated_core.sql'
+      - 'scripts/sql/migrations/011_consolidated_pipeline.sql'
+      - '.github/workflows/bug019-isolation.yml'
+  pull_request:
+    paths:
+      - 'docs/release/BUG-019-tenant-rls-fix.sql'
+      - 'scripts/tenant-isolation/local/**'
+  workflow_dispatch:
+
+jobs:
+  isolation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Add postgres binaries to PATH
+        run: |
+          PGBIN=$(ls -d /usr/lib/postgresql/*/bin | sort -V | tail -1)
+          echo "$PGBIN" >> "$GITHUB_PATH"
+          echo "using $PGBIN"
+      - name: Behavioral isolation (representative + real migration)
+        run: bash scripts/tenant-isolation/local/run_local.sh
+      - name: Structural sweep (all client_id tables from real schema)
+        run: bash scripts/tenant-isolation/local/run_sweep.sh
