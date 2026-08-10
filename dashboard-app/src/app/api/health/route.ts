@@ -16,13 +16,15 @@ interface HealthCheck {
 async function checkSupabaseConnection(): Promise<HealthCheck> {
   const start = Date.now()
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/wansoft_daily?select=fecha&order=fecha.desc&limit=1`, {
+    // OCM: canonical ops_daily (source-agnostic) instead of wansoft_daily — works for any tenant/data_source
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/ops_daily?select=fecha&order=fecha.desc&limit=1`, {
       headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
     })
     const ms = Date.now() - start
     if (!res.ok) return { name: 'supabase', status: 'error', detail: `HTTP ${res.status}`, ms }
     const data = await res.json()
-    if (!data || data.length === 0) return { name: 'supabase', status: 'error', detail: 'No data in wansoft_daily', ms }
+    // empty is healthy for a brand-new (clonable) tenant — connection works, no data yet
+    if (!data || data.length === 0) return { name: 'supabase', status: 'ok', detail: 'Connected — no data yet', ms }
     return { name: 'supabase', status: 'ok', detail: `Latest: ${data[0].fecha}`, ms }
   } catch (e) {
     return { name: 'supabase', status: 'error', detail: String(e), ms: Date.now() - start }
@@ -32,13 +34,13 @@ async function checkSupabaseConnection(): Promise<HealthCheck> {
 async function checkDataFreshness(): Promise<HealthCheck> {
   const start = Date.now()
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/wansoft_daily?select=fecha&order=fecha.desc&limit=1`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/ops_daily?select=fecha&order=fecha.desc&limit=1`, {
       headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
     })
     const ms = Date.now() - start
     if (!res.ok) return { name: 'data_freshness', status: 'error', detail: `HTTP ${res.status}`, ms }
     const data = await res.json()
-    if (!data || data.length === 0) return { name: 'data_freshness', status: 'error', detail: 'No data', ms }
+    if (!data || data.length === 0) return { name: 'data_freshness', status: 'ok', detail: 'No data yet (new tenant)', ms }
 
     const latestDate = new Date(data[0].fecha + 'T23:59:59Z')
     const now = new Date()
@@ -103,10 +105,8 @@ async function checkCosteoData(): Promise<HealthCheck> {
   }
 }
 
-const SKIPPED = (name: string): HealthCheck => ({ name, status: 'ok', detail: 'Skipped — data_source=fullsite', ms: 0 })
-
-export async function GET(request: NextRequest) {
-  // Fail-closed: sin service key el health NO cae a anon; reporta degraded explícito.
+export async function GET(_request: NextRequest) {
+  // Fail-closed (BUG-019): sin service key el health NO cae a anon; reporta degraded explícito.
   if (!SUPABASE_KEY) {
     return NextResponse.json({
       status: 'degraded',
@@ -115,13 +115,10 @@ export async function GET(request: NextRequest) {
       checks: [{ name: 'config', status: 'error', detail: 'SUPABASE_SERVICE_KEY no configurada', ms: 0 }],
     }, { status: 503 })
   }
-  const { searchParams } = new URL(request.url)
-  const dataSource = searchParams.get('data_source') ?? 'wansoft'
-  const wansoft = dataSource === 'wansoft'
-
+  // OCM: ops_daily is canonical & source-agnostic, so every tenant gets a real health check
   const checks = await Promise.all([
-    wansoft ? checkSupabaseConnection() : Promise.resolve(SKIPPED('supabase')),
-    wansoft ? checkDataFreshness() : Promise.resolve(SKIPPED('data_freshness')),
+    checkSupabaseConnection(),
+    checkDataFreshness(),
     checkAgentsRunning(),
     checkAuth(),
     checkCosteoData(),
