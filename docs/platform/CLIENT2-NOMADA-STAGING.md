@@ -50,12 +50,30 @@ Correr contra staging (MCP `supabase-fullsite-staging` o psql con service key de
 bloque de verificación `scripts/onboarding/verify_nomada_e2e.sql` → confirma provisioning +
 E2E + aislamiento en una sola consulta JSON.
 
-## Blocker de URL navegable (acción mínima)
+## URL navegable + $510 visible en UI (2026-08-10) — RESUELTO
 
-No hay frontend desplegado apuntando a staging: `staging.app.fullsite.mx` no responde y
-`sandbox.app.fullsite.mx` + el `next dev` local resuelven Supabase a **producción AMALAY**
-(`qjiomlvudfmzuvqvhwpk`) por un target hardcodeado/proxy server-side (`proxy.ts`), ignorando
-`NEXT_PUBLIC_SUPABASE_URL`. No se operó el producto contra prod.
-**Acción mínima para URL navegable:** desplegar un preview de `dashboard-app` (Vercel) con
+- **URL:** `http://localhost:3939` corriendo `dashboard-app` real vía
+  `scripts/onboarding/run_dashboard_staging.sh` (fuerza staging jkcnxf, `.next` limpio,
+  neutraliza service key de prod). Red verificada: **36 req a jkcnxf, 0 a qjiom**.
+- **Login:** `owner@nomada.staging` → dashboard "Café Nómada — DEMO / DATOS SINTÉTICOS":
+  **Ventas del día $510 · 2 órdenes · Carlos Méndez $290 · Diana Torres $220 · Propinas $55**.
+  Captura: `scratchpad/nomada-14-final.png`. **0 "amalay" en toda la UI.**
+- **RLS NO necesitó reparación:** jkcnxf ya tenía RLS correcta scoped por JWT/membresía
+  (`private.user_has_client_access(client_id)` + `client_users`). Verificado: nómada autenticado
+  lee sus 2 órdenes/$510, **cross-read=0**, cross-write bloqueado, anon denegado (403).
+  Evidencia: `scripts/onboarding/verify_tenant_rls_nomada.sql`.
+- **Causa raíz del $0 (app-layer, no RLS), corregida a nivel data/config reversible:**
+  (1) `getDataSource()` default `wansoft` → el dashboard leía `wansoft_daily`; fix
+  `localStorage.fullsite_data_source='fullsite'` (nómada es POS Fullsite). (2)
+  `getDashboardFromPosOrders` filtra `status='cerrada'`; el E2E usó `'cobrada'` → fix data.
+- **Gap de clonabilidad (follow-up, no bloquea):** AuthContext debería derivar
+  `fullsite_data_source` de `clients.data_source` al login (nómada = `supabase`), para no
+  depender de setear localStorage a mano. No se tocó código de producto en este sprint.
+
+### Blocker histórico (resuelto arriba)
+
+`staging.app.fullsite.mx` no responde y `sandbox.app.fullsite.mx` + `next dev` heredaban
+`SUPABASE_URL/DATABASE_URL`=prod del shell (`~/.zshrc`), que preceden a `.env.local`, + `.next`
+stale. El wrapper lo resuelve. **Acción para URL persistente:** preview de `dashboard-app` (Vercel) con
 env de staging efectivo en el proxy server-side (o parametrizar `proxy.ts` por entorno) —
 requiere acceso a `dashboard-app`/Vercel (restringido en esta sesión).
