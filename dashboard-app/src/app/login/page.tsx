@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { ArrowRight } from 'lucide-react'
+import { fetchWithTimeout, isFetchAbort } from '@/lib/fetch-with-timeout'
 
 type CapacitorStatusBar = {
   Capacitor?: { isNativePlatform?: () => boolean; Plugins?: { StatusBar?: { setStyle: (o: { style: string }) => void } } }
@@ -29,11 +30,11 @@ export default function LoginPage() {
     try {
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
       const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      const res = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
+      const res = await fetchWithTimeout(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
         method: 'POST',
         headers: { 'apikey': supabaseKey, 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
-      })
+      }, 10_000)
       const data = await res.json()
       if (!res.ok || data.error) {
         const rawMsg = data.error_description || data.msg || ''
@@ -69,8 +70,10 @@ export default function LoginPage() {
         setError('No se pudo crear la sesión.')
         setLoading(false)
       }
-    } catch {
-      setError('Error de conexión.')
+    } catch (err) {
+      setError(isFetchAbort(err)
+        ? 'La conexión tardó demasiado. Intenta de nuevo.'
+        : 'Error de conexión.')
       setLoading(false)
     }
   }
