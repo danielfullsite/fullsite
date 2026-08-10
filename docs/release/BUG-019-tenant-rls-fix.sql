@@ -70,6 +70,34 @@ begin
   end loop;
 end $$;
 
+-- ── 1b. pos_orders: excepción MÍNIMA de turno para borradores QR server-owned ──
+--    BUG-019-C2: la orden pública QR nace 'abierta' con turno_id=NULL, pero el
+--    CHECK prod pos_orders_turno_id_check exige turno NOT NULL. Se reemplaza por la
+--    excepción MÁS ESTRECHA posible: turno puede ser NULL SOLO en un borrador QR
+--    (status='abierta' AND id like 'qr-%'). Las órdenes normales (id uuid) siguen
+--    exigiendo turno; cualquier transición fuera de 'abierta' exige turno válido.
+--    Procedencia NO falsificable: las policies authenticated de pos_orders exigen
+--    turno_id NOT NULL en el with-check → un cliente autenticado NUNCA puede crear
+--    ni persistir una orden turno-null (aunque forje id 'qr-'). Solo service_role
+--    (el endpoint /api/public/qr-order, server) puede insertar el borrador turno-null.
+do $$
+begin
+  if exists (select 1 from information_schema.tables where table_schema='public' and table_name='pos_orders') then
+    alter table public.pos_orders drop constraint if exists pos_orders_turno_id_check;
+    alter table public.pos_orders add constraint pos_orders_turno_id_check
+      check (turno_id is not null or (status = 'abierta' and id like 'qr-%'));
+    -- Endurecer las policies authenticated (reemplazan las genéricas de la §1 para pos_orders):
+    -- INSERT/UPDATE exigen además turno_id NOT NULL. service_role conserva su bypass (§1 svc policy).
+    drop policy if exists pos_orders_ins on public.pos_orders;
+    drop policy if exists pos_orders_upd on public.pos_orders;
+    create policy pos_orders_ins on public.pos_orders for insert to authenticated
+      with check (private.user_has_client_access(client_id) and turno_id is not null);
+    create policy pos_orders_upd on public.pos_orders for update to authenticated
+      using (private.user_has_client_access(client_id))
+      with check (private.user_has_client_access(client_id) and turno_id is not null);
+  end if;
+end $$;
+
 -- ── 2. pos_audit_log INMUTABLE (override): sin update/delete ──────────────────
 drop policy if exists pos_audit_log_upd on public.pos_audit_log;
 drop policy if exists pos_audit_log_del on public.pos_audit_log;
