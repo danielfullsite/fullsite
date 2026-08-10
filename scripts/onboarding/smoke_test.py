@@ -41,6 +41,7 @@ stdout. Exit 0 = PASS, 1 = FAIL. Sin deps externas (stdlib puro).
 import argparse
 import json
 import os
+import ssl
 import sys
 import time
 import urllib.error
@@ -53,8 +54,27 @@ from contract import AMALAY_REF, Result, verify_ref  # noqa: E402
 
 FORBIDDEN_CLIENT_IDS = {"amalay", "prod", "production"}
 SMOKE_MARK = "smoke_test:TSK-014"
+SMOKE_MESA = 999
+SMOKE_ORDER_NUMBER = 999_999_999
 IVA_RATE = 0.16
 TIMEOUT = 15
+
+
+def _verified_ssl_context():
+    """Return a verifying TLS context that also works with python.org macOS builds.
+
+    Those builds may not have a populated OpenSSL trust store.  Use certifi when
+    it is installed, while retaining the operating-system defaults elsewhere.
+    Never fall back to CERT_NONE: a smoke test must not weaken transport safety.
+    """
+    try:
+        import certifi
+        return ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        return ssl.create_default_context()
+
+
+_SSL_CONTEXT = _verified_ssl_context()
 
 
 # ── HTTP helpers (stdlib) ─────────────────────────────────────────────────────
@@ -65,7 +85,7 @@ def _req(method, url, headers, body=None):
                                  headers={**headers,
                                           "Content-Type": "application/json"})
     try:
-        with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
+        with urllib.request.urlopen(req, timeout=TIMEOUT, context=_SSL_CONTEXT) as resp:
             raw = resp.read().decode() or "null"
             return resp.status, json.loads(raw)
     except urllib.error.HTTPError as e:
@@ -126,7 +146,7 @@ class Smoke:
         self.cid = client_id
         self.enc = urllib.parse.quote(client_id)
         self.turno_id = f"SMOKE-TURNO-{client_id}"
-        self.order_number = f"SMOKE-{client_id}"
+        self.order_number = SMOKE_ORDER_NUMBER
         self.order_id = None
         self.turno_created = False
 
@@ -234,7 +254,7 @@ class Smoke:
         iva = round(subtotal * IVA_RATE, 2)
         total = round(subtotal + iva, 2)
         s, body = _post(f"{self.rest}/pos_orders", {
-            "client_id": self.cid, "mesa": "SMOKE",
+            "client_id": self.cid, "mesa": SMOKE_MESA,
             "mesero": staff[0].get("name", SMOKE_MARK), "personas": 1,
             "status": "enviada", "items": items,
             "subtotal": subtotal, "iva": iva, "total": total,
@@ -249,7 +269,7 @@ class Smoke:
 
         # F6c: aislamiento — la orden solo es visible bajo el filtro del tenant
         mine = self.rows("pos_orders",
-                         f"client_id=eq.{self.enc}&order_number=eq.{urllib.parse.quote(self.order_number)}",
+                         f"client_id=eq.{self.enc}&order_number=eq.{urllib.parse.quote(str(self.order_number))}",
                          "id,client_id,total")
         visible = bool(mine) and all(r["client_id"] == self.cid for r in mine)
         self.check("F6c: orden visible solo en el tenant correcto", visible,

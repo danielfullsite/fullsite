@@ -332,6 +332,11 @@ def _upsert(rest, table, row, pk, svc_h, state, kind, dry_run):
         print(f"  = [ALREADY_EXISTS ] {table}: {pk_val}")
         return "ALREADY_EXISTS"
 
+    if s != 200 or not isinstance(ex, list):
+        print(f"  ✗ [FAILED        ] {table}: no se pudo verificar {pk}={pk_val} antes de escribir",
+              file=sys.stderr)
+        return "FAILED"
+
     if dry_run:
         print(f"  · [DRY-RUN       ] {table}: {pk_val}")
         return "SKIPPED"
@@ -342,6 +347,14 @@ def _upsert(rest, table, row, pk, svc_h, state, kind, dry_run):
         state.record_created(kind, pk_val)
         print(f"  ✚ [CREATED       ] {table}: {pk_val}")
         return "CREATED"
+
+    # Reconcile a concurrent/stale-read duplicate as idempotent success. Never
+    # mutate the existing row: verify the canonical PK now exists and stop.
+    if s2 == 409 or (isinstance(r2, dict) and r2.get("code") == "23505"):
+        s3, ex3 = _get(f"{rest}/{table}?{pk}=eq.{enc}&select={pk}&limit=1", svc_h)
+        if s3 == 200 and isinstance(ex3, list) and ex3:
+            print(f"  = [ALREADY_EXISTS ] {table}: {pk_val} (reconciliado)")
+            return "ALREADY_EXISTS"
 
     print(f"  ✗ [FAILED        ] {table}: {pk_val} — {redact(str(r2)[:100])}", file=sys.stderr)
     return "FAILED"
@@ -356,6 +369,11 @@ def _upsert_compound(rest, table, row, pk_fields, svc_h, state, kind, dry_run):
         print(f"  = [ALREADY_EXISTS ] {table}: {label}")
         return "ALREADY_EXISTS"
 
+    if s != 200 or not isinstance(ex, list):
+        print(f"  ✗ [FAILED        ] {table}: no se pudo verificar {label} antes de escribir",
+              file=sys.stderr)
+        return "FAILED"
+
     if dry_run:
         print(f"  · [DRY-RUN       ] {table}: {label}")
         return "SKIPPED"
@@ -366,6 +384,12 @@ def _upsert_compound(rest, table, row, pk_fields, svc_h, state, kind, dry_run):
         state.record_created(kind, label)
         print(f"  ✚ [CREATED       ] {table}: {label}")
         return "CREATED"
+
+    if s2 == 409 or (isinstance(r2, dict) and r2.get("code") == "23505"):
+        s3, ex3 = _get(f"{rest}/{table}?{filters}&limit=1", svc_h)
+        if s3 == 200 and isinstance(ex3, list) and ex3:
+            print(f"  = [ALREADY_EXISTS ] {table}: {label} (reconciliado)")
+            return "ALREADY_EXISTS"
 
     print(f"  ✗ [FAILED        ] {table}: {label} — {redact(str(r2)[:100])}", file=sys.stderr)
     return "FAILED"
@@ -660,22 +684,42 @@ def step_auth_user_create(ctx, dry_run):
         return _contract("auth_user_create", t0, created=1)
 
     if s == 422 and "already" in str(r).lower():
-        # Fetch existing user_id
-        s2, r2 = _req("GET", f"{auth}/admin/users", None, h)
-        uid = None
-        if s2 == 200 and isinstance(r2, dict):
-            for u in r2.get("users", []):
-                if u.get("email") == m["owner_email"]:
-                    uid = u["id"]
-                    break
+        # GoTrue paginates /admin/users. Searching only page 1 makes a rerun
+        # silently lose auth_user_id once the project has enough users, which
+        # in turn skips the tenant membership step. Resolve across pages and
+        # fail closed when the existing owner cannot be identified.
+        uid = _find_auth_user_id_by_email(auth, h, m["owner_email"])
         if uid:
             ctx["state"].set_ctx("auth_user_id", uid)
-        print(f"  = [ALREADY_EXISTS ] auth user: {m['owner_email']}")
-        return _contract("auth_user_create", t0, updated=1)
+            print(f"  = [ALREADY_EXISTS ] auth user: {m['owner_email']}")
+            return _contract("auth_user_create", t0, updated=1)
+        return _contract("auth_user_create", t0, errors=[
+            "auth user already exists but its canonical user_id could not be resolved"
+        ])
 
     return _contract("auth_user_create", t0, errors=[
         f"auth/admin/users → HTTP {s}: {redact(str(r)[:120])}"
     ])
+
+
+def _find_auth_user_id_by_email(auth, headers, email, per_page=200, max_pages=100):
+    """Resolve an existing GoTrue user deterministically across pagination."""
+    wanted = email.strip().casefold()
+    for page in range(1, max_pages + 1):
+        query = urllib.parse.urlencode({"page": page, "per_page": per_page})
+        status, body = _req("GET", f"{auth}/admin/users?{query}", None, headers)
+        if status != 200 or not isinstance(body, dict):
+            return None
+        users = body.get("users")
+        if not isinstance(users, list):
+            return None
+        for user in users:
+            if str(user.get("email", "")).strip().casefold() == wanted:
+                uid = user.get("id")
+                return uid if isinstance(uid, str) and uid else None
+        if len(users) < per_page:
+            return None
+    return None
 
 
 def step_client_users_create(ctx, dry_run):
