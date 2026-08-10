@@ -68,9 +68,16 @@ AMALAY_REF   = "qjiomlvudfmzuvqvhwpk"
 FORBIDDEN    = {"amalay"}
 JWT_PAT      = re.compile(r'eyJ[A-Za-z0-9_\-\.]{50,}')
 
-_SSL = ssl.create_default_context()
-_SSL.check_hostname = False
-_SSL.verify_mode    = ssl.CERT_NONE
+def _verified_ssl_context():
+    """Use a real CA bundle without ever disabling certificate verification."""
+    try:
+        import certifi
+        return ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        return ssl.create_default_context()
+
+
+_SSL = _verified_ssl_context()
 
 REQUIRED_MANIFEST_FIELDS = ["client_id", "name", "owner_email", "confirm_ref", "template"]
 

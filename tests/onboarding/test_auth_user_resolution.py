@@ -1,4 +1,5 @@
 import importlib.util
+import ssl
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -12,6 +13,10 @@ SPEC.loader.exec_module(ONBOARD)
 
 
 class ExistingAuthUserResolutionTest(unittest.TestCase):
+    def test_onboarding_tls_is_verified(self):
+        self.assertEqual(ONBOARD._SSL.verify_mode, ssl.CERT_REQUIRED)
+        self.assertTrue(ONBOARD._SSL.check_hostname)
+
     def test_finds_existing_owner_beyond_first_page(self):
         pages = [
             (200, {"users": [{"id": "u-1", "email": "other@example.test"}]}),
