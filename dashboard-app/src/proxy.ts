@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { canAccessPage, resolveRole } from '@/lib/roles'
+import { fetchWithTimeout } from '@/lib/fetch-with-timeout'
 
 // Páginas sin sesión — debe coincidir con publicPages de AppShell.tsx
 const PUBLIC_PAGES = ['/login', '/seguridad', '/privacidad', '/terminos', '/reservar', '/factura', '/demo-live']
@@ -101,9 +102,9 @@ export async function proxy(req: NextRequest) {
   // Validar el token contra Supabase Auth (server-side, no falsificable)
   let user: { email?: string; app_metadata?: { role?: string } } | null = null
   try {
-    const res = await fetch(`${supabaseUrl}/auth/v1/user`, {
+    const res = await fetchWithTimeout(`${supabaseUrl}/auth/v1/user`, {
       headers: { apikey: anonKey, Authorization: `Bearer ${token}` },
-    })
+    }, 5_000)
     if (!res.ok) {
       const redirect = NextResponse.redirect(loginUrl)
       redirect.cookies.delete('fs-at')

@@ -1,6 +1,7 @@
 import type { WansoftDaily } from './types'
 import { supabase } from './supabase'
 import { nowMX, fmtDateMX } from './date-mx'
+import { fetchWithTimeout } from './fetch-with-timeout'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -87,12 +88,12 @@ async function sbFetch(table: string, params: string = ''): Promise<unknown[]> {
   const url = `${SUPABASE_URL}/rest/v1/${table}?${params}`
   try {
     const token = await getAuthToken()
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(url, {
       headers: {
         'apikey': SUPABASE_KEY,
         'Authorization': `Bearer ${token}`,
       },
-    })
+    }, 10_000)
     if (!res.ok) {
       console.error(`[Fullsite] Supabase error ${res.status} on ${table}:`, await res.text().catch(() => ''))
       return []
