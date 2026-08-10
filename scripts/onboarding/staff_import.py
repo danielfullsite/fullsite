@@ -32,6 +32,7 @@ import csv
 import json
 import os
 import random
+import ssl
 import sys
 import urllib.error
 import urllib.parse
@@ -40,7 +41,19 @@ from pathlib import Path
 
 # Add scripts/ to path so `contract` is importable from scripts/onboarding/contract.py
 sys.path.insert(0, str(Path(__file__).parent))
-from contract import Result, verify_ref
+from contract import Result, resolve_db_headers, verify_ref
+
+
+def _verified_ssl_context():
+    """Use a trusted CA bundle and never disable certificate verification."""
+    try:
+        import certifi
+        return ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        return ssl.create_default_context()
+
+
+_SSL_CTX = _verified_ssl_context()
 
 VALID_ROLES = {"waiter", "manager", "cashier", "kitchen", "admin"}
 AUTO_PIN_MIN = 1000
@@ -53,36 +66,35 @@ def redact(token: str) -> str:
     return token[:8] + "***REDACTED***" if len(token) > 8 else "***REDACTED***"
 
 
-def sb_headers(key: str) -> dict:
+def sb_headers(auth_headers: dict[str, str]) -> dict:
     return {
-        "apikey": key,
-        "Authorization": f"Bearer {key}",
+        **auth_headers,
         "Content-Type": "application/json",
         "Prefer": "return=representation",
     }
 
 
-def sb_get(url: str, path: str, key: str, params: dict | None = None) -> list:
+def sb_get(url: str, path: str, auth_headers: dict[str, str], params: dict | None = None) -> list:
     qs = ("?" + urllib.parse.urlencode(params)) if params else ""
-    req = urllib.request.Request(url + path + qs, headers=sb_headers(key))
-    with urllib.request.urlopen(req) as r:
+    req = urllib.request.Request(url + path + qs, headers=sb_headers(auth_headers))
+    with urllib.request.urlopen(req, context=_SSL_CTX) as r:
         return json.loads(r.read())
 
 
-def sb_post(url: str, path: str, key: str, body: dict | list) -> list:
+def sb_post(url: str, path: str, auth_headers: dict[str, str], body: dict | list) -> list:
     data = json.dumps(body).encode()
     req = urllib.request.Request(url + path, data=data,
-                                  headers=sb_headers(key), method="POST")
-    with urllib.request.urlopen(req) as r:
+                                  headers=sb_headers(auth_headers), method="POST")
+    with urllib.request.urlopen(req, context=_SSL_CTX) as r:
         return json.loads(r.read())
 
 
-def sb_patch(url: str, path: str, key: str, body: dict, params: dict) -> list:
+def sb_patch(url: str, path: str, auth_headers: dict[str, str], body: dict, params: dict) -> list:
     qs = "?" + urllib.parse.urlencode(params)
     data = json.dumps(body).encode()
     req = urllib.request.Request(url + path + qs, data=data,
-                                  headers=sb_headers(key), method="PATCH")
-    with urllib.request.urlopen(req) as r:
+                                  headers=sb_headers(auth_headers), method="PATCH")
+    with urllib.request.urlopen(req, context=_SSL_CTX) as r:
         return json.loads(r.read())
 
 
@@ -134,6 +146,15 @@ def generate_pin(used_pins: set[str]) -> str:
     raise RuntimeError("No hay PINs disponibles en el rango 1000-8999.")
 
 
+def choose_pin(requested_pin: str | None, existing: dict | None, used_pins: set[str]) -> str:
+    """Keep a prior PIN on rerun; only generate for a genuinely new record."""
+    if requested_pin:
+        return requested_pin
+    if existing and existing.get("pin"):
+        return str(existing["pin"])
+    return generate_pin(used_pins)
+
+
 # ── CSV parsing ───────────────────────────────────────────────────────────────
 
 def parse_csv(csv_path: str, result: Result) -> list[dict]:
@@ -181,14 +202,19 @@ def main() -> None:
     args = parser.parse_args()
 
     url = os.environ.get("SUPABASE_URL", "")
-    key = os.environ.get("SUPABASE_SERVICE_KEY", "")
-    if not url or not key:
-        print("  ✗ SUPABASE_URL y SUPABASE_SERVICE_KEY son requeridos.", file=sys.stderr)
+    try:
+        auth_headers, auth_mode = resolve_db_headers()
+    except RuntimeError as exc:
+        print(f"  ✗ {exc}", file=sys.stderr)
+        sys.exit(1)
+    if not url:
+        print("  ✗ SUPABASE_URL es requerido.", file=sys.stderr)
         sys.exit(1)
 
     verify_ref(url, args.confirm_ref)
 
     result = Result("staff_import")
+    print(f"  Auth DB: {auth_mode}")
 
     csv_stem = Path(args.csv).stem
     state = State(args.client_id, csv_stem)
@@ -201,9 +227,9 @@ def main() -> None:
 
     # ── Validate client ────────────────────────────────────────────────────
     print(f"  Verificando cliente '{args.client_id}'…")
-    clients = sb_get(url, "/rest/v1/clients", key, {
-        "select": "id,slug,name",
-        "slug": f"eq.{args.client_id}",
+    clients = sb_get(url, "/rest/v1/clients", auth_headers, {
+        "select": "id,display_name",
+        "id": f"eq.{args.client_id}",
         "limit": "1",
     })
     if not clients:
@@ -212,7 +238,7 @@ def main() -> None:
         return
     client = clients[0]
     client_id = client["id"]
-    print(f"  Cliente: {client['name']} (id={client_id})")
+    print(f"  Cliente: {client['display_name']} (id={client_id})")
 
     state.mark("__started__")
 
@@ -239,8 +265,8 @@ def main() -> None:
 
     # ── Fetch existing staff & PINs ────────────────────────────────────────
     print("  Cargando personal existente…")
-    existing_rows = sb_get(url, "/rest/v1/pos_staff", key, {
-        "select": "id,name,role,pin,active",
+    existing_rows = sb_get(url, "/rest/v1/pos_staff", auth_headers, {
+        "select": "id,name,role,pin,role_display,active",
         "client_id": f"eq.{client_id}",
     })
     existing_by_name = {r["name"].strip().lower(): r for r in existing_rows}
@@ -283,27 +309,34 @@ def main() -> None:
             print(f"    [skip] {r['name']} (ya procesado)")
             continue
 
-        # Auto-assign PIN if not provided
-        pin = r["pin"]
-        if not pin:
-            pin = generate_pin(used_pins)
-            used_pins.add(pin)
-
         key_lower = r["name"].strip().lower()
+        existing = existing_by_name.get(key_lower)
+        pin = choose_pin(r["pin"], existing, used_pins)
+        used_pins.add(pin)
         if key_lower in existing_by_name:
             # Update existing record
-            existing = existing_by_name[key_lower]
-            sb_patch(url, "/rest/v1/pos_staff", key, {
+            desired = {
                 "role": r["role"],
                 "pin": pin,
                 "role_display": r["role_display"],
                 "active": r["active"],
-            }, {"id": f"eq.{existing['id']}", "client_id": f"eq.{client_id}"})
-            result.add_updated()
-            action = "actualizado"
+            }
+            unchanged = all(existing.get(field) == value for field, value in desired.items())
+            if unchanged:
+                action = "sin cambios"
+            else:
+                sb_patch(
+                    url,
+                    "/rest/v1/pos_staff",
+                    auth_headers,
+                    desired,
+                    {"id": f"eq.{existing['id']}", "client_id": f"eq.{client_id}"},
+                )
+                result.add_updated()
+                action = "actualizado"
         else:
             # Insert new record
-            sb_post(url, "/rest/v1/pos_staff", key, {
+            sb_post(url, "/rest/v1/pos_staff", auth_headers, {
                 "client_id": client_id,
                 "name": r["name"],
                 "role": r["role"],

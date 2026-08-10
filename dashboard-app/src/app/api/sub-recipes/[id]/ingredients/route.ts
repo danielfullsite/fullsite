@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { getClientId } from '@/lib/api-auth'
+import { withPOSAuth, unauthorized } from '@/lib/api-auth'
 
 const SB_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -126,7 +126,9 @@ async function buildPath(fromId: string, toId: string, _clientId: string): Promi
 
 export async function GET(request: NextRequest, ctx: RouteCtx) {
   const { id } = await ctx.params
-  const clientId = getClientId(request)
+  const auth = await withPOSAuth(request)
+  if (!auth) return unauthorized()
+  const clientId = auth.clientId
 
   if (!(await subRecipeExists(id, clientId))) {
     return err(404, 'NOT_FOUND', 'Sub-receta no encontrada')
@@ -144,7 +146,9 @@ export async function GET(request: NextRequest, ctx: RouteCtx) {
 
 export async function POST(request: NextRequest, ctx: RouteCtx) {
   const { id: subRecipeId } = await ctx.params
-  const clientId = getClientId(request)
+  const auth = await withPOSAuth(request)
+  if (!auth) return unauthorized()
+  const clientId = auth.clientId
 
   // 1. Validate sub-recipe exists and belongs to client
   if (!(await subRecipeExists(subRecipeId, clientId))) {

@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { getClientId } from '@/lib/api-auth'
+import { withPOSAuth, unauthorized } from '@/lib/api-auth'
 
 const SB_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -15,7 +15,9 @@ type RouteCtx = { params: Promise<{ id: string; lineId: string }> }
 
 export async function DELETE(request: NextRequest, ctx: RouteCtx) {
   const { id: subRecipeId, lineId } = await ctx.params
-  const clientId = getClientId(request)
+  const auth = await withPOSAuth(request)
+  if (!auth) return unauthorized()
+  const clientId = auth.clientId
 
   // Verify sub-recipe exists and belongs to client
   const srRes = await fetch(

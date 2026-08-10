@@ -25,6 +25,40 @@ export interface StationRouting {
   [station: string]: string[]
 }
 
+// Gate R2-G04 / CLON-TERMINALS — espejo de scripts/manifests/manifest.schema.json §terminals.
+// generate_terminal_config.mjs emite un TerminalConfig (electron-app/local-server/config-schema.js)
+// por cada entrada — provisioning config-only, sin editar código.
+export interface TerminalSpec {
+  terminal_id: string
+  name: string
+  role: 'server_pos' | 'pos' | 'kds' | 'admin'
+  pos_server_ip?: string
+  local_server_port?: number
+  channel?: 'stable' | 'pilot' | 'development'
+  kds?: boolean
+  printer_ids?: string[]
+}
+
+// Espejo de manifest.schema.json §printers — subset del schema v2 de
+// electron-app/local-server/adapters/printer-config-schema.js.
+export interface PrinterSpec {
+  printer_id: string
+  name: string
+  enabled?: boolean
+  connection: {
+    type: 'tcp' | 'usb' | 'windows'
+    host?: string
+    port?: number
+    names?: string[]
+  }
+  station_ids: string[]
+  document_types?: Array<
+    'kitchen_ticket' | 'bar_ticket' | 'receipt' | 'pre_ticket' | 'invoice' | 'corte' | 'reprint'
+  >
+  copies?: number
+  encoding?: 'cp850' | 'cp858' | 'utf-8'
+}
+
 export interface RestaurantManifest {
   // Identity
   client_id: string
@@ -79,4 +113,8 @@ export interface RestaurantManifest {
     owner_context?: string
     staff_names?: string
   }
+
+  // Terminal provisioning (R2-G04 / CLON-TERMINALS)
+  terminals?: TerminalSpec[]
+  printers?: PrinterSpec[]
 }

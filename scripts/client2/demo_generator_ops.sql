@@ -1,0 +1,9 @@
+-- Café Nómada demo generator — operational commands (staging jkcnxfbbuyyfhwfjizgw).
+-- Function bodies: migration demo_generator_canonical_v2 (demo_generate_tick, demo_close_turno).
+-- Schedule 24/7 (pg_cron, every 5 min):
+--   select cron.schedule('nomada-generator','*/5 * * * *', $$select public.demo_generate_tick('nomada')$$);
+-- Run one tick manually:      select public.demo_generate_tick('nomada');
+-- Heartbeat / status:         select * from demo_generator_state where client_id='nomada';
+-- KILL SWITCH (stop cold):    update demo_generator_state set kill_switch=true where client_id='nomada';
+-- Resume:                     update demo_generator_state set kill_switch=false, status='idle' where client_id='nomada';
+-- Stop scheduler entirely:    select cron.unschedule('nomada-generator');

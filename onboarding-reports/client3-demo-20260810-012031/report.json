@@ -1,0 +1,183 @@
+{
+  "client_id": "client3-demo",
+  "manifest": {
+    "client_id": "client3-demo",
+    "name": "Bistro Horizonte — DEMO",
+    "confirm_ref": "jkcnxfbbuyyfhwfjizgw",
+    "template": "cafe",
+    "city": "Monterrey",
+    "timezone": "America/Monterrey",
+    "business_day_start_local": "05:00:00"
+  },
+  "started_at": "2026-08-10T07:20:31Z",
+  "finished_at": "2026-08-10T07:20:43Z",
+  "total_duration_s": 11.6,
+  "pipeline_status": "PASS",
+  "failed_step": null,
+  "steps": [
+    {
+      "step": "env_validation",
+      "status": "PASS",
+      "duration_ms": 0,
+      "created": 0,
+      "updated": 0,
+      "warnings": [],
+      "errors": [],
+      "skipped": false
+    },
+    {
+      "step": "schema_check",
+      "status": "PASS",
+      "duration_ms": 127,
+      "created": 0,
+      "updated": 0,
+      "warnings": [],
+      "errors": [],
+      "skipped": false
+    },
+    {
+      "step": "client_create",
+      "status": "PASS",
+      "duration_ms": 282,
+      "created": 1,
+      "updated": 0,
+      "warnings": [],
+      "errors": [],
+      "skipped": false
+    },
+    {
+      "step": "menu_seed",
+      "status": "PASS",
+      "duration_ms": 3118,
+      "created": 11,
+      "updated": 0,
+      "warnings": [],
+      "errors": [],
+      "skipped": false
+    },
+    {
+      "step": "modifiers_seed",
+      "status": "PASS",
+      "duration_ms": 4044,
+      "created": 15,
+      "updated": 0,
+      "warnings": [],
+      "errors": [],
+      "skipped": false
+    },
+    {
+      "step": "payment_methods_seed",
+      "status": "PASS",
+      "duration_ms": 1470,
+      "created": 4,
+      "updated": 0,
+      "warnings": [],
+      "errors": [],
+      "skipped": false
+    },
+    {
+      "step": "staff_seed",
+      "status": "PASS",
+      "duration_ms": 797,
+      "created": 3,
+      "updated": 0,
+      "warnings": [],
+      "errors": [],
+      "skipped": false
+    },
+    {
+      "step": "auth_user_create",
+      "status": "PASS",
+      "duration_ms": 348,
+      "created": 1,
+      "updated": 0,
+      "warnings": [],
+      "errors": [],
+      "skipped": false
+    },
+    {
+      "step": "client_users_create",
+      "status": "PASS",
+      "duration_ms": 274,
+      "created": 1,
+      "updated": 0,
+      "warnings": [],
+      "errors": [],
+      "skipped": false
+    },
+    {
+      "step": "menu_import",
+      "status": "SKIP",
+      "duration_ms": 0,
+      "created": 0,
+      "updated": 0,
+      "warnings": [],
+      "errors": [],
+      "skipped": true,
+      "_reason": "omitido — manifest.menu_csv no definido"
+    },
+    {
+      "step": "diff_report",
+      "status": "SKIP",
+      "duration_ms": 0,
+      "created": 0,
+      "updated": 0,
+      "warnings": [],
+      "errors": [],
+      "skipped": true,
+      "_reason": "omitido — manifest.menu_csv no definido"
+    },
+    {
+      "step": "staff_import",
+      "status": "SKIP",
+      "duration_ms": 0,
+      "created": 0,
+      "updated": 0,
+      "warnings": [],
+      "errors": [],
+      "skipped": true,
+      "_reason": "omitido — manifest.staff_csv no definido"
+    },
+    {
+      "step": "vercel_provision",
+      "status": "SKIP",
+      "duration_ms": 0,
+      "created": 0,
+      "updated": 0,
+      "warnings": [],
+      "errors": [],
+      "skipped": true,
+      "_reason": "omitido — manifest.vercel_project no definido"
+    },
+    {
+      "step": "dns_provision",
+      "status": "SKIP",
+      "duration_ms": 0,
+      "created": 0,
+      "updated": 0,
+      "warnings": [],
+      "errors": [],
+      "skipped": true,
+      "_reason": "omitido — manifest.subdomain no definido"
+    },
+    {
+      "step": "smoke_check",
+      "status": "PASS",
+      "duration_ms": 1152,
+      "created": 0,
+      "updated": 0,
+      "warnings": [],
+      "errors": [],
+      "skipped": false
+    }
+  ],
+  "totals": {
+    "created": 36,
+    "updated": 0,
+    "warnings": 0,
+    "errors": 0,
+    "steps_run": 10,
+    "steps_skipped": 5
+  },
+  "report_generated_at": "2026-08-10T07:20:43Z"
+}

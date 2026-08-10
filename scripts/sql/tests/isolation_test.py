@@ -9,6 +9,7 @@ Usage
 -----
   # Minimum: two separate tenant user credentials
   export SUPABASE_URL="https://qjiomlvudfmzuvqvhwpk.supabase.co"
+  export SUPABASE_ANON_KEY="..."             # public anon key
   export SUPABASE_SERVICE_KEY="..."          # service_role key
   export TENANT_A_EMAIL="user@amalay.com"
   export TENANT_A_PASSWORD="..."
@@ -42,6 +43,7 @@ from typing import Optional
 
 SUPABASE_URL       = os.environ.get("SUPABASE_URL", "").rstrip("/")
 SERVICE_KEY        = os.environ.get("SUPABASE_SERVICE_KEY", "")
+ANON_KEY           = os.environ.get("SUPABASE_ANON_KEY", "")
 TENANT_A_EMAIL     = os.environ.get("TENANT_A_EMAIL", "")
 TENANT_A_PASSWORD  = os.environ.get("TENANT_A_PASSWORD", "")
 TENANT_A_CLIENT_ID = os.environ.get("TENANT_A_CLIENT_ID", "amalay")
@@ -49,6 +51,7 @@ TENANT_B_EMAIL     = os.environ.get("TENANT_B_EMAIL", "")
 TENANT_B_PASSWORD  = os.environ.get("TENANT_B_PASSWORD", "")
 TENANT_B_CLIENT_ID = os.environ.get("TENANT_B_CLIENT_ID", "nomada")
 EPHEMERAL          = os.environ.get("EPHEMERAL", "0") == "1"
+AMALAY_REF         = "qjiomlvudfmzuvqvhwpk"
 
 REST   = f"{SUPABASE_URL}/rest/v1"
 AUTH   = f"{SUPABASE_URL}/auth/v1"
@@ -103,7 +106,7 @@ def sro_delete(table: str, params: dict):
 def sign_in(email: str, password: str) -> Optional[str]:
     r = requests.post(
         f"{AUTH}/token?grant_type=password",
-        headers={"apikey": SERVICE_KEY, "Content-Type": "application/json"},
+        headers={"apikey": ANON_KEY, "Content-Type": "application/json"},
         json={"email": email, "password": password},
     )
     if r.status_code != 200:
@@ -113,7 +116,7 @@ def sign_in(email: str, password: str) -> Optional[str]:
 
 def authed_get(token: str, table: str, params: dict = None) -> tuple[int, list]:
     headers = {
-        "apikey":        SERVICE_KEY,   # anon key would be more realistic; service key as apikey is fine for REST
+        "apikey":        ANON_KEY,
         "Authorization": f"Bearer {token}",
     }
     r = requests.get(f"{REST}/{table}", headers=headers, params=params or {})
@@ -121,8 +124,7 @@ def authed_get(token: str, table: str, params: dict = None) -> tuple[int, list]:
 
 
 def anon_get(table: str, params: dict = None) -> tuple[int, list]:
-    # anon: no Authorization header, just apikey
-    headers = {"apikey": SERVICE_KEY}  # in Supabase, apikey alone = anon role
+    headers = {"apikey": ANON_KEY, "Authorization": f"Bearer {ANON_KEY}"}
     r = requests.get(f"{REST}/{table}", headers=headers, params=params or {})
     return r.status_code, (r.json() if r.status_code < 500 else [])
 
@@ -190,8 +192,14 @@ def setup() -> tuple[str, str, list[str]]:
     """
     ephemeral_ids = []
 
-    if not SUPABASE_URL or not SERVICE_KEY:
-        print("ERROR: SUPABASE_URL and SUPABASE_SERVICE_KEY are required.")
+    if os.environ.get("SANDBOX_ENV") != "true":
+        print("ERROR: SANDBOX_ENV=true is required; this suite writes synthetic sentinels.")
+        sys.exit(2)
+    if not SUPABASE_URL or not SERVICE_KEY or not ANON_KEY:
+        print("ERROR: SUPABASE_URL, SUPABASE_ANON_KEY and SUPABASE_SERVICE_KEY are required.")
+        sys.exit(2)
+    if AMALAY_REF in SUPABASE_URL:
+        print("ERROR: production AMALAY project is forbidden for this suite.")
         sys.exit(2)
 
     if EPHEMERAL:

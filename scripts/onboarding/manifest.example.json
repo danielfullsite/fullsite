@@ -9,6 +9,7 @@
 
   "city":         "Monterrey",
   "timezone":     "America/Monterrey",
+  "business_day_start_local": "05:00:00",
 
   "menu_csv":     "menus/dunkin-menu.csv",
   "staff_csv":    "staff/dunkin-staff.csv",

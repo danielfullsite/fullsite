@@ -1,0 +1,11 @@
+{
+  "_comment": "Evidencia reproducible de Client #3 sintético; la contraseña se inyecta por OWNER_PASSWORD.",
+  "client_id": "client3-demo",
+  "name": "Bistro Horizonte — DEMO",
+  "owner_email": "owner@client3.demo",
+  "confirm_ref": "jkcnxfbbuyyfhwfjizgw",
+  "template": "cafe",
+  "city": "Monterrey",
+  "timezone": "America/Monterrey",
+  "business_day_start_local": "05:00:00"
+}

@@ -3,11 +3,12 @@
 // Generates daily accounting entries (pólizas) for Mexican restaurant
 
 import { NextRequest } from 'next/server'
-import { requireAuth, getClientId } from '@/lib/api-auth'
+import { requireAuth, withPOSAuth, unauthorized } from '@/lib/api-auth'
 import { resolveBusinessDayConfig, getBusinessDayBounds, getCurrentBusinessDate, type ResolvedBusinessDayConfig } from '@/lib/business-date'
+import { ownsLegacyWansoft } from '@/lib/wansoft-owner'
 
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const SB_KEY = process.env.SUPABASE_SERVICE_KEY || ''
 const HEADERS = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }
 const OPTS = { headers: HEADERS, cache: 'no-store' as const }
 
@@ -122,7 +123,12 @@ async function fetchWansoftDaily(fecha: string) {
 export async function GET(request: NextRequest) {
   const authErr = await requireAuth(request)
   if (authErr) return authErr
-  const clientId = getClientId(request)
+  const auth = await withPOSAuth(request)
+  if (!auth) return unauthorized()
+  const clientId = auth.clientId
+  if (!SB_URL || !SB_KEY) {
+    return Response.json({ error: 'service_unavailable' }, { status: 503 })
+  }
   try {
     const { searchParams } = new URL(request.url)
     const formato = searchParams.get('formato') || 'json' // json | xml | csv
@@ -167,7 +173,7 @@ export async function GET(request: NextRequest) {
         `${SB_URL}/rest/v1/pos_market_movements?client_id=eq.${cid}&${rangeFilter}&select=id,created_at,type,product_name,quantity,cost_per_unit,total_cost,reason&order=created_at.asc&limit=500`,
         OPTS
       ),
-      fetchWansoftDaily(fecha),
+      ownsLegacyWansoft(clientId) ? fetchWansoftDaily(fecha) : Promise.resolve(null),
     ])
 
     const orders: PosOrder[] = ordersRes.ok ? await ordersRes.json() : []

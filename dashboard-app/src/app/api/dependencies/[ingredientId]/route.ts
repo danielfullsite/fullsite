@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { getClientId } from '@/lib/api-auth'
+import { withPOSAuth, unauthorized } from '@/lib/api-auth'
 
 const SB_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -47,7 +47,9 @@ interface DependencyMap {
 
 export async function GET(request: NextRequest, ctx: RouteCtx) {
   const { ingredientId } = await ctx.params
-  const clientId = getClientId(request)
+  const auth = await withPOSAuth(request)
+  if (!auth) return unauthorized()
+  const clientId = auth.clientId
 
   // 1. Verify ingredient exists
   const ingRows = await sbGet('pos_ingredients',

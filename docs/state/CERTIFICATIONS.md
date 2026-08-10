@@ -44,6 +44,41 @@ Shadow Day es un gate explícito antes de Go-Live para todo cliente nuevo (Clien
 
 ---
 
+## R2 — Cloneability / Client #3 synthetic
+
+**Estado:** CODE + HOSTED TEST PASS — 2026-08-10. No FIELD CERTIFIED.
+**Entorno:** staging `jkcnxfbbuyyfhwfjizgw`; producción/AMALAY sin cambios.
+**Resultado:** alta inicial 36 registros/11.6 s; rerun idempotente 0 nuevos/0 warnings; CLON-SMOKE
+15/15; aislamiento Nómada↔Client #3 19/19 con JWT real y anon real; login/PIN público muestra
+“Bistro Horizonte — DEMO” y no genera requests a `qjiom…`; import menú/staff mediante JWT/RLS
+PASS (10 items, 1 staff, diff 0, rerun 0/0); hardcode gate 742 archivos/53 excepciones/0 violaciones.
+**Evidencia primaria:** `docs/platform/CLONEABILITY-REPORT-v1.md`, manifests y reportes enlazados ahí.
+**Código:** `17290dd`, `e3cbf7f`, `3bca37e`, `238d7ad`, `be02c9b`, `78dfb39`.
+**Pendiente para CERTIFIED:** instalación física, impresión, entrenamiento y Shadow Day sin Daniel.
+No cambia por sí mismo los gates congelados de `FULLSITE-READINESS-CONTRACT.md`.
+
+---
+
+## BUG-019 — Tenant Isolation (LOCAL + HOSTED STAGING)
+
+**Estado:** LOCAL PASS + HOSTED STAGING PASS — 2026-08-09/10. Decisión de producción PENDIENTE.
+**Scope:** aislamiento multi-tenant + excepción de turno más estrecha para borradores QR
+server-owned (BUG-019-C).
+**LOCAL:** stack oficial de Supabase (Postgres + GoTrue JWT + PostgREST reales, 2 tenants), migración
+sin modificar → 16/16; barrido 74/74 tablas `client_id`; 6/6 procedencia de turno; app 86/86.
+Evidencia `docs/release/BUG-019-FULLSTACK-LOCAL-CERT.md`. Commits `d155a35`, `c7ebb7d`, `13193cc`.
+**HOSTED STAGING:** proyecto `jkcnxfbbuyyfhwfjizgw` (≠ prod `qjiomlvudfmzuvqvhwpk`), 2 tenants
+sintéticos + JWT real → aislamiento A/B, anon, §7b, Voice/Coach 11/11, fail-closed, refresh+revocación,
+rollback→reapply. Evidencia `docs/release/BUG-019-HOSTED-STAGING-CERT.md`. Commit `233f7f0`.
+**Sub-caso 8 (fail-closed turno ambiguo):** `resolveOpenTurno` → `409 AMBIGUOUS_TURNO` (sin garantía
+DB de un turno abierto por restaurante). app 12/12 en `bug019-turno-adoption`.
+**Findings abiertos p/prod:** H1 (grants `service_role` en preflight), G1 (rutas HTTP no re-ejecutadas
+en hosted — aceptado cert local). Paquete go/no-go: `docs/release/BUG-019-GO-NO-GO.md`.
+**Regla:** NO certifica RLS estricto en prod — gate con aprobación del fundador en
+`docs/release/BUG-019-PROD-RLS-GATE.md`. No reabrir un PASS sin evidencia de regresión.
+
+---
+
 ## R1 — Field Certification
 
 **Estado:** PASS — 2026-07-16

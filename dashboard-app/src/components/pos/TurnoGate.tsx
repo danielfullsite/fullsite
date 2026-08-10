@@ -14,6 +14,7 @@ interface StaffMember {
 
 interface TurnoGateProps {
   staff: StaffMember
+  restaurantName?: string
   children: React.ReactNode
 }
 
@@ -29,7 +30,7 @@ interface ActiveTurno {
 // Paths that should NOT be blocked by turno gate
 const UNGATED_PATHS = ['/pos/turno', '/pos/configuracion', '/pos/huella']
 
-export default function TurnoGate({ staff, children }: TurnoGateProps) {
+export default function TurnoGate({ staff, restaurantName = '', children }: TurnoGateProps) {
   const pathname = usePathname()
   const [status, setStatus] = useState<TurnoStatus>('loading')
   const [turno, setTurno] = useState<ActiveTurno | null>(null)
@@ -193,6 +194,11 @@ export default function TurnoGate({ staff, children }: TurnoGateProps) {
       <div className="h-dvh flex items-center justify-center select-none" style={{ background: 'linear-gradient(180deg, #0a0a14 0%, #111827 100%)' }}>
         <div className="text-center w-full max-w-sm mx-4">
           <DoorOpen size={64} className="mx-auto mb-6 text-blue-400" strokeWidth={1.5} />
+          {restaurantName ? (
+            <p data-testid="pos-tenant-name" className="text-blue-300 text-sm font-semibold mb-3">
+              {restaurantName}
+            </p>
+          ) : null}
           <h2 className="text-2xl font-bold text-white mb-2">No hay turno abierto</h2>
           <p className="text-slate-400 text-sm mb-8">Cuenta el efectivo en caja y abre el turno para comenzar operaciones.</p>
 
@@ -237,6 +243,11 @@ export default function TurnoGate({ staff, children }: TurnoGateProps) {
           <div className="relative mx-auto mb-6 w-16 h-16">
             <Clock size={64} className="text-blue-400 animate-pulse" strokeWidth={1.5} />
           </div>
+          {restaurantName ? (
+            <p data-testid="pos-tenant-name" className="text-blue-300 text-sm font-semibold mb-3">
+              {restaurantName}
+            </p>
+          ) : null}
           <h2 className="text-2xl font-bold text-white mb-2">Esperando turno</h2>
           <p className="text-slate-400 text-sm mb-6">Un encargado debe abrir el turno para comenzar operaciones.</p>
 

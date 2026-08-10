@@ -44,13 +44,22 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import uuid
 from pathlib import Path
 
-from contract import Result, verify_ref
+from contract import Result, resolve_db_headers, verify_ref
 
-_SSL_CTX = ssl.create_default_context()
-_SSL_CTX.check_hostname = False
-_SSL_CTX.verify_mode = ssl.CERT_NONE
+
+def _verified_ssl_context():
+    """Use a trusted CA bundle and never disable certificate verification."""
+    try:
+        import certifi
+        return ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        return ssl.create_default_context()
+
+
+_SSL_CTX = _verified_ssl_context()
 
 AMALAY_REF = "qjiomlvudfmzuvqvhwpk"
 JWT_PAT = re.compile(r'eyJ[A-Za-z0-9_\-\.]{50,}')
@@ -218,15 +227,17 @@ def upsert_category(rest, client_id, name, sort_order, svc_h, state, dry_run, lo
 
     if dry_run:
         log(f"  · [SKIP / DRY-RUN ] category: {name}")
-        return f"dry-run-cat-{sort_order}"
+        cat_id = f"dry-run-cat-{sort_order}"
+        # Keep the synthetic ID in memory so item/link validation exercises
+        # the complete graph without persisting a checkpoint or touching DB.
+        state.data["cats"][name] = cat_id
+        return cat_id
 
-    import secrets as _s
-    cat_id = str(_s.token_hex(16))
-    # Use a UUID-like format
-    cat_id = f"{cat_id[:8]}-{cat_id[8:12]}-4{cat_id[13:16]}-{cat_id[16:20]}-{cat_id[20:32]}"
+    cat_id = str(uuid.uuid4())
 
     h = {**svc_h, "Content-Type": "application/json", "Prefer": "return=representation"}
     s2, r2 = post(f"{rest}/pos_menu_categories", {
+        "id": cat_id,
         "client_id": client_id,
         "name": name,
         "sort_order": sort_order,
@@ -239,7 +250,7 @@ def upsert_category(rest, client_id, name, sort_order, svc_h, state, dry_run, lo
         log(f"  ✚ [CREATED        ] category: {name} ({cat_id[:8]}...)")
         return cat_id
     else:
-        log(f"  ✗ [FAILED         ] category: {name} — {redact(str(r2)[:80])}")
+        log(f"  ✗ [FAILED         ] category: {name} — {redact(str(r2)[:240])}")
         return None
 
 
@@ -265,8 +276,10 @@ def upsert_item(rest, client_id, cat_id, item, sort_order, svc_h, state, dry_run
         log(f"  · [SKIP / DRY-RUN ] item: {item['name']}")
         return f"dry-run-item-{sort_order}"
 
+    item_id = str(uuid.uuid4())
     h = {**svc_h, "Content-Type": "application/json", "Prefer": "return=representation"}
     s2, r2 = post(f"{rest}/pos_menu_items", {
+        "id": item_id,
         "client_id": client_id,
         "category_id": cat_id,
         "name": item["name"],
@@ -280,7 +293,7 @@ def upsert_item(rest, client_id, cat_id, item, sort_order, svc_h, state, dry_run
         log(f"  ✚ [CREATED        ] item: {item['name']} — ${item['price']:.2f}")
         return item_id
     else:
-        log(f"  ✗ [FAILED         ] item: {item['name']} — {redact(str(r2)[:80])}")
+        log(f"  ✗ [FAILED         ] item: {item['name']} — {redact(str(r2)[:240])}")
         return None
 
 
@@ -328,19 +341,25 @@ def run(args):
     do_resume = args.resume
 
     result = Result("menu_import")
+    created_count = 0
 
     def log(msg):
+        nonlocal created_count
+        if "[CREATED" in msg:
+            created_count += 1
         print(msg)
 
     # Env validation
     url     = os.environ.get("NEXT_PUBLIC_SUPABASE_URL", "").rstrip("/")
-    svc_key = os.environ.get("SUPABASE_SERVICE_KEY", "")
     sbox    = os.environ.get("SANDBOX_ENV", "")
 
     if not url:
         result.error("NEXT_PUBLIC_SUPABASE_URL vacío")
-    if not svc_key:
-        result.error("SUPABASE_SERVICE_KEY vacío")
+    try:
+        svc_h, auth_mode = resolve_db_headers()
+    except RuntimeError as exc:
+        result.error(str(exc))
+        svc_h, auth_mode = {}, "unavailable"
     if AMALAY_REF in url and sbox != "true":
         result.error("URL contiene ref de AMALAY producción — requiere SANDBOX_ENV=true")
     if not Path(csv_path).exists():
@@ -352,9 +371,9 @@ def run(args):
     # verify_ref aborts if mismatch (exits with code 1)
     verify_ref(url, args.confirm_ref)
 
-    svc_h = {"apikey": svc_key, "Authorization": f"Bearer {svc_key}"}
     rest  = f"{url}/rest/v1"
     state = State(client_id, csv_path)
+    print(f"  Auth DB: {auth_mode}")
 
     if not do_resume:
         state.reset()
@@ -419,9 +438,6 @@ def run(args):
             failed += 1
             result.error(f"item '{row['name']}' falló — ver log arriba")
             continue
-        else:
-            result.add_created()
-
         if row["modifier_group"] and row["modifier_group"] in mod_groups:
             group_id = mod_groups[row["modifier_group"]]
             link_modifier_group(rest, client_id, item_id, group_id,
@@ -434,7 +450,7 @@ def run(args):
     cats_done  = len(state.data["cats"])
     items_done = len(state.data["items"])
     links_done = len(state.data["links"])
-    result.created = items_done + cats_done
+    result.created = created_count
 
     print(f"\n{'═'*68}")
     if dry_run:

@@ -10,7 +10,7 @@ import {
   StatusBar,
 } from 'react-native'
 import { usePOSStore } from '@/lib/store'
-import { supabase } from '@/lib/supabase'
+import { CLIENT_ID, supabase } from '@/lib/supabase'
 import type { MenuItem, OrderItem, MenuCategory } from '@/lib/types'
 
 export default function POSScreen() {
@@ -28,7 +28,7 @@ export default function POSScreen() {
       const { data } = await supabase
         .from('pos_menu')
         .select('*')
-        .eq('client_id', 'amalay')
+        .eq('client_id', CLIENT_ID)
       if (data) {
         // Transform to MenuCategory format
         // TODO: proper menu loading

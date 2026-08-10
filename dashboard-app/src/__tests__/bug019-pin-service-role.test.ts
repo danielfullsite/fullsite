@@ -28,6 +28,7 @@ function stubFetch(rows: unknown) {
 function makeReq(body: Record<string, unknown>) {
   return {
     headers: { get: (_k: string) => null },
+    cookies: { get: (_k: string) => undefined },
     json: async () => body,
   } as unknown as import('next/server').NextRequest
 }
