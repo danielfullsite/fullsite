@@ -44,18 +44,23 @@ Shadow Day es un gate explícito antes de Go-Live para todo cliente nuevo (Clien
 
 ---
 
-## BUG-019 — Tenant Isolation (full-stack LOCAL)
+## BUG-019 — Tenant Isolation (LOCAL + HOSTED STAGING)
 
-**Estado:** LOCAL PASS — 2026-08-09. HOSTED STAGING pendiente antes de producción.
+**Estado:** LOCAL PASS + HOSTED STAGING PASS — 2026-08-09/10. Decisión de producción PENDIENTE.
 **Scope:** aislamiento multi-tenant + excepción de turno más estrecha para borradores QR
-server-owned (BUG-019-C), verificado sobre el stack local OFICIAL de Supabase (Postgres +
-GoTrue JWT + PostgREST reales, 2 tenants) con la migración real sin modificar.
-**Resultado:** suite full-stack 16/16 PASS; barrido estructural 74/74 tablas con `client_id`;
-6/6 casos de procedencia de turno; app-layer vitest 82/82 (`bug019-*`).
-**Evidencia:** `docs/release/BUG-019-FULLSTACK-LOCAL-CERT.md`; harness en
-`scripts/tenant-isolation/local/` (+ `official-stack/`). Commits `d155a35`, `c7ebb7d`.
-**Regla:** NO certifica RLS estricto en prod — ese es el gate con aprobación del fundador en
-`docs/release/BUG-019-PROD-RLS-GATE.md`. No reabrir el LOCAL PASS sin evidencia de regresión.
+server-owned (BUG-019-C).
+**LOCAL:** stack oficial de Supabase (Postgres + GoTrue JWT + PostgREST reales, 2 tenants), migración
+sin modificar → 16/16; barrido 74/74 tablas `client_id`; 6/6 procedencia de turno; app 86/86.
+Evidencia `docs/release/BUG-019-FULLSTACK-LOCAL-CERT.md`. Commits `d155a35`, `c7ebb7d`, `13193cc`.
+**HOSTED STAGING:** proyecto `jkcnxfbbuyyfhwfjizgw` (≠ prod `qjiomlvudfmzuvqvhwpk`), 2 tenants
+sintéticos + JWT real → aislamiento A/B, anon, §7b, Voice/Coach 11/11, fail-closed, refresh+revocación,
+rollback→reapply. Evidencia `docs/release/BUG-019-HOSTED-STAGING-CERT.md`. Commit `233f7f0`.
+**Sub-caso 8 (fail-closed turno ambiguo):** `resolveOpenTurno` → `409 AMBIGUOUS_TURNO` (sin garantía
+DB de un turno abierto por restaurante). app 12/12 en `bug019-turno-adoption`.
+**Findings abiertos p/prod:** H1 (grants `service_role` en preflight), G1 (rutas HTTP no re-ejecutadas
+en hosted — aceptado cert local). Paquete go/no-go: `docs/release/BUG-019-GO-NO-GO.md`.
+**Regla:** NO certifica RLS estricto en prod — gate con aprobación del fundador en
+`docs/release/BUG-019-PROD-RLS-GATE.md`. No reabrir un PASS sin evidencia de regresión.
 
 ---
 

@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { withPOSAuth, unauthorized } from '@/lib/api-auth'
-import { isQrDraftId, resolveOpenTurnoId } from '@/lib/turno'
+import { isQrDraftId, resolveOpenTurno } from '@/lib/turno'
 
 /**
  * R2D1 + R2 Final + R2D — Revision-aware order save + R1 reconciliation boundary
@@ -101,11 +101,17 @@ export async function POST(request: NextRequest) {
     if (isQrDraftId(order_id)) {
       const movingToEffects = typeof body.status === 'string' && body.status !== 'abierta'
       if (movingToEffects) {
-        const turnoId = await resolveOpenTurnoId(sbUrl, sbKey, clientId, auth.staffId)
-        if (!turnoId) {
-          return Response.json({ ok: false, error: 'NO_OPEN_TURNO' } satisfies SaveResult, { status: 409 })
+        const t = await resolveOpenTurno(sbUrl, sbKey, clientId, auth.staffId)
+        if (!t.ok) {
+          // Fail closed: no open turno, or ambiguous (>1 eligible) — never guess the corte.
+          const [error, status] = t.reason === 'ambiguous'
+            ? ['AMBIGUOUS_TURNO', 409] as const
+            : t.reason === 'error'
+              ? ['TURNO_LOOKUP_FAILED', 502] as const
+              : ['NO_OPEN_TURNO', 409] as const
+          return Response.json({ ok: false, error } satisfies SaveResult, { status })
         }
-        rpcParams.p_turno_id = turnoId
+        rpcParams.p_turno_id = t.turnoId
       } else {
         rpcParams.p_turno_id = null
       }

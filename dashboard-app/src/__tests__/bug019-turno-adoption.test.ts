@@ -9,7 +9,7 @@
 //  - idempotent replay does NOT re-fire inventory effects.
 /* eslint-disable @typescript-eslint/no-explicit-any -- test doubles for request + fetch */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { isQrDraftId, resolveOpenTurnoId } from '@/lib/turno'
+import { isQrDraftId, resolveOpenTurno } from '@/lib/turno'
 
 const URLBASE = 'https://staging.supabase.co'
 const SERVICE = 'SERVICE_KEY_SENTINEL'
@@ -64,16 +64,31 @@ describe('turno resolver (pure)', () => {
     expect(isQrDraftId('550e8400-e29b-41d4-a716-446655440000')).toBe(false)
     expect(isQrDraftId('')).toBe(false)
   })
-  it('resolves the OPEN turno, preferring the one the caller opened', async () => {
-    const fetchFn = (async () => ({ ok: true, json: async () => [
-      { id: 't-other', opened_by: 'someone-else' },
-      { id: 't-mine', opened_by: 'user-amalay' },
-    ] })) as unknown as typeof fetch
-    expect(await resolveOpenTurnoId(URLBASE, SERVICE, 'amalay', 'user-amalay', fetchFn)).toBe('t-mine')
+  const fetchReturning = (rows: unknown) => (async () => ({ ok: true, json: async () => rows })) as unknown as typeof fetch
+  it('resolves the OPEN turno the caller opened (even if others are open)', async () => {
+    const r = await resolveOpenTurno(URLBASE, SERVICE, 'amalay', 'user-amalay', fetchReturning([
+      { id: 't-other', opened_by: 'someone-else' }, { id: 't-mine', opened_by: 'user-amalay' },
+    ]))
+    expect(r).toEqual({ ok: true, turnoId: 't-mine' })
   })
-  it('returns null when the tenant has NO open turno', async () => {
-    const fetchFn = (async () => ({ ok: true, json: async () => [] })) as unknown as typeof fetch
-    expect(await resolveOpenTurnoId(URLBASE, SERVICE, 'amalay', 'user-amalay', fetchFn)).toBeNull()
+  it('uses the single tenant open turno when the caller opened none', async () => {
+    const r = await resolveOpenTurno(URLBASE, SERVICE, 'amalay', 'user-amalay', fetchReturning([{ id: 't-only', opened_by: 'someone-else' }]))
+    expect(r).toEqual({ ok: true, turnoId: 't-only' })
+  })
+  it('FAILS CLOSED (ambiguous) when ≥2 open turnos and none is the caller\'s', async () => {
+    const r = await resolveOpenTurno(URLBASE, SERVICE, 'amalay', 'user-amalay', fetchReturning([
+      { id: 't1', opened_by: 'x' }, { id: 't2', opened_by: 'y' },
+    ]))
+    expect(r).toEqual({ ok: false, reason: 'ambiguous' })
+  })
+  it('FAILS CLOSED (ambiguous) when the caller opened more than one', async () => {
+    const r = await resolveOpenTurno(URLBASE, SERVICE, 'amalay', 'user-amalay', fetchReturning([
+      { id: 'ta', opened_by: 'user-amalay' }, { id: 'tb', opened_by: 'user-amalay' },
+    ]))
+    expect(r).toEqual({ ok: false, reason: 'ambiguous' })
+  })
+  it('reason none when the tenant has NO open turno', async () => {
+    expect(await resolveOpenTurno(URLBASE, SERVICE, 'amalay', 'user-amalay', fetchReturning([]))).toEqual({ ok: false, reason: 'none' })
   })
 })
 
@@ -99,6 +114,17 @@ describe('save-order — QR draft adoption assigns the SESSION turno server-side
     expect(j.error).toBe('NO_OPEN_TURNO')
     expect(saveRpcCall()).toBeUndefined()                         // never sent
     expect(reconcileCalls().length).toBe(0)                       // nothing off the books
+  })
+
+  it('staff send with ≥2 ambiguous open turnos → 409 AMBIGUOUS_TURNO, no save, no effects', async () => {
+    installFetch({ openTurnos: [{ id: 't1', opened_by: 'x' }, { id: 't2', opened_by: 'y' }] })
+    const { POST } = await import('@/app/api/pos/save-order/route')
+    const res = await POST(makeReq({ order_id: 'qr-deadbeef', expected_revision: 0, status: 'enviada', turno_id: 't1', items: [] }))
+    const j = await res.json()
+    expect(res.status).toBe(409)
+    expect(j.error).toBe('AMBIGUOUS_TURNO')                       // fail closed — never guess the corte
+    expect(saveRpcCall()).toBeUndefined()
+    expect(reconcileCalls().length).toBe(0)
   })
 
   it('QR draft edit that stays abierta keeps it turno-null (server-owned draft, ignores client turno)', async () => {

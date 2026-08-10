@@ -5,37 +5,58 @@
 // NO operational effects. On the FIRST authenticated staff action that transitions it out
 // of 'abierta' (enviar/cobrar/imprimir/afectar inventario), the server MUST obtain the
 // turno_id from the caller's own session — server-side — and assign it atomically in the
-// same save. A client-supplied turno_id is NEVER trusted for a QR draft: the browser
-// controls nothing authoritative (same principle as createPublicOrder). Without an open
-// turno for the tenant, the transition is refused, so an order can never be sent, charged
-// or printed off the books.
+// same save. A client-supplied turno_id is NEVER trusted for a QR draft.
+//
+// FAIL-CLOSED (sub-case 8): the DB does not guarantee a single open turno per restaurant
+// (pos_turnos has no partial-unique on client_id WHERE closed_at IS NULL). So when more
+// than one eligible open turno exists and the server cannot unambiguously identify the
+// caller's, it REFUSES rather than silently pick one — a wrong turno corrupts the corte.
 
 /** A server-owned QR draft id is namespaced 'qr-'. Real POS orders are uuids. */
 export function isQrDraftId(orderId: string): boolean {
   return typeof orderId === 'string' && orderId.startsWith('qr-')
 }
 
+export type TurnoResolution =
+  | { ok: true; turnoId: string }
+  | { ok: false; reason: 'none' | 'ambiguous' | 'error' }
+
 /**
- * Resolve the OPEN turno for `clientId` from the server, preferring the one the caller
- * opened. Returns the turno id, or null if the tenant has no open turno (→ caller must
- * refuse the transition). Reads with the service key server-side; never trusts the client.
+ * Resolve the caller's OPEN turno for `clientId`, server-side, fail-closed:
+ *  - exactly one turno opened by the caller → use it (their session's turno);
+ *  - caller opened none but the tenant has exactly one open turno → use it;
+ *  - caller opened more than one, OR ≥2 open turnos none of which is the caller's → 'ambiguous';
+ *  - no open turno → 'none'; read failure → 'error'.
+ * Reads with the service key server-side; never trusts the client.
  */
-export async function resolveOpenTurnoId(
+export async function resolveOpenTurno(
   sbUrl: string,
   sbKey: string,
   clientId: string,
   staffId?: string,
   fetchFn: typeof fetch = fetch,
-): Promise<string | null> {
+): Promise<TurnoResolution> {
   const ecid = encodeURIComponent(clientId)
-  const res = await fetchFn(
-    `${sbUrl}/rest/v1/pos_turnos?client_id=eq.${ecid}&closed_at=is.null&select=id,opened_by,opened_at&order=opened_at.desc`,
-    { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' as RequestCache },
-  )
-  if (!res.ok) return null
-  const rows = (await res.json().catch(() => [])) as Array<{ id: string; opened_by: string }>
-  if (!Array.isArray(rows) || rows.length === 0) return null
-  // Prefer the turno the caller opened; otherwise the tenant's most-recent open turno.
-  const own = staffId ? rows.find(r => r.opened_by === staffId) : undefined
-  return (own ?? rows[0]).id ?? null
+  let rows: Array<{ id: string; opened_by: string }>
+  try {
+    const res = await fetchFn(
+      `${sbUrl}/rest/v1/pos_turnos?client_id=eq.${ecid}&closed_at=is.null&select=id,opened_by,opened_at&order=opened_at.desc`,
+      { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' as RequestCache },
+    )
+    if (!res.ok) return { ok: false, reason: 'error' }
+    const j = await res.json().catch(() => null)
+    if (!Array.isArray(j)) return { ok: false, reason: 'error' }
+    rows = j as Array<{ id: string; opened_by: string }>
+  } catch {
+    return { ok: false, reason: 'error' }
+  }
+  if (rows.length === 0) return { ok: false, reason: 'none' }
+  if (staffId) {
+    const own = rows.filter(r => r.opened_by === staffId)
+    if (own.length === 1) return { ok: true, turnoId: own[0].id }
+    if (own.length > 1) return { ok: false, reason: 'ambiguous' }
+  }
+  // Caller opened no turno of their own: only safe if the restaurant has exactly one open.
+  if (rows.length === 1) return { ok: true, turnoId: rows[0].id }
+  return { ok: false, reason: 'ambiguous' }
 }
