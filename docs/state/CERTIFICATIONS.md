@@ -44,6 +44,20 @@ Shadow Day es un gate explícito antes de Go-Live para todo cliente nuevo (Clien
 
 ---
 
+## R2 — Cloneability / Client #3 synthetic
+
+**Estado:** CODE + HOSTED TEST PASS — 2026-08-10. No FIELD CERTIFIED.
+**Entorno:** staging `jkcnxfbbuyyfhwfjizgw`; producción/AMALAY sin cambios.
+**Resultado:** alta inicial 36 registros/11.6 s; rerun idempotente 0 nuevos/0 warnings; CLON-SMOKE
+15/15; aislamiento Nómada↔Client #3 19/19 con JWT real y anon real; login/PIN público muestra
+“Bistro Horizonte — DEMO” y no genera requests a `qjiom…`.
+**Evidencia primaria:** `docs/platform/CLONEABILITY-REPORT-v1.md`, manifests y reportes enlazados ahí.
+**Código:** `17290dd`, `e3cbf7f`, `3bca37e`, `238d7ad`.
+**Pendiente para CERTIFIED:** instalación física, impresión, entrenamiento y Shadow Day sin Daniel.
+No cambia por sí mismo los gates congelados de `FULLSITE-READINESS-CONTRACT.md`.
+
+---
+
 ## BUG-019 — Tenant Isolation (LOCAL + HOSTED STAGING)
 
 **Estado:** LOCAL PASS + HOSTED STAGING PASS — 2026-08-09/10. Decisión de producción PENDIENTE.

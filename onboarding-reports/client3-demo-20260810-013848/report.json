@@ -1,0 +1,184 @@
+{
+  "client_id": "client3-demo",
+  "manifest": {
+    "_comment": "Evidencia reproducible de Client #3 sintético; la contraseña se inyecta por OWNER_PASSWORD.",
+    "client_id": "client3-demo",
+    "name": "Bistro Horizonte — DEMO",
+    "confirm_ref": "jkcnxfbbuyyfhwfjizgw",
+    "template": "cafe",
+    "city": "Monterrey",
+    "timezone": "America/Monterrey",
+    "business_day_start_local": "05:00:00"
+  },
+  "started_at": "2026-08-10T07:38:48Z",
+  "finished_at": "2026-08-10T07:38:55Z",
+  "total_duration_s": 7.1,
+  "pipeline_status": "PASS",
+  "failed_step": null,
+  "steps": [
+    {
+      "step": "env_validation",
+      "status": "PASS",
+      "duration_ms": 0,
+      "created": 0,
+      "updated": 0,
+      "warnings": [],
+      "errors": [],
+      "skipped": false
+    },
+    {
+      "step": "schema_check",
+      "status": "PASS",
+      "duration_ms": 429,
+      "created": 0,
+      "updated": 0,
+      "warnings": [],
+      "errors": [],
+      "skipped": false
+    },
+    {
+      "step": "client_create",
+      "status": "PASS",
+      "duration_ms": 154,
+      "created": 0,
+      "updated": 1,
+      "warnings": [],
+      "errors": [],
+      "skipped": false
+    },
+    {
+      "step": "menu_seed",
+      "status": "PASS",
+      "duration_ms": 1630,
+      "created": 0,
+      "updated": 0,
+      "warnings": [],
+      "errors": [],
+      "skipped": false
+    },
+    {
+      "step": "modifiers_seed",
+      "status": "PASS",
+      "duration_ms": 2093,
+      "created": 0,
+      "updated": 0,
+      "warnings": [],
+      "errors": [],
+      "skipped": false
+    },
+    {
+      "step": "payment_methods_seed",
+      "status": "PASS",
+      "duration_ms": 591,
+      "created": 0,
+      "updated": 0,
+      "warnings": [],
+      "errors": [],
+      "skipped": false
+    },
+    {
+      "step": "staff_seed",
+      "status": "PASS",
+      "duration_ms": 384,
+      "created": 0,
+      "updated": 0,
+      "warnings": [],
+      "errors": [],
+      "skipped": false
+    },
+    {
+      "step": "auth_user_create",
+      "status": "PASS",
+      "duration_ms": 354,
+      "created": 0,
+      "updated": 1,
+      "warnings": [],
+      "errors": [],
+      "skipped": false
+    },
+    {
+      "step": "client_users_create",
+      "status": "PASS",
+      "duration_ms": 134,
+      "created": 0,
+      "updated": 1,
+      "warnings": [],
+      "errors": [],
+      "skipped": false
+    },
+    {
+      "step": "menu_import",
+      "status": "SKIP",
+      "duration_ms": 0,
+      "created": 0,
+      "updated": 0,
+      "warnings": [],
+      "errors": [],
+      "skipped": true,
+      "_reason": "omitido — manifest.menu_csv no definido"
+    },
+    {
+      "step": "diff_report",
+      "status": "SKIP",
+      "duration_ms": 0,
+      "created": 0,
+      "updated": 0,
+      "warnings": [],
+      "errors": [],
+      "skipped": true,
+      "_reason": "omitido — manifest.menu_csv no definido"
+    },
+    {
+      "step": "staff_import",
+      "status": "SKIP",
+      "duration_ms": 0,
+      "created": 0,
+      "updated": 0,
+      "warnings": [],
+      "errors": [],
+      "skipped": true,
+      "_reason": "omitido — manifest.staff_csv no definido"
+    },
+    {
+      "step": "vercel_provision",
+      "status": "SKIP",
+      "duration_ms": 0,
+      "created": 0,
+      "updated": 0,
+      "warnings": [],
+      "errors": [],
+      "skipped": true,
+      "_reason": "omitido — manifest.vercel_project no definido"
+    },
+    {
+      "step": "dns_provision",
+      "status": "SKIP",
+      "duration_ms": 0,
+      "created": 0,
+      "updated": 0,
+      "warnings": [],
+      "errors": [],
+      "skipped": true,
+      "_reason": "omitido — manifest.subdomain no definido"
+    },
+    {
+      "step": "smoke_check",
+      "status": "PASS",
+      "duration_ms": 1325,
+      "created": 0,
+      "updated": 0,
+      "warnings": [],
+      "errors": [],
+      "skipped": false
+    }
+  ],
+  "totals": {
+    "created": 0,
+    "updated": 3,
+    "warnings": 0,
+    "errors": 0,
+    "steps_run": 10,
+    "steps_skipped": 5
+  },
+  "report_generated_at": "2026-08-10T07:38:55Z"
+}

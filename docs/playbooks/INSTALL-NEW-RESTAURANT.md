@@ -126,6 +126,10 @@ python3 scripts/onboarding/smoke_test.py --client-id <client_id> --confirm-ref <
 Reemplaza solamente los dos valores entre `< >` con los del manifest de nube.
 Debe terminar en `PASS`.
 
+Referencia ejecutable sin datos AMALAY: `scripts/onboarding/examples/client3-demo.json`. Fue probado
+en staging tanto en alta inicial como en segunda ejecución idempotente. La contraseña del dueño se
+inyecta desde el gestor de secretos mediante `OWNER_PASSWORD`; nunca se agrega al manifest.
+
 ## 8. Criterios de detención
 
 Detener la instalación si ocurre cualquiera:

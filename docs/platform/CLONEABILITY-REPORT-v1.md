@@ -7,6 +7,36 @@
 
 ---
 
+## Revalidación 2026-08-10 — Client #3 sintético
+
+La conclusión histórica de ~26 minutos ya no describe el path compartido actual. El pipeline
+`scripts/onboarding/onboard_client.py` provisionó **Bistro Horizonte — DEMO** (`client3-demo`) en el
+staging hospedado `jkcnxfbbuyyfhwfjizgw`, sin infraestructura ni código por restaurante:
+
+| Evidencia | Resultado |
+|---|---|
+| Alta inicial | PASS · 36 registros · 11.6 s · 0 warnings |
+| Re-ejecución idempotente | PASS · 0 registros nuevos · 7.1 s · 0 warnings |
+| CLON-SMOKE turno→orden→cobro→cierre+cleanup | 15/15 PASS · 2.5 s |
+| Aislamiento real `client3-demo` ↔ `nomada` | 19/19 PASS · GoTrue JWT + `apikey=anon` |
+| UI pública compartida | Login + PIN + identidad visible en `https://fullsite-client2-demo.vercel.app` |
+| Red UI | staging presente · requests a producción `qjiom…` = 0 |
+
+Artefactos reproducibles:
+
+- Manifest: `scripts/onboarding/examples/client3-demo.json` (password solo por secret env).
+- Primera alta: `onboarding-reports/client3-demo-20260810-012031/`.
+- Rerun TLS-verificado/idempotente: `onboarding-reports/client3-demo-20260810-013848/`.
+- Fixes de onboarding: `17290dd`, `3bca37e`.
+- Runner de aislamiento con roles reales: `e3cbf7f`.
+- Identidad de restaurante visible en POS: `238d7ad`.
+
+**Claim permitido:** CODE + HOSTED TEST VERIFIED para onboarding de un tercer tenant sobre la
+infraestructura compartida existente. **No es FIELD CERTIFIED:** siguen pendientes terminal física,
+impresora, entrenamiento y Shadow Day del cliente real.
+
+---
+
 ## 1. ¿Qué siguió funcionando sin modificar código?
 
 | Feature | Mecanismo | Estado |
