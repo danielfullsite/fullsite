@@ -1,0 +1,9 @@
+# Raw Wansoft exports contain waiter + customer PII. NEVER commit them.
+# Only the sanitized fixtures/ JSON is committable.
+*.xlsx
+*.xls
+*.csv
+
+# Allow the sanitized, anonymized golden fixtures
+!fixtures/
+!fixtures/**
