@@ -1,0 +1,41 @@
+name: Uber Validation Runner
+
+# Runs the fail-closed Uber Basic Production Validation lifecycle against the
+# fullsite-uber-sandbox deployment. Admin secret comes from a DEDICATED GitHub
+# secret (UBER_SANDBOX_ADMIN_SECRET) — never the prod INTEGRATION_ADMIN_SECRET.
+# The runner never prints tokens/keys; job status = runner exit code (fail-closed).
+#
+# Dispatch (from the branch that carries the runner):
+#   gh workflow run uber-validation-runner.yml --ref uber/validation-ready \
+#     -f sandbox_url=https://fullsite-uber-sandbox-<hash>.vercel.app \
+#     -f order_id=<real Uber sandbox order id>   # optional; lifecycle BLOCKED if empty
+
+on:
+  workflow_dispatch:
+    inputs:
+      sandbox_url:
+        description: 'Sandbox deployment URL (https://...)'
+        required: true
+      order_id:
+        description: 'Uber sandbox test order id (optional; lifecycle steps BLOCKED if empty)'
+        required: false
+      item_id:
+        description: 'Item id for resolve-fulfillment (optional)'
+        required: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Run Uber validation (fail-closed)
+        env:
+          SANDBOX_URL: ${{ inputs.sandbox_url }}
+          INTEGRATION_ADMIN_SECRET: ${{ secrets.UBER_SANDBOX_ADMIN_SECRET }}
+          UBER_TEST_STORE_ID: '633b57d4-237a-5a32-b249-7ceb795f1d35'
+          UBER_TEST_ORDER_ID: ${{ inputs.order_id }}
+          UBER_TEST_ITEM_ID: ${{ inputs.item_id }}
+        run: node dashboard-app/scripts/uber-validation/runner.mjs
