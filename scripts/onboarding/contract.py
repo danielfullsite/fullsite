@@ -26,12 +26,44 @@ Confirm-ref helper:
     equivocado.
 """
 import json
+import os
 import re
 import sys
 import time
 
 AMALAY_REF = "qjiomlvudfmzuvqvhwpk"
 _REF_PAT = re.compile(r'https://([^.]+)\.supabase\.co')
+
+
+def resolve_db_headers() -> tuple[dict[str, str], str]:
+    """Resolve a server operator or a real authenticated-user DB session.
+
+    Service role remains the unattended onboarding mode. Interactive imports
+    may instead use a short-lived GoTrue access token plus the public anon key;
+    PostgREST then enforces the caller's tenant RLS. No anon-only fallback is
+    allowed.
+    """
+    service_key = os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
+    if service_key:
+        return {
+            "apikey": service_key,
+            "Authorization": f"Bearer {service_key}",
+        }, "service_role"
+
+    anon_key = (
+        os.environ.get("SUPABASE_ANON_KEY", "")
+        or os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY", "")
+    ).strip()
+    access_token = os.environ.get("SUPABASE_ACCESS_TOKEN", "").strip()
+    if anon_key and access_token:
+        return {
+            "apikey": anon_key,
+            "Authorization": f"Bearer {access_token}",
+        }, "authenticated_rls"
+
+    raise RuntimeError(
+        "SUPABASE_SERVICE_KEY or SUPABASE_ANON_KEY + SUPABASE_ACCESS_TOKEN is required"
+    )
 
 
 def verify_ref(url: str, confirm_ref: str) -> str:

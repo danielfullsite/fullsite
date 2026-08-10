@@ -34,11 +34,19 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-from contract import Result, verify_ref
+from contract import Result, resolve_db_headers, verify_ref
 
-_SSL_CTX = ssl.create_default_context()
-_SSL_CTX.check_hostname = False
-_SSL_CTX.verify_mode = ssl.CERT_NONE
+
+def _verified_ssl_context():
+    """Use a trusted CA bundle and never disable certificate verification."""
+    try:
+        import certifi
+        return ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        return ssl.create_default_context()
+
+
+_SSL_CTX = _verified_ssl_context()
 JWT_PAT = re.compile(r'eyJ[A-Za-z0-9_\-\.]{50,}')
 
 
@@ -304,11 +312,13 @@ def run(args):
     result = Result("diff_report")
 
     url     = os.environ.get("NEXT_PUBLIC_SUPABASE_URL", "").rstrip("/")
-    svc_key = os.environ.get("SUPABASE_SERVICE_KEY", "")
     if not url:
         result.error("NEXT_PUBLIC_SUPABASE_URL vacío")
-    if not svc_key:
-        result.error("SUPABASE_SERVICE_KEY vacío")
+    try:
+        svc_h, auth_mode = resolve_db_headers()
+    except RuntimeError as exc:
+        result.error(str(exc))
+        svc_h, auth_mode = {}, "unavailable"
     if not Path(csv_path).exists():
         result.error(f"CSV no encontrado: {csv_path}")
     if result.errors:
@@ -317,8 +327,8 @@ def run(args):
 
     verify_ref(url, args.confirm_ref)
 
-    svc_h = {"apikey": svc_key, "Authorization": f"Bearer {svc_key}"}
     rest  = f"{url}/rest/v1"
+    print(f"  Auth DB: {auth_mode}")
 
     print(f"\n── 1 · Parsing CSV ─────────────────────────────────────────────")
     csv_rows = parse_csv(csv_path)
