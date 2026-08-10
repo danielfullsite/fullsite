@@ -44,6 +44,21 @@ Shadow Day es un gate explícito antes de Go-Live para todo cliente nuevo (Clien
 
 ---
 
+## BUG-019 — Tenant Isolation (full-stack LOCAL)
+
+**Estado:** LOCAL PASS — 2026-08-09. HOSTED STAGING pendiente antes de producción.
+**Scope:** aislamiento multi-tenant + excepción de turno más estrecha para borradores QR
+server-owned (BUG-019-C), verificado sobre el stack local OFICIAL de Supabase (Postgres +
+GoTrue JWT + PostgREST reales, 2 tenants) con la migración real sin modificar.
+**Resultado:** suite full-stack 16/16 PASS; barrido estructural 74/74 tablas con `client_id`;
+6/6 casos de procedencia de turno; app-layer vitest 82/82 (`bug019-*`).
+**Evidencia:** `docs/release/BUG-019-FULLSTACK-LOCAL-CERT.md`; harness en
+`scripts/tenant-isolation/local/` (+ `official-stack/`). Commits `d155a35`, `c7ebb7d`.
+**Regla:** NO certifica RLS estricto en prod — ese es el gate con aprobación del fundador en
+`docs/release/BUG-019-PROD-RLS-GATE.md`. No reabrir el LOCAL PASS sin evidencia de regresión.
+
+---
+
 ## R1 — Field Certification
 
 **Estado:** PASS — 2026-07-16
