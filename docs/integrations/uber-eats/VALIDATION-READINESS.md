@@ -60,24 +60,26 @@ INTEGRATION_TOKEN_KEY        = <clave propia de producción>
 | Activación / USL | authorization_code | `eats.pos_provisioning offline_access` | `/oauth/v2/authorize` + token |
 | Get Integration Details | client_credentials | `eats.store` | `GET /v1/eats/stores/{id}/pos_data` |
 | Menu upload / Update Item | client_credentials | `eats.store` | `PUT /v2/.../menus` · `POST /v2/.../menus/items/{item}` |
-| Accept / Deny / Cancel | client_credentials | `eats.order` | `/v1/eats/orders/{id}/...` (Previous Version — pendiente A3) |
-| Get Order Details | client_credentials | `eats.order` ∨ `eats.store.orders.read` | `GET /v2/eats/order/{id}` |
-| **Mark Ready** (canónico) | client_credentials | **`UBER_ORDER_FULFILLMENT_SCOPE` (A2)** | `POST /v1/delivery/order/{id}/ready` body `{}` |
-| **Resolve Fulfillment** (canónico restaurant) | client_credentials | **`UBER_ORDER_FULFILLMENT_SCOPE` (A2)** | `POST /v1/delivery/order/{id}/resolve-fulfillment-issues` |
+| **Get / Accept / Deny / Cancel** | client_credentials | `eats.order` | `GET·POST /v1/delivery/order/{id}[/accept\|/deny\|/cancel]` (Order Fulfillment family — **default**) |
+| **Mark Ready** | client_credentials | `eats.order` | `POST /v1/delivery/order/{id}/ready` body `{}` |
+| **Resolve Fulfillment** (restaurant) | client_credentials | `eats.order` | `POST /v1/delivery/order/{id}/resolve-fulfillment-issues` |
 
+- **CONFIRMADO por Uber (case #58972404, 2026-08-09):** todo el ciclo de orden
+  (get/accept/deny/cancel/ready/resolve) va por `/v1/delivery/order/*` y lo
+  autoriza **`eats.order`** — **no hay scope separado**. El default del adapter
+  es ahora `delivery`; el legacy `/v1/eats/orders/*` queda solo como escape hatch
+  explícito (`channel='eats'`). El guard fail-closed A2 se retiró; el scope de la
+  familia default es `eats.order` (override `UBER_ORDER_FULFILLMENT_SCOPE` sigue por compat).
 - `getUberAccessToken` valida scope otorgado vs solicitado → `UberScopeError` (fail closed).
-- La familia `/v1/delivery/order/*` usa `tokenType: 'order-fulfillment'`: **sin
-  `UBER_ORDER_FULFILLMENT_SCOPE` la adquisición de token falla cerrado citando A2** —
-  el hardcode previo `eats.deliveries` era no verificado y fue retirado del path.
 - Refresh token: USL pide `offline_access`; callback/refresh persisten rotación sellada.
   El token actual de AMALAY (expira 2026-08-31) no tiene refresh → requiere re-auth USL.
 
-## 4. Requirements 8 y 9 — estado reconciliado
+## 4. Requirements 8 y 9 — estado reconciliado (Uber-confirmado)
 
 | Req | Estado | Detalle |
 |---|---|---|
-| **8 Mark Ready** | **CODE READY — external scope validation pending (A2)** | Default restaurante (ambos canales) → `POST /v1/delivery/order/{id}/ready` body `{}`. `ready_for_pickup` (extinto) solo existe como `markOrderReadyLegacy`, sin routing default. Tests GAP-READY-001..003. |
-| **9 Resolve Fulfillment** | **CODE READY — external scope validation pending (A2)** | Contrato RESTAURANT canónico: `POST .../resolve-fulfillment-issues` con `{issue_type, action_type, item{id,name}, suspend_until, store_response}`; respuesta `should_wait_for_customer_response` propagada. El PATCH cart grocery-only fue **eliminado** (sin caso de uso grocery). Webhooks: `order(s).fulfillment_issues.resolved` + `order.failed` → cancelación local. Tests GAP-FULFILL-001..004, GAP-WH-004/005/009. |
+| **8 Mark Ready** | **CODE READY — pendiente tráfico real** | `POST /v1/delivery/order/{id}/ready` body `{}`, scope `eats.order` (Uber-confirmado). `ready_for_pickup` (extinto) solo como `markOrderReadyLegacy`, sin routing default. Tests GAP-READY-001..003. |
+| **9 Resolve Fulfillment** | **CODE READY — pendiente tráfico real** | `POST /v1/delivery/order/{id}/resolve-fulfillment-issues`, schema RESTAURANT `{issue_type, action_type, item{id,name}, suspend_until, store_response}`, scope `eats.order`; `should_wait_for_customer_response` propagado. PATCH cart grocery **eliminado**. Webhooks `order(s).fulfillment_issues.resolved` + `order.failed` → cancelación. Tests GAP-FULFILL-001..004, GAP-WH-004/005/009. |
 
 **Ninguno se declara REAL UBER VALIDATED hasta ver tráfico real 2xx de Uber en
 `integration_audit_log` del entorno correcto.** Un fixture interno es Cat A.
@@ -98,58 +100,35 @@ configurar la clave ANTES de cualquier USL de producción. Filas legacy se leen
 transparente y se re-sellan al siguiente refresh. Ningún log imprime tokens
 (test GAP-WH-008).
 
-## 7. Preguntas externas — reconciliadas 2026-08-07
+## 7. Preguntas externas — RESUELTAS por Uber (case #58972404, 2026-08-09)
 
-### MUST ASK UBER NOW (citando ticket #D5FEA8)
+| # | Pregunta | Respuesta de Uber | Encodeado en código |
+|---|---|---|---|
+| **A1** | ¿Qué app/host monitorea la validación? | **Test Client `k2DPoUeX…`** en **`test-api.uber.com`** con el test store provisto. Prod solo tras completar la validación. | `UBER_ENV=sandbox` → Test Client + `test-api.uber.com` (env.ts) |
+| **A2** | Habilitar scopes M2M + scope de `/v1/delivery/order/*` | **Scopes ya concedidos al Test Client.** La familia Order Fulfillment (ready/resolve + get/accept/deny/cancel) la autoriza **`eats.order`** — **sin scope separado**. | `getOrderFulfillmentScope()` → `eats.order`; guard fail-closed retirado |
+| **A3a** | ¿Qué generación de API para get/accept/deny/cancel? | **`/v1/delivery/order/{id}/...`** (Order Fulfillment). Legacy `/v1/eats/orders/...` **no** se usa en validación. | default del adapter = `delivery` (adapter-factory) |
+| **A3b** | ¿Evento de cancelación? | **`orders.failure`** (contrato actual), no `orders.cancel`. | handler acepta `orders.failure` + `order.failed` |
+| **A3c** | ¿Scheduled requerido? | **No bloqueante** — se puede completar Basic con órdenes on-demand. | scheduled implementado pero no requerido |
+| **A4** | ¿Timing de accept en scheduled? | `orders.scheduled.notification` = **informativo**; aceptar en el `orders.notification` de release (15–30 min antes). Validación busca 200-ack del scheduled + accept sobre la orden liberada. | persiste `programada`, sin auto-accept; release llega como `orders.notification` → handleNewOrder |
 
-- **A1 — Identidad de validación:** *"Which application do the Basic Production
-  Validation checks monitor — our Test Client (`k2DPoUeX…`) or the Production
-  Client (`6bHtSqLJ…`)? And against which host: `test-api.uber.com`, or
-  `api.uber.com` with an Uber-provisioned test store?"* (mecánica de detección
-  no publicada; bloquea los 10).
-- **A2 — Scopes:** *"Please enable the client_credentials scopes `eats.order`,
-  `eats.store`, `eats.store.orders.read`, `eats.store.status.write` for the app
-  from A1 (token requests currently return no granted scopes — probe corr
-  `83095544…`, 2026-08-03). Also: which scope authorizes the Order Fulfillment
-  family `/v1/delivery/order/*` (ready / resolve-fulfillment-issues)?"* —
-  la parte del scope de esa familia mantiene ready/resolve en fail-closed
-  (`UBER_ORDER_FULFILLMENT_SCOPE` sin valor).
-- **A3 — Generación de API + configuración del store:** *"Should our validation
-  target the current Order Fulfillment API (`/v1/delivery/order/...`) or the
-  Previous Version (`/v1/eats/orders/...`) for accept/deny/cancel? How is
-  webhooks_version configured for our app/test store (orders.cancel vs
-  orders.failure era), and is scheduled-orders enabled on test store
-  `633b57d4-237a-5a32-b249-7ceb795f1d35`?"* (ninguno de estos datos aparece en
-  GET/POST `pos_data` públicos).
-- **A4 — Scheduled lifecycle:** *"For `orders.scheduled.notification`, must the
-  POS accept at notification time or upon release, and which behavior does
-  validation expect?"* (el guide documenta el evento, no la obligación del POS).
+**Verificable por nosotros tras el deploy sandbox:** `integration_enabled`,
+`order_manager_client_id`, `order_release_enabled`, `online_status` → `GET pos_data`
+(ruta admin `/pos-data`). El scope efectivo se re-confirma con un probe fresco.
 
-### CAN VERIFY OURSELVES AFTER SCOPES
+## 7b. Punto abierto crítico — reconciliar credenciales
 
-- `integration_enabled`, `order_manager_client_id`, `order_release_enabled`,
-  `online_status` → `GET pos_data` (schema público; ruta admin `/pos-data` lista).
-- Scope efectivo de `/v1/delivery/order/*` → probe empírico de tokens contra el
-  test store si A2 no lo responde explícitamente (el 401 de Uber nombra el scope).
-- `orders.cancel` vs `orders.failure` → observable en el primer cancel real
-  (ambos manejados).
-
-### RESOLVED BY PUBLIC DOCS (preguntas eliminadas)
-
-- Mark Ready = `POST /v1/delivery/order/{id}/ready`, body `{}` (order_suite
-  `#tag/OrderReady`).
-- Resolve Fulfillment restaurant = `POST /v1/delivery/order/{id}/resolve-fulfillment-issues`
-  con schema restaurant; `PATCH /v2/eats/orders/{id}/cart` es Grocery-only.
-- Scopes de `pos_data`: GET=`eats.store`, POST=`eats.pos_provisioning`.
-- Webhooks del ciclo de resolución: `order.fulfillment_issues.resolved` /
-  `order.failed`.
+Nuestros probes 08-01/08-03 dieron `400 invalid_scope` / `granted:[]`, pero Uber
+dice que los scopes **ya están concedidos** al Test Client. Explicación probable:
+Uber los habilitó tras el email del 08-07. **Antes de correr tráfico hay que
+confirmar con un probe fresco** que las credenciales del deployment sandbox son
+las del Test Client `k2DPoUeX…` (no otra app), y que el token ahora trae `eats.order`.
 
 ## 8. Gates de ejecución
 
 | Gate | Condición | Estado |
 |---|---|---|
-| G1 Código interno | 251 tests Cat A + tsc + build | ✔ CERRADO |
-| G2 Config Uber | Respuestas A1–A4 + scopes otorgados | ⏳ UBER |
-| G3 Deploy validación + staging | Autorización de Daniel | ⏳ BLOQUEADO |
-| G4 Tráfico real (test orders) | Autorización de Daniel + G2 + G3 | ⏳ BLOQUEADO |
-| G5 Producción (Prod Client) | Certificación oficial de Uber | ⏳ BLOQUEADO |
+| G1 Código interno | 251 tests Cat A + tsc + build | ✔ CERRADO (código reconciliado con respuestas Uber) |
+| G2 Config Uber | Respuestas A1–A4 + scopes otorgados | ✔ CERRADO (case #58972404, 2026-08-09; scopes concedidos al Test Client) |
+| G3 Deploy validación + staging | Proyecto Vercel sandbox + Test Client secret + staging DB (acción de Daniel) | ⏳ SIGUIENTE |
+| G4 Tráfico real (test orders) | G3 + probe fresco confirma `eats.order` + Uber genera test order | ⏳ BLOQUEADO por G3 |
+| G5 Producción (Prod Client) | Basic Production Validation completada → Uber concede scopes a prod app | ⏳ BLOQUEADO |

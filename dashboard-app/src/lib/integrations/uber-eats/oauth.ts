@@ -21,7 +21,7 @@
 // covers every scope requested; a silently-narrowed grant throws instead of
 // letting API calls fail downstream with confusing 401s.
 
-import { resolveUberIdentity, resolveUberEnv, uberDomains, describeUberIdentity, UberConfigError, type UberIdentity } from './env'
+import { resolveUberIdentity, resolveUberEnv, uberDomains, describeUberIdentity, type UberIdentity } from './env'
 import { openToken, sealToken } from '../token-vault'
 
 export class UberScopeError extends Error {
@@ -49,18 +49,14 @@ export const DELIVERY_M2M_SCOPES = ['eats.deliveries']
 
 /**
  * Scope for the current Order Fulfillment family (/v1/delivery/order/*).
- * Uber's public docs do not state it (blocker A2) — we refuse to guess.
- * Set UBER_ORDER_FULFILLMENT_SCOPE once Uber confirms (or once a scope probe
- * against the test store proves which grant the family accepts).
+ * CONFIRMED by Uber support (case #58972404, 2026-08-09): the whole family —
+ * get / accept / deny / cancel / ready / resolve-fulfillment-issues — is
+ * authorized by `eats.order`; there is NO separate OAuth scope. The former A2
+ * fail-closed guard is retired now that the answer is known. UBER_ORDER_
+ * FULFILLMENT_SCOPE remains as an override for forward-compat only.
  */
 export function getOrderFulfillmentScope(): string {
-  const scope = (process.env.UBER_ORDER_FULFILLMENT_SCOPE ?? '').trim()
-  if (!scope) {
-    throw new UberConfigError(
-      'scope for /v1/delivery/order/* is not confirmed by Uber (blocker A2) — set UBER_ORDER_FULFILLMENT_SCOPE once confirmed; refusing to call with a guessed scope'
-    )
-  }
-  return scope
+  return (process.env.UBER_ORDER_FULFILLMENT_SCOPE ?? '').trim() || 'eats.order'
 }
 
 // Explicit scope constants (kept for audit documentation)

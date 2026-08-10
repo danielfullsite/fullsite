@@ -107,9 +107,9 @@ beforeEach(() => {
   process.env.UBER_CLIENT_ID = 'test-client-id'
   process.env.UBER_CLIENT_SECRET = 'test-client-secret'
   process.env.UBER_ENV = 'sandbox'
-  // Placeholder config for the /v1/delivery/order/* family — the real scope is
-  // pending Uber confirmation (A2); tests validate the mechanism, not the value.
-  process.env.UBER_ORDER_FULFILLMENT_SCOPE = 'scope.test.order-fulfillment'
+  // /v1/delivery/order/* scope is Uber-confirmed = eats.order (case #58972404);
+  // no override — the code defaults correctly.
+  delete process.env.UBER_ORDER_FULFILLMENT_SCOPE
 })
 
 afterEach(() => {
@@ -138,8 +138,8 @@ describe('DAY2-001..005: detectChannel', () => {
     expect(detectChannel({ channel: 'DELIVERY' })).toBe('delivery')
   })
 
-  it('DAY2-004: no channel field → eats (default)', () => {
-    expect(detectChannel({})).toBe('eats')
+  it('DAY2-004: no channel field → delivery (current Order Fulfillment default)', () => {
+    expect(detectChannel({})).toBe('delivery')
   })
 
   it('DAY2-005: event_type="delivery.order.created" → delivery via prefix', () => {
@@ -162,8 +162,8 @@ describe('DAY2-006..010: getOrderAdapter + getOrderAdapterForPayload', () => {
     expect(getOrderAdapterForPayload({ channel: 'delivery' }).channel).toBe('delivery')
   })
 
-  it('DAY2-009: getOrderAdapterForPayload({}).channel === "eats" (default)', () => {
-    expect(getOrderAdapterForPayload({}).channel).toBe('eats')
+  it('DAY2-009: getOrderAdapterForPayload({}).channel === "delivery" (default)', () => {
+    expect(getOrderAdapterForPayload({}).channel).toBe('delivery')
   })
 
   it('DAY2-010: getOrderAdapterForPayload({event_type:"delivery.order.accept"}).channel === "delivery"', () => {
@@ -334,7 +334,7 @@ describe('DAY2-021..024: Token grant type routing', () => {
     const tokenCall = calls.find(c => c.url.includes('sandbox-login.uber.com'))
     expect(tokenCall).toBeDefined()
     const body = new URLSearchParams(tokenCall!.init?.body as string)
-    expect(body.get('scope')).toBe('scope.test.order-fulfillment')
+    expect(body.get('scope')).toBe('eats.order')
     expect(body.get('scope')).not.toContain('eats.deliveries')
     // No provisioning lookup — the order-fulfillment family is M2M only
     expect(calls.some(c => c.url.includes('integration_providers'))).toBe(false)

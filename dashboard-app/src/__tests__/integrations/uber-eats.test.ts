@@ -503,11 +503,13 @@ describe('UBER-026: detectChannel payload classification', () => {
     expect(detectChannel({ event_type: 'delivery.order.created' })).toBe('delivery')
   })
 
-  it('defaults to eats for unknown channel', async () => {
+  it('defaults to delivery (current Order Fulfillment family, Uber-confirmed) for unknown channel', async () => {
     const { detectChannel } = await import('@/lib/integrations/uber-eats/adapter-factory')
-    expect(detectChannel({})).toBe('eats')
-    expect(detectChannel({ event_type: 'orders.notification' })).toBe('eats')
-    expect(detectChannel({ channel: 'rappi' })).toBe('eats')
+    expect(detectChannel({})).toBe('delivery')
+    expect(detectChannel({ event_type: 'orders.notification' })).toBe('delivery')
+    expect(detectChannel({ channel: 'rappi' })).toBe('delivery')
+    // explicit eats. event prefix still routes to the legacy escape hatch
+    expect(detectChannel({ event_type: 'eats.order.order_cancelled' })).toBe('eats')
   })
 })
 
@@ -530,7 +532,7 @@ describe('UBER-027: adapter-factory returns correct adapter', () => {
     const { getOrderAdapterForPayload } = await import('@/lib/integrations/uber-eats/adapter-factory')
     expect(getOrderAdapterForPayload({ channel: 'delivery' }).channel).toBe('delivery')
     expect(getOrderAdapterForPayload({ channel: 'eats' }).channel).toBe('eats')
-    expect(getOrderAdapterForPayload({}).channel).toBe('eats')
+    expect(getOrderAdapterForPayload({}).channel).toBe('delivery')
   })
 
   it('adapter interface has all 5 lifecycle methods', async () => {

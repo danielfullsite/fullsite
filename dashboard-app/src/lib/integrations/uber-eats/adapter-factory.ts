@@ -7,13 +7,13 @@
 // Channel detection priority:
 //   1. payload.channel field ('eats' | 'delivery')
 //   2. payload.event_type prefix ('delivery.' prefix → delivery)
-//   3. Default: 'eats' (backward compatible with all existing webhooks)
+//   3. Default: 'delivery' — the current Order Fulfillment family
 //
-// Reconciliation 2026-08-07: markOrderReady and resolveFulfillmentIssues are
-// restaurant-canonical on the current family and route there on BOTH channels —
-// the extinct ready_for_pickup and the grocery-only cart PATCH are never the
-// default. accept/deny/cancel/get keep per-channel routing until Uber answers
-// the generation-selection question (blocker A3).
+// CONFIRMED by Uber support (case #58972404, 2026-08-09): validation uses
+// /v1/delivery/order/{id}/... for get/accept/deny/cancel/ready (+ resolve);
+// the legacy /v1/eats/orders/... family is NOT used. So the canonical default
+// is now 'delivery'; the eats-legacy adapter is an explicit escape hatch,
+// reachable only when a payload sets channel='eats'.
 
 import {
   getOrderDetails as eatsGetOrderDetails,
@@ -53,9 +53,10 @@ export function detectChannel(payload: Record<string, unknown>): UberChannel {
   if (channel === 'eats') return 'eats'
 
   const eventType = ((payload.event_type ?? payload.type ?? '') as string).toLowerCase()
-  if (eventType.startsWith('delivery.')) return 'delivery'
+  if (eventType.startsWith('eats.')) return 'eats'
 
-  return 'eats'
+  // Default to the current Order Fulfillment family (Uber-confirmed for validation).
+  return 'delivery'
 }
 
 function makeEatsAdapter(): OrderAdapter {
