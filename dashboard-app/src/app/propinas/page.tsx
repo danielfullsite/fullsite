@@ -5,7 +5,7 @@ import { HandCoins, Users, TrendingUp, CreditCard } from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
 import EmptyState from '@/components/EmptyState'
-import { getRecentDays, aggregatePayments, getLatestDeep, getWansoftData, getWansoftDataRange, getDeepTable, getDashboardFromPosOrders } from '@/lib/data'
+import { getRecentDays, aggregatePayments, getLatestDeep, getWansoftData, getWansoftDataRange, getDashboardFromPosOrders } from '@/lib/data'
 import { formatCurrency } from '@/lib/format'
 import type { WansoftDaily } from '@/lib/types'
 
@@ -62,8 +62,7 @@ export default function PropinasPage() {
       getLatestDeep('wansoft_tips'),
       getWansoftData('tips_raw'),
       getWansoftDataRange('tips_raw', 30),
-      getDeepTable('wansoft_tips', 30),
-    ]).then(async ([d, tips, tipsRaw, tipsRawRange, tipsTableRange]) => {
+    ]).then(async ([d, tips, tipsRaw, tipsRawRange]) => {
       // Fallback: if no wansoft_daily data, build from pos_orders
       let recentResult = d
       if (recentResult.length === 0) {
@@ -72,14 +71,9 @@ export default function PropinasPage() {
       setData(recentResult)
       // Prefer multi-day tips_raw (real detailed scraper data) over latest single-day snapshots.
       const realRange = tipsRawRange.filter(row => Array.isArray(row.data) && row.data.length > 0)
-      const tableRange = (tipsTableRange as { fecha: string; data: unknown }[])
-        .filter(row => Array.isArray(row.data) && row.data.length > 0)
       if (realRange.length > 0) {
         setRealTips(aggregateTipsByMesero(realRange))
         setRealTipsDays(realRange.length)
-      } else if (tableRange.length > 0) {
-        setRealTips(aggregateTipsByMesero(tableRange))
-        setRealTipsDays(tableRange.length)
       } else if (tipsRaw && Array.isArray(tipsRaw.data) && tipsRaw.data.length > 0) {
         setRealTips(tipsRaw.data as TipEntry[])
         setRealTipsDays(1)
