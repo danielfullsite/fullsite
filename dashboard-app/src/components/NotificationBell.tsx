@@ -74,16 +74,28 @@ function agentLabel(id: string): string {
 export default function NotificationBell() {
   const [alerts, setAlerts] = useState<AgentAlert[]>([])
   const [open, setOpen] = useState(false)
-  const [lastSeen, setLastSeen] = useState<string | null>(null)
+  const [lastSeen, setLastSeen] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null
+    try {
+      return localStorage.getItem(LAST_SEEN_KEY)
+    } catch {
+      return null
+    }
+  })
   const ref = useRef<HTMLDivElement>(null)
 
   const fetchAlerts = useCallback(async () => {
+    let fullsiteDataSource = false
+    try {
+      fullsiteDataSource = localStorage.getItem('fullsite_data_source') === 'fullsite'
+    } catch { /* private browsing */ }
+
     const [results, errors] = await Promise.all([
       sbFetch(
         'agent_results',
         'select=agent_id,summary,priority,updated_at&or=(priority.eq.critical,priority.eq.warning)&order=updated_at.desc&limit=20'
       ),
-      sbFetch(
+      fullsiteDataSource ? Promise.resolve([]) : sbFetch(
         'agent_runs',
         'select=agent_id,output_summary,status,created_at&status=eq.error&order=created_at.desc&limit=10'
       ),
@@ -117,19 +129,14 @@ export default function NotificationBell() {
     setAlerts(items.slice(0, 25))
   }, [])
 
-  // Load lastSeen from localStorage
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(LAST_SEEN_KEY)
-      if (stored) setLastSeen(stored)
-    } catch { /* private browsing */ }
-  }, [])
-
   // Fetch on mount + interval
   useEffect(() => {
-    fetchAlerts()
+    const start = setTimeout(fetchAlerts, 0)
     const interval = setInterval(fetchAlerts, REFRESH_INTERVAL)
-    return () => clearInterval(interval)
+    return () => {
+      clearTimeout(start)
+      clearInterval(interval)
+    }
   }, [fetchAlerts])
 
   // Close dropdown on outside click

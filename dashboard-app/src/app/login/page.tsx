@@ -60,6 +60,54 @@ export default function LoginPage() {
         }))
         // Cookie para el middleware server-side (mismo token; expira con él)
         document.cookie = `fs-at=${data.access_token}; path=/; max-age=${data.expires_in || 3600}; secure; samesite=lax`
+
+        // Resolver y persistir el tenant autenticado antes de redirigir.
+        //
+        // En previews/sandbox corremos con NEXT_PUBLIC_DEFAULT_CLIENT_ID=''
+        // para evitar fallback a AMALAY. El valor autoritativo disponible en
+        // browser es la fila client_users del usuario bajo RLS con su JWT real,
+        // no localStorage previo, URL ni defaults hardcodeados.
+        let resolvedClientId = data.user?.app_metadata?.client_id as string | undefined
+        try {
+          const cuRes = await fetch(
+            `${supabaseUrl}/rest/v1/client_users?user_id=eq.${encodeURIComponent(data.user.id)}&select=client_id&limit=1`,
+            {
+              headers: {
+                apikey: supabaseKey,
+                Authorization: `Bearer ${data.access_token}`,
+              },
+              cache: 'no-store',
+            }
+          )
+          if (cuRes.ok) {
+            const rows = await cuRes.json()
+            const cid = Array.isArray(rows) ? rows[0]?.client_id : null
+            if (typeof cid === 'string' && cid.trim()) resolvedClientId = cid.trim()
+          }
+        } catch { /* AuthContext retry after redirect */ }
+        if (resolvedClientId) {
+          const normalizedClientId = resolvedClientId.toLowerCase()
+          try { localStorage.setItem('fullsite_client_id', normalizedClientId) } catch {}
+          try {
+            const cfgRes = await fetch(
+              `${supabaseUrl}/rest/v1/clients?id=eq.${encodeURIComponent(normalizedClientId)}&select=data_source&limit=1`,
+              {
+                headers: {
+                  apikey: supabaseKey,
+                  Authorization: `Bearer ${data.access_token}`,
+                },
+                cache: 'no-store',
+              }
+            )
+            if (cfgRes.ok) {
+              const rows = await cfgRes.json()
+              const dataSource = Array.isArray(rows) ? rows[0]?.data_source : null
+              const useFullsite = dataSource === 'fullsite' || (dataSource === 'supabase' && normalizedClientId !== 'amalay')
+              localStorage.setItem('fullsite_data_source', useFullsite ? 'fullsite' : 'wansoft')
+            }
+          } catch { /* AuthContext retry after redirect */ }
+        }
+
         // Super-admin de plataforma → Control Center (no al POS de un tenant)
         const appMeta = (data.user?.app_metadata ?? {}) as Record<string, unknown>
         if (appMeta.platform_admin === true) {
@@ -67,7 +115,7 @@ export default function LoginPage() {
           return
         }
         // Redirect por rol: dueño/gerente/capitan → dashboard; cajero/mesero/staff → POS
-        const clientId = data.user?.user_metadata?.client_id as string | undefined
+        const clientId = resolvedClientId || data.user?.user_metadata?.client_id as string | undefined
         const rawRole = data.user?.user_metadata?.role as string | undefined
         const { DB_ROLE_MAP, resolveLoginRedirect } = await import('@/lib/roles')
         const role = rawRole ? (DB_ROLE_MAP[rawRole] ?? null) : null

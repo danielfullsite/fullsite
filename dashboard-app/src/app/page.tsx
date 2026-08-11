@@ -128,12 +128,9 @@ export default function DashboardPage() {
   const [selectedDayIdx, setSelectedDayIdx] = useState(0) // 0 = latest, 1 = yesterday, etc.
   const [weekOffset, setWeekOffset] = useState(0) // 0 = current week, 1 = last week, etc.
   const [monthOffset, setMonthOffset] = useState(0) // 0 = current month, 1 = last month, etc.
-  const [widgets, setWidgets] = useState<WidgetConfig>(getDefaultWidgets)
+  const [widgets, setWidgets] = useState<WidgetConfig>(() => loadWidgetConfig())
   const [showSettings, setShowSettings] = useState(false)
   const [agentRuns, setAgentRuns] = useState<AgentRun[]>([])
-
-  // Load widget config from localStorage
-  useEffect(() => { setWidgets(loadWidgetConfig()) }, [])
 
   const toggleWidget = useCallback((id: WidgetId) => {
     setWidgets(prev => {
@@ -417,9 +414,9 @@ export default function DashboardPage() {
                     <input
                       type="date"
                       className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                      value={viewDay.fecha}
-                      min={recentData[0]?.fecha}
-                      max={recentData[recentData.length - 1]?.fecha}
+                      value={String(viewDay.fecha || '')}
+                      min={recentData[0]?.fecha || ''}
+                      max={recentData[recentData.length - 1]?.fecha || ''}
                       onChange={(e) => {
                         const idx = recentData.findIndex(d => d.fecha === e.target.value)
                         if (idx >= 0) setSelectedDayIdx(recentData.length - 1 - idx)

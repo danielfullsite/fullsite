@@ -181,6 +181,7 @@ function locationFilter(locationId?: string | null): string {
 export async function getRecentDays(days: number = 30, clientSlug: string = getActiveClientSlug(), locationId?: string | null): Promise<WansoftDaily[]> {
   // Try pos_orders first for recent data (last 7 days) — this is the live POS data
   const posRecent = await getDashboardFromPosOrders(Math.min(days, 90), clientSlug)
+  if (isFullsitePOS()) return posRecent.slice(-days)
   // Then get wansoft_daily for historical data
   const data = await sbFetch('wansoft_daily', `select=*&client_slug=eq.${clientSlug}${locationFilter(locationId)}&ventas_dia=gt.0&order=fecha.desc&limit=${days * 2}`) as Record<string, unknown>[]
   const wansoftData = dedupeByFecha(data).slice(0, days).reverse().map(parseRow)
@@ -198,6 +199,7 @@ export async function getLatestDay(clientSlug: string = getActiveClientSlug(), l
   // Try pos_orders first — live POS data takes priority
   const posData = await getDashboardFromPosOrders(7, clientSlug)
   if (posData.length > 0) return posData[posData.length - 1]
+  if (isFullsitePOS()) return null
   // Fallback to wansoft_daily
   const data = await sbFetch('wansoft_daily', `select=*&client_slug=eq.${clientSlug}${locationFilter(locationId)}&ventas_dia=gt.0&order=fecha.desc&limit=5`) as Record<string, unknown>[]
   const deduped = dedupeByFecha(data)
@@ -206,12 +208,17 @@ export async function getLatestDay(clientSlug: string = getActiveClientSlug(), l
 }
 
 export async function getDayData(fecha: string, clientSlug: string = getActiveClientSlug(), locationId?: string | null): Promise<WansoftDaily | null> {
+  if (isFullsitePOS()) {
+    const rows = await getDashboardFromPosOrders(365, clientSlug)
+    return rows.find(row => row.fecha === fecha) || null
+  }
   const data = await sbFetch('wansoft_daily', `select=*&client_slug=eq.${clientSlug}${locationFilter(locationId)}&fecha=eq.${fecha}&ventas_dia=gt.0&order=ventas_dia.desc&limit=5`) as Record<string, unknown>[]
   const deduped = dedupeByFecha(data)
   return deduped.length > 0 ? parseRow(deduped[0]) : null
 }
 
 export async function getMonthlyData(clientSlug: string = getActiveClientSlug(), locationId?: string | null): Promise<WansoftDaily[]> {
+  if (isFullsitePOS()) return getDashboardFromPosOrders(365, clientSlug)
   const data = await sbFetch('wansoft_daily', `select=*&client_slug=eq.${clientSlug}${locationFilter(locationId)}&ventas_dia=gt.0&order=fecha.asc&limit=1000`) as Record<string, unknown>[]
   const rows = dedupeByFecha(data).map(parseRow)
   if (rows.length > 0) return rows
@@ -220,6 +227,7 @@ export async function getMonthlyData(clientSlug: string = getActiveClientSlug(),
 }
 
 export async function getWaiterCategories(days: number = 7, clientSlug: string = getActiveClientSlug()) {
+  if (isFullsitePOS()) return []
   return sbFetch('wansoft_waiter_categories', `select=*&client_slug=eq.${clientSlug}&order=fecha.desc&limit=${days}`)
 }
 
@@ -389,6 +397,23 @@ export interface AgentRun {
 }
 
 export async function getLatestAgentRuns(): Promise<AgentRun[]> {
+  if (isFullsitePOS()) {
+    const rows = await sbFetch('agent_results', 'select=agent_id,summary,priority,updated_at&order=updated_at.desc&limit=100') as {
+      agent_id?: string
+      summary?: string
+      priority?: string
+      updated_at?: string
+    }[]
+    return rows
+      .filter(row => row.agent_id)
+      .map(row => ({
+        agent_id: row.agent_id!,
+        status: row.priority === 'critical' ? 'error' : 'success',
+        output_summary: row.summary || '',
+        trigger_type: row.priority || 'agent_result',
+        created_at: row.updated_at || new Date().toISOString(),
+      }))
+  }
   const rows = await sbFetch('agent_runs', 'select=agent_id,status,output_summary,trigger_type,created_at&order=created_at.desc&limit=100')
   const map = new Map<string, AgentRun>()
   for (const row of rows as AgentRun[]) {
