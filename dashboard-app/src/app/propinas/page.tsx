@@ -5,34 +5,87 @@ import { HandCoins, Users, TrendingUp, CreditCard } from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
 import EmptyState from '@/components/EmptyState'
-import { getRecentDays, aggregatePayments, getLatestDeep, getWansoftData, getDashboardFromPosOrders } from '@/lib/data'
+import { getRecentDays, aggregatePayments, getLatestDeep, getWansoftData, getWansoftDataRange, getDeepTable, getDashboardFromPosOrders } from '@/lib/data'
 import { formatCurrency } from '@/lib/format'
 import type { WansoftDaily } from '@/lib/types'
 
 const PROPINA_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4', '#ec4899']
 
+type TipEntry = {
+  mesero: string
+  ventas: number
+  tickets: number
+  propinas: number
+  propina_promedio: number
+}
+
+function aggregateTipsByMesero(rows: { fecha: string; data: unknown }[]): TipEntry[] {
+  const map = new Map<string, TipEntry & { dias: Set<string> }>()
+
+  for (const row of rows) {
+    if (!Array.isArray(row.data)) continue
+    for (const item of row.data as TipEntry[]) {
+      if (!item?.mesero) continue
+      const current = map.get(item.mesero) || {
+        mesero: item.mesero,
+        ventas: 0,
+        tickets: 0,
+        propinas: 0,
+        propina_promedio: 0,
+        dias: new Set<string>(),
+      }
+      current.ventas += Number(item.ventas) || 0
+      current.tickets += Number(item.tickets) || 0
+      current.propinas += Number(item.propinas) || 0
+      current.dias.add(row.fecha)
+      map.set(item.mesero, current)
+    }
+  }
+
+  return [...map.values()]
+    .map(({ dias, ...entry }) => ({
+      ...entry,
+      propina_promedio: dias.size > 0 ? entry.propinas / dias.size : 0,
+    }))
+    .sort((a, b) => b.propinas - a.propinas)
+}
+
 export default function PropinasPage() {
   const [data, setData] = useState<WansoftDaily[]>([])
   const [loading, setLoading] = useState(true)
-  const [realTips, setRealTips] = useState<{ mesero: string; ventas: number; tickets: number; propinas: number; propina_promedio: number }[] | null>(null)
+  const [realTips, setRealTips] = useState<TipEntry[] | null>(null)
+  const [realTipsDays, setRealTipsDays] = useState(0)
 
   useEffect(() => {
     Promise.all([
       getRecentDays(30),
       getLatestDeep('wansoft_tips'),
       getWansoftData('tips_raw'),
-    ]).then(async ([d, tips, tipsRaw]) => {
+      getWansoftDataRange('tips_raw', 30),
+      getDeepTable('wansoft_tips', 30),
+    ]).then(async ([d, tips, tipsRaw, tipsRawRange, tipsTableRange]) => {
       // Fallback: if no wansoft_daily data, build from pos_orders
       let recentResult = d
       if (recentResult.length === 0) {
         recentResult = await getDashboardFromPosOrders(30)
       }
       setData(recentResult)
-      // Prefer tips_raw (real data from deep scraper) over wansoft_tips (often zeros)
-      if (tipsRaw && Array.isArray(tipsRaw.data) && tipsRaw.data.length > 0) {
-        setRealTips(tipsRaw.data as typeof realTips)
+      // Prefer multi-day tips_raw (real detailed scraper data) over latest single-day snapshots.
+      const realRange = tipsRawRange.filter(row => Array.isArray(row.data) && row.data.length > 0)
+      const tableRange = (tipsTableRange as { fecha: string; data: unknown }[])
+        .filter(row => Array.isArray(row.data) && row.data.length > 0)
+      if (realRange.length > 0) {
+        setRealTips(aggregateTipsByMesero(realRange))
+        setRealTipsDays(realRange.length)
+      } else if (tableRange.length > 0) {
+        setRealTips(aggregateTipsByMesero(tableRange))
+        setRealTipsDays(tableRange.length)
+      } else if (tipsRaw && Array.isArray(tipsRaw.data) && tipsRaw.data.length > 0) {
+        setRealTips(tipsRaw.data as TipEntry[])
+        setRealTipsDays(1)
       } else if (tips && Array.isArray(tips.data) && tips.data.length > 0) {
-        setRealTips(tips.data as typeof realTips)
+        setRealTips(tips.data as TipEntry[])
+        setRealTipsDays(1)
       }
     }).catch(() => {}).finally(() => setLoading(false))
   }, [])
@@ -163,7 +216,7 @@ export default function PropinasPage() {
                 {isRealTipsData ? (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 font-medium">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                    Datos reales de Wansoft
+                    Datos reales de Fullsite/Wansoft · {realTipsDays} día{realTipsDays === 1 ? '' : 's'}
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 font-medium">

@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
     // Service key (server-side only): sobrevive el endurecimiento RLS anon→authenticated
     const sbKey = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     const sbHeaders = { apikey: sbKey, Authorization: `Bearer ${sbKey}` }
-    const selectCols = 'fecha,ventas_dia,ventas_brutas,descuentos,tickets_count,personas_restaurant,ticket_promedio_restaurant,efectivo,tarjeta,meseros,ventas_por_grupo,pago_metodos,platillos_top'
+    const selectCols = 'fecha,ventas_dia,ventas_brutas,descuentos,propinas_total,tickets_count,personas_restaurant,ticket_promedio_restaurant,efectivo,tarjeta,meseros,ventas_por_grupo,pago_metodos,platillos_top'
 
     // ── PARALLEL DATA LOADING ── All queries run at once to stay under Vercel 10s limit
     const wantsMeseros = ['mesero', 'quien', 'quién', 'ranking', 'top', 'mejor', 'peor', 'h&h', 'half', 'bebida', 'postre', 'pan', 'toast', 'propina', 'vendio', 'vendió', 'omar', 'brayan', 'julio', 'daniela', 'mauricio', 'oscar', 'alexis', 'hector', 'crack', 'manco', 'chilaquil', 'cuantos', 'cuántos', 'vendieron', 'vendimos'].some(kw => q.includes(kw))
@@ -214,7 +214,7 @@ export async function POST(request: NextRequest) {
     // 3. Waiter × platillo data — process results from parallel fetch
     let waiterContext = ''
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let waiterRows = (waiterRowsRaw || []) as Array<{ fecha: string; data: any }>
+    const waiterRows = (waiterRowsRaw || []) as Array<{ fecha: string; data: any }>
     if (wantsMeseros) {
 
     if (waiterRows && waiterRows.length > 0) {
@@ -599,6 +599,8 @@ export async function POST(request: NextRequest) {
         if (wantsDetail) {
           const descuentos = Number(d.descuentos) || 0
           if (descuentos > 0) line += `, Descuentos $${descuentos}`
+          const propinas = Number(d.propinas_total) || 0
+          if (propinas > 0) line += `, Propinas $${propinas}`
 
           const meseros = parseJsonb(d.meseros) as { nombre: string; total: number }[]
           if (meseros.length > 0) {
@@ -855,7 +857,7 @@ CÓMO INTERPRETAR (lee la intención, no las palabras):
 - "qué le dirías a Monica/dueño/gerente" → dar resumen ejecutivo con 3 puntos + acciones
 - "hoy" sin datos de hoy → Di "aún no hay datos de hoy (el scraper no ha corrido). El último día registrado es [fecha]:" y da los datos de ese día. NO inventes números para hoy.
 - "hora pico" → si hay VENTAS POR HORA en los datos, usarlas. Si no, decir "no tengo desglose por hora, revísalo en el dashboard"
-- "propinas" → NO hay datos de propinas en el sistema. Di: "las propinas no llegan al sistema — revísalas en el corte de caja físico o en Wansoft → Reportes → Corte de Caja". NO inventes montos.
+- "propinas" → usar el campo real propinas_total de los datos diarios. Si el periodo tiene propinas_total > 0, responde con el total y los días con dato; si no hay propinas_total en ese periodo, di "no tengo propinas sincronizadas para ese periodo" y NO inventes montos.
 - "inventario" / "stock" / "market" → buscar en INVENTARIO MARKET si hay datos. Dar stock actual, items con bajo stock, últimos movimientos. Si preguntan por ingredientes de cocina, decir que se revisa en /pos/inventario.
 - "vs semana pasada" / "comparado con" → usa los RESÚMENES ÚLTIMOS 7 DÍAS y compara con los 7 días anteriores de los datos diarios. NO digas "no tengo datos completos" si tienes datos de ambos periodos
 - Cualquier nombre propio → buscar en TODOS los datos disponibles

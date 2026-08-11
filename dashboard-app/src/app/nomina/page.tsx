@@ -83,6 +83,19 @@ function formatDateShort(dateStr: string): string {
   return d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })
 }
 
+function SortIcon({
+  field,
+  sortField,
+  sortAsc,
+}: {
+  field: SortField
+  sortField: SortField
+  sortAsc: boolean
+}) {
+  if (sortField !== field) return <ChevronDown size={12} className="text-[var(--text-4)] opacity-0 group-hover:opacity-100 transition-opacity" />
+  return <ChevronDown size={12} className={`text-[var(--text-2)] transition-transform ${sortAsc ? 'rotate-180' : ''}`} />
+}
+
 // ── Component ───────────────────────────────────────────────────────────
 
 export default function NominaPage() {
@@ -151,7 +164,13 @@ export default function NominaPage() {
       }
 
       // Tips: prefer tips_raw over wansoft_tips
-      if (tipsRawRow?.data && Array.isArray(tipsRawRow.data) && tipsRawRow.data.length > 0) {
+      const tipsRawRange = await getWansoftDataRange('tips_raw', days)
+      const detailedTips = tipsRawRange
+        .filter(row => Array.isArray(row.data) && row.data.length > 0)
+        .flatMap(row => row.data as TipEntry[])
+      if (detailedTips.length > 0) {
+        setTips(detailedTips)
+      } else if (tipsRawRow?.data && Array.isArray(tipsRawRow.data) && tipsRawRow.data.length > 0) {
         setTips(tipsRawRow.data as TipEntry[])
       } else if (tipsRow?.data && Array.isArray(tipsRow.data)) {
         setTips(tipsRow.data as TipEntry[])
@@ -172,7 +191,10 @@ export default function NominaPage() {
     }
   }, [])
 
-  useEffect(() => { loadData(period) }, [period, loadData])
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadData(period)
+  }, [period, loadData])
 
   // ── Computed: aggregate meseros from daily data ────────────────────
 
@@ -314,12 +336,6 @@ export default function NominaPage() {
     if (!isNaN(rate) && rate >= 0) {
       setEditingRates(prev => ({ ...prev, [nombre]: rate }))
     }
-  }
-
-  // Column sort indicator
-  function SortIcon({ field }: { field: SortField }) {
-    if (sortField !== field) return <ChevronDown size={12} className="text-[var(--text-4)] opacity-0 group-hover:opacity-100 transition-opacity" />
-    return <ChevronDown size={12} className={`text-[var(--text-2)] transition-transform ${sortAsc ? 'rotate-180' : ''}`} />
   }
 
   // ── Render ────────────────────────────────────────────────────────
@@ -471,27 +487,27 @@ export default function NominaPage() {
                     <tr className="border-b border-[var(--line-soft)] text-[var(--text-3)]">
                       <th className="text-left px-4 py-3 font-medium w-8">#</th>
                       <th className="text-left px-4 py-3 font-medium group cursor-pointer select-none" onClick={() => toggleSort('nombre')}>
-                        <span className="inline-flex items-center gap-1">Empleado <SortIcon field="nombre" /></span>
+                        <span className="inline-flex items-center gap-1">Empleado <SortIcon field="nombre" sortField={sortField} sortAsc={sortAsc} /></span>
                       </th>
                       <th className="text-center px-4 py-3 font-medium group cursor-pointer select-none" onClick={() => toggleSort('daysWorked')}>
-                        <span className="inline-flex items-center gap-1">Dias <SortIcon field="daysWorked" /></span>
+                        <span className="inline-flex items-center gap-1">Dias <SortIcon field="daysWorked" sortField={sortField} sortAsc={sortAsc} /></span>
                       </th>
                       <th className="text-right px-4 py-3 font-medium group cursor-pointer select-none" onClick={() => toggleSort('hoursTotal')}>
-                        <span className="inline-flex items-center gap-1 justify-end">Horas <SortIcon field="hoursTotal" /></span>
+                        <span className="inline-flex items-center gap-1 justify-end">Horas <SortIcon field="hoursTotal" sortField={sortField} sortAsc={sortAsc} /></span>
                       </th>
                       <th className="text-right px-4 py-3 font-medium w-[100px]">$/hora</th>
                       <th className="text-right px-4 py-3 font-medium">Sueldo base</th>
                       <th className="text-right px-4 py-3 font-medium group cursor-pointer select-none" onClick={() => toggleSort('tipsEarned')}>
-                        <span className="inline-flex items-center gap-1 justify-end">Propinas <SortIcon field="tipsEarned" /></span>
+                        <span className="inline-flex items-center gap-1 justify-end">Propinas <SortIcon field="tipsEarned" sortField={sortField} sortAsc={sortAsc} /></span>
                       </th>
                       <th className="text-right px-4 py-3 font-medium group cursor-pointer select-none" onClick={() => toggleSort('salesTotal')}>
-                        <span className="inline-flex items-center gap-1 justify-end">Ventas <SortIcon field="salesTotal" /></span>
+                        <span className="inline-flex items-center gap-1 justify-end">Ventas <SortIcon field="salesTotal" sortField={sortField} sortAsc={sortAsc} /></span>
                       </th>
                       <th className="text-right px-4 py-3 font-medium">
                         <span className="inline-flex items-center gap-1 justify-end text-red-400">Deducciones</span>
                       </th>
                       <th className="text-right px-4 py-3 font-medium group cursor-pointer select-none" onClick={() => toggleSort('totalPay')}>
-                        <span className="inline-flex items-center gap-1 justify-end font-bold text-emerald-500">Total <SortIcon field="totalPay" /></span>
+                        <span className="inline-flex items-center gap-1 justify-end font-bold text-emerald-500">Total <SortIcon field="totalPay" sortField={sortField} sortAsc={sortAsc} /></span>
                       </th>
                     </tr>
                   </thead>
