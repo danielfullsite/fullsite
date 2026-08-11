@@ -60,6 +60,12 @@ export default function LoginPage() {
         }))
         // Cookie para el middleware server-side (mismo token; expira con él)
         document.cookie = `fs-at=${data.access_token}; path=/; max-age=${data.expires_in || 3600}; secure; samesite=lax`
+        // Super-admin de plataforma → Control Center (no al POS de un tenant)
+        const appMeta = (data.user?.app_metadata ?? {}) as Record<string, unknown>
+        if (appMeta.platform_admin === true) {
+          window.location.href = '/platform'
+          return
+        }
         // Redirect por rol: dueño/gerente/capitan → dashboard; cajero/mesero/staff → POS
         const clientId = data.user?.user_metadata?.client_id as string | undefined
         const rawRole = data.user?.user_metadata?.role as string | undefined
