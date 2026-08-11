@@ -44,6 +44,9 @@ const tentacleColors: Record<string, string> = {
   resenas: 'bg-pink-500/10 text-pink-400',
 }
 
+const CARD_STYLE = { background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' } as const
+const MONO = { fontFamily: 'var(--font-mono)' } as const
+
 export default function DemoAgentes() {
   return (
     <div className="min-h-screen bg-[var(--bg)] text-[var(--text-1)]">
@@ -62,31 +65,31 @@ export default function DemoAgentes() {
       <div className="p-6 max-w-[1400px] mx-auto space-y-6">
         {/* Summary */}
         <div className="grid grid-cols-3 gap-4">
-          <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-5">
+          <div className="border border-[var(--line)] rounded-2xl p-5" style={CARD_STYLE}>
             <div className="flex items-center gap-2 mb-3">
               <Bot size={18} className="text-emerald-400" />
             </div>
-            <p className="text-3xl font-bold">{AGENTS.length}</p>
+            <p className="text-3xl font-bold tabular-nums" style={MONO}>{AGENTS.length}</p>
             <p className="text-xs text-[var(--text-3)] mt-1">Agentes totales</p>
           </div>
-          <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-5">
+          <div className="border border-[var(--line)] rounded-2xl p-5" style={CARD_STYLE}>
             <div className="flex items-center gap-2 mb-3">
               <CheckCircle2 size={18} className="text-emerald-400" />
             </div>
-            <p className="text-3xl font-bold text-emerald-400">{activeCount}</p>
+            <p className="text-3xl font-bold text-emerald-400 tabular-nums" style={MONO}>{activeCount}</p>
             <p className="text-xs text-[var(--text-3)] mt-1">Activos</p>
           </div>
-          <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-5">
+          <div className="border border-[var(--line)] rounded-2xl p-5" style={CARD_STYLE}>
             <div className="flex items-center gap-2 mb-3">
               <Clock size={18} className="text-amber-400" />
             </div>
-            <p className="text-3xl font-bold text-amber-400">{scheduledCount}</p>
+            <p className="text-3xl font-bold text-amber-400 tabular-nums" style={MONO}>{scheduledCount}</p>
             <p className="text-xs text-[var(--text-3)] mt-1">Programados</p>
           </div>
         </div>
 
         {/* Latest insights */}
-        <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-5">
+        <div className="border border-[var(--line)] rounded-2xl p-5" style={CARD_STYLE}>
           <h3 className="flex items-center gap-2 font-bold mb-4">
             <Zap size={18} className="text-emerald-400" /> Ultimos hallazgos
           </h3>
@@ -106,7 +109,7 @@ export default function DemoAgentes() {
         </div>
 
         {/* Agent list */}
-        <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-5">
+        <div className="border border-[var(--line)] rounded-2xl p-5" style={CARD_STYLE}>
           <h3 className="flex items-center gap-2 font-bold mb-4">
             <Bot size={18} className="text-blue-400" /> Todos los agentes
           </h3>
@@ -119,7 +122,7 @@ export default function DemoAgentes() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
                     <span className="text-sm font-semibold">{agent.name}</span>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${tentacleColors[agent.tentacle] || 'bg-zinc-500/10 text-[var(--text-2)]'}`}>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium uppercase ${tentacleColors[agent.tentacle] || 'bg-zinc-500/10 text-[var(--text-2)]'}`} style={{ fontFamily: 'var(--font-mono)', letterSpacing: '0.08em' }}>
                       {agent.tentacle}
                     </span>
                   </div>
@@ -129,7 +132,7 @@ export default function DemoAgentes() {
                   <span className={`text-xs font-medium ${agent.status === 'activo' ? 'text-emerald-400' : 'text-amber-400'}`}>
                     {agent.status}
                   </span>
-                  <p className="text-[10px] text-[var(--text-4)] mt-0.5 flex items-center gap-1 justify-end">
+                  <p className="text-[10px] text-[var(--text-4)] mt-0.5 flex items-center gap-1 justify-end" style={MONO}>
                     <Calendar size={10} /> {agent.schedule}
                   </p>
                 </div>

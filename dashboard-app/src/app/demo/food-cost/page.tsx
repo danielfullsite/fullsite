@@ -31,6 +31,9 @@ function foodCostBadge(pct: number) {
   return 'text-red-400 bg-red-400/10'
 }
 
+const CARD_STYLE = { background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' } as const
+const MONO = { fontFamily: 'var(--font-mono)' } as const
+
 export default function DemoFoodCost() {
   const platillosConCalc = PLATILLOS.map(p => ({
     ...p,
@@ -60,22 +63,22 @@ export default function DemoFoodCost() {
         {/* Summary cards */}
         <div className="grid grid-cols-3 gap-4">
           {[
-            { label: 'Food cost promedio', value: `${avgFoodCost.toFixed(1)}%`, icon: Percent, color: foodCostColor(avgFoodCost) },
-            { label: 'Margen promedio', value: formatDemoMXN(Math.round(avgMargen)), icon: TrendingUp, color: 'text-emerald-400' },
-            { label: 'Más rentable', value: masRentable.nombre, icon: Star, color: 'text-amber-400' },
+            { label: 'Food cost promedio', value: `${avgFoodCost.toFixed(1)}%`, icon: Percent, color: foodCostColor(avgFoodCost), mono: true },
+            { label: 'Margen promedio', value: formatDemoMXN(Math.round(avgMargen)), icon: TrendingUp, color: 'text-emerald-400', mono: true },
+            { label: 'Más rentable', value: masRentable.nombre, icon: Star, color: 'text-amber-400', mono: false },
           ].map(card => (
-            <div key={card.label} className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-5">
+            <div key={card.label} className="border border-[var(--line)] rounded-2xl p-5" style={CARD_STYLE}>
               <div className="flex items-center gap-2 mb-3">
                 <card.icon size={18} className={card.color} />
               </div>
-              <p className="text-2xl font-bold">{card.value}</p>
+              <p className={`text-2xl font-bold ${card.mono ? 'tabular-nums' : ''}`} style={card.mono ? MONO : undefined}>{card.value}</p>
               <p className="text-xs text-[var(--text-3)] mt-1">{card.label}</p>
             </div>
           ))}
         </div>
 
         {/* Table */}
-        <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl overflow-hidden">
+        <div className="border border-[var(--line)] rounded-2xl overflow-hidden" style={CARD_STYLE}>
           <div className="p-5 border-b border-[var(--line)]">
             <h3 className="font-bold flex items-center gap-2">
               <ChefHat size={18} className="text-orange-400" /> Análisis por platillo
@@ -84,7 +87,7 @@ export default function DemoFoodCost() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-[var(--text-3)] text-xs border-b border-[var(--line)]">
+                <tr className="text-[var(--text-3)] text-xs uppercase border-b border-[var(--line)]" style={{ fontFamily: 'var(--font-mono)', letterSpacing: '0.12em' }}>
                   <th className="text-left px-5 py-3 font-medium">Platillo</th>
                   <th className="text-right px-5 py-3 font-medium">Costo ingredientes</th>
                   <th className="text-right px-5 py-3 font-medium">Precio venta</th>
@@ -96,14 +99,14 @@ export default function DemoFoodCost() {
                 {platillosConCalc.map(p => (
                   <tr key={p.nombre} className="border-b border-[var(--line)] last:border-0 hover:bg-white/[0.02]">
                     <td className="px-5 py-3 font-medium">{p.nombre}</td>
-                    <td className="px-5 py-3 text-right tabular-nums text-[var(--text-2)]">{formatDemoMXN(p.costo)}</td>
-                    <td className="px-5 py-3 text-right tabular-nums">{formatDemoMXN(p.precio)}</td>
+                    <td className="px-5 py-3 text-right tabular-nums text-[var(--text-2)]" style={MONO}>{formatDemoMXN(p.costo)}</td>
+                    <td className="px-5 py-3 text-right tabular-nums" style={MONO}>{formatDemoMXN(p.precio)}</td>
                     <td className="px-5 py-3 text-center">
-                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${foodCostBadge(p.foodCost)}`}>
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium tabular-nums ${foodCostBadge(p.foodCost)}`} style={MONO}>
                         {p.foodCost.toFixed(1)}%
                       </span>
                     </td>
-                    <td className="px-5 py-3 text-right tabular-nums text-emerald-400 font-medium">{formatDemoMXN(p.margen)}</td>
+                    <td className="px-5 py-3 text-right tabular-nums text-emerald-400 font-medium" style={MONO}>{formatDemoMXN(p.margen)}</td>
                   </tr>
                 ))}
               </tbody>

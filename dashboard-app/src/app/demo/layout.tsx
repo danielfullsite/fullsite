@@ -133,11 +133,11 @@ function DemoLayoutInner({ children }: { children: React.ReactNode }) {
           {!collapsed && (
             <div>
               <span className={`font-black text-xl tracking-tight ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                fullsite<span className="inline-block w-1.5 h-1.5 bg-emerald-500 ml-0.5 mb-0.5" />
+                fullsite<span className="inline-block align-baseline ml-0.5" style={{ width: '0.34em', height: '0.34em', background: 'var(--accent)', transform: 'translateY(-0.05em)' }} />
               </span>
             </div>
           )}
-          {collapsed && <span className={`font-black text-lg mx-auto ${isDark ? 'text-white' : 'text-gray-900'}`}>f<span className="text-emerald-500">.</span></span>}
+          {collapsed && <span className={`font-black text-lg mx-auto ${isDark ? 'text-white' : 'text-gray-900'}`}>f<span className="inline-block align-baseline ml-px" style={{ width: '0.34em', height: '0.34em', background: 'var(--accent)', transform: 'translateY(-0.05em)' }} /></span>}
         </div>
 
         {/* Nav sections */}
@@ -145,7 +145,7 @@ function DemoLayoutInner({ children }: { children: React.ReactNode }) {
           {NAV.map(section => (
             <div key={section.title} className="mb-3">
               {!collapsed && (
-                <p className={`text-[10px] font-semibold uppercase tracking-wider px-3 mb-1.5 ${isDark ? 'text-zinc-600' : 'text-gray-400'}`}>{section.title}</p>
+                <p className={`text-[10px] font-semibold uppercase px-3 mb-1.5 ${isDark ? 'text-zinc-600' : 'text-gray-400'}`} style={{ fontFamily: 'var(--font-mono)', letterSpacing: '0.12em' }}>{section.title}</p>
               )}
               {collapsed && <div className={`border-t my-2 ${isDark ? 'border-white/5' : 'border-gray-200'}`} />}
               {section.items.map(item => {
@@ -155,11 +155,12 @@ function DemoLayoutInner({ children }: { children: React.ReactNode }) {
                   <Comp
                     key={item.label}
                     href={item.href || '#'}
-                    className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors mb-0.5 ${
+                    className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] transition-colors mb-0.5 ${
                       active
-                        ? isDark ? 'bg-emerald-500/10 text-emerald-400' : 'bg-emerald-50 text-emerald-600'
-                        : isDark ? 'text-zinc-500 hover:text-white hover:bg-white/5' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
+                        ? isDark ? 'font-medium' : 'bg-emerald-50 text-emerald-600 font-medium'
+                        : isDark ? 'font-medium text-zinc-500 hover:text-white hover:bg-[var(--surface-2)]' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100 font-medium'
                     } ${collapsed ? 'justify-center px-2' : ''}`}
+                    style={active && isDark ? { background: 'var(--accent-soft)', color: 'var(--accent-bright)' } : undefined}
                     title={collapsed ? item.label : undefined}
                   >
                     <item.icon size={18} className="flex-shrink-0" />
@@ -189,7 +190,8 @@ function DemoLayoutInner({ children }: { children: React.ReactNode }) {
                 href="https://wa.me/528115324371?text=Hola%20Daniel%2C%20vi%20el%20demo%20de%20Fullsite%20y%20me%20interesa."
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 w-full py-2 bg-emerald-500 text-white text-xs font-bold rounded-lg hover:bg-emerald-600"
+                className="flex items-center justify-center gap-2 w-full py-2 text-xs font-bold rounded-lg transition-opacity hover:opacity-90"
+                style={{ background: 'linear-gradient(150deg, var(--accent-bright), var(--accent-deep))', color: '#04120c', boxShadow: '0 6px 18px rgba(16,185,129,0.28)' }}
               >
                 Lo quiero para mi restaurante
               </a>

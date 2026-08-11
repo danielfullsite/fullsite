@@ -54,8 +54,9 @@ export default function DemoChat() {
                 className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                   m.rol === 'user'
                     ? 'bg-[var(--line)] text-[var(--text-1)]'
-                    : 'bg-[var(--surface)] border border-[var(--line)] text-zinc-300'
+                    : 'border border-[var(--line)] text-zinc-300'
                 }`}
+                style={m.rol === 'ai' ? { background: 'var(--bento-card)', boxShadow: 'var(--shadow-soft)' } : undefined}
               >
                 {m.texto}
               </div>
@@ -71,7 +72,7 @@ export default function DemoChat() {
 
       <div className="border-t border-[var(--line)] p-4">
         <div className="max-w-2xl mx-auto">
-          <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl px-4 py-3 flex items-center gap-3">
+          <div className="border border-[var(--line)] rounded-2xl px-4 py-3 flex items-center gap-3" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-soft)' }}>
             <Lock size={14} className="text-[var(--text-4)] flex-shrink-0" />
             <span className="text-sm text-[var(--text-4)] flex-1">Disponible con suscripcion activa</span>
             <button

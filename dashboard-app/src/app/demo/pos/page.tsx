@@ -11,6 +11,8 @@ import {
 import { DEMO_MENU, DEMO_RESTAURANT, DEMO_MESEROS, DEMO_INSIGHTS, formatDemoMXN } from '@/lib/demo-data'
 
 const IVA_RATE = 0.16
+// Signature dashboard-pro numeric look (DS v1)
+const MONO = { fontFamily: 'var(--font-mono)' } as const
 
 interface OrderItem {
   id: string
@@ -53,7 +55,7 @@ function ModifierModal({ item, onConfirm, onCancel }: {
         <div className="px-5 py-4 border-b border-white/5 flex justify-between items-center">
           <div>
             <h3 className="font-bold text-lg">{item.name}</h3>
-            <p className="text-emerald-400 font-bold">{formatDemoMXN(item.price)}</p>
+            <p className="text-emerald-400 font-bold tabular-nums" style={MONO}>{formatDemoMXN(item.price)}</p>
           </div>
           <button onClick={onCancel} className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center"><X size={20} /></button>
         </div>
@@ -102,7 +104,7 @@ function ModifierModal({ item, onConfirm, onCancel }: {
         </div>
 
         <div className="px-5 py-4 border-t border-white/5 flex justify-between items-center">
-          <span className="text-xl font-bold text-emerald-400">{formatDemoMXN(subtotal)}</span>
+          <span className="text-xl font-bold text-emerald-400 tabular-nums" style={MONO}>{formatDemoMXN(subtotal)}</span>
           <button onClick={() => {
             const mods = [...Array.from(quitar), ...Array.from(agregar).map(a => { const opt = agregarOpts.find(o => o.name === a); return opt && opt.price > 0 ? `${a} +$${opt.price}` : a })]
             onConfirm({
@@ -365,7 +367,7 @@ export default function DemoPOS() {
               </div>
             )}
             <span className="text-sm bg-emerald-500/10 text-emerald-400 px-2 py-1 rounded-lg text-xs font-medium">DEMO</span>
-            <span className="text-sm">{clock}</span>
+            <span className="text-sm tabular-nums" style={MONO}>{clock}</span>
           </div>
         </div>
 
@@ -421,7 +423,7 @@ export default function DemoPOS() {
               {DEMO_MESEROS.slice(0, 5).map((m, i) => (
                 <div key={m.nombre} className={`flex items-center justify-between py-1.5 text-xs ${m.nombre === mesero ? 'text-emerald-400' : 'text-zinc-500'}`}>
                   <span>{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}.`} {m.nombre.split(' ')[0]}</span>
-                  <span className="font-bold">{formatDemoMXN(m.total)}</span>
+                  <span className="font-bold tabular-nums" style={MONO}>{formatDemoMXN(m.total)}</span>
                 </div>
               ))}
               <div className="mt-3">
@@ -460,10 +462,10 @@ export default function DemoPOS() {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Left — Order */}
-        <div className={`md:w-[45%] md:flex flex-col border-r border-white/5 bg-[#0d0d10] ${mobileView === 'order' ? 'flex w-full' : 'hidden'}`}>
+        <div className={`md:w-[45%] md:flex flex-col border-r border-white/5 bg-[#0d0d10] ${mobileView === 'order' ? 'flex w-full' : 'hidden'}`} style={{ backgroundImage: 'linear-gradient(165deg, transparent 0%, transparent 62%, rgba(16,185,129,0.05) 100%)' }}>
           <div className="px-4 py-2 border-b border-white/5 flex justify-between items-center">
-            <h2 className="text-lg font-bold">Mesa {mesa} <span className="text-zinc-500 text-sm font-normal">{personas} pers · {mesero.split(' ')[0]}</span></h2>
-            <span className="text-emerald-400 font-bold text-xl">{formatDemoMXN(total)}</span>
+            <h2 className="text-lg font-bold">Mesa <span className="tabular-nums" style={MONO}>{mesa}</span> <span className="text-zinc-500 text-sm font-normal"><span className="tabular-nums" style={MONO}>{personas}</span> pers · {mesero.split(' ')[0]}</span></h2>
+            <span className="text-emerald-400 font-bold text-xl tabular-nums" style={MONO}>{formatDemoMXN(total)}</span>
           </div>
 
           {/* Customer memory */}
@@ -509,7 +511,7 @@ export default function DemoPOS() {
                       {item.notas && <p className="text-zinc-600 text-xs italic">{item.notas}</p>}
                       {item.cancelled && <p className="text-red-500 text-xs font-bold">CANCELADO</p>}
                     </div>
-                    <span className={`font-semibold text-lg w-24 text-right ${item.cancelled ? 'line-through text-red-400/50' : ''}`}>{formatDemoMXN(item.subtotal)}</span>
+                    <span className={`font-semibold text-lg w-24 text-right tabular-nums ${item.cancelled ? 'line-through text-red-400/50' : ''}`} style={MONO}>{formatDemoMXN(item.subtotal)}</span>
                     {!item.cancelled && (
                       <button onClick={() => setCancellingItem(item)} className="w-9 h-9 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 flex items-center justify-center"><Ban size={14} /></button>
                     )}
@@ -536,10 +538,10 @@ export default function DemoPOS() {
                 className="w-full bg-white/5 border border-white/5 rounded-lg px-3 py-2 text-sm text-zinc-400 placeholder-zinc-700 focus:outline-none focus:border-emerald-500/50" />
             </div>
 
-            <div className="flex justify-between text-zinc-500 text-sm mb-1"><span>Subtotal</span><span>{formatDemoMXN(subtotal)}</span></div>
-            {discount > 0 && <div className="flex justify-between text-red-400 text-sm mb-1"><span>Descuento</span><span>-{formatDemoMXN(discount)}</span></div>}
-            <div className="flex justify-between text-zinc-500 text-sm mb-2"><span>IVA (16%)</span><span>{formatDemoMXN(iva)}</span></div>
-            <div className="flex justify-between text-2xl font-bold"><span>Total</span><span>{formatDemoMXN(total)}</span></div>
+            <div className="flex justify-between text-zinc-500 text-sm mb-1"><span>Subtotal</span><span className="tabular-nums" style={MONO}>{formatDemoMXN(subtotal)}</span></div>
+            {discount > 0 && <div className="flex justify-between text-red-400 text-sm mb-1"><span>Descuento</span><span className="tabular-nums" style={MONO}>-{formatDemoMXN(discount)}</span></div>}
+            <div className="flex justify-between text-zinc-500 text-sm mb-2"><span>IVA (16%)</span><span className="tabular-nums" style={MONO}>{formatDemoMXN(iva)}</span></div>
+            <div className="flex justify-between text-2xl font-bold"><span>Total</span><span className="tabular-nums" style={MONO}>{formatDemoMXN(total)}</span></div>
           </div>
 
           {/* Action buttons */}
@@ -582,7 +584,7 @@ export default function DemoPOS() {
                         <div className={`w-1.5 self-stretch ${catColor}`} />
                         <div className="flex items-center justify-between flex-1 px-3 py-2">
                           <div><span className="font-semibold text-sm">{item.name}</span> <span className="text-zinc-600 text-xs ml-1">{catName}</span></div>
-                          <span className="text-emerald-400 font-bold">${item.price}</span>
+                          <span className="text-emerald-400 font-bold tabular-nums" style={MONO}>${item.price}</span>
                         </div>
                       </button>
                     ))}
@@ -617,7 +619,7 @@ export default function DemoPOS() {
                         {isOOS && <span className="absolute top-2 right-2 bg-red-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded-md">Agotado</span>}
                         <div className="flex flex-col justify-between px-4 py-4 flex-1 relative">
                           <span className={`font-bold text-base leading-snug ${isOOS ? 'text-zinc-600 line-through' : ''}`}>{item.name}</span>
-                          <span className={`font-bold text-lg mt-2 ${isOOS ? 'text-red-400' : 'text-emerald-400'}`}>${item.price}</span>
+                          <span className={`font-bold text-lg mt-2 tabular-nums ${isOOS ? 'text-red-400' : 'text-emerald-400'}`} style={MONO}>${item.price}</span>
                         </div>
                       </button>
                     )
@@ -657,9 +659,9 @@ export default function DemoPOS() {
             </div>
 
             <div className="text-center mb-4">
-              <p className="text-zinc-500 text-sm">Mesa {mesa} · {mesero}</p>
-              <p className="text-4xl font-bold">{formatDemoMXN(total)}</p>
-              {discount > 0 && <p className="text-red-400 text-sm mt-1">Descuento: -{formatDemoMXN(discount)}</p>}
+              <p className="text-zinc-500 text-sm">Mesa <span className="tabular-nums" style={MONO}>{mesa}</span> · {mesero}</p>
+              <p className="text-4xl font-bold tabular-nums" style={MONO}>{formatDemoMXN(total)}</p>
+              {discount > 0 && <p className="text-red-400 text-sm mt-1">Descuento: <span className="tabular-nums" style={MONO}>-{formatDemoMXN(discount)}</span></p>}
             </div>
 
             {/* Propina */}
@@ -674,7 +676,7 @@ export default function DemoPOS() {
                 <input type="number" inputMode="numeric" value={propina || ''} onChange={e => setPropina(Number(e.target.value) || 0)}
                   placeholder="$" className="w-20 bg-white/5 border border-white/10 rounded-lg px-2 py-2.5 text-sm text-center focus:outline-none focus:border-emerald-500" />
               </div>
-              {propina > 0 && <p className="text-emerald-400 text-sm mt-2 text-center">Total + propina: {formatDemoMXN(total + propina)}</p>}
+              {propina > 0 && <p className="text-emerald-400 text-sm mt-2 text-center">Total + propina: <span className="tabular-nums" style={MONO}>{formatDemoMXN(total + propina)}</span></p>}
             </div>
 
             <div className="space-y-3">
@@ -698,7 +700,7 @@ export default function DemoPOS() {
                   {cashReceivedNum > 0 && cashChange >= 0 && (
                     <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 text-center">
                       <p className="text-sm text-zinc-400">Cambio</p>
-                      <p className="text-3xl font-black text-emerald-400">{formatDemoMXN(cashChange)}</p>
+                      <p className="text-3xl font-black text-emerald-400 tabular-nums" style={MONO}>{formatDemoMXN(cashChange)}</p>
                       {cashChange > 0 && (
                         <div className="flex flex-wrap justify-center gap-2 mt-2">
                           {getChange(cashChange).map(({ d, c }) => <span key={d} className="text-xs bg-white/5 rounded px-2 py-1 font-bold">{c}×${d}</span>)}
