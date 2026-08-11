@@ -14,17 +14,20 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const { user, loading, role } = useAuth()
   const [showContent, setShowContent] = useState(false)
 
+  // Super-admin de plataforma: nunca se le fuerza al POS; su lugar es el Control Center.
+  const isPlatformAdmin = (user?.app_metadata as Record<string, unknown> | undefined)?.platform_admin === true
+
   // Build offline empaquetado (terminales POS): arrancar directo en /pos.
-  // Solo aplica a roles operativos; dueño/gerente/capitan siempre ven el dashboard.
+  // Solo aplica a roles operativos; dueño/gerente/capitan y super-admin ven el dashboard.
   const isOfflineBuild = process.env.NEXT_PUBLIC_CAPACITOR_OFFLINE === '1'
   useEffect(() => {
-    if (isOfflineBuild && pathname === '/' && !loading) {
+    if (isOfflineBuild && pathname === '/' && !loading && !isPlatformAdmin) {
       const isPosOnlyRole = role === 'mesero' || role === 'staff' || role === 'cajero'
       if (!user || isPosOnlyRole) {
         router.replace('/pos')
       }
     }
-  }, [isOfflineBuild, pathname, router, user, role, loading])
+  }, [isOfflineBuild, pathname, router, user, role, loading, isPlatformAdmin])
 
   const publicPages = ['/login', '/onboarding', '/seguridad', '/privacidad', '/terminos', '/reservar', '/factura', '/demo-live', '/cocina', '/barra']
   const isPosRoute = pathname.startsWith('/pos')
