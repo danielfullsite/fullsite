@@ -108,7 +108,7 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     features: JSON.stringify(DEFAULT_FEATURES),
     mesas,
     data_source: 'fullsite',
-    plan: input.plan || 'fullsite_completo',
+    // 'plan' NO es columna real de `clients` (validado contra el esquema en staging) → no se escribe.
   }])
 
   // ── 2. default location ────────────────────────────────────────────────────
