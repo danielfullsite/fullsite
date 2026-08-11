@@ -24,6 +24,12 @@
     "directories": {
       "output": "dist"
     },
+    "extraResources": [
+      {
+        "from": "../dashboard-app/out",
+        "to": "out"
+      }
+    ],
     "win": {
       "target": "nsis",
       "icon": "icon.ico"

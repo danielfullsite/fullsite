@@ -25,6 +25,7 @@ const processAdapter = require('./adapters/process')
 const logger         = require('./logger')
 const printerAdapter = require('./adapters/printer')
 const networkAdapter = require('./adapters/network')
+const staticServe    = require('./adapters/static-serve')
 const { NdjsonEventStore }  = require('./adapters/storage/ndjson')
 const { CoreEventStore }    = require('./core/event-store')
 const { RestaurantState }   = require('./core/state')
@@ -300,6 +301,12 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, versio
       }
       return
     }
+
+    // ── Static UI bundle (Offline Shell) ─────────────────────────────────────
+    // Serves dashboard-app/out (Next export) so the POS loads with zero internet
+    // and LAN clients load from an http:// origin (no mixed-content to :7717).
+    // No-op unless config.staticRoot is set → cloud-loading stays default.
+    if (staticServe.serveStatic(config.staticRoot, req, res)) return
 
     json(res, 404, { error: 'Not found' })
   }

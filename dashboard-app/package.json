@@ -6,6 +6,7 @@
     "dev": "next dev",
     "dev:sandbox": "bash scripts/sandbox-dev.sh",
     "build": "next build",
+    "build:offline": "bash scripts/build-offline.sh",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",

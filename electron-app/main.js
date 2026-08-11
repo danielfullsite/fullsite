@@ -5,8 +5,45 @@ const os   = require('os');
 const fs   = require('fs');
 const { execSync } = require('child_process');
 
-const POS_URL = 'https://app.fullsite.mx/pos';
-const KDS_URL = 'https://app.fullsite.mx/kds';
+// UI source URLs. Default = cloud (unchanged). When LOCAL_UI is enabled
+// (config.local_ui or env FULLSITE_LOCAL_UI=1), resolveUiUrls() rewrites these
+// to the local bridge so the POS opens offline and LAN clients avoid the
+// mixed-content wall. See docs/architecture/OFFLINE-SHELL-001.md.
+let POS_URL = 'https://app.fullsite.mx/pos';
+let KDS_URL = 'https://app.fullsite.mx/kds';
+
+// ─── Offline Shell (OFFLINE-SHELL-001) ────────────────────────────────────────
+function isLocalUiEnabled() {
+  return appConfig?.local_ui === true
+    || String(appConfig?.local_ui ?? '') === '1'
+    || process.env.FULLSITE_LOCAL_UI === '1';
+}
+
+// Point POS_URL/KDS_URL at the LAN bridge that serves the static bundle.
+// Server (CAJA): its own 127.0.0.1. Secondary terminal / KDS: pos_server_ip.
+function resolveUiUrls() {
+  if (!isLocalUiEnabled()) return; // keep cloud defaults — zero change
+  const host = appConfig?.pos_server_ip || '127.0.0.1';
+  POS_URL = `http://${host}:${LOCAL_SERVER_PORT}/pos`;
+  KDS_URL = `http://${host}:${LOCAL_SERVER_PORT}/kds`;
+  console.log(`[main] LOCAL_UI on → UI served from ${POS_URL}`);
+}
+
+// Absolute path to the bundled Next export (dashboard-app/out). undefined when
+// LOCAL_UI is off or the bundle is absent → the bridge won't serve static and
+// cloud loading stays the default.
+function resolveStaticRoot() {
+  if (!isLocalUiEnabled()) return undefined;
+  const candidates = [
+    process.resourcesPath ? path.join(process.resourcesPath, 'out') : null, // packaged
+    path.join(__dirname, '..', 'dashboard-app', 'out'),                     // dev / monorepo
+  ].filter(Boolean);
+  for (const c of candidates) {
+    try { if (fs.existsSync(path.join(c, 'pos.html'))) return c; } catch { /* ignore */ }
+  }
+  console.warn('[main] LOCAL_UI on but no out/ bundle found — bridge will not serve UI.');
+  return undefined;
+}
 
 // ─── LOCAL SERVER ─────────────────────────────────────────────────────────────
 // Fullsite Local Server (WS hub + print bridge + mDNS + heartbeat).
@@ -225,6 +262,7 @@ async function startLocalServer() {
     queueFilePath,
     clientId:           appConfig.client_id      || appConfig.clientId,
     terminalId:         appConfig.terminal_id    || appConfig.terminalId,
+    staticRoot:         resolveStaticRoot(),      // Offline Shell: bridge serves out/ when LOCAL_UI on
   };
 
   try {
@@ -845,6 +883,7 @@ app.whenReady().then(async () => {
   if (app.getName() === 'Fullsite KDS') appConfig.kds_only = true;
   console.log(`[main] Provisioned: restaurant_id=${appConfig.restaurant_id} terminal_id=${appConfig.terminal_id} role=${appConfig.terminal_role}`);
 
+  resolveUiUrls();            // Offline Shell: rewrite POS_URL/KDS_URL to local bridge if LOCAL_UI on
   await startLocalServer();   // Local server starts first (provides WS hub for KDS events)
 
   // ── kds_only mode: dedicated kitchen display machine ──────────────────────
