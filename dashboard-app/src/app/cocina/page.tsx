@@ -7,7 +7,7 @@ import {
   getKitchenOrders, updateOrderStatus, logAudit, saveOrder,
   updateInventoryStock, logInventoryMovement, getInventory, getRecipes,
   getRecipeDetail,
-  verifyManagerPin, RECIPE_ALIASES, formatMXN,
+  verifyManagerPin, RECIPE_ALIASES, formatMXN, getPOSAuthHeaders,
   type KitchenOrderFromDB, type RecipeDetail,
 } from '@/lib/pos-data'
 import { isBebida, POLL_INTERVAL_KITCHEN, getStationByName, type StationName } from '@/lib/pos-constants'
@@ -162,7 +162,7 @@ export default function CocinaPage() {
       // Ver /api/pos/delivery-orders + docs/release/delivery-orders-rls.sql
       const delRes = await fetch(
         `/api/pos/delivery-orders?status=nueva,aceptada,preparando`,
-        { cache: 'no-store' }
+        { headers: getPOSAuthHeaders(), cache: 'no-store' }
       )
       if (delRes.ok) {
         const deliveryOrders = await delRes.json()

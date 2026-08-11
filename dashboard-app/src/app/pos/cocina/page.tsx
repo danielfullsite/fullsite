@@ -198,7 +198,7 @@ export default function CocinaPage() {
       // Ver /api/pos/delivery-orders + docs/release/delivery-orders-rls.sql
       const delRes = await fetch(
         `/api/pos/delivery-orders?status=nueva,aceptada,preparando`,
-        { cache: 'no-store' }
+        { headers: getPOSAuthHeaders(), cache: 'no-store' }
       )
       if (delRes.ok) {
         const deliveryOrders = await delRes.json()

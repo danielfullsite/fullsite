@@ -11,7 +11,7 @@ import {
   ArrowLeft, RefreshCw, Clock, ChefHat, PackageCheck,
   Truck, CheckCircle2, ShoppingBag, DollarSign, XCircle, Ban,
 } from 'lucide-react'
-import { formatMXN, logAudit } from '@/lib/pos-data'
+import { formatMXN, logAudit, getPOSAuthHeaders } from '@/lib/pos-data'
 import { CANCEL_REASON_LABELS, UBER_CANCEL_REASONS } from '@/lib/integrations/uber-eats/reasons'
 import type { UberCancelReason } from '@/lib/integrations/uber-eats/reasons'
 
@@ -98,7 +98,7 @@ export default function DeliveryPage() {
       const today = new Date().toISOString().slice(0, 10)
       const res = await fetch(
         `/api/pos/delivery-orders?platform=ubereats,rappi&since=${today}T00:00:00`,
-        { cache: 'no-store' }
+        { headers: getPOSAuthHeaders(), cache: 'no-store' }
       )
       if (res.ok) {
         const data: DeliveryOrder[] = await res.json()
@@ -150,7 +150,7 @@ export default function DeliveryPage() {
   const patchOrder = async (id: string, body: Record<string, unknown>) => {
     await fetch(`/api/pos/delivery-orders`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getPOSAuthHeaders() },
       body: JSON.stringify({ id, patch: body }),
     })
     fetchOrders()
