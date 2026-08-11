@@ -4,21 +4,8 @@ import { useEffect, useState } from 'react'
 import { Store, Plus, Activity, AlertTriangle, ArrowUpRight, Bot, RefreshCw, X, Sparkles, Circle } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-
-async function sb(table: string, params = ''): Promise<Record<string, unknown>[]> {
-  try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params}`, {
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
-    })
-    if (!res.ok) return []
-    const data = await res.json()
-    return Array.isArray(data) ? data : []
-  } catch {
-    return []
-  }
-}
+// Control Plane: sin anon key. Todo pasa por /api/platform/tenants
+// (admin-gated + service_role server-side). Same-origin envía la cookie fs-at.
 
 interface Tenant {
   id: string
@@ -28,51 +15,46 @@ interface Tenant {
   openEvents: number
 }
 
-function hoursSince(dateStr: string): number {
-  const then = new Date(dateStr + 'T23:59:00')
-  return Math.max(0, Math.round((Date.now() - then.getTime()) / 3_600_000))
-}
-
 export default function TenantsConsole() {
   const [tenants, setTenants] = useState<Tenant[]>([])
   const [loading, setLoading] = useState(true)
+  const [denied, setDenied] = useState(false)
   const [showNew, setShowNew] = useState(false)
 
   async function load() {
     setLoading(true)
-    // OCM: freshness desde ops_daily (canónico, source-agnostic) — no wansoft_daily
-    const [clients, daily, events] = await Promise.all([
-      sb('clients', 'select=id,display_name&order=display_name'),
-      sb('ops_daily', 'select=client_id,fecha&order=fecha.desc&limit=2000'),
-      sb('agent_events', 'select=client_id,status&status=eq.open&limit=5000'),
-    ])
-    const latest = new Map<string, string>()
-    for (const r of daily) {
-      const cid = r.client_id as string
-      if (cid && !latest.has(cid)) latest.set(cid, r.fecha as string)
+    setDenied(false)
+    try {
+      const res = await fetch('/api/platform/tenants', { credentials: 'include' })
+      if (res.status === 401 || res.status === 403) {
+        setDenied(true)
+        setTenants([])
+        return
+      }
+      if (!res.ok) {
+        console.error('Error loading tenants: HTTP', res.status)
+        return
+      }
+      const json = (await res.json()) as { tenants: Tenant[] }
+      setTenants(Array.isArray(json.tenants) ? json.tenants : [])
+    } catch (err) {
+      console.error('Error loading tenants:', err)
+    } finally {
+      setLoading(false)
     }
-    const eventCount = new Map<string, number>()
-    for (const e of events) {
-      const cid = e.client_id as string
-      if (cid) eventCount.set(cid, (eventCount.get(cid) || 0) + 1)
-    }
-    setTenants(
-      clients.map(c => {
-        const id = c.id as string
-        const fecha = latest.get(id) || null
-        return {
-          id,
-          name: (c.display_name as string) || id,
-          lastData: fecha,
-          hoursAgo: fecha ? hoursSince(fecha) : null,
-          openEvents: eventCount.get(id) || 0,
-        }
-      })
-    )
-    setLoading(false)
   }
 
   useEffect(() => { load() }, [])
+
+  if (denied) {
+    return (
+      <div className="flex flex-col items-center justify-center h-96 gap-3 text-center">
+        <AlertTriangle size={32} style={{ color: '#f43f5e' }} />
+        <p className="text-lg font-bold text-[var(--text-1)]">Acceso denegado</p>
+        <p className="text-sm text-[var(--text-3)]">Esta consola es solo para administradores de plataforma.</p>
+      </div>
+    )
+  }
 
   const withData = tenants.filter(t => t.hoursAgo !== null).length
   const totalAlerts = tenants.reduce((s, t) => s + t.openEvents, 0)

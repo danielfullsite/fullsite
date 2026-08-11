@@ -100,7 +100,7 @@ export async function proxy(req: NextRequest) {
   if (!supabaseUrl || !anonKey) return NextResponse.next() // mal configurado: no bloquear
 
   // Validar el token contra Supabase Auth (server-side, no falsificable)
-  let user: { email?: string; app_metadata?: { role?: string } } | null = null
+  let user: { email?: string; app_metadata?: { role?: string; platform_admin?: boolean } } | null = null
   try {
     const res = await fetchWithTimeout(`${supabaseUrl}/auth/v1/user`, {
       headers: { apikey: anonKey, Authorization: `Bearer ${token}` },
@@ -113,6 +113,16 @@ export async function proxy(req: NextRequest) {
     user = await res.json()
   } catch {
     // Supabase caído: dejar pasar — el cliente igual no podrá leer datos sin red
+    return NextResponse.next()
+  }
+
+  // Control Plane: gate rápido de ROUTING para /platform/*. app_metadata.platform_admin
+  // lo controla el admin (no es user-writable), así que sirve para redirigir temprano.
+  // La verificación dura (is_platform_admin vía service_role) la hacen los endpoints /api/platform/*.
+  if (pathname.startsWith('/platform')) {
+    if (user?.app_metadata?.platform_admin !== true) {
+      return NextResponse.redirect(loginUrl)
+    }
     return NextResponse.next()
   }
 

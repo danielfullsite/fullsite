@@ -5,47 +5,8 @@ import { Users, Bot, CheckCircle, AlertTriangle, DollarSign, Activity, Clock, Re
 import { formatCurrency, formatNumber } from '@/lib/format'
 import PageHeader from '@/components/PageHeader'
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-
-async function sbFetch(table: string, params: string = ''): Promise<unknown[]> {
-  const url = `${SUPABASE_URL}/rest/v1/${table}?${params}`
-  try {
-    const res = await fetch(url, {
-      headers: {
-        'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
-      },
-    })
-    if (!res.ok) return []
-    const data = await res.json()
-    return Array.isArray(data) ? data : []
-  } catch {
-    return []
-  }
-}
-
-async function sbCount(table: string, filter: string = ''): Promise<number> {
-  const url = `${SUPABASE_URL}/rest/v1/${table}?select=*${filter ? '&' + filter : ''}`
-  try {
-    const res = await fetch(url, {
-      headers: {
-        'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
-        'Prefer': 'count=exact',
-        'Range': '0-0',
-      },
-    })
-    const range = res.headers.get('content-range')
-    if (range) {
-      const total = range.split('/')[1]
-      return total === '*' ? 0 : parseInt(total, 10)
-    }
-    return 0
-  } catch {
-    return 0
-  }
-}
+// Control Plane: sin anon key. Todo pasa por /api/platform/overview
+// (admin-gated + service_role server-side). Same-origin envía la cookie fs-at.
 
 interface DayBucket {
   label: string
@@ -67,103 +28,27 @@ interface PlatformData {
   dailyRuns: DayBucket[]
 }
 
-function daysAgo(n: number): string {
-  const d = new Date()
-  d.setDate(d.getDate() - n)
-  return d.toISOString().slice(0, 10)
-}
-
-function shortDay(dateStr: string): string {
-  const d = new Date(dateStr + 'T12:00:00')
-  return d.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric' })
-}
-
-function hoursAgoFromDate(dateStr: string): number {
-  const now = new Date()
-  const then = new Date(dateStr + 'T23:59:00')
-  return Math.max(0, Math.round((now.getTime() - then.getTime()) / (1000 * 60 * 60)))
-}
-
 export default function PlatformPage() {
   const [data, setData] = useState<PlatformData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [denied, setDenied] = useState(false)
 
   async function load() {
     setLoading(true)
+    setDenied(false)
     try {
-      // Parallel fetches
-      const [
-        clientCount,
-        totalRunCount,
-        successCount,
-        errorCount,
-        criticalAlerts,
-        warningAlerts,
-        recentRuns,
-        latestDaily,
-        uptimeRuns,
-        uptimeSuccess,
-      ] = await Promise.all([
-        sbCount('clients'),
-        sbCount('agent_runs'),
-        sbCount('agent_runs', 'status=eq.success'),
-        sbCount('agent_runs', 'status=eq.error'),
-        sbCount('agent_results', 'priority=eq.critical'),
-        sbCount('agent_results', 'priority=eq.warning'),
-        sbFetch('agent_runs', `select=created_at,status&order=created_at.desc&limit=2000&created_at=gte.${daysAgo(7)}`),
-        sbFetch('wansoft_daily', 'select=client_slug,fecha&order=fecha.desc&limit=50'),
-        sbCount('agent_runs', 'agent_id=eq.uptime-monitor'),
-        sbCount('agent_runs', 'agent_id=eq.uptime-monitor&status=eq.success'),
-      ])
-
-      // Build 7-day buckets
-      const buckets: DayBucket[] = []
-      for (let i = 6; i >= 0; i--) {
-        const date = daysAgo(i)
-        buckets.push({ label: shortDay(date), date, total: 0, success: 0, error: 0 })
+      const res = await fetch('/api/platform/overview', { credentials: 'include' })
+      if (res.status === 401 || res.status === 403) {
+        setDenied(true)
+        setData(null)
+        return
       }
-      for (const run of recentRuns as { created_at: string; status: string }[]) {
-        const runDate = run.created_at?.slice(0, 10)
-        const bucket = buckets.find(b => b.date === runDate)
-        if (bucket) {
-          bucket.total++
-          if (run.status === 'success') bucket.success++
-          if (run.status === 'error') bucket.error++
-        }
+      if (!res.ok) {
+        console.error('Error loading platform data: HTTP', res.status)
+        return
       }
-
-      // Data freshness per client
-      const freshnessMap = new Map<string, string>()
-      for (const row of latestDaily as { client_slug: string; fecha: string }[]) {
-        if (!freshnessMap.has(row.client_slug)) {
-          freshnessMap.set(row.client_slug, row.fecha)
-        }
-      }
-      const freshness = Array.from(freshnessMap.entries()).map(([client, fecha]) => ({
-        client,
-        hoursAgo: hoursAgoFromDate(fecha),
-      }))
-
-      // Uptime %
-      const uptimePercent = uptimeRuns > 0 ? (uptimeSuccess / uptimeRuns) * 100 : 99.9
-
-      // Value created placeholder
-      const clients = Math.max(clientCount, 1)
-      const valueCreated = clients * 80000
-
-      const successRate = totalRunCount > 0 ? (successCount / totalRunCount) * 100 : 0
-
-      setData({
-        activeClients: clientCount,
-        totalRuns: totalRunCount,
-        successRate,
-        alertsCritical: criticalAlerts,
-        alertsWarning: warningAlerts,
-        valueCreated,
-        uptimePercent,
-        freshness,
-        dailyRuns: buckets,
-      })
+      const json = (await res.json()) as PlatformData
+      setData(json)
     } catch (err) {
       console.error('Error loading platform data:', err)
     } finally {
@@ -177,6 +62,16 @@ export default function PlatformPage() {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  if (denied) {
+    return (
+      <div className="flex flex-col items-center justify-center h-96 gap-3 text-center">
+        <AlertTriangle size={32} className="text-red-400" />
+        <p className="text-lg font-bold text-[var(--text-1)]">Acceso denegado</p>
+        <p className="text-sm text-[var(--text-3)]">Esta página es solo para administradores de plataforma.</p>
       </div>
     )
   }
