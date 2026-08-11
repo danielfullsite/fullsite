@@ -345,7 +345,7 @@ export default function PlatformPage() {
             <h3 className="text-sm font-bold text-[var(--text-1)]">Data Freshness</h3>
           </div>
           <p className="text-[11px] text-[var(--text-3)] mt-0.5">
-            Hours since last wansoft_daily entry per client
+            Hours since last operational data entry per client
           </p>
         </div>
         <div className="divide-y divide-[var(--line-soft)]">
@@ -383,7 +383,7 @@ export default function PlatformPage() {
       <div className="mt-4 px-4 py-3 bg-[var(--surface-2)] rounded-lg">
         <p className="text-[11px] text-[var(--text-3)] leading-relaxed">
           <strong className="text-[var(--text-2)]">Internal page.</strong> Value Created uses a placeholder estimate of $80K MXN/client/year.
-          Uptime is derived from uptime-monitor agent runs. Data freshness shows hours since the most recent wansoft_daily row per client_slug.
+          Uptime is derived from uptime-monitor agent runs. Data freshness shows hours since the most recent operational data row per client.
         </p>
       </div>
     </>

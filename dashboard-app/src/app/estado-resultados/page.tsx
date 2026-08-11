@@ -196,10 +196,10 @@ export default function EstadoResultadosPage() {
           {isRealFoodCost ? (
             <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 mb-6">
               <p className="text-sm text-emerald-700 font-medium">
-                Food cost real de Wansoft
+                Food cost real
               </p>
               <p className="text-xs text-emerald-600 mt-1">
-                El costo de alimentos se calcula con datos reales de Wansoft ({(effectiveFoodCostPct * 100).toFixed(1)}% promedio).
+                El costo de alimentos se calcula con datos reales de operación ({(effectiveFoodCostPct * 100).toFixed(1)}% promedio).
                 {foodCostFecha && ` Ultima actualizacion: ${foodCostFecha}.`}
                 {' '}Para labor cost, conecta el modulo de nomina.
               </p>
@@ -211,7 +211,7 @@ export default function EstadoResultadosPage() {
               </p>
               <p className="text-xs text-blue-400 mt-1">
                 El costo de alimentos se estima al 35% de ventas netas. Para datos reales de food cost y labor cost,
-                conecta los modulos de inventario y nomina de Wansoft.
+                conecta los módulos de inventario y nómina de Fullsite.
               </p>
             </div>
           )}
@@ -244,7 +244,7 @@ export default function EstadoResultadosPage() {
               Costos {isRealFoodCost ? '(real)' : '(estimado)'}
             </h3>
             <p className="text-xs text-[var(--text-3)] mb-5">
-              {isRealFoodCost ? 'Basado en datos reales de Wansoft' : 'Basado en porcentajes de industria'}
+              {isRealFoodCost ? 'Basado en datos reales de operación' : 'Basado en porcentajes de industria'}
             </p>
             <div className="space-y-3">
               <div className="flex items-center justify-between py-2 border-b border-[var(--line-soft)]">
@@ -274,7 +274,7 @@ export default function EstadoResultadosPage() {
                 Detalle de Food Cost
               </h3>
               <p className="text-xs text-[var(--text-3)] mb-5">
-                Top platillos por costo — datos reales de Wansoft
+                Top platillos por costo — datos reales de operación
                 {foodCostFecha && ` (${foodCostFecha})`}
                 {periodoView !== 'mes' && (
                   <span className="ml-2 text-amber-500 font-medium">· snapshot independiente del periodo seleccionado</span>
@@ -315,13 +315,13 @@ export default function EstadoResultadosPage() {
             </div>
           )}
 
-          {/* P&L de Wansoft section */}
+          {/* P&L section */}
           {pnlData && pnlData.months && (
             <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
               <div className="flex items-center gap-2 mb-1">
                 <FileText className="w-4 h-4 text-[var(--text-2)]" />
                 <h3 className="text-sm font-semibold text-[var(--text-1)]">
-                  P&L de Wansoft
+                  P&L operativo
                 </h3>
               </div>
               <p className="text-xs text-[var(--text-3)] mb-5">

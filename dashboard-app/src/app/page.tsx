@@ -239,9 +239,9 @@ export default function DashboardPage() {
       const ventas = day?.ventas_dia || 0
       const personas = day?.personas_restaurant || 0
       const tickets = day?.tickets_count || 0
-      // TP por persona (como Wansoft "Promedio por persona")
+      // TP por persona (como el POS anterior "Promedio por persona")
       const tp = personas > 0 ? Math.round(ventas / personas) : (day?.ticket_promedio_restaurant || 0)
-      // TP por orden/mesa (como Wansoft "Promedio por orden")
+      // TP por orden/mesa (como el POS anterior "Promedio por orden")
       const tpOrden = tickets > 0 ? Math.round(ventas / tickets) : (day?.ticket_promedio_restaurant || 0)
       const propinas = day?.propinas_total || 0
       const descuentos = day?.descuentos || 0
@@ -530,7 +530,7 @@ export default function DashboardPage() {
             <div className="mb-4 text-xs text-[var(--text-3)] font-medium">
               {isFullsitePOS()
                 ? `Datos POS Fullsite actualizados a las ${syncTime} — DEMO / DATOS SINTÉTICOS.`
-                : `Datos de Wansoft actualizados a las ${syncTime} — se sincronizan cada 30 min, pueden diferir de la app de Wansoft en tiempo real.`}
+                : `Datos históricos Fullsite actualizados a las ${syncTime} — se sincronizan periódicamente y pueden diferir del POS en tiempo real.`}
             </div>
           )
         }
@@ -836,7 +836,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Week comparison banner — like Wansoft */}
+      {/* Week comparison banner — like legacy POS */}
       {show('week_comparison') && vsLastWeek !== null && vsLastWeekAmount !== null && sameDayLastWeek && (
         <div className={`mb-4 sm:mb-6 rounded-xl border p-3 sm:p-4 ${vsLastWeek >= 0 ? 'bg-[var(--accent-soft)] border-[var(--accent-line)]' : 'bg-red-500/10 border-red-500/30'}`}>
           <div className="flex items-center justify-between flex-wrap gap-2">

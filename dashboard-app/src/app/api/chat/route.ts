@@ -380,7 +380,7 @@ export async function POST(request: NextRequest) {
         if (costo > 0) recipeMap.set(normName(String(r.nombre || '')), { costo, precio: Number(r.precio_venta) || 0, pct: Number(r.pct_costo) || 0 })
       }
     }
-    // Alias map: nombre en POS/Wansoft → nombre de la receta en el Excel de costeo (typos y variantes)
+    // Alias map: nombre en POS/fuente histórica → nombre de la receta en el Excel de costeo (typos y variantes)
     const RECIPE_ALIASES: Record<string, string> = {
       'EGG AND PANCAKE COMBO': 'EGG & PANCAKE COMBO',
       'SALMON BAGEL': 'BAGEL DE SALMON CURADO',
@@ -424,7 +424,7 @@ export async function POST(request: NextRequest) {
               const ventaTotal = Number(item.subtotal_venta || 0)
               // Prefer Excel recipe cost (real) over stale scraped costo_real
               const recipe = recipeMap.get(normName(nombre))
-              // SOLO recetas reales (pos_recipes/Excel). El costo_real scrapeado de Wansoft está stale y da márgenes falsos.
+              // SOLO recetas reales (pos_recipes/Excel). El costo_real scrapeado de la fuente histórica está stale y da márgenes falsos.
               const costoReal = recipe && qty > 0 ? qty * recipe.costo : 0
               const costoPct = ventaTotal > 0 ? (costoReal / ventaTotal) * 100 : 0
               const precioUnit = qty > 0 ? Math.round(ventaTotal / qty) : 0
@@ -855,7 +855,7 @@ CÓMO INTERPRETAR (lee la intención, no las palabras):
 - "qué le dirías a Monica/dueño/gerente" → dar resumen ejecutivo con 3 puntos + acciones
 - "hoy" sin datos de hoy → Di "aún no hay datos de hoy (el scraper no ha corrido). El último día registrado es [fecha]:" y da los datos de ese día. NO inventes números para hoy.
 - "hora pico" → si hay VENTAS POR HORA en los datos, usarlas. Si no, decir "no tengo desglose por hora, revísalo en el dashboard"
-- "propinas" → NO hay datos de propinas en el sistema. Di: "las propinas no llegan al sistema — revísalas en el corte de caja físico o en Wansoft → Reportes → Corte de Caja". NO inventes montos.
+- "propinas" → NO hay datos de propinas en el sistema. Di: "las propinas no llegan al sistema — revísalas en el corte de caja físico o en el POS → Reportes → Corte de Caja". NO inventes montos.
 - "inventario" / "stock" / "market" → buscar en INVENTARIO MARKET si hay datos. Dar stock actual, items con bajo stock, últimos movimientos. Si preguntan por ingredientes de cocina, decir que se revisa en /pos/inventario.
 - "vs semana pasada" / "comparado con" → usa los RESÚMENES ÚLTIMOS 7 DÍAS y compara con los 7 días anteriores de los datos diarios. NO digas "no tengo datos completos" si tienes datos de ambos periodos
 - Cualquier nombre propio → buscar en TODOS los datos disponibles

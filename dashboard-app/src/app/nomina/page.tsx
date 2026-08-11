@@ -448,7 +448,7 @@ export default function NominaPage() {
             <EmptyState
               icon={Users}
               title="Sin datos de empleados"
-              description="Los datos se generan automaticamente desde las ventas de Wansoft. Verifica que haya datos en el periodo seleccionado."
+              description="Los datos se generan automáticamente desde las ventas sincronizadas. Verifica que haya datos en el periodo seleccionado."
               iconColor="text-emerald-500"
               iconBg="bg-emerald-500/10"
             />
@@ -561,7 +561,7 @@ export default function NominaPage() {
               <div className="px-4 py-3 border-t border-[var(--line-soft)] bg-amber-500/5">
                 <p className="text-[11px] text-amber-500/80 flex items-center gap-1.5">
                   <AlertTriangle size={12} />
-                  Pre-nomina estimada. Las horas provienen de Wansoft. Deducciones estimadas al 5.5% (ISR ~3% + IMSS ~2.5%). Ajusta tarifa por hora manualmente.
+                  Pre-nómina estimada. Las horas provienen de la fuente operativa sincronizada. Deducciones estimadas al 5.5% (ISR ~3% + IMSS ~2.5%). Ajusta tarifa por hora manualmente.
                 </p>
               </div>
             </div>
@@ -639,7 +639,7 @@ export default function NominaPage() {
             <EmptyState
               icon={DollarSign}
               title="Sin datos de propinas"
-              description="Las propinas se actualizan diario desde Wansoft. Verifica que haya datos en el periodo seleccionado."
+              description="Las propinas se actualizan diario desde la fuente operativa sincronizada. Verifica que haya datos en el periodo seleccionado."
               iconColor="text-violet-500"
               iconBg="bg-violet-500/10"
             />
@@ -743,7 +743,7 @@ export default function NominaPage() {
             <EmptyState
               icon={Clock}
               title="Sin datos de asistencia"
-              description="La asistencia se actualiza diario desde Wansoft. Verifica que haya datos de labor/hours_worked."
+              description="La asistencia se actualiza diario desde la fuente operativa sincronizada. Verifica que haya datos de labor/hours_worked."
               iconColor="text-amber-500"
               iconBg="bg-amber-500/10"
             />

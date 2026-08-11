@@ -41,7 +41,7 @@ interface Subproducto {
   rendimiento_unit: string
   costo_total: number
   costo_unitario: number
-  // Solo para subproductos importados de Wansoft (inventory_parsed)
+  // Solo para subproductos importados de fuente histórica (inventory_parsed)
   wansoft?: boolean
   codigo?: string
   departamento?: string
@@ -91,13 +91,13 @@ function inferCategoria(nombre: string): string {
   return 'Otro'
 }
 
-// Receta de subproducto scrapeada de Wansoft (Production/GetSubProductRecipe)
+// Receta de subproducto importada de fuente histórica (Production/GetSubProductRecipe)
 interface WansoftSubRecipe {
   name: string
   ingredientes: SubproductoIngrediente[]
 }
 
-// Convierte ingredientes crudos de Wansoft a nuestro formato, costeando con inventario
+// Convierte ingredientes crudos de fuente histórica a nuestro formato, costeando con inventario
 function parseSubRecipes(parsed: unknown, inventory: InventoryItem[]): Map<string, WansoftSubRecipe> {
   const map = new Map<string, WansoftSubRecipe>()
   if (!Array.isArray(parsed)) return map
@@ -130,7 +130,7 @@ function parseSubRecipes(parsed: unknown, inventory: InventoryItem[]): Map<strin
   return map
 }
 
-// Construye subproductos a partir del inventario Wansoft (departamentos SUBS%)
+// Construye subproductos a partir del inventario histórico (departamentos SUBS%)
 // + recetas scrapeadas (subproduct_recipes)
 function buildWansoftSubs(
   inventory: InventoryItem[],
@@ -178,7 +178,7 @@ function buildWansoftSubs(
       usedRecipes.add(sp.nombre.toUpperCase())
     }
   }
-  // Recetas de Wansoft sin item de inventario SUBS (ej. productos MARCA PROPIA)
+  // Recetas históricas sin item de inventario SUBS (ej. productos MARCA PROPIA)
   for (const [key, rec] of recipes) {
     if (usedRecipes.has(key)) continue
     const recipeCost = rec.ingredientes.reduce((s, i) => s + i.costo, 0)
@@ -240,7 +240,7 @@ export default function SubproductosPage() {
           }
         }
 
-        // Load inventory + recetas de subproductos Wansoft en paralelo
+        // Load inventory + recetas de subproductos históricas en paralelo
         const [invResult, recResult] = await Promise.all([
           getWansoftDataLatest('inventory_parsed'),
           getWansoftDataLatest('subproduct_recipes'),
@@ -422,9 +422,9 @@ export default function SubproductosPage() {
       .slice(0, 15)
   }, [ingredientSearch, inventory])
 
-  // ── Combined list: manuales + importados de Wansoft ──────────────
+  // ── Combined list: manuales + importados de fuente histórica ──────────────
   const allSubproductos = useMemo(() => {
-    // Si un manual tiene el mismo nombre que uno de Wansoft, gana el manual
+    // Si un manual tiene el mismo nombre que uno importado, gana el manual
     const manualNames = new Set(subproductos.map(s => s.nombre.toUpperCase()))
     return [...subproductos, ...wansoftSubs.filter(w => !manualNames.has(w.nombre.toUpperCase()))]
   }, [subproductos, wansoftSubs])
@@ -820,7 +820,7 @@ export default function SubproductosPage() {
                       </span>
                       {sp.wansoft && (
                         <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold border bg-cyan-500/15 text-cyan-400 border-cyan-500/30">
-                          Wansoft
+                          Importado
                         </span>
                       )}
                     </div>
@@ -861,7 +861,7 @@ export default function SubproductosPage() {
                 {/* Expanded detail */}
                 {isExpanded && (
                   <div className="border-t border-[var(--accent-line)] px-5 py-4">
-                    {/* Wansoft sub: stock detail */}
+                    {/* Imported sub: stock detail */}
                     {sp.wansoft && (
                       <div className="rounded-xl bg-[var(--surface-2)] border border-[var(--accent-line)] p-4 mb-4">
                         <div className="grid grid-cols-3 gap-4 text-center">
@@ -882,7 +882,7 @@ export default function SubproductosPage() {
                     )}
                     {sp.wansoft && sp.ingredientes.length === 0 && (
                       <p className="text-xs text-[var(--text-4)] mb-2">
-                        Receta importada de Wansoft sin ingredientes detallados. Puedes crear un subproducto manual con el mismo nombre para definir su receta.
+                        Receta importada sin ingredientes detallados. Puedes crear un subproducto manual con el mismo nombre para definir su receta.
                       </p>
                     )}
                     {/* Ingredients table */}

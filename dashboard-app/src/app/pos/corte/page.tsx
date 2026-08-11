@@ -222,7 +222,7 @@ export default function CortePage() {
     // Incluye propina: lo cobrado por método debe cuadrar contra caja/terminal (la propina con tarjeta entra por la terminal)
     // Si la orden tiene pagos[] (pago mixto / formas custom), desglosamos por forma real.
     const byPayment: Record<string, number> = {}
-    // Formato Wansoft: venta y propina separadas por forma (propina prorrateada por pago)
+    // Formato POS clásico: venta y propina separadas por forma (propina prorrateada por pago)
     const ventasPorForma: Record<string, number> = {}
     const propinaPorForma: Record<string, number> = {}
     for (const o of closed) {
@@ -288,7 +288,7 @@ export default function CortePage() {
       .reduce((s, [, v]) => s + v, 0)
     const comisionTarjeta = totalTarjeta * cardPct / 100
 
-    // ── Arqueo de efectivo (formato Wansoft, spec 14.2) ──
+    // ── Arqueo de efectivo (formato POS clásico, spec 14.2) ──
     const isEfectivo = (m: string) => getMethodType(m) === 'cash'
     const ventasEfectivo = Object.entries(ventasPorForma).filter(([m]) => isEfectivo(m)).reduce((s, [, v]) => s + v, 0)
     const propinaEfectivo = Object.entries(propinaPorForma).filter(([m]) => isEfectivo(m)).reduce((s, [, v]) => s + v, 0)
@@ -603,7 +603,7 @@ export default function CortePage() {
               )}
             </div>
 
-            {/* Reporte Corte Turno — formato Wansoft (spec 14.2) */}
+            {/* Reporte Corte Turno */}
             <div className="bg-[var(--surface-2)]/60 border border-slate-700 rounded-xl p-5 md:col-span-2">
               <h3 className="font-bold text-white mb-1 flex items-center gap-2">
                 <Receipt size={18} className="text-emerald-400" />
@@ -691,7 +691,7 @@ export default function CortePage() {
                       </div>
                     </div>
                   )}
-                  <p className="text-[var(--text-2)] text-xs mt-3 leading-relaxed">Las propinas cobradas con tarjeta/otras formas se pagan al mesero en efectivo desde caja (regla Wansoft).</p>
+                  <p className="text-[var(--text-2)] text-xs mt-3 leading-relaxed">Las propinas cobradas con tarjeta/otras formas se pagan al mesero en efectivo desde caja.</p>
                 </div>
                 {/* Columna 3: Información operativa */}
                 <div>

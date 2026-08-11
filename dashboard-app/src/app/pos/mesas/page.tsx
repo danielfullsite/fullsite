@@ -186,7 +186,7 @@ export default function MesasPage() {
     })
   }, [])
 
-  // Staff + turno (estilo Wansoft: "Usuario: X · Turno: N")
+  // Staff + turno (estilo POS clásico: "Usuario: X · Turno: N")
   useEffect(() => {
     try {
       const saved = sessionStorage.getItem('pos_staff')
@@ -286,7 +286,7 @@ export default function MesasPage() {
     }
   }, [fetchData])
 
-  // Cuentas por nombre (sin mesa, estilo Wansoft "#SR RAUL")
+  // Cuentas por nombre (sin mesa, estilo POS clásico "#SR RAUL")
   const namedOrders = activeOrders.filter(o => o.customer_name && (!o.mesa || o.mesa === 0))
 
   // Build mesa states
@@ -907,7 +907,7 @@ export default function MesasPage() {
           <>
             {viewMode === 'planograma' ? <PlanogramaView /> : <GridView />}
 
-            {/* Cuentas por nombre (sin mesa, estilo Wansoft) */}
+            {/* Cuentas por nombre (sin mesa, estilo POS clásico) */}
             {namedOrders.length > 0 && (
               <div className="max-w-5xl mx-auto mt-6">
                 <h3 className="text-white font-bold text-lg mb-3 flex items-center gap-2">

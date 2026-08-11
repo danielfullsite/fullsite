@@ -231,10 +231,10 @@ function parsePurchaseSnapshots(rows: Record<string, unknown>[]): Movement[] {
       id: `wpurch_${curr.fecha}`,
       type: 'entrada',
       date: curr.fecha,
-      description: `Compras Wansoft (${items.length} producto${items.length === 1 ? '' : 's'})`,
+      description: `Compras importadas (${items.length} producto${items.length === 1 ? '' : 's'})`,
       items: items.sort((a, b) => (b.costo_total || 0) - (a.costo_total || 0)),
       total: Math.round(total * 100) / 100,
-      user: 'Wansoft',
+      user: 'Importación',
       source: 'wansoft_data',
       raw_key: 'purchases_by_product',
     })
@@ -305,7 +305,7 @@ export default function MovimientosPage() {
         `client_id=eq.${clientId}&order=created_at.desc&limit=200`
       )
 
-      // Fetch Wansoft purchases snapshots (rolling report → daily deltas)
+      // Fetch historical purchases snapshots (rolling report → daily deltas)
       const purchasesPromise = sbFetchRows(
         'wansoft_data',
         `select=fecha,data&client_id=eq.${clientId}&data_key=eq.purchases_by_product&order=fecha.desc&limit=15`
@@ -690,7 +690,7 @@ export default function MovimientosPage() {
                           {/* Metadata */}
                           <div className="flex items-center gap-4 mt-2 text-[10px] text-[var(--text-4)]">
                             {m.raw_key && <span>Key: {m.raw_key}</span>}
-                            <span>Fuente: {m.source === 'pos' ? 'POS' : 'Wansoft'}</span>
+                            <span>Fuente: {m.source === 'pos' ? 'POS' : 'Histórico'}</span>
                           </div>
                         </div>
                       </motion.div>

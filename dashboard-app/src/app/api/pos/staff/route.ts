@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { withPOSAuth, unauthorized } from '@/lib/api-auth'
 
-// Lista de empleados para asignaciones (repartidores estilo Wansoft: se eligen
+// Lista de empleados para asignaciones (repartidores estilo POS clásico: se eligen
 // de la lista general de empleados, no hay rol "repartidor").
 // Server-side con service key — NUNCA expone PINs (select solo id,name,role).
 
