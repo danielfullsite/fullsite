@@ -6,6 +6,7 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Toolti
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
 import { getRecentDays } from '@/lib/data'
+import { chartTooltipCursor, chartTooltipItemStyle, chartTooltipLabelStyle, chartTooltipStyle, chartTooltipWrapperStyle } from '@/lib/chart-theme'
 import { formatCurrency } from '@/lib/format'
 import type { WansoftDaily } from '@/lib/types'
 
@@ -119,7 +120,13 @@ export default function DeliveryPage() {
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" vertical={false} />
                   <XAxis dataKey="fecha" tick={{ fontSize: 10, fill: 'var(--text-3)' }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 10, fill: 'var(--text-3)' }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} width={45} />
-                  <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, fontSize: 12 }} />
+                  <Tooltip
+                    cursor={chartTooltipCursor}
+                    contentStyle={chartTooltipStyle}
+                    labelStyle={chartTooltipLabelStyle}
+                    itemStyle={chartTooltipItemStyle}
+                    wrapperStyle={chartTooltipWrapperStyle}
+                  />
                   <Legend />
                   <Bar dataKey="Uber" stackId="1" fill="#10b981" radius={[0, 0, 0, 0]} />
                   <Bar dataKey="Rappi" stackId="1" fill="#f97316" radius={[0, 0, 0, 0]} />
@@ -137,7 +144,13 @@ export default function DeliveryPage() {
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" vertical={false} />
                   <XAxis dataKey="mes" tick={{ fontSize: 10, fill: 'var(--text-3)' }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 10, fill: 'var(--text-3)' }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} width={45} />
-                  <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, fontSize: 12 }} />
+                  <Tooltip
+                    cursor={chartTooltipCursor}
+                    contentStyle={chartTooltipStyle}
+                    labelStyle={chartTooltipLabelStyle}
+                    itemStyle={chartTooltipItemStyle}
+                    wrapperStyle={chartTooltipWrapperStyle}
+                  />
                   <Legend />
                   <Bar dataKey="Uber" fill="#10b981" radius={[0, 0, 0, 0]} />
                   <Bar dataKey="Rappi" fill="#f97316" radius={[4, 4, 0, 0]} />

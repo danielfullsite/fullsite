@@ -6,6 +6,7 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Toolti
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
 import { getRecentDays } from '@/lib/data'
+import { chartTooltipCursor, chartTooltipItemStyle, chartTooltipLabelStyle, chartTooltipStyle, chartTooltipWrapperStyle } from '@/lib/chart-theme'
 import { formatCurrency } from '@/lib/format'
 import type { WansoftDaily } from '@/lib/types'
 
@@ -82,7 +83,13 @@ export default function CancelacionesPage() {
                   <XAxis dataKey="fecha" tick={{ fontSize: 10, fill: 'var(--text-3)' }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 10, fill: 'var(--text-3)' }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} width={45} />
                   <Tooltip // @ts-expect-error recharts formatter type
-                  formatter={(v: number) => formatCurrency(v)} contentStyle={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, fontSize: 12 }} />
+                    formatter={(v: number) => formatCurrency(v)}
+                    cursor={chartTooltipCursor}
+                    contentStyle={chartTooltipStyle}
+                    labelStyle={chartTooltipLabelStyle}
+                    itemStyle={chartTooltipItemStyle}
+                    wrapperStyle={chartTooltipWrapperStyle}
+                  />
                   <Bar dataKey="descuentos" fill="#ef4444" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -99,7 +106,13 @@ export default function CancelacionesPage() {
                   <XAxis dataKey="mes" tick={{ fontSize: 10, fill: 'var(--text-3)' }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 10, fill: 'var(--text-3)' }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} width={45} />
                   <Tooltip // @ts-expect-error recharts formatter type
-                  formatter={(v: number) => formatCurrency(v)} contentStyle={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, fontSize: 12 }} />
+                    formatter={(v: number) => formatCurrency(v)}
+                    cursor={chartTooltipCursor}
+                    contentStyle={chartTooltipStyle}
+                    labelStyle={chartTooltipLabelStyle}
+                    itemStyle={chartTooltipItemStyle}
+                    wrapperStyle={chartTooltipWrapperStyle}
+                  />
                   <Bar dataKey="descuentos" fill="#f59e0b" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>

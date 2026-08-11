@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { ChevronLeft, ChevronRight, BarChart3 } from 'lucide-react'
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts'
 import PageHeader from '@/components/PageHeader'
+import { chartTooltipCursor, chartTooltipItemStyle, chartTooltipLabelStyle, chartTooltipStyle, chartTooltipWrapperStyle } from '@/lib/chart-theme'
 import { formatCurrency } from '@/lib/format'
 import { getMonthlyData } from '@/lib/data'
 import type { WansoftDaily } from '@/lib/types'
@@ -321,7 +322,11 @@ export default function IngresosReportePage() {
                   <Tooltip
                     // @ts-expect-error recharts formatter type mismatch
                     formatter={(value: number) => formatCurrency(value)}
-                    contentStyle={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, fontSize: 12 }}
+                    cursor={chartTooltipCursor}
+                    contentStyle={chartTooltipStyle}
+                    labelStyle={chartTooltipLabelStyle}
+                    itemStyle={chartTooltipItemStyle}
+                    wrapperStyle={chartTooltipWrapperStyle}
                   />
                   <Area type="monotone" dataKey="ventas" stroke="#3b82f6" strokeWidth={2} fill="url(#colorVentas)" dot={{ r: 4, fill: '#3b82f6' }} />
                 </AreaChart>

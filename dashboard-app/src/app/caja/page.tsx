@@ -5,6 +5,7 @@ import { Banknote, CreditCard, ArrowDownRight, ArrowUpRight } from 'lucide-react
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
 import { getRecentDays } from '@/lib/data'
+import { chartTooltipCursor, chartTooltipItemStyle, chartTooltipLabelStyle, chartTooltipStyle, chartTooltipWrapperStyle } from '@/lib/chart-theme'
 import { formatCurrency } from '@/lib/format'
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts'
 import type { WansoftDaily } from '@/lib/types'
@@ -67,7 +68,13 @@ export default function CajaPage() {
                   <XAxis dataKey="fecha" tick={{ fontSize: 10, fill: 'var(--text-3)' }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 10, fill: 'var(--text-3)' }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} width={45} />
                   <Tooltip // @ts-expect-error recharts formatter type
-                  formatter={(v: number) => formatCurrency(v)} contentStyle={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, fontSize: 12 }} />
+                    formatter={(v: number) => formatCurrency(v)}
+                    cursor={chartTooltipCursor}
+                    contentStyle={chartTooltipStyle}
+                    labelStyle={chartTooltipLabelStyle}
+                    itemStyle={chartTooltipItemStyle}
+                    wrapperStyle={chartTooltipWrapperStyle}
+                  />
                   <Area type="monotone" dataKey="tarjeta" stackId="1" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.3} name="Tarjeta" />
                   <Area type="monotone" dataKey="efectivo" stackId="1" stroke="#10b981" fill="#10b981" fillOpacity={0.3} name="Efectivo" />
                 </AreaChart>

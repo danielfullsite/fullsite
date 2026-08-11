@@ -21,6 +21,7 @@ import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
 import EmptyState from '@/components/EmptyState'
 import { getMonthlyData, getDashboardFromPosOrders } from '@/lib/data'
+import { chartTooltipCursor, chartTooltipItemStyle, chartTooltipLabelStyle, chartTooltipStyle, chartTooltipWrapperStyle } from '@/lib/chart-theme'
 import { formatCurrency, formatPercent, percentChange, formatNumber } from '@/lib/format'
 import type { WansoftDaily } from '@/lib/types'
 
@@ -770,7 +771,14 @@ export default function TendenciasPage() {
               <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" vertical={false} />
               <XAxis dataKey="mes" tick={{ fontSize: 11, fill: 'var(--text-3)' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: 'var(--text-3)' }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000000).toFixed(1)}M`} width={55} />
-              <Tooltip formatter={(v, name) => [formatCurrency(Number(v)), name]} contentStyle={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, fontSize: 12 }} />
+              <Tooltip
+                formatter={(v, name) => [formatCurrency(Number(v)), name]}
+                cursor={chartTooltipCursor}
+                contentStyle={chartTooltipStyle}
+                labelStyle={chartTooltipLabelStyle}
+                itemStyle={chartTooltipItemStyle}
+                wrapperStyle={chartTooltipWrapperStyle}
+              />
               <Legend verticalAlign="top" height={30} iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '12px', color: 'var(--text-2)' }} />
               {yoyYears.map((yr, i) => (
                 <Bar key={yr} dataKey={yr} fill={YOY_COLORS[i % YOY_COLORS.length]} radius={[4, 4, 0, 0]} />
@@ -790,7 +798,14 @@ export default function TendenciasPage() {
               <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" vertical={false} />
               <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'var(--text-3)' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: 'var(--text-3)' }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} width={55} />
-              <Tooltip formatter={(v, name) => [formatCurrency(Number(v)), name]} contentStyle={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, fontSize: 12 }} />
+              <Tooltip
+                formatter={(v, name) => [formatCurrency(Number(v)), name]}
+                cursor={chartTooltipCursor}
+                contentStyle={chartTooltipStyle}
+                labelStyle={chartTooltipLabelStyle}
+                itemStyle={chartTooltipItemStyle}
+                wrapperStyle={chartTooltipWrapperStyle}
+              />
               <Legend verticalAlign="top" height={30} iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '12px', color: 'var(--text-2)' }} />
               <Area type="monotone" dataKey="Tarjeta" stackId="1" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.3} />
               <Area type="monotone" dataKey="Efectivo" stackId="1" stroke="#10b981" fill="#10b981" fillOpacity={0.3} />
@@ -811,7 +826,14 @@ export default function TendenciasPage() {
               <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'var(--text-3)' }} axisLine={false} tickLine={false} />
               <YAxis yAxisId="left" tick={{ fontSize: 11, fill: 'var(--text-3)' }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} width={55} />
               <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11, fill: '#ef4444' }} axisLine={false} tickLine={false} tickFormatter={v => `${v}%`} width={40} />
-              <Tooltip formatter={(v, name) => [name === 'pctVentas' ? `${v}%` : formatCurrency(Number(v)), name === 'pctVentas' ? '% sobre ventas' : 'Descuentos']} contentStyle={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, fontSize: 12 }} />
+              <Tooltip
+                formatter={(v, name) => [name === 'pctVentas' ? `${v}%` : formatCurrency(Number(v)), name === 'pctVentas' ? '% sobre ventas' : 'Descuentos']}
+                cursor={chartTooltipCursor}
+                contentStyle={chartTooltipStyle}
+                labelStyle={chartTooltipLabelStyle}
+                itemStyle={chartTooltipItemStyle}
+                wrapperStyle={chartTooltipWrapperStyle}
+              />
               <Bar yAxisId="left" dataKey="descuentos" fill="#f59e0b" radius={[4, 4, 0, 0]} />
               <Line yAxisId="right" type="monotone" dataKey="pctVentas" stroke="#ef4444" strokeWidth={2} dot={{ r: 3 }} />
             </BarChart>
@@ -830,7 +852,13 @@ export default function TendenciasPage() {
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" vertical={false} />
                 <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'var(--text-3)' }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 11, fill: 'var(--text-3)' }} axisLine={false} tickLine={false} width={40} />
-                <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, fontSize: 12 }} />
+                <Tooltip
+                  cursor={chartTooltipCursor}
+                  contentStyle={chartTooltipStyle}
+                  labelStyle={chartTooltipLabelStyle}
+                  itemStyle={chartTooltipItemStyle}
+                  wrapperStyle={chartTooltipWrapperStyle}
+                />
                 <Legend verticalAlign="top" height={30} iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '12px', color: 'var(--text-2)' }} />
                 {top5Names.map((name, i) => (
                   <Bar key={name} dataKey={name} fill={PLAT_COLORS[i % PLAT_COLORS.length]} radius={[4, 4, 0, 0]} />
@@ -894,7 +922,11 @@ export default function TendenciasPage() {
                     const p = payload?.[0]?.payload
                     return p ? `${p.fecha} — ${p.personas} personas, TP ${formatCurrency(p.ticketPromedio)}` : label
                   }}
-                  contentStyle={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, fontSize: 12 }}
+                  cursor={chartTooltipCursor}
+                  contentStyle={chartTooltipStyle}
+                  labelStyle={chartTooltipLabelStyle}
+                  itemStyle={chartTooltipItemStyle}
+                  wrapperStyle={chartTooltipWrapperStyle}
                 />
                 <Bar dataKey="ventas" radius={[6, 6, 0, 0]} barSize={28}>
                   {sameDowTrend.map((d, i) => (
