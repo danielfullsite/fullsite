@@ -1,11 +1,50 @@
 # Fullsite Offline — Deployment Multi-Restaurante
 
-> Versión: 1.0 — 2026-07-27
+> Versión: 1.1 — 2026-08-11 (offline-first / Fullsite POS 1.3.5)
 >
 > **Principio rector de este documento:** Fullsite Offline es un producto, no una
 > instalación de AMALAY. El mismo código, el mismo instalador, el mismo Local Server
 > funcionan en cualquier restaurante. Lo único que cambia es la configuración.
 > AMALAY es la instalación de referencia — no el caso especial.
+
+---
+
+## 🆕 Actualización v1.1 — Offline-First real (Fullsite POS 1.3.5)
+
+> **Léelo antes que nada si vienes de la v1.0.** Cambia cómo se garantiza el offline.
+
+**Qué cambió.** En la v1.0 la app cargaba la UI **desde la nube** (`app.fullsite.mx/pos`)
+y dependía del Service Worker para operar sin internet (ver §5.5). Eso tenía dos fallas
+que se vieron en campo (AMALAY, 2026-08-10):
+
+1. **Pantalla negra** al cortar internet si el caché del Service Worker no se había
+   calentado — arranque en frío sin señal = no abría.
+2. **El LAN chocaba con *mixed-content*:** una página servida por **HTTPS** no puede
+   llamar a `http://192.168.x.x:7717` ni abrir `ws://192.168.x.x:7717` (IP de LAN). Solo
+   `127.0.0.1` está exento. Por eso el KDS y las terminales secundarias no recibían
+   comandas offline, y la ruta `?bridge=IP` (§5.6/§11 opción B) **no funciona** cargada
+   desde la nube.
+
+**Solución (1.3.5 — `OFFLINE-SHELL-001.md`).** El instalador ahora **empaqueta la UI del
+POS** (export estático de Next, ~19 MB) dentro del `.exe`. El bridge de SERVER1 la sirve
+localmente y **la app carga de `http://127.0.0.1:7717/pos`** (o `http://<SERVER1>:7717/pos`
+en terminales secundarias). Con eso:
+
+- Abre **sin internet** (se acaba la pantalla negra).
+- El origen de la página pasa a ser `http://` local → `http://`/`ws://` al LAN **ya no se
+  bloquean** → KDS y terminales secundarias reciben por LAN offline.
+- Reusa toda la Fase 1 que ya existía (IDB, event store, auth PIN offline con PBKDF2).
+
+**Cómo se activa (config-as-data, sin recompilar).** Agregar `"local_ui": true` al
+`config.json` de cada terminal (ver §2 y §3). Las terminales secundarias y el KDS además
+ponen `"pos_server_ip": "<IP de SERVER1>"` para cargar del servidor. **Sin el flag, la
+1.3.5 se comporta igual que la nube** (compatible hacia atrás — el default no cambia).
+
+**Efecto en el resto del doc.** El §5.5 ("Primer arranque con internet — CRÍTICO") deja de
+ser un bloqueador para *abrir* offline (ya no depende del calentamiento del SW), pero
+**sigue siendo necesario para poblar los datos** (menú, staff, modificadores) en IDB — ver
+§6. La ruta "KDS en Chrome con `?bridge=`" (§5.6-B / §11-B) queda **obsoleta con carga de
+nube**; usar Electron 1.3.5 con `local_ui` + `pos_server_ip`.
 
 ---
 
@@ -174,7 +213,8 @@ Todo lo que diferencia una instalación de otra está declarado en dos archivos 
 | `instance_name` | string | Nombre del servidor para mDNS discovery |
 | `kds` | boolean | `true` → abre ventana KDS en segundo monitor |
 | `kds_only` | boolean | `true` → omite ventana POS, solo KDS |
-| `pos_server_ip` | string | IP del SERVER1 (para terminales `kds_only`) |
+| `pos_server_ip` | string | IP del SERVER1 (para terminales secundarias / `kds_only`) |
+| `local_ui` | boolean | **(1.3.5+)** `true` → carga la UI del bundle local en vez de la nube. SERVER1 → `127.0.0.1:7717`; secundarias/KDS → `pos_server_ip:7717`. Requerido para offline-first. Ver §v1.1 |
 
 ### 2.2 `printers.json` — Configuración de hardware de impresión
 
@@ -248,9 +288,15 @@ Copiar este template para cada instalación nueva. Reemplazar los valores en may
   "channel": "stable",
   "instance_name": "NOMBRE_DEL_RESTAURANTE",
   "kds": false,
-  "kds_only": false
+  "kds_only": false,
+  "local_ui": true
 }
 ```
+
+> **(1.3.5+) `local_ui`:** en SERVER1 déjalo así (`true`, sin `pos_server_ip` → usa
+> `127.0.0.1`). En **terminales secundarias / KDS** agrega también
+> `"pos_server_ip": "<IP de SERVER1>"` para que carguen la UI del servidor. Si omites
+> `local_ui`, la 1.3.5 carga de la nube (comportamiento v1.0).
 
 ### Archivo `C:\fullsite\printers.json`
 
@@ -1013,6 +1059,46 @@ C:\fullsite\
 
 ---
 
-*Versión 1.0 — 2026-07-27*
-*Aplica a: Fullsite POS 1.x con Local Server 1.x*
-*Próxima revisión: al completar Phase 2 (turno offline + cierre offline)*
+## Apéndice C — Lecciones de campo (AMALAY, 2026-08-10)
+
+Cosas que se aprendieron en la primera instalación en vivo. Léelas antes de la próxima:
+
+**Instalación / build**
+- **NO uses el wrapper `INSTALL.cmd` del field kit v2:** tiene un bug — se cicla en el
+  paso `[1/6]` (backup) y **nunca instala**. Corre el instalador directo:
+  `Start-Process "...\Fullsite POS Setup X.Y.Z.exe"` (el backup se hace aparte una vez).
+- **NO corras nada en PowerShell ISE** (el editor azul con menús): se cuelga en el
+  `Compress-Archive` del backup y parece "ciclado". Usa la **consola normal** de PowerShell.
+- Si una ventana de consola dice **"Select …"** en el título, le diste click adentro y la
+  **pausaste** (QuickEdit) — presiona **Esc** para descongelarla.
+- El instalador `.exe` lo compila **CI** (`electron-build.yml`, runner Windows) — no desde
+  Mac (no hay wine). El build offline-first corre `dashboard-app` `build:offline` antes de
+  empaquetar (bundle en `extraResources`).
+
+**Red (crítico para reproducibilidad)**
+- **Fija IPs estáticas** para SERVER1, terminales, KDS e impresoras, y **documéntalas**. En
+  AMALAY estaban por DHCP sin documentar → adivinanza en cada paso.
+- **Revisa que el SERVER1 no tenga IPs duplicadas** en el mismo adaptador (AMALAY tenía
+  `192.168.1.71` **y** `192.168.123.253` fantasma) — confunde el descubrimiento mDNS.
+- Verifica alcance con `Test-NetConnection <ip> -Port <7717|9100> -InformationLevel Quiet`
+  (es cmdlet de PowerShell, no de CMD).
+
+**Huella (DigitalPersona)**
+- El servicio de huella es local: `C:\fullsite\fingerprint-service.exe` + `DPUruNet.dll`
+  en `:7718`; el bridge lo proxea vía `/fp`. Si `:7718/health` no responde, el login **cae
+  a solo-PIN por diseño** (no es que se borró la huella). Fix: verificar los archivos +
+  lector conectado + reabrir la app (la relanza).
+
+**Impresión / bridge**
+- Cada terminal levanta su **propio bridge local** (`127.0.0.1:7717`) con las estaciones
+  configuradas. Con `local_ui`, imprime por su bridge local sin chocar con mixed-content.
+- El campo "URL del Bridge" de Configuración que dice *"PDV1-3: usar IP de Caja"* es de la
+  época de carga-nube y **está mal para 1.3.5 con `local_ui`** — déjalo vacío (usa el
+  bridge local) o resuélvelo con `pos_server_ip`.
+
+---
+
+*Versión 1.1 — 2026-08-11 (offline-first)*
+*Aplica a: Fullsite POS 1.3.5+ con Local Server 1.x*
+*Historial: v1.0 (2026-07-27) carga-nube + Service Worker; v1.1 bundle local + `local_ui`*
+*Próxima revisión: al completar Phase 2 (turno offline + cierre offline) y validar el corte de módem en campo*
