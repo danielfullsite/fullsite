@@ -1,11 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Store, Plus, Activity, AlertTriangle, ArrowUpRight, Bot, RefreshCw, X, Sparkles, Circle } from 'lucide-react'
+import { Store, Plus, Activity, AlertTriangle, ArrowUpRight, Bot, RefreshCw, X, Sparkles, Circle, Power } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
+import { ToastProvider, useToast, ConfirmModal } from '@/components/platform/PlatformFeedback'
 
-// Control Plane: sin anon key. Todo pasa por /api/platform/tenants
-// (admin-gated + service_role server-side). Same-origin envía la cookie fs-at.
+// Control Plane: sin anon key. Todo pasa por /api/platform/* (admin-gated + service_role).
+// Fase 4: alta de tenant (POST /api/platform/onboard), activar/desactivar
+// (POST /api/platform/tenant-toggle) y punto de entrada "Entrar" (act-as placeholder).
 
 interface Tenant {
   id: string
@@ -13,13 +15,17 @@ interface Tenant {
   lastData: string | null
   hoursAgo: number | null
   openEvents: number
+  active?: boolean
 }
 
-export default function TenantsConsole() {
+function TenantsInner() {
+  const toast = useToast()
   const [tenants, setTenants] = useState<Tenant[]>([])
   const [loading, setLoading] = useState(true)
   const [denied, setDenied] = useState(false)
   const [showNew, setShowNew] = useState(false)
+  const [confirm, setConfirm] = useState<null | { title: string; message?: string; run: () => Promise<void> }>(null)
+  const [busy, setBusy] = useState(false)
 
   async function load() {
     setLoading(true)
@@ -45,6 +51,17 @@ export default function TenantsConsole() {
   }
 
   useEffect(() => { load() }, [])
+
+  async function toggleTenant(t: Tenant, active: boolean) {
+    const res = await fetch('/api/platform/tenant-toggle', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientId: t.id, active }),
+    })
+    if (res.ok) { toast('success', `${t.name} ${active ? 'activado' : 'desactivado'}`); await load() }
+    else if (res.status === 429) toast('error', 'Límite de escrituras excedido.')
+    else toast('error', 'No se pudo cambiar el estado del tenant.')
+  }
 
   if (denied) {
     return (
@@ -113,6 +130,8 @@ export default function TenantsConsole() {
           <div className="flex items-center justify-center py-16">
             <div className="w-8 h-8 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
           </div>
+        ) : tenants.length === 0 ? (
+          <div className="px-4 py-10 text-center text-sm text-[var(--text-3)]">No hay tenants aún.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -128,6 +147,7 @@ export default function TenantsConsole() {
                   const stale = t.hoursAgo !== null && t.hoursAgo > 48
                   const warn = t.hoursAgo !== null && t.hoursAgo > 24
                   const dot = t.hoursAgo === null ? 'var(--text-4)' : stale ? '#f43f5e' : warn ? '#fbbf24' : 'var(--accent)'
+                  const isActive = t.active !== false
                   return (
                     <tr key={t.id} className="border-t border-[var(--line-soft)] hover:bg-[var(--surface-2)] transition-colors">
                       <td className="px-4 py-3 font-semibold text-[var(--text-1)]">
@@ -144,10 +164,29 @@ export default function TenantsConsole() {
                           ? <span style={{ color: '#fbbf24' }} className="font-semibold">{t.openEvents}</span>
                           : <span className="text-[var(--text-4)]">—</span>}
                       </td>
-                      <td className="px-4 py-3 text-right">
-                        <button className="inline-flex items-center gap-1 text-[var(--accent-bright)] font-semibold text-xs hover:underline">
-                          Entrar <ArrowUpRight size={13} />
-                        </button>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-3">
+                          <button
+                            onClick={() => setConfirm({
+                              title: `${isActive ? 'Desactivar' : 'Activar'} "${t.name}"`,
+                              message: isActive
+                                ? 'El tenant dejará de operar hasta reactivarlo.'
+                                : 'El tenant volverá a estar activo.',
+                              run: async () => { await toggleTenant(t, !isActive) },
+                            })}
+                            className={`inline-flex items-center gap-1 text-xs font-semibold ${isActive ? 'text-[var(--text-3)] hover:text-red-400' : 'text-emerald-500 hover:text-emerald-400'}`}
+                          >
+                            <Power size={13} /> {isActive ? 'Desactivar' : 'Activar'}
+                          </button>
+                          {/* Punto de entrada act-as (placeholder — impersonation completa NO se construye aquí) */}
+                          <a
+                            href={`/?client_id=${encodeURIComponent(t.id)}`}
+                            title="Abrir admin del tenant (placeholder — sin impersonation aún)"
+                            className="inline-flex items-center gap-1 text-[var(--accent-bright)] font-semibold text-xs hover:underline"
+                          >
+                            Entrar <ArrowUpRight size={13} />
+                          </a>
+                        </div>
                       </td>
                     </tr>
                   )
@@ -157,62 +196,164 @@ export default function TenantsConsole() {
           </div>
         )}
       </div>
+      <p className="mt-3 text-[11px] text-[var(--text-4)]">
+        &quot;Entrar&quot; es el punto de entrada al admin del tenant. La impersonation completa (act-as) se implementará después.
+      </p>
 
-      {/* Nuevo cliente (clonar) */}
-      {showNew && <NewTenantModal onClose={() => setShowNew(false)} />}
+      {showNew && <NewTenantModal onClose={() => setShowNew(false)} onDone={load} toast={toast} tenantCount={tenants.length} />}
+
+      <ConfirmModal
+        open={!!confirm}
+        title={confirm?.title || ''}
+        message={confirm?.message}
+        busy={busy}
+        onCancel={() => { if (!busy) setConfirm(null) }}
+        onConfirm={async () => {
+          if (!confirm) return
+          setBusy(true)
+          try { await confirm.run() } finally { setBusy(false); setConfirm(null) }
+        }}
+      />
     </>
   )
 }
 
-function NewTenantModal({ onClose }: { onClose: () => void }) {
+const ACCENT_OPTIONS = ['emerald', 'blue', 'violet', 'amber', 'pink', 'cyan']
+
+function NewTenantModal({ onClose, onDone, toast, tenantCount }: {
+  onClose: () => void; onDone: () => void
+  toast: (k: 'success' | 'error', m: string) => void; tenantCount: number
+}) {
   const [name, setName] = useState('')
   const [slug, setSlug] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [accent, setAccent] = useState('emerald')
+  const [theme, setTheme] = useState<'light' | 'dark'>('light')
+  const [logo, setLogo] = useState('')
+  const [mesas, setMesas] = useState('10')
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+
   const autoSlug = (v: string) => v.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+  const valid = name && slug && email && password.length >= 6
+
+  async function submit() {
+    setBusy(true)
+    try {
+      const res = await fetch('/api/platform/onboard', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientId: slug, email, password, display_name: name,
+          accent_color: accent, default_theme: theme,
+          logo_url: logo || undefined, mesas: parseInt(mesas, 10) || 10,
+        }),
+      })
+      if (res.ok) { toast('success', `Tenant "${slug}" dado de alta`); onDone(); onClose() }
+      else if (res.status === 429) toast('error', 'Límite de escrituras excedido.')
+      else {
+        const j = await res.json().catch(() => ({}))
+        toast('error', j.error || 'No se pudo dar de alta el tenant.')
+      }
+    } catch {
+      toast('error', 'Error de red al dar de alta.')
+    } finally {
+      setBusy(false); setConfirmOpen(false)
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
-      <div className="w-full max-w-md rounded-2xl border border-[var(--line)] bg-[var(--bg)] shadow-2xl" onClick={e => e.stopPropagation()}>
-        <div className="px-5 py-4 border-b border-[var(--line)] flex items-center gap-3">
+      <div className="w-full max-w-md rounded-2xl border border-[var(--line)] bg-[var(--bg)] shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="px-5 py-4 border-b border-[var(--line)] flex items-center gap-3 sticky top-0 bg-[var(--bg)]">
           <Sparkles size={18} className="text-[var(--accent-bright)]" />
           <div>
             <div className="font-bold text-[var(--text-1)]">Nuevo cliente</div>
-            <div className="text-[11px] text-[var(--text-3)]">Clonar Fullsite completo · onboarding cero-código</div>
+            <div className="text-[11px] text-[var(--text-3)]">Alta completa · onboarding cero-código</div>
           </div>
           <button onClick={onClose} className="ml-auto text-[var(--text-3)] hover:text-[var(--text-1)]"><X size={18} /></button>
         </div>
         <div className="p-5 space-y-4">
           <label className="block">
             <span className="text-xs text-[var(--text-3)]">Nombre del restaurante</span>
-            <input
-              value={name}
-              onChange={e => { setName(e.target.value); setSlug(autoSlug(e.target.value)) }}
+            <input value={name} onChange={e => { setName(e.target.value); setSlug(autoSlug(e.target.value)) }}
               placeholder="La Costa Verde"
-              className="mt-1 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2.5 text-[var(--text-1)] outline-none focus:border-[var(--accent-line)]"
-            />
+              className="mt-1 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2.5 text-[var(--text-1)] outline-none focus:border-[var(--accent-line)]" />
           </label>
           <label className="block">
-            <span className="text-xs text-[var(--text-3)]">Subdominio (tenant)</span>
+            <span className="text-xs text-[var(--text-3)]">Client ID (tenant / subdominio)</span>
             <div className="mt-1 flex items-center rounded-lg border border-[var(--line)] bg-[var(--surface-2)] overflow-hidden">
-              <input
-                value={slug}
-                onChange={e => setSlug(autoSlug(e.target.value))}
-                placeholder="lacostaverde"
-                className="flex-1 bg-transparent px-3 py-2.5 text-[var(--text-1)] outline-none font-mono text-sm"
-              />
+              <input value={slug} onChange={e => setSlug(autoSlug(e.target.value))} placeholder="lacostaverde"
+                className="flex-1 bg-transparent px-3 py-2.5 text-[var(--text-1)] outline-none font-mono text-sm" />
               <span className="px-3 text-[var(--text-4)] text-sm font-mono border-l border-[var(--line)]">.app.fullsite.mx</span>
             </div>
           </label>
-          <div className="rounded-lg bg-[var(--accent-soft)] border border-[var(--accent-line)] p-3 text-[12px] text-[var(--text-2)] leading-relaxed">
-            Al clonar se ejecuta <span className="font-mono">bootstrap_client.py</span> con el <span className="font-mono">RestaurantManifest</span>: crea el tenant en la BD compartida, mapea el subdominio, y siembra menú/staff/pagos. <b>Cero código, cero deploy nuevo.</b>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block">
+              <span className="text-xs text-[var(--text-3)]">Email del dueño</span>
+              <input value={email} onChange={e => setEmail(e.target.value)} type="email" placeholder="dueno@rest.mx"
+                className="mt-1 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2.5 text-[var(--text-1)] outline-none focus:border-[var(--accent-line)] text-sm" />
+            </label>
+            <label className="block">
+              <span className="text-xs text-[var(--text-3)]">Password inicial</span>
+              <input value={password} onChange={e => setPassword(e.target.value)} type="text" placeholder="mín. 6 caracteres"
+                className="mt-1 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2.5 text-[var(--text-1)] outline-none focus:border-[var(--accent-line)] text-sm" />
+            </label>
           </div>
-          <button
-            disabled={!name || !slug}
-            className="w-full py-3 rounded-xl bg-[var(--accent)] text-[#04120c] font-bold disabled:opacity-40 flex items-center justify-center gap-2"
-          >
-            <Plus size={16} /> Clonar cliente
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block">
+              <span className="text-xs text-[var(--text-3)]">Color de acento</span>
+              <select value={accent} onChange={e => setAccent(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2.5 text-[var(--text-1)] outline-none focus:border-[var(--accent-line)] text-sm">
+                {ACCENT_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </label>
+            <label className="block">
+              <span className="text-xs text-[var(--text-3)]">Tema por defecto</span>
+              <select value={theme} onChange={e => setTheme(e.target.value as 'light' | 'dark')}
+                className="mt-1 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2.5 text-[var(--text-1)] outline-none focus:border-[var(--accent-line)] text-sm">
+                <option value="light">light</option>
+                <option value="dark">dark</option>
+              </select>
+            </label>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block">
+              <span className="text-xs text-[var(--text-3)]">Logo URL (opcional)</span>
+              <input value={logo} onChange={e => setLogo(e.target.value)} placeholder="https://…"
+                className="mt-1 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2.5 text-[var(--text-1)] outline-none focus:border-[var(--accent-line)] text-sm" />
+            </label>
+            <label className="block">
+              <span className="text-xs text-[var(--text-3)]">Mesas</span>
+              <input value={mesas} onChange={e => setMesas(e.target.value.replace(/\D/g, ''))} inputMode="numeric"
+                className="mt-1 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2.5 text-[var(--text-1)] outline-none focus:border-[var(--accent-line)] text-sm tabular-nums" />
+            </label>
+          </div>
+          <button disabled={!valid} onClick={() => setConfirmOpen(true)}
+            className="w-full py-3 rounded-xl bg-[var(--accent)] text-[#04120c] font-bold disabled:opacity-40 flex items-center justify-center gap-2">
+            <Plus size={16} /> Dar de alta cliente
           </button>
         </div>
       </div>
+
+      <ConfirmModal
+        open={confirmOpen}
+        title={`Dar de alta "${slug}"`}
+        message={`Se creará el usuario dueño, el mapping y el skeleton completo. Es idempotente. Actualmente hay ${tenantCount} tenants.`}
+        confirmLabel="Crear tenant"
+        busy={busy}
+        onCancel={() => { if (!busy) setConfirmOpen(false) }}
+        onConfirm={submit}
+      />
     </div>
+  )
+}
+
+export default function TenantsConsole() {
+  return (
+    <ToastProvider>
+      <TenantsInner />
+    </ToastProvider>
   )
 }

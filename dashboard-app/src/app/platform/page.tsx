@@ -1,9 +1,16 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Users, Bot, CheckCircle, AlertTriangle, DollarSign, Activity, Clock, RefreshCw } from 'lucide-react'
+import { Users, Bot, CheckCircle, AlertTriangle, DollarSign, Activity, Clock, RefreshCw, Store, Flag, ScrollText, ArrowUpRight } from 'lucide-react'
+import Link from 'next/link'
 import { formatCurrency, formatNumber } from '@/lib/format'
 import PageHeader from '@/components/PageHeader'
+
+const CONTROL_LINKS = [
+  { href: '/platform/tenants', label: 'Tenants', desc: 'Alta, activar/desactivar, entrar', icon: Store },
+  { href: '/platform/flags', label: 'Flags & Config', desc: 'Feature flags · settings · aviso global', icon: Flag },
+  { href: '/platform/audit', label: 'Bitácora', desc: 'Auditoría de acciones cross-tenant', icon: ScrollText },
+]
 
 // Control Plane: sin anon key. Todo pasa por /api/platform/overview
 // (admin-gated + service_role server-side). Same-origin envía la cookie fs-at.
@@ -151,6 +158,30 @@ export default function PlatformPage() {
         >
           <RefreshCw size={16} />
         </button>
+      </div>
+
+      {/* Control global */}
+      <div className="mb-6">
+        <p className="text-[11px] font-semibold text-[var(--accent-ink)] uppercase tracking-widest mb-2">Control global</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {CONTROL_LINKS.map(l => {
+            const Icon = l.icon
+            return (
+              <Link
+                key={l.href}
+                href={l.href}
+                className="group rounded-xl border border-[var(--line)] bg-[var(--card)] p-4 hover:border-[var(--accent-line)] transition-colors"
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <Icon size={15} className="text-[var(--accent-bright)]" />
+                  <b className="text-sm text-[var(--text-1)]">{l.label}</b>
+                  <ArrowUpRight size={13} className="ml-auto text-[var(--text-4)] group-hover:text-[var(--accent-bright)]" />
+                </div>
+                <p className="text-[11px] text-[var(--text-3)]">{l.desc}</p>
+              </Link>
+            )
+          })}
+        </div>
       </div>
 
       {/* KPI Grid */}
