@@ -11,17 +11,13 @@ import {
   ArrowLeft, RefreshCw, Clock, ChefHat, PackageCheck,
   Truck, CheckCircle2, ShoppingBag, DollarSign, XCircle, Ban,
 } from 'lucide-react'
-import { formatMXN, logAudit, getClientId } from '@/lib/pos-data'
+import { formatMXN, logAudit } from '@/lib/pos-data'
 import { CANCEL_REASON_LABELS, UBER_CANCEL_REASONS } from '@/lib/integrations/uber-eats/reasons'
 import type { UberCancelReason } from '@/lib/integrations/uber-eats/reasons'
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-const SB_HEADERS = {
-  apikey: SUPABASE_KEY,
-  Authorization: `Bearer ${SUPABASE_KEY}`,
-  'Content-Type': 'application/json',
-}
+// delivery_orders is read/written via /api/pos/delivery-orders (service_role,
+// client_id resuelto en servidor). No se usa la anon key directa (RLS deny-all
+// para anon). Ver docs/release/delivery-orders-rls.sql.
 
 type PlatformFilter = 'todas' | 'ubereats' | 'rappi'
 
@@ -101,8 +97,8 @@ export default function DeliveryPage() {
     try {
       const today = new Date().toISOString().slice(0, 10)
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/delivery_orders?client_id=eq.${getClientId()}&platform=in.(ubereats,rappi)&created_at=gte.${today}T00:00:00&order=created_at.desc`,
-        { headers: SB_HEADERS, cache: 'no-store' }
+        `/api/pos/delivery-orders?platform=ubereats,rappi&since=${today}T00:00:00`,
+        { cache: 'no-store' }
       )
       if (res.ok) {
         const data: DeliveryOrder[] = await res.json()
@@ -152,8 +148,10 @@ export default function DeliveryPage() {
   }, [orders])
 
   const patchOrder = async (id: string, body: Record<string, unknown>) => {
-    await fetch(`${SUPABASE_URL}/rest/v1/delivery_orders?id=eq.${id}`, {
-      method: 'PATCH', headers: SB_HEADERS, body: JSON.stringify(body),
+    await fetch(`/api/pos/delivery-orders`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, patch: body }),
     })
     fetchOrders()
   }
