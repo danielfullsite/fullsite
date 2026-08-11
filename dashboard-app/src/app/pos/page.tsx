@@ -156,7 +156,7 @@ export default function POSPage() {
   return (
     <Suspense fallback={
       <div className="h-dvh flex items-center justify-center text-white" style={{background:'#0a0a0f',color:'#fff'}}>
-        <div className="w-10 h-10 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-10 h-10 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }} />
       </div>
     }>
       <POSContent />
@@ -3457,7 +3457,7 @@ function POSContent() {
   }
 
   return (
-    <div className="pos-kiosk h-dvh flex flex-col text-white overflow-hidden select-none" style={{'--bg':'#000000','--surface':'#0a0a0c','--surface-2':'#0f1014','--panel':'#0b0b0e','--line':'#1c1d22','--line-soft':'#141519','--text-1':'#f5f5f7','--text-2':'#c4c4cc','--text-3':'#87878f','--text-4':'#555560','--accent':'#10b981','--accent-bright':'#34d399','--accent-deep':'#059669','--accent-soft':'rgba(16,185,129,0.12)','--accent-line':'rgba(16,185,129,0.28)',background:'#0a0a0f',color:'#fff',colorScheme:'dark'} as React.CSSProperties}>
+    <div className="pos-kiosk h-dvh flex flex-col text-white overflow-hidden select-none" style={{'--bg':'#000000','--surface':'#0a0a0c','--surface-2':'#0f1014','--panel':'#0b0b0e','--line':'#1c1d22','--line-soft':'#141519','--text-1':'#f5f5f7','--text-2':'#c4c4cc','--text-3':'#87878f','--text-4':'#555560','--accent-ink':'var(--accent-bright)',background:'#0a0a0f',color:'#fff',colorScheme:'dark'} as React.CSSProperties}>
 
       {/* COB-017: MP Payment Recovery Banner — shown when MP captured money but Fullsite failed to record */}
       {needsOperatorAttention(mpRecovery) && mpRecovery && (
@@ -4238,7 +4238,7 @@ function POSContent() {
         </div>
 
         {/* Right Panel -- Menu (50% on tablet, full on mobile when active) */}
-        <div className={`md:w-[50%] lg:w-[55%] md:flex flex-col ${mobileView === 'menu' ? 'flex w-full' : 'hidden'}`} style={{background:'#0d0d12'}}>
+        <div className={`md:w-[50%] lg:w-[55%] md:flex flex-col ${mobileView === 'menu' ? 'flex w-full' : 'hidden'}`} style={{background:'var(--surface)'}}>
           {/* Search bar — touch target + barcode scanner */}
           <div className="px-2 pt-1 pb-0.5 flex-shrink-0 flex gap-2">
             <input
@@ -4386,7 +4386,7 @@ function POSContent() {
               {/* Menu items — centered modal overlay on category tap */}
               {selectedCategory && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => { setSelectedCategory(''); setCategorySearch('') }}>
-                  <div className={`bg-[#111118] rounded-2xl border border-[rgba(255,255,255,0.1)] shadow-2xl w-[96vw] max-w-[1200px] overflow-hidden flex flex-col ${activeCategory.items.filter(i => i.price > 0).length > 15 ? 'h-[90vh]' : 'max-h-[90vh]'}`} onClick={e => e.stopPropagation()}>
+                  <div className={`bg-[var(--panel)] rounded-2xl border border-[var(--line)] shadow-2xl w-[96vw] max-w-[1200px] overflow-hidden flex flex-col ${activeCategory.items.filter(i => i.price > 0).length > 15 ? 'h-[90vh]' : 'max-h-[90vh]'}`} onClick={e => e.stopPropagation()}>
                     <div className={`flex items-center justify-between px-4 py-2 border-b border-[rgba(255,255,255,0.08)] ${(activeCategory as { color?: string }).color || 'bg-emerald-600'}`}>
                       <h3 className="text-white font-bold text-lg">{activeCategory.name} <span className="text-white/60 text-sm font-normal ml-2">{activeCategory.items.filter(i => i.price > 0).length} platillos</span></h3>
                       <button onClick={() => { setSelectedCategory(''); setCategorySearch('') }} className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center text-white text-2xl font-bold hover:bg-white/30 active:scale-95">&times;</button>
@@ -4398,7 +4398,7 @@ function POSContent() {
                           value={categorySearch}
                           onChange={e => setCategorySearch(e.target.value)}
                           placeholder="Buscar en esta categoría..."
-                          className="w-full bg-[#1a1a24] border border-[rgba(255,255,255,0.1)] rounded-lg px-3 py-2 text-white text-sm placeholder:text-gray-500 focus:outline-none focus:border-emerald-500/50"
+                          className="w-full bg-[var(--surface-2)] border border-[var(--line)] rounded-lg px-3 py-2 text-white text-sm placeholder:text-gray-500 focus:outline-none focus:border-[var(--accent)]"
                           autoFocus
                         />
                       </div>
@@ -4411,12 +4411,12 @@ function POSContent() {
                     <button
                       key={item.id}
                       onClick={() => { if (isOOS) { showToast(`${item.name} — AGOTADO`); return } handleMenuItemTap(item, activeCategory.id); setSelectedCategory(''); setMobileView('order') }}
-                      className={`bg-[#1a1a24] hover:bg-[#222230] active:scale-[0.97] border rounded-xl text-left transition-all flex overflow-hidden relative shadow-sm ${
+                      className={`bg-[var(--surface-2)] hover:bg-[var(--raised)] active:scale-[0.97] border rounded-xl text-left transition-all flex overflow-hidden relative shadow-sm ${
                         isOOS
                           ? 'border-red-500/30 opacity-50 cursor-not-allowed'
                           : (item as MenuItem & { promo?: boolean }).promo
-                          ? 'border-emerald-500/40 ring-1 ring-emerald-500/20'
-                          : 'border-[rgba(255,255,255,0.08)] hover:border-emerald-500/30'
+                          ? 'border-[var(--accent-line)] ring-1 ring-[var(--accent-soft)]'
+                          : 'border-[var(--line-soft)] hover:border-[var(--accent-line)]'
                       }`}
                     >
                       <div className={`w-1.5 flex-shrink-0 rounded-l-2xl ${isOOS ? 'bg-red-500' : (activeCategory as { color?: string }).color || 'bg-emerald-600'}`} />
@@ -4436,7 +4436,7 @@ function POSContent() {
               {/* Combo selection modal */}
               {showComboModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowComboModal(false)}>
-                  <div className="bg-[#111118] rounded-2xl border border-[rgba(255,255,255,0.1)] shadow-2xl w-[90vw] max-w-[600px] max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+                  <div className="bg-[var(--panel)] rounded-2xl border border-[var(--line)] shadow-2xl w-[90vw] max-w-[600px] max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
                     <div className="flex items-center justify-between px-5 py-3 border-b border-[rgba(255,255,255,0.08)] bg-gradient-to-r from-amber-600 to-orange-600">
                       <h3 className="text-white font-bold text-lg">Combos <span className="text-white/60 text-sm font-normal ml-2">{allCombos.length} disponibles</span></h3>
                       <button onClick={() => setShowComboModal(false)} className="w-11 h-11 rounded-lg bg-white/20 flex items-center justify-center text-white text-2xl font-bold hover:bg-white/30 active:scale-95">&times;</button>
@@ -4478,7 +4478,7 @@ function POSContent() {
                                 setShowComboModal(false)
                                 setMobileView('order')
                               }}
-                              className="w-full bg-[#1a1a24] hover:bg-[#222230] active:scale-[0.97] border border-[rgba(255,255,255,0.08)] hover:border-amber-500/30 rounded-2xl text-left transition-all p-4 shadow-sm"
+                              className="w-full bg-[var(--surface-2)] hover:bg-[var(--raised)] active:scale-[0.97] border border-[var(--line-soft)] hover:border-amber-500/30 rounded-2xl text-left transition-all p-4 shadow-sm"
                             >
                               <div className="flex items-center justify-between mb-2">
                                 <span className="font-bold text-white text-lg">{combo.name}</span>
@@ -4651,7 +4651,7 @@ function POSContent() {
 
         return (
           <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={() => setShowVerify(false)}>
-            <div className="bg-[#111118] rounded-2xl border border-[rgba(255,255,255,0.1)] shadow-2xl w-[96vw] max-w-[1000px] max-h-[88vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="bg-[var(--panel)] rounded-2xl border border-[var(--line)] shadow-2xl w-[96vw] max-w-[1000px] max-h-[88vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
               <div className="bg-cyan-600 px-5 py-3 flex items-center justify-between flex-shrink-0">
                 <h3 className="text-white font-bold text-lg">Verificar Orden — Mesa {mesa} <span className="text-white/60 font-normal ml-2">{activeItems.reduce((s, i) => s + i.cantidad, 0)} items</span></h3>
                 <button onClick={() => setShowVerify(false)} className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center text-white text-2xl font-bold hover:bg-white/30">&times;</button>
@@ -4997,7 +4997,7 @@ function POSContent() {
       {/* Mercado Pago Point Config Modal */}
       {showMPConfig && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-          <div className="rounded-2xl p-6 w-full max-w-md border border-slate-700" style={{background:'#1a1a2e'}}>
+          <div className="rounded-2xl p-6 w-full max-w-md border border-[var(--line)]" style={{background:'var(--panel)'}}>
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-bold text-white flex items-center gap-2">
                 <Smartphone size={20} />
@@ -5019,7 +5019,7 @@ function POSContent() {
                   value={mpAccessToken}
                   onChange={e => setMpAccessToken(e.target.value)}
                   placeholder="APP_USR-..."
-                  className="w-full border border-slate-600 rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-cyan-500" style={{background:'#0f0f1a'}}
+                  className="w-full border border-[var(--line)] rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-cyan-500" style={{background:'var(--surface-2)'}}
                 />
               </div>
 
@@ -5031,7 +5031,7 @@ function POSContent() {
                     value={mpDeviceId}
                     onChange={e => setMpDeviceId(e.target.value)}
                     placeholder="GERTEC_MP35P__..."
-                    className="flex-1 border border-slate-600 rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-cyan-500" style={{background:'#0f0f1a'}}
+                    className="flex-1 border border-[var(--line)] rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-cyan-500" style={{background:'var(--surface-2)'}}
                   />
                   <button
                     onClick={async () => {

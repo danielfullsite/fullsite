@@ -10,7 +10,7 @@ export default function PageHeader({ title, subtitle, eyebrow, action }: PageHea
     <div className="mb-6 flex items-end justify-between">
       <div>
         {eyebrow && (
-          <p className="text-[11px] font-semibold text-blue-500 uppercase tracking-widest mb-1">
+          <p className="text-[11px] font-semibold text-[var(--accent-ink)] uppercase tracking-widest mb-1">
             {eyebrow}
           </p>
         )}

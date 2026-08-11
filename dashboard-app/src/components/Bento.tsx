@@ -42,10 +42,10 @@ export function Chip({
 }) {
   const toneClasses = {
     neutral: 'border-[var(--line)] bg-[var(--surface-2)] text-[var(--text-2)]',
-    good: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400',
-    bad: 'border-red-500/30 bg-red-500/10 text-red-400',
-    accent: 'border-[var(--accent-line)] bg-[var(--accent-soft)] text-[var(--accent-bright)]',
-    warn: 'border-amber-500/30 bg-amber-500/10 text-amber-400',
+    good: 'border-[var(--ok-soft)] bg-[var(--ok-soft)] text-[var(--ok-ink)]',
+    bad: 'border-[var(--crit-soft)] bg-[var(--crit-soft)] text-[var(--crit-ink)]',
+    accent: 'border-[var(--accent-line)] bg-[var(--accent-soft)] text-[var(--accent-ink)]',
+    warn: 'border-[var(--warn-soft)] bg-[var(--warn-soft)] text-[var(--warn-ink)]',
   }[tone]
   return (
     <span className={cn(
@@ -74,8 +74,8 @@ export function StatCard({
       <div className="text-[24px] font-bold tabular-nums tracking-tight">{value}</div>
       {sub && (
         <div className={cn('text-xs mt-1', {
-          'text-emerald-400': tone === 'up',
-          'text-red-400': tone === 'down',
+          'text-[var(--ok-ink)]': tone === 'up',
+          'text-[var(--crit-ink)]': tone === 'down',
           'text-[var(--text-3)]': tone === 'neutral',
         })}>
           {sub}

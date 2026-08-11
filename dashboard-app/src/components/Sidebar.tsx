@@ -197,7 +197,7 @@ export default function Sidebar() {
         <div className="flex items-center justify-between">
           <Link href="/" className="flex items-center logo-hover" onClick={() => setMobileOpen(false)}>
             <span className="text-[var(--text-1)] font-black text-xl tracking-tight">
-              fullsite<span className="inline-block w-2 h-2 bg-emerald-500 ml-0.5 mb-0.5 rounded-none" />
+              fullsite<span className="inline-block w-2 h-2 ml-0.5 mb-0.5 rounded-none" style={{ background: 'var(--accent)' }} />
             </span>
           </Link>
           {/* Close button inside sidebar on mobile */}
@@ -227,7 +227,7 @@ export default function Sidebar() {
             >
               <span>{section.label}</span>
               <span className="flex items-center gap-1">
-                {hasActive && !isExpanded && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />}
+                {hasActive && !isExpanded && <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--accent)' }} />}
                 <svg width="12" height="12" viewBox="0 0 12 12" className={`transition-transform ${isExpanded ? 'rotate-90' : ''}`}>
                   <path d="M4 2L8 6L4 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                 </svg>
@@ -281,7 +281,7 @@ export default function Sidebar() {
           <select
             value={locationId || ''}
             onChange={e => setLocationId(e.target.value || null)}
-            className="w-full mb-3 px-2 py-1.5 text-xs rounded-lg border border-[var(--line)] bg-[var(--surface-2)] text-[var(--text-2)] focus:outline-none focus:border-emerald-500 transition-colors"
+            className="w-full mb-3 px-2 py-1.5 text-xs rounded-lg border border-[var(--line)] bg-[var(--surface-2)] text-[var(--text-2)] focus:outline-none focus:border-[var(--accent)] transition-colors"
           >
             <option value="">Todas las sucursales</option>
             {locations.map(loc => (
@@ -309,7 +309,7 @@ export default function Sidebar() {
             sessionStorage.clear()
             window.location.href = '/login'
           }}
-          className="flex items-center gap-2 text-xs text-[var(--text-3)] hover:text-red-500 transition-colors w-full px-2 py-1.5 rounded-md hover:bg-red-500/10"
+          className="flex items-center gap-2 text-xs text-[var(--text-3)] hover:text-[var(--crit-ink)] transition-colors w-full px-2 py-1.5 rounded-md hover:bg-[var(--crit-soft)]"
         >
           <LogOut size={14} />
           <span>Cerrar sesión</span>

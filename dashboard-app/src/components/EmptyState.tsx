@@ -14,8 +14,8 @@ export default function EmptyState({
   icon: Icon,
   title,
   description,
-  iconColor = 'text-emerald-500',
-  iconBg = 'bg-emerald-500/10',
+  iconColor = 'text-[var(--accent-ink)]',
+  iconBg = 'bg-[var(--accent-soft)]',
 }: EmptyStateProps) {
   return (
     <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-8 text-center">

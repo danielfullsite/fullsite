@@ -33,7 +33,7 @@ function Sparkline({ data, color }: { data: number[]; color?: string }) {
   const w = 80, h = 24
   const points = data.map((v, i) => `${(i / (data.length - 1)) * w},${h - ((v - min) / range) * h}`).join(' ')
   const trending = data[data.length - 1] > data[0]
-  const c = color || (data[data.length - 1] === data[0] ? '#6b7280' : trending ? '#10b981' : '#ef4444')
+  const c = color || (data[data.length - 1] === data[0] ? 'var(--text-3)' : trending ? 'var(--accent)' : 'var(--crit)')
   return (
     <svg width={w} height={h} className="inline-block">
       <polyline points={points} fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -85,7 +85,7 @@ export default function KPICard({
         {/* Single compact delta */}
         {weekChange !== undefined && weekChange !== null && (
           <div className={`mt-2 flex items-center gap-1 text-[11px] font-bold ${
-            weekChange > 0 ? 'text-emerald-500' : weekChange < 0 ? 'text-red-500' : 'text-[var(--text-4)]'
+            weekChange > 0 ? 'text-[var(--ok-ink)]' : weekChange < 0 ? 'text-[var(--crit-ink)]' : 'text-[var(--text-4)]'
           }`}>
             {weekChange >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
             <span>{weekChange > 0 ? '+' : ''}{weekChange.toFixed(1)}% 7d</span>
@@ -133,7 +133,7 @@ export default function KPICard({
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.3, delay: index * 0.06 + 0.22 }}
                 className={`text-[10px] font-semibold mt-0.5 ${
-                  weekChange > 0 ? 'text-emerald-400' : weekChange < 0 ? 'text-red-400' : 'text-[var(--text-4)]'
+                  weekChange > 0 ? 'text-[var(--ok-ink)]' : weekChange < 0 ? 'text-[var(--crit-ink)]' : 'text-[var(--text-4)]'
                 }`}
               >
                 {weekChange > 0 ? '+' : ''}{weekChange.toFixed(1)}% vs semana pasada
@@ -149,7 +149,7 @@ export default function KPICard({
             className="mt-3 flex items-center gap-1.5"
           >
             <span className={`inline-flex items-center gap-1 text-xs font-semibold ${
-              deltaType === 'up' ? 'text-emerald-400' : deltaType === 'down' ? 'text-red-400' : 'text-[var(--text-3)]'
+              deltaType === 'up' ? 'text-[var(--ok-ink)]' : deltaType === 'down' ? 'text-[var(--crit-ink)]' : 'text-[var(--text-3)]'
             }`}>
               {deltaType === 'up' && <TrendingUp size={13} />}
               {deltaType === 'down' && <TrendingDown size={13} />}

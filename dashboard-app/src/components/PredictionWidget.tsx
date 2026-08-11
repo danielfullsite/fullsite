@@ -93,16 +93,16 @@ export default function PredictionWidget({
         className="absolute inset-x-0 top-0 h-1"
         style={{
           background: isAboveAvg
-            ? 'linear-gradient(90deg, #10b981, #34d399)'
-            : 'linear-gradient(90deg, #f59e0b, #fbbf24)',
+            ? 'linear-gradient(90deg, var(--accent), var(--accent-bright))'
+            : 'linear-gradient(90deg, var(--warn), var(--warn-ink))',
         }}
       />
 
       <div className="px-4 sm:px-6 py-4 sm:py-5">
         <div className="flex items-center justify-between mb-3 sm:mb-4">
           <div className="flex items-center gap-2">
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isAboveAvg ? 'bg-emerald-500/10' : 'bg-amber-500/10'}`}>
-              <Target className={`w-4 h-4 ${isAboveAvg ? 'text-emerald-500' : 'text-amber-500'}`} />
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isAboveAvg ? 'bg-[var(--accent-soft)]' : 'bg-[var(--warn-soft)]'}`}>
+              <Target className={`w-4 h-4 ${isAboveAvg ? 'text-[var(--accent-ink)]' : 'text-[var(--warn-ink)]'}`} />
             </div>
             <p className="text-xs font-medium text-[var(--text-3)] uppercase tracking-wider">Predicción de cierre</p>
           </div>
@@ -114,10 +114,10 @@ export default function PredictionWidget({
         </div>
 
         <div className="flex items-end gap-3 sm:gap-4 mb-3 sm:mb-4">
-          <p className="text-3xl sm:text-4xl font-black text-[var(--text-1)] tracking-tight">
+          <p className="text-3xl sm:text-4xl font-black text-[var(--text-1)] tracking-tight tnum">
             {formatCurrency(projected)}
           </p>
-          <div className={`flex items-center gap-1 text-xs sm:text-sm font-semibold mb-1 ${isUp ? 'text-emerald-500' : 'text-amber-500'}`}>
+          <div className={`flex items-center gap-1 text-xs sm:text-sm font-semibold mb-1 ${isUp ? 'text-[var(--accent-ink)]' : 'text-[var(--warn-ink)]'}`}>
             {isUp ? <TrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <TrendingDown className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
             <span>{isUp ? '+' : ''}{mainComparison.toFixed(1)}%</span>
             <span className="text-[var(--text-3)] font-normal hidden sm:inline">{mainCompLabel}</span>
@@ -135,8 +135,8 @@ export default function PredictionWidget({
               style={{
                 width: `${Math.min(pctDone, 100)}%`,
                 background: isAboveAvg
-                  ? 'linear-gradient(90deg, #10b981, #34d399)'
-                  : 'linear-gradient(90deg, #f59e0b, #fbbf24)',
+                  ? 'linear-gradient(90deg, var(--accent), var(--accent-bright))'
+                  : 'linear-gradient(90deg, var(--warn), var(--warn-ink))',
               }}
             />
           </div>
@@ -149,13 +149,13 @@ export default function PredictionWidget({
           </div>
           <div>
             <p className="text-[10px] sm:text-xs text-[var(--text-3)] mb-0.5">vs ayer</p>
-            <p className={`text-xs sm:text-sm font-semibold ${vsYesterday >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+            <p className={`text-xs sm:text-sm font-semibold ${vsYesterday >= 0 ? 'text-[var(--ok-ink)]' : 'text-[var(--crit-ink)]'}`}>
               {vsYesterday >= 0 ? '+' : ''}{vsYesterday.toFixed(1)}%
             </p>
           </div>
           <div>
             <p className="text-[10px] sm:text-xs text-[var(--text-3)] mb-0.5">vs 7d</p>
-            <p className={`text-xs sm:text-sm font-semibold ${vsLastWeek >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+            <p className={`text-xs sm:text-sm font-semibold ${vsLastWeek >= 0 ? 'text-[var(--ok-ink)]' : 'text-[var(--crit-ink)]'}`}>
               {vsLastWeek >= 0 ? '+' : ''}{vsLastWeek.toFixed(1)}%
             </p>
           </div>

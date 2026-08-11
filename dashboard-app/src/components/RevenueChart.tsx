@@ -44,11 +44,11 @@ export default function RevenueChart({ data, title, highlightDate }: RevenueChar
         </div>
         <div className="flex flex-col sm:flex-row gap-1 sm:gap-4 text-[10px] sm:text-xs">
           <div className="flex items-center gap-1 sm:gap-1.5">
-            <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-emerald-500" />
+            <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full" style={{ background: 'var(--accent)' }} />
             <span className="text-[var(--text-2)]">{formatCurrency(maxVal)}</span>
           </div>
           <div className="flex items-center gap-1 sm:gap-1.5">
-            <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-red-400" />
+            <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full" style={{ background: 'var(--crit)' }} />
             <span className="text-[var(--text-2)]">{formatCurrency(minVal)}</span>
           </div>
         </div>
@@ -87,18 +87,18 @@ export default function RevenueChart({ data, title, highlightDate }: RevenueChar
                 padding: '10px 14px',
                 boxShadow: 'var(--shadow-mid)',
               }}
-              itemStyle={{ color: 'var(--accent-bright)', fontSize: '13px', fontWeight: 600 }}
+              itemStyle={{ color: 'var(--accent-ink)', fontSize: '13px', fontWeight: 600 }}
               labelStyle={{ color: 'var(--text-3)', fontSize: '11px', marginBottom: '4px' }}
-              cursor={{ stroke: '#10b981', strokeWidth: 1, strokeDasharray: '4 4' }}
+              cursor={{ stroke: 'var(--accent)', strokeWidth: 1, strokeDasharray: '4 4' }}
             />
             <Area
               type="monotone"
               dataKey="Ventas"
-              stroke="#10b981"
+              stroke="var(--accent)"
               strokeWidth={2.5}
               fill="url(#gradientVentas)"
               dot={false}
-              activeDot={{ r: 6, fill: '#10b981', stroke: 'var(--text-1)', strokeWidth: 2 }}
+              activeDot={{ r: 6, fill: 'var(--accent)', stroke: 'var(--bg)', strokeWidth: 2 }}
             />
             {highlightDate && (() => {
               const hlLabel = formatShortDate(highlightDate)
@@ -109,8 +109,8 @@ export default function RevenueChart({ data, title, highlightDate }: RevenueChar
                   x={hlPoint.fecha}
                   y={hlPoint.Ventas}
                   r={8}
-                  fill="#10b981"
-                  stroke="#fff"
+                  fill="var(--accent)"
+                  stroke="var(--bg)"
                   strokeWidth={3}
                 />
               )

@@ -133,7 +133,7 @@ export default function TopNav() {
               onClick={togglePush}
               className={`flex items-center gap-1 text-xs px-2 py-1.5 rounded-md transition-colors ${
                 pushEnabled
-                  ? 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100'
+                  ? 'text-[var(--accent-ink)] bg-[var(--accent-soft)] hover:brightness-110'
                   : 'text-[var(--text-3)] hover:text-[var(--text-2)] hover:bg-[var(--surface-2)]'
               }`}
               title={pushEnabled ? 'Desactivar notificaciones' : 'Activar notificaciones'}
