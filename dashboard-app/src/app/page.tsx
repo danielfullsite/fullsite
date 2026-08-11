@@ -6,7 +6,7 @@ import { DollarSign, Ticket, Users, Receipt, TrendingDown, TrendingUp, Award, Ar
 import KPICard from '@/components/KPICard'
 import RevenueChart from '@/components/RevenueChart'
 import RevenueDistributionChart from '@/components/RevenueDistributionChart'
-import { getRecentDays, getLatestDay, getDashboardFromPosOrders, aggregateMeseros, getLatestAgentRuns, type AgentRun } from '@/lib/data'
+import { getRecentDays, getLatestDay, getDashboardFromPosOrders, aggregateMeseros, getLatestAgentRuns, isFullsitePOS, type AgentRun } from '@/lib/data'
 import { formatCurrency, formatNumber, formatPercent, formatDate, percentChange } from '@/lib/format'
 import PredictionWidget from '@/components/PredictionWidget'
 import type { WansoftDaily, GrupoEntry, PagoMetodoEntry } from '@/lib/types'
@@ -528,7 +528,9 @@ export default function DashboardPage() {
         if (fecha === mxToday && syncTime) {
           return (
             <div className="mb-4 text-xs text-[var(--text-3)] font-medium">
-              Datos de Wansoft actualizados a las {syncTime} — se sincronizan cada 30 min, pueden diferir de la app de Wansoft en tiempo real.
+              {isFullsitePOS()
+                ? `Datos POS Fullsite actualizados a las ${syncTime} — DEMO / DATOS SINTÉTICOS.`
+                : `Datos de Wansoft actualizados a las ${syncTime} — se sincronizan cada 30 min, pueden diferir de la app de Wansoft en tiempo real.`}
             </div>
           )
         }
