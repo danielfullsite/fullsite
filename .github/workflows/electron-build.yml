@@ -26,6 +26,21 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Offline Shell (OFFLINE-SHELL-001): build the static POS bundle that the
+      # installer packages via extraResources (../dashboard-app/out). Baked with
+      # the production multi-tenant Supabase env from CI secrets. Per-terminal
+      # offline loading is turned on at runtime via config.local_ui (config-as-data).
+      - name: Build offline POS bundle (dashboard-app)
+        working-directory: dashboard-app
+        shell: bash
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+        run: |
+          npm ci
+          bash scripts/build-offline.sh
+          test -f out/pos.html || { echo "offline bundle missing pos.html"; exit 1; }
+
       - name: Build Windows installer
         run: npx electron-builder --win --publish never
 

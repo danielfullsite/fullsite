@@ -1,7 +1,7 @@
 {
   "name": "fullsite-pos",
-  "version": "1.3.4",
-  "description": "Fullsite POS — kiosk wrapper for app.fullsite.mx/pos",
+  "version": "1.3.5",
+  "description": "Fullsite POS — offline-first shell (bundles the POS UI; loads locally when config.local_ui is set)",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
