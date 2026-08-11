@@ -28,6 +28,17 @@ export const ROLE_MAP: Record<string, DashboardRole> = {
   'demo@fullsite.mx': 'dueño',
 }
 
+const PLATFORM_ADMIN_EMAILS = new Set(['daniel@fullsite.mx'])
+
+export function isPlatformAdminIdentity(
+  appMetadata: Record<string, unknown> | null | undefined,
+  email: string | null | undefined,
+): boolean {
+  if (appMetadata?.platform_admin === true) return true
+  const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : ''
+  return PLATFORM_ADMIN_EMAILS.has(normalizedEmail)
+}
+
 // client_users.role / app_metadata.role usan 'admin' para dueños históricos
 export const DB_ROLE_MAP: Record<string, DashboardRole> = {
   admin: 'dueño',

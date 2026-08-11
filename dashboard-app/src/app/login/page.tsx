@@ -110,14 +110,14 @@ export default function LoginPage() {
 
         // Super-admin de plataforma → Control Center (no al POS de un tenant)
         const appMeta = (data.user?.app_metadata ?? {}) as Record<string, unknown>
-        if (appMeta.platform_admin === true) {
+        const { DB_ROLE_MAP, isPlatformAdminIdentity, resolveLoginRedirect } = await import('@/lib/roles')
+        if (isPlatformAdminIdentity(appMeta, data.user?.email)) {
           window.location.href = '/platform'
           return
         }
         // Redirect por rol: dueño/gerente/capitan → dashboard; cajero/mesero/staff → POS
         const clientId = resolvedClientId || data.user?.user_metadata?.client_id as string | undefined
         const rawRole = data.user?.user_metadata?.role as string | undefined
-        const { DB_ROLE_MAP, resolveLoginRedirect } = await import('@/lib/roles')
         const role = rawRole ? (DB_ROLE_MAP[rawRole] ?? null) : null
         window.location.href = resolveLoginRedirect(role, clientId)
       } else {

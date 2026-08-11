@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { canAccessPage, resolveRole } from '@/lib/roles'
+import { canAccessPage, isPlatformAdminIdentity, resolveRole } from '@/lib/roles'
 import { fetchWithTimeout } from '@/lib/fetch-with-timeout'
 
 // Páginas sin sesión — debe coincidir con publicPages de AppShell.tsx
@@ -100,7 +100,7 @@ export async function proxy(req: NextRequest) {
   if (!supabaseUrl || !anonKey) return NextResponse.next() // mal configurado: no bloquear
 
   // Validar el token contra Supabase Auth (server-side, no falsificable)
-  let user: { email?: string; app_metadata?: { role?: string } } | null = null
+  let user: { email?: string; app_metadata?: Record<string, unknown> & { role?: string } } | null = null
   try {
     const res = await fetchWithTimeout(`${supabaseUrl}/auth/v1/user`, {
       headers: { apikey: anonKey, Authorization: `Bearer ${token}` },
@@ -115,6 +115,8 @@ export async function proxy(req: NextRequest) {
     // Supabase caído: dejar pasar — el cliente igual no podrá leer datos sin red
     return NextResponse.next()
   }
+
+  if (isPlatformAdminIdentity(user?.app_metadata, user?.email)) return NextResponse.next()
 
   // Enforcement de rol por página (app_metadata.role lo setea el servidor, no el usuario)
   const role = resolveRole(user?.app_metadata?.role, user?.email)
