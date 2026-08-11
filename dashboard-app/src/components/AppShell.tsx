@@ -7,6 +7,7 @@ import ChatWidget from '@/components/ChatWidget'
 import NotificationBell from '@/components/NotificationBell'
 import { PageTransition } from '@/components/motion'
 import { useEffect, useState } from 'react'
+import { isPlatformAdminIdentity } from '@/lib/roles'
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -15,7 +16,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [showContent, setShowContent] = useState(false)
 
   // Super-admin de plataforma: nunca se le fuerza al POS; su lugar es el Control Center.
-  const isPlatformAdmin = (user?.app_metadata as Record<string, unknown> | undefined)?.platform_admin === true
+  const isPlatformAdmin = isPlatformAdminIdentity(
+    user?.app_metadata as Record<string, unknown> | undefined,
+    user?.email,
+  )
 
   // Build offline empaquetado (terminales POS): arrancar directo en /pos.
   // Solo aplica a roles operativos; dueño/gerente/capitan y super-admin ven el dashboard.
@@ -33,6 +37,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const isPosRoute = pathname.startsWith('/pos')
   const isKdsRoute = pathname.startsWith('/cocina') || pathname.startsWith('/barra') || pathname.startsWith('/kds')
   const isDemoRoute = pathname.startsWith('/demo')
+  const isPlatformRoute = pathname.startsWith('/platform')
   const isPublicPage = publicPages.includes(pathname) || isPosRoute || isKdsRoute || isDemoRoute
 
   // Demo user: always redirect to /demo/* world
@@ -43,6 +48,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       if (!user && !isPublicPage) {
         // En build offline no hay login de Supabase: todo va al POS (gate de PIN propio)
         router.push(isOfflineBuild ? '/pos' : '/login')
+      } else if (user && isPlatformRoute && !isPlatformAdmin) {
+        router.replace('/')
       } else if (isDemoUser && !isDemoRoute) {
         // Demo user trying to access real dashboard → redirect to demo
         router.push('/demo/dashboard')
@@ -50,7 +57,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         setShowContent(true)
       }
     }
-  }, [loading, user, pathname, router, isPublicPage, isDemoUser, isDemoRoute, isOfflineBuild])
+  }, [loading, user, pathname, router, isPublicPage, isPlatformRoute, isPlatformAdmin, isDemoUser, isDemoRoute, isOfflineBuild])
 
   // POS pages: full screen, dark theme, no sidebar
   if (isPosRoute) {

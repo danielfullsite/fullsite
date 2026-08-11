@@ -209,6 +209,21 @@ export default function LoginPage() {
             </button>
           </form>
 
+          <div className="mt-5 grid grid-cols-2 gap-3">
+            <a
+              href="/demo/dashboard"
+              className="rounded-lg border border-gray-200 px-4 py-3 text-center text-sm font-semibold text-gray-700 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 transition-colors"
+            >
+              Ver demo
+            </a>
+            <a
+              href="/platform"
+              className="rounded-lg border border-gray-200 px-4 py-3 text-center text-sm font-semibold text-gray-700 hover:border-gray-300 hover:bg-gray-50 hover:text-gray-950 transition-colors"
+            >
+              Administración
+            </a>
+          </div>
+
           <p className="mt-6 text-center text-sm text-gray-500">
             ¿No tienes cuenta?{' '}
             <a
