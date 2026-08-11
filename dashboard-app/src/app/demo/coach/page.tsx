@@ -53,6 +53,8 @@ const categoriaColor: Record<string, string> = {
   'Eficiencia': 'bg-violet-500/10 text-violet-400',
 }
 
+const CARD_STYLE = { background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' } as const
+
 export default function DemoCoach() {
   return (
     <div className="min-h-screen bg-[var(--bg)] text-[var(--text-1)]">
@@ -69,7 +71,7 @@ export default function DemoCoach() {
       </header>
 
       <main className="p-6 space-y-6">
-        <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-5 flex items-center gap-4">
+        <div className="border border-[var(--line)] rounded-2xl p-5 flex items-center gap-4" style={CARD_STYLE}>
           <div className="w-12 h-12 rounded-xl bg-violet-500/10 flex items-center justify-center">
             <Brain size={22} className="text-violet-400" />
           </div>
@@ -85,7 +87,8 @@ export default function DemoCoach() {
           {TIPS.map((t, i) => (
             <div
               key={i}
-              className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-5"
+              className="border border-[var(--line)] rounded-2xl p-5"
+              style={CARD_STYLE}
             >
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">

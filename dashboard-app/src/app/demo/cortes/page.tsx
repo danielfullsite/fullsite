@@ -32,6 +32,9 @@ function getDiferenciaBg(diff: number) {
   return 'bg-red-400/10'
 }
 
+const CARD_STYLE = { background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' } as const
+const MONO = { fontFamily: 'var(--font-mono)' } as const
+
 export default function DemoCortes() {
   const diferencias = CORTES.map(c => getDiferencia(c))
   const totalDiferencia = diferencias.reduce((s, d) => s + d, 0)
@@ -62,18 +65,18 @@ export default function DemoCortes() {
             { label: 'Cortes sin diferencia', value: `${cortesOk} / ${CORTES.length}`, icon: CheckCircle, color: 'text-emerald-400' },
             { label: 'Cortes con alerta', value: `${cortesAlerta}`, icon: AlertTriangle, color: cortesAlerta > 0 ? 'text-red-400' : 'text-emerald-400' },
           ].map(card => (
-            <div key={card.label} className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-5">
+            <div key={card.label} className="border border-[var(--line)] rounded-2xl p-5" style={CARD_STYLE}>
               <div className="flex items-center gap-2 mb-3">
                 <card.icon size={18} className={card.color} />
               </div>
-              <p className="text-2xl font-bold">{card.value}</p>
+              <p className="text-2xl font-bold tabular-nums" style={MONO}>{card.value}</p>
               <p className="text-xs text-[var(--text-3)] mt-1">{card.label}</p>
             </div>
           ))}
         </div>
 
         {/* Table */}
-        <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl overflow-hidden">
+        <div className="border border-[var(--line)] rounded-2xl overflow-hidden" style={CARD_STYLE}>
           <div className="px-5 py-4 border-b border-[var(--line)]">
             <h2 className="text-sm font-semibold">Detalle de cortes</h2>
           </div>
@@ -96,17 +99,17 @@ export default function DemoCortes() {
                   const diff = getDiferencia(corte)
                   return (
                     <tr key={i} className="border-b border-[var(--line)] last:border-0 hover:bg-white/[0.02]">
-                      <td className="px-5 py-3 font-mono text-zinc-300">{corte.fecha}</td>
+                      <td className="px-5 py-3 font-mono text-zinc-300 tabular-nums">{corte.fecha}</td>
                       <td className="px-5 py-3">
                         <span className={`px-2 py-0.5 rounded text-xs ${corte.turno === 'Matutino' ? 'bg-amber-400/10 text-amber-400' : 'bg-indigo-400/10 text-indigo-400'}`}>
                           {corte.turno}
                         </span>
                       </td>
-                      <td className="px-5 py-3 text-right text-[var(--text-2)]">{formatDemoMXN(corte.fondo_inicial)}</td>
-                      <td className="px-5 py-3 text-right font-medium">{formatDemoMXN(corte.efectivo_contado)}</td>
-                      <td className="px-5 py-3 text-right text-[var(--text-2)]">{formatDemoMXN(corte.esperado)}</td>
+                      <td className="px-5 py-3 text-right text-[var(--text-2)] tabular-nums" style={MONO}>{formatDemoMXN(corte.fondo_inicial)}</td>
+                      <td className="px-5 py-3 text-right font-medium tabular-nums" style={MONO}>{formatDemoMXN(corte.efectivo_contado)}</td>
+                      <td className="px-5 py-3 text-right text-[var(--text-2)] tabular-nums" style={MONO}>{formatDemoMXN(corte.esperado)}</td>
                       <td className="px-5 py-3 text-right">
-                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${getDiferenciaBg(diff)} ${getDiferenciaColor(diff)}`}>
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium tabular-nums ${getDiferenciaBg(diff)} ${getDiferenciaColor(diff)}`} style={MONO}>
                           {diff >= 0 ? '+' : ''}{formatDemoMXN(diff)}
                         </span>
                       </td>
