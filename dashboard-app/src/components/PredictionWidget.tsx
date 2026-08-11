@@ -88,7 +88,7 @@ export default function PredictionWidget({
   void currentTickets
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--surface)] shadow-sm mb-6">
+    <div className="relative overflow-hidden rounded-2xl border border-[var(--accent-line)] mb-6" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' }}>
       <div
         className="absolute inset-x-0 top-0 h-1"
         style={{

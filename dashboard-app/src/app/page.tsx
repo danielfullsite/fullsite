@@ -540,7 +540,7 @@ export default function DashboardPage() {
 
       {/* Settings panel — toggle widgets */}
       {showSettings && (
-        <div className="mb-6 bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5 animate-in slide-in-from-top-2">
+        <div className="relative overflow-hidden mb-6 rounded-2xl border border-[var(--accent-line)] p-5 animate-in slide-in-from-top-2" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' }}>
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-bold text-[var(--text-1)]">Personalizar dashboard</h3>
             <button onClick={() => setShowSettings(false)} className="text-xs text-[var(--text-3)] hover:text-[var(--text-2)]">
@@ -748,7 +748,7 @@ export default function DashboardPage() {
 
       {/* Agent Status Widget — real data from agent_runs */}
       {show('agent_status') && (
-        <div className="mb-4 sm:mb-6 bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-4 sm:p-5">
+        <div className="relative overflow-hidden mb-4 sm:mb-6 rounded-2xl border border-[var(--accent-line)] p-4 sm:p-5" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' }}>
           <div className="flex items-center gap-2 mb-3 sm:mb-4">
             <div className="w-7 h-7 rounded-lg bg-violet-500/10 flex items-center justify-center">
               <Bot size={14} className="text-purple-400" />
@@ -881,7 +881,7 @@ export default function DashboardPage() {
       {/* Two columns: Top meseros + Categories */}
       {(show('top_meseros') || show('categories')) && <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
         {/* Top meseros — R365 style with progress bars */}
-        {show('top_meseros') && <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6">
+        {show('top_meseros') && <div className="relative overflow-hidden rounded-2xl border border-[var(--accent-line)] p-6" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' }}>
           <div className="flex items-center gap-2 mb-1">
             <div className="w-7 h-7 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
               <Award size={14} className="text-[var(--accent-bright)]" />
@@ -947,7 +947,7 @@ export default function DashboardPage() {
 
       {/* Payment methods */}
       {show('payment_methods') && <div className="mb-6">
-        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6">
+        <div className="relative overflow-hidden rounded-2xl border border-[var(--accent-line)] p-6" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' }}>
           <div className="flex items-center gap-2 mb-1">
             <div className="w-7 h-7 rounded-lg bg-violet-500/10 flex items-center justify-center">
               <CreditCard size={14} className="text-violet-600" />
@@ -1012,7 +1012,7 @@ export default function DashboardPage() {
       {show('hora_pico') && latestDay && (
         <div className="mb-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Hora pico */}
-          <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
+          <div className="relative overflow-hidden rounded-2xl border border-[var(--accent-line)] p-5" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' }}>
             <div className="flex items-center gap-2 mb-3">
               <div className="w-7 h-7 rounded-lg bg-amber-500/10 flex items-center justify-center">
                 <Clock size={14} className="text-amber-400" />
@@ -1045,7 +1045,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Efficiency metrics */}
-          <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
+          <div className="relative overflow-hidden rounded-2xl border border-[var(--accent-line)] p-5" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' }}>
             <div className="flex items-center gap-2 mb-3">
               <div className="w-7 h-7 rounded-lg bg-cyan-500/10 flex items-center justify-center">
                 <Activity size={14} className="text-cyan-400" />
@@ -1082,7 +1082,7 @@ export default function DashboardPage() {
             <Link
               key={action.href}
               href={action.href}
-              className={`bg-gradient-to-br ${action.gradient} to-[var(--surface)] sm:from-[var(--surface)] sm:to-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-3 sm:p-4 hover:shadow-md transition-all group`}
+              className={`bg-gradient-to-br ${action.gradient} to-[var(--surface)] sm:from-[var(--surface)] sm:to-[var(--surface)] rounded-2xl border border-[var(--line)] shadow-[var(--shadow-soft)] p-3 sm:p-4 hover:shadow-[var(--shadow-mid)] transition-all group`}
             >
               <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center mb-2 sm:mb-3 ${action.bg}`}>
                 <ActionIcon size={16} className={action.color} />

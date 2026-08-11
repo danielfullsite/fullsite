@@ -58,12 +58,12 @@ export default function RevenueChart({ data, title, highlightDate }: RevenueChar
           <AreaChart data={chartData} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="gradientVentas" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#10b981" stopOpacity={0.3} />
-                <stop offset="50%" stopColor="#10b981" stopOpacity={0.1} />
+                <stop offset="0%" stopColor="#10b981" stopOpacity={0.24} />
+                <stop offset="55%" stopColor="#10b981" stopOpacity={0.07} />
                 <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" vertical={false} />
+            <CartesianGrid strokeDasharray="2 6" stroke="var(--line-soft)" vertical={false} />
             <XAxis
               dataKey="fecha"
               tick={{ fontSize: 11, fill: 'var(--text-3)' }}
@@ -100,6 +100,23 @@ export default function RevenueChart({ data, title, highlightDate }: RevenueChar
               dot={false}
               activeDot={{ r: 6, fill: '#10b981', stroke: 'var(--text-1)', strokeWidth: 2 }}
             />
+            {/* Endpoint marker — highlights the most recent day (skipped if it's the actively selected/highlighted day, which gets its own larger marker below) */}
+            {(() => {
+              const endPoint = chartData[chartData.length - 1]
+              if (!endPoint) return null
+              const hlLabel = highlightDate ? formatShortDate(highlightDate) : null
+              if (hlLabel && endPoint.fecha === hlLabel) return null
+              return (
+                <ReferenceDot
+                  x={endPoint.fecha}
+                  y={endPoint.Ventas}
+                  r={4}
+                  fill="#10b981"
+                  stroke="var(--panel)"
+                  strokeWidth={2}
+                />
+              )
+            })()}
             {highlightDate && (() => {
               const hlLabel = formatShortDate(highlightDate)
               const hlPoint = chartData.find(d => d.fecha === hlLabel)
