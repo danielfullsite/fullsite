@@ -594,7 +594,7 @@ export default function FoodCostPage() {
                         {item.precioPromedio && (
                           <span
                             className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-500"
-                            title="Precio promedio cobrado (ventas reales Wansoft), no precio de lista"
+                            title="Precio promedio cobrado (ventas reales Fullsite), no precio de lista"
                           >
                             precio prom.
                           </span>

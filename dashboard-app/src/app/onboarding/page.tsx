@@ -315,7 +315,7 @@ export default function OnboardingPage() {
                   <label className="text-xs font-semibold text-[var(--text-2)] uppercase">Sistema POS</label>
                   <select value={posSystem} onChange={e => setPosSystem(e.target.value)}
                     className="w-full border border-[var(--line)] rounded-xl px-4 py-3 text-sm mt-1">
-                    <option value="wansoft">Wansoft</option>
+                    <option value="wansoft">Fuente histórica</option>
                     <option value="soft_restaurant">Soft Restaurant</option>
                     <option value="square">Square</option>
                     <option value="toast">Toast</option>
@@ -331,7 +331,7 @@ export default function OnboardingPage() {
                       <div>
                         <label className="text-xs font-semibold text-[var(--text-2)] uppercase">Usuario</label>
                         <input value={posUser} onChange={e => setPosUser(e.target.value)}
-                          placeholder="usuario@wansoft" className="w-full border border-[var(--line)] rounded-xl px-4 py-3 text-sm mt-1 focus:outline-none focus:border-emerald-500" />
+                          placeholder="usuario del sistema" className="w-full border border-[var(--line)] rounded-xl px-4 py-3 text-sm mt-1 focus:outline-none focus:border-emerald-500" />
                       </div>
                       <div>
                         <label className="text-xs font-semibold text-[var(--text-2)] uppercase">Contraseña</label>
@@ -344,7 +344,7 @@ export default function OnboardingPage() {
                         <label className="text-xs font-semibold text-[var(--text-2)] uppercase">ID de sucursal (subsidiary ID)</label>
                         <input value={posSubsidiaryId} onChange={e => setPosSubsidiaryId(e.target.value)}
                           placeholder="Ej: 123" className="w-full border border-[var(--line)] rounded-xl px-4 py-3 text-sm mt-1 focus:outline-none focus:border-emerald-500" />
-                        <p className="text-xs text-[var(--text-3)] mt-1">Lo encuentras en Wansoft → Configuracion → Sucursal</p>
+                        <p className="text-xs text-[var(--text-3)] mt-1">Lo encuentras en la configuracion de sucursal del sistema origen.</p>
                       </div>
                     )}
                     <p className="text-xs text-[var(--text-3)] bg-emerald-500/5 border border-emerald-500/10 rounded-lg px-3 py-2">Tus credenciales se guardan encriptadas y solo se usan para sincronizar datos. Nunca las compartimos.</p>

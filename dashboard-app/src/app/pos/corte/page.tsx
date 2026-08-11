@@ -691,7 +691,7 @@ export default function CortePage() {
                       </div>
                     </div>
                   )}
-                  <p className="text-[var(--text-2)] text-xs mt-3 leading-relaxed">Las propinas cobradas con tarjeta/otras formas se pagan al mesero en efectivo desde caja (regla Wansoft).</p>
+                  <p className="text-[var(--text-2)] text-xs mt-3 leading-relaxed">Las propinas cobradas con tarjeta/otras formas se pagan al mesero en efectivo desde caja.</p>
                 </div>
                 {/* Columna 3: Información operativa */}
                 <div>

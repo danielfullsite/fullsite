@@ -531,7 +531,7 @@ export default function DashboardPage() {
         if (fecha === mxToday && syncTime) {
           return (
             <div className="mb-4 text-xs text-[var(--text-3)] font-medium">
-              Datos de Wansoft actualizados a las {syncTime} — se sincronizan cada 30 min, pueden diferir de la app de Wansoft en tiempo real.
+              Datos históricos actualizados a las {syncTime} — se sincronizan cada 30 min y pueden diferir del sistema operativo en tiempo real.
             </div>
           )
         }

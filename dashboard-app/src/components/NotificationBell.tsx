@@ -65,7 +65,7 @@ function agentLabel(id: string): string {
     'weekly-summary': 'Reporte Semanal',
     'wansoft-query': 'KB 24/7',
     'reservas-pendientes': 'Reservas',
-    'wansoft-staleness': 'Wansoft Sync',
+    'wansoft-staleness': 'Sincronización',
     hermes: 'Hermes',
   }
   return map[id] || id.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())

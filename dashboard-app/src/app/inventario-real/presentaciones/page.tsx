@@ -696,7 +696,7 @@ export default function PresentacionesPage() {
           <div className="px-5 py-4 border-b border-[var(--accent-line)] flex flex-wrap items-center justify-between gap-3">
             <h3 className="text-sm font-bold text-[var(--text-1)] flex items-center gap-2">
               <Layers size={16} className="text-cyan-400" />
-              Catalogo de presentaciones Wansoft
+              Catalogo de presentaciones Fullsite
               <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold border bg-cyan-500/15 text-cyan-400 border-cyan-500/30">
                 {wsCatalog.length}
               </span>

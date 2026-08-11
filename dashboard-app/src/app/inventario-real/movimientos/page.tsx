@@ -231,10 +231,10 @@ function parsePurchaseSnapshots(rows: Record<string, unknown>[]): Movement[] {
       id: `wpurch_${curr.fecha}`,
       type: 'entrada',
       date: curr.fecha,
-      description: `Compras Wansoft (${items.length} producto${items.length === 1 ? '' : 's'})`,
+      description: `Compras históricas (${items.length} producto${items.length === 1 ? '' : 's'})`,
       items: items.sort((a, b) => (b.costo_total || 0) - (a.costo_total || 0)),
       total: Math.round(total * 100) / 100,
-      user: 'Wansoft',
+      user: 'Fullsite',
       source: 'wansoft_data',
       raw_key: 'purchases_by_product',
     })
@@ -690,7 +690,7 @@ export default function MovimientosPage() {
                           {/* Metadata */}
                           <div className="flex items-center gap-4 mt-2 text-[10px] text-[var(--text-4)]">
                             {m.raw_key && <span>Key: {m.raw_key}</span>}
-                            <span>Fuente: {m.source === 'pos' ? 'POS' : 'Wansoft'}</span>
+                            <span>Fuente: {m.source === 'pos' ? 'POS' : 'Histórica'}</span>
                           </div>
                         </div>
                       </motion.div>

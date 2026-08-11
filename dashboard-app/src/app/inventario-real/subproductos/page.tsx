@@ -820,7 +820,7 @@ export default function SubproductosPage() {
                       </span>
                       {sp.wansoft && (
                         <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold border bg-cyan-500/15 text-cyan-400 border-cyan-500/30">
-                          Wansoft
+                          Fullsite
                         </span>
                       )}
                     </div>
@@ -882,7 +882,7 @@ export default function SubproductosPage() {
                     )}
                     {sp.wansoft && sp.ingredientes.length === 0 && (
                       <p className="text-xs text-[var(--text-4)] mb-2">
-                        Receta importada de Wansoft sin ingredientes detallados. Puedes crear un subproducto manual con el mismo nombre para definir su receta.
+                        Receta importada sin ingredientes detallados. Puedes crear un subproducto manual con el mismo nombre para definir su receta.
                       </p>
                     )}
                     {/* Ingredients table */}
