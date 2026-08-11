@@ -111,4 +111,38 @@ Con la página servida en `http://…:7717`, el fetch a `…:7717/print` y el `w
 4. `main.js` carga local detrás de `LOCAL_UI`.
 5. Terminales/KDS → `http://<SERVER1>:7717`.
 6. Correr matriz §4 en campo (vía TeamViewer + corte físico de módem).
-7. PR + gate. Después: Outbox Fase 2.
+7. PR + gate.
+
+---
+
+## 8. Fases siguientes (prioridad del fundador, 2026-08-11)
+
+### FASE 2 — Catálogo central en SERVER1 (a prueba de arranque en frío) · **prioridad #1**
+
+**Por qué.** Hoy el catálogo (menú, staff, promos, precios, modificadores) se cachea en
+**IndexedDB por terminal**. Eso funciona para una terminal que prendió online al menos una
+vez, pero **una terminal en frío (recién instalada / apagada / cache borrado) sin internet
+→ truena** ("si no está Juanito, truena"). Es exactamente el modelo que Pedro señaló como
+esencial: **la base vive en SERVER1, las terminales le preguntan a SERVER1.**
+
+**Qué construir.**
+1. SERVER1 (local-server) **persiste el catálogo local**: al arrancar/refrescar online, jala
+   de Supabase menú+staff+promos+precios+modificadores+formas de pago y los guarda en disco
+   (junto a `events.ndjson`).
+2. **Endpoints del bridge** para servir el catálogo: `GET /catalog` (o `/menu`, `/staff`, …).
+3. La UI, cuando `local_ui` + `pos_server_ip`, **jala el catálogo de SERVER1** (no de Supabase
+   directo). Supabase sigue como fuente de refresco **en SERVER1**, no en cada terminal.
+4. Refresh: SERVER1 actualiza su catálogo cuando hay internet (liga con Outbox/Inbox Fase 2).
+
+**Resultado:** una terminal nueva funciona offline en frío mientras SERVER1 esté vivo — el
+modelo de Pedro, a prueba de apagón.
+
+### FASE 3 — Blindaje / anti-hackeo (seguridad) · **prioridad #2**
+
+Ver `docs/architecture/SECURITY-HARDENING.md`. Resumen: aislamiento multi-tenant (RLS,
+BUG-019) como candado #1 para 1000 clientes; superficie del bridge mínima (LocalSubnet +
+validación de comandos); sin secretos en claro (solo anon key pública en el bundle, DB local
+cifrada); exe firmado + ofuscado (protege la IP); updates OTA firmados. Es defensa en capas,
+no un "candado mágico".
+
+### FASE 4 — Wansoft réplica (ventana de 15 min) + provisioning 1-clic + consola de flota.
