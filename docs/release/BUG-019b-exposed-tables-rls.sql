@@ -48,7 +48,15 @@ begin
     'pos_menu_item_recipes'
   ]
   loop
-    -- Enciende RLS (default deny) — service_role la salta por diseño.
+    -- Defensivo: saltar tablas que no existen en este entorno (staging vs prod).
+    if not exists (
+      select 1 from information_schema.tables
+      where table_schema = 'public' and table_name = t
+    ) then
+      raise notice 'skip (no existe): %', t;
+      continue;
+    end if;
+    -- Enciende RLS (default deny) — service_role la salta por diseño. Idempotente.
     execute format('alter table public.%I enable row level security', t);
     -- La anon key (pública) deja de tocar la tabla.
     execute format('revoke all on public.%I from anon', t);
@@ -63,11 +71,23 @@ begin
   end loop;
 end $$;
 
--- ── 2. is_platform_admin: NO debe ser callable por anon (checa privilegios) ─────
-revoke execute on function public.is_platform_admin(text, uuid) from anon;
--- NOTA: revisar si también quitar de `authenticated` (hoy un usuario logueado
--- puede preguntar si CUALQUIER email es admin). Dejar para revisión — puede
--- romper el chequeo del panel admin si depende de esta ruta.
+-- ── 2. is_platform_admin: NO debe ser callable sin autorización ────────────────
+--     GOTCHA (detectado en staging): las funciones se otorgan a PUBLIC por
+--     default → revocar solo de `anon` NO basta. Hay que revocar de PUBLIC.
+--     Verificado en staging: is_platform_admin NO la usa ninguna policy, función
+--     ni el cliente → seguro revocarla de PUBLIC (nada interno depende de ella).
+do $$
+declare f record;
+begin
+  for f in
+    select p.oid::regprocedure as sig
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'is_platform_admin'
+  loop
+    execute format('revoke execute on function %s from public', f.sig);
+    execute format('revoke execute on function %s from anon',   f.sig);
+  end loop;
+end $$;
 
 -- ── 3. Fijar search_path de funciones (endurecimiento anti-inyección) ───────────
 --     No cambia comportamiento; solo evita hijacking del search_path.
