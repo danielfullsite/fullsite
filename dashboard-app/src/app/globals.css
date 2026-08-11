@@ -103,41 +103,49 @@ body:has(.pos-kiosk) {
  */
 
 :root {
-  /* Base — DARK negro puro */
-  --bg: #000000;
-  --surface: #0a0a0c;
-  --surface-2: #0f1014;
-  --panel: #0b0b0e;
-  --line: #1c1d22;
-  --line-soft: #141519;
+  /* Base — DS v2.1 "Servicio": near-black con sesgo frío-verde, superficies escalonadas */
+  --bg: #07090a;
+  --surface: #0c1012;
+  --surface-2: #11171a;
+  --panel: #131a1d;
+  --raised: #18211f;
+  --line: #232b2c;
+  --line-soft: #191f20;
 
-  /* Texto */
-  --text-1: #f5f5f7;
-  --text-2: #c4c4cc;
-  --text-3: #87878f;
-  --text-4: #555560;
+  /* Texto — blanco frío escalonado */
+  --text-1: #eef2f0;
+  --text-2: #b4bfbb;
+  --text-3: #7d8985;
+  --text-4: #525c58;
 
-  /* Accent (emerald) */
+  /* Accent (emerald · swappable por tenant vía applyAccent) */
   --accent: #10b981;
   --accent-bright: #34d399;
   --accent-deep: #059669;
   --accent-soft: rgba(16, 185, 129, 0.12);
-  --accent-line: rgba(16, 185, 129, 0.28);
+  --accent-line: rgba(16, 185, 129, 0.26);
+  /* Acento COMO TEXTO — sigue al tenant, legible sobre fondo oscuro */
+  --accent-ink: var(--accent-bright);
 
-  /* Estados */
+  /* Semánticos operativos (separados del acento) + softs + inks theme-aware */
+  --ok: #22c55e;   --ok-soft: rgba(34,197,94,0.12);   --ok-ink: #4ade80;
+  --warn: #f5a524; --warn-soft: rgba(245,165,36,0.13); --warn-ink: #fcd57f;
+  --crit: #f5455c; --crit-soft: rgba(245,69,92,0.13);  --crit-ink: #fda4af;
+  --info: #38bdf8; --info-soft: rgba(56,189,248,0.13); --info-ink: #a7e3ff;
+  /* Aliases legacy (compatibilidad de componentes) */
   --emerald: #10b981;
-  --rose: #ef4444;
-  --amber: #f59e0b;
-  --sky: #38bdf8;
+  --rose: var(--crit);
+  --amber: var(--warn);
+  --sky: var(--info);
 
-  /* Bento (cards 3D emerald sobre negro puro) */
-  --bento-card: linear-gradient(165deg, var(--panel) 0%, var(--panel) 60%, rgba(16,185,129,0.08) 100%);
-  --bento-bevel: linear-gradient(90deg, transparent 0%, rgba(52,211,153,0.32) 50%, transparent 100%);
-  --bento-radial: radial-gradient(circle, rgba(16,185,129,0.20) 0%, transparent 65%);
+  /* Bento (cards) */
+  --bento-card: linear-gradient(168deg, var(--panel) 0%, var(--panel) 58%, rgba(16,185,129,0.055) 140%);
+  --bento-bevel: linear-gradient(90deg, transparent 0%, rgba(52,211,153,0.30) 50%, transparent 100%);
+  --bento-radial: radial-gradient(circle, rgba(16,185,129,0.18) 0%, transparent 65%);
 
-  --shadow-hero: 0 4px 16px rgba(0,0,0,0.65), 0 24px 60px rgba(16,185,129,0.10);
-  --shadow-mid:  0 2px 8px rgba(0,0,0,0.45), 0 12px 32px rgba(0,0,0,0.4);
-  --shadow-soft: 0 1px 2px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.3);
+  --shadow-hero: 0 4px 16px rgba(0,0,0,0.6), 0 30px 70px rgba(0,0,0,0.5);
+  --shadow-mid:  0 1px 2px rgba(0,0,0,0.55), 0 14px 34px rgba(0,0,0,0.4);
+  --shadow-soft: 0 1px 1px rgba(0,0,0,0.5), 0 6px 18px rgba(0,0,0,0.3);
   --shadow-deep: 0 2px 12px rgba(0,0,0,0.6), 0 20px 50px rgba(0,0,0,0.5);
 
   --radius: 14px;
@@ -151,32 +159,46 @@ body:has(.pos-kiosk) {
 }
 
 [data-theme="light"] {
-  --bg: #fafafa;
+  /* DS v2.1 "Servicio · Día": papel neutro cálido con leve sesgo verde (elegido, no gris) */
+  --bg: #eef1ec;
   --surface: #ffffff;
-  --surface-2: #f4f4f6;
+  --surface-2: #f5f8f3;
   --panel: #ffffff;
-  --line: #e6e6ea;
-  --line-soft: #efeff2;
+  --raised: #fbfdfa;
+  --line: #dde3db;
+  --line-soft: #e9ede6;
 
-  --text-1: #08080a;
-  --text-2: #36363f;
-  --text-3: #6b6b75;
-  --text-4: #9c9ca5;
+  --text-1: #0e1613;
+  --text-2: #3b4642;
+  --text-3: #66716c;
+  --text-4: #98a29d;
 
-  --accent: #059669;
+  --accent: #0ea371;
   --accent-bright: #10b981;
   --accent-deep: #047857;
-  --accent-soft: rgba(5, 150, 105, 0.07);
-  --accent-line: rgba(5, 150, 105, 0.22);
+  --accent-soft: rgba(16, 185, 129, 0.10);
+  --accent-line: rgba(5, 120, 90, 0.24);
+  /* Acento COMO TEXTO — AA sobre papel para CUALQUIER acento de tenant (color-mix garantiza contraste) */
+  --accent-ink: color-mix(in srgb, var(--accent) 60%, #0b1a13);
 
-  --bento-card: linear-gradient(165deg, var(--panel) 0%, var(--panel) 60%, var(--accent-soft) 100%);
-  --bento-bevel: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.9) 50%, transparent 100%);
-  --bento-radial: radial-gradient(circle, rgba(5,150,105,0.15) 0%, transparent 65%);
+  /* Semánticos — inks oscurecidos para contraste sobre papel */
+  --ok: #16a34a;   --ok-soft: rgba(22,163,74,0.11);   --ok-ink: #047857;
+  --warn: #e08a00; --warn-soft: rgba(224,138,0,0.13); --warn-ink: #b45309;
+  --crit: #e11d48; --crit-soft: rgba(225,29,72,0.10); --crit-ink: #be123c;
+  --info: #0ea5e9; --info-soft: rgba(14,165,233,0.11); --info-ink: #0369a1;
+  --emerald: #10b981;
+  --rose: var(--crit);
+  --amber: var(--warn);
+  --sky: var(--info);
 
-  --shadow-hero: 0 1px 2px rgba(15,23,42,.04), 0 24px 60px rgba(5,150,105,0.08);
-  --shadow-mid:  0 1px 2px rgba(15,23,42,.04), 0 12px 32px rgba(15,23,42,.06);
-  --shadow-soft: 0 1px 2px rgba(15,23,42,.04), 0 8px 24px rgba(15,23,42,.04);
-  --shadow-deep: 0 4px 12px rgba(15,23,42,.06), 0 24px 48px rgba(15,23,42,.08);
+  --bento-card: linear-gradient(168deg, #fff 0%, #fff 62%, rgba(16,185,129,0.05) 150%);
+  --bento-bevel: linear-gradient(90deg, transparent 0%, rgba(16,32,26,0.10) 50%, transparent 100%);
+  --bento-radial: radial-gradient(circle, rgba(5,150,105,0.12) 0%, transparent 65%);
+
+  --shadow-hero: 0 2px 6px rgba(16,32,26,0.07), 0 26px 60px rgba(5,120,90,0.10);
+  --shadow-mid:  0 1px 2px rgba(16,32,26,0.06), 0 12px 30px rgba(16,32,26,0.08);
+  --shadow-soft: 0 1px 2px rgba(16,32,26,0.05), 0 6px 16px rgba(16,32,26,0.06);
+  --shadow-deep: 0 4px 12px rgba(16,32,26,0.07), 0 24px 48px rgba(16,32,26,0.09);
 
   /* Aliases for component compatibility */
   --surface-1: var(--surface);

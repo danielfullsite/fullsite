@@ -12,6 +12,10 @@ const ACCENTS: Record<string, Accent> = {
   amber:   { accent: '#f59e0b', bright: '#fbbf24', deep: '#d97706' },
   teal:    { accent: '#14b8a6', bright: '#2dd4bf', deep: '#0d9488' },
   sky:     { accent: '#0ea5e9', bright: '#38bdf8', deep: '#0284c7' },
+  orange:  { accent: '#f97316', bright: '#fb923c', deep: '#ea580c' },
+  green:   { accent: '#10b981', bright: '#34d399', deep: '#059669' }, // alias de emerald
+  purple:  { accent: '#8b5cf6', bright: '#a78bfa', deep: '#7c3aed' }, // alias de violet
+  red:     { accent: '#ef4444', bright: '#f87171', deep: '#dc2626' }, // alias de rose fuerte
 }
 
 function hexToRgba(hex: string, a: number): string {

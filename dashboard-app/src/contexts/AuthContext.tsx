@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase-browser'
 import type { User } from '@supabase/supabase-js'
 import { getClientConfig, getClientIdFromEmail, fetchClientConfig, type ClientConfig } from '@/lib/client-config'
 import { applyAccent } from '@/lib/accent'
+import { applyTenantDefaultTheme } from '@/lib/tenant-theme'
 
 import { canAccessPage, resolveRole, ROLE_MAP, type DashboardRole } from '@/lib/roles'
 
@@ -97,8 +98,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Load full client config from Supabase (with fallback to hardcoded)
     const config = await fetchClientConfig(cid)
     setClientConfig(config)
-    // DS v1 gap #1: aplicar el acento del tenant (AMALAY=emerald → no-op; otros heredan su color)
+    // Contrato multi-tenant (Hallazgo #1): marca + tema por cliente en runtime.
+    // Acento: AMALAY=emerald → no-op; otros heredan su color. Tema: adopta default_theme si el usuario no eligió.
     applyAccent(config?.accent_color)
+    applyTenantDefaultTheme(config?.default_theme)
 
     // Set data source switch (wansoft or fullsite)
     const ds = config?.data_source
