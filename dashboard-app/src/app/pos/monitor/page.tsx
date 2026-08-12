@@ -160,7 +160,8 @@ export default function MonitorPage() {
   )
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
+    <div className="h-dvh overflow-y-auto pos-fat-scroll">
+     <div className="max-w-6xl mx-auto p-6">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <Link href="/pos" className="p-2 rounded-lg hover:bg-[var(--surface-2)] text-[var(--text-3)]"><ArrowLeft size={16} /></Link>
@@ -377,6 +378,7 @@ export default function MonitorPage() {
           </div>
         </div>
       )}
+     </div>
     </div>
   )
 }
