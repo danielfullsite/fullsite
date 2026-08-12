@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { requirePlatformAdmin, platformServiceFetch } from '@/lib/platform-auth'
+import { requirePlatformAdmin2FA, platformServiceFetch } from '@/lib/platform-auth'
 import { auditLog } from '@/lib/platform-writes'
 
 // ── Control Plane · POST /api/platform/act-as ────────────────────────────────
@@ -20,7 +20,7 @@ const CLIENT_ID_RE = /^[a-z0-9_-]{1,40}$/i
 const ACTAS_ROLE = 'platform_actas'
 
 export async function POST(req: NextRequest) {
-  const gate = await requirePlatformAdmin(req)
+  const gate = await requirePlatformAdmin2FA(req)
   if ('error' in gate) return gate.error
   const { userId } = gate.ctx
 
