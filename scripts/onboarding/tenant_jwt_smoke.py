@@ -119,7 +119,13 @@ def main() -> int:
         {"email": email, "password": password},
     )
     jwt = login.get("access_token") if isinstance(login, dict) else None
-    check(results, "auth-login", status == 200 and bool(jwt), f"status={status}, jwt={'SET' if jwt else 'MISSING'}")
+    auth_reason = "ok"
+    if not jwt:
+        if isinstance(login, dict):
+            auth_reason = str(login.get("error_code") or login.get("error") or login.get("msg") or "denied")
+        else:
+            auth_reason = "denied"
+    check(results, "auth-login", status == 200 and bool(jwt), f"status={status}, jwt={'SET' if jwt else 'MISSING'}, reason={auth_reason}")
     if not jwt:
         print(json.dumps({"status": "FAIL", "results": [asdict(r) for r in results]}, ensure_ascii=False))
         return 1

@@ -144,8 +144,9 @@ def client2_checks() -> list[Check]:
             "c2-rls",
             "Tenant isolation check exists and requires authenticated session",
             10,
-            contains("scripts/tenant-isolation/README.md", "sesión autenticada como nomada", "no como service_role"),
-            "scripts/tenant-isolation/README.md",
+            contains("scripts/tenant-isolation/README.md", "sesión autenticada como nomada", "no como service_role")
+            and exists("scripts/onboarding/tenant_jwt_smoke.py"),
+            "scripts/tenant-isolation/README.md + scripts/onboarding/tenant_jwt_smoke.py",
         ),
         Check(
             "c2-public-url",
