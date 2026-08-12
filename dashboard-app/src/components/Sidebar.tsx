@@ -179,6 +179,7 @@ const platformNavSections = [
     label: 'Plataforma',
     items: [
       { href: '/platform', label: 'Métricas', icon: LayoutDashboard },
+      { href: '/platform/copiloto', label: 'Copiloto', icon: Sparkles },
       { href: '/platform/tenants', label: 'Tenants', icon: Store },
       { href: '/platform/flags', label: 'Flags & Config', icon: Flag },
       { href: '/platform/audit', label: 'Bitácora', icon: ScrollText },
