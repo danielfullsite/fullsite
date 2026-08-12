@@ -13,7 +13,7 @@ let _cachedToken: string | null = null
 let _cachedTokenTime = 0
 const TOKEN_CACHE_MS = 30_000
 
-async function getAuthToken(): Promise<string> {
+export async function getAuthToken(): Promise<string> {
   const now = Date.now()
   if (_cachedToken && (now - _cachedTokenTime) < TOKEN_CACHE_MS) return _cachedToken
   try {

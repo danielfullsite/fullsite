@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Bell, AlertTriangle, AlertCircle, Info, Sparkles, X } from 'lucide-react'
 
+import { getAuthToken, getActiveClientSlug } from '@/lib/data'
+
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
@@ -18,12 +20,16 @@ interface AgentAlert {
   source: 'result' | 'error'
 }
 
+// Aislamiento por tenant: usa el JWT de sesión (RLS por membresía, BUG-019) —
+// NO la anon key, que devolvía 0 filas (o filtraría mal). El caller además filtra
+// por client_id para defensa en profundidad.
 async function sbFetch(table: string, params: string): Promise<unknown[]> {
   try {
+    const token = await getAuthToken()
     const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params}`, {
       headers: {
         apikey: SUPABASE_KEY,
-        Authorization: `Bearer ${SUPABASE_KEY}`,
+        Authorization: `Bearer ${token}`,
       },
     })
     if (!res.ok) return []
@@ -100,16 +106,16 @@ export default function NotificationBell() {
   const ref = useRef<HTMLDivElement>(null)
 
   const fetchAlerts = useCallback(async () => {
-    const [results, errors] = await Promise.all([
-      sbFetch(
-        'agent_results',
-        'select=agent_id,summary,priority,updated_at&or=(priority.eq.critical,priority.eq.warning)&order=updated_at.desc&limit=20'
-      ),
-      sbFetch(
-        'agent_runs',
-        'select=agent_id,output_summary,status,created_at&status=eq.error&order=created_at.desc&limit=10'
-      ),
-    ])
+    // Solo detecciones del TENANT ACTIVO (agent_results tiene client_id + RLS por
+    // membresía). Se quita agent_runs: es GLOBAL (sin client_id) → mezclaría errores
+    // de otros clientes en la campana; además son ruido de ops, no del tenant.
+    const clientId = getActiveClientSlug()
+    const results = clientId
+      ? await sbFetch(
+          'agent_results',
+          `select=agent_id,summary,priority,updated_at&client_id=eq.${encodeURIComponent(clientId)}&or=(priority.eq.critical,priority.eq.warning)&order=updated_at.desc&limit=20`
+        )
+      : []
 
     const items: AgentAlert[] = []
 
@@ -121,17 +127,6 @@ export default function NotificationBell() {
         priority: r.priority,
         updated_at: r.updated_at,
         source: 'result',
-      })
-    }
-
-    for (const e of errors as { agent_id: string; output_summary: string; status: string; created_at: string }[]) {
-      items.push({
-        id: `error-${e.agent_id}-${e.created_at}`,
-        agent_id: e.agent_id,
-        summary: e.output_summary || 'Error en ejecucion',
-        priority: 'critical',
-        updated_at: e.created_at,
-        source: 'error',
       })
     }
 
