@@ -346,6 +346,12 @@ def render_section(title: str, checks: list[Check]) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--json", action="store_true", help="emit machine-readable JSON")
+    parser.add_argument(
+        "--scope",
+        choices=["all", "client2-clone"],
+        default="all",
+        help="all = Client #2 + cloneability + offline; client2-clone excludes physical offline",
+    )
     args = parser.parse_args()
 
     sections = {
@@ -353,6 +359,8 @@ def main() -> int:
         "cloneability": cloneability_checks(),
         "offline": offline_checks(),
     }
+    if args.scope == "client2-clone":
+        sections.pop("offline")
     overall = round(sum(score(v) for v in sections.values()) / len(sections))
     blockers = [c for checks in sections.values() for c in checks if c.blocker and not c.passed]
     payload = {
