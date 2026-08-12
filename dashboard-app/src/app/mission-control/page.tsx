@@ -424,7 +424,7 @@ export default function MissionControlPage() {
 
       {/* Drawer del agente — se desliza desde la derecha (como el artifact) */}
       {selectedAgent && <div onClick={() => setSelectedAgent(null)} className="fixed inset-0 z-[80] bg-black/55 backdrop-blur-[2px]" />}
-      <div className={`fixed top-0 right-0 h-screen w-full sm:w-[440px] max-w-full z-[85] bg-[var(--bg)] border-l border-[var(--line)] shadow-2xl flex flex-col transition-transform duration-300 ease-out ${selectedAgent ? 'translate-x-0' : 'translate-x-full'}`}>
+      <div style={{ paddingTop: 'env(safe-area-inset-top)' }} className={`fixed top-0 right-0 h-screen w-full sm:w-[440px] max-w-full z-[85] bg-[var(--bg)] border-l border-[var(--line)] shadow-2xl flex flex-col transition-transform duration-300 ease-out ${selectedAgent ? 'translate-x-0' : 'translate-x-full'}`}>
         {selectedAgent && (() => {
           const meta = AGENT_META[selectedAgent]
           const Icon = meta?.icon || Bot

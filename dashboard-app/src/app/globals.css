@@ -223,7 +223,7 @@ body:has(.pos-kiosk) {
   --color-text-muted: var(--text-3);
   --color-border: var(--line);
   --color-border-light: var(--line-soft);
-  --font-sans: var(--font-inter), 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: Arial, Helvetica, 'Liberation Sans', system-ui, sans-serif;
   --font-mono: var(--font-jetbrains-mono), 'JetBrains Mono', ui-monospace, monospace;
 }
 
