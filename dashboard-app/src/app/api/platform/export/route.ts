@@ -21,17 +21,22 @@ const DATASETS: Record<string, { table: string; select: string; order?: string; 
 
 // Excel "a la antigüita": tabla HTML con MIME de Excel → se abre como hoja de
 // cálculo (.xls) sin librerías. Es el mismo truco que usan muchos reportes clásicos.
-function toXls(rows: Record<string, unknown>[]): string {
+function toXls(rows: Record<string, unknown>[], title = 'Reporte', client = ''): string {
   const esc = (v: unknown): string => {
     if (v === null || v === undefined) return ''
     const s = typeof v === 'object' ? JSON.stringify(v) : String(v)
     return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   }
-  if (rows.length === 0) return '<html><body><table></table></body></html>'
-  const cols = Array.from(rows.reduce((set, r) => { Object.keys(r).forEach(k => set.add(k)); return set }, new Set<string>()))
-  const head = `<tr>${cols.map(c => `<th style="background:#eee;text-align:left">${esc(c)}</th>`).join('')}</tr>`
-  const body = rows.map(r => `<tr>${cols.map(c => `<td>${esc(r[c])}</td>`).join('')}</tr>`).join('')
-  return `<html><head><meta charset="utf-8"></head><body><table border="1" cellspacing="0">${head}${body}</table></body></html>`
+  const cols = rows.length ? Array.from(rows.reduce((set, r) => { Object.keys(r).forEach(k => set.add(k)); return set }, new Set<string>())) : []
+  const n = cols.length || 1
+  const stamp = new Date().toLocaleString('es-MX')
+  const brand =
+    `<tr><td colspan="${n}" style="font-family:Arial;font-size:20px;font-weight:bold;color:#0f9d6e;padding:8px 6px 2px">fullsite ▪</td></tr>` +
+    `<tr><td colspan="${n}" style="font-family:Arial;font-size:11px;color:#555;padding:0 6px 8px">${esc(title)}${client ? ` · ${esc(client)}` : ''} · Generado ${esc(stamp)}</td></tr>` +
+    `<tr><td colspan="${n}"></td></tr>`
+  const head = `<tr>${cols.map(c => `<th style="background:#0f9d6e;color:#fff;text-align:left;padding:4px 6px">${esc(c)}</th>`).join('')}</tr>`
+  const body = rows.map(r => `<tr>${cols.map(c => `<td style="padding:3px 6px">${esc(r[c])}</td>`).join('')}</tr>`).join('')
+  return `<html><head><meta charset="utf-8"></head><body><table border="1" cellspacing="0" style="font-family:Arial">${brand}${head}${body}</table></body></html>`
 }
 
 function toCsv(rows: Record<string, unknown>[]): string {
@@ -75,7 +80,7 @@ export async function GET(req: NextRequest) {
     })
   }
   if (format === 'xls' || format === 'excel') {
-    return new Response(toXls(rows), {
+    return new Response(toXls(rows, dataset, clientId), {
       headers: { 'Content-Type': 'application/vnd.ms-excel; charset=utf-8', 'Content-Disposition': `attachment; filename="${clientId}-${dataset}-${stamp}.xls"` },
     })
   }
