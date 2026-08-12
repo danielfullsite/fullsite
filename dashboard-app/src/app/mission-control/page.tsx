@@ -154,6 +154,60 @@ function PrettyData({ value, depth = 0 }: { value: unknown; depth?: number }) {
   )
 }
 
+// ── Evidencia: serie REAL para la sparkline del drawer ───────────────────────
+// Prioridad: 1) una serie numérica dentro de result.data (lo que el agente midió);
+// 2) actividad real del agente (nº de corridas/día, últimos 14 días desde agent_runs).
+// Si no hay señal, el drawer muestra "sin datos" en vez de una curva inventada.
+function extractSeries(data: unknown, depth = 0): number[] | null {
+  if (depth > 3 || !data || typeof data !== 'object') return null
+  if (Array.isArray(data)) {
+    if (data.length >= 3 && data.every(x => typeof x === 'number' && isFinite(x))) return data as number[]
+    const keys = ['total', 'value', 'ventas_dia', 'ventas', 'count', 'monto', 'amount', 'y', 'n']
+    const nums = (data as unknown[]).map(x => {
+      if (x && typeof x === 'object') {
+        for (const key of keys) {
+          const n = (x as Record<string, unknown>)[key]
+          if (typeof n === 'number' && isFinite(n)) return n
+        }
+      }
+      return null
+    })
+    if (nums.length >= 3 && nums.every(n => n !== null)) return nums as number[]
+  }
+  for (const v of Object.values(data as Record<string, unknown>)) {
+    const r = extractSeries(v, depth + 1)
+    if (r) return r
+  }
+  return null
+}
+
+function activitySeries(runs: AgentRun[], agentId: string, days = 14): number[] {
+  const now = Date.now()
+  const buckets = new Array(days).fill(0)
+  for (const r of runs) {
+    if (r.agent_id !== agentId) continue
+    const d = Math.floor((now - new Date(r.created_at).getTime()) / 86400000)
+    if (d >= 0 && d < days) buckets[days - 1 - d] += 1
+  }
+  return buckets
+}
+
+function sparkPaths(series: number[], w = 300, h = 56) {
+  const n = series.length
+  const min = Math.min(...series)
+  const max = Math.max(...series)
+  const range = max - min || 1
+  const pad = 6
+  const pts = series.map((v, i) => {
+    const x = n === 1 ? w / 2 : (i / (n - 1)) * w
+    const y = pad + (1 - (v - min) / range) * (h - pad * 2)
+    return [x, y] as const
+  })
+  const line = pts.map(([x, y], i) => `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`).join(' ')
+  const area = `${line} L ${w.toFixed(1)} ${h} L 0 ${h} Z`
+  return { line, area }
+}
+
 export default function MissionControlPage() {
   const [runs, setRuns] = useState<AgentRunFull[]>([])
   const [results, setResults] = useState<AgentResultFull[]>([])
@@ -412,17 +466,35 @@ export default function MissionControlPage() {
                     {result?.fecha && <li className="flex gap-2 text-xs text-[var(--text-2)] leading-snug"><span className="w-1 h-1 rounded-full bg-emerald-400 mt-1.5 flex-shrink-0" />Último análisis: {result.fecha}.</li>}
                   </ul>
                 </div>
-                {/* Evidencia */}
-                <div>
-                  <p className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-4)] mb-2">Evidencia</p>
-                  <div className="rounded-xl bg-[var(--surface)] border border-[var(--line-soft)] p-2">
-                    <svg viewBox="0 0 300 56" preserveAspectRatio="none" className="w-full h-14">
-                      <defs><linearGradient id="evg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#34d399" stopOpacity="0.35" /><stop offset="1" stopColor="#34d399" stopOpacity="0" /></linearGradient></defs>
-                      <path d="M0 44 C 40 40, 60 30, 90 32 S 150 20, 190 24 S 250 14, 300 18 L 300 56 L 0 56 Z" fill="url(#evg)" />
-                      <path d="M0 44 C 40 40, 60 30, 90 32 S 150 20, 190 24 S 250 14, 300 18" fill="none" stroke="#34d399" strokeWidth="2.4" strokeLinecap="round" />
-                    </svg>
-                  </div>
-                </div>
+                {/* Evidencia — serie REAL (dato medido por el agente, o su actividad) */}
+                {(() => {
+                  const dataSeries = extractSeries(result?.data)
+                  const series = dataSeries ?? activitySeries(runs, selectedAgent)
+                  const hasSignal = series.length >= 2 && Math.max(...series) > 0 && new Set(series).size > 1
+                  const caption = dataSeries ? 'Serie medida por el agente' : 'Actividad del agente · 14 días'
+                  return (
+                    <div>
+                      <p className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-4)] mb-2">Evidencia</p>
+                      <div className="rounded-xl bg-[var(--surface)] border border-[var(--line-soft)] p-2">
+                        {hasSignal ? (() => {
+                          const { line, area } = sparkPaths(series)
+                          return (
+                            <>
+                              <svg viewBox="0 0 300 56" preserveAspectRatio="none" className="w-full h-14">
+                                <defs><linearGradient id="evg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#34d399" stopOpacity="0.35" /><stop offset="1" stopColor="#34d399" stopOpacity="0" /></linearGradient></defs>
+                                <path d={area} fill="url(#evg)" />
+                                <path d={line} fill="none" stroke="#34d399" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                              <p className="text-[9px] text-[var(--text-4)] mt-1 px-1">{caption}</p>
+                            </>
+                          )
+                        })() : (
+                          <p className="text-[11px] text-[var(--text-4)] text-center py-4">Sin datos suficientes para graficar todavía.</p>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })()}
                 {/* Recomendación */}
                 <div>
                   <p className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-4)] mb-1.5">Recomendación</p>
