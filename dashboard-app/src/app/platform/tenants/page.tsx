@@ -27,6 +27,26 @@ function TenantsInner() {
   const [confirm, setConfirm] = useState<null | { title: string; message?: string; run: () => Promise<void> }>(null)
   const [busy, setBusy] = useState(false)
 
+  // Act-as real: el server da membresía (service_role) → RLS deja leer el tenant.
+  // Guardamos el flag + client_id y navegamos al dashboard del tenant.
+  async function enterTenant(t: Tenant) {
+    setBusy(true)
+    try {
+      const res = await fetch('/api/platform/act-as', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ client_id: t.id }),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) { toast(j.error || 'No se pudo entrar al tenant', 'error'); return }
+      try {
+        localStorage.setItem('fullsite_actas', t.id)
+        localStorage.setItem('fullsite_client_id', t.id)
+      } catch { /* SSR */ }
+      window.location.href = '/'
+    } finally { setBusy(false) }
+  }
+
   async function load() {
     setLoading(true)
     setDenied(false)
@@ -178,14 +198,15 @@ function TenantsInner() {
                           >
                             <Power size={13} /> {isActive ? 'Desactivar' : 'Activar'}
                           </button>
-                          {/* Punto de entrada act-as (placeholder — impersonation completa NO se construye aquí) */}
-                          <a
-                            href={`/?client_id=${encodeURIComponent(t.id)}`}
-                            title="Abrir admin del tenant (placeholder — sin impersonation aún)"
-                            className="inline-flex items-center gap-1 text-[var(--accent-bright)] font-semibold text-xs hover:underline"
+                          {/* Act-as real: pide membresía al server (service_role) y entra al tenant */}
+                          <button
+                            onClick={() => enterTenant(t)}
+                            disabled={busy}
+                            title="Entrar al panel de este tenant como admin"
+                            className="inline-flex items-center gap-1 text-[var(--accent-bright)] font-semibold text-xs hover:underline disabled:opacity-50"
                           >
                             Entrar <ArrowUpRight size={13} />
-                          </a>
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -197,7 +218,7 @@ function TenantsInner() {
         )}
       </div>
       <p className="mt-3 text-[11px] text-[var(--text-4)]">
-        &quot;Entrar&quot; es el punto de entrada al admin del tenant. La impersonation completa (act-as) se implementará después.
+        &quot;Entrar&quot; te da acceso de admin al panel de ese tenant (impersonation con membresía temporal vía service_role, auditada). Sal con el banner &quot;Salir&quot; arriba.
       </p>
 
       {showNew && <NewTenantModal onClose={() => setShowNew(false)} onDone={load} toast={toast} tenantCount={tenants.length} />}

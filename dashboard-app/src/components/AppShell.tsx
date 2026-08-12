@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import Sidebar from '@/components/Sidebar'
 import ChatWidget from '@/components/ChatWidget'
 import NotificationBell from '@/components/NotificationBell'
+import ActAsBanner from '@/components/ActAsBanner'
 import { PageTransition } from '@/components/motion'
 import { useEffect, useState } from 'react'
 
@@ -87,6 +88,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <div className="grid lg:grid-cols-[240px_1fr] min-h-screen bg-[var(--bg)] overflow-x-hidden">
       <Sidebar />
       <main className="min-h-screen overflow-x-hidden overflow-y-auto lg:pt-0 relative min-w-0" style={{ paddingTop: 'max(3.5rem, calc(env(safe-area-inset-top, 0px) + 3.5rem))' }}>
+        <ActAsBanner />
         {/* Notification bell — top right */}
         <div className="absolute right-4 lg:right-8 z-30 hidden lg:block" style={{ top: '1.25rem' }}>
           <NotificationBell />

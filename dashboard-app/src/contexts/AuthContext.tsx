@@ -87,7 +87,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const emailClientId = getClientIdFromEmail(userEmail || '')
 
     // Use first available
-    const cid = metaClientId || dbClientId || emailClientId
+    let cid = metaClientId || dbClientId || emailClientId
+
+    // Act-as (super-admin): si un platform admin entró a un tenant desde
+    // /platform/tenants, ese tenant manda. El endpoint /api/platform/act-as ya
+    // le dio membresía vía service_role → RLS deja leer sus datos. Aditivo y
+    // gateado por platform_admin: un usuario normal jamás entra a esta rama.
+    try {
+      const actas = typeof window !== 'undefined' ? localStorage.getItem('fullsite_actas') : null
+      if (actas && appMeta?.platform_admin === true) {
+        cid = actas
+        setRole(resolveRole('dueño', userEmail)) // ve el tenant con acceso completo
+      }
+    } catch { /* SSR */ }
+
     setClientId(cid)
 
     // Persist for data.ts getActiveClientSlug() — allows data functions to auto-resolve client
