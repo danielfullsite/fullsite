@@ -209,7 +209,8 @@ export default function MesasPage() {
   useEffect(() => {
     const compute = () => {
       const availW = window.innerWidth - 32
-      const availH = window.innerHeight - 180
+      // Reserva: header (~64) + status (~30) + fila de KPIs (~72) + paddings.
+      const availH = window.innerHeight - 236
       const s = Math.min(availW / PLANO_BASE_W, availH / PLANO_BASE_H)
       if (s > 0.2) setPlanoScale(s)
     }
@@ -342,8 +343,6 @@ export default function MesasPage() {
   }
 
   const totalPersonas = mesas.reduce((s, m) => s + (m.personas || 0), 0)
-  const totalVentas = mesas.reduce((s, m) => s + (m.total || 0), 0)
-  const ticketPromedio = totalPersonas > 0 ? totalVentas / totalPersonas : 0
 
   // Timer
   const [, setTick] = useState(0)
@@ -726,11 +725,7 @@ export default function MesasPage() {
               {(staffName || currentMesero) && <span className="text-[var(--accent-ink)]">{staffName || currentMesero}</span>}
               {turnoNum != null && <span> · Turno {turnoNum}</span>}
               {(staffName || currentMesero || turnoNum != null) && ' · '}
-              MESA(S): {counts.ocupada + counts.cuenta}{namedOrders.length > 0 && ` · CUENTAS: ${namedOrders.length}`} · {totalPersonas} personas · TP {formatMXN(ticketPromedio)}
-              {activeOrders.length > 0 && (() => {
-                const avgMins = Math.round(activeOrders.reduce((s, o) => s + getMinutes(o.created_at), 0) / activeOrders.length)
-                return <span className={avgMins > 60 ? 'text-[var(--warn-ink)]' : ''}> · Prom: {formatDur(avgMins)}</span>
-              })()}
+              MESA(S): {counts.ocupada + counts.cuenta}{namedOrders.length > 0 && ` · CUENTAS: ${namedOrders.length}`} · {totalPersonas} personas
               <span className="hidden lg:inline"> · {new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })} {new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</span>
             </p>
           </div>
@@ -902,14 +897,11 @@ export default function MesasPage() {
         const ocupadas = counts.ocupada + counts.cuenta
         const totalMesas = mesas.length || 0
         const aforo = totalMesas > 0 ? Math.round((ocupadas / totalMesas) * 100) : 0
-        const avgMins = activeOrders.length > 0 ? Math.round(activeOrders.reduce((s, o) => s + getMinutes(o.created_at), 0) / activeOrders.length) : 0
         return (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 px-4 lg:px-6 pt-2.5 flex-shrink-0">
+          <div className="grid grid-cols-2 gap-2 px-4 lg:px-6 pt-2.5 flex-shrink-0">
             {[
               { l: 'Mesas ocupadas', v: `${ocupadas}`, sub: `/${totalMesas}`, d: `${aforo}% de aforo`, ink: 'var(--accent-ink)' },
               { l: 'Personas', v: `${totalPersonas}`, sub: '', d: 'en piso ahora', ink: 'var(--text-3)' },
-              { l: 'Ingreso actual', v: formatMXN(totalVentas), sub: '', d: `TP ${formatMXN(ticketPromedio)}`, ink: 'var(--accent-ink)' },
-              { l: 'Tiempo prom.', v: formatDur(avgMins), sub: '', d: 'rotación de mesa', ink: 'var(--text-3)' },
             ].map((k) => (
               <div key={k.l} className="rounded-xl border border-[var(--line)] px-3.5 py-2 shadow-[var(--shadow-soft)] bg-[var(--surface)]">
                 <div className="font-mono text-[9px] uppercase tracking-[0.13em] text-[var(--text-3)]">{k.l}</div>
@@ -923,7 +915,7 @@ export default function MesasPage() {
         )
       })()}
 
-      <div className={`flex-1 overflow-y-auto ${viewMode === 'planograma' ? 'p-2' : 'px-4 py-3'}`}>
+      <div className={`flex-1 ${viewMode === 'planograma' ? 'p-2 overflow-hidden' : 'px-4 py-3 overflow-y-auto'}`}>
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <div className="w-8 h-8 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
