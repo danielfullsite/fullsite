@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Receipt, RefreshCw, Clock, DollarSign, Users, CreditCard, Banknote, Ban, Percent, ChefHat, RotateCcw, ShieldAlert, AlertTriangle, X, Download } from 'lucide-react'
+import { ArrowLeft, Receipt, RefreshCw, Clock, DollarSign, Users, CreditCard, Banknote, Ban, Percent, ChefHat, RotateCcw, ShieldAlert, AlertTriangle, X, Download, Printer } from 'lucide-react'
 import { formatMXN, getAuditLog, reopenOrder, logAudit, getClientId, verifyManagerPin, getActiveTurno, getPaymentMethodsFromDB, type AuditLogEntry, type PagoForma, type PaymentMethodDB } from '@/lib/pos-data'
 import { isTiempoItem } from '@/lib/pos-constants'
 
@@ -330,6 +330,46 @@ export default function CortePage() {
       cancellations: cancellations.length,
     }
   }, [orders, auditLog, cardPct, cashMovements, paymentMethods])
+
+  // Corte Mesero individual (tip-out) — formato térmico Wansoft (spec 18). Tip-out 5% de ventas al pool.
+  const TIP_OUT_PCT = 5
+  const printCorteMesero = (mesero: string, data: { ventas: number; ordenes: number; personas: number; propinas: number }) => {
+    const w = window.open('', '_blank', 'width=400,height=600')
+    if (!w) return
+    const now = new Date()
+    const tipOut = data.ventas * (TIP_OUT_PCT / 100)
+    const propinaNeta = Math.max(0, data.propinas - tipOut)
+    const ticketProm = data.personas > 0 ? data.ventas / data.personas : 0
+    w.document.write(`
+      <html><head><title>Corte Mesero — ${mesero}</title>
+      <style>
+        body{font-family:monospace;font-size:12px;padding:20px;max-width:300px;margin:0 auto}
+        h2{text-align:center;margin:0 0 4px}
+        .sub{text-align:center;font-size:11px;margin:0 0 10px;color:#666}
+        .line{border-top:1px dashed #000;margin:8px 0}
+        .row{display:flex;justify-content:space-between;margin:3px 0}
+        .total{font-weight:bold;font-size:14px}
+      </style></head><body>
+      <h2>CORTE MESERO</h2>
+      <p class="sub">${mesero}</p>
+      <p style="text-align:center">${now.toLocaleDateString('es-MX')} ${now.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</p>
+      <div class="line"></div>
+      <div class="row"><span>Ventas:</span><span>${formatMXN(data.ventas)}</span></div>
+      <div class="row"><span>Ordenes:</span><span>${data.ordenes}</span></div>
+      <div class="row"><span>Personas:</span><span>${data.personas}</span></div>
+      <div class="row"><span>Ticket promedio:</span><span>${formatMXN(ticketProm)}</span></div>
+      <div class="line"></div>
+      <div class="row"><span>Propinas cobradas:</span><span>${formatMXN(data.propinas)}</span></div>
+      <div class="row"><span>Tip-out (${TIP_OUT_PCT}% ventas):</span><span>-${formatMXN(tipOut)}</span></div>
+      <div class="line"></div>
+      <div class="row total"><span>Propina neta:</span><span>${formatMXN(propinaNeta)}</span></div>
+      <div class="line"></div>
+      <p style="text-align:center;font-size:10px;color:#666">Tip-out al pool (regla ${TIP_OUT_PCT}%).<br/>Firma: ____________________</p>
+      </body></html>
+    `)
+    w.document.close()
+    w.print()
+  }
 
   const exportCSV = () => {
     const headers = ['Fecha','Orden','Mesa','Mesero','Subtotal','Descuento','IVA','Propina','Total','MetodoPago','Status']
@@ -731,6 +771,7 @@ export default function CortePage() {
                         <th className="text-right px-3 py-2">Ordenes</th>
                         <th className="text-right px-3 py-2">Personas</th>
                         <th className="text-right px-3 py-2">Ticket prom</th>
+                        <th className="text-right px-3 py-2">Corte</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -743,6 +784,15 @@ export default function CortePage() {
                           <td className="px-3 py-2.5 text-right text-[var(--text-4)]">{data.ordenes}</td>
                           <td className="px-3 py-2.5 text-right text-[var(--text-4)]">{data.personas}</td>
                           <td className="px-3 py-2.5 text-right text-white">{formatMXN(data.personas > 0 ? data.ventas / data.personas : 0)}</td>
+                          <td className="px-3 py-2.5 text-right">
+                            <button
+                              onClick={() => printCorteMesero(mesero, data)}
+                              title="Imprimir corte de mesero (tip-out)"
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[var(--line)]/60 hover:bg-blue-600 hover:text-white text-[var(--text-2)] transition-colors text-xs font-medium"
+                            >
+                              <Printer size={14} /> Imprimir
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
