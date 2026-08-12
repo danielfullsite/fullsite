@@ -83,6 +83,7 @@ import {
 import {
   ChefHat,
   Grid3X3,
+  ChevronDown,
   Minus,
   Plus,
   X,
@@ -97,9 +98,7 @@ import {
   ShieldAlert,
   Ban,
   FileText,
-  BookOpen,
   Package,
-  ShoppingCart,
   Wine,
   Bike,
   Receipt,
@@ -3696,43 +3695,61 @@ function POSContent() {
         <div className="fixed inset-0 z-40 flex" onClick={() => setShowNav(false)}>
           <div className="w-64 bg-[var(--surface-2)] border-r border-[var(--line)] p-4 shadow-2xl overflow-y-auto max-h-[100dvh] pos-fat-scroll" onClick={e => e.stopPropagation()}>
             <p className="text-[var(--text-2)] text-xs font-semibold uppercase mb-2">Navegacion</p>
+            {/* Acordeón: un grupo abierto a la vez (details[name="posnav"]) → sin scroll.
+             * Solo lo que un operador toca en servicio. El back-office (recetas, food-cost,
+             * compras, inventario, XML/facturas proveedor, analítica) vive en el dashboard. */}
             <div className="space-y-1">
               {[
-                { href: '/pos/mesas', icon: Grid3X3, label: 'Mesas', section: 'mesas' },
-                { href: '/pos/cocina', icon: ChefHat, label: 'Cocina', section: 'cocina' },
-                { href: '/pos/kds', icon: Monitor, label: 'KDS Tablet', section: 'kds' },
-                { href: '/pos/barra', icon: Wine, label: 'Barra', section: 'barra' },
-                { href: '/pos/delivery', icon: Bike, label: 'Domicilio', section: 'delivery' },
-                { href: '/pos/recetas', icon: BookOpen, label: 'Recetas', section: 'recetas' },
-                { href: '/pos/food-cost', icon: DollarSign, label: 'Food Cost', section: 'recetas' },
-                { href: '/pos/compras', icon: ShoppingCart, label: 'Compras', section: 'compras' },
-                { href: '/pos/inventario', icon: Package, label: 'Inventario', section: 'inventario' },
-                { href: '/pos/inventario-market', icon: Package, label: 'Inventario Market', section: 'inventario' },
-                { href: '/pos/auditoria', icon: FileText, label: 'Auditoria', section: 'auditoria' },
-                { href: '/pos/corte', icon: Receipt, label: 'Corte de caja', section: 'corte' },
-                { href: '/pos/qr', icon: QrCode, label: 'QR Mesas', section: 'qr' },
-                { href: '/pos/turno', icon: Clock, label: 'Turno', section: 'turno' },
-                { href: '/pos/facturacion', icon: Stamp, label: 'Facturación', section: 'facturacion' },
-                { href: '/pos/recepcion-factura', icon: FileText, label: 'Recepción XML', section: 'facturacion' },
-                { href: '/pos/facturas-proveedor', icon: FileText, label: 'Facturas Proveedor', section: 'facturacion' },
-                { href: '/pos/asistencia', icon: Clock, label: 'Checador', section: 'configuracion' },
-                { href: '/pos/staff-analytics', icon: Users, label: 'Rutina Meseros', section: 'configuracion' },
-                { href: '/pos/monitor', icon: Monitor, label: 'Monitor', section: 'configuracion' },
-                { href: '/pos/historial', icon: FileText, label: 'Historial', section: 'historial' },
-                { href: '/pos/staff', icon: Users, label: 'Empleados', section: 'configuracion' },
-                { href: '/pos/huella', icon: Lock, label: 'Huellas', section: 'configuracion' },
-                { href: '/pos/configuracion', icon: Settings, label: 'Configuración', section: 'configuracion' },
-              ].filter(item => canSee(item.section)).map(item => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setShowNav(false)}
-                  className="flex items-center gap-3 px-4 py-1.5 rounded-xl text-[var(--text-4)] hover:bg-[var(--line)] hover:text-white active:bg-[var(--accent-soft)] transition-colors min-h-[40px]"
-                >
-                  <item.icon size={18} />
-                  <span className="text-sm font-medium">{item.label}</span>
-                </Link>
-              ))}
+                { title: 'Operación', icon: Grid3X3, defaultOpen: true, items: [
+                  { href: '/pos/mesas', icon: Grid3X3, label: 'Mesas', section: 'mesas' },
+                  { href: '/pos/cocina', icon: ChefHat, label: 'Cocina', section: 'cocina' },
+                  { href: '/pos/barra', icon: Wine, label: 'Barra', section: 'barra' },
+                  { href: '/pos/delivery', icon: Bike, label: 'Domicilio', section: 'delivery' },
+                  { href: '/pos/kds', icon: Monitor, label: 'KDS Tablet', section: 'kds' },
+                ] },
+                { title: 'Caja & Turno', icon: Receipt, defaultOpen: false, items: [
+                  { href: '/pos/turno', icon: Clock, label: 'Turno', section: 'turno' },
+                  { href: '/pos/corte', icon: Receipt, label: 'Corte de caja', section: 'corte' },
+                  { href: '/pos/facturacion', icon: Stamp, label: 'Facturación', section: 'facturacion' },
+                ] },
+                { title: 'Personal', icon: Users, defaultOpen: false, items: [
+                  { href: '/pos/asistencia', icon: Clock, label: 'Checador', section: 'configuracion' },
+                  { href: '/pos/staff', icon: Users, label: 'Empleados', section: 'configuracion' },
+                  { href: '/pos/huella', icon: Lock, label: 'Huellas', section: 'configuracion' },
+                ] },
+                { title: 'Terminal', icon: Settings, defaultOpen: false, items: [
+                  { href: '/pos/configuracion', icon: Settings, label: 'Configuración', section: 'configuracion' },
+                  { href: '/pos/monitor', icon: Monitor, label: 'Monitor', section: 'configuracion' },
+                  { href: '/pos/qr', icon: QrCode, label: 'QR Mesas', section: 'qr' },
+                  { href: '/pos/historial', icon: FileText, label: 'Historial', section: 'historial' },
+                  { href: '/pos/auditoria', icon: FileText, label: 'Auditoria', section: 'auditoria' },
+                ] },
+              ].map(group => {
+                const items = group.items.filter(item => canSee(item.section))
+                if (items.length === 0) return null
+                return (
+                  <details key={group.title} name="posnav" open={group.defaultOpen} className="group/nav">
+                    <summary className="flex items-center gap-3 px-4 py-2 rounded-xl cursor-pointer select-none text-[var(--text-2)] hover:bg-[var(--line)] hover:text-white transition-colors min-h-[44px]">
+                      <group.icon size={18} />
+                      <span className="text-sm font-semibold flex-1">{group.title}</span>
+                      <ChevronDown size={16} className="nav-caret opacity-60" />
+                    </summary>
+                    <div className="mt-0.5 mb-1 ml-3 pl-3 border-l border-[var(--line)] space-y-0.5">
+                      {items.map(item => (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          onClick={() => setShowNav(false)}
+                          className="flex items-center gap-3 px-3 py-1.5 rounded-lg text-[var(--text-4)] hover:bg-[var(--line)] hover:text-white active:bg-[var(--accent-soft)] transition-colors min-h-[38px]"
+                        >
+                          <item.icon size={16} />
+                          <span className="text-sm font-medium">{item.label}</span>
+                        </Link>
+                      ))}
+                    </div>
+                  </details>
+                )
+              })}
             </div>
 
             {/* Leaderboard + Kitchen Timer in nav */}

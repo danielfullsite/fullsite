@@ -34,6 +34,13 @@ html.capacitor .pos-safe-top { padding-top: env(safe-area-inset-top, 0px); }
 .pos-fat-scroll::-webkit-scrollbar-button { display: none !important; }
 .pos-fat-scroll { scrollbar-width: auto; scrollbar-color: rgba(255,255,255,0.5) rgba(255,255,255,0.1); }
 
+/* Nav del POS en acordeón — un grupo abierto a la vez (details[name]), sin scroll.
+ * Oculta el triángulo nativo y rota el chevron al abrir. */
+details[name="posnav"] > summary { list-style: none; }
+details[name="posnav"] > summary::-webkit-details-marker { display: none; }
+details[name="posnav"] > summary .nav-caret { transition: transform 0.15s ease; }
+details[name="posnav"][open] > summary .nav-caret { transform: rotate(180deg); }
+
 .pos-kiosk {
   overscroll-behavior: none;
   -webkit-touch-callout: none;

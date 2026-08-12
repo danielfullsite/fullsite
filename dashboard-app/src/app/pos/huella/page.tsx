@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Fingerprint, CheckCircle, XCircle, Trash2, User } from 'lucide-react'
+import { ArrowLeft, Fingerprint, CheckCircle, XCircle, Trash2, User, Search } from 'lucide-react'
 import { apiUrl } from '@/lib/api-base'
 import { getActiveClientSlug as _cid } from '@/lib/data'
 
@@ -19,6 +19,7 @@ export default function HuellaPage() {
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [biometricAvailable, setBiometricAvailable] = useState(false)
+  const [search, setSearch] = useState('')
 
   useEffect(() => {
     // Check biometric
@@ -98,6 +99,10 @@ export default function HuellaPage() {
   }
 
   const registeredCount = Object.keys(registered).length
+  const q = search.trim().toLowerCase()
+  const visibleStaff = q
+    ? staff.filter(m => m.name.toLowerCase().includes(q) || m.role.toLowerCase().includes(q))
+    : staff
 
   return (
     <div className="h-dvh flex flex-col bg-[#0a0a0f] text-white overflow-hidden">
@@ -107,6 +112,15 @@ export default function HuellaPage() {
         <div>
           <h1 className="text-2xl font-bold">Registro de Huellas</h1>
           <p className="text-sm text-white/50">{registeredCount} de {staff.length} empleados registrados</p>
+        </div>
+        <div className="ml-auto relative w-full max-w-xs">
+          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Buscar empleado…"
+            className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-3 py-3 text-base text-white placeholder-white/40 focus:outline-none focus:border-blue-500"
+          />
         </div>
       </header>
       <div className="flex-1 overflow-y-auto p-6 max-w-3xl mx-auto w-full" style={{ WebkitOverflowScrolling: 'touch' }}>
@@ -132,39 +146,42 @@ export default function HuellaPage() {
         </div>
       )}
 
-      <div className="space-y-2">
-        {staff.map(member => {
+      <div className="space-y-1.5">
+        {visibleStaff.map(member => {
           const isRegistered = member.id in registered
           return (
             <div key={member.id}
-              className={`flex items-center gap-4 p-5 rounded-2xl border transition-all ${
+              className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
                 isRegistered ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-white/5 border-white/10'
               }`}>
-              <div className={`w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0 ${
+              <div className={`w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 ${
                 isRegistered ? 'bg-emerald-600' : 'bg-white/10'
               }`}>
-                {isRegistered ? <Fingerprint size={28} className="text-white" /> : <User size={28} className="text-white/40" />}
+                {isRegistered ? <Fingerprint size={22} className="text-white" /> : <User size={22} className="text-white/40" />}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-bold text-lg truncate">{member.name}</p>
-                <p className="text-sm text-white/50">{member.role}{isRegistered ? ' — registrada ✓' : ''}</p>
+                <p className="font-bold text-base truncate">{member.name}</p>
+                <p className="text-xs text-white/50">{member.role}{isRegistered ? ' — registrada ✓' : ''}</p>
               </div>
               {isRegistered ? (
                 <button onClick={() => handleRemove(member.id)}
-                  className="w-12 h-12 rounded-xl hover:bg-red-500/10 text-red-400 flex items-center justify-center flex-shrink-0">
+                  className="w-11 h-11 rounded-xl hover:bg-red-500/10 text-red-400 flex items-center justify-center flex-shrink-0">
                   <Trash2 size={20} />
                 </button>
               ) : (
                 <button onClick={() => handleRegister(member)}
                   disabled={!biometricAvailable}
-                  className="px-6 py-4 rounded-xl bg-blue-600 hover:bg-blue-500 active:scale-95 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold text-base flex items-center gap-2 flex-shrink-0 min-h-[56px]">
-                  <Fingerprint size={22} />
+                  className="px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 active:scale-95 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold text-sm flex items-center gap-2 flex-shrink-0 min-h-[48px]">
+                  <Fingerprint size={20} />
                   Registrar
                 </button>
               )}
             </div>
           )
         })}
+        {visibleStaff.length === 0 && (
+          <p className="text-center text-white/40 py-8 text-sm">Sin resultados para “{search}”.</p>
+        )}
       </div>
       </div>
     </div>
