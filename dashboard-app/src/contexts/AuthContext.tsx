@@ -70,8 +70,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .from('client_users')
         .select('client_id, role')
         .eq('user_id', userId)
+        .neq('role', 'platform_actas')           // una membresía de impersonación NUNCA es el "home"
+        .order('client_id', { ascending: true })  // determinista: si es dueño de varios, home estable (no aleatorio)
         .limit(1)
-        .single()
+        .maybeSingle()
       const cu = clientUser as { client_id: string; role: string | null } | null
       dbClientId = cu?.client_id || null
       // Role: DB row wins; fall back to app_metadata.role (admin-set, not user-writable)

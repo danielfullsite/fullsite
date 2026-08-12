@@ -58,19 +58,33 @@ export async function POST(req: NextRequest) {
   }
   const display = rows[0].display_name || target
 
-  // Limpia cualquier impersonación previa (solo una activa a la vez) y crea la nueva.
+  // Limpia cualquier impersonación previa (solo una activa a la vez).
   await platformServiceFetch(
     `client_users?user_id=eq.${userId}&role=eq.${ACTAS_ROLE}`,
     { method: 'DELETE', headers: { Prefer: 'return=minimal' } }
   )
-  const ins = await platformServiceFetch('client_users', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
-    body: JSON.stringify([{ user_id: userId, client_id: target, role: ACTAS_ROLE }]),
-  })
-  if (!ins.ok) {
-    const detail = await ins.text().catch(() => '')
-    return Response.json({ error: `No se pudo entrar (${ins.status})`, detail }, { status: 502 })
+
+  // Si el admin YA es miembro real del tenant (ej. dueño de todos los tenants),
+  // NO crear una membresía de impersonación: ya puede leer vía RLS, y una fila
+  // extra sólo ensucia la resolución de "home". Sólo se inserta para admins que
+  // no son miembros del tenant destino.
+  const memChk = await platformServiceFetch(
+    `client_users?user_id=eq.${userId}&client_id=eq.${encodeURIComponent(target)}&role=neq.${ACTAS_ROLE}&select=id&limit=1`,
+    { headers: { Accept: 'application/json' } }
+  )
+  const memRows = memChk.ok ? await memChk.json().catch(() => []) : []
+  const alreadyMember = Array.isArray(memRows) && memRows.length > 0
+
+  if (!alreadyMember) {
+    const ins = await platformServiceFetch('client_users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify([{ user_id: userId, client_id: target, role: ACTAS_ROLE }]),
+    })
+    if (!ins.ok) {
+      const detail = await ins.text().catch(() => '')
+      return Response.json({ error: `No se pudo entrar (${ins.status})`, detail }, { status: 502 })
+    }
   }
 
   await auditLog(gate.ctx, { action: 'actas.enter', scope: 'tenant', target_tenant: target })
