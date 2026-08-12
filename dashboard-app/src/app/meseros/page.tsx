@@ -309,6 +309,8 @@ export default function MeserosPage() {
       <PageHeader
         title="Meseros"
         subtitle={`Performance de meseros - últimos ${period} días`}
+        exportData={meseros as unknown as Record<string, unknown>[]}
+        exportName="meseros"
       />
 
       {/* Tabs — segmented control style */}

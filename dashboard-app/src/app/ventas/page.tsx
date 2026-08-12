@@ -170,6 +170,8 @@ export default function VentasPage() {
       <PageHeader
         title="Ventas Detalladas"
         subtitle={`${dates.from} al ${dates.to} ${data.length > 0 ? `- ${data.length} días con datos` : ''}`}
+        exportData={data.map(d => ({ fecha: d.fecha, ventas: d.ventas_dia, tickets: d.tickets_count, ticket_promedio: d.ticket_promedio_restaurant, efectivo: d.efectivo, tarjeta: d.tarjeta, propinas: d.propinas_total }))}
+        exportName="ventas"
       />
 
       {/* Segmented date range picker */}

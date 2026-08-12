@@ -103,6 +103,8 @@ export default function PropinasPage() {
       <PageHeader
         title="Modulo de Propinas"
         subtitle="Analisis de propinas por mesero y metodo de pago"
+        exportData={propinasPorMesero as unknown as Record<string, unknown>[]}
+        exportName="propinas"
       />
 
       {loading ? (

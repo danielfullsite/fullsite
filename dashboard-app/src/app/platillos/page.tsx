@@ -95,6 +95,8 @@ export default function PlatillosPage() {
       <PageHeader
         title="Platillos y Categorías"
         subtitle="Desglose de ventas por grupo y platillos destacados (30 días)"
+        exportData={grupos as unknown as Record<string, unknown>[]}
+        exportName="platillos"
       />
 
       {/* KPI Cards */}
