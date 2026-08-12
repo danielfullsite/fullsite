@@ -51,19 +51,44 @@ function loadOrCreateServerId(dataDir) {
 
 let _supabasePolling = null
 
-async function startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, state, eventStore, wsHub }) {
+async function startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, serviceEmail, servicePassword, state, eventStore, wsHub }) {
   if (!supabaseUrl || !supabaseKey) return
   const POLL_INTERVAL = 5000
+
+  // Auth SCOPED al tenant. Si hay una service-account (usuario Supabase miembro
+  // SOLO de este client_id), se usa su JWT (role authenticated) → la RLS deja leer
+  // únicamente ESTE tenant. Así NO va la god service_role key en la terminal (si se
+  // filtra, solo expone este local). Fallback a la anon key (legacy) si no está
+  // configurada — tras el RLS lockdown ese fallback devuelve 0 filas, por eso se
+  // recomienda configurar la service-account por restaurante.
+  let _tok = null, _tokExp = 0
+  async function getBearer() {
+    if (!serviceEmail || !servicePassword) return supabaseKey
+    if (_tok && Date.now() < _tokExp - 60000) return _tok
+    try {
+      const r = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
+        method: 'POST',
+        headers: { apikey: supabaseKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: serviceEmail, password: servicePassword }),
+      })
+      if (!r.ok) return supabaseKey
+      const j = await r.json()
+      _tok = j.access_token
+      _tokExp = Date.now() + (Number(j.expires_in) || 3600) * 1000
+      return _tok || supabaseKey
+    } catch { return supabaseKey }
+  }
 
   async function poll() {
     try {
       const controller = new AbortController()
       const t = setTimeout(() => controller.abort(), 6000)
 
+      const bearer = await getBearer()
       const res = await fetch(
         `${supabaseUrl}/rest/v1/pos_orders?client_id=eq.${encodeURIComponent(restaurantId)}&status=neq.closed&select=id,mesa,status,items,turno_id,updated_at`,
         {
-          headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` },
+          headers: { apikey: supabaseKey, Authorization: `Bearer ${bearer}` },
           signal:  controller.signal,
         }
       ).finally(() => clearTimeout(t))
@@ -327,6 +352,10 @@ async function startLocalServer({ dataDir, port = 7717, config = {} }) {
     instanceName       = config.instanceName || `Fullsite POS — ${os.hostname()}`,
     supabaseUrl        = process.env.SUPABASE_URL || '',
     supabaseKey        = process.env.SUPABASE_ANON_KEY || '',
+    // Service-account por-tenant (miembro SOLO de este client_id) para que el poll
+    // lea con JWT authenticated en vez de la anon key. Opcional (fallback a anon).
+    serviceEmail       = config.serviceEmail || process.env.SUPABASE_SERVICE_EMAIL || '',
+    servicePassword    = config.servicePassword || process.env.SUPABASE_SERVICE_PASSWORD || '',
     // CFG-01: printersConfig is the validated v2 printers config, or null.
     // null means PRINTER_NOT_CONFIGURED — printer adapter handles safely.
     printersConfig     = null,
@@ -420,7 +449,7 @@ async function startLocalServer({ dataDir, port = 7717, config = {} }) {
 
   // ── Supabase poll (Phase 1 bridge) ────────────────────────────────────────
   if (supabaseUrl && supabaseKey) {
-    startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, state, eventStore, wsHub })
+    startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, serviceEmail, servicePassword, state, eventStore, wsHub })
       .catch(e => console.warn('[server] Supabase poll start error:', e.message))
   }
 

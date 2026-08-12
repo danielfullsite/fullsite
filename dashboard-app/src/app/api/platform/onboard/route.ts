@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { requirePlatformAdmin2FA } from '@/lib/platform-auth'
 import { rateLimit, auditLog } from '@/lib/platform-writes'
 import { provisionTenant } from '@/lib/provision-tenant'
+import { randomUUID } from 'crypto'
 
 // ── Control Plane · POST /api/platform/onboard ───────────────────────────────
 // Dar de alta un tenant desde la super-admin console. Admin-gated (requirePlatformAdmin2FA)
@@ -106,12 +107,43 @@ export async function POST(req: NextRequest) {
       detail: provision.created,
     })
 
+    // ── Service-account del Local Server offline (esqueleton) ──────────────────
+    // Usuario Supabase miembro SOLO de este client_id → el Local Server (Node) lo
+    // usa para leer pos_orders con JWT authenticated (RLS lo scopea a este tenant),
+    // sin la god service_role key en la terminal. Idempotente.
+    const svcEmail = `local-server+${clientId}@fullsite.local`
+    let localServer: { email: string; password: string } | null = null
+    try {
+      const svcPassword = `ls-${randomUUID()}`
+      const { data: svcData, error: svcErr } = await supabase.auth.admin.createUser({
+        email: svcEmail, password: svcPassword, email_confirm: true,
+        user_metadata: { client_id: clientId, kind: 'local_server' },
+        app_metadata: { client_id: clientId },
+      })
+      let svcId = svcData?.user?.id
+      if (svcErr) {
+        const { data: list } = await supabase.auth.admin.listUsers()
+        svcId = list?.users?.find(u => u.email?.toLowerCase() === svcEmail.toLowerCase())?.id
+      }
+      if (svcId) {
+        await supabase.from('client_users').upsert(
+          { user_id: svcId, client_id: clientId, role: 'local_server' },
+          { onConflict: 'user_id,client_id', ignoreDuplicates: true }
+        )
+        // Solo devolvemos el password si el usuario es NUEVO (createUser sin error).
+        if (!svcErr) localServer = { email: svcEmail, password: svcPassword }
+      }
+    } catch (e) { console.error('[onboard] service-account', e) }
+
     return Response.json({
       ok: true,
       userId,
       clientId,
       provisioned: provision.created,
       audited,
+      // Credenciales del Local Server (solo al crear). Guárdalas en el setup del
+      // servidor local del restaurante. Si es null, ya existía (rota el password).
+      local_server: localServer,
     })
   } catch (err) {
     console.error('[platform/onboard] error', err)
