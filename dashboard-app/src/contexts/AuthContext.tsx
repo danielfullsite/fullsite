@@ -91,13 +91,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Use first available
     let cid = metaClientId || dbClientId || emailClientId
 
-    // Act-as (super-admin): si un platform admin entró a un tenant desde
-    // /platform/tenants, ese tenant manda. El endpoint /api/platform/act-as ya
-    // le dio membresía vía service_role → RLS deja leer sus datos. Aditivo y
-    // gateado por platform_admin: un usuario normal jamás entra a esta rama.
+    // Act-as: si hay un tenant de impersonación activo (lo fija "Entrar" en
+    // /platform/tenants, endpoint server-gated por is_platform_admin), ese tenant
+    // manda. NO se depende de app_metadata.platform_admin del JWT: la sesión puede
+    // traerlo viejo/ausente y el override no aplicaba, dejando el banner "viendo X"
+    // desincronizado del tenant real. La seguridad real es RLS (BUG-019): si el
+    // usuario no es miembro del tenant, sus lecturas quedan vacías (no hay fuga).
+    // "Salir" limpia el flag.
     try {
       const actas = typeof window !== 'undefined' ? localStorage.getItem('fullsite_actas') : null
-      if (actas && appMeta?.platform_admin === true) {
+      if (actas) {
         cid = actas
         setRole(resolveRole('dueño', userEmail)) // ve el tenant con acceso completo
       }
