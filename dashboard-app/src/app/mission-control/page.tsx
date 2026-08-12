@@ -46,6 +46,11 @@ const AGENT_META: Record<string, { name: string; icon: typeof Bot; color: string
   'wansoft-browser-scraper': { name: 'Scraper Web', icon: Activity, color: 'text-slate-400', tentacle: 'Data' },
   'wansoft-deep-scraper': { name: 'Deep Scraper', icon: Activity, color: 'text-slate-400', tentacle: 'Data' },
   'reservas-pendientes': { name: 'Reservas', icon: Calendar, color: 'text-amber-400', tentacle: 'Operaciones' },
+  // Agentes activos que faltaban en el UI (corren y escriben datos pero no aparecían)
+  'table-time': { name: 'Tiempo de Mesa', icon: Timer, color: 'text-cyan-400', tentacle: 'Operaciones' },
+  'speed_of_service': { name: 'Velocidad de Servicio', icon: Zap, color: 'text-yellow-400', tentacle: 'Operaciones' },
+  'stock-alert': { name: 'Alerta de Stock', icon: Package, color: 'text-orange-400', tentacle: 'Operaciones' },
+  'crm-recompra': { name: 'CRM Recompra', icon: Users, color: 'text-emerald-400', tentacle: 'Personal' },
 }
 
 function timeAgo(ts: string): string {
