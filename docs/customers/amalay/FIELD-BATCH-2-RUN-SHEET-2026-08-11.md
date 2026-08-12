@@ -62,6 +62,22 @@ Este es el formato rápido para ejecutar en piso. El pack completo vive en:
 | Sync queue stuck | 0 |  |
 | Corte cuadra | Sí |  |
 
+## Verificación técnica rápida
+
+En la Caja AMALAY, si hay terminal disponible, correr:
+
+```bash
+python3 scripts/offline/fleet_readiness_check.py --json
+```
+
+Si el Bridge corre en otra IP:
+
+```bash
+python3 scripts/offline/fleet_readiness_check.py --url http://192.168.1.71:7717/health --json
+```
+
+Adjuntar el JSON como evidencia. `PASS` o `WARN` documentado puede continuar; `FAIL` bloquea el cierre hasta explicar la causa.
+
 ## Resultado
 
 Marcar solo uno:
