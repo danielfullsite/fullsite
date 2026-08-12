@@ -149,7 +149,6 @@ const InventoryAlerts = dynamic(() => import('@/components/pos/InventoryAlerts')
 const MeseroLeaderboard = dynamic(() => import('@/components/pos/MeseroLeaderboard'), { ssr: false })
 const SmartCashCalculator = dynamic(() => import('@/components/pos/SmartCashCalculator'), { ssr: false })
 const CustomerMemory = dynamic(() => import('@/components/pos/CustomerMemory'), { ssr: false })
-const KitchenTimer = dynamic(() => import('@/components/pos/KitchenTimer'), { ssr: false })
 
 
 export default function POSPage() {
@@ -3752,10 +3751,9 @@ function POSContent() {
               })}
             </div>
 
-            {/* Leaderboard + Kitchen Timer in nav */}
+            {/* Leaderboard en nav */}
             <div className="mt-4 pt-4 border-t border-[var(--line)] space-y-3">
               <MeseroLeaderboard currentMesero={mesero} compact />
-              <KitchenTimer />
             </div>
 
             {/* Cerrar app — admin/gerente only */}
