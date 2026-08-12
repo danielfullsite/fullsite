@@ -345,6 +345,10 @@ body {
 [data-theme="light"] .recharts-tooltip-item { color: #08080a !important; }
 .recharts-cartesian-grid line { stroke: var(--line) !important; }
 .recharts-text { fill: var(--text-3) !important; }
+/* Hover cursor (rectángulo detrás de las barras) — translúcido según tema.
+   Sin esto Recharts usa gris claro por defecto → se ve blanco en tema oscuro. */
+.recharts-tooltip-cursor { fill: rgba(255,255,255,0.06) !important; }
+[data-theme="light"] .recharts-tooltip-cursor { fill: rgba(0,0,0,0.05) !important; }
 
 /* Nuclear: kill ALL remaining white backgrounds in dark mode */
 :root .recharts-wrapper, :root .recharts-surface { background: transparent !important; }
