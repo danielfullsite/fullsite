@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { requirePlatformAdmin, platformServiceFetch } from '@/lib/platform-auth'
+import { requirePlatformAdmin2FA, platformServiceFetch } from '@/lib/platform-auth'
 import { rateLimit, auditLog, clientsCount } from '@/lib/platform-writes'
 
 // ── Control Plane · POST /api/platform/announce ──────────────────────────────
@@ -11,7 +11,7 @@ import { rateLimit, auditLog, clientsCount } from '@/lib/platform-writes'
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
-  const gate = await requirePlatformAdmin(req)
+  const gate = await requirePlatformAdmin2FA(req)
   if ('error' in gate) return gate.error
   const limited = rateLimit(gate.ctx)
   if (limited) return limited

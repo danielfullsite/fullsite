@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server'
+import { verifyStepUp, is2FAEnforced, STEPUP_COOKIE } from './platform-2fa'
 
 // ── Control Plane · contrato de seguridad ─────────────────────────────────────
 // El super-admin es el objetivo #1 de un atacante, así que TODA acción cross-tenant
@@ -72,6 +73,31 @@ export async function requirePlatformAdmin(
   } catch {
     return { error: Response.json({ error: 'Error verificando admin' }, { status: 500 }) }
   }
+}
+
+/**
+ * Guard ESTRICTO: requirePlatformAdmin + segundo factor por correo (step-up).
+ * Usar en TODOS los endpoints /api/platform/* EXCEPTO los del propio flujo 2FA
+ * (status/send/verify/enroll), que usan requirePlatformAdmin base.
+ *
+ * Fail-open por flag: si PLATFORM_2FA_ENFORCED !== 'true', se comporta idéntico
+ * al guard base (NO exige el segundo factor → cero riesgo de lockout mientras se
+ * prueba el flujo). Con enforcement ON y sin token step-up válido → 401 { error: '2fa_required' }.
+ */
+export async function requirePlatformAdmin2FA(
+  request: NextRequest,
+  nowMs: number = Date.now()
+): Promise<{ ctx: PlatformAdminContext } | { error: Response }> {
+  const base = await requirePlatformAdmin(request)
+  if ('error' in base) return base
+  if (!is2FAEnforced()) return base
+
+  const token = request.cookies.get(STEPUP_COOKIE)?.value
+  const uid = verifyStepUp(token, nowMs)
+  if (!uid || uid !== base.ctx.userId) {
+    return { error: Response.json({ error: '2fa_required' }, { status: 401 }) }
+  }
+  return base
 }
 
 /**

@@ -1,11 +1,11 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { requirePlatformAdmin } from '@/lib/platform-auth'
+import { requirePlatformAdmin2FA } from '@/lib/platform-auth'
 import { rateLimit, auditLog } from '@/lib/platform-writes'
 import { provisionTenant } from '@/lib/provision-tenant'
 
 // ── Control Plane · POST /api/platform/onboard ───────────────────────────────
-// Dar de alta un tenant desde la super-admin console. Admin-gated (requirePlatformAdmin)
+// Dar de alta un tenant desde la super-admin console. Admin-gated (requirePlatformAdmin2FA)
 // + service_role + audit + rate-limit. Reusa los MISMOS pasos que /api/onboarding:
 //   1. Auth user (Supabase admin createUser) con client_id en user_metadata Y app_metadata.
 //   2. client_users owner row.
@@ -16,13 +16,13 @@ import { provisionTenant } from '@/lib/provision-tenant'
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
-  const gate = await requirePlatformAdmin(req)
+  const gate = await requirePlatformAdmin2FA(req)
   if ('error' in gate) return gate.error
   const limited = rateLimit(gate.ctx)
   if (limited) return limited
 
   // Fail-closed: full provisioning + Auth Admin requiere service_role.
-  // (requirePlatformAdmin ya devuelve 503 si falta, pero lo re-afirmamos para el SDK.)
+  // (requirePlatformAdmin2FA ya devuelve 503 si falta, pero lo re-afirmamos para el SDK.)
   const serviceKey = process.env.SUPABASE_SERVICE_KEY
   if (!serviceKey) {
     return Response.json({ error: 'Onboarding no configurado (falta service key)' }, { status: 503 })

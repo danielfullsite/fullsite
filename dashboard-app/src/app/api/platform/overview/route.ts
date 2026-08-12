@@ -1,10 +1,10 @@
 import { NextRequest } from 'next/server'
-import { requirePlatformAdmin, platformServiceFetch } from '@/lib/platform-auth'
+import { requirePlatformAdmin2FA, platformServiceFetch } from '@/lib/platform-auth'
 
 // ── Control Plane · /api/platform/overview ────────────────────────────────────
 // Reproduce EXACTAMENTE lo que src/app/platform/page.tsx leía antes con la anon key,
 // pero server-side, admin-gated y con service_role (cross-tenant sólo aquí, nunca en el browser).
-// Fail-closed vía requirePlatformAdmin (503 sin service key, 401 sin sesión, 403 no admin).
+// Fail-closed vía requirePlatformAdmin2FA (503 sin service key, 401 sin sesión, 403 no admin).
 
 export const dynamic = 'force-dynamic'
 
@@ -63,7 +63,7 @@ async function sbFetch(path: string): Promise<unknown[]> {
 }
 
 export async function GET(req: NextRequest) {
-  const gate = await requirePlatformAdmin(req)
+  const gate = await requirePlatformAdmin2FA(req)
   if ('error' in gate) return gate.error
 
   const [

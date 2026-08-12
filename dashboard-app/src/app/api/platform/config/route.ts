@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { requirePlatformAdmin, platformServiceFetch } from '@/lib/platform-auth'
+import { requirePlatformAdmin2FA, platformServiceFetch } from '@/lib/platform-auth'
 
 // ── Control Plane · GET /api/platform/config ─────────────────────────────────
 // Lectura admin-gated de las filas COMPLETAS de feature_flags + platform_settings
@@ -21,7 +21,7 @@ async function sb(path: string): Promise<Record<string, unknown>[]> {
 }
 
 export async function GET(req: NextRequest) {
-  const gate = await requirePlatformAdmin(req)
+  const gate = await requirePlatformAdmin2FA(req)
   if ('error' in gate) return gate.error
 
   const [flags, settings, clients] = await Promise.all([

@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { requirePlatformAdmin, platformServiceFetch } from '@/lib/platform-auth'
+import { requirePlatformAdmin2FA, platformServiceFetch } from '@/lib/platform-auth'
 
 // ── Control Plane · GET /api/platform/audit ──────────────────────────────────
 // Últimos 200 registros de platform_audit_log (append-only), created_at desc.
@@ -8,7 +8,7 @@ import { requirePlatformAdmin, platformServiceFetch } from '@/lib/platform-auth'
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest) {
-  const gate = await requirePlatformAdmin(req)
+  const gate = await requirePlatformAdmin2FA(req)
   if ('error' in gate) return gate.error
 
   try {
