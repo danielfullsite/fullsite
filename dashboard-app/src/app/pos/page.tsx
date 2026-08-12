@@ -125,6 +125,7 @@ import {
   Layers,
   ClipboardCheck,
   Power,
+  Utensils,
 } from 'lucide-react'
 import {
   getMPConfig,
@@ -155,7 +156,7 @@ const KitchenTimer = dynamic(() => import('@/components/pos/KitchenTimer'), { ss
 export default function POSPage() {
   return (
     <Suspense fallback={
-      <div className="h-dvh flex items-center justify-center text-white" style={{background:'#0a0a0f',color:'#fff'}}>
+      <div className="h-dvh flex items-center justify-center text-[var(--text-1)]" style={{background:'#0a0a0f',color:'#fff'}}>
         <div className="w-10 h-10 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }} />
       </div>
     }>
@@ -327,8 +328,8 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
         {/* Header */}
         <div className="bg-[var(--surface-2)] border-b border-[var(--line)] px-5 py-4 flex items-center justify-between rounded-t-2xl flex-shrink-0">
           <div>
-            <h3 className="text-lg font-bold text-white">{item.name}</h3>
-            <p className="text-emerald-400 font-semibold">{formatMXN(item.price)}</p>
+            <h3 className="text-lg font-bold text-[var(--text-1)]">{item.name}</h3>
+            <p className="text-[var(--accent-ink)] font-semibold">{formatMXN(item.price)}</p>
           </div>
           <button
             onClick={onCancel}
@@ -342,12 +343,12 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
           {/* Step indicator (only for stepped flow) */}
           {hasGroups && modGroups.length > 0 && (
             <div className="flex items-center justify-between pb-1">
-              <h4 className="text-sm font-bold text-white">
+              <h4 className="text-sm font-bold text-[var(--text-1)]">
                 {modGroups[currentLevel]?.name ?? 'Confirmar'} ({currentLevel + 1}/{modGroups.length})
               </h4>
               <div className="flex gap-1">
                 {modGroups.map((_, i) => (
-                  <div key={i} className={`w-2.5 h-2.5 rounded-full ${i === currentLevel ? 'bg-emerald-500' : i < currentLevel ? 'bg-emerald-800' : 'bg-slate-600'}`} />
+                  <div key={i} className={`w-2.5 h-2.5 rounded-full ${i === currentLevel ? 'bg-emerald-500' : i < currentLevel ? 'bg-emerald-800' : 'bg-[var(--surface-2)]'}`} />
                 ))}
               </div>
             </div>
@@ -360,7 +361,7 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
               onClick={() => setShowQuitar(prev => !prev)}
               className="w-full flex items-center justify-between py-2 text-sm font-semibold text-[var(--text-3)] uppercase tracking-wide"
             >
-              <span>Quitar {quitarChecked.size > 0 && <span className="text-red-400">({quitarChecked.size})</span>}</span>
+              <span>Quitar {quitarChecked.size > 0 && <span className="text-[var(--crit-ink)]">({quitarChecked.size})</span>}</span>
               <span className="text-xs normal-case text-[var(--text-4)]">{showQuitar ? '▲ Cerrar' : '▼ Abrir'}</span>
             </button>
             {showQuitar && (
@@ -370,8 +371,8 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
                   key={mod}
                   className={`flex items-center gap-2 px-3 py-3 rounded-xl cursor-pointer transition-colors min-h-[48px] ${
                     quitarChecked.has(mod)
-                      ? 'bg-red-900/40 border border-red-700/60'
-                      : 'bg-[var(--line)]/50 border border-slate-600/50 hover:bg-[var(--line)]'
+                      ? 'bg-[var(--crit-soft)] border border-red-700/60'
+                      : 'bg-[var(--line)]/50 border border-[var(--line-soft)] hover:bg-[var(--line)]'
                   }`}
                 >
                   <input
@@ -383,15 +384,15 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
                   <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
                     quitarChecked.has(mod)
                       ? 'bg-red-500 border-red-500'
-                      : 'border-slate-500'
+                      : 'border-[var(--line)]'
                   }`}>
                     {quitarChecked.has(mod) && (
-                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <svg className="w-3 h-3 text-[var(--text-1)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                       </svg>
                     )}
                   </div>
-                  <span className="text-sm text-white">{mod}</span>
+                  <span className="text-sm text-[var(--text-1)]">{mod}</span>
                 </label>
               ))}
             </div>
@@ -411,14 +412,14 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
                 <h4 className="text-sm font-semibold uppercase tracking-wide mb-2 flex items-center gap-2 flex-wrap">
                   <span className="text-[var(--text-3)]">Nivel {group.level}: {group.name}</span>
                   {min > 0 ? (
-                    <span className={`text-[11px] normal-case font-bold px-2 py-0.5 rounded-full ${unmet ? 'bg-red-900/50 text-red-300 border border-red-700/60' : 'bg-emerald-900/40 text-emerald-300 border border-emerald-700/50'}`}>
+                    <span className={`text-[11px] normal-case font-bold px-2 py-0.5 rounded-full ${unmet ? 'bg-[var(--crit-soft)] text-[var(--crit-ink)] border border-red-700/60' : 'bg-[var(--accent-soft)] text-[var(--accent-ink)] border border-emerald-700/50'}`}>
                       Obligatorio{min > 1 ? ` (min ${min})` : ''}
                     </span>
                   ) : (
                     <span className="text-[11px] normal-case font-medium px-2 py-0.5 rounded-full bg-[var(--line)]/60 text-[var(--text-3)]">Opcional</span>
                   )}
                   {group.maxSelections !== null && (
-                    <span className={`text-[11px] normal-case font-medium px-2 py-0.5 rounded-full ${maxReached ? 'bg-amber-900/40 text-amber-300 border border-amber-700/50' : 'bg-[var(--line)]/60 text-[var(--text-3)]'}`}>
+                    <span className={`text-[11px] normal-case font-medium px-2 py-0.5 rounded-full ${maxReached ? 'bg-[var(--warn-soft)] text-[var(--warn-ink)] border border-amber-700/50' : 'bg-[var(--line)]/60 text-[var(--text-3)]'}`}>
                       Max {group.maxSelections}{group.maxSelections > 1 ? ` (${sel.size}/${group.maxSelections})` : ''}
                     </span>
                   )}
@@ -432,10 +433,10 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
                         key={opt.name}
                         className={`flex items-center gap-2 px-3 py-3 rounded-xl transition-colors min-h-[48px] ${
                           checked
-                            ? 'bg-emerald-900/40 border border-emerald-700/60 cursor-pointer'
+                            ? 'bg-[var(--accent-soft)] border border-emerald-700/60 cursor-pointer'
                             : blocked
-                            ? 'bg-[var(--line)]/30 border border-slate-700/40 opacity-40 cursor-not-allowed'
-                            : 'bg-[var(--line)]/50 border border-slate-600/50 hover:bg-[var(--line)] cursor-pointer'
+                            ? 'bg-[var(--line)]/30 border border-[var(--line-soft)] opacity-40 cursor-not-allowed'
+                            : 'bg-[var(--line)]/50 border border-[var(--line-soft)] hover:bg-[var(--line)] cursor-pointer'
                         }`}
                       >
                         <input
@@ -449,14 +450,14 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
                           checked ? 'bg-emerald-500 border-emerald-500' : 'border-[var(--line-soft)]0'
                         }`}>
                           {checked && (
-                            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                            <svg className="w-3 h-3 text-[var(--text-1)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                             </svg>
                           )}
                         </div>
                         <div className="flex-1 flex items-center justify-between">
-                          <span className="text-sm text-white">{opt.name}</span>
-                          <span className={`text-xs font-medium ${opt.price > 0 ? 'text-emerald-400' : 'text-[var(--text-3)]'}`}>
+                          <span className="text-sm text-[var(--text-1)]">{opt.name}</span>
+                          <span className={`text-xs font-medium ${opt.price > 0 ? 'text-[var(--accent-ink)]' : 'text-[var(--text-3)]'}`}>
                             {opt.price > 0 ? `+${formatMXN(opt.price)}` : 'Gratis'}
                           </span>
                         </div>
@@ -477,8 +478,8 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
                   key={mod.name}
                   className={`flex items-center gap-3 px-4 py-4 rounded-xl cursor-pointer transition-colors min-h-[52px] ${
                     agregarChecked.has(mod.name)
-                      ? 'bg-emerald-900/40 border border-emerald-700/60'
-                      : 'bg-[var(--line)]/50 border border-slate-600/50 hover:bg-[var(--line)]'
+                      ? 'bg-[var(--accent-soft)] border border-emerald-700/60'
+                      : 'bg-[var(--line)]/50 border border-[var(--line-soft)] hover:bg-[var(--line)]'
                   }`}
                 >
                   <input
@@ -493,14 +494,14 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
                       : 'border-[var(--line-soft)]0'
                   }`}>
                     {agregarChecked.has(mod.name) && (
-                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <svg className="w-3 h-3 text-[var(--text-1)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                       </svg>
                     )}
                   </div>
                   <div className="flex-1 flex items-center justify-between">
-                    <span className="text-sm text-white">{mod.name}</span>
-                    <span className={`text-xs font-medium ${mod.price > 0 ? 'text-emerald-400' : 'text-[var(--text-3)]'}`}>
+                    <span className="text-sm text-[var(--text-1)]">{mod.name}</span>
+                    <span className={`text-xs font-medium ${mod.price > 0 ? 'text-[var(--accent-ink)]' : 'text-[var(--text-3)]'}`}>
                       {mod.price > 0 ? `+${formatMXN(mod.price)}` : 'Gratis'}
                     </span>
                   </div>
@@ -516,19 +517,19 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
               value={notas}
               onChange={(e) => setNotas(e.target.value)}
               placeholder="Notas: sin cebolla, termino medio..."
-              className="flex-1 bg-[var(--line)] border border-slate-600 rounded-lg px-3 py-2.5 text-white placeholder-slate-400 text-sm focus:outline-none focus:border-emerald-500"
+              className="flex-1 bg-[var(--line)] border border-[var(--line)] rounded-lg px-3 py-2.5 text-[var(--text-1)] placeholder-[var(--text-4)] text-sm focus:outline-none focus:border-[var(--accent)]"
             />
             <div className="flex items-center gap-2 flex-shrink-0">
               <button
                 onClick={() => setCantidad(Math.max(1, cantidad - 1))}
-                className="w-10 h-10 rounded-lg bg-[var(--line)] flex items-center justify-center text-white"
+                className="w-10 h-10 rounded-lg bg-[var(--line)] flex items-center justify-center text-[var(--text-1)]"
               >
                 <Minus size={18} />
               </button>
-              <span className="text-xl font-bold text-white w-8 text-center">{cantidad}</span>
+              <span className="text-xl font-bold text-[var(--text-1)] w-8 text-center">{cantidad}</span>
               <button
                 onClick={() => setCantidad(cantidad + 1)}
-                className="w-10 h-10 rounded-lg bg-[var(--line)] flex items-center justify-center text-white"
+                className="w-10 h-10 rounded-lg bg-[var(--line)] flex items-center justify-center text-[var(--text-1)]"
               >
                 <Plus size={18} />
               </button>
@@ -549,7 +550,7 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
             <button
               onClick={handleConfirm}
               disabled={unmetGroups.length > 0}
-              className="flex-[2] py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold text-lg transition-colors min-h-[56px]"
+              className="flex-[2] py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-[var(--raised)] disabled:text-[var(--text-4)] text-white font-bold text-lg transition-colors min-h-[56px]"
             >
               {unmetGroups.length > 0
                 ? `Elige ${unmetGroups[0].name}`
@@ -577,7 +578,7 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
                   return isOptional ? (
                     <button
                       onClick={() => setCurrentLevel(currentLevel + 1)}
-                      className="flex-1 py-4 rounded-xl bg-slate-700 hover:bg-slate-600 text-[var(--text-3)] font-bold text-lg transition-colors min-h-[56px]"
+                      className="flex-1 py-4 rounded-xl bg-[var(--raised)] hover:bg-[var(--surface-2)] text-[var(--text-3)] font-bold text-lg transition-colors min-h-[56px]"
                     >
                       Omitir &rarr;
                     </button>
@@ -592,7 +593,7 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
                     const min = g.required ? Math.max(1, g.minSelections) : g.minSelections
                     return count < min
                   })()}
-                  className="flex-[2] py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold text-lg transition-colors min-h-[56px]"
+                  className="flex-[2] py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-[var(--raised)] disabled:text-[var(--text-4)] text-white font-bold text-lg transition-colors min-h-[56px]"
                 >
                   {(() => {
                     const g = modGroups[currentLevel]
@@ -613,7 +614,7 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
                   return isOptional && count === 0 ? (
                     <button
                       onClick={handleConfirm}
-                      className="flex-1 py-4 rounded-xl bg-slate-700 hover:bg-slate-600 text-[var(--text-3)] font-bold text-lg transition-colors min-h-[56px]"
+                      className="flex-1 py-4 rounded-xl bg-[var(--raised)] hover:bg-[var(--surface-2)] text-[var(--text-3)] font-bold text-lg transition-colors min-h-[56px]"
                     >
                       Omitir &rarr;
                     </button>
@@ -622,7 +623,7 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
                 <button
                   onClick={handleConfirm}
                   disabled={unmetGroups.length > 0}
-                  className="flex-[2] py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold text-lg transition-colors min-h-[56px]"
+                  className="flex-[2] py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-[var(--raised)] disabled:text-[var(--text-4)] text-white font-bold text-lg transition-colors min-h-[56px]"
                 >
                   {unmetGroups.length > 0
                     ? `Elige ${unmetGroups[0].name}`
@@ -709,7 +710,7 @@ function DiscountModal({ subtotal, personas, items, onApply, onCancel }: Discoun
       <div className="absolute inset-0 bg-black/60" onClick={onCancel} />
       <div className="relative bg-[var(--surface-2)] border border-[var(--line)] rounded-2xl w-full max-w-sm shadow-2xl mx-4 p-5">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-bold text-white">Aplicar descuento</h3>
+          <h3 className="text-lg font-bold text-[var(--text-1)]">Aplicar descuento</h3>
           <button onClick={onCancel} className="w-11 h-11 rounded-lg bg-[var(--line)] hover:bg-[var(--line)] flex items-center justify-center text-[var(--text-4)]">
             <X size={20} />
           </button>
@@ -736,7 +737,7 @@ function DiscountModal({ subtotal, personas, items, onApply, onCancel }: Discoun
           <button
             onClick={() => setMode('cortesia')}
             className={`flex-1 py-3 rounded-lg font-semibold text-sm transition-colors min-h-[48px] ${
-              mode === 'cortesia' ? 'bg-violet-600 text-white' : 'bg-[var(--line)] text-[var(--text-4)]'
+              mode === 'cortesia' ? 'bg-violet-600 text-[var(--text-1)]' : 'bg-[var(--line)] text-[var(--text-4)]'
             }`}
           >
             Cortesía
@@ -763,7 +764,7 @@ function DiscountModal({ subtotal, personas, items, onApply, onCancel }: Discoun
                   <label
                     key={it.id}
                     className={`flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-colors min-h-[44px] ${
-                      checked ? 'bg-amber-900/40 border border-amber-700/60' : 'bg-[var(--line)]/50 border border-slate-600/50 hover:bg-[var(--line)]'
+                      checked ? 'bg-[var(--warn-soft)] border border-amber-700/60' : 'bg-[var(--line)]/50 border border-[var(--line-soft)] hover:bg-[var(--line)]'
                     }`}
                   >
                     <input type="checkbox" checked={checked} onChange={() => togglePromoItem(it.id)} className="sr-only" />
@@ -771,12 +772,12 @@ function DiscountModal({ subtotal, personas, items, onApply, onCancel }: Discoun
                       checked ? 'bg-amber-500 border-amber-500' : 'border-[var(--line-soft)]0'
                     }`}>
                       {checked && (
-                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <svg className="w-3 h-3 text-[var(--text-1)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                         </svg>
                       )}
                     </div>
-                    <span className="flex-1 text-sm text-white">{it.cantidad}x {it.nombre}</span>
+                    <span className="flex-1 text-sm text-[var(--text-1)]">{it.cantidad}x {it.nombre}</span>
                     <span className="text-xs text-[var(--text-3)]">{formatMXN((it.precio + it.precioExtra) * it.cantidad)}</span>
                   </label>
                 )
@@ -785,8 +786,8 @@ function DiscountModal({ subtotal, personas, items, onApply, onCancel }: Discoun
             {promoUnits.length > 0 && (
               <p className="text-center text-sm">
                 <span className="text-[var(--text-3)]">{promoPairs} {promoPairs === 1 ? 'par' : 'pares'}</span>
-                {promoUnits.length % 2 === 1 && <span className="text-amber-400"> · 1 unidad sin par</span>}
-                {promoDiscount > 0 && <span className="text-amber-400 font-semibold"> · Gratis: -{formatMXN(promoDiscount)}</span>}
+                {promoUnits.length % 2 === 1 && <span className="text-[var(--warn-ink)]"> · 1 unidad sin par</span>}
+                {promoDiscount > 0 && <span className="text-[var(--warn-ink)] font-semibold"> · Gratis: -{formatMXN(promoDiscount)}</span>}
               </p>
             )}
           </div>
@@ -797,7 +798,7 @@ function DiscountModal({ subtotal, personas, items, onApply, onCancel }: Discoun
             value={value}
             onChange={(e) => setValue(e.target.value)}
             placeholder={mode === 'percent' ? 'Ej. 10' : 'Ej. 50'}
-            className="w-full bg-[var(--line)] border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-400 text-lg text-center focus:outline-none focus:border-emerald-500 min-h-[48px] mb-3"
+            className="w-full bg-[var(--line)] border border-[var(--line)] rounded-lg px-4 py-3 text-[var(--text-1)] placeholder-[var(--text-4)] text-lg text-center focus:outline-none focus:border-[var(--accent)] min-h-[48px] mb-3"
             autoFocus
           />
         ) : (
@@ -808,17 +809,17 @@ function DiscountModal({ subtotal, personas, items, onApply, onCancel }: Discoun
             <div className="flex items-center justify-center gap-4">
               <button
                 onClick={() => setCortesiaPersonas(Math.max(1, cortesiaPersonas - 1))}
-                className="w-12 h-12 rounded-xl bg-[var(--line)] flex items-center justify-center text-white text-lg font-bold"
+                className="w-12 h-12 rounded-xl bg-[var(--line)] flex items-center justify-center text-[var(--text-1)] text-lg font-bold"
               >
                 −
               </button>
               <div className="text-center">
-                <span className="text-3xl font-bold text-white">{cortesiaPersonas}</span>
+                <span className="text-3xl font-bold text-[var(--text-1)]">{cortesiaPersonas}</span>
                 <p className="text-xs text-[var(--text-3)]">{cortesiaPersonas === 1 ? 'persona' : 'personas'}</p>
               </div>
               <button
                 onClick={() => setCortesiaPersonas(Math.min(personas || 10, cortesiaPersonas + 1))}
-                className="w-12 h-12 rounded-xl bg-[var(--line)] flex items-center justify-center text-white text-lg font-bold"
+                className="w-12 h-12 rounded-xl bg-[var(--line)] flex items-center justify-center text-[var(--text-1)] text-lg font-bold"
               >
                 +
               </button>
@@ -831,7 +832,7 @@ function DiscountModal({ subtotal, personas, items, onApply, onCancel }: Discoun
 
         {discountAmount > 0 && mode !== 'cortesia' && mode !== '2x1' && (
           <p className="text-center text-[var(--text-3)] text-sm mb-3">
-            Descuento: <span className="text-red-400 font-semibold">-{formatMXN(discountAmount)}</span>
+            Descuento: <span className="text-[var(--crit-ink)] font-semibold">-{formatMXN(discountAmount)}</span>
           </p>
         )}
 
@@ -842,7 +843,7 @@ function DiscountModal({ subtotal, personas, items, onApply, onCancel }: Discoun
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             placeholder={mode === 'cortesia' ? 'Motivo de cortesía (ej. cliente frecuente)' : 'Motivo del descuento (opcional)'}
-            className="w-full bg-[var(--line)] border border-slate-600 rounded-lg px-4 py-2.5 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-emerald-500 mb-3"
+            className="w-full bg-[var(--line)] border border-[var(--line)] rounded-lg px-4 py-2.5 text-[var(--text-1)] placeholder-[var(--text-4)] text-sm focus:outline-none focus:border-[var(--accent)] mb-3"
           />
         )}
 
@@ -860,7 +861,7 @@ function DiscountModal({ subtotal, personas, items, onApply, onCancel }: Discoun
                 value={pin}
                 onChange={(e) => { setPin(e.target.value.replace(/\D/g, '')); setPinError(false) }}
                 placeholder="••••"
-                className={`flex-1 bg-[var(--line)] border ${pinError ? 'border-red-500' : 'border-slate-600'} rounded-lg px-4 py-3 text-white text-lg text-center tracking-[0.3em] focus:outline-none focus:border-emerald-500 min-h-[48px]`}
+                className={`flex-1 bg-[var(--line)] border ${pinError ? 'border-red-500' : 'border-[var(--line)]'} rounded-lg px-4 py-3 text-[var(--text-1)] text-lg text-center tracking-[0.3em] focus:outline-none focus:border-[var(--accent)] min-h-[48px]`}
               />
               {discBioAvail && (
                 <button
@@ -905,7 +906,7 @@ function DiscountModal({ subtotal, personas, items, onApply, onCancel }: Discoun
                 </button>
               )}
             </div>
-            {pinError && <p className="text-red-400 text-xs text-center mt-1">PIN incorrecto o huella no reconocida</p>}
+            {pinError && <p className="text-[var(--crit-ink)] text-xs text-center mt-1">PIN incorrecto o huella no reconocida</p>}
           </div>
         )}
 
@@ -1031,12 +1032,12 @@ function CancelModal({ itemName, onConfirm, onCancel }: CancelModalProps) {
       <div className="absolute inset-0 bg-black/60" onClick={onCancel} />
       <div className="relative bg-[var(--surface-2)] border border-red-700/40 rounded-2xl w-full max-w-md shadow-2xl mx-4 p-5">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-full bg-red-900/60 flex items-center justify-center">
-            <ShieldAlert size={20} className="text-red-400" />
+          <div className="w-10 h-10 rounded-full bg-[var(--crit-soft)] flex items-center justify-center">
+            <ShieldAlert size={20} className="text-[var(--crit-ink)]" />
           </div>
           <div>
-            <h3 className="text-lg font-bold text-white">{step === 'reason' ? 'Cancelar item' : '¿Se preparó este artículo?'}</h3>
-            <p className="text-red-400 text-sm">{itemName}</p>
+            <h3 className="text-lg font-bold text-[var(--text-1)]">{step === 'reason' ? 'Cancelar item' : '¿Se preparó este artículo?'}</h3>
+            <p className="text-[var(--crit-ink)] text-sm">{itemName}</p>
           </div>
         </div>
 
@@ -1052,8 +1053,8 @@ function CancelModal({ itemName, onConfirm, onCancel }: CancelModalProps) {
                       onClick={() => { setReason(r); setError('') }}
                       className={`px-3 py-2.5 rounded-lg text-sm text-left transition-colors min-h-[44px] ${
                         reason === r
-                          ? 'bg-red-900/40 border border-red-600 text-white'
-                          : 'bg-[var(--line)]/50 border border-slate-600/50 text-[var(--text-4)] hover:bg-[var(--line)]'
+                          ? 'bg-[var(--crit-soft)] border border-red-600 text-white'
+                          : 'bg-[var(--line)]/50 border border-[var(--line-soft)] text-[var(--text-4)] hover:bg-[var(--line)]'
                       }`}
                     >
                       {r}
@@ -1074,7 +1075,7 @@ function CancelModal({ itemName, onConfirm, onCancel }: CancelModalProps) {
                     value={pin}
                     onChange={(e) => { setPin(e.target.value.replace(/\D/g, '')); setError('') }}
                     placeholder="****"
-                    className="flex-1 bg-[var(--line)] border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 text-center text-2xl tracking-[0.5em] focus:outline-none focus:border-red-500 min-h-[48px]"
+                    className="flex-1 bg-[var(--line)] border border-[var(--line)] rounded-lg px-4 py-3 text-[var(--text-1)] placeholder-[var(--text-4)] text-center text-2xl tracking-[0.5em] focus:outline-none focus:border-red-500 min-h-[48px]"
                   />
                   {biometricAvailable && (
                     <button
@@ -1092,7 +1093,7 @@ function CancelModal({ itemName, onConfirm, onCancel }: CancelModalProps) {
                 </div>
               </div>
 
-              {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+              {error && <p className="text-[var(--crit-ink)] text-sm text-center">{error}</p>}
             </div>
 
             <div className="flex gap-3 mt-5">
@@ -1130,7 +1131,7 @@ function CancelModal({ itemName, onConfirm, onCancel }: CancelModalProps) {
               </button>
               <button
                 onClick={() => onConfirm(reason, managerName, { prepared: false, voided: true })}
-                className="w-full py-3 rounded-xl bg-slate-600 hover:bg-slate-500 text-white font-semibold transition-colors min-h-[48px] flex items-center justify-center gap-2"
+                className="w-full py-3 rounded-xl bg-[var(--surface-2)] hover:bg-[var(--text-4)] text-[var(--text-1)] font-semibold transition-colors min-h-[48px] flex items-center justify-center gap-2"
               >
                 <X size={18} />
                 Anular — Error operativo
@@ -1217,12 +1218,12 @@ function VoidOrderModal({ mesa, total, onConfirm, onCancel }: VoidOrderModalProp
       <div className="absolute inset-0 bg-black/60" onClick={onCancel} />
       <div className="relative bg-[var(--surface-2)] border border-red-700/40 rounded-2xl w-full max-w-md shadow-2xl mx-4 p-5">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-full bg-red-900/60 flex items-center justify-center">
-            <ShieldAlert size={20} className="text-red-400" />
+          <div className="w-10 h-10 rounded-full bg-[var(--crit-soft)] flex items-center justify-center">
+            <ShieldAlert size={20} className="text-[var(--crit-ink)]" />
           </div>
           <div>
-            <h3 className="text-lg font-bold text-white">Anular orden completa</h3>
-            <p className="text-red-400 text-sm">Mesa {mesa} · {formatMXN(total)}</p>
+            <h3 className="text-lg font-bold text-[var(--text-1)]">Anular orden completa</h3>
+            <p className="text-[var(--crit-ink)] text-sm">Mesa {mesa} · {formatMXN(total)}</p>
           </div>
         </div>
 
@@ -1234,7 +1235,7 @@ function VoidOrderModal({ mesa, total, onConfirm, onCancel }: VoidOrderModalProp
               onChange={(e) => { setReason(e.target.value); setError('') }}
               placeholder="Describe el motivo..."
               rows={3}
-              className="w-full bg-[var(--line)] border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-red-500 resize-none"
+              className="w-full bg-[var(--line)] border border-[var(--line)] rounded-lg px-4 py-3 text-[var(--text-1)] placeholder-[var(--text-4)] text-sm focus:outline-none focus:border-red-500 resize-none"
             />
           </div>
 
@@ -1250,7 +1251,7 @@ function VoidOrderModal({ mesa, total, onConfirm, onCancel }: VoidOrderModalProp
                 value={pin}
                 onChange={(e) => { setPin(e.target.value.replace(/\D/g, '')); setError('') }}
                 placeholder="****"
-                className="flex-1 bg-[var(--line)] border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 text-center text-2xl tracking-[0.5em] focus:outline-none focus:border-red-500 min-h-[48px]"
+                className="flex-1 bg-[var(--line)] border border-[var(--line)] rounded-lg px-4 py-3 text-[var(--text-1)] placeholder-[var(--text-4)] text-center text-2xl tracking-[0.5em] focus:outline-none focus:border-red-500 min-h-[48px]"
               />
               {biometricAvail && (
                 <button
@@ -1265,7 +1266,7 @@ function VoidOrderModal({ mesa, total, onConfirm, onCancel }: VoidOrderModalProp
             </div>
           </div>
 
-          {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+          {error && <p className="text-[var(--crit-ink)] text-sm text-center">{error}</p>}
         </div>
 
         <div className="flex gap-3 mt-5">
@@ -1392,13 +1393,13 @@ function CashMovementModal({ turnoId, actor, onConfirm, onCancel }: CashMovement
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/60" onClick={onCancel} />
-      <div className="relative bg-[var(--surface-2)] border border-slate-600/40 rounded-2xl w-full max-w-md shadow-2xl mx-4 p-5">
+      <div className="relative bg-[var(--surface-2)] border border-[var(--line-soft)] rounded-2xl w-full max-w-md shadow-2xl mx-4 p-5">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-full bg-emerald-900/60 flex items-center justify-center">
-            <ArrowDownUp size={20} className="text-emerald-400" />
+            <ArrowDownUp size={20} className="text-[var(--accent-ink)]" />
           </div>
           <div>
-            <h3 className="text-lg font-bold text-white">Movimiento de caja</h3>
+            <h3 className="text-lg font-bold text-[var(--text-1)]">Movimiento de caja</h3>
             <p className="text-[var(--text-3)] text-sm">Retiro o depósito de efectivo</p>
           </div>
         </div>
@@ -1409,7 +1410,7 @@ function CashMovementModal({ turnoId, actor, onConfirm, onCancel }: CashMovement
             <button
               onClick={() => setType('retiro')}
               className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-colors min-h-[44px] ${
-                type === 'retiro' ? 'bg-red-600 text-white' : 'bg-[var(--line)]/50 border border-slate-600/50 text-[var(--text-4)]'
+                type === 'retiro' ? 'bg-red-600 text-white' : 'bg-[var(--line)]/50 border border-[var(--line-soft)] text-[var(--text-4)]'
               }`}
             >
               Retiro
@@ -1417,7 +1418,7 @@ function CashMovementModal({ turnoId, actor, onConfirm, onCancel }: CashMovement
             <button
               onClick={() => setType('deposito')}
               className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-colors min-h-[44px] ${
-                type === 'deposito' ? 'bg-emerald-600 text-white' : 'bg-[var(--line)]/50 border border-slate-600/50 text-[var(--text-4)]'
+                type === 'deposito' ? 'bg-emerald-600 text-white' : 'bg-[var(--line)]/50 border border-[var(--line-soft)] text-[var(--text-4)]'
               }`}
             >
               Deposito
@@ -1433,7 +1434,7 @@ function CashMovementModal({ turnoId, actor, onConfirm, onCancel }: CashMovement
               value={amount}
               onChange={(e) => { setAmount(e.target.value); setError('') }}
               placeholder="$0.00"
-              className="w-full bg-[var(--line)] border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 text-center text-2xl focus:outline-none focus:border-emerald-500 min-h-[48px]"
+              className="w-full bg-[var(--line)] border border-[var(--line)] rounded-lg px-4 py-3 text-[var(--text-1)] placeholder-[var(--text-4)] text-center text-2xl focus:outline-none focus:border-[var(--accent)] min-h-[48px]"
             />
           </div>
 
@@ -1445,7 +1446,7 @@ function CashMovementModal({ turnoId, actor, onConfirm, onCancel }: CashMovement
               value={reason}
               onChange={(e) => { setReason(e.target.value); setError('') }}
               placeholder="Ej: Cambio, pago proveedor, fondo inicial..."
-              className="w-full bg-[var(--line)] border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-emerald-500 min-h-[48px]"
+              className="w-full bg-[var(--line)] border border-[var(--line)] rounded-lg px-4 py-3 text-[var(--text-1)] placeholder-[var(--text-4)] text-sm focus:outline-none focus:border-[var(--accent)] min-h-[48px]"
             />
           </div>
 
@@ -1462,7 +1463,7 @@ function CashMovementModal({ turnoId, actor, onConfirm, onCancel }: CashMovement
                 value={pin}
                 onChange={(e) => { setPin(e.target.value.replace(/\D/g, '')); setError('') }}
                 placeholder="****"
-                className="flex-1 bg-[var(--line)] border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 text-center text-2xl tracking-[0.5em] focus:outline-none focus:border-emerald-500 min-h-[48px]"
+                className="flex-1 bg-[var(--line)] border border-[var(--line)] rounded-lg px-4 py-3 text-[var(--text-1)] placeholder-[var(--text-4)] text-center text-2xl tracking-[0.5em] focus:outline-none focus:border-[var(--accent)] min-h-[48px]"
               />
               {biometricAvail && (
                 <button
@@ -1477,7 +1478,7 @@ function CashMovementModal({ turnoId, actor, onConfirm, onCancel }: CashMovement
             </div>
           </div>
 
-          {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+          {error && <p className="text-[var(--crit-ink)] text-sm text-center">{error}</p>}
         </div>
 
         <div className="flex gap-3 mt-5">
@@ -1965,7 +1966,7 @@ function POSContent() {
     'bg-cyan-900/30 border-cyan-700',
     'bg-lime-900/30 border-lime-700',
   ]
-  const CUENTA_TEXT = ['', 'text-blue-400', 'text-purple-400', 'text-amber-400', 'text-rose-400', 'text-cyan-400', 'text-lime-400']
+  const CUENTA_TEXT = ['', 'text-[var(--info-ink)]', 'text-[var(--info-ink)]', 'text-[var(--warn-ink)]', 'text-[var(--crit-ink)]', 'text-[var(--info-ink)]', 'text-lime-400']
 
   // Propina
   const [propina, setPropina] = useState(0)
@@ -3457,7 +3458,7 @@ function POSContent() {
   }
 
   return (
-    <div className="pos-kiosk h-dvh flex flex-col text-white overflow-hidden select-none" style={{'--bg':'#000000','--surface':'#0a0a0c','--surface-2':'#0f1014','--panel':'#0b0b0e','--line':'#1c1d22','--line-soft':'#141519','--text-1':'#f5f5f7','--text-2':'#c4c4cc','--text-3':'#87878f','--text-4':'#555560','--accent-ink':'var(--accent-bright)',background:'#0a0a0f',color:'#fff',colorScheme:'dark'} as React.CSSProperties}>
+    <div className="pos-kiosk h-dvh flex flex-col overflow-hidden select-none" style={{ background:'var(--bg)', color:'var(--text-1)' } as React.CSSProperties}>
 
       {/* COB-017: MP Payment Recovery Banner — shown when MP captured money but Fullsite failed to record */}
       {needsOperatorAttention(mpRecovery) && mpRecovery && (
@@ -3469,7 +3470,7 @@ function POSContent() {
                   ? 'Pago MP marcado para revisión manual'
                   : 'Pago aprobado en terminal — registro pendiente en Fullsite'}
               </p>
-              <p className="text-red-300/80 text-xs mt-0.5">
+              <p className="text-[var(--crit-ink)] text-xs mt-0.5">
                 Mesa {mpRecovery.mesa} · {formatMXN(mpRecovery.amount)} · {new Date(mpRecovery.timestamp).toLocaleTimeString('es-MX')} · ID: <span className="font-mono">{mpRecovery.intentId.slice(-8)}</span>
               </p>
             </div>
@@ -3484,7 +3485,7 @@ function POSContent() {
                 </button>
                 <button
                   onClick={handleMpMarkManual}
-                  className="bg-red-900 hover:bg-red-800 text-red-300 text-xs font-bold px-3 py-2 rounded-lg border border-red-700"
+                  className="bg-red-900 hover:bg-red-800 text-[var(--crit-ink)] text-xs font-bold px-3 py-2 rounded-lg border border-red-700"
                 >
                   Marcar manual
                 </button>
@@ -3493,7 +3494,7 @@ function POSContent() {
             {mpRecovery.state === 'FAILED_MANUAL_REVIEW' && (
               <button
                 onClick={clearMpRecovery}
-                className="bg-red-900 hover:bg-red-800 text-red-300 text-xs font-bold px-3 py-2 rounded-lg border border-red-700 flex-shrink-0"
+                className="bg-red-900 hover:bg-red-800 text-[var(--crit-ink)] text-xs font-bold px-3 py-2 rounded-lg border border-red-700 flex-shrink-0"
               >
                 Resuelto
               </button>
@@ -3510,7 +3511,7 @@ function POSContent() {
             <button onClick={() => setShowNav(!showNav)} className="w-11 h-11 rounded-lg bg-[var(--line)] hover:bg-[var(--line)] active:bg-[var(--surface-2)]0 flex items-center justify-center transition-colors">
               {showNav ? <X size={18} /> : <Menu size={18} />}
             </button>
-            <span className="text-white font-black text-base tracking-tight">
+            <span className="text-[var(--text-1)] font-black text-base tracking-tight">
               fullsite
               <span className="inline-block w-1.5 h-1.5 bg-emerald-500 ml-0.5 mb-0.5" />
             </span>
@@ -3587,8 +3588,8 @@ function POSContent() {
               <Smartphone size={16} />
               {mpConfig ? 'Point' : 'MP'}
             </button>
-            {staffName && <span className="text-xs text-emerald-400">{staffName}</span>}
-            {isMobileRestricted && <span className="text-[10px] text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full">Solo ordenes</span>}
+            {staffName && <span className="text-xs text-[var(--accent-ink)]">{staffName}</span>}
+            {isMobileRestricted && <span className="text-[10px] text-[var(--warn-ink)] bg-[var(--warn-soft)] px-2 py-0.5 rounded-full">Solo ordenes</span>}
             <div className="flex items-center gap-1">
               <Clock size={14} />
               <span className="text-xs font-mono">{clock}</span>
@@ -3608,7 +3609,7 @@ function POSContent() {
                 window.location.reload()
               }}
               title="Bloquear pantalla"
-              className="w-11 h-11 rounded-lg bg-[var(--line)] hover:bg-red-900/40 flex items-center justify-center transition-colors"
+              className="w-11 h-11 rounded-lg bg-[var(--line)] hover:bg-[var(--crit-soft)] flex items-center justify-center transition-colors"
             >
               <Lock size={18} />
             </button>
@@ -3619,13 +3620,13 @@ function POSContent() {
           {/* Back to mesa map — always visible in kiosk mode (no browser back button) */}
           <Link
             href="/pos/plano"
-            className="flex items-center justify-center w-11 h-11 rounded-lg bg-[var(--line)] border border-slate-600 text-[var(--text-3)] hover:text-white flex-shrink-0 transition-colors"
+            className="flex items-center justify-center w-11 h-11 rounded-lg bg-[var(--line)] border border-[var(--line)] text-[var(--text-3)] hover:text-[var(--text-1)] flex-shrink-0 transition-colors"
             title="Volver al mapa de mesas"
           >
             <ArrowLeft size={18} />
           </Link>
-          <div className="flex items-center gap-1 bg-[var(--line)] rounded-lg px-3 py-0.5 border border-slate-600 min-h-[40px]">
-            <span className="text-white text-sm font-medium">Mesa</span>
+          <div className="flex items-center gap-1 bg-[var(--line)] rounded-lg px-3 py-0.5 border border-[var(--line)] min-h-[40px]">
+            <span className="text-[var(--text-1)] text-sm font-medium">Mesa</span>
             <input
               type="number"
               disabled={!!clienteNombre}
@@ -3641,13 +3642,13 @@ function POSContent() {
                 router.replace(`/pos?mesa=${newMesa}`)
               }}
               min={1} max={999}
-              className="w-14 bg-transparent text-white text-base font-bold text-center border-none outline-none"
+              className="w-14 bg-transparent text-[var(--text-1)] text-base font-bold text-center border-none outline-none"
             />
           </div>
-          <select value={personas} onChange={(e) => setPersonas(Number(e.target.value))} className="bg-[var(--line)] text-white rounded-lg px-4 py-2 text-lg font-bold border border-slate-600 min-h-[48px]">
+          <select value={personas} onChange={(e) => setPersonas(Number(e.target.value))} className="bg-[var(--line)] text-[var(--text-1)] rounded-lg px-4 py-2 text-lg font-bold border border-[var(--line)] min-h-[48px]">
             {Array.from({ length: 20 }, (_, i) => (<option key={i + 1} value={i + 1}>{i + 1}p</option>))}
           </select>
-          <select value={mesero} onChange={(e) => { const newMesero = e.target.value; setMesero(newMesero); try { localStorage.setItem('pos_mesero', newMesero) } catch {} if (loadedOrderId) { fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${loadedOrderId}`, { method: 'PATCH', headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify({ mesero: newMesero }) }).catch(err => console.error('[mesero-update]', err)) } }} className="bg-[var(--line)] text-white rounded-lg px-3 py-2 text-base font-medium border border-slate-600 min-h-[48px] flex-1 min-w-0">
+          <select value={mesero} onChange={(e) => { const newMesero = e.target.value; setMesero(newMesero); try { localStorage.setItem('pos_mesero', newMesero) } catch {} if (loadedOrderId) { fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${loadedOrderId}`, { method: 'PATCH', headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify({ mesero: newMesero }) }).catch(err => console.error('[mesero-update]', err)) } }} className="bg-[var(--line)] text-[var(--text-1)] rounded-lg px-3 py-2 text-base font-medium border border-[var(--line)] min-h-[48px] flex-1 min-w-0">
             {meserosList.map((m) => (<option key={m} value={m}>{m}</option>))}
           </select>
         </div>
@@ -3726,7 +3727,7 @@ function POSContent() {
                   key={item.href}
                   href={item.href}
                   onClick={() => setShowNav(false)}
-                  className="flex items-center gap-3 px-4 py-1.5 rounded-xl text-[var(--text-4)] hover:bg-[var(--line)] hover:text-white active:bg-emerald-500/10 transition-colors min-h-[40px]"
+                  className="flex items-center gap-3 px-4 py-1.5 rounded-xl text-[var(--text-4)] hover:bg-[var(--line)] hover:text-white active:bg-[var(--accent-soft)] transition-colors min-h-[40px]"
                 >
                   <item.icon size={18} />
                   <span className="text-sm font-medium">{item.label}</span>
@@ -3763,7 +3764,7 @@ function POSContent() {
                       },
                     })
                   }}
-                  className="flex items-center gap-3 px-4 py-2 rounded-xl w-full text-red-400 hover:bg-red-900/30 hover:text-red-300 transition-colors min-h-[40px]"
+                  className="flex items-center gap-3 px-4 py-2 rounded-xl w-full text-[var(--crit-ink)] hover:bg-[var(--crit-soft)] hover:text-[var(--crit-ink)] transition-colors min-h-[40px]"
                 >
                   <Power size={18} />
                   <span className="text-sm font-medium">Cerrar app</span>
@@ -3790,19 +3791,22 @@ function POSContent() {
                   onChange={e => { const v = Number(e.target.value) || 1; setMesa(v); router.replace(`/pos?mesa=${v}`) }}
                   min={1}
                   max={999}
-                  className="w-14 text-center bg-transparent border border-[var(--line)] rounded-lg text-white font-bold text-base mx-1 py-0.5 focus:border-emerald-500 focus:outline-none"
+                  className="w-14 text-center bg-transparent border border-[var(--line)] rounded-lg text-[var(--text-1)] font-bold text-base mx-1 py-0.5 focus:border-[var(--accent)] focus:outline-none"
                 />
                 <span className="text-[var(--text-3)] font-normal text-xs">{personas}p · {(mesero || '').split(' ')[0] || 'Sin mesero'}</span>
               </h2>
-              <span className="text-emerald-400 font-bold text-lg">{formatMXN(total)}</span>
+              <span className="text-[var(--accent-ink)] font-extrabold text-xl font-mono tabular-nums tracking-tight">{formatMXN(total)}</span>
             </div>
           </div>
 
           {/* Order items list — MAIN AREA, takes all available space */}
           <div className="flex-1 overflow-y-auto px-3 py-1 min-h-0 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
             {orderItems.length === 0 ? (
-              <div className="flex items-center justify-center h-32 text-[var(--text-2)]">
-                <p className="text-sm">Toca un producto para agregar</p>
+              <div className="flex flex-col items-center justify-center gap-3 h-40 text-center border border-dashed border-[var(--line)] rounded-[14px] bg-[var(--surface)] mx-1 my-2">
+                <span className="w-10 h-10 rounded-[12px] grid place-items-center bg-[var(--surface-2)] text-[var(--text-3)]">
+                  <Utensils size={18} />
+                </span>
+                <p className="text-sm font-semibold text-[var(--text-2)]">Toca un producto para agregar</p>
               </div>
             ) : (
               <div className="space-y-px">
@@ -3825,12 +3829,12 @@ function POSContent() {
 
                   // Render tiempo separators first
                   const tiempoElements = tiempoItems.map(item => (
-                    <div key={item.id} className="flex items-center gap-2 py-1 px-2 rounded-lg bg-amber-500/10 border border-amber-500/30">
-                      <Flame size={13} className="text-amber-400 flex-shrink-0" />
-                      <p className="flex-1 text-amber-400 font-bold text-xs tracking-widest text-center">{item.nombre}</p>
+                    <div key={item.id} className="flex items-center gap-2 py-1 px-2 rounded-lg bg-[var(--warn-soft)] border border-[color-mix(in_srgb,var(--warn)_40%,transparent)]">
+                      <Flame size={13} className="text-[var(--warn-ink)] flex-shrink-0" />
+                      <p className="flex-1 text-[var(--warn-ink)] font-bold text-xs tracking-widest text-center">{item.nombre}</p>
                       <button
                         onClick={(e) => { e.stopPropagation(); removeTiempoSeparator(item.id) }}
-                        className="w-11 h-11 rounded-md bg-amber-500/10 hover:bg-amber-500/25 text-amber-400 flex items-center justify-center transition-colors"
+                        className="w-11 h-11 rounded-md bg-[var(--warn-soft)] hover:bg-[var(--warn-soft)] text-[var(--warn-ink)] flex items-center justify-center transition-colors"
                       >
                         <X size={16} />
                       </button>
@@ -3850,11 +3854,11 @@ function POSContent() {
                               <button
                                 onClick={() => setSillaActual(seat)}
                                 className={`w-full flex items-center gap-2 px-2 py-1 mt-1 rounded-lg transition-colors ${
-                                  sillaActual === seat ? 'bg-sky-500/15 border border-sky-500/30' : 'bg-[var(--surface-2)]/40'
+                                  sillaActual === seat ? 'bg-[var(--info-soft)] border border-[color-mix(in_srgb,var(--info)_40%,transparent)]' : 'bg-[var(--surface-2)]/40'
                                 }`}
                               >
-                                <Armchair size={14} className="text-sky-400" />
-                                <span className="text-sky-400 text-xs font-bold">Asiento {seat}</span>
+                                <Armchair size={14} className="text-[var(--info-ink)]" />
+                                <span className="text-[var(--info-ink)] text-xs font-bold">Asiento {seat}</span>
                                 <span className="text-[var(--text-3)] text-xs ml-auto">{formatMXN(seatTotal)}</span>
                               </button>
                             )}
@@ -3865,14 +3869,14 @@ function POSContent() {
                   return (
                     <div
                       key={item.id}
-                      className={`flex items-center gap-2 py-1 px-2 rounded-lg transition-all ${
+                      className={`flex items-center gap-2 py-1.5 px-2.5 rounded-[12px] transition-all ${
                         isVoided
-                          ? 'bg-slate-500/10 border border-slate-500/20 opacity-40'
+                          ? 'bg-[var(--surface-2)] border border-[var(--line)] opacity-40'
                           : isCancelled
-                          ? 'bg-red-500/10 border border-red-500/20 opacity-60'
+                          ? 'bg-[var(--crit-soft)] border border-[color-mix(in_srgb,var(--crit)_40%,transparent)] opacity-60'
                           : flashItemId === item.id
-                          ? 'ring-2 ring-emerald-500 bg-emerald-500/10'
-                          : 'bg-[var(--surface-2)]/60 hover:bg-[var(--surface-2)]'
+                          ? 'ring-2 ring-[var(--accent)] bg-[var(--accent-soft)] border border-[var(--accent-line)]'
+                          : 'bg-[var(--surface-2)] border border-[var(--line)] hover:bg-[var(--raised)] hover:border-[var(--accent-line)]'
                       }`}
                     >
                       {/* Quantity controls */}
@@ -3884,7 +3888,7 @@ function POSContent() {
                         >
                           <Minus size={18} />
                         </button>
-                        <span className={`w-7 text-center font-bold text-lg ${isSent ? 'text-[var(--text-3)]' : ''}`}>
+                        <span className={`w-7 text-center font-bold text-lg font-mono tabular-nums ${isSent ? 'text-[var(--text-3)]' : ''}`}>
                           {item.cantidad}
                         </span>
                         <button
@@ -3898,21 +3902,31 @@ function POSContent() {
 
                       {/* Item name + modifiers + KDS status */}
                       <div className="flex-1 min-w-0">
-                        <p className={`font-medium text-sm leading-tight ${isVoided ? 'line-through text-slate-500' : isCancelled ? 'line-through text-red-400' : ''}`}>
+                        <p className={`font-medium text-sm leading-tight ${isVoided ? 'line-through text-[var(--text-4)]' : isCancelled ? 'line-through text-[var(--crit-ink)]' : ''}`}>
                           {item.nombre}
                           {!isCancelled && !isVoided && (item as OrderItem & { kds_done?: boolean }).kds_done && (
-                            <span className="ml-2 inline-block bg-emerald-500/20 text-emerald-400 text-[9px] font-bold px-1.5 py-0.5 rounded-full">LISTO</span>
+                            <span className="ml-2 inline-flex items-center bg-[var(--accent-soft)] text-[var(--accent-ink)] border border-[var(--accent-line)] text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none">LISTO</span>
                           )}
                         </p>
                         {isVoided && (
-                          <span className="inline-block bg-slate-600/60 text-slate-300 text-[10px] font-bold px-1.5 py-0.5 rounded">ANULADO</span>
+                          <span className="inline-flex items-center bg-[var(--surface-2)] text-[var(--text-2)] border border-[var(--line)] text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none mt-0.5">ANULADO</span>
                         )}
                         {isCancelled && !isVoided && (
-                          <p className="text-red-500 text-[10px] font-semibold">CANCELADO</p>
+                          <span className="inline-flex items-center bg-[var(--crit-soft)] text-[var(--crit-ink)] border border-[color-mix(in_srgb,var(--crit)_40%,transparent)] text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none mt-0.5">CANCELADO</span>
                         )}
                         {(item.modificadores || []).length > 0 && (
-                          <p className="text-[var(--text-3)] text-[11px] truncate">
-                            {(item.modificadores || []).join(' · ')}
+                          <p className="text-[var(--text-3)] text-[11px] truncate leading-relaxed">
+                            {(item.modificadores || []).map((mod, mi, arr) => {
+                              const parts = String(mod).split(/(\+\$[\d,.]+)/g)
+                              return (
+                                <span key={mi}>
+                                  {parts.map((p, pi) => /^\+\$/.test(p)
+                                    ? <span key={pi} className="text-[var(--accent-ink)] font-semibold font-mono tabular-nums">{p}</span>
+                                    : <span key={pi}>{p}</span>)}
+                                  {mi < arr.length - 1 ? ' · ' : ''}
+                                </span>
+                              )
+                            })}
                           </p>
                         )}
                         {item.notas && (
@@ -3927,7 +3941,7 @@ function POSContent() {
                         <button
                           onClick={(e) => { e.stopPropagation(); if (!isSent) cycleSilla(item.id) }}
                           disabled={isSent}
-                          className={`flex-shrink-0 min-w-[44px] h-11 px-2 rounded-lg text-sm font-bold flex items-center justify-center transition-colors ${isSent ? 'bg-slate-500/10 border border-slate-500/20 text-slate-500 cursor-not-allowed' : 'bg-sky-500/15 border border-sky-500/30 text-sky-400 hover:bg-sky-500/30'}`}
+                          className={`flex-shrink-0 min-w-[44px] h-11 px-2 rounded-lg text-sm font-bold flex items-center justify-center transition-colors ${isSent ? 'bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-4)] cursor-not-allowed' : 'bg-[var(--info-soft)] border border-[color-mix(in_srgb,var(--info)_40%,transparent)] text-[var(--info-ink)] hover:bg-[var(--info-soft)]'}`}
                           title={isSent ? 'Enviado — no se puede cambiar silla' : 'Silla — toca para cambiar'}
                         >
                           {isSent && <Lock size={12} className="mr-1" />}
@@ -3936,7 +3950,7 @@ function POSContent() {
                       )}
 
                       {/* Line total */}
-                      <span className={`font-semibold text-sm w-20 text-right flex-shrink-0 ${isVoided ? 'line-through text-slate-500/60' : isCancelled ? 'line-through text-red-400/60' : ''}`}>
+                      <span className={`font-semibold text-sm w-20 text-right flex-shrink-0 font-mono tabular-nums ${isVoided ? 'line-through text-[var(--text-4)]' : isCancelled ? 'line-through text-[var(--crit-ink)]' : ''}`}>
                         {formatMXN(item.subtotal)}
                       </span>
 
@@ -3956,7 +3970,7 @@ function POSContent() {
                           {isSent && (
                           <button
                             onClick={(e) => { e.stopPropagation(); setTransferringItem(item) }}
-                            className="w-11 h-11 rounded-lg bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20 text-amber-400 flex items-center justify-center transition-colors"
+                            className="w-11 h-11 rounded-lg bg-[var(--warn-soft)] border border-[color-mix(in_srgb,var(--warn)_40%,transparent)] hover:bg-[var(--warn-soft)] text-[var(--warn-ink)] flex items-center justify-center transition-colors"
                             title="Transferir platillo a otra mesa (requiere supervisor)"
                           >
                             <ArrowRightLeft size={16} />
@@ -3967,7 +3981,7 @@ function POSContent() {
                           {can('cancelar_ordenes') && (
                           <button
                             onClick={(e) => { e.stopPropagation(); setCancellingItem(item) }}
-                            className="w-11 h-11 rounded-lg bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 text-red-500 flex items-center justify-center transition-colors"
+                            className="w-11 h-11 rounded-lg bg-[var(--crit-soft)] border border-[color-mix(in_srgb,var(--crit)_40%,transparent)] hover:bg-[var(--crit-soft)] text-[var(--crit-ink)] flex items-center justify-center transition-colors"
                             title="Cancelar item (requiere gerente)"
                           >
                             <Ban size={18} />
@@ -4008,7 +4022,7 @@ function POSContent() {
               <button
                 onClick={addTiempoSeparator}
                 disabled={activeItems.filter(i => !isTiempoItem(i)).length === 0}
-                className="flex items-center gap-1.5 px-4 min-h-[48px] rounded-lg bg-amber-500/10 border border-amber-500/25 hover:bg-amber-500/20 disabled:opacity-40 disabled:cursor-not-allowed text-amber-400 text-sm font-semibold transition-colors"
+                className="flex items-center gap-1.5 px-4 min-h-[48px] rounded-lg bg-[var(--warn-soft)] border border-[color-mix(in_srgb,var(--warn)_40%,transparent)] hover:bg-[var(--warn-soft)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--warn-ink)] text-sm font-semibold transition-colors"
                 title="Insertar separador de tiempo"
               >
                 <Clock size={18} />
@@ -4044,7 +4058,7 @@ function POSContent() {
                     setDiscount(0)
                     setAppliedPromo(null)
                   }}
-                  className="w-12 min-h-[48px] flex items-center justify-center rounded-lg bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 text-red-500 transition-colors"
+                  className="w-12 min-h-[48px] flex items-center justify-center rounded-lg bg-[var(--crit-soft)] border border-[color-mix(in_srgb,var(--crit)_40%,transparent)] hover:bg-[var(--crit-soft)] text-[var(--crit-ink)] transition-colors"
                 >
                   <X size={18} />
                 </button>
@@ -4057,13 +4071,13 @@ function POSContent() {
                   value={orderNotes}
                   onChange={(e) => setOrderNotes(e.target.value)}
                   placeholder="Nota..."
-                  className="flex-1 min-w-0 bg-[var(--line)]/60 border border-slate-600/50 rounded-lg px-3 min-h-[48px] text-white placeholder-slate-500 text-sm focus:outline-none focus:border-emerald-500/50"
+                  className="flex-1 min-w-0 bg-[var(--line)]/60 border border-[var(--line-soft)] rounded-lg px-3 min-h-[48px] text-[var(--text-1)] placeholder-[var(--text-4)] text-sm focus:outline-none focus:border-[var(--accent)]"
                 />
               </div>
               <button
                 onClick={() => { if (!isMobileRestricted) { openCashDrawer(); showToast('Cajón abierto') } }}
                 disabled={isMobileRestricted}
-                className="w-12 min-h-[48px] flex items-center justify-center rounded-lg bg-slate-700/50 hover:bg-slate-700 disabled:opacity-30 text-[var(--text-3)] transition-colors"
+                className="w-12 min-h-[48px] flex items-center justify-center rounded-lg bg-[var(--surface-2)] hover:bg-[var(--raised)] disabled:opacity-30 text-[var(--text-3)] transition-colors"
                 title={isMobileRestricted ? 'Solo disponible en terminal de caja' : 'Abrir cajón'}
               >
                 <Banknote size={18} />
@@ -4071,7 +4085,7 @@ function POSContent() {
               <button
                 onClick={() => { if (!isMobileRestricted) setShowCashMovement(true) }}
                 disabled={isMobileRestricted}
-                className="w-12 min-h-[48px] flex items-center justify-center rounded-lg bg-slate-700/50 hover:bg-slate-700 disabled:opacity-30 text-[var(--text-3)] transition-colors"
+                className="w-12 min-h-[48px] flex items-center justify-center rounded-lg bg-[var(--surface-2)] hover:bg-[var(--raised)] disabled:opacity-30 text-[var(--text-3)] transition-colors"
                 title={isMobileRestricted ? 'Solo disponible en terminal de caja' : 'Retiro / Deposito'}
               >
                 <DollarSign size={18} />
@@ -4094,7 +4108,7 @@ function POSContent() {
                   showToast('Reimpresión de ticket')
                 }}
                 disabled={orderItems.length === 0}
-                className="w-12 min-h-[48px] flex items-center justify-center rounded-lg bg-slate-700/50 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-[var(--text-3)] transition-colors"
+                className="w-12 min-h-[48px] flex items-center justify-center rounded-lg bg-[var(--surface-2)] hover:bg-[var(--raised)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--text-3)] transition-colors"
                 title="Reimprimir ticket"
               >
                 <Printer size={18} />
@@ -4127,7 +4141,7 @@ function POSContent() {
                   })
                 }}
                 disabled={orderItems.length === 0}
-                className="w-12 min-h-[48px] flex items-center justify-center rounded-lg bg-sky-900/30 hover:bg-sky-900/50 disabled:opacity-40 disabled:cursor-not-allowed text-sky-400 transition-colors"
+                className="w-12 min-h-[48px] flex items-center justify-center rounded-lg bg-[var(--info-soft)] hover:bg-[var(--info-soft)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--info-ink)] transition-colors"
                 title="Transferir mesa"
               >
                 <ArrowRightLeft size={18} />
@@ -4135,7 +4149,7 @@ function POSContent() {
               <button
                 onClick={() => setShowVoidOrder(true)}
                 disabled={orderItems.length === 0}
-                className="w-12 min-h-[48px] flex items-center justify-center rounded-lg bg-red-900/30 hover:bg-red-900/50 disabled:opacity-40 disabled:cursor-not-allowed text-red-400 transition-colors"
+                className="w-12 min-h-[48px] flex items-center justify-center rounded-lg bg-[var(--crit-soft)] hover:bg-[var(--crit-soft)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--crit-ink)] transition-colors"
                 title="Anular orden"
               >
                 <ShieldAlert size={18} />
@@ -4157,7 +4171,7 @@ function POSContent() {
                       })
                       showToast(`${ap.label} aplicado: -${formatMXN(ap.discount)}`)
                     }}
-                    className="flex items-center gap-1 px-3 min-h-[36px] rounded-full bg-emerald-600/20 border border-emerald-500/40 text-emerald-400 text-xs font-bold whitespace-nowrap hover:bg-emerald-600/30 animate-pulse"
+                    className="flex items-center gap-1 px-3 min-h-[36px] rounded-full bg-[var(--accent-soft)] border border-[var(--accent-line)] text-[var(--accent-ink)] text-xs font-bold whitespace-nowrap hover:bg-[var(--accent-soft)] animate-pulse"
                   >
                     <Tag size={12} />
                     {ap.label} (-{formatMXN(ap.discount)})
@@ -4166,7 +4180,7 @@ function POSContent() {
               </div>
             )}
             {appliedPromo && discount > 0 && (
-              <div className="flex items-center gap-1.5 mb-1 text-xs text-emerald-400">
+              <div className="flex items-center gap-1.5 mb-1 text-xs text-[var(--accent-ink)]">
                 <Tag size={12} />
                 <span className="font-semibold">{appliedPromo.label}</span>
               </div>
@@ -4174,10 +4188,10 @@ function POSContent() {
 
             {/* Totals — compact */}
             <div className="flex items-center justify-between text-xs text-[var(--text-3)] mb-0.5">
-              <span>Sub {formatMXN(subtotal)}</span>
-              {discount > 0 && <span className="text-red-400">-{formatMXN(discount)}</span>}
-              <span>IVA {formatMXN(iva)}</span>
-              <span className="text-white text-base font-bold">{formatMXN(total)}</span>
+              <span>Sub <span className="font-mono tabular-nums text-[var(--text-2)]">{formatMXN(subtotal)}</span></span>
+              {discount > 0 && <span className="text-[var(--crit-ink)]">-<span className="font-mono tabular-nums">{formatMXN(discount)}</span></span>}
+              <span>IVA <span className="font-mono tabular-nums text-[var(--text-2)]">{formatMXN(iva)}</span></span>
+              <span className="text-[var(--accent-ink)] text-lg font-extrabold font-mono tabular-nums tracking-tight">{formatMXN(total)}</span>
             </div>
           </div>
 
@@ -4186,7 +4200,7 @@ function POSContent() {
             {orderItems.length === 0 ? (
               <button
                 onClick={() => router.push('/pos/mesas')}
-                className="flex-1 flex items-center justify-center gap-2 bg-slate-600 hover:bg-slate-500 active:bg-slate-700 active:scale-[0.97] text-white font-bold py-2.5 rounded-xl text-base transition-all min-h-[52px]"
+                className="flex-1 flex items-center justify-center gap-2 bg-[var(--surface-2)] hover:bg-[var(--text-4)] active:bg-[var(--raised)] active:scale-[0.97] text-[var(--text-1)] font-bold py-2.5 rounded-xl text-base transition-all min-h-[52px]"
               >
                 <ArrowLeft size={18} />
                 Salir
@@ -4246,7 +4260,7 @@ function POSContent() {
               value={menuSearch}
               onChange={(e) => setMenuSearch(e.target.value)}
               placeholder="Buscar platillo..."
-              className="flex-1 bg-[var(--line)] border border-slate-600 rounded-lg px-3 py-1.5 text-white placeholder-slate-400 text-sm focus:outline-none focus:border-emerald-500 min-h-[36px]"
+              className="flex-1 bg-[var(--surface-2)] border border-[var(--line)] rounded-[11px] px-3 py-1.5 text-[var(--text-1)] placeholder-[var(--text-4)] text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)] min-h-[36px]"
             />
             <button
               onClick={() => setShowBarcodeScanner(true)}
@@ -4323,15 +4337,15 @@ function POSContent() {
                         <button
                           key={item.id}
                           onClick={() => { handleMenuItemTap(item, catId); setMobileView('order') }}
-                          className="w-full bg-[var(--surface-2)] hover:bg-[var(--line)] active:bg-emerald-500/10 border border-[var(--line)] rounded-xl text-left transition-colors flex items-center min-h-[64px] overflow-hidden"
+                          className="w-full bg-[var(--surface-2)] hover:bg-[var(--line)] active:bg-[var(--accent-soft)] border border-[var(--line)] rounded-xl text-left transition-colors flex items-center min-h-[64px] overflow-hidden"
                         >
                           <div className={`w-1.5 self-stretch flex-shrink-0 rounded-l-lg ${catColor}`} />
                           <div className="flex items-center justify-between flex-1 px-3 py-3">
                             <div>
-                              <span className="font-semibold text-base text-white">{item.name}</span>
+                              <span className="font-semibold text-base text-[var(--text-1)]">{item.name}</span>
                               <span className="text-[var(--text-2)] text-xs ml-2">{category}</span>
                             </div>
-                            <span className="text-emerald-400 font-bold text-lg">{formatMXN(item.price)}</span>
+                            <span className="text-[var(--accent-ink)] font-bold text-lg font-mono tabular-nums">{formatMXN(item.price)}</span>
                           </div>
                         </button>
                       )
@@ -4367,13 +4381,13 @@ function POSContent() {
                   {menuCategories.filter(cat => cat.items.some(i => i.price > 0))
                     .sort((a, b) => a.name.localeCompare(b.name, 'es'))
                     .map((cat) => {
-                      const catColor = (cat as { color?: string }).color || 'bg-slate-600'
+                      const catColor = (cat as { color?: string }).color || 'bg-[var(--surface-2)]'
                       const itemCount = cat.items.filter(i => i.price > 0).length
                       return (
                         <button
                           key={cat.id}
                           onClick={() => setSelectedCategory(cat.id)}
-                          className={`px-3 py-3 rounded-xl text-sm font-bold text-center transition-all min-h-[72px] leading-tight flex flex-col items-center justify-center gap-0.5 ${catColor} opacity-85 text-white hover:opacity-100 active:scale-95`}
+                          className={`px-3 py-3 rounded-xl text-sm font-bold text-center transition-all min-h-[72px] leading-tight flex flex-col items-center justify-center gap-0.5 ${catColor} opacity-85 text-[var(--text-1)] hover:opacity-100 active:scale-95`}
                         >
                           <span>{cat.name}</span>
                           <span className="text-[10px] font-normal opacity-70">{itemCount}</span>
@@ -4388,7 +4402,7 @@ function POSContent() {
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => { setSelectedCategory(''); setCategorySearch('') }}>
                   <div className={`bg-[var(--panel)] rounded-2xl border border-[var(--line)] shadow-2xl w-[96vw] max-w-[1200px] overflow-hidden flex flex-col ${activeCategory.items.filter(i => i.price > 0).length > 15 ? 'h-[90vh]' : 'max-h-[90vh]'}`} onClick={e => e.stopPropagation()}>
                     <div className={`flex items-center justify-between px-4 py-2 border-b border-[rgba(255,255,255,0.08)] ${(activeCategory as { color?: string }).color || 'bg-emerald-600'}`}>
-                      <h3 className="text-white font-bold text-lg">{activeCategory.name} <span className="text-white/60 text-sm font-normal ml-2">{activeCategory.items.filter(i => i.price > 0).length} platillos</span></h3>
+                      <h3 className="text-[var(--text-1)] font-bold text-lg">{activeCategory.name} <span className="text-[var(--text-1)]/60 text-sm font-normal ml-2">{activeCategory.items.filter(i => i.price > 0).length} platillos</span></h3>
                       <button onClick={() => { setSelectedCategory(''); setCategorySearch('') }} className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center text-white text-2xl font-bold hover:bg-white/30 active:scale-95">&times;</button>
                     </div>
                     {activeCategory.items.filter(i => i.price > 0).length > 30 && (
@@ -4398,7 +4412,7 @@ function POSContent() {
                           value={categorySearch}
                           onChange={e => setCategorySearch(e.target.value)}
                           placeholder="Buscar en esta categoría..."
-                          className="w-full bg-[var(--surface-2)] border border-[var(--line)] rounded-lg px-3 py-2 text-white text-sm placeholder:text-gray-500 focus:outline-none focus:border-[var(--accent)]"
+                          className="w-full bg-[var(--surface-2)] border border-[var(--line)] rounded-lg px-3 py-2 text-[var(--text-1)] text-sm placeholder:text-[var(--text-4)] focus:outline-none focus:border-[var(--accent)]"
                           autoFocus
                         />
                       </div>
@@ -4413,17 +4427,17 @@ function POSContent() {
                       onClick={() => { if (isOOS) { showToast(`${item.name} — AGOTADO`); return } handleMenuItemTap(item, activeCategory.id); setSelectedCategory(''); setMobileView('order') }}
                       className={`bg-[var(--surface-2)] hover:bg-[var(--raised)] active:scale-[0.97] border rounded-xl text-left transition-all flex overflow-hidden relative shadow-sm ${
                         isOOS
-                          ? 'border-red-500/30 opacity-50 cursor-not-allowed'
+                          ? 'border-[color-mix(in_srgb,var(--crit)_40%,transparent)] opacity-50 cursor-not-allowed'
                           : (item as MenuItem & { promo?: boolean }).promo
                           ? 'border-[var(--accent-line)] ring-1 ring-[var(--accent-soft)]'
                           : 'border-[var(--line-soft)] hover:border-[var(--accent-line)]'
                       }`}
                     >
-                      <div className={`w-1.5 flex-shrink-0 rounded-l-2xl ${isOOS ? 'bg-red-500' : (activeCategory as { color?: string }).color || 'bg-emerald-600'}`} />
-                      {isOOS && <span className="absolute top-2 right-2 bg-red-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded-md uppercase">Agotado</span>}
+                      <div className={`w-1.5 flex-shrink-0 rounded-l-2xl ${isOOS ? 'bg-[var(--crit)]' : (activeCategory as { color?: string }).color || 'bg-emerald-600'}`} />
+                      {isOOS && <span className="absolute top-2 right-2 bg-[var(--crit)] text-white text-[10px] font-black px-1.5 py-0.5 rounded-md uppercase tracking-wide">Agotado</span>}
                       <div className="flex flex-col justify-between px-3 py-2.5 flex-1">
-                        <span className={`font-semibold text-sm leading-snug ${isOOS ? 'text-gray-500 line-through' : 'text-white'}`}>{item.name}</span>
-                        <span className={`font-bold text-base mt-1 ${isOOS ? 'text-red-400' : 'text-emerald-400'}`}>${Math.round(item.price)}</span>
+                        <span className={`font-semibold text-sm leading-snug ${isOOS ? 'text-[var(--text-4)] line-through' : 'text-[var(--text-1)]'}`}>{item.name}</span>
+                        <span className={`font-bold text-base mt-1 font-mono tabular-nums ${isOOS ? 'text-[var(--crit-ink)]' : 'text-[var(--accent-ink)]'}`}>${Math.round(item.price)}</span>
                       </div>
                     </button>
                     )
@@ -4438,7 +4452,7 @@ function POSContent() {
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowComboModal(false)}>
                   <div className="bg-[var(--panel)] rounded-2xl border border-[var(--line)] shadow-2xl w-[90vw] max-w-[600px] max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
                     <div className="flex items-center justify-between px-5 py-3 border-b border-[rgba(255,255,255,0.08)] bg-gradient-to-r from-amber-600 to-orange-600">
-                      <h3 className="text-white font-bold text-lg">Combos <span className="text-white/60 text-sm font-normal ml-2">{allCombos.length} disponibles</span></h3>
+                      <h3 className="text-[var(--text-1)] font-bold text-lg">Combos <span className="text-[var(--text-1)]/60 text-sm font-normal ml-2">{allCombos.length} disponibles</span></h3>
                       <button onClick={() => setShowComboModal(false)} className="w-11 h-11 rounded-lg bg-white/20 flex items-center justify-center text-white text-2xl font-bold hover:bg-white/30 active:scale-95">&times;</button>
                     </div>
                     <div className="overflow-y-auto p-4 max-h-[65vh] overscroll-contain pos-fat-scroll" style={{ WebkitOverflowScrolling: 'touch' }}>
@@ -4478,11 +4492,11 @@ function POSContent() {
                                 setShowComboModal(false)
                                 setMobileView('order')
                               }}
-                              className="w-full bg-[var(--surface-2)] hover:bg-[var(--raised)] active:scale-[0.97] border border-[var(--line-soft)] hover:border-amber-500/30 rounded-2xl text-left transition-all p-4 shadow-sm"
+                              className="w-full bg-[var(--surface-2)] hover:bg-[var(--raised)] active:scale-[0.97] border border-[var(--line-soft)] hover:border-[color-mix(in_srgb,var(--warn)_40%,transparent)] rounded-2xl text-left transition-all p-4 shadow-sm"
                             >
                               <div className="flex items-center justify-between mb-2">
-                                <span className="font-bold text-white text-lg">{combo.name}</span>
-                                <span className="text-amber-400 font-bold text-xl">${Math.round(combo.price)}</span>
+                                <span className="font-bold text-[var(--text-1)] text-lg">{combo.name}</span>
+                                <span className="text-[var(--warn-ink)] font-bold text-xl">${Math.round(combo.price)}</span>
                               </div>
                               <div className="text-[var(--text-3)] text-sm space-y-0.5">
                                 {combo.items.map((ci, i) => (
@@ -4490,7 +4504,7 @@ function POSContent() {
                                 ))}
                               </div>
                               {savings > 0 && (
-                                <div className="mt-2 text-emerald-400 text-xs font-semibold">
+                                <div className="mt-2 text-[var(--accent-ink)] text-xs font-semibold">
                                   Ahorras ${Math.round(savings)} (era ${Math.round(originalTotal)})
                                 </div>
                               )}
@@ -4619,7 +4633,7 @@ function POSContent() {
 
       {/* Toast notification */}
       {toast && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[60] bg-[var(--line)] border border-slate-600 text-white px-6 py-3 rounded-xl shadow-2xl text-sm font-medium animate-fade-in">
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[60] bg-[var(--line)] border border-[var(--line)] text-[var(--text-1)] px-6 py-3 rounded-xl shadow-2xl text-sm font-medium animate-fade-in">
           {toast}
         </div>
       )}
@@ -4653,14 +4667,14 @@ function POSContent() {
           <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={() => setShowVerify(false)}>
             <div className="bg-[var(--panel)] rounded-2xl border border-[var(--line)] shadow-2xl w-[96vw] max-w-[1000px] max-h-[88vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
               <div className="bg-cyan-600 px-5 py-3 flex items-center justify-between flex-shrink-0">
-                <h3 className="text-white font-bold text-lg">Verificar Orden — Mesa {mesa} <span className="text-white/60 font-normal ml-2">{activeItems.reduce((s, i) => s + i.cantidad, 0)} items</span></h3>
+                <h3 className="text-[var(--text-1)] font-bold text-lg">Verificar Orden — Mesa {mesa} <span className="text-[var(--text-1)]/60 font-normal ml-2">{activeItems.reduce((s, i) => s + i.cantidad, 0)} items</span></h3>
                 <button onClick={() => setShowVerify(false)} className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center text-white text-2xl font-bold hover:bg-white/30">&times;</button>
               </div>
               <div className="flex-1 overflow-auto p-3">
                 {products.map(([productName, items]) => (
                   <div key={productName} className="mb-4">
                     <div className="flex items-center gap-2 mb-1.5">
-                      <span className="text-white font-bold text-base">{productName}</span>
+                      <span className="text-[var(--text-1)] font-bold text-base">{productName}</span>
                       <span className="text-[var(--text-3)] text-sm">×{items.reduce((s, i) => s + i.cantidad, 0)}</span>
                     </div>
                     <div className="overflow-x-auto">
@@ -4687,16 +4701,16 @@ function POSContent() {
                             }))
                             return (
                               <tr key={item.id || idx} className="border-b border-[rgba(255,255,255,0.03)] hover:bg-[rgba(255,255,255,0.03)]">
-                                <td className="py-2 text-white font-bold">{item.cantidad}</td>
+                                <td className="py-2 text-[var(--text-1)] font-bold">{item.cantidad}</td>
                                 {relevantMods.map(mc => (
                                   <td key={mc} className="py-2 text-center">
                                     {itemMods.toUpperCase().includes(mc.toUpperCase())
-                                      ? <span className="text-emerald-400 text-lg">✓</span>
+                                      ? <span className="text-[var(--accent-ink)] text-lg">✓</span>
                                       : <span className="text-[var(--text-4)]">—</span>
                                     }
                                   </td>
                                 ))}
-                                <td className="py-2 text-right text-white font-semibold">${Math.round(item.precio).toLocaleString()}</td>
+                                <td className="py-2 text-right text-[var(--text-1)] font-semibold">${Math.round(item.precio).toLocaleString()}</td>
                                 <td className="py-2 text-center">
                                   <button
                                     onClick={() => { setShowVerify(false); handleEditOrderItem(item) }}
@@ -4715,13 +4729,13 @@ function POSContent() {
                 ))}
                 <div className="flex justify-between items-center mt-2 pt-3 border-t border-[rgba(255,255,255,0.1)]">
                   <span className="text-[var(--text-3)] text-lg">{activeItems.reduce((s, i) => s + i.cantidad, 0)} items</span>
-                  <span className="text-white font-bold text-2xl">${Math.round(activeItems.reduce((s, i) => s + i.precio * i.cantidad, 0)).toLocaleString()}</span>
+                  <span className="text-[var(--text-1)] font-bold text-2xl">${Math.round(activeItems.reduce((s, i) => s + i.precio * i.cantidad, 0)).toLocaleString()}</span>
                 </div>
               </div>
               <div className="px-4 py-3 border-t border-[rgba(255,255,255,0.1)] flex gap-3 flex-shrink-0">
                 <button
                   onClick={() => setShowVerify(false)}
-                  className="flex-1 py-3 rounded-xl bg-[var(--surface)] border border-[var(--line)] text-white font-bold text-base hover:bg-[var(--line)] transition-colors"
+                  className="flex-1 py-3 rounded-xl bg-[var(--surface)] border border-[var(--line)] text-[var(--text-1)] font-bold text-base hover:bg-[var(--line)] transition-colors"
                 >
                   Editar
                 </button>
@@ -4766,7 +4780,7 @@ function POSContent() {
                   ))}
                   <button
                     onClick={() => { setSplitMode('parejo'); setSplitParejoN(0) }}
-                    className="py-4 rounded-xl bg-emerald-900/30 hover:bg-emerald-600/30 border border-emerald-700/50 hover:border-emerald-500 text-emerald-400 font-bold text-sm transition-all"
+                    className="py-4 rounded-xl bg-emerald-900/30 hover:bg-[var(--accent-soft)] border border-emerald-700/50 hover:border-emerald-500 text-[var(--accent-ink)] font-bold text-sm transition-all"
                   >
                     Parejo
                   </button>
@@ -4783,7 +4797,7 @@ function POSContent() {
                     <button
                       key={n}
                       onClick={() => setSplitParejoN(n)}
-                      className="py-4 rounded-xl bg-[var(--line)] hover:bg-emerald-600/30 border border-transparent hover:border-emerald-600 text-white font-bold text-xl transition-all"
+                      className="py-4 rounded-xl bg-[var(--line)] hover:bg-[var(--accent-soft)] border border-transparent hover:border-emerald-600 text-white font-bold text-xl transition-all"
                     >
                       {n}
                     </button>
@@ -4809,7 +4823,7 @@ function POSContent() {
                   return (
                     <div className="text-center mb-6">
                       <p className="text-[var(--text-3)] text-sm mb-2">Total dividido entre {splitParejoN} personas</p>
-                      <p className="text-3xl font-bold text-emerald-400">{formatMXN(perPerson)}</p>
+                      <p className="text-3xl font-bold text-[var(--accent-ink)]">{formatMXN(perPerson)}</p>
                       <p className="text-[var(--text-3)] text-xs mt-1">cada persona</p>
                       <p className="text-[var(--text-2)] text-xs mt-2">Total: {formatMXN(fullTotal)}</p>
                     </div>
@@ -4853,10 +4867,10 @@ function POSContent() {
                         className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-colors ${CUENTA_BG[cuenta]} border`}
                       >
                         <div className="flex items-center gap-3">
-                          <span className={`text-xs font-bold px-2 py-1 rounded-full ${CUENTA_COLORS[cuenta]} text-white`}>C{cuenta}</span>
-                          <span className="text-white text-sm">{item.cantidad}x {item.nombre}</span>
+                          <span className={`text-xs font-bold px-2 py-1 rounded-full ${CUENTA_COLORS[cuenta]} text-[var(--text-1)]`}>C{cuenta}</span>
+                          <span className="text-[var(--text-1)] text-sm">{item.cantidad}x {item.nombre}</span>
                         </div>
-                        <span className="text-white font-semibold">{formatMXN(item.subtotal)}</span>
+                        <span className="text-[var(--text-1)] font-semibold">{formatMXN(item.subtotal)}</span>
                       </button>
                     )
                   })}
@@ -4872,7 +4886,7 @@ function POSContent() {
                     return (
                       <div key={cNum} className={`${CUENTA_BG[cNum]} border rounded-xl p-3 text-center`}>
                         <p className={`${CUENTA_TEXT[cNum]} text-xs font-bold mb-1`}>CUENTA {cNum}</p>
-                        <p className="text-white text-lg font-bold">{formatMXN(cWithIva)}</p>
+                        <p className="text-[var(--text-1)] text-lg font-bold">{formatMXN(cWithIva)}</p>
                         <p className={`${CUENTA_TEXT[cNum]} opacity-60 text-xs`}>{cItems.length} items</p>
                       </div>
                     )
@@ -4926,7 +4940,7 @@ function POSContent() {
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
           <div className="bg-[var(--surface-2)] rounded-2xl p-6 w-full max-w-sm border border-[var(--line)]">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold text-white">Confirmar personas</h3>
+              <h3 className="text-lg font-bold text-[var(--text-1)]">Confirmar personas</h3>
               <button
                 onClick={() => setShowPersonVerify(false)}
                 className="w-11 h-11 rounded-lg bg-[var(--line)] hover:bg-[var(--line)] flex items-center justify-center"
@@ -4976,7 +4990,7 @@ function POSContent() {
                   min={1}
                   max={99}
                   autoFocus
-                  className="w-full bg-[var(--bg)] border border-slate-600 rounded-xl px-4 py-3 text-white text-2xl text-center font-bold focus:outline-none focus:border-emerald-500"
+                  className="w-full bg-[var(--bg)] border border-[var(--line)] rounded-xl px-4 py-3 text-[var(--text-1)] text-2xl text-center font-bold focus:outline-none focus:border-[var(--accent)]"
                 />
               </div>
             )}
@@ -4999,7 +5013,7 @@ function POSContent() {
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
           <div className="rounded-2xl p-6 w-full max-w-md border border-[var(--line)]" style={{background:'var(--panel)'}}>
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+              <h3 className="text-lg font-bold text-[var(--text-1)] flex items-center gap-2">
                 <Smartphone size={20} />
                 Mercado Pago Point
               </h3>
@@ -5019,7 +5033,7 @@ function POSContent() {
                   value={mpAccessToken}
                   onChange={e => setMpAccessToken(e.target.value)}
                   placeholder="APP_USR-..."
-                  className="w-full border border-[var(--line)] rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-cyan-500" style={{background:'var(--surface-2)'}}
+                  className="w-full border border-[var(--line)] rounded-lg px-4 py-3 text-[var(--text-1)] text-sm focus:outline-none focus:border-cyan-500" style={{background:'var(--surface-2)'}}
                 />
               </div>
 
@@ -5031,7 +5045,7 @@ function POSContent() {
                     value={mpDeviceId}
                     onChange={e => setMpDeviceId(e.target.value)}
                     placeholder="GERTEC_MP35P__..."
-                    className="flex-1 border border-[var(--line)] rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-cyan-500" style={{background:'var(--surface-2)'}}
+                    className="flex-1 border border-[var(--line)] rounded-lg px-4 py-3 text-[var(--text-1)] text-sm focus:outline-none focus:border-cyan-500" style={{background:'var(--surface-2)'}}
                   />
                   <button
                     onClick={async () => {
@@ -5085,7 +5099,7 @@ function POSContent() {
                       setShowMPConfig(false)
                       showToast('Point desconfigurado')
                     }}
-                    className="flex-1 py-3 rounded-xl bg-red-600/20 hover:bg-red-600/30 text-red-400 font-semibold text-sm transition-colors"
+                    className="flex-1 py-3 rounded-xl bg-red-600/20 hover:bg-red-600/30 text-[var(--crit-ink)] font-semibold text-sm transition-colors"
                   >
                     Desconectar
                   </button>
@@ -5129,20 +5143,20 @@ function POSContent() {
         const nextItems = done ? [] : itemsOfTiempo(nextTiempo)
         return (
           <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-            <div className="bg-[var(--surface-2)] rounded-2xl p-6 w-full max-w-sm border border-amber-500/30">
+            <div className="bg-[var(--surface-2)] rounded-2xl p-6 w-full max-w-sm border border-[color-mix(in_srgb,var(--warn)_40%,transparent)]">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-bold flex items-center gap-2"><Flame size={18} className="text-amber-400" />Impresión por tiempos</h3>
+                <h3 className="text-lg font-bold flex items-center gap-2"><Flame size={18} className="text-[var(--warn-ink)]" />Impresión por tiempos</h3>
                 <button onClick={() => setShowFirebutton(false)} className="w-11 h-11 rounded-lg bg-[var(--line)] flex items-center justify-center"><X size={18} /></button>
               </div>
               {done ? (
-                <p className="text-emerald-400 text-sm text-center py-4">Todos los tiempos fueron disparados ({numTiempos} de {numTiempos})</p>
+                <p className="text-[var(--accent-ink)] text-sm text-center py-4">Todos los tiempos fueron disparados ({numTiempos} de {numTiempos})</p>
               ) : (
                 <>
-                  <p className="text-[var(--text-3)] text-sm mb-1">Tiempo siguiente: <span className="text-amber-400 font-bold text-lg">{nextTiempo}</span> de {numTiempos}</p>
+                  <p className="text-[var(--text-3)] text-sm mb-1">Tiempo siguiente: <span className="text-[var(--warn-ink)] font-bold text-lg">{nextTiempo}</span> de {numTiempos}</p>
                   <div className="bg-[var(--line)]/50 rounded-lg p-3 mb-4 max-h-36 overflow-y-auto">
                     {nextItems.length === 0
                       ? <p className="text-[var(--text-2)] text-xs">Sin platillos en este tiempo</p>
-                      : nextItems.map(i => <p key={i.id} className="text-white text-xs py-0.5">{i.cantidad}x {i.nombre}</p>)}
+                      : nextItems.map(i => <p key={i.id} className="text-[var(--text-1)] text-xs py-0.5">{i.cantidad}x {i.nombre}</p>)}
                   </div>
                   <button
                     onClick={async () => {
@@ -5226,12 +5240,12 @@ function POSContent() {
 
             <div className="text-center mb-3">
               <p className="text-[var(--text-3)] text-sm">Mesa {mesa} · {mesero}</p>
-              <p className="text-5xl font-black text-white">{formatMXN(payTotal)}</p>
+              <p className="text-5xl font-black text-[var(--text-1)]">{formatMXN(payTotal)}</p>
               {discount > 0 && splitPayingCuenta === 0 && (
-                <p className="text-red-400 text-sm mt-1">Descuento: -{formatMXN(discount)}</p>
+                <p className="text-[var(--crit-ink)] text-sm mt-1">Descuento: -{formatMXN(discount)}</p>
               )}
               {propina > 0 && (
-                <p className="text-emerald-400 text-lg font-bold">+ propina {formatMXN(propina)} = {formatMXN(payTotal + propina)}</p>
+                <p className="text-[var(--accent-ink)] text-lg font-bold">+ propina {formatMXN(propina)} = {formatMXN(payTotal + propina)}</p>
               )}
             </div>
 
@@ -5257,7 +5271,7 @@ function POSContent() {
                   value={propina || ''}
                   onChange={e => setPropina(Number(e.target.value) || 0)}
                   placeholder="$"
-                  className="w-28 min-h-[56px] bg-[var(--line)] border border-slate-600 rounded-xl px-3 text-white text-lg text-center focus:outline-none focus:border-emerald-500"
+                  className="w-28 min-h-[56px] bg-[var(--line)] border border-[var(--line)] rounded-xl px-3 text-[var(--text-1)] text-lg text-center focus:outline-none focus:border-[var(--accent)]"
                 />
               </div>
             </div>
@@ -5380,7 +5394,7 @@ function POSContent() {
                 const cambio = cashReceived - totalConPropina
                 return (
                   <div className="bg-[var(--surface-2)] border border-emerald-700/40 rounded-xl p-4 space-y-3">
-                    <p className="text-emerald-400 text-lg font-bold text-center">Total a cobrar: {formatMXN(totalConPropina)}</p>
+                    <p className="text-[var(--accent-ink)] text-lg font-bold text-center">Total a cobrar: {formatMXN(totalConPropina)}</p>
                     <div className="flex gap-3">
                       {[100, 200, 500, 1000].map(bill => (
                         <button key={bill} onClick={() => setCashAmount(String(bill))}
@@ -5392,14 +5406,14 @@ function POSContent() {
                       type="number" inputMode="decimal" value={cashAmount}
                       onChange={e => setCashAmount(e.target.value)}
                       placeholder="Monto recibido" autoFocus
-                      className="w-full bg-[var(--bg)] border-2 border-slate-600 rounded-xl px-4 py-4 text-white text-3xl text-center font-black focus:outline-none focus:border-emerald-500"
+                      className="w-full bg-[var(--bg)] border-2 border-[var(--line)] rounded-xl px-4 py-4 text-[var(--text-1)] text-3xl text-center font-black focus:outline-none focus:border-[var(--accent)]"
                     />
                     {cashReceived > 0 && (
-                      <div className={`text-center py-3 rounded-xl ${cambio >= 0 ? 'bg-emerald-900/40 border border-emerald-700/40' : 'bg-red-900/40 border border-red-700/40'}`}>
+                      <div className={`text-center py-3 rounded-xl ${cambio >= 0 ? 'bg-[var(--accent-soft)] border border-emerald-700/40' : 'bg-[var(--crit-soft)] border border-red-700/40'}`}>
                         {cambio >= 0 ? (
-                          <p className="text-3xl font-black text-emerald-400">Cambio: {formatMXN(cambio)}</p>
+                          <p className="text-3xl font-black text-[var(--accent-ink)]">Cambio: {formatMXN(cambio)}</p>
                         ) : (
-                          <p className="text-xl text-red-400 font-bold">Falta {formatMXN(Math.abs(cambio))}</p>
+                          <p className="text-xl text-[var(--crit-ink)] font-bold">Falta {formatMXN(Math.abs(cambio))}</p>
                         )}
                       </div>
                     )}
@@ -5415,8 +5429,8 @@ function POSContent() {
               })()}
               {showCardConfirm && (
                 <div className="bg-[var(--surface-2)] border border-blue-600/50 rounded-xl p-4 space-y-3">
-                  <p className="text-blue-300 text-sm font-bold text-center uppercase tracking-wide">Teclea en la terminal bancaria</p>
-                  <p className="text-5xl font-black text-white text-center tabular-nums">{formatMXN(payTotal + propina)}</p>
+                  <p className="text-[var(--info-ink)] text-sm font-bold text-center uppercase tracking-wide">Teclea en la terminal bancaria</p>
+                  <p className="text-5xl font-black text-[var(--text-1)] text-center tabular-nums">{formatMXN(payTotal + propina)}</p>
                   <p className="text-[var(--text-3)] text-xs text-center">Verifica que el monto en la Getnet coincida ANTES de cobrar</p>
                   <div className="flex gap-2">
                     <button
@@ -5482,12 +5496,12 @@ function POSContent() {
                     {/* Pagos agregados */}
                     {mixtoPagos.map((p, idx) => (
                       <div key={idx} className="flex items-center justify-between bg-[var(--bg)]/60 rounded-lg px-3 py-2">
-                        <span className="text-sm text-white">{p.metodo}</span>
+                        <span className="text-sm text-[var(--text-1)]">{p.metodo}</span>
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-semibold text-white">{formatMXN(p.monto)}</span>
+                          <span className="text-sm font-semibold text-[var(--text-1)]">{formatMXN(p.monto)}</span>
                           <button
                             onClick={() => setMixtoPagos(prev => prev.filter((_, i) => i !== idx))}
-                            className="w-11 h-11 rounded-lg bg-red-500/15 text-red-400 flex items-center justify-center"
+                            className="w-11 h-11 rounded-lg bg-red-500/15 text-[var(--crit-ink)] flex items-center justify-center"
                           >
                             <X size={18} />
                           </button>
@@ -5515,11 +5529,11 @@ function POSContent() {
                             value={mixtoMonto}
                             onChange={(e) => setMixtoMonto(e.target.value)}
                             placeholder="0.00"
-                            className="flex-1 min-h-[52px] bg-[var(--bg)] border border-slate-600 rounded-lg px-3 text-white text-lg text-right focus:outline-none focus:border-amber-500"
+                            className="flex-1 min-h-[52px] bg-[var(--bg)] border border-[var(--line)] rounded-lg px-3 text-[var(--text-1)] text-lg text-right focus:outline-none focus:border-amber-500"
                           />
                           <button
                             onClick={() => setMixtoMonto(restante.toFixed(2))}
-                            className="px-4 min-h-[52px] rounded-lg bg-[var(--bg)]/60 text-amber-400 text-sm font-semibold"
+                            className="px-4 min-h-[52px] rounded-lg bg-[var(--bg)]/60 text-[var(--warn-ink)] text-sm font-semibold"
                           >
                             Restante
                           </button>
@@ -5530,7 +5544,7 @@ function POSContent() {
                               setMixtoMonto('')
                             }}
                             disabled={montoNum <= 0 || montoNum > restante + 0.009}
-                            className="px-5 min-h-[52px] rounded-lg bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:text-slate-500 text-white text-base font-bold"
+                            className="px-5 min-h-[52px] rounded-lg bg-amber-600 hover:bg-amber-500 disabled:bg-[var(--raised)] disabled:text-[var(--text-4)] text-white text-base font-bold"
                           >
                             Agregar
                           </button>
@@ -5539,12 +5553,12 @@ function POSContent() {
                     )}
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-[var(--text-2)]">Restante:</span>
-                      <span className={`font-bold ${restante <= 0.009 ? 'text-emerald-400' : 'text-amber-400'}`}>{formatMXN(restante)}</span>
+                      <span className={`font-bold ${restante <= 0.009 ? 'text-[var(--accent-ink)]' : 'text-[var(--warn-ink)]'}`}>{formatMXN(restante)}</span>
                     </div>
                     <button
                       onClick={() => handlePayment('Mixto')}
                       disabled={saving || mixtoPagos.length === 0 || restante > 0.009}
-                      className="w-full bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold py-4 rounded-xl text-lg transition-colors min-h-[60px]"
+                      className="w-full bg-amber-600 hover:bg-amber-500 disabled:bg-[var(--raised)] disabled:text-[var(--text-4)] text-white font-bold py-4 rounded-xl text-lg transition-colors min-h-[60px]"
                     >
                       {restante > 0.009 ? `Faltan ${formatMXN(restante)}` : 'Confirmar pago mixto'}
                     </button>
@@ -5575,7 +5589,7 @@ function POSContent() {
                 if (e.key === 'Enter' && pinInput) { pinPrompt.onSubmit(pinInput); setPinInput('') }
                 if (e.key === 'Escape') { setPinPrompt(null); setPinInput('') }
               }}
-              className="w-full px-4 py-3 rounded-xl bg-[var(--surface-2)] border border-[var(--line)] text-center text-lg font-mono text-[var(--text-1)] focus:outline-none focus:border-emerald-500"
+              className="w-full px-4 py-3 rounded-xl bg-[var(--surface-2)] border border-[var(--line)] text-center text-lg font-mono text-[var(--text-1)] focus:outline-none focus:border-[var(--accent)]"
               placeholder={pinPrompt.title.toLowerCase().includes('pin') ? '****' : '#'}
             />
             <div className="flex gap-3 mt-4">
