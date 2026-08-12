@@ -1,5 +1,5 @@
 // Demo data for a fictional restaurant "Casa Montaña"
-// Premium casual dining in Monterrey — ~$1M MXN/month
+// Premium casual dining in Monterrey — ~$2.5M MXN/month, high-volume flagship
 // Used in /demo/dashboard and /demo/pos for sales demos
 
 export const DEMO_RESTAURANT = {
@@ -13,45 +13,45 @@ export const DEMO_RESTAURANT = {
   ],
 }
 
-// ~$1M/month = ~$33,300/day avg (30 days) but some days higher
-// Today is a strong Saturday: $38,450 so far at 3pm, will close ~$52K
+// ~$2.5M/month = ~$83,000/day avg (30 days), fines de semana mucho más altos.
+// Hoy es un sábado fuerte: $87,400 a las 3pm, cierra ~$120K.
 
 export const DEMO_KPIS = {
-  ventas_dia: 38450,
-  ventas_brutas: 40120,
-  descuentos: 1670,
-  tickets_count: 74,
-  personas_restaurant: 156,
+  ventas_dia: 87400,
+  ventas_brutas: 91650,
+  descuentos: 4250,
+  tickets_count: 168,
+  personas_restaurant: 352,
   ticket_promedio: 520,
-  mesas_atendidas: 22,
-  ordenes_llevar: 8,
-  efectivo: 11535,
-  tarjeta: 21148,
-  transferencia: 5767,
-  propinas_total: 5768,
+  mesas_atendidas: 26,
+  ordenes_llevar: 19,
+  efectivo: 24480,
+  tarjeta: 48320,
+  transferencia: 14600,
+  propinas_total: 13110,
   hora_pico: '13:00 - 14:00',
   ultima_venta: '15:12',
-  chilaquiles_total: 4890,
-  half_half_total: 2150,
+  chilaquiles_total: 9860,
+  half_half_total: 4720,
 }
 
 export const DEMO_YESTERDAY = {
-  ventas_dia: 35200,
-  tickets_count: 68,
-  ticket_promedio: 518,
+  ventas_dia: 79600,
+  tickets_count: 154,
+  ticket_promedio: 517,
 }
 
 export const DEMO_LAST_WEEK = {
-  ventas_dia: 36800,
-  tickets_count: 71,
+  ventas_dia: 82300,
+  tickets_count: 159,
 }
 
 export const DEMO_DOW_AVG = {
-  ventas_dia: 37500,
+  ventas_dia: 84500,
 }
 
-// 90 days of history — realistic seasonality
-// Weekdays ~$28-35K, Sat ~$45-55K, Sun ~$38-48K
+// 90 days of history — realistic seasonality (restaurante de alto volumen)
+// Weekdays ~$58-70K, Sat ~$105-118K, Sun ~$88-98K
 function generateHistory(): { fecha: string; ventas_dia: number; tickets_count: number }[] {
   const data = []
   const today = new Date()
@@ -63,20 +63,20 @@ function generateHistory(): { fecha: string; ventas_dia: number; tickets_count: 
 
     // Base by day of week
     let base: number
-    if (dow === 6) base = 48000 + Math.random() * 8000       // Sat: $48-56K
-    else if (dow === 0) base = 40000 + Math.random() * 8000   // Sun: $40-48K
-    else if (dow === 5) base = 35000 + Math.random() * 5000   // Fri: $35-40K
-    else base = 28000 + Math.random() * 7000                   // Mon-Thu: $28-35K
+    if (dow === 6) base = 105000 + Math.random() * 13000      // Sat: $105-118K
+    else if (dow === 0) base = 88000 + Math.random() * 10000   // Sun: $88-98K
+    else if (dow === 5) base = 76000 + Math.random() * 10000   // Fri: $76-86K
+    else base = 58000 + Math.random() * 12000                  // Mon-Thu: $58-70K
 
     // Trend: slight growth over 3 months (+8%)
     const trendMultiplier = 1 + (90 - i) * 0.0009
     base *= trendMultiplier
 
     // Random noise
-    base += (Math.random() - 0.5) * 3000
+    base += (Math.random() - 0.5) * 6000
 
     const ventas = Math.round(base)
-    const tickets = Math.round(ventas / (480 + Math.random() * 80))
+    const tickets = Math.round(ventas / (500 + Math.random() * 60))
 
     data.push({ fecha: dateStr, ventas_dia: ventas, tickets_count: tickets })
   }
@@ -108,59 +108,59 @@ export const DEMO_MONTHLY = (() => {
   }))
 })()
 
-// Mesero ranking — 8 meseros, top 3 carry the weight
+// Mesero ranking — 8 meseros, top 3 carry the weight (suma ≈ ventas del día)
 export const DEMO_MESEROS = [
-  { nombre: 'Alejandro Treviño', total: 8200, tickets: 16, propinas: 1640, personas: 34 },
-  { nombre: 'Sofía Garza', total: 7100, tickets: 14, propinas: 1420, personas: 28 },
-  { nombre: 'Diego Cantú', total: 5900, tickets: 11, propinas: 1062, personas: 24 },
-  { nombre: 'Valeria Lozano', total: 5400, tickets: 10, propinas: 918, personas: 22 },
-  { nombre: 'Emilio Salinas', total: 4800, tickets: 9, propinas: 720, personas: 19 },
-  { nombre: 'Camila Ruiz', total: 3200, tickets: 6, propinas: 480, personas: 13 },
-  { nombre: 'Santiago Herrera', total: 2400, tickets: 5, propinas: 336, personas: 10 },
-  { nombre: 'Isabella Flores', total: 1450, tickets: 3, propinas: 192, personas: 6 },
+  { nombre: 'Alejandro Treviño', total: 18600, tickets: 34, propinas: 3720, personas: 74 },
+  { nombre: 'Sofía Garza', total: 15400, tickets: 29, propinas: 3080, personas: 62 },
+  { nombre: 'Diego Cantú', total: 13200, tickets: 25, propinas: 2376, personas: 53 },
+  { nombre: 'Valeria Lozano', total: 11800, tickets: 22, propinas: 2006, personas: 47 },
+  { nombre: 'Emilio Salinas', total: 9900, tickets: 19, propinas: 1485, personas: 40 },
+  { nombre: 'Camila Ruiz', total: 7400, tickets: 15, propinas: 1110, personas: 30 },
+  { nombre: 'Santiago Herrera', total: 6200, tickets: 13, propinas: 868, personas: 26 },
+  { nombre: 'Isabella Flores', total: 4900, tickets: 11, propinas: 637, personas: 20 },
 ]
 
 // Top platillos — mix of brunch and dinner items
 export const DEMO_PLATILLOS = [
-  { nombre: 'Rib Eye 300g', cantidad: 12, total: 5400 },
-  { nombre: 'Chilaquiles Rojos', cantidad: 28, total: 4480 },
-  { nombre: 'Salmon a la Parrilla', cantidad: 14, total: 3780 },
-  { nombre: 'Café Americano', cantidad: 52, total: 2860 },
-  { nombre: 'Avocado Toast', cantidad: 19, total: 2660 },
-  { nombre: 'Pasta Trufa Negra', cantidad: 9, total: 2520 },
-  { nombre: 'Eggs Benedict', cantidad: 13, total: 2470 },
-  { nombre: 'Capuchino', cantidad: 34, total: 2720 },
-  { nombre: 'Hamburguesa Angus', cantidad: 11, total: 2310 },
-  { nombre: 'Smoothie Bowl Acai', cantidad: 15, total: 2085 },
-  { nombre: 'Tacos de Arrachera', cantidad: 18, total: 1980 },
-  { nombre: 'Latte', cantidad: 28, total: 2100 },
-  { nombre: 'Limonada con Menta', cantidad: 22, total: 1540 },
-  { nombre: 'Cheesecake NY', cantidad: 10, total: 1450 },
-  { nombre: 'Mimosa', cantidad: 16, total: 1280 },
+  { nombre: 'Rib Eye 300g', cantidad: 28, total: 12600 },
+  { nombre: 'Chilaquiles Rojos', cantidad: 62, total: 9920 },
+  { nombre: 'Salmon a la Parrilla', cantidad: 31, total: 8370 },
+  { nombre: 'Café Americano', cantidad: 118, total: 6490 },
+  { nombre: 'Arrachera 250g', cantidad: 24, total: 7680 },
+  { nombre: 'Avocado Toast', cantidad: 43, total: 6020 },
+  { nombre: 'Pasta Trufa Negra', cantidad: 21, total: 5880 },
+  { nombre: 'Eggs Benedict', cantidad: 30, total: 5670 },
+  { nombre: 'Capuchino', cantidad: 76, total: 6080 },
+  { nombre: 'Hamburguesa Angus', cantidad: 25, total: 5250 },
+  { nombre: 'Smoothie Bowl Acai', cantidad: 34, total: 4726 },
+  { nombre: 'Tacos de Arrachera', cantidad: 41, total: 4510 },
+  { nombre: 'Costillas BBQ', cantidad: 13, total: 4940 },
+  { nombre: 'Cheesecake NY', cantidad: 28, total: 4060 },
+  { nombre: 'Mimosa', cantidad: 38, total: 4560 },
 ]
 
-// Ventas por grupo — casual dining mix
+// Ventas por grupo — casual dining mix (suma ≈ ventas del día)
 export const DEMO_GRUPOS = [
-  { nombre: 'CARNES & PARRILLA', total: 8900 },
-  { nombre: 'DESAYUNOS', total: 6200 },
-  { nombre: 'CAFÉ & ESPRESSO', total: 5580 },
-  { nombre: 'MARISCOS', total: 4100 },
-  { nombre: 'PASTAS', total: 3400 },
-  { nombre: 'TOAST & BAGELS', total: 2800 },
-  { nombre: 'COCTELERÍA', total: 2600 },
-  { nombre: 'BOWLS & ENSALADAS', total: 2200 },
-  { nombre: 'JUGOS & SMOOTHIES', total: 1900 },
-  { nombre: 'POSTRES', total: 1800 },
-  { nombre: 'VINOS', total: 1500 },
-  { nombre: 'TACOS & ANTOJITOS', total: 1350 },
+  { nombre: 'CARNES & PARRILLA', total: 19200 },
+  { nombre: 'DESAYUNOS', total: 13400 },
+  { nombre: 'CAFÉ & ESPRESSO', total: 12100 },
+  { nombre: 'MARISCOS', total: 8900 },
+  { nombre: 'PASTAS', total: 7400 },
+  { nombre: 'TOAST & BAGELS', total: 6100 },
+  { nombre: 'COCTELERÍA', total: 5600 },
+  { nombre: 'BOWLS & ENSALADAS', total: 4800 },
+  { nombre: 'JUGOS & SMOOTHIES', total: 4100 },
+  { nombre: 'POSTRES', total: 3900 },
+  { nombre: 'VINOS', total: 3300 },
+  { nombre: 'TACOS & ANTOJITOS', total: 2900 },
 ]
 
-// Pago metodos
+// Pago metodos (suma ≈ ventas del día)
 export const DEMO_PAGOS = [
-  { nombre: 'Tarjeta de crédito', total: 14380 },
-  { nombre: 'Tarjeta de débito', total: 6768 },
-  { nombre: 'Efectivo', total: 11535 },
-  { nombre: 'Transferencia electrónica', total: 5767 },
+  { nombre: 'Tarjeta de crédito', total: 33820 },
+  { nombre: 'Efectivo', total: 24480 },
+  { nombre: 'Tarjeta de débito', total: 14500 },
+  { nombre: 'Transferencia electrónica', total: 14600 },
 ]
 
 // Propinas por mesero
@@ -168,37 +168,37 @@ export const DEMO_PROPINAS = DEMO_MESEROS.map(m => ({ nombre: m.nombre, total: m
 
 // Hourly sales pattern (for prediction widget)
 export const DEMO_HOURLY = [
-  { hora: '08:00', ventas: 1200 },
-  { hora: '09:00', ventas: 2800 },
-  { hora: '10:00', ventas: 4100 },
-  { hora: '11:00', ventas: 5200 },
-  { hora: '12:00', ventas: 5800 },
-  { hora: '13:00', ventas: 6200 },
-  { hora: '14:00', ventas: 4900 },
-  { hora: '15:00', ventas: 3100 },
-  { hora: '16:00', ventas: 1500 },
-  { hora: '17:00', ventas: 1100 },
-  { hora: '18:00', ventas: 2400 },
-  { hora: '19:00', ventas: 3800 },
-  { hora: '20:00', ventas: 4500 },
-  { hora: '21:00', ventas: 3200 },
-  { hora: '22:00', ventas: 1800 },
+  { hora: '08:00', ventas: 2000 },
+  { hora: '09:00', ventas: 4700 },
+  { hora: '10:00', ventas: 6900 },
+  { hora: '11:00', ventas: 8700 },
+  { hora: '12:00', ventas: 9700 },
+  { hora: '13:00', ventas: 10400 },
+  { hora: '14:00', ventas: 8200 },
+  { hora: '15:00', ventas: 5200 },
+  { hora: '16:00', ventas: 2500 },
+  { hora: '17:00', ventas: 1900 },
+  { hora: '18:00', ventas: 4000 },
+  { hora: '19:00', ventas: 6400 },
+  { hora: '20:00', ventas: 7600 },
+  { hora: '21:00', ventas: 5400 },
+  { hora: '22:00', ventas: 3000 },
 ]
 
 // AI Insights (what the system "detected")
 export const DEMO_INSIGHTS = [
-  { type: 'trend', title: 'Ventas +8% vs mes pasado', desc: 'Tendencia creciente sostenida los últimos 3 meses. Proyección: $1.08M en junio.' },
-  { type: 'alert', title: 'Salmon stock bajo', desc: 'Al ritmo actual, quedan ~6 órdenes de Salmon a la Parrilla. Reordenar hoy.' },
-  { type: 'insight', title: 'Sábados rinden 52% más', desc: 'Promedio sábado: $51,200 vs promedio L-V: $33,600. Considerar eventos especiales.' },
-  { type: 'upsell', title: 'Oportunidad en postres', desc: 'Solo 14% de mesas piden postre. Promedio industria: 25%. +$3,200/día potencial.' },
-  { type: 'staff', title: 'Alejandro: mejor TP del equipo', desc: 'Ticket promedio $513 vs promedio del equipo $438. Estudiar su técnica de venta.' },
+  { type: 'trend', title: 'Ventas +8% vs mes pasado', desc: 'Tendencia creciente sostenida los últimos 3 meses. Proyección: $2.6M este mes.' },
+  { type: 'alert', title: 'Salmon stock bajo', desc: 'Al ritmo actual, quedan ~10 órdenes de Salmon a la Parrilla. Reordenar hoy.' },
+  { type: 'insight', title: 'Sábados rinden 54% más', desc: 'Promedio sábado: $112,000 vs promedio L-V: $68,400. Considerar eventos especiales.' },
+  { type: 'upsell', title: 'Oportunidad en postres', desc: 'Solo 14% de mesas piden postre. Promedio industria: 25%. +$7,400/día potencial.' },
+  { type: 'staff', title: 'Alejandro: mejor TP del equipo', desc: 'Ticket promedio $547 vs promedio del equipo $438. Estudiar su técnica de venta.' },
 ]
 
 // Week-over-week comparison
 export const DEMO_WOW = {
-  thisWeek: { ventas: 198500, tickets: 382, personas: 803 },
-  lastWeek: { ventas: 187200, tickets: 361, personas: 758 },
-  change: { ventas: 6.0, tickets: 5.8, personas: 5.9 },
+  thisWeek: { ventas: 542000, tickets: 1042, personas: 2180 },
+  lastWeek: { ventas: 511000, tickets: 984, personas: 2050 },
+  change: { ventas: 6.1, tickets: 5.9, personas: 6.3 },
 }
 
 // POS Menu — premium casual dining
