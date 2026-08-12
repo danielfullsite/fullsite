@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { Bot, Activity, AlertTriangle, CheckCircle2, Clock, RefreshCw, Zap, Shield, TrendingUp, Package, Users, ChefHat, Star, MessageCircle, FileText, Truck, Trash2, CloudSun, Target, BarChart3, Calendar, Bell, Settings, Timer, Brain, Sparkles } from 'lucide-react'
+import { Bot, Activity, AlertTriangle, CheckCircle2, Clock, RefreshCw, Zap, Shield, TrendingUp, Package, Users, ChefHat, Star, MessageCircle, FileText, Truck, Trash2, CloudSun, Target, BarChart3, Calendar, Bell, Settings, Timer, Brain, Sparkles, Send, Check, X } from 'lucide-react'
 import { getDeepTable } from '@/lib/data'
 
 interface AgentRun {
@@ -131,6 +131,12 @@ export default function MissionControlPage() {
   const [results, setResults] = useState<AgentResultFull[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null)
+  // Chat + acciones del drawer del agente
+  type ChatMsg = { role: 'user' | 'assistant'; content: string }
+  const [chats, setChats] = useState<Record<string, ChatMsg[]>>({})
+  const [chatInput, setChatInput] = useState('')
+  const [chatLoading, setChatLoading] = useState(false)
+  const [actioned, setActioned] = useState<Record<string, 'aplicado' | 'recordar' | 'descartado'>>({})
 
   const load = useCallback(async () => {
     try {
@@ -182,7 +188,7 @@ export default function MissionControlPage() {
   }
 
   // Recent activity feed (last 15 runs)
-  const recentFeed = [...runs].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 15)
+  const recentFeed = [...runs].filter(r => r.agent_id !== 'smoke-test').sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 15)
 
   // Detecciones — hallazgos de los agentes (color-coded), ordenados por severidad
   const detections = Array.from(latestResults.values())
@@ -193,6 +199,50 @@ export default function MissionControlPage() {
     })
     .sort((a, b) => SEV[b.kind] - SEV[a.kind])
   const briefing = detections.filter(d => d.kind === 'crit' || d.kind === 'warn').slice(0, 3)
+
+  // Mensaje de bienvenida del agente (basado en su última detección)
+  function introFor(id: string): ChatMsg {
+    const meta = AGENT_META[id]
+    const r = latestResults.get(id)
+    const name = meta?.name || id
+    return {
+      role: 'assistant',
+      content: r?.summary
+        ? `Soy el agente de ${name}. Detecté: ${r.summary} ¿Quieres que te explique por qué o qué hacer?`
+        : `Soy el agente de ${name}. Pregúntame lo que quieras sobre lo que analizo.`,
+    }
+  }
+
+  async function sendChat() {
+    const agent = selectedAgent
+    const q = chatInput.trim()
+    if (!agent || !q || chatLoading) return
+    const meta = AGENT_META[agent]
+    const result = latestResults.get(agent)
+    const prev = chats[agent] ?? [introFor(agent)]
+    const next: ChatMsg[] = [...prev, { role: 'user', content: q }]
+    setChats(c => ({ ...c, [agent]: next }))
+    setChatInput('')
+    setChatLoading(true)
+    try {
+      const res = await fetch('/api/agents/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agentName: meta?.name || agent,
+          summary: result?.summary || '',
+          data: result?.data,
+          messages: next.map(m => ({ role: m.role, content: m.content })),
+        }),
+      })
+      const j = await res.json().catch(() => ({ reply: '' }))
+      setChats(c => ({ ...c, [agent]: [...next, { role: 'assistant', content: j.reply || 'No pude responder ahora.' }] }))
+    } catch {
+      setChats(c => ({ ...c, [agent]: [...next, { role: 'assistant', content: 'No pude responder ahora. Intenta de nuevo.' }] }))
+    } finally {
+      setChatLoading(false)
+    }
+  }
 
   if (loading) {
     return <div className="flex items-center justify-center h-96"><div className="w-10 h-10 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>
@@ -434,6 +484,35 @@ export default function MissionControlPage() {
                       )}
                     </div>
                   )}
+                </div>
+
+                {/* Acciones + Habla con el agente */}
+                <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] p-4 space-y-3">
+                  <div className="flex gap-2">
+                    <button onClick={() => setActioned(a => ({ ...a, [selectedAgent]: 'aplicado' }))} className={`flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-semibold rounded-lg py-2 transition-colors ${actioned[selectedAgent] === 'aplicado' ? 'bg-emerald-500 text-[#04130d]' : 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20'}`}>
+                      <Check size={14} />{actioned[selectedAgent] === 'aplicado' ? 'Aplicado' : 'Aplicar'}
+                    </button>
+                    <button onClick={() => setActioned(a => ({ ...a, [selectedAgent]: 'recordar' }))} className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-semibold rounded-lg py-2 bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-2)] hover:bg-[var(--panel)] transition-colors">
+                      <Clock size={14} />Recordar
+                    </button>
+                    <button onClick={() => { setActioned(a => ({ ...a, [selectedAgent]: 'descartado' })); setSelectedAgent(null) }} className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-semibold rounded-lg py-2 bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-3)] hover:bg-[var(--panel)] transition-colors">
+                      <X size={14} />Descartar
+                    </button>
+                  </div>
+
+                  <div className="border-t border-[var(--line-soft)] pt-3">
+                    <p className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-4)] mb-2 flex items-center gap-1.5"><Sparkles size={12} className="text-emerald-400" />Habla con el agente</p>
+                    <div className="space-y-2 max-h-[260px] overflow-y-auto mb-2.5 pr-1">
+                      {(chats[selectedAgent] ?? [introFor(selectedAgent)]).map((m, i) => (
+                        <div key={i} className={`max-w-[88%] px-3 py-2 rounded-2xl text-xs leading-snug ${m.role === 'user' ? 'ml-auto bg-emerald-500/[0.12] border border-emerald-500/25 text-[var(--text-1)] rounded-br-md' : 'bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-2)] rounded-bl-md'}`}>{m.content}</div>
+                      ))}
+                      {chatLoading && <div className="bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-3)] max-w-[60%] px-3 py-2 rounded-2xl rounded-bl-md text-xs">escribiendo…</div>}
+                    </div>
+                    <form onSubmit={(e) => { e.preventDefault(); sendChat() }} className="flex gap-2">
+                      <input value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="Pregúntale al agente…" className="flex-1 bg-[var(--surface-2)] border border-[var(--line)] rounded-full px-3.5 py-2 text-xs text-[var(--text-1)] outline-none focus:border-emerald-500/40 min-w-0" />
+                      <button type="submit" disabled={!chatInput.trim() || chatLoading} className="w-9 h-9 rounded-full bg-emerald-500 text-[#04130d] grid place-items-center disabled:opacity-40 flex-shrink-0"><Send size={15} /></button>
+                    </form>
+                  </div>
                 </div>
 
                 {/* Historial de ejecuciones */}
