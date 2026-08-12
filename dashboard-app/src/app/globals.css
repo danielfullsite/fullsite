@@ -166,19 +166,21 @@ body:has(.pos-kiosk) {
 }
 
 [data-theme="light"] {
-  /* DS v2.1 "Servicio · Día": papel neutro cálido con leve sesgo verde (elegido, no gris) */
-  --bg: #eef1ec;
+  /* DS v2.1 "Servicio · Día": papel neutro cálido con leve sesgo verde (elegido, no gris).
+   * Fondo un poco más profundo + bordes más definidos → las tarjetas blancas destacan
+   * y el texto secundario se lee mejor (dashboard "más visible y amigable"). */
+  --bg: #e7ece2;
   --surface: #ffffff;
-  --surface-2: #f5f8f3;
+  --surface-2: #f4f7f1;
   --panel: #ffffff;
   --raised: #fbfdfa;
-  --line: #dde3db;
-  --line-soft: #e9ede6;
+  --line: #c9d2c4;
+  --line-soft: #dbe2d6;
 
   --text-1: #0e1613;
-  --text-2: #3b4642;
-  --text-3: #66716c;
-  --text-4: #98a29d;
+  --text-2: #364039;
+  --text-3: #57625a;
+  --text-4: #8a958e;
 
   --accent: #0ea371;
   --accent-bright: #10b981;
@@ -202,10 +204,10 @@ body:has(.pos-kiosk) {
   --bento-bevel: linear-gradient(90deg, transparent 0%, rgba(16,32,26,0.10) 50%, transparent 100%);
   --bento-radial: radial-gradient(circle, rgba(5,150,105,0.12) 0%, transparent 65%);
 
-  --shadow-hero: 0 2px 6px rgba(16,32,26,0.07), 0 26px 60px rgba(5,120,90,0.10);
-  --shadow-mid:  0 1px 2px rgba(16,32,26,0.06), 0 12px 30px rgba(16,32,26,0.08);
-  --shadow-soft: 0 1px 2px rgba(16,32,26,0.05), 0 6px 16px rgba(16,32,26,0.06);
-  --shadow-deep: 0 4px 12px rgba(16,32,26,0.07), 0 24px 48px rgba(16,32,26,0.09);
+  --shadow-hero: 0 2px 8px rgba(16,32,26,0.09), 0 26px 60px rgba(5,120,90,0.12);
+  --shadow-mid:  0 1px 3px rgba(16,32,26,0.09), 0 10px 26px rgba(16,32,26,0.11);
+  --shadow-soft: 0 1px 2px rgba(16,32,26,0.07), 0 5px 14px rgba(16,32,26,0.08);
+  --shadow-deep: 0 5px 14px rgba(16,32,26,0.10), 0 24px 48px rgba(16,32,26,0.12);
 
   /* Aliases for component compatibility */
   --surface-1: var(--surface);

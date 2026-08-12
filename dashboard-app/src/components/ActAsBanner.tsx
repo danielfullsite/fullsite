@@ -32,13 +32,13 @@ export default function ActAsBanner() {
   }
 
   return (
-    <div className="sticky top-0 z-40 flex items-center justify-center gap-3 bg-amber-500/15 border-b border-amber-500/30 px-4 py-2 text-[13px] text-amber-200 backdrop-blur">
+    <div className="sticky top-0 z-40 flex items-center justify-center gap-3 bg-[var(--warn-soft)] border-b border-[color-mix(in_srgb,var(--warn)_45%,transparent)] px-4 py-2 text-[13px] font-medium text-[var(--warn-ink)] backdrop-blur">
       <Eye size={15} className="flex-shrink-0" />
       <span>Estás viendo <b className="font-mono">{actas}</b> como administrador de plataforma.</span>
       <button
         onClick={exit}
         disabled={busy}
-        className="ml-1 inline-flex items-center gap-1.5 rounded-md bg-amber-500/20 px-2.5 py-1 font-semibold text-amber-100 hover:bg-amber-500/30 disabled:opacity-60"
+        className="ml-1 inline-flex items-center gap-1.5 rounded-md bg-[color-mix(in_srgb,var(--warn)_22%,transparent)] px-2.5 py-1 font-semibold text-[var(--warn-ink)] hover:bg-[color-mix(in_srgb,var(--warn)_34%,transparent)] disabled:opacity-60"
       >
         {busy ? <Loader2 size={13} className="animate-spin" /> : <LogOut size={13} />} Salir
       </button>
