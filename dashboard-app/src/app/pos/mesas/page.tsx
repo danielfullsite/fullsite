@@ -888,16 +888,9 @@ export default function MesasPage() {
         </div>
       </header>
 
-      {/* Alert banner */}
-      {alertMesas.length > 0 && (
-        <div className="mx-6 mt-3 flex items-center gap-3 px-4 py-3 bg-red-500/10 border border-red-500/20 rounded-xl animate-pulse">
-          <AlertTriangle size={18} className="text-[var(--crit-ink)] flex-shrink-0" />
-          <span className="text-sm text-[var(--crit-ink)] font-medium">
-            {alertMesas.length} mesa{alertMesas.length > 1 ? 's' : ''} con +{ALERT_THRESHOLD} min:{' '}
-            {alertMesas.map(o => `Mesa ${o.mesa} (${getMinutes(o.created_at)}m)`).join(', ')}
-          </span>
-        </div>
-      )}
+      {/* La barra agregada de "+90 min" se quitó (ruido en pantalla táctil sin scroll).
+          El aviso sigue POR MESA: cada tarjeta se pinta en rojo si lleva demasiado
+          tiempo abierta — control anti robo-hormiga sin ocupar espacio arriba. */}
 
       {!loading && (() => {
         const ocupadas = counts.ocupada + counts.cuenta
@@ -905,19 +898,19 @@ export default function MesasPage() {
         const aforo = totalMesas > 0 ? Math.round((ocupadas / totalMesas) * 100) : 0
         const avgMins = activeOrders.length > 0 ? Math.round(activeOrders.reduce((s, o) => s + getMinutes(o.created_at), 0) / activeOrders.length) : 0
         return (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 px-4 lg:px-6 pt-4 flex-shrink-0">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 px-4 lg:px-6 pt-2.5 flex-shrink-0">
             {[
               { l: 'Mesas ocupadas', v: `${ocupadas}`, sub: `/${totalMesas}`, d: `${aforo}% de aforo`, ink: 'var(--accent-ink)' },
               { l: 'Personas', v: `${totalPersonas}`, sub: '', d: 'en piso ahora', ink: 'var(--text-3)' },
               { l: 'Ingreso actual', v: formatMXN(totalVentas), sub: '', d: `TP ${formatMXN(ticketPromedio)}`, ink: 'var(--accent-ink)' },
               { l: 'Tiempo prom.', v: `${avgMins}`, sub: ' min', d: 'rotación de mesa', ink: 'var(--text-3)' },
             ].map((k) => (
-              <div key={k.l} className="rounded-[14px] border border-[var(--line)] p-4 shadow-[var(--shadow-soft)] bg-[var(--surface)]">
-                <div className="font-mono text-[10px] uppercase tracking-[0.13em] text-[var(--text-3)]">{k.l}</div>
-                <div className="text-2xl font-extrabold mt-2 tabular-nums tracking-tight text-[var(--text-1)]">
-                  {k.v}<span className="text-[var(--text-4)] text-base font-bold">{k.sub}</span>
+              <div key={k.l} className="rounded-xl border border-[var(--line)] px-3.5 py-2 shadow-[var(--shadow-soft)] bg-[var(--surface)]">
+                <div className="font-mono text-[9px] uppercase tracking-[0.13em] text-[var(--text-3)]">{k.l}</div>
+                <div className="text-lg font-extrabold mt-0.5 tabular-nums tracking-tight text-[var(--text-1)] leading-none">
+                  {k.v}<span className="text-[var(--text-4)] text-sm font-bold">{k.sub}</span>
                 </div>
-                <div className="text-xs font-semibold mt-1" style={{ color: k.ink }}>{k.d}</div>
+                <div className="text-[11px] font-semibold mt-0.5" style={{ color: k.ink }}>{k.d}</div>
               </div>
             ))}
           </div>
