@@ -126,6 +126,13 @@ export async function proxy(req: NextRequest) {
     return NextResponse.next()
   }
 
+  // Platform admins (modo Dios) ven TODA la app — no se les aplica el enforcement de
+  // rol de tenant. Su app_metadata.role suele ser null (no pertenecen a un tenant), lo
+  // que si no caería a 'staff' en resolveRole y los mandaría al /pos. FIX: exentarlos.
+  if (user?.app_metadata?.platform_admin === true) {
+    return NextResponse.next()
+  }
+
   // Enforcement de rol por página (app_metadata.role lo setea el servidor, no el usuario)
   const role = resolveRole(user?.app_metadata?.role, user?.email)
   if (!canAccessPage(role, pathname)) {
