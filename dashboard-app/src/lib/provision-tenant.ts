@@ -46,6 +46,7 @@ export interface ProvisionResult {
     pos_menu_items: number
     pos_payment_methods: number
     pos_staff: number
+    pos_mesas: number
   }
 }
 
@@ -65,6 +66,32 @@ function headers() {
     // Idempotent upsert on the table's primary key.
     Prefer: 'resolution=merge-duplicates,return=minimal',
   }
+}
+
+/** ¿Cuántas filas tiene `table` para este client? (para siembras idempotentes por conteo). */
+async function countFor(table: string, clientId: string): Promise<number> {
+  const res = await fetch(
+    `${SB_URL}/rest/v1/${table}?client_id=eq.${encodeURIComponent(clientId)}&select=id`,
+    { headers: { ...headers(), Prefer: 'count=exact', Range: '0-0' }, cache: 'no-store' }
+  )
+  const range = res.headers.get('content-range')
+  if (range) { const total = range.split('/')[1]; return total === '*' ? 0 : parseInt(total, 10) }
+  return 0
+}
+
+async function insertRows(table: string, rows: Record<string, unknown>[]): Promise<number> {
+  if (rows.length === 0) return 0
+  const res = await fetch(`${SB_URL}/rest/v1/${table}`, {
+    method: 'POST',
+    headers: { ...headers(), Prefer: 'return=minimal' },
+    body: JSON.stringify(rows),
+    cache: 'no-store',
+  })
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '')
+    throw new Error(`[provision] insert ${table} failed (${res.status}): ${detail}`)
+  }
+  return rows.length
 }
 
 async function upsert(table: string, rows: Record<string, unknown>[]): Promise<number> {
@@ -176,6 +203,32 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
   })
   const staffCount = await upsert('pos_staff', staffRows)
 
+  // ── 6. mesas (floor plan) ──────────────────────────────────────────────────
+  // Sin esto el POS del tenant nuevo abre con plano vacío (no se puede sentar
+  // ni cobrar en mesa). Se siembra SOLO si el tenant aún no tiene mesas
+  // (idempotente por conteo, ya que pos_mesas.id es uuid autogenerado).
+  let mesasCount = 0
+  if (mesas > 0 && (await countFor('pos_mesas', clientId)) === 0) {
+    const PER_ROW = 5
+    const mesaRows = Array.from({ length: mesas }, (_, i) => {
+      const n = i + 1
+      const col = i % PER_ROW
+      const row = Math.floor(i / PER_ROW)
+      return {
+        client_id: clientId,
+        number: n,
+        capacity: 4,
+        zone: 'Principal',
+        x_pct: Math.min(92, 10 + col * 19),
+        y_pct: Math.min(88, 14 + row * 20),
+        shape: n % 3 === 0 ? 'round' : 'square',
+        sort_order: n,
+        active: true,
+      }
+    })
+    mesasCount = await insertRows('pos_mesas', mesaRows)
+  }
+
   return {
     clientId,
     created: {
@@ -185,6 +238,7 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
       pos_menu_items: itemsCount,
       pos_payment_methods: pmCount,
       pos_staff: staffCount,
+      pos_mesas: mesasCount,
     },
   }
 }
