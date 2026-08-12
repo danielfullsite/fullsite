@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { DollarSign, Ticket, Users, Receipt, TrendingDown, TrendingUp, Award, ArrowRight, CreditCard, FileBarChart, ClipboardList, Target, Settings, Eye, EyeOff, GripVertical, Bot, Clock, Zap, Activity, ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react'
+import { DollarSign, Ticket, Users, Receipt, TrendingDown, TrendingUp, Award, ArrowRight, CreditCard, FileBarChart, ClipboardList, Target, Settings, Eye, EyeOff, GripVertical, Bot, Clock, Zap, Activity, ChevronLeft, ChevronRight, CalendarDays, TriangleAlert } from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import RevenueChart from '@/components/RevenueChart'
 import RevenueDistributionChart from '@/components/RevenueDistributionChart'
@@ -398,20 +398,20 @@ export default function DashboardPage() {
             if (period === 'dia' && viewDay) {
               return (
                 <div className="flex items-center gap-2">
-                  <button onClick={() => setSelectedDayIdx(i => Math.min(i + 1, recentData.length - 1))} disabled={selectedDayIdx >= recentData.length - 1} className="w-8 h-8 rounded-lg bg-[var(--line-soft)] hover:bg-[var(--line)] flex items-center justify-center disabled:opacity-30"><ChevronLeft size={16} /></button>
-                  <span className="text-sm text-[var(--text-2)] font-medium">
-                    {formatDate(viewDay.fecha)}
+                  <button onClick={() => setSelectedDayIdx(i => Math.min(i + 1, recentData.length - 1))} disabled={selectedDayIdx >= recentData.length - 1} aria-label="Día anterior" className="w-9 h-9 rounded-[10px] bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-2)] hover:bg-[var(--raised)] hover:border-[var(--accent-line)] flex items-center justify-center transition-colors disabled:opacity-30"><ChevronLeft size={16} /></button>
+                  <span className="flex items-center gap-2">
+                    <span className="font-mono text-[13px] text-[var(--text-2)] font-semibold">{formatDate(viewDay.fecha)}</span>
                     {(() => {
                       const mxToday = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' })
                       const fecha = String(viewDay.fecha).slice(0, 10)
-                      if (fecha === mxToday) return <span className="text-[var(--accent)] ml-1 text-xs font-bold">HOY</span>
-                      if (selectedDayIdx === 0) return <span className="text-[var(--text-3)] ml-1 text-xs font-bold">ÚLTIMO CIERRE</span>
+                      if (fecha === mxToday) return <span className="inline-flex items-center text-[11px] font-semibold leading-none px-2.5 py-1 rounded-full border border-[var(--accent-line)] bg-[var(--accent-soft)] text-[var(--accent-ink)]">HOY</span>
+                      if (selectedDayIdx === 0) return <span className="inline-flex items-center text-[11px] font-semibold leading-none px-2.5 py-1 rounded-full border border-[var(--line)] bg-[var(--surface-2)] text-[var(--text-2)]">ÚLTIMO CIERRE</span>
                       return null
                     })()}
                   </span>
-                  <button onClick={() => setSelectedDayIdx(i => Math.max(i - 1, 0))} disabled={selectedDayIdx <= 0} className="w-8 h-8 rounded-lg bg-[var(--line-soft)] hover:bg-[var(--line)] flex items-center justify-center disabled:opacity-30"><ChevronRight size={16} /></button>
+                  <button onClick={() => setSelectedDayIdx(i => Math.max(i - 1, 0))} disabled={selectedDayIdx <= 0} aria-label="Día siguiente" className="w-9 h-9 rounded-[10px] bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-2)] hover:bg-[var(--raised)] hover:border-[var(--accent-line)] flex items-center justify-center transition-colors disabled:opacity-30"><ChevronRight size={16} /></button>
                   <div className="relative w-9 h-9">
-                    <div className="w-9 h-9 rounded-lg bg-[var(--line-soft)] flex items-center justify-center pointer-events-none">
+                    <div className="w-9 h-9 rounded-[10px] bg-[var(--surface-2)] border border-[var(--line)] flex items-center justify-center pointer-events-none">
                       <CalendarDays size={16} className="text-[var(--text-2)]" />
                     </div>
                     <input
@@ -440,14 +440,14 @@ export default function DashboardPage() {
               const label = `${weekStart.getDate()} ${MESES[weekStart.getMonth()].slice(0,3)} - ${weekEnd.getDate()} ${MESES[weekEnd.getMonth()].slice(0,3)} ${weekEnd.getFullYear()}`
               return (
                 <div className="flex items-center gap-2">
-                  <button onClick={() => setWeekOffset(w => w + 1)} disabled={weekOffset >= 130} className="w-8 h-8 rounded-lg bg-[var(--line-soft)] hover:bg-[var(--line)] flex items-center justify-center disabled:opacity-30"><ChevronLeft size={16} /></button>
-                  <span className="text-sm text-[var(--text-2)] font-medium text-center">
-                    {label}
-                    {weekOffset === 0 && <span className="text-[var(--accent)] ml-1 text-xs font-bold">ACTUAL</span>}
+                  <button onClick={() => setWeekOffset(w => w + 1)} disabled={weekOffset >= 130} aria-label="Semana anterior" className="w-9 h-9 rounded-[10px] bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-2)] hover:bg-[var(--raised)] hover:border-[var(--accent-line)] flex items-center justify-center transition-colors disabled:opacity-30"><ChevronLeft size={16} /></button>
+                  <span className="flex items-center gap-2 text-center">
+                    <span className="font-mono text-[13px] text-[var(--text-2)] font-semibold">{label}</span>
+                    {weekOffset === 0 && <span className="inline-flex items-center text-[11px] font-semibold leading-none px-2.5 py-1 rounded-full border border-[var(--accent-line)] bg-[var(--accent-soft)] text-[var(--accent-ink)]">ACTUAL</span>}
                   </span>
-                  <button onClick={() => setWeekOffset(w => Math.max(w - 1, 0))} disabled={weekOffset <= 0} className="w-8 h-8 rounded-lg bg-[var(--line-soft)] hover:bg-[var(--line)] flex items-center justify-center disabled:opacity-30"><ChevronRight size={16} /></button>
+                  <button onClick={() => setWeekOffset(w => Math.max(w - 1, 0))} disabled={weekOffset <= 0} aria-label="Semana siguiente" className="w-9 h-9 rounded-[10px] bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-2)] hover:bg-[var(--raised)] hover:border-[var(--accent-line)] flex items-center justify-center transition-colors disabled:opacity-30"><ChevronRight size={16} /></button>
                   <div className="relative w-9 h-9">
-                    <div className="w-9 h-9 rounded-lg bg-[var(--line-soft)] flex items-center justify-center pointer-events-none"><CalendarDays size={16} className="text-[var(--text-2)]" /></div>
+                    <div className="w-9 h-9 rounded-[10px] bg-[var(--surface-2)] border border-[var(--line)] flex items-center justify-center pointer-events-none"><CalendarDays size={16} className="text-[var(--text-2)]" /></div>
                     <input type="date" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={(e) => {
                       const picked = new Date(e.target.value + 'T12:00:00')
                       const today = new Date()
@@ -464,14 +464,14 @@ export default function DashboardPage() {
               const label = `${MESES[viewMonth.getMonth()]} ${viewMonth.getFullYear()}`
               return (
                 <div className="flex items-center gap-2">
-                  <button onClick={() => setMonthOffset(m => m + 1)} disabled={monthOffset >= 36} className="w-8 h-8 rounded-lg bg-[var(--line-soft)] hover:bg-[var(--line)] flex items-center justify-center disabled:opacity-30"><ChevronLeft size={16} /></button>
-                  <span className="text-sm text-[var(--text-2)] font-medium text-center">
-                    {label}
-                    {monthOffset === 0 && <span className="text-[var(--accent)] ml-1 text-xs font-bold">ACTUAL</span>}
+                  <button onClick={() => setMonthOffset(m => m + 1)} disabled={monthOffset >= 36} aria-label="Mes anterior" className="w-9 h-9 rounded-[10px] bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-2)] hover:bg-[var(--raised)] hover:border-[var(--accent-line)] flex items-center justify-center transition-colors disabled:opacity-30"><ChevronLeft size={16} /></button>
+                  <span className="flex items-center gap-2 text-center">
+                    <span className="font-mono text-[13px] text-[var(--text-2)] font-semibold">{label}</span>
+                    {monthOffset === 0 && <span className="inline-flex items-center text-[11px] font-semibold leading-none px-2.5 py-1 rounded-full border border-[var(--accent-line)] bg-[var(--accent-soft)] text-[var(--accent-ink)]">ACTUAL</span>}
                   </span>
-                  <button onClick={() => setMonthOffset(m => Math.max(m - 1, 0))} disabled={monthOffset <= 0} className="w-8 h-8 rounded-lg bg-[var(--line-soft)] hover:bg-[var(--line)] flex items-center justify-center disabled:opacity-30"><ChevronRight size={16} /></button>
+                  <button onClick={() => setMonthOffset(m => Math.max(m - 1, 0))} disabled={monthOffset <= 0} aria-label="Mes siguiente" className="w-9 h-9 rounded-[10px] bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-2)] hover:bg-[var(--raised)] hover:border-[var(--accent-line)] flex items-center justify-center transition-colors disabled:opacity-30"><ChevronRight size={16} /></button>
                   <div className="relative w-9 h-9">
-                    <div className="w-9 h-9 rounded-lg bg-[var(--line-soft)] flex items-center justify-center pointer-events-none"><CalendarDays size={16} className="text-[var(--text-2)]" /></div>
+                    <div className="w-9 h-9 rounded-[10px] bg-[var(--surface-2)] border border-[var(--line)] flex items-center justify-center pointer-events-none"><CalendarDays size={16} className="text-[var(--text-2)]" /></div>
                     <input type="date" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={(e) => {
                       const picked = new Date(e.target.value + 'T12:00:00')
                       const now = new Date()
@@ -489,21 +489,28 @@ export default function DashboardPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowSettings(!showSettings)}
-              className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors ${
-                showSettings ? 'bg-[var(--surface)] text-white' : 'bg-[var(--line-soft)] text-[var(--text-2)] hover:bg-[var(--line)]'
+              className={`w-9 h-9 rounded-[10px] border flex items-center justify-center transition-colors ${
+                showSettings
+                  ? 'bg-[var(--accent-soft)] border-[var(--accent-line)] text-[var(--accent-ink)]'
+                  : 'bg-[var(--surface-2)] border-[var(--line)] text-[var(--text-2)] hover:bg-[var(--raised)] hover:border-[var(--accent-line)]'
               }`}
               title="Personalizar dashboard"
+              aria-label="Personalizar dashboard"
             >
               <Settings size={16} />
             </button>
           </div>
-          <div className="flex bg-[var(--surface)] rounded-xl p-1 gap-1">
+          <div className="flex gap-[2px] bg-[var(--surface-2)] border border-[var(--line)] rounded-full p-[3px]" role="tablist" aria-label="Periodo">
             {(['dia', 'semana', 'mes'] as Period[]).map(p => (
               <button
                 key={p}
                 onClick={() => setPeriod(p)}
-                className={`px-4 sm:px-6 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all ${
-                  period === p ? 'bg-emerald-500 text-white shadow-lg' : 'text-[var(--text-3)] hover:text-white hover:bg-[var(--surface-2)]'
+                role="tab"
+                aria-selected={period === p}
+                className={`px-4 sm:px-[13px] py-1.5 rounded-full text-xs sm:text-[12.5px] font-semibold transition-all ${
+                  period === p
+                    ? 'bg-[var(--panel)] text-[var(--text-1)] shadow-[var(--shadow-soft)]'
+                    : 'text-[var(--text-3)] hover:text-[var(--text-1)]'
                 }`}
               >
                 {p === 'dia' ? 'Día' : p === 'semana' ? 'Semana' : 'Mes'}
@@ -522,16 +529,16 @@ export default function DashboardPage() {
           : null
         if (fecha !== mxToday && selectedDayIdx === 0) {
           return (
-            <div className="mb-4 flex items-center gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-600 dark:text-amber-400">
-              <span className="font-bold">⚠ Sin sincronización de hoy todavía.</span>
-              <span>Mostrando el último día con datos: {formatDate(fecha)}{syncTime ? ` (actualizado ${syncTime})` : ''}.</span>
+            <div className="mb-4 flex items-center gap-2 rounded-xl border bg-[var(--warn-soft)] px-3.5 py-2.5 text-[12.5px] text-[var(--warn-ink)]" style={{ borderColor: 'color-mix(in srgb, var(--warn) 40%, transparent)' }}>
+              <TriangleAlert size={15} className="shrink-0" />
+              <span><span className="font-bold">Sin sincronización de hoy todavía.</span> Mostrando el último día con datos: {formatDate(fecha)}{syncTime ? ` (actualizado ${syncTime})` : ''}. <span className="ml-1.5 inline-flex items-center text-[11px] font-semibold leading-none px-2.5 py-1 rounded-full border border-[var(--line)] bg-[var(--surface-2)] text-[var(--text-2)] align-middle">ÚLTIMO CIERRE</span></span>
             </div>
           )
         }
         if (fecha === mxToday && syncTime) {
           return (
             <div className="mb-4 text-xs text-[var(--text-3)] font-medium">
-              Datos de Wansoft actualizados a las {syncTime} — se sincronizan cada 30 min, pueden diferir de la app de Wansoft en tiempo real.
+              Datos de Wansoft actualizados a las <span className="font-mono text-[var(--text-2)]">{syncTime}</span> — se sincronizan cada 30 min, pueden diferir de la app de Wansoft en tiempo real.
             </div>
           )
         }
@@ -540,26 +547,34 @@ export default function DashboardPage() {
 
       {/* Settings panel — toggle widgets */}
       {showSettings && (
-        <div className="mb-6 bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5 animate-in slide-in-from-top-2">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-bold text-[var(--text-1)]">Personalizar dashboard</h3>
-            <button onClick={() => setShowSettings(false)} className="text-xs text-[var(--text-3)] hover:text-[var(--text-2)]">
-              Cerrar
-            </button>
+        <div className="mb-6 rounded-[14px] border border-[var(--line)] p-[18px] animate-in slide-in-from-top-2" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' }}>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-[9px]">
+              <span className="w-7 h-7 rounded-[9px] grid place-items-center bg-[var(--surface-2)] text-[var(--text-2)]">
+                <Settings size={14} />
+              </span>
+              <h3 className="text-sm font-bold text-[var(--text-1)]">Personalizar dashboard</h3>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="hidden sm:inline text-[11px] text-[var(--text-3)]">{WIDGET_DEFS.length} widgets · el gerente elige qué ver</span>
+              <button onClick={() => setShowSettings(false)} className="text-xs text-[var(--text-3)] hover:text-[var(--text-2)]">
+                Cerrar
+              </button>
+            </div>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+          <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))' }}>
             {WIDGET_DEFS.map(w => (
               <button
                 key={w.id}
                 onClick={() => toggleWidget(w.id)}
-                className={`flex items-center gap-2 px-3 py-2.5 rounded-lg text-left text-sm transition-all ${
+                className={`flex items-center gap-2 px-[11px] py-[9px] rounded-[10px] text-left text-xs font-semibold transition-all border ${
                   widgets[w.id]
-                    ? 'bg-[var(--accent-soft)] border border-[var(--accent-line)] text-[var(--accent-bright)]'
-                    : 'bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-3)]'
+                    ? 'bg-[var(--accent-soft)] border-[var(--accent-line)] text-[var(--accent-ink)]'
+                    : 'bg-[var(--surface-2)] border-[var(--line)] text-[var(--text-3)]'
                 }`}
               >
-                {widgets[w.id] ? <Eye size={14} /> : <EyeOff size={14} />}
-                <span className="font-medium truncate">{w.label}</span>
+                {widgets[w.id] ? <Eye size={13} className="shrink-0" /> : <EyeOff size={13} className="shrink-0" />}
+                <span className="truncate">{w.label}</span>
               </button>
             ))}
           </div>
@@ -568,39 +583,37 @@ export default function DashboardPage() {
 
       {/* Quick insight */}
       {show('insight') && quickInsight && (
-        <div className="mb-3 sm:mb-4 px-3 sm:px-4 py-2 sm:py-2.5 bg-purple-500/10 border border-purple-500/30 rounded-xl">
-          <p className="text-xs sm:text-sm text-purple-400">
-            <Zap size={12} className="inline mr-1 -mt-0.5" />
-            {quickInsight}
-          </p>
+        <div className="mb-3 sm:mb-4 flex items-start gap-[9px] px-3.5 py-2.5 bg-purple-500/10 border border-purple-500/30 rounded-xl">
+          <Zap size={15} className="text-purple-400 shrink-0 mt-0.5" fill="currentColor" />
+          <p className="text-[13px] leading-[1.45] text-purple-400">{quickInsight}</p>
         </div>
       )}
 
       {/* Month progress — premium card */}
       {show('month_progress') && monthProgress && monthProgress.monthVentas > 0 && (
-        <div className="mb-4 sm:mb-6 bg-gradient-to-br from-emerald-500/10 via-[var(--surface)] to-[var(--surface-2)] rounded-2xl border border-emerald-500/20 shadow-lg px-4 sm:px-6 py-4 sm:py-5">
+        <div className="mb-4 sm:mb-6 bg-gradient-to-br from-emerald-500/10 via-[var(--panel)] to-[var(--surface-2)] rounded-[18px] border border-[var(--accent-line)] px-4 sm:px-5 py-4 sm:py-[18px]" style={{ boxShadow: 'var(--shadow-mid)' }}>
           <div className="flex items-center justify-between mb-2 sm:mb-3">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-emerald-500/15 flex items-center justify-center">
-                <Target size={14} className="text-emerald-500" />
+            <div className="flex items-center gap-[9px]">
+              <div className="w-7 h-7 rounded-[9px] grid place-items-center bg-[var(--accent-soft)] text-[var(--accent-bright)]">
+                <Target size={15} />
               </div>
-              <span className="text-sm sm:text-base font-bold text-[var(--text-1)]">
+              <span className="text-[15px] font-bold text-[var(--text-1)]">
                 {monthProgress.monthName.charAt(0).toUpperCase() + monthProgress.monthName.slice(1)} {monthProgress.yearNum}
               </span>
             </div>
-            <span className="text-[10px] sm:text-xs text-emerald-400 bg-emerald-500/10 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full font-semibold">
+            <span className="inline-flex items-center text-[11px] leading-none px-2.5 py-1 rounded-full border border-[var(--accent-line)] bg-[var(--accent-soft)] text-[var(--accent-ink)] font-semibold">
               Día {monthProgress.dayOfMonth}/{monthProgress.daysInMonth}
             </span>
           </div>
-          <p className="text-2xl sm:text-4xl font-black text-[var(--text-1)] mb-1">{formatCurrency(monthProgress.monthVentas)}</p>
-          <div className="flex flex-wrap gap-x-3 sm:gap-x-4 gap-y-1 text-[10px] sm:text-xs text-[var(--text-3)] mb-2 sm:mb-3">
-            <span>Proy. <span className="font-bold text-emerald-400">{formatCurrency(monthProgress.projected)}</span></span>
-            <span>Prom. <span className="font-semibold text-[var(--text-2)]">{formatCurrency(monthProgress.dailyAvg)}</span>/día</span>
+          <p className="text-[28px] sm:text-[34px] font-black tracking-[-0.03em] text-[var(--text-1)] tnum mb-1.5">{formatCurrency(monthProgress.monthVentas)}</p>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--text-3)] mb-3">
+            <span>Proy. <span className="font-bold text-[var(--accent-ink)] tnum">{formatCurrency(monthProgress.projected)}</span></span>
+            <span>Prom. <span className="font-semibold text-[var(--text-2)] tnum">{formatCurrency(monthProgress.dailyAvg)}</span>/día</span>
             <span className="hidden sm:inline">{monthProgress.daysLeft} días restantes</span>
           </div>
-          <div className="w-full bg-[var(--line-soft)] rounded-full h-2.5 sm:h-3 overflow-hidden">
+          <div className="w-full bg-[var(--line-soft)] rounded-full h-2.5 overflow-hidden">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-all shadow-sm shadow-emerald-500/25"
+              className="h-full rounded-full bg-gradient-to-r from-[var(--accent-deep)] to-[var(--accent-bright)] transition-all"
               style={{ width: `${Math.min((monthProgress.dayOfMonth / monthProgress.daysInMonth) * 100, 100)}%` }}
             />
           </div>
@@ -723,39 +736,39 @@ export default function DashboardPage() {
 
       {/* Extra KPI row — Propinas + Descuentos + Brutas */}
       {show('extra_kpis') && <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-4 sm:mb-6">
-        <div className="bg-gradient-to-b from-emerald-500/10 to-[var(--surface)] sm:from-[var(--surface)] sm:to-[var(--surface)] rounded-2xl border border-emerald-500/20 sm:border-[var(--line)] shadow-sm px-3 sm:px-4 py-3 sm:py-4 text-center">
-          <div className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center mx-auto mb-1.5 sm:mb-2">
-            <Award size={14} className="text-emerald-400" />
+        <div className="rounded-[14px] border border-[var(--line)] px-3 sm:px-4 py-3 sm:py-3.5 text-center" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-soft)' }}>
+          <div className="w-[30px] h-[30px] rounded-[9px] grid place-items-center bg-[var(--accent-soft)] text-[var(--accent-bright)] mx-auto mb-2">
+            <Award size={15} />
           </div>
-          <p className="text-[9px] sm:text-xs text-[var(--text-3)] font-semibold uppercase tracking-wider mb-1">Propinas</p>
-          <p className="text-base sm:text-xl font-black text-emerald-400">{formatCurrency(periodData.propinas)}</p>
+          <p className="text-[9px] sm:text-[9.5px] text-[var(--text-3)] font-semibold uppercase tracking-[0.13em] font-mono mb-1.5">Propinas</p>
+          <p className="text-lg sm:text-xl font-extrabold tracking-[-0.02em] tnum text-[var(--accent-ink)]">{formatCurrency(periodData.propinas)}</p>
         </div>
-        <div className="bg-gradient-to-b from-red-500/10 to-[var(--surface)] sm:from-[var(--surface)] sm:to-[var(--surface)] rounded-2xl border border-red-500/20 sm:border-[var(--line)] shadow-sm px-3 sm:px-4 py-3 sm:py-4 text-center">
-          <div className="w-7 h-7 rounded-lg bg-red-500/10 flex items-center justify-center mx-auto mb-1.5 sm:mb-2">
-            <TrendingDown size={14} className="text-red-400" />
+        <div className="rounded-[14px] border border-[var(--line)] px-3 sm:px-4 py-3 sm:py-3.5 text-center" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-soft)' }}>
+          <div className="w-[30px] h-[30px] rounded-[9px] grid place-items-center bg-[var(--crit-soft)] text-[var(--crit-ink)] mx-auto mb-2">
+            <TrendingDown size={15} />
           </div>
-          <p className="text-[9px] sm:text-xs text-[var(--text-3)] font-semibold uppercase tracking-wider mb-1">Descuentos</p>
-          <p className="text-base sm:text-xl font-black text-red-400">{formatCurrency(periodData.descuentos)}</p>
+          <p className="text-[9px] sm:text-[9.5px] text-[var(--text-3)] font-semibold uppercase tracking-[0.13em] font-mono mb-1.5">Descuentos</p>
+          <p className="text-lg sm:text-xl font-extrabold tracking-[-0.02em] tnum text-[var(--crit-ink)]">{formatCurrency(periodData.descuentos)}</p>
         </div>
-        <div className="bg-gradient-to-b from-blue-500/10 to-[var(--surface)] sm:from-[var(--surface)] sm:to-[var(--surface)] rounded-2xl border border-blue-500/20 sm:border-[var(--line)] shadow-sm px-3 sm:px-4 py-3 sm:py-4 text-center">
-          <div className="w-7 h-7 rounded-lg bg-blue-500/10 flex items-center justify-center mx-auto mb-1.5 sm:mb-2">
-            <DollarSign size={14} className="text-blue-400" />
+        <div className="rounded-[14px] border border-[var(--line)] px-3 sm:px-4 py-3 sm:py-3.5 text-center" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-soft)' }}>
+          <div className="w-[30px] h-[30px] rounded-[9px] grid place-items-center bg-[var(--info-soft)] text-[var(--info-ink)] mx-auto mb-2">
+            <DollarSign size={15} />
           </div>
-          <p className="text-[9px] sm:text-xs text-[var(--text-3)] font-semibold uppercase tracking-wider mb-1">Brutas</p>
-          <p className="text-base sm:text-xl font-black text-[var(--text-1)]">{formatCurrency(periodData.brutas)}</p>
+          <p className="text-[9px] sm:text-[9.5px] text-[var(--text-3)] font-semibold uppercase tracking-[0.13em] font-mono mb-1.5">Brutas</p>
+          <p className="text-lg sm:text-xl font-extrabold tracking-[-0.02em] tnum text-[var(--info-ink)]">{formatCurrency(periodData.brutas)}</p>
         </div>
       </div>}
 
       {/* Agent Status Widget — real data from agent_runs */}
       {show('agent_status') && (
-        <div className="mb-4 sm:mb-6 bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-4 sm:p-5">
-          <div className="flex items-center gap-2 mb-3 sm:mb-4">
-            <div className="w-7 h-7 rounded-lg bg-violet-500/10 flex items-center justify-center">
-              <Bot size={14} className="text-purple-400" />
+        <div className="mb-4 sm:mb-6 rounded-[14px] border border-[var(--line)] p-4 sm:p-[18px]" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' }}>
+          <div className="flex items-center gap-[9px] mb-3 sm:mb-4">
+            <div className="w-7 h-7 rounded-[9px] grid place-items-center bg-violet-500/12 text-violet-300">
+              <Bot size={15} />
             </div>
-            <h3 className="text-sm font-semibold text-[var(--text-1)]">Agentes IA</h3>
-            <span className="ml-auto text-xs text-[var(--accent-bright)] font-medium flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <h3 className="text-sm font-bold text-[var(--text-1)]">Agentes IA</h3>
+            <span className="ml-auto text-[13px] text-[var(--accent-ink)] font-semibold flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-[var(--accent-bright)] animate-pulse" />
               {agentRuns.length} activos
             </span>
           </div>
@@ -797,9 +810,9 @@ export default function DashboardPage() {
                     const name = agentNames[run.agent_id] || run.agent_id
                     const isError = run.status === 'error'
                     return (
-                      <div key={run.agent_id} className={`flex items-center gap-1.5 shrink-0 rounded-full px-2.5 py-1.5 ${isError ? 'bg-red-500/10 border border-red-500/20' : 'bg-emerald-500/10 border border-emerald-500/20'}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${isError ? 'bg-red-500' : 'bg-emerald-400'}`} />
-                        <span className="text-[10px] font-semibold text-[var(--text-2)] whitespace-nowrap">{name}</span>
+                      <div key={run.agent_id} className={`flex items-center gap-1.5 shrink-0 rounded-full px-2.5 py-1.5 border ${isError ? 'bg-[var(--crit-soft)] border-[var(--crit-line,rgba(245,69,92,.3))]' : 'bg-[var(--accent-soft)] border-[var(--accent-line)]'}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${isError ? 'bg-[var(--crit)]' : 'bg-[var(--accent)]'}`} />
+                        <span className={`text-[11px] font-semibold whitespace-nowrap ${isError ? 'text-[var(--crit-ink)]' : 'text-[var(--accent-ink)]'}`}>{name}</span>
                       </div>
                     )
                   })}
@@ -839,17 +852,17 @@ export default function DashboardPage() {
 
       {/* Week comparison banner — like Wansoft */}
       {show('week_comparison') && vsLastWeek !== null && vsLastWeekAmount !== null && sameDayLastWeek && (
-        <div className={`mb-4 sm:mb-6 rounded-xl border p-3 sm:p-4 ${vsLastWeek >= 0 ? 'bg-[var(--accent-soft)] border-[var(--accent-line)]' : 'bg-red-500/10 border-red-500/30'}`}>
+        <div className={`mb-4 sm:mb-6 rounded-[14px] border px-4 py-3.5 sm:px-[18px] ${vsLastWeek >= 0 ? 'bg-[var(--accent-soft)] border-[var(--accent-line)]' : 'bg-[var(--crit-soft)] border-[color-mix(in_srgb,var(--crit)_40%,transparent)]'}`}>
           <div className="flex items-center justify-between flex-wrap gap-2">
-            <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex items-center gap-[11px]">
               {vsLastWeek >= 0
-                ? <TrendingUp size={18} className="text-[var(--accent-bright)] shrink-0" />
-                : <TrendingDown size={18} className="text-red-600 shrink-0" />}
+                ? <TrendingUp size={20} className="text-[var(--accent-bright)] shrink-0" strokeWidth={2.2} />
+                : <TrendingDown size={20} className="text-[var(--crit-ink)] shrink-0" strokeWidth={2.2} />}
               <div>
-                <p className={`font-bold text-sm sm:text-lg ${vsLastWeek >= 0 ? 'text-[var(--accent-bright)]' : 'text-red-400'}`}>
+                <p className={`font-extrabold text-sm sm:text-base ${vsLastWeek >= 0 ? 'text-[var(--accent-ink)]' : 'text-[var(--crit-ink)]'}`}>
                   {formatPercent(vsLastWeek)} vs semana pasada
                 </p>
-                <p className="text-xs sm:text-sm text-[var(--text-2)]">
+                <p className="text-[12.5px] text-[var(--text-2)]">
                   {vsLastWeekAmount >= 0 ? '+' : ''}{formatCurrency(vsLastWeekAmount)}
                   <span className="hidden sm:inline"> · {(() => {
                     const d = new Date(sameDayLastWeek.fecha + 'T12:00:00')
@@ -859,8 +872,8 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="text-right">
-              <p className="text-[10px] sm:text-sm text-[var(--text-2)]">7d atrás</p>
-              <p className="text-sm sm:text-base font-semibold text-[var(--text-1)]">{formatCurrency(sameDayLastWeek.ventas_dia)}</p>
+              <p className="text-[10px] sm:text-[11px] text-[var(--text-3)]">7d atrás</p>
+              <p className="text-sm sm:text-[15px] font-bold text-[var(--text-1)] tnum">{formatCurrency(sameDayLastWeek.ventas_dia)}</p>
             </div>
           </div>
         </div>
@@ -881,16 +894,16 @@ export default function DashboardPage() {
       {/* Two columns: Top meseros + Categories */}
       {(show('top_meseros') || show('categories')) && <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
         {/* Top meseros — R365 style with progress bars */}
-        {show('top_meseros') && <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6">
-          <div className="flex items-center gap-2 mb-1">
-            <div className="w-7 h-7 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
-              <Award size={14} className="text-[var(--accent-bright)]" />
+        {show('top_meseros') && <div className="rounded-[14px] border border-[var(--line)] p-[18px]" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' }}>
+          <div className="flex items-center gap-[9px] mb-0.5">
+            <div className="w-7 h-7 rounded-[9px] grid place-items-center bg-[var(--accent-soft)] text-[var(--accent-bright)]">
+              <Award size={15} />
             </div>
-            <h3 className="text-sm font-semibold text-[var(--text-1)]">
+            <h3 className="text-sm font-bold text-[var(--text-1)]">
               Top meseros del día
             </h3>
           </div>
-          <p className="text-xs text-[var(--text-3)] mb-5 ml-9">Ranking por ventas</p>
+          <p className="text-[11px] text-[var(--text-3)] mb-4 ml-[37px]">Ranking por ventas</p>
           {topMeseros.length === 0 ? (
             <p className="text-[var(--text-3)] text-sm">Sin datos de meseros</p>
           ) : (
@@ -907,22 +920,22 @@ export default function DashboardPage() {
                 const color = colors[i] || colors[4]
                 return (
                   <div key={m.nombre}>
-                    <div className="flex items-center gap-3 mb-1.5">
+                    <div className="flex items-center gap-[11px] mb-1.5">
                       <div
-                        className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ${color.bg} ${color.text}`}
+                        className={`w-[26px] h-[26px] rounded-lg grid place-items-center text-xs font-extrabold ${color.bg} ${color.text}`}
                       >
                         {i + 1}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-[var(--text-1)] truncate">
+                        <p className="text-[13.5px] font-semibold text-[var(--text-1)] truncate">
                           {m.nombre}
                         </p>
                       </div>
-                      <p className="text-sm font-semibold text-[var(--text-1)] tabular-nums">
+                      <p className="text-sm font-bold text-[var(--text-1)] font-mono tabular-nums">
                         {formatCurrency(m.total)}
                       </p>
                     </div>
-                    <div className="ml-10 w-auto bg-[var(--line-soft)] rounded-full h-1.5 overflow-hidden">
+                    <div className="ml-[37px] w-auto bg-[var(--line-soft)] rounded-full h-1.5 overflow-hidden">
                       <div
                         className="h-1.5 rounded-full animate-progress"
                         style={{
@@ -947,20 +960,20 @@ export default function DashboardPage() {
 
       {/* Payment methods */}
       {show('payment_methods') && <div className="mb-6">
-        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6">
-          <div className="flex items-center gap-2 mb-1">
-            <div className="w-7 h-7 rounded-lg bg-violet-500/10 flex items-center justify-center">
-              <CreditCard size={14} className="text-violet-600" />
+        <div className="rounded-[14px] border border-[var(--line)] p-[18px]" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' }}>
+          <div className="flex items-center gap-[9px] mb-0.5">
+            <div className="w-7 h-7 rounded-[9px] grid place-items-center bg-violet-500/12 text-violet-300">
+              <CreditCard size={14} />
             </div>
-            <h3 className="text-sm font-semibold text-[var(--text-1)]">
+            <h3 className="text-sm font-bold text-[var(--text-1)]">
               Métodos de pago
             </h3>
           </div>
-          <p className="text-xs text-[var(--text-3)] mb-5 ml-9">
+          <p className="text-[11px] text-[var(--text-3)] mb-4 ml-[37px]">
             {latestDay ? formatCurrency(latestDay.ventas_dia) : '-'} total
           </p>
           {paymentMethods.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {paymentMethods.map((p, i) => {
                 const ventasDia = latestDay?.ventas_dia || 0
                 // p.total is a PERCENTAGE (e.g. 42.0 = 42%), not MXN
@@ -969,22 +982,22 @@ export default function DashboardPage() {
                 const barWidth = paymentMax > 0 ? ((p.total / paymentMax) * 100) : 0
                 const barColors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4']
                 return (
-                  <div key={p.nombre} className="bg-[var(--surface-2)] rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-2">
+                  <div key={p.nombre} className="bg-[var(--surface-2)] border border-[var(--line)] rounded-xl p-[13px]">
+                    <div className="flex items-center justify-between mb-[7px]">
                       <div className="flex items-center gap-2">
                         <div
-                          className="w-2.5 h-2.5 rounded-full shrink-0"
+                          className="w-2 h-2 rounded-full shrink-0"
                           style={{ backgroundColor: barColors[i % barColors.length] }}
                         />
-                        <span className="text-sm font-medium text-[var(--text-1)]">
+                        <span className="text-[12.5px] font-semibold text-[var(--text-1)]">
                           {p.nombre}
                         </span>
                       </div>
-                      <span className="text-xs text-[var(--text-3)] font-medium">
+                      <span className="text-[11px] text-[var(--text-3)] font-mono">
                         {pct.toFixed(0)}%
                       </span>
                     </div>
-                    <p className="text-lg font-bold text-[var(--text-1)] tabular-nums mb-2">
+                    <p className="text-[17px] font-extrabold tracking-[-0.02em] text-[var(--text-1)] tabular-nums mb-2">
                       {formatCurrency(mxnAmount)}
                     </p>
                     <div className="w-full bg-[var(--line)] rounded-full h-1.5 overflow-hidden">
@@ -1012,15 +1025,15 @@ export default function DashboardPage() {
       {show('hora_pico') && latestDay && (
         <div className="mb-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Hora pico */}
-          <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-7 h-7 rounded-lg bg-amber-500/10 flex items-center justify-center">
-                <Clock size={14} className="text-amber-400" />
+          <div className="rounded-[14px] border border-[var(--line)] p-[18px]" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' }}>
+            <div className="flex items-center gap-[9px] mb-3">
+              <div className="w-7 h-7 rounded-[9px] grid place-items-center bg-[var(--warn-soft)] text-[var(--warn-ink)]">
+                <Clock size={15} />
               </div>
-              <h3 className="text-sm font-semibold text-[var(--text-1)]">Mejor día de la semana</h3>
+              <h3 className="text-sm font-bold text-[var(--text-1)]">Mejor día de la semana</h3>
             </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-bold text-[var(--text-1)] capitalize">
+            <div className="flex items-baseline gap-[9px]">
+              <span className="text-[30px] font-extrabold tracking-[-0.02em] text-[var(--text-1)] capitalize leading-none">
                 {(() => {
                   const peak = recentData.slice(-7).reduce((best, d) => {
                     const m = d.meseros as unknown as Array<{ nombre: string; total: number }>
@@ -1030,38 +1043,38 @@ export default function DashboardPage() {
                   return peak.fecha ? new Date(peak.fecha + 'T12:00:00').toLocaleDateString('es-MX', { weekday: 'long' }) : '-'
                 })()}
               </span>
-              <span className="text-sm text-[var(--text-3)]">últimos 7 días</span>
+              <span className="text-[12.5px] text-[var(--text-3)]">últimos 7 días</span>
             </div>
-            <div className="mt-3 flex items-center gap-4 text-sm">
+            <div className="mt-3 flex items-center gap-[22px] text-[12.5px]">
               <div>
-                <span className="text-[var(--text-3)]">Mesas/dia:</span>
-                <span className="ml-1 font-semibold text-[var(--text-1)]">{latestDay.mesas_atendidas || 0}</span>
+                <span className="text-[var(--text-3)]">Mesas/día:</span>
+                <span className="ml-[3px] font-bold text-[var(--text-1)] tnum">{latestDay.mesas_atendidas || 0}</span>
               </div>
               <div>
                 <span className="text-[var(--text-3)]">Para llevar:</span>
-                <span className="ml-1 font-semibold text-[var(--text-1)]">{latestDay.ordenes_llevar || 0}</span>
+                <span className="ml-[3px] font-bold text-[var(--text-1)] tnum">{latestDay.ordenes_llevar || 0}</span>
               </div>
             </div>
           </div>
 
           {/* Efficiency metrics */}
-          <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-7 h-7 rounded-lg bg-cyan-500/10 flex items-center justify-center">
-                <Activity size={14} className="text-cyan-400" />
+          <div className="rounded-[14px] border border-[var(--line)] p-[18px]" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' }}>
+            <div className="flex items-center gap-[9px] mb-2">
+              <div className="w-7 h-7 rounded-[9px] grid place-items-center" style={{ background: 'rgba(34,211,238,.12)', color: '#67e8f9' }}>
+                <Activity size={15} />
               </div>
-              <h3 className="text-sm font-semibold text-[var(--text-1)]">Eficiencia del día</h3>
+              <h3 className="text-sm font-bold text-[var(--text-1)]">Eficiencia del día</h3>
             </div>
-            <div className="space-y-3">
+            <div>
               {[
                 { label: 'Venta por persona', value: formatCurrency((latestDay.ventas_dia || 0) / Math.max(latestDay.personas_restaurant || 1, 1)) },
                 { label: 'Venta por mesa', value: formatCurrency((latestDay.ventas_dia || 0) / Math.max(latestDay.mesas_atendidas || 1, 1)) },
                 { label: 'Propina promedio', value: formatCurrency((latestDay.propinas_total || 0) / Math.max(latestDay.mesas_atendidas || 1, 1)) },
                 { label: 'Descuento %', value: `${((latestDay.descuentos || 0) / Math.max(latestDay.ventas_brutas || 1, 1) * 100).toFixed(1)}%` },
               ].map(m => (
-                <div key={m.label} className="flex items-center justify-between">
-                  <span className="text-sm text-[var(--text-2)]">{m.label}</span>
-                  <span className="text-sm font-semibold text-[var(--text-1)] tabular-nums">{m.value}</span>
+                <div key={m.label} className="flex items-center justify-between py-[9px] border-b border-[var(--line-soft)] last:border-b-0 text-[13.5px]">
+                  <span className="text-[var(--text-2)]">{m.label}</span>
+                  <span className="font-bold text-[var(--text-1)] tabular-nums">{m.value}</span>
                 </div>
               ))}
             </div>
@@ -1082,15 +1095,16 @@ export default function DashboardPage() {
             <Link
               key={action.href}
               href={action.href}
-              className={`bg-gradient-to-br ${action.gradient} to-[var(--surface)] sm:from-[var(--surface)] sm:to-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-3 sm:p-4 hover:shadow-md transition-all group`}
+              className="rounded-xl border border-[var(--line)] p-3 sm:p-3.5 hover:border-[var(--accent-line)] transition-all group active:scale-[0.98]"
+              style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-soft)' }}
             >
-              <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center mb-2 sm:mb-3 ${action.bg}`}>
-                <ActionIcon size={16} className={action.color} />
+              <div className={`w-8 h-8 sm:w-[34px] sm:h-[34px] rounded-[10px] grid place-items-center mb-2 sm:mb-2.5 ${action.bg}`}>
+                <ActionIcon size={17} className={action.color} />
               </div>
               <p className="text-xs sm:text-sm font-bold text-[var(--text-1)] mb-0.5">{action.label}</p>
               <div className="flex items-center justify-between">
-                <p className="text-[10px] sm:text-xs text-[var(--text-3)]">{action.desc}</p>
-                <ArrowRight size={12} className="text-[var(--text-4)] group-hover:text-[var(--text-2)] transition-colors" />
+                <p className="text-[10px] sm:text-[11px] text-[var(--text-3)]">{action.desc}</p>
+                <ArrowRight size={13} className="text-[var(--text-4)] group-hover:text-[var(--text-2)] transition-colors" />
               </div>
             </Link>
           )
