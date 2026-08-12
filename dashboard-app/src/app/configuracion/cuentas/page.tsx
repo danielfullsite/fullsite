@@ -32,13 +32,21 @@ const TIPO_LABELS: Record<TipoCuenta, string> = {
   capital: 'Capital',
 }
 
-const TIPO_COLORS: Record<TipoCuenta, string> = {
-  activo: 'bg-blue-500/20 text-blue-400',
-  pasivo: 'bg-red-500/20 text-red-400',
-  ingreso: 'bg-emerald-500/20 text-emerald-400',
-  egreso: 'bg-amber-500/20 text-amber-400',
-  capital: 'bg-purple-500/20 text-purple-400',
+// DS v2.1 account-type badge tints — Activo=info, Pasivo=crit, Ingreso=ok(accent), Egreso=warn, Capital=violet(st-barra)
+type TipoTint = { color: string; bg: string; border: string }
+const TIPO_TINT: Record<TipoCuenta, TipoTint> = {
+  activo:  { color: 'var(--info-ink)',   bg: 'var(--info-soft)',   border: 'color-mix(in srgb, var(--info) 38%, transparent)' },
+  pasivo:  { color: 'var(--crit-ink)',   bg: 'var(--crit-soft)',   border: 'color-mix(in srgb, var(--crit) 35%, transparent)' },
+  ingreso: { color: 'var(--accent-ink)', bg: 'var(--accent-soft)', border: 'var(--accent-line)' },
+  egreso:  { color: 'var(--warn-ink)',   bg: 'var(--warn-soft)',   border: 'color-mix(in srgb, var(--warn) 38%, transparent)' },
+  capital: { color: 'var(--st-barra)',   bg: 'color-mix(in srgb, var(--st-barra) 12%, transparent)', border: 'color-mix(in srgb, var(--st-barra) 38%, transparent)' },
 }
+
+// Tokens de estación DS v2.1 (violet st-barra — no viven en globals, scoped a esta página)
+const CUENTAS_TOKENS = `
+  .cta-scope{ --st-barra:#a78bfa; }
+  [data-theme="light"] .cta-scope{ --st-barra:#7c3aed; }
+`
 
 interface CuentaContable {
   id: string
@@ -274,33 +282,38 @@ export default function CuentasPage() {
   // ── Render ────────────────────────────────────────────────────────
 
   const inputCls =
-    'w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[var(--text-1)] placeholder:text-[var(--text-3)] focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500'
-  const labelCls = 'block text-xs font-medium text-[var(--text-2)] mb-1'
-  const tabCls = (active: boolean) =>
-    `px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-      active ? 'bg-blue-600 text-white' : 'text-[var(--text-2)] hover:bg-white/5'
-    }`
+    'w-full rounded-[11px] border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2.5 text-sm text-[var(--text-1)] placeholder:text-[var(--text-4)] focus:border-[var(--accent)] focus:outline-none focus:ring-[3px] focus:ring-[var(--accent-soft)]'
+  const labelCls = 'block text-xs font-semibold text-[var(--text-3)] mb-1.5'
+  const tabBtnStyle = (active: boolean) =>
+    active
+      ? { background: 'var(--accent-soft)', color: 'var(--accent-ink)', borderColor: 'var(--accent-line)' }
+      : { background: 'var(--surface-2)', color: 'var(--text-3)', borderColor: 'var(--line)' }
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-6xl px-4 py-8">
+      <div className="cta-scope mx-auto max-w-6xl px-4 py-8">
+        <style dangerouslySetInnerHTML={{ __html: CUENTAS_TOKENS }} />
         <PageHeader title="Cuentas Contables y Bancarias" subtitle="Configuracion contable" />
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-6 w-6 animate-spin text-[var(--text-3)]" />
+        <div className="flex flex-col items-center justify-center gap-2.5 py-20">
+          <div className="w-[26px] h-[26px] border-[2.5px] rounded-full animate-spin" style={{ borderColor: 'var(--line)', borderTopColor: 'var(--accent)' }} />
+          <span className="text-sm font-semibold" style={{ color: 'var(--text-2)' }}>Cargando cuentas…</span>
+          <span className="text-xs" style={{ color: 'var(--text-4)' }}>Consultando configuración contable</span>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8">
+    <div className="cta-scope mx-auto max-w-6xl px-4 py-8">
+      <style dangerouslySetInnerHTML={{ __html: CUENTAS_TOKENS }} />
       <PageHeader
         title="Cuentas Contables y Bancarias"
         subtitle="Configuracion contable"
         action={
           <button
             onClick={() => { setLoading(true); Promise.all([loadCuentas(), loadBancos()]).then(() => setLoading(false)) }}
-            className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-[var(--text-2)] hover:bg-white/10 transition-colors"
+            className="flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors min-h-[44px]"
+            style={{ borderColor: 'var(--line)', background: 'var(--surface-2)', color: 'var(--text-1)' }}
           >
             <RefreshCw className="h-4 w-4" />
             Recargar
@@ -310,11 +323,19 @@ export default function CuentasPage() {
 
       {/* ── Tabs ─────────────────────────────────────────────────── */}
       <div className="flex gap-2 mb-6">
-        <button className={tabCls(tab === 'contables')} onClick={() => setTab('contables')}>
-          <span className="flex items-center gap-2"><Landmark className="h-4 w-4" />Cuentas Contables</span>
+        <button
+          className="inline-flex items-center gap-2 rounded-[11px] border px-4 py-2.5 text-[13.5px] font-semibold transition-colors"
+          style={tabBtnStyle(tab === 'contables')}
+          onClick={() => setTab('contables')}
+        >
+          <Landmark className="h-4 w-4" />Cuentas Contables
         </button>
-        <button className={tabCls(tab === 'bancarias')} onClick={() => setTab('bancarias')}>
-          <span className="flex items-center gap-2"><Building2 className="h-4 w-4" />Cuentas Bancarias</span>
+        <button
+          className="inline-flex items-center gap-2 rounded-[11px] border px-4 py-2.5 text-[13.5px] font-semibold transition-colors"
+          style={tabBtnStyle(tab === 'bancarias')}
+          onClick={() => setTab('bancarias')}
+        >
+          <Building2 className="h-4 w-4" />Cuentas Bancarias
         </button>
       </div>
 
@@ -325,7 +346,7 @@ export default function CuentasPage() {
             <p className="text-sm text-[var(--text-3)]">{cuentas.length} cuenta{cuentas.length !== 1 ? 's' : ''} registrada{cuentas.length !== 1 ? 's' : ''}</p>
             <button
               onClick={() => { resetCuentaForm(); setShowCuentaForm(!showCuentaForm) }}
-              className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition-colors"
+              className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold min-h-[44px] transition-[filter] hover:brightness-105" style={{ background: "linear-gradient(150deg, var(--accent-bright), var(--accent-deep))", color: "#04140d", boxShadow: "0 1px 0 rgba(255,255,255,.18) inset, 0 10px 22px -8px var(--accent)" }}
             >
               {showCuentaForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
               {showCuentaForm ? 'Cancelar' : 'Agregar Cuenta'}
@@ -334,7 +355,7 @@ export default function CuentasPage() {
 
           {/* Form */}
           {showCuentaForm && (
-            <div className="rounded-xl border border-white/10 bg-white/[.02] p-6 mb-6">
+            <div className="rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-6 mb-6">
               <h3 className="text-sm font-semibold text-[var(--text-1)] mb-4">
                 {editCuentaId ? 'Editar Cuenta' : 'Nueva Cuenta Contable'}
               </h3>
@@ -393,7 +414,7 @@ export default function CuentasPage() {
                 <button
                   onClick={handleSaveCuenta}
                   disabled={saving || !cuentaCodigo.trim() || !cuentaNombre.trim()}
-                  className="flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-500 transition-colors disabled:opacity-40"
+                  className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold min-h-[44px] transition-[filter] hover:brightness-105 disabled:opacity-40 disabled:cursor-not-allowed" style={{ background: "linear-gradient(150deg, var(--accent-bright), var(--accent-deep))", color: "#04140d", boxShadow: "0 1px 0 rgba(255,255,255,.18) inset, 0 10px 22px -8px var(--accent)" }}
                 >
                   {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}
                   {saving ? 'Guardando...' : saved ? 'Guardado' : editCuentaId ? 'Actualizar' : 'Guardar'}
@@ -404,22 +425,28 @@ export default function CuentasPage() {
 
           {/* Hierarchical List */}
           {cuentas.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-[var(--text-3)]">
-              <Landmark className="h-10 w-10 mb-3 opacity-40" />
-              <p className="text-sm">No hay cuentas contables registradas</p>
+            <div className="flex flex-col items-center justify-center gap-2.5 rounded-xl border border-dashed py-[34px] px-5 text-center" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
+              <span className="w-10 h-10 rounded-xl grid place-items-center" style={{ background: 'var(--surface-2)', color: 'var(--text-3)' }}>
+                <Landmark className="h-5 w-5" />
+              </span>
+              <span className="text-sm font-semibold" style={{ color: 'var(--text-2)' }}>No hay cuentas contables registradas</span>
+              <span className="text-xs" style={{ color: 'var(--text-4)' }}>Agrega la primera cuenta para construir tu catálogo.</span>
             </div>
           ) : (
-            <div className="rounded-xl border border-white/10 divide-y divide-white/5">
+            <div className="rounded-xl border border-[var(--line)] divide-y divide-[var(--line-soft)]">
               {parentCuentas.map((cuenta) => {
                 const children = childrenOf(cuenta.id)
                 return (
                   <div key={cuenta.id}>
                     {/* Parent row */}
-                    <div className="flex items-center justify-between px-4 py-3 hover:bg-white/[.02] transition-colors">
+                    <div className="flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-2)] transition-colors">
                       <div className="flex items-center gap-3">
                         <span className="font-mono text-xs text-[var(--text-2)] w-16">{cuenta.codigo}</span>
-                        <span className="text-sm font-medium text-[var(--text-1)]">{cuenta.nombre}</span>
-                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${TIPO_COLORS[cuenta.tipo]}`}>
+                        <span className="text-sm font-semibold text-[var(--text-1)]">{cuenta.nombre}</span>
+                        <span
+                          className="inline-flex items-center rounded-lg px-2.5 py-1 text-[11px] font-semibold border"
+                          style={{ color: TIPO_TINT[cuenta.tipo].color, background: TIPO_TINT[cuenta.tipo].bg, borderColor: TIPO_TINT[cuenta.tipo].border }}
+                        >
                           {TIPO_LABELS[cuenta.tipo]}
                         </span>
                         {children.length > 0 && (
@@ -429,13 +456,13 @@ export default function CuentasPage() {
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => startEditCuenta(cuenta)}
-                          className="rounded p-1 text-[var(--text-3)] hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
+                          className="rounded-lg p-1.5 text-[var(--text-3)] hover:text-[var(--text-1)] hover:bg-[var(--surface-2)] transition-colors"
                         >
                           <Edit3 className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => deleteCuenta(cuenta.id)}
-                          className="rounded p-1 text-[var(--text-3)] hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                          className="rounded-lg p-1.5 text-[var(--text-3)] hover:text-[var(--crit-ink)] hover:bg-[var(--crit-soft)] transition-colors"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -445,26 +472,29 @@ export default function CuentasPage() {
                     {children.map((child) => (
                       <div
                         key={child.id}
-                        className="flex items-center justify-between px-4 py-2.5 pl-10 bg-white/[.01] hover:bg-white/[.03] transition-colors border-t border-white/[.03]"
+                        className="flex items-center justify-between px-4 py-2.5 pl-10 hover:bg-[var(--surface-2)] transition-colors border-t border-[var(--line-soft)] bg-[color-mix(in_srgb,var(--text-1)_2.5%,transparent)]"
                       >
                         <div className="flex items-center gap-3">
                           <ChevronRight className="h-3 w-3 text-[var(--text-3)]" />
                           <span className="font-mono text-xs text-[var(--text-3)] w-16">{child.codigo}</span>
                           <span className="text-sm text-[var(--text-2)]">{child.nombre}</span>
-                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${TIPO_COLORS[child.tipo]}`}>
+                          <span
+                            className="inline-flex items-center rounded-lg px-2.5 py-1 text-[11px] font-semibold border"
+                            style={{ color: TIPO_TINT[child.tipo].color, background: TIPO_TINT[child.tipo].bg, borderColor: TIPO_TINT[child.tipo].border }}
+                          >
                             {TIPO_LABELS[child.tipo]}
                           </span>
                         </div>
                         <div className="flex items-center gap-1">
                           <button
                             onClick={() => startEditCuenta(child)}
-                            className="rounded p-1 text-[var(--text-3)] hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
+                            className="rounded-lg p-1.5 text-[var(--text-3)] hover:text-[var(--text-1)] hover:bg-[var(--surface-2)] transition-colors"
                           >
                             <Edit3 className="h-3.5 w-3.5" />
                           </button>
                           <button
                             onClick={() => deleteCuenta(child.id)}
-                            className="rounded p-1 text-[var(--text-3)] hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                            className="rounded-lg p-1.5 text-[var(--text-3)] hover:text-[var(--crit-ink)] hover:bg-[var(--crit-soft)] transition-colors"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -486,7 +516,7 @@ export default function CuentasPage() {
             <p className="text-sm text-[var(--text-3)]">{bancos.length} cuenta{bancos.length !== 1 ? 's' : ''} bancaria{bancos.length !== 1 ? 's' : ''}</p>
             <button
               onClick={() => { resetBancoForm(); setShowBancoForm(!showBancoForm) }}
-              className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition-colors"
+              className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold min-h-[44px] transition-[filter] hover:brightness-105" style={{ background: "linear-gradient(150deg, var(--accent-bright), var(--accent-deep))", color: "#04140d", boxShadow: "0 1px 0 rgba(255,255,255,.18) inset, 0 10px 22px -8px var(--accent)" }}
             >
               {showBancoForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
               {showBancoForm ? 'Cancelar' : 'Agregar Cuenta'}
@@ -495,7 +525,7 @@ export default function CuentasPage() {
 
           {/* Form */}
           {showBancoForm && (
-            <div className="rounded-xl border border-white/10 bg-white/[.02] p-6 mb-6">
+            <div className="rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-6 mb-6">
               <h3 className="text-sm font-semibold text-[var(--text-1)] mb-4">
                 {editBancoId ? 'Editar Cuenta Bancaria' : 'Nueva Cuenta Bancaria'}
               </h3>
@@ -557,7 +587,7 @@ export default function CuentasPage() {
                 <button
                   onClick={handleSaveBanco}
                   disabled={saving || !bancoNombre.trim() || !bancoNumero.trim()}
-                  className="flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-500 transition-colors disabled:opacity-40"
+                  className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold min-h-[44px] transition-[filter] hover:brightness-105 disabled:opacity-40 disabled:cursor-not-allowed" style={{ background: "linear-gradient(150deg, var(--accent-bright), var(--accent-deep))", color: "#04140d", boxShadow: "0 1px 0 rgba(255,255,255,.18) inset, 0 10px 22px -8px var(--accent)" }}
                 >
                   {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}
                   {saving ? 'Guardando...' : saved ? 'Guardado' : editBancoId ? 'Actualizar' : 'Guardar'}
@@ -568,15 +598,18 @@ export default function CuentasPage() {
 
           {/* Bank accounts list */}
           {bancos.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-[var(--text-3)]">
-              <Building2 className="h-10 w-10 mb-3 opacity-40" />
-              <p className="text-sm">No hay cuentas bancarias registradas</p>
+            <div className="flex flex-col items-center justify-center gap-2.5 rounded-xl border border-dashed py-[34px] px-5 text-center" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
+              <span className="w-10 h-10 rounded-xl grid place-items-center" style={{ background: 'var(--surface-2)', color: 'var(--text-3)' }}>
+                <Building2 className="h-5 w-5" />
+              </span>
+              <span className="text-sm font-semibold" style={{ color: 'var(--text-2)' }}>No hay cuentas bancarias registradas</span>
+              <span className="text-xs" style={{ color: 'var(--text-4)' }}>Agrega la primera cuenta para registrar saldos.</span>
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-white/10">
+            <div className="overflow-x-auto rounded-xl border border-[var(--line)]">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-white/10 bg-white/[.02]">
+                  <tr className="border-b border-[var(--line)] bg-[var(--surface-2)]">
                     <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-3)] uppercase tracking-wider">Banco</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-3)] uppercase tracking-wider">No. Cuenta</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-3)] uppercase tracking-wider">CLABE</th>
@@ -585,25 +618,25 @@ export default function CuentasPage() {
                     <th className="px-4 py-3 text-right text-xs font-medium text-[var(--text-3)] uppercase tracking-wider">Acciones</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/5">
+                <tbody className="divide-y divide-[var(--line-soft)]">
                   {bancos.map((banco) => (
-                    <tr key={banco.id} className="hover:bg-white/[.02] transition-colors">
+                    <tr key={banco.id} className="hover:bg-[var(--surface-2)] transition-colors">
                       <td className="px-4 py-3 font-medium text-[var(--text-1)]">{banco.banco}</td>
-                      <td className="px-4 py-3 font-mono text-xs text-[var(--text-2)]">{banco.numero_cuenta}</td>
-                      <td className="px-4 py-3 font-mono text-xs text-[var(--text-2)]">{banco.clabe || '-'}</td>
+                      <td className="px-4 py-3 font-mono text-xs tnum text-[var(--text-2)]">{banco.numero_cuenta}</td>
+                      <td className="px-4 py-3 font-mono text-xs tnum text-[var(--text-2)]">{banco.clabe || '-'}</td>
                       <td className="px-4 py-3 text-[var(--text-2)]">{banco.titular || '-'}</td>
-                      <td className="px-4 py-3 text-right font-medium text-[var(--text-1)]">{formatCurrency(banco.saldo)}</td>
+                      <td className="px-4 py-3 text-right font-mono font-medium tnum text-[var(--text-1)]">{formatCurrency(banco.saldo)}</td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <button
                             onClick={() => startEditBanco(banco)}
-                            className="rounded p-1 text-[var(--text-3)] hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
+                            className="rounded-lg p-1.5 text-[var(--text-3)] hover:text-[var(--text-1)] hover:bg-[var(--surface-2)] transition-colors"
                           >
                             <Edit3 className="h-4 w-4" />
                           </button>
                           <button
                             onClick={() => deleteBanco(banco.id)}
-                            className="rounded p-1 text-[var(--text-3)] hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                            className="rounded-lg p-1.5 text-[var(--text-3)] hover:text-[var(--crit-ink)] hover:bg-[var(--crit-soft)] transition-colors"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -613,9 +646,9 @@ export default function CuentasPage() {
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr className="border-t border-white/10 bg-white/[.02]">
-                    <td colSpan={4} className="px-4 py-3 text-sm font-medium text-[var(--text-2)]">Total</td>
-                    <td className="px-4 py-3 text-right text-sm font-bold text-[var(--text-1)]">
+                  <tr className="border-t border-[var(--line)] bg-[var(--surface-2)]">
+                    <td colSpan={4} className="px-4 py-3 text-sm font-semibold text-[var(--text-2)]">Total</td>
+                    <td className="px-4 py-3 text-right text-sm font-mono font-extrabold tnum text-[var(--text-1)]">
                       {formatCurrency(bancos.reduce((s, b) => s + b.saldo, 0))}
                     </td>
                     <td />
