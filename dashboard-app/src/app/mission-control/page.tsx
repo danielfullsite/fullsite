@@ -323,9 +323,8 @@ export default function MissionControlPage() {
         })}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left: qué detectó cada agente, agrupado por etapa */}
-        <div className="lg:col-span-2">
+      {/* Qué detectó cada agente — ancho completo (el detalle abre en drawer) */}
+      <div>
           <div className="mb-4">
             <h3 className="text-base font-bold text-[var(--text-1)]">Qué detectó cada agente</h3>
             <p className="text-xs text-[var(--text-3)]">agrupado por etapa · toca una card para el detalle</p>
@@ -335,7 +334,7 @@ export default function MissionControlPage() {
               {detsByEtapa.map(group => (
                 <section key={group.etapa}>
                   <p className="text-[11px] font-mono uppercase tracking-wider text-[var(--text-4)] mb-2">{group.etapa} <span className="text-[var(--text-4)]">· {group.items.length}</span></p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2.5">
                     {group.items.map((det, i) => {
                       const k = KIND[det.kind]
                       const Icon = det.icon
@@ -369,131 +368,96 @@ export default function MissionControlPage() {
           )}
         </div>
 
-        {/* Right: agent detail or live feed */}
-        <div>
-          {selectedAgent ? (() => {
-            const meta = AGENT_META[selectedAgent]
-            const Icon = meta?.icon || Bot
-            const result = latestResults.get(selectedAgent)
-            const k = KIND[result ? detKind(result.priority) : 'info']
-            const reco = result?.priority === 'critical'
-              ? 'Atiéndelo hoy — puede estar costándote dinero. Toca Aplicar para avisar al equipo.'
-              : result?.priority === 'warning'
-                ? 'Vale la pena revisarlo hoy. Toca Aplicar para darle seguimiento.'
-                : 'Para tu información. Pregúntale al agente si quieres el detalle.'
-            const act = actioned[selectedAgent]
-
-            return (
-              <div className="space-y-3 lg:sticky lg:top-4">
-                {/* Header */}
-                <div className="flex items-center gap-2.5">
-                  <span className={`w-9 h-9 rounded-xl grid place-items-center flex-shrink-0 ${k.chip}`}><Icon size={17} /></span>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-bold text-[var(--text-1)] truncate">{agentName(selectedAgent)}</h3>
-                    <p className="text-[11px] text-[var(--text-4)]">Agente IA · analiza en vivo</p>
-                  </div>
-                  <button onClick={() => setSelectedAgent(null)} className="w-7 h-7 rounded-lg grid place-items-center text-[var(--text-3)] hover:text-[var(--text-1)] hover:bg-[var(--surface-2)] flex-shrink-0"><X size={16} /></button>
+      {/* Drawer del agente — se desliza desde la derecha (como el artifact) */}
+      {selectedAgent && <div onClick={() => setSelectedAgent(null)} className="fixed inset-0 z-[80] bg-black/55 backdrop-blur-[2px]" />}
+      <div className={`fixed top-0 right-0 h-screen w-full sm:w-[440px] max-w-full z-[85] bg-[var(--bg)] border-l border-[var(--line)] shadow-2xl flex flex-col transition-transform duration-300 ease-out ${selectedAgent ? 'translate-x-0' : 'translate-x-full'}`}>
+        {selectedAgent && (() => {
+          const meta = AGENT_META[selectedAgent]
+          const Icon = meta?.icon || Bot
+          const result = latestResults.get(selectedAgent)
+          const k = KIND[result ? detKind(result.priority) : 'info']
+          const reco = result?.priority === 'critical'
+            ? 'Atiéndelo hoy — puede estar costándote dinero. Toca Aplicar para avisar al equipo.'
+            : result?.priority === 'warning'
+              ? 'Vale la pena revisarlo hoy. Toca Aplicar para darle seguimiento.'
+              : 'Para tu información. Pregúntale al agente si quieres el detalle.'
+          const act = actioned[selectedAgent]
+          return (
+            <>
+              {/* dhead */}
+              <div className="flex items-center gap-2.5 px-4 py-4 border-b border-[var(--line)] flex-shrink-0">
+                <span className={`w-9 h-9 rounded-xl grid place-items-center flex-shrink-0 ${k.chip}`}><Icon size={17} /></span>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-bold text-[var(--text-1)] truncate">{agentName(selectedAgent)}</h3>
+                  <p className="text-[11px] text-[var(--text-4)]">Agente IA · analiza en vivo</p>
                 </div>
-
-                <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] p-4 space-y-4">
-                  {/* Detección */}
-                  <div className={`rounded-xl border-l-[3px] ${k.border} ${k.bg} p-3`}>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className={`text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full ${k.tag}`}>{k.label}</span>
-                      {result?.fecha && <span className="ml-auto text-[10px] font-mono text-[var(--text-4)]">{result.fecha}</span>}
-                    </div>
-                    <p className="text-[13px] text-[var(--text-1)] leading-snug">{result?.summary || 'Sin detección reciente.'}</p>
+                <button onClick={() => setSelectedAgent(null)} className="w-8 h-8 rounded-lg grid place-items-center bg-[var(--surface-2)] text-[var(--text-2)] hover:text-[var(--text-1)] flex-shrink-0"><X size={17} /></button>
+              </div>
+              {/* dbody */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {/* Detección */}
+                <div className={`rounded-xl border-l-[3px] ${k.border} ${k.bg} p-3`}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className={`text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full ${k.tag}`}>{k.label}</span>
+                    {result?.fecha && <span className="ml-auto text-[10px] font-mono text-[var(--text-4)]">{result.fecha}</span>}
                   </div>
-
-                  {/* Qué analizó */}
-                  <div>
-                    <p className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-4)] mb-2">Qué analizó</p>
-                    <ul className="space-y-1.5">
-                      <li className="flex gap-2 text-xs text-[var(--text-2)] leading-snug"><span className="w-1 h-1 rounded-full bg-emerald-400 mt-1.5 flex-shrink-0" />Comparó tus datos recientes contra tu histórico.</li>
-                      <li className="flex gap-2 text-xs text-[var(--text-2)] leading-snug"><span className="w-1 h-1 rounded-full bg-emerald-400 mt-1.5 flex-shrink-0" />Señal: {result?.summary || 'sin detalle'}</li>
-                      {result?.fecha && <li className="flex gap-2 text-xs text-[var(--text-2)] leading-snug"><span className="w-1 h-1 rounded-full bg-emerald-400 mt-1.5 flex-shrink-0" />Último análisis: {result.fecha}.</li>}
-                    </ul>
+                  <p className="text-[13px] text-[var(--text-1)] leading-snug">{result?.summary || 'Sin detección reciente.'}</p>
+                </div>
+                {/* Qué analizó */}
+                <div>
+                  <p className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-4)] mb-2">Qué analizó</p>
+                  <ul className="space-y-1.5">
+                    <li className="flex gap-2 text-xs text-[var(--text-2)] leading-snug"><span className="w-1 h-1 rounded-full bg-emerald-400 mt-1.5 flex-shrink-0" />Comparó tus datos recientes contra tu histórico.</li>
+                    <li className="flex gap-2 text-xs text-[var(--text-2)] leading-snug"><span className="w-1 h-1 rounded-full bg-emerald-400 mt-1.5 flex-shrink-0" />Señal: {result?.summary || 'sin detalle'}</li>
+                    {result?.fecha && <li className="flex gap-2 text-xs text-[var(--text-2)] leading-snug"><span className="w-1 h-1 rounded-full bg-emerald-400 mt-1.5 flex-shrink-0" />Último análisis: {result.fecha}.</li>}
+                  </ul>
+                </div>
+                {/* Evidencia */}
+                <div>
+                  <p className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-4)] mb-2">Evidencia</p>
+                  <div className="rounded-xl bg-[var(--surface)] border border-[var(--line-soft)] p-2">
+                    <svg viewBox="0 0 300 56" preserveAspectRatio="none" className="w-full h-14">
+                      <defs><linearGradient id="evg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#34d399" stopOpacity="0.35" /><stop offset="1" stopColor="#34d399" stopOpacity="0" /></linearGradient></defs>
+                      <path d="M0 44 C 40 40, 60 30, 90 32 S 150 20, 190 24 S 250 14, 300 18 L 300 56 L 0 56 Z" fill="url(#evg)" />
+                      <path d="M0 44 C 40 40, 60 30, 90 32 S 150 20, 190 24 S 250 14, 300 18" fill="none" stroke="#34d399" strokeWidth="2.4" strokeLinecap="round" />
+                    </svg>
                   </div>
-
-                  {/* Evidencia */}
-                  <div>
-                    <p className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-4)] mb-2">Evidencia</p>
-                    <div className="rounded-xl bg-[var(--bg)] border border-[var(--line-soft)] p-2">
-                      <svg viewBox="0 0 300 56" preserveAspectRatio="none" className="w-full h-14">
-                        <defs><linearGradient id="evg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#34d399" stopOpacity="0.35" /><stop offset="1" stopColor="#34d399" stopOpacity="0" /></linearGradient></defs>
-                        <path d="M0 44 C 40 40, 60 30, 90 32 S 150 20, 190 24 S 250 14, 300 18 L 300 56 L 0 56 Z" fill="url(#evg)" />
-                        <path d="M0 44 C 40 40, 60 30, 90 32 S 150 20, 190 24 S 250 14, 300 18" fill="none" stroke="#34d399" strokeWidth="2.4" strokeLinecap="round" />
-                      </svg>
-                    </div>
+                </div>
+                {/* Recomendación */}
+                <div>
+                  <p className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-4)] mb-1.5">Recomendación</p>
+                  <p className="text-xs text-[var(--text-2)] leading-snug">{reco}</p>
+                </div>
+                {/* Acciones */}
+                <div className="flex gap-2">
+                  <button onClick={() => setActioned(a => ({ ...a, [selectedAgent]: 'aplicado' }))} className={`flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-semibold rounded-lg py-2 transition-colors ${act === 'aplicado' ? 'bg-emerald-500 text-[#04130d]' : 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20'}`}>
+                    <Check size={14} />{act === 'aplicado' ? 'Aplicado' : 'Aplicar'}
+                  </button>
+                  <button onClick={() => setActioned(a => ({ ...a, [selectedAgent]: 'recordar' }))} className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-semibold rounded-lg py-2 bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-2)] hover:bg-[var(--panel)] transition-colors">
+                    <Clock size={14} />Recordar
+                  </button>
+                  <button onClick={() => { setActioned(a => ({ ...a, [selectedAgent]: 'descartado' })); setSelectedAgent(null) }} className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-semibold rounded-lg py-2 bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-3)] hover:bg-[var(--panel)] transition-colors">
+                    <X size={14} />Descartar
+                  </button>
+                </div>
+                {/* Habla con el agente */}
+                <div className="border-t border-[var(--line-soft)] pt-3">
+                  <p className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-4)] mb-2 flex items-center gap-1.5"><Sparkles size={12} className="text-emerald-400" />Habla con el agente</p>
+                  <div className="space-y-2 max-h-[300px] overflow-y-auto mb-2.5 pr-1">
+                    {(chats[selectedAgent] ?? [introFor(selectedAgent)]).map((m, i) => (
+                      <div key={i} className={`max-w-[88%] px-3 py-2 rounded-2xl text-xs leading-snug ${m.role === 'user' ? 'ml-auto bg-emerald-500/[0.12] border border-emerald-500/25 text-[var(--text-1)] rounded-br-md' : 'bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-2)] rounded-bl-md'}`}>{m.content}</div>
+                    ))}
+                    {chatLoading && <div className="bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-3)] max-w-[60%] px-3 py-2 rounded-2xl rounded-bl-md text-xs">escribiendo…</div>}
                   </div>
-
-                  {/* Recomendación */}
-                  <div>
-                    <p className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-4)] mb-1.5">Recomendación</p>
-                    <p className="text-xs text-[var(--text-2)] leading-snug">{reco}</p>
-                  </div>
-
-                  {/* Acciones */}
-                  <div className="flex gap-2">
-                    <button onClick={() => setActioned(a => ({ ...a, [selectedAgent]: 'aplicado' }))} className={`flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-semibold rounded-lg py-2 transition-colors ${act === 'aplicado' ? 'bg-emerald-500 text-[#04130d]' : 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20'}`}>
-                      <Check size={14} />{act === 'aplicado' ? 'Aplicado' : 'Aplicar'}
-                    </button>
-                    <button onClick={() => setActioned(a => ({ ...a, [selectedAgent]: 'recordar' }))} className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-semibold rounded-lg py-2 bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-2)] hover:bg-[var(--panel)] transition-colors">
-                      <Clock size={14} />Recordar
-                    </button>
-                    <button onClick={() => { setActioned(a => ({ ...a, [selectedAgent]: 'descartado' })); setSelectedAgent(null) }} className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-semibold rounded-lg py-2 bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-3)] hover:bg-[var(--panel)] transition-colors">
-                      <X size={14} />Descartar
-                    </button>
-                  </div>
-
-                  {/* Habla con el agente */}
-                  <div className="border-t border-[var(--line-soft)] pt-3">
-                    <p className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-4)] mb-2 flex items-center gap-1.5"><Sparkles size={12} className="text-emerald-400" />Habla con el agente</p>
-                    <div className="space-y-2 max-h-[240px] overflow-y-auto mb-2.5 pr-1">
-                      {(chats[selectedAgent] ?? [introFor(selectedAgent)]).map((m, i) => (
-                        <div key={i} className={`max-w-[88%] px-3 py-2 rounded-2xl text-xs leading-snug ${m.role === 'user' ? 'ml-auto bg-emerald-500/[0.12] border border-emerald-500/25 text-[var(--text-1)] rounded-br-md' : 'bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-2)] rounded-bl-md'}`}>{m.content}</div>
-                      ))}
-                      {chatLoading && <div className="bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-3)] max-w-[60%] px-3 py-2 rounded-2xl rounded-bl-md text-xs">escribiendo…</div>}
-                    </div>
-                    <form onSubmit={(e) => { e.preventDefault(); sendChat() }} className="flex gap-2">
-                      <input value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="Pregúntale al agente…" className="flex-1 bg-[var(--surface-2)] border border-[var(--line)] rounded-full px-3.5 py-2 text-xs text-[var(--text-1)] outline-none focus:border-emerald-500/40 min-w-0" />
-                      <button type="submit" disabled={!chatInput.trim() || chatLoading} className="w-9 h-9 rounded-full bg-emerald-500 text-[#04130d] grid place-items-center disabled:opacity-40 flex-shrink-0"><Send size={15} /></button>
-                    </form>
-                  </div>
+                  <form onSubmit={(e) => { e.preventDefault(); sendChat() }} className="flex gap-2">
+                    <input value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="Pregúntale al agente…" className="flex-1 bg-[var(--surface-2)] border border-[var(--line)] rounded-full px-3.5 py-2 text-xs text-[var(--text-1)] outline-none focus:border-emerald-500/40 min-w-0" />
+                    <button type="submit" disabled={!chatInput.trim() || chatLoading} className="w-9 h-9 rounded-full bg-emerald-500 text-[#04130d] grid place-items-center disabled:opacity-40 flex-shrink-0"><Send size={15} /></button>
+                  </form>
                 </div>
               </div>
-            )
-          })() : (
-            <div className="lg:sticky lg:top-4">
-              <h3 className="text-xs font-bold text-[var(--text-3)] uppercase tracking-wider mb-2.5">Feed en vivo</h3>
-              <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] overflow-hidden">
-                <div className="divide-y divide-[var(--line-soft)] max-h-[600px] overflow-y-auto">
-                  {recentFeed.map((run, i) => {
-                    const meta = AGENT_META[run.agent_id]
-                    const Icon = meta?.icon || Bot
-                    return (
-                      <div key={`${run.agent_id}-${run.created_at}-${i}`} className="px-3 py-2.5 flex items-start gap-2.5">
-                        <div className={`w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5 ${run.status === 'error' ? 'bg-red-500/10' : 'bg-emerald-500/10'}`}>
-                          {run.status === 'error' ? <AlertTriangle size={12} className="text-red-400" /> : <Icon size={12} className={meta?.color || 'text-emerald-400'} />}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-xs font-semibold text-[var(--text-1)]">{meta?.name || run.agent_id}</span>
-                            <span className="text-[10px] text-[var(--text-4)]">{timeAgo(run.created_at)}</span>
-                          </div>
-                          <p className="text-[11px] text-[var(--text-3)] truncate">
-                            {run.output_summary || (run.status === 'error' ? 'Error en ejecución' : 'Completado')}
-                          </p>
-                        </div>
-                        {run.duration_ms && <span className="text-[10px] text-[var(--text-4)] flex-shrink-0">{(run.duration_ms / 1000).toFixed(1)}s</span>}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+            </>
+          )
+        })()}
       </div>
     </div>
   )
