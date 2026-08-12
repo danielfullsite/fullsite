@@ -100,7 +100,7 @@ export default function TopNav() {
           {/* Logo */}
           <Link href="/" className="flex items-center shrink-0 mr-6 logo-hover">
             <span className="text-[var(--text-1)] font-black text-xl tracking-tight">
-              fullsite<span className="logo-dot inline-block w-2 h-2 bg-emerald-500 ml-0.5 mb-0.5 rounded-none" />
+              fullsite
             </span>
           </Link>
 

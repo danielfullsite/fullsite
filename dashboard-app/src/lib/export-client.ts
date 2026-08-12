@@ -28,7 +28,7 @@ function toXls(rows: Row[], title = 'Reporte'): string {
   const stamp = new Date().toLocaleString('es-MX')
   // Encabezado de marca Fullsite (esqueleton de reporte, consistente en toda la app).
   const brand =
-    `<tr><td colspan="${n}" style="font-family:Arial;font-size:20px;font-weight:bold;color:#0f9d6e;padding:8px 6px 2px">fullsite ▪</td></tr>` +
+    `<tr><td colspan="${n}" style="font-family:Arial;font-size:20px;font-weight:bold;color:#0f9d6e;padding:8px 6px 2px">fullsite</td></tr>` +
     `<tr><td colspan="${n}" style="font-family:Arial;font-size:11px;color:#555;padding:0 6px 8px">${esc(title)}${clientId ? ` · ${esc(clientId)}` : ''} · Generado ${esc(stamp)}</td></tr>` +
     `<tr><td colspan="${n}"></td></tr>`
   const head = `<tr>${cs.map(c => `<th style="background:#0f9d6e;color:#fff;text-align:left;padding:4px 6px">${esc(c)}</th>`).join('')}</tr>`

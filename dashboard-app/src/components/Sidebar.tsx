@@ -234,7 +234,7 @@ export default function Sidebar() {
         <div className="flex items-center justify-between">
           <Link href={isPlatform ? '/platform' : '/'} className="flex items-center logo-hover" onClick={() => setMobileOpen(false)}>
             <span className="text-[var(--text-1)] font-black text-xl tracking-tight">
-              fullsite<span className="inline-block w-2 h-2 ml-0.5 mb-0.5 rounded-none" style={{ background: 'var(--accent)' }} />
+              fullsite
             </span>
           </Link>
           {/* Close button inside sidebar on mobile */}

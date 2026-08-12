@@ -379,6 +379,8 @@ export default function TendenciasPage() {
       <PageHeader
         title="Tendencias"
         subtitle="Comparativos mensuales, por día de la semana, y acumulado del año"
+        exportData={monthlyAgg as unknown as Record<string, unknown>[]}
+        exportName="tendencias"
       />
 
       {/* KPIs */}

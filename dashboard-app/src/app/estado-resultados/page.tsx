@@ -140,6 +140,8 @@ export default function EstadoResultadosPage() {
       <PageHeader
         title="Estado de Resultados"
         subtitle={`Profit & Loss — Vista ${periodoView === 'mes' ? 'mensual' : periodoView === 'trimestre' ? 'trimestral' : periodoView === 'semestre' ? 'semestral' : 'anual'}`}
+        exportData={monthlyPL as unknown as Record<string, unknown>[]}
+        exportName="estado-resultados"
         action={
           <div className="flex gap-1 bg-[var(--surface)] rounded-lg p-1 border border-[var(--line)]">
             {(['mes', 'trimestre', 'semestre', 'año'] as const).map(p => (

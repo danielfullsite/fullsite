@@ -31,7 +31,7 @@ function toXls(rows: Record<string, unknown>[], title = 'Reporte', client = ''):
   const n = cols.length || 1
   const stamp = new Date().toLocaleString('es-MX')
   const brand =
-    `<tr><td colspan="${n}" style="font-family:Arial;font-size:20px;font-weight:bold;color:#0f9d6e;padding:8px 6px 2px">fullsite ▪</td></tr>` +
+    `<tr><td colspan="${n}" style="font-family:Arial;font-size:20px;font-weight:bold;color:#0f9d6e;padding:8px 6px 2px">fullsite</td></tr>` +
     `<tr><td colspan="${n}" style="font-family:Arial;font-size:11px;color:#555;padding:0 6px 8px">${esc(title)}${client ? ` · ${esc(client)}` : ''} · Generado ${esc(stamp)}</td></tr>` +
     `<tr><td colspan="${n}"></td></tr>`
   const head = `<tr>${cols.map(c => `<th style="background:#0f9d6e;color:#fff;text-align:left;padding:4px 6px">${esc(c)}</th>`).join('')}</tr>`
