@@ -5630,28 +5630,9 @@ function POSAlerts({ role }: { role: string }) {
         const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
         const headers = { apikey: sbKey, Authorization: `Bearer ${sbKey}` }
 
-        // Stock bajo alerts moved to dashboard only — too distracting in POS during rush
-        if (role === 'admin' || role === 'gerente') {
-
-          // Check agent anomalies
-          try {
-            const agentRes = await fetch(
-              `${sbUrl}/rest/v1/agent_results?agent_id=eq.anomaly&order=updated_at.desc&limit=1`,
-              { headers }
-            )
-            if (agentRes.ok) {
-              const [anomaly] = await agentRes.json()
-              if (anomaly?.priority === 'critical') {
-                newAlerts.push({
-                  id: 'anomaly-critical',
-                  type: 'warning',
-                  message: `🚨 ${anomaly.summary}`,
-                  dismissible: true,
-                })
-              }
-            }
-          } catch { /* ignore */ }
-        }
+        // Las alertas de AGENTES IA (anomalías, stock bajo, etc.) NO se muestran en
+        // el POS — son para el dashboard. En servicio el operador solo ve alertas
+        // OPERATIVAS (órdenes listas, delivery), abajo.
 
         // Check ready orders (all roles)
         try {

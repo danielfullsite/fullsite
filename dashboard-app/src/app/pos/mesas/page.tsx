@@ -912,7 +912,7 @@ export default function MesasPage() {
               { l: 'Ingreso actual', v: formatMXN(totalVentas), sub: '', d: `TP ${formatMXN(ticketPromedio)}`, ink: 'var(--accent-ink)' },
               { l: 'Tiempo prom.', v: `${avgMins}`, sub: ' min', d: 'rotación de mesa', ink: 'var(--text-3)' },
             ].map((k) => (
-              <div key={k.l} className="rounded-[14px] border border-[var(--line)] p-4 shadow-[var(--shadow-soft)]" style={{ background: 'var(--bento-card)' }}>
+              <div key={k.l} className="rounded-[14px] border border-[var(--line)] p-4 shadow-[var(--shadow-soft)] bg-[var(--surface)]">
                 <div className="font-mono text-[10px] uppercase tracking-[0.13em] text-[var(--text-3)]">{k.l}</div>
                 <div className="text-2xl font-extrabold mt-2 tabular-nums tracking-tight text-[var(--text-1)]">
                   {k.v}<span className="text-[var(--text-4)] text-base font-bold">{k.sub}</span>
