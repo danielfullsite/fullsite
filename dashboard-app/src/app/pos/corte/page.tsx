@@ -104,6 +104,7 @@ export default function CortePage() {
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethodDB[]>([])
   const [declarado, setDeclarado] = useState(0)
   const [turno, setTurno] = useState<{ id: string; fondo_inicial: number; opened_by: string; opened_at: string } | null>(null)
+  const [tab, setTab] = useState<'resumen' | 'arqueo' | 'meseros' | 'ordenes'>('resumen')
   // 'turno' = corte del turno activo (por turno_id); 'dia' = corte histórico por fecha
   const [corteMode, setCorteMode] = useState<'turno' | 'dia'>('turno')
 
@@ -481,7 +482,7 @@ export default function CortePage() {
           <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : (
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 min-h-0 flex flex-col p-4 gap-3 overflow-hidden">
           {/* Offline banner */}
           {offlineMode && (
             <div className="mb-6 bg-amber-900/30 border border-amber-600/50 rounded-xl px-5 py-3 flex items-center gap-3">
@@ -519,6 +520,17 @@ export default function CortePage() {
             </div>
           )}
 
+          {/* Tabs — el POS no scrollea: cada pestaña cabe en pantalla */}
+          <div className="flex gap-1 flex-shrink-0 bg-[var(--surface-2)]/40 p-1 rounded-xl w-fit">
+            {([['resumen', 'Resumen'], ['arqueo', 'Arqueo de caja'], ['meseros', 'Meseros'], ['ordenes', 'Órdenes']] as const).map(([k, label]) => (
+              <button key={k} onClick={() => setTab(k)}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${tab === k ? 'bg-blue-600 text-white' : 'text-[var(--text-3)] hover:text-white'}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="flex-1 min-h-0 overflow-y-auto pos-fat-scroll pr-1">
+          {tab === 'resumen' && (<>
           {/* KPI Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <div className="bg-emerald-900/20 border border-emerald-700/30 rounded-xl px-4 py-4">
@@ -642,9 +654,12 @@ export default function CortePage() {
                 </div>
               )}
             </div>
+          </div>
+          </>)}
+          {tab === 'arqueo' && (<>
 
             {/* Reporte Corte Turno — formato Wansoft (spec 14.2) */}
-            <div className="bg-[var(--surface-2)]/60 border border-slate-700 rounded-xl p-5 md:col-span-2">
+            <div className="bg-[var(--surface-2)]/60 border border-slate-700 rounded-xl p-5">
               <h3 className="font-bold text-white mb-1 flex items-center gap-2">
                 <Receipt size={18} className="text-emerald-400" />
                 Reporte Corte Turno
@@ -751,8 +766,10 @@ export default function CortePage() {
               </div>
             </div>
 
+            </>)}
+          {tab === 'meseros' && (<>
             {/* Ventas por mesero */}
-            <div className="bg-[var(--surface-2)]/60 border border-slate-700 rounded-xl p-5 md:col-span-2">
+            <div className="bg-[var(--surface-2)]/60 border border-slate-700 rounded-xl p-5">
               <h3 className="font-bold text-white mb-4 flex items-center gap-2">
                 <ChefHat size={18} className="text-amber-400" />
                 Ventas por mesero
@@ -800,7 +817,8 @@ export default function CortePage() {
                 </div>
               )}
             </div>
-          </div>
+          </>)}
+          {tab === 'ordenes' && (<>
 
           {/* Ordenes cerradas — con opción de reabrir */}
           <div className="mt-6 bg-[var(--surface-2)]/60 border border-slate-700 rounded-xl p-5">
@@ -836,6 +854,8 @@ export default function CortePage() {
             <span>Abiertas: {stats.ordenesAbiertas}</span>
             <span>Cerradas: {stats.ordenesCerradas}</span>
             <span>Canceladas: {stats.ordenesCanceladas}</span>
+          </div>
+          </>)}
           </div>
         </div>
       )}
