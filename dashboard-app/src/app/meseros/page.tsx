@@ -34,6 +34,7 @@ import {
 } from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
+import PeriodPicker, { type DateRange } from '@/components/PeriodPicker'
 import { getRecentDays, aggregateMeseros, getWaiterCategories, getDashboardFromPosOrders } from '@/lib/data'
 import { formatCurrency, formatNumber } from '@/lib/format'
 import type { WansoftDaily, WaiterCategoryData } from '@/lib/types'
@@ -78,6 +79,7 @@ export default function MeserosPage() {
   const [waiterData, setWaiterData] = useState<{ fecha: string; data: WaiterCategoryData }[]>([])
   const [loading, setLoading] = useState(true)
   const [period, setPeriod] = useState<7 | 14 | 30>(7)
+  const [range, setRange] = useState<DateRange | null>(null)
   const [tab, setTab] = useState<Tab>('ventas')
   const [sortKey, setSortKey] = useState<SortKey>('total')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
@@ -89,13 +91,13 @@ export default function MeserosPage() {
     async function load() {
       try {
         const [data, waiterCats] = await Promise.all([
-          getRecentDays(30),
-          getWaiterCategories(30),
+          getRecentDays(90),
+          getWaiterCategories(90),
         ])
         // Fallback: if no wansoft_daily data, build from pos_orders
         let recentResult = data
         if (recentResult.length === 0) {
-          recentResult = await getDashboardFromPosOrders(30)
+          recentResult = await getDashboardFromPosOrders(90)
         }
         setRecentData(recentResult)
         setWaiterData(waiterCats as { fecha: string; data: WaiterCategoryData }[])
@@ -108,7 +110,9 @@ export default function MeserosPage() {
     load()
   }, [])
 
-  const periodData = recentData.slice(-period)
+  const periodData = range
+    ? recentData.filter(d => d.fecha >= range.from && d.fecha <= range.to)
+    : recentData.slice(-period)
   const meseros = aggregateMeseros(periodData)
 
   const totalVentas = meseros.reduce((sum, m) => sum + m.total, 0)
@@ -339,23 +343,9 @@ export default function MeserosPage() {
           })}
         </div>
 
-        {/* Period selector — segmented control */}
+        {/* Period selector — presets + rango personalizado */}
         {tab === 'ventas' && (
-          <div className="inline-flex bg-[var(--surface-2)] rounded-lg p-1 gap-0.5">
-            {([7, 14, 30] as const).map((p) => (
-              <button
-                key={p}
-                onClick={() => setPeriod(p)}
-                className={`px-3.5 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${
-                  period === p
-                    ? 'bg-[var(--surface)] text-[var(--text-1)] shadow-sm'
-                    : 'text-[var(--text-2)] hover:text-[var(--text-1)]'
-                }`}
-              >
-                {p}d
-              </button>
-            ))}
-          </div>
+          <PeriodPicker period={period} onPeriod={(n) => setPeriod(n as 7 | 14 | 30)} range={range} onRange={setRange} />
         )}
       </div>
 
