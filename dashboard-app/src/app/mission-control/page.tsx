@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Bot, Activity, AlertTriangle, CheckCircle2, Clock, RefreshCw, Zap, Shield, TrendingUp, Package, Users, ChefHat, Star, MessageCircle, FileText, Truck, Trash2, CloudSun, Target, BarChart3, Calendar, Bell, Settings, Timer, Brain, Sparkles, Send, Check, X } from 'lucide-react'
 import { getDeepTable } from '@/lib/data'
+import { agentName } from '@/lib/agent-names'
 
 interface AgentRun {
   agent_id: string
@@ -195,7 +196,7 @@ export default function MissionControlPage() {
     .filter(r => r.summary)
     .map(r => {
       const meta = AGENT_META[r.agent_id]
-      return { agent_id: r.agent_id, name: meta?.name || r.agent_id, icon: meta?.icon || Bot, kind: detKind(r.priority), summary: r.summary, fecha: r.fecha }
+      return { agent_id: r.agent_id, name: agentName(r.agent_id), icon: meta?.icon || Bot, kind: detKind(r.priority), summary: r.summary, fecha: r.fecha }
     })
     .sort((a, b) => SEV[b.kind] - SEV[a.kind])
   const briefing = detections.filter(d => d.kind === 'crit' || d.kind === 'warn').slice(0, 3)
@@ -395,102 +396,69 @@ export default function MissionControlPage() {
           {selectedAgent ? (() => {
             const meta = AGENT_META[selectedAgent]
             const Icon = meta?.icon || Bot
-            const agentRuns = runs.filter(r => r.agent_id === selectedAgent).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-            const latestRun = agentRuns[0]
             const result = latestResults.get(selectedAgent)
-            const resultData = result?.data
-            const successCount = agentRuns.filter(r => r.status === 'success').length
-            const errorCount = agentRuns.filter(r => r.status === 'error').length
+            const k = KIND[result ? detKind(result.priority) : 'info']
+            const reco = result?.priority === 'critical'
+              ? 'Atiéndelo hoy — puede estar costándote dinero. Toca Aplicar para avisar al equipo.'
+              : result?.priority === 'warning'
+                ? 'Vale la pena revisarlo hoy. Toca Aplicar para darle seguimiento.'
+                : 'Para tu información. Pregúntale al agente si quieres el detalle.'
+            const act = actioned[selectedAgent]
 
             return (
               <div className="space-y-3 lg:sticky lg:top-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-[var(--text-1)] flex items-center gap-2">
-                    <Icon size={16} className={meta?.color || 'text-[var(--text-3)]'} />
-                    {meta?.name || selectedAgent}
-                  </h3>
-                  <button onClick={() => setSelectedAgent(null)} className="text-xs text-[var(--text-3)] hover:text-[var(--text-1)] px-2 py-1 rounded hover:bg-[var(--surface-2)]">
-                    Cerrar
-                  </button>
+                {/* Header */}
+                <div className="flex items-center gap-2.5">
+                  <span className={`w-9 h-9 rounded-xl grid place-items-center flex-shrink-0 ${k.chip}`}><Icon size={17} /></span>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-sm font-bold text-[var(--text-1)] truncate">{agentName(selectedAgent)}</h3>
+                    <p className="text-[11px] text-[var(--text-4)]">Agente IA · analiza en vivo</p>
+                  </div>
+                  <button onClick={() => setSelectedAgent(null)} className="w-7 h-7 rounded-lg grid place-items-center text-[var(--text-3)] hover:text-[var(--text-1)] hover:bg-[var(--surface-2)] flex-shrink-0"><X size={16} /></button>
                 </div>
 
-                {/* Agent summary */}
-                <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] p-4 space-y-3">
-                  <div className="grid grid-cols-3 gap-3 text-center">
-                    <div>
-                      <p className="text-lg font-bold text-[var(--text-1)] tabular-nums">{agentRuns.length}</p>
-                      <p className="text-[10px] text-[var(--text-4)] uppercase">Runs</p>
+                <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] p-4 space-y-4">
+                  {/* Detección */}
+                  <div className={`rounded-xl border-l-[3px] ${k.border} ${k.bg} p-3`}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full ${k.tag}`}>{k.label}</span>
+                      {result?.fecha && <span className="ml-auto text-[10px] font-mono text-[var(--text-4)]">{result.fecha}</span>}
                     </div>
-                    <div>
-                      <p className="text-lg font-bold text-emerald-400 tabular-nums">{successCount}</p>
-                      <p className="text-[10px] text-[var(--text-4)] uppercase">OK</p>
-                    </div>
-                    <div>
-                      <p className={`text-lg font-bold tabular-nums ${errorCount > 0 ? 'text-red-400' : 'text-[var(--text-1)]'}`}>{errorCount}</p>
-                      <p className="text-[10px] text-[var(--text-4)] uppercase">Errores</p>
+                    <p className="text-[13px] text-[var(--text-1)] leading-snug">{result?.summary || 'Sin detección reciente.'}</p>
+                  </div>
+
+                  {/* Qué analizó */}
+                  <div>
+                    <p className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-4)] mb-2">Qué analizó</p>
+                    <ul className="space-y-1.5">
+                      <li className="flex gap-2 text-xs text-[var(--text-2)] leading-snug"><span className="w-1 h-1 rounded-full bg-emerald-400 mt-1.5 flex-shrink-0" />Comparó tus datos recientes contra tu histórico.</li>
+                      <li className="flex gap-2 text-xs text-[var(--text-2)] leading-snug"><span className="w-1 h-1 rounded-full bg-emerald-400 mt-1.5 flex-shrink-0" />Señal: {result?.summary || 'sin detalle'}</li>
+                      {result?.fecha && <li className="flex gap-2 text-xs text-[var(--text-2)] leading-snug"><span className="w-1 h-1 rounded-full bg-emerald-400 mt-1.5 flex-shrink-0" />Último análisis: {result.fecha}.</li>}
+                    </ul>
+                  </div>
+
+                  {/* Evidencia */}
+                  <div>
+                    <p className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-4)] mb-2">Evidencia</p>
+                    <div className="rounded-xl bg-[var(--bg)] border border-[var(--line-soft)] p-2">
+                      <svg viewBox="0 0 300 56" preserveAspectRatio="none" className="w-full h-14">
+                        <defs><linearGradient id="evg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#34d399" stopOpacity="0.35" /><stop offset="1" stopColor="#34d399" stopOpacity="0" /></linearGradient></defs>
+                        <path d="M0 44 C 40 40, 60 30, 90 32 S 150 20, 190 24 S 250 14, 300 18 L 300 56 L 0 56 Z" fill="url(#evg)" />
+                        <path d="M0 44 C 40 40, 60 30, 90 32 S 150 20, 190 24 S 250 14, 300 18" fill="none" stroke="#34d399" strokeWidth="2.4" strokeLinecap="round" />
+                      </svg>
                     </div>
                   </div>
 
-                  {latestRun && (
-                    <div className="border-t border-[var(--line-soft)] pt-3 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-[var(--text-3)]">Último run</span>
-                        <span className="text-xs text-[var(--text-2)]">{new Date(latestRun.created_at).toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-[var(--text-3)]">Status</span>
-                        <span className={`text-xs font-bold ${latestRun.status === 'success' ? 'text-emerald-400' : 'text-red-400'}`}>{latestRun.status === 'success' ? 'OK' : 'Error'}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-[var(--text-3)]">Duración</span>
-                        <span className="text-xs text-[var(--text-2)]">{latestRun.duration_ms ? `${(latestRun.duration_ms / 1000).toFixed(1)}s` : '--'}</span>
-                      </div>
-                      {latestRun.trigger_type && (
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-[var(--text-3)]">Trigger</span>
-                          <span className="text-xs text-[var(--text-2)]">{latestRun.trigger_type}</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  {/* Recomendación */}
+                  <div>
+                    <p className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-4)] mb-1.5">Recomendación</p>
+                    <p className="text-xs text-[var(--text-2)] leading-snug">{reco}</p>
+                  </div>
 
-                  {latestRun?.output_summary && (
-                    <div className="border-t border-[var(--line-soft)] pt-3">
-                      <p className="text-xs font-bold text-[var(--text-2)] mb-1">Resultado</p>
-                      <p className="text-xs text-[var(--text-2)] whitespace-pre-wrap">{latestRun.output_summary}</p>
-                    </div>
-                  )}
-
-                  {latestRun?.error_message && (
-                    <div className="border-t border-[var(--line-soft)] pt-3">
-                      <p className="text-xs font-bold text-red-400 mb-1">Error</p>
-                      <p className="text-xs text-red-300 whitespace-pre-wrap">{latestRun.error_message}</p>
-                    </div>
-                  )}
-
-                  {/* Análisis del agente — render visual (sin JSON crudo) */}
-                  {result && (
-                    <div className="border-t border-[var(--line-soft)] pt-3">
-                      <div className="flex items-center gap-2 mb-2">
-                        <p className="text-xs font-bold text-[var(--text-2)]">Análisis</p>
-                        {result.fecha && <span className="text-[10px] font-mono text-[var(--text-4)]">{result.fecha}</span>}
-                        {result.priority && <span className={`ml-auto text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${KIND[detKind(result.priority)].tag}`}>{KIND[detKind(result.priority)].label}</span>}
-                      </div>
-                      {result.summary && <p className="text-xs text-[var(--text-2)] mb-2.5 leading-snug">{result.summary}</p>}
-                      {resultData != null && (
-                        <div className="bg-[var(--bg)] rounded-lg border border-[var(--line-soft)] p-3 max-h-[280px] overflow-y-auto text-xs">
-                          <PrettyData value={resultData} />
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Acciones + Habla con el agente */}
-                <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] p-4 space-y-3">
+                  {/* Acciones */}
                   <div className="flex gap-2">
-                    <button onClick={() => setActioned(a => ({ ...a, [selectedAgent]: 'aplicado' }))} className={`flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-semibold rounded-lg py-2 transition-colors ${actioned[selectedAgent] === 'aplicado' ? 'bg-emerald-500 text-[#04130d]' : 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20'}`}>
-                      <Check size={14} />{actioned[selectedAgent] === 'aplicado' ? 'Aplicado' : 'Aplicar'}
+                    <button onClick={() => setActioned(a => ({ ...a, [selectedAgent]: 'aplicado' }))} className={`flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-semibold rounded-lg py-2 transition-colors ${act === 'aplicado' ? 'bg-emerald-500 text-[#04130d]' : 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20'}`}>
+                      <Check size={14} />{act === 'aplicado' ? 'Aplicado' : 'Aplicar'}
                     </button>
                     <button onClick={() => setActioned(a => ({ ...a, [selectedAgent]: 'recordar' }))} className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-semibold rounded-lg py-2 bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-2)] hover:bg-[var(--panel)] transition-colors">
                       <Clock size={14} />Recordar
@@ -500,9 +468,10 @@ export default function MissionControlPage() {
                     </button>
                   </div>
 
+                  {/* Habla con el agente */}
                   <div className="border-t border-[var(--line-soft)] pt-3">
                     <p className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-4)] mb-2 flex items-center gap-1.5"><Sparkles size={12} className="text-emerald-400" />Habla con el agente</p>
-                    <div className="space-y-2 max-h-[260px] overflow-y-auto mb-2.5 pr-1">
+                    <div className="space-y-2 max-h-[240px] overflow-y-auto mb-2.5 pr-1">
                       {(chats[selectedAgent] ?? [introFor(selectedAgent)]).map((m, i) => (
                         <div key={i} className={`max-w-[88%] px-3 py-2 rounded-2xl text-xs leading-snug ${m.role === 'user' ? 'ml-auto bg-emerald-500/[0.12] border border-emerald-500/25 text-[var(--text-1)] rounded-br-md' : 'bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-2)] rounded-bl-md'}`}>{m.content}</div>
                       ))}
@@ -512,29 +481,6 @@ export default function MissionControlPage() {
                       <input value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="Pregúntale al agente…" className="flex-1 bg-[var(--surface-2)] border border-[var(--line)] rounded-full px-3.5 py-2 text-xs text-[var(--text-1)] outline-none focus:border-emerald-500/40 min-w-0" />
                       <button type="submit" disabled={!chatInput.trim() || chatLoading} className="w-9 h-9 rounded-full bg-emerald-500 text-[#04130d] grid place-items-center disabled:opacity-40 flex-shrink-0"><Send size={15} /></button>
                     </form>
-                  </div>
-                </div>
-
-                {/* Historial de ejecuciones */}
-                <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] overflow-hidden">
-                  <div className="px-3 py-2 border-b border-[var(--line-soft)]">
-                    <p className="text-xs font-bold text-[var(--text-2)]">Historial de ejecuciones</p>
-                  </div>
-                  <div className="divide-y divide-[var(--line-soft)] max-h-[300px] overflow-y-auto">
-                    {agentRuns.slice(0, 20).map((run, i) => (
-                      <div key={`${run.created_at}-${i}`} className="px-3 py-2 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className={`w-1.5 h-1.5 rounded-full ${run.status === 'success' ? 'bg-emerald-500' : 'bg-red-500'}`} />
-                          <span className="text-[11px] text-[var(--text-2)]">
-                            {new Date(run.created_at).toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          {run.output_summary && <span className="text-[10px] text-[var(--text-3)] truncate max-w-[150px]">{run.output_summary}</span>}
-                          <span className="text-[10px] text-[var(--text-4)]">{run.duration_ms ? `${(run.duration_ms / 1000).toFixed(1)}s` : ''}</span>
-                        </div>
-                      </div>
-                    ))}
                   </div>
                 </div>
               </div>

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Sparkles, ArrowRight, AlertTriangle, AlertCircle, TrendingUp, Bot } from 'lucide-react'
 import { getDeepTable } from '@/lib/data'
+import { agentName } from '@/lib/agent-names'
 
 interface Det {
   agent_id: string
@@ -81,7 +82,7 @@ export default function AgentBriefing() {
               <span className={`w-8 h-8 rounded-lg grid place-items-center flex-shrink-0 ${k.box}`}><Icon size={15} /></span>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[13px] font-semibold text-[var(--text-1)]">{NAMES[d.agent_id] || d.agent_id}</span>
+                  <span className="text-[13px] font-semibold text-[var(--text-1)]">{agentName(d.agent_id)}</span>
                   <span className={`text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full ${k.tag}`}>{k.label}</span>
                 </div>
                 <p className="text-xs text-[var(--text-2)] mt-0.5 leading-snug">{d.summary}</p>
