@@ -180,3 +180,68 @@ Reglas:
   }
   return { text: 'Me tomó demasiados pasos; reformula la pregunta por favor.' }
 }
+
+// ── Asesor de producto (proactivo) ───────────────────────────────────────────
+// Distinto del copiloto (reactivo): junta el estado real de la plataforma + un
+// checklist de "qué necesita un POS de restaurantes COMPLETO" y le pide a Claude
+// las recomendaciones priorizadas de qué falta/mejorar. Single-shot, structured.
+export interface Recommendation { titulo: string; por_que: string; impacto: 'alto' | 'medio' | 'bajo'; area: string }
+
+const PLATFORM_CHECKLIST = `Una plataforma POS de restaurantes COMPLETA suele tener, entre otras cosas:
+- Importar/exportar datos (CSV/Excel): menú, ventas, inventario, clientes — SIN depender de un dev.
+- Configuración de impresión (tickets, comandas de cocina, impresoras por estación).
+- Checador de personal (entrada/salida, PIN o biométrico) y reportes de horas.
+- Reportes descargables (PDF/Excel): ventas, cortes, propinas, meseros, inventario.
+- Gestión de usuarios y PINs por rol; permisos.
+- Onboarding self-service de cliente nuevo (menú, mesas, pagos, offline, KDS).
+- Backups / restauración de datos.
+- Facturación/CFDI y conciliación de pagos.
+- Multi-sucursal y comparativos.
+- Modo offline robusto + KDS; sincronización.
+- Notificaciones/alertas configurables.
+- Auditoría de acciones.
+- Panel móvil usable.`
+
+export async function runAdvisor(today: string): Promise<{ recommendations: Recommendation[]; error?: string }> {
+  const key = anthropicKey()
+  if (!key) return { recommendations: [], error: 'ANTHROPIC_API_KEY no configurada' }
+
+  const [overview, tenants, agents] = await Promise.all([
+    toolPlatformOverview().catch(() => ({})),
+    toolListTenants().catch(() => ([])),
+    toolAgentsStatus({}).catch(() => ({})),
+  ])
+  const state = JSON.stringify({ overview, tenants, agents }).slice(0, 5000)
+
+  const system = `Eres el asesor de producto del super-admin de Fullsite (plataforma multi-tenant de POS para restaurantes en México). Tu trabajo es decirle proactivamente QUÉ LE FALTA o QUÉ PODRÍA MEJORAR — features, dashboard, import/export, operación — para que no tenga que pensarlo todo él.
+
+${PLATFORM_CHECKLIST}
+
+Cruza ese checklist con el estado real de la plataforma. Prioriza lo que de verdad mueve la aguja para poder vender y operar clientes reales. Sé concreto y accionable, no genérico.
+
+Responde SÓLO con JSON válido, sin texto alrededor:
+{"recommendations":[{"titulo":"...","por_que":"...","impacto":"alto|medio|bajo","area":"..."}]}
+Da entre 5 y 7. "area" es una etiqueta corta (ej. "Datos", "Impresión", "Personal", "Reportes", "Onboarding", "Móvil", "Seguridad").`
+
+  try {
+    const res = await fetch(ANTHROPIC_URL, {
+      method: 'POST',
+      headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: model(), max_tokens: 1500, system,
+        messages: [{ role: 'user', content: `Fecha: ${today}. Estado actual de la plataforma:\n${state}\n\nDame las recomendaciones priorizadas de qué nos falta o podríamos mejorar.` }],
+      }),
+      cache: 'no-store',
+    })
+    if (!res.ok) return { recommendations: [], error: `anthropic ${res.status}` }
+    const data = await res.json()
+    const text: string = (data.content || []).filter((b: { type: string }) => b.type === 'text').map((b: { text?: string }) => b.text || '').join('')
+    const m = text.match(/\{[\s\S]*\}/)
+    if (!m) return { recommendations: [], error: 'sin json' }
+    const parsed = JSON.parse(m[0]) as { recommendations?: Recommendation[] }
+    const recs = Array.isArray(parsed.recommendations) ? parsed.recommendations.slice(0, 8) : []
+    return { recommendations: recs }
+  } catch (e) {
+    return { recommendations: [], error: e instanceof Error ? e.message : String(e) }
+  }
+}

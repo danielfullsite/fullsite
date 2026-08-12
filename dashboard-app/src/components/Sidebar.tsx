@@ -24,6 +24,7 @@ import {
   Monitor,
   Settings,
   Sparkles,
+  Lightbulb,
   PieChart,
   Truck,
   Bot,
@@ -180,6 +181,7 @@ const platformNavSections = [
     items: [
       { href: '/platform', label: 'Métricas', icon: LayoutDashboard },
       { href: '/platform/copiloto', label: 'Copiloto', icon: Sparkles },
+      { href: '/platform/recomendaciones', label: 'Recomendaciones', icon: Lightbulb },
       { href: '/platform/tenants', label: 'Tenants', icon: Store },
       { href: '/platform/flags', label: 'Flags & Config', icon: Flag },
       { href: '/platform/audit', label: 'Bitácora', icon: ScrollText },
