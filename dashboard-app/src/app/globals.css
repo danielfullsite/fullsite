@@ -56,12 +56,12 @@ details[name="posnav"][open] > summary .nav-caret { transform: rotate(180deg); }
  * Piso mínimo de touch target en TODO el POS: ningún control < 44px.
  * Los controles primarios se suben a 56-60px vía clases Tailwind puntuales. */
 .pos-kiosk button {
-  min-height: 44px;
+  min-height: 48px;
   -webkit-tap-highlight-color: transparent;
 }
 .pos-kiosk input:not([type="checkbox"]):not([type="radio"]),
 .pos-kiosk select {
-  min-height: 44px;
+  min-height: 48px;
 }
 .pos-kiosk input[type="checkbox"], .pos-kiosk input[type="radio"] {
   width: 22px;

@@ -75,6 +75,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
         colorScheme:'dark',
         // @ts-expect-error CSS custom properties
         '--bg':'#0a0a0f','--bg-1':'#0f0f14','--surface':'#111118','--surface-2':'#1a1a24',
+        '--bento-card':'#15151d','--panel':'#141420','--shadow-mid':'0 1px 2px rgba(0,0,0,0.55), 0 14px 34px rgba(0,0,0,0.4)',
         '--line':'rgba(255,255,255,0.08)','--line-soft':'rgba(255,255,255,0.04)',
         '--text-1':'#fff','--text-2':'rgba(255,255,255,0.7)','--text-3':'rgba(255,255,255,0.45)',
         '--text-4':'rgba(255,255,255,0.25)',
@@ -605,6 +606,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
         // Force all CSS variables to dark values for POS
         // @ts-expect-error CSS custom properties
         '--bg':'#0a0a0f','--bg-1':'#0f0f14','--surface':'#111118','--surface-2':'#1a1a24',
+        '--bento-card':'#15151d','--panel':'#141420','--shadow-mid':'0 1px 2px rgba(0,0,0,0.55), 0 14px 34px rgba(0,0,0,0.4)',
         '--line':'rgba(255,255,255,0.08)','--line-soft':'rgba(255,255,255,0.04)',
         '--text-1':'#fff','--text-2':'rgba(255,255,255,0.7)','--text-3':'rgba(255,255,255,0.45)',
         '--text-4':'rgba(255,255,255,0.25)',
