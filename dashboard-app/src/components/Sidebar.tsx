@@ -49,6 +49,7 @@ import {
   Map,
   Calculator,
   Mic,
+  Fingerprint,
   Store,
   Flag,
   ScrollText,
@@ -150,6 +151,7 @@ const navSections = [
     items: [
       { href: '/pos', label: 'Punto de Venta', icon: Monitor },
       { href: '/pos/plano', label: 'Plano', icon: Map },
+      { href: '/checador', label: 'Checador', icon: Fingerprint },
     ],
   },
   {
