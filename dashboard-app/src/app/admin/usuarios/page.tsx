@@ -29,18 +29,35 @@ interface PortalUser {
 
 // ── Role config ────────────────────────────────────────────────────
 
-const ROLES: { value: Role; label: string; color: string; icon: typeof Shield; pages: string[] }[] = [
-  { value: 'admin', label: 'Admin', color: 'text-red-400 bg-red-500/15', icon: ShieldAlert, pages: ['Todas las paginas'] },
-  { value: 'gerente', label: 'Gerente', color: 'text-purple-400 bg-purple-500/15', icon: ShieldCheck, pages: ['Dashboard', 'Reportes', 'Inventario', 'Meseros', 'CRM'] },
-  { value: 'cajero', label: 'Cajero', color: 'text-blue-400 bg-blue-500/15', icon: Shield, pages: ['POS', 'Caja', 'Cortes'] },
-  { value: 'mesero', label: 'Mesero', color: 'text-emerald-400 bg-emerald-500/15', icon: Users, pages: ['POS'] },
-  { value: 'cocina', label: 'Cocina', color: 'text-amber-400 bg-amber-500/15', icon: Eye, pages: ['KDS'] },
-  { value: 'viewer', label: 'Viewer', color: 'text-gray-400 bg-gray-500/15', icon: Eye, pages: ['Dashboard'] },
+// DS v2.1 role badge tint — admin=crit, gerente=violet(st-barra), cajero=info, mesero=ok(accent), cocina=warn, viewer=neutral
+type BadgeTint = { color: string; bg: string; border: string }
+const ROLE_TINT: Record<Role, BadgeTint> = {
+  admin:   { color: 'var(--crit-ink)',  bg: 'var(--crit-soft)',  border: 'color-mix(in srgb, var(--crit) 35%, transparent)' },
+  gerente: { color: 'var(--st-barra)',  bg: 'color-mix(in srgb, var(--st-barra) 12%, transparent)', border: 'color-mix(in srgb, var(--st-barra) 38%, transparent)' },
+  cajero:  { color: 'var(--info-ink)',  bg: 'var(--info-soft)',  border: 'color-mix(in srgb, var(--info) 38%, transparent)' },
+  mesero:  { color: 'var(--accent-ink)', bg: 'var(--accent-soft)', border: 'var(--accent-line)' },
+  cocina:  { color: 'var(--warn-ink)',  bg: 'var(--warn-soft)',  border: 'color-mix(in srgb, var(--warn) 38%, transparent)' },
+  viewer:  { color: 'var(--text-2)',    bg: 'var(--surface-2)',  border: 'var(--line)' },
+}
+
+const ROLES: { value: Role; label: string; icon: typeof Shield; pages: string[] }[] = [
+  { value: 'admin', label: 'Admin', icon: ShieldAlert, pages: ['Todas las paginas'] },
+  { value: 'gerente', label: 'Gerente', icon: ShieldCheck, pages: ['Dashboard', 'Reportes', 'Inventario', 'Meseros', 'CRM'] },
+  { value: 'cajero', label: 'Cajero', icon: Shield, pages: ['POS', 'Caja', 'Cortes'] },
+  { value: 'mesero', label: 'Mesero', icon: Users, pages: ['POS'] },
+  { value: 'cocina', label: 'Cocina', icon: Eye, pages: ['KDS'] },
+  { value: 'viewer', label: 'Viewer', icon: Eye, pages: ['Dashboard'] },
 ]
 
 const SUCURSALES_DISPONIBLES = ['Principal', 'Sucursal 2', 'Sucursal 3']
 
 const roleMap = Object.fromEntries(ROLES.map(r => [r.value, r]))
+
+// Tokens de estación DS v2.1 (violet st-barra — no viven en globals, scoped a esta página)
+const USUARIOS_TOKENS = `
+  .usr-scope{ --st-barra:#a78bfa; }
+  [data-theme="light"] .usr-scope{ --st-barra:#7c3aed; }
+`
 
 // ── Supabase fetch helper ──────────────────────────────────────────
 
@@ -234,9 +251,13 @@ export default function AdminUsuariosPage() {
   const RoleBadge = ({ rol }: { rol: Role }) => {
     const r = roleMap[rol]
     if (!r) return <span className="text-xs text-[var(--text-3)]">{rol}</span>
+    const t = ROLE_TINT[rol]
     return (
-      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-semibold ${r.color}`}>
-        <r.icon size={12} />
+      <span
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border"
+        style={{ color: t.color, background: t.bg, borderColor: t.border }}
+      >
+        <r.icon size={11} />
         {r.label}
       </span>
     )
@@ -263,11 +284,12 @@ export default function AdminUsuariosPage() {
                 : [...selected, s]
             )
           }
-          className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors ${
+          className="px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors border"
+          style={
             selected.includes(s)
-              ? 'bg-blue-500 text-white'
-              : 'bg-[var(--surface-2)] text-[var(--text-3)] hover:bg-[var(--line)]'
-          }`}
+              ? { background: 'var(--accent-soft)', color: 'var(--accent-ink)', borderColor: 'var(--accent-line)' }
+              : { background: 'var(--surface-2)', color: 'var(--text-3)', borderColor: 'var(--line)' }
+          }
         >
           {s}
         </button>
@@ -278,7 +300,8 @@ export default function AdminUsuariosPage() {
   // ── Render ─────────────────────────────────────────────────────
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="usr-scope max-w-6xl mx-auto">
+      <style dangerouslySetInnerHTML={{ __html: USUARIOS_TOKENS }} />
       <PageHeader
         title="Usuarios"
         subtitle="Gestion de accesos al portal"
@@ -286,7 +309,12 @@ export default function AdminUsuariosPage() {
         action={
           <button
             onClick={() => { setAdding(true); setForm({ ...emptyUser }); setFormPassword('') }}
-            className="px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm transition-colors"
+            className="px-4 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 transition-[filter] min-h-[44px] hover:brightness-105"
+            style={{
+              background: 'linear-gradient(150deg, var(--accent-bright), var(--accent-deep))',
+              color: '#04140d',
+              boxShadow: '0 1px 0 rgba(255,255,255,.18) inset, 0 10px 22px -8px var(--accent)',
+            }}
           >
             <UserPlus size={16} /> Nuevo usuario
           </button>
@@ -331,9 +359,9 @@ export default function AdminUsuariosPage() {
 
       {/* ── Add user form ────────────────────────────────────── */}
       {adding && (
-        <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-5 mb-6">
-          <h3 className="font-semibold text-blue-400 mb-4 flex items-center gap-2">
-            <UserPlus size={16} /> Nuevo usuario
+        <div className="rounded-2xl p-5 mb-6 border" style={{ background: 'var(--bento-card)', borderColor: 'var(--line)', boxShadow: 'var(--shadow-mid)' }}>
+          <h3 className="font-semibold mb-4 flex items-center gap-2" style={{ color: 'var(--text-1)' }}>
+            <UserPlus size={16} style={{ color: 'var(--accent-ink)' }} /> Nuevo usuario
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
             <div>
@@ -389,28 +417,36 @@ export default function AdminUsuariosPage() {
           </div>
 
           {/* Role access preview */}
-          <div className="bg-[var(--surface)] border border-[var(--line)] rounded-lg p-3 mb-4">
-            <p className="text-[10px] uppercase tracking-wider text-[var(--text-3)] font-semibold mb-2">Acceso de {roleMap[form.rol]?.label}</p>
-            <div className="flex flex-wrap gap-1">
-              {roleMap[form.rol]?.pages.map(p => (
-                <span key={p} className="px-2 py-0.5 bg-blue-500/10 text-blue-400 rounded text-xs font-medium">{p}</span>
-              ))}
+          <div className="rounded-lg p-3 mb-4 border" style={{ background: 'var(--surface-2)', borderColor: 'var(--line)' }}>
+            <p className="text-[9.5px] uppercase tracking-wider font-mono font-semibold mb-2" style={{ color: 'var(--text-4)' }}>Acceso de {roleMap[form.rol]?.label}</p>
+            <div className="flex flex-wrap gap-1.5">
+              {roleMap[form.rol]?.pages.map(p => {
+                const t = ROLE_TINT[form.rol]
+                return <span key={p} className="px-2.5 py-1 rounded-lg text-[11px] font-semibold border" style={{ color: t.color, background: t.bg, borderColor: t.border }}>{p}</span>
+              })}
             </div>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center flex-wrap">
             <button
               onClick={handleAdd}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold flex items-center gap-1 transition-colors"
+              className="px-4 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-1.5 transition-[filter] min-h-[44px] hover:brightness-105"
+              style={{
+                background: 'linear-gradient(150deg, var(--accent-bright), var(--accent-deep))',
+                color: '#04140d',
+                boxShadow: '0 1px 0 rgba(255,255,255,.18) inset, 0 10px 22px -8px var(--accent)',
+              }}
             >
-              <Save size={14} /> Crear usuario
+              <Save size={15} /> Crear usuario
             </button>
             <button
               onClick={() => { setAdding(false); setForm({ ...emptyUser }); setFormPassword('') }}
-              className="px-4 py-2 bg-[var(--line)] text-[var(--text-2)] rounded-lg text-sm hover:bg-[var(--surface-2)] transition-colors"
+              className="px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors min-h-[44px] border"
+              style={{ background: 'var(--surface-2)', color: 'var(--text-1)', borderColor: 'var(--line)' }}
             >
               Cancelar
             </button>
+            <span className="text-xs" style={{ color: 'var(--text-3)' }}>Guardar → Guardando… → Guardado ✓</span>
           </div>
         </div>
       )}
@@ -445,7 +481,7 @@ export default function AdminUsuariosPage() {
       <div className="bg-[var(--surface)] rounded-2xl border border-[var(--line)] shadow-sm overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-16">
-            <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            <div className="w-8 h-8 border-[2.5px] rounded-full animate-spin" style={{ borderColor: 'var(--line)', borderTopColor: 'var(--accent)' }} />
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-16">
@@ -479,7 +515,7 @@ export default function AdminUsuariosPage() {
                         <input
                           value={editing.nombre}
                           onChange={e => setEditing({ ...editing, nombre: e.target.value })}
-                          className="border border-blue-400/50 bg-[var(--surface)] rounded px-2 py-1 text-sm text-[var(--text-1)] w-full"
+                          className="border border-[var(--accent-line)] bg-[var(--surface)] rounded px-2 py-1 text-sm text-[var(--text-1)] w-full"
                         />
                       ) : (
                         <div>
@@ -496,7 +532,7 @@ export default function AdminUsuariosPage() {
                           type="email"
                           value={editing.email}
                           onChange={e => setEditing({ ...editing, email: e.target.value })}
-                          className="border border-blue-400/50 bg-[var(--surface)] rounded px-2 py-1 text-sm text-[var(--text-1)] w-full"
+                          className="border border-[var(--accent-line)] bg-[var(--surface)] rounded px-2 py-1 text-sm text-[var(--text-1)] w-full"
                         />
                       ) : (
                         <span className="text-sm text-[var(--text-2)]">{u.email}</span>
@@ -509,7 +545,7 @@ export default function AdminUsuariosPage() {
                         <select
                           value={editing.rol}
                           onChange={e => setEditing({ ...editing, rol: e.target.value as Role })}
-                          className="border border-blue-400/50 bg-[var(--surface)] rounded px-2 py-1 text-sm text-[var(--text-1)]"
+                          className="border border-[var(--accent-line)] bg-[var(--surface)] rounded px-2 py-1 text-sm text-[var(--text-1)]"
                         >
                           {ROLES.map(r => (
                             <option key={r.value} value={r.value}>{r.label}</option>
@@ -555,12 +591,12 @@ export default function AdminUsuariosPage() {
                         className="inline-flex items-center gap-1 transition-colors"
                       >
                         {u.activo ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-xs font-semibold">
-                            <CheckCircle size={12} /> Activo
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border" style={{ color: 'var(--accent-ink)', background: 'var(--accent-soft)', borderColor: 'var(--accent-line)' }}>
+                            <CheckCircle size={11} /> Activo
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/15 text-red-400 text-xs font-semibold">
-                            <XCircle size={12} /> Inactivo
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border" style={{ color: 'var(--crit-ink)', background: 'var(--crit-soft)', borderColor: 'color-mix(in srgb, var(--crit) 40%, transparent)' }}>
+                            <XCircle size={11} /> Inactivo
                           </span>
                         )}
                       </button>
@@ -572,13 +608,15 @@ export default function AdminUsuariosPage() {
                         <div className="flex gap-1 justify-end">
                           <button
                             onClick={handleSave}
-                            className="w-8 h-8 rounded-lg bg-blue-500/15 hover:bg-blue-500/25 text-blue-500 flex items-center justify-center transition-colors"
+                            className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors border"
+                            style={{ background: 'var(--accent-soft)', color: 'var(--accent-ink)', borderColor: 'var(--accent-line)' }}
                           >
                             <Save size={14} />
                           </button>
                           <button
                             onClick={() => setEditing(null)}
-                            className="w-8 h-8 rounded-lg bg-[var(--surface-2)] hover:bg-[var(--line)] text-[var(--text-2)] flex items-center justify-center transition-colors"
+                            className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors border"
+                            style={{ background: 'var(--surface-2)', color: 'var(--text-2)', borderColor: 'var(--line)' }}
                           >
                             <X size={14} />
                           </button>
@@ -587,14 +625,18 @@ export default function AdminUsuariosPage() {
                         <div className="flex gap-1 justify-end">
                           <button
                             onClick={() => setEditing({ ...u })}
-                            className="w-8 h-8 rounded-lg bg-[var(--surface-2)] hover:bg-[var(--line)] text-[var(--text-2)] flex items-center justify-center transition-colors"
+                            className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors border border-transparent hover:border-[var(--line)] hover:bg-[var(--surface-2)]"
+                            style={{ color: 'var(--text-3)' }}
                             title="Editar"
                           >
                             <Pencil size={14} />
                           </button>
                           <button
                             onClick={() => handleDelete(u)}
-                            className="w-8 h-8 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 flex items-center justify-center transition-colors"
+                            className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors border border-transparent"
+                            style={{ color: 'var(--text-3)' }}
+                            onMouseEnter={e => { e.currentTarget.style.color = 'var(--crit-ink)'; e.currentTarget.style.background = 'var(--crit-soft)'; e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--crit) 30%, transparent)' }}
+                            onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-3)'; e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'transparent' }}
                             title="Eliminar"
                           >
                             <Trash2 size={14} />
@@ -611,35 +653,52 @@ export default function AdminUsuariosPage() {
       </div>
 
       {/* ── Role access reference ────────────────────────────── */}
-      <div className="mt-6 bg-[var(--surface)] rounded-2xl border border-[var(--line)] p-5">
-        <h3 className="text-sm font-semibold text-[var(--text-1)] mb-3 flex items-center gap-2">
-          <Shield size={14} className="text-[var(--text-3)]" />
+      <div className="mt-6 rounded-2xl border p-5" style={{ background: 'var(--bento-card)', borderColor: 'var(--line)', boxShadow: 'var(--shadow-mid)' }}>
+        <h3 className="text-[15px] font-bold mb-3.5 flex items-center gap-2" style={{ color: 'var(--text-1)' }}>
+          <Shield size={16} style={{ color: 'var(--accent-ink)' }} />
           Referencia de permisos por rol
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {ROLES.map(r => (
-            <div key={r.value} className="bg-[var(--surface-2)] rounded-xl p-3">
-              <div className="flex items-center gap-2 mb-2">
-                <r.icon size={14} className={r.color.split(' ')[0]} />
-                <span className="text-sm font-semibold text-[var(--text-1)]">{r.label}</span>
-              </div>
-              <div className="flex flex-wrap gap-1">
-                {r.pages.map(p => (
-                  <span key={p} className="px-2 py-0.5 bg-[var(--surface)] text-[var(--text-3)] rounded text-[10px] font-medium">
-                    {p}
+          {ROLES.map(r => {
+            const t = ROLE_TINT[r.value]
+            return (
+              <div key={r.value} className="rounded-xl p-3 border" style={{ background: 'var(--surface)', borderColor: 'var(--line)' }}>
+                <div className="flex items-center gap-2 mb-2.5">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border" style={{ color: t.color, background: t.bg, borderColor: t.border }}>
+                    <r.icon size={11} />{r.label}
                   </span>
-                ))}
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {r.pages.map(p => (
+                    <span key={p} className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] border" style={{ background: 'var(--surface-2)', borderColor: 'var(--line)', color: 'var(--text-2)' }}>
+                      {p}
+                    </span>
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
 
       {/* ── Toast ─────────────────────────────────────────────── */}
       {toast && (
-        <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-xl shadow-2xl text-sm font-medium ${
-          toast.type === 'ok' ? 'bg-[var(--surface-2)] text-white' : 'bg-red-600 text-white'
-        }`}>
+        <div
+          className="fixed top-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-xl text-sm font-semibold border inline-flex items-center gap-2"
+          style={
+            toast.type === 'ok'
+              ? { background: 'var(--surface-2)', color: 'var(--text-1)', borderColor: 'var(--line)', boxShadow: 'var(--shadow-mid)' }
+              : { background: 'var(--surface-2)', color: 'var(--text-1)', borderColor: 'color-mix(in srgb, var(--crit) 40%, transparent)', boxShadow: 'var(--shadow-mid)' }
+          }
+        >
+          <span
+            className="w-5 h-5 rounded-md grid place-items-center flex-none"
+            style={toast.type === 'ok'
+              ? { background: 'var(--accent-soft)', color: 'var(--accent-ink)' }
+              : { background: 'var(--crit-soft)', color: 'var(--crit-ink)' }}
+          >
+            {toast.type === 'ok' ? <CheckCircle size={13} /> : <XCircle size={13} />}
+          </span>
           {toast.msg}
         </div>
       )}
