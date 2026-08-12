@@ -46,6 +46,10 @@ import {
   Map,
   Calculator,
   Mic,
+  Store,
+  Flag,
+  ScrollText,
+  ArrowLeft,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
@@ -168,6 +172,26 @@ const navSections = [
   },
 ]
 
+// Nav de la consola de plataforma (modo Dios) — se usa en /platform/*.
+// Reemplaza el menú operativo del tenant (POS, reportes, inventario) que no aplica aquí.
+const platformNavSections = [
+  {
+    label: 'Plataforma',
+    items: [
+      { href: '/platform', label: 'Métricas', icon: LayoutDashboard },
+      { href: '/platform/tenants', label: 'Tenants', icon: Store },
+      { href: '/platform/flags', label: 'Flags & Config', icon: Flag },
+      { href: '/platform/audit', label: 'Bitácora', icon: ScrollText },
+    ],
+  },
+  {
+    label: 'General',
+    items: [
+      { href: '/', label: 'Volver a la app', icon: ArrowLeft },
+    ],
+  },
+]
+
 function getTodayFormatted(): string {
   return new Date().toLocaleDateString('es-MX', {
     day: 'numeric',
@@ -181,8 +205,13 @@ export default function Sidebar() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const { user, role, clientConfig, locations, locationId, setLocationId, signOut } = useAuth()
 
+  // En la consola de plataforma (/platform/*) mostramos el nav de plataforma,
+  // no el menú operativo del restaurante.
+  const isPlatform = pathname.startsWith('/platform')
+  const sections = isPlatform ? platformNavSections : navSections
+
   // Collapsible sections — auto-expand section containing current page
-  const activeSection = navSections.findIndex(s => s.items.some(i => pathname === i.href || (i.href !== '/' && pathname.startsWith(i.href + '/'))))
+  const activeSection = sections.findIndex(s => s.items.some(i => pathname === i.href || (i.href !== '/' && pathname.startsWith(i.href + '/'))))
   const [expandedSections, setExpandedSections] = useState<Set<number>>(() => new Set(activeSection >= 0 ? [activeSection, 0] : [0]))
   const toggleSection = (idx: number) => setExpandedSections(prev => {
     const next = new Set(prev)
@@ -195,7 +224,7 @@ export default function Sidebar() {
       {/* Logo — with safe-area padding on mobile for iPhone notch */}
       <div className="px-5 py-5 lg:border-b lg:border-[var(--line-soft)]" style={{ paddingTop: 'max(1.25rem, env(safe-area-inset-top, 1.25rem))' }}>
         <div className="flex items-center justify-between">
-          <Link href="/" className="flex items-center logo-hover" onClick={() => setMobileOpen(false)}>
+          <Link href={isPlatform ? '/platform' : '/'} className="flex items-center logo-hover" onClick={() => setMobileOpen(false)}>
             <span className="text-[var(--text-1)] font-black text-xl tracking-tight">
               fullsite<span className="inline-block w-2 h-2 ml-0.5 mb-0.5 rounded-none" style={{ background: 'var(--accent)' }} />
             </span>
@@ -212,10 +241,12 @@ export default function Sidebar() {
 
       {/* Navigation sections */}
       <nav className="flex-1 px-3 py-2 overflow-y-auto">
-        {navSections.map((section, sectionIdx) => {
-          const visibleItems = section.items.filter(item =>
-            canAccessPage(role, item.href) && canPlanAccessPage(clientConfig?.plan, item.href)
-          )
+        {sections.map((section, sectionIdx) => {
+          const visibleItems = isPlatform
+            ? section.items
+            : section.items.filter(item =>
+                canAccessPage(role, item.href) && canPlanAccessPage(clientConfig?.plan, item.href)
+              )
           if (visibleItems.length === 0) return null
           const isExpanded = expandedSections.has(sectionIdx)
           const hasActive = visibleItems.some(i => pathname === i.href || (i.href !== '/' && pathname.startsWith(i.href + '/')))
@@ -290,8 +321,12 @@ export default function Sidebar() {
           </select>
         )}
 
-        {/* Client name */}
-        {clientConfig && (
+        {/* Client name (o etiqueta de plataforma en modo Dios) */}
+        {isPlatform ? (
+          <p className="text-[11px] font-semibold mb-3 truncate" style={{ color: 'var(--accent)' }}>
+            Modo Dios · Plataforma
+          </p>
+        ) : clientConfig && (
           <p className="text-[11px] text-[var(--text-4)] mb-3 truncate">
             {clientConfig.display_name || clientConfig.id}
           </p>
