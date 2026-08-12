@@ -22,6 +22,7 @@ const iconStyles: Record<string, { bg: string; icon: string; borderColor: string
   'kpi-accent-amber': { bg: 'bg-amber-500/15', icon: 'text-amber-500', borderColor: 'border-amber-500/30', spark: '#f59e0b' },
   'kpi-accent-purple': { bg: 'bg-purple-500/15', icon: 'text-purple-500', borderColor: 'border-purple-500/30', spark: '#a855f7' },
   'kpi-accent-pink': { bg: 'bg-pink-500/15', icon: 'text-pink-500', borderColor: 'border-pink-500/30', spark: '#ec4899' },
+  'kpi-accent-red': { bg: 'bg-[var(--crit-soft)]', icon: 'text-[var(--crit-ink)]', borderColor: 'border-[color-mix(in_srgb,var(--crit)_30%,transparent)]', spark: '#ef4444' },
   'kpi-accent-cyan': { bg: 'bg-cyan-500/15', icon: 'text-cyan-500', borderColor: 'border-cyan-500/30', spark: '#06b6d4' },
 }
 
