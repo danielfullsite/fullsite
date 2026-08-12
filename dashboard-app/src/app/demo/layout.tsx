@@ -12,6 +12,7 @@ import {
   Bot, Star, GraduationCap, MessageSquare, LogOut, Sun, ChevronLeft,
   ChevronRight, Wifi,
 } from 'lucide-react'
+import DemoBell from '@/components/DemoBell'
 
 interface NavItem {
   href?: string
@@ -207,6 +208,9 @@ function DemoLayoutInner({ children }: { children: React.ReactNode }) {
           )}
         </div>
       </aside>
+
+      {/* Notificaciones (demo) — flotante top-right */}
+      <DemoBell />
 
       {/* Main — uses CSS variables from globals.css [data-theme] */}
       <main className="flex-1 min-h-screen overflow-auto bg-[var(--bg)] text-[var(--text-1)]">

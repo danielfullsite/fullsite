@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Bell, AlertTriangle, AlertCircle, XCircle, X } from 'lucide-react'
+import { Bell, AlertTriangle, AlertCircle, Info, Sparkles, X } from 'lucide-react'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -69,6 +69,19 @@ function agentLabel(id: string): string {
     hermes: 'Hermes',
   }
   return map[id] || id.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
+
+// Detección estilo skeleton: color + etiqueta por tipo (no es el acento de marca)
+type NKind = 'crit' | 'warn' | 'info'
+function kindOf(priority: string, source: string): NKind {
+  if (source === 'error' || priority === 'critical') return 'crit'
+  if (priority === 'warning') return 'warn'
+  return 'info'
+}
+const NKIND: Record<NKind, { label: string; box: string; tag: string; Icon: typeof Bell }> = {
+  crit: { label: 'Alerta', box: 'bg-red-500/10 text-red-400', tag: 'bg-red-500/15 text-red-300', Icon: AlertTriangle },
+  warn: { label: 'Ojo', box: 'bg-amber-500/10 text-amber-400', tag: 'bg-amber-500/15 text-amber-300', Icon: AlertCircle },
+  info: { label: 'Info', box: 'bg-sky-500/10 text-sky-400', tag: 'bg-sky-500/15 text-sky-300', Icon: Info },
 }
 
 export default function NotificationBell() {
@@ -164,105 +177,75 @@ export default function NotificationBell() {
     setOpen(prev => !prev)
   }
 
-  function priorityBadge(priority: string) {
-    switch (priority) {
-      case 'critical':
-        return (
-          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold rounded-md bg-red-500/15 text-red-500">
-            <XCircle size={10} />
-            critico
-          </span>
-        )
-      case 'warning':
-        return (
-          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold rounded-md bg-amber-500/15 text-amber-500">
-            <AlertTriangle size={10} />
-            aviso
-          </span>
-        )
-      default:
-        return (
-          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold rounded-md bg-blue-500/15 text-blue-500">
-            <AlertCircle size={10} />
-            {priority}
-          </span>
-        )
-    }
-  }
-
   return (
     <div ref={ref} className="relative">
       {/* Bell button */}
       <button
         onClick={handleToggle}
-        className="relative flex items-center justify-center w-9 h-9 rounded-lg transition-colors hover:bg-[var(--surface-2)] border border-transparent hover:border-[var(--line)]"
+        className="relative flex items-center justify-center w-9 h-9 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] hover:bg-[var(--panel)] transition-colors"
         title="Notificaciones"
         aria-label="Notificaciones"
       >
-        <Bell size={20} className="text-[var(--text-2)]" strokeWidth={1.8} />
+        <Bell size={18} className="text-[var(--text-2)]" strokeWidth={1.9} />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 min-w-5 h-5 flex items-center justify-center px-1 text-[11px] font-bold text-white bg-red-500 rounded-full shadow-sm">
+          <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center px-1 text-[10px] font-bold text-white bg-red-500 rounded-full">
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
       </button>
 
-      {/* Dropdown panel */}
+      {/* Dropdown panel — estilo skeleton */}
       {open && (
         <div
-          className="absolute right-0 top-11 w-[360px] max-h-[480px] rounded-xl shadow-xl border border-[var(--line)] overflow-hidden z-50"
-          style={{ background: 'var(--surface)' }}
+          className="absolute right-0 top-12 w-[380px] max-w-[calc(100vw-2rem)] max-h-[500px] rounded-2xl border border-[var(--line)] overflow-hidden z-50 shadow-2xl"
+          style={{ background: 'var(--panel)' }}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--line)]">
-            <h3 className="text-sm font-semibold text-[var(--text-1)]">Alertas de Agentes</h3>
+          <div className="flex items-center gap-2 px-4 py-3.5 border-b border-[var(--line)]">
+            <Sparkles size={15} className="text-emerald-400" />
+            <b className="text-[13px] font-bold text-[var(--text-1)]">Notificaciones</b>
+            <span className="ml-auto text-[11px] font-mono text-[var(--text-4)]">{alerts.length > 0 ? String(alerts.length) : 'al día'}</span>
             <button
               onClick={() => setOpen(false)}
               className="p-1 rounded-md hover:bg-[var(--surface-2)] text-[var(--text-3)] transition-colors"
+              aria-label="Cerrar"
             >
-              <X size={16} />
+              <X size={15} />
             </button>
           </div>
 
           {/* Alert list */}
-          <div className="overflow-y-auto max-h-[420px]">
+          <div className="overflow-y-auto max-h-[440px]">
             {alerts.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-[var(--text-3)]">
-                <Bell size={28} className="mb-2 opacity-40" />
-                <p className="text-sm">Sin alertas recientes</p>
+              <div className="flex flex-col items-center justify-center py-14 text-center gap-2">
+                <div className="w-11 h-11 rounded-xl grid place-items-center bg-emerald-500/10 text-emerald-400"><Bell size={20} /></div>
+                <p className="text-sm font-semibold text-[var(--text-2)]">Todo en orden</p>
+                <p className="text-xs text-[var(--text-4)]">Sin alertas recientes de los agentes.</p>
               </div>
             ) : (
               alerts.map(alert => {
                 const isUnread = lastSeen
                   ? new Date(alert.updated_at).getTime() > new Date(lastSeen).getTime()
                   : false
+                const k = NKIND[kindOf(alert.priority, alert.source)]
+                const Icon = k.Icon
                 return (
                   <div
                     key={alert.id}
-                    className={`px-4 py-3 border-b border-[var(--line-soft)] hover:bg-[var(--surface-2)] transition-colors ${
-                      isUnread ? 'bg-[var(--accent)]/[0.03]' : ''
+                    className={`flex gap-3 px-4 py-3 border-t border-[var(--line-soft)] first:border-t-0 hover:bg-[var(--surface-2)] transition-colors ${
+                      isUnread ? 'bg-emerald-500/[0.03]' : ''
                     }`}
                   >
-                    <div className="flex items-start justify-between gap-2 mb-1">
-                      <div className="flex items-center gap-2">
-                        {isUnread && (
-                          <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
-                        )}
-                        <span className="text-xs font-semibold text-[var(--text-1)]">
-                          {agentLabel(alert.agent_id)}
-                        </span>
-                        {alert.source === 'error' && (
-                          <span className="text-[10px] text-red-400 font-medium">ERROR</span>
-                        )}
+                    <span className={`w-8 h-8 rounded-lg grid place-items-center flex-shrink-0 ${k.box}`}><Icon size={15} /></span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {isUnread && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />}
+                        <span className="text-[12.5px] font-semibold text-[var(--text-1)]">{agentLabel(alert.agent_id)}</span>
+                        <span className={`text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full ${k.tag}`}>{k.label}</span>
+                        <span className="ml-auto text-[10px] font-mono text-[var(--text-4)] whitespace-nowrap">{timeAgo(alert.updated_at)}</span>
                       </div>
-                      <span className="text-[10px] text-[var(--text-4)] whitespace-nowrap shrink-0">
-                        {timeAgo(alert.updated_at)}
-                      </span>
+                      <p className="text-xs text-[var(--text-2)] mt-1 leading-snug line-clamp-2">{alert.summary}</p>
                     </div>
-                    <p className="text-xs text-[var(--text-2)] line-clamp-2 mb-1.5 leading-relaxed">
-                      {alert.summary}
-                    </p>
-                    {priorityBadge(alert.priority)}
                   </div>
                 )
               })
