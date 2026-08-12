@@ -233,10 +233,10 @@ def cloneability_checks() -> list[Check]:
         ),
         Check(
             "clone-smoke",
-            "Automated clone smoke exists",
+            "Automated clone smoke exists and can exercise JWT/RLS",
             12,
-            exists("scripts/smoke_test_nomada.py"),
-            "scripts/smoke_test_nomada.py exists, but needs modernization to JWT-first",
+            exists("scripts/onboarding/tenant_jwt_smoke.py"),
+            "scripts/onboarding/tenant_jwt_smoke.py signs in with real Supabase Auth JWT and does not use service_role",
         ),
         Check(
             "clone-teardown",
