@@ -74,13 +74,10 @@ export async function withPOSAuth(request: NextRequest): Promise<POSAuthContext 
   if (!userId) return null
 
   // Resolve clientId from client_users — not from user_metadata (user-writable)
-  const serviceKey = process.env.SUPABASE_SERVICE_KEY || ''
-  const dbToken = serviceKey || token
-  const dbApiKey = serviceKey || SB_ANON
   try {
     const res = await fetch(
       `${SB_URL}/rest/v1/client_users?user_id=eq.${encodeURIComponent(userId)}&select=client_id,role&limit=1`,
-      { headers: { apikey: dbApiKey, Authorization: `Bearer ${dbToken}` }, cache: 'no-store' }
+      { headers: { apikey: SB_ANON, Authorization: `Bearer ${token}` }, cache: 'no-store' }
     )
     if (!res.ok) return null
     const rows = await res.json()
