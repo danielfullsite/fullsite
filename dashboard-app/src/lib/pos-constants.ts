@@ -217,6 +217,28 @@ export function isNoPrintStation(station: StationName): boolean {
   return _noPrintStations.includes(station)
 }
 
+// ─── Catálogos configurables por tenant (setting pos.*; cargados en el layout) ──
+// Regla Wansoft: cancelaciones y descuentos usan catálogos cerrados (anti-fraude),
+// no texto libre. Configurable por restaurante vía settings.
+let _cancellationReasons: string[] = ['Error de captura', 'Cliente canceló', 'Platillo no disponible', 'Orden duplicada', 'Otro']
+export function initCancellationReasons(reasons: unknown) {
+  if (Array.isArray(reasons)) {
+    const list = reasons.filter((r): r is string => typeof r === 'string' && r.trim().length > 0)
+    if (list.length > 0) _cancellationReasons = list
+  }
+}
+export function getCancellationReasons(): string[] { return _cancellationReasons }
+
+export interface DiscountCatalogItem { id: string; label: string; pct?: number; amount?: number }
+let _discountCatalog: DiscountCatalogItem[] = []
+export function initDiscountCatalog(catalog: unknown) {
+  if (Array.isArray(catalog)) {
+    _discountCatalog = catalog.filter((d): d is DiscountCatalogItem =>
+      !!d && typeof d === 'object' && typeof (d as DiscountCatalogItem).label === 'string')
+  }
+}
+export function getDiscountCatalog(): DiscountCatalogItem[] { return _discountCatalog }
+
 /**
  * Resolve station for an OrderItem: honours the pre-computed item.station when
  * present (set at order-creation time by category), normalises the legacy

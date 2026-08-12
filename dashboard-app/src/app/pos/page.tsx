@@ -38,7 +38,7 @@ import {
   updateOrderStatus,
   getPOSAuthHeaders,
 } from '@/lib/pos-data'
-import { getIvaRate, TIEMPO_ITEM_ID, isTiempoItem, getStationForItem, setCategoryNameCache, _categoryNameCache, isNoPrintStation } from '@/lib/pos-constants'
+import { getIvaRate, TIEMPO_ITEM_ID, isTiempoItem, getStationForItem, setCategoryNameCache, _categoryNameCache, isNoPrintStation, getCancellationReasons, getDiscountCatalog } from '@/lib/pos-constants'
 import { calcSplitParejo, calcSplitItems } from '@/lib/pos-calculations'
 import { publishEvent, getDeviceId } from '@/lib/events'
 import { apiUrl } from '@/lib/api-base'
@@ -694,6 +694,9 @@ function DiscountModal({ subtotal, personas, items, onApply, onCancel }: Discoun
   const promoPairs = Math.floor(promoUnits.length / 2)
   const promoDiscount = promoUnits.filter((_, idx) => idx % 2 === 1).reduce((s, p) => s + p, 0)
 
+  // Catálogo configurable por tenant (setting pos.discount_catalog) — presets de 1 toque
+  const catalog = getDiscountCatalog()
+
   const maxCortesia = CORTESIA_POR_PERSONA * cortesiaPersonas
   const discountAmount = mode === 'percent'
     ? subtotal * (Math.min(100, Math.max(0, Number(value) || 0)) / 100)
@@ -713,6 +716,36 @@ function DiscountModal({ subtotal, personas, items, onApply, onCancel }: Discoun
             <X size={20} />
           </button>
         </div>
+
+        {/* Catálogo de descuentos configurable (pos.discount_catalog) — presets de 1 toque */}
+        {catalog.length > 0 && (
+          <div className="mb-4">
+            <label className="text-xs font-semibold text-[var(--text-3)] uppercase tracking-wide mb-2 block">Catálogo</label>
+            <div className="grid grid-cols-2 gap-2">
+              {catalog.map(d => {
+                const active = reason === d.label
+                return (
+                  <button
+                    key={d.id}
+                    onClick={() => {
+                      if (typeof d.pct === 'number') { setMode('percent'); setValue(String(d.pct)) }
+                      else if (typeof d.amount === 'number') { setMode('fixed'); setValue(String(d.amount)) }
+                      setReason(d.label)
+                    }}
+                    className={`px-3 py-2.5 rounded-lg text-sm text-left transition-colors min-h-[44px] border ${
+                      active ? 'bg-[var(--accent-soft)] border-[var(--accent-line)] text-[var(--text-1)]' : 'bg-[var(--line)]/50 border-[var(--line-soft)] text-[var(--text-2)] hover:bg-[var(--line)]'
+                    }`}
+                  >
+                    <span className="font-semibold">{d.label}</span>
+                    <span className="text-[var(--accent-ink)] ml-1 font-mono tabular-nums">
+                      {typeof d.pct === 'number' ? `${d.pct}%` : typeof d.amount === 'number' ? formatMXN(d.amount) : ''}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Mode toggle */}
         <div className="flex gap-2 mb-4">
@@ -1007,14 +1040,8 @@ function CancelModal({ itemName, onConfirm, onCancel }: CancelModalProps) {
     setBiometricChecking(false)
   }
 
-  const CANCEL_REASONS = [
-    'Cliente cambio de opinion',
-    'Platillo agotado',
-    'Error del mesero',
-    'Preparacion incorrecta',
-    'Tiempo de espera excesivo',
-    'Otro',
-  ]
+  // Catálogo configurable por tenant (setting pos.cancellation_reasons)
+  const CANCEL_REASONS = getCancellationReasons()
 
   const handlePinConfirm = async () => {
     if (!reason) { setError('Selecciona un motivo'); return }
