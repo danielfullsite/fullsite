@@ -83,9 +83,9 @@ export default function CierreInventarioPage() {
   useEffect(() => {
     async function load() {
       const [ingredients, inventory, snaps] = await Promise.all([
-        sbFetch<Ingredient[]>('pos_ingredients?client_id=eq.${getActiveClientSlug()}&active=eq.true&select=id,name,unit,cost_per_unit,category'),
-        sbFetch<InventoryRow[]>('pos_inventory?client_id=eq.${getActiveClientSlug()}&select=ingredient_id,stock,reorder_point'),
-        sbFetch<Snapshot[]>('pos_inventory_snapshots?client_id=eq.${getActiveClientSlug()}&select=id,snapshot_date,total_value,total_items,items_zero&order=snapshot_date.desc&limit=20'),
+        sbFetch<Ingredient[]>(`pos_ingredients?client_id=eq.${getActiveClientSlug()}&active=eq.true&select=id,name,unit,cost_per_unit,category`),
+        sbFetch<InventoryRow[]>(`pos_inventory?client_id=eq.${getActiveClientSlug()}&select=ingredient_id,stock,reorder_point`),
+        sbFetch<Snapshot[]>(`pos_inventory_snapshots?client_id=eq.${getActiveClientSlug()}&select=id,snapshot_date,total_value,total_items,items_zero&order=snapshot_date.desc&limit=20`),
       ])
 
       if (ingredients && inventory) {
