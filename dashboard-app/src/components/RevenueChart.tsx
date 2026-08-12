@@ -34,22 +34,21 @@ export default function RevenueChart({ data, title, highlightDate }: RevenueChar
   const total = chartData.reduce((s, d) => s + d.Ventas, 0)
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-[var(--accent-line)] p-4 sm:p-6" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' }}>
-      <div aria-hidden className="absolute inset-x-0 top-0 h-px pointer-events-none" style={{ background: 'var(--bento-bevel)' }} />
-      <div className="flex items-center justify-between mb-4 sm:mb-6">
+    <div className="relative overflow-hidden rounded-[14px] border border-[var(--line)] p-4 sm:p-[18px]" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' }}>
+      <div className="flex items-start justify-between mb-4 sm:mb-4">
         <div>
-          <h3 className="text-xs sm:text-sm font-semibold text-[var(--text-1)]">{title || 'Ventas'}</h3>
-          <p className="text-xl sm:text-2xl font-black text-[var(--text-1)] mt-0.5 sm:mt-1">{formatCurrency(total)}</p>
-          <p className="text-[10px] sm:text-xs text-[var(--text-3)] mt-0.5">{chartData.length} días</p>
+          <h3 className="text-sm font-bold text-[var(--text-1)]">{title || 'Ventas'}</h3>
+          <p className="text-xl sm:text-[26px] font-black tracking-[-0.03em] text-[var(--text-1)] tnum mt-1 leading-none">{formatCurrency(total)}</p>
+          <p className="text-[10px] sm:text-[11px] text-[var(--text-3)] mt-1">{chartData.length} días</p>
         </div>
-        <div className="flex flex-col sm:flex-row gap-1 sm:gap-4 text-[10px] sm:text-xs">
-          <div className="flex items-center gap-1 sm:gap-1.5">
-            <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full" style={{ background: 'var(--accent)' }} />
-            <span className="text-[var(--text-2)]">{formatCurrency(maxVal)}</span>
+        <div className="flex flex-col sm:flex-row gap-1 sm:gap-3.5 text-[10px] sm:text-[11px]">
+          <div className="flex items-center gap-1.5">
+            <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full" style={{ background: 'var(--accent-bright)' }} />
+            <span className="text-[var(--text-2)]">Alta {formatCurrency(maxVal)}</span>
           </div>
-          <div className="flex items-center gap-1 sm:gap-1.5">
-            <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full" style={{ background: 'var(--crit)' }} />
-            <span className="text-[var(--text-2)]">{formatCurrency(minVal)}</span>
+          <div className="flex items-center gap-1.5">
+            <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full" style={{ background: '#f87171' }} />
+            <span className="text-[var(--text-2)]">Baja {formatCurrency(minVal)}</span>
           </div>
         </div>
       </div>
@@ -58,12 +57,11 @@ export default function RevenueChart({ data, title, highlightDate }: RevenueChar
           <AreaChart data={chartData} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="gradientVentas" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#10b981" stopOpacity={0.3} />
-                <stop offset="50%" stopColor="#10b981" stopOpacity={0.1} />
-                <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
+                <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.28} />
+                <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" vertical={false} />
+            <CartesianGrid strokeDasharray="2 6" stroke="var(--line)" vertical={false} />
             <XAxis
               dataKey="fecha"
               tick={{ fontSize: 11, fill: 'var(--text-3)' }}
@@ -95,11 +93,22 @@ export default function RevenueChart({ data, title, highlightDate }: RevenueChar
               type="monotone"
               dataKey="Ventas"
               stroke="var(--accent)"
-              strokeWidth={2.5}
+              strokeWidth={2.4}
               fill="url(#gradientVentas)"
               dot={false}
               activeDot={{ r: 6, fill: 'var(--accent)', stroke: 'var(--bg)', strokeWidth: 2 }}
             />
+            {/* Emphasized endpoint dot (matches DS v2 .chart-end) */}
+            {chartData.length > 0 && !highlightDate && (
+              <ReferenceDot
+                x={chartData[chartData.length - 1].fecha}
+                y={chartData[chartData.length - 1].Ventas}
+                r={5.5}
+                fill="var(--accent)"
+                stroke="var(--bg)"
+                strokeWidth={2}
+              />
+            )}
             {highlightDate && (() => {
               const hlLabel = formatShortDate(highlightDate)
               const hlPoint = chartData.find(d => d.fecha === hlLabel)

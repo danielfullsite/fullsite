@@ -88,9 +88,9 @@ export default function PredictionWidget({
   void currentTickets
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--surface)] shadow-sm mb-6">
+    <div className="relative overflow-hidden rounded-[18px] border border-[var(--line)] mb-6" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' }}>
       <div
-        className="absolute inset-x-0 top-0 h-1"
+        className="absolute inset-x-0 top-0 h-[3px]"
         style={{
           background: isAboveAvg
             ? 'linear-gradient(90deg, var(--accent), var(--accent-bright))'
@@ -98,23 +98,23 @@ export default function PredictionWidget({
         }}
       />
 
-      <div className="px-4 sm:px-6 py-4 sm:py-5">
-        <div className="flex items-center justify-between mb-3 sm:mb-4">
-          <div className="flex items-center gap-2">
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isAboveAvg ? 'bg-[var(--accent-soft)]' : 'bg-[var(--warn-soft)]'}`}>
-              <Target className={`w-4 h-4 ${isAboveAvg ? 'text-[var(--accent-ink)]' : 'text-[var(--warn-ink)]'}`} />
+      <div className="px-4 sm:px-5 py-4 sm:py-[18px]">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-[9px]">
+            <div className={`w-7 h-7 rounded-[9px] grid place-items-center ${isAboveAvg ? 'bg-[var(--accent-soft)] text-[var(--accent-bright)]' : 'bg-[var(--warn-soft)] text-[var(--warn-ink)]'}`}>
+              <Target className="w-[15px] h-[15px]" />
             </div>
-            <p className="text-xs font-medium text-[var(--text-3)] uppercase tracking-wider">Predicción de cierre</p>
+            <p className="text-[10px] font-semibold text-[var(--text-3)] uppercase tracking-[0.13em] font-mono">Predicción de cierre</p>
           </div>
-          <div className="flex items-center gap-1 text-xs text-[var(--text-3)]">
-            <Zap className="w-3 h-3" />
+          <div className="flex items-center gap-1.5 text-[11px] text-[var(--text-3)]">
+            <Zap className="w-3 h-3" fill="currentColor" />
             <span className="hidden sm:inline">Tiempo real</span>
             <span className="sm:hidden">{pctDone.toFixed(0)}%</span>
           </div>
         </div>
 
-        <div className="flex items-end gap-3 sm:gap-4 mb-3 sm:mb-4">
-          <p className="text-3xl sm:text-4xl font-black text-[var(--text-1)] tracking-tight tnum">
+        <div className="flex items-end gap-3 sm:gap-3.5 mb-3 sm:mb-3.5">
+          <p className="text-[32px] sm:text-[36px] font-black text-[var(--text-1)] tracking-[-0.03em] tnum leading-none">
             {formatCurrency(projected)}
           </p>
           <div className={`flex items-center gap-1 text-xs sm:text-sm font-semibold mb-1 ${isUp ? 'text-[var(--accent-ink)]' : 'text-[var(--warn-ink)]'}`}>
@@ -144,18 +144,18 @@ export default function PredictionWidget({
 
         <div className="grid grid-cols-3 gap-2 sm:gap-4 pt-3 border-t border-[var(--line-soft)]">
           <div>
-            <p className="text-[10px] sm:text-xs text-[var(--text-3)] mb-0.5">Falta</p>
-            <p className="text-xs sm:text-sm font-semibold text-[var(--text-1)]">{formatCurrency(remaining)}</p>
+            <p className="text-[10px] sm:text-[10.5px] text-[var(--text-3)] mb-0.5">Falta</p>
+            <p className="text-[13.5px] font-bold text-[var(--text-1)] tnum">{formatCurrency(remaining)}</p>
           </div>
           <div>
-            <p className="text-[10px] sm:text-xs text-[var(--text-3)] mb-0.5">vs ayer</p>
-            <p className={`text-xs sm:text-sm font-semibold ${vsYesterday >= 0 ? 'text-[var(--ok-ink)]' : 'text-[var(--crit-ink)]'}`}>
+            <p className="text-[10px] sm:text-[10.5px] text-[var(--text-3)] mb-0.5">vs ayer</p>
+            <p className={`text-[13.5px] font-bold tnum ${vsYesterday >= 0 ? 'text-[var(--accent-ink)]' : 'text-[var(--crit-ink)]'}`}>
               {vsYesterday >= 0 ? '+' : ''}{vsYesterday.toFixed(1)}%
             </p>
           </div>
           <div>
-            <p className="text-[10px] sm:text-xs text-[var(--text-3)] mb-0.5">vs 7d</p>
-            <p className={`text-xs sm:text-sm font-semibold ${vsLastWeek >= 0 ? 'text-[var(--ok-ink)]' : 'text-[var(--crit-ink)]'}`}>
+            <p className="text-[10px] sm:text-[10.5px] text-[var(--text-3)] mb-0.5">vs 7d</p>
+            <p className={`text-[13.5px] font-bold tnum ${vsLastWeek >= 0 ? 'text-[var(--accent-ink)]' : 'text-[var(--crit-ink)]'}`}>
               {vsLastWeek >= 0 ? '+' : ''}{vsLastWeek.toFixed(1)}%
             </p>
           </div>

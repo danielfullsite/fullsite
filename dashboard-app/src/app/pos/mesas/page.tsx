@@ -317,9 +317,9 @@ export default function MesasPage() {
   uniqueMeseros.forEach((m, i) => { meseroColorMap[m] = MESERO_COLORS[i % MESERO_COLORS.length] })
 
   const getMesaColor = (mesa: Mesa): string => {
-    if (mesa.status === 'disponible') return 'bg-emerald-900/40 border-emerald-600/60 hover:bg-emerald-800/50'
-    if (mesa.status === 'cuenta') return 'bg-amber-900/40 border-amber-500/60 hover:bg-amber-800/50'
-    return 'bg-blue-900/40 border-blue-500/60 hover:bg-blue-800/50'
+    if (mesa.status === 'disponible') return 'bg-[var(--accent-soft)] border-[var(--accent-line)] hover:bg-[var(--accent-soft)] hover:border-[var(--accent)]'
+    if (mesa.status === 'cuenta') return 'bg-[var(--warn-soft)] border-[color-mix(in_srgb,var(--warn)_45%,transparent)] hover:border-[var(--warn)]'
+    return 'bg-[var(--info-soft)] border-[color-mix(in_srgb,var(--info)_45%,transparent)] hover:border-[var(--info)]'
   }
   const getMeseroBorderStyle = (mesa: Mesa): React.CSSProperties => {
     if (mesa.status === 'disponible' || !mesa.mesero) return {}
@@ -328,12 +328,12 @@ export default function MesasPage() {
   }
 
   const statusColor: Record<string, string> = {
-    disponible: 'bg-emerald-900/40 border-emerald-600/60 hover:bg-emerald-800/50',
-    ocupada: 'bg-blue-900/40 border-blue-500/60 hover:bg-blue-800/50',
-    cuenta: 'bg-amber-900/40 border-amber-500/60 hover:bg-amber-800/50',
+    disponible: 'bg-[var(--accent-soft)] border-[var(--accent-line)] hover:border-[var(--accent)]',
+    ocupada: 'bg-[var(--info-soft)] border-[color-mix(in_srgb,var(--info)_45%,transparent)] hover:border-[var(--info)]',
+    cuenta: 'bg-[var(--warn-soft)] border-[color-mix(in_srgb,var(--warn)_45%,transparent)] hover:border-[var(--warn)]',
   }
   const statusLabel: Record<string, string> = { disponible: 'Disponible', ocupada: 'Ocupada', cuenta: 'Lista' }
-  const statusDot: Record<string, string> = { disponible: 'bg-emerald-400', ocupada: 'bg-blue-400', cuenta: 'bg-amber-400' }
+  const statusDot: Record<string, string> = { disponible: 'bg-[var(--accent)]', ocupada: 'bg-[var(--info)]', cuenta: 'bg-[var(--warn)]' }
 
   const counts = {
     disponible: mesas.filter(m => m.status === 'disponible').length,
@@ -468,20 +468,21 @@ export default function MesasPage() {
     return (
       <button
         onClick={() => handleMesaClick(mesa.number)}
-        className={`border-2 p-3 transition-all active:scale-95 flex flex-col justify-between w-full h-full ${shapeClass} ${
-          mergeSource === mesa.number ? 'ring-4 ring-amber-400 border-amber-400 bg-amber-900/50' :
-          mergeTarget === mesa.number ? 'ring-4 ring-emerald-400 border-emerald-400 bg-emerald-900/50' :
+        className={`relative overflow-hidden border p-3 pl-4 transition-all active:scale-95 flex flex-col justify-between w-full h-full shadow-[var(--shadow-soft)] ${shapeClass} ${
+          mergeSource === mesa.number ? 'ring-4 ring-[var(--warn)] border-[var(--warn)] bg-[var(--warn-soft)]' :
+          mergeTarget === mesa.number ? 'ring-4 ring-[var(--accent)] border-[var(--accent)] bg-[var(--accent-soft)]' :
           getMesaColor(mesa)
         }`}
         style={mergeSource !== mesa.number && mergeTarget !== mesa.number ? getMeseroBorderStyle(mesa) : {}}
       >
+        <span aria-hidden className="absolute left-0 top-0 bottom-0 w-1" style={{ background: mesa.status === 'disponible' ? 'var(--accent)' : mesa.status === 'cuenta' ? 'var(--warn)' : 'var(--info)' }} />
         <div className="flex items-start justify-between">
-          <span className={`${compact ? 'text-xl' : 'text-2xl'} font-bold`}>{mesa.number}</span>
+          <span className={`${compact ? 'text-xl' : 'text-2xl'} font-extrabold tabular-nums tracking-tight`}>{mesa.number}</span>
           {!compact && (
-            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
-              mesa.status === 'disponible' ? 'bg-emerald-600/30 text-emerald-300' :
-              mesa.status === 'ocupada' ? 'bg-blue-600/30 text-blue-300' :
-              'bg-amber-600/30 text-amber-300'
+            <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border leading-none ${
+              mesa.status === 'disponible' ? 'bg-[var(--accent-soft)] text-[var(--accent-ink)] border-[var(--accent-line)]' :
+              mesa.status === 'ocupada' ? 'bg-[var(--info-soft)] text-[var(--info-ink)] border-[color-mix(in_srgb,var(--info)_40%,transparent)]' :
+              'bg-[var(--warn-soft)] text-[var(--warn-ink)] border-[color-mix(in_srgb,var(--warn)_40%,transparent)]'
             }`}>
               {statusLabel[mesa.status]}
             </span>
@@ -490,12 +491,12 @@ export default function MesasPage() {
         {mesa.status !== 'disponible' ? (
           <div className={compact ? 'mt-1' : 'mt-2'}>
             {order && (
-              <div className={`flex items-center gap-1 mb-0.5 ${isAlert ? 'text-red-400' : isWarning ? 'text-amber-400' : 'text-[var(--text-3)]'}`}>
+              <div className={`flex items-center gap-1 mb-0.5 ${isAlert ? 'text-[var(--crit-ink)]' : isWarning ? 'text-[var(--warn-ink)]' : 'text-[var(--text-3)]'}`}>
                 <Clock size={10} />
                 <span className={`text-[10px] font-mono font-bold ${isAlert ? 'animate-pulse' : ''}`}>
                   {mins >= 60 ? `${Math.floor(mins/60)}h${mins%60}m` : `${mins}m`}
                 </span>
-                {isAlert && <AlertTriangle size={9} className="text-red-400" />}
+                {isAlert && <AlertTriangle size={9} className="text-[var(--crit-ink)]" />}
               </div>
             )}
             {!compact && <p className="text-[var(--text-4)] text-xs truncate">{mesa.mesero}</p>}
@@ -508,10 +509,10 @@ export default function MesasPage() {
             <div className="flex items-center justify-between mt-0.5">
               <div className="flex items-center gap-1 text-[var(--text-3)] text-xs">
                 <Users size={11} />
-                <span className="font-semibold text-white">{mesa.personas}</span>
+                <span className="font-semibold text-[var(--text-1)] tabular-nums">{mesa.personas}</span>
               </div>
               {mesa.total != null && (
-                <span className="text-white font-semibold text-xs">{formatMXN(mesa.total)}</span>
+                <span className="text-[var(--text-1)] font-bold text-xs font-mono tabular-nums">{formatMXN(mesa.total)}</span>
               )}
             </div>
           </div>
@@ -531,7 +532,7 @@ export default function MesasPage() {
     const { w, h } = TABLE_SIZE[shape]
     const chairClass = `absolute w-[12px] h-[12px] rounded-full ${
       status === 'ocupada' ? 'bg-blue-500/70' :
-      status === 'cuenta' ? 'bg-amber-500/70' : 'bg-slate-500/60'
+      status === 'cuenta' ? 'bg-amber-500/70' : 'bg-[var(--text-4)]'
     }`
     const chairs: { left: number; top: number }[] = []
 
@@ -587,8 +588,8 @@ export default function MesasPage() {
             className={`relative z-10 w-full h-full border-2 flex flex-col items-center justify-center transition-all active:scale-95 ${
               ft.shape === 'round' || ft.shape === 'round-lg' ? 'rounded-full' : 'rounded-lg'
             } ${
-              mergeSource === mesa.number ? 'ring-4 ring-amber-400 border-amber-400 bg-amber-900/60' :
-              mergeTarget === mesa.number ? 'ring-4 ring-emerald-400 border-emerald-400 bg-emerald-900/60' :
+              mergeSource === mesa.number ? 'ring-4 ring-[var(--warn)] border-[var(--warn)] bg-amber-900/60' :
+              mergeTarget === mesa.number ? 'ring-4 ring-[var(--accent)] border-[var(--accent)] bg-emerald-900/60' :
               getMesaColor(mesa)
             }`}
             style={mergeSource !== mesa.number && mergeTarget !== mesa.number ? getMeseroBorderStyle(mesa) : {}}
@@ -601,7 +602,7 @@ export default function MesasPage() {
             )}
             {order && (
               <span className={`text-[9px] font-mono font-bold leading-tight ${
-                isAlert ? 'text-red-400 animate-pulse' : isWarning ? 'text-amber-400' : 'text-[var(--text-3)]'
+                isAlert ? 'text-[var(--crit-ink)] animate-pulse' : isWarning ? 'text-[var(--warn-ink)]' : 'text-[var(--text-3)]'
               }`}>
                 {mins >= 60 ? `${Math.floor(mins / 60)}h${mins % 60}` : `${mins}m`}
               </span>
@@ -674,10 +675,10 @@ export default function MesasPage() {
 
         {/* Mesas fuera del plano (otros clientes / extras) */}
         {unassigned.length > 0 && (
-          <div className="bg-slate-500/5 rounded-2xl border border-[var(--line)] p-5 max-w-6xl mx-auto mt-4">
+          <div className="bg-[var(--surface-2)] rounded-2xl border border-[var(--line)] p-5 max-w-6xl mx-auto mt-4">
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-2 h-2 rounded-full bg-slate-400" />
-              <h3 className="text-sm font-bold text-slate-400">Sin zona asignada</h3>
+              <div className="w-2 h-2 rounded-full bg-[var(--text-4)]" />
+              <h3 className="text-sm font-bold text-[var(--text-3)]">Sin zona asignada</h3>
             </div>
             <div className="grid grid-cols-4 gap-3">
               {unassigned.map(mesa => (
@@ -707,27 +708,27 @@ export default function MesasPage() {
   )
 
   return (
-    <div className="h-screen flex flex-col text-white">
-      <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 lg:px-6 py-3 lg:py-4 bg-[var(--surface-2)] border-b border-slate-700 flex-shrink-0">
+    <div className="h-screen flex flex-col text-[var(--text-1)]" style={{ background:"var(--bg)" }}>
+      <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 lg:px-6 py-3 lg:py-4 bg-[var(--surface-2)] border-b border-[var(--line)] flex-shrink-0">
         <div className="flex flex-wrap items-center gap-3 min-w-0">
-          <Link href="/pos" className="w-10 h-10 rounded-lg bg-[var(--line)] hover:bg-slate-600 flex items-center justify-center transition-colors flex-shrink-0">
+          <Link href="/pos" className="w-10 h-10 rounded-lg bg-[var(--line)] hover:bg-[var(--surface-2)] flex items-center justify-center transition-colors flex-shrink-0">
             <ArrowLeft size={20} />
           </Link>
           <div className="min-w-0">
             <h1 className="text-xl font-bold leading-tight">Mesas</h1>
             <p className="text-[var(--text-3)] text-xs lg:text-sm whitespace-nowrap">
-              {(staffName || currentMesero) && <span className="text-emerald-400">{staffName || currentMesero}</span>}
+              {(staffName || currentMesero) && <span className="text-[var(--accent-ink)]">{staffName || currentMesero}</span>}
               {turnoNum != null && <span> · Turno {turnoNum}</span>}
               {(staffName || currentMesero || turnoNum != null) && ' · '}
               MESA(S): {counts.ocupada + counts.cuenta}{namedOrders.length > 0 && ` · CUENTAS: ${namedOrders.length}`} · {totalPersonas} personas · TP {formatMXN(ticketPromedio)}
               {activeOrders.length > 0 && (() => {
                 const avgMins = Math.round(activeOrders.reduce((s, o) => s + getMinutes(o.created_at), 0) / activeOrders.length)
-                return <span className={avgMins > 60 ? 'text-amber-400' : ''}> · Prom: {avgMins}m</span>
+                return <span className={avgMins > 60 ? 'text-[var(--warn-ink)]' : ''}> · Prom: {avgMins}m</span>
               })()}
               <span className="hidden lg:inline"> · {new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })} {new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</span>
             </p>
           </div>
-          <button onClick={fetchData} className="w-11 h-11 rounded-lg bg-[var(--line)] hover:bg-slate-600 flex items-center justify-center">
+          <button onClick={fetchData} className="w-11 h-11 rounded-lg bg-[var(--line)] hover:bg-[var(--surface-2)] flex items-center justify-center">
             <RefreshCw size={14} />
           </button>
 
@@ -737,7 +738,7 @@ export default function MesasPage() {
               <button
                 onClick={() => setViewMode('planograma')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                  viewMode === 'planograma' ? 'bg-slate-600 text-white' : 'text-[var(--text-3)] hover:text-white'
+                  viewMode === 'planograma' ? 'bg-[var(--surface-2)] text-[var(--text-1)]' : 'text-[var(--text-3)] hover:text-[var(--text-1)]'
                 }`}
               >
                 <Map size={13} /> Plano
@@ -746,7 +747,7 @@ export default function MesasPage() {
             <button
               onClick={() => setViewMode('grid')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                viewMode === 'grid' ? 'bg-slate-600 text-white' : 'text-[var(--text-3)] hover:text-white'
+                viewMode === 'grid' ? 'bg-[var(--surface-2)] text-[var(--text-1)]' : 'text-[var(--text-3)] hover:text-[var(--text-1)]'
               }`}
             >
               <LayoutGrid size={13} /> Grid
@@ -757,7 +758,7 @@ export default function MesasPage() {
             <button
               onClick={() => setSoloMisMesas(!soloMisMesas)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                soloMisMesas ? 'bg-emerald-500 text-black' : 'bg-[var(--line)] hover:bg-slate-600 text-[var(--text-3)]'
+                soloMisMesas ? 'bg-emerald-500 text-black' : 'bg-[var(--line)] hover:bg-[var(--surface-2)] text-[var(--text-3)]'
               }`}
             >
               <Users size={14} />
@@ -767,7 +768,7 @@ export default function MesasPage() {
           <button
             onClick={() => { setMergeMode(!mergeMode); setMergeSource(null); setMergeTarget(null) }}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              mergeMode ? 'bg-amber-500 text-black' : 'bg-[var(--line)] hover:bg-slate-600 text-[var(--text-3)]'
+              mergeMode ? 'bg-amber-500 text-black' : 'bg-[var(--line)] hover:bg-[var(--surface-2)] text-[var(--text-3)]'
             }`}
           >
             {mergeMode ? <X size={14} /> : <Merge size={14} />}
@@ -775,7 +776,7 @@ export default function MesasPage() {
           </button>
           <button
             onClick={() => { setNewCuentaName(''); setShowNewCuenta(true) }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-teal-600/30 hover:bg-teal-600/50 text-teal-300 border border-teal-600/40 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-teal-600/30 hover:bg-teal-600/50 text-[var(--accent-ink)] border border-teal-600/40 transition-colors"
           >
             <UserPlus size={14} /> Cuenta
           </button>
@@ -869,7 +870,7 @@ export default function MesasPage() {
                 })
               }}
               title="Cerrar app"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-red-900/30 hover:bg-red-900/50 text-red-400 border border-red-800/40 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-red-900/30 hover:bg-red-900/50 text-[var(--crit-ink)] border border-red-800/40 transition-colors"
             >
               <Power size={14} /> Cerrar
             </button>
@@ -890,18 +891,43 @@ export default function MesasPage() {
       {/* Alert banner */}
       {alertMesas.length > 0 && (
         <div className="mx-6 mt-3 flex items-center gap-3 px-4 py-3 bg-red-500/10 border border-red-500/20 rounded-xl animate-pulse">
-          <AlertTriangle size={18} className="text-red-400 flex-shrink-0" />
-          <span className="text-sm text-red-400 font-medium">
+          <AlertTriangle size={18} className="text-[var(--crit-ink)] flex-shrink-0" />
+          <span className="text-sm text-[var(--crit-ink)] font-medium">
             {alertMesas.length} mesa{alertMesas.length > 1 ? 's' : ''} con +{ALERT_THRESHOLD} min:{' '}
             {alertMesas.map(o => `Mesa ${o.mesa} (${getMinutes(o.created_at)}m)`).join(', ')}
           </span>
         </div>
       )}
 
+      {!loading && (() => {
+        const ocupadas = counts.ocupada + counts.cuenta
+        const totalMesas = mesas.length || 0
+        const aforo = totalMesas > 0 ? Math.round((ocupadas / totalMesas) * 100) : 0
+        const avgMins = activeOrders.length > 0 ? Math.round(activeOrders.reduce((s, o) => s + getMinutes(o.created_at), 0) / activeOrders.length) : 0
+        return (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 px-4 lg:px-6 pt-4 flex-shrink-0">
+            {[
+              { l: 'Mesas ocupadas', v: `${ocupadas}`, sub: `/${totalMesas}`, d: `${aforo}% de aforo`, ink: 'var(--accent-ink)' },
+              { l: 'Personas', v: `${totalPersonas}`, sub: '', d: 'en piso ahora', ink: 'var(--text-3)' },
+              { l: 'Ingreso actual', v: formatMXN(totalVentas), sub: '', d: `TP ${formatMXN(ticketPromedio)}`, ink: 'var(--accent-ink)' },
+              { l: 'Tiempo prom.', v: `${avgMins}`, sub: ' min', d: 'rotación de mesa', ink: 'var(--text-3)' },
+            ].map((k) => (
+              <div key={k.l} className="rounded-[14px] border border-[var(--line)] p-4 shadow-[var(--shadow-soft)]" style={{ background: 'var(--bento-card)' }}>
+                <div className="font-mono text-[10px] uppercase tracking-[0.13em] text-[var(--text-3)]">{k.l}</div>
+                <div className="text-2xl font-extrabold mt-2 tabular-nums tracking-tight text-[var(--text-1)]">
+                  {k.v}<span className="text-[var(--text-4)] text-base font-bold">{k.sub}</span>
+                </div>
+                <div className="text-xs font-semibold mt-1" style={{ color: k.ink }}>{k.d}</div>
+              </div>
+            ))}
+          </div>
+        )
+      })()}
+
       <div className={`flex-1 overflow-y-auto ${viewMode === 'planograma' ? 'p-2' : 'p-6'}`}>
         {loading ? (
           <div className="flex items-center justify-center h-full">
-            <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            <div className="w-8 h-8 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
           </div>
         ) : (
           <>
@@ -910,8 +936,8 @@ export default function MesasPage() {
             {/* Cuentas por nombre (sin mesa, estilo Wansoft) */}
             {namedOrders.length > 0 && (
               <div className="max-w-5xl mx-auto mt-6">
-                <h3 className="text-white font-bold text-lg mb-3 flex items-center gap-2">
-                  <UserPlus size={18} className="text-teal-400" />
+                <h3 className="text-[var(--text-1)] font-bold text-lg mb-3 flex items-center gap-2">
+                  <UserPlus size={18} className="text-[var(--accent-ink)]" />
                   Cuentas por nombre ({namedOrders.length})
                 </h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -925,19 +951,19 @@ export default function MesasPage() {
                         className="bg-teal-900/40 border-2 border-teal-600/60 hover:bg-teal-800/50 rounded-2xl p-3 text-left transition-all active:scale-95"
                       >
                         <div className="flex items-start justify-between">
-                          <span className="font-bold text-teal-200 uppercase truncate">#{o.customer_name}</span>
-                          {o.order_number != null && <span className="text-[10px] font-mono text-teal-400/70">#{o.order_number}</span>}
+                          <span className="font-bold text-[var(--accent-ink)] uppercase truncate">#{o.customer_name}</span>
+                          {o.order_number != null && <span className="text-[10px] font-mono text-[var(--accent-ink)]">#{o.order_number}</span>}
                         </div>
-                        <div className={`flex items-center gap-1 mt-1 ${isAlert ? 'text-red-400' : 'text-teal-300/70'}`}>
+                        <div className={`flex items-center gap-1 mt-1 ${isAlert ? 'text-[var(--crit-ink)]' : 'text-[var(--accent-ink)]'}`}>
                           <Clock size={10} />
                           <span className={`text-[10px] font-mono font-bold ${isAlert ? 'animate-pulse' : ''}`}>
                             {mins >= 60 ? `${Math.floor(mins / 60)}h${mins % 60}m` : `${mins}m`}
                           </span>
-                          {isAlert && <AlertTriangle size={9} className="text-red-400" />}
+                          {isAlert && <AlertTriangle size={9} className="text-[var(--crit-ink)]" />}
                         </div>
                         <div className="flex items-center justify-between mt-1">
                           <span className="text-[var(--text-3)] text-xs truncate">{o.mesero}</span>
-                          <span className="text-white font-semibold text-xs">{formatMXN(o.total || 0)}</span>
+                          <span className="text-[var(--text-1)] font-semibold text-xs">{formatMXN(o.total || 0)}</span>
                         </div>
                       </button>
                     )
@@ -949,18 +975,18 @@ export default function MesasPage() {
             {/* Reservaciones */}
             {reservas.length > 0 && (
               <div className="max-w-5xl mx-auto mt-6">
-                <h3 className="text-white font-bold text-lg mb-3 flex items-center gap-2">
-                  <Calendar size={18} className="text-amber-400" />
+                <h3 className="text-[var(--text-1)] font-bold text-lg mb-3 flex items-center gap-2">
+                  <Calendar size={18} className="text-[var(--warn-ink)]" />
                   Reservaciones hoy ({reservas.length})
                 </h3>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   {reservas.map(r => (
                     <div key={r.codigo_reserva} className="bg-amber-900/20 border border-amber-700/30 rounded-xl px-4 py-3">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-amber-400 font-bold text-sm">{r.horario_inicio?.slice(0, 5)}</span>
-                        <span className="text-amber-400/60 text-xs">{r.codigo_reserva}</span>
+                        <span className="text-[var(--warn-ink)] font-bold text-sm">{r.horario_inicio?.slice(0, 5)}</span>
+                        <span className="text-[var(--warn-ink)] text-xs">{r.codigo_reserva}</span>
                       </div>
-                      <p className="text-white font-medium">{r.nombre}</p>
+                      <p className="text-[var(--text-1)] font-medium">{r.nombre}</p>
                       <div className="flex items-center justify-between mt-1">
                         <span className="text-[var(--text-3)] text-sm flex items-center gap-1"><Users size={12} /> {r.guests} personas</span>
                         <span className="text-[var(--text-2)] text-xs">{r.espacio}</span>
@@ -979,11 +1005,11 @@ export default function MesasPage() {
         <div className="px-6 py-3 bg-amber-900/30 border-t border-amber-700/40 flex items-center justify-between">
           <div className="text-sm">
             {!mergeSource ? (
-              <span className="text-amber-400">Toca la mesa <strong>origen</strong> (la que se mueve)</span>
+              <span className="text-[var(--warn-ink)]">Toca la mesa <strong>origen</strong> (la que se mueve)</span>
             ) : !mergeTarget ? (
-              <span className="text-amber-400">Mesa {mergeSource} seleccionada. Ahora toca la mesa <strong>destino</strong></span>
+              <span className="text-[var(--warn-ink)]">Mesa {mergeSource} seleccionada. Ahora toca la mesa <strong>destino</strong></span>
             ) : (
-              <span className="text-emerald-400">Mesa {mergeSource} → Mesa {mergeTarget}</span>
+              <span className="text-[var(--accent-ink)]">Mesa {mergeSource} → Mesa {mergeTarget}</span>
             )}
           </div>
           {mergeSource && mergeTarget && (
@@ -1002,8 +1028,8 @@ export default function MesasPage() {
       {showNewCuenta && (
         <div className="fixed inset-0 z-[70] bg-black/70 flex items-center justify-center p-6" onClick={() => setShowNewCuenta(false)}>
           <div className="bg-[var(--surface-2)] border border-[var(--line)] rounded-2xl p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
-            <h3 className="text-white font-bold text-lg mb-1 flex items-center gap-2">
-              <UserPlus size={18} className="text-teal-400" /> Cuenta por nombre
+            <h3 className="text-[var(--text-1)] font-bold text-lg mb-1 flex items-center gap-2">
+              <UserPlus size={18} className="text-[var(--accent-ink)]" /> Cuenta por nombre
             </h3>
             <p className="text-[var(--text-3)] text-sm mb-4">Sin mesa — para llevar, barra o cliente frecuente</p>
             <input
@@ -1014,7 +1040,7 @@ export default function MesasPage() {
               placeholder="NOMBRE DEL CLIENTE"
               autoFocus
               maxLength={30}
-              className="w-full bg-[var(--line)] border border-slate-600 rounded-xl px-4 py-3 text-white font-bold focus:outline-none focus:border-teal-500 mb-4 placeholder:font-normal placeholder:text-[var(--text-4)]"
+              className="w-full bg-[var(--line)] border border-[var(--line)] rounded-xl px-4 py-3 text-[var(--text-1)] font-bold focus:outline-none focus:border-teal-500 mb-4 placeholder:font-normal placeholder:text-[var(--text-4)]"
             />
             <div className="flex gap-2">
               <button onClick={() => setShowNewCuenta(false)} className="flex-1 py-3 rounded-xl bg-[var(--line)] text-[var(--text-2)] font-medium">
@@ -1023,7 +1049,7 @@ export default function MesasPage() {
               <button
                 onClick={() => { if (newCuentaName.trim()) router.push(`/pos?cuenta=${encodeURIComponent(newCuentaName.trim())}`) }}
                 disabled={!newCuentaName.trim()}
-                className="flex-1 py-3 rounded-xl bg-teal-600 hover:bg-teal-500 disabled:opacity-40 text-white font-bold"
+                className="flex-1 py-3 rounded-xl bg-teal-600 hover:bg-teal-500 disabled:opacity-40 text-[var(--text-1)] font-bold"
               >
                 Abrir cuenta
               </button>
@@ -1033,7 +1059,7 @@ export default function MesasPage() {
       )}
 
       {toast && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[60] bg-[var(--surface-2)] border border-[var(--line)] text-white px-6 py-3 rounded-xl shadow-2xl text-sm font-medium">
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[60] bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-1)] px-6 py-3 rounded-xl shadow-2xl text-sm font-medium">
           {toast}
         </div>
       )}
@@ -1042,7 +1068,7 @@ export default function MesasPage() {
       {pinPrompt && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70" onClick={() => setPinPrompt(null)}>
           <div className="bg-[var(--surface-2)] rounded-2xl p-6 w-80 shadow-2xl border border-[var(--line)]" onClick={e => e.stopPropagation()}>
-            <p className="text-white font-bold text-center mb-4">{pinPrompt.title}</p>
+            <p className="text-[var(--text-1)] font-bold text-center mb-4">{pinPrompt.title}</p>
             <input
               type="password"
               inputMode="numeric"
@@ -1051,7 +1077,7 @@ export default function MesasPage() {
               onChange={e => setPinInput(e.target.value.replace(/\D/g, ''))}
               onKeyDown={e => { if (e.key === 'Enter' && pinInput) { pinPrompt.onSubmit(pinInput) } }}
               maxLength={6}
-              className="w-full bg-[var(--line)] border border-slate-600 rounded-xl px-4 py-3 text-white text-center text-2xl tracking-[0.3em] font-bold focus:outline-none focus:border-emerald-500 mb-4"
+              className="w-full bg-[var(--line)] border border-[var(--line)] rounded-xl px-4 py-3 text-[var(--text-1)] text-center text-2xl tracking-[0.3em] font-bold focus:outline-none focus:border-[var(--accent)] mb-4"
               placeholder="****"
             />
             <div className="flex gap-2">
@@ -1061,7 +1087,7 @@ export default function MesasPage() {
               <button
                 onClick={() => { if (pinInput) pinPrompt.onSubmit(pinInput) }}
                 disabled={!pinInput}
-                className="flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-bold"
+                className="flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-[var(--text-1)] font-bold"
               >
                 Confirmar
               </button>
