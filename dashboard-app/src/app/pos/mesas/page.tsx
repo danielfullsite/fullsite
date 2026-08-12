@@ -352,6 +352,12 @@ export default function MesasPage() {
     return () => clearInterval(timer)
   }, [])
   const getMinutes = (createdAt: string) => Math.floor((Date.now() - new Date(createdAt).getTime()) / 60000)
+  // Formato legible: 45m · 2h 15m · 3d 4h (evita "464h18m" ilegible)
+  const formatDur = (mins: number): string => {
+    if (mins < 60) return `${mins}m`
+    if (mins < 1440) return `${Math.floor(mins / 60)}h ${mins % 60}m`
+    return `${Math.floor(mins / 1440)}d ${Math.floor((mins % 1440) / 60)}h`
+  }
   const formatHoraAbrir = (createdAt: string) =>
     new Date(createdAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase()
 
@@ -494,7 +500,7 @@ export default function MesasPage() {
               <div className={`flex items-center gap-1 mb-0.5 ${isAlert ? 'text-[var(--crit-ink)]' : isWarning ? 'text-[var(--warn-ink)]' : 'text-[var(--text-3)]'}`}>
                 <Clock size={10} />
                 <span className={`text-[10px] font-mono font-bold ${isAlert ? 'animate-pulse' : ''}`}>
-                  {mins >= 60 ? `${Math.floor(mins/60)}h${mins%60}m` : `${mins}m`}
+                  {formatDur(mins)}
                 </span>
                 {isAlert && <AlertTriangle size={9} className="text-[var(--crit-ink)]" />}
               </div>
@@ -604,7 +610,7 @@ export default function MesasPage() {
               <span className={`text-[9px] font-mono font-bold leading-tight ${
                 isAlert ? 'text-[var(--crit-ink)] animate-pulse' : isWarning ? 'text-[var(--warn-ink)]' : 'text-[var(--text-3)]'
               }`}>
-                {mins >= 60 ? `${Math.floor(mins / 60)}h${mins % 60}` : `${mins}m`}
+                {formatDur(mins)}
               </span>
             )}
           </button>
@@ -723,7 +729,7 @@ export default function MesasPage() {
               MESA(S): {counts.ocupada + counts.cuenta}{namedOrders.length > 0 && ` · CUENTAS: ${namedOrders.length}`} · {totalPersonas} personas · TP {formatMXN(ticketPromedio)}
               {activeOrders.length > 0 && (() => {
                 const avgMins = Math.round(activeOrders.reduce((s, o) => s + getMinutes(o.created_at), 0) / activeOrders.length)
-                return <span className={avgMins > 60 ? 'text-[var(--warn-ink)]' : ''}> · Prom: {avgMins}m</span>
+                return <span className={avgMins > 60 ? 'text-[var(--warn-ink)]' : ''}> · Prom: {formatDur(avgMins)}</span>
               })()}
               <span className="hidden lg:inline"> · {new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })} {new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</span>
             </p>
@@ -903,7 +909,7 @@ export default function MesasPage() {
               { l: 'Mesas ocupadas', v: `${ocupadas}`, sub: `/${totalMesas}`, d: `${aforo}% de aforo`, ink: 'var(--accent-ink)' },
               { l: 'Personas', v: `${totalPersonas}`, sub: '', d: 'en piso ahora', ink: 'var(--text-3)' },
               { l: 'Ingreso actual', v: formatMXN(totalVentas), sub: '', d: `TP ${formatMXN(ticketPromedio)}`, ink: 'var(--accent-ink)' },
-              { l: 'Tiempo prom.', v: `${avgMins}`, sub: ' min', d: 'rotación de mesa', ink: 'var(--text-3)' },
+              { l: 'Tiempo prom.', v: formatDur(avgMins), sub: '', d: 'rotación de mesa', ink: 'var(--text-3)' },
             ].map((k) => (
               <div key={k.l} className="rounded-xl border border-[var(--line)] px-3.5 py-2 shadow-[var(--shadow-soft)] bg-[var(--surface)]">
                 <div className="font-mono text-[9px] uppercase tracking-[0.13em] text-[var(--text-3)]">{k.l}</div>
@@ -950,7 +956,7 @@ export default function MesasPage() {
                         <div className={`flex items-center gap-1 mt-1 ${isAlert ? 'text-[var(--crit-ink)]' : 'text-[var(--accent-ink)]'}`}>
                           <Clock size={10} />
                           <span className={`text-[10px] font-mono font-bold ${isAlert ? 'animate-pulse' : ''}`}>
-                            {mins >= 60 ? `${Math.floor(mins / 60)}h${mins % 60}m` : `${mins}m`}
+                            {formatDur(mins)}
                           </span>
                           {isAlert && <AlertTriangle size={9} className="text-[var(--crit-ink)]" />}
                         </div>
