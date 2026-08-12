@@ -201,7 +201,7 @@ export default function RecepcionFacturaPage() {
   const totalRestock = matched.filter(m => m.includeInRestock).length
 
   return (
-    <div className="max-w-5xl mx-auto p-6">
+    <div className="h-dvh overflow-y-auto pos-fat-scroll max-w-5xl mx-auto p-6">
       <div className="flex items-center gap-3 mb-6">
         <Link href="/pos" className="p-2 rounded-lg hover:bg-[var(--surface-2)] text-[var(--text-3)]"><ArrowLeft size={16} /></Link>
         <Zap size={24} className="text-amber-400" />

@@ -108,7 +108,7 @@ export default function InventarioFisicoPage() {
   if (loading) return <div className="flex items-center justify-center h-96"><div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="h-dvh overflow-y-auto pos-fat-scroll max-w-4xl mx-auto">
       <div className="flex items-center gap-3 mb-6">
         <Link href="/pos" className="p-2 rounded-lg hover:bg-[var(--surface-2)] text-[var(--text-3)]"><ArrowLeft size={16} /></Link>
         <div>

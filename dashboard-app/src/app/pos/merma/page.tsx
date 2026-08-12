@@ -160,7 +160,7 @@ export default function MermaPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="h-dvh overflow-y-auto pos-fat-scroll max-w-2xl mx-auto">
       <div className="flex items-center gap-3 mb-6">
         <Link href="/pos" className="p-2 rounded-lg hover:bg-[var(--surface-2)] text-[var(--text-3)]">
           <ArrowLeft size={16} />
