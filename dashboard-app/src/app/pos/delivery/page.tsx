@@ -188,9 +188,9 @@ export default function DeliveryPage() {
   }
 
   return (
-    <div className="min-h-dvh" style={{ background: '#0a0a0f' }}>
+    <div className="h-dvh flex flex-col overflow-hidden" style={{ background: '#0a0a0f' }}>
       {/* Header */}
-      <div className="sticky top-0 z-20 bg-[#12121a] border-b border-white/10 px-4 py-3 flex items-center gap-3">
+      <div className="flex-shrink-0 z-20 bg-[#12121a] border-b border-white/10 px-4 py-3 flex items-center gap-3">
         <Link href="/pos" className="w-11 h-11 rounded-lg bg-white/10 flex items-center justify-center text-white">
           <ArrowLeft size={20} />
         </Link>
@@ -203,7 +203,7 @@ export default function DeliveryPage() {
         </button>
       </div>
 
-      <div className="p-4 max-w-3xl mx-auto space-y-4">
+      <div className="flex-1 min-h-0 overflow-y-auto pos-fat-scroll p-4 max-w-3xl mx-auto w-full space-y-4">
         {/* Stats bar */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <StatCard
