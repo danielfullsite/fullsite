@@ -7,6 +7,7 @@ import KPICard from '@/components/KPICard'
 import RevenueChart from '@/components/RevenueChart'
 import RevenueDistributionChart from '@/components/RevenueDistributionChart'
 import { getRecentDays, getLatestDay, getDashboardFromPosOrders, aggregateMeseros, getLatestAgentRuns, type AgentRun } from '@/lib/data'
+import AgentBriefing from '@/components/AgentBriefing'
 import { formatCurrency, formatNumber, formatPercent, formatDate, percentChange } from '@/lib/format'
 import PredictionWidget from '@/components/PredictionWidget'
 import type { WansoftDaily, GrupoEntry, PagoMetodoEntry } from '@/lib/types'
@@ -519,6 +520,9 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Resumen del día — "N cosas para hoy" (detecciones de los agentes IA) */}
+      <AgentBriefing />
 
       {/* Data freshness: warn when showing a past day as the default view, show sync time for today */}
       {period === 'dia' && viewDay && (() => {
