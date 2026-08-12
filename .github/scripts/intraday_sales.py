@@ -784,7 +784,21 @@ def main():
 
     except Exception as e:
         duration = int((time.time() - start) * 1000)
-        log_run("error", duration, error=str(e))
+        msg = str(e)
+        # La fuente externa (Wansoft) puede estar caída/bloqueada. Eso NO es un error
+        # del agente — es "sin datos disponibles" → skip limpio (status success), para
+        # no spamear el rate con fallos de un tercero. Un error real de código sí se loguea.
+        etype = type(e).__name__
+        transient = (
+            "Wansoft login failed" in msg
+            or "wansoft.net" in msg.lower()
+            or etype in ("WansoftAuthExpired", "ConnectionError", "Timeout", "ConnectTimeout", "ReadTimeout")
+        )
+        if transient:
+            log_run("success", duration, summary="Wansoft no disponible — sin datos intraday (skip)")
+            print(f"[intraday] Wansoft unavailable → skip limpio: {e}")
+            sys.exit(0)
+        log_run("error", duration, error=msg)
         print(f"[intraday] ERROR: {e}")
         sys.exit(1)
 

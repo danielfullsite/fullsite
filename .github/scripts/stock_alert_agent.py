@@ -250,6 +250,7 @@ try:
 
     # 6. Save to agent_results
     sb_upsert("agent_results", {
+        "client_id": CLIENT["id"],
         "agent_id": "stock-alert",
         "fecha": today_str,
         "priority": "critical" if sin_stock else ("warning" if critico or bajo_minimo else "info"),
