@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Database, Download, FileJson, AlertTriangle } from 'lucide-react'
+import { Database, Download, FileJson, FileSpreadsheet, AlertTriangle } from 'lucide-react'
 
 // Control Plane · Exportar datos. El super-admin baja los datos de cualquier
 // cliente a CSV/JSON (via service_role, gateado). Sin depender de un dev.
@@ -65,7 +65,8 @@ export default function DatosPage() {
         {DATASETS.map(d => (
           <div key={d.key} className="flex items-center gap-3 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 py-3">
             <span className="flex-1 text-sm font-medium text-[var(--text-1)]">{d.label}</span>
-            <a href={url(d.key, 'csv')} className="inline-flex items-center gap-1.5 rounded-md bg-[var(--accent)] px-2.5 py-1.5 text-xs font-semibold text-[#04130d]"><Download size={13} /> CSV</a>
+            <a href={url(d.key, 'xls')} className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white"><FileSpreadsheet size={13} /> Excel</a>
+            <a href={url(d.key, 'csv')} className="inline-flex items-center gap-1.5 rounded-md border border-[var(--line)] bg-[var(--surface-2)] px-2.5 py-1.5 text-xs font-medium text-[var(--text-2)] hover:text-[var(--text-1)]"><Download size={13} /> CSV</a>
             <a href={url(d.key, 'json')} className="inline-flex items-center gap-1.5 rounded-md border border-[var(--line)] bg-[var(--surface-2)] px-2.5 py-1.5 text-xs font-medium text-[var(--text-2)] hover:text-[var(--text-1)]"><FileJson size={13} /> JSON</a>
           </div>
         ))}

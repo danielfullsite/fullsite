@@ -19,6 +19,21 @@ const DATASETS: Record<string, { table: string; select: string; order?: string; 
   ordenes: { table: 'pos_orders', select: 'id,mesa,mesero,personas,status,subtotal,iva,total,descuento,propina,metodo_pago,turno_id,closed_at', order: 'closed_at.desc', limit: 5000 },
 }
 
+// Excel "a la antigüita": tabla HTML con MIME de Excel → se abre como hoja de
+// cálculo (.xls) sin librerías. Es el mismo truco que usan muchos reportes clásicos.
+function toXls(rows: Record<string, unknown>[]): string {
+  const esc = (v: unknown): string => {
+    if (v === null || v === undefined) return ''
+    const s = typeof v === 'object' ? JSON.stringify(v) : String(v)
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  }
+  if (rows.length === 0) return '<html><body><table></table></body></html>'
+  const cols = Array.from(rows.reduce((set, r) => { Object.keys(r).forEach(k => set.add(k)); return set }, new Set<string>()))
+  const head = `<tr>${cols.map(c => `<th style="background:#eee;text-align:left">${esc(c)}</th>`).join('')}</tr>`
+  const body = rows.map(r => `<tr>${cols.map(c => `<td>${esc(r[c])}</td>`).join('')}</tr>`).join('')
+  return `<html><head><meta charset="utf-8"></head><body><table border="1" cellspacing="0">${head}${body}</table></body></html>`
+}
+
 function toCsv(rows: Record<string, unknown>[]): string {
   if (rows.length === 0) return ''
   const cols = Array.from(rows.reduce((set, r) => { Object.keys(r).forEach(k => set.add(k)); return set }, new Set<string>()))
@@ -57,6 +72,11 @@ export async function GET(req: NextRequest) {
   if (format === 'json') {
     return new Response(JSON.stringify(rows, null, 2), {
       headers: { 'Content-Type': 'application/json', 'Content-Disposition': `attachment; filename="${clientId}-${dataset}-${stamp}.json"` },
+    })
+  }
+  if (format === 'xls' || format === 'excel') {
+    return new Response(toXls(rows), {
+      headers: { 'Content-Type': 'application/vnd.ms-excel; charset=utf-8', 'Content-Disposition': `attachment; filename="${clientId}-${dataset}-${stamp}.xls"` },
     })
   }
   return new Response(toCsv(rows), {

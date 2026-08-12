@@ -115,7 +115,8 @@ export default function ImportarPage() {
         </select>
       </div>
 
-      <p className="text-[11px] text-[var(--text-4)] mb-3">Columnas esperadas (encabezado del CSV): <span className="font-mono text-[var(--text-3)]">{cols}</span>. Si no traes <span className="font-mono">id</span>, se genera por nombre (idempotente: reimportar actualiza).</p>
+      <p className="text-[11px] text-[var(--text-4)] mb-1">Columnas esperadas (encabezado del CSV): <span className="font-mono text-[var(--text-3)]">{cols}</span>. Si no traes <span className="font-mono">id</span>, se genera por nombre (idempotente: reimportar actualiza).</p>
+      <p className="text-[11px] text-[var(--text-4)] mb-3">📊 <b className="text-[var(--text-3)]">¿Vienes de Excel?</b> En Excel: <span className="text-[var(--text-3)]">Archivo → Guardar como → CSV UTF-8</span>, y sube ese archivo aquí.</p>
 
       <label className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--line)] bg-[var(--surface)] px-4 py-6 text-sm text-[var(--text-3)] cursor-pointer hover:border-[var(--accent)]">
         <FileUp size={18} /> {fileName || 'Elegir archivo CSV…'}
