@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { DollarSign, Ticket, Users, Receipt, Banknote, CreditCard, Vault, ArrowDownCircle, Building2 } from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
+import PeriodPicker, { type DateRange } from '@/components/PeriodPicker'
 import { getRecentDays, getWansoftData, getDashboardFromPosOrders } from '@/lib/data'
 import { formatCurrency, formatNumber, formatPercent, percentChange } from '@/lib/format'
 import type { WansoftDaily, PagoMetodoEntry } from '@/lib/types'
@@ -47,6 +48,7 @@ export default function CortesPage() {
   const [cashClosingFecha, setCashClosingFecha] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [period, setPeriod] = useState<30 | 60 | 90>(30)
+  const [range, setRange] = useState<DateRange | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -86,7 +88,9 @@ export default function CortesPage() {
     load()
   }, [])
 
-  const periodData = useMemo(() => recentData.slice(-period), [recentData, period])
+  const periodData = useMemo(() => range
+    ? recentData.filter(d => d.fecha >= range.from && d.fecha <= range.to)
+    : recentData.slice(-period), [recentData, period, range])
 
   // Totals
   const totalVentas = periodData.reduce((s, d) => s + (d.ventas_dia || 0), 0)
@@ -155,22 +159,14 @@ export default function CortesPage() {
     <>
       <PageHeader
         title="Cortes de Caja"
-        subtitle={`Histórico de cortes diarios - últimos ${period} días`}
+        subtitle={range ? `Cortes ${range.from} → ${range.to}` : `Histórico de cortes diarios - últimos ${period} días`}
+        exportData={periodData.map(d => ({ fecha: d.fecha, ventas: d.ventas_dia, tickets: d.tickets_count, efectivo: d.efectivo, tarjeta: d.tarjeta, propinas: d.propinas_total }))}
+        exportName="cortes"
       />
 
-      {/* Period selector */}
+      {/* Period selector — presets + rango personalizado */}
       <div className="mb-6">
-        <div className="segmented-control">
-          {([30, 60, 90] as const).map(p => (
-            <button
-              key={p}
-              onClick={() => setPeriod(p)}
-              className={period === p ? 'active' : ''}
-            >
-              {p} días
-            </button>
-          ))}
-        </div>
+        <PeriodPicker period={period} onPeriod={(n) => setPeriod(n as 30 | 60 | 90)} range={range} onRange={setRange} presets={[30, 60, 90]} />
       </div>
 
       {/* KPI Cards */}

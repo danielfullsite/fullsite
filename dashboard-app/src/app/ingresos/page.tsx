@@ -81,6 +81,8 @@ export default function IngresosPage() {
       <PageHeader
         title="Control de Ingresos"
         subtitle="Desglose de métodos de pago y flujo diario"
+        exportData={payments as unknown as Record<string, unknown>[]}
+        exportName="ingresos"
       />
 
       {loading ? (
