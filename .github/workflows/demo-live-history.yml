@@ -1,0 +1,25 @@
+name: Demo Live — Seed 1 año de historial
+on:
+  workflow_dispatch:
+    inputs:
+      client:
+        description: "client_id del tenant demo-live"
+        default: "demo-live"
+      days:
+        description: "días de historial"
+        default: "365"
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install requests
+      - run: python .github/scripts/demo_live_history.py
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          DEMO_CLIENT: ${{ github.event.inputs.client }}
+          DEMO_DAYS: ${{ github.event.inputs.days }}
