@@ -22,11 +22,10 @@ export function patchSupabaseFetch() {
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : (input as Request).url
 
-    // Only patch Supabase REST API calls — but NOT from POS pages.
-    // POS uses anon key with RLS policies for anon role. Replacing it
-    // with a user JWT that may be expired causes 401 errors (AUTH-01).
-    const isPosPage = typeof window !== 'undefined' && window.location.pathname.startsWith('/pos')
-    if (!isPosPage && url.includes(SUPABASE_URL) && url.includes('/rest/v1/')) {
+    // Patch Supabase REST API calls that still use the bare anon key.
+    // Under strict RLS, dashboard and POS browser reads must carry the
+    // authenticated Supabase JWT; otherwise tenant-scoped tables return 401.
+    if (url.includes(SUPABASE_URL) && url.includes('/rest/v1/')) {
       const headers = new Headers(init?.headers)
       const currentAuth = headers.get('Authorization')
 
