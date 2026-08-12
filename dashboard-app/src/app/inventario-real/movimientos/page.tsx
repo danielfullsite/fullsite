@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, Fragment } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Search, ChevronDown, ChevronUp, Package, ArrowRightLeft,
@@ -40,13 +40,49 @@ interface Movement {
 }
 
 // ── Constants ───────────────────────────────────────────────────────
-
-const TYPE_CONFIG: Record<MovementType, { label: string; color: string; bg: string; border: string; icon: typeof Package }> = {
-  entrada:       { label: 'Entrada',       color: 'text-emerald-400', bg: 'bg-emerald-500/15', border: 'border-emerald-500/40', icon: Package },
-  transferencia: { label: 'Transferencia', color: 'text-blue-400',    bg: 'bg-blue-500/15',    border: 'border-blue-500/40',    icon: ArrowRightLeft },
-  merma:         { label: 'Merma',         color: 'text-red-400',     bg: 'bg-red-500/15',     border: 'border-red-500/40',     icon: Trash2 },
-  conteo:        { label: 'Conteo Fisico', color: 'text-amber-400',   bg: 'bg-amber-500/15',   border: 'border-amber-500/40',   icon: ClipboardCheck },
-  venta:         { label: 'Venta',         color: 'text-purple-400',  bg: 'bg-purple-500/15',  border: 'border-purple-500/40',  icon: ShoppingCart },
+// Type badge treatment mapped to DS v2.1 tokens (theme-aware in both themes):
+//   entrada → accent-ink · transferencia → info-ink · merma → crit-ink
+//   conteo → warn-ink · venta → violet (--st-barra)
+// A leading `.g` dot inherits currentColor of the badge text.
+const TYPE_CONFIG: Record<
+  MovementType,
+  { label: string; color: string; bg: string; border: string; icon: typeof Package }
+> = {
+  entrada: {
+    label: 'Entrada',
+    color: 'text-[var(--accent-ink)]',
+    bg: 'bg-[var(--accent-soft)]',
+    border: 'border-[var(--accent-line)]',
+    icon: Package,
+  },
+  transferencia: {
+    label: 'Transferencia',
+    color: 'text-[var(--info-ink)]',
+    bg: 'bg-[var(--info-soft)]',
+    border: 'border-[color-mix(in_srgb,var(--info)_40%,transparent)]',
+    icon: ArrowRightLeft,
+  },
+  merma: {
+    label: 'Merma',
+    color: 'text-[var(--crit-ink)]',
+    bg: 'bg-[var(--crit-soft)]',
+    border: 'border-[color-mix(in_srgb,var(--crit)_40%,transparent)]',
+    icon: Trash2,
+  },
+  conteo: {
+    label: 'Conteo Fisico',
+    color: 'text-[var(--warn-ink)]',
+    bg: 'bg-[var(--warn-soft)]',
+    border: 'border-[color-mix(in_srgb,var(--warn)_40%,transparent)]',
+    icon: ClipboardCheck,
+  },
+  venta: {
+    label: 'Venta',
+    color: 'text-[var(--st-barra)]',
+    bg: 'bg-[color-mix(in_srgb,var(--st-barra)_13%,transparent)]',
+    border: 'border-[color-mix(in_srgb,var(--st-barra)_42%,transparent)]',
+    icon: ShoppingCart,
+  },
 }
 
 const FILTER_OPTIONS: { value: string; label: string }[] = [
@@ -264,6 +300,18 @@ function formatDateShort(d: string): string {
   return dt.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
+// ── Shared cell styles (dense table · DS v2.1) ──────────────────────
+const TH = 'px-3.5 py-2.5 border-b border-[var(--line)] font-mono text-[10px] uppercase tracking-[0.11em] font-semibold text-[var(--text-4)] whitespace-nowrap text-left'
+const TH_NUM = TH + ' text-right'
+const TD = 'px-3.5 py-2.5 border-b border-[var(--line-soft)] text-[var(--text-2)] align-middle'
+const TD_NUM = TD + ' text-right tnum font-mono text-[var(--text-1)]'
+
+// detail sub-table cells
+const DTH = 'px-3 py-2 border-b border-[var(--line)] font-mono text-[9px] uppercase tracking-[0.11em] font-semibold text-[var(--text-4)] whitespace-nowrap text-left bg-[var(--panel)]'
+const DTH_NUM = DTH + ' text-right'
+const DTD = 'px-3 py-2 border-b border-[var(--line-soft)] text-[var(--text-2)]'
+const DTD_NUM = DTD + ' text-right tnum font-mono text-[var(--text-1)]'
+
 // ── Component ───────────────────────────────────────────────────────
 
 export default function MovimientosPage() {
@@ -408,7 +456,7 @@ export default function MovimientosPage() {
           label="Merma del mes"
           value={formatCurrency(kpis.mermaTotal)}
           icon={TrendingDown}
-          accentClass="kpi-accent-pink"
+          accentClass="kpi-accent-red"
           index={2}
         />
         <KPICard
@@ -422,8 +470,8 @@ export default function MovimientosPage() {
 
       {/* ── Filters ───────────────────────────────────────────── */}
       <div
-        className="rounded-2xl border border-[var(--accent-line)] p-4 mb-6 flex flex-wrap items-center gap-3"
-        style={{ background: 'var(--bento-card)' }}
+        className="rounded-[14px] border border-[var(--line)] p-3 sm:px-3.5 sm:py-3 mb-4 flex flex-wrap items-center gap-3"
+        style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-soft)' }}
       >
         {/* Date range */}
         <div className="flex items-center gap-2">
@@ -432,14 +480,14 @@ export default function MovimientosPage() {
             type="date"
             value={dateFrom}
             onChange={e => setDateFrom(e.target.value)}
-            className="rounded-lg border border-[var(--accent-line)] px-3 py-1.5 text-sm bg-[var(--surface)] text-[var(--text-1)] outline-none focus:border-blue-500"
+            className="rounded-[9px] border border-[var(--line)] px-3 py-2 text-[12.5px] font-mono tnum bg-[var(--surface-2)] text-[var(--text-1)] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_3px_var(--accent-soft)]"
           />
-          <span className="text-[var(--text-4)] text-xs">a</span>
+          <span className="text-[var(--text-4)] text-[11px]">a</span>
           <input
             type="date"
             value={dateTo}
             onChange={e => setDateTo(e.target.value)}
-            className="rounded-lg border border-[var(--accent-line)] px-3 py-1.5 text-sm bg-[var(--surface)] text-[var(--text-1)] outline-none focus:border-blue-500"
+            className="rounded-[9px] border border-[var(--line)] px-3 py-2 text-[12.5px] font-mono tnum bg-[var(--surface-2)] text-[var(--text-1)] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_3px_var(--accent-soft)]"
           />
         </div>
 
@@ -449,7 +497,7 @@ export default function MovimientosPage() {
           <select
             value={typeFilter}
             onChange={e => setTypeFilter(e.target.value)}
-            className="rounded-lg border border-[var(--accent-line)] px-3 py-1.5 text-sm bg-[var(--surface)] text-[var(--text-1)] outline-none focus:border-blue-500"
+            className="rounded-[9px] border border-[var(--line)] px-3 py-2 text-[12.5px] bg-[var(--surface-2)] text-[var(--text-1)] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_3px_var(--accent-soft)]"
           >
             {FILTER_OPTIONS.map(o => (
               <option key={o.value} value={o.value}>{o.label}</option>
@@ -465,241 +513,220 @@ export default function MovimientosPage() {
             placeholder="Buscar producto, proveedor, usuario..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full rounded-lg border border-[var(--accent-line)] px-3 py-1.5 text-sm bg-[var(--surface)] text-[var(--text-1)] outline-none focus:border-blue-500 placeholder:text-[var(--text-4)]"
+            className="w-full rounded-[9px] border border-[var(--line)] px-3 py-2 text-[12.5px] bg-[var(--surface-2)] text-[var(--text-1)] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_3px_var(--accent-soft)] placeholder:text-[var(--text-4)]"
           />
         </div>
 
         {/* Count */}
-        <span className="text-xs text-[var(--text-3)] ml-auto whitespace-nowrap">
+        <span className="ml-auto font-mono text-[11px] tnum text-[var(--text-3)] whitespace-nowrap">
           {filtered.length} resultado{filtered.length !== 1 ? 's' : ''}
         </span>
       </div>
 
       {/* ── Table ─────────────────────────────────────────────── */}
       {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        <div className="rounded-[14px] border border-dashed border-[var(--line)] px-5 py-9 flex flex-col items-center justify-center gap-2.5 text-center" style={{ background: 'var(--surface)' }}>
+          <div className="w-[26px] h-[26px] border-[2.5px] border-[var(--line)] border-t-[var(--accent)] rounded-full animate-spin" />
+          <p className="text-sm font-semibold text-[var(--text-2)]">Cargando movimientos...</p>
+          <p className="text-xs text-[var(--text-4)]">Consultando wansoft_data · pos_inventory_movements</p>
         </div>
       ) : filtered.length === 0 ? (
-        <div
-          className="rounded-2xl border border-[var(--accent-line)] p-12 text-center"
-          style={{ background: 'var(--bento-card)' }}
-        >
-          <ArrowDownUp size={40} className="mx-auto text-[var(--text-4)] mb-3" />
-          <p className="text-[var(--text-3)] text-sm">No se encontraron movimientos</p>
-          <p className="text-[var(--text-4)] text-xs mt-1">Ajusta los filtros o el rango de fechas</p>
+        <div className="rounded-[14px] border border-dashed border-[var(--line)] px-5 py-9 flex flex-col items-center justify-center gap-2.5 text-center" style={{ background: 'var(--surface)' }}>
+          <div className="w-10 h-10 rounded-xl grid place-items-center bg-[var(--surface-2)] text-[var(--text-3)]">
+            <ArrowDownUp size={22} />
+          </div>
+          <p className="text-sm font-semibold text-[var(--text-2)]">No se encontraron movimientos</p>
+          <p className="text-xs text-[var(--text-4)]">Ajusta los filtros o el rango de fechas</p>
         </div>
       ) : (
-        <div
-          className="rounded-2xl border border-[var(--accent-line)] overflow-hidden"
-          style={{ background: 'var(--bento-card)' }}
-        >
-          {/* Header */}
-          <div className="hidden sm:grid grid-cols-[120px_130px_1fr_80px_110px_120px] gap-2 px-4 py-3 border-b border-[var(--accent-line)] text-[10px] uppercase tracking-[0.12em] font-mono text-[var(--text-4)]">
-            <span>Fecha</span>
-            <span>Tipo</span>
-            <span>Descripcion</span>
-            <span className="text-right">Items</span>
-            <span className="text-right">Total</span>
-            <span>Usuario</span>
-          </div>
+        <div className="overflow-x-auto rounded-[14px] border border-[var(--line)]" style={{ background: 'var(--surface)' }}>
+          <table className="w-full border-collapse text-[13px] min-w-[820px]">
+            <thead>
+              <tr>
+                <th className={`${TH} sticky top-0 z-[1] bg-[var(--surface-2)]`}>Fecha</th>
+                <th className={`${TH} sticky top-0 z-[1] bg-[var(--surface-2)]`}>Tipo</th>
+                <th className={`${TH} sticky top-0 z-[1] bg-[var(--surface-2)]`}>Descripcion</th>
+                <th className={`${TH_NUM} sticky top-0 z-[1] bg-[var(--surface-2)]`}>Items</th>
+                <th className={`${TH_NUM} sticky top-0 z-[1] bg-[var(--surface-2)]`}>Total</th>
+                <th className={`${TH} sticky top-0 z-[1] bg-[var(--surface-2)]`}>Usuario</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((m, idx) => {
+                const config = TYPE_CONFIG[m.type]
+                const isExpanded = expandedId === m.id
+                const Icon = config.icon
+                const totalCls =
+                  m.total > 0
+                    ? m.type === 'merma'
+                      ? 'text-[var(--crit-ink)]'
+                      : 'text-[var(--accent-ink)]'
+                    : 'text-[var(--text-4)]'
 
-          {/* Rows */}
-          <div className="divide-y divide-[var(--accent-line)]">
-            {filtered.map((m, idx) => {
-              const config = TYPE_CONFIG[m.type]
-              const isExpanded = expandedId === m.id
-              const Icon = config.icon
-
-              return (
-                <div key={m.id}>
-                  {/* Main row */}
-                  <motion.div
+                return (
+                  <Fragment key={m.id}>
+                  <motion.tr
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.2, delay: Math.min(idx * 0.02, 0.5) }}
                     onClick={() => setExpandedId(isExpanded ? null : m.id)}
-                    className="grid grid-cols-1 sm:grid-cols-[120px_130px_1fr_80px_110px_120px] gap-1 sm:gap-2 px-4 py-3 cursor-pointer hover:bg-white/[0.03] transition-colors"
+                    className={`cursor-pointer transition-colors ${isExpanded ? '[&>td]:!bg-[var(--accent-soft)]' : 'hover:[&>td]:bg-[var(--surface-2)]'}`}
                   >
-                    {/* Date */}
-                    <span className="text-sm text-[var(--text-2)] font-mono sm:flex items-center hidden">
-                      {formatDateShort(m.date)}
-                    </span>
-
-                    {/* Type badge */}
-                    <div className="flex items-center gap-2">
-                      {/* Mobile date */}
-                      <span className="sm:hidden text-xs text-[var(--text-3)] font-mono mr-2">
-                        {formatDateShort(m.date)}
-                      </span>
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${config.color} ${config.bg} border ${config.border}`}>
+                    <td className={`${TD} font-mono whitespace-nowrap`}>{formatDateShort(m.date)}</td>
+                    <td className={TD}>
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold leading-none whitespace-nowrap border ${config.color} ${config.bg} ${config.border}`}
+                      >
                         <Icon size={12} />
                         {config.label}
                       </span>
-                    </div>
+                    </td>
+                    <td className={`${TD} text-[var(--text-1)]`}>
+                      <div className="max-w-[340px] truncate">{m.description}</div>
+                    </td>
+                    <td className={TD_NUM}>{m.items.length}</td>
+                    <td className={`${TD_NUM} ${totalCls}`}>
+                      {m.total > 0 ? (m.type === 'merma' ? `−${formatCurrency(m.total).replace(/^[-−]/, '')}` : formatCurrency(m.total)) : '—'}
+                    </td>
+                    <td className={`${TD} text-[var(--text-3)] text-[12px]`}>
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate max-w-[110px]">{m.user || '-'}</span>
+                        {isExpanded
+                          ? <ChevronUp size={14} className="text-[var(--accent-ink)] shrink-0" />
+                          : <ChevronDown size={14} className="text-[var(--text-4)] shrink-0" />}
+                      </div>
+                    </td>
 
-                    {/* Description */}
-                    <div className="flex items-center text-sm text-[var(--text-1)] truncate">
-                      {m.description}
-                    </div>
+                  </motion.tr>
 
-                    {/* Items count */}
-                    <div className="hidden sm:flex items-center justify-end text-sm text-[var(--text-2)]">
-                      {m.items.length}
-                    </div>
-
-                    {/* Total */}
-                    <div className="hidden sm:flex items-center justify-end text-sm font-semibold text-[var(--text-1)]">
-                      {m.total > 0 ? formatCurrency(m.total) : '-'}
-                    </div>
-
-                    {/* User + chevron */}
-                    <div className="hidden sm:flex items-center justify-between">
-                      <span className="text-xs text-[var(--text-3)] truncate max-w-[90px]">{m.user || '-'}</span>
-                      {isExpanded
-                        ? <ChevronUp size={14} className="text-[var(--text-4)]" />
-                        : <ChevronDown size={14} className="text-[var(--text-4)]" />
-                      }
-                    </div>
-
-                    {/* Mobile summary row */}
-                    <div className="sm:hidden flex items-center justify-between text-xs text-[var(--text-3)]">
-                      <span>{m.items.length} items</span>
-                      <span className="font-semibold text-[var(--text-1)]">{m.total > 0 ? formatCurrency(m.total) : '-'}</span>
-                      <span className="truncate max-w-[80px]">{m.user || '-'}</span>
-                      {isExpanded
-                        ? <ChevronUp size={14} className="text-[var(--text-4)]" />
-                        : <ChevronDown size={14} className="text-[var(--text-4)]" />
-                      }
-                    </div>
-                  </motion.div>
-
-                  {/* Expanded detail */}
+                  {/* Expanded detail — full-width row inside <tbody> */}
                   <AnimatePresence>
                     {isExpanded && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.25 }}
-                        className="overflow-hidden"
-                      >
-                        <div className="px-4 pb-4 pt-1">
-                          <div className="rounded-xl border border-[var(--accent-line)] overflow-hidden" style={{ background: 'var(--surface)' }}>
-                            {/* Detail header */}
-                            <div className="grid gap-2 px-3 py-2 border-b border-[var(--accent-line)] text-[9px] uppercase tracking-[0.12em] font-mono text-[var(--text-4)]"
-                              style={{
-                                gridTemplateColumns: m.type === 'conteo'
-                                  ? '1fr 80px 80px 80px'
-                                  : m.type === 'merma'
-                                    ? '1fr 70px 1fr 90px'
-                                    : '1fr 80px 90px 90px',
-                              }}
-                            >
-                              <span>Producto</span>
-                              {m.type === 'conteo' ? (
-                                <>
-                                  <span className="text-right">Sistema</span>
-                                  <span className="text-right">Conteo</span>
-                                  <span className="text-right">Diferencia</span>
-                                </>
-                              ) : m.type === 'merma' ? (
-                                <>
-                                  <span className="text-right">Cant.</span>
-                                  <span>Motivo</span>
-                                  <span className="text-right">Costo</span>
-                                </>
-                              ) : m.type === 'transferencia' ? (
-                                <>
-                                  <span className="text-right">Cantidad</span>
-                                  <span></span>
-                                  <span></span>
-                                </>
-                              ) : (
-                                <>
-                                  <span className="text-right">Cant.</span>
-                                  <span className="text-right">C. Unit.</span>
-                                  <span className="text-right">C. Total</span>
-                                </>
-                              )}
+                      <tr>
+                        <td colSpan={6} className="p-0" style={{ background: 'var(--surface)' }}>
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.25 }}
+                            className="overflow-hidden"
+                          >
+                            <div className="px-3.5 pb-4 pt-1.5">
+                              <div className="rounded-[10px] border border-[var(--line)] overflow-hidden bg-[var(--surface-2)]">
+                                <table className="w-full border-collapse text-[12.5px]">
+                                  <thead>
+                                    <tr>
+                                      <th className={DTH}>Producto</th>
+                                      {m.type === 'conteo' ? (
+                                        <>
+                                          <th className={DTH_NUM}>Sistema</th>
+                                          <th className={DTH_NUM}>Conteo</th>
+                                          <th className={DTH_NUM}>Diferencia</th>
+                                        </>
+                                      ) : m.type === 'merma' ? (
+                                        <>
+                                          <th className={DTH_NUM}>Cant.</th>
+                                          <th className={DTH}>Motivo</th>
+                                          <th className={DTH_NUM}>Costo</th>
+                                        </>
+                                      ) : m.type === 'transferencia' ? (
+                                        <>
+                                          <th className={DTH_NUM}>Cantidad</th>
+                                          <th className={DTH}></th>
+                                          <th className={DTH}></th>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <th className={DTH_NUM}>Cant.</th>
+                                          <th className={DTH_NUM}>C. Unit.</th>
+                                          <th className={DTH_NUM}>C. Total</th>
+                                        </>
+                                      )}
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {m.items.map((it, k) => (
+                                      <tr key={k}>
+                                        <td className={`${DTD} text-[var(--text-1)]`}>
+                                          <div className="truncate max-w-[280px]">{it.producto}</div>
+                                        </td>
+                                        {m.type === 'conteo' ? (
+                                          <>
+                                            <td className={DTD_NUM}>{it.stock_sistema ?? '-'}</td>
+                                            <td className={DTD_NUM}>{it.conteo_real ?? '-'}</td>
+                                            <td className={`${DTD_NUM} font-semibold ${
+                                              (it.diferencia || 0) < 0
+                                                ? 'text-[var(--crit-ink)]'
+                                                : (it.diferencia || 0) > 0
+                                                  ? 'text-[var(--accent-ink)]'
+                                                  : 'text-[var(--text-3)]'
+                                            }`}>
+                                              {(it.diferencia || 0) > 0 ? '+' : ''}{it.diferencia ?? 0}
+                                            </td>
+                                          </>
+                                        ) : m.type === 'merma' ? (
+                                          <>
+                                            <td className={DTD_NUM}>{it.cantidad}</td>
+                                            <td className={`${DTD} text-[var(--text-3)] text-xs`}>
+                                              <div className="truncate max-w-[160px]">{it.motivo || '-'}</div>
+                                            </td>
+                                            <td className={`${DTD_NUM} text-[var(--crit-ink)] font-semibold`}>
+                                              {it.costo_total ? `−${formatCurrency(it.costo_total).replace(/^[-−]/, '')}` : '-'}
+                                            </td>
+                                          </>
+                                        ) : m.type === 'transferencia' ? (
+                                          <>
+                                            <td className={DTD_NUM}>{it.cantidad}</td>
+                                            <td className={DTD}></td>
+                                            <td className={DTD}></td>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <td className={DTD_NUM}>{it.cantidad}</td>
+                                            <td className={`${DTD_NUM} text-[var(--text-3)]`}>
+                                              {it.costo_unitario ? formatCurrency(it.costo_unitario) : '-'}
+                                            </td>
+                                            <td className={`${DTD_NUM} text-[var(--accent-ink)] font-semibold`}>
+                                              {it.costo_total ? formatCurrency(it.costo_total) : '-'}
+                                            </td>
+                                          </>
+                                        )}
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                  {m.total > 0 && (
+                                    <tfoot>
+                                      <tr>
+                                        <td className="px-3 py-2.5 border-t border-[var(--line)] bg-[color-mix(in_srgb,var(--text-1)_2%,transparent)] font-mono text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--text-3)]">
+                                          Total
+                                        </td>
+                                        <td className="px-3 py-2.5 border-t border-[var(--line)] bg-[color-mix(in_srgb,var(--text-1)_2%,transparent)]" />
+                                        <td className="px-3 py-2.5 border-t border-[var(--line)] bg-[color-mix(in_srgb,var(--text-1)_2%,transparent)]" />
+                                        <td className={`px-3 py-2.5 border-t border-[var(--line)] bg-[color-mix(in_srgb,var(--text-1)_2%,transparent)] text-right tnum font-mono font-bold ${m.type === 'merma' ? 'text-[var(--crit-ink)]' : 'text-[var(--accent-ink)]'}`}>
+                                          {m.type === 'merma' ? `−${formatCurrency(m.total).replace(/^[-−]/, '')}` : formatCurrency(m.total)}
+                                        </td>
+                                      </tr>
+                                    </tfoot>
+                                  )}
+                                </table>
+                              </div>
+
+                              {/* Metadata */}
+                              <div className="flex flex-wrap items-center gap-4 mt-2.5 font-mono text-[10px] text-[var(--text-4)]">
+                                {m.raw_key && <span><span className="text-[var(--text-3)]">Key:</span> {m.raw_key}</span>}
+                                <span><span className="text-[var(--text-3)]">Fuente:</span> {m.source === 'pos' ? 'POS' : 'Wansoft'}</span>
+                              </div>
                             </div>
-
-                            {/* Detail rows */}
-                            {m.items.map((it, i) => (
-                              <div
-                                key={i}
-                                className="grid gap-2 px-3 py-2 border-b border-[var(--accent-line)] last:border-b-0 text-sm"
-                                style={{
-                                  gridTemplateColumns: m.type === 'conteo'
-                                    ? '1fr 80px 80px 80px'
-                                    : m.type === 'merma'
-                                      ? '1fr 70px 1fr 90px'
-                                      : '1fr 80px 90px 90px',
-                                }}
-                              >
-                                <span className="text-[var(--text-1)] truncate">{it.producto}</span>
-                                {m.type === 'conteo' ? (
-                                  <>
-                                    <span className="text-right text-[var(--text-2)]">{it.stock_sistema ?? '-'}</span>
-                                    <span className="text-right text-[var(--text-2)]">{it.conteo_real ?? '-'}</span>
-                                    <span className={`text-right font-semibold ${
-                                      (it.diferencia || 0) < 0 ? 'text-red-400' : (it.diferencia || 0) > 0 ? 'text-emerald-400' : 'text-[var(--text-3)]'
-                                    }`}>
-                                      {(it.diferencia || 0) > 0 ? '+' : ''}{it.diferencia ?? 0}
-                                    </span>
-                                  </>
-                                ) : m.type === 'merma' ? (
-                                  <>
-                                    <span className="text-right text-[var(--text-2)]">{it.cantidad}</span>
-                                    <span className="text-[var(--text-3)] text-xs truncate">{it.motivo || '-'}</span>
-                                    <span className="text-right text-red-400 font-semibold">
-                                      {it.costo_total ? formatCurrency(it.costo_total) : '-'}
-                                    </span>
-                                  </>
-                                ) : m.type === 'transferencia' ? (
-                                  <>
-                                    <span className="text-right text-[var(--text-2)]">{it.cantidad}</span>
-                                    <span></span>
-                                    <span></span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <span className="text-right text-[var(--text-2)]">{it.cantidad}</span>
-                                    <span className="text-right text-[var(--text-3)]">
-                                      {it.costo_unitario ? formatCurrency(it.costo_unitario) : '-'}
-                                    </span>
-                                    <span className="text-right text-emerald-400 font-semibold">
-                                      {it.costo_total ? formatCurrency(it.costo_total) : '-'}
-                                    </span>
-                                  </>
-                                )}
-                              </div>
-                            ))}
-
-                            {/* Total footer for types that have it */}
-                            {m.total > 0 && (
-                              <div className="flex justify-between items-center px-3 py-2 bg-white/[0.03]">
-                                <span className="text-xs font-semibold text-[var(--text-3)] uppercase tracking-wider">Total</span>
-                                <span className={`text-sm font-bold ${m.type === 'merma' ? 'text-red-400' : 'text-emerald-400'}`}>
-                                  {formatCurrency(m.total)}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Metadata */}
-                          <div className="flex items-center gap-4 mt-2 text-[10px] text-[var(--text-4)]">
-                            {m.raw_key && <span>Key: {m.raw_key}</span>}
-                            <span>Fuente: {m.source === 'pos' ? 'POS' : 'Wansoft'}</span>
-                          </div>
-                        </div>
-                      </motion.div>
+                          </motion.div>
+                        </td>
+                      </tr>
                     )}
                   </AnimatePresence>
-                </div>
-              )
-            })}
-          </div>
+                  </Fragment>
+                )
+              })}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
