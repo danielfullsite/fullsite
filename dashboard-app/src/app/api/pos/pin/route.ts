@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { issueShiftToken } from '@/lib/shift-token'
+import { withPOSAuth, unauthorized } from '@/lib/api-auth'
 
 // PIN validation + shift token issuance.
 // On success returns { staff, shiftToken } — the client stores shiftToken
@@ -40,25 +41,33 @@ async function respond(staff: { id: string; name: string; role: string }, client
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = await withPOSAuth(request)
+    if (!auth) return unauthorized()
+
     const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
-    const { pin, client_id, manager, fingerprint_id, min_role } = await request.json()
+    const { pin, manager, fingerprint_id, min_role } = await request.json()
     const rateLimitKey = `${ip}:${typeof pin === 'string' ? pin : 'x'}`
     if (!checkRateLimit(rateLimitKey)) {
       return Response.json({ error: 'Demasiados intentos' }, { status: 429 })
     }
-    if (typeof client_id !== 'string' || !/^[a-z0-9_-]{1,40}$/i.test(client_id)) {
-      return Response.json({ error: 'client_id requerido' }, { status: 400 })
-    }
-    const clientId = client_id
+    const clientId = auth.clientId
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    // pos_staff has anon_read policy → anon key is sufficient for PIN lookup
     const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    const bearer = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
+    const cookieToken = request.cookies.get('fs-at')?.value
+    const serviceKey = process.env.SUPABASE_SERVICE_KEY || ''
+    const dbAuth = auth.authType === 'supabase_session'
+      ? (bearer || cookieToken || sbKey)
+      : (cookieToken || serviceKey)
+    if (!dbAuth) {
+      return Response.json({ error: 'PIN temporalmente no disponible' }, { status: 503 })
+    }
 
     // Fingerprint (WebAuthn) login — look up by staff ID, validate active status + tenant
     if (fingerprint_id && typeof fingerprint_id === 'string') {
       const fpRes = await fetch(
         `${sbUrl}/rest/v1/pos_staff?id=eq.${encodeURIComponent(fingerprint_id)}&active=eq.true&client_id=eq.${encodeURIComponent(clientId)}&select=id,name,role&limit=1`,
-        { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
+        { headers: { apikey: sbKey, Authorization: `Bearer ${dbAuth}` }, cache: 'no-store' }
       )
       if (fpRes.ok) {
         const rows = await fpRes.json()
@@ -87,7 +96,7 @@ export async function POST(request: NextRequest) {
 
     const res = await fetch(
       `${sbUrl}/rest/v1/pos_staff?pin=eq.${encodeURIComponent(pin)}&active=eq.true&client_id=eq.${encodeURIComponent(clientId)}${roleFilter}&select=id,name,role&limit=1`,
-      { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
+      { headers: { apikey: sbKey, Authorization: `Bearer ${dbAuth}` }, cache: 'no-store' }
     )
     if (res.ok) {
       const rows = await res.json()

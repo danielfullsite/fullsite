@@ -12,6 +12,7 @@ import { initStationRouting } from '@/lib/pos-constants'
 import { inventoryPolicyService } from '@/lib/inventory-policy'
 import { getFingerprintUrl } from '@/lib/fingerprint-url'
 import { POSLockContext } from './pos-lock-context'
+import { createClient } from '@/lib/supabase-browser'
 
 async function hashPin(pin: string, staffId: string): Promise<string> {
   try {
@@ -440,9 +441,13 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
       if (!navigator.onLine) throw new Error('offline')
       // Validación server-side (service key) — el cliente ya no lee pos_staff
       // 4-second timeout: on degraded LAN, browser default is 30-90s — frozen UI
+      const { data: { session } } = await createClient().auth.getSession()
       const res = await fetch(apiUrl('/api/pos/pin'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({ pin, client_id: _cid() }),
         signal: AbortSignal.timeout(4000),
       })
