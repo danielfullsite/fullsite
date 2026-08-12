@@ -92,6 +92,33 @@ const KIND: Record<DetKind, { label: string; text: string; border: string; bg: s
   info: { label: 'Info', text: 'text-sky-400', border: 'border-sky-500', bg: 'bg-sky-500/[0.05]', chip: 'bg-sky-500/10 text-sky-400', tag: 'bg-sky-500/15 text-sky-300' },
 }
 
+// Etapa del flujo — para agrupar "Qué detectó cada agente" como el artifact.
+const ETAPA: Record<string, string> = {
+  anomaly: 'POS · Venta y servicio', 'anomaly-detector': 'POS · Venta y servicio',
+  upselling: 'POS · Venta y servicio',
+  'table-time': 'POS · Venta y servicio', speed_of_service: 'POS · Venta y servicio',
+  tips: 'POS · Venta y servicio', 'tips-analyzer': 'POS · Venta y servicio',
+  kitchen: 'Cocina · KDS', 'kitchen-quality': 'Cocina · KDS',
+  auto86: 'Cocina · KDS', waste: 'Cocina · KDS', 'waste-detector': 'Cocina · KDS',
+  'stock-alert': 'Inventario & compras', suppliers: 'Inventario & compras', 'supplier-monitor': 'Inventario & compras',
+  'purchase-predictor': 'Inventario & compras', 'cost-variance': 'Inventario & compras',
+  'crm-recompra': 'Clientes',
+  predictor: 'Finanzas & cierre', 'close-predictor': 'Finanzas & cierre',
+  'intraday-sales': 'Finanzas & cierre', 'menu-engineering': 'Finanzas & cierre',
+  staffing: 'Finanzas & cierre', 'staffing-optimizer': 'Finanzas & cierre',
+  antifraud: 'Finanzas & cierre', 'antifraud-agent': 'Finanzas & cierre',
+  'daily-briefing': 'Reportes', 'weekly-amalay': 'Reportes', 'weekly-summary': 'Reportes',
+  'intraday-sales-report': 'Reportes',
+  hermes: 'Sistema', config: 'Sistema', 'config-validator': 'Sistema',
+  climate: 'Sistema', 'climate-events': 'Sistema', sync: 'Sistema', 'wansoft-staleness': 'Sistema',
+  'reservas-pendientes': 'Operaciones', 'wansoft-query': 'Sistema',
+}
+const ETAPA_ORDER = ['POS · Venta y servicio', 'Cocina · KDS', 'Inventario & compras', 'Clientes', 'Finanzas & cierre', 'Reportes', 'Operaciones', 'Sistema', 'Otros']
+function etapaOf(id: string): string { return ETAPA[id] || 'Otros' }
+function impactoLabel(kind: DetKind): string {
+  return kind === 'crit' ? 'Atender hoy' : kind === 'warn' ? 'Revisar' : kind === 'ok' ? 'Capturar' : 'Para tu info'
+}
+
 // Render de datos del agente como árbol limpio (reemplaza el volcado de JSON crudo)
 function PrettyData({ value, depth = 0 }: { value: unknown; depth?: number }) {
   if (value === null || value === undefined) return <span className="text-[var(--text-4)]">—</span>
@@ -201,6 +228,13 @@ export default function MissionControlPage() {
     .sort((a, b) => SEV[b.kind] - SEV[a.kind])
   const briefing = detections.filter(d => d.kind === 'crit' || d.kind === 'warn').slice(0, 3)
 
+  // Agrupado por etapa (como el artifact "AI Operations Lab")
+  const detsByEtapa = ETAPA_ORDER
+    .map(et => ({ etapa: et, items: detections.filter(d => etapaOf(d.agent_id) === et) }))
+    .filter(g => g.items.length > 0)
+  const alertasN = detections.filter(d => d.kind === 'crit' || d.kind === 'warn').length
+  const oportsN = detections.filter(d => d.kind === 'ok').length
+
   // Mensaje de bienvenida del agente (basado en su última detección)
   function introFor(id: string): ChatMsg {
     const meta = AGENT_META[id]
@@ -253,12 +287,12 @@ export default function MissionControlPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h2 className="text-2xl font-extrabold text-[var(--text-1)] tracking-tight flex items-center gap-2.5">
-            <span className="w-9 h-9 rounded-xl grid place-items-center bg-emerald-500/10 text-emerald-400"><Bot size={19} /></span>
-            Mission Control
-          </h2>
-          <p className="text-sm text-[var(--text-3)] mt-0.5">Agentic OS — {Object.keys(AGENT_META).length} agentes en tiempo real</p>
+        <div className="flex items-center gap-2.5">
+          <span className="w-9 h-9 rounded-xl grid place-items-center bg-emerald-500/10 text-emerald-400"><Sparkles size={19} /></span>
+          <div>
+            <h2 className="text-2xl font-extrabold text-[var(--text-1)] tracking-tight">AI Operations Lab</h2>
+            <p className="text-sm text-[var(--text-3)] mt-0.5">{activeAgents} agentes vigilando todo el flujo · de POS a dashboard</p>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/25">
@@ -271,43 +305,13 @@ export default function MissionControlPage() {
         </div>
       </div>
 
-      {/* Briefing — "N cosas para hoy" */}
-      {briefing.length > 0 && (
-        <div className="rounded-2xl border border-emerald-500/25 bg-gradient-to-br from-emerald-500/[0.08] to-transparent p-5">
-          <div className="flex items-center gap-2 mb-3.5">
-            <Sparkles size={17} className="text-emerald-400" />
-            <b className="text-sm font-bold text-[var(--text-1)]">{briefing.length === 1 ? '1 cosa para hoy' : `${briefing.length} cosas para hoy`}</b>
-            <span className="ml-auto text-[11px] font-mono text-[var(--text-4)]">actualizado {recentFeed[0] ? timeAgo(recentFeed[0].created_at) : '—'}</span>
-          </div>
-          <div className="space-y-2.5">
-            {briefing.map((det, i) => {
-              const k = KIND[det.kind]
-              const Icon = det.icon
-              return (
-                <div key={`${det.agent_id}-${i}`} onClick={() => setSelectedAgent(det.agent_id)} className="flex items-start gap-3 rounded-xl border border-[var(--line)] p-3 cursor-pointer transition-colors hover:bg-[var(--surface-2)]">
-                  <span className={`w-8 h-8 rounded-lg grid place-items-center flex-shrink-0 ${k.chip}`}><Icon size={15} /></span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[13px] font-semibold text-[var(--text-1)]">{det.name}</span>
-                      <span className={`text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full ${k.tag}`}>{k.label}</span>
-                    </div>
-                    <p className="text-xs text-[var(--text-2)] mt-0.5 leading-snug">{det.summary}</p>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      {/* KPIs — Detecciones / Alertas / Oportunidades / Agentes */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {([
-          { l: 'Agentes activos', v: String(activeAgents), c: 'text-emerald-400', Ic: Bot },
-          { l: 'Ejecuciones 24h', v: String(totalRuns24h), c: 'text-[var(--text-1)]', Ic: Activity },
-          { l: 'Errores 24h', v: String(errors24h), c: errors24h > 0 ? 'text-red-400' : 'text-emerald-400', Ic: AlertTriangle },
-          { l: 'Alertas críticas', v: String(criticalAlerts), c: criticalAlerts > 0 ? 'text-red-400' : 'text-emerald-400', Ic: Shield },
-          { l: 'Duración prom.', v: `${(avgDuration / 1000).toFixed(1)}s`, c: 'text-[var(--text-1)]', Ic: Clock },
+          { l: 'Detecciones hoy', v: String(detections.length), c: 'text-[var(--text-1)]', Ic: Activity },
+          { l: 'Alertas', v: String(alertasN), c: alertasN > 0 ? 'text-amber-400' : 'text-emerald-400', Ic: AlertTriangle },
+          { l: 'Oportunidades', v: String(oportsN), c: 'text-emerald-400', Ic: TrendingUp },
+          { l: 'Agentes activos', v: String(activeAgents), c: 'text-[var(--text-1)]', Ic: Bot },
         ]).map((k, i) => {
           const Ic = k.Ic
           return (
@@ -320,75 +324,49 @@ export default function MissionControlPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left: detections + agents */}
-        <div className="lg:col-span-2 space-y-5">
-          {/* Detecciones */}
-          <section>
-            <h3 className="text-xs font-bold text-[var(--text-3)] uppercase tracking-wider mb-2.5 flex items-center gap-2">
-              Detecciones <span className="text-[var(--text-4)] font-mono normal-case tracking-normal">{detections.length}</span>
-            </h3>
-            {detections.length > 0 ? (
-              <div className="space-y-2">
-                {detections.map((det, i) => {
-                  const k = KIND[det.kind]
-                  const Icon = det.icon
-                  return (
-                    <div key={`${det.agent_id}-${i}`} onClick={() => setSelectedAgent(det.agent_id)} className={`rounded-xl border-l-[3px] ${k.border} ${k.bg} p-3.5 cursor-pointer transition-transform hover:translate-x-0.5`}>
-                      <div className="flex items-center gap-2">
-                        <Icon size={15} className={k.text} />
-                        <span className="text-[13px] font-semibold text-[var(--text-1)]">{det.name}</span>
-                        <span className={`ml-auto text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${k.tag}`}>{k.label}</span>
-                      </div>
-                      <p className="text-xs text-[var(--text-2)] mt-1.5 leading-snug">{det.summary}</p>
-                      <p className="text-[10px] text-[var(--text-4)] mt-1.5 font-mono">{det.fecha}</p>
-                    </div>
-                  )
-                })}
-              </div>
-            ) : (
-              <div className="rounded-xl border border-dashed border-[var(--line)] bg-[var(--surface)] p-8 text-center">
-                <CheckCircle2 size={26} className="text-emerald-400 mx-auto mb-2" />
-                <p className="text-sm font-semibold text-[var(--text-2)]">Todo en orden</p>
-                <p className="text-xs text-[var(--text-4)] mt-0.5">Sin detecciones activas de los agentes.</p>
-              </div>
-            )}
-          </section>
-
-          {/* Agentes por tentáculo */}
-          {Array.from(tentacles.entries()).map(([tentacle, agentIds]) => (
-            <section key={tentacle}>
-              <h3 className="text-xs font-bold text-[var(--text-3)] uppercase tracking-wider mb-2.5">{tentacle}</h3>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5">
-                {agentIds.map(id => {
-                  const meta = AGENT_META[id]
-                  const run = latestRuns.get(id)
-                  const result = latestResults.get(id)
-                  const Icon = meta?.icon || Bot
-                  const isError = run?.status === 'error'
-                  const isRecent = run && (Date.now() - new Date(run.created_at).getTime()) < 3600000
-                  return (
-                    <div key={id} onClick={() => setSelectedAgent(id)} className={`rounded-xl border bg-[var(--surface)] p-3.5 cursor-pointer transition-all hover:-translate-y-0.5 ${
-                      selectedAgent === id ? 'ring-1 ring-emerald-500/50 border-emerald-500/40' : 'border-[var(--line)] hover:border-emerald-500/30'
-                    }`}>
-                      <div className="flex items-center gap-2.5 mb-2">
-                        <span className="w-8 h-8 rounded-lg grid place-items-center bg-[var(--surface-2)] border border-[var(--line)] flex-shrink-0"><Icon size={15} className={meta?.color || 'text-[var(--text-3)]'} /></span>
-                        <span className="text-xs font-bold text-[var(--text-1)] truncate flex-1">{meta?.name || id}</span>
-                        {run && <span className={`w-2 h-2 rounded-full flex-shrink-0 ${isError ? 'bg-red-500' : isRecent ? 'bg-emerald-500 animate-pulse' : 'bg-[var(--text-4)]'}`} />}
-                      </div>
-                      {run ? (
-                        <>
-                          <p className="text-[10px] text-[var(--text-4)] font-mono">{timeAgo(run.created_at)}{run.duration_ms ? ` · ${(run.duration_ms / 1000).toFixed(1)}s` : ''}</p>
-                          {result?.summary && <p className="text-[11px] text-[var(--text-2)] mt-1 truncate">{result.summary}</p>}
-                        </>
-                      ) : (
-                        <p className="text-[10px] text-[var(--text-4)]">Sin datos</p>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            </section>
-          ))}
+        {/* Left: qué detectó cada agente, agrupado por etapa */}
+        <div className="lg:col-span-2">
+          <div className="mb-4">
+            <h3 className="text-base font-bold text-[var(--text-1)]">Qué detectó cada agente</h3>
+            <p className="text-xs text-[var(--text-3)]">agrupado por etapa · toca una card para el detalle</p>
+          </div>
+          {detsByEtapa.length > 0 ? (
+            <div className="space-y-5">
+              {detsByEtapa.map(group => (
+                <section key={group.etapa}>
+                  <p className="text-[11px] font-mono uppercase tracking-wider text-[var(--text-4)] mb-2">{group.etapa} <span className="text-[var(--text-4)]">· {group.items.length}</span></p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                    {group.items.map((det, i) => {
+                      const k = KIND[det.kind]
+                      const Icon = det.icon
+                      return (
+                        <div key={`${det.agent_id}-${i}`} onClick={() => setSelectedAgent(det.agent_id)} className={`rounded-xl border bg-[var(--surface)] p-3.5 cursor-pointer transition-all hover:-translate-y-0.5 ${selectedAgent === det.agent_id ? 'ring-1 ring-emerald-500/50 border-emerald-500/40' : 'border-[var(--line)] hover:border-emerald-500/30'}`}>
+                          <div className="flex items-center gap-2 mb-2">
+                            <Icon size={15} className={k.text} />
+                            <span className="text-[13px] font-semibold text-[var(--text-1)] truncate flex-1">{det.name}</span>
+                            <span className={`text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full flex-shrink-0 ${k.tag}`}>{k.label}</span>
+                          </div>
+                          <div className={`rounded-lg border-l-[3px] ${k.border} ${k.bg} px-2.5 py-2`}>
+                            <p className="text-xs text-[var(--text-2)] leading-snug">{det.summary}</p>
+                          </div>
+                          <div className="flex items-center justify-between mt-2 text-[11px]">
+                            <span className="text-[var(--text-4)]">Impacto estimado</span>
+                            <span className={`font-mono font-semibold ${k.text}`}>{impactoLabel(det.kind)}</span>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </section>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed border-[var(--line)] bg-[var(--surface)] p-8 text-center">
+              <CheckCircle2 size={26} className="text-emerald-400 mx-auto mb-2" />
+              <p className="text-sm font-semibold text-[var(--text-2)]">Todo en orden</p>
+              <p className="text-xs text-[var(--text-4)] mt-0.5">Sin detecciones activas de los agentes.</p>
+            </div>
+          )}
         </div>
 
         {/* Right: agent detail or live feed */}
