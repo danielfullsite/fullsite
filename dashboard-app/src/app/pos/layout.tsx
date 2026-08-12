@@ -8,7 +8,7 @@ import { checkActiveSession, registerSession, startHeartbeat, removeSession } fr
 import TurnoGate from '@/components/pos/TurnoGate'
 import { getActiveClientSlug as _cid } from '@/lib/data'
 import { getEffectiveSetting } from '@/lib/settings'
-import { initStationRouting } from '@/lib/pos-constants'
+import { initStationRouting, initNoPrintStations } from '@/lib/pos-constants'
 import { inventoryPolicyService } from '@/lib/inventory-policy'
 import { getFingerprintUrl } from '@/lib/fingerprint-url'
 import { POSLockContext } from './pos-lock-context'
@@ -132,10 +132,12 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
         Promise.all([
           getEffectiveSetting(clientId, 'pos.idle_timeout_ms'),
           getEffectiveSetting(clientId, 'pos.station_routing'),
+          getEffectiveSetting(clientId, 'pos.no_print_stations'),
           inventoryPolicyService.initialize(clientId),
-        ]).then(([idleMs, stationRouting]) => {
+        ]).then(([idleMs, stationRouting, noPrintStations]) => {
           IDLE_TIMEOUT_MS = idleMs
           initStationRouting(stationRouting as Record<string, string[]>)
+          initNoPrintStations(noPrintStations)
         }).catch(() => { /* keep module-level defaults */ })
       }
     }

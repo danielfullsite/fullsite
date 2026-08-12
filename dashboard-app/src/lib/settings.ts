@@ -39,6 +39,7 @@ interface SettingDefinition<T> {
 
 type SettingKey =
   | 'pos.station_routing'
+  | 'pos.no_print_stations'
   | 'pos.cancellation_reasons'
   | 'pos.discount_catalog'
   | 'pos.idle_timeout_ms'
@@ -46,6 +47,7 @@ type SettingKey =
 
 type SettingValue<K extends SettingKey> =
   K extends 'pos.station_routing' ? Record<string, string[]> :
+  K extends 'pos.no_print_stations' ? string[] :
   K extends 'pos.cancellation_reasons' ? string[] :
   K extends 'pos.discount_catalog' ? Array<{ id: string; label: string; pct?: number; amount?: number }> :
   K extends 'pos.idle_timeout_ms' ? number :
@@ -78,6 +80,15 @@ const REGISTRY: { [K in SettingKey]: SettingDefinition<SettingValue<K>> } = {
         'icecream', 'desserts',
       ],
     } as Record<string, string[]>,
+  },
+
+  'pos.no_print_stations': {
+    scope: 'sucursal',
+    operationalProblem:
+      'Los productos de Market/retail se toman del anaquel y no se preparan, así que no deben generar ' +
+      'comanda de cocina/barra (regla Wansoft "[NO IMPRIMIR]"). Qué estaciones no imprimen varía por ' +
+      'restaurante; hardcodearlo impide el onboarding.',
+    default: ['caja'] as string[],  // caja = MARKET → no imprime comanda
   },
 
   'pos.cancellation_reasons': {

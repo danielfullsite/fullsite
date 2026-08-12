@@ -203,6 +203,20 @@ export function getStationByName(name: string): StationName {
   return 'cocina'
 }
 
+// ─── [NO IMPRIMIR] — estaciones que NO generan comanda de preparación ─────────
+// Regla Wansoft (spec 5/16): los productos de Market (estación caja) se toman del
+// anaquel, no se preparan → no imprimen comanda. Configurable por tenant vía el
+// setting pos.no_print_stations (cargado en el layout). Default: ['caja'] (=MARKET).
+let _noPrintStations: StationName[] = ['caja']
+export function initNoPrintStations(stations: unknown) {
+  if (Array.isArray(stations)) {
+    _noPrintStations = stations.filter((s): s is StationName => s === 'cocina' || s === 'barra' || s === 'caja')
+  }
+}
+export function isNoPrintStation(station: StationName): boolean {
+  return _noPrintStations.includes(station)
+}
+
 /**
  * Resolve station for an OrderItem: honours the pre-computed item.station when
  * present (set at order-creation time by category), normalises the legacy

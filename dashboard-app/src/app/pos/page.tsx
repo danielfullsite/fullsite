@@ -38,7 +38,7 @@ import {
   updateOrderStatus,
   getPOSAuthHeaders,
 } from '@/lib/pos-data'
-import { getIvaRate, TIEMPO_ITEM_ID, isTiempoItem, getStationForItem, setCategoryNameCache, _categoryNameCache } from '@/lib/pos-constants'
+import { getIvaRate, TIEMPO_ITEM_ID, isTiempoItem, getStationForItem, setCategoryNameCache, _categoryNameCache, isNoPrintStation } from '@/lib/pos-constants'
 import { calcSplitParejo, calcSplitItems } from '@/lib/pos-calculations'
 import { publishEvent, getDeviceId } from '@/lib/events'
 import { apiUrl } from '@/lib/api-base'
@@ -3921,6 +3921,9 @@ function POSContent() {
                           {item.nombre}
                           {!isCancelled && !isVoided && (item as OrderItem & { kds_done?: boolean }).kds_done && (
                             <span className="ml-2 inline-flex items-center bg-[var(--accent-soft)] text-[var(--accent-ink)] border border-[var(--accent-line)] text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none">LISTO</span>
+                          )}
+                          {!isCancelled && !isVoided && item.station && isNoPrintStation(item.station) && (
+                            <span className="ml-2 inline-flex items-center bg-[var(--surface-2)] text-[var(--text-3)] border border-[var(--line)] text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none" title="Producto de Market — no genera comanda">SIN COMANDA</span>
                           )}
                         </p>
                         {isVoided && (

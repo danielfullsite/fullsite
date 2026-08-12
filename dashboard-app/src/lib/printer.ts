@@ -5,7 +5,7 @@
 
 import { formatMXN, MENU_CATEGORIES } from './pos-data'
 import type { Order, OrderItem } from './pos-data'
-import { getStationForItem, STATION_LABELS, isTiempoItem, getIvaRate, type StationName } from './pos-constants'
+import { getStationForItem, STATION_LABELS, isTiempoItem, getIvaRate, isNoPrintStation, type StationName } from './pos-constants'
 import { enqueueFailedPrint } from './print-queue'
 import { getPosConfigSync } from './pos-config'
 import { qrToDataURL } from './qr'
@@ -1548,6 +1548,12 @@ export async function printByStation(order: Order): Promise<{ printed: boolean; 
     const items = split[station]
     if (items.length === 0) {
       console.log(`[printer] ${station}: 0 items, skipping`)
+      continue
+    }
+
+    // [NO IMPRIMIR] — estación configurada como sin-comanda (Market no se prepara)
+    if (isNoPrintStation(station)) {
+      console.log(`[printer] ${station}: NO IMPRIMIR (${items.length} items) — sin comanda por config`)
       continue
     }
 
