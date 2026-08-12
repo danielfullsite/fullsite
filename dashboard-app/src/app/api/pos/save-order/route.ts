@@ -47,14 +47,25 @@ export async function POST(request: NextRequest) {
     }
 
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const sbKey = process.env.SUPABASE_SERVICE_KEY
-    if (!sbKey) {
+    const sbAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+    const serviceKey = process.env.SUPABASE_SERVICE_KEY || ''
+    const bearer = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
+    const cookieToken = request.cookies.get('fs-at')?.value
+
+    // Browser/dashboard sessions must use the real Supabase user JWT so strict
+    // RLS enforces tenant membership. POS shift tokens are local JWTs, so they
+    // still require the server-only service key after withPOSAuth has resolved
+    // the authoritative client_id from the signed shift token.
+    const dbApiKey = auth.authType === 'supabase_session' ? sbAnon : serviceKey
+    const dbToken = auth.authType === 'supabase_session' ? (bearer || cookieToken || '') : serviceKey
+
+    if (!dbApiKey || !dbToken) {
       return Response.json({ ok: false, error: 'SERVER_CONFIG_ERROR' } satisfies SaveResult, { status: 500 })
     }
 
     const headers = {
-      'apikey': sbKey,
-      'Authorization': `Bearer ${sbKey}`,
+      'apikey': dbApiKey,
+      'Authorization': `Bearer ${dbToken}`,
       'Content-Type': 'application/json',
       'Prefer': 'return=representation',
     }
@@ -134,7 +145,7 @@ export async function POST(request: NextRequest) {
       try {
         const lineageRes = await fetch(
           `${sbUrl}/rest/v1/pos_orders?id=eq.${order_id}&client_id=eq.${clientId}&select=last_inventory_processed_revision`,
-          { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` } }
+          { headers: { apikey: dbApiKey, Authorization: `Bearer ${dbToken}` } }
         )
         if (lineageRes.ok) {
           const lineageRows = await lineageRes.json()
@@ -197,7 +208,7 @@ export async function POST(request: NextRequest) {
       try {
         const statusRes = await fetch(
           `${sbUrl}/rest/v1/pos_orders?id=eq.${order_id}&client_id=eq.${clientId}&select=last_inventory_processed_revision,last_inventory_complete_revision`,
-          { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` } }
+          { headers: { apikey: dbApiKey, Authorization: `Bearer ${dbToken}` } }
         )
         if (statusRes.ok) {
           const statusRows = await statusRes.json()
