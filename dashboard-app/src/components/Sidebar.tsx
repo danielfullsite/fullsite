@@ -183,6 +183,7 @@ const platformNavSections = [
       { href: '/platform/copiloto', label: 'Copiloto', icon: Sparkles },
       { href: '/platform/recomendaciones', label: 'Recomendaciones', icon: Lightbulb },
       { href: '/platform/tenants', label: 'Tenants', icon: Store },
+      { href: '/platform/staff', label: 'Personal & PINs', icon: Users },
       { href: '/platform/flags', label: 'Flags & Config', icon: Flag },
       { href: '/platform/audit', label: 'Bitácora', icon: ScrollText },
     ],
