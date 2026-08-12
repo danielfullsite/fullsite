@@ -197,6 +197,7 @@ export default function ConfigPage() {
   const [loading, setLoading] = useState(true)
   const [bridgeUrlInput, setBridgeUrlInput] = useState('')
   const [bridgeUrlSaved, setBridgeUrlSaved] = useState(false)
+  const [tab, setTab] = useState<'impresion' | 'personal' | 'catalogos' | 'terminal'>('impresion')
 
   useEffect(() => {
     // Device info
@@ -273,7 +274,7 @@ export default function ConfigPage() {
   )
 
   return (
-    <div className="cfg-scope h-dvh flex flex-col overflow-y-auto" style={{ background: 'var(--bg)', color: 'var(--text-1)' }}>
+    <div className="cfg-scope h-dvh flex flex-col overflow-hidden" style={{ background: 'var(--bg)', color: 'var(--text-1)' }}>
       <style dangerouslySetInnerHTML={{ __html: CONFIG_TOKENS }} />
       {/* Header */}
       <header
@@ -295,7 +296,21 @@ export default function ConfigPage() {
         <StatusBadge ok={deviceInfo.online} label={deviceInfo.online ? 'Online' : 'Offline'} />
       </header>
 
-      <div className="flex-1 p-6 space-y-6 max-w-5xl mx-auto w-full">
+      {/* Tabs — Configuración cabe sin scroll de página */}
+      <div className="flex-shrink-0 px-6 pt-4 w-full max-w-5xl mx-auto">
+        <div className="flex gap-1 p-1 rounded-xl w-fit border" style={{ background: 'var(--surface-2)', borderColor: 'var(--line)' }}>
+          {([['impresion', 'Impresión'], ['personal', 'Personal'], ['catalogos', 'Catálogos'], ['terminal', 'Terminal']] as const).map(([k, label]) => (
+            <button key={k} onClick={() => setTab(k)}
+              className="px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+              style={tab === k ? { background: 'var(--accent)', color: '#fff' } : { color: 'var(--text-3)' }}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="flex-1 min-h-0 overflow-y-auto">
+      <div className="p-6 space-y-6 max-w-5xl mx-auto w-full">
+        {tab === 'impresion' && (<>
 
         {/* Print Bridge */}
         <section
@@ -368,6 +383,8 @@ export default function ConfigPage() {
             <p className="text-[11.5px] mt-2" style={{ color: 'var(--text-4)' }}>PDV1-3: usar IP de Caja, ej. <span className="font-mono" style={{ color: 'var(--text-3)' }}>http://192.168.1.71:7717</span>. Caja: dejar vacío.</p>
           </div>
         </section>
+        </>)}
+        {tab === 'personal' && (<>
 
         {/* Staff */}
         <section
@@ -394,6 +411,8 @@ export default function ConfigPage() {
             ))}
           </div>
         </section>
+        </>)}
+        {tab === 'catalogos' && (<>
 
         {/* Promos */}
         <section
@@ -423,6 +442,8 @@ export default function ConfigPage() {
 
         {/* Catálogos configurables (cancelación + descuentos) */}
         <CatalogosCard />
+        </>)}
+        {tab === 'terminal' && (<>
 
         {/* Device & System */}
         <section
@@ -544,7 +565,9 @@ export default function ConfigPage() {
             )}
           </section>
         )}
+        </>)}
 
+      </div>
       </div>
     </div>
   )
