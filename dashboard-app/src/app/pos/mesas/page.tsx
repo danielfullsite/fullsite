@@ -695,7 +695,7 @@ export default function MesasPage() {
 
   // ─── Grid View (classic) ──────────────────────────────────────────────────
   const GridView = () => (
-    <div className="grid grid-cols-4 gap-4 max-w-5xl mx-auto">
+    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-2.5">
       {mesas.filter(mesa => {
         if (!soloMisMesas || !currentMesero) return true
         return mesa.status === 'disponible' || mesa.mesero === currentMesero
@@ -917,7 +917,7 @@ export default function MesasPage() {
         )
       })()}
 
-      <div className={`flex-1 overflow-y-auto ${viewMode === 'planograma' ? 'p-2' : 'p-6'}`}>
+      <div className={`flex-1 overflow-y-auto ${viewMode === 'planograma' ? 'p-2' : 'px-4 py-3'}`}>
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <div className="w-8 h-8 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
