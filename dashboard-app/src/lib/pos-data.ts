@@ -323,9 +323,23 @@ export function getClientId(): string {
   return _getClientId()
 }
 
-/** Returns Authorization header with POS shift token, if one is stored. */
+/** Returns Authorization header for POS API calls.
+ *
+ * Prefer the logged-in Supabase JWT when available so hosted previews/staging
+ * exercise strict RLS with the real tenant membership. POS kiosk/offline flows
+ * that do not have a dashboard session continue to fall back to the signed
+ * shift token issued by /api/pos/pin.
+ */
 export function getPOSAuthHeaders(): Record<string, string> {
   if (typeof window === 'undefined') return {}
+  try {
+    const hostname = new URL(_SUPABASE_URL).hostname.split('.')[0]
+    const stored = localStorage.getItem(`sb-${hostname}-auth-token`)
+    if (stored) {
+      const parsed = JSON.parse(stored)
+      if (parsed?.access_token) return { Authorization: `Bearer ${parsed.access_token}` }
+    }
+  } catch {}
   const token = localStorage.getItem('pos_shift_token')
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
