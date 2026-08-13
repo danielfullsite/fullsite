@@ -539,18 +539,6 @@ export default function MissionControlPage() {
                   <p className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-4)] mb-1.5">Recomendación</p>
                   <p className="text-xs text-[var(--text-2)] leading-snug">{reco}</p>
                 </div>
-                {/* Acciones */}
-                <div className="flex gap-2">
-                  <button onClick={() => saveAction(selectedAgent, 'aplicado')} className={`fs-btn fs-btn-sm flex-1 ${act === 'aplicado' ? 'fs-btn-primary' : 'fs-btn-soft'}`}>
-                    <Check size={14} />{act === 'aplicado' ? 'Aplicado' : 'Aplicar'}
-                  </button>
-                  <button onClick={() => saveAction(selectedAgent, 'recordar')} className="fs-btn fs-btn-sm fs-btn-secondary flex-1">
-                    <Clock size={14} />{act === 'recordar' ? 'Recordando' : 'Recordar'}
-                  </button>
-                  <button onClick={() => { saveAction(selectedAgent, 'descartado'); setSelectedAgent(null) }} className="fs-btn fs-btn-sm fs-btn-ghost flex-1">
-                    <X size={14} />Descartar
-                  </button>
-                </div>
                 {/* Habla con el agente */}
                 <div className="border-t border-[var(--line-soft)] pt-3">
                   <p className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-4)] mb-2 flex items-center gap-1.5"><Sparkles size={12} className="text-emerald-400" />Habla con el agente</p>

@@ -1,0 +1,48 @@
+name: Lab 24/7 — Restaurante sintético
+
+# Laboratorio-restaurante corriendo 24/7 sobre el tenant sintético (lab-resto) en
+# STAGING. Simula la operación (meseros/cocina/caja) y un watchdog revisa que todo
+# el flujo cuadre — caza bugs antes de que lleguen a un cliente real.
+#
+# Requiere secrets de STAGING en GitHub:
+#   STAGING_SUPABASE_URL, STAGING_SUPABASE_SERVICE_KEY
+# (opcional) TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID_DANIEL para alertas del watchdog.
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'   # cada 30 min, 24/7
+  workflow_dispatch:
+    inputs:
+      client_id:
+        description: "Tenant del lab"
+        required: false
+        default: "lab-resto"
+
+concurrency:
+  group: lab-24-7
+  cancel-in-progress: false
+
+jobs:
+  lab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    env:
+      SUPABASE_URL:         ${{ secrets.STAGING_SUPABASE_URL }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.STAGING_SUPABASE_SERVICE_KEY }}
+      TELEGRAM_BOT_TOKEN:   ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID_DANIEL: ${{ secrets.TELEGRAM_CHAT_ID_DANIEL }}
+      CLIENT_ID:            ${{ github.event.inputs.client_id || 'lab-resto' }}
+      TRIGGER_TYPE:         ${{ github.event_name }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - run: pip install requests
+
+      - name: Simular operación (meseros / cocina / caja)
+        run: python .github/scripts/lab_simulator.py
+
+      - name: Watchdog — revisar que todo el flujo cuadre
+        if: always()   # revisa aunque el simulador falle
+        run: python .github/scripts/lab_watchdog.py
