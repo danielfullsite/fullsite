@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { Bot, Activity, AlertTriangle, CheckCircle2, Clock, RefreshCw, Zap, Shield, TrendingUp, Package, Users, ChefHat, Star, MessageCircle, FileText, Truck, Trash2, CloudSun, Target, BarChart3, Calendar, Bell, Settings, Timer, Brain, Sparkles, Send, Check, X } from 'lucide-react'
 import { getDeepTable } from '@/lib/data'
 import { agentName } from '@/lib/agent-names'
@@ -53,6 +53,8 @@ const AGENT_META: Record<string, { name: string; icon: typeof Bot; color: string
   'stock-alert': { name: 'Alerta de Stock', icon: Package, color: 'text-orange-400', tentacle: 'Operaciones' },
   'crm-recompra': { name: 'CRM Recompra', icon: Users, color: 'text-emerald-400', tentacle: 'Personal' },
 }
+
+const ACTION_SET = new Set(['aplicado', 'recordar', 'descartado'])
 
 function timeAgo(ts: string): string {
   const diff = Date.now() - new Date(ts).getTime()
@@ -219,6 +221,7 @@ export default function MissionControlPage() {
   const [chatInput, setChatInput] = useState('')
   const [chatLoading, setChatLoading] = useState(false)
   const [actioned, setActioned] = useState<Record<string, 'aplicado' | 'recordar' | 'descartado'>>({})
+  const latestResultsRef = useRef<Map<string, AgentResultFull>>(new Map())
 
   const load = useCallback(async () => {
     try {
@@ -230,11 +233,31 @@ export default function MissionControlPage() {
       ])
       setRuns(runsData as unknown as AgentRun[])
       setResults(resultsData as unknown as AgentResult[])
+      // Restaura el feedback guardado (Aplicado/Recordar/Descartado) por agente.
+      try {
+        const fb = await fetch('/api/agents/feedback', { credentials: 'include' }).then(r => r.ok ? r.json() : null)
+        if (fb?.feedback) {
+          const map: Record<string, 'aplicado' | 'recordar' | 'descartado'> = {}
+          for (const row of fb.feedback) if (ACTION_SET.has(row.action)) map[row.agent_id] = row.action
+          setActioned(map)
+        }
+      } catch {}
     } catch (e) {
       console.error('Mission control load error:', e)
     } finally {
       setLoading(false)
     }
+  }, [])
+
+  // Persiste el feedback del dueño — se vuelve señal para mejorar el producto.
+  const saveAction = useCallback((agentId: string, action: 'aplicado' | 'recordar' | 'descartado') => {
+    setActioned(a => ({ ...a, [agentId]: action }))
+    const r = latestResultsRef.current.get(agentId)
+    fetch('/api/agents/feedback', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agent_id: agentId, action, insight_fecha: r?.fecha, insight_summary: r?.summary }),
+    }).catch(() => {})
   }, [])
 
   useEffect(() => { load() }, [load])
@@ -256,6 +279,7 @@ export default function MissionControlPage() {
   for (const r of results) {
     if (!latestResults.has(r.agent_id)) latestResults.set(r.agent_id, r)
   }
+  latestResultsRef.current = latestResults
 
   // Stats
   const totalRuns24h = runs.filter(r => Date.now() - new Date(r.created_at).getTime() < 86400000).length
@@ -509,13 +533,13 @@ export default function MissionControlPage() {
                 </div>
                 {/* Acciones */}
                 <div className="flex gap-2">
-                  <button onClick={() => setActioned(a => ({ ...a, [selectedAgent]: 'aplicado' }))} className={`flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-semibold rounded-lg py-2 transition-colors ${act === 'aplicado' ? 'bg-emerald-500 text-[#04130d]' : 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20'}`}>
+                  <button onClick={() => saveAction(selectedAgent, 'aplicado')} className={`flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-semibold rounded-lg py-2 transition-colors ${act === 'aplicado' ? 'bg-emerald-500 text-[#04130d]' : 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20'}`}>
                     <Check size={14} />{act === 'aplicado' ? 'Aplicado' : 'Aplicar'}
                   </button>
-                  <button onClick={() => setActioned(a => ({ ...a, [selectedAgent]: 'recordar' }))} className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-semibold rounded-lg py-2 bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-2)] hover:bg-[var(--panel)] transition-colors">
-                    <Clock size={14} />Recordar
+                  <button onClick={() => saveAction(selectedAgent, 'recordar')} className={`flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-semibold rounded-lg py-2 border transition-colors ${act === 'recordar' ? 'bg-amber-500/15 border-amber-500/40 text-amber-300' : 'bg-[var(--surface-2)] border-[var(--line)] text-[var(--text-2)] hover:bg-[var(--panel)]'}`}>
+                    <Clock size={14} />{act === 'recordar' ? 'Recordando' : 'Recordar'}
                   </button>
-                  <button onClick={() => { setActioned(a => ({ ...a, [selectedAgent]: 'descartado' })); setSelectedAgent(null) }} className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-semibold rounded-lg py-2 bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-3)] hover:bg-[var(--panel)] transition-colors">
+                  <button onClick={() => { saveAction(selectedAgent, 'descartado'); setSelectedAgent(null) }} className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-semibold rounded-lg py-2 bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-3)] hover:bg-[var(--panel)] transition-colors">
                     <X size={14} />Descartar
                   </button>
                 </div>
