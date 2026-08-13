@@ -1,7 +1,7 @@
 /**
  * pos-manager-auth — secure offline manager authorization.
  *
- * Wansoft verifies manager actions against a local SQL Server database.
+ * El sistema anterior verifies manager actions against a local SQL Server database.
  * Fullsite must match: offline authorization must work without WAN.
  *
  * Design:
@@ -22,7 +22,7 @@
  * Known limitations:
  *   – If a manager is terminated while the terminal is offline, their cached
  *     credential remains valid until TTL expires (max 8 hours) or until the
- *     terminal reconnects. This matches Wansoft's offline behavior.
+ *     terminal reconnects. This matches the POS legado's offline behavior.
  *   – Only PIN auth is provisioned; biometric remains independent.
  *   – PIN changes on the server are not automatically propagated offline:
  *     the old hash stays valid until the manager authenticates online with

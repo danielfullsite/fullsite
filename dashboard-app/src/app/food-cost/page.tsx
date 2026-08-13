@@ -18,7 +18,7 @@ interface CostItem {
   market: boolean           // producto de Market (retail) — excluido de KPIs de cocina
   modifier?: boolean        // receta de modificador (wsm-*): costo vs precio extra
   precioPromedio?: boolean  // precio derivado de ventas reales (total/qty), no de lista
-  sospechoso?: {            // probable capture error in Wansoft recipe
+  sospechoso?: {            // probable capture error in el sistema anterior recipe
     ingrediente: string
     costo: number
     pct: number             // % of total recipe cost
@@ -174,7 +174,7 @@ export default function FoodCostPage() {
             }
           }
 
-          // Modificadores reales (wsm-*): las ~93 recetas huérfanas de Wansoft
+          // Modificadores reales (wsm-*): las ~93 recetas huérfanas del sistema anterior
           // (EXT. POLLO, C/ PAN BRIOCHE...) son recetas de modificadores — se
           // costean contra el precio EXTRA del modificador, no contra el menú.
           const modMap = new Map<string, number>()
@@ -231,7 +231,7 @@ export default function FoodCostPage() {
               const qty = Number(ing?.Quantity) || 0
               const budgetCost = Number(ing?.ProductBudgetedCost) || 0
               if (qty > 0 && budgetCost > 0) {
-                costoTotal += budgetCost  // NOT qty * budgetCost — Wansoft already calculates the total
+                costoTotal += budgetCost  // NOT qty * budgetCost — el sistema anterior already calculates the total
                 validIngredients++
                 if (budgetCost > maxIngCost) {
                   maxIngCost = budgetCost
@@ -244,7 +244,7 @@ export default function FoodCostPage() {
 
             // Receta sospechosa: un solo ingrediente concentra >=60% del costo
             // y cuesta >=$50 con >=2 ingredientes — casi siempre error de captura
-            // en Wansoft (unidad/cantidad mal, ej. MOZARELA en litros a $187/porción)
+            // en el sistema anterior (unidad/cantidad mal, ej. MOZARELA en litros a $187/porción)
             const sospechoso =
               validIngredients >= 2 && maxIngCost >= 50 && maxIngCost / costoTotal >= 0.6
                 ? {
@@ -449,7 +449,7 @@ export default function FoodCostPage() {
         </div>
       </div>
 
-      {/* Recetas con costo sospechoso (error de captura en Wansoft) */}
+      {/* Recetas con costo sospechoso (error de captura en el sistema anterior) */}
       {suspicious.length > 0 && (
         <div className="bg-amber-500/5 rounded-xl border border-amber-500/30 shadow-sm mb-6">
           <div className="p-4 border-b border-amber-500/20 flex items-center gap-2">
@@ -594,7 +594,7 @@ export default function FoodCostPage() {
                         {item.precioPromedio && (
                           <span
                             className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-500"
-                            title="Precio promedio cobrado (ventas reales Wansoft), no precio de lista"
+                            title="Precio promedio cobrado (ventas reales), no precio de lista"
                           >
                             precio prom.
                           </span>

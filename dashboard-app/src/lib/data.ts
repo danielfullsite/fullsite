@@ -58,7 +58,7 @@ export function getActiveClientSlug(): string {
 }
 
 /**
- * Data Source Switch — controls whether dashboard reads from Wansoft or Fullsite POS.
+ * Data Source Switch — controls whether dashboard reads from the POS legado or Fullsite POS.
  * Stored in clients.data_source: 'wansoft' | 'fullsite' | 'supabase' (legacy = wansoft)
  * Cached in localStorage after first fetch.
  */
@@ -79,7 +79,7 @@ export function setDataSource(source: DataSource) {
   }
 }
 
-/** Check if this client uses Fullsite POS as primary (not Wansoft) */
+/** Check if this client uses Fullsite POS as primary (not the POS legado) */
 export function isFullsitePOS(): boolean {
   return getDataSource() === 'fullsite'
 }
@@ -115,7 +115,7 @@ function parseJsonbField<T>(value: unknown): T[] {
   if (Array.isArray(value)) return value as T[]
   const parsed = parseJsonb(value)
   if (Array.isArray(parsed)) return parsed as T[]
-  // If it's an object with a Result array (Wansoft pattern)
+  // If it's an object with a Result array (el sistema anterior pattern)
   if (parsed && typeof parsed === 'object' && 'Result' in (parsed as Record<string, unknown>)) {
     const result = (parsed as Record<string, unknown>).Result
     if (Array.isArray(result)) return result as T[]
@@ -366,7 +366,7 @@ export function aggregateGrupos(
     .sort((a, b) => b.total - a.total)
 }
 
-// ── Wansoft Data (35 data types) ────────────────────────────────────
+// ── POS legado Data (35 data types) ────────────────────────────────────
 
 export async function getWansoftDataLatest(dataKey: string, clientId: string = getActiveClientSlug()) {
   const data = await sbFetch('wansoft_data', `select=fecha,data&client_id=eq.${clientId}&data_key=eq.${dataKey}&order=fecha.desc&limit=1`) as Record<string, unknown>[]
@@ -399,7 +399,7 @@ export async function getLatestAgentRuns(): Promise<AgentRun[]> {
   return Array.from(map.values())
 }
 
-// ── POS Orders fallback (for clients without Wansoft) ─────────────────
+// ── POS Orders fallback (for clients without the POS legado) ─────────────────
 
 /** Aggregate pos_orders into WansoftDaily-compatible format for dashboard pages.
  *  Used when wansoft_daily has no data for a client (new clients using only Fullsite POS). */

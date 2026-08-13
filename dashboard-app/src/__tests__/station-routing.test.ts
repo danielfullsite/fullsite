@@ -81,7 +81,7 @@ describe('splitOrderByStation con item.station', () => {
 })
 
 describe('getStationForItem (fijado de station al agregar)', () => {
-  it('categorías de alcohol Wansoft → barra', () => {
+  it('categorías de alcohol → barra', () => {
     for (const cat of ['cerveza', 'vinos', 'licores', 'alcohol']) {
       expect(getStationForItem(cat, 'HEINEKEN')).toBe('barra')
     }

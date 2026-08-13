@@ -924,7 +924,7 @@ export default function MesasPage() {
           <>
             {viewMode === 'planograma' ? <PlanogramaView /> : <GridView />}
 
-            {/* Cuentas por nombre (sin mesa, estilo Wansoft) */}
+            {/* Cuentas por nombre (sin mesa) */}
             {namedOrders.length > 0 && (
               <div className="max-w-5xl mx-auto mt-6">
                 <h3 className="text-[var(--text-1)] font-bold text-lg mb-3 flex items-center gap-2">

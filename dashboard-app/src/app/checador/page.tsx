@@ -5,7 +5,7 @@ import { Fingerprint, Delete, LogIn, LogOut, Check, Clock, ArrowLeft } from 'luc
 import Link from 'next/link'
 
 // Checador (kiosk) — registro de entrada/salida por PIN. Opción de huella:
-// WebAuthn donde el terminal tenga sensor; el lector USB dedicado (Wansoft) va por
+// WebAuthn donde el terminal tenga sensor; el lector USB dedicado (del sistema anterior) va por
 // integración nativa (shell offline) más adelante.
 interface Reciente { type: string; method: string; ts: string }
 interface Result { staff_name: string; type: string; ts: string; recientes: Reciente[] }

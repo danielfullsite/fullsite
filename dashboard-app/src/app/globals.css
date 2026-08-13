@@ -52,7 +52,7 @@ details[name="posnav"][open] > summary .nav-caret { transform: rotate(180deg); }
   -webkit-user-select: text;
   user-select: text;
 }
-/* ============ POS touch-friendly (estilo Wansoft) ============
+/* ============ POS touch-friendly ============
  * Piso mínimo de touch target en TODO el POS: ningún control < 44px.
  * Los controles primarios se suben a 56-60px vía clases Tailwind puntuales. */
 .pos-kiosk button {

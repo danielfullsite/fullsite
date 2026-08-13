@@ -267,10 +267,10 @@ function parsePurchaseSnapshots(rows: Record<string, unknown>[]): Movement[] {
       id: `wpurch_${curr.fecha}`,
       type: 'entrada',
       date: curr.fecha,
-      description: `Compras Wansoft (${items.length} producto${items.length === 1 ? '' : 's'})`,
+      description: `Compras (${items.length} producto${items.length === 1 ? '' : 's'})`,
       items: items.sort((a, b) => (b.costo_total || 0) - (a.costo_total || 0)),
       total: Math.round(total * 100) / 100,
-      user: 'Wansoft',
+      user: 'Sistema anterior',
       source: 'wansoft_data',
       raw_key: 'purchases_by_product',
     })
@@ -353,7 +353,7 @@ export default function MovimientosPage() {
         `client_id=eq.${clientId}&order=created_at.desc&limit=200`
       )
 
-      // Fetch Wansoft purchases snapshots (rolling report → daily deltas)
+      // Fetch purchases snapshots del sistema anterior (rolling report → daily deltas)
       const purchasesPromise = sbFetchRows(
         'wansoft_data',
         `select=fecha,data&client_id=eq.${clientId}&data_key=eq.purchases_by_product&order=fecha.desc&limit=15`
@@ -528,7 +528,7 @@ export default function MovimientosPage() {
         <div className="rounded-[14px] border border-dashed border-[var(--line)] px-5 py-9 flex flex-col items-center justify-center gap-2.5 text-center" style={{ background: 'var(--surface)' }}>
           <div className="w-[26px] h-[26px] border-[2.5px] border-[var(--line)] border-t-[var(--accent)] rounded-full animate-spin" />
           <p className="text-sm font-semibold text-[var(--text-2)]">Cargando movimientos...</p>
-          <p className="text-xs text-[var(--text-4)]">Consultando wansoft_data · pos_inventory_movements</p>
+          <p className="text-xs text-[var(--text-4)]">Consultando movimientos de inventario</p>
         </div>
       ) : filtered.length === 0 ? (
         <div className="rounded-[14px] border border-dashed border-[var(--line)] px-5 py-9 flex flex-col items-center justify-center gap-2.5 text-center" style={{ background: 'var(--surface)' }}>
@@ -714,7 +714,7 @@ export default function MovimientosPage() {
                               {/* Metadata */}
                               <div className="flex flex-wrap items-center gap-4 mt-2.5 font-mono text-[10px] text-[var(--text-4)]">
                                 {m.raw_key && <span><span className="text-[var(--text-3)]">Key:</span> {m.raw_key}</span>}
-                                <span><span className="text-[var(--text-3)]">Fuente:</span> {m.source === 'pos' ? 'POS' : 'Wansoft'}</span>
+                                <span><span className="text-[var(--text-3)]">Fuente:</span> {m.source === 'pos' ? 'POS' : 'Sistema anterior'}</span>
                               </div>
                             </div>
                           </motion.div>

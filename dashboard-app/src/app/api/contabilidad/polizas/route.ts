@@ -477,7 +477,7 @@ async function getResumenMensual(mes: string, formato: string, clientId: string)
   const wansoftDays = wansoftRes.ok ? await wansoftRes.json() : []
   const movements: InventoryMovement[] = movRes.ok ? await movRes.json() : []
 
-  // Calculate from POS orders or Wansoft
+  // Calculate from POS orders or el sistema anterior
   let ventasBrutas = 0
   let ventasNetas = 0
   let totalIVA = 0

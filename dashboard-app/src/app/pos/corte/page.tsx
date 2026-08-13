@@ -658,7 +658,7 @@ export default function CortePage() {
           </>)}
           {tab === 'arqueo' && (<>
 
-            {/* Reporte Corte Turno — formato Wansoft (spec 14.2) */}
+            {/* Reporte Corte Turno */}
             <div className="bg-[var(--surface-2)]/60 border border-slate-700 rounded-xl p-5">
               <h3 className="font-bold text-white mb-1 flex items-center gap-2">
                 <Receipt size={18} className="text-emerald-400" />
@@ -746,7 +746,7 @@ export default function CortePage() {
                       </div>
                     </div>
                   )}
-                  <p className="text-[var(--text-2)] text-xs mt-3 leading-relaxed">Las propinas cobradas con tarjeta/otras formas se pagan al mesero en efectivo desde caja (regla Wansoft).</p>
+                  <p className="text-[var(--text-2)] text-xs mt-3 leading-relaxed">Las propinas cobradas con tarjeta/otras formas se pagan al mesero en efectivo desde caja.</p>
                 </div>
                 {/* Columna 3: Información operativa */}
                 <div>

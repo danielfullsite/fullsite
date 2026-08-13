@@ -86,7 +86,7 @@ function CatalogosCard() {
   return (
     <section className="rounded-2xl border p-6" style={{ background: 'var(--bento-card)', borderColor: 'var(--line)', boxShadow: 'var(--shadow-mid)' }}>
       <h2 className="text-lg font-bold flex items-center gap-2 mb-1"><ListChecks size={20} style={{ color: 'var(--accent-ink)' }} /> Catálogos</h2>
-      <p className="text-sm text-[var(--text-3)] mb-5">Listas cerradas anti-fraude: qué motivos y descuentos puede usar el personal (regla Wansoft).</p>
+      <p className="text-sm text-[var(--text-3)] mb-5">Listas cerradas anti-fraude: qué motivos y descuentos puede usar el personal.</p>
 
       {!loaded ? (
         <p className="text-sm text-[var(--text-3)]">Cargando…</p>

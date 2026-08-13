@@ -23,7 +23,7 @@ interface ProductPresentations {
   presentations: Presentation[]
 }
 
-// Catálogo plano de presentaciones de Wansoft (Inventory/Presentations)
+// Catálogo plano de presentaciones del sistema anterior (Inventory/Presentations)
 interface WansoftPresentation {
   id: string
   clave: string
@@ -132,7 +132,7 @@ export default function PresentacionesPage() {
           }
         }
 
-        // Catálogo de productos Wansoft: Text = "NOMBRE (CODIGO)"
+        // Catálogo de productos del sistema anterior: Text = "NOMBRE (CODIGO)"
         let catalog: ProductPresentations[] = []
         if (catRes.ok) {
           const rows = await catRes.json()
@@ -160,7 +160,7 @@ export default function PresentacionesPage() {
           }
         }
 
-        // Catálogo plano de presentaciones Wansoft: {id, cell: [clave, presentacion, ...]}
+        // Catálogo plano de presentaciones del sistema anterior: {id, cell: [clave, presentacion, ...]}
         if (presCatRes.ok) {
           const rows = await presCatRes.json()
           if (rows.length > 0) {
@@ -690,13 +690,13 @@ export default function PresentacionesPage() {
         </div>
       </div>
 
-      {/* ── Catálogo Wansoft de presentaciones ── */}
+      {/* ── Catálogo de presentaciones del sistema anterior ── */}
       {wsCatalog.length > 0 && (
         <div className="rounded-2xl border border-[var(--accent-line)] overflow-hidden" style={{ background: 'var(--bento-card)' }}>
           <div className="px-5 py-4 border-b border-[var(--accent-line)] flex flex-wrap items-center justify-between gap-3">
             <h3 className="text-sm font-bold text-[var(--text-1)] flex items-center gap-2">
               <Layers size={16} className="text-cyan-400" />
-              Catalogo de presentaciones Wansoft
+              Catalogo de presentaciones
               <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold border bg-cyan-500/15 text-cyan-400 border-cyan-500/30">
                 {wsCatalog.length}
               </span>

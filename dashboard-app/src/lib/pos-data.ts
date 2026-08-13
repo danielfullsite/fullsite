@@ -1,4 +1,4 @@
-// POS Menu Data — AMALAY real menu (Wansoft)
+// POS Menu Data — AMALAY real menu (el POS legado)
 //
 // SQL for Supabase (run in SQL Editor):
 //
@@ -383,7 +383,7 @@ async function _getMenuFromCache(): Promise<MenuCategory[]> {
   return []
 }
 
-/** Forma de pago custom (catálogo pos_payment_methods, estilo Wansoft: Rappi, Ubereats, Cortesía...) */
+/** Forma de pago custom (catálogo pos_payment_methods, estilo el POS legado: Rappi, Ubereats, Cortesía...) */
 export interface PaymentMethodDB {
   id: string
   name: string
@@ -484,12 +484,12 @@ export async function openTurno(fondoInicial: number, openedBy: string): Promise
   } catch { return null }
 }
 
-// ── Modificadores multinivel (estilo Wansoft: "NIVEL 1: PROTEINA, opcional, máx 2") ──
+// ── Modificadores multinivel (estilo el POS legado: "NIVEL 1: PROTEINA, opcional, máx 2") ──
 
 export interface ModifierGroupDef {
   id: string
   name: string
-  /** Nivel Wansoft (1, 2, 3...) — define orden de render */
+  /** Nivel del POS legado (1, 2, 3...) — define orden de render */
   level: number
   minSelections: number
   /** null = sin límite */
@@ -777,7 +777,7 @@ export const RECIPE_ALIASES: Record<string, string[]> = {
 const RECIPE_FALLBACK_ENABLED =
   (typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_RECIPE_FALLBACK : undefined) !== 'disabled'
 
-/** Un pago dentro de una cuenta (pago mixto multi-forma, estilo Wansoft) */
+/** Un pago dentro de una cuenta (pago mixto multi-forma, estilo el POS legado) */
 export interface PagoForma {
   metodo: string
   monto: number
@@ -786,7 +786,7 @@ export interface PagoForma {
 export interface Order {
   id: string
   mesa: number
-  /** Cuenta por nombre (sin mesa, estilo Wansoft "#SR RAUL") — mesa queda en 0 */
+  /** Cuenta por nombre (sin mesa, estilo el POS legado "#SR RAUL") — mesa queda en 0 */
   clienteNombre?: string
   mesero: string
   personas: number

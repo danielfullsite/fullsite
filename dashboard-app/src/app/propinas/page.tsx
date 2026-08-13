@@ -118,7 +118,7 @@ export default function PropinasPage() {
         <EmptyState
           icon={HandCoins}
           title="Sin datos de propinas"
-          description="No hay registros de ventas para el periodo. Los datos de propinas aparecerán cuando Wansoft sincronice."
+          description="No hay registros de ventas para el periodo. Los datos de propinas aparecerán cuando el sistema de ventas sincronice."
           iconColor="text-blue-500"
           iconBg="bg-blue-500/10"
         />
@@ -165,7 +165,7 @@ export default function PropinasPage() {
                 {isRealTipsData ? (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 font-medium">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                    Datos reales de Wansoft
+                    Datos reales del sistema de ventas
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 font-medium">

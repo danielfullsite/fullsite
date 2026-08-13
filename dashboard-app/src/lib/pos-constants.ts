@@ -93,7 +93,7 @@ export const STATION_CATEGORIES: Record<StationName, string[]> = {
     'pizzas', 'bowls', 'ceviche',
     // Panadería → cocina (AMALAY: un solo KDS en cocina)
     'toast', 'bakery', 'postres',
-    // Grupos Wansoft (AMALAY): comida → cocina
+    // Grupos del sistema anterior (AMALAY): comida → cocina
     'promos', 'keto', 'kids', 'soups', 'munchies', 'extras', 'envios',
     'enchiladas-tacos', 'salads-ceviche', 'appetizers', 'evento', 'signature',
   ],
@@ -204,7 +204,7 @@ export function getStationByName(name: string): StationName {
 }
 
 // ─── [NO IMPRIMIR] — estaciones que NO generan comanda de preparación ─────────
-// Regla Wansoft (spec 5/16): los productos de Market (estación caja) se toman del
+// Regla del sistema anterior (spec 5/16): los productos de Market (estación caja) se toman del
 // anaquel, no se preparan → no imprimen comanda. Configurable por tenant vía el
 // setting pos.no_print_stations (cargado en el layout). Default: ['caja'] (=MARKET).
 let _noPrintStations: StationName[] = ['caja']
@@ -218,7 +218,7 @@ export function isNoPrintStation(station: StationName): boolean {
 }
 
 // ─── Catálogos configurables por tenant (setting pos.*; cargados en el layout) ──
-// Regla Wansoft: cancelaciones y descuentos usan catálogos cerrados (anti-fraude),
+// Regla del sistema anterior: cancelaciones y descuentos usan catálogos cerrados (anti-fraude),
 // no texto libre. Configurable por restaurante vía settings.
 let _cancellationReasons: string[] = ['Error de captura', 'Cliente canceló', 'Platillo no disponible', 'Orden duplicada', 'Otro']
 export function initCancellationReasons(reasons: unknown) {

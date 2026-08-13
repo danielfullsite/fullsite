@@ -11,7 +11,7 @@
  *   - fullsite_software:  $49,999/año ($4,166/mes equiv, ahorra $10K vs monthly $4,999×12)
  *   - fullsite_completo:  $49,999/año + hardware kit $45,000 (one-time)
  *
- * Competitor: Wansoft = $1,500/mes software + $130K hardware = $148K first year
+ * Competitor: el sistema anterior = $1,500/mes software + $130K hardware = $148K first year
  * Fullsite completo = $95K first year (36% cheaper)
  */
 

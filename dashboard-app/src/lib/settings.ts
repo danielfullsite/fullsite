@@ -86,7 +86,7 @@ const REGISTRY: { [K in SettingKey]: SettingDefinition<SettingValue<K>> } = {
     scope: 'sucursal',
     operationalProblem:
       'Los productos de Market/retail se toman del anaquel y no se preparan, así que no deben generar ' +
-      'comanda de cocina/barra (regla Wansoft "[NO IMPRIMIR]"). Qué estaciones no imprimen varía por ' +
+      'comanda de cocina/barra ("no imprimir"). Qué estaciones no imprimen varía por ' +
       'restaurante; hardcodearlo impide el onboarding.',
     default: ['caja'] as string[],  // caja = MARKET → no imprime comanda
   },

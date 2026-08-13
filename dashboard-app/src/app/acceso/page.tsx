@@ -121,7 +121,7 @@ export default function AccesoPage() {
             <EmptyState
               icon={Clock}
               title="Sin datos de acceso"
-              description="Los registros de entrada y salida se llenan automáticamente cada noche desde Wansoft."
+              description="Los registros de entrada y salida se llenan automáticamente cada noche desde el sistema de ventas."
               iconColor="text-blue-500"
               iconBg="bg-blue-500/10"
             />

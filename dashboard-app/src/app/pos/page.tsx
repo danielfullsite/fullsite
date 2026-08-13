@@ -177,7 +177,7 @@ interface ModifierModalProps {
 function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onConfirm, onCancel }: ModifierModalProps) {
   const { quitarOptions: defaultQuitar, agregarOptions: legacyAgregar } = getModifiersForCategory(categoryId)
 
-  // ── Grupos multinivel (Wansoft: "NIVEL 1: PROTEINA, opcional, máx 2") ──
+  // ── Grupos multinivel (el POS legado: "NIVEL 1: PROTEINA, opcional, máx 2") ──
   const [modGroups, setModGroups] = useState<ModifierGroupDef[]>([])
   const [currentLevel, setCurrentLevel] = useState(0)
   const [groupChecked, setGroupChecked] = useState<Map<string, Set<string>>>(() => {
@@ -672,7 +672,7 @@ function DiscountModal({ subtotal, personas, items, onApply, onCancel }: Discoun
     } catch {}
   }, [])
 
-  // ── 2x1 (estilo Wansoft: aplicar sobre partidas seleccionadas) ──
+  // ── 2x1 (estilo POS legado: aplicar sobre partidas seleccionadas) ──
   const promoItems = items.filter(i => !isTiempoItem(i))
   const [promoSelected, setPromoSelected] = useState<Set<string>>(new Set())
   const togglePromoItem = (id: string) => {
@@ -1531,7 +1531,7 @@ function POSContent() {
   const router = useRouter()
   const { lock } = usePOSLock()
   const initialCuenta = searchParams.get('cuenta') || ''
-  // Cuenta por nombre (estilo Wansoft): sin mesa → mesa 0
+  // Cuenta por nombre (estilo POS legado): sin mesa → mesa 0
   const initialMesa = initialCuenta ? 0 : (Number(searchParams.get('mesa')) || 1)
 
   const [menuCategories, setMenuCategories] = useState<MenuCategory[]>([])
@@ -1624,7 +1624,7 @@ function POSContent() {
   const [clock, setClock] = useState<string>('')
   const [showPayment, setShowPayment] = useState(false)
   const [showMixto, setShowMixto] = useState(false)
-  // Pago mixto multi-forma (estilo Wansoft): lista de {metodo, monto}
+  // Pago mixto multi-forma (estilo POS legado): lista de {metodo, monto}
   const [mixtoPagos, setMixtoPagos] = useState<PagoForma[]>([])
   const [mixtoForma, setMixtoForma] = useState('Efectivo')
   const [mixtoMonto, setMixtoMonto] = useState('')
@@ -1635,7 +1635,7 @@ function POSContent() {
   const [turnoId, setTurnoId] = useState<string | null>(() => {
     try { return localStorage.getItem('pos_turno_id') || null } catch { return null }
   })
-  // Sillas: silla activa para nuevos items (spinner SILLA estilo Wansoft)
+  // Sillas: silla activa para nuevos items (spinner SILLA estilo POS legado)
   const [sillaActual, setSillaActual] = useState(1)
   // Tiempos: firebutton "Impresión por tiempos"
   const [showFirebutton, setShowFirebutton] = useState(false)
@@ -1859,7 +1859,7 @@ function POSContent() {
     setBtConnecting(false)
   }
 
-  // Modo piloto: mute de comandas físicas (Wansoft pilot ended — gate removed from printer.ts).
+  // Modo piloto: mute de comandas físicas (piloto del POS legado terminado — gate removed from printer.ts).
   // Flag cleared on startup so stale pilot-period values don't persist across devices.
   const [comandasOff, setComandasOff] = useState(false)
   useEffect(() => {
@@ -2248,7 +2248,7 @@ function POSContent() {
   const isMobileRestricted = isMobileDevice && (staffRole === 'mesero' || staffRole === 'barra')
   // Mobile-restricted users cannot: cobrar, cancelar, descontar, corte, abrir cajón
 
-  // Role permissions — granular system (50+ permissions per Wansoft parity)
+  // Role permissions — granular system (50+ permissions per paridad con el POS legado)
   const _perms = (() => {
     try {
       // getPermissions imported at top level
@@ -2443,7 +2443,7 @@ function POSContent() {
         ticketId: orderId, itemId: orderItem.id, productId: orderItem.nombre,
         qty: orderItem.cantidad, precio: orderItem.precio, mesa, clientId: getClientId(),
       })
-      // Silla activa (estilo Wansoft CANT/SILLA): nuevos items se asignan a la silla seleccionada
+      // Silla activa (estilo POS legado CANT/SILLA): nuevos items se asignan a la silla seleccionada
       // courseId: items go into the current (last) course group
       const currentCourse = prev.filter(isTiempoItem).length + 1
       return [...prev, { ...orderItem, silla: orderItem.silla ?? (sillaActual || 1), station, courseId: currentCourse, courseStatus: 'pending' as const }]
@@ -2708,7 +2708,7 @@ function POSContent() {
     })
   }, [orderId, mesero, mesa])
 
-  // Cambiar silla de un item (tap en el badge — cicla 1..personas, estilo Wansoft "Cambiar # de silla")
+  // Cambiar silla de un item (tap en el badge — cicla 1..personas, estilo POS legado "Cambiar # de silla")
   const cycleSilla = useCallback((id: string) => {
     setOrderItems(prev => prev.map(oi => {
       if (oi.id !== id || isTiempoItem(oi)) return oi
@@ -2727,7 +2727,7 @@ function POSContent() {
     })
   }, [])
 
-  // Insertar separador de tiempo (estilo Wansoft "XX TIEMPO: N XX" — partida especial $0.00, silla 0)
+  // Insertar separador de tiempo (estilo POS legado "XX TIEMPO: N XX" — partida especial $0.00, silla 0)
   const addTiempoSeparator = useCallback(() => {
     setOrderItems(prev => {
       const n = prev.filter(isTiempoItem).length + 1
@@ -3286,7 +3286,7 @@ function POSContent() {
     const payIva = paySubtotalAfterDiscount * getIvaRate()
     const payId = splitPayingCuenta > 0 ? `${orderId}-C${splitPayingCuenta}` : orderId
 
-    // Desglose de pagos (multi-forma estilo Wansoft). Pago simple → 1 elemento.
+    // Desglose de pagos (multi-forma estilo POS legado). Pago simple → 1 elemento.
     const pagos: PagoForma[] = method === 'Mixto' && mixtoPagos.length > 0
       ? mixtoPagos
       : [{ metodo: method, monto: payTotal + propina }]
@@ -5169,7 +5169,7 @@ function POSContent() {
         </div>
       )}
 
-      {/* Impresión por tiempos (firebutton estilo Wansoft) */}
+      {/* Impresión por tiempos (firebutton estilo POS legado) */}
       {showFirebutton && (() => {
         // Tiempo 1 sale con la comanda inicial; el firebutton dispara los siguientes
         const numTiempos = activeItems.filter(isTiempoItem).length + 1
@@ -5494,7 +5494,7 @@ function POSContent() {
                   </div>
                 </div>
               )}
-              {/* Formas de pago custom desde catálogo (estilo Wansoft: Rappi, Ubereats, Cortesía...) */}
+              {/* Formas de pago custom desde catálogo (estilo POS legado: Rappi, Ubereats, Cortesía...) */}
               {(() => {
                 const customMethods = paymentMethodsDB.filter(m => m.type !== 'cash' && m.type !== 'card')
                 if (customMethods.length === 0) {

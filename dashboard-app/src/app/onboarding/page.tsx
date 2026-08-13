@@ -315,7 +315,7 @@ export default function OnboardingPage() {
                   <label className="text-xs font-semibold text-[var(--text-2)] uppercase">Sistema POS</label>
                   <select value={posSystem} onChange={e => setPosSystem(e.target.value)}
                     className="w-full border border-[var(--line)] rounded-xl px-4 py-3 text-sm mt-1">
-                    <option value="wansoft">Wansoft</option>
+                    <option value="wansoft">Otro sistema</option>
                     <option value="soft_restaurant">Soft Restaurant</option>
                     <option value="square">Square</option>
                     <option value="toast">Toast</option>
@@ -344,7 +344,7 @@ export default function OnboardingPage() {
                         <label className="text-xs font-semibold text-[var(--text-2)] uppercase">ID de sucursal (subsidiary ID)</label>
                         <input value={posSubsidiaryId} onChange={e => setPosSubsidiaryId(e.target.value)}
                           placeholder="Ej: 123" className="w-full border border-[var(--line)] rounded-xl px-4 py-3 text-sm mt-1 focus:outline-none focus:border-emerald-500" />
-                        <p className="text-xs text-[var(--text-3)] mt-1">Lo encuentras en Wansoft → Configuracion → Sucursal</p>
+                        <p className="text-xs text-[var(--text-3)] mt-1">Lo encuentras en la configuración de tu sistema de ventas</p>
                       </div>
                     )}
                     <p className="text-xs text-[var(--text-3)] bg-emerald-500/5 border border-emerald-500/10 rounded-lg px-3 py-2">Tus credenciales se guardan encriptadas y solo se usan para sincronizar datos. Nunca las compartimos.</p>

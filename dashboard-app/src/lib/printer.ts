@@ -1105,14 +1105,14 @@ export function splitOrderByStation(order: Order): Record<StationName, OrderItem
   const result: Record<StationName, OrderItem[]> = { cocina: [], barra: [], caja: [] }
   const stations: StationName[] = ['cocina', 'barra', 'caja']
   for (const item of order.items) {
-    // Separadores de tiempo (Wansoft): van a TODAS las estaciones para que
+    // Separadores de tiempo (el POS legado): van a TODAS las estaciones para que
     // cada una sepa qué partidas son de qué tiempo
     if (isTiempoItem(item)) {
       for (const s of stations) result[s].push(item)
       continue
     }
     // Estación explícita del item (fijada por el POS al agregar, por categoría de BD)
-    // — el lookup por MENU_CATEGORIES estático falla con el catálogo Wansoft importado
+    // — el lookup por MENU_CATEGORIES estático falla con el catálogo importado del sistema anterior
     const station = item.station ?? getStationForItem(getCategoryIdForItem(item), item.nombre)
     result[station].push(item)
   }
@@ -1157,7 +1157,7 @@ function buildStationTicketBytes(order: Order, station: StationName, items: Orde
 
   let lineNum = 0
   for (const item of items) {
-    // Separador de tiempo (Wansoft): línea centrada e invertida "XX TIEMPO: N XX"
+    // Separador de tiempo (el POS legado): línea centrada e invertida "XX TIEMPO: N XX"
     if (isTiempoItem(item)) {
       cmds.push(ESC, 0x61, 0x01) // center
       cmds.push(GS, 0x42, 0x01) // inverted (white on black)
@@ -1371,8 +1371,8 @@ function printStationTicketCSS(order: Order, station: StationName, items: OrderI
 }
 
 // ── Modo piloto: mute de comandas ────────────────────────────────────────
-// Durante el piloto en paralelo con Wansoft, las comandas físicas las imprime
-// SOLO Wansoft (evitar dobles en cocina). Este flag apaga printByStation en
+// Durante el piloto en paralelo con el sistema anterior, las comandas físicas las imprime
+// SOLO el sistema anterior (evitar dobles en cocina). Este flag apaga printByStation en
 // esta terminal (localStorage = por dispositivo). El KDS no se afecta — las
 // órdenes siguen llegando por Supabase. Toggle protegido con PIN de gerente.
 
