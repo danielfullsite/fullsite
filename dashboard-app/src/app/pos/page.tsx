@@ -1562,7 +1562,11 @@ function POSContent() {
       try {
         const existing = localStorage.getItem(`pos_order_${mesa}`)
         const prev = existing ? JSON.parse(existing) : {}
-        localStorage.setItem(`pos_order_${mesa}`, JSON.stringify({ ...prev, ts: Date.now(), items: orderItems }))
+        // NUNCA sobrescribir items en caché con [] durante transiciones (cambio de
+        // mesa dispara un setOrderItems([]) momentáneo). Un vaciado REAL (pago/cancelación)
+        // borra la caché por separado. Esto evita que la orden desaparezca al reabrir.
+        const nextItems = orderItems.length > 0 ? orderItems : (prev.items || [])
+        localStorage.setItem(`pos_order_${mesa}`, JSON.stringify({ ...prev, ts: Date.now(), items: nextItems }))
       } catch { /* ignore */ }
     }
   }, [orderItems, mesa])
