@@ -51,6 +51,7 @@ import {
   Fingerprint,
   Store,
   Flag,
+  Sliders,
   ScrollText,
   ArrowLeft,
 } from 'lucide-react'
@@ -185,6 +186,7 @@ const platformNavSections = [
       { href: '/platform/copiloto', label: 'Copiloto', icon: Sparkles },
       { href: '/platform/recomendaciones', label: 'Recomendaciones', icon: Lightbulb },
       { href: '/platform/tenants', label: 'Tenants', icon: Store },
+      { href: '/platform/config', label: 'Config restaurante', icon: Sliders },
       { href: '/platform/staff', label: 'Personal & PINs', icon: Users },
       { href: '/platform/datos', label: 'Exportar datos', icon: Database },
       { href: '/platform/importar', label: 'Importar datos', icon: Upload },
