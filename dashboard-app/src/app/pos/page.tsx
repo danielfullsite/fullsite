@@ -3796,7 +3796,6 @@ function POSContent() {
                   { href: '/pos/cocina', icon: ChefHat, label: 'Cocina', section: 'cocina' },
                   { href: '/pos/barra', icon: Wine, label: 'Barra', section: 'barra' },
                   { href: '/pos/delivery', icon: Bike, label: 'Domicilio', section: 'delivery' },
-                  { href: '/pos/kds', icon: Monitor, label: 'KDS Tablet', section: 'kds' },
                 ] },
                 { title: 'Caja & Turno', icon: Receipt, defaultOpen: false, items: [
                   { href: '/pos/turno', icon: Clock, label: 'Turno', section: 'turno' },
