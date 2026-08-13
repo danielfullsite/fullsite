@@ -2054,6 +2054,23 @@ function POSContent() {
               setSentItemSnapshots(snaps)
             }
           } else {
+            // DB devolvió 0 filas. PROTECCIÓN CONTRA CARRERA (read-after-write):
+            // si hay una orden en caché RECIÉN escrita (<2 min, p.ej. recién enviada
+            // a cocina), casi seguro es lag/replicación — NO destruir la orden local.
+            // Se conserva lo que mostró el instant-cache y el próximo poll reconcilia.
+            // Las órdenes pagadas/canceladas borran su caché (ver handlers de pago),
+            // así que esas sí caen a 0 filas y se limpian correctamente.
+            try {
+              const freshCache = localStorage.getItem(`pos_order_${mesa}`)
+              if (freshCache) {
+                const fc = JSON.parse(freshCache)
+                if (fc.items?.length > 0 && fc.ts && Date.now() - fc.ts < 120000) {
+                  // Orden local fresca — no vaciar. Mantener y salir.
+                  if (!cancelled) setLoadingMesa(false)
+                  return
+                }
+              }
+            } catch {}
             // DB says no open order for this mesa — clear stale cache
             try { localStorage.removeItem(`pos_order_${mesa}`) } catch {}
             // Check for unsaved draft
