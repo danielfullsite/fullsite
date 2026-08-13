@@ -5,10 +5,14 @@ import {
   AlertTriangle,
   ArrowUpRight,
   Bot,
+  ChefHat,
   DatabaseZap,
   LockKeyhole,
+  Monitor,
   Plus,
+  PlugZap,
   Power,
+  Printer,
   RefreshCw,
   Store,
 } from 'lucide-react'
@@ -39,6 +43,31 @@ interface PlatformClient {
   type: string | null
   created_at: string | null
   integrations: PlatformIntegration[]
+  operations?: {
+    pos: {
+      open_turnos: number
+      recent_orders: number
+      last_order_at: string | null
+      status: 'idle' | 'ready' | 'live'
+    }
+    kds: {
+      active_orders: number
+      pending_batches: number
+      last_sent_at: string | null
+      status: 'idle' | 'live'
+    }
+    printing: {
+      pending_jobs: number
+      failed_jobs: number
+      last_print_at: string | null
+      status: 'idle' | 'ok' | 'queued' | 'attention'
+    }
+    bridge: {
+      events: number
+      last_seen_at: string | null
+      status: 'unknown' | 'seen' | 'stale' | 'online'
+    }
+  }
 }
 
 interface PlatformOverview {
@@ -91,6 +120,26 @@ function statusDot(client: PlatformClient) {
   if (tenantOpenDetections(client) > 0) return 'bg-amber-400'
   if (tenantHasData(client)) return 'bg-rose-400'
   return 'bg-slate-500'
+}
+
+function integrationTone(integration: PlatformIntegration) {
+  if (integration.status === 'active') return 'border-emerald-500/25 bg-emerald-500/10 text-emerald-300'
+  if (integration.status === 'ready_for_cert' || integration.status === 'configured' || integration.status === 'mapped') {
+    return 'border-amber-500/25 bg-amber-500/10 text-amber-300'
+  }
+  if (integration.last_error) return 'border-red-500/25 bg-red-500/10 text-red-300'
+  return 'border-white/10 bg-white/[0.03] text-[var(--text-3)]'
+}
+
+function opTone(status: string) {
+  if (status === 'live' || status === 'online') return 'border-emerald-500/25 bg-emerald-500/10 text-emerald-300'
+  if (status === 'ready' || status === 'seen' || status === 'queued' || status === 'ok') return 'border-sky-500/25 bg-sky-500/10 text-sky-300'
+  if (status === 'attention' || status === 'stale') return 'border-amber-500/25 bg-amber-500/10 text-amber-300'
+  return 'border-white/10 bg-white/[0.03] text-[var(--text-3)]'
+}
+
+function shortStatus(status: string) {
+  return status.replaceAll('_', ' ')
 }
 
 export default function PlatformTenantsPage() {
@@ -206,13 +255,15 @@ export default function PlatformTenantsPage() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[860px] text-left">
+          <table className="w-full min-w-[1120px] text-left">
             <thead>
               <tr className="border-b border-[var(--line-soft)] text-[11px] uppercase tracking-[0.18em] text-[var(--text-3)]">
                 <th className="px-5 py-3 font-black">Cliente</th>
                 <th className="px-5 py-3 font-black">ID</th>
                 <th className="px-5 py-3 font-black">Últimos datos</th>
                 <th className="px-5 py-3 font-black">Detecciones</th>
+                <th className="px-5 py-3 font-black">Integraciones</th>
+                <th className="px-5 py-3 font-black">Operación</th>
                 <th className="px-5 py-3 font-black text-right">Acciones</th>
               </tr>
             </thead>
@@ -234,6 +285,28 @@ export default function PlatformTenantsPage() {
                     <td className="px-5 py-4 font-mono text-sm text-[var(--text-2)]">{client.id}</td>
                     <td className="px-5 py-4 text-sm text-[var(--text-2)]">{signal}</td>
                     <td className="px-5 py-4 text-sm text-[var(--text-2)]">{detections ? detections : '—'}</td>
+                    <td className="px-5 py-4">
+                      <div className="flex flex-wrap gap-1.5">
+                        {client.integrations.map(integration => (
+                          <span
+                            key={integration.provider}
+                            title={`${integration.label}: ${shortStatus(integration.status)}`}
+                            className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-black ${integrationTone(integration)}`}
+                          >
+                            <PlugZap size={11} />
+                            {integration.provider === 'ubereats' ? 'Uber' : integration.provider === 'rappi' ? 'Rappi' : 'DiDi'}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="flex flex-wrap gap-1.5">
+                        <OperationChip icon={Monitor} label="POS" value={client.operations?.pos.status || 'idle'} />
+                        <OperationChip icon={ChefHat} label="KDS" value={client.operations?.kds.status || 'idle'} />
+                        <OperationChip icon={Printer} label="Print" value={client.operations?.printing.status || 'idle'} />
+                        <OperationChip icon={DatabaseZap} label="Bridge" value={client.operations?.bridge.status || 'unknown'} />
+                      </div>
+                    </td>
                     <td className="px-5 py-4">
                       <div className="flex items-center justify-end gap-3">
                         <button
@@ -294,5 +367,25 @@ function TenantMetric({
       </div>
       <p className="text-3xl font-black tracking-tight text-[var(--text-1)]">{value}</p>
     </div>
+  )
+}
+
+function OperationChip({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: typeof Store
+  label: string
+  value: string
+}) {
+  return (
+    <span
+      title={`${label}: ${shortStatus(value)}`}
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-black ${opTone(value)}`}
+    >
+      <Icon size={11} />
+      {label}
+    </span>
   )
 }

@@ -18,6 +18,11 @@ describe('Platform Control Center security contract', () => {
     expect(source).not.toContain('fullsite_client_id')
     expect(source).toContain('impersonation auditada')
     expect(source).toContain('No se habilita cambiando tenant en browser')
+    expect(source).toContain('Uber')
+    expect(source).toContain('Rappi')
+    expect(source).toContain('DiDi')
+    expect(source).toContain('OperationChip')
+    expect(source).toContain('disabled')
   })
 
   it('fails closed without configured platform admin emails', () => {
@@ -41,6 +46,17 @@ describe('Platform Control Center security contract', () => {
     const serviceFetchIndex = source.indexOf("sbGet<ClientRow>")
     expect(authzIndex).toBeGreaterThan(0)
     expect(serviceFetchIndex).toBeGreaterThan(authzIndex)
+  })
+
+  it('adds tenant operations health only after platform-admin authorization', () => {
+    const source = readFileSync(join(process.cwd(), 'src/app/api/platform/overview/route.ts'), 'utf8')
+    const authzIndex = source.indexOf("admins.has(user.email.toLowerCase())")
+    for (const table of ['pos_orders', 'pos_turnos', 'pos_print_jobs', 'pos_bridge_logs']) {
+      const tableIndex = source.indexOf(`${table}?select`)
+      expect(tableIndex).toBeGreaterThan(authzIndex)
+    }
+    expect(source).toContain('operations: makeOperations()')
+    expect(source).not.toContain('SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY')
   })
 
   it('only exposes the Control Center sidebar link to configured platform admin emails', () => {
