@@ -1,391 +1,342 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Users, Bot, CheckCircle, AlertTriangle, DollarSign, Activity, Clock, RefreshCw } from 'lucide-react'
-import { formatCurrency, formatNumber } from '@/lib/format'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  AlertTriangle,
+  CheckCircle2,
+  PlugZap,
+  RefreshCw,
+  ShieldCheck,
+  Store,
+  UtensilsCrossed,
+  Users,
+  Zap,
+} from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
+import { createClient } from '@/lib/supabase-browser'
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+type ProviderKey = 'ubereats' | 'rappi' | 'didi'
 
-async function sbFetch(table: string, params: string = ''): Promise<unknown[]> {
-  const url = `${SUPABASE_URL}/rest/v1/${table}?${params}`
-  try {
-    const res = await fetch(url, {
-      headers: {
-        'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
-      },
-    })
-    if (!res.ok) return []
-    const data = await res.json()
-    return Array.isArray(data) ? data : []
-  } catch {
-    return []
-  }
-}
-
-async function sbCount(table: string, filter: string = ''): Promise<number> {
-  const url = `${SUPABASE_URL}/rest/v1/${table}?select=*${filter ? '&' + filter : ''}`
-  try {
-    const res = await fetch(url, {
-      headers: {
-        'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
-        'Prefer': 'count=exact',
-        'Range': '0-0',
-      },
-    })
-    const range = res.headers.get('content-range')
-    if (range) {
-      const total = range.split('/')[1]
-      return total === '*' ? 0 : parseInt(total, 10)
-    }
-    return 0
-  } catch {
-    return 0
-  }
-}
-
-interface DayBucket {
+interface PlatformIntegration {
+  provider: ProviderKey
   label: string
-  date: string
-  total: number
-  success: number
-  error: number
+  status: string
+  certification_state: string
+  provider_account_id: string | null
+  store_ids: string[]
+  store_open: boolean | null
+  menu_sync_enabled: boolean | null
+  recent_webhook_count: number
+  recent_order_count: number
+  last_webhook_at: string | null
+  last_order_at: string | null
+  last_error: string | null
+  blockers: string[]
 }
 
-interface PlatformData {
-  activeClients: number
-  totalRuns: number
-  successRate: number
-  alertsCritical: number
-  alertsWarning: number
-  valueCreated: number
-  uptimePercent: number
-  freshness: { client: string; hoursAgo: number }[]
-  dailyRuns: DayBucket[]
+interface PlatformClient {
+  id: string
+  display_name: string
+  city: string | null
+  active: boolean | null
+  data_source: string | null
+  mesas: number | null
+  type: string | null
+  created_at: string | null
+  integrations: PlatformIntegration[]
 }
 
-function daysAgo(n: number): string {
-  const d = new Date()
-  d.setDate(d.getDate() - n)
-  return d.toISOString().slice(0, 10)
+interface PlatformOverview {
+  ok: boolean
+  error?: string
+  environment?: {
+    supabase_ref: string
+    service_role_used: boolean
+    service_role_scope: string
+  }
+  summary?: {
+    clients: number
+    active_clients: number
+    integration_slots: number
+    configured_integrations: number
+    recent_delivery_orders: number
+    unmapped_events_hidden: number
+  }
+  clients?: PlatformClient[]
 }
 
-function shortDay(dateStr: string): string {
-  const d = new Date(dateStr + 'T12:00:00')
-  return d.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric' })
+function providerStyle(provider: ProviderKey) {
+  if (provider === 'ubereats') return 'border-emerald-500/25 bg-emerald-500/10 text-emerald-300'
+  if (provider === 'rappi') return 'border-orange-500/25 bg-orange-500/10 text-orange-300'
+  return 'border-sky-500/25 bg-sky-500/10 text-sky-300'
 }
 
-function hoursAgoFromDate(dateStr: string): number {
-  const now = new Date()
-  const then = new Date(dateStr + 'T23:59:00')
-  return Math.max(0, Math.round((now.getTime() - then.getTime()) / (1000 * 60 * 60)))
+function statusCopy(status: string) {
+  const map: Record<string, string> = {
+    active: 'Activo',
+    ready_for_cert: 'Listo para certificar',
+    configured: 'Configurado',
+    mapped: 'Mapeado',
+    not_connected: 'No conectado',
+    waiting_external: 'Esperando externo',
+  }
+  return map[status] || status.replaceAll('_', ' ')
+}
+
+function statusTone(status: string) {
+  if (status === 'active') return 'text-emerald-400'
+  if (status === 'ready_for_cert' || status === 'configured' || status === 'mapped') return 'text-amber-300'
+  return 'text-white/45'
+}
+
+function shortDate(value: string | null) {
+  if (!value) return '—'
+  try {
+    return new Date(value).toLocaleString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+  } catch {
+    return '—'
+  }
 }
 
 export default function PlatformPage() {
-  const [data, setData] = useState<PlatformData | null>(null)
+  const [overview, setOverview] = useState<PlatformOverview | null>(null)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [query, setQuery] = useState('')
 
   async function load() {
-    setLoading(true)
+    setRefreshing(true)
     try {
-      // Parallel fetches
-      const [
-        clientCount,
-        totalRunCount,
-        successCount,
-        errorCount,
-        criticalAlerts,
-        warningAlerts,
-        recentRuns,
-        latestDaily,
-        uptimeRuns,
-        uptimeSuccess,
-      ] = await Promise.all([
-        sbCount('clients'),
-        sbCount('agent_runs'),
-        sbCount('agent_runs', 'status=eq.success'),
-        sbCount('agent_runs', 'status=eq.error'),
-        sbCount('agent_results', 'priority=eq.critical'),
-        sbCount('agent_results', 'priority=eq.warning'),
-        sbFetch('agent_runs', `select=created_at,status&order=created_at.desc&limit=2000&created_at=gte.${daysAgo(7)}`),
-        sbFetch('wansoft_daily', 'select=client_slug,fecha&order=fecha.desc&limit=50'),
-        sbCount('agent_runs', 'agent_id=eq.uptime-monitor'),
-        sbCount('agent_runs', 'agent_id=eq.uptime-monitor&status=eq.success'),
-      ])
-
-      // Build 7-day buckets
-      const buckets: DayBucket[] = []
-      for (let i = 6; i >= 0; i--) {
-        const date = daysAgo(i)
-        buckets.push({ label: shortDay(date), date, total: 0, success: 0, error: 0 })
-      }
-      for (const run of recentRuns as { created_at: string; status: string }[]) {
-        const runDate = run.created_at?.slice(0, 10)
-        const bucket = buckets.find(b => b.date === runDate)
-        if (bucket) {
-          bucket.total++
-          if (run.status === 'success') bucket.success++
-          if (run.status === 'error') bucket.error++
-        }
-      }
-
-      // Data freshness per client
-      const freshnessMap = new Map<string, string>()
-      for (const row of latestDaily as { client_slug: string; fecha: string }[]) {
-        if (!freshnessMap.has(row.client_slug)) {
-          freshnessMap.set(row.client_slug, row.fecha)
-        }
-      }
-      const freshness = Array.from(freshnessMap.entries()).map(([client, fecha]) => ({
-        client,
-        hoursAgo: hoursAgoFromDate(fecha),
-      }))
-
-      // Uptime %
-      const uptimePercent = uptimeRuns > 0 ? (uptimeSuccess / uptimeRuns) * 100 : 99.9
-
-      // Value created placeholder
-      const clients = Math.max(clientCount, 1)
-      const valueCreated = clients * 80000
-
-      const successRate = totalRunCount > 0 ? (successCount / totalRunCount) * 100 : 0
-
-      setData({
-        activeClients: clientCount,
-        totalRuns: totalRunCount,
-        successRate,
-        alertsCritical: criticalAlerts,
-        alertsWarning: warningAlerts,
-        valueCreated,
-        uptimePercent,
-        freshness,
-        dailyRuns: buckets,
+      const { data: { session } } = await createClient().auth.getSession()
+      const res = await fetch('/api/platform/overview', {
+        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
+        cache: 'no-store',
       })
-    } catch (err) {
-      console.error('Error loading platform data:', err)
+      const payload = await res.json().catch(() => ({ ok: false, error: `HTTP_${res.status}` })) as PlatformOverview
+      setOverview({ ...payload, ok: res.ok && payload.ok })
+    } catch {
+      setOverview({ ok: false, error: 'NETWORK_ERROR' })
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void load()
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [])
+
+  const clients = useMemo(() => {
+    const source = overview?.clients ?? []
+    const q = query.trim().toLowerCase()
+    if (!q) return source
+    return source.filter(client =>
+      client.id.toLowerCase().includes(q) ||
+      client.display_name.toLowerCase().includes(q) ||
+      (client.city || '').toLowerCase().includes(q)
+    )
+  }, [overview?.clients, query])
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-10 h-10 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
       </div>
     )
   }
 
-  if (!data) return null
+  if (!overview?.ok) {
+    return (
+      <div className="max-w-3xl">
+        <PageHeader title="Control Center" subtitle="Panel interno de clientes e integraciones" eyebrow="PLATFORM" />
+        <div className="mt-6 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-6">
+          <div className="flex items-start gap-4">
+            <AlertTriangle className="text-amber-300 shrink-0" size={24} />
+            <div>
+              <h2 className="text-lg font-black text-[var(--text-1)]">Control Center no disponible</h2>
+              <p className="text-sm text-[var(--text-2)] mt-2">
+                {overview?.error || 'UNKNOWN_ERROR'}
+              </p>
+              <p className="text-xs text-[var(--text-3)] mt-3">
+                Esta pantalla falla cerrada. Requiere sesión válida, email incluido en PLATFORM_ADMIN_EMAILS y service role configurado solo server-side.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
-  const maxRuns = Math.max(...data.dailyRuns.map(d => d.total), 1)
-
-  const kpis = [
-    {
-      label: 'Active Clients',
-      value: formatNumber(data.activeClients),
-      sub: 'Multi-tenant SaaS',
-      icon: Users,
-      color: 'text-blue-400',
-      bg: 'from-blue-500/10 to-blue-500/5',
-      border: 'border-blue-500/20',
-    },
-    {
-      label: 'Total Agent Runs',
-      value: formatNumber(data.totalRuns),
-      sub: 'Lifetime executions',
-      icon: Bot,
-      color: 'text-violet-400',
-      bg: 'from-violet-500/10 to-violet-500/5',
-      border: 'border-violet-500/20',
-    },
-    {
-      label: 'Success Rate',
-      value: `${data.successRate.toFixed(1)}%`,
-      sub: `${formatNumber(data.totalRuns - Math.round(data.totalRuns * data.successRate / 100))} errors`,
-      icon: CheckCircle,
-      color: data.successRate >= 95 ? 'text-emerald-400' : data.successRate >= 80 ? 'text-amber-400' : 'text-red-400',
-      bg: data.successRate >= 95 ? 'from-emerald-500/10 to-emerald-500/5' : 'from-amber-500/10 to-amber-500/5',
-      border: data.successRate >= 95 ? 'border-emerald-500/20' : 'border-amber-500/20',
-    },
-    {
-      label: 'Alerts Generated',
-      value: formatNumber(data.alertsCritical + data.alertsWarning),
-      sub: `${data.alertsCritical} critical, ${data.alertsWarning} warning`,
-      icon: AlertTriangle,
-      color: data.alertsCritical > 0 ? 'text-red-400' : 'text-amber-400',
-      bg: data.alertsCritical > 0 ? 'from-red-500/10 to-red-500/5' : 'from-amber-500/10 to-amber-500/5',
-      border: data.alertsCritical > 0 ? 'border-red-500/20' : 'border-amber-500/20',
-    },
-    {
-      label: 'Value Created',
-      value: formatCurrency(data.valueCreated),
-      sub: `~${formatCurrency(80000)}/client/yr`,
-      icon: DollarSign,
-      color: 'text-emerald-400',
-      bg: 'from-emerald-500/10 to-emerald-500/5',
-      border: 'border-emerald-500/20',
-    },
-    {
-      label: 'System Uptime',
-      value: `${data.uptimePercent.toFixed(1)}%`,
-      sub: 'Based on uptime-monitor runs',
-      icon: Activity,
-      color: data.uptimePercent >= 99 ? 'text-emerald-400' : 'text-amber-400',
-      bg: data.uptimePercent >= 99 ? 'from-emerald-500/10 to-emerald-500/5' : 'from-amber-500/10 to-amber-500/5',
-      border: data.uptimePercent >= 99 ? 'border-emerald-500/20' : 'border-amber-500/20',
-    },
-  ]
+  const summary = overview.summary!
 
   return (
     <>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4 mb-6">
         <PageHeader
-          title="Platform Metrics"
-          subtitle="Fullsite operational overview"
-          eyebrow="INTERNAL"
+          title="Control Center"
+          subtitle="Clientes, módulos e integraciones marketplace — lectura segura server-side"
+          eyebrow="FULLSITE PLATFORM"
         />
         <button
-          onClick={load}
-          className="p-2 rounded-lg hover:bg-[var(--surface-2)] text-[var(--text-3)] hover:text-[var(--text-2)] transition-colors"
+          onClick={() => void load()}
+          disabled={refreshing}
+          className="inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 py-2.5 text-sm font-bold text-[var(--text-2)] hover:text-[var(--text-1)] hover:bg-[var(--surface-2)] disabled:opacity-60"
         >
-          <RefreshCw size={16} />
+          <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
+          Actualizar
         </button>
       </div>
 
-      {/* KPI Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-        {kpis.map(kpi => {
-          const Icon = kpi.icon
-          return (
-            <div
-              key={kpi.label}
-              className={`bg-gradient-to-br ${kpi.bg} rounded-xl border ${kpi.border} p-5`}
-            >
-              <div className="flex items-start justify-between mb-3">
-                <div className={`w-9 h-9 rounded-lg bg-[var(--surface)] flex items-center justify-center`}>
-                  <Icon size={16} className={kpi.color} />
-                </div>
-              </div>
-              <p className="text-2xl font-black text-[var(--text-1)] tracking-tight">{kpi.value}</p>
-              <p className="text-xs font-medium text-[var(--text-2)] mt-1">{kpi.label}</p>
-              <p className="text-[11px] text-[var(--text-3)] mt-0.5">{kpi.sub}</p>
-            </div>
-          )
-        })}
+      <div className="grid sm:grid-cols-2 xl:grid-cols-5 gap-3 mb-6">
+        <MetricCard icon={Users} label="Clientes" value={String(summary.clients)} sub={`${summary.active_clients} activos`} />
+        <MetricCard icon={PlugZap} label="Slots integración" value={String(summary.integration_slots)} sub="Uber · Rappi · DiDi por tenant" />
+        <MetricCard icon={CheckCircle2} label="Configuradas" value={String(summary.configured_integrations)} sub="con mapping o provider" />
+        <MetricCard icon={UtensilsCrossed} label="Órdenes recientes" value={String(summary.recent_delivery_orders)} sub="marketplaces" />
+        <MetricCard icon={ShieldCheck} label="Entorno" value={overview.environment?.supabase_ref || '—'} sub="server-mediated" mono />
       </div>
 
-      {/* 7-Day Agent Runs Chart */}
-      <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm mb-6">
-        <div className="px-5 py-4 border-b border-[var(--line-soft)]">
-          <h3 className="text-sm font-bold text-[var(--text-1)]">Agent Runs - Last 7 Days</h3>
-          <p className="text-[11px] text-[var(--text-3)] mt-0.5">
-            Daily execution volume with success/error breakdown
-          </p>
-        </div>
-        <div className="px-5 py-5">
-          <div className="flex items-end gap-2" style={{ height: 180 }}>
-            {data.dailyRuns.map(day => {
-              const barH = maxRuns > 0 ? (day.total / maxRuns) * 150 : 0
-              const successH = day.total > 0 ? (day.success / day.total) * barH : 0
-              const errorH = day.total > 0 ? (day.error / day.total) * barH : 0
-              const otherH = barH - successH - errorH
-              return (
-                <div key={day.date} className="flex-1 flex flex-col items-center gap-1">
-                  <span className="text-[10px] text-[var(--text-3)] tabular-nums">{day.total}</span>
-                  <div
-                    className="w-full rounded-md overflow-hidden flex flex-col-reverse"
-                    style={{ height: Math.max(barH, 2) }}
-                  >
-                    <div
-                      className="w-full bg-emerald-500/80 transition-all"
-                      style={{ height: successH }}
-                    />
-                    <div
-                      className="w-full bg-amber-500/60 transition-all"
-                      style={{ height: otherH }}
-                    />
-                    <div
-                      className="w-full bg-red-500/70 transition-all"
-                      style={{ height: errorH }}
-                    />
-                  </div>
-                  <span className="text-[10px] text-[var(--text-3)] text-center leading-tight">{day.label}</span>
-                </div>
-              )
-            })}
+      <div className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] shadow-sm overflow-hidden">
+        <div className="p-5 border-b border-[var(--line-soft)] flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div>
+            <h2 className="text-base font-black text-[var(--text-1)]">Restaurantes</h2>
+            <p className="text-xs text-[var(--text-3)] mt-1">
+              Crear un cliente no lo conecta automáticamente: lo deja listo para asignarle Store ID, credenciales y prueba oficial por plataforma.
+            </p>
           </div>
-          <div className="flex items-center gap-4 mt-4 pt-3 border-t border-[var(--line-soft)]">
-            <div className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-sm bg-emerald-500/80" />
-              <span className="text-[11px] text-[var(--text-3)]">Success</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-sm bg-amber-500/60" />
-              <span className="text-[11px] text-[var(--text-3)]">Other</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-sm bg-red-500/70" />
-              <span className="text-[11px] text-[var(--text-3)]">Error</span>
-            </div>
-          </div>
+          <input
+            value={query}
+            onChange={event => setQuery(event.target.value)}
+            placeholder="Buscar tenant..."
+            className="w-full md:w-72 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-2.5 text-sm text-[var(--text-1)] outline-none focus:border-emerald-500"
+          />
         </div>
-      </div>
 
-      {/* Data Freshness */}
-      <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm">
-        <div className="px-5 py-4 border-b border-[var(--line-soft)]">
-          <div className="flex items-center gap-2">
-            <Clock size={14} className="text-[var(--text-3)]" />
-            <h3 className="text-sm font-bold text-[var(--text-1)]">Data Freshness</h3>
-          </div>
-          <p className="text-[11px] text-[var(--text-3)] mt-0.5">
-            Hours since last wansoft_daily entry per client
-          </p>
-        </div>
         <div className="divide-y divide-[var(--line-soft)]">
-          {data.freshness.length === 0 ? (
-            <div className="px-5 py-4 text-sm text-[var(--text-3)]">No client data found</div>
+          {clients.length === 0 ? (
+            <div className="p-8 text-center text-sm text-[var(--text-3)]">No hay clientes que coincidan.</div>
           ) : (
-            data.freshness.map(f => {
-              const isStale = f.hoursAgo > 48
-              const isWarning = f.hoursAgo > 24
-              return (
-                <div key={f.client} className="px-5 py-3 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`w-2 h-2 rounded-full ${
-                        isStale ? 'bg-red-500' : isWarning ? 'bg-amber-500' : 'bg-emerald-500'
-                      }`}
-                    />
-                    <span className="text-sm font-medium text-[var(--text-1)] capitalize">{f.client}</span>
+            clients.map(client => (
+              <section key={client.id} className="p-5">
+                <div className="flex flex-col xl:flex-row xl:items-start gap-4">
+                  <div className="xl:w-72 shrink-0">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                        <Store size={18} className="text-emerald-300" />
+                      </div>
+                      <div>
+                        <h3 className="font-black text-[var(--text-1)]">{client.display_name}</h3>
+                        <p className="text-xs font-mono text-[var(--text-3)]">{client.id}</p>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <span className={`text-[11px] px-2 py-1 rounded-full border ${client.active === false ? 'border-red-500/20 text-red-300 bg-red-500/10' : 'border-emerald-500/20 text-emerald-300 bg-emerald-500/10'}`}>
+                        {client.active === false ? 'Inactivo' : 'Activo'}
+                      </span>
+                      <span className="text-[11px] px-2 py-1 rounded-full border border-white/10 text-white/45 bg-white/5">
+                        {client.city || 'Sin ciudad'}
+                      </span>
+                      <span className="text-[11px] px-2 py-1 rounded-full border border-white/10 text-white/45 bg-white/5">
+                        {client.mesas ?? '—'} mesas
+                      </span>
+                    </div>
                   </div>
-                  <span
-                    className={`text-sm tabular-nums font-medium ${
-                      isStale ? 'text-red-400' : isWarning ? 'text-amber-400' : 'text-[var(--text-3)]'
-                    }`}
-                  >
-                    {f.hoursAgo}h ago
-                  </span>
+
+                  <div className="grid md:grid-cols-3 gap-3 flex-1">
+                    {client.integrations.map(integration => (
+                      <IntegrationCard key={`${client.id}-${integration.provider}`} integration={integration} />
+                    ))}
+                  </div>
                 </div>
-              )
-            })
+              </section>
+            ))
           )}
         </div>
       </div>
-
-      {/* Footer note */}
-      <div className="mt-4 px-4 py-3 bg-[var(--surface-2)] rounded-lg">
-        <p className="text-[11px] text-[var(--text-3)] leading-relaxed">
-          <strong className="text-[var(--text-2)]">Internal page.</strong> Value Created uses a placeholder estimate of $80K MXN/client/year.
-          Uptime is derived from uptime-monitor agent runs. Data freshness shows hours since the most recent wansoft_daily row per client_slug.
-        </p>
-      </div>
     </>
+  )
+}
+
+function MetricCard({
+  icon: Icon,
+  label,
+  value,
+  sub,
+  mono = false,
+}: {
+  icon: typeof Users
+  label: string
+  value: string
+  sub: string
+  mono?: boolean
+}) {
+  return (
+    <div className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-4 shadow-sm">
+      <div className="flex items-center gap-2 text-[var(--text-3)] mb-3">
+        <Icon size={15} />
+        <span className="text-[11px] font-bold uppercase tracking-[0.18em]">{label}</span>
+      </div>
+      <p className={`text-2xl font-black text-[var(--text-1)] ${mono ? 'font-mono text-lg' : ''}`}>{value}</p>
+      <p className="text-xs text-[var(--text-3)] mt-1">{sub}</p>
+    </div>
+  )
+}
+
+function IntegrationCard({ integration }: { integration: PlatformIntegration }) {
+  const hasBlockers = integration.blockers.length > 0
+  return (
+    <div className="rounded-2xl border border-[var(--line)] bg-[var(--surface-2)]/50 p-4">
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-xs font-black ${providerStyle(integration.provider)}`}>
+          <Zap size={12} />
+          {integration.label}
+        </span>
+        {hasBlockers ? (
+          <AlertTriangle size={18} className="text-amber-300" />
+        ) : (
+          <CheckCircle2 size={18} className="text-emerald-300" />
+        )}
+      </div>
+
+      <p className={`text-sm font-black ${statusTone(integration.status)}`}>{statusCopy(integration.status)}</p>
+      <p className="text-[11px] text-[var(--text-3)] mt-1">
+        Cert: {integration.certification_state} · Store: {integration.store_ids.length ? integration.store_ids.join(', ') : '—'}
+      </p>
+
+      <div className="grid grid-cols-2 gap-2 mt-3 text-[11px]">
+        <div className="rounded-lg bg-black/10 border border-white/5 px-2 py-2">
+          <p className="text-[var(--text-3)]">Webhooks</p>
+          <p className="font-bold text-[var(--text-1)]">{integration.recent_webhook_count}</p>
+        </div>
+        <div className="rounded-lg bg-black/10 border border-white/5 px-2 py-2">
+          <p className="text-[var(--text-3)]">Órdenes</p>
+          <p className="font-bold text-[var(--text-1)]">{integration.recent_order_count}</p>
+        </div>
+      </div>
+
+      <div className="mt-3 text-[11px] text-[var(--text-3)] space-y-1">
+        <p>Último webhook: {shortDate(integration.last_webhook_at)}</p>
+        <p>Última orden: {shortDate(integration.last_order_at)}</p>
+      </div>
+
+      {integration.last_error && (
+        <p className="mt-3 rounded-lg bg-red-500/10 border border-red-500/20 px-2 py-2 text-[11px] text-red-300">
+          {integration.last_error}
+        </p>
+      )}
+
+      {hasBlockers && (
+        <ul className="mt-3 space-y-1">
+          {integration.blockers.slice(0, 3).map(blocker => (
+            <li key={blocker} className="text-[11px] text-amber-200/80 flex gap-1.5">
+              <span>•</span>
+              <span>{blocker}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }
