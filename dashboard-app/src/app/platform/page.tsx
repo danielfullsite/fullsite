@@ -151,7 +151,7 @@ export default function PlatformPage() {
   if (!overview?.ok) {
     return (
       <div className="max-w-3xl">
-        <PageHeader title="Control Center" subtitle="Panel interno de clientes e integraciones" eyebrow="PLATFORM" />
+        <PageHeader title="Control Center" subtitle="God Mode global de Fullsite · clientes e integraciones" eyebrow="GOD MODE" />
         <div className="mt-6 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-6">
           <div className="flex items-start gap-4">
             <AlertTriangle className="text-amber-300 shrink-0" size={24} />
@@ -177,8 +177,8 @@ export default function PlatformPage() {
       <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4 mb-6">
         <PageHeader
           title="Control Center"
-          subtitle="Clientes, módulos e integraciones marketplace — lectura segura server-side"
-          eyebrow="FULLSITE PLATFORM"
+          subtitle="God Mode global: clientes, módulos e integraciones marketplace — lectura segura server-side"
+          eyebrow="GOD MODE · FULLSITE PLATFORM"
         />
         <button
           onClick={() => void load()}

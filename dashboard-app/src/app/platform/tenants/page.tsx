@@ -195,7 +195,7 @@ export default function PlatformTenantsPage() {
   if (!overview?.ok) {
     return (
       <div className="max-w-3xl">
-        <PageHeader title="Tenants" subtitle="Todos los clientes de Fullsite · lectura segura" eyebrow="PLATAFORMA" />
+        <PageHeader title="Tenants" subtitle="God Mode global · todos los clientes de Fullsite · lectura segura" eyebrow="GOD MODE · PLATAFORMA" />
         <div className="mt-6 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-6">
           <div className="flex items-start gap-4">
             <AlertTriangle className="text-amber-300 shrink-0" size={24} />
@@ -215,7 +215,7 @@ export default function PlatformTenantsPage() {
   return (
     <div className="space-y-8">
       <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
-        <PageHeader title="Tenants" subtitle="Todos los clientes de Fullsite · un solo cerebro" eyebrow="PLATAFORMA" />
+        <PageHeader title="Tenants" subtitle="God Mode global · todos los clientes de Fullsite · un solo cerebro" eyebrow="GOD MODE · PLATAFORMA" />
         <div className="flex items-center gap-2">
           <button
             onClick={() => void load()}

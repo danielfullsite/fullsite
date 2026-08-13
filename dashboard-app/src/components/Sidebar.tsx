@@ -168,7 +168,7 @@ const navSections = [
     ],
   },
   {
-    label: 'Fullsite',
+    label: 'God Mode',
     items: [
       { href: '/platform', label: 'Control Center', icon: ShieldCheck, platformOnly: true },
       { href: '/platform/tenants', label: 'Tenants', icon: Users, platformOnly: true },
