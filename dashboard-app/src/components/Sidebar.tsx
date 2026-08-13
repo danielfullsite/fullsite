@@ -67,6 +67,7 @@ const navSections = [
     label: 'Principal',
     items: [
       { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+      { href: '/resumen', label: 'Resumen', icon: Sparkles },
       { href: '/ventas', label: 'Ventas', icon: DollarSign },
       { href: '/cortes', label: 'Cortes', icon: ClipboardList },
     ],
