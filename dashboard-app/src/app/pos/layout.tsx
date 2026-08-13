@@ -8,7 +8,7 @@ import { checkActiveSession, registerSession, startHeartbeat, removeSession } fr
 import TurnoGate from '@/components/pos/TurnoGate'
 import { getActiveClientSlug as _cid } from '@/lib/data'
 import { getEffectiveSetting } from '@/lib/settings'
-import { initStationRouting, initNoPrintStations, initCancellationReasons, initDiscountCatalog } from '@/lib/pos-constants'
+import { initStationRouting, initNoPrintStations, initCancellationReasons, initDiscountCatalog, initKdsStations } from '@/lib/pos-constants'
 import { inventoryPolicyService } from '@/lib/inventory-policy'
 import { getFingerprintUrl } from '@/lib/fingerprint-url'
 import { POSLockContext } from './pos-lock-context'
@@ -135,13 +135,15 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
           getEffectiveSetting(clientId, 'pos.no_print_stations'),
           getEffectiveSetting(clientId, 'pos.cancellation_reasons'),
           getEffectiveSetting(clientId, 'pos.discount_catalog'),
+          getEffectiveSetting(clientId, 'pos.kds_stations'),
           inventoryPolicyService.initialize(clientId),
-        ]).then(([idleMs, stationRouting, noPrintStations, cancelReasons, discountCatalog]) => {
+        ]).then(([idleMs, stationRouting, noPrintStations, cancelReasons, discountCatalog, kdsStations]) => {
           IDLE_TIMEOUT_MS = idleMs
           initStationRouting(stationRouting as Record<string, string[]>)
           initNoPrintStations(noPrintStations)
           initCancellationReasons(cancelReasons)
           initDiscountCatalog(discountCatalog)
+          initKdsStations(kdsStations)
         }).catch(() => { /* keep module-level defaults */ })
       }
     }

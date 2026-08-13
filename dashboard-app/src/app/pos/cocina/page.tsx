@@ -10,7 +10,7 @@ import {
   verifyManagerPin, RECIPE_ALIASES, formatMXN, getPOSAuthHeaders,
   type KitchenOrderFromDB, type RecipeDetail, type OrderItem,
 } from '@/lib/pos-data'
-import { isBebida, POLL_INTERVAL_KITCHEN, getStationByName, type StationName } from '@/lib/pos-constants'
+import { isBebida, POLL_INTERVAL_KITCHEN, getStationByName, effectiveKdsStation, type StationName } from '@/lib/pos-constants'
 import { reprintByStation, type ReprintOrderContext } from '@/lib/printer'
 import { getActiveClientSlug as _cid } from '@/lib/data'
 import { useBridgeClient, setPosServerHost } from '@/lib/bridge-client'
@@ -54,8 +54,9 @@ function orderHasItemsForStation(order: KitchenOrderFromDB, filter: 'todo' | 'pa
     if (filter === 'todo') return true
     const name = (i.nombre || i.name || '').toLowerCase()
     if (filter === 'panaderia') return PANADERIA_KW.some(kw => name.includes(kw))
-    const itemStation = resolveItemStation(i)
-    // Eduardo Jul 21: strict filtering — each station only sees its own items
+    // Estación efectiva: si el tenant no tiene pantalla de esa estación (p.ej. AMALAY
+    // sin barra), se pliega a cocina → ningún platillo se pierde.
+    const itemStation = effectiveKdsStation(resolveItemStation(i))
     return itemStation === filter
   })
 }
@@ -65,6 +66,17 @@ export default function CocinaPage() {
   const [mounted, setMounted] = useState(false)
   const [loading, setLoading] = useState(true)
   const [offline, setOffline] = useState(false)
+
+  // Carga qué pantallas KDS tiene este tenant (la cocina hace bypass del layout, así
+  // que carga el setting aquí). AMALAY=['cocina'] → barra/caja se pliegan a cocina.
+  useEffect(() => {
+    const cid = _cid()
+    if (!cid) return
+    import('@/lib/settings').then(({ getEffectiveSetting }) =>
+      getEffectiveSetting(cid, 'pos.kds_stations')
+    ).then(s => { import('@/lib/pos-constants').then(({ initKdsStations }) => initKdsStations(s)) })
+      .catch(() => {})
+  }, [])
 
   // Recipe detail modal
   const [recipeDetail, setRecipeDetail] = useState<RecipeDetail | null>(null)

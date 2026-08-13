@@ -39,6 +39,7 @@ interface SettingDefinition<T> {
 
 type SettingKey =
   | 'pos.station_routing'
+  | 'pos.kds_stations'
   | 'pos.no_print_stations'
   | 'pos.cancellation_reasons'
   | 'pos.discount_catalog'
@@ -47,6 +48,7 @@ type SettingKey =
 
 type SettingValue<K extends SettingKey> =
   K extends 'pos.station_routing' ? Record<string, string[]> :
+  K extends 'pos.kds_stations' ? string[] :
   K extends 'pos.no_print_stations' ? string[] :
   K extends 'pos.cancellation_reasons' ? string[] :
   K extends 'pos.discount_catalog' ? Array<{ id: string; label: string; pct?: number; amount?: number }> :
@@ -80,6 +82,15 @@ const REGISTRY: { [K in SettingKey]: SettingDefinition<SettingValue<K>> } = {
         'icecream', 'desserts',
       ],
     } as Record<string, string[]>,
+  },
+
+  'pos.kds_stations': {
+    scope: 'sucursal',
+    operationalProblem:
+      'Cada restaurante tiene distinto número de pantallas KDS. AMALAY tiene UNA (cocina), ' +
+      'sin pantalla de barra; otros tienen cocina + barra separadas. Las estaciones sin ' +
+      'pantalla propia deben plegarse a la principal (cocina) para que ningún platillo se pierda.',
+    default: ['cocina', 'barra', 'caja'] as string[],  // pantallas KDS que existen en este tenant
   },
 
   'pos.no_print_stations': {

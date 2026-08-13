@@ -217,6 +217,23 @@ export function isNoPrintStation(station: StationName): boolean {
   return _noPrintStations.includes(station)
 }
 
+// ─── Pantallas KDS por tenant ────────────────────────────────────────────────
+// Qué estaciones tienen pantalla KDS propia en este restaurante. Las que NO,
+// se pliegan a 'cocina' (la principal) para que ningún platillo se pierda.
+// AMALAY = ['cocina'] → barra/caja aparecen también en la cocina.
+let _kdsStations: StationName[] = ['cocina', 'barra', 'caja']
+export function initKdsStations(stations: unknown) {
+  if (Array.isArray(stations)) {
+    const list = stations.filter((s): s is StationName => s === 'cocina' || s === 'barra' || s === 'caja')
+    if (list.length > 0) _kdsStations = list
+  }
+}
+export function getKdsStations(): StationName[] { return _kdsStations }
+// Estación efectiva del KDS para un item: su estación si tiene pantalla, si no → cocina.
+export function effectiveKdsStation(station: StationName): StationName {
+  return _kdsStations.includes(station) ? station : 'cocina'
+}
+
 // ─── Catálogos configurables por tenant (setting pos.*; cargados en el layout) ──
 // Regla del sistema anterior: cancelaciones y descuentos usan catálogos cerrados (anti-fraude),
 // no texto libre. Configurable por restaurante vía settings.
