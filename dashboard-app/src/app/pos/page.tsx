@@ -1553,12 +1553,17 @@ function POSContent() {
     return []
   })
   const [mesa, setMesa] = useState<number>(initialMesa)
+  // Mesa a la que pertenecen los orderItems actuales. loadMesaOrder lo fija a la mesa
+  // que carga. Evita que el persist escriba items de la mesa vieja en la caché de la
+  // nueva durante una transición de mesa (fuga cross-mesa).
+  const orderItemsMesaRef = useRef<number>(initialMesa)
 
   // Persist order items to localStorage on every change (8h TTL, survives offline navigation).
   // Merge into any existing cache entry to preserve fields (id, revision, mesero) written
   // by the success path, so the lazy-init still finds the order id on fast remounts.
   useEffect(() => {
-    if (mesa > 0) {
+    // Solo persistir si los items pertenecen a la mesa actual (no en plena transición).
+    if (mesa > 0 && orderItemsMesaRef.current === mesa) {
       try {
         const existing = localStorage.getItem(`pos_order_${mesa}`)
         const prev = existing ? JSON.parse(existing) : {}
@@ -2009,6 +2014,8 @@ function POSContent() {
   useEffect(() => {
     let cancelled = false
     setLoadingMesa(true)
+    // Desde aquí los orderItems representan a ESTA mesa (instant-cache la puebla abajo).
+    orderItemsMesaRef.current = mesa
     const loadMesaOrder = async () => {
       try {
         // Cuenta por nombre: busca por customer_name; mesa: busca por número
