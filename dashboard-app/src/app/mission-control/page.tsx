@@ -427,9 +427,15 @@ export default function MissionControlPage() {
                       const Icon = det.icon
                       return (
                         <div key={`${det.agent_id}-${i}`} onClick={() => setSelectedAgent(det.agent_id)} className={`rounded-xl border bg-[var(--surface)] p-3.5 cursor-pointer transition-all hover:-translate-y-0.5 ${selectedAgent === det.agent_id ? 'ring-1 ring-emerald-500/50 border-emerald-500/40' : 'border-[var(--line)] hover:border-emerald-500/30'}`}>
-                          <div className="flex items-center gap-2 mb-2">
-                            <Icon size={15} className={k.text} />
-                            <span className="text-[13px] font-semibold text-[var(--text-1)] truncate flex-1">{det.name}</span>
+                          <div className="flex items-center gap-2.5 mb-2.5">
+                            <span className="relative grid place-items-center flex-shrink-0 rounded-full" style={{ width: 32, height: 32, background: 'var(--accent-soft)', color: 'var(--accent-ink)' }}>
+                              <Icon size={16} />
+                              <span className="absolute rounded-full animate-pulse" style={{ width: 9, height: 9, right: -1, bottom: -1, background: 'var(--accent)', border: '2px solid var(--surface)' }} />
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-[13px] font-bold text-[var(--text-1)] truncate leading-tight">{det.name}</div>
+                              <div className="text-[9px] font-bold uppercase tracking-wider" style={{ color: 'var(--accent-ink)' }}>Agente IA · en vivo</div>
+                            </div>
                             <span className={`text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full flex-shrink-0 ${k.tag}`}>{k.label}</span>
                           </div>
                           <div className={`rounded-lg border-l-[3px] ${k.border} ${k.bg} px-2.5 py-2`}>
