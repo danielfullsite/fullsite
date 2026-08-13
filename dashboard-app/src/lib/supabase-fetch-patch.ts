@@ -31,22 +31,35 @@ export function patchSupabaseFetch() {
     // Public QR pages (/menu/[mesa]) have NO session and must NOT hit POS tables
     // directly — they use the get_public_menu() RPC (granted to anon). Those
     // calls target /rest/v1/rpc/get_public_menu and keep the anon key.
-    if (url.includes(SUPABASE_URL) && url.includes('/rest/v1/')) {
+    // RPC público (menú QR) no se toca — usa la anon key contra get_public_menu().
+    if (url.includes(SUPABASE_URL) && url.includes('/rest/v1/') && !url.includes('/rest/v1/rpc/')) {
       const headers = new Headers(init?.headers)
       const currentAuth = headers.get('Authorization')
 
-      // If using the bare anon key AND a session exists, upgrade to the user JWT.
-      if (currentAuth === `Bearer ${SUPABASE_KEY}`) {
-        try {
-          const hostname = new URL(SUPABASE_URL).hostname.split('.')[0]
-          const stored = localStorage.getItem(`sb-${hostname}-auth-token`)
-          if (stored) {
-            const parsed = JSON.parse(stored)
-            if (parsed.access_token) {
-              headers.set('Authorization', `Bearer ${parsed.access_token}`)
-            }
-          }
-        } catch {}
+      // ¿Hay sesión de Supabase? (dashboard: dueño/gerente)
+      let sessionJwt: string | null = null
+      try {
+        const hostname = new URL(SUPABASE_URL).hostname.split('.')[0]
+        const stored = localStorage.getItem(`sb-${hostname}-auth-token`)
+        if (stored) sessionJwt = JSON.parse(stored)?.access_token || null
+      } catch {}
+
+      // Terminal POS: shiftToken pero SIN sesión de Supabase → rutea por el proxy
+      // autenticado /api/pos/db (Fase B anti-hack). El shiftToken no es JWT de
+      // Supabase, así que las tablas (con RLS cerrado) solo se alcanzan por aquí.
+      const shiftToken = (() => { try { return localStorage.getItem('pos_shift_token') } catch { return null } })()
+      if (!sessionJwt && shiftToken && currentAuth === `Bearer ${SUPABASE_KEY}`) {
+        const restPath = url.split('/rest/v1/')[1] || ''
+        const proxyUrl = `/api/pos/db?path=${encodeURIComponent(restPath)}`
+        const proxyHeaders = new Headers(init?.headers)
+        proxyHeaders.set('Authorization', `Bearer ${shiftToken}`)
+        proxyHeaders.delete('apikey')
+        return originalFetch(proxyUrl, { ...init, headers: proxyHeaders })
+      }
+
+      // Dashboard: si usa la anon key y hay sesión, sube al JWT del usuario.
+      if (currentAuth === `Bearer ${SUPABASE_KEY}` && sessionJwt) {
+        headers.set('Authorization', `Bearer ${sessionJwt}`)
       }
 
       return originalFetch(input, { ...init, headers })
