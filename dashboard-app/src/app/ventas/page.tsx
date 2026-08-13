@@ -434,42 +434,26 @@ export default function VentasPage() {
           {(cancelaciones.length > 0 || anulaciones.length > 0 || cortesias.length > 0) && (
             <>
               <div className="mt-2 mb-4 flex items-center gap-2">
-                <ShieldAlert size={20} className="text-red-500" />
-                <h2 className="text-lg font-bold text-red-400">Control y Anti-Fraude</h2>
+                <ShieldAlert size={20} style={{ color: 'var(--crit)' }} />
+                <h2 className="text-lg font-bold" style={{ color: 'var(--text-1)' }}>Control y Anti-Fraude</h2>
               </div>
 
-              {/* Anti-fraud KPI cards */}
+              {/* Anti-fraud KPI cards — card neutra + acento de color en ícono/número (theme-aware) */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-                <div className="bg-red-500/10 rounded-xl border border-red-500/20 p-5 text-center">
-                  <div className="w-9 h-9 bg-red-500/15 rounded-lg flex items-center justify-center mx-auto mb-3">
-                    <XCircle size={18} className="text-red-500" />
+                {[
+                  { label: 'Cancelaciones', n: cancelaciones.length, total: cancelaciones.reduce((s, c) => s + (c.total || 0), 0), Icon: XCircle, color: 'var(--crit)', soft: 'var(--crit-soft)', ink: 'var(--crit-ink)' },
+                  { label: 'Anulaciones', n: anulaciones.length, total: anulaciones.reduce((s, a) => s + (a.total || 0), 0), Icon: ShieldAlert, color: 'var(--warn)', soft: 'var(--warn-soft)', ink: 'var(--warn-ink)' },
+                  { label: 'Cortesías', n: cortesias.length, total: cortesias.reduce((s, c) => s + (c.total || 0), 0), Icon: HeartHandshake, color: '#0ea5e9', soft: 'rgba(14,165,233,0.12)', ink: 'var(--info-ink)' },
+                ].map((k) => (
+                  <div key={k.label} className="rounded-2xl border p-5 text-center" style={{ background: 'var(--bento-card)', borderColor: 'var(--line)', boxShadow: 'var(--shadow-mid)' }}>
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-3" style={{ background: k.soft, color: k.color }}>
+                      <k.Icon size={19} />
+                    </div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-3)' }}>{k.label}</p>
+                    <p className="text-2xl font-extrabold tabular-nums" style={{ color: k.ink }}>{k.n}</p>
+                    <p className="text-xs mt-1" style={{ color: 'var(--text-3)' }}>{formatCurrency(k.total)} total</p>
                   </div>
-                  <p className="text-xs font-medium text-red-600 uppercase tracking-wider mb-1">Cancelaciones</p>
-                  <p className="text-2xl font-bold text-red-400">{cancelaciones.length}</p>
-                  <p className="text-xs text-red-400 mt-1">
-                    {formatCurrency(cancelaciones.reduce((s, c) => s + (c.total || 0), 0))} total
-                  </p>
-                </div>
-                <div className="bg-amber-500/10 rounded-xl border border-amber-500/20 p-5 text-center">
-                  <div className="w-9 h-9 bg-amber-100 rounded-lg flex items-center justify-center mx-auto mb-3">
-                    <ShieldAlert size={18} className="text-amber-500" />
-                  </div>
-                  <p className="text-xs font-medium text-amber-400 uppercase tracking-wider mb-1">Anulaciones</p>
-                  <p className="text-2xl font-bold text-amber-400">{anulaciones.length}</p>
-                  <p className="text-xs text-amber-400 mt-1">
-                    {formatCurrency(anulaciones.reduce((s, a) => s + (a.total || 0), 0))} total
-                  </p>
-                </div>
-                <div className="bg-orange-500/10 rounded-xl border border-orange-500/20 p-5 text-center">
-                  <div className="w-9 h-9 bg-orange-500/15 rounded-lg flex items-center justify-center mx-auto mb-3">
-                    <HeartHandshake size={18} className="text-orange-500" />
-                  </div>
-                  <p className="text-xs font-medium text-orange-600 uppercase tracking-wider mb-1">Cortesias</p>
-                  <p className="text-2xl font-bold text-orange-400">{cortesias.length}</p>
-                  <p className="text-xs text-orange-400 mt-1">
-                    {formatCurrency(cortesias.reduce((s, c) => s + (c.total || 0), 0))} total
-                  </p>
-                </div>
+                ))}
               </div>
 
               {/* Anti-fraud detail tables */}
