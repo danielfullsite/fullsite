@@ -27,7 +27,7 @@ async function respond(staff: { id: string; name: string; role: string }, client
 export async function POST(request: NextRequest) {
   try {
     const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
-    const { pin, client_id, manager, fingerprint_id, min_role } = await request.json()
+    const { pin, client_id, manager, fingerprint_id, min_role, device_id } = await request.json()
     if (typeof client_id !== 'string' || !/^[a-z0-9_-]{1,40}$/i.test(client_id)) {
       return Response.json({ error: 'client_id requerido' }, { status: 400 })
     }
@@ -49,6 +49,42 @@ export async function POST(request: NextRequest) {
     // issued shift token binds the operator to this tenant. Never expose this key
     // to the client.
     const sbKey = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    const sbHeaders = { apikey: sbKey, Authorization: `Bearer ${sbKey}` }
+
+    // Device binding — si el tenant lo exige, la terminal debe estar enrolada
+    // ANTES de aceptar el PIN. Así un navegador desconocido ni llega al login.
+    // Opt-in por tenant (pos.require_enrolled_terminal); por defecto no aplica.
+    try {
+      const cfgRes = await fetch(
+        `${sbUrl}/rest/v1/clients?id=eq.${encodeURIComponent(clientId)}&select=pos_settings&limit=1`,
+        { headers: sbHeaders, cache: 'no-store' }
+      )
+      const cfgRows = cfgRes.ok ? await cfgRes.json() : []
+      const requireEnrolled = cfgRows?.[0]?.pos_settings?.['pos.require_enrolled_terminal'] === true
+      if (requireEnrolled) {
+        const dev = typeof device_id === 'string' ? device_id : ''
+        let enrolled = false
+        if (dev && /^[\w-]{1,64}$/.test(dev)) {
+          const tRes = await fetch(
+            `${sbUrl}/rest/v1/pos_terminals?client_id=eq.${encodeURIComponent(clientId)}&device_id=eq.${encodeURIComponent(dev)}&active=eq.true&select=device_id&limit=1`,
+            { headers: sbHeaders, cache: 'no-store' }
+          )
+          if (tRes.ok) {
+            const tRows = await tRes.json()
+            enrolled = Array.isArray(tRows) && tRows.length > 0
+          }
+        }
+        if (!enrolled) {
+          return Response.json(
+            { error: 'Terminal no autorizada', code: 'terminal_not_enrolled', device_id: dev },
+            { status: 403 }
+          )
+        }
+      }
+    } catch {
+      // Fallo de infra al verificar enrolamiento: no bloquear el login (fail-open
+      // en la verificación de device; el PIN + throttle + RLS siguen aplicando).
+    }
 
     // Fingerprint (WebAuthn) login — look up by staff ID, validate active status + tenant
     if (fingerprint_id && typeof fingerprint_id === 'string') {

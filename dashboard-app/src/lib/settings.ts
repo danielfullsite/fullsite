@@ -45,6 +45,7 @@ type SettingKey =
   | 'pos.discount_catalog'
   | 'pos.idle_timeout_ms'
   | 'pos.return_to_plano'
+  | 'pos.require_enrolled_terminal'
 
 type SettingValue<K extends SettingKey> =
   K extends 'pos.station_routing' ? Record<string, string[]> :
@@ -54,6 +55,7 @@ type SettingValue<K extends SettingKey> =
   K extends 'pos.discount_catalog' ? Array<{ id: string; label: string; pct?: number; amount?: number }> :
   K extends 'pos.idle_timeout_ms' ? number :
   K extends 'pos.return_to_plano' ? boolean :
+  K extends 'pos.require_enrolled_terminal' ? boolean :
   never
 
 // ─── Registry ────────────────────────────────────────────────────────────────
@@ -139,6 +141,15 @@ const REGISTRY: { [K in SettingKey]: SettingDefinition<SettingValue<K>> } = {
       'La mayoría prefiere regresar al plano post-envío para atender otras mesas desde el mapa. ' +
       'Algunos operadores con flujo de lista prefieren /pos/mesas.',
     default: true,
+  },
+
+  'pos.require_enrolled_terminal': {
+    scope: 'sucursal',
+    operationalProblem:
+      'Por defecto cualquier navegador con la liga llega al teclado de PIN. Con esto activado, ' +
+      'una terminal debe estar dada de alta (enrolada) por el admin antes de que el PIN funcione — ' +
+      'así un equipo desconocido ni llega al login. Se activa por restaurante desde el panel admin.',
+    default: false,  // opt-in por tenant; no rompe terminales existentes
   },
 }
 

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { registerServiceWorker, requestNotificationPermission } from '@/lib/service-worker'
 import { apiUrl } from '@/lib/api-base'
-import { checkActiveSession, registerSession, startHeartbeat, removeSession } from '@/lib/pos-sessions'
+import { checkActiveSession, registerSession, startHeartbeat, removeSession, getTerminalId } from '@/lib/pos-sessions'
 import TurnoGate from '@/components/pos/TurnoGate'
 import { getActiveClientSlug as _cid } from '@/lib/data'
 import { getEffectiveSetting } from '@/lib/settings'
@@ -89,6 +89,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
   const [staff, setStaff] = useState<StaffMember | null>(null)
   const [pin, setPin] = useState('')
   const [error, setError] = useState(false)
+  const [notEnrolled, setNotEnrolled] = useState<string | null>(null)
   const [networkError, setNetworkError] = useState(false)
   const [checking, setChecking] = useState(false)
   const [attempts, setAttempts] = useState(0)
@@ -320,7 +321,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
         const staffRes = await fetch(apiUrl('/api/pos/pin'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pin: '___fingerprint___', client_id: _cid(), fingerprint_id: data.staffId }),
+          body: JSON.stringify({ pin: '___fingerprint___', client_id: _cid(), fingerprint_id: data.staffId, device_id: getTerminalId() }),
           signal: AbortSignal.timeout(4000),
         })
 
@@ -452,9 +453,15 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
       const res = await fetch(apiUrl('/api/pos/pin'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin, client_id: _cid() }),
+        body: JSON.stringify({ pin, client_id: _cid(), device_id: getTerminalId() }),
         signal: AbortSignal.timeout(4000),
       })
+      if (res.status === 403) {
+        try {
+          const j = await res.json()
+          if (j?.code === 'terminal_not_enrolled') { setNotEnrolled(j.device_id || getTerminalId()); return }
+        } catch {}
+      }
       if (res.ok) {
         const { staff: member, shiftToken } = await res.json()
         if (member?.id) {
@@ -732,6 +739,12 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
         )}
         {isLocked && (
           <p className="text-red-400 text-sm mt-3">Demasiados intentos. Espera 1 minuto.</p>
+        )}
+        {notEnrolled && (
+          <div className="text-sm mt-3 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2 text-amber-300">
+            Esta terminal no está autorizada. Pide a tu admin que la dé de alta con este ID:
+            <span className="block font-mono text-amber-200 mt-1 select-all break-all">{notEnrolled}</span>
+          </div>
         )}
       </div>
     </div>
