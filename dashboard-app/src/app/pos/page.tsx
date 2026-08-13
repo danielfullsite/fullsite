@@ -3441,6 +3441,12 @@ function POSContent() {
       setSplitMode(null)
       setSplitParejoN(0)
       setOrderId(generateId())
+      // Tras cobrar: al mapa de mesas + bloqueo (re-identificación), igual que al
+      // enviar. Evita quedar en la mesa (o caer a mesa 1) tras cerrar la cuenta.
+      sessionStorage.removeItem('pos_staff')
+      sessionStorage.removeItem('pos_last_activity')
+      router.push('/pos/mesas')
+      lock()
     } else {
       showToast('Error al cerrar cuenta')
       setSaving(false); operationLock.current = false

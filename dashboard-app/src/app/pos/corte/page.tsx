@@ -206,6 +206,19 @@ export default function CortePage() {
 
   useEffect(() => { if (accessGranted) fetchData() }, [selectedDate, accessGranted, corteMode])
 
+  // Refetch al volver a la pestaña / recuperar foco — evita tener que dar refresh
+  // manual cuando la primera carga corrió carrera con el token del proxy.
+  useEffect(() => {
+    if (!accessGranted) return
+    const refetch = () => { if (document.visibilityState === 'visible') fetchData() }
+    document.addEventListener('visibilitychange', refetch)
+    window.addEventListener('focus', refetch)
+    return () => {
+      document.removeEventListener('visibilitychange', refetch)
+      window.removeEventListener('focus', refetch)
+    }
+  }, [accessGranted, selectedDate, corteMode]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const stats = useMemo(() => {
     const closed = orders.filter(o => o.status === 'cerrada')
     const cancelled = orders.filter(o => o.status === 'cancelada')

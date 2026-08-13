@@ -271,7 +271,8 @@ export default function MesasPage() {
 
   useEffect(() => {
     fetchData()
-    const interval = setInterval(fetchData, 5000)
+    // Poll 3s (antes 5s) — la mesa se pone ocupada más rápido tras enviar una orden.
+    const interval = setInterval(fetchData, 3000)
     // Refresh immediately when page becomes visible (returning from order)
     const onVisible = () => { if (document.visibilityState === 'visible') fetchData() }
     document.addEventListener('visibilitychange', onVisible)
