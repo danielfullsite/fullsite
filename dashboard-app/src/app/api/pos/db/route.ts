@@ -30,6 +30,10 @@ const ALLOW = new Set<string>([
   'pos_item_modifier_groups', 'pos_category_modifiers', 'pos_combos', 'pos_promos', 'pos_promotions',
   'pos_payment_methods', 'pos_staff', 'pos_recipes', 'pos_recipe_details', 'pos_ingredients',
   'pos_gastos', 'reservaciones', 'amalay_reservaciones',
+  // Delivery + retail + config leídas por el POS/dashboard
+  'delivery_orders', 'delivery_platform_payments', 'pos_delivery_zones', 'pos_gift_cards',
+  'pos_price_types', 'pos_retail_groups', 'pos_retail_items', 'pos_retail_promotions',
+  'pos_save_operations', 'pos_schedules', 'pos_sizes', 'pos_bridge_logs',
 ])
 
 // Tablas SIN columna client_id → no se inyecta scope (globales/child de bajo riesgo).
