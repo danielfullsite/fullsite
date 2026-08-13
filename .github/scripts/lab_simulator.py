@@ -58,11 +58,14 @@ def make_order(seq):
     iva = round(subtotal * IVA_RATE, 2)
     total = round(subtotal + iva, 2)
     oid = f"lab-{int(time.time()*1000)}-{seq}-{random.randint(100,999)}"
+    # turno_id requerido por el constraint pos_orders_turno_id_check (salvo QR abierto).
+    turno = f"lab-turno-{datetime.now(timezone.utc).strftime('%Y%m%d')}"
     return {
         "id": oid, "client_id": CLIENT_ID, "mesa": random.randint(1, 24),
         "mesero": random.choice(MESEROS), "personas": random.randint(1, 6),
         "status": "abierta", "subtotal": subtotal, "iva": iva, "total": total,
         "descuento": 0, "items": items, "kds_item_status": {},
+        "turno_id": turno,
         "order_number": next_order_number() + seq, "created_at": now_iso(),
     }
 
