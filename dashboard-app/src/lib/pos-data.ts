@@ -1675,8 +1675,16 @@ export async function getAuditLogForOrder(orderId: string): Promise<AuditLogEntr
 // Uses btoa(pin) as a deterministic, non-reversible-enough obfuscation for cache keying.
 // (Not cryptographic — purpose is to avoid storing raw PINs, not to resist an attacker
 //  with full localStorage access; that threat is out of scope for an in-person POS.)
-function _pinCacheKey(pin: string): string {
-  return btoa(pin)
+async function _pinCacheKey(pin: string): Promise<string> {
+  // Hash NO reversible (SHA-256 con sal de la app) — antes era btoa() reversible,
+  // lo que dejaba recuperar el PIN del gerente leyendo localStorage. Ya no.
+  try {
+    const data = new TextEncoder().encode(`fs-pin-v2:${pin}`)
+    const buf = await crypto.subtle.digest('SHA-256', data)
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
+  } catch {
+    return `len:${pin.length}` // fallback improbable; nunca guarda el PIN crudo
+  }
 }
 
 // Validación server-side de PIN de gerente (cancelaciones, descuentos, cortes).
@@ -1697,7 +1705,7 @@ export async function verifyManagerPin(pin: string): Promise<string | null> {
       if (staff?.name) {
         try {
           const cached = JSON.parse(localStorage.getItem('pos_manager_pin_cache') || '{}')
-          cached[_pinCacheKey(pin)] = { name: staff.name, role: staff.role || 'gerente', cached_at: Date.now() }
+          cached[await _pinCacheKey(pin)] = { name: staff.name, role: staff.role || 'gerente', cached_at: Date.now() }
           localStorage.setItem('pos_manager_pin_cache', JSON.stringify(cached))
         } catch { /* ignore */ }
         return staff.name as string
@@ -1706,11 +1714,12 @@ export async function verifyManagerPin(pin: string): Promise<string | null> {
     }
     if (res.status === 401 || res.status === 400) return null
   } catch { /* offline → fallback al cache */ }
-  // Fallback offline: PINs validados previamente (máx 8 horas — un turno)
+  // Fallback offline: PINs validados en los últimos 30 min (re-verificación frecuente
+  // = menos ventana de robo si alguien opera la terminal de otro).
   try {
     const cached = JSON.parse(localStorage.getItem('pos_manager_pin_cache') || '{}')
-    const entry = cached[_pinCacheKey(pin)]
-    if (entry?.name && Date.now() - (entry.cached_at || 0) < 8 * 60 * 60 * 1000) { // 15 min TTL
+    const entry = cached[await _pinCacheKey(pin)]
+    if (entry?.name && Date.now() - (entry.cached_at || 0) < 30 * 60 * 1000) {
       return entry.name as string
     }
   } catch { /* ignore */ }
@@ -1733,7 +1742,7 @@ export async function verifyManagerPinWithRole(pin: string): Promise<{ name: str
         const role = staff.role || 'gerente'
         try {
           const cached = JSON.parse(localStorage.getItem('pos_manager_pin_cache') || '{}')
-          cached[_pinCacheKey(pin)] = { name: staff.name, role, cached_at: Date.now() }
+          cached[await _pinCacheKey(pin)] = { name: staff.name, role, cached_at: Date.now() }
           localStorage.setItem('pos_manager_pin_cache', JSON.stringify(cached))
         } catch { /* ignore */ }
         return { name: staff.name, role }
@@ -1745,8 +1754,8 @@ export async function verifyManagerPinWithRole(pin: string): Promise<{ name: str
   // Fallback offline (máx 8 horas — un turno)
   try {
     const cached = JSON.parse(localStorage.getItem('pos_manager_pin_cache') || '{}')
-    const entry = cached[_pinCacheKey(pin)]
-    if (entry?.name && Date.now() - (entry.cached_at || 0) < 8 * 60 * 60 * 1000) { // 15 min TTL
+    const entry = cached[await _pinCacheKey(pin)]
+    if (entry?.name && Date.now() - (entry.cached_at || 0) < 30 * 60 * 1000) {
       return { name: entry.name, role: entry.role || 'gerente' }
     }
   } catch { /* ignore */ }
@@ -1777,7 +1786,7 @@ export async function verifyPinWithMinRole(pin: string, minRole: string): Promis
         const role = staff.role || minRole
         try {
           const cached = JSON.parse(localStorage.getItem('pos_manager_pin_cache') || '{}')
-          cached[_pinCacheKey(pin)] = { name: staff.name, role, cached_at: Date.now() }
+          cached[await _pinCacheKey(pin)] = { name: staff.name, role, cached_at: Date.now() }
           localStorage.setItem('pos_manager_pin_cache', JSON.stringify(cached))
         } catch { /* ignore */ }
         return { name: staff.name, role }
@@ -1788,8 +1797,8 @@ export async function verifyPinWithMinRole(pin: string, minRole: string): Promis
   } catch { /* offline → fallback */ }
   try {
     const cached = JSON.parse(localStorage.getItem('pos_manager_pin_cache') || '{}')
-    const entry = cached[_pinCacheKey(pin)]
-    if (entry?.name && Date.now() - (entry.cached_at || 0) < 8 * 60 * 60 * 1000) {
+    const entry = cached[await _pinCacheKey(pin)]
+    if (entry?.name && Date.now() - (entry.cached_at || 0) < 30 * 60 * 1000) {
       return { name: entry.name, role: entry.role || minRole }
     }
   } catch { /* ignore */ }
