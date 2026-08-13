@@ -3644,7 +3644,7 @@ function POSContent() {
         <div className="flex items-center gap-1.5 px-3 py-1 border-t border-[var(--line)]/50 overflow-x-auto">
           {/* Back to mesa map — always visible in kiosk mode (no browser back button) */}
           <Link
-            href="/pos/plano"
+            href="/pos/mesas"
             className="flex items-center justify-center w-11 h-11 rounded-lg bg-[var(--line)] border border-[var(--line)] text-[var(--text-3)] hover:text-[var(--text-1)] flex-shrink-0 transition-colors"
             title="Volver al mapa de mesas"
           >
@@ -3719,7 +3719,7 @@ function POSContent() {
       {/* Nav overlay */}
       {showNav && (
         <div className="fixed inset-0 z-40 flex" onClick={() => setShowNav(false)}>
-          <div className="w-64 bg-[var(--surface-2)] border-r border-[var(--line)] p-4 shadow-2xl overflow-y-auto max-h-[100dvh] pos-fat-scroll" onClick={e => e.stopPropagation()}>
+          <div className="w-80 bg-[var(--surface-2)] border-r border-[var(--line)] p-4 shadow-2xl overflow-y-auto max-h-[100dvh] pos-fat-scroll" onClick={e => e.stopPropagation()}>
             <p className="text-[var(--text-2)] text-xs font-semibold uppercase mb-2">Navegacion</p>
             {/* Acordeón: un grupo abierto a la vez (details[name="posnav"]) → sin scroll.
              * Solo lo que un operador toca en servicio. El back-office (recetas, food-cost,
@@ -3755,21 +3755,21 @@ function POSContent() {
                 if (items.length === 0) return null
                 return (
                   <details key={group.title} name="posnav" open={group.defaultOpen} className="group/nav">
-                    <summary className="flex items-center gap-3 px-4 py-2 rounded-xl cursor-pointer select-none text-[var(--text-2)] hover:bg-[var(--line)] hover:text-white transition-colors min-h-[44px]">
-                      <group.icon size={18} />
-                      <span className="text-sm font-semibold flex-1">{group.title}</span>
-                      <ChevronDown size={16} className="nav-caret opacity-60" />
+                    <summary className="flex items-center gap-3 px-4 rounded-xl cursor-pointer select-none text-[var(--text-2)] hover:bg-[var(--line)] hover:text-white transition-colors min-h-[60px]">
+                      <group.icon size={24} />
+                      <span className="text-lg font-bold flex-1">{group.title}</span>
+                      <ChevronDown size={20} className="nav-caret opacity-60" />
                     </summary>
-                    <div className="mt-0.5 mb-1 ml-3 pl-3 border-l border-[var(--line)] space-y-0.5">
+                    <div className="mt-1 mb-2 ml-3 pl-3 border-l border-[var(--line)] space-y-1">
                       {items.map(item => (
                         <Link
                           key={item.href}
                           href={item.href}
                           onClick={() => setShowNav(false)}
-                          className="flex items-center gap-3 px-3 py-1.5 rounded-lg text-[var(--text-4)] hover:bg-[var(--line)] hover:text-white active:bg-[var(--accent-soft)] transition-colors min-h-[38px]"
+                          className="flex items-center gap-3 px-3 rounded-lg text-[var(--text-3)] hover:bg-[var(--line)] hover:text-white active:bg-[var(--accent-soft)] transition-colors min-h-[56px]"
                         >
-                          <item.icon size={16} />
-                          <span className="text-sm font-medium">{item.label}</span>
+                          <item.icon size={22} />
+                          <span className="text-base font-semibold">{item.label}</span>
                         </Link>
                       ))}
                     </div>
