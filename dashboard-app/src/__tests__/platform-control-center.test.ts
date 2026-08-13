@@ -32,4 +32,12 @@ describe('Platform Control Center security contract', () => {
     expect(authzIndex).toBeGreaterThan(0)
     expect(serviceFetchIndex).toBeGreaterThan(authzIndex)
   })
+
+  it('only exposes the Control Center sidebar link to configured platform admin emails', () => {
+    const source = readFileSync(join(process.cwd(), 'src/components/Sidebar.tsx'), 'utf8')
+    expect(source).toContain('NEXT_PUBLIC_PLATFORM_ADMIN_EMAILS')
+    expect(source).toContain("href: '/platform'")
+    expect(source).toContain('platformOnly: true')
+    expect(source).toContain('isPlatformAdminEmail(user?.email)')
+  })
 })

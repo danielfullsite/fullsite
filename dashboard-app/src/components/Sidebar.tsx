@@ -29,6 +29,7 @@ import {
   Bot,
   Stamp,
   ShieldOff,
+  ShieldCheck,
   Ban,
   FileText,
   Bike,
@@ -166,6 +167,12 @@ const navSections = [
       { href: '/voice', label: 'Voice Agent', icon: Mic },
     ],
   },
+  {
+    label: 'Fullsite',
+    items: [
+      { href: '/platform', label: 'Control Center', icon: ShieldCheck, platformOnly: true },
+    ],
+  },
 ]
 
 function getTodayFormatted(): string {
@@ -176,10 +183,20 @@ function getTodayFormatted(): string {
   })
 }
 
+function isPlatformAdminEmail(email: string | undefined | null): boolean {
+  const admins = (process.env.NEXT_PUBLIC_PLATFORM_ADMIN_EMAILS || '')
+    .split(',')
+    .map(value => value.trim().toLowerCase())
+    .filter(Boolean)
+  if (admins.length === 0 || !email) return false
+  return admins.includes(email.toLowerCase())
+}
+
 export default function Sidebar() {
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
   const { user, role, clientConfig, locations, locationId, setLocationId, signOut } = useAuth()
+  const isPlatformAdmin = isPlatformAdminEmail(user?.email)
 
   // Collapsible sections — auto-expand section containing current page
   const activeSection = navSections.findIndex(s => s.items.some(i => pathname === i.href || (i.href !== '/' && pathname.startsWith(i.href + '/'))))
@@ -214,6 +231,7 @@ export default function Sidebar() {
       <nav className="flex-1 px-3 py-2 overflow-y-auto">
         {navSections.map((section, sectionIdx) => {
           const visibleItems = section.items.filter(item =>
+            (!('platformOnly' in item) || !item.platformOnly || isPlatformAdmin) &&
             canAccessPage(role, item.href) && canPlanAccessPage(clientConfig?.plan, item.href)
           )
           if (visibleItems.length === 0) return null
