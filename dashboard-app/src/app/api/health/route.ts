@@ -127,10 +127,17 @@ export async function GET(_request: NextRequest) {
   const allOk = checks.every(c => c.status === 'ok')
   const totalMs = checks.reduce((s, c) => s + c.ms, 0)
 
+  // Liveness correcto: 503 SOLO si falla lo crítico (la conexión a la BD).
+  // data_freshness/costeo/auth son informativos — que el scraper legacy no haya
+  // refrescado datos NO significa que el servicio esté caído. Antes cualquier
+  // check informativo en error tumbaba todo a 503 (falsos "caído" al monitor/curl).
+  const criticalOk = checks.find(c => c.name === 'supabase')?.status === 'ok'
+  const status = allOk ? 'healthy' : criticalOk ? 'degraded' : 'down'
+
   return NextResponse.json({
-    status: allOk ? 'healthy' : 'degraded',
+    status,
     timestamp: new Date().toISOString(),
     total_ms: totalMs,
     checks,
-  }, { status: allOk ? 200 : 503 })
+  }, { status: criticalOk ? 200 : 503 })
 }

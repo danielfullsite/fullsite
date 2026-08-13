@@ -263,6 +263,8 @@ export default function MissionControlPage() {
   const criticalAlerts = Array.from(latestResults.values()).filter(r => r.priority === 'critical').length
   const activeAgents = latestRuns.size
   const avgDuration = runs.length > 0 ? Math.round(runs.slice(0, 50).reduce((s, r) => s + (r.duration_ms || 0), 0) / Math.min(runs.length, 50)) : 0
+  // Señal de vida 24/7 — la corrida más reciente de cualquier agente.
+  const lastSignalTs = runs.length > 0 ? runs.reduce((m, r) => new Date(r.created_at) > new Date(m) ? r.created_at : m, runs[0].created_at) : ''
 
   // Group by tentacle
   const tentacles = new Map<string, string[]>()
@@ -347,7 +349,10 @@ export default function MissionControlPage() {
           <span className="w-9 h-9 rounded-xl grid place-items-center bg-emerald-500/10 text-emerald-400"><Sparkles size={19} /></span>
           <div>
             <h2 className="text-2xl font-extrabold text-[var(--text-1)] tracking-tight">AI Operations Lab</h2>
-            <p className="text-sm text-[var(--text-3)] mt-0.5">{activeAgents} agentes vigilando todo el flujo · de POS a dashboard</p>
+            <p className="text-sm text-[var(--text-3)] mt-0.5">
+              {activeAgents} agentes vigilando · {totalRuns24h} corridas hoy
+              {lastSignalTs && <> · última señal <span className="text-emerald-400 font-semibold">hace {timeAgo(lastSignalTs)}</span></>}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-3">
