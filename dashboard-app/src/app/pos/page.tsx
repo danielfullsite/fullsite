@@ -5814,12 +5814,12 @@ function POSAlerts({ role }: { role: string }) {
       setAlerts(newAlerts)
     }
 
-    fetchAlerts()
-    const interval = setInterval(fetchAlerts, 60000)
-    return () => {
-      clearInterval(interval)
-      // mpPollRef cleanup handled in payment modal close
-    }
+    // POS SIN notificaciones: el mesero NO recibe popups en la caja (ni delivery,
+    // ni órdenes listas, ni push). Los pedidos de delivery se integran al flujo
+    // por su cuenta (comanda a cocina/barra + vista Domicilio). Efecto desactivado
+    // a propósito — fetchAlerts queda definida pero nunca se ejecuta.
+    void fetchAlerts
+    return () => {}
   }, [role])
 
   const visibleAlerts = alerts.filter(a => !dismissed.has(a.id))
