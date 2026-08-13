@@ -1,33 +1,19 @@
 import { NextRequest } from 'next/server'
 import { issueShiftToken } from '@/lib/shift-token'
+import { pinGate, pinRecord } from '@/lib/pin-throttle'
 
 // PIN validation + shift token issuance.
 // On success returns { staff, shiftToken } — the client stores shiftToken
 // and sends it as Authorization: Bearer <shiftToken> on every POS request.
 // This replaces the btoa(pin) PIN cache (P0-E fix) and provides server-verified
 // identity for all POS API calls (P0-N fix via withPOSAuth).
+//
+// Brute-force protection lives in pin-throttle.ts: keyed by clientId:ip (NOT
+// ip:pin), so trying many different PINs from one source shares one budget and
+// trips a lockout — 10k-PIN enumeration becomes infeasible.
 
-const MAX_ATTEMPTS = 30
-const WINDOW_MS = 300_000 // 5 minutes
-
-// In-memory rate limit keyed by IP+PIN so one bad PIN from one terminal
-// doesn't lock all terminals sharing the same NAT IP (restaurant scenario).
-const attemptsByIp = new Map<string, { count: number; resetAt: number }>()
-
-function checkRateLimit(ip: string): boolean {
-  const now = Date.now()
-  const entry = attemptsByIp.get(ip)
-  if (!entry || now > entry.resetAt) {
-    attemptsByIp.set(ip, { count: 1, resetAt: now + WINDOW_MS })
-    return true
-  }
-  if (entry.count >= MAX_ATTEMPTS) return false
-  entry.count++
-  return true
-}
-
-async function respond(staff: { id: string; name: string; role: string }, clientId: string, ip: string) {
-  attemptsByIp.delete(ip)
+async function respond(staff: { id: string; name: string; role: string }, clientId: string, key: string) {
+  await pinRecord(key, true) // success clears the throttle for this source
   let shiftToken: string | undefined
   try {
     shiftToken = await issueShiftToken(staff.id, clientId, staff.role, staff.name)
@@ -42,14 +28,20 @@ export async function POST(request: NextRequest) {
   try {
     const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
     const { pin, client_id, manager, fingerprint_id, min_role } = await request.json()
-    const rateLimitKey = `${ip}:${typeof pin === 'string' ? pin : 'x'}`
-    if (!checkRateLimit(rateLimitKey)) {
-      return Response.json({ error: 'Demasiados intentos' }, { status: 429 })
-    }
     if (typeof client_id !== 'string' || !/^[a-z0-9_-]{1,40}$/i.test(client_id)) {
       return Response.json({ error: 'client_id requerido' }, { status: 400 })
     }
     const clientId = client_id
+    // Brute-force gate — one budget per (tenant, source), NOT per PIN, so
+    // enumerating many PINs from one source trips the lockout.
+    const throttleKey = `${clientId}:${ip}`
+    const gate = await pinGate(throttleKey)
+    if (!gate.allowed) {
+      return Response.json(
+        { error: 'Terminal bloqueada por intentos fallidos. Espera unos minutos.' },
+        { status: 429, headers: gate.retryAfter ? { 'Retry-After': String(gate.retryAfter) } : undefined }
+      )
+    }
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
     // BUG-019: pos_staff is now tenant-scoped RLS with NO anon access, so the PIN
     // lookup must run server-side with the service_role key (bypasses RLS). The
@@ -67,9 +59,10 @@ export async function POST(request: NextRequest) {
       if (fpRes.ok) {
         const rows = await fpRes.json()
         if (Array.isArray(rows) && rows.length > 0) {
-          return respond({ id: rows[0].id, name: rows[0].name, role: rows[0].role }, clientId, rateLimitKey)
+          return respond({ id: rows[0].id, name: rows[0].name, role: rows[0].role }, clientId, throttleKey)
         }
       }
+      await pinRecord(throttleKey, false)
       return Response.json({ error: 'Empleado no encontrado o desactivado' }, { status: 401 })
     }
 
@@ -96,14 +89,14 @@ export async function POST(request: NextRequest) {
     if (res.ok) {
       const rows = await res.json()
       if (Array.isArray(rows) && rows.length > 0) {
-        return respond({ id: rows[0].id, name: rows[0].name, role: rows[0].role }, clientId, rateLimitKey)
+        return respond({ id: rows[0].id, name: rows[0].name, role: rows[0].role }, clientId, throttleKey)
       }
     }
 
     // Fallback PIN — server-side env, never exposed to client
     const fallback = process.env.POS_FALLBACK_PIN
     if (fallback && pin === fallback) {
-      return respond({ id: 'admin', name: 'Admin', role: 'admin' }, clientId, rateLimitKey)
+      return respond({ id: 'admin', name: 'Admin', role: 'admin' }, clientId, throttleKey)
     }
 
     // MANAGER_PINS — server-side env format "pin:Nombre,pin:Nombre"
@@ -112,11 +105,12 @@ export async function POST(request: NextRequest) {
       for (const entry of raw.split(',')) {
         const [p, name] = entry.split(':')
         if (p && name && p.trim() === pin) {
-          return respond({ id: 'manager', name: name.trim(), role: 'gerente' }, clientId, rateLimitKey)
+          return respond({ id: 'manager', name: name.trim(), role: 'gerente' }, clientId, throttleKey)
         }
       }
     }
 
+    await pinRecord(throttleKey, false)
     return Response.json({ error: 'PIN incorrecto' }, { status: 401 })
   } catch {
     return Response.json({ error: 'Error interno' }, { status: 500 })
