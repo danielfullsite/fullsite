@@ -52,7 +52,7 @@ export default function CostosPage() {
 
         // Fetch latest agent results for cost changes
         const agentRes = await fetch(
-          `${SUPABASE_URL}/rest/v1/agent_results?agent_id=eq.cost-variance&order=fecha.desc&limit=1&select=data`,
+          `${SUPABASE_URL}/rest/v1/agent_results?agent_id=eq.cost-variance&client_id=eq.${_cid()}&order=fecha.desc&limit=1&select=data`,
           { headers }
         )
         const agentRows = agentRes.ok ? await agentRes.json() : []

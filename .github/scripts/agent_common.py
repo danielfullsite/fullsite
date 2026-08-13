@@ -154,9 +154,15 @@ def create_insight(
     deep_link: str = None,
     data_freshness: str = None,
     confidence: float = None,
-    client_id: str = "amalay",
+    client_id: str = None,
 ):
-    """Create a structured insight in agent_insights table."""
+    """Create a structured insight in agent_insights table.
+    client_id DEBE identificar al tenant. Si no se pasa, se toma de CLIENT_ID en el
+    entorno — NUNCA se asume 'amalay' (evita estampar insights de un cliente en otro)."""
+    client_id = client_id or os.environ.get("CLIENT_ID")
+    if not client_id:
+        print(f"[{agent_id}] create_insight sin client_id — se omite (aislamiento tenant)", file=sys.stderr)
+        return
     row = {
         "agent_id": agent_id,
         "client_id": client_id,

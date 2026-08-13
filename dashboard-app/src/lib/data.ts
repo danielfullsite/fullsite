@@ -308,15 +308,29 @@ function parseJsonb(val: unknown): unknown {
   return current
 }
 
-export async function getDeepTable(table: string, limit: number = 30) {
+// Tablas de agentes con datos de negocio: SIEMPRE aisladas por tenant.
+// agent_results/agent_insights llevan client_id (insights con $, ventas, etc.).
+// agent_runs NO se incluye aquí: es telemetría operativa (qué agente corrió) sin
+// client_id → filtrarla vaciaría el widget de estado. Se auto-inyecta el cliente
+// activo salvo que el caller ya pase client_id.
+const TENANT_SCOPED_TABLES = new Set(['agent_results', 'agent_insights'])
+
+export async function getDeepTable(table: string, limit: number = 30, filter: string = '') {
+  // filter: extra PostgREST query, e.g. 'client_id=eq.amalay' (tenant scoping).
+  if (TENANT_SCOPED_TABLES.has(table) && !filter.includes('client_id')) {
+    const cid = getActiveClientSlug()
+    // Sin cliente activo → no devolver nada (fail-closed, nunca datos de otro tenant).
+    filter = `client_id=eq.${encodeURIComponent(cid || '__none__')}${filter ? `&${filter}` : ''}`
+  }
+  const f = filter ? `&${filter}` : ''
   // Try created_at first (agent_runs, etc.), then updated_at, then no order
   let data: Record<string, unknown>[] = []
   for (const col of ['created_at', 'updated_at']) {
-    data = await sbFetch(table, `select=*&order=${col}.desc&limit=${limit}`) as Record<string, unknown>[]
+    data = await sbFetch(table, `select=*&order=${col}.desc&limit=${limit}${f}`) as Record<string, unknown>[]
     if (data.length > 0) break
   }
   if (data.length === 0) {
-    data = await sbFetch(table, `select=*&limit=${limit}`) as Record<string, unknown>[]
+    data = await sbFetch(table, `select=*&limit=${limit}${f}`) as Record<string, unknown>[]
   }
   console.log(`[getDeepTable] ${table}: ${data.length} rows`)
   return data.map(row => ({ ...row, data: parseJsonb(row.data) }))
@@ -389,6 +403,7 @@ export interface AgentRun {
 }
 
 export async function getLatestAgentRuns(): Promise<AgentRun[]> {
+  // agent_runs es telemetría operativa (sin client_id) — no lleva datos de negocio.
   const rows = await sbFetch('agent_runs', 'select=agent_id,status,output_summary,trigger_type,created_at&order=created_at.desc&limit=100')
   const map = new Map<string, AgentRun>()
   for (const row of rows as AgentRun[]) {

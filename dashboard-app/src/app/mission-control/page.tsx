@@ -222,6 +222,8 @@ export default function MissionControlPage() {
 
   const load = useCallback(async () => {
     try {
+      // agent_results se auto-aísla por tenant en getDeepTable (cada cliente ve solo
+      // sus insights). agent_runs es telemetría operativa global (sin datos de negocio).
       const [runsData, resultsData] = await Promise.all([
         getDeepTable('agent_runs', 200),
         getDeepTable('agent_results', 100),
