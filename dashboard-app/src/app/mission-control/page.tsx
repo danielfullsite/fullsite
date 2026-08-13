@@ -87,11 +87,13 @@ function detKind(p?: string): DetKind {
   if (p === 'opportunity' || p === 'positive' || p === 'success') return 'ok'
   return 'info'
 }
+// Colores vía tokens semánticos → crisp en tema oscuro Y claro (antes usaba
+// shades fijos de Tailwind que salían lavados en light).
 const KIND: Record<DetKind, { label: string; text: string; border: string; bg: string; chip: string; tag: string }> = {
-  crit: { label: 'Alerta', text: 'text-red-400', border: 'border-red-500', bg: 'bg-red-500/[0.06]', chip: 'bg-red-500/10 text-red-400', tag: 'bg-red-500/15 text-red-300' },
-  warn: { label: 'Ojo', text: 'text-amber-400', border: 'border-amber-500', bg: 'bg-amber-500/[0.06]', chip: 'bg-amber-500/10 text-amber-400', tag: 'bg-amber-500/15 text-amber-300' },
-  ok: { label: 'Oportunidad', text: 'text-emerald-400', border: 'border-emerald-500', bg: 'bg-emerald-500/[0.06]', chip: 'bg-emerald-500/10 text-emerald-400', tag: 'bg-emerald-500/15 text-emerald-300' },
-  info: { label: 'Info', text: 'text-sky-400', border: 'border-sky-500', bg: 'bg-sky-500/[0.05]', chip: 'bg-sky-500/10 text-sky-400', tag: 'bg-sky-500/15 text-sky-300' },
+  crit: { label: 'Alerta', text: 'text-[var(--crit-ink)]', border: 'border-[var(--crit)]', bg: 'bg-[var(--crit-soft)]', chip: 'bg-[var(--crit-soft)] text-[var(--crit-ink)]', tag: 'bg-[var(--crit-soft)] text-[var(--crit-ink)]' },
+  warn: { label: 'Ojo', text: 'text-[var(--warn-ink)]', border: 'border-[var(--warn)]', bg: 'bg-[var(--warn-soft)]', chip: 'bg-[var(--warn-soft)] text-[var(--warn-ink)]', tag: 'bg-[var(--warn-soft)] text-[var(--warn-ink)]' },
+  ok: { label: 'Oportunidad', text: 'text-[var(--accent-ink)]', border: 'border-[var(--accent)]', bg: 'bg-[var(--accent-soft)]', chip: 'bg-[var(--accent-soft)] text-[var(--accent-ink)]', tag: 'bg-[var(--accent-soft)] text-[var(--accent-ink)]' },
+  info: { label: 'Info', text: 'text-[var(--info-ink)]', border: 'border-[var(--info)]', bg: 'bg-[var(--info-soft)]', chip: 'bg-[var(--info-soft)] text-[var(--info-ink)]', tag: 'bg-[var(--info-soft)] text-[var(--info-ink)]' },
 }
 
 // Etapa del flujo — para agrupar "Qué detectó cada agente" como el artifact.
@@ -394,8 +396,8 @@ export default function MissionControlPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {([
           { l: 'Detecciones hoy', v: String(detections.length), c: 'text-[var(--text-1)]', Ic: Activity },
-          { l: 'Alertas', v: String(alertasN), c: alertasN > 0 ? 'text-amber-400' : 'text-emerald-400', Ic: AlertTriangle },
-          { l: 'Oportunidades', v: String(oportsN), c: 'text-emerald-400', Ic: TrendingUp },
+          { l: 'Alertas', v: String(alertasN), c: alertasN > 0 ? 'text-[var(--warn-ink)]' : 'text-[var(--accent-ink)]', Ic: AlertTriangle },
+          { l: 'Oportunidades', v: String(oportsN), c: 'text-[var(--accent-ink)]', Ic: TrendingUp },
           { l: 'Agentes activos', v: String(activeAgents), c: 'text-[var(--text-1)]', Ic: Bot },
         ]).map((k, i) => {
           const Ic = k.Ic
@@ -533,13 +535,13 @@ export default function MissionControlPage() {
                 </div>
                 {/* Acciones */}
                 <div className="flex gap-2">
-                  <button onClick={() => saveAction(selectedAgent, 'aplicado')} className={`flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-semibold rounded-lg py-2 transition-colors ${act === 'aplicado' ? 'bg-emerald-500 text-[#04130d]' : 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20'}`}>
+                  <button onClick={() => saveAction(selectedAgent, 'aplicado')} className={`fs-btn fs-btn-sm flex-1 ${act === 'aplicado' ? 'fs-btn-primary' : 'fs-btn-soft'}`}>
                     <Check size={14} />{act === 'aplicado' ? 'Aplicado' : 'Aplicar'}
                   </button>
-                  <button onClick={() => saveAction(selectedAgent, 'recordar')} className={`flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-semibold rounded-lg py-2 border transition-colors ${act === 'recordar' ? 'bg-amber-500/15 border-amber-500/40 text-amber-300' : 'bg-[var(--surface-2)] border-[var(--line)] text-[var(--text-2)] hover:bg-[var(--panel)]'}`}>
+                  <button onClick={() => saveAction(selectedAgent, 'recordar')} className="fs-btn fs-btn-sm fs-btn-secondary flex-1">
                     <Clock size={14} />{act === 'recordar' ? 'Recordando' : 'Recordar'}
                   </button>
-                  <button onClick={() => { saveAction(selectedAgent, 'descartado'); setSelectedAgent(null) }} className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-semibold rounded-lg py-2 bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-3)] hover:bg-[var(--panel)] transition-colors">
+                  <button onClick={() => { saveAction(selectedAgent, 'descartado'); setSelectedAgent(null) }} className="fs-btn fs-btn-sm fs-btn-ghost flex-1">
                     <X size={14} />Descartar
                   </button>
                 </div>
