@@ -52,4 +52,12 @@ describe('/delivery security contract', () => {
     expect(source).not.toContain('/rest/v1/')
     expect(source).toContain('/api/pos/delivery-orders')
   })
+
+  it('keeps POS delivery operations server-mediated and tenant-scoped', () => {
+    const source = readFileSync(join(process.cwd(), 'src/app/pos/delivery/page.tsx'), 'utf8')
+    expect(source).not.toContain('NEXT_PUBLIC_SUPABASE_ANON_KEY')
+    expect(source).not.toContain('/rest/v1/delivery_orders')
+    expect(source).not.toContain('getClientId(')
+    expect(source).toContain('/api/pos/delivery-orders')
+  })
 })

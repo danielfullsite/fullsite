@@ -3,13 +3,20 @@ import { withPOSAuth, unauthorized } from '@/lib/api-auth'
 
 type DeliveryOrderRow = {
   id: string
+  client_id?: string
   platform: string
   platform_order_id: string | null
   status: string
   customer_name: string | null
+  address?: string | null
+  phone?: string | null
   total: number | null
   created_at: string | null
   estimated_pickup: string | null
+  en_route_at?: string | null
+  delivered_at?: string | null
+  closed_at?: string | null
+  payment_method?: string | null
   items: unknown
 }
 
@@ -71,6 +78,19 @@ async function sbGet<T>(path: string): Promise<T[]> {
   return Array.isArray(rows) ? rows as T[] : []
 }
 
+async function sbPatch<T>(path: string, body: Record<string, unknown>): Promise<T[]> {
+  if (!SB_URL || !SB_SERVICE_KEY) return []
+  const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
+    method: 'PATCH',
+    headers: { ...serviceHeaders(), Prefer: 'return=representation' },
+    body: JSON.stringify(body),
+    cache: 'no-store',
+  }).catch(() => null)
+  if (!res?.ok) return []
+  const rows = await res.json().catch(() => [])
+  return Array.isArray(rows) ? rows as T[] : []
+}
+
 export async function GET(request: NextRequest) {
   const auth = await withPOSAuth(request)
   if (!auth) return unauthorized()
@@ -86,7 +106,7 @@ export async function GET(request: NextRequest) {
 
   const [orders, payments, providers, mappings, webhookEvents] = await Promise.all([
     sbGet<DeliveryOrderRow>(
-      `delivery_orders?client_id=eq.${encodedClient}&select=id,platform,platform_order_id,status,customer_name,total,created_at,estimated_pickup,items&order=created_at.desc&limit=50`
+      `delivery_orders?client_id=eq.${encodedClient}&select=id,client_id,platform,platform_order_id,status,customer_name,address,phone,total,payment_method,created_at,estimated_pickup,en_route_at,delivered_at,closed_at,items&order=created_at.desc&limit=50`
     ),
     sbGet<PlatformPaymentRow>(
       `delivery_platform_payments?client_id=eq.${encodedClient}&select=id,platform,lot_id,period_start,period_end,paid_date,total,status&order=period_start.desc&limit=20`
@@ -150,4 +170,58 @@ export async function GET(request: NextRequest) {
     payments,
     webhook_events: webhookEvents,
   })
+}
+
+export async function PATCH(request: NextRequest) {
+  const auth = await withPOSAuth(request)
+  if (!auth) return unauthorized()
+
+  if (!SB_URL || !SB_SERVICE_KEY) {
+    return Response.json({ ok: false, error: 'SERVER_CONFIG_ERROR' }, { status: 503 })
+  }
+
+  const body = await request.json().catch(() => ({})) as {
+    id?: string
+    status?: 'preparando' | 'lista' | 'cancelada'
+    reason?: string
+  }
+
+  if (!body.id || !body.status || !['preparando', 'lista', 'cancelada'].includes(body.status)) {
+    return Response.json({ ok: false, error: 'INVALID_DELIVERY_UPDATE' }, { status: 400 })
+  }
+
+  const encodedClient = encodeURIComponent(auth.clientId)
+  const encodedId = encodeURIComponent(body.id)
+  const now = new Date().toISOString()
+
+  const rows = await sbPatch<DeliveryOrderRow>(
+    `delivery_orders?id=eq.${encodedId}&client_id=eq.${encodedClient}`,
+    { status: body.status, updated_at: now }
+  )
+
+  const order = rows[0]
+  if (!order) {
+    return Response.json({ ok: false, error: 'DELIVERY_ORDER_NOT_FOUND' }, { status: 404 })
+  }
+
+  // Platform-side notification happens only after the order row is proven to
+  // belong to the authenticated tenant. Failures are returned as non-fatal so
+  // kitchen state remains usable even if Uber/Rappi is temporarily unavailable.
+  let platform_sync: { attempted: boolean; ok?: boolean; error?: unknown } = { attempted: false }
+  if (order.platform === 'ubereats' && order.platform_order_id && (body.status === 'lista' || body.status === 'cancelada')) {
+    const action = body.status === 'lista' ? 'ready' : 'cancel'
+    const res = await fetch(new URL('/api/integrations/uber-eats/order', request.url), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        order_id: order.platform_order_id,
+        action,
+        ...(action === 'cancel' ? { reason: body.reason || 'OUT_OF_ITEM' } : {}),
+      }),
+    }).catch((error: unknown) => ({ ok: false, json: async () => ({ error: String(error) }) }))
+    const payload = await res.json().catch(() => ({}))
+    platform_sync = { attempted: true, ok: res.ok, error: res.ok ? undefined : payload }
+  }
+
+  return Response.json({ ok: true, order, platform_sync })
 }
