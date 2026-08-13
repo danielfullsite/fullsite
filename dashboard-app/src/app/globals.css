@@ -218,6 +218,27 @@ body:has(.pos-kiosk) {
   color-scheme: light;
 }
 
+/* Riel oscuro del sidebar — scope de tokens (esqueleton): funciona igual en tema
+ * claro y oscuro porque redefine los tokens a "carbón-verde con texto claro".
+ * Todo lo que viva dentro (.sidebar-rail) hereda estos valores automáticamente. */
+.sidebar-rail {
+  --surface: #0f1a15;
+  --surface-2: #18271f;
+  --panel: #18271f;
+  --raised: #18271f;
+  --line: #25352c;
+  --line-soft: #1f2e26;
+  --text-1: #eef3f0;
+  --text-2: #c2d0c8;
+  --text-3: #8ba095;
+  --text-4: #61756a;
+  --accent-ink: #34d399;
+  --crit-ink: #f87171;
+  --crit-soft: rgba(248,113,113,0.13);
+  background: #0f1a15;
+  color: var(--text-1);
+}
+
 @theme inline {
   --color-background: var(--bg);
   --color-foreground: var(--text-1);

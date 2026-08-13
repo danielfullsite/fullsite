@@ -217,6 +217,14 @@ export default function Sidebar() {
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
   const { user, role, clientConfig, locations, locationId, setLocationId, signOut } = useAuth()
+  // Avatar del usuario logueado (iniciales, ej. Daniel Ramonfaur → DR)
+  const _u = user as { email?: string; name?: string; user_metadata?: { full_name?: string } } | null
+  const userLabel = _u?.name || _u?.user_metadata?.full_name || _u?.email || 'Usuario'
+  const userInitials = (() => {
+    const src = (_u?.name || _u?.user_metadata?.full_name || (_u?.email || '').split('@')[0].replace(/[._-]/g, ' ')).trim()
+    const p = src.split(/\s+/)
+    return ((p[0]?.[0] || '') + (p[1]?.[0] || '')).toUpperCase() || 'U'
+  })()
 
   // En la consola de plataforma (/platform/*) mostramos el nav de plataforma,
   // no el menú operativo del restaurante.
@@ -233,13 +241,20 @@ export default function Sidebar() {
   })
 
   const sidebarContent = (
-    <aside className="flex flex-col h-screen sticky top-0 w-full lg:border-r lg:border-[var(--line)]" style={{ background: 'var(--surface)' }}>
+    <aside className="sidebar-rail flex flex-col h-screen sticky top-0 w-full lg:border-r lg:border-[var(--line)]" style={{ background: 'var(--surface)' }}>
       {/* Logo — with safe-area padding on mobile for iPhone notch */}
       <div className="px-5 py-5 lg:border-b lg:border-[var(--line-soft)]" style={{ paddingTop: 'max(1.25rem, env(safe-area-inset-top, 1.25rem))' }}>
         <div className="flex items-center justify-between">
-          <Link href={isPlatform ? '/platform' : '/'} className="flex items-center logo-hover" onClick={() => setMobileOpen(false)}>
-            <span className="text-[var(--text-1)] font-black text-xl tracking-tight">
-              fullsite
+          <Link href={isPlatform ? '/platform' : '/'} className="flex items-center gap-2.5 logo-hover min-w-0" onClick={() => setMobileOpen(false)}>
+            <span className="relative grid place-items-center flex-shrink-0" style={{ width: 34, height: 34, borderRadius: 10, background: '#0b1712', border: '1px solid var(--line)' }}>
+              <span className="font-black leading-none text-white" style={{ fontSize: 18 }}>f</span>
+              <span className="absolute" style={{ right: 6, bottom: 6, width: 6, height: 6, background: 'var(--accent)', borderRadius: 1 }} />
+            </span>
+            <span className="flex flex-col leading-tight min-w-0">
+              <span className="font-black text-[14px] tracking-tight truncate" style={{ color: 'var(--text-1)' }}>
+                {isPlatform ? 'Fullsite' : (clientConfig?.display_name || 'Fullsite')}
+              </span>
+              <span className="text-[10px]" style={{ color: 'var(--text-3)' }}>{isPlatform ? 'Plataforma' : 'Fullsite'}</span>
             </span>
           </Link>
           {/* Close button inside sidebar on mobile */}
@@ -333,6 +348,15 @@ export default function Sidebar() {
             ))}
           </select>
         )}
+
+        {/* Usuario logueado — avatar con iniciales (DR) */}
+        <div className="flex items-center gap-2.5 mb-3">
+          <span className="grid place-items-center flex-shrink-0 rounded-full text-[11px] font-bold text-white" style={{ width: 30, height: 30, background: 'linear-gradient(150deg, #1d3a2c, var(--accent))' }}>{userInitials}</span>
+          <div className="min-w-0">
+            <div className="text-xs font-semibold truncate" style={{ color: 'var(--text-1)' }}>{userLabel}</div>
+            <div className="text-[10px] truncate capitalize" style={{ color: 'var(--text-3)' }}>{role || 'usuario'}</div>
+          </div>
+        </div>
 
         {/* Client name (o etiqueta de plataforma en modo Dios) */}
         {isPlatform ? (
