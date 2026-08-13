@@ -238,18 +238,40 @@ body:has(.pos-kiosk) {
   background: #0f1a15;
   color: var(--text-1);
   scrollbar-width: thin;
-  scrollbar-color: rgba(255,255,255,0.12) transparent;
+  scrollbar-color: rgba(255,255,255,0.14) transparent;
 }
-/* Scrollbar del riel oscuro: fino y discreto (antes salía una pastilla clara que
- * parecía un "corte"). Aplica a la barra y a cualquier scroll interno del sidebar. */
+/* Versión BRIGHT (tema claro): riel blanco como el diseño de antes. */
+[data-theme="light"] .sidebar-rail {
+  --surface: #ffffff;
+  --surface-2: #f4f7f1;
+  --panel: #ffffff;
+  --raised: #fbfdfa;
+  --line: #e3e8e2;
+  --line-soft: #eef1ec;
+  --text-1: #0e1613;
+  --text-2: #364039;
+  --text-3: #57625a;
+  --text-4: #8a958e;
+  --accent-ink: color-mix(in srgb, var(--accent) 60%, #0b1a13);
+  --crit-ink: #be123c;
+  --crit-soft: rgba(225,29,72,0.10);
+  background: #ffffff;
+  scrollbar-color: rgba(16,32,26,0.18) transparent;
+}
+/* Scrollbar fino y discreto en ambos temas (antes salía una pastilla clara
+ * que parecía un "corte" del sidebar). */
 .sidebar-rail::-webkit-scrollbar,
 .sidebar-rail *::-webkit-scrollbar { width: 6px; height: 6px; }
 .sidebar-rail::-webkit-scrollbar-track,
 .sidebar-rail *::-webkit-scrollbar-track { background: transparent; }
 .sidebar-rail::-webkit-scrollbar-thumb,
-.sidebar-rail *::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.10); border-radius: 3px; }
-.sidebar-rail::-webkit-scrollbar-thumb:hover,
-.sidebar-rail *::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
+.sidebar-rail *::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 3px; }
+[data-theme="light"] .sidebar-rail::-webkit-scrollbar-thumb,
+[data-theme="light"] .sidebar-rail *::-webkit-scrollbar-thumb { background: rgba(16,32,26,0.16); }
+/* Logo por tema: oscuro → f blanca, claro → f negra */
+.sidebar-logo-black { display: none; }
+[data-theme="light"] .sidebar-logo-white { display: none; }
+[data-theme="light"] .sidebar-logo-black { display: block; }
 
 @theme inline {
   --color-background: var(--bg);

@@ -128,17 +128,17 @@ function DemoLayoutInner({ children }: { children: React.ReactNode }) {
   return (
     <div className={`flex min-h-screen transition-colors ${isDark ? 'bg-[#0a0a0c]' : 'bg-gray-50'}`} style={{ '--sidebar-w': sidebarWidth } as React.CSSProperties}>
       {/* Sidebar */}
-      <aside className={`hidden lg:flex flex-col flex-shrink-0 overflow-y-auto overflow-x-hidden transition-all duration-200 ${isDark ? 'bg-[#0d0d10] border-r border-white/5' : 'bg-white border-r border-gray-200'}`} style={{ width: sidebarWidth }}>
-        {/* Logo */}
-        <div className="px-4 py-5 flex items-center justify-between flex-shrink-0">
+      <aside className="sidebar-rail hidden lg:flex flex-col flex-shrink-0 overflow-y-auto overflow-x-hidden transition-all duration-200 border-r border-[var(--line)]" style={{ width: sidebarWidth }}>
+        {/* Logo — swap por tema (oscuro → f blanca, claro → f negra) */}
+        <div className={`px-4 py-5 flex items-center flex-shrink-0 ${collapsed ? 'justify-center' : 'gap-2.5'}`}>
+          <img src="/fullsite-logo-white.png" alt="Fullsite" width={34} height={34} className="sidebar-logo-white flex-shrink-0" style={{ objectFit: 'contain' }} />
+          <img src="/fullsite-logo-black.png" alt="Fullsite" width={34} height={34} className="sidebar-logo-black flex-shrink-0" style={{ objectFit: 'contain' }} />
           {!collapsed && (
-            <div>
-              <span className={`font-black text-xl tracking-tight ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                fullsite<span className="inline-block align-baseline ml-0.5" style={{ width: '0.34em', height: '0.34em', background: 'var(--accent)', transform: 'translateY(-0.05em)' }} />
-              </span>
-            </div>
+            <span className="flex flex-col leading-tight min-w-0">
+              <span className="font-black text-[15px] tracking-tight" style={{ color: 'var(--text-1)' }}>Fullsite</span>
+              <span className="text-[10px]" style={{ color: 'var(--text-3)' }}>Demo</span>
+            </span>
           )}
-          {collapsed && <span className={`font-black text-lg mx-auto ${isDark ? 'text-white' : 'text-gray-900'}`}>f<span className="inline-block align-baseline ml-px" style={{ width: '0.34em', height: '0.34em', background: 'var(--accent)', transform: 'translateY(-0.05em)' }} /></span>}
         </div>
 
         {/* Nav sections */}

@@ -246,7 +246,8 @@ export default function Sidebar() {
       <div className="px-5 py-5 lg:border-b lg:border-[var(--line-soft)]" style={{ paddingTop: 'max(1.25rem, env(safe-area-inset-top, 1.25rem))' }}>
         <div className="flex items-center justify-between">
           <Link href={isPlatform ? '/platform' : '/'} className="flex items-center gap-2.5 logo-hover min-w-0" onClick={() => setMobileOpen(false)}>
-            <img src="/fullsite-logo-white.png" alt="Fullsite" width={38} height={38} className="flex-shrink-0" style={{ display: 'block', objectFit: 'contain' }} />
+            <img src="/fullsite-logo-white.png" alt="Fullsite" width={38} height={38} className="sidebar-logo-white flex-shrink-0" style={{ objectFit: 'contain' }} />
+            <img src="/fullsite-logo-black.png" alt="Fullsite" width={38} height={38} className="sidebar-logo-black flex-shrink-0" style={{ objectFit: 'contain' }} />
             <span className="flex flex-col leading-tight min-w-0">
               <span className="font-black text-[14px] tracking-tight truncate" style={{ color: 'var(--text-1)' }}>
                 {isPlatform ? 'Fullsite' : (clientConfig?.display_name || 'Fullsite')}
