@@ -10,6 +10,16 @@ describe('Platform Control Center security contract', () => {
     expect(source).toContain('/api/platform/overview')
   })
 
+  it('renders platform tenants through the same server-mediated admin endpoint', () => {
+    const source = readFileSync(join(process.cwd(), 'src/app/platform/tenants/page.tsx'), 'utf8')
+    expect(source).toContain('/api/platform/overview')
+    expect(source).not.toContain('NEXT_PUBLIC_SUPABASE_ANON_KEY')
+    expect(source).not.toContain('/rest/v1/')
+    expect(source).not.toContain('fullsite_client_id')
+    expect(source).toContain('impersonation auditada')
+    expect(source).toContain('No se habilita cambiando tenant en browser')
+  })
+
   it('fails closed without configured platform admin emails', () => {
     const source = readFileSync(join(process.cwd(), 'src/app/api/platform/overview/route.ts'), 'utf8')
     expect(source).toContain('PLATFORM_ADMIN_EMAILS')
@@ -37,6 +47,7 @@ describe('Platform Control Center security contract', () => {
     const source = readFileSync(join(process.cwd(), 'src/components/Sidebar.tsx'), 'utf8')
     expect(source).toContain('NEXT_PUBLIC_PLATFORM_ADMIN_EMAILS')
     expect(source).toContain("href: '/platform'")
+    expect(source).toContain("href: '/platform/tenants'")
     expect(source).toContain('platformOnly: true')
     expect(source).toContain('isPlatformAdminEmail(user?.email)')
   })

@@ -171,6 +171,7 @@ const navSections = [
     label: 'Fullsite',
     items: [
       { href: '/platform', label: 'Control Center', icon: ShieldCheck, platformOnly: true },
+      { href: '/platform/tenants', label: 'Tenants', icon: Users, platformOnly: true },
     ],
   },
 ]
