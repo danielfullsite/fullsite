@@ -53,6 +53,7 @@ import {
   Flag,
   Sliders,
   ScrollText,
+  TrendingDown,
   ArrowLeft,
 } from 'lucide-react'
 import { useState } from 'react'
@@ -106,6 +107,7 @@ const navSections = [
       { href: '/delivery', label: 'Delivery', icon: Bike },
       { href: '/auto86', label: 'Auto-86', icon: ShieldOff },
       { href: '/food-cost', label: 'Food Cost', icon: PieChart },
+      { href: '/rentabilidad', label: 'Rentabilidad', icon: TrendingDown },
       { href: '/compras', label: 'Compras', icon: ShoppingCart },
       { href: '/proveedores', label: 'Proveedores', icon: Truck },
       { href: '/reportes', label: 'Reportes', icon: FileBarChart },
