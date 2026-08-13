@@ -47,7 +47,6 @@ import {
   Coins,
   Wallet,
   Calculator,
-  Mic,
   Fingerprint,
   Store,
   Flag,
@@ -174,7 +173,6 @@ const navSections = [
       { href: '/mission-control', label: 'Agentes IA', icon: Bot },
       { href: '/coach', label: 'Coach', icon: Sparkles },
       { href: '/chat', label: 'Chat IA', icon: MessageCircle },
-      { href: '/voice', label: 'Voice Agent', icon: Mic },
     ],
   },
 ]
