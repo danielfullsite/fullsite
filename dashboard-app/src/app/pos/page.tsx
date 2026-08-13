@@ -1588,46 +1588,26 @@ function POSContent() {
   // Order loading is handled by the useEffect below (mesa + clienteNombre dependency)
   const [clienteNombre, setClienteNombre] = useState<string>(initialCuenta)
   const [mesero, setMesero] = useState<string>(() => {
+    // Anti-fraude: el mesero de una orden NUEVA = la identidad autenticada (quien
+    // hizo login con PIN/huella), NO una selección libre. Reasignar requiere gerente.
     if (typeof window !== 'undefined') {
       try {
-        // First check localStorage (dropdown selection persists across reloads)
-        const fromDropdown = localStorage.getItem('pos_mesero')
-        if (fromDropdown && MESEROS.includes(fromDropdown)) return fromDropdown
-        // Fallback: match from staff session
         const saved = sessionStorage.getItem('pos_staff')
         if (saved) {
           const s = JSON.parse(saved)
-          const match = MESEROS.find(m => m.toLowerCase().includes(s.name?.toLowerCase()?.split(' ')[0] || ''))
-          if (match) return match
+          if (s.name) return s.name
         }
       } catch { /* */ }
     }
-    return MESEROS[0] || ''
+    return ''
   })
   // Dynamic meseros list from pos_staff (replaces hardcoded MESEROS for dropdown)
   const [meserosList, setMeserosList] = useState<string[]>(MESEROS)
   useEffect(() => {
-    fetchMeseros().then(list => {
-      setMeserosList(list)
-      // If current mesero is not in the new list, update to first available
-      if (list.length > 0 && !list.includes(mesero)) {
-        const saved = localStorage.getItem('pos_mesero')
-        if (saved && list.includes(saved)) {
-          setMesero(saved)
-        } else {
-          // Try matching by first name from staff session
-          try {
-            const s = sessionStorage.getItem('pos_staff')
-            if (s) {
-              const staff = JSON.parse(s)
-              const match = list.find(m => m.toLowerCase().includes(staff.name?.toLowerCase()?.split(' ')[0] || ''))
-              if (match) { setMesero(match); return }
-            }
-          } catch { /* */ }
-        }
-      }
-    })
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    // Solo carga la lista (para reasignación por gerente). NO reasigna el mesero
+    // automáticamente desde el dropdown/localStorage — la identidad la fija el login.
+    fetchMeseros().then(setMeserosList)
+  }, [])
 
   const [personas, setPersonas] = useState<number>(2)
   const [clock, setClock] = useState<string>('')
@@ -1879,6 +1859,10 @@ function POSContent() {
   // Pin prompt state (replaces window.prompt for kiosk/PWA compatibility)
   const [pinPrompt, setPinPrompt] = useState<{ title: string; onSubmit: (pin: string) => void } | null>(null)
   const [pinInput, setPinInput] = useState('')
+  // Reasignación de mesero: null = bloqueado. Si tiene el nombre del gerente que
+  // autorizó, se habilita el selector una sola vez (anti-fraude: nadie ordena a
+  // nombre de otro sin autorización + bitácora).
+  const [reassignMgr, setReassignMgr] = useState<string | null>(null)
 
   const handleToggleComandas = async () => {
     const next = !comandasOff
@@ -2270,6 +2254,12 @@ function POSContent() {
       }
     } catch { /* */ }
   }, [])
+
+  // Anti-fraude: en una orden NUEVA el mesero = la identidad logueada. En órdenes
+  // existentes se respeta order.mesero (reasignable solo por gerente).
+  useEffect(() => {
+    if (loadedOrderId === null && staffName) setMesero(staffName)
+  }, [loadedOrderId, staffName])
 
   // Mobile device detection — meseros en celular solo pueden tomar orden + enviar a cocina
   const isMobileDevice = typeof window !== 'undefined' && (window.innerWidth < 768 || /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent))
@@ -2908,8 +2898,6 @@ function POSContent() {
                 const racePrint = await printByStation(racePrintOrder)
                 if (racePrint.failed.length > 0) showToast(`⚠ Impresora sin conexión: ${racePrint.failed.join(', ')}`)
                 showToast(`${raceNewItems.length} item${raceNewItems.length !== 1 ? 's' : ''} enviados`)
-                setSaving(false); operationLock.current = false
-                await new Promise(r => setTimeout(r, 15000))
                 sessionStorage.removeItem('pos_staff')
                 sessionStorage.removeItem('pos_last_activity')
                 router.push('/pos/mesas'); lock()
@@ -3004,8 +2992,6 @@ function POSContent() {
               })
               if (freshRes.ok) { const rows = await freshRes.json(); if (rows[0]?.updated_at) setLoadedUpdatedAt(rows[0].updated_at) }
             } catch {}
-            setSaving(false); operationLock.current = false
-            await new Promise(r => setTimeout(r, 15000))
             sessionStorage.removeItem('pos_staff')
             sessionStorage.removeItem('pos_last_activity')
             router.push('/pos/mesas'); lock()
@@ -3073,8 +3059,7 @@ function POSContent() {
             client_id: _cid(),
           }),
         }).catch(() => {})
-        // Treat as success — wait so user reads toast and printer finishes, then lock
-        await new Promise(r => setTimeout(r, 15000))
+        // Enviado (offline queue). Al mapa de mesas al instante + bloqueo. Sin espera.
         sessionStorage.removeItem('pos_staff')
         sessionStorage.removeItem('pos_last_activity')
         router.push('/pos/mesas')
@@ -3200,14 +3185,15 @@ function POSContent() {
           if (rows[0]?.order_number) setOrderNumber(rows[0].order_number)
         } else setLoadedUpdatedAt(new Date().toISOString())
       } catch { setLoadedUpdatedAt(new Date().toISOString()) }
-      setSaving(false); operationLock.current = false
+      // NO liberar el lock aquí: se mantiene hasta navegar → evita doble-envío/doble-lock
+      // si el mesero toca Enviar dos veces.
       // Cache order locally so it loads instantly when returning to this mesa
       try {
         localStorage.setItem(`pos_order_${mesa}`, JSON.stringify({ id: orderId, items: activeItems, mesero, personas, discount, notas: orderNotes, revision: saveResult.revision ?? orderRevision, updatedAt: new Date().toISOString(), ts: Date.now() }))
         localStorage.removeItem(`pos_draft_${mesa}`) // clear draft after successful save
       } catch {}
-      // After send: wait so user reads toast and printer finishes, then navigate + lock
-      await new Promise(r => setTimeout(r, 15000))
+      // Tras enviar: al mapa de mesas AL INSTANTE + bloqueo (re-identificación por
+      // PIN/huella = cada comanda atada a quien la envió). Sin la espera de 15s.
       sessionStorage.removeItem('pos_staff')
       sessionStorage.removeItem('pos_last_activity')
       router.push('/pos/mesas')
@@ -3701,9 +3687,54 @@ function POSContent() {
           <select value={personas} onChange={(e) => setPersonas(Number(e.target.value))} className="bg-[var(--line)] text-[var(--text-1)] rounded-lg px-4 py-2 text-lg font-bold border border-[var(--line)] min-h-[48px]">
             {Array.from({ length: 20 }, (_, i) => (<option key={i + 1} value={i + 1}>{i + 1}p</option>))}
           </select>
-          <select value={mesero} onChange={(e) => { const newMesero = e.target.value; setMesero(newMesero); try { localStorage.setItem('pos_mesero', newMesero) } catch {} if (loadedOrderId) { fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${loadedOrderId}`, { method: 'PATCH', headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify({ mesero: newMesero }) }).catch(err => console.error('[mesero-update]', err)) } }} className="bg-[var(--line)] text-[var(--text-1)] rounded-lg px-3 py-2 text-base font-medium border border-[var(--line)] min-h-[48px] flex-1 min-w-0">
-            {meserosList.map((m) => (<option key={m} value={m}>{m}</option>))}
-          </select>
+          {/* Mesero — BLOQUEADO a la identidad logueada (anti-fraude). Reasignar
+              requiere PIN de gerente y queda en bitácora. */}
+          {reassignMgr ? (
+            <select
+              autoFocus
+              value={mesero}
+              onChange={(e) => {
+                const newMesero = e.target.value
+                const prevMesero = mesero
+                setMesero(newMesero)
+                try { localStorage.setItem('pos_mesero', newMesero) } catch {}
+                if (loadedOrderId) {
+                  fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${loadedOrderId}`, { method: 'PATCH', headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify({ mesero: newMesero }) }).catch(err => console.error('[mesero-update]', err))
+                }
+                logAudit({ order_id: orderId, action: 'mesero_reassigned', actor: reassignMgr, mesa, details: { from: prevMesero, to: newMesero, authorized_by: reassignMgr } })
+                setReassignMgr(null)
+              }}
+              className="bg-[var(--line)] text-[var(--text-1)] rounded-lg px-3 py-2 text-base font-medium border border-amber-500 min-h-[48px] flex-1 min-w-0"
+            >
+              {meserosList.map((m) => (<option key={m} value={m}>{m}</option>))}
+            </select>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                if (!(staffRole === 'admin' || staffRole === 'gerente')) {
+                  setPinInput('')
+                  setPinPrompt({
+                    title: 'PIN de gerente para reasignar el mesero:',
+                    onSubmit: async (pin: string) => {
+                      const mgr = await verifyManagerPin(pin)
+                      if (!mgr) { showToast('PIN incorrecto'); return }
+                      setPinPrompt(null)
+                      setReassignMgr(mgr)
+                    },
+                  })
+                } else {
+                  // Admin/gerente ya logueado: puede reasignar directo (queda en bitácora)
+                  setReassignMgr(staffName || 'gerente')
+                }
+              }}
+              title="Mesero de la orden — bloqueado. Reasignar requiere gerente."
+              className="flex items-center gap-2 bg-[var(--line)] text-[var(--text-1)] rounded-lg px-3 py-2 text-base font-medium border border-[var(--line)] min-h-[48px] flex-1 min-w-0"
+            >
+              <Lock size={14} className="text-[var(--text-3)] flex-shrink-0" />
+              <span className="truncate">{mesero || 'Sin mesero'}</span>
+            </button>
+          )}
         </div>
         {/* Row 3: Mobile tab toggle (only visible on mobile) */}
         <div className="flex md:hidden border-t border-[var(--line)]/50">

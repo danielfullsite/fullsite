@@ -1576,6 +1576,7 @@ export type AuditAction =
   | 'reprint_comanda'
   | 'mp_payment_recovery_required'
   | 'mp_payment_marked_manual_review'
+  | 'mesero_reassigned'
 
 export interface AuditEvent {
   client_id?: string
