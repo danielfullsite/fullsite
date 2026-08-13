@@ -38,7 +38,7 @@ import {
   updateOrderStatus,
   getPOSAuthHeaders,
 } from '@/lib/pos-data'
-import { getIvaRate, TIEMPO_ITEM_ID, isTiempoItem, getStationForItem, setCategoryNameCache, _categoryNameCache, isNoPrintStation, getCancellationReasons, getDiscountCatalog } from '@/lib/pos-constants'
+import { getIvaRate, TIEMPO_ITEM_ID, isTiempoItem, getStationForItem, setCategoryNameCache, _categoryNameCache, isNoPrintStation, getCancellationReasons, getDiscountCatalog, hasKdsStation } from '@/lib/pos-constants'
 import { calcSplitParejo, calcSplitItems } from '@/lib/pos-calculations'
 import { publishEvent, getDeviceId } from '@/lib/events'
 import { apiUrl } from '@/lib/api-base'
@@ -3793,8 +3793,9 @@ function POSContent() {
               {[
                 { title: 'Operación', icon: Grid3X3, defaultOpen: true, items: [
                   { href: '/pos/mesas', icon: Grid3X3, label: 'Mesas', section: 'mesas' },
-                  { href: '/pos/cocina', icon: ChefHat, label: 'Cocina', section: 'cocina' },
-                  { href: '/pos/barra', icon: Wine, label: 'Barra', section: 'barra' },
+                  // Cocina/Barra solo si el tenant tiene esa pantalla KDS (esqueleton).
+                  ...(hasKdsStation('cocina') ? [{ href: '/pos/cocina', icon: ChefHat, label: 'Cocina', section: 'cocina' }] : []),
+                  ...(hasKdsStation('barra') ? [{ href: '/pos/barra', icon: Wine, label: 'Barra', section: 'barra' }] : []),
                   { href: '/pos/delivery', icon: Bike, label: 'Domicilio', section: 'delivery' },
                 ] },
                 { title: 'Caja & Turno', icon: Receipt, defaultOpen: false, items: [

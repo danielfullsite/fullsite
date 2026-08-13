@@ -229,10 +229,7 @@ export function initKdsStations(stations: unknown) {
   }
 }
 export function getKdsStations(): StationName[] { return _kdsStations }
-// Estación efectiva del KDS para un item: su estación si tiene pantalla, si no → cocina.
-export function effectiveKdsStation(station: StationName): StationName {
-  return _kdsStations.includes(station) ? station : 'cocina'
-}
+export function hasKdsStation(station: StationName): boolean { return _kdsStations.includes(station) }
 
 // ─── Catálogos configurables por tenant (setting pos.*; cargados en el layout) ──
 // Regla del sistema anterior: cancelaciones y descuentos usan catálogos cerrados (anti-fraude),
