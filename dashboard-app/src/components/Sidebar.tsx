@@ -67,7 +67,6 @@ const navSections = [
     label: 'Principal',
     items: [
       { href: '/', label: 'Dashboard', icon: LayoutDashboard },
-      { href: '/resumen', label: 'Resumen', icon: Sparkles },
       { href: '/ventas', label: 'Ventas', icon: DollarSign },
       { href: '/cortes', label: 'Cortes', icon: ClipboardList },
     ],
@@ -107,6 +106,7 @@ const navSections = [
       { href: '/cancelaciones', label: 'Cancelaciones', icon: Ban },
       { href: '/delivery', label: 'Delivery', icon: Bike },
       { href: '/auto86', label: 'Auto-86', icon: ShieldOff },
+      { href: '/costeo', label: 'Costeo', icon: Sparkles },
       { href: '/food-cost', label: 'Food Cost', icon: PieChart },
       { href: '/rentabilidad', label: 'Rentabilidad', icon: TrendingDown },
       { href: '/compras', label: 'Compras', icon: ShoppingCart },
