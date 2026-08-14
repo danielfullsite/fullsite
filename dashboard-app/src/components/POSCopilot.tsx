@@ -67,7 +67,7 @@ const COMBO_RULES: Array<{
   discount: number
 }> = [
   { items: ['cafe', 'croissant'], name: 'Combo Croissant + Cafe', discount: 15 },
-  { items: ['chilaquiles', 'jugo'], name: 'Combo Desayuno AMALAY', discount: 20 },
+  { items: ['chilaquiles', 'jugo'], name: 'Combo Desayuno', discount: 20 },
 ]
 
 // ── Time-based suggestions ───────────────────────────────────────────────
@@ -81,7 +81,7 @@ function getTimeBasedSuggestions(): CopilotSuggestion[] {
       type: 'insight',
       priority: 3,
       title: 'Hora de desayuno',
-      description: 'Chilaquiles y cafe son los mas pedidos a esta hora',
+      description: 'El desayuno es el servicio mas fuerte a esta hora — sugiere combos',
     })
   } else if (hour >= 13 && hour < 16) {
     suggestions.push({

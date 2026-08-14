@@ -31,8 +31,6 @@ export const DEMO_KPIS = {
   propinas_total: 13110,
   hora_pico: '13:00 - 14:00',
   ultima_venta: '15:12',
-  chilaquiles_total: 9860,
-  half_half_total: 4720,
 }
 
 export const DEMO_YESTERDAY = {

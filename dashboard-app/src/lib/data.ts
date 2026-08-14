@@ -140,8 +140,6 @@ function parseRow(row: Record<string, unknown>): WansoftDaily {
     mesas_atendidas: num(row.mesas_atendidas),
     ordenes_llevar: num(row.ordenes_llevar),
     propinas_total: num(row.propinas_total),
-    chilaquiles_total: num(row.chilaquiles_total),
-    half_half_total: num(row.half_half_total),
     meseros: parseJsonbField(row.meseros),
     platillos_top: parseJsonbField(row.platillos_top),
     ventas_por_grupo: parseJsonbField(row.ventas_por_grupo),
@@ -503,7 +501,6 @@ export async function getDashboardFromPosOrders(days: number = 30, clientId: str
     // Top platillos from items + group by category
     const itemMap = new Map<string, { total: number; cantidad: number }>()
     const grupoMap = new Map<string, number>()
-    let chilaquilesTotal = 0, halfHalfTotal = 0
     for (const o of dayOrders) {
       if (Array.isArray(o.items)) {
         for (const item of o.items) {
@@ -522,10 +519,6 @@ export async function getDashboardFromPosOrders(days: number = 30, clientId: str
           const lower = item.nombre.toLowerCase()
           const grupo = classifyItemGroup(lower)
           grupoMap.set(grupo, (grupoMap.get(grupo) || 0) + itemTotal)
-
-          // Special KPIs
-          if (lower.includes('chilaquil') || lower.includes('enchilada')) chilaquilesTotal += itemTotal
-          if (lower.includes('half') || lower.includes('h&h') || lower.includes('mitad')) halfHalfTotal += itemTotal
         }
       }
     }
@@ -565,8 +558,6 @@ export async function getDashboardFromPosOrders(days: number = 30, clientId: str
       personas_restaurant: personas,
       ticket_promedio_restaurant: tp,
       propinas_total: propinasTotal,
-      chilaquiles_total: chilaquilesTotal,
-      half_half_total: halfHalfTotal,
       meseros,
       platillos_top: platillosTop,
       ventas_por_grupo: ventasPorGrupo,

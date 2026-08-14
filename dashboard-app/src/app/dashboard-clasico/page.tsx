@@ -36,7 +36,6 @@ const CATEGORY_NAMES: Record<string, string> = {
   'CEVICHE': 'Ceviche',
   'BEBIDAS OH': 'Bebidas OH',
   'PIZZAS & PASTAS': 'Pizzas & Pastas',
-  'SEMILLAS Y DULCES AMALAY': 'Dulces',
   'MUNCHIES': 'Snacks',
   'LA NONNA Gorditas Keto': 'La Nonna',
   'VARIOS': 'Varios',

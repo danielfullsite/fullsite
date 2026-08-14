@@ -9,15 +9,13 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  AreaChart,
-  Area,
   Cell,
 } from 'recharts'
 import { UtensilsCrossed, TrendingUp, BarChart3, Coffee, Sparkles } from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
 import { getRecentDays, aggregateGrupos, getWansoftDataLatest, getDashboardFromPosOrders } from '@/lib/data'
-import { formatCurrency, formatShortDate, formatNumber } from '@/lib/format'
+import { formatCurrency, formatNumber } from '@/lib/format'
 import type { WansoftDaily } from '@/lib/types'
 
 const CATEGORY_COLORS = [
@@ -80,16 +78,6 @@ export default function PlatillosPage() {
     fill: CATEGORY_COLORS[i % CATEGORY_COLORS.length],
   }))
 
-  // Chilaquiles & H&H trend
-  const specialTrend = recentData.map((d) => ({
-    fecha: formatShortDate(d.fecha),
-    chilaquiles: d.chilaquiles_total || 0,
-    hh: d.half_half_total || 0,
-  }))
-
-  const totalChilaquiles = recentData.reduce((s, d) => s + (d.chilaquiles_total || 0), 0)
-  const totalHH = recentData.reduce((s, d) => s + (d.half_half_total || 0), 0)
-
   return (
     <>
       <PageHeader
@@ -115,20 +103,24 @@ export default function PlatillosPage() {
           icon={UtensilsCrossed}
           accentClass="kpi-accent-green"
         />
-        <KPICard
-          label="Chilaquiles"
-          value={formatCurrency(totalChilaquiles)}
-          subtitle="30 días acumulado"
-          icon={Coffee}
-          accentClass="kpi-accent-amber"
-        />
-        <KPICard
-          label="Half & Half"
-          value={formatCurrency(totalHH)}
-          subtitle="30 días acumulado"
-          icon={TrendingUp}
-          accentClass="kpi-accent-purple"
-        />
+        {grupos[0] && (
+          <KPICard
+            label={grupos[0].nombre}
+            value={formatCurrency(grupos[0].total)}
+            subtitle="categoría #1 · 30 días"
+            icon={Coffee}
+            accentClass="kpi-accent-amber"
+          />
+        )}
+        {grupos[1] && (
+          <KPICard
+            label={grupos[1].nombre}
+            value={formatCurrency(grupos[1].total)}
+            subtitle="categoría #2 · 30 días"
+            icon={TrendingUp}
+            accentClass="kpi-accent-purple"
+          />
+        )}
       </div>
 
       {/* Top categories horizontal bar chart */}
@@ -207,115 +199,6 @@ export default function PlatillosPage() {
               </div>
             )
           })}
-        </div>
-      </div>
-
-      {/* Chilaquiles & H&H trend */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6 hover:shadow-md transition-shadow">
-          <h3 className="text-sm font-semibold text-[var(--text-1)] mb-1">
-            Chilaquiles (ventas $)
-          </h3>
-          <p className="text-xs text-[var(--text-3)] mb-5">Tendencia 30 días</p>
-          <div className="h-[180px] sm:h-[220px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={specialTrend}>
-                <defs>
-                  <linearGradient id="colorChilaquiles" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#ef4444" stopOpacity={0.2} />
-                    <stop offset="100%" stopColor="#ef4444" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" vertical={false} />
-                <XAxis
-                  dataKey="fecha"
-                  tick={{ fontSize: 10, fill: '#94a3b8' }}
-                  axisLine={false}
-                  tickLine={false}
-                  interval="preserveStartEnd"
-                />
-                <YAxis
-                  tick={{ fontSize: 10, fill: '#94a3b8' }}
-                  axisLine={false}
-                  tickLine={false}
-                  tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
-                  width={45}
-                />
-                <Tooltip
-                  formatter={(value) => [formatCurrency(Number(value)), 'Chilaquiles']}
-                  contentStyle={{
-                    background: 'var(--surface)',
-                    border: '1px solid var(--line)',
-                    borderRadius: '8px',
-                    fontSize: '12px',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                  }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="chilaquiles"
-                  stroke="#ef4444"
-                  fill="url(#colorChilaquiles)"
-                  strokeWidth={2}
-                  dot={false}
-                  activeDot={{ r: 4, stroke: '#ef4444', strokeWidth: 2, fill: 'var(--text-3)' }}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6 hover:shadow-md transition-shadow">
-          <h3 className="text-sm font-semibold text-[var(--text-1)] mb-1">
-            Half & Half (ventas $)
-          </h3>
-          <p className="text-xs text-[var(--text-3)] mb-5">Tendencia 30 días</p>
-          <div className="h-[180px] sm:h-[220px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={specialTrend}>
-                <defs>
-                  <linearGradient id="colorHH" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.2} />
-                    <stop offset="100%" stopColor="#f59e0b" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" vertical={false} />
-                <XAxis
-                  dataKey="fecha"
-                  tick={{ fontSize: 10, fill: '#94a3b8' }}
-                  axisLine={false}
-                  tickLine={false}
-                  interval="preserveStartEnd"
-                />
-                <YAxis
-                  tick={{ fontSize: 10, fill: '#94a3b8' }}
-                  axisLine={false}
-                  tickLine={false}
-                  tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
-                  width={45}
-                />
-                <Tooltip
-                  formatter={(value) => [formatCurrency(Number(value)), 'H&H']}
-                  contentStyle={{
-                    background: 'var(--surface)',
-                    border: '1px solid var(--line)',
-                    borderRadius: '8px',
-                    fontSize: '12px',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                  }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="hh"
-                  stroke="#f59e0b"
-                  fill="url(#colorHH)"
-                  strokeWidth={2}
-                  dot={false}
-                  activeDot={{ r: 4, stroke: '#f59e0b', strokeWidth: 2, fill: 'var(--text-3)' }}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
         </div>
       </div>
 

@@ -33,8 +33,6 @@ function makeDaily(overrides: Partial<WansoftDaily> = {}): WansoftDaily {
     mesas_atendidas: 25,
     ordenes_llevar: 5,
     propinas_total: 3000,
-    chilaquiles_total: 8000,
-    half_half_total: 4000,
     meseros: [],
     platillos_top: [],
     ventas_por_grupo: [],

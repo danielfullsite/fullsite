@@ -12,8 +12,6 @@ export interface WansoftDaily {
   mesas_atendidas: number
   ordenes_llevar: number
   propinas_total: number
-  chilaquiles_total: number
-  half_half_total: number
   meseros: MeseroEntry[]
   platillos_top: PlatilloEntry[]
   ventas_por_grupo: GrupoEntry[]

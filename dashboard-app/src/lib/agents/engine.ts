@@ -132,9 +132,17 @@ export async function runAgent(agentId: AgentId, clientId: string): Promise<Agen
   }
 }
 
-/** Run all 5 agents concurrently. */
+/**
+ * Tenant dueño de las tablas legacy globales (wansoft_daily / wansoft_kpis).
+ * Esas tablas no tienen client_id, así que el finance agent solo puede correr
+ * para este tenant — de lo contrario expondría sus ventas a otros clientes.
+ */
+const WANSOFT_LEGACY_TENANT = 'amalay'
+
+/** Run all agents concurrently (finance solo para el tenant legacy de wansoft). */
 export async function runAllAgents(clientId: string): Promise<AgentResult[]> {
-  const agentIds: AgentId[] = ['operations', 'inventory', 'fraud', 'staff', 'finance']
+  const agentIds: AgentId[] = ['operations', 'inventory', 'fraud', 'staff']
+  if (clientId === WANSOFT_LEGACY_TENANT) agentIds.push('finance')
   return Promise.all(agentIds.map(id => runAgent(id, clientId)))
 }
 
