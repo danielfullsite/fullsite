@@ -1,6 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { canAccessPage, resolveRole } from '@/lib/roles'
-import { fetchWithTimeout } from '@/lib/fetch-with-timeout'
 
 // Páginas sin sesión — debe coincidir con publicPages de AppShell.tsx
 const PUBLIC_PAGES = ['/login', '/seguridad', '/privacidad', '/terminos', '/reservar', '/factura', '/demo-live']
@@ -19,6 +18,11 @@ function isPublic(pathname: string): boolean {
 
 // Orígenes del POS empaquetado (Capacitor) — necesitan CORS para llamar /api offline-first
 const CAPACITOR_ORIGINS = ['capacitor://localhost', 'ionic://localhost', 'https://localhost', 'http://localhost']
+// Orígenes del Offline Shell (Electron): la UI se sirve desde el bridge local
+// http://<ip>:7717 y llama /api cross-origin (login, /api/pos/menu). Solo el
+// puerto del bridge en loopback/LAN privada.
+const BRIDGE_ORIGIN =
+  /^http:\/\/(127\.0\.0\.1|localhost|(?:192\.168|10\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01]))\.\d{1,3}\.\d{1,3}):7717$/
 
 function corsHeaders(origin: string): Record<string, string> {
   return {
@@ -79,7 +83,7 @@ export async function proxy(req: NextRequest) {
   // CORS para /api desde la app nativa (capacitor://localhost). Same-origin no se afecta.
   if (pathname.startsWith('/api')) {
     const origin = req.headers.get('origin') || ''
-    const allowed = CAPACITOR_ORIGINS.includes(origin)
+    const allowed = CAPACITOR_ORIGINS.includes(origin) || BRIDGE_ORIGIN.test(origin)
     if (req.method === 'OPTIONS' && allowed) {
       return new NextResponse(null, { status: 204, headers: corsHeaders(origin) })
     }
@@ -100,11 +104,11 @@ export async function proxy(req: NextRequest) {
   if (!supabaseUrl || !anonKey) return NextResponse.next() // mal configurado: no bloquear
 
   // Validar el token contra Supabase Auth (server-side, no falsificable)
-  let user: { email?: string; app_metadata?: { role?: string; platform_admin?: boolean } } | null = null
+  let user: { email?: string; app_metadata?: { role?: string } } | null = null
   try {
-    const res = await fetchWithTimeout(`${supabaseUrl}/auth/v1/user`, {
+    const res = await fetch(`${supabaseUrl}/auth/v1/user`, {
       headers: { apikey: anonKey, Authorization: `Bearer ${token}` },
-    }, 5_000)
+    })
     if (!res.ok) {
       const redirect = NextResponse.redirect(loginUrl)
       redirect.cookies.delete('fs-at')
@@ -113,23 +117,6 @@ export async function proxy(req: NextRequest) {
     user = await res.json()
   } catch {
     // Supabase caído: dejar pasar — el cliente igual no podrá leer datos sin red
-    return NextResponse.next()
-  }
-
-  // Control Plane: gate rápido de ROUTING para /platform/*. app_metadata.platform_admin
-  // lo controla el admin (no es user-writable), así que sirve para redirigir temprano.
-  // La verificación dura (is_platform_admin vía service_role) la hacen los endpoints /api/platform/*.
-  if (pathname.startsWith('/platform')) {
-    if (user?.app_metadata?.platform_admin !== true) {
-      return NextResponse.redirect(loginUrl)
-    }
-    return NextResponse.next()
-  }
-
-  // Platform admins (modo Dios) ven TODA la app — no se les aplica el enforcement de
-  // rol de tenant. Su app_metadata.role suele ser null (no pertenecen a un tenant), lo
-  // que si no caería a 'staff' en resolveRole y los mandaría al /pos. FIX: exentarlos.
-  if (user?.app_metadata?.platform_admin === true) {
     return NextResponse.next()
   }
 
