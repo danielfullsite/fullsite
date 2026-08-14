@@ -367,18 +367,26 @@ function _isLocalBridge(): boolean {
   return typeof window !== 'undefined' && window.location.port === '7717'
 }
 
-/** Devuelve el catálogo servido por SERVER1, o null si no estamos en el bridge
- *  local o SERVER1 aún no lo tiene tibio (503). Cachea solo en éxito. */
+/** Catálogo para el Offline Shell. Se lee del endpoint server `/api/pos/menu`
+ *  (service key, del lado Vercel) porque desde la red del restaurante los
+ *  clientes no-navegador los bloquea Cloudflare y las tablas del menú exigen
+ *  auth (RLS). apiUrl() lo rutea a la nube en modo bridge. Online devuelve el
+ *  catálogo (los getters lo cachean a IDB); offline la llamada falla → null →
+ *  cada getter cae a su cache de IndexedDB. Cachea en memoria solo en éxito. */
 async function _getLocalCatalog(): Promise<LocalCatalog | null> {
   if (!_isLocalBridge()) return null
   if (_localCatalogCache) return _localCatalogCache
   try {
-    const res = await fetch(`${window.location.origin}/catalog`, { cache: 'no-store' })
+    const { apiUrl } = await import('./api-base')
+    const res = await fetch(apiUrl('/api/pos/menu'), {
+      headers: { 'Content-Type': 'application/json', ...getPOSAuthHeaders() },
+      cache: 'no-store',
+    })
     if (res.ok) {
       _localCatalogCache = (await res.json()) as LocalCatalog
       return _localCatalogCache
     }
-  } catch { /* SERVER1 inalcanzable — cae a Supabase/IDB */ }
+  } catch { /* offline o error — cae al cache de IndexedDB */ }
   return null
 }
 
