@@ -757,7 +757,11 @@ function setupOfflineRetry() {
   setInterval(() => {
     if (!mainWindow) return;
     const url = mainWindow.webContents.getURL();
-    if (!url.startsWith('https://')) mainWindow.loadURL(POS_URL);
+    // Reintenta cargar el POS SOLO si caímos a la página de fallo (offline.html).
+    // Antes reintentaba si la URL no era https:// — pero en el Offline Shell el POS
+    // se sirve por http://<bridge>:7717 (carga exitosa), así que recargaba la
+    // ventana cada 10s = "refresh raro" en loop. Ahora solo recupera del fallback.
+    if (url.includes('offline.html')) mainWindow.loadURL(POS_URL);
   }, 10000);
 }
 
