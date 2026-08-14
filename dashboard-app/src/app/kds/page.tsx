@@ -546,15 +546,15 @@ export default function KDSStandalone() {
               const doneCount = activeItemsWithIndex.filter(({ originalIndex }) => doneItems.has(`${order.id}-${originalIndex}`)).length
               const totalCount = activeItemsWithIndex.length
 
-              const borderColor = isNew ? (L ? 'border-neutral-300' : 'border-white/40') : isPrep ? 'border-amber-500/60' : 'border-emerald-500/60'
-              const headerBg = isNew ? (L ? 'bg-neutral-900 text-white' : 'bg-white text-black') : isPrep ? 'bg-amber-500 text-black' : 'bg-emerald-500 text-black'
+              const borderColor = isNew ? 'border-sky-500/70' : isPrep ? 'border-amber-500/70' : 'border-emerald-500/70'
+              const headerBg = isNew ? 'bg-sky-500 text-white' : isPrep ? 'bg-amber-500 text-black' : 'bg-emerald-500 text-black'
               const cardKey = card.batchId ? `${order.id}-${card.batchId}` : order.id
 
               return (
                 <div
                   key={cardKey}
                   className={`rounded-2xl border-2 ${borderColor} flex flex-col overflow-hidden ${isNew ? 'animate-pulse-once' : ''} ${mins >= alertMins ? 'kds-late' : ''} ${L ? 'shadow-md' : ''}`}
-                  style={{ background: L ? '#ffffff' : '#1a1a1a' }}
+                  style={{ background: L ? '#ffffff' : '#141518' }}
                 >
                   <div
                     onDoubleClick={() => bump(order.id, order.mesa, order.mesero)}
@@ -627,11 +627,11 @@ export default function KDSStandalone() {
                             {item.cantidad || item.quantity || 1}×
                           </span>
                           <div className="flex-1">
-                            <p className={`text-[15px] font-semibold leading-tight ${itemDone ? (L ? 'text-emerald-600 line-through' : 'text-emerald-400 line-through') : itemPrep ? (L ? 'text-amber-700' : 'text-amber-200') : (L ? 'text-neutral-900' : 'text-white')}`}>
+                            <p className={`text-[17px] font-bold leading-snug ${itemDone ? (L ? 'text-emerald-600 line-through' : 'text-emerald-500 line-through') : itemPrep ? (L ? 'text-amber-700' : 'text-amber-300') : (L ? 'text-neutral-900' : 'text-white')}`}>
                               {item.nombre || item.name}
                             </p>
                             {item.modificadores && item.modificadores.length > 0 && (
-                              <p className={`text-xs ${itemDone ? 'text-emerald-600/60 line-through' : (L ? 'text-amber-600' : 'text-amber-400/80')}`}>
+                              <p className={`text-[13px] font-medium ${itemDone ? 'text-emerald-600/60 line-through' : (L ? 'text-amber-600' : 'text-amber-400')}`}>
                                 {item.modificadores.join(' · ')}
                               </p>
                             )}
