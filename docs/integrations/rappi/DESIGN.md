@@ -1,15 +1,15 @@
 # Rappi Integration — Technical Design v0.2
 
 **Workstream:** Delivery Platform Expansion — Phase 1  
-**Estado:** `WAITING_EXTERNAL` — Correo de onboarding enviado a Rodrigo + `integraciones_rest@rappi.com` el 2026-08-02. Workstream congelado hasta respuesta de Rappi.  
-**Fecha:** 2026-08-02  
+**Estado:** `DEV_CREDENTIALS_RECEIVED` — Credenciales DEV y Store ID de pruebas recibidos por email el 2026-08-13. RAPPI-001 abierto; webhook signature contract sigue ECR.
+**Fecha:** 2026-08-14
 **Fuentes:** dev-portal.rappi.com (oficial), research multi-agente confirmado
 
-### Reglas mientras el workstream está en WAITING_EXTERNAL
+### Reglas de seguridad vigentes
 
-- NO abrir RAPPI-001
-- NO escribir código
-- NO asumir contratos de API
+- NO guardar `RAPPI_CLIENT_SECRET` ni tokens Rappi en código, docs, logs ni DB sin cifrado.
+- Credenciales DEV viven solo en variables de entorno server-side.
+- Los endpoints operativos deben fallar cerrado si falta `SUPABASE_SERVICE_KEY`, credenciales Rappi o mapping tienda→tenant.
 - NO implementar ningún punto marcado como ECR (External Confirmation Required)
 
 ### Al recibir respuesta de Rappi
@@ -28,6 +28,7 @@
 | v0.2 | 2026-08-02 | **Arquitectura invertida:** webhooks push como primario, polling solo como reconciliación. Firma Rappi-Signature descubierta. Host México corregido. TTL corregido. Reutilización recalculada: 62% → ~68%. |
 | v0.2.1 | 2026-08-02 | Estado actualizado a `WAITING_EXTERNAL`. Correo de onboarding enviado. Workstream congelado. |
 | v0.2.2 | 2026-08-03 | **Partners dashboard + doc pública:** storeId confirmado `MX1930030014`, brandId `MX491066`. Auth header corregido: `x-authorization: bearer` (NO `Authorization: Bearer`). Secreto webhook: Rappi lo devuelve en `POST webhook` response. Token TTL: 86400s (24h, no 1 semana). Precios en centavos confirmado por muestras de payload. ECRs reducidos de 5 a 2. |
+| v0.3.0 | 2026-08-14 | Credenciales DEV recibidas. Implementado OAuth server-side, header `x-authorization: "Bearer: <token>"`, normalizador centavos, ingesta fail-closed por `integration_store_mappings`, poller manual admin-only y acciones POS→Rappi. Webhook continúa fail-closed hasta contrato oficial de firma. |
 
 ---
 
@@ -367,12 +368,15 @@ Research indica que Wansoft tiene integración nativa con Rappi en México. **La
 
 ### RAPPI-001 — Autenticación
 
-**Objetivo:** Token válido en header `x-authorization` para todos los requests a `services.mxgrability.rappi.com`.
+**Estado:** `IMPLEMENTED_DEV_READY`
+
+**Objetivo:** Token válido en header `x-authorization` para todos los requests Rappi.
 
 **Módulo:** `src/lib/integrations/rappi/auth.ts`
 - `getAccessToken()`: POST al endpoint de auth, cache en memoria con TTL de **23h** (no 7 días — TTL del token de órdenes es 24h)
-- Variables de entorno: `RAPPI_CLIENT_ID`, `RAPPI_CLIENT_SECRET`
+- Variables de entorno server-only: `RAPPI_CLIENT_ID`, `RAPPI_CLIENT_SECRET`, `RAPPI_STORE_ID`, `RAPPI_ENV`
 - Header resultante: `x-authorization: "Bearer: <token>"` (los dos puntos son parte del valor)
+- Default seguro: `RAPPI_ENV=dev` apunta a `https://api.dev.rappi.com`; producción requiere configuración explícita.
 
 **Criterios PASS:**
 - POST al auth endpoint retorna token con HTTP 200
@@ -384,7 +388,7 @@ Research indica que Wansoft tiene integración nativa con Rappi en México. **La
 - Cache usa 7 días de TTL (confunde los dos endpoints)
 - Token expirado no produce re-auth automática
 
-**Dependencias externas:** `RAPPI_CLIENT_ID` y `RAPPI_CLIENT_SECRET` de Rappi — blocker externo.
+**Dependencias externas:** recibidas para DEV. Pendiente cargar como secretos server-side en el entorno correspondiente.
 
 ---
 
@@ -734,10 +738,10 @@ Detecta órdenes con `status='nueva'` y `age > N min`. Compara contra estado en 
 
 ### Blockers externos — 4 abiertos
 
-> RAPPI-001 no abre hasta que todos estén cerrados. Contacto: Rodrigo / `integraciones_rest@rappi.com`
+> RAPPI-001 abierto el 2026-08-14. Contacto: Rodrigo / `integraciones_rest@rappi.com`
 
-1. `RAPPI_CLIENT_ID` y `RAPPI_CLIENT_SECRET` — credenciales OAuth 2.0 client_credentials
-2. `storeId` de AMALAY en la plataforma Rappi México
+1. `RAPPI_CLIENT_ID` y `RAPPI_CLIENT_SECRET` — credenciales OAuth 2.0 client_credentials DEV recibidas; no documentar valores.
+2. `storeId` de pruebas en la plataforma Rappi México recibido; no documentar valores sensibles/operativos en git.
 3. **Contrato de webhook completo:** formato exacto de `Rappi-Signature`, string firmado, secreto HMAC y proceso de rotación, URL/método del health PING, garantía de entrega y política de retries
 4. **Payload real de una orden:** estructura JSON completa + confirmación de unidad monetaria (pesos MXN o centavos)
 

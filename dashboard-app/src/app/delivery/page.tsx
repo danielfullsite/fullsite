@@ -20,6 +20,11 @@ interface PlatformPayment {
   status: string
 }
 
+type DeliveryOrdersResponse = {
+  ok: boolean
+  payments?: PlatformPayment[]
+}
+
 export default function DeliveryPage() {
   const [data, setData] = useState<WansoftDaily[]>([])
   const [loading, setLoading] = useState(true)
@@ -27,12 +32,10 @@ export default function DeliveryPage() {
 
   useEffect(() => {
     getRecentDays(90).then(d => { setData(d); setLoading(false) })
-    // Fetch real platform payments from Supabase
-    const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    fetch(`${sbUrl}/rest/v1/delivery_platform_payments?order=period_start.desc&limit=20`, {
-      headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` },
-    }).then(r => r.ok ? r.json() : []).then(setPayments).catch(() => {})
+    fetch('/api/pos/delivery-orders', { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : { payments: [] })
+      .then((payload: DeliveryOrdersResponse) => setPayments(payload.payments ?? []))
+      .catch(() => {})
   }, [])
 
   // Extract delivery data from pago_metodos (Ubereats, Rappi appear as payment methods)
@@ -65,8 +68,6 @@ export default function DeliveryPage() {
   const pctDelivery = totalVentas > 0 ? (totalDelivery / totalVentas * 100) : 0
   const totalUber = deliveryData.reduce((s, d) => s + d.Uber, 0)
   const totalRappi = deliveryData.reduce((s, d) => s + d.Rappi, 0)
-  const diasActivos = deliveryData.filter(d => d.total > 0).length
-  const promedioDelivery = diasActivos > 0 ? totalDelivery / diasActivos : 0
 
   // Monthly trend
   const monthlyData = useMemo(() => {

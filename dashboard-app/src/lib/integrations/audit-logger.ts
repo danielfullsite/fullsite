@@ -18,8 +18,7 @@ function redact(obj: unknown, depth = 0): unknown {
 }
 
 const sbUrl = () => process.env.NEXT_PUBLIC_SUPABASE_URL!
-const sbKey = () =>
-  process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const sbKey = () => process.env.SUPABASE_SERVICE_KEY || ''
 
 export async function auditLog(entry: {
   provider: string
@@ -32,11 +31,13 @@ export async function auditLog(entry: {
   duration_ms?: number | null
 }): Promise<void> {
   try {
+    const key = sbKey()
+    if (!sbUrl() || !key) return
     await fetch(`${sbUrl()}/rest/v1/integration_audit_log`, {
       method: 'POST',
       headers: {
-        apikey: sbKey(),
-        Authorization: `Bearer ${sbKey()}`,
+        apikey: key,
+        Authorization: `Bearer ${key}`,
         'Content-Type': 'application/json',
         Prefer: 'return=minimal',
       },

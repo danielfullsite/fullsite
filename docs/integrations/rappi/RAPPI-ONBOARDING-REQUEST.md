@@ -164,9 +164,9 @@ Fullsite
 
 Marcar cuando se reciba confirmación escrita:
 
-- [ ] `RAPPI_CLIENT_ID` recibido
-- [ ] `RAPPI_CLIENT_SECRET` recibido
-- [x] `storeId` de AMALAY confirmado — `MX1930030014` (brandId: `MX491066`) — extraído de URL partners.rappi.com 2026-08-03
+- [x] `RAPPI_CLIENT_ID` DEV recibido — 2026-08-13, no documentar valor en git
+- [x] `RAPPI_CLIENT_SECRET` DEV recibido — 2026-08-13, no documentar valor en git
+- [x] `storeId` de pruebas recibido — 2026-08-13, no documentar valor en git
 - [ ] Formato de `Rappi-Signature` documentado oficialmente — **ECR ABIERTO** (no en doc pública)
 - [x] String firmado para HMAC: pendiente, pero secreto lo da Rappi en respuesta `POST webhook` — confirmado por doc pública
 - [x] Secreto HMAC: Rappi lo devuelve en `POST /webhook` response campo `secret` — confirmado
@@ -174,6 +174,6 @@ Marcar cuando se reciba confirmación escrita:
 - [x] Payload de ejemplo de orden recibido — disponible en doc pública `GET /orders`
 - [x] Unidad monetaria: **centavos** — confirmado por muestras de payload (28900 = $289 MXN)
 - [x] Semántica del polling: `GET /orders` devuelve órdenes "nuevas" (persisten hasta ser tomadas/rechazadas) — confirmado por doc pública
-- [ ] Sandbox disponible: dev domain `microservices.dev.rappi.com` + `rests-integrations-dev.auth0.com` — credenciales dev separadas, pendiente confirmar
+- [x] Sandbox DEV disponible para Integrations Manager / POS tester — credenciales DEV recibidas 2026-08-13
 
-**Cuando todos estén marcados → abrir RAPPI-001.**
+**Estado:** RAPPI-001 abierto/implementado. ECR restantes: firma webhook y health PING exacto antes de activar webhooks push.
