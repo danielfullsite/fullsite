@@ -40,10 +40,9 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json().catch(() => ({})) as { dry_run?: boolean; store_id?: string }
   const dryRun = body.dry_run !== false
-  const storeId = body.store_id || rappiStoreId()
-  if (!storeId) return NextResponse.json({ ok: false, error: 'RAPPI_STORE_ID_REQUIRED' }, { status: 503 })
+  const storeIdFallback = body.store_id || rappiStoreId()
 
-  const res = await rappiFetch(`${rappiOrdersBasePath()}/stores/${encodeURIComponent(storeId)}/orders`, { method: 'GET' })
+  const res = await rappiFetch(`${rappiOrdersBasePath()}/orders`, { method: 'GET' })
   const payload = await res.json().catch(() => null)
   if (!res.ok) {
     return NextResponse.json({ ok: false, error: 'RAPPI_POLLER_FAILED', status_code: res.status }, { status: 502 })
@@ -56,7 +55,10 @@ export async function POST(request: NextRequest) {
       provider: 'rappi',
       dry_run: true,
       checked: orders.length,
-      orders: orders.map(redactedSummary),
+      orders: orders.map(order => ({
+        ...redactedSummary(order),
+        store_id_fallback_configured: Boolean(storeIdFallback),
+      })),
     })
   }
 

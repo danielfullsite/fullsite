@@ -50,7 +50,7 @@
 
 ### v0.2 corrige: Rappi es push-first. Ambos mecanismos coexisten.
 
-Research posterior al Design v0.1 encontró un mecanismo de push con HMAC-SHA256 documentado en el dev portal. El polling (`GET /stores/{storeId}/orders`) también existe pero es **secundario** — su rol correcto es reconciliación y recuperación ante outages, no ingesta primaria.
+Research posterior al Design v0.1 encontró un mecanismo de push con HMAC-SHA256 documentado en el dev portal. El polling (`GET /orders`) también existe pero es **secundario** — su rol correcto es reconciliación y recuperación ante outages, no ingesta primaria.
 
 | Dimensión | Uber Eats | Rappi |
 |---|---|---|
@@ -164,7 +164,7 @@ Cron (≥45s entre ejecuciones) → POST /api/integrations/rappi/poller
   │
   ├─ Para cada storeId en integration_store_mappings WHERE provider=rappi:
   │   ├─ getAccessToken()
-  │   ├─ GET /stores/{storeId}/orders
+  │   ├─ GET /orders
   │   │   [EXTERNAL CONFIRMATION REQUIRED — ¿semántica destructiva (dequeue)?]
   │   │
   │   └─ Para cada orden en el response:
@@ -277,7 +277,7 @@ Operador → acepta → adapter.acceptOrder() → auditLog(actor, response_time_
 
 | Acción | Método | Endpoint | Notas |
 |---|---|---|---|
-| Obtener órdenes | `GET` | `/stores/{storeId}/orders` | Semántica posiblemente destructiva **ECR** |
+| Obtener órdenes | `GET` | `/orders` | Semántica posiblemente destructiva **ECR** |
 | Aceptar | `PUT` | `/stores/{storeId}/orders/{orderId}/take` | |
 | Aceptar con ETA | `PUT` | `/stores/{storeId}/orders/{orderId}/cooking_time/{min}/take` | Preferida |
 | Rechazar/cancelar | `PUT` | `/stores/{storeId}/orders/{orderId}/cancel_type/{type}/reject` | Body: `{description, additional_info}` |
@@ -618,12 +618,12 @@ Eventos a cubrir: `webhook.received`, `webhook.invalid_sig`, `order.new`, `order
 **Módulo:** `src/lib/integrations/rappi/poller.ts` + `src/app/api/integrations/rappi/poller/route.ts`
 
 **Roles del poller (NO es ingesta primaria):**
-1. `GET /stores/{storeId}/orders` → para cada orden no en `delivery_orders`: llamar `processRappiOrder(order, 'poller')`
+1. `GET /orders` → para cada orden no en `delivery_orders`: llamar `processRappiOrder(order, 'poller')`
 2. Gap detection: órdenes `status='nueva'` con `source='webhook'` y `age > 5min` — puede indicar accept automático pendiente o estado inconsistente
 3. Recovery post-outage: si el webhook handler estuvo caído, el poller recupera las órdenes perdidas
 
 **⚠️ EXTERNAL CONFIRMATION REQUIRED — Semántica del polling:**  
-¿El GET `/stores/{storeId}/orders` tiene semántica destructiva (dequeue)? Si sí, una orden consumida por polling no reaparece aunque el webhook no la haya entregado. Si no, las órdenes siguen disponibles hasta ser aceptadas. Esta respuesta de Rappi define si el poller puede reconstruir el estado completo o solo detectar gaps.
+¿El GET `/orders` tiene semántica destructiva (dequeue)? Si sí, una orden consumida por polling no reaparece aunque el webhook no la haya entregado. Si no, las órdenes siguen disponibles hasta ser aceptadas. Esta respuesta de Rappi define si el poller puede reconstruir el estado completo o solo detectar gaps.
 
 **Infraestructura — Decisión (2026-08-02):** Vercel Cron + DB advisory lock por storeId.
 
@@ -632,7 +632,7 @@ Eventos a cubrir: `webhook.received`, `webhook.invalid_sig`, `order.new`, `order
 2. Verificar que `SELECT ... FOR UPDATE SKIP LOCKED` en la DB de Supabase previene ejecuciones concurrentes por storeId bajo carga real
 3. Métricas obligatorias: `last_run_at`, `duration_ms`, `error_count` en `agent_runs` por storeId
 4. Alerta activa si el poller no ejecuta en > 3× el intervalo configurado
-5. Confirmar semántica de `GET /stores/{storeId}/orders` con Rappi **antes de implementar** — ECR crítico
+5. Confirmar semántica de `GET /orders` con Rappi **antes de implementar** — ECR crítico
 
 Si Vercel Cron no puede cumplir la frecuencia o disponibilidad requerida, presentar alternativa a Daniel antes de cambiar la arquitectura.
 
@@ -750,7 +750,7 @@ Detecta órdenes con `status='nueva'` y `age > N min`. Compara contra estado en 
 - Formato del header `Rappi-Signature` y del string firmado para HMAC-SHA256
 - Garantía de entrega del webhook (at-least-once, best-effort) y número de retries
 - Método HTTP (GET o POST) y URL exacta del health PING
-- Semántica de `GET /stores/{storeId}/orders` — ¿dequeue destructivo o idempotente?
+- Semántica de `GET /orders` — ¿dequeue destructivo o idempotente?
 
 ---
 

@@ -37,7 +37,7 @@ Para avanzar necesito que nos apoyes con lo siguiente:
 
 **2. Store ID de AMALAY**
 
-El identificador del restaurante AMALAY en la plataforma Rappi México. Es el `storeId` que usamos en todos los endpoints de lifecycle de órdenes (`/stores/{storeId}/orders`, etc.).
+El identificador del restaurante AMALAY en la plataforma Rappi México. Es el `storeId` que usamos en los endpoints de lifecycle de órdenes (`/stores/{storeId}/orders/...`). El listado DEV de órdenes nuevas se consulta en `GET /orders`.
 
 ---
 
@@ -70,7 +70,7 @@ d) ¿Con qué frecuencia llega el PING?
 
 **5. Payload de ejemplo de una orden**
 
-Un JSON completo de una orden real o de prueba que devuelva `GET /stores/{storeId}/orders`. Con esto podemos mapear todos los campos sin hacer suposiciones.
+Un JSON completo de una orden real o de prueba que devuelva `GET /orders`. Con esto podemos mapear todos los campos sin hacer suposiciones.
 
 En particular necesitamos confirmar:
 
@@ -82,7 +82,7 @@ c) Tipo de dato de `order_id` (¿string UUID o entero?)
 
 **6. Semántica del polling**
 
-El endpoint `GET /stores/{storeId}/orders` — cuando lo consultamos, ¿las órdenes que devuelve "desaparecen" del response en la siguiente consulta (semántica de dequeue/cola), o siguen disponibles hasta que las confirmemos explícitamente?
+El endpoint `GET /orders` — cuando lo consultamos, ¿las órdenes que devuelve "desaparecen" del response en la siguiente consulta (semántica de dequeue/cola), o siguen disponibles hasta que las confirmemos explícitamente?
 
 Esto impacta cómo diseñamos el mecanismo de reconciliación.
 
@@ -121,7 +121,7 @@ To proceed, we need the following from your technical team:
 - Auth endpoint: `POST .../restaurants/auth/v1/token/login/integrations`
 
 **2. AMALAY store ID**
-- The `storeId` used in all order lifecycle endpoints (`/stores/{storeId}/orders`, etc.)
+- The `storeId` used in order lifecycle endpoints (`/stores/{storeId}/orders/...`). The DEV new-order listing is read from `GET /orders`.
 
 **3. Webhook documentation**
 We need to confirm the following — the dev portal mentions these but does not provide full private integration specs:
@@ -139,13 +139,13 @@ c. Expected response body (`{"status":"OK"}` or just HTTP 200?)
 d. PING frequency
 
 **5. Sample order payload**
-A full JSON response from `GET /stores/{storeId}/orders` (real or test order). We specifically need to confirm:  
+A full JSON response from `GET /orders` (real or test order). We specifically need to confirm:
 a. Whether `totals.products_subtotal`, `totals.charges`, and `totals.tips` are in **MXN pesos** or **centavos** (÷100)  
 b. Structure of `items[].subitems[]` (modifiers / customizations)  
 c. Data type of `order_id` (UUID string or integer?)
 
 **6. Polling semantics**
-Is `GET /stores/{storeId}/orders` destructive (dequeue — orders disappear from the next response after being fetched), or do orders remain available until explicitly accepted?
+Is `GET /orders` destructive (dequeue — orders disappear from the next response after being fetched), or do orders remain available until explicitly accepted?
 
 **7. Sandbox / test environment**
 Is `api.dev.rappi.com` available with test credentials and synthetic orders? If not, what is the recommended testing approach without affecting live AMALAY orders?
