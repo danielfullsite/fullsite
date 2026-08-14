@@ -694,7 +694,11 @@ function createWindow() {
   // activates from the previous session. Retrying 2-3 times gives the SW time
   // to activate and serve /pos from cache without network.
   let loadFailCount = 0;
-  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDesc) => {
+  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDesc, _validatedURL, isMainFrame) => {
+    // did-fail-load also fires for sub-resources (background fetch a Supabase cloud
+    // que Cloudflare bloquea desde la LAN → ERR_ABORTED/ERR_FAILED). Recargar la
+    // ventana por un fetch de fondo = loop de "refresh raro". Solo el main frame cuenta.
+    if (isMainFrame === false) return;
     if (errorCode === -3) return; // ERR_ABORTED: SW or redirect intercepted — not a real failure
 
     // If the device is definitively offline, skip retries — offline.html handles recovery.
@@ -793,7 +797,13 @@ function createKdsWindow(x, y, width, height, urlOverride) {
   kdsWindow.loadURL(targetUrl);
 
   let kdsFailCount = 0;
-  kdsWindow.webContents.on('did-fail-load', (_event, errorCode) => {
+  kdsWindow.webContents.on('did-fail-load', (_event, errorCode, _errorDesc, _validatedURL, isMainFrame) => {
+    // CRÍTICO: did-fail-load también dispara con sub-recursos. El KDS hace fetch a
+    // Supabase cloud en segundo plano (getKitchenOrders, PATCH kds_item_status,
+    // logAudit) que Cloudflare bloquea desde la LAN → ERR_ABORTED. Sin este guard,
+    // cada fetch fallido recargaba TODA la ventana → el board aparecía 1 instante
+    // (3 órdenes) y se caía a "This page couldn't load" en loop. Solo el main frame recarga.
+    if (isMainFrame === false) return;
     if (errorCode === -3) {
       // ERR_ABORTED: navegación interrumpida (SW/redirect/renderer). Antes se
       // ignoraba con return → la ventana quedaba en la página de error de Chromium
