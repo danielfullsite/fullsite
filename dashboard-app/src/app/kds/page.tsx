@@ -123,10 +123,10 @@ export default function KDSStandalone() {
     const t = (m: number) => new Date(Date.now() - m * 60000).toISOString()
     const mk = (o: Record<string, unknown>) => o as unknown as KitchenOrderFromDB
     return [
-      mk({ id: 'demo-1', mesa: 5, mesero: 'Omar Aguilera', status: 'enviada', created_at: t(2), items: JSON.stringify([{ nombre: 'Chilaquiles Verdes', cantidad: 2, station: 'cocina', modificadores: ['Sin cebolla'] }, { nombre: 'Ensalada de papa', cantidad: 1, station: 'cocina' }]) }),
-      mk({ id: 'demo-2', mesa: 12, mesero: 'Aldo Ruiz Ramirez', status: 'preparando', created_at: t(7), items: JSON.stringify([{ nombre: 'Ensalada de papa', cantidad: 3, station: 'cocina' }, { nombre: 'Croissant Clásico', cantidad: 1, station: 'cocina' }]) }),
-      mk({ id: 'demo-3', mesa: 3, mesero: 'Mariana Salas', status: 'lista', created_at: t(1), items: JSON.stringify([{ nombre: 'Pancakes', cantidad: 1, station: 'cocina', modificadores: ['Extra miel'] }]) }),
-      mk({ id: 'demo-4', mesa: 20, mesero: 'Julio Hernández', status: 'enviada', created_at: t(18), items: JSON.stringify([{ nombre: 'Ensalada de papa', cantidad: 1, station: 'cocina' }, { nombre: 'Chilaquiles Rojos', cantidad: 2, station: 'cocina', modificadores: ['Extra pollo'] }]) }),
+      mk({ id: 'demo-1', mesa: 5, order_number: 104, personas: 2, mesero: 'Omar Aguilera', status: 'enviada', created_at: t(2), items: JSON.stringify([{ nombre: 'Chilaquiles Verdes', cantidad: 2, station: 'cocina', modificadores: ['Sin cebolla'] }, { nombre: 'Ensalada de papa', cantidad: 1, station: 'cocina' }]) }),
+      mk({ id: 'demo-2', mesa: 12, order_number: 105, personas: 4, mesero: 'Aldo Ruiz Ramirez', status: 'preparando', created_at: t(7), items: JSON.stringify([{ nombre: 'Ensalada de papa', cantidad: 3, station: 'cocina' }, { nombre: 'Croissant Clásico', cantidad: 1, station: 'cocina' }]) }),
+      mk({ id: 'demo-3', mesa: 3, order_number: 106, personas: 1, mesero: 'Mariana Salas', status: 'lista', created_at: t(1), items: JSON.stringify([{ nombre: 'Pancakes', cantidad: 1, station: 'cocina', modificadores: ['Extra miel'] }]) }),
+      mk({ id: 'demo-4', mesa: 20, order_number: 103, personas: 3, mesero: 'Julio Hernández', status: 'enviada', created_at: t(18), items: JSON.stringify([{ nombre: 'Ensalada de papa', cantidad: 1, station: 'cocina' }, { nombre: 'Chilaquiles Rojos', cantidad: 2, station: 'cocina', modificadores: ['Extra pollo'] }]) }),
     ]
   })
   const kdsClient = useKdsWsClient()
@@ -458,15 +458,15 @@ export default function KDSStandalone() {
             {station.charAt(0).toUpperCase() + station.slice(1)}
           </span>
           <div className="flex items-center gap-3 text-sm ml-4">
-            <span className="flex items-center gap-1.5 text-slate-400">
-              <span className="w-2.5 h-2.5 rounded-full bg-white/40" />
+            <span className={`flex items-center gap-1.5 ${L ? 'text-neutral-500' : 'text-slate-400'}`}>
+              <span className={`w-2.5 h-2.5 rounded-full ${L ? 'bg-neutral-400' : 'bg-white/40'}`} />
               {orders.filter(o => o.status === 'enviada').length} nueva{orders.filter(o => o.status === 'enviada').length !== 1 ? 's' : ''}
             </span>
-            <span className="flex items-center gap-1.5 text-slate-400">
+            <span className={`flex items-center gap-1.5 ${L ? 'text-neutral-500' : 'text-slate-400'}`}>
               <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
               {orders.filter(o => o.status === 'preparando').length} prep
             </span>
-            <span className="flex items-center gap-1.5 text-slate-400">
+            <span className={`flex items-center gap-1.5 ${L ? 'text-neutral-500' : 'text-slate-400'}`}>
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
               {orders.filter(o => o.status === 'lista').length} lista{orders.filter(o => o.status === 'lista').length !== 1 ? 's' : ''}
             </span>
@@ -553,7 +553,7 @@ export default function KDSStandalone() {
               return (
                 <div
                   key={cardKey}
-                  className={`rounded-2xl border-2 ${borderColor} flex flex-col overflow-hidden ${isNew ? 'animate-pulse-once' : ''} ${mins >= alertMins ? 'kds-late' : ''}`}
+                  className={`rounded-2xl border-2 ${borderColor} flex flex-col overflow-hidden ${isNew ? 'animate-pulse-once' : ''} ${mins >= alertMins ? 'kds-late' : ''} ${L ? 'shadow-md' : ''}`}
                   style={{ background: L ? '#ffffff' : '#1a1a1a' }}
                 >
                   <div
@@ -562,15 +562,23 @@ export default function KDSStandalone() {
                     className={`flex items-center justify-between px-4 py-3 cursor-pointer ${headerBg}`}
                   >
                     <div className="flex items-center gap-3">
-                      <span className="text-3xl font-black">{order.mesa || 'D'}</span>
+                      <div className="flex flex-col items-center leading-none">
+                        <span className="text-[9px] font-bold opacity-60 tracking-wider">MESA</span>
+                        <span className="text-3xl font-black">{order.mesa || 'D'}</span>
+                      </div>
                       {card.batchSeq > 0 && (
                         <span className="text-xs font-bold opacity-60 bg-black/20 px-1.5 py-0.5 rounded">
                           R{card.batchSeq + 1}
                         </span>
                       )}
                       <div className="leading-tight">
-                        <p className="text-sm font-black uppercase tracking-wide">{isNew ? 'NUEVA' : isPrep ? 'PREPARANDO' : 'LISTA'}</p>
-                        <p className="text-xs opacity-70">{order.mesero?.split(' ').slice(0, 2).join(' ')} · {new Date(card.batchCreatedAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</p>
+                        <p className="text-sm font-black uppercase tracking-wide">
+                          {isNew ? 'NUEVA' : isPrep ? 'PREPARANDO' : 'LISTA'}
+                          {order.order_number ? <span className="opacity-70"> · Orden #{order.order_number}</span> : null}
+                        </p>
+                        <p className="text-xs opacity-70">
+                          {order.mesero?.split(' ').slice(0, 2).join(' ')} · {new Date(card.batchCreatedAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}{order.personas ? ` · ${order.personas}p` : ''}
+                        </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -586,7 +594,7 @@ export default function KDSStandalone() {
                   </div>
 
                   {isPrep && totalCount > 0 && (
-                    <div className="h-1 bg-slate-700">
+                    <div className={`h-1 ${L ? 'bg-neutral-200' : 'bg-slate-700'}`}>
                       <div className="h-full bg-emerald-500 transition-all duration-300" style={{ width: `${(doneCount / totalCount) * 100}%` }} />
                     </div>
                   )}
@@ -615,7 +623,7 @@ export default function KDSStandalone() {
                               <span className="w-2 h-2 rounded-full bg-amber-400" />
                             ) : null}
                           </span>
-                          <span className={`font-black text-base min-w-[26px] tabular-nums ${itemDone ? 'text-emerald-600' : 'text-emerald-400'}`}>
+                          <span className={`font-black text-base min-w-[26px] tabular-nums ${itemDone ? 'text-emerald-600' : (L ? 'text-emerald-600' : 'text-emerald-400')}`}>
                             {item.cantidad || item.quantity || 1}×
                           </span>
                           <div className="flex-1">
@@ -755,10 +763,10 @@ export default function KDSStandalone() {
         }
         .animate-pulse-once { animation: pulse-once 1s ease-in-out 2; }
         @keyframes kds-late-blink {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(242,85,90,0); }
-          50% { box-shadow: 0 0 0 4px rgba(242,85,90,0.55); }
+          0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
+          50% { box-shadow: 0 0 0 5px rgba(239,68,68,0.45), 0 0 26px 3px rgba(239,68,68,0.5); }
         }
-        .kds-late { animation: kds-late-blink 1.1s ease-in-out infinite; }
+        .kds-late { animation: kds-late-blink 1s ease-in-out infinite; border-color: #ef4444 !important; }
       `}</style>
     </div>
   )
