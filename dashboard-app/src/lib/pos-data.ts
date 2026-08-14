@@ -367,6 +367,40 @@ function _isLocalBridge(): boolean {
   return typeof window !== 'undefined' && window.location.port === '7717'
 }
 
+// ── Proxy de Supabase para el Offline Shell ───────────────────────────────────
+// En el bridge (:7717), Cloudflare bloquea los fetch directos a Supabase y ~30
+// tablas están RLS-locked a anon. Este interceptor reescribe TODAS las llamadas
+// `${SUPABASE_URL}/rest/v1/*` hacia el proxy autenticado /api/pos/db (Vercel),
+// que autoriza con el shift token y fuerza el client_id del token. Se instala una
+// sola vez, desde el layout del POS. Fuera del bridge no hace nada.
+const _PROXY_CLOUD = 'https://app.fullsite.mx'
+let _bridgeProxyInstalled = false
+export function installBridgeSupabaseProxy(): void {
+  if (_bridgeProxyInstalled || !_isLocalBridge()) return
+  if (!_SUPABASE_URL) return
+  _bridgeProxyInstalled = true
+  const origFetch = window.fetch.bind(window)
+  const REST = `${_SUPABASE_URL}/rest/v1/`
+  window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+    if (url && url.startsWith(REST)) {
+      const proxied = `${_PROXY_CLOUD}/api/pos/db/rest/v1/${url.slice(REST.length)}`
+      const headers = new Headers(
+        init?.headers || (typeof input !== 'string' && !(input instanceof URL) ? input.headers : undefined),
+      )
+      headers.delete('apikey')
+      const token = typeof localStorage !== 'undefined' ? localStorage.getItem('pos_shift_token') : null
+      if (token) headers.set('Authorization', `Bearer ${token}`)
+      return origFetch(proxied, { ...init, headers })
+    }
+    return origFetch(input as RequestInfo, init)
+  }
+}
+
+// Auto-instala en el cliente al importar el módulo (antes de que cualquier
+// componente del POS haga fetch). No-op fuera del bridge / en SSR.
+if (typeof window !== 'undefined') installBridgeSupabaseProxy()
+
 /** Catálogo para el Offline Shell. Se lee del endpoint server `/api/pos/menu`
  *  (service key, del lado Vercel) porque desde la red del restaurante los
  *  clientes no-navegador los bloquea Cloudflare y las tablas del menú exigen
