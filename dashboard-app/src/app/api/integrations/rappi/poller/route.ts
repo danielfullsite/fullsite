@@ -34,6 +34,31 @@ function redactedSummary(order: unknown) {
   }
 }
 
+function upstreamErrorSummary(payload: unknown): Record<string, unknown> | string | null {
+  if (!payload) return null
+  if (typeof payload === 'string') return payload.slice(0, 300)
+  if (typeof payload !== 'object') return null
+  const obj = payload as Record<string, unknown>
+  return {
+    code: typeof obj.code === 'string' || typeof obj.code === 'number' ? obj.code : undefined,
+    code_message: typeof obj.code_message === 'string' ? obj.code_message : undefined,
+    message: typeof obj.message === 'string' ? obj.message.slice(0, 300) : undefined,
+    error: typeof obj.error === 'string' ? obj.error.slice(0, 300) : undefined,
+  }
+}
+
+async function fetchOrders(path: string) {
+  const res = await rappiFetch(path, { method: 'GET' })
+  const text = await res.text()
+  let payload: unknown = null
+  try {
+    payload = text ? JSON.parse(text) : null
+  } catch {
+    payload = text
+  }
+  return { path, res, payload }
+}
+
 export async function POST(request: NextRequest) {
   const denied = requireAdmin(request)
   if (denied) return denied
@@ -42,10 +67,30 @@ export async function POST(request: NextRequest) {
   const dryRun = body.dry_run !== false
   const storeIdFallback = body.store_id || rappiStoreId()
 
-  const res = await rappiFetch(`${rappiOrdersBasePath()}/orders`, { method: 'GET' })
-  const payload = await res.json().catch(() => null)
-  if (!res.ok) {
-    return NextResponse.json({ ok: false, error: 'RAPPI_POLLER_FAILED', status_code: res.status }, { status: 502 })
+  const candidates = [`${rappiOrdersBasePath()}/orders`]
+  if (storeIdFallback) candidates.push(`${rappiOrdersBasePath()}/stores/${encodeURIComponent(storeIdFallback)}/orders`)
+
+  const attempts = []
+  let payload: unknown = null
+  for (const path of candidates) {
+    const attempt = await fetchOrders(path)
+    payload = attempt.payload
+    attempts.push({
+      path: attempt.path,
+      status_code: attempt.res.status,
+      upstream_error: attempt.res.ok ? undefined : upstreamErrorSummary(attempt.payload),
+    })
+    if (attempt.res.ok) break
+  }
+
+  const successfulAttempt = attempts.find(attempt => attempt.status_code >= 200 && attempt.status_code < 300)
+  if (!successfulAttempt) {
+    return NextResponse.json({
+      ok: false,
+      error: 'RAPPI_POLLER_FAILED',
+      status_code: attempts.at(-1)?.status_code ?? 502,
+      attempts,
+    }, { status: 502 })
   }
 
   const orders = orderList(payload)
