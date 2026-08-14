@@ -794,7 +794,13 @@ function createKdsWindow(x, y, width, height, urlOverride) {
 
   let kdsFailCount = 0;
   kdsWindow.webContents.on('did-fail-load', (_event, errorCode) => {
-    if (errorCode === -3) return; // ERR_ABORTED: SW or redirect intercepted
+    if (errorCode === -3) {
+      // ERR_ABORTED: navegación interrumpida (SW/redirect/renderer). Antes se
+      // ignoraba con return → la ventana quedaba en la página de error de Chromium
+      // ("This page couldn't load") de forma permanente. Ahora recarga el board.
+      setTimeout(() => { if (kdsWindow && !kdsWindow.isDestroyed()) kdsWindow.loadURL(targetUrl); }, 1500);
+      return;
+    }
     const { net } = require('electron');
     if (!net.online) {
       kdsFailCount = 0;
