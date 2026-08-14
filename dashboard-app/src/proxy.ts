@@ -24,14 +24,23 @@ const CAPACITOR_ORIGINS = ['capacitor://localhost', 'ionic://localhost', 'https:
 const BRIDGE_ORIGIN =
   /^http:\/\/(127\.0\.0\.1|localhost|(?:192\.168|10\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01]))\.\d{1,3}\.\d{1,3}):7717$/
 
-function corsHeaders(origin: string): Record<string, string> {
+function corsHeaders(origin: string, requestedHeaders?: string | null): Record<string, string> {
+  // El Offline Shell escribe a /api/pos/db/rest/v1/* vía PostgREST, que manda
+  // headers como `Prefer` (return=minimal/representation), `Range`,
+  // `Accept-Profile`, etc. Con `Allow-Credentials: true` NO se puede usar '*',
+  // así que reflejamos los headers que pide el preflight y caemos a una lista
+  // amplia. Sin esto el preflight rechaza `Prefer` → CORS block → "error al
+  // guardar orden" (las lecturas GET no mandan Prefer, por eso solo rompían writes).
+  const allowHeaders = requestedHeaders && requestedHeaders.trim()
+    ? requestedHeaders
+    : 'Content-Type, Authorization, apikey, x-client-info, Prefer, Range, Accept-Profile, Content-Profile, x-client-id'
   return {
     'Access-Control-Allow-Origin': origin,
     'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, x-client-info',
+    'Access-Control-Allow-Headers': allowHeaders,
     'Access-Control-Allow-Credentials': 'true',
     'Access-Control-Max-Age': '86400',
-    'Vary': 'Origin',
+    'Vary': 'Origin, Access-Control-Request-Headers',
   }
 }
 
@@ -85,7 +94,7 @@ export async function proxy(req: NextRequest) {
     const origin = req.headers.get('origin') || ''
     const allowed = CAPACITOR_ORIGINS.includes(origin) || BRIDGE_ORIGIN.test(origin)
     if (req.method === 'OPTIONS' && allowed) {
-      return new NextResponse(null, { status: 204, headers: corsHeaders(origin) })
+      return new NextResponse(null, { status: 204, headers: corsHeaders(origin, req.headers.get('access-control-request-headers')) })
     }
     const res = NextResponse.next()
     if (allowed) for (const [k, v] of Object.entries(corsHeaders(origin))) res.headers.set(k, v)
