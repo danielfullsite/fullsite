@@ -115,8 +115,21 @@ export default function KDSStandalone() {
   const advancingRef = useRef<Set<string>>(new Set())
   const prevEnviadaRef = useRef(0)
 
+  // Modo demo (?demo=1): comandas de muestra para ver/mostrar el rediseño sin datos
+  // reales. Read-only: los toques marcan estado local, no escriben a Supabase.
+  const [isDemo, setIsDemo] = useState(false)
+  const [demoOrders] = useState<KitchenOrderFromDB[]>(() => {
+    const t = (m: number) => new Date(Date.now() - m * 60000).toISOString()
+    const mk = (o: Record<string, unknown>) => o as unknown as KitchenOrderFromDB
+    return [
+      mk({ id: 'demo-1', mesa: 5, mesero: 'Omar Aguilera', status: 'enviada', created_at: t(2), items: JSON.stringify([{ nombre: 'Chilaquiles Verdes', cantidad: 2, station: 'cocina', modificadores: ['Sin cebolla'] }, { nombre: 'Ensalada de papa', cantidad: 1, station: 'cocina' }]) }),
+      mk({ id: 'demo-2', mesa: 12, mesero: 'Aldo Ruiz Ramirez', status: 'preparando', created_at: t(7), items: JSON.stringify([{ nombre: 'Ensalada de papa', cantidad: 3, station: 'cocina' }, { nombre: 'Croissant Clásico', cantidad: 1, station: 'cocina' }]) }),
+      mk({ id: 'demo-3', mesa: 3, mesero: 'Mariana Salas', status: 'lista', created_at: t(1), items: JSON.stringify([{ nombre: 'Pancakes', cantidad: 1, station: 'cocina', modificadores: ['Extra miel'] }]) }),
+      mk({ id: 'demo-4', mesa: 20, mesero: 'Julio Hernández', status: 'enviada', created_at: t(18), items: JSON.stringify([{ nombre: 'Ensalada de papa', cantidad: 1, station: 'cocina' }, { nombre: 'Chilaquiles Rojos', cantidad: 2, station: 'cocina', modificadores: ['Extra pollo'] }]) }),
+    ]
+  })
   const kdsClient = useKdsWsClient()
-  const orders = kdsClient.orders
+  const orders = isDemo ? demoOrders : kdsClient.orders
 
   useEffect(() => {
     const n = orders.filter(o => o.status === 'enviada').length
@@ -192,6 +205,7 @@ export default function KDSStandalone() {
   useEffect(() => {
     if (typeof window === 'undefined') return
     const params = new URLSearchParams(window.location.search)
+    if (params.get('demo') === '1') setIsDemo(true)
     const bridgeHost = params.get('bridge')
     if (bridgeHost) setPosServerHost(bridgeHost)
     // Station identity — URL param wins; fall back to persisted value from last session
@@ -230,6 +244,7 @@ export default function KDSStandalone() {
   }, [kdsClient.mode, fetchOrdersForFallback])
 
   const advance = async (id: string, currentStatus: string, mesa: number, mesero: string) => {
+    if (isDemo) return
     if (advancingRef.current.has(id)) return
     advancingRef.current.add(id)
     const next = currentStatus === 'enviada' ? 'preparando' : currentStatus === 'preparando' ? 'lista' : currentStatus === 'lista' ? 'entregada' : null
@@ -261,6 +276,7 @@ export default function KDSStandalone() {
   }
 
   const bump = async (id: string, mesa: number, mesero: string) => {
+    if (isDemo) return
     if (advancingRef.current.has(id)) return
     advancingRef.current.add(id)
     // KDS-020: optimistic update — remove order from visible list immediately
@@ -378,6 +394,11 @@ export default function KDSStandalone() {
   // El 1er toque en una orden NUEVA la avanza a "preparando" (color ámbar).
   const handleItemTap = (order: KitchenOrderFromDB, originalIndex: number) => {
     const key = `${order.id}-${originalIndex}`
+    if (isDemo) {  // solo visual, sin red
+      if (doneItems.has(key)) { setDoneItems(p => { const n = new Set(p); n.delete(key); return n }); return }
+      if (prepItems.has(key)) { setPrepItems(p => { const n = new Set(p); n.delete(key); return n }); setDoneItems(p => { const n = new Set(p); n.add(key); return n }); return }
+      setPrepItems(p => { const n = new Set(p); n.add(key); return n }); return
+    }
     if (doneItems.has(key)) {
       toggleItemDone(order.id, originalIndex, order)  // deshacer: listo → pending
       return
