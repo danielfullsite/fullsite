@@ -132,6 +132,10 @@ function fromLegacy(legacy) {
     instance_name:  legacy.instanceName || null,
     kds:            legacy.kds || false,
     kds_only:       legacy.kds_only || false,
+    // local_ui activa el Offline Shell (servir UI local). Si no se preserva en
+    // la migración, la app cae a nube → pantalla negra offline. Es OBLIGATORIO
+    // pasarlo through — es justo lo que hace que el campo funcione offline.
+    local_ui:       legacy.local_ui === true || String(legacy.local_ui ?? '') === '1',
     pos_server_ip:  legacy.pos_server_ip || null,
     supabaseUrl:    legacy.supabaseUrl || null,
     supabaseAnonKey: legacy.supabaseAnonKey || null,

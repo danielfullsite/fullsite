@@ -190,6 +190,15 @@ describe('fromLegacy()', () => {
     assert.equal(valid, true, `errors: ${errors.join('; ')}`)
   })
 
+  test('PRESERVA local_ui — sin esto el Offline Shell se apaga al migrar (pantalla negra)', () => {
+    const withUi = fromLegacy({ ...LEGACY_POS, local_ui: true })
+    assert.equal(withUi.local_ui, true, 'local_ui:true debe sobrevivir la migración')
+    const withUiStr = fromLegacy({ ...LEGACY_KDS, local_ui: '1' })
+    assert.equal(withUiStr.local_ui, true, 'local_ui:"1" también')
+    const withoutUi = fromLegacy(LEGACY_POS)
+    assert.equal(withoutUi.local_ui, false, 'sin local_ui → false (nube), no undefined')
+  })
+
   test('returns null when restaurantId is "unknown"', () => {
     const result = fromLegacy({ restaurantId: 'unknown', clientId: 'unknown' })
     assert.equal(result, null)
