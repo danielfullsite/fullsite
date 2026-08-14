@@ -52,6 +52,18 @@ function resolveItemStation(item: ParsedItem): string {
   return getStationByName(item.nombre || item.name || '')
 }
 
+// Parseo defensivo de order.items. Una fila con items="null"/malformado hacía
+// JSON.parse → null y luego .forEach/.map/.some sobre null → TypeError sin
+// capturar → crasheaba TODO el KDS. Siempre devuelve un array.
+function safeItems(raw: unknown): ParsedItem[] {
+  try {
+    const v = typeof raw === 'string' ? JSON.parse(raw) : raw
+    return Array.isArray(v) ? (v as ParsedItem[]) : []
+  } catch {
+    return []
+  }
+}
+
 // ── Sound ────────────────────────────────────────────────────────────────
 
 function playAlert() {
@@ -112,9 +124,13 @@ export default function KDSStandalone() {
       let kdsStatus: Record<string, boolean> = {}
       if (order.kds_item_status) {
         try {
-          kdsStatus = typeof order.kds_item_status === 'string'
+          const parsed = typeof order.kds_item_status === 'string'
             ? JSON.parse(order.kds_item_status)
             : order.kds_item_status
+          // JSON.parse('null') → null; una fila con kds_item_status="null" hacía
+          // Object.keys(null) → TypeError sin capturar → crasheaba TODO el KDS
+          // (pantalla "This page couldn't load"). Solo aceptar objetos reales.
+          if (parsed && typeof parsed === 'object') kdsStatus = parsed as Record<string, boolean>
         } catch { /* */ }
       }
       if (Object.keys(kdsStatus).length > 0) {
@@ -122,7 +138,7 @@ export default function KDSStandalone() {
           if (done) restored.add(`${order.id}-${idx}`)
         }
       } else {
-        const items: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
+        const items = safeItems(order.items)
         items.forEach((item, idx) => {
           if ((item as ParsedItem & { kds_done?: boolean }).kds_done) restored.add(`${order.id}-${idx}`)
         })
@@ -266,7 +282,7 @@ export default function KDSStandalone() {
         next.delete(key)
       } else {
         next.add(key)
-        const items: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
+        const items: ParsedItem[] = safeItems(order.items)
         const allDone = items.every((item, idx) => {
           if (item.cancelled) return true
           const k = `${orderId}-${idx}`
@@ -277,7 +293,7 @@ export default function KDSStandalone() {
         }
       }
 
-      const items: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
+      const items: ParsedItem[] = safeItems(order.items)
       const kdsStatus: Record<string, boolean> = {}
       items.forEach((item, idx) => {
         if (item.cancelled) return
@@ -315,7 +331,7 @@ export default function KDSStandalone() {
   const filteredOrders = orders
     .filter(o => o.status !== 'entregada')
     .filter(o => {
-      const items: ParsedItem[] = typeof o.items === 'string' ? JSON.parse(o.items) : (o.items || [])
+      const items: ParsedItem[] = safeItems(o.items)
       return items.some(item => !item.cancelled && resolveItemStation(item) === station)
     })
     .sort((a, b) => {
@@ -334,7 +350,7 @@ export default function KDSStandalone() {
   }
   const kdsCards: KDSBatchCard[] = []
   for (const order of filteredOrders) {
-    const allBatchItems: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
+    const allBatchItems: ParsedItem[] = safeItems(order.items)
     let batchMeta: Record<string, { seq?: number; created_at?: string }> = {}
     try { batchMeta = typeof order.comanda_batches === 'string' ? JSON.parse(order.comanda_batches || '{}') : ((order.comanda_batches as unknown as Record<string, { seq?: number; created_at?: string }>) ?? {}) } catch {}
     const batchIds = [...new Set(allBatchItems.map(i => i.comanda_batch_id).filter((b): b is string => !!b))]
@@ -420,7 +436,7 @@ export default function KDSStandalone() {
               const isPrep = order.status === 'preparando'
               const isDone = order.status === 'lista'
 
-              const allItems: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
+              const allItems: ParsedItem[] = safeItems(order.items)
               const activeItemsWithIndex = allItems
                 .map((item, idx) => ({ item, originalIndex: idx }))
                 .filter(({ item }) => !item.cancelled && (!card.batchId || item.comanda_batch_id === card.batchId) && resolveItemStation(item) === station)
