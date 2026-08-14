@@ -131,8 +131,8 @@ function DemoLayoutInner({ children }: { children: React.ReactNode }) {
       <aside className="sidebar-rail hidden lg:flex flex-col flex-shrink-0 overflow-y-auto overflow-x-hidden transition-all duration-200 border-r border-[var(--line)]" style={{ width: sidebarWidth }}>
         {/* Logo — swap por tema (oscuro → f blanca, claro → f negra) */}
         <div className={`px-4 py-5 flex items-center flex-shrink-0 ${collapsed ? 'justify-center' : 'gap-2.5'}`}>
-          <img src="/fullsite-logo-white.png" alt="Fullsite" width={34} height={34} className="sidebar-logo-white flex-shrink-0" style={{ objectFit: 'contain' }} />
-          <img src="/fullsite-logo-black.png" alt="Fullsite" width={34} height={34} className="sidebar-logo-black flex-shrink-0" style={{ objectFit: 'contain' }} />
+          <img src="/fullsite-logo-white-v2.png" alt="Fullsite" width={34} height={34} className="sidebar-logo-white flex-shrink-0" style={{ objectFit: 'contain' }} />
+          <img src="/fullsite-logo-black-v2.png" alt="Fullsite" width={34} height={34} className="sidebar-logo-black flex-shrink-0" style={{ objectFit: 'contain' }} />
           {!collapsed && (
             <span className="flex flex-col leading-tight min-w-0">
               <span className="font-black text-[15px] tracking-tight" style={{ color: 'var(--text-1)' }}>Fullsite</span>
