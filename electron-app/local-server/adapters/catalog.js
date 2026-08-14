@@ -70,7 +70,7 @@ class CatalogStore {
     try {
       const [cats, items, mgroups, mods, itemLinks, catLinks, methods] = await Promise.all([
         sbFetch(supabaseUrl, supabaseKey, `pos_menu_categories?client_id=eq.${cid}&active=eq.true&order=sort_order.asc&select=id,name,color,sort_order`),
-        sbFetch(supabaseUrl, supabaseKey, `pos_menu_items?client_id=eq.${cid}&active=eq.true&order=sort_order.asc&select=id,category_id,name,price,promo,barcode,sort_order`),
+        sbFetch(supabaseUrl, supabaseKey, `pos_menu_items?client_id=eq.${cid}&active=eq.true&order=sort_order.asc&select=id,category_id,name,price,barcode,sort_order`),
         sbFetch(supabaseUrl, supabaseKey, `pos_modifier_groups?client_id=eq.${cid}&active=eq.true&select=id,name,level,min_selections,max_selections,required,sort_order`),
         sbFetch(supabaseUrl, supabaseKey, `pos_modifiers?client_id=eq.${cid}&active=eq.true&select=id,group_id,name,price,sort_order`),
         sbFetch(supabaseUrl, supabaseKey, `pos_item_modifier_groups?client_id=eq.${cid}&select=item_id,group_id`),
@@ -81,7 +81,7 @@ class CatalogStore {
       const itemsByCat = new Map()
       for (const it of items) {
         const arr = itemsByCat.get(it.category_id) || []
-        arr.push({ id: it.id, name: it.name, price: Number(it.price), promo: it.promo, barcode: it.barcode })
+        arr.push({ id: it.id, name: it.name, price: Number(it.price), barcode: it.barcode })
         itemsByCat.set(it.category_id, arr)
       }
       const categories = cats.map(c => ({
