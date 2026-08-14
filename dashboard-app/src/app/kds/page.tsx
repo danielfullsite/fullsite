@@ -452,7 +452,7 @@ export default function KDSStandalone() {
   return (
     <div className={`h-screen flex flex-col select-none overflow-hidden ${L ? 'bg-neutral-100 text-neutral-900' : 'bg-black text-white'}`} style={{ fontFamily: 'system-ui, sans-serif' }}>
       {/* Top bar */}
-      <div className={`flex items-center justify-between px-4 py-2 border-b flex-shrink-0 ${L ? 'border-neutral-200' : 'border-slate-800'}`} style={{ background: L ? '#ffffff' : '#111' }}>
+      <div className={`flex items-center justify-between px-4 py-2 border-b flex-shrink-0 ${L ? 'border-neutral-200' : 'border-slate-800'}`} style={{ background: L ? '#fdfdfd' : '#111' }}>
         <div className="flex items-center gap-3">
           <span className={`font-black text-xl tracking-widest uppercase ${L ? 'text-neutral-900' : 'text-white'}`}>
             {station.charAt(0).toUpperCase() + station.slice(1)}
@@ -554,7 +554,7 @@ export default function KDSStandalone() {
                 <div
                   key={cardKey}
                   className={`rounded-2xl border-2 ${borderColor} flex flex-col overflow-hidden ${isNew ? 'animate-pulse-once' : ''} ${mins >= alertMins ? 'kds-late' : ''} ${L ? 'shadow-md' : ''}`}
-                  style={{ background: L ? '#ffffff' : '#141518' }}
+                  style={{ background: L ? '#fdfdfd' : '#141518' }}
                 >
                   <div
                     onDoubleClick={() => bump(order.id, order.mesa, order.mesero)}
@@ -574,7 +574,7 @@ export default function KDSStandalone() {
                       <div className="leading-tight">
                         <p className="text-sm font-black uppercase tracking-wide">
                           {isNew ? 'NUEVA' : isPrep ? 'PREPARANDO' : 'LISTA'}
-                          {order.order_number ? <span className="opacity-70"> · Orden #{order.order_number}</span> : null}
+                          {order.order_number ? <span> · ORDEN #{order.order_number}</span> : null}
                         </p>
                         <p className="text-xs opacity-70">
                           {order.mesero?.split(' ').slice(0, 2).join(' ')} · {new Date(card.batchCreatedAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}{order.personas ? ` · ${order.personas}p` : ''}
