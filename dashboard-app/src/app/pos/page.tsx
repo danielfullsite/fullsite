@@ -3642,7 +3642,7 @@ function POSContent() {
         <div className="flex items-center gap-1.5 px-3 py-1 border-t border-[var(--line)]/50 overflow-x-auto">
           {/* Back to mesa map — always visible in kiosk mode (no browser back button) */}
           <Link
-            href="/pos/plano"
+            href="/pos/mesas"
             className="flex items-center justify-center w-11 h-11 rounded-lg bg-[var(--line)] border border-slate-600 text-[var(--text-3)] hover:text-white flex-shrink-0 transition-colors"
             title="Volver al mapa de mesas"
           >
