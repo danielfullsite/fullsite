@@ -1512,6 +1512,12 @@ export async function saveOrder(order: Order, saveOperationId?: string): Promise
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...getPOSAuthHeaders() },
       body: JSON.stringify(payload),
+      // navigator.onLine miente cuando la LAN está viva pero el WAN caído → el
+      // fetch a la nube se cuelga en vez de fallar. Timeout → cae rápido al
+      // catch → OFFLINE_QUEUED (imprime + avisa al KDS por el bridge + encola).
+      // Idempotente por save_operation_id: si el server sí guardó tras el abort,
+      // el replay no duplica. 8s cubre cold-start de Vercel + r1_save_order.
+      signal: AbortSignal.timeout(8000),
     })
 
     if (!res.ok) {
