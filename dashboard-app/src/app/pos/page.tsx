@@ -2621,7 +2621,7 @@ function POSContent() {
     // Mark order as cancelled via revision-aware boundary (reconciliation-relevant status)
     if (loadedOrderId) {
       const voidOpId = genOpId()
-      const voidRes = await fetch('/api/pos/save-order', {
+      const voidRes = await fetch(apiUrl('/api/pos/save-order'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getPOSAuthHeaders() },
         body: JSON.stringify({

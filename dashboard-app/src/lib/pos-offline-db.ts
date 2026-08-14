@@ -378,9 +378,11 @@ interface AppApiReplayResult {
 
 async function replayViaAppApi(item: SyncQueueItem): Promise<AppApiReplayResult> {
   const apiPath = item.endpoint!
-  // In browser: use window.location.origin. In SSR/worker: fall back to relative URL.
-  const base = typeof window !== 'undefined' ? window.location.origin : ''
-  const url = `${base}${apiPath}`
+  // apiUrl() rutea /api a la nube en el Offline Shell (bridge :7717, que no sirve
+  // /api). Antes usaba window.location.origin → en el bridge daba 404 al reintentar
+  // órdenes encoladas. Online devuelve la ruta relativa (mismo-origen), sin cambio.
+  const { apiUrl } = await import('./api-base')
+  const url = apiUrl(apiPath)
 
   // Pass x-client-id so the route's getClientId() returns the correct client,
   // same as the original saveOrder call. Without this, p_client_id = '' in the RPC.

@@ -1503,8 +1503,12 @@ export async function saveOrder(order: Order, saveOperationId?: string): Promise
     payload.save_operation_id = saveOperationId
   }
 
+  const { apiUrl } = await import('./api-base')
   try {
-    const res = await fetch('/api/pos/save-order', {
+    // apiUrl() rutea /api a la nube en el Offline Shell (UI servida del bridge
+    // :7717). Con ruta relativa el POST pegaba a http://127.0.0.1:7717/api/pos/
+    // save-order → el bridge no sirve /api → 404 = "error al guardar orden".
+    const res = await fetch(apiUrl('/api/pos/save-order'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...getPOSAuthHeaders() },
       body: JSON.stringify(payload),
