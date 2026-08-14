@@ -238,13 +238,21 @@
     </div>
     <div class="field">
       <label>Rol de la terminal *</label>
-      <select id="terminalRole">
-        <option value="server_pos">Servidor POS (caja principal con Local Server)</option>
-        <option value="pos">POS adicional (caja secundaria)</option>
+      <select id="terminalRole" onchange="document.getElementById('kdsStationGroup').style.display = this.value==='kds' ? 'block' : 'none'">
+        <option value="server_pos">Caja principal (Servidor — aloja el Local Server e imprime)</option>
+        <option value="pos">Caja / POS adicional</option>
         <option value="kds">KDS — Pantalla de cocina</option>
         <option value="admin">Admin</option>
       </select>
-      <div class="field-hint">La terminal "Servidor POS" aloja el Local Server y es la única que imprime directo.</div>
+      <div class="field-hint">La "Caja principal" aloja el Local Server y sirve la UI a las demás terminales (modelo SERVER1).</div>
+    </div>
+    <div class="form-group" id="kdsStationGroup" style="display:none">
+      <label>Estación del KDS</label>
+      <select id="kdsStation">
+        <option value="cocina">Cocina</option>
+        <option value="barra">Barra</option>
+      </select>
+      <div class="field-hint">Qué comandas muestra esta pantalla (solo aplica al rol KDS).</div>
     </div>
     <div class="btn-row">
       <button class="btn btn-secondary" onclick="goTo(1)">← Atrás</button>
@@ -1222,6 +1230,7 @@ async function saveAndRestart() {
     instance_name:     state.terminalName,
     kds:               state.terminalRole === 'kds' ? true : (state.legacy?.kds || false),
     kds_only:          state.terminalRole === 'kds' ? true : (state.legacy?.kds_only || false),
+    kds_station:       state.terminalRole === 'kds' ? (document.getElementById('kdsStation')?.value || 'cocina') : (state.legacy?.kds_station || undefined),
     // Offline Shell: sirve/carga la UI localmente y rompe el mixed-content. Es el
     // estándar ahora — SIN esto la terminal cae a modo nube = pantalla negra offline.
     // (Era lo que provocaba que el wizard dejara terminales sin offline.)

@@ -931,10 +931,12 @@ app.whenReady().then(async () => {
     const { screen } = require('electron');
     const primary = screen.getPrimaryDisplay();
     const { bounds } = primary;
-    // Inject the POS server LAN IP so the KDS bridge connects cross-device
-    const kdsUrlWithBridge = appConfig.pos_server_ip
-      ? `${KDS_URL}?bridge=${appConfig.pos_server_ip}`
-      : KDS_URL;
+    // Inject the POS server LAN IP (bridge) + la estación (cocina/barra) del config.
+    // Sin ?station=, el KDS siempre cae en 'cocina' → un KDS de barra mostraría cocina.
+    const kdsParams = new URLSearchParams();
+    if (appConfig.pos_server_ip) kdsParams.set('bridge', appConfig.pos_server_ip);
+    kdsParams.set('station', appConfig.kds_station || 'cocina');
+    const kdsUrlWithBridge = `${KDS_URL}?${kdsParams.toString()}`;
     createKdsWindow(bounds.x, bounds.y, bounds.width, bounds.height, kdsUrlWithBridge);
     console.log('[main] kds_only mode — POS window skipped');
     return;
