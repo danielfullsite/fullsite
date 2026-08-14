@@ -391,7 +391,11 @@ export function installBridgeSupabaseProxy(): void {
       headers.delete('apikey')
       const token = typeof localStorage !== 'undefined' ? localStorage.getItem('pos_shift_token') : null
       if (token) headers.set('Authorization', `Bearer ${token}`)
-      return origFetch(proxied, { ...init, headers })
+      // Timeout: sin internet (pero LAN vivo → navigator.onLine miente), el fetch
+      // a la nube se colgaría. Con AbortSignal falla rápido → cada flujo cae a su
+      // fallback offline (cache/cola). Respeta el signal del caller si ya trae uno.
+      const signal = init?.signal ?? (typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(6000) : undefined)
+      return origFetch(proxied, { ...init, headers, signal })
     }
     return origFetch(input as RequestInfo, init)
   }
@@ -1839,6 +1843,7 @@ export async function verifyManagerPin(pin: string): Promise<string | null> {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pin, client_id: _getClientId(), manager: true }),
+      signal: AbortSignal.timeout(4000),
     })
     if (res.ok) {
       const { staff } = await res.json()
@@ -1868,6 +1873,7 @@ export async function verifyManagerPinWithRole(pin: string): Promise<{ name: str
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pin, client_id: _getClientId(), manager: true }),
+      signal: AbortSignal.timeout(4000),
     })
     if (res.ok) {
       const { staff } = await res.json()
@@ -1905,6 +1911,7 @@ export async function verifyPinWithMinRole(pin: string, minRole: string): Promis
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pin, client_id: _getClientId(), min_role: minRole }),
+      signal: AbortSignal.timeout(4000),
     })
     if (res.ok) {
       const { staff } = await res.json()
