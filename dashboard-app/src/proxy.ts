@@ -18,6 +18,11 @@ function isPublic(pathname: string): boolean {
 
 // Orígenes del POS empaquetado (Capacitor) — necesitan CORS para llamar /api offline-first
 const CAPACITOR_ORIGINS = ['capacitor://localhost', 'ionic://localhost', 'https://localhost', 'http://localhost']
+// Orígenes del Offline Shell (Electron): la UI se sirve desde el bridge local
+// http://<ip>:7717 y llama /api cross-origin (login, /api/pos/menu). Solo el
+// puerto del bridge en loopback/LAN privada.
+const BRIDGE_ORIGIN =
+  /^http:\/\/(127\.0\.0\.1|localhost|(?:192\.168|10\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01]))\.\d{1,3}\.\d{1,3}):7717$/
 
 function corsHeaders(origin: string): Record<string, string> {
   return {
@@ -78,7 +83,7 @@ export async function proxy(req: NextRequest) {
   // CORS para /api desde la app nativa (capacitor://localhost). Same-origin no se afecta.
   if (pathname.startsWith('/api')) {
     const origin = req.headers.get('origin') || ''
-    const allowed = CAPACITOR_ORIGINS.includes(origin)
+    const allowed = CAPACITOR_ORIGINS.includes(origin) || BRIDGE_ORIGIN.test(origin)
     if (req.method === 'OPTIONS' && allowed) {
       return new NextResponse(null, { status: 204, headers: corsHeaders(origin) })
     }
