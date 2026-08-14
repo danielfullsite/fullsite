@@ -28,7 +28,7 @@
 | v0.2 | 2026-08-02 | **Arquitectura invertida:** webhooks push como primario, polling solo como reconciliación. Firma Rappi-Signature descubierta. Host México corregido. TTL corregido. Reutilización recalculada: 62% → ~68%. |
 | v0.2.1 | 2026-08-02 | Estado actualizado a `WAITING_EXTERNAL`. Correo de onboarding enviado. Workstream congelado. |
 | v0.2.2 | 2026-08-03 | **Partners dashboard + doc pública:** storeId confirmado `MX1930030014`, brandId `MX491066`. Auth header corregido: `x-authorization: bearer` (NO `Authorization: Bearer`). Secreto webhook: Rappi lo devuelve en `POST webhook` response. Token TTL: 86400s (24h, no 1 semana). Precios en centavos confirmado por muestras de payload. ECRs reducidos de 5 a 2. |
-| v0.3.0 | 2026-08-14 | Credenciales DEV recibidas. Implementado OAuth server-side, header `x-authorization: "Bearer <token>"`, normalizador centavos, ingesta fail-closed por `integration_store_mappings`, poller manual admin-only y acciones POS→Rappi. Webhook continúa fail-closed hasta contrato oficial de firma. |
+| v0.3.0 | 2026-08-14 | Credenciales DEV recibidas. Implementado OAuth server-side, header `x-authorization: "Bearer: <token>"`, normalizador centavos, ingesta fail-closed por `integration_store_mappings`, poller manual admin-only y acciones POS→Rappi. Webhook continúa fail-closed hasta contrato oficial de firma. |
 
 ---
 
@@ -74,7 +74,7 @@ Research posterior al Design v0.1 encontró un mecanismo de push con HMAC-SHA256
 | # | Capacidad | Uber Eats | Rappi | Estado para Rappi |
 |---|---|---|---|---|
 | 1 | Auth mecanismo | OAuth 2.0 `authorization_code` (por tienda) | OAuth 2.0 `client_credentials` (global) | Needs Adapter |
-| 2 | Auth header | `Authorization: Bearer <token>` | `x-authorization: "Bearer <token>"` | Needs Adapter |
+| 2 | Auth header | `Authorization: Bearer <token>` | `x-authorization: "Bearer: <token>"` | Needs Adapter |
 | 3 | Token storage | `integration_providers` por store | Var de entorno / config global | Needs New |
 | 4 | Mecanismo de ingesta | Webhook push | Webhook push (push-first) | Needs Adapter |
 | 5 | Firma de webhook | `x-uber-signature: <hex>` | `Rappi-Signature: t=<ts>,sign=<hex>` (**ECR**) | Needs Adapter |
@@ -242,7 +242,7 @@ Operador → acepta → adapter.acceptOrder() → auditLog(actor, response_time_
 | Token TTL (órdenes/menú) | **86,400s (24h)** — usar para cache de auth.ts |
 | Token TTL (utilidades) | 604,798s (~7 días) — endpoint diferente, no confundir |
 | Header name | `x-authorization` |
-| Header value | `"Bearer <token>"` |
+| Header value | `"Bearer: <token>"` — **con dos puntos después de Bearer** |
 | Auth0 dominio (prod) | `rests-integrations.auth0.com` |
 | Re-auth | Re-auth completa (no hay refresh token) |
 
@@ -375,16 +375,16 @@ Research indica que Wansoft tiene integración nativa con Rappi en México. **La
 **Módulo:** `src/lib/integrations/rappi/auth.ts`
 - `getAccessToken()`: POST al endpoint de auth, cache en memoria con TTL de **23h** (no 7 días — TTL del token de órdenes es 24h)
 - Variables de entorno server-only: `RAPPI_CLIENT_ID`, `RAPPI_CLIENT_SECRET`, `RAPPI_STORE_ID`, `RAPPI_ENV`
-- Header resultante: `x-authorization: "Bearer <token>"`
+- Header resultante: `x-authorization: "Bearer: <token>"` (los dos puntos son parte del valor)
 - Default seguro: `RAPPI_ENV=dev` apunta a `https://api.dev.rappi.com`; producción requiere configuración explícita.
 
 **Criterios PASS:**
 - POST al auth endpoint retorna token con HTTP 200
-- Header generado es exactamente `x-authorization: "Bearer <TOKEN>"` verificado con request curl manual
+- Header generado es exactamente `x-authorization: "Bearer: <TOKEN>"` verificado con request curl manual
 - Re-auth automática antes de TTL (23h check)
 
 **Criterios FAIL:**
-- Header usa el formato antiguo con dos puntos: `"Bearer: <token>"` en vez de `"Bearer <token>"`
+- Header omite los dos puntos: `"Bearer <token>"` en vez de `"Bearer: <token>"`
 - Cache usa 7 días de TTL (confunde los dos endpoints)
 - Token expirado no produce re-auth automática
 
@@ -528,7 +528,7 @@ rawOrder.delivery_operation_type   → metadata.rappi_delivery_type
 
 ```
 PUT /restaurants/orders/v1/stores/{storeId}/orders/{orderId}/cooking_time/{min}/take
-Headers: { x-authorization: "Bearer <token>" }
+Headers: { x-authorization: "Bearer: <token>" }
 ```
 
 **⚠️ PENDIENTE DECISIÓN OPERACIONAL:** Esta función existe pero NO se llama automáticamente hasta que Daniel confirme si la aceptación es automática o manual desde el KDS.
