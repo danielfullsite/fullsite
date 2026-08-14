@@ -21,7 +21,8 @@ export async function getOrderDetails(
   const t0 = Date.now()
   try {
     const r = await withRetry(
-      () => uberFetch(`/v1/eats/orders/${orderId}`, { method: 'GET', tokenType: 'marketplace' }),
+      // Uber "Basic Production validation" spec: GET /v2/eats/order/{id} (singular).
+      () => uberFetch(`/v2/eats/order/${orderId}`, { method: 'GET', tokenType: 'marketplace' }),
       { maxAttempts: 3, baseDelayMs: 500 }
     )
     if (!r.ok) {
