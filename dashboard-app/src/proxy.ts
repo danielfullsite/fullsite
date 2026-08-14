@@ -8,6 +8,9 @@ function isPublic(pathname: string): boolean {
   return (
     PUBLIC_PAGES.includes(pathname) ||
     pathname.startsWith('/pos') || // gate propio por PIN
+    pathname.startsWith('/kds') || // pantalla de cocina (display; en campo se sirve del bridge LAN)
+    pathname.startsWith('/cocina') || // KDS cocina
+    pathname.startsWith('/barra') || // KDS barra
     pathname.startsWith('/internal') || // gate propio por password
     pathname === '/panel.html' || // standalone internal panel
     pathname.startsWith('/demo') ||
