@@ -797,18 +797,24 @@ function createKdsWindow(x, y, width, height, urlOverride) {
   kdsWindow.loadURL(targetUrl);
 
   let kdsFailCount = 0;
-  kdsWindow.webContents.on('did-fail-load', (_event, errorCode, _errorDesc, _validatedURL, isMainFrame) => {
-    // CRÍTICO: did-fail-load también dispara con sub-recursos. El KDS hace fetch a
-    // Supabase cloud en segundo plano (getKitchenOrders, PATCH kds_item_status,
-    // logAudit) que Cloudflare bloquea desde la LAN → ERR_ABORTED. Sin este guard,
-    // cada fetch fallido recargaba TODA la ventana → el board aparecía 1 instante
-    // (3 órdenes) y se caía a "This page couldn't load" en loop. Solo el main frame recarga.
+  let kdsEverLoaded = false;   // ¿la página llegó a cargar con éxito alguna vez?
+  const reloadKds = (delay) => setTimeout(() => {
+    if (kdsWindow && !kdsWindow.isDestroyed()) kdsWindow.loadURL(targetUrl);
+  }, delay);
+
+  kdsWindow.webContents.on('did-fail-load', (_event, errorCode, errorDesc, validatedURL, isMainFrame) => {
+    // did-fail-load dispara TAMBIÉN con sub-recursos (fetch a Supabase cloud que
+    // Cloudflare bloquea desde la LAN → ERR_ABORTED). Solo el main frame nos importa.
     if (isMainFrame === false) return;
+    console.error(`[kds] did-fail-load main frame: code=${errorCode} desc=${errorDesc} url=${validatedURL} everLoaded=${kdsEverLoaded}`);
     if (errorCode === -3) {
-      // ERR_ABORTED: navegación interrumpida (SW/redirect/renderer). Antes se
-      // ignoraba con return → la ventana quedaba en la página de error de Chromium
-      // ("This page couldn't load") de forma permanente. Ahora recarga el board.
-      setTimeout(() => { if (kdsWindow && !kdsWindow.isDestroyed()) kdsWindow.loadURL(targetUrl); }, 1500);
+      // ERR_ABORTED. CLAVE: si la página YA cargó con éxito, este abort es espurio
+      // (una navegación/prefetch/fetch del renderer que Chromium reporta en el main
+      // frame). Recargar aquí MATA una página que ya estaba operando → loop de
+      // "This page couldn't load" cada ~1.5s. Si ya cargó, se IGNORA. Solo se
+      // recarga si el abort ocurrió ANTES de la primera carga exitosa.
+      if (kdsEverLoaded) { console.log('[kds] ERR_ABORTED post-carga → ignorado (board sigue vivo)'); return; }
+      reloadKds(1500);
       return;
     }
     const { net } = require('electron');
@@ -819,17 +825,28 @@ function createKdsWindow(x, y, width, height, urlOverride) {
     }
     kdsFailCount++;
     if (kdsFailCount <= 3) {
-      // Give SW time to activate from previous session (progressive backoff)
-      setTimeout(() => {
-        if (kdsWindow && !kdsWindow.isDestroyed()) kdsWindow.loadURL(targetUrl);
-      }, kdsFailCount * 800);
+      reloadKds(kdsFailCount * 800);
     } else {
       kdsFailCount = 0;
       kdsWindow.loadFile('offline.html', { query: { target: targetUrl } });
     }
   });
 
-  kdsWindow.webContents.on('did-finish-load', () => { kdsFailCount = 0; });
+  kdsWindow.webContents.on('did-finish-load', () => {
+    kdsFailCount = 0;
+    kdsEverLoaded = true;
+    console.log('[kds] did-finish-load OK', kdsWindow.webContents.getURL());
+  });
+
+  // Recuperación ante crash del renderer (OOM, GPU, etc.): el KDS no tenía handler
+  // → un crash dejaba la pantalla "This page couldn't load" para siempre. Ahora
+  // se registra el motivo y se recarga el board.
+  kdsWindow.webContents.on('render-process-gone', (_event, details) => {
+    console.error('[kds] render-process-gone:', details && details.reason);
+    reloadKds(2000);
+  });
+  kdsWindow.webContents.on('unresponsive', () => console.error('[kds] webContents unresponsive'));
+
   kdsWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   kdsWindow.on('closed', () => { kdsWindow = null; });
   console.log('[kds] KDS window opened on', `${x},${y} ${width}x${height}`);
