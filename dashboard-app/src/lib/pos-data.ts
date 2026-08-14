@@ -344,8 +344,58 @@ export function getPOSAuthHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
+// ─── Catálogo local de SERVER1 (Fase 2 — modelo Pedro) ────────────────────────
+// Cuando el POS se sirve desde el bridge local (Offline Shell, puerto 7717), el
+// catálogo se jala de SERVER1 (GET /catalog), no de Supabase. Así una terminal
+// en frío sin internet funciona mientras SERVER1 esté vivo. Fuera del bridge
+// (app.fullsite.mx, nube) → null → se usa el camino normal de Supabase/IDB.
+interface LocalCatalog {
+  restaurant_id: string
+  refreshed_at: string
+  categories: { id: string; name: string; color: string; items: { id: string; name: string; price: number; promo?: boolean; barcode?: string | null }[] }[]
+  modifiers: {
+    groups: Record<string, unknown>[]
+    mods: { id: string; group_id: string; name: string; price: number }[]
+    item_links: { item_id: string; group_id: string }[]
+    category_links: { category_id: string; modifier_group_id: string }[]
+  }
+  payment_methods: PaymentMethodDB[]
+}
+let _localCatalogCache: LocalCatalog | null = null
+
+function _isLocalBridge(): boolean {
+  return typeof window !== 'undefined' && window.location.port === '7717'
+}
+
+/** Devuelve el catálogo servido por SERVER1, o null si no estamos en el bridge
+ *  local o SERVER1 aún no lo tiene tibio (503). Cachea solo en éxito. */
+async function _getLocalCatalog(): Promise<LocalCatalog | null> {
+  if (!_isLocalBridge()) return null
+  if (_localCatalogCache) return _localCatalogCache
+  try {
+    const res = await fetch(`${window.location.origin}/catalog`, { cache: 'no-store' })
+    if (res.ok) {
+      _localCatalogCache = (await res.json()) as LocalCatalog
+      return _localCatalogCache
+    }
+  } catch { /* SERVER1 inalcanzable — cae a Supabase/IDB */ }
+  return null
+}
+
 export async function getMenuCategoriesFromDB(): Promise<MenuCategory[]> {
   try {
+    // Fase 2: en el bridge local, el menú viene de SERVER1 (a prueba de arranque en frío).
+    const local = await _getLocalCatalog()
+    if (local?.categories?.length) {
+      const categories = local.categories.map((c) => ({
+        id: c.id, name: c.name, color: c.color,
+        items: c.items.map((i) => ({ id: i.id, name: i.name, price: Number(i.price), promo: i.promo, barcode: i.barcode ?? undefined })),
+      }))
+      if (typeof window !== 'undefined') {
+        import('@/lib/pos-offline-db').then(m => m.cacheMenu(categories as unknown as Record<string, unknown>[])).catch(() => {})
+      }
+      return categories
+    }
     const clientId = _getClientId()
     if (!clientId) return []
 
@@ -409,6 +459,12 @@ export interface PaymentMethodDB {
 
 export async function getPaymentMethodsFromDB(): Promise<PaymentMethodDB[]> {
   try {
+    // Fase 2: en el bridge local, las formas de pago vienen de SERVER1.
+    const local = await _getLocalCatalog()
+    if (local?.payment_methods?.length) {
+      import('@/lib/pos-offline-db').then(m => m.cachePaymentMethods(local.payment_methods as unknown as Record<string, unknown>[])).catch(() => {})
+      return local.payment_methods
+    }
     const res = await fetch(
       `${_SUPABASE_URL}/rest/v1/pos_payment_methods?client_id=eq.${_getClientId()}&active=eq.true&select=id,name,type,commission_pct&order=name.asc`,
       { headers: _SB_HEADERS, cache: 'no-store' }
@@ -680,6 +736,19 @@ export async function getModifiersForCategoryFromDB(categoryId: string): Promise
   agregarOptions: ModificadorAgregar[]
 }> {
   try {
+    // Fase 2: en el bridge local, los modificadores vienen del catálogo de SERVER1.
+    const local = await _getLocalCatalog()
+    if (local?.modifiers) {
+      const groupIds = local.modifiers.category_links
+        .filter(l => l.category_id === categoryId)
+        .map(l => l.modifier_group_id)
+      if (!groupIds.length) return { quitarOptions: [], agregarOptions: [] }
+      const mods = local.modifiers.mods.filter(m => groupIds.includes(m.group_id))
+      return {
+        quitarOptions: mods.filter(m => m.group_id === 'quitar').map(m => m.name),
+        agregarOptions: mods.filter(m => m.group_id !== 'quitar').map(m => ({ name: m.name, price: Number(m.price) })),
+      }
+    }
     const assignRes = await fetch(
       `${_SUPABASE_URL}/rest/v1/pos_category_modifiers?client_id=eq.${_getClientId()}&category_id=eq.${categoryId}&select=modifier_group_id`,
       { headers: _SB_HEADERS, cache: 'no-store' }
