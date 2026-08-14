@@ -106,6 +106,12 @@ export default function KDSStandalone() {
   const [reprintMsg, setReprintMsg] = useState<{ success: boolean; text: string } | null>(null)
   const [statusMsg, setStatusMsg] = useState<{ success: boolean; text: string } | null>(null)
   const [showExitConfirm, setShowExitConfirm] = useState(false)
+  // Estado "preparando" por item (local/efímero): 1er toque = preparando (ámbar),
+  // 2º toque = listo. Eduardo: el chef marca 1×1 conforme trabaja.
+  const [prepItems, setPrepItems] = useState<Set<string>>(new Set())
+  const [showSettings, setShowSettings] = useState(false)
+  const [alertMins, setAlertMins] = useState(10)   // min para parpadear "te tardas"
+  const [fontScale, setFontScale] = useState(1)     // tamaño de comanda ajustable (zoom)
   const advancingRef = useRef<Set<string>>(new Set())
   const prevEnviadaRef = useRef(0)
 
@@ -201,6 +207,10 @@ export default function KDSStandalone() {
     if (bridgeHost || stationParam) {
       window.history.replaceState({}, '', window.location.pathname)
     }
+    const am = parseInt(localStorage.getItem('kds_alert_mins') || '10', 10)
+    if (am > 0) setAlertMins(am)
+    const fs = parseFloat(localStorage.getItem('kds_font_scale') || '1')
+    if (fs >= 0.6 && fs <= 1.8) setFontScale(fs)
     setMounted(true)
   }, [])
 
@@ -364,6 +374,41 @@ export default function KDSStandalone() {
   }
   kdsCards.sort((a, b) => new Date(a.batchCreatedAt).getTime() - new Date(b.batchCreatedAt).getTime())
 
+  // Toque por item (Eduardo): pending → preparando (1 toque) → listo (2º toque).
+  // El 1er toque en una orden NUEVA la avanza a "preparando" (color ámbar).
+  const handleItemTap = (order: KitchenOrderFromDB, originalIndex: number) => {
+    const key = `${order.id}-${originalIndex}`
+    if (doneItems.has(key)) {
+      toggleItemDone(order.id, originalIndex, order)  // deshacer: listo → pending
+      return
+    }
+    if (prepItems.has(key)) {
+      setPrepItems(p => { const n = new Set(p); n.delete(key); return n })
+      toggleItemDone(order.id, originalIndex, order)  // preparando → listo
+      return
+    }
+    if (order.status === 'enviada') advance(order.id, 'enviada', order.mesa, order.mesero)
+    setPrepItems(p => { const n = new Set(p); n.add(key); return n })
+  }
+
+  const saveSettings = (mins: number, scale: number) => {
+    setAlertMins(mins); setFontScale(scale)
+    try { localStorage.setItem('kds_alert_mins', String(mins)); localStorage.setItem('kds_font_scale', String(scale)) } catch {}
+  }
+
+  // Panel izquierdo — platillos PENDIENTES agregados por DEMANDA (lo más pedido arriba).
+  // Excluye cancelados, otra estación y los ya marcados listos. Eduardo: "me debes 5 ensaladas".
+  const demandMap = new Map<string, number>()
+  for (const order of filteredOrders) {
+    safeItems(order.items).forEach((item, idx) => {
+      if (item.cancelled || resolveItemStation(item) !== station) return
+      if (doneItems.has(`${order.id}-${idx}`)) return
+      const name = String(item.nombre || item.name || '—')
+      demandMap.set(name, (demandMap.get(name) || 0) + (item.cantidad || item.quantity || 1))
+    })
+  }
+  const demandList = [...demandMap.entries()].map(([name, qty]) => ({ name, qty })).sort((a, b) => b.qty - a.qty)
+
   const modePill = MODE_PILL[kdsClient.mode]
 
   if (!mounted) return null
@@ -402,23 +447,29 @@ export default function KDSStandalone() {
           <span className="text-slate-500 text-xs font-mono">
             {lastUpdate.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
           </span>
-          {/* X button — only visible in Electron */}
-          {typeof window !== 'undefined' && window.fullsiteApp && (
-            <button
-              onClick={() => setShowExitConfirm(true)}
-              className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-500 hover:bg-red-600 hover:text-white transition-colors"
-              title="Cerrar KDS"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            </button>
-          )}
+          {/* Ajustes */}
+          <button
+            onClick={() => setShowSettings(true)}
+            className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-700 hover:text-white transition-colors"
+            title="Ajustes"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </button>
+          {/* X salir — SIEMPRE visible */}
+          <button
+            onClick={() => setShowExitConfirm(true)}
+            className="w-10 h-10 rounded-xl flex items-center justify-center bg-slate-800 text-slate-300 hover:bg-red-600 hover:text-white transition-colors"
+            title="Salir del KDS"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
         </div>
       </div>
 
-      {/* Orders grid */}
-      <div className="flex-1 overflow-y-auto p-3">
+      {/* Cuerpo: panel PENDIENTES (izq) + comandas (der) */}
+      <div className="flex-1 flex overflow-hidden">
         {filteredOrders.length === 0 ? (
-          <div className="flex items-center justify-center h-full">
+          <div className="flex-1 flex items-center justify-center">
             <div className="text-center text-slate-500">
               <p className="text-5xl mb-4">👨‍🍳</p>
               <p className="text-2xl font-bold text-slate-300">Sin ordenes</p>
@@ -428,7 +479,22 @@ export default function KDSStandalone() {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+        <>
+          {/* Panel izquierdo: platillos pendientes por DEMANDA (lo más pedido arriba) */}
+          <aside className="w-56 flex-shrink-0 border-r border-slate-800 overflow-y-auto py-2" style={{ background: '#0d0d0d' }}>
+            <p className="px-3 pb-2 text-[11px] font-black uppercase tracking-[0.15em] text-slate-500">Pendientes</p>
+            <div>
+              {demandList.map(d => (
+                <div key={d.name} className="flex items-baseline gap-2 px-3 py-1.5 border-b border-slate-800/50">
+                  <span className="text-emerald-400 font-black text-xl min-w-[38px] tabular-nums">{d.qty}×</span>
+                  <span className="text-slate-200 text-sm font-medium leading-tight">{d.name}</span>
+                </div>
+              ))}
+            </div>
+          </aside>
+          {/* Comandas (zoom = tamaño ajustable en Ajustes) */}
+          <div className="flex-1 overflow-y-auto p-2.5" style={{ zoom: fontScale }}>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2.5">
             {kdsCards.map(card => {
               const order = card.order
               const mins = elapsed(card.batchCreatedAt)
@@ -451,10 +517,14 @@ export default function KDSStandalone() {
               return (
                 <div
                   key={cardKey}
-                  className={`rounded-2xl border-2 ${borderColor} flex flex-col overflow-hidden ${isNew ? 'animate-pulse-once' : ''}`}
+                  className={`rounded-2xl border-2 ${borderColor} flex flex-col overflow-hidden ${isNew ? 'animate-pulse-once' : ''} ${mins >= alertMins ? 'kds-late' : ''}`}
                   style={{ background: '#1a1a1a' }}
                 >
-                  <div className={`flex items-center justify-between px-4 py-3 ${headerBg}`}>
+                  <div
+                    onDoubleClick={() => bump(order.id, order.mesa, order.mesero)}
+                    title="Doble clic = quitar la comanda"
+                    className={`flex items-center justify-between px-4 py-3 cursor-pointer ${headerBg}`}
+                  >
                     <div className="flex items-center gap-3">
                       <span className="text-3xl font-black">{order.mesa || 'D'}</span>
                       {card.batchSeq > 0 && (
@@ -464,7 +534,7 @@ export default function KDSStandalone() {
                       )}
                       <div className="leading-tight">
                         <p className="text-sm font-black uppercase tracking-wide">{isNew ? 'NUEVA' : isPrep ? 'PREPARANDO' : 'LISTA'}</p>
-                        <p className="text-xs opacity-70">{order.mesero?.split(' ').slice(0, 2).join(' ')}</p>
+                        <p className="text-xs opacity-70">{order.mesero?.split(' ').slice(0, 2).join(' ')} · {new Date(card.batchCreatedAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -489,34 +559,31 @@ export default function KDSStandalone() {
                     {activeItemsWithIndex.map(({ item, originalIndex }) => {
                       const itemKey = `${order.id}-${originalIndex}`
                       const itemDone = doneItems.has(itemKey)
-                      const canToggle = isPrep
+                      const itemPrep = !itemDone && prepItems.has(itemKey)
 
                       return (
                         <button
                           key={originalIndex}
                           type="button"
-                          disabled={!canToggle}
-                          onClick={() => canToggle && toggleItemDone(order.id, originalIndex, order)}
-                          className={`flex items-start gap-2 w-full text-left rounded-lg px-2 py-1.5 min-h-[48px] transition-colors ${
-                            canToggle ? 'active:bg-slate-700/50 cursor-pointer' : 'cursor-default'
-                          } ${itemDone ? 'opacity-60' : ''}`}
+                          onClick={() => handleItemTap(order, originalIndex)}
+                          className={`flex items-start gap-2 w-full text-left rounded-lg px-2 py-2 min-h-[46px] transition-colors cursor-pointer active:bg-slate-700/50 ${itemPrep ? 'bg-amber-500/10' : ''} ${itemDone ? 'opacity-55' : ''}`}
                         >
-                          {canToggle && (
-                            <span className={`mt-0.5 w-5 h-5 rounded-md border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
-                              itemDone ? 'bg-emerald-500 border-emerald-500' : 'border-slate-500'
-                            }`}>
-                              {itemDone && (
-                                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                </svg>
-                              )}
-                            </span>
-                          )}
-                          <span className={`font-bold text-base min-w-[28px] ${itemDone ? 'text-emerald-600' : 'text-emerald-400'}`}>
-                            {item.cantidad || item.quantity || 1}x
+                          <span className={`mt-0.5 w-5 h-5 rounded-md border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
+                            itemDone ? 'bg-emerald-500 border-emerald-500' : itemPrep ? 'border-amber-400 bg-amber-400/20' : 'border-slate-600'
+                          }`}>
+                            {itemDone ? (
+                              <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                              </svg>
+                            ) : itemPrep ? (
+                              <span className="w-2 h-2 rounded-full bg-amber-400" />
+                            ) : null}
+                          </span>
+                          <span className={`font-black text-base min-w-[26px] tabular-nums ${itemDone ? 'text-emerald-600' : 'text-emerald-400'}`}>
+                            {item.cantidad || item.quantity || 1}×
                           </span>
                           <div className="flex-1">
-                            <p className={`text-sm font-medium ${itemDone ? 'text-emerald-400 line-through' : 'text-white'}`}>
+                            <p className={`text-[15px] font-semibold leading-tight ${itemDone ? 'text-emerald-400 line-through' : itemPrep ? 'text-amber-200' : 'text-white'}`}>
                               {item.nombre || item.name}
                             </p>
                             {item.modificadores && item.modificadores.length > 0 && (
@@ -565,6 +632,8 @@ export default function KDSStandalone() {
               )
             })}
           </div>
+          </div>
+        </>
         )}
       </div>
 
@@ -576,6 +645,39 @@ export default function KDSStandalone() {
       {statusMsg && (
         <div className={`fixed bottom-16 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl text-sm font-bold shadow-lg z-50 ${statusMsg.success ? 'bg-slate-700 text-white' : 'bg-red-600 text-white'}`}>
           {statusMsg.text}
+        </div>
+      )}
+
+      {/* Ajustes del KDS */}
+      {showSettings && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50" onClick={() => setShowSettings(false)}>
+          <div className="bg-slate-800 rounded-2xl p-7 w-[340px] shadow-2xl" onClick={e => e.stopPropagation()}>
+            <p className="text-white text-lg font-bold mb-5">Ajustes del KDS</p>
+
+            <label className="block text-slate-300 text-sm mb-2">Alerta de demora — parpadea a los (min)</label>
+            <div className="flex items-center gap-2 mb-5">
+              {[5, 10, 15, 20].map(m => (
+                <button key={m} onClick={() => saveSettings(m, fontScale)}
+                  className={`flex-1 py-2 rounded-lg font-bold ${alertMins === m ? 'bg-amber-500 text-black' : 'bg-slate-700 text-slate-300'}`}>
+                  {m}
+                </button>
+              ))}
+            </div>
+
+            <label className="block text-slate-300 text-sm mb-2">Tamaño de comanda</label>
+            <div className="flex items-center gap-3 mb-6">
+              <button onClick={() => saveSettings(alertMins, Math.max(0.7, Math.round((fontScale - 0.1) * 10) / 10))}
+                className="w-12 h-12 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-2xl font-black">−</button>
+              <span className="flex-1 text-center text-white font-bold text-lg tabular-nums">{Math.round(fontScale * 100)}%</span>
+              <button onClick={() => saveSettings(alertMins, Math.min(1.6, Math.round((fontScale + 0.1) * 10) / 10))}
+                className="w-12 h-12 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-2xl font-black">+</button>
+            </div>
+
+            <button onClick={() => setShowSettings(false)}
+              className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-lg">
+              Listo
+            </button>
+          </div>
         </div>
       )}
 
@@ -608,6 +710,11 @@ export default function KDSStandalone() {
           50% { box-shadow: 0 0 0 8px rgba(255,255,255,0.15); }
         }
         .animate-pulse-once { animation: pulse-once 1s ease-in-out 2; }
+        @keyframes kds-late-blink {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(242,85,90,0); }
+          50% { box-shadow: 0 0 0 4px rgba(242,85,90,0.55); }
+        }
+        .kds-late { animation: kds-late-blink 1.1s ease-in-out infinite; }
       `}</style>
     </div>
   )
