@@ -25,15 +25,17 @@ from agent_common import sb_get, sb_post, sb_patch, log_run
 CLIENT_ID = os.environ.get("CLIENT_ID", "lab-resto")
 IVA_RATE = 0.16
 
-MESEROS = ["Ana Torres", "Luis Marín", "Sofía Ruiz", "Diego Peña", "Mara Solís"]
-# (nombre, precio, estación)
+MESEROS = ["Fernanda del Río", "Sebastián Icaza", "Regina Barragán", "Patricio Elizondo", "Valentina Sada"]
+# Restaurante PREMIUM (fine dining). (nombre, precio, estación)
 MENU = [
-    ("Rib Eye 300g", 320, "cocina"), ("Arrachera", 260, "cocina"),
-    ("Chilaquiles", 140, "cocina"), ("Ensalada César", 130, "cocina"),
-    ("Pasta Alfredo", 175, "cocina"), ("Hamburguesa", 165, "cocina"),
-    ("Café Americano", 55, "barra"), ("Capuchino", 62, "barra"),
-    ("Limonada", 48, "barra"), ("Cerveza", 70, "barra"),
-    ("Cheesecake", 95, "caja"), ("Brownie", 80, "caja"),
+    ("Wagyu A5 200g", 1280, "cocina"), ("Langosta Thermidor", 980, "cocina"),
+    ("Ribeye Prime 400g", 720, "cocina"), ("Atún Sellado", 560, "cocina"),
+    ("Risotto de Trufa", 480, "cocina"), ("Foie Gras", 620, "cocina"),
+    ("Rack de Cordero", 690, "cocina"), ("Pulpo a la Brasa", 520, "cocina"),
+    ("Carpaccio de Res", 340, "barra"), ("Ostras (6)", 420, "barra"),
+    ("Copa Malbec Reserva", 280, "barra"), ("Cóctel de autor", 240, "barra"),
+    ("Agua mineral", 90, "barra"),
+    ("Crème Brûlée", 190, "caja"), ("Soufflé de Chocolate", 210, "caja"),
 ]
 PAGOS = ["Tarjeta de crédito", "Efectivo", "Tarjeta de débito", "Transferencia"]
 
@@ -94,8 +96,8 @@ def main():
     start = time.time()
     created = advanced = closed = 0
     try:
-        # 1) Crear órdenes nuevas (servicio entrando)
-        n_new = random.randint(1, 4)
+        # 1) Crear órdenes nuevas (servicio premium entrando — más volumen)
+        n_new = random.randint(4, 9)
         base_seq = 0
         for s in range(n_new):
             order = make_order(base_seq + s)
@@ -103,14 +105,14 @@ def main():
             created += 1
 
         # 2) Avanzar a cocina algunas abiertas
-        abiertas = sb_get("pos_orders", f"client_id=eq.{CLIENT_ID}&status=eq.abierta&select=id,items&order=created_at.asc&limit=6")
+        abiertas = sb_get("pos_orders", f"client_id=eq.{CLIENT_ID}&status=eq.abierta&select=id,items&order=created_at.asc&limit=15")
         for o in abiertas:
             if random.random() < 0.7:
                 advance_to_kitchen(o)
                 advanced += 1
 
         # 3) Cobrar algunas enviadas
-        enviadas = sb_get("pos_orders", f"client_id=eq.{CLIENT_ID}&status=eq.enviada&select=id,items,total&order=created_at.asc&limit=6")
+        enviadas = sb_get("pos_orders", f"client_id=eq.{CLIENT_ID}&status=eq.enviada&select=id,items,total&order=created_at.asc&limit=15")
         for o in enviadas:
             if random.random() < 0.6:
                 close_order(o)
