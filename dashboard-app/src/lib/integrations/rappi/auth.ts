@@ -112,7 +112,7 @@ export async function getRappiAccessToken(): Promise<string> {
 
 export async function buildRappiAuthHeaders(): Promise<Record<string, string>> {
   const token = await getRappiAccessToken()
-  return { 'x-authorization': `Bearer: ${token}` }
+  return { 'x-authorization': `Bearer ${token}` }
 }
 
 export async function rappiFetch(path: string, init: RequestInit = {}): Promise<Response> {
