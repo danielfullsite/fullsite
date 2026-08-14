@@ -112,6 +112,7 @@ export default function KDSStandalone() {
   const [showSettings, setShowSettings] = useState(false)
   const [alertMins, setAlertMins] = useState(10)   // min para parpadear "te tardas"
   const [fontScale, setFontScale] = useState(1)     // tamaño de comanda ajustable (zoom)
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark')
   const advancingRef = useRef<Set<string>>(new Set())
   const prevEnviadaRef = useRef(0)
 
@@ -225,6 +226,8 @@ export default function KDSStandalone() {
     if (am > 0) setAlertMins(am)
     const fs = parseFloat(localStorage.getItem('kds_font_scale') || '1')
     if (fs >= 0.6 && fs <= 1.8) setFontScale(fs)
+    const th = localStorage.getItem('kds_theme')
+    if (th === 'light' || th === 'dark') setTheme(th)
     setMounted(true)
   }, [])
 
@@ -416,6 +419,16 @@ export default function KDSStandalone() {
     setAlertMins(mins); setFontScale(scale)
     try { localStorage.setItem('kds_alert_mins', String(mins)); localStorage.setItem('kds_font_scale', String(scale)) } catch {}
   }
+  const setThemePersist = (th: 'dark' | 'light') => {
+    setTheme(th)
+    try { localStorage.setItem('kds_theme', th) } catch {}
+  }
+  const exitKds = () => {
+    if (typeof window !== 'undefined') {
+      if (window.fullsiteApp?.quit) window.fullsiteApp.quit()
+      else window.close()
+    }
+  }
 
   // Panel izquierdo — platillos PENDIENTES agregados por DEMANDA (lo más pedido arriba).
   // Excluye cancelados, otra estación y los ya marcados listos. Eduardo: "me debes 5 ensaladas".
@@ -434,12 +447,14 @@ export default function KDSStandalone() {
 
   if (!mounted) return null
 
+  const L = theme === 'light'  // modo claro
+
   return (
-    <div className="h-screen flex flex-col bg-black text-white select-none overflow-hidden" style={{ fontFamily: 'system-ui, sans-serif' }}>
+    <div className={`h-screen flex flex-col select-none overflow-hidden ${L ? 'bg-neutral-100 text-neutral-900' : 'bg-black text-white'}`} style={{ fontFamily: 'system-ui, sans-serif' }}>
       {/* Top bar */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-slate-800 flex-shrink-0" style={{ background: '#111' }}>
+      <div className={`flex items-center justify-between px-4 py-2 border-b flex-shrink-0 ${L ? 'border-neutral-200' : 'border-slate-800'}`} style={{ background: L ? '#ffffff' : '#111' }}>
         <div className="flex items-center gap-3">
-          <span className="text-white font-black text-xl tracking-widest uppercase">
+          <span className={`font-black text-xl tracking-widest uppercase ${L ? 'text-neutral-900' : 'text-white'}`}>
             {station.charAt(0).toUpperCase() + station.slice(1)}
           </span>
           <div className="flex items-center gap-3 text-sm ml-4">
@@ -471,15 +486,15 @@ export default function KDSStandalone() {
           {/* Ajustes */}
           <button
             onClick={() => setShowSettings(true)}
-            className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-700 hover:text-white transition-colors"
+            className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${L ? 'text-neutral-500 hover:bg-neutral-200 hover:text-neutral-900' : 'text-slate-400 hover:bg-slate-700 hover:text-white'}`}
             title="Ajustes"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           </button>
-          {/* X salir — SIEMPRE visible */}
+          {/* X salir — SIEMPRE visible, sale directo */}
           <button
-            onClick={() => setShowExitConfirm(true)}
-            className="w-10 h-10 rounded-xl flex items-center justify-center bg-slate-800 text-slate-300 hover:bg-red-600 hover:text-white transition-colors"
+            onClick={exitKds}
+            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors hover:bg-red-600 hover:text-white ${L ? 'bg-neutral-200 text-neutral-600' : 'bg-slate-800 text-slate-300'}`}
             title="Salir del KDS"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -491,9 +506,9 @@ export default function KDSStandalone() {
       <div className="flex-1 flex overflow-hidden">
         {filteredOrders.length === 0 ? (
           <div className="flex-1 flex items-center justify-center">
-            <div className="text-center text-slate-500">
+            <div className={`text-center ${L ? 'text-neutral-500' : 'text-slate-500'}`}>
               <p className="text-5xl mb-4">👨‍🍳</p>
-              <p className="text-2xl font-bold text-slate-300">Sin ordenes</p>
+              <p className={`text-2xl font-bold ${L ? 'text-neutral-700' : 'text-slate-300'}`}>Sin ordenes</p>
               <p className="text-sm mt-1">
                 {kdsClient.mode === 'LAN_PRIMARY' ? 'Escuchando en red local' : 'Actualizando cada 2 segundos'}
               </p>
@@ -502,13 +517,13 @@ export default function KDSStandalone() {
         ) : (
         <>
           {/* Panel izquierdo: platillos pendientes por DEMANDA (lo más pedido arriba) */}
-          <aside className="w-56 flex-shrink-0 border-r border-slate-800 overflow-y-auto py-2" style={{ background: '#0d0d0d' }}>
-            <p className="px-3 pb-2 text-[11px] font-black uppercase tracking-[0.15em] text-slate-500">Pendientes</p>
+          <aside className={`w-56 flex-shrink-0 border-r overflow-y-auto py-2 ${L ? 'border-neutral-200' : 'border-slate-800'}`} style={{ background: L ? '#f5f5f5' : '#0d0d0d' }}>
+            <p className={`px-3 pb-2 text-[11px] font-black uppercase tracking-[0.15em] ${L ? 'text-neutral-500' : 'text-slate-500'}`}>Pendientes</p>
             <div>
               {demandList.map(d => (
-                <div key={d.name} className="flex items-baseline gap-2 px-3 py-1.5 border-b border-slate-800/50">
-                  <span className="text-emerald-400 font-black text-xl min-w-[38px] tabular-nums">{d.qty}×</span>
-                  <span className="text-slate-200 text-sm font-medium leading-tight">{d.name}</span>
+                <div key={d.name} className={`flex items-baseline gap-2 px-3 py-1.5 border-b ${L ? 'border-neutral-200' : 'border-slate-800/50'}`}>
+                  <span className={`font-black text-xl min-w-[38px] tabular-nums ${L ? 'text-emerald-600' : 'text-emerald-400'}`}>{d.qty}×</span>
+                  <span className={`text-sm font-medium leading-tight ${L ? 'text-neutral-800' : 'text-slate-200'}`}>{d.name}</span>
                 </div>
               ))}
             </div>
@@ -531,15 +546,15 @@ export default function KDSStandalone() {
               const doneCount = activeItemsWithIndex.filter(({ originalIndex }) => doneItems.has(`${order.id}-${originalIndex}`)).length
               const totalCount = activeItemsWithIndex.length
 
-              const borderColor = isNew ? 'border-white/40' : isPrep ? 'border-amber-500/50' : 'border-emerald-500/50'
-              const headerBg = isNew ? 'bg-white text-black' : isPrep ? 'bg-amber-500 text-black' : 'bg-emerald-500 text-black'
+              const borderColor = isNew ? (L ? 'border-neutral-300' : 'border-white/40') : isPrep ? 'border-amber-500/60' : 'border-emerald-500/60'
+              const headerBg = isNew ? (L ? 'bg-neutral-900 text-white' : 'bg-white text-black') : isPrep ? 'bg-amber-500 text-black' : 'bg-emerald-500 text-black'
               const cardKey = card.batchId ? `${order.id}-${card.batchId}` : order.id
 
               return (
                 <div
                   key={cardKey}
                   className={`rounded-2xl border-2 ${borderColor} flex flex-col overflow-hidden ${isNew ? 'animate-pulse-once' : ''} ${mins >= alertMins ? 'kds-late' : ''}`}
-                  style={{ background: '#1a1a1a' }}
+                  style={{ background: L ? '#ffffff' : '#1a1a1a' }}
                 >
                   <div
                     onDoubleClick={() => bump(order.id, order.mesa, order.mesero)}
@@ -590,7 +605,7 @@ export default function KDSStandalone() {
                           className={`flex items-start gap-2 w-full text-left rounded-lg px-2 py-2 min-h-[46px] transition-colors cursor-pointer active:bg-slate-700/50 ${itemPrep ? 'bg-amber-500/10' : ''} ${itemDone ? 'opacity-55' : ''}`}
                         >
                           <span className={`mt-0.5 w-5 h-5 rounded-md border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
-                            itemDone ? 'bg-emerald-500 border-emerald-500' : itemPrep ? 'border-amber-400 bg-amber-400/20' : 'border-slate-600'
+                            itemDone ? 'bg-emerald-500 border-emerald-500' : itemPrep ? 'border-amber-400 bg-amber-400/20' : (L ? 'border-neutral-300' : 'border-slate-600')
                           }`}>
                             {itemDone ? (
                               <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
@@ -604,16 +619,16 @@ export default function KDSStandalone() {
                             {item.cantidad || item.quantity || 1}×
                           </span>
                           <div className="flex-1">
-                            <p className={`text-[15px] font-semibold leading-tight ${itemDone ? 'text-emerald-400 line-through' : itemPrep ? 'text-amber-200' : 'text-white'}`}>
+                            <p className={`text-[15px] font-semibold leading-tight ${itemDone ? (L ? 'text-emerald-600 line-through' : 'text-emerald-400 line-through') : itemPrep ? (L ? 'text-amber-700' : 'text-amber-200') : (L ? 'text-neutral-900' : 'text-white')}`}>
                               {item.nombre || item.name}
                             </p>
                             {item.modificadores && item.modificadores.length > 0 && (
-                              <p className={`text-xs ${itemDone ? 'text-emerald-600/60 line-through' : 'text-amber-400/80'}`}>
+                              <p className={`text-xs ${itemDone ? 'text-emerald-600/60 line-through' : (L ? 'text-amber-600' : 'text-amber-400/80')}`}>
                                 {item.modificadores.join(' · ')}
                               </p>
                             )}
                             {item.notas && (
-                              <p className={`text-xs italic ${itemDone ? 'text-sky-600/60 line-through' : 'text-sky-300/80'}`}>
+                              <p className={`text-xs italic ${itemDone ? 'text-sky-600/60 line-through' : (L ? 'text-sky-600' : 'text-sky-300/80')}`}>
                                 {item.notas}
                               </p>
                             )}
@@ -644,7 +659,7 @@ export default function KDSStandalone() {
                   )}
                   <button
                     onClick={() => handleReprint(order, activeItemsWithIndex.map(i => i.item), card.batchId ? card.batchSeq : undefined, card.batchId ? card.batchCreatedAt : undefined)}
-                    className="mx-3 mb-3 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-white text-sm font-medium flex items-center justify-center gap-1.5 min-h-[40px] transition-colors"
+                    className={`mx-3 mb-3 py-2 rounded-xl text-sm font-medium flex items-center justify-center gap-1.5 min-h-[40px] transition-colors ${L ? 'bg-neutral-200 hover:bg-neutral-300 text-neutral-700' : 'bg-slate-700 hover:bg-slate-600 text-white'}`}
                   >
                     <Printer className="w-4 h-4" />
                     Reimprimir
@@ -671,27 +686,35 @@ export default function KDSStandalone() {
 
       {/* Ajustes del KDS */}
       {showSettings && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50" onClick={() => setShowSettings(false)}>
-          <div className="bg-slate-800 rounded-2xl p-7 w-[340px] shadow-2xl" onClick={e => e.stopPropagation()}>
-            <p className="text-white text-lg font-bold mb-5">Ajustes del KDS</p>
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowSettings(false)}>
+          <div className={`rounded-2xl p-7 w-[340px] shadow-2xl ${L ? 'bg-white' : 'bg-slate-800'}`} onClick={e => e.stopPropagation()}>
+            <p className={`text-lg font-bold mb-5 ${L ? 'text-neutral-900' : 'text-white'}`}>Ajustes del KDS</p>
 
-            <label className="block text-slate-300 text-sm mb-2">Alerta de demora — parpadea a los (min)</label>
+            <label className={`block text-sm mb-2 ${L ? 'text-neutral-600' : 'text-slate-300'}`}>Tema</label>
+            <div className="flex items-center gap-2 mb-5">
+              <button onClick={() => setThemePersist('dark')}
+                className={`flex-1 py-2 rounded-lg font-bold ${theme === 'dark' ? 'bg-emerald-500 text-black' : (L ? 'bg-neutral-200 text-neutral-700' : 'bg-slate-700 text-slate-300')}`}>Oscuro</button>
+              <button onClick={() => setThemePersist('light')}
+                className={`flex-1 py-2 rounded-lg font-bold ${theme === 'light' ? 'bg-emerald-500 text-black' : (L ? 'bg-neutral-200 text-neutral-700' : 'bg-slate-700 text-slate-300')}`}>Claro</button>
+            </div>
+
+            <label className={`block text-sm mb-2 ${L ? 'text-neutral-600' : 'text-slate-300'}`}>Alerta de demora — parpadea a los (min)</label>
             <div className="flex items-center gap-2 mb-5">
               {[5, 10, 15, 20].map(m => (
                 <button key={m} onClick={() => saveSettings(m, fontScale)}
-                  className={`flex-1 py-2 rounded-lg font-bold ${alertMins === m ? 'bg-amber-500 text-black' : 'bg-slate-700 text-slate-300'}`}>
+                  className={`flex-1 py-2 rounded-lg font-bold ${alertMins === m ? 'bg-amber-500 text-black' : (L ? 'bg-neutral-200 text-neutral-700' : 'bg-slate-700 text-slate-300')}`}>
                   {m}
                 </button>
               ))}
             </div>
 
-            <label className="block text-slate-300 text-sm mb-2">Tamaño de comanda</label>
+            <label className={`block text-sm mb-2 ${L ? 'text-neutral-600' : 'text-slate-300'}`}>Tamaño de comanda</label>
             <div className="flex items-center gap-3 mb-6">
               <button onClick={() => saveSettings(alertMins, Math.max(0.7, Math.round((fontScale - 0.1) * 10) / 10))}
-                className="w-12 h-12 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-2xl font-black">−</button>
-              <span className="flex-1 text-center text-white font-bold text-lg tabular-nums">{Math.round(fontScale * 100)}%</span>
+                className={`w-12 h-12 rounded-lg text-2xl font-black ${L ? 'bg-neutral-200 hover:bg-neutral-300 text-neutral-800' : 'bg-slate-700 hover:bg-slate-600 text-white'}`}>−</button>
+              <span className={`flex-1 text-center font-bold text-lg tabular-nums ${L ? 'text-neutral-900' : 'text-white'}`}>{Math.round(fontScale * 100)}%</span>
               <button onClick={() => saveSettings(alertMins, Math.min(1.6, Math.round((fontScale + 0.1) * 10) / 10))}
-                className="w-12 h-12 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-2xl font-black">+</button>
+                className={`w-12 h-12 rounded-lg text-2xl font-black ${L ? 'bg-neutral-200 hover:bg-neutral-300 text-neutral-800' : 'bg-slate-700 hover:bg-slate-600 text-white'}`}>+</button>
             </div>
 
             <button onClick={() => setShowSettings(false)}
