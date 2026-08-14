@@ -92,7 +92,7 @@ Best regards,
 | 04 | URL + credenciales sandbox (`api.dev.rappi.com`) | Imprescindible para implementar sin afectar órdenes reales |
 | 05 | Formato de montos (MXN o centavos) | Crítico para normalizer — error produce precios incorrectos en todas las órdenes |
 | 06 | Payload de ejemplo de una orden | Permite construir normalizer sin suposiciones |
-| 07 | Confirmación del header `x-authorization: "Bearer: <token>"` | Patrón no estándar (dos puntos después de Bearer) — verificar explícitamente |
+| 07 | Confirmación del header `x-authorization: "Bearer <token>"` | Header específico de Rappi — verificar explícitamente |
 | 08 | Acuerdo de integrador / Partnership agreement | Si existe, solicitar en primer contacto para no bloquear después |
 | 09 | Contacto técnico de soporte para integradores | No el soporte general — el canal de Partner Engineering |
 
@@ -140,8 +140,8 @@ curl -X POST https://api.dev.rappi.com/restaurants/auth/v1/token/login/integrati
 
 # Paso 2: Poll una vez
 TOKEN=$(cat /tmp/rappi_token.json | jq -r '.access_token')
-curl -X GET "https://api.dev.rappi.com/restaurants/orders/v1/stores/DEV_STORE_ID/orders" \
-  -H "x-authorization: Bearer: $TOKEN" \
+curl -X GET "https://api.dev.rappi.com/restaurants/orders/v1/orders" \
+  -H "x-authorization: Bearer $TOKEN" \
   | tee /tmp/rappi_payload_sample.json
 ```
 
@@ -179,5 +179,5 @@ Research indica que Wansoft, Parrot Software y Soft Restaurant tienen integracio
 | **Externo** | Al menos un payload de orden real/prueba en `docs/integrations/rappi/sample-order-payload.json` |
 | **Interno** | Decisión de arquitectura del poller aprobada por Daniel (mecanismo + mutex + observabilidad) |
 | **Operativo** | Decisión explícita de Daniel: ¿aceptación automática de órdenes o manual? |
-| **Interno** | Header `x-authorization: "Bearer: <token>"` verificado con request manual exitoso |
+| **Interno** | Header `x-authorization: "Bearer <token>"` verificado con request manual exitoso |
 | **Interno** ✅ | Design v0.1 aprobado — completado 2026-08-01 |

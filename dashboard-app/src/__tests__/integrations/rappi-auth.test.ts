@@ -39,7 +39,7 @@ describe('Rappi OAuth client_credentials', () => {
     const fetchSpy = vi.fn(async () => Response.json({ access_token: 'TOKEN-123', expires_in: 86400 }))
     vi.stubGlobal('fetch', fetchSpy)
 
-    await expect(buildRappiAuthHeaders()).resolves.toEqual({ 'x-authorization': 'Bearer: TOKEN-123' })
+    await expect(buildRappiAuthHeaders()).resolves.toEqual({ 'x-authorization': 'Bearer TOKEN-123' })
 
     expect(fetchSpy).toHaveBeenCalledTimes(1)
     const [url, init] = fetchSpy.mock.calls[0] as unknown as [string, RequestInit]
