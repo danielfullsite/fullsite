@@ -26,6 +26,7 @@ const logger         = require('./logger')
 const printerAdapter = require('./adapters/printer')
 const networkAdapter = require('./adapters/network')
 const staticServe    = require('./adapters/static-serve')
+const { CatalogStore } = require('./adapters/catalog')
 const { NdjsonEventStore }  = require('./adapters/storage/ndjson')
 const { CoreEventStore }    = require('./core/event-store')
 const { RestaurantState }   = require('./core/state')
@@ -124,7 +125,7 @@ function json(res, statusCode, payload) {
   res.end(JSON.stringify(payload))
 }
 
-function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, version, serverId, restaurantId, config = {}, instanceName = '' }) {
+function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, version, serverId, restaurantId, config = {}, instanceName = '', catalog = null }) {
   return async function router(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
@@ -184,6 +185,22 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, versio
     if (url === '/state' && req.method === 'GET') {
       const seq = await eventStore.getLastSequence()
       json(res, 200, { sequence: seq, ...state.toSnapshot() })
+      return
+    }
+
+    // ── GET /catalog ──────────────────────────────────────────────────────────
+    // Fase 2 (modelo Pedro): SERVER1 es la DB master del catálogo. Las terminales
+    // con local_ui + pos_server_ip jalan de aquí en vez de Supabase → una
+    // terminal en frío sin internet funciona mientras SERVER1 esté vivo.
+    if (url === '/catalog' && req.method === 'GET') {
+      const data = catalog && catalog.get()
+      if (!data) {
+        // SERVER1 aún no ha llenado el catálogo (nunca prendió online). La UI
+        // debe caer a su propio cache/Supabase.
+        json(res, 503, { error: 'catalog_not_ready', restaurant_id: restaurantId })
+        return
+      }
+      json(res, 200, data)
       return
     }
 
@@ -390,8 +407,12 @@ async function startLocalServer({ dataDir, port = 7717, config = {} }) {
 
   wsHub.onCommand((msg, clientId) => cmdHandler.handle(msg, clientId))
 
+  // ── Catalog store (Fase 2 — modelo Pedro: SERVER1 = DB master) ────────────
+  const catalog = new CatalogStore({ dataDir, logger })
+  catalog.load()  // arranque en frío: sirve lo que haya en disco de inmediato
+
   // ── HTTP server ──────────────────────────────────────────────────────────
-  const router = buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer: printerAdapter, version, serverId, restaurantId, config, instanceName })
+  const router = buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer: printerAdapter, version, serverId, restaurantId, config, instanceName, catalog })
   const httpServer = http.createServer(router)
 
   wsHub.attach(httpServer)
@@ -436,6 +457,15 @@ async function startLocalServer({ dataDir, port = 7717, config = {} }) {
   if (supabaseUrl && supabaseKey) {
     startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, state, eventStore, wsHub })
       .catch(e => console.warn('[server] Supabase poll start error:', e.message))
+
+    // ── Catalog refresh (Fase 2): baja de Supabase al arrancar y cada 15 min ──
+    // Si no hay red, refresh() conserva el cache en disco (no lo borra).
+    catalog.refresh({ supabaseUrl, supabaseKey, restaurantId })
+      .catch(e => console.warn('[catalog] refresh inicial:', e.message))
+    setInterval(() => {
+      catalog.refresh({ supabaseUrl, supabaseKey, restaurantId })
+        .catch(e => console.warn('[catalog] refresh periódico:', e.message))
+    }, 15 * 60 * 1000)
   }
 
   // ── Shutdown ──────────────────────────────────────────────────────────────
