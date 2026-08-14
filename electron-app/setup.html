@@ -1222,7 +1222,13 @@ async function saveAndRestart() {
     instance_name:     state.terminalName,
     kds:               state.terminalRole === 'kds' ? true : (state.legacy?.kds || false),
     kds_only:          state.terminalRole === 'kds' ? true : (state.legacy?.kds_only || false),
-    pos_server_ip:     state.terminalRole === 'kds' ? state.serverHost : (state.legacy?.pos_server_ip || null),
+    // Offline Shell: sirve/carga la UI localmente y rompe el mixed-content. Es el
+    // estándar ahora — SIN esto la terminal cae a modo nube = pantalla negra offline.
+    // (Era lo que provocaba que el wizard dejara terminales sin offline.)
+    local_ui:          true,
+    // La CAJA (server_pos) es su propio servidor (127.0.0.1). Terminales y KDS
+    // cargan la UI del server_pos → su pos_server_ip = la IP que capturaste.
+    pos_server_ip:     state.terminalRole === 'server_pos' ? null : state.serverHost,
     supabaseUrl:       state.legacy?.supabaseUrl || null,
     supabaseAnonKey:   state.legacy?.supabaseAnonKey || null,
   }
