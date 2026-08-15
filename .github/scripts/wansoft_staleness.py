@@ -98,6 +98,34 @@ else:
         output_sum = f"ALERT enviado. Datos de hace {days_behind} días."
         print(f"[wansoft-staleness] STALE alert sent — {days_behind} days behind")
 
+# ── Proactive cookie health probe ────────────────────────────────────────────
+# La cookie .ASPXAUTH de Wansoft caduca y el CAPTCHA (Cloudflare Turnstile) impide
+# el re-login automático. Si expiró, avisamos con el comando EXACTO para refrescarla,
+# en vez de dejar que los scrapers fallen en silencio (ventas/inventario stale).
+try:
+    sys.path.insert(0, os.path.dirname(__file__))
+    from wansoft_auth import get_session, WansoftAuthExpired
+    try:
+        get_session(CLIENT["id"])
+        print("[wansoft-staleness] cookie OK")
+    except WansoftAuthExpired:
+        cookie_msg = (
+            "🔴 Wansoft: cookie de sesión EXPIRADA\n"
+            "Los scrapers no pueden entrar → ventas e inventario dejarán de actualizarse.\n\n"
+            "Refréscala (2 min):\n"
+            "1. Entra a wansoft.net en Chrome y pasa el CAPTCHA\n"
+            "2. DevTools → Application → Cookies → copia el valor de .ASPXAUTH\n"
+            f"3. python3 .github/scripts/wansoft_auth.py store --client-id {CLIENT['id']} --aspxauth 'VALOR'"
+        )
+        send_telegram(cookie_msg)
+        if status == "success":
+            status = "warning"
+        output_sum = (output_sum + " | COOKIE EXPIRADA — alerta enviada").strip(" |")
+        print("[wansoft-staleness] cookie EXPIRED — alert sent")
+except Exception as e:
+    # Best-effort: nunca romper el agente por el chequeo de cookie.
+    print(f"[wansoft-staleness] WARN: cookie probe skipped: {e}", file=sys.stderr)
+
 # ── Log ──────────────────────────────────────────────────────────────────────
 duration_ms = int((time.time() - start) * 1000)
 try:
