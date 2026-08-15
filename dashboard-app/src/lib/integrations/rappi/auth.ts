@@ -38,6 +38,14 @@ export function rappiBaseUrl(): string {
     : 'https://api.dev.rappi.com'
 }
 
+export function rappiLegacyBaseUrl(): string {
+  const override = process.env.RAPPI_LEGACY_API_BASE_URL?.trim()
+  if (override) return trimSlash(override)
+  return rappiEnv() === 'prod'
+    ? 'https://services.mxgrability.rappi.com'
+    : 'https://microservices.dev.rappi.com'
+}
+
 export function rappiOrdersBasePath(): string {
   return '/restaurants/orders/v1'
 }
