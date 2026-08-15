@@ -32,15 +32,14 @@ export default function IngresosPage() {
     }).catch(() => {}).finally(() => setLoading(false))
   }, [])
 
-  // efectivo/tarjeta in wansoft_daily are PERCENTAGES, not MXN
-  // Multiply by ventas_dia to get real amounts
+  // efectivo/tarjeta in wansoft_daily are MXN amounts
   const totalEfectivo = useMemo(() => data.reduce((s, d) => {
-    const pct = d.efectivo || 0
-    return s + (pct < 100 ? (pct / 100) * (d.ventas_dia || 0) : pct)
+    const val = d.efectivo || 0
+    return s + val
   }, 0), [data])
   const totalTarjeta = useMemo(() => data.reduce((s, d) => {
-    const pct = d.tarjeta || 0
-    return s + (pct < 100 ? (pct / 100) * (d.ventas_dia || 0) : pct)
+    const val = d.tarjeta || 0
+    return s + val
   }, 0), [data])
   const totalVentas = useMemo(() => data.reduce((s, d) => s + (d.ventas_dia || 0), 0), [data])
   const totalTransferencia = useMemo(() => {
@@ -49,9 +48,8 @@ export default function IngresosPage() {
       if (!day.pago_métodos || !Array.isArray(day.pago_métodos)) continue
       for (const m of day.pago_métodos) {
         if ((m.nombre || '').toLowerCase().includes('transferencia')) {
-          // m.total is percentage — convert to MXN
-          const pct = m.total || 0
-          sum += pct < 100 ? (pct / 100) * (day.ventas_dia || 0) : pct
+          // m.total is an MXN amount
+          sum += m.total || 0
         }
       }
     }
@@ -65,13 +63,12 @@ export default function IngresosPage() {
   // Daily cash flow chart
   const dailyChart = useMemo(() => {
     return data.map(d => {
-      const ventas = d.ventas_dia || 0
       const rawEf = d.efectivo || 0
       const rawTj = d.tarjeta || 0
       return {
         fecha: new Date(d.fecha + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }),
-        efectivo: rawEf < 100 ? Math.round((rawEf / 100) * ventas) : rawEf,
-        tarjeta: rawTj < 100 ? Math.round((rawTj / 100) * ventas) : rawTj,
+        efectivo: rawEf,
+        tarjeta: rawTj,
       }
     })
   }, [data])

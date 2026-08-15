@@ -101,9 +101,9 @@ function formatGrupoLine(grupos: { nombre: string; total: number }[]): string {
     .join(', ')
 }
 
-function formatPagoLine(pagos: { nombre: string; total: number }[], ventasDia: number): string {
+function formatPagoLine(pagos: { nombre: string; total: number }[], _ventasDia: number): string {
   return pagos.map(p => {
-    const mxn = (p.total || 0) < 100 ? Math.round(((p.total || 0) / 100) * ventasDia) : Math.round(p.total || 0)
+    const mxn = Math.round(p.total || 0)
     return `${p.nombre}:$${mxn}`
   }).join(', ')
 }
@@ -279,44 +279,43 @@ describe('Chat Data Pipeline — data formatting: grupos', () => {
   })
 })
 
-describe('Chat Data Pipeline — data formatting: pagos (percentage conversion)', () => {
-  it('converts values < 100 as percentage of ventasDia', () => {
+describe('Chat Data Pipeline — data formatting: pagos (MXN amounts)', () => {
+  it('treats total as raw MXN amount', () => {
     const pagos = [{ nombre: 'Tarjeta de crédito', total: 60 }]
     const ventasDia = 50000
     const result = formatPagoLine(pagos, ventasDia)
-    // 60 < 100 → (60/100)*50000 = 30000
-    expect(result).toBe('Tarjeta de crédito:$30000')
+    // total is MXN → 60
+    expect(result).toBe('Tarjeta de crédito:$60')
   })
 
-  it('keeps values >= 100 as absolute MXN', () => {
+  it('keeps large values as absolute MXN', () => {
     const pagos = [{ nombre: 'Efectivo', total: 25000 }]
     const result = formatPagoLine(pagos, 50000)
     expect(result).toBe('Efectivo:$25000')
   })
 
-  it('handles mixed percentage and absolute values', () => {
+  it('handles mixed small and large values as MXN', () => {
     const pagos = [
-      { nombre: 'Tarjeta', total: 55 },   // percentage
-      { nombre: 'Efectivo', total: 20000 }, // absolute
+      { nombre: 'Tarjeta', total: 55 },   // MXN
+      { nombre: 'Efectivo', total: 20000 }, // MXN
     ]
     const result = formatPagoLine(pagos, 40000)
-    expect(result).toBe('Tarjeta:$22000, Efectivo:$20000')
+    expect(result).toBe('Tarjeta:$55, Efectivo:$20000')
   })
 
   it('handles zero total gracefully', () => {
     const pagos = [{ nombre: 'Transferencia', total: 0 }]
     const result = formatPagoLine(pagos, 50000)
-    // 0 < 100 → (0/100)*50000 = 0
     expect(result).toBe('Transferencia:$0')
   })
 
-  it('boundary: total=99 treated as percentage', () => {
+  it('small value 99 stays as MXN', () => {
     const pagos = [{ nombre: 'Tarjeta', total: 99 }]
     const result = formatPagoLine(pagos, 10000)
-    expect(result).toBe('Tarjeta:$9900')
+    expect(result).toBe('Tarjeta:$99')
   })
 
-  it('boundary: total=100 treated as absolute', () => {
+  it('value 100 stays as MXN', () => {
     const pagos = [{ nombre: 'Ubereats', total: 100 }]
     const result = formatPagoLine(pagos, 10000)
     expect(result).toBe('Ubereats:$100')

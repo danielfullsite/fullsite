@@ -979,9 +979,9 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {paymentMethods.map((p, i) => {
                 const ventasDia = latestDay?.ventas_dia || 0
-                // p.total is a PERCENTAGE (e.g. 42.0 = 42%), not MXN
-                const pct = p.total < 100 ? p.total : (ventasDia > 0 ? (p.total / ventasDia) * 100 : 0)
-                const mxnAmount = p.total < 100 ? (p.total / 100) * ventasDia : p.total
+                // p.total is an MXN amount
+                const pct = ventasDia > 0 ? (p.total / ventasDia) * 100 : 0
+                const mxnAmount = p.total
                 const barWidth = paymentMax > 0 ? ((p.total / paymentMax) * 100) : 0
                 const barColors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4']
                 return (

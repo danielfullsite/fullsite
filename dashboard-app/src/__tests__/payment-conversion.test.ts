@@ -53,10 +53,10 @@ describe('aggregatePayments', () => {
     expect(aggregatePayments(data)).toEqual([])
   })
 
-  it('converts percentage to MXN (42% of 50000 = 21000)', () => {
+  it('treats total as raw MXN amount', () => {
     const data = [makeDaily({
       ventas_dia: 50000,
-      pago_métodos: [{ nombre: 'Efectivo', total: 42.0 }],
+      pago_métodos: [{ nombre: 'Efectivo', total: 21000 }],
     })]
     const result = aggregatePayments(data)
     expect(result).toHaveLength(1)
@@ -64,32 +64,28 @@ describe('aggregatePayments', () => {
     expect(result[0].total).toBe(21000)
   })
 
-  it('converts multiple percentage methods correctly', () => {
+  it('sums multiple MXN methods correctly', () => {
     const data = [makeDaily({
       ventas_dia: 100000,
       pago_métodos: [
-        { nombre: 'Tarjeta de crédito', total: 42.0 },
-        { nombre: 'Tarjeta de débito', total: 24.9 },
-        { nombre: 'Efectivo', total: 25.1 },
-        { nombre: 'Transferencia electrónica', total: 8.0 },
+        { nombre: 'Tarjeta de crédito', total: 42000 },
+        { nombre: 'Tarjeta de débito', total: 24900 },
+        { nombre: 'Efectivo', total: 25100 },
+        { nombre: 'Transferencia electrónica', total: 8000 },
       ],
     })]
     const result = aggregatePayments(data)
-    // 42% of 100000 = 42000
     const credito = result.find(r => r.nombre === 'Tarjeta de crédito')
     expect(credito?.total).toBe(42000)
-    // 24.9% of 100000 = 24900
     const debito = result.find(r => r.nombre === 'Tarjeta de débito')
     expect(debito?.total).toBe(24900)
-    // 25.1% of 100000 = 25100
     const efectivo = result.find(r => r.nombre === 'Efectivo')
     expect(efectivo?.total).toBe(25100)
-    // 8% of 100000 = 8000
     const transferencia = result.find(r => r.nombre === 'Transferencia electrónica')
     expect(transferencia?.total).toBe(8000)
   })
 
-  it('treats values >= 100 as already MXN', () => {
+  it('treats large values as MXN', () => {
     const data = [makeDaily({
       ventas_dia: 50000,
       pago_métodos: [{ nombre: 'Efectivo', total: 25000 }],
@@ -98,41 +94,38 @@ describe('aggregatePayments', () => {
     expect(result[0].total).toBe(25000)
   })
 
-  it('value of exactly 100 is treated as MXN (not percentage)', () => {
+  it('value of exactly 100 is treated as MXN', () => {
     const data = [makeDaily({
       ventas_dia: 50000,
       pago_métodos: [{ nombre: 'Efectivo', total: 100 }],
     })]
     const result = aggregatePayments(data)
-    // 100 is NOT < 100, so it stays as MXN
     expect(result[0].total).toBe(100)
   })
 
-  it('handles 0 ventas_dia with percentages', () => {
+  it('handles 0 ventas_dia', () => {
     const data = [makeDaily({
       ventas_dia: 0,
-      pago_métodos: [{ nombre: 'Efectivo', total: 50.0 }],
+      pago_métodos: [{ nombre: 'Efectivo', total: 500 }],
     })]
     const result = aggregatePayments(data)
-    expect(result[0].total).toBe(0)
+    expect(result[0].total).toBe(500)
   })
 
   it('aggregates across multiple days', () => {
     const data = [
       makeDaily({
         ventas_dia: 50000,
-        pago_métodos: [{ nombre: 'Efectivo', total: 40.0 }],
+        pago_métodos: [{ nombre: 'Efectivo', total: 20000 }],
       }),
       makeDaily({
         fecha: '2026-05-21',
         ventas_dia: 60000,
-        pago_métodos: [{ nombre: 'Efectivo', total: 50.0 }],
+        pago_métodos: [{ nombre: 'Efectivo', total: 30000 }],
       }),
     ]
     const result = aggregatePayments(data)
-    // Day 1: 40% of 50000 = 20000
-    // Day 2: 50% of 60000 = 30000
-    // Total: 50000
+    // Day 1: 20000, Day 2: 30000, Total: 50000
     expect(result[0].total).toBe(50000)
   })
 
@@ -141,24 +134,24 @@ describe('aggregatePayments', () => {
       makeDaily({
         ventas_dia: 100000,
         pago_métodos: [
-          { nombre: 'Tarjeta de crédito', total: 60.0 },
-          { nombre: 'Efectivo', total: 40.0 },
+          { nombre: 'Tarjeta de crédito', total: 60000 },
+          { nombre: 'Efectivo', total: 40000 },
         ],
       }),
       makeDaily({
         fecha: '2026-05-21',
         ventas_dia: 80000,
         pago_métodos: [
-          { nombre: 'Tarjeta de crédito', total: 50.0 },
-          { nombre: 'Efectivo', total: 50.0 },
+          { nombre: 'Tarjeta de crédito', total: 40000 },
+          { nombre: 'Efectivo', total: 40000 },
         ],
       }),
     ]
     const result = aggregatePayments(data)
-    // Credito: 60% * 100000 + 50% * 80000 = 60000 + 40000 = 100000
+    // Credito: 60000 + 40000 = 100000
     const credito = result.find(r => r.nombre === 'Tarjeta de crédito')
     expect(credito?.total).toBe(100000)
-    // Efectivo: 40% * 100000 + 50% * 80000 = 40000 + 40000 = 80000
+    // Efectivo: 40000 + 40000 = 80000
     const efectivo = result.find(r => r.nombre === 'Efectivo')
     expect(efectivo?.total).toBe(80000)
   })
@@ -167,9 +160,9 @@ describe('aggregatePayments', () => {
     const data = [makeDaily({
       ventas_dia: 100000,
       pago_métodos: [
-        { nombre: 'Transferencia', total: 10.0 },
-        { nombre: 'Tarjeta', total: 60.0 },
-        { nombre: 'Efectivo', total: 30.0 },
+        { nombre: 'Transferencia', total: 10000 },
+        { nombre: 'Tarjeta', total: 60000 },
+        { nombre: 'Efectivo', total: 30000 },
       ],
     })]
     const result = aggregatePayments(data)
@@ -181,11 +174,11 @@ describe('aggregatePayments', () => {
   it('results are rounded to integers', () => {
     const data = [makeDaily({
       ventas_dia: 33333,
-      pago_métodos: [{ nombre: 'Efectivo', total: 33.33 }],
+      pago_métodos: [{ nombre: 'Efectivo', total: 11110.0889 }],
     })]
     const result = aggregatePayments(data)
-    // 33.33% of 33333 = 11110.0889 → rounded to 11110
-    expect(result[0].total).toBe(Math.round((33.33 / 100) * 33333))
+    // 11110.0889 → rounded to 11110
+    expect(result[0].total).toBe(11110)
   })
 
   it('skips entries without nombre', () => {
@@ -221,29 +214,28 @@ describe('aggregatePayments', () => {
   it('handles pago_métodos as JSON string', () => {
     const data = [makeDaily({
       ventas_dia: 100000,
-      pago_métodos: JSON.stringify([{ nombre: 'Efectivo', total: 50.0 }]) as any,
+      pago_métodos: JSON.stringify([{ nombre: 'Efectivo', total: 50000 }]) as any,
     })]
     const result = aggregatePayments(data)
     expect(result[0].nombre).toBe('Efectivo')
     expect(result[0].total).toBe(50000)
   })
 
-  it('handles single day with single method at 100%', () => {
+  it('handles a single day with a single method', () => {
     const data = [makeDaily({
       ventas_dia: 75000,
-      pago_métodos: [{ nombre: 'Efectivo', total: 99.9 }],
+      pago_métodos: [{ nombre: 'Efectivo', total: 74925 }],
     })]
     const result = aggregatePayments(data)
-    // 99.9% of 75000 = 74925
-    expect(result[0].total).toBe(Math.round((99.9 / 100) * 75000))
+    expect(result[0].total).toBe(74925)
   })
 
   it('handles Ubereats as a payment method', () => {
     const data = [makeDaily({
       ventas_dia: 50000,
       pago_métodos: [
-        { nombre: 'Efectivo', total: 40.0 },
-        { nombre: 'Ubereats', total: 10.0 },
+        { nombre: 'Efectivo', total: 20000 },
+        { nombre: 'Ubereats', total: 5000 },
       ],
     })]
     const result = aggregatePayments(data)
@@ -256,37 +248,36 @@ describe('aggregatePayments', () => {
       makeDaily({
         fecha: `2026-05-${20 + i}`,
         ventas_dia: 50000,
-        pago_métodos: [{ nombre: 'Efectivo', total: 50.0 }],
+        pago_métodos: [{ nombre: 'Efectivo', total: 25000 }],
       })
     )
     const result = aggregatePayments(data)
-    // 50% of 50000 = 25000 * 7 = 175000
+    // 25000 * 7 = 175000
     expect(result[0].total).toBe(175000)
   })
 
-  it('handles mixed percentage and MXN values across days', () => {
+  it('handles mixed small and large MXN values across days', () => {
     const data = [
       makeDaily({
         ventas_dia: 50000,
-        pago_métodos: [{ nombre: 'Efectivo', total: 40.0 }], // 40% = 20000
+        pago_métodos: [{ nombre: 'Efectivo', total: 20000 }],
       }),
       makeDaily({
         fecha: '2026-05-21',
         ventas_dia: 50000,
-        pago_métodos: [{ nombre: 'Efectivo', total: 500 }], // already MXN = 500
+        pago_métodos: [{ nombre: 'Efectivo', total: 500 }],
       }),
     ]
     const result = aggregatePayments(data)
     expect(result[0].total).toBe(20500)
   })
 
-  it('handles very small percentages', () => {
+  it('handles small MXN values', () => {
     const data = [makeDaily({
       ventas_dia: 100000,
-      pago_métodos: [{ nombre: 'Otro', total: 0.5 }],
+      pago_métodos: [{ nombre: 'Otro', total: 500 }],
     })]
     const result = aggregatePayments(data)
-    // 0.5% of 100000 = 500
     expect(result[0].total).toBe(500)
   })
 })
