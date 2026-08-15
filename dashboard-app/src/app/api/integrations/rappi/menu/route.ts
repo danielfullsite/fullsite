@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { rappiEnv, rappiStoreId, RappiConfigError } from '@/lib/integrations/rappi/auth'
-import { buildRappiDevTestMenu, readRappiMenu, uploadRappiMenu, type RappiMenuPayload } from '@/lib/integrations/rappi/menu'
+import { buildRappiDevTestMenu, readRappiMenu, uploadRappiMenu, type RappiMenuPayload, type RappiMenuReadMode } from '@/lib/integrations/rappi/menu'
 
 function requireAdmin(request: NextRequest): Response | null {
   const expected = process.env.INTEGRATION_ADMIN_SECRET || ''
@@ -42,6 +42,11 @@ function errorCode(error: unknown): string {
   return 'RAPPI_MENU_FAILED'
 }
 
+function readMode(value: string | null): RappiMenuReadMode {
+  if (value === 'approved' || value === 'rappi') return value
+  return 'submitted'
+}
+
 export async function GET(request: NextRequest) {
   const denied = requireAdmin(request)
   if (denied) return denied
@@ -50,9 +55,10 @@ export async function GET(request: NextRequest) {
   if (notDev) return notDev
 
   const storeId = request.nextUrl.searchParams.get('store_id')?.trim() || rappiStoreId()
+  const mode = readMode(request.nextUrl.searchParams.get('mode'))
   try {
-    const result = await readRappiMenu(storeId)
-    return NextResponse.json({ ok: result.ok, provider: 'rappi', action: 'read_menu', status_code: result.status_code, upstream: result.upstream }, {
+    const result = await readRappiMenu(storeId, mode)
+    return NextResponse.json({ ok: result.ok, provider: 'rappi', action: 'read_menu', mode, status_code: result.status_code, upstream: result.upstream }, {
       status: result.ok ? 200 : 502,
     })
   } catch (error) {

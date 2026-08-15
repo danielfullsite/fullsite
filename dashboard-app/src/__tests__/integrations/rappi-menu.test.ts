@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
-import { POST as rappiMenuPost } from '@/app/api/integrations/rappi/menu/route'
+import { GET as rappiMenuGet, POST as rappiMenuPost } from '@/app/api/integrations/rappi/menu/route'
 import { buildRappiDevTestMenu } from '@/lib/integrations/rappi/menu'
 import { clearRappiTokenCacheForTests } from '@/lib/integrations/rappi/auth'
 
@@ -11,6 +11,13 @@ function authedRequest(body: unknown = {}) {
     method: 'POST',
     headers: { Authorization: 'Bearer admin-secret' },
     body: JSON.stringify(body),
+  })
+}
+
+function authedGet(url = 'https://app.fullsite.mx/api/integrations/rappi/menu?store_id=900173586') {
+  return new NextRequest(url, {
+    method: 'GET',
+    headers: { Authorization: 'Bearer admin-secret' },
   })
 }
 
@@ -157,6 +164,34 @@ describe('Rappi DEV menu upload route', () => {
     expect(calledUrls).toContain('https://microservices.dev.rappi.com/api/v2/restaurants-integrations-public-api/menu')
     expect(JSON.stringify(payload)).not.toContain('TOKEN-123')
     expect(JSON.stringify(payload)).not.toContain('test-client-secret')
+  })
+
+  it('reads the approved menu validation endpoint without leaking tokens', async () => {
+    const fetchSpy = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.endsWith('/restaurants/auth/v1/token/login/integrations')) {
+        return Response.json({ access_token: 'TOKEN-123', expires_in: 86400 })
+      }
+      if (url.endsWith('/api/v2/restaurants-integrations-public-api/menu/approved/900173586')) {
+        expect(new Headers(init?.headers).get('x-authorization')).toBe('Bearer TOKEN-123')
+        return Response.json({ status: 'APPROVED', items: [{ sku: 'fullsite-dev-latte' }] })
+      }
+      return Response.json({ error: 'unexpected url' }, { status: 500 })
+    })
+    vi.stubGlobal('fetch', fetchSpy)
+
+    const res = await rappiMenuGet(authedGet('https://app.fullsite.mx/api/integrations/rappi/menu?store_id=900173586&mode=approved'))
+    const payload = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(payload).toMatchObject({
+      ok: true,
+      provider: 'rappi',
+      action: 'read_menu',
+      mode: 'approved',
+      status_code: 200,
+      upstream: { status: 'APPROVED', item_count: 1 },
+    })
+    expect(JSON.stringify(payload)).not.toContain('TOKEN-123')
   })
 
   it('returns only sanitized upstream errors', async () => {

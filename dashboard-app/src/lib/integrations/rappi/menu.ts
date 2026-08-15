@@ -31,6 +31,8 @@ export type RappiMenuUploadResult = {
   upstream: Record<string, unknown> | string | null
 }
 
+export type RappiMenuReadMode = 'submitted' | 'approved' | 'rappi'
+
 const MENU_PATH = '/api/v2/restaurants-integrations-public-api/menu'
 
 function asObject(value: unknown): Record<string, unknown> | null {
@@ -42,9 +44,11 @@ function asObject(value: unknown): Record<string, unknown> | null {
 function summarizeUpstreamPayload(payload: unknown): Record<string, unknown> | string | null {
   if (!payload) return null
   if (typeof payload === 'string') return payload.slice(0, 300)
+  if (Array.isArray(payload)) return { item_count: payload.length }
 
   const obj = asObject(payload)
   if (!obj) return null
+  const items = Array.isArray(obj.items) ? obj.items : null
 
   return {
     status: typeof obj.status === 'string' || typeof obj.status === 'number' ? obj.status : undefined,
@@ -52,6 +56,7 @@ function summarizeUpstreamPayload(payload: unknown): Record<string, unknown> | s
     message: typeof obj.message === 'string' ? obj.message.slice(0, 300) : undefined,
     error: typeof obj.error === 'string' ? obj.error.slice(0, 300) : undefined,
     code_message: typeof obj.code_message === 'string' ? obj.code_message.slice(0, 300) : undefined,
+    item_count: items ? items.length : undefined,
   }
 }
 
@@ -142,11 +147,18 @@ export async function uploadRappiMenu(payload: RappiMenuPayload): Promise<RappiM
   }
 }
 
-export async function readRappiMenu(storeId = rappiStoreId()): Promise<RappiMenuUploadResult> {
+function menuReadPath(storeId: string, mode: RappiMenuReadMode): string {
+  const encodedStoreId = encodeURIComponent(storeId)
+  if (mode === 'approved') return `${MENU_PATH}/approved/${encodedStoreId}`
+  if (mode === 'rappi') return `${MENU_PATH}/rappi/${encodedStoreId}`
+  return `${MENU_PATH}?storeId=${encodedStoreId}`
+}
+
+export async function readRappiMenu(storeId = rappiStoreId(), mode: RappiMenuReadMode = 'submitted'): Promise<RappiMenuUploadResult> {
   if (!storeId) throw new Error('RAPPI_STORE_ID_REQUIRED')
 
   const headers = new Headers(await buildRappiAuthHeaders())
-  const res = await fetch(`${rappiLegacyBaseUrl()}${MENU_PATH}?storeId=${encodeURIComponent(storeId)}`, {
+  const res = await fetch(`${rappiLegacyBaseUrl()}${menuReadPath(storeId, mode)}`, {
     method: 'GET',
     headers,
     cache: 'no-store',
