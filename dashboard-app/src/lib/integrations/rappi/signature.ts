@@ -1,27 +1,35 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 
 // Verificación HMAC-SHA256 del webhook de Rappi.
-// Contrato confirmado en el Integrations Manager (pestaña HMAC):
+// Contrato (Integrations Manager → pestaña HMAC):
 //   Header:  Rappi-Signature: t=<timestamp>,sign=<hex>
-//   Regla:   la firma se calcula sobre el body EXACTAMENTE como se recibe
-//            (raw bytes, sin reformatear). Por eso el caller debe pasar request.text()
-//            crudo, nunca un JSON re-serializado.
+//   Regla:   firma sobre el body EXACTAMENTE como se recibe (raw bytes, sin
+//            reformatear). El caller pasa request.text() crudo.
 //
-// El string firmado exacto (¿"<t>.<body>" o "<body>"?) y qué secret usa Rappi
-// (webhook secret dedicado vs client_secret) no vienen documentados palabra por
-// palabra, así que probamos los candidatos plausibles y devolvemos cuál casó.
-// Con eso el primer evento de prueba fija el contrato de forma determinística;
-// después se puede bloquear a la combinación ganadora.
+// Seguridad (cert RAPPI-003):
+//   - Único secret: RAPPI_WEBHOOK_SECRET (dedicado, lo entrega Rappi al registrar
+//     el webhook). NO se usa el client_secret de OAuth como llave de firma.
+//   - Chequeo de frescura del timestamp (anti-replay): fuera de la ventana → rechaza.
+//   - En prod la firma se valida con UN solo formato (determinístico). En DEV se
+//     permiten formatos candidatos SOLO para fijar el contrato con el primer evento
+//     real; una vez confirmado, se bloquea a la combinación ganadora.
 
 export interface RappiSigResult {
   ok: boolean
-  matchedSecret?: string
   matchedFormat?: string
   reason?: string
 }
 
+export interface VerifyOpts {
+  nowMs?: number
+  toleranceMs?: number
+  /** DEV: probar formatos candidatos para fijar el contrato. Prod: solo 't.body'. */
+  allowFormatDiscovery?: boolean
+}
+
+const DEFAULT_TOLERANCE_MS = 5 * 60 * 1000
+
 function parseHeader(header: string): { t: string; sign: string } | null {
-  // t=<timestamp>,sign=<hex>  (tolerante a espacios y a alias del campo de firma)
   let t = ''
   let sign = ''
   for (const part of header.split(',')) {
@@ -48,39 +56,41 @@ function hexEq(a: string, b: string): boolean {
   return timingSafeEqual(ab, bb)
 }
 
-export function rappiSecretCandidates(): Array<{ name: string; value: string }> {
-  const out: Array<{ name: string; value: string }> = []
-  const push = (name: string, value: string | undefined) => {
-    if (value && !out.some(s => s.value === value)) out.push({ name, value })
-  }
-  push('RAPPI_WEBHOOK_SECRET', process.env.RAPPI_WEBHOOK_SECRET)
-  push('RAPPI_CLIENT_SECRET', process.env.RAPPI_CLIENT_SECRET)
-  return out
+// Timestamp en ms (13 díg) o s (10 díg). Devuelve ms, o null si no parsea.
+function tsToMs(t: string): number | null {
+  if (!/^\d{9,14}$/.test(t)) return null
+  const n = Number(t)
+  if (!Number.isFinite(n)) return null
+  return n < 1e12 ? n * 1000 : n
 }
 
-export function verifyRappiSignature(rawBody: string, header: string | null): RappiSigResult {
-  // Misconfig del servidor tiene prioridad (fail-closed 503) sobre input del cliente.
-  const secrets = rappiSecretCandidates()
-  if (secrets.length === 0) return { ok: false, reason: 'NO_SECRET_CONFIGURED' }
+export function verifyRappiSignature(rawBody: string, header: string | null, opts: VerifyOpts = {}): RappiSigResult {
+  const secret = process.env.RAPPI_WEBHOOK_SECRET
+  if (!secret) return { ok: false, reason: 'NO_SECRET_CONFIGURED' }
 
   if (!header) return { ok: false, reason: 'MISSING_SIGNATURE' }
   const parsed = parseHeader(header)
   if (!parsed) return { ok: false, reason: 'BAD_SIGNATURE_HEADER' }
   const { t, sign } = parsed
 
-  const formats: Array<{ name: string; msg: string }> = [
-    { name: 't.body', msg: `${t}.${rawBody}` },
-    { name: 'body', msg: rawBody },
-    { name: 't+body', msg: `${t}${rawBody}` },
-  ]
+  // Anti-replay: el timestamp debe estar dentro de la ventana de tolerancia.
+  const nowMs = opts.nowMs ?? Date.now()
+  const toleranceMs = opts.toleranceMs ?? DEFAULT_TOLERANCE_MS
+  const tMs = tsToMs(t)
+  if (tMs === null) return { ok: false, reason: 'BAD_TIMESTAMP' }
+  if (Math.abs(nowMs - tMs) > toleranceMs) return { ok: false, reason: 'STALE_TIMESTAMP' }
 
-  for (const s of secrets) {
-    for (const f of formats) {
-      const computed = createHmac('sha256', s.value).update(f.msg, 'utf8').digest('hex')
-      if (hexEq(computed, sign)) {
-        return { ok: true, matchedSecret: s.name, matchedFormat: f.name }
-      }
-    }
+  const formats: Array<{ name: string; msg: string }> = opts.allowFormatDiscovery
+    ? [
+        { name: 't.body', msg: `${t}.${rawBody}` },
+        { name: 'body', msg: rawBody },
+        { name: 't+body', msg: `${t}${rawBody}` },
+      ]
+    : [{ name: 't.body', msg: `${t}.${rawBody}` }]
+
+  for (const f of formats) {
+    const computed = createHmac('sha256', secret).update(f.msg, 'utf8').digest('hex')
+    if (hexEq(computed, sign)) return { ok: true, matchedFormat: f.name }
   }
   return { ok: false, reason: 'SIGNATURE_MISMATCH' }
 }

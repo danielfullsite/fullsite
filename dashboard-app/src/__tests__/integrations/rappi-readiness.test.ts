@@ -26,12 +26,11 @@ describe('Rappi readiness endpoints', () => {
     await expect(getRes.json()).resolves.toMatchObject({ status: 'OK', provider: 'rappi' })
   })
 
-  it('webhook fails closed (503) when no signing secret is configured', async () => {
+  it('webhook fails closed (503) when the webhook secret is not configured', async () => {
     delete process.env.RAPPI_WEBHOOK_SECRET
-    delete process.env.RAPPI_CLIENT_SECRET
     const req = new NextRequest('https://app.fullsite.mx/api/integrations/rappi/webhook', {
       method: 'POST',
-      headers: { 'Rappi-Signature': 't=1,sign=deadbeef' },
+      headers: { 'Rappi-Signature': `t=${Date.now()},sign=deadbeef` },
       body: JSON.stringify({ id: 'rappi-order-1' }),
     })
     const res = await rappiWebhookPost(req)
@@ -41,10 +40,9 @@ describe('Rappi readiness endpoints', () => {
 
   it('webhook rejects an invalid signature (401) and does not ingest', async () => {
     process.env.RAPPI_WEBHOOK_SECRET = 'test-rappi-secret'
-    delete process.env.RAPPI_CLIENT_SECRET
     const req = new NextRequest('https://app.fullsite.mx/api/integrations/rappi/webhook', {
       method: 'POST',
-      headers: { 'Rappi-Signature': 't=1,sign=deadbeef' },
+      headers: { 'Rappi-Signature': `t=${Date.now()},sign=deadbeef` },
       body: JSON.stringify({ id: 'rappi-order-1' }),
     })
     const res = await rappiWebhookPost(req)
@@ -52,12 +50,27 @@ describe('Rappi readiness endpoints', () => {
     await expect(res.json()).resolves.toMatchObject({ ok: false, error: 'SIGNATURE_MISMATCH' })
   })
 
-  it('webhook accepts a correctly signed payload (HMAC over raw body)', async () => {
+  it('webhook rejects a replayed (stale timestamp) event (RAPPI-003)', async () => {
     const { createHmac } = await import('node:crypto')
     process.env.RAPPI_WEBHOOK_SECRET = 'test-rappi-secret'
-    delete process.env.RAPPI_CLIENT_SECRET
     const body = JSON.stringify({ event: 'PING' })
-    const t = '1700000000'
+    const t = String(Date.now() - 60 * 60 * 1000) // 1h atrás → fuera de ventana
+    const sign = createHmac('sha256', 'test-rappi-secret').update(`${t}.${body}`, 'utf8').digest('hex')
+    const req = new NextRequest('https://app.fullsite.mx/api/integrations/rappi/webhook', {
+      method: 'POST',
+      headers: { 'Rappi-Signature': `t=${t},sign=${sign}` },
+      body,
+    })
+    const res = await rappiWebhookPost(req)
+    expect(res.status).toBe(401)
+    await expect(res.json()).resolves.toMatchObject({ ok: false, error: 'STALE_TIMESTAMP' })
+  })
+
+  it('webhook accepts a correctly signed fresh payload (HMAC over raw body)', async () => {
+    const { createHmac } = await import('node:crypto')
+    process.env.RAPPI_WEBHOOK_SECRET = 'test-rappi-secret'
+    const body = JSON.stringify({ event: 'PING' })
+    const t = String(Date.now())
     const sign = createHmac('sha256', 'test-rappi-secret').update(`${t}.${body}`, 'utf8').digest('hex')
     const req = new NextRequest('https://app.fullsite.mx/api/integrations/rappi/webhook', {
       method: 'POST',
