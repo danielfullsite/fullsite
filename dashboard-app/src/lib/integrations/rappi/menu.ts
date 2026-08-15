@@ -1,30 +1,28 @@
 import { buildRappiAuthHeaders, rappiLegacyBaseUrl, rappiStoreId } from '@/lib/integrations/rappi/auth'
 
-export type RappiMenuPrice = {
-  price: number
+export type RappiMenuCategory = {
+  id: string
+  name: string
+  minQty: number
+  maxQty: number
+  sortingPosition: number
 }
 
-export type RappiMenuProduct = {
-  sku: string
+export type RappiMenuItem = {
+  category: RappiMenuCategory
+  children: RappiMenuItem[]
   name: string
   description: string
   price: number
-  active: boolean
-  type: 'PRODUCT'
-}
-
-export type RappiMenuCategory = {
   sku: string
-  name: string
-  active: boolean
-  products: RappiMenuProduct[]
+  sortingPosition: number
+  type: 'PRODUCT'
+  combo?: boolean
 }
 
 export type RappiMenuPayload = {
   storeId: string
-  menu: {
-    categories: RappiMenuCategory[]
-  }
+  items: RappiMenuItem[]
 }
 
 export type RappiMenuUploadResult = {
@@ -72,48 +70,56 @@ export function buildRappiDevTestMenu(storeId = rappiStoreId()): RappiMenuPayloa
 
   return {
     storeId,
-    menu: {
-      categories: [
-        {
-          sku: 'fullsite-dev-bebidas',
+    items: [
+      {
+        category: {
+          id: 'fullsite-dev-cat-bebidas',
           name: 'Bebidas',
-          active: true,
-          products: [
-            {
-              sku: 'fullsite-dev-cafe-americano',
-              name: 'Café americano',
-              description: 'Café americano de prueba Fullsite DEV.',
-              price: 4500,
-              active: true,
-              type: 'PRODUCT',
-            },
-            {
-              sku: 'fullsite-dev-latte',
-              name: 'Latte',
-              description: 'Latte de prueba Fullsite DEV.',
-              price: 5500,
-              active: true,
-              type: 'PRODUCT',
-            },
-          ],
+          minQty: 0,
+          maxQty: 0,
+          sortingPosition: 0,
         },
-        {
-          sku: 'fullsite-dev-alimentos',
+        children: [],
+        name: 'Café americano',
+        description: 'Café americano de prueba Fullsite DEV.',
+        price: 4500,
+        sku: 'fullsite-dev-cafe-americano',
+        sortingPosition: 0,
+        type: 'PRODUCT',
+      },
+      {
+        category: {
+          id: 'fullsite-dev-cat-bebidas',
+          name: 'Bebidas',
+          minQty: 0,
+          maxQty: 0,
+          sortingPosition: 0,
+        },
+        children: [],
+        name: 'Latte',
+        description: 'Latte de prueba Fullsite DEV.',
+        price: 5500,
+        sku: 'fullsite-dev-latte',
+        sortingPosition: 1,
+        type: 'PRODUCT',
+      },
+      {
+        category: {
+          id: 'fullsite-dev-cat-alimentos',
           name: 'Alimentos',
-          active: true,
-          products: [
-            {
-              sku: 'fullsite-dev-pan-dulce',
-              name: 'Pan dulce',
-              description: 'Pan dulce de prueba Fullsite DEV.',
-              price: 3900,
-              active: true,
-              type: 'PRODUCT',
-            },
-          ],
+          minQty: 0,
+          maxQty: 0,
+          sortingPosition: 1,
         },
-      ],
-    },
+        children: [],
+        name: 'Pan dulce',
+        description: 'Pan dulce de prueba Fullsite DEV.',
+        price: 3900,
+        sku: 'fullsite-dev-pan-dulce',
+        sortingPosition: 0,
+        type: 'PRODUCT',
+      },
+    ],
   }
 }
 
@@ -153,4 +159,3 @@ export async function readRappiMenu(storeId = rappiStoreId()): Promise<RappiMenu
     upstream: summarizeUpstreamPayload(parsed),
   }
 }
-

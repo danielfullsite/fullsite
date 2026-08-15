@@ -37,13 +37,16 @@ describe('Rappi DEV menu upload route', () => {
     const menu = buildRappiDevTestMenu('store-123')
 
     expect(menu.storeId).toBe('store-123')
-    expect(menu.menu.categories).toHaveLength(2)
-    expect(menu.menu.categories.reduce((count, category) => count + category.products.length, 0)).toBe(3)
-    expect(menu.menu.categories[0]?.products[0]).toMatchObject({
+    expect(menu.items).toHaveLength(3)
+    expect(new Set(menu.items.map(item => item.category.id)).size).toBe(2)
+    expect(menu.items[0]).toMatchObject({
       sku: 'fullsite-dev-cafe-americano',
       price: 4500,
       type: 'PRODUCT',
-      active: true,
+      category: {
+        id: 'fullsite-dev-cat-bebidas',
+        name: 'Bebidas',
+      },
     })
   })
 
@@ -118,9 +121,18 @@ describe('Rappi DEV menu upload route', () => {
         const body = JSON.parse(String(init?.body))
         expect(body).toMatchObject({
           storeId: '900173586',
-          menu: {
-            categories: expect.any(Array),
+          items: expect.any(Array),
+        })
+        expect(body.items).toHaveLength(3)
+        expect(body.items[0]).toMatchObject({
+          category: {
+            id: 'fullsite-dev-cat-bebidas',
+            name: 'Bebidas',
           },
+          name: 'Café americano',
+          price: 4500,
+          sku: 'fullsite-dev-cafe-americano',
+          type: 'PRODUCT',
         })
         expect(new Headers(init?.headers).get('x-authorization')).toBe('Bearer TOKEN-123')
         return Response.json({ message: 'ok' })
@@ -175,4 +187,3 @@ describe('Rappi DEV menu upload route', () => {
     expect(JSON.stringify(payload)).not.toContain('TOKEN-123')
   })
 })
-

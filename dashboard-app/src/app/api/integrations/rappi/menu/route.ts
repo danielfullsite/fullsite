@@ -20,9 +20,20 @@ function hasMenuPayload(value: unknown): value is RappiMenuPayload {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false
   const obj = value as Record<string, unknown>
   if (typeof obj.storeId !== 'string' || !obj.storeId.trim()) return false
-  if (!obj.menu || typeof obj.menu !== 'object' || Array.isArray(obj.menu)) return false
-  const menu = obj.menu as Record<string, unknown>
-  return Array.isArray(menu.categories)
+  return Array.isArray(obj.items)
+}
+
+function menuSummary(payload: RappiMenuPayload) {
+  const categoryIds = new Set<string>()
+  for (const item of payload.items) {
+    const categoryId = item.category?.id || item.category?.name
+    if (categoryId) categoryIds.add(categoryId)
+  }
+  return {
+    store_id_configured: Boolean(payload.storeId),
+    category_count: categoryIds.size,
+    product_count: payload.items.length,
+  }
 }
 
 function errorCode(error: unknown): string {
@@ -70,13 +81,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, provider: 'rappi', action: 'upload_menu', error: errorCode(error) }, { status: 502 })
   }
 
-  const categoryCount = payload.menu.categories.length
-  const productCount = payload.menu.categories.reduce((sum, category) => sum + category.products.length, 0)
-  const summary = {
-    store_id_configured: Boolean(payload.storeId),
-    category_count: categoryCount,
-    product_count: productCount,
-  }
+  const summary = menuSummary(payload)
 
   if (body.dry_run === true) {
     return NextResponse.json({ ok: true, provider: 'rappi', action: 'upload_menu', dry_run: true, summary })
@@ -99,4 +104,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, provider: 'rappi', action: 'upload_menu', error: errorCode(error), summary }, { status: 502 })
   }
 }
-
