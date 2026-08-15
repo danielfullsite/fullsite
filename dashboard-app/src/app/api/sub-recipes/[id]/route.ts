@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { getClientId } from '@/lib/api-auth'
+import { withPOSAuth } from '@/lib/api-auth'
 
 const SB_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -38,7 +38,9 @@ async function fetchSubRecipe(id: string, clientId: string) {
 
 export async function GET(request: NextRequest, ctx: RouteCtx) {
   const { id } = await ctx.params
-  const clientId = getClientId(request)
+  const auth = await withPOSAuth(request)
+  if (!auth) return err(401, 'UNAUTHORIZED', 'No autorizado')
+  const clientId = auth.clientId
 
   const subRecipe = await fetchSubRecipe(id, clientId)
   if (!subRecipe) {
@@ -87,7 +89,9 @@ export async function GET(request: NextRequest, ctx: RouteCtx) {
 
 export async function PATCH(request: NextRequest, ctx: RouteCtx) {
   const { id } = await ctx.params
-  const clientId = getClientId(request)
+  const auth = await withPOSAuth(request)
+  if (!auth) return err(401, 'UNAUTHORIZED', 'No autorizado')
+  const clientId = auth.clientId
 
   const existing = await fetchSubRecipe(id, clientId)
   if (!existing) {
@@ -156,7 +160,9 @@ export async function PATCH(request: NextRequest, ctx: RouteCtx) {
 
 export async function DELETE(request: NextRequest, ctx: RouteCtx) {
   const { id } = await ctx.params
-  const clientId = getClientId(request)
+  const auth = await withPOSAuth(request)
+  if (!auth) return err(401, 'UNAUTHORIZED', 'No autorizado')
+  const clientId = auth.clientId
 
   const existing = await fetchSubRecipe(id, clientId)
   if (!existing) {

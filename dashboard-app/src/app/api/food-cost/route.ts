@@ -3,18 +3,18 @@
 // anon SELECT (los costos son sensibles y no deben viajar con la anon key),
 // por eso este route las lee con la service key y la página consume esto.
 
-import { requireAuth, getClientId } from '@/lib/api-auth'
+import { withPOSAuth } from '@/lib/api-auth'
 import { NextRequest } from 'next/server'
 
 export async function GET(request: NextRequest) {
-  const authErr = await requireAuth(request)
-  if (authErr) return authErr
+  const auth = await withPOSAuth(request)
+  if (!auth) return Response.json({ error: 'No autorizado' }, { status: 401 })
   try {
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
     const sbKey = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     const headers = { apikey: sbKey, Authorization: `Bearer ${sbKey}` }
     const opts = { headers, cache: 'no-store' as const }
-    const clientId = getClientId(request)
+    const clientId = auth.clientId
 
     const [recipesRes, menuRes, posRecipesRes, menuConfigRes, costeoRes, modsRes, invRes] = await Promise.all([
       fetch(`${sbUrl}/rest/v1/wansoft_recipes?client_id=eq.${clientId}&select=saucer_id,saucer_name,budget_cost,ingredients`, opts),

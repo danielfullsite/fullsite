@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { getClientId } from '@/lib/api-auth'
+import { withPOSAuth } from '@/lib/api-auth'
 
 const SB_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -18,7 +18,9 @@ type RouteCtx = { params: Promise<{ id: string }> }
 
 export async function POST(request: NextRequest, ctx: RouteCtx) {
   const { id: presentationId } = await ctx.params
-  const clientId = getClientId(request)
+  const auth = await withPOSAuth(request)
+  if (!auth) return err(401, 'UNAUTHORIZED', 'No autorizado')
+  const clientId = auth.clientId
 
   // 1. Verify presentation exists and belongs to client
   const presRes = await fetch(
