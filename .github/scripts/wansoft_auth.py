@@ -93,28 +93,41 @@ def _build_session(cookies: dict) -> requests.Session:
     return s
 
 
-def _validate(session: requests.Session) -> bool:
+def _validate(session: requests.Session, attempts: int = 3) -> bool:
     """Check if session is still authenticated against Wansoft.
 
-    Uses the GetConsolidatedSales API endpoint (returns JSON when
-    authenticated, HTML login page when not). More reliable than
-    checking for text in the Dashboard HTML page.
-    """
-    try:
-        from datetime import datetime as _dt
+    Uses GetConsolidatedSales (JSON when authenticated, HTML login page when not).
 
-        r = session.post(
-            f"{WANSOFT_URL}/Reports/GetConsolidatedSales",
-            data={
-                "subsidiaryId": "6043",
-                "startDate": _dt.now().strftime("%m/%d/%Y"),
-                "endDate": _dt.now().strftime("%m/%d/%Y"),
-            },
-            timeout=15,
-        )
-        return r.status_code == 200 and r.text.strip().startswith("{")
-    except Exception:
-        return False
+    Reintenta en fallas TRANSITORIAS (timeout / 5xx / red) para que un hipo
+    momentáneo del servidor de Wansoft NO declare expirada una cookie válida
+    (esa cascada era la causa del ~50% de "Wansoft login failed" intermitente:
+    validación single-shot → False → fallback al login legacy roto por CAPTCHA).
+
+    Una respuesta 200 que NO es JSON = página de login = cookie REALMENTE
+    expirada → falla rápido, sin reintentar.
+    """
+    from datetime import datetime as _dt
+    import time as _time
+
+    today = _dt.now().strftime("%m/%d/%Y")
+    for i in range(attempts):
+        try:
+            r = session.post(
+                f"{WANSOFT_URL}/Reports/GetConsolidatedSales",
+                data={"subsidiaryId": "6043", "startDate": today, "endDate": today},
+                timeout=20,
+            )
+            if r.status_code == 200 and r.text.strip().startswith("{"):
+                return True
+            if r.status_code == 200:
+                # 200 pero no-JSON → login page → cookie expirada de verdad, no reintentar
+                return False
+            # non-200 (5xx/429) → transitorio → reintentar
+        except Exception:
+            pass  # timeout/red → transitorio → reintentar
+        if i < attempts - 1:
+            _time.sleep(2 * (i + 1))  # backoff 2s, 4s
+    return False
 
 
 def _send_alert(client_id: str, message: str):
