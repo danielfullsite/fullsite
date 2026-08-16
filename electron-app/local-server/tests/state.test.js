@@ -138,3 +138,49 @@ describe('Snapshot', () => {
     assert.equal(back.mesas['3'].status, 'ocupada')
   })
 })
+
+describe('Clobber / STATE_SYNC merge (GAP-002)', () => {
+  test('una orden local FRESCA sobrevive un poll vacío (no clobber)', () => {
+    const state = new RestaurantState()
+    // orden creada localmente → mesa 5 ocupada
+    state.apply(makeEvent(EVENT.ORDER_UPSERTED, { order_id: 'local-1', mesa: '5', items: [{ n: 'taco' }] }, 1))
+    assert.equal(state.getMesa('5').status, 'ocupada')
+    // el poll corre ANTES de que Supabase tenga la orden → mesas vacío
+    state.apply(makeEvent(EVENT.STATE_SYNC, { mesas: [], kds_queue: [], synced_at: new Date().toISOString() }, 2))
+    // antes del fix: la mesa quedaba 'libre' (la orden desaparecía). Ahora sobrevive.
+    assert.equal(state.getMesa('5').status, 'ocupada', 'la orden local fresca NO debe borrarse')
+    assert.equal(state.getMesa('5').order_id, 'local-1')
+  })
+
+  test('el poll SÍ actualiza mesas que no tienen orden local fresca', () => {
+    const state = new RestaurantState()
+    // el poll trae una orden de otra terminal
+    state.apply(makeEvent(EVENT.STATE_SYNC, {
+      mesas: [{ mesa: '7', status: 'ocupada', order_id: 'remote-9' }],
+      kds_queue: [], synced_at: new Date().toISOString(),
+    }, 1))
+    assert.equal(state.getMesa('7').status, 'ocupada')
+    assert.equal(state.getMesa('7').order_id, 'remote-9')
+  })
+
+  test('orden local VIEJA ausente del poll SÍ se reconcilia (Supabase manda tras la gracia)', () => {
+    const state = new RestaurantState()
+    state.apply(makeEvent(EVENT.ORDER_UPSERTED, { order_id: 'stale-1', mesa: '9', items: [] }, 1))
+    // envejecemos la orden más allá de la ventana de gracia
+    const o = state._orders.get('stale-1')
+    o.updated_at = new Date(Date.now() - (RestaurantState.SYNC_GRACE_MS + 5000)).toISOString()
+    // el poll ya no la ve (fue cerrada en otra terminal) → debe liberarse
+    state.apply(makeEvent(EVENT.STATE_SYNC, { mesas: [], kds_queue: [], synced_at: new Date().toISOString() }, 2))
+    assert.equal(state.getMesa('9').status, 'libre', 'orden vieja ausente del poll se reconcilia')
+  })
+
+  test('la orden protegida sigue en el KDS tras el poll', () => {
+    const state = new RestaurantState()
+    state.apply(makeEvent(EVENT.ORDER_SENT, { order_id: 'k-1', mesa: '2', items: [{ n: 'sopa' }] }, 1))
+    const kdsBefore = state.getKdsQueue().some(k => k.order_id === 'k-1')
+    state.apply(makeEvent(EVENT.STATE_SYNC, { mesas: [], kds_queue: [], synced_at: new Date().toISOString() }, 2))
+    const kdsAfter = state.getKdsQueue().some(k => k.order_id === 'k-1')
+    assert.ok(kdsBefore, 'ORDER_SENT debe encolar en KDS')
+    assert.ok(kdsAfter, 'la orden fresca debe seguir en el KDS tras el poll')
+  })
+})
