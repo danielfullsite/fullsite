@@ -125,6 +125,7 @@ import {
   ClipboardCheck,
   Power,
   Utensils,
+  Coffee, EggFried, Sandwich, Salad, CupSoda, Citrus, Croissant, CakeSlice, IceCream, Leaf, Pizza, Fish, Cookie,
 } from 'lucide-react'
 import {
   getMPConfig,
@@ -143,6 +144,28 @@ import { getActiveClientSlug as _cid } from '@/lib/data'
 import { usePOSLock } from './pos-lock-context'
 
 const BarcodeScanner = dynamic(() => import('@/components/BarcodeScanner'), { ssr: false })
+
+// Icono heurístico por nombre de categoría (esqueleton: aplica a cualquier restaurante,
+// sin configurar — mapea palabras clave del nombre a un icono Lucide).
+function catIconFor(name: string, size = 20) {
+  const n = (name || '').toLowerCase()
+  const has = (...keys: string[]) => keys.some((k) => n.includes(k))
+  if (has('coffee', 'café', 'cafe', 'espresso', 'latte', 'capuch', 'mocha', 'americano', 'frappe')) return <Coffee size={size} />
+  if (has('tisana', 'matcha', 'chai', ' tea', 'té ', 'infus')) return <Leaf size={size} />
+  if (has('egg', 'huevo', 'keto', 'omelet')) return <EggFried size={size} />
+  if (has('toast', 'bagel', 'panini', 'sandwich', 'sándwich', 'torta', 'baguette', 'burger', 'hamburg')) return <Sandwich size={size} />
+  if (has('bowl', 'ensalada', 'salad', 'healthy', 'veget')) return <Salad size={size} />
+  if (has('croissant', 'panader', 'bakery', 'waffle', 'pancake', 'hotcake', 'crepa')) return <Croissant size={size} />
+  if (has('jugo', 'juice', 'citrus', 'naranja', 'limon', 'limón')) return <Citrus size={size} />
+  if (has('smoothie', 'shake', 'malteada', 'soda', 'refresco', 'fresh', 'drink', 'bebida', 'agua')) return <CupSoda size={size} />
+  if (has('helado', 'ice cream', 'nieve', 'gelato')) return <IceCream size={size} />
+  if (has('postre', 'dessert', 'pastel', 'cake', 'cheesecake', 'brownie', 'dulce')) return <CakeSlice size={size} />
+  if (has('pizza', 'pasta', 'lasagna', 'spaghetti', 'nonna')) return <Pizza size={size} />
+  if (has('ceviche', 'pescado', 'fish', 'marisco', 'sushi')) return <Fish size={size} />
+  if (has('snack', 'munchies', 'chips', 'botana', 'candy', 'semilla')) return <Cookie size={size} />
+  if (has('vino', 'wine')) return <Wine size={size} />
+  return <Utensils size={size} />
+}
 const POSCopilot = dynamic(() => import('@/components/POSCopilot'), { ssr: false })
 const OfflineIndicator = dynamic(() => import('@/components/pos/OfflineIndicator'), { ssr: false })
 const InventoryAlerts = dynamic(() => import('@/components/pos/InventoryAlerts'), { ssr: false })
@@ -4529,6 +4552,7 @@ function POSContent() {
                           onClick={() => setSelectedCategory(cat.id)}
                           className={`px-3 py-3 rounded-xl text-sm font-bold text-center transition-all min-h-[72px] leading-tight flex flex-col items-center justify-center gap-0.5 ${catColor} opacity-85 text-[var(--text-1)] hover:opacity-100 active:scale-95`}
                         >
+                          <span className="opacity-90">{catIconFor(cat.name, 22)}</span>
                           <span>{cat.name}</span>
                           <span className="text-[10px] font-normal opacity-70">{itemCount}</span>
                         </button>
