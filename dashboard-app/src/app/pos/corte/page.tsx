@@ -126,8 +126,25 @@ export default function CortePage() {
       const cm = corteMode === 'turno' && t
         ? await getCashMovementsByTurno(t.id)
         : await getCashMovementsByDate(selectedDate)
+      // Overlay de movimientos AÚN sin sincronizar (cola offline): el path online solo
+      // trae lo de Supabase, y con el SW sirviendo cache viejo el corte "cree" estar
+      // online -> un retiro/deposito offline en la cola no aparecia en el arqueo hasta
+      // sincronizar. Merge por id (dedup). (auditoria I-C)
+      let cmMerged: CashMovement[] = cm as CashMovement[]
+      if (corteMode === 'turno' && t) {
+        try {
+          const { getPendingQueue } = await import('@/lib/pos-offline-db')
+          const pending = await getPendingQueue()
+          const seenIds = new Set((cm as CashMovement[]).map(m => m.id))
+          const queuedCm = pending
+            .filter(p => p.table === 'pos_cash_movements')
+            .map(p => p.data as unknown as (CashMovement & { turno_id?: string }))
+            .filter(d => d && d.turno_id === t.id && d.id && !seenIds.has(d.id))
+          if (queuedCm.length) cmMerged = [...(cm as CashMovement[]), ...queuedCm]
+        } catch { /* cola no disponible → solo lo de Supabase */ }
+      }
       setOrders(o)
-      setCashMovements(cm)
+      setCashMovements(cmMerged)
       setAuditLog(a)
       setCardPct(pct)
       setTurno(t)
