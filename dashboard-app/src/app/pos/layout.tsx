@@ -706,28 +706,63 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
           </button>
         )}
 
-        <input
-          type="password"
-          inputMode="numeric"
-          maxLength={8}
-          value={pin}
-          onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
-          onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-          placeholder="PIN"
-          autoFocus={!biometricAvailable}
-          disabled={isLocked}
-          className={`w-full bg-slate-800 border rounded-xl px-6 py-4 text-white text-center text-3xl tracking-[0.5em] focus:outline-none mb-4 placeholder-slate-500 ${
-            error ? 'border-red-500' : isLocked ? 'border-red-800 opacity-50' : 'border-slate-600 focus:border-emerald-500'
-          }`}
-        />
+        {/* Puntitos del PIN (progreso) */}
+        <div className="flex items-center justify-center gap-3 mb-6" aria-hidden>
+          {Array.from({ length: Math.max(4, pin.length) }).map((_, i) => (
+            <span
+              key={i}
+              className="rounded-full transition-all"
+              style={{
+                width: 14,
+                height: 14,
+                background: i < pin.length ? '#10b981' : 'transparent',
+                border: i < pin.length ? 'none' : '2px solid rgba(148,163,184,0.35)',
+              }}
+            />
+          ))}
+        </div>
 
-        <button
-          onClick={handleSubmit}
-          disabled={pin.length < 4 || checking || isLocked}
-          className="w-full py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-[0.97] disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold text-lg transition-all min-h-[56px]"
-        >
-          {checking ? 'Verificando...' : isLocked ? 'Bloqueado (1 min)' : 'Entrar con PIN'}
-        </button>
+        {/* Teclado numérico touch-first */}
+        <div className="grid grid-cols-3 gap-3">
+          {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => (
+            <button
+              key={d}
+              onClick={() => { if (!isLocked && !checking) setPin((p) => (p + d).slice(0, 8)) }}
+              disabled={isLocked || checking}
+              className="min-h-[64px] rounded-2xl bg-slate-800/70 hover:bg-slate-700 active:scale-95 border border-slate-700 text-white text-2xl font-bold transition-all disabled:opacity-40"
+            >
+              {d}
+            </button>
+          ))}
+          {/* Borrar */}
+          <button
+            onClick={() => { if (!isLocked && !checking) setPin((p) => p.slice(0, -1)) }}
+            disabled={isLocked || checking || pin.length === 0}
+            aria-label="Borrar"
+            className="min-h-[64px] rounded-2xl bg-slate-800/40 hover:bg-slate-700 active:scale-95 border border-slate-700 text-slate-300 flex items-center justify-center transition-all disabled:opacity-30"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2ZM18 9l-6 6M12 9l6 6" /></svg>
+          </button>
+          {/* 0 */}
+          <button
+            onClick={() => { if (!isLocked && !checking) setPin((p) => (p + '0').slice(0, 8)) }}
+            disabled={isLocked || checking}
+            className="min-h-[64px] rounded-2xl bg-slate-800/70 hover:bg-slate-700 active:scale-95 border border-slate-700 text-white text-2xl font-bold transition-all disabled:opacity-40"
+          >
+            0
+          </button>
+          {/* Entrar */}
+          <button
+            onClick={handleSubmit}
+            disabled={pin.length < 4 || checking || isLocked}
+            aria-label="Entrar"
+            className="min-h-[64px] rounded-2xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 disabled:bg-slate-700 disabled:text-slate-500 text-white flex items-center justify-center transition-all"
+          >
+            {checking
+              ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              : <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>}
+          </button>
+        </div>
 
         {sessionError && (
           <p className="text-amber-400 text-sm mt-3 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
