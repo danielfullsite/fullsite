@@ -7,7 +7,7 @@ import {
   getKitchenOrders, updateOrderStatus, logAudit, saveOrder,
   updateInventoryStock, logInventoryMovement, getInventory, getRecipes,
   getRecipeDetail,
-  verifyManagerPin, RECIPE_ALIASES, formatMXN,
+  verifyManagerPin, RECIPE_ALIASES, formatMXN, getPOSAuthHeaders,
   type KitchenOrderFromDB, type RecipeDetail,
 } from '@/lib/pos-data'
 import { isBebida, POLL_INTERVAL_KITCHEN, getStationByName, type StationName } from '@/lib/pos-constants'
@@ -159,11 +159,12 @@ export default function CocinaPage() {
 
     // Also fetch delivery orders (nueva/preparando)
     try {
-      const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-      const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      // Delivery read via server endpoint (service_role + client_id resuelto en
+      // servidor). NO anon key, NO _cid() (client-side/spoofeable).
+      // Ver /api/pos/delivery-orders + docs/release/delivery-orders-rls.sql
       const delRes = await fetch(
-        `${sbUrl}/rest/v1/delivery_orders?select=*&status=in.(nueva,aceptada,preparando)&client_id=eq.${_cid()}&order=created_at.desc`,
-        { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` } }
+        `/api/pos/delivery-orders?status=nueva,aceptada,preparando`,
+        { headers: getPOSAuthHeaders(), cache: 'no-store' }
       )
       if (delRes.ok) {
         const deliveryOrders = await delRes.json()
