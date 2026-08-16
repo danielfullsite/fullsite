@@ -1542,10 +1542,12 @@ export async function getKitchenOrders(): Promise<KitchenOrderFromDB[]> {
     }
   }
 
-  // Deduplicate by mesa+mesero+items (same order sent twice)
+  // QW3: deduplicar por id. Antes la key era mesa+mesero+items -> dos ordenes
+  // distintas identicas colapsaban (se perdia un platillo del KDS) y diferencias
+  // de serializacion online/offline duplicaban cards.
   const seen = new Set<string>()
   return orders.filter(o => {
-    const key = `${o.mesa}-${o.mesero}-${o.items}`
+    const key = String(o.id)
     if (seen.has(key)) return false
     seen.add(key)
     return true

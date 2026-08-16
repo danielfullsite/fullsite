@@ -704,7 +704,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
         <input
           type="password"
           inputMode="numeric"
-          maxLength={6}
+          maxLength={8}
           value={pin}
           onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
           onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}

@@ -42,8 +42,12 @@ export default function ClienteDisplay() {
     getPosClientConfig().then(cfg => { if (cfg) setPosConfig(cfg) }).catch(() => {})
     const fetchLatest = async () => {
       try {
+        // QW1: sin filtro de mesa, con varias mesas abiertas el display del cliente
+        // mostraba la orden de OTRA cuenta. Si la pantalla se abre con ?mesa=N, filtra.
+        const mesaParam = new URLSearchParams(window.location.search).get('mesa')
+        const mesaFilter = mesaParam ? `&mesa=eq.${encodeURIComponent(mesaParam)}` : ''
         const res = await fetch(
-          `${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${getClientId()}&status=in.(enviada,preparando,lista,abierta)&order=created_at.desc&limit=1`,
+          `${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${getClientId()}&status=in.(enviada,preparando,lista,abierta)${mesaFilter}&order=created_at.desc&limit=1`,
           { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
         )
         if (res.ok) {

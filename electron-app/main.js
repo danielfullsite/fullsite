@@ -713,8 +713,7 @@ function createWindow() {
       });
     }
   });
-  try { globalShortcut.register('CommandOrControl+Shift+Q', () => { allowClose = true; app.quit(); }); } catch {}
-  try { globalShortcut.register('F12', () => { if (mainWindow) mainWindow.webContents.toggleDevTools(); }); } catch {}
+  // (shortcuts de recuperacion se registran en app.whenReady — QW11 — para cubrir kds_only)
   mainWindow.on('closed', () => { mainWindow = null; });
 }
 
@@ -723,7 +722,9 @@ function setupOfflineRetry() {
   setInterval(() => {
     if (!mainWindow) return;
     const url = mainWindow.webContents.getURL();
-    if (!url.startsWith('https://')) mainWindow.loadURL(POS_URL);
+    // QW9: offline.html (file://) gestiona sus PROPIOS reintentos; si aqui tambien
+    // recargamos POS_URL, ambos compiten -> parpadeo/ping-pong. No tocar file://.
+    if (!url.startsWith('https://') && !url.startsWith('file://')) mainWindow.loadURL(POS_URL);
   }, 10000);
 }
 
@@ -841,6 +842,12 @@ app.whenReady().then(async () => {
   // Dedicated KDS build always opens in kds_only mode regardless of saved config
   if (app.getName() === 'Fullsite KDS') appConfig.kds_only = true;
   console.log(`[main] Provisioned: restaurant_id=${appConfig.restaurant_id} terminal_id=${appConfig.terminal_id} role=${appConfig.terminal_role}`);
+
+  // QW11: shortcuts de recuperacion registrados AQUI (no dentro de createWindow, que
+  // NO corre en kds_only) -> una maquina de cocina colgada ya puede abrir DevTools/salir.
+  // F12 apunta a la ventana ENFOCADA (en kds_only mainWindow es null).
+  try { globalShortcut.register('CommandOrControl+Shift+Q', () => { allowClose = true; app.quit(); }); } catch {}
+  try { globalShortcut.register('F12', () => { const w = BrowserWindow.getFocusedWindow(); if (w) w.webContents.toggleDevTools(); }); } catch {}
 
   await startLocalServer();   // Local server starts first (provides WS hub for KDS events)
 

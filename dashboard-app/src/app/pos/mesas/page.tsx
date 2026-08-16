@@ -261,6 +261,9 @@ export default function MesasPage() {
         const syncedMesas = new Set(orders.filter(o => o.mesa).map(o => o.mesa))
         const byMesa = new globalThis.Map<number, Record<string, unknown>>()
         for (const p of pending) {
+          // QW8: saltar items con error terminal (conflicto) — sin esto una orden
+          // en conflicto terminal dejaria la mesa Ocupada para siempre.
+          if (p.error_class) continue
           const d = p.data as Record<string, unknown>
           if (p.table !== 'pos_orders' || typeof d?.mesa !== 'number') continue
           if (!ACTIVE.has(String(d.status)) || syncedMesas.has(d.mesa)) continue
@@ -477,7 +480,6 @@ export default function MesasPage() {
   const [pinInput, setPinInput] = useState('')
 
   const handleMesaClick = (mesaNum: number) => {
-    console.log('[mesa-debug] handleMesaClick received:', mesaNum)
     if (mergeMode) {
       if (!mergeSource) setMergeSource(mesaNum)
       else if (mesaNum !== mergeSource) setMergeTarget(mesaNum)
@@ -485,10 +487,8 @@ export default function MesasPage() {
     }
     // Cajero can only open occupied tables (to charge), not empty ones
     if (staffRole === 'cajero' && !ordersByMesa.has(mesaNum)) {
-      console.log('[mesa-debug] cajero blocked: mesa not occupied', mesaNum)
       return // silently ignore — cajero can't open new restaurant tables
     }
-    console.log('[mesa-debug] router.push:', `/pos?mesa=${mesaNum}`)
     router.push(`/pos?mesa=${mesaNum}`)
   }
 

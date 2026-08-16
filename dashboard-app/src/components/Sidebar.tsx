@@ -380,7 +380,9 @@ export default function Sidebar() {
           onClick={() => {
             try { signOut() } catch {}
             // Never use localStorage.clear() — it destroys print queue and offline sync data
-            const preserveKeys = ['pos_print_queue', 'fullsite_offline_queue', 'fullsite_client_id']
+            // QW12: preservar tambien el login PIN offline y el seed de turno — sin esto,
+            // logout durante un corte de internet dejaba la terminal sin poder re-entrar.
+            const preserveKeys = ['pos_print_queue', 'fullsite_offline_queue', 'fullsite_client_id', 'pos_staff_cache', 'pos_turno_cache', 'pos_cached_turno']
             const preserved = preserveKeys.map(k => [k, localStorage.getItem(k)] as const)
             localStorage.clear()
             for (const [k, v] of preserved) { if (v !== null) localStorage.setItem(k, v) }

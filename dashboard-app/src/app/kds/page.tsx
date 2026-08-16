@@ -77,7 +77,7 @@ const MODE_PILL = {
   LAN_PRIMARY:  { dot: 'bg-emerald-500', label: 'LAN' },
   RECONCILING:  { dot: 'bg-amber-400 animate-pulse', label: '...' },
   FALLBACK:     { dot: 'bg-orange-400', label: 'Supabase' },
-  OFFLINE:      { dot: 'bg-slate-500', label: '' },
+  OFFLINE:      { dot: 'bg-red-500 animate-pulse', label: 'OFFLINE' }, // QW2: antes label:'' -> el KDS no avisaba offline (el cocinero no sabia que dejaron de llegar ordenes)
 }
 
 // ── Component ────────────────────────────────────────────────────────────
