@@ -282,8 +282,8 @@ export function aggregatePayments(
     const ventasDia = day.ventas_dia || 0
     for (const m of métodos) {
       if (!m.nombre) continue
-      // m.total is a PERCENTAGE (e.g. 42.0 = 42%), convert to MXN
-      const mxn = (m.total || 0) < 100 ? ((m.total || 0) / 100) * ventasDia : (m.total || 0)
+      // m.total is an MXN amount
+      const mxn = (m.total || 0)
       map[m.nombre] = (map[m.nombre] || 0) + mxn
     }
   }

@@ -311,7 +311,7 @@ export async function POST(request: NextRequest) {
           const pagos = Array.isArray(d.pago_métodos) ? d.pago_métodos : (typeof d.pago_métodos === 'string' ? JSON.parse(d.pago_métodos) : [])
           if (pagos.length > 0) {
             const pagoStr = pagos.map((p: { nombre: string; total: number }) => {
-              const mxn = (p.total || 0) < 100 ? Math.round(((p.total || 0) / 100) * ventasDia) : Math.round(p.total || 0)
+              const mxn = Math.round(p.total || 0)
               return `${p.nombre}:$${mxn}`
             }).join(', ')
             line += ` | Pagos: ${pagoStr}`
