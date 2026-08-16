@@ -9,8 +9,11 @@ import {
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
 import { formatCurrency } from '@/lib/format'
-import { getActiveClientSlug } from '@/lib/data'
+import { getActiveClientSlug, getWansoftDataLatest } from '@/lib/data'
 import { fetchClientConfig } from '@/lib/client-config'
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 // ─── Types ───────────────────────────────────────────────────────────
 interface LoyaltyConfig {
@@ -53,23 +56,38 @@ interface ActivityLog {
 
 type Tab = 'config' | 'rewards' | 'customers' | 'activity'
 
-// ─── Storage ─────────────────────────────────────────────────────────
+// ─── Storage (persistido en wansoft_data, scoped por cliente) ────────
+// Antes vivía en localStorage: se perdía al limpiar caché y no sincronizaba
+// entre dispositivos. Ahora persiste en la DB con data_key por sección.
 const KEYS = {
   config: 'loyalty_config',
   rewards: 'loyalty_rewards',
-  customers: 'loyalty_points',
+  customers: 'loyalty_customers',
   activity: 'loyalty_activity',
 }
 
-function load<T>(key: string, fallback: T): T {
+// Escribe un blob de lealtad a wansoft_data (upsert por client_id+data_key+fecha).
+// Mismo patrón que /inventario-real/reorden. Devuelve true si guardó.
+async function saveKey<T>(dataKey: string, data: T): Promise<boolean> {
   try {
-    const raw = localStorage.getItem(key)
-    return raw ? JSON.parse(raw) : fallback
-  } catch { return fallback }
-}
-
-function save<T>(key: string, data: T) {
-  localStorage.setItem(key, JSON.stringify(data))
+    const clientId = getActiveClientSlug()
+    const today = new Date().toISOString().split('T')[0]
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/wansoft_data`, {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates,return=minimal',
+      },
+      body: JSON.stringify({ client_id: clientId, data_key: dataKey, fecha: today, data }),
+    })
+    if (!res.ok) { console.error('[lealtad] save failed:', dataKey, await res.text()) }
+    return res.ok
+  } catch (e) {
+    console.error('[lealtad] save error:', dataKey, e)
+    return false
+  }
 }
 
 function uuid(): string {
@@ -119,24 +137,31 @@ export default function LealtadPage() {
 
   const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(null), 3000) }
 
-  // Load from localStorage; derive program_name from client config on first load
+  // Load from wansoft_data (DB); derive program_name from client config si no hay config guardada.
   useEffect(() => {
-    const stored = load<LoyaltyConfig | null>(KEYS.config, null)
-    if (stored) {
-      setConfig(stored)
-    } else {
-      const clientId = getActiveClientSlug()
-      if (clientId) {
-        fetchClientConfig(clientId)
-          .then(cfg => setConfig({ ...DEFAULT_CONFIG, program_name: `${cfg.display_name} Rewards` }))
-          .catch(() => setConfig(DEFAULT_CONFIG))
+    ;(async () => {
+      const [cfg, rw, cust, act] = await Promise.all([
+        getWansoftDataLatest(KEYS.config),
+        getWansoftDataLatest(KEYS.rewards),
+        getWansoftDataLatest(KEYS.customers),
+        getWansoftDataLatest(KEYS.activity),
+      ])
+      if (cfg?.data) {
+        setConfig(cfg.data as LoyaltyConfig)
       } else {
-        setConfig(DEFAULT_CONFIG)
+        const clientId = getActiveClientSlug()
+        if (clientId) {
+          fetchClientConfig(clientId)
+            .then(c => setConfig({ ...DEFAULT_CONFIG, program_name: `${c.display_name} Rewards` }))
+            .catch(() => setConfig(DEFAULT_CONFIG))
+        } else {
+          setConfig(DEFAULT_CONFIG)
+        }
       }
-    }
-    setRewards(load(KEYS.rewards, []))
-    setCustomers(load(KEYS.customers, []))
-    setActivity(load(KEYS.activity, []))
+      if (Array.isArray(rw?.data)) setRewards(rw.data as Reward[])
+      if (Array.isArray(cust?.data)) setCustomers(cust.data as CustomerPoints[])
+      if (Array.isArray(act?.data)) setActivity(act.data as ActivityLog[])
+    })()
   }, [])
 
   // ─── KPI calculations ──────────────────────────────────────────────
@@ -151,10 +176,14 @@ export default function LealtadPage() {
     setConfigDirty(true)
   }
 
-  const saveConfig = () => {
-    save(KEYS.config, config)
-    setConfigDirty(false)
-    showToast('Configuracion guardada')
+  const saveConfig = async () => {
+    const ok = await saveKey(KEYS.config, config)
+    if (ok) {
+      setConfigDirty(false)
+      showToast('Configuracion guardada')
+    } else {
+      showToast('Error al guardar. Reintenta.')
+    }
   }
 
   // ─── Reward handlers ──────────────────────────────────────────────
@@ -174,7 +203,7 @@ export default function LealtadPage() {
       updated = rewards.map(r => r.id === editingReward.id ? editingReward : r)
     }
     setRewards(updated)
-    save(KEYS.rewards, updated)
+    void saveKey(KEYS.rewards, updated)
     setEditingReward(null)
     setIsNewReward(false)
     showToast(isNewReward ? 'Recompensa creada' : 'Recompensa actualizada')
@@ -183,7 +212,7 @@ export default function LealtadPage() {
   const deleteReward = (id: string) => {
     const updated = rewards.filter(r => r.id !== id)
     setRewards(updated)
-    save(KEYS.rewards, updated)
+    void saveKey(KEYS.rewards, updated)
     showToast('Recompensa eliminada')
   }
 
