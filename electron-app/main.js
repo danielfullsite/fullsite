@@ -8,6 +8,11 @@ const { execSync } = require('child_process');
 const POS_URL = 'https://app.fullsite.mx/pos';
 const KDS_URL = 'https://app.fullsite.mx/kds';
 
+// Modo dev/desk-lab: con FULLSITE_DEV=1 las ventanas abren en modo VENTANA (no
+// kiosco/fullscreen) para poder probar en una Mac/PC sin quedar atrapado. En
+// producción (sin el flag) sigue en kiosco, como debe ser en una terminal real.
+const DEV = process.env.FULLSITE_DEV === '1';
+
 // ─── LOCAL SERVER ─────────────────────────────────────────────────────────────
 // Fullsite Local Server (WS hub + print bridge + mDNS + heartbeat).
 // Runs inside the Electron main process — no separate Node.js process needed.
@@ -606,8 +611,8 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     title: 'Fullsite POS',
     icon: path.join(__dirname, 'icon.png'),
-    kiosk: true,
-    fullscreen: true,
+    kiosk: !DEV,
+    fullscreen: !DEV,
     frame: false,
     autoHideMenuBar: true,
     backgroundColor: '#000000',
@@ -732,8 +737,8 @@ function createKdsWindow(x, y, width, height, urlOverride) {
   kdsWindow = new BrowserWindow({
     title: 'Fullsite KDS',
     x, y, width, height,
-    kiosk: true,
-    fullscreen: true,
+    kiosk: !DEV,
+    fullscreen: !DEV,
     frame: false,
     autoHideMenuBar: true,
     backgroundColor: '#000000',
