@@ -1366,8 +1366,12 @@ function CashMovementModal({ turnoId, actor, onConfirm, onCancel }: CashMovement
         .catch(() => { /* IDB unavailable — sync_queue is the fallback */ })
       onConfirm(type, num, reason.trim(), manager)
     } catch {
-      // Offline or server error — queue for sync and confirm locally.
-      // getCachedCashMovsByTurno also reads sync_queue, so the wizard sees it.
+      // Offline or server error — queue for sync AND write-through al cache IDB.
+      // Sin el cache, tras sincronizar (markSynced + clearSyncedItems) el movimiento
+      // sale de la cola y desaparece del arqueo si se vuelve offline en el mismo turno.
+      // getCachedCashMovsByTurno dedup por id, asi que cache + cola no cuenta doble. (P0 dinero)
+      cacheCashMovement({ id, client_id: payload.client_id, turno_id: turnoId ?? '', type, amount: num, reason: reason.trim(), actor, approved_by: manager })
+        .catch(() => { /* IDB no disponible — la cola es el fallback */ })
       await queueOperation('pos_cash_movements', 'POST', payload as Record<string, unknown>, undefined, undefined, 'SUPABASE_REST')
       onConfirm(type, num, reason.trim(), manager)
     }
@@ -2648,29 +2652,43 @@ function POSContent() {
     // Mark order as cancelled via revision-aware boundary (reconciliation-relevant status)
     if (loadedOrderId) {
       const voidOpId = genOpId()
-      const voidRes = await fetch('/api/pos/save-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getPOSAuthHeaders() },
-        body: JSON.stringify({
-          order_id: loadedOrderId,
-          expected_revision: orderRevision,
-          save_operation_id: voidOpId,
-          status: 'cancelada',
-          notas: `ANULADA: ${reason} (por ${managerName})`,
-        }),
-      })
-      const voidResult = voidRes.ok ? await voidRes.json() : { ok: false }
-      if (voidResult.conflict) {
-        showToast('Orden modificada por otra terminal — recarga para ver cambios')
-        setSaving(false); operationLock.current = false
-        return
+      const voidPayload = {
+        order_id: loadedOrderId,
+        expected_revision: orderRevision,
+        save_operation_id: voidOpId,
+        status: 'cancelada',
+        notas: `ANULADA: ${reason} (por ${managerName})`,
       }
-      if (!voidResult.ok) {
-        showToast('Error al anular — la orden NO se anuló. Reintenta.')
-        setSaving(false); operationLock.current = false
-        return
+      try {
+        const voidRes = await fetch('/api/pos/save-order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...getPOSAuthHeaders() },
+          body: JSON.stringify(voidPayload),
+        })
+        const voidResult = voidRes.ok ? await voidRes.json() : { ok: false }
+        if (voidResult.conflict) {
+          showToast('Orden modificada por otra terminal — recarga para ver cambios')
+          setSaving(false); operationLock.current = false
+          return
+        }
+        if (!voidResult.ok) {
+          showToast('Error al anular — la orden NO se anuló. Reintenta.')
+          setSaving(false); operationLock.current = false
+          return
+        }
+        if (voidResult.revision != null) setOrderRevision(voidResult.revision)
+      } catch (err) {
+        // Offline: un fetch desnudo dejaba operationLock=true para siempre (terminal
+        // congelada) y perdia la anulacion. Encola el cancel para replay idempotente
+        // (save_operation_id dedup) y sigue con la limpieza local. (P0 dinero)
+        console.warn('[void] Network error — queuing cancel offline:', err)
+        try {
+          const { queueOperation } = await import('@/lib/pos-offline-db')
+          await queueOperation('pos_orders', 'POST', voidPayload, '/api/pos/save-order',
+            String(orderRevision ?? 0), 'APP_API')
+        } catch { /* si falla el encolado, la limpieza local igual procede */ }
+        showToast('Anulada offline — se sincroniza al reconectar')
       }
-      if (voidResult.revision != null) setOrderRevision(voidResult.revision)
     }
     // R0.5 RESOLVED: Reverse deductions for items that were sent to kitchen.
     // Void = entire order cancelled before payment, stock should come back.
@@ -3575,9 +3593,21 @@ function POSContent() {
                 setIsSyncing(false)
               }}
               onClear={async () => {
-                const { clearAllPending } = await import('@/lib/pos-offline-db')
-                await clearAllPending()
-                setPendingSync(0)
+                // P0 dinero: el viejo clearAllPending() hacia store.clear() = borraba
+                // TODA la cola (ordenes/pagos reales sin sincronizar). Ahora solo se
+                // limpian synced + terminales/conflictos; las pendientes accionables
+                // (ordenes/pagos por subir) NUNCA se borran, y con confirm().
+                const { getSyncQueueSummary, clearSyncedItems, clearTerminalItems } = await import('@/lib/pos-offline-db')
+                const s = await getSyncQueueSummary()
+                const keep = s.pending + s.exhausted
+                const msg = keep > 0
+                  ? `Se conservan ${keep} operacion(es) SIN sincronizar (ordenes/pagos) para subir al reconectar.\nSolo se limpiaran ${s.terminal} en conflicto terminal.\n\n¿Continuar?`
+                  : `¿Limpiar ${s.terminal} elemento(s) en conflicto de la cola? Las pendientes no se tocan.`
+                if (!window.confirm(msg)) return
+                await clearSyncedItems()
+                await clearTerminalItems()
+                const after = await getSyncQueueSummary()
+                setPendingSync(after.pending + after.terminal + after.exhausted)
               }}
             />
             {readyOrders > 0 && (

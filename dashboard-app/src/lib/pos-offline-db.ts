@@ -721,22 +721,27 @@ export async function cacheCashMovement(movement: Record<string, unknown>): Prom
 
 export async function getCachedCashMovsByTurno(turnoId: string): Promise<{ type: string; amount: number }[]> {
   const db = await openDB()
-  // Read from cash_movements store (synced ones)
-  const synced: { type: string; amount: number }[] = await new Promise((resolve) => {
+  // Read from cash_movements store (write-through cache: online success + offline)
+  const synced: { id: string; type: string; amount: number }[] = await new Promise((resolve) => {
     const tx = db.transaction('cash_movements', 'readonly')
     const req = tx.objectStore('cash_movements').index('turno_id').getAll(IDBKeyRange.only(turnoId))
-    req.onsuccess = () => resolve((req.result || []).map((m: Record<string, unknown>) => ({ type: m.type as string, amount: Number(m.amount) || 0 })))
+    req.onsuccess = () => resolve((req.result || []).map((m: Record<string, unknown>) => ({ id: String(m.id ?? ''), type: m.type as string, amount: Number(m.amount) || 0 })))
     req.onerror = () => resolve([])
   })
-  // Also check sync_queue for unsynced cash movements
+  // Also check sync_queue for unsynced cash movements, DEDUP por id: un movimiento
+  // offline ahora vive en el cache write-through Y en la cola hasta sincronizar;
+  // sin dedup se contaria doble en el arqueo. (P0 dinero)
+  const seen = new Set(synced.map(m => m.id).filter(Boolean))
   const pending = await getPendingQueue()
   const queued = pending
     .filter(item => item.table === 'pos_cash_movements' && (item.data as Record<string, unknown>).turno_id === turnoId)
     .map(item => ({
+      id: String((item.data as Record<string, unknown>).id ?? ''),
       type: (item.data as Record<string, unknown>).type as string,
       amount: Number((item.data as Record<string, unknown>).amount) || 0,
     }))
-  return [...synced, ...queued]
+    .filter(m => !m.id || !seen.has(m.id))
+  return [...synced, ...queued].map(({ type, amount }) => ({ type, amount }))
 }
 
 // ─── Print Jobs (IDB v4) — durable backup for print-queue.ts localStorage ───

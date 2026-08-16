@@ -46,6 +46,20 @@ export async function POST(request: NextRequest) {
       return Response.json({ ok: false, error: 'INVALID_REVISION' } satisfies SaveResult, { status: 400 })
     }
 
+    // R1 reconciliation server-side (P0 dinero): el invariante sum(pagos)==total+propina
+    // solo se validaba en el cliente (pos-data.ts); el replay offline de la cola y
+    // cualquier caller directo lo saltaban -> se commiteaban cierres con pagos que no
+    // cuadran = descuadre silencioso en arqueo. Se replica EXACTO (centavos) aqui porque
+    // este route corre en TODO write, incluido el replay.
+    if (body.status === 'cerrada' && Array.isArray(body.pagos) && body.pagos.length > 0) {
+      const toCents = (n: unknown) => Math.round((Number(n) || 0) * 100)
+      const pagosSum = body.pagos.reduce((s: number, p: { monto?: number }) => s + toCents(p?.monto ?? 0), 0)
+      const expected = toCents(body.total) + toCents(body.propina ?? 0)
+      if (pagosSum !== expected) {
+        return Response.json({ ok: false, error: 'PAYMENT_MISMATCH' } satisfies SaveResult, { status: 400 })
+      }
+    }
+
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
     const sbKey = process.env.SUPABASE_SERVICE_KEY
     if (!sbKey) {

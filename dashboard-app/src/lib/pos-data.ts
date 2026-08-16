@@ -1375,6 +1375,30 @@ export async function saveOrder(order: Order, saveOperationId?: string): Promise
     payload.save_operation_id = saveOperationId
   }
 
+  // Encola el save para replay idempotente (save_operation_id dedup server-side).
+  // Sobrevive catch offline -> cola -> replay con token fresco. Usado tanto por el
+  // path offline (catch) como por el 401 (sesion expirada) para NUNCA perder la orden/cobro.
+  const queueForReplay = async () => {
+    if (typeof window === 'undefined') return
+    try {
+      const { queueOperation, cacheOrder } = await import('@/lib/pos-offline-db')
+      await queueOperation('pos_orders', 'POST', payload, '/api/pos/save-order',
+        (order.orderRevision ?? 0).toString(), 'APP_API')
+      await cacheOrder({
+        id: order.id,
+        created_at: new Date().toISOString(),
+        client_id: _getClientId(),
+        ...payload,
+        items: JSON.stringify(order.items),
+      })
+    } catch {
+      const queue = JSON.parse(localStorage.getItem('fullsite_offline_queue') || '[]')
+      queue.push({ table: 'pos_orders', data: payload, endpoint: '/api/pos/save-order', transport: 'APP_API', timestamp: Date.now(), synced: false })
+      localStorage.setItem('fullsite_offline_queue', JSON.stringify(queue))
+    }
+    console.log('[offline] Order saved to queue — will sync when online')
+  }
+
   try {
     const res = await fetch('/api/pos/save-order', {
       method: 'POST',
@@ -1384,7 +1408,12 @@ export async function saveOrder(order: Order, saveOperationId?: string): Promise
 
     if (!res.ok) {
       console.warn(`[saveOrder] API error: ${res.status}`)
-      if (res.status === 401) return { ok: false, error: 'SESSION_EXPIRED' }
+      // 401 = shift token expirado. NO perder la orden/cobro: encolar para replay
+      // idempotente (save_operation_id dedup) y señalar re-login. (P0 dinero)
+      if (res.status === 401) {
+        await queueForReplay()
+        return { ok: false, error: 'SESSION_EXPIRED' }
+      }
       return { ok: false, error: 'API_ERROR' }
     }
 
@@ -1398,25 +1427,7 @@ export async function saveOrder(order: Order, saveOperationId?: string): Promise
   } catch (err) {
     // Offline — queue the revision-aware save for later replay
     console.warn('[saveOrder] Network error — queuing offline:', err)
-    if (typeof window !== 'undefined') {
-      try {
-        const { queueOperation, cacheOrder } = await import('@/lib/pos-offline-db')
-        await queueOperation('pos_orders', 'POST', payload, '/api/pos/save-order',
-          (order.orderRevision ?? 0).toString(), 'APP_API')
-        await cacheOrder({
-          id: order.id,
-          created_at: new Date().toISOString(),
-          client_id: _getClientId(),
-          ...payload,
-          items: JSON.stringify(order.items),
-        })
-      } catch {
-        const queue = JSON.parse(localStorage.getItem('fullsite_offline_queue') || '[]')
-        queue.push({ table: 'pos_orders', data: payload, endpoint: '/api/pos/save-order', transport: 'APP_API', timestamp: Date.now(), synced: false })
-        localStorage.setItem('fullsite_offline_queue', JSON.stringify(queue))
-      }
-      console.log('[offline] Order saved to queue — will sync when online')
-    }
+    await queueForReplay()
     return { ok: false, error: 'OFFLINE_QUEUED' }
   }
 }

@@ -1,7 +1,7 @@
 // Service Worker — Fullsite POS offline-first
 // Caches app shell, static assets, and API responses for true offline operation
 
-const CACHE_VERSION = 'v11'
+const CACHE_VERSION = 'v12'
 const STATIC_CACHE = `fullsite-static-${CACHE_VERSION}`
 const DYNAMIC_CACHE = `fullsite-dynamic-${CACHE_VERSION}`
 const API_CACHE = `fullsite-api-${CACHE_VERSION}`
@@ -15,6 +15,7 @@ const STATIC_ASSETS = [
   '/pos/cocina',
   '/pos/barra',
   '/pos/kds',
+  '/kds', // ruta top-level que carga la VENTANA KDS del Electron (createKdsWindow → KDS_URL=/kds). Distinta de /pos/kds. Sin esto, la maquina kds_only da pantalla negra offline (#35).
   '/pos/corte',
   '/pos/historial',
   '/pos/inventario',
@@ -65,7 +66,7 @@ self.addEventListener('install', (event) => {
       // (el HTML carga pero falta el chunk de esa ruta → React no monta). Ahora
       // recorremos TODAS las rutas del POS y cacheamos la unión de sus chunks.
       try {
-        const routesToWarm = STATIC_ASSETS.filter((u) => u === '/' || u.startsWith('/pos'))
+        const routesToWarm = STATIC_ASSETS.filter((u) => u === '/' || u.startsWith('/pos') || u === '/kds')
         const chunkUrls = new Set()
         await Promise.allSettled(
           routesToWarm.map(async (route) => {
