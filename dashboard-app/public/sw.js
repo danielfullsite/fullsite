@@ -1,7 +1,7 @@
 // Service Worker — Fullsite POS offline-first
 // Caches app shell, static assets, and API responses for true offline operation
 
-const CACHE_VERSION = 'v8'
+const CACHE_VERSION = 'v9'
 const STATIC_CACHE = `fullsite-static-${CACHE_VERSION}`
 const DYNAMIC_CACHE = `fullsite-dynamic-${CACHE_VERSION}`
 const API_CACHE = `fullsite-api-${CACHE_VERSION}`
@@ -59,29 +59,36 @@ self.addEventListener('install', (event) => {
         }))
       )
 
-      // Phase 2: pre-cache all Next.js JS/CSS chunks by fetching the /pos page HTML
-      // and extracting every /_next/static/ URL. Without this, Electron shows a black
-      // screen when offline — the HTML shell loads but React cannot mount without chunks.
+      // Phase 2: pre-cache all Next.js JS/CSS chunks. Cada ruta de Next.js hace
+      // code-split → carga chunks DISTINTOS. Antes solo se cacheaba /pos, así que
+      // entrar a /pos/kds, /pos/cocina, /pos/mesas… offline daba PANTALLA NEGRA
+      // (el HTML carga pero falta el chunk de esa ruta → React no monta). Ahora
+      // recorremos TODAS las rutas del POS y cacheamos la unión de sus chunks.
       try {
-        const posRes = await fetch('/pos', { cache: 'reload' })
-        if (posRes.ok) {
-          const html = await posRes.text()
-          const chunkUrls = []
-          const regex = /"(\/_next\/static\/[^"]+\.(js|css))"/g
-          let m
-          while ((m = regex.exec(html)) !== null) {
-            if (!chunkUrls.includes(m[1])) chunkUrls.push(m[1])
-          }
-          const results = await Promise.allSettled(
-            chunkUrls.map(url =>
-              fetch(url, { cache: 'reload' })
-                .then(r => { if (r.ok) return staticCache.put(url, r) })
-                .catch(() => {})
-            )
+        const routesToWarm = STATIC_ASSETS.filter((u) => u === '/' || u.startsWith('/pos'))
+        const chunkUrls = new Set()
+        await Promise.allSettled(
+          routesToWarm.map(async (route) => {
+            try {
+              const res = await fetch(route, { cache: 'reload' })
+              if (!res.ok) return
+              const html = await res.text()
+              const regex = /"(\/_next\/static\/[^"]+\.(js|css))"/g
+              let m
+              while ((m = regex.exec(html)) !== null) chunkUrls.add(m[1])
+            } catch { /* ruta individual falla → seguimos con las demás */ }
+          })
+        )
+        const urls = [...chunkUrls]
+        const results = await Promise.allSettled(
+          urls.map((url) =>
+            fetch(url, { cache: 'reload' })
+              .then((r) => { if (r.ok) return staticCache.put(url, r) })
+              .catch(() => {})
           )
-          const ok = results.filter(r => r.status === 'fulfilled').length
-          console.log(`[SW] Pre-cached ${ok}/${chunkUrls.length} Next.js chunks`)
-        }
+        )
+        const ok = results.filter((r) => r.status === 'fulfilled').length
+        console.log(`[SW] Pre-cached ${ok}/${urls.length} Next.js chunks across ${routesToWarm.length} routes`)
       } catch (e) {
         console.warn('[SW] Chunk pre-cache skipped (warm-cache will cover on next online load):', e.message)
       }
