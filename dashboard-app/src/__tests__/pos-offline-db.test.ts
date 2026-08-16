@@ -16,6 +16,7 @@ import {
   cachePaymentMethods, getCachedPaymentMethods,
   cacheStaff, getCachedStaff,
   cacheInventory, getCachedInventory,
+  cacheCashMovement, getCachedCashMovsByTurno,
 } from '@/lib/pos-offline-db'
 
 // DB fresca por test (aislamiento total)
@@ -110,5 +111,25 @@ describe('pos-offline-db — turno offline', () => {
     await cacheTurno({ id: 'TB', client_id: 'otro-cliente', opened_by: 's2', fondo_inicial: 0, opened_at: new Date().toISOString() })
     expect((await getCachedActiveTurno('amalay'))?.id).toBe('TA')
     expect((await getCachedActiveTurno('otro-cliente'))?.id).toBe('TB')
+  })
+})
+
+describe('pos-offline-db — movimientos de efectivo (respaldan el fix del Corte X offline)', () => {
+  it('round-trip de movimientos cacheados por turno', async () => {
+    await cacheCashMovement({ id: 'm1', turno_id: 'T1', type: 'retiro', amount: 100 })
+    await cacheCashMovement({ id: 'm2', turno_id: 'T1', type: 'deposito', amount: 50 })
+    await cacheCashMovement({ id: 'm3', turno_id: 'OTRO', type: 'retiro', amount: 999 })
+    const movs = await getCachedCashMovsByTurno('T1')
+    expect(movs.length).toBe(2)                         // no cruza turnos
+    expect(movs.reduce((s, m) => s + m.amount, 0)).toBe(150)
+  })
+
+  it('combina cacheados + los que siguen en la cola de sync (creados offline)', async () => {
+    await cacheCashMovement({ id: 'm1', turno_id: 'T1', type: 'retiro', amount: 100 })
+    // movimiento creado offline: aún en la cola de sync, no persistido
+    await queueOperation('pos_cash_movements', 'POST', { id: 'm2', turno_id: 'T1', type: 'deposito', amount: 50 })
+    const movs = await getCachedCashMovsByTurno('T1')
+    expect(movs.length).toBe(2)                         // cacheado + encolado
+    expect(movs.some((m) => m.type === 'deposito' && m.amount === 50)).toBe(true)
   })
 })

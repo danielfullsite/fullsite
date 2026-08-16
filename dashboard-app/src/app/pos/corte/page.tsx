@@ -137,12 +137,16 @@ export default function CortePage() {
       // Offline fallback — load from IndexedDB so gerente can still see corte
       setOfflineMode(true)
       try {
-        const { getCachedActiveTurno, getCachedOrdersByTurno, getCachedPaymentMethods } = await import('@/lib/pos-offline-db')
+        const { getCachedActiveTurno, getCachedOrdersByTurno, getCachedPaymentMethods, getCachedCashMovsByTurno } = await import('@/lib/pos-offline-db')
         const cachedTurno = await getCachedActiveTurno(getClientId())
         if (cachedTurno) {
           const cachedOrders = await getCachedOrdersByTurno(cachedTurno.id)
           setOrders(cachedOrders as unknown as OrderFromDB[])
           setTurno({ id: cachedTurno.id, fondo_inicial: cachedTurno.fondo_inicial, opened_by: cachedTurno.opened_by, opened_at: cachedTurno.opened_at })
+          // Movimientos de efectivo offline (fondo/retiros/depósitos) — sin esto el
+          // Corte X contaba mal el efectivo esperado en caja al estar sin internet.
+          const cachedMovs = await getCachedCashMovsByTurno(cachedTurno.id)
+          setCashMovements(cachedMovs as unknown as CashMovement[])
         }
         const cachedPMs = await getCachedPaymentMethods()
         setPaymentMethods(cachedPMs as unknown as PaymentMethodDB[])
