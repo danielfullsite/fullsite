@@ -37,7 +37,7 @@ Para avanzar necesito que nos apoyes con lo siguiente:
 
 **2. Store ID de AMALAY**
 
-El identificador del restaurante AMALAY en la plataforma Rappi México. Es el `storeId` que usamos en todos los endpoints de lifecycle de órdenes (`/stores/{storeId}/orders`, etc.).
+El identificador del restaurante AMALAY en la plataforma Rappi México. Es el `storeId` que usamos en los endpoints de lifecycle de órdenes (`/stores/{storeId}/orders/...`). El listado DEV de órdenes nuevas se consulta en `GET /orders`.
 
 ---
 
@@ -70,7 +70,7 @@ d) ¿Con qué frecuencia llega el PING?
 
 **5. Payload de ejemplo de una orden**
 
-Un JSON completo de una orden real o de prueba que devuelva `GET /stores/{storeId}/orders`. Con esto podemos mapear todos los campos sin hacer suposiciones.
+Un JSON completo de una orden real o de prueba que devuelva `GET /orders`. Con esto podemos mapear todos los campos sin hacer suposiciones.
 
 En particular necesitamos confirmar:
 
@@ -82,7 +82,7 @@ c) Tipo de dato de `order_id` (¿string UUID o entero?)
 
 **6. Semántica del polling**
 
-El endpoint `GET /stores/{storeId}/orders` — cuando lo consultamos, ¿las órdenes que devuelve "desaparecen" del response en la siguiente consulta (semántica de dequeue/cola), o siguen disponibles hasta que las confirmemos explícitamente?
+El endpoint `GET /orders` — cuando lo consultamos, ¿las órdenes que devuelve "desaparecen" del response en la siguiente consulta (semántica de dequeue/cola), o siguen disponibles hasta que las confirmemos explícitamente?
 
 Esto impacta cómo diseñamos el mecanismo de reconciliación.
 
@@ -121,7 +121,7 @@ To proceed, we need the following from your technical team:
 - Auth endpoint: `POST .../restaurants/auth/v1/token/login/integrations`
 
 **2. AMALAY store ID**
-- The `storeId` used in all order lifecycle endpoints (`/stores/{storeId}/orders`, etc.)
+- The `storeId` used in order lifecycle endpoints (`/stores/{storeId}/orders/...`). The DEV new-order listing is read from `GET /orders`.
 
 **3. Webhook documentation**
 We need to confirm the following — the dev portal mentions these but does not provide full private integration specs:
@@ -139,13 +139,13 @@ c. Expected response body (`{"status":"OK"}` or just HTTP 200?)
 d. PING frequency
 
 **5. Sample order payload**
-A full JSON response from `GET /stores/{storeId}/orders` (real or test order). We specifically need to confirm:  
+A full JSON response from `GET /orders` (real or test order). We specifically need to confirm:
 a. Whether `totals.products_subtotal`, `totals.charges`, and `totals.tips` are in **MXN pesos** or **centavos** (÷100)  
 b. Structure of `items[].subitems[]` (modifiers / customizations)  
 c. Data type of `order_id` (UUID string or integer?)
 
 **6. Polling semantics**
-Is `GET /stores/{storeId}/orders` destructive (dequeue — orders disappear from the next response after being fetched), or do orders remain available until explicitly accepted?
+Is `GET /orders` destructive (dequeue — orders disappear from the next response after being fetched), or do orders remain available until explicitly accepted?
 
 **7. Sandbox / test environment**
 Is `api.dev.rappi.com` available with test credentials and synthetic orders? If not, what is the recommended testing approach without affecting live AMALAY orders?
@@ -164,9 +164,9 @@ Fullsite
 
 Marcar cuando se reciba confirmación escrita:
 
-- [ ] `RAPPI_CLIENT_ID` recibido
-- [ ] `RAPPI_CLIENT_SECRET` recibido
-- [x] `storeId` de AMALAY confirmado — `MX1930030014` (brandId: `MX491066`) — extraído de URL partners.rappi.com 2026-08-03
+- [x] `RAPPI_CLIENT_ID` DEV recibido — 2026-08-13, no documentar valor en git
+- [x] `RAPPI_CLIENT_SECRET` DEV recibido — 2026-08-13, no documentar valor en git
+- [x] `storeId` de pruebas recibido — 2026-08-13, no documentar valor en git
 - [ ] Formato de `Rappi-Signature` documentado oficialmente — **ECR ABIERTO** (no en doc pública)
 - [x] String firmado para HMAC: pendiente, pero secreto lo da Rappi en respuesta `POST webhook` — confirmado por doc pública
 - [x] Secreto HMAC: Rappi lo devuelve en `POST /webhook` response campo `secret` — confirmado
@@ -174,6 +174,6 @@ Marcar cuando se reciba confirmación escrita:
 - [x] Payload de ejemplo de orden recibido — disponible en doc pública `GET /orders`
 - [x] Unidad monetaria: **centavos** — confirmado por muestras de payload (28900 = $289 MXN)
 - [x] Semántica del polling: `GET /orders` devuelve órdenes "nuevas" (persisten hasta ser tomadas/rechazadas) — confirmado por doc pública
-- [ ] Sandbox disponible: dev domain `microservices.dev.rappi.com` + `rests-integrations-dev.auth0.com` — credenciales dev separadas, pendiente confirmar
+- [x] Sandbox DEV disponible para Integrations Manager / POS tester — credenciales DEV recibidas 2026-08-13
 
-**Cuando todos estén marcados → abrir RAPPI-001.**
+**Estado:** RAPPI-001 abierto/implementado. ECR restantes: firma webhook y health PING exacto antes de activar webhooks push.

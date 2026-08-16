@@ -11,22 +11,13 @@ import {
   ArrowLeft, RefreshCw, Clock, ChefHat, PackageCheck,
   Truck, CheckCircle2, ShoppingBag, DollarSign, XCircle, Ban,
 } from 'lucide-react'
-import { formatMXN, logAudit, getClientId } from '@/lib/pos-data'
-import { CANCEL_REASON_LABELS, UBER_CANCEL_REASONS } from '@/lib/integrations/uber-eats/reasons'
+import { formatMXN, logAudit } from '@/lib/pos-data'
+import { CANCEL_REASON_LABELS } from '@/lib/integrations/uber-eats/reasons'
 import type { UberCancelReason } from '@/lib/integrations/uber-eats/reasons'
-
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-const SB_HEADERS = {
-  apikey: SUPABASE_KEY,
-  Authorization: `Bearer ${SUPABASE_KEY}`,
-  'Content-Type': 'application/json',
-}
 
 type PlatformFilter = 'todas' | 'ubereats' | 'rappi'
 
-const STATUS_FLOW = ['nueva', 'preparando', 'lista', 'en_ruta', 'entregada'] as const
-type OrderStatus = (typeof STATUS_FLOW)[number] | 'cancelada'
+type OrderStatus = 'nueva' | 'preparando' | 'lista' | 'en_ruta' | 'entregada' | 'cancelada'
 
 interface DeliveryItem {
   name: string
@@ -50,6 +41,12 @@ interface DeliveryOrder {
   en_route_at: string | null
   delivered_at: string | null
   closed_at: string | null
+}
+
+type DeliveryOrdersResponse = {
+  ok: boolean
+  orders?: DeliveryOrder[]
+  error?: string
 }
 
 function elapsedStr(dateStr: string): string {
@@ -84,15 +81,15 @@ const STATUS_CONFIG: Record<string, { label: string; icon: typeof Clock; color: 
 export default function DeliveryPage() {
   const [orders, setOrders] = useState<DeliveryOrder[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<PlatformFilter>('todas')
-  const [actorName, setActorName] = useState('Caja')
-
-  useEffect(() => {
+  const [actorName] = useState(() => {
     try {
       const saved = sessionStorage.getItem('pos_staff')
-      if (saved) setActorName(JSON.parse(saved).name || 'Caja')
+      if (saved) return JSON.parse(saved).name || 'Caja'
     } catch { /* */ }
-  }, [])
+    return 'Caja'
+  })
 
   const fetchingRef = useRef(false)
   const fetchOrders = useCallback(async () => {
@@ -100,25 +97,38 @@ export default function DeliveryPage() {
     fetchingRef.current = true
     try {
       const today = new Date().toISOString().slice(0, 10)
-      const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/delivery_orders?client_id=eq.${getClientId()}&platform=in.(ubereats,rappi)&created_at=gte.${today}T00:00:00&order=created_at.desc`,
-        { headers: SB_HEADERS, cache: 'no-store' }
-      )
+      const res = await fetch('/api/pos/delivery-orders', { cache: 'no-store' })
       if (res.ok) {
-        const data: DeliveryOrder[] = await res.json()
+        const payload = await res.json() as DeliveryOrdersResponse
+        const data = payload.orders ?? []
         // Filter out test/invalid orders
-        setOrders(data.filter(o => o.customer_name && !o.customer_name.startsWith('TEST') && o.total > 0))
+        setOrders(data.filter(o =>
+          o.platform && ['ubereats', 'rappi'].includes(o.platform) &&
+          o.created_at?.startsWith(today) &&
+          o.customer_name &&
+          !o.customer_name.startsWith('TEST') &&
+          Number(o.total || 0) > 0
+        ))
+        setError(null)
+      } else {
+        const payload = await res.json().catch(() => ({})) as DeliveryOrdersResponse
+        setError(payload.error || 'No se pudieron cargar las órdenes de delivery')
       }
-    } catch { /* sin red */ } finally {
+    } catch {
+      setError('Sin red o servidor no disponible')
+    } finally {
       fetchingRef.current = false
       setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    fetchOrders()
+    const initial = window.setTimeout(() => { void fetchOrders() }, 0)
     const interval = setInterval(fetchOrders, 10000)
-    return () => clearInterval(interval)
+    return () => {
+      window.clearTimeout(initial)
+      clearInterval(interval)
+    }
   }, [fetchOrders])
 
   const filteredOrders = useMemo(() => {
@@ -152,22 +162,24 @@ export default function DeliveryPage() {
   }, [orders])
 
   const patchOrder = async (id: string, body: Record<string, unknown>) => {
-    await fetch(`${SUPABASE_URL}/rest/v1/delivery_orders?id=eq.${id}`, {
-      method: 'PATCH', headers: SB_HEADERS, body: JSON.stringify(body),
+    const res = await fetch('/api/pos/delivery-orders', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, ...body }),
     })
+    if (!res.ok) {
+      const payload = await res.json().catch(() => ({})) as DeliveryOrdersResponse
+      setError(payload.error || 'No se pudo actualizar la orden')
+      return false
+    }
+    setError(null)
     fetchOrders()
+    return true
   }
 
   const handleStatusChange = async (order: DeliveryOrder, newStatus: 'preparando' | 'lista') => {
-    await patchOrder(order.id, { status: newStatus, updated_at: new Date().toISOString() })
-    // When marking lista → notify Uber that order is ready for pickup
-    if (newStatus === 'lista' && order.platform === 'ubereats' && order.platform_order_id) {
-      fetch('/api/integrations/uber-eats/order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ order_id: order.platform_order_id, action: 'ready' }),
-      }).catch(e => console.warn('[delivery] mark-ready failed:', e))
-    }
+    const ok = await patchOrder(order.id, { status: newStatus })
+    if (!ok) return
     logAudit({
       action: 'delivery_status_changed',
       actor: actorName,
@@ -176,14 +188,8 @@ export default function DeliveryPage() {
   }
 
   const handleCancel = async (order: DeliveryOrder, reason: UberCancelReason) => {
-    await patchOrder(order.id, { status: 'cancelada', updated_at: new Date().toISOString() })
-    if (order.platform === 'ubereats' && order.platform_order_id) {
-      fetch('/api/integrations/uber-eats/order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ order_id: order.platform_order_id, action: 'cancel', reason }),
-      }).catch(e => console.warn('[delivery] cancel failed:', e))
-    }
+    const ok = await patchOrder(order.id, { status: 'cancelada', reason })
+    if (!ok) return
     logAudit({ action: 'order_cancelled', actor: actorName, details: { delivery_id: order.id, platform: order.platform, reason, cliente: order.customer_name } })
   }
 
@@ -231,6 +237,13 @@ export default function DeliveryPage() {
             platformDot="bg-orange-500"
           />
         </div>
+
+        {/* Platform tabs */}
+        {error && (
+          <div className="rounded-xl border border-red-500/30 bg-red-950/40 px-4 py-3 text-sm font-semibold text-red-200">
+            {error}
+          </div>
+        )}
 
         {/* Platform tabs */}
         <div className="flex gap-2">
