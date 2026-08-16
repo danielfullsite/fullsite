@@ -18,7 +18,16 @@ WANSOFT = os.path.join(BASE, "agents", "wansoft")
 OUT = os.path.join(BASE, "scripts", "sql")
 os.makedirs(OUT, exist_ok=True)
 
-CLIENT_ID = "amalay"
+# client_id del tenant destino. OBLIGATORIO — nunca cae en 'amalay' por default
+# (migrar cliente #2 sin esto contaminaría los datos de AMALAY). Pásalo por env:
+#   CLIENT_ID=nuevo-cliente python3 scripts/migrate-wansoft-to-supabase.py
+CLIENT_ID = os.environ.get("CLIENT_ID", "").strip()
+if not re.match(r"^[a-z0-9][a-z0-9_-]{1,63}$", CLIENT_ID):
+    raise SystemExit(
+        "ERROR: define CLIENT_ID (slug del tenant destino) como variable de entorno.\n"
+        "  Ej: CLIENT_ID=nuevo-cliente python3 scripts/migrate-wansoft-to-supabase.py\n"
+        f"  Recibido: {CLIENT_ID!r}"
+    )
 
 
 def esc(s):
@@ -110,7 +119,7 @@ def migrate_proveedores():
         "-- Crear tabla si no existe",
         "CREATE TABLE IF NOT EXISTS pos_suppliers (",
         "  id BIGSERIAL PRIMARY KEY,",
-        "  client_id TEXT DEFAULT 'amalay',",
+        "  client_id TEXT NOT NULL,",
         "  name TEXT NOT NULL,",
         "  rfc TEXT,",
         "  phone TEXT,",
@@ -168,7 +177,7 @@ def migrate_recetas():
         "-- Crear tabla si no existe",
         "CREATE TABLE IF NOT EXISTS pos_recipes_old (",
         "  id BIGSERIAL PRIMARY KEY,",
-        "  client_id TEXT DEFAULT 'amalay',",
+        "  client_id TEXT NOT NULL,",
         "  menu_item_id TEXT NOT NULL,",
         "  menu_item_name TEXT,",
         "  ingredient_id TEXT NOT NULL,",
