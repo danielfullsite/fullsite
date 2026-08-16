@@ -5535,27 +5535,43 @@ function POSContent() {
                 return (
                   <div className="bg-[var(--surface-2)] border border-emerald-700/40 rounded-xl p-4 space-y-3">
                     <p className="text-[var(--accent-ink)] text-lg font-bold text-center">Total a cobrar: {formatMXN(totalConPropina)}</p>
-                    <div className="flex gap-3">
-                      {[100, 200, 500, 1000].map(bill => (
-                        <button key={bill} onClick={() => setCashAmount(String(bill))}
-                          className={`flex-1 min-h-[60px] rounded-xl text-lg font-bold transition-colors ${cashAmount === String(bill) ? 'bg-emerald-600 text-white' : 'bg-[var(--line)] text-[var(--text-3)]'}`}
-                        >${bill}</button>
-                      ))}
-                    </div>
+                    {/* Montos rápidos: Exacto + denominaciones redondeadas arriba del total (un tap, sin teclear) */}
+                    {(() => {
+                      const roundUp = (n: number, step: number) => Math.ceil(n / step) * step
+                      const quicks = Array.from(new Set<number>([
+                        Math.ceil(totalConPropina * 100) / 100,
+                        roundUp(totalConPropina, 50),
+                        roundUp(totalConPropina, 100),
+                        roundUp(totalConPropina, 500),
+                      ])).filter(v => v >= totalConPropina).slice(0, 4)
+                      return (
+                        <div className="grid grid-cols-2 gap-3">
+                          {quicks.map((v, i) => (
+                            <button key={v} onClick={() => setCashAmount(String(v))}
+                              className={`min-h-[60px] rounded-xl text-lg font-bold transition-colors ${cashAmount === String(v) ? 'bg-emerald-600 text-white' : 'bg-[var(--line)] text-[var(--text-2)]'}`}
+                            >{i === 0 ? 'Exacto' : `$${Math.round(v).toLocaleString('es-MX')}`}</button>
+                          ))}
+                        </div>
+                      )
+                    })()}
                     <input
                       type="number" inputMode="decimal" value={cashAmount}
                       onChange={e => setCashAmount(e.target.value)}
-                      placeholder="Monto recibido" autoFocus
-                      className="w-full bg-[var(--bg)] border-2 border-[var(--line)] rounded-xl px-4 py-4 text-[var(--text-1)] text-3xl text-center font-black focus:outline-none focus:border-[var(--accent)]"
+                      placeholder="Otro monto" autoFocus
+                      className="w-full bg-[var(--bg)] border-2 border-[var(--line)] rounded-xl px-4 py-3 text-[var(--text-1)] text-2xl text-center font-black focus:outline-none focus:border-[var(--accent)]"
                     />
                     {cashReceived > 0 && (
-                      <div className={`text-center py-3 rounded-xl ${cambio >= 0 ? 'bg-[var(--accent-soft)] border border-emerald-700/40' : 'bg-[var(--crit-soft)] border border-red-700/40'}`}>
-                        {cambio >= 0 ? (
-                          <p className="text-3xl font-black text-[var(--accent-ink)]">Cambio: {formatMXN(cambio)}</p>
-                        ) : (
+                      cambio >= 0 ? (
+                        <div className="text-center py-4 rounded-xl bg-[var(--info-soft)] border" style={{ borderColor: 'color-mix(in srgb, var(--info) 35%, transparent)' }}>
+                          <p className="text-[10px] font-mono uppercase tracking-[0.15em] text-[var(--text-3)]">Cambio a dar</p>
+                          <p className="font-black tabular-nums text-[var(--info)] tracking-tight leading-none" style={{ fontSize: 52 }}>{formatMXN(cambio)}</p>
+                          <p className="text-xs font-semibold text-[var(--accent-ink)] mt-1.5">Pagado {formatMXN(cashReceived)} · efectivo</p>
+                        </div>
+                      ) : (
+                        <div className="text-center py-3 rounded-xl bg-[var(--crit-soft)] border border-red-700/40">
                           <p className="text-xl text-[var(--crit-ink)] font-bold">Falta {formatMXN(Math.abs(cambio))}</p>
-                        )}
-                      </div>
+                        </div>
+                      )
                     )}
                     <button
                       onClick={() => { if (cashReceived >= totalConPropina) handlePayment('Efectivo') }}
