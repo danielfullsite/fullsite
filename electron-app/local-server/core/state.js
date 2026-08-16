@@ -202,20 +202,51 @@ class RestaurantState {
     return { changed: ['mesas', 'locks'] }
   }
 
-  // Phase 1: bulk sync from Supabase poll replaces the state entirely for mesas/kds/turno
+  // Phase 1: bulk sync from Supabase poll. Antes reemplazaba TODO el estado, lo que
+  // causaba el "Clobber" (GAP-002): una orden creada localmente (ORDER_SENT) que aún
+  // no llegó a Supabase se borraba de mesas/KDS al correr el poll → desaparecía de la
+  // pantalla por <1s. Fix: proteger las órdenes locales ACTIVAS y FRESCAS (dentro de
+  // una ventana de gracia) que el poll todavía no refleja; reconcilian solas cuando
+  // Supabase ya las conoce o cuando expira la gracia (Supabase sigue siendo autoridad
+  // en Phase 1, así que no divergimos permanentemente).
   _applyStateSync({ mesas, kds_queue, turno, synced_at }) {
+    const now = Date.now()
+
+    // order_ids que el poll ya conoce (ya están en Supabase)
+    const pollOrderIds = new Set()
+    if (Array.isArray(mesas))     for (const m of mesas)     if (m && m.order_id) pollOrderIds.add(m.order_id)
+    if (Array.isArray(kds_queue)) for (const k of kds_queue) if (k && k.order_id) pollOrderIds.add(k.order_id)
+
+    // Órdenes locales activas + frescas + aún no vistas por el poll → proteger del clobber
+    const isActive = (o) => o && o.status !== 'cerrada' && o.status !== 'cancelada' && o.status !== 'pagada'
+    const protectedOrders = [...this._orders.values()].filter((o) => {
+      if (!isActive(o)) return false
+      if (pollOrderIds.has(o.order_id)) return false
+      const ts = Date.parse(o.updated_at || o.created_at) || 0
+      return (now - ts) < RestaurantState.SYNC_GRACE_MS
+    })
+    const protectedMesas    = new Set(protectedOrders.map((o) => (o.mesa != null ? String(o.mesa) : null)).filter(Boolean))
+    const protectedOrderIds = new Set(protectedOrders.map((o) => o.order_id))
+
     if (mesas) {
+      const keep = new Map()
+      for (const key of protectedMesas) { const cur = this._mesas.get(key); if (cur) keep.set(key, cur) }
       this._mesas.clear()
       for (const m of mesas) {
-        this._mesas.set(String(m.mesa), {
+        const key = String(m.mesa)
+        if (protectedMesas.has(key)) continue  // no pisar mesa con orden local fresca
+        this._mesas.set(key, {
           status:    m.status || (m.order_id ? 'ocupada' : 'libre'),
           order_id:  m.order_id || null,
           locked_by: null,
         })
       }
+      for (const [key, val] of keep) this._mesas.set(key, val)  // re-aplica las protegidas
     }
     if (kds_queue) {
-      this._kds = kds_queue
+      const protectedKds = this._kds.filter((k) => protectedOrderIds.has(k.order_id))
+      const fromPoll     = kds_queue.filter((k) => !protectedOrderIds.has(k.order_id))
+      this._kds = [...fromPoll, ...protectedKds]
     }
     if (turno !== undefined) {
       this._turno = turno
@@ -264,5 +295,10 @@ class RestaurantState {
   getLock(mesa)    { return this._locks.get(String(mesa)) || null }
   hasActiveTurno() { return this._turno !== null }
 }
+
+// Ventana de gracia (ms) para proteger órdenes locales recién creadas del clobber del
+// poll (GAP-002). Debe cubrir el lag entre crear la orden local y que aparezca en
+// Supabase (el browser POS la sube por su propia sync_queue). 45s es holgado.
+RestaurantState.SYNC_GRACE_MS = 45000
 
 module.exports = { RestaurantState }
