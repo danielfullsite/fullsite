@@ -114,6 +114,7 @@ class OutboxWorker {
       id:            ev.id,
       sequence:      ev.sequence,
       type:          ev.type,
+      ts:            typeof ev.ts === 'number' ? ev.ts : 0,  // pos_local_events.ts es BIGINT NOT NULL
       terminal_id:   ev.terminal_id || null,
       restaurant_id: ev.restaurant_id || this._restaurantId,
       payload:       ev.payload != null ? ev.payload : {},

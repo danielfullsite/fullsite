@@ -29,7 +29,7 @@ function mockFetch(responder) {
 }
 
 const ev = (sequence, type, over = {}) => ({
-  id: `cmd-${sequence}`, sequence, type, restaurant_id: 'r1', payload: { x: sequence }, ...over,
+  id: `cmd-${sequence}`, sequence, type, ts: sequence * 1000, restaurant_id: 'r1', payload: { x: sequence }, ...over,
 })
 
 function makeWorker(store, fetchImpl) {
@@ -51,6 +51,9 @@ describe('OutboxWorker.flush', () => {
     assert.deepEqual(fetchImpl.calls.map((c) => c.body.sequence), [1, 2, 3])
     // idempotency key = event.id
     assert.equal(fetchImpl.calls[0].body.id, 'cmd-1')
+    // ts se envía (pos_local_events.ts es BIGINT NOT NULL)
+    assert.equal(fetchImpl.calls[0].body.ts, 1000)
+    assert.equal(typeof fetchImpl.calls[2].body.ts, 'number')
   })
 
   test('NO sube eventos STATE_SYNC (observaciones internas del poll)', async () => {
