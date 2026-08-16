@@ -54,6 +54,9 @@ import {
   ScrollText,
   TrendingDown,
   ArrowLeft,
+  BookOpen,
+  MessageSquare,
+  Mic,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
@@ -93,6 +96,7 @@ const navSections = [
       { href: '/conciliacion', label: 'Conciliación', icon: FileSpreadsheet },
       { href: '/egresos', label: 'Egresos', icon: Wallet },
       { href: '/control-efectivo', label: 'Control de Efectivo', icon: Coins },
+      { href: '/cuentas-por-cobrar', label: 'Cuentas por Cobrar', icon: HandCoins },
       { href: '/contabilidad', label: 'Contabilidad CONTPAQi', icon: Calculator },
     ],
   },
@@ -100,11 +104,13 @@ const navSections = [
     label: 'Operaciones',
     items: [
       { href: '/inventario', label: 'Inventario', icon: Package },
+      { href: '/inventario-prediccion', label: 'Predicción Inventario', icon: Activity },
       { href: '/cierre-inventario', label: 'Cierre Inventario', icon: ClipboardList },
       { href: '/caja', label: 'Caja', icon: Banknote },
       { href: '/cancelaciones', label: 'Cancelaciones', icon: Ban },
       { href: '/delivery', label: 'Delivery', icon: Bike },
       { href: '/auto86', label: 'Auto-86', icon: ShieldOff },
+      { href: '/recetas', label: 'Recetas', icon: BookOpen },
       { href: '/costeo', label: 'Costeo', icon: Sparkles },
       { href: '/food-cost', label: 'Food Cost', icon: PieChart },
       { href: '/rentabilidad', label: 'Rentabilidad', icon: TrendingDown },
@@ -171,8 +177,12 @@ const navSections = [
     items: [
       { href: '/crm', label: 'CRM', icon: Users },
       { href: '/mission-control', label: 'Agentes IA', icon: Bot },
+      { href: '/roi', label: 'ROI Agentes', icon: TrendingUp },
       { href: '/coach', label: 'Coach', icon: Sparkles },
       { href: '/chat', label: 'Chat IA', icon: MessageCircle },
+      { href: '/voice', label: 'Voice Agent', icon: Mic },
+      { href: '/encuestas', label: 'Encuestas', icon: MessageSquare },
+      { href: '/ecommerce', label: 'E-commerce', icon: Store },
     ],
   },
 ]
