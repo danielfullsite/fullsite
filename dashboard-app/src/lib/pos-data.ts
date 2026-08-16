@@ -1703,6 +1703,27 @@ async function _pinCacheKey(pin: string): Promise<string> {
   }
 }
 
+// Fallback offline de auth de gerente: si el usuario LOGUEADO es admin/gerente,
+// su propio PIN lo autoriza validando contra pos_staff_cache (mismo hash que el
+// login: SHA-256 de `${pin}:${id}`, valido 8h). Cubre "el dueño/manager opera la
+// terminal" durante un corte de internet, sin depender de una verificacion online
+// reciente (la cache de 30min quedaba vacia -> "PIN invalido" offline).
+const _ROLE_LVL: Record<string, number> = { mesero: 1, cajero: 2, capitan: 3, gerente: 4, admin: 5 }
+async function _managerFromStaffCache(pin: string, minLevel = 4): Promise<{ name: string; role: string } | null> {
+  try {
+    if (typeof localStorage === 'undefined') return null
+    const raw = localStorage.getItem('pos_staff_cache')
+    if (!raw) return null
+    const s = JSON.parse(raw)
+    if (!s || Array.isArray(s) || !s.pin_hash || !(s.exp > Date.now())) return null
+    if ((_ROLE_LVL[s.role] || 0) < minLevel) return null
+    const data = new TextEncoder().encode(`${pin}:${s.id}`)
+    const buf = await crypto.subtle.digest('SHA-256', data)
+    const h = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
+    return h === s.pin_hash ? { name: s.name as string, role: s.role as string } : null
+  } catch { return null }
+}
+
 // Validación server-side de PIN de gerente (cancelaciones, descuentos, cortes).
 // Antes venía de NEXT_PUBLIC_MANAGER_PINS (expuesto en el bundle) — ahora valida
 // contra /api/pos/pin con manager=true (pos_staff admin/gerente + env server-only).
@@ -1739,6 +1760,9 @@ export async function verifyManagerPin(pin: string): Promise<string | null> {
       return entry.name as string
     }
   } catch { /* ignore */ }
+  // Fallback offline #2: el propio PIN del admin/gerente logueado (pos_staff_cache, 8h)
+  const fromStaff = await _managerFromStaffCache(pin)
+  if (fromStaff) return fromStaff.name
   return null
 }
 
@@ -1775,6 +1799,9 @@ export async function verifyManagerPinWithRole(pin: string): Promise<{ name: str
       return { name: entry.name, role: entry.role || 'gerente' }
     }
   } catch { /* ignore */ }
+  // Fallback offline #2: el propio PIN del admin/gerente logueado (pos_staff_cache, 8h)
+  const fromStaff = await _managerFromStaffCache(pin)
+  if (fromStaff) return fromStaff
   return null
 }
 
@@ -1818,6 +1845,9 @@ export async function verifyPinWithMinRole(pin: string, minRole: string): Promis
       return { name: entry.name, role: entry.role || minRole }
     }
   } catch { /* ignore */ }
+  // Fallback offline #2: el propio PIN del usuario logueado si cumple el min_role (pos_staff_cache, 8h)
+  const fromStaff = await _managerFromStaffCache(pin, _ROLE_LVL[minRole] || 99)
+  if (fromStaff) return fromStaff
   return null
 }
 
