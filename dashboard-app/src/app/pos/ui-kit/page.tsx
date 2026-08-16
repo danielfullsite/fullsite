@@ -3,8 +3,8 @@
 // vivo del sistema de diseño. Abre /pos/ui-kit para ver los componentes reales.
 import React, { useState } from 'react'
 import {
-  Coffee, Egg, Cake, CupSoda, Droplet, Send, CreditCard, Split, Receipt,
-  Printer, Users, Clock, WifiOff, Check,
+  Coffee, UtensilsCrossed, CakeSlice, Leaf, Droplet, Send, CreditCard, Split, Receipt,
+  Printer, Users, Clock, WifiOff, Check, Ban,
 } from 'lucide-react'
 import {
   PosButton, CategoryChip, ProductTile, Stepper, StatusPill, QuickAmount, CatKey,
@@ -24,9 +24,9 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
 
 const CATS: { key: CatKey; label: string; icon: React.ReactNode }[] = [
   { key: 'cafe', label: 'Café', icon: <Coffee size={16} /> },
-  { key: 'cocina', label: 'Cocina', icon: <Egg size={16} /> },
-  { key: 'postre', label: 'Postre', icon: <Cake size={16} /> },
-  { key: 'te', label: 'Té', icon: <CupSoda size={16} /> },
+  { key: 'cocina', label: 'Cocina', icon: <UtensilsCrossed size={16} /> },
+  { key: 'postre', label: 'Postre', icon: <CakeSlice size={16} /> },
+  { key: 'te', label: 'Té', icon: <Leaf size={16} /> },
   { key: 'agua', label: 'Agua', icon: <Droplet size={16} /> },
 ]
 
@@ -50,7 +50,7 @@ export default function UiKitPreview() {
             <PosButton variant="primary" icon={<Send size={18} />}>Enviar</PosButton>
             <PosButton variant="info" icon={<CreditCard size={18} />}>Cobrar</PosButton>
             <PosButton variant="ghost" icon={<Receipt size={18} />}>Cuenta</PosButton>
-            <PosButton variant="danger" icon={<Split size={18} />}>Anular</PosButton>
+            <PosButton variant="danger" icon={<Ban size={18} />}>Anular</PosButton>
           </div>
           <div className="mt-3">
             <PosButton variant="primary" size="lg" full icon={<Send size={20} />}>Enviar orden</PosButton>
@@ -70,9 +70,9 @@ export default function UiKitPreview() {
             <ProductTile catKey="cafe" icon={<Coffee size={16} />} name="Latte" price={47} />
             <ProductTile catKey="cafe" icon={<Coffee size={16} />} name="Capuchino" price={52} />
             <ProductTile catKey="cafe" icon={<Coffee size={16} />} name="Cold Brew" price={58} />
-            <ProductTile catKey="cocina" icon={<Egg size={16} />} name="Chilaquiles" price={215} />
-            <ProductTile catKey="postre" icon={<Cake size={16} />} name="Cheesecake" price={99} />
-            <ProductTile catKey="te" icon={<CupSoda size={16} />} name="Chai" price={55} />
+            <ProductTile catKey="cocina" icon={<UtensilsCrossed size={16} />} name="Chilaquiles" price={215} />
+            <ProductTile catKey="postre" icon={<CakeSlice size={16} />} name="Cheesecake" price={99} />
+            <ProductTile catKey="te" icon={<Leaf size={16} />} name="Chai" price={55} />
           </div>
         </Section>
 
