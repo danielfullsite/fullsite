@@ -97,6 +97,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
   const [showFingerprintRegister, setShowFingerprintRegister] = useState(false)
   const [registeringFingerprint, setRegisteringFingerprint] = useState(false)
   const [logoSrc, setLogoSrc] = useState('')
+  const [clientName, setClientName] = useState('')
   const [fingerprintMsg, setFingerprintMsg] = useState('')
   const [sessionError, setSessionError] = useState('')
 
@@ -122,6 +123,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
       // Load client config for receipts, IVA, branding (cached singleton)
       import('@/lib/pos-config').then(m => m.getPosClientConfig()).then(async cfg => {
         if (cfg?.logoUrl) setLogoSrc(cfg.logoUrl)
+        if (cfg?.name) setClientName(cfg.name)
         if (cfg?.ivaRate !== undefined) {
           const { setIvaRate } = await import('@/lib/pos-constants')
           setIvaRate(cfg.ivaRate)
@@ -667,6 +669,10 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
               }
             }}
           />
+          {/* Nombre del restaurante (tenant) — el header del mockup */}
+          {clientName && (
+            <div className="font-mono text-xs tracking-[0.22em] uppercase text-emerald-400/80 mb-2">{clientName}</div>
+          )}
           {/* Marca de producto Fullsite (wordmark en CSS, crisp) */}
           <div className="mb-4 flex items-baseline justify-center" aria-label="Fullsite">
             <span className="text-white font-black tracking-[-0.04em]" style={{ fontSize: 34 }}>fullsite</span>
