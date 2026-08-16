@@ -42,7 +42,7 @@ jobs:
           echo "D3002_DELTA=$DELTA" >> $GITHUB_ENV
           echo "D3002_CORR=$CORR" >> $GITHUB_ENV
 
-      - name: D3-003 - Re-auth URL (USL with expanded scopes)
+      - name: D3-003 - Re-auth URL (escrita al resumen PRIVADO del run)
         run: |
           RESP=$(curl -s -w "\n%{http_code}" -X POST \
             "$APP_URL/api/integrations/uber-eats/sandbox" \
@@ -50,8 +50,27 @@ jobs:
             -H "Content-Type: application/json" \
             -d "{\"action\":\"reauth_url\",\"store_id\":\"$CERT_STORE_ID\"}")
           HTTP_CODE=$(echo "$RESP" | tail -1)
-          echo "D3-003 reauth_url: HTTP $HTTP_CODE (URL omitted - contains secrets)"
+          BODY=$(echo "$RESP" | head -n -1)
+          REAUTH_URL=$(echo "$BODY" | jq -r '.authorize_url // .reauth_url // .url // empty' 2>/dev/null || echo "")
+          echo "D3-003 reauth_url: HTTP $HTTP_CODE"
           echo "D3003_HTTP=$HTTP_CODE" >> $GITHUB_ENV
+          # Escribe la URL + scopes faltantes al RESUMEN del run (visible solo para
+          # miembros del repo privado), NO al log general. Así Daniel concede scopes
+          # sin Telegram: abre el run en GitHub → Summary → click en la URL.
+          {
+            echo "## 🔑 Uber — concede los scopes que faltan"
+            echo ""
+            echo "- **scopes concedidos:** \`${D3002_GRANTED:-(vacío)}\`"
+            echo "- **scopes que faltan (delta):** \`${D3002_DELTA:-(vacío)}\`"
+            echo ""
+            if [ -n "$REAUTH_URL" ]; then
+              echo "### 👉 Abre esta URL y autoriza (concede los scopes):"
+              echo ""
+              echo "<$REAUTH_URL>"
+            else
+              echo "_No se pudo extraer la URL de reauth del body (HTTP $HTTP_CODE). Revisa el paso._"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: D3-004 - Delivery Store APIs + real order attempt (day3_full)
         run: |
