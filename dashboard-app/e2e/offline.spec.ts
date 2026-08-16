@@ -21,19 +21,21 @@ import { test, expect } from '@playwright/test'
 
 test.describe.serial('POS offline — service worker + boot sin pantalla negra', () => {
   test('el POS ARRANCA offline sin pantalla negra (valida #45: precache de chunks)', async ({ page, context }) => {
-    // 1. Carga online → registra y calienta el service worker (precache de chunks)
+    // 1. Carga online → registra el SW. En la PRIMERA visita el SW se instala pero
+    //    aún no controla la página; una recarga hace que tome control. Esperamos a
+    //    navigator.serviceWorker.controller (= la página ya la sirve el SW) hasta ~15s.
     await page.goto('/pos', { waitUntil: 'networkidle' }).catch(() => {})
-    const swReady = await page.evaluate(async () => {
+    await page.evaluate(async () => { if ('serviceWorker' in navigator) { try { await navigator.serviceWorker.ready } catch {} } })
+    await page.reload({ waitUntil: 'networkidle' }).catch(() => {})
+    const swControls = await page.evaluate(async () => {
       if (!('serviceWorker' in navigator)) return false
-      try {
-        const reg = await Promise.race([
-          navigator.serviceWorker.ready.then(() => true),
-          new Promise<boolean>((r) => setTimeout(() => r(false), 5000)),
-        ])
-        return reg === true
-      } catch { return false }
+      for (let i = 0; i < 30; i++) {
+        if (navigator.serviceWorker.controller) return true
+        await new Promise((r) => setTimeout(r, 500))
+      }
+      return false
     })
-    test.skip(!swReady, 'Service worker no activo — corre contra un build de producción (npm run build && npm run start)')
+    test.skip(!swControls, 'Service worker no controla la página — corre contra un build de producción (npm run build && npm run start)')
 
     // Dale tiempo al SW de precachear los chunks de las rutas del POS (install Phase 2)
     await page.waitForTimeout(3500)
