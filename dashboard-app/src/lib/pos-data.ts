@@ -1217,14 +1217,17 @@ export async function fetchMeseros(clientId?: string): Promise<string[]> {
       const rows: { name: string }[] = await res.json()
       if (rows.length > 0) {
         MESEROS = rows.map(r => r.name)
-        try { localStorage.setItem('pos_staff_cache', JSON.stringify(MESEROS)) } catch {}
+        // NOTE: key is pos_meseros_cache (NOT pos_staff_cache) — pos_staff_cache is
+        // owned by the offline PIN auth object {id,pin_hash,exp} in pos/layout.tsx.
+        // Sharing the key clobbered the auth object → offline PIN login broke.
+        try { localStorage.setItem('pos_meseros_cache', JSON.stringify(MESEROS)) } catch {}
         return MESEROS
       }
     }
   } catch {
-    // Network error — try localStorage cache
+    // Network error — try localStorage cache (own key, see note above)
     try {
-      const cached = localStorage.getItem('pos_staff_cache')
+      const cached = localStorage.getItem('pos_meseros_cache')
       if (cached) {
         const parsed: string[] = JSON.parse(cached)
         if (parsed.length > 0) { MESEROS = parsed; return MESEROS }

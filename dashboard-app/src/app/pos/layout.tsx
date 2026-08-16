@@ -484,7 +484,9 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
         const staffJson = localStorage.getItem('pos_staff_cache')
         if (staffJson) {
           const entry = JSON.parse(staffJson)
-          if (entry && entry.exp > Date.now()) {
+          // Guard: only accept the auth-object shape. A stale array (legacy bug where
+          // fetchMeseros shared this key) must never be treated as a valid session.
+          if (entry && !Array.isArray(entry) && entry.exp > Date.now()) {
             // Verify PIN hash when present (new cache entries); old entries without hash pass through
             if (entry.pin_hash) {
               const hash = await hashPin(pin, entry.id)
