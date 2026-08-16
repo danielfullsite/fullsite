@@ -5,7 +5,7 @@
 //
 // Autenticado (session del dashboard) + service key con client_id inyectado.
 
-import { requireAuth, getClientId } from '@/lib/api-auth'
+import { withPOSAuth } from '@/lib/api-auth'
 import { NextRequest } from 'next/server'
 
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -13,9 +13,9 @@ const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPAB
 const ACTIONS = new Set(['aplicado', 'recordar', 'descartado'])
 
 export async function GET(request: NextRequest) {
-  const authErr = await requireAuth(request)
-  if (authErr) return authErr
-  const clientId = getClientId(request)
+  const auth = await withPOSAuth(request)
+  if (!auth) return Response.json({ error: 'No autorizado' }, { status: 401 })
+  const clientId = auth.clientId
   try {
     const res = await fetch(
       `${SB_URL}/rest/v1/agent_feedback?client_id=eq.${encodeURIComponent(clientId)}&select=agent_id,action,updated_at`,
@@ -29,9 +29,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const authErr = await requireAuth(request)
-  if (authErr) return authErr
-  const clientId = getClientId(request)
+  const auth = await withPOSAuth(request)
+  if (!auth) return Response.json({ error: 'No autorizado' }, { status: 401 })
+  const clientId = auth.clientId
   let body: { agent_id?: string; action?: string; insight_fecha?: string; insight_summary?: string; note?: string }
   try { body = await request.json() } catch { return Response.json({ error: 'bad json' }, { status: 400 }) }
   const { agent_id, action, insight_fecha, insight_summary, note } = body

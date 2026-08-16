@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { getClientId } from '@/lib/api-auth'
+import { withPOSAuth } from '@/lib/api-auth'
 
 const SB_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -13,7 +13,9 @@ function err(status: number, code: string, message: string, details?: unknown): 
 // List all unit conversions for the client (system + custom).
 
 export async function GET(request: NextRequest) {
-  const clientId = getClientId(request)
+  const auth = await withPOSAuth(request)
+  if (!auth) return err(401, 'UNAUTHORIZED', 'No autorizado')
+  const clientId = auth.clientId
 
   const res = await fetch(
     `${SB_URL}/rest/v1/pos_unit_conversions?client_id=eq.${clientId}&order=from_unit.asc,to_unit.asc&select=id,from_unit,to_unit,factor,is_system`,
@@ -28,7 +30,9 @@ export async function GET(request: NextRequest) {
 // Create a custom unit conversion. System conversions cannot be created via API.
 
 export async function POST(request: NextRequest) {
-  const clientId = getClientId(request)
+  const auth = await withPOSAuth(request)
+  if (!auth) return err(401, 'UNAUTHORIZED', 'No autorizado')
+  const clientId = auth.clientId
 
   let body: { from_unit?: string; to_unit?: string; factor?: number }
   try {

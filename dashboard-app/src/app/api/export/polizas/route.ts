@@ -3,7 +3,7 @@
 // Cada venta cerrada genera un asiento: Debe (Caja/Banco) / Haber (Ingreso + IVA).
 
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAuth, getClientId } from '@/lib/api-auth'
+import { withPOSAuth } from '@/lib/api-auth'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -35,12 +35,12 @@ function accountForMethod(method: string): { code: string; name: string } {
 }
 
 export async function GET(request: NextRequest) {
-  const authErr = await requireAuth(request)
-  if (authErr) return authErr
+  const auth = await withPOSAuth(request)
+  if (!auth) return Response.json({ error: 'No autorizado' }, { status: 401 })
   const { searchParams } = new URL(request.url)
   const from = searchParams.get('from') || new Date().toISOString().slice(0, 8) + '01'
   const to = searchParams.get('to') || new Date().toISOString().slice(0, 10)
-  const clientId = getClientId(request)
+  const clientId = auth.clientId
 
   try {
     const res = await fetch(

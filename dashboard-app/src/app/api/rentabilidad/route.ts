@@ -5,7 +5,7 @@
 //
 // Server-side con service key (los costos son sensibles, RLS sin anon SELECT).
 
-import { requireAuth, getClientId } from '@/lib/api-auth'
+import { withPOSAuth } from '@/lib/api-auth'
 import { NextRequest } from 'next/server'
 import {
   calculateDishCost,
@@ -32,9 +32,9 @@ async function sb(table: string, query: string, maxRows = 3000): Promise<any[]> 
 const norm = (s: string) => (s || '').trim().toUpperCase()
 
 export async function GET(request: NextRequest) {
-  const authErr = await requireAuth(request)
-  if (authErr) return authErr
-  const clientId = getClientId(request)
+  const auth = await withPOSAuth(request)
+  if (!auth) return Response.json({ error: 'No autorizado' }, { status: 401 })
+  const clientId = auth.clientId
   const days = Math.min(Math.max(Number(new URL(request.url).searchParams.get('days')) || 30, 1), 180)
 
   try {

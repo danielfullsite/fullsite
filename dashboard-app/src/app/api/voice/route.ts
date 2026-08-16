@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { getClientId } from '@/lib/api-auth'
+import { withPOSAuth } from '@/lib/api-auth'
 
 // Simple rate limiting — max 15 requests per minute per IP
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>()
@@ -24,6 +24,8 @@ function checkRateLimit(userId: string): boolean {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await withPOSAuth(request)
+  if (!auth) return Response.json({ error: 'No autorizado' }, { status: 401 })
   try {
     const ip = request.headers.get('x-forwarded-for') || 'unknown'
     if (!checkRateLimit(ip)) {
@@ -392,7 +394,7 @@ DATOS DIARIOS (ultimos ${recentDays.length} dias).\n${lines.join('\n')}`
     let activeMeserosStr = 'Omar Aguilera, Hector Rodriguez, Brayan Berlanga, Daniela Rico, Julio Cesar Hernandez, Mauricio Rodriguez, Oscar Rios, Alexis Ocampo, Aldo Ruiz, Mariana Salas, Mario Garcia'
     try {
       const staffRes = await fetch(
-        `${sbUrl}/rest/v1/pos_staff?client_id=eq.${encodeURIComponent(getClientId(request))}&active=eq.true&role=in.(mesero,cajero,barra,supervisor)&select=name&order=name.asc`,
+        `${sbUrl}/rest/v1/pos_staff?client_id=eq.${encodeURIComponent(auth.clientId)}&active=eq.true&role=in.(mesero,cajero,barra,supervisor)&select=name&order=name.asc`,
         { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
       )
       if (staffRes.ok) {
@@ -405,7 +407,7 @@ DATOS DIARIOS (ultimos ${recentDays.length} dias).\n${lines.join('\n')}`
 
     // 5. System prompt — voice-optimized, parameterized by client
     const { fetchClientConfig } = await import('@/lib/client-config')
-    const voiceClientConfig = await fetchClientConfig(getClientId(request))
+    const voiceClientConfig = await fetchClientConfig(auth.clientId)
     const voiceRestaurantName = voiceClientConfig.display_name || 'el restaurante'
     const voiceRestaurantCity = voiceClientConfig.city || ''
 

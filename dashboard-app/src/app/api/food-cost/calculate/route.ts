@@ -1,12 +1,14 @@
 import { NextRequest } from 'next/server'
-import { getClientId } from '@/lib/api-auth'
+import { withPOSAuth } from '@/lib/api-auth'
 import { loadCostEngineData, calculateDishCost, calculateSubRecipeCost } from '@/lib/cost-engine'
 
 // ─── GET /api/food-cost/calculate?item_id=X or ?sub_recipe_id=X ─────────────
 // Pure cost calculation. No side effects. No caching. No persistence.
 
 export async function GET(request: NextRequest) {
-  const clientId = getClientId(request)
+  const auth = await withPOSAuth(request)
+  if (!auth) return Response.json({ error: 'No autorizado' }, { status: 401 })
+  const clientId = auth.clientId
   const itemId = request.nextUrl.searchParams.get('item_id')
   const subRecipeId = request.nextUrl.searchParams.get('sub_recipe_id')
 

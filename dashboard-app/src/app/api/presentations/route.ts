@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { getClientId } from '@/lib/api-auth'
+import { withPOSAuth } from '@/lib/api-auth'
 
 const SB_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -12,7 +12,9 @@ function err(status: number, code: string, message: string, details?: unknown): 
 // ─── GET /api/presentations ──────────────────────────────────────────────────
 
 export async function GET(request: NextRequest) {
-  const clientId = getClientId(request)
+  const auth = await withPOSAuth(request)
+  if (!auth) return err(401, 'UNAUTHORIZED', 'No autorizado')
+  const clientId = auth.clientId
   const activeOnly = request.nextUrl.searchParams.get('active') !== 'false'
 
   const filters = `client_id=eq.${clientId}${activeOnly ? '&active=eq.true' : ''}`
@@ -28,7 +30,9 @@ export async function GET(request: NextRequest) {
 // ─── POST /api/presentations ─────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
-  const clientId = getClientId(request)
+  const auth = await withPOSAuth(request)
+  if (!auth) return err(401, 'UNAUTHORIZED', 'No autorizado')
+  const clientId = auth.clientId
 
   let body: { code?: string; name?: string }
   try {

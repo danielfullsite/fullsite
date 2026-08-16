@@ -3,7 +3,7 @@
 // and compares against current stock in pos_inventory_products
 
 import { NextRequest } from 'next/server'
-import { getClientId } from '@/lib/api-auth'
+import { withPOSAuth } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,6 +17,8 @@ interface InventoryProduct {
 interface DailyRow { fecha: string; ventas_por_grupo: VentasPorGrupo[] | null }
 
 export async function GET(request: NextRequest) {
+  const auth = await withPOSAuth(request)
+  if (!auth) return Response.json({ error: 'No autorizado' }, { status: 401 })
   try {
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
     const sbKey = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -28,7 +30,7 @@ export async function GET(request: NextRequest) {
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
     const since = thirtyDaysAgo.toISOString().split('T')[0]
 
-    const cid = encodeURIComponent(getClientId(request))
+    const cid = encodeURIComponent(auth.clientId)
     const [dailyRes, recipesRes, inventoryRes, menuRes] = await Promise.all([
       fetch(`${sbUrl}/rest/v1/wansoft_daily?fecha=gte.${since}&select=fecha,ventas_por_grupo&order=fecha.asc`, opts),
       fetch(`${sbUrl}/rest/v1/pos_recipes?client_id=eq.${cid}&select=nombre,precio_venta,ingredientes,category`, opts),
