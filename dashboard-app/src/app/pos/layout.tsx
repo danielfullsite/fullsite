@@ -667,6 +667,11 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
               }
             }}
           />
+          {/* Marca de producto Fullsite (wordmark en CSS, crisp) */}
+          <div className="mb-4 flex items-baseline justify-center" aria-label="Fullsite">
+            <span className="text-white font-black tracking-[-0.04em]" style={{ fontSize: 34 }}>fullsite</span>
+            <span className="inline-block bg-emerald-500" style={{ width: 11, height: 11, marginLeft: 3, borderRadius: 2 }} />
+          </div>
           <p className="text-slate-400 text-sm mt-2">
             {biometricAvailable ? 'Huella digital o PIN para abrir' : 'Ingresa tu PIN para abrir'}
           </p>
