@@ -36,23 +36,33 @@ export default function HistorialPage() {
 
   const fetchOrders = async () => {
     setLoading(true)
-    const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${getClientId()}&created_at=gte.${selectedDate}T00:00:00&created_at=lte.${selectedDate}T23:59:59&order=created_at.desc&limit=200`,
-      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
-    )
-    if (res.ok) {
-      const raw: OrderFromDB[] = await res.json()
-      // Deduplicate by mesa+mesero+items+created_at (same order sent twice)
-      const seen = new Set<string>()
-      const deduped = raw.filter(o => {
-        const key = `${o.mesa}-${o.mesero}-${o.items}-${o.created_at.slice(0, 16)}`
-        if (seen.has(key)) return false
-        seen.add(key)
-        return true
-      })
-      setOrders(deduped)
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${getClientId()}&created_at=gte.${selectedDate}T00:00:00&created_at=lte.${selectedDate}T23:59:59&order=created_at.desc&limit=200`,
+        { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
+      )
+      if (res.ok) {
+        const raw: OrderFromDB[] = await res.json()
+        // Deduplicate by mesa+mesero+items+created_at (same order sent twice)
+        const seen = new Set<string>()
+        const deduped = raw.filter(o => {
+          const key = `${o.mesa}-${o.mesero}-${o.items}-${o.created_at.slice(0, 16)}`
+          if (seen.has(key)) return false
+          seen.add(key)
+          return true
+        })
+        setOrders(deduped)
+      }
+    } catch {
+      // Offline — muestra las órdenes cacheadas (sin filtro de fecha) en vez de
+      // quedarse colgado en "cargando" con la red caída.
+      try {
+        const { getCachedOrders } = await import('@/lib/pos-offline-db')
+        setOrders((await getCachedOrders()) as unknown as OrderFromDB[])
+      } catch { /* IDB no disponible */ }
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   useEffect(() => { fetchOrders() }, [selectedDate])

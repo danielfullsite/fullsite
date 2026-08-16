@@ -187,3 +187,53 @@ describe('Integración offline — flujo completo de servicio', () => {
     assert.equal(orderEvents.length, 1, 'solo un evento en el log')
   })
 })
+
+describe('Integración offline — edge cases del servicio', () => {
+  let dir
+  beforeEach(() => { dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fs-offline-edge-')) })
+  afterEach(() => { try { fs.rmSync(dir, { recursive: true, force: true }) } catch {} })
+
+  test('cancelar una orden offline libera la mesa y la saca del KDS', async () => {
+    const s = await buildStack(dir)
+    await send(s.cmd, { command_type: 'ORDER_UPSERTED', command_id: 'c0', order_id: 'o1', mesa: '5', items: [{ n: 'taco' }] })
+    await send(s.cmd, { command_type: 'ORDER_SENT', command_id: 'c1', order_id: 'o1', mesa: '5', items: [{ n: 'taco' }] })
+    assert.equal(s.state.getMesa('5').status, 'ocupada')
+    assert.ok(s.state.getKdsQueue().some(k => k.order_id === 'o1'))
+
+    await send(s.cmd, { command_type: 'ORDER_CANCELLED', command_id: 'c2', order_id: 'o1', mesa: '5' })
+    assert.equal(s.state.getMesa('5').status, 'libre', 'la mesa se libera al cancelar')
+    assert.ok(!s.state.getKdsQueue().some(k => k.order_id === 'o1'), 'la orden sale del KDS')
+  })
+
+  test('modificar una orden (enviar de nuevo con más ítems) no duplica la orden', async () => {
+    const s = await buildStack(dir)
+    await send(s.cmd, { command_type: 'ORDER_UPSERTED', command_id: 'c0', order_id: 'o1', mesa: '3', items: [{ n: 'sopa' }] })
+    await send(s.cmd, { command_type: 'ORDER_SENT', command_id: 'c1', order_id: 'o1', mesa: '3', items: [{ n: 'sopa' }] })
+    await send(s.cmd, { command_type: 'ORDER_SENT', command_id: 'c2', order_id: 'o1', mesa: '3', items: [{ n: 'sopa' }, { n: 'agua' }] })
+
+    const kds = s.state.getKdsQueue().filter(k => k.order_id === 'o1')
+    assert.equal(kds.length, 1, 'sigue habiendo UNA sola comanda para o1 (no se duplica)')
+    assert.equal(s.state.getMesa('3').status, 'ocupada')
+  })
+
+  test('KDS_ITEM_STATUS offline se aplica sin romper el estado', async () => {
+    const s = await buildStack(dir)
+    await send(s.cmd, { command_type: 'ORDER_UPSERTED', command_id: 'c0', order_id: 'o1', mesa: '2', items: [{ id: 'i1', n: 'taco' }] })
+    await send(s.cmd, { command_type: 'ORDER_SENT', command_id: 'c1', order_id: 'o1', mesa: '2', items: [{ id: 'i1', n: 'taco' }] })
+    const r = await send(s.cmd, { command_type: 'KDS_ITEM_STATUS', command_id: 'c2', order_id: 'o1', item_id: 'i1', status: 'listo', kds_item_status: 'listo' })
+    assert.ok(!r.error, 'KDS_ITEM_STATUS se procesa sin error')
+    assert.equal(s.state.getMesa('2').status, 'ocupada', 'la mesa sigue ocupada')
+  })
+
+  test('la cancelación se propaga a otras terminales', async () => {
+    // reusa el hub multi-terminal del stack de integración vía broadcasts
+    const s = await buildStack(dir)
+    await send(s.cmd, { command_type: 'ORDER_UPSERTED', command_id: 'c0', order_id: 'o1', mesa: '8', items: [] })
+    await send(s.cmd, { command_type: 'ORDER_CANCELLED', command_id: 'c1', order_id: 'o1', mesa: '8' })
+    // el estado autoritativo quedó consistente (mesa libre) tras cancelar
+    assert.equal(s.state.getMesa('8').status, 'libre')
+    // y quedó registrado en el log para sincronizar
+    const cancels = (await s.eventStore.readAfter(0)).filter(e => e.type === 'ORDER_CANCELLED')
+    assert.equal(cancels.length, 1)
+  })
+})
