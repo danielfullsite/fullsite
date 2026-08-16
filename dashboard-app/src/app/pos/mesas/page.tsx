@@ -248,13 +248,45 @@ export default function MesasPage() {
           { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
         ),
       ])
-      const orders = ordersRes.ok ? await ordersRes.json() : []
-      setActiveOrders(orders)
+      const orders: ActiveOrder[] = ordersRes.ok ? await ordersRes.json() : []
+      // Overlay unsynced offline orders still in the sync queue. On reconnect the
+      // poll comes DOWN (Supabase doesn't have the offline order yet — it's queued
+      // going UP), which would flip an occupied mesa back to Disponible and risk a
+      // double-booking. Keep those mesas occupied until the order actually syncs. (#37)
+      let merged: ActiveOrder[] = orders
+      try {
+        const { getPendingQueue } = await import('@/lib/pos-offline-db')
+        const pending = await getPendingQueue()
+        const ACTIVE = new Set(['enviada', 'preparando', 'lista', 'abierta', 'entregada'])
+        const syncedMesas = new Set(orders.filter(o => o.mesa).map(o => o.mesa))
+        const byMesa = new globalThis.Map<number, Record<string, unknown>>()
+        for (const p of pending) {
+          const d = p.data as Record<string, unknown>
+          if (p.table !== 'pos_orders' || typeof d?.mesa !== 'number') continue
+          if (!ACTIVE.has(String(d.status)) || syncedMesas.has(d.mesa)) continue
+          byMesa.set(d.mesa, d) // last pending op per mesa wins
+        }
+        if (byMesa.size > 0) {
+          const extra: ActiveOrder[] = Array.from(byMesa.values()).map(d => ({
+            id: String(d.order_id ?? d.id ?? `pending-${String(d.mesa)}`),
+            mesa: d.mesa as number,
+            customer_name: (d.customer_name as string | null) ?? null,
+            order_number: null,
+            mesero: (d.mesero as string) ?? '',
+            personas: (d.personas as number) ?? 0,
+            total: (d.total as number) ?? 0,
+            status: String(d.status),
+            created_at: (d.created_at as string) ?? new Date().toISOString(),
+          }))
+          merged = [...orders, ...extra]
+        }
+      } catch { /* queue unavailable — show synced orders only */ }
+      setActiveOrders(merged)
       try { localStorage.setItem('pos_mesas_orders', JSON.stringify({ orders, ts: Date.now() })) } catch {}
       // Persist to IndexedDB so offline access survives beyond the 30s localStorage TTL
       if (orders.length > 0) {
         import('@/lib/pos-offline-db').then(({ cacheOrder }) =>
-          Promise.all((orders as Record<string, unknown>[]).map(o => cacheOrder(o)))
+          Promise.all((orders as unknown as Record<string, unknown>[]).map(o => cacheOrder(o)))
         ).catch(() => {})
       }
       setReservas(resRes.ok ? await resRes.json() : [])
