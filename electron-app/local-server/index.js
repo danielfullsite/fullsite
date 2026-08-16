@@ -29,6 +29,7 @@ const { CoreEventStore }    = require('./core/event-store')
 const { RestaurantState }   = require('./core/state')
 const { WsHub }             = require('./core/ws-hub')
 const { CommandHandler }    = require('./core/command-handler')
+const { OutboxWorker }      = require('./core/outbox')
 const mdns      = require('./discovery/mdns')
 const heartbeat = require('./telemetry/heartbeat')
 const updater   = require('./update/manager')
@@ -453,9 +454,21 @@ async function startLocalServer({ dataDir, port = 7717, config = {} }) {
       .catch(e => console.warn('[server] Supabase poll start error:', e.message))
   }
 
+  // ── Outbox Worker (Phase 2 — SHADOW MODE, OFF por default) ─────────────────
+  // Con OFFLINE_OUTBOX_SHADOW=1 sube los eventos locales a pos_local_events en
+  // paralelo (el browser sigue siendo autoridad) → valida el pipeline del modelo
+  // Pedro sin riesgo. Prerequisito: schema pos_local_events aplicado en Supabase.
+  let _outbox = null
+  if (supabaseUrl && supabaseKey && process.env.OFFLINE_OUTBOX_SHADOW === '1') {
+    _outbox = new OutboxWorker({ eventStore, supabaseUrl, supabaseKey, restaurantId })
+    _outbox.start()
+    console.log('[server] Outbox Worker: SHADOW MODE activo')
+  }
+
   // ── Shutdown ──────────────────────────────────────────────────────────────
   function close() {
     if (_supabasePolling) clearInterval(_supabasePolling)
+    if (_outbox) _outbox.stop()
     mdns.stop()
     heartbeat.stop()
     updater.stop()
