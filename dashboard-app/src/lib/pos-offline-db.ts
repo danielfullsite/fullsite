@@ -507,8 +507,20 @@ async function _syncAllInner(): Promise<{ synced: number; failed: number }> {
   // FAIL CLOSED: no drenar, preservar la cola, pedir re-login. Nunca replay con
   // anon (RLS lo rechazaría) ni pérdida de datos.
   const accessToken = queue.length > 0 ? await getFreshAccessToken() : null
-  if (queue.length > 0 && !accessToken) {
-    console.warn('[offline-sync] sesión no renovable — replay pospuesto (fail closed), cola preservada')
+  // Los terminales POS entran con PIN → shift token (NO crean sesión de Supabase
+  // Auth). El replay APP_API va a /api/pos/save-order, cuyo withPOSAuth valida el
+  // shift token igual que en el guardado online (verifyShiftToken primero). Sin
+  // este fallback, un terminal con PIN nunca sube sus órdenes offline (getSession
+  // = null → fail closed) — regresión de BUG-019. El shift token es credencial
+  // válida server-side, así que replay con él es tan seguro como el save online.
+  // Fail-closed solo si NO hay NINGÚN token (nunca replay anónimo).
+  let shiftToken: string | null = null
+  if (typeof window !== 'undefined') {
+    try { shiftToken = localStorage.getItem('pos_shift_token') } catch {}
+  }
+  const appApiToken = accessToken || shiftToken
+  if (queue.length > 0 && !appApiToken) {
+    console.warn('[offline-sync] sin sesión ni shift token — replay pospuesto (fail closed), cola preservada')
     emitAuthRequired()
     return { synced: 0, failed: queue.length }
   }
@@ -529,7 +541,7 @@ async function _syncAllInner(): Promise<{ synced: number; failed: number }> {
         if (synced > 0 || failed > 0) {
           await new Promise<void>(r => setTimeout(r, 400))
         }
-        const result = await replayViaAppApi(item, accessToken!)
+        const result = await replayViaAppApi(item, appApiToken!)
 
         if (result.ok) {
           await markSynced(item.id)
@@ -570,6 +582,14 @@ async function _syncAllInner(): Promise<{ synced: number; failed: number }> {
         }
       } else {
         // ── SUPABASE_REST replay: direct PostgREST for non-reconciliation data ──
+        // Requiere el JWT de Supabase (RLS tenant-scoped); el shift token NO sirve
+        // contra PostgREST. Si solo hay shift token, diferir este item (no romper
+        // el sync de órdenes, que sí va por APP_API): se reintenta cuando haya JWT.
+        if (!accessToken) {
+          await incrementRetry(item.id)
+          failed++
+          continue
+        }
         const url = item.endpoint
           ? `${SUPABASE_URL}/rest/v1/${item.endpoint}`
           : `${SUPABASE_URL}/rest/v1/${item.table}`
