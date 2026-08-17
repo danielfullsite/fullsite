@@ -1553,37 +1553,30 @@ export async function getKitchenOrders(): Promise<KitchenOrderFromDB[]> {
         Promise.all(orders.map(o => cacheOrder(o as unknown as Record<string, unknown>)))
       ).catch(() => {})
     }
-    // Anti-clobber: mergear las órdenes locales que aún están en la cola de sync
-    // (enviadas offline, todavía no en Supabase). Sin esto, el poll online del KDS
-    // borra de la vista una comanda offline hasta que sincroniza — la cocina la ve
-    // aparecer y desaparecer. Solo se mergean ids en la cola pendiente (no resucita
-    // órdenes ya cerradas: esas no están en la cola).
+    // Anti-clobber: en el KDS, una comanda enviada offline llega por el bridge (WS)
+    // y se cachea en IndexedDB marcada _bridge_unsynced. Aún no está en Supabase, así
+    // que el poll online la borraría de la vista (la cocina la ve aparecer y
+    // desaparecer). Mergeamos las cacheadas marcadas que NO estén ya en el resultado
+    // de Supabase. Cuando la orden sincroniza y aparece en el poll, se re-cachea SIN
+    // la marca (put la sobrescribe), así deja de mergearse y no se duplica. No resucita
+    // cerradas: al cerrarse también sale del resultado activo y ya no trae la marca.
     if (typeof window !== 'undefined') {
       try {
-        const { getPendingQueue, getCachedOrders } = await import('@/lib/pos-offline-db')
-        const pending = await getPendingQueue()
-        const pendingOrderIds = new Set(
-          pending
-            .map(p => (p.data as Record<string, unknown>)?.order_id)
-            .filter((x): x is string => typeof x === 'string')
-        )
-        if (pendingOrderIds.size > 0) {
-          const existing = new Set(orders.map(o => String(o.id)))
-          const cached = await getCachedOrders()
-          for (const c of cached) {
-            const cid = String(c.id)
-            if (
-              pendingOrderIds.has(cid) && !existing.has(cid) &&
-              ['enviada', 'preparando', 'lista'].includes(String(c.status)) &&
-              String(c.created_at || c.updated_at || '') >= cutoff
-            ) {
-              orders.push({
-                ...c,
-                items: typeof c.items === 'string'
-                  ? (() => { try { return JSON.parse(c.items as string) } catch { return [] } })()
-                  : (c.items ?? []),
-              } as unknown as KitchenOrderFromDB)
-            }
+        const { getCachedOrders } = await import('@/lib/pos-offline-db')
+        const existing = new Set(orders.map(o => String(o.id)))
+        const cached = await getCachedOrders()
+        for (const c of cached) {
+          if (
+            c._bridge_unsynced === true && !existing.has(String(c.id)) &&
+            ['enviada', 'preparando', 'lista'].includes(String(c.status)) &&
+            String(c.created_at || c.updated_at || '') >= cutoff
+          ) {
+            orders.push({
+              ...c,
+              items: typeof c.items === 'string'
+                ? (() => { try { return JSON.parse(c.items as string) } catch { return [] } })()
+                : (c.items ?? []),
+            } as unknown as KitchenOrderFromDB)
           }
         }
       } catch { /* IndexedDB unavailable — online result stands */ }

@@ -278,6 +278,10 @@ export default function CocinaPage() {
           comanda_batches: p.comanda_batches ? JSON.stringify(p.comanda_batches) : null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
+          // Llegó por el bridge (offline): aún no está en Supabase. La marca hace que
+          // getKitchenOrders la conserve en la vista aunque el poll online no la traiga,
+          // hasta que sincronice (ahí se re-cachea sin la marca). Mata el "clobber".
+          _bridge_unsynced: true,
         })
         fetchOrders()
       }).catch(() => { fetchOrders() })
