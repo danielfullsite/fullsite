@@ -1,7 +1,7 @@
 // Service Worker — Fullsite POS offline-first
 // Caches app shell, static assets, and API responses for true offline operation
 
-const CACHE_VERSION = 'v24'
+const CACHE_VERSION = 'v25'
 const STATIC_CACHE = `fullsite-static-${CACHE_VERSION}`
 const DYNAMIC_CACHE = `fullsite-dynamic-${CACHE_VERSION}`
 const API_CACHE = `fullsite-api-${CACHE_VERSION}`
@@ -46,6 +46,16 @@ const API_CACHE_PATTERNS = [
 const NEVER_CACHE_PATTERNS = [
   /\/auth\//,
   /\/api\/mp-point/,
+  // Datos dinámicos que NUNCA deben servirse viejos offline. El catch-all
+  // (staleWhileRevalidate) servía cache stale de:
+  //  - pos_orders: el phantom-check del POS creía que había orden en la mesa →
+  //    addOrderItems (online-only) tronaba → la comanda no llegaba al KDS.
+  //  - pos_mesas: el grid mostraba 1 mesa (respuesta vieja) en vez de las 33 reales.
+  // Sin intercept, offline el fetch falla limpio y cada consumidor cae a su
+  // propio fallback (phantom-check → crear+encolar+bridge; mesas → MESAS_CONFIG;
+  // KDS → IndexedDB alimentado por el bridge).
+  /\/rest\/v1\/pos_orders/,
+  /\/rest\/v1\/pos_mesas/,
 ]
 
 self.addEventListener('install', (event) => {

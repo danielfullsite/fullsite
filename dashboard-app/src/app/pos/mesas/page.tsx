@@ -172,7 +172,11 @@ export default function MesasPage() {
         // floorTables not updated from DB here — mesas canvas has different coordinates
         // than plano canvas (Toldo/Privado at top-right vs bottom). See pos_mesas seed.
       } else {
-        // fallback: read count from clients table
+        // fetchPosMesas devolvió [] (offline o sin config). Fallback a la config local
+        // (MESAS_CONFIG para amalay = 33 mesas) — NO dejar el grid en la respuesta vieja
+        // de 1 mesa que servía el SW. Intentamos afinar el conteo con la tabla clients,
+        // pero si esa llamada también falla (offline), quedamos con la config local.
+        setClientMesas(getMesasConfig(cid, 16))
         fetch(
           `${SUPABASE_URL}/rest/v1/clients?id=eq.${cid}&select=mesas`,
           { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
@@ -181,7 +185,7 @@ export default function MesasPage() {
           .then((clients: { mesas?: number }[]) => {
             setClientMesas(getMesasConfig(cid, clients[0]?.mesas ?? 16))
           })
-          .catch(() => {})
+          .catch(() => { /* offline — nos quedamos con getMesasConfig local */ })
       }
     })
   }, [])
