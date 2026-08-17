@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { withPOSAuth, unauthorized } from '@/lib/api-auth'
+import { sameOriginOnly } from '@/lib/api-guard'
 import { randomUUID } from 'crypto'
 
 /**
@@ -80,6 +81,7 @@ export async function GET(request: NextRequest) {
 
 // ── POST — crea un miembro del staff ──────────────────────────────────────────
 export async function POST(request: NextRequest) {
+  const originBlock = sameOriginOnly(request); if (originBlock) return originBlock
   const auth = await withPOSAuth(request)
   if (!auth) return unauthorized()
   if (!MANAGER_ROLES.has(auth.role)) return Response.json({ error: 'Requiere rol dueño o gerente' }, { status: 403 })
@@ -114,6 +116,7 @@ export async function POST(request: NextRequest) {
 
 // ── PATCH — edita nombre/PIN/rol/estado/tarifas ───────────────────────────────
 export async function PATCH(request: NextRequest) {
+  const originBlock = sameOriginOnly(request); if (originBlock) return originBlock
   const auth = await withPOSAuth(request)
   if (!auth) return unauthorized()
   if (!MANAGER_ROLES.has(auth.role)) return Response.json({ error: 'Requiere rol dueño o gerente' }, { status: 403 })
