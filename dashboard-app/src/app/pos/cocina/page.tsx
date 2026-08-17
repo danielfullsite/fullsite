@@ -258,28 +258,30 @@ export default function CocinaPage() {
   // Push DELTA events from the POS local server — works cross-device over LAN
   useBridgeClient((event) => {
     const ORDER_EVENTS = ['ORDER_UPSERTED', 'ORDER_SENT', 'ORDER_CLOSED', 'KDS_ITEM_STATUS']
-    if (ORDER_EVENTS.includes(event.type)) {
-      if ((event.type === 'ORDER_SENT' || event.type === 'ORDER_UPSERTED') && event.payload) {
-        const p = event.payload as Record<string, unknown>
-        if (p.order_id) {
-          import('@/lib/pos-offline-db').then(({ cacheOrder }) => {
-            cacheOrder({
-              id: p.order_id as string,
-              mesa: p.mesa,
-              mesero: p.mesero,
-              status: 'enviada',
-              items: typeof p.items === 'string' ? p.items : JSON.stringify(p.items || []),
-              personas: p.personas || 1,
-              total: p.total || 0,
-              turno_id: p.turno_id || null,
-              notas: p.notas || null,
-              comanda_batches: p.comanda_batches ? JSON.stringify(p.comanda_batches) : null,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            })
-          }).catch(() => {})
-        }
-      }
+    if (!ORDER_EVENTS.includes(event.type)) return
+    const p = event.payload as Record<string, unknown> | undefined
+    if ((event.type === 'ORDER_SENT' || event.type === 'ORDER_UPSERTED') && p && p.order_id) {
+      // Cachear en IndexedDB ANTES de re-consultar: offline, fetchOrders lee de
+      // IndexedDB, así que si consultamos antes de cachear la comanda no aparece
+      // hasta el siguiente poll. Con await, cae al instante también sin internet.
+      import('@/lib/pos-offline-db').then(async ({ cacheOrder }) => {
+        await cacheOrder({
+          id: p.order_id as string,
+          mesa: p.mesa,
+          mesero: p.mesero,
+          status: 'enviada',
+          items: typeof p.items === 'string' ? p.items : JSON.stringify(p.items || []),
+          personas: p.personas || 1,
+          total: p.total || 0,
+          turno_id: p.turno_id || null,
+          notas: p.notas || null,
+          comanda_batches: p.comanda_batches ? JSON.stringify(p.comanda_batches) : null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        fetchOrders()
+      }).catch(() => { fetchOrders() })
+    } else {
       fetchOrders()
     }
   }, 'kds')
