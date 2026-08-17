@@ -233,13 +233,24 @@ export default function CocinaPage() {
     setOrders(fresh)
   }
 
-  // Register ?bridge=IP on first visit
+  // Register ?bridge=IP and ?client=slug on first visit.
+  // ?client= is essential for KDS terminals that never do a Supabase login
+  // (the KDS route is public): getKitchenOrders() filters by getActiveClientSlug(),
+  // which reads localStorage 'fullsite_client_id' — only set by AuthContext on login.
+  // Without it the KDS queries an empty client_id and shows 0 orders even though
+  // the order exists in pos_orders. The Electron injects ?client= like ?bridge=.
   useEffect(() => {
     if (typeof window === 'undefined') return
     const params = new URLSearchParams(window.location.search)
     const bridgeHost = params.get('bridge')
+    const clientParam = params.get('client')
+    if (clientParam) {
+      try { localStorage.setItem('fullsite_client_id', clientParam.toLowerCase().trim()) } catch { /* private browsing */ }
+    }
     if (bridgeHost) {
       setPosServerHost(bridgeHost)
+    }
+    if (bridgeHost || clientParam) {
       window.history.replaceState({}, '', window.location.pathname)
     }
   }, [])
