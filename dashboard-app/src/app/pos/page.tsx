@@ -1831,7 +1831,15 @@ function POSContent() {
     updateCount()
     // Periodic count refresh every 30s — reads IndexedDB only (no network needed offline)
     const interval = setInterval(updateCount, 30000)
-    return () => { mounted = false; window.removeEventListener('online', goOnline); window.removeEventListener('offline', goOffline); clearInterval(interval) }
+    // Auto-sanado PERIÓDICO de la caché de referencia (menú/modificadores/pagos/staff).
+    // No depende del evento 'online' (poco confiable): cada 5 min, si hay red,
+    // re-precachea. Garantiza que la caché offline se mantenga fresca y se auto-repare
+    // sola, sin que nadie recargue ni toque botones. Barato + con guardas (#2) no
+    // sobreescribe con vacío ni deja entrar basura.
+    const healInterval = setInterval(() => {
+      if (navigator.onLine) prefetchOfflineData().catch(() => {})
+    }, 5 * 60 * 1000)
+    return () => { mounted = false; window.removeEventListener('online', goOnline); window.removeEventListener('offline', goOffline); clearInterval(interval); clearInterval(healInterval) }
   }, [])
 
   // Print queue state — pending/retrying (queue working) vs needs_attention (user action required)
