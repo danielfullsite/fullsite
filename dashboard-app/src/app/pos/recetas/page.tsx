@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, BookOpen, Search, RefreshCw, ChevronDown, ChevronRight, Package, Plus, Trash2, Save, X } from 'lucide-react'
-import { getRecipes, getIngredients, formatMXN, type RecipeRow, type Ingredient } from '@/lib/pos-data'
+import { getRecipes, getIngredients, formatMXN, syncRecipeToR1, type RecipeRow, type Ingredient } from '@/lib/pos-data'
 import { getActiveClientSlug as _cid } from '@/lib/data'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -38,6 +38,7 @@ export default function RecetasPage() {
     })
     setSaving(false)
     setAddingTo(null); setNewIngId(''); setNewIngQty('')
+    await syncRecipeToR1(menuItemId)  // A1.2 — proyecta a R1 para que descuente stock
     fetchData()
   }
 
@@ -45,6 +46,7 @@ export default function RecetasPage() {
     await fetch(`${SUPABASE_URL}/rest/v1/pos_recipes_old?client_id=eq.${_cid()}&menu_item_id=eq.${menuItemId}&ingredient_id=eq.${ingredientId}`, {
       method: 'DELETE', headers: hdrs(),
     })
+    await syncRecipeToR1(menuItemId)  // A1.2
     fetchData()
   }
 
@@ -53,6 +55,7 @@ export default function RecetasPage() {
       method: 'PATCH', headers: { ...hdrs(), Prefer: 'return=minimal' },
       body: JSON.stringify({ quantity }),
     })
+    await syncRecipeToR1(menuItemId)  // A1.2
     fetchData()
   }
 

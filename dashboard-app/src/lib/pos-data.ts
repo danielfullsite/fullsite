@@ -2079,6 +2079,42 @@ export async function fetchRecipeRefCoverage(clientId: string): Promise<{
   }
 }
 
+/**
+ * A1.2 — Recipe unification. Tras editar una receta en la UI (pos_recipes_old, el
+ * sistema flat que lee food-cost), proyecta la receta al sistema normalizado R1
+ * (pos_recipe_versions + pos_recipe_lines) que la deducción de stock realmente lee.
+ * Sin esto, capturar una receta NO descuenta (los dos sistemas estaban desconectados).
+ *
+ * Best-effort: nunca lanza (no rompe la edición). Same-origin manda la cookie fs-at
+ * (dashboard); si hay shift token (POS) lo manda como bearer. La ruta server
+ * (/api/pos/recipe-sync) resuelve client_id server-side y aplica las guardas
+ * (subrecetas → skip; policy flip solo desde unclassified/non_inventory).
+ * Devuelve el resultado por si el caller quiere avisar al usuario.
+ */
+export async function syncRecipeToR1(
+  menuItemId: string, actor?: string
+): Promise<{ ok: boolean; skipped?: string; error?: string }> {
+  try {
+    let shift: string | null = null
+    try { shift = localStorage.getItem('pos_shift_token') } catch { /* ssr/private */ }
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (shift) headers.Authorization = `Bearer ${shift}`
+    const res = await fetch('/api/pos/recipe-sync', {
+      method: 'POST', headers, credentials: 'same-origin',
+      body: JSON.stringify({ menu_item_id: menuItemId, actor: actor || 'ui_sync' }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok || !data?.ok) {
+      console.warn('[recipe-sync] R1 projection failed', { menuItemId, status: res.status, data })
+      return { ok: false, error: data?.error || `HTTP ${res.status}` }
+    }
+    return { ok: true, skipped: data.skipped }
+  } catch (e) {
+    console.warn('[recipe-sync] R1 projection threw', e)
+    return { ok: false, error: e instanceof Error ? e.message : 'threw' }
+  }
+}
+
 export async function saveRecipeRow(row: { menu_item_id: string; menu_item_name: string; ingredient_id: string; quantity: number; unit: string }): Promise<boolean> {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/pos_recipes_old`, {
     method: 'POST',

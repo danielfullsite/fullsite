@@ -47,6 +47,8 @@ export interface ProvisionResult {
     pos_payment_methods: number
     pos_staff: number
     pos_mesas: number
+    pos_mutation_authority: number
+    pos_item_inventory_policy: number
   }
 }
 
@@ -105,6 +107,27 @@ async function upsert(table: string, rows: Record<string, unknown>[]): Promise<n
   if (!res.ok) {
     const detail = await res.text().catch(() => '')
     throw new Error(`[provision] upsert ${table} failed (${res.status}): ${detail}`)
+  }
+  return rows.length
+}
+
+/**
+ * Upsert resolving on a NON-primary-key unique constraint. Needed for tables
+ * whose PK is a serial id but whose logical identity is (client_id, ...): the
+ * default merge-duplicates resolves on the serial PK (never conflicts → dup on
+ * re-run). `on_conflict` tells PostgREST which unique index to merge on.
+ */
+async function upsertOnConflict(table: string, rows: Record<string, unknown>[], conflictCols: string): Promise<number> {
+  if (rows.length === 0) return 0
+  const res = await fetch(`${SB_URL}/rest/v1/${table}?on_conflict=${encodeURIComponent(conflictCols)}`, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify(rows),
+    cache: 'no-store',
+  })
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '')
+    throw new Error(`[provision] upsert ${table} (on_conflict=${conflictCols}) failed (${res.status}): ${detail}`)
   }
   return rows.length
 }
@@ -229,6 +252,37 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     mesasCount = await insertRows('pos_mesas', mesaRows)
   }
 
+  // ── 7. inventory deduction gates (SKEL04 · A1) ─────────────────────────────
+  // Sin estos dos gates la deducción de stock NUNCA corre para un tenant nuevo
+  // (r1_reconcile_item, 004_functions.sql):
+  //   • pos_mutation_authority.sale_authority DEBE ser 'r1'. Sin fila el default
+  //     es 'legacy' → cada item cae en BLOCKED_OWNER_MISSING.
+  //   • pos_item_inventory_policy DEBE existir por menu_item con inventory_mode
+  //     != 'unclassified'. Sin fila → BLOCKED_UNCLASSIFIED.
+  // Default por item = 'non_inventory': la venta reconcilia limpio
+  // (NO_MUTATION_APPROVED) SIN descontar, hasta que el cliente capture una receta
+  // (que flipa la policy del item a 'recipe' — ver setItemRecipe en pos-data).
+  // Así nunca se bloquea la venta ni se "miente" descontando algo que no existe.
+  const nowIso = new Date().toISOString()
+
+  const authorityCount = await upsert('pos_mutation_authority', [{
+    client_id: clientId,
+    sale_authority: 'r1',
+    cutover_at: nowIso,
+    cutover_by: 'provision',
+  }])
+
+  const policyRows = itemRows.map(it => ({
+    client_id: clientId,
+    menu_item_id: it.id,
+    inventory_mode: 'non_inventory',
+    approved_at: nowIso,
+    approved_by: 'provision',
+  }))
+  const policyCount = await upsertOnConflict(
+    'pos_item_inventory_policy', policyRows, 'client_id,menu_item_id'
+  )
+
   return {
     clientId,
     created: {
@@ -239,6 +293,8 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
       pos_payment_methods: pmCount,
       pos_staff: staffCount,
       pos_mesas: mesasCount,
+      pos_mutation_authority: authorityCount,
+      pos_item_inventory_policy: policyCount,
     },
   }
 }
