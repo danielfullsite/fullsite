@@ -249,6 +249,31 @@ export async function incrementRetry(id: string): Promise<void> {
   }
 }
 
+/** Reinicia el contador de reintentos de los items no-terminales de la cola.
+ *  Se llama en una sesión FRESCA (re-PIN): un backlog que agotó sus reintentos con
+ *  un token vencido merece un re-intento limpio con la credencial nueva. Los items
+ *  con error_class (terminal) NO se tocan — esos requieren intervención humana. */
+export async function resetSyncQueueRetries(): Promise<number> {
+  const db = await openDB()
+  return new Promise((resolve) => {
+    const tx = db.transaction('sync_queue', 'readwrite')
+    const store = tx.objectStore('sync_queue')
+    const req = store.getAll()
+    req.onsuccess = () => {
+      let reset = 0
+      for (const item of (req.result || []) as SyncQueueItem[]) {
+        if (!item.synced && !item.error_class && (item.retries ?? 0) > 0) {
+          item.retries = 0
+          store.put(item)
+          reset++
+        }
+      }
+      tx.oncomplete = () => resolve(reset)
+    }
+    req.onerror = () => resolve(0)
+  })
+}
+
 export async function clearAllPending(): Promise<void> {
   const db = await openDB()
   const tx = db.transaction('sync_queue', 'readwrite')
@@ -596,29 +621,34 @@ async function _syncAllInner(): Promise<{ synced: number; failed: number }> {
           failed++
         }
       } else {
-        // ── SUPABASE_REST replay: direct PostgREST for non-reconciliation data ──
-        // Requiere el JWT de Supabase (RLS tenant-scoped); el shift token NO sirve
-        // contra PostgREST. Si solo hay shift token, diferir este item (no romper
-        // el sync de órdenes, que sí va por APP_API): se reintenta cuando haya JWT.
-        if (!accessToken) {
+        // ── SUPABASE_REST replay: datos no-orden (turnos, caja, estados KDS) ──
+        // Dos caminos según la credencial disponible:
+        //  - JWT de Supabase (dashboard): PostgREST directo con RLS tenant-scoped.
+        //  - Shift token (terminal POS, sin sesión de Supabase): por el proxy
+        //    autenticado /api/pos/db — MISMO camino que las escrituras online
+        //    (supabase-fetch-patch). withPOSAuth valida el shift token e inyecta
+        //    client_id. Antes esto se difería → en un terminal-PIN los turnos/caja/
+        //    estados-KDS offline NUNCA subían (quedaban como "N pendientes" para
+        //    siempre). Este es el cierre del gap.
+        const restPath = item.endpoint || item.table
+        let url: string
+        let reqHeaders: Record<string, string>
+        if (accessToken) {
+          url = `${SUPABASE_URL}/rest/v1/${restPath}`
+          reqHeaders = { apikey: SUPABASE_KEY, Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' }
+        } else if (shiftToken) {
+          const base = typeof window !== 'undefined' ? window.location.origin : ''
+          url = `${base}/api/pos/db?path=${encodeURIComponent(restPath)}`
+          reqHeaders = { Authorization: `Bearer ${shiftToken}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' }
+        } else {
           await incrementRetry(item.id)
           failed++
           continue
         }
-        const url = item.endpoint
-          ? `${SUPABASE_URL}/rest/v1/${item.endpoint}`
-          : `${SUPABASE_URL}/rest/v1/${item.table}`
 
         const res = await fetch(url, {
           method: item.method,
-          headers: {
-            apikey: SUPABASE_KEY,
-            // BUG-019: token de sesión fresco (no anon) → RLS tenant-scoped valida
-            // que la fila pertenezca al tenant del usuario (WITH CHECK).
-            Authorization: `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-            Prefer: 'return=minimal',
-          },
+          headers: reqHeaders,
           body: item.method !== 'DELETE' ? JSON.stringify(item.data) : undefined,
         })
         if (res.ok) {
@@ -629,6 +659,11 @@ async function _syncAllInner(): Promise<{ synced: number; failed: number }> {
           console.warn(`[offline-sync] 409 on ${item.table} — already exists, marking synced`)
           await markSynced(item.id)
           synced++
+        } else if (res.status === 401 || res.status === 403) {
+          // Sesión expirada (igual que APP_API): detener, preservar, pedir re-PIN.
+          console.warn('[offline-sync] Sesión expirada en replay REST — se requiere re-PIN. Cola preservada.')
+          emitAuthRequired()
+          break
         } else {
           await incrementRetry(item.id)
           failed++

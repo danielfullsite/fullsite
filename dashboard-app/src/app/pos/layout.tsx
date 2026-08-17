@@ -484,7 +484,16 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
         const { staff: member, shiftToken } = await res.json()
         if (member?.id) {
           try {
-            if (shiftToken) localStorage.setItem('pos_shift_token', shiftToken)
+            if (shiftToken) {
+              localStorage.setItem('pos_shift_token', shiftToken)
+              // Sesión fresca: darle un re-intento limpio al backlog de sync con el
+              // token nuevo (resetea reintentos agotados y dispara syncAll). Drena las
+              // comandas/turnos/caja que se atoraron con el token vencido. No bloquea.
+              import('@/lib/pos-offline-db').then(async m => {
+                await m.resetSyncQueueRetries()
+                await m.syncAll()
+              }).catch(() => {})
+            }
             const pinHash = await hashPin(pin, member.id)
             localStorage.setItem('pos_staff_cache', JSON.stringify({
               id: member.id, name: member.name, role: member.role,
