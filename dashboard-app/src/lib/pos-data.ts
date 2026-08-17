@@ -1447,9 +1447,10 @@ export async function saveOrder(order: Order, saveOperationId?: string): Promise
 
     if (!res.ok) {
       console.warn(`[saveOrder] API error: ${res.status}`)
-      // 401 = shift token expirado. NO perder la orden/cobro: encolar para replay
-      // idempotente (save_operation_id dedup) y señalar re-login. (P0 dinero)
-      if (res.status === 401) {
+      // 401/403 = shift token expirado (withPOSAuth rechaza; algunos paths dan 403).
+      // NO perder la orden/cobro: encolar para replay idempotente (save_operation_id
+      // dedup) y señalar re-login. (P0 dinero)
+      if (res.status === 401 || res.status === 403) {
         await queueForReplay()
         return { ok: false, error: 'SESSION_EXPIRED' }
       }

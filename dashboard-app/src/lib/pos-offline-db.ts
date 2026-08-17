@@ -17,7 +17,10 @@ type ReplayTransport = 'APP_API' | 'SUPABASE_REST'
 // TRANSIENT_RETRYABLE: network failure, 5xx, fetch error — will retry
 // STALE_WRITE_CONFLICT: revision mismatch — TERMINAL, no auto-retry, no overwrite
 // TERMINAL_NON_RETRYABLE: malformed payload, validation rejection — cannot succeed unchanged
-type SyncErrorClass = 'TRANSIENT_RETRYABLE' | 'STALE_WRITE_CONFLICT' | 'TERMINAL_NON_RETRYABLE'
+// AUTH_EXPIRED: 401/403 — shift token venció (TTL 8h, sin refresh). NO es transient:
+//   reintentar en silencio no sirve. Detiene el drenado, PRESERVA la cola y pide
+//   re-PIN (emitAuthRequired). Tras re-login, la cola drena sola. Nunca se pierde nada.
+type SyncErrorClass = 'TRANSIENT_RETRYABLE' | 'STALE_WRITE_CONFLICT' | 'TERMINAL_NON_RETRYABLE' | 'AUTH_EXPIRED'
 
 interface SyncQueueItem {
   id: string
@@ -400,6 +403,11 @@ async function replayViaAppApi(item: SyncQueueItem, accessToken: string): Promis
   })
 
   if (!res.ok) {
+    // Sesión expirada: el shift token venció (8h). Reintentar en silencio no sirve
+    // — hay que re-PIN. Se clasifica aparte para detener el drenado y avisar.
+    if (res.status === 401 || res.status === 403) {
+      return { ok: false, errorClass: 'AUTH_EXPIRED', detail: `HTTP ${res.status} — sesión expirada` }
+    }
     if (res.status >= 500) {
       return { ok: false, errorClass: 'TRANSIENT_RETRYABLE', detail: `HTTP ${res.status}` }
     }
@@ -556,6 +564,13 @@ async function _syncAllInner(): Promise<{ synced: number; failed: number }> {
               }
             }))
           }
+        } else if (result.errorClass === 'AUTH_EXPIRED') {
+          // Sesión expirada (403/401): detener el drenado YA — no tiene caso seguir
+          // martillando 403s por cada item. PRESERVAR la cola (sin consumir reintentos
+          // ni marcar terminal) y pedir re-PIN. Tras re-login, syncAll drena sola.
+          console.warn('[offline-sync] Sesión expirada — replay pausado, se requiere re-PIN. Cola preservada.')
+          emitAuthRequired()
+          break
         } else if (result.errorClass === 'STALE_WRITE_CONFLICT') {
           // TERMINAL — preserve payload, mark conflict, NO retry, NO overwrite, NO direct PATCH
           console.error(`[offline-sync] ${result.detail}`)

@@ -178,6 +178,22 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
   const wakeLockRef = useRef<{ release: () => Promise<void> } | null>(null)
   const unlockedRef = useRef(unlocked)
   useEffect(() => { unlockedRef.current = unlocked }, [unlocked])
+
+  // Sesión expirada durante operación: la cola de sync detectó un 401/403 (el shift
+  // token venció — TTL 8h, sin refresh). NUNCA fallar en silencio: bloquear el POS y
+  // pedir re-PIN con un mensaje claro. Las comandas quedan guardadas (cola + Pedro);
+  // al reingresar el PIN, syncAll drena todo solo. Evita que en un restaurante las
+  // comandas dejen de llegar sin que nadie se entere.
+  useEffect(() => {
+    const onAuthRequired = () => {
+      if (!unlockedRef.current) return // ya está en la pantalla de PIN
+      try { sessionStorage.removeItem('pos_staff') } catch {}
+      setSessionError('Tu sesión expiró — vuelve a ingresar tu PIN. Tus comandas están guardadas y se enviarán al reingresar.')
+      setUnlocked(false)
+    }
+    window.addEventListener('pos-sync-auth-required', onAuthRequired)
+    return () => window.removeEventListener('pos-sync-auth-required', onAuthRequired)
+  }, [])
   useEffect(() => {
     let cancelled = false
     const acquire = async () => {
