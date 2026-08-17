@@ -236,6 +236,7 @@ async function syncJobToCloud(job: PrintJob) {
 // ── Bridge health check ────────────────────────────────────────────────
 
 let _bridgeUp: boolean | null = null
+let _printersConfigured = false // ¿el bridge tiene AL MENOS una impresora configurada?
 let _bridgeCheckedAt = 0
 const BRIDGE_HEALTH_TTL_MS = 10_000
 
@@ -251,6 +252,11 @@ async function isBridgeHealthy(): Promise<boolean> {
     const res = await fetch(`${getBridgeUrl()}/health`, { signal: ctrl.signal })
     clearTimeout(t)
     _bridgeUp = res.ok
+    // Leer si hay impresoras CONFIGURADAS. Sin esto, "sin impresora" se trataba
+    // como fallo de impresión → POST /print → 500 → retry 5x → inunda la consola.
+    if (res.ok) {
+      try { const h = await res.json(); _printersConfigured = Array.isArray(h.stations) && h.stations.length > 0 } catch { _printersConfigured = false }
+    }
   } catch {
     _bridgeUp = false
   }
@@ -328,7 +334,10 @@ async function _processQueueInner() {
   }
 
   // ── Phase 2: Handle needs_attention auto-recovery ───────────────────
-  if (bridgeUp) {
+  // Solo recuperar si el bridge está arriba Y hay impresora configurada. Si no
+  // hay impresora, recuperar sería un ciclo infinito (recuperar → intentar → 500
+  // → needs_attention → recuperar…). Se recuperan solas cuando se configure una.
+  if (bridgeUp && _printersConfigured) {
     for (const job of queue) {
       if (job.status === 'needs_attention') {
         job.status = 'pending'
@@ -351,6 +360,19 @@ async function _processQueueInner() {
       changed = true
     }
     console.log(`[print-queue] Bridge DOWN — ${pending.length} job(s) marked bridge_unavailable`)
+  } else if (pending.length > 0 && bridgeUp && !_printersConfigured) {
+    // Bridge arriba pero SIN impresora configurada: no llamar /print (daría 500 e
+    // inundaría la consola cada 15s). Marcar needs_attention en SILENCIO, sin
+    // consumir reintentos ni llamar al bridge. Se recuperan solas al configurar
+    // una impresora (Phase 2). Log una sola vez por transición, no por ciclo.
+    let held = 0
+    for (const job of pending) {
+      job.status = 'needs_attention'
+      job.error = 'Impresora no configurada'
+      held++
+      changed = true
+    }
+    if (held > 0) console.warn(`[print-queue] ${held} comanda(s) en espera — no hay impresora configurada`)
   } else if (pending.length > 0 && bridgeUp) {
     // Bridge is up — attempt real prints (retries count here)
     for (const job of pending) {
