@@ -1560,6 +1560,12 @@ export async function getKitchenOrders(): Promise<KitchenOrderFromDB[]> {
     // de Supabase. Cuando la orden sincroniza y aparece en el poll, se re-cachea SIN
     // la marca (put la sobrescribe), así deja de mergearse y no se duplica. No resucita
     // cerradas: al cerrarse también sale del resultado activo y ya no trae la marca.
+    // Ventana corta: solo mergeamos comandas del bridge recibidas en los últimos
+    // minutos. Al reconectar, la cola del POS sincroniza en segundos y la orden
+    // aparece en Supabase (se re-cachea sin marca). La ventana evita que órdenes
+    // marcadas que NUNCA sincronizaron (p.ej. sesión caída) se resuciten para
+    // siempre y llenen el KDS. El created_at cacheado = hora en que llegó por WS.
+    const bridgeMergeCutoff = new Date(Date.now() - 5 * 60 * 1000).toISOString()
     if (typeof window !== 'undefined') {
       try {
         const { getCachedOrders } = await import('@/lib/pos-offline-db')
@@ -1569,7 +1575,7 @@ export async function getKitchenOrders(): Promise<KitchenOrderFromDB[]> {
           if (
             c._bridge_unsynced === true && !existing.has(String(c.id)) &&
             ['enviada', 'preparando', 'lista'].includes(String(c.status)) &&
-            String(c.created_at || c.updated_at || '') >= cutoff
+            String(c.created_at || c.updated_at || '') >= bridgeMergeCutoff
           ) {
             orders.push({
               ...c,
