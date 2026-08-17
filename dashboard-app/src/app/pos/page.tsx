@@ -2885,8 +2885,12 @@ function POSContent() {
     // Client-side conflict check removed: caused false positives from stale updatedAt.
 
     // Phantom order prevention: if this is a NEW order (not loaded from DB),
-    // re-check Supabase to see if another terminal already created one for this mesa
-    if (!loadedOrderId && mesa) {
+    // re-check Supabase to see if another terminal already created one for this mesa.
+    // OFFLINE: skip — el GET lo puede servir el Service Worker con data CACHEADA vieja
+    // (parece que hay orden existente en la mesa), empujando al path de addOrderItems
+    // que es online-only y truena ("Error al agregar items"). Sin red vamos directo a
+    // saveOrder, que SÍ encola offline. El dedup real se resuelve al reconectar.
+    if (!loadedOrderId && mesa && navigator.onLine) {
       try {
         const filter = clienteNombre
           ? `customer_name=eq.${encodeURIComponent(clienteNombre)}`
