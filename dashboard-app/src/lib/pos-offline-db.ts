@@ -638,10 +638,23 @@ export async function cacheModifierData(
   mods: Record<string, unknown>[],
   links: Record<string, unknown>[],
 ): Promise<void> {
+  // Validación de ESCRITURA (defensa en profundidad): solo persistir registros con
+  // la FORMA esperada de cada store. Si un caller pasa datos de otra tabla (p.ej.
+  // staff/meseros), NO entran a la caché de modificadores. PostgREST devuelve las
+  // columnas del SELECT como keys aun si el valor es null, así que la presencia de
+  // la key discrimina de forma confiable (un mesero no tiene 'max_selections').
+  const isObj = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object'
+  const validGroups = groups.filter(g => isObj(g) && 'id' in g && 'max_selections' in g)
+  const validMods   = mods.filter(m => isObj(m) && 'id' in m && 'group_id' in m && 'price' in m)
+  const validLinks  = links.filter(l => isObj(l) && 'id' in l && 'group_id' in l)
+
   const db = await openDB()
   const stores = ['modifier_groups', 'modifiers', 'item_modifier_links'] as const
-  const data = [groups, mods, links]
+  const data = [validGroups, validMods, validLinks]
   for (let i = 0; i < stores.length; i++) {
+    // No sobrescribir con vacío: una respuesta transitoria vacía (red degradada)
+    // NO debe borrar la caché buena. Solo reemplazamos si hay datos válidos.
+    if (data[i].length === 0) continue
     const tx = db.transaction(stores[i], 'readwrite')
     const store = tx.objectStore(stores[i])
     store.clear()
@@ -721,6 +734,23 @@ export async function getCachedStaff(): Promise<Record<string, unknown>[]> {
     req.onsuccess = () => resolve(req.result || [])
     req.onerror = () => resolve([])
   })
+}
+
+// ─── Field escape hatch: reset the read-only reference caches ─────────────────
+// Limpia SOLO las cachés de REFERENCIA que pueden quedar viejas/corruptas (menú,
+// modificadores, métodos de pago, staff, inventario). NUNCA toca sync_queue,
+// orders, turnos ni cash_movements — esos guardan datos operativos SIN sincronizar
+// que jamás deben perderse. Tras limpiar, un prefetch online los repuebla. Es el
+// botón "Actualizar datos offline" para que un gerente recupere sin DevTools.
+export async function resetOfflineReferenceCaches(): Promise<void> {
+  const db = await openDB()
+  const REFERENCE_STORES = ['menu', 'modifier_groups', 'modifiers', 'item_modifier_links', 'payment_methods', 'staff', 'inventory'] as const
+  for (const name of REFERENCE_STORES) {
+    try {
+      const tx = db.transaction(name, 'readwrite')
+      tx.objectStore(name).clear()
+    } catch { /* el store puede no existir en un DB viejo — ignorar */ }
+  }
 }
 
 // ─── Orders by Turno ────────────────────────────────────────────────────────

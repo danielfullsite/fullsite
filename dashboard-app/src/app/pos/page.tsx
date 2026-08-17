@@ -1817,7 +1817,14 @@ function POSContent() {
       updateCount()
     }
 
-    const goOnline = () => { if (mounted) setOnline(true); doSync() }
+    const goOnline = () => {
+      if (mounted) setOnline(true)
+      doSync()
+      // Auto-sanado: al volver el internet, re-precachear modificadores/pagos.
+      // Si la caché offline quedó corrupta o incompleta, se repara sola aquí —
+      // sin que nadie tenga que recargar la app a media operación.
+      prefetchOfflineData().catch(() => {})
+    }
     const goOffline = () => { if (mounted) setOnline(false) }
     window.addEventListener('online', goOnline)
     window.addEventListener('offline', goOffline)

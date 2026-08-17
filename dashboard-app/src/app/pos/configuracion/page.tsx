@@ -10,6 +10,8 @@ import {
 import { getActiveClientSlug as _cid, getAuthToken } from '@/lib/data'
 import { getBridgeUrl, setBridgeUrl, DEFAULT_BRIDGE_URL } from '@/lib/bridge-url'
 import { getEffectiveSetting, updateSetting } from '@/lib/settings'
+import { resetOfflineReferenceCaches } from '@/lib/pos-offline-db'
+import { prefetchOfflineData } from '@/lib/pos-data'
 import type { DiscountCatalogItem } from '@/lib/pos-constants'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -194,6 +196,24 @@ export default function ConfigPage() {
   const [syncStatus, setSyncStatus] = useState({ pending: 0, lastSync: '' })
   const [terminalInfo, setTerminalInfo] = useState({ restaurantId: '', terminalId: '', isElectron: false })
   const [reprovisionState, setReprovisionState] = useState<'idle' | 'confirm' | 'done'>('idle')
+  const [refreshState, setRefreshState] = useState<'idle' | 'busy' | 'done' | 'error'>('idle')
+
+  // Botón de escape en campo: limpia las cachés de REFERENCIA (menú/modificadores/
+  // pagos/staff/inventario) y las repuebla del servidor. NO toca la cola de sync ni
+  // órdenes/turnos/caja. Recupera una caché offline corrupta sin DevTools ni recargar.
+  const handleRefreshOfflineData = async () => {
+    if (!navigator.onLine) { setRefreshState('error'); setTimeout(() => setRefreshState('idle'), 3000); return }
+    setRefreshState('busy')
+    try {
+      await resetOfflineReferenceCaches()
+      await prefetchOfflineData()
+      setRefreshState('done')
+      setTimeout(() => setRefreshState('idle'), 3000)
+    } catch {
+      setRefreshState('error')
+      setTimeout(() => setRefreshState('idle'), 3000)
+    }
+  }
   const [loading, setLoading] = useState(true)
   const [bridgeUrlInput, setBridgeUrlInput] = useState('')
   const [bridgeUrlSaved, setBridgeUrlSaved] = useState(false)
@@ -475,6 +495,24 @@ export default function ConfigPage() {
             </div>
           </div>
           <p className="text-[11.5px] mt-3 truncate font-mono" style={{ color: 'var(--text-4)' }}>{deviceInfo.userAgent}</p>
+          {/* Escape hatch en campo: refrescar datos offline sin DevTools ni recargar */}
+          <div className="mt-4 pt-4 border-t flex items-center justify-between gap-3 flex-wrap" style={{ borderColor: 'var(--line)' }}>
+            <div className="min-w-[200px] flex-1">
+              <p className="text-[13px] font-semibold" style={{ color: 'var(--text-1)' }}>Datos offline</p>
+              <p className="text-[11.5px] mt-0.5" style={{ color: 'var(--text-4)' }}>
+                Refresca menú, modificadores, pagos y personal guardados para operar sin internet. No borra órdenes ni ventas pendientes.
+              </p>
+            </div>
+            <button
+              onClick={handleRefreshOfflineData}
+              disabled={refreshState === 'busy'}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-[13px] transition-all active:scale-[0.97] disabled:opacity-60 flex-none"
+              style={{ background: 'var(--accent-soft)', color: 'var(--accent-ink)' }}
+            >
+              <RefreshCw size={15} className={refreshState === 'busy' ? 'animate-spin' : ''} />
+              {refreshState === 'busy' ? 'Actualizando...' : refreshState === 'done' ? '✓ Actualizado' : refreshState === 'error' ? 'Requiere internet' : 'Actualizar datos offline'}
+            </button>
+          </div>
         </section>
 
         {/* Security */}
