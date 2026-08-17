@@ -597,6 +597,10 @@ export async function getModifierGroupsForItem(itemId: string, categoryId: strin
         required: Boolean(g.required),
         options: optsByGroup.get(g.id) || [],
       }))
+      // Blindaje: descartar registros malformados (no son grupos de modificadores).
+      // Un registro sin campo max_selections (ej. un mesero que se coló al cache por
+      // IDB dañado) produce maxSelections=NaN → nunca debe renderizarse como modificador.
+      .filter(g => g.maxSelections === null || Number.isFinite(g.maxSelections))
       .filter(g => g.options.length > 0)
       // Filter out incompatible groups (e.g. "Término" on coffee, "Shot" on food)
       .filter(g => isGroupCompatible(g.name, categoryId))
@@ -642,6 +646,10 @@ async function _getModifierGroupsFromCache(itemId: string, categoryId: string): 
         required: Boolean(g.required),
         options: optsByGroup.get(g.id) || [],
       }))
+      // Blindaje (ver getModifierGroupsForItem): descartar registros malformados
+      // (max_selections ausente → NaN). Evita que basura del cache (p.ej. meseros
+      // por IDB dañado) se renderice como grupos de modificadores.
+      .filter(g => g.maxSelections === null || Number.isFinite(g.maxSelections))
       .filter(g => g.options.length > 0)
       .filter(g => isGroupCompatible(g.name, categoryId))
   } catch {
