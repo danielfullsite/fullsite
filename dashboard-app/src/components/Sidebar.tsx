@@ -164,6 +164,7 @@ const navSections = [
   {
     label: 'POS Restaurante',
     items: [
+      { href: '/equipo', label: 'Equipo', icon: Users },
       { href: '/admin/menu', label: 'Platillos', icon: UtensilsCrossed },
       { href: '/admin/grupos', label: 'Grupos', icon: Package },
       { href: '/admin/modificadores', label: 'Modificadores', icon: Settings },
