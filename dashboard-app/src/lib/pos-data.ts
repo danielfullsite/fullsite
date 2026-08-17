@@ -1493,6 +1493,7 @@ export interface KitchenOrderFromDB {
   notas: string | null
   order_revision?: number
   order_number?: number
+  personas?: number
 }
 
 export async function getKitchenOrders(): Promise<KitchenOrderFromDB[]> {

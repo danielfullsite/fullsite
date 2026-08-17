@@ -82,7 +82,10 @@ export default function CocinaPage() {
   // Station filter
   const isKdsSurface = typeof window !== 'undefined' && (window as unknown as { fullsiteApp?: { surface?: string } }).fullsiteApp?.surface === 'kds'
 
-  const [stationFilter, setStationFilter] = useState<'todo' | 'panaderia' | StationName>('cocina')
+  const [stationFilter, setStationFilter] = useState<'todo' | 'panaderia' | StationName>(() => {
+    try { const v = localStorage.getItem('kds_station'); if (v) return v as 'todo' | 'panaderia' | StationName } catch {}
+    return 'cocina'
+  })
 
   // Cancel modal state
   const [cancelTarget, setCancelTarget] = useState<{ orderId: string; itemIndex: number; itemName: string; mesa: number; mesero: string } | null>(null)
@@ -431,6 +434,14 @@ export default function CocinaPage() {
     try { localStorage.setItem('kds_alert_minutes', String(alertMinutes)) } catch {}
   }, [alertMinutes])
 
+  // KDS font scale (legibilidad — "chefs medio ciegos") + modo compacto
+  const [fontScale, setFontScale] = useState(() => {
+    try { const v = localStorage.getItem('kds_font_scale'); return v ? Number(v) : 1 } catch { return 1 }
+  })
+  useEffect(() => { try { localStorage.setItem('kds_font_scale', String(fontScale)) } catch {} }, [fontScale])
+  // Persist station selection so a KDS terminal keeps its station across reloads
+  useEffect(() => { try { localStorage.setItem('kds_station', stationFilter) } catch {} }, [stationFilter])
+
   // Item-level status tracking: 1 click = preparando, 2 clicks = listo (disappears)
   // Persisted in localStorage so refresh doesn't reset chef's progress
   const KDS_STATUS_KEY = 'kds_item_status'
@@ -506,6 +517,18 @@ export default function CocinaPage() {
         return { ...prev, [key]: 'listo' }
       }
       return prev
+    })
+  }
+
+  // Eduardo: dos toques al título de la comanda = marcar toda la comanda lista
+  const completeComanda = (orderId: string, activeItems: ParsedItem[], allItems: ParsedItem[]) => {
+    setItemStatus(prev => {
+      const next = { ...prev }
+      for (const it of activeItems) {
+        const gi = allItems.indexOf(it)
+        if (gi >= 0) next[`${orderId}-${gi}`] = 'listo'
+      }
+      return next
     })
   }
 
@@ -641,6 +664,12 @@ export default function CocinaPage() {
           <button onClick={fetchOrders} className="w-11 h-11 rounded-lg bg-[var(--line)] hover:bg-slate-600 flex items-center justify-center">
             <RefreshCw size={14} />
           </button>
+          <button onClick={() => setShowSettings(true)} className="w-11 h-11 rounded-lg bg-[var(--line)] hover:bg-slate-600 flex items-center justify-center" title="Configuración">
+            <Settings size={16} />
+          </button>
+          <Link href="/pos" className="w-11 h-11 rounded-lg bg-[var(--line)] hover:bg-red-600/40 flex items-center justify-center" title="Salir del KDS">
+            <X size={18} />
+          </Link>
         </div>
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2">
@@ -702,6 +731,24 @@ export default function CocinaPage() {
                   className="w-full bg-[var(--line)] border border-slate-600 rounded-lg px-4 py-3 text-white text-center text-xl focus:outline-none focus:border-emerald-500"
                 />
                 <p className="text-xs text-[var(--text-4)] mt-1">Las órdenes se ponen en rojo después de {alertMinutes} minutos</p>
+              </div>
+              <div>
+                <label className="text-sm text-[var(--text-3)] block mb-2">Estación de esta pantalla</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {([['cocina', 'Cocina'], ['barra', 'Barra'], ['panaderia', 'Panadería'], ['todo', 'Expo (todo)']] as const).map(([k, l]) => (
+                    <button key={k} onClick={() => setStationFilter(k as 'todo' | 'panaderia' | StationName)}
+                      className={`py-2 rounded-lg text-sm font-semibold ${stationFilter === k ? 'bg-emerald-500 text-black' : 'bg-[var(--line)] text-[var(--text-3)]'}`}>{l}</button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-sm text-[var(--text-3)] block mb-2">Tamaño de letra</label>
+                <div className="grid grid-cols-4 gap-2">
+                  {([['0.85', 'Compacto'], ['1', 'Normal'], ['1.2', 'Grande'], ['1.4', 'Enorme']] as const).map(([v, l]) => (
+                    <button key={v} onClick={() => setFontScale(Number(v))}
+                      className={`py-2 rounded-lg text-xs font-semibold ${Math.abs(fontScale - Number(v)) < 0.01 ? 'bg-emerald-500 text-black' : 'bg-[var(--line)] text-[var(--text-3)]'}`}>{l}</button>
+                  ))}
+                </div>
               </div>
             </div>
             <button onClick={() => setShowSettings(false)} className="w-full mt-4 py-3 rounded-xl bg-emerald-500 text-black font-bold">
@@ -787,7 +834,7 @@ export default function CocinaPage() {
 
               return (
                 <div key={card.batchId ? `${order.id}-${card.batchId}` : order.id} className={`rounded-2xl border-2 p-3 flex flex-col ${isOverAlert ? 'bg-red-950/60 border-red-500/60' : `${config.bg} ${config.border}`}`}>
-                  <div className="flex items-start justify-between mb-2">
+                  <div onDoubleClick={() => completeComanda(order.id, activeItems, items)} title="Doble toque: marcar toda la comanda lista" className="flex items-start justify-between mb-2 cursor-pointer select-none">
                     <div>
                       <div className="flex items-center gap-1.5 mb-0.5">
                         <span className="text-3xl font-black">{order.mesa}</span>
@@ -796,6 +843,7 @@ export default function CocinaPage() {
                           {config.label}
                         </span>
                         {order.order_number != null && <span className="text-[10px] font-mono text-[var(--text-3)]">#{order.order_number}</span>}
+                        {order.personas ? <span className="text-[10px] font-bold text-sky-300">{order.personas}p</span> : null}
                       </div>
                       <p className="text-[var(--text-3)] text-xs">{order.mesero}</p>
                     </div>
@@ -821,11 +869,11 @@ export default function CocinaPage() {
                           status === 'preparando' ? 'bg-amber-900/30 border border-amber-500/30' : 'hover:bg-white/5'
                         }`}
                       >
-                        <span className={`font-bold text-lg min-w-[32px] ${status === 'preparando' ? 'text-amber-400' : 'text-emerald-400'}`}>
+                        <span style={{ fontSize: `${1.125 * fontScale}rem` }} className={`font-bold min-w-[32px] ${status === 'preparando' ? 'text-amber-400' : 'text-emerald-400'}`}>
                           {`${item.cantidad || item.quantity || 1}x`}
                         </span>
                         <div className="flex-1">
-                          <p className={`text-lg font-bold leading-tight ${status === 'preparando' ? 'text-amber-200' : 'text-white'}`}>
+                          <p style={{ fontSize: `${1.125 * fontScale}rem` }} className={`font-bold leading-tight ${status === 'preparando' ? 'text-amber-200' : 'text-white'}`}>
                             {item.nombre || item.name}
                           </p>
                           {item.modificadores && item.modificadores.length > 0 && (
