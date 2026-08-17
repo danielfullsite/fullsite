@@ -156,7 +156,7 @@ export default function PlanoEditor() {
             ref={canvasRef}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
-            onClick={() => setSelected(null)}
+            onClick={(e) => { if (e.target === e.currentTarget) setSelected(null) }}
             className="relative w-full h-full rounded-2xl border"
             style={{ borderColor: 'var(--line)', background: 'var(--bg)', backgroundImage: 'radial-gradient(var(--line) 1px, transparent 1px)', backgroundSize: '22px 22px' }}
           >
