@@ -493,7 +493,12 @@ export default function MesasPage() {
     if (staffRole === 'cajero' && !ordersByMesa.has(mesaNum)) {
       return // silently ignore — cajero can't open new restaurant tables
     }
-    router.push(`/pos?mesa=${mesaNum}`)
+    // Navegación DURA (no router.push). Evidencia de campo: en este Next.js (16.2)
+    // router.push('/pos?mesa=N') desde /pos/mesas SOLTABA el ?mesa= y caía al default
+    // (mesa 1) — tocabas la 52 y abría la 1. Una navegación dura a /pos?mesa=N sí lleva
+    // el parámetro (comprobado escribiendo la URL a mano). Offline el SW sirve /pos del
+    // cache (con ignoreVary), así que funciona sin internet igual.
+    window.location.href = `/pos?mesa=${mesaNum}`
   }
 
   // ─── Mesa Card (shared between views) ─────────────────────────────────────
