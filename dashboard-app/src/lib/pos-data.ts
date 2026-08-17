@@ -473,15 +473,46 @@ export async function openTurno(fondoInicial: number, openedBy: string): Promise
   if (existing) return existing // Ya hay uno abierto, retornarlo
 
   const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
+  const openedAt = new Date().toISOString()
+  const localTurno = { id, fondo_inicial: fondoInicial, opened_by: openedBy, opened_at: openedAt }
+  const body = { id, client_id: _getClientId(), opened_by: openedBy, fondo_inicial: fondoInicial, opened_at: openedAt }
+
+  // Cachear el turno local para que getActiveTurno lo devuelva offline (mismo key/shape).
+  const cacheLocal = () => {
+    if (typeof window !== 'undefined') {
+      try { localStorage.setItem('pos_turno_cache', JSON.stringify({ turno: localTurno, ts: Date.now() })) } catch {}
+    }
+  }
+  // Encolar el POST para sincronizar al reconectar. id client-side = idempotente:
+  // al subir crea la MISMA fila, sin duplicar. turno_id en órdenes es TEXT (sin FK),
+  // así que las comandas offline sincronizan aunque el turno suba después.
+  const queueForSync = async () => {
+    try { const { addToQueue } = await import('@/lib/offline-sync'); addToQueue('pos_turnos', body) } catch {}
+  }
+
+  // Offline: abrir turno LOCAL + encolar (el día arranca sin internet).
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    await queueForSync()
+    cacheLocal()
+    return localTurno
+  }
+
   try {
     const res = await fetch(`${_SUPABASE_URL}/rest/v1/pos_turnos`, {
       method: 'POST', headers: { ..._SB_HEADERS, 'Content-Type': 'application/json', Prefer: 'return=representation' },
-      body: JSON.stringify({ id, client_id: _getClientId(), opened_by: openedBy, fondo_inicial: fondoInicial }),
+      body: JSON.stringify(body),
     })
-    if (!res.ok) return null
+    if (!res.ok) throw new Error('post failed')
     const rows = await res.json()
-    return rows[0] || null
-  } catch { return null }
+    cacheLocal()
+    return rows[0] || localTurno
+  } catch {
+    // "Online" pero el POST falló (LAN degradada / timeout) — abrir local + encolar
+    // en vez de bloquear el día con "Error al abrir turno".
+    await queueForSync()
+    cacheLocal()
+    return localTurno
+  }
 }
 
 // ── Modificadores multinivel (estilo el POS legado: "NIVEL 1: PROTEINA, opcional, máx 2") ──
