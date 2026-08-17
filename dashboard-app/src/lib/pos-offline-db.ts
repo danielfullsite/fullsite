@@ -997,4 +997,27 @@ export function registerAutoSync() {
       }
     }, 2000) // small delay to let the app initialize
   }
+
+  // 3. Periodic safety net. El evento 'online' es poco confiable: puede NO
+  //    dispararse en cada reconexión (quirk del navegador), dejando órdenes
+  //    offline atoradas hasta una recarga manual. Cada 20s, si hay red y quedan
+  //    items ACCIONABLES (no synced, no terminal, no agotados en reintentos),
+  //    drena la cola. Garantiza que las comandas offline suban solas.
+  setInterval(async () => {
+    if (isSyncing || !navigator.onLine) return
+    try {
+      const queue = await getPendingQueue(true) // excluye terminales (error_class)
+      const actionable = queue.filter(i => (i.retries ?? 0) < 5)
+      if (actionable.length === 0) return
+      isSyncing = true
+      const { synced, failed } = await syncAll()
+      if (synced > 0 || failed > 0) {
+        console.log(`[offline-sync] Periodic sync: ${synced} synced, ${failed} failed`)
+      }
+    } catch {
+      /* transitorio — el siguiente tick reintenta */
+    } finally {
+      isSyncing = false
+    }
+  }, 20000)
 }
