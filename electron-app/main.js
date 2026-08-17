@@ -6,7 +6,10 @@ const fs   = require('fs');
 const { execSync } = require('child_process');
 
 const POS_URL = 'https://app.fullsite.mx/pos';
-const KDS_URL = 'https://app.fullsite.mx/kds';
+// KDS de Eduardo (sesión de campo Jul 21): panel de demanda, toque por item, tarjeta
+// por envío, FIFO, alertas. login-less (KDS_PATHS en pos/layout) + bridge offline.
+// El /kds standalone (598 líneas) es una versión simplificada sin esos cambios.
+const KDS_URL = 'https://app.fullsite.mx/pos/cocina';
 
 // Modo dev/desk-lab: con FULLSITE_DEV=1 las ventanas abren en modo VENTANA (no
 // kiosco/fullscreen) para poder probar en una Mac/PC sin quedar atrapado. En
@@ -755,6 +758,19 @@ function createKdsWindow(x, y, width, height, urlOverride) {
   kdsWindow.setMenu(null);
   kdsWindow.loadURL(targetUrl);
 
+  // Inject provisioned identity into the KDS window (mirror of mainWindow).
+  // Essential: getKitchenOrders() filters by localStorage 'fullsite_client_id',
+  // and the KDS route never does a Supabase login to set it. Without this the
+  // KDS shows 0 orders even though they exist in pos_orders for this tenant.
+  kdsWindow.webContents.on('did-finish-load', () => {
+    const clientId   = (appConfig.restaurant_id || appConfig.client_id || appConfig.restaurantId || appConfig.clientId || '').toLowerCase().trim();
+    const terminalId = appConfig.terminal_id || appConfig.terminalId;
+    const scripts = [];
+    if (clientId)   scripts.push(`localStorage.setItem('fullsite_client_id', ${JSON.stringify(String(clientId))})`);
+    if (terminalId) scripts.push(`localStorage.setItem('pos_terminal_id', ${JSON.stringify(String(terminalId))})`);
+    if (scripts.length) kdsWindow.webContents.executeJavaScript(scripts.join('; ')).catch(() => {});
+  });
+
   let kdsFailCount = 0;
   kdsWindow.webContents.on('did-fail-load', (_event, errorCode) => {
     if (errorCode === -3) return; // ERR_ABORTED: SW or redirect intercepted
@@ -859,10 +875,15 @@ app.whenReady().then(async () => {
     const { screen } = require('electron');
     const primary = screen.getPrimaryDisplay();
     const { bounds } = primary;
-    // Inject the POS server LAN IP so the KDS bridge connects cross-device
-    const kdsUrlWithBridge = appConfig.pos_server_ip
-      ? `${KDS_URL}?bridge=${appConfig.pos_server_ip}`
-      : KDS_URL;
+    // Inject the POS server LAN IP so the KDS bridge connects cross-device,
+    // and the client slug so getKitchenOrders() filters by the right tenant.
+    // kds_only skips mainWindow (the only place that injects fullsite_client_id),
+    // so without ?client= the KDS queries an empty client_id and shows 0 orders.
+    const kdsClientId = (appConfig.restaurant_id || appConfig.client_id || appConfig.restaurantId || appConfig.clientId || '').toLowerCase().trim();
+    const kdsParams = new URLSearchParams();
+    if (appConfig.pos_server_ip) kdsParams.set('bridge', appConfig.pos_server_ip);
+    if (kdsClientId) kdsParams.set('client', kdsClientId);
+    const kdsUrlWithBridge = kdsParams.toString() ? `${KDS_URL}?${kdsParams.toString()}` : KDS_URL;
     createKdsWindow(bounds.x, bounds.y, bounds.width, bounds.height, kdsUrlWithBridge);
     console.log('[main] kds_only mode — POS window skipped');
     return;
@@ -891,7 +912,9 @@ app.whenReady().then(async () => {
 app.on('window-all-closed', () => app.quit());
 
 app.on('will-quit', () => {
-  globalShortcut.unregisterAll();
+  // globalShortcut solo existe tras 'ready' — si salimos antes (ej. no obtuvimos el
+  // single-instance lock) unregisterAll() truena con "cannot be used before the app is ready".
+  if (app.isReady()) { try { globalShortcut.unregisterAll(); } catch {} }
   if (localServer) { try { localServer.close(); } catch {} }
   if (fingerprintProcess) { fingerprintProcess.kill(); fingerprintProcess = null; }
 });
