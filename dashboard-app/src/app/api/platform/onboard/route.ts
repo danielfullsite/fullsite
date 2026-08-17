@@ -61,7 +61,12 @@ export async function POST(req: NextRequest) {
       password,
       email_confirm: true,
       user_metadata: { client_id: clientId, display_name: resolvedDisplayName },
-      app_metadata: { client_id: clientId },
+      // CRÍTICO: el proxy resuelve el rol SERVER-SIDE desde app_metadata.role (no
+      // desde user_metadata ni client_users, que son falsificables). Sin role='dueño'
+      // aquí, el dueño de cada cliente nuevo cae a rol mínimo y rebota a /pos en vez
+      // del dashboard (era el bug de daniel@fullsite.mx). app_metadata NO es
+      // user-writable, por eso es la fuente de verdad del enforcement.
+      app_metadata: { client_id: clientId, role: 'dueño' },
     })
     if (authError) {
       // Idempotencia: si ya existe, buscarlo por email y continuar.
@@ -71,6 +76,13 @@ export async function POST(req: NextRequest) {
         return Response.json({ error: authError.message }, { status: 400 })
       }
       userId = existing.id
+      // Backfill: un usuario PRE-EXISTENTE pudo crearse sin app_metadata.role (cuentas
+      // viejas). Lo seteamos ahora sin pisar platform_admin ni otras claves.
+      try {
+        await supabase.auth.admin.updateUserById(existing.id, {
+          app_metadata: { ...(existing.app_metadata || {}), client_id: clientId, role: (existing.app_metadata?.role as string) || 'dueño' },
+        })
+      } catch { /* no bloquear el onboarding por esto */ }
     } else {
       userId = authData.user?.id
     }
