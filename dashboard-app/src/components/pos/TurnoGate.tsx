@@ -57,8 +57,14 @@ export default function TurnoGate({ staff, children }: TurnoGateProps) {
         setIsOfflineMode(false)
         setOfflineSince(null)
         if (result.isStale) {
+          // Si el gerente ya eligió "Continuar" para ESTE turno en la sesión,
+          // no volver a preguntar en cada mesa. La navegación de mesa es dura
+          // (window.location) → re-monta el gate en cada tap; sin este ack el
+          // aviso saldría una y otra vez. Se limpia al cerrar la pestaña / login.
+          let acked = false
+          try { acked = sessionStorage.getItem('pos_turno_stale_ack') === result.turno.id } catch {}
           setTurno(result.turno)
-          setStatus('stale')
+          setStatus(acked ? 'active' : 'stale')
         } else {
           setTurno(result.turno)
           setStatus('active')
@@ -286,6 +292,8 @@ export default function TurnoGate({ staff, children }: TurnoGateProps) {
     }
 
     const handleContinue = () => {
+      // Recordar la elección por sesión — no volver a preguntar en cada mesa.
+      try { if (turno) sessionStorage.setItem('pos_turno_stale_ack', turno.id) } catch {}
       setStatus('active')
     }
 
