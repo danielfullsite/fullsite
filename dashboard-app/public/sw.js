@@ -1,7 +1,7 @@
 // Service Worker — Fullsite POS offline-first
 // Caches app shell, static assets, and API responses for true offline operation
 
-const CACHE_VERSION = 'v25'
+const CACHE_VERSION = 'v26'
 const STATIC_CACHE = `fullsite-static-${CACHE_VERSION}`
 const DYNAMIC_CACHE = `fullsite-dynamic-${CACHE_VERSION}`
 const API_CACHE = `fullsite-api-${CACHE_VERSION}`
@@ -181,8 +181,13 @@ async function networkFirstWithCache(request, cacheName) {
     }
     return response
   } catch {
-    // Try exact URL first, then ignore query params (e.g. /pos?mesa=3 → /pos)
-    const cached = await caches.match(request) || await caches.match(request, { ignoreSearch: true })
+    // Try exact URL first, then ignore query params (e.g. /pos?mesa=3 → /pos).
+    // ignoreVary: las respuestas de Next.js App Router traen Vary: rsc, next-router-*
+    // → una navegación cliente (router.push a /pos?mesa=1 con headers RSC) NO empataba
+    // con el /pos cacheado (Vary mismatch) → caía a la página offline aunque /pos SÍ
+    // estaba en cache. ignoreVary hace que empate sin importar esos headers.
+    const cached = await caches.match(request) ||
+      await caches.match(request, { ignoreSearch: true, ignoreVary: true })
     if (cached) return cached
     // Return offline page for HTML requests
     if (request.headers.get('accept')?.includes('text/html')) {
@@ -221,7 +226,11 @@ async function staleWhileRevalidate(request, cacheName) {
     return response
   }).catch(() => null)
 
-  return cached || (await networkFetch) || new Response('Offline', { status: 503 })
+  // Fallback offline: si el match exacto no dio y la red falló, intenta el mismo
+  // recurso ignorando query y Vary (navegación RSC de Next.js → /pos cacheado).
+  return cached || (await networkFetch) ||
+    (await caches.match(request, { ignoreSearch: true, ignoreVary: true })) ||
+    new Response('Offline', { status: 503 })
 }
 
 // ─── Offline HTML ──────────────────────────────────────────────────────────
