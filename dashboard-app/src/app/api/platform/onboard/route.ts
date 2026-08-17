@@ -90,16 +90,22 @@ export async function POST(req: NextRequest) {
       return Response.json({ error: 'No se pudo crear/resolver el usuario' }, { status: 500 })
     }
 
-    // 2. client_users owner mapping (idempotente vía upsert por user_id+client_id).
+    // 2. client_users owner mapping. Idempotente vía check-then-insert (client_users
+    //    NO tiene UNIQUE(user_id,client_id), así que .upsert onConflict TRONABA y el
+    //    error se tragaba en silencio → ningún cliente nuevo obtenía su membresía).
+    //    Ahora: seleccionar existente → insertar si falta → LOGUEAR si falla (nunca
+    //    silencio). El proxy usa app_metadata.role, pero esta fila es la membresía
+    //    canónica (act-as, dueño-de-varios, RLS del service-account offline).
     try {
-      await supabase
-        .from('client_users')
-        .upsert(
-          { user_id: userId, client_id: clientId, role: 'dueño' },
-          { onConflict: 'user_id,client_id', ignoreDuplicates: true }
-        )
-    } catch {
-      // Tabla puede no existir — OK, user_metadata.client_id es fallback.
+      const { data: exists } = await supabase.from('client_users')
+        .select('id').eq('user_id', userId).eq('client_id', clientId).maybeSingle()
+      if (!exists) {
+        const { error: cuErr } = await supabase.from('client_users')
+          .insert({ user_id: userId, client_id: clientId, role: 'dueño' })
+        if (cuErr) console.error(`[onboard] client_users owner insert FAILED for ${clientId}:`, cuErr.message)
+      }
+    } catch (e) {
+      console.error(`[onboard] client_users owner mapping error for ${clientId}:`, e)
     }
 
     // 3. Skeleton completo (idempotente).
@@ -138,10 +144,16 @@ export async function POST(req: NextRequest) {
         svcId = list?.users?.find(u => u.email?.toLowerCase() === svcEmail.toLowerCase())?.id
       }
       if (svcId) {
-        await supabase.from('client_users').upsert(
-          { user_id: svcId, client_id: clientId, role: 'local_server' },
-          { onConflict: 'user_id,client_id', ignoreDuplicates: true }
-        )
+        // Mismo check-then-insert que el dueño (sin onConflict — no hay UNIQUE).
+        // Sin esta membresía, el RLS del service-account offline puede bloquear su
+        // sync a Supabase para este tenant.
+        const { data: svcExists } = await supabase.from('client_users')
+          .select('id').eq('user_id', svcId).eq('client_id', clientId).maybeSingle()
+        if (!svcExists) {
+          const { error: svcCuErr } = await supabase.from('client_users')
+            .insert({ user_id: svcId, client_id: clientId, role: 'local_server' })
+          if (svcCuErr) console.error(`[onboard] client_users local_server insert FAILED for ${clientId}:`, svcCuErr.message)
+        }
         // Solo devolvemos el password si el usuario es NUEVO (createUser sin error).
         if (!svcErr) localServer = { email: svcEmail, password: svcPassword }
       }
