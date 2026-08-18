@@ -17,6 +17,7 @@ export async function GET(req: NextRequest) {
     const events = await fetchEvents(clientId, { status, limit, ...(agentId ? { agentId } : {}) })
     return NextResponse.json({ events, count: events.length })
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 })
+    console.error('[agents/events]', err)
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
   }
 }

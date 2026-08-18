@@ -101,6 +101,7 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (e) {
-    return NextResponse.json({ error: (e as Error).message }, { status: 500 })
+    console.error('[export/polizas]', e)
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
   }
 }

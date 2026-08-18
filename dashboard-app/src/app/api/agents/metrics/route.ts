@@ -60,6 +60,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ metrics, by_agent: byAgent, period_days: 30 })
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 })
+    console.error('[agents/metrics]', err)
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
   }
 }

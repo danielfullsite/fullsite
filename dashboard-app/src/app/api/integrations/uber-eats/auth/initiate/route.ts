@@ -43,7 +43,8 @@ export async function GET(request: NextRequest) {
   try {
     authUrl = buildUberAuthUrl(state, callbackUri)
   } catch (e) {
-    return NextResponse.json({ error: 'oauth_config_error', detail: String(e) }, { status: 503 })
+    console.error('[uber/initiate] oauth_config_error', e)
+    return NextResponse.json({ error: 'oauth_config_error' }, { status: 503 })
   }
 
   await auditLog({
