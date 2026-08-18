@@ -165,6 +165,9 @@ function forwardPost(targetUrl, bodyStr) {
   })
 }
 
+const edgeWatcher = require('./core/edge-watcher')
+const EDGE_SLOW_MINUTES = Number(process.env.FULLSITE_EDGE_SLOW_MIN) || 15
+
 function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, version, serverId, restaurantId, instanceName, branchId, posServerIp, port }) {
   return async function router(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*')
@@ -241,6 +244,14 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, versio
     if (url === '/state' && req.method === 'GET') {
       const seq = await eventStore.getLastSequence()
       json(res, 200, { sequence: seq, ...state.toSnapshot() })
+      return
+    }
+
+    // ── GET /alerts — Edge Agent v0: el experto local vigilando en vivo (offline, determinista) ──
+    if (url === '/alerts' && req.method === 'GET') {
+      let alerts = []
+      try { alerts = edgeWatcher.evaluate(state.toSnapshot(), { slowMinutes: EDGE_SLOW_MINUTES }, Date.now()) } catch (e) {}
+      json(res, 200, { alerts, generated_at: new Date().toISOString() })
       return
     }
 
@@ -473,6 +484,16 @@ async function startLocalServer({ dataDir, port = 7717, config = {} }) {
 
   // ── Lock GC every 30s ────────────────────────────────────────────────────
   setInterval(() => state.gcLocks(), 30_000)
+
+  // ── Edge Agent v0: vigila el estado local y loguea alertas nuevas (offline, determinista) ──
+  let _edgeSeen = new Set()
+  setInterval(() => {
+    try {
+      const alerts = edgeWatcher.evaluate(state.toSnapshot(), { slowMinutes: EDGE_SLOW_MINUTES }, Date.now())
+      for (const a of alerts) if (!_edgeSeen.has(a.id)) console.log(`  [edge] ${a.level.toUpperCase()} · ${a.message}`)
+      _edgeSeen = new Set(alerts.map(a => a.id))
+    } catch (e) {}
+  }, 30_000)
 
   // ── Listen ───────────────────────────────────────────────────────────────
   await new Promise((resolve, reject) => {
