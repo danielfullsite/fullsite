@@ -24,8 +24,15 @@
 Frase congelada: **"El experto que vive en tu restaurante."** Landing ya reposicionada
 (`fullsite-web/index.html`: hero "Un experto de IA en tu restaurante"). Hoja tesis publicada.
 
-### 2. El agente de borde (edge agent) — PLAN
+### 2. El agente de borde (edge agent) — **v0 HECHO**
 El diferenciador que nadie más tiene: un experto que vigila **en vivo y offline**, dentro de Pedro.
+
+> ✅ **v0 shipped (commits f0b42f4d + a2941b58):** `core/edge-watcher.js` — `evaluate()` puro,
+> reglas deterministas offline sobre `kds_orders` (comanda parada > 15 min warn/critical; pico de
+> cancelaciones). Ruta `GET /alerts` en Pedro + tick 30s que loguea `[edge] …`. El **KDS muestra la
+> barra "👁 Experto"** (poll a /alerts, warn ámbar / critical rojo). Probado (node --check + unit test).
+> Vista previa: artifact `18a0a38a`. **Falta v1:** baselines desde la nube (ritmo de venta), regla de
+> print-falló, push a Telegram/nube cuando hay internet, enriquecimiento LLM online.
 
 - **Dónde vive:** `electron-app/local-server/` — nuevo módulo (ej. `core/edge-watcher.js`), corriendo DENTRO de Pedro (la caja). No es la nube; es el borde.
 - **Qué observa:** el event store local + `/state` (kds_orders, tiempos por orden/batch, cancelaciones, ritmo de venta). Cero dependencia de internet.
@@ -84,9 +91,9 @@ clonable. Nadie más lo tiene junto. Wansoft tiene manos; nosotros tenemos el ex
 ---
 
 ## Estado / siguiente
-- Jugada 1: HECHO (landing + tesis).
-- Jugada 5: guion listo (arriba) — ejecutar el jueves.
-- Jugadas 2, 3, 4: PLAN listo aquí. Arranque sugerido: **el agente de borde v0** (reglas
-  deterministas locales) — es el más on-brand y encaja con el offline ya cerrado. Esperar go de Daniel para construir.
+- Jugada 1: HECHO (landing reposicionada + en vivo + hoja tesis).
+- Jugada 2: **v0 HECHO** (edge-watcher + /alerts + barra del Experto en el KDS). Falta v1 (baselines/print-falló/nube).
+- Jugada 5: guion listo — ejecutar el jueves.
+- Jugadas 3, 4: PLAN listo aquí. La caja **ya anuncia por mDNS** (`_fullsite-pos._tcp`) → media #3 hecha; falta el descubrimiento del lado POS/KDS + auto-detect de impresoras + confirmar.
 
 *Relacionados: `docs/offline/OFFLINE-LAN-FIELD-PROVEN-AND-CLONE.md`, `docs/pos/PIPELINE-POS-KDS-OFFLINE.md`.*
