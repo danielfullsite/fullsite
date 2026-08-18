@@ -1450,11 +1450,18 @@ export async function saveOrder(order: Order, saveOperationId?: string): Promise
   }
 
   try {
+    // Hard timeout on the save request. Without it, "connected to the LAN but no
+    // internet" (navigator.onLine stays true, so the guard above doesn't fire) makes
+    // this fetch hang forever and FREEZES the POS. On timeout we abort → the catch
+    // below queues for replay and returns OFFLINE_QUEUED (prints via the local bridge).
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 7000)
     const res = await fetch('/api/pos/save-order', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...getPOSAuthHeaders() },
       body: JSON.stringify(payload),
-    })
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timeoutId))
 
     if (!res.ok) {
       console.warn(`[saveOrder] API error: ${res.status}`)
