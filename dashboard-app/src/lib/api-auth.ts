@@ -100,18 +100,7 @@ export function unauthorized(message = 'No autorizado'): Response {
   return Response.json({ error: message }, { status: 401 })
 }
 
-// ── Legacy helper ─────────────────────────────────────────────────────────────
-// WARNING: getClientId() trusts a client-controlled header. Only safe on routes
-// that already enforce requireAuth() AND where the user is assumed to be honest
-// (internal dashboard fetches). Never use on unauthenticated routes.
-
-const CLIENT_ID_RE = /^[a-z0-9_-]{1,40}$/i
-
-/** @deprecated Use withPOSAuth() for POS mutation routes. */
-export function getClientId(request: NextRequest): string {
-  const fromHeader = request.headers.get('x-client-id')
-  if (fromHeader && CLIENT_ID_RE.test(fromHeader)) return fromHeader
-  const fromParam = request.nextUrl.searchParams.get('client_id')
-  if (fromParam && CLIENT_ID_RE.test(fromParam)) return fromParam
-  return ''
-}
+// BLINDAJE P2-5: se ELIMINÓ el helper legacy getClientId(request) que confiaba en el
+// header client-controlado x-client-id / query param client_id. Era código muerto (0
+// importadores — todas las rutas usan withPOSAuth, que resuelve client_id server-side).
+// Nunca reintroducir un client_id derivado de input del cliente para scoping de tenant.
