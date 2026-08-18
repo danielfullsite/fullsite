@@ -179,22 +179,23 @@ export default function CocinaPage() {
       throw new Error('offline')
     }
 
-    // Auto-archive orders older than 4 hours (stuck in enviada/preparando)
+    // Auto-archive orders with NO activity in 4h (genuinely abandoned). Uses
+    // updated_at (last touch), NOT created_at: a table opened hours ago but still
+    // being worked — e.g. an item just added — must stay on screen and never be
+    // auto-archived. Falls back to created_at when updated_at is absent.
     const now = Date.now()
     const fourHoursMs = 4 * 60 * 60 * 1000
+    const activityAge = (o: KitchenOrderFromDB) =>
+      now - new Date(o.updated_at || o.created_at).getTime()
     for (const order of data) {
-      const age = now - new Date(order.created_at).getTime()
-      if (age > fourHoursMs && (order.status === 'enviada' || order.status === 'preparando')) {
+      if (activityAge(order) > fourHoursMs && (order.status === 'enviada' || order.status === 'preparando')) {
         try {
           await updateOrderStatus(order.id, 'entregada')
         } catch { /* non-blocking */ }
       }
     }
-    // Re-filter after auto-archive
-    const fresh = data.filter(o => {
-      const age = now - new Date(o.created_at).getTime()
-      return age <= fourHoursMs || o.status === 'lista'
-    })
+    // Re-filter after auto-archive — keep orders active within the last 4h.
+    const fresh = data.filter(o => activityAge(o) <= fourHoursMs || o.status === 'lista')
 
     // Also fetch delivery orders (nueva/preparando)
     try {

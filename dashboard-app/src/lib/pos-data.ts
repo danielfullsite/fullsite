@@ -1530,6 +1530,7 @@ export interface KitchenOrderFromDB {
   kds_item_status: string | null // JSON string of Record<string, boolean> — separate from items to avoid race condition
   comanda_batches: string | null // JSON string of Record<string, ComandaBatch> — per-batch status
   created_at: string
+  updated_at?: string // last activity — used to keep long-running tables on the KDS
   notas: string | null
   order_revision?: number
   order_number?: number

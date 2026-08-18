@@ -25,7 +25,7 @@ const CLIENT_RE = /^[a-z0-9_-]{1,40}$/i
 
 // Kitchen-only projection — no total/subtotal/iva/propina/metodo_pago/pagos.
 const KITCHEN_SELECT =
-  'id,mesa,mesero,status,items,kds_item_status,comanda_batches,created_at,notas,order_revision,order_number'
+  'id,mesa,mesero,status,items,kds_item_status,comanda_batches,created_at,updated_at,notas,order_revision,order_number'
 
 export async function GET(request: NextRequest) {
   const clientId = request.nextUrl.searchParams.get('client_id') || ''
