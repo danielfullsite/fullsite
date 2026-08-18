@@ -690,9 +690,16 @@ export default function CocinaPage() {
           <button onClick={() => setShowSettings(true)} className="w-11 h-11 rounded-lg bg-[var(--line)] hover:bg-slate-600 flex items-center justify-center" title="Configuración">
             <Settings size={16} />
           </button>
-          <Link href="/pos" className="w-11 h-11 rounded-lg bg-[var(--line)] hover:bg-red-600/40 flex items-center justify-center" title="Salir del KDS">
-            <X size={18} />
-          </Link>
+          {/* On a dedicated KDS terminal (Electron kds_only, surface==='kds') the
+              "exit" link navigates to /pos, which has no session → it lands on a
+              locked mesas screen and traps the operator. That's unrecoverable while
+              offline (TeamViewer is down). Hide it there; keep it when the kitchen
+              view is opened from within a POS session. */}
+          {!isKdsSurface && (
+            <Link href="/pos" className="w-11 h-11 rounded-lg bg-[var(--line)] hover:bg-red-600/40 flex items-center justify-center" title="Salir del KDS">
+              <X size={18} />
+            </Link>
+          )}
         </div>
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2">
