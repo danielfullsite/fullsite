@@ -1,10 +1,10 @@
 # OFFLINE LAN — Field-Proven Architecture & Clone Recipe
 
-> **Estado (honesto, AMALAY 2026-08-18):** el **print offline de la CAJA** está VERIFICADO
-> (se desconectó internet y sí imprimió). La arquitectura LAN (KDS servido por http + reenvío
-> de POS secundarios) está probada **ONLINE** y es **offline-capable por diseño** — pero el
-> offline de KDS/Entrada **AÚN NO se probó físicamente**. No dar por verificado su offline hasta
-> el test: desconectar internet con el POS abierto → orden → imprime en caja + sale en KDS.
+> **Estado (honesto, AMALAY 2026-08-18):** VERIFICADO offline en **2 terminales** — la **CAJA**
+> imprimió con internet desconectado, y el **KDS recibió órdenes con la caja offline**. El reenvío
+> de **POS secundarios** (Entrada) está probado **ONLINE**; su offline es **offline-capable por
+> diseño** pero **aún no probado físicamente**. No darlo por verificado hasta el test: desconectar
+> internet con el POS abierto → orden → imprime en caja + sale en KDS.
 >
 > Este documento captura **la arquitectura que SÍ jaló** y **cómo clonarla** a un
 > restaurante nuevo. Los docs previos ([[OFFLINE-MASTER]], `docs/offline/*`) describen
