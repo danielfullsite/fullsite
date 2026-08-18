@@ -1438,6 +1438,17 @@ export async function saveOrder(order: Order, saveOperationId?: string): Promise
     console.log('[offline] Order saved to queue — will sync when online')
   }
 
+  // OFFLINE GUARD (root-cause fix): the POS runs under a Service Worker that
+  // intercepts /api/* (network-first). When there is no internet the SW can RETURN a
+  // non-ok Response instead of letting fetch throw — which used to fall through to
+  // API_ERROR, so the send flow showed "Error al guardar orden — NO se imprimió" and
+  // never took the offline branch that prints via the local bridge. Detecting offline
+  // up front guarantees the OFFLINE_QUEUED path (queue for idempotent replay + print).
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    await queueForReplay()
+    return { ok: false, error: 'OFFLINE_QUEUED' }
+  }
+
   try {
     const res = await fetch('/api/pos/save-order', {
       method: 'POST',
@@ -1453,6 +1464,13 @@ export async function saveOrder(order: Order, saveOperationId?: string): Promise
       if (res.status === 401 || res.status === 403) {
         await queueForReplay()
         return { ok: false, error: 'SESSION_EXPIRED' }
+      }
+      // status 0 (SW/network offline fallback) or a transient 5xx must NOT lose the
+      // order or skip printing: queue for idempotent replay and take the offline path
+      // (prints via the local bridge). Real client errors (4xx) still surface.
+      if (res.status === 0 || res.status >= 500) {
+        await queueForReplay()
+        return { ok: false, error: 'OFFLINE_QUEUED' }
       }
       return { ok: false, error: 'API_ERROR' }
     }

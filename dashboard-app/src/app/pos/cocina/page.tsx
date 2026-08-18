@@ -115,7 +115,7 @@ export default function CocinaPage() {
     'Tiempo de espera excesivo',
   ]
 
-  const prevOrderCountRef = useRef(0)
+  const prevEnviadaIdsRef = useRef<Set<string> | null>(null)
 
   const playNotificationSound = () => {
     try {
@@ -225,12 +225,17 @@ export default function CocinaPage() {
       }
     } catch { /* delivery table might not exist yet */ }
 
-    // Play sound if new 'enviada' orders appeared (skip first load)
-    const newEnviadas = fresh.filter(o => o.status === 'enviada').length
-    if (prevOrderCountRef.current > 0 && newEnviadas > prevOrderCountRef.current) {
-      playNotificationSound()
+    // Play sound only when a genuinely NEW 'enviada' order ID appears — compare ID
+    // sets, not counts. A count check beeps on any churn (delivery query flickering,
+    // an order archived then another shown) even when nothing new was sent. Skip the
+    // first load (ref is null) so the initial batch doesn't beep.
+    const enviadaIds = new Set(fresh.filter(o => o.status === 'enviada').map(o => o.id))
+    if (prevEnviadaIdsRef.current !== null) {
+      let hasNew = false
+      for (const id of enviadaIds) { if (!prevEnviadaIdsRef.current.has(id)) { hasNew = true; break } }
+      if (hasNew) playNotificationSound()
     }
-    prevOrderCountRef.current = newEnviadas
+    prevEnviadaIdsRef.current = enviadaIds
     setOrders(fresh)
   }
 
