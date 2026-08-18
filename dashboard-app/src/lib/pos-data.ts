@@ -1544,15 +1544,15 @@ export async function getKitchenOrders(): Promise<KitchenOrderFromDB[]> {
 
   let orders: KitchenOrderFromDB[]
   try {
+    // KDS displays read via the same-origin /api/pos/kitchen endpoint (server-side
+    // service key, tenant-scoped, kitchen-only fields). A login-less KDS cannot read
+    // pos_orders directly — the anon key hits RLS and sees 0 rows — and a KDS on a
+    // separate machine cannot hold the LAN ws:// bridge from an https page (mixed
+    // content). This endpoint is the reliable online path; offline still falls back
+    // to the IndexedDB cache in the catch block below. `cutoff` is applied server-side.
     const res = await fetchWithTimeout(
-      `${SUPABASE_URL}/rest/v1/pos_orders?status=in.(enviada,preparando,lista)&client_id=eq.${_getClientId()}&created_at=gte.${cutoff}&order=created_at.desc`,
-      {
-        headers: {
-          apikey: SUPABASE_KEY,
-          Authorization: `Bearer ${SUPABASE_KEY}`,
-        },
-        cache: 'no-store',
-      }
+      `/api/pos/kitchen?client_id=${encodeURIComponent(_getClientId())}`,
+      { cache: 'no-store' }
     )
     if (!res.ok) return []
     orders = await res.json()
