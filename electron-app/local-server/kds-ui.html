@@ -210,7 +210,7 @@
     return "nueva";
   }
 
-  function render(){
+  function render(allowBeep){
     var built = buildCards(lastGood);
     var cards = built.cards, orderMeta = built.orderMeta;
     var activeIds = new Set(lastGood.map(function(o){ return o.id; }));
@@ -271,10 +271,14 @@
       boardEl.innerHTML=html;
     }
 
-    // new-send sound: beep when a batch id appears that we hadn't seen (and isn't already lista)
-    var cur=new Set(); cards.forEach(function(c){ if(cardStatus(c)!=="lista") cur.add(c.batchId); });
-    if(seenBatches!==null){ var isNew=false; cur.forEach(function(b){ if(!seenBatches.has(b)) isNew=true; }); if(isNew) beep(); }
-    seenBatches=cur;
+    // new-send sound: solo en cargas exitosas del /state (allowBeep). El primer render con
+    // datos (seenBatches===null) establece el baseline SIN sonar; batches nuevos después sí.
+    // Taps y renders offline no tocan el baseline ni suenan.
+    if(allowBeep){
+      var cur=new Set(); cards.forEach(function(c){ if(cardStatus(c)!=="lista") cur.add(c.batchId); });
+      if(seenBatches!==null){ var isNew=false; cur.forEach(function(b){ if(!seenBatches.has(b)) isNew=true; }); if(isNew) beep(); }
+      seenBatches=cur;
+    }
 
     render._meta = orderMeta; // for syncOrder after clicks
   }
@@ -308,7 +312,7 @@
         var bid=it.comanda_batch_id||("seq"+(it.comanda_batch_seq==null?0:it.comanda_batch_seq));
         if(bid===batch) setIState(oid,itemKey(oid,it,i),"listo");
       });
-      render(); syncOrder(order); return;
+      render(false); syncOrder(order); return;
     }
     var item=e.target.closest(".item[data-o]");
     if(item){
@@ -316,7 +320,7 @@
       var cur=getIState(oid2,k);
       var next = cur==="nueva"?"preparando":cur==="preparando"?"listo":"nueva"; // 3rd tap = corregir
       setIState(oid2,k,next);
-      render();
+      render(false);
       var order2=lastGood.find(function(x){ return x.id===oid2; }); if(order2) syncOrder(order2);
     }
   });
@@ -327,13 +331,15 @@
     var ctrl=new AbortController(); var to=setTimeout(function(){ ctrl.abort(); },4000);
     fetch(STATE_BASE+"/state",{cache:"no-store",signal:ctrl.signal})
       .then(function(r){ return r.ok?r.json():Promise.reject(); })
-      .then(function(data){ clearTimeout(to); lastGood=(data&&data.kds_orders)||[]; setConn(true); render(); })
-      .catch(function(){ clearTimeout(to); setConn(false); render(); }); // keep last known orders on the board
+      .then(function(data){ clearTimeout(to); lastGood=(data&&data.kds_orders)||[]; setConn(true); render(true); })
+      .catch(function(){ clearTimeout(to); setConn(false); render(false); }); // keep last known orders on the board
   }
 
   function tick(){ var d=new Date(); document.getElementById("clock").textContent=("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2); }
   tick(); setInterval(tick,15000);
-  render();                    // paint from any cached local state immediately
+  // NOTA: no llamar render() antes del primer /state — dejaría seenBatches en vacío y
+  // la primera carga con órdenes existentes sonaría el beep. El primer render con datos
+  // (seenBatches===null) establece el baseline SIN sonar. Órdenes nuevas después sí suenan.
   fetchState(); setInterval(fetchState,POLL_MS);
 })();
 </script>
