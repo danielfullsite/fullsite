@@ -6,6 +6,20 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { getOrderDetails } from '@/lib/integrations/uber-eats/adapter'
 import { auditLog } from '@/lib/integrations/audit-logger'
+import { withPOSAuth } from '@/lib/api-auth'
+import { timingSafeEqual } from 'crypto'
+
+// BLINDAJE B1 (P0-3): antes SIN auth → POST {} reconciliaba TODOS los tenants
+// (quema cuota Uber = DoS). Ahora: bearer INTEGRATION_ADMIN_SECRET para el job
+// programado (puede reconciliar todos/uno), o sesión de tenant que SOLO reconcilia
+// su propio client_id (jamás todos).
+function isIntegrationAdmin(request: NextRequest): boolean {
+  const secret = process.env.INTEGRATION_ADMIN_SECRET
+  if (!secret) return false
+  const provided = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') || ''
+  const a = Buffer.from(provided), b = Buffer.from(secret)
+  return a.length === b.length && timingSafeEqual(a, b)
+}
 
 const SB_URL = () => process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SB_KEY = () => process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -22,7 +36,18 @@ export async function POST(request: NextRequest) {
   }
 
   const correlationId = crypto.randomUUID()
-  const { client_id, threshold_minutes } = await request.json().catch(() => ({})) as { client_id?: string; threshold_minutes?: number }
+  const bodyIn = await request.json().catch(() => ({})) as { client_id?: string; threshold_minutes?: number }
+  const threshold_minutes = bodyIn.threshold_minutes
+
+  // Resolver el scope de client_id de forma segura.
+  let client_id: string | undefined
+  if (isIntegrationAdmin(request)) {
+    client_id = bodyIn.client_id // admin/job: puede reconciliar uno o todos
+  } else {
+    const auth = await withPOSAuth(request)
+    if (!auth) return NextResponse.json({ ok: false, error: 'No autorizado' }, { status: 401 })
+    client_id = auth.clientId // tenant: SOLO su propio client_id, nunca todos
+  }
 
   const effectiveThreshold = (process.env.UBER_ENV === 'sandbox' && threshold_minutes != null)
     ? threshold_minutes

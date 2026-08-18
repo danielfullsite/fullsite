@@ -9,6 +9,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { buildUberAuthUrl } from '@/lib/integrations/uber-eats/oauth'
 import { auditLog } from '@/lib/integrations/audit-logger'
+import { withPOSAuth } from '@/lib/api-auth'
 
 function redirectUri(req: NextRequest): string {
   const override = process.env.UBER_REDIRECT_URI
@@ -21,15 +22,18 @@ function redirectUri(req: NextRequest): string {
 export async function GET(request: NextRequest) {
   const correlationId = crypto.randomUUID()
 
+  // BLINDAJE B1 (P0-3): el client_id se deriva de la SESIÓN, no del query param.
+  // Antes un atacante iniciaba el flujo con client_id=<víctima> y mapeaba su propia
+  // tienda Uber al tenant de la víctima. Ahora el state lleva el client_id autenticado.
+  const auth = await withPOSAuth(request)
+  if (!auth) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  const clientId = auth.clientId
+
   const { searchParams } = new URL(request.url)
   const storeId = searchParams.get('store_id') || ''
-  const clientId = searchParams.get('client_id') || process.env.NEXT_PUBLIC_DEFAULT_CLIENT_ID
 
   if (!storeId) {
     return NextResponse.json({ error: 'store_id is required' }, { status: 400 })
-  }
-  if (!clientId) {
-    return NextResponse.json({ error: 'client_id is required' }, { status: 400 })
   }
 
   // Generate CSRF state: uuid + encoded store context

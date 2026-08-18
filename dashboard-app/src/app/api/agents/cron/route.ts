@@ -12,10 +12,15 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 export async function GET(req: NextRequest) {
-  // Vercel Cron sends a secret header; validate it
-  const authHeader = req.headers.get('authorization')
+  // BLINDAJE B1 (P0-5): fail-CLOSED. Antes, sin CRON_SECRET configurado el check se
+  // saltaba y el endpoint quedaba abierto (cualquiera dispara corridas de agentes =
+  // costo LLM). Ahora sin secret → 503; con secret → debe coincidir.
   const cronSecret = process.env.CRON_SECRET
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  if (!cronSecret) {
+    return NextResponse.json({ error: 'Cron no configurado' }, { status: 503 })
+  }
+  const authHeader = req.headers.get('authorization')
+  if (authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -33,7 +38,7 @@ export async function GET(req: NextRequest) {
       agents: results.map(r => ({ agent: r.agent_id, events: r.events.length, ms: r.duration_ms })),
       errors: errors.length > 0 ? errors : undefined,
     })
-  } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 })
+  } catch {
+    return NextResponse.json({ error: 'Error ejecutando agentes' }, { status: 500 })
   }
 }

@@ -10,26 +10,36 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { getOrderAdapter, type UberChannel } from '@/lib/integrations/uber-eats/adapter-factory'
 import type { UberDenyReason, UberCancelReason } from '@/lib/integrations/uber-eats/reasons'
 import { UBER_DENY_REASONS, UBER_CANCEL_REASONS } from '@/lib/integrations/uber-eats/reasons'
+import { withPOSAuth } from '@/lib/api-auth'
+import { sameOriginOnly } from '@/lib/api-guard'
+
+// BLINDAJE B1 (P0-3): antes SIN auth → con un order_id adivinable se podía
+// denegar/cancelar la orden en curso de OTRO tenant. Ahora sesión + la orden debe
+// pertenecer al client_id del caller (delivery_orders.client_id).
 
 const SB_URL = () => process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SB_KEY = () => process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-async function resolveOrderContext(platformOrderId: string): Promise<{ storeId?: string; channel: UberChannel }> {
+async function resolveOrderContext(platformOrderId: string): Promise<{ storeId?: string; channel: UberChannel; clientId?: string; found: boolean }> {
   const r = await fetch(
-    `${SB_URL()}/rest/v1/delivery_orders?platform=eq.ubereats&platform_order_id=eq.${encodeURIComponent(platformOrderId)}&select=raw_payload&limit=1`,
+    `${SB_URL()}/rest/v1/delivery_orders?platform=eq.ubereats&platform_order_id=eq.${encodeURIComponent(platformOrderId)}&select=raw_payload,client_id&limit=1`,
     { headers: { apikey: SB_KEY(), Authorization: `Bearer ${SB_KEY()}` } }
   ).catch(() => null)
-  if (!r?.ok) return { channel: 'eats' }
-  const rows = (await r.json()) as Array<{ raw_payload?: Record<string, unknown> }>
-  const raw = rows[0]?.raw_payload
-  if (!raw) return { channel: 'eats' }
-  const storeId = (raw.store as { store_id?: string } | undefined)?.store_id
-  const channelRaw = ((raw.channel ?? '') as string).toLowerCase()
+  if (!r?.ok) return { channel: 'eats', found: false }
+  const rows = (await r.json()) as Array<{ raw_payload?: Record<string, unknown>; client_id?: string }>
+  const row = rows[0]
+  if (!row) return { channel: 'eats', found: false }
+  const raw = row.raw_payload
+  const storeId = (raw?.store as { store_id?: string } | undefined)?.store_id
+  const channelRaw = ((raw?.channel ?? '') as string).toLowerCase()
   const channel: UberChannel = channelRaw === 'delivery' ? 'delivery' : 'eats'
-  return { storeId, channel }
+  return { storeId, channel, clientId: row.client_id, found: true }
 }
 
 export async function POST(request: NextRequest) {
+  const originBlock = sameOriginOnly(request); if (originBlock) return originBlock
+  const auth = await withPOSAuth(request)
+  if (!auth) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   const correlationId = crypto.randomUUID()
   try {
     const { order_id, action, reason, minutes_to_ready } = await request.json() as {
@@ -42,7 +52,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'order_id and action required' }, { status: 400 })
     }
 
-    const { storeId, channel } = await resolveOrderContext(order_id)
+    const { storeId, channel, clientId, found } = await resolveOrderContext(order_id)
+    // La orden debe existir y pertenecer al tenant del caller (sin IDOR cross-tenant).
+    if (!found || clientId !== auth.clientId) {
+      return NextResponse.json({ error: 'No encontrado' }, { status: 404 })
+    }
     const adapter = getOrderAdapter(channel)
 
     switch (action) {
@@ -71,7 +85,7 @@ export async function POST(request: NextRequest) {
       default:
         return NextResponse.json({ error: 'action must be accept, deny, cancel, or ready' }, { status: 400 })
     }
-  } catch (e) {
-    return NextResponse.json({ ok: false, error: String(e), correlation_id: correlationId }, { status: 500 })
+  } catch {
+    return NextResponse.json({ ok: false, error: 'Error interno', correlation_id: correlationId }, { status: 500 })
   }
 }
