@@ -1,5 +1,12 @@
 # OFFLINE-MASTER — Arquitectura Offline de Fullsite
 
+> ⭐ **ACTUALIZACIÓN DE CAMPO 2026-08-18:** el offline completo (imprimir sin internet +
+> KDS recibiendo órdenes en máquina separada) **funcionó end-to-end en producción (AMALAY)**
+> por primera vez. La arquitectura **field-proven** y la **receta clonable** viven en
+> **`docs/offline/OFFLINE-LAN-FIELD-PROVEN-AND-CLONE.md`** — LÉELO PRIMERO; corrige supuestos
+> de este doc (el KDS se sirve por **http desde Pedro**, no https, y el POS imprime por
+> `FULLSITE_BRIDGE_URL` a la caja). Este documento queda como diseño histórico de julio.
+
 > Auditoría OFFLINE-100. Fecha: 2026-07-27.
 > Cada componente tiene status: **VERIFIED** | **PARTIAL** | **UNKNOWN** | **NOT IMPLEMENTED**
 > VERIFIED = código existe + test corre verde. PARTIAL = código existe, sin test o con gap. UNKNOWN = no hay evidencia suficiente. NOT IMPLEMENTED = diseñado pero sin código.

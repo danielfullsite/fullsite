@@ -1,0 +1,15 @@
+{
+  "config_version": 1,
+  "restaurant_id": "amalay",
+  "terminal_id": "E3CB3435-AC7F-43D5-B23D-656DA5D6F6EA",
+  "terminal_role": "server_pos",
+  "terminal_name": "Caja Principal",
+  "local_server_host": "127.0.0.1",
+  "local_server_port": 7717,
+  "protocol_version": "1.0",
+  "provisioned_at": "2026-08-18T03:01:15Z",
+  "client_id": "amalay",
+  "channel": "stable",
+  "kds": false,
+  "kds_only": false
+}

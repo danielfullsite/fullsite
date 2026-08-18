@@ -1,0 +1,15 @@
+{
+  "config_version": 1,
+  "restaurant_id": "amalay",
+  "terminal_id": "23BCC89A-540C-46A2-942C-7CB43C74B723",
+  "terminal_role": "kds",
+  "terminal_name": "Cocina",
+  "local_server_host": "192.168.1.71",
+  "local_server_port": 7717,
+  "protocol_version": "1.0",
+  "provisioned_at": "2026-08-18T03:01:15Z",
+  "client_id": "amalay",
+  "channel": "stable",
+  "kds_only": true,
+  "pos_server_ip": "192.168.1.71"
+}
