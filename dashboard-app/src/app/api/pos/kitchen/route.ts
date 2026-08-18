@@ -33,14 +33,16 @@ export async function GET(request: NextRequest) {
     return Response.json({ error: 'client_id inválido' }, { status: 400 })
   }
 
-  // Last 12h of active orders — mirrors getKitchenOrders() so ancient "enviada"
-  // rows don't pile up on the screen.
+  // Show orders with activity in the last 12h so ancient "enviada" rows don't pile
+  // up — but filter on updated_at, NOT created_at: a table opened >12h ago that just
+  // had an item added (e.g. a bowl) is still active and must appear. On creation
+  // updated_at == created_at, so new orders are covered too.
   const cutoff = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString()
   const url =
     `${SB_URL}/rest/v1/pos_orders` +
     `?status=in.(enviada,preparando,lista)` +
     `&client_id=eq.${encodeURIComponent(clientId)}` +
-    `&created_at=gte.${encodeURIComponent(cutoff)}` +
+    `&updated_at=gte.${encodeURIComponent(cutoff)}` +
     `&select=${KITCHEN_SELECT}` +
     `&order=created_at.desc`
 
