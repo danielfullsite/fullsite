@@ -334,9 +334,12 @@ export async function getMenuCategoriesFromDB(): Promise<MenuCategory[]> {
     const clientId = _getClientId()
     if (!clientId) return []
 
+    // velocidad offline: si el SO ya sabe que no hay red, sirve de caché al instante (no esperes el timeout)
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return _getMenuFromCache()
+
     const [catRes, itemsRes] = await Promise.all([
-      fetch(`${_SUPABASE_URL}/rest/v1/pos_menu_categories?client_id=eq.${clientId}&active=eq.true&order=sort_order.asc`, { headers: _SB_HEADERS, cache: 'no-store' }),
-      fetch(`${_SUPABASE_URL}/rest/v1/pos_menu_items?client_id=eq.${clientId}&active=eq.true&order=sort_order.asc`, { headers: _SB_HEADERS, cache: 'no-store' }),
+      fetchWithTimeout(`${_SUPABASE_URL}/rest/v1/pos_menu_categories?client_id=eq.${clientId}&active=eq.true&order=sort_order.asc`, { headers: _SB_HEADERS, cache: 'no-store' }, 3500),
+      fetchWithTimeout(`${_SUPABASE_URL}/rest/v1/pos_menu_items?client_id=eq.${clientId}&active=eq.true&order=sort_order.asc`, { headers: _SB_HEADERS, cache: 'no-store' }, 3500),
     ])
     if (!catRes.ok || !itemsRes.ok) {
       // DB error — try IDB cache before returning empty
@@ -394,9 +397,10 @@ export interface PaymentMethodDB {
 
 export async function getPaymentMethodsFromDB(): Promise<PaymentMethodDB[]> {
   try {
-    const res = await fetch(
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return _getPaymentMethodsFromCache()
+    const res = await fetchWithTimeout(
       `${_SUPABASE_URL}/rest/v1/pos_payment_methods?client_id=eq.${_getClientId()}&active=eq.true&select=id,name,type,commission_pct&order=name.asc`,
-      { headers: _SB_HEADERS, cache: 'no-store' }
+      { headers: _SB_HEADERS, cache: 'no-store' }, 3500
     )
     if (!res.ok) {
       return _getPaymentMethodsFromCache()
@@ -524,9 +528,10 @@ function isGroupCompatible(groupName: string, categoryId: string): boolean {
 export async function getModifierGroupsForItem(itemId: string, categoryId: string): Promise<ModifierGroupDef[]> {
   try {
     const cid = _getClientId()
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return _getModifierGroupsFromCache(itemId, categoryId)
     const [itemAssignRes, catAssignRes] = await Promise.all([
-      fetch(`${_SUPABASE_URL}/rest/v1/pos_item_modifier_groups?client_id=eq.${cid}&item_id=eq.${encodeURIComponent(itemId)}&select=group_id`, { headers: _SB_HEADERS, cache: 'no-store' }),
-      fetch(`${_SUPABASE_URL}/rest/v1/pos_category_modifiers?client_id=eq.${cid}&category_id=eq.${encodeURIComponent(categoryId)}&select=modifier_group_id`, { headers: _SB_HEADERS, cache: 'no-store' }),
+      fetchWithTimeout(`${_SUPABASE_URL}/rest/v1/pos_item_modifier_groups?client_id=eq.${cid}&item_id=eq.${encodeURIComponent(itemId)}&select=group_id`, { headers: _SB_HEADERS, cache: 'no-store' }, 3500),
+      fetchWithTimeout(`${_SUPABASE_URL}/rest/v1/pos_category_modifiers?client_id=eq.${cid}&category_id=eq.${encodeURIComponent(categoryId)}&select=modifier_group_id`, { headers: _SB_HEADERS, cache: 'no-store' }, 3500),
     ])
 
     const groupIds = new Set<string>()
@@ -541,8 +546,8 @@ export async function getModifierGroupsForItem(itemId: string, categoryId: strin
 
     const idList = [...groupIds].map(encodeURIComponent).join(',')
     const [groupsRes, optsRes] = await Promise.all([
-      fetch(`${_SUPABASE_URL}/rest/v1/pos_modifier_groups?client_id=eq.${cid}&active=eq.true&id=in.(${idList})&order=level.asc,sort_order.asc`, { headers: _SB_HEADERS, cache: 'no-store' }),
-      fetch(`${_SUPABASE_URL}/rest/v1/pos_modifiers?client_id=eq.${cid}&active=eq.true&group_id=in.(${idList})&order=sort_order.asc`, { headers: _SB_HEADERS, cache: 'no-store' }),
+      fetchWithTimeout(`${_SUPABASE_URL}/rest/v1/pos_modifier_groups?client_id=eq.${cid}&active=eq.true&id=in.(${idList})&order=level.asc,sort_order.asc`, { headers: _SB_HEADERS, cache: 'no-store' }, 3500),
+      fetchWithTimeout(`${_SUPABASE_URL}/rest/v1/pos_modifiers?client_id=eq.${cid}&active=eq.true&group_id=in.(${idList})&order=sort_order.asc`, { headers: _SB_HEADERS, cache: 'no-store' }, 3500),
     ])
     if (!groupsRes.ok || !optsRes.ok) return []
 
@@ -627,11 +632,11 @@ export async function prefetchOfflineData(): Promise<void> {
   const cid = _getClientId()
   try {
     const [groupsRes, modsRes, itemLinksRes, catLinksRes, methodsRes] = await Promise.all([
-      fetch(`${_SUPABASE_URL}/rest/v1/pos_modifier_groups?client_id=eq.${cid}&active=eq.true&select=id,name,level,min_selections,max_selections,required,sort_order`, { headers: _SB_HEADERS }),
-      fetch(`${_SUPABASE_URL}/rest/v1/pos_modifiers?client_id=eq.${cid}&active=eq.true&select=id,group_id,name,price,sort_order`, { headers: _SB_HEADERS }),
-      fetch(`${_SUPABASE_URL}/rest/v1/pos_item_modifier_groups?client_id=eq.${cid}&select=item_id,group_id`, { headers: _SB_HEADERS }),
-      fetch(`${_SUPABASE_URL}/rest/v1/pos_category_modifiers?client_id=eq.${cid}&select=category_id,modifier_group_id`, { headers: _SB_HEADERS }),
-      fetch(`${_SUPABASE_URL}/rest/v1/pos_payment_methods?client_id=eq.${cid}&active=eq.true&select=id,name,type,commission_pct&order=name.asc`, { headers: _SB_HEADERS }),
+      fetchWithTimeout(`${_SUPABASE_URL}/rest/v1/pos_modifier_groups?client_id=eq.${cid}&active=eq.true&select=id,name,level,min_selections,max_selections,required,sort_order`, { headers: _SB_HEADERS }, 6000),
+      fetchWithTimeout(`${_SUPABASE_URL}/rest/v1/pos_modifiers?client_id=eq.${cid}&active=eq.true&select=id,group_id,name,price,sort_order`, { headers: _SB_HEADERS }, 6000),
+      fetchWithTimeout(`${_SUPABASE_URL}/rest/v1/pos_item_modifier_groups?client_id=eq.${cid}&select=item_id,group_id`, { headers: _SB_HEADERS }, 6000),
+      fetchWithTimeout(`${_SUPABASE_URL}/rest/v1/pos_category_modifiers?client_id=eq.${cid}&select=category_id,modifier_group_id`, { headers: _SB_HEADERS }, 6000),
+      fetchWithTimeout(`${_SUPABASE_URL}/rest/v1/pos_payment_methods?client_id=eq.${cid}&active=eq.true&select=id,name,type,commission_pct&order=name.asc`, { headers: _SB_HEADERS }, 6000),
     ])
 
     const { cacheModifierData, cachePaymentMethods } = await import('@/lib/pos-offline-db')
@@ -665,9 +670,10 @@ export async function getModifiersForCategoryFromDB(categoryId: string): Promise
   agregarOptions: ModificadorAgregar[]
 }> {
   try {
-    const assignRes = await fetch(
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return getModifiersForCategory(categoryId)
+    const assignRes = await fetchWithTimeout(
       `${_SUPABASE_URL}/rest/v1/pos_category_modifiers?client_id=eq.${_getClientId()}&category_id=eq.${categoryId}&select=modifier_group_id`,
-      { headers: _SB_HEADERS, cache: 'no-store' }
+      { headers: _SB_HEADERS, cache: 'no-store' }, 3500
     )
     if (!assignRes.ok) return getModifiersForCategory(categoryId)
 
@@ -675,9 +681,9 @@ export async function getModifiersForCategoryFromDB(categoryId: string): Promise
     if (!assignments.length) return { quitarOptions: [], agregarOptions: [] }
 
     const groupIds = assignments.map(a => a.modifier_group_id)
-    const modRes = await fetch(
+    const modRes = await fetchWithTimeout(
       `${_SUPABASE_URL}/rest/v1/pos_modifiers?client_id=eq.${_getClientId()}&active=eq.true&group_id=in.(${groupIds.join(',')})&order=sort_order.asc`,
-      { headers: _SB_HEADERS, cache: 'no-store' }
+      { headers: _SB_HEADERS, cache: 'no-store' }, 3500
     )
     if (!modRes.ok) return getModifiersForCategory(categoryId)
 
@@ -1208,10 +1214,18 @@ export async function fetchMeseros(clientId?: string): Promise<string[]> {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   if (!url || !key) return MESEROS
 
+  // velocidad offline: si no hay red, usa el cache local al instante (no esperes el timeout)
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    try {
+      const cached = localStorage.getItem('pos_meseros_cache')
+      if (cached) { const parsed: string[] = JSON.parse(cached); if (parsed.length > 0) { MESEROS = parsed; return MESEROS } }
+    } catch {}
+  }
+
   try {
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       `${url}/rest/v1/pos_staff?client_id=eq.${cid}&active=eq.true&role=in.(mesero,cajero,barra,supervisor)&select=name&order=name.asc`,
-      { headers: { apikey: key, Authorization: `Bearer ${key}` }, cache: 'no-store' }
+      { headers: { apikey: key, Authorization: `Bearer ${key}` }, cache: 'no-store' }, 3500
     )
     if (res.ok) {
       const rows: { name: string }[] = await res.json()
@@ -1503,15 +1517,15 @@ export async function getKitchenOrders(): Promise<KitchenOrderFromDB[]> {
 
   let orders: KitchenOrderFromDB[]
   try {
+    // KDS displays read via the same-origin /api/pos/kitchen endpoint (server-side
+    // service key, tenant-scoped, kitchen-only fields). A login-less KDS cannot read
+    // pos_orders directly — the anon key hits RLS and sees 0 rows — and a KDS on a
+    // separate machine cannot hold the LAN ws:// bridge from an https page (mixed
+    // content). This endpoint is the reliable online path; offline still falls back
+    // to the IndexedDB cache in the catch block below. `cutoff` is applied server-side.
     const res = await fetchWithTimeout(
-      `${SUPABASE_URL}/rest/v1/pos_orders?status=in.(enviada,preparando,lista)&client_id=eq.${_getClientId()}&created_at=gte.${cutoff}&order=created_at.desc`,
-      {
-        headers: {
-          apikey: SUPABASE_KEY,
-          Authorization: `Bearer ${SUPABASE_KEY}`,
-        },
-        cache: 'no-store',
-      }
+      `/api/pos/kitchen?client_id=${encodeURIComponent(_getClientId())}`,
+      { cache: 'no-store' }
     )
     if (!res.ok) return []
     orders = await res.json()
