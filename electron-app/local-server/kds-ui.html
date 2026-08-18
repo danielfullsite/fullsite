@@ -33,6 +33,13 @@
   .gear:active{background:var(--line)}
   .gear:focus-visible{outline:2px solid var(--prep);outline-offset:2px}
 
+  /* edge agent — el experto vigilando (barra de alertas) */
+  .alerts{display:flex;gap:9px;align-items:center;padding:9px 18px;background:#191307;border-bottom:1px solid #3a2c12;overflow-x:auto;flex-shrink:0}
+  .alerts .lbl{font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--prep);display:flex;align-items:center;gap:6px;flex-shrink:0}
+  .alerts .chip{font-size:13.5px;font-weight:600;padding:5px 12px;border-radius:20px;white-space:nowrap;flex-shrink:0}
+  .alerts .chip.warn{background:var(--prep-bg);color:#fcd34d;border:1px solid #5a4a1f}
+  .alerts .chip.critical{background:rgba(239,68,68,.15);color:#fca5a5;border:1px solid #7f1d1d}
+
   /* body: rail + board */
   .body{flex:1;display:flex;min-height:0}
   aside{width:230px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden}
@@ -146,6 +153,7 @@
       <button class="gear" id="gear" title="Ajustes" aria-label="Ajustes">⚙</button>
     </div>
   </header>
+  <div class="alerts" id="alerts" hidden></div>
   <div class="body">
     <aside>
       <div class="rail-h">Pendientes por platillo</div>
@@ -408,6 +416,23 @@
     applyStationLabel(); seenBatches=null; render(false); closeModal(); toast("Ajustes guardados");
   });
 
+  // ── Edge Agent: el experto vigilando (barra de alertas, poll a /alerts) ──
+  var alertsEl=document.getElementById("alerts");
+  function renderAlerts(list){
+    if(!list || !list.length){ alertsEl.hidden=true; alertsEl.innerHTML=""; return; }
+    alertsEl.hidden=false;
+    alertsEl.innerHTML='<span class="lbl">👁 Experto</span>'+list.slice(0,6).map(function(a){
+      return '<span class="chip '+(a.level==="critical"?"critical":"warn")+'">'+esc(a.message)+'</span>';
+    }).join("");
+  }
+  function fetchAlerts(){
+    var ctrl=new AbortController(); var to=setTimeout(function(){ ctrl.abort(); },4000);
+    fetch(STATE_BASE+"/alerts",{cache:"no-store",signal:ctrl.signal})
+      .then(function(r){ return r.ok?r.json():Promise.reject(); })
+      .then(function(d){ clearTimeout(to); renderAlerts((d&&d.alerts)||[]); })
+      .catch(function(){ clearTimeout(to); }); // deja lo último; nunca rompe el KDS
+  }
+
   function setConn(ok){ online=ok; connDot.style.background=ok?"var(--lista)":"var(--danger)"; connTxt.textContent=ok?"conectado":"sin conexión — reintentando"; }
 
   function fetchState(){
@@ -422,6 +447,7 @@
   tick(); setInterval(tick,15000);
   // El primer render con datos (seenBatches===null) fija el baseline SIN sonar.
   fetchState(); setInterval(fetchState,POLL_MS);
+  fetchAlerts(); setInterval(fetchAlerts,15000);   // el experto vigilando
 })();
 </script>
 </body>
