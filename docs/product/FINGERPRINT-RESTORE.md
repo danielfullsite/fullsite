@@ -25,13 +25,27 @@
 - `GET /identify` (captura 1x, match 1:N) → `{ ok:true, staffId }` | `{ ok:false, error }`
 - `GET /list` → lista de enrolados (usado por KDS/monitor)
 
-## Cómo reactivarla — caminos (rápido → lento)
-1. **Localizar el `.exe` en las cajas (RÁPIDO, ~30 min).** En la caja de AMALAY (SERVER1, y quizá PDV2/PDV3),
-   revisar `C:\fullsite\fingerprint-service.exe` + `DPUruNet.dll`. Estaban ahí el 12-jul. Si están:
-   copiarlos, **respaldarlos en el repo** (como artefacto/release, no en git normal) + documentar hash/origen.
-   Luego basta con conectar el lector + desplegar el web (el login ya usa el 7718).
-2. **Encontrar la FUENTE C#** (donde se compiló ~8-jul) → recompilar y **commitear la fuente** para no volver a perderla.
-3. **Rehacer el servicio** desde el contrato de arriba (con el SDK U.are.U de HID) — ~2-4 semanas, pero sabemos exactamente qué debe hacer. Solo si 1 y 2 fallan.
+## ✅ FUENTE RECUPERADA (2026-08-18)
+La fuente C# completa (**`print-bridge/fingerprint-service.cs`**, 547 líneas) se recuperó del transcript
+de la sesión de julio (`363a0548`) y **YA ESTÁ COMMITEADA** (`be129f8a`). Nunca se había commiteado y
+se había borrado del disco. **Ya no dependemos del `.exe` suelto de la caja.**
+
+Del encabezado del archivo:
+- **Compila en Windows con UNA línea** (el compilador ya viene con Windows, NO necesita Visual Studio):
+  ```
+  C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe /r:DPUruNet.dll /out:fingerprint-service.exe fingerprint-service.cs
+  ```
+- **Prerrequisito:** `DPUruNet.dll` (del SDK **DigitalPersona U.are.U** de HID) junto al `.cs`.
+- Lee `C:\fullsite\config.json` (restaurant_id, supabaseUrl, supabaseAnonKey).
+- Guarda templates **local + Supabase** → multi-terminal.
+
+## Cómo reactivarla — el camino AHORA (fácil)
+1. **Compilar** (en cualquier Windows, ~5 min): conseguir `DPUruNet.dll` (SDK U.are.U de HID; probablemente ya está en la caja o en el SDK), poner junto al `.cs`, correr la línea `csc.exe` de arriba → sale `fingerprint-service.exe`.
+2. **Instalar**: copiar `fingerprint-service.exe` + `DPUruNet.dll` a `C:\fullsite\` en la caja + `config.json`. Conectar el lector HID 4500 + drivers.
+3. **Desplegar el web** (el login ya usa el 7718). La opción "Entrar con huella" sale sola cuando `/health` responde.
+4. **Revisar** la confiabilidad del lector USB (los problemas reportados).
+
+> Fallback si se pierde el `.cs` otra vez: está en git (`be129f8a`) y en el transcript. Y un `.exe` de C# se decompila limpio (ILSpy/dnSpy).
 
 ## Estado del código (ya listo)
 - El login **ya usa el 7718** (se revirtió el desvío a WebAuthn, commit `34618598`).
