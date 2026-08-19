@@ -835,6 +835,9 @@ function createKdsWindow(x, y, width, height, urlOverride) {
     const scripts = [];
     if (clientId)   scripts.push(`localStorage.setItem('fullsite_client_id', ${JSON.stringify(String(clientId))})`);
     if (terminalId) scripts.push(`localStorage.setItem('pos_terminal_id', ${JSON.stringify(String(terminalId))})`);
+    // Token de cocina por-tenant (si está en la config): el KDS lo manda a /api/pos/kitchen.
+    const kitchenToken = appConfig.kitchen_token || appConfig.kitchenToken;
+    if (kitchenToken) scripts.push(`localStorage.setItem('pos_kitchen_token', ${JSON.stringify(String(kitchenToken))})`);
     if (scripts.length) kdsWindow.webContents.executeJavaScript(scripts.join('; ')).catch(() => {});
     // TEMP DIAG
     kdsWindow.webContents.executeJavaScript(`JSON.stringify({cid: localStorage.getItem('fullsite_client_id'), bh: localStorage.getItem('pos_bridge_host'), tid: localStorage.getItem('pos_terminal_id'), electron: navigator.userAgent.includes('Electron'), url: location.href})`).then(v => console.log('[kds-diag]', v)).catch(e => console.log('[kds-diag ERR]', e.message));

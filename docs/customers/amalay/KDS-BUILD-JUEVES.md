@@ -59,6 +59,22 @@ Se guarda en `%APPDATA%\Fullsite KDS\config.json` (o legacy `C:\fullsite\config.
 - `http://192.168.1.71:7717/state` → `kds_orders` poblado.
 - KDS en pantalla completa, sin botón Salir visible (terminal dedicada).
 
+## Token de cocina (endurecimiento, opcional — no bloquea el jueves)
+
+El endpoint `/api/pos/kitchen` sirve las órdenes a la pantalla. Por defecto opera **abierto**
+(igual que hoy). Para cerrarlo contra enumeración entre tenants, es **opt-in**:
+
+1. **Vercel:** setear env `KITCHEN_TOKEN_SECRET` (≥16 chars, aleatorio).
+2. **Generar el token del cliente:**
+   ```
+   KITCHEN_TOKEN_SECRET="<secreto>" node print-bridge/gen-kitchen-token.js amalay
+   ```
+3. **Config del KDS/caja:** agregar `"kitchen_token": "<lo que imprimió>"` al `config.json`.
+   El Electron lo inyecta en el KDS; `pos-data.ts` lo manda en el header `x-kitchen-token`.
+
+Sin el env → todo sigue igual (cero riesgo). Con el env pero sin el token en config → el KDS
+recibiría 401; por eso se activan juntos. Recomendado hacerlo **después** del jueves.
+
 ## Riesgos / notas
 - **No reiniciar sin internet** durante el demo (arranque en frío puede quedar en negro).
 - Si el KDS marca 0 órdenes: revisar que `restaurant_id` coincida (caja y KDS mismo `amalay`) y que el 7717 de la caja responda.
