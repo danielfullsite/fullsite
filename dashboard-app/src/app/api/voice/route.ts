@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
       ? 'fecha,ventas_dia,ventas_brutas,descuentos,tickets_count,personas_restaurant,ticket_promedio_restaurant,efectivo,tarjeta,meseros,ventas_por_grupo,pago_métodos,platillos_top'
       : 'fecha,ventas_dia,tickets_count,personas_restaurant,ticket_promedio_restaurant,efectivo,tarjeta'
     const dailyRes = await fetch(
-      `${sbUrl}/rest/v1/wansoft_daily?select=${selectCols}&ventas_dia=gt.0&order=fecha.desc&limit=${histLimit}`,
+      `${sbUrl}/rest/v1/wansoft_daily?select=${selectCols}&client_slug=eq.${encodeURIComponent(auth.clientId)}&ventas_dia=gt.0&order=fecha.desc&limit=${histLimit}`,
       { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
     )
     const recentDays = dailyRes.ok ? await dailyRes.json() : []
@@ -119,7 +119,9 @@ export async function POST(request: NextRequest) {
     let waiterContext = ''
     const wantsMeseros = ['mesero', 'quien', 'quién', 'ranking', 'top', 'mejor', 'peor', 'h&h', 'half', 'bebida', 'postre', 'pan', 'toast', 'propina'].some(kw => q.includes(kw))
 
-    if (!wantsMeseros) {
+    // wansoft_waiter_categories NO tiene columna de cliente → es solo-AMALAY (legacy).
+    // Para otros tenants no se lee (evita filtrar datos de AMALAY).
+    if (!wantsMeseros || auth.clientId !== 'amalay') {
       // Skip entirely — saves ~5,000-10,000 tokens per call
     } else {
     let wcParams = 'select=fecha,data&order=fecha.desc'
@@ -348,7 +350,7 @@ DATOS DIARIOS (ultimos ${recentDays.length} dias).\n${lines.join('\n')}`
           const currentYear = todayStr.slice(0, 4)
           const prevYear = String(Number(currentYear) - 1)
           const yoyRes = await fetch(
-            `${sbUrl}/rest/v1/wansoft_daily?select=fecha,ventas_dia,tickets_count,personas_restaurant&ventas_dia=gt.0&fecha=gte.${prevYear}-01-01&fecha=lte.${prevYear}-12-31&order=fecha.asc&limit=500`,
+            `${sbUrl}/rest/v1/wansoft_daily?select=fecha,ventas_dia,tickets_count,personas_restaurant&client_slug=eq.${encodeURIComponent(auth.clientId)}&ventas_dia=gt.0&fecha=gte.${prevYear}-01-01&fecha=lte.${prevYear}-12-31&order=fecha.asc&limit=500`,
             { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
           )
           if (yoyRes.ok) {

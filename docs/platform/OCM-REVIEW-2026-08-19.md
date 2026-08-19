@@ -44,8 +44,14 @@ Son **dos problemas superpuestos**, con **una raíz**:
 
 ## Plan de repunte (fases, en orden)
 
-### Fase 0 — Hotfix de aislamiento `[P0 seguridad, rápido]`
-Agregar filtro `client_id` en las queries de `coach`, `voice`, `inventory/predict`, y el YoY de `chat` (L716), y en `waste_detector.py` / `purchase_predictor.py`. **Va sí o sí antes de Cliente #2** — son service_role, RLS no las cubre. No depende de OCM; es puro filtro.
+### Fase 0 — Hotfix de aislamiento `[P0 seguridad]` — ✅ TS HECHO 2026-08-19
+Agregar filtro por tenant en las queries de IA. **Va sí o sí antes de Cliente #2** — usan anon/service key, RLS no basta.
+- ✅ `coach`: `wansoft_daily` scopeado por `client_slug`; guard si falta `client_id`; `wansoft_waiter_categories` (sin columna de cliente) gateada a AMALAY.
+- ✅ `voice`: `wansoft_daily` (2 queries) scopeado por `auth.clientId`; waiter_categories gateada a AMALAY.
+- ✅ `inventory/predict`: `wansoft_daily` scopeado por `auth.clientId`.
+- ✅ `chat`: YoY (L716) scopeado; `wansoft_waiter_categories` gateada a AMALAY.
+- **Descubrimiento:** `wansoft_waiter_categories` NO tiene columna de cliente → es solo-AMALAY; el equivalente vivo será `ocm_waiter_rankings` (Fase 2).
+- ⏳ Pendiente (follow-up, agentes Python cron, menor superficie): `waste_detector.py`, `purchase_predictor.py` (leen `wansoft_*` sin filtro); revisar `wansoft_hourly` (¿columna de cliente?).
 
 ### Fase 1 — `ocm_daily` vivo `[el eslabón clave]`
 Reescribir `ocm_daily` para **agregar `pos_orders` directamente** (como vista), matando la dependencia de la tabla muerta `ops_daily` y del `pos_daily_aggregator` bloqueado. Resultado: ventas/tickets/ticket-promedio/tendencias **vivas para cualquier tenant, sin job intermedio**. Para AMALAY, `UNION` con la historia de `wansoft_daily` (source_system) para no perder el histórico rico pre-cutover.

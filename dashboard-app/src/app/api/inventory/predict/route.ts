@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
 
     const cid = encodeURIComponent(auth.clientId)
     const [dailyRes, recipesRes, inventoryRes, menuRes] = await Promise.all([
-      fetch(`${sbUrl}/rest/v1/wansoft_daily?fecha=gte.${since}&select=fecha,ventas_por_grupo&order=fecha.asc`, opts),
+      fetch(`${sbUrl}/rest/v1/wansoft_daily?client_slug=eq.${cid}&fecha=gte.${since}&select=fecha,ventas_por_grupo&order=fecha.asc`, opts),
       fetch(`${sbUrl}/rest/v1/pos_recipes?client_id=eq.${cid}&select=nombre,precio_venta,ingredientes,category`, opts),
       fetch(`${sbUrl}/rest/v1/pos_inventory_products?client_id=eq.${cid}&active=eq.true&select=name,unit,cost_per_unit,stock,reorder_point,category`, opts),
       fetch(`${sbUrl}/rest/v1/pos_menu_items?client_id=eq.${cid}&select=name,price,category_id`, opts),
