@@ -6,7 +6,9 @@
   "scripts": {
     "start": "electron .",
     "build:win": "electron-builder --win",
-    "build:mac": "electron-builder --mac"
+    "build:mac": "electron-builder --mac",
+    "build:pos": "electron-builder --win -c electron-builder-pos.json",
+    "build:kds": "electron-builder --win -c electron-builder-kds.json"
   },
   "author": "Fullsite",
   "license": "UNLICENSED",
