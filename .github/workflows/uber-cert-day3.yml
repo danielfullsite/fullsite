@@ -31,6 +31,10 @@ jobs:
           HTTP_CODE=$(echo "$RESP" | tail -1)
           BODY=$(echo "$RESP" | head -n -1)
           echo "D3-002 scope_probe: HTTP $HTTP_CODE"
+          echo "----- RAW BODY (diagnostic) -----"
+          echo "$BODY" | jq '.' 2>/dev/null || echo "$BODY"
+          echo "----- phase1 (USL provisioning) -----"
+          echo "$BODY" | jq '{scopes_granted_by_uber: .phase1.scopes_granted_by_uber, db_status: .phase1.db_status, probe: .phase1.probe_accept_pos_order, blocker: .phase1.blocker}' 2>/dev/null || echo "(jq failed)"
           GRANTED=$(echo "$BODY" | jq -r '.scopes_granted // [] | join(", ")' 2>/dev/null || echo "?")
           DELTA=$(echo "$BODY" | jq -r '.scopes_delta // [] | join(", ")' 2>/dev/null || echo "?")
           CORR=$(echo "$BODY" | jq -r '.correlation_id // "?"' 2>/dev/null || echo "?")
