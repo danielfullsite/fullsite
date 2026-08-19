@@ -27,7 +27,7 @@ jobs:
           echo "scope_probe: HTTP $(echo "$RESP" | tail -1)"
           echo "$RESP" | head -n -1 | jq '{p1_scopes: .phases.phase1_usl.scopes_granted_by_uber, p1_db: .phases.phase1_usl.db_status, p1_probe: .phases.phase1_usl.probe_accept_pos_order, p2_endpoint: .phases.phase2_marketplace.endpoint_probe}' 2>/dev/null || echo "$RESP" | head -n -1
 
-      - name: A-002 - Test webhook (pipeline interno: firma HMAC → handler)
+      - name: A-002 - Test webhook (pipeline interno HMAC handler)
         run: |
           RESP=$(curl -s -w "\n%{http_code}" -X POST \
             "$APP_URL/api/integrations/uber-eats/sandbox" \
