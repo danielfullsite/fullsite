@@ -211,6 +211,7 @@ export async function POST(request: NextRequest) {
       lines: lineRows.length, mode: finalMode,
     } satisfies SyncResult)
   } catch (e) {
-    return Response.json({ ok: false, error: e instanceof Error ? e.message : 'INTERNAL' } satisfies SyncResult, { status: 500 })
+    console.error('[recipe-sync]', e)
+    return Response.json({ ok: false, error: 'INTERNAL' } satisfies SyncResult, { status: 500 })
   }
 }

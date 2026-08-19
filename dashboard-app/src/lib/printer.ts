@@ -11,6 +11,16 @@ import { getPosConfigSync } from './pos-config'
 import { qrToDataURL } from './qr'
 import { getBridgeUrl } from './bridge-url'
 
+// BLINDAJE P1-8: escapa texto dinámico (nombres de platillos/mesero/config, controlados
+// por el tenant) antes de interpolarlo en el HTML del ticket. Sin esto, un nombre como
+// `<img src=x onerror=…>` ejecuta en el popup same-origin (window.document.write corre
+// <script>), donde vive el shift token → XSS almacenado. Aplicar a TODO campo dinámico.
+function esc(v: unknown): string {
+  return String(v ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+}
+
 // ─── PRINT CSS (works on any device) ────────────────────────────────────────
 
 export async function printTicketCSS(order: Order) {
@@ -24,7 +34,7 @@ export async function printTicketCSS(order: Order) {
 
   const itemRows = items.map(i => `
     <tr>
-      <td style="text-align:left">${i.cantidad}x ${i.nombre}${i.modificadores ? '<br><small style="color:#666">' + i.modificadores + '</small>' : ''}</td>
+      <td style="text-align:left">${i.cantidad}x ${esc(i.nombre)}${i.modificadores ? '<br><small style="color:#666">' + esc(i.modificadores) + '</small>' : ''}</td>
       <td style="text-align:right;white-space:nowrap">${formatMXN(i.subtotal)}</td>
     </tr>
   `).join('')
@@ -45,14 +55,14 @@ export async function printTicketCSS(order: Order) {
   .small { font-size: 9px; color: #666; }
 </style>
 </head><body>
-  <div class="center bold" style="font-size:14px;margin-bottom:4px">${getPosConfigSync().name}</div>
-  <div class="center small">${getPosConfigSync().subtitle}</div>
-  <div class="center small">${getPosConfigSync().address}</div>
+  <div class="center bold" style="font-size:14px;margin-bottom:4px">${esc(getPosConfigSync().name)}</div>
+  <div class="center small">${esc(getPosConfigSync().subtitle)}</div>
+  <div class="center small">${esc(getPosConfigSync().address)}</div>
   <div class="line"></div>
 
   <div style="display:flex;justify-content:space-between;font-size:10px">
-    <span>Mesa: ${order.mesa}</span>
-    <span>${order.mesero}</span>
+    <span>Mesa: ${esc(order.mesa)}</span>
+    <span>${esc(order.mesero)}</span>
   </div>
   <div style="display:flex;justify-content:space-between;font-size:10px">
     <span>${dateStr}</span>
@@ -75,8 +85,8 @@ export async function printTicketCSS(order: Order) {
   <div class="line"></div>
 
   ${order.pagos && order.pagos.length > 1
-    ? `<table style="width:100%;margin-top:4px"><tr><td colspan="2" style="font-weight:bold;font-size:10px">PAGOS:</td></tr>${order.pagos.map((p: { metodo: string; monto: number }) => `<tr><td style="font-size:10px">${p.metodo}</td><td class="right" style="font-size:10px">${formatMXN(p.monto)}</td></tr>`).join('')}</table>`
-    : `<div class="center small" style="margin-top:2px">${order.metodoPago || ''}</div>`
+    ? `<table style="width:100%;margin-top:4px"><tr><td colspan="2" style="font-weight:bold;font-size:10px">PAGOS:</td></tr>${order.pagos.map((p: { metodo: string; monto: number }) => `<tr><td style="font-size:10px">${esc(p.metodo)}</td><td class="right" style="font-size:10px">${formatMXN(p.monto)}</td></tr>`).join('')}</table>`
+    : `<div class="center small" style="margin-top:2px">${esc(order.metodoPago || '')}</div>`
   }
 
   <div class="center" style="margin-top:8px">
@@ -86,7 +96,7 @@ export async function printTicketCSS(order: Order) {
   </div>
 
   <div class="line"></div>
-  <div class="center" style="margin-top:4px;font-size:10px">${getPosConfigSync().receiptFooter}</div>
+  <div class="center" style="margin-top:4px;font-size:10px">${esc(getPosConfigSync().receiptFooter)}</div>
   <div class="center small">fullsite.mx</div>
 
   <script>window.onload=function(){window.print();setTimeout(function(){window.close()},500)}</script>
@@ -279,7 +289,7 @@ export function printPreTicketCSS(order: Order) {
 
   const itemRows = items.map(i => `
     <tr>
-      <td style="text-align:left">${i.cantidad}x ${i.nombre}${i.modificadores ? '<br><small style="color:#666">' + i.modificadores + '</small>' : ''}</td>
+      <td style="text-align:left">${i.cantidad}x ${esc(i.nombre)}${i.modificadores ? '<br><small style="color:#666">' + esc(i.modificadores) + '</small>' : ''}</td>
       <td style="text-align:right;white-space:nowrap">${formatMXN(i.subtotal)}</td>
     </tr>
   `).join('')
@@ -299,13 +309,13 @@ export function printPreTicketCSS(order: Order) {
 </style>
 </head><body>
   <div class="center bold" style="font-size:14px;margin-bottom:2px">*** PRE-CUENTA ***</div>
-  <div class="center bold" style="font-size:13px;margin-bottom:4px">${getPosConfigSync().name}</div>
+  <div class="center bold" style="font-size:13px;margin-bottom:4px">${esc(getPosConfigSync().name)}</div>
   <div class="center" style="font-size:9px">${getPosConfigSync().subtitle}</div>
   <div class="line"></div>
 
   <div style="display:flex;justify-content:space-between;font-size:10px">
-    <span>Mesa: ${order.mesa}</span>
-    <span>${order.mesero}</span>
+    <span>Mesa: ${esc(order.mesa)}</span>
+    <span>${esc(order.mesero)}</span>
   </div>
   <div style="display:flex;justify-content:space-between;font-size:10px">
     <span>${dateStr}</span>
@@ -1058,8 +1068,8 @@ export function printKitchenTicketCSS(order: Order) {
 
   const itemRows = items.map(i => `
     <div style="font-size:14px;font-weight:bold;margin:4px 0">
-      ${i.cantidad}x ${i.nombre}
-      ${i.modificadores && i.modificadores.length > 0 ? `<div style="font-size:11px;font-weight:normal;color:#666;margin-left:16px">${Array.isArray(i.modificadores) ? i.modificadores.join(', ') : i.modificadores}</div>` : ''}
+      ${i.cantidad}x ${esc(i.nombre)}
+      ${i.modificadores && i.modificadores.length > 0 ? `<div style="font-size:11px;font-weight:normal;color:#666;margin-left:16px">${esc(Array.isArray(i.modificadores) ? i.modificadores.join(', ') : i.modificadores)}</div>` : ''}
     </div>
   `).join('')
 
@@ -1072,10 +1082,10 @@ export function printKitchenTicketCSS(order: Order) {
 </style>
 </head><body>
   <div class="big">COCINA</div>
-  <div style="text-align:center;font-size:11px">Mesa ${order.mesa} · ${order.mesero} · ${timeStr}</div>
+  <div style="text-align:center;font-size:11px">Mesa ${esc(order.mesa)} · ${esc(order.mesero)} · ${timeStr}</div>
   <hr style="border-top:2px dashed #000;margin:6px 0">
   ${itemRows}
-  ${order.notas ? `<hr style="border-top:1px dashed #000;margin:6px 0"><div style="font-size:11px"><b>NOTA:</b> ${order.notas}</div>` : ''}
+  ${order.notas ? `<hr style="border-top:1px dashed #000;margin:6px 0"><div style="font-size:11px"><b>NOTA:</b> ${esc(order.notas)}</div>` : ''}
   <script>window.onload=function(){window.print();setTimeout(function(){window.close()},500)}</script>
 </body></html>`
 
@@ -1340,13 +1350,13 @@ function printStationTicketCSS(order: Order, station: StationName, items: OrderI
 
   const itemRows = items.map(i => {
     if (isTiempoItem(i)) {
-      return `<div style="font-size:12px;font-weight:bold;text-align:center;background:#000;color:#fff;padding:2px 0;margin:6px 0">${i.nombre}</div>`
+      return `<div style="font-size:12px;font-weight:bold;text-align:center;background:#000;color:#fff;padding:2px 0;margin:6px 0">${esc(i.nombre)}</div>`
     }
     const sillaTag = i.silla && i.silla > 0 ? ` [S${i.silla}]` : ''
     return `
     <div style="font-size:14px;font-weight:bold;margin:4px 0">
-      ${i.cantidad}x ${i.nombre}${sillaTag}
-      ${i.modificadores && i.modificadores.length > 0 ? `<div style="font-size:11px;font-weight:normal;color:#666;margin-left:16px">${i.modificadores.join(', ')}</div>` : ''}
+      ${i.cantidad}x ${esc(i.nombre)}${sillaTag}
+      ${i.modificadores && i.modificadores.length > 0 ? `<div style="font-size:11px;font-weight:normal;color:#666;margin-left:16px">${esc(i.modificadores.join(', '))}</div>` : ''}
     </div>
   `}).join('')
 
@@ -1359,10 +1369,10 @@ function printStationTicketCSS(order: Order, station: StationName, items: OrderI
 </style>
 </head><body>
   <div class="big">${label}</div>
-  <div style="text-align:center;font-size:11px">Mesa ${order.mesa} · ${order.mesero} · ${timeStr}</div>
+  <div style="text-align:center;font-size:11px">Mesa ${esc(order.mesa)} · ${esc(order.mesero)} · ${timeStr}</div>
   <hr style="border-top:2px dashed #000;margin:6px 0">
   ${itemRows}
-  ${order.notas ? `<hr style="border-top:1px dashed #000;margin:6px 0"><div style="font-size:11px"><b>NOTA:</b> ${order.notas}</div>` : ''}
+  ${order.notas ? `<hr style="border-top:1px dashed #000;margin:6px 0"><div style="font-size:11px"><b>NOTA:</b> ${esc(order.notas)}</div>` : ''}
   <script>window.onload=function(){window.print();setTimeout(function(){window.close()},500)}</script>
 </body></html>`
 

@@ -31,6 +31,7 @@ export async function POST(request: NextRequest) {
       uuid: result.uuid,
     })
   } catch (e) {
-    return NextResponse.json({ error: (e as Error).message }, { status: 500 })
+    console.error('[factura/complemento-pago]', e)
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
   }
 }

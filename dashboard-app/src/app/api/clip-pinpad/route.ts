@@ -96,6 +96,7 @@ export async function POST(request: NextRequest) {
 
     return Response.json({ error: `Acción desconocida: ${action}` }, { status: 400 })
   } catch (e) {
-    return Response.json({ error: (e as Error).message }, { status: 500 })
+    console.error('[clip-pinpad]', e)
+    return Response.json({ error: 'Error procesando el pago' }, { status: 500 })
   }
 }

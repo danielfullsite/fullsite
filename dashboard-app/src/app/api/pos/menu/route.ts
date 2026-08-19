@@ -57,6 +57,7 @@ export async function GET(request: NextRequest) {
       payment_methods: methods,
     })
   } catch (e) {
-    return NextResponse.json({ error: String(e) }, { status: 502 })
+    console.error('[pos/menu]', e)
+    return NextResponse.json({ error: 'Error interno' }, { status: 502 })
   }
 }
