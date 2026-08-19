@@ -48,6 +48,7 @@ import {
   markDeliveryOrderReady,
 } from '@/lib/integrations/uber-eats/delivery-adapter'
 import { buildUberAuthUrl, USL_SCOPES, MARKETPLACE_M2M_SCOPES, DELIVERY_M2M_SCOPES, probeM2MToken } from '@/lib/integrations/uber-eats/oauth'
+import { getPosData, activateIntegration } from '@/lib/integrations/uber-eats/provisioning'
 
 function checkAuth(request: NextRequest): boolean {
   const expected = (process.env.INTEGRATION_ADMIN_SECRET ?? '').trim()
@@ -642,6 +643,53 @@ export async function POST(request: NextRequest) {
   }
 
   // ─── Re-auth URL ──────────────────────────────────────────────────────────
+
+  // ─── Integration Activation Suite (POST pos_data con token USL) ──────────────
+  // Asocia la app con la location en Uber y enciende la integración. POST pos_data
+  // usa eats.pos_provisioning (token merchant). Tras esto, el M2M eats.store ya puede
+  // acceder al store (deja de dar "User not allowed to access the store").
+  if (action === 'activate') {
+    const corrId = crypto.randomUUID()
+    const before = await getPosData(storeId, `${corrId}-get-before`)
+    const activation = await activateIntegration(
+      storeId,
+      {
+        integrator_store_id: storeId,
+        integrator_brand_id: 'fullsite',
+        is_order_manager: true,
+        integration_enabled: true,
+        webhook_config: { version: '1.0.0' },
+      },
+      `${corrId}-activate`
+    )
+    const after = await getPosData(storeId, `${corrId}-get-after`)
+    // Re-probe: accept_pos_order debería dejar de dar 401 una vez asociado
+    let reprobe: { status?: number; interpretation?: string; error?: string } = {}
+    try {
+      const { uberFetch } = await import('@/lib/integrations/uber-eats/oauth')
+      const r = await uberFetch('/v1/eats/orders/SCOPE-PROBE-USL/accept_pos_order', {
+        method: 'POST',
+        body: JSON.stringify({ reason: 'post_activation_probe', minutes_to_ready: 20 }),
+        tokenType: 'provisioning',
+        storeId,
+      })
+      reprobe = {
+        status: r.status,
+        interpretation: r.status === 404 ? 'eats.pos_provisioning OK (404=order not found, esperado)' : r.status === 401 ? 'aún 401 — revisar asociación' : `HTTP ${r.status}`,
+      }
+    } catch (e) { reprobe = { error: String(e) } }
+    return NextResponse.json({
+      action,
+      ts: new Date().toISOString(),
+      store_id: storeId,
+      correlation_id: corrId,
+      get_before: { ok: before.ok, status: before.status_code, error: before.error },
+      activate: { ok: activation.ok, status: activation.status_code, error: activation.error, data: activation.data },
+      get_after: { ok: after.ok, status: after.status_code, data: after.data, error: after.error },
+      accept_pos_order_reprobe: reprobe,
+      next_step: activation.ok ? 'App asociada. Verifica get_after.integration_enabled y coloca orden de prueba.' : 'Activación falló — revisa activate.error',
+    }, { status: activation.ok ? 200 : 422 })
+  }
 
   if (action === 'reauth_url') {
     const state = crypto.randomUUID()

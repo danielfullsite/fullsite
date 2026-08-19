@@ -94,10 +94,14 @@ export async function activateIntegration(
   const t0 = Date.now()
   try {
     const r = await withRetry(
+      // POST pos_data requiere el token USL del merchant (eats.pos_provisioning),
+      // NO el M2M marketplace (default de uberFetch). Sin esto → 401. Verbo POST/DELETE
+      // = provisioning; GET/PATCH = eats.store (M2M) — ver openapi Uber.
       () => uberFetch(`/v1/eats/stores/${encodeURIComponent(storeId)}/pos_data`, {
         method: 'POST',
         body: JSON.stringify(config),
         storeId,
+        tokenType: 'provisioning',
       }),
       { maxAttempts: 3, baseDelayMs: 1000 }
     )
