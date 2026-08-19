@@ -35,6 +35,14 @@ Es lo mismo que Wansoft tenía con el HID viejo. Es la parte de hardware (Fase 2
 > WebAuthn queda como **fallback interino / 1-persona-por-terminal**; el camino PRIMARIO es el 7718.
 > Los arreglos de anon/RLS (staff por `/api/pos/staff`) SÍ se conservan — son correctos en cualquier caso.
 
+> 🔎 **HALLAZGO (2026-08-18): el servicio 7718 YA EXISTE y funcionaba.** Es
+> **`C:\fullsite\fingerprint-service.exe` + `C:\fullsite\DPUruNet.dll`** (SDK DigitalPersona
+> U.are.U, .NET). `electron-app/main.js:565` (`startFingerprintService`) verifica que esos
+> archivos existan y **lanza el .exe** (que sirve el 7718). Por eso antes salía "Entrar con huella"
+> y jalaba (1:N, como Wansoft) — la caja tenía el .exe. **NO está en el repo** (binario en las cajas
+> Windows o con quien lo compiló). → Fase 2 NO es "construir de cero": es **localizar el .exe/fuente**,
+> ponerlo en `C:\fullsite\`, conectar el lector + drivers, y desplegar el login (que ya usa el 7718).
+
 **Contrato del servicio 7718 (lo que el POS ya espera — congelarlo):**
 ```
 GET /health            → { ok:true, reader:true|false }
