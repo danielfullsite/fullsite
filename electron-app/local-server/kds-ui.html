@@ -11,6 +11,15 @@
     --nueva:#3b82f6; --prep:#f59e0b; --lista:#10b981; --danger:#ef4444;
     --nueva-bg:rgba(59,130,246,.13); --prep-bg:rgba(245,158,11,.13); --lista-bg:rgba(16,185,129,.12);
   }
+  /* ── Modo claro (toggle en Ajustes) — override de las variables + los 2 hardcoded ── */
+  body.light{
+    --bg:#eef1f5; --surface:#ffffff; --surface-2:#f5f8fb; --surface-3:#e9eef4; --line:#dde4ec; --line-2:#cbd5e1;
+    --text-1:#0f1720; --text-2:#33414f; --text-3:#5b6875; --text-4:#8a97a5;
+    --nueva:#2563eb; --prep:#c2760a; --lista:#059669; --danger:#dc2626;
+    --nueva-bg:rgba(37,99,235,.10); --prep-bg:rgba(217,119,6,.13); --lista-bg:rgba(5,150,105,.11);
+  }
+  body.light .alerts{background:#fff7e6;border-bottom-color:#f0d9a8}
+  body.light .counts .c-new{color:#2563eb} body.light .counts .c-prep{color:#b45309} body.light .counts .c-lista{color:#047857}
   *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
   html,body{height:100%}
   body{background:var(--bg);color:var(--text-1);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;overflow:hidden;user-select:none}
@@ -189,6 +198,7 @@
         </div>
       </div>
       <div class="fld"><div class="tgl"><label style="margin:0">Sonido de nueva orden</label><div class="sw" id="sound-sw"></div></div></div>
+      <div class="fld"><div class="tgl"><label style="margin:0">Modo claro</label><div class="sw" id="theme-sw"></div></div></div>
     </div>
     <div class="modal-f"><button id="m-cancel">Cancelar</button><button class="save" id="m-save">Guardar</button></div>
   </div>
@@ -210,8 +220,10 @@
   var ALERT_MIN = Number(_s.alert_min || CFG.alert_min) || 10;
   var SOUND     = _s.sound !== false;   // default ON
   var SCALE     = Number(_s.scale) || 1;   // tamaño de letra = zoom del board (chefs medio ciegos, KDS-03)
-  function saveSettings(){ try{ localStorage.setItem(SKEY, JSON.stringify({ station:STATION, alert_min:ALERT_MIN, sound:SOUND, scale:SCALE })); }catch(e){} }
+  var THEME     = _s.theme === "light" ? "light" : "dark";   // default oscuro
+  function saveSettings(){ try{ localStorage.setItem(SKEY, JSON.stringify({ station:STATION, alert_min:ALERT_MIN, sound:SOUND, scale:SCALE, theme:THEME })); }catch(e){} }
   function applyScale(){ try{ var b=document.getElementById("board"); if(b) b.style.zoom=String(SCALE); }catch(e){} }
+  function applyTheme(){ try{ document.body.classList.toggle("light", THEME==="light"); }catch(e){} }
 
   var boardEl = document.getElementById("board");
   var demandEl = document.getElementById("demand");
@@ -221,6 +233,7 @@
   function applyStationLabel(){ document.getElementById("title").textContent = STATION.charAt(0).toUpperCase()+STATION.slice(1); document.getElementById("stn").textContent = STATION; }
   applyStationLabel();
   applyScale();
+  applyTheme();
 
   var lastGood = [];
   var seenBatches = null;
@@ -411,14 +424,15 @@
 
   // ── settings modal ──
   var modal=document.getElementById("modal");
-  var draft={ station:STATION, alert_min:ALERT_MIN, sound:SOUND, scale:SCALE };
+  var draft={ station:STATION, alert_min:ALERT_MIN, sound:SOUND, scale:SCALE, theme:THEME };
   function paintModal(){
     Array.prototype.forEach.call(document.querySelectorAll("#seg-station button"),function(b){ b.classList.toggle("on", b.getAttribute("data-st")===draft.station); });
     Array.prototype.forEach.call(document.querySelectorAll("#seg-scale button"),function(b){ b.classList.toggle("on", Number(b.getAttribute("data-sc"))===Number(draft.scale)); });
     document.getElementById("alert-val").textContent=draft.alert_min;
     document.getElementById("sound-sw").classList.toggle("on", draft.sound);
+    document.getElementById("theme-sw").classList.toggle("on", draft.theme==="light");
   }
-  function openModal(){ draft={ station:STATION, alert_min:ALERT_MIN, sound:SOUND, scale:SCALE }; paintModal(); modal.classList.add("show"); }
+  function openModal(){ draft={ station:STATION, alert_min:ALERT_MIN, sound:SOUND, scale:SCALE, theme:THEME }; paintModal(); modal.classList.add("show"); }
   function closeModal(){ modal.classList.remove("show"); }
   document.getElementById("gear").addEventListener("click",openModal);
   document.getElementById("m-close").addEventListener("click",closeModal);
@@ -430,9 +444,10 @@
   document.getElementById("alert-dn").addEventListener("click",function(){ draft.alert_min=Math.max(1,draft.alert_min-1); paintModal(); });
   document.getElementById("alert-up").addEventListener("click",function(){ draft.alert_min=Math.min(60,draft.alert_min+1); paintModal(); });
   document.getElementById("sound-sw").addEventListener("click",function(){ draft.sound=!draft.sound; paintModal(); });
+  document.getElementById("theme-sw").addEventListener("click",function(){ draft.theme=draft.theme==="light"?"dark":"light"; paintModal(); });
   document.getElementById("m-save").addEventListener("click",function(){
-    STATION=draft.station; ALERT_MIN=draft.alert_min; SOUND=draft.sound; SCALE=draft.scale; saveSettings();
-    applyScale(); applyStationLabel(); seenBatches=null; render(false); closeModal(); toast("Ajustes guardados");
+    STATION=draft.station; ALERT_MIN=draft.alert_min; SOUND=draft.sound; SCALE=draft.scale; THEME=draft.theme; saveSettings();
+    applyScale(); applyTheme(); applyStationLabel(); seenBatches=null; render(false); closeModal(); toast("Ajustes guardados");
   });
 
   // ── Edge Agent: el experto vigilando (barra de alertas, poll a /alerts) ──
