@@ -659,7 +659,14 @@ function createWindow() {
   });
 
   mainWindow.setMenu(null);
-  mainWindow.loadURL(POS_URL);
+  // P1-1 fix: para el POS secundario (rol 'pos'), pasar el rol en la URL para que
+  // preload.js fije el bridge a localhost ANTES de que monte React (evita que
+  // server-discovery lea un 'pos_bridge_host' viejo = IP de la caja → ws://<caja>
+  // bloqueado por mixed-content → "print bridge offline"). Espeja el patrón del KDS.
+  const posUrl = (appConfig && appConfig.terminal_role === 'pos')
+    ? POS_URL + (POS_URL.includes('?') ? '&' : '?') + 'terminal_role=pos'
+    : POS_URL;
+  mainWindow.loadURL(posUrl);
 
   // Save last successful boot time for offline.html display
   mainWindow.webContents.on('did-finish-load', () => {
