@@ -2238,9 +2238,10 @@ function POSContent() {
       const detail = (e as CustomEvent).detail
       if (detail?.orderId === orderId && typeof detail?.revision === 'number' && detail.revision > orderRevision) {
         setOrderRevision(detail.revision)
-        // Refresh server updated_at to prevent false checkOrderConflict
+        // Refresh server updated_at to prevent false checkOrderConflict (solo online)
+        if (typeof navigator === 'undefined' || navigator.onLine)
         fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${detail.orderId}&select=updated_at`, {
-          headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` },
+          headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` }, signal: AbortSignal.timeout(3500),
         }).then(r => r.json()).then(rows => {
           if (Array.isArray(rows) && rows[0]?.updated_at) setLoadedUpdatedAt(rows[0].updated_at)
         }).catch(() => {})
@@ -2333,10 +2334,12 @@ function POSContent() {
   const [readyOrders, setReadyOrders] = useState(0)
   useEffect(() => {
     const checkReady = async () => {
+      // Offline: no colgar el poll esperando una red muerta (velocidad).
+      if (typeof navigator !== 'undefined' && !navigator.onLine) return
       try {
         const res = await fetch(
           `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${_cid()}&status=eq.lista&select=id&limit=50`,
-          { headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` }, cache: 'no-store' }
+          { headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` }, cache: 'no-store', signal: AbortSignal.timeout(3500) }
         )
         if (res.ok) {
           const rows = await res.json()
@@ -3028,8 +3031,9 @@ function POSContent() {
             if (conflictPrint.failed.length > 0) showToast(`⚠ Impresora sin conexión: ${conflictPrint.failed.join(', ')}`)
             showToast(`${conflictNewItems.length} item${conflictNewItems.length !== 1 ? 's' : ''} enviados`)
             try {
+              if (typeof navigator !== 'undefined' && !navigator.onLine) throw new Error('offline')
               const freshRes = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${order.id}&select=updated_at`, {
-                headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` },
+                headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` }, signal: AbortSignal.timeout(3500),
               })
               if (freshRes.ok) { const rows = await freshRes.json(); if (rows[0]?.updated_at) setLoadedUpdatedAt(rows[0].updated_at) }
             } catch {}
@@ -3046,8 +3050,9 @@ function POSContent() {
           if (saveResult.current_revision != null) {
             setOrderRevision(saveResult.current_revision)
             try {
+              if (typeof navigator !== 'undefined' && !navigator.onLine) throw new Error('offline')
               const freshRes = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${order.id}&select=updated_at`, {
-                headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` },
+                headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` }, signal: AbortSignal.timeout(3500),
               })
               if (freshRes.ok) { const rows = await freshRes.json(); if (rows[0]?.updated_at) setLoadedUpdatedAt(rows[0].updated_at) }
             } catch {}
@@ -3216,8 +3221,10 @@ function POSContent() {
       setLoadedOrderId(orderId)
       // Read server's actual updated_at + order_number (triggers set these)
       try {
+        // Offline: no esperar al server para abrir la orden (velocidad); usa ahora.
+        if (typeof navigator !== 'undefined' && !navigator.onLine) throw new Error('offline')
         const freshRes = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${orderId}&select=updated_at,order_number`, {
-          headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` },
+          headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` }, signal: AbortSignal.timeout(3500),
         })
         if (freshRes.ok) {
           const rows = await freshRes.json()
@@ -5818,7 +5825,7 @@ function POSAlerts({ role }: { role: string }) {
         try {
           const readyRes = await fetch(
             `${sbUrl}/rest/v1/pos_orders?status=eq.lista&client_id=eq.${_cid()}&limit=5`,
-            { headers }
+            { headers, signal: AbortSignal.timeout(4000) }
           )
           if (readyRes.ok) {
             const readyOrders = await readyRes.json()
@@ -5837,7 +5844,7 @@ function POSAlerts({ role }: { role: string }) {
         try {
           const delRes = await fetch(
             `${sbUrl}/rest/v1/delivery_orders?status=eq.nueva&client_id=eq.${_cid()}&limit=3`,
-            { headers }
+            { headers, signal: AbortSignal.timeout(4000) }
           )
           if (delRes.ok) {
             const deliveryOrders = await delRes.json()
