@@ -59,8 +59,10 @@ Reescrito: `ocm_daily` **agrega `pos_orders` en vivo** (sin `ops_daily` ni aggre
 - Validado: creado en **staging**; lógica corrida **read-only contra prod (AMALAY)** → días fullsite recientes ($133–$4,161; ralos porque AMALAY aún no mete todo el volumen al POS) + historia wansoft (Jul: $41K–$60K/día), transición limpia.
 - **Pendiente:** aplicar a prod = Daniel (DDL). Refinamientos anotados en el .sql (día-negocio 05:00, pagos mixtos).
 
-### Fase 2 — vistas que faltan
-Crear `ocm_waiter_rankings` (equiv. `wansoft_waiter_categories`, desde `pos_orders.mesero`) y `ocm_menu_groups` (equiv. `ventas_por_grupo`, desde items de `pos_orders`). Son las 2 piezas que la IA usa y que aún no tienen equivalente OCM vivo.
+### Fase 2 — vistas que faltan — ✅ HECHO + VALIDADO 2026-08-19
+- `ocm_waiter_rankings` (equiv. `wansoft_waiter_categories`) — agrega `pos_orders` por mesero. Validado: Mario García $5,689/16 tickets, etc.
+- `ocm_menu_groups` (equiv. `ventas_por_grupo`) — explota `pos_orders.items` + join a catálogo. Validado: Chilaquiles & Enchiladas $2,620, Bowls, Coffee Hot/Ice, etc.
+- Migración: `scripts/sql/migrations/015_ocm_waiter_menu_views.sql`. Vivas para cualquier tenant. Aplicar a prod = Daniel.
 
 ### Fase 3 — repuntar las rutas de IA
 `chat/coach/voice/predict` → leer `ocm_daily` / `ocm_waiter_rankings` / `ocm_menu_groups` en vez de `wansoft_*`. Los agentes Python → `ocm_*` en vez de `ops_daily_*`.
