@@ -16,6 +16,8 @@ import {
   Clock,
   Users,
   AlertTriangle,
+  Fingerprint,
+  KeyRound,
 } from 'lucide-react'
 import { getActiveClientSlug as _cid } from '@/lib/data'
 
@@ -33,6 +35,14 @@ function sbHeaders() {
     'Content-Type': 'application/json',
     Prefer: 'return=representation',
   }
+}
+
+// El staff del POS se gestiona por la API server-side (service_role), autenticada con el
+// shift token del login (gerente+). pos_staff NO tiene acceso anon (RLS), y las terminales
+// del POS no tienen sesión de Supabase — por eso NO se escribe directo con la anon key.
+function apiHeaders(): Record<string, string> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('pos_shift_token') : null
+  return { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }
 }
 
 interface StaffMember {
@@ -108,12 +118,13 @@ export default function StaffPage() {
 
   // Form state
   const [formName, setFormName] = useState('')
-  const [formPin, setFormPin] = useState('')
-  const [formNewPin, setFormNewPin] = useState('')
   const [formRole, setFormRole] = useState('mesero')
   const [formActive, setFormActive] = useState(true)
   const [formError, setFormError] = useState('')
   const [formSaving, setFormSaving] = useState(false)
+  const [regenPin, setRegenPin] = useState(false)
+  // PIN de 10 díg generado por el sistema — se muestra UNA sola vez (para enrolar/respaldo)
+  const [createdStaff, setCreatedStaff] = useState<{ id: string; name: string; pin: string } | null>(null)
 
   // ------ Auth check ------
   useEffect(() => {
@@ -133,14 +144,10 @@ export default function StaffPage() {
 
   // ------ Fetch data ------
   const fetchStaff = useCallback(async () => {
-    const cid = _cid()
-    const res = await fetch(
-      `${SB_URL}/rest/v1/pos_staff?client_id=eq.${cid}&select=id,name,role,active,created_at&order=name.asc`,
-      { headers: sbHeaders() },
-    )
+    const res = await fetch('/api/pos/staff', { headers: apiHeaders(), cache: 'no-store' })
     if (res.ok) {
       const data = await res.json()
-      setStaff(data)
+      setStaff(data.staff || [])
     }
   }, [])
 
@@ -161,74 +168,28 @@ export default function StaffPage() {
     Promise.all([fetchStaff(), fetchAudit()]).finally(() => setLoading(false))
   }, [authorized, fetchStaff, fetchAudit])
 
-  // ------ PIN uniqueness check ------
-  async function isPinTaken(pin: string, excludeId?: string): Promise<boolean> {
-    const cid = _cid()
-    let url = `${SB_URL}/rest/v1/pos_staff?pin=eq.${pin}&client_id=eq.${cid}&select=id&limit=1`
-    if (excludeId) url += `&id=neq.${excludeId}`
-    const res = await fetch(url, { headers: sbHeaders() })
-    if (!res.ok) return false
-    const data = await res.json()
-    return data.length > 0
-  }
-
-  // ------ Audit helper ------
-  async function postAudit(staffId: string, action: string, changedFields?: Record<string, unknown>) {
-    const cid = _cid()
-    await fetch(`${SB_URL}/rest/v1/pos_staff_audit`, {
-      method: 'POST',
-      headers: sbHeaders(),
-      body: JSON.stringify({
-        client_id: cid,
-        staff_id: staffId,
-        action,
-        changed_fields: changedFields || null,
-        changed_by: currentStaff?.name || 'unknown',
-      }),
-    })
-  }
-
   // ------ Create ------
   async function handleCreate() {
     setFormError('')
     if (!formName.trim()) { setFormError('Nombre es requerido'); return }
-    if (!formPin || formPin.length < 4 || formPin.length > 8 || !/^\d+$/.test(formPin)) {
-      setFormError('PIN debe ser de 4 a 8 digitos')
-      return
-    }
     setFormSaving(true)
-    if (await isPinTaken(formPin)) {
-      setFormError('Este PIN ya esta en uso')
-      setFormSaving(false)
-      return
-    }
-    const cid = _cid()
-    const newId = crypto.randomUUID()
-    const body = {
-      id: newId,
-      client_id: cid,
-      name: formName.trim(),
-      pin: formPin,
-      role: formRole,
-      active: formActive,
-    }
-    const res = await fetch(`${SB_URL}/rest/v1/pos_staff`, {
+    // El PIN de 10 díg lo GENERA el sistema (server-side). Nadie lo elige ni lo memoriza.
+    const res = await fetch('/api/pos/staff', {
       method: 'POST',
-      headers: sbHeaders(),
-      body: JSON.stringify(body),
+      headers: apiHeaders(),
+      body: JSON.stringify({ name: formName.trim(), role: formRole }),
     })
+    const d = await res.json().catch(() => ({}))
     if (!res.ok) {
-      const txt = await res.text()
-      setFormError(txt.includes('unique') ? 'PIN ya esta en uso' : 'Error al guardar')
+      setFormError(d.error || 'Error al guardar')
       setFormSaving(false)
       return
     }
-    await postAudit(newId, 'created', { name: formName.trim(), role: formRole, active: formActive })
     setShowCreateModal(false)
     resetForm()
     setFormSaving(false)
+    setCreatedStaff({ id: d.staff.id, name: d.staff.name, pin: d.pin }) // mostrar el PIN UNA vez
     fetchStaff()
-    fetchAudit()
   }
 
   // ------ Edit ------
@@ -236,105 +197,59 @@ export default function StaffPage() {
     if (!editingStaff) return
     setFormError('')
     if (!formName.trim()) { setFormError('Nombre es requerido'); return }
-
-    // If new PIN provided, validate
-    if (formNewPin) {
-      if (formNewPin.length < 4 || formNewPin.length > 8 || !/^\d+$/.test(formNewPin)) {
-        setFormError('PIN debe ser de 4 a 8 digitos')
-        return
-      }
-    }
-
     setFormSaving(true)
 
-    if (formNewPin && await isPinTaken(formNewPin, editingStaff.id)) {
-      setFormError('Este PIN ya esta en uso')
-      setFormSaving(false)
-      return
-    }
-
-    const changes: Record<string, unknown> = {}
-    const patch: Record<string, unknown> = {}
-
-    if (formName.trim() !== editingStaff.name) {
-      patch.name = formName.trim()
-      changes.name = { from: editingStaff.name, to: formName.trim() }
-    }
-    if (formRole !== editingStaff.role) {
-      patch.role = formRole
-      changes.role = { from: editingStaff.role, to: formRole }
-    }
-    // Prevent self-deactivation
+    const patch: Record<string, unknown> = { staff_id: editingStaff.id }
+    if (formName.trim() !== editingStaff.name) patch.name = formName.trim()
+    if (formRole !== editingStaff.role) patch.role = formRole
     const isSelf = currentStaff?.id === editingStaff.id
-    if (!isSelf && formActive !== editingStaff.active) {
-      patch.active = formActive
-      changes.active = { from: editingStaff.active, to: formActive }
-    }
-    if (formNewPin) {
-      patch.pin = formNewPin
-      changes.pin = { changed: true }
+    if (!isSelf && formActive !== editingStaff.active) patch.active = formActive
+    if (regenPin) patch.regenerate_pin = true
+
+    if (Object.keys(patch).length === 1) { // solo staff_id → nada que cambiar
+      setEditingStaff(null); resetForm(); setFormSaving(false); return
     }
 
-    if (Object.keys(patch).length === 0) {
-      setEditingStaff(null)
-      resetForm()
-      setFormSaving(false)
-      return
-    }
-
-    const res = await fetch(`${SB_URL}/rest/v1/pos_staff?id=eq.${editingStaff.id}`, {
-      method: 'PATCH',
-      headers: sbHeaders(),
-      body: JSON.stringify(patch),
-    })
-
+    const res = await fetch('/api/pos/staff', { method: 'PATCH', headers: apiHeaders(), body: JSON.stringify(patch) })
+    const d = await res.json().catch(() => ({}))
     if (!res.ok) {
-      const txt = await res.text()
-      setFormError(txt.includes('unique') ? 'PIN ya esta en uso' : 'Error al guardar')
+      setFormError(d.error || 'Error al guardar')
       setFormSaving(false)
       return
     }
-
-    await postAudit(editingStaff.id, 'updated', changes)
     setEditingStaff(null)
     resetForm()
     setFormSaving(false)
+    if (d.pin) setCreatedStaff({ id: d.staff.id, name: d.staff.name, pin: d.pin }) // PIN regenerado → mostrar una vez
     fetchStaff()
-    fetchAudit()
   }
 
   // ------ Toggle active ------
   async function handleToggle(s: StaffMember) {
-    const newActive = !s.active
-    const action = newActive ? 'reactivated' : 'deactivated'
-    await fetch(`${SB_URL}/rest/v1/pos_staff?id=eq.${s.id}`, {
+    await fetch('/api/pos/staff', {
       method: 'PATCH',
-      headers: sbHeaders(),
-      body: JSON.stringify({ active: newActive }),
+      headers: apiHeaders(),
+      body: JSON.stringify({ staff_id: s.id, active: !s.active }),
     })
-    await postAudit(s.id, action, { active: { from: s.active, to: newActive } })
     setConfirmToggle(null)
     fetchStaff()
-    fetchAudit()
   }
 
   // ------ Form reset ------
   function resetForm() {
     setFormName('')
-    setFormPin('')
-    setFormNewPin('')
     setFormRole('mesero')
     setFormActive(true)
     setFormError('')
+    setRegenPin(false)
   }
 
   function openEdit(s: StaffMember) {
     setFormName(s.name)
-    setFormPin('')
-    setFormNewPin('')
     setFormRole(s.role)
     setFormActive(s.active)
     setFormError('')
+    setRegenPin(false)
     setEditingStaff(s)
   }
 
@@ -476,6 +391,13 @@ export default function StaffPage() {
                   {s.active ? 'Activo' : 'Inactivo'}
                 </span>
                 <div className="flex items-center gap-1 justify-end">
+                  <Link
+                    href={`/pos/huella?id=${s.id}`}
+                    className="p-2 rounded-xl hover:bg-[#2a2a3e] transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+                    title="Enrolar huella"
+                  >
+                    <Fingerprint size={16} className="text-cyan-400" />
+                  </Link>
                   <button
                     onClick={() => openEdit(s)}
                     className="p-2 rounded-xl hover:bg-[#2a2a3e] transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
@@ -579,17 +501,9 @@ export default function StaffPage() {
                   autoFocus
                 />
               </div>
-              <div>
-                <label className="text-sm text-gray-400 block mb-1">PIN (4-8 digitos) *</label>
-                <input
-                  type="password"
-                  inputMode="numeric"
-                  maxLength={8}
-                  value={formPin}
-                  onChange={e => setFormPin(e.target.value.replace(/\D/g, ''))}
-                  className="w-full bg-[#1e1e2e] border border-[#2a2a3e] rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500 min-h-[48px] font-mono tracking-widest"
-                  placeholder="****"
-                />
+              <div className="bg-emerald-600/10 border border-emerald-600/30 rounded-xl px-4 py-3 text-sm text-emerald-300 flex items-start gap-2">
+                <Shield size={16} className="flex-shrink-0 mt-0.5" />
+                <span>El sistema generará un <b className="text-emerald-200">PIN de 10 dígitos</b> automáticamente. Se muestra una sola vez — la <b className="text-emerald-200">huella</b> será el acceso diario.</span>
               </div>
               <div>
                 <label className="text-sm text-gray-400 block mb-1">Rol *</label>
@@ -602,18 +516,6 @@ export default function StaffPage() {
                     <option key={r} value={r}>{ROLE_LABELS[r]}</option>
                   ))}
                 </select>
-              </div>
-              <div className="flex items-center gap-3">
-                <label className="text-sm text-gray-400">Activo</label>
-                <button
-                  onClick={() => setFormActive(!formActive)}
-                  className="min-h-[44px] min-w-[44px] flex items-center justify-center"
-                >
-                  {formActive
-                    ? <ToggleRight size={28} className="text-emerald-400" />
-                    : <ToggleLeft size={28} className="text-gray-500" />
-                  }
-                </button>
               </div>
               {formError && (
                 <div className="bg-red-600/20 text-red-400 px-4 py-2 rounded-xl text-sm flex items-center gap-2">
@@ -653,17 +555,21 @@ export default function StaffPage() {
                   autoFocus
                 />
               </div>
-              <div>
-                <label className="text-sm text-gray-400 block mb-1">Nuevo PIN (opcional, 4-8 digitos)</label>
-                <input
-                  type="password"
-                  inputMode="numeric"
-                  maxLength={8}
-                  value={formNewPin}
-                  onChange={e => setFormNewPin(e.target.value.replace(/\D/g, ''))}
-                  className="w-full bg-[#1e1e2e] border border-[#2a2a3e] rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500 min-h-[48px] font-mono tracking-widest"
-                  placeholder="Dejar vacio para no cambiar"
-                />
+              <div className="flex items-center justify-between bg-[#1e1e2e] border border-[#2a2a3e] rounded-xl px-4 py-3">
+                <div>
+                  <div className="text-sm text-white">Regenerar PIN</div>
+                  <div className="text-xs text-gray-500">Genera un nuevo PIN de 10 díg (se muestra una vez)</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setRegenPin(!regenPin)}
+                  className="min-h-[44px] min-w-[44px] flex items-center justify-center"
+                >
+                  {regenPin
+                    ? <ToggleRight size={28} className="text-emerald-400" />
+                    : <ToggleLeft size={28} className="text-gray-500" />
+                  }
+                </button>
               </div>
               <div>
                 <label className="text-sm text-gray-400 block mb-1">Rol</label>
@@ -738,6 +644,42 @@ export default function StaffPage() {
                 }`}
               >
                 {confirmToggle.active ? 'Desactivar' : 'Reactivar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ---- PIN generado — se muestra UNA sola vez ---- */}
+      {createdStaff && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+          <div className="bg-[#12121a] border border-emerald-600/40 rounded-2xl w-full max-w-sm p-6">
+            <div className="text-center mb-4">
+              <KeyRound size={40} className="mx-auto mb-3 text-emerald-400" />
+              <h2 className="text-lg font-bold mb-1">PIN de {createdStaff.name}</h2>
+              <p className="text-gray-400 text-sm">Anótalo — <b className="text-white">no se vuelve a mostrar</b>. La huella será el acceso diario.</p>
+            </div>
+            <div className="bg-[#1e1e2e] border border-[#2a2a3e] rounded-xl px-4 py-4 mb-4 flex items-center justify-between gap-3">
+              <span className="font-mono text-2xl tracking-widest text-emerald-300">{createdStaff.pin}</span>
+              <button
+                onClick={() => { navigator.clipboard?.writeText(createdStaff.pin).catch(() => {}) }}
+                className="text-xs text-gray-400 hover:text-white border border-[#2a2a3e] rounded-lg px-3 py-2 min-h-[40px]"
+              >
+                Copiar
+              </button>
+            </div>
+            <div className="flex gap-3">
+              <Link
+                href={`/pos/huella?id=${createdStaff.id}`}
+                className="flex-1 bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-3 rounded-xl font-semibold min-h-[52px] flex items-center justify-center gap-2"
+              >
+                <Fingerprint size={18} /> Enrolar huella
+              </Link>
+              <button
+                onClick={() => setCreatedStaff(null)}
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 rounded-xl font-semibold min-h-[52px]"
+              >
+                Listo
               </button>
             </div>
           </div>

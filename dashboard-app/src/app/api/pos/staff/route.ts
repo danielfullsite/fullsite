@@ -116,6 +116,16 @@ export async function PATCH(request: NextRequest) {
     let newPin: string | undefined
 
     if (typeof body.active === 'boolean') patch.active = body.active
+    if (typeof body.name === 'string') {
+      const nm = body.name.trim()
+      if (nm.length < 2 || nm.length > 60) return Response.json({ error: 'Nombre inválido' }, { status: 400 })
+      patch.name = nm
+    }
+    if (typeof body.role === 'string') {
+      const r = body.role.trim().toLowerCase()
+      if (!CREATABLE_ROLES.has(r)) return Response.json({ error: 'Rol inválido' }, { status: 400 })
+      patch.role = r; patch.role_display = r
+    }
     if (body.regenerate_pin === true) {
       newPin = generatePin10(await existingPins(mgr.cid))
       patch.pin = newPin
