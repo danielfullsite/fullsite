@@ -77,6 +77,7 @@ const navSections = [
     label: 'Reportes',
     items: [
       { href: '/meseros', label: 'Meseros', icon: Users },
+      { href: '/equipo', label: 'Equipo', icon: Users },
       { href: '/platillos', label: 'Platillos', icon: UtensilsCrossed },
       { href: '/tendencias', label: 'Tendencias', icon: TrendingUp },
       { href: '/propinas', label: 'Propinas', icon: HandCoins },
