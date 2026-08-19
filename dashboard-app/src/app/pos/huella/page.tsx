@@ -3,14 +3,13 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Fingerprint, CheckCircle, XCircle, Trash2, User, Search } from 'lucide-react'
-import { apiUrl } from '@/lib/api-base'
-import { getActiveClientSlug as _cid } from '@/lib/data'
+interface StaffMember { id: string; name: string; role: string; active?: boolean }
 
-
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-
-interface StaffMember { id: string; name: string; role: string }
+// Auth para la API del POS (shift token del login, gerente+). pos_staff no tiene acceso anon.
+function apiHeaders(): Record<string, string> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('pos_shift_token') : null
+  return { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }
+}
 
 export default function HuellaPage() {
   const [staff, setStaff] = useState<StaffMember[]>([])
@@ -29,10 +28,11 @@ export default function HuellaPage() {
         .catch(() => {})
     }
 
-    // Load staff
-    fetch(`${SUPABASE_URL}/rest/v1/pos_staff?client_id=eq.${_cid()}&active=eq.true&select=id,name,role&order=name.asc`,
-      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
-    ).then(r => r.ok ? r.json() : []).then(setStaff).finally(() => setLoading(false))
+    // Load staff via la API segura (pos_staff no tiene acceso anon con la anon key)
+    fetch('/api/pos/staff', { headers: apiHeaders(), cache: 'no-store' })
+      .then(r => r.ok ? r.json() : { staff: [] })
+      .then(d => setStaff((d.staff || []).filter((s: StaffMember) => s.active !== false)))
+      .finally(() => setLoading(false))
 
     // Load registered credentials
     try {
