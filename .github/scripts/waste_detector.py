@@ -58,6 +58,7 @@ def get_suppliers_data(days=30):
     start_date = (now_mx - timedelta(days=days)).strftime("%Y-%m-%d")
     return sb_get("wansoft_suppliers", {
         "select": "fecha,periodo,data",
+        "client_id": f"eq.{CLIENT['id']}",  # OCM Fase 0: aislamiento por tenant
         "fecha": f"gte.{start_date}",
         "order": "fecha.desc",
         "limit": "10",
@@ -81,6 +82,7 @@ def get_food_cost_data(days=30):
     start_date = (now_mx - timedelta(days=days)).strftime("%Y-%m-%d")
     return sb_get("wansoft_food_cost", {
         "select": "fecha,data",
+        "client_id": f"eq.{CLIENT['id']}",  # OCM Fase 0: aislamiento por tenant
         "fecha": f"gte.{start_date}",
         "order": "fecha.desc",
         "limit": "10",
@@ -91,6 +93,7 @@ def get_shrinkage_data():
     """Fetch physical vs system inventory differences if available."""
     return sb_get("wansoft_shrinkage", {
         "select": "fecha,data",
+        "client_id": f"eq.{CLIENT['id']}",  # OCM Fase 0: aislamiento por tenant
         "order": "fecha.desc",
         "limit": "5",
     })
