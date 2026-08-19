@@ -73,6 +73,35 @@ export async function POST(request: NextRequest) {
       'Prefer': 'return=representation',
     }
 
+    // ── Detección de skimming (Fase 1 · log-only · CERO riesgo) ──
+    // r1_save_order guarda el `total` que manda el cliente (COALESCE(p_total, total)). El
+    // vector: bajar el `total` dejando los items → sum(items) − descuento ≠ total; el arqueo
+    // cuadra (pagos==total) y la diferencia se embolsa. Aquí recomputamos desde los items y
+    // AUDITAMOS la discrepancia — NO rechazamos (Fase 2 rechazará vía flag tras observar).
+    if (body.status === 'cerrada' && Array.isArray(body.items) && body.items.length > 0) {
+      try {
+        const cents = (n: unknown) => Math.round((Number(n) || 0) * 100)
+        const sumItems = (body.items as Array<{ subtotal?: number; cancelled?: boolean }>)
+          .filter(it => !it?.cancelled)
+          .reduce((s, it) => s + cents(it?.subtotal ?? 0), 0)
+        const expectedTotal = sumItems - cents(body.descuento ?? 0)
+        const declaredTotal = cents(body.total ?? 0)
+        const diff = expectedTotal - declaredTotal
+        if (Math.abs(diff) > 100) { // tolerancia $1 (redondeo/combos/promos)
+          console.warn('[skimming-suspect]', order_id, { sumItems, descuento: body.descuento, declaredTotal, diffCents: diff })
+          fetch(`${sbUrl}/rest/v1/pos_audit_log`, {
+            method: 'POST',
+            headers: { ...headers, Prefer: 'return=minimal' },
+            body: JSON.stringify({
+              client_id: clientId, order_id,
+              action: 'skimming_suspect', actor: body.mesero || 'POS',
+              details: { sum_items_cents: sumItems, descuento: body.descuento ?? 0, declared_total: body.total ?? 0, diff_cents: diff },
+            }),
+          }).catch(() => {})
+        }
+      } catch { /* detección best-effort — NUNCA bloquea el guardado */ }
+    }
+
     // ── Step 1: Save order via idempotent wrapper (or legacy direct) ──
     const hasOperationId = typeof body.save_operation_id === 'string' && body.save_operation_id.length > 0
     const rpcName = hasOperationId ? 'r1_save_order_idempotent' : 'r1_save_order'
