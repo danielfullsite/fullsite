@@ -85,6 +85,8 @@ No se puede salir a vender sin auditoría real — y **Claude no se autoaudita**
 | P2-2 | **Flujo de usuario / identificación de cliente (CRM)** | Cliente llega = identificado (nuevo o cautivo) antes de la mesa. Vía **OpenTable/reservas/WhatsApp** → mete al historial cómo pide esa persona. QR con incentivo (café/descuento) para captar. Base para upselling personalizado por IA. |
 | P2-3 | **Auto-config completo** | La caja **ya anuncia por mDNS** (`_fullsite-pos._tcp`) → media hecha. Falta: lado POS/KDS descubre la caja + auto-detect de impresoras + confirmar con un toque + fallback. Desbloquea instalar "donde sea". |
 | P2-4 | **Un POS configurable + IA personaliza** | Principio: un solo núcleo, jamás forkear por cliente; la IA aprende TU restaurante. (ADR en DIRECTION §4.) |
+| P2-5 | **Personas al sentar (paridad Polo) + covers** | Tocar mesa → "¿cuántas personas?" → sentar (hoy no se pide primero). Cambio chico de UI que además alimenta ticket-por-persona, ocupación y forecast — combustible del experto. Idea #1 del teardown de PoloTab. |
+| P2-6 | **Paridad operativa POS (teardown Polo)** | Asiento por ítem (A1/A2) para split limpio, rail de categorías por color, modificadores con cantidad + precio abierto, timer visible por mesa. Base operativa; encima va la capa AI-native (experto lee el piso, upsell en el punto, margen/inventario en vivo). Ver artifact teardown PoloTab. |
 
 ---
 
