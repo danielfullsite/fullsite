@@ -130,7 +130,7 @@ export default function TerminalesPage() {
 
         {error && <div className="rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm px-3 py-2">{error}</div>}
 
-        <button onClick={generate} disabled={busy || !clientId} className="w-full rounded-xl bg-[var(--accent)] hover:opacity-90 text-white font-medium py-2.5 text-sm disabled:opacity-40 inline-flex items-center justify-center gap-2">
+        <button onClick={generate} disabled={busy || !clientId || (needsBridge && !bridgeHost.trim())} className="w-full rounded-xl bg-[var(--accent)] hover:opacity-90 text-white font-medium py-2.5 text-sm disabled:opacity-40 inline-flex items-center justify-center gap-2">
           {busy ? <><Loader2 size={15} className="animate-spin" /> Generando…</> : 'Generar config'}
         </button>
       </div>
