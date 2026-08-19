@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
       // 0: Daily data (always)
       fetch(`${sbUrl}/rest/v1/wansoft_daily?select=${selectCols}&client_slug=eq.${encodeURIComponent(client_id || '')}&ventas_dia=gt.0&order=fecha.desc&limit=${histLimit}`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []),
       // 1: Waiter categories (conditional)
-      wantsMeseros ? fetch(`${sbUrl}/rest/v1/wansoft_waiter_categories?select=fecha,data&order=fecha.desc&limit=7`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
+      (wantsMeseros && client_id === 'amalay') ? fetch(`${sbUrl}/rest/v1/wansoft_waiter_categories?select=fecha,data&order=fecha.desc&limit=7`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
       // 2: Food cost (conditional)
       wantsFoodCost ? fetch(`${sbUrl}/rest/v1/wansoft_food_cost?select=fecha,data&order=fecha.desc&limit=1`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
       // 3: Reservaciones (conditional)
@@ -713,7 +713,7 @@ NOTA RANGO DE DATOS: los datos diarios abajo cubren EXACTAMENTE del ${(recentDay
           // Fetch same months from previous year
           const currentMonth = todayStr.slice(5, 7)
           const yoyRes = await fetch(
-            `${sbUrl}/rest/v1/wansoft_daily?select=fecha,ventas_dia,tickets_count,personas_restaurant&ventas_dia=gt.0&fecha=gte.${prevYear}-01-01&fecha=lte.${prevYear}-12-31&order=fecha.asc&limit=500`,
+            `${sbUrl}/rest/v1/wansoft_daily?select=fecha,ventas_dia,tickets_count,personas_restaurant&client_slug=eq.${encodeURIComponent(client_id || '')}&ventas_dia=gt.0&fecha=gte.${prevYear}-01-01&fecha=lte.${prevYear}-12-31&order=fecha.asc&limit=500`,
             { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
           )
           if (yoyRes.ok) {

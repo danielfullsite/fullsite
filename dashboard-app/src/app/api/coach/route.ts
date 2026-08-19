@@ -7,14 +7,16 @@ export async function POST(request: NextRequest) {
     if (!process.env.GROQ_API_KEY && !process.env.GROQ) {
       return Response.json({ insights: [] }, { status: 200 })
     }
+    // AISLAMIENTO (OCM Fase 0): sin client_id no se consulta nada — evita leer TODOS los tenants.
+    if (!client_id) return Response.json({ insights: [] }, { status: 200 })
 
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
     const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     const headers = { apikey: sbKey, Authorization: `Bearer ${sbKey}` }
 
-    // Fetch 90 days of daily data
+    // Fetch 90 days of daily data — SCOPED al tenant (antes leía todos los clientes).
     const dailyRes = await fetch(
-      `${sbUrl}/rest/v1/wansoft_daily?select=fecha,ventas_dia,ventas_brutas,descuentos,tickets_count,personas_restaurant,ticket_promedio_restaurant,meseros,ventas_por_grupo,propinas_total,pago_métodos&ventas_dia=gt.0&order=fecha.desc&limit=90`,
+      `${sbUrl}/rest/v1/wansoft_daily?select=fecha,ventas_dia,ventas_brutas,descuentos,tickets_count,personas_restaurant,ticket_promedio_restaurant,meseros,ventas_por_grupo,propinas_total,pago_métodos&client_slug=eq.${encodeURIComponent(client_id)}&ventas_dia=gt.0&order=fecha.desc&limit=90`,
       { headers, cache: 'no-store' }
     )
     const days = dailyRes.ok ? await dailyRes.json() : []
@@ -23,12 +25,11 @@ export async function POST(request: NextRequest) {
       return Response.json({ insights: [] })
     }
 
-    // Fetch waiter categories (last 7 days)
-    const wcRes = await fetch(
-      `${sbUrl}/rest/v1/wansoft_waiter_categories?select=fecha,data&order=fecha.desc&limit=7`,
-      { headers, cache: 'no-store' }
-    )
-    const waiterRows = wcRes.ok ? await wcRes.json() : []
+    // wansoft_waiter_categories NO tiene columna de cliente → es solo-AMALAY (legacy).
+    // Solo se lee para el tenant legacy; para otros se omite (evita filtrar datos de AMALAY).
+    const waiterRows = client_id === 'amalay'
+      ? await fetch(`${sbUrl}/rest/v1/wansoft_waiter_categories?select=fecha,data&order=fecha.desc&limit=7`, { headers, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => [])
+      : []
 
     // Build waiter rankings text
     let waiterText = ''
