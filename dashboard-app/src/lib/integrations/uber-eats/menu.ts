@@ -129,3 +129,47 @@ export async function restoreItems(
     return { ok: false, error: String(e) }
   }
 }
+
+/**
+ * Update a SINGLE menu item — POST /v2/eats/stores/{store_id}/menus/items/{item_id}.
+ * Requerido por la validación de Uber (endpoint "Update Item"). Distinto del upload
+ * masivo (uploadMenu, PUT) y del OOS por lote (markItemsOOS/restoreItems). Se usa para
+ * cambiar precio/título/descripción/suspensión de un item sin resubir todo el menú.
+ * `patch` = campos a actualizar (parcial del item).
+ */
+export interface UberItemUpdate {
+  title?: Record<string, string>
+  description?: Record<string, string>
+  price_info?: { price: number; currency_code: string }
+  suspension_info?: { suspension: { suspend_until: number | null; reason?: string } }
+  tax_info?: { tax_rate: number }
+}
+
+export async function updateItem(
+  storeId: string,
+  itemId: string,
+  patch: UberItemUpdate,
+  correlationId: string
+): Promise<{ ok: boolean; error?: string }> {
+  const t0 = Date.now()
+  try {
+    const r = await withRetry(
+      () => uberFetch(`/v2/eats/stores/${storeId}/menus/items/${itemId}`, {
+        method: 'POST', storeId,
+        body: JSON.stringify(patch),
+      }),
+      { maxAttempts: 3, baseDelayMs: 500 }
+    )
+    const errText = r.ok ? undefined : await r.text()
+    await auditLog({
+      provider: 'ubereats', correlation_id: correlationId, action: 'menu.item_update',
+      request: { store_id: storeId, item_id: itemId, fields: Object.keys(patch) },
+      response: errText ? { error: errText } : { status: 'updated' },
+      status_code: r.status, duration_ms: Date.now() - t0,
+    })
+    return r.ok ? { ok: true } : { ok: false, error: errText }
+  } catch (e) {
+    await auditLog({ provider: 'ubereats', correlation_id: correlationId, action: 'menu.item_update', response: { error: String(e) }, duration_ms: Date.now() - t0 })
+    return { ok: false, error: String(e) }
+  }
+}

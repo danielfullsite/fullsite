@@ -3,7 +3,7 @@
 // PATCH /api/integrations/uber-eats/menu → mark OOS / restore items
 
 import { type NextRequest, NextResponse } from 'next/server'
-import { uploadMenu, markItemsOOS, restoreItems } from '@/lib/integrations/uber-eats/menu'
+import { uploadMenu, markItemsOOS, restoreItems, updateItem, type UberItemUpdate } from '@/lib/integrations/uber-eats/menu'
 import { withPOSAuth } from '@/lib/api-auth'
 import { sameOriginOnly } from '@/lib/api-guard'
 import { storeBelongsToClient } from '@/lib/integrations/uber-eats/ownership'
@@ -33,11 +33,13 @@ export async function PATCH(request: NextRequest) {
   if (!auth) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   const correlationId = crypto.randomUUID()
   try {
-    const { store_id, action, items, item_ids } = await request.json() as {
+    const { store_id, action, items, item_ids, item_id, patch } = await request.json() as {
       store_id: string
-      action: 'oos' | 'restore'
+      action: 'oos' | 'restore' | 'update'
       items?: Parameters<typeof markItemsOOS>[1]
       item_ids?: string[]
+      item_id?: string
+      patch?: UberItemUpdate
     }
     if (!store_id) return NextResponse.json({ error: 'store_id required' }, { status: 400 })
     if (!(await storeBelongsToClient(store_id, auth.clientId))) return NextResponse.json({ error: 'No encontrado' }, { status: 404 })
@@ -48,6 +50,11 @@ export async function PATCH(request: NextRequest) {
     }
     if (action === 'restore' && item_ids?.length) {
       const result = await restoreItems(store_id, item_ids, correlationId)
+      return NextResponse.json({ ...result, correlation_id: correlationId }, { status: result.ok ? 200 : 422 })
+    }
+    // Uber endpoint #9: update de UN item (POST /v2/eats/stores/{id}/menus/items/{id})
+    if (action === 'update' && item_id && patch) {
+      const result = await updateItem(store_id, item_id, patch, correlationId)
       return NextResponse.json({ ...result, correlation_id: correlationId }, { status: result.ok ? 200 : 422 })
     }
     return NextResponse.json({ error: 'Invalid action or missing items/item_ids' }, { status: 400 })
