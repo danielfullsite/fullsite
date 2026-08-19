@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'Empleado no encontrado o desactivado' }, { status: 401 })
     }
 
-    if (typeof pin !== 'string' || !/^\d{4,8}$/.test(pin)) {
+    if (typeof pin !== 'string' || !/^\d{4,10}$/.test(pin)) {
       return Response.json({ error: 'PIN inválido' }, { status: 400 })
     }
 
