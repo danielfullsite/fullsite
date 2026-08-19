@@ -24,7 +24,16 @@ El POS ya llama a un servicio local **7718** con `/health`, `/enroll?id=`, `/ide
 | **A · Servicio 7718 (nativo)** | Wrapper de DigitalPersona (native SDK / U.are.U) que corre local y expone el contrato que el POS YA usa | ✅ local, "pon el dedo → sabe quién eres" | **RECOMENDADO** — el POS ya está cableado; mantiene el contrato |
 | B · Browser SDK | `@digitalpersona/devices` (WebSocket al DP Agent) dentro del POS | ⚠️ 1:1 fácil; 1:N offline complejo (necesita matcher) | Alterna si el nativo no está disponible |
 
-**Recomendación: Opción A** — mantener el contrato 7718 (ya cableado) y que el servicio 7718 sea el wrapper de DigitalPersona que hace **captura + match 1:N local**. Es la parte de hardware (Fase 2). Daniel confirmó el lector = **DigitalPersona/HID (7718)**.
+**DECISIÓN (confirmada por Daniel 2026-08-18): Opción A — servicio DigitalPersona 7718 (1:N).**
+El uso real es **muchos meseros comparten la caja y cada quien entra con SU huella** (para que no se
+pasen el PIN) → se necesita **identificación 1:N por empleado.** WebAuthn/Windows Hello **NO sirve**
+para esto (identifica al *usuario de Windows*, no a cada mesero; solo vale para 1-persona-por-terminal).
+Es lo mismo que Wansoft tenía con el HID viejo. Es la parte de hardware (Fase 2).
+
+> ⚠️ **Nota histórica:** hubo un desvío el 2026-08-18 donde el login se consolidó temporalmente en
+> **WebAuthn** (commit 543affae) por una recomendación mía equivocada (no consideré el caso multi-mesero).
+> WebAuthn queda como **fallback interino / 1-persona-por-terminal**; el camino PRIMARIO es el 7718.
+> Los arreglos de anon/RLS (staff por `/api/pos/staff`) SÍ se conservan — son correctos en cualquier caso.
 
 **Contrato del servicio 7718 (lo que el POS ya espera — congelarlo):**
 ```
@@ -74,7 +83,7 @@ GET /identify          → captura 1x, match 1:N → { ok:true, staffId } | { ok
   - ✅ **API `/api/pos/staff`** (crear/listar/editar/desactivar, admin-gated con shift token gerente+, PIN generado, client_id del token).
   - ✅ **UI `pos/staff`** rewireada a la API segura: crea con PIN generado (mostrado 1 vez + copiar + enrolar huella), toggle regenerar. *(Bonus: estaba ROTA en el POS — escribía con anon key que RLS bloquea.)*
   - ✅ Widen validación a 10 díg (`api/pos/pin` regex + keypad del POS).
-- **FASE 2 — con el lector (hardware):** el **servicio 7718** (wrapper DigitalPersona) — captura + match 1:N + persistir template cifrado al server. Probar enroll + login físico.
+- **FASE 2 — con el lector (hardware) — ES EL CAMINO PRIMARIO (1:N):** el **servicio 7718** (wrapper DigitalPersona) que hace captura + **match 1:N** (pon el dedo → sabe cuál mesero) + persiste el template cifrado en el server. Wirear el **login Y la página `/pos/huella`** al 7718 (reemplazando el WebAuthn interino). Probar enroll + login físico en la caja de AMALAY. Se hace junto con el **auto-detect de HID/impresoras** (auto-config, mismo frente Electron+hardware).
 - **FASE 3 — endurecer:** hashear PIN server-side; cifrado del template; incluir en la auditoría de seguridad (P0-E).
 
 ## 8. Cambios exactos listos para aplicar (con deploy + prueba)
