@@ -13,7 +13,7 @@ const CLIENT_RE = /^[a-z0-9_-]{1,40}$/i
 const DATASETS: Record<string, { table: string; select: string; order?: string; limit?: number }> = {
   menu: { table: 'pos_menu_items', select: 'id,name,price,category_id,active,sort_order', order: 'sort_order' },
   categorias: { table: 'pos_menu_categories', select: 'id,name,color,sort_order,active', order: 'sort_order' },
-  personal: { table: 'pos_staff', select: 'id,name,pin,role,role_display,active', order: 'name' },
+  personal: { table: 'pos_staff', select: 'id,name,role,role_display,active', order: 'name' }, // P2-1: NO exportar pin (secreto)
   pagos: { table: 'pos_payment_methods', select: 'id,name,type,commission_pct,active', order: 'name' },
   mesas: { table: 'pos_mesas', select: 'number,capacity,zone,shape,active', order: 'number' },
   ordenes: { table: 'pos_orders', select: 'id,mesa,mesero,personas,status,subtotal,iva,total,descuento,propina,metodo_pago,turno_id,closed_at', order: 'closed_at.desc', limit: 5000 },
