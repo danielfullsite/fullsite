@@ -53,8 +53,11 @@ Agregar filtro por tenant en las queries de IA. **Va sí o sí antes de Cliente 
 - **Descubrimiento:** `wansoft_waiter_categories` NO tiene columna de cliente → es solo-AMALAY; el equivalente vivo será `ocm_waiter_rankings` (Fase 2).
 - ⏳ Pendiente (follow-up, agentes Python cron, menor superficie): `waste_detector.py`, `purchase_predictor.py` (leen `wansoft_*` sin filtro); revisar `wansoft_hourly` (¿columna de cliente?).
 
-### Fase 1 — `ocm_daily` vivo `[el eslabón clave]`
-Reescribir `ocm_daily` para **agregar `pos_orders` directamente** (como vista), matando la dependencia de la tabla muerta `ops_daily` y del `pos_daily_aggregator` bloqueado. Resultado: ventas/tickets/ticket-promedio/tendencias **vivas para cualquier tenant, sin job intermedio**. Para AMALAY, `UNION` con la historia de `wansoft_daily` (source_system) para no perder el histórico rico pre-cutover.
+### Fase 1 — `ocm_daily` vivo `[el eslabón clave]` — ✅ HECHO + VALIDADO 2026-08-19
+Reescrito: `ocm_daily` **agrega `pos_orders` en vivo** (sin `ops_daily` ni aggregator) **UNION** la historia de `ops_daily` (`record_type` cierre/cierre_wansoft) solo para fechas sin órdenes → data diaria viva para cualquier tenant + histórico de AMALAY intacto, sin doble-contar.
+- Migración: `scripts/sql/migrations/014_ocm_daily_live.sql`.
+- Validado: creado en **staging**; lógica corrida **read-only contra prod (AMALAY)** → días fullsite recientes ($133–$4,161; ralos porque AMALAY aún no mete todo el volumen al POS) + historia wansoft (Jul: $41K–$60K/día), transición limpia.
+- **Pendiente:** aplicar a prod = Daniel (DDL). Refinamientos anotados en el .sql (día-negocio 05:00, pagos mixtos).
 
 ### Fase 2 — vistas que faltan
 Crear `ocm_waiter_rankings` (equiv. `wansoft_waiter_categories`, desde `pos_orders.mesero`) y `ocm_menu_groups` (equiv. `ventas_por_grupo`, desde items de `pos_orders`). Son las 2 piezas que la IA usa y que aún no tienen equivalente OCM vivo.
