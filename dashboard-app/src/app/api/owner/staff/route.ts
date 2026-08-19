@@ -16,7 +16,7 @@ import { randomUUID } from 'crypto'
  *  - Gate: solo roles manager (dueño/admin/gerente) pueden gestionar equipo.
  *  - Escalación: solo dueño/admin puede crear/editar staff con rol admin|gerente;
  *    un gerente solo gestiona roles ≤ capitan.
- *  - PIN: 3–8 dígitos, único entre staff ACTIVO del mismo tenant. Nunca se loguea
+ *  - PIN: 4–10 dígitos, único entre staff ACTIVO del mismo tenant. Nunca se loguea
  *    en claro (auditoría registra solo los campos cambiados, no el valor).
  */
 
@@ -25,7 +25,10 @@ export const dynamic = 'force-dynamic'
 const MANAGER_ROLES = new Set(['dueño', 'admin', 'gerente'])
 const ELEVATED_STAFF_ROLES = new Set(['admin', 'gerente'])
 const ALLOWED_STAFF_ROLES = new Set(['mesero', 'cajero', 'cocina', 'barra', 'capitan', 'gerente', 'admin'])
-const PIN_RE = /^\d{3,8}$/
+// 4–10 dígitos: 4 = PIN corto que teclea el mesero; hasta 10 para el PIN de
+// respaldo generado por el sistema (ver src/lib/pos-pin.ts). Debe coincidir con
+// el CHECK de BD pos_staff_pin_len_chk (^[0-9]{4,10}$).
+const PIN_RE = /^\d{4,10}$/
 
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 
@@ -93,7 +96,7 @@ export async function POST(request: NextRequest) {
   const pin = typeof body?.pin === 'string' ? body.pin : ''
   const role = typeof body?.role === 'string' ? body.role : ''
   if (!name) return Response.json({ error: 'Nombre requerido' }, { status: 400 })
-  if (!PIN_RE.test(pin)) return Response.json({ error: 'PIN debe ser 3–8 dígitos' }, { status: 400 })
+  if (!PIN_RE.test(pin)) return Response.json({ error: 'PIN debe ser 4–10 dígitos' }, { status: 400 })
   if (!ALLOWED_STAFF_ROLES.has(role)) return Response.json({ error: 'Rol inválido' }, { status: 400 })
   if (!canAssignRole(auth.role, role)) return Response.json({ error: 'No puedes asignar ese rol' }, { status: 403 })
   if (await pinTaken(H, auth.clientId, pin)) return Response.json({ error: 'Ese PIN ya está en uso' }, { status: 409 })
@@ -142,7 +145,7 @@ export async function PATCH(request: NextRequest) {
   const fields: string[] = []
   if (typeof body.name === 'string' && body.name.trim()) { changes.name = body.name.trim(); fields.push('name') }
   if (typeof body.pin === 'string') {
-    if (!PIN_RE.test(body.pin)) return Response.json({ error: 'PIN debe ser 3–8 dígitos' }, { status: 400 })
+    if (!PIN_RE.test(body.pin)) return Response.json({ error: 'PIN debe ser 4–10 dígitos' }, { status: 400 })
     if (await pinTaken(H, auth.clientId, body.pin, id)) return Response.json({ error: 'Ese PIN ya está en uso' }, { status: 409 })
     changes.pin = body.pin; fields.push('pin')
   }
