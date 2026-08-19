@@ -7,6 +7,7 @@ import {
   MESEROS,
   fetchMeseros,
   verifyManagerPin,
+  consumeManagerApproval,
   verifyPinWithMinRole,
   type MenuCategory,
   RECIPE_ALIASES,
@@ -2582,6 +2583,11 @@ function POSContent() {
     const effectiveOrderId = loadedOrderId || orderId
     if (effectiveOrderId) {
       const cancelOpId = genOpId()
+      // Aprobación server-verificable: si el PIN de gerente se validó online,
+      // consumeManagerApproval devuelve su token firmado (la ruta valida el rol =
+      // infalsificable). Offline no hay token → offline_approved (device-trust, "como
+      // Wansoft": el cancel se encoló tras verificar el PIN en el dispositivo).
+      const _approvalToken = consumeManagerApproval(managerName)
       const cancelBody = {
         client_id: _cid(),
         order_id: effectiveOrderId,
@@ -2591,6 +2597,8 @@ function POSContent() {
         mesero,
         reason,
         manager: managerName,
+        approval_token: _approvalToken || undefined,
+        offline_approved: _approvalToken ? undefined : true,
       }
       try {
         const res = await fetch('/api/pos/cancel-item', {

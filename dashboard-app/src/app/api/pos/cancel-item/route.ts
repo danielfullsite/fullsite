@@ -1,5 +1,9 @@
 import { NextRequest } from 'next/server'
 import { withPOSAuth, unauthorized } from '@/lib/api-auth'
+import { verifyShiftToken } from '@/lib/shift-token'
+
+// Nivel de rol por nombre (gerente/admin = manager+). Debe coincidir con pin/route.ts.
+const ROLE_LVL: Record<string, number> = { mesero: 1, cajero: 2, capitan: 3, gerente: 4, admin: 5 }
 
 /**
  * Atomic item cancel within an order.
@@ -28,10 +32,40 @@ export async function POST(request: NextRequest) {
     const clientId = auth.clientId
 
     const body = await request.json()
-    const { order_id, item_id, voided, operation_id, mesero, reason, manager } = body
+    const { order_id, item_id, voided, operation_id, mesero, reason, manager, approval_token, offline_approved } = body
 
     if (!order_id || !item_id) {
       return Response.json({ ok: false, error: 'MISSING_PARAMS' }, { status: 400 })
+    }
+
+    // ── Enforcement de aprobación de gerente (anti-fraude, PERM-07) ──
+    // Antes: la ruta confiaba en el string `manager` → un mesero podía cancelar por POST
+    // directo. Ahora:
+    //   • Online: exige el token FIRMADO del gerente (rol gerente+, mismo tenant) que emite
+    //     /api/pos/pin → infalsificable desde el cliente.
+    //   • Offline (offline_approved): el cancel se encoló tras verificar el PIN del gerente
+    //     EN EL DISPOSITIVO (PBKDF2, 8h). Decisión Opción A ("como Wansoft"): se acepta y se
+    //     audita como device-trust, para no romper la operación offline en país 40% efectivo.
+    let approvalMode = ''
+    if (typeof approval_token === 'string' && approval_token) {
+      const p = await verifyShiftToken(approval_token)
+      if (p && p.cid === clientId && (ROLE_LVL[p.rol] || 0) >= 4) approvalMode = 'online:' + p.rol
+    }
+    if (!approvalMode) {
+      if (offline_approved === true) {
+        approvalMode = 'offline_device_trust'
+      } else {
+        // Sin ninguna aprobación. ROLLOUT EN 2 FASES para no romper clientes viejos (SW
+        // cacheado que aún no manda la aprobación):
+        //   • Fase 1 (default): GRACE — permite pero audita como 'legacy_no_approval'.
+        //     Cero riesgo al desplegar; empieza a detectar el vector.
+        //   • Fase 2: setear CANCEL_APPROVAL_STRICT=true en el env → 403 (bloquea el POST
+        //     forjado). Se activa cuando el log deje de mostrar 'legacy_no_approval'.
+        if (process.env.CANCEL_APPROVAL_STRICT === 'true') {
+          return Response.json({ ok: false, error: 'MANAGER_APPROVAL_REQUIRED' }, { status: 403 })
+        }
+        approvalMode = 'legacy_no_approval'
+      }
     }
 
     // ── Step 1: Read order with current updated_at ──
@@ -102,6 +136,7 @@ export async function POST(request: NextRequest) {
             item_name: targetItem.nombre || targetItem.name,
             reason,
             manager,
+            approval_mode: approvalMode,
             voided: !!voided,
             operation_id,
           },

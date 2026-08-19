@@ -1828,6 +1828,19 @@ async function _managerFromStaffCache(pin: string, minLevel = 4): Promise<{ name
   } catch { return null }
 }
 
+// Aprobación de gerente SERVER-VERIFICABLE: cuando el PIN se valida online, /api/pos/pin
+// emite un shiftToken firmado del gerente. Lo guardamos aquí un instante para que la ruta
+// de cancelar/descuento valide el ROL server-side (infalsificable), en vez de confiar en
+// el string `manager`. De un solo uso, vida 2 min. Offline no hay token → device-trust
+// (ver cancel-item/route.ts, decisión "como Wansoft").
+let _lastManagerApproval: { token: string; name: string; at: number } | null = null
+export function consumeManagerApproval(name: string): string | null {
+  const a = _lastManagerApproval
+  _lastManagerApproval = null // un solo uso
+  if (a && a.name === name && Date.now() - a.at < 120_000) return a.token
+  return null
+}
+
 // Validación server-side de PIN de gerente (cancelaciones, descuentos, cortes).
 // Antes venía de NEXT_PUBLIC_MANAGER_PINS (expuesto en el bundle) — ahora valida
 // contra /api/pos/pin con manager=true (pos_staff admin/gerente + env server-only).
@@ -1842,13 +1855,15 @@ export async function verifyManagerPin(pin: string): Promise<string | null> {
       body: JSON.stringify({ pin, client_id: _getClientId(), manager: true }),
     })
     if (res.ok) {
-      const { staff } = await res.json()
+      const { staff, shiftToken } = await res.json()
       if (staff?.name) {
         try {
           const cached = JSON.parse(localStorage.getItem('pos_manager_pin_cache') || '{}')
           cached[await _pinCacheKey(pin)] = { name: staff.name, role: staff.role || 'gerente', cached_at: Date.now() }
           localStorage.setItem('pos_manager_pin_cache', JSON.stringify(cached))
         } catch { /* ignore */ }
+        // Token firmado del gerente = aprobación server-verificable para la ruta.
+        if (shiftToken) _lastManagerApproval = { token: shiftToken as string, name: staff.name as string, at: Date.now() }
         return staff.name as string
       }
       return null
