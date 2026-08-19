@@ -68,11 +68,12 @@ GET /identify          → captura 1x, match 1:N → { ok:true, staffId } | { ok
 
 ## 7. Plan por fases
 
-- **FASE 1 — código ahora (sin hardware):**
+- **FASE 1 — código ahora (sin hardware): ✅ COMPLETA**
   - ✅ Generador PIN 10 díg → `dashboard-app/src/lib/pos-pin.ts` (criptográfico, con exclusión de duplicados).
-  - Migración `pos_staff_biometrics` + widen `pos_staff.pin` a 10 díg (SQL abajo, aplicar en prod = Daniel).
-  - UI/API de **alta de staff en el POS** (crear staff, generar PIN, marcar para enrolar). API admin-gated.
-  - Widen validación: `route.ts:105` `/^\d{4,8}$/` → `/^\d{4,10}$/` + `maxLength` del input de PIN → 10.
+  - ✅ Migración `013_pos_biometrics_pin10.sql` (tabla `pos_staff_biometrics` + widen `pos_staff.pin` a 10 díg). *Aplicar en prod = Daniel.*
+  - ✅ **API `/api/pos/staff`** (crear/listar/editar/desactivar, admin-gated con shift token gerente+, PIN generado, client_id del token).
+  - ✅ **UI `pos/staff`** rewireada a la API segura: crea con PIN generado (mostrado 1 vez + copiar + enrolar huella), toggle regenerar. *(Bonus: estaba ROTA en el POS — escribía con anon key que RLS bloquea.)*
+  - ✅ Widen validación a 10 díg (`api/pos/pin` regex + keypad del POS).
 - **FASE 2 — con el lector (hardware):** el **servicio 7718** (wrapper DigitalPersona) — captura + match 1:N + persistir template cifrado al server. Probar enroll + login físico.
 - **FASE 3 — endurecer:** hashear PIN server-side; cifrado del template; incluir en la auditoría de seguridad (P0-E).
 
