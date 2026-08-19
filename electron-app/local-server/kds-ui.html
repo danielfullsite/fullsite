@@ -308,6 +308,7 @@
     else {
       var html="";
       cards.forEach(function(c){
+       try{
         var st=cardStatus(c);
         var mins=Math.floor((Date.now()-(Date.parse(c.createdAt)||Date.now()))/60000);
         var urgent = mins>=ALERT_MIN && st!=="lista";
@@ -318,7 +319,7 @@
         var body="";
         c.items.forEach(function(it,i){
           var ist=getIState(c.order.id,itemKey(c.order.id,it,i));
-          var mods=(it.modificadores||[]).filter(Boolean);
+          var mods=Array.isArray(it.modificadores)?it.modificadores.filter(Boolean):(it.modificadores?[String(it.modificadores)]:[]);
           var check = ist==="listo"?"✓":(ist==="preparando"?"•":"");
           body+='<div class="item i-'+ist+'" data-o="'+esc(c.order.id)+'" data-k="'+esc(itemKey(c.order.id,it,i))+'">'+
             '<div class="tick">'+check+'</div>'+
@@ -343,6 +344,7 @@
           '<div class="items">'+body+'</div>'+
           (st!=="lista"?'<div class="card-f"><button class="fbtn ready" data-ready="'+esc(c.order.id)+'" data-batch="'+esc(c.batchId)+'">✓ Todo listo</button></div>':'')+
         '</div>';
+       }catch(cardErr){ try{ console.error('[kds] tarjeta con error, se omite:', (c&&c.order&&c.order.id), cardErr); }catch(_){} }
       });
       boardEl.innerHTML=html;
     }
