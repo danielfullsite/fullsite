@@ -64,8 +64,14 @@ Reescrito: `ocm_daily` **agrega `pos_orders` en vivo** (sin `ops_daily` ni aggre
 - `ocm_menu_groups` (equiv. `ventas_por_grupo`) — explota `pos_orders.items` + join a catálogo. Validado: Chilaquiles & Enchiladas $2,620, Bowls, Coffee Hot/Ice, etc.
 - Migración: `scripts/sql/migrations/015_ocm_waiter_menu_views.sql`. Vivas para cualquier tenant. Aplicar a prod = Daniel.
 
-### Fase 3 — repuntar las rutas de IA
-`chat/coach/voice/predict` → leer `ocm_daily` / `ocm_waiter_rankings` / `ocm_menu_groups` en vez de `wansoft_*`. Los agentes Python → `ocm_*` en vez de `ops_daily_*`.
+### Fase 3 — repuntar las rutas de IA `[refactor cuidadoso — sesión fresca]`
+**Las 3 vistas OCM YA están en PROD (aplicadas por Daniel 2026-08-19).** Falta que el código las use.
+**NO es un swap de URL** — la forma de los datos cambió: `wansoft_daily` traía `meseros`/`ventas_por_grupo`/`platillos_top` como jsonb *en cada fila diaria*; ahora eso vive en vistas relacionales separadas. Pasos por ruta:
+1. Swap del top-line diario: `wansoft_daily` → `ocm_daily` (columnas ~iguales: ventas_dia, tickets_count, ticket_promedio_restaurant, personas_restaurant, efectivo, tarjeta, propinas_total).
+2. Agregar queries a `ocm_waiter_rankings` (meseros) y `ocm_menu_groups` (grupos) — reemplazan el parseo jsonb.
+3. **Reescribir el ensamblado**: en `chat/route.ts` las líneas ~603-662 (`parseJsonb(d.meseros)` / `d.ventas_por_grupo` / `d.platillos_top`) hoy leen del jsonb de la fila diaria → cambiar a consumir las vistas relacionales. Igual en coach/voice.
+4. **Probar respuestas reales del chat antes/después** (no romper meseros/grupos para AMALAY).
+> Riesgo si se hace a medias: se regresan las respuestas de meseros/grupos del chat. Por eso NO se hizo al vuelo. El histórico rico de AMALAY (platillos_top pre-cutover) puede quedarse leyendo wansoft_daily como fuente legacy SOLO para AMALAY, o migrarse a una vista de platillos.
 
 ### Fase 4 — desplegar OCM a prod + deprecar
 Aplicar las vistas OCM a prod (AMALAY). Deprecar `wansoft_*` como fuente de IA (mantener solo para reporting histórico de AMALAY).
