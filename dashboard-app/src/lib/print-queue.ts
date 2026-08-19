@@ -13,6 +13,7 @@
 // Retries only count real print attempts. Bridge-down skips don't consume retries.
 
 import { getBridgeUrl } from './bridge-url'
+import { getActiveClientSlug } from './data'
 
 export interface PrintJob {
   id: string
@@ -216,6 +217,10 @@ async function syncJobToCloud(job: PrintJob) {
       },
       body: JSON.stringify({
         id: job.id,
+        // client_id explícito: sin esto la fila queda con client_id NULL y, bajo el
+        // RLS tenant-scoped (BLINDAJE B2), el insert authenticated se rechaza. Es el
+        // mismo patrón que el resto de escrituras del POS (pos-data.ts).
+        client_id: getActiveClientSlug(),
         order_id: job.meta?.orderId || null,
         station: job.station,
         type: job.type,
