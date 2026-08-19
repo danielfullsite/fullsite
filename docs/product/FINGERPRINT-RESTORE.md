@@ -78,6 +78,34 @@ Cosas a arreglar (no bloquean la compilación, sí el uso correcto):
 (endpoint + C#); solo falta poner `apiBaseUrl`+`fingerprintSyncSecret` en el `config.json` de la caja y el
 env en Vercel. Cifrado del template = Fase 3.
 
+## Kit llave-en-mano (2026-08-18) — para que el jueves sea de 10 min
+
+**Hallazgo del checkeo full de git:** la huella **funcionó en las 3 terminales el 12-jul**
+(`FIELD-NOTES-PREFLIGHT-JUL12.md`: "Huella visible cold start = PASS" en Caja/Entrada/Escondite).
+El `.exe` **nunca estuvo en git** — siempre se puso a mano en `C:\fullsite\`. El código de hoy pega
+`127.0.0.1:7718/health` y muestra el botón si responde — **idéntico** al known-good. O sea: cuando no
+sale huella, **siempre** es que el servicio 7718 no responde, no el código.
+
+**Bug #1 de campo (mismo síntoma que hoy):** "POS solo PIN, sin huella" → un `start-bridge.bat` en el
+Startup de Windows ocupaba el 7717 antes que Electron. Fix: quitarlo del Startup.
+
+**Lo que quedó listo desde aquí (commit del kit):**
+1. **`electron-app` empaqueta el servicio** (`build.extraResources` → `fingerprint/`). Al instalar la app,
+   `startFingerprintService()` **copia** `fingerprint-service.exe` + `DPUruNet.dll` a `C:\fullsite\` la
+   primera vez (si no existen) y los arranca. **Fin del copiar-a-mano** = camino clonable a N clientes.
+   *(Los binarios NO se commitean; se dejan en `electron-app/fingerprint/` antes de `electron-builder`.)*
+2. **`print-bridge/build-fingerprint.bat`** — compila el `.exe` con `csc.exe` (sin Visual Studio). Necesita
+   `DPUruNet.dll` junto al `.cs`.
+3. **`print-bridge/install-fingerprint.ps1`** — instala/repara en la caja: copia binarios, **quita el
+   `start-bridge.bat` intruso del Startup**, arranca el servicio y hace `/health`. Idempotente.
+4. **`main.js` grita** si el 7717 está ocupado por otro proceso (antes lo callaba) → diagnóstico instantáneo.
+
+**Procedimiento jueves (físico en AMALAY):**
+1. En la caja: `dir C:\fullsite\fingerprint-service.exe` — ¿sobrevivió al reinstall?
+   - **Sí** → correr `install-fingerprint.ps1` (quita `.bat`, arranca, `/health`). Conectar lector. Listo.
+   - **No** → poner `DPUruNet.dll` junto al `.cs`, correr `build-fingerprint.bat`, luego `install-fingerprint.ps1`.
+2. Copiar los 2 binarios a `electron-app/fingerprint/` y rebuild → de ahí en adelante **toda** instalación los trae.
+
 ## Estado del código (ya listo)
 - El login **ya usa el 7718** (se revirtió el desvío a WebAuthn, commit `34618598`).
 - La opción "Entrar con huella" **saldrá sola** en cuanto el `.exe` responda en `/health` en la caja.

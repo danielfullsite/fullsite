@@ -243,7 +243,11 @@ async function startLocalServer() {
     console.log('[main] Local server started.');
   } catch (e) {
     if (e.code === 'EADDRINUSE') {
-      console.log('[main] Port 7717 already in use — another server running, skipping.');
+      // KNOWN FIELD BUG (AMALAY jul-12): un `start-bridge.bat` en el Startup de Windows
+      // ocupaba 7717 antes que Electron → el bridge/proxy /fp no se exponía y el POS se
+      // quedaba "solo PIN, sin huella". Si ves esto, revisa el Startup por un .bat intruso.
+      console.warn('[main] ⚠ Port 7717 OCUPADO por otro proceso (¿start-bridge.bat en Startup?).');
+      console.warn('[main] ⚠ El bridge/impresión/LAN de ESTA app no arrancó. Revisa Startup y reinicia.');
     } else {
       console.error('[main] Local server failed to start:', e.message);
     }
@@ -564,6 +568,25 @@ let fingerprintRestartCount = 0;
 function startFingerprintService() {
   const fpExe = 'C:\\fullsite\\fingerprint-service.exe';
   const fpDll = 'C:\\fullsite\\DPUruNet.dll';
+
+  // Auto-instalar desde el paquete si no están en C:\fullsite\ (clonable: el instalador
+  // trae el servicio; no hay que copiarlo a mano en cada caja). Requiere que el build
+  // incluya electron-app/fingerprint/{fingerprint-service.exe,DPUruNet.dll} vía extraResources.
+  if (!fs.existsSync(fpExe) || !fs.existsSync(fpDll)) {
+    try {
+      const bundledDir = path.join(process.resourcesPath || __dirname, 'fingerprint');
+      const bExe = path.join(bundledDir, 'fingerprint-service.exe');
+      const bDll = path.join(bundledDir, 'DPUruNet.dll');
+      if (fs.existsSync(bExe) && fs.existsSync(bDll)) {
+        fs.mkdirSync('C:\\fullsite', { recursive: true });
+        if (!fs.existsSync(fpExe)) fs.copyFileSync(bExe, fpExe);
+        if (!fs.existsSync(fpDll)) fs.copyFileSync(bDll, fpDll);
+        console.log('[fingerprint] Servicio instalado desde el paquete a C:\\fullsite\\');
+      }
+    } catch (e) {
+      console.warn('[fingerprint] No se pudo auto-instalar desde el paquete:', e.message);
+    }
+  }
 
   // Check if files exist
   if (!fs.existsSync(fpExe) || !fs.existsSync(fpDll)) {
