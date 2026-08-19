@@ -47,7 +47,7 @@ desconectar internet **con el POS ya abierto** → orden → debe imprimir en la
 Escondite: config BOM → import limpio por **asistente**. Bloqueado además por **licencia TeamViewer**.
 
 ### ⚠️ Deuda técnica crítica
-- ✅ **electron-app COMMITEADO** (`0924b5d5` en `feat/pos-ui-kit`, local) — main.js, local-server/index.js, kds-ui.html, electron-builder-pos/kds.json, configs + docs. **PENDIENTE: push de respaldo a remoto** (rama backup, no toca prod).
+- ✅ **electron-app COMMITEADO + RESPALDADO** (2026-08-18): `feat/pos-ui-kit` (26 commits sobre `origin/main`) pusheado a `origin/backup/pos-ui-kit-20260818` — NO es `main`, no toca prod. Incluye electron-app + kit de huella + velocidad.
 - Los cambios **web SÍ** están en `origin/main` (danielfullsite): commits 8ec06a04, ec42d34d, a93cd358, 12bce59a, 1a26fb62 (endpoint /api/pos/kitchen, saveOrder offline, beep por ID).
 
 ---
@@ -77,7 +77,7 @@ Escondite: config BOM → import limpio por **asistente**. Bloqueado además por
 ### 🔴 P0 — `[JUEVES]` listo para el demo con Eduardo (20-ago)
 | # | Tarea | Detalle | Esfuerzo |
 |---|---|---|---|
-| **P0-1** | **⚡ VELOCIDAD offline del POS** `[JUEVES]` | **Lo que MÁS molesta en uso real** (Daniel: "se tarda mucho en abrir, mucho en enviar"). Offline el POS se cuelga porque los fetches no tienen timeout y esperan a un internet que no está. Fix: `fetchWithTimeout` + guard `navigator.onLine` en rutas calientes: **abrir mesa**, **cargar menú**, **enviar orden**, ready-orders poll (`pos/page.tsx:2337`). En vivo frente a Eduardo un POS lento se ve pésimo → **es la #1**. | 1-2 h |
+| **P0-1** | **⚡ VELOCIDAD offline del POS** `[JUEVES]` | **Lo que MÁS molesta en uso real** (Daniel: "se tarda mucho en abrir, mucho en enviar"). Offline el POS se colgaba porque los fetches no tenían timeout. ✅ **CÓDIGO LISTO (2026-08-18):** `pos-data.ts` (menú/categorías/modifiers/meseros con `fetchWithTimeout`+guard) **y** `page.tsx` (checkReady poll, abrir-orden updated_at, alertas ready/delivery, refresh post-envío — todos con guard `navigator.onLine`+`AbortSignal.timeout`). Falta: **probar en vivo + deploy a prod**. | ~~1-2 h~~ → test+deploy |
 | **P0-2** | **🍳 KDS diseño de Eduardo (el golazo)** `[JUEVES]` | Rediseñar `electron-app/local-server/kds-ui.html` (el motor offline ya jala; esto es piel + render). Es SU diseño, enseñárselo corriendo = el momento del demo. Requisitos EXPLÍCITOS: **(1) Filtrar por estación** — Cocina muestra SOLO items de cocina, NO bebidas/barra (hoy muestra todo); configurable por estación. **(2) Tarjeta por envío, no por orden** — mostrar SOLO los productos NUEVOS del `comanda_batch` recién enviado, NO toda la mesa cada vez (agregas un bowl → sale SOLO el bowl). **(3) Look Eduardo** — cascada, toque por item para marcar listo, alertas por tiempo, botón salida/config. Ver `EDUARDO-SESSION-JUL21.md` / [[project_kds_variants]]. | 3-5 h |
 | **P0-3** | **Terminar Escondite + probar offline Entrada/Escondite** `[JUEVES]` | Escondite: import limpio del config por **asistente** (no a mano — el BOM lo rompe), `pos_server_ip: 192.168.1.71`; requiere acceso (TeamViewer licencia o físico el jueves). Y probar offline físicamente Entrada + Escondite (desconectar internet → orden → imprime + KDS). | 20-40 min |
 | P0-4 | **Push de respaldo del electron-app** | `0924b5d5` está local. Empujar a rama backup remota (no toca prod) para no perderlo. | 5 min |
