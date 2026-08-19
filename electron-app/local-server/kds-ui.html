@@ -165,7 +165,12 @@
     <div class="modal-b">
       <div class="fld"><label>Estación de esta pantalla</label>
         <div class="seg" id="seg-station">
-          <button data-st="cocina">Cocina</button><button data-st="barra">Barra</button><button data-st="caja">Caja</button>
+          <button data-st="cocina">Cocina</button><button data-st="barra">Barra</button><button data-st="caja">Caja</button><button data-st="todas">Todas · expo</button>
+        </div>
+      </div>
+      <div class="fld"><label>Tamaño de letra</label>
+        <div class="seg" id="seg-scale">
+          <button data-sc="1">Normal</button><button data-sc="1.25">Grande</button><button data-sc="1.5">XL</button>
         </div>
       </div>
       <div class="fld"><label>Alerta de tiempo</label>
@@ -196,7 +201,9 @@
   var STATION   = String(_s.station || CFG.station || "cocina").toLowerCase();
   var ALERT_MIN = Number(_s.alert_min || CFG.alert_min) || 10;
   var SOUND     = _s.sound !== false;   // default ON
-  function saveSettings(){ try{ localStorage.setItem(SKEY, JSON.stringify({ station:STATION, alert_min:ALERT_MIN, sound:SOUND })); }catch(e){} }
+  var SCALE     = Number(_s.scale) || 1;   // tamaño de letra = zoom del board (chefs medio ciegos, KDS-03)
+  function saveSettings(){ try{ localStorage.setItem(SKEY, JSON.stringify({ station:STATION, alert_min:ALERT_MIN, sound:SOUND, scale:SCALE })); }catch(e){} }
+  function applyScale(){ try{ var b=document.getElementById("board"); if(b) b.style.zoom=String(SCALE); }catch(e){} }
 
   var boardEl = document.getElementById("board");
   var demandEl = document.getElementById("demand");
@@ -205,6 +212,7 @@
   var toastEl = document.getElementById("toast");
   function applyStationLabel(){ document.getElementById("title").textContent = STATION.charAt(0).toUpperCase()+STATION.slice(1); document.getElementById("stn").textContent = STATION; }
   applyStationLabel();
+  applyScale();
 
   var lastGood = [];
   var seenBatches = null;
@@ -250,7 +258,7 @@
   function buildCards(orders){
     var cards=[]; var orderMeta={};
     orders.forEach(function(o){
-      var items = parseItems(o.items).filter(function(it){ return !isSkippable(it) && resolveStation(it)===STATION; });
+      var items = parseItems(o.items).filter(function(it){ return !isSkippable(it) && (STATION==="todas"||resolveStation(it)===STATION); });
       if(!items.length) return;
       var bmeta = parseBatches(o.comanda_batches);
       var groups={};
@@ -328,7 +336,7 @@
         var badge='<span class="badge b-'+st+'">'+(st==="lista"?"Lista":st==="preparando"?"Preparando":"Nueva")+'</span>';
         html+='<div class="card s-'+st+(urgent?' urgent':'')+'">'+
           '<div class="card-h"><div class="mesa">'+(c.order.mesa?("Mesa "+esc(c.order.mesa)):"Para llevar")+
-            '<span class="mesero">'+esc(c.order.mesero||"")+'</span></div>'+
+            '<span class="mesero">'+esc(c.order.mesero||"")+(c.order.personas?(' · 👥 '+esc(c.order.personas)):"")+'</span></div>'+
             '<div class="rt"><span class="folio'+(f.official?" official":"")+'">'+esc(f.txt)+'</span>'+
             '<span class="round'+(c.seq>0?" extra":"")+'">'+roundLbl+'</span>'+
             '<span class="time '+timeCls+'">'+elapsed(c.createdAt)+'</span>'+badge+'</div></div>'+
@@ -370,7 +378,7 @@
     if(ready){
       var oid=ready.getAttribute("data-ready"); var order=lastGood.find(function(x){ return x.id===oid; }); if(!order) return;
       var batch=ready.getAttribute("data-batch");
-      parseItems(order.items).filter(function(it){ return !isSkippable(it) && resolveStation(it)===STATION; }).forEach(function(it,i){
+      parseItems(order.items).filter(function(it){ return !isSkippable(it) && (STATION==="todas"||resolveStation(it)===STATION); }).forEach(function(it,i){
         var bid=it.comanda_batch_id||("seq"+(it.comanda_batch_seq==null?0:it.comanda_batch_seq));
         if(bid===batch) setIState(oid,itemKey(oid,it,i),"listo");
       });
@@ -388,13 +396,14 @@
 
   // ── settings modal ──
   var modal=document.getElementById("modal");
-  var draft={ station:STATION, alert_min:ALERT_MIN, sound:SOUND };
+  var draft={ station:STATION, alert_min:ALERT_MIN, sound:SOUND, scale:SCALE };
   function paintModal(){
     Array.prototype.forEach.call(document.querySelectorAll("#seg-station button"),function(b){ b.classList.toggle("on", b.getAttribute("data-st")===draft.station); });
+    Array.prototype.forEach.call(document.querySelectorAll("#seg-scale button"),function(b){ b.classList.toggle("on", Number(b.getAttribute("data-sc"))===Number(draft.scale)); });
     document.getElementById("alert-val").textContent=draft.alert_min;
     document.getElementById("sound-sw").classList.toggle("on", draft.sound);
   }
-  function openModal(){ draft={ station:STATION, alert_min:ALERT_MIN, sound:SOUND }; paintModal(); modal.classList.add("show"); }
+  function openModal(){ draft={ station:STATION, alert_min:ALERT_MIN, sound:SOUND, scale:SCALE }; paintModal(); modal.classList.add("show"); }
   function closeModal(){ modal.classList.remove("show"); }
   document.getElementById("gear").addEventListener("click",openModal);
   document.getElementById("m-close").addEventListener("click",closeModal);
@@ -402,12 +411,13 @@
   modal.addEventListener("click",function(e){ if(e.target===modal) closeModal(); });
   document.addEventListener("keydown",function(e){ if(e.key==="Escape") closeModal(); });
   document.getElementById("seg-station").addEventListener("click",function(e){ var b=e.target.closest("[data-st]"); if(b){ draft.station=b.getAttribute("data-st"); paintModal(); } });
+  document.getElementById("seg-scale").addEventListener("click",function(e){ var b=e.target.closest("[data-sc]"); if(b){ draft.scale=Number(b.getAttribute("data-sc"))||1; paintModal(); } });
   document.getElementById("alert-dn").addEventListener("click",function(){ draft.alert_min=Math.max(1,draft.alert_min-1); paintModal(); });
   document.getElementById("alert-up").addEventListener("click",function(){ draft.alert_min=Math.min(60,draft.alert_min+1); paintModal(); });
   document.getElementById("sound-sw").addEventListener("click",function(){ draft.sound=!draft.sound; paintModal(); });
   document.getElementById("m-save").addEventListener("click",function(){
-    STATION=draft.station; ALERT_MIN=draft.alert_min; SOUND=draft.sound; saveSettings();
-    applyStationLabel(); seenBatches=null; render(false); closeModal(); toast("Ajustes guardados");
+    STATION=draft.station; ALERT_MIN=draft.alert_min; SOUND=draft.sound; SCALE=draft.scale; saveSettings();
+    applyScale(); applyStationLabel(); seenBatches=null; render(false); closeModal(); toast("Ajustes guardados");
   });
 
   function setConn(ok){ online=ok; connDot.style.background=ok?"var(--lista)":"var(--danger)"; connTxt.textContent=ok?"conectado":"sin conexión — reintentando"; }
