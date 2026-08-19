@@ -30,6 +30,11 @@
 
 ## 🔴 P0 — AHORA (cerrar el producto + urgentes)
 
+### P0-0 · RESCATE + disciplina de deploy `[URGENTE — nuevo 2026-08-19]`
+Mucho construido pero NO en prod (~60 ramas, prod = fracción). Ver auditoría `reality-check`.
+- **Rescatar a prod lo varado valioso**, una pieza segura a la vez (como OCM Fase 0): separación POS/dashboard users (A2, en `fix/kds-public-route`) → PIN-10 → migraciones seguridad (B2/B3, tu SQL) → control-plane.
+- **Regla nueva:** construir → mergear a prod pronto. Nada "hecho" hasta que esté en prod. Limpiar las ramas experimentales.
+
 ### P0-A · Huellas + PIN de 10 dígitos + separación de usuarios `[URGENTE]`
 **Qué:** conectar el lector de **huella (HID / DigitalPersona)** a Fullsite como login principal del POS, para que **nunca se pasen el PIN**. (Antes las huellas HID sí estaban conectadas — en Wansoft.)
 - **PIN de 10 dígitos**, **generado aleatoriamente por el sistema** para el personal del POS — nadie lo memoriza ni lo comparte; la **huella** es lo que usan a diario.
@@ -111,6 +116,18 @@ No se puede salir a vender sin auditoría real — y **Claude no se autoaudita**
 | P4-3 | **WhatsApp payments** | Llega el otro año; que el cliente pague por WhatsApp. |
 | P4-4 | **Proveedores / compras** | Marketplace de materia prima (aguacate, chile, etc.) — otra entrada de dinero. |
 | P4-5 | **Integraciones delivery** | Uber Eats/Rappi ya llegan al KDS; DiDi Food falta. |
+
+---
+
+## 🎯 P5 — Estrategia / YC / valuación `[nuevo 2026-08-19]`
+
+Mandato Daniel: **entrar a YC ya, sesiones eficientes, cero distracciones**, y llevar Fullsite a valuación altísima / adquisición. Ver `[[project_yc_masterplan_direction]]`.
+
+| # | Item | Detalle |
+|---|---|---|
+| P5-1 | **Master plan "mejor ingeniero del mundo"** | Doc/artifact: cómo cerrar Fullsite esquina-a-esquina (producto robusto+clonable) + hacia dónde llevar la EMPRESA para valer muchísimo y ser adquirida. "Todas las mejores ideas", research profundo. Producto + negocio + moat + camino a valuación. |
+| P5-2 | **Copiloto de founder en el admin** | Feature: un estratega IA EN la cuenta admin de Daniel que siempre le dé las mejores ideas para subir el valor (research profundo). No agente operativo — agente de ESTRATEGIA de negocio. |
+| P5-3 | **Camino a YC** | 3-5 clientes pagando (traction) → reaplicar. Priorizar lo que consigue clientes + sube valuación. Sesiones eficientes: ejecutar>analizar, aterrizar en prod. |
 
 ---
 
