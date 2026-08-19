@@ -70,9 +70,16 @@ export function generateTerminalConfig(input: GenerateInput): TerminalConfig {
     client_id: clientId,
     channel: 'stable',
   }
+  // Terminales remotas (pos/kds) hablan con la caja por la LAN → pos_server_ip.
+  // Es EL campo que hace funcionar el offline: el POS secundario REENVÍA prints/eventos
+  // a la caja, y el KDS dedicado lee /state de la caja. Coincide con los configs de
+  // campo probados (config-ENTRADA.json / config-KDS.json). Antes solo se seteaba para
+  // kds → un POS secundario generado por el esqueleton NO reenviaba offline (gap P4).
+  if (role === 'pos' || role === 'kds') {
+    config.pos_server_ip = bridge || null
+  }
   if (role === 'kds') {
     config.kds_only = true
-    config.pos_server_ip = bridge || null
   }
   return config
 }
