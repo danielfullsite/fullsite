@@ -27,12 +27,22 @@ jobs:
           echo "scope_probe: HTTP $(echo "$RESP" | tail -1)"
           echo "$RESP" | head -n -1 | jq '{p1_scopes: .phases.phase1_usl.scopes_granted_by_uber, p1_db: .phases.phase1_usl.db_status, p1_probe: .phases.phase1_usl.probe_accept_pos_order, p2_endpoint: .phases.phase2_marketplace.endpoint_probe}' 2>/dev/null || echo "$RESP" | head -n -1
 
-      - name: A-002 - Get pos_data (config actual del store)
+      - name: A-002 - Test webhook (pipeline interno: firma HMAC → handler)
         run: |
           RESP=$(curl -s -w "\n%{http_code}" -X POST \
             "$APP_URL/api/integrations/uber-eats/sandbox" \
             -H "Authorization: Bearer $INTEGRATION_ADMIN_SECRET" \
             -H "Content-Type: application/json" \
-            -d "{\"action\":\"merchant_stores\",\"store_id\":\"$STORE_ID\"}")
-          echo "merchant_stores: HTTP $(echo "$RESP" | tail -1)"
-          echo "$RESP" | head -n -1 | jq '.stores.stores[] | {name, store_id, pos_data}' 2>/dev/null || echo "$RESP" | head -n -1
+            -d "{\"action\":\"test_webhook\",\"store_id\":\"$STORE_ID\"}")
+          echo "test_webhook: HTTP $(echo "$RESP" | tail -1)"
+          echo "$RESP" | head -n -1 | jq '.' 2>/dev/null || echo "$RESP" | head -n -1
+
+      - name: A-003 - Sandbox order (intento crear orden real en Uber)
+        run: |
+          RESP=$(curl -s -w "\n%{http_code}" -X POST \
+            "$APP_URL/api/integrations/uber-eats/sandbox" \
+            -H "Authorization: Bearer $INTEGRATION_ADMIN_SECRET" \
+            -H "Content-Type: application/json" \
+            -d "{\"action\":\"delivery_sandbox_order\",\"store_id\":\"$STORE_ID\"}")
+          echo "delivery_sandbox_order: HTTP $(echo "$RESP" | tail -1)"
+          echo "$RESP" | head -n -1 | jq '.' 2>/dev/null || echo "$RESP" | head -n -1
