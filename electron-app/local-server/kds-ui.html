@@ -263,9 +263,16 @@
     return { txt:"#"+base+"·"+((Number(seq)||0)+1), official:false };
   }
 
+  // Corte por tiempo SOLO de la VISTA (no toca el estado de Pedro ni /state): oculta
+  // órdenes sin actividad en >18h (updated_at) para que las de prueba/abandonadas no se
+  // acumulen en pantalla. NO borra nada — la orden sigue en el estado, sincroniza,
+  // imprime, y si le llega una ronda nueva (updated_at se refresca) reaparece. Fail-safe:
+  // si la fecha no se puede leer, se DEJA (nunca oculta trabajo activo).
+  var STALE_MS = 18*60*60*1000;
+  function isStale(o){ var u=Date.parse((o&&(o.updated_at||o.created_at))||""); return !isNaN(u) && (Date.now()-u)>STALE_MS; }
   function buildCards(orders){
     var cards=[]; var orderMeta={};
-    orders.forEach(function(o){
+    orders.filter(function(o){ return !isStale(o); }).forEach(function(o){
       var items = parseItems(o.items).filter(function(it){ return !isSkippable(it) && (STATION==="todas"||resolveStation(it)===STATION); });
       if(!items.length) return;
       var bmeta = parseBatches(o.comanda_batches);
