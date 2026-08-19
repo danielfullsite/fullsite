@@ -17,6 +17,16 @@ jobs:
           RESP=$(curl -s -w "\n%{http_code}" "$APP_URL/api/integrations/uber-eats/webhook")
           echo "health: $(echo "$RESP" | tail -1) - $(echo "$RESP" | head -n -1)"
 
+      - name: A-000 - Merchant stores (which stores does the authorizing account manage?)
+        run: |
+          RESP=$(curl -s -w "\n%{http_code}" -X POST \
+            "$APP_URL/api/integrations/uber-eats/sandbox" \
+            -H "Authorization: Bearer $INTEGRATION_ADMIN_SECRET" \
+            -H "Content-Type: application/json" \
+            -d "{\"action\":\"merchant_stores\",\"store_id\":\"$CERT_STORE_ID\"}")
+          echo "merchant_stores: HTTP $(echo "$RESP" | tail -1)"
+          echo "$RESP" | head -n -1 | jq '.' 2>/dev/null || echo "$RESP" | head -n -1
+
       - name: A-002 - Activate integration (POST pos_data, provisioning token)
         run: |
           RESP=$(curl -s -w "\n%{http_code}" -X POST \

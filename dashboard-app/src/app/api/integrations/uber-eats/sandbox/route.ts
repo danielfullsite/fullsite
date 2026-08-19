@@ -644,6 +644,32 @@ export async function POST(request: NextRequest) {
 
   // ─── Re-auth URL ──────────────────────────────────────────────────────────
 
+  // ─── Diagnóstico: qué stores puede ver la cuenta que autorizó (token USL guardado) ──
+  // Usa el token merchant guardado (indexado por store_id en integration_providers) para
+  // GET /v1/eats/stores. Si 633b57d4 NO está en la lista → la cuenta que autorizó no es
+  // manager de ese store (por eso "user_not_allowed"). La lista revela el store_id REAL.
+  if (action === 'merchant_stores') {
+    const corrId = crypto.randomUUID()
+    try {
+      const { getStoredTokenForStore, getApiBase } = await import('@/lib/integrations/uber-eats/oauth')
+      const token = await getStoredTokenForStore(storeId)
+      const r = await fetch(`${getApiBase()}/v1/eats/stores`, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${token}`, 'Accept-Encoding': 'gzip' },
+      })
+      const body = await r.json().catch(() => null)
+      return NextResponse.json({
+        action, ts: new Date().toISOString(), correlation_id: corrId,
+        stored_token_for: storeId,
+        http_status: r.status,
+        stores: body,
+        hint: r.ok ? 'Revisa la lista: usa el store_id que aparezca aquí para activar.' : 'Si 403/401, la cuenta que autorizó no administra ningún store — Uber debe aprovisionar el test store a esta app/cuenta.',
+      }, { status: r.ok ? 200 : 422 })
+    } catch (e) {
+      return NextResponse.json({ action, error: String(e), correlation_id: corrId }, { status: 500 })
+    }
+  }
+
   // ─── Integration Activation Suite (POST pos_data con token USL) ──────────────
   // Asocia la app con la location en Uber y enciende la integración. POST pos_data
   // usa eats.pos_provisioning (token merchant). Tras esto, el M2M eats.store ya puede
