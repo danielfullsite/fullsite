@@ -1576,9 +1576,12 @@ export async function getKitchenOrders(): Promise<KitchenOrderFromDB[]> {
     // separate machine cannot hold the LAN ws:// bridge from an https page (mixed
     // content). This endpoint is the reliable online path; offline still falls back
     // to the IndexedDB cache in the catch block below. `cutoff` is applied server-side.
+    // Token de cocina por-tenant (provisionado a la terminal; el Electron KDS lo
+    // inyecta desde su config). Si no está presente, el endpoint opera abierto.
+    const _kt = typeof window !== 'undefined' ? localStorage.getItem('pos_kitchen_token') : null
     const res = await fetchWithTimeout(
       `/api/pos/kitchen?client_id=${encodeURIComponent(_getClientId())}`,
-      { cache: 'no-store' }
+      { cache: 'no-store', headers: _kt ? { 'x-kitchen-token': _kt } : undefined }
     )
     if (!res.ok) return []
     orders = await res.json()

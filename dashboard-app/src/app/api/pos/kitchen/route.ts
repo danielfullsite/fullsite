@@ -14,9 +14,12 @@ import { NextRequest } from 'next/server'
 // kitchen-relevant columns — never totals, payments, tips or customer data — so the
 // surface is the least-sensitive slice of the order (what is being cooked).
 //
-// SECURITY NOTE: this is currently gated only by client_id (like get_public_menu).
-// Follow-up: bind it to a per-tenant kitchen token so it cannot be enumerated across
-// tenants. Tracked as a post-install hardening item.
+// SECURITY: además del client_id, se ata a un token de cocina por-tenant
+// (x-kitchen-token = HMAC(client_id, KITCHEN_TOKEN_SECRET)) para que no se pueda
+// enumerar entre tenants. OPT-IN: si KITCHEN_TOKEN_SECRET no está seteado, opera
+// abierto igual que antes (backward-compatible). Ver lib/kitchen-token.ts.
+import { kitchenTokenEnabled, verifyKitchenToken } from '@/lib/kitchen-token'
+
 export const dynamic = 'force-dynamic'
 
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -31,6 +34,11 @@ export async function GET(request: NextRequest) {
   const clientId = request.nextUrl.searchParams.get('client_id') || ''
   if (!CLIENT_RE.test(clientId)) {
     return Response.json({ error: 'client_id inválido' }, { status: 400 })
+  }
+
+  // Token de cocina por-tenant (solo se exige si KITCHEN_TOKEN_SECRET está activo).
+  if (kitchenTokenEnabled() && !verifyKitchenToken(clientId, request.headers.get('x-kitchen-token'))) {
+    return Response.json({ error: 'no autorizado' }, { status: 401 })
   }
 
   // Show orders with activity in the last 12h so ancient "enviada" rows don't pile
