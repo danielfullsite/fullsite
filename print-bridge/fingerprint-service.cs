@@ -32,6 +32,9 @@ class FingerprintService
     static string supabaseUrl = "";
     static string supabaseKey = "";
     static string clientId    = "";
+    // Sync de templates vía el SERVIDOR (el service_role NO vive en la caja).
+    static string apiBaseUrl  = "https://app.fullsite.mx";
+    static string syncSecret  = "";
 
     static void Main(string[] args)
     {
@@ -133,6 +136,11 @@ class FingerprintService
             clientId    = rid.ToLowerInvariant().Trim();
             supabaseUrl = url.TrimEnd('/');
             supabaseKey = key;
+
+            // Opcionales: endpoint de sync + secreto acotado (recomendado para multi-terminal).
+            string api = ExtractJsonString(json, "apiBaseUrl") ?? ExtractJsonString(json, "api_base_url");
+            if (!string.IsNullOrEmpty(api)) apiBaseUrl = api.TrimEnd('/');
+            syncSecret = ExtractJsonString(json, "fingerprintSyncSecret") ?? ExtractJsonString(json, "fingerprint_sync_secret") ?? "";
             return true;
         }
         catch (Exception e)
@@ -443,23 +451,34 @@ class FingerprintService
         catch (Exception e) { Console.WriteLine("[save] Error: " + e.Message); }
     }
 
-    // ── Supabase sync ───────────────────────────────────────────────────────
-    // Table: pos_fingerprint_templates (id TEXT PK, client_id TEXT, template TEXT, updated_at TIMESTAMPTZ)
-    // Templates are synced per client_id so multi-terminal enrollment works:
-    // enroll on terminal A → available on terminal B after next startup sync.
+    // ── Sync de templates vía el SERVIDOR (service_role del lado servidor) ────
+    // La caja NO tiene el service_role (= llave maestra de TODOS los clientes). Manda el
+    // secreto ACOTADO fingerprintSyncSecret al endpoint /api/pos/fingerprint, que hace la
+    // escritura con service_role allá. Tabla: pos_fingerprint_templates. Multi-terminal:
+    // enrola en la caja A → disponible en B tras el próximo arranque (SyncFromSupabase).
+    // Si no hay syncSecret configurado, el servicio opera SOLO local (no sincroniza).
+
+    static string SyncEndpoint() { return apiBaseUrl + "/api/pos/fingerprint"; }
+
+    static WebClient CreateSyncClient()
+    {
+        var wc = new WebClient();
+        wc.Encoding = Encoding.UTF8;
+        wc.Headers.Add("x-fp-secret", syncSecret);
+        wc.Headers.Add("Content-Type", "application/json");
+        return wc;
+    }
 
     static void SyncFromSupabase()
     {
-        if (string.IsNullOrEmpty(supabaseUrl) || string.IsNullOrEmpty(supabaseKey)) return;
+        if (string.IsNullOrEmpty(syncSecret)) return;
         try
         {
-            string url = supabaseUrl + "/rest/v1/pos_fingerprint_templates?client_id=eq."
-                       + Uri.EscapeDataString(clientId) + "&select=id,template";
-            WebClient wc = CreateWebClient();
+            string url = SyncEndpoint() + "?client_id=" + Uri.EscapeDataString(clientId);
+            WebClient wc = CreateSyncClient();
             string response = wc.DownloadString(url);
 
-            // Parse [{\"id\":\"...\",\"template\":\"...\"}, ...]
-            // Both fields are plain base64/alphanumeric so capturing [^"]+ is safe.
+            // Respuesta: {"templates":[{"id":"...","template":"..."}, ...]}
             var idRe  = new Regex("\"id\"\\s*:\\s*\"([^\"]+)\"");
             var tplRe = new Regex("\"template\"\\s*:\\s*\"([^\"]+)\"");
             var ids   = idRe.Matches(response);
@@ -467,7 +486,7 @@ class FingerprintService
 
             if (ids.Count != tpls.Count)
             {
-                Console.WriteLine("[sync] Respuesta inesperada de Supabase (ids=" + ids.Count + " templates=" + tpls.Count + ")");
+                Console.WriteLine("[sync] Respuesta inesperada (ids=" + ids.Count + " templates=" + tpls.Count + ")");
                 return;
             }
 
@@ -491,48 +510,37 @@ class FingerprintService
                 }
                 catch (Exception e) { Console.WriteLine("[sync] Error importando template " + sid + ": " + e.Message); }
             }
-            if (added > 0) Console.WriteLine("[sync] " + added + " template(s) descargado(s) de Supabase");
+            if (added > 0) Console.WriteLine("[sync] " + added + " template(s) descargado(s) del servidor");
         }
-        catch (Exception e) { Console.WriteLine("[sync] Error Supabase: " + e.Message); }
+        catch (Exception e) { Console.WriteLine("[sync] Error bajando templates: " + e.Message); }
     }
 
     static void SyncToSupabase(string staffId, Fmd fmd)
     {
-        if (string.IsNullOrEmpty(supabaseUrl) || string.IsNullOrEmpty(supabaseKey)) return;
+        if (string.IsNullOrEmpty(syncSecret)) return;
         try
         {
             string b64  = Convert.ToBase64String(fmd.Bytes);
-            string json = "{\"id\":\"" + EscapeJson(staffId) + "\",\"client_id\":\"" + EscapeJson(clientId) + "\",\"template\":\"" + b64 + "\"}";
-            WebClient wc = CreateWebClient();
-            wc.Headers.Add("Content-Type", "application/json");
-            wc.Headers.Add("Prefer", "resolution=merge-duplicates");
-            wc.UploadString(supabaseUrl + "/rest/v1/pos_fingerprint_templates", "POST", json);
-            Console.WriteLine("[sync] " + staffId + " → Supabase OK");
+            string json = "{\"client_id\":\"" + EscapeJson(clientId) + "\",\"staff_id\":\"" + EscapeJson(staffId) + "\",\"template\":\"" + b64 + "\"}";
+            WebClient wc = CreateSyncClient();
+            wc.UploadString(SyncEndpoint(), "POST", json);
+            Console.WriteLine("[sync] " + staffId + " → servidor OK");
         }
         catch (Exception e) { Console.WriteLine("[sync] Error enviando " + staffId + ": " + e.Message); }
     }
 
     static void SyncDeleteFromSupabase(string staffId)
     {
-        if (string.IsNullOrEmpty(supabaseUrl) || string.IsNullOrEmpty(supabaseKey)) return;
+        if (string.IsNullOrEmpty(syncSecret)) return;
         try
         {
-            string url = supabaseUrl + "/rest/v1/pos_fingerprint_templates?id=eq."
-                       + Uri.EscapeDataString(staffId) + "&client_id=eq." + Uri.EscapeDataString(clientId);
-            WebClient wc = CreateWebClient();
+            string url = SyncEndpoint() + "?client_id=" + Uri.EscapeDataString(clientId)
+                       + "&staff_id=" + Uri.EscapeDataString(staffId);
+            WebClient wc = CreateSyncClient();
             wc.UploadString(url, "DELETE", "");
-            Console.WriteLine("[sync] " + staffId + " eliminado de Supabase");
+            Console.WriteLine("[sync] " + staffId + " eliminado del servidor");
         }
         catch (Exception e) { Console.WriteLine("[sync] Error eliminando " + staffId + ": " + e.Message); }
-    }
-
-    static WebClient CreateWebClient()
-    {
-        var wc = new WebClient();
-        wc.Encoding = Encoding.UTF8;
-        wc.Headers.Add("apikey", supabaseKey);
-        wc.Headers.Add("Authorization", "Bearer " + supabaseKey);
-        return wc;
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────

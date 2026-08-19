@@ -57,16 +57,26 @@ Cosas a arreglar (no bloquean la compilación, sí el uso correcto):
 1. **Tabla correcta = `pos_fingerprint_templates`** (ya existe en prod: `id, client_id, template, updated_at`;
    RLS service_role + authenticated SELECT, **sin anon**). Mi migración `013` creaba `pos_staff_biometrics`
    por error → **corregido** (013 ahora solo amplía el PIN a 10 díg).
-2. **⚠️ Sync a Supabase roto por RLS.** El servicio usa la **anon key** (`supabaseAnonKey` del config) para
-   INSERT/SELECT/DELETE en `pos_fingerprint_templates`, pero esa tabla **no da acceso anon** → 403. Efecto:
-   los templates se guardan **local (por terminal)** pero **no sincronizan entre cajas.** Para AMALAY (una
-   caja hace el identify) **funciona local**; el multi-terminal (enrolar en caja, identificar en Entrada)
-   necesita el **service_role** en el config (o un endpoint server). Es también lo correcto de seguridad
-   (el biométrico no debe ser anon-accesible).
+2. **✅ Sync multi-terminal — RESUELTO (2026-08-18) del modo correcto.** Antes el servicio usaba la **anon
+   key** contra `pos_fingerprint_templates` (que no da acceso anon → 403), así que los templates quedaban
+   **solo locales por terminal.** La tentación fácil era meter el **service_role en la caja** — NO se hizo:
+   el service_role es la **llave maestra de TODOS los clientes** y jamás debe vivir en una terminal (una caja
+   comprometida = toda la BD). En vez de eso:
+   - **Nuevo endpoint `POST/GET/DELETE /api/pos/fingerprint`** (`dashboard-app/src/app/api/pos/fingerprint/route.ts`).
+     Corre en el servidor, hace la escritura con **service_role del lado servidor**, y se autentica con un
+     **secreto acotado** `FINGERPRINT_SYNC_SECRET` (header `x-fp-secret`, ≥16 chars). El biométrico nunca se
+     expone al navegador.
+   - **El C# ahora sincroniza contra ese endpoint** (no contra Supabase directo). `SyncFromSupabase` (GET),
+     `SyncToSupabase` (POST), `SyncDeleteFromSupabase` (DELETE) usan `CreateSyncClient()` con el header
+     `x-fp-secret`. Si no hay `syncSecret` configurado → opera **solo local** (no rompe nada).
+   - **Config necesaria (Fase 2, en la caja):** `C:\fullsite\config.json` agrega
+     `"apiBaseUrl": "https://app.fullsite.mx"` y `"fingerprintSyncSecret": "<secreto>"`. En Vercel:
+     env `FINGERPRINT_SYNC_SECRET` (mismo valor, ≥16 chars). Sin esto → local-only, seguro por defecto.
 3. **Template sin cifrar** (base64 plano local + Supabase). Es dato biométrico → cifrar at-rest (Fase 3).
 
-**Para compilar/usar hoy:** basta con lo local (no toca el sync). Para multi-terminal + seguro:
-cambiar el config a `service_role` (o endpoint) + cifrar. Ambos son ajustes chicos cuando estemos en la caja.
+**Para compilar/usar hoy:** basta con lo local (no toca el sync). El multi-terminal seguro ya está cableado
+(endpoint + C#); solo falta poner `apiBaseUrl`+`fingerprintSyncSecret` en el `config.json` de la caja y el
+env en Vercel. Cifrado del template = Fase 3.
 
 ## Estado del código (ya listo)
 - El login **ya usa el 7718** (se revirtió el desvío a WebAuthn, commit `34618598`).
