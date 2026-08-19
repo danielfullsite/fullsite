@@ -47,6 +47,27 @@ Del encabezado del archivo:
 
 > Fallback si se pierde el `.cs` otra vez: está en git (`be129f8a`) y en el transcript. Y un `.exe` de C# se decompila limpio (ILSpy/dnSpy).
 
+## Revisión de la fuente (2026-08-18) — hallazgos
+**Veredicto: código completo y sólido.** HttpListener :7718, captura vía DPUruNet, enroll 4x →
+`CreateEnrollmentFmd`, identify 1:N con umbral de falso-positivo, thread-safe, config-driven (sin
+secretos hardcodeados), templates local (`C:\fullsite\fingerprints\*.b64`) + Supabase. El contrato
+concuerda con el POS (`/health` ok, `/identify` staffId, `/enroll` ok). **Compila tal cual** (con DPUruNet.dll).
+
+Cosas a arreglar (no bloquean la compilación, sí el uso correcto):
+1. **Tabla correcta = `pos_fingerprint_templates`** (ya existe en prod: `id, client_id, template, updated_at`;
+   RLS service_role + authenticated SELECT, **sin anon**). Mi migración `013` creaba `pos_staff_biometrics`
+   por error → **corregido** (013 ahora solo amplía el PIN a 10 díg).
+2. **⚠️ Sync a Supabase roto por RLS.** El servicio usa la **anon key** (`supabaseAnonKey` del config) para
+   INSERT/SELECT/DELETE en `pos_fingerprint_templates`, pero esa tabla **no da acceso anon** → 403. Efecto:
+   los templates se guardan **local (por terminal)** pero **no sincronizan entre cajas.** Para AMALAY (una
+   caja hace el identify) **funciona local**; el multi-terminal (enrolar en caja, identificar en Entrada)
+   necesita el **service_role** en el config (o un endpoint server). Es también lo correcto de seguridad
+   (el biométrico no debe ser anon-accesible).
+3. **Template sin cifrar** (base64 plano local + Supabase). Es dato biométrico → cifrar at-rest (Fase 3).
+
+**Para compilar/usar hoy:** basta con lo local (no toca el sync). Para multi-terminal + seguro:
+cambiar el config a `service_role` (o endpoint) + cifrar. Ambos son ajustes chicos cuando estemos en la caja.
+
 ## Estado del código (ya listo)
 - El login **ya usa el 7718** (se revirtió el desvío a WebAuthn, commit `34618598`).
 - La opción "Entrar con huella" **saldrá sola** en cuanto el `.exe` responda en `/health` en la caja.
