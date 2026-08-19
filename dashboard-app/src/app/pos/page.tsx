@@ -143,6 +143,19 @@ import dynamic from 'next/dynamic'
 import { getActiveClientSlug as _cid } from '@/lib/data'
 import { usePOSLock } from './pos-lock-context'
 
+// POST al local-server (bridge) con reintento. El KDS en otras terminales LAN recibe
+// la orden por /events; si la caja está reiniciando o hay un blip de LAN, un solo POST
+// fire-and-forget se pierde y el KDS NO ve la comanda (offline no tiene poll de respaldo,
+// a diferencia de la impresión que sí reintenta por print-queue). Reintenta hasta 3 veces
+// con backoff. NUNCA rechaza (best-effort) — el .catch() existente en los call sites queda
+// como no-op inofensivo. NO toca a Pedro ni el contrato de /events.
+function retryFetch(url: string, init: RequestInit, attempt = 0): Promise<void> {
+  const again = () => new Promise<void>(res => setTimeout(res, 400 * (attempt + 1))).then(() => retryFetch(url, init, attempt + 1))
+  return fetch(url, init)
+    .then(r => { if (!r.ok && attempt < 3) return again() })
+    .catch(() => { if (attempt < 3) return again() })
+}
+
 const BarcodeScanner = dynamic(() => import('@/components/BarcodeScanner'), { ssr: false })
 
 // Icono heurístico por nombre de categoría (esqueleton: aplica a cualquier restaurante,
@@ -3100,7 +3113,7 @@ function POSContent() {
         // Immediate count refresh: interval only fires every 30s, but IDB is local.
         getPendingQueue().then(q => setPendingSync(q.length)).catch(() => {})
         // Broadcast to local server so KDS on other LAN devices receives the order offline
-        fetch(`${getBridgeUrl()}/events`, {
+        retryFetch(`${getBridgeUrl()}/events`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -3142,7 +3155,7 @@ function POSContent() {
     const ok = true
 
     // Broadcast to local server so KDS on LAN devices updates immediately (not on 5s Supabase poll)
-    fetch(`${getBridgeUrl()}/events`, {
+    retryFetch(`${getBridgeUrl()}/events`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
