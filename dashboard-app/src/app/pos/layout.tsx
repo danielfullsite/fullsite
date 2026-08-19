@@ -10,6 +10,7 @@ import { getActiveClientSlug as _cid } from '@/lib/data'
 import { getEffectiveSetting } from '@/lib/settings'
 import { initStationRouting, initNoPrintStations, initCancellationReasons, initDiscountCatalog, initKdsStations } from '@/lib/pos-constants'
 import { inventoryPolicyService } from '@/lib/inventory-policy'
+import { getFingerprintUrl } from '@/lib/fingerprint-url'
 import { POSLockContext } from './pos-lock-context'
 
 async function hashPin(pin: string, staffId: string): Promise<string> {
@@ -278,105 +279,111 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
   const [biometricAvailable, setBiometricAvailable] = useState(false)
   const [biometricChecking, setBiometricChecking] = useState(false)
 
-  // Huella por WebAuthn / Windows Hello (el lector DigitalPersona se da de alta en Windows Hello).
-  // Consistente con /pos/huella. NO usa el servicio 7718. Credenciales en pos_biometric_credentials.
+  const FINGERPRINT_URL = getFingerprintUrl()
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.PublicKeyCredential) {
-      PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable?.()
-        .then(ok => setBiometricAvailable(!!ok))
-        .catch(() => {})
-    }
+    fetch(`${FINGERPRINT_URL}/health`, { signal: AbortSignal.timeout(1000) })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data?.ok) setBiometricAvailable(true) })
+      .catch(() => setBiometricAvailable(false))
   }, [])
 
-  // Registrar huella (WebAuthn create) — mismo mecanismo que /pos/huella.
+  // Register fingerprint via DigitalPersona service (port 7718)
   const handleBiometricRegister = async (staffMember: StaffMember) => {
     try {
-      const challenge = new Uint8Array(32)
-      crypto.getRandomValues(challenge)
-      const credential = await navigator.credentials.create({
-        publicKey: {
-          challenge,
-          rp: { name: 'Fullsite POS', id: window.location.hostname },
-          user: { id: new TextEncoder().encode(staffMember.id), name: staffMember.name, displayName: staffMember.name },
-          pubKeyCredParams: [{ alg: -7, type: 'public-key' }, { alg: -257, type: 'public-key' }],
-          authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required' },
-          timeout: 60000,
-        },
-      }) as PublicKeyCredential | null
-      if (credential) {
-        const credId = btoa(String.fromCharCode(...new Uint8Array(credential.rawId)))
-        const stored = JSON.parse(localStorage.getItem('pos_biometric_credentials') || '{}')
-        stored[credId] = { id: staffMember.id, name: staffMember.name, role: staffMember.role }
-        localStorage.setItem('pos_biometric_credentials', JSON.stringify(stored))
+      // Call fingerprint service to enroll (captures 4 samples)
+      const res = await fetch(`${FINGERPRINT_URL}/enroll?id=${encodeURIComponent(staffMember.id)}`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(90000), // 90 sec for 4 captures
+      })
+      const data = await res.json()
+
+      if (data.ok) {
+        // Save mapping: staffId → staff member info (for fingerprint login)
+        const fpMap = JSON.parse(localStorage.getItem('pos_fingerprint_staff') || '{}')
+        fpMap[staffMember.id] = { id: staffMember.id, name: staffMember.name, role: staffMember.role }
+        localStorage.setItem('pos_fingerprint_staff', JSON.stringify(fpMap))
         return true
       }
+      console.warn('[fingerprint] Enrollment failed:', data.error)
     } catch (e) {
-      console.warn('[fingerprint] Registro WebAuthn falló:', e)
+      console.warn('[fingerprint] Registration failed:', e)
     }
     return false
   }
 
-  // Entrar con huella (WebAuthn get) — identifica al empleado y valida activo + shift token vía la API.
+  // Authenticate with fingerprint via DigitalPersona service (port 7718)
   const handleBiometricLogin = async () => {
     setBiometricChecking(true)
     try {
-      const stored = JSON.parse(localStorage.getItem('pos_biometric_credentials') || '{}') as Record<string, { id: string; name: string; role: string }>
-      const credIds = Object.keys(stored)
-      if (credIds.length === 0) {
-        setSessionError('No hay huellas registradas en esta terminal. Regístrala en Configuración → Huellas.')
-        setBiometricChecking(false)
-        return
-      }
-      const challenge = new Uint8Array(32)
-      crypto.getRandomValues(challenge)
-      const assertion = await navigator.credentials.get({
-        publicKey: {
-          challenge,
-          allowCredentials: credIds.map(id => ({ id: Uint8Array.from(atob(id), c => c.charCodeAt(0)), type: 'public-key' as const })),
-          userVerification: 'required',
-          timeout: 60000,
-        },
-      }) as PublicKeyCredential | null
-      if (!assertion) { setSessionError('Huella no reconocida'); setBiometricChecking(false); return }
-      const credId = btoa(String.fromCharCode(...new Uint8Array(assertion.rawId)))
-      const mapped = stored[credId]
-      if (!mapped) { setSessionError('Huella no vinculada. Regístrala de nuevo en Configuración → Huellas.'); setBiometricChecking(false); return }
+      const res = await fetch(`${FINGERPRINT_URL}/identify`, { method: 'GET', signal: AbortSignal.timeout(20000) })
+      const data = await res.json()
 
-      // Validar activo + emitir shift token vía la API (mismo contrato que el PIN)
-      let member: StaffMember | null = null
-      try {
+      if (data.ok && data.staffId) {
+        // Look up staff member by ID from pos_staff via API
         const staffRes = await fetch(apiUrl('/api/pos/pin'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pin: '___fingerprint___', client_id: _cid(), fingerprint_id: mapped.id, device_id: getTerminalId() }),
+          body: JSON.stringify({ pin: '___fingerprint___', client_id: _cid(), fingerprint_id: data.staffId, device_id: getTerminalId() }),
           signal: AbortSignal.timeout(4000),
         })
+
+        // Try API first (validates active status), fall back to local cache
+        let member: StaffMember | null = null
         if (staffRes.ok) {
-          const d = await staffRes.json()
-          if (d.staff) { member = d.staff; if (d.shiftToken) localStorage.setItem('pos_shift_token', d.shiftToken) }
+          try {
+            const staffData = await staffRes.json()
+            if (staffData.staff) {
+              member = staffData.staff
+              // Refresh offline cache so it survives a future storage-cleared offline session
+              try {
+                const fpMap = JSON.parse(localStorage.getItem('pos_fingerprint_staff') || '{}')
+                fpMap[data.staffId] = member
+                localStorage.setItem('pos_fingerprint_staff', JSON.stringify(fpMap))
+              } catch {}
+            }
+          } catch {}
         }
-      } catch { /* offline → cae al fallback local */ }
-      // Offline: la huella ya verificó la identidad localmente (WebAuthn userVerification).
-      if (!member) member = { id: mapped.id, name: mapped.name, role: mapped.role }
+        if (!member) {
+          try {
+            const fpMap = JSON.parse(localStorage.getItem('pos_fingerprint_staff') || '{}')
+            if (fpMap[data.staffId]) member = fpMap[data.staffId]
+          } catch {}
+        }
 
-      setSessionError('')
-      const conflict = await checkActiveSession(member.id)
-      if (conflict) { setSessionError('Usuario activo en otra terminal.'); setBiometricChecking(false); return }
-      await registerSession(member.id, member.name)
-      startHeartbeat(member.id)
-      ensureAttendanceEntry(member.id, member.name, 'huella')
+        if (!member) {
+          setSessionError('Huella reconocida pero usuario no vinculado. Entra con PIN primero.')
+          setBiometricChecking(false)
+          return
+        }
 
-      setStaff(member)
-      setUnlocked(true)
-      setAttempts(0)
-      sessionStorage.setItem('pos_staff', JSON.stringify(member))
-      sessionStorage.setItem('pos_last_activity', Date.now().toString())
-      requestNotificationPermission().catch(() => {})
-      if (window.location.pathname === '/pos' && !window.location.search) {
-        router.push('/pos/mesas')
+        // Session locking
+        setSessionError('')
+        const conflict = await checkActiveSession(member.id)
+        if (conflict) {
+          setSessionError('Usuario activo en otra terminal.')
+          setBiometricChecking(false)
+          return
+        }
+        await registerSession(member.id, member.name)
+        startHeartbeat(member.id)
+        ensureAttendanceEntry(member.id, member.name, 'huella')
+
+        setStaff(member)
+        setUnlocked(true)
+        setAttempts(0)
+        sessionStorage.setItem('pos_staff', JSON.stringify(member))
+        sessionStorage.setItem('pos_last_activity', Date.now().toString())
+        // Fullscreen handled by Electron kiosk mode
+        requestNotificationPermission().catch(() => {})
+        // Go to mesas after fingerprint login
+        if (window.location.pathname === '/pos' && !window.location.search) {
+          router.push('/pos/mesas')
+        }
+      } else {
+        setSessionError(data.error || 'Huella no reconocida')
       }
     } catch (e) {
-      console.warn('[fingerprint] Login WebAuthn falló:', e)
+      console.warn('[fingerprint] Login failed:', e)
       setSessionError('Error al leer huella. Intenta de nuevo.')
     }
     setBiometricChecking(false)
@@ -411,15 +418,23 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
       // Ask for notification permission after login (non-blocking, user gesture context)
       requestNotificationPermission().catch(() => {})
 
-      // ¿Este empleado ya tiene huella registrada en esta terminal? (WebAuthn / pos_biometric_credentials)
-      // Si no, ofrecer registrarla ahora que ya entró con PIN.
+      // Check if this staff member has a fingerprint registered
+      // Verify with the fingerprint service that templates actually exist
       if (biometricAvailable) {
-        let hasCredential = false
+        let serviceHasTemplates = true
         try {
-          const creds = JSON.parse(localStorage.getItem('pos_biometric_credentials') || '{}') as Record<string, { id: string }>
-          hasCredential = Object.values(creds).some(c => c.id === member.id)
-        } catch {}
-        if (!hasCredential) {
+          const listRes = await fetch(`${getFingerprintUrl()}/list`, { signal: AbortSignal.timeout(2000) })
+          const listData = await listRes.json()
+          serviceHasTemplates = listData.count > 0 && listData.enrolled?.includes(member.id)
+        } catch { serviceHasTemplates = false }
+
+        if (!serviceHasTemplates) {
+          // Clear stale local mapping and show registration
+          try {
+            const fpMap = JSON.parse(localStorage.getItem('pos_fingerprint_staff') || '{}')
+            delete fpMap[member.id]
+            localStorage.setItem('pos_fingerprint_staff', JSON.stringify(fpMap))
+          } catch {}
           setShowFingerprintRegister(true)
           return
         }
@@ -568,9 +583,10 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
             Registra tu huella para entrar sin PIN.
           </p>
           <div className="text-slate-500 text-xs mb-6 space-y-1">
-            <p>1. Toca el botón — Windows te pedirá tu huella.</p>
-            <p>2. Pon tu dedo en el lector.</p>
-            <p>3. Listo — la próxima vez entras con la huella.</p>
+            <p>1. Toca el boton y pon tu dedo firme y plano en el lector</p>
+            <p>2. Quita el dedo cuando la luz parpadee</p>
+            <p>3. Vuelve a poner el dedo (4 veces en total)</p>
+            <p>4. Espera ~20 segundos</p>
           </div>
           <button
             onClick={doRegister}
@@ -583,7 +599,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
               <path d="M19.5 12.5c0 4-3.5 7.5-7.5 7.5-2 0-3.5-.5-5-2" />
               <path d="M12 14.5c1.5 0 2.5-1 2.5-2.5S13.5 9.5 12 9.5 9.5 10.5 9.5 12" />
             </svg>
-            {registeringFingerprint ? 'Sigue las indicaciones de Windows…' : 'Registrar huella'}
+            {registeringFingerprint ? 'Pon tu dedo... quita y pon 4 veces' : 'Registrar huella'}
           </button>
           <button
             onClick={skipRegister}
