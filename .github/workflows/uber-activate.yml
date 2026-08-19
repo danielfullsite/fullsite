@@ -1,0 +1,42 @@
+name: UBER Activate - POST pos_data (associate app with location)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  activate:
+    runs-on: ubuntu-latest
+    env:
+      APP_URL: https://app.fullsite.mx
+      INTEGRATION_ADMIN_SECRET: ${{ secrets.INTEGRATION_ADMIN_SECRET }}
+      CERT_STORE_ID: 633b57d4-237a-5a32-b249-7ceb795f1d35
+
+    steps:
+      - name: A-001 - Health check (deploy Ready)
+        run: |
+          RESP=$(curl -s -w "\n%{http_code}" "$APP_URL/api/integrations/uber-eats/webhook")
+          echo "health: $(echo "$RESP" | tail -1) - $(echo "$RESP" | head -n -1)"
+
+      - name: A-002 - Activate integration (POST pos_data, provisioning token)
+        run: |
+          RESP=$(curl -s -w "\n%{http_code}" -X POST \
+            "$APP_URL/api/integrations/uber-eats/sandbox" \
+            -H "Authorization: Bearer $INTEGRATION_ADMIN_SECRET" \
+            -H "Content-Type: application/json" \
+            -d "{\"action\":\"activate\",\"store_id\":\"$CERT_STORE_ID\"}")
+          HTTP_CODE=$(echo "$RESP" | tail -1)
+          BODY=$(echo "$RESP" | head -n -1)
+          echo "activate: HTTP $HTTP_CODE"
+          echo "----- FULL BODY -----"
+          echo "$BODY" | jq '.' 2>/dev/null || echo "$BODY"
+
+      - name: A-003 - Scope probe (accept_pos_order should no longer be 401)
+        run: |
+          RESP=$(curl -s -w "\n%{http_code}" -X POST \
+            "$APP_URL/api/integrations/uber-eats/sandbox" \
+            -H "Authorization: Bearer $INTEGRATION_ADMIN_SECRET" \
+            -H "Content-Type: application/json" \
+            -d "{\"action\":\"scope_probe\",\"store_id\":\"$CERT_STORE_ID\"}")
+          BODY=$(echo "$RESP" | head -n -1)
+          echo "----- phase1 + phase2 endpoint access -----"
+          echo "$BODY" | jq '{p1_probe: .phases.phase1_usl.probe_accept_pos_order, p2_endpoint: .phases.phase2_marketplace.endpoint_probe}' 2>/dev/null || echo "$BODY"
