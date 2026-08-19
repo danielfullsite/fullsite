@@ -20,7 +20,14 @@ Ninguno identificado actualmente. El sistema `client_users` es la fuente de verd
 
 ## P1 — Bloquea demo
 
-### HC-01 — Tarjetas de regalo: default client_id hardcodeado
+> **VERIFICADO 2026-08-18:** HC-01, HC-02 y HC-03 están **CERRADOS** en el código (commit `056537c`,
+> ancestro de la rama actual). Ya no bloquean el demo de Cliente #2. Único residuo: `internal/chat-logs`
+> línea 159 (`!== 'amalay'`) — cosmético en el visor super-admin, no funcional. Los verdaderos pendientes
+> multi-tenant hoy son: (a) plano de mesas data-driven (`pos/mesas` + `pos-data.ts:1282` gatean a AMALAY
+> **a propósito** hasta que el `/pos/plano-editor` guarde plano por tenant), y (b) el acople a `wansoft_daily`
+> (HC-04..07, requiere OCM).
+
+### HC-01 (CLOSED 2026-08-18) — Tarjetas de regalo: default client_id hardcodeado
 
 | Campo | Valor |
 |---|---|
@@ -31,7 +38,7 @@ Ninguno identificado actualmente. El sistema `client_users` es la fuente de verd
 | Fix propuesto | Reemplazar con `client_id: clientId` donde `clientId` viene de `useClientId()` hook. |
 | Effort | 15 min |
 
-### HC-02 — Vault Admin: dropdown solo muestra AMALAY
+### HC-02 (CLOSED 2026-08-18) — Vault Admin: dropdown solo muestra AMALAY
 
 | Campo | Valor |
 |---|---|
@@ -41,7 +48,7 @@ Ninguno identificado actualmente. El sistema `client_users` es la fuente de verd
 | Fix propuesto | Reemplazar con `SELECT id, display_name FROM clients ORDER BY display_name`. |
 | Effort | 30 min |
 
-### HC-03 — Chat logs: condición de display invertida
+### HC-03 (CLOSED 2026-08-18 en admin/; residuo cosmético en internal/) — Chat logs: condición de display invertida
 
 | Campo | Valor |
 |---|---|
@@ -149,7 +156,7 @@ Ninguno identificado actualmente. El sistema `client_users` es la fuente de verd
 | Prioridad | Issues | Acción |
 |---|---|---|
 | P0 | — | Ninguno identificado |
-| P1 | HC-01, HC-02, HC-03 | Fix antes del primer demo con cliente externo |
+| P1 | ~~HC-01, HC-02, HC-03~~ | ✅ CERRADOS 2026-08-18 (verificado en código) — ya no bloquean el demo externo |
 | P2 | HC-04, HC-05, HC-06, HC-07 | Fix después de OCM — no bloquea demo básico |
 | P3 | HC-08, HC-09, HC-10, HC-11 | Fix en el sprint siguiente a demo |
 
