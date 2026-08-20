@@ -90,47 +90,28 @@ export default function MermaPage() {
     try {
       const today = new Date().toISOString().split('T')[0]
 
-      // Save each merma as inventory movement
-      for (const entry of entries) {
-        await fetch(`${SUPABASE_URL}/rest/v1/pos_inventory_movements`, {
-          method: 'POST',
-          headers: {
-            apikey: SUPABASE_KEY,
-            Authorization: `Bearer ${SUPABASE_KEY}`,
-            'Content-Type': 'application/json',
-            Prefer: 'return=minimal',
-          },
-          body: JSON.stringify({
-            client_id: _cid(),
-            ingredient_id: entry.ingredient_id,
-            movement_type: 'waste',
-            quantity: -entry.quantity,
-            actor: 'almacén',
-            notes: `Merma ${today}: ${entry.motivo}`,
-          }),
-        })
-
-        // Also deduct from pos_inventory
-        const invRes = await fetch(
-          `${SUPABASE_URL}/rest/v1/pos_inventory?client_id=eq.${_cid()}&ingredient_id=eq.${entry.ingredient_id}&select=id,stock`,
-          { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
-        )
-        if (invRes.ok) {
-          const rows = await invRes.json()
-          if (rows.length > 0) {
-            const newStock = Math.max(0, Number(rows[0].stock || 0) - entry.quantity)
-            await fetch(`${SUPABASE_URL}/rest/v1/pos_inventory?id=eq.${rows[0].id}`, {
-              method: 'PATCH',
-              headers: {
-                apikey: SUPABASE_KEY,
-                Authorization: `Bearer ${SUPABASE_KEY}`,
-                'Content-Type': 'application/json',
-                Prefer: 'return=minimal',
-              },
-              body: JSON.stringify({ stock: newStock }),
-            })
-          }
-        }
+      // Contrato de inventario (AGENTS.md): UN solo recordMovement escribe el ledger +
+      // descuenta stock + previene underflow (piso 0) + idempotencia, ATÓMICO. Antes esta
+      // página hacía insert al ledger + PATCH directo a pos_inventory por separado — prohibido
+      // (corrompe stock/costo, doble-click duplicaba, sin idempotencia). Ahora usa el contrato.
+      const { recordMovement } = await import('@/lib/inventory')
+      const idempotency_key = `merma-${today}-` + entries.map(e => `${e.ingredient_id}:${e.quantity}`).join('|').slice(0, 140)
+      const invResult = await recordMovement({
+        client_id: _cid(),
+        movement_type: 'waste',
+        actor: 'almacén',
+        idempotency_key,
+        lines: entries.map(e => ({
+          ingredient_id: e.ingredient_id,
+          quantity: -Math.abs(e.quantity),   // negativo = baja de stock
+          notes: `Merma ${today}: ${e.motivo}`,
+        })),
+        metadata: { source: 'pos/merma', total_cost: totalCost },
+      })
+      if (!invResult.success && !invResult.was_duplicate) {
+        setSaving(false)
+        alert(`Error al registrar merma: ${invResult.errors[0] || 'desconocido'}`)
+        return
       }
 
       // Audit log
