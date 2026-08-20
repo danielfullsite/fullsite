@@ -204,3 +204,126 @@ def send_telegram(chat_id: str, text: str, parse_mode: str = "HTML") -> bool:
     except Exception as e:
         print(f"[telegram] Send failed: {e}", file=sys.stderr)
         return False
+
+
+# ─── Bucle de valor: agent_events ─────────────────────────────
+# La auditoría de IA (2026-08-19) encontró que agent_events NUNCA se escribe → no se
+# puede medir si un agente acierta, ni priorizar, ni podar falsos positivos. Este helper
+# cierra el WRITE del bucle: cada hallazgo se registra con un estimated_value y queda
+# 'open' hasta que se resuelva (resolve_event). Aislado del POS — solo analítica.
+
+def log_event(
+    agent_id: str,
+    event_type: str,          # "fraud" | "waste" | "upsell" | "forecast" | "anomaly" | ...
+    title: str,
+    severity: str = "info",   # "critical" | "high" | "medium" | "info"
+    estimated_value: float = 0.0,   # MXN que este hallazgo vale (ahorro/riesgo/oportunidad)
+    confidence: float = None,       # 0..1
+    evidence: dict = None,
+    explanation: str = None,
+    suggested_action: str = None,
+    expires_at: str = None,         # ISO — cuándo deja de ser relevante
+    client_id: str = None,
+):
+    """Registra un evento medible en agent_events (status='open', outcome=None).
+    Tenant-aware como create_insight: client_id del entorno, NUNCA asume 'amalay'."""
+    client_id = client_id or os.environ.get("CLIENT_ID")
+    if not client_id:
+        print(f"[{agent_id}] log_event sin client_id — se omite (aislamiento tenant)", file=sys.stderr)
+        return
+    row = {
+        "agent_id": agent_id, "client_id": client_id, "type": event_type,
+        "title": title, "severity": severity, "status": "open", "outcome": None,
+        "estimated_value": estimated_value, "confidence": confidence,
+        "evidence": json.dumps(evidence) if evidence else None,
+        "explanation": explanation, "suggested_action": suggested_action,
+        "expires_at": expires_at,
+    }
+    try:
+        requests.post(
+            f"{SUPABASE_URL}/rest/v1/agent_events",
+            headers={**_sb_headers, "Content-Type": "application/json"},
+            json=row, timeout=10,
+        )
+    except Exception as e:
+        print(f"[{agent_id}] FAILED to log event: {e}", file=sys.stderr)
+
+
+def resolve_event(event_id: str, outcome: str, actual_value: float = None):
+    """Cierra el bucle: marca cómo resultó un evento ('confirmed'|'false_positive'|'expired').
+    Un job de reconciliación posterior lo llama al comparar predicho vs real."""
+    data = {"status": "resolved", "outcome": outcome}
+    if actual_value is not None:
+        data["estimated_value"] = actual_value
+    try:
+        sb_patch("agent_events", f"id=eq.{event_id}", data)
+    except Exception as e:
+        print(f"[resolve_event] FAILED for {event_id}: {e}", file=sys.stderr)
+
+
+# ─── Contexto de monitoreo compartido ─────────────────────────
+# La auditoría encontró que 22/24 agentes alertan FUERA de contexto (ej. "ventas 95%
+# abajo" a las 9am con 2 órdenes). Este primitivo da el contexto operativo para que un
+# agente sepa si SIQUIERA debe evaluar una métrica ahora. Regla: antes de comparar
+# contra un baseline de día completo, checar `should_evaluate_daily_totals`.
+
+MX_OFFSET = timedelta(hours=-6)  # Monterrey = UTC-6 (sin DST desde 2023)
+
+# % ACUMULADO aproximado de ventas del día por hora local (perfil desayuno/brunch tipo
+# AMALAY, front-loaded). Default — debería venir del histórico del cliente cuando exista.
+_DAY_PROGRESS = {
+    0:0.0, 1:0.0, 2:0.0, 3:0.0, 4:0.0, 5:0.0, 6:0.0, 7:0.03, 8:0.10, 9:0.20,
+    10:0.33, 11:0.47, 12:0.60, 13:0.71, 14:0.80, 15:0.86, 16:0.90, 17:0.93,
+    18:0.95, 19:0.97, 20:0.985, 21:0.995, 22:1.0, 23:1.0,
+}
+
+def _day_phase(h: int) -> str:
+    if h < 7:  return "pre_service"
+    if h < 11: return "opening"
+    if h < 16: return "peak"
+    if h < 19: return "afternoon"
+    if h < 22: return "dinner"
+    return "closing"
+
+def get_monitoring_context(client_id: str = None, eval_threshold: float = 0.70) -> dict:
+    """Contexto operativo para decidir si evaluar una métrica ahora. Nunca lanza —
+    si la lectura falla, degrada a solo-tiempo (source='degraded'). Aislado del POS."""
+    client_id = client_id or os.environ.get("CLIENT_ID")
+    now_mx = datetime.now(timezone.utc) + MX_OFFSET
+    h = now_mx.hour
+    progress = _DAY_PROGRESS.get(h, 1.0)
+    ctx = {
+        "now_mx": now_mx.isoformat(),
+        "hour": h,
+        "weekday": now_mx.weekday(),           # 0=lunes
+        "day_phase": _day_phase(h),
+        "expected_progress_pct": progress,     # % del día que ya debió pasar
+        "should_evaluate_daily_totals": progress >= eval_threshold,
+        "orders_today": None,
+        "sales_today": None,
+        "minutes_since_last_order": None,
+        "source": "degraded",
+    }
+    if not client_id or not SUPABASE_URL or not SUPABASE_KEY:
+        return ctx
+    try:
+        # inicio del día local en UTC (MX 00:00 = UTC 06:00)
+        day_start_mx = now_mx.replace(hour=0, minute=0, second=0, microsecond=0)
+        day_start_utc = (day_start_mx - MX_OFFSET).replace(tzinfo=timezone.utc)
+        rows = sb_get("pos_orders",
+            f"client_id=eq.{client_id}&created_at=gte.{day_start_utc.isoformat()}"
+            f"&status=neq.cancelada&select=total,created_at,status")
+        ctx["orders_today"] = len(rows)
+        ctx["sales_today"] = round(sum(float(r.get("total") or 0) for r in rows), 2)
+        if rows:
+            last = max(str(r.get("created_at")) for r in rows if r.get("created_at"))
+            try:
+                ldt = datetime.fromisoformat(str(last).replace("Z", "+00:00"))
+                if ldt.tzinfo is None: ldt = ldt.replace(tzinfo=timezone.utc)
+                ctx["minutes_since_last_order"] = round((datetime.now(timezone.utc) - ldt).total_seconds() / 60, 1)
+            except Exception:
+                pass
+        ctx["source"] = "pos_orders"
+    except Exception as e:
+        print(f"[monitoring-context] read failed (degraded): {e}", file=sys.stderr)
+    return ctx
