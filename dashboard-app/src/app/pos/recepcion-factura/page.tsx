@@ -143,48 +143,31 @@ export default function RecepcionFacturaPage() {
         }),
       })
 
-      // 2. Update ingredient costs + restock
-      for (const line of matched) {
-        if (!line.ingredient) continue
-
-        // Update cost if changed
-        if (line.priceDiff !== null && Math.abs(line.priceDiff) > 0.1) {
-          await fetch(`${SUPABASE_URL}/rest/v1/pos_ingredients?id=eq.${line.ingredient.id}&client_id=eq.${_cid()}`, {
-            method: 'PATCH', headers,
-            body: JSON.stringify({ cost_per_unit: line.concepto.valorUnitario }),
-          })
-        }
-
-        // Restock inventory
-        if (line.includeInRestock) {
-          // Get current stock
-          const invRes = await fetch(
-            `${SUPABASE_URL}/rest/v1/pos_inventory?client_id=eq.${_cid()}&ingredient_id=eq.${line.ingredient.id}&select=id,stock`,
-            { headers: H }
-          )
-          if (invRes.ok) {
-            const rows = await invRes.json()
-            if (rows.length > 0) {
-              const newStock = Number(rows[0].stock || 0) + line.concepto.cantidad
-              await fetch(`${SUPABASE_URL}/rest/v1/pos_inventory?id=eq.${rows[0].id}`, {
-                method: 'PATCH', headers,
-                body: JSON.stringify({ stock: newStock, last_restock: new Date().toISOString() }),
-              })
-            }
-          }
-
-          // Log movement
-          await fetch(`${SUPABASE_URL}/rest/v1/pos_inventory_movements`, {
-            method: 'POST', headers,
-            body: JSON.stringify({
-              client_id: _cid(),
-              ingredient_id: line.ingredient.id,
-              movement_type: 'restock',
-              quantity: line.concepto.cantidad,
-              actor: 'XML Factura',
-              notes: `${cfdi.emisorNombre} — ${cfdi.serie}${cfdi.folio}`,
-            }),
-          })
+      // 2. Entrada al inventario por el CONTRATO (invoice_entry): costo promedio ponderado
+      // (unit_cost = valor unitario del CFDI) + stock atómico + ledger inmutable + idempotencia
+      // por UUID del CFDI. Antes: PATCH directo a cost_per_unit + PATCH/insert manual — prohibido (AGENTS.md).
+      const { recordMovement } = await import('@/lib/inventory')
+      const invLines = matched
+        .filter(l => l.ingredient && l.includeInRestock)
+        .map(l => ({
+          ingredient_id: l.ingredient!.id,
+          quantity: Math.abs(l.concepto.cantidad),
+          unit_cost: l.concepto.valorUnitario,
+          notes: `${cfdi.emisorNombre} — ${cfdi.serie}${cfdi.folio}`,
+        }))
+      if (invLines.length > 0) {
+        const invResult = await recordMovement({
+          client_id: _cid(),
+          movement_type: 'invoice_entry',
+          actor: 'XML Factura',
+          idempotency_key: `cfdi-${cfdi.uuid || `${cfdi.serie}${cfdi.folio}`}`,
+          lines: invLines,
+          metadata: { supplier: cfdi.emisorNombre, folio: `${cfdi.serie}${cfdi.folio}`, cfdi_uuid: cfdi.uuid, source: 'pos/recepcion-factura' },
+        })
+        if (!invResult.success && !invResult.was_duplicate) {
+          setError(`Error al subir inventario: ${invResult.errors[0] || 'desconocido'}`)
+          setSaving(false)
+          return
         }
       }
 

@@ -27,6 +27,35 @@ export async function POST(request: NextRequest) {
       'Content-Type': 'application/json', 'Prefer': 'return=representation',
     }
 
+    // ── Anti-skimming (P0-F): recomputar totales del lado SERVIDOR desde las órdenes en BD
+    // (service_role), sin confiar en el cliente. El total de una fusión = suma de los totales
+    // YA guardados de ambas órdenes (que ya incluyen sus descuentos). Si el cliente mandó algo
+    // distinto (>$1), se audita como skimming_suspect (log-only). Fallback a los del cliente si
+    // la lectura falla → nunca peor que hoy.
+    let sTotal = total
+    try {
+      const ordRes = await fetch(
+        `${sbUrl}/rest/v1/pos_orders?client_id=eq.${clientId}&id=in.(${target_order_id},${source_order_id})&select=id,total`,
+        { headers },
+      )
+      if (ordRes.ok) {
+        const ords = await ordRes.json() as Array<{ total?: number }>
+        if (ords.length === 2) {
+          sTotal = ords.reduce((s, o) => s + (Number(o.total) || 0), 0)
+          const diffCents = Math.abs(Math.round(sTotal * 100) - Math.round((Number(total) || 0) * 100))
+          if (diffCents > 100) {
+            fetch(`${sbUrl}/rest/v1/pos_audit_log`, {
+              method: 'POST', headers: { ...headers, Prefer: 'return=minimal' },
+              body: JSON.stringify({
+                client_id: clientId, order_id: target_order_id, action: 'skimming_suspect', actor: 'POS-merge',
+                details: { server_total: sTotal, client_total: total, diff_cents: diffCents, source_order: source_order_id },
+              }),
+            }).catch(() => {})
+          }
+        }
+      }
+    } catch { /* fallback: usa los totales del cliente */ }
+
     // Step 1: Atomic merge
     const res = await fetch(`${sbUrl}/rest/v1/rpc/r1_merge_orders`, {
       method: 'POST', headers,
@@ -37,8 +66,7 @@ export async function POST(request: NextRequest) {
         p_source_order_id: source_order_id,
         p_source_expected_revision: source_expected_revision ?? 0,
         p_merged_items: merged_items,
-        // TODO P0-F: recalculate totals server-side from pos_menu_items
-        p_total: total, p_subtotal: subtotal, p_iva: iva,
+        p_total: sTotal, p_subtotal: subtotal, p_iva: iva,   // p_total server-side (P0-F cerrado; subtotal/iva informativos)
         p_personas: personas, p_notas: notas,
       }),
     })
