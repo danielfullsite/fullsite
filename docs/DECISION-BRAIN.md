@@ -18,6 +18,13 @@ Marcadores: 🏆 = probado en campo (máxima autoridad) · ✅ = verificado en c
 
 ---
 
+## Estado global y qué hacer ahora (empieza aquí)
+
+| Fuente | Autoridad | Qué fundamenta |
+|---|---|---|
+| `docs/audit/AUDITORIA-FULL-FULLSITE-2026-08-19.md` | ✅ | **Auditoría full de los 6 dominios.** Tesis: el núcleo es sólido, pero la verdad se bifurcó (rama vs main, docs vs código). Estado por dominio + registro de docs viejos. |
+| `docs/PLAN-AHORA.md` | ✅ | **Qué hacer ahora, priorizado en olas** (0: AMALAY 100% + fraude; 1: reconverger la verdad; 2: prod/Cliente #2; 3: IA; 4: negocio). |
+
 ## Offline / caja / LAN — el corazón, el oro más grande
 
 **Antes de tocar CUALQUIER cosa de offline, print, KDS, bridge o el local-server, leer primero:**
