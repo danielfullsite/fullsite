@@ -14,7 +14,7 @@
 import { uberFetch } from './oauth'
 import { withRetry } from '../retry'
 import { auditLog } from '../audit-logger'
-import type { UberDenyReason, UberCancelReason } from './reasons'
+import { toDeliveryReason, type UberDenyReason, type UberCancelReason } from './reasons'
 
 export const DELIVERY_ADAPTER_VERSION = '1.0.0'
 
@@ -76,7 +76,7 @@ export async function denyDeliveryOrder(
     const r = await withRetry(
       () => uberFetch(`/v1/delivery/order/${encodeURIComponent(orderId)}/deny`, {
         method: 'POST',
-        body: JSON.stringify({ reason }),
+        body: JSON.stringify({ deny_reason: toDeliveryReason(reason) }),
         tokenType: 'delivery',
       }),
       { maxAttempts: 2, baseDelayMs: 500 }
@@ -100,7 +100,7 @@ export async function cancelDeliveryOrder(
     const r = await withRetry(
       () => uberFetch(`/v1/delivery/order/${encodeURIComponent(orderId)}/cancel`, {
         method: 'POST',
-        body: JSON.stringify({ reason }),
+        body: JSON.stringify({ cancellation_reason: toDeliveryReason(reason) }),
         tokenType: 'delivery',
       }),
       { maxAttempts: 2, baseDelayMs: 500 }

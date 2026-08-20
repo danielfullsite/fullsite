@@ -17,6 +17,7 @@ import {
 } from '@/lib/integrations/uber-eats/adapter-factory'
 import { DELIVERY_ADAPTER_VERSION } from '@/lib/integrations/uber-eats/delivery-adapter'
 import { listDeliveryStores } from '@/lib/integrations/uber-eats/delivery-store'
+import { uploadMenu } from '@/lib/integrations/uber-eats/menu'
 import { clearTokenCache } from '@/lib/integrations/uber-eats/oauth'
 
 // ─── Test helpers ─────────────────────────────────────────────────────────────
@@ -227,7 +228,8 @@ describe('DAY2-016..018: EatsLegacyAdapter URL + minutesToReady', () => {
     expect(apiCalls.every(u => !u.includes('/v1/delivery/'))).toBe(true)
   })
 
-  it('DAY2-017: minutesToReady=45 override → body includes minutes_to_ready:45', async () => {
+  it('DAY2-017: minutesToReady=45 override → body includes an absolute pickup_time', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
     const calls: Array<{ url: string; body: string }> = []
     vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
       const url = input.toString()
@@ -248,10 +250,14 @@ describe('DAY2-016..018: EatsLegacyAdapter URL + minutesToReady', () => {
     const apiCall = calls.find(c => c.url.includes('/v1/eats/orders/'))
     expect(apiCall).toBeDefined()
     const parsed = JSON.parse(apiCall!.body)
-    expect(parsed.minutes_to_ready ?? parsed.minutesToReady).toBe(45)
+    expect(parsed).toEqual({
+      reason: 'Accepted by Fullsite POS',
+      pickup_time: 1_700_002_700,
+    })
   })
 
-  it('DAY2-018: minutesToReady not set → body defaults to 20', async () => {
+  it('DAY2-018: minutesToReady not set → pickup_time defaults to 20 minutes', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
     const calls: Array<{ url: string; body: string }> = []
     vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
       const url = input.toString()
@@ -272,7 +278,84 @@ describe('DAY2-016..018: EatsLegacyAdapter URL + minutesToReady', () => {
     const apiCall = calls.find(c => c.url.includes('/v1/eats/orders/'))
     expect(apiCall).toBeDefined()
     const parsed = JSON.parse(apiCall!.body)
-    expect(parsed.minutes_to_ready ?? parsed.minutesToReady).toBe(20)
+    expect(parsed).toEqual({
+      reason: 'Accepted by Fullsite POS',
+      pickup_time: 1_700_001_200,
+    })
+  })
+})
+
+describe('Uber request payload contracts', () => {
+  it('serializes legacy deny and cancel reasons using Uber enums', async () => {
+    const { spy, calls } = makeFetchSpyWithInit()
+    vi.spyOn(globalThis, 'fetch').mockImplementation(spy as unknown as typeof fetch)
+    const adapter = getOrderAdapter('eats')
+
+    await adapter.denyOrder('order-contract-deny', 'ITEM_UNAVAILABLE', 'corr-contract-deny')
+    await adapter.cancelOrder('order-contract-cancel', 'DUPLICATE_ORDER', 'corr-contract-cancel')
+
+    const denyCall = calls.find(c => c.url.includes('/deny_pos_order'))
+    const cancelCall = calls.find(c => c.url.includes('/cancel'))
+    expect(JSON.parse(denyCall!.init!.body as string)).toEqual({
+      reason: {
+        code: 'ITEM_AVAILABILITY',
+        explanation: 'Artículo no disponible',
+      },
+    })
+    expect(JSON.parse(cancelCall!.init!.body as string)).toEqual({
+      reason: 'OTHER',
+      details: 'Orden duplicada',
+    })
+  })
+
+  it('wraps Delivery deny and cancel reasons in the required objects', async () => {
+    const { spy, calls } = makeFetchSpyWithInit()
+    vi.spyOn(globalThis, 'fetch').mockImplementation(spy as unknown as typeof fetch)
+    const adapter = getOrderAdapter('delivery')
+
+    await adapter.denyOrder('order-contract-deny', 'ITEM_UNAVAILABLE', 'corr-contract-deny')
+    await adapter.cancelOrder('order-contract-cancel', 'RESTAURANT_TOO_BUSY', 'corr-contract-cancel')
+
+    const denyCall = calls.find(c => c.url.includes('/deny'))
+    const cancelCall = calls.find(c => c.url.includes('/cancel'))
+    expect(JSON.parse(denyCall!.init!.body as string)).toEqual({
+      deny_reason: {
+        type: 'ITEM_ISSUE',
+        info: 'Artículo no disponible',
+      },
+    })
+    expect(JSON.parse(cancelCall!.init!.body as string)).toEqual({
+      cancellation_reason: {
+        type: 'ITEM_ISSUE',
+        info: 'Restaurante muy ocupado',
+      },
+    })
+  })
+
+  it('normalizes stored legacy menu availability to Menu API v2', async () => {
+    const { spy, calls } = makeFetchSpyWithInit()
+    vi.spyOn(globalThis, 'fetch').mockImplementation(spy as unknown as typeof fetch)
+
+    await uploadMenu('store-contract', {
+      menus: [{
+        id: 'menu-1',
+        title: { es: 'Menú' },
+        service_availability: [{
+          day_of_week: ['monday', 'tuesday'],
+          time_period: [{ start_time: '09:00', end_time: '18:00' }],
+        }],
+        category_ids: ['category-1'],
+      }],
+      categories: [{ id: 'category-1', title: { es: 'Comida' }, entities: [] }],
+      items: [],
+    }, 'corr-menu-contract')
+
+    const menuCall = calls.find(c => c.url.includes('/v2/eats/stores/store-contract/menus'))
+    const payload = JSON.parse(menuCall!.init!.body as string)
+    expect(payload.menus[0].service_availability).toEqual([
+      { day_of_week: 'monday', time_periods: [{ start_time: '09:00', end_time: '18:00' }] },
+      { day_of_week: 'tuesday', time_periods: [{ start_time: '09:00', end_time: '18:00' }] },
+    ])
   })
 })
 

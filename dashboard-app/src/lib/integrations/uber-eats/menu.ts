@@ -10,8 +10,10 @@ export interface UberMenuUpload {
     id: string
     title: Record<string, string>
     service_availability: Array<{
-      day_of_week: string[]
-      time_period: Array<{ start_time: string; end_time: string }>
+      day_of_week: string | string[]
+      time_periods?: Array<{ start_time: string; end_time: string }>
+      /** Legacy Fullsite field kept only so persisted payloads can be repaired at upload time. */
+      time_period?: Array<{ start_time: string; end_time: string }>
     }>
     category_ids: string[]
   }>
@@ -41,6 +43,22 @@ export interface UberMenuUpload {
   }>
 }
 
+function normalizeMenuPayload(menu: UberMenuUpload): UberMenuUpload {
+  return {
+    ...menu,
+    menus: menu.menus.map(menuSection => ({
+      ...menuSection,
+      service_availability: menuSection.service_availability.flatMap(availability => {
+        const days = Array.isArray(availability.day_of_week)
+          ? availability.day_of_week
+          : [availability.day_of_week]
+        const timePeriods = availability.time_periods ?? availability.time_period ?? []
+        return days.map(day => ({ day_of_week: day, time_periods: timePeriods }))
+      }),
+    })),
+  }
+}
+
 export interface OOSItem {
   item_id: string
   /** ISO 8601 — omit to suspend indefinitely. */
@@ -58,7 +76,7 @@ export async function uploadMenu(
       () => uberFetch(`/v2/eats/stores/${storeId}/menus`, {
         method: 'PUT',
         storeId,
-        body: JSON.stringify(menu),
+        body: JSON.stringify(normalizeMenuPayload(menu)),
       }),
       { maxAttempts: 3, baseDelayMs: 1000 }
     )

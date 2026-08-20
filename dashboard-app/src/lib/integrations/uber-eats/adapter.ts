@@ -9,7 +9,12 @@
 import { uberFetch } from './oauth'
 import { withRetry } from '../retry'
 import { auditLog } from '../audit-logger'
-import type { UberDenyReason, UberCancelReason } from './reasons'
+import {
+  toLegacyCancelPayload,
+  toLegacyDenyPayload,
+  type UberDenyReason,
+  type UberCancelReason,
+} from './reasons'
 
 export const ADAPTER_VERSION = '1.0.0'
 
@@ -49,7 +54,10 @@ export async function acceptOrder(
     const r = await withRetry(
       () => uberFetch(`/v1/eats/orders/${orderId}/accept_pos_order`, {
         method: 'POST',
-        body: JSON.stringify({ reason: 'Accepted by Fullsite POS', minutes_to_ready: minutesToReady }),
+        body: JSON.stringify({
+          reason: 'Accepted by Fullsite POS',
+          pickup_time: Math.floor(Date.now() / 1000) + minutesToReady * 60,
+        }),
         tokenType: 'provisioning',
         storeId,
       }),
@@ -74,7 +82,7 @@ export async function denyOrder(
     const r = await withRetry(
       () => uberFetch(`/v1/eats/orders/${orderId}/deny_pos_order`, {
         method: 'POST',
-        body: JSON.stringify({ reason }),
+        body: JSON.stringify(toLegacyDenyPayload(reason)),
         tokenType: 'marketplace',
       }),
       { maxAttempts: 2, baseDelayMs: 500 }
@@ -98,7 +106,7 @@ export async function cancelOrder(
     const r = await withRetry(
       () => uberFetch(`/v1/eats/orders/${orderId}/cancel`, {
         method: 'POST',
-        body: JSON.stringify({ reason }),
+        body: JSON.stringify(toLegacyCancelPayload(reason)),
         tokenType: 'marketplace',
       }),
       { maxAttempts: 2, baseDelayMs: 500 }
