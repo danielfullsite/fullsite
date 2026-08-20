@@ -117,6 +117,67 @@ Ordenados por impacto operativo real:
 
 ---
 
+## Diagnóstico Escondite — por qué no imprime + fix
+
+> Cerrado con 4 fuentes cruzadas: código (`main.js`, `local-server/index.js`, `printer.js`,
+> `config-schema.js`), `PIPELINE-POS-KDS-OFFLINE.md`, notas de campo AMALAY, y una simulación
+> con el Pedro real. Escondite = PDV1, `192.168.1.68`, rol `pos`.
+
+**Causa raíz:** el `config.json` de Escondite quedó con un **BOM UTF-8** (3 bytes `EF BB BF`) por
+editarlo **a mano en Notepad** (Windows lo mete al guardar como UTF-8). *(PIPELINE L24)*
+
+**Cadena de la falla (citada):**
+1. BOM al inicio → `JSON.parse(...'utf8')` tropieza *(main.js:62)* → el `pos_server_ip` no se aplica *(main.js:237: `pos_server_ip || null`)*.
+2. Sin `pos_server_ip`, el reenvío a la caja no ocurre *(index.js:185: `if (posServerIp && POST && /print…)`)*.
+3. El `/print` cae al handler local *(index.js:319)* → `printToStation` → **Escondite no tiene impresora propia** → `PRINTER_NOT_CONFIGURED`, error 500 *(printer.js:123)* → **no sale nada**.
+4. Además, sin `terminal_role='pos'` no se inyecta `FULLSITE_BRIDGE_URL` *(main.js:691-692)* → el POS ni sabe a dónde mandar la impresión.
+
+**Dos firmas posibles (determinan qué verás en sitio):**
+- **BOM tumbó el parse completo** → estado `NOT_PROVISIONED` → Escondite arranca en el **wizard de setup** (no abre el POS).
+- **Config cargó pero sin `pos_server_ip`** → abre el POS **pero no imprime** (falla silenciosa al enviar).
+
+**Bloqueador secundario:** para arreglarlo hay que correr el asistente, y eso necesita **acceso** (licencia TeamViewer o físico el jueves). *(PIPELINE L47)*
+
+**Cabo viejo a descartar aparte:** el 2026-07-12 (DEBRIEF-JUL12 #10) Escondite falló por `192.168.1.250 unreachable` — esa era la **impresora de tickets de pago** (otra IP, otro problema). Verificar el jueves que esa impresora responda, no vaya a estar tapando otra falla bajo el BOM.
+
+### Fix (paso a paso)
+
+1. Acceso a Escondite (TeamViewer o físico).
+2. **Cerrar Fullsite** y **borrar el config viejo** (con BOM): `%APPDATA%\Fullsite POS\config.json` (y `C:\fullsite\config.json` si existe).
+3. Desinstalar el Fullsite viejo → instalar **`Fullsite-POS-1.3.7-x64`** (trae el fix P1-1 `cff0cb20` del bridge que Escondite aún no tiene).
+4. En el asistente de provisión → **importar config** (NUNCA teclear/editar a mano). Usar el archivo limpio ya validado (abajo).
+5. Enviar una orden de prueba → **debe imprimir en la caja**. Verificar en la caja: `http://192.168.1.71:7717/health` → `clients_connected` incluye a Escondite.
+
+### Config limpio (validado contra `config-schema.js`, sin BOM)
+
+```json
+{
+  "config_version": 1,
+  "restaurant_id": "amalay",
+  "client_id": "amalay",
+  "terminal_id": "amalay-escondite-pdv1",
+  "terminal_role": "pos",
+  "terminal_name": "Escondite",
+  "instance_name": "Escondite (PDV1)",
+  "local_server_host": "127.0.0.1",
+  "local_server_port": 7717,
+  "pos_server_ip": "192.168.1.71",
+  "protocol_version": "1.0",
+  "channel": "stable",
+  "provisioned_at": "2026-08-19T12:00:00-06:00"
+}
+```
+
+Claves: `pos_server_ip = 192.168.1.71` (la caja → activa el reenvío) y `local_server_host = 127.0.0.1`
+(su propio Pedro, NO la caja — ponerlo a la IP de la caja confunde al asistente, PIPELINE L120).
+`terminal_id` puede regenerarse como UUID desde el asistente si se prefiere identidad de dispositivo formal.
+
+**Prevención definitiva (post-jueves):** el hueco #1 de clonabilidad (§9) — un generador de config que
+nunca se teclea a mano. Escondite es la prueba viviente de por qué importa: la falla no fue de código,
+fue de un JSON editado en Notepad.
+
+---
+
 ## 9. Clonabilidad — el modelo (post-jueves)
 
 **La arquitectura ya es clonable.** El código soporta: caja como ancla con estado (Local Server), satélites sin estado (POS/KDS apuntando a la caja), config universal sin hardcodes de AMALAY (`config-schema.js`, roles `server_pos/pos/kds`), y UI OTA por web. Lo que falta es **automatización operacional**, no arquitectura:
