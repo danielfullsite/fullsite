@@ -1,5 +1,6 @@
 > ⚠️ **DOCUMENTO HISTÓRICO / DESACTUALIZADO** (snapshot de julio 2026 — verificar antes de citar).
-> Estado real vigente: docs/audit/AUDITORIA-FULL-FULLSITE-2026-08-19.md (este registro no incluye los 4 CRÍTICO reales y tiene 13 bugs "pendiente de documentar").
+> **Registro vigente: [`OPEN-ITEMS.md`](OPEN-ITEMS.md)** (índice único OP-01..OP-35). Este archivo
+> es legacy — no incluye los 4 CRÍTICO reales y tiene 13 bugs "pendiente de documentar".
 
 # Bugs abiertos — Fullsite
 

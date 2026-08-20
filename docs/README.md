@@ -1,7 +1,12 @@
 # Fullsite — Knowledge Base
 
-> Única fuente de verdad. Última actualización: 2026-07-31 (P2.5.4 Caja — OCS v1).
+> Única fuente de verdad. Última actualización: 2026-08-19 (auditoría full + saneo de docs).
 > Flujo permanente: Artifact → Revisión → Consolidación → **docs/** → Commit.
+>
+> ⚠️ Muchos docs individuales son de julio y llevan banner "DOCUMENTO HISTÓRICO". El estado
+> vigente vive en: [`DECISION-BRAIN.md`](DECISION-BRAIN.md) (router de decisiones),
+> [`PLAN-AHORA.md`](PLAN-AHORA.md) (qué hacer), [`audit/AUDITORIA-FULL-FULLSITE-2026-08-19.md`](audit/AUDITORIA-FULL-FULLSITE-2026-08-19.md)
+> (estado completo) y [`state/OPEN-ITEMS.md`](state/OPEN-ITEMS.md) (todo lo abierto).
 
 ---
 
@@ -22,7 +27,10 @@ El modelo: plataforma SaaS multi-tenant, un solo Supabase, particionamiento por 
 | **Antes de decidir/cambiar algo: de dónde sale cada decisión** | [`DECISION-BRAIN.md`](DECISION-BRAIN.md) |
 | Entender la filosofía y restricciones | [`constitution/PRINCIPLES.md`](constitution/PRINCIPLES.md) |
 | Entender cómo está construido | [`architecture/SYSTEM-ARCHITECTURE.md`](architecture/SYSTEM-ARCHITECTURE.md) |
-| Entender el estado actual | [`state/CERTIFICATIONS.md`](state/CERTIFICATIONS.md) + [`state/BUGS.md`](state/BUGS.md) |
+| **Qué está abierto (índice único)** | [`state/OPEN-ITEMS.md`](state/OPEN-ITEMS.md) |
+| **Qué hacer ahora (priorizado)** | [`PLAN-AHORA.md`](PLAN-AHORA.md) |
+| **Estado completo auditado** | [`audit/AUDITORIA-FULL-FULLSITE-2026-08-19.md`](audit/AUDITORIA-FULL-FULLSITE-2026-08-19.md) |
+| Certificaciones (⚠️ congeladas 07-31) | [`state/CERTIFICATIONS.md`](state/CERTIFICATIONS.md) |
 | Entender qué sigue | [`feos/INITIATIVES.md`](feos/INITIATIVES.md) + [`feos/EXECUTION-PLAN.md`](feos/EXECUTION-PLAN.md) |
 | Entender la arquitectura offline | [`architecture/LOCAL-FIRST.md`](architecture/LOCAL-FIRST.md) |
 
@@ -148,7 +156,8 @@ certifications/
 ### State — estado vivo (se actualiza cada sesión)
 ```
 state/
-  BUGS.md                    Registro canónico de bugs (POS-XX, DASH-XX).
+  OPEN-ITEMS.md              Índice ÚNICO de lo abierto (OP-01..OP-35). Fuente de verdad.
+  BUGS.md                    ⚠️ Legacy (POS-XX/DASH-XX, incompleto). Migrar a OPEN-ITEMS.
   CERTIFICATIONS.md          Estado de P0-1 a P0-4 y certificaciones activas.
   FREEZES.md                 Freezes activos.
 ```
