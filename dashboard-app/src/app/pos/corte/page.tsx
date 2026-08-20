@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Receipt, RefreshCw, Clock, DollarSign, Users, CreditCard, Banknote, Ban, Percent, ChefHat, RotateCcw, ShieldAlert, AlertTriangle, X, Download, Printer } from 'lucide-react'
-import { formatMXN, getAuditLog, reopenOrder, logAudit, getClientId, verifyManagerPin, getActiveTurno, getPaymentMethodsFromDB, type AuditLogEntry, type PagoForma, type PaymentMethodDB } from '@/lib/pos-data'
+import { formatMXN, getAuditLog, reopenOrder, logAudit, getClientId, verifyManagerPin, consumeManagerApproval, getActiveTurno, getPaymentMethodsFromDB, type AuditLogEntry, type PagoForma, type PaymentMethodDB } from '@/lib/pos-data'
 import { isTiempoItem } from '@/lib/pos-constants'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -185,7 +185,9 @@ export default function CortePage() {
     const manager = await verifyManagerPin(reopenPin)
     if (!manager) { setReopenError('PIN invalido'); return }
 
-    const ok = await reopenOrder(reopenTarget.id)
+    // Aprobación server-verificable: token firmado del gerente (online) que la ruta valida.
+    const approvalToken = consumeManagerApproval(manager)
+    const ok = await reopenOrder(reopenTarget.id, manager, approvalToken)
     if (ok) {
       logAudit({
         order_id: reopenTarget.id, action: 'status_changed', actor: manager,

@@ -3137,15 +3137,20 @@ export async function getClosedOrders(date: string): Promise<{ id: string; mesa:
   return res.json()
 }
 
-export async function reopenOrder(orderId: string): Promise<boolean> {
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/pos_orders?id=eq.${orderId}&client_id=eq.${_getClientId()}`,
-    {
-      method: 'PATCH',
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-      body: JSON.stringify({ status: 'enviada', closed_at: null, metodo_pago: null }),
-    }
-  )
+export async function reopenOrder(orderId: string, manager?: string, approvalToken?: string | null): Promise<boolean> {
+  // Reabrir una cuenta PAGADA es sensible (fraude: reabrir → modificar → re-cerrar menor).
+  // Ya NO es un PATCH directo con anon-key: va por /api/pos/reopen-order, que VERIFICA la
+  // aprobación de gerente server-side (token firmado online, o offline_approved device-trust).
+  const res = await fetch('/api/pos/reopen-order', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getPOSAuthHeaders() },
+    body: JSON.stringify({
+      order_id: orderId,
+      manager: manager || undefined,
+      approval_token: approvalToken || undefined,
+      offline_approved: approvalToken ? undefined : true,
+    }),
+  })
   return res.ok
 }
 
