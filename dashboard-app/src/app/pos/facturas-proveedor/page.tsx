@@ -109,48 +109,28 @@ export default function FacturasProveedorPage() {
         }),
       })
 
-      // Update ingredient costs if price changed
-      for (const item of items) {
-        if (Math.abs(item.variance_pct) > 0.1) {
-          await fetch(`${SUPABASE_URL}/rest/v1/pos_ingredients?id=eq.${item.ingredient_id}&client_id=eq.${_cid()}`, {
-            method: 'PATCH',
-            headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-            body: JSON.stringify({ cost_per_unit: item.unit_price }),
-          })
-        }
-      }
-
-      // Add inventory (restock)
-      for (const item of items) {
-        await fetch(`${SUPABASE_URL}/rest/v1/pos_inventory_movements`, {
-          method: 'POST',
-          headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-          body: JSON.stringify({
-            client_id: _cid(),
-            ingredient_id: item.ingredient_id,
-            movement_type: 'restock',
-            quantity: item.quantity,
-            actor: 'almacén',
-            notes: `Factura ${numFactura || today} — ${proveedor}`,
-          }),
-        })
-
-        // Update stock
-        const invRes = await fetch(
-          `${SUPABASE_URL}/rest/v1/pos_inventory?client_id=eq.${_cid()}&ingredient_id=eq.${item.ingredient_id}&select=id,stock`,
-          { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
-        )
-        if (invRes.ok) {
-          const rows = await invRes.json()
-          if (rows.length > 0) {
-            const newStock = Number(rows[0].stock || 0) + item.quantity
-            await fetch(`${SUPABASE_URL}/rest/v1/pos_inventory?id=eq.${rows[0].id}`, {
-              method: 'PATCH',
-              headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-              body: JSON.stringify({ stock: newStock }),
-            })
-          }
-        }
+      // Entrada al inventario por el CONTRATO (AGENTS.md): un solo recordMovement de tipo
+      // 'invoice_entry' recalcula el COSTO PROMEDIO PONDERADO (con unit_cost = precio de la
+      // factura), fija el stock atómico e inserta el ledger inmutable + idempotencia. Antes:
+      // PATCH directo a cost_per_unit (pisaba con el último precio) + insert/PATCH manual — prohibido.
+      const { recordMovement } = await import('@/lib/inventory')
+      const invResult = await recordMovement({
+        client_id: _cid(),
+        movement_type: 'invoice_entry',
+        actor: 'almacén',
+        idempotency_key: `factura-${numFactura || today}-${proveedor}`,
+        lines: items.map(item => ({
+          ingredient_id: item.ingredient_id,
+          quantity: Math.abs(item.quantity),   // entra stock
+          unit_cost: item.unit_price,           // ← el contrato calcula el costo promedio ponderado
+          notes: `Factura ${numFactura || today} — ${proveedor}`,
+        })),
+        metadata: { supplier: proveedor, folio: numFactura || null, source: 'pos/facturas-proveedor' },
+      })
+      if (!invResult.success && !invResult.was_duplicate) {
+        setSaving(false)
+        alert(`Error al guardar la factura: ${invResult.errors[0] || 'desconocido'}`)
+        return
       }
 
       setSaved(true)
