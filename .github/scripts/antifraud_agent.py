@@ -14,7 +14,7 @@ from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 
 sys.path.insert(0, os.path.dirname(__file__))
-from agent_common import sb_get as _sb_get, log_run as _log_run, create_insight
+from agent_common import sb_get as _sb_get, log_run as _log_run, create_insight, log_event
 from client_config import get_client, get_tz, get_chat_ids, is_mesero
 try:
     from audit_log import AuditLogger
@@ -578,6 +578,15 @@ def main():
     skimming_events = get_skimming_events(7)
     skimming_findings = analyze_skimming(skimming_events)
     print(f"[antifraud] skimming events: {len(skimming_events)}, findings: {len(skimming_findings)}")
+    # Bucle de valor (Fase 0 IA): cada skimming se registra en agent_events con su $ faltante,
+    # para poder medir/priorizar y no dejar la señal muda. Aditivo, aislado del POS.
+    for _f in skimming_findings:
+        log_event(agent_id="antifraud-agent", event_type="fraud",
+                  title=(_f.get("message") or "skimming")[:200], severity="high",
+                  estimated_value=float(_f.get("faltante_mxn") or 0), confidence=0.7,
+                  evidence={"actor": _f.get("actor"), "tickets": _f.get("count")},
+                  suggested_action="Cruzar order_id contra arqueo del mesero; pedir explicación.",
+                  client_id=CLIENT["id"])
 
     if len(data) < 3 and not skimming_findings:
         print("[antifraud] Not enough data and no skimming, skipping")
