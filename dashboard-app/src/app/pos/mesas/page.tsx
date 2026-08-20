@@ -157,9 +157,10 @@ export default function MesasPage() {
   const [newCuentaName, setNewCuentaName] = useState('')
 
   // Fetch mesa list from DB (pos_mesas).
-  // Uses DB for number + capacity; FLOOR_TABLES hardcode drives positions because
-  // mesas/page.tsx and plano/page.tsx use different canvas coordinate systems.
-  // Coordinate unification is tracked separately.
+  // OP-40: el mapa (posición + forma) ahora viene de pos_mesas (x_pct/y_pct/shape),
+  // que es lo que guarda el editor /pos/plano-editor. Antes las posiciones venían del
+  // hardcode FLOOR_TABLES (solo AMALAY). Fallback a FLOOR_TABLES si el tenant no tiene
+  // coords guardadas o estamos offline → cero regresión.
   useEffect(() => {
     const cid = _cid()
     fetchPosMesas(cid).then(rows => {
@@ -169,8 +170,19 @@ export default function MesasPage() {
           capacity: r.capacity,
           status: 'disponible' as const,
         })))
-        // floorTables not updated from DB here — mesas canvas has different coordinates
-        // than plano canvas (Toldo/Privado at top-right vs bottom). See pos_mesas seed.
+        // Construir el planograma desde las coords guardadas. Solo si al menos una
+        // mesa trae x_pct/y_pct numérico (tenant con mapa hecho en el editor).
+        const SHAPES: TableShape[] = ['round', 'round-lg', 'square', 'rect-h']
+        const withCoords = rows.filter(r => typeof r.x_pct === 'number' && typeof r.y_pct === 'number')
+        if (withCoords.length > 0) {
+          setFloorTables(withCoords.map(r => ({
+            number: r.number,
+            x: r.x_pct,
+            y: r.y_pct,
+            shape: (SHAPES.includes(r.shape as TableShape) ? r.shape : 'round') as TableShape,
+          })))
+        }
+        // si ninguna mesa trae coords → se queda el hardcode FLOOR_TABLES (fallback AMALAY).
       } else {
         // fetchPosMesas devolvió [] (offline o sin config). Fallback a la config local
         // (MESAS_CONFIG para amalay = 33 mesas) — NO dejar el grid en la respuesta vieja
