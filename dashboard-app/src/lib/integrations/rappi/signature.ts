@@ -3,8 +3,10 @@ import { createHmac, timingSafeEqual } from 'node:crypto'
 // Verificación HMAC-SHA256 del webhook de Rappi.
 // Contrato (Integrations Manager → pestaña HMAC):
 //   Header:  Rappi-Signature: t=<timestamp>,sign=<hex>
-//   Regla:   firma sobre el body EXACTAMENTE como se recibe (raw bytes, sin
-//            reformatear). El caller pasa request.text() crudo.
+//   Regla:   firma sobre `<timestamp>.<payload normalizado>`. El normalizador
+//            es el del verificador oficial de Integrations Manager: conserva el
+//            orden/espacios, pero convierte valores JSON boolean/number/null a
+//            strings antes de calcular HMAC-SHA256.
 //
 // Seguridad (cert RAPPI-003):
 //   - Único secret: RAPPI_WEBHOOK_SECRET (dedicado, lo entrega Rappi al registrar
@@ -23,7 +25,7 @@ export interface RappiSigResult {
 export interface VerifyOpts {
   nowMs?: number
   toleranceMs?: number
-  /** DEV: probar formatos candidatos para fijar el contrato. Prod: solo 't.body'. */
+  /** DEV: probar formatos históricos. Prod: sólo el formato oficial 't.normalized'. */
   allowFormatDiscovery?: boolean
 }
 
@@ -64,6 +66,18 @@ function tsToMs(t: string): number | null {
   return n < 1e12 ? n * 1000 : n
 }
 
+function normalizeRappiPayload(rawBody: string): string {
+  let normalized = rawBody
+  if (normalized.length > 1 && normalized.startsWith('"') && normalized.endsWith('"')) {
+    normalized = normalized.slice(1, -1)
+  }
+  return normalized
+    .replace(/\\"/g, '"')
+    .replace(/:(\s*)(true|false)/g, ':"$2"')
+    .replace(/:(\s*)(-?\d+\.?\d*)([,}\]])/g, ':"$2"$3')
+    .replace(/:(\s*)null/g, ':"null"')
+}
+
 export function verifyRappiSignature(rawBody: string, header: string | null, opts: VerifyOpts = {}): RappiSigResult {
   const secret = process.env.RAPPI_WEBHOOK_SECRET
   if (!secret) return { ok: false, reason: 'NO_SECRET_CONFIGURED' }
@@ -80,13 +94,15 @@ export function verifyRappiSignature(rawBody: string, header: string | null, opt
   if (tMs === null) return { ok: false, reason: 'BAD_TIMESTAMP' }
   if (Math.abs(nowMs - tMs) > toleranceMs) return { ok: false, reason: 'STALE_TIMESTAMP' }
 
+  const normalizedBody = normalizeRappiPayload(rawBody)
   const formats: Array<{ name: string; msg: string }> = opts.allowFormatDiscovery
     ? [
+        { name: 't.normalized', msg: `${t}.${normalizedBody}` },
         { name: 't.body', msg: `${t}.${rawBody}` },
         { name: 'body', msg: rawBody },
         { name: 't+body', msg: `${t}${rawBody}` },
       ]
-    : [{ name: 't.body', msg: `${t}.${rawBody}` }]
+    : [{ name: 't.normalized', msg: `${t}.${normalizedBody}` }]
 
   for (const f of formats) {
     const computed = createHmac('sha256', secret).update(f.msg, 'utf8').digest('hex')
