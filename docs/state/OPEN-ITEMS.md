@@ -48,7 +48,7 @@ Regla: cuando cierres un item, márcalo aquí. Cuando aparezca uno nuevo, entra 
 | OP-18 | Sesión robable: cookie `fs-at` sin httpOnly + refresh token en localStorage | 🟠 P0 | ⬜ (SEC-2 / P0-D) | SECURITY §1 |
 | OP-19 | 2FA super-admin `daniel@fullsite.mx` (0 MFA) | 🟠 P1 | ⬜ (SEC-1) | SECURITY §2 |
 | OP-20 | OCM Fase 3 (IA consume vistas por-tenant; fuga cross-tenant) | 🟠 P0 | ⬜ vistas en prod, falta refactor | OCM-REVIEW-2026-08-19 |
-| OP-21 | Inventario: facturas-proveedor + recepción-factura al `recordMovement()` | 🟠 P1 | ⬜ (físico+merma ya migrados) | AGENTS.md; PLAN-JUEVES §7 |
+| OP-21 | Inventario: facturas-proveedor + recepción-factura al `recordMovement()` | 🟠 P1 | 🔶 **facturas-proveedor ✅ (`f1583bb5`, invoice_entry)**; recepción-factura ⬜ | AGENTS.md; PLAN-JUEVES §7 |
 | OP-22 | Editor de ticket POS-side (riesgo fiscal: RFC/serie → CFDI-QR roto) | 🟠 P1 | ⬜ | FULLSITE-VS-WANSOFT-BIBLE §4 |
 | OP-23 | Wizard self-serve + provisioning de terminales por código | 🟠 P1 | ⬜ | CLIENT-ONBOARDING-REQUIREMENTS |
 | OP-24 | Impuestos (IVA/IEPS) hardcodeados → por-tenant | 🟠 P1 | ⬜ | GO-LIVE.md |
@@ -89,8 +89,29 @@ Estos venían de `state/BUGS.md` marcados abiertos pero **sin documentar** — p
 - **P3:** POS-10, DASH-18
 - **CLOSED (verificar que no regresionaron):** POS-02 (phantom merge), POS-03 (silent print), POS-04 (boot offline)
 
+## Nuevos — del pipeline de código 2026-08-20 (`docs/PIPELINE-CODIGO.md`)
+
+Hallados por las 3 investigaciones; no estaban rastreados. Verificar en campo los 🔴 (impacto dinero) antes de accionar.
+
+| ID | Item | Sev | Estado | Fuente |
+|---|---|---|---|---|
+| OP-36 | Bug "laboratorio": POS de AMALAY aterriza en tenant `lab-resto` por impersonación residual (`fullsite_actas`) | 🟠 P1 | ⬜ fix inmediato=limpiar localStorage; fix código=resolver tenant + limpiar act-as | PIPELINE §0; `AuthContext.tsx:101` |
+| OP-37 | `merge-orders` recalcular totales server-side (vector skimming) | 🔴 P0 | ⬜ **flagged: money-math, verificar con merge real (no a ciegas)** | `merge-orders/route.ts:40` TODO P0-F |
+| OP-38 | Credenciales MP Point / Clip → `credentials_vault` (hoy client-supplied) | 🔴 P0 | ⬜ | `mp-point/route.ts:8`, `clip-pinpad/route.ts:4` (P0-H/I) |
+| OP-39 | Enforcement server-side de permisos (cancelar=admin, PERM-07) | 🟠 P0 | ⬜ confirmar `/api/pos/*` valida rol, no solo registra | roles.ts; auditoría fraude |
+| OP-40 | Constructor de mapa de mesas: mergear a main + link nav + **unificar coordenadas** (hoy plano solo renderiza AMALAY hardcode) | 🟠 P1 | 🔶 editor funciona en rama; loop sin cerrar | `plano-editor/page.tsx`, `mesas/page.tsx:159` |
+| OP-41 | Roles/jerarquía: unificar 3 sistemas + reconectar `/admin/usuarios` (hoy cosmético, escribe blob) + puente PIN + tier `platform_admin` | 🟠 P1 | 🔶 motor `roles.ts` ok; `/admin/usuarios` no crea usuarios reales | roles.ts; usuarios/page.tsx |
+| OP-42 | Alta de mesero en ~30s (rotación): wizard 1 paso sobre motor existente | 🟢 P2 | ⬜ | pos-pin.ts, roles.ts |
+| OP-43 | Alertas de fraude en tiempo real (event-driven, no cron viernes) | 🟠 P1 | ⬜ net-new (única brecha de arquitectura) | antifraud_agent.py |
+| OP-44 | CRM recovery: cablear WhatsApp Business API + bulk + tracking (hoy `wa.me` manual) | 🟢 P2 | 🔶 | whatsapp-crm.ts |
+| OP-45 | DASH-03 agente lee factura→entrada · DASH-06 transferencias inter-sucursal | 🟢 P2 | ⬜ | entradas-factura; inventory.ts |
+| OP-46 | pgvector / RAG para IA (idea Juan Carlos) | 🟢 P2 | ⬜ gap AI-native | — |
+| OP-47 | Split de cuenta por N personas (>3) + división pareja | 🟢 P2 | 🔶 parcial (C1/C2/C3) | pos/page.tsx |
+| OP-48 | Setear `FACTURAMA_USER/PASSWORD/EXPEDITION_PLACE` en prod | 🟢 P2 | ⬜ | facturama.ts |
+| OP-49 | Higiene: 6 tenants de prueba mezclados en `clients` + 2 valores data_source (`supabase` vs `fullsite`) | 🟢 P3 | ⬜ | clients (MCP) |
+
 ## Certificación (bloquea "milestone POS V2" → Golden Skeleton)
 
 - **PRR-v1:** 27 hallazgos OPEN (10 P0), score 4.7/10 — `certifications/PRR-v1.md`
 - **P0-4 Fase 5 física** (checklist OCS-P2.5.9 sin ejecutar) — bloquea todo el track downstream
-- **P0-3 CSD Facturapi** — blocker externo SAT
+- **P0-3 CSD — PAC = Facturama** (no Facturapi) — blocker externo SAT (Andy tramita CSD)
