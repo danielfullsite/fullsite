@@ -71,7 +71,8 @@ Marcadores: 🏆 = probado en campo (máxima autoridad) · ✅ = verificado en c
 | Fuente | Autoridad | Qué fundamenta |
 |---|---|---|
 | `docs/audit/AUDITORIA-FULL-2026-08-19.md` | ✅ | **Auditoría full POS/KDS/Dash/Offline.** 4 CRÍTICO (skimming, cancelar, KDS fan-out, render), 6 ALTO. |
-| Código en `origin/main` | ✅ | `save-order` (skimming grace), `cancel-item` (enforcement grace), `reopen-order`+`manager-approval` (grace). Flags `POS_APPROVAL_STRICT`/`CANCEL_APPROVAL_STRICT` (default false, sin documentar aún). |
+| `docs/security/FRAUD-ENFORCEMENT-FLAGS.md` | ✅ | **Runbook de los flags grace→strict:** `POS_APPROVAL_STRICT` (reopen), `CANCEL_APPROVAL_STRICT` (cancel). Cuándo/cómo voltear, verificar, rollback. Skimming Fase 2 (rechazo) aún no codificada. |
+| Código en `origin/main` | ✅ | `save-order` (skimming grace), `cancel-item` (enforcement grace), `reopen-order`+`manager-approval` (grace). Default = grace (audita `legacy_no_approval`). |
 | `docs/security/SECURITY-FOUNDATION.md` + `policies/` | 📐 | PINs, roles, RLS, audit, SOC2. |
 | Memoria: `project_blindaje_security_audit`, `project_full_audit_20260819` | ✅ | 31 hallazgos, plan B1-B6, aislamiento multi-tenant cerrado+verificado. |
 
