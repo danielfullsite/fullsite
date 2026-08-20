@@ -47,7 +47,12 @@ function canAssignRole(callerRole: string, staffRole: string): boolean {
 
 async function pinTaken(H: Record<string, string>, clientId: string, pin: string, exceptId?: string): Promise<boolean> {
   const cid = encodeURIComponent(clientId)
-  let url = `${SB_URL}/rest/v1/pos_staff?client_id=eq.${cid}&pin=eq.${encodeURIComponent(pin)}&active=eq.true&select=id`
+  // OJO: NO filtrar por active. El índice único de BD es `unique_pin_per_client
+  // UNIQUE (pin, client_id)` — abarca staff INACTIVO también. Si filtráramos active,
+  // un PIN de un mesero desactivado se vería "libre" aquí pero el INSERT chocaría con
+  // el índice → 502 opaco (y el autogen podría lazar sin salida). Chequear contra TODO
+  // el tenant para coincidir con la constraint.
+  const url = `${SB_URL}/rest/v1/pos_staff?client_id=eq.${cid}&pin=eq.${encodeURIComponent(pin)}&select=id`
   const res = await fetch(url, { headers: H, cache: 'no-store' })
   if (!res.ok) return false
   const rows: { id: string }[] = await res.json()
@@ -123,6 +128,8 @@ export async function POST(request: NextRequest) {
     method: 'POST', headers: { ...H, Prefer: 'return=minimal' }, body: JSON.stringify(row),
   })
   if (!res.ok) {
+    // Colisión de PIN por carrera (índice único) → mensaje legible en vez de 502 opaco.
+    if (res.status === 409) return Response.json({ error: 'Ese PIN ya está en uso' }, { status: 409 })
     const detail = await res.text().catch(() => '')
     return Response.json({ error: `No se pudo crear (${res.status})`, detail: detail.slice(0, 200) }, { status: 502 })
   }

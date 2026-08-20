@@ -101,9 +101,14 @@ export function unauthorized(message = 'No autorizado'): Response {
 }
 
 // ── OP-39: role gate for sensitive /api/pos routes ────────────────────────────
-// Jerarquía de roles POS. Debe coincidir con la tabla usada en cancel-item.
+// Jerarquía de roles. Incluye TANTO los de pos_staff (shift token: mesero..admin)
+// COMO los de client_users (sesión dashboard: admin/dueño). `dueño` es el tope real
+// (owner) — sin él, checkPosRole trataba a los dueños como nivel 0 → en strict los
+// bloqueaba y en grace los marcaba como below_role (falsos eventos de fraude).
+// `member`/`barra`/`cocina` quedan sin mapear a propósito → nivel 0 (no-manager) para
+// estos gates administrativos (ajuste de stock / edición de receta).
 export const POS_ROLE_LVL: Record<string, number> = {
-  mesero: 1, cajero: 2, capitan: 3, gerente: 4, admin: 5,
+  mesero: 1, cajero: 2, capitan: 3, gerente: 4, admin: 5, dueño: 6,
 }
 
 /**
