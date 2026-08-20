@@ -48,7 +48,7 @@ Regla: cuando cierres un item, márcalo aquí. Cuando aparezca uno nuevo, entra 
 | OP-18 | Sesión robable: cookie `fs-at` sin httpOnly + refresh token en localStorage | 🟠 P0 | ⬜ (SEC-2 / P0-D) | SECURITY §1 |
 | OP-19 | 2FA super-admin `daniel@fullsite.mx` (0 MFA) | 🟠 P1 | ⬜ (SEC-1) | SECURITY §2 |
 | OP-20 | OCM Fase 3 (IA consume vistas por-tenant; fuga cross-tenant) | 🟠 P0 | ⬜ vistas en prod, falta refactor | OCM-REVIEW-2026-08-19 |
-| OP-21 | Inventario: facturas-proveedor + recepción-factura al `recordMovement()` | 🟠 P1 | 🔶 **facturas-proveedor ✅ (`f1583bb5`, invoice_entry)**; recepción-factura ⬜ | AGENTS.md; PLAN-JUEVES §7 |
+| OP-21 | Inventario: facturas-proveedor + recepción-factura al `recordMovement()` | 🟠 P1 | ✅ **HECHO** — ambas a invoice_entry (`f1583bb5`, `eb6ec359`) | AGENTS.md |
 | OP-22 | Editor de ticket POS-side (riesgo fiscal: RFC/serie → CFDI-QR roto) | 🟠 P1 | ⬜ | FULLSITE-VS-WANSOFT-BIBLE §4 |
 | OP-23 | Wizard self-serve + provisioning de terminales por código | 🟠 P1 | ⬜ | CLIENT-ONBOARDING-REQUIREMENTS |
 | OP-24 | Impuestos (IVA/IEPS) hardcodeados → por-tenant | 🟠 P1 | ⬜ | GO-LIVE.md |
@@ -96,7 +96,7 @@ Hallados por las 3 investigaciones; no estaban rastreados. Verificar en campo lo
 | ID | Item | Sev | Estado | Fuente |
 |---|---|---|---|---|
 | OP-36 | "Laboratorio" NO era bug de código — el act-as de platform-admin se quedaba pegado en `lab-resto`. Se resuelve entrando al tenant correcto (Tenants→Entrar AMALAY). Mejora real = **UX de act-as** (letrero "viendo como X" + switch/salir visible) para no quedar pegado. Nota: quitar `fullsite_actas` a un platform-admin da 403 (pierde el camino RLS autorizado). | 🟢 P2 | 🔶 operativo resuelto; falta UX | `AuthContext.tsx:101`, `/platform/tenants` |
-| OP-37 | `merge-orders` recalcular totales server-side (vector skimming) | 🔴 P0 | ⬜ **flagged: money-math, verificar con merge real (no a ciegas)** | `merge-orders/route.ts:40` TODO P0-F |
+| OP-37 | `merge-orders` recalcular totales server-side (vector skimming) | 🔴 P0 | ✅ **HECHO** (`eb6ec359`) — total server-side (suma 2 órdenes BD) + audita skimming + fallback seguro. Falta probar un merge real en campo | `merge-orders/route.ts` |
 | OP-38 | Credenciales MP Point / Clip → `credentials_vault` (hoy client-supplied) | 🔴 P0 | ⬜ | `mp-point/route.ts:8`, `clip-pinpad/route.ts:4` (P0-H/I) |
 | OP-39 | Enforcement server-side de permisos (cancelar=admin, PERM-07) | 🟠 P0 | ⬜ confirmar `/api/pos/*` valida rol, no solo registra | roles.ts; auditoría fraude |
 | OP-40 | Constructor de mapa de mesas: mergear a main + link nav + **unificar coordenadas** (hoy plano solo renderiza AMALAY hardcode) | 🟠 P1 | 🔶 editor funciona en rama; loop sin cerrar | `plano-editor/page.tsx`, `mesas/page.tsx:159` |
