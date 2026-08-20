@@ -1,0 +1,37 @@
+name: Fraud Watcher — near-real-time (OP-43)
+
+on:
+  schedule:
+    # Cada 30 min en horario de servicio MX (MX = UTC-6):
+    #   8:00am–5:59pm MX = 14:00–23:59 UTC
+    #   6:00pm–11:59pm MX = 00:00–05:59 UTC
+    - cron: '*/30 14-23 * * *'
+    - cron: '*/30 0-5 * * *'
+  workflow_dispatch:
+    inputs:
+      client_id:
+        description: 'Tenant a vigilar'
+        default: 'amalay'
+      alert:
+        description: "Enviar Telegram de verdad? ('true' = alerta real; vacío = modo sombra)"
+        default: ''
+
+env:
+  CLIENT_ID: ${{ github.event.inputs.client_id || 'amalay' }}
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+  # Modo sombra por default. Prender alertas reales con la repo variable
+  # FRAUD_WATCHER_ALERT='true' (Settings → Variables) o el input 'alert' en un dispatch.
+  FRAUD_WATCHER_ALERT: ${{ github.event.inputs.alert || vars.FRAUD_WATCHER_ALERT || '' }}
+  TRIGGER_TYPE: ${{ github.event_name }}
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with: { python-version: '3.11' }
+      - run: pip install requests
+      - run: python .github/scripts/fraud_watcher.py
