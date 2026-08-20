@@ -21,6 +21,16 @@ function extractOrder(payload: unknown): unknown {
   return payload
 }
 
+// Browser/monitor health check. Rappi deliveries still require a signed POST.
+export async function GET() {
+  return NextResponse.json({
+    status: 'ok',
+    service: 'fullsite-rappi-webhook',
+    version: '1.0.0',
+    accepts: ['POST'],
+  })
+}
+
 export async function POST(request: NextRequest) {
   const rawBody = await request.text()
   const header = request.headers.get('rappi-signature')
