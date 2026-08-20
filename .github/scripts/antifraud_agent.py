@@ -41,6 +41,7 @@ CANCEL_RATE_THRESHOLD = 0.05    # 5% cancellation rate is suspicious
 DISCOUNT_RATE_THRESHOLD = 0.08  # 8% discount rate is suspicious
 CASH_SHIFT_THRESHOLD = 0.15    # 15% shift in cash ratio is suspicious
 COURTESY_THRESHOLD = 500        # More than $500 in courtesies per week
+SKIMMING_ALERT_MXN = 50         # Suma por mesero > $50 en discrepancias → alerta (POS nativo)
 
 
 # ── Supabase helpers ────────────────────────────────────────────────────────
@@ -64,6 +65,28 @@ def get_weekly_data(weeks=2):
         "order": "fecha.desc",
         "limit": str(weeks * 7),
     })
+
+
+def get_skimming_events(days=7):
+    """Fetch POS-native skimming_suspect events (Fullsite POS, no Wansoft).
+
+    save-order audita cuando sum(items) − descuento ≠ total declarado (el vector: bajar
+    el `total` dejando los items; el arqueo cuadra y la diferencia se embolsa). Aquí el
+    agente CIERRA EL LAZO: lee esos eventos y los reporta por mesero. Sin este paso la
+    detección se queda muda en el log. Ver save-order/route.ts (Fase 1 · log-only)."""
+    cutoff = (datetime.now(MX_TZ) - timedelta(days=days)).isoformat()
+    try:
+        return sb_get("pos_audit_log", {
+            "client_id": f"eq.{CLIENT['id']}",
+            "action": "eq.skimming_suspect",
+            "created_at": f"gte.{cutoff}",
+            "select": "order_id,actor,mesa,details,created_at",
+            "order": "created_at.desc",
+            "limit": "500",
+        }) or []
+    except Exception as e:
+        print(f"[antifraud] skimming fetch failed: {e}")
+        return []
 
 
 def get_waiter_categories():
@@ -112,6 +135,45 @@ def get_courtesy_details(weeks=2):
 
 
 # ── Analysis ────────────────────────────────────────────────────────────────
+def analyze_skimming(events):
+    """Agrupa eventos skimming_suspect por mesero. diff_cents = esperado − declarado;
+    positivo = se cobró MENOS de lo que los items implican (dinero sin explicar). Reporta
+    meseros cuya suma de faltantes supere el umbral. Evidencia directa a nivel ticket —
+    peso alto en el risk score."""
+    findings = []
+    by_actor = defaultdict(lambda: {"faltante_mxn": 0.0, "count": 0, "mesas": set()})
+
+    for ev in events:
+        details = ev.get("details") or {}
+        diff_cents = details.get("diff_cents")
+        if diff_cents is None:
+            continue
+        # Solo dirección sospechosa: cobró de menos (positivo). Negativos = combos/promos legítimos.
+        if diff_cents <= 0:
+            continue
+        actor = ev.get("actor") or "desconocido"
+        agg = by_actor[actor]
+        agg["faltante_mxn"] += diff_cents / 100.0
+        agg["count"] += 1
+        if ev.get("mesa") is not None:
+            agg["mesas"].add(ev["mesa"])
+
+    for actor, agg in sorted(by_actor.items(), key=lambda kv: kv[1]["faltante_mxn"], reverse=True):
+        if agg["faltante_mxn"] < SKIMMING_ALERT_MXN:
+            continue
+        mesas = ", ".join(f"#{m}" for m in sorted(agg["mesas"])[:6]) if agg["mesas"] else "s/mesa"
+        findings.append({
+            "type": "skimming",
+            "actor": actor,
+            "faltante_mxn": round(agg["faltante_mxn"], 2),
+            "count": agg["count"],
+            "message": f"{actor}: ${agg['faltante_mxn']:,.0f} sin explicar en {agg['count']} ticket(s) — total cobrado < items (mesas {mesas})",
+            "detail": "Vector: bajar el total del ticket dejando los platillos; el arqueo cuadra y la diferencia se embolsa.",
+        })
+
+    return findings
+
+
 def analyze_cancellations(data):
     """Detect meseros with high cancellation/void rates."""
     findings = []
@@ -360,6 +422,7 @@ def calculate_risk_score(all_findings):
     """Calculate overall risk score 0-100."""
     score = 0
     weights = {
+        "skimming": 30,     # Evidencia directa a nivel ticket — el más grave
         "cancellations": 15,
         "discount_high": 20,
         "discount_spike": 10,
@@ -401,6 +464,14 @@ def build_message(all_findings, risk_score, data):
     by_type = defaultdict(list)
     for f in all_findings:
         by_type[f["type"]].append(f)
+
+    # Skimming (POS nativo — evidencia directa a nivel ticket, va primero)
+    skimming_findings = by_type.get("skimming", [])
+    if skimming_findings:
+        msg += "🩸 SKIMMING (total cobrado < items) — POS:\n"
+        for f in skimming_findings[:5]:
+            msg += f"  • {f['message']}\n"
+        msg += "\n"
 
     # Cancellations
     cancel_findings = by_type.get("cancellations", [])
@@ -452,6 +523,8 @@ def build_message(all_findings, risk_score, data):
 
     # Recommendations
     recs = []
+    if skimming_findings:
+        recs.append("URGENTE: Ticket cobrado por menos que sus platillos. Cruzar order_id contra arqueo del mesero y pedir explicación HOY.")
     if cancel_findings:
         recs.append("Revisar tickets cancelados — solicitar justificación por escrito")
     if discount_findings:
@@ -499,8 +572,15 @@ def main():
     data = get_weekly_data(2)
     print(f"[antifraud] Got {len(data)} days")
 
-    if len(data) < 3:
-        print("[antifraud] Not enough data, skipping")
+    # POS nativo: eventos skimming_suspect. Se leen ANTES del gate de Wansoft porque son
+    # evidencia directa a nivel ticket y no dependen del histórico agregado. Un solo evento
+    # debe poder disparar aunque no haya suficiente data de Wansoft.
+    skimming_events = get_skimming_events(7)
+    skimming_findings = analyze_skimming(skimming_events)
+    print(f"[antifraud] skimming events: {len(skimming_events)}, findings: {len(skimming_findings)}")
+
+    if len(data) < 3 and not skimming_findings:
+        print("[antifraud] Not enough data and no skimming, skipping")
         elapsed = int((time.time() - start) * 1000)
         _log_run("antifraud-agent", "no_data", elapsed, skip_reason=f"only {len(data)} days available, need 3+", data_status="no_data", tentacle="ops")
         return
@@ -512,6 +592,7 @@ def main():
     all_findings.extend(analyze_discounts(data))
     all_findings.extend(analyze_cash_ratio(data))
     all_findings.extend(analyze_mesero_patterns(data))
+    all_findings.extend(skimming_findings)
 
     risk_score = calculate_risk_score(all_findings)
     print(f"[antifraud] Findings: {len(all_findings)}, Risk: {risk_score}/100")
@@ -560,9 +641,9 @@ def main():
     except Exception as e:
         print(f"[antifraud] Error saving to DB: {e}")
 
-    # 5. Send Telegram ONLY when risk > 50
+    # 5. Send Telegram cuando risk > 50 O hay skimming (evidencia directa: un solo ticket avisa)
     sent = 0
-    if risk_score > 50:
+    if risk_score > 50 or skimming_findings:
         msg = build_message(all_findings, risk_score, data)
         print(f"\n{msg}")
         sent = send_telegram(msg)
