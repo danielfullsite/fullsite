@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Users, Calendar, RefreshCw, Merge, X, Clock, AlertTriangle, LayoutGrid, Map, UserPlus, Lock as LockIcon, Power } from 'lucide-react'
+import { ArrowLeft, Users, Calendar, RefreshCw, Merge, X, Clock, AlertTriangle, LayoutGrid, Map, UserPlus, Lock as LockIcon, Power, PencilRuler } from 'lucide-react'
 import { getMesasConfig, formatMXN, logAudit, verifyManagerPin, fetchPosMesas, fetchWithTimeout, getPOSAuthHeaders } from '@/lib/pos-data'
 import type { Mesa } from '@/lib/pos-data'
 import { getActiveClientSlug as _cid } from '@/lib/data'
@@ -152,6 +152,9 @@ export default function MesasPage() {
   const [staffName, setStaffName] = useState<string>('')
   const [clientMesas, setClientMesas] = useState<Mesa[]>(() => getMesasConfig(_cid(), 16))
   const [floorTables, setFloorTables] = useState<FloorTable[]>(FLOOR_TABLES)
+  // OP-40: true cuando el tenant tiene un mapa real guardado (coords en pos_mesas).
+  // Habilita la vista Plano para cualquier tenant, no solo AMALAY.
+  const [hasFloorplan, setHasFloorplan] = useState(false)
   const [turnoNum, setTurnoNum] = useState<number | null>(null)
   const [showNewCuenta, setShowNewCuenta] = useState(false)
   const [newCuentaName, setNewCuentaName] = useState('')
@@ -181,6 +184,7 @@ export default function MesasPage() {
             y: r.y_pct,
             shape: (SHAPES.includes(r.shape as TableShape) ? r.shape : 'round') as TableShape,
           })))
+          setHasFloorplan(true)
         }
         // si ninguna mesa trae coords → se queda el hardcode FLOOR_TABLES (fallback AMALAY).
       } else {
@@ -787,9 +791,10 @@ export default function MesasPage() {
             <RefreshCw size={14} />
           </button>
 
-          {/* View toggle — Plano only for AMALAY (AMALAY-specific floor layout) */}
+          {/* View toggle — OP-40: Plano para cualquier tenant con mapa guardado (coords
+              en pos_mesas), no solo AMALAY. AMALAY siempre (tiene fallback hardcode). */}
           <div className="flex items-center bg-[var(--line)] rounded-lg p-0.5 ml-2">
-            {_cid() === 'amalay' && (
+            {(_cid() === 'amalay' || hasFloorplan) && (
               <button
                 onClick={() => setViewMode('planograma')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
@@ -808,6 +813,18 @@ export default function MesasPage() {
               <LayoutGrid size={13} /> Grid
             </button>
           </div>
+
+          {/* OP-40 #2: acceso al editor de mapa — solo gerente/admin. Antes el editor
+              (/pos/plano-editor) solo se alcanzaba tecleando la URL. */}
+          {(staffRole === 'admin' || staffRole === 'gerente') && (
+            <Link
+              href="/pos/plano-editor"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[var(--line)] text-[var(--text-2)] hover:text-[var(--text-1)] hover:bg-[var(--surface-2)] transition-colors ml-2"
+              title="Editar el mapa de mesas"
+            >
+              <PencilRuler size={13} /> Editar mapa
+            </Link>
+          )}
 
           {currentMesero && (
             <button
