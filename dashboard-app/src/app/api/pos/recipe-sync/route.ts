@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { withPOSAuth, unauthorized } from '@/lib/api-auth'
+import { withPOSAuth, unauthorized, checkPosRole, POS_ROLE_LVL } from '@/lib/api-auth'
 
 /**
  * A1.2 — Recipe unification: proyecta una receta editada en la UI (pos_recipes_old,
@@ -67,6 +67,25 @@ export async function POST(request: NextRequest) {
     const H = { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json' }
     const cid = encodeURIComponent(clientId)
     const mid = encodeURIComponent(menuItemId)
+
+    // OP-39: editar/reconstruir recetas (BOM y costo) es administrativo → gerente+.
+    // Grace: audita, no bloquea hasta setear MARKET_ROLE_STRICT='true'.
+    const gate = checkPosRole(auth, POS_ROLE_LVL.gerente, 'MARKET_ROLE_STRICT')
+    if (!gate.ok) {
+      return Response.json({ ok: false, error: 'ROLE_REQUIRED' } satisfies SyncResult, { status: 403 })
+    }
+    if (gate.mode.startsWith('below_role:')) {
+      void fetch(`${sbUrl}/rest/v1/pos_audit_log`, {
+        method: 'POST',
+        headers: { ...H, Prefer: 'return=minimal' },
+        body: JSON.stringify({
+          client_id: clientId,
+          action: 'recipe_sync_below_role',
+          actor: auth.staffName || auth.staffId || actor,
+          details: { role_mode: gate.mode, menu_item_id: menuItemId },
+        }),
+      }).catch(() => {})
+    }
 
     // ── 1. Leer la receta flat actual (fuente de verdad de la UI) ──────────────
     const oldRes = await fetch(
