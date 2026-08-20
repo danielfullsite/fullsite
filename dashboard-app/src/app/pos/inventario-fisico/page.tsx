@@ -67,34 +67,35 @@ export default function InventarioFisicoPage() {
     if (counted.length === 0) return
     setSaving(true)
     try {
-      for (const item of counted) {
-        const diff = (item.physical || 0) - item.stock
-        // Update stock to physical count
-        await fetch(`${SUPABASE_URL}/rest/v1/pos_inventory?client_id=eq.${_cid()}&ingredient_id=eq.${item.ingredient_id}`, {
-          method: 'PATCH',
-          headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-          body: JSON.stringify({ stock: item.physical }),
+      // Contrato de inventario (AGENTS.md): un solo recordMovement de ajuste (delta = físico −
+      // sistema) escribe el ledger + fija el stock atómico + idempotencia. Antes: PATCH directo
+      // a pos_inventory + insert al ledger por separado — prohibido (corrompe stock, sin idempotencia).
+      const { recordMovement } = await import('@/lib/inventory')
+      const lines = counted
+        .map(item => ({ item, diff: (item.physical || 0) - item.stock }))
+        .filter(x => Math.abs(x.diff) > 0.001)
+        .map(({ item, diff }) => ({
+          ingredient_id: item.ingredient_id,
+          quantity: diff,   // + sube / − baja: ajuste al conteo físico
+          notes: `Conteo físico: sistema ${item.stock.toFixed(2)} → físico ${(item.physical || 0).toFixed(2)} (diff: ${diff > 0 ? '+' : ''}${diff.toFixed(2)})`,
+        }))
+      if (lines.length > 0) {
+        const idempotency_key = `conteo-${new Date().toISOString().split('T')[0]}-` +
+          lines.map(l => `${l.ingredient_id}:${l.quantity.toFixed(3)}`).join('|').slice(0, 140)
+        const invResult = await recordMovement({
+          client_id: _cid(), movement_type: 'adjustment', actor: 'almacén', idempotency_key, lines,
+          metadata: { source: 'pos/inventario-fisico' },
         })
-        // Log movement
-        if (Math.abs(diff) > 0.001) {
-          await fetch(`${SUPABASE_URL}/rest/v1/pos_inventory_movements`, {
-            method: 'POST',
-            headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-            body: JSON.stringify({
-              client_id: _cid(),
-              ingredient_id: item.ingredient_id,
-              movement_type: 'adjustment',
-              quantity: diff,
-              actor: 'almacén',
-              notes: `Conteo físico: sistema ${item.stock.toFixed(2)} → físico ${(item.physical || 0).toFixed(2)} (diff: ${diff > 0 ? '+' : ''}${diff.toFixed(2)})`,
-            }),
-          })
+        if (!invResult.success && !invResult.was_duplicate) {
+          setSaving(false)
+          alert(`Error al guardar conteo: ${invResult.errors[0] || 'desconocido'}`)
+          return
         }
       }
       logAudit({
-        action: 'merma_registered' as any,
+        action: 'conteo_fisico' as any,
         actor: 'almacén',
-        details: { type: 'conteo_fisico', items_counted: counted.length, differences: differences.length, cost_diff: totalDiffCost },
+        details: { items_counted: counted.length, differences: differences.length, cost_diff: totalDiffCost },
       })
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
