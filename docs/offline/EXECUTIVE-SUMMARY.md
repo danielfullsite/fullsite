@@ -1,3 +1,6 @@
+> ⚠️ **DOCUMENTO HISTÓRICO / DESACTUALIZADO** (snapshot de julio 2026 — verificar antes de citar).
+> Estado real vigente: docs/offline/OFFLINE-LAN-FIELD-PROVEN-AND-CLONE.md (readiness 52/100 y "0/23 certificados" son de julio; offline ya se probó en campo).
+
 # OFFLINE-100 — Resumen Ejecutivo
 
 > Fecha: 2026-07-27 | OFFLINE-100 | Versión 2

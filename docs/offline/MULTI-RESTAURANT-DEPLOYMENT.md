@@ -539,15 +539,14 @@ Instalar el mismo instalador. En el wizard:
 
 El wizard pone `kds_only: true` en config.json. Electron abre directamente la vista KDS.
 
-**Para KDS en Chrome (sin Electron):**
+**⚠️ NO usar Chrome con `https://app.fullsite.mx/pos/kds` para el KDS.** Una página `https`
+NO puede leer una IP LAN por `http` (muro mixed-content / Private Network Access de Chromium) →
+el KDS se queda en 0 órdenes offline. Es la **regla dura #1** de `OFFLINE-LAN-FIELD-PROVEN-AND-CLONE.md`.
 
-No se instala nada. El usuario abre:
-```
-https://app.fullsite.mx/pos/kds?bridge=192.168.X.X
-```
-(reemplazar con la IP de SERVER1)
-
-La IP queda en `localStorage('pos_bridge_host')`. El `?bridge=` solo es necesario la primera vez.
+**El KDS correcto es el build dedicado (Electron, `kds_only: true`)**, que carga
+`http://127.0.0.1:7717/kds` servido por su propio Pedro local (una página `http` sí puede leer
+`http://<caja>:7717/state` por la LAN). Funciona offline, incluso en frío. Ver `main.js` (kds_only)
+y `local-server/index.js` (`GET /kds`).
 
 ---
 
@@ -910,12 +909,10 @@ Opción A — Electron:
 2. Wizard: "KDS dedicado"
 3. IP del servidor: IP LAN de SERVER1
 
-Opción B — Chrome (sin instalación):
-```
-https://app.fullsite.mx/pos/kds?bridge=192.168.X.X
-```
-Reemplazar `X.X` con la IP del SERVER1. Esto solo se necesita la primera vez —
-el `pos_bridge_host` queda en `localStorage`.
+Opción B — ~~Chrome (sin instalación)~~ **PROHIBIDA para KDS.** `https://app.fullsite.mx/pos/kds`
+en Chrome NO funciona offline (una página https no puede leer la IP LAN por http → mixed-content).
+Usar siempre la **Opción A (Electron `kds_only`)**, que carga `http://127.0.0.1:7717/kds` de su Pedro
+local. Ver regla dura #1 en `OFFLINE-LAN-FIELD-PROVEN-AND-CLONE.md`.
 
 ### Verificar que la terminal nueva está conectada
 

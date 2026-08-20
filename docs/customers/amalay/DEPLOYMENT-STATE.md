@@ -1,3 +1,6 @@
+> ⚠️ **DOCUMENTO HISTÓRICO / DESACTUALIZADO** (snapshot de julio 2026 — verificar antes de citar).
+> Estado real vigente: docs/pos/PLAN-INSTALACION-AMALAY-JUEVES.md (topología y versiones reales; este doc dice "Tablet+Chrome" y "offline pendiente" — ambos falsos hoy).
+
 # AMALAY — Estado de Deployment
 
 > Documento vivo. Actualizar con cada visita.  

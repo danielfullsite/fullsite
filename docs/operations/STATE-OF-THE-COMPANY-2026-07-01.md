@@ -1,3 +1,6 @@
+> ⚠️ **DOCUMENTO HISTÓRICO / DESACTUALIZADO** (snapshot de julio 2026 — verificar antes de citar).
+> Estado real vigente: docs/PLAN-AHORA.md (este snapshot dice "0 restaurantes"; AMALAY ya está en vivo).
+
 # STATE OF THE COMPANY — 1 julio 2026
 
 > Snapshot completo de Fullsite.

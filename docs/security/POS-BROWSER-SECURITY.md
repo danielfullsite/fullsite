@@ -1,3 +1,6 @@
+> ⚠️ **DOCUMENTO HISTÓRICO / DESACTUALIZADO** (snapshot de julio 2026 — verificar antes de citar).
+> Estado real vigente: docs/audit/AUDITORIA-FULL-FULLSITE-2026-08-19.md (matriz de amenazas de julio/staging; útil como historia del exploit, no como estado actual).
+
 # POS Browser Security Audit — Foundation v1
 
 **Fecha:** 2026-07-29  

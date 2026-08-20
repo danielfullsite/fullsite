@@ -1,3 +1,6 @@
+> ⚠️ **DOCUMENTO HISTÓRICO / DESACTUALIZADO** (snapshot de julio 2026 — verificar antes de citar).
+> Estado real vigente: docs/audit/AUDITORIA-FULL-FULLSITE-2026-08-19.md + docs/security/FRAUD-ENFORCEMENT-FLAGS.md (el blindaje B2/RLS de agosto ya cerró en prod lo que aquí figura IN_PROGRESS).
+
 # Security Foundation (P0) — Milestone Tracking
 
 **Fecha:** 2026-07-29

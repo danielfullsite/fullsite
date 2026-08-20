@@ -1,3 +1,6 @@
+> ⚠️ **DOCUMENTO HISTÓRICO / DESACTUALIZADO** (snapshot de julio 2026 — verificar antes de citar).
+> Estado real vigente: PRICING EN REVISIÓN — hay 4 esquemas conviviendo ($1,999 aquí / $4,999 en lib/plans.ts / $1,799-$2,999 en memoria). Decidir UNO. Ver docs/PLAN-AHORA.md Ola 1.
+
 # Pricing Fullsite — Final
 
 ---

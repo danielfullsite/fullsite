@@ -1,3 +1,6 @@
+> ⚠️ **DOCUMENTO HISTÓRICO / DESACTUALIZADO** (snapshot de julio 2026 — verificar antes de citar).
+> Estado real vigente: docs/offline/OFFLINE-LAN-FIELD-PROVEN-AND-CLONE.md (offline probado en campo; §9 de este doc describe blockers ya resueltos y diseño WS/https superado).
+
 # Fullsite — Arquitectura Local-First
 
 > **Documento de referencia oficial.** Escrito para que cualquier ingeniero pueda desplegar, operar y extender el sistema sin haber estado en las conversaciones donde fue diseñado. Actualiza este documento cuando cambie la arquitectura.

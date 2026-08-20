@@ -1,3 +1,6 @@
+> ⚠️ **DOCUMENTO HISTÓRICO / DESACTUALIZADO** (snapshot de julio 2026 — verificar antes de citar).
+> Estado real vigente: docs/platform/CLIENT-ONBOARDING-REQUIREMENTS.md (dice "onboard_client.py no existe" — ya existe con templates/rollback).
+
 # Cloneability Report v1
 
 **Fecha:** 2026-07-29  

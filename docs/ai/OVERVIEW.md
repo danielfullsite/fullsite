@@ -1,3 +1,6 @@
+> ⚠️ **DOCUMENTO HISTÓRICO / DESACTUALIZADO** (snapshot de julio 2026 — verificar antes de citar).
+> Estado real vigente: los agents/*/CONTEXT.md reales + docs/audit/AUDITORIA-FULL-FULLSITE-2026-08-19.md (orquestador/kb son skeleton, no "active"; 0 agentes certificados; agent_events no se escribe).
+
 # AI — War Room Multi-Agente
 
 > 26+ agentes autónomos que monitorean, reportan y alertan sobre operaciones de AMALAY.

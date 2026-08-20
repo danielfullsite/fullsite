@@ -1,3 +1,6 @@
+> ⚠️ **DOCUMENTO HISTÓRICO / DESACTUALIZADO** (snapshot de julio 2026 — verificar antes de citar).
+> Estado real vigente: el provisioning programático (dashboard-app/src/lib/provision-tenant.ts, /api/platform/onboard, scripts/sql/sandbox/onboard_client.py) — el flujo "pega SQL a mano" de este doc quedó superado.
+
 # Provisioning — New Restaurant Client
 
 > **Invariant:** Adding a new client requires zero code changes.  

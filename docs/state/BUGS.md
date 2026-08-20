@@ -1,3 +1,6 @@
+> ⚠️ **DOCUMENTO HISTÓRICO / DESACTUALIZADO** (snapshot de julio 2026 — verificar antes de citar).
+> Estado real vigente: docs/audit/AUDITORIA-FULL-FULLSITE-2026-08-19.md (este registro no incluye los 4 CRÍTICO reales y tiene 13 bugs "pendiente de documentar").
+
 # Bugs abiertos — Fullsite
 
 > **Fuente de verdad.** Reemplaza la memoria de Claude y cualquier lista anterior.
