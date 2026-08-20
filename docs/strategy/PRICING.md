@@ -30,6 +30,17 @@ paquete "POS sin IA"** — eso sería competir como commodity contra Wansoft, ju
 
 ---
 
+## Conectividad — módem celular incluido (bala + chaleco)
+
+Incluido en la **activación** + datos dentro de la **mensualidad**: un **módem celular dedicado**,
+permanente, aislado del internet del local. No es respaldo que entra cuando falla la fibra — es una
+línea independiente para el POS. Una caja consume datos mínimos (solo texto).
+
+**La diferencia con quien vende "solo módem" (MaxIA):** ellos son *conectividad-primero* — si el
+celular falla, su POS muere. Fullsite es **local-first**: opera con **cero señal** (fibra Y celular
+caídos), y el módem es el complemento para el 99.9% de uptime. **Garantizamos operación, no solo conexión.**
+Ver `knowledge/competitive/MAXIA.md`.
+
 ## Por qué esta estructura (la lógica)
 
 1. **La cuña resuelve la primera venta sin traction.** Vender $4,999 en frío, sin cliente arm's-length,
