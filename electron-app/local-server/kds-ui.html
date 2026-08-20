@@ -61,12 +61,12 @@
   .drow.hot .dn{background:rgba(245,158,11,.24)}
   .demand .none{color:var(--text-4);font-size:13px;padding:12px 9px}
 
-  main{flex:1;overflow-y:auto;padding:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:15px;align-content:start}
+  main{flex:1;overflow-y:auto;padding:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px;align-content:start;align-items:start}
   .empty{grid-column:1/-1;display:flex;flex-direction:column;align-items:center;justify-content:center;height:72vh;color:var(--text-4);gap:14px}
   .empty .chef{font-size:56px;opacity:.4}
 
   /* card = one send (batch) */
-  .card{background:var(--surface);border:1px solid var(--line);border-radius:15px;overflow:hidden;display:flex;flex-direction:column;border-top:5px solid var(--nueva)}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:15px;overflow:hidden;display:flex;flex-direction:column;border-top:5px solid var(--nueva);align-self:start}
   .card.s-preparando{border-top-color:var(--prep)}
   .card.s-lista{border-top-color:var(--lista);opacity:.82}
   .card.urgent{animation:pulse 1.5s infinite}
@@ -107,7 +107,7 @@
   .mods{font-size:14px;color:#fcd34d;margin-top:3px;line-height:1.3}
   .note{font-size:14px;color:var(--text-3);font-style:italic;margin-top:2px;line-height:1.3}
 
-  .card-f{display:flex;border-top:1px solid var(--line);margin-top:auto}
+  .card-f{display:flex;border-top:1px solid var(--line)}
   .fbtn{flex:1;padding:13px;border:none;background:transparent;color:var(--text-2);font-size:15px;font-weight:800;cursor:pointer;letter-spacing:.3px}
   .fbtn:active{background:var(--line)}
   .fbtn.ready{color:#6ee7b7}
@@ -299,7 +299,15 @@
         cards.push({ order:o, batchId:bid, seq:Number(seq)||0, createdAt:(m.created_at||o.created_at), serverStatus:(m.status||o.status||"enviada"), items:groups[bid] });
       });
     });
-    cards.sort(function(a,b){ return (Date.parse(a.createdAt)||0)-(Date.parse(b.createdAt)||0); });
+    // Orden: rondas de una MISMA mesa juntas; las mesas que esperan más, primero.
+    var tmin={};
+    cards.forEach(function(c){ var k=String(c.order.mesa||c.order.id); var t=Date.parse(c.createdAt)||0; if(tmin[k]===undefined||t<tmin[k]) tmin[k]=t; });
+    cards.sort(function(a,b){
+      var ka=String(a.order.mesa||a.order.id), kb=String(b.order.mesa||b.order.id);
+      if(tmin[ka]!==tmin[kb]) return tmin[ka]-tmin[kb];
+      if(ka!==kb) return ka.localeCompare(kb,undefined,{numeric:true});
+      return (Number(a.seq)||0)-(Number(b.seq)||0);
+    });
     return { cards:cards, orderMeta:orderMeta };
   }
 
