@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { withPOSAuth, unauthorized } from '@/lib/api-auth'
 import { sameOriginOnly } from '@/lib/api-guard'
-import { randomUUID } from 'crypto'
+import { randomUUID, randomInt } from 'crypto'
 
 /**
  * A2a — Gestión de staff POS + PINs desde el DASHBOARD del dueño.
@@ -93,13 +93,26 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json().catch(() => ({}))
   const name = typeof body?.name === 'string' ? body.name.trim() : ''
-  const pin = typeof body?.pin === 'string' ? body.pin : ''
+  let pin = typeof body?.pin === 'string' ? body.pin.trim() : ''
   const role = typeof body?.role === 'string' ? body.role : ''
   if (!name) return Response.json({ error: 'Nombre requerido' }, { status: 400 })
-  if (!PIN_RE.test(pin)) return Response.json({ error: 'PIN debe ser 4–10 dígitos' }, { status: 400 })
   if (!ALLOWED_STAFF_ROLES.has(role)) return Response.json({ error: 'Rol inválido' }, { status: 400 })
   if (!canAssignRole(auth.role, role)) return Response.json({ error: 'No puedes asignar ese rol' }, { status: 403 })
-  if (await pinTaken(H, auth.clientId, pin)) return Response.json({ error: 'Ese PIN ya está en uso' }, { status: 409 })
+
+  // OP-42 — alta rápida: si el gerente no teclea PIN, generamos uno de 4 dígitos
+  // único entre el staff ACTIVO del tenant (alta de mesero en ~15s en la rotación).
+  // Si lo teclea, se valida y se checa colisión como siempre.
+  let pinGenerated = false
+  if (!pin) {
+    for (let i = 0; i < 40 && !pinGenerated; i++) {
+      const cand = String(randomInt(0, 10000)).padStart(4, '0')
+      if (!(await pinTaken(H, auth.clientId, cand))) { pin = cand; pinGenerated = true }
+    }
+    if (!pinGenerated) return Response.json({ error: 'No se pudo generar un PIN libre — especifícalo manualmente' }, { status: 409 })
+  } else {
+    if (!PIN_RE.test(pin)) return Response.json({ error: 'PIN debe ser 4–10 dígitos' }, { status: 400 })
+    if (await pinTaken(H, auth.clientId, pin)) return Response.json({ error: 'Ese PIN ya está en uso' }, { status: 409 })
+  }
 
   const id = `${auth.clientId}-${randomUUID()}`
   const row = {
@@ -114,7 +127,9 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: `No se pudo crear (${res.status})`, detail: detail.slice(0, 200) }, { status: 502 })
   }
   await audit(H, auth.clientId, id, 'created', ['name', 'pin', 'role'], auth.staffName || auth.role)
-  return Response.json({ ok: true, id })
+  // Devolvemos el PIN (el gerente ya ve todos los PINs en la tabla) para mostrarlo
+  // una vez, sobre todo cuando fue autogenerado.
+  return Response.json({ ok: true, id, pin, pinGenerated })
 }
 
 // ── PATCH — edita nombre/PIN/rol/estado/tarifas ───────────────────────────────

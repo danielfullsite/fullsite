@@ -47,6 +47,8 @@ export default function EquipoPage() {
   const [staff, setStaff] = useState<Staff[]>([])
   const [revealed, setRevealed] = useState<Set<string>>(new Set())
   const [sForm, setSForm] = useState<StaffForm | null>(null)
+  // OP-42 — tras alta rápida, mostrar el PIN una vez para que el gerente lo anote.
+  const [justCreated, setJustCreated] = useState<{ name: string; pin: string; generated: boolean } | null>(null)
 
   // Usuarios dashboard
   const [users, setUsers] = useState<DashUser[]>([])
@@ -101,6 +103,8 @@ export default function EquipoPage() {
     const data = await res.json().catch(() => ({}))
     setSaving(false)
     if (!res.ok) { setError(data.error || `Error ${res.status}`); return }
+    // Alta nueva: mostrar el PIN una vez (sobre todo si fue autogenerado).
+    if (!isEdit && data.pin) setJustCreated({ name: sForm.name.trim(), pin: String(data.pin), generated: !!data.pinGenerated })
     setSForm(null); await loadStaff()
   }
   async function toggleStaff(s: Staff) {
@@ -253,12 +257,28 @@ export default function EquipoPage() {
             <div className="space-y-4">
               <div><label className="block text-xs text-[var(--text-3)] mb-1.5">Nombre</label><input value={sForm.name} onChange={e => setSForm({ ...sForm, name: e.target.value })} className={inputCls} /></div>
               <div className="flex gap-3">
-                <div className="flex-1"><label className="block text-xs text-[var(--text-3)] mb-1.5">PIN {sForm.id && <span className="text-[var(--text-4)]">(vacío = sin cambio)</span>}</label><input value={sForm.pin} onChange={e => setSForm({ ...sForm, pin: e.target.value.replace(/\D/g, '').slice(0, 8) })} inputMode="numeric" placeholder={sForm.id ? '••••' : '3–8 dígitos'} className={`${inputCls} font-mono`} /></div>
+                <div className="flex-1"><label className="block text-xs text-[var(--text-3)] mb-1.5">PIN {sForm.id ? <span className="text-[var(--text-4)]">(vacío = sin cambio)</span> : <span className="text-[var(--text-4)]">(opcional — vacío = automático)</span>}</label><input value={sForm.pin} onChange={e => setSForm({ ...sForm, pin: e.target.value.replace(/\D/g, '').slice(0, 8) })} inputMode="numeric" placeholder={sForm.id ? '••••' : 'vacío = automático'} className={`${inputCls} font-mono`} /></div>
                 <div className="flex-1"><label className="block text-xs text-[var(--text-3)] mb-1.5">Rol</label><select value={sForm.role} onChange={e => setSForm({ ...sForm, role: e.target.value })} className={inputCls}>{staffRoleOptions.map(r => <option key={r} value={r}>{ROLE_LABELS[r] || r}</option>)}</select></div>
               </div>
               {error && <div className="px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{error}</div>}
             </div>
-            <div className="flex gap-2 mt-6"><button onClick={() => setSForm(null)} className="flex-1 py-2.5 rounded-xl text-sm text-[var(--text-3)] hover:bg-[var(--surface-2)]">Cancelar</button><button onClick={submitStaff} disabled={saving || !sForm.name.trim() || (!sForm.id && !sForm.pin)} className="flex-1 py-2.5 rounded-xl text-sm text-white font-medium bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 flex items-center justify-center gap-1.5">{saving ? 'Guardando…' : <><Check size={14} /> Guardar</>}</button></div>
+            <div className="flex gap-2 mt-6"><button onClick={() => setSForm(null)} className="flex-1 py-2.5 rounded-xl text-sm text-[var(--text-3)] hover:bg-[var(--surface-2)]">Cancelar</button><button onClick={submitStaff} disabled={saving || !sForm.name.trim()} className="flex-1 py-2.5 rounded-xl text-sm text-white font-medium bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 flex items-center justify-center gap-1.5">{saving ? 'Guardando…' : <><Check size={14} /> Guardar</>}</button></div>
+          </div>
+        </div>
+      )}
+
+      {/* OP-42 — confirmación de alta: muestra el PIN una vez para anotarlo */}
+      {justCreated && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setJustCreated(null)}>
+          <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl w-full max-w-sm p-6 text-center" onClick={e => e.stopPropagation()}>
+            <div className="w-12 h-12 rounded-full bg-emerald-500/15 flex items-center justify-center mx-auto mb-4"><Check size={24} className="text-emerald-400" /></div>
+            <h3 className="text-lg font-bold text-[var(--text-1)] mb-1">{justCreated.name} ya puede entrar al POS</h3>
+            <p className="text-sm text-[var(--text-3)] mb-4">{justCreated.generated ? 'PIN generado automáticamente' : 'PIN asignado'} — anótalo, no se vuelve a mostrar así.</p>
+            <div className="flex items-center justify-center gap-2 mb-5">
+              <span className="text-4xl font-mono font-bold tracking-[0.3em] text-[var(--text-1)] bg-[var(--surface-2)] rounded-xl px-6 py-3">{justCreated.pin}</span>
+              <button onClick={() => navigator.clipboard?.writeText(justCreated.pin).catch(() => {})} className="w-11 h-11 rounded-lg bg-[var(--surface-2)] hover:bg-[var(--line)] flex items-center justify-center text-[var(--text-3)] hover:text-[var(--text-1)]" title="Copiar PIN"><Copy size={16} /></button>
+            </div>
+            <button onClick={() => setJustCreated(null)} className="w-full py-2.5 rounded-xl text-sm text-white font-medium bg-emerald-600 hover:bg-emerald-500">Listo</button>
           </div>
         </div>
       )}
