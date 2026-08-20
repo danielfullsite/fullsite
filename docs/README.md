@@ -19,6 +19,7 @@ El modelo: plataforma SaaS multi-tenant, un solo Supabase, particionamiento por 
 
 | Propósito | Doc |
 |---|---|
+| **Antes de decidir/cambiar algo: de dónde sale cada decisión** | [`DECISION-BRAIN.md`](DECISION-BRAIN.md) |
 | Entender la filosofía y restricciones | [`constitution/PRINCIPLES.md`](constitution/PRINCIPLES.md) |
 | Entender cómo está construido | [`architecture/SYSTEM-ARCHITECTURE.md`](architecture/SYSTEM-ARCHITECTURE.md) |
 | Entender el estado actual | [`state/CERTIFICATIONS.md`](state/CERTIFICATIONS.md) + [`state/BUGS.md`](state/BUGS.md) |
