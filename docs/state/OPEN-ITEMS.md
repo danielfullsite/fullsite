@@ -95,7 +95,7 @@ Hallados por las 3 investigaciones; no estaban rastreados. Verificar en campo lo
 
 | ID | Item | Sev | Estado | Fuente |
 |---|---|---|---|---|
-| OP-36 | Bug "laboratorio": POS de AMALAY aterriza en tenant `lab-resto` por impersonación residual (`fullsite_actas`) | 🟠 P1 | ⬜ fix inmediato=limpiar localStorage; fix código=resolver tenant + limpiar act-as | PIPELINE §0; `AuthContext.tsx:101` |
+| OP-36 | "Laboratorio" NO era bug de código — el act-as de platform-admin se quedaba pegado en `lab-resto`. Se resuelve entrando al tenant correcto (Tenants→Entrar AMALAY). Mejora real = **UX de act-as** (letrero "viendo como X" + switch/salir visible) para no quedar pegado. Nota: quitar `fullsite_actas` a un platform-admin da 403 (pierde el camino RLS autorizado). | 🟢 P2 | 🔶 operativo resuelto; falta UX | `AuthContext.tsx:101`, `/platform/tenants` |
 | OP-37 | `merge-orders` recalcular totales server-side (vector skimming) | 🔴 P0 | ⬜ **flagged: money-math, verificar con merge real (no a ciegas)** | `merge-orders/route.ts:40` TODO P0-F |
 | OP-38 | Credenciales MP Point / Clip → `credentials_vault` (hoy client-supplied) | 🔴 P0 | ⬜ | `mp-point/route.ts:8`, `clip-pinpad/route.ts:4` (P0-H/I) |
 | OP-39 | Enforcement server-side de permisos (cancelar=admin, PERM-07) | 🟠 P0 | ⬜ confirmar `/api/pos/*` valida rol, no solo registra | roles.ts; auditoría fraude |
