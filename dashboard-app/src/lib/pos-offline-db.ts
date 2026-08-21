@@ -103,6 +103,53 @@ function openDB(): Promise<IDBDatabase> {
 
 // ─── Menu Cache ─────────────────────────────────────────────────────────────
 
+/**
+ * Aislamiento de tenant del store local del POS. Si el navegador ya usó este POS con
+ * OTRO `client_id` (ej. brincó de amalay → boruca / esqueleton), limpia el store local
+ * (IndexedDB `fullsite_pos` + claves `pos_*` de localStorage) para no mostrar órdenes,
+ * comandas o menú de otro restaurante. Devuelve `true` si limpió (el caller debe recargar).
+ *
+ * SEGURO en una terminal de un solo tenant (AMALAY): el client_id nunca cambia → nunca
+ * limpia. Fail-safe: si el client_id actual viene vacío, no toca nada. Solo limpia cuando
+ * el tenant guardado es no-vacío Y distinto del actual.
+ */
+export async function guardTenant(clientId: string): Promise<boolean> {
+  if (!clientId) return false
+  const db = await openDB()
+  const prev = await new Promise<string | null>((resolve) => {
+    const tx = db.transaction('meta', 'readonly')
+    const r = tx.objectStore('meta').get('tenant')
+    r.onsuccess = () => resolve((r.result?.value as string) ?? null)
+    r.onerror = () => resolve(null)
+  })
+  const mismatch = !!prev && prev !== clientId
+  if (mismatch) {
+    const stores = ['orders', 'sync_queue', 'print_jobs', 'cash_movements', 'inventory', 'menu', 'modifier_groups', 'modifiers', 'item_modifier_links', 'payment_methods', 'staff', 'turnos']
+    const present = stores.filter((s) => db.objectStoreNames.contains(s))
+    await new Promise<void>((resolve) => {
+      const tx = db.transaction(present, 'readwrite')
+      for (const s of present) { try { tx.objectStore(s).clear() } catch { /* */ } }
+      tx.oncomplete = () => resolve()
+      tx.onerror = () => resolve()
+    })
+    try {
+      const kill: string[] = []
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i)
+        if (k && (k.startsWith('pos_') || k === 'fullsite_offline_queue')) kill.push(k)
+      }
+      kill.forEach((k) => localStorage.removeItem(k))
+    } catch { /* */ }
+  }
+  await new Promise<void>((resolve) => {
+    const tx = db.transaction('meta', 'readwrite')
+    tx.objectStore('meta').put({ key: 'tenant', value: clientId })
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => resolve()
+  })
+  return mismatch
+}
+
 export async function cacheMenu(categories: Record<string, unknown>[]): Promise<void> {
   const db = await openDB()
   const tx = db.transaction('menu', 'readwrite')

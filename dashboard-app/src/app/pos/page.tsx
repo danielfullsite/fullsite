@@ -70,7 +70,7 @@ import {
   buildCategoryMap,
 } from '@/lib/pos-promos'
 import { getActiveCombos, applyCombo, type Combo } from '@/lib/pos-combos'
-import { syncAll, getPendingQueue, queueOperation, cacheMenu, getCachedMenu, cacheCashMovement } from '@/lib/pos-offline-db'
+import { syncAll, getPendingQueue, queueOperation, cacheMenu, getCachedMenu, cacheCashMovement, guardTenant } from '@/lib/pos-offline-db'
 import { sendNotification } from '@/lib/service-worker'
 import { getPermissions } from '@/lib/pos-permissions'
 import {
@@ -189,6 +189,13 @@ const CustomerMemory = dynamic(() => import('@/components/pos/CustomerMemory'), 
 
 
 export default function POSPage() {
+  // Aislamiento de tenant: si el navegador usó el POS con OTRO restaurante (ej. brincó
+  // de amalay a boruca/esqueleton), limpia el store local y recarga — evita ver órdenes
+  // y comandas de otro tenant. No-op en una terminal de un solo tenant (AMALAY): el
+  // client_id nunca cambia, así que nunca limpia ni recarga.
+  useEffect(() => {
+    guardTenant(_cid()).then((wiped) => { if (wiped) window.location.reload() }).catch(() => {})
+  }, [])
   return (
     <Suspense fallback={
       <div className="h-dvh flex items-center justify-center text-[var(--text-1)]" style={{background:'#0a0a0f',color:'#fff'}}>
