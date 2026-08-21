@@ -13,10 +13,22 @@ export function generateRecoveryMessage(msg: RecoveryMessage): string {
 }
 
 export function generateWhatsAppLink(phone: string, message: string): string {
-  // Clean phone number
-  const clean = phone.replace(/[^0-9]/g, '')
-  const formatted = clean.startsWith('52') ? clean : `52${clean}`
-  return `https://wa.me/${formatted}?text=${encodeURIComponent(message)}`
+  // Normalizar a internacional MX (52 + 10 díg) por LONGITUD, no por prefijo:
+  // un número MX de 10 díg que casualmente empieza en "52" (ej. lada 520) NO trae
+  // código de país — el `startsWith('52')` viejo lo dejaba sin lada → wa.me roto.
+  let clean = phone.replace(/\D/g, '')
+  if (clean.length === 10) clean = `52${clean}`
+  else if (clean.length === 13 && clean.startsWith('521')) clean = `52${clean.slice(3)}` // WhatsApp viejo (521) → 52
+  // 12 díg con 52 ya está en formato; otras longitudes se dejan tal cual (mejor esfuerzo).
+  return `https://wa.me/${clean}?text=${encodeURIComponent(message)}`
+}
+
+/** ¿El teléfono es marcable por WhatsApp MX? (10 díg, o 12/13 con lada 52/521). */
+export function isWhatsAppablePhone(phone: string): boolean {
+  const clean = (phone || '').replace(/\D/g, '')
+  return clean.length === 10 ||
+    (clean.length === 12 && clean.startsWith('52')) ||
+    (clean.length === 13 && clean.startsWith('521'))
 }
 
 // For bulk sending via WhatsApp Business API (future)

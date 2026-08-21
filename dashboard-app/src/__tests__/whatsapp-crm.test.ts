@@ -3,6 +3,7 @@ import {
   generateRecoveryMessage,
   generateWhatsAppLink,
   generateBulkMessages,
+  isWhatsAppablePhone,
   type RecoveryMessage,
 } from '@/lib/whatsapp-crm'
 
@@ -153,9 +154,26 @@ describe('generateWhatsAppLink', () => {
     expect(link).toContain(encodeURIComponent('Precio: $100 (50% off)'))
   })
 
-  it('handles empty phone', () => {
+  it('handles empty phone gracefully (no inventa un número)', () => {
+    // Contrato nuevo (fix A2): un teléfono vacío NO produce un "52" falso.
+    // La validez se filtra con isWhatsAppablePhone antes de ofrecer el botón.
     const link = generateWhatsAppLink('', 'Hi')
-    expect(link).toContain('wa.me/52')
+    expect(link).toContain('wa.me/')
+    expect(link).not.toContain('wa.me/52')
+    expect(isWhatsAppablePhone('')).toBe(false)
+  })
+
+  it('A2: prepende 52 a un número de 10 díg AUNQUE empiece en 52 (lada 520 no es país)', () => {
+    expect(generateWhatsAppLink('5203609693', 'Hi')).toContain('wa.me/525203609693')
+    expect(generateWhatsAppLink('8112345678', 'Hi')).toContain('wa.me/528112345678')
+  })
+
+  it('A2: no duplica el 52 en un número de 12 díg que ya lo trae', () => {
+    expect(generateWhatsAppLink('528112345678', 'Hi')).toContain('wa.me/528112345678')
+  })
+
+  it('A2: convierte el 521 legacy (13 díg) a 52', () => {
+    expect(generateWhatsAppLink('5218112345678', 'Hi')).toContain('wa.me/528112345678')
   })
 
   it('handles empty message', () => {
@@ -169,8 +187,8 @@ describe('generateWhatsAppLink', () => {
   })
 
   it('handles phone with plus sign only', () => {
-    const link = generateWhatsAppLink('+', 'Hi')
-    expect(link).toContain('wa.me/52')
+    expect(isWhatsAppablePhone('+')).toBe(false)
+    expect(generateWhatsAppLink('+', 'Hi')).toContain('wa.me/')
   })
 
   it('handles newlines in message', () => {

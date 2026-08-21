@@ -8,7 +8,7 @@ import {
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
 import { formatCurrency } from '@/lib/format'
-import { generateRecoveryMessage, generateWhatsAppLink } from '@/lib/whatsapp-crm'
+import { generateRecoveryMessage, generateWhatsAppLink, isWhatsAppablePhone } from '@/lib/whatsapp-crm'
 
 // ─── Types ───────────────────────────────────────────────────────────
 interface PosCustomer {
@@ -42,11 +42,16 @@ const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 const COMMON_TAGS = ['VIP', 'frecuente', 'cumpleanero', 'nuevo', 'corporativo', 'evento', 'influencer']
 
-function hdrs() {
-  return { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' }
-}
+import { getActiveClientSlug as clientId, getAuthToken } from '@/lib/data'
 
-import { getActiveClientSlug as clientId } from '@/lib/data'
+// Headers AUTENTICADOS. El CRM antes usaba la ANON key como Bearer → RLS de
+// pos_customers bloquea a `anon` (sin grants SELECT/UPDATE) → lecturas y escrituras
+// fallaban en silencio (0 clientes). getAuthToken() devuelve el access_token de la
+// sesión (con timeout + fallback a anon), igual que el resto del dashboard (data.ts).
+async function authHdrs(): Promise<Record<string, string>> {
+  const token = await getAuthToken()
+  return { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+}
 
 function parseDate(dateStr: string): Date {
   if (dateStr.includes('/')) {
@@ -90,7 +95,7 @@ export default function CRMPage() {
   const loadCustomers = useCallback(async () => {
     try {
       const url = `${SUPABASE_URL}/rest/v1/pos_customers?client_id=eq.${cid}&select=*&order=total_visits.desc&limit=1000`
-      const res = await fetch(url, { headers: hdrs() })
+      const res = await fetch(url, { headers: await authHdrs() })
       if (res.ok) {
         const data = await res.json()
         setCustomers(data.map((r: Record<string, unknown>) => ({
@@ -174,7 +179,7 @@ export default function CRMPage() {
         `${SUPABASE_URL}/rest/v1/pos_customers`,
         {
           method: 'POST',
-          headers: { ...hdrs(), Prefer: 'return=representation' },
+          headers: { ...(await authHdrs()), Prefer: 'return=representation' },
           body: JSON.stringify(body),
         }
       )
@@ -193,7 +198,7 @@ export default function CRMPage() {
         `${SUPABASE_URL}/rest/v1/pos_customers?id=eq.${id}`,
         {
           method: 'PATCH',
-          headers: { ...hdrs(), Prefer: 'return=representation' },
+          headers: { ...(await authHdrs()), Prefer: 'return=representation' },
           body: JSON.stringify(data),
         }
       )
@@ -207,12 +212,23 @@ export default function CRMPage() {
 
   // ─── OP-44: marcar como contactado (recuperación) ───────────────
   // Tracking sin tabla nueva: tag 'contactado' (filtrable, ya se muestra) + línea
-  // fechada en notes. Reusa el PATCH de handleUpdateCustomer.
-  const markContacted = (c: PosCustomer) => {
-    const tags = c.tags?.includes('contactado') ? c.tags : [...(c.tags || []), 'contactado']
+  // fechada en notes. PATCH propio (NO reusa handleUpdateCustomer para no arrastrar
+  // su side-effect setSelectedCustomer(null)): optimista + filtro de tenant + revert.
+  const markContacted = async (c: PosCustomer) => {
+    if (c.tags?.includes('contactado')) return  // idempotente — ya contactado, no re-escribe
+    const tags = [...(c.tags || []), 'contactado']
     const stamp = new Date().toISOString().slice(0, 10)
     const note = `${c.notes ? c.notes + '\n' : ''}Contactado (recuperación) ${stamp}`.slice(0, 2000)
-    handleUpdateCustomer(c.id, { tags, notes: note })
+    setCustomers(prev => prev.map(x => x.id === c.id ? { ...x, tags, notes: note } : x))  // optimista
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/pos_customers?id=eq.${c.id}&client_id=eq.${cid}`,  // filtro tenant (defensa)
+        { method: 'PATCH', headers: { ...(await authHdrs()), Prefer: 'return=minimal' }, body: JSON.stringify({ tags, notes: note }) }
+      )
+      if (!res.ok) throw new Error(String(res.status))
+    } catch {
+      setCustomers(prev => prev.map(x => x.id === c.id ? c : x))  // revertir si falló
+    }
   }
 
   // Import customers from reservations
@@ -220,7 +236,7 @@ export default function CRMPage() {
     try {
       const res = await fetch(
         `${SUPABASE_URL}/rest/v1/reservaciones?client_id=eq.${clientId()}&select=nombre,telefono,fecha,total&order=fecha.desc&limit=500`,
-        { headers: hdrs() }
+        { headers: await authHdrs() }
       )
       if (!res.ok) return
       const reservations = await res.json()
@@ -265,7 +281,7 @@ export default function CRMPage() {
 
       const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/pos_customers`, {
         method: 'POST',
-        headers: { ...hdrs(), Prefer: 'return=representation' },
+        headers: { ...(await authHdrs()), Prefer: 'return=representation' },
         body: JSON.stringify(batch),
       })
 
@@ -664,7 +680,7 @@ function CustomerDetailModal({ customer, onClose, onUpdate }: {
       try {
         const res = await fetch(
           `${SUPABASE_URL}/rest/v1/pos_customer_visits?customer_id=eq.${customer.id}&order=visited_at.desc&limit=50`,
-          { headers: hdrs() }
+          { headers: await authHdrs() }
         )
         if (res.ok) setVisits(await res.json())
       } catch { /* silent */ }
@@ -912,7 +928,7 @@ function RecoveryModal({ customers, restaurantSlug, onMarkContacted, onClose }: 
 
   const inactivos = useMemo(() => {
     return customers
-      .filter(c => (c.phone || '').replace(/\D/g, '').length >= 10 && daysSince(c.last_visit) >= days)
+      .filter(c => isWhatsAppablePhone(c.phone) && daysSince(c.last_visit) >= days)
       .sort((a, b) => (b.total_spent || 0) - (a.total_spent || 0))
   }, [customers, days])
 
@@ -929,7 +945,8 @@ function RecoveryModal({ customers, restaurantSlug, onMarkContacted, onClose }: 
       restaurantName,
       validDays,
     })
-    window.open(generateWhatsAppLink(c.phone, message), '_blank', 'noopener')
+    const w = window.open(generateWhatsAppLink(c.phone, message), '_blank')
+    if (w) w.opener = null  // anti reverse-tabnabbing sin pasar features string (evita abrir ventana en vez de pestaña)
     onMarkContacted(c)
   }
 

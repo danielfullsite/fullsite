@@ -173,20 +173,26 @@ export default function MesasPage() {
           capacity: r.capacity,
           status: 'disponible' as const,
         })))
-        // Construir el planograma desde las coords guardadas. Solo si al menos una
-        // mesa trae x_pct/y_pct numérico (tenant con mapa hecho en el editor).
+        // Construir el planograma desde las coords guardadas. OJO: PostgREST serializa
+        // `numeric` (x_pct/y_pct) como STRING para no perder precisión — por eso hay que
+        // coercer con Number(), no confiar en `typeof === 'number'` (siempre sería false
+        // → planograma de BD quedaba como código muerto).
         const SHAPES: TableShape[] = ['round', 'round-lg', 'square', 'rect-h']
-        const withCoords = rows.filter(r => typeof r.x_pct === 'number' && typeof r.y_pct === 'number')
-        if (withCoords.length > 0) {
+        const withCoords = rows
+          .map(r => ({ ...r, _x: Number(r.x_pct), _y: Number(r.y_pct) }))
+          .filter(r => Number.isFinite(r._x) && Number.isFinite(r._y))
+        // Exigir que la MAYORÍA de las mesas tenga coords (evita pintar un plano casi
+        // vacío si alguien guardó 1 mesa suelta en el editor).
+        if (withCoords.length > 0 && withCoords.length >= rows.length / 2) {
           setFloorTables(withCoords.map(r => ({
             number: r.number,
-            x: r.x_pct,
-            y: r.y_pct,
+            x: r._x,
+            y: r._y,
             shape: (SHAPES.includes(r.shape as TableShape) ? r.shape : 'round') as TableShape,
           })))
           setHasFloorplan(true)
         }
-        // si ninguna mesa trae coords → se queda el hardcode FLOOR_TABLES (fallback AMALAY).
+        // si (casi) ninguna mesa trae coords → se queda el hardcode FLOOR_TABLES (fallback AMALAY).
       } else {
         // fetchPosMesas devolvió [] (offline o sin config). Fallback a la config local
         // (MESAS_CONFIG para amalay = 33 mesas) — NO dejar el grid en la respuesta vieja
