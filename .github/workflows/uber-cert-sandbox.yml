@@ -75,6 +75,7 @@ jobs:
           call upload_menu        "{\"action\":\"upload_menu\",\"store_id\":\"$STORE\"}"
           call create_promotion   "{\"action\":\"create_promotion\",\"store_id\":\"$STORE\"}"
           call request_report     "{\"action\":\"request_report\",\"store_id\":\"$STORE\"}"
+          call sandbox_order      "{\"action\":\"delivery_sandbox_order\",\"store_id\":\"$STORE\"}"
 
           # ── Flujo de orden (happy path) ──
           OID="${{ github.event.inputs.order_id }}"
