@@ -93,11 +93,17 @@ export async function updateDeliveryStoreStatus(
   correlationId: string
 ): Promise<{ ok: boolean; error?: string }> {
   const t0 = Date.now()
+  // Uber espera el campo `status` con el estado deseado (no `action`); un body sin `status`
+  // lo interpreta como "invalid store status: UNKNOWN". ACTIVATE->ONLINE, PAUSE->PAUSED
+  // (los valores que reporta el propio GET .../status). Override por env si Uber cambia el enum.
+  const status = action === 'PAUSE'
+    ? (process.env.UBER_STORE_STATUS_PAUSED || 'PAUSED')
+    : (process.env.UBER_STORE_STATUS_ACTIVE || 'ONLINE')
   try {
     const r = await withRetry(
       () => uberFetch(`/v1/delivery/store/${encodeURIComponent(storeId)}/update-store-status`, {
         method: 'POST',
-        body: JSON.stringify({ action }),
+        body: JSON.stringify({ status }),
         tokenType: 'marketplace',
       }),
       { maxAttempts: 3, baseDelayMs: 500 }
