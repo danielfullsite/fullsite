@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { withPOSAuth } from '@/lib/api-auth'
+import { buildDailyFromOrders } from '@/lib/pos-daily'
 
 // Simple rate limiting — max 15 requests per minute per IP
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>()
@@ -59,7 +60,12 @@ export async function POST(request: NextRequest) {
       `${sbUrl}/rest/v1/wansoft_daily?select=${selectCols}&client_slug=eq.${encodeURIComponent(auth.clientId)}&ventas_dia=gt.0&order=fecha.desc&limit=${histLimit}`,
       { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
     )
-    const recentDays = dailyRes.ok ? await dailyRes.json() : []
+    let recentDays = dailyRes.ok ? await dailyRes.json() : []
+
+    // OCM Fase 3: tenant clonado sin histórico wansoft_daily → voz lee su pos_orders vivo.
+    if (!recentDays || recentDays.length === 0) {
+      recentDays = await buildDailyFromOrders(sbUrl, { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, auth.clientId, histLimit)
+    }
 
     // 2. Detect date from question
     const now = new Date()
