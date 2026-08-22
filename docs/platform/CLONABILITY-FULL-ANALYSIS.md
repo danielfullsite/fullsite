@@ -14,14 +14,19 @@ Fullsite **ya es clonable en su columna vertebral**: un tenant nuevo se provisio
 `client_id`. Desde hoy (2026-08-21) el **chat/coach/voz** leen la data VIVA (`pos_orders`) de cada
 tenant vía `src/lib/pos-daily.ts` — un clon ya "sabe su info" en esas superficies.
 
-**El único hueco de fondo para que "los agentes sepan toda la info":** los **17 agentes de AI Ops
-(Python)** siguen acoplados a `wansoft_*`/`ops_daily_*`, tablas muertas para cualquier cliente que no
-sea AMALAY. **4 mueren y 9 se degradan** en un clon. La solución es **una sola** — la misma que ya
-apliqué al chat: una columna vertebral de datos por tenant derivada de `pos_orders`.
+**Los gaps reales, por tipo (mapa completo en §4):**
+- 🔴 **Core del clon** (la IA no cruza todo / alertas mal ruteadas): (G1) los 17 agentes leen fuente
+  muerta `wansoft_*`, (G1b) los crons hardcodean `amalay` y no hacen fan-out por tenant, (G11) ~15
+  scripts mandan alertas al canal de Daniel, no al del clon. **Todo se cierra con la misma columna
+  vertebral de datos por tenant (pos_orders) + fan-out.** = **Fase 0**.
+- 🟠 **Escala / revenue**: (G2) falta wizard de alta self-serve, (G10) no hay routing host→subdominio,
+  (G7/G8) CFDI y pagos usan credenciales globales (falta `credentials_vault` por tenant + cuenta PAC por cliente).
+- 🟡 **Fricción / degradación silenciosa**: (G3) alta de hardware manual por terminal, (G4) contenido
+  AMALAY hardcoded (`EXCLUDE_STAFF`/`MARKET_BRANDS`), hardcodes P1/P3, T4.
 
-**Lo que NO es el problema:** ni el aislamiento (seguro), ni el provisioning (funciona), ni la
-migración de datos (opcional y concierge). **El cuello real es (a) repuntar los agentes a data viva
-y (b) el wizard de alta self-serve.** Ninguno es "difícil de datos"; son trabajo de ingeniería acotado.
+**Lo que NO es el problema (verificado sano):** aislamiento/RLS (el clon nace seguro), provisioning base,
+scoping POS/KDS/dash, chat/coach/voz (ya en pos_orders), Uber Eats (multi-tenant real), Local Server/offline.
+**El cuello no es dificultad de datos ni seguridad — es ingeniería acotada, empezando por la Fase 0.**
 
 ---
 
@@ -115,6 +120,39 @@ Refs: `client_config.py:18-47` (hub), `agent_common.py:96-187` (log+insight aisl
 `crm_recompra_agent.py:75-81` / `purchase_predictor.py:139-146` / `staffing_optimizer.py:58-67`
 (dependencia dura Wansoft).
 
+**Segundo hueco (orquestación):** los crons `agents-daily/hourly/weekly.yml` hardcodean
+`CLIENT_ID: … || 'amalay'` y **ningún workflow itera `clients`** → aunque el código es multi-tenant,
+**el cron solo corre para AMALAY**. Un clon nunca dispara sus agentes solo.
+
+### Capa E — Integraciones externas (credenciales por tenant) ⚠️
+
+Cada integración suele requerir credenciales/cuenta POR cliente. Estado:
+
+| Integración | ¿Por-tenant? | Credenciales | Clon sin código | Nota |
+|---|---|---|---|---|
+| **CFDI / Facturama** | Parcial | **env global** + cuenta única AMALAY (RFC AFO200806JI0) | ❌ **NO** | datos fiscales sí en `clients`, pero PAC hardcoded (`lib/facturama.ts:14-15`) |
+| **MP Point** | En tránsito | `MP_ACCESS_TOKEN` global + fallback inseguro | ❌ NO | Phase 2 → `credentials_vault` (`api/mp-point/route.ts:6-21`) |
+| **Clip** | En tránsito | `CLIP_API_KEY` global | ❌ NO | igual que MP (`api/clip-pinpad/route.ts:3-20`) |
+| **Uber Eats** | **✅ SÍ** | `integration_providers` por client_id + OAuth por tenant | ⚠️ parcial (OAuth initiate manual) | framework multi-tenant real |
+| **Rappi** | Diseñado ✅ | igual patrón, sin implementar | ❌ (sin código) | `docs/integrations/rappi/DESIGN.md` |
+
+**Patrón del gap:** falta un **`credentials_vault` por tenant (encriptado)** para CFDI/MP/Clip.
+
+### Capa F — Routing host→tenant + notificaciones ⚠️
+
+- **Host→tenant:** no hay campo `subdomain`/`host` en `clients`. El `client_id` se resuelve por
+  JWT `app_metadata` / `client_users` / `NEXT_PUBLIC_DEFAULT_CLIENT_ID` (`lib/data.ts:50-58`,
+  `AuthContext.tsx:61-93`). Funciona por-usuario, pero **no hay routing por subdominio** → a escala,
+  falta columna `subdomain` + resolución por host en middleware.
+- **Notificaciones Telegram:** infra por-tenant existe (`client_config.get_chat_ids()`, `clients.telegram_chat_ids`),
+  **pero ~15 scripts hardcodean `TELEGRAM_CHAT_ID_DANIEL`** (orquestador, uptime, wansoft_*, smoke) →
+  **las alertas de un clon caen en el canal de Daniel/AMALAY** (fallback silencioso). WhatsApp no es multi-tenant.
+- **Hardcodes de contenido AMALAY en dashboard:** `EXCLUDE_STAFF` (`lib/data.ts:225`) y `MARKET_BRANDS`
+  (`food-cost/page.tsx:57`) están quemados → un clon puede ver meseros/food-cost mal categorizados
+  (degradación silenciosa, no error). El resto de rutas (~8 muestreadas: ventas, meseros, nómina, gastos,
+  conciliación, cortes, reporte-fiscal, propinas) **sí filtran por client_id/slug** y tienen fallback
+  `getDashboardFromPosOrders()` para clones sin wansoft_daily.
+
 ---
 
 ## 3. El keystone: una columna vertebral de datos por tenant
@@ -140,40 +178,58 @@ de `pos-daily`) en vez de `wansoft_daily`/`ops_daily_*`. Con eso:
 
 ---
 
-## 4. Gaps priorizados
+## 4. Mapa completo de gaps (todo el producto)
 
-| # | Gap | Capa | Impacto | Esfuerzo |
+Clasificados por qué tan clonable es HOY. Tres tipos: **🔴 bloquea el valor core del clon**,
+**🟠 bloquea un feature de revenue**, **🟡 fricción de alta / degradación silenciosa**.
+
+| # | Gap | Capa | Tipo | Esfuerzo |
 |---|---|---|---|---|
-| **G1** | 17 agentes leen fuente muerta para clones | D | 🔴 la IA del clon no cruza todo | Medio (repoint a OCM/pos-daily, patrón repetible) |
-| **G2** | Wizard de alta self-serve (menú/staff/connector) | A | 🔴 Daniel = cuello de botella del alta | Medio-alto (UI/orquestación) |
-| **G3** | Provisioning de terminales por código (POS/KDS) | A | 🟠 hardware aún manual | Medio |
-| **G4** | Hardcode P1 `tarjetas-regalo` + limpieza P3 | C | 🟠 fuga cosmética/lógica | Bajo |
-| **G5** | T4: `pos_customers` sin write policy authenticated | B | 🟡 escrituras vía server (ok) | Bajo |
-| **G6** | Import histórico concierge (cookie Wansoft / CSV) | A | 🟢 opcional, day-1 history | Bajo-medio |
+| **G1** | 17 agentes AI Ops leen fuente muerta (`wansoft_*`/`ops_daily_*`) para clones | D | 🔴 core | Medio (repoint a OCM/pos-daily) |
+| **G1b** | Crons de agentes hardcodean `amalay`, sin fan-out por tenant | D | 🔴 core | Bajo (workflow: matrix sobre `clients`) |
+| **G11** | ~15 scripts mandan alertas a `TELEGRAM_CHAT_ID_DANIEL` (no al canal del clon) | F | 🔴 core (privacidad) | Bajo-medio (usar `get_chat_ids()`) |
+| **G2** | Wizard de alta self-serve (menú/staff/connector) | A | 🟠 escala | Medio-alto (UI/orquestación) |
+| **G7** | CFDI: PAC (Facturama) en env global, cuenta única AMALAY | E | 🟠 revenue | Medio-alto (`credentials_vault` + cuenta por cliente) |
+| **G8** | Pagos MP Point / Clip: token en env global | E | 🟠 revenue | Medio (`credentials_vault` Phase 2) |
+| **G10** | Sin routing host→tenant (falta `subdomain` en `clients`) | F | 🟠 escala | Medio (columna + resolución en middleware) |
+| **G3** | Electron/hardware: alta manual por terminal (25-45 min), sin config pre-empacada, `POS_URL` hardcoded | A | 🟡 fricción | Medio |
+| **G4** | Contenido AMALAY hardcoded: `EXCLUDE_STAFF`, `MARKET_BRANDS` → mis-categorización silenciosa | C/F | 🟡 degradación | Bajo (mover a `client_config`) |
+| **G4b** | Hardcodes `amalay`: `tarjetas-regalo:23` (P1), health route, pos-config/pos-data (P3) | C | 🟡 fuga | Bajo |
+| **G6** | Import histórico concierge (cookie Wansoft / CSV) | A | 🟡 opcional | Bajo-medio |
+| **G5** | T4: `pos_customers` sin write policy authenticated (escrituras vía server) | B | 🟡 menor | Bajo |
+| **G9** | Rappi diseñado, no implementado (Uber ✅ ya multi-tenant) | E | 🟡 feature | (fuera de scope clon) |
+
+**Lo que NO es gap (verificado sano):** aislamiento/RLS (el clon nace seguro), provisioning base
+(`provisionTenant` idempotente), scoping por client_id en POS/KDS/dash, chat/coach/voz (ya viven en pos_orders),
+Uber Eats (multi-tenant real), Local Server + offline (tenant-aware).
 
 ---
 
 ## 5. Plan por fases
 
-### Fase 0 — Columna vertebral de datos (keystone, desbloquea "agentes saben todo")
-- Repuntar los 17 agentes Python a la fuente viva por tenant (vistas OCM o helper `pos_daily.py`
+### Fase 0 — Que la IA del clon "sepa todo" (keystone, 🔴 core)
+- **G1** — repuntar los 17 agentes Python a la fuente viva por tenant (vistas OCM o helper `pos_daily.py`
   espejo de `pos-daily.ts`). Empezar por los 🔴 (crm, purchase, staffing, menu-engineering, stock).
-- Degradación explícita cuando falte historia (< N semanas de POS) en vez de `no_data` mudo.
-- **Resultado:** un clon con POS operando tiene chat + coach + voz + 17 agentes cruzando su info.
+  Degradación explícita cuando falte historia (< N semanas de POS) en vez de `no_data` mudo.
+- **G1b** — crons con fan-out por tenant (matrix sobre `clients` activos) en vez de `CLIENT_ID=amalay`.
+- **G11** — que todos los scripts usen `get_chat_ids(client)` → cada clon recibe SUS alertas en SU canal.
+- **Resultado:** un clon con POS operando tiene chat + coach + voz + 17 agentes cruzando su info, y sus alertas.
 
-### Fase 1 — Alta self-serve (saca a Daniel del cuello)
-- Piezas #1-#3 del `CLIENT-ONBOARDING-REQUIREMENTS`: wizard en `/platform` + import CSV de menú/staff
-  + selector de connector (De cero / CSV / Wansoft-cookie / Otro).
-- Reusa `provisionTenant()` (ya idempotente) + smoke test existente.
+### Fase 1 — Alta self-serve (🟠 escala; saca a Daniel del cuello)
+- **G2** — piezas #1-#3 del `CLIENT-ONBOARDING-REQUIREMENTS`: wizard en `/platform` + import CSV de
+  menú/staff + selector de connector. Reusa `provisionTenant()` idempotente + smoke test.
+- **G10** — columna `subdomain` en `clients` + resolución host→tenant (habilita subdominio por cliente).
 
-### Fase 2 — Hardware self-serve
-- Provisioning de terminales por código (POS/KDS se autoconfiguran) — pieza #4.
+### Fase 2 — Revenue features por tenant (🟠 revenue)
+- **G7/G8** — `credentials_vault` por tenant (encriptado) para CFDI (Facturama), MP Point, Clip.
+  Requiere además cuenta PAC por cliente (operativo, no solo código).
+- **G3** — provisioning de terminales por código + config Electron pre-empacada (pieza #4).
 
-### Fase 3 — Pulido y cobertura
-- Limpiar hardcode P1 (`tarjetas-regalo`) + P3 residuales.
-- Cerrar T4 (`pos_customers` write policy) si se requiere captura client-side.
-- Import histórico concierge (cookie Wansoft guiada / CSV) — piezas #5-#7, opcional.
-- Starter kits (categorías/roles/estaciones KDS por defecto).
+### Fase 3 — Pulido y cobertura (🟡)
+- **G4** — mover `EXCLUDE_STAFF` / `MARKET_BRANDS` a `client_config` (por tenant).
+- **G4b** — limpiar hardcode P1 (`tarjetas-regalo`) + P3 residuales.
+- **G5** — cerrar T4 (`pos_customers` write policy) si se requiere captura client-side.
+- **G6** — import histórico concierge (cookie Wansoft guiada / CSV). Starter kits por defecto.
 
 ---
 
