@@ -57,19 +57,19 @@ function buildSampleMenu() {
   return {
     menus: [{
       id: 'fs-menu-1',
-      title: { en: 'Fullsite Menu' },
+      title: { en: 'Fullsite Menu', en_us: 'Fullsite Menu', es: 'Menu Fullsite', es_mx: 'Menu Fullsite' },
       service_availability: [{
         day_of_week: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
         time_period: [{ start_time: '00:00', end_time: '23:59' }],
       }],
       category_ids: ['fs-cat-1'],
     }],
-    categories: [{ id: 'fs-cat-1', title: { en: 'Bebidas' }, entities: [{ id: 'fs-item-1', type: 'ITEM' as const }] }],
+    categories: [{ id: 'fs-cat-1', title: { en: 'Beverages', en_us: 'Beverages', es: 'Bebidas', es_mx: 'Bebidas' }, entities: [{ id: 'fs-item-1', type: 'ITEM' as const }] }],
     items: [{
       id: 'fs-item-1',
       external_data: 'fs-item-1',
-      title: { en: 'Cafe Americano' },
-      description: { en: 'Cafe negro 12oz' },
+      title: { en: 'Americano', en_us: 'Americano', es: 'Cafe Americano', es_mx: 'Cafe Americano' },
+      description: { en: 'Black coffee 12oz', en_us: 'Black coffee 12oz', es: 'Cafe negro 12oz', es_mx: 'Cafe negro 12oz' },
       price_info: { price: 5000, currency_code: 'MXN' },
     }],
     modifier_groups: [],
