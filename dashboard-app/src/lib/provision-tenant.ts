@@ -158,6 +158,9 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     features: JSON.stringify(DEFAULT_FEATURES),
     mesas,
     data_source: 'fullsite',
+    // Requerido por el cálculo de día de negocio (ops_aggregate.get_business_day_config).
+    // Sin esto, los agentes de IA crashean para el clon. Default 05:00 (día empieza a las 5am).
+    business_day_start_local: '05:00:00',
     // 'plan' NO es columna real de `clients` (validado contra el esquema en staging) → no se escribe.
   }])
 
