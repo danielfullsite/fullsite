@@ -161,20 +161,38 @@ Todo el hueco de la Capa D se cierra con **una sola pieza**: un **agregado diari
 `pos_orders`, por tenant**, que todas las superficies (TS y Python) consuman en lugar de `wansoft_*`.
 
 Ya existe la mitad:
-- **TypeScript:** `src/lib/pos-daily.ts` (hecho hoy) — chat/coach/voz.
+- **TypeScript:** `src/lib/pos-daily.ts` (commits `2b4d8ff7`+`e54ace52`, en prod) — chat/coach/voz.
 - **SQL:** vistas OCM `ocm_daily` / `ocm_waiter_rankings` / `ocm_menu_groups` (Fase 1/2, aplicadas a
   prod 2026-08-19) — agregan `pos_orders` UNION historia, sin doble-conteo.
 
-**Falta:** que los **17 agentes Python** lean de esa columna (las vistas OCM o un helper Python espejo
-de `pos-daily`) en vez de `wansoft_daily`/`ops_daily_*`. Con eso:
-- Los 🔴 reviven leyendo `ocm_waiter_rankings`/`ocm_menu_groups` del propio tenant.
-- Los 🟡 dejan de devolver `no_data` cuando hay POS.
-- Un clon con POS operando **tiene los 17 agentes cruzando su info** sin seeds.
-- Los que necesitan histórico (anomaly, close-predictor) **maduran solos** al acumular 2-4 semanas de POS.
+**Verificado en prod (2026-08-21) — las vistas OCM YA sirven a clones:**
 
-> **Regla de arquitectura:** ninguna superficie de IA (TS o Python) vuelve a acoplarse a `wansoft_*`.
-> Fuente única = agregado de `pos_orders` por tenant (OCM views / pos-daily). AMALAY usa su histórico
-> legacy hasta el cutover; después, mismo camino que todos.
+| Vista | Columnas clave | boruca (clon) | amalay |
+|---|---|---|---|
+| `ocm_daily` | escalares: ventas_dia, tickets_count, personas, ticket_promedio, propinas_total, `source_system` | 31 días (fullsite) | 924 (wansoft+fullsite) |
+| `ocm_waiter_rankings` | **relacional**: mesero, ventas, tickets, propinas (1 fila/mesero/fecha) | 109 filas | 12 |
+| `ocm_menu_groups` | **relacional**: grupo, ventas, cantidad | 31 | 44 |
+
+**Falta:** que los **17 agentes Python** (helper compartido `agent_common.py:sb_get(table,params)`,
+repoint **por-agente**) lean de esa columna en vez de `wansoft_daily`/`ops_daily_*`. El repoint es **mixto**
+porque la forma cambió (antes meseros/platillos/grupos venían como jsonb-por-fila; ahora son relacionales):
+
+| Grupo | Agentes | Cambio |
+|---|---|---|
+| **Swap fácil** (escalares → `ocm_daily`) | anomaly, close-predictor, kitchen-quality, table-time | cambiar nombre de tabla |
+| **Restructure** (meseros/platillos JSON → vistas relacionales) | crm-recompra, staffing → `ocm_waiter_rankings`; purchase-predictor, menu-engineering → `ocm_menu_groups`; upselling | leer vista relacional + re-parsear |
+| **Sin cambio** (ya POS) | auto86, cost-variance, hermes | — |
+
+Con eso: los 🔴 reviven, los 🟡 dejan de devolver `no_data`, un clon con POS tiene los 17 agentes cruzando
+su info sin seeds, y los que necesitan histórico (anomaly, close-predictor) **maduran solos** en 2-4 semanas.
+
+> **Subtleza AMALAY (crítica):** `ocm_daily` de AMALAY **mezcla su `pos_orders` de PRUEBA ($2k/día)**
+> con Wansoft (ver §6). Si los agentes de AMALAY leyeran `ocm_daily` hoy, reportarían un desplome falso.
+> Por eso el repoint debe ser **tenant-aware: AMALAY sigue en `wansoft_daily` hasta el cutover; los clones
+> leen OCM.** Tras el cutover, AMALAY voltea a OCM solo.
+
+> **Regla de arquitectura:** ninguna superficie de IA (TS o Python) vuelve a acoplarse a `wansoft_*` como
+> fuente nueva. Fuente única = agregado de `pos_orders` por tenant (OCM views / pos-daily).
 
 ---
 
