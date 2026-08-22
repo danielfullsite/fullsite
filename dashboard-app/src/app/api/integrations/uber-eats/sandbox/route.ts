@@ -150,7 +150,7 @@ export async function POST(request: NextRequest) {
     order_id?: string
   }
 
-  const storeId = body.store_id || '633b57d4-237a-5a32-b249-7ceb795f1d35'
+  const storeId = body.store_id || '0f655507-7337-41e9-b536-5fd6171bb0da'
   const orderId = body.order_id || `CERT-${Date.now()}`
   const action = body.action || 'test_webhook'
 
@@ -646,8 +646,9 @@ export async function POST(request: NextRequest) {
 
   // ─── Diagnóstico: qué stores puede ver la cuenta que autorizó (token USL guardado) ──
   // Usa el token merchant guardado (indexado por store_id en integration_providers) para
-  // GET /v1/eats/stores. Si 633b57d4 NO está en la lista → la cuenta que autorizó no es
-  // manager de ese store (por eso "user_not_allowed"). La lista revela el store_id REAL.
+  // GET /v1/eats/stores. El store correcto (0f655507) debe estar en la lista; si NO aparece,
+  // la cuenta que autorizó no es manager de ese store (da "user_not_allowed"). Nota: el store
+  // 633b57d4 es de OTRO client y siempre da 403 — no usarlo. La lista revela el store_id REAL.
   if (action === 'merchant_stores') {
     const corrId = crypto.randomUUID()
     try {

@@ -17,7 +17,7 @@ jobs:
             "$APP_URL/api/integrations/uber-eats/sandbox" \
             -H "Authorization: Bearer $INTEGRATION_ADMIN_SECRET" \
             -H "Content-Type: application/json" \
-            -d '{"action":"test_webhook","store_id":"633b57d4-237a-5a32-b249-7ceb795f1d35"}')
+            -d '{"action":"test_webhook","store_id":"0f655507-7337-41e9-b536-5fd6171bb0da"}')
 
           HTTP_CODE=$(echo "$RESP" | tail -1)
           BODY=$(echo "$RESP" | head -n -1)
@@ -34,7 +34,7 @@ jobs:
             "$APP_URL/api/integrations/uber-eats/sandbox" \
             -H "Authorization: Bearer $INTEGRATION_ADMIN_SECRET" \
             -H "Content-Type: application/json" \
-            -d "{\"action\":\"test_webhook\",\"store_id\":\"633b57d4-237a-5a32-b249-7ceb795f1d35\",\"order_id\":\"$ORDER_ID\"}")
+            -d "{\"action\":\"test_webhook\",\"store_id\":\"0f655507-7337-41e9-b536-5fd6171bb0da\",\"order_id\":\"$ORDER_ID\"}")
           HTTP_CODE=$(echo "$RESP" | tail -1)
           BODY=$(echo "$RESP" | head -n -1)
           echo "UBER-011 HTTP (replay): $HTTP_CODE — $BODY"
@@ -46,7 +46,7 @@ jobs:
             "$APP_URL/api/integrations/uber-eats/sandbox" \
             -H "Authorization: Bearer $INTEGRATION_ADMIN_SECRET" \
             -H "Content-Type: application/json" \
-            -d '{"action":"test_invalid_sig","store_id":"633b57d4-237a-5a32-b249-7ceb795f1d35"}')
+            -d '{"action":"test_invalid_sig","store_id":"0f655507-7337-41e9-b536-5fd6171bb0da"}')
           HTTP_CODE=$(echo "$RESP" | tail -1)
           BODY=$(echo "$RESP" | head -n -1)
           echo "UBER-017 Body: $BODY"
