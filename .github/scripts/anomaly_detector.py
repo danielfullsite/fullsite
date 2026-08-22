@@ -17,6 +17,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from agent_common import sb_get as _sb_get, log_run as _log_run, check_freshness, create_insight
 from client_config import get_client, get_tz, get_chat_ids, is_mesero
 from ops_aggregate import get_current_business_date
+from agent_daily_source import daily_today, daily_by_dates
 try:
     from audit_log import AuditLogger
     _audit = AuditLogger("anomaly_detector")
@@ -56,37 +57,16 @@ def sb_get(table, params):
 
 # ── Data fetching ───────────────────────────────────────────────────────────
 def get_today_kpis(business_date):
-    """Fetch KPIs for the given business date from ops_daily_live."""
-    rows = sb_get("ops_daily_live", {
-        "client_id": f"eq.{CLIENT['id']}",
-        "fecha": f"eq.{business_date}",
-        "select": "*",
-        "order": "generated_at.desc",
-        "limit": "1",
-    })
-    return rows[0] if rows else None
+    """KPIs de HOY. Fuente tenant-aware: OCM (pos_orders vivo) para clones,
+    ops_daily_live legacy para AMALAY. Ver agent_daily_source."""
+    return daily_today(CLIENT, business_date)
 
 
 def get_historical_same_dow(today, weeks=4):
-    """Fetch wansoft_daily for the same DOW over the last N weeks."""
-    dates = []
-    for w in range(1, weeks + 1):
-        d = today - timedelta(weeks=w)
-        dates.append(d.strftime("%Y-%m-%d"))
-
-    if not dates:
-        return []
-
-    # Fetch each date individually (OR filters aren't clean in REST)
-    results = []
-    for fecha in dates:
-        rows = sb_get("ops_daily_history", {"client_id": f"eq.{CLIENT['id']}",
-            "select": "fecha,ventas_dia,ticket_promedio_restaurant,meseros,ventas_por_grupo",
-            "fecha": f"eq.{fecha}",
-            "limit": "1",
-        })
-        results.extend(rows)
-    return results
+    """Mismo día de la semana en las últimas N semanas. Fuente tenant-aware
+    (OCM para clones, ops_daily_history legacy para AMALAY)."""
+    dates = [(today - timedelta(weeks=w)).strftime("%Y-%m-%d") for w in range(1, weeks + 1)]
+    return daily_by_dates(CLIENT, dates)
 
 
 # ── Analysis ────────────────────────────────────────────────────────────────

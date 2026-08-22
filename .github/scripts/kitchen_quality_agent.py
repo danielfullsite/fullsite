@@ -22,6 +22,7 @@ from collections import defaultdict
 sys.path.insert(0, os.path.dirname(__file__))
 from agent_common import sb_get as _sb_get, log_run as _log_run, check_freshness, create_insight
 from client_config import get_client, get_tz, get_chat_ids
+from agent_daily_source import daily_recent
 try:
     from audit_log import AuditLogger
     _audit = AuditLogger("kitchen_quality_agent")
@@ -55,26 +56,13 @@ def sb_get(table, params):
 
 # -- Data fetching --
 def get_recent_daily(days=7):
-    """Fetch last N days from wansoft_daily."""
-    now_mx = datetime.now(MX_TZ)
-    start_date = (now_mx - timedelta(days=days)).strftime("%Y-%m-%d")
-    return sb_get("ops_daily_history", {"client_id": f"eq.{CLIENT['id']}",
-        "select": "fecha,ventas_dia,descuentos,tickets_count,ventas_por_grupo",
-        "fecha": f"gte.{start_date}",
-        "ventas_dia": "gt.0",
-        "order": "fecha.desc",
-        "limit": str(days),
-    })
+    """Últimos N días. Fuente tenant-aware (OCM para clones, ops_daily_history legacy AMALAY)."""
+    return daily_recent(CLIENT, days)
 
 
 def get_historical_avg(days=30):
-    """Fetch longer history for baseline comparison."""
-    return sb_get("ops_daily_history", {"client_id": f"eq.{CLIENT['id']}",
-        "select": "fecha,descuentos,tickets_count,ventas_dia",
-        "ventas_dia": "gt.0",
-        "order": "fecha.desc",
-        "limit": str(days),
-    })
+    """Historial más largo para baseline. Fuente tenant-aware."""
+    return daily_recent(CLIENT, days)
 
 
 def get_today_kpis():

@@ -20,6 +20,7 @@ from datetime import datetime, timedelta, timezone
 sys.path.insert(0, os.path.dirname(__file__))
 from agent_common import sb_get as _sb_get_common, log_run as _log_run_common, create_insight
 from client_config import get_client, get_tz, get_chat_ids
+from agent_daily_source import daily_today, daily_recent
 from ops_aggregate import get_current_business_date, get_business_day_config, get_business_day_bounds
 try:
     from audit_log import AuditLogger
@@ -55,22 +56,13 @@ def sb_get(table, params):
 
 # -- Data fetching --
 def get_today_kpis():
-    today_str = get_current_business_date(CLIENT)
-    rows = sb_get("ops_daily_live", {"client_id": f"eq.{CLIENT['id']}",
-        "fecha": f"eq.{today_str}",
-        "select": "*",
-        "limit": "1",
-    })
-    return rows[0] if rows else None
+    """KPIs de HOY. Fuente tenant-aware (OCM para clones, ops_daily_live legacy AMALAY)."""
+    return daily_today(CLIENT, get_current_business_date(CLIENT))
 
 
 def get_historical(days=30):
-    data = sb_get("ops_daily_history", {"client_id": f"eq.{CLIENT['id']}",
-        "select": "fecha,ventas_dia,tickets_count,mesas_atendidas,personas_restaurant,ticket_promedio_restaurant",
-        "ventas_dia": "gt.0",
-        "order": "fecha.desc",
-        "limit": str(days),
-    })
+    """Últimos N días. Fuente tenant-aware (OCM para clones, ops_daily_history legacy AMALAY)."""
+    data = daily_recent(CLIENT, days)
     print(f"    [historical] Query returned {len(data)} rows")
     return data
 
@@ -293,7 +285,7 @@ def main():
     today_kpis = get_today_kpis()
     # If live view returned no tickets, try latest available date from ops_daily_live
     if not today_kpis or int(today_kpis.get("tickets_count", 0) or 0) == 0:
-        daily = sb_get("ops_daily_live", {"client_id": f"eq.{CLIENT['id']}","select": "*", "ventas_dia": "gt.0", "order": "fecha.desc", "limit": "1"})
+        daily = daily_recent(CLIENT, 1)  # fuente tenant-aware (OCM para clones, ops_daily_live legacy AMALAY)
         if daily and int(daily[0].get("tickets_count", 0) or 0) > 0:
             today_kpis = daily[0]
             print(f"[table_time] Using ops_daily_live latest: {today_kpis.get('fecha')} ({today_kpis.get('tickets_count')} tickets)")
