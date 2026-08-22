@@ -50,6 +50,30 @@ import {
 import { buildUberAuthUrl, USL_SCOPES, MARKETPLACE_M2M_SCOPES, DELIVERY_M2M_SCOPES, probeM2MToken } from '@/lib/integrations/uber-eats/oauth'
 import { createPromotion, buildSamplePromotion } from '@/lib/integrations/uber-eats/promotions'
 import { requestReport, buildSampleReportRequest, getReportFile } from '@/lib/integrations/uber-eats/reporting'
+import { uploadMenu } from '@/lib/integrations/uber-eats/menu'
+
+// Menú mínimo válido para probar el cert "Menu: Update Item/modifier" (PUT full menu).
+function buildSampleMenu() {
+  return {
+    menus: [{
+      id: 'fs-menu-1',
+      title: { en: 'Fullsite Menu' },
+      service_availability: [{
+        day_of_week: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
+        time_period: [{ start_time: '00:00', end_time: '23:59' }],
+      }],
+      category_ids: ['fs-cat-1'],
+    }],
+    categories: [{ id: 'fs-cat-1', title: { en: 'Bebidas' }, entities: [{ id: 'fs-item-1', type: 'ITEM' as const }] }],
+    items: [{
+      id: 'fs-item-1',
+      external_data: 'fs-item-1',
+      title: { en: 'Cafe Americano' },
+      description: { en: 'Cafe negro 12oz' },
+      price_info: { price: 5000, currency_code: 'MXN' },
+    }],
+  }
+}
 import { getPosData, activateIntegration } from '@/lib/integrations/uber-eats/provisioning'
 
 function checkAuth(request: NextRequest): boolean {
@@ -338,6 +362,12 @@ export async function POST(request: NextRequest) {
   //   Requests M2M token. On success, probes GET /v1/delivery/order/PROBE.
 
   // ─── Promotions + Reporting (Uber cert requirements #10, #11) ─────────────
+
+  if (action === 'upload_menu') {
+    const corrId = crypto.randomUUID()
+    const result = await uploadMenu(storeId, buildSampleMenu(), corrId)
+    return NextResponse.json({ action, correlation_id: corrId, store_id: storeId, ts: new Date().toISOString(), result })
+  }
 
   if (action === 'create_promotion') {
     const corrId = crypto.randomUUID()
