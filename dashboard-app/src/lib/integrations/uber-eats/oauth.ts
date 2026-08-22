@@ -254,15 +254,19 @@ export async function uberFetch(
   path: string,
   opts: RequestInit & { tokenType?: UberTokenType; storeId?: string; scope?: string } = {}
 ): Promise<Response> {
-  const { tokenType = 'marketplace', storeId, scope: _scope, ...rest } = opts
+  // scope override: si el caller pide un scope específico (ej. reporting → eats.report,
+  // que NO está en MARKETPLACE_M2M_SCOPES), se respeta. Sin override, usa el set por defecto
+  // del tokenType. (Antes se descartaba `scope` → reporting daba 401 aunque el scope estuviera
+  // concedido.) Los callers existentes no pasan scope → comportamiento idéntico.
+  const { tokenType = 'marketplace', storeId, scope, ...rest } = opts
   let token: string
   if (tokenType === 'provisioning') {
     if (!storeId) throw new Error('[uber-fetch] storeId required for provisioning token (USL)')
     token = await getStoredTokenForStore(storeId)
   } else if (tokenType === 'delivery') {
-    token = await getUberAccessToken(DELIVERY_M2M_SCOPES.join(' '))
+    token = await getUberAccessToken(scope ?? DELIVERY_M2M_SCOPES.join(' '))
   } else {
-    token = await getUberAccessToken(MARKETPLACE_M2M_SCOPES.join(' '))
+    token = await getUberAccessToken(scope ?? MARKETPLACE_M2M_SCOPES.join(' '))
   }
   return fetch(`${getApiBase()}${path}`, {
     ...rest,
