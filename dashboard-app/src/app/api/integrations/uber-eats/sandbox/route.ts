@@ -27,6 +27,9 @@
 //   delivery_order_deny    — POST /v1/delivery/order/{id}/deny
 //   delivery_order_cancel  — POST /v1/delivery/order/{id}/cancel
 //   delivery_order_ready   — POST /v1/delivery/order/{id}/ready
+//   create_promotion       — POST create a store promotion (cert req #10)
+//   request_report         — POST request a report → workflow_id (cert req #11)
+//   get_report_file        — GET the report file from a pre-signed download_url
 //   scope_probe            — diagnostic: tries each endpoint, records status codes
 //   reauth_url             — returns USL authorize URL with expanded scopes
 //   day3_full              — runs full approved Day 3 sequence, returns structured evidence
@@ -48,6 +51,8 @@ import {
   markDeliveryOrderReady,
 } from '@/lib/integrations/uber-eats/delivery-adapter'
 import { buildUberAuthUrl, USL_SCOPES, MARKETPLACE_M2M_SCOPES, DELIVERY_M2M_SCOPES, probeM2MToken } from '@/lib/integrations/uber-eats/oauth'
+import { createPromotion, buildSamplePromotion } from '@/lib/integrations/uber-eats/promotions'
+import { requestReport, buildSampleReportRequest, getReportFile } from '@/lib/integrations/uber-eats/reporting'
 
 function checkAuth(request: NextRequest): boolean {
   const expected = (process.env.INTEGRATION_ADMIN_SECRET ?? '').trim()
@@ -147,6 +152,7 @@ export async function POST(request: NextRequest) {
     action?: string
     store_id?: string
     order_id?: string
+    download_url?: string
   }
 
   const storeId = body.store_id || '633b57d4-237a-5a32-b249-7ceb795f1d35'
@@ -332,6 +338,30 @@ export async function POST(request: NextRequest) {
   //
   // Phase 3 — Delivery M2M (client_credentials: eats.deliveries)
   //   Requests M2M token. On success, probes GET /v1/delivery/order/PROBE.
+
+  // ─── Promotions + Reporting (Uber cert requirements #10, #11) ─────────────
+
+  if (action === 'create_promotion') {
+    const corrId = crypto.randomUUID()
+    const result = await createPromotion(storeId, buildSamplePromotion(), corrId)
+    return NextResponse.json({ action, correlation_id: corrId, store_id: storeId, ts: new Date().toISOString(), result })
+  }
+
+  if (action === 'request_report') {
+    const corrId = crypto.randomUUID()
+    const result = await requestReport(buildSampleReportRequest(storeId), corrId)
+    return NextResponse.json({ action, correlation_id: corrId, store_id: storeId, ts: new Date().toISOString(), result })
+  }
+
+  if (action === 'get_report_file') {
+    // Pass the pre-signed download_url delivered by the eats.report.success webhook.
+    if (!body.download_url) {
+      return NextResponse.json({ error: 'provide download_url from the eats.report.success webhook' }, { status: 400 })
+    }
+    const corrId = crypto.randomUUID()
+    const result = await getReportFile(body.download_url, corrId)
+    return NextResponse.json({ action, correlation_id: corrId, ts: new Date().toISOString(), result })
+  }
 
   if (action === 'scope_probe') {
     const corrId = crypto.randomUUID()
