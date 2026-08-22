@@ -346,6 +346,15 @@ export async function POST(request: NextRequest) {
       // Production Validation spec. 'menu.refresh' is NOT an official Uber event name —
       // no alias is added; unknown events (including menu.refresh) already ACK 200.
       await handleMenuRefreshRequest(storeId, clientId, body, eventRow.id, correlationId)
+    } else if (eventType === 'eats.report.success' || eventType === 'report.success') {
+      // Reporting API: la URL pre-firmada del CSV terminado llega aquí. Se loguea (es una
+      // URL firmada, no un secreto) para poder bajar el archivo después (get_report_file).
+      const b = body as unknown as Record<string, unknown>
+      const meta = (b.meta ?? {}) as Record<string, unknown>
+      const data = (b.data ?? {}) as Record<string, unknown>
+      const url = (data.download_url ?? meta.download_url ?? meta.resource_href ?? b.download_url) as string | undefined
+      await auditLog({ provider: 'ubereats', client_id: clientId, correlation_id: correlationId, action: 'reporting.webhook_success', response: { download_url: url ?? null } })
+      await markEventProcessed(eventRow.id)
     } else {
       // Unknown event type — ACK 200 without DLQ (don't penalize unknown future events)
       console.log(`[uber-webhook-v2] Unknown event type: ${eventType}`)

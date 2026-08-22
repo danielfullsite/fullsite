@@ -6,6 +6,12 @@
 //   Sandbox:    auth  → sandbox-login.uber.com   API → test-api.uber.com
 //   Production: auth  → auth.uber.com             API → api.uber.com
 // Mixing auth domain with API domain causes 401 from Uber.
+//
+// Identidad de client (test/prod) resuelta SOLO en env.ts (resolveUberIdentity):
+// en sandbox usa UBER_TEST_CLIENT_ID con fallback legacy UBER_CLIENT_ID. Así prod
+// se autentica como el test app sin cruzar entornos. Los tokenTypes y contratos de
+// abajo NO cambian.
+import { resolveUberIdentity } from './env'
 
 const isProduction = (): boolean => process.env.UBER_ENV === 'production'
 
@@ -72,24 +78,22 @@ const tokenCache = new Map<string, CachedToken>()
 export function clearTokenCache(): void { tokenCache.clear() }
 
 export async function getUberAccessToken(scope = 'eats.pos_provisioning'): Promise<string> {
-  const cached = tokenCache.get(scope)
+  // Credenciales + login URL de la identidad activa (test/prod aware). Cache por
+  // clientAlias+scope para no servir un token del otro client tras un cambio de config.
+  const identity = resolveUberIdentity()
+  const cacheKey = `${identity.clientAlias}:${scope}`
+  const cached = tokenCache.get(cacheKey)
   if (cached && cached.expiresAt > Date.now() + 60_000) return cached.token
 
-  const clientId = process.env.UBER_CLIENT_ID || process.env.UBER_SANDBOX_CLIENT_ID || ''
-  const clientSecret = process.env.UBER_CLIENT_SECRET || process.env.UBER_SANDBOX_CLIENT_SECRET || ''
-  if (!clientId || !clientSecret) {
-    throw new Error('[uber-oauth] UBER_CLIENT_ID/UBER_CLIENT_SECRET not configured')
-  }
-
-  const r = await fetch(getLoginUrl(), {
+  const r = await fetch(identity.loginUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, grant_type: 'client_credentials', scope }),
+    body: new URLSearchParams({ client_id: identity.clientId, client_secret: identity.clientSecret, grant_type: 'client_credentials', scope }),
   })
   if (!r.ok) throw new Error(`[uber-oauth] token request failed ${r.status}: ${await r.text()}`)
 
   const data = (await r.json()) as { access_token: string; expires_in: number; scope?: string }
-  tokenCache.set(scope, { token: data.access_token, expiresAt: Date.now() + data.expires_in * 1000 })
+  tokenCache.set(cacheKey, { token: data.access_token, expiresAt: Date.now() + data.expires_in * 1000 })
   return data.access_token
 }
 
@@ -107,10 +111,8 @@ export async function getUberAccessToken(scope = 'eats.pos_provisioning'): Promi
 // verifies on callback, clears cookie after use.
 
 function clientCredentials() {
-  const clientId = process.env.UBER_CLIENT_ID || process.env.UBER_SANDBOX_CLIENT_ID || ''
-  const clientSecret = process.env.UBER_CLIENT_SECRET || process.env.UBER_SANDBOX_CLIENT_SECRET || ''
-  if (!clientId || !clientSecret) throw new Error('[uber-usl] UBER_CLIENT_ID/UBER_CLIENT_SECRET not configured')
-  return { clientId, clientSecret }
+  const identity = resolveUberIdentity()
+  return { clientId: identity.clientId, clientSecret: identity.clientSecret }
 }
 
 /** Build the Uber OAuth authorization URL for the USL redirect. */
@@ -221,11 +223,15 @@ export async function getStoredTokenForStore(storeId: string): Promise<string> {
 /** Probe whether the Uber app has a given M2M scope approved.
  *  Returns the scope Uber actually granted (may be narrower than requested). */
 export async function probeM2MToken(scope: string): Promise<{ ok: boolean; granted_scope?: string; error?: string }> {
-  const clientId = process.env.UBER_CLIENT_ID || process.env.UBER_SANDBOX_CLIENT_ID || ''
-  const clientSecret = process.env.UBER_CLIENT_SECRET || process.env.UBER_SANDBOX_CLIENT_SECRET || ''
-  if (!clientId || !clientSecret) return { ok: false, error: 'credentials not configured' }
+  let clientId: string, clientSecret: string, loginUrl: string
   try {
-    const r = await fetch(getLoginUrl(), {
+    const identity = resolveUberIdentity()
+    clientId = identity.clientId; clientSecret = identity.clientSecret; loginUrl = identity.loginUrl
+  } catch (e) {
+    return { ok: false, error: String(e) }
+  }
+  try {
+    const r = await fetch(loginUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, grant_type: 'client_credentials', scope }),

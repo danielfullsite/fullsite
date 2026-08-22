@@ -57,7 +57,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'sandbox_only', env, correlation_id: correlationId }, { status: 403 })
   }
 
-  if (!process.env.UBER_CLIENT_ID || !process.env.UBER_CLIENT_SECRET) {
+  // Acepta el test client (split) o el legacy — ruta sandbox_only, así que basta test||legacy.
+  const hasCreds = (process.env.UBER_TEST_CLIENT_ID && process.env.UBER_TEST_CLIENT_SECRET)
+    || (process.env.UBER_CLIENT_ID && process.env.UBER_CLIENT_SECRET)
+  if (!hasCreds) {
     return NextResponse.json({ error: 'uber_credentials_missing', correlation_id: correlationId }, { status: 503 })
   }
 

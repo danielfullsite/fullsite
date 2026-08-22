@@ -48,6 +48,8 @@ import {
   markDeliveryOrderReady,
 } from '@/lib/integrations/uber-eats/delivery-adapter'
 import { buildUberAuthUrl, USL_SCOPES, MARKETPLACE_M2M_SCOPES, DELIVERY_M2M_SCOPES, probeM2MToken } from '@/lib/integrations/uber-eats/oauth'
+import { createPromotion, buildSamplePromotion } from '@/lib/integrations/uber-eats/promotions'
+import { requestReport, buildSampleReportRequest, getReportFile } from '@/lib/integrations/uber-eats/reporting'
 import { getPosData, activateIntegration } from '@/lib/integrations/uber-eats/provisioning'
 
 function checkAuth(request: NextRequest): boolean {
@@ -148,6 +150,7 @@ export async function POST(request: NextRequest) {
     action?: string
     store_id?: string
     order_id?: string
+    download_url?: string
   }
 
   const storeId = body.store_id || '0f655507-7337-41e9-b536-5fd6171bb0da'
@@ -333,6 +336,29 @@ export async function POST(request: NextRequest) {
   //
   // Phase 3 — Delivery M2M (client_credentials: eats.deliveries)
   //   Requests M2M token. On success, probes GET /v1/delivery/order/PROBE.
+
+  // ─── Promotions + Reporting (Uber cert requirements #10, #11) ─────────────
+
+  if (action === 'create_promotion') {
+    const corrId = crypto.randomUUID()
+    const result = await createPromotion(storeId, buildSamplePromotion(), corrId)
+    return NextResponse.json({ action, correlation_id: corrId, store_id: storeId, ts: new Date().toISOString(), result })
+  }
+
+  if (action === 'request_report') {
+    const corrId = crypto.randomUUID()
+    const result = await requestReport(buildSampleReportRequest(storeId), corrId)
+    return NextResponse.json({ action, correlation_id: corrId, store_id: storeId, ts: new Date().toISOString(), result })
+  }
+
+  if (action === 'get_report_file') {
+    if (!body.download_url) {
+      return NextResponse.json({ error: 'provide download_url from the eats.report.success webhook' }, { status: 400 })
+    }
+    const corrId = crypto.randomUUID()
+    const result = await getReportFile(body.download_url, corrId)
+    return NextResponse.json({ action, correlation_id: corrId, ts: new Date().toISOString(), result })
+  }
 
   if (action === 'scope_probe') {
     const corrId = crypto.randomUUID()

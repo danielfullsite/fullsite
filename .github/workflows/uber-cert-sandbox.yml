@@ -1,0 +1,105 @@
+name: Uber Cert — Sandbox Sequence
+
+# Corre la secuencia de certificación contra el sandbox runner en prod y sube la
+# evidencia (respuestas JSON con el status de Uber) como artifact — para adjuntar a
+# la respuesta a Uber GTS. Los webhooks ya responden 200 desde el handler.
+#
+# Requiere secret INTEGRATION_ADMIN_SECRET (mismo que valida el runner).
+# La app debe estar desplegada con UBER_ENV=sandbox y el test client k2DPoUeX…
+#
+# Uso:
+#   - Sin inputs → corre lo independiente (scope_probe, activate, get details,
+#     status, create_promotion, request_report, evidence_export).
+#   - order_id → agrega el happy-path de orden (get → accept → mark ready).
+#   - deny_order_id / cancel_order_id → esos endpoints terminales en órdenes frescas.
+#   - download_url → get_report_file desde la URL del webhook eats.report.success.
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Base URL de la app"
+        required: false
+        default: "https://app.fullsite.mx"
+      store_id:
+        description: "Store test provisionado a nuestra app (0f655507; 633b57d4 da 403)"
+        required: false
+        default: "0f655507-7337-41e9-b536-5fd6171bb0da"
+      order_id:
+        description: "order_id real del sandbox de Uber (happy path: get→accept→ready)"
+        required: false
+      deny_order_id:
+        description: "order_id para probar Deny (orden fresca)"
+        required: false
+      cancel_order_id:
+        description: "order_id para probar Cancel (orden fresca)"
+        required: false
+      download_url:
+        description: "download_url del webhook eats.report.success (para get_report_file)"
+        required: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    env:
+      BASE: ${{ github.event.inputs.base_url }}
+      STORE: ${{ github.event.inputs.store_id }}
+      SECRET: ${{ secrets.INTEGRATION_ADMIN_SECRET }}
+    steps:
+      - name: Ejecutar secuencia de certificación
+        run: |
+          set -uo pipefail
+          mkdir -p evidence
+          if [ -z "${SECRET:-}" ]; then echo "::error::Falta secret INTEGRATION_ADMIN_SECRET"; exit 1; fi
+
+          call () {
+            local name="$1" data="$2"
+            local code
+            code=$(curl -sS -o "evidence/$name.json" -w "%{http_code}" \
+              -X POST "$BASE/api/integrations/uber-eats/sandbox" \
+              -H "Authorization: Bearer $SECRET" \
+              -H "Content-Type: application/json" \
+              -d "$data" || echo "000")
+            echo "═══════════════════════════════════════════════"
+            echo "▶ $name  —  HTTP $code (runner)"
+            echo "  (el status de Uber va dentro del body: .result.status / .status)"
+            cat "evidence/$name.json" 2>/dev/null || true
+            echo ""
+          }
+
+          # ── Independientes (no requieren orden) — usan el store test correcto ──
+          call scope_probe        '{"action":"scope_probe"}'
+          call activate           "{\"action\":\"delivery_store_activate\",\"store_id\":\"$STORE\"}"
+          call get_details        "{\"action\":\"delivery_store_get\",\"store_id\":\"$STORE\"}"
+          call store_status       "{\"action\":\"delivery_store_status\",\"store_id\":\"$STORE\"}"
+          call create_promotion   "{\"action\":\"create_promotion\",\"store_id\":\"$STORE\"}"
+          call request_report     "{\"action\":\"request_report\",\"store_id\":\"$STORE\"}"
+
+          # ── Flujo de orden (happy path) ──
+          OID="${{ github.event.inputs.order_id }}"
+          if [ -n "$OID" ]; then
+            call order_get    "{\"action\":\"delivery_order_get\",\"order_id\":\"$OID\"}"
+            call order_accept "{\"action\":\"delivery_order_accept\",\"order_id\":\"$OID\"}"
+            call order_ready  "{\"action\":\"delivery_order_ready\",\"order_id\":\"$OID\"}"
+          fi
+
+          # ── Endpoints terminales (órdenes frescas) ──
+          DOID="${{ github.event.inputs.deny_order_id }}"
+          if [ -n "$DOID" ]; then call order_deny "{\"action\":\"delivery_order_deny\",\"order_id\":\"$DOID\"}"; fi
+          COID="${{ github.event.inputs.cancel_order_id }}"
+          if [ -n "$COID" ]; then call order_cancel "{\"action\":\"delivery_order_cancel\",\"order_id\":\"$COID\"}"; fi
+
+          # ── Reporte: descargar archivo ──
+          DURL="${{ github.event.inputs.download_url }}"
+          if [ -n "$DURL" ]; then call get_report_file "{\"action\":\"get_report_file\",\"download_url\":\"$DURL\"}"; fi
+
+          # ── Export de audit_log 48h (evidencia consolidada) ──
+          call evidence_export '{"action":"evidence_export"}'
+
+      - name: Subir evidencia
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uber-cert-evidence
+          path: evidence/*.json
+          if-no-files-found: warn
