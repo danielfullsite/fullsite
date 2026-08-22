@@ -72,6 +72,7 @@ function buildSampleMenu() {
       description: { en: 'Cafe negro 12oz' },
       price_info: { price: 5000, currency_code: 'MXN' },
     }],
+    modifier_groups: [],
   }
 }
 import { getPosData, activateIntegration } from '@/lib/integrations/uber-eats/provisioning'
