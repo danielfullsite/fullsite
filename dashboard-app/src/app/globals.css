@@ -317,8 +317,10 @@ body:has(.pos-kiosk) {
   --color-text-muted: var(--text-3);
   --color-border: var(--line);
   --color-border-light: var(--line-soft);
-  --font-sans: Arial, Helvetica, 'Liberation Sans', system-ui, sans-serif;
+  --font-sans: var(--font-inter), system-ui, -apple-system, 'Segoe UI', Helvetica, sans-serif;
   --font-mono: var(--font-jetbrains-mono), 'JetBrains Mono', ui-monospace, monospace;
+  /* Display — títulos y números grandes. Carácter sin caer en la fuente genérica. */
+  --font-heading: var(--font-display), var(--font-inter), system-ui, sans-serif;
 }
 
 * { -webkit-tap-highlight-color: transparent; }
@@ -336,9 +338,17 @@ body {
 
 ::selection { background: var(--accent); color: white; }
 
+/* Títulos con la fuente de display — le da personalidad a toda la app de un golpe. */
+h1, h2, h3 {
+  font-family: var(--font-heading);
+  letter-spacing: -0.022em;
+  font-feature-settings: "ss01";
+}
+
 /* Utilities */
 .serif { letter-spacing: -0.025em; font-feature-settings: "ss01", "cv11"; }
 .mono { font-family: var(--font-mono); }
+.font-display { font-family: var(--font-heading); letter-spacing: -0.03em; }
 .tnum { font-variant-numeric: tabular-nums; }
 
 .lift { transition: transform 200ms ease, box-shadow 200ms ease; }

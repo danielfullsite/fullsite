@@ -389,7 +389,7 @@ export default function DashboardPage() {
       {/* Page header with period selector + day navigation + settings */}
       <div className="mb-4 sm:mb-6 space-y-2 sm:space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-base sm:text-xl font-bold tracking-tight text-[var(--text-1)]">
+          <h2 className="text-lg sm:text-2xl font-bold text-[var(--text-1)]">
             {period === 'dia' ? 'Resumen del día' : period === 'semana' ? 'Resumen semanal' : 'Resumen mensual'}
           </h2>
           {/* Navigation arrows + date label for all periods */}
@@ -608,7 +608,7 @@ export default function DashboardPage() {
               Día {monthProgress.dayOfMonth}/{monthProgress.daysInMonth}
             </span>
           </div>
-          <p className="text-[28px] sm:text-[34px] font-black tracking-[-0.03em] text-[var(--text-1)] tnum mb-1.5">{formatCurrency(monthProgress.monthVentas)}</p>
+          <p className="font-display text-[32px] sm:text-[40px] font-extrabold text-[var(--text-1)] tnum mb-1.5">{formatCurrency(monthProgress.monthVentas)}</p>
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--text-3)] mb-3">
             <span>Proy. <span className="font-bold text-[var(--accent-ink)] tnum">{formatCurrency(monthProgress.projected)}</span></span>
             <span>Prom. <span className="font-semibold text-[var(--text-2)] tnum">{formatCurrency(monthProgress.dailyAvg)}</span>/día</span>

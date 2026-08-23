@@ -80,7 +80,7 @@ export default function KPICard({
           )}
           <div className="flex-1 min-w-0">
             <p className="text-[9px] uppercase tracking-[0.12em] font-mono text-[var(--text-3)] mb-0.5">{label}</p>
-            <p className="text-[22px] font-black tracking-tight text-[var(--text-1)] leading-tight tnum">{value}</p>
+            <p className="font-display text-[25px] font-extrabold text-[var(--text-1)] leading-none tnum">{value}</p>
           </div>
         </div>
         {/* Single compact delta */}
@@ -125,7 +125,7 @@ export default function KPICard({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.3, delay: index * 0.06 + 0.15 }}
-          className="text-[26px] font-extrabold tracking-[-0.02em] text-[var(--text-1)] tnum mt-[9px] leading-none"
+          className="font-display text-[31px] font-extrabold text-[var(--text-1)] tnum mt-[10px] leading-none"
         >
           {value}
         </motion.p>
