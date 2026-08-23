@@ -322,10 +322,10 @@ body:has(.pos-kiosk) {
   --color-text-muted: var(--text-3);
   --color-border: var(--line);
   --color-border-light: var(--line-soft);
-  --font-sans: var(--font-inter), system-ui, -apple-system, 'Segoe UI', Helvetica, sans-serif;
+  --font-sans: var(--font-geist), system-ui, -apple-system, 'Segoe UI', Helvetica, sans-serif;
   --font-mono: var(--font-jetbrains-mono), 'JetBrains Mono', ui-monospace, monospace;
-  /* Títulos — sans tight y contundente (concepto Cockpit, sin fuente de display). */
-  --font-heading: var(--font-inter), system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* Títulos — Geist tight y contundente (concepto Cockpit). */
+  --font-heading: var(--font-geist), system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 
 * { -webkit-tap-highlight-color: transparent; }

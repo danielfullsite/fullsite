@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next'
-import { Inter, JetBrains_Mono } from 'next/font/google'
+import { Geist, JetBrains_Mono } from 'next/font/google'
 import './globals.css'
 import { AuthProvider } from '@/contexts/AuthContext'
 import AppShell from '@/components/AppShell'
@@ -7,10 +7,10 @@ import PosthogInit from '@/components/PosthogInit'
 import SupabasePatch from '@/components/SupabasePatch'
 import InstallPrompt from '@/components/InstallPrompt'
 
-const inter = Inter({
-  variable: '--font-inter',
+// UI + títulos — Geist (moderna, técnica, limpia). Fuente variable → todos los pesos.
+const geist = Geist({
+  variable: '--font-geist',
   subsets: ['latin'],
-  weight: ['300', '400', '500', '600', '700', '800'],
   display: 'swap',
 })
 
@@ -49,7 +49,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="es" className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased`} suppressHydrationWarning>
+    <html lang="es" className={`${geist.variable} ${jetbrainsMono.variable} h-full antialiased`} suppressHydrationWarning>
       <head>
         {/* Dark by default. Only set light if user chose it. */}
         <script dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='light'){document.documentElement.setAttribute('data-theme','light')}}catch(e){}try{var C=window.Capacitor;if(C&&C.isNativePlatform&&C.isNativePlatform()){document.documentElement.classList.add('capacitor')}}catch(e){}})();` }} />
