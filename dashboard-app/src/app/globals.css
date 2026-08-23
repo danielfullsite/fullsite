@@ -125,12 +125,14 @@ body:has(.pos-kiosk) {
   --text-3: #7d8985;
   --text-4: #525c58;
 
-  /* Accent (emerald · swappable por tenant vía applyAccent) */
-  --accent: #10b981;
-  --accent-bright: #34d399;
-  --accent-deep: #059669;
-  --accent-soft: rgba(16, 185, 129, 0.12);
-  --accent-line: rgba(16, 185, 129, 0.26);
+  /* Accent — Cockpit: esmeralda ELÉCTRICA como única señal (swappable por tenant) */
+  --accent: #12b98a;
+  --accent-bright: #12e29a;
+  --accent-deep: #0e9e73;
+  --accent-soft: rgba(18, 226, 154, 0.12);
+  --accent-line: rgba(18, 226, 154, 0.26);
+  /* Rejilla de instrumento (fondo global) */
+  --grid-line: rgba(255, 255, 255, 0.022);
   /* Acento COMO TEXTO — sigue al tenant, legible sobre fondo oscuro */
   --accent-ink: var(--accent-bright);
 
@@ -145,18 +147,19 @@ body:has(.pos-kiosk) {
   --amber: var(--warn);
   --sky: var(--info);
 
-  /* Bento (cards) */
-  --bento-card: linear-gradient(168deg, var(--panel) 0%, var(--panel) 58%, rgba(16,185,129,0.055) 140%);
-  --bento-bevel: linear-gradient(90deg, transparent 0%, rgba(52,211,153,0.30) 50%, transparent 100%);
-  --bento-radial: radial-gradient(circle, rgba(16,185,129,0.18) 0%, transparent 65%);
+  /* Cockpit: paneles planos tipo instrumento (leve luz arriba, no degradado verde) */
+  --bento-card: linear-gradient(180deg, var(--raised) 0%, var(--panel) 55%);
+  --bento-bevel: linear-gradient(90deg, transparent 0%, rgba(18,226,154,0.32) 50%, transparent 100%);
+  --bento-radial: radial-gradient(circle, rgba(18,226,154,0.16) 0%, transparent 65%);
 
   --shadow-hero: 0 4px 16px rgba(0,0,0,0.6), 0 30px 70px rgba(0,0,0,0.5);
   --shadow-mid:  0 1px 2px rgba(0,0,0,0.55), 0 14px 34px rgba(0,0,0,0.4);
   --shadow-soft: 0 1px 1px rgba(0,0,0,0.5), 0 6px 18px rgba(0,0,0,0.3);
   --shadow-deep: 0 2px 12px rgba(0,0,0,0.6), 0 20px 50px rgba(0,0,0,0.5);
 
-  --radius: 14px;
-  --radius-sm: 10px;
+  /* Cockpit: esquinas más filosas (tablero de control, no cards blandas) */
+  --radius: 8px;
+  --radius-sm: 6px;
 
   /* Aliases for component compatibility */
   --surface-1: var(--surface);
@@ -182,13 +185,15 @@ body:has(.pos-kiosk) {
   --text-3: #57625a;
   --text-4: #8a958e;
 
-  --accent: #0ea371;
-  --accent-bright: #10b981;
+  --accent: #0ca678;
+  --accent-bright: #10c98a;
   --accent-deep: #047857;
-  --accent-soft: rgba(16, 185, 129, 0.10);
+  --accent-soft: rgba(16, 201, 138, 0.10);
   --accent-line: rgba(5, 120, 90, 0.24);
   /* Acento COMO TEXTO — AA sobre papel para CUALQUIER acento de tenant (color-mix garantiza contraste) */
   --accent-ink: color-mix(in srgb, var(--accent) 60%, #0b1a13);
+  /* Rejilla de instrumento — casi imperceptible sobre papel */
+  --grid-line: rgba(16, 32, 26, 0.028);
 
   /* Semánticos — inks oscurecidos para contraste sobre papel */
   --ok: #16a34a;   --ok-soft: rgba(22,163,74,0.11);   --ok-ink: #047857;
@@ -200,8 +205,8 @@ body:has(.pos-kiosk) {
   --amber: var(--warn);
   --sky: var(--info);
 
-  /* Tarjetas más limpias (estilo artifact): blanco casi puro, tinte apenas perceptible */
-  --bento-card: linear-gradient(168deg, #fff 0%, #fff 72%, rgba(16,185,129,0.035) 160%);
+  /* Cockpit · día: paneles blancos planos (instrumento sobre papel) */
+  --bento-card: #ffffff;
   --bento-bevel: linear-gradient(90deg, transparent 0%, rgba(16,32,26,0.07) 50%, transparent 100%);
   --bento-radial: radial-gradient(circle, rgba(5,150,105,0.10) 0%, transparent 65%);
 
@@ -319,8 +324,8 @@ body:has(.pos-kiosk) {
   --color-border-light: var(--line-soft);
   --font-sans: var(--font-inter), system-ui, -apple-system, 'Segoe UI', Helvetica, sans-serif;
   --font-mono: var(--font-jetbrains-mono), 'JetBrains Mono', ui-monospace, monospace;
-  /* Display — títulos y números grandes. Carácter sin caer en la fuente genérica. */
-  --font-heading: var(--font-display), var(--font-inter), system-ui, sans-serif;
+  /* Títulos — sans tight y contundente (concepto Cockpit, sin fuente de display). */
+  --font-heading: var(--font-inter), system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 
 * { -webkit-tap-highlight-color: transparent; }
@@ -334,21 +339,29 @@ body {
   -moz-osx-font-smoothing: grayscale;
   letter-spacing: -0.005em;
   overscroll-behavior-y: contain;
+  /* Cockpit: rejilla de instrumento apenas perceptible en todo el fondo */
+  background-color: var(--bg);
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 46px 46px;
+  background-position: -1px -1px;
 }
 
 ::selection { background: var(--accent); color: white; }
 
-/* Títulos con la fuente de display — le da personalidad a toda la app de un golpe. */
+/* Títulos — sans tight y contundente (Cockpit). */
 h1, h2, h3 {
   font-family: var(--font-heading);
-  letter-spacing: -0.022em;
+  letter-spacing: -0.03em;
   font-feature-settings: "ss01";
 }
 
 /* Utilities */
 .serif { letter-spacing: -0.025em; font-feature-settings: "ss01", "cv11"; }
 .mono { font-family: var(--font-mono); }
-.font-display { font-family: var(--font-heading); letter-spacing: -0.03em; }
+/* Números grandes / display → MONO (precisión de instrumento, tabular) */
+.font-display { font-family: var(--font-mono); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
 .tnum { font-variant-numeric: tabular-nums; }
 
 .lift { transition: transform 200ms ease, box-shadow 200ms ease; }

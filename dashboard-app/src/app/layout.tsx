@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next'
-import { Inter, JetBrains_Mono, Bricolage_Grotesque } from 'next/font/google'
+import { Inter, JetBrains_Mono } from 'next/font/google'
 import './globals.css'
 import { AuthProvider } from '@/contexts/AuthContext'
 import AppShell from '@/components/AppShell'
@@ -14,18 +14,11 @@ const inter = Inter({
   display: 'swap',
 })
 
+// Mono — datos y números, estilo instrumento/terminal (concepto "Cockpit").
 const jetbrainsMono = JetBrains_Mono({
   variable: '--font-jetbrains-mono',
   subsets: ['latin'],
-  weight: ['400', '500'],
-  display: 'swap',
-})
-
-// Display face — carácter para títulos y números grandes (no la típica Inter/Space Grotesk).
-const bricolage = Bricolage_Grotesque({
-  variable: '--font-display',
-  subsets: ['latin'],
-  weight: ['500', '600', '700', '800'],
+  weight: ['400', '500', '600', '700'],
   display: 'swap',
 })
 
@@ -56,7 +49,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="es" className={`${inter.variable} ${jetbrainsMono.variable} ${bricolage.variable} h-full antialiased`} suppressHydrationWarning>
+    <html lang="es" className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased`} suppressHydrationWarning>
       <head>
         {/* Dark by default. Only set light if user chose it. */}
         <script dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='light'){document.documentElement.setAttribute('data-theme','light')}}catch(e){}try{var C=window.Capacitor;if(C&&C.isNativePlatform&&C.isNativePlatform()){document.documentElement.classList.add('capacitor')}}catch(e){}})();` }} />
