@@ -520,6 +520,23 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Tira de status en vivo — command center (Cockpit) */}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <span className="inline-flex items-center gap-2 h-7 px-2.5 rounded-full border border-[var(--line)] bg-[var(--surface-2)] font-mono text-[11px] tracking-wide text-[var(--text-2)]">
+          <span className="pulse-dot" style={{ width: 6, height: 6 }} />EN VIVO
+        </span>
+        {viewDay?.updated_at && (
+          <span className="inline-flex items-center h-7 px-2.5 rounded-full border border-[var(--line)] bg-[var(--surface-2)] font-mono text-[11px] tracking-wide text-[var(--text-3)]">
+            SYNC · {new Date(viewDay.updated_at).toLocaleTimeString('es-MX', { timeZone: 'America/Mexico_City', hour: 'numeric', minute: '2-digit' })}
+          </span>
+        )}
+        {agentRuns.length > 0 && (
+          <span className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full border border-[var(--accent-line)] bg-[var(--accent-soft)] font-mono text-[11px] tracking-wide text-[var(--accent-ink)]">
+            <Activity size={12} strokeWidth={2.4} />{agentRuns.length} AGENTES OK
+          </span>
+        )}
+      </div>
+
       {/* Resumen del día — "N cosas para hoy" (detecciones de los agentes IA) */}
       <AgentBriefing />
 
@@ -550,7 +567,7 @@ export default function DashboardPage() {
 
       {/* Settings panel — toggle widgets */}
       {showSettings && (
-        <div className="mb-6 rounded-[14px] border border-[var(--line)] p-[18px] animate-in slide-in-from-top-2" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' }}>
+        <div className="mb-6 rounded-[var(--radius)] border border-[var(--line)] p-[18px] animate-in slide-in-from-top-2" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' }}>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-[9px]">
               <span className="w-7 h-7 rounded-[9px] grid place-items-center bg-[var(--surface-2)] text-[var(--text-2)]">
@@ -594,7 +611,7 @@ export default function DashboardPage() {
 
       {/* Month progress — premium card */}
       {show('month_progress') && monthProgress && monthProgress.monthVentas > 0 && (
-        <div className="mb-4 sm:mb-6 bg-gradient-to-br from-emerald-500/10 via-[var(--panel)] to-[var(--surface-2)] rounded-[18px] border border-[var(--accent-line)] px-4 sm:px-5 py-4 sm:py-[18px]" style={{ boxShadow: 'var(--shadow-mid)' }}>
+        <div className="mb-4 sm:mb-6 bg-gradient-to-br from-emerald-500/10 via-[var(--panel)] to-[var(--surface-2)] rounded-[var(--radius)] border border-[var(--accent-line)] px-4 sm:px-5 py-4 sm:py-[18px]" style={{ boxShadow: 'var(--shadow-mid)' }}>
           <div className="flex items-center justify-between mb-2 sm:mb-3">
             <div className="flex items-center gap-[9px]">
               <div className="w-7 h-7 rounded-[9px] grid place-items-center bg-[var(--accent-soft)] text-[var(--accent-bright)]">
@@ -739,21 +756,21 @@ export default function DashboardPage() {
 
       {/* Extra KPI row — Propinas + Descuentos + Brutas */}
       {show('extra_kpis') && <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-4 sm:mb-6">
-        <div className="rounded-[14px] border border-[var(--line)] px-3 sm:px-4 py-3 sm:py-3.5 text-center" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-soft)' }}>
+        <div className="rounded-[var(--radius)] border border-[var(--line)] px-3 sm:px-4 py-3 sm:py-3.5 text-center" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-soft)' }}>
           <div className="w-[30px] h-[30px] rounded-[9px] grid place-items-center bg-[var(--accent-soft)] text-[var(--accent-bright)] mx-auto mb-2">
             <Award size={15} />
           </div>
           <p className="text-[9px] sm:text-[9.5px] text-[var(--text-3)] font-semibold uppercase tracking-[0.13em] font-mono mb-1.5">Propinas</p>
           <p className="text-lg sm:text-xl font-extrabold tracking-[-0.02em] tnum text-[var(--accent-ink)]">{formatCurrency(periodData.propinas)}</p>
         </div>
-        <div className="rounded-[14px] border border-[var(--line)] px-3 sm:px-4 py-3 sm:py-3.5 text-center" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-soft)' }}>
+        <div className="rounded-[var(--radius)] border border-[var(--line)] px-3 sm:px-4 py-3 sm:py-3.5 text-center" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-soft)' }}>
           <div className="w-[30px] h-[30px] rounded-[9px] grid place-items-center bg-[var(--crit-soft)] text-[var(--crit-ink)] mx-auto mb-2">
             <TrendingDown size={15} />
           </div>
           <p className="text-[9px] sm:text-[9.5px] text-[var(--text-3)] font-semibold uppercase tracking-[0.13em] font-mono mb-1.5">Descuentos</p>
           <p className="text-lg sm:text-xl font-extrabold tracking-[-0.02em] tnum text-[var(--crit-ink)]">{formatCurrency(periodData.descuentos)}</p>
         </div>
-        <div className="rounded-[14px] border border-[var(--line)] px-3 sm:px-4 py-3 sm:py-3.5 text-center" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-soft)' }}>
+        <div className="rounded-[var(--radius)] border border-[var(--line)] px-3 sm:px-4 py-3 sm:py-3.5 text-center" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-soft)' }}>
           <div className="w-[30px] h-[30px] rounded-[9px] grid place-items-center bg-[var(--info-soft)] text-[var(--info-ink)] mx-auto mb-2">
             <DollarSign size={15} />
           </div>
@@ -764,7 +781,7 @@ export default function DashboardPage() {
 
       {/* Agent Status Widget — real data from agent_runs */}
       {show('agent_status') && (
-        <div className="mb-4 sm:mb-6 rounded-[14px] border border-[var(--line)] p-4 sm:p-[18px]" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' }}>
+        <div className="mb-4 sm:mb-6 rounded-[var(--radius)] border border-[var(--line)] p-4 sm:p-[18px]" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' }}>
           <div className="flex items-center gap-[9px] mb-3 sm:mb-4">
             <div className="w-7 h-7 rounded-[9px] grid place-items-center bg-violet-500/12 text-violet-300">
               <Bot size={15} />
@@ -855,7 +872,7 @@ export default function DashboardPage() {
 
       {/* Week comparison banner — like el POS legado */}
       {show('week_comparison') && vsLastWeek !== null && vsLastWeekAmount !== null && sameDayLastWeek && (
-        <div className={`mb-4 sm:mb-6 rounded-[14px] border px-4 py-3.5 sm:px-[18px] ${vsLastWeek >= 0 ? 'bg-[var(--accent-soft)] border-[var(--accent-line)]' : 'bg-[var(--crit-soft)] border-[color-mix(in_srgb,var(--crit)_40%,transparent)]'}`}>
+        <div className={`mb-4 sm:mb-6 rounded-[var(--radius)] border px-4 py-3.5 sm:px-[18px] ${vsLastWeek >= 0 ? 'bg-[var(--accent-soft)] border-[var(--accent-line)]' : 'bg-[var(--crit-soft)] border-[color-mix(in_srgb,var(--crit)_40%,transparent)]'}`}>
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-[11px]">
               {vsLastWeek >= 0
@@ -897,7 +914,7 @@ export default function DashboardPage() {
       {/* Two columns: Top meseros + Categories */}
       {(show('top_meseros') || show('categories')) && <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
         {/* Top meseros — R365 style with progress bars */}
-        {show('top_meseros') && <div className="rounded-[14px] border border-[var(--line)] p-[18px]" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' }}>
+        {show('top_meseros') && <div className="rounded-[var(--radius)] border border-[var(--line)] p-[18px]" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' }}>
           <div className="flex items-center gap-[9px] mb-0.5">
             <div className="w-7 h-7 rounded-[9px] grid place-items-center bg-[var(--accent-soft)] text-[var(--accent-bright)]">
               <Award size={15} />
@@ -963,7 +980,7 @@ export default function DashboardPage() {
 
       {/* Payment methods */}
       {show('payment_methods') && <div className="mb-6">
-        <div className="rounded-[14px] border border-[var(--line)] p-[18px]" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' }}>
+        <div className="rounded-[var(--radius)] border border-[var(--line)] p-[18px]" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' }}>
           <div className="flex items-center gap-[9px] mb-0.5">
             <div className="w-7 h-7 rounded-[9px] grid place-items-center bg-violet-500/12 text-violet-300">
               <CreditCard size={14} />
@@ -1028,7 +1045,7 @@ export default function DashboardPage() {
       {show('hora_pico') && latestDay && (
         <div className="mb-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Hora pico */}
-          <div className="rounded-[14px] border border-[var(--line)] p-[18px]" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' }}>
+          <div className="rounded-[var(--radius)] border border-[var(--line)] p-[18px]" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' }}>
             <div className="flex items-center gap-[9px] mb-3">
               <div className="w-7 h-7 rounded-[9px] grid place-items-center bg-[var(--warn-soft)] text-[var(--warn-ink)]">
                 <Clock size={15} />
@@ -1061,7 +1078,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Efficiency metrics */}
-          <div className="rounded-[14px] border border-[var(--line)] p-[18px]" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' }}>
+          <div className="rounded-[var(--radius)] border border-[var(--line)] p-[18px]" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' }}>
             <div className="flex items-center gap-[9px] mb-2">
               <div className="w-7 h-7 rounded-[9px] grid place-items-center" style={{ background: 'rgba(34,211,238,.12)', color: '#67e8f9' }}>
                 <Activity size={15} />

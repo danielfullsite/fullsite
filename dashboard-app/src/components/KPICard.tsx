@@ -63,12 +63,12 @@ export default function KPICard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, delay: index * 0.06, ease: [0.22, 1, 0.36, 1] }}
       whileHover={{ scale: 1.02, y: -2 }}
-      className={`relative overflow-hidden rounded-[14px] border ${style.borderColor} sm:border-[var(--line)] p-3 sm:p-4 transition-shadow`}
+      className={`relative overflow-hidden rounded-[var(--radius)] border ${style.borderColor} sm:border-[var(--line)] p-3 pl-[15px] sm:p-4 sm:pl-[18px] transition-shadow`}
       style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-soft)' }}
     >
-      {/* Bisel superior coloreado en mobile */}
-      <div aria-hidden className="absolute inset-x-0 top-0 h-[2px] sm:h-px pointer-events-none sm:hidden"
-        style={{ background: 'var(--bento-bevel)' }} />
+      {/* Cockpit: barra de acento a la izquierda (señal del KPI) */}
+      <div aria-hidden className="absolute left-0 top-0 bottom-0 w-[2px] pointer-events-none"
+        style={{ background: style.spark || 'var(--accent)', opacity: .9 }} />
 
       {/* ── MOBILE LAYOUT ── */}
       <div className="sm:hidden">
