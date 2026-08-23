@@ -389,15 +389,16 @@ body {
 .sidebar { width: 240px; background: var(--surface); border-right: 1px solid var(--line); display: flex; flex-direction: column; height: 100vh; position: fixed; top: 0; left: 0; z-index: 40; }
 .sidebar-nav-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; font-size: 13px; font-weight: 500; color: var(--text-2); transition: all 0.15s ease; position: relative; }
 .sidebar-nav-item:hover { color: var(--text-1); background: var(--surface-2); }
-.sidebar-nav-item.active { color: var(--accent-bright); background: var(--accent-soft); font-weight: 600; }
-.sidebar-nav-item.active::before { content: ''; position: absolute; left: -12px; top: 4px; bottom: 4px; width: 4px; border-radius: 0 4px 4px 0; background: var(--accent); }
-.sidebar-section-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); padding: 16px 12px 6px; }
+/* DS v2.2 — pastilla del item activo más limpia (ring interno + indicador redondeado) */
+.sidebar-nav-item.active { color: var(--accent-bright); background: var(--accent-soft); font-weight: 600; box-shadow: inset 0 0 0 1px var(--accent-line); }
+.sidebar-nav-item.active::before { content: ''; position: absolute; left: -9px; top: 7px; bottom: 7px; width: 3px; border-radius: 3px; background: var(--accent); }
+.sidebar-section-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.11em; color: var(--text-3); padding: 16px 12px 6px; }
 
-/* Cards */
-.dash-card { background: var(--surface); border-radius: 12px; border: 1px solid var(--line); box-shadow: var(--shadow-soft); transition: box-shadow 0.2s ease; }
-.dash-card:hover { box-shadow: var(--shadow-mid); }
-.premium-card { background: var(--surface); border-radius: 12px; border: 1px solid var(--line); box-shadow: var(--shadow-soft); transition: box-shadow 0.2s ease; }
-.premium-card:hover { box-shadow: var(--shadow-mid); }
+/* Cards — DS v2.2: fondo bento (profundidad verde sutil), radio 14, hover con borde acento */
+.dash-card { background: var(--bento-card); border-radius: var(--radius); border: 1px solid var(--line); box-shadow: var(--shadow-soft); transition: box-shadow .2s ease, border-color .2s ease; }
+.dash-card:hover { box-shadow: var(--shadow-mid); border-color: var(--accent-line); }
+.premium-card { background: var(--bento-card); border-radius: var(--radius); border: 1px solid var(--line); box-shadow: var(--shadow-soft); transition: box-shadow .2s ease, border-color .2s ease; }
+.premium-card:hover { box-shadow: var(--shadow-mid); border-color: var(--accent-line); }
 
 /* Animations */
 @keyframes messageSlideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
