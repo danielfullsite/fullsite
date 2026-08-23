@@ -8,8 +8,20 @@ let _client: ReturnType<typeof createClient> | null = null
 
 export function getSupabase() {
   if (!_client) {
-    if (!supabaseUrl || !supabaseAnonKey) {
-      throw new Error('NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are required')
+    let url = supabaseUrl
+    let key = supabaseAnonKey
+    if (!url || !key) {
+      // Durante `next build` (prerender de páginas estáticas como /_not-found) las
+      // env vars públicas pueden no estar inyectadas — no tumbar el build por eso.
+      // En runtime real (server o browser) SÍ exigimos las vars: config faltante
+      // debe fallar ruidoso, no correr con un cliente muerto.
+      const isBuildPhase = process.env.NEXT_PHASE === 'phase-production-build'
+      if (isBuildPhase) {
+        url = 'https://placeholder.supabase.co'
+        key = 'placeholder-anon-key-build-only'
+      } else {
+        throw new Error('NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are required')
+      }
     }
     // Wrap fetch with a 4s timeout so ALL Supabase calls (auth refresh,
     // REST, realtime handshake) abort quickly when the network cable is
@@ -30,7 +42,7 @@ export function getSupabase() {
         : ctrl.signal
       return fetch(input, { ...init, signal }).finally(() => clearTimeout(tid))
     }
-    _client = createClient(supabaseUrl, supabaseAnonKey, {
+    _client = createClient(url, key, {
       global: { fetch: fetchWithTimeout },
     })
   }
