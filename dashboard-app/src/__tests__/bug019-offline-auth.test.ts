@@ -212,4 +212,29 @@ describe('BUG-019 — replay offline autenticado (código real)', () => {
     expect(fetchCalls.at(-1)?.authorization).toBe('Bearer REAUTH_TOKEN')
     expect(await db.getPendingQueue()).toHaveLength(0)
   })
+
+  it('8. un ciclo online posterior reactiva fallos transitorios agotados y drena la cola', async () => {
+    getSession.mockResolvedValue({
+      data: { session: { access_token: 'FRESH_TOKEN', expires_at: Math.floor(Date.now() / 1000) + 3600 } },
+      error: null,
+    })
+    installFetch(() => ({ ok: false, status: 503, body: { ok: false } }))
+    const db = await loadModule()
+    await db.queueOperation('pos_orders', 'POST', { id: 'o8', client_id: 'tenantA' }, '/api/pos/save-order', undefined, 'APP_API')
+
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await db.syncAll()
+      await flush()
+    }
+    expect((await db.getPendingQueue())[0].retries).toBe(5)
+
+    installFetch(() => ({ ok: true, status: 200, body: { ok: true } }))
+    expect((await db.syncAll()).synced).toBe(0)
+
+    const recovered = await db.syncAll({ retryExhausted: true })
+    await flush()
+
+    expect(recovered.synced).toBe(1)
+    expect(await db.getPendingQueue()).toHaveLength(0)
+  })
 })

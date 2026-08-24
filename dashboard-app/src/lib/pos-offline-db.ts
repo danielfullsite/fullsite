@@ -660,13 +660,17 @@ async function markConflict(
 // completes, causing conflicted items to be re-processed and potentially lost.
 let syncAllRunning = false
 
-export async function syncAll(): Promise<{ synced: number; failed: number }> {
+export async function syncAll(options: { retryExhausted?: boolean } = {}): Promise<{ synced: number; failed: number }> {
   if (syncAllRunning) {
     console.log('[offline-sync] syncAll already running — skipping duplicate call')
     return { synced: 0, failed: 0 }
   }
   syncAllRunning = true
   try {
+    if (options.retryExhausted) {
+      const reset = await resetSyncQueueRetries()
+      if (reset > 0) console.log(`[offline-sync] Reactivated ${reset} transient item(s) for a fresh connectivity cycle`)
+    }
     return await _syncAllInner()
   } finally {
     syncAllRunning = false
@@ -1206,7 +1210,7 @@ export function registerAutoSync() {
     isSyncing = true
     console.log('[offline-sync] Internet restored — syncing pending operations...')
     try {
-      const { synced, failed } = await syncAll()
+      const { synced, failed } = await syncAll({ retryExhausted: true })
       if (synced > 0 || failed > 0) {
         console.log(`[offline-sync] Sync complete: ${synced} synced, ${failed} failed`)
       }
@@ -1225,7 +1229,7 @@ export function registerAutoSync() {
         if (queue.length > 0) {
           isSyncing = true
           console.log(`[offline-sync] Found ${queue.length} pending items on mount — syncing...`)
-          const { synced, failed } = await syncAll()
+          const { synced, failed } = await syncAll({ retryExhausted: true })
           console.log(`[offline-sync] Mount sync complete: ${synced} synced, ${failed} failed`)
           isSyncing = false
         }

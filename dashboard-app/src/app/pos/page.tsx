@@ -1835,7 +1835,7 @@ function POSContent() {
       syncRef.current = true
       if (mounted) setIsSyncing(true)
       try {
-        const result = await syncAll()
+        const result = await syncAll({ retryExhausted: true })
         if (mounted && result.synced > 0) setLastSyncTime(new Date().toISOString())
       } catch {}
       if (mounted) setIsSyncing(false)
@@ -3667,7 +3667,7 @@ function POSContent() {
                 } = await import('@/lib/pos-offline-db')
                 setIsSyncing(true)
                 try {
-                  const result = await syncAll()
+                  const result = await syncAll({ retryExhausted: true })
                   const summary = await getSyncQueueSummary()
                   const diagnostics = await getSyncQueueDiagnostics()
                   setPendingSync(summary.pending + summary.terminal + summary.exhausted)
