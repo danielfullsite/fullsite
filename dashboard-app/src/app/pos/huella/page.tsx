@@ -4,13 +4,13 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Fingerprint, CheckCircle, XCircle, Trash2, User, Search } from 'lucide-react'
 import { getFingerprintUrl } from '@/lib/fingerprint-url'
-import { getActiveClientSlug as _cid } from '@/lib/data'
-
-
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 interface StaffMember { id: string; name: string; role: string }
+
+function apiHeaders(): Record<string, string> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('pos_shift_token') : null
+  return { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }
+}
 
 export default function HuellaPage() {
   const [staff, setStaff] = useState<StaffMember[]>([])
@@ -32,10 +32,11 @@ export default function HuellaPage() {
       setRegistered(Object.fromEntries(enrolled.map((id: string) => [id, id])))
     }).catch(() => setBiometricAvailable(false))
 
-    // Load staff
-    fetch(`${SUPABASE_URL}/rest/v1/pos_staff?client_id=eq.${_cid()}&active=eq.true&select=id,name,role&order=name.asc`,
-      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
-    ).then(r => r.ok ? r.json() : []).then(setStaff)
+    // Load staff through the authenticated POS API. Anonymous Supabase access
+    // is blocked by RLS and previously returned an empty list here.
+    fetch('/api/pos/staff', { headers: apiHeaders(), cache: 'no-store' })
+      .then(r => r.ok ? r.json() : { staff: [] })
+      .then(data => setStaff(Array.isArray(data.staff) ? data.staff : []))
 
   }, [])
 
