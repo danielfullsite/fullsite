@@ -282,7 +282,7 @@ export async function markSynced(id: string): Promise<void> {
   }
 }
 
-export async function incrementRetry(id: string): Promise<void> {
+export async function incrementRetry(id: string, detail = ''): Promise<void> {
   const db = await openDB()
   const tx = db.transaction('sync_queue', 'readwrite')
   const store = tx.objectStore('sync_queue')
@@ -291,6 +291,7 @@ export async function incrementRetry(id: string): Promise<void> {
     const item = request.result
     if (item) {
       item.retries += 1
+      if (detail) item.error_detail = detail.slice(0, 500)
       store.put(item)
     }
   }
@@ -750,7 +751,7 @@ async function _syncAllInner(): Promise<{ synced: number; failed: number }> {
         } else {
           // TRANSIENT_RETRYABLE
           console.warn(`[offline-sync] Transient failure for ${item.endpoint}: ${result.detail}`)
-          await incrementRetry(item.id)
+          await incrementRetry(item.id, result.detail || 'TRANSIENT_RETRYABLE')
           failed++
         }
       } else {
@@ -774,7 +775,7 @@ async function _syncAllInner(): Promise<{ synced: number; failed: number }> {
           url = `${base}/api/pos/db?path=${encodeURIComponent(restPath)}`
           reqHeaders = { Authorization: `Bearer ${shiftToken}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' }
         } else {
-          await incrementRetry(item.id)
+          await incrementRetry(item.id, 'NO_AUTH_TOKEN')
           failed++
           continue
         }
@@ -798,13 +799,14 @@ async function _syncAllInner(): Promise<{ synced: number; failed: number }> {
           emitAuthRequired()
           break
         } else {
-          await incrementRetry(item.id)
+          const errorBody = await res.text().catch(() => '')
+          await incrementRetry(item.id, `HTTP ${res.status}${errorBody ? `: ${errorBody}` : ''}`)
           failed++
         }
       }
-    } catch {
+    } catch (error) {
       // Network error — transient retryable
-      await incrementRetry(item.id)
+      await incrementRetry(item.id, error instanceof Error ? error.message : 'NETWORK_ERROR')
       failed++
     }
   }

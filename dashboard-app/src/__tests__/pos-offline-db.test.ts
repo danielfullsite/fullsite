@@ -102,10 +102,11 @@ describe('pos-offline-db — cola de sync (el corazón del offline)', () => {
 
   it('incrementRetry sube el contador (para backoff)', async () => {
     const id = await queueOperation('pos_orders', 'POST', { id: 'o1' })
-    await incrementRetry(id)
+    await incrementRetry(id, 'HTTP 400: schema mismatch')
     await incrementRetry(id)
     const item = (await getPendingQueue()).find((i) => i.id === id)
     expect(item?.retries).toBe(2)
+    expect(item?.error_detail).toBe('HTTP 400: schema mismatch')
   })
 
   it('conservar nube elimina únicamente el conflicto elegido', async () => {
