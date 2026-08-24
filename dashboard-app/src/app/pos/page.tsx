@@ -10,7 +10,6 @@ import {
   consumeManagerApproval,
   verifyPinWithMinRole,
   type MenuCategory,
-  RECIPE_ALIASES,
   formatMXN,
   generateId,
   saveOrder,
@@ -73,6 +72,7 @@ import { getActiveCombos, applyCombo, type Combo } from '@/lib/pos-combos'
 import { syncAll, getPendingQueue, queueOperation, cacheMenu, getCachedMenu, cacheCashMovement, guardTenant } from '@/lib/pos-offline-db'
 import { sendNotification } from '@/lib/service-worker'
 import { getPermissions } from '@/lib/pos-permissions'
+import { getRecipeIngredientNames } from '@/lib/pos-recipe-ingredients'
 import {
   type MpPaymentRecovery,
   type MpPaymentState,
@@ -1807,38 +1807,7 @@ function POSContent() {
 
   // Get ingredient names for a specific menu item
   const getRecipeIngredients = useCallback((itemName: string): string[] => {
-    const name = itemName.toLowerCase()
-    const ingMap = new Map(allIngredients.map(i => [i.id, i]))
-
-    // Use alias map first
-    const aliases = RECIPE_ALIASES[name]
-    let rows: RecipeRow[] = []
-
-    if (aliases) {
-      for (const alias of aliases) {
-        const matched = allRecipes.filter(r => r.menu_item_name.toLowerCase() === alias.toLowerCase())
-        if (matched.length > 0) { rows = matched; break }
-      }
-    }
-
-    // Fallback: partial match
-    if (rows.length === 0) {
-      rows = allRecipes.filter(r => {
-        const rName = r.menu_item_name.toLowerCase()
-        return rName === name || rName.includes(name) || name.includes(rName)
-      })
-    }
-
-    // Get unique ingredient names, capitalize first letter
-    const names = new Set<string>()
-    for (const row of rows) {
-      const ing = ingMap.get(row.ingredient_id)
-      const ingName = ing?.name || row.ingredient_id
-      // Skip very generic ingredients (water, oil, salt, pepper)
-      if (['agua de filtro', 'aceite vegetal', 'sal', 'pimienta', 'aceite de oliva'].includes(ingName.toLowerCase())) continue
-      names.add(ingName.charAt(0).toUpperCase() + ingName.slice(1))
-    }
-    return Array.from(names).slice(0, 12) // max 12 options
+    return getRecipeIngredientNames(itemName, allRecipes, allIngredients)
   }, [allRecipes, allIngredients])
 
   // Online/offline + sync (IndexedDB-backed)
