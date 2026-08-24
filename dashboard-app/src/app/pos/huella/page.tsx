@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Fingerprint, CheckCircle, XCircle, Trash2, User, Search } from 'lucide-react'
-import { apiUrl } from '@/lib/api-base'
+import { getFingerprintUrl } from '@/lib/fingerprint-url'
 import { getActiveClientSlug as _cid } from '@/lib/data'
 
 
@@ -14,88 +14,73 @@ interface StaffMember { id: string; name: string; role: string }
 
 export default function HuellaPage() {
   const [staff, setStaff] = useState<StaffMember[]>([])
-  const [registered, setRegistered] = useState<Record<string, string>>({}) // credId → staffName
-  const [loading, setLoading] = useState(true)
+  const [registered, setRegistered] = useState<Record<string, string>>({}) // staffId → staffName
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [biometricAvailable, setBiometricAvailable] = useState(false)
   const [search, setSearch] = useState('')
 
   useEffect(() => {
-    // Check biometric
-    if (window.PublicKeyCredential) {
-      PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable?.()
-        .then(ok => setBiometricAvailable(ok))
-        .catch(() => {})
-    }
+    const fingerprintUrl = getFingerprintUrl()
+    // DigitalPersona is exposed through Pedro's CSP-safe local proxy.
+    Promise.all([
+      fetch(`${fingerprintUrl}/health`, { signal: AbortSignal.timeout(3000) }).then(r => r.ok ? r.json() : null),
+      fetch(`${fingerprintUrl}/list`, { signal: AbortSignal.timeout(3000) }).then(r => r.ok ? r.json() : null),
+    ]).then(([health, list]) => {
+      setBiometricAvailable(health?.ok === true)
+      const enrolled = Array.isArray(list?.enrolled) ? list.enrolled : []
+      setRegistered(Object.fromEntries(enrolled.map((id: string) => [id, id])))
+    }).catch(() => setBiometricAvailable(false))
 
     // Load staff
     fetch(`${SUPABASE_URL}/rest/v1/pos_staff?client_id=eq.${_cid()}&active=eq.true&select=id,name,role&order=name.asc`,
       { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
-    ).then(r => r.ok ? r.json() : []).then(setStaff).finally(() => setLoading(false))
+    ).then(r => r.ok ? r.json() : []).then(setStaff)
 
-    // Load registered credentials
-    try {
-      const stored = JSON.parse(localStorage.getItem('pos_biometric_credentials') || '{}')
-      const byStaff: Record<string, string> = {}
-      for (const [credId, member] of Object.entries(stored)) {
-        const m = member as { id: string; name: string }
-        byStaff[m.id] = m.name
-      }
-      setRegistered(byStaff)
-    } catch { /* */ }
   }, [])
 
   const handleRegister = async (member: StaffMember) => {
     setMessage('')
     setError('')
     try {
-      const challenge = new Uint8Array(32)
-      crypto.getRandomValues(challenge)
-      const credential = await navigator.credentials.create({
-        publicKey: {
-          challenge,
-          rp: { name: 'Fullsite POS', id: window.location.hostname },
-          user: {
-            id: new TextEncoder().encode(member.id),
-            name: member.name,
-            displayName: member.name,
-          },
-          pubKeyCredParams: [{ alg: -7, type: 'public-key' }, { alg: -257, type: 'public-key' }],
-          authenticatorSelection: {
-            authenticatorAttachment: 'platform',
-            userVerification: 'required',
-          },
-          timeout: 60000,
-        },
+      const res = await fetch(`${getFingerprintUrl()}/enroll?id=${encodeURIComponent(member.id)}`, {
+        signal: AbortSignal.timeout(90000),
       })
-      if (credential) {
-        const credId = btoa(String.fromCharCode(...new Uint8Array((credential as PublicKeyCredential).rawId)))
-        const stored = JSON.parse(localStorage.getItem('pos_biometric_credentials') || '{}')
-        stored[credId] = { id: member.id, name: member.name, role: member.role }
-        localStorage.setItem('pos_biometric_credentials', JSON.stringify(stored))
+      const data = await res.json()
+      if (data.ok) {
+        const stored = JSON.parse(localStorage.getItem('pos_fingerprint_staff') || '{}')
+        stored[member.id] = { id: member.id, name: member.name, role: member.role }
+        localStorage.setItem('pos_fingerprint_staff', JSON.stringify(stored))
         setRegistered(prev => ({ ...prev, [member.id]: member.name }))
         setMessage(`Huella registrada para ${member.name}`)
+      } else {
+        setError(data.error || 'No se pudo registrar la huella')
       }
     } catch (e) {
       setError(`Error al registrar huella: ${(e as Error).message}`)
     }
   }
 
-  const handleRemove = (memberId: string) => {
-    const stored = JSON.parse(localStorage.getItem('pos_biometric_credentials') || '{}')
-    for (const [credId, member] of Object.entries(stored)) {
-      if ((member as { id: string }).id === memberId) {
-        delete stored[credId]
-      }
+  const handleRemove = async (memberId: string) => {
+    setError('')
+    try {
+      const res = await fetch(`${getFingerprintUrl()}/delete?id=${encodeURIComponent(memberId)}`, {
+        signal: AbortSignal.timeout(5000),
+      })
+      const data = await res.json()
+      if (!data.ok) throw new Error(data.error || 'No se pudo eliminar')
+      const stored = JSON.parse(localStorage.getItem('pos_fingerprint_staff') || '{}')
+      delete stored[memberId]
+      localStorage.setItem('pos_fingerprint_staff', JSON.stringify(stored))
+      setRegistered(prev => {
+        const next = { ...prev }
+        delete next[memberId]
+        return next
+      })
+      setMessage('Huella eliminada')
+    } catch (e) {
+      setError(`Error al eliminar huella: ${(e as Error).message}`)
     }
-    localStorage.setItem('pos_biometric_credentials', JSON.stringify(stored))
-    setRegistered(prev => {
-      const next = { ...prev }
-      delete next[memberId]
-      return next
-    })
-    setMessage('Huella eliminada')
   }
 
   const registeredCount = Object.keys(registered).length
@@ -128,7 +113,7 @@ export default function HuellaPage() {
       {!biometricAvailable && (
         <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 mb-4">
           <p className="text-red-400 font-semibold">Lector de huella no detectado</p>
-          <p className="text-sm text-[var(--text-3)] mt-1">Verifica que el lector HID DigitalPersona esté conectado y que Windows Hello esté configurado con huellas.</p>
+          <p className="text-sm text-[var(--text-3)] mt-1">Verifica que DigitalPersona y el servicio local de Fullsite estén activos.</p>
         </div>
       )}
 

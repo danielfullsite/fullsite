@@ -1,4 +1,6 @@
-const FINGERPRINT_DEFAULT_URL = 'http://127.0.0.1:7718'
+// Reach DigitalPersona through Pedro's local proxy. The deployed CSP allows
+// :7717, while direct browser requests to :7718 are intentionally blocked.
+const FINGERPRINT_DEFAULT_URL = 'http://127.0.0.1:7717/fp'
 
 let _override: string | null = null
 
