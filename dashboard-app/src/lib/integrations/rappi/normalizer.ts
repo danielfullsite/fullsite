@@ -46,11 +46,19 @@ function stringifyAddress(value: unknown): string {
   if (typeof value === 'string') return value.trim()
   const address = obj(value)
   return [
+    address.complete_address,
     address.street,
+    address.street_name,
     address.street_number ?? address.number,
     address.neighborhood,
     address.city,
   ].map(str).filter(Boolean).join(', ')
+}
+
+function orderEnvelope(rawOrder: unknown): { envelope: Record<string, unknown>; detail: Record<string, unknown> } {
+  const envelope = obj(rawOrder)
+  const nested = obj(envelope.order_detail)
+  return { envelope, detail: Object.keys(nested).length ? nested : envelope }
 }
 
 function normalizeItem(rawItem: unknown): CanonicalOrderItem {
@@ -79,14 +87,14 @@ function normalizeItem(rawItem: unknown): CanonicalOrderItem {
 }
 
 export function rappiProviderOrderId(rawOrder: unknown): string {
-  const order = obj(rawOrder)
-  return firstNonEmpty(order.order_id, order.id, order.orderId)
+  const { envelope, detail } = orderEnvelope(rawOrder)
+  return firstNonEmpty(detail.order_id, detail.id, detail.orderId, envelope.order_id, envelope.id, envelope.orderId)
 }
 
 export function rappiProviderStoreId(rawOrder: unknown, fallback?: string | null): string {
-  const order = obj(rawOrder)
-  const store = obj(order.store)
-  return firstNonEmpty(store.internal_id, store.external_id, store.id, order.store_id, fallback)
+  const { envelope, detail } = orderEnvelope(rawOrder)
+  const store = obj(envelope.store ?? detail.store)
+  return firstNonEmpty(store.internal_id, store.external_id, store.id, detail.store_id, envelope.store_id, fallback)
 }
 
 export function normalizeRappiOrder(rawOrder: unknown, options: {
@@ -94,11 +102,13 @@ export function normalizeRappiOrder(rawOrder: unknown, options: {
   correlationId: string
   storeIdFallback?: string | null
 }): CanonicalOrder {
-  const order = obj(rawOrder)
+  const { envelope, detail: order } = orderEnvelope(rawOrder)
   const totals = obj(order.totals)
-  const customer = obj(order.customer)
+  const customer = obj(envelope.customer ?? order.customer)
   const billing = obj(order.billing_information)
   const delivery = obj(order.delivery_information)
+  const charges = obj(totals.charges)
+  const otherTotals = obj(totals.other_totals)
 
   const providerOrderId = rappiProviderOrderId(rawOrder)
   const providerStoreId = rappiProviderStoreId(rawOrder, options.storeIdFallback)
@@ -106,11 +116,11 @@ export function normalizeRappiOrder(rawOrder: unknown, options: {
   if (!providerStoreId) throw new Error('RAPPI_STORE_ID_MISSING')
 
   const items = arr(order.items).map(normalizeItem)
-  const subtotal = cents(totals.products_subtotal ?? totals.subtotal ?? totals.items_subtotal)
-  const deliveryFee = cents(totals.charges ?? totals.delivery_fee ?? totals.deliveryFee)
-  const tip = cents(totals.tips ?? totals.tip)
-  const discounts = discountTotal(totals.discounts)
-  const explicitTotal = cents(totals.total ?? order.total)
+  const subtotal = cents(totals.products_subtotal ?? totals.subtotal ?? totals.items_subtotal ?? totals.total_products)
+  const deliveryFee = cents(totals.delivery_fee ?? totals.deliveryFee ?? charges.shipping ?? totals.charges)
+  const tip = cents(totals.tips ?? totals.tip ?? otherTotals.tip)
+  const discounts = discountTotal(order.discounts ?? totals.discounts)
+  const explicitTotal = cents(totals.total ?? totals.total_order ?? order.total)
   const total = explicitTotal > 0
     ? explicitTotal
     : Math.max(0, Math.round((subtotal + deliveryFee + tip - discounts) * 100) / 100)
@@ -121,8 +131,13 @@ export function normalizeRappiOrder(rawOrder: unknown, options: {
     provider_store_id: providerStoreId,
     client_id: options.clientId,
     status: 'nueva',
-    customer_name: firstNonEmpty(customer.name, billing.name, 'Cliente Rappi'),
-    customer_phone: firstNonEmpty(customer.contact, customer.phone, billing.contact) || undefined,
+    customer_name: firstNonEmpty(
+      customer.name,
+      [str(customer.first_name), str(customer.last_name)].filter(Boolean).join(' '),
+      billing.name,
+      'Cliente Rappi',
+    ),
+    customer_phone: firstNonEmpty(customer.contact, customer.phone, customer.phone_number, billing.contact, billing.phone) || undefined,
     delivery_address: stringifyAddress(delivery.address ?? delivery) || undefined,
     items,
     subtotal,
@@ -130,7 +145,7 @@ export function normalizeRappiOrder(rawOrder: unknown, options: {
     tip,
     total,
     notes: str(order.comments ?? order.notes),
-    estimated_pickup_at: str(order.estimated_pickup ?? order.eta ?? order.cooking_time) || undefined,
+    estimated_pickup_at: str(order.estimated_pickup ?? order.estimated_pickup_at ?? order.eta) || undefined,
     correlation_id: options.correlationId,
     idempotency_key: `rappi-order-${providerOrderId}`,
     raw_payload: rawOrder,
