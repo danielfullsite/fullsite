@@ -18,6 +18,7 @@ import {
   AlertTriangle,
 } from 'lucide-react'
 import { getActiveClientSlug as _cid } from '@/lib/data'
+import { generateStaffPin } from '@/lib/staff-pin'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -389,7 +390,7 @@ export default function StaffPage() {
         <Users size={22} className="text-emerald-400" />
         <h1 className="text-lg font-bold flex-1">Empleados</h1>
         <button
-          onClick={() => { resetForm(); setShowCreateModal(true) }}
+          onClick={() => { resetForm(); setFormPin(generateStaffPin()); setShowCreateModal(true) }}
           className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-semibold flex items-center gap-2 min-h-[48px] transition-colors"
         >
           <UserPlus size={18} />
@@ -582,14 +583,18 @@ export default function StaffPage() {
               <div>
                 <label className="text-sm text-gray-400 block mb-1">PIN individual (10 digitos) *</label>
                 <input
-                  type="password"
+                  type="text"
                   inputMode="numeric"
                   maxLength={10}
                   value={formPin}
-                  onChange={e => setFormPin(e.target.value.replace(/\D/g, ''))}
+                  readOnly
                   className="w-full bg-[#1e1e2e] border border-[#2a2a3e] rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500 min-h-[48px] font-mono tracking-widest"
                   placeholder="••••••••••"
                 />
+                <button type="button" onClick={() => setFormPin(generateStaffPin())}
+                  className="mt-2 text-xs text-emerald-400 hover:text-emerald-300 min-h-[36px]">
+                  Generar otro PIN aleatorio
+                </button>
               </div>
               <div>
                 <label className="text-sm text-gray-400 block mb-1">Rol *</label>
@@ -656,14 +661,18 @@ export default function StaffPage() {
               <div>
                 <label className="text-sm text-gray-400 block mb-1">Nuevo PIN (opcional, 10 digitos)</label>
                 <input
-                  type="password"
+                  type="text"
                   inputMode="numeric"
                   maxLength={10}
                   value={formNewPin}
-                  onChange={e => setFormNewPin(e.target.value.replace(/\D/g, ''))}
+                  readOnly
                   className="w-full bg-[#1e1e2e] border border-[#2a2a3e] rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500 min-h-[48px] font-mono tracking-widest"
-                  placeholder="Dejar vacio para no cambiar"
+                  placeholder="Pulsa generar para rotarlo"
                 />
+                <button type="button" onClick={() => setFormNewPin(generateStaffPin())}
+                  className="mt-2 text-xs text-amber-400 hover:text-amber-300 min-h-[36px]">
+                  Generar PIN nuevo aleatorio
+                </button>
               </div>
               <div>
                 <label className="text-sm text-gray-400 block mb-1">Rol</label>
