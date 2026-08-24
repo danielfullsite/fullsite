@@ -452,11 +452,26 @@
 
   function setConn(ok){ online=ok; connDot.style.background=ok?"var(--lista)":"var(--danger)"; connTxt.textContent=ok?"conectado":"sin conexión — reintentando"; }
 
+  // Adaptador robusto: el KDS pinta órdenes con forma {id, mesa, items,...}. Prefiere la
+  // fuente offline-nativa (kds_orders) si viene poblada; si no, normaliza kds_queue —el
+  // campo que SÍ llena la caja (incl. 1.3.3)— a esa misma forma. Así jala online y offline
+  // sin tocar la caja ni romper el flujo probado caja→KDS por LAN.
+  function adaptOrders(data){
+    if(!data) return [];
+    if(Array.isArray(data.kds_orders) && data.kds_orders.length) return data.kds_orders;
+    if(Array.isArray(data.kds_queue) && data.kds_queue.length){
+      return data.kds_queue.map(function(q){
+        return { id:q.order_id, mesa:q.mesa, items:q.items_sent||[], created_at:q.sent_at, updated_at:q.sent_at, status:"enviada" };
+      });
+    }
+    return [];
+  }
+
   function fetchState(){
     var ctrl=new AbortController(); var to=setTimeout(function(){ ctrl.abort(); },4000);
     fetch(STATE_BASE+"/state",{cache:"no-store",signal:ctrl.signal})
       .then(function(r){ return r.ok?r.json():Promise.reject(); })
-      .then(function(data){ clearTimeout(to); lastGood=(data&&data.kds_orders)||[]; setConn(true); render(true); })
+      .then(function(data){ clearTimeout(to); lastGood=adaptOrders(data); setConn(true); render(true); })
       .catch(function(){ clearTimeout(to); setConn(false); render(false); });
   }
 
