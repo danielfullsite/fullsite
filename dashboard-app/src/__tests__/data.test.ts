@@ -82,8 +82,7 @@ describe('getActiveClientSlug', () => {
 // ─── aggregatePayments ────────────────────────────────────────────────────
 
 describe('aggregatePayments', () => {
-  it('converts percentage values to MXN correctly', () => {
-    // Real scenario: 42.0% of $59,258 = $24,888.36 → rounds to $24,888
+  it('treats payment totals as MXN amounts, including values below 100', () => {
     const data = [makeDaily({
       ventas_dia: 59258,
       pago_métodos: [
@@ -96,15 +95,15 @@ describe('aggregatePayments', () => {
 
     const tarjeta = result.find(r => r.nombre === 'Tarjeta de crédito')
     expect(tarjeta).toBeDefined()
-    expect(tarjeta!.total).toBe(Math.round(0.42 * 59258))
+    expect(tarjeta!.total).toBe(42)
 
     const efectivo = result.find(r => r.nombre === 'Efectivo')
     expect(efectivo).toBeDefined()
-    expect(efectivo!.total).toBe(Math.round(0.30 * 59258))
+    expect(efectivo!.total).toBe(30)
 
     const debito = result.find(r => r.nombre === 'Tarjeta de débito')
     expect(debito).toBeDefined()
-    expect(debito!.total).toBe(Math.round(0.28 * 59258))
+    expect(debito!.total).toBe(28)
   })
 
   it('handles empty array', () => {
@@ -134,8 +133,7 @@ describe('aggregatePayments', () => {
     const result = aggregatePayments(data)
     const efectivo = result.find(r => r.nombre === 'Efectivo')
     expect(efectivo).toBeDefined()
-    // Day 1: 50% of 50000 = 25000, Day 2: 60% of 40000 = 24000
-    expect(efectivo!.total).toBe(Math.round(25000 + 24000))
+    expect(efectivo!.total).toBe(110)
   })
 
   it('passes through absolute values >= 100 without conversion', () => {
@@ -183,16 +181,16 @@ describe('aggregatePayments', () => {
       pago_métodos: [{ nombre: 'Efectivo', total: 50.0 }],
     })]
     const result = aggregatePayments(data)
-    expect(result[0].total).toBe(0)
+    expect(result[0].total).toBe(50)
   })
 
-  it('handles percentage with 99.9% total', () => {
+  it('rounds a fractional MXN amount', () => {
     const data = [makeDaily({
       ventas_dia: 10000,
       pago_métodos: [{ nombre: 'Tarjeta', total: 99.9 }],
     })]
     const result = aggregatePayments(data)
-    expect(result[0].total).toBe(Math.round(0.999 * 10000))
+    expect(result[0].total).toBe(100)
   })
 
   it('handles single day with multiple payment methods', () => {
@@ -209,8 +207,7 @@ describe('aggregatePayments', () => {
     const result = aggregatePayments(data)
     expect(result).toHaveLength(5)
     const sum = result.reduce((s, r) => s + r.total, 0)
-    // Percentages add to 100%, so MXN sum should equal ventas_dia
-    expect(sum).toBe(80000)
+    expect(sum).toBe(100)
   })
 })
 
