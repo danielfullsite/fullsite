@@ -366,6 +366,24 @@ export async function getSyncQueueSummary(): Promise<SyncQueueSummary> {
   return { pending, terminal, conflicts, exhausted }
 }
 
+export interface SyncQueueDiagnostic {
+  operation: string
+  retries: number
+  errorClass: string
+  detail: string
+}
+
+/** Safe operator diagnostics: deliberately excludes queued order/payment payloads. */
+export async function getSyncQueueDiagnostics(): Promise<SyncQueueDiagnostic[]> {
+  const queue = await getPendingQueue()
+  return queue.map(item => ({
+    operation: item.endpoint || item.table || item.method || 'unknown',
+    retries: item.retries ?? 0,
+    errorClass: item.error_class || ((item.retries ?? 0) >= 5 ? 'RETRIES_EXHAUSTED' : 'PENDING'),
+    detail: item.error_detail || '',
+  }))
+}
+
 export async function clearSyncedItems(): Promise<void> {
   const db = await openDB()
   const tx = db.transaction('sync_queue', 'readwrite')

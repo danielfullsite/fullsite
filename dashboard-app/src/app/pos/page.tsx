@@ -3657,9 +3657,21 @@ function POSContent() {
               lastSyncTime={lastSyncTime}
               connectedDevices={connectedDevices}
               onSync={async () => {
-                const { syncAll } = await import('@/lib/pos-offline-db')
+                const { syncAll, getSyncQueueSummary, getSyncQueueDiagnostics } = await import('@/lib/pos-offline-db')
                 setIsSyncing(true)
-                try { await syncAll(); setLastSyncTime(new Date().toISOString()) } catch {}
+                try {
+                  const result = await syncAll()
+                  const summary = await getSyncQueueSummary()
+                  const diagnostics = await getSyncQueueDiagnostics()
+                  setPendingSync(summary.pending + summary.terminal + summary.exhausted)
+                  if (result.synced > 0) setLastSyncTime(new Date().toISOString())
+                  if (diagnostics.length > 0) {
+                    const rows = diagnostics.map((d, i) =>
+                      `${i + 1}. ${d.operation} — ${d.errorClass} — intentos ${d.retries}${d.detail ? `\n   ${d.detail}` : ''}`
+                    )
+                    window.alert(`Diagnóstico de sincronización\n\n${rows.join('\n')}`)
+                  }
+                } catch {}
                 setIsSyncing(false)
               }}
               onClear={async () => {
