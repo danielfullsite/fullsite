@@ -49,6 +49,7 @@ jobs:
           call health GET "$BASE/api/integrations/rappi/health"
           call oauth GET "$BASE/api/integrations/rappi/status?probe=oauth"
           call menu_dry_run POST "$BASE/api/integrations/rappi/menu" '{"dry_run":true}'
+          call poller_dry_run POST "$BASE/api/integrations/rappi/poller" '{"dry_run":true}'
 
       - name: Upload minimal menu to Rappi DEV
         if: ${{ inputs.exercise_menu }}
@@ -62,6 +63,13 @@ jobs:
           echo "menu_upload HTTP $code"
           jq '{ok, provider, action, error, status_code, summary}' evidence/menu_upload.json 2>/dev/null || true
           [[ "$code" =~ ^2[0-9][0-9]$ ]] && jq -e '.ok == true' evidence/menu_upload.json >/dev/null
+
+          code=$(curl --fail-with-body -sS -o evidence/menu_read_submitted.json -w "%{http_code}" \
+            "$BASE/api/integrations/rappi/menu?mode=submitted" \
+            -H "Authorization: Bearer $SECRET") || true
+          echo "menu_read_submitted HTTP $code"
+          jq '{ok, provider, action, error, status_code, upstream}' evidence/menu_read_submitted.json 2>/dev/null || true
+          [[ "$code" =~ ^2[0-9][0-9]$ ]] && jq -e '.ok == true' evidence/menu_read_submitted.json >/dev/null
 
       - name: Publish evidence
         if: always()
