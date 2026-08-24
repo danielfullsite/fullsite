@@ -107,6 +107,63 @@ function buildDeliveryTicket(command, station) {
   )
 }
 
+async function injectDeliveryTest({ platform = 'rappi', testId, restaurantId, cmdHandler, eventStore, print = true }) {
+  if (platform !== 'rappi' && platform !== 'ubereats') throw new Error('platform must be rappi or ubereats')
+  const id = String(testId || Date.now()).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 48)
+  if (!id) throw new Error('invalid test_id')
+  const row = {
+    id: `delivery-test-${platform}-${id}`,
+    platform,
+    platform_order_id: `TEST-${id}`,
+    status: 'nueva',
+    customer_name: 'PRUEBA FULLSITE — NO PREPARAR',
+    total: 123.45,
+    notes: 'PEDIDO SIMULADO. NO ES VENTA REAL.',
+    items: [
+      { id: `test-food-${id}`, sku: 'TEST-FOOD', name: 'PRUEBA Chilaquiles', qty: 1, notes: 'NO PREPARAR', station: 'cocina' },
+      { id: `test-drink-${id}`, sku: 'TEST-DRINK', name: 'PRUEBA Latte', qty: 1, notes: 'NO PREPARAR', station: 'barra' },
+    ],
+  }
+  const command = deliveryOrderCommand(row, restaurantId)
+  command.test_mode = true
+  const result = await cmdHandler.handle({ protocol_version: PROTOCOL_VERSION, type: 'COMMAND', restaurant_id: restaurantId, payload: command }, 'delivery-test')
+  if (result.event?.sequence) await eventStore.markSynced(result.event.sequence)
+  const printedStations = []
+  if (print) for (const station of ['cocina', 'barra', 'caja']) {
+    const ticket = buildDeliveryTicket(command, station)
+    if (!ticket) continue
+    const pr = await cmdHandler.handle({
+      protocol_version: PROTOCOL_VERSION, type: 'COMMAND', restaurant_id: restaurantId,
+      payload: { command_id: `delivery-test-print:${platform}:${id}:${station}`, command_type: 'PRINT_COMMAND', station, data_b64: ticket.toString('base64'), test_mode: true },
+    }, 'delivery-test')
+    if (pr.event?.sequence) await eventStore.markSynced(pr.event.sequence)
+    if (!pr.duplicate) printedStations.push(station)
+  }
+  return { test_id: id, order_id: row.id, platform, duplicate: !!result.duplicate, printed_stations: printedStations, command }
+}
+
+async function clearDeliveryTest({ orderId, restaurantId, cmdHandler, eventStore }) {
+  const safeOrderId = String(orderId || '')
+  if (!/^delivery-test-(rappi|ubereats)-[a-zA-Z0-9_-]{1,48}$/.test(safeOrderId)) {
+    throw new Error('only delivery test orders can be cleared')
+  }
+  const result = await cmdHandler.handle({
+    protocol_version: PROTOCOL_VERSION,
+    type: 'COMMAND',
+    restaurant_id: restaurantId,
+    payload: {
+      command_id: `delivery-test-clear:${safeOrderId}`,
+      command_type: 'ORDER_CANCELLED',
+      order_id: safeOrderId,
+      mesa: null,
+      reason: 'delivery_test_cleanup',
+      test_mode: true,
+    },
+  }, 'delivery-test')
+  if (result.event?.sequence) await eventStore.markSynced(result.event.sequence)
+  return { order_id: safeOrderId, duplicate: !!result.duplicate, cleared: true }
+}
+
 async function startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, serviceEmail, servicePassword, state, eventStore, wsHub, cmdHandler }) {
   if (!supabaseUrl || !supabaseKey) return
   const POLL_INTERVAL = 5000
@@ -333,6 +390,51 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, versio
       let alerts = []
       try { alerts = edgeWatcher.evaluate(state.toSnapshot(), { slowMinutes: EDGE_SLOW_MINUTES }, Date.now()) } catch (e) {}
       json(res, 200, { alerts, generated_at: new Date().toISOString() })
+      return
+    }
+
+    // ── POST /delivery-test — local, explicit, non-production marketplace test ──
+    // Loopback-only prevents another LAN device from creating fake orders. The
+    // confirmation phrase prevents accidental clicks/scripts on the caja itself.
+    if (url === '/delivery-test' && req.method === 'POST') {
+      const remote = req.socket.remoteAddress || ''
+      if (remote !== '127.0.0.1' && remote !== '::1' && remote !== '::ffff:127.0.0.1') {
+        json(res, 403, { ok: false, error: 'LOOPBACK_ONLY' }); return
+      }
+      const body = await parseBody(req)
+      if (body.confirm !== 'CONFIRMAR_PRUEBA') {
+        json(res, 400, { ok: false, error: 'CONFIRMATION_REQUIRED', expected: 'CONFIRMAR_PRUEBA' }); return
+      }
+      try {
+        const evidence = await injectDeliveryTest({
+          platform: body.platform || 'rappi', testId: body.test_id,
+          restaurantId, cmdHandler, eventStore, print: body.print !== false,
+        })
+        json(res, 200, { ok: true, test_mode: true, warning: 'NO ES VENTA REAL', created_at: new Date().toISOString(), ...evidence })
+      } catch (e) {
+        json(res, 400, { ok: false, error: e.message })
+      }
+      return
+    }
+
+    // ── POST /delivery-test/clear — removes only explicit simulated orders ──
+    if (url === '/delivery-test/clear' && req.method === 'POST') {
+      const remote = req.socket.remoteAddress || ''
+      if (remote !== '127.0.0.1' && remote !== '::1' && remote !== '::ffff:127.0.0.1') {
+        json(res, 403, { ok: false, error: 'LOOPBACK_ONLY' }); return
+      }
+      const body = await parseBody(req)
+      if (body.confirm !== 'LIMPIAR_PRUEBA') {
+        json(res, 400, { ok: false, error: 'CONFIRMATION_REQUIRED', expected: 'LIMPIAR_PRUEBA' }); return
+      }
+      try {
+        const evidence = await clearDeliveryTest({
+          orderId: body.order_id, restaurantId, cmdHandler, eventStore,
+        })
+        json(res, 200, { ok: true, test_mode: true, ...evidence })
+      } catch (e) {
+        json(res, 400, { ok: false, error: e.message })
+      }
       return
     }
 
@@ -641,4 +743,4 @@ async function startLocalServer({ dataDir, port = 7717, config = {} }) {
   return { httpServer, close, serverId, lanIp, wsHub }
 }
 
-module.exports = { startLocalServer, deliveryStation, deliveryOrderCommand, buildDeliveryTicket }
+module.exports = { startLocalServer, deliveryStation, deliveryOrderCommand, buildDeliveryTicket, injectDeliveryTest, clearDeliveryTest }

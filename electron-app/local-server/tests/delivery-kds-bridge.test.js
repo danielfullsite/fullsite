@@ -1,7 +1,7 @@
 'use strict'
 const { describe, test } = require('node:test')
 const assert = require('node:assert/strict')
-const { deliveryStation, deliveryOrderCommand, buildDeliveryTicket } = require('../index')
+const { deliveryStation, deliveryOrderCommand, buildDeliveryTicket, injectDeliveryTest, clearDeliveryTest } = require('../index')
 const { RestaurantState } = require('../core/state')
 const { EVENT } = require('../protocol')
 
@@ -51,5 +51,54 @@ describe('Rappi → Local Server → Electron KDS', () => {
   test('respeta estación explícita y usa fallback seguro', () => {
     assert.equal(deliveryStation('Café molido', 'caja'), 'caja')
     assert.equal(deliveryStation('Producto desconocido'), 'cocina')
+  })
+
+  test('modo prueba usa el flujo real, queda marcado y no entra al outbox', async () => {
+    const calls = []
+    const synced = []
+    const cmdHandler = {
+      async handle(msg) {
+        calls.push(msg.payload)
+        return { event: { sequence: calls.length } }
+      },
+    }
+    const evidence = await injectDeliveryTest({
+      platform: 'rappi', testId: 'field-1', restaurantId: 'amalay', cmdHandler,
+      eventStore: { async markSynced(seq) { synced.push(seq) } }, print: true,
+    })
+    assert.equal(evidence.order_id, 'delivery-test-rappi-field-1')
+    assert.equal(evidence.command.test_mode, true)
+    assert.match(evidence.command.notas, /NO ES VENTA REAL/)
+    assert.deepEqual(evidence.printed_stations, ['cocina', 'barra'])
+    assert.deepEqual(calls.map(c => c.command_type), ['ORDER_SENT', 'PRINT_COMMAND', 'PRINT_COMMAND'])
+    assert.deepEqual(synced, [1, 2, 3])
+  })
+
+  test('modo prueba rechaza plataformas desconocidas', async () => {
+    await assert.rejects(
+      injectDeliveryTest({ platform: 'fake', restaurantId: 'amalay', cmdHandler: {}, eventStore: {} }),
+      /platform must be rappi or ubereats/
+    )
+  })
+
+  test('limpieza cancela solo pedidos simulados y no entra al outbox', async () => {
+    const calls = []
+    const synced = []
+    const evidence = await clearDeliveryTest({
+      orderId: 'delivery-test-rappi-field-1', restaurantId: 'amalay',
+      cmdHandler: { async handle(msg) { calls.push(msg.payload); return { event: { sequence: 9 } } } },
+      eventStore: { async markSynced(seq) { synced.push(seq) } },
+    })
+    assert.equal(evidence.cleared, true)
+    assert.equal(calls[0].command_type, 'ORDER_CANCELLED')
+    assert.equal(calls[0].test_mode, true)
+    assert.deepEqual(synced, [9])
+  })
+
+  test('limpieza nunca acepta una orden real', async () => {
+    await assert.rejects(
+      clearDeliveryTest({ orderId: 'real-order-123', restaurantId: 'amalay', cmdHandler: {}, eventStore: {} }),
+      /only delivery test orders can be cleared/
+    )
   })
 })
