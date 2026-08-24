@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect, useRef, Suspense } from 'react'
+import { Component, useState, useCallback, useEffect, useRef, Suspense, type ErrorInfo, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
 import {
@@ -216,6 +216,37 @@ interface ModifierModalProps {
   categoryId: string
   onConfirm: (orderItem: OrderItem) => void
   onCancel: () => void
+}
+
+class ModifierModalErrorBoundary extends Component<
+  { children: ReactNode; onClose: () => void },
+  { error: Error | null }
+> {
+  state: { error: Error | null } = { error: null }
+
+  static getDerivedStateFromError(error: Error) {
+    return { error }
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error('[ModifierModal] render failed', error, info.componentStack)
+  }
+
+  render() {
+    if (!this.state.error) return this.props.children
+    return (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-6">
+        <div className="w-full max-w-xl rounded-2xl border border-red-700 bg-[var(--panel)] p-6 text-[var(--text-1)] shadow-2xl">
+          <h3 className="text-xl font-bold text-red-400">No se pudieron abrir las opciones</h3>
+          <p className="mt-2 text-sm text-[var(--text-3)]">La orden sigue intacta. Cierra este aviso y elige otro producto.</p>
+          <pre className="mt-4 max-h-36 overflow-auto whitespace-pre-wrap rounded-lg bg-black/40 p-3 text-xs text-red-200">{this.state.error.message || this.state.error.name}</pre>
+          <button type="button" onClick={this.props.onClose} className="mt-5 w-full rounded-xl bg-red-600 px-4 py-3 font-bold text-white">
+            Cerrar sin agregar
+          </button>
+        </div>
+      </div>
+    )
+  }
 }
 
 function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onConfirm, onCancel }: ModifierModalProps) {
@@ -4743,14 +4774,16 @@ function POSContent() {
 
       {/* Modifier Modal */}
       {modifierItem && (
-        <ModifierModal
-          item={modifierItem}
-          existingOrder={editingOrderItem}
-          recipeIngredients={getRecipeIngredients(modifierItem.name)}
-          categoryId={modifierCategoryId}
-          onConfirm={handleModifierConfirm}
-          onCancel={handleModifierCancel}
-        />
+        <ModifierModalErrorBoundary key={`${modifierItem.id}:${modifierCategoryId}`} onClose={handleModifierCancel}>
+          <ModifierModal
+            item={modifierItem}
+            existingOrder={editingOrderItem}
+            recipeIngredients={getRecipeIngredients(modifierItem.name)}
+            categoryId={modifierCategoryId}
+            onConfirm={handleModifierConfirm}
+            onCancel={handleModifierCancel}
+          />
+        </ModifierModalErrorBoundary>
       )}
 
       {/* Discount Modal */}
