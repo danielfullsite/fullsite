@@ -419,12 +419,27 @@ async function _getPaymentMethodsFromCache(): Promise<PaymentMethodDB[]> {
 
 /** Turno activo (pos_turnos sin closed_at). Devuelve null si no hay turno abierto. */
 export async function getActiveTurno(): Promise<{ id: string; fondo_inicial: number; opened_by: string; opened_at: string } | null> {
+  const fromCache = () => {
+    if (typeof localStorage === 'undefined') return null
+    try {
+      const raw = localStorage.getItem('pos_turno_cache')
+      if (raw) {
+        const { turno, ts } = JSON.parse(raw)
+        if (turno && Date.now() - ts < 24 * 3600 * 1000) return turno
+      }
+    } catch {}
+    return null
+  }
+
   try {
     const res = await fetchWithTimeout(
       `${_SUPABASE_URL}/rest/v1/pos_turnos?client_id=eq.${_getClientId()}&closed_at=is.null&select=id,fondo_inicial,opened_by,opened_at&order=opened_at.desc&limit=1`,
       { headers: _SB_HEADERS, cache: 'no-store' }
     )
-    if (!res.ok) return null
+    // Service Worker network-first resolves offline Supabase requests as a 503
+    // Response. fetch() therefore does NOT throw, so the catch fallback below
+    // never ran and TurnoGate incorrectly blocked a valid cold-offline shift.
+    if (!res.ok) return fromCache()
     const rows = await res.json()
     const turno = rows[0] || null
     if (turno && typeof window !== 'undefined') {
@@ -433,16 +448,7 @@ export async function getActiveTurno(): Promise<{ id: string; fondo_inicial: num
     return turno
   } catch {
     // Offline o timeout — usar turno cacheado del mismo día
-    if (typeof window !== 'undefined') {
-      try {
-        const raw = localStorage.getItem('pos_turno_cache')
-        if (raw) {
-          const { turno, ts } = JSON.parse(raw)
-          if (turno && Date.now() - ts < 24 * 3600 * 1000) return turno
-        }
-      } catch {}
-    }
-    return null
+    return fromCache()
   }
 }
 

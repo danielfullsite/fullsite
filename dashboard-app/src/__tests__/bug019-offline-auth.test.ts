@@ -167,7 +167,7 @@ describe('BUG-019 — replay offline autenticado (código real)', () => {
     expect(fetchCalls[0].apikey).toBe(ANON)
   })
 
-  it('6. membership revocada (server 401) → item preservado con retry, NO marcado como sincronizado', async () => {
+  it('6. auth rechazada (server 401) → item preservado sin quemar retries y pide re-auth', async () => {
     getSession.mockResolvedValue({
       data: { session: { access_token: 'FRESH_TOKEN', expires_at: Math.floor(Date.now() / 1000) + 3600 } },
       error: null,
@@ -185,7 +185,8 @@ describe('BUG-019 — replay offline autenticado (código real)', () => {
     const pending = await db.getPendingQueue()
     expect(pending).toHaveLength(1)                    // NO se perdió el dato
     expect(pending[0].synced).toBe(false)
-    expect(pending[0].retries).toBe(1)                 // reintentable, no abandonado
+    expect(pending[0].retries).toBe(0)                 // auth no consume presupuesto de red
+    expect(dispatched).toContain('pos-sync-auth-required')
   })
 
   it('7. replay tiene éxito tras recuperar sesión (re-auth) — la cola preservada se drena', async () => {

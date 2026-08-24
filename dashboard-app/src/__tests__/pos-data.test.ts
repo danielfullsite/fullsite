@@ -31,7 +31,21 @@ import {
   REGIMENES_FISCALES,
   USOS_CFDI,
   RECIPE_ALIASES,
+  getActiveTurno,
 } from '@/lib/pos-data'
+
+describe('getActiveTurno cold offline', () => {
+  it('uses the cached turno when the Service Worker resolves Supabase as HTTP 503', async () => {
+    const turno = { id: 'turno-offline', fondo_inicial: 500, opened_by: 'QA', opened_at: new Date().toISOString() }
+    localStorage.setItem('pos_turno_cache', JSON.stringify({ turno, ts: Date.now() }))
+    const originalFetch = globalThis.fetch
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 503 }))
+
+    await expect(getActiveTurno()).resolves.toEqual(turno)
+
+    vi.stubGlobal('fetch', originalFetch)
+  })
+})
 
 // ─── formatMXN ────────────────────────────────────────────────────────────
 
