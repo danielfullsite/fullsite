@@ -121,13 +121,17 @@ export async function proxy(req: NextRequest) {
   try {
     // REGRESIÓN (2026-08-14, 8ee5315e): este fetch quedó SIN acotar al mover la
     // lógica entre middleware.ts y proxy.ts. a59a6b11 (PR #21) lo había acotado.
-    // Sin timeout, una terminal con LAN viva y WAN caído —donde navigator.onLine
-    // sigue en true y el TCP se cuelga por minutos— congela CADA navegación
-    // protegida del POS, porque este middleware corre en todas. Es la misma causa
-    // raíz que 12bf36f2 acotó en el Service Worker; el middleware quedó fuera.
-    // 4 s, no el default de 10 s del helper: este fetch BLOQUEA la navegación, así
-    // que su bound tiene que ser más corto que el genérico. Mismo criterio que
+    // Sin timeout, con la red degradada el TCP se cuelga y la navegación se congela.
+    //
+    // ALCANCE: sólo páginas del DASHBOARD. /pos, /kds, /cocina y /barra salen por
+    // isPublic() arriba y nunca llegan aquí — el POS se gatea por PIN, no por esta
+    // sesión. O sea que esto NO estaba afectando el camino offline del restaurante.
+    //
+    // 4 s, no el default de 10 s del helper: este fetch bloquea la navegación, así
+    // que su bound debe ser más corto que el genérico. Mismo criterio que
     // pos/layout.tsx en el PIN ("on degraded LAN, browser default is 30-90s").
+    // Al vencer, el catch de abajo hace NextResponse.next() → fail-open: la
+    // navegación se libera en vez de quedarse colgada.
     const res = await fetchWithTimeout(`${supabaseUrl}/auth/v1/user`, {
       headers: { apikey: anonKey, Authorization: `Bearer ${token}` },
     }, 4_000)
