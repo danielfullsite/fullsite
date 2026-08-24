@@ -90,6 +90,13 @@ Si no se proporcionan argumentos, usa [valor default].
 
 This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
 
+> **Ojo con la frescura.** El grafo se construye desde el WORKING TREE, no desde `main`.
+> Hoy este checkout está en `feat/pos-ui-kit`, 149 commits atrás de `main`, y el grafo es
+> del 2026-08-21 — o sea que NO refleja producción (todo el lote de offline del 22-24 ago
+> quedó fuera). Úsalo para orientarte, pero **verifica contra el código antes de afirmar
+> nada**, y prefiere `git show origin/main:<ruta>` cuando la pregunta sea sobre producción.
+> Corre `graphify update .` después de cambiar código para que al menos empate con el disco.
+
 Rules:
 - For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
 - If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
