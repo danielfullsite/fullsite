@@ -1,12 +1,14 @@
 name: Dashboard Tests
 
+# SIN filtro `paths` a propósito. `test` es el contexto REQUERIDO de la protección de
+# rama de main. Con el filtro, un PR que no tocara dashboard-app/ nunca recibía el check
+# y quedaba BLOCKED para siempre — le pasó a #66 (local-server) y le pasaría a cualquier
+# PR de docs, workflows o electron-app. Un check requerido tiene que poder reportar
+# SIEMPRE. El costo es ~1.5 min de CI por PR; el beneficio es que la protección de rama
+# funciona en vez de ser una trampa.
 on:
   push:
-    paths:
-      - 'dashboard-app/**'
   pull_request:
-    paths:
-      - 'dashboard-app/**'
 
 defaults:
   run:
