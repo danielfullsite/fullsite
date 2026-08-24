@@ -52,7 +52,62 @@ function loadOrCreateServerId(dataDir) {
 
 let _supabasePolling = null
 
-async function startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, serviceEmail, servicePassword, state, eventStore, wsHub }) {
+function deliveryStation(name = '', explicit) {
+  if (explicit === 'cocina' || explicit === 'barra' || explicit === 'caja') return explicit
+  const n = String(name).toLowerCase()
+  if (/cafe|café|latte|frappe|frappé|jugo|juice|soda|smoothie|cerveza|beer|vino|tea|tisana|limonada|mojito/.test(n)) return 'barra'
+  if (/ice cream|helado|nieve|market|snack|regalo|suplemento/.test(n)) return 'caja'
+  return 'cocina'
+}
+
+function deliveryOrderCommand(row, restaurantId) {
+  const rawItems = Array.isArray(row.items) ? row.items : []
+  const items = rawItems.map((item, index) => ({
+    id: item.id || item.sku || `${row.id}-${index}`,
+    menuItemId: item.sku || item.id || null,
+    nombre: item.name || item.nombre || 'Producto',
+    cantidad: Number(item.qty ?? item.quantity ?? 1),
+    modificadores: item.modifiers || [],
+    notas: item.notes || '',
+    station: deliveryStation(item.name || item.nombre, item.station),
+  }))
+  return {
+    command_id: `delivery-ingest:${row.platform}:${row.platform_order_id}`,
+    command_type: 'ORDER_SENT',
+    restaurant_id: restaurantId,
+    order_id: row.id,
+    mesa: null,
+    mesero: row.platform === 'rappi' ? '🟠 Rappi' : '🟢 Uber',
+    status: 'enviada',
+    items,
+    personas: 1,
+    total: Number(row.total || 0),
+    notas: [row.customer_name, row.notes].filter(Boolean).join(' · '),
+    delivery: true,
+    platform: row.platform,
+    platform_order_id: row.platform_order_id,
+  }
+}
+
+function buildDeliveryTicket(command, station) {
+  const items = command.items.filter(item => item.station === station)
+  if (!items.length) return null
+  const lines = items.flatMap(item => {
+    const out = [`${item.cantidad} x ${item.nombre}`]
+    if (Array.isArray(item.modificadores)) for (const mod of item.modificadores) out.push(`  + ${typeof mod === 'string' ? mod : (mod.name || mod.nombre || '')}`)
+    if (item.notas) out.push(`  NOTA: ${item.notas}`)
+    return out
+  })
+  return Buffer.from(
+    '\x1b\x40\x1b\x61\x01\x1b\x45\x01' + `${command.mesero} — ${station.toUpperCase()}\n` +
+    '\x1b\x45\x00' + `Orden: ${command.platform_order_id}\n` +
+    (command.notas ? `${command.notas}\n` : '') + '\n' +
+    '\x1b\x61\x00' + lines.join('\n') + '\n\n\x1d\x56\x41\x03',
+    'binary'
+  )
+}
+
+async function startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, serviceEmail, servicePassword, state, eventStore, wsHub, cmdHandler }) {
   if (!supabaseUrl || !supabaseKey) return
   const POLL_INTERVAL = 5000
 
@@ -97,6 +152,32 @@ async function startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, servi
       if (!res.ok) return
 
       const orders = await res.json()
+
+      // Marketplace orders live in delivery_orders. Mirror them into the same
+      // durable ORDER_SENT protocol consumed by Electron KDS and printer queues.
+      // Stable command IDs make every 5s poll and every restart exactly-once.
+      const deliveryRes = await fetch(
+        `${supabaseUrl}/rest/v1/delivery_orders?client_id=eq.${encodeURIComponent(restaurantId)}&platform=in.(ubereats,rappi)&status=in.(nueva,aceptada,preparando)&select=id,platform,platform_order_id,status,customer_name,total,notes,items,created_at`,
+        { headers: { apikey: supabaseKey, Authorization: `Bearer ${bearer}` }, signal: controller.signal }
+      )
+      const deliveryOrders = deliveryRes.ok ? await deliveryRes.json() : []
+      if (cmdHandler) {
+        for (const row of deliveryOrders) {
+          const command = deliveryOrderCommand(row, restaurantId)
+          const ingestResult = await cmdHandler.handle({ protocol_version: PROTOCOL_VERSION, type: 'COMMAND', restaurant_id: restaurantId, payload: command }, 'delivery-poll')
+          // This event originated in Supabase; do not echo it back through the outbox.
+          if (ingestResult.event?.sequence) await eventStore.markSynced(ingestResult.event.sequence)
+          for (const station of ['cocina', 'barra', 'caja']) {
+            const ticket = buildDeliveryTicket(command, station)
+            if (!ticket) continue
+            const printResult = await cmdHandler.handle({
+              protocol_version: PROTOCOL_VERSION, type: 'COMMAND', restaurant_id: restaurantId,
+              payload: { command_id: `delivery-print:${row.platform}:${row.platform_order_id}:${station}`, command_type: 'PRINT_COMMAND', station, data_b64: ticket.toString('base64') },
+            }, 'delivery-poll')
+            if (printResult.event?.sequence) await eventStore.markSynced(printResult.event.sequence)
+          }
+        }
+      }
 
       // Build mesa state from active orders
       const mesaMap = {}
@@ -450,7 +531,7 @@ async function startLocalServer({ dataDir, port = 7717, config = {} }) {
 
   // ── Supabase poll (Phase 1 bridge) ────────────────────────────────────────
   if (supabaseUrl && supabaseKey) {
-    startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, serviceEmail, servicePassword, state, eventStore, wsHub })
+    startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, serviceEmail, servicePassword, state, eventStore, wsHub, cmdHandler })
       .catch(e => console.warn('[server] Supabase poll start error:', e.message))
   }
 
@@ -480,4 +561,4 @@ async function startLocalServer({ dataDir, port = 7717, config = {} }) {
   return { httpServer, close, serverId, lanIp, wsHub }
 }
 
-module.exports = { startLocalServer }
+module.exports = { startLocalServer, deliveryStation, deliveryOrderCommand, buildDeliveryTicket }
