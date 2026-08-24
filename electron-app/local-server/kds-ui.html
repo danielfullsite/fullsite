@@ -54,13 +54,14 @@
   .drow.hot .dn{background:rgba(245,158,11,.24)}
   .demand .none{color:var(--text-4);font-size:13px;padding:12px 9px}
 
-  /* Tablero en columnas (masonry por flujo normal) — las tarjetas NO se enciman nunca */
-  main{flex:1;overflow-y:auto;padding:16px;column-width:330px;column-gap:14px}
-  .empty{column-span:all;display:flex;flex-direction:column;align-items:center;justify-content:center;height:72vh;color:var(--text-4);gap:14px}
+  /* Tablero: flujo horizontal (izq→der por tiempo), envuelve a la siguiente fila.
+     Sin encimarse y en orden de lectura natural de cocina. */
+  main{flex:1;overflow-y:auto;padding:16px;display:flex;flex-wrap:wrap;align-items:flex-start;align-content:flex-start;gap:14px}
+  .empty{flex:1 1 100%;display:flex;flex-direction:column;align-items:center;justify-content:center;height:72vh;color:var(--text-4);gap:14px}
   .empty .chef{font-size:56px;opacity:.4}
 
   /* card = one send (batch) */
-  .card{background:var(--surface);border:1px solid var(--line);border-radius:15px;overflow:hidden;display:flex;flex-direction:column;border-top:5px solid var(--nueva);width:100%;margin:0 0 14px;break-inside:avoid;-webkit-column-break-inside:avoid;page-break-inside:avoid}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:15px;overflow:hidden;display:flex;flex-direction:column;border-top:5px solid var(--nueva);flex:1 1 320px;max-width:460px}
   .card.s-preparando{border-top-color:var(--prep)}
   .card.s-lista{border-top-color:var(--lista);opacity:.82}
   .card.urgent{animation:pulse 1.5s infinite}
