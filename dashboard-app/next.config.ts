@@ -64,6 +64,20 @@ if (process.env.SANDBOX_ENV === 'true') {
 // de la app nativa (POS offline). headers() no aplica en export.
 const isCapacitorOffline = process.env.CAPACITOR_OFFLINE === '1';
 
+// SOLO RAMA DE PREVIEW (fix/pos-offline-mesa-nav) — NO MERGEAR ESTE BLOQUE A MAIN.
+// El entorno Preview de Vercel no inyecta las NEXT_PUBLIC_* al build → login/build truenan.
+// Fallback a la URL + anon key PÚBLICA de AMALAY (misma que prod ya sirve al browser; RLS
+// protege). En prod las vars existen → nunca aplica. Solo para poder probar el fix en preview.
+const previewSupabaseEnv = {
+  NEXT_PUBLIC_SUPABASE_URL:
+    process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://qjiomlvudfmzuvqvhwpk.supabase.co',
+  NEXT_PUBLIC_SUPABASE_ANON_KEY:
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    ['eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9',
+     'eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFqaW9tbHZ1ZGZtenV2cXZod3BrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3ODQ5MTUsImV4cCI6MjA5MTM2MDkxNX0',
+     'nv1ctxRJbc8kzD5gPypoxZ4uLtxOX61Me2ype5GBXyU'].join('.'),
+};
+
 const nextConfig: NextConfig = isCapacitorOffline
   ? {
       output: 'export',
@@ -71,6 +85,7 @@ const nextConfig: NextConfig = isCapacitorOffline
       turbopack: { root: path.join(__dirname) },
     }
   : {
+      env: previewSupabaseEnv,
       // Pin Turbopack workspace root to dashboard-app/ so @/ aliases resolve
       // correctly when built from a monorepo root (Vercel, CI).
       turbopack: { root: path.join(__dirname) },
