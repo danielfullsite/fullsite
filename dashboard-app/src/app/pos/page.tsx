@@ -4811,6 +4811,40 @@ function POSContent() {
               className="mt-2 w-full rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3 text-center text-2xl tracking-[0.5em] text-[var(--text-1)]"
               placeholder="••••"
             />
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(digit => (
+                <button
+                  key={digit}
+                  type="button"
+                  onClick={() => { setSyncConflictPin(p => `${p}${digit}`.slice(0, 8)); setSyncConflictError('') }}
+                  className="min-h-[54px] rounded-xl bg-[var(--surface-2)] text-xl font-black text-[var(--text-1)] active:bg-[var(--accent-soft)]"
+                >
+                  {digit}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => { setSyncConflictPin(''); setSyncConflictError('') }}
+                className="min-h-[54px] rounded-xl bg-red-900/50 text-sm font-bold text-red-300 active:bg-red-800"
+              >
+                Borrar
+              </button>
+              <button
+                type="button"
+                onClick={() => { setSyncConflictPin(p => `${p}0`.slice(0, 8)); setSyncConflictError('') }}
+                className="min-h-[54px] rounded-xl bg-[var(--surface-2)] text-xl font-black text-[var(--text-1)] active:bg-[var(--accent-soft)]"
+              >
+                0
+              </button>
+              <button
+                type="button"
+                onClick={() => { setSyncConflictPin(p => p.slice(0, -1)); setSyncConflictError('') }}
+                className="min-h-[54px] rounded-xl bg-[var(--line)] text-xl font-black text-[var(--text-1)] active:bg-[var(--raised)]"
+                aria-label="Borrar último dígito"
+              >
+                ⌫
+              </button>
+            </div>
             {syncConflictError && <p className="mt-2 text-sm font-semibold text-red-400">{syncConflictError}</p>}
 
             <button
