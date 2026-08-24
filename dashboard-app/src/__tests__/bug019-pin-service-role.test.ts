@@ -8,6 +8,13 @@ vi.mock('@/lib/shift-token', () => ({
   issueShiftToken: vi.fn(async () => 'SHIFT_TOKEN_XYZ'),
 }))
 
+// Throttling has its own contract tests. Keep this suite focused on the
+// privileged tenant-scoped staff lookup instead of consuming its RPC calls.
+vi.mock('@/lib/pin-throttle', () => ({
+  pinGate: vi.fn(async () => ({ allowed: true })),
+  pinRecord: vi.fn(async () => undefined),
+}))
+
 const SERVICE = 'SERVICE_ROLE_SENTINEL'
 const ANON = 'ANON_SENTINEL'
 
@@ -48,14 +55,15 @@ describe('BUG-019 — PIN lookup usa service role, no anon', () => {
     const res = await POST(makeReq({ pin: '1234', client_id: 'tenantA' }))
     const json = await res.json()
 
-    expect(outbound).toHaveLength(1)
-    expect(outbound[0].apikey).toBe(SERVICE)
-    expect(outbound[0].authorization).toBe(`Bearer ${SERVICE}`)
+    const staffLookup = outbound.find(call => call.url.includes('/pos_staff?'))
+    expect(staffLookup).toBeDefined()
+    expect(staffLookup!.apikey).toBe(SERVICE)
+    expect(staffLookup!.authorization).toBe(`Bearer ${SERVICE}`)
     // NO se usó la anon key para el lookup privilegiado.
-    expect(outbound[0].apikey).not.toBe(ANON)
-    expect(outbound[0].authorization).not.toBe(`Bearer ${ANON}`)
+    expect(staffLookup!.apikey).not.toBe(ANON)
+    expect(staffLookup!.authorization).not.toBe(`Bearer ${ANON}`)
     // El tenant se fuerza explícitamente en el filtro de la query.
-    expect(outbound[0].url).toContain('client_id=eq.tenantA')
+    expect(staffLookup!.url).toContain('client_id=eq.tenantA')
     // Éxito → staff + shiftToken; la service key nunca viaja al cliente.
     expect(json.staff).toMatchObject({ id: 's1', role: 'mesero' })
     expect(json.shiftToken).toBe('SHIFT_TOKEN_XYZ')
@@ -68,8 +76,9 @@ describe('BUG-019 — PIN lookup usa service role, no anon', () => {
 
     await POST(makeReq({ fingerprint_id: 'fp-abc', client_id: 'tenantB' }))
 
-    expect(outbound[0].authorization).toBe(`Bearer ${SERVICE}`)
-    expect(outbound[0].url).toContain('client_id=eq.tenantB')
-    expect(outbound[0].url).toContain('pos_staff')
+    const staffLookup = outbound.find(call => call.url.includes('/pos_staff?'))
+    expect(staffLookup).toBeDefined()
+    expect(staffLookup!.authorization).toBe(`Bearer ${SERVICE}`)
+    expect(staffLookup!.url).toContain('client_id=eq.tenantB')
   })
 })
