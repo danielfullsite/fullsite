@@ -229,7 +229,11 @@ function json(res, statusCode, payload) {
   res.end(JSON.stringify(payload))
 }
 
-function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, version, serverId, restaurantId }) {
+// `config` e `instanceName` son parámetros de verdad, no opcionales: GET /identity los
+// usa (branch_id, instance_name) y antes NO estaban en este scope — vivían dentro de
+// startLocalServer. Cada llamada a /identity tiraba ReferenceError, y ése es el endpoint
+// con el que las terminales descubren y verifican la caja por LAN.
+function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, version, serverId, restaurantId, config = {}, instanceName = '' }) {
   return async function router(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
@@ -488,7 +492,7 @@ async function startLocalServer({ dataDir, port = 7717, config = {} }) {
   wsHub.onCommand((msg, clientId) => cmdHandler.handle(msg, clientId))
 
   // ── HTTP server ──────────────────────────────────────────────────────────
-  const router = buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer: printerAdapter, version, serverId, restaurantId })
+  const router = buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer: printerAdapter, version, serverId, restaurantId, config, instanceName })
   const httpServer = http.createServer(router)
 
   wsHub.attach(httpServer)
@@ -561,4 +565,6 @@ async function startLocalServer({ dataDir, port = 7717, config = {} }) {
   return { httpServer, close, serverId, lanIp, wsHub }
 }
 
-module.exports = { startLocalServer, deliveryStation, deliveryOrderCommand, buildDeliveryTicket }
+// buildHttpRouter se exporta para poder probar las rutas sin levantar el servidor
+// completo (mDNS + heartbeat + polling quedarían corriendo y colgarían el test).
+module.exports = { startLocalServer, buildHttpRouter, deliveryStation, deliveryOrderCommand, buildDeliveryTicket }
