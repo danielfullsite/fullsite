@@ -34,6 +34,31 @@ export default function MonitorPage() {
   const [loading, setLoading] = useState(true)
   const [lastRefresh, setLastRefresh] = useState('')
   const [error, setError] = useState('')
+  const [cleaning, setCleaning] = useState(false)
+
+  const cleanTestOrders = async () => {
+    if (!confirm('Se descargará un respaldo y se borrarán TODAS las órdenes del restaurante. ¿Continuar?')) return
+    setCleaning(true); setError('')
+    try {
+      const token = localStorage.getItem('pos_shift_token') || ''
+      const headers = { Authorization: `Bearer ${token}` }
+      const backupRes = await fetch('/api/pos/admin/cleanup-orders', { headers, cache: 'no-store' })
+      const backup = await backupRes.json()
+      if (!backupRes.ok) throw new Error(backup.error || 'No se pudo crear respaldo')
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob)
+      a.download = `amalay-orders-backup-${Date.now()}.json`; a.click(); URL.revokeObjectURL(a.href)
+      const del = await fetch('/api/pos/admin/cleanup-orders', {
+        method: 'DELETE', headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirm: 'BORRAR TODAS LAS ORDENES', digest: backup.digest }),
+      })
+      const result = await del.json()
+      if (!del.ok) throw new Error(result.error || 'No se pudo limpiar')
+      localStorage.removeItem('pos_mesas_orders')
+      alert(`Limpieza completa: ${result.deleted} órdenes eliminadas. Respaldo descargado.`)
+      await refresh()
+    } catch (e) { setError((e as Error).message) } finally { setCleaning(false) }
+  }
 
   const refresh = async () => {
     setLoading(true)
@@ -174,6 +199,10 @@ export default function MonitorPage() {
         </div>
         <button onClick={refresh} disabled={loading} className="p-2 rounded-lg bg-[var(--surface)] border border-[var(--line)] hover:bg-[var(--surface-2)]">
           <RefreshCw size={16} className={loading ? 'animate-spin text-emerald-400' : 'text-[var(--text-3)]'} />
+        </button>
+        <button onClick={cleanTestOrders} disabled={cleaning}
+          className="ml-2 px-3 py-2 rounded-lg bg-red-950 border border-red-700 text-red-300 text-xs font-bold disabled:opacity-50">
+          {cleaning ? 'Limpiando…' : 'Limpiar órdenes de prueba'}
         </button>
       </div>
 
