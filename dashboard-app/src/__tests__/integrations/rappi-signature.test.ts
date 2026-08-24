@@ -35,4 +35,15 @@ describe('Rappi Integrations Manager signature contract', () => {
 
     expect(verifyRappiSignature(raw, header, { nowMs: NOW }).ok).toBe(true)
   })
+
+  it('rejects replayed, missing and malformed signatures', () => {
+    process.env.RAPPI_WEBHOOK_SECRET = SECRET
+    const raw = '{"order_id":"SAMPLE-ORDER-0002"}'
+    const header = `t=${TIMESTAMP},sign=${sign(`${TIMESTAMP}.${raw}`)}`
+
+    expect(verifyRappiSignature(raw, null, { nowMs: NOW }).reason).toBe('MISSING_SIGNATURE')
+    expect(verifyRappiSignature(raw, 'invalid', { nowMs: NOW }).reason).toBe('BAD_SIGNATURE_HEADER')
+    expect(verifyRappiSignature(raw, header, { nowMs: NOW + 10 * 60 * 1000 }).reason).toBe('STALE_TIMESTAMP')
+    expect(verifyRappiSignature(raw, `t=${TIMESTAMP},sign=${'00'.repeat(32)}`, { nowMs: NOW }).reason).toBe('SIGNATURE_MISMATCH')
+  })
 })
