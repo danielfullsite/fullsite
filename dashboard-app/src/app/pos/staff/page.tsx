@@ -192,8 +192,8 @@ export default function StaffPage() {
   async function handleCreate() {
     setFormError('')
     if (!formName.trim()) { setFormError('Nombre es requerido'); return }
-    if (!formPin || formPin.length < 4 || formPin.length > 8 || !/^\d+$/.test(formPin)) {
-      setFormError('PIN debe ser de 4 a 8 digitos')
+    if (!/^\d{10}$/.test(formPin)) {
+      setFormError('PIN debe ser de exactamente 10 digitos')
       return
     }
     setFormSaving(true)
@@ -239,8 +239,8 @@ export default function StaffPage() {
 
     // If new PIN provided, validate
     if (formNewPin) {
-      if (formNewPin.length < 4 || formNewPin.length > 8 || !/^\d+$/.test(formNewPin)) {
-        setFormError('PIN debe ser de 4 a 8 digitos')
+      if (!/^\d{10}$/.test(formNewPin)) {
+        setFormError('PIN debe ser de exactamente 10 digitos')
         return
       }
     }
@@ -580,15 +580,15 @@ export default function StaffPage() {
                 />
               </div>
               <div>
-                <label className="text-sm text-gray-400 block mb-1">PIN (4-8 digitos) *</label>
+                <label className="text-sm text-gray-400 block mb-1">PIN individual (10 digitos) *</label>
                 <input
                   type="password"
                   inputMode="numeric"
-                  maxLength={8}
+                  maxLength={10}
                   value={formPin}
                   onChange={e => setFormPin(e.target.value.replace(/\D/g, ''))}
                   className="w-full bg-[#1e1e2e] border border-[#2a2a3e] rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500 min-h-[48px] font-mono tracking-widest"
-                  placeholder="****"
+                  placeholder="••••••••••"
                 />
               </div>
               <div>
@@ -654,11 +654,11 @@ export default function StaffPage() {
                 />
               </div>
               <div>
-                <label className="text-sm text-gray-400 block mb-1">Nuevo PIN (opcional, 4-8 digitos)</label>
+                <label className="text-sm text-gray-400 block mb-1">Nuevo PIN (opcional, 10 digitos)</label>
                 <input
                   type="password"
                   inputMode="numeric"
-                  maxLength={8}
+                  maxLength={10}
                   value={formNewPin}
                   onChange={e => setFormNewPin(e.target.value.replace(/\D/g, ''))}
                   className="w-full bg-[#1e1e2e] border border-[#2a2a3e] rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500 min-h-[48px] font-mono tracking-widest"

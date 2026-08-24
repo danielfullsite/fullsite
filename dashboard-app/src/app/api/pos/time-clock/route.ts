@@ -36,7 +36,9 @@ export async function POST(req: NextRequest) {
   try { body = await req.json() } catch { return Response.json({ error: 'JSON inválido' }, { status: 400 }) }
   const pin = String(body.pin || '').trim()
   const method = body.method === 'huella' ? 'huella' : 'pin'
-  if (!/^\d{3,8}$/.test(pin)) return Response.json({ error: 'PIN inválido' }, { status: 400 })
+  // Keep legacy staff working during biometric rollout; all newly assigned
+  // credentials are exactly 10 digits.
+  if (!/^\d{3,10}$/.test(pin)) return Response.json({ error: 'PIN inválido' }, { status: 400 })
 
   // 1. Identificar al empleado por PIN dentro del tenant.
   const sr = await svc(`pos_staff?client_id=eq.${encodeURIComponent(clientId)}&pin=eq.${encodeURIComponent(pin)}&active=eq.true&select=id,name&limit=1`)

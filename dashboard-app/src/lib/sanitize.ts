@@ -39,9 +39,9 @@ export function isValidCP(cp: string): boolean {
   return /^\d{5}$/.test(cp)
 }
 
-// Sanitize PIN (only digits, max 6)
+// Sanitize PIN (only digits, max 10)
 export function sanitizePIN(pin: string): string {
-  return pin.replace(/\D/g, '').slice(0, 6)
+  return pin.replace(/\D/g, '').slice(0, 10)
 }
 
 // Rate limit check for client-side (prevents rapid-fire submissions)
