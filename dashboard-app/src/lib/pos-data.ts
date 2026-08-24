@@ -1720,7 +1720,7 @@ export async function logAudit(event: AuditEvent): Promise<boolean> {
     client_id: event.client_id || _getClientId(),
     order_id: event.order_id || null,
     action: event.action,
-    actor: event.actor,
+    actor: typeof event.actor === 'string' && event.actor.trim() ? event.actor.trim() : 'POS Offline',
     mesa: event.mesa ?? null,
     details: event.details ? JSON.stringify(event.details) : null,
     reason: event.reason || null,

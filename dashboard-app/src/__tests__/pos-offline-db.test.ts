@@ -13,6 +13,7 @@ import {
   cacheOrder, getCachedOrders, deleteCachedOrder,
   queueOperation, getPendingQueue, markSynced, incrementRetry, clearSyncedItems, getSyncQueueSummary,
   getSyncQueueDiagnostics, resolveSyncConflictKeepServer, resolveSyncConflictApplyLocal,
+  repairReplayData,
   cacheTurno, getCachedActiveTurno, closeCachedTurno,
   cachePaymentMethods, getCachedPaymentMethods,
   cacheStaff, getCachedStaff,
@@ -136,6 +137,13 @@ describe('pos-offline-db — cola de sync (el corazón del offline)', () => {
     expect(after.data.conflict_resolution).toBe(true)
     expect(after.error_class).toBeUndefined()
     expect((await getSyncQueueDiagnostics())[0].errorClass).toBe('PENDING')
+  })
+
+  it('repara actor nulo de auditoría sin alterar el resto del evento', () => {
+    const event = { action: 'item_added', actor: null, mesa: 4, details: '{"item":"agua"}' }
+    expect(repairReplayData('pos_audit_log', event, 'Daniel')).toEqual({ ...event, actor: 'Daniel' })
+    expect(repairReplayData('pos_audit_log', event).actor).toBe('POS Offline')
+    expect(repairReplayData('pos_orders', event)).toBe(event)
   })
 })
 

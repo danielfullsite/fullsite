@@ -255,6 +255,15 @@ export async function queueOperation(
   return id
 }
 
+export function repairReplayData(
+  table: string,
+  data: Record<string, unknown>,
+  sessionActor = '',
+): Record<string, unknown> {
+  if (table !== 'pos_audit_log' || (typeof data.actor === 'string' && data.actor.trim())) return data
+  return { ...data, actor: sessionActor.trim() || 'POS Offline' }
+}
+
 export async function getPendingQueue(actionableOnly = false): Promise<SyncQueueItem[]> {
   const db = await openDB()
   return new Promise((resolve) => {
@@ -780,10 +789,23 @@ async function _syncAllInner(): Promise<{ synced: number; failed: number }> {
           continue
         }
 
+        let sessionActor = ''
+        // Legacy/offline events could be queued before the staff name hydrated,
+        // leaving actor=null. pos_audit_log.actor is NOT NULL, so those events
+        // otherwise exhaust retries forever. Repair metadata only; preserve the
+        // action, order, mesa and details exactly as queued.
+        if (item.table === 'pos_audit_log' && typeof window !== 'undefined') {
+          try {
+            const staff = JSON.parse(sessionStorage.getItem('pos_staff') || '{}')
+            if (typeof staff?.name === 'string') sessionActor = staff.name
+          } catch {}
+        }
+        const replayData = repairReplayData(item.table, item.data, sessionActor)
+
         const res = await fetch(url, {
           method: item.method,
           headers: reqHeaders,
-          body: item.method !== 'DELETE' ? JSON.stringify(item.data) : undefined,
+          body: item.method !== 'DELETE' ? JSON.stringify(replayData) : undefined,
         })
         if (res.ok) {
           await markSynced(item.id)
