@@ -133,16 +133,17 @@ export default function StaffPage() {
   }, [])
 
   // ------ Fetch data ------
+  // Las LECTURAS de pos_staff también van por la API: BUG-019 cerró la tabla a la anon
+  // key, y por eso api/pos/pin/route.ts usa la service key incluso para leer
+  // ("pos_staff is now tenant-scoped RLS with NO anon access", route.ts:46). Sin esto la
+  // pantalla se quedaba en blanco aunque el alta funcionara.
   const fetchStaff = useCallback(async () => {
-    const cid = _cid()
-    const res = await fetch(
-      `${SB_URL}/rest/v1/pos_staff?client_id=eq.${cid}&select=id,name,role,active,created_at&order=name.asc`,
-      { headers: sbHeaders() },
-    )
-    if (res.ok) {
+    try {
+      const res = await fetch('/api/owner/staff')
+      if (!res.ok) return
       const data = await res.json()
-      setStaff(data)
-    }
+      if (Array.isArray(data?.staff)) setStaff(data.staff)
+    } catch { /* sin red: la pantalla queda con lo último cargado */ }
   }, [])
 
   const fetchAudit = useCallback(async () => {
@@ -163,31 +164,44 @@ export default function StaffPage() {
   }, [authorized, fetchStaff, fetchAudit])
 
   // ------ PIN uniqueness check ------
+  // Chequeo previo sólo para dar feedback inmediato. La verdad la tiene el índice único
+  // + la validación de /api/owner/staff, que corre en la misma transacción y no tiene
+  // carrera. Por eso ante la duda devuelve false: mejor dejar que la API rechace con su
+  // mensaje que bloquear un PIN válido desde el cliente.
   async function isPinTaken(pin: string, excludeId?: string): Promise<boolean> {
-    const cid = _cid()
-    let url = `${SB_URL}/rest/v1/pos_staff?pin=eq.${pin}&client_id=eq.${cid}&select=id&limit=1`
-    if (excludeId) url += `&id=neq.${excludeId}`
-    const res = await fetch(url, { headers: sbHeaders() })
-    if (!res.ok) return false
-    const data = await res.json()
-    return data.length > 0
+    try {
+      const res = await fetch('/api/owner/staff')
+      if (!res.ok) return false
+      const data = await res.json()
+      const rows: { id: string; pin?: string }[] = Array.isArray(data?.staff) ? data.staff : []
+      return rows.some(r => r.pin === pin && r.id !== excludeId)
+    } catch { return false }
   }
 
   // ------ Audit helper ------
-  async function postAudit(staffId: string, action: string, changedFields?: Record<string, unknown>) {
-    const cid = _cid()
-    await fetch(`${SB_URL}/rest/v1/pos_staff_audit`, {
-      method: 'POST',
-      headers: sbHeaders(),
-      body: JSON.stringify({
-        client_id: cid,
-        staff_id: staffId,
-        action,
-        changed_fields: changedFields || null,
-        changed_by: currentStaff?.name || 'unknown',
-      }),
-    })
+  // BUG-019 cerró la RLS de pos_staff a la anon key, así que las escrituras directas
+  // desde el navegador dejaron de funcionar: no se podía dar de alta ni editar a nadie.
+  // Toda escritura pasa ahora por /api/owner/staff, que ya existe en main y valida sesión
+  // (withPOSAuth), usa la service key, fuerza el client_id del token, respeta la jerarquía
+  // de roles y escribe la auditoría. La página no vuelve a tocar PostgREST para escribir.
+  async function staffApi(
+    method: 'POST' | 'PATCH',
+    body: Record<string, unknown>,
+  ): Promise<{ ok: true; data: Record<string, unknown> } | { ok: false; error: string }> {
+    try {
+      const res = await fetch('/api/owner/staff', {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) return { ok: false, error: typeof data?.error === 'string' ? data.error : 'Error al guardar' }
+      return { ok: true, data }
+    } catch {
+      return { ok: false, error: 'Sin conexión con el servidor' }
+    }
   }
+
 
   // ------ Create ------
   async function handleCreate() {
@@ -203,28 +217,18 @@ export default function StaffPage() {
       setFormSaving(false)
       return
     }
-    const cid = _cid()
-    const newId = crypto.randomUUID()
-    const body = {
-      id: newId,
-      client_id: cid,
-      name: formName.trim(),
-      pin: formPin,
-      role: formRole,
-      active: formActive,
-    }
-    const res = await fetch(`${SB_URL}/rest/v1/pos_staff`, {
-      method: 'POST',
-      headers: sbHeaders(),
-      body: JSON.stringify(body),
-    })
-    if (!res.ok) {
-      const txt = await res.text()
-      setFormError(txt.includes('unique') ? 'PIN ya esta en uso' : 'Error al guardar')
+    const created = await staffApi('POST', { name: formName.trim(), pin: formPin, role: formRole })
+    if (!created.ok) {
+      setFormError(created.error)
       setFormSaving(false)
       return
     }
-    await postAudit(newId, 'created', { name: formName.trim(), role: formRole, active: formActive })
+    // La API crea siempre activo. Si el alta pidió inactivo, se refleja aparte para no
+    // cambiar el comportamiento de la pantalla.
+    if (!formActive && typeof created.data.id === 'string') {
+      await staffApi('PATCH', { id: created.data.id, active: false })
+    }
+    // La auditoría la escribe la propia API — no se duplica desde aquí.
     setShowCreateModal(false)
     resetForm()
     setFormSaving(false)
@@ -283,20 +287,13 @@ export default function StaffPage() {
       return
     }
 
-    const res = await fetch(`${SB_URL}/rest/v1/pos_staff?id=eq.${editingStaff.id}`, {
-      method: 'PATCH',
-      headers: sbHeaders(),
-      body: JSON.stringify(patch),
-    })
-
-    if (!res.ok) {
-      const txt = await res.text()
-      setFormError(txt.includes('unique') ? 'PIN ya esta en uso' : 'Error al guardar')
+    const saved = await staffApi('PATCH', { id: editingStaff.id, ...patch })
+    if (!saved.ok) {
+      setFormError(saved.error)
       setFormSaving(false)
       return
     }
-
-    await postAudit(editingStaff.id, 'updated', changes)
+    // Auditoría escrita por la API.
     setEditingStaff(null)
     resetForm()
     setFormSaving(false)
@@ -307,13 +304,8 @@ export default function StaffPage() {
   // ------ Toggle active ------
   async function handleToggle(s: StaffMember) {
     const newActive = !s.active
-    const action = newActive ? 'reactivated' : 'deactivated'
-    await fetch(`${SB_URL}/rest/v1/pos_staff?id=eq.${s.id}`, {
-      method: 'PATCH',
-      headers: sbHeaders(),
-      body: JSON.stringify({ active: newActive }),
-    })
-    await postAudit(s.id, action, { active: { from: s.active, to: newActive } })
+    // La API distingue sola entre 'reactivated' y 'deactivated' al auditar.
+    await staffApi('PATCH', { id: s.id, active: newActive })
     setConfirmToggle(null)
     fetchStaff()
     fetchAudit()
