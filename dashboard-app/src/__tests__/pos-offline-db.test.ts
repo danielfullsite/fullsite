@@ -11,6 +11,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import {
   cacheMenu, getCachedMenu,
   cacheOrder, getCachedOrders, deleteCachedOrder,
+  clearLocalOrderData,
   queueOperation, getPendingQueue, markSynced, incrementRetry, clearSyncedItems, getSyncQueueSummary,
   getSyncQueueDiagnostics, resolveSyncConflictKeepServer, resolveSyncConflictApplyLocal,
   repairReplayData,
@@ -50,6 +51,40 @@ describe('pos-offline-db — órdenes offline', () => {
     await deleteCachedOrder('o1')
     orders = await getCachedOrders()
     expect(orders.find((o) => o.id === 'o1')).toBeFalsy()
+  })
+
+  it('limpieza total purga órdenes y su replay, pero conserva operaciones de caja', async () => {
+    const memory = new Map<string, string>([
+      ['pos_order_4', '{"items":[1]}'], ['pos_draft_9', '{"items":[2]}'],
+      ['pos_mesas_orders', '{}'], ['pos_print_queue', '[{"id":"print-1"}]'],
+      ['fullsite_offline_queue', JSON.stringify([
+        { table: 'pos_orders', data: { id: 'o1' } },
+        { table: 'pos_cash_movements', data: { id: 'cash-1' } },
+      ])],
+    ])
+    const storage = {
+      get length() { return memory.size },
+      key: (i: number) => [...memory.keys()][i] ?? null,
+      getItem: (k: string) => memory.get(k) ?? null,
+      setItem: (k: string, v: string) => { memory.set(k, v) },
+      removeItem: (k: string) => { memory.delete(k) },
+    } as Storage
+    await cacheOrder({ id: 'o1', mesa: 4 })
+    await queueOperation('pos_orders', 'POST', { id: 'o1' })
+    await queueOperation('pos_audit_log', 'POST', { order_id: 'o1' })
+    await queueOperation('pos_cash_movements', 'POST', { id: 'cash-1' })
+
+    await clearLocalOrderData(storage)
+
+    expect(await getCachedOrders()).toEqual([])
+    expect((await getPendingQueue()).map(item => item.table)).toEqual(['pos_cash_movements'])
+    expect(memory.has('pos_order_4')).toBe(false)
+    expect(memory.has('pos_draft_9')).toBe(false)
+    expect(memory.has('pos_mesas_orders')).toBe(false)
+    expect(memory.has('pos_print_queue')).toBe(true)
+    expect(JSON.parse(memory.get('fullsite_offline_queue') || '[]')).toEqual([
+      { table: 'pos_cash_movements', data: { id: 'cash-1' } },
+    ])
   })
 })
 

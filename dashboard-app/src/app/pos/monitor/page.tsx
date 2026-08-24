@@ -47,6 +47,25 @@ export default function MonitorPage() {
       const backupRes = await fetch('/api/pos/admin/cleanup-orders', { headers, cache: 'no-store' })
       const backup = await backupRes.json()
       if (!backupRes.ok) throw new Error(backup.error || 'No se pudo crear respaldo')
+      // Snapshot Pedro too: a previous cloud-only cleanup may have left an older
+      // local projection even when the new cloud backup already contains 0 rows.
+      let pedroOrders: Array<{ id?: string; mesa?: number }> = []
+      try {
+        const stateRes = await fetch(`${getBridgeUrl()}/state`, { signal: AbortSignal.timeout(3000), cache: 'no-store' })
+        if (stateRes.ok) {
+          const state = await stateRes.json()
+          const byId = new Map<string, { id?: string; mesa?: number }>()
+          for (const order of (Array.isArray(state.kds_orders) ? state.kds_orders : [])) {
+            const id = String(order.id || order.order_id || '')
+            if (id) byId.set(id, { id, mesa: Number(order.mesa) || undefined })
+          }
+          for (const [mesa, entry] of Object.entries(state.mesas || {})) {
+            const id = String((entry as { order_id?: string }).order_id || '')
+            if (id && !byId.has(id)) byId.set(id, { id, mesa: Number(mesa) || undefined })
+          }
+          pedroOrders = [...byId.values()]
+        }
+      } catch { /* Pedro unavailable; cloud + browser cleanup can continue */ }
       const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
       const a = document.createElement('a'); a.href = URL.createObjectURL(blob)
       a.download = `amalay-orders-backup-${Date.now()}.json`; a.click(); URL.revokeObjectURL(a.href)
@@ -56,8 +75,35 @@ export default function MonitorPage() {
       })
       const result = await del.json()
       if (!del.ok) throw new Error(result.error || 'No se pudo limpiar')
-      localStorage.removeItem('pos_mesas_orders')
-      alert(`Limpieza completa: ${result.deleted} órdenes eliminadas. Respaldo descargado.`)
+      const { clearLocalOrderData } = await import('@/lib/pos-offline-db')
+      await clearLocalOrderData()
+
+      // Clear Pedro's live projection (mesas + KDS) immediately. This is a LAN
+      // best-effort step: cloud + browser cleanup stay complete if Pedro is down.
+      let pedroCleared = true
+      const byOrderId = new Map<string, { id?: string; mesa?: number }>()
+      for (const order of [...(Array.isArray(backup.orders) ? backup.orders : []), ...pedroOrders]) {
+        const id = String(order.id || '')
+        if (id) byOrderId.set(id, order)
+      }
+      const orders = [...byOrderId.values()]
+      if (orders.length > 0) {
+        try {
+          const events = orders.map((order: { id?: string; mesa?: number }, index: number) => ({
+            command_id: `owner-cleanup-${backup.digest}-${index}`,
+            command_type: 'ORDER_CANCELLED',
+            restaurant_id: backup.client_id,
+            order_id: order.id,
+            mesa: order.mesa,
+          }))
+          const bridge = await fetch(`${getBridgeUrl()}/events`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(events), signal: AbortSignal.timeout(5000),
+          })
+          pedroCleared = bridge.ok
+        } catch { pedroCleared = false }
+      }
+      alert(`Limpieza completa: ${result.deleted} órdenes eliminadas. Respaldo descargado.${pedroCleared ? '' : ' Pedro no respondió; se reconciliará automáticamente.'}`)
       await refresh()
     } catch (e) { setError((e as Error).message) } finally { setCleaning(false) }
   }

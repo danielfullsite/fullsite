@@ -204,6 +204,47 @@ export async function deleteCachedOrder(id: string): Promise<void> {
   tx.objectStore('orders').delete(id)
 }
 
+/**
+ * Purge only order/test-sale state after the owner has deleted every cloud order.
+ * Keeps menu, staff, fingerprints, terminal config, print jobs, inventory, turnos
+ * and cash movements intact. Order writes must also leave the replay queues or they
+ * would recreate the deleted orders on the next reconnect.
+ */
+export async function clearLocalOrderData(storage?: Storage): Promise<void> {
+  const db = await openDB()
+  await new Promise<void>((resolve) => {
+    const tx = db.transaction(['orders', 'sync_queue'], 'readwrite')
+    tx.objectStore('orders').clear()
+    const queue = tx.objectStore('sync_queue')
+    const req = queue.getAll()
+    req.onsuccess = () => {
+      for (const item of (req.result || []) as SyncQueueItem[]) {
+        if (item.table === 'pos_orders' || item.table === 'pos_audit_log') queue.delete(item.id)
+      }
+    }
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => resolve()
+  })
+
+  const ls = storage ?? (typeof localStorage !== 'undefined' ? localStorage : undefined)
+  if (!ls) return
+  const remove: string[] = []
+  for (let i = 0; i < ls.length; i++) {
+    const key = ls.key(i)
+    if (key && (key === 'pos_mesas_orders' || key.startsWith('pos_order_') || key.startsWith('pos_draft_'))) remove.push(key)
+  }
+  remove.forEach(key => ls.removeItem(key))
+
+  // Emergency fallback queue used when IndexedDB is temporarily unavailable.
+  try {
+    const key = 'fullsite_offline_queue'
+    const queued = JSON.parse(ls.getItem(key) || '[]') as Array<{ table?: string }>
+    const preserved = queued.filter(item => item.table !== 'pos_orders' && item.table !== 'pos_audit_log')
+    if (preserved.length > 0) ls.setItem(key, JSON.stringify(preserved))
+    else ls.removeItem(key)
+  } catch { /* malformed legacy queue: leave it for diagnostics */ }
+}
+
 // ─── Inventory Cache ────────────────────────────────────────────────────────
 
 export async function cacheInventory(items: Record<string, unknown>[]): Promise<void> {
