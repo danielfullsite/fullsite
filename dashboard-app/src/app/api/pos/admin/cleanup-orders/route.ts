@@ -1,14 +1,15 @@
 import { createHash } from 'node:crypto'
 import { NextRequest } from 'next/server'
 import { POS_ROLE_LVL, withPOSAuth, unauthorized } from '@/lib/api-auth'
+import { canCleanupAllOrders } from '@/lib/order-cleanup-auth'
 
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 
 async function context(request: NextRequest) {
   const auth = await withPOSAuth(request)
   if (!auth) return { error: unauthorized() }
-  if ((POS_ROLE_LVL[auth.role] ?? 0) < POS_ROLE_LVL.gerente) {
-    return { error: Response.json({ error: 'Requiere gerente' }, { status: 403 }) }
+  if ((POS_ROLE_LVL[auth.role] ?? 0) < POS_ROLE_LVL.gerente || !canCleanupAllOrders(auth)) {
+    return { error: Response.json({ error: 'Esta limpieza está reservada exclusivamente para Daniel' }, { status: 403 }) }
   }
   return { auth }
 }

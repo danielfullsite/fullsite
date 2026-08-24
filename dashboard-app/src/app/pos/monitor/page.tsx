@@ -6,6 +6,7 @@ import { ArrowLeft, Activity, Printer, Wifi, WifiOff, AlertTriangle, CheckCircle
 import { getActiveClientSlug as _cid } from '@/lib/data'
 
 import { getBridgeUrl } from '@/lib/bridge-url'
+import { canCleanupAllOrders } from '@/lib/order-cleanup-auth'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -35,6 +36,7 @@ export default function MonitorPage() {
   const [lastRefresh, setLastRefresh] = useState('')
   const [error, setError] = useState('')
   const [cleaning, setCleaning] = useState(false)
+  const [canCleanOrders, setCanCleanOrders] = useState(false)
 
   const cleanTestOrders = async () => {
     if (!confirm('Se descargará un respaldo y se borrarán TODAS las órdenes del restaurante. ¿Continuar?')) return
@@ -175,6 +177,12 @@ export default function MonitorPage() {
   }
 
   useEffect(() => {
+    try {
+      const staff = JSON.parse(sessionStorage.getItem('pos_staff') || '{}')
+      setCanCleanOrders(canCleanupAllOrders({
+        clientId: _cid(), staffId: staff.id || '', staffName: staff.name || '', role: staff.role || '',
+      }))
+    } catch { setCanCleanOrders(false) }
     refresh()
     const interval = setInterval(refresh, 10000) // refresh every 10s
     return () => clearInterval(interval)
@@ -200,10 +208,12 @@ export default function MonitorPage() {
         <button onClick={refresh} disabled={loading} className="p-2 rounded-lg bg-[var(--surface)] border border-[var(--line)] hover:bg-[var(--surface-2)]">
           <RefreshCw size={16} className={loading ? 'animate-spin text-emerald-400' : 'text-[var(--text-3)]'} />
         </button>
-        <button onClick={cleanTestOrders} disabled={cleaning}
-          className="ml-2 px-3 py-2 rounded-lg bg-red-950 border border-red-700 text-red-300 text-xs font-bold disabled:opacity-50">
-          {cleaning ? 'Limpiando…' : 'Limpiar órdenes de prueba'}
-        </button>
+        {canCleanOrders && (
+          <button onClick={cleanTestOrders} disabled={cleaning}
+            className="ml-2 px-3 py-2 rounded-lg bg-red-950 border border-red-700 text-red-300 text-xs font-bold disabled:opacity-50">
+            {cleaning ? 'Limpiando…' : 'Limpiar órdenes de prueba'}
+          </button>
+        )}
       </div>
 
       {data && (
