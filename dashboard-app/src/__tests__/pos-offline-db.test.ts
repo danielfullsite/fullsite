@@ -12,6 +12,7 @@ import {
   cacheMenu, getCachedMenu,
   cacheOrder, getCachedOrders, deleteCachedOrder,
   queueOperation, getPendingQueue, markSynced, incrementRetry, clearSyncedItems, getSyncQueueSummary,
+  getSyncQueueDiagnostics, resolveSyncConflictKeepServer, resolveSyncConflictApplyLocal,
   cacheTurno, getCachedActiveTurno, closeCachedTurno,
   cachePaymentMethods, getCachedPaymentMethods,
   cacheStaff, getCachedStaff,
@@ -52,6 +53,23 @@ describe('pos-offline-db — órdenes offline', () => {
 })
 
 describe('pos-offline-db — cola de sync (el corazón del offline)', () => {
+  async function classify(id: string, errorClass: string, serverRevision?: number) {
+    const req = indexedDB.open('fullsite_pos', 4)
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      req.onsuccess = () => resolve(req.result)
+      req.onerror = () => reject(req.error)
+    })
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction('sync_queue', 'readwrite')
+      const store = tx.objectStore('sync_queue')
+      const get = store.get(id)
+      get.onsuccess = () => store.put({ ...get.result, error_class: errorClass, server_revision: serverRevision, conflict: true })
+      tx.oncomplete = () => resolve()
+      tx.onerror = () => reject(tx.error)
+    })
+    db.close()
+  }
+
   it('encola una operación → aparece pendiente → markSynced la saca', async () => {
     const id = await queueOperation('pos_orders', 'POST', { id: 'o1', total: 100 }, '/api/pos/save-order')
     let pending = await getPendingQueue()
@@ -88,6 +106,35 @@ describe('pos-offline-db — cola de sync (el corazón del offline)', () => {
     await incrementRetry(id)
     const item = (await getPendingQueue()).find((i) => i.id === id)
     expect(item?.retries).toBe(2)
+  })
+
+  it('conservar nube elimina únicamente el conflicto elegido', async () => {
+    const conflictId = await queueOperation('pos_orders', 'POST', { order_id: 'o1', mesa: 4 })
+    await queueOperation('pos_audit_log', 'POST', { action: 'test' })
+    await classify(conflictId, 'TERMINAL_NON_RETRYABLE')
+
+    expect(await resolveSyncConflictKeepServer(conflictId)).toBe(true)
+    const left = await getPendingQueue()
+    expect(left).toHaveLength(1)
+    expect(left[0].table).toBe('pos_audit_log')
+  })
+
+  it('aplicar local rebasa revisión, rota idempotency key y conserva payload', async () => {
+    const id = await queueOperation('pos_orders', 'POST', {
+      order_id: 'o4', mesa: 4, status: 'cerrada', total: 250,
+      expected_revision: 1, save_operation_id: 'rejected-op',
+    }, '/api/pos/save-order')
+    await classify(id, 'STALE_WRITE_CONFLICT', 2)
+
+    const before = (await getPendingQueue())[0]
+    expect(await resolveSyncConflictApplyLocal(id, 'manager-token', 'Gerente')).toBe(true)
+    const after = (await getPendingQueue())[0]
+    expect(after.data.expected_revision).toBe(2)
+    expect(after.data.save_operation_id).not.toBe(before.data.save_operation_id)
+    expect(after.data.total).toBe(250)
+    expect(after.data.conflict_resolution).toBe(true)
+    expect(after.error_class).toBeUndefined()
+    expect((await getSyncQueueDiagnostics())[0].errorClass).toBe('PENDING')
   })
 })
 

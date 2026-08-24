@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { withPOSAuth, unauthorized } from '@/lib/api-auth'
+import { verifyManagerApproval } from '@/lib/manager-approval'
 
 /**
  * R2D1 + R2 Final + R2D — Revision-aware order save + R1 reconciliation boundary
@@ -44,6 +45,20 @@ export async function POST(request: NextRequest) {
     }
     if (typeof expected_revision !== 'number' || expected_revision < 0) {
       return Response.json({ ok: false, error: 'INVALID_REVISION' } satisfies SaveResult, { status: 400 })
+    }
+
+    if (body.conflict_resolution === true) {
+      const approval = await verifyManagerApproval({
+        approvalToken: body.approval_token,
+        clientId,
+        minLevel: 4,
+      })
+      // Conflict rebases overwrite a newer server revision. Unlike the gradual
+      // rollout used by legacy sensitive actions, this path is strict from day one:
+      // only a fresh, signed online manager token may authorize it.
+      if (!approval.ok || !approval.mode.startsWith('online:')) {
+        return Response.json({ ok: false, error: 'MANAGER_APPROVAL_REQUIRED' } satisfies SaveResult, { status: 403 })
+      }
     }
 
     // R1 reconciliation server-side (P0 dinero): el invariante sum(pagos)==total+propina

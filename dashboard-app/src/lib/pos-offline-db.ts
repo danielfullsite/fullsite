@@ -367,21 +367,89 @@ export async function getSyncQueueSummary(): Promise<SyncQueueSummary> {
 }
 
 export interface SyncQueueDiagnostic {
+  id: string
   operation: string
   retries: number
   errorClass: string
   detail: string
+  orderId: string
+  mesa: number | null
+  status: string
+  total: number | null
+  serverRevision: number | null
 }
 
 /** Safe operator diagnostics: deliberately excludes queued order/payment payloads. */
 export async function getSyncQueueDiagnostics(): Promise<SyncQueueDiagnostic[]> {
   const queue = await getPendingQueue()
-  return queue.map(item => ({
-    operation: item.endpoint || item.table || item.method || 'unknown',
-    retries: item.retries ?? 0,
-    errorClass: item.error_class || ((item.retries ?? 0) >= 5 ? 'RETRIES_EXHAUSTED' : 'PENDING'),
-    detail: item.error_detail || '',
-  }))
+  return queue.map(item => {
+    const data = item.data || {}
+    return {
+      id: item.id,
+      operation: item.endpoint || item.table || item.method || 'unknown',
+      retries: item.retries ?? 0,
+      errorClass: item.error_class || ((item.retries ?? 0) >= 5 ? 'RETRIES_EXHAUSTED' : 'PENDING'),
+      detail: item.error_detail || '',
+      orderId: typeof data.order_id === 'string' ? data.order_id : '',
+      mesa: Number.isFinite(Number(data.mesa)) ? Number(data.mesa) : null,
+      status: typeof data.status === 'string' ? data.status : '',
+      total: Number.isFinite(Number(data.total)) ? Number(data.total) : null,
+      serverRevision: typeof item.server_revision === 'number' ? item.server_revision : null,
+    }
+  })
+}
+
+export async function resolveSyncConflictKeepServer(itemId: string): Promise<boolean> {
+  const db = await openDB()
+  return new Promise(resolve => {
+    const tx = db.transaction('sync_queue', 'readwrite')
+    const store = tx.objectStore('sync_queue')
+    const req = store.get(itemId)
+    req.onsuccess = () => {
+      const item = req.result as SyncQueueItem | undefined
+      if (!item || !item.error_class) { resolve(false); return }
+      store.delete(itemId)
+      tx.oncomplete = () => resolve(true)
+    }
+    req.onerror = () => resolve(false)
+  })
+}
+
+export async function resolveSyncConflictApplyLocal(
+  itemId: string,
+  approvalToken: string,
+  manager: string,
+): Promise<boolean> {
+  const db = await openDB()
+  return new Promise(resolve => {
+    const tx = db.transaction('sync_queue', 'readwrite')
+    const store = tx.objectStore('sync_queue')
+    const req = store.get(itemId)
+    req.onsuccess = () => {
+      const item = req.result as SyncQueueItem | undefined
+      if (!item || item.error_class !== 'STALE_WRITE_CONFLICT' || typeof item.server_revision !== 'number') {
+        resolve(false)
+        return
+      }
+      item.data = {
+        ...item.data,
+        expected_revision: item.server_revision,
+        save_operation_id: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+        conflict_resolution: true,
+        approval_token: approvalToken,
+        conflict_resolved_by: manager,
+      }
+      item.base_version = String(item.server_revision)
+      item.retries = 0
+      delete item.error_class
+      delete item.error_detail
+      delete item.server_revision
+      delete item.conflict
+      store.put(item)
+      tx.oncomplete = () => resolve(true)
+    }
+    req.onerror = () => resolve(false)
+  })
 }
 
 export async function clearSyncedItems(): Promise<void> {

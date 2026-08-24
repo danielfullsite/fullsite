@@ -3657,7 +3657,10 @@ function POSContent() {
               lastSyncTime={lastSyncTime}
               connectedDevices={connectedDevices}
               onSync={async () => {
-                const { syncAll, getSyncQueueSummary, getSyncQueueDiagnostics } = await import('@/lib/pos-offline-db')
+                const {
+                  syncAll, getSyncQueueSummary, getSyncQueueDiagnostics,
+                  resolveSyncConflictKeepServer, resolveSyncConflictApplyLocal,
+                } = await import('@/lib/pos-offline-db')
                 setIsSyncing(true)
                 try {
                   const result = await syncAll()
@@ -3670,6 +3673,49 @@ function POSContent() {
                       `${i + 1}. ${d.operation} — ${d.errorClass} — intentos ${d.retries}${d.detail ? `\n   ${d.detail}` : ''}`
                     )
                     window.alert(`Diagnóstico de sincronización\n\n${rows.join('\n')}`)
+
+                    const conflict = diagnostics.find(d =>
+                      d.errorClass === 'STALE_WRITE_CONFLICT' || d.errorClass === 'TERMINAL_NON_RETRYABLE'
+                    )
+                    if (conflict) {
+                      const label = [
+                        conflict.mesa != null ? `Mesa ${conflict.mesa}` : 'Mesa desconocida',
+                        conflict.status ? `estado local: ${conflict.status}` : '',
+                        conflict.total != null ? `total local: ${formatMXN(conflict.total)}` : '',
+                        conflict.detail,
+                      ].filter(Boolean).join('\n')
+                      const allowed = conflict.errorClass === 'STALE_WRITE_CONFLICT' ? 'LOCAL o NUBE' : 'NUBE'
+                      const decision = window.prompt(
+                        `Resolver UN conflicto\n\n${label}\n\nEscribe ${allowed}.\nCancelar conserva todo sin cambios.`
+                      )?.trim().toUpperCase()
+                      if (decision === 'LOCAL' || decision === 'NUBE') {
+                        if (decision === 'LOCAL' && conflict.errorClass !== 'STALE_WRITE_CONFLICT') {
+                          window.alert('Esta operación no existe en nube y no puede rebasarse automáticamente. Elige NUBE o cancela para revisión.')
+                        } else {
+                          const managerPin = window.prompt('PIN de gerente para autorizar esta resolución:') || ''
+                          const manager = managerPin.length >= 4 ? await verifyManagerPin(managerPin) : null
+                          if (!manager) {
+                            window.alert('PIN de gerente inválido. No se cambió la cola.')
+                          } else if (decision === 'NUBE') {
+                            const ok = await resolveSyncConflictKeepServer(conflict.id)
+                            window.alert(ok ? 'Conflicto resuelto conservando la versión de nube.' : 'No se pudo resolver; la operación permanece guardada.')
+                          } else {
+                            const approvalToken = consumeManagerApproval(manager)
+                            const prepared = approvalToken
+                              ? await resolveSyncConflictApplyLocal(conflict.id, approvalToken, manager)
+                              : false
+                            if (prepared) {
+                              const replay = await syncAll()
+                              window.alert(replay.synced > 0 ? 'Versión local aplicada y sincronizada.' : 'La versión local quedó preparada, pero no sincronizó. Revisa pendientes nuevamente.')
+                            } else {
+                              window.alert('No se pudo preparar la resolución; la operación permanece guardada.')
+                            }
+                          }
+                          const after = await getSyncQueueSummary()
+                          setPendingSync(after.pending + after.terminal + after.exhausted)
+                        }
+                      }
+                    }
                   }
                 } catch {}
                 setIsSyncing(false)
