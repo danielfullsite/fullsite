@@ -515,12 +515,13 @@ export default function MesasPage() {
     if (staffRole === 'cajero' && !ordersByMesa.has(mesaNum)) {
       return // silently ignore — cajero can't open new restaurant tables
     }
-    // Navegación DURA (no router.push). Evidencia de campo: en este Next.js (16.2)
-    // router.push('/pos?mesa=N') desde /pos/mesas SOLTABA el ?mesa= y caía al default
-    // (mesa 1) — tocabas la 52 y abría la 1. Una navegación dura a /pos?mesa=N sí lleva
-    // el parámetro (comprobado escribiendo la URL a mano). Offline el SW sirve /pos del
-    // cache (con ignoreVary), así que funciona sin internet igual.
-    window.location.href = `/pos?mesa=${mesaNum}`
+    // Navegación CLIENTE (router.push), NO recarga la página. La navegación DURA
+    // (window.location.href) rompía offline: forzaba recarga completa → dependía del
+    // Service Worker sirviendo /pos + re-corría el gate de auth → sin internet NO abría
+    // la mesa. router.push mantiene viva la SPA (cero recarga, cero dependencia del SW).
+    // El /pos abre la mesa correcta porque ya sincroniza el ?mesa= de forma reactiva
+    // (efecto urlMesa, page.tsx) + initialMesa — ya no "cae a la mesa 1".
+    router.push(`/pos?mesa=${mesaNum}`)
   }
 
   // ─── Mesa Card (shared between views) ─────────────────────────────────────
