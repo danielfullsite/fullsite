@@ -8,6 +8,7 @@ import { getMesasConfig, formatMXN, logAudit, verifyManagerPin, fetchPosMesas, f
 import type { Mesa } from '@/lib/pos-data'
 import { getActiveClientSlug as _cid } from '@/lib/data'
 import { getPosConfigSync } from '@/lib/pos-config'
+import { shouldUsePersistedFloorCoordinates } from '@/lib/floorplan-coordinates'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -183,7 +184,7 @@ export default function MesasPage() {
           .filter(r => Number.isFinite(r._x) && Number.isFinite(r._y))
         // Exigir que la MAYORÍA de las mesas tenga coords (evita pintar un plano casi
         // vacío si alguien guardó 1 mesa suelta en el editor).
-        if (withCoords.length > 0 && withCoords.length >= rows.length / 2) {
+        if (shouldUsePersistedFloorCoordinates(cid) && withCoords.length > 0 && withCoords.length >= rows.length / 2) {
           setFloorTables(withCoords.map(r => ({
             number: r.number,
             x: r._x,
