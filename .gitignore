@@ -47,6 +47,25 @@ electron-kds/dist/
 electron-kds/kds.config.json
 electron-dashboard/dist/
 
+# Instaladores generados por electron-builder (dist-pos/ y dist-kds/ pesan 3.1 GB
+# juntos y ahogaban `git status`, escondiendo cambios reales). Se ignoran los
+# ARTEFACTOS, no las carpetas: los config-*.json de cada terminal de AMALAY
+# (CAJA/ENTRADA/ESCONDITE/POS2/POS3/KDS) viven ahí y SÍ deben trackearse.
+electron-app/dist-pos/**/*.exe
+electron-app/dist-pos/**/*.blockmap
+electron-app/dist-pos/**/*.zip
+electron-app/dist-pos/builder-debug.yml
+electron-app/dist-pos/win-unpacked/
+electron-app/dist-pos/win-arm64-unpacked/
+electron-app/dist-kds/**/*.exe
+electron-app/dist-kds/**/*.blockmap
+electron-app/dist-kds/**/*.zip
+electron-app/dist-kds/builder-debug.yml
+electron-app/dist-kds/win-unpacked/
+electron-app/dist-kds/win-arm64-unpacked/
+!electron-app/dist-pos/config-*.json
+!electron-app/dist-kds/config-*.json
+
 # Fingerprint service binaries (compiled from print-bridge/fingerprint-service.cs;
 # contain the DigitalPersona SDK DLL which must not be tracked in git)
 electron-app/resources/fingerprint/*.exe
@@ -56,3 +75,16 @@ print-bridge/*.dll
 
 # Graphify regenerable cache
 graphify-out/cache/ast/
+
+# Worktrees y sandboxes de agentes (copias completas del repo — 4+ GB)
+.claude/worktrees/
+.codex/
+
+# Temporales de Supabase CLI
+**/supabase/.temp/
+
+# Copias sueltas del build de Windows (78 MB c/u, regenerables)
+electron-app/fullsite-pos-win-*/
+dashboard-app/fullsite-pos-win-*/
+electron-app/fullsite-pos@*
+dashboard-app/ios/App/App.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/

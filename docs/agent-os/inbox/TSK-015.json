@@ -1,0 +1,65 @@
+{
+  "id": "TSK-015",
+  "execution_class": "AUTO_TECH",
+  "gate_id": "CLON-HARDCODES",
+  "domain": "clonability",
+  "title": "CLON-HARDCODES — Cero hardcodes AMALAY — checker ejecutable PASS (R2-G09)",
+  "objective": "check_hardcodes ejecutable en CI; HARDCODE-ISSUES-REGISTRY reconciliado; P0/P1 en cero\n\nGATE: CLON-HARDCODES · dominio: clonability · cert level objetivo: SOFTWARE\nContexto: este task implementa un gate del pipeline CLIENT_2_READY. Reconcilia SIEMPRE contra el estado actual del repo antes de asumir docs como verdad. NO toques: branches bug-019/*, wave1/*, release/offline-field-*, producción, secretos.",
+  "role": "RUNTIME_ENGINEER",
+  "priority": "P1",
+  "status": "READY",
+  "tags": [
+    "gate:CLON-HARDCODES",
+    "clonability"
+  ],
+  "dod": [
+    "check_hardcodes ejecutable en CI; HARDCODE-ISSUES-REGISTRY reconciliado; P0/P1 en cero",
+    "Tests deterministas incluidos y en verde",
+    "Commit en el branch del task (nunca push, nunca merge manual)"
+  ],
+  "dependencies": [],
+  "budget_tokens": 150000,
+  "max_turns": 20,
+  "max_retries": 3,
+  "retry_count": 0,
+  "files_allowed": [],
+  "notes": "",
+  "claimed_by": null,
+  "claimed_at": null,
+  "submitted_at": null,
+  "verified_at": null,
+  "created_at": "2026-08-09T04:21:12Z",
+  "updated_at": "2026-08-15T00:14:51Z",
+  "history": [
+    {
+      "from": null,
+      "to": "READY",
+      "by": "ORCHESTRATOR",
+      "at": "2026-08-09T04:21:12Z",
+      "note": "Task created"
+    },
+    {
+      "from": "READY",
+      "to": "CLAIMED",
+      "by": "RUNTIME_ENGINEER",
+      "at": "2026-08-09T04:21:13Z",
+      "note": "Worker claimed task"
+    },
+    {
+      "from": "CLAIMED",
+      "to": "IN_PROGRESS",
+      "by": "RUNTIME_ENGINEER",
+      "at": "2026-08-09T04:21:13Z",
+      "note": "Engineering started"
+    },
+    {
+      "from": "IN_PROGRESS",
+      "to": "READY",
+      "by": "SUPERVISOR",
+      "at": "2026-08-15T00:14:51Z",
+      "note": "Recovered: stuck IN_PROGRESS for 8394m, no active worker"
+    }
+  ],
+  "branch": "agent-os/TSK-015",
+  "worktree_path": "/tmp/fullsite-worker-TSK-015"
+}
