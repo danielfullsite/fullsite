@@ -69,7 +69,7 @@ import {
   buildCategoryMap,
 } from '@/lib/pos-promos'
 import { getActiveCombos, applyCombo, type Combo } from '@/lib/pos-combos'
-import { syncAll, getPendingQueue, queueOperation, cacheMenu, getCachedMenu, cacheCashMovement, guardTenant } from '@/lib/pos-offline-db'
+import { syncAll, getPendingQueue, queueOperation, cacheMenu, getCachedMenu, cacheCashMovement, guardTenant, type SyncQueueDiagnostic } from '@/lib/pos-offline-db'
 import { sendNotification } from '@/lib/service-worker'
 import { getPermissions } from '@/lib/pos-permissions'
 import { getRecipeIngredientNames } from '@/lib/pos-recipe-ingredients'
@@ -1815,6 +1815,11 @@ function POSContent() {
   const [pendingSync, setPendingSync] = useState(0)
   const [isSyncing, setIsSyncing] = useState(false)
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null)
+  const [syncConflict, setSyncConflict] = useState<SyncQueueDiagnostic | null>(null)
+  const [syncConflictDecision, setSyncConflictDecision] = useState<'LOCAL' | 'NUBE' | null>(null)
+  const [syncConflictPin, setSyncConflictPin] = useState('')
+  const [syncConflictError, setSyncConflictError] = useState('')
+  const [syncConflictBusy, setSyncConflictBusy] = useState(false)
   const syncRef = useRef(false)
   useEffect(() => {
     let mounted = true
@@ -3659,7 +3664,6 @@ function POSContent() {
               onSync={async () => {
                 const {
                   syncAll, getSyncQueueSummary, getSyncQueueDiagnostics,
-                  resolveSyncConflictKeepServer, resolveSyncConflictApplyLocal,
                 } = await import('@/lib/pos-offline-db')
                 setIsSyncing(true)
                 try {
@@ -3678,43 +3682,10 @@ function POSContent() {
                       d.errorClass === 'STALE_WRITE_CONFLICT' || d.errorClass === 'TERMINAL_NON_RETRYABLE'
                     )
                     if (conflict) {
-                      const label = [
-                        conflict.mesa != null ? `Mesa ${conflict.mesa}` : 'Mesa desconocida',
-                        conflict.status ? `estado local: ${conflict.status}` : '',
-                        conflict.total != null ? `total local: ${formatMXN(conflict.total)}` : '',
-                        conflict.detail,
-                      ].filter(Boolean).join('\n')
-                      const allowed = conflict.errorClass === 'STALE_WRITE_CONFLICT' ? 'LOCAL o NUBE' : 'NUBE'
-                      const decision = window.prompt(
-                        `Resolver UN conflicto\n\n${label}\n\nEscribe ${allowed}.\nCancelar conserva todo sin cambios.`
-                      )?.trim().toUpperCase()
-                      if (decision === 'LOCAL' || decision === 'NUBE') {
-                        if (decision === 'LOCAL' && conflict.errorClass !== 'STALE_WRITE_CONFLICT') {
-                          window.alert('Esta operación no existe en nube y no puede rebasarse automáticamente. Elige NUBE o cancela para revisión.')
-                        } else {
-                          const managerPin = window.prompt('PIN de gerente para autorizar esta resolución:') || ''
-                          const manager = managerPin.length >= 4 ? await verifyManagerPin(managerPin) : null
-                          if (!manager) {
-                            window.alert('PIN de gerente inválido. No se cambió la cola.')
-                          } else if (decision === 'NUBE') {
-                            const ok = await resolveSyncConflictKeepServer(conflict.id)
-                            window.alert(ok ? 'Conflicto resuelto conservando la versión de nube.' : 'No se pudo resolver; la operación permanece guardada.')
-                          } else {
-                            const approvalToken = consumeManagerApproval(manager)
-                            const prepared = approvalToken
-                              ? await resolveSyncConflictApplyLocal(conflict.id, approvalToken, manager)
-                              : false
-                            if (prepared) {
-                              const replay = await syncAll()
-                              window.alert(replay.synced > 0 ? 'Versión local aplicada y sincronizada.' : 'La versión local quedó preparada, pero no sincronizó. Revisa pendientes nuevamente.')
-                            } else {
-                              window.alert('No se pudo preparar la resolución; la operación permanece guardada.')
-                            }
-                          }
-                          const after = await getSyncQueueSummary()
-                          setPendingSync(after.pending + after.terminal + after.exhausted)
-                        }
-                      }
+                      setSyncConflict(conflict)
+                      setSyncConflictDecision(null)
+                      setSyncConflictPin('')
+                      setSyncConflictError('')
                     }
                   }
                 } catch {}
@@ -4790,6 +4761,101 @@ function POSContent() {
           )}
         </div>
       </div>
+
+      {/* Offline sync conflict resolver — native React UI (Electron does not support window.prompt). */}
+      {syncConflict && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/75 p-5">
+          <div className="w-full max-w-2xl rounded-2xl border border-amber-600/60 bg-[var(--panel)] p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-xl font-black text-amber-400">Resolver conflicto offline</h3>
+                <p className="mt-1 text-sm text-[var(--text-3)]">Se resolverá una sola operación. Las demás permanecen guardadas.</p>
+              </div>
+              <button type="button" onClick={() => setSyncConflict(null)} className="h-11 w-11 rounded-lg bg-[var(--line)] text-[var(--text-2)]"><X size={20} className="mx-auto" /></button>
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-2 rounded-xl bg-black/25 p-4 text-sm">
+              <span className="text-[var(--text-3)]">Mesa</span><strong>{syncConflict.mesa ?? 'Desconocida'}</strong>
+              <span className="text-[var(--text-3)]">Estado local</span><strong>{syncConflict.status || 'Sin estado'}</strong>
+              <span className="text-[var(--text-3)]">Total local</span><strong>{syncConflict.total != null ? formatMXN(syncConflict.total) : 'Sin total'}</strong>
+              <span className="text-[var(--text-3)]">Conflicto</span><strong className="break-words text-amber-300">{syncConflict.detail}</strong>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => { setSyncConflictDecision('NUBE'); setSyncConflictError('') }}
+                className={`min-h-[68px] rounded-xl border px-4 py-3 text-left ${syncConflictDecision === 'NUBE' ? 'border-blue-400 bg-blue-600 text-white' : 'border-[var(--line)] bg-[var(--surface-2)] text-[var(--text-1)]'}`}
+              >
+                <strong className="block">Conservar nube</strong>
+                <span className="text-xs opacity-80">Descarta solo esta operación local conflictiva.</span>
+              </button>
+              {syncConflict.errorClass === 'STALE_WRITE_CONFLICT' && (
+                <button
+                  type="button"
+                  onClick={() => { setSyncConflictDecision('LOCAL'); setSyncConflictError('') }}
+                  className={`min-h-[68px] rounded-xl border px-4 py-3 text-left ${syncConflictDecision === 'LOCAL' ? 'border-amber-300 bg-amber-600 text-white' : 'border-[var(--line)] bg-[var(--surface-2)] text-[var(--text-1)]'}`}
+                >
+                  <strong className="block">Aplicar versión local</strong>
+                  <span className="text-xs opacity-80">Sobrescribe la revisión actual con este cierre offline.</span>
+                </button>
+              )}
+            </div>
+
+            <label className="mt-4 block text-sm font-bold text-[var(--text-2)]">PIN de gerente</label>
+            <input
+              type="password"
+              inputMode="numeric"
+              value={syncConflictPin}
+              onChange={e => { setSyncConflictPin(e.target.value.replace(/\D/g, '').slice(0, 8)); setSyncConflictError('') }}
+              className="mt-2 w-full rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3 text-center text-2xl tracking-[0.5em] text-[var(--text-1)]"
+              placeholder="••••"
+            />
+            {syncConflictError && <p className="mt-2 text-sm font-semibold text-red-400">{syncConflictError}</p>}
+
+            <button
+              type="button"
+              disabled={!syncConflictDecision || syncConflictPin.length < 4 || syncConflictBusy}
+              onClick={async () => {
+                if (!syncConflictDecision) return
+                setSyncConflictBusy(true)
+                setSyncConflictError('')
+                try {
+                  const manager = await verifyManagerPin(syncConflictPin)
+                  if (!manager) { setSyncConflictError('PIN de gerente inválido. No se cambió la cola.'); return }
+                  const {
+                    resolveSyncConflictKeepServer, resolveSyncConflictApplyLocal,
+                    getSyncQueueSummary, syncAll: replayQueue,
+                  } = await import('@/lib/pos-offline-db')
+                  let ok = false
+                  if (syncConflictDecision === 'NUBE') {
+                    ok = await resolveSyncConflictKeepServer(syncConflict.id)
+                  } else {
+                    const approvalToken = consumeManagerApproval(manager)
+                    ok = Boolean(approvalToken) && await resolveSyncConflictApplyLocal(syncConflict.id, approvalToken!, manager)
+                    if (ok) {
+                      const replay = await replayQueue()
+                      ok = replay.synced > 0
+                    }
+                  }
+                  if (!ok) { setSyncConflictError('No se pudo completar. La operación permanece guardada.'); return }
+                  const after = await getSyncQueueSummary()
+                  setPendingSync(after.pending + after.terminal + after.exhausted)
+                  showToast(syncConflictDecision === 'NUBE' ? 'Conflicto resuelto: se conservó nube' : 'Conflicto resuelto: se aplicó la versión local')
+                  setSyncConflict(null)
+                  setSyncConflictDecision(null)
+                  setSyncConflictPin('')
+                } finally {
+                  setSyncConflictBusy(false)
+                }
+              }}
+              className="mt-4 w-full rounded-xl bg-emerald-600 px-5 py-4 text-lg font-black text-white disabled:bg-[var(--line)] disabled:text-[var(--text-3)]"
+            >
+              {syncConflictBusy ? 'Resolviendo…' : 'Confirmar resolución'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Barcode Scanner */}
       {showBarcodeScanner && (
