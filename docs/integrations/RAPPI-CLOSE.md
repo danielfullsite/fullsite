@@ -1,60 +1,87 @@
-# Rappi — checklist de cierre (DEV)
+# Rappi — cierre técnico DEV
 
-> Estado 2026-08-19: el **receptor v2 está desplegado en main** (commit `53764ff2`). Faltan solo
-> config + el signing secret (self-serve, sin Rodrigo). Fuente: dev-portal.rappi.com/en/api-reference/webhooks.
-> NUNCA pegar secretos en chat/git — van como env var en Vercel.
+> Última validación: **2026-08-24**. La integración está desplegada en producción de
+> Fullsite, conectada al ambiente DEV de Rappi y lista para recibir una orden de certificación.
+> No guardar credenciales, tokens ni secretos en este documento, Git o chats.
 
-## URL del webhook (v2, ya en prod)
-`https://app.fullsite.mx/api/integrations/rappi/webhook` — verifica HMAC; devuelve **503 si falta
-`RAPPI_WEBHOOK_SECRET`** (inerte hasta configurar), manda a DLQ si el store no está mapeado.
+## Estado comprobado
 
-## Paso 1 — obtener el signing secret (self-serve, NO depende de Rodrigo)
-Rappi expone la config del webhook por API. Con el `client_id/secret` DEV:
+| Capacidad | Estado | Evidencia |
+|---|---|---|
+| Health Fullsite | ✅ | `GET /api/integrations/rappi/health` → HTTP 200 |
+| OAuth DEV | ✅ | token emitido por `api.dev.rappi.com` |
+| Store DEV configurado | ✅ | `store_id_configured: true` |
+| Menú mínimo | ✅ | upload Rappi DEV → HTTP 200 |
+| Lectura de menú enviado | ✅ | submitted menu → HTTP 200 |
+| Polling de órdenes | ✅ | HTTP 200; última corrida `checked: 0` |
+| Firma HMAC webhook | ✅ código/pruebas | `Rappi-Signature`, anti-replay y comparación constante |
+| Payload Orders v1 | ✅ código/pruebas | soporta el sobre oficial `order_detail` |
+| Deduplicación y tenant mapping | ✅ código | `platform + platform_order_id`; store → `client_id` |
+| POS → servidor local → KDS/impresión | ✅ campo/simulación | puente Electron 1.3.8 |
+| Accept / Reject / Ready reales | ⏳ orden DEV | requieren un `order_id` vigente emitido por Rappi |
 
-```bash
-# 1) token (rellena tus credenciales DEV)
-TOKEN=$(curl -s -X POST https://api.dev.rappi.com/restaurants/auth/v1/token/login/integrations \
-  -H 'Content-Type: application/json' \
-  -d '{"client_id":"<RAPPI_CLIENT_ID>","client_secret":"<RAPPI_CLIENT_SECRET>"}' \
-  | python3 -c 'import sys,json;d=json.load(sys.stdin);print(d.get("token") or d.get("access_token") or "")')
+Evidencia automatizada: workflow **Rappi Cert — DEV Readiness**, corrida
+`32776461555` sobre commit de main `a754eb4d`.
 
-# 2) leer la config del webhook NEW_ORDER → trae el campo "secret"
-curl -s https://api.dev.rappi.com/api/v2/restaurants-integrations-public-api/webhook/NEW_ORDER \
-  -H "x-authorization: Bearer $TOKEN"
+## Endpoints Fullsite
+
+- Webhook firmado: `https://app.fullsite.mx/api/integrations/rappi/webhook`
+- Health: `https://app.fullsite.mx/api/integrations/rappi/health`
+- Estado/OAuth: `/api/integrations/rappi/status?probe=oauth` (admin)
+- Menú DEV: `/api/integrations/rappi/menu` (admin)
+- Poller: `/api/integrations/rappi/poller` (admin)
+- Acciones de orden: `/api/integrations/rappi/order` (sesión POS)
+
+## Contrato implementado
+
+- API Orders v1: `https://api.dev.rappi.com/restaurants/orders/v1`.
+- Autorización: `x-authorization: Bearer <token>`.
+- Consultar por integración: `GET /orders`.
+- Consultar por tienda: `GET /stores/{storeId}/orders`.
+- Aceptar: `PUT /stores/{storeId}/orders/{orderId}/cooking_time/{minutes}/take`.
+- Rechazar: `PUT /stores/{storeId}/orders/{orderId}/cancel_type/{cancelType}/reject`.
+- Lista: `POST /stores/{storeId}/orders/{orderId}/ready-for-pickup`.
+
+El normalizador acepta tanto payload plano de webhook como el sobre oficial del REST API:
+
+```json
+{
+  "order_detail": { "order_id": "...", "totals": {}, "items": [] },
+  "customer": {},
+  "store": { "internal_id": "..." }
+}
 ```
-El campo **`"secret"`** de la respuesta ES el signing secret. (Si no aparece, **resetéalo**:
-`PUT .../webhook/NEW_ORDER/reset-secret` con el mismo header → devuelve `"secret":"NEW_SECRET"`.
-Ojo: resetear invalida el secret viejo — no pasa nada porque nunca lo tuvimos.)
 
-## Paso 2 — env vars en Vercel (proyecto raíz `fullsite`, Production) + redeploy
-```
-RAPPI_ENV=dev
-RAPPI_CLIENT_ID=<dev client_id>
-RAPPI_CLIENT_SECRET=<dev client_secret>
-RAPPI_STORE_ID=900173586
-RAPPI_WEBHOOK_SECRET=<el secret del paso 1>
-```
+Los importes de Rappi se convierten de centavos a moneda. `cooking_time` son minutos y
+**nunca** se persiste como timestamp.
 
-## Paso 3 — mapear el store de pruebas → tenant AMALAY (SQL en Supabase)
-```sql
-insert into integration_store_mappings (provider, provider_store_id, client_id, store_open)
-values ('rappi', '900173586', 'amalay', true)
-on conflict (provider, provider_store_id) do update set client_id = excluded.client_id, store_open = true;
-```
+## Único bloqueo externo restante
 
-## Paso 4 — apuntar la suscripción `Fullsite_DEV` al receptor v2
-En la UI de Suscripciones de Rappi, cambiar la URL del webhook `NEW_ORDER` a
-`https://app.fullsite.mx/api/integrations/rappi/webhook` (hoy apunta al worker legacy de Cloudflare,
-que NO valida firma). O re-registrar por API (`POST .../webhook` con `event`, `url`, `data.stores`).
+Rappi debe generar una orden en la tienda DEV. La corrida actual devuelve `checked: 0`, por
+lo que no existe un `order_id` válido sobre el cual ejercer legalmente las transiciones.
 
-## Paso 5 — probar
-Disparar una orden de prueba desde el POS Tester (`integrations-manager.rappi.com/pos-tester/menu`).
-Esperado: webhook responde **200**, firma válida. En DEV el código auto-descubre el formato firmado
-y loguea `matchedFormat` (debe ser `t.body` = `<timestamp>.<body crudo>`). La orden entra a
-`delivery_orders` (status `nueva`) → cocina.
+Procedimiento cuando aparezca:
 
-## Pendientes post-cierre
-- Retirar/blindar el `cloudflare/delivery-worker` (recibe Rappi/Didi **sin firma**).
-- Para producción: mapear el store real (`MX1930030014`) + `RAPPI_ENV=prod`.
+1. Confirmar que webhook/poller crea exactamente una fila `delivery_orders` para AMALAY.
+2. Confirmar aparición en POS, servidor local, KDS y comandas por estación.
+3. Aceptar una orden DEV y guardar HTTP/status/correlation ID.
+4. Generar otra orden DEV y rechazarla con un cancel type oficial.
+5. Generar o aceptar otra orden y marcarla lista si la tienda está configurada en modo manual.
+6. Confirmar deduplicación repitiendo polling sin duplicar orden ni impresión.
+7. Adjuntar respuestas sanitizadas como evidencia de certificación.
 
-Ver `docs/integrations/rappi/DESIGN.md`, memoria [[project_rappi_integration_state]].
+## Cómo generar la orden
+
+La documentación oficial indica que las órdenes nacen desde la aplicación/infraestructura de
+Rappi; el API de integración solo las consulta y transiciona. Para DEV se debe usar el POS Tester
+de Integrations Manager o solicitar al contacto técnico de Rappi que coloque una orden en la
+tienda configurada. No fabricar un `order_id` ni llamar acciones contra producción.
+
+## Paso a producción
+
+No cambiar `RAPPI_ENV=prod` hasta completar el ciclo DEV anterior y acordar el cutover. Antes de
+producción se debe validar el mapping de la tienda real, la suscripción del webhook, modo de
+`READY_FOR_PICKUP`, impresoras/KDS en sitio y que Wansoft no consuma simultáneamente las órdenes.
+
+Referencias: `docs/integrations/rappi/DESIGN.md` y
+`docs/integrations/rappi/RAPPI-ONBOARDING-REQUEST.md`.
