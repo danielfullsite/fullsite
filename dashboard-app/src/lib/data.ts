@@ -279,7 +279,6 @@ export function aggregatePayments(
   const map: Record<string, number> = {}
   for (const day of dailyData) {
     const métodos = parseJsonbField<{ nombre?: string; total?: number }>(day.pago_métodos)
-    const ventasDia = day.ventas_dia || 0
     for (const m of métodos) {
       if (!m.nombre) continue
       // m.total is an MXN amount

@@ -124,13 +124,13 @@ describe('parseRow field sanitization (numeric fields)', () => {
     const daily = makeDaily({ ventas_dia: null as any })
     // ventas_dia: null -> 0 after parseRow
     expect(daily.ventas_dia).toBe(null)
-    // When passed through aggregatePayments, ventas_dia=0 means percentage conversion gives 0
+    // Payment totals are absolute MXN and do not depend on ventas_dia.
     const result = aggregatePayments([{
       ...daily,
       ventas_dia: 0, // simulating what parseRow would produce
       pago_métodos: [{ nombre: 'Efectivo', total: 50.0 }],
     }])
-    expect(result[0].total).toBe(0)
+    expect(result[0].total).toBe(50)
   })
 
   it('treats undefined numeric fields as 0', () => {
@@ -228,7 +228,7 @@ describe('Multi-day aggregation consistency', () => {
     expect(totalSum).toBe(10000 + 8000 + 6000 + 12000 + 7000)
   })
 
-  it('payment methods percentages from single day sum to ventas_dia', () => {
+  it('payment method amounts from a single day sum as absolute MXN', () => {
     const data = [makeDaily({
       ventas_dia: 100000,
       pago_métodos: [
@@ -240,7 +240,7 @@ describe('Multi-day aggregation consistency', () => {
     })]
     const result = aggregatePayments(data)
     const totalMXN = result.reduce((s, r) => s + r.total, 0)
-    expect(totalMXN).toBe(100000)
+    expect(totalMXN).toBe(100)
   })
 
   it('grupos totals accumulate correctly across days', () => {
