@@ -1,0 +1,72 @@
+name: Rappi Cert — DEV Readiness
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Fullsite deployment to validate"
+        required: false
+        default: "https://app.fullsite.mx"
+      exercise_menu:
+        description: "Upload the minimal certification menu to Rappi DEV"
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    env:
+      BASE: ${{ inputs.base_url }}
+      SECRET: ${{ secrets.INTEGRATION_ADMIN_SECRET }}
+    steps:
+      - name: Validate configured DEV integration
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          test -n "${SECRET:-}" || { echo "::error::Missing INTEGRATION_ADMIN_SECRET"; exit 1; }
+
+          call () {
+            local name="$1" method="$2" url="$3" body="${4:-}"
+            local code
+            if [ "$method" = "GET" ]; then
+              code=$(curl --fail-with-body -sS -o "evidence/$name.json" -w "%{http_code}" \
+                "$url" -H "Authorization: Bearer $SECRET") || true
+            else
+              code=$(curl --fail-with-body -sS -o "evidence/$name.json" -w "%{http_code}" \
+                -X "$method" "$url" \
+                -H "Authorization: Bearer $SECRET" \
+                -H "Content-Type: application/json" -d "$body") || true
+            fi
+            echo "$name HTTP $code"
+            jq '{ok, provider, action, env, oauth_ok, error, status_code, summary}' "evidence/$name.json" 2>/dev/null || true
+            [[ "$code" =~ ^2[0-9][0-9]$ ]] || { echo "::error::$name returned HTTP $code"; return 1; }
+            jq -e '.ok == true or .status == "OK" or .status == "ok"' "evidence/$name.json" >/dev/null || {
+              echo "::error::$name did not return a successful application status"; return 1;
+            }
+          }
+
+          call health GET "$BASE/api/integrations/rappi/health"
+          call oauth GET "$BASE/api/integrations/rappi/status?probe=oauth"
+          call menu_dry_run POST "$BASE/api/integrations/rappi/menu" '{"dry_run":true}'
+
+      - name: Upload minimal menu to Rappi DEV
+        if: ${{ inputs.exercise_menu }}
+        run: |
+          set -euo pipefail
+          code=$(curl --fail-with-body -sS -o evidence/menu_upload.json -w "%{http_code}" \
+            -X POST "$BASE/api/integrations/rappi/menu" \
+            -H "Authorization: Bearer $SECRET" \
+            -H "Content-Type: application/json" \
+            -d '{"dry_run":false}') || true
+          echo "menu_upload HTTP $code"
+          jq '{ok, provider, action, error, status_code, summary}' evidence/menu_upload.json 2>/dev/null || true
+          [[ "$code" =~ ^2[0-9][0-9]$ ]] && jq -e '.ok == true' evidence/menu_upload.json >/dev/null
+
+      - name: Publish evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rappi-dev-readiness-${{ github.run_id }}
+          path: evidence/*.json
+          if-no-files-found: warn
