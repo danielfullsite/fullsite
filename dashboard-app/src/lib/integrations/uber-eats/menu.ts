@@ -5,10 +5,14 @@ import { uberFetch } from './oauth'
 import { withRetry } from '../retry'
 import { auditLog } from '../audit-logger'
 
+export type UberLocalizedText =
+  | Record<string, string>
+  | { translations: Record<string, string> }
+
 export interface UberMenuUpload {
   menus: Array<{
     id: string
-    title: Record<string, string>
+    title: UberLocalizedText
     service_availability: Array<{
       day_of_week: string | string[]
       time_periods?: Array<{ start_time: string; end_time: string }>
@@ -19,34 +23,40 @@ export interface UberMenuUpload {
   }>
   categories: Array<{
     id: string
-    title: Record<string, string>
+    title: UberLocalizedText
     entities: Array<{ id: string; type: 'ITEM' }>
   }>
   items: Array<{
     id: string
     external_data: string
-    title: Record<string, string>
-    description?: Record<string, string>
+    title: UberLocalizedText
+    description?: UberLocalizedText
     price_info: { price: number; currency_code: string }
     modifier_group_ids?: string[]
     tax_info?: { tax_rate: number }
   }>
   modifier_groups?: Array<{
     id: string
-    title: Record<string, string>
+    title: UberLocalizedText
     quantity_info: { quantity: { min_permitted: number; max_permitted: number } }
     modifier_options: Array<{
       id: string
-      title: Record<string, string>
+      title: UberLocalizedText
       price_info: { price: number; currency_code: string }
     }>
   }>
 }
 
-function withDefaultLocale(text: Record<string, string>): Record<string, string> {
-  if (text.default?.trim()) return text
-  const fallback = text.es_mx || text.es || text.en_us || text.en || Object.values(text).find(value => value?.trim())
-  return fallback ? { ...text, default: fallback } : text
+function withDefaultLocale(text: UberLocalizedText): { translations: Record<string, string> } {
+  const nested = (text as { translations?: unknown }).translations
+  const translations = nested && typeof nested === 'object'
+    ? nested as Record<string, string>
+    : text as Record<string, string>
+  const fallback = translations.default || translations.es_mx || translations.es ||
+    translations.en_us || translations.en || Object.values(translations).find(value => value?.trim())
+  // Uber's MultiLanguageText contract nests locale values under `translations`.
+  // Its validator asks specifically for a non-empty `default` translation.
+  return { translations: fallback ? { default: fallback } : {} }
 }
 
 /** Repair persisted/legacy Fullsite menus to Uber's current localized-text contract. */

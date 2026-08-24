@@ -40,12 +40,12 @@ describe('Uber menu payload normalization', () => {
 
     const result = normalizeMenuPayload(menu)
 
-    expect(result.menus[0].title.default).toBe('Menú Fullsite')
-    expect(result.categories[0].title.default).toBe('Bebidas')
-    expect(result.items[0].title.default).toBe('Americano')
-    expect(result.items[0].description?.default).toBe('Black coffee')
-    expect(result.modifier_groups?.[0].title.default).toBe('Leche')
-    expect(result.modifier_groups?.[0].modifier_options[0].title.default).toBe('Avena')
+    expect(result.menus[0].title).toEqual({ translations: { default: 'Menú Fullsite' } })
+    expect(result.categories[0].title).toEqual({ translations: { default: 'Bebidas' } })
+    expect(result.items[0].title).toEqual({ translations: { default: 'Americano' } })
+    expect(result.items[0].description).toEqual({ translations: { default: 'Black coffee' } })
+    expect(result.modifier_groups?.[0].title).toEqual({ translations: { default: 'Leche' } })
+    expect(result.modifier_groups?.[0].modifier_options[0].title).toEqual({ translations: { default: 'Avena' } })
     expect(result.menus[0].service_availability).toEqual([
       { day_of_week: 'monday', time_periods: [{ start_time: '00:00', end_time: '23:59' }] },
       { day_of_week: 'tuesday', time_periods: [{ start_time: '00:00', end_time: '23:59' }] },
@@ -59,6 +59,16 @@ describe('Uber menu payload normalization', () => {
       items: [],
     })
 
-    expect(result.menus[0].title.default).toBe('Canonical')
+    expect(result.menus[0].title).toEqual({ translations: { default: 'Canonical' } })
+  })
+
+  it('accepts Uber-native translations and canonicalizes them to default', () => {
+    const result = normalizeMenuPayload({
+      menus: [{ id: 'm', title: { translations: { es_mx: 'Menú' } }, service_availability: [], category_ids: [] }],
+      categories: [],
+      items: [],
+    })
+
+    expect(result.menus[0].title).toEqual({ translations: { default: 'Menú' } })
   })
 })
