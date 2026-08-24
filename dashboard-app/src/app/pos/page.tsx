@@ -73,6 +73,7 @@ import { syncAll, getPendingQueue, queueOperation, cacheMenu, getCachedMenu, cac
 import { sendNotification } from '@/lib/service-worker'
 import { getPermissions } from '@/lib/pos-permissions'
 import { getRecipeIngredientNames } from '@/lib/pos-recipe-ingredients'
+import { navigateToMesaMap } from '@/lib/pos-navigation'
 import {
   type MpPaymentRecovery,
   type MpPaymentState,
@@ -2993,7 +2994,7 @@ function POSContent() {
                 showToast(`${raceNewItems.length} item${raceNewItems.length !== 1 ? 's' : ''} enviados`)
                 sessionStorage.removeItem('pos_staff')
                 sessionStorage.removeItem('pos_last_activity')
-                router.push('/pos/mesas'); lock()
+                navigateToMesaMap(); lock()
                 return
               } else {
                 showToast('Error al agregar items — intenta de nuevo')
@@ -3087,7 +3088,7 @@ function POSContent() {
             } catch {}
             sessionStorage.removeItem('pos_staff')
             sessionStorage.removeItem('pos_last_activity')
-            router.push('/pos/mesas'); lock()
+            navigateToMesaMap(); lock()
             return
           } else {
             if (saveResult.current_revision != null) setOrderRevision(saveResult.current_revision)
@@ -3155,7 +3156,7 @@ function POSContent() {
         // Enviado (offline queue). Al mapa de mesas al instante + bloqueo. Sin espera.
         sessionStorage.removeItem('pos_staff')
         sessionStorage.removeItem('pos_last_activity')
-        router.push('/pos/mesas')
+        navigateToMesaMap()
         lock()
       } else if (saveResult.error === 'SESSION_EXPIRED') {
         showToast('Sesión expirada — ingresa tu PIN de nuevo')
@@ -3289,7 +3290,7 @@ function POSContent() {
       // PIN/huella = cada comanda atada a quien la envió). Sin la espera de 15s.
       sessionStorage.removeItem('pos_staff')
       sessionStorage.removeItem('pos_last_activity')
-      router.push('/pos/mesas')
+      navigateToMesaMap()
       lock()
     } finally {
       operationLock.current = false
@@ -3538,7 +3539,7 @@ function POSContent() {
       // enviar. Evita quedar en la mesa (o caer a mesa 1) tras cerrar la cuenta.
       sessionStorage.removeItem('pos_staff')
       sessionStorage.removeItem('pos_last_activity')
-      router.push('/pos/mesas')
+      navigateToMesaMap()
       lock()
     } else {
       showToast('Error al cerrar cuenta')
@@ -3792,13 +3793,14 @@ function POSContent() {
         {/* Row 2: Selectors (compact for tablet) */}
         <div className="flex items-center gap-1.5 px-3 py-1 border-t border-[var(--line)]/50 overflow-x-auto">
           {/* Back to mesa map — always visible in kiosk mode (no browser back button) */}
-          <Link
-            href="/pos/mesas"
+          <button
+            type="button"
+            onClick={() => navigateToMesaMap()}
             className="flex items-center justify-center w-11 h-11 rounded-lg bg-[var(--line)] border border-[var(--line)] text-[var(--text-3)] hover:text-[var(--text-1)] flex-shrink-0 transition-colors"
             title="Volver al mapa de mesas"
           >
             <ArrowLeft size={18} />
-          </Link>
+          </button>
           <div className="flex items-center gap-1 bg-[var(--line)] rounded-lg px-3 py-0.5 border border-[var(--line)] min-h-[40px]">
             <span className="text-[var(--text-1)] text-sm font-medium">Mesa</span>
             <input
@@ -4438,7 +4440,7 @@ function POSContent() {
           <div className="px-3 py-1 border-t border-[var(--line)] flex gap-2 flex-shrink-0">
             {orderItems.length === 0 ? (
               <button
-                onClick={() => router.push('/pos/mesas')}
+                onClick={() => navigateToMesaMap()}
                 className="flex-1 flex items-center justify-center gap-2 bg-[var(--surface-2)] hover:bg-[var(--text-4)] active:bg-[var(--raised)] active:scale-[0.97] text-[var(--text-1)] font-bold py-2.5 rounded-xl text-base transition-all min-h-[52px]"
               >
                 <ArrowLeft size={18} />
