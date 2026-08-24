@@ -60,4 +60,15 @@ describe('sw.js structure', () => {
     expect(content).toContain('auth')
     expect(content).toContain('mp-point')
   })
+
+  it('bounds runtime network-first requests so WAN loss cannot freeze a mesa navigation', async () => {
+    const fs = await import('fs')
+    const path = await import('path')
+    const swPath = path.resolve(__dirname, '../../public/sw.js')
+    const content = fs.readFileSync(swPath, 'utf-8')
+
+    expect(content).toContain('const NETWORK_TIMEOUT_MS = 2500')
+    expect(content).toContain('const controller = new AbortController()')
+    expect(content).toContain('const response = await fetchWithTimeout(request)')
+  })
 })

@@ -1,10 +1,11 @@
 // Service Worker — Fullsite POS offline-first
 // Caches app shell, static assets, and API responses for true offline operation
 
-const CACHE_VERSION = 'v39'
+const CACHE_VERSION = 'v40'
 const STATIC_CACHE = `fullsite-static-${CACHE_VERSION}`
 const DYNAMIC_CACHE = `fullsite-dynamic-${CACHE_VERSION}`
 const API_CACHE = `fullsite-api-${CACHE_VERSION}`
+const NETWORK_TIMEOUT_MS = 2500
 
 // App shell — always cache these
 const STATIC_ASSETS = [
@@ -172,9 +173,22 @@ self.addEventListener('fetch', (event) => {
 
 // ─── Caching Strategies ────────────────────────────────────────────────────
 
+async function fetchWithTimeout(request, timeoutMs = NETWORK_TIMEOUT_MS) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    return await fetch(request, { signal: controller.signal })
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 async function networkFirstWithCache(request, cacheName) {
   try {
-    const response = await fetch(request)
+    // A Windows terminal can keep its LAN link while WAN is down. In that state
+    // navigator.onLine remains true and a raw fetch may hang on TCP for minutes.
+    // Bound the network attempt so cached POS HTML wins in operational time.
+    const response = await fetchWithTimeout(request)
     if (response.ok) {
       const cache = await caches.open(cacheName)
       cache.put(request, response.clone())
@@ -204,7 +218,7 @@ async function cacheFirstWithNetwork(request, cacheName) {
   if (cached) return cached
 
   try {
-    const response = await fetch(request)
+    const response = await fetchWithTimeout(request)
     if (response.ok) {
       const cache = await caches.open(cacheName)
       cache.put(request, response.clone())
@@ -219,7 +233,7 @@ async function staleWhileRevalidate(request, cacheName) {
   const cache = await caches.open(cacheName)
   const cached = await cache.match(request)
 
-  const networkFetch = fetch(request).then((response) => {
+  const networkFetch = fetchWithTimeout(request).then((response) => {
     if (response.ok) {
       cache.put(request, response.clone())
     }
