@@ -566,14 +566,21 @@ export async function getModifierGroupsForItem(itemId: string, categoryId: strin
       fetch(`${_SUPABASE_URL}/rest/v1/pos_category_modifiers?client_id=eq.${cid}&category_id=eq.${encodeURIComponent(categoryId)}&select=modifier_group_id`, { headers: _SB_HEADERS, cache: 'no-store' }),
     ])
 
+    // OFFLINE: el Service Worker resuelve estas rutas con `new Response('Offline', {status:503})`
+    // (catch-all staleWhileRevalidate — no están en API_CACHE_PATTERNS ni NEVER_CACHE_PATTERNS),
+    // así que fetch() NO lanza y el catch del final NUNCA corre. Sin este guard, `.ok` es false,
+    // groupIds queda vacío y se caía por `return []` — el platillo perdía sus grupos
+    // OBLIGATORIOS (p.ej. "Término" en una arrachera) y la comanda salía a cocina sin ellos,
+    // en silencio. Mismo patrón ya resuelto en getMenuCategoriesFromDB y getPaymentMethodsFromDB.
+    if (!itemAssignRes.ok || !catAssignRes.ok) {
+      return _getModifierGroupsFromCache(itemId, categoryId)
+    }
+
     const groupIds = new Set<string>()
-    if (itemAssignRes.ok) {
-      for (const a of await itemAssignRes.json() as { group_id: string }[]) groupIds.add(a.group_id)
-    }
-    if (catAssignRes.ok) {
-      for (const a of await catAssignRes.json() as { modifier_group_id: string }[]) groupIds.add(a.modifier_group_id)
-    }
+    for (const a of await itemAssignRes.json() as { group_id: string }[]) groupIds.add(a.group_id)
+    for (const a of await catAssignRes.json() as { modifier_group_id: string }[]) groupIds.add(a.modifier_group_id)
     groupIds.delete('quitar') // legacy group, manejado aparte
+    // Vacío CON respuestas buenas = el platillo de verdad no tiene grupos. No es fallo.
     if (groupIds.size === 0) return []
 
     const idList = [...groupIds].map(encodeURIComponent).join(',')
@@ -581,7 +588,8 @@ export async function getModifierGroupsForItem(itemId: string, categoryId: strin
       fetch(`${_SUPABASE_URL}/rest/v1/pos_modifier_groups?client_id=eq.${cid}&active=eq.true&id=in.(${idList})&order=level.asc,sort_order.asc`, { headers: _SB_HEADERS, cache: 'no-store' }),
       fetch(`${_SUPABASE_URL}/rest/v1/pos_modifiers?client_id=eq.${cid}&active=eq.true&group_id=in.(${idList})&order=sort_order.asc`, { headers: _SB_HEADERS, cache: 'no-store' }),
     ])
-    if (!groupsRes.ok || !optsRes.ok) return []
+    // Mismo caso: 503 del SW → no lanza → hay que caer al caché IDB explícitamente.
+    if (!groupsRes.ok || !optsRes.ok) return _getModifierGroupsFromCache(itemId, categoryId)
 
     const groups: { id: string; name: string; level: number; min_selections: number; max_selections: number | null; required: boolean }[] = await groupsRes.json()
     const opts: { group_id: string; name: string; price: number }[] = await optsRes.json()
