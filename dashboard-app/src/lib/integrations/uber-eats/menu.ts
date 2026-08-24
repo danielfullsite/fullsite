@@ -43,11 +43,19 @@ export interface UberMenuUpload {
   }>
 }
 
-function normalizeMenuPayload(menu: UberMenuUpload): UberMenuUpload {
+function withDefaultLocale(text: Record<string, string>): Record<string, string> {
+  if (text.default?.trim()) return text
+  const fallback = text.es_mx || text.es || text.en_us || text.en || Object.values(text).find(value => value?.trim())
+  return fallback ? { ...text, default: fallback } : text
+}
+
+/** Repair persisted/legacy Fullsite menus to Uber's current localized-text contract. */
+export function normalizeMenuPayload(menu: UberMenuUpload): UberMenuUpload {
   return {
     ...menu,
     menus: menu.menus.map(menuSection => ({
       ...menuSection,
+      title: withDefaultLocale(menuSection.title),
       service_availability: menuSection.service_availability.flatMap(availability => {
         const days = Array.isArray(availability.day_of_week)
           ? availability.day_of_week
@@ -55,6 +63,23 @@ function normalizeMenuPayload(menu: UberMenuUpload): UberMenuUpload {
         const timePeriods = availability.time_periods ?? availability.time_period ?? []
         return days.map(day => ({ day_of_week: day, time_periods: timePeriods }))
       }),
+    })),
+    categories: menu.categories.map(category => ({
+      ...category,
+      title: withDefaultLocale(category.title),
+    })),
+    items: menu.items.map(item => ({
+      ...item,
+      title: withDefaultLocale(item.title),
+      description: item.description ? withDefaultLocale(item.description) : undefined,
+    })),
+    modifier_groups: menu.modifier_groups?.map(group => ({
+      ...group,
+      title: withDefaultLocale(group.title),
+      modifier_options: group.modifier_options.map(option => ({
+        ...option,
+        title: withDefaultLocale(option.title),
+      })),
     })),
   }
 }
