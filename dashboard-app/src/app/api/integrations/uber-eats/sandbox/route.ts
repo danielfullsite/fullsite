@@ -58,10 +58,10 @@ function buildSampleMenu() {
     menus: [{
       id: 'fs-menu-1',
       title: { en: 'Fullsite Menu', en_us: 'Fullsite Menu', es: 'Menu Fullsite', es_mx: 'Menu Fullsite' },
-      service_availability: [{
-        day_of_week: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
-        time_period: [{ start_time: '00:00', end_time: '23:59' }],
-      }],
+      service_availability: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(day => ({
+        day_of_week: day,
+        time_periods: [{ start_time: '00:00', end_time: '23:59' }],
+      })),
       category_ids: ['fs-cat-1'],
     }],
     categories: [{ id: 'fs-cat-1', title: { en: 'Beverages', en_us: 'Beverages', es: 'Bebidas', es_mx: 'Bebidas' }, entities: [{ id: 'fs-item-1', type: 'ITEM' as const }] }],
