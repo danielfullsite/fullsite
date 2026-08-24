@@ -124,13 +124,15 @@ describe('parseRow field sanitization (numeric fields)', () => {
     const daily = makeDaily({ ventas_dia: null as any })
     // ventas_dia: null -> 0 after parseRow
     expect(daily.ventas_dia).toBe(null)
-    // When passed through aggregatePayments, ventas_dia=0 means percentage conversion gives 0
+    // Contrato MXN (0769a8f3): pago_métodos[].total ya viene en pesos, así que
+    // ventas_dia NO participa en el cálculo. Que sea 0 (o null) no puede alterar
+    // el monto — antes lo aplastaba a 0 vía el heurístico de porcentaje.
     const result = aggregatePayments([{
       ...daily,
       ventas_dia: 0, // simulating what parseRow would produce
-      pago_métodos: [{ nombre: 'Efectivo', total: 50.0 }],
+      pago_métodos: [{ nombre: 'Efectivo', total: 50 }],
     }])
-    expect(result[0].total).toBe(0)
+    expect(result[0].total).toBe(50)
   })
 
   it('treats undefined numeric fields as 0', () => {
@@ -228,14 +230,16 @@ describe('Multi-day aggregation consistency', () => {
     expect(totalSum).toBe(10000 + 8000 + 6000 + 12000 + 7000)
   })
 
-  it('payment methods percentages from single day sum to ventas_dia', () => {
+  it('payment methods from a single day sum to ventas_dia', () => {
+    // Contrato MXN (0769a8f3): los montos vienen en pesos; el desglose debe
+    // cuadrar contra ventas_dia por suma directa, no por reconstrucción de %.
     const data = [makeDaily({
       ventas_dia: 100000,
       pago_métodos: [
-        { nombre: 'Tarjeta de crédito', total: 40.0 },
-        { nombre: 'Tarjeta de débito', total: 20.0 },
-        { nombre: 'Efectivo', total: 30.0 },
-        { nombre: 'Transferencia', total: 10.0 },
+        { nombre: 'Tarjeta de crédito', total: 40000 },
+        { nombre: 'Tarjeta de débito', total: 20000 },
+        { nombre: 'Efectivo', total: 30000 },
+        { nombre: 'Transferencia', total: 10000 },
       ],
     })]
     const result = aggregatePayments(data)

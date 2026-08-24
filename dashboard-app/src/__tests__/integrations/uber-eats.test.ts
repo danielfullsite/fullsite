@@ -52,14 +52,27 @@ describe('UBER-001: OAuth / USL', () => {
   })
 
   it('throws descriptively when credentials are missing', async () => {
-    const saved = { id: process.env.UBER_CLIENT_ID, secret: process.env.UBER_CLIENT_SECRET }
+    // Contrato actualizado en c905458e (split test/prod): el error ahora nombra las
+    // credenciales de sandbox y menciona el fallback legacy. Se fija UBER_ENV para
+    // que el mensaje sea determinista — sin fijarlo, env.ts falla antes con
+    // "UBER_ENV must be exactly 'sandbox' or 'production'".
+    const saved = {
+      id: process.env.UBER_CLIENT_ID, secret: process.env.UBER_CLIENT_SECRET,
+      testId: process.env.UBER_TEST_CLIENT_ID, testSecret: process.env.UBER_TEST_CLIENT_SECRET,
+      env: process.env.UBER_ENV,
+    }
+    process.env.UBER_ENV = 'sandbox'
     delete process.env.UBER_CLIENT_ID
     delete process.env.UBER_CLIENT_SECRET
+    delete process.env.UBER_TEST_CLIENT_ID
+    delete process.env.UBER_TEST_CLIENT_SECRET
     const { getUberAccessToken } = await import('@/lib/integrations/uber-eats/oauth')
-    // Clear module cache to pick up env change
-    await expect(getUberAccessToken()).rejects.toThrow('UBER_CLIENT_ID/UBER_CLIENT_SECRET not configured')
+    await expect(getUberAccessToken()).rejects.toThrow(/UBER_ENV=sandbox requires UBER_TEST_CLIENT_ID/)
     if (saved.id) process.env.UBER_CLIENT_ID = saved.id
     if (saved.secret) process.env.UBER_CLIENT_SECRET = saved.secret
+    if (saved.testId) process.env.UBER_TEST_CLIENT_ID = saved.testId
+    if (saved.testSecret) process.env.UBER_TEST_CLIENT_SECRET = saved.testSecret
+    if (saved.env) process.env.UBER_ENV = saved.env; else delete process.env.UBER_ENV
   })
 })
 
