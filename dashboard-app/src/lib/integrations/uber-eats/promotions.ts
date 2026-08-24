@@ -6,7 +6,7 @@
 //
 // All calls log to integration_audit_log with redacted payloads.
 
-import { uberFetch, SCOPE_STORE } from './oauth'
+import { uberFetch } from './oauth'
 import { withRetry } from '../retry'
 import { auditLog } from '../audit-logger'
 
@@ -15,7 +15,8 @@ const promotionsPath = (storeId: string): string =>
     .trim()
     .replace('{store_id}', encodeURIComponent(storeId))
 
-const promotionsScope = (): string => (process.env.UBER_PROMOTIONS_SCOPE || SCOPE_STORE).trim()
+const promotionsScope = (): string =>
+  (process.env.UBER_PROMOTIONS_SCOPE || 'eats.store.promotion.write').trim()
 
 export interface UberPromotion {
   start_time: string
