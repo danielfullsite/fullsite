@@ -178,6 +178,7 @@ platform/
   PAE.md                     Platform Acceptance Environment — Café Nómada. Gate antes de Cliente #2.
   PAE-IMPLEMENTATION-PLAN.md Backlog de implementación PAE: 6 componentes, dependencias, riesgos, PASS/FAIL.
   PROVISIONING.md            Cómo aprovisionar un nuevo cliente.
+  GOLDEN-DEPLOYMENT-KIT-v1.md Generador de configs, impresoras, manifiesto y smoke por sucursal.
   CLONEABILITY-REPORT-v1.md  Reporte de clonabilidad v1.
   migrations/
     00..07 *.md               Pipeline del Migration Engine (MT-03 CLOSED).

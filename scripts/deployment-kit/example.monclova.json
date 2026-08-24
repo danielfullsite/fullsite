@@ -1,0 +1,37 @@
+{
+  "restaurant_id": "cliente-monclova",
+  "display_name": "Cliente Monclova",
+  "server_ip": "192.168.10.50",
+  "channel": "pilot",
+  "terminals": [
+    { "name": "Caja Principal", "role": "server_pos" },
+    { "name": "POS Entrada", "role": "pos" },
+    { "name": "KDS Cocina", "role": "kds" }
+  ],
+  "printers": {
+    "schema_version": 2,
+    "printers": [
+      {
+        "printer_id": "cocina-principal",
+        "name": "Cocina principal",
+        "enabled": true,
+        "connection": { "type": "tcp", "host": "192.168.10.60", "port": 9100 },
+        "station_ids": ["cocina"],
+        "document_types": ["kitchen_ticket", "reprint"],
+        "copies": 1,
+        "encoding": "cp850"
+      },
+      {
+        "printer_id": "caja-tickets",
+        "name": "Caja tickets",
+        "enabled": true,
+        "connection": { "type": "windows", "names": ["EPSON TM-T20III"] },
+        "station_ids": ["caja", "tickets"],
+        "document_types": ["receipt", "pre_ticket", "invoice", "corte", "reprint"],
+        "copies": 1,
+        "encoding": "cp850"
+      }
+    ],
+    "routing": { "default_station": "caja" }
+  }
+}
