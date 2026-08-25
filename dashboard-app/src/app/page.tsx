@@ -6,12 +6,10 @@ import { DollarSign, Ticket, Users, Receipt, TrendingDown, TrendingUp, Award, Ar
 import KPICard from '@/components/KPICard'
 import RevenueChart from '@/components/RevenueChart'
 import RevenueDistributionChart from '@/components/RevenueDistributionChart'
-import { getRecentDays, getLatestDay, getDashboardFromPosOrders, aggregateMeseros, getLatestAgentRuns, getDeteccionesAgentes, getTurnoAbierto, type AgentRun, type TurnoAbierto } from '@/lib/data'
+import { getRecentDays, getLatestDay, getDashboardFromPosOrders, aggregateMeseros, getLatestAgentRuns, getTurnoAbierto, type AgentRun, type TurnoAbierto } from '@/lib/data'
 import { useAuth } from '@/contexts/AuthContext'
 import { useDsPilot } from '@/lib/ds-pilot'
-import { desdeEventos, type Atencion } from '@/lib/atencion'
 import BarraTurno from '@/components/dashboard/BarraTurno'
-import ListaAtencion from '@/components/dashboard/ListaAtencion'
 import AgentBriefing from '@/components/AgentBriefing'
 import { formatCurrency, formatNumber, formatPercent, formatDate, percentChange } from '@/lib/format'
 import PredictionWidget from '@/components/PredictionWidget'
@@ -141,22 +139,16 @@ export default function DashboardPage() {
   // consultas de más en cada carga.
   const { clientConfig } = useAuth()
   const dsPiloto = useDsPilot(clientConfig?.id)
-  const [atencion, setAtencion] = useState<Atencion[]>([])
   const [turnoAbierto, setTurnoAbierto] = useState<TurnoAbierto | null>(null)
-  const [cargandoTurno, setCargandoTurno] = useState(true)
 
   useEffect(() => {
     if (!dsPiloto) return
     let vivo = true
-    Promise.all([
-      getDeteccionesAgentes().catch(() => []),
-      getTurnoAbierto().catch(() => null),
-    ]).then(([eventos, turno]) => {
-      if (!vivo) return
-      setAtencion(desdeEventos(eventos))
-      setTurnoAbierto(turno)
-      setCargandoTurno(false)
-    })
+    getTurnoAbierto()
+      .catch(() => null)
+      .then(turno => {
+        if (vivo) setTurnoAbierto(turno)
+      })
     return () => { vivo = false }
   }, [dsPiloto])
 
@@ -434,7 +426,17 @@ export default function DashboardPage() {
               mesasTotal: null,
             }}
           />
-          <ListaAtencion items={atencion} cargando={cargandoTurno} />
+          {/* AQUÍ IBA ListaAtencion. Se quitó: Fullsite YA TENÍA una lista de
+              atención — el widget "Buenos días — N cosas para hoy · TUS AGENTES
+              IA", que vive unos píxeles más abajo y muestra las MISMAS
+              detecciones de agent_events, con el agente que las generó y la
+              narrativa completa. Es mejor que la mía.
+
+              Se conserva src/lib/atencion.ts con sus 24 pruebas: encoda
+              decisiones que el widget existente no toma (no promover severidades
+              desconocidas a críticas, descartar vencidas, ordenar por dinero en
+              juego). El siguiente paso es aplicárselas a ESE widget, no montar
+              un segundo. */}
         </>
       )}
 
