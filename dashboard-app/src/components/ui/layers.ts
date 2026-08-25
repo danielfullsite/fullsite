@@ -17,6 +17,10 @@ export const LAYER = {
   sidebarBackdrop: 30,
   /** Drawer de navegación (POS y demo). */
   drawer: 40,
+  /** Menú o panel flotante anclado a un botón (selector de rango, etc.).
+   *  Por encima del drawer y por debajo de cualquier diálogo: un popover no
+   *  debe poder taparle un modal al usuario. */
+  popover: 45,
   /** Diálogo normal. */
   dialog: 50,
   /** Segundo nivel: una confirmación encima de un cobro abierto. */

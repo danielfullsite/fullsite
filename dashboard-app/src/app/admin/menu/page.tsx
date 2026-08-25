@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Plus, Pencil, Search, Save, X, ChevronDown, GripVertical } from 'lucide-react'
 import { useClientId } from '@/hooks/useClientId'
 import { createClient } from '@/lib/supabase-browser'
+import { LAYER } from '@/components/ui/layers'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -400,7 +401,7 @@ export default function AdminMenuPage() {
 
       {/* Toast */}
       {toast && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-[var(--surface-2)] text-white px-6 py-3 rounded-xl shadow-2xl text-sm font-medium">
+        <div style={{ zIndex: LAYER.toast }} className="fixed top-6 left-1/2 -translate-x-1/2 bg-[var(--surface-2)] text-[var(--text-1)] border border-[var(--line)] px-6 py-3 rounded-xl shadow-2xl text-sm font-medium">
           {toast}
         </div>
       )}

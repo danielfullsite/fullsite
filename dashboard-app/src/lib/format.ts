@@ -41,3 +41,26 @@ export function percentChange(current: number | null | undefined, previous: numb
   const result = ((current - previous) / previous) * 100
   return isNaN(result) ? 0 : result
 }
+
+
+/**
+ * Fecha corta para la interfaz: "26 ago".
+ *
+ * Existe porque varias pantallas imprimian el ISO crudo —"2026-07-26 → 2026-08-25"
+ * en el encabezado de Cortes, "2026-08-12" en la tabla de gastos— mientras que en
+ * la MISMA fila los montos si pasaban por formatCurrency. Una fecha ISO en pantalla
+ * es una fuga de la base de datos hacia el usuario.
+ *
+ * Devuelve la cadena original si no es una fecha valida: es preferible enseñar el
+ * dato crudo a enseñar "Invalid Date".
+ */
+export function fechaCorta(iso: string | null | undefined, conAnio = false): string {
+  if (!iso) return '—'
+  const d = new Date(`${String(iso).slice(0, 10)}T12:00:00`)
+  if (isNaN(d.getTime())) return String(iso)
+  return d.toLocaleDateString('es-MX', {
+    day: 'numeric',
+    month: 'short',
+    ...(conAnio ? { year: 'numeric' } : {}),
+  })
+}
