@@ -6,7 +6,12 @@ import { DollarSign, Ticket, Users, Receipt, TrendingDown, TrendingUp, Award, Ar
 import KPICard from '@/components/KPICard'
 import RevenueChart from '@/components/RevenueChart'
 import RevenueDistributionChart from '@/components/RevenueDistributionChart'
-import { getRecentDays, getLatestDay, getDashboardFromPosOrders, aggregateMeseros, getLatestAgentRuns, type AgentRun } from '@/lib/data'
+import { getRecentDays, getLatestDay, getDashboardFromPosOrders, aggregateMeseros, getLatestAgentRuns, getDeteccionesAgentes, getTurnoAbierto, type AgentRun, type TurnoAbierto } from '@/lib/data'
+import { useAuth } from '@/contexts/AuthContext'
+import { useDsPilot } from '@/lib/ds-pilot'
+import { desdeEventos, type Atencion } from '@/lib/atencion'
+import BarraTurno from '@/components/dashboard/BarraTurno'
+import ListaAtencion from '@/components/dashboard/ListaAtencion'
 import AgentBriefing from '@/components/AgentBriefing'
 import { formatCurrency, formatNumber, formatPercent, formatDate, percentChange } from '@/lib/format'
 import PredictionWidget from '@/components/PredictionWidget'
@@ -131,6 +136,29 @@ export default function DashboardPage() {
   const [widgets, setWidgets] = useState<WidgetConfig>(getDefaultWidgets)
   const [showSettings, setShowSettings] = useState(false)
   const [agentRuns, setAgentRuns] = useState<AgentRun[]>([])
+  // Dashboard «Turno» — sólo se pinta con el piloto encendido, así que los datos
+  // se piden únicamente si el flag está activo: un tenant sin piloto no paga dos
+  // consultas de más en cada carga.
+  const { clientConfig } = useAuth()
+  const dsPiloto = useDsPilot(clientConfig?.id)
+  const [atencion, setAtencion] = useState<Atencion[]>([])
+  const [turnoAbierto, setTurnoAbierto] = useState<TurnoAbierto | null>(null)
+  const [cargandoTurno, setCargandoTurno] = useState(true)
+
+  useEffect(() => {
+    if (!dsPiloto) return
+    let vivo = true
+    Promise.all([
+      getDeteccionesAgentes().catch(() => []),
+      getTurnoAbierto().catch(() => null),
+    ]).then(([eventos, turno]) => {
+      if (!vivo) return
+      setAtencion(desdeEventos(eventos))
+      setTurnoAbierto(turno)
+      setCargandoTurno(false)
+    })
+    return () => { vivo = false }
+  }, [dsPiloto])
 
   // Load widget config from localStorage
   useEffect(() => { setWidgets(loadWidgetConfig()) }, [])
@@ -386,6 +414,30 @@ export default function DashboardPage() {
 
   return (
     <>
+      {/* ── Dashboard «Turno» ──────────────────────────────────────────────
+          Lo primero de la pantalla deja de ser "cómo vamos" y pasa a ser "qué
+          hago". Va arriba del encabezado a propósito: si hay algo crítico, se
+          ve antes que el selector de periodo.
+
+          Las dos piezas se autocensuran cuando no hay nada que decir —
+          ListaAtencion no renderiza sin pendientes— así que en un turno limpio
+          la pantalla queda igual que antes. */}
+      {dsPiloto && (
+        <>
+          <BarraTurno
+            turno={turnoAbierto}
+            resumen={{
+              ventas: viewDay?.ventas_dia ?? null,
+              ordenes: viewDay?.tickets_count ?? null,
+              personas: viewDay?.personas_restaurant ?? null,
+              mesasOcupadas: null,
+              mesasTotal: null,
+            }}
+          />
+          <ListaAtencion items={atencion} cargando={cargandoTurno} />
+        </>
+      )}
+
       {/* Page header with period selector + day navigation + settings */}
       <div className="mb-4 sm:mb-6 space-y-2 sm:space-y-3">
         <div className="flex items-center justify-between">

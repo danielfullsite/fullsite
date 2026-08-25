@@ -568,3 +568,67 @@ export async function getDashboardFromPosOrders(days: number = 30, clientId: str
   }
   return result
 }
+
+// ─── Dashboard «Turno» ──────────────────────────────────────────────────────
+// Las dos consultas que alimentan la barra de turno y la lista de atención.
+// Van aquí y no en un archivo aparte para reusar sbFetch: mismo token, mismo
+// timeout de 10s, mismo manejo de error (devolver [] en vez de reventar la
+// pantalla completa).
+
+import type { EventoAgente } from '@/lib/atencion'
+
+/**
+ * Detecciones de los agentes para el tenant activo.
+ *
+ * NO se filtra por status en la consulta. El panel de plataforma filtraba por
+ * `status=eq.open` y reportaba 0 detecciones habiendo 12, porque el único valor
+ * que los agentes escriben es 'new'. Filtrar por una lista blanca de estados es
+ * frágil: se filtra por lo que YA NO importa (resuelto, descartado) en
+ * `desdeEventos`, que es una lista negra y falla del lado seguro.
+ */
+export async function getDeteccionesAgentes(
+  clientSlug: string = getActiveClientSlug(),
+): Promise<EventoAgente[]> {
+  const rows = await sbFetch(
+    'agent_events',
+    `select=id,severity,title,explanation,suggested_action,estimated_value,confidence,status,created_at,expires_at,type` +
+      `&client_id=eq.${encodeURIComponent(clientSlug)}&order=created_at.desc&limit=40`,
+  )
+  return rows as EventoAgente[]
+}
+
+export interface TurnoAbierto {
+  id: string
+  numero: number | null
+  abiertoPor: string | null
+  abiertoAt: string | null
+  fondoInicial: number | null
+}
+
+/**
+ * El turno abierto, si lo hay.
+ *
+ * Devuelve null cuando no hay ninguno — que es el caso de AMALAY hoy: 17 turnos
+ * históricos, cero vivos. La barra usa ese null para decir "sin turno abierto"
+ * en vez de pintar ceros.
+ */
+export async function getTurnoAbierto(
+  clientSlug: string = getActiveClientSlug(),
+): Promise<TurnoAbierto | null> {
+  const rows = (await sbFetch(
+    'pos_turnos',
+    `select=id,opened_by,opened_at,fondo_inicial&client_id=eq.${encodeURIComponent(clientSlug)}` +
+      `&closed_at=is.null&order=opened_at.desc&limit=1`,
+  )) as Record<string, unknown>[]
+  const t = rows[0]
+  if (!t) return null
+  return {
+    id: String(t.id),
+    // El número de turno no existe como columna; se deriva del id sólo si es
+    // numérico. Si no, se muestra un guion en vez de inventar un consecutivo.
+    numero: /^\d+$/.test(String(t.id)) ? Number(t.id) : null,
+    abiertoPor: (t.opened_by as string) || null,
+    abiertoAt: (t.opened_at as string) || null,
+    fondoInicial: typeof t.fondo_inicial === 'number' ? t.fondo_inicial : null,
+  }
+}
