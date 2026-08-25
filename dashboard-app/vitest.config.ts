@@ -5,7 +5,10 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    exclude: ['e2e/**', 'tests/**', 'node_modules/**'],
+    // `src/components/ui/**` son pruebas de componente: necesitan DOM y corren
+    // con `npm run test:ui` (vitest.config.dom.ts). Si se cuelan aquí fallan en
+    // bloque, porque este proyecto corre en `environment: 'node'`.
+    exclude: ['e2e/**', 'tests/**', 'node_modules/**', 'src/components/ui/**/*.test.tsx'],
   },
   resolve: {
     alias: {
