@@ -13,6 +13,7 @@ import {
 import { DollarSign, Receipt, Tag, Gift, Store, ShoppingBag, Smartphone, ShieldAlert, XCircle, HeartHandshake } from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
+import { Table, type ColumnDef } from '@/components/ui/Table'
 import { getDateRange, aggregatePayments, aggregateGrupos, getWansoftData, getDashboardFromPosOrders } from '@/lib/data'
 import { fmtDateMX } from '@/lib/date-mx'
 import { formatCurrency, formatPercent, percentChange } from '@/lib/format'
@@ -61,6 +62,61 @@ const CATEGORY_COLORS = [
   '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
   '#ec4899', '#06b6d4', '#84cc16', '#f97316', '#6366f1',
 ]
+
+
+/**
+ * Las cuatro tablas de control (cancelaciones, anulaciones, cortesías y
+ * descuentos) eran markup COPIADO cuatro veces: mismo par Producto/Monto, misma
+ * alineación, mismo hover, y sólo cambiaba el color. Ahora es una sola pieza
+ * sobre `<Table>`.
+ *
+ * Los colores se conservan TAL CUAL —red-500, amber-500, orange-500— aunque no
+ * sean tokens. Migrar y recolorear en el mismo cambio hace imposible saber cuál
+ * de los dos rompió algo. La tokenización va aparte.
+ */
+function TablaControl({
+  titulo, subtitulo, filas, etiquetaCol, tono,
+}: {
+  titulo: string
+  subtitulo: string
+  filas: { nombre: string; total: number }[]
+  etiquetaCol: string
+  tono: { borde: string; titulo: string; header: string; monto: string; hover: string; regla: string }
+}) {
+  if (filas.length === 0) return null
+  const columnas: ColumnDef<{ nombre: string; total: number }>[] = [
+    {
+      id: 'concepto',
+      header: etiquetaCol,
+      accessor: r => r.nombre,
+      headerClassName: `py-2 text-xs font-semibold uppercase tracking-wider ${tono.header}`,
+      cellClassName: 'py-2.5 text-[var(--text-1)]',
+    },
+    {
+      id: 'monto',
+      header: 'Monto',
+      numeric: true,
+      render: ({ row }) => formatCurrency(row.total),
+      headerClassName: `py-2 text-xs font-semibold uppercase tracking-wider ${tono.header}`,
+      cellClassName: `py-2.5 font-medium ${tono.monto}`,
+    },
+  ]
+  return (
+    <div className={`bg-[var(--surface)] rounded-xl border ${tono.borde} shadow-sm p-6 hover:shadow-md transition-shadow`}>
+      <h3 className={`text-sm font-semibold ${tono.titulo} mb-1`}>{titulo}</h3>
+      <p className={`text-xs ${tono.titulo} mb-4`}>{subtitulo}</p>
+      <Table
+        rows={filas}
+        columns={columnas}
+        rowKey={(_, i) => i}
+        emptyMode="none"
+        tableClassName="text-sm"
+        theadClassName={`border-b ${tono.regla}`}
+        rowClassName={() => `${tono.hover} transition-colors`}
+      />
+    </div>
+  )
+}
 
 export default function VentasPage() {
   const [data, setData] = useState<WansoftDaily[]>([])
@@ -458,109 +514,34 @@ export default function VentasPage() {
 
               {/* Anti-fraud detail tables */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                {/* Cancelaciones table */}
-                {cancelaciones.length > 0 && (
-                  <div className="bg-[var(--surface)] rounded-xl border border-red-500/20 shadow-sm p-6 hover:shadow-md transition-shadow">
-                    <h3 className="text-sm font-semibold text-red-400 mb-1">Cancelaciones</h3>
-                    <p className="text-xs text-red-400 mb-4">{cancelaciones.length} items cancelados</p>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b border-red-500/20">
-                            <th className="text-left py-2 text-xs font-semibold text-red-500 uppercase tracking-wider">Producto</th>
-                            <th className="text-right py-2 text-xs font-semibold text-red-500 uppercase tracking-wider">Monto</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {cancelaciones.map((item, i) => (
-                            <tr key={i} className="border-b border-[var(--line-soft)] hover:bg-red-500/10 transition-colors">
-                              <td className="py-2.5 text-[var(--text-1)]">{item.nombre}</td>
-                              <td className="py-2.5 text-right font-medium text-red-600 tabular-nums">{formatCurrency(item.total)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-
-                {/* Anulaciones table */}
-                {anulaciones.length > 0 && (
-                  <div className="bg-[var(--surface)] rounded-xl border border-amber-500/20 shadow-sm p-6 hover:shadow-md transition-shadow">
-                    <h3 className="text-sm font-semibold text-amber-400 mb-1">Anulaciones</h3>
-                    <p className="text-xs text-amber-400 mb-4">{anulaciones.length} items anulados</p>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b border-amber-500/20">
-                            <th className="text-left py-2 text-xs font-semibold text-amber-500 uppercase tracking-wider">Producto</th>
-                            <th className="text-right py-2 text-xs font-semibold text-amber-500 uppercase tracking-wider">Monto</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {anulaciones.map((item, i) => (
-                            <tr key={i} className="border-b border-[var(--line-soft)] hover:bg-amber-500/10 transition-colors">
-                              <td className="py-2.5 text-[var(--text-1)]">{item.nombre}</td>
-                              <td className="py-2.5 text-right font-medium text-amber-400 tabular-nums">{formatCurrency(item.total)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-
-                {/* Cortesias table */}
-                {cortesias.length > 0 && (
-                  <div className="bg-[var(--surface)] rounded-xl border border-orange-500/20 shadow-sm p-6 hover:shadow-md transition-shadow">
-                    <h3 className="text-sm font-semibold text-orange-400 mb-1">Cortesias</h3>
-                    <p className="text-xs text-orange-400 mb-4">{cortesias.length} cortesias otorgadas</p>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b border-orange-500/15">
-                            <th className="text-left py-2 text-xs font-semibold text-orange-500 uppercase tracking-wider">Producto</th>
-                            <th className="text-right py-2 text-xs font-semibold text-orange-500 uppercase tracking-wider">Monto</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {cortesias.map((item, i) => (
-                            <tr key={i} className="border-b border-[var(--line-soft)] hover:bg-orange-500/10 transition-colors">
-                              <td className="py-2.5 text-[var(--text-1)]">{item.nombre}</td>
-                              <td className="py-2.5 text-right font-medium text-orange-600 tabular-nums">{formatCurrency(item.total)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-
-                {/* Descuentos detalle table */}
-                {descuentosDetalle.length > 0 && (
-                  <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6 hover:shadow-md transition-shadow">
-                    <h3 className="text-sm font-semibold text-[var(--text-1)] mb-1">Detalle de Descuentos</h3>
-                    <p className="text-xs text-[var(--text-3)] mb-4">{descuentosDetalle.length} descuentos aplicados</p>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b border-[var(--line-soft)]">
-                            <th className="text-left py-2 text-xs font-semibold text-[var(--text-2)] uppercase tracking-wider">Concepto</th>
-                            <th className="text-right py-2 text-xs font-semibold text-[var(--text-2)] uppercase tracking-wider">Monto</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {descuentosDetalle.map((item, i) => (
-                            <tr key={i} className="border-b border-[var(--line-soft)] hover:bg-[var(--surface-2)]/50 transition-colors">
-                              <td className="py-2.5 text-[var(--text-1)]">{item.nombre}</td>
-                              <td className="py-2.5 text-right font-medium text-[var(--text-2)] tabular-nums">{formatCurrency(item.total)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
+                <TablaControl
+                  titulo="Cancelaciones"
+                  subtitulo={`${cancelaciones.length} items cancelados`}
+                  filas={cancelaciones}
+                  etiquetaCol="Producto"
+                  tono={{ borde: 'border-red-500/20', titulo: 'text-red-400', header: 'text-red-500', monto: 'text-red-600', hover: 'hover:bg-red-500/10', regla: 'border-red-500/20' }}
+                />
+                <TablaControl
+                  titulo="Anulaciones"
+                  subtitulo={`${anulaciones.length} items anulados`}
+                  filas={anulaciones}
+                  etiquetaCol="Producto"
+                  tono={{ borde: 'border-amber-500/20', titulo: 'text-amber-400', header: 'text-amber-500', monto: 'text-amber-400', hover: 'hover:bg-amber-500/10', regla: 'border-amber-500/20' }}
+                />
+                <TablaControl
+                  titulo="Cortesias"
+                  subtitulo={`${cortesias.length} cortesias otorgadas`}
+                  filas={cortesias}
+                  etiquetaCol="Producto"
+                  tono={{ borde: 'border-orange-500/20', titulo: 'text-orange-400', header: 'text-orange-500', monto: 'text-orange-600', hover: 'hover:bg-orange-500/10', regla: 'border-orange-500/15' }}
+                />
+                <TablaControl
+                  titulo="Detalle de Descuentos"
+                  subtitulo={`${descuentosDetalle.length} descuentos aplicados`}
+                  filas={descuentosDetalle}
+                  etiquetaCol="Concepto"
+                  tono={{ borde: 'border-[var(--line)]', titulo: 'text-[var(--text-1)]', header: 'text-[var(--text-2)]', monto: 'text-[var(--text-2)]', hover: 'hover:bg-[var(--surface-2)]/50', regla: 'border-[var(--line-soft)]' }}
+                />
               </div>
             </>
           )}

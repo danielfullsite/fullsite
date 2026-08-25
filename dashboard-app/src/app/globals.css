@@ -492,3 +492,89 @@ body {
   table { border-collapse: collapse; width: 100%; }
   th, td { border: 1px solid #ddd; padding: 4px 8px; font-size: 11px; }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * DS v3 · PILOTO POR TENANT
+ *
+ * Todo lo de aquí abajo sólo aplica cuando `data-ds="v3"` está en la raíz de la
+ * app, y eso lo decide el flag `ds_v3` de feature_flags con rollout por
+ * client_ids (ver src/lib/ds-pilot.ts).
+ *
+ * Apagar el flag revierte el aspecto SIN desplegar nada. Nada fuera de este
+ * selector cambia, así que un tenant sin el flag no se entera de que existe.
+ *
+ * Cuando el piloto se apruebe: mover estas reglas al bloque general, borrar el
+ * selector y retirar el flag. Si se rechaza: borrar este bloque completo.
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. Riel oscuro también en tema claro ──────────────────────────────────
+ * Es el rasgo más reconocible de Haze: el sidebar no cambia con el tema, así
+ * que el ojo tiene un ancla fija y el contenido es lo único que se aclara. */
+[data-theme="light"] [data-ds="v3"] .sidebar-rail {
+  --surface: #0f1a15;
+  --surface-2: #18271f;
+  --panel: #18271f;
+  --raised: #18271f;
+  --line: #25352c;
+  --line-soft: #1f2e26;
+  --text-1: #eef3f0;
+  --text-2: #c2d0c8;
+  --text-3: #8ba095;
+  --text-4: #61756a;
+  --accent-ink: #34d399;
+  --crit-ink: #f87171;
+  background: #0f1a15;
+  scrollbar-color: rgba(255,255,255,0.14) transparent;
+}
+/* El logo sigue al riel, no al tema: sobre carbón va la f blanca. */
+[data-theme="light"] [data-ds="v3"] .sidebar-logo-black { display: none; }
+[data-theme="light"] [data-ds="v3"] .sidebar-logo-white { display: block; }
+
+/* ── 2. Densidad medida ────────────────────────────────────────────────────
+ * Ritmo de Haze: radio 12px y celdas de tabla a 16×12. Las tarjetas dejan de
+ * flotar y se apoyan en el borde. */
+[data-ds="v3"] .dash-card,
+[data-ds="v3"] .premium-card {
+  border-radius: 12px;
+  box-shadow: none;
+}
+[data-ds="v3"] .dash-card:hover,
+[data-ds="v3"] .premium-card:hover {
+  box-shadow: none;
+  border-color: var(--accent-line);
+}
+[data-ds="v3"] table td { padding-top: 12px; padding-bottom: 12px; }
+[data-ds="v3"] table th { padding-top: 10px; padding-bottom: 10px; }
+
+/* ── 3. El grupo de navegación deja de gritar ──────────────────────────────
+ * La etiqueta de sección pasa a mono y baja de peso: separa sin competir. */
+[data-ds="v3"] .sidebar-section-label {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: var(--text-4);
+}
+/* La barra de acento del ítem activo pasa de 4px a 3px y se ancla al borde. */
+[data-ds="v3"] .sidebar-nav-item.active::before { width: 3px; left: -10px; }
+
+/* ── 4. Barras de ranking: un solo color ───────────────────────────────────
+ * El ranking de meseros pintaba cada barra de un color distinto, y al #4 le
+ * tocaba ROJO — que se lee como alarma cuando sólo significa "cuarto lugar".
+ * El orden ya lo dice la posición; el color no tenía nada que agregar. */
+[data-ds="v3"] [class*="bg-blue-5"],
+[data-ds="v3"] [class*="bg-purple-5"],
+[data-ds="v3"] [class*="bg-pink-5"],
+[data-ds="v3"] [class*="bg-cyan-5"],
+[data-ds="v3"] [class*="bg-indigo-5"] {
+  background-color: var(--accent) !important;
+}
+
+/* ── 5. Foco visible ───────────────────────────────────────────────────────
+ * Hay 306 `focus:outline-none` en el código y cero `focus-visible`: hoy nadie
+ * ve dónde está parado al navegar con teclado. En la caja hay teclado físico. */
+[data-ds="v3"] :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}

@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
+import { useDsPilot } from '@/lib/ds-pilot'
 import Sidebar from '@/components/Sidebar'
 import ChatWidget from '@/components/ChatWidget'
 import NotificationBell from '@/components/NotificationBell'
@@ -12,7 +13,9 @@ import { useEffect, useState } from 'react'
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
-  const { user, loading, role } = useAuth()
+  const { user, loading, role, clientConfig } = useAuth()
+  // Piloto visual por tenant: marca la raíz y el CSS del piloto engancha ahí.
+  const dsPiloto = useDsPilot(clientConfig?.id)
   const [showContent, setShowContent] = useState(false)
 
   // Super-admin de plataforma: nunca se le fuerza al POS; su lugar es el Control Center.
@@ -85,7 +88,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="grid lg:grid-cols-[240px_1fr] min-h-screen lg:h-screen bg-[var(--bg)] overflow-x-hidden lg:overflow-hidden">
+    <div data-ds={dsPiloto ? 'v3' : undefined} className="grid lg:grid-cols-[240px_1fr] min-h-screen lg:h-screen bg-[var(--bg)] overflow-x-hidden lg:overflow-hidden">
       <Sidebar />
       <main className="min-h-screen lg:h-screen overflow-x-hidden overflow-y-auto lg:pt-0 relative min-w-0" style={{ paddingTop: 'max(3.5rem, calc(env(safe-area-inset-top, 0px) + 3.5rem))' }}>
         <ActAsBanner />
