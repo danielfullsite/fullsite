@@ -558,17 +558,19 @@ body {
 /* La barra de acento del ítem activo pasa de 4px a 3px y se ancla al borde. */
 [data-ds="v3"] .sidebar-nav-item.active::before { width: 3px; left: -10px; }
 
-/* ── 4. Barras de ranking: un solo color ───────────────────────────────────
- * El ranking de meseros pintaba cada barra de un color distinto, y al #4 le
- * tocaba ROJO — que se lee como alarma cuando sólo significa "cuarto lugar".
- * El orden ya lo dice la posición; el color no tenía nada que agregar. */
-[data-ds="v3"] [class*="bg-blue-5"],
-[data-ds="v3"] [class*="bg-purple-5"],
-[data-ds="v3"] [class*="bg-pink-5"],
-[data-ds="v3"] [class*="bg-cyan-5"],
-[data-ds="v3"] [class*="bg-indigo-5"] {
-  background-color: var(--accent) !important;
-}
+/* ── 4. Barras de ranking ──────────────────────────────────────────────────
+ * RETIRADO. La primera versión decía:
+ *
+ *     [data-ds="v3"] [class*="bg-purple-5"] { background-color: var(--accent) !important }
+ *
+ * y era demasiado amplia: `bg-purple-500/10` —un tinte al 10% que usa el aviso
+ * de insight del dashboard— también coincide. El resultado fue una barra VERDE
+ * SÓLIDA a todo lo ancho, con texto morado encima. Peor que el problema que
+ * intentaba resolver.
+ *
+ * Lección: un selector por subcadena de clase no distingue un fondo sólido de
+ * un tinte con opacidad. Las barras del ranking se arreglan en el markup de la
+ * página, donde se sabe qué es una barra y qué no — no aquí a ciegas. */
 
 /* ── 5. Foco visible ───────────────────────────────────────────────────────
  * Hay 306 `focus:outline-none` en el código y cero `focus-visible`: hoy nadie
