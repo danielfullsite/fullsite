@@ -1,46 +1,76 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, type RefObject } from 'react'
 
 /**
- * Bloquea el scroll del <body> mientras hay al menos un diálogo abierto.
+ * Congela el scroll de fondo mientras hay un diálogo abierto.
  *
- * Hoy NINGUNO de los 75 overlays bloquea el scroll (auditoría 2026-08-24). El
- * síntoma en campo: con el modal de cobro abierto, rodar la rueda fuera del panel
- * mueve la lista de platillos que está atrás. En tablet, con el momentum del dedo,
- * el fondo se va solo.
+ * El síntoma que lo motiva: con el modal de cobro abierto, rodar la rueda fuera del
+ * panel mueve la lista de platillos que está atrás; en tablet, con el momentum del
+ * dedo, el fondo se va solo.
  *
- * Dos cuidados que se ven simples y no lo son:
+ * ⚠️ La versión ingenua de esto —poner `overflow:hidden` en `<body>`— **no arregla
+ * el POS**, y esa fue la primera versión de este archivo. En `/pos/*` el body nunca
+ * scrollea: la raíz es `.pos-kiosk h-dvh flex flex-col overflow-hidden`
+ * (`pos/page.tsx:3600`) y los scrollers de verdad son divs internos con
+ * `overflow-y-auto`. `globals.css:76` lo dice explícito: *"Sin overflow:hidden —
+ * subpáginas /pos/* sí scrollean"*.
  *
- * 1. **Refcount.** Con dos diálogos anidados (una confirmación sobre el cobro),
- *    cerrar el de arriba no debe desbloquear el scroll. Sólo el último suelta.
+ * Por eso aquí se bloquean DOS cosas: el `<body>` (que es el scroller del
+ * dashboard) y todo contenedor con scroll vertical propio que quede por detrás del
+ * panel. Se excluye el subárbol del panel para que el diálogo sí pueda scrollear
+ * por dentro.
  *
- * 2. **Restaurar el valor PREVIO, no vaciarlo.** `globals.css:70` dice explícito
- *    que las subpáginas `/pos/*` sí scrollean. Si al cerrar pusiéramos
- *    `overflow = ''` estaríamos borrando lo que la página hubiera puesto a
- *    propósito. Guardamos lo que había y lo devolvemos tal cual.
+ * Dos cuidados que parecen simples y no lo son:
+ *
+ * 1. **Refcount.** Con dos diálogos anidados, cerrar el de arriba no debe soltar el
+ *    scroll. Sólo el último suelta.
+ * 2. **Restaurar el valor PREVIO, no vaciarlo.** Se guarda lo que cada elemento
+ *    tenía y se le devuelve tal cual.
  */
 
-let locks = 0
-let previousOverflow: string | null = null
-let previousPaddingRight: string | null = null
+interface Saved {
+  el: HTMLElement
+  overflow: string
+  paddingRight: string
+}
 
-/** Ancho de la barra de scroll, para que el layout no salte al bloquear. */
+let locks = 0
+let saved: Saved[] = []
+
 function scrollbarWidth(): number {
   if (typeof window === 'undefined') return 0
   return window.innerWidth - document.documentElement.clientWidth
 }
 
-function acquire(compensate: boolean): void {
+/** Contenedores con scroll vertical propio, excluyendo el subárbol del panel. */
+function backgroundScrollers(exclude: HTMLElement | null): HTMLElement[] {
+  if (typeof document === 'undefined') return []
+  const out: HTMLElement[] = []
+  for (const el of Array.from(document.querySelectorAll<HTMLElement>('*'))) {
+    if (exclude && (exclude === el || exclude.contains(el) || el.contains(exclude))) continue
+    const cs = window.getComputedStyle(el)
+    const oy = cs.overflowY
+    if ((oy === 'auto' || oy === 'scroll') && el.scrollHeight > el.clientHeight) out.push(el)
+  }
+  return out
+}
+
+function acquire(compensate: boolean, panel: HTMLElement | null): void {
   if (typeof document === 'undefined') return
   locks += 1
-  if (locks > 1) return // ya estaba bloqueado por un diálogo de abajo
+  if (locks > 1) return
 
   const body = document.body
-  previousOverflow = body.style.overflow
-  previousPaddingRight = body.style.paddingRight
+  const targets: HTMLElement[] = [body, ...backgroundScrollers(panel)]
 
-  body.style.overflow = 'hidden'
+  saved = targets.map(el => ({
+    el,
+    overflow: el.style.overflow,
+    paddingRight: el.style.paddingRight,
+  }))
+
+  for (const el of targets) el.style.overflow = 'hidden'
 
   if (compensate) {
     const gap = scrollbarWidth()
@@ -54,41 +84,48 @@ function acquire(compensate: boolean): void {
 function release(): void {
   if (typeof document === 'undefined') return
   locks = Math.max(0, locks - 1)
-  if (locks > 0) return // todavía hay un diálogo abierto
+  if (locks > 0) return
 
-  const body = document.body
-  body.style.overflow = previousOverflow ?? ''
-  body.style.paddingRight = previousPaddingRight ?? ''
-  previousOverflow = null
-  previousPaddingRight = null
+  for (const s of saved) {
+    s.el.style.overflow = s.overflow
+    s.el.style.paddingRight = s.paddingRight
+  }
+  saved = []
 }
 
 /**
- * @param active   si el diálogo está abierto
- * @param mode     `true` bloquea; `'compensate'` además compensa la barra de scroll
- *                 (sólo dashboard — en POS la barra mide 14–44px y el layout saltaría);
- *                 `false` no toca el body (bottom sheet del menú del comensal).
+ * @param active    si el diálogo está abierto
+ * @param mode      `true` bloquea; `'compensate'` además compensa la barra de
+ *                  scroll (sólo dashboard — en POS la barra mide 14–44px y el
+ *                  layout saltaría); `false` no toca nada.
+ * @param panelRef  el panel del diálogo, para NO bloquear su scroll interno.
  */
-export function useScrollLock(active: boolean, mode: boolean | 'compensate' = true): void {
+export function useScrollLock(
+  active: boolean,
+  mode: boolean | 'compensate' = true,
+  panelRef?: RefObject<HTMLElement | null>,
+): void {
   useEffect(() => {
     if (!active || mode === false) return
-    acquire(mode === 'compensate')
+    acquire(mode === 'compensate', panelRef?.current ?? null)
     return release
-  }, [active, mode])
+  }, [active, mode, panelRef])
 }
 
-/** Sólo para pruebas: deja el contador y el body como estaban. */
+/** Sólo para pruebas: deja el contador y los estilos como estaban. */
 export function __resetScrollLockForTests(): void {
+  for (const s of saved) {
+    s.el.style.overflow = s.overflow
+    s.el.style.paddingRight = s.paddingRight
+  }
+  saved = []
   locks = 0
-  previousOverflow = null
-  previousPaddingRight = null
   if (typeof document !== 'undefined') {
     document.body.style.overflow = ''
     document.body.style.paddingRight = ''
   }
 }
 
-/** Sólo para pruebas y aserciones internas. */
 export function __scrollLockCount(): number {
   return locks
 }

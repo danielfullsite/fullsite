@@ -1,11 +1,12 @@
 'use client'
 
-import { useCallback, useEffect, useId, useRef, type ReactNode, type RefObject } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, type ReactNode, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { LAYER, type Layer } from './layers'
 import { useScrollLock } from './useScrollLock'
 import { useFocusTrap, type InitialFocus } from './useFocusTrap'
+import { isTopDialog, popDialog, pushDialog } from './dialogStack'
 
 /**
  * Diálogo compartido.
@@ -173,8 +174,19 @@ export function Dialog({
     onClose()
   }, [onClose, preventCloseWhile])
 
-  useScrollLock(open, scrollLock)
-  useFocusTrap(open, panelRef, { initialFocus, returnFocus })
+  // Identidad estable para la pila. Sin esto, dos diálogos apilados se pelean:
+  // un ESC cerraba los dos, y los focus traps se robaban el foco entre sí.
+  const stackId = useMemo(() => Symbol('dialog'), [])
+  useEffect(() => {
+    if (!open) return
+    pushDialog(stackId)
+    return () => popDialog(stackId)
+  }, [open, stackId])
+
+  // Se pasa el panel para que su scroll interno NO se bloquee junto con el fondo.
+  useScrollLock(open, scrollLock, panelRef)
+  // Sólo el diálogo de hasta arriba atrapa el foco.
+  useFocusTrap(open, panelRef, { initialFocus, returnFocus, isActive: () => isTopDialog(stackId) })
 
   // ESC a nivel de documento. Hoy sólo 2 de 75 overlays cierran con ESC, y uno de
   // ellos sólo si el foco está dentro del input.
@@ -182,18 +194,26 @@ export function Dialog({
     if (!open || !policy.esc) return
     function onKey(e: KeyboardEvent) {
       if (e.key !== 'Escape') return
+      // Sólo responde el de hasta arriba. `stopPropagation` no bastaba: no detiene
+      // a los otros listeners registrados en el MISMO nodo (document), así que
+      // una confirmación sobre el cobro cerraba las dos de un solo ESC.
+      if (!isTopDialog(stackId)) return
       e.stopPropagation()
       requestClose()
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [open, policy.esc, requestClose])
+  }, [open, policy.esc, requestClose, stackId])
 
   if (!open) return null
 
   const sizeClass = SIZE_CLASS[size as string] ?? size
   const heightClass = height === 'auto' ? '' : height === 'full' ? 'h-[calc(100vh-2rem)]' : height
   const isFlex = layout === 'flex-column'
+  // El tope de 85vh sólo se aplica cuando NO se pidió una altura explícita. Antes
+  // se emitían juntos y `max-h-[85vh]` ganaba, así que `height="full"` no hacía
+  // nada con el layout por defecto — sin ningún aviso.
+  const capHeight = height === 'auto'
 
   const headerTone =
     headerVariant === 'accent'
@@ -229,7 +249,9 @@ export function Dialog({
           'rounded-2xl shadow-[var(--shadow-pop,0_20px_40px_-4px_rgba(0,0,0,.45))]',
           sizeClass,
           heightClass,
-          isFlex ? 'flex flex-col overflow-hidden' : 'max-h-[85vh] overflow-y-auto',
+          isFlex
+            ? 'flex flex-col overflow-hidden'
+            : `${capHeight ? 'max-h-[85vh]' : ''} overflow-y-auto`,
           panelClassName,
         ]
           .filter(Boolean)

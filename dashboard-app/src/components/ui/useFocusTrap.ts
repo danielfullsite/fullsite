@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, type RefObject } from 'react'
+import { useEffect, useRef, type RefObject } from 'react'
 
 /**
  * Atrapa el foco dentro del panel mientras el diálogo está abierto, y lo devuelve
@@ -43,14 +43,17 @@ function focusables(root: HTMLElement): HTMLElement[] {
   })
 }
 
-/** Campos de captura, en el sentido de "dónde va a escribir la persona".
- *  Un `autoFocus` explícito gana sobre el orden del DOM. */
+/**
+ * Campos de captura, en el sentido de "dónde va a escribir la persona".
+ *
+ * Ojo con `autoFocus`: React 19 **no emite el atributo en el DOM** — lo aplica
+ * llamando `.focus()` durante el commit. Buscar `[autofocus]` devuelve 0
+ * coincidencias siempre, así que aquí no se busca. La forma correcta de respetar
+ * los 43 `autoFocus` que ya existen en el código es NO pisarlos: si React ya dejó
+ * el foco dentro del panel, se deja donde está (ver `useFocusTrap`).
+ */
 function firstField(root: HTMLElement): HTMLElement | null {
-  const auto = root.querySelector<HTMLElement>('[autofocus]')
-  if (auto && !auto.hasAttribute('disabled')) return auto
-  const fields = focusables(root).filter(el =>
-    ['INPUT', 'SELECT', 'TEXTAREA'].includes(el.tagName),
-  )
+  const fields = focusables(root).filter(el => ['INPUT', 'SELECT', 'TEXTAREA'].includes(el.tagName))
   return fields[0] ?? null
 }
 
@@ -65,13 +68,28 @@ export interface FocusTrapOptions {
    *  existe (la mesa se cerró, la fila se borró), cae al contenedor del POS o al
    *  body — nunca lanza. */
   returnFocus?: boolean | RefObject<HTMLElement | null>
+  /** Con varios diálogos apilados sólo debe atrapar el de hasta arriba. Sin esto
+   *  todos los traps corren en cada Tab y gana el que se registró al último: el
+   *  foco puede aterrizar en un input del diálogo de abajo y disparar su `onFocus`
+   *  sin que nadie lo vea. */
+  isActive?: () => boolean
 }
 
 export function useFocusTrap(
   active: boolean,
   panelRef: RefObject<HTMLElement | null>,
-  { initialFocus = 'first-input', returnFocus = true }: FocusTrapOptions = {},
+  { initialFocus = 'first-input', returnFocus = true, isActive }: FocusTrapOptions = {},
 ): void {
+  // `isActive` llega como una función nueva en cada render. Si estuviera en las
+  // dependencias del efecto, el trap se desmontaría y remontaría constantemente y
+  // el foco volvería al inicio a cada tecla. Se guarda en un ref, que sí es estable.
+  // La asignación va dentro de un efecto, no en el render: mutar un ref durante el
+  // render rompe las garantías de concurrencia de React 19.
+  const isActiveRef = useRef(isActive)
+  useEffect(() => {
+    isActiveRef.current = isActive
+  })
+
   useEffect(() => {
     if (!active) return
     const panel = panelRef.current
@@ -98,16 +116,30 @@ export function useFocusTrap(
       // El panel necesita tabIndex para poder recibir foco programático.
       if (target === panel && !panel.hasAttribute('tabindex')) panel.setAttribute('tabindex', '-1')
       // rAF: el panel puede no estar medido todavía en el mismo tick del montaje.
-      const raf = requestAnimationFrame(() => target?.focus?.())
+      const raf = requestAnimationFrame(() => {
+        // Si React ya colocó el foco dentro del panel —eso es lo que hace un
+        // `autoFocus`, que en React 19 no deja atributo en el DOM— se respeta.
+        // Antes este rAF corría DESPUÉS y lo pisaba, mandando el cursor al campo
+        // equivocado en cualquier modal migrado que usara autoFocus.
+        const yaDentro = panel.contains(document.activeElement) && document.activeElement !== panel
+        if (yaDentro) return
+        target?.focus?.()
+      })
       cancelInitial = () => cancelAnimationFrame(raf)
     }
 
     // ── Trap ─────────────────────────────────────────────────────────
     function onKeyDown(e: KeyboardEvent) {
       if (e.key !== 'Tab') return
+      // Sólo atrapa el diálogo de hasta arriba.
+      const activo = isActiveRef.current
+      if (activo && !activo()) return
       const items = focusables(panel!)
       if (items.length === 0) {
-        // Sin nada enfocable, el foco se queda en el panel.
+        // Sin nada enfocable el foco se queda en el panel — pero hay que darle
+        // tabIndex primero: sin él `.focus()` es un no-op y, como ya se llamó a
+        // preventDefault, el foco se quedaba FUERA, operando el POS de atrás.
+        if (!panel!.hasAttribute('tabindex')) panel!.setAttribute('tabindex', '-1')
         e.preventDefault()
         panel!.focus()
         return

@@ -2,6 +2,7 @@
 
 import { useMemo, useState, type ReactNode } from 'react'
 import { ArrowUpDown, ChevronDown, ChevronUp } from 'lucide-react'
+import { LAYER } from './layers'
 
 /**
  * Tabla compartida.
@@ -199,6 +200,10 @@ function cellClasses<TRow>(c: ColumnDef<TRow>, ctx: CellContext<TRow> | null): s
 }
 
 function isNil(v: unknown): boolean {
+  // NaN cuenta como ausente. Si no, `a - b` devuelve NaN, el comparador se vuelve
+  // inconsistente y V8 no sólo coloca mal ese valor: desordena la tabla entera.
+  // Un `parseFloat('')` en un costo de inventario basta para provocarlo.
+  if (typeof v === 'number' && Number.isNaN(v)) return true
   return v === null || v === undefined || v === ''
 }
 
@@ -367,14 +372,30 @@ export function Table<TRow>({
               title={c.headerTitle}
               aria-sort={isActive ? (activeSort!.dir === 'asc' ? 'ascending' : 'descending') : undefined}
               onClick={sortableHere ? () => toggleSort(c.id) : undefined}
+              // Ordenar tiene que poder hacerse con teclado: en la caja hay teclado
+              // físico, y anunciar aria-sort para una acción que sólo responde al
+              // ratón es prometer algo que no se cumple.
+              tabIndex={sortableHere ? 0 : undefined}
+              onKeyDown={
+                sortableHere
+                  ? e => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        toggleSort(c.id)
+                      }
+                    }
+                  : undefined
+              }
+              style={stickyHeader ? { zIndex: LAYER.stickyHeader } : undefined}
               className={[
                 'px-3 py-2 text-xs font-semibold text-[var(--text-3)] whitespace-nowrap',
                 ALIGN_CLASS[alignOf(c)],
                 c.numeric ? 'tabular-nums' : '',
                 c.hideBelow ? HIDE_BELOW[c.hideBelow] : '',
                 c.width ?? '',
+                c.minWidth ?? '',
                 sortableHere ? 'cursor-pointer select-none hover:text-[var(--text-1)]' : '',
-                stickyHeader ? 'sticky top-0 z-10 bg-[var(--surface-2)]' : '',
+                stickyHeader ? 'sticky top-0 bg-[var(--surface-2)]' : '',
                 c.headerClassName ?? '',
               ]
                 .filter(Boolean)
@@ -442,7 +463,14 @@ export function Table<TRow>({
                   // Un clic nacido de un control no es un clic de fila. Sin esto,
                   // escribir en una celda editable abriría el detalle.
                   const t = e.target as HTMLElement
-                  if (t.closest('input,select,textarea,button,a,label')) return
+                  // Incluye controles NO nativos: un `<div role="button">Eliminar</div>`
+                  // disparaba el borrado Y además abría el detalle de la fila.
+                  if (
+                    t.closest(
+                      'input,select,textarea,button,a,label,summary,[role="button"],[role="checkbox"],[contenteditable],[data-no-row-click]',
+                    )
+                  )
+                    return
                   onRowClick(ctx)
                 }
               : undefined
@@ -463,11 +491,14 @@ export function Table<TRow>({
               content = v === null || v === undefined ? '' : String(v)
             } else content = ''
 
-            if (c.collapseRepeated && i > 0) {
-              const prev = ctxOf(limited[i - 1], i - 1)
-              const prevVal = c.accessor ? c.accessor(limited[i - 1], i - 1) : c.render?.(prev)
-              const curVal = c.accessor ? c.accessor(row, i) : content
-              if (String(prevVal) === String(curVal)) content = ''
+            // collapseRepeated necesita un valor comparable. Con sólo `render`, los
+            // dos lados son elementos de React y `String()` los vuelve
+            // "[object Object]": colapsaría SIEMPRE y borraría filas legítimas
+            // (Carnes/Carnes/Bebidas quedaba como Carnes/·/·). Se exige accessor.
+            if (c.collapseRepeated && i > 0 && c.accessor) {
+              const prevVal = c.accessor(limited[i - 1], i - 1)
+              const curVal = c.accessor(row, i)
+              if (!isNil(prevVal) && Object.is(prevVal, curVal)) content = ''
             }
 
             return (
@@ -511,7 +542,10 @@ export function Table<TRow>({
               .filter(Boolean)
               .join(' ')}
           >
-            {typeof c.footer === 'function' ? c.footer(limited) : c.footer}
+            {/* `sorted`, NO `limited`: el pie suma TODAS las filas, no la página
+                visible. Con limit=2 sobre 320/410/55 el total daba 730 en vez de
+                785 — un descuadre de caja que el software imprime sin avisar. */}
+            {typeof c.footer === 'function' ? c.footer(sorted) : c.footer}
           </td>
         ))}
       </tr>

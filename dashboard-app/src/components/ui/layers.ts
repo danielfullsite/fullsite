@@ -10,6 +10,9 @@
  * falta una capa nueva, se agrega aquí y se justifica.
  */
 export const LAYER = {
+  /** Encabezado pegajoso de tabla — por encima de las celdas, muy por debajo
+   *  de cualquier capa flotante. */
+  stickyHeader: 5,
   /** Backdrop del sidebar móvil. */
   sidebarBackdrop: 30,
   /** Drawer de navegación (POS y demo). */
