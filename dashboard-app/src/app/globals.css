@@ -533,16 +533,11 @@ body {
 /* ── 2. Densidad medida ────────────────────────────────────────────────────
  * Ritmo de Haze: radio 12px y celdas de tabla a 16×12. Las tarjetas dejan de
  * flotar y se apoyan en el borde. */
-[data-ds="v3"] .dash-card,
-[data-ds="v3"] .premium-card {
-  border-radius: 12px;
-  box-shadow: none;
-}
-[data-ds="v3"] .dash-card:hover,
-[data-ds="v3"] .premium-card:hover {
-  box-shadow: none;
-  border-color: var(--accent-line);
-}
+/* Aquí vivían dos reglas para .dash-card y .premium-card. Se retiran: esas
+ * clases están definidas más arriba en este archivo pero NINGÚN componente las
+ * usa: cero ocurrencias en todo src. Las tarjetas reales se arman con
+ * utilidades de Tailwind y un style inline, así que la regla no pintaba nada.
+ * El tratamiento de tarjeta del piloto ahora vive en el bloque 6. */
 [data-ds="v3"] table td { padding-top: 12px; padding-bottom: 12px; }
 [data-ds="v3"] table th { padding-top: 10px; padding-bottom: 10px; }
 
@@ -606,4 +601,72 @@ body {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: 4px;
+}
+
+/* ── 6. Sistema savio.mx ───────────────────────────────────────────────────
+ * Medido en vivo de savio.mx — SaaS B2B mexicano, mismo mercado que nosotros.
+ * Lo que lo hace ver caro no es el color; son tres cosas concretas:
+ *
+ *   Título    peso 400 a tamaño grande, tracking -0.028em   (teníamos 700 a 26px)
+ *   Tarjeta   sin sombra: se distingue por tono y radio      (teníamos sombra)
+ *   Aire      radio 18px, padding 24px                       (teníamos 14 y 18)
+ *
+ * Un título en peso 700 grita; en 400, grande y con el tracking cerrado, se lee
+ * seguro. Esa es la diferencia entre una plantilla y un producto.
+ *
+ * Cada selector de aquí abajo se verificó contra el markup real antes de
+ * escribirlo. La primera versión de este bloque enganchaba .dash-card y
+ * .kpi-accent-*: la primera está definida en este archivo pero NO la usa ningún
+ * componente, y la segunda ni siquiera es una clase — es una llave del mapa
+ * `iconStyles` de KPICard.tsx. Ambas habrían pasado tsc, lint y la suite
+ * completa sin pintar un solo pixel. */
+[data-ds="v3"] {
+  --font-display: "Schibsted Grotesk", var(--font-sans);
+
+  /* Tarjetas planas. Se apagan los dos tokens de sombra que consumen las
+   * tarjetas — verificado: sólo los usan tarjetas y el tooltip de las gráficas,
+   * que trae su propio `1px solid var(--line)` y no queda flotando sin apoyo.
+   * Los modales usan --shadow-deep/--shadow-hero y NO se tocan: ahí la sombra
+   * es lo que separa el diálogo del fondo. */
+  --shadow-soft: none;
+  --shadow-mid: none;
+}
+
+/* Familia de display en los encabezados. El peso 400 se reserva para los
+ * tamaños grandes —que es donde savio lo usa—: bajarle el peso a un subtítulo
+ * de 15px no se ve elegante, se ve descolorido. */
+[data-ds="v3"] h1,
+[data-ds="v3"] h2,
+[data-ds="v3"] h3 {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+/* El título de página: la pieza central del sistema. */
+[data-ds="v3"] .ds-title {
+  font-size: 34px;
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: -0.028em;
+}
+
+/* La cifra del KPI, mismo tratamiento: grande y en peso 400. */
+[data-ds="v3"] [data-testid="kpi-valor"] {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: -0.025em;
+}
+
+/* Radio y aire. Se sobreescriben las utilidades EXACTAS que usan las tarjetas,
+ * no un selector por subcadena: `[class*="rounded-1"]` también agarraría
+ * rounded-100 o rounded-12xl. Medido: rounded-[14px] son 32 usos y 27 son
+ * tarjetas; rounded-[12px] son 6 y los 2 que no son tarjeta viven en /pos, que
+ * no cuelga de AppShell y por lo tanto nunca lleva data-ds; p-[18px] son 16 y
+ * 14 son tarjetas. */
+[data-ds="v3"] .rounded-\[14px\],
+[data-ds="v3"] .rounded-\[12px\] {
+  border-radius: 18px;
+}
+[data-ds="v3"] .p-\[18px\] {
+  padding: 24px;
 }
