@@ -10,7 +10,10 @@ import { getRecentDays, getLatestDay, getDashboardFromPosOrders, aggregateMesero
 import { useAuth } from '@/contexts/AuthContext'
 import { useDsPilot } from '@/lib/ds-pilot'
 import { desdeEventos, type Atencion } from '@/lib/atencion'
-import BarraTurno from '@/components/dashboard/BarraTurno'
+import EstadoOperacion from '@/components/dashboard/EstadoOperacion'
+import ResumenDia from '@/components/dashboard/ResumenDia'
+import QuienVendio from '@/components/dashboard/QuienVendio'
+import RitmoSemana from '@/components/dashboard/RitmoSemana'
 import ListaAtencion from '@/components/dashboard/ListaAtencion'
 import AgentBriefing from '@/components/AgentBriefing'
 import { formatCurrency, formatNumber, formatPercent, formatDate, percentChange } from '@/lib/format'
@@ -89,6 +92,7 @@ const WIDGET_DEFS = [
   { id: 'extra_kpis', label: 'Propinas / Descuentos / Brutas', defaultOn: true },
   { id: 'agent_status', label: 'Status de agentes', defaultOn: false },
   { id: 'week_comparison', label: 'vs Semana pasada', defaultOn: true },
+  { id: 'ritmo_semana', label: 'Qué esperar hoy', defaultOn: true },
   { id: 'revenue_chart', label: 'Gráfica de ventas (30d)', defaultOn: true },
   { id: 'top_meseros', label: 'Top meseros', defaultOn: true },
   { id: 'categories', label: 'Distribución por categoría', defaultOn: false },
@@ -240,16 +244,29 @@ export default function DashboardPage() {
     ? (recentData[recentData.length - 1 - selectedDayIdx] || latestDay)
     : latestDay
 
-  // Same DOW average (last 4 weeks) for "dia" comparison
+  // Promedio del mismo día de la semana, para la comparación de "dia".
+  //
+  // BUG CORREGIDO: esto decía `.slice(0, 4)`. Pero `recentData` viene ordenado
+  // de MÁS VIEJO a MÁS NUEVO (getDashboardFromPosOrders agrupa órdenes pedidas
+  // con `order=created_at.asc`), así que tomaba los cuatro viernes MÁS ANTIGUOS
+  // de hasta 90 días de historia — exactamente lo contrario de lo que prometía
+  // el comentario "last 4 weeks". Con tres meses de historia, la tarjeta
+  // comparaba el viernes de hoy contra cuatro viernes de hace tres meses y lo
+  // llamaba "el promedio de los viernes". Para un negocio que crece, eso pinta
+  // rojo permanente.
+  //
+  // `n` sale hacia afuera porque el tamaño de la muestra es parte del dato: un
+  // "promedio" de un solo día no es un promedio, y la pantalla tiene que poder
+  // decirlo en vez de esconderlo detrás de la palabra "prom.".
   const sameDOWAvg = (() => {
-    if (!viewDay) return { ventas: 0, tickets: 0, personas: 0, tp: 0 }
+    if (!viewDay) return { ventas: 0, tickets: 0, personas: 0, tp: 0, n: 0 }
     const viewDate = new Date(viewDay.fecha + 'T12:00:00')
     const dow = viewDate.getDay()
     const sameDOW = recentData.filter(d => {
       const dt = new Date(d.fecha + 'T12:00:00')
       return dt.getDay() === dow && d.fecha !== viewDay.fecha
-    }).slice(0, 4)
-    if (sameDOW.length === 0) return { ventas: 0, tickets: 0, personas: 0, tp: 0 }
+    }).slice(-4)
+    if (sameDOW.length === 0) return { ventas: 0, tickets: 0, personas: 0, tp: 0, n: 0 }
     const avg = (key: keyof WansoftDaily) => sameDOW.reduce((s, d) => s + (Number(d[key]) || 0), 0) / sameDOW.length
     return {
       ventas: avg('ventas_dia'),
@@ -257,6 +274,7 @@ export default function DashboardPage() {
       personas: avg('personas_restaurant'),
       // TP por persona para comparar igual que el dato del dia
       tp: avg('personas_restaurant') > 0 ? avg('ventas_dia') / avg('personas_restaurant') : avg('ticket_promedio_restaurant'),
+      n: sameDOW.length,
     }
   })()
 
@@ -363,6 +381,40 @@ export default function DashboardPage() {
     return { monthVentas, projected, daysLeft, dayOfMonth, daysInMonth, monthName, dailyAvg, yearNum }
   })()
 
+  // Ritmo por día de la semana. Sale de `recentData`, que la página ya tiene:
+  // no hay una consulta nueva. El patrón más fuerte de una cafetería es el día
+  // de la semana y ningún widget lo mostraba.
+  const ritmoSemana = (() => {
+    const NOMBRES = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+    const acumulado = new Map<number, { ventas: number[]; cuentas: number[] }>()
+    for (const d of recentData) {
+      const dt = new Date(String(d.fecha).slice(0, 10) + 'T12:00:00')
+      if (isNaN(dt.getTime())) continue
+      const venta = Number(d.ventas_dia) || 0
+      if (venta <= 0) continue
+      // ISO: 1 = lunes … 7 = domingo. getDay() da 0 para domingo.
+      const iso = dt.getDay() === 0 ? 7 : dt.getDay()
+      if (!acumulado.has(iso)) acumulado.set(iso, { ventas: [], cuentas: [] })
+      const a = acumulado.get(iso)!
+      a.ventas.push(venta)
+      a.cuentas.push(Number(d.tickets_count) || 0)
+    }
+    return [1, 2, 3, 4, 5, 6, 7].map(dow => {
+      const a = acumulado.get(dow)
+      const ventas = a?.ventas ?? []
+      const n = ventas.length
+      return {
+        dow,
+        nombre: NOMBRES[dow - 1],
+        ventaProm: n > 0 ? ventas.reduce((x, y) => x + y, 0) / n : 0,
+        cuentasProm: n > 0 ? (a!.cuentas.reduce((x, y) => x + y, 0)) / n : 0,
+        peor: n > 0 ? Math.min(...ventas) : 0,
+        mejor: n > 0 ? Math.max(...ventas) : 0,
+        n,
+      }
+    })
+  })()
+
   // Quick insight line
   const quickInsight = (() => {
     const day = period === 'dia' ? viewDay : latestDay
@@ -424,15 +476,24 @@ export default function DashboardPage() {
           la pantalla queda igual que antes. */}
       {dsPiloto && (
         <>
-          <BarraTurno
-            turno={turnoAbierto}
-            resumen={{
-              ventas: viewDay?.ventas_dia ?? null,
-              ordenes: viewDay?.tickets_count ?? null,
-              personas: viewDay?.personas_restaurant ?? null,
-              mesasOcupadas: null,
-              mesasTotal: null,
-            }}
+          {/* Una sola línea de estado. Antes eran tres mensajes distintos
+              diciendo el mismo hecho —la barra de turno, el aviso de sync y el
+              chip del selector— y ninguno decía cuántos DÍAS lleva el POS sin
+              mandar datos, que es el número que cambia la decisión. */}
+          <EstadoOperacion
+            turno={turnoAbierto ? {
+              numero: turnoAbierto.numero ?? null,
+              abiertoPor: turnoAbierto.abiertoPor ?? null,
+              abiertoAt: turnoAbierto.abiertoAt ?? null,
+            } : null}
+            ultimaFecha={recentData.length > 0 ? String(recentData[recentData.length - 1].fecha).slice(0, 10) : null}
+            hoy={new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' })}
+            syncTime={
+              recentData.length > 0 && recentData[recentData.length - 1].updated_at
+                ? new Date(recentData[recentData.length - 1].updated_at as string).toLocaleTimeString('es-MX', { timeZone: 'America/Mexico_City', hour: 'numeric', minute: '2-digit' })
+                : null
+            }
+            cargando={cargandoTurno}
           />
           <ListaAtencion items={atencion} cargando={cargandoTurno} />
         </>
@@ -576,7 +637,7 @@ export default function DashboardPage() {
       <AgentBriefing />
 
       {/* Data freshness: warn when showing a past day as the default view, show sync time for today */}
-      {period === 'dia' && viewDay && (() => {
+      {!dsPiloto && period === 'dia' && viewDay && (() => {
         const mxToday = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' })
         const fecha = String(viewDay.fecha).slice(0, 10)
         const syncTime = viewDay.updated_at
@@ -646,7 +707,62 @@ export default function DashboardPage() {
       )}
 
       {/* Quick insight */}
-      {show('insight') && quickInsight && (
+      {/* ── Resumen del día (piloto) ─────────────────────────────────────
+          Sustituye tres bloques que se peleaban por la misma atención: las 4
+          tarjetas KPI con su mini-gráfica y sus dos porcentajes, la fila de
+          Propinas/Descuentos/Brutas, y el banner morado del insight.
+
+          Ningún dato se pierde. La comparación del insight sube al encabezado
+          —ahora con el tamaño de la muestra escrito— y el "cargó el N%" baja a
+          QuienVendio, donde el porcentaje va en CADA renglón y no sólo en el
+          primero. "Brutas" deja de ser un duplicado de "Ventas del día"
+          (ventas_brutas = ventas + descuentos) y vuelve a ser lo que es: el
+          primer renglón de un desglose que suma hasta lo que entró a la caja.
+
+          Se respetan los interruptores del panel de personalización. */}
+      {dsPiloto && (show('kpis') || show('extra_kpis')) && (() => {
+        const mxToday = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' })
+        const fechaVista = viewDay ? String(viewDay.fecha).slice(0, 10) : null
+        return (
+          <ResumenDia
+            fecha={fechaVista}
+            esUltimoCierre={period === 'dia' && !!fechaVista && fechaVista !== mxToday && selectedDayIdx === 0}
+            periodo={period}
+            ventas={periodData.ventas}
+            ordenes={periodData.tickets}
+            personas={periodData.personas}
+            ticketPersona={periodData.tp}
+            ticketOrden={periodData.tpOrden}
+            propinas={periodData.propinas}
+            descuentos={periodData.descuentos}
+            promedioMismoDia={periodData.prevVentas}
+            muestraMismoDia={period === 'dia' ? sameDOWAvg.n : 1}
+            tipoComparacion={period === 'dia' ? 'promedio' : 'periodo'}
+            etiquetaComparacion={
+              period === 'dia' ? `los ${todayDOWName.toLowerCase()}`
+                : period === 'semana' ? 'la semana anterior'
+                : 'el mes anterior'
+            }
+            mostrarDinero={show('extra_kpis')}
+          />
+        )
+      })()}
+
+      {/* Qué esperar hoy — la pieza nueva. Contesta "¿con cuánta gente abro?",
+          que es la decisión que un dueño toma antes de abrir la cortina y que
+          ninguno de los 13 widgets contestaba. */}
+      {dsPiloto && show('ritmo_semana') && (
+        <RitmoSemana
+          filas={ritmoSemana}
+          hoyDow={(() => {
+            const hoyMX = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' })
+            const d = new Date(hoyMX + 'T12:00:00')
+            return d.getDay() === 0 ? 7 : d.getDay()
+          })()}
+        />
+      )}
+
+      {!dsPiloto && show('insight') && quickInsight && (
         <div className="mb-3 sm:mb-4 flex items-start gap-[9px] px-3.5 py-2.5 bg-purple-500/10 border border-purple-500/30 rounded-xl">
           <Zap size={15} className="text-purple-400 shrink-0 mt-0.5" fill="currentColor" />
           <p className="text-[13px] leading-[1.45] text-purple-400">{quickInsight}</p>
@@ -685,7 +801,7 @@ export default function DashboardPage() {
       )}
 
       {/* KPI Summary Cards — 4 across like Toast */}
-      {show('kpis') && (() => {
+      {!dsPiloto && show('kpis') && (() => {
         // Sparkline data: last 7 days
         const spark7 = recentData.slice(-7)
         const sparkVentas = spark7.map(d => d.ventas_dia || 0)
@@ -799,7 +915,7 @@ export default function DashboardPage() {
       })()}
 
       {/* Extra KPI row — Propinas + Descuentos + Brutas */}
-      {show('extra_kpis') && <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-4 sm:mb-6">
+      {!dsPiloto && show('extra_kpis') && <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-4 sm:mb-6">
         <div className="rounded-[14px] border border-[var(--line)] px-3 sm:px-4 py-3 sm:py-3.5 text-center" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-soft)' }}>
           <div className="w-[30px] h-[30px] rounded-[9px] grid place-items-center bg-[var(--accent-soft)] text-[var(--accent-bright)] mx-auto mb-2">
             <Award size={15} />
@@ -967,7 +1083,7 @@ export default function DashboardPage() {
       {/* Two columns: Top meseros + Categories */}
       {(show('top_meseros') || show('categories')) && <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
         {/* Top meseros — R365 style with progress bars */}
-        {show('top_meseros') && <div className="rounded-[14px] border border-[var(--line)] p-[18px]" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' }}>
+        {!dsPiloto && show('top_meseros') && <div className="rounded-[14px] border border-[var(--line)] p-[18px]" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' }}>
           <div className="flex items-center gap-[9px] mb-0.5">
             <div className="w-7 h-7 rounded-[9px] grid place-items-center bg-[var(--accent-soft)] text-[var(--accent-bright)]">
               <Award size={15} />
@@ -1023,6 +1139,15 @@ export default function DashboardPage() {
             </div>
           )}
         </div>}
+
+        {/* Quién vendió (piloto). La barra pasa a medirse contra el TOTAL y no
+            contra el primer lugar: con `m.total / topMeseroMax` el primero
+            llenaba SIEMPRE la barra completa, así que un reparto 51/49 se veía
+            igual que uno 95/5. Y el porcentaje va en cada renglón, que es donde
+            se comprueba, en vez de sólo en el banner morado de arriba. */}
+        {dsPiloto && show('top_meseros') && (
+          <QuienVendio filas={topMeseros} totalPeriodo={periodData.ventas} />
+        )}
 
         {/* Categories — horizontal bars */}
         {show('categories') && <RevenueDistributionChart

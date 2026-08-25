@@ -650,6 +650,15 @@ body {
   letter-spacing: -0.028em;
 }
 
+/* La cifra principal del resumen del día. Es el número más grande de la
+ * pantalla, y por eso mismo el que más gana con el peso 400: en 700 grita, y lo
+ * que dice —"esto es lo que vendiste"— no necesita gritar. */
+[data-ds="v3"] .ds-cifra {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: -0.035em;
+}
+
 /* La cifra del KPI, mismo tratamiento: grande y en peso 400. */
 [data-ds="v3"] [data-testid="kpi-valor"] {
   font-family: var(--font-display);
