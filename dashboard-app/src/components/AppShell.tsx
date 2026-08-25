@@ -2,7 +2,6 @@
 
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
-import { useDsPilot } from '@/lib/ds-pilot'
 import Sidebar from '@/components/Sidebar'
 import ChatWidget from '@/components/ChatWidget'
 import NotificationBell from '@/components/NotificationBell'
@@ -13,9 +12,8 @@ import { useEffect, useState } from 'react'
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
-  const { user, loading, role, clientConfig } = useAuth()
+  const { user, loading, role } = useAuth()
   // Piloto visual por tenant: marca la raíz y el CSS del piloto engancha ahí.
-  const dsPiloto = useDsPilot(clientConfig?.id)
   const [showContent, setShowContent] = useState(false)
 
   // Super-admin de plataforma: nunca se le fuerza al POS; su lugar es el Control Center.
@@ -87,8 +85,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     )
   }
 
+  // `data-ds="v3"` ya no es condicional: el rediseño dejó de ser piloto y aplica
+  // a todos los restaurantes. El atributo se conserva —en vez de aplanar el CSS—
+  // para que siga siendo evidente qué reglas pertenecen a este sistema y se
+  // puedan retirar juntas el día que haga falta.
   return (
-    <div data-ds={dsPiloto ? 'v3' : undefined} className="grid lg:grid-cols-[240px_1fr] min-h-screen lg:h-screen bg-[var(--bg)] overflow-x-hidden lg:overflow-hidden">
+    <div data-ds="v3" className="grid lg:grid-cols-[240px_1fr] min-h-screen lg:h-screen bg-[var(--bg)] overflow-x-hidden lg:overflow-hidden">
       <Sidebar />
       <main className="min-h-screen lg:h-screen overflow-x-hidden overflow-y-auto lg:pt-0 relative min-w-0" style={{ paddingTop: 'max(3.5rem, calc(env(safe-area-inset-top, 0px) + 3.5rem))' }}>
         <ActAsBanner />

@@ -2,11 +2,11 @@
 
 import React, { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { DollarSign, Ticket, Users, Receipt, TrendingDown, TrendingUp, Award, ArrowRight, CreditCard, FileBarChart, ClipboardList, Target, Settings, Eye, EyeOff, GripVertical, Bot, Clock, Zap, Activity, ChevronLeft, ChevronRight, CalendarDays, TriangleAlert } from 'lucide-react'
+import { DollarSign, Ticket, Users, Receipt, TrendingDown, TrendingUp, Award, ArrowRight, CreditCard, FileBarChart, ClipboardList, Target, Settings, Eye, EyeOff, GripVertical, Clock, Zap, Activity, ChevronLeft, ChevronRight, CalendarDays, TriangleAlert } from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import RevenueChart from '@/components/RevenueChart'
 import RevenueDistributionChart from '@/components/RevenueDistributionChart'
-import { getRecentDays, getLatestDay, getDashboardFromPosOrders, aggregateMeseros, getLatestAgentRuns, type AgentRun } from '@/lib/data'
+import { getRecentDays, getLatestDay, getDashboardFromPosOrders, aggregateMeseros } from '@/lib/data'
 import AgentBriefing from '@/components/AgentBriefing'
 import { formatCurrency, formatNumber, formatPercent, formatDate, percentChange } from '@/lib/format'
 import PredictionWidget from '@/components/PredictionWidget'
@@ -76,13 +76,22 @@ function findRecentDataForField<T>(
 type Period = 'dia' | 'semana' | 'mes'
 
 // ── Widget Configuration System ─────────────────────────────────────────
+//
+// Aquí vivía 'agent_status', que pintaba las corridas de los agentes con su
+// salida cruda: "0F 1W", "18 issues: 0 critical, 12 high", "no KPI row in
+// wansoft_kpis", "lab-simulator", "smoke-test". Eso es telemetría de la
+// PLATAFORMA, no información del restaurante — y además `agent_runs` no se
+// filtra por tenant (son ~9,586 corridas globales), así que cada restaurante
+// veía la operación de todos.
+//
+// Su lugar es Herramientas → Agentes IA (/mission-control), que ya lee esa misma
+// tabla y cuyo propio código reconoce que es "telemetría operativa global".
 const WIDGET_DEFS = [
   { id: 'insight', label: 'Insight del día', defaultOn: true },
   { id: 'month_progress', label: 'Progreso del mes', defaultOn: true },
   { id: 'kpis', label: 'KPIs principales', defaultOn: true },
   { id: 'prediction', label: 'Predicción de cierre', defaultOn: true },
   { id: 'extra_kpis', label: 'Propinas / Descuentos / Brutas', defaultOn: true },
-  { id: 'agent_status', label: 'Status de agentes', defaultOn: false },
   { id: 'week_comparison', label: 'vs Semana pasada', defaultOn: true },
   { id: 'revenue_chart', label: 'Gráfica de ventas (30d)', defaultOn: true },
   { id: 'top_meseros', label: 'Top meseros', defaultOn: true },
@@ -130,7 +139,6 @@ export default function DashboardPage() {
   const [monthOffset, setMonthOffset] = useState(0) // 0 = current month, 1 = last month, etc.
   const [widgets, setWidgets] = useState<WidgetConfig>(getDefaultWidgets)
   const [showSettings, setShowSettings] = useState(false)
-  const [agentRuns, setAgentRuns] = useState<AgentRun[]>([])
 
   // Load widget config from localStorage
   useEffect(() => { setWidgets(loadWidgetConfig()) }, [])
@@ -151,10 +159,13 @@ export default function DashboardPage() {
         // Timeout: if data doesn't load in 10s, show empty state instead of infinite spinner
         const timeoutP = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000))
         // Fetch all data in parallel instead of sequentially
-        const [recentRaw, latestRaw, runs] = await Promise.all([
+        // Ya no se pide agent_runs aquí: alimentaba el widget de status de
+        // agentes, que se movió a Herramientas → Agentes IA. Era una consulta a
+        // telemetría GLOBAL de la plataforma en cada carga del dashboard de cada
+        // restaurante, y ninguno la usaba para decidir nada.
+        const [recentRaw, latestRaw] = await Promise.all([
           Promise.race([getRecentDays(1000), timeoutP]).catch(() => [] as WansoftDaily[]),
           Promise.race([getLatestDay(), timeoutP]).catch(() => null as WansoftDaily | null),
-          getLatestAgentRuns().catch(() => [] as AgentRun[]),
         ])
         let recent = recentRaw
         let latest = latestRaw
@@ -176,7 +187,6 @@ export default function DashboardPage() {
             setPrevDay(recent[recent.length - 2])
           }
         }
-        setAgentRuns(runs)
       } catch (err) {
         console.error('Error loading dashboard data:', err)
       } finally {
@@ -781,95 +791,6 @@ export default function DashboardPage() {
       </div>}
 
       {/* Agent Status Widget — real data from agent_runs */}
-      {show('agent_status') && (
-        <div className="mb-4 sm:mb-6 rounded-[14px] border border-[var(--line)] p-4 sm:p-[18px]" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' }}>
-          <div className="flex items-center gap-[9px] mb-3 sm:mb-4">
-            <div className="w-7 h-7 rounded-[9px] grid place-items-center bg-violet-500/12 text-violet-300">
-              <Bot size={15} />
-            </div>
-            <h3 className="text-sm font-bold text-[var(--text-1)]">Agentes IA</h3>
-            <span className="ml-auto text-[13px] text-[var(--accent-ink)] font-semibold flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-[var(--accent-bright)] animate-pulse" />
-              {agentRuns.length} activos
-            </span>
-          </div>
-          {agentRuns.length === 0 ? (
-            <p className="text-[var(--text-3)] text-sm">Cargando datos de agentes...</p>
-          ) : (
-            (() => {
-              const agentNames: Record<string, string> = {
-                'anomaly-detector': 'Anomalias',
-                'close-predictor': 'Predicción',
-                'upselling': 'Upselling',
-                'menu-engineering': 'Menu Eng.',
-                'staffing-optimizer': 'Staffing',
-                'antifraud-agent': 'Anti-fraude',
-                'kitchen-quality': 'Cocina',
-                'tips-analyzer': 'Propinas',
-                'supplier-monitor': 'Proveedores',
-                'waste-detector': 'Merma',
-                'daily-briefing': 'Briefing',
-                'weekly-amalay': 'Semanal',
-                'reservas-pendientes': 'Reservas',
-                'wansoft-staleness': 'Sync',
-                'config-validator': 'Config',
-                'intraday-sales': 'Intraday',
-                'speed_of_service': 'Velocidad',
-                'inventory_auto_order': 'Auto-orden',
-                'pos_daily_aggregator': 'Agregador',
-                'proactive-alerts': 'Alertas',
-                'climate-events': 'Clima',
-                'hermes': 'Hermes',
-                'table-time': 'Mesas',
-                'menu-gap': 'Menu Gap',
-              }
-              return (
-                <>
-                {/* Mobile: horizontal scrollable chips */}
-                <div className="flex sm:hidden gap-1.5 overflow-x-auto pb-2 -mx-1 px-1" style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
-                  {agentRuns.slice(0, 12).map(run => {
-                    const name = agentNames[run.agent_id] || run.agent_id
-                    const isError = run.status === 'error'
-                    return (
-                      <div key={run.agent_id} className={`flex items-center gap-1.5 shrink-0 rounded-full px-2.5 py-1.5 border ${isError ? 'bg-[var(--crit-soft)] border-[var(--crit-line,rgba(245,69,92,.3))]' : 'bg-[var(--accent-soft)] border-[var(--accent-line)]'}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${isError ? 'bg-[var(--crit)]' : 'bg-[var(--accent)]'}`} />
-                        <span className={`text-[11px] font-semibold whitespace-nowrap ${isError ? 'text-[var(--crit-ink)]' : 'text-[var(--accent-ink)]'}`}>{name}</span>
-                      </div>
-                    )
-                  })}
-                </div>
-                {/* Desktop: vertical list */}
-                <div className="hidden sm:block space-y-1.5">
-                  {agentRuns.slice(0, 8).map(run => {
-                    const name = agentNames[run.agent_id] || run.agent_id
-                    const isError = run.status === 'error'
-                    const mins = Math.floor((Date.now() - new Date(run.created_at).getTime()) / 60000)
-                    const timeAgo = mins < 60 ? `${mins}m` : mins < 1440 ? `${Math.floor(mins / 60)}h` : `${Math.floor(mins / 1440)}d`
-                    return (
-                      <div key={run.agent_id} className="flex items-center gap-2 bg-[var(--surface-2)] rounded-lg px-3 py-2">
-                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${isError ? 'bg-red-500' : 'bg-emerald-400'}`} />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p className="text-xs font-medium text-[var(--text-1)]">{name}</p>
-                            <span className="text-[10px] text-[var(--text-4)]">{timeAgo}</span>
-                          </div>
-                          <p className="text-[10px] text-[var(--text-3)] truncate">{run.output_summary}</p>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-                {agentRuns.length > 8 && (
-                  <a href="/agentes" className="block text-center text-xs text-[var(--accent)] hover:text-[var(--accent-bright)] py-1 mt-2">
-                    Ver los {agentRuns.length} agentes →
-                  </a>
-                )}
-                </>
-              )
-            })()
-          )}
-        </div>
-      )}
 
       {/* Week comparison banner — like el POS legado */}
       {show('week_comparison') && vsLastWeek !== null && vsLastWeekAmount !== null && sameDayLastWeek && (

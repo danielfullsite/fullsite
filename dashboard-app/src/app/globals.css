@@ -621,7 +621,7 @@ body {
  * `iconStyles` de KPICard.tsx. Ambas habrían pasado tsc, lint y la suite
  * completa sin pintar un solo pixel. */
 [data-ds="v3"] {
-  --font-display: "Schibsted Grotesk", var(--font-sans);
+  --font-display: var(--font-schibsted), "Schibsted Grotesk", var(--font-sans);
 
   /* Tarjetas planas. Se apagan los dos tokens de sombra que consumen las
    * tarjetas — verificado: sólo los usan tarjetas y el tooltip de las gráficas,
