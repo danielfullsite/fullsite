@@ -37,6 +37,15 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder
 
+      # Pruebas de componente (jsdom). Van en su propio config para no
+      # ralentizar la suite de Node, y en su propio paso para que una prueba
+      # que nunca corre no pueda pasar por verde.
+      - name: Component tests
+        run: npm run test:ui
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder
+
       - name: Build
         run: npm run build
         env:
