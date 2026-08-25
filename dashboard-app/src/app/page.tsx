@@ -532,9 +532,18 @@ export default function DashboardPage() {
           : null
         if (fecha !== mxToday && selectedDayIdx === 0) {
           return (
-            <div className="mb-4 flex items-center gap-2 rounded-xl border bg-[var(--warn-soft)] px-3.5 py-2.5 text-[12.5px] text-[var(--warn-ink)]" style={{ borderColor: 'color-mix(in srgb, var(--warn) 40%, transparent)' }}>
-              <TriangleAlert size={15} className="shrink-0" />
-              <span><span className="font-bold">Sin sincronización de hoy todavía.</span> Mostrando el último día con datos: {formatDate(fecha)}{syncTime ? ` (actualizado ${syncTime})` : ''}. <span className="ml-1.5 inline-flex items-center text-[11px] font-semibold leading-none px-2.5 py-1 rounded-full border border-[var(--line)] bg-[var(--surface-2)] text-[var(--text-2)] align-middle">ÚLTIMO CIERRE</span></span>
+            // DS v3: el aviso pasa de banner a línea. Dice lo mismo —los datos NO
+            // son de hoy— pero deja de ocupar el ancho completo encima del
+            // contenido. No se elimina a propósito: sin él, el dashboard mostraría
+            // números de hace semanas como si fueran de hoy, y alguien podría
+            // decidir sobre ellos sin enterarse.
+            <div className="mb-4 flex items-center gap-1.5 text-[12px] text-[var(--warn-ink)]">
+              <TriangleAlert size={13} className="shrink-0" />
+              <span>
+                Datos del <span className="font-semibold">{formatDate(fecha)}</span>
+                {syncTime ? ` · último cierre ${syncTime}` : ' · último cierre'}
+                <span className="text-[var(--text-4)]"> — hoy aún no sincroniza</span>
+              </span>
             </div>
           )
         }
