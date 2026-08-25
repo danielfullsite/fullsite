@@ -88,6 +88,20 @@ describe('EstadoOperacion', () => {
     expect(screen.queryByText(/0 días/)).toBeNull()
   })
 
+  it('no imprime dos puntos tras la hora — es-MX ya cierra con punto', () => {
+    // Salía "a las 2:28 p.m.." en producción.
+    render(
+      <EstadoOperacion
+        turno={null}
+        ultimaFecha="2026-07-24"
+        hoy={hoy}
+        syncTime="2:28 p.m."
+      />
+    )
+    expect(screen.getByText(/2:28 p\.m\. Todas las cifras/)).toBeTruthy()
+    expect(screen.queryByText(/p\.m\.\./)).toBeNull()
+  })
+
   it('una hora inválida no imprime "Invalid Date"', () => {
     render(
       <EstadoOperacion
@@ -297,7 +311,9 @@ describe('RitmoSemana — la decisión sin un clic', () => {
     // (la comparación contra los otros días). No es el defecto de repetir el
     // mismo aviso en tres estilos distintos — son dos trabajos distintos.
     expect(screen.getAllByText(/\$6,021/)).toHaveLength(2)
-    expect(screen.getByText(/4 martess? de historia/)).toBeTruthy()
+    // "martes" es invariable en plural: cuatro martes, no cuatro "martess"
+    expect(screen.getByText(/4 martes de historia/)).toBeTruthy()
+    expect(screen.queryByText(/martess/)).toBeNull()
     expect(screen.getByText(/de \$4,945 a \$8,275/)).toBeTruthy()
   })
 
@@ -311,7 +327,8 @@ describe('RitmoSemana — la decisión sin un clic', () => {
     const flaco = RITMO.map(f => (f.dow === 2 ? { ...f, n: 1 } : f))
     render(<RitmoSemana filas={flaco} hoyDow={2} />)
     expect(screen.queryByText(/Un martes normal son/)).toBeNull()
-    expect(screen.getByText(/Todavía no hay 2 martess/)).toBeTruthy()
+    expect(screen.getByText(/Todavía no hay 2 martes/)).toBeTruthy()
+    expect(screen.queryByText(/martess/)).toBeNull()
   })
 
   it('sin historia suficiente no renderiza nada', () => {
