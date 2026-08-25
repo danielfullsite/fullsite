@@ -1079,10 +1079,14 @@ export default function DashboardPage() {
             </div>
             <div>
               {[
-                { label: 'Venta por persona', value: formatCurrency((latestDay.ventas_dia || 0) / Math.max(latestDay.personas_restaurant || 1, 1)) },
-                { label: 'Venta por mesa', value: formatCurrency((latestDay.ventas_dia || 0) / Math.max(latestDay.mesas_atendidas || 1, 1)) },
-                { label: 'Propina promedio', value: formatCurrency((latestDay.propinas_total || 0) / Math.max(latestDay.mesas_atendidas || 1, 1)) },
-                { label: 'Descuento %', value: `${((latestDay.descuentos || 0) / Math.max(latestDay.ventas_brutas || 1, 1) * 100).toFixed(1)}%` },
+                { label: 'Venta por persona', value: latestDay.personas_restaurant ? formatCurrency((latestDay.ventas_dia || 0) / latestDay.personas_restaurant) : '—' },
+                // `mesas_atendidas` viene NULL en TODOS los días de AMALAY, y el
+                // `|| 1` de antes lo convertía en 1: la tarjeta mostraba la venta del
+                // día ENTERO como si fuera lo de una sola mesa ($39,505). Sin dato se
+                // dice que no hay dato; un guion es honesto, un número inventado no.
+                { label: 'Venta por mesa', value: latestDay.mesas_atendidas ? formatCurrency((latestDay.ventas_dia || 0) / latestDay.mesas_atendidas) : '—' },
+                { label: 'Propina promedio', value: latestDay.mesas_atendidas ? formatCurrency((latestDay.propinas_total || 0) / latestDay.mesas_atendidas) : '—' },
+                { label: 'Descuento %', value: latestDay.ventas_brutas ? `${((latestDay.descuentos || 0) / latestDay.ventas_brutas * 100).toFixed(1)}%` : '—' },
               ].map(m => (
                 <div key={m.label} className="flex items-center justify-between py-[9px] border-b border-[var(--line-soft)] last:border-b-0 text-[13.5px]">
                   <span className="text-[var(--text-2)]">{m.label}</span>
