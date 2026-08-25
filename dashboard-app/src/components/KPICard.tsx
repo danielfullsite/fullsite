@@ -16,14 +16,49 @@ interface KPICardProps {
   weekChange?: number | null
 }
 
-const iconStyles: Record<string, { bg: string; icon: string; borderColor: string; spark: string }> = {
-  'kpi-accent-blue': { bg: 'bg-blue-500/15', icon: 'text-blue-500', borderColor: 'border-blue-500/30', spark: '#3b82f6' },
-  'kpi-accent-green': { bg: 'bg-emerald-500/15', icon: 'text-emerald-500', borderColor: 'border-emerald-500/30', spark: '#10b981' },
-  'kpi-accent-amber': { bg: 'bg-amber-500/15', icon: 'text-amber-500', borderColor: 'border-amber-500/30', spark: '#f59e0b' },
-  'kpi-accent-purple': { bg: 'bg-purple-500/15', icon: 'text-purple-500', borderColor: 'border-purple-500/30', spark: '#a855f7' },
-  'kpi-accent-pink': { bg: 'bg-pink-500/15', icon: 'text-pink-500', borderColor: 'border-pink-500/30', spark: '#ec4899' },
-  'kpi-accent-red': { bg: 'bg-[var(--crit-soft)]', icon: 'text-[var(--crit-ink)]', borderColor: 'border-[color-mix(in_srgb,var(--crit)_30%,transparent)]', spark: '#ef4444' },
-  'kpi-accent-cyan': { bg: 'bg-cyan-500/15', icon: 'text-cyan-500', borderColor: 'border-cyan-500/30', spark: '#06b6d4' },
+/**
+ * DS v3. Antes había siete acentos saturados —azul, verde, ámbar, morado, rosa,
+ * rojo, cian— pintando el chip del icono. Con seis tarjetas en pantalla eso es un
+ * arcoíris que compite con el número, que es lo único que la persona vino a leer.
+ *
+ * Ahora el color se gana: el chip es neutro y sólo `red` conserva tinte, porque
+ * ahí el color SIGNIFICA algo. El resto del color de la tarjeta lo carga el delta
+ * (sube/baja), que es semántico.
+ *
+ * Los siete nombres se conservan — 35 páginas los pasan como prop y ninguna se
+ * toca. Cambia el valor, no el contrato.
+ */
+const iconStyles: Record<string, { bg: string; icon: string; borderColor: string; spark: string | undefined }> = {
+  'kpi-accent-blue': { bg: 'bg-[var(--surface-2)]', icon: 'text-[var(--text-3)]', borderColor: 'border-[var(--line)]', spark: undefined },
+  'kpi-accent-green': { bg: 'bg-[var(--surface-2)]', icon: 'text-[var(--text-3)]', borderColor: 'border-[var(--line)]', spark: undefined },
+  'kpi-accent-amber': { bg: 'bg-[var(--surface-2)]', icon: 'text-[var(--text-3)]', borderColor: 'border-[var(--line)]', spark: undefined },
+  'kpi-accent-purple': { bg: 'bg-[var(--surface-2)]', icon: 'text-[var(--text-3)]', borderColor: 'border-[var(--line)]', spark: undefined },
+  'kpi-accent-pink': { bg: 'bg-[var(--surface-2)]', icon: 'text-[var(--text-3)]', borderColor: 'border-[var(--line)]', spark: undefined },
+  // El único que conserva color: aquí el rojo ES el mensaje.
+  'kpi-accent-red': { bg: 'bg-[var(--crit-soft)]', icon: 'text-[var(--crit-ink)]', borderColor: 'border-[color-mix(in_srgb,var(--crit)_30%,transparent)]', spark: 'var(--crit)' },
+  'kpi-accent-cyan': { bg: 'bg-[var(--surface-2)]', icon: 'text-[var(--text-3)]', borderColor: 'border-[var(--line)]', spark: undefined },
+}
+
+/**
+ * Cifra al estilo Mercury: el entero manda y los centavos se elevan a poco más de
+ * la mitad del tamaño.
+ *
+ * Se leen los pesos de un vistazo y el centavo sigue ahí para cuadrar el corte —
+ * que es justo lo que un dueño de restaurante necesita: ver $48,250 sin que el
+ * `.75` le robe la mitad del ancho.
+ *
+ * Sólo parte valores que terminan en punto decimal con exactamente 2 dígitos.
+ * "118", "27.6%", "7 / 16" y "$1.2M" pasan intactos.
+ */
+function Cifra({ value }: { value: string }) {
+  const m = /^(.*?)(\.\d{2})$/.exec(value)
+  if (!m) return <>{value}</>
+  return (
+    <>
+      {m[1]}
+      <span className="text-[0.58em] font-bold align-[0.42em] ml-[0.5px]">{m[2]}</span>
+    </>
+  )
 }
 
 function Sparkline({ data, color }: { data: number[]; color?: string }) {
@@ -62,14 +97,9 @@ export default function KPICard({
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, delay: index * 0.06, ease: [0.22, 1, 0.36, 1] }}
-      whileHover={{ scale: 1.02, y: -2 }}
-      className={`relative overflow-hidden rounded-[14px] border ${style.borderColor} sm:border-[var(--line)] p-3 sm:p-4 transition-shadow`}
+      className={`relative overflow-hidden rounded-[12px] border ${style.borderColor} sm:border-[var(--line)] p-3.5 sm:p-[18px] transition-colors hover:border-[var(--accent-line)]`}
       style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-soft)' }}
     >
-      {/* Bisel superior coloreado en mobile */}
-      <div aria-hidden className="absolute inset-x-0 top-0 h-[2px] sm:h-px pointer-events-none sm:hidden"
-        style={{ background: 'var(--bento-bevel)' }} />
-
       {/* ── MOBILE LAYOUT ── */}
       <div className="sm:hidden">
         <div className="flex items-start gap-2.5">
@@ -80,7 +110,7 @@ export default function KPICard({
           )}
           <div className="flex-1 min-w-0">
             <p className="text-[9px] uppercase tracking-[0.12em] font-mono text-[var(--text-3)] mb-0.5">{label}</p>
-            <p className="text-[22px] font-black tracking-tight text-[var(--text-1)] leading-tight tnum">{value}</p>
+            <p data-testid="kpi-valor" className="text-[23px] font-extrabold tracking-[-0.02em] text-[var(--text-1)] leading-tight tnum"><Cifra value={value} /></p>
           </div>
         </div>
         {/* Single compact delta */}
@@ -125,9 +155,10 @@ export default function KPICard({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.3, delay: index * 0.06 + 0.15 }}
-          className="text-[26px] font-extrabold tracking-[-0.02em] text-[var(--text-1)] tnum mt-[9px] leading-none"
+          data-testid="kpi-valor"
+          className="text-[31px] font-extrabold tracking-[-0.025em] text-[var(--text-1)] tnum mt-[10px] leading-none"
         >
-          {value}
+          <Cifra value={value} />
         </motion.p>
         {delta && (
           <motion.div
