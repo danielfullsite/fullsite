@@ -17,9 +17,11 @@ type ReplayTransport = 'APP_API' | 'SUPABASE_REST'
 // TRANSIENT_RETRYABLE: network failure, 5xx, fetch error — will retry
 // STALE_WRITE_CONFLICT: revision mismatch — TERMINAL, no auto-retry, no overwrite
 // TERMINAL_NON_RETRYABLE: malformed payload, validation rejection — cannot succeed unchanged
-// AUTH_EXPIRED: 401/403 — shift token venció (TTL 8h, sin refresh). NO es transient:
+// AUTH_EXPIRED: 401 SOLAMENTE — shift token venció (TTL 8h, sin refresh). NO es transient:
 //   reintentar en silencio no sirve. Detiene el drenado, PRESERVA la cola y pide
 //   re-PIN (emitAuthRequired). Tras re-login, la cola drena sola. Nunca se pierde nada.
+//   Un 403 NO entra aquí: 403 = autenticado pero sin permiso, y re-PIN con el mismo staff
+//   no lo arregla → se clasifica TERMINAL_NON_RETRYABLE y sólo se aísla ese item.
 type SyncErrorClass = 'TRANSIENT_RETRYABLE' | 'STALE_WRITE_CONFLICT' | 'TERMINAL_NON_RETRYABLE' | 'AUTH_EXPIRED'
 
 interface SyncQueueItem {
@@ -612,10 +614,18 @@ async function replayViaAppApi(item: SyncQueueItem, accessToken: string): Promis
   })
 
   if (!res.ok) {
-    // Sesión expirada: el shift token venció (8h). Reintentar en silencio no sirve
-    // — hay que re-PIN. Se clasifica aparte para detener el drenado y avisar.
-    if (res.status === 401 || res.status === 403) {
-      return { ok: false, errorClass: 'AUTH_EXPIRED', detail: `HTTP ${res.status} — sesión expirada` }
+    // 401 = NO autenticado: el shift token venció (8h, sin refresh). Re-PIN LO ARREGLA.
+    // Se clasifica aparte para detener el drenado, preservar la cola y avisar.
+    if (res.status === 401) {
+      return { ok: false, errorClass: 'AUTH_EXPIRED', detail: 'HTTP 401 — sesión expirada' }
+    }
+    // 403 = autenticado PERO no permitido. Re-PIN con el MISMO staff NUNCA lo arregla.
+    // Aquí el único 403 alcanzable es MANAGER_APPROVAL_REQUIRED de save-order (rebase de
+    // conflicto sin token de gerente firmado online, o con el token ya vencido). Tratarlo
+    // como AUTH_EXPIRED dejaba el item colgado sin error_class y abortaba el drenado.
+    if (res.status === 403) {
+      const errText = await res.text().catch(() => '')
+      return { ok: false, errorClass: 'TERMINAL_NON_RETRYABLE', detail: `HTTP 403${errText ? `: ${errText}` : ''}` }
     }
     if (res.status >= 500) {
       return { ok: false, errorClass: 'TRANSIENT_RETRYABLE', detail: `HTTP ${res.status}` }
@@ -860,11 +870,31 @@ async function _syncAllInner(): Promise<{ synced: number; failed: number }> {
           console.warn(`[offline-sync] 409 on ${item.table} — already exists, marking synced`)
           await markSynced(item.id)
           synced++
-        } else if (res.status === 401 || res.status === 403) {
-          // Sesión expirada (igual que APP_API): detener, preservar, pedir re-PIN.
+        } else if (res.status === 401) {
+          // 401 = sesión expirada (igual que APP_API): detener, preservar, pedir re-PIN.
           console.warn('[offline-sync] Sesión expirada en replay REST — se requiere re-PIN. Cola preservada.')
           emitAuthRequired()
           break
+        } else if (res.status === 403) {
+          // 403 = autenticado PERO no permitido — regla de negocio, NO sesión expirada.
+          // Los 403 alcanzables por este camino vienen del proxy /api/pos/db:
+          //   • 'manager required'   → pos_cash_movements / pos_cierres escritos por un
+          //     staff no-gerente. El shift token lleva el rol del staff LOGUEADO, no el
+          //     del gerente que tecleó su PIN para autorizar, así que una caja logueada
+          //     como cajero lo dispara en CADA retiro/depósito y en CADA corte nocturno.
+          //   • 'table not allowed'  → tabla fuera del allowlist del proxy.
+          // Antes esto caía en la rama de arriba y hacía dos daños graves:
+          //   1. `break` abortaba el drenado COMPLETO — todas las órdenes y cobros
+          //      encolados DESPUÉS de ese item nunca subían (dinero perdido en la nube).
+          //   2. `emitAuthRequired` deslogueaba al operador; al re-teclear el PIN se
+          //      dispara syncAll de nuevo → mismo 403 → deslogueo otra vez, en bucle
+          //      cada ~20s (el interval de autosync). La caja no podía cobrar.
+          // Ahora se AÍSLA el item: se marca conflicto (el payload se preserva intacto)
+          // y el drenado CONTINÚA con el resto de la cola.
+          const errorBody = await res.text().catch(() => '')
+          console.error(`[offline-sync] TERMINAL 403 en ${item.table} — regla de negocio, no sesión: ${errorBody}`)
+          await markConflict(item.id, 'TERMINAL_NON_RETRYABLE', `HTTP 403${errorBody ? `: ${errorBody}` : ''}`)
+          failed++
         } else {
           const errorBody = await res.text().catch(() => '')
           await incrementRetry(item.id, `HTTP ${res.status}${errorBody ? `: ${errorBody}` : ''}`)
