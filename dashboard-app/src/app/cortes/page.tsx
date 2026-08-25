@@ -7,7 +7,7 @@ import PageHeader from '@/components/PageHeader'
 import { Table, type ColumnDef } from '@/components/ui/Table'
 import PeriodPicker, { type DateRange } from '@/components/PeriodPicker'
 import { getRecentDays, getWansoftData, getDashboardFromPosOrders } from '@/lib/data'
-import { formatCurrency, formatNumber, formatPercent, percentChange } from '@/lib/format'
+import { formatCurrency, formatNumber, formatPercent, percentChange, fechaCorta} from '@/lib/format'
 import type { WansoftDaily } from '@/lib/types'
 
 function extractPayment(d: WansoftDaily): { efectivo: number; tarjeta: number; transferencia: number } {
@@ -213,7 +213,7 @@ export default function CortesPage() {
     <>
       <PageHeader
         title="Cortes de Caja"
-        subtitle={range ? `Cortes ${range.from} → ${range.to}` : `Histórico de cortes diarios - últimos ${period} días`}
+        subtitle={range ? `Cortes del ${fechaCorta(range.from)} al ${fechaCorta(range.to)}` : `Histórico de cortes diarios · últimos ${period} días`}
         exportData={periodData.map(d => ({ fecha: d.fecha, ventas: d.ventas_dia, tickets: d.tickets_count, efectivo: d.efectivo, tarjeta: d.tarjeta, propinas: d.propinas_total }))}
         exportName="cortes"
       />

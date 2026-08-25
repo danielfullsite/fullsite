@@ -176,7 +176,7 @@ export default function AdminTamañosPage() {
       </div>
 
       {toast && (
-        <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-xl shadow-2xl text-sm font-medium ${toast.type === 'ok' ? 'bg-[var(--surface-2)] text-white' : 'bg-red-600 text-white'}`}>
+        <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-xl shadow-2xl text-sm font-medium ${toast.type === 'ok' ? 'bg-[var(--surface-2)] text-[var(--text-1)] border border-[var(--line)]' : 'bg-red-600 text-white'}`}>
           {toast.msg}
         </div>
       )}

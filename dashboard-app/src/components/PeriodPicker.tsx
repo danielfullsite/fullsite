@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { CalendarRange, Check } from 'lucide-react'
+import { LAYER } from '@/components/ui/layers'
 
 // Selector de periodo reusable: presets (7/14/30 días) + rango de fechas custom.
 // Los módulos de reporte cargan una ventana amplia (p.ej. 90 días) y filtran por
@@ -26,15 +27,28 @@ export default function PeriodPicker({ period, onPeriod, range, onRange, presets
 
   useEffect(() => {
     function onDoc(e: MouseEvent) { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    // Con el teclado también se sale. Antes sólo cerraba con clic fuera, así que
+    // quien navega con teclado quedaba atrapado en el panel.
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setOpen(false) }
     document.addEventListener('mousedown', onDoc)
-    return () => document.removeEventListener('mousedown', onDoc)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDoc)
+      document.removeEventListener('keydown', onKey)
+    }
   }, [])
 
   function apply() {
     if (from && to && from <= to) { onRange({ from, to }); setOpen(false) }
   }
 
-  const label = range ? `${range.from} → ${range.to}` : null
+  // El botón mostraba el rango en ISO crudo: "2026-07-26 → 2026-08-25". Aquí se
+  // lee como lo escribiría una persona.
+  const corto = (iso: string) => {
+    const d = new Date(`${iso}T12:00:00`)
+    return isNaN(d.getTime()) ? iso : d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })
+  }
+  const label = range ? `${corto(range.from)} – ${corto(range.to)}` : null
 
   return (
     <div className="inline-flex items-center gap-2" ref={ref}>
@@ -59,11 +73,27 @@ export default function PeriodPicker({ period, onPeriod, range, onRange, presets
             range ? 'border-[var(--accent)] text-[var(--accent-ink)] bg-[var(--accent-soft)]' : 'border-[var(--line)] text-[var(--text-2)] bg-[var(--surface-2)] hover:text-[var(--text-1)]'
           }`}
           title="Rango de fechas personalizado"
+          aria-haspopup="dialog"
+          aria-expanded={open}
         >
           <CalendarRange size={15} /> {label || 'Rango'}
         </button>
         {open && (
-          <div className="absolute right-0 mt-1.5 z-50 rounded-xl border border-[var(--line)] bg-[var(--surface)] shadow-xl p-3 w-[280px]">
+          // El panel iba en `bg-[var(--surface)]`, que en tema claro es BLANCO —
+          // el mismo blanco de las tarjetas que tapa. Al abrirse encima de una,
+          // las dos se fundían en una sola figura y parecía que la tarjeta se
+          // había roto. Ahora va sobre `--raised`, con un anillo de acento y una
+          // sombra que sobrevive al aplanado del piloto (que apaga --shadow-*,
+          // pero no las sombras propias de Tailwind).
+          //
+          // `max-w` con `calc` para que en pantallas angostas no se salga: con
+          // `w-[280px]` fijo y `right-0`, en un teléfono el panel se cortaba.
+          <div
+            className="absolute right-0 mt-1.5 w-[280px] max-w-[calc(100vw-2rem)] rounded-xl border border-[var(--accent-line)] p-3 shadow-2xl ring-1 ring-black/5"
+            style={{ zIndex: LAYER.popover, background: 'var(--raised)' }}
+            role="dialog"
+            aria-label="Rango de fechas personalizado"
+          >
             <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-4)] mb-2">Fechas personalizadas</p>
             <div className="flex items-center gap-2 mb-3">
               <label className="flex-1 text-[11px] text-[var(--text-3)]">Desde

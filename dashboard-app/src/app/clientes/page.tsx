@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Plus, Search, Pencil, Save, Phone, Mail, Calendar, DollarSign, User, X } from 'lucide-react'
 import { useClientId } from '@/hooks/useClientId'
+import { LAYER } from '@/components/ui/layers'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -261,7 +262,7 @@ export default function ClientesPage() {
       )}
 
       {toast && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-[var(--surface-2)] text-white px-6 py-3 rounded-xl shadow-2xl text-sm font-medium">
+        <div style={{ zIndex: LAYER.toast }} className="fixed top-6 left-1/2 -translate-x-1/2 bg-[var(--surface-2)] text-[var(--text-1)] border border-[var(--line)] px-6 py-3 rounded-xl shadow-2xl text-sm font-medium">
           {toast}
         </div>
       )}
