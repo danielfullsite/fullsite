@@ -5,12 +5,14 @@ import Link from 'next/link'
 import { Sparkles, ArrowRight, Bot } from 'lucide-react'
 import { getDeepTable } from '@/lib/data'
 import { agentName } from '@/lib/agent-names'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface Det {
   agent_id: string
   summary: string
   priority: string
   fecha: string
+  client_id?: string
 }
 
 function kind(p: string): 'crit' | 'warn' {
@@ -22,11 +24,36 @@ const K = {
   warn: { label: 'Ojo', color: 'var(--warn)', soft: 'var(--warn-soft)', ink: 'var(--warn-ink)' },
 }
 
+/**
+ * P0 — fuga entre restaurantes.
+ *
+ * Este componente consultaba con `useEffect(..., [])`: una sola vez al montar y
+ * nunca mas. Al entrar a otro restaurante desde el panel de plataforma, el
+ * componente NO se desmonta, asi que las alertas del restaurante anterior se
+ * quedaban en pantalla debajo del banner que ya decia "Estas viendo coffee-shop".
+ *
+ * Observado en produccion: el dashboard de coffee-shop mostrando
+ * "ALERTAS: 225 sin stock", "19 issues: 0 critical, 11 high" y "1 issues", que
+ * son filas de agent_results con client_id='amalay'. coffee-shop tiene CERO
+ * filas propias.
+ *
+ * getDeepTable() ya filtraba bien por tenant — lee getActiveClientSlug() en el
+ * momento de la consulta. El agujero no estaba en la consulta sino en CUANDO se
+ * hacia: una sola vez, con el tenant viejo.
+ *
+ * Dos candados:
+ *   1. el estado guarda PARA QUE tenant se resolvio, asi que mientras la
+ *      respuesta del nuevo no llega, la lista esta vacia — falla cerrado, nunca
+ *      enseña lo del anterior.
+ *   2. se descarta toda fila cuyo client_id no sea el activo, por si alguna vez
+ *      una consulta se salta el filtro.
+ */
 export default function AgentBriefing() {
-  const [dets, setDets] = useState<Det[]>([])
-  const [ready, setReady] = useState(false)
+  const { clientId } = useAuth()
+  const [resuelto, setResuelto] = useState<{ cid: string; dets: Det[] } | null>(null)
 
   useEffect(() => {
+    if (!clientId) return
     let alive = true
     getDeepTable('agent_results', 60)
       .then(rows => {
@@ -35,19 +62,24 @@ export default function AgentBriefing() {
         const list: Det[] = []
         for (const r of rows as unknown as Det[]) {
           if (r.priority !== 'critical' && r.priority !== 'warning') continue
+          // Candado 2: jamas pintar la fila de otro restaurante.
+          if (r.client_id && r.client_id !== clientId) continue
           if (seen.has(r.agent_id)) continue
           seen.add(r.agent_id)
           list.push(r)
         }
         list.sort((a, b) => (a.priority === 'critical' ? 0 : 1) - (b.priority === 'critical' ? 0 : 1))
-        setDets(list.slice(0, 3))
-        setReady(true)
+        setResuelto({ cid: clientId, dets: list.slice(0, 3) })
       })
-      .catch(() => setReady(true))
+      .catch(() => setResuelto({ cid: clientId, dets: [] }))
     return () => { alive = false }
-  }, [])
+  }, [clientId])
 
-  if (!ready || dets.length === 0) return null
+  // Candado 1: el valor es derivado. Si el tenant cambio y su respuesta no ha
+  // llegado, esto es [] y el bloque no se pinta.
+  const dets = resuelto && resuelto.cid === clientId ? resuelto.dets : []
+
+  if (dets.length === 0) return null
 
   return (
     <div className="rounded-2xl border p-4 sm:p-5 mb-5" style={{ borderColor: 'var(--accent-line)', background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' }}>
