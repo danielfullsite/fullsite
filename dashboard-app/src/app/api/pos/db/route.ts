@@ -15,39 +15,20 @@
  * directo con su JWT. Solo las terminales POS (shiftToken) se rutean aquí.
  */
 import { NextRequest, NextResponse } from 'next/server'
+import { ALLOW, MANAGER_ONLY_WRITE, NO_CID, isManager, redactResponse, tableOf } from '@/lib/pos-db-policy'
 import { withPOSAuth } from '@/lib/api-auth'
 
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SB_SERVICE = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 // Tablas que el POS puede LEER/ESCRIBIR vía proxy. Todo lo demás se rechaza.
-const ALLOW = new Set<string>([
-  'pos_orders', 'pos_turnos', 'pos_cierres', 'pos_cash_movements', 'pos_attendance',
-  'pos_staff_shifts', 'pos_staff_audit', 'pos_audit_log', 'pos_sessions', 'pos_print_jobs',
-  'pos_customers', 'pos_customer_notes', 'pos_customer_visits', 'pos_facturas', 'pos_cfdi_requests',
-  'pos_inventory', 'pos_inventory_movements', 'pos_market_stock', 'pos_market_movements',
-  'pos_mesas', 'pos_menu_categories', 'pos_menu_items', 'pos_modifiers', 'pos_modifier_groups',
-  'pos_item_modifier_groups', 'pos_category_modifiers', 'pos_combos', 'pos_promos', 'pos_promotions',
-  'pos_payment_methods', 'pos_staff', 'pos_recipes', 'pos_recipe_details', 'pos_ingredients',
-  'pos_gastos', 'reservaciones', 'amalay_reservaciones',
-  // Delivery + retail + config leídas por el POS/dashboard
-  'delivery_orders', 'delivery_platform_payments', 'pos_delivery_zones', 'pos_gift_cards',
-  'pos_price_types', 'pos_retail_groups', 'pos_retail_items', 'pos_retail_promotions',
-  'pos_save_operations', 'pos_schedules', 'pos_sizes', 'pos_bridge_logs',
-])
 
 // Tablas SIN columna client_id → no se inyecta scope (globales/child de bajo riesgo).
-const NO_CID = new Set<string>(['pos_purchase_order_items', 'pos_sub_recipe_ingredients'])
 
 // Escrituras sensibles: requieren gerente/admin.
-const MANAGER_ONLY_TABLES = new Set<string>(['pos_cash_movements', 'pos_cierres'])
 
-function isManager(role: string) { return role === 'admin' || role === 'gerente' || role === 'dueño' }
 
 // Extrae el nombre de tabla del path PostgREST: "pos_orders?mesa=eq.5" → "pos_orders"
-function tableOf(path: string): string {
-  return path.split('?')[0].split('/')[0].trim()
-}
 
 async function handle(request: NextRequest, method: string) {
   const auth = await withPOSAuth(request)
@@ -61,7 +42,7 @@ async function handle(request: NextRequest, method: string) {
   if (!ALLOW.has(table)) return NextResponse.json({ error: `table not allowed: ${table}` }, { status: 403 })
 
   const isWrite = method !== 'GET'
-  if (isWrite && MANAGER_ONLY_TABLES.has(table) && !isManager(auth.role)) {
+  if (isWrite && MANAGER_ONLY_WRITE.has(table) && !isManager(auth.role)) {
     return NextResponse.json({ error: 'manager required' }, { status: 403 })
   }
 
@@ -97,9 +78,12 @@ async function handle(request: NextRequest, method: string) {
   }
 
   const res = await fetch(`${SB_URL}/rest/v1/${target}`, { method, headers, body, cache: 'no-store' })
-  const text = await res.text()
+  const rawOut = await res.text()
+  const ct = res.headers.get('content-type')
+  // El PIN nunca sale por el proxy, pida lo que pida el `select`.
+  const text = redactResponse(table, rawOut, ct)
   const out = new NextResponse(text, { status: res.status })
-  const ct = res.headers.get('content-type'); if (ct) out.headers.set('content-type', ct)
+  if (ct) out.headers.set('content-type', ct)
   const cr = res.headers.get('content-range'); if (cr) out.headers.set('content-range', cr)
   return out
 }

@@ -17,6 +17,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { withPOSAuth, unauthorized } from '@/lib/api-auth'
+import { ALLOW, MANAGER_ONLY_WRITE, isManager, redactResponse, tableOf } from '@/lib/pos-db-policy'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -36,6 +37,19 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ path: string[] 
   const resource = rel.slice('rest/v1/'.length)
   const isRpc = resource.startsWith('rpc/')
   if (!isRpc && !resource.startsWith('pos_')) return forbidden('solo tablas pos_*')
+
+  // ── Autorización por tabla ────────────────────────────────────────────
+  // Hasta hoy aquí no había nada: bastaba que la tabla empezara con `pos_`.
+  // Como este proxy usa service_role (se salta RLS), un shift token de mesero
+  // podía leer el PIN del gerente y reescribírselo. El aislamiento por tenant
+  // sí existía; el de rol no.
+  const table = isRpc ? '' : tableOf(resource)
+  if (!isRpc) {
+    if (!ALLOW.has(table)) return forbidden(`tabla no permitida: ${table}`)
+    if (req.method !== 'GET' && req.method !== 'HEAD' && MANAGER_ONLY_WRITE.has(table) && !isManager(auth.role)) {
+      return forbidden('se requiere rol de gerente')
+    }
+  }
 
   // Query params del request original + forzar client_id salvo en inserts/rpc.
   const params = new URLSearchParams(req.nextUrl.search)
@@ -75,9 +89,12 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ path: string[] 
 
   try {
     const r = await fetch(target, { method: req.method, headers: fwd, body })
-    const text = await r.text()
+    const raw2 = await r.text()
+    const ct = r.headers.get('content-type')
+    // El PIN nunca sale por aquí, sin importar qué pidió el `select`.
+    const text = isRpc ? raw2 : redactResponse(table, raw2, ct)
     const res = new NextResponse(text, { status: r.status })
-    const ct = r.headers.get('content-type'); if (ct) res.headers.set('content-type', ct)
+    if (ct) res.headers.set('content-type', ct)
     const cr = r.headers.get('content-range'); if (cr) res.headers.set('content-range', cr)
     return res
   } catch (e) {
