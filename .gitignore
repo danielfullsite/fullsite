@@ -56,3 +56,8 @@ print-bridge/*.dll
 
 # Graphify regenerable cache
 graphify-out/cache/ast/
+
+# Respaldos locales de archivos persistentes (CLAUDE.md, settings.json…) creados antes
+# de parchearlos. Son recuperación local, no historia del repo — y pueden contener
+# estados intermedios. No se versionan ni se borran sin confirmar con Daniel.
+.claude/backups/
