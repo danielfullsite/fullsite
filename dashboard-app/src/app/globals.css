@@ -679,3 +679,46 @@ body {
 [data-ds="v3"] .p-\[18px\] {
   padding: 24px;
 }
+
+/* ── 7. Movimiento del centro de agentes ───────────────────────────────────
+ * Los @keyframes son globales por definición del lenguaje: no se pueden meter
+ * dentro de [data-ds="v3"]. Sólo los usan los componentes del piloto, así que
+ * fuera de él no cuestan nada más que su peso en el archivo.
+ *
+ * Todas las entradas usan la misma curva (0.22, 1, 0.36, 1): arranca rápido y
+ * frena suave, que es como se mueven las cosas con peso. Una curva lineal se
+ * siente mecánica y una con rebote se siente de juguete; en una pantalla donde
+ * se toman decisiones de dinero, ninguna de las dos ayuda. */
+@keyframes panel-entra {
+  from { transform: translateX(24px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+@keyframes fila-entra {
+  from { transform: translateY(6px); opacity: 0; }
+  to   { transform: translateY(0);   opacity: 1; }
+}
+@keyframes aviso-entra {
+  from { transform: translateY(-14px) scale(0.97); opacity: 0; }
+  to   { transform: translateY(0)     scale(1);    opacity: 1; }
+}
+@keyframes aviso-sale {
+  from { transform: translateY(0)     scale(1);    opacity: 1; }
+  to   { transform: translateY(-10px) scale(0.98); opacity: 0; }
+}
+
+/* Se enganchan por CLASE, no con [style*="..."]. Un selector por subcadena ya
+ * costó un incidente esta semana —[class*="bg-purple-5"] agarró un tinte al 10%
+ * y pintó una barra sólida— y la regla que salió de ahí aplica también aquí. */
+.ag-entra-panel { animation: panel-entra 320ms cubic-bezier(0.22, 1, 0.36, 1); }
+.ag-entra-fila  { animation: fila-entra  420ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.ag-entra-aviso { animation: aviso-entra 420ms cubic-bezier(0.22, 1, 0.36, 1); }
+.ag-sale-aviso  { animation: aviso-sale  240ms cubic-bezier(0.4, 0, 1, 1) forwards; }
+
+/* Quien pidió menos movimiento recibe el mismo contenido, sin el viaje. */
+@media (prefers-reduced-motion: reduce) {
+  .ag-entra-panel,
+  .ag-entra-fila,
+  .ag-entra-aviso {
+    animation-duration: 1ms;
+  }
+}
