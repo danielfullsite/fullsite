@@ -34,6 +34,8 @@ interface TipEntry {
 
 interface Employee {
   nombre: string
+  /** false cuando las horas se ESTIMARON (8 h por día) en vez de medirse. */
+  horasMedidas: boolean
   role: string
   hourlyRate: number
   daysWorked: number
@@ -251,7 +253,13 @@ export default function NominaPage() {
       const mesero = meseros.find(m => m.nombre === nombre)
       const hours = employeeHoursMap[nombre]
       const daysWorked = hours?.daysPresent?.size || mesero?.dias || 0
-      const hoursTotal = hours?.totalHours || (daysWorked * 8) // Estimate 8hr if no hours data
+      // Sin horas registradas se ESTIMA a 8h por día trabajado. La estimación se
+      // conserva porque sirve para planear, pero se marca: esta pantalla mostraba
+      // "Total Nómina $4,197" para una semana con CERO turnos en la base, sin
+      // ningún indicio de que fuera un cálculo hipotético. Alguien puede pagar
+      // contra ese número.
+      const horasMedidas = !!hours?.totalHours
+      const hoursTotal = hours?.totalHours || (daysWorked * 8)
       const hourlyRate = editingRates[nombre] || guessHourlyRate(nombre)
       const basePay = Math.round(hoursTotal * hourlyRate)
       const tipsEarned = tipsByMesero[nombre] || 0
@@ -263,6 +271,7 @@ export default function NominaPage() {
 
       return {
         nombre,
+        horasMedidas,
         role: 'Mesero',
         hourlyRate,
         daysWorked,
@@ -293,6 +302,11 @@ export default function NominaPage() {
   // ── Summary KPIs ──────────────────────────────────────────────────
 
   const totalNomina = useMemo(() => employees.reduce((s, e) => s + e.totalPay, 0), [employees])
+  /** true si a ALGÚN empleado se le estimaron las horas en vez de medirlas. */
+  const hayHorasEstimadas = useMemo(
+    () => employees.length > 0 && employees.some(e => !e.horasMedidas),
+    [employees],
+  )
   const totalBasePay = useMemo(() => employees.reduce((s, e) => s + e.basePay, 0), [employees])
   const totalHoursAll = useMemo(() => employees.reduce((s, e) => s + e.hoursTotal, 0), [employees])
   const avgCostPerHour = useMemo(() => totalHoursAll > 0 ? Math.round(totalNomina / totalHoursAll) : 0, [totalNomina, totalHoursAll])
@@ -378,7 +392,11 @@ export default function NominaPage() {
         <KPICard
           label="Total Nomina"
           value={formatCurrency(totalNomina)}
-          subtitle={`Base ${formatCurrency(totalBasePay)} + Propinas ${formatCurrency(tipsTotal)}`}
+          subtitle={
+            hayHorasEstimadas
+              ? `ESTIMADO — sin horas registradas, se asumen 8 h por día`
+              : `Base ${formatCurrency(totalBasePay)} + Propinas ${formatCurrency(tipsTotal)}`
+          }
           icon={Wallet}
           accentClass="kpi-accent-green"
           index={0}
