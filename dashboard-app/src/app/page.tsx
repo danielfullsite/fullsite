@@ -2,13 +2,10 @@
 
 import React, { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { DollarSign, Ticket, Users, Receipt, TrendingDown, TrendingUp, Award, ArrowRight, CreditCard, FileBarChart, ClipboardList, Target, Settings, Eye, EyeOff, GripVertical, Bot, Clock, Zap, Activity, ChevronLeft, ChevronRight, CalendarDays, TriangleAlert } from 'lucide-react'
-import KPICard from '@/components/KPICard'
+import { DollarSign, TrendingDown, TrendingUp, Award, ArrowRight, CreditCard, FileBarChart, ClipboardList, Target, Settings, Eye, EyeOff, GripVertical, Clock, Activity, ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react'
 import RevenueChart from '@/components/RevenueChart'
 import RevenueDistributionChart from '@/components/RevenueDistributionChart'
-import { getRecentDays, getLatestDay, getDashboardFromPosOrders, aggregateMeseros, getLatestAgentRuns, getDeteccionesAgentes, getTurnoAbierto, type AgentRun, type TurnoAbierto } from '@/lib/data'
-import { useAuth } from '@/contexts/AuthContext'
-import { useDsPilot } from '@/lib/ds-pilot'
+import { getRecentDays, getLatestDay, getDashboardFromPosOrders, aggregateMeseros, getDeteccionesAgentes, getTurnoAbierto, type TurnoAbierto } from '@/lib/data'
 import { desdeEventos, type Atencion } from '@/lib/atencion'
 import EstadoOperacion from '@/components/dashboard/EstadoOperacion'
 import ResumenDia from '@/components/dashboard/ResumenDia'
@@ -17,8 +14,7 @@ import RitmoSemana from '@/components/dashboard/RitmoSemana'
 import CentroAgentes from '@/components/agentes/CentroAgentes'
 import { detectar } from '@/lib/agentes/detectar'
 import ListaAtencion from '@/components/dashboard/ListaAtencion'
-import AgentBriefing from '@/components/AgentBriefing'
-import { formatCurrency, formatNumber, formatPercent, formatDate, percentChange } from '@/lib/format'
+import { formatCurrency, formatPercent, formatDate, percentChange } from '@/lib/format'
 import PredictionWidget from '@/components/PredictionWidget'
 import type { WansoftDaily, GrupoEntry, PagoMetodoEntry } from '@/lib/types'
 
@@ -86,13 +82,22 @@ function findRecentDataForField<T>(
 type Period = 'dia' | 'semana' | 'mes'
 
 // ── Widget Configuration System ─────────────────────────────────────────
+//
+// Aquí vivía 'agent_status', que pintaba las corridas de los agentes con su
+// salida cruda: "0F 1W", "18 issues: 0 critical, 12 high", "no KPI row in
+// wansoft_kpis", "lab-simulator", "smoke-test". Eso es telemetría de la
+// PLATAFORMA, no información del restaurante — y además `agent_runs` no se
+// filtra por tenant (son ~9,586 corridas globales), así que cada restaurante
+// veía la operación de todos.
+//
+// Su lugar es Herramientas → Agentes IA (/mission-control), que ya lee esa misma
+// tabla y cuyo propio código reconoce que es "telemetría operativa global".
 const WIDGET_DEFS = [
   { id: 'insight', label: 'Insight del día', defaultOn: true },
   { id: 'month_progress', label: 'Progreso del mes', defaultOn: true },
   { id: 'kpis', label: 'KPIs principales', defaultOn: true },
   { id: 'prediction', label: 'Predicción de cierre', defaultOn: true },
   { id: 'extra_kpis', label: 'Propinas / Descuentos / Brutas', defaultOn: true },
-  { id: 'agent_status', label: 'Status de agentes', defaultOn: false },
   { id: 'week_comparison', label: 'vs Semana pasada', defaultOn: true },
   { id: 'ritmo_semana', label: 'Qué esperar hoy', defaultOn: true },
   { id: 'revenue_chart', label: 'Gráfica de ventas (30d)', defaultOn: true },
@@ -141,18 +146,14 @@ export default function DashboardPage() {
   const [monthOffset, setMonthOffset] = useState(0) // 0 = current month, 1 = last month, etc.
   const [widgets, setWidgets] = useState<WidgetConfig>(getDefaultWidgets)
   const [showSettings, setShowSettings] = useState(false)
-  const [agentRuns, setAgentRuns] = useState<AgentRun[]>([])
   // Dashboard «Turno» — sólo se pinta con el piloto encendido, así que los datos
   // se piden únicamente si el flag está activo: un tenant sin piloto no paga dos
   // consultas de más en cada carga.
-  const { clientConfig } = useAuth()
-  const dsPiloto = useDsPilot(clientConfig?.id)
   const [atencion, setAtencion] = useState<Atencion[]>([])
   const [turnoAbierto, setTurnoAbierto] = useState<TurnoAbierto | null>(null)
   const [cargandoTurno, setCargandoTurno] = useState(true)
 
   useEffect(() => {
-    if (!dsPiloto) return
     let vivo = true
     Promise.all([
       getDeteccionesAgentes().catch(() => []),
@@ -164,7 +165,7 @@ export default function DashboardPage() {
       setCargandoTurno(false)
     })
     return () => { vivo = false }
-  }, [dsPiloto])
+  }, [])
 
   // Load widget config from localStorage
   useEffect(() => { setWidgets(loadWidgetConfig()) }, [])
@@ -185,10 +186,13 @@ export default function DashboardPage() {
         // Timeout: if data doesn't load in 10s, show empty state instead of infinite spinner
         const timeoutP = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000))
         // Fetch all data in parallel instead of sequentially
-        const [recentRaw, latestRaw, runs] = await Promise.all([
+        // Ya no se pide agent_runs aquí: alimentaba el widget de status de
+        // agentes, que se movió a Herramientas → Agentes IA. Era una consulta a
+        // telemetría GLOBAL de la plataforma en cada carga del dashboard de cada
+        // restaurante, y ninguno la usaba para decidir nada.
+        const [recentRaw, latestRaw] = await Promise.all([
           Promise.race([getRecentDays(1000), timeoutP]).catch(() => [] as WansoftDaily[]),
           Promise.race([getLatestDay(), timeoutP]).catch(() => null as WansoftDaily | null),
-          getLatestAgentRuns().catch(() => [] as AgentRun[]),
         ])
         let recent = recentRaw
         let latest = latestRaw
@@ -210,7 +214,6 @@ export default function DashboardPage() {
             setPrevDay(recent[recent.length - 2])
           }
         }
-        setAgentRuns(runs)
       } catch (err) {
         console.error('Error loading dashboard data:', err)
       } finally {
@@ -350,15 +353,14 @@ export default function DashboardPage() {
     return { ventas, tickets, personas, tp, tpOrden, propinas, descuentos, brutas, prevVentas, prevTickets, prevPersonas, prevTp, label: 'vs mes anterior' }
   })()
 
-  const ventasChange = periodData.prevVentas > 0 ? percentChange(periodData.ventas, periodData.prevVentas) : 0
-  const ticketsChange = periodData.prevTickets > 0 ? percentChange(periodData.tickets, periodData.prevTickets) : 0
-  const personasChange = periodData.prevPersonas > 0 ? percentChange(periodData.personas, periodData.prevPersonas) : 0
-  const ticketPromChange = periodData.prevTp > 0 ? percentChange(periodData.tp, periodData.prevTp) : 0
+  // Los cuatro `*Change` que vivían aquí alimentaban los porcentajes de las
+  // tarjetas KPI anteriores. Se calculaban con percentChange(), que devuelve 0
+  // cuando no hay base — y formatPercent lo pintaba como "+0.0%" en verde, o sea
+  // una comparación que nunca ocurrió. ResumenDia no compara sin muestra.
 
   const topMeseros = (period === 'dia' ? viewDay : latestDay)
     ? aggregateMeseros([period === 'dia' ? viewDay! : latestDay!]).slice(0, 5)
     : []
-  const topMeseroMax = topMeseros[0]?.total || 1
 
   // Month progress
   const monthProgress = (() => {
@@ -434,23 +436,11 @@ export default function DashboardPage() {
     })
   })()
 
-  // Quick insight line
-  const quickInsight = (() => {
-    const day = period === 'dia' ? viewDay : latestDay
-    if (!day || topMeseros.length === 0) return null
-    const ventas = day.ventas_dia || 0
-    const topMesero = topMeseros[0]
-    const pct = ventas > 0 ? Math.round((topMesero.total / ventas) * 100) : 0
-    const vsAvg = sameDOWAvg.ventas > 0 ? ((ventas / sameDOWAvg.ventas - 1) * 100).toFixed(0) : null
-    const parts: string[] = []
-    if (vsAvg && Math.abs(Number(vsAvg)) > 5) {
-      parts.push(`${Number(vsAvg) > 0 ? '+' : ''}${vsAvg}% vs promedio de ${todayDOWName}`)
-    }
-    if (pct > 20) {
-      parts.push(`${topMesero.nombre.split(' ')[0]} cargó el ${pct}% de las ventas`)
-    }
-    return parts.length > 0 ? parts.join('. ') + '.' : null
-  })()
+  // Aquí se armaba `quickInsight`, la frase del banner morado. Sus dos partes
+  // siguen en pantalla, mejor puestas: la comparación subió al encabezado de
+  // ResumenDia —ahora con el tamaño de la muestra escrito— y el "cargó el N%"
+  // bajó a QuienVendio, donde el porcentaje va en CADA renglón y no sólo en el
+  // primero.
 
   // Same day last week comparison
   const sameDayLastWeek = (() => {
@@ -493,7 +483,7 @@ export default function DashboardPage() {
           Las dos piezas se autocensuran cuando no hay nada que decir —
           ListaAtencion no renderiza sin pendientes— así que en un turno limpio
           la pantalla queda igual que antes. */}
-      {dsPiloto && (
+      {(
         <>
           {/* Una sola línea de estado. Antes eran tres mensajes distintos
               diciendo el mismo hecho —la barra de turno, el aviso de sync y el
@@ -655,42 +645,9 @@ export default function DashboardPage() {
       {/* Resumen del día — "N cosas para hoy" (detecciones de los agentes IA) */}
       {/* Fuera del piloto sigue el briefing de siempre. Dentro, el centro nuevo:
           frases con verbo, dinero a la derecha, y evidencia al hacer clic. */}
-      {!dsPiloto && <AgentBriefing />}
-      {dsPiloto && <CentroAgentes detecciones={detecciones} cargando={loading} />}
+      <CentroAgentes detecciones={detecciones} cargando={loading} />
 
       {/* Data freshness: warn when showing a past day as the default view, show sync time for today */}
-      {!dsPiloto && period === 'dia' && viewDay && (() => {
-        const mxToday = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' })
-        const fecha = String(viewDay.fecha).slice(0, 10)
-        const syncTime = viewDay.updated_at
-          ? new Date(viewDay.updated_at).toLocaleTimeString('es-MX', { timeZone: 'America/Mexico_City', hour: 'numeric', minute: '2-digit' })
-          : null
-        if (fecha !== mxToday && selectedDayIdx === 0) {
-          return (
-            // DS v3: el aviso pasa de banner a línea. Dice lo mismo —los datos NO
-            // son de hoy— pero deja de ocupar el ancho completo encima del
-            // contenido. No se elimina a propósito: sin él, el dashboard mostraría
-            // números de hace semanas como si fueran de hoy, y alguien podría
-            // decidir sobre ellos sin enterarse.
-            <div className="mb-4 flex items-center gap-1.5 text-[12px] text-[var(--warn-ink)]">
-              <TriangleAlert size={13} className="shrink-0" />
-              <span>
-                Datos del <span className="font-semibold">{formatDate(fecha)}</span>
-                {syncTime ? ` · último cierre ${syncTime}` : ' · último cierre'}
-                <span className="text-[var(--text-4)]"> — hoy aún no sincroniza</span>
-              </span>
-            </div>
-          )
-        }
-        if (fecha === mxToday && syncTime) {
-          return (
-            <div className="mb-4 text-xs text-[var(--text-3)] font-medium">
-              Datos del sistema de ventas actualizados a las <span className="font-mono text-[var(--text-2)]">{syncTime}</span> — se sincronizan cada 30 min, pueden diferir del sistema de ventas en tiempo real.
-            </div>
-          )
-        }
-        return null
-      })()}
 
       {/* Settings panel — toggle widgets */}
       {showSettings && (
@@ -742,7 +699,7 @@ export default function DashboardPage() {
           primer renglón de un desglose que suma hasta lo que entró a la caja.
 
           Se respetan los interruptores del panel de personalización. */}
-      {dsPiloto && (show('kpis') || show('extra_kpis')) && (() => {
+      {(show('kpis') || show('extra_kpis')) && (() => {
         const mxToday = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' })
         const fechaVista = viewDay ? String(viewDay.fecha).slice(0, 10) : null
         return (
@@ -773,7 +730,7 @@ export default function DashboardPage() {
       {/* Qué esperar hoy — la pieza nueva. Contesta "¿con cuánta gente abro?",
           que es la decisión que un dueño toma antes de abrir la cortina y que
           ninguno de los 13 widgets contestaba. */}
-      {dsPiloto && show('ritmo_semana') && (
+      {show('ritmo_semana') && (
         <RitmoSemana
           filas={ritmoSemana}
           hoyDow={(() => {
@@ -784,12 +741,6 @@ export default function DashboardPage() {
         />
       )}
 
-      {!dsPiloto && show('insight') && quickInsight && (
-        <div className="mb-3 sm:mb-4 flex items-start gap-[9px] px-3.5 py-2.5 bg-purple-500/10 border border-purple-500/30 rounded-xl">
-          <Zap size={15} className="text-purple-400 shrink-0 mt-0.5" fill="currentColor" />
-          <p className="text-[13px] leading-[1.45] text-purple-400">{quickInsight}</p>
-        </div>
-      )}
 
       {/* Month progress — premium card */}
       {show('month_progress') && monthProgress && monthProgress.monthVentas > 0 && (
@@ -823,83 +774,6 @@ export default function DashboardPage() {
       )}
 
       {/* KPI Summary Cards — 4 across like Toast */}
-      {!dsPiloto && show('kpis') && (() => {
-        // Sparkline data: last 7 days
-        const spark7 = recentData.slice(-7)
-        const sparkVentas = spark7.map(d => d.ventas_dia || 0)
-        const sparkTickets = spark7.map(d => d.tickets_count || 0)
-        const sparkPersonas = spark7.map(d => d.personas_restaurant || 0)
-        const sparkTP = spark7.map(d => d.ticket_promedio_restaurant || 0)
-
-        // Week-over-week comparison: last 7 days total vs previous 7 days total
-        const thisWeek7 = recentData.slice(-7)
-        const prevWeek7 = recentData.slice(-14, -7)
-        const sumField = (arr: WansoftDaily[], key: keyof WansoftDaily) =>
-          arr.reduce((s, d) => s + (Number(d[key]) || 0), 0)
-        const avgField = (arr: WansoftDaily[], key: keyof WansoftDaily) => {
-          const vals = arr.map(d => Number(d[key]) || 0).filter(v => v > 0)
-          return vals.length > 0 ? vals.reduce((s, v) => s + v, 0) / vals.length : 0
-        }
-
-        const wkVentas = prevWeek7.length >= 3
-          ? percentChange(sumField(thisWeek7, 'ventas_dia'), sumField(prevWeek7, 'ventas_dia'))
-          : null
-        const wkTickets = prevWeek7.length >= 3
-          ? percentChange(sumField(thisWeek7, 'tickets_count'), sumField(prevWeek7, 'tickets_count'))
-          : null
-        const wkPersonas = prevWeek7.length >= 3
-          ? percentChange(sumField(thisWeek7, 'personas_restaurant'), sumField(prevWeek7, 'personas_restaurant'))
-          : null
-        const wkTP = prevWeek7.length >= 3
-          ? percentChange(avgField(thisWeek7, 'ticket_promedio_restaurant'), avgField(prevWeek7, 'ticket_promedio_restaurant'))
-          : null
-
-        return (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
-            <KPICard
-              label={period === 'dia' ? 'Ventas del día' : period === 'semana' ? 'Ventas semana' : 'Ventas del mes'}
-              value={formatCurrency(periodData.ventas)}
-              delta={`${formatPercent(ventasChange)} ${periodData.label}`}
-              deltaType={ventasChange >= 0 ? 'up' : 'down'}
-              icon={DollarSign}
-              accentClass="kpi-accent-blue"
-              sparklineData={sparkVentas}
-              weekChange={wkVentas}
-            />
-            <KPICard
-              label="Ordenes"
-              value={formatNumber(periodData.tickets)}
-              delta={`${formatPercent(ticketsChange)} ${periodData.label}`}
-              deltaType={ticketsChange >= 0 ? 'up' : 'down'}
-              icon={Ticket}
-              accentClass="kpi-accent-green"
-              sparklineData={sparkTickets}
-              weekChange={wkTickets}
-            />
-            <KPICard
-              label="Personas"
-              value={formatNumber(periodData.personas)}
-              delta={`${formatPercent(personasChange)} ${periodData.label}`}
-              deltaType={personasChange >= 0 ? 'up' : 'down'}
-              icon={Users}
-              accentClass="kpi-accent-amber"
-              sparklineData={sparkPersonas}
-              weekChange={wkPersonas}
-            />
-            <KPICard
-              label="Prom. por persona"
-              value={formatCurrency(periodData.tp)}
-              delta={`${formatPercent(ticketPromChange)} ${periodData.label}`}
-              deltaType={ticketPromChange >= 0 ? 'up' : 'down'}
-              icon={Receipt}
-              accentClass="kpi-accent-purple"
-              sparklineData={sparkTP}
-              weekChange={wkTP}
-              subtitle={`Por orden: ${formatCurrency(periodData.tpOrden || 0)}`}
-            />
-          </div>
-        )
-      })()}
 
       {/* Prediction Widget */}
       {show('prediction') && period === 'dia' && (() => {
@@ -937,129 +811,8 @@ export default function DashboardPage() {
       })()}
 
       {/* Extra KPI row — Propinas + Descuentos + Brutas */}
-      {!dsPiloto && show('extra_kpis') && <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-4 sm:mb-6">
-        <div className="rounded-[14px] border border-[var(--line)] px-3 sm:px-4 py-3 sm:py-3.5 text-center" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-soft)' }}>
-          <div className="w-[30px] h-[30px] rounded-[9px] grid place-items-center bg-[var(--accent-soft)] text-[var(--accent-bright)] mx-auto mb-2">
-            <Award size={15} />
-          </div>
-          <p className="text-[9px] sm:text-[9.5px] text-[var(--text-3)] font-semibold uppercase tracking-[0.13em] font-mono mb-1.5">Propinas</p>
-          <p className="text-lg sm:text-xl font-extrabold tracking-[-0.02em] tnum text-[var(--accent-ink)]">{formatCurrency(periodData.propinas)}</p>
-        </div>
-        <div className="rounded-[14px] border border-[var(--line)] px-3 sm:px-4 py-3 sm:py-3.5 text-center" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-soft)' }}>
-          {/* El color es condicional: cero descuentos NO es una alarma. Antes iba
-              siempre en rojo con flecha hacia abajo, así que un día sin ningún
-              descuento se veía igual de grave que uno con $5,000 regalados. */}
-          <div className={`w-[30px] h-[30px] rounded-[9px] grid place-items-center mx-auto mb-2 ${
-            periodData.descuentos > 0
-              ? 'bg-[var(--crit-soft)] text-[var(--crit-ink)]'
-              : 'bg-[var(--surface-2)] text-[var(--text-3)]'
-          }`}>
-            <TrendingDown size={15} />
-          </div>
-          <p className="text-[9px] sm:text-[9.5px] text-[var(--text-3)] font-semibold uppercase tracking-[0.13em] font-mono mb-1.5">Descuentos</p>
-          <p className={`text-lg sm:text-xl font-extrabold tracking-[-0.02em] tnum ${
-            periodData.descuentos > 0 ? 'text-[var(--crit-ink)]' : 'text-[var(--text-1)]'
-          }`}>{formatCurrency(periodData.descuentos)}</p>
-        </div>
-        <div className="rounded-[14px] border border-[var(--line)] px-3 sm:px-4 py-3 sm:py-3.5 text-center" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-soft)' }}>
-          <div className="w-[30px] h-[30px] rounded-[9px] grid place-items-center bg-[var(--info-soft)] text-[var(--info-ink)] mx-auto mb-2">
-            <DollarSign size={15} />
-          </div>
-          <p className="text-[9px] sm:text-[9.5px] text-[var(--text-3)] font-semibold uppercase tracking-[0.13em] font-mono mb-1.5">Brutas</p>
-          <p className="text-lg sm:text-xl font-extrabold tracking-[-0.02em] tnum text-[var(--info-ink)]">{formatCurrency(periodData.brutas)}</p>
-        </div>
-      </div>}
 
       {/* Agent Status Widget — real data from agent_runs */}
-      {show('agent_status') && (
-        <div className="mb-4 sm:mb-6 rounded-[14px] border border-[var(--line)] p-4 sm:p-[18px]" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' }}>
-          <div className="flex items-center gap-[9px] mb-3 sm:mb-4">
-            <div className="w-7 h-7 rounded-[9px] grid place-items-center bg-violet-500/12 text-violet-300">
-              <Bot size={15} />
-            </div>
-            <h3 className="text-sm font-bold text-[var(--text-1)]">Agentes IA</h3>
-            <span className="ml-auto text-[13px] text-[var(--accent-ink)] font-semibold flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-[var(--accent-bright)] animate-pulse" />
-              {agentRuns.length} activos
-            </span>
-          </div>
-          {agentRuns.length === 0 ? (
-            <p className="text-[var(--text-3)] text-sm">Cargando datos de agentes...</p>
-          ) : (
-            (() => {
-              const agentNames: Record<string, string> = {
-                'anomaly-detector': 'Anomalias',
-                'close-predictor': 'Predicción',
-                'upselling': 'Upselling',
-                'menu-engineering': 'Menu Eng.',
-                'staffing-optimizer': 'Staffing',
-                'antifraud-agent': 'Anti-fraude',
-                'kitchen-quality': 'Cocina',
-                'tips-analyzer': 'Propinas',
-                'supplier-monitor': 'Proveedores',
-                'waste-detector': 'Merma',
-                'daily-briefing': 'Briefing',
-                'weekly-amalay': 'Semanal',
-                'reservas-pendientes': 'Reservas',
-                'wansoft-staleness': 'Sync',
-                'config-validator': 'Config',
-                'intraday-sales': 'Intraday',
-                'speed_of_service': 'Velocidad',
-                'inventory_auto_order': 'Auto-orden',
-                'pos_daily_aggregator': 'Agregador',
-                'proactive-alerts': 'Alertas',
-                'climate-events': 'Clima',
-                'hermes': 'Hermes',
-                'table-time': 'Mesas',
-                'menu-gap': 'Menu Gap',
-              }
-              return (
-                <>
-                {/* Mobile: horizontal scrollable chips */}
-                <div className="flex sm:hidden gap-1.5 overflow-x-auto pb-2 -mx-1 px-1" style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
-                  {agentRuns.slice(0, 12).map(run => {
-                    const name = agentNames[run.agent_id] || run.agent_id
-                    const isError = run.status === 'error'
-                    return (
-                      <div key={run.agent_id} className={`flex items-center gap-1.5 shrink-0 rounded-full px-2.5 py-1.5 border ${isError ? 'bg-[var(--crit-soft)] border-[var(--crit-line,rgba(245,69,92,.3))]' : 'bg-[var(--accent-soft)] border-[var(--accent-line)]'}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${isError ? 'bg-[var(--crit)]' : 'bg-[var(--accent)]'}`} />
-                        <span className={`text-[11px] font-semibold whitespace-nowrap ${isError ? 'text-[var(--crit-ink)]' : 'text-[var(--accent-ink)]'}`}>{name}</span>
-                      </div>
-                    )
-                  })}
-                </div>
-                {/* Desktop: vertical list */}
-                <div className="hidden sm:block space-y-1.5">
-                  {agentRuns.slice(0, 8).map(run => {
-                    const name = agentNames[run.agent_id] || run.agent_id
-                    const isError = run.status === 'error'
-                    const mins = Math.floor((Date.now() - new Date(run.created_at).getTime()) / 60000)
-                    const timeAgo = mins < 60 ? `${mins}m` : mins < 1440 ? `${Math.floor(mins / 60)}h` : `${Math.floor(mins / 1440)}d`
-                    return (
-                      <div key={run.agent_id} className="flex items-center gap-2 bg-[var(--surface-2)] rounded-lg px-3 py-2">
-                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${isError ? 'bg-red-500' : 'bg-emerald-400'}`} />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p className="text-xs font-medium text-[var(--text-1)]">{name}</p>
-                            <span className="text-[10px] text-[var(--text-4)]">{timeAgo}</span>
-                          </div>
-                          <p className="text-[10px] text-[var(--text-3)] truncate">{run.output_summary}</p>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-                {agentRuns.length > 8 && (
-                  <a href="/agentes" className="block text-center text-xs text-[var(--accent)] hover:text-[var(--accent-bright)] py-1 mt-2">
-                    Ver los {agentRuns.length} agentes →
-                  </a>
-                )}
-                </>
-              )
-            })()
-          )}
-        </div>
-      )}
 
       {/* Week comparison banner — like el POS legado */}
       {show('week_comparison') && vsLastWeek !== null && vsLastWeekAmount !== null && sameDayLastWeek && (
@@ -1105,69 +858,13 @@ export default function DashboardPage() {
       {/* Two columns: Top meseros + Categories */}
       {(show('top_meseros') || show('categories')) && <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
         {/* Top meseros — R365 style with progress bars */}
-        {!dsPiloto && show('top_meseros') && <div className="rounded-[14px] border border-[var(--line)] p-[18px]" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' }}>
-          <div className="flex items-center gap-[9px] mb-0.5">
-            <div className="w-7 h-7 rounded-[9px] grid place-items-center bg-[var(--accent-soft)] text-[var(--accent-bright)]">
-              <Award size={15} />
-            </div>
-            <h3 className="text-sm font-bold text-[var(--text-1)]">
-              Top meseros del día
-            </h3>
-          </div>
-          <p className="text-[11px] text-[var(--text-3)] mb-4 ml-[37px]">Ranking por ventas</p>
-          {topMeseros.length === 0 ? (
-            <p className="text-[var(--text-3)] text-sm">Sin datos de meseros</p>
-          ) : (
-            <div className="space-y-4">
-              {topMeseros.map((m, i) => {
-                const barWidth = topMeseroMax > 0 ? ((m.total / topMeseroMax) * 100) : 0
-                const colors = [
-                  { bg: 'bg-blue-500/10', text: 'text-blue-400', bar: '#3b82f6' },
-                  { bg: 'bg-emerald-500/10', text: 'text-[var(--accent-bright)]', bar: '#10b981' },
-                  { bg: 'bg-amber-500/10', text: 'text-amber-400', bar: '#f59e0b' },
-                  { bg: 'bg-red-500/10', text: 'text-red-400', bar: '#ef4444' },
-                  { bg: 'bg-[var(--surface-2)]', text: 'text-[var(--text-2)]', bar: '#94a3b8' },
-                ]
-                const color = colors[i] || colors[4]
-                return (
-                  <div key={m.nombre}>
-                    <div className="flex items-center gap-[11px] mb-1.5">
-                      <div
-                        className={`w-[26px] h-[26px] rounded-lg grid place-items-center text-xs font-extrabold ${color.bg} ${color.text}`}
-                      >
-                        {i + 1}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[13.5px] font-semibold text-[var(--text-1)] truncate">
-                          {m.nombre}
-                        </p>
-                      </div>
-                      <p className="text-sm font-bold text-[var(--text-1)] font-mono tabular-nums">
-                        {formatCurrency(m.total)}
-                      </p>
-                    </div>
-                    <div className="ml-[37px] w-auto bg-[var(--line-soft)] rounded-full h-1.5 overflow-hidden">
-                      <div
-                        className="h-1.5 rounded-full animate-progress"
-                        style={{
-                          width: `${barWidth}%`,
-                          backgroundColor: color.bar,
-                        }}
-                      />
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>}
 
         {/* Quién vendió (piloto). La barra pasa a medirse contra el TOTAL y no
             contra el primer lugar: con `m.total / topMeseroMax` el primero
             llenaba SIEMPRE la barra completa, así que un reparto 51/49 se veía
             igual que uno 95/5. Y el porcentaje va en cada renglón, que es donde
             se comprueba, en vez de sólo en el banner morado de arriba. */}
-        {dsPiloto && show('top_meseros') && (
+        {show('top_meseros') && (
           <QuienVendio filas={topMeseros} totalPeriodo={periodData.ventas} />
         )}
 

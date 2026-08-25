@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next'
-import { Public_Sans, IBM_Plex_Mono } from 'next/font/google'
+import { Public_Sans, IBM_Plex_Mono, Schibsted_Grotesk } from 'next/font/google'
 import './globals.css'
 import { AuthProvider } from '@/contexts/AuthContext'
 import AppShell from '@/components/AppShell'
@@ -23,6 +23,22 @@ const sans = Public_Sans({
   variable: '--font-public-sans',
   subsets: ['latin'],
   weight: ['300', '400', '500', '600', '700', '800'],
+  display: 'swap',
+})
+
+// Tipografía de display: títulos y cifras grandes.
+//
+// Se cargaba inyectando un <link> desde lib/ds-pilot.ts, porque el rediseño era
+// un piloto de UN tenant y no tenía sentido que los ocho descargaran una fuente
+// que usaba uno. Ahora aplica a todos, así que next/font es lo correcto: la
+// autohospeda, la precarga y evita el salto de texto.
+//
+// Sólo los pesos 400 y 500: el sistema vive en peso 400 y traer 600/700 sería
+// peso muerto para un título que nunca los usa.
+const display = Schibsted_Grotesk({
+  variable: '--font-schibsted',
+  subsets: ['latin'],
+  weight: ['400', '500'],
   display: 'swap',
 })
 
@@ -60,7 +76,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="es" className={`${sans.variable} ${mono.variable} h-full antialiased`} suppressHydrationWarning>
+    <html lang="es" className={`${sans.variable} ${mono.variable} ${display.variable} h-full antialiased`} suppressHydrationWarning>
       <head>
         {/* Dark by default. Only set light if user chose it. */}
         <script dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='light'){document.documentElement.setAttribute('data-theme','light')}}catch(e){}try{var C=window.Capacitor;if(C&&C.isNativePlatform&&C.isNativePlatform()){document.documentElement.classList.add('capacitor')}}catch(e){}})();` }} />
