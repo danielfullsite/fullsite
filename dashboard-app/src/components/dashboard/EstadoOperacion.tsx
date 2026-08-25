@@ -67,6 +67,15 @@ function hora(iso: string | null): string | null {
   return d.toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit' })
 }
 
+/**
+ * es-MX formatea la tarde como "2:28 p.m." — CON punto final. Al pegarle el
+ * punto de la oración salía "a las 2:28 p.m..", con dos puntos, visible en
+ * pantalla. Se le quita el suyo y la oración pone el que le toca.
+ */
+function sinPuntoFinal(s: string | null): string | null {
+  return s ? s.replace(/\.$/, '') : null
+}
+
 export default function EstadoOperacion({
   turno, ultimaFecha, hoy, syncTime, cargando,
 }: EstadoOperacionProps) {
@@ -119,7 +128,7 @@ export default function EstadoOperacion({
         </span>
         <span className="text-[14px] font-semibold text-[var(--text-1)]">Sin turno abierto</span>
         <span className="text-[13px] text-[var(--text-3)]">
-          Los datos de hoy están al día{syncTime ? ` · último cierre ${syncTime}` : ''}
+          Los datos de hoy están al día{syncTime ? ` · último cierre ${sinPuntoFinal(syncTime)}` : ''}
         </span>
       </div>
     )
@@ -148,7 +157,7 @@ export default function EstadoOperacion({
         </p>
         <p className="mt-0.5 text-[13px] leading-[1.45] text-[var(--text-2)]">
           Lo último que cerró fue el {fechaLarga(ultimaFecha)}
-          {syncTime ? ` a las ${syncTime}` : ''}. Todas las cifras de abajo son de ese día.
+          {syncTime ? ` a las ${sinPuntoFinal(syncTime)}` : ''}. Todas las cifras de abajo son de ese día.
         </p>
       </div>
     </div>

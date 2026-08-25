@@ -388,7 +388,13 @@ export default function DashboardPage() {
     const NOMBRES = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
     const acumulado = new Map<number, { ventas: number[]; cuentas: number[] }>()
     for (const d of recentData) {
-      const dt = new Date(String(d.fecha).slice(0, 10) + 'T12:00:00')
+      const fecha = String(d.fecha).slice(0, 10)
+      // Se excluye el día que se está viendo, EXACTAMENTE como hace sameDOWAvg.
+      // Si no, "un viernes normal" valía dos cosas distintas en la misma
+      // pantalla: el encabezado decía $6,444 (sin el día visto) y esta tarjeta
+      // $5,569 (con él). Dos promedios del viernes a 30 cm de distancia.
+      if (viewDay && fecha === String(viewDay.fecha).slice(0, 10)) continue
+      const dt = new Date(fecha + 'T12:00:00')
       if (isNaN(dt.getTime())) continue
       const venta = Number(d.ventas_dia) || 0
       if (venta <= 0) continue
@@ -401,13 +407,16 @@ export default function DashboardPage() {
     }
     return [1, 2, 3, 4, 5, 6, 7].map(dow => {
       const a = acumulado.get(dow)
-      const ventas = a?.ventas ?? []
+      // Las últimas 4 apariciones, misma ventana que sameDOWAvg. `recentData`
+      // va de viejo a nuevo, así que slice(-4) son las MÁS RECIENTES.
+      const ventas = (a?.ventas ?? []).slice(-4)
+      const cuentas = (a?.cuentas ?? []).slice(-4)
       const n = ventas.length
       return {
         dow,
         nombre: NOMBRES[dow - 1],
         ventaProm: n > 0 ? ventas.reduce((x, y) => x + y, 0) / n : 0,
-        cuentasProm: n > 0 ? (a!.cuentas.reduce((x, y) => x + y, 0)) / n : 0,
+        cuentasProm: n > 0 ? cuentas.reduce((x, y) => x + y, 0) / n : 0,
         peor: n > 0 ? Math.min(...ventas) : 0,
         mejor: n > 0 ? Math.max(...ventas) : 0,
         n,

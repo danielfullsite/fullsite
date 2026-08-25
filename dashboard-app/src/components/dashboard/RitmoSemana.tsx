@@ -49,6 +49,16 @@ export interface RitmoSemanaProps {
 /** Con menos de esto, un "promedio del martes" no es un promedio. */
 const MUESTRA_MINIMA = 2
 
+/**
+ * En español los días terminados en -s son INVARIABLES en plural: cuatro
+ * martes, no cuatro "martess". Sólo sábado y domingo llevan -s.
+ * Salía en pantalla como "4 martess de historia".
+ */
+function plural(nombre: string): string {
+  const n = nombre.toLowerCase()
+  return n.endsWith('s') ? n : `${n}s`
+}
+
 export default function RitmoSemana({ filas, hoyDow }: RitmoSemanaProps) {
   const conDatos = filas.filter(f => f.n > 0)
   if (conDatos.length < 3) return null
@@ -72,12 +82,12 @@ export default function RitmoSemana({ filas, hoyDow }: RitmoSemanaProps) {
             <span className="font-semibold text-[var(--text-1)] tnum">{Math.round(hoy.cuentasProm)}</span>
             {' '}cuentas
             <span className="text-[var(--text-4)]">
-              {' '}· {hoy.n} {hoy.nombre.toLowerCase()}s de historia, de {formatCurrency(hoy.peor)} a {formatCurrency(hoy.mejor)}
+              {' '}· {hoy.n} {plural(hoy.nombre)} de historia, de {formatCurrency(hoy.peor)} a {formatCurrency(hoy.mejor)}
             </span>
           </>
         ) : (
           <span className="text-[var(--text-4)]">
-            Todavía no hay {MUESTRA_MINIMA} {hoy ? `${hoy.nombre.toLowerCase()}s` : 'días iguales'} en el
+            Todavía no hay {MUESTRA_MINIMA} {hoy ? plural(hoy.nombre) : 'días iguales'} en el
             historial para decir qué esperar hoy.
           </span>
         )}
