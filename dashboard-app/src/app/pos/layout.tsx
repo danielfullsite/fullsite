@@ -758,7 +758,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
           {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => (
             <button
               key={d}
-              onClick={() => { if (!isLocked && !checking) setPin((p) => (p + d).slice(0, 8)) }}
+              onClick={() => { if (!isLocked && !checking) setPin((p) => (p + d).slice(0, 10)) }}
               disabled={isLocked || checking}
               className="min-h-[64px] rounded-2xl bg-slate-800/70 hover:bg-slate-700 active:scale-95 border border-slate-700 text-white text-2xl font-bold transition-all disabled:opacity-40"
             >
@@ -776,7 +776,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
           </button>
           {/* 0 */}
           <button
-            onClick={() => { if (!isLocked && !checking) setPin((p) => (p + '0').slice(0, 8)) }}
+            onClick={() => { if (!isLocked && !checking) setPin((p) => (p + '0').slice(0, 10)) }}
             disabled={isLocked || checking}
             className="min-h-[64px] rounded-2xl bg-slate-800/70 hover:bg-slate-700 active:scale-95 border border-slate-700 text-white text-2xl font-bold transition-all disabled:opacity-40"
           >

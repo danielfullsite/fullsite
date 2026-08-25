@@ -1,0 +1,48 @@
+name: Local Server Tests
+
+# El Local Server ("Pedro") es el núcleo del offline: hub WS, cola de eventos, puente de
+# impresión, descubrimiento LAN. Tenía 11 archivos de test (163 casos) que NINGÚN workflow
+# ejecutaba. Por eso un `ReferenceError: config is not defined` en GET /identity —el
+# endpoint con el que las terminales descubren la caja— llegó a producción sin que nadie
+# lo notara.
+#
+# El job se llama `local-server` a propósito, NO `test`: `test` es el contexto requerido
+# de la protección de rama (anclado a test-dashboard.yml). Un segundo job con ese nombre
+# haría ambiguo el check obligatorio.
+
+on:
+  push:
+    paths:
+      - 'electron-app/local-server/**'
+      - 'electron-app/package.json'
+      - '.github/workflows/test-local-server.yml'
+  pull_request:
+    paths:
+      - 'electron-app/local-server/**'
+      - 'electron-app/package.json'
+      - '.github/workflows/test-local-server.yml'
+
+defaults:
+  run:
+    working-directory: electron-app
+
+jobs:
+  local-server:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: electron-app/package-lock.json
+
+      # Los tests sólo necesitan las deps de runtime del local server (ws,
+      # bonjour-service). --ignore-scripts evita descargar el binario de Electron
+      # (~100 MB de devDependency) que ninguna prueba usa.
+      - name: Install deps
+        run: npm ci --no-audit --no-fund --ignore-scripts
+
+      - name: Local server tests
+        run: node --test local-server/tests/*.test.js

@@ -1,4 +1,7 @@
-const PIN_LENGTH = 10
+// Exportado a propósito: el teclado del POS (pos/layout.tsx) tiene que aceptar
+// exactamente esta longitud. Cuando eran dos números independientes se
+// desincronizaron —generador 10, teclado 8— y nadie nuevo podía entrar.
+export const PIN_LENGTH = 10
 
 /** Generate an unpredictable 10-digit PIN. The first digit is non-zero. */
 export function generateStaffPin(): string {

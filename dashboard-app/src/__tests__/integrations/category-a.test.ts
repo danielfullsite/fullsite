@@ -501,11 +501,17 @@ describe('CAT-A-039..043: USL / OAuth Flow', () => {
   })
 
   it('CAT-A-043: exchangeUberCode throws descriptively when credentials missing', async () => {
+    // Contrato actualizado en c905458e: el mensaje nombra las credenciales de
+    // sandbox (UBER_TEST_*) y menciona el fallback legacy. Se fija UBER_ENV para
+    // que el error sea el de credenciales y no el de entorno mal configurado.
+    process.env.UBER_ENV = 'sandbox'
     delete process.env.UBER_CLIENT_ID
     delete process.env.UBER_CLIENT_SECRET
+    delete process.env.UBER_TEST_CLIENT_ID
+    delete process.env.UBER_TEST_CLIENT_SECRET
     const { exchangeUberCode } = await import('@/lib/integrations/uber-eats/oauth')
     await expect(exchangeUberCode('test-code', 'https://app.fullsite.mx/callback'))
-      .rejects.toThrow('UBER_CLIENT_ID/UBER_CLIENT_SECRET not configured')
+      .rejects.toThrow(/UBER_ENV=sandbox requires UBER_TEST_CLIENT_ID/)
   })
 })
 
