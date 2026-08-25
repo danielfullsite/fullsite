@@ -756,11 +756,20 @@ export default function DashboardPage() {
           <p className="text-lg sm:text-xl font-extrabold tracking-[-0.02em] tnum text-[var(--accent-ink)]">{formatCurrency(periodData.propinas)}</p>
         </div>
         <div className="rounded-[14px] border border-[var(--line)] px-3 sm:px-4 py-3 sm:py-3.5 text-center" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-soft)' }}>
-          <div className="w-[30px] h-[30px] rounded-[9px] grid place-items-center bg-[var(--crit-soft)] text-[var(--crit-ink)] mx-auto mb-2">
+          {/* El color es condicional: cero descuentos NO es una alarma. Antes iba
+              siempre en rojo con flecha hacia abajo, así que un día sin ningún
+              descuento se veía igual de grave que uno con $5,000 regalados. */}
+          <div className={`w-[30px] h-[30px] rounded-[9px] grid place-items-center mx-auto mb-2 ${
+            periodData.descuentos > 0
+              ? 'bg-[var(--crit-soft)] text-[var(--crit-ink)]'
+              : 'bg-[var(--surface-2)] text-[var(--text-3)]'
+          }`}>
             <TrendingDown size={15} />
           </div>
           <p className="text-[9px] sm:text-[9.5px] text-[var(--text-3)] font-semibold uppercase tracking-[0.13em] font-mono mb-1.5">Descuentos</p>
-          <p className="text-lg sm:text-xl font-extrabold tracking-[-0.02em] tnum text-[var(--crit-ink)]">{formatCurrency(periodData.descuentos)}</p>
+          <p className={`text-lg sm:text-xl font-extrabold tracking-[-0.02em] tnum ${
+            periodData.descuentos > 0 ? 'text-[var(--crit-ink)]' : 'text-[var(--text-1)]'
+          }`}>{formatCurrency(periodData.descuentos)}</p>
         </div>
         <div className="rounded-[14px] border border-[var(--line)] px-3 sm:px-4 py-3 sm:py-3.5 text-center" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-soft)' }}>
           <div className="w-[30px] h-[30px] rounded-[9px] grid place-items-center bg-[var(--info-soft)] text-[var(--info-ink)] mx-auto mb-2">
