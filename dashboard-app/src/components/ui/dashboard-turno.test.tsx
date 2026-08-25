@@ -1,4 +1,8 @@
-// Los dos componentes nuevos del dashboard.
+// ListaAtencion.
+//
+// Las pruebas de BarraTurno vivían aquí. El componente lo reemplazó
+// EstadoOperacion —que además cuenta los DÍAS sin datos, que es lo que a
+// BarraTurno le faltaba— y su cobertura se trasladó a resumen-dashboard.test.tsx.
 //
 // Lo que más se prueba aquí NO es que pinten bien: es que se CALLEN cuando no
 // hay nada que decir. Este dashboard venía mostrando "$39,505 por mesa" y
@@ -7,7 +11,6 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { render, screen, cleanup } from '@testing-library/react'
 import ListaAtencion from '@/components/dashboard/ListaAtencion'
-import BarraTurno, { type Turno, type ResumenTurno } from '@/components/dashboard/BarraTurno'
 import type { Atencion } from '@/lib/atencion'
 
 afterEach(cleanup)
@@ -77,58 +80,5 @@ describe('ListaAtencion — lo que muestra', () => {
   it('la gravedad se anuncia a lectores de pantalla, no sólo por color', () => {
     render(<ListaAtencion items={[item({ severidad: 'critical' })]} />)
     expect(screen.getByText('Crítico:')).toBeTruthy()
-  })
-})
-
-describe('BarraTurno — sin turno abierto', () => {
-  const vacio: ResumenTurno = { ventas: null, ordenes: null, personas: null, mesasOcupadas: null, mesasTotal: null }
-
-  it('dice "Sin turno abierto" en vez de mostrar ceros', () => {
-    render(<BarraTurno turno={null} resumen={vacio} />)
-    expect(screen.getByText('Sin turno abierto')).toBeTruthy()
-    // un $0 se leería como "no vendimos", y no es eso
-    expect(screen.queryByText('$0')).toBeNull()
-    expect(screen.queryByText('$0.00')).toBeNull()
-  })
-
-  it('avisa que las cifras de abajo no son de hoy', () => {
-    render(<BarraTurno turno={null} resumen={vacio} />)
-    expect(screen.getByText(/no de hoy/)).toBeTruthy()
-  })
-})
-
-describe('BarraTurno — con turno abierto', () => {
-  const turno: Turno = {
-    id: 't1',
-    numero: 3,
-    abiertoPor: 'Pedro',
-    abiertoAt: '2026-08-25T18:04:00Z',
-    fondoInicial: 2000,
-  }
-
-  it('muestra número, quién abrió y a qué hora', () => {
-    render(<BarraTurno turno={turno} resumen={{ ventas: 48250.75, ordenes: 117, personas: 118, mesasOcupadas: 7, mesasTotal: 16 }} />)
-    expect(screen.getByText('3')).toBeTruthy()
-    expect(screen.getByText(/Pedro/)).toBeTruthy()
-    // formatCurrency redondea a pesos: 48250.75 -> $48,251
-    expect(screen.getByText(/48,251/)).toBeTruthy()
-    expect(screen.getByText(/117 órdenes · 118 personas/)).toBeTruthy()
-  })
-
-  it('un dato ausente sale como guion, NO como cero', () => {
-    render(<BarraTurno turno={turno} resumen={{ ventas: null, ordenes: null, personas: null, mesasOcupadas: null, mesasTotal: null }} />)
-    // "Llevas" y "En piso" sin dato → guiones, y ningún $0 fabricado
-    expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(2)
-    expect(screen.queryByText('$0.00')).toBeNull()
-  })
-
-  it('las mesas se muestran como ocupadas sobre total', () => {
-    render(<BarraTurno turno={turno} resumen={{ ventas: 100, ordenes: 1, personas: 2, mesasOcupadas: 7, mesasTotal: 16 }} />)
-    expect(screen.getByText('/ 16')).toBeTruthy()
-  })
-
-  it('una hora inválida no revienta ni imprime "Invalid Date"', () => {
-    render(<BarraTurno turno={{ ...turno, abiertoAt: 'no-es-fecha' }} resumen={{ ventas: 1, ordenes: 1, personas: 1, mesasOcupadas: 1, mesasTotal: 2 }} />)
-    expect(screen.queryByText(/Invalid/)).toBeNull()
   })
 })
