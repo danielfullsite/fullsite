@@ -82,29 +82,43 @@ describe('getActiveClientSlug', () => {
 // ─── aggregatePayments ────────────────────────────────────────────────────
 
 describe('aggregatePayments', () => {
-  it('converts percentage values to MXN correctly', () => {
-    // Real scenario: 42.0% of $59,258 = $24,888.36 → rounds to $24,888
+  // CONTRATO (verificado contra prod en 0769a8f3 / PR #35):
+  // `pago_métodos[].total` es SIEMPRE un monto en MXN. El porcentaje vive en un
+  // campo `pct` aparte. Cero filas del dataset están bajo 100.
+  //
+  // Estos tests codificaban el heurístico viejo `total < 100 ? (total/100)*ventas_dia : total`,
+  // que #35 eliminó por ser una mina latente: multiplicaba por miles cualquier monto
+  // real bajo $100 (un día lento, una propina, o un tenant nuevo chico). El commit
+  // actualizó chat-data-pipeline y payment-conversion, pero se saltó este archivo y
+  // dedup-parserow — quedaron rojos desde el 2026-08-15 defendiendo el bug.
+
+  it('suma los montos MXN tal cual, sin reinterpretarlos', () => {
     const data = [makeDaily({
       ventas_dia: 59258,
       pago_métodos: [
-        { nombre: 'Tarjeta de crédito', total: 42.0 },
-        { nombre: 'Efectivo', total: 30.0 },
-        { nombre: 'Tarjeta de débito', total: 28.0 },
+        { nombre: 'Tarjeta de crédito', total: 24888 },
+        { nombre: 'Efectivo', total: 17777 },
+        { nombre: 'Tarjeta de débito', total: 16593 },
       ],
     })]
     const result = aggregatePayments(data)
 
-    const tarjeta = result.find(r => r.nombre === 'Tarjeta de crédito')
-    expect(tarjeta).toBeDefined()
-    expect(tarjeta!.total).toBe(Math.round(0.42 * 59258))
+    expect(result.find(r => r.nombre === 'Tarjeta de crédito')!.total).toBe(24888)
+    expect(result.find(r => r.nombre === 'Efectivo')!.total).toBe(17777)
+    expect(result.find(r => r.nombre === 'Tarjeta de débito')!.total).toBe(16593)
+  })
 
-    const efectivo = result.find(r => r.nombre === 'Efectivo')
-    expect(efectivo).toBeDefined()
-    expect(efectivo!.total).toBe(Math.round(0.30 * 59258))
-
-    const debito = result.find(r => r.nombre === 'Tarjeta de débito')
-    expect(debito).toBeDefined()
-    expect(debito!.total).toBe(Math.round(0.28 * 59258))
+  // Ésta es LA prueba del bug que #35 quitó: con el heurístico viejo, $84 de
+  // efectivo se convertían en 0.84 * 50000 = $42,000. Es el escenario del día
+  // lento y del tenant nuevo chico — el que motivó el fix.
+  it('un monto bajo $100 se respeta, NO se trata como porcentaje', () => {
+    const data = [makeDaily({
+      ventas_dia: 50000,
+      pago_métodos: [{ nombre: 'Efectivo', total: 84 }],
+    })]
+    const result = aggregatePayments(data)
+    expect(result[0].total).toBe(84)
+    expect(result[0].total).not.toBe(Math.round(0.84 * 50000))
   })
 
   it('handles empty array', () => {
@@ -120,56 +134,32 @@ describe('aggregatePayments', () => {
 
   it('aggregates across multiple days', () => {
     const data = [
-      makeDaily({
-        fecha: '2026-05-20',
-        ventas_dia: 50000,
-        pago_métodos: [{ nombre: 'Efectivo', total: 50.0 }],
-      }),
-      makeDaily({
-        fecha: '2026-05-21',
-        ventas_dia: 40000,
-        pago_métodos: [{ nombre: 'Efectivo', total: 60.0 }],
-      }),
+      makeDaily({ fecha: '2026-05-20', ventas_dia: 50000, pago_métodos: [{ nombre: 'Efectivo', total: 25000 }] }),
+      makeDaily({ fecha: '2026-05-21', ventas_dia: 40000, pago_métodos: [{ nombre: 'Efectivo', total: 24000 }] }),
     ]
     const result = aggregatePayments(data)
-    const efectivo = result.find(r => r.nombre === 'Efectivo')
-    expect(efectivo).toBeDefined()
-    // Day 1: 50% of 50000 = 25000, Day 2: 60% of 40000 = 24000
-    expect(efectivo!.total).toBe(Math.round(25000 + 24000))
-  })
-
-  it('passes through absolute values >= 100 without conversion', () => {
-    // If total >= 100, it's treated as absolute MXN, not percentage
-    const data = [makeDaily({
-      ventas_dia: 50000,
-      pago_métodos: [{ nombre: 'Efectivo', total: 25000 }],
-    })]
-    const result = aggregatePayments(data)
-    const efectivo = result.find(r => r.nombre === 'Efectivo')
-    expect(efectivo!.total).toBe(25000)
+    expect(result.find(r => r.nombre === 'Efectivo')!.total).toBe(49000)
   })
 
   it('sorts results by total descending', () => {
     const data = [makeDaily({
       ventas_dia: 100000,
       pago_métodos: [
-        { nombre: 'Transferencia', total: 10.0 },
-        { nombre: 'Efectivo', total: 50.0 },
-        { nombre: 'Tarjeta', total: 40.0 },
+        { nombre: 'Transferencia', total: 10000 },
+        { nombre: 'Efectivo', total: 50000 },
+        { nombre: 'Tarjeta', total: 40000 },
       ],
     })]
     const result = aggregatePayments(data)
-    expect(result[0].nombre).toBe('Efectivo')
-    expect(result[1].nombre).toBe('Tarjeta')
-    expect(result[2].nombre).toBe('Transferencia')
+    expect(result.map(r => r.nombre)).toEqual(['Efectivo', 'Tarjeta', 'Transferencia'])
   })
 
   it('skips entries with no nombre', () => {
     const data = [makeDaily({
       ventas_dia: 50000,
       pago_métodos: [
-        { nombre: '', total: 50.0 },
-        { nombre: 'Efectivo', total: 50.0 },
+        { nombre: '', total: 25000 },
+        { nombre: 'Efectivo', total: 25000 },
       ] as any,
     })]
     const result = aggregatePayments(data)
@@ -177,40 +167,26 @@ describe('aggregatePayments', () => {
     expect(result[0].nombre).toBe('Efectivo')
   })
 
+  // ventas_dia ya no participa en el cálculo; que sea 0 no puede alterar el monto.
   it('handles zero ventas_dia gracefully', () => {
     const data = [makeDaily({
       ventas_dia: 0,
-      pago_métodos: [{ nombre: 'Efectivo', total: 50.0 }],
+      pago_métodos: [{ nombre: 'Efectivo', total: 1250 }],
     })]
     const result = aggregatePayments(data)
-    expect(result[0].total).toBe(0)
-  })
-
-  it('handles percentage with 99.9% total', () => {
-    const data = [makeDaily({
-      ventas_dia: 10000,
-      pago_métodos: [{ nombre: 'Tarjeta', total: 99.9 }],
-    })]
-    const result = aggregatePayments(data)
-    expect(result[0].total).toBe(Math.round(0.999 * 10000))
+    expect(result[0].total).toBe(1250)
   })
 
   it('handles single day with multiple payment methods', () => {
     const data = [makeDaily({
       ventas_dia: 80000,
       pago_métodos: [
-        { nombre: 'Tarjeta de crédito', total: 35.0 },
-        { nombre: 'Tarjeta de débito', total: 25.0 },
-        { nombre: 'Efectivo', total: 30.0 },
-        { nombre: 'Transferencia electrónica', total: 5.0 },
-        { nombre: 'Ubereats', total: 5.0 },
+        { nombre: 'Efectivo', total: 32000 },
+        { nombre: 'Tarjeta', total: 48000 },
       ],
     })]
     const result = aggregatePayments(data)
-    expect(result).toHaveLength(5)
-    const sum = result.reduce((s, r) => s + r.total, 0)
-    // Percentages add to 100%, so MXN sum should equal ventas_dia
-    expect(sum).toBe(80000)
+    expect(result.reduce((s, r) => s + r.total, 0)).toBe(80000)
   })
 })
 

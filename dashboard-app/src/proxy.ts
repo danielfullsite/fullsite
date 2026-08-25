@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from '@/lib/fetch-with-timeout'
 import { NextResponse, type NextRequest } from 'next/server'
 import { canAccessPage, resolveRole } from '@/lib/roles'
 
@@ -118,9 +119,22 @@ export async function proxy(req: NextRequest) {
   // Validar el token contra Supabase Auth (server-side, no falsificable)
   let user: { email?: string; app_metadata?: { role?: string } } | null = null
   try {
-    const res = await fetch(`${supabaseUrl}/auth/v1/user`, {
+    // REGRESIÓN (2026-08-14, 8ee5315e): este fetch quedó SIN acotar al mover la
+    // lógica entre middleware.ts y proxy.ts. a59a6b11 (PR #21) lo había acotado.
+    // Sin timeout, con la red degradada el TCP se cuelga y la navegación se congela.
+    //
+    // ALCANCE: sólo páginas del DASHBOARD. /pos, /kds, /cocina y /barra salen por
+    // isPublic() arriba y nunca llegan aquí — el POS se gatea por PIN, no por esta
+    // sesión. O sea que esto NO estaba afectando el camino offline del restaurante.
+    //
+    // 4 s, no el default de 10 s del helper: este fetch bloquea la navegación, así
+    // que su bound debe ser más corto que el genérico. Mismo criterio que
+    // pos/layout.tsx en el PIN ("on degraded LAN, browser default is 30-90s").
+    // Al vencer, el catch de abajo hace NextResponse.next() → fail-open: la
+    // navegación se libera en vez de quedarse colgada.
+    const res = await fetchWithTimeout(`${supabaseUrl}/auth/v1/user`, {
       headers: { apikey: anonKey, Authorization: `Bearer ${token}` },
-    })
+    }, 4_000)
     if (!res.ok) {
       const redirect = NextResponse.redirect(loginUrl)
       redirect.cookies.delete('fs-at')
