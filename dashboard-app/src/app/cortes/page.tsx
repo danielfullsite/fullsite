@@ -4,10 +4,11 @@ import { useEffect, useState, useMemo } from 'react'
 import { DollarSign, Ticket, Users, Receipt, Banknote, CreditCard, Vault, ArrowDownCircle, Building2 } from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
+import { Table, type ColumnDef } from '@/components/ui/Table'
 import PeriodPicker, { type DateRange } from '@/components/PeriodPicker'
 import { getRecentDays, getWansoftData, getDashboardFromPosOrders } from '@/lib/data'
 import { formatCurrency, formatNumber, formatPercent, percentChange } from '@/lib/format'
-import type { WansoftDaily, PagoMetodoEntry } from '@/lib/types'
+import type { WansoftDaily } from '@/lib/types'
 
 function extractPayment(d: WansoftDaily): { efectivo: number; tarjeta: number; transferencia: number } {
   // If efectivo/tarjeta fields have data, use them
@@ -144,8 +145,61 @@ export default function CortesPage() {
     return weeks
   }, [periodData])
 
+  
+  /* Se invierte UNA vez. Antes `[...periodData].reverse()` corría dentro del map
+     y otra vez por fila para leer la anterior: 30 filas = 60 copias del arreglo
+     en cada render. */
+  const cortesFilas = [...periodData].reverse()
+
+  const columnasCortes: ColumnDef<typeof cortesFilas[number]>[] = [
+    {
+      id: 'fecha',
+      header: 'Fecha',
+      headerClassName: 'text-xs font-semibold text-[var(--text-2)] py-3.5 px-4 uppercase tracking-wider',
+      cellClassName: 'py-3 px-4',
+      render: ({ row, index, rows }) => {
+        const prev = rows[index + 1]
+        const change = prev ? percentChange(row.ventas_dia, prev.ventas_dia) : 0
+        return (
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-[var(--text-1)]">
+              {new Date(row.fecha + 'T12:00:00').toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short' })}
+            </span>
+            {prev && (
+              <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${change >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
+                {change >= 0 ? '+' : ''}{change.toFixed(0)}%
+              </span>
+            )}
+          </div>
+        )
+      },
+      footer: <span className="text-sm font-bold text-[var(--text-1)]">TOTAL</span>,
+    },
+    { id: 'ventas', header: 'Ventas', numeric: true, headerClassName: 'text-xs font-semibold text-[var(--text-2)] py-3.5 px-4 uppercase tracking-wider',
+      cellClassName: 'py-3 px-4 text-sm tabular-nums font-bold text-[var(--text-1)]',
+      render: ({ row }) => formatCurrency(row.ventas_dia),
+      footer: <span className="text-sm font-bold text-blue-400 tabular-nums">{formatCurrency(totalVentas)}</span> },
+    { id: 'tickets', header: 'Tickets', numeric: true, headerClassName: 'text-xs font-semibold text-[var(--text-2)] py-3.5 px-4 uppercase tracking-wider', cellClassName: 'py-3 px-4 text-sm tabular-nums text-[var(--text-2)]',
+      render: ({ row }) => formatNumber(row.tickets_count),
+      footer: <span className="py-3.5 px-4 text-sm tabular-nums font-bold text-[var(--text-1)]">{formatNumber(totalTickets)}</span> },
+    { id: 'personas', header: 'Personas', numeric: true, headerClassName: 'text-xs font-semibold text-[var(--text-2)] py-3.5 px-4 uppercase tracking-wider', cellClassName: 'py-3 px-4 text-sm tabular-nums text-[var(--text-2)]',
+      render: ({ row }) => formatNumber(row.personas_restaurant),
+      footer: <span className="py-3.5 px-4 text-sm tabular-nums font-bold text-[var(--text-1)]">{formatNumber(totalPersonas)}</span> },
+    { id: 'ticketprom', header: 'Ticket Prom.', numeric: true, headerClassName: 'text-xs font-semibold text-[var(--text-2)] py-3.5 px-4 uppercase tracking-wider', cellClassName: 'py-3 px-4 text-sm tabular-nums text-[var(--text-2)]',
+      render: ({ row }) => formatCurrency(row.ticket_promedio_restaurant),
+      footer: <span className="py-3.5 px-4 text-sm tabular-nums font-bold text-[var(--text-1)]">{formatCurrency(avgTicket)}</span> },
+    { id: 'efectivo', header: 'Efectivo', numeric: true, headerClassName: 'text-xs font-semibold text-[var(--text-2)] py-3.5 px-4 uppercase tracking-wider', cellClassName: 'py-3 px-4 text-sm tabular-nums text-[var(--text-2)]',
+      render: ({ row }) => formatCurrency(extractPayment(row).efectivo),
+      footer: <span className="py-3.5 px-4 text-sm tabular-nums font-bold text-[var(--text-1)]">{formatCurrency(totalEfectivo)}</span> },
+    { id: 'tarjeta', header: 'Tarjeta', numeric: true, headerClassName: 'text-xs font-semibold text-[var(--text-2)] py-3.5 px-4 uppercase tracking-wider', cellClassName: 'py-3 px-4 text-sm tabular-nums text-[var(--text-2)]',
+      render: ({ row }) => formatCurrency(extractPayment(row).tarjeta),
+      footer: <span className="py-3.5 px-4 text-sm tabular-nums font-bold text-[var(--text-1)]">{formatCurrency(totalTarjeta)}</span> },
+  ]
+
   if (loading) {
-    return (
+
+
+  return (
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
           <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
@@ -300,91 +354,23 @@ export default function CortesPage() {
             {periodData.length} días - Totales acumulados abajo
           </p>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full table-striped">
-            <thead className="sticky top-0 z-10">
-              <tr className="border-b border-[var(--line)] bg-[var(--surface-2)]/80 backdrop-blur-sm">
-                <th className="text-left text-xs font-semibold text-[var(--text-2)] py-3.5 px-4 uppercase tracking-wider">Fecha</th>
-                <th className="text-right text-xs font-semibold text-[var(--text-2)] py-3.5 px-4 uppercase tracking-wider">Ventas</th>
-                <th className="text-right text-xs font-semibold text-[var(--text-2)] py-3.5 px-4 uppercase tracking-wider">Tickets</th>
-                <th className="text-right text-xs font-semibold text-[var(--text-2)] py-3.5 px-4 uppercase tracking-wider">Personas</th>
-                <th className="text-right text-xs font-semibold text-[var(--text-2)] py-3.5 px-4 uppercase tracking-wider">Ticket Prom.</th>
-                <th className="text-right text-xs font-semibold text-[var(--text-2)] py-3.5 px-4 uppercase tracking-wider">Efectivo</th>
-                <th className="text-right text-xs font-semibold text-[var(--text-2)] py-3.5 px-4 uppercase tracking-wider">Tarjeta</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[...periodData].reverse().map((d, i) => {
-                const prev = [...periodData].reverse()[i + 1]
-                const change = prev ? percentChange(d.ventas_dia, prev.ventas_dia) : 0
-                return (
-                  <tr
-                    key={d.fecha}
-                    className="border-b border-[var(--line-soft)] hover:bg-blue-500/10 transition-colors"
-                  >
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-[var(--text-1)]">
-                          {new Date(d.fecha + 'T12:00:00').toLocaleDateString('es-MX', {
-                            weekday: 'short',
-                            day: 'numeric',
-                            month: 'short',
-                          })}
-                        </span>
-                        {prev && (
-                          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${change >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
-                            {change >= 0 ? '+' : ''}{change.toFixed(0)}%
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 text-sm text-right tabular-nums font-bold text-[var(--text-1)]">
-                      {formatCurrency(d.ventas_dia)}
-                    </td>
-                    <td className="py-3 px-4 text-sm text-right tabular-nums text-[var(--text-2)]">
-                      {formatNumber(d.tickets_count)}
-                    </td>
-                    <td className="py-3 px-4 text-sm text-right tabular-nums text-[var(--text-2)]">
-                      {formatNumber(d.personas_restaurant)}
-                    </td>
-                    <td className="py-3 px-4 text-sm text-right tabular-nums text-[var(--text-2)]">
-                      {formatCurrency(d.ticket_promedio_restaurant)}
-                    </td>
-                    <td className="py-3 px-4 text-sm text-right tabular-nums text-[var(--text-2)]">
-                      {formatCurrency(extractPayment(d).efectivo)}
-                    </td>
-                    <td className="py-3 px-4 text-sm text-right tabular-nums text-[var(--text-2)]">
-                      {formatCurrency(extractPayment(d).tarjeta)}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-            <tfoot>
-              <tr className="bg-[var(--surface-2)]/80 border-t-2 border-[var(--line)]">
-                <td className="py-3.5 px-4 text-sm font-bold text-[var(--text-1)]">TOTAL</td>
-                <td className="py-3.5 px-4 text-sm text-right tabular-nums font-bold text-blue-400">
-                  {formatCurrency(totalVentas)}
-                </td>
-                <td className="py-3.5 px-4 text-sm text-right tabular-nums font-bold text-[var(--text-1)]">
-                  {formatNumber(totalTickets)}
-                </td>
-                <td className="py-3.5 px-4 text-sm text-right tabular-nums font-bold text-[var(--text-1)]">
-                  {formatNumber(totalPersonas)}
-                </td>
-                <td className="py-3.5 px-4 text-sm text-right tabular-nums font-bold text-[var(--text-1)]">
-                  {formatCurrency(avgTicket)}
-                </td>
-                <td className="py-3.5 px-4 text-sm text-right tabular-nums font-bold text-[var(--text-1)]">
-                  {formatCurrency(totalEfectivo)}
-                </td>
-                <td className="py-3.5 px-4 text-sm text-right tabular-nums font-bold text-[var(--text-1)]">
-                  {formatCurrency(totalTarjeta)}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
+        <Table
+          rows={cortesFilas}
+          columns={columnasCortes}
+          rowKey={d => d.fecha}
+          /* El orden ES dato: la variación de cada fila se calcula contra la
+             SIGUIENTE. Ordenar por otra columna produciría porcentajes falsos,
+             así que ninguna columna es sortable y el contrato lo hace explícito. */
+          rowOrderIsMeaningful
+          striped
+          stickyHeader
+          showFooterRow
+          footerPlacement="tfoot"
+          footerRowClassName="bg-[var(--surface-2)]/80 border-t-2 border-[var(--line)]"
+          theadClassName="sticky top-0 border-b border-[var(--line)] bg-[var(--surface-2)]/80 backdrop-blur-sm"
+          rowClassName={() => 'hover:bg-blue-500/10 transition-colors'}
+          emptyMode="none"
+        />
       </div>
 
       {/* Detalle de Corte de Caja */}
