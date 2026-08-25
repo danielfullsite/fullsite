@@ -146,14 +146,20 @@ body:has(.pos-kiosk) {
   --sky: var(--info);
 
   /* Bento (cards) */
-  --bento-card: linear-gradient(168deg, var(--panel) 0%, var(--panel) 58%, rgba(16,185,129,0.055) 140%);
+  /* DS v3: plano. El degradado verde en cada tarjeta competía con el acento y
+   * hacía que 30 tarjetas en pantalla se vieran sucias. El borde carga la
+   * elevación, como en Mercury. Se conserva la variable porque 40+ archivos la
+   * usan: cambia el valor, no el contrato. */
+  --bento-card: var(--panel);
   --bento-bevel: linear-gradient(90deg, transparent 0%, rgba(52,211,153,0.30) 50%, transparent 100%);
   --bento-radial: radial-gradient(circle, rgba(16,185,129,0.18) 0%, transparent 65%);
 
-  --shadow-hero: 0 4px 16px rgba(0,0,0,0.6), 0 30px 70px rgba(0,0,0,0.5);
-  --shadow-mid:  0 1px 2px rgba(0,0,0,0.55), 0 14px 34px rgba(0,0,0,0.4);
-  --shadow-soft: 0 1px 1px rgba(0,0,0,0.5), 0 6px 18px rgba(0,0,0,0.3);
-  --shadow-deep: 0 2px 12px rgba(0,0,0,0.6), 0 20px 50px rgba(0,0,0,0.5);
+  /* DS v3: sombras casi imperceptibles. Sólo flota lo que de verdad flota
+   * (modales, menús). Una tarjeta quieta no proyecta sombra de 70px. */
+  --shadow-hero: 0 0 2px rgba(0,0,0,.35), 0 20px 40px -8px rgba(0,0,0,.45);
+  --shadow-mid:  0 0 2px rgba(0,0,0,.28), 0 10px 22px -8px rgba(0,0,0,.30);
+  --shadow-soft: 0 0 2px rgba(0,0,0,.22), 0 4px 12px -6px rgba(0,0,0,.22);
+  --shadow-deep: 0 0 2px rgba(0,0,0,.40), 0 24px 48px -10px rgba(0,0,0,.50);
 
   --radius: 14px;
   --radius-sm: 10px;
@@ -201,15 +207,15 @@ body:has(.pos-kiosk) {
   --sky: var(--info);
 
   /* Tarjetas más limpias (estilo artifact): blanco casi puro, tinte apenas perceptible */
-  --bento-card: linear-gradient(168deg, #fff 0%, #fff 72%, rgba(16,185,129,0.035) 160%);
+  --bento-card: var(--panel);
   --bento-bevel: linear-gradient(90deg, transparent 0%, rgba(16,32,26,0.07) 50%, transparent 100%);
   --bento-radial: radial-gradient(circle, rgba(5,150,105,0.10) 0%, transparent 65%);
 
   /* Sombras más finas y neutras → las tarjetas flotan limpio sobre el papel claro */
-  --shadow-hero: 0 2px 8px rgba(16,32,26,0.06), 0 22px 50px rgba(16,32,26,0.08);
-  --shadow-mid:  0 1px 2px rgba(16,32,26,0.05), 0 8px 24px rgba(16,32,26,0.06);
-  --shadow-soft: 0 1px 2px rgba(16,32,26,0.04), 0 4px 12px rgba(16,32,26,0.05);
-  --shadow-deep: 0 4px 12px rgba(16,32,26,0.07), 0 20px 40px rgba(16,32,26,0.09);
+  --shadow-hero: 0 0 2px rgba(16,32,26,.08), 0 20px 40px -8px rgba(16,32,26,.14);
+  --shadow-mid:  0 0 2px rgba(16,32,26,.06), 0 10px 22px -8px rgba(16,32,26,.09);
+  --shadow-soft: 0 0 2px rgba(16,32,26,.05), 0 4px 12px -6px rgba(16,32,26,.06);
+  --shadow-deep: 0 0 2px rgba(16,32,26,.09), 0 24px 48px -10px rgba(16,32,26,.16);
 
   /* Aliases for component compatibility */
   --surface-1: var(--surface);
@@ -317,8 +323,11 @@ body:has(.pos-kiosk) {
   --color-text-muted: var(--text-3);
   --color-border: var(--line);
   --color-border-light: var(--line-soft);
-  --font-sans: Arial, Helvetica, 'Liberation Sans', system-ui, sans-serif;
-  --font-mono: var(--font-jetbrains-mono), 'JetBrains Mono', ui-monospace, monospace;
+  /* DS v3. Hasta hoy esto decía `Arial, Helvetica, …` y la variable de la
+   * webfont no se referenciaba: la app descargaba Inter y renderizaba en Arial.
+   * Si alguien vuelve a tocar la fuente en layout.tsx, tiene que tocar ESTO. */
+  --font-sans: var(--font-public-sans), 'Public Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: var(--font-plex-mono), 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 }
 
 * { -webkit-tap-highlight-color: transparent; }
@@ -327,7 +336,10 @@ html, body { background: var(--bg); color: var(--text-1); }
 
 body {
   font-family: var(--font-sans);
-  font-feature-settings: "ss01", "cv11", "cv02";
+  /* `ss01/cv11/cv02` eran sets estilísticos de Inter — se aplicaban sobre Arial,
+   * donde no hacían nada. `tnum` sí sirve y es lo que queremos siempre: que una
+   * columna de montos alinee sin pensarlo. */
+  font-feature-settings: "tnum" 1;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   letter-spacing: -0.005em;
