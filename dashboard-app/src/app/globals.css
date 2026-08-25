@@ -546,14 +546,41 @@ body {
 [data-ds="v3"] table td { padding-top: 12px; padding-bottom: 12px; }
 [data-ds="v3"] table th { padding-top: 10px; padding-bottom: 10px; }
 
-/* ── 3. El grupo de navegación deja de gritar ──────────────────────────────
- * La etiqueta de sección pasa a mono y baja de peso: separa sin competir. */
+/* ── 3. Los grupos del sidebar son BOTONES, no etiquetas ───────────────────
+ * Corrección de la primera versión del piloto, que los puso en monoespaciada,
+ * peso 600 y color apagado — tratándolos como el "Workflows" decorativo de
+ * Mercury.
+ *
+ * No lo son: en Fullsite "REPORTES" o "FINANZAS" se hacen CLIC para desplegar
+ * el grupo. Un control que se toca no puede verse más apagado que el texto que
+ * lo rodea, y la monoespaciada lo hacía parecer un dato de sistema.
+ *
+ * Medido en las cuatro referencias (Mercury, Haze, Apex, TailPanel): ninguna
+ * usa monoespaciada en el chrome, y en las tres con sidebar oscuro el ítem
+ * navegable va CLARO. Apex marca la escala exacta: 11px, peso 400-500,
+ * letter-spacing normal. */
 [data-ds="v3"] .sidebar-section-label {
-  font-family: var(--font-mono);
-  font-size: 9.5px;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  color: var(--text-4);
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 550;
+  letter-spacing: 0.02em;
+  color: var(--text-1);
+  opacity: 0.92;
+}
+[data-ds="v3"] .sidebar-section-label:hover { opacity: 1; }
+
+/* ── 3b. Fuera la monoespaciada del chrome del dashboard ───────────────────
+ * `font-mono` se usaba en las píldoras de fecha ("viernes, 24 de julio de
+ * 2026") y en las etiquetas de KPI. Una fecha no es un dato de máquina: leerla
+ * en monoespaciada la vuelve dura y la separa del resto de la interfaz.
+ *
+ * El alcance es sólo el shell del dashboard — el POS y el KDS tienen su propio
+ * layout, no llevan `data-ds`, y ahí la monoespaciada SÍ sirve: los cronómetros
+ * de comanda y los folios se leen mejor con anchos fijos. */
+[data-ds="v3"] .font-mono,
+[data-ds="v3"] .mono {
+  font-family: var(--font-sans);
+  letter-spacing: 0.01em;
 }
 /* La barra de acento del ítem activo pasa de 4px a 3px y se ancla al borde. */
 [data-ds="v3"] .sidebar-nav-item.active::before { width: 3px; left: -10px; }
