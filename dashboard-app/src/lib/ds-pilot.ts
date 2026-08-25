@@ -23,6 +23,30 @@ import { getPlatformConfig, isEnabledForTenant } from '@/lib/platform-config'
  */
 export const DS_PILOT_FLAG = 'ds_v3'
 
+/**
+ * La tipografía de display del piloto se carga SÓLO cuando el piloto está
+ * activo, no con `next/font` en el layout.
+ *
+ * Razón: `next/font` es estático — se descargaría para los 8 tenants y la usaría
+ * uno. Es exactamente el defecto que arreglamos hoy, cuando la app bajaba Inter
+ * completo y renderizaba en Arial. No lo repetimos.
+ *
+ * Schibsted Grotesk sólo trae los pesos 400 y 500: el sistema de savio.mx vive
+ * en peso 400, y traer 600/700 sería peso muerto para un título que nunca los usa.
+ */
+const HREF_DISPLAY =
+  'https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500&display=swap'
+
+function cargarDisplay(): void {
+  if (typeof document === 'undefined') return
+  if (document.querySelector('link[data-ds-display]')) return
+  const l = document.createElement('link')
+  l.rel = 'stylesheet'
+  l.href = HREF_DISPLAY
+  l.setAttribute('data-ds-display', '')
+  document.head.appendChild(l)
+}
+
 export function useDsPilot(clientId: string | null | undefined): boolean {
   // El estado guarda PARA QUÉ tenant se resolvió. Así el valor es derivado y no
   // hay que sincronizarlo con un setState al cambiar de cliente: mientras la
@@ -34,7 +58,10 @@ export function useDsPilot(clientId: string | null | undefined): boolean {
     let vivo = true
     getPlatformConfig()
       .then(cfg => {
-        if (vivo) setResuelto({ cid: clientId, activo: isEnabledForTenant(cfg.flags?.[DS_PILOT_FLAG], clientId) })
+        if (!vivo) return
+        const activo = isEnabledForTenant(cfg.flags?.[DS_PILOT_FLAG], clientId)
+        if (activo) cargarDisplay()
+        setResuelto({ cid: clientId, activo })
       })
       // Si la config no carga, el piloto queda APAGADO: ante la duda, el aspecto
       // que ya está probado, no el experimental.

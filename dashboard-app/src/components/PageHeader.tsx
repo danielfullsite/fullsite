@@ -24,7 +24,7 @@ export default function PageHeader({ title, subtitle, eyebrow, action, exportDat
             {eyebrow}
           </p>
         )}
-        <h2 className="text-[26px] font-bold tracking-[-0.022em] text-[var(--text-1)] leading-[1.15] text-balance">
+        <h2 className="ds-title text-[26px] font-bold tracking-[-0.022em] text-[var(--text-1)] leading-[1.15] text-balance">
           {title}
         </h2>
         {subtitle && (
