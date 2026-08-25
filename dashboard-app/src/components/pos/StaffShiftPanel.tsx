@@ -1,4 +1,5 @@
 'use client'
+import { PIN_LENGTH } from '@/lib/staff-pin'
 
 import { useState, useEffect, useCallback } from 'react'
 import { Clock, LogIn, LogOut, Coffee, Users, TrendingUp, DollarSign, Timer } from 'lucide-react'
@@ -234,7 +235,7 @@ export default function StaffShiftPanel({ onShiftChange }: StaffShiftPanelProps)
               <input
                 type="password"
                 inputMode="numeric"
-                maxLength={4}
+                maxLength={PIN_LENGTH}
                 value={pin}
                 onChange={(e) => { setPin(e.target.value); setPinError('') }}
                 placeholder="••••"

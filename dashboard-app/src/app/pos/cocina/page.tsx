@@ -1,4 +1,5 @@
 'use client'
+import { PIN_LENGTH } from '@/lib/staff-pin'
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
@@ -1099,7 +1100,7 @@ export default function CocinaPage() {
                 <input
                   type="password"
                   inputMode="numeric"
-                  maxLength={4}
+                  maxLength={PIN_LENGTH}
                   value={cancelPin}
                   onChange={(e) => { setCancelPin(e.target.value.replace(/\D/g, '')); setCancelError('') }}
                   placeholder="****"

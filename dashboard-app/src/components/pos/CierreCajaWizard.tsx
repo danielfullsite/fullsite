@@ -20,6 +20,7 @@ import {
   openOrderStatusLabel,
   type OpenOrder,
 } from '@/lib/pos-cierre-guard'
+import { PIN_LENGTH } from '@/lib/staff-pin'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -507,7 +508,7 @@ export default function CierreCajaWizard({
                   <input
                     type="password"
                     inputMode="numeric"
-                    maxLength={8}
+                    maxLength={PIN_LENGTH}
                     value={escalationPin}
                     onChange={(e) => { setEscalationPin(e.target.value.replace(/\D/g, '')); setEscalationError('') }}
                     placeholder="PIN"
@@ -695,7 +696,7 @@ export default function CierreCajaWizard({
                 <input
                   type="password"
                   inputMode="numeric"
-                  maxLength={8}
+                  maxLength={PIN_LENGTH}
                   value={pin}
                   onChange={(e) => { setPin(e.target.value.replace(/\D/g, '')); setPinError('') }}
                   placeholder="PIN"

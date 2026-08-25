@@ -1,4 +1,5 @@
 'use client'
+import { PIN_LENGTH } from '@/lib/staff-pin'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
@@ -306,7 +307,7 @@ export default function AsistenciaPage() {
               <input
                 type="password"
                 inputMode="numeric"
-                maxLength={8}
+                maxLength={PIN_LENGTH}
                 value={pin}
                 onChange={e => { setPin(e.target.value.replace(/\D/g, '')); setError('') }}
                 onKeyDown={e => e.key === 'Enter' && handlePin()}
