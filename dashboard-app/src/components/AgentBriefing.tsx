@@ -27,10 +27,31 @@ const K = {
 /**
  * P0 — fuga entre restaurantes.
  *
- * Este componente consultaba con `useEffect(..., [])`: una sola vez al montar y
- * nunca mas. Al entrar a otro restaurante desde el panel de plataforma, el
- * componente NO se desmonta, asi que las alertas del restaurante anterior se
- * quedaban en pantalla debajo del banner que ya decia "Estas viendo coffee-shop".
+ * Este componente consultaba con `useEffect(..., [])`: una sola vez al montar,
+ * sin volver a consultar y sin dejar registro de a que restaurante pertenece lo
+ * que pinta. Una vez que la lista queda mal, se queda mal.
+ *
+ * CORRECCION DE LA CAUSA RAIZ. La primera version de este comentario decia que
+ * al cambiar de restaurante "el componente NO se desmonta". Es FALSO y lo
+ * refuta el propio codigo: entrar a otro tenant hace
+ * `window.location.href = '/'` (platform/tenants/page.tsx) y salir hace lo mismo
+ * (ActAsBanner.tsx) — las dos son recargas completas de documento.
+ *
+ * Los vectores reales, que este parche si cierra:
+ *   · getActiveClientSlug() cae a NEXT_PUBLIC_DEFAULT_CLIENT_ID, que en el
+ *     deploy vale 'amalay' — verificado en el bundle de produccion. Cualquier
+ *     consulta que corra sin tenant resuelto pregunta por AMALAY, no por nada.
+ *     El "fail-closed" que promete el comentario de data.ts:320 esta anulado.
+ *   · No hay sincronizacion entre pestañas: localStorage se comparte, asi que
+ *     cambiar de restaurante en una pestaña no avisa a los componentes montados
+ *     en otra. Ahi el `[]` si deja las alertas viejas indefinidamente.
+ *   · AuthContext abre la compuerta de AppShell con un setTimeout de 5 s; si la
+ *     consulta de membresias tarda mas, los hijos montan sin slug resuelto.
+ *   · El logout preserva 'fullsite_client_id' a proposito.
+ *
+ * Cual de los cuatro produjo la captura concreta no se puede afirmar por
+ * lectura. El parche cierra los cuatro porque espera a `clientId` de useAuth(),
+ * que es null hasta que las membresias resolvieron.
  *
  * Observado en produccion: el dashboard de coffee-shop mostrando
  * "ALERTAS: 225 sin stock", "19 issues: 0 critical, 11 high" y "1 issues", que

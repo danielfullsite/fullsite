@@ -14,6 +14,8 @@ import EstadoOperacion from '@/components/dashboard/EstadoOperacion'
 import ResumenDia from '@/components/dashboard/ResumenDia'
 import QuienVendio from '@/components/dashboard/QuienVendio'
 import RitmoSemana from '@/components/dashboard/RitmoSemana'
+import CentroAgentes from '@/components/agentes/CentroAgentes'
+import { detectar } from '@/lib/agentes/detectar'
 import ListaAtencion from '@/components/dashboard/ListaAtencion'
 import AgentBriefing from '@/components/AgentBriefing'
 import { formatCurrency, formatNumber, formatPercent, formatDate, percentChange } from '@/lib/format'
@@ -381,6 +383,14 @@ export default function DashboardPage() {
     return { monthVentas, projected, daysLeft, dayOfMonth, daysInMonth, monthName, dailyAvg, yearNum }
   })()
 
+  // Detecciones de los agentes, calculadas del historial de ESTE restaurante.
+  //
+  // No se leen de agent_events ni de agent_results: esas tablas tienen filas de
+  // amalay y de boruca y CERO de coffee-shop, y el bloque que las leía acabó
+  // enseñando las alertas de AMALAY aquí (P0 corregido aparte). `recentData` ya
+  // viene acotado al tenant activo, así que no hay forma de que se crucen.
+  const detecciones = detectar(recentData, viewDay)
+
   // Ritmo por día de la semana. Sale de `recentData`, que la página ya tiene:
   // no hay una consulta nueva. El patrón más fuerte de una cafetería es el día
   // de la semana y ningún widget lo mostraba.
@@ -643,7 +653,10 @@ export default function DashboardPage() {
       </div>
 
       {/* Resumen del día — "N cosas para hoy" (detecciones de los agentes IA) */}
-      <AgentBriefing />
+      {/* Fuera del piloto sigue el briefing de siempre. Dentro, el centro nuevo:
+          frases con verbo, dinero a la derecha, y evidencia al hacer clic. */}
+      {!dsPiloto && <AgentBriefing />}
+      {dsPiloto && <CentroAgentes detecciones={detecciones} cargando={loading} />}
 
       {/* Data freshness: warn when showing a past day as the default view, show sync time for today */}
       {!dsPiloto && period === 'dia' && viewDay && (() => {
