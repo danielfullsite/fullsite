@@ -107,11 +107,22 @@ export async function updateDeliveryStoreStatus(
   const status = action === 'PAUSE'
     ? (process.env.UBER_STORE_STATUS_PAUSED || 'OFFLINE')
     : (process.env.UBER_STORE_STATUS_ACTIVE || 'ONLINE')
+  // Poner la tienda OFFLINE exige decir HASTA CUANDO. Uber lo pide explícito:
+  //   {"code":"bad_request", ... "field_violations":[{"field":"is_offline_until",
+  //     "description":"is_offline_until timestamp is needed when setting store offline"}]}
+  // (evidencia: run day3 32944479542, 2026-08-26 — el enum OFFLINE ya lo aceptó y el
+  // error avanzó a este.) Ventana configurable por env; el default de 60 min es una pausa
+  // operativa normal (cocina saturada, se acabó un insumo), no un cierre indefinido.
+  const body: Record<string, unknown> = { status }
+  if (action === 'PAUSE') {
+    const minutos = Number(process.env.UBER_STORE_PAUSE_MINUTES) || 60
+    body.is_offline_until = new Date(Date.now() + minutos * 60_000).toISOString()
+  }
   try {
     const r = await withRetry(
       () => uberFetch(`/v1/delivery/store/${encodeURIComponent(storeId)}/update-store-status`, {
         method: 'POST',
-        body: JSON.stringify({ status }),
+        body: JSON.stringify(body),
         tokenType: 'marketplace',
       }),
       { maxAttempts: 3, baseDelayMs: 500 }
