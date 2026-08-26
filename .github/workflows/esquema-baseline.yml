@@ -124,9 +124,32 @@ jobs:
             cat reporte.txt
             echo '```'
           } > cuerpo_pr.md
-          gh pr create --base main --head "$rama" \
-            --title 'chore(esquema): actualizar el baseline desde la base viva' \
-            --body-file cuerpo_pr.md
+          # El PR es el remate, no el trabajo. Lo valioso —la rama con el baseline— ya
+          # está empujada arriba. Si el repositorio no le permite a Actions abrir PRs
+          # ("GitHub Actions is not permitted to create or approve pull requests", que
+          # es un ajuste en Settings → Actions → General → Workflow permissions),
+          # tronar aquí tiraría una corrida que ya hizo todo bien y dejaría la rama
+          # huérfana sin que nadie se entere. Mejor dejar la liga a la vista.
+          if gh pr create --base main --head "$rama" \
+               --title 'chore(esquema): actualizar el baseline desde la base viva' \
+               --body-file cuerpo_pr.md
+          then
+            echo "PR abierto."
+          else
+            liga="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/compare/main...${rama}?expand=1"
+            echo "::warning::No se pudo abrir el PR, pero la rama SÍ quedó empujada."
+            {
+              echo '### La rama quedó lista; falta abrir el PR a mano'
+              echo
+              echo "Rama: \`${rama}\`"
+              echo
+              echo "[Abrir el PR desde aquí]($liga)"
+              echo
+              echo 'Causa más probable: Settings → Actions → General → Workflow'
+              echo 'permissions → "Allow GitHub Actions to create and approve pull'
+              echo 'requests" está apagado. Encenderlo evita este paso manual.'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
