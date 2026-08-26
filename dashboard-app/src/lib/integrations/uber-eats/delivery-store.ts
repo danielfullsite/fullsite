@@ -76,7 +76,11 @@ export async function getDeliveryStoreStatus(
       return { ok: false, error: err }
     }
     const data = (await r.json()) as { is_open?: boolean; status?: string; store_status?: string }
-    const isOpen = data.is_open !== undefined ? data.is_open : (data.store_status ?? data.status) === 'ACTIVE'
+    // Uber devuelve "ONLINE", no "ACTIVE" — verificado 2026-08-26 contra el store
+    // a4f298f4: {"status":"ONLINE"}. Con la comparacion anterior is_open salia
+    // false aunque la tienda estuviera abierta.
+    const uberStatus = data.store_status ?? data.status
+    const isOpen = data.is_open !== undefined ? data.is_open : uberStatus === 'ONLINE'
     const statusStr = data.store_status ?? data.status
     await auditLog({ provider: 'ubereats', correlation_id: correlationId, action: 'delivery.store.get_status', request: { store_id: storeId }, response: { is_open: isOpen, status: statusStr }, status_code: r.status, duration_ms: Date.now() - t0 })
     return { ok: true, is_open: isOpen, status: statusStr }
@@ -97,7 +101,12 @@ export async function updateDeliveryStoreStatus(
     const r = await withRetry(
       () => uberFetch(`/v1/delivery/store/${encodeURIComponent(storeId)}/update-store-status`, {
         method: 'POST',
-        body: JSON.stringify({ action }),
+        // Uber espera el campo `status`, no `action`. Mandando `action` el campo
+        // `status` llegaba vacio y respondia:
+        //   bad_request — field_violations: [{field:"status", description:"invalid store status: UNKNOWN"}]
+        // El enum correcto lo dijo el propio Uber: GET /v1/delivery/store/{id}/status
+        // devuelve "ONLINE" para este store (2026-08-26).
+        body: JSON.stringify({ status: action === 'PAUSE' ? 'PAUSED' : 'ONLINE' }),
         tokenType: 'marketplace',
       }),
       { maxAttempts: 3, baseDelayMs: 500 }

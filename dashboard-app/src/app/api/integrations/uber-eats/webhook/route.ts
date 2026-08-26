@@ -672,7 +672,10 @@ async function handleStoreStatus(
   correlationId: string
 ): Promise<void> {
   const p = payload as { store_status?: string; is_open?: boolean }
-  const isOpen = p.store_status === 'ACTIVE' || p.is_open === true
+  // Uber usa "ONLINE" — verificado 2026-08-26 en GET /v1/delivery/store/{id}/status.
+  // Se aceptan los dos: no hemos visto un store.status.changed real de Uber, asi que
+  // no se retira "ACTIVE" sin evidencia de que no lo manda.
+  const isOpen = p.store_status === 'ACTIVE' || p.store_status === 'ONLINE' || p.is_open === true
   if (storeId) {
     await fetch(
       `${SB_URL()}/rest/v1/integration_store_mappings?provider=eq.ubereats&provider_store_id=eq.${encodeURIComponent(storeId)}`,

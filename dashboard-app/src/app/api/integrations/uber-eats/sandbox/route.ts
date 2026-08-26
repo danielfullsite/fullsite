@@ -182,7 +182,10 @@ export async function POST(request: NextRequest) {
       event_time: Math.floor(Date.now() / 1000),
       event_id: `store-status-cert-${Date.now()}`,
       store_id: storeId,
-      store_status: is_open ? 'ACTIVE' : 'PAUSED',
+      // Emitir el enum REAL de Uber ("ONLINE"). Antes mandaba "ACTIVE", que es el
+      // mismo valor que el handler aceptaba: la prueba pasaba por construccion y no
+      // ejercia el contrato de verdad.
+      store_status: is_open ? 'ONLINE' : 'PAUSED',
       is_open,
       meta: { resource: { store: { store_id: storeId } } },
     })
