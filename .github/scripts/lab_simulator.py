@@ -92,12 +92,54 @@ def close_order(order):
     })
 
 
+# Curva de un restaurante de verdad, por hora local (0–23).
+#
+# El simulador nació generando el MISMO volumen a toda hora, y por eso lab-resto tiene
+# órdenes a las 4 de la mañana: 109 a las 4am, 133 a las 5am, y sólo 3 a las 6pm —
+# medido el 2026-08-26. O sea, un restaurante que nunca cierra y que está muerto justo
+# a la hora de la cena. Para un laboratorio da igual; para un DEMO que se le enseña a un
+# restaurantero, es lo primero que va a notar que está mal.
+#
+# Los factores multiplican el volumen base. 0.0 = cerrado.
+CURVA_RESTAURANTE = [
+    0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,   # 00–06 cerrado
+    0.3, 0.6, 0.8, 0.7, 0.9,             # 07–11 desayuno
+    1.3, 1.6, 1.4, 0.8,                  # 12–15 comida (pico)
+    0.4, 0.5, 0.9,                       # 16–18 tarde floja
+    1.5, 1.6, 1.2,                       # 19–21 cena (pico)
+    0.6, 0.3,                            # 22–23 cierre
+]
+
+
+def factor_de_la_hora() -> float:
+    """1.0 = volumen base. Sólo aplica si CURVA_HORARIA está encendida.
+
+    Apagada por omisión a propósito: el lab existente depende de su volumen parejo y
+    este cambio no debe alterarlo. Se enciende por tenant, desde el workflow.
+    """
+    if os.environ.get("CURVA_HORARIA", "").strip().lower() not in ("1", "true", "si", "sí"):
+        return 1.0
+    tz = os.environ.get("TZ_LOCAL", "America/Monterrey")
+    try:
+        from zoneinfo import ZoneInfo
+        hora = datetime.now(ZoneInfo(tz)).hour
+    except Exception:
+        hora = datetime.utcnow().hour  # sin zona, mejor seguir que tronar
+    return CURVA_RESTAURANTE[hora % 24]
+
+
 def main():
     start = time.time()
     created = advanced = closed = 0
     try:
         # 1) Crear órdenes nuevas (servicio premium entrando — más volumen)
-        n_new = random.randint(4, 9)
+        factor = factor_de_la_hora()
+        if factor == 0.0:
+            # Cerrado. No se crean órdenes, pero SÍ se cierran las que quedaron
+            # abiertas — un restaurante que cierra cobra lo que tiene en mesa.
+            n_new = 0
+        else:
+            n_new = max(1, round(random.randint(4, 9) * factor))
         base_seq = 0
         for s in range(n_new):
             order = make_order(base_seq + s)
@@ -119,7 +161,12 @@ def main():
                 closed += 1
 
         dur = int((time.time() - start) * 1000)
-        summary = f"lab sim: +{created} órdenes, {advanced} a cocina, {closed} cobradas"
+        # El tenant va en el resumen porque agent_runs NO tiene columna de client_id:
+        # con dos restaurantes corriendo este mismo script, "lab sim: +6" no dice de
+        # cuál habla. Es la única forma de distinguirlos hoy.
+        estado = "cerrado" if factor == 0.0 else f"factor {factor:.1f}"
+        summary = (f"[{CLIENT_ID}] {estado} · +{created} órdenes, "
+                   f"{advanced} a cocina, {closed} cobradas")
         print(f"[lab-simulator] {summary}")
         log_run("lab-simulator", "success", dur, output_summary=summary,
                 tentacle="lab", rows_processed=created + advanced + closed)
