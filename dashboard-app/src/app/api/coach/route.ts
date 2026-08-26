@@ -1,15 +1,22 @@
 import { NextRequest } from 'next/server'
 import { buildDailyFromOrders } from '@/lib/pos-daily'
+import { requireTenant } from '@/lib/api-auth'
 
 export async function POST(request: NextRequest) {
   try {
-    const { client_id } = await request.json().catch(() => ({} as { client_id?: string }))
+    const { client_id: pedido } = await request.json().catch(() => ({} as { client_id?: string }))
 
     if (!process.env.GROQ_API_KEY && !process.env.GROQ) {
       return Response.json({ insights: [] }, { status: 200 })
     }
     // AISLAMIENTO (OCM Fase 0): sin client_id no se consulta nada — evita leer TODOS los tenants.
-    if (!client_id) return Response.json({ insights: [] }, { status: 200 })
+    if (!pedido) return Response.json({ insights: [] }, { status: 200 })
+
+    // El client_id venía del cuerpo de la petición sin verificar contra la sesión: bastaba
+    // mandar el slug de otro restaurante para leer sus ventas. Ahora sale de client_users.
+    const ctx = await requireTenant(request, pedido)
+    if (ctx instanceof Response) return ctx
+    const client_id = ctx.clientId
 
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
     const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!

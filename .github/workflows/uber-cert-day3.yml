@@ -33,6 +33,16 @@ jobs:
           echo "D3-002 scope_probe: HTTP $HTTP_CODE"
           GRANTED=$(echo "$BODY" | jq -r '.scopes_granted // [] | join(", ")' 2>/dev/null || echo "?")
           DELTA=$(echo "$BODY" | jq -r '.scopes_delta // [] | join(", ")' 2>/dev/null || echo "?")
+          # Promociones: Uber las concede por separado, así que hasta ahora el probe
+          # salía limpio aunque no estuvieran. Se reporta explícito.
+          PROMO_GRANTED=$(echo "$BODY" | jq -r '.phases.phase4_promotions.scopes_granted // [] | join(", ")' 2>/dev/null || echo "?")
+          PROMO_MISSING=$(echo "$BODY" | jq -r '.phases.phase4_promotions.scopes_missing // [] | join(", ")' 2>/dev/null || echo "?")
+          PROMO_BLOCKER=$(echo "$BODY" | jq -r '.phases.phase4_promotions.blocker // "ninguno"' 2>/dev/null || echo "?")
+          echo "  promociones concedidas: ${PROMO_GRANTED:-(ninguna)}"
+          echo "  promociones faltantes : ${PROMO_MISSING:-(ninguna)}"
+          echo "  promociones blocker   : $PROMO_BLOCKER"
+          echo "D3002_PROMO_GRANTED=$PROMO_GRANTED" >> $GITHUB_ENV
+          echo "D3002_PROMO_MISSING=$PROMO_MISSING" >> $GITHUB_ENV
           CORR=$(echo "$BODY" | jq -r '.correlation_id // "?"' 2>/dev/null || echo "?")
           echo "  scopes_granted: $GRANTED"
           echo "  scopes_delta:   $DELTA"
@@ -61,6 +71,8 @@ jobs:
             echo "## 🔑 Uber — concede los scopes que faltan"
             echo ""
             echo "- **scopes concedidos:** \`${D3002_GRANTED:-(vacío)}\`"
+            echo "- **promociones concedidas:** \`${D3002_PROMO_GRANTED:-(ninguna)}\`"
+            echo "- **promociones faltantes:** \`${D3002_PROMO_MISSING:-(ninguna)}\`"
             echo "- **scopes que faltan (delta):** \`${D3002_DELTA:-(vacío)}\`"
             echo ""
             if [ -n "$REAUTH_URL" ]; then
@@ -88,6 +100,22 @@ jobs:
           EVIDENCE=$(echo "$BODY" | jq -r '.summary.uber_evidence_status // "?"' 2>/dev/null || echo "?")
           RUN_ID=$(echo "$BODY" | jq -r '.day3_run_id // "?"' 2>/dev/null || echo "?")
           echo "  delivery_store_apis: $STORE_APIS"
+          # Desglose por API. El sumario "N/5 OK" no dice CUAL falla, y sin eso no hay
+          # nada que arreglar ni que reportarle a Uber. El detalle ya venia en el JSON.
+          echo "  --- desglose de las 5 Delivery Store APIs ---"
+          for API in list get status pause activate; do
+            OK=$(echo "$BODY" | jq -r ".phases[0].$API.ok // false" 2>/dev/null || echo "?")
+            ERR=$(echo "$BODY" | jq -r ".phases[0].$API.error // \"\"" 2>/dev/null || echo "")
+            ST=$(echo "$BODY" | jq -r ".phases[0].$API.status // \"\"" 2>/dev/null || echo "")
+            if [ "$OK" = "true" ]; then
+              echo "    $API: OK"
+            else
+              echo "    $API: FALLA  status=${ST:-?}  error=${ERR:-sin mensaje}"
+              FAILED_APIS="${FAILED_APIS}${API} "
+            fi
+          done
+          echo "  APIs que fallan: ${FAILED_APIS:-(ninguna)}"
+          echo "D3004_FAILED_APIS=${FAILED_APIS:-ninguna}" >> $GITHUB_ENV
           echo "  internal_pipeline:   $PIPELINE"
           echo "  real_order:          $REAL_ORDER"
           echo "  uber_evidence_status: $EVIDENCE"
@@ -131,6 +159,7 @@ jobs:
           MSG="${MSG}D3-003 reauth_url: $D3003_HTTP%0A"
           MSG="${MSG}D3-004 day3_full: $D3004_HTTP%0A"
           MSG="${MSG}  store_apis: $D3004_STORE_APIS%0A"
+          MSG="${MSG}  fallan: $D3004_FAILED_APIS%0A"
           MSG="${MSG}  real_order: $D3004_REAL_ORDER%0A"
           MSG="${MSG}  run_id: $D3004_RUN_ID%0A"
           MSG="${MSG}D3-005 evidence: $D3005_HTTP ($D3005_ENTRIES entries)%0A%0A"

@@ -231,6 +231,124 @@ es la definición de sobreingeniería prematura. La curva de aprendizaje es la b
 
 ---
 
+### 2026-08-25 — La red y la marca se pagan con revenue share, no con equity
+
+**Decisión:** A los partners que aportan **red y acceso** (no construcción) se les paga con
+**comisión sobre el primer año** de cada contrato que cierren. El equity se reserva para quien
+construye un activo permanente de la empresa, y sólo después de un entregable verificable.
+
+**Contexto:** Conversación con **JC Tame** (restaurantero, consultor de aperturas de barras de
+café). Ofrece identidad de marca, red de pilotos y modelo de equipo comercial. No pidió nada
+a cambio — textual: *"la regalía es lo de menos"*. Fullsite: 1 restaurante en producción,
+7 demos, cero revenue.
+
+**Estructura acordada como recomendación:**
+
+| Momento | Instrumento | Cantidad |
+|---|---|---|
+| Hoy (plática) | Nada | 0% |
+| Tras el primer entregable verificable | Advisor grant | 1%, vesting 2 años, cliff 3 meses |
+| Si se vuelve operativo (dueño del go-to-market) | Equity de operador | 5% base, earn-up a 10% por hitos de revenue, vesting 4 años, cliff 1 año |
+| Siempre, en paralelo | Revenue share | 10-15% del primer año de cada contrato que él cierre |
+
+**Por qué:**
+1. El equity es para quien construye la compañía; el revenue share para quien trae los deals.
+   Confundirlos es el error clásico del founder solo.
+2. Un partner que trae 10 restaurantes cobrando 12% del primer año se paga con dinero que **no
+   existía sin él** — el cap table queda intacto.
+3. Ofrecer doble dígito a alguien que no ha pedido nada abarata el equity y se lee como
+   desesperación. JC negocia con proveedores toda su vida; lo notaría.
+4. Aplica el mismo patrón que con Hugo Vaquera: **founding sprint antes de firmar equity.**
+
+**El ask correcto — no pedirle una lista de leads.** Si el activo es su nombre, un lead frío
+vale poco y una presentación con su nombre de por medio vale todo. El entregable es:
+*"escoge un lugar donde tu palabra pese, nos sentamos los tres, tú abres y yo enseño el
+sistema."* Eso consigue el piloto, prueba si la red es real, y lo compromete públicamente.
+
+**Alternativas descartadas:**
+- *10-15% de equity de entrada, como Hugo:* Hugo compromete 2-4 años y transiciona su ingreso
+  al mes 18. JC no va a cerrar su consultoría — su valor depende de que siga adentro del
+  circuito. Contribución estructuralmente parcial.
+- *Nada hasta que traiga clientes:* deja enfriar a alguien con red. La gente con nombre tiene
+  diez conversaciones interesantes al mes; la que se enfría es la que no recibió algo suyo que
+  empujar en la primera quincena.
+
+**⚠️ Pendiente que bloquea cualquier oferta formal — el cap table no está resuelto.**
+`DUE-DILIGENCE-v2.md` registra a Monica con **20% sin contrato legal**, más las propuestas de
+Eduardo y Hugo. FULLSITE SAS se constituyó (2026-06-11) con Daniel como **único accionista**.
+Legalmente hay 100%; en compromisos verbales no. **Antes de ofrecerle equity a nadie más hay
+que reconciliar y documentar el cap table real.** Suma comprometida estimada: Monica 20% +
+Hugo 15% + Eduardo 4% + pool 10% + aceleradora 7% + seed ~18% = **~74%**.
+
+**Estado:** decisión tomada, oferta no presentada. Ver `memory/project_jc_tame_brand_partner.md`.
+
+---
+
+### 2026-08-25 — Sin acta de línea base no hay instalación
+
+**Decisión:** Ningún restaurante se instala sin haber levantado y firmado el
+**acta de línea base** ([`../playbooks/guides/ACTA-LINEA-BASE.md`](../playbooks/guides/ACTA-LINEA-BASE.md)).
+Un restaurante instalado sin acta se registra como *"sin línea base"* y **no se usa como caso
+de éxito**.
+
+**Por qué:** El caso de éxito se construye el día cero o no existe. Sin el antes medido, a los
+seis meses hay una anécdota — *"les fue mejor"* — que no convence a un dueño escéptico ni
+sostiene una nota de prensa ni se presenta a un inversionista. El playbook de onboarding cubría
+bien la configuración técnica y **no medía nada del negocio**. Hueco cerrado en §1E.
+
+**Regla asociada:** cada dato lleva fuente y confiabilidad (`MEDIDO` / `EXPORTADO` /
+`DECLARADO` / `ESTIMADO`). Nunca presentar un dato declarado por el dueño como medido por
+nosotros. Al comparar contra el día 30/60/90, anotar qué más cambió en el periodo — atribuirle
+a Fullsite un cambio que fue del mercado destruye la credibilidad de todos los casos.
+
+---
+
+### 2026-08-25 — Posicionamiento: "el punto de venta final"
+
+**Decisión:** Adoptar **"el punto de venta final"** como frase de posicionamiento hacia afuera.
+Documento: [`POSICIONAMIENTO.md`](POSICIONAMIENTO.md). Estado: **borrador, pendiente de
+validación en las primeras tres conversaciones de venta reales.**
+
+**Contexto:** Diagnóstico de JC Tame, textual: *"si yo no veo lo que tú tienes en persona, lo
+visualizo como otro punto de venta más."* El problema no es de producto — es de encuadre.
+Al presentarnos como "punto de venta" entramos a la lista de los cinco que el dueño ya vio, y
+ahí se compite por precio.
+
+**Consecuencia operativa inmediata:** el demo **deja de abrir en la pantalla de mesas.**
+Abrir en la cuadrícula es entrar por la puerta de "otro POS más". El demo abre con el hallazgo
+que su sistema actual no le puede dar; el POS se enseña después, como prueba de que el hallazgo
+salió de su operación real. Secuencia: **hallazgo → de dónde salió → cómo se opera.**
+
+**Límite explícito:** sólo se venden los pilares con evidencia (opera sin fallar · piensa por
+ti). La capa de proveedores, benchmark de precios entre clientes y consultoría de apertura es
+**tesis, no producto** — se cuenta como visión y nunca como capacidad.
+
+**Lo que NO se dice (verificado contra el repo el 2026-08-25):** que el sistema le manda solo el
+correo al proveedor. `inventory_auto_order.py`, `purchase_predictor.py`, `stock_alert_agent.py`
+y `supplier_monitor.py` detectan el reorden, predicen la compra y sugieren la orden — pero el
+envío es **Telegram al dueño**. El tramo hacia el proveedor no existe, y cuando exista es un
+efecto externo Tipo A con aprobación humana obligatoria.
+
+---
+
+### 2026-08-25 — Marca y red corren en paralelo; no tocan el núcleo
+
+**Decisión:** El trabajo de marca, red y pilotos es **clase B**: corre en paralelo, **no bloquea
+el núcleo** (offline, cutover de AMALAY, camino del dinero) y **no consume tiempo de producto
+de Daniel**.
+
+**Por qué:** La prioridad 20 del `CLAUDE.md` sigue vigente — no se abren iniciativas nuevas
+mientras el núcleo crítico no esté certificado. Pero la conversación con JC cambió la urgencia
+en el otro sentido: si abre una puerta en dos semanas, el cutover deja de ser tarea técnica y
+se vuelve **prerrequisito comercial**. No se puede instalar en un restaurante que nos presentó
+alguien que puso su nombre de por medio, con un producto que no se ha ejercido físicamente.
+
+**No se empieza:** rediseño de marca, logo, redes o campaña · benchmark de precios cross-tenant
+y "academia de restaurantes" (requiere agregación anónima con opt-in) · agentes nuevos
+(AI Ops v1 está completo; sólo refinamientos por evidencia real).
+
+---
+
 ## Decisiones Descartadas (y por qué)
 
 | Decisión considerada | Por qué se descartó |

@@ -54,6 +54,16 @@ export const getApiBase = (): string =>
 export const USL_SCOPES = ['eats.pos_provisioning']
 export const MARKETPLACE_M2M_SCOPES = ['eats.store', 'eats.store.status.write', 'eats.order', 'eats.store.orders.read']
 export const DELIVERY_M2M_SCOPES = ['eats.deliveries']
+/** Scopes de promociones. Uber los concede POR SEPARADO del set de marketplace: no
+ *  están en MARKETPLACE_M2M_SCOPES y por eso las promociones piden su scope por
+ *  override (ver promotionsScope en promotions.ts). Se listan aquí para poder
+ *  PROBARLOS — sin este set el scope_probe nunca tocaba promociones y no había forma
+ *  de comprobar si Uber los concedió. Configurable por env por si Uber renombra el
+ *  scope, sin requerir deploy. */
+export const PROMOTIONS_M2M_SCOPES = (
+  process.env.UBER_PROMOTIONS_PROBE_SCOPE ||
+  'eats.store.promotion.write eats.store.promotion.read'
+).trim().split(/\s+/).filter(Boolean)
 
 // Explicit scope constants (kept for audit documentation)
 export const SCOPE_ORDER = 'eats.order'

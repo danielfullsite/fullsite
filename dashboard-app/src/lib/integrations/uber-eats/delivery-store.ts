@@ -94,16 +94,35 @@ export async function updateDeliveryStoreStatus(
 ): Promise<{ ok: boolean; error?: string }> {
   const t0 = Date.now()
   // Uber espera el campo `status` con el estado deseado (no `action`); un body sin `status`
-  // lo interpreta como "invalid store status: UNKNOWN". ACTIVATE->ONLINE, PAUSE->PAUSED
-  // (los valores que reporta el propio GET .../status). Override por env si Uber cambia el enum.
+  // lo interpreta como "invalid store status: UNKNOWN".
+  //
+  // OJO — el enum de LECTURA y el de ESCRITURA no son el mismo. El GET .../status reporta
+  // PAUSED, y de ahí se tomó el valor para el POST; pero el POST lo rechaza:
+  //   {"error":"error transforming request: ... toField: status, error: unknown enum
+  //     value string:PAUSED"}
+  // Evidencia: run day3 32943685915 (2026-08-26) — `pause` era la ÚNICA de las 5 Delivery
+  // Store APIs que fallaba (4/5 OK), y el sumario nunca decía cuál. ACTIVATE->ONLINE sí
+  // pasa, así que la contraparte del par es OFFLINE, no PAUSED.
+  // Override por env si Uber vuelve a cambiar el enum, sin necesidad de deploy.
   const status = action === 'PAUSE'
-    ? (process.env.UBER_STORE_STATUS_PAUSED || 'PAUSED')
+    ? (process.env.UBER_STORE_STATUS_PAUSED || 'OFFLINE')
     : (process.env.UBER_STORE_STATUS_ACTIVE || 'ONLINE')
+  // Poner la tienda OFFLINE exige decir HASTA CUANDO. Uber lo pide explícito:
+  //   {"code":"bad_request", ... "field_violations":[{"field":"is_offline_until",
+  //     "description":"is_offline_until timestamp is needed when setting store offline"}]}
+  // (evidencia: run day3 32944479542, 2026-08-26 — el enum OFFLINE ya lo aceptó y el
+  // error avanzó a este.) Ventana configurable por env; el default de 60 min es una pausa
+  // operativa normal (cocina saturada, se acabó un insumo), no un cierre indefinido.
+  const body: Record<string, unknown> = { status }
+  if (action === 'PAUSE') {
+    const minutos = Number(process.env.UBER_STORE_PAUSE_MINUTES) || 60
+    body.is_offline_until = new Date(Date.now() + minutos * 60_000).toISOString()
+  }
   try {
     const r = await withRetry(
       () => uberFetch(`/v1/delivery/store/${encodeURIComponent(storeId)}/update-store-status`, {
         method: 'POST',
-        body: JSON.stringify({ status }),
+        body: JSON.stringify(body),
         tokenType: 'marketplace',
       }),
       { maxAttempts: 3, baseDelayMs: 500 }

@@ -60,6 +60,32 @@ if (process.env.SANDBOX_ENV === 'true') {
   }
 }
 
+// Un build de PRODUCCIÓN sin credenciales embarca un bundle permanentemente roto.
+//
+// Las NEXT_PUBLIC_* se inlinean en el bundle del navegador en tiempo de build: si
+// faltan cuando se compila, no hay manera de arreglarlo después poniéndolas en Vercel
+// — habría que volver a compilar. Antes esto lo atrapaba por accidente, porque crear
+// el cliente de Supabase durante el prerender tronaba. Eso se corrigió (el cliente
+// ahora se construye cuando se usa, no cuando se compila), así que el chequeo tiene
+// que ser explícito o se pierde.
+//
+// Deliberadamente SÓLO para producción. Los previews de rama no traen estas variables
+// —decisión tomada para que un preview no pueda tocar datos de producción— y exigirlas
+// ahí dejaba el check de Vercel en rojo permanente para todos los PR, que es peor que
+// no tener check: entrena a mergear pasando por encima de rojo.
+if (process.env.VERCEL_ENV === 'production') {
+  const faltantes = ['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY']
+    .filter((v) => !process.env[v]);
+  if (faltantes.length > 0) {
+    throw new Error(
+      `[PRODUCCIÓN] Faltan variables de build: ${faltantes.join(', ')}. ` +
+      'Se inlinean en el bundle del navegador, así que un build sin ellas queda roto ' +
+      'de forma permanente. Configurar en Vercel → Settings → Environment Variables ' +
+      '(scope Production) y volver a desplegar.'
+    );
+  }
+}
+
 // CAPACITOR_OFFLINE=1 → static export para empaquetar el bundle dentro
 // de la app nativa (POS offline). headers() no aplica en export.
 const isCapacitorOffline = process.env.CAPACITOR_OFFLINE === '1';
