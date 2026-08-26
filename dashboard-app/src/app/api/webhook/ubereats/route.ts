@@ -62,7 +62,10 @@ async function acceptOrder(orderId: string) {
   if (!token) return
 
   const isProduction = process.env.UBER_ENV === 'production'
-  const apiBase = isProduction ? 'https://api.uber.com' : 'https://api.uber.com'
+  // Ambas ramas decian api.uber.com: en sandbox esto mandaba un token de
+  // sandbox-login contra el host de produccion, que responde 401/403. El
+  // sandbox vive en test-api.uber.com (docs de Uber, guia Sandbox & Testing).
+  const apiBase = isProduction ? 'https://api.uber.com' : 'https://test-api.uber.com'
 
   await fetch(`${apiBase}/v1/eats/orders/${orderId}/accept_pos_order`, {
     method: 'POST',
