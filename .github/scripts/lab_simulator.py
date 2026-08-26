@@ -49,11 +49,55 @@ def next_order_number():
     return (rows[0]["order_number"] + 1) if rows and rows[0].get("order_number") else 1
 
 
+# El menú del propio restaurante, cuando lo tiene.
+#
+# MENU (arriba) es una carta de steakhouse: Wagyu A5 a $1,280, langosta a $980. Coherente
+# para el lab, que no tiene menú propio en la base. Pero apuntar el simulador a `demo`
+# con esa carta convirtió al demo en OTRO NEGOCIO de un día para otro:
+#
+#   históricas del demo   1,203 órdenes, ticket promedio $418   (rango $30–$1,365)
+#   generadas con MENU       11 órdenes, ticket promedio $4,945 (rango $1,195–$12,992)
+#
+# Doce veces el ticket. Cualquier agente que compare hoy contra la historia grita
+# "anomalía" — y tiene razón, pero por el motivo equivocado. Y un prospecto ve un ticket
+# de $12,992 al lado de un promedio de $418 y sabe que le están enseñando algo falso.
+#
+# Se lee el menú real del tenant. Si no tiene (el caso de lab-resto), se usa MENU y el
+# lab se comporta EXACTAMENTE igual que antes.
+_menu_cache = None
+
+
+def menu_del_tenant():
+    """[(nombre, precio, estación)] del restaurante, o el MENU de respaldo."""
+    global _menu_cache
+    if _menu_cache is not None:
+        return _menu_cache
+    try:
+        filas = sb_get(
+            "pos_menu_items",
+            f"client_id=eq.{CLIENT_ID}&active=eq.true&select=name,price&limit=200",
+        )
+        propio = [(f["name"], float(f["price"]), "cocina")
+                  for f in filas if f.get("name") and f.get("price")]
+        if propio:
+            print(f"[lab-simulator] menú de {CLIENT_ID}: {len(propio)} platillos "
+                  f"(promedio ${sum(p for _, p, _ in propio)/len(propio):,.0f})")
+            _menu_cache = propio
+            return _menu_cache
+    except Exception as e:
+        print(f"[lab-simulator] no se pudo leer el menú de {CLIENT_ID}: {e}", file=sys.stderr)
+
+    print(f"[lab-simulator] {CLIENT_ID} no tiene menú propio — se usa el de respaldo")
+    _menu_cache = MENU
+    return _menu_cache
+
+
 def make_order(seq):
+    carta = menu_del_tenant()
     n_items = random.randint(2, 5)
     items = []
     for _ in range(n_items):
-        nombre, precio, est = random.choice(MENU)
+        nombre, precio, est = random.choice(carta)
         cant = random.randint(1, 3)
         items.append({"nombre": nombre, "precio": precio, "cantidad": cant, "estacion": est})
     subtotal = sum(i["precio"] * i["cantidad"] for i in items)
