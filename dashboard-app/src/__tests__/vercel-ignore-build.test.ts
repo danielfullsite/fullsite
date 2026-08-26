@@ -31,12 +31,12 @@ const VERCEL_JSON = path.resolve(AQUI, '../../../vercel.json')
 // copia. Va inline y no como script porque `.vercelignore` excluye `/scripts/`
 // y además `*.sh`; un archivo aparte podría no existir cuando Vercel corre el
 // paso, y el fallo sería silencioso.
-const IGNORE_COMMAND = JSON.parse(readFileSync(VERCEL_JSON, 'utf-8')).ignoreCommand
+const IGNORE_COMMAND: string = JSON.parse(readFileSync(VERCEL_JSON, 'utf-8')).ignoreCommand
 
 /** Crea un repo temporal con un commit base y un segundo commit que toca `archivos`. */
-function repoQueToca(archivos) {
+function repoQueToca(archivos: string[]): string {
   const dir = mkdtempSync(path.join(tmpdir(), 'vib-'))
-  const git = (...args) => execFileSync('git', args, { cwd: dir, stdio: 'pipe' })
+  const git = (...args: string[]) => execFileSync('git', args, { cwd: dir, stdio: 'pipe' })
 
   git('init', '-q', '-b', 'main')
   git('config', 'user.email', 'test@fullsite.local')
@@ -58,7 +58,7 @@ function repoQueToca(archivos) {
 }
 
 /** Devuelve el exit code real del ignoreCommand parado en ese repo. */
-function correr(dir) {
+function correr(dir: string): number | null {
   return spawnSync('bash', ['-c', IGNORE_COMMAND], { cwd: dir, encoding: 'utf-8' }).status
 }
 
@@ -66,7 +66,7 @@ const SALTAR = 0
 const CONSTRUIR = 1
 
 describe('vercel-ignore-build · salta lo que no puede cambiar el deploy', () => {
-  const casos = [
+  const casos: Array<[string, string[]]> = [
     ['docs/', ['docs/playbooks/algo.md']],
     ['docs/ con varios archivos', ['docs/a.md', 'docs/b/c.md']],
     ['.github/ workflows', ['.github/workflows/ci.yml']],
@@ -87,7 +87,7 @@ describe('vercel-ignore-build · salta lo que no puede cambiar el deploy', () =>
 })
 
 describe('vercel-ignore-build · construye ante cualquier cambio desplegable', () => {
-  const casos = [
+  const casos: Array<[string, string[]]> = [
     ['dashboard-app/', ['dashboard-app/src/app/pos/layout.tsx']],
     ['un html de la raíz', ['fullsite.html']],
     ['package.json de la raíz', ['package.json']],
@@ -128,7 +128,7 @@ describe('vercel-ignore-build · el comando vive en vercel.json', () => {
 describe('vercel-ignore-build · falla hacia construir, nunca hacia no desplegar', () => {
   it('sin commit padre construye en vez de saltar', () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'vib-raiz-'))
-    const git = (...args) => execFileSync('git', args, { cwd: dir, stdio: 'pipe' })
+    const git = (...args: string[]) => execFileSync('git', args, { cwd: dir, stdio: 'pipe' })
     git('init', '-q', '-b', 'main')
     git('config', 'user.email', 'test@fullsite.local')
     git('config', 'user.name', 'test')
