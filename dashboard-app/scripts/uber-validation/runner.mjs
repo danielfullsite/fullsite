@@ -21,7 +21,9 @@
 
 const SANDBOX_ACTION_PATH = '/api/integrations/uber-eats/sandbox'
 const ORDER_PATH = '/api/integrations/uber-eats/order'
-const DEFAULT_STORE_ID = '633b57d4-237a-5a32-b249-7ceb795f1d35'
+// Store de prueba vigente. Uber recreo el store el 2026-08-25 (caso #59499952) porque
+// el anterior estaba roto; el 401 de Menu y el invalid_scope se observaron contra el viejo.
+const DEFAULT_STORE_ID = 'a4f298f4-202f-47f5-b375-d2eefec0126c'
 
 // ─── Sanitizer ────────────────────────────────────────────────────────────────
 // Redacts anything token/secret-shaped from any string before it is emitted.

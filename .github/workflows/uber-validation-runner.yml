@@ -22,6 +22,10 @@ on:
       item_id:
         description: 'Item id for resolve-fulfillment (optional)'
         required: false
+      store_id:
+        description: 'Uber test store id (default: store nuevo del caso #59499952, 2026-08-25)'
+        required: false
+        default: 'a4f298f4-202f-47f5-b375-d2eefec0126c'
 
 jobs:
   run:
@@ -35,7 +39,7 @@ jobs:
         env:
           SANDBOX_URL: ${{ inputs.sandbox_url }}
           INTEGRATION_ADMIN_SECRET: ${{ secrets.UBER_SANDBOX_ADMIN_SECRET }}
-          UBER_TEST_STORE_ID: '633b57d4-237a-5a32-b249-7ceb795f1d35'
+          UBER_TEST_STORE_ID: ${{ inputs.store_id }}
           UBER_TEST_ORDER_ID: ${{ inputs.order_id }}
           UBER_TEST_ITEM_ID: ${{ inputs.item_id }}
         run: node dashboard-app/scripts/uber-validation/runner.mjs
