@@ -246,6 +246,19 @@ def log_event(
         "explanation": explanation, "suggested_action": suggested_action,
         "expires_at": expires_at,
     }
+    # Un NULL explicito ANULA el default de la columna.
+    #
+    # `confidence`, `explanation`, `suggested_action` y `evidence` son NOT NULL CON
+    # DEFAULT en agent_events (0.80, '', '', '{}'). Mandarlos en None no los deja en su
+    # default: los manda como NULL y PostgREST responde 23502.
+    #
+    # Se descubrio el 2026-08-26 cuando el agente de cuadre encontro 25 descuadres reales
+    # en boruca y NINGUNO se pudo guardar. Solo se vio porque este mismo modulo acababa de
+    # aprender a reportar el rechazo en vez de tragarselo — antes habria sido silencio.
+    #
+    # `outcome` es la excepcion: es NULLABLE a proposito, y su NULL significa "todavia no
+    # calificado". Se conserva.
+    row = {k: v for k, v in row.items() if v is not None or k == "outcome"}
     # Se revisa r.ok, no solo la excepcion.
     #
     # Esta es la razon por la que el fallo duro meses sin que nadie lo viera: PostgREST
