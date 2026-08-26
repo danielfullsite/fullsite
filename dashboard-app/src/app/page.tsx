@@ -11,6 +11,7 @@ import EstadoOperacion from '@/components/dashboard/EstadoOperacion'
 import ResumenDia from '@/components/dashboard/ResumenDia'
 import QuienVendio from '@/components/dashboard/QuienVendio'
 import RitmoSemana from '@/components/dashboard/RitmoSemana'
+import EnVista from '@/components/ui/EnVista'
 import CentroAgentes from '@/components/agentes/CentroAgentes'
 import { detectar } from '@/lib/agentes/detectar'
 import ListaAtencion from '@/components/dashboard/ListaAtencion'
@@ -844,16 +845,21 @@ export default function DashboardPage() {
       )}
 
       {/* Main chart — last 30 days, highlights selected day */}
-      {show('revenue_chart') && <div className="mb-4 sm:mb-6">
-        <RevenueChart
-          data={recentData.slice(-30).map((d) => ({
-            fecha: d.fecha,
-            ventas_dia: d.ventas_dia,
-          }))}
-          title="Ventas últimos 30 días"
-          highlightDate={viewDay?.fecha}
-        />
-      </div>}
+      {/* Se monta cuando entra en pantalla, no al cargar la página. Recharts
+          anima AL MONTAR, así que montándola junto con todo lo demás la
+          animación terminaba antes de que bajaras a verla. */}
+      {show('revenue_chart') && (
+        <EnVista minAlto={300} className="mb-4 sm:mb-6">
+          <RevenueChart
+            data={recentData.slice(-30).map((d) => ({
+              fecha: d.fecha,
+              ventas_dia: d.ventas_dia,
+            }))}
+            title="Ventas últimos 30 días"
+            highlightDate={viewDay?.fecha}
+          />
+        </EnVista>
+      )}
 
       {/* Two columns: Top meseros + Categories */}
       {(show('top_meseros') || show('categories')) && <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
@@ -869,10 +875,14 @@ export default function DashboardPage() {
         )}
 
         {/* Categories — horizontal bars */}
-        {show('categories') && <RevenueDistributionChart
-          data={gruposData}
-          title="Distribución por categoría"
-        />}
+        {show('categories') && (
+          <EnVista minAlto={320}>
+            <RevenueDistributionChart
+              data={gruposData}
+              title="Distribución por categoría"
+            />
+          </EnVista>
+        )}
       </div>}
 
       {/* Payment methods */}

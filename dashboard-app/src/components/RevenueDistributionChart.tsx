@@ -35,6 +35,11 @@ export default function RevenueDistributionChart({ data, title }: Props) {
           <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
             <PieChart>
               <Pie
+                // La dona se dibuja girando desde arriba. Sin esto entraba de
+                // golpe y no se alcanzaba a leer el reparto.
+                isAnimationActive
+                animationDuration={800}
+                animationEasing="ease-out"
                 data={top8}
                 dataKey="total"
                 nameKey="nombre"

@@ -96,6 +96,13 @@ export default function RevenueChart({ data, title, highlightDate }: RevenueChar
               strokeWidth={2.4}
               fill="url(#gradientVentas)"
               dot={false}
+              // Recharts anima por omisión, pero con 1500 ms y curva genérica: se
+              // siente lento y a nadie le queda claro si terminó. 900 ms con
+              // salida suave lee como "se está dibujando" en vez de "está
+              // tardando". La misma curva que usa el resto del sistema.
+              isAnimationActive
+              animationDuration={900}
+              animationEasing="ease-out"
               activeDot={{ r: 6, fill: 'var(--accent)', stroke: 'var(--bg)', strokeWidth: 2 }}
             />
             {/* Emphasized endpoint dot (matches DS v2 .chart-end) */}
