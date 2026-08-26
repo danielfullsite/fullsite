@@ -29,48 +29,49 @@ function digest(orders: unknown[]) {
 }
 
 /**
- * Deja constancia del borrado en pos_audit_log.
+ * El borrado y su constancia, en una sola transacción.
  *
- * Por qué existe: el 2026-08-26 a las 02:49:03 esta ruta borró las 303 órdenes de AMALAY
- * —correctamente, con confirmación y digest— y **no dejó ni una línea**. La ausencia de
- * rastro convirtió una acción legítima en un misterio: `pos_orders` vacío contra 303
- * operaciones `COMMITTED` en `pos_save_operations`, sin nada que explicara la diferencia.
- * Reconstruirlo costó una investigación completa y sólo se resolvió leyendo los registros
- * de Supabase, que caducan a las 24 h.
+ * Historia, porque explica por qué NO se hace de la forma obvia:
  *
- * La regla que se sigue de ahí: **una acción destructiva que no se registra es
- * indistinguible de una pérdida de datos.**
+ * El 2026-08-25 a las 20:49:03 (Monterrey) un DELETE se llevó las órdenes de AMALAY —al
+ * menos las 143 que el libro de operaciones documenta. Con todas las protecciones puestas:
+ * confirmación literal, digest contra respaldo, guardián por tenant y nombre.
  *
- * Best-effort a propósito: el borrado ya ocurrió cuando esto corre, y fallar aquí no
- * debe convertir una operación exitosa en un 500. Pero se registra en consola si falla,
- * para que la ausencia del renglón tenga a su vez su propia huella.
+ * Pero **no dejó rastro**, y el resultado fue indistinguible de una pérdida de datos:
+ * `pos_orders` vacío contra 303 operaciones `COMMITTED` en `pos_save_operations`. Sólo se
+ * reconstruyó por los registros de Supabase, que caducan a las 24 h.
+ *
+ * El primer intento de arreglo escribía la auditoría DESPUÉS del borrado, con `try/catch`.
+ * **Eso reproduce el defecto:** si la escritura falla, el borrado vuelve a ser invisible.
+ * Un registro *best-effort* de una acción destructiva no es un registro.
+ *
+ * Por eso el borrado vive ahora en `r1_cleanup_orders`, del lado de la base:
+ *
+ *   · `operation_id` idempotente — reintentar devuelve el resultado anterior, no borra otra vez
+ *   · fila `STARTED` antes de tocar nada — una interrupción deja huella en vez de silencio
+ *   · borrado y `COMMITTED` en la MISMA transacción — o quedan los dos, o ninguno
+ *   · el respaldo completo se guarda en la propia fila, restaurable con `r1_cleanup_restore`
+ *
+ * Y por eso el cliente ya no necesita interpretar un `500`: reintentar con el mismo
+ * `operation_id` es seguro por construcción.
  */
-async function registrarLimpieza(
-  clientId: string, key: string,
-  datos: { actor: string; staffId?: string; role: string; count: number; digest: string },
-): Promise<void> {
-  try {
-    const res = await fetch(`${SB_URL}/rest/v1/pos_audit_log`, {
-      method: 'POST',
-      headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-      body: JSON.stringify({
-        client_id: clientId,
-        order_id: `cleanup:${datos.digest.slice(0, 12)}`,
-        action: 'orders_cleanup',
-        actor: datos.actor,
-        reason: 'Limpieza total de órdenes desde /api/pos/admin/cleanup-orders',
-        details: {
-          deleted_count: datos.count,
-          backup_digest: datos.digest,
-          staff_id: datos.staffId ?? null,
-          role: datos.role,
-        },
-      }),
-    })
-    if (!res.ok) console.error('[cleanup-orders] no se pudo auditar:', res.status, await res.text())
-  } catch (e) {
-    console.error('[cleanup-orders] no se pudo auditar:', (e as Error).message)
+async function ejecutarLimpieza(
+  key: string,
+  args: Record<string, unknown>,
+): Promise<{ ok: boolean; status: number; body: unknown }> {
+  const res = await fetch(`${SB_URL}/rest/v1/rpc/r1_cleanup_orders`, {
+    method: 'POST',
+    headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(args),
+  })
+  if (!res.ok) {
+    return { ok: false, status: 502, body: { error: `RPC_FAILED: HTTP ${res.status}` } }
   }
+  const out = await res.json() as { ok?: boolean; error?: string }
+  // `CONTEO_CAMBIO` es el mismo caso que antes devolvía 409: las órdenes cambiaron
+  // entre el respaldo y el borrado, así que no se borró nada.
+  if (!out.ok) return { ok: false, status: out.error === 'CONTEO_CAMBIO' ? 409 : 500, body: out }
+  return { ok: true, status: 200, body: out }
 }
 
 export async function GET(request: NextRequest) {
@@ -92,20 +93,31 @@ export async function DELETE(request: NextRequest) {
     if (body?.confirm !== 'BORRAR TODAS LAS ORDENES' || typeof body?.digest !== 'string') {
       return Response.json({ error: 'Confirmación inválida' }, { status: 400 })
     }
+    // La llave de idempotencia la pone quien pide. Sin ella no se borra: es lo que hace
+    // que un reintento sea seguro y que un `500` deje de ser ambiguo.
+    if (typeof body?.operation_id !== 'string' || body.operation_id.length < 8) {
+      return Response.json({ error: 'Falta operation_id' }, { status: 400 })
+    }
+
+    // Verificación del digest en la capa web: confirma que el operador vio exactamente
+    // estas órdenes. La verificación que de verdad protege —el conteo— vive dentro de la
+    // transacción, porque entre esta lectura y el borrado cabe una orden nueva.
     const { orders, key } = await readOrders(ctx.auth!.clientId)
-    if (digest(orders) !== body.digest) return Response.json({ error: 'Las órdenes cambiaron; descarga un respaldo nuevo' }, { status: 409 })
-    const del = await fetch(`${SB_URL}/rest/v1/pos_orders?client_id=eq.${encodeURIComponent(ctx.auth!.clientId)}`, {
-      method: 'DELETE', headers: { apikey: key, Authorization: `Bearer ${key}`, Prefer: 'return=minimal' },
+    if (digest(orders) !== body.digest) {
+      return Response.json({ error: 'Las órdenes cambiaron; descarga un respaldo nuevo' }, { status: 409 })
+    }
+
+    const r = await ejecutarLimpieza(key, {
+      p_client_id: ctx.auth!.clientId,
+      p_operation_id: body.operation_id,
+      p_actor: ctx.auth!.staffName,
+      p_staff_id: ctx.auth!.staffId ?? null,
+      p_role: ctx.auth!.role,
+      p_backup_digest: body.digest,
+      p_expected_count: orders.length,
+      p_reason: typeof body?.reason === 'string' ? body.reason : null,
     })
-    if (!del.ok) return Response.json({ error: `Delete failed: HTTP ${del.status}` }, { status: 500 })
-    await registrarLimpieza(ctx.auth!.clientId, key, {
-      actor: ctx.auth!.staffName,
-      staffId: ctx.auth!.staffId,
-      role: ctx.auth!.role,
-      count: orders.length,
-      digest: body.digest,
-    })
-    return Response.json({ ok: true, deleted: orders.length })
+    return Response.json(r.body, { status: r.status })
   } catch (e) {
     return Response.json({ error: (e as Error).message }, { status: 500 })
   }

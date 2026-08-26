@@ -1,17 +1,40 @@
-# Las órdenes de AMALAY sí llegaron — y las borró una limpieza deliberada
+# Las órdenes de AMALAY sí llegaron a la nube — y un `DELETE` las quitó
 
-**2026-08-26.** Investigación adversarial, **sólo lectura**, sin tocar producción.
+**2026-08-26.** Investigación adversarial. Diagnóstico en **sólo lectura**; la corrección sí
+tocó producción, y está detallada al final.
 
-> **RESUELTO.** La conclusión cambió dos veces. Primero fue *"las órdenes nunca llegaron"*
-> (falso). Luego *"llegaron y algo las borró, no sabemos qué"* (cierto pero incompleto). Los
-> registros de Supabase cierran el caso con evidencia directa:
+> ## Dictamen, por grado de evidencia
 >
-> **`2026-08-26T02:49:03.208Z · DELETE /rest/v1/pos_orders?client_id=eq.amalay · 204`**
+> Esta es la parte que importa leer con cuidado. Los cuatro renglones **no son
+> intercambiables**, y un borrador anterior de este documento los mezcló.
 >
-> Fue `/api/pos/admin/cleanup-orders`, una función deliberada de limpieza, ejecutada
-> correctamente. **No hubo pérdida de datos ni falla de sincronización.**
+> **HECHO — hubo un `GET` de todo seguido de un `DELETE` de todo.** Observado en los
+> registros de Supabase, con hora, filtro, código de respuesta y rol:
+> `2026-08-25 20:49:03.208 (America/Monterrey)` · `DELETE /rest/v1/pos_orders?client_id=eq.amalay` · `204`,
+> precedido 26 ms antes por el `GET` equivalente.
 >
-> El defecto real es otro y está corregido: esa acción destructiva **no dejaba rastro**.
+> **HECHO — `/api/pos/admin/cleanup-orders` genera exactamente esa secuencia, y no la
+> auditaba.** Leído en el código: `readOrders()` y después `DELETE` con el mismo filtro. Cero
+> escrituras a `pos_audit_log`, verificado por búsqueda.
+>
+> **INFERENCIA FUERTE — el evento observado provino de esa ruta.** La firma coincide (dos
+> peticiones, mismo filtro, 26 ms, `service_role`) y es la única ruta del repositorio que la
+> produce. Pero *coincidencia de firma no es correlación causal*: haría falta empatar el
+> evento con una petición concreta de Vercel — identificador, despliegue, sesión. Se intentó.
+> **No se pudo** (ver *"Lo que no se pudo correlacionar"*).
+>
+> **NO VERIFICADO — quién lo ejecutó, con qué intención, y de dónde salieron los otros
+> borrados.** El guardián de la ruta exige nombre `daniel`, pero eso demuestra *quién puede
+> pasar*, no *quién pasó*. `pg_stat_user_tables` acumula **514** filas borradas de
+> `pos_orders` desde que se reinició la estadística; de ésas, este evento explica **al menos
+> 143**. La cifra exacta que borró no se conoce: la respuesta fue `204` sin conteo. **El resto
+> —hasta 371 filas— no tiene explicación en este documento.**
+>
+> Lo que sí queda cerrado: **no hubo falla de sincronización.** El camino
+> `POS → save-order → r1_save_order → pos_orders` funciona — por eso había órdenes que
+> borrar.
+>
+> Y el defecto que sí es nuestro, ya corregido: esa acción destructiva **no dejaba rastro**.
 
 ---
 
@@ -66,26 +89,29 @@ sus 240 órdenes. No es una variante de identificador.
 `pos_save_operations` es el libro de comandos: guarda `save_operation_id`, `order_id`,
 `payload_hash`, `state`, `committed_revision` y `rejection_detail`.
 
+Fechas en `America/Monterrey`:
+
 | `client_id` | Estado | Operaciones | Rango |
 |---|---|---:|---|
-| **amalay** | `COMMITTED` | **303** | 2026-07-15 → **2026-08-26** |
-| **amalay** | `REJECTED` | 50 | 2026-07-15 → 2026-08-26 |
+| **amalay** | `COMMITTED` | **303** | 2026-07-14 → **2026-08-25** |
+| **amalay** | `REJECTED` | 50 | 2026-07-15 → 2026-08-25 |
 | *(vacío)* | `COMMITTED` | 7 | 2026-07-27 |
 | *(vacío)* | `REJECTED` | 5 | 2026-07-27 |
 | demo | `COMMITTED` | 1 | 2026-08-12 |
 
-Trazando cinco operaciones `COMMITTED` recientes de AMALAY de punta a punta:
+Trazando cinco operaciones `COMMITTED` recientes de AMALAY de punta a punta
+(`completed_at` en `America/Monterrey`, todas del **lunes 25 de agosto**):
 
 | `save_operation_id` | `order_id` | `committed_revision` | `completed_at` | ¿la orden existe? |
 |---|---|---:|---|---|
-| `9fa0615c…` | `2381109f…` | 1 | 02:47:36 | **no** |
-| `b2a98216…` | `0bfe7a43…` | 1 | 02:47:32 | **no** |
-| `f0a5a0ff…` | `c3130c56…` | 1 | 02:46:36 | **no** |
-| `e97335e2…` | `f1841449…` | 1 | 02:46:35 | **no** |
-| `33258a1f…` | `f1ff74d6…` | 1 | 02:24:09 | **no** |
+| `9fa0615c…` | `2381109f…` | 1 | 20:47:36 | **no** |
+| `b2a98216…` | `0bfe7a43…` | 1 | 20:47:32 | **no** |
+| `f0a5a0ff…` | `c3130c56…` | 1 | 20:46:36 | **no** |
+| `e97335e2…` | `f1841449…` | 1 | 20:46:35 | **no** |
+| `33258a1f…` | `f1ff74d6…` | 1 | 20:24:09 | **no** |
 
 **HECHO:** el libro dice `COMMITTED`, con revisión asignada y hora de término, y la fila no
-está.
+está. La última se confirmó **87 segundos antes** del `DELETE` de las 20:49:03.
 
 ### El control que valida el método
 
@@ -102,9 +128,9 @@ libro ni de mi forma de consultarlo.
 
 Las 50 rechazadas de AMALAY se reparten en exactamente dos motivos:
 
-| `rejection_detail` | n | Rango |
+| `rejection_detail` | n | Rango (`America/Monterrey`) |
 |---|---:|---|
-| `ORDER_NOT_FOUND` | 26 | 2026-07-16 → 2026-08-26 |
+| `ORDER_NOT_FOUND` | 26 | 2026-07-16 → 2026-08-25 |
 | `STALE_WRITE_REJECTED` | 24 | 2026-07-15 → 2026-08-24 |
 
 Son **las mismas dos** que el acta del 24-ago registra como hallazgo, y su resolución está
@@ -199,29 +225,73 @@ pg_stat_user_tables · pos_orders
 
 ### HECHO — el borrado, con firma completa
 
-Los registros de Supabase lo resuelven. Único `DELETE` a `pos_orders` en la ventana:
+Los registros de Supabase lo resuelven. Único `DELETE` a `pos_orders` en la ventana de
+retención (24 h):
 
 | | |
 |---|---|
-| Momento | **`2026-08-26T02:49:03.208Z`** |
+| Momento | **2026-08-25 20:49:03.208 · `America/Monterrey`** |
+| El mismo, en UTC | `2026-08-26T02:49:03.208Z` |
 | Petición | `DELETE /rest/v1/pos_orders?client_id=eq.amalay` |
 | Respuesta | **204** — exitoso |
 | Rol | `service_role` · agente `node` · IP `44.211.69.215` (AWS `us-east-1`) |
 
-Y 26 milisegundos antes:
+> **Sobre la fecha.** Los registros de Supabase vienen en UTC, y un borrador anterior de este
+> documento copió `2026-08-26T02:49` como si fuera hora local. **No lo es.** En Monterrey
+> (UTC−6) fue **la noche del lunes 25**, 87 segundos después del último `COMMITTED`
+> (20:47:36). Esto tampoco tiene que ver con la sesión de campo del 23–24 de agosto, que es
+> un evento distinto y anterior.
+
+Y 26 milisegundos antes del borrado:
 
 ```
-02:49:03.182  GET    /rest/v1/pos_orders?client_id=eq.amalay&select=*&order=created_at.asc  200
-02:49:03.208  DELETE /rest/v1/pos_orders?client_id=eq.amalay                                204
+02:49:03.182 Z  GET    /rest/v1/pos_orders?client_id=eq.amalay&select=*&order=created_at.asc  200
+02:49:03.208 Z  DELETE /rest/v1/pos_orders?client_id=eq.amalay                                204
 ```
 
-**Leer todo, luego borrar todo.** Esa firma coincide exactamente con
-`dashboard-app/src/app/api/pos/admin/cleanup-orders/route.ts`, que hace `readOrders()` y
-después el `DELETE` con el mismo filtro.
+**Leer todo, luego borrar todo.**
 
-### Qué es esa ruta — y por qué NO es un bug
+### INFERENCIA FUERTE — de dónde vino esa secuencia
 
-Es una limpieza de órdenes de prueba, deliberada y bien protegida:
+`dashboard-app/src/app/api/pos/admin/cleanup-orders/route.ts` hace exactamente eso:
+`readOrders()` con `select=*&order=created_at.asc`, y después el `DELETE` con el mismo
+filtro. Es la **única** ruta del repositorio que produce esa firma —
+`grep -rn "DELETE.*pos_orders"` no devuelve otra fuera de datos de prueba.
+
+**Por qué esto es inferencia y no hecho:** coincidencia de firma ≠ correlación causal. Para
+afirmarlo como hecho haría falta empatar el evento con una petición concreta del lado de la
+aplicación: identificador de petición, despliegue, registro de la función, sesión. Eso es lo
+que no se pudo obtener.
+
+### Lo que NO se pudo correlacionar
+
+Se intentó empatar el evento con Vercel. **No fue posible, y la razón es concreta:**
+
+```
+Consulta de registros de ejecución, ventana de 24 h → 1 (una) línea en total
+```
+
+Reproducido con dos consultas distintas. El plan actual conserva registros de ejecución de
+forma tan limitada que el `DELETE` no tiene contraparte consultable. **Estado: NO VERIFICABLE
+con la instrumentación de hoy** — no "verificado como negativo".
+
+Lo que eso implica, dicho sin adornos:
+
+- **No se puede nombrar al actor.** El guardián exige nombre `daniel`, pero eso demuestra
+  *quién tiene permiso*, no *quién ejecutó*. Afirmar lo segundo desde lo primero es el mismo
+  error de método que este documento ya cometió una vez.
+- **No se puede afirmar la intención.** Ni "fueron órdenes de prueba" ni "fue deliberado".
+  Que la ruta *exija* confirmación literal demuestra que **alguien la escribió**, no qué
+  pensaba quien la escribió.
+- **No se puede explicar el resto.** `pg_stat_user_tables` acumula 514 filas borradas. Este
+  evento explica **al menos 143** —las órdenes que el libro documenta y que hoy no están—,
+  pero **no se sabe cuántas borró en realidad**: `DELETE … client_id=eq.amalay` responde `204`
+  sin conteo, y pudo llevarse órdenes que nunca pasaron por el libro. Quedan **hasta 371 sin
+  explicación**: podrían ser limpiezas anteriores del mismo tipo, datos de prueba, o algo más.
+  Fuera de la ventana de 24 h **no hay forma de saberlo hoy**. Es justo el conteo que la
+  operación nueva sí deja escrito (`deleted_count`).
+
+### Qué protecciones sí tenía la ruta — HECHO, leído en el código
 
 - `withPOSAuth` + rol ≥ `gerente` + `canCleanupAllOrders()`, que exige tenant `amalay`,
   nombre `daniel`/`daniel ramonfaur`, y opcionalmente un `staff_id` de una lista por entorno
@@ -229,19 +299,15 @@ Es una limpieza de órdenes de prueba, deliberada y bien protegida:
 - Y un **`digest`** que debe coincidir con el respaldo recién descargado por `GET` — si las
   órdenes cambiaron entre el respaldo y el borrado, responde `409` y no borra
 
-O sea: hubo respaldo, confirmación explícita y control de concurrencia. **Funcionó como fue
-diseñada.**
+Hubo respaldo, confirmación explícita y control de concurrencia. Eso es lo que el código
+garantiza. **No garantiza quién estaba del otro lado.**
 
-**HECHO:** no hubo pérdida de datos, ni falla de sincronización, ni fuga. El camino
-`POS → save-order → r1_save_order → pos_orders` **funciona**: por eso había 303 órdenes que
-borrar.
+### El defecto que sí es nuestro
 
-### El defecto real — y está corregido
+La ruta **no escribía nada en `pos_audit_log`**. Cero referencias, verificado por búsqueda.
 
-La ruta **no escribía nada en `pos_audit_log`**. Cero referencias, verificado.
-
-Sin ese renglón, una acción legítima quedó indistinguible de una catástrofe: `pos_orders`
-vacío contra 303 `COMMITTED`, sin nada que explicara la diferencia. Reconstruirlo tomó una
+Sin ese renglón, el resultado quedó indistinguible de una catástrofe: `pos_orders` vacío
+contra 303 `COMMITTED`, sin nada que explicara la diferencia. Reconstruirlo tomó una
 investigación completa y **sólo se resolvió leyendo los registros de Supabase, que caducan a
 las 24 horas.** Un día más tarde habría sido irreconstruible.
 
@@ -249,9 +315,39 @@ las 24 horas.** Un día más tarde habría sido irreconstruible.
 > **indistinguible de una pérdida de datos**. No basta con que sea correcta: tiene que ser
 > demostrable después.
 
-Corregido: la ruta ahora escribe `action: 'orders_cleanup'` con actor, `staff_id`, rol,
-cantidad borrada y el digest del respaldo. Ocho pruebas de regresión, prueba de mutantes
-confirmada.
+---
+
+## Los identificadores — qué órdenes, exactamente
+
+Daniel pidió los identificadores que ligan las 303 operaciones `COMMITTED` con las órdenes
+afectadas, en vez de un número suelto. Consultado directamente:
+
+| | |
+|---|---|
+| Operaciones `COMMITTED` | **303** |
+| Órdenes distintas que representan | **143** (varias operaciones por orden: guardar, agregar, cobrar) |
+| Primera | 2026-07-14 20:53:51 `America/Monterrey` |
+| Última | **2026-08-25 20:47:36** — 87 s antes del `DELETE` |
+| Cuántas sobreviven hoy | **0** |
+| ¿Alguna es posterior al `DELETE`? | **Ninguna.** Todas caen antes de las 20:49:03 |
+
+Ese último renglón importa más de lo que parece: **el borrado explica el 100 % de las
+ausencias.** No queda ni una orden `COMMITTED` cuya desaparición haya que atribuir a otra
+cosa. Si alguna fuera posterior al `DELETE` y aun así faltara, habría un segundo problema —
+no lo hay.
+
+Muestra de `order_id` afectados (los mismos que la tabla de trazado, más uno con tres
+guardados y revisión 3, que confirma que el ciclo de vida completo funcionaba):
+
+```
+2381109f…   0bfe7a43…   c3130c56…   f1841449…   f1ff74d6…
+85144b39…   ← 3 operaciones COMMITTED, committed_revision = 3
+```
+
+La lista completa de los 143 vive en el respaldo que ahora guarda la propia operación
+(`pos_cleanup_operations.backup`); para este evento **no existe**, porque el respaldo se
+descargó al navegador del operador y la ruta de entonces no conservaba copia. Es
+exactamente el agujero que cierra el rediseño.
 
 ---
 
@@ -310,20 +406,132 @@ entregadas y 50 descartadas.
 - **No encender `OFFLINE_OUTBOX_SHADOW`** esperando arreglar esto. Ese worker llena
   `pos_local_events`, no `pos_orders`. Está documentado desde la noche del 23-24.
 - **No declarar pérdida de datos.** AMALAY factura en Wansoft; el POS de Fullsite no está en
-  servicio. Lo que hay es un camino roto, no dinero perdido.
-- **No tocar producción para diagnosticar.** Todo lo de arriba se obtuvo en lectura.
+  servicio. Y las órdenes no se perdieron: un `DELETE` las quitó después de haberse guardado
+  bien. No es dinero perdido ni sincronización rota.
+- **No tocar producción para diagnosticar.** Todo el diagnóstico de arriba se obtuvo en
+  lectura. La corrección sí escribió en producción — migración aditiva, con rollback al
+  final de este documento — y sus pruebas corrieron sobre un tenant sintético.
 
-## Impacto real
+## Impacto real — corregido respecto al borrador anterior
 
-**Bloqueador duro del cutover.** Cambiar a AMALAY a Fullsite con este camino roto sí
-significaría perder órdenes de verdad.
+Un borrador de este documento decía *"bloqueador duro del cutover: el camino está roto"*.
+**Eso era falso**, y se escribió cuando la hipótesis vigente era que las órdenes nunca habían
+llegado. Los hechos lo desmienten: 303 operaciones `COMMITTED` sobre 143 órdenes demuestran
+que `POS → save-order → r1_save_order → pos_orders` **funciona de punta a punta**.
 
-Y hacia atrás: invalida `Cola final = PASÓ` como evidencia de sincronización, y debilita el
-`CERTIFICADO` que el acta otorga a Caja, Entrada y Escondite — porque ese certificado incluye
-*"reconexión y cola 0"*.
+Lo que sí queda tocado:
 
-## Siguiente paso decisivo
+- **`Cola final = PASÓ` no sirve como evidencia de sincronización.** La cola llega a cero
+  tanto por entrega como por descarte de conflictos (26 `ORDER_NOT_FOUND` + 24
+  `STALE_WRITE_REJECTED`). Ambas cosas se ven igual en pantalla. La evidencia buena es el
+  libro de operaciones, no el contador.
+- **El certificado de la sesión del 23–24 se debilita en un punto**, no en su conjunto: la
+  frase *"reconexión y cola 0"* no distingue esos dos caminos.
+- **La instrumentación del lado de la aplicación no alcanza para una investigación
+  forense.** Un evento con consecuencia total sobre un tenant no tuvo contraparte en los
+  registros de ejecución. Eso es un hallazgo por derecho propio.
 
-Leer completos los cuerpos de `r1_save_order_idempotent` y de las dos `r1_save_order`, y
-seguir qué ocurre entre la inserción y el `COMMITTED`. Es lectura, no requiere campo, y
-distingue H1 de H2 de una vez.
+---
+
+# La corrección
+
+## Por qué el primer arreglo no servía
+
+El primer intento escribía la auditoría **después** del `DELETE`, envuelta en `try/catch`
+para no convertir un borrado exitoso en un `500`. Daniel lo rechazó con el argumento correcto:
+
+> *"Si el borrado termina y la auditoría falla, vuelve a quedar invisible exactamente como
+> ahora."*
+
+Es exacto. Un registro *best-effort* de una acción destructiva **no es un registro**: es una
+esperanza. El modo de falla que hay que cubrir no es "la ruta se le olvidó auditar" —es "la
+auditoría no llegó"— y `try/catch` lo garantiza en vez de impedirlo.
+
+## Qué se construyó
+
+`supabase/migrations/20260826200000_cleanup_orders_transaccional.sql` — el borrado se movió
+adentro de la base, donde puede ser atómico con su constancia.
+
+| Propiedad | Cómo se logra |
+|---|---|
+| **Idempotente** | `operation_id` es la llave primaria del libro. Repetirlo devuelve el resultado anterior, sin volver a borrar |
+| **Registro duradero de inicio** | Se inserta `STARTED` **antes** de leer o borrar nada |
+| **Actor, tenant, motivo, digest, cantidad esperada** | Columnas de `pos_cleanup_operations`, obligatorias al iniciar |
+| **Borrado y constancia atómicos** | `DELETE` y `UPDATE … 'COMMITTED'` en la misma función plpgsql ⇒ misma transacción. O quedan los dos, o ninguno |
+| **`STARTED` / `COMMITTED` / `FAILED`** | Restricción `CHECK` en la columna `state` |
+| **Reintento seguro** | Consulta por `operation_id` antes de actuar; responde `replay: true` |
+| **Respaldo con restauración probada** | El respaldo completo se guarda en la propia fila; `r1_cleanup_restore()` lo repone sin pisar órdenes que ya existan |
+| **Alerta de `STARTED` sin resolver** | Índice parcial `WHERE state = 'STARTED'` — ver más abajo |
+
+La capa web ya no borra: valida el digest (que el operador vio esas órdenes) y delega. El
+control que de verdad protege —el conteo— vive **dentro** de la transacción, porque entre la
+lectura de la ruta y el borrado cabe una orden nueva.
+
+## Evidencia — seis modos de falla, contra la función real en producción
+
+Ejecutados sobre un tenant sintético `__cleanup_test__`, nunca sobre datos de AMALAY:
+
+| # | Escenario | Resultado esperado | Observado |
+|---|---|---|---|
+| P1 | Conteo equivocado (esperaba 5, había 3) | No borra, queda `FAILED` | `FAILED` · 3 órdenes intactas ✓ |
+| P2 | Conteo correcto | `COMMITTED`, borra, guarda respaldo | `COMMITTED` · `deleted:3` · respaldo de 3 ✓ |
+| P3 | Mismo `operation_id` otra vez | `replay`, sin volver a borrar | `replay:true` · sin segundo borrado ✓ |
+| P4 | Restaurar desde el respaldo | Reponer las 3 | `restored:3, del_respaldo:3` ✓ |
+| P5 | Nueva llave después de restaurar | `COMMITTED` normal | `COMMITTED` ✓ |
+| P6 | Carrera tardía: tabla ya vacía, esperaba 3 | `CONTEO_CAMBIO` | `CONTEO_CAMBIO/FAILED` ✓ |
+
+Estado tras la limpieza de las pruebas — verificado en consulta aparte, porque una subconsulta
+en el mismo `SELECT` que el RPC lee la instantánea previa y da un número falso (ese error se
+cometió y se corrigió):
+
+```
+sobra_prueba: 0 · filas_en_libro: 0 · total_global: 6,309 · amalay: 0
+```
+
+Idéntico al estado previo a aplicar la migración.
+
+## Evidencia — la capa web
+
+`dashboard-app/src/__tests__/cleanup-orders-transaccional.test.ts` · **10 pruebas**, incluidas
+doble petición, timeout **después** del commit, digest vencido, tenant cruzado y RPC caído.
+
+Prueba de mutantes, que es lo que distingue una prueba real de una decorativa:
+
+| Mutación | Pruebas que fallan |
+|---|---:|
+| Quitar la exigencia de `operation_id` | 1 |
+| **Volver al `DELETE` directo + auditoría best-effort** | **6** |
+
+Suite completa del tablero: **2,415 pruebas en 99 archivos, todas verdes.** `tsc --noEmit`
+limpio. `eslint` limpio en los archivos tocados (los 7 avisos de `monitor/page.tsx` son
+preexistentes e idénticos en `HEAD`).
+
+## Lo que falta, dicho como pendiente y no como hecho
+
+- **La alerta de `STARTED` atorado no existe todavía.** El índice parcial que la hace barata
+  sí está; falta quien la consulte y avise. Hoy la consulta es esta, y hay que correrla a
+  mano:
+
+  ```sql
+  select operation_id, client_id, actor, started_at, now() - started_at as lleva
+    from pos_cleanup_operations
+   where state = 'STARTED' and started_at < now() - interval '5 minutes';
+  ```
+
+- **La correlación con el lado de la aplicación sigue sin resolverse.** Mientras los
+  registros de ejecución conserven una línea por día, el próximo evento tampoco será
+  correlacionable. Es un pendiente de plataforma, no de esta ruta.
+- **Las 371 filas borradas restantes siguen sin explicación**, y fuera de la ventana de 24 h
+  no hay forma de investigarlas con lo que existe hoy.
+
+## Rollback
+
+```sql
+DROP FUNCTION IF EXISTS public.r1_cleanup_orders(text,text,text,text,text,text,integer,text);
+DROP FUNCTION IF EXISTS public.r1_cleanup_restore(text);
+DROP TABLE IF EXISTS public.pos_cleanup_operations;
+```
+
+La tabla es aditiva y nada existente depende de ella. Revertir la ruta y el cliente devuelve
+el comportamiento anterior — que es exactamente el defecto, así que revertir sólo tiene
+sentido si el RPC resulta estar roto.

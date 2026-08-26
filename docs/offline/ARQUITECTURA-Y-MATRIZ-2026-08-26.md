@@ -29,17 +29,27 @@ sigue faltando es medirla dentro del protocolo, con `F5-28`, en una corrida de c
 
 > ### ✅ RESUELTO el 2026-08-26 — la persistencia en nube **sí funciona**
 >
-> La contradicción está cerrada con evidencia directa de los registros de Supabase:
+> **HECHO**, de los registros de Supabase, con hora local:
 >
-> **`2026-08-26T02:49:03.208Z · DELETE /rest/v1/pos_orders?client_id=eq.amalay · 204`**
+> **`2026-08-25 20:49:03.208 America/Monterrey · DELETE /rest/v1/pos_orders?client_id=eq.amalay · 204`**
 >
-> Las órdenes **sí llegaron** — había 303 que borrar. Las borró
-> `/api/pos/admin/cleanup-orders`, una limpieza deliberada de órdenes de prueba que exige
-> rol gerente, autorización nominal, el texto `"BORRAR TODAS LAS ORDENES"` y un digest que
-> coincida con un respaldo recién descargado. **Funcionó como fue diseñada.**
+> (En UTC, `2026-08-26T02:49:03Z`. Es la noche del **lunes 25**, no del 26, y no tiene que ver
+> con la sesión de campo del 23–24.)
 >
-> **No hubo pérdida de datos ni falla de sincronización.** El único defecto era que esa
-> acción no dejaba rastro en `pos_audit_log` — corregido, con 8 pruebas.
+> Las órdenes **sí llegaron**: 303 operaciones `COMMITTED` sobre 143 órdenes distintas, la
+> última 87 segundos antes del borrado. **No hubo pérdida de datos ni falla de
+> sincronización.**
+>
+> **INFERENCIA FUERTE:** ese `DELETE` vino de `/api/pos/admin/cleanup-orders` — es la única
+> ruta que produce esa firma (`GET` de todo, `DELETE` de todo, 26 ms). No se pudo correlacionar
+> con una petición concreta del lado de la aplicación: los registros de ejecución guardan
+> **una línea en 24 horas**.
+>
+> **NO VERIFICADO:** quién la ejecutó y con qué intención.
+>
+> El defecto que sí es nuestro: esa acción destructiva no dejaba rastro. Corregido con una
+> operación transaccional e idempotente del lado de la base (10 pruebas de ruta + 6 escenarios
+> contra la función real).
 >
 > Detalle completo en
 > [`CONTRADICCION-ORDENES-AMALAY-2026-08-26.md`](CONTRADICCION-ORDENES-AMALAY-2026-08-26.md).
