@@ -1318,7 +1318,18 @@ export const MESAS_CONFIG: Mesa[] = AMALAY_MESA_NUMBERS.map(n => ({
  * - any other client → sequential mesas 1..count, capacity 4
  */
 export function getMesasConfig(clientId: string, count: number): Mesa[] {
-  if (clientId === 'amalay') return MESAS_CONFIG
+  // El layout real de AMALAY —33 mesas con sus capacidades y su forma— sólo se
+  // entrega si el tenant resuelto ES amalay de verdad.
+  //
+  // Antes bastaba con la comparación de arriba, pero getActiveClientSlug() cae
+  // al literal 'amalay' cuando no hay tenant resuelto (bundle de producción). O
+  // sea: el POS de un restaurante NUEVO podía montar las mesas de AMALAY antes
+  // de que su sesión terminara de resolver. Se exige que el slug venga de una
+  // sesión real, no del valor por omisión.
+  if (clientId === 'amalay' && typeof window !== 'undefined'
+      && localStorage.getItem('fullsite_client_id') === 'amalay') {
+    return MESAS_CONFIG
+  }
   return Array.from({ length: count }, (_, i) => ({
     number: i + 1,
     capacity: 4,
