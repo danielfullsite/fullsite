@@ -91,6 +91,40 @@ Visita previa o fotos del restaurante (via WhatsApp):
 | Red WiFi | Velocidad, estabilidad, cobertura en cocina | Recomendar access point si es necesario |
 | Pantalla tactil (si aplica) | Tamaño, calibracion | Verificar touch funciona con Fullsite |
 
+### 1E. Acta de linea base — medir el ANTES
+
+**Regla dura: sin acta de linea base levantada y firmada, no hay instalacion.**
+
+Las secciones 1A-1D capturan lo que necesitamos para *configurar el sistema*. Esta captura lo
+que necesitamos para *demostrar que sirvio*. Son cosas distintas y la segunda solo se puede
+levantar una vez: **antes de tocar nada**.
+
+Si instalamos sin medir el antes, a los seis meses tenemos una anecdota, no un caso de exito.
+Y una anecdota no convence a un dueño esceptico ni sostiene una nota de prensa.
+
+Plantilla completa: [`guides/ACTA-LINEA-BASE.md`](guides/ACTA-LINEA-BASE.md)
+
+Resumen de lo que se levanta:
+
+| Bloque | Que mide | Por que importa |
+|---|---|---|
+| A — Dinero | Venta semanal, ticket promedio, mix de pago | La base de cualquier comparativo |
+| B — Costo | Food cost declarado **vs** calculado, merma, 86s | La brecha entre lo que el dueño cree y lo que es suele ser el hallazgo mas vendedor |
+| C — Operacion | Rotacion, tiempo de mesa, corte de caja, comandas corregidas | Lo que mejora primero y se nota solo |
+| D — Tiempo del dueño | Horas/semana en corte, inventario, pedidos, reportes | El numero que mas vende. Un dueño discute un porcentaje; no discute sus domingos |
+| E — Lo que paga hoy | Licencias, modulos, hardware, otro software | Define el ancla de precio |
+| F — Evidencia visual | Video del flujo de comanda y del corte, fotos del POS actual | Sin el antes no hay "antes y despues" |
+| G — Consentimiento | Uso del caso con nombre, foto y video, datos agregados | Se pregunta el dia cero, por escrito |
+
+**Cada dato lleva fuente y confiabilidad** (`MEDIDO` / `EXPORTADO` / `DECLARADO` / `ESTIMADO`).
+Nunca presentar un dato declarado por el dueño como si lo hubieramos medido nosotros.
+
+**Re-medicion a los 30, 60 y 90 dias** con exactamente la misma definicion, anotando que mas
+cambio en el periodo (precios, temporada, apertura de terraza). Atribuirle a Fullsite un cambio
+que fue del mercado destruye la credibilidad del caso completo.
+
+---
+
 ---
 
 ## 2. Dia de implementacion

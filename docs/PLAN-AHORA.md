@@ -13,6 +13,53 @@ El núcleo es sólido. El problema es que **la verdad se bifurcó** (rama vs `ma
 
 ---
 
+## Actualización 2026-08-25 — qué cambió en 6 días
+
+> El plan de abajo sigue vigente en su lógica. Esto corrige lo que ya no es cierto.
+> Verificado contra el repo y GitHub el 2026-08-25; lo que no pude verificar va marcado.
+
+**Corrección importante — el punto 6 está INVERTIDO y ya está hecho.**
+Decía que `feat/pos-ui-kit` iba *223 commits adelante de `main`*. Hoy **`main` va 177 commits
+adelante de esa rama** (la rama conserva 58 propios). El merge ocurrió con el lote de offline
+del 22-24 de agosto. **La verdad ya reconvergió** — era el punto de más apalancamiento de OLA 1.
+
+**Cerrado desde el 08-19:**
+- **P0-1** (`#61`, un 403 de negocio confundido con sesión expirada) y **P0-2** (`#63`,
+  modificadores obligatorios perdidos offline) — mergeados a `main` el 2026-08-25.
+- **`main` protegida** con check requerido `test` anclado a GitHub Actions; `force push` y
+  borrado bloqueados. Dos workflows verdes: `test` (2118 casos) y `local-server` (192).
+
+**Sin verificar desde el repo:** si los flags `CANCEL_APPROVAL_STRICT` / `POS_APPROVAL_STRICT`
+están en strict en producción — el código existe, el valor es de entorno. Confirmar en Vercel.
+
+**El hueco que este plan no veía — el camino del dinero nunca ha corrido.**
+Según la consulta de sólo lectura registrada en `pos/MATRIZ-CAMINO-DEL-DINERO.md` (2026-08-25):
+`pos_menu_items` 687 · `pos_staff` 40 · `pos_print_jobs` 338 · pero **`pos_orders` 0 ·
+`pos_cash_movements` 0 · `pos_facturas` 0**. AMALAY comanda e imprime; **cobrar, mover efectivo
+y cortar turno no ha pasado nunca.** Y los dos P0 recién mergeados viven exactamente en ese
+tramo, sin ejercerse en campo.
+
+**Esto reordena OLA 0: la prueba física del camino del dinero es el punto 1 de todo el plan.**
+El guion ya está escrito — falta correrlo.
+
+**Frentes nuevos que el plan no contempla y sí bloquean:**
+1. **Decisión de contrato OCM.** Hay dos generaciones de vistas (9 nombres exige
+   `scripts/clone-test.sql` vs 4 que definen las migraciones 014/015/016; sólo `ocm_daily`
+   coincide). **Bloquea el gate de clonabilidad**, o sea bloquea al cliente #2. Decisión de
+   Daniel, no técnica.
+2. **10 PRs abiertos**, entre ellos los dos de campo (`#74` matriz, `#71` rollback + checklist)
+   que hacen falta **en `main`** antes de la visita.
+3. **Cap table sin reconciliar** — `strategy/DUE-DILIGENCE-v2.md:325` pone a Mónica en 20% sin
+   contrato legal. Bloquea cerrar cofundador y bloquea levantar. Ver `strategy/DECISIONS.md`.
+
+**Marco de la meta (2026-08-25):** el objetivo deja de ser "el mejor POS" — según
+`product/FULLSITE-VS-WANSOFT-BIBLE.md` esa comparación ya está ganada 51-0 con 43 capacidades
+exclusivas, y aun así hay 1 restaurante y cero revenue. El objetivo es **el punto de venta
+final** (`strategy/POSICIONAMIENTO.md`), y se mide por **retención y horas que el dueño
+recupera** (bloque D de `playbooks/guides/ACTA-LINEA-BASE.md`), no por features.
+
+---
+
 ## OLA 0 — Esta semana (AMALAY al 100% + no perder dinero)
 
 **Objetivo:** que AMALAY opere completo y confiable, y que el fraude deje de ser observado y empiece a bloquearse.
