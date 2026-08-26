@@ -1,0 +1,52 @@
+# Califica las predicciones de ayer contra lo que realmente pasó.
+#
+# Es la mitad que faltaba del ciclo. `resolve_event()` llevaba meses escrita en
+# agent_common.py sin que la llamara nadie, y por eso al 2026-08-26 la base tenía 12
+# eventos, CERO calificados, y 2,387 insights con `confidence` en NULL.
+#
+# Sin esto no hay número de precisión — ni bueno ni malo. No hay denominador.
+#
+# Corre a las 3am de Monterrey: el día ya cerró y las órdenes tardías ya entraron.
+
+name: Precisión — calificar predicciones
+
+on:
+  schedule:
+    - cron: '0 9 * * *'      # 09:00 UTC = 3am Monterrey
+  workflow_dispatch:
+    inputs:
+      client_id:
+        description: 'Un restaurante, o ALL para todos'
+        required: false
+        default: 'ALL'
+
+jobs:
+  calificar:
+    runs-on: ubuntu-latest
+    env:
+      CLIENT_ID: ${{ github.event.inputs.client_id || 'ALL' }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      TRIGGER_TYPE: ${{ github.event_name }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with: { python-version: '3.11' }
+      - run: pip install requests
+
+      # Las pruebas corren ANTES de calificar. Este script ESCRIBE el veredicto de
+      # precisión: si su lógica está mal, ensucia el único número que vamos a usar
+      # para decidir si los agentes sirven.
+      - run: python .github/scripts/test_resolver_predicciones.py
+
+      - run: python .github/scripts/resolver_predicciones.py | tee salida.txt
+
+      - name: Resumen
+        if: always()
+        run: |
+          {
+            echo '## Precisión de las predicciones'
+            echo '```'
+            cat salida.txt 2>/dev/null || echo 'sin salida'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
