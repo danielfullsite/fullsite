@@ -20,12 +20,36 @@ export async function getAuthToken(): Promise<string> {
     const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000))
     const sessionP = supabase.auth.getSession().then(r => r.data.session).catch(() => null)
     const session = await Promise.race([sessionP, timeout])
-    _cachedToken = session?.access_token || SUPABASE_KEY
+
+    // SÓLO se cachea un token de sesión REAL.
+    //
+    // Antes esto hacía `_cachedToken = session?.access_token || SUPABASE_KEY` y
+    // guardaba el resultado pasara lo que pasara. O sea: si la sesión todavía no
+    // estaba lista —cosa normal en los primeros milisegundos de la app, o si
+    // getSession() tardaba más de 3 s en una red mala— se cacheaba LA ANON KEY
+    // como si fuera un token, y se la devolvía a TODOS los que llamaran durante
+    // los siguientes 30 segundos.
+    //
+    // Con RLS eso no da error: da CERO FILAS. No hay ninguna política para el rol
+    // anon en todo el esquema (0 de 350), así que cada consulta de esa ventana
+    // regresaba vacía y cada pantalla mostraba su estado de "sin datos" o su
+    // fallback, en silencio.
+    //
+    // Así se veía: la configuración del restaurante nunca cargaba, y el sidebar
+    // decía "amalay" en vez de "AMALAY Coffee & Market" con IVA del 16% aplicado
+    // a restaurantes que cobran 0. Arreglar la consulta de client-config no bastó
+    // —la hice usar este token y siguió fallando— porque el veneno estaba aquí.
+    //
+    // Ahora, sin sesión se devuelve la anon key SIN cachearla: la siguiente
+    // llamada vuelve a intentar, y en cuanto la sesión existe se cachea de verdad.
+    const token = session?.access_token
+    if (!token) return SUPABASE_KEY
+
+    _cachedToken = token
     _cachedTokenTime = now
-    return _cachedToken
+    return token
   } catch {
-    _cachedToken = SUPABASE_KEY
-    _cachedTokenTime = now
+    // Tampoco se cachea el error: reintentar es barato, quedarse ciego 30 s no.
     return SUPABASE_KEY
   }
 }
