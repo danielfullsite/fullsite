@@ -11,6 +11,7 @@ import { getEffectiveSetting } from '@/lib/settings'
 import { initStationRouting, initNoPrintStations, initCancellationReasons, initDiscountCatalog, initKdsStations } from '@/lib/pos-constants'
 import { inventoryPolicyService } from '@/lib/inventory-policy'
 import { getFingerprintUrl } from '@/lib/fingerprint-url'
+import { provisionManagerCredential, verifyPinOffline } from '@/lib/pos-manager-auth'
 import { POSLockContext } from './pos-lock-context'
 
 async function hashPin(pin: string, staffId: string): Promise<string> {
@@ -517,6 +518,14 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
               exp: Date.now() + 28_800_000,
               pin_hash: pinHash,
             }))
+            // pos_staff_cache guarda UNA sola credencial y se sobrescribe en cada login,
+            // así que offline sólo podía entrar la última persona que se logueó con red.
+            // En una terminal que comparten meseros, cajero y gerente eso falla el primer
+            // turno. pos-manager-auth ya tenía el almacén multi-credencial con PBKDF2,
+            // salt por dispositivo, revocación y bitácora — sólo no estaba conectado.
+            // Se provisiona aquí, sin tocar nada de lo de arriba. Si falla, el camino
+            // validado en campo sigue funcionando igual.
+            provisionManagerCredential(pin, member.id, member.name, member.role).catch(() => {})
           } catch { /* ignore */ }
           unlock(member)
           return
@@ -532,22 +541,18 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
           // fetchMeseros shared this key) must never be treated as a valid session.
           if (entry && !Array.isArray(entry) && entry.exp > Date.now()) {
             // Verify PIN hash when present (new cache entries); old entries without hash pass through
+            //
+            // Si NO coincide, ya no se falla aquí: este caché guarda a UNA sola persona
+            // (la última que se logueó con red), así que un PIN distinto puede ser
+            // perfectamente válido y pertenecer a otro empleado de la misma terminal.
+            // Se deja pasar al almacén multi-credencial de abajo, que sí tiene a todos.
+            // El PIN correcto de la persona cacheada sigue entrando por aquí, idéntico.
+            let coincideCacheSimple = true
             if (entry.pin_hash) {
               const hash = await hashPin(pin, entry.id)
-              if (hash !== entry.pin_hash) {
-                const na = attempts + 1
-                setAttempts(na)
-                setError(true)
-                setPin('')
-                if (na >= MAX_ATTEMPTS) {
-                  setLockedUntil(Date.now() + LOCKOUT_MS)
-                  setTimeout(() => { setLockedUntil(0); setAttempts(0) }, LOCKOUT_MS)
-                }
-                setTimeout(() => setError(false), 1500)
-                setChecking(false)
-                return
-              }
+              coincideCacheSimple = hash === entry.pin_hash
             }
+            if (!coincideCacheSimple) throw new Error('pin-no-es-de-la-persona-cacheada')
             // Offline: bypass checkActiveSession (network-dependent) — restore session directly
             const member: StaffMember = { id: entry.id, name: entry.name, role: entry.role }
             setStaff(member)
@@ -560,6 +565,33 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
           }
         }
       } catch { /* ignore */ }
+
+      // Almacén multi-credencial (pos-manager-auth): tiene a TODOS los que se han
+      // logueado con red en esta terminal, no sólo al último. Cubre los dos casos que
+      // el caché simple no puede: otro empleado teclea su PIN, o el caché simple ya
+      // venció. Verifica con PBKDF2 + salt del dispositivo, respeta revocación y deja
+      // bitácora que se sincroniza al reconectar.
+      try {
+        const offline = await verifyPinOffline(pin, 'pos_login')
+        if (offline) {
+          const cachedId = (() => {
+            try {
+              const raw = localStorage.getItem('pos_staff_cache')
+              const e = raw ? JSON.parse(raw) : null
+              return e && !Array.isArray(e) && e.name === offline.name ? e.id : ''
+            } catch { return '' }
+          })()
+          const member: StaffMember = { id: cachedId, name: offline.name, role: offline.role }
+          setStaff(member)
+          setUnlocked(true)
+          setAttempts(0)
+          sessionStorage.setItem('pos_staff', JSON.stringify(member))
+          sessionStorage.setItem('pos_last_activity', Date.now().toString())
+          setChecking(false)
+          return
+        }
+      } catch { /* almacén no disponible — cae al mensaje de abajo */ }
+
       // Network error with no valid cache — distinguish from wrong PIN
       setNetworkError(true)
       setPin('')

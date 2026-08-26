@@ -9,7 +9,9 @@
  *     localStorage. Ensures credentials from device A cannot be replayed on B.
  *   – PIN hash: PBKDF2(pin, deviceSalt, 10_000 iterations, SHA-256).
  *     Not reversible. 10K iterations ~5-20ms on tablet (acceptable for POS).
- *   – Credential TTL: 8 hours (one shift). After that, requires online auth.
+ *   – Credential TTL: 16 h por defecto, configurable
+ *     (NEXT_PUBLIC_POS_OFFLINE_CREDENTIAL_TTL_HOURS). Cubre un ciclo cierre-apertura;
+ *     ver el bloque de CREDENTIAL_TTL_MS para el compromiso de seguridad.
  *   – Revocation: marked via `disabled: true`. Honored immediately.
  *   – Audit: every offline auth is logged to `pos_offline_auth_log` in
  *     localStorage and synced to Supabase on reconnect.
@@ -21,7 +23,7 @@
  *
  * Known limitations:
  *   – If a manager is terminated while the terminal is offline, their cached
- *     credential remains valid until TTL expires (max 8 hours) or until the
+ *     credential remains valid until TTL expires (16 h por defecto) or until the
  *     terminal reconnects. This matches the POS legado's offline behavior.
  *   – Only PIN auth is provisioned; biometric remains independent.
  *   – PIN changes on the server are not automatically propagated offline:
@@ -30,7 +32,28 @@
  */
 
 const PBKDF2_ITERATIONS = 10_000
-const CREDENTIAL_TTL_MS = 8 * 60 * 60 * 1000  // 8 hours
+
+/**
+ * TTL de la credencial offline.
+ *
+ * Era de 8 h ("un turno"), y eso no cubre el caso que de verdad duele: el restaurante
+ * **abre** sin internet. Cierra a la 1am, abre a la 1pm — son 12 h. Con 8 h el caché ya
+ * venció y nadie entra al POS. No poder abrir es peor que cualquier otro modo de falla.
+ *
+ * El compromiso, explícito: alargar el TTL alarga también la ventana en la que la
+ * credencial de alguien dado de baja sigue sirviendo **en esa terminal y sin red**. Se
+ * mitiga con `disabled` (revocación honrada de inmediato al reconectar) y con la bitácora
+ * de `pos_offline_auth_log`. Es el mismo compromiso que hace el POS legado.
+ *
+ * 16 h cubre un ciclo cierre-apertura con margen sin volverlo indefinido. Configurable
+ * por si un cliente quiere apretarlo o aflojarlo sin tocar código.
+ */
+const DEFAULT_TTL_HOURS = 16
+const CREDENTIAL_TTL_MS = (() => {
+  const raw = Number(process.env.NEXT_PUBLIC_POS_OFFLINE_CREDENTIAL_TTL_HOURS)
+  const horas = Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_TTL_HOURS
+  return horas * 60 * 60 * 1000
+})()
 const CREDENTIALS_KEY = 'pos_manager_credentials_v2'
 const DEVICE_SALT_KEY = 'pos_pin_device_salt'
 const OFFLINE_LOG_KEY = 'pos_offline_auth_log'
