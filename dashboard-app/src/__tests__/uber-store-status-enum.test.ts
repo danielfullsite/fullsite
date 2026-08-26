@@ -18,12 +18,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const RUTA = '@/lib/integrations/uber-eats/delivery-store'
 
-/** Captura el body que se le manda a Uber, sin salir a la red. */
-async function statusEnviado(action: 'PAUSE' | 'ACTIVATE'): Promise<string> {
-  let capturado = ''
+/** Captura el body completo que se le manda a Uber, sin salir a la red. */
+async function bodyEnviado(action: 'PAUSE' | 'ACTIVATE'): Promise<Record<string, unknown>> {
+  let capturado: Record<string, unknown> = {}
   vi.doMock('@/lib/integrations/uber-eats/oauth', () => ({
     uberFetch: async (_path: string, opts: { body?: string }) => {
-      capturado = JSON.parse(opts.body ?? '{}').status ?? ''
+      capturado = JSON.parse(opts.body ?? '{}')
       return { ok: true, status: 200, text: async () => '', json: async () => ({}) }
     },
   }))
@@ -33,6 +33,8 @@ async function statusEnviado(action: 'PAUSE' | 'ACTIVATE'): Promise<string> {
   await updateDeliveryStoreStatus('store-de-prueba', action, 'corr-test')
   return capturado
 }
+
+const statusEnviado = async (a: 'PAUSE' | 'ACTIVATE') => (await bodyEnviado(a)).status as string
 
 describe('Uber — enum de estado de tienda (escritura)', () => {
   afterEach(() => { vi.doUnmock('@/lib/integrations/uber-eats/oauth'); vi.unstubAllEnvs() })
@@ -73,5 +75,51 @@ describe('Uber — el default de PAUSE no vuelve a PAUSED', () => {
     )
     expect(src).toContain("process.env.UBER_STORE_STATUS_PAUSED || 'OFFLINE'")
     expect(src).not.toContain("process.env.UBER_STORE_STATUS_PAUSED || 'PAUSED'")
+  })
+})
+
+/**
+ * Segunda capa del mismo bug. Con OFFLINE ya aceptado, Uber pidió otra cosa:
+ *   {"field":"is_offline_until","description":"is_offline_until timestamp is needed
+ *     when setting store offline"}
+ * Evidencia: run day3 32944479542 (2026-08-26).
+ */
+describe('Uber — pausar exige decir hasta cuándo', () => {
+  afterEach(() => { vi.doUnmock('@/lib/integrations/uber-eats/oauth'); vi.unstubAllEnvs() })
+
+  it('PAUSE manda is_offline_until, que es lo que Uber reclamaba', async () => {
+    const body = await bodyEnviado('PAUSE')
+    expect(body).toHaveProperty('is_offline_until')
+    expect(typeof body.is_offline_until).toBe('string')
+  })
+
+  it('es un ISO 8601 válido y en el FUTURO (una pausa que ya venció no pausa nada)', async () => {
+    const body = await bodyEnviado('PAUSE')
+    const t = Date.parse(body.is_offline_until as string)
+    expect(Number.isNaN(t)).toBe(false)
+    expect(t).toBeGreaterThan(Date.now())
+    expect(body.is_offline_until).toMatch(/^\d{4}-\d{2}-\d{2}T/)
+  })
+
+  it('ACTIVATE NO lo manda: sólo aplica al poner la tienda offline', async () => {
+    const body = await bodyEnviado('ACTIVATE')
+    expect(body).not.toHaveProperty('is_offline_until')
+    expect(body.status).toBe('ONLINE')
+  })
+
+  it('la ventana se configura por env sin tocar código', async () => {
+    vi.stubEnv('UBER_STORE_PAUSE_MINUTES', '15')
+    const body = await bodyEnviado('PAUSE')
+    const min = (Date.parse(body.is_offline_until as string) - Date.now()) / 60_000
+    expect(min).toBeGreaterThan(13)
+    expect(min).toBeLessThan(17)
+  })
+
+  it('un env basura cae al default de 60 min en vez de mandar una fecha inválida', async () => {
+    vi.stubEnv('UBER_STORE_PAUSE_MINUTES', 'abc')
+    const body = await bodyEnviado('PAUSE')
+    const min = (Date.parse(body.is_offline_until as string) - Date.now()) / 60_000
+    expect(min).toBeGreaterThan(58)
+    expect(min).toBeLessThan(62)
   })
 })
