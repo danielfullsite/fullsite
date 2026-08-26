@@ -138,9 +138,15 @@ export default function ROIPage() {
 
       // 5. Staffing: labor optimization
       const staffingRuns = runsMap.get('staffing-optimizer') || 0
-      // Conservative: $3,200/week savings from optimized scheduling × weeks active
-      const weeksActive = Math.ceil(salesData.length / 7)
-      const staffingSaved = weeksActive * 3200
+      // Antes: `Math.ceil(salesData.length / 7) * 3200`. O sea, se acreditaba
+      // ahorro por SEMANAS TRANSCURRIDAS, sin que el agente hubiera encontrado
+      // nada — con un solo día de ventas ya pintaba "+$3,200".
+      //
+      // Los demás renglones de esta página multiplican HALLAZGOS por un supuesto,
+      // que es un estimado defendible. Éste multiplicaba el calendario, que no lo
+      // es: cobra por existir. Ahora se ata a las corridas que de verdad
+      // ocurrieron; sin corridas, cero.
+      const staffingSaved = staffingRuns * 3200
       roi.push({
         agentId: 'staffing',
         agentName: 'Staffing Optimizer',
@@ -153,6 +159,11 @@ export default function ROIPage() {
       })
 
       // 6. Daily Briefing: time saved (15 min/day × $500/hr manager time)
+      // OJO: runsMap sale de agent_runs, que NO está filtrada por tenant (no
+      // tiene columna client_id). Las corridas de TODOS los restaurantes entran
+      // aquí, así que este valor sobreestima. Se marca en pantalla mientras se
+      // arregla la tabla; no se borra el renglón porque la información sí sirve,
+      // pero no se puede presentar como propia.
       const briefingRuns = runsMap.get('daily-briefing') || 0
       const briefingValue = briefingRuns * (15 / 60) * 500
       roi.push({
@@ -208,14 +219,31 @@ export default function ROIPage() {
       <div className="bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 rounded-2xl border border-emerald-500/20 p-6 mb-6">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-center">
           <div className="lg:col-span-2">
-            <p className="text-xs font-medium text-emerald-400 uppercase tracking-wider mb-2">Valor total generado</p>
+            {/* Decía "Valor total generado" — en verde, en 4xl, como un hecho.
+                No es un hecho: es un modelo. Los supuestos están declarados al
+                pie, pero a 60 renglones de distancia del número.
+                "Generado" afirma que el dinero entró. "Estimado" dice lo que es,
+                y sigue sirviendo para vender — lo que no sirve es que un cliente
+                pida el desglose y no cuadre. */}
+            <p className="text-xs font-medium text-emerald-400 uppercase tracking-wider mb-2">Valor estimado</p>
             <p className="text-4xl font-black text-[var(--text-1)] tracking-tight">{formatCurrency(totalSaved)}</p>
-            <p className="text-sm text-[var(--text-3)] mt-1">~{formatCurrency(monthlyValue)}/mes estimado</p>
+            <p className="text-sm text-[var(--text-3)] mt-1">
+              ~{formatCurrency(monthlyValue)}/mes · <span className="text-[var(--text-4)]">modelo con supuestos, ver metodología abajo</span>
+            </p>
           </div>
           <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] p-4">
-            <p className="text-xs text-[var(--text-3)] mb-1">Ejecuciones totales</p>
-            <p className="text-xl font-bold text-[var(--text-1)]">{totalRuns.toLocaleString()}</p>
-            <p className="text-[11px] text-[var(--text-3)]">en {daysActive} días</p>
+            {/* `totalRuns` sale de getDeepTable('agent_runs', 500): con 500 o
+                más corridas SIEMPRE dice "500", que es el límite de la consulta,
+                no un conteo. Y agent_runs es GLOBAL — cuenta las corridas de
+                todos los restaurantes. Se marca hasta que la tabla tenga
+                client_id. */}
+            <p className="text-xs text-[var(--text-3)] mb-1">Corridas de agentes</p>
+            <p className="text-xl font-bold text-[var(--text-1)]">
+              {totalRuns >= 500 ? '500+' : totalRuns.toLocaleString()}
+            </p>
+            <p className="text-[11px] text-[var(--text-3)]">
+              {daysActive > 0 ? `en ${daysActive} días` : 'sin días con ventas'} · de toda la plataforma
+            </p>
           </div>
           <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] p-4">
             <p className="text-xs text-[var(--text-3)] mb-1">Costo Fullsite</p>
@@ -272,7 +300,7 @@ export default function ROIPage() {
       {/* Methodology note */}
       <div className="mt-4 px-4 py-3 bg-[var(--surface-2)] rounded-lg">
         <p className="text-[11px] text-[var(--text-3)] leading-relaxed">
-          <strong className="text-[var(--text-2)]">Metodología:</strong> Anti-fraude: hallazgos × $1,840 ticket promedio. Anomalías: alertas × $500 corrección promedio. Upselling: 10% conversión × $150 promedio. Staffing: $3,200/semana ahorro estimado. Briefing: 15 min/día × $500/hr gerente. Estos son estimados conservadores basados en benchmarks de la industria restaurantera en México.
+          <strong className="text-[var(--text-2)]">Metodología:</strong> Anti-fraude: hallazgos × $1,840 ticket promedio. Anomalías: alertas × $500 corrección promedio. Upselling: 10% conversión × $150 promedio. Staffing: $3,200 por análisis de horarios ejecutado (antes se cobraba por semana transcurrida, sin que el agente hubiera corrido). Briefing: 15 min/día × $500/hr gerente. Estos son estimados conservadores basados en benchmarks de la industria restaurantera en México.
         </p>
       </div>
     </>
