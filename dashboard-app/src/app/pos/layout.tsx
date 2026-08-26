@@ -11,7 +11,7 @@ import { getEffectiveSetting } from '@/lib/settings'
 import { initStationRouting, initNoPrintStations, initCancellationReasons, initDiscountCatalog, initKdsStations } from '@/lib/pos-constants'
 import { inventoryPolicyService } from '@/lib/inventory-policy'
 import { getFingerprintUrl } from '@/lib/fingerprint-url'
-import { provisionManagerCredential, verifyPinOffline } from '@/lib/pos-manager-auth'
+import { provisionManagerCredential, verifyPinOffline, estadoCredencialesOffline } from '@/lib/pos-manager-auth'
 import { POSLockContext } from './pos-lock-context'
 
 async function hashPin(pin: string, staffId: string): Promise<string> {
@@ -100,6 +100,10 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
   // ninguna pista de qué estaba mal.
   const [sinTenant, setSinTenant] = useState(false)
   const [networkError, setNetworkError] = useState(false)
+  // Distinto de networkError: la terminal SÍ tiene credenciales, pero todas vencieron.
+  // El PIN pudo ser correcto, así que no se cuenta como intento fallido — pero el
+  // operador necesita saber que la salida es conectarse una vez, no seguir tecleando.
+  const [sesionVencida, setSesionVencida] = useState(false)
   const [checking, setChecking] = useState(false)
   const [attempts, setAttempts] = useState(0)
   const [lockedUntil, setLockedUntil] = useState(0)
@@ -574,14 +578,11 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
       try {
         const offline = await verifyPinOffline(pin, 'pos_login')
         if (offline) {
-          const cachedId = (() => {
-            try {
-              const raw = localStorage.getItem('pos_staff_cache')
-              const e = raw ? JSON.parse(raw) : null
-              return e && !Array.isArray(e) && e.name === offline.name ? e.id : ''
-            } catch { return '' }
-          })()
-          const member: StaffMember = { id: cachedId, name: offline.name, role: offline.role }
+          // El id viene de la credencial que acaba de coincidir, no de `pos_staff_cache`.
+          // Ese caché guarda a UNA sola persona, así que buscar el id por nombre ahí
+          // devolvía `''` para el segundo empleado — y un id vacío viaja a la sesión y
+          // a pos_attendance. Era justo el caso que este almacén existe para cubrir.
+          const member: StaffMember = { id: offline.staff_id, name: offline.name, role: offline.role }
           setStaff(member)
           setUnlocked(true)
           setAttempts(0)
@@ -592,12 +593,24 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
         }
       } catch { /* almacén no disponible — cae al mensaje de abajo */ }
 
-      // Network error with no valid cache — distinguish from wrong PIN
-      setNetworkError(true)
-      setPin('')
-      setTimeout(() => setNetworkError(false), 4000)
-      setChecking(false)
-      return
+      // Camino de falla sin red. Son TRES casos, no dos, y lo que decide es si se
+      // cuenta el intento — porque contar de más bloquea la terminal a los 5 intentos.
+      //
+      // El de en medio es el que muerde: un restaurante que abre pasadas las 16 h del
+      // TTL tiene credenciales guardadas y ninguna válida. Tratarlo como PIN incorrecto
+      // bloquearía al gerente tecleando bien, justo el día que abre sin internet.
+      const estado = estadoCredencialesOffline()
+      if (estado !== 'utilizable') {
+        if (estado === 'todas-vencidas') setSesionVencida(true)
+        else setNetworkError(true)
+        setPin('')
+        setTimeout(() => { setNetworkError(false); setSesionVencida(false) }, 4000)
+        setChecking(false)
+        return
+      }
+      // `utilizable`: había con qué juzgar y ninguna credencial coincidió. El PIN está
+      // mal de verdad, así que cae al contador de abajo — que es lo que #133 se saltó,
+      // dejando intentos infinitos sin red (comparado contra cd3bdb1e^).
     }
 
     const newAttempts = attempts + 1
@@ -852,6 +865,11 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
         {networkError && (
           <p className="text-amber-400 text-sm mt-3">
             Sin conexión — espera un momento e intenta de nuevo
+          </p>
+        )}
+        {sesionVencida && (
+          <p className="text-amber-400 text-sm mt-3">
+            La sesión guardada en esta terminal venció — conéctala a internet una vez
           </p>
         )}
         {error && !isLocked && (

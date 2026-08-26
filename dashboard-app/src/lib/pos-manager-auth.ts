@@ -70,6 +70,13 @@ export interface ManagerCredential {
 }
 
 export interface OfflineAuthResult {
+  /**
+   * Quién entró. Va aquí y no se deduce afuera: `pos_staff_cache` guarda a UNA sola
+   * persona, así que reconstruir el id por nombre contra ese caché devuelve vacío para
+   * cualquiera que no sea el último que se logueó con red — justo el caso que el almacén
+   * multi-credencial existe para cubrir. Un id vacío viaja a la sesión y a asistencia.
+   */
+  staff_id: string
   name: string
   role: string
 }
@@ -175,7 +182,7 @@ export async function verifyPinOffline(
     }
     if (hash === cred.pin_hash) {
       logOfflineAuth({ ts: now, staff_id: cred.staff_id, action: 'auth_success', context })
-      return { name: cred.name, role: cred.role }
+      return { staff_id: cred.staff_id, name: cred.name, role: cred.role }
     }
   }
 
@@ -184,6 +191,38 @@ export async function verifyPinOffline(
   }
 
   return null
+}
+
+export type EstadoCredencialesOffline =
+  | 'sin-credenciales'  // esta terminal nunca guardó a nadie
+  | 'todas-vencidas'    // guardó gente, pero ninguna credencial sirve hoy
+  | 'utilizable'        // hay al menos una con la que SÍ se puede juzgar un PIN
+
+/**
+ * En qué estado está el almacén offline de esta terminal.
+ *
+ * Existe para que el login sin red pueda distinguir tres fallas que se ven iguales en
+ * pantalla y no lo son. La distinción importa porque decide **si se cuenta el intento**:
+ *
+ *   · `sin-credenciales` — no hay con qué juzgar. Es un problema de red. NO cuenta.
+ *   · `todas-vencidas`   — el PIN pudo ser perfecto y aun así no entrar. NO cuenta, y
+ *                          merece su propio mensaje: hay que conectarse una vez.
+ *   · `utilizable`       — había con qué juzgar y ninguna coincidió. El PIN está mal:
+ *                          cuenta y bloquea.
+ *
+ * El caso de en medio es el que muerde. Un restaurante que abre pasadas las 16 h del TTL
+ * tiene credenciales guardadas y ninguna válida; si eso se tratara como PIN incorrecto,
+ * el gerente tecleando bien bloquearía la terminal a los 5 intentos — **justo el día
+ * que abre sin internet**, que es el escenario T-24 completo.
+ */
+export function estadoCredencialesOffline(): EstadoCredencialesOffline {
+  const creds = loadCredentials()
+  if (creds.length === 0) return 'sin-credenciales'
+  const now = Date.now()
+  const hayUtilizable = creds.some(
+    c => !c.disabled && now - c.synced_at <= CREDENTIAL_TTL_MS,
+  )
+  return hayUtilizable ? 'utilizable' : 'todas-vencidas'
 }
 
 /**
