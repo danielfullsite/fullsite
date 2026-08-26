@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useSyncExternalStore } from 'react'
 import { Calendar, Users, MapPin, Clock, ChefHat, CreditCard, Check, ArrowRight, ArrowLeft, Phone, User, AlertTriangle, Cake } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -111,8 +111,65 @@ function getHorarios(espacio: EspacioId): string[] {
   return ['14:30', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00']
 }
 
+/**
+ * Esta página es de AMALAY, escrita a mano.
+ *
+ * Los espacios, los paquetes de $480 por persona, el prefijo "AMA-" de los
+ * códigos, el enlace a cafeamalay.com y la marca AMALAY están en este archivo
+ * como literales.
+ *
+ * Sin esta guarda, la página PÚBLICA de reservaciones de CUALQUIER restaurante
+ * nuevo era la de AMALAY: su nombre, su sitio, sus precios. Un comensal del
+ * restaurante nuevo podía escanear un QR y acabar reservando en otro negocio.
+ *
+ * Esto NO parametriza la página — eso es un trabajo aparte, con los espacios y
+ * paquetes viviendo en la base. Esto sólo impide que suplante a AMALAY mientras
+ * tanto. Es preferible decir "todavía no está configurado" que mandarle los
+ * clientes de alguien a otro restaurante.
+ */
+function esAmalay(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    return window.localStorage.getItem('fullsite_client_id') === 'amalay'
+  } catch {
+    return false
+  }
+}
+
+function SinConfigurar() {
+  return (
+    <main className="min-h-screen grid place-items-center px-6" style={{ background: 'var(--bg)' }}>
+      <div className="max-w-md text-center">
+        <h1 className="text-[22px] font-bold text-[var(--text-1)]">
+          Reservaciones todavía no configuradas
+        </h1>
+        <p className="mt-2 text-[14px] leading-[1.55] text-[var(--text-3)]">
+          Este restaurante aún no tiene sus espacios y paquetes dados de alta, así que
+          la página de reservaciones no está lista para recibir clientes.
+        </p>
+        <p className="mt-4 text-[13px] text-[var(--text-4)]">
+          Si administras este restaurante, escríbenos para activarla.
+        </p>
+      </div>
+    </main>
+  )
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 export default function ReservarPage() {
+  // En el render de servidor no hay localStorage. `useSyncExternalStore` existe
+  // justo para esto: da una foto distinta en servidor (null) y en cliente, sin
+  // llamar a setState dentro de un efecto —que encadena renders y el React
+  // Compiler marca como error— y sin desajuste de hidratación.
+  //
+  // No hay suscripción porque el tenant no cambia sin recargar la página: entrar
+  // a otro restaurante hace window.location.href.
+  const esDeAmalay = useSyncExternalStore<boolean | null>(
+    () => () => {},
+    () => esAmalay(),
+    () => null,
+  )
+
   const [step, setStep] = useState<Step>(1)
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
@@ -164,7 +221,12 @@ export default function ReservarPage() {
       const codigo = 'AMA-' + String(Math.floor(Math.random() * 9000) + 1000)
 
       const body = {
-        client_id: process.env.NEXT_PUBLIC_DEFAULT_CLIENT_ID || '',
+        // Antes: process.env.NEXT_PUBLIC_DEFAULT_CLIENT_ID, que en el bundle de
+        // producción vale 'amalay'. Cualquier reservación hecha desde la página
+        // de otro restaurante se guardaba a nombre de AMALAY. Este código sólo
+        // se alcanza si la guarda de arriba ya confirmó el tenant, así que se
+        // escribe explícito en vez de depender de un valor de entorno.
+        client_id: 'amalay',
         codigo_reserva: codigo,
         nombre: form.nombre,
         teléfono: form.teléfono,
@@ -226,6 +288,11 @@ export default function ReservarPage() {
       </div>
     )
   }
+
+  // Mientras no se sabe de qué restaurante es, no se pinta: evita un parpadeo
+  // con la marca de AMALAY en la pantalla de otro negocio.
+  if (esDeAmalay === null) return null
+  if (!esDeAmalay) return <SinConfigurar />
 
   return (
     <div className="min-h-screen bg-gray-50">
