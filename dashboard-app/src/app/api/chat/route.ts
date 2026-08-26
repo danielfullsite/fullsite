@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase'
 import { buildDailyFromOrders } from '@/lib/pos-daily'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { esDuenoDelHistoricoWansoft } from '@/lib/wansoft-legacy'
 
 async function getAuthUser() {
   const cookieStore = await cookies()
@@ -134,11 +135,19 @@ export async function POST(request: NextRequest) {
     const wantsOrders = ['orden', 'ordenes', 'órdenes', 'cancelacion', 'cancelada', 'abierta', 'mesa ', 'ticket pos', 'cuantas mesas', 'cuántas mesas'].some(kw => q.includes(kw))
     const wantsMarket = ['market', 'inventario', 'stock', 'existencia', 'agotado', 'reorden', 'tienda', 'abarrote', 'producto market'].some(kw => q.includes(kw))
 
+    // Se resuelve una sola vez antes del arreglo de fetches: adentro no cabe un await
+    // sin volver perezoso todo el paralelismo, y este dato cambia una vez en la vida
+    // del restaurante (además va cacheado 5 minutos).
+    const duenoDelHistorico = wantsMeseros ? await esDuenoDelHistoricoWansoft(client_id) : false
+
     const fetches: Promise<unknown>[] = [
       // 0: Daily data (always)
       fetch(`${sbUrl}/rest/v1/wansoft_daily?select=${selectCols}&client_slug=eq.${encodeURIComponent(client_id || '')}&ventas_dia=gt.0&order=fecha.desc&limit=${histLimit}`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []),
       // 1: Waiter categories (conditional)
-      (wantsMeseros && client_id === 'amalay') ? fetch(`${sbUrl}/rest/v1/wansoft_waiter_categories?select=fecha,data&order=fecha.desc&limit=7`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
+      // wansoft_waiter_categories no tiene columna de cliente; el guardián impide que
+      // un restaurante vea los meseros de otro. Pregunta por la propiedad, no por el
+      // nombre, y falla cerrado. Ver src/lib/wansoft-legacy.ts.
+      (wantsMeseros && duenoDelHistorico) ? fetch(`${sbUrl}/rest/v1/wansoft_waiter_categories?select=fecha,data&order=fecha.desc&limit=7`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
       // 2: Food cost (conditional)
       wantsFoodCost ? fetch(`${sbUrl}/rest/v1/wansoft_food_cost?select=fecha,data&order=fecha.desc&limit=1`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
       // 3: Reservaciones (conditional)
