@@ -1,0 +1,78 @@
+# El restaurante demo, vivo a toda hora.
+#
+# PARA QUÉ
+# Un demo que se le enseña a un prospecto tiene que tener datos de hoy, sin importar a
+# qué hora caiga la junta. Y sirve de banco de pruebas para afinar los agentes con datos
+# que se mueven, en vez de esperar a que un restaurante real genere volumen.
+#
+# EN QUÉ SE DIFERENCIA DEL LAB
+# `lab-24-7` genera el MISMO volumen a toda hora. Por eso lab-resto tiene 109 órdenes a
+# las 4 de la mañana y sólo 3 a las 6 de la tarde (medido 2026-08-26): un restaurante que
+# nunca cierra y que está muerto en la cena. Para un laboratorio da igual; para un demo
+# es lo primero que un restaurantero nota que está mal.
+#
+# Aquí se enciende CURVA_HORARIA: cerrado de 00:00 a 07:00, pico de comida a las 13–14 y
+# pico de cena a las 19–21. La curva viene apagada por omisión, así que el lab existente
+# no se toca.
+#
+# COSTO
+# ~20 segundos por corrida, cada hora → unos 250 minutos de Actions al mes. El simulador
+# es Python puro, sin llamadas a Groq: de los 71 scripts sólo 6 usan LLM, y ninguno es
+# éste. Prácticamente gratis.
+#
+# CÓMO APAGARLO
+# Actions → este workflow → "..." → Disable workflow. Nada más depende de él.
+
+name: Demo — restaurante vivo 24/7
+
+on:
+  schedule:
+    - cron: '5 * * * *'      # cada hora, en el minuto 5
+  workflow_dispatch:
+    inputs:
+      client_id:
+        description: 'Tenant a simular'
+        required: false
+        default: 'demo'
+
+concurrency:
+  # Que dos corridas no escriban órdenes encima. Sin esto, un retraso de GitHub puede
+  # encimar la corrida de las 14:05 con la de las 15:05 y duplicar el volumen.
+  group: demo-24-7
+  cancel-in-progress: false
+
+jobs:
+  simular:
+    runs-on: ubuntu-latest
+    env:
+      CLIENT_ID: ${{ github.event.inputs.client_id || 'demo' }}
+      CURVA_HORARIA: '1'
+      TZ_LOCAL: 'America/Monterrey'
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      TRIGGER_TYPE: ${{ github.event_name }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with: { python-version: '3.11' }
+      - run: pip install requests
+
+      - name: No tocar un restaurante real por accidente
+        run: |
+          # El simulador ESCRIBE órdenes. Apuntarlo a un tenant real le inventaría
+          # ventas que nunca ocurrieron: números falsos en el dashboard de alguien que
+          # paga. La lista blanca es corta a propósito.
+          case "$CLIENT_ID" in
+            demo|lab-resto|esqueleton-demo) echo "Tenant de pruebas: $CLIENT_ID" ;;
+            *) echo "::error::$CLIENT_ID no es un tenant de pruebas. El simulador NO escribe en restaurantes reales."
+               exit 1 ;;
+          esac
+
+      - run: python .github/scripts/test_curva_horaria.py
+
+      - run: python .github/scripts/lab_simulator.py
+
+      - name: Resumen
+        if: always()
+        run: |
+          echo "Tenant: \`$CLIENT_ID\` · curva horaria activa (zona $TZ_LOCAL)" >> "$GITHUB_STEP_SUMMARY"
