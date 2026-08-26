@@ -54,10 +54,14 @@ buscar "sesiones Codex (outputs)" "$HOME/.codex"
 
 echo
 echo "── 3-6. Raíces del usuario"
-buscar "~/Downloads"        "$HOME/Downloads"
-buscar "~/Documents"        "$HOME/Documents"
-buscar "~/Documents/Codex"  "$HOME/Documents/Codex"
-buscar "~/Desktop"          "$HOME/Desktop"
+# shellcheck disable=SC2088  # el "~" es etiqueta para leer, la ruta real va en $2
+buscar '~/Downloads'        "$HOME/Downloads"
+# shellcheck disable=SC2088
+buscar '~/Documents'        "$HOME/Documents"
+# shellcheck disable=SC2088
+buscar '~/Documents/Codex'  "$HOME/Documents/Codex"
+# shellcheck disable=SC2088
+buscar '~/Desktop'          "$HOME/Desktop"
 
 echo
 echo "── 7. Búsqueda global en la carpeta del usuario"
@@ -65,7 +69,8 @@ echo "── 7. Búsqueda global en la carpeta del usuario"
 # Se corre igual, pero SIN depender de él: el paso 8 (índice) cubre el mismo terreno
 # en milisegundos, y el resultado final se arma de la unión de todos los pasos.
 GLOBAL_ANTES=$(wc -l < "$RESULTADOS" | tr -d ' ')
-buscar "~ (global, find)" "$HOME"
+# shellcheck disable=SC2088
+buscar '~ (global, find)' "$HOME"
 GLOBAL_DESPUES=$(wc -l < "$RESULTADOS" | tr -d ' ')
 if [ "$GLOBAL_DESPUES" -le "$GLOBAL_ANTES" ] && [ "$GLOBAL_ANTES" -gt 0 ]; then
   echo "  ⚠️  el barrido global aportó 0 y los pasos anteriores sí encontraron."
