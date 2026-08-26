@@ -225,33 +225,61 @@ def log_event(
     expires_at: str = None,         # ISO — cuándo deja de ser relevante
     client_id: str = None,
 ):
-    """Registra un evento medible en agent_events (status='open', outcome=None).
-    Tenant-aware como create_insight: client_id del entorno, NUNCA asume 'amalay'."""
+    """Registra un evento medible en agent_events (status='new', outcome=None).
+
+    Tenant-aware como create_insight: client_id del entorno, NUNCA asume 'amalay'.
+
+    OJO CON `status`: la tabla acepta solo 'new' | 'acknowledged' | 'resolved'. Esta
+    funcion escribia 'open', que NO existe, asi que TODOS sus INSERT se rechazaban —
+    y como el except solo imprime a stderr, fallaba en silencio. antifraud-agent y
+    fraud_watcher llevaban meses reportando al vacio. Verificado el 2026-08-26: cero
+    filas suyas en agent_events."""
     client_id = client_id or os.environ.get("CLIENT_ID")
     if not client_id:
         print(f"[{agent_id}] log_event sin client_id — se omite (aislamiento tenant)", file=sys.stderr)
         return
     row = {
         "agent_id": agent_id, "client_id": client_id, "type": event_type,
-        "title": title, "severity": severity, "status": "open", "outcome": None,
+        "title": title, "severity": severity, "status": "new", "outcome": None,
         "estimated_value": estimated_value, "confidence": confidence,
         "evidence": json.dumps(evidence) if evidence else None,
         "explanation": explanation, "suggested_action": suggested_action,
         "expires_at": expires_at,
     }
+    # Se revisa r.ok, no solo la excepcion.
+    #
+    # Esta es la razon por la que el fallo duro meses sin que nadie lo viera: PostgREST
+    # devolvia 400 por el CHECK de agent_id, y un 400 NO es una excepcion para
+    # `requests` — el except ni se activaba. El INSERT se perdia y la funcion regresaba
+    # como si todo hubiera salido bien.
+    #
+    # Un error de registro no debe tumbar al agente, pero SI tiene que verse en el log
+    # de la corrida. Silencio y exito no pueden verse igual.
     try:
-        requests.post(
+        r = requests.post(
             f"{SUPABASE_URL}/rest/v1/agent_events",
             headers={**_sb_headers, "Content-Type": "application/json"},
             json=row, timeout=10,
         )
+        if not r.ok:
+            print(
+                f"[{agent_id}] ERROR: agent_events rechazo el evento — HTTP {r.status_code}: "
+                f"{r.text[:300]}",
+                file=sys.stderr,
+            )
+            return False
+        return True
     except Exception as e:
-        print(f"[{agent_id}] FAILED to log event: {e}", file=sys.stderr)
+        print(f"[{agent_id}] ERROR: no se pudo registrar el evento: {e}", file=sys.stderr)
+        return False
 
 
 def resolve_event(event_id: str, outcome: str, actual_value: float = None):
-    """Cierra el bucle: marca cómo resultó un evento ('confirmed'|'false_positive'|'expired').
-    Un job de reconciliación posterior lo llama al comparar predicho vs real."""
+    """Cierra el bucle: marca como resulto un evento.
+
+    `outcome` solo admite 'correct' | 'false_positive' — es un CHECK de la tabla. El
+    docstring anterior decia 'confirmed' y 'expired', que NO existen; cualquiera que
+    los hubiera usado habria fallado en silencio."""
     data = {"status": "resolved", "outcome": outcome}
     if actual_value is not None:
         data["estimated_value"] = actual_value

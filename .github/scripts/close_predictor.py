@@ -13,7 +13,7 @@ import requests
 from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.dirname(__file__))
-from agent_common import sb_get as _sb_get, log_run as _log_run, create_insight
+from agent_common import sb_get as _sb_get, log_run as _log_run, create_insight, log_event
 from client_config import get_client, get_tz, get_chat_ids
 from agent_daily_source import daily_today, daily_by_dates
 from ops_aggregate import get_current_business_date
@@ -433,6 +433,43 @@ def main():
             "hour": current_hour,
         },
         recommended_action=f"Faltan ${remaining:,.0f} para cerrar en línea con el promedio." if remaining > 0 else None,
+        client_id=CLIENT["id"],
+    )
+
+    # 9. La predicción, en forma FALSIFICABLE.
+    #
+    # El insight de arriba es para que un humano lo lea. Esto es distinto: registra el
+    # número predicho y el día al que se refiere, para que mañana se pueda comparar
+    # contra lo que realmente pasó y calificarlo.
+    #
+    # Sin esto no hay precisión que medir. Una proyección que sólo vive en un texto
+    # ("las ventas van bajas") no se puede equivocar, y lo que no se puede equivocar
+    # tampoco se puede acertar. De ahí salían los 2,387 insights con confidence NULL y
+    # cero eventos calificados.
+    #
+    # Lo resuelve resolver_predicciones.py al cierre del día.
+    fecha_predicha = get_current_business_date(CLIENT)
+    log_event(
+        agent_id="close-predictor",
+        event_type="forecast",
+        title=f"Proyección de cierre para {fecha_predicha}: ${projected:,.0f}",
+        severity="info",
+        estimated_value=float(projected),
+        evidence={
+            "prediccion": float(projected),
+            "fecha_objetivo": str(fecha_predicha),
+            "hora_de_la_prediccion": current_hour,
+            "ventas_al_predecir": float(current_ventas),
+            "pct_avance": round(pct_done, 1),
+            "promedio_mismo_dia": round(avg_dow),
+            # Tolerancia con la que se va a calificar. Va escrita AQUÍ, junto a la
+            # predicción, para que nadie pueda moverla después y hacer que un fallo
+            # parezca acierto.
+            "tolerancia_pct": 10,
+        },
+        explanation=(f"A las {current_hour}h el restaurante lleva ${current_ventas:,.0f} "
+                     f"({pct_done:.0f}% del día). Se proyecta cerrar en ${projected:,.0f}."),
+        suggested_action="Se califica solo al cierre del día contra la venta real.",
         client_id=CLIENT["id"],
     )
 
