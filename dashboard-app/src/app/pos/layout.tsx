@@ -90,6 +90,14 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
   const [pin, setPin] = useState('')
   const [error, setError] = useState(false)
   const [notEnrolled, setNotEnrolled] = useState<string | null>(null)
+  // La terminal no sabe a qué restaurante pertenece.
+  //
+  // Sin esto, un 400 de /api/pos/pin caía al mismo camino que un PIN equivocado:
+  // la pantalla decía "PIN incorrecto" con el PIN correcto y bloqueaba la
+  // terminal 60 s a los 5 intentos. El `catch` que distingue "error de red" no
+  // se alcanza, porque un 400 RESUELVE, no lanza. El cajero quedaba en bucle sin
+  // ninguna pista de qué estaba mal.
+  const [sinTenant, setSinTenant] = useState(false)
   const [networkError, setNetworkError] = useState(false)
   const [checking, setChecking] = useState(false)
   const [attempts, setAttempts] = useState(0)
@@ -480,6 +488,15 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
           if (j?.code === 'terminal_not_enrolled') { setNotEnrolled(j.device_id || getTerminalId()); return }
         } catch {}
       }
+      // 400 = el servidor rechazó el client_id (vacío o mal formado). Es un
+      // problema de provisionamiento de la terminal, no del PIN de quien lo
+      // teclea. Se dice, y no se cuenta como intento fallido.
+      if (res.status === 400) {
+        setSinTenant(true)
+        setPin('')
+        setChecking(false)
+        return
+      }
       if (res.ok) {
         const { staff: member, shiftToken } = await res.json()
         if (member?.id) {
@@ -812,6 +829,12 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
         )}
         {isLocked && (
           <p className="text-red-400 text-sm mt-3">Demasiados intentos. Espera 1 minuto.</p>
+        )}
+        {sinTenant && (
+          <div className="text-sm mt-3 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2 text-amber-300">
+            Esta terminal no tiene restaurante asignado, así que no puede validar el PIN.
+            No es tu PIN: es configuración. Pide a tu admin que la provisione.
+          </div>
         )}
         {notEnrolled && (
           <div className="text-sm mt-3 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2 text-amber-300">

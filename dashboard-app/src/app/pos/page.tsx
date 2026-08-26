@@ -144,6 +144,7 @@ import {
 import dynamic from 'next/dynamic'
 import { getActiveClientSlug as _cid } from '@/lib/data'
 import { usePOSLock } from './pos-lock-context'
+import { layerZ } from '@/components/ui/layers'
 
 // POST al local-server (bridge) con reintento. El KDS en otras terminales LAN recibe
 // la orden por /events; si la caja está reiniciando o hay un blip de LAN, un solo POST
@@ -236,7 +237,7 @@ class ModifierModalErrorBoundary extends Component<
   render() {
     if (!this.state.error) return this.props.children
     return (
-      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-6">
+      <div style={{ zIndex: layerZ('errorBoundary') }} className="fixed inset-0 flex items-center justify-center bg-black/70 p-6">
         <div className="w-full max-w-xl rounded-2xl border border-red-700 bg-[var(--panel)] p-6 text-[var(--text-1)] shadow-2xl">
           <h3 className="text-xl font-bold text-red-400">No se pudieron abrir las opciones</h3>
           <p className="mt-2 text-sm text-[var(--text-3)]">La orden sigue intacta. Cierra este aviso y elige otro producto.</p>
@@ -3601,7 +3602,7 @@ function POSContent() {
 
       {/* COB-017: MP Payment Recovery Banner — shown when MP captured money but Fullsite failed to record */}
       {needsOperatorAttention(mpRecovery) && mpRecovery && (
-        <div className="fixed top-0 left-0 right-0 z-[200] bg-red-950 border-b-2 border-red-500 px-4 py-3 flex flex-col gap-1">
+        <div style={{ zIndex: layerZ('banner') }} className="fixed top-0 left-0 right-0 bg-red-950 border-b-2 border-red-500 px-4 py-3 flex flex-col gap-1">
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
               <p className="text-red-200 font-bold text-sm leading-tight">
@@ -4766,7 +4767,7 @@ function POSContent() {
 
       {/* Offline sync conflict resolver — native React UI (Electron does not support window.prompt). */}
       {syncConflict && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/75 p-5">
+        <div style={{ zIndex: layerZ('blocking') }} className="fixed inset-0 flex items-center justify-center bg-black/75 p-5">
           <div className="w-full max-w-2xl rounded-2xl border border-amber-600/60 bg-[var(--panel)] p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -5006,7 +5007,7 @@ function POSContent() {
 
       {/* Toast notification */}
       {toast && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[60] bg-[var(--line)] border border-[var(--line)] text-[var(--text-1)] px-6 py-3 rounded-xl shadow-2xl text-sm font-medium animate-fade-in">
+        <div style={{ zIndex: layerZ('toast') }} className="fixed top-6 left-1/2 -translate-x-1/2 bg-[var(--line)] border border-[var(--line)] text-[var(--text-1)] px-6 py-3 rounded-xl shadow-2xl text-sm font-medium animate-fade-in">
           {toast}
         </div>
       )}
@@ -5966,7 +5967,7 @@ function POSContent() {
 
       {/* Pin/Input Prompt Modal (replaces window.prompt for kiosk/PWA) */}
       {pinPrompt && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm">
+        <div style={{ zIndex: layerZ('prompt') }} className="fixed inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm">
           <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-6 w-80 shadow-2xl">
             <p className="text-sm font-medium text-[var(--text-1)] mb-4">{pinPrompt.title}</p>
             <input

@@ -10,14 +10,19 @@ import path from 'path'
  * ganar nada, así que las de DOM viven en su propio config y su propio script.
  *
  *   npm run test      → node, las de siempre
- *   npm run test:ui   → jsdom, sólo src/components/ui/**
+ *   npm run test:ui   → jsdom, componentes + lógica que necesita window
+ *
+ * El sufijo `.dom.test.ts` es para lógica que NO es un componente pero sí depende
+ * de que exista `window` — por ejemplo el rescate offline del KDS, que revisa
+ * `typeof window === 'undefined'` antes de leer IndexedDB. En el config de node
+ * esa rama nunca se ejecuta y la prueba pasaría sin probar nada.
  */
 export default defineConfig({
   plugins: [react()],
   test: {
     globals: true,
     environment: 'jsdom',
-    include: ['src/components/ui/**/*.test.tsx'],
+    include: ['src/components/ui/**/*.test.tsx', 'src/**/*.dom.test.ts'],
   },
   resolve: {
     alias: {
