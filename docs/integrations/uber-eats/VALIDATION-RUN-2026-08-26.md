@@ -1,27 +1,44 @@
 # Uber — corrida de validación 2026-08-26 (caso #59499952)
 
 > Qué es: la primera corrida contra el **test store nuevo** que Uber creó el 2026-08-25.
-> Resultado corto: **el sandbox nunca había servido la aplicación**. Ésa era la causa raíz del
-> histórico "cero 2xx" — no eran los scopes, era que no había app que responder.
+>
+> ⚠️ **CORREGIDO el 2026-08-26.** La primera versión de este documento afirmaba que el sandbox
+> nunca había servido la aplicación y que ésa era la causa raíz del histórico "cero 2xx".
+> **Era falso, y el error fue mío.** Ver la sección siguiente.
 
 ---
 
-## Causa raíz del "cero 2xx"
+## Corrección — el 404 me lo causé yo
 
-El proyecto de Vercel `fullsite-uber-sandbox` tenía **Root Directory = `.`** (la raíz del repo),
-y la raíz **no tiene build** — `package.json` de raíz sólo declara `vitest`, y no hay `vercel.json`
-ahí. El proyecto de producción `fullsite` sí apunta a `dashboard-app` con preset Next.js.
+La versión anterior de este documento decía que el proyecto de Vercel `fullsite-uber-sandbox`
+tenía **Root Directory = `.`**, que la raíz del repo no tiene build, y que por eso toda la API
+devolvía 404 desde siempre.
 
-Consecuencia: cada deploy del sandbox terminaba "Ready" en 12-16 segundos sin construir nada, y
-**todas las rutas `/api/...` devolvían 404**. Todas las corridas de validación anteriores
-chocaban contra eso, no contra Uber.
+Lo primero es cierto: el Root Directory sí estaba en `.`. Lo segundo **no**: los deployments
+anteriores **sí servían la aplicación**. Se comprueba golpeando cada deployment por separado —
+`401` significa que la ruta existe y rechaza firma inválida (fail-closed correcto), `404`
+significa que no hay app:
 
-Evidencia del antes y el después, misma llamada, mismo store:
+| Deployment | `POST /api/integrations/uber-eats/webhook` |
+|---|---|
+| `3qotxbspm` — hace 15 días | **401** ← la app estaba ahí |
+| `h6t55c4fe` — hace 15 días | **401** ← la app estaba ahí |
+| `q17y23fnw` — mi deploy desde la raíz, 03:11 | **404** ← lo introduje yo |
+| `7gebmxq6a` — mi deploy desde `dashboard-app`, 04:17 | **401** |
 
-| Hora (UTC) | Deploy | `scope_probe` |
-|---|---|---|
-| 03:11 | root `.` (12-16 s, sin build) | **404** — `eats.order NOT granted / probe error` |
-| 04:17 | `dashboard-app`, Next.js 16.2.6 (2 min) | **200 PASS** — `eats.order granted (marketplace M2M)` |
+O sea: **desplegué desde la raíz, rompí el sandbox, y luego reporté el arreglo como si fuera el
+hallazgo.** El "cero 2xx" histórico **sigue sin explicación probada**, y la hipótesis viva es
+otra: si la petición de token falla, nunca sale una llamada a la API, y Uber no registra nada.
+
+> Regla que se me olvidó: antes de declarar causa raíz, comprobar que el síntoma existía
+> **antes** de que yo tocara algo.
+
+## Lo que sí cambió de configuración
+
+El Root Directory del proyecto está en `.` y la raíz del repo no tiene build, así que hay que
+desplegar **desde `dashboard-app`** (que trae su propio `vercel.json` con `framework: nextjs`).
+Es una trampa real del proyecto, pero **no era la causa de nada** — los deploys anteriores se
+habían hecho bien.
 
 ---
 
@@ -29,7 +46,7 @@ Evidencia del antes y el después, misma llamada, mismo store:
 
 | # | Problema | Corrección |
 |---|---|---|
-| 1 | Root Directory apuntaba a la raíz del repo → 404 en toda la API | Deploy desde `dashboard-app` (que ya trae `vercel.json` con `framework: nextjs`) |
+| 1 | Root Directory en `.` — desplegar desde la raíz rompe el sandbox (me pasó) | Desplegar siempre desde `dashboard-app` |
 | 2 | **Vercel SSO protection activa** en `all_except_custom_domains` — los webhooks de Uber recibían una pantalla de login, nunca la app | Desactivada para este proyecto (sandbox, `UBER_ENV` fail-closed, endpoints admin con secreto propio) |
 | 3 | Faltaban `UBER_ENV`, `UBER_TEST_CLIENT_ID` e `INTEGRATION_ADMIN_SECRET` en el proyecto | Agregadas en Production y Preview |
 | 4 | `INTEGRATION_ADMIN_SECRET` (Vercel) y `UBER_SANDBOX_ADMIN_SECRET` (GitHub) podían no coincidir | Regenerado y sincronizado en ambos lados |
