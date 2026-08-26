@@ -84,8 +84,8 @@ Y peor, las dos mitades del cruce más valioso viven en restaurantes **distintos
 
 ## La arquitectura
 
-Seis capas. Las tres de abajo son el *cruce*; las tres de arriba son el *juicio* que ya definió
-el documento del 19-ago.
+Siete capas. La 0 es el suelo: que los números cierren. Las tres siguientes son el *cruce*;
+las tres de arriba son el *juicio* que ya definió el documento del 19-ago.
 
 ```
   ┌──────────────────────────────────────────────────────────────┐
@@ -100,8 +100,96 @@ el documento del 19-ago.
   │  2 · PERFIL           qué es "normal" PARA ESTE restaurante    │
   ├──────────────────────────────────────────────────────────────┤
   │  1 · CONTRATO         una sola forma de leer la operación      │
+  ├──────────────────────────────────────────────────────────────┤
+  │  0 · CUADRE           los números cierran, o nadie los usa     │
   └──────────────────────────────────────────────────────────────┘
 ```
+
+> **La Capa 0 se agregó el 2026-08-26**, y en rigor es la primera: un agente que razona
+> sobre números que no cuadran miente con confianza. Todo lo de arriba se apoya en que
+> lo de abajo cierre.
+
+### Capa 0 · Cuadre — *los números cierran, o nadie los usa*
+
+**Regla: ningún agente lee un día que no cuadró. Y si lo lee, sabe que no cuadró.**
+
+Es la capa que faltaba en el diseño original, y es la primera. Un detector de merma que
+corre sobre un inventario que no cuadra no detecta merma: inventa una. Y un falso positivo
+de robo cuesta más que no tener el detector — se acusa a una persona.
+
+Cada día de cada restaurante se marca `cuadrado`, `descuadrado` o `parcial`. Los agentes
+consumen sólo lo cuadrado, o lo dicen explícitamente.
+
+#### El catálogo de invariantes
+
+**Nivel 1 — dentro de una orden.** Aritmética pura.
+
+| Invariante | Estado hoy |
+|---|---|
+| `Σ items = subtotal` | ✅ 0 violaciones en 3,043 órdenes / 30 días |
+| `subtotal − descuento + IVA = total` | ✅ 0 violaciones |
+| `Σ pagos = total` (cerradas) | ✅ 0 violaciones |
+| Una orden cerrada tiene forma de pago | ⚠️ `boruca`: 200/200 sin el arreglo `pagos` |
+
+El caso de `boruca` no rompe el corte —tiene `metodo_pago`, así que el efectivo cuadra—
+pero **no puede representar un pago dividido**, y cualquier agente que lea `pagos` queda
+ciego para ese restaurante. Es exactamente el tipo de hueco que esta capa existe para
+nombrar, en vez de que un agente lo descubra sacando cero y reportando "sin datos".
+
+**Nivel 2 — el turno.** El arqueo. La fórmula no la inventamos: está capturada de Wansoft
+en [`docs/knowledge/wansoft/CAJA-SPEC.md`](../knowledge/wansoft/CAJA-SPEC.md) línea 523,
+y es el estándar contra el que un restaurantero ya sabe medir.
+
+```
+Efectivo esperado = Fondo
+                  + Ventas en efectivo
+                  + Propinas en efectivo
+                  + Depósitos
+                  − Vales
+                  − Propinas por tarjeta pagadas en efectivo
+```
+
+La diferencia entre eso y lo contado **es** el hallazgo. No hace falta un modelo para
+interpretarla: un descuadre de caja es dinero, y el número lo da la resta.
+
+**Nivel 3 — inventario contra venta.** El cruce que hoy no se puede hacer en ningún
+restaurante.
+
+```
+Movimientos de salida = Σ(receta del platillo × cantidad vendida)  ±  merma declarada
+```
+
+Lo que sobra de esa resta es merma no declarada: producto que salió sin venderse. Es el
+cruce más valioso del sistema y el que justifica todo el trabajo del laboratorio.
+
+**Nivel 4 — el día contra sus partes.** `ops_daily_history.ventas_dia` debe ser la suma
+de sus órdenes. Suena obvio, y es justo el tipo de cosa que se rompe cuando alguien
+cambia una vista — como pasó hoy con `ops_daily`, congelada 13 días sin que nadie lo
+notara.
+
+**Nivel 5 — contra el mundo exterior.** Las órdenes de Rappi y Uber deben aparecer en
+`pos_orders`, y sus liquidaciones deben conciliar contra `delivery_platform_payments`. Una
+plataforma que cobra comisión distinta a la pactada sale de aquí.
+
+#### Por qué el cuadre es el primer agente, no una utilería
+
+Los descuadres **son** los hallazgos más valiosos del sistema, y son deterministas:
+
+| Descuadre | Qué significa en el restaurante |
+|---|---|
+| Caja no cuadra | Faltante, error de cobro, o robo |
+| Salidas de inventario > lo vendido | Merma no declarada o producto que se va |
+| Orden cerrada sin pago | Se sirvió y no se cobró |
+| Comisión de plataforma ≠ pactada | Te están cobrando de más |
+
+Ninguno necesita un modelo. Los da una resta, y son exactos. **Es la mejor relación
+valor/riesgo de todo el sistema**: cero falsos positivos por diseño, porque una identidad
+aritmética no opina.
+
+Por eso el orden del roadmap cambia: el cuadre va antes que cualquier detector
+estadístico, no después.
+
+---
 
 ### Capa 1 · Contrato de datos
 
@@ -274,16 +362,21 @@ Las cinco del documento del 19-ago siguen vigentes. Éstas se suman:
 
 | # | Qué | Depende de |
 |---|---|---|
-| 1 | Cruces posibles hoy (venta × hora × mesero, pago × propina, tiempo de mesa) | nada — **listo para empezar** |
-| 2 | Demo como restaurante completo (recetas, inventario, POS real) | decisión de Daniel |
-| 3 | Perfil por restaurante (Capa 2), con las tres etapas de arranque | 1 |
-| 4 | Contrato de datos (Capa 1): `ops_hourly`, `ops_consumo`, `ops_personal` | 2 |
-| 5 | Cruce consumo × venta | 2, 4 |
-| 6 | Situaciones (Capa 4) | 3, 5 |
-| 7 | Auto-silenciado por precisión (Capa 5) | medición con datos, ~2 semanas de #144 |
+| **1** | **Cuadre nivel 1 y 4** (aritmética de orden, día vs sus partes) | nada — **listo para empezar** |
+| 2 | Cruces posibles hoy (venta × hora × mesero, pago × propina, tiempo de mesa) | nada |
+| 3 | Demo como restaurante completo (recetas, inventario, POS real) | decisión de Daniel |
+| 4 | Cuadre nivel 2 — el arqueo, con la fórmula de Wansoft | 3 |
+| 5 | Perfil por restaurante (Capa 2), con las tres etapas de arranque | 2 |
+| 6 | Contrato de datos (Capa 1): `ops_hourly`, `ops_consumo`, `ops_personal` | 3 |
+| 7 | Cuadre nivel 3 — inventario contra venta | 3, 6 |
+| 8 | Situaciones (Capa 4) | 5, 7 |
+| 9 | Auto-silenciado por precisión (Capa 5) | medición con datos, ~2 semanas de #144 |
 
-**El paso 1 no depende de nada** y son los tres cruces que un restaurantero siente de inmediato.
-El paso 2 es el que desbloquea la mitad de la tabla.
+**El cuadre va primero, y ése es el cambio de orden respecto al plan original.** Los descuadres
+son hallazgos deterministas con cero falsos positivos por diseño: una identidad aritmética no
+opina. Es la mejor relación valor/riesgo del sistema, y no depende de nada.
+
+El paso 3 desbloquea la mitad de la tabla de cruces.
 
 ---
 

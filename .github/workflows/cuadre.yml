@@ -1,0 +1,59 @@
+# Capa 0 — que los números de cada restaurante cierren.
+#
+# Corre ANTES que los agentes del día (07:00 UTC = 1am MX, con el día ya cerrado) porque
+# su veredicto es la puerta por la que pasan todos: un agente que razona sobre números
+# que no cuadran miente con confianza.
+#
+# Y es también el mejor detector que tenemos: los descuadres son hallazgos deterministas
+# con cero falsos positivos por diseño — una identidad aritmética no opina.
+#
+# Un descuadre NO pone la corrida en rojo: es un hallazgo, no un fallo del verificador.
+# Que saliera en rojo escondería el día que el verificador sí se rompa.
+
+name: Cuadre — que los números cierren
+
+on:
+  schedule:
+    - cron: '0 7 * * *'      # 07:00 UTC = 1am Monterrey
+  workflow_dispatch:
+    inputs:
+      client_id:
+        description: 'Un restaurante, o ALL para todos'
+        required: false
+        default: 'ALL'
+      dias:
+        description: 'Días hacia atrás a revisar'
+        required: false
+        default: '7'
+
+jobs:
+  cuadrar:
+    runs-on: ubuntu-latest
+    env:
+      CLIENT_ID: ${{ github.event.inputs.client_id || 'ALL' }}
+      DIAS: ${{ github.event.inputs.dias || '7' }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      TRIGGER_TYPE: ${{ github.event_name }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with: { python-version: '3.11' }
+      - run: pip install requests
+
+      # Las pruebas corren ANTES. Este verificador decide si los datos son confiables:
+      # si su lógica está mal, o deja pasar datos podridos, o acusa de descuadre a un
+      # restaurante que está bien.
+      - run: python .github/scripts/test_cuadre.py
+
+      - run: python .github/scripts/cuadre.py | tee salida.txt
+
+      - name: Resumen
+        if: always()
+        run: |
+          {
+            echo '## Cuadre'
+            echo '```'
+            cat salida.txt 2>/dev/null || echo 'sin salida'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
