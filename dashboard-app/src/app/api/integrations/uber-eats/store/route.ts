@@ -1,11 +1,16 @@
 // Uber Eats — Store status API.
 // GET  /api/integrations/uber-eats/store?store_id=xxx → get status
 // POST /api/integrations/uber-eats/store → pause or activate
+//
+// Requiere Authorization: Bearer <INTEGRATION_ADMIN_SECRET>. Sin el guard,
+// cualquiera podia pausar la tienda de un restaurante en Uber.
 
 import { type NextRequest, NextResponse } from 'next/server'
 import { pauseStore, activateStore, getStoreStatus } from '@/lib/integrations/uber-eats/store'
+import { checkAdminAuth, unauthorizedResponse } from '@/lib/integrations/admin-auth'
 
 export async function GET(request: NextRequest) {
+  if (!checkAdminAuth(request).ok) return unauthorizedResponse()
   const correlationId = crypto.randomUUID()
   const storeId = request.nextUrl.searchParams.get('store_id') ?? ''
   if (!storeId) return NextResponse.json({ error: 'store_id required' }, { status: 400 })
@@ -14,6 +19,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  if (!checkAdminAuth(request).ok) return unauthorizedResponse()
   const correlationId = crypto.randomUUID()
   try {
     const { store_id, action, duration_minutes } = await request.json() as {

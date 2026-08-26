@@ -2,6 +2,9 @@
 // POST /api/integrations/uber-eats/order
 //   body: { order_id, action: 'accept'|'deny'|'cancel'|'ready', reason?, minutes_to_ready? }
 //
+// Requiere Authorization: Bearer <INTEGRATION_ADMIN_SECRET>. Sin el guard,
+// cualquiera podia aceptar, rechazar o cancelar ordenes reales.
+//
 // Routes to EatsLegacyAdapter or DeliveryV1Adapter based on the channel stored
 // in delivery_orders.raw_payload. Defaults to 'eats' when no record is found
 // so that existing POS integrations continue to work unchanged.
@@ -10,6 +13,8 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { getOrderAdapter, type UberChannel } from '@/lib/integrations/uber-eats/adapter-factory'
 import type { UberDenyReason, UberCancelReason } from '@/lib/integrations/uber-eats/reasons'
 import { UBER_DENY_REASONS, UBER_CANCEL_REASONS } from '@/lib/integrations/uber-eats/reasons'
+import { checkAdminAuth } from '@/lib/integrations/admin-auth'
+import { withPOSAuth, unauthorized } from '@/lib/api-auth'
 
 const SB_URL = () => process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SB_KEY = () => process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -30,6 +35,15 @@ async function resolveOrderContext(platformOrderId: string): Promise<{ storeId?:
 }
 
 export async function POST(request: NextRequest) {
+  // Auth dual a proposito: esta ruta la llaman DOS clientes legitimos.
+  //   - /pos/delivery desde el navegador del cajero  -> sesion POS
+  //   - los workflows de certificacion desde CI      -> INTEGRATION_ADMIN_SECRET
+  // Poner solo el secreto admin romperia la pantalla del cajero, y el navegador
+  // no puede sostener ese secreto. Falla cerrado si no hay ninguno de los dos.
+  if (!checkAdminAuth(request).ok) {
+    const ctx = await withPOSAuth(request)
+    if (!ctx) return unauthorized('Se requiere sesion')
+  }
   const correlationId = crypto.randomUUID()
   try {
     const { order_id, action, reason, minutes_to_ready } = await request.json() as {

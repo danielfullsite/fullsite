@@ -1,11 +1,17 @@
 // Uber Eats — Menu management API.
 // POST /api/integrations/uber-eats/menu → upload full menu
 // PATCH /api/integrations/uber-eats/menu → mark OOS / restore items
+//
+// Requiere Authorization: Bearer <INTEGRATION_ADMIN_SECRET>. Sin el guard,
+// cualquiera podia reemplazar el menu de un restaurante en Uber Eats o marcar
+// sus platillos agotados.
 
 import { type NextRequest, NextResponse } from 'next/server'
 import { uploadMenu, markItemsOOS, restoreItems } from '@/lib/integrations/uber-eats/menu'
+import { checkAdminAuth, unauthorizedResponse } from '@/lib/integrations/admin-auth'
 
 export async function POST(request: NextRequest) {
+  if (!checkAdminAuth(request).ok) return unauthorizedResponse()
   const correlationId = crypto.randomUUID()
   try {
     const { store_id, menu } = await request.json() as { store_id: string; menu: Parameters<typeof uploadMenu>[1] }
@@ -18,6 +24,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
+  if (!checkAdminAuth(request).ok) return unauthorizedResponse()
   const correlationId = crypto.randomUUID()
   try {
     const { store_id, action, items, item_ids } = await request.json() as {
