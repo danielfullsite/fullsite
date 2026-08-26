@@ -291,7 +291,7 @@ El subnet scan existe en `server-discovery.ts` (`_subnetScan`) pero `permitSubne
 
 | Impl | Test | Cert | Pendiente |
 |---|---|---|---|
-| ✓ | ✓ (event-store.test.js: "same command_id does not create duplicate events") | ✗ | Ampliar a nivel HTTP; ejecutar manualmente |
+| ✓ | ✓ (event-store + `idempotencia-transporte.test.js`, 5 casos a nivel HTTP) | ✗ | Cubierto el camino de `POST /events`: segundo POST devuelve `duplicate`, una sola línea en `events.ndjson`, lotes con id repetido, y rechazo sin `command_id`. Falta ejecución contra el proceso real |
 
 ---
 
@@ -310,7 +310,7 @@ El subnet scan existe en `server-discovery.ts` (`_subnetScan`) pero `permitSubne
 
 | Impl | Test | Cert | Pendiente |
 |---|---|---|---|
-| ✓ | ✓ (event-store.test.js: "duplicate detection survives restart") | ✗ | Ejecutar manualmente a nivel de proceso Electron |
+| ✓ | ✓ (event-store + `idempotencia-transporte.test.js`, 4 casos de reinicio) | ✗ | Cubierto: tras reiniciar sobre los mismos archivos el comando sigue siendo duplicado, el estado se reconstruye, la secuencia no se reinicia, y 4 arranques seguidos no acumulan. Falta relanzar el proceso Electron real |
 
 ---
 
@@ -330,7 +330,7 @@ El subnet scan existe en `server-discovery.ts` (`_subnetScan`) pero `permitSubne
 
 | Impl | Test | Cert | Pendiente |
 |---|---|---|---|
-| ✓ | ✓ (event-store.test.js cubre la lógica; sin test WS end-to-end) | ✗ | Ampliar a nivel WS con mock |
+| ✓ | ✓ (`idempotencia-transporte.test.js`, 4 casos con canal WS simulado) | ✗ | Cubierto: ACK tragado + reenvío devuelve `duplicate` sin segundo evento, el estado no cambia, el reenvío desde otra terminal tampoco duplica. **Destapó una carrera real de idempotencia — ver abajo.** Falta LAN real |
 
 ---
 
@@ -516,21 +516,41 @@ El subnet scan existe en `server-discovery.ts` (`_subnetScan`) pero `permitSubne
 | 2 — Reinicios | 4 | 4 | 3 | 0 | T-04 y T-07 con test de recuperación; falta lanzar Electron real |
 | 3 — LAN | 2 | 1 | 0 | 0 | T-09: rediscovery de IP no confirmado |
 | 4 — Volumen | 2 | 2 | 0 | 0 | Sin scripts de carga |
-| 5 — Idempotencia | 3 | 3 | 2 | 0 | Falta ampliar a nivel HTTP/WS |
+| 5 — Idempotencia | 3 | 3 | 3 | 0 | Ampliado a HTTP y WS el 2026-08-26. Destapó una carrera real (corregida) |
 | 6 — Timeout/Retry | 2 | 2 | 1 | 0 | Reconexión cliente WS auditada: reconecta a IP fija, sin re-discovery |
 | 7 — Impresora | 2 | 2 | 2 | 0 | Sin test con hardware real |
 | 8 — Multi-terminal | 3 | 3 | 1 | 0 | Sin test concurrente real |
 | 9 — Recovery | 2 | 2 | 0 | 0 | Requiere Supabase staging |
-| **Total** | **23** | **22** | **10** | **0** | |
+| **Total** | **23** | **22** | **13** | **0** | |
 
 **Escenarios Implementados**: 22/23 (96%)
-**Escenarios con Test Automatizado**: 10/23 (43%) — +3 el 2026-08-26 (T-01, T-04, T-07)
+**Escenarios con Test Automatizado**: 13/23 (57%) — +6 el 2026-08-26 (T-01, T-04, T-07 en el navegador; T-12, T-13, T-14 a nivel de transporte)
 **Escenarios Certificados**: 0/23 (0%)
 **Escenarios con evidencia de campo parcial**: 4/23 — T-01, T-17, T-22, T-23
 (AMALAY 2026-08-24, caja únicamente. Ver [`EVIDENCIA-CAMPO-AMALAY-2026-08-24.md`](EVIDENCIA-CAMPO-AMALAY-2026-08-24.md))
 **Escenarios sin tocar**: 17/23
 
 > T-09: auditado 2026-07-27. Re-discovery automático en cambio de IP NO implementado (`BridgeClient` reconecta a URL fija; `useBridgeClient` corre discovery una sola vez al montar; subnet scan existe pero desactivado). Requiere nueva funcionalidad antes de poder ejecutar o certificar.
+
+---
+
+## Hallazgo: la dedup tenía una carrera bajo concurrencia (corregida 2026-08-26)
+
+Al llevar T-14 a nivel de transporte salió algo que el test de `event-store` no podía ver:
+`processCommand` hacía **check-then-act cruzando dos `await`**. Entre consultar
+`hasProcessedCommand` y escribir `saveProcessedCommand` hay una ventana, y **todo reintento
+que caiga ahí pasa el chequeo y escribe su propio evento**.
+
+No es teórico: es el escenario T-14 exacto. Si el ACK viene *lento* en vez de perderse, el
+reenvío del POS se traslapa con el original. Reproducido con 5 reintentos concurrentes del
+mismo `command_id`: **5 eventos en vez de 1**. En un `ORDER_CLOSED` eso es un cobro duplicado.
+
+Corregido coalescendo comandos en vuelo por `command_id`. Prueba mutante: al quitar el fix,
+`reintentos en ráfaga` se pone en rojo.
+
+**Lección para el resto de la matriz:** que un escenario esté "cubierto" en la capa de abajo
+no dice nada de la capa que usa la terminal. T-12, T-13 y T-14 estaban marcados con test desde
+antes; el bug vivía en el pedazo que nadie probaba.
 
 ---
 
