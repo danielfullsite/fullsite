@@ -47,8 +47,8 @@ import {
   cancelDeliveryOrder,
   markDeliveryOrderReady,
 } from '@/lib/integrations/uber-eats/delivery-adapter'
-import { buildUberAuthUrl, USL_SCOPES, MARKETPLACE_M2M_SCOPES, DELIVERY_M2M_SCOPES, probeM2MToken } from '@/lib/integrations/uber-eats/oauth'
-import { createPromotion, buildSamplePromotion } from '@/lib/integrations/uber-eats/promotions'
+import { buildUberAuthUrl, USL_SCOPES, MARKETPLACE_M2M_SCOPES, DELIVERY_M2M_SCOPES, PROMOTIONS_M2M_SCOPES, probeM2MToken } from '@/lib/integrations/uber-eats/oauth'
+import { createPromotion, buildSamplePromotion, promotionsScope } from '@/lib/integrations/uber-eats/promotions'
 import { requestReport, buildSampleReportRequest, getReportFile } from '@/lib/integrations/uber-eats/reporting'
 import { uploadMenu } from '@/lib/integrations/uber-eats/menu'
 
@@ -474,13 +474,50 @@ export async function POST(request: NextRequest) {
         : null,
     }
 
+    // ── Phase 4: Promotions M2M ───────────────────────────────────────────────
+    // Uber concede los scopes de promociones por separado (no están en
+    // MARKETPLACE_M2M_SCOPES), así que las fases 2 y 3 NUNCA los tocaban: el probe
+    // podía salir limpio con las promociones sin permiso. Se prueban explícitamente y
+    // se reporta lo que Uber CONCEDE (granted_scope), no lo que se pidió — Uber puede
+    // devolver un set más angosto sin fallar la petición.
+    const promotionsTokenProbe = await probeM2MToken(PROMOTIONS_M2M_SCOPES.join(' '))
+    const promotionsGranted = (promotionsTokenProbe.granted_scope ?? '')
+      .trim().split(/\s+/).filter(Boolean)
+    const promotionsMissing = PROMOTIONS_M2M_SCOPES.filter((sc) => !promotionsGranted.includes(sc))
+    const runtimeScope = promotionsScope()
+    const runtimeScopeGranted = runtimeScope.split(/\s+/).filter(Boolean)
+      .every((sc) => promotionsGranted.includes(sc))
+    const phase4 = {
+      grant_type: 'client_credentials',
+      scopes_requested: PROMOTIONS_M2M_SCOPES,
+      scopes_granted: promotionsGranted,
+      scopes_missing: promotionsMissing,
+      // Lo que create_promotion pide de verdad hoy, para ver la diferencia entre lo
+      // concedido y lo que el runtime usa.
+      runtime_scope: runtimeScope,
+      runtime_scope_granted: runtimeScopeGranted,
+      token_probe: promotionsTokenProbe,
+      blocker: !promotionsTokenProbe.ok
+        ? `Promotions M2M token request failed: ${promotionsTokenProbe.error} — enable ${PROMOTIONS_M2M_SCOPES.join(', ')} for this client_id`
+        : promotionsMissing.length > 0
+          ? `Uber no concedió: ${promotionsMissing.join(', ')} (concedidos: ${promotionsGranted.join(', ') || 'ninguno'})`
+          : !runtimeScopeGranted
+            ? `El scope de runtime (${runtimeScope}) no está entre los concedidos`
+            : null,
+    }
+
     return NextResponse.json({
       action,
       correlation_id: corrId,
       ts,
       store_id: storeId,
-      phases: { phase1_usl: phase1, phase2_marketplace: phase2, phase3_delivery: phase3 },
-      blockers: [phase1.blocker, phase2.blocker, phase3.blocker].filter(Boolean),
+      phases: {
+        phase1_usl: phase1,
+        phase2_marketplace: phase2,
+        phase3_delivery: phase3,
+        phase4_promotions: phase4,
+      },
+      blockers: [phase1.blocker, phase2.blocker, phase3.blocker, phase4.blocker].filter(Boolean),
     })
   }
 
