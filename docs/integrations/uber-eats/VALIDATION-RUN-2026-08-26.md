@@ -47,7 +47,7 @@ habían hecho bien.
 | # | Problema | Corrección |
 |---|---|---|
 | 1 | Root Directory en `.` — desplegar desde la raíz rompe el sandbox (me pasó) | Desplegar siempre desde `dashboard-app` |
-| 2 | **Vercel SSO protection activa** en `all_except_custom_domains` — los webhooks de Uber recibían una pantalla de login, nunca la app | Desactivada para este proyecto (sandbox, `UBER_ENV` fail-closed, endpoints admin con secreto propio) |
+| 2 | **Vercel SSO protection activa** en `all_except_custom_domains` — cualquier llamada externa a las URLs del sandbox recibía una pantalla de login. Bloqueaba al **runner**, no a los webhooks de Uber: el webhook registrado apunta a `app.fullsite.mx` | Desactivada para este proyecto (sandbox, `UBER_ENV` fail-closed, endpoints admin con secreto propio) |
 | 3 | Faltaban `UBER_ENV`, `UBER_TEST_CLIENT_ID` e `INTEGRATION_ADMIN_SECRET` en el proyecto | Agregadas en Production y Preview |
 | 4 | `INTEGRATION_ADMIN_SECRET` (Vercel) y `UBER_SANDBOX_ADMIN_SECRET` (GitHub) podían no coincidir | Regenerado y sincronizado en ambos lados |
 | 5 | `UBER_REDIRECT_URI` caía por default a `https://app.fullsite.mx/...` — **el código de USL habría aterrizado en producción**, no en el sandbox | Apuntado al callback del sandbox |
@@ -64,7 +64,7 @@ habían hecho bien.
 | 2 | Get Integration Details | ⛔ | token 403 para `eats.store …` |
 | 3 | Menu: Update Item/modifier | ⛔ | scope `eats.store` |
 | 4 | Order: Accept | ⛔ | **no hay orden sandbox** |
-| 5 | Cancel Notification (webhook) | ✅ implementado, responde 200 | ahora sí alcanzable (SSO off) |
+| 5 | Cancel Notification (webhook) | ✅ implementado; rechaza firma inválida con 401 (verificado) | falta un evento real |
 | 6 | Order: Cancel | ⛔ | **no hay orden sandbox** |
 | 7 | Order: Deny | ⛔ | **no hay orden sandbox** |
 | 8 | Order: Get details | ⛔ | **no hay orden sandbox** |
@@ -87,22 +87,34 @@ La petición de token M2M devuelve **403** por combinación de scopes:
 | `eats.report` | ❌ 403 |
 | `eats.deliveries` | ❌ 403 |
 
-**2. No existe endpoint para crear órdenes sandbox.** `delivery_sandbox_order` probó los dos
-documentados y ninguno responde:
-
-- `POST /v1/eats/sandbox/orders`
-- `POST /v1/sandbox/eats/orders`
-
-Sin órdenes, los certs **4, 6, 7, 8 y 9** no se pueden ejercer. Uber tiene que generarlas.
+**2. Las órdenes de prueba NO son un bloqueo de Uber — las ponemos nosotros.**
+`delivery_sandbox_order` probó `POST /v1/eats/sandbox/orders` y `POST /v1/sandbox/eats/orders`;
+ninguno existe. Y no deberían: la guía *Order Integration → Testing Orders* de Uber dice que la
+orden se coloca **a mano, como cliente**, contra el test store con la tienda en **Open**.
+Uber ya nos lo respondió en el caso #59128344 el 2026-08-20.
+Procedimiento: [RUNBOOK-ORDEN-DE-PRUEBA.md](RUNBOOK-ORDEN-DE-PRUEBA.md).
+**No volver a pedírselas.**
 
 **3. USL no completado para el store nuevo.** `phase1_usl.db_status = no_row_found` — el store
 recién creado no tiene token almacenado. Requiere que el dueño re-autorice, y que
 **el redirect URI del sandbox quede registrado en el Developer Dashboard del test app**:
 `https://fullsite-uber-sandbox.vercel.app/api/integrations/uber-eats/auth/callback`
 
-**4. Rate limiting observado.** Tras ~20 peticiones de token en dos minutos, el endpoint de
-auth empezó a devolver **HTML en vez de JSON** (`Unexpected token '<'`). No es un fallo nuestro:
-la misma llamada había pasado en 200 minutos antes. Espaciar las corridas.
+**4. Endpoint de token degradado — evidencia incompleta.** Cronología real:
+
+| Hora UTC | Qué se observó |
+|---|---|
+| 04:17 | `scope_probe` **200 PASS** — `eats.order` concedido. Único dato limpio. |
+| 04:30 | 7 acciones seguidas → **403** con el scope enumerado: `scope='eats.store'`, `scope='eats.report'`, y el combo de 4 |
+| 04:31 en adelante | el endpoint devuelve **HTML en vez de JSON** (`Unexpected token '<'`) |
+| 05:01 | sigue devolviendo HTML, 30 min después |
+
+Se dispararon ~20 peticiones de token en dos minutos, así que **rate limiting es la hipótesis
+principal** — pero no está probado, y mientras el endpoint devuelva HTML **no se puede
+re-confirmar el estado de los scopes**. La tabla de 403 de arriba se apoya en la corrida de las
+04:30, que ya pudo estar degradada.
+
+> No mandar la reclamación de scopes a Uber hasta re-confirmar en frío con **una sola** corrida.
 
 ---
 
