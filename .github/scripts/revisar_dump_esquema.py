@@ -93,8 +93,14 @@ def main() -> int:
     print()
 
     if args.baseline is None or not args.baseline.is_file():
-        print("Sin baseline previo con el cual comparar — este volcado se vuelve el primero.")
-        return 0
+        # No hay baseline todavía: TODO lo que trae el volcado falta en el repositorio.
+        # Eso es deriva máxima, no "sin novedad" — devolver 0 aquí dejaba al workflow
+        # sin abrir nunca el primer PR, porque el paso que lo abre exige el código 3.
+        # La primera corrida es justo la que más necesita abrirlo.
+        total = sum(len(v) for v in nuevo.values())
+        print("Sin baseline previo: este volcado se vuelve el primero.")
+        print(f"Los {total} objetos del volcado faltan hoy en el repositorio.")
+        return 3
 
     viejo = inventario(args.baseline.read_text(encoding="utf-8", errors="replace"))
     print("═══ 3. Deriva contra el baseline del repositorio ═══")
