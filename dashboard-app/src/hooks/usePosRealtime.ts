@@ -1,13 +1,25 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { createClient, RealtimeChannel } from '@supabase/supabase-js'
+import { createClient, type RealtimeChannel, type SupabaseClient } from '@supabase/supabase-js'
 import { getActiveClientSlug } from '@/lib/data'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+// Perezoso a propósito. Construirlo en scope de módulo lo construía durante el build:
+// Next evalúa el módulo al recolectar los datos de página, y ahí las variables
+// NEXT_PUBLIC_* no están en un build sin credenciales, así que supabase-js tronaba con
+// "supabaseUrl is required" y se caía el build entero.
+//
+// Este hook sólo corre en el navegador, donde las variables sí están inlineadas.
+let _supabase: SupabaseClient | null = null
+function getSupabase(): SupabaseClient {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    )
+  }
+  return _supabase
+}
 
 type RealtimePayload = {
   eventType: 'INSERT' | 'UPDATE' | 'DELETE'
@@ -42,7 +54,7 @@ export function usePosRealtime(): RealtimeState {
     const clientId = typeof window !== 'undefined' ? getActiveClientSlug() : getActiveClientSlug()
 
     // Orders channel
-    const channel = supabase
+    const channel = getSupabase()
       .channel('pos-orders-live')
       .on(
         'postgres_changes',
@@ -87,7 +99,7 @@ export function usePosRealtime(): RealtimeState {
     channelRef.current = channel
 
     // Presence channel for device tracking
-    const presenceChannel = supabase
+    const presenceChannel = getSupabase()
       .channel('pos-presence')
       .on('presence', { event: 'sync' }, () => {
         const state = presenceChannel.presenceState()
@@ -107,11 +119,11 @@ export function usePosRealtime(): RealtimeState {
 
   const unsubscribe = useCallback(() => {
     if (channelRef.current) {
-      supabase.removeChannel(channelRef.current)
+      getSupabase().removeChannel(channelRef.current)
       channelRef.current = null
     }
     if (presenceChannelRef.current) {
-      supabase.removeChannel(presenceChannelRef.current)
+      getSupabase().removeChannel(presenceChannelRef.current)
       presenceChannelRef.current = null
     }
     setIsConnected(false)
