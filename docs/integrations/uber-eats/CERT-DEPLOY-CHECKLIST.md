@@ -48,9 +48,16 @@ no toca la operación viva. Confirmar el deploy verde.
 
 ## Store de prueba (CRÍTICO)
 
-Usar **`0f655507-7337-41e9-b536-5fd6171bb0da`** ("Fullsite POS Test Store", provisionado a nuestra
-test app). **NO** usar `633b57d4-237a-5a32-b249-7ceb795f1d35` — es de otro client y da `403
-user_not_allowed`. El workflow ya default-ea al store correcto (input `store_id`).
+Usar **`a4f298f4-202f-47f5-b375-d2eefec0126c`** ("Fullsite POS Test Store — AMALAY"). Uber lo recreó
+el **2026-08-25** (caso #59499952) porque el anterior estaba roto — la explicación más probable
+del `401` que veíamos en Menu upload. Mismo test client id.
+
+Stores retirados, **no usar**:
+- `0f655507-7337-41e9-b536-5fd6171bb0da` — el que Uber reemplazó por estar roto.
+- `633b57d4-237a-5a32-b249-7ceb795f1d35` — de otro client, da `403 user_not_allowed`.
+
+Los workflows default-ean al store vigente (input `store_id`), así que no hay que tocar YAML
+la próxima vez que Uber lo recree — se pasa por input.
 
 ## Paso 4 — Correr la secuencia y capturar evidencia
 
