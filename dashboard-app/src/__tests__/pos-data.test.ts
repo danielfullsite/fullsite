@@ -19,7 +19,6 @@ import { IVA_RATE } from '@/lib/pos-constants'
 import {
   formatMXN,
   generateId,
-  MESAS_CONFIG,
   MENU_CATEGORIES,
   MESEROS,
   MODIFIERS_QUITAR,
@@ -127,51 +126,9 @@ describe('IVA_RATE', () => {
   })
 })
 
-// ─── MESAS_CONFIG ─────────────────────────────────────────────────────────
-
-describe('MESAS_CONFIG', () => {
-  it('has 33 mesas (layout real AMALAY)', () => {
-    expect(MESAS_CONFIG).toHaveLength(33)
-  })
-
-  it('mesas match the real floor plan numbers', () => {
-    const numbers = MESAS_CONFIG.map(m => m.number)
-    expect(numbers).toEqual([
-      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
-      20, 21, 30, 31, 32, 40, 41, 42, 43, 44, 45,
-      50, 51, 52, 53, 54, 55, 60, 61, 62, 63,
-    ])
-  })
-
-  it('all mesas start as disponible', () => {
-    for (const mesa of MESAS_CONFIG) {
-      expect(mesa.status).toBe('disponible')
-    }
-  })
-
-  it('mesa 30 (redonda grande terraza) has capacity 8', () => {
-    expect(MESAS_CONFIG.find(m => m.number === 30)?.capacity).toBe(8)
-  })
-
-  it('rectangulares grandes terraza (40,41,42) have capacity 6', () => {
-    for (const n of [40, 41, 42]) {
-      expect(MESAS_CONFIG.find(m => m.number === n)?.capacity).toBe(6)
-    }
-  })
-
-  it('remaining mesas default to capacity 4 (sillas del plano)', () => {
-    const special = new Set([30, 40, 41, 42])
-    for (const mesa of MESAS_CONFIG) {
-      if (!special.has(mesa.number)) expect(mesa.capacity).toBe(4)
-    }
-  })
-
-  it('total restaurant capacity is correct', () => {
-    const total = MESAS_CONFIG.reduce((s, m) => s + m.capacity, 0)
-    // 8 (mesa 30) + 3*6 (rect grandes terraza) + 29*4 = 8+18+116 = 142
-    expect(total).toBe(142)
-  })
-})
+// El plano de salón dejó de ser una constante de AMALAY compilada en el bundle.
+// Ahora es la caché por restaurante, y su contrato se prueba en
+// src/__tests__/plano-por-restaurante.test.ts.
 
 // ─── MENU_CATEGORIES ──────────────────────────────────────────────────────
 
