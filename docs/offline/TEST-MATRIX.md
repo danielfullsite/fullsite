@@ -52,7 +52,7 @@ Un escenario es **CERTIFIED** solo cuando las 3 columnas están marcadas: Impl �
 
 | Impl | Test | Cert | Pendiente |
 |---|---|---|---|
-| ✓ | ✗ | ✗ (campo parcial) | **Validado en campo 2026-08-24 04:03-04:07** — mesa abre, envía, imprime, KDS recibe, sin red. Falta test Playwright y repetir en entrada/escondite. Ver EVIDENCIA-CAMPO |
+| ✓ | ✓ (`offline-t01-venta-activa.test.ts`, 10 casos) | ✗ (campo parcial) | **Validado en campo 2026-08-24 04:03-04:07** — mesa abre, envía, imprime, KDS recibe, sin red. La capa de escritura offline ya corre en CI. Falta: SW sirviendo el shell, WS al KDS por LAN, impresora física, y repetir en entrada/escondite |
 
 ---
 
@@ -117,7 +117,7 @@ Un escenario es **CERTIFIED** solo cuando las 3 columnas están marcadas: Impl �
 
 | Impl | Test | Cert | Pendiente |
 |---|---|---|---|
-| ✓ | ✗ | ✗ | Playwright Electron puede hacer esto |
+| ✓ | ✓ (`offline-t04-t07-recovery.test.ts`, 9 casos) | ✗ | Mecanismos de recuperación cubiertos en CI: `drainLocalStorageToIdb` (buffer de emergencia → cola canónica, idempotente) y supervivencia de print jobs en IDB. Falta con caja física: arranque del proceso Electron, SW sirviendo el shell, replay de `events.ndjson` |
 
 ---
 
@@ -173,7 +173,7 @@ Un escenario es **CERTIFIED** solo cuando las 3 columnas están marcadas: Impl �
 
 | Impl | Test | Cert | Pendiente |
 |---|---|---|---|
-| ✓ | ✗ | ✗ | Automatizable con Playwright Electron |
+| ✓ | ✓ (`offline-t04-t07-recovery.test.ts`, 5 casos) | ✗ | Contrato de catch-up cubierto en CI: SUBSCRIBE lleva `last_sequence`, la secuencia sólo avanza, frames corruptos no la mueven. Falta con caja física: relanzar `electron-kds` y confirmar el SNAPSHOT real por LAN |
 
 ---
 
@@ -512,8 +512,8 @@ El subnet scan existe en `server-discovery.ts` (`_subnetScan`) pero `permitSubne
 
 | Grupo | Escenarios | Impl ✓ | Test ✓ | Cert ✓ | Blocker |
 |---|---|---|---|---|---|
-| 1 — Caída de Internet | 3 | 3 | 0 | 0 | Sin tests e2e |
-| 2 — Reinicios | 4 | 4 | 1 | 0 | Sin test de WS reconnect post-restart |
+| 1 — Caída de Internet | 3 | 3 | 1 | 0 | T-01 con test; T-02/T-03 sin e2e |
+| 2 — Reinicios | 4 | 4 | 3 | 0 | T-04 y T-07 con test de recuperación; falta lanzar Electron real |
 | 3 — LAN | 2 | 1 | 0 | 0 | T-09: rediscovery de IP no confirmado |
 | 4 — Volumen | 2 | 2 | 0 | 0 | Sin scripts de carga |
 | 5 — Idempotencia | 3 | 3 | 2 | 0 | Falta ampliar a nivel HTTP/WS |
@@ -521,10 +521,10 @@ El subnet scan existe en `server-discovery.ts` (`_subnetScan`) pero `permitSubne
 | 7 — Impresora | 2 | 2 | 2 | 0 | Sin test con hardware real |
 | 8 — Multi-terminal | 3 | 3 | 1 | 0 | Sin test concurrente real |
 | 9 — Recovery | 2 | 2 | 0 | 0 | Requiere Supabase staging |
-| **Total** | **23** | **22** | **7** | **0** | |
+| **Total** | **23** | **22** | **10** | **0** | |
 
 **Escenarios Implementados**: 22/23 (96%)
-**Escenarios con Test Automatizado**: 7/23 (30%)
+**Escenarios con Test Automatizado**: 10/23 (43%) — +3 el 2026-08-26 (T-01, T-04, T-07)
 **Escenarios Certificados**: 0/23 (0%)
 **Escenarios con evidencia de campo parcial**: 4/23 — T-01, T-17, T-22, T-23
 (AMALAY 2026-08-24, caja únicamente. Ver [`EVIDENCIA-CAMPO-AMALAY-2026-08-24.md`](EVIDENCIA-CAMPO-AMALAY-2026-08-24.md))
