@@ -1,13 +1,13 @@
 // Uber Eats — Promotions: create a store promotion.
 //
-// Uber's Promotions API contract is NOT published in a machine-fetchable spec
-// (developer.uber.com renders client-side; the *.yaml specs 404). Following the
-// codebase convention for un-pinned Uber contracts (see getOrderFulfillmentScope
-// in oauth.ts — we refuse to hardcode-guess), the path and scope are env-overridable
-// with best-known defaults. Confirm against the Uber Developer Dashboard API
-// reference and set UBER_PROMOTIONS_PATH / UBER_PROMOTIONS_SCOPE if they differ.
+// El contrato de Promotions no esta publicado en una spec descargable
+// (developer.uber.com renderiza en cliente; los *.yaml dan 404). Se descubrio
+// empiricamente contra el sandbox el 2026-08-26 — ver el detalle abajo:
 //
-//   Default: POST /v1/eats/stores/{store_id}/promotions   (scope eats.store)
+//   POST /v1/delivery/stores/{store_id}/promotion   (scope eats.store.promotion.write)
+//
+// Ambos siguen siendo override-ables por entorno (UBER_PROMOTIONS_PATH /
+// UBER_PROMOTIONS_SCOPE) por si Uber los mueve.
 //
 // All calls log to integration_audit_log with redacted payloads.
 
