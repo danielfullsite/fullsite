@@ -399,10 +399,59 @@ body {
 
 /* Sidebar */
 .sidebar { width: 240px; background: var(--surface); border-right: 1px solid var(--line); display: flex; flex-direction: column; height: 100vh; position: fixed; top: 0; left: 0; z-index: 40; }
-.sidebar-nav-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; font-size: 13px; font-weight: 500; color: var(--text-2); transition: all 0.15s ease; position: relative; }
+/* Navegación.
+ *
+ * Tenía `transition: all 0.15s ease`, que anima TODAS las propiedades — incluido
+ * el font-weight, que pasa de 500 a 600 al activarse. El peso de una fuente no
+ * interpola: el navegador rehace el trazado del texto en cada cuadro, y eso se
+ * ve como un temblor en el renglón cada vez que pasas el mouse. Es de las cosas
+ * que hacen sentir barata una interfaz sin que uno sepa por qué.
+ *
+ * Se declaran sólo las dos propiedades que sí deben animar. La curva
+ * (0, 0, 0.2, 1) sale de TailPanel, que Daniel puso como referencia: arranca
+ * rápido y frena suave.
+ *
+ * `min-height` fija la altura: sin ella, el renglón activo era 1-2px más alto
+ * que los demás porque el peso 600 ocupa un poco más, y la lista bailaba al
+ * cambiar de sección. */
+.sidebar-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-2);
+  transition: color 0.18s cubic-bezier(0, 0, 0.2, 1),
+              background-color 0.18s cubic-bezier(0, 0, 0.2, 1);
+  position: relative;
+}
+/* Se hunde al tocarlo. En una tablet de restaurante el acuse táctil importa más
+ * que en escritorio: confirma que el toque entró. */
+.sidebar-nav-item:active { transform: scale(0.985); }
 .sidebar-nav-item:hover { color: var(--text-1); background: var(--surface-2); }
 .sidebar-nav-item.active { color: var(--accent-bright); background: var(--accent-soft); font-weight: 600; }
-.sidebar-nav-item.active::before { content: ''; position: absolute; left: -12px; top: 4px; bottom: 4px; width: 4px; border-radius: 0 4px 4px 0; background: var(--accent); }
+.sidebar-nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: -12px; top: 4px; bottom: 4px;
+  width: 4px;
+  border-radius: 0 4px 4px 0;
+  background: var(--accent);
+  /* Crece desde el centro en vez de aparecer. Es el único movimiento de la
+   * navegación y dura menos de un cuarto de segundo: marca a dónde llegaste. */
+  animation: barra-activa 0.22s cubic-bezier(0, 0, 0.2, 1);
+}
+@keyframes barra-activa {
+  from { transform: scaleY(0); opacity: 0; }
+  to   { transform: scaleY(1); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-nav-item.active::before { animation-duration: 1ms; }
+  .sidebar-nav-item:active { transform: none; }
+}
 .sidebar-section-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); padding: 16px 12px 6px; }
 
 /* Cards */
