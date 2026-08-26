@@ -29,7 +29,7 @@ razón de este documento.
 | `RAPPI_WEBHOOK_SECRET` | ✅ | — | Firma de webhooks de Rappi |
 | `POS_FALLBACK_CLIENT_ID` | ✅ | cerrada | Puesto el 2026-08-26 |
 | **`KITCHEN_TOKEN_SECRET`** | 🔴 | **ABIERTA** | **Demostrado explotable** |
-| ~~`CRON_SECRET`~~ | 🔴 | **cerrada** ✅ | Corregida el 2026-08-26: sin secreto → `503` |
+| ~~`CRON_SECRET`~~ | 🔴 | **cerrada** en `main` | Corregida (#130). **Aún no en producción** |
 | `CANCEL_APPROVAL_STRICT` | 🔴 | observa | Registra pero no bloquea |
 | `POS_APPROVAL_STRICT` | 🔴 | observa | Registra pero no bloquea |
 | `PLATFORM_2FA_ENFORCED` | 🔴 | abierta *(a propósito)* | Rollout sin segundo factor |
@@ -41,7 +41,9 @@ razón de este documento.
 4 apagadas fallando cerradas.**
 
 > Al 2026-08-26 quedaba **una** fallando abierta: `KITCHEN_TOKEN_SECRET`. `CRON_SECRET` se
-> corrigió el mismo día — no encendiéndola, sino invirtiendo el default.
+> corrigió el mismo día —no encendiéndola, sino invirtiendo el default— pero el arreglo está
+> en `main`, **no desplegado**: Vercel rechazó el build de producción con *"Deployment rate
+> limited — retry in 24 hours"*. Mientras no despliegue, **producción sigue con las dos**.
 
 ---
 
@@ -77,7 +79,12 @@ Así que exigir el secreto no rompe nada, y sin él la ruta ya no existe (`503`)
 sin puerta. Si algún día se agrega un Vercel Cron, basta con poner la variable: Vercel manda la
 cabecera solo.
 
-5 pruebas de regresión; prueba de mutantes confirmada.
+5 pruebas de regresión; prueba de mutantes confirmada. Mergeada en #130.
+
+> ⚠️ **Implementado y probado, no desplegado.** El build de producción del merge falló con
+> *"Deployment rate limited — retry in 24 hours"* — el límite diario de deploys de Vercel,
+> quemado la madrugada del 26. Hasta que despliegue, producción sigue sirviendo la ruta sin
+> puerta. Verificar en vivo cuando se libere: `GET /api/agents/cron` sin cabecera → **503**.
 
 ---
 
