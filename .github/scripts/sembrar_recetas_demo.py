@@ -43,6 +43,16 @@ from agent_common import sb_get, sb_post  # noqa: E402
 
 TENANTS_PERMITIDOS = {"demo", "lab-resto", "esqueleton-demo"}
 
+# Las únicas unidades que la base acepta, impuestas por el CHECK
+# `pos_inventory_stock_unit_check`. NO es una convención nuestra: es una restricción real
+# y sembrar fuera de ella hace fallar el INSERT con un 400 seco.
+#
+# Ojo con el desorden que hay del otro lado: `pos_ingredients.unit` NO tiene ese CHECK, y
+# en AMALAY conviven 18 grafías para 5 unidades — PZ/pz/pza./PZA, KG/kg/kilo/k, LT/lt,
+# ML/GR/gramos, más BTA/paq/PQ/BL/porción. Cualquier cálculo que agrupe por unidad ahí
+# está mal. Medido el 2026-08-26. Aquí se usa el conjunto canónico y punto.
+UNIDADES_VALIDAS = {"kg", "g", "lt", "ml", "pz"}
+
 # ─── Despensa ────────────────────────────────────────────────────────────────
 # (id, nombre, unidad, costo por unidad MXN, categoría)
 # Costos de mayoreo en Monterrey, orden de magnitud realista.
@@ -52,12 +62,12 @@ INGREDIENTES = [
     ("leche-vegetal", "Leche de almendra",    "lt",    62.0, "Lácteos"),
     ("matcha",        "Matcha ceremonial",    "kg",  1450.0, "Café"),
     ("chocolate",     "Chocolate para taza",  "kg",   240.0, "Café"),
-    ("huevo",         "Huevo",                "pza",    4.2, "Abarrotes"),
-    ("pan-brioche",   "Pan brioche (rebanada)", "pza",  8.0, "Panadería"),
-    ("pan-masa-madre","Pan masa madre (reb.)", "pza",   6.0, "Panadería"),
-    ("aguacate",      "Aguacate",             "pza",   22.0, "Frutas y verduras"),
+    ("huevo",         "Huevo",                "pz",    4.2, "Abarrotes"),
+    ("pan-brioche",   "Pan brioche (rebanada)", "pz",  8.0, "Panadería"),
+    ("pan-masa-madre","Pan masa madre (reb.)", "pz",   6.0, "Panadería"),
+    ("aguacate",      "Aguacate",             "pz",   22.0, "Frutas y verduras"),
     ("jitomate",      "Jitomate",             "kg",    32.0, "Frutas y verduras"),
-    ("lechuga",       "Lechuga romana",       "pza",   18.0, "Frutas y verduras"),
+    ("lechuga",       "Lechuga romana",       "pz",   18.0, "Frutas y verduras"),
     ("fresa",         "Fresa",                "kg",    85.0, "Frutas y verduras"),
     ("naranja",       "Naranja para jugo",    "kg",    22.0, "Frutas y verduras"),
     ("limon",         "Limón",                "kg",    35.0, "Frutas y verduras"),
@@ -70,11 +80,11 @@ INGREDIENTES = [
     ("pasta",         "Pasta seca",           "kg",    42.0, "Abarrotes"),
     ("granola",       "Granola artesanal",    "kg",   135.0, "Abarrotes"),
     ("yogurt",        "Yogurt natural",       "lt",    45.0, "Lácteos"),
-    ("tortilla",      "Tortilla de maíz",     "pza",    1.6, "Abarrotes"),
+    ("tortilla",      "Tortilla de maíz",     "pz",    1.6, "Abarrotes"),
     ("mantequilla",   "Mantequilla",          "kg",   180.0, "Lácteos"),
     ("azucar",        "Azúcar",               "kg",    26.0, "Abarrotes"),
     ("te-hojas",      "Té de hoja suelta",    "kg",   650.0, "Café"),
-    ("agua-mineral",  "Agua mineral 355ml",   "pza",    9.0, "Bebidas"),
+    ("agua-mineral",  "Agua mineral 355ml",   "pz",    9.0, "Bebidas"),
 ]
 
 # ─── Recetas: platillo → [(ingrediente, cantidad)] ───────────────────────────
@@ -128,6 +138,16 @@ def sembrar(cid: str) -> int:
     costos = {slug: costo for slug, _, _, costo, _ in INGREDIENTES}
     unidades = {slug: um for slug, _, um, _, _ in INGREDIENTES}
     errores = 0
+
+    # Se valida ANTES de escribir nada. La primera corrida sembró 28 ingredientes y 75
+    # renglones de receta y sólo entonces reventó en el inventario con un 400, porque la
+    # unidad decía "pza" y el CHECK exige "pz". Dejó los datos a medias.
+    malas = {um for um in unidades.values() if um not in UNIDADES_VALIDAS}
+    if malas:
+        raise ValueError(
+            f"unidades que la base va a rechazar: {sorted(malas)}. "
+            f"Sólo acepta {sorted(UNIDADES_VALIDAS)} (CHECK pos_inventory_stock_unit_check)."
+        )
 
     # 1) Ingredientes
     existentes = {r["id"] for r in sb_get("pos_ingredients", f"client_id=eq.{cid}&select=id&limit=500")}
