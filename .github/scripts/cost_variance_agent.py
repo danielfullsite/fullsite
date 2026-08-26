@@ -64,8 +64,13 @@ def sb_upsert(table, data):
 def send_telegram(text):
     for chat_id in TG_CHAT_IDS:
         for chunk in [text[i:i+4000] for i in range(0, len(text), 4000)]:
-            requests.post(f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
-                json={"chat_id": chat_id, "text": chunk}, timeout=15)
+            # Un aviso que no se pudo mandar NO puede tumbar el job.
+            try:
+                requests.post(f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
+                    json={"chat_id": chat_id, "text": chunk}, timeout=15)
+            except Exception as _e:
+                print('[telegram] no se pudo enviar, se ignora: %s' % _e)
+
 
 try:
     cid = CLIENT["id"]

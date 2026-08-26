@@ -55,8 +55,13 @@ def send_telegram(msg):
         if not chat_id:
             continue
         for chunk in [msg[i:i+4000] for i in range(0, len(msg), 4000)]:
-            requests.post(f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
-                          json={"chat_id": chat_id, "text": chunk}, timeout=10)
+            # Un aviso que no se pudo mandar NO puede tumbar el job.
+            try:
+                requests.post(f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
+                              json={"chat_id": chat_id, "text": chunk}, timeout=10)
+            except Exception as _e:
+                print('[telegram] no se pudo enviar, se ignora: %s' % _e)
+
 
 
 def main():

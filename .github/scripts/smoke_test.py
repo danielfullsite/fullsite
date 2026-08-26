@@ -147,17 +147,35 @@ if failures:
     if warnings:
         msg += "\n\nWARNINGS:\n" + "\n".join(f"⚠ {w}" for w in warnings)
     msg += f"\n\nDuration: {duration}ms"
-    requests.post(f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
-        json={"chat_id": TG_CHAT, "text": msg}, timeout=10)
+    # Un aviso que no se pudo mandar NO puede tumbar el job.
+    try:
+        requests.post(f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
+            json={"chat_id": TG_CHAT, "text": msg}, timeout=10)
+    except Exception as _e:
+        print('[telegram] no se pudo enviar, se ignora: %s' % _e)
+
     print(f"\nALERT SENT: {len(failures)} failures, {len(warnings)} warnings")
+    # El detalle va al log pase lo que pase. Si mañana se retiran los secretos de
+    # Telegram, el motivo del fallo tiene que seguir estando en algún lado.
+    print(msg)
+    # Un fallo REAL sí tumba el job: eso no cambia.
     sys.exit(1)
 elif warnings:
     msg = "🟡 SMOKE TEST — Warnings\n\n"
     msg += "\n".join(f"⚠ {w}" for w in warnings)
     msg += f"\n\nDuration: {duration}ms"
-    requests.post(f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
-        json={"chat_id": TG_CHAT, "text": msg}, timeout=10)
+    # ESTA es la llamada que el 2026-08-26 pintó de rojo un despliegue sano: las
+    # seis comprobaciones dieron OK, la corrida traía sólo advertencias —o sea
+    # que iba a salir con éxito— y el ReadTimeout de Telegram a los 10 s se
+    # propagó como excepción sin atrapar. Exit code 1 por un aviso.
+    try:
+        requests.post(f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
+            json={"chat_id": TG_CHAT, "text": msg}, timeout=10)
+    except Exception as _e:
+        print('[telegram] no se pudo enviar, se ignora: %s' % _e)
     print(f"\nWARNINGS SENT: {len(warnings)}")
+    # El texto va al log pase lo que pase: es la fuente que sí sobrevive.
+    print(msg)
 else:
     print(f"\nALL CHECKS PASSED — {duration}ms — silent success")
 
