@@ -236,7 +236,7 @@ definiciones que devuelve `pg_get_viewdef()` — no transcritas a mano.
 > por una migración lo deja atrás en silencio. La detección semanal de deriva lo habría
 > encontrado el lunes; esto se encontró horas después por casualidad.
 
-### 2. Los roles del baseline no se crean en la ruta de migración
+### 2. Los roles del baseline no se crean en la ruta de migración ✅ RESUELTO
 
 El baseline hace **342 `GRANT`** a `fullsite_readonly` y `fullsite_agent`. `pg_dump` no
 vuelca roles — son del clúster, no de la base — así que los `GRANT` llegan sin que exista
@@ -252,10 +252,43 @@ Un `supabase db push` contra un proyecto nuevo truena en el primer `GRANT`:
 ERROR: role "fullsite_readonly" does not exist
 ```
 
-No se cambió el orden de migraciones aquí: eso es una decisión de quien sea dueño del
-flujo de aprovisionamiento, y tocarla a ciegas es justo lo que el protocolo evita. Pero
-**hasta que se resuelva, el baseline no se puede aplicar a una base nueva** — que era su
-razón de existir.
+#### Cómo se resolvió
+
+**No cambiando el orden de las migraciones.** Renombrar archivos para que uno gane
+lexicográficamente es una garantía frágil: se rompe el día que alguien agrega otro
+archivo, y no hay nada que avise.
+
+En vez de eso, los roles se **anteponen al volcado dentro del propio baseline**:
+
+```bash
+# .github/workflows/esquema-baseline.yml
+cat supabase/preambulo_roles.sql esquema_nuevo.sql > "$BASELINE"
+```
+
+[`supabase/preambulo_roles.sql`](../../supabase/preambulo_roles.sql) sólo crea los dos
+roles, de forma idempotente. **Los permisos no van ahí**: los trae el volcado, que es la
+fuente fiel de lo que hay en producción. Duplicarlos sería inventar una segunda verdad
+que se desincroniza en silencio.
+
+Así el orden lo garantiza **el archivo, no su nombre**, y sobrevive a la regeneración
+semanal porque quien regenera es el mismo workflow que antepone.
+
+**Verificado:**
+
+- El volcado quedó **idéntico byte a byte** bajo el preámbulo — se compararon los 10,372
+  renglones originales contra los mismos 46 renglones más abajo.
+- El detector de deriva **sigue diciendo "sin deriva"** (código 0). Su inventario cuenta
+  tablas, vistas, políticas, funciones, índices y triggers; `CREATE ROLE` no es ninguno,
+  así que el preámbulo no genera un falso positivo permanente.
+- El revisor de secretos no marca nada: los roles se crean **sin contraseña**. `LOGIN` sin
+  contraseña no puede autenticarse; el rol existe para recibir los `GRANT`, y quien lo
+  necesite para conectarse le pone contraseña fuera del repositorio.
+
+> Nota sobre la próxima corrida semanal: `ops_daily_desde_pos` va como migración aparte
+> (`20260826120000_ops_daily_desde_pos.sql`), no dentro del baseline. El detector compara
+> el volcado **sólo contra el baseline**, así que reportará esa vista como deriva hasta
+> que se regenere el baseline. No es un error: el baseline efectivamente no la tiene. Se
+> resuelve solo en la siguiente regeneración.
 
 ### 3. Residuo de permisos en las vistas OCM
 
