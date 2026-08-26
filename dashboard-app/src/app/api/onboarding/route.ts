@@ -1,15 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { provisionTenant } from '@/lib/provision-tenant'
 
 // Server-side Supabase client with service role for creating auth users.
 // NOTE: the SDK is used ONLY for the Auth Admin API (createUser) + the client_users
 // mapping — the existing, working behavior. All TENANT DATA provisioning goes through
 // provisionTenant() (PostgREST + service_role), per the domain-contract rule.
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+//
+// Perezoso a propósito: Next evalúa este módulo al recolectar los datos de página
+// durante el build. Construido en scope de módulo, un build sin credenciales tronaba
+// con "supabaseUrl is required" y se caía el build completo. Aquí sólo se construye
+// cuando entra una petición de verdad, que es cuando las variables existen.
+let _supabase: SupabaseClient | null = null
+function getSupabase(): SupabaseClient {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    )
+  }
+  return _supabase
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -53,7 +64,7 @@ export async function POST(request: NextRequest) {
     const resolvedDisplayName = display_name || displayName || ''
 
     // 1. Create auth user with client_id in metadata
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+    const { data: authData, error: authError } = await getSupabase().auth.admin.createUser({
       email,
       password,
       email_confirm: true, // Auto-confirm — no email verification needed
@@ -75,7 +86,7 @@ export async function POST(request: NextRequest) {
 
     // 2. Create client_users mapping (owner)
     try {
-      await supabase.from('client_users').insert({
+      await getSupabase().from('client_users').insert({
         user_id: userId,
         client_id: clientId,
         role: 'dueño',
