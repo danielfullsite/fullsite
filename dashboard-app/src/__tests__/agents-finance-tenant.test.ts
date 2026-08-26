@@ -29,9 +29,30 @@ vi.mock('@/lib/agents/inventory', () => ({ runInventoryAgent: async () => [] }))
 vi.mock('@/lib/agents/fraud', () => ({ runFraudAgent: async () => [] }))
 vi.mock('@/lib/agents/staff', () => ({ runStaffAgent: async () => [] }))
 
-beforeEach(() => {
+// El guardián dejó de preguntar `clientId === 'amalay'` y ahora pregunta si el
+// restaurante es dueño del histórico de Wansoft — `clients.wansoft_subsidiary_id`.
+// Misma protección, pero configurable: otro restaurante que migre desde Wansoft
+// funciona sin tocar código. Ver src/lib/wansoft-legacy.ts.
+//
+// Por eso el stub de fetch ya no puede devolver [] para todo: tiene que contestar esa
+// consulta. Aquí amalay es el dueño; cualquier otro no lo es.
+const SUBSIDIARIA_POR_TENANT: Record<string, string | null> = { amalay: '4821' }
+
+beforeEach(async () => {
   finanzasCorrio.mockClear()
-  vi.stubGlobal('fetch', async () => ({ ok: true, json: async () => [], text: async () => '' }) as unknown as Response)
+  // El helper cachea la respuesta 5 minutos por tenant. Sin limpiar, el resultado de un
+  // caso se filtra al siguiente y el archivo pasa por el orden en que corren, no porque
+  // el guardián funcione. Un verde así es peor que un rojo.
+  ;(await import('@/lib/wansoft-legacy'))._limpiarCacheWansoft()
+  vi.stubGlobal('fetch', async (url: string) => {
+    const u = String(url)
+    if (u.includes('/clients?') && u.includes('wansoft_subsidiary_id')) {
+      const slug = decodeURIComponent(u.match(/id=eq\.([^&]+)/)?.[1] ?? '')
+      const sub = SUBSIDIARIA_POR_TENANT[slug] ?? null
+      return { ok: true, json: async () => [{ wansoft_subsidiary_id: sub }], text: async () => '' } as unknown as Response
+    }
+    return { ok: true, json: async () => [], text: async () => '' } as unknown as Response
+  })
   process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://staging.supabase.co'
   process.env.SUPABASE_SERVICE_KEY = 'SERVICE'
 })

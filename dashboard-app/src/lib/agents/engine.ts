@@ -8,6 +8,7 @@ import { runInventoryAgent } from './inventory'
 import { runFraudAgent } from './fraud'
 import { runStaffAgent } from './staff'
 import { runFinanceAgent } from './finance'
+import { esDuenoDelHistoricoWansoft } from '@/lib/wansoft-legacy'
 
 const SB_URL = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/$/, '')
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || ''
@@ -82,7 +83,13 @@ export async function runAgent(agentId: AgentId, clientId: string): Promise<Agen
   //
   // El guardian se mueve a donde esta el peligro — la funcion que corre el
   // agente — en vez de a la funcion que casualmente lo llamaba.
-  if (agentId === 'finance' && clientId !== WANSOFT_LEGACY_TENANT) {
+  //
+  // La pregunta dejó de ser "¿eres amalay?" y pasó a ser "¿eres dueño del histórico
+  // de Wansoft?" (clients.wansoft_subsidiary_id). Misma protección, pero configurable:
+  // un restaurante que migre desde Wansoft mañana tiene su agente de finanzas sin
+  // tocar código. `esDuenoDelHistoricoWansoft` falla CERRADO — si la consulta truena,
+  // devuelve false y el agente no corre.
+  if (agentId === 'finance' && !(await esDuenoDelHistoricoWansoft(clientId))) {
     return {
       agent_id: agentId,
       events: [],
@@ -161,12 +168,13 @@ export async function runAgent(agentId: AgentId, clientId: string): Promise<Agen
  * `/api/agents/run` lo saltaba llamando a `runAgent` directo con el `agent_id`
  * del cuerpo de la petición.
  */
-const WANSOFT_LEGACY_TENANT = 'amalay'
-
-/** Run all agents concurrently (finance solo para el tenant legacy de wansoft). */
+/** Run all agents concurrently (finance solo para el dueño del histórico de Wansoft). */
 export async function runAllAgents(clientId: string): Promise<AgentResult[]> {
   const agentIds: AgentId[] = ['operations', 'inventory', 'fraud', 'staff']
-  if (clientId === WANSOFT_LEGACY_TENANT) agentIds.push('finance')
+  // Antes: `clientId === 'amalay'`. Ahora se pregunta por la propiedad, no por el
+  // nombre — así el día que otro restaurante migre desde Wansoft, su agente de
+  // finanzas corre sin tocar código. Ver src/lib/wansoft-legacy.ts.
+  if (await esDuenoDelHistoricoWansoft(clientId)) agentIds.push('finance')
   return Promise.all(agentIds.map(id => runAgent(id, clientId)))
 }
 

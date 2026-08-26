@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { withPOSAuth } from '@/lib/api-auth'
 import { buildDailyFromOrders } from '@/lib/pos-daily'
+import { esDuenoDelHistoricoWansoft } from '@/lib/wansoft-legacy'
 
 // Simple rate limiting — max 15 requests per minute per IP
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>()
@@ -125,9 +126,14 @@ export async function POST(request: NextRequest) {
     let waiterContext = ''
     const wantsMeseros = ['mesero', 'quien', 'quién', 'ranking', 'top', 'mejor', 'peor', 'h&h', 'half', 'bebida', 'postre', 'pan', 'toast', 'propina'].some(kw => q.includes(kw))
 
-    // wansoft_waiter_categories NO tiene columna de cliente → es solo-AMALAY (legacy).
-    // Para otros tenants no se lee (evita filtrar datos de AMALAY).
-    if (!wantsMeseros || auth.clientId !== 'amalay') {
+    // wansoft_waiter_categories NO tiene columna de cliente: sólo puede haber un
+    // restaurante dueño de esas filas, y quien las lea ve las suyas. El guardián no es
+    // una bandera de producto — impide que un restaurante vea los meseros de otro.
+    //
+    // Se pregunta por la propiedad (clients.wansoft_subsidiary_id) y no por el nombre,
+    // para que no quede atado a AMALAY. Falla cerrado: si no se puede comprobar, no se
+    // lee. Ver src/lib/wansoft-legacy.ts.
+    if (!wantsMeseros || !(await esDuenoDelHistoricoWansoft(auth.clientId))) {
       // Skip entirely — saves ~5,000-10,000 tokens per call
     } else {
     let wcParams = 'select=fecha,data&order=fecha.desc'
