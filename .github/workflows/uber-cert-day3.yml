@@ -33,6 +33,16 @@ jobs:
           echo "D3-002 scope_probe: HTTP $HTTP_CODE"
           GRANTED=$(echo "$BODY" | jq -r '.scopes_granted // [] | join(", ")' 2>/dev/null || echo "?")
           DELTA=$(echo "$BODY" | jq -r '.scopes_delta // [] | join(", ")' 2>/dev/null || echo "?")
+          # Promociones: Uber las concede por separado, así que hasta ahora el probe
+          # salía limpio aunque no estuvieran. Se reporta explícito.
+          PROMO_GRANTED=$(echo "$BODY" | jq -r '.phases.phase4_promotions.scopes_granted // [] | join(", ")' 2>/dev/null || echo "?")
+          PROMO_MISSING=$(echo "$BODY" | jq -r '.phases.phase4_promotions.scopes_missing // [] | join(", ")' 2>/dev/null || echo "?")
+          PROMO_BLOCKER=$(echo "$BODY" | jq -r '.phases.phase4_promotions.blocker // "ninguno"' 2>/dev/null || echo "?")
+          echo "  promociones concedidas: ${PROMO_GRANTED:-(ninguna)}"
+          echo "  promociones faltantes : ${PROMO_MISSING:-(ninguna)}"
+          echo "  promociones blocker   : $PROMO_BLOCKER"
+          echo "D3002_PROMO_GRANTED=$PROMO_GRANTED" >> $GITHUB_ENV
+          echo "D3002_PROMO_MISSING=$PROMO_MISSING" >> $GITHUB_ENV
           CORR=$(echo "$BODY" | jq -r '.correlation_id // "?"' 2>/dev/null || echo "?")
           echo "  scopes_granted: $GRANTED"
           echo "  scopes_delta:   $DELTA"
@@ -61,6 +71,8 @@ jobs:
             echo "## 🔑 Uber — concede los scopes que faltan"
             echo ""
             echo "- **scopes concedidos:** \`${D3002_GRANTED:-(vacío)}\`"
+            echo "- **promociones concedidas:** \`${D3002_PROMO_GRANTED:-(ninguna)}\`"
+            echo "- **promociones faltantes:** \`${D3002_PROMO_MISSING:-(ninguna)}\`"
             echo "- **scopes que faltan (delta):** \`${D3002_DELTA:-(vacío)}\`"
             echo ""
             if [ -n "$REAUTH_URL" ]; then

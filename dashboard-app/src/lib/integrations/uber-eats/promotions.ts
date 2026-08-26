@@ -15,7 +15,9 @@ const promotionsPath = (storeId: string): string =>
     .trim()
     .replace('{store_id}', encodeURIComponent(storeId))
 
-const promotionsScope = (): string =>
+/** Scope que create_promotion pide EN RUNTIME. Se exporta para que el scope_probe
+ *  pueda reportar la diferencia entre lo que la app pide y lo que Uber concede. */
+export const promotionsScope = (): string =>
   (process.env.UBER_PROMOTIONS_SCOPE || 'eats.store.promotion.write').trim()
 
 export interface UberPromotion {
