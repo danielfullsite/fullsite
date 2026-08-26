@@ -524,9 +524,50 @@ preexistentes e idénticos en `HEAD`).
 - **Las 371 filas borradas restantes siguen sin explicación**, y fuera de la ventana de 24 h
   no hay forma de investigarlas con lo que existe hoy.
 
+## Un agujero que abrí y cerré la misma noche
+
+La revisión posterior a aplicar la migración —el linter de Supabase, regla 0029— encontró
+esto:
+
+```
+r1_cleanup_orders   proacl: postgres=X | authenticated=X | service_role=X
+                                          └── no debería estar ahí
+```
+
+La migración hacía `REVOKE ALL … FROM PUBLIC, anon` y yo di por hecho que con eso quedaba
+sólo para `service_role`. **Falso.** Supabase otorga `EXECUTE` a `authenticated` sobre las
+funciones nuevas de `public` mediante `ALTER DEFAULT PRIVILEGES`, y lo hace como grant
+**directo** — que un `REVOKE` a `PUBLIC` no toca.
+
+Lo que eso permitía: cualquier usuario con sesión iniciada, **de cualquier restaurante**,
+podía llamar `POST /rest/v1/rpc/r1_cleanup_orders` con el `p_client_id` de otro tenant y
+borrarle todas sus órdenes — saltándose el guardián de la ruta, el rol mínimo, la
+confirmación literal y el digest. **Peor que el defecto que venía a corregir.**
+
+Cerrado en `20260826213000_cleanup_orders_revocar_authenticated.sql`, y comprobado en vez de
+supuesto:
+
+```
+r1_cleanup_orders    anon:false  authenticated:false  service_role:true
+r1_cleanup_restore   anon:false  authenticated:false  service_role:true
+```
+
+Más humo bajo `service_role`, para no haber cerrado la puerta con la ruta adentro:
+`deleted:2` · `restored:2` · estado final sin residuo.
+
+**El barrido del patrón encontró tres funciones más con la misma exposición, todas
+preexistentes.** Una es seria —`r1_save_order` acepta `p_client_id` como argumento y evade
+RLS— y **no está corregida**: es un P0 de otra capacidad y va en su propia rama. Detalle,
+clasificación y fix propuesto en
+[`docs/audit/SECDEF-GRANTS-AUTHENTICATED-2026-08-26.md`](../audit/SECDEF-GRANTS-AUTHENTICATED-2026-08-26.md).
+
+> **La regla:** escribir el `REVOKE` no es verificar el permiso. La comprobación es
+> `has_function_privilege`, y hay que correrla.
+
 ## Rollback
 
 ```sql
+-- 20260826213000 no se revierte: reabriría el agujero de arriba.
 DROP FUNCTION IF EXISTS public.r1_cleanup_orders(text,text,text,text,text,text,integer,text);
 DROP FUNCTION IF EXISTS public.r1_cleanup_restore(text);
 DROP TABLE IF EXISTS public.pos_cleanup_operations;
