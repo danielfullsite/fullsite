@@ -12,10 +12,21 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 export async function GET(req: NextRequest) {
-  // Vercel Cron sends a secret header; validate it
-  const authHeader = req.headers.get('authorization')
+  // Vercel Cron manda `Authorization: Bearer <CRON_SECRET>`.
+  //
+  // Falla CERRADO. La version anterior era `if (cronSecret && ...)`: sin la
+  // variable, la condicion entera se saltaba y cualquiera podia disparar la
+  // corrida de los 5 agentes — quemando cuota de Groq, escribiendo en
+  // agent_events y mandando avisos por Telegram. CRON_SECRET no estaba puesta en
+  // produccion, asi que ese era el estado real desde que existe la ruta.
+  //
+  // Sin secreto la ruta no existe, en vez de existir sin puerta. Mismo patron
+  // que /api/onboarding, que ya devolvia 503 cuando le falta el suyo.
   const cronSecret = process.env.CRON_SECRET
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  if (!cronSecret) {
+    return NextResponse.json({ error: 'Cron no configurado' }, { status: 503 })
+  }
+  if (req.headers.get('authorization') !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
