@@ -74,6 +74,24 @@ export async function runAgent(agentId: AgentId, clientId: string): Promise<Agen
   let events: AgentEvent[] = []
   let error: string | undefined
 
+  // El guardian de las tablas legacy vivia solo en runAllAgents, y eso dejaba
+  // una puerta: /api/agents/run acepta agent_id del cuerpo y llama aqui DIRECTO.
+  // Un usuario de otro restaurante pedia { agent_id: 'finance' } y recibia
+  // analisis calculados con las ventas de AMALAY, guardados como eventos suyos.
+  // No era solo una fuga: era informacion equivocada presentada como propia.
+  //
+  // El guardian se mueve a donde esta el peligro — la funcion que corre el
+  // agente — en vez de a la funcion que casualmente lo llamaba.
+  if (agentId === 'finance' && clientId !== WANSOFT_LEGACY_TENANT) {
+    return {
+      agent_id: agentId,
+      events: [],
+      ran_at: new Date().toISOString(),
+      duration_ms: Date.now() - start,
+      error: 'finance no disponible para este restaurante',
+    }
+  }
+
   try {
     switch (agentId) {
       case 'operations': events = await runOperationsAgent(clientId, sbGet); break
@@ -136,6 +154,12 @@ export async function runAgent(agentId: AgentId, clientId: string): Promise<Agen
  * Tenant dueño de las tablas legacy globales (wansoft_daily / wansoft_kpis).
  * Esas tablas no tienen client_id, así que el finance agent solo puede correr
  * para este tenant — de lo contrario expondría sus ventas a otros clientes.
+ *
+ * El guardián REAL vive en `runAgent`, que es la función que corre el agente.
+ * El de aquí abajo se conserva por defensa en profundidad: evita intentarlo y
+ * recibir un resultado con error. Hasta el 2026-08-26 sólo existía éste, y
+ * `/api/agents/run` lo saltaba llamando a `runAgent` directo con el `agent_id`
+ * del cuerpo de la petición.
  */
 const WANSOFT_LEGACY_TENANT = 'amalay'
 
