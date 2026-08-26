@@ -86,8 +86,17 @@ jobs:
                   --baseline "$BASELINE" | tee reporte.txt
           codigo=${PIPESTATUS[0]}
           echo "codigo=$codigo" >> "$GITHUB_OUTPUT"
-          # 0 = sin deriva · 1 = SECRETO (siempre fatal) · 3 = hay deriva
-          [ "$codigo" = "1" ] && exit 1
+          # 0 = sin deriva · 1 = SECRETO · 2 = el detector no ve todo · 3 = hay deriva
+          #
+          # El 1 y el 2 son fatales por razones distintas. El 1 es obvio. El 2 es más
+          # sutil y por eso importa: significa que el patrón del detector no empató con
+          # algo del volcado, así que su veredicto de deriva no vale — diría "sin
+          # novedad" sobre objetos que ni alcanzó a leer. Dejarlo pasar convertiría este
+          # workflow en un check que siempre aprueba, que es peor que no tenerlo.
+          case "$codigo" in
+            1) echo "::error::El volcado trae algo con forma de credencial."; exit 1 ;;
+            2) echo "::error::El detector no está viendo todo el volcado; su veredicto no es confiable."; exit 1 ;;
+          esac
           exit 0
 
       - name: Resumen
