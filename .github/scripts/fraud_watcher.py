@@ -31,6 +31,7 @@ from datetime import datetime, timedelta
 
 from agent_common import sb_get, log_run, log_event, send_telegram
 from client_config import get_client, get_tz, get_chat_ids, get_all_chat_ids
+from urllib.parse import quote
 
 AGENT_ID = "fraud-watcher"
 CLIENT = get_client()
@@ -55,6 +56,27 @@ ACTIONS_IN = "(" + ",".join(SEVERITY.keys()) + ")"
 FALLBACK_LOOKBACK_MIN = 60
 
 
+def iso_para_url(ts: str) -> str:
+    """Deja un timestamp ISO seguro para meterlo en una query de PostgREST.
+
+    ESTE ERA EL BUG QUE TENÍA CAÍDO A fraud-watcher DESDE EL 2026-08-20.
+
+    Postgres devuelve el created_at como '2026-08-20T23:09:51.922571+00:00'. Al
+    interpolarlo tal cual en la URL, el '+' se decodifica como ESPACIO y
+    PostgREST responde:
+
+        400 Client Error: Bad Request ... created_at=gt.2026-08-20T23:09:51.922571 00:00
+
+    Resultado: 127 de 128 corridas en error y el único detector de fraude en
+    casi-tiempo-real sin correr durante días, en silencio.
+
+    El mismo defecto ya estaba identificado y resuelto en table_time_agent.py:74
+    —"Usar Z (o URL-encodear) evita el bad request"— pero la corrección nunca se
+    propagó a este archivo.
+    """
+    return quote(str(ts).replace("+00:00", "Z"), safe="")
+
+
 def get_watermark() -> str:
     """created_at del último run exitoso; si no hay, ahora − FALLBACK_LOOKBACK_MIN."""
     fallback = (datetime.now(MX_TZ) - timedelta(minutes=FALLBACK_LOOKBACK_MIN)).isoformat()
@@ -76,7 +98,7 @@ def get_new_events(since: str) -> list:
     return sb_get(
         "pos_audit_log",
         f"client_id=eq.{CLIENT_ID}"
-        f"&created_at=gt.{since}"
+        f"&created_at=gt.{iso_para_url(since)}"
         f"&action=in.{ACTIONS_IN}"
         "&order=created_at.asc&limit=200"
         "&select=id,order_id,action,actor,mesa,details,created_at",
