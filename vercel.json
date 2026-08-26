@@ -1,0 +1,4 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "ignoreCommand": "git rev-parse HEAD^ >/dev/null 2>&1 || exit 1; git diff --quiet HEAD^ HEAD -- . ':(exclude)docs/' ':(exclude)Legal/' ':(exclude)AMALAY X FULLSITE/' ':(exclude)electron-app/' ':(exclude)electron-kds/' ':(exclude)electron-dashboard/' ':(exclude)print-bridge/' ':(exclude)agents/' ':(exclude)scripts/' ':(exclude)graphify-out/' ':(exclude)ios/' ':(exclude)fullsite-web/' ':(exclude)tests/' ':(exclude).github/'"
+}
