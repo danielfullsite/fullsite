@@ -526,22 +526,34 @@ El subnet scan existe en `server-discovery.ts` (`_subnetScan`) pero `permitSubne
 **Expected Result**:
 - Ambos entran. La operación arranca sin depender de la nube.
 
-**Estado real (auditado en código 2026-08-26)** — dos límites que lo impiden hoy:
+**Estado real (auditado en código 2026-08-26)** — dos límites que lo impedían:
 
-- **Ventana de 8 h.** `pos_staff_cache` guarda `exp: Date.now() + 28_800_000` en cada login
-  *online* (`pos/layout.tsx`). Un restaurante que cierra a la 1am y abre a la 1pm son **12
-  horas**: el caché ya expiró y **nadie entra**.
-- **Una sola credencial por terminal.** `pos_staff_cache` guarda un objeto, no una lista, y se
-  sobrescribe en cada login. Offline sólo puede entrar **la última persona que se logueó con
+- **Ventana de 8 h.** `pos_staff_cache` guardaba `exp: Date.now() + 28_800_000` en cada login
+  *online*. Un restaurante que cierra a la 1am y abre a la 1pm son **12 horas**: el caché ya
+  había expirado y **nadie entraba**.
+- **Una sola credencial por terminal.** `pos_staff_cache` guardaba un objeto, no una lista, y se
+  sobrescribía en cada login. Offline sólo entraba **la última persona que se logueó con
   internet**. En una terminal compartida entre meseros, cajero y gerente, eso falla el primer día.
 
 Validado en campo el 2026-08-24 06:49 (*"si jala! que chulada!"*) — pero con caché fresco, una
 sola persona, y a las pocas horas del último login online. Ninguna de las dos condiciones se
 parece a abrir el restaurante.
 
+**Los dos límites están cerrados en `main` desde el 2026-08-26 (PR #133):**
+
+| Era | Es |
+|---|---|
+| TTL de 8 h, fijo | **16 h**, configurable por `NEXT_PUBLIC_POS_OFFLINE_CREDENTIAL_TTL_HOURS` |
+| `pos_staff_cache`: un objeto que se sobrescribía | `pos_manager_credentials_v2`: **lista de `ManagerCredential[]`**, indexada por `staff_id` |
+
+El compromiso de alargar el TTL está escrito en el propio módulo: la credencial de alguien dado
+de baja sigue sirviendo más tiempo *en esa terminal y sin red*. Se mitiga con `disabled`
+—revocación honrada al reconectar— y con la bitácora `pos_offline_auth_log`. Es el mismo
+compromiso que hace el POS legado.
+
 | Impl | Test | Cert | Pendiente |
 |---|---|---|---|
-| ⚠️ parcial | ✗ | ✗ | La ventana debe superar un ciclo cierre-apertura y el caché debe admitir varias credenciales. Hasta entonces, el arranque en frío sin WAN no es viable |
+| ✓ (PR #133) | ✓ | ✗ | **Sólo falta campo.** Apagar la terminal al cierre, encenderla al día siguiente sin WAN, y que entren **dos personas distintas**. El test cubre el cableado; que la ventana de 16 h cubra el ciclo real de AMALAY sólo se comprueba abriendo |
 
 ---
 
@@ -590,12 +602,17 @@ síncrona y se llama dentro del inicializador de un `useState`.
 | 7 — Impresora | 2 | 2 | 2 | 0 | Sin test con hardware real |
 | 8 — Multi-terminal | 3 | 3 | 1 | 0 | Sin test concurrente real |
 | 9 — Recovery | 2 | 2 | 0 | 0 | Requiere Supabase staging |
-| 10 — Arranque y sesión | 2 | 1 | 0 | 0 | T-24 bloqueado por diseño del caché de sesión; T-25 corregido en #128, falta validar |
-| **Total** | **25** | **23** | **13** | **0** | |
+| 10 — Arranque y sesión | 2 | 2 | 1 | 0 | T-24 cerrado en #133 (TTL 16 h + varias credenciales); T-25 corregido en #128, falta validar |
+| **Total** | **25** | **24** | **14** | **0** | |
 
-**Escenarios Implementados**: 23/25 (92%) — T-24 sólo parcial (ver Grupo 10)
-**Escenarios con Test Automatizado**: 13/25 (52%) — +6 el 2026-08-26 (T-01, T-04, T-07 en el navegador; T-12, T-13, T-14 a nivel de transporte)
+**Escenarios Implementados**: 24/25 (96%) — +1 el 2026-08-26 (T-24, PR #133)
+**Escenarios con Test Automatizado**: 14/25 (56%) — +7 el 2026-08-26 (T-01, T-04, T-07 en el navegador; T-12, T-13, T-14 a nivel de transporte; T-24 el cableado del login)
 **Escenarios Certificados**: 0/25 (0%)
+
+> **El cuello de botella ya no es código.** 24 de 25 implementados, 14 con prueba automatizada,
+> y **cero certificados** — porque certificar quiere decir ejecutarlo físicamente, y eso no lo
+> hace un test. De aquí en adelante lo que mueve el número es un turno en el restaurante, no un
+> PR.
 
 **Escenarios con evidencia de campo parcial**: 4/25 — T-01, T-17, T-22, T-23
 (AMALAY 2026-08-24, caja únicamente. Ver [`EVIDENCIA-CAMPO-AMALAY-2026-08-24.md`](EVIDENCIA-CAMPO-AMALAY-2026-08-24.md))
