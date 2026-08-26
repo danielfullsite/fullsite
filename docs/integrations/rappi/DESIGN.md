@@ -1,16 +1,44 @@
 # Rappi Integration — Technical Design v0.2
 
 **Workstream:** Delivery Platform Expansion — Phase 1  
-**Estado:** `WAITING_EXTERNAL` — Correo de onboarding enviado a Rodrigo + `integraciones_rest@rappi.com` el 2026-08-02. Workstream congelado hasta respuesta de Rappi.  
-**Fecha:** 2026-08-02  
-**Fuentes:** dev-portal.rappi.com (oficial), research multi-agente confirmado
+**Estado:** `DEV_VALIDADO — esperando aprovisionamiento de PROD por Rappi`  
+**Fecha de este encabezado:** 2026-08-26  
+**Fuentes:** dev-portal.rappi.com (oficial) + hilo de correo con Rodrigo Murguía Irigoyen (TAM Integraciones, Rappi)
 
-### Reglas mientras el workstream está en WAITING_EXTERNAL
+> ⚠️ **Este encabezado decía `WAITING_EXTERNAL` desde el 2026-08-02 y estuvo obsoleto tres
+> semanas.** Rappi sí respondió, entregó credenciales y la validación DEV ya se completó.
+> Corregido el 2026-08-26 a partir del hilo de correo.
 
-- NO abrir RAPPI-001
-- NO escribir código
-- NO asumir contratos de API
-- NO implementar ningún punto marcado como ECR (External Confirmation Required)
+### Lo que ya ocurrió (cronología verificada en el hilo)
+
+| Fecha | Hecho |
+|---|---|
+| 2026-08-10 | Daniel confirma a Rodrigo: **T&C firmados** (los 3 documentos) y onboarding completado |
+| 2026-08-13 | **Rappi entrega credenciales DEV**: `client_id`, `client_secret` y **store de pruebas `900173586`**. Menú se administra en `integrations-manager.rappi.com` |
+| 2026-08-15 | Webhook `NEW_ORDER` suscrito y recibiendo eventos del POS Tester. Contrato de firma confirmado: header `Rappi-Signature: t=<timestamp>,sign=<hex>`, HMAC-SHA256 sobre el **body crudo** |
+| 2026-08-20 | **Validación técnica DEV completa**: prueba oficial del Integrations Manager entregada con **HTTP 200**, respuesta del integrador `{"ok":true,"accepted":true}`, endpoint `https://app.fullsite.mx/api/integrations/rappi/webhook`, pruebas automatizadas aprobadas |
+
+### 🚨 Por qué está detenido — y no es culpa de Rappi
+
+Los **dos correos que destraban el siguiente paso nunca llegaron a Rappi.** Verificado en las
+cabeceras del hilo:
+
+- **2026-08-15** — la petición del *webhook secret*: `to: Daniel Ramonfaur <daniel@fullsite.mx>`
+- **2026-08-20** — la petición de **aprovisionar `Fullsite_PROD`**: `from: daniel@fullsite.mx` →
+  `to: daniel@fullsite.mx`
+
+Ambos se enviaron **a nosotros mismos**. Rodrigo no los recibió. El último mensaje que Rappi
+realmente vio es del 2026-08-13, cuando nos mandaron las credenciales.
+
+**Acción única para destrabar:** reenviar a Rodrigo Murguía el mensaje del 2026-08-20 pidiendo:
+creación de `Fullsite_PROD`, credenciales productivas, asociación de las tiendas de AMALAY,
+checklist de certificación y procedimiento del piloto. (En el portal PROD sólo aparece
+`DEFAULT (NO USAR)`.)
+
+### 🔐 Secreto expuesto
+
+El `client_secret` de DEV viajó **en texto plano por correo** el 2026-08-13. Considerarlo
+expuesto y **rotarlo** al pedir las credenciales productivas. No copiarlo a este repo.
 
 ### Al recibir respuesta de Rappi
 
