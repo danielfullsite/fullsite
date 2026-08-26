@@ -131,5 +131,70 @@ class Robustez(unittest.TestCase):
         self.assertEqual(codigos(orden(total="116.00")), [])
 
 
+
+class ElCaminoDelDescuento(unittest.TestCase):
+    """El descuento nunca se ha ejercitado con datos reales.
+
+    Se midieron 0 violaciones en 3,043 órdenes de 30 días — pero en TODA la base hay
+    CERO órdenes con descuento. O sea que la rama que más aritmética tiene es la única
+    que ningún dato ha tocado.
+
+    Y es justo donde otra sesión encontró un bug hoy (#136): el detector de skimming
+    comparaba la suma de items SIN IVA contra el total CON IVA, y disparaba en cada
+    ticket de los 5 tenants con iva_rate > 0. Misma familia de error: mezclar unidades
+    a los dos lados de una resta.
+
+    Estas pruebas usan la fórmula EXACTA del POS (pos/page.tsx:2896-2898), redondeos
+    incluidos, para que el invariante se pruebe contra lo que el sistema realmente
+    escribe y no contra lo que yo creo que escribe:
+
+        subtotalTrasDescuento = redondear(subtotal − descuento)
+        iva                   = redondear(subtotalTrasDescuento × tasa)
+        total                 = redondear(subtotalTrasDescuento + iva)
+    """
+
+    @staticmethod
+    def como_el_pos(subtotal: float, descuento: float, tasa: float) -> dict:
+        r = lambda x: round(x * 100) / 100
+        tras = r(max(0.0, subtotal - descuento))
+        iva = r(tras * tasa)
+        total = r(tras + iva)
+        return {"subtotal": subtotal, "descuento": descuento, "iva": iva, "total": total,
+                "items": [{"nombre": "X", "subtotal": subtotal}],
+                "pagos": [{"metodo": "Efectivo", "monto": total}]}
+
+    def test_con_IVA_16_y_descuento_cuadra(self):
+        o = orden(**self.como_el_pos(1888.00, 150.00, 0.16))
+        self.assertEqual(codigos(o), [])
+
+    def test_con_IVA_cero_tambien(self):
+        # coffee-shop y boruca tienen iva_rate = 0. El invariante no puede asumir 16%.
+        o = orden(**self.como_el_pos(430.00, 30.00, 0.0))
+        self.assertEqual(codigos(o), [])
+
+    def test_los_redondeos_no_acumulan_mas_de_un_centavo(self):
+        # Tres redondeos en el camino. Se barre un rango amplio de importes y descuentos
+        # con la fórmula real: si algún caso se saliera del centavo, la tolerancia
+        # estaría mal calibrada y el reporte se llenaría de falsos positivos.
+        for tasa in (0.16, 0.08, 0.0):
+            for sub in (33.33, 99.99, 1888.00, 12345.67, 7.77):
+                for desc in (0.0, 0.01, 3.33, sub / 3):
+                    o = orden(**self.como_el_pos(sub, round(desc, 2), tasa))
+                    self.assertEqual(
+                        codigos(o), [],
+                        f"falso positivo con subtotal={sub} descuento={desc} tasa={tasa}")
+
+    def test_un_descuento_mayor_que_el_subtotal_no_genera_negativos(self):
+        # El POS lo topa (pos/page.tsx:2881), pero un dato viejo podría traerlo.
+        o = orden(**self.como_el_pos(100.0, 500.0, 0.16))
+        self.assertIsInstance(cuadre.revisar_orden(o), list)
+
+    def test_y_SI_alguien_baja_el_total_dejando_lo_demas_se_detecta(self):
+        # El vector que el detector de skimming vigila en save-order. Aquí debe caer
+        # también, por la otra ruta: la aritmética de los campos guardados.
+        o = orden(**self.como_el_pos(1888.00, 0.0, 0.16))
+        o["total"] = 1500.00
+        self.assertIn("aritmetica_del_total", codigos(o))
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
