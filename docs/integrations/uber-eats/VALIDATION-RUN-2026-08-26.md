@@ -77,12 +77,53 @@ Los 403 de las 04:30 eran la caída, no un bloqueo.
 | 7 | Order: Deny | ⏸ | Requiere orden de prueba |
 | 8 | Order: Get details | ⏸ | Requiere orden de prueba |
 | 9 | Order: Mark Ready | ⏸ | Requiere orden de prueba |
-| 10 | Promotions: Create | 🔴 **bloqueo real de Uber** | Ruta corregida a `/v1/delivery/stores/{id}/promotion`. El token con `eats.store.promotion.write` responde **400** — scope no habilitado |
+| 10 | Promotions: Create | ✅ **resuelto** | Uber habilitó `eats.store.promotion.write` y `.read`. **Promoción creada con éxito** (caso #59620807) |
 | 11 | Reporting: Request Report | ✅ **200** | Devuelve `workflow_id` |
 
-**Marcador: 5 verdes · 5 esperando la orden de prueba · 1 bloqueado por Uber · 1 sin probar.**
+**Marcador al cierre del 2026-08-26: 6 verdes · 5 esperando la orden de prueba · 0 bloqueados
+por Uber · 1 sin probar** (`Menu: Update Item/modifier`, ya desbloqueado — el menú se subió con
+`200`).
 
-## Bloqueos del lado de Uber — sólo queda uno
+### Lo único que falta, y no es código
+
+**Una cuenta de comensal (*eater*) de prueba.** La que Uber creó el 25-ago es de tipo
+*Restaurant* (`daniel+test@fullsitetest.mx`), o sea el lado del comerciante. Para poner una
+orden de prueba hace falta la del cliente.
+
+El test store **no aparece en la app de Uber Eats** buscándolo por nombre con la dirección de
+entrega puesta en la tienda — y es lo esperado: **el test store vive en sandbox y la app del
+consumidor es producción.**
+
+Pedido a Uber el 2026-08-26 13:12 con la plantilla del caso #59032062
+(`daniel+eater@fullsitetest.mx`, misma dirección, ligada al test client). Uber acusó recibo a
+la 13:53: *"Our technical team will review and respond to the issue."*
+
+> **Está en su cancha.** Los cinco endpoints del ciclo de orden —Get, Accept, Deny, Cancel,
+> Mark Ready— están implementados y esperan una orden real. No hay nada que preguntar de nuevo
+> hasta que contesten.
+
+## Bloqueos del lado de Uber — ya no queda ninguno
+
+> ### ✅ Actualizado el 2026-08-26 por la tarde, contra el hilo de correo
+>
+> **Fuente:** caso **#59620807** (continuación del #59499952), no una corrida nueva. Este
+> documento se había quedado atrás de la conversación con Uber.
+>
+> **Promociones: resuelto.** Uber habilitó `eats.store.promotion.write` **y**
+> `eats.store.promotion.read` para el test client. Ambos scopes vuelven concedidos en el token
+> M2M y **se creó una promoción con éxito**. Lo de abajo describe el estado anterior.
+>
+> **Delivery Store API: las cinco llamadas pasan** — List Stores, Get Store, Get Store Status,
+> Pause y Activate. Dos fallaban por bugs nuestros, ya corregidos:
+>
+> - `update-store-status` rechazaba `PAUSED` como enum desconocido — el GET devuelve `PAUSED`
+>   pero el POST espera `OFFLINE`;
+> - poner una tienda offline exige `is_offline_until`, que no se mandaba.
+>
+> **Menú: subido.** `PUT /v2/eats/stores/{store_id}/menus` → **200**. La tienda reporta
+> `onboarding_status ACTIVE` y `orderability ONLINE`, con horario de 24 h.
+
+**Estado anterior, para referencia histórica:**
 
 **`eats.store.promotion.write` no está habilitado para el test client.**
 Con la ruta correcta, Uber nombra el scope él mismo:
