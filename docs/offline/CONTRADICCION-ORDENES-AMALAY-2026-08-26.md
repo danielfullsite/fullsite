@@ -1,10 +1,12 @@
-# Contradicción: 303 guardados `COMMITTED` de AMALAY, cero órdenes en la nube
+# Las órdenes de AMALAY sí llegaron a la nube — y algo las borró después
 
 **2026-08-26.** Investigación adversarial, **sólo lectura**, sin tocar producción.
 
-> **Advertencia de alcance.** Esto **no** declara pérdida de datos. Declara una contradicción
-> interna de la base que está probada, y una causa raíz que **no** está probada. Las
-> hipótesis van marcadas como tales.
+> **Advertencia de alcance.** La conclusión de este documento **se invirtió** durante la
+> investigación. La lectura inicial fue *"las órdenes nunca llegaron"*; leer los cuerpos de
+> las funciones demuestra lo contrario. Todo va marcado como **HECHO**, **INFERENCIA** o
+> **NO VERIFICADO**, y no se declara pérdida de datos: se declara borrado posterior de origen
+> no identificado.
 
 ---
 
@@ -119,43 +121,138 @@ el gerente elige "conservar nube" → la operación local se DESCARTA
 la cola baja … hasta 0
 ```
 
-**INFERENCIA (bien soportada, no probada):** así es como `0 pendientes` pudo convivir con
-cero órdenes en la nube. La cola no se vació porque los datos llegaran, sino porque las
-operaciones que no podían escribirse se descartaron.
+**INFERENCIA:** parte de la cola se vació por descarte. Ver la sección de clasificación más
+abajo — no fue todo descarte: 303 sí se entregaron.
 
 ---
 
-## Lo que NO está probado: por qué no queda la fila
+## La causa raíz, cerrada por deducción
 
-Tres candidatos. Ninguno demostrado; van en orden de lo que la evidencia sugiere.
+Al leer los cuerpos completos, dos de las tres hipótesis quedaron **descartadas** y la
+conclusión se invirtió.
 
-### H1 — El envoltorio marca `COMMITTED` sin que la inserción quede
+### El `COMMITTED` y el `INSERT` son atómicos
 
-`r1_save_order_idempotent` escribe el libro y delega. Si la delegación no persiste y el
-envoltorio igual marca `COMMITTED`, se ve exactamente lo observado. **Prueba pendiente:**
-leer completos ambos cuerpos y seguir el manejo de excepciones.
+`r1_save_order_idempotent`, textual:
 
-### H2 — Sobrecarga de función
+```sql
+v_save_result := r1_save_order( … );
 
-Hay **dos** `r1_save_order`, idénticas salvo en un parámetro:
+IF (v_save_result->>'ok')::boolean THEN
+  UPDATE pos_save_operations SET
+    state = 'COMMITTED',
+    committed_revision = (v_save_result->>'revision')::bigint,
+    completed_at = now()
+  WHERE …
+```
 
-| oid | `p_mesa` | guardián | `SECURITY DEFINER` |
-|---|---|---|---|
-| 27937 | `integer` | sí | sí |
-| 28460 | `text` | sí | sí |
+`r1_save_order` es una función plpgsql llamada desde otra: **corre en la misma transacción.**
+El libro sólo pasa a `COMMITTED` si esa función devolvió `ok:true` con revisión.
 
-Cuál se ejecuta depende del tipo que mande el llamador. **Debilita esta hipótesis:** los
-eventos de AMALAY traen `mesa` numérica en 1,056 de 1,073 casos. Pero dos cuerpos distintos
-para el mismo nombre es deuda real y hay que resolverla igual.
+Por lo tanto: **si existe una fila `COMMITTED`, la transacción se confirmó — y con ella el
+`INSERT INTO pos_orders`.** No hay forma de tener una sin la otra.
 
-### H3 — Algo borra las filas
+### ~~H1 — el envoltorio marca COMMITTED sin insertar~~ · DESCARTADA
 
-`pg_stat_user_tables` reporta **514 filas borradas** de `pos_orders` (acumulado, sin
-distinguir cliente). **Debilita esta hipótesis:** no hay en el repositorio ningún `DELETE`
-sobre órdenes de AMALAY — los que existen son de datos de prueba, del *teardown* de `nomada`
-y del *seed* de `boruca`.
+Sería posible si algún `EXCEPTION` se tragara el fallo y devolviera `ok:true`. Se leyó el
+único bloque `EXCEPTION` que existe (en la sobrecarga `text`, oid 28460):
+
+```sql
+EXCEPTION WHEN unique_violation THEN
+  SELECT order_revision INTO v_current_revision FROM pos_orders WHERE …
+  RETURN jsonb_build_object('ok', false, …, 'error', 'STALE_WRITE_REJECTED', …);
+```
+
+Atrapa **sólo** `unique_violation` y devuelve `ok:false`. **No se traga nada.**
+
+### ~~H2 — sobrecarga de función~~ · DESCARTADA como causa
+
+Hay dos `r1_save_order` (`p_mesa integer` oid 27937 · `p_mesa text` oid 28460). Es deuda real
+—dos cuerpos para un nombre— y hay que resolverla. **Pero no explica esto:** ninguna de las
+dos puede devolver `ok:true` sin insertar.
+
+### H3 — las filas se insertaron y se borraron · **ÚNICA QUE SOBREVIVE**
+
+Es lo que queda cuando las otras dos caen, y tiene respaldo propio:
+
+```
+pg_stat_user_tables · pos_orders
+  insertadas .... 6,869
+  borradas ......   514      ← acumulado, sin distinguir cliente
+  vivas ......... 6,304
+```
+
+**Y no fue nada de dentro de la base.** Se descartó, con consulta, cada mecanismo interno:
+
+| Mecanismo | Resultado |
+|---|---|
+| Llaves foráneas hacia/desde `pos_orders` | **ninguna** — no hay cascada posible |
+| Disparadores | 2, y son `set_pos_order_number` y `set_updated_at`. Ninguno borra |
+| Funciones con `DELETE FROM pos_orders` | **0** en `public` y `private` |
+| Trabajos de `pg_cron` | 3 activos: `cancel-stale-pending`, `r1-obs-hourly`, `r1-obs-final`. Ninguno borra |
+| `DELETE` en el repositorio | Sólo datos de prueba, *teardown* de `nomada` y *seed* de `boruca` |
+
+**INFERENCIA (fuerte):** las órdenes de AMALAY **llegaron a la nube y se borraron después**,
+desde fuera de la base — un cliente con `service_role`, el panel de Supabase, o una acción
+manual.
+
+**NO VERIFICADO:** quién, cuándo y con qué alcance. Eso no se puede reconstruir desde las
+tablas actuales; requeriría registros de auditoría del proyecto Supabase.
+
+> **Esto invierte la conclusión inicial.** No es *"las órdenes nunca llegaron"* — el camino de
+> sincronización **sí funciona**. Es que algo las está quitando después.
 
 ---
+
+## Clasificación de las operaciones de AMALAY
+
+Con la deducción de arriba, cada operación del libro se puede clasificar:
+
+| Estado | n | Qué significa |
+|---|---:|---|
+| **ENTREGADO** | **303** | `COMMITTED` ⇒ el `INSERT` se confirmó. Llegaron a la nube |
+| **DESCARTADO POR CONFLICTO** | 50 | `REJECTED`: 26 `ORDER_NOT_FOUND` + 24 `STALE_WRITE_REJECTED`. Nunca se insertaron, y el POS los presentó como conflicto |
+| **IDEMPOTENTE** | 0 observados | La ruta existe (`idempotent_replay`), pero no hay reintentos del mismo `save_operation_id` en la muestra |
+| **NO RECIBIDO** | **0** | Ninguna operación quedó sin veredicto del servidor |
+| **NO VERIFICABLE** | — | *Qué pasó con las 303 después de insertarse.* El borrado no dejó rastro consultable |
+
+### La ventana exacta de la sesión de campo
+
+Zona horaria `America/Monterrey`, no UTC:
+
+| | |
+|---|---|
+| Primera operación | **2026-08-23 19:15:56** |
+| Última operación | **2026-08-24 00:58:36** |
+| `COMMITTED` | **12** (8 el día 23, 4 el 24) |
+| `REJECTED` | 3 |
+
+**Doce órdenes se confirmaron esa noche.** Ninguna existe hoy.
+
+## ¿Pudo *"Conservar nube"* vaciar la cola sin insertar nada?
+
+**Sí, y está probado por código, no supuesto.**
+
+Cuando la orden no está en `pos_orders`, `r1_save_order` devuelve:
+
+```sql
+IF NOT v_exists THEN
+  RETURN jsonb_build_object('ok', false, 'revision', NULL, 'conflict', false,
+    'error', 'ORDER_NOT_FOUND');
+```
+
+El envoltorio marca `REJECTED`, el POS lo presenta como conflicto, y el acta documenta la
+resolución: *"Conservar nube **descarta** solo la operación local conflictiva."*
+
+```
+orden ausente → ORDER_NOT_FOUND → REJECTED → conflicto en pantalla
+    → el gerente elige "conservar nube" → la operación local se DESCARTA
+    → el contador baja … hasta 0
+```
+
+**HECHO:** hay 26 `ORDER_NOT_FOUND` de AMALAY. **INFERENCIA:** parte de la cola llegó a cero
+por descarte, no por entrega. Ambas cosas pueden coexistir, y de hecho coexisten: 303
+entregadas y 50 descartadas.
 
 ## Riesgos y qué NO hacer
 

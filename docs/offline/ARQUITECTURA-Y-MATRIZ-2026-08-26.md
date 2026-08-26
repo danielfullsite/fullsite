@@ -22,7 +22,16 @@ anterior de `Cola final = PASÓ`:
 | Persistencia en Supabase | 🔴 **NO VERIFICADA · CONTRADICCIÓN ABIERTA** |
 
 Lo primero es lo que hace que el restaurante opere en un apagón, y sigue en pie. Lo tercero
-no se midió nunca, y hoy los datos lo contradicen.
+no se midió nunca.
+
+> **Precisión del 2026-08-26, tras la investigación adversarial.** La escritura a la nube
+> **sí ocurrió**: el libro de comandos `pos_save_operations` tiene **303 operaciones
+> `COMMITTED`** de AMALAY, y el `COMMITTED` es atómico con el `INSERT` — están en la misma
+> transacción. Las órdenes llegaron **y algo las borró después**, desde fuera de la base.
+>
+> El estado sigue siendo **NO VERIFICADA**, y con más razón: no basta con que el dato llegue
+> si no permanece. Detalle completo en
+> [`CONTRADICCION-ORDENES-AMALAY-2026-08-26.md`](CONTRADICCION-ORDENES-AMALAY-2026-08-26.md).
 
 ---
 
