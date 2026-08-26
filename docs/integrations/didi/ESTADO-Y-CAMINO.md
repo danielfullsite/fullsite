@@ -78,4 +78,23 @@ mandar un correo a `didiOpenApiSupport@didiglobal.com` preguntando el camino de 
 **POS vendor en México** y si el portal de `developer.didi-food.com` aplica o si México tiene
 otra puerta. La respuesta tarda; que llegue mientras cerramos Rappi.
 
+## ✉️ Correo enviado — 2026-08-26
+
+Enviado a `didiOpenApiSupport@didiglobal.com` desde `daniel@fullsite.mx`.
+Asunto: *POS Vendor Self-Service Integration - Fullsite (Mexico)*.
+
+Preguntamos tres cosas:
+
+1. Si `developer.didi-food.com` es la puerta correcta para un POS vendor **en México**, o si
+   México tiene otra — señalando que el formulario pide **CNPJ** (Brasil) y lo nuestro es **RFC**.
+2. Qué poner en ese campo si el portal sí aplica.
+3. La documentación de API y detalles de sandbox, para dimensionar el trabajo mientras se procesa
+   el alta: contrato del webhook de órdenes, ciclo de vida (accept/deny/ready/cancel) y menú.
+
+Se mencionó como respaldo que ya operamos Rappi (DEV validado) y Uber Eats (en validación), y a
+Café AMALAY como merchant piloto.
+
+**Estado: `ESPERANDO_EXTERNO`.** No abrir desarrollo hasta que respondan y hasta que Rappi y Uber
+estén cerrados.
+
 Ver [`../IDENTIDADES-Y-ACCESOS.md`](../IDENTIDADES-Y-ACCESOS.md) para el registro de cuentas.
