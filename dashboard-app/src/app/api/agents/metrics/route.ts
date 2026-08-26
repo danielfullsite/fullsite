@@ -4,6 +4,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { sbGet } from '@/lib/agents/engine'
+import { requireTenant } from '@/lib/api-auth'
 import type { AgentMetrics } from '@/lib/agents/types'
 
 export const dynamic = 'force-dynamic'
@@ -17,8 +18,13 @@ interface EventRow {
 }
 
 export async function GET(req: NextRequest) {
-  const clientId = req.nextUrl.searchParams.get('client_id') || ''
-  if (!clientId) return NextResponse.json({ error: 'client_id required' }, { status: 400 })
+  const pedido = req.nextUrl.searchParams.get('client_id') || ''
+  if (!pedido) return NextResponse.json({ error: 'client_id required' }, { status: 400 })
+
+  // sbGet usa la service key (ignora RLS): el tenant tiene que salir de la sesión.
+  const ctx = await requireTenant(req, pedido)
+  if (ctx instanceof Response) return ctx
+  const clientId = ctx.clientId
 
   const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
 
