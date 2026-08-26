@@ -28,6 +28,51 @@ function digest(orders: unknown[]) {
   return createHash('sha256').update(JSON.stringify(orders)).digest('hex')
 }
 
+/**
+ * Deja constancia del borrado en pos_audit_log.
+ *
+ * Por qué existe: el 2026-08-26 a las 02:49:03 esta ruta borró las 303 órdenes de AMALAY
+ * —correctamente, con confirmación y digest— y **no dejó ni una línea**. La ausencia de
+ * rastro convirtió una acción legítima en un misterio: `pos_orders` vacío contra 303
+ * operaciones `COMMITTED` en `pos_save_operations`, sin nada que explicara la diferencia.
+ * Reconstruirlo costó una investigación completa y sólo se resolvió leyendo los registros
+ * de Supabase, que caducan a las 24 h.
+ *
+ * La regla que se sigue de ahí: **una acción destructiva que no se registra es
+ * indistinguible de una pérdida de datos.**
+ *
+ * Best-effort a propósito: el borrado ya ocurrió cuando esto corre, y fallar aquí no
+ * debe convertir una operación exitosa en un 500. Pero se registra en consola si falla,
+ * para que la ausencia del renglón tenga a su vez su propia huella.
+ */
+async function registrarLimpieza(
+  clientId: string, key: string,
+  datos: { actor: string; staffId?: string; role: string; count: number; digest: string },
+): Promise<void> {
+  try {
+    const res = await fetch(`${SB_URL}/rest/v1/pos_audit_log`, {
+      method: 'POST',
+      headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({
+        client_id: clientId,
+        order_id: `cleanup:${datos.digest.slice(0, 12)}`,
+        action: 'orders_cleanup',
+        actor: datos.actor,
+        reason: 'Limpieza total de órdenes desde /api/pos/admin/cleanup-orders',
+        details: {
+          deleted_count: datos.count,
+          backup_digest: datos.digest,
+          staff_id: datos.staffId ?? null,
+          role: datos.role,
+        },
+      }),
+    })
+    if (!res.ok) console.error('[cleanup-orders] no se pudo auditar:', res.status, await res.text())
+  } catch (e) {
+    console.error('[cleanup-orders] no se pudo auditar:', (e as Error).message)
+  }
+}
+
 export async function GET(request: NextRequest) {
   const ctx = await context(request)
   if (ctx.error) return ctx.error
@@ -53,6 +98,13 @@ export async function DELETE(request: NextRequest) {
       method: 'DELETE', headers: { apikey: key, Authorization: `Bearer ${key}`, Prefer: 'return=minimal' },
     })
     if (!del.ok) return Response.json({ error: `Delete failed: HTTP ${del.status}` }, { status: 500 })
+    await registrarLimpieza(ctx.auth!.clientId, key, {
+      actor: ctx.auth!.staffName,
+      staffId: ctx.auth!.staffId,
+      role: ctx.auth!.role,
+      count: orders.length,
+      digest: body.digest,
+    })
     return Response.json({ ok: true, deleted: orders.length })
   } catch (e) {
     return Response.json({ error: (e as Error).message }, { status: 500 })

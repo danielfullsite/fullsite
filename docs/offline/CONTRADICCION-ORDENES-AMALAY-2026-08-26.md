@@ -1,12 +1,17 @@
-# Las órdenes de AMALAY sí llegaron a la nube — y algo las borró después
+# Las órdenes de AMALAY sí llegaron — y las borró una limpieza deliberada
 
 **2026-08-26.** Investigación adversarial, **sólo lectura**, sin tocar producción.
 
-> **Advertencia de alcance.** La conclusión de este documento **se invirtió** durante la
-> investigación. La lectura inicial fue *"las órdenes nunca llegaron"*; leer los cuerpos de
-> las funciones demuestra lo contrario. Todo va marcado como **HECHO**, **INFERENCIA** o
-> **NO VERIFICADO**, y no se declara pérdida de datos: se declara borrado posterior de origen
-> no identificado.
+> **RESUELTO.** La conclusión cambió dos veces. Primero fue *"las órdenes nunca llegaron"*
+> (falso). Luego *"llegaron y algo las borró, no sabemos qué"* (cierto pero incompleto). Los
+> registros de Supabase cierran el caso con evidencia directa:
+>
+> **`2026-08-26T02:49:03.208Z · DELETE /rest/v1/pos_orders?client_id=eq.amalay · 204`**
+>
+> Fue `/api/pos/admin/cleanup-orders`, una función deliberada de limpieza, ejecutada
+> correctamente. **No hubo pérdida de datos ni falla de sincronización.**
+>
+> El defecto real es otro y está corregido: esa acción destructiva **no dejaba rastro**.
 
 ---
 
@@ -192,15 +197,61 @@ pg_stat_user_tables · pos_orders
 | Trabajos de `pg_cron` | 3 activos: `cancel-stale-pending`, `r1-obs-hourly`, `r1-obs-final`. Ninguno borra |
 | `DELETE` en el repositorio | Sólo datos de prueba, *teardown* de `nomada` y *seed* de `boruca` |
 
-**INFERENCIA (fuerte):** las órdenes de AMALAY **llegaron a la nube y se borraron después**,
-desde fuera de la base — un cliente con `service_role`, el panel de Supabase, o una acción
-manual.
+### HECHO — el borrado, con firma completa
 
-**NO VERIFICADO:** quién, cuándo y con qué alcance. Eso no se puede reconstruir desde las
-tablas actuales; requeriría registros de auditoría del proyecto Supabase.
+Los registros de Supabase lo resuelven. Único `DELETE` a `pos_orders` en la ventana:
 
-> **Esto invierte la conclusión inicial.** No es *"las órdenes nunca llegaron"* — el camino de
-> sincronización **sí funciona**. Es que algo las está quitando después.
+| | |
+|---|---|
+| Momento | **`2026-08-26T02:49:03.208Z`** |
+| Petición | `DELETE /rest/v1/pos_orders?client_id=eq.amalay` |
+| Respuesta | **204** — exitoso |
+| Rol | `service_role` · agente `node` · IP `44.211.69.215` (AWS `us-east-1`) |
+
+Y 26 milisegundos antes:
+
+```
+02:49:03.182  GET    /rest/v1/pos_orders?client_id=eq.amalay&select=*&order=created_at.asc  200
+02:49:03.208  DELETE /rest/v1/pos_orders?client_id=eq.amalay                                204
+```
+
+**Leer todo, luego borrar todo.** Esa firma coincide exactamente con
+`dashboard-app/src/app/api/pos/admin/cleanup-orders/route.ts`, que hace `readOrders()` y
+después el `DELETE` con el mismo filtro.
+
+### Qué es esa ruta — y por qué NO es un bug
+
+Es una limpieza de órdenes de prueba, deliberada y bien protegida:
+
+- `withPOSAuth` + rol ≥ `gerente` + `canCleanupAllOrders()`, que exige tenant `amalay`,
+  nombre `daniel`/`daniel ramonfaur`, y opcionalmente un `staff_id` de una lista por entorno
+- El `DELETE` exige el texto literal **`"BORRAR TODAS LAS ORDENES"`** en el cuerpo
+- Y un **`digest`** que debe coincidir con el respaldo recién descargado por `GET` — si las
+  órdenes cambiaron entre el respaldo y el borrado, responde `409` y no borra
+
+O sea: hubo respaldo, confirmación explícita y control de concurrencia. **Funcionó como fue
+diseñada.**
+
+**HECHO:** no hubo pérdida de datos, ni falla de sincronización, ni fuga. El camino
+`POS → save-order → r1_save_order → pos_orders` **funciona**: por eso había 303 órdenes que
+borrar.
+
+### El defecto real — y está corregido
+
+La ruta **no escribía nada en `pos_audit_log`**. Cero referencias, verificado.
+
+Sin ese renglón, una acción legítima quedó indistinguible de una catástrofe: `pos_orders`
+vacío contra 303 `COMMITTED`, sin nada que explicara la diferencia. Reconstruirlo tomó una
+investigación completa y **sólo se resolvió leyendo los registros de Supabase, que caducan a
+las 24 horas.** Un día más tarde habría sido irreconstruible.
+
+> **La regla que sale de aquí:** una acción destructiva que no se registra es
+> **indistinguible de una pérdida de datos**. No basta con que sea correcta: tiene que ser
+> demostrable después.
+
+Corregido: la ruta ahora escribe `action: 'orders_cleanup'` con actor, `staff_id`, rol,
+cantidad borrada y el digest del respaldo. Ocho pruebas de regresión, prueba de mutantes
+confirmada.
 
 ---
 

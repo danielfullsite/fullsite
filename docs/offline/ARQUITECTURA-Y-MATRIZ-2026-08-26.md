@@ -19,18 +19,29 @@ anterior de `Cola final = PASÓ`:
 |---|---|
 | `POS → Pedro → KDS/impresión` | ✅ **PASÓ EN CAMPO** |
 | Indicador `0 pendientes` | ✅ **PASÓ LOCALMENTE** |
-| Persistencia en Supabase | 🔴 **NO VERIFICADA · CONTRADICCIÓN ABIERTA** |
+| Persistencia en Supabase | ⚠️ **NO CERTIFICADA — pero ya no contradicha** |
 
-Lo primero es lo que hace que el restaurante opere en un apagón, y sigue en pie. Lo tercero
-no se midió nunca.
+Lo primero es lo que hace que el restaurante opere en un apagón, y sigue en pie.
 
-> **Precisión del 2026-08-26, tras la investigación adversarial.** La escritura a la nube
-> **sí ocurrió**: el libro de comandos `pos_save_operations` tiene **303 operaciones
-> `COMMITTED`** de AMALAY, y el `COMMITTED` es atómico con el `INSERT` — están en la misma
-> transacción. Las órdenes llegaron **y algo las borró después**, desde fuera de la base.
+Lo tercero cambió de estado el 2026-08-26: pasó de **contradicción abierta** a **funciona,
+falta certificarlo**. La escritura a la nube está demostrada — 303 órdenes llegaron. Lo que
+sigue faltando es medirla dentro del protocolo, con `F5-28`, en una corrida de campo.
+
+> ### ✅ RESUELTO el 2026-08-26 — la persistencia en nube **sí funciona**
 >
-> El estado sigue siendo **NO VERIFICADA**, y con más razón: no basta con que el dato llegue
-> si no permanece. Detalle completo en
+> La contradicción está cerrada con evidencia directa de los registros de Supabase:
+>
+> **`2026-08-26T02:49:03.208Z · DELETE /rest/v1/pos_orders?client_id=eq.amalay · 204`**
+>
+> Las órdenes **sí llegaron** — había 303 que borrar. Las borró
+> `/api/pos/admin/cleanup-orders`, una limpieza deliberada de órdenes de prueba que exige
+> rol gerente, autorización nominal, el texto `"BORRAR TODAS LAS ORDENES"` y un digest que
+> coincida con un respaldo recién descargado. **Funcionó como fue diseñada.**
+>
+> **No hubo pérdida de datos ni falla de sincronización.** El único defecto era que esa
+> acción no dejaba rastro en `pos_audit_log` — corregido, con 8 pruebas.
+>
+> Detalle completo en
 > [`CONTRADICCION-ORDENES-AMALAY-2026-08-26.md`](CONTRADICCION-ORDENES-AMALAY-2026-08-26.md).
 
 ---
@@ -45,40 +56,28 @@ El documento marca:
 
 Y el dictamen ejecutivo cierra con *"la cola terminó en cero"*.
 
-**Medido contra producción el 2026-08-26, sólo lectura:**
+**Por qué no se sostiene** — y ojo, la razón NO es la que parecía:
 
-| | |
-|---|---:|
-| Órdenes de `amalay` en `pos_orders` | **0** — nunca, desde siempre |
-| Eventos de `amalay` en `pos_audit_log` | 1,324, incluidos 39 `payment_processed` |
-| `pos_local_events` (todos los tenants) | **0** |
-| Otros tenants en `pos_orders` | `lab-resto` 4,212 · `demo` 1,218 · `coffee-shop` 627 · `boruca` 240 |
+Al medir el 2026-08-26, `pos_orders` tenía **cero** órdenes de AMALAY. Eso apuntaba a que la
+sincronización nunca había funcionado. **Era una lectura equivocada de un dato correcto.**
 
-La cola llegando a cero significa que **el POS soltó el pendiente**, no que Supabase lo
-recibió. Ninguna orden de AMALAY ha llegado nunca a la nube.
+La tabla estaba vacía porque una limpieza deliberada la vació esa madrugada — ver el aviso
+al inicio de este documento. Las órdenes **sí llegaban**: había 303 que borrar.
 
-El propio documento contiene la pieza que lo explica, en §3.2: *"La escritura a nube queda
-pendiente en la cola."* Correcto. Lo que falta es el paso siguiente — comprobar del lado de
-la nube — y nunca se dio.
+Lo que sí queda invalidado, y por otra razón:
 
-**Qué cambia y qué no:**
-
-- **No invalida** el hallazgo central. `POS → Pedro → KDS/impresión sin Internet` sigue
-  demostrado, y es lo que más importa para que un restaurante opere en un apagón.
-- **Sí invalida** `Cola final = PASÓ` como evidencia de sincronización, y por arrastre debilita
-  `Reconexión = PASÓ`. Lo que se observó fue el POS vaciando su cola, no la nube recibiendo.
-- La fila **`No duplicación/pérdida integral = PARCIAL`** del propio documento ya apuntaba en
-  esta dirección. Se queda corta: no es que falte concurrencia y soak — es que no llegó nada.
+- `Cola final = PASÓ` **no es evidencia de sincronización.** Mide que el POS soltó el
+  pendiente, no que Supabase lo recibió. Son cosas distintas, y esa noche sólo se midió la
+  primera.
+- El propio documento tiene la pieza en §3.2 — *"La escritura a nube queda pendiente en la
+  cola"* — y le faltó el paso siguiente: comprobar del lado de la nube.
+- **No invalida** el hallazgo central: `POS → Pedro → KDS/impresión sin Internet` sigue
+  demostrado, y es lo que hace que el restaurante opere en un apagón.
 
 El criterio correcto está en el protocolo desde julio: `F5-28` cuenta órdenes **en
 `pos_orders`**, `F5-29` busca duplicados en Supabase y `F5-30` compara IDB local contra
-Supabase. La sesión del 23-24 se hizo por chat y no los usó.
-
-> Causa raíz en curso. La evidencia que la estrecha: los `skimming_suspect` de AMALAY apuntan
-> a `order_id`s que **no existen** en `pos_orders`, y ese bloque vive dentro de
-> `/api/pos/save-order` **antes** del guardado — o sea que la ruta corrió y la orden se perdió
-> después. El OutboxWorker no es el camino: por diseño llena `pos_local_events`, no
-> `pos_orders`.
+Supabase. La sesión del 23-24 se hizo por chat y no los usó. **Ésa es la corrección que
+importa** — no que faltara la capacidad, sino que faltó medirla.
 
 ---
 
