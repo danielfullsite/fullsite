@@ -81,16 +81,36 @@ La rama cambia abrir mesa de `window.location.href` a `router.push`, con este ar
 > *"En este Next.js (16.2) `router.push('/pos?mesa=N')` desde `/pos/mesas` SOLTABA el
 > `?mesa=` y caía al default (mesa 1) — tocabas la 52 y abría la 1."*
 
-Parece una contradicción sin resolver entre dos observaciones de campo. No lo es: el
-commit de `main` es literalmente un `Revert` del de la rama, **el mismo día**. Y la
-objeción de offline quedó contestada en el comentario que sobrevivió — *"offline el SW
-sirve `/pos` del cache (con `ignoreVary`), así que funciona sin internet igual."*
-
-Además la rama arrastra un commit marcado **"(NO merge a main)"**: un *fallback* de
+Parece una contradicción sin resolver entre dos observaciones de campo. Sobre la **rama**
+no lo es: el commit de `main` es literalmente un `Revert` del suyo, **el mismo día**.
+Además arrastra un commit marcado **"(NO merge a main)"** — un *fallback* de
 `NEXT_PUBLIC_SUPABASE_*` en `next.config.ts` para que compilara el preview. Mergearla
 metería eso a producción.
 
-**Veredicto: borrable.** Su contenido fue rechazado a propósito y con evidencia.
+**Veredicto sobre la rama: borrable.**
+
+### Corrección — el problema NO estaba resuelto
+
+La primera versión de este documento decía que la objeción de offline "quedó contestada"
+por el comentario que sobrevivió en `main`:
+
+> *"Offline el SW sirve `/pos` del cache (con `ignoreVary`), así que funciona sin internet
+> igual."*
+
+**Eso era creerle a un comentario, no a una medición.** El PR **#110**
+(`fix/pos-mesa-nav-offline`, abierto el 2026-08-26) mide las dos y encuentra que ninguna
+funciona sola:
+
+> · `window.location.href` → recarga dura → depende del SW **+ gate de auth** → no abría nada
+> · `router.push` → resolvía el shell cacheado **sin `?mesa=`** → caía a la mesa 1
+
+La solución es una tercera: llevar la mesa por `sessionStorage` en vez del *query string*,
+más una prueba que **fija el método** para que deje de oscilar. El handler ya había
+cambiado de técnica varias veces.
+
+O sea: la rama vieja está muerta, pero **el problema siguió abierto un mes** y se está
+cerrando ahora en #110. Dos ramas revertiéndose entre sí no son un empate — son la señal
+de que a las dos les faltaba una pieza.
 
 ---
 
