@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { buildDailyFromOrders } from '@/lib/pos-daily'
 import { requireTenant } from '@/lib/api-auth'
+import { esDuenoDelHistoricoWansoft } from '@/lib/wansoft-legacy'
 
 export async function POST(request: NextRequest) {
   try {
@@ -38,9 +39,10 @@ export async function POST(request: NextRequest) {
       return Response.json({ insights: [] })
     }
 
-    // wansoft_waiter_categories NO tiene columna de cliente → es solo-AMALAY (legacy).
-    // Solo se lee para el tenant legacy; para otros se omite (evita filtrar datos de AMALAY).
-    const waiterRows = client_id === 'amalay'
+    // wansoft_waiter_categories NO tiene columna de cliente: sólo un restaurante puede
+    // ser dueño de esas filas. El guardián impide que otro vea sus meseros. Se pregunta
+    // por la propiedad y no por el nombre; falla cerrado. Ver src/lib/wansoft-legacy.ts.
+    const waiterRows = (await esDuenoDelHistoricoWansoft(client_id))
       ? await fetch(`${sbUrl}/rest/v1/wansoft_waiter_categories?select=fecha,data&order=fecha.desc&limit=7`, { headers, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => [])
       : []
 

@@ -112,7 +112,12 @@ jobs:
         if: inputs.commitear == true && steps.revisar.outputs.codigo == '3'
         run: |
           mkdir -p "$(dirname "$BASELINE")"
-          mv esquema_nuevo.sql "$BASELINE"
+          # El volcado NO trae los roles: pg_dump no vuelca objetos del clúster. Sin
+          # ellos, los 342 GRANT del baseline truenan en un proyecto nuevo con
+          # `role "fullsite_readonly" does not exist`. El preámbulo va ARRIBA del
+          # volcado para que el orden lo garantice el archivo, no su nombre.
+          cat supabase/preambulo_roles.sql esquema_nuevo.sql > "$BASELINE"
+          rm -f esquema_nuevo.sql
           rama="chore/baseline-esquema-${GITHUB_RUN_ID}"
           git config user.name  'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'

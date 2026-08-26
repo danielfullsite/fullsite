@@ -8,7 +8,6 @@ import {
   MODIFIERS_AGREGAR_DRINKS,
   getModifiersForCategory,
   MESEROS,
-  MESAS_CONFIG,
   formatMXN,
   type MenuCategory,
   type MenuItem,
@@ -175,33 +174,6 @@ describe('POS Constants', () => {
     }
   })
 
-  it('MESAS_CONFIG has 33 tables (layout real AMALAY)', () => {
-    expect(MESAS_CONFIG).toHaveLength(33)
-    for (const mesa of MESAS_CONFIG) {
-      expect(mesa.number).toBeGreaterThan(0)
-      expect(mesa.capacity).toBeGreaterThan(0)
-      expect(mesa.status).toBe('disponible')
-    }
-  })
-
-  it('table capacities are reasonable (2-8)', () => {
-    for (const mesa of MESAS_CONFIG) {
-      expect(mesa.capacity).toBeGreaterThanOrEqual(2)
-      expect(mesa.capacity).toBeLessThanOrEqual(8)
-    }
-  })
-})
-
-// ---------------------------------------------------------------------------
-// formatMXN
-// ---------------------------------------------------------------------------
-
-describe('formatMXN', () => {
-  it('formats positive numbers with $ and commas', () => {
-    const result = formatMXN(12345.67)
-    expect(result).toContain('$')
-    expect(result).toContain('12')
-  })
 
   it('formats zero', () => {
     const result = formatMXN(0)

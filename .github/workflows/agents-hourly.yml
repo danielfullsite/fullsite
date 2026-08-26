@@ -1,3 +1,20 @@
+# Agentes por hora — para TODOS los restaurantes, no sólo AMALAY.
+#
+# Antes el tenant se resolvía así:
+#
+#     CLIENT_ID: ${{ github.event.inputs.client_id || 'amalay' }}
+#
+# En un disparo manual puedes pasar otro cliente. Pero en una corrida PROGRAMADA no hay
+# inputs, así que el valor era SIEMPRE 'amalay' — y las corridas programadas son la
+# única forma en que los agentes corren de verdad. Un restaurante nuevo no tenía ni un
+# agente encendido: el producto de IA no existía para él. No daba error, daba silencio.
+#
+# Ahora un job descubre los restaurantes elegibles (activos y con la bandera agentesIA)
+# y cada agente corre una vez por restaurante, en paralelo.
+#
+# El disparo manual con un client_id concreto sigue funcionando igual: el script lo
+# respeta y devuelve sólo ése.
+
 name: Agents — Hourly (Anomalías + Predicción + Upselling)
 
 on:
@@ -9,10 +26,13 @@ on:
   workflow_dispatch:
     inputs:
       client_id:
-        default: 'amalay'
+        description: 'Un restaurante en concreto. Vacío = todos los elegibles.'
+        required: false
+        default: ''
 
 env:
-  CLIENT_ID: ${{ github.event.inputs.client_id || 'amalay' }}
+  # Vacío en las corridas programadas → el descubrimiento consulta a todos.
+  CLIENT_ID: ${{ github.event.inputs.client_id || '' }}
   SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
   SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
   SUPABASE_AGENT_KEY: ${{ secrets.SUPABASE_AGENT_KEY }}
@@ -20,8 +40,31 @@ env:
   TRIGGER_TYPE: ${{ github.event_name }}
 
 jobs:
-  anomaly:
+  tenants:
     runs-on: ubuntu-latest
+    outputs:
+      lista: ${{ steps.descubrir.outputs.lista }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with: { python-version: '3.11' }
+      - run: pip install requests
+      - id: descubrir
+        run: python .github/scripts/tenants_activos.py >> "$GITHUB_OUTPUT"
+      - name: Resumen
+        run: |
+          echo "Restaurantes de esta corrida: ${{ steps.descubrir.outputs.lista }}" >> "$GITHUB_STEP_SUMMARY"
+
+  anomaly:
+    needs: tenants
+    if: needs.tenants.outputs.lista != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false   # que un restaurante caído no cancele a los demás
+      matrix:
+        client: ${{ fromJson(needs.tenants.outputs.lista) }}
+    env:
+      CLIENT_ID: ${{ matrix.client }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
@@ -30,7 +73,15 @@ jobs:
       - run: python .github/scripts/anomaly_detector.py
 
   predictor:
+    needs: tenants
+    if: needs.tenants.outputs.lista != '[]'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        client: ${{ fromJson(needs.tenants.outputs.lista) }}
+    env:
+      CLIENT_ID: ${{ matrix.client }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
@@ -39,7 +90,15 @@ jobs:
       - run: python .github/scripts/close_predictor.py
 
   upselling:
+    needs: tenants
+    if: needs.tenants.outputs.lista != '[]'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        client: ${{ fromJson(needs.tenants.outputs.lista) }}
+    env:
+      CLIENT_ID: ${{ matrix.client }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6

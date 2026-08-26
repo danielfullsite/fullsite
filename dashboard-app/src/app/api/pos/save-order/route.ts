@@ -32,6 +32,43 @@ interface SaveResult {
   idempotent_replay?: boolean
 }
 
+/**
+ * Tasa de IVA del tenant, resuelta SIEMPRE del servidor.
+ *
+ * No se lee del body a propósito: si la tasa viniera del cliente, bastaría con mandar una
+ * falsa para que el total rebajado cuadrara y el detector de skimming se callara.
+ *
+ * Cacheada por instancia — la tasa cambia con la configuración del restaurante, no con la
+ * orden, y este camino corre al cerrar cada cuenta. Devuelve `null` si no se puede resolver;
+ * el llamador entonces NO audita (ver el comentario de la detección).
+ */
+const _ivaRateCache = new Map<string, number>()
+async function ivaRateFor(
+  clientId: string,
+  sbUrl: string,
+  headers: Record<string, string>,
+): Promise<number | null> {
+  const cached = _ivaRateCache.get(clientId)
+  if (cached !== undefined) return cached
+  try {
+    const res = await fetch(
+      `${sbUrl}/rest/v1/clients?id=eq.${encodeURIComponent(clientId)}&select=iva_rate&limit=1`,
+      { headers },
+    )
+    if (!res.ok) return null
+    // PostgREST devuelve numeric como STRING — de ahí el Number().
+    const rows = await res.json() as Array<{ iva_rate?: number | string | null }>
+    const raw = rows?.[0]?.iva_rate
+    if (raw === undefined || raw === null) return null
+    const rate = Number(raw)
+    if (!Number.isFinite(rate) || rate < 0 || rate > 1) return null
+    _ivaRateCache.set(clientId, rate)
+    return rate
+  } catch {
+    return null
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const auth = await withPOSAuth(request)
@@ -93,26 +130,46 @@ export async function POST(request: NextRequest) {
     // vector: bajar el `total` dejando los items → sum(items) − descuento ≠ total; el arqueo
     // cuadra (pagos==total) y la diferencia se embolsa. Aquí recomputamos desde los items y
     // AUDITAMOS la discrepancia — NO rechazamos (Fase 2 rechazará vía flag tras observar).
+    //
+    // El total que arma el POS es `subtotal_tras_descuento * (1 + iva_rate)` (pos/page.tsx:2889).
+    // La version anterior comparaba la suma de items SIN IVA contra ese total CON IVA, asi que
+    // disparaba en cada ticket cerrado de cualquier restaurante con iva_rate > 0 — 5 de los 8
+    // tenants, AMALAY incluido. Los 15 eventos que habia en pos_audit_log al 2026-08-26 eran
+    // todos ese falso positivo (1888 -> 2190.08 = x1.16 exacto).
+    //
+    // Un detector log-only que dispara siempre no es conservador: es ruido que tapa el caso real.
     if (body.status === 'cerrada' && Array.isArray(body.items) && body.items.length > 0) {
       try {
-        const cents = (n: unknown) => Math.round((Number(n) || 0) * 100)
-        const sumItems = (body.items as Array<{ subtotal?: number; cancelled?: boolean }>)
-          .filter(it => !it?.cancelled)
-          .reduce((s, it) => s + cents(it?.subtotal ?? 0), 0)
-        const expectedTotal = sumItems - cents(body.descuento ?? 0)
-        const declaredTotal = cents(body.total ?? 0)
-        const diff = expectedTotal - declaredTotal
-        if (Math.abs(diff) > 100) { // tolerancia $1 (redondeo/combos/promos)
-          console.warn('[skimming-suspect]', order_id, { sumItems, descuento: body.descuento, declaredTotal, diffCents: diff })
-          fetch(`${sbUrl}/rest/v1/pos_audit_log`, {
-            method: 'POST',
-            headers: { ...headers, Prefer: 'return=minimal' },
-            body: JSON.stringify({
-              client_id: clientId, order_id,
-              action: 'skimming_suspect', actor: body.mesero || 'POS',
-              details: { sum_items_cents: sumItems, descuento: body.descuento ?? 0, declared_total: body.total ?? 0, diff_cents: diff },
-            }),
-          }).catch(() => {})
+        const ivaRate = await ivaRateFor(clientId, sbUrl, headers)
+        // Sin tasa resoluble no se audita: preferimos no reportar a reportar de mas.
+        if (ivaRate !== null) {
+          const cents = (n: unknown) => Math.round((Number(n) || 0) * 100)
+          const sumItems = (body.items as Array<{ subtotal?: number; cancelled?: boolean }>)
+            .filter(it => !it?.cancelled)
+            .reduce((s, it) => s + cents(it?.subtotal ?? 0), 0)
+          const base = sumItems - cents(body.descuento ?? 0)
+          const expectedTotal = base + Math.round(base * ivaRate)
+          const declaredTotal = cents(body.total ?? 0)
+          const diff = expectedTotal - declaredTotal
+          // Solo la direccion del fraude: cobrar MENOS que los items. Un total mayor al
+          // esperado no es skimming (no hay faltante que embolsarse), y marcarlo asi
+          // duplicaba la superficie de falsos positivos.
+          if (diff > 100) { // tolerancia $1 (redondeo/combos/promos)
+            console.warn('[skimming-suspect]', order_id, { sumItems, descuento: body.descuento, ivaRate, expectedTotal, declaredTotal, diffCents: diff })
+            fetch(`${sbUrl}/rest/v1/pos_audit_log`, {
+              method: 'POST',
+              headers: { ...headers, Prefer: 'return=minimal' },
+              body: JSON.stringify({
+                client_id: clientId, order_id,
+                action: 'skimming_suspect', actor: body.mesero || 'POS',
+                details: {
+                  sum_items_cents: sumItems, descuento: body.descuento ?? 0,
+                  iva_rate: ivaRate, expected_total_cents: expectedTotal,
+                  declared_total: body.total ?? 0, diff_cents: diff,
+                },
+              }),
+            }).catch(() => {})
+          }
         }
       } catch { /* detección best-effort — NUNCA bloquea el guardado */ }
     }

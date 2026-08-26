@@ -207,7 +207,8 @@ export default function OnboardingPage() {
       }).catch(() => {}) // OK if table doesn't exist yet
 
       // 6. Create MESAS config based on table count
-      // (MESAS_CONFIG in pos-data.ts is static, but the table count is saved in clients)
+      // El plano real vive en pos_mesas, por restaurante. Aquí sólo se guarda el
+      // conteo en clients; el salón con zonas y coordenadas se edita después.
 
       // 7. Save clientId to localStorage for data.ts auto-resolution
       try {

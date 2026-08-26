@@ -1293,43 +1293,72 @@ export async function fetchMeseros(clientId?: string): Promise<string[]> {
 
 // IVA_RATE lives in pos-constants.ts (single source of truth)
 
-// AMALAY physical floor plan (foto 2026-06-10)
-// Zonas: entrada (45,1-4), lámparas (5-9), pasillo (43,44), terraza (20,21,30-32,40-42),
-// barra (10-12), toldo (50-55), privado (60-63)
-const AMALAY_MESA_NUMBERS = [
-  1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
-  20, 21, 30, 31, 32, 40, 41, 42, 43, 44, 45,
-  50, 51, 52, 53, 54, 55, 60, 61, 62, 63,
-]
-const AMALAY_MESA_CAPACITY: Record<number, number> = {
-  30: 8,
-  40: 6, 41: 6, 42: 6,
+// El plano de salón de CADA restaurante, cacheado localmente.
+//
+// Antes aquí vivía el plano físico de AMALAY —33 mesas con sus capacidades— compilado
+// dentro del bundle. Funcionaba, pero le daba a AMALAY una capacidad que ningún otro
+// restaurante podía tener: cuando `fetchPosMesas` no responde (arranque en frío sin
+// internet, o sin configuración), AMALAY recuperaba sus 33 mesas y cualquier otro se
+// quedaba con 16 genéricas de capacidad 4. Y /pos/qr, que sólo usa este camino, imprimía
+// QR para mesas 1..16 sin importar cómo fuera el salón de verdad.
+//
+// Ahora el respaldo es el plano del propio restaurante: `fetchPosMesas` guarda lo que
+// leyó y `getMesasConfig` lo recupera. Mismo comportamiento para AMALAY —sus 33 mesas
+// salen de su caché en vez del bundle— y por fin el mismo comportamiento para todos.
+//
+// localStorage y no IndexedDB a propósito: `getMesasConfig` es SÍNCRONA y se llama en el
+// inicializador de un useState. IndexedDB es asíncrona y obligaría a cambiar la firma y
+// todos los llamadores, incluidos archivos que otra sesión está tocando.
+//
+// La llave empieza con `pos_` para que la barra el guard de cambio de tenant de
+// pos-offline-db.ts, que limpia todo `pos_*` cuando el dispositivo cambia de restaurante.
+const LLAVE_PLANO = (clientId: string) => `pos_plano_${clientId}`
+
+interface MesaCacheada { number: number; capacity: number }
+
+/** Guarda el plano leído de la base para que sobreviva un arranque sin internet. */
+export function cachearPlano(clientId: string, mesas: MesaCacheada[]): void {
+  if (typeof window === 'undefined' || !clientId || mesas.length === 0) return
+  try {
+    const minimo = mesas.map(m => ({ number: m.number, capacity: m.capacity ?? 4 }))
+    localStorage.setItem(LLAVE_PLANO(clientId), JSON.stringify(minimo))
+  } catch { /* cuota llena o modo privado — no es fatal, se cae al genérico */ }
 }
-// AMALAY-specific layout (kept for backward compat)
-export const MESAS_CONFIG: Mesa[] = AMALAY_MESA_NUMBERS.map(n => ({
-  number: n,
-  capacity: AMALAY_MESA_CAPACITY[n] ?? 4,
-  status: 'disponible' as const,
-}))
+
+function leerPlanoCacheado(clientId: string): Mesa[] | null {
+  if (typeof window === 'undefined' || !clientId) return null
+  try {
+    const crudo = localStorage.getItem(LLAVE_PLANO(clientId))
+    if (!crudo) return null
+    const filas = JSON.parse(crudo) as MesaCacheada[]
+    if (!Array.isArray(filas) || filas.length === 0) return null
+    return filas
+      .filter(f => Number.isFinite(f?.number))
+      .map(f => ({
+        number: Number(f.number),
+        capacity: Number.isFinite(f?.capacity) ? Number(f.capacity) : 4,
+        status: 'disponible' as const,
+      }))
+  } catch { return null }
+}
 
 /**
- * Returns mesa config for any client.
- * - 'amalay' → physical floor plan with exact zone layout
- * - any other client → sequential mesas 1..count, capacity 4
+ * Plano de salón de respaldo, para cuando la base no responde.
+ *
+ * Orden: el plano cacheado del propio restaurante → mesas secuenciales 1..count.
+ *
+ * Ya no hay un caso especial por slug. El plano de AMALAY sale de su caché igual que
+ * el de cualquier otro, así que un restaurante nuevo puede tener el suyo — que era
+ * justo lo que no se podía antes.
+ *
+ * Se exige que el tenant venga de una sesión real y no del valor por omisión: la caché
+ * está indexada por clientId, así que un slug equivocado no encuentra nada y cae al
+ * genérico, en vez de montar el salón de otro restaurante.
  */
 export function getMesasConfig(clientId: string, count: number): Mesa[] {
-  // El layout real de AMALAY —33 mesas con sus capacidades y su forma— sólo se
-  // entrega si el tenant resuelto ES amalay de verdad.
-  //
-  // Antes bastaba con la comparación de arriba, pero getActiveClientSlug() cae
-  // al literal 'amalay' cuando no hay tenant resuelto (bundle de producción). O
-  // sea: el POS de un restaurante NUEVO podía montar las mesas de AMALAY antes
-  // de que su sesión terminara de resolver. Se exige que el slug venga de una
-  // sesión real, no del valor por omisión.
-  if (clientId === 'amalay' && typeof window !== 'undefined'
-      && localStorage.getItem('fullsite_client_id') === 'amalay') {
-    return MESAS_CONFIG
-  }
+  const cacheado = leerPlanoCacheado(clientId)
+  if (cacheado) return cacheado
+
   return Array.from({ length: count }, (_, i) => ({
     number: i + 1,
     capacity: 4,
@@ -3353,8 +3382,18 @@ export interface PosMesa {
 }
 
 /**
- * Fetches floor plan rows from pos_mesas, ordered by sort_order.
- * Returns [] on any error — callers must fall back to their hardcoded FLOOR_TABLES.
+ * Lee el plano de salón de pos_mesas, ordenado por sort_order.
+ *
+ * Devuelve [] ante cualquier error; el llamador cae a getMesasConfig().
+ *
+ * La petición sale con la anon key, pero NO viaja así: supabase-fetch-patch.ts está
+ * instalado en el layout raíz e intercepta todo /rest/v1/ — si hay sesión de Supabase
+ * la sube al JWT del usuario, y si hay shift token del POS la rutea al proxy
+ * autenticado /api/pos/db. Sin ese parche esto daría 401, porque `anon` ni siquiera
+ * tiene GRANT sobre pos_mesas.
+ *
+ * Lo que sí lee se guarda en caché, para que el plano sobreviva un arranque en frío
+ * sin internet. Antes sólo AMALAY sobrevivía, porque su plano venía compilado.
  */
 export async function fetchPosMesas(clientId: string): Promise<PosMesa[]> {
   try {
@@ -3363,6 +3402,8 @@ export async function fetchPosMesas(clientId: string): Promise<PosMesa[]> {
       { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
     )
     if (!res.ok) return []
-    return await res.json()
+    const filas: PosMesa[] = await res.json()
+    if (Array.isArray(filas) && filas.length > 0) cachearPlano(clientId, filas)
+    return filas
   } catch { return [] }
 }

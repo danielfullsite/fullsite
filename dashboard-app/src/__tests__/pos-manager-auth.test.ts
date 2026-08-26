@@ -85,11 +85,83 @@ describe('TTL expiration', () => {
     // Manually expire the credential
     const raw = localStorage.getItem('pos_manager_credentials_v2')!
     const creds = JSON.parse(raw)
-    creds[0].synced_at = Date.now() - 9 * 60 * 60 * 1000  // 9 hours ago > 8h TTL
+    // Muy pasado de CUALQUIER TTL razonable — el test prueba que la expiración
+    // funciona, no cuánto vale el TTL (que ahora es configurable).
+    creds[0].synced_at = Date.now() - 72 * 60 * 60 * 1000
     localStorage.setItem('pos_manager_credentials_v2', JSON.stringify(creds))
 
     const result = await verifyPinOffline('1234')
     expect(result).toBeNull()
+  })
+})
+
+describe('T-24 · la credencial sobrevive un ciclo cierre-apertura', () => {
+  it('EL CASO QUE ROMPÍA: 12 h después (cierra 1am, abre 1pm) el PIN sigue entrando', async () => {
+    await provisionManagerCredential('1234', 'staff-noct', 'Cajero Noche', 'cajero')
+
+    const raw = localStorage.getItem('pos_manager_credentials_v2')!
+    const creds = JSON.parse(raw)
+    creds[0].synced_at = Date.now() - 12 * 60 * 60 * 1000   // último login online: anoche
+    localStorage.setItem('pos_manager_credentials_v2', JSON.stringify(creds))
+
+    const r = await verifyPinOffline('1234')
+    expect(r, 'con TTL de 8 h el restaurante no podía abrir sin internet').not.toBeNull()
+    expect(r?.name).toBe('Cajero Noche')
+  })
+
+  it('pero no es indefinido: a las 72 h sigue rechazando', async () => {
+    await provisionManagerCredential('1234', 'staff-viejo', 'Ex Empleado', 'mesero')
+
+    const raw = localStorage.getItem('pos_manager_credentials_v2')!
+    const creds = JSON.parse(raw)
+    creds[0].synced_at = Date.now() - 72 * 60 * 60 * 1000
+    localStorage.setItem('pos_manager_credentials_v2', JSON.stringify(creds))
+
+    expect(await verifyPinOffline('1234')).toBeNull()
+  })
+
+  it('la revocación gana sobre el TTL, aunque la credencial esté fresca', async () => {
+    await provisionManagerCredential('1234', 'staff-baja', 'Dado de Baja', 'gerente')
+    revokeManagerCredential('staff-baja')
+
+    expect(await verifyPinOffline('1234'),
+      'alargar el TTL no puede debilitar la baja de un empleado').toBeNull()
+  })
+})
+
+describe('T-24 · varias personas en la MISMA terminal', () => {
+  it('EL CASO QUE ROMPÍA: dos empleados distintos entran offline', async () => {
+    await provisionManagerCredential('1111', 'mesero-1', 'Ana', 'mesero')
+    await provisionManagerCredential('2222', 'cajero-1', 'Beto', 'cajero')
+
+    const ana = await verifyPinOffline('1111')
+    const beto = await verifyPinOffline('2222')
+
+    expect(ana?.name, 'pos_staff_cache sólo guardaba al último — Ana quedaba fuera').toBe('Ana')
+    expect(beto?.name).toBe('Beto')
+  })
+
+  it('cada quien conserva su rol — el mesero no hereda permisos del gerente', async () => {
+    await provisionManagerCredential('1111', 'm1', 'Ana', 'mesero')
+    await provisionManagerCredential('9999', 'g1', 'Gerente', 'gerente')
+
+    expect((await verifyPinOffline('1111'))?.role).toBe('mesero')
+    expect((await verifyPinOffline('9999'))?.role).toBe('gerente')
+  })
+
+  it('un PIN que no es de nadie sigue siendo rechazado', async () => {
+    await provisionManagerCredential('1111', 'm1', 'Ana', 'mesero')
+    expect(await verifyPinOffline('0000')).toBeNull()
+  })
+
+  it('re-loguearse online actualiza SU credencial sin borrar la de los demás', async () => {
+    await provisionManagerCredential('1111', 'm1', 'Ana', 'mesero')
+    await provisionManagerCredential('2222', 'c1', 'Beto', 'cajero')
+    await provisionManagerCredential('3333', 'm1', 'Ana', 'mesero')   // Ana cambió su PIN
+
+    expect(await verifyPinOffline('3333'), 'el PIN nuevo de Ana entra').not.toBeNull()
+    expect(await verifyPinOffline('1111'), 'el viejo de Ana ya no').toBeNull()
+    expect((await verifyPinOffline('2222'))?.name, 'y Beto no se ve afectado').toBe('Beto')
   })
 })
 
@@ -110,7 +182,7 @@ describe('pruneStaleCredentials', () => {
     const raw = localStorage.getItem('pos_manager_credentials_v2')!
     const creds = JSON.parse(raw)
     const staleIdx = creds.findIndex((c: { staff_id: string }) => c.staff_id === 'staff-stale')
-    creds[staleIdx].synced_at = Date.now() - 9 * 60 * 60 * 1000
+    creds[staleIdx].synced_at = Date.now() - 72 * 60 * 60 * 1000
     localStorage.setItem('pos_manager_credentials_v2', JSON.stringify(creds))
 
     pruneStaleCredentials()

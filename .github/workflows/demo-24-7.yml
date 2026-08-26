@@ -69,6 +69,7 @@ jobs:
           esac
 
       - run: python .github/scripts/test_curva_horaria.py
+      - run: python .github/scripts/test_menu_del_tenant.py
 
       - run: python .github/scripts/lab_simulator.py
 

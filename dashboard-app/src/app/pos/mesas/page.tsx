@@ -9,6 +9,7 @@ import type { Mesa } from '@/lib/pos-data'
 import { getActiveClientSlug as _cid } from '@/lib/data'
 import { getPosConfigSync } from '@/lib/pos-config'
 import { shouldUsePersistedFloorCoordinates } from '@/lib/floorplan-coordinates'
+import { setMesaTarget } from '@/lib/pos-navigation'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -516,12 +517,15 @@ export default function MesasPage() {
     if (staffRole === 'cajero' && !ordersByMesa.has(mesaNum)) {
       return // silently ignore — cajero can't open new restaurant tables
     }
-    // Navegación DURA (no router.push). Evidencia de campo: en este Next.js (16.2)
-    // router.push('/pos?mesa=N') desde /pos/mesas SOLTABA el ?mesa= y caía al default
-    // (mesa 1) — tocabas la 52 y abría la 1. Una navegación dura a /pos?mesa=N sí lleva
-    // el parámetro (comprobado escribiendo la URL a mano). Offline el SW sirve /pos del
-    // cache (con ignoreVary), así que funciona sin internet igual.
-    window.location.href = `/pos?mesa=${mesaNum}`
+    // La mesa viaja FUERA del query, porque offline el query no sobrevive por ninguna
+    // de las dos rutas (evidencia de campo 23-ago): la navegación dura recarga y depende
+    // del SW + del gate de auth (no abría NINGUNA mesa), y router.push puede resolver el
+    // shell cacheado sin el ?mesa= (caía a la mesa 1). Se deja parqueada en sessionStorage
+    // y se navega por cliente: la SPA sigue viva (cero recarga, cero SW) y /pos abre la
+    // mesa correcta aunque el query se pierda. El ?mesa= se conserva para que la URL siga
+    // siendo compartible y para que Back/adelante funcionen igual.
+    setMesaTarget(mesaNum)
+    router.push(`/pos?mesa=${mesaNum}`)
   }
 
   // ─── Mesa Card (shared between views) ─────────────────────────────────────
