@@ -1597,7 +1597,18 @@ export async function getKitchenOrders(): Promise<KitchenOrderFromDB[]> {
       `/api/pos/kitchen?client_id=${encodeURIComponent(_getClientId())}`,
       { cache: 'no-store', headers: _kt ? { 'x-kitchen-token': _kt } : undefined }
     )
-    if (!res.ok) return []
+    // Un error del servidor NO puede devolver lista vacía.
+    //
+    // Con `return []`, un 400 —por ejemplo un client_id que la terminal no supo
+    // resolver— dejaba el tablero de cocina VACÍO Y EN SILENCIO: sin comandas,
+    // sin aviso, y sin caer al caché de IndexedDB, porque una respuesta 400
+    // RESUELVE y el `catch` de abajo nunca se alcanzaba. La cocina se quedaba
+    // ciega y nadie se enteraba.
+    //
+    // Lanzando, el catch hace lo que ya sabe hacer: mostrar las comandas
+    // cacheadas en el dispositivo. Para una pantalla de cocina, ver las últimas
+    // comandas conocidas siempre es mejor que ver la nada.
+    if (!res.ok) throw new Error(`kitchen_http_${res.status}`)
     orders = await res.json()
     // Cache para offline — fire and forget, no bloquea
     if (typeof window !== 'undefined') {
