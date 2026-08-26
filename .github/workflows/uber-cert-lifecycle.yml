@@ -10,7 +10,7 @@ jobs:
       APP_URL: https://app.fullsite.mx
       INTEGRATION_ADMIN_SECRET: ${{ secrets.INTEGRATION_ADMIN_SECRET }}
       CERT_ORDER_ID: CERT-1785628914964
-      CERT_STORE_ID: 0f655507-7337-41e9-b536-5fd6171bb0da
+      CERT_STORE_ID: a4f298f4-202f-47f5-b375-d2eefec0126c
 
     steps:
       - name: UBER-007 — Store Status Webhook (store.status event)
