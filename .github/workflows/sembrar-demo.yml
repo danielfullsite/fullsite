@@ -1,0 +1,49 @@
+# Le siembra al restaurante de pruebas la mitad que le falta: ingredientes, recetas e
+# inventario inicial.
+#
+# POR QUÉ EXISTE
+# Hoy ningún restaurante puede cruzar consumo contra venta. `amalay` tiene inventario y
+# recetas pero cero ventas en pos_orders (opera en Wansoft); `demo` tiene ventas y no
+# tiene recetas. Las dos mitades viven en tenants distintos.
+#
+# Sin un restaurante donde pase todo, cualquier cruce que se codifique corre sobre datos
+# donde el fenómeno no ocurre. Se puede escribir; no se puede saber si sirve.
+#
+# Se dispara A MANO. No tiene cron: sembrar es una operación de una vez, no un proceso.
+#
+# El script sólo escribe en la lista blanca de tenants de prueba y es idempotente.
+
+name: Demo — sembrar recetas e inventario
+
+on:
+  workflow_dispatch:
+    inputs:
+      client_id:
+        description: 'Tenant de pruebas a sembrar'
+        required: false
+        default: 'demo'
+
+jobs:
+  sembrar:
+    runs-on: ubuntu-latest
+    env:
+      CLIENT_ID: ${{ github.event.inputs.client_id || 'demo' }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with: { python-version: '3.11' }
+      - run: pip install requests
+
+      - run: python .github/scripts/sembrar_recetas_demo.py | tee salida.txt
+
+      - name: Resumen
+        if: always()
+        run: |
+          {
+            echo '## Siembra del restaurante de pruebas'
+            echo '```'
+            cat salida.txt 2>/dev/null || echo 'sin salida'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -21,6 +21,34 @@ Lo que eso le hace a la precisión (hallazgos de la auditoría):
 
 ---
 
+## Estado verificado el 2026-08-26 — tres correcciones a lo de arriba
+
+> Medido contra producción. Cambian el plan, así que van aquí y no en una nota al pie.
+> El detalle y la arquitectura del cruce están en [`ARQUITECTURA-CRUCE.md`](ARQUITECTURA-CRUCE.md).
+
+**Los agentes NO usan LLM.** Arriba dice *"saca datos → Groq/Claude → Telegram"*. De 71 scripts
+sólo 6 llaman a Groq, y **ninguno de los 6 es un agente** — son el briefing, el router de
+Telegram, las alertas y las consultas de Wansoft. Los doce agentes son Python determinista.
+
+Es buena noticia: la **Capa 1 ya existe**. No hay que migrar detectores a código; ya están en
+código. La Fase 2 de la migración es más corta de lo que este documento supone.
+
+**`agent_events` no estaba vacía por olvido: la tabla rechazaba los INSERT.** Un
+`CHECK (agent_id IN (…5 valores…))` admitía sólo los agentes del motor de TypeScript; los de
+Python usan otros siete. Y PostgREST responde 400, que no es excepción para `requests`, así que
+`log_event()` fallaba **en silencio**. `antifraud-agent` y `fraud_watcher` llevaban meses
+reportando al vacío. Corregido en #144, junto con el resolvedor que faltaba.
+
+**Ocho agentes no producían nada.** 283 corridas en `no_data` en 14 días: `ops_daily_live` y
+`ops_daily_history` leían `ops_daily`, congelada. Corregido en #134.
+
+**Y una que este documento no contemplaba:** el modelo de "un día normal" está hardcodeado al
+perfil de AMALAY (`agent_common._DAY_PROGRESS`, `close_predictor.HOURLY_DISTRIBUTION`, ambos con
+el comentario admitiéndolo). Mientras siga así, la inteligencia no es clonable aunque los agentes
+corran para todos.
+
+---
+
 ## El objetivo — híbrido de 3 capas
 
 Ni 30 bots ciegos, ni un solo agente gigante que lo hace todo (shallow). **Lo más preciso:**

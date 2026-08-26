@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(__file__))
 from agent_common import sb_get, sb_post, sb_patch, log_run
+import pos_client
 
 CLIENT_ID = os.environ.get("CLIENT_ID", "lab-resto")
 IVA_RATE = 0.16
@@ -172,12 +173,81 @@ def factor_de_la_hora() -> float:
     return CURVA_RESTAURANTE[hora % 24]
 
 
+def ciclo_por_el_pos(token: str, factor: float) -> tuple[int, int, int]:
+    """Un servicio completo POR EL CAMINO REAL: crear → cocina → cobrar, vía save-order.
+
+    Cada paso pasa por api/pos/save-order, que es donde vive el descuento de inventario
+    (`reconcile_order_inventory`), la concurrencia optimista por revisión, la detección de
+    skimming y la validación de pagos. Escribir directo a la tabla se salta todo eso.
+
+    La orden se lleva COMPLETA en una sola corrida —crear, cocina, cobrar— en vez de
+    dejarla a medias para la siguiente. El POS usa revisiones optimistas, y encadenarlas
+    aquí ejercita ese mecanismo, que es justo lo que no se estaba probando.
+    """
+    creadas = avanzadas = cobradas = 0
+    n = 0 if factor == 0.0 else max(1, round(random.randint(2, 5) * factor))
+
+    for s in range(n):
+        orden = make_order(s)
+        oid = orden["id"]
+        base = {
+            "order_id": oid, "mesa": orden["mesa"], "mesero": orden["mesero"],
+            "personas": orden["personas"], "subtotal": orden["subtotal"],
+            "iva": orden["iva"], "total": orden["total"], "descuento": 0,
+            "turno_id": orden["turno_id"], "items": orden["items"],
+        }
+        try:
+            r = pos_client.guardar(token, {**base, "expected_revision": 0, "status": "abierta"})
+            creadas += 1
+            rev = r.get("revision", 1)
+
+            r = pos_client.guardar(token, {**base, "expected_revision": rev, "status": "enviada"})
+            avanzadas += 1
+            rev = r.get("revision", rev + 1)
+
+            propina = round(float(orden["total"]) * random.uniform(0.08, 0.15), 2)
+            metodo = random.choice(PAGOS)
+            r = pos_client.guardar(token, {
+                **base, "expected_revision": rev, "status": "cerrada",
+                "propina": propina, "metodo_pago": metodo,
+                # El invariante que rechazaba el 100% de las órdenes viejas.
+                "pagos": pos_client.pagos_que_cuadran(orden["total"], propina, metodo),
+                "closed_at": now_iso(),
+            })
+            cobradas += 1
+            print(f"[lab-simulator]   {oid[:24]} cobrada · {pos_client.diagnostico_inventario(r)}")
+        except pos_client.ErrorPOS as e:
+            # Una orden rechazada NO tumba el servicio: se reporta y se sigue. Pero se
+            # reporta FUERTE — un rechazo silencioso es exactamente cómo se acumularon
+            # 2,813 órdenes que el POS real nunca habría aceptado.
+            print(f"[lab-simulator]   RECHAZADA {oid[:24]}: {e}", file=sys.stderr)
+
+    return creadas, avanzadas, cobradas
+
+
 def main():
     start = time.time()
     created = advanced = closed = 0
     try:
-        # 1) Crear órdenes nuevas (servicio premium entrando — más volumen)
         factor = factor_de_la_hora()
+
+        # ¿Por el camino real del POS, o escribiendo directo a la tabla?
+        #
+        # Apagado por omisión: lab-resto lleva meses con la escritura directa y este
+        # cambio no debe alterarlo. Se enciende por tenant, desde el workflow.
+        if os.environ.get("VIA_POS", "").strip().lower() in ("1", "true", "si", "sí"):
+            token, _ = pos_client.autenticar(CLIENT_ID, os.environ.get("POS_PIN", ""))
+            created, advanced, closed = ciclo_por_el_pos(token, factor)
+            dur = int((time.time() - start) * 1000)
+            estado = "cerrado" if factor == 0.0 else f"factor {factor:.1f}"
+            summary = (f"[{CLIENT_ID}] vía POS · {estado} · +{created} órdenes, "
+                       f"{advanced} a cocina, {closed} cobradas")
+            print(f"[lab-simulator] {summary}")
+            log_run("lab-simulator", "success", dur, output_summary=summary,
+                    tentacle="lab", rows_processed=created + advanced + closed)
+            return
+
+        # 1) Crear órdenes nuevas (servicio premium entrando — más volumen)
         if factor == 0.0:
             # Cerrado. No se crean órdenes, pero SÍ se cierran las que quedaron
             # abiertas — un restaurante que cierra cobra lo que tiene en mesa.
