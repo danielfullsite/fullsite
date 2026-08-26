@@ -14,39 +14,57 @@ import { uberFetch, SCOPE_STORE } from './oauth'
 import { withRetry } from '../retry'
 import { auditLog } from '../audit-logger'
 
+/**
+ * MultiLanguageText de Uber. Un `Record<string,string>` plano NO sirve: Uber
+ * responde "non-empty default title is required". Las claves llevan region
+ * (es_mx, en_us).
+ */
+export interface UberText {
+  translations: Record<string, string>
+}
+
+/**
+ * Contrato del Menu API de Uber, CORREGIDO el 2026-08-26 ejercitandolo contra
+ * el sandbox. La version anterior nunca subio un menu; cada campo marcado abajo
+ * fue rechazado por Uber con el error que se cita.
+ */
 export interface UberMenuUpload {
   menus: Array<{
     id: string
-    title: Record<string, string>
+    title: UberText
+    /** UNA entrada por dia. Un arreglo en day_of_week devuelve
+     *  "invalid enum value type: jsoniter.ValueType(5)" (= array). */
     service_availability: Array<{
-      day_of_week: string[]
-      time_period: Array<{ start_time: string; end_time: string }>
+      day_of_week: string
+      /** `time_periods`, en plural. */
+      time_periods: Array<{ start_time: string; end_time: string }>
     }>
     category_ids: string[]
   }>
   categories: Array<{
     id: string
-    title: Record<string, string>
+    title: UberText
     entities: Array<{ id: string; type: 'ITEM' }>
   }>
   items: Array<{
     id: string
     external_data: string
-    title: Record<string, string>
-    description?: Record<string, string>
+    title: UberText
+    description?: UberText
     price_info: { price: number; currency_code: string }
-    modifier_group_ids?: string[]
+    /** Objeto, no lista. Una lista devuelve
+     *  "modifierGroupIds, error: ReadMapCB: expect { or n, but found [". */
+    modifier_group_ids?: { ids: string[] }
     tax_info?: { tax_rate: number }
   }>
   modifier_groups?: Array<{
     id: string
-    title: Record<string, string>
+    title: UberText
     quantity_info: { quantity: { min_permitted: number; max_permitted: number } }
-    modifier_options: Array<{
-      id: string
-      title: Record<string, string>
-      price_info: { price: number; currency_code: string }
-    }>
+    /** Referencias a ITEMS ya declarados en `items` — el titulo y el precio de
+     *  cada opcion viven ahi. Definirlas inline devuelve
+     *  "customization <id> contains invalid modifier options [...]". */
+    modifier_options: Array<{ id: string; type: 'ITEM' }>
   }>
 }
 
