@@ -1,12 +1,15 @@
 # Identidades y accesos de las plataformas de delivery
 
 > **Por qué existe:** el 2026-08-26 se perdió media sesión investigando por qué el Uber
-> Developer Dashboard mostraba *"Something went wrong"* y cero aplicaciones. La respuesta no era
-> un fallo de Uber: **el navegador estaba con una cuenta distinta a la dueña de la aplicación.**
-> Eso no estaba escrito en ningún lado del repo.
+> Developer Dashboard mostraba *"Something went wrong"* y cero aplicaciones, sin saber con qué
+> cuenta se estaba entrando. La identidad correcta (`admon@cafeamalay.com`) no estaba escrita en
+> ningún lado del repo.
 >
 > **Regla:** ninguna plataforma se da por bloqueada hasta confirmar **con qué identidad** se está
 > entrando. Este documento es la fuente de esa respuesta.
+>
+> ⚠️ **Nota (misma fecha):** en este caso la cuenta **no** era la causa — ver
+> *"El dashboard sí está roto"* abajo. La regla sigue valiendo; el diagnóstico de ese día, no.
 
 **Este documento NO contiene secretos.** Sólo dice *qué cuenta* y *dónde vive* cada credencial.
 Los valores viven en Vercel, en GitHub Secrets, o en el gestor de contraseñas. Nunca aquí.
@@ -25,6 +28,32 @@ Los valores viven en Vercel, en GitHub Secrets, o en el gestor de contraseñas. 
 **Test client ID:** `k2DPoUeXuBdLd6gV7W5VMFR7fSnmnEaq`
 **Production client ID:** `6bHtSqLJsdTZxWvFRt0f1jjv-BzbE92T`
 **Test store vigente:** `a4f298f4-202f-47f5-b375-d2eefec0126c`
+
+### El dashboard sí está roto — evidencia (2026-08-26)
+
+Se probó con dos cuentas distintas, incluida `admon@cafeamalay.com` recién autenticada
+(round-trip de OAuth completo, `_csid` y `state` frescos en la URL). Resultado idéntico:
+
+| Ruta | Resultado |
+|---|---|
+| `/dashboard/products` (listado) | *"Something went wrong"* |
+| `/dashboard/products/{client_id}` (detalle) | *"Something went wrong"* |
+| **`/dashboard/create-application`** | *"Something went wrong"* + el botón queda deshabilitado |
+
+La tercera es la que decide: **crear una aplicación no depende de que existan aplicaciones
+previas.** Si esa ruta también truena, no es un problema de titularidad ni de cuenta vacía.
+
+Señales adicionales: el endpoint `/dashboard/graphql` responde **HTTP 200** (el servidor
+contesta) pero la UI entra a su rama de error, y **no hay errores en consola** — o sea que la
+app está manejando deliberadamente un error que viene del servidor.
+
+**Correlación, no prueba:** desde las **04:31 UTC** del mismo día, el endpoint de token del
+sandbox (`sandbox-login.uber.com`) devuelve **HTML en vez de JSON**, y a las 05:04 seguía igual.
+Dos superficies de la plataforma de desarrolladores degradadas el mismo día. Vale la pena
+mencionárselo a Uber GTS junto, por si es el mismo incidente — pero **no afirmar que lo es**.
+
+> Consecuencia práctica: mientras el dashboard no cargue, **no se puede cambiar el webhook URL
+> del test app ni revisar los scopes aprobados**, que son dos de los tres bloqueos de Uber.
 
 ### 🚩 Problema estructural — la app de Uber no es de Fullsite
 
