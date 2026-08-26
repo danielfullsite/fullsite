@@ -34,7 +34,7 @@ conflictos contra `main` hoy.
 
 | Rama | Último | Archivos | Atrás | Integra | Veredicto |
 |---|---|---:|---:|---|---|
-| `uber/validation-ready` | 08-26 | **35** | 390 | 🔴 conflicto | **Rescatar.** 3,144 renglones de la certificación de Uber |
+| `uber/validation-ready` | 08-26 | **35** | 403 | 🔴 conflicto | ~~Rescatar~~ → **el código está obsoleto; sólo se rescataron los 7 documentos.** Ver abajo |
 | `docs/revision-20260826` | 08-26 | 1 | 16 | ✅ limpio | PR abierto → #140 |
 | `codex/rappi-kds-bridge-138` | 08-24 | 56 | 215 | 🔴 conflicto | Revisar contra el puente de Rappi que ya está en `main` |
 | `codex/delivery-test-mode` | 08-24 | 56 | 215 | 🔴 conflicto | Mismo tamaño que la anterior — probablemente hermanas |
@@ -64,9 +64,43 @@ títulos con `translations`), más `promotions.ts`, `fulfillment.ts`, `reporting
 `oauth.ts`, y ocho documentos — el runbook de la orden de prueba, el checklist de
 despliegue, la evidencia de validación y el mapa de identidades y accesos.
 
-**Está 390 commits atrás de `main` y tiene conflictos.** Rebasarla no es limpieza: es
+**Está 403 commits atrás de `main` y tiene conflictos.** Rebasarla no es limpieza: es
 trabajo de integración sobre código que no se puede verificar sin el *sandbox* de Uber
 respondiendo. Por eso no se hizo de madrugada.
+
+#### Corrección — el código está obsoleto, no pendiente
+
+Al medirlo en vez de suponerlo, la conclusión se invierte. **`main` va adelante de la rama**,
+no atrás:
+
+| En `menu.ts` | `main` | la rama |
+|---|---:|---:|
+| `day_of_week` | 5 | 2 |
+| `translations` | 8 | 1 |
+| `time_periods` | 3 | 2 |
+
+Y los seis archivos de `lib/integrations/uber-eats/` son más nuevos en `main` (18–26 ago) que
+en la rama (7–25 ago). Otra sesión rehizo ese trabajo, y mejor. **Mergear la rama regresaría
+`main`.**
+
+De los 15 archivos que no existen en `main`:
+
+- Los **3 tests** referencian APIs que `main` ya no tiene — `UberScopeError`, `updateItem`,
+  `markOrderReadyLegacy`. `tsc` los rechaza.
+- **`fulfillment.ts`** pide `tokenType: 'order-fulfillment'` y `main` declara
+  `'provisioning' | 'marketplace' | 'delivery'`. Se podría inferir `'delivery'` por la ruta
+  `/v1/delivery`, pero eso no se verifica sin el sandbox respondiendo. **No se adivina.**
+- **`token-vault.ts`, `fulfillment.ts` y el endpoint `pos-data`** no los importa nadie en
+  `main`. Agregarlos sería código muerto.
+
+Queda vivo lo que no caduca: **los 7 documentos**, rescatados aparte. Entre ellos el runbook
+de la orden de prueba y el mapa de identidades y accesos, que registra que la app de Uber vive
+bajo un buzón de AMALAY y no de Fullsite — un bloqueo operativo real que sólo estaba escrito
+ahí.
+
+> **La lección:** *"rama vieja con mucho código"* no equivale a *"trabajo pendiente"*. Puede
+> ser trabajo ya superado. La pregunta no es cuánto trae, sino **si `main` ya va adelante** —
+> y eso se mide, no se supone. Este documento afirmó lo contrario hace unas horas.
 
 ### La que está muerta con razón: `fix/pos-offline-mesa-nav`
 
