@@ -1,3 +1,4 @@
+import { getAuthToken } from '@/lib/data'
 // Multi-tenant client configuration
 // Single source of truth: Supabase `clients` table
 // This file provides TypeScript types + helpers to read the config
@@ -80,8 +81,29 @@ export async function fetchClientConfig(clientId: string): Promise<ClientConfig>
   }
 
   try {
+    // Con el TOKEN DE SESIÓN, no con la anon key.
+    //
+    // Esto era la raíz de que Fullsite no fuera clonable. La tabla `clients`
+    // tiene RLS con una sola política —`clients_tenant_read`, para el rol
+    // `authenticated`— y en toda la base NO existe ni una política para `anon`
+    // (0 de 350). Con la anon key la consulta devuelve 200 con arreglo VACÍO, y
+    // como el código sólo revisa `res.ok`, cae al fallback en silencio.
+    //
+    // El fallback tiene UNA entrada: 'demo'. Todos los demás restaurantes
+    // recibían display_name = su slug, iva_rate = 0.16, timezone Mexico_City y
+    // mesas = 16 — sin importar lo que dijera su fila.
+    //
+    // O sea: la configuración por restaurante existía en la base, era correcta,
+    // y nadie la leía nunca. Se veía así en pantalla:
+    //
+    //     base:      Espresso Lab · IVA 0    · 10 mesas · Monterrey
+    //     pantalla:  coffee-shop   · IVA 16% · 16 mesas · Mexico_City
+    //
+    // El IVA es lo grave: dos de los tres tenants cobran 0 y la app les aplicaba
+    // 16%.
+    const token = await getAuthToken()
     const res = await fetch(`${SUPABASE_URL}/rest/v1/clients?id=eq.${clientId}&limit=1`, {
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}` },
       cache: 'no-store',
     })
     if (res.ok) {
@@ -97,10 +119,20 @@ export async function fetchClientConfig(clientId: string): Promise<ClientConfig>
           type: row.type || '',
           default_theme: row.default_theme || 'light',
           accent_color: row.accent_color || 'emerald',
-          mesas: row.mesas || 16,
+          // `??` y no `||`: un restaurante puede tener 0 mesas (barra, para
+          // llevar) y `||` lo convertiría en 16.
+          mesas: row.mesas ?? 16,
           meseros: typeof row.meseros === 'string' ? JSON.parse(row.meseros) : (row.meseros || []),
           features: { ...DEFAULT_FEATURES, ...(typeof row.features === 'string' ? JSON.parse(row.features) : (row.features || {})) },
-          iva_rate: row.iva_rate || 0.16,
+          // `??` y no `||`. ESTE ERA UN COBRO MAL HECHO: dos de los tres
+          // restaurantes de la base tienen iva_rate = 0, y `||` lo volvía 0.16.
+          // Es la misma familia de defecto que formatCurrency(null) → '$0':
+          // usar `||` sobre un valor donde el CERO significa algo.
+          //
+          // PostgREST devuelve numeric como STRING ("0", "0.16"), así que se
+          // convierte explícitamente — si no, "0" es truthy y el `??` no bastaría
+          // para detectar el problema, pero el número quedaría como texto.
+          iva_rate: row.iva_rate == null ? 0.16 : Number(row.iva_rate),
           data_source: row.data_source || 'supabase',
           logo_url: row.logo_url,
           wansoft_subsidiary_id: row.wansoft_subsidiary_id,
@@ -141,6 +173,15 @@ function getClientConfigFallback(clientId: string): ClientConfig {
     },
   }
 
+  // Llegar aquí ya NO es normal: significa que la fila del restaurante no se
+  // pudo leer. Antes era el camino de todos los días y por eso nadie lo notó.
+  if (typeof console !== 'undefined' && !FALLBACKS[clientId]) {
+    console.warn(
+      `[client-config] Sin configuración para "${clientId}": se usan valores por ` +
+      `omisión (IVA 16%, 16 mesas, America/Mexico_City). Revisa su fila en clients ` +
+      `y que la sesión esté activa.`
+    )
+  }
   const fb = FALLBACKS[clientId] || {}
   return {
     id: clientId,
