@@ -54,9 +54,43 @@ lo montó desde el principio.** La queja no era "bakery no debería ir a cocina"
 platillo *no aparecía*, que se ruteaba a *dos* lados, y que *imprimía en la estación
 equivocada*. Nada de eso se ve en la tabla de configuración.
 
-**Sigue sin verificar.** Necesita saber cuántas pantallas KDS hay, dónde están, y qué debe
-salir en cada una — y eso no está en la base ni en el código: está en cómo opera el
-restaurante.
+### La topología real, que Daniel aportó y sin la cual nada de esto se puede leer
+
+> **Una** pantalla KDS, en cocina. **Tres** POS. Impresoras con sus HID.
+
+De ahí se sigue lo que la tabla sola no dice: **`caja` y `barra` no son pantallas, son
+impresoras.** Sólo `cocina` tiene KDS.
+
+Eso reinterpreta la queja: *"no sale en KDS"* para un artículo de market **no es un bug** —
+es lo esperado. El bug era que un **toast**, que es comida, terminara ruteado a market.
+
+### Con eso sí se puede verificar — cadena completa
+
+| Platillo | Categoría | Estación | ¿Llega al KDS? |
+|---|---|---|---|
+| `EL MEXICANO TOAST` | `toast` | `cocina` | ✅ |
+| `CONCHA DE MANTEQUILLA` | `bakery` | `cocina` | ✅ |
+
+Los dos que Daniel reportó el 08-10 hoy resuelven a la pantalla de cocina. Eso es una
+afirmación **en presente y comprobable** — no una afirmación de que antes estuviera roto,
+que no se puede sostener sin la configuración de entonces.
+
+### 🔴 Pero salió uno vivo
+
+```
+SPRW - TOAST SALMON   →   categoría 'activaciones'   →   estación 'barra'
+```
+
+`activaciones` tiene **un solo platillo**, y es ese toast. La categoría rutea a `barra`, que
+es **impresora, no pantalla**.
+
+O sea: un toast de salmón se imprime en la barra y **nunca aparece en el KDS de cocina**.
+Es exactamente la forma de la queja del 08-10.
+
+**No lo declaro bug**, porque no sé si ese platillo se prepara en barra — puede ser una
+activación de marca servida ahí. Es una pregunta de una línea para quien opera:
+*¿la SPRW Toast Salmon se hace en cocina o en barra?* Si es cocina, está mal ruteada hoy,
+en producción.
 
 > **Hallazgo lateral, ése sí sólido:** `lab-resto` **no tiene** `pos.station_routing`. Un
 > restaurante nuevo nace sin ruteo. Es el tipo de dato semilla que el baseline del esquema
