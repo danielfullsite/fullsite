@@ -18,6 +18,19 @@ Un escenario es **CERTIFIED** solo cuando las 3 columnas están marcadas: Impl �
 
 ---
 
+> ## Evidencia de campo — AMALAY, 2026-08-24
+>
+> Cuatro escenarios tienen **validación física parcial** de la madrugada del 24-ago en AMALAY
+> (caja, WiFi apagado, Daniel presente por TeamViewer). Estaba encerrada en un rollout de Codex
+> de 116 MB; se extrajo a [`EVIDENCIA-CAMPO-AMALAY-2026-08-24.md`](EVIDENCIA-CAMPO-AMALAY-2026-08-24.md)
+> con cita textual y hora.
+>
+> **Sigue siendo 0 certificados, y con razón:** una sola terminal, con supervisión en vivo,
+> por el camino feliz, y los 3 P0 se encontraron *después*. Camino controlado ≠ certificado.
+>
+> Lo que cambia es que el 0 ya no significa "no sabemos". Significa **4 con evidencia parcial
+> y 17 sin tocar**.
+
 ## Grupo 1: Caída de Internet
 
 ### T-01: Internet cae durante una venta activa
@@ -39,7 +52,7 @@ Un escenario es **CERTIFIED** solo cuando las 3 columnas están marcadas: Impl �
 
 | Impl | Test | Cert | Pendiente |
 |---|---|---|---|
-| ✓ | ✗ | ✗ | Ejecutar escenario + crear test Playwright |
+| ✓ | ✗ | ✗ (campo parcial) | **Validado en campo 2026-08-24 04:03-04:07** — mesa abre, envía, imprime, KDS recibe, sin red. Falta test Playwright y repetir en entrada/escondite. Ver EVIDENCIA-CAMPO |
 
 ---
 
@@ -513,8 +526,28 @@ El subnet scan existe en `server-discovery.ts` (`_subnetScan`) pero `permitSubne
 **Escenarios Implementados**: 22/23 (96%)
 **Escenarios con Test Automatizado**: 7/23 (30%)
 **Escenarios Certificados**: 0/23 (0%)
+**Escenarios con evidencia de campo parcial**: 4/23 — T-01, T-17, T-22, T-23
+(AMALAY 2026-08-24, caja únicamente. Ver [`EVIDENCIA-CAMPO-AMALAY-2026-08-24.md`](EVIDENCIA-CAMPO-AMALAY-2026-08-24.md))
+**Escenarios sin tocar**: 17/23
 
 > T-09: auditado 2026-07-27. Re-discovery automático en cambio de IP NO implementado (`BridgeClient` reconecta a URL fija; `useBridgeClient` corre discovery una sola vez al montar; subnet scan existe pero desactivado). Requiere nueva funcionalidad antes de poder ejecutar o certificar.
+
+---
+
+## Hueco conocido: la matriz no cubre el login offline
+
+Los 23 escenarios **no incluyen autenticación sin red**, y es de lo más crítico: si nadie puede
+entrar al POS, lo demás da igual. Se validó en campo el 2026-08-24 06:49 (*"si jala! que
+chulada!"*), pero no tiene casilla.
+
+Dos límites del código que una prueba de una noche no alcanza a tocar:
+
+- **Ventana de 8 h** — `pos_staff_cache` expira 8 h tras el último login *online*. Un restaurante
+  que cierra a la 1am y abre a la 1pm son 12 h: si el internet está caído al abrir, **nadie entra**.
+- **Una sola credencial por terminal** — `pos_staff_cache` guarda un objeto, no una lista, y se
+  sobrescribe en cada login. Offline sólo entra **la última persona que se logueó con internet**.
+
+Pendiente: levantarlo como **T-24** con esos dos como criterios de aceptación.
 
 ---
 
