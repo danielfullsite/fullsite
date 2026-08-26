@@ -100,6 +100,22 @@ jobs:
           EVIDENCE=$(echo "$BODY" | jq -r '.summary.uber_evidence_status // "?"' 2>/dev/null || echo "?")
           RUN_ID=$(echo "$BODY" | jq -r '.day3_run_id // "?"' 2>/dev/null || echo "?")
           echo "  delivery_store_apis: $STORE_APIS"
+          # Desglose por API. El sumario "N/5 OK" no dice CUAL falla, y sin eso no hay
+          # nada que arreglar ni que reportarle a Uber. El detalle ya venia en el JSON.
+          echo "  --- desglose de las 5 Delivery Store APIs ---"
+          for API in list get status pause activate; do
+            OK=$(echo "$BODY" | jq -r ".phases[0].$API.ok // false" 2>/dev/null || echo "?")
+            ERR=$(echo "$BODY" | jq -r ".phases[0].$API.error // \"\"" 2>/dev/null || echo "")
+            ST=$(echo "$BODY" | jq -r ".phases[0].$API.status // \"\"" 2>/dev/null || echo "")
+            if [ "$OK" = "true" ]; then
+              echo "    $API: OK"
+            else
+              echo "    $API: FALLA  status=${ST:-?}  error=${ERR:-sin mensaje}"
+              FAILED_APIS="${FAILED_APIS}${API} "
+            fi
+          done
+          echo "  APIs que fallan: ${FAILED_APIS:-(ninguna)}"
+          echo "D3004_FAILED_APIS=${FAILED_APIS:-ninguna}" >> $GITHUB_ENV
           echo "  internal_pipeline:   $PIPELINE"
           echo "  real_order:          $REAL_ORDER"
           echo "  uber_evidence_status: $EVIDENCE"
@@ -143,6 +159,7 @@ jobs:
           MSG="${MSG}D3-003 reauth_url: $D3003_HTTP%0A"
           MSG="${MSG}D3-004 day3_full: $D3004_HTTP%0A"
           MSG="${MSG}  store_apis: $D3004_STORE_APIS%0A"
+          MSG="${MSG}  fallan: $D3004_FAILED_APIS%0A"
           MSG="${MSG}  real_order: $D3004_REAL_ORDER%0A"
           MSG="${MSG}  run_id: $D3004_RUN_ID%0A"
           MSG="${MSG}D3-005 evidence: $D3005_HTTP ($D3005_ENTRIES entries)%0A%0A"
