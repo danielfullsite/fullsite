@@ -55,68 +55,54 @@ habían hecho bien.
 
 ---
 
-## Estado de los 11 endpoints de la certificación
+## Estado de los 11 endpoints — medido con la plataforma sana (06:20 UTC)
 
-| # | Endpoint | Estado | Bloqueado por |
+> Las mediciones de las 04:30 quedaron invalidadas: Uber estaba degradado. Éstas son en frío,
+> después de que el probe volvió a pasar.
+
+**Los scopes SÍ están concedidos.** `scope_probe` phase2 devuelve `blocker: null` y
+`granted_scope: "eats.order eats.store eats.store.orders.read eats.store.status.write"`.
+Los 403 de las 04:30 eran la caída, no un bloqueo.
+
+| # | Endpoint | Estado | Nota |
 |---|---|---|---|
-| — | `scope_probe` (diagnóstico) | ✅ **200**, `eats.order` concedido | — |
-| 1 | Activate Integration | ⛔ | token 403 para `eats.store …` |
-| 2 | Get Integration Details | ⛔ | token 403 para `eats.store …` |
-| 3 | Menu: Update Item/modifier | ⛔ | scope `eats.store` |
-| 4 | Order: Accept | ⛔ | **no hay orden sandbox** |
-| 5 | Cancel Notification (webhook) | ✅ implementado; rechaza firma inválida con 401 (verificado) | falta un evento real |
-| 6 | Order: Cancel | ⛔ | **no hay orden sandbox** |
-| 7 | Order: Deny | ⛔ | **no hay orden sandbox** |
-| 8 | Order: Get details | ⛔ | **no hay orden sandbox** |
-| 9 | Order: Mark Ready | ⛔ | **no hay orden sandbox** |
-| 10 | Promotions: Create | ⛔ | token 403 para `eats.store` |
-| 11 | Reporting: Get Report files | ⛔ | token 403 para `eats.report` |
+| — | `scope_probe` | ✅ 200 | 4 scopes concedidos |
+| — | Store Status (GET) | ✅ 200 | `{"status":"ONLINE"}` — de ahí salió el enum correcto |
+| 1 | Activate Integration | ✅ **200** | Estaba en rojo por mandar `action` en vez de `status`. Corregido y verificado en vivo |
+| 2 | Get Integration Details | ✅ **200** | Devuelve *"Fullsite POS Test Store — AMALAY"* |
+| 3 | Menu: Update Item/modifier | ⏳ sin probar | Requiere subir un menú real al store |
+| 4 | Order: Accept | ⏸ | Requiere orden de prueba (se pone a mano) |
+| 5 | Cancel Notification (webhook) | ✅ implementado | Rechaza firma inválida con 401 (verificado) |
+| 6 | Order: Cancel | ⏸ | Requiere orden de prueba |
+| 7 | Order: Deny | ⏸ | Requiere orden de prueba |
+| 8 | Order: Get details | ⏸ | Requiere orden de prueba |
+| 9 | Order: Mark Ready | ⏸ | Requiere orden de prueba |
+| 10 | Promotions: Create | 🔴 **bloqueo real de Uber** | Ruta corregida a `/v1/delivery/stores/{id}/promotion`. El token con `eats.store.promotion.write` responde **400** — scope no habilitado |
+| 11 | Reporting: Request Report | ✅ **200** | Devuelve `workflow_id` |
 
----
+**Marcador: 5 verdes · 5 esperando la orden de prueba · 1 bloqueado por Uber · 1 sin probar.**
 
-## Bloqueos del lado de Uber (con evidencia)
+## Bloqueos del lado de Uber — sólo queda uno
 
-**1. Scopes no concedidos al test client `k2DPoUeXuBdLd6gV7W5VMFR7fSnmnEaq`.**
-La petición de token M2M devuelve **403** por combinación de scopes:
+**`eats.store.promotion.write` no está habilitado para el test client.**
+Con la ruta correcta, Uber nombra el scope él mismo:
 
-| Scopes pedidos | Resultado |
-|---|---|
-| `eats.order` | ✅ concedido (probe 200, 04:17 UTC) |
-| `eats.store eats.store.status.write eats.order eats.store.orders.read` | ❌ 403 |
-| `eats.store` | ❌ 403 |
-| `eats.report` | ❌ 403 |
-| `eats.deliveries` | ❌ 403 |
+> *"This endpoint requires at least one of the following scopes: eats.store.promotion.write"*
 
-**2. Las órdenes de prueba NO son un bloqueo de Uber — las ponemos nosotros.**
-`delivery_sandbox_order` probó `POST /v1/eats/sandbox/orders` y `POST /v1/sandbox/eats/orders`;
-ninguno existe. Y no deberían: la guía *Order Integration → Testing Orders* de Uber dice que la
-orden se coloca **a mano, como cliente**, contra el test store con la tienda en **Open**.
-Uber ya nos lo respondió en el caso #59128344 el 2026-08-20.
-Procedimiento: [RUNBOOK-ORDEN-DE-PRUEBA.md](RUNBOOK-ORDEN-DE-PRUEBA.md).
-**No volver a pedírselas.**
+Y al pedir un token con ese scope, el endpoint responde **400**. Es el único punto de la
+certificación que requiere que Uber mueva algo.
 
-**3. USL no completado para el store nuevo.** `phase1_usl.db_status = no_row_found` — el store
-recién creado no tiene token almacenado. Requiere que el dueño re-autorice, y que
-**el redirect URI del sandbox quede registrado en el Developer Dashboard del test app**:
-`https://fullsite-uber-sandbox.vercel.app/api/integrations/uber-eats/auth/callback`
+**Ya NO son bloqueos** (se cayeron al medir con la plataforma sana):
 
-**4. Endpoint de token degradado — evidencia incompleta.** Cronología real:
+- ~~Scopes `eats.store` y compañía~~ → concedidos.
+- ~~`eats.report`~~ → el cert #11 pasa.
+- ~~Órdenes sandbox~~ → no son un bloqueo de Uber: se ponen a mano, ver
+  [RUNBOOK-ORDEN-DE-PRUEBA.md](RUNBOOK-ORDEN-DE-PRUEBA.md).
+- ~~Dashboard caído~~ → fue una degradación temporal de la plataforma de Uber
+  (dashboard en todas sus rutas + endpoint de token devolviendo HTML entre 04:31 y ~05:50 UTC).
 
-| Hora UTC | Qué se observó |
-|---|---|
-| 04:17 | `scope_probe` **200 PASS** — `eats.order` concedido. Único dato limpio. |
-| 04:30 | 7 acciones seguidas → **403** con el scope enumerado: `scope='eats.store'`, `scope='eats.report'`, y el combo de 4 |
-| 04:31 en adelante | el endpoint devuelve **HTML en vez de JSON** (`Unexpected token '<'`) |
-| 05:01 | sigue devolviendo HTML, 30 min después |
-
-Se dispararon ~20 peticiones de token en dos minutos, así que **rate limiting es la hipótesis
-principal** — pero no está probado, y mientras el endpoint devuelva HTML **no se puede
-re-confirmar el estado de los scopes**. La tabla de 403 de arriba se apoya en la corrida de las
-04:30, que ya pudo estar degradada.
-
-> No mandar la reclamación de scopes a Uber hasta re-confirmar en frío con **una sola** corrida.
-
----
+**Pendiente que no es un bloqueo técnico:** la titularidad de la aplicación está bajo
+`admon@cafeamalay.com`. Ver [`../IDENTIDADES-Y-ACCESOS.md`](../IDENTIDADES-Y-ACCESOS.md).
 
 ## Cómo reproducir
 
