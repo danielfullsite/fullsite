@@ -346,7 +346,10 @@ export async function POST(request: NextRequest) {
 
   if (action === 'create_promotion') {
     const corrId = crypto.randomUUID()
-    const result = await createPromotion(storeId, buildSamplePromotion(), corrId)
+    const pathOverride = typeof (body as Record<string, unknown>).promotions_path === 'string'
+      ? String((body as Record<string, unknown>).promotions_path)
+      : undefined
+    const result = await createPromotion(storeId, buildSamplePromotion(), corrId, pathOverride)
     return NextResponse.json({ action, correlation_id: corrId, store_id: storeId, ts: new Date().toISOString(), result })
   }
 

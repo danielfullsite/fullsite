@@ -11,16 +11,25 @@
 //
 // All calls log to integration_audit_log with redacted payloads.
 
-import { uberFetch, SCOPE_STORE } from './oauth'
+import { uberFetch } from './oauth'
 import { withRetry } from '../retry'
 import { auditLog } from '../audit-logger'
 
+// Ruta CONFIRMADA empíricamente el 2026-08-26 probando candidatos contra el
+// sandbox: sólo `/v1/delivery/stores/{store_id}/promotion` existe — "stores" en
+// plural, "promotion" en singular. Las otras cinco variantes devuelven 404.
+// El default anterior (`/v1/eats/stores/{store_id}/promotions`) no existe.
 const promotionsPath = (storeId: string): string =>
-  (process.env.UBER_PROMOTIONS_PATH || '/v1/eats/stores/{store_id}/promotions')
+  (process.env.UBER_PROMOTIONS_PATH || '/v1/delivery/stores/{store_id}/promotion')
     .trim()
     .replace('{store_id}', encodeURIComponent(storeId))
 
-const promotionsScope = (): string => (process.env.UBER_PROMOTIONS_SCOPE || SCOPE_STORE).trim()
+// Scope dicho por el propio Uber al llamar la ruta correcta:
+//   "This endpoint requires at least one of the following scopes:
+//    eats.store.promotion.write"
+// Ya no es una suposición: es la respuesta del endpoint.
+const promotionsScope = (): string =>
+  (process.env.UBER_PROMOTIONS_SCOPE || 'eats.store.promotion.write').trim()
 
 export interface UberPromotion {
   title?: Record<string, string>
@@ -45,12 +54,21 @@ export function buildSamplePromotion(): UberPromotion {
 export async function createPromotion(
   storeId: string,
   promo: UberPromotion,
-  correlationId: string
+  correlationId: string,
+  /**
+   * Override de ruta por llamada, sólo para descubrir el contrato desde la ruta
+   * sandbox. La ruta por defecto devuelve 404, y probar candidatos vía variable
+   * de entorno cuesta un deploy por intento. No lo usa ningún camino productivo.
+   */
+  pathOverride?: string
 ): Promise<{ ok: boolean; status: number; body?: unknown; error?: string }> {
   const t0 = Date.now()
+  const path = pathOverride
+    ? pathOverride.trim().replace('{store_id}', encodeURIComponent(storeId))
+    : promotionsPath(storeId)
   try {
     const r = await withRetry(
-      () => uberFetch(promotionsPath(storeId), {
+      () => uberFetch(path, {
         method: 'POST',
         tokenType: 'marketplace',
         scope: promotionsScope(),
