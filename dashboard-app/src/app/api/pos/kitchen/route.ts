@@ -18,7 +18,7 @@ import { NextRequest } from 'next/server'
 // (x-kitchen-token = HMAC(client_id, KITCHEN_TOKEN_SECRET)) para que no se pueda
 // enumerar entre tenants. OPT-IN: si KITCHEN_TOKEN_SECRET no está seteado, opera
 // abierto igual que antes (backward-compatible). Ver lib/kitchen-token.ts.
-import { kitchenTokenEnabled, verifyKitchenToken } from '@/lib/kitchen-token'
+import { evaluarTokenCocina } from '@/lib/kitchen-token'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,9 +36,21 @@ export async function GET(request: NextRequest) {
     return Response.json({ error: 'client_id inválido' }, { status: 400 })
   }
 
-  // Token de cocina por-tenant (solo se exige si KITCHEN_TOKEN_SECRET está activo).
-  if (kitchenTokenEnabled() && !verifyKitchenToken(clientId, request.headers.get('x-kitchen-token'))) {
+  // Token de cocina por-tenant. Rollout off → grace → strict: ver kitchen-token.ts.
+  // Sin KITCHEN_TOKEN_SECRET el modo es `off` y esto no hace nada, igual que antes.
+  const veredicto = evaluarTokenCocina(clientId, request.headers.get('x-kitchen-token'))
+  if (!veredicto.permitir) {
     return Response.json({ error: 'no autorizado' }, { status: 401 })
+  }
+  if (veredicto.reportar) {
+    // Modo grace: la pantalla no trae token válido pero se le sirve igual, para no
+    // dejar la cocina sin comandas mientras se provisiona. Se deja rastro de CUÁL
+    // pantalla falta — sin el token, que es un secreto.
+    console.warn('[kitchen-token] sin token válido, servido en modo grace', {
+      client_id: clientId,
+      trae_token: Boolean(request.headers.get('x-kitchen-token')),
+      ua: request.headers.get('user-agent')?.slice(0, 80) ?? null,
+    })
   }
 
   // Show orders with activity in the last 12h so ancient "enviada" rows don't pile
