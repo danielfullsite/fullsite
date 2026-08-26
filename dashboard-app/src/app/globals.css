@@ -274,6 +274,20 @@ body:has(.pos-kiosk) {
 .sidebar-rail *::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 3px; }
 [data-theme="light"] .sidebar-rail::-webkit-scrollbar-thumb,
 [data-theme="light"] .sidebar-rail *::-webkit-scrollbar-thumb { background: rgba(16,32,26,0.16); }
+/* Logo según la SUPERFICIE que tiene debajo.
+ *
+ * Las clases `sidebar-logo-*` significan "qué logo va DENTRO DEL RIEL", que en el
+ * tema claro sigue siendo oscuro. Eso está bien para el riel y mal para todo lo
+ * demás: al reusarlas en la notificación, la f salió BLANCA sobre un fondo claro
+ * y se volvió invisible.
+ *
+ * Estas otras se leen por lo que son: la tinta que contrasta con la superficie
+ * donde estás. Fondo oscuro → f blanca. Fondo claro → f negra. */
+.logo-sobre-oscuro { display: block; }
+.logo-sobre-claro { display: none; }
+[data-theme="light"] .logo-sobre-oscuro { display: none; }
+[data-theme="light"] .logo-sobre-claro { display: block; }
+
 /* Logo por tema: oscuro → f blanca, claro → f negra */
 .sidebar-logo-black { display: none; }
 [data-theme="light"] .sidebar-logo-white { display: none; }
@@ -590,8 +604,12 @@ body {
   scrollbar-color: rgba(255,255,255,0.14) transparent;
 }
 /* El logo sigue al riel, no al tema: sobre carbón va la f blanca. */
-[data-theme="light"] [data-ds="v3"] .sidebar-logo-black { display: none; }
-[data-theme="light"] [data-ds="v3"] .sidebar-logo-white { display: block; }
+/* Acotado a `.sidebar-rail`. Antes aplicaba a cualquier elemento con esas clases
+ * bajo [data-ds="v3"] — y cuando el rediseño dejó de ser piloto, eso pasó a ser
+ * TODA la app. Una excepción del riel no puede alcanzar a un aviso flotante que
+ * vive sobre otra superficie. */
+[data-theme="light"] [data-ds="v3"] .sidebar-rail .sidebar-logo-black { display: none; }
+[data-theme="light"] [data-ds="v3"] .sidebar-rail .sidebar-logo-white { display: block; }
 
 /* ── 2. Densidad medida ────────────────────────────────────────────────────
  * Ritmo de Haze: radio 12px y celdas de tabla a 16×12. Las tarjetas dejan de

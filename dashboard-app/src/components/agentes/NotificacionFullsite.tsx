@@ -109,10 +109,13 @@ export default function NotificacionFullsite({ detecciones, onAbrir, forzar }: N
         style={{ background: 'var(--raised)' }}
       >
         <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-[10px] bg-[var(--surface-2)]">
-          {/* El logo va en las dos versiones y el CSS del tema decide cuál se ve,
-              igual que en el sidebar. Un solo PNG se perdería en un tema u otro. */}
-          <Image src="/fullsite-logo-white-v2.png" alt="" width={26} height={26} className="sidebar-logo-white" style={{ objectFit: 'contain' }} />
-          <Image src="/fullsite-logo-black-v2.png" alt="" width={26} height={26} className="sidebar-logo-black" style={{ objectFit: 'contain' }} />
+          {/* Van las dos versiones y el tema decide cuál se ve.
+              NO se usan las clases `sidebar-logo-*`: esas significan "qué logo va
+              dentro del riel", que es oscuro incluso en tema claro. Al reusarlas
+              aquí la f salía BLANCA sobre el fondo claro del aviso — invisible.
+              Estas se leen por la superficie: oscuro → f blanca, claro → f negra. */}
+          <Image src="/fullsite-logo-white-v2.png" alt="" width={26} height={26} className="logo-sobre-oscuro" style={{ objectFit: 'contain' }} />
+          <Image src="/fullsite-logo-black-v2.png" alt="" width={26} height={26} className="logo-sobre-claro" style={{ objectFit: 'contain' }} />
         </span>
 
         <button
