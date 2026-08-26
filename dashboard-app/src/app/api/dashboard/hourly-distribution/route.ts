@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireTenant } from '@/lib/api-auth'
 
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 // BUG-019: este route lee pos_orders (tabla tenant con RLS). DEBE usar la
@@ -10,7 +11,11 @@ const MIN_DAYS = 7
 
 export async function GET(request: NextRequest) {
   if (!SB_KEY) return NextResponse.json({ error: 'server misconfigured: SUPABASE_SERVICE_KEY required' }, { status: 503 })
-  const clientId = request.nextUrl.searchParams.get('client_id')
+  // Sin sesión no se lee la operación de nadie. Antes el client_id venía del
+  // query string y se consultaba pos_orders con la service key, que ignora RLS.
+  const auth = await requireTenant(request, request.nextUrl.searchParams.get('client_id'))
+  if (auth instanceof Response) return auth
+  const clientId = auth.clientId
   if (!clientId) return NextResponse.json({ error: 'client_id required' }, { status: 400 })
 
   const since = new Date()

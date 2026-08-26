@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runAgent, runAllAgents } from '@/lib/agents/engine'
 import type { AgentId } from '@/lib/agents/types'
+import { requireTenant } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -9,8 +10,12 @@ export async function POST(req: NextRequest) {
   let body: { client_id?: string; agent_id?: AgentId } = {}
   try { body = await req.json() } catch { /* empty body ok */ }
 
-  const clientId = body.client_id || ''
-  if (!clientId) return NextResponse.json({ error: 'client_id required' }, { status: 400 })
+  // El tenant NO lo decide quien llama. Antes esta ruta tomaba client_id del
+  // cuerpo, sin sesión, y corría los agentes con la service key: cualquiera
+  // podía disparar los agentes de otro restaurante y escribirle filas.
+  const auth = await requireTenant(req, body.client_id)
+  if (auth instanceof Response) return auth
+  const clientId = auth.clientId
 
   try {
     if (body.agent_id) {

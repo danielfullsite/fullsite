@@ -136,3 +136,44 @@ export function checkPosRole(
 // header client-controlado x-client-id / query param client_id. Era código muerto (0
 // importadores — todas las rutas usan withPOSAuth, que resuelve client_id server-side).
 // Nunca reintroducir un client_id derivado de input del cliente para scoping de tenant.
+
+/**
+ * El tenant NUNCA lo decide quien llama.
+ *
+ * Nace de una auditoría de clonabilidad del 2026-08-26. Tres rutas tomaban el
+ * `client_id` del cuerpo o del query string —o sea, del navegador— y consultaban
+ * con SUPABASE_SERVICE_KEY, que ignora la RLS:
+ *
+ *   /api/agents/run                          POST, sin sesión, ESCRIBE
+ *   /api/dashboard/hourly-distribution       GET,  sin sesión, lee pos_orders
+ *   /api/integrations/uber-eats/reconcile    POST, sin sesión, ESCRIBE
+ *
+ * Cualquiera en internet podía mandar {client_id:"amalay"} y disparar los
+ * agentes de otro restaurante, o leer sus órdenes. El filtro de la URL era el
+ * único control, y lo controlaba el atacante.
+ *
+ * Este guardián resuelve el restaurante desde `client_users` (vía withPOSAuth) y
+ * exige que coincida con el pedido. Si no hay sesión: 401. Si pide otro
+ * restaurante: 403. Falla cerrado.
+ *
+ * Uso:
+ *     const auth = await requireTenant(request, body.client_id)
+ *     if (auth instanceof Response) return auth
+ *     // a partir de aquí, auth.clientId es de confianza
+ */
+export async function requireTenant(
+  request: NextRequest,
+  pedido?: string | null,
+): Promise<POSAuthContext | Response> {
+  const ctx = await withPOSAuth(request)
+  if (!ctx) return unauthorized('Se requiere sesión')
+
+  if (pedido && pedido !== ctx.clientId) {
+    // No se dice cuál es el suyo: eso ya sería filtrar información.
+    return new Response(
+      JSON.stringify({ error: 'El restaurante solicitado no corresponde a tu sesión' }),
+      { status: 403, headers: { 'Content-Type': 'application/json' } },
+    )
+  }
+  return ctx
+}

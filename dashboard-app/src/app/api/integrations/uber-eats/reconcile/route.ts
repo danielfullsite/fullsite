@@ -6,6 +6,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { getOrderDetails } from '@/lib/integrations/uber-eats/adapter'
 import { auditLog } from '@/lib/integrations/audit-logger'
+import { requireTenant } from '@/lib/api-auth'
 
 const SB_URL = () => process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SB_KEY = () => process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -23,6 +24,9 @@ export async function POST(request: NextRequest) {
 
   const correlationId = crypto.randomUUID()
   const { client_id, threshold_minutes } = await request.json().catch(() => ({})) as { client_id?: string; threshold_minutes?: number }
+  // Reconciliar mueve datos de pedidos: exige sesión del propio restaurante.
+  const auth = await requireTenant(request, client_id)
+  if (auth instanceof Response) return auth
 
   const effectiveThreshold = (process.env.UBER_ENV === 'sandbox' && threshold_minutes != null)
     ? threshold_minutes
