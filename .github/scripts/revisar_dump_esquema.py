@@ -41,8 +41,19 @@ FORMAS_DE_SECRETO: list[tuple[str, re.Pattern[str]]] = [
 OBJETOS = [
     ("tabla",     re.compile(r"(?im)^\s*CREATE TABLE(?: IF NOT EXISTS)?\s+(?:\"?public\"?\.)?\"?([a-z0-9_]+)")),
     ("vista",     re.compile(r"(?im)^\s*CREATE(?: OR REPLACE)? VIEW\s+(?:\"?public\"?\.)?\"?([a-z0-9_]+)")),
-    ("política",  re.compile(r"(?im)^\s*CREATE POLICY\s+\"?([^\"\s]+)\"?")),
-    ("función",   re.compile(r"(?im)^\s*CREATE(?: OR REPLACE)? FUNCTION\s+(?:\"?(?:public|private)\"?\.)?\"?([a-z0-9_]+)")),
+    # Nombre Y tabla. Los nombres de política NO son únicos en el esquema: `sro_only`
+    # existe en cuatro tablas distintas. Identificarlas sólo por nombre las colapsaba
+    # en una, y eso no sólo desinflaba el conteo — hacía al detector CIEGO a una
+    # política nueva que reusara un nombre ya existente en otra tabla. Un detector que
+    # puede no ver es peor que no tener detector, porque da confianza falsa.
+    # El nombre puede venir entrecomillado Y con espacios — `CREATE POLICY "Allow read"`
+    # existe hoy en wansoft_kpis. Un patrón que corta en el primer espacio no empata, y
+    # entonces esa política es INVISIBLE para el detector, sin avisar. Por eso las dos
+    # alternativas, y por eso la autocomprobación de más abajo.
+    ("política",  re.compile(r"(?im)^\s*CREATE POLICY\s+(?:\"([^\"]+)\"|(\S+))\s+ON\s+(?:\"?public\"?\.)?\"?([a-z0-9_]+)")),
+    # Las funciones se sobrecargan: mismo nombre, distinta firma. Se incluyen los
+    # argumentos para no colapsar dos sobrecargas en una.
+    ("función",   re.compile(r"(?im)^\s*CREATE(?: OR REPLACE)? FUNCTION\s+(?:\"?(?:public|private)\"?\.)?\"?([a-z0-9_]+)\"?\s*(\([^)]*\))")),
     ("índice",    re.compile(r"(?im)^\s*CREATE(?: UNIQUE)? INDEX(?: IF NOT EXISTS)?\s+\"?([a-z0-9_]+)")),
     ("trigger",   re.compile(r"(?im)^\s*CREATE(?: OR REPLACE)? TRIGGER\s+\"?([a-z0-9_]+)")),
 ]
@@ -59,8 +70,54 @@ def revisar_secretos(ruta: Path) -> list[str]:
     return hallazgos
 
 
+def clave(m: re.Match[str]) -> str:
+    """Identidad del objeto. Con dos grupos se compone `tabla.nombre` (o nombre+firma),
+    porque el nombre solo no es único — ver el comentario en OBJETOS."""
+    partes = [p for p in m.groups() if p]
+    if len(partes) >= 2:
+        nombre, contexto = partes[0], partes[1]
+        # Para políticas el orden natural de lectura es tabla.política.
+        return f"{contexto}.{nombre}".lower() if not contexto.startswith("(") else f"{nombre}{contexto}".lower()
+    return partes[0].lower()
+
+
 def inventario(texto: str) -> dict[str, set[str]]:
-    return {clase: set(m.group(1).lower() for m in patron.finditer(texto)) for clase, patron in OBJETOS}
+    return {clase: set(clave(m) for m in patron.finditer(texto)) for clase, patron in OBJETOS}
+
+
+# Cuántas sentencias `CREATE <cosa>` hay de verdad, contadas sin extraer el nombre.
+# Sirve para cachar al detector cuando su patrón detallado no empata con algo.
+CUENTAS_CRUDAS = {
+    "tabla":    re.compile(r"(?im)^\s*CREATE TABLE\b"),
+    "vista":    re.compile(r"(?im)^\s*CREATE(?: OR REPLACE)? VIEW\b"),
+    "política": re.compile(r"(?im)^\s*CREATE POLICY\b"),
+    "función":  re.compile(r"(?im)^\s*CREATE(?: OR REPLACE)? FUNCTION\b"),
+    "índice":   re.compile(r"(?im)^\s*CREATE(?: UNIQUE)? INDEX\b"),
+    "trigger":  re.compile(r"(?im)^\s*CREATE(?: OR REPLACE)? TRIGGER\b"),
+}
+
+
+def revisar_cobertura(texto: str, inv: dict[str, set[str]]) -> list[str]:
+    """¿El detector vio todo lo que hay?
+
+    Existe porque el modo de fallo peor de esta herramienta no es equivocarse: es no
+    ver. Un `CREATE POLICY "Allow read"` —nombre con espacio— no empataba con el patrón
+    y desaparecía del inventario sin una sola queja. Un detector que puede no ver da
+    confianza falsa, que es peor que no tener detector.
+
+    Compara lo extraído contra un conteo crudo de sentencias. Si no cuadran, el patrón
+    detallado se está comiendo algo y hay que arreglarlo.
+    """
+    problemas = []
+    for clase, patron in CUENTAS_CRUDAS.items():
+        crudo = len(patron.findall(texto))
+        visto = len(inv.get(clase, ()))
+        if visto < crudo:
+            problemas.append(
+                f"{clase}: hay {crudo} sentencias pero el detector sólo identificó {visto}"
+                f" — su patrón no empata con {crudo - visto}"
+            )
+    return problemas
 
 
 def main() -> int:
@@ -86,11 +143,22 @@ def main() -> int:
         return 1
     print("OK — ningún renglón con forma de credencial.\n")
 
-    nuevo = inventario(args.nuevo.read_text(encoding="utf-8", errors="replace"))
+    texto_nuevo = args.nuevo.read_text(encoding="utf-8", errors="replace")
+    nuevo = inventario(texto_nuevo)
     print("═══ 2. Inventario del volcado ═══")
     for clase in nuevo:
         print(f"  {clase:>10}: {len(nuevo[clase])}")
     print()
+
+    ciegos = revisar_cobertura(texto_nuevo, nuevo)
+    if ciegos:
+        print("FALLA: el detector no está viendo todo lo que hay.\n")
+        for c in ciegos:
+            print(f"  · {c}")
+        print("\nNo se reporta deriva con un detector incompleto: diría 'sin novedad'")
+        print("sobre objetos que ni siquiera alcanzó a leer. Arregla el patrón en")
+        print("OBJETOS y vuelve a correr.")
+        return 2
 
     if args.baseline is None or not args.baseline.is_file():
         # No hay baseline todavía: TODO lo que trae el volcado falta en el repositorio.
