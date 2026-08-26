@@ -24,6 +24,25 @@ async function respond(staff: { id: string; name: string; role: string }, client
   return Response.json({ staff, shiftToken })
 }
 
+/**
+ * Restaurantes para los que un fallback de entorno esta habilitado.
+ *
+ * Falla CERRADO: si la variable no esta puesta, devuelve false y el fallback no
+ * aplica a nadie. Acepta lista separada por comas, para una instalacion con
+ * varias sucursales bajo el mismo despliegue.
+ */
+function envTenantAllows(varName: string, clientId: string): boolean {
+  const declarados = (process.env[varName] ?? '')
+    .split(',')
+    .map((c) => c.trim())
+    .filter(Boolean)
+  if (declarados.length === 0) return false
+  return declarados.includes(clientId)
+}
+
+const fallbackAllowedFor = (clientId: string) => envTenantAllows('POS_FALLBACK_CLIENT_ID', clientId)
+const managerPinsAllowedFor = (clientId: string) => envTenantAllows('MANAGER_PINS_CLIENT_ID', clientId)
+
 export async function POST(request: NextRequest) {
   try {
     const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
@@ -131,14 +150,26 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Fallback PIN — server-side env, never exposed to client
-    const fallback = process.env.POS_FALLBACK_PIN
-    if (fallback && pin === fallback) {
-      return respond({ id: 'admin', name: 'Admin', role: 'admin' }, clientId, throttleKey)
+    // ── Fallbacks de emergencia por variable de entorno ─────────────────────
+    //
+    // Existen para no dejar a un restaurante sin acceso si pos_staff falla.
+    // Pero un PIN de entorno NO pertenece a ningun restaurante, y hasta el
+    // 2026-08-26 no se comparaba contra ninguno: quien conociera
+    // POS_FALLBACK_PIN entraba como admin de CUALQUIER tenant y se llevaba un
+    // shift token firmado. MANAGER_PINS tenia el mismo agujero, dando gerente.
+    //
+    // Ahora cada fallback declara A QUE restaurante pertenece y falla CERRADO:
+    // sin su variable de tenant no aplica a nadie. Un despliegue nuevo nace sin
+    // llave maestra, en vez de nacer con una.
+    if (fallbackAllowedFor(clientId)) {
+      const fallback = (process.env.POS_FALLBACK_PIN ?? '').trim()
+      if (fallback && pin === fallback) {
+        return respond({ id: 'admin', name: 'Admin', role: 'admin' }, clientId, throttleKey)
+      }
     }
 
-    // MANAGER_PINS — server-side env format "pin:Nombre,pin:Nombre"
-    if (manager === true) {
+    // MANAGER_PINS — formato "pin:Nombre,pin:Nombre"
+    if (manager === true && managerPinsAllowedFor(clientId)) {
       const raw = process.env.MANAGER_PINS || ''
       for (const entry of raw.split(',')) {
         const [p, name] = entry.split(':')
