@@ -726,7 +726,26 @@ NOTA RANGO DE DATOS: los datos diarios abajo cubren EXACTAMENTE del ${(recentDay
             { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
           )
           if (yoyRes.ok) {
-            const yoyRows = await yoyRes.json()
+            let yoyRows = await yoyRes.json()
+
+            // OCM Fase 3 — este bloque era el ultimo que seguia acoplado a
+            // wansoft_daily sin salida. Para un tenant clonado la consulta
+            // devolvia vacio y el año-contra-año simplemente NUNCA aparecia:
+            // no daba una respuesta mala, daba una capacidad que no llegaba
+            // jamas, ni despues de un año operando sobre Fullsite.
+            //
+            // El contrato de pos-daily.ts es explicito: "los agentes NUNCA
+            // vuelven a acoplarse a wansoft_daily; cuando viene vacio se llama
+            // a esta funcion". Aqui faltaba cumplirlo.
+            if (!Array.isArray(yoyRows) || yoyRows.length === 0) {
+              // Ventana desde hoy hasta el 1-ene del año anterior, con holgura.
+              const diasHastaInicioPrevio = Math.ceil(
+                (Date.parse(`${todayStr}T00:00:00Z`) - Date.parse(`${prevYear}-01-01T00:00:00Z`)) / 86400000
+              ) + 1
+              const vivas = await buildDailyFromOrders(sbUrl, sbHeaders, client_id || '', diasHastaInicioPrevio)
+              yoyRows = vivas.filter((r) => String(r.fecha ?? '').startsWith(prevYear))
+            }
+
             if (yoyRows.length > 0) {
               // Aggregate by month
               const prevMonthly: Record<string, { ventas: number; tickets: number; dias: number }> = {}

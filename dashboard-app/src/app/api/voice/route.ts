@@ -360,7 +360,25 @@ DATOS DIARIOS (ultimos ${recentDays.length} dias).\n${lines.join('\n')}`
             { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
           )
           if (yoyRes.ok) {
-            const yoyRows = await yoyRes.json()
+            let yoyRows = await yoyRes.json()
+
+            // OCM Fase 3 — misma salida que en /api/chat. Este bloque estaba
+            // copiado ahi tal cual, y ninguno de los dos tenia fallback: para un
+            // tenant clonado el año-contra-año no daba una respuesta mala, daba
+            // una capacidad que no llegaba nunca.
+            if (!Array.isArray(yoyRows) || yoyRows.length === 0) {
+              const diasHastaInicioPrevio = Math.ceil(
+                (Date.parse(`${todayStr}T00:00:00Z`) - Date.parse(`${prevYear}-01-01T00:00:00Z`)) / 86400000
+              ) + 1
+              const vivas = await buildDailyFromOrders(
+                sbUrl,
+                { apikey: sbKey, Authorization: `Bearer ${sbKey}` },
+                auth.clientId,
+                diasHastaInicioPrevio
+              )
+              yoyRows = vivas.filter((r) => String(r.fecha ?? '').startsWith(prevYear))
+            }
+
             if (yoyRows.length > 0) {
               const prevMonthly: Record<string, { ventas: number; tickets: number; dias: number }> = {}
               for (const row of yoyRows) {
