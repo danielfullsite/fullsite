@@ -1,4 +1,5 @@
 'use client'
+import { PIN_LENGTH } from '@/lib/staff-pin'
 
 import { Component, useState, useCallback, useEffect, useRef, Suspense, type ErrorInfo, type ReactNode } from 'react'
 import Link from 'next/link'
@@ -966,7 +967,7 @@ function DiscountModal({ subtotal, personas, items, onApply, onCancel }: Discoun
               <input
                 type="password"
                 inputMode="numeric"
-                maxLength={4}
+                maxLength={PIN_LENGTH}
                 value={pin}
                 onChange={(e) => { setPin(e.target.value.replace(/\D/g, '')); setPinError(false) }}
                 placeholder="••••"
@@ -1174,7 +1175,7 @@ function CancelModal({ itemName, onConfirm, onCancel }: CancelModalProps) {
                   <input
                     type="password"
                     inputMode="numeric"
-                    maxLength={4}
+                    maxLength={PIN_LENGTH}
                     value={pin}
                     onChange={(e) => { setPin(e.target.value.replace(/\D/g, '')); setError('') }}
                     placeholder="****"
@@ -1350,7 +1351,7 @@ function VoidOrderModal({ mesa, total, onConfirm, onCancel }: VoidOrderModalProp
               <input
                 type="password"
                 inputMode="numeric"
-                maxLength={4}
+                maxLength={PIN_LENGTH}
                 value={pin}
                 onChange={(e) => { setPin(e.target.value.replace(/\D/g, '')); setError('') }}
                 placeholder="****"
@@ -1566,7 +1567,7 @@ function CashMovementModal({ turnoId, actor, onConfirm, onCancel }: CashMovement
               <input
                 type="password"
                 inputMode="numeric"
-                maxLength={4}
+                maxLength={PIN_LENGTH}
                 value={pin}
                 onChange={(e) => { setPin(e.target.value.replace(/\D/g, '')); setError('') }}
                 placeholder="****"
@@ -4967,7 +4968,7 @@ function POSContent() {
                   type="password"
                   id="transfer-pin-input"
                   placeholder="PIN"
-                  maxLength={8}
+                  maxLength={PIN_LENGTH}
                   className="w-full px-3 py-2.5 rounded-lg bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-1)] text-center text-lg tracking-widest"
                 />
               </div>

@@ -1,4 +1,5 @@
 'use client'
+import { PIN_LENGTH } from '@/lib/staff-pin'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
@@ -1149,7 +1150,7 @@ export default function MesasPage() {
               value={pinInput}
               onChange={e => setPinInput(e.target.value.replace(/\D/g, ''))}
               onKeyDown={e => { if (e.key === 'Enter' && pinInput) { pinPrompt.onSubmit(pinInput) } }}
-              maxLength={6}
+              maxLength={PIN_LENGTH}
               className="w-full bg-[var(--line)] border border-[var(--line)] rounded-xl px-4 py-3 text-[var(--text-1)] text-center text-2xl tracking-[0.3em] font-bold focus:outline-none focus:border-[var(--accent)] mb-4"
               placeholder="****"
             />

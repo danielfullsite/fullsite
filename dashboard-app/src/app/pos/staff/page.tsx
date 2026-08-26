@@ -18,7 +18,7 @@ import {
   AlertTriangle,
 } from 'lucide-react'
 import { getActiveClientSlug as _cid } from '@/lib/data'
-import { generateStaffPin } from '@/lib/staff-pin'
+import { generateStaffPin, PIN_LENGTH } from '@/lib/staff-pin'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -577,7 +577,7 @@ export default function StaffPage() {
                 <input
                   type="text"
                   inputMode="numeric"
-                  maxLength={10}
+                  maxLength={PIN_LENGTH}
                   value={formPin}
                   readOnly
                   className="w-full bg-[#1e1e2e] border border-[#2a2a3e] rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500 min-h-[48px] font-mono tracking-widest"
@@ -655,7 +655,7 @@ export default function StaffPage() {
                 <input
                   type="text"
                   inputMode="numeric"
-                  maxLength={10}
+                  maxLength={PIN_LENGTH}
                   value={formNewPin}
                   readOnly
                   className="w-full bg-[#1e1e2e] border border-[#2a2a3e] rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500 min-h-[48px] font-mono tracking-widest"

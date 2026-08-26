@@ -1,4 +1,5 @@
 'use client'
+import { PIN_LENGTH } from '@/lib/staff-pin'
 
 import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
@@ -913,7 +914,7 @@ export default function CortePage() {
               <input
                 type="password"
                 inputMode="numeric"
-                maxLength={4}
+                maxLength={PIN_LENGTH}
                 value={reopenPin}
                 onChange={e => { setReopenPin(e.target.value.replace(/\D/g, '')); setReopenError('') }}
                 placeholder="****"
