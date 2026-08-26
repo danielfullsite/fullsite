@@ -1,8 +1,34 @@
 # P0-4 — Offline Fase 5: Protocolo de Certificación Física (4h)
 
-> **PROTOCOLO OFICIAL — CONGELADO v1.0 · 2026-07-31**  
+> **PROTOCOLO OFICIAL — v1.1 · propuesto 2026-08-26** *(v1.0 congelado el 2026-07-31)*  
 > Todo restaurante nuevo debe superar exactamente esta prueba antes de considerarse listo para producción.  
 > Cualquier cambio a este documento requiere incrementar la versión y aprobación explícita.
+
+> ### Por qué cambia — v1.0 → v1.1
+>
+> **El punto ciego:** v1.0 hace 30 minutos de preflight **con WAN**, y desconecta el cable en
+> T+00. Para entonces cada terminal ya está encendida, logueada y con caché caliente. El
+> protocolo **nunca enciende una terminal sin internet**.
+>
+> Eso deja fuera el modo de falla que apareció en campo esta semana: **abrir el restaurante
+> sin red**. Se encontró auditando código el 2026-08-26 y era doble —
+>
+> - el caché de credenciales duraba 8 h, y de la 1am a la 1pm van 12: **nadie entraba**;
+> - guardaba **una sola credencial**, así que offline sólo entraba la última persona que se
+>   había logueado con internet.
+>
+> Los dos están corregidos (#133), pero **corregido no es certificado**. Y corriendo v1.0 tal
+> cual, la prueba habría salido verde sin tocar el caso: se certifica un restaurante que no
+> puede abrir.
+>
+> **El cambio:** una **FASE 0** de 10 minutos que va *antes* del preflight, con las terminales
+> apagadas y el cable ya desconectado. Cubre T-24 (login sin red, **dos** personas), T-25
+> (plano de salón en arranque en frío, corregido en #128) y la apertura de una mesa concreta
+> sin red (#110).
+>
+> No se toca nada más del protocolo. v1.0 sigue siendo válido de la PRE-FASE en adelante.
+>
+> **Requiere aprobación explícita para quedar congelado como v1.1.**
 
 > **Propósito:** Certificación física E4. Sin código. Sin DevTools. Sin intervención técnica.  
 > **Fuente canónica:** `docs/offline/RUNBOOK.md`  
@@ -14,6 +40,7 @@
 
 | ID | Descripción | Tiempo esperado | Owner | Severidad si falla |
 |---|---|---|---|---|
+| **F5-00A–C** | **Arranque en frío sin WAN** *(v1.1 — va primero)* | **10 min** | **Operador** | **P0 — aborta la prueba** |
 | PRE-01–07 | Preflight completo | 30 min | Técnico | P0 — aborta la prueba |
 | T+00 | Desconexión WAN | 5 min | Técnico | P0 |
 | F5-01 | Abrir turno | 2 min | Gerente | P1 |
@@ -63,6 +90,52 @@
 | Router | — | Acceso a cable WAN para desconexión |
 | Impresora cocina | — | Conectada al bridge |
 | Cajón | — | Puerto RJ-11 Caja |
+
+---
+
+## FASE 0 — Arranque en frío sin WAN *(nueva en v1.1)*
+
+> **Va PRIMERO, antes del preflight.** Es la única parte del protocolo que se ejecuta con
+> las terminales **apagadas y sin internet**, y por eso no puede ir después: cualquier paso
+> con WAN deja el caché caliente y ya no se puede volver atrás sin repetir el día.
+>
+> **Duración: 10 min.** Si falla, se detiene todo — un restaurante que no puede abrir no
+> necesita que le certifiquen el resto.
+
+```
+F5-00A — T-24 · Login sin red al abrir
+  Precondición: terminales APAGADAS desde el cierre de anoche. Cable WAN YA desconectado.
+  Registrar la hora del último login con internet:  ________
+  Registrar la hora de esta prueba:                 ________
+  Horas transcurridas: ________   (el TTL es 16 h — si pasaron más, se espera que falle)
+
+  1. Encender PDV1 sin internet.
+     ¿Carga el POS?                                  [ ] Sí  [ ] No
+  2. Persona A teclea su PIN.
+     ¿Entra?                                         [ ] Sí  [ ] No   Nombre: ________
+  3. Persona B —distinta— teclea el suyo, misma terminal.
+     ¿Entra?                                         [ ] Sí  [ ] No   Nombre: ________
+
+  PASS sólo si entran LAS DOS. Que entre una sola es el bug de #133 sin arreglar.
+
+F5-00B — T-25 · Plano de salón en arranque en frío
+  4. Con PDV1 ya adentro y sin internet, abrir la vista de mesas.
+     ¿Sale el plano REAL de AMALAY, con sus mesas y posiciones?   [ ] Sí  [ ] No
+     ¿O sale un plano genérico / vacío?                            [ ] Sí  [ ] No
+
+  PASS sólo si es el plano real. Se corrigió en #128 y nunca se validó en campo.
+
+F5-00C — Apertura de mesa sin red
+  5. Tocar una mesa concreta y distinta de la 1 — por ejemplo la 52.
+     ¿Abre ESA mesa, o cae a la mesa 1?              [ ] la correcta  [ ] cayó a la 1
+
+  Este handler cambió de técnica tres veces (window.location.href → router.push → revert
+  → sessionStorage en #110). El test fija el método; que abra la mesa correcta sin red
+  sólo se comprueba tocándola.
+```
+
+**Si F5-00 pasa completo**, reconectar la WAN y continuar con el preflight de abajo. Si algo
+falla, anotarlo y **detener** — ver [BUGS — si aparece uno durante la prueba](#bugs--si-aparece-uno-durante-la-prueba).
 
 ---
 
