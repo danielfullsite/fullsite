@@ -18,6 +18,19 @@ Un escenario es **CERTIFIED** solo cuando las 3 columnas están marcadas: Impl �
 
 ---
 
+> ## Evidencia de campo — AMALAY, 2026-08-24
+>
+> Cuatro escenarios tienen **validación física parcial** de la madrugada del 24-ago en AMALAY
+> (caja, WiFi apagado, Daniel presente por TeamViewer). Estaba encerrada en un rollout de Codex
+> de 116 MB; se extrajo a [`EVIDENCIA-CAMPO-AMALAY-2026-08-24.md`](EVIDENCIA-CAMPO-AMALAY-2026-08-24.md)
+> con cita textual y hora.
+>
+> **Sigue siendo 0 certificados, y con razón:** una sola terminal, con supervisión en vivo,
+> por el camino feliz, y los 3 P0 se encontraron *después*. Camino controlado ≠ certificado.
+>
+> Lo que cambia es que el 0 ya no significa "no sabemos". Significa **4 con evidencia parcial
+> y 17 sin tocar**.
+
 ## Grupo 1: Caída de Internet
 
 ### T-01: Internet cae durante una venta activa
@@ -39,7 +52,7 @@ Un escenario es **CERTIFIED** solo cuando las 3 columnas están marcadas: Impl �
 
 | Impl | Test | Cert | Pendiente |
 |---|---|---|---|
-| ✓ | ✗ | ✗ | Ejecutar escenario + crear test Playwright |
+| ✓ | ✓ (`offline-t01-venta-activa.test.ts`, 10 casos) | ✗ (campo parcial) | **Validado en campo 2026-08-24 04:03-04:07** — mesa abre, envía, imprime, KDS recibe, sin red. La capa de escritura offline ya corre en CI. Falta: SW sirviendo el shell, WS al KDS por LAN, impresora física, y repetir en entrada/escondite |
 
 ---
 
@@ -104,7 +117,7 @@ Un escenario es **CERTIFIED** solo cuando las 3 columnas están marcadas: Impl �
 
 | Impl | Test | Cert | Pendiente |
 |---|---|---|---|
-| ✓ | ✗ | ✗ | Playwright Electron puede hacer esto |
+| ✓ | ✓ (`offline-t04-t07-recovery.test.ts`, 9 casos) | ✗ | Mecanismos de recuperación cubiertos en CI: `drainLocalStorageToIdb` (buffer de emergencia → cola canónica, idempotente) y supervivencia de print jobs en IDB. Falta con caja física: arranque del proceso Electron, SW sirviendo el shell, replay de `events.ndjson` |
 
 ---
 
@@ -160,7 +173,7 @@ Un escenario es **CERTIFIED** solo cuando las 3 columnas están marcadas: Impl �
 
 | Impl | Test | Cert | Pendiente |
 |---|---|---|---|
-| ✓ | ✗ | ✗ | Automatizable con Playwright Electron |
+| ✓ | ✓ (`offline-t04-t07-recovery.test.ts`, 5 casos) | ✗ | Contrato de catch-up cubierto en CI: SUBSCRIBE lleva `last_sequence`, la secuencia sólo avanza, frames corruptos no la mueven. Falta con caja física: relanzar `electron-kds` y confirmar el SNAPSHOT real por LAN |
 
 ---
 
@@ -278,7 +291,7 @@ El subnet scan existe en `server-discovery.ts` (`_subnetScan`) pero `permitSubne
 
 | Impl | Test | Cert | Pendiente |
 |---|---|---|---|
-| ✓ | ✓ (event-store.test.js: "same command_id does not create duplicate events") | ✗ | Ampliar a nivel HTTP; ejecutar manualmente |
+| ✓ | ✓ (event-store + `idempotencia-transporte.test.js`, 5 casos a nivel HTTP) | ✗ | Cubierto el camino de `POST /events`: segundo POST devuelve `duplicate`, una sola línea en `events.ndjson`, lotes con id repetido, y rechazo sin `command_id`. Falta ejecución contra el proceso real |
 
 ---
 
@@ -297,7 +310,7 @@ El subnet scan existe en `server-discovery.ts` (`_subnetScan`) pero `permitSubne
 
 | Impl | Test | Cert | Pendiente |
 |---|---|---|---|
-| ✓ | ✓ (event-store.test.js: "duplicate detection survives restart") | ✗ | Ejecutar manualmente a nivel de proceso Electron |
+| ✓ | ✓ (event-store + `idempotencia-transporte.test.js`, 4 casos de reinicio) | ✗ | Cubierto: tras reiniciar sobre los mismos archivos el comando sigue siendo duplicado, el estado se reconstruye, la secuencia no se reinicia, y 4 arranques seguidos no acumulan. Falta relanzar el proceso Electron real |
 
 ---
 
@@ -317,7 +330,7 @@ El subnet scan existe en `server-discovery.ts` (`_subnetScan`) pero `permitSubne
 
 | Impl | Test | Cert | Pendiente |
 |---|---|---|---|
-| ✓ | ✓ (event-store.test.js cubre la lógica; sin test WS end-to-end) | ✗ | Ampliar a nivel WS con mock |
+| ✓ | ✓ (`idempotencia-transporte.test.js`, 4 casos con canal WS simulado) | ✗ | Cubierto: ACK tragado + reenvío devuelve `duplicate` sin segundo evento, el estado no cambia, el reenvío desde otra terminal tampoco duplica. **Destapó una carrera real de idempotencia — ver abajo.** Falta LAN real |
 
 ---
 
@@ -495,26 +508,143 @@ El subnet scan existe en `server-discovery.ts` (`_subnetScan`) pero `permitSubne
 
 ---
 
+## Grupo 10: Arranque y sesión — escenarios que faltaban
+
+> Estos dos no estaban en la matriz original. No es que se hayan olvidado: son huecos que
+> sólo se ven cuando el restaurante **abre** un día sin internet, no cuando el internet se
+> cae a media operación. La prueba de campo del 24-ago duró unas horas y no los alcanzó.
+
+### T-24: Login sin red al abrir el restaurante
+
+**Preconditions**: terminal apagada desde el cierre de anoche. Sin WAN al encender.
+
+**Steps**:
+1. Encender la terminal sin internet.
+2. Un mesero teclea su PIN.
+3. Un segundo empleado, distinto, teclea el suyo.
+
+**Expected Result**:
+- Ambos entran. La operación arranca sin depender de la nube.
+
+**Estado real (auditado en código 2026-08-26)** — dos límites que lo impiden hoy:
+
+- **Ventana de 8 h.** `pos_staff_cache` guarda `exp: Date.now() + 28_800_000` en cada login
+  *online* (`pos/layout.tsx`). Un restaurante que cierra a la 1am y abre a la 1pm son **12
+  horas**: el caché ya expiró y **nadie entra**.
+- **Una sola credencial por terminal.** `pos_staff_cache` guarda un objeto, no una lista, y se
+  sobrescribe en cada login. Offline sólo puede entrar **la última persona que se logueó con
+  internet**. En una terminal compartida entre meseros, cajero y gerente, eso falla el primer día.
+
+Validado en campo el 2026-08-24 06:49 (*"si jala! que chulada!"*) — pero con caché fresco, una
+sola persona, y a las pocas horas del último login online. Ninguna de las dos condiciones se
+parece a abrir el restaurante.
+
+| Impl | Test | Cert | Pendiente |
+|---|---|---|---|
+| ⚠️ parcial | ✗ | ✗ | La ventana debe superar un ciclo cierre-apertura y el caché debe admitir varias credenciales. Hasta entonces, el arranque en frío sin WAN no es viable |
+
+---
+
+### T-25: Arranque en frío sin WAN — el plano de mesas
+
+**Preconditions**: terminal apagada, sin WAN al encender, restaurante que NO es AMALAY.
+
+**Steps**:
+1. Encender sin internet.
+2. Entrar al mapa de mesas.
+
+**Expected Result**:
+- Aparece el plano real del restaurante, con sus mesas y su distribución.
+
+**Por qué existe este escenario** (hallazgo 2026-08-26, PR #128): el plano de salón **no se
+cacheaba en ningún lado**. `pos-offline-db.ts` cachea menú, órdenes, inventario, modificadores,
+métodos de pago, staff, turnos y movimientos de caja — **mesas no**.
+
+AMALAY sobrevivía el arranque en frío **sólo porque su plano de 33 mesas venía compilado en el
+bundle** (`MESAS_CONFIG` en `lib/pos-data.ts`, devuelto únicamente si el slug era literalmente
+`'amalay'`). Cualquier otro restaurante arrancaba con **16 mesas genéricas**.
+
+Es el ejemplo más claro de por qué el 0 certificados importaba: **el hueco se veía como
+configuración, no como falla de offline**, y por eso nadie lo contó como escenario.
+
+Corregido en PR #128 — `fetchPosMesas()` cachea en `localStorage` (`pos_plano_<clientId>`) y
+`getMesasConfig()` lo recupera. localStorage y no IDB a propósito: `getMesasConfig()` es
+síncrona y se llama dentro del inicializador de un `useState`.
+
+| Impl | Test | Cert | Pendiente |
+|---|---|---|---|
+| ✓ (PR #128) | ✗ | ✗ | Validación física: encender una terminal sin WAN y confirmar que sale el plano real. Probar con un tenant que NO sea AMALAY, que es donde estaba roto |
+
+---
+
 ## Resumen de la Matriz
 
 | Grupo | Escenarios | Impl ✓ | Test ✓ | Cert ✓ | Blocker |
 |---|---|---|---|---|---|
-| 1 — Caída de Internet | 3 | 3 | 0 | 0 | Sin tests e2e |
-| 2 — Reinicios | 4 | 4 | 1 | 0 | Sin test de WS reconnect post-restart |
+| 1 — Caída de Internet | 3 | 3 | 1 | 0 | T-01 con test; T-02/T-03 sin e2e |
+| 2 — Reinicios | 4 | 4 | 3 | 0 | T-04 y T-07 con test de recuperación; falta lanzar Electron real |
 | 3 — LAN | 2 | 1 | 0 | 0 | T-09: rediscovery de IP no confirmado |
 | 4 — Volumen | 2 | 2 | 0 | 0 | Sin scripts de carga |
-| 5 — Idempotencia | 3 | 3 | 2 | 0 | Falta ampliar a nivel HTTP/WS |
+| 5 — Idempotencia | 3 | 3 | 3 | 0 | Ampliado a HTTP y WS el 2026-08-26. Destapó una carrera real (corregida) |
 | 6 — Timeout/Retry | 2 | 2 | 1 | 0 | Reconexión cliente WS auditada: reconecta a IP fija, sin re-discovery |
 | 7 — Impresora | 2 | 2 | 2 | 0 | Sin test con hardware real |
 | 8 — Multi-terminal | 3 | 3 | 1 | 0 | Sin test concurrente real |
 | 9 — Recovery | 2 | 2 | 0 | 0 | Requiere Supabase staging |
-| **Total** | **23** | **22** | **7** | **0** | |
+| 10 — Arranque y sesión | 2 | 1 | 0 | 0 | T-24 bloqueado por diseño del caché de sesión; T-25 corregido en #128, falta validar |
+| **Total** | **25** | **23** | **13** | **0** | |
 
-**Escenarios Implementados**: 22/23 (96%)
-**Escenarios con Test Automatizado**: 7/23 (30%)
-**Escenarios Certificados**: 0/23 (0%)
+**Escenarios Implementados**: 23/25 (92%) — T-24 sólo parcial (ver Grupo 10)
+**Escenarios con Test Automatizado**: 13/25 (52%) — +6 el 2026-08-26 (T-01, T-04, T-07 en el navegador; T-12, T-13, T-14 a nivel de transporte)
+**Escenarios Certificados**: 0/25 (0%)
+
+**Escenarios con evidencia de campo parcial**: 4/25 — T-01, T-17, T-22, T-23
+(AMALAY 2026-08-24, caja únicamente. Ver [`EVIDENCIA-CAMPO-AMALAY-2026-08-24.md`](EVIDENCIA-CAMPO-AMALAY-2026-08-24.md))
+**Escenarios sin tocar**: 17/25
+
+> **La matriz creció de 23 a 25 el 2026-08-26, y eso es una mejora, no un retroceso.** Los dos
+> nuevos (T-24 login sin red, T-25 plano de mesas en arranque en frío) son huecos que existían
+> desde siempre y no se veían: uno porque parecía un tema de sesión y el otro porque parecía
+> configuración. Un denominador honesto vale más que un porcentaje bonito.
+
 
 > T-09: auditado 2026-07-27. Re-discovery automático en cambio de IP NO implementado (`BridgeClient` reconecta a URL fija; `useBridgeClient` corre discovery una sola vez al montar; subnet scan existe pero desactivado). Requiere nueva funcionalidad antes de poder ejecutar o certificar.
+
+---
+
+## Hallazgo: la dedup tenía una carrera bajo concurrencia (corregida 2026-08-26)
+
+Al llevar T-14 a nivel de transporte salió algo que el test de `event-store` no podía ver:
+`processCommand` hacía **check-then-act cruzando dos `await`**. Entre consultar
+`hasProcessedCommand` y escribir `saveProcessedCommand` hay una ventana, y **todo reintento
+que caiga ahí pasa el chequeo y escribe su propio evento**.
+
+No es teórico: es el escenario T-14 exacto. Si el ACK viene *lento* en vez de perderse, el
+reenvío del POS se traslapa con el original. Reproducido con 5 reintentos concurrentes del
+mismo `command_id`: **5 eventos en vez de 1**. En un `ORDER_CLOSED` eso es un cobro duplicado.
+
+Corregido coalescendo comandos en vuelo por `command_id`. Prueba mutante: al quitar el fix,
+`reintentos en ráfaga` se pone en rojo.
+
+**Lección para el resto de la matriz:** que un escenario esté "cubierto" en la capa de abajo
+no dice nada de la capa que usa la terminal. T-12, T-13 y T-14 estaban marcados con test desde
+antes; el bug vivía en el pedazo que nadie probaba.
+
+---
+
+## Hueco conocido: la matriz no cubre el login offline
+
+Los 23 escenarios **no incluyen autenticación sin red**, y es de lo más crítico: si nadie puede
+entrar al POS, lo demás da igual. Se validó en campo el 2026-08-24 06:49 (*"si jala! que
+chulada!"*), pero no tiene casilla.
+
+Dos límites del código que una prueba de una noche no alcanza a tocar:
+
+- **Ventana de 8 h** — `pos_staff_cache` expira 8 h tras el último login *online*. Un restaurante
+  que cierra a la 1am y abre a la 1pm son 12 h: si el internet está caído al abrir, **nadie entra**.
+- **Una sola credencial por terminal** — `pos_staff_cache` guarda un objeto, no una lista, y se
+  sobrescribe en cada login. Offline sólo entra **la última persona que se logueó con internet**.
+
+**Levantado como [T-24](#t-24-login-sin-red-al-abrir-el-restaurante)** el 2026-08-26, con esos dos límites como criterios de aceptación.
 
 ---
 
