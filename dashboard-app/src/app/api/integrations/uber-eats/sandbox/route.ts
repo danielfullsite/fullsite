@@ -178,7 +178,7 @@ export async function POST(request: NextRequest) {
     download_url?: string
   }
 
-  const storeId = body.store_id || '0f655507-7337-41e9-b536-5fd6171bb0da'
+  const storeId = body.store_id || 'a4f298f4-202f-47f5-b375-d2eefec0126c'
   const orderId = body.order_id || `CERT-${Date.now()}`
   const action = body.action || 'test_webhook'
 

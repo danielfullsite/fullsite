@@ -3,6 +3,22 @@
 > Instrucción para quien trabaja `uber/validation-ready`. Fecha: 2026-08-15.
 > Origen: correo de Uber GTS (case #58949479).
 
+> ## ⚠️ REGISTRO HISTÓRICO — el store de abajo YA NO ES EL VIGENTE
+>
+> El `0f655507-7337-41e9-b536-5fd6171bb0da` que aparece en este documento era el test store
+> de agosto. **Uber lo dio de baja y provisionó uno nuevo el 2026-08-25:**
+>
+> ```
+> a4f298f4-202f-47f5-b375-d2eefec0126c
+> ```
+>
+> Este archivo **no se actualiza** a propósito: documenta un mensaje que ya se le envió a Uber
+> con el store viejo, y reescribirlo falsificaría el registro de lo que se dijo y cuándo.
+>
+> Para trabajar hoy usa `CERT-RUNBOOK.md`, que sí está al día. El store vigente vive en los
+> workflows `uber-cert-*.yml` y en el default de `sandbox/route.ts` — hay una prueba
+> (`uber-store-id-vigente.test.ts`) que falla si el viejo se cuela de vuelta.
+
 ## El hallazgo que cambia el enfoque
 
 Uber respondió textualmente:

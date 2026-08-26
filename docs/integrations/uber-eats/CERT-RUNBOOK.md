@@ -7,7 +7,7 @@ requeridos → marcó la app como "no lista". **Deadline: 5 días o auto-cierran
 endpoints **nunca se ejercieron con éxito** contra el test store (blocker: scopes de
 OAuth no concedidos → 403 → sin logs válidos).
 
-**Test App ID:** `k2DPoUeXuBdLd6gV7W5VMFR7fSnmnEaq` · **Test Store:** `0f655507-7337-41e9-b536-5fd6171bb0da`
+**Test App ID:** `k2DPoUeXuBdLd6gV7W5VMFR7fSnmnEaq` · **Test Store:** `a4f298f4-202f-47f5-b375-d2eefec0126c`
 
 ---
 
@@ -48,7 +48,7 @@ Abre la URL que devuelve → autoriza el test app → concede los scopes ampliad
 
 ### Paso 2 — Ejercer todos los endpoints (genera los logs)
 ```bash
-export STORE_ID="0f655507-7337-41e9-b536-5fd6171bb0da"
+export STORE_ID="a4f298f4-202f-47f5-b375-d2eefec0126c"
 bash scripts/uber/run_cert.sh
 ```
 Éxito = todos 2xx. Si ves 401/403 → los scopes no quedaron (repite Paso 1).
@@ -67,7 +67,7 @@ Pega la evidencia y confirma que los webhooks responden 200.
 >
 > Thanks for the detailed checklist. We have now implemented and **exercised all the
 > required endpoints and webhooks** against the test store
-> (`0f655507-7337-41e9-b536-5fd6171bb0da`). You should now see call logs for:
+> (`a4f298f4-202f-47f5-b375-d2eefec0126c`). You should now see call logs for:
 >
 > - **Integration/Onboarding:** GET /v1/eats/stores, GET /v1/delivery/store/{id},
 >   and the pos_data GET/POST/PATCH activation flow.

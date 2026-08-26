@@ -48,7 +48,7 @@ no toca la operación viva. Confirmar el deploy verde.
 
 ## Store de prueba (CRÍTICO)
 
-Usar **`0f655507-7337-41e9-b536-5fd6171bb0da`** ("Fullsite POS Test Store", provisionado a nuestra
+Usar **`a4f298f4-202f-47f5-b375-d2eefec0126c`** ("Fullsite POS Test Store", provisionado a nuestra
 test app). **NO** usar `633b57d4-237a-5a32-b249-7ceb795f1d35` — es de otro client y da `403
 user_not_allowed`. El workflow ya default-ea al store correcto (input `store_id`).
 
