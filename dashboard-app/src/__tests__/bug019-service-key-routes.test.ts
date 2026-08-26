@@ -30,7 +30,27 @@ function setEnv({ service }: { service: boolean }) {
 const restCalls = () => calls.filter(c => c.url.includes('/rest/v1/'))
 const usedAnonAsAuth = () => calls.some(c => c.authorization === `Bearer ${ANON}`)
 
-beforeEach(() => { vi.resetModules(); vi.clearAllMocks(); calls = [] })
+// La ruta ahora exige sesión del propio restaurante (requireTenant). Esta suite
+// mide QUÉ LLAVE usa para consultar, no la autenticación, así que el guardián se
+// simula como "sesión válida de demo". El caso sin sesión se prueba abajo.
+let tenantAutorizado: string | null = 'demo'
+vi.mock('@/lib/api-auth', async (orig) => {
+  const real = await orig<typeof import('@/lib/api-auth')>()
+  return {
+    ...real,
+    requireTenant: async (_req: unknown, pedido?: string | null) => {
+      if (!tenantAutorizado) {
+        return new Response(JSON.stringify({ error: 'Se requiere sesión' }), { status: 401 })
+      }
+      if (pedido && pedido !== tenantAutorizado) {
+        return new Response(JSON.stringify({ error: 'otro restaurante' }), { status: 403 })
+      }
+      return { clientId: tenantAutorizado, staffId: 's1', staffName: 'x', role: 'dueno', authType: 'session' }
+    },
+  }
+})
+
+beforeEach(() => { vi.resetModules(); vi.clearAllMocks(); calls = []; tenantAutorizado = 'demo' })
 
 describe('BUG-019 dep patch — hourly-distribution usa service key, no anon', () => {
   it('con SUPABASE_SERVICE_KEY (y SIN service_role_key): lee pos_orders con Bearer service, nunca anon', async () => {
@@ -46,6 +66,30 @@ describe('BUG-019 dep patch — hourly-distribution usa service key, no anon', (
     expect(usedAnonAsAuth()).toBe(false)
     expect(res.status).not.toBe(503)
     expect(JSON.stringify(await res.json())).not.toContain(SERVICE)
+  })
+
+  it('SIN sesión → 401 y NUNCA toca pos_orders', async () => {
+    // Antes esta ruta leía la operación de cualquier restaurante con sólo poner
+    // ?client_id= en la URL, sin sesión, usando la service key (que ignora RLS).
+    setEnv({ service: true })
+    installFetch(() => [])
+    tenantAutorizado = null
+    const { GET } = await import('@/app/api/dashboard/hourly-distribution/route')
+    const req = { nextUrl: { searchParams: new URLSearchParams({ client_id: 'amalay' }) } } as unknown as import('next/server').NextRequest
+    const res = await GET(req)
+    expect(res.status).toBe(401)
+    expect(restCalls().find(c => c.url.includes('pos_orders'))).toBeUndefined()
+  })
+
+  it('pidiendo OTRO restaurante → 403 y NUNCA toca pos_orders', async () => {
+    setEnv({ service: true })
+    installFetch(() => [])
+    tenantAutorizado = 'demo'
+    const { GET } = await import('@/app/api/dashboard/hourly-distribution/route')
+    const req = { nextUrl: { searchParams: new URLSearchParams({ client_id: 'amalay' }) } } as unknown as import('next/server').NextRequest
+    const res = await GET(req)
+    expect(res.status).toBe(403)
+    expect(restCalls().find(c => c.url.includes('pos_orders'))).toBeUndefined()
   })
 
   it('SIN service key → 503 fail-closed, NO se llama a pos_orders con anon', async () => {
