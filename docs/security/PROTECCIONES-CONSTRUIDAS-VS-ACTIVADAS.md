@@ -29,7 +29,7 @@ razón de este documento.
 | `RAPPI_WEBHOOK_SECRET` | ✅ | — | Firma de webhooks de Rappi |
 | `POS_FALLBACK_CLIENT_ID` | ✅ | cerrada | Puesto el 2026-08-26 |
 | **`KITCHEN_TOKEN_SECRET`** | 🔴 | **ABIERTA** | **Demostrado explotable** |
-| **`CRON_SECRET`** | 🔴 | **ABIERTA** | Cualquiera dispara los agentes |
+| ~~`CRON_SECRET`~~ | 🔴 | **cerrada** ✅ | Corregida el 2026-08-26: sin secreto → `503` |
 | `CANCEL_APPROVAL_STRICT` | 🔴 | observa | Registra pero no bloquea |
 | `POS_APPROVAL_STRICT` | 🔴 | observa | Registra pero no bloquea |
 | `PLATFORM_2FA_ENFORCED` | 🔴 | abierta *(a propósito)* | Rollout sin segundo factor |
@@ -37,8 +37,11 @@ razón de este documento.
 | `INTERNAL_ADMIN_PASSWORD` | 🔴 | **cerrada** | `500`. Correcto |
 | `MANAGER_PINS_CLIENT_ID` | 🔴 | cerrada | Irrelevante: `MANAGER_PINS` tampoco está |
 
-**5 activadas · 2 apagadas fallando abiertas · 2 en modo observación · 1 apagada a propósito ·
-3 apagadas fallando cerradas.**
+**5 activadas · 1 apagada fallando abierta · 2 en modo observación · 1 apagada a propósito ·
+4 apagadas fallando cerradas.**
+
+> Al 2026-08-26 quedaba **una** fallando abierta: `KITCHEN_TOKEN_SECRET`. `CRON_SECRET` se
+> corrigió el mismo día — no encendiéndola, sino invirtiendo el default.
 
 ---
 
@@ -54,22 +57,27 @@ Sin credenciales de ningún tipo. Devuelve mesa, mesero, items, notas y tiempos 
 restaurante cuyo slug se adivine. Procedimiento de activación —que **requiere provisionar las
 pantallas primero**— en [`ACTIVAR-KITCHEN-TOKEN.md`](ACTIVAR-KITCHEN-TOKEN.md).
 
-### 2. `CRON_SECRET` — falla abierta por construcción
+### 2. `CRON_SECRET` — CORREGIDA el 2026-08-26
+
+Era:
 
 ```ts
-// api/agents/cron/route.ts:17
-const cronSecret = process.env.CRON_SECRET
 if (cronSecret && authHeader !== `Bearer ${cronSecret}`) { ... 401 }
 ```
 
-Sin la variable, la condición completa se salta. Cualquiera puede disparar la corrida de agentes:
-consume cuota de Groq, escribe en `agent_events` y manda avisos por Telegram.
+Sin la variable la condición entera se saltaba, y la variable no estaba puesta. Cualquiera podía
+disparar la corrida de los 5 agentes: cuota de Groq, escrituras en `agent_events`, avisos por
+Telegram.
 
-No se comprobó en vivo **a propósito**: dispararlo ejecuta los agentes de verdad. El código es
-concluyente sin necesidad de hacerlo.
+**No se arregló poniendo el secreto, sino invirtiendo el default.** Al revisarlo resultó que la
+ruta no tiene ningún llamador legítimo: no aparece en el repo y **no hay `crons` en
+`vercel.json`**. El agendado real de agentes lo hacen los workflows de GitHub Actions.
 
-Ésta sí se puede encender sin coordinar nada: se pone la variable y se agrega la cabecera al
-workflow que la llama. **Es la más barata de las dos.**
+Así que exigir el secreto no rompe nada, y sin él la ruta ya no existe (`503`) en vez de existir
+sin puerta. Si algún día se agrega un Vercel Cron, basta con poner la variable: Vercel manda la
+cabecera solo.
+
+5 pruebas de regresión; prueba de mutantes confirmada.
 
 ---
 
