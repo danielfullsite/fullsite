@@ -48,6 +48,17 @@ jobs:
       CLIENT_ID: ${{ github.event.inputs.client_id || 'demo' }}
       CURVA_HORARIA: '1'
       TZ_LOCAL: 'America/Monterrey'
+      # Por el camino real del POS: PIN -> shift token -> api/pos/save-order.
+      #
+      # Escribir directo a pos_orders se salta el descuento de inventario, la
+      # concurrencia por revision, la deteccion de skimming y la validacion de pagos.
+      # Medido el 2026-08-26: el 100% de las ordenes cerradas del laboratorio (2,813 de
+      # 2,813 en lab-resto) serian RECHAZADAS por el POS real.
+      #
+      # Sin POS_PIN el paso falla con un mensaje que lo explica, en vez de escribir mal.
+      VIA_POS: '1'
+      POS_PIN: ${{ secrets.DEMO_POS_PIN }}
+      APP_URL: 'https://app.fullsite.mx'
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
       TRIGGER_TYPE: ${{ github.event_name }}
@@ -70,6 +81,16 @@ jobs:
 
       - run: python .github/scripts/test_curva_horaria.py
       - run: python .github/scripts/test_menu_del_tenant.py
+      - run: python .github/scripts/test_pos_client.py
+
+      - name: Comprobar que el PIN esta puesto
+        run: |
+          if [ -z "$POS_PIN" ]; then
+            echo "::error::Falta el secreto DEMO_POS_PIN. El simulador entra al POS como"
+            echo "una terminal real (PIN -> shift token). Agregalo en Settings -> Secrets"
+            echo "and variables -> Actions. Es el PIN de un empleado del tenant demo."
+            exit 1
+          fi
 
       - run: python .github/scripts/lab_simulator.py
 
