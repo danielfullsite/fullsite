@@ -418,7 +418,6 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 36px;
   padding: 8px 12px;
   border-radius: 8px;
   font-size: 13px;
@@ -428,6 +427,21 @@ body {
               background-color 0.18s cubic-bezier(0, 0, 0.2, 1);
   position: relative;
 }
+/* La altura fija va SÓLO en escritorio.
+ *
+ * Estaba suelta en `.sidebar-nav-item` y eso fue una regresión mía: una clase
+ * (0,1,0) le gana al piso táctil de móvil, que son selectores de elemento
+ * (0,0,1) — `@media (max-width:768px) { button, a, input, select {
+ * min-height:44px } }`. En teléfono los enlaces del riel bajaron de 44 a 36px,
+ * por debajo del estándar del propio proyecto (44 móvil, 48 en POS).
+ *
+ * Una media query no cambia la especificidad: sólo decide si la regla aplica.
+ * Por eso la solución no es mover el piso de 44px, sino acotar los 36px al
+ * ancho donde hay mouse. */
+@media (min-width: 769px) {
+  .sidebar-nav-item { min-height: 36px; }
+}
+
 /* Se hunde al tocarlo. En una tablet de restaurante el acuse táctil importa más
  * que en escritorio: confirma que el toque entró. */
 .sidebar-nav-item:active { transform: scale(0.985); }
