@@ -713,6 +713,34 @@ body {
   letter-spacing: -0.028em;
 }
 
+/* La fuente de display NO lleva cifras tabulares.
+ *
+ * `body` declara `font-feature-settings: "tnum" 1` para que una columna de
+ * montos alinee sin pensarlo. Con Public Sans eso era inofensivo, pero
+ * Schibsted Grotesk le da a la COMA y al PUNTO el mismo ancho completo que a un
+ * dígito. En pantalla se lee:
+ *
+ *     "Viernes , 24 de julio"        en vez de   "Viernes, 24 de julio"
+ *     "$2 , 070"                     en vez de   "$2,070"
+ *
+ * Y se ve justo en la cifra más grande de la pantalla.
+ *
+ * No se quita el tnum global: las tablas de montos sí lo necesitan. Se apaga
+ * sólo donde vive la fuente de display, que además nunca está en una columna —
+ * es un número solo, no hay nada con qué alinearlo.
+ *
+ * Va ANTES de las reglas de display para que la especificidad (0,2,0) le gane a
+ * la clase .tnum (0,1,0) que traen esos mismos elementos en el markup. */
+[data-ds="v3"] h1,
+[data-ds="v3"] h2,
+[data-ds="v3"] h3,
+[data-ds="v3"] .ds-title,
+[data-ds="v3"] .ds-cifra,
+[data-ds="v3"] [data-testid="kpi-valor"] {
+  font-feature-settings: normal;
+  font-variant-numeric: normal;
+}
+
 /* La cifra principal del resumen del día. Es el número más grande de la
  * pantalla, y por eso mismo el que más gana con el peso 400: en 700 grita, y lo
  * que dice —"esto es lo que vendiste"— no necesita gritar. */
