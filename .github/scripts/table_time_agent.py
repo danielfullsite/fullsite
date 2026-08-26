@@ -75,7 +75,28 @@ def get_pos_orders_today(today_str):
     # Usar "Z" (o URL-encodear) evita el bad request.
     start_iso = utc_start.isoformat().replace("+00:00", "Z")
     end_iso = utc_end.isoformat().replace("+00:00", "Z")
-    qs = f"select=id,created_at,closed_at,mesa,total,status&created_at=gte.{start_iso}&created_at=lt.{end_iso}&status=eq.cerrada&order=created_at.asc&limit=500"
+    # P0 — FUGA ENTRE RESTAURANTES. Esta consulta no llevaba `client_id` y traía
+    # las órdenes de TODOS los tenants. El agente corre etiquetado como un
+    # restaurante y publicaba en agent_results con `client_id` de ese restaurante,
+    # así que las conclusiones de uno salían firmadas por otro.
+    #
+    # No era teórico: amalay tiene 0 filas en pos_orders y coffee-shop tiene 627.
+    # Todo lo que este agente "midió" para amalay eran las mesas de coffee-shop.
+    # Y explica por qué parecía el agente más sano del sistema —97% de variedad
+    # diaria— mientras los demás repetían: era el único leyendo datos vivos,
+    # sólo que del restaurante equivocado.
+    cid = CLIENT["id"]
+    if not cid:
+        # Sin restaurante resuelto no se consulta nada: es preferible no medir a
+        # medir el negocio de alguien más.
+        print("[table-time] sin client_id resuelto — no se consulta pos_orders")
+        return []
+    qs = (
+        f"select=id,created_at,closed_at,mesa,total,status"
+        f"&client_id=eq.{cid}"
+        f"&created_at=gte.{start_iso}&created_at=lt.{end_iso}"
+        f"&status=eq.cerrada&order=created_at.asc&limit=500"
+    )
     return sb_get("pos_orders", qs)
 
 
