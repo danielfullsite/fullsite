@@ -10,6 +10,22 @@
 
 ---
 
+## Veredicto de sincronización — tres estados, no uno
+
+Acordado con Daniel el 2026-08-26 tras la contradicción de datos. Sustituye cualquier lectura
+anterior de `Cola final = PASÓ`:
+
+| | Estado |
+|---|---|
+| `POS → Pedro → KDS/impresión` | ✅ **PASÓ EN CAMPO** |
+| Indicador `0 pendientes` | ✅ **PASÓ LOCALMENTE** |
+| Persistencia en Supabase | 🔴 **NO VERIFICADA · CONTRADICCIÓN ABIERTA** |
+
+Lo primero es lo que hace que el restaurante opere en un apagón, y sigue en pie. Lo tercero
+no se midió nunca, y hoy los datos lo contradicen.
+
+---
+
 ## ⚠️ Corrección a la matriz original — una fila en `PASÓ` no se sostiene
 
 El documento marca:
@@ -247,13 +263,53 @@ Del documento original, y sigue vigente:
 
 ## Fuentes y precedencia
 
-| Fuente | Nota |
+> **Corrección del 2026-08-26.** Una versión anterior de este archivo afirmaba que dos de
+> estas fuentes *"no se encuentran en la máquina"*. **Era falso.** Sí existen, se leyeron, y
+> abajo van sus rutas reales y sus hashes. La causa raíz del error está en
+> [`../operations/FALSO-NEGATIVO-BUSQUEDA-2026-08-26.md`](../operations/FALSO-NEGATIVO-BUSQUEDA-2026-08-26.md).
+
+| Fuente | Ruta real · SHA-256 |
 |---|---|
-| `OFFLINE-AMALAY-CIERRE-2026-08-24.docx` | Acta física, máxima precedencia. **No está en el repo ni en `~/Downloads`** |
+| **`OFFLINE-AMALAY-CIERRE-2026-08-24.docx`**<br>Acta física, máxima precedencia | `~/Documents/Codex/2026-08-23/daniel-te-voy-a-ser-completamente/outputs/`<br>(copia idéntica en `~/Documents/`)<br>44,647 bytes · `7d274d8f1638c3849e335e1e8543ca05a8f9eca1888e103bc379dfbac6f8ae70` |
+| **`FULLSITE-OFFLINE-PLAYBOOK-ESCALA-2026-08-24.docx`**<br>Arquitectura y operación | misma carpeta · 47,876 bytes<br>`1a909875b3ce0a22947a4652e1ae41ea000ef2e59e4071c100439c37212c7cbc` |
+| `FULLSITE-ARQUITECTURA-…-2026-08-26.docx` | `~/Downloads/` — origen de esta transcripción |
 | Chat *"Cerrar offline total para POS"* | Ejecución que produjo el cierre |
-| `FULLSITE-OFFLINE-PLAYBOOK-ESCALA-2026-08-24.docx` | Arquitectura y operación. **Tampoco localizado** |
 | Overlays 3–4 de agosto y handoff maestro | Historia y gaps previos |
 
-> Dos de las tres fuentes que este documento declara de mayor precedencia **no se encuentran
-> en la máquina**. Si existen, conviene traerlas al repositorio antes de que pase lo mismo
-> que con éste.
+### Qué dice el acta, leída
+
+Su prueba de aceptación tiene **nueve pasos**, y el noveno es:
+
+> *"9. Confirmar cola — **Aprobado: 0 pendientes.**"*
+
+**No hay un décimo paso que verifique Supabase.** El acta declara `CERTIFICADO` a Caja,
+Entrada, Escondite y KDS sobre evidencia enteramente local.
+
+El acta es más precisa que la matriz en un punto, y conviene citarlo:
+
+> *"El contador 'pendientes' representa operaciones guardadas para sincronizar; **no es
+> pérdida de datos por sí mismo**."*
+
+Correcto — y tampoco es prueba de entrega. Esa distinción estaba escrita y no se usó como
+criterio.
+
+Entre sus hallazgos aparecen **`ORDER_NOT_FOUND`** y **`STALE_WRITE_REJECTED`**, resueltos así:
+
+> *"Conservar nube **descarta** solo la operación local conflictiva."*
+
+Eso importa para entender cómo la cola llegó a cero: las operaciones que no podían escribirse
+se resolvieron descartándolas. **La cola se vació; el dato no llegó.**
+
+### Qué cambia, qué se sostiene y qué queda contradicho
+
+| Afirmación | Estado tras leer las fuentes |
+|---|---|
+| `POS → Pedro → KDS/impresión` sin Internet | ✅ **Se sostiene.** Acta y matriz coinciden, y es evidencia de campo directa |
+| Impresión por estación sin WAN | ✅ Se sostiene |
+| Recuperación de reintentos agotados (`a1f04704`) | ✅ Se sostiene — commit verificado, existe y coincide |
+| Cold boot sin WAN **PENDIENTE** | ✅ Se sostiene, y las dos fuentes lo confirman |
+| Failover de Pedro **NO IMPLEMENTADO** | ✅ Se sostiene |
+| Huellas `enrolled=1` | ✅ Se sostiene, marcado **P0** en las dos |
+| `Cola final = PASÓ` como sincronización | 🔴 **Contradicho.** Pasó localmente; la nube no se verificó |
+| `Caja/Entrada/Escondite = CERTIFICADO` | ⚠️ **Se debilita.** El certificado incluye "reconexión y cola 0", que ya no vale como evidencia de nube |
+| *"Las fuentes no están en la máquina"* | 🔴 **Falso.** Corregido arriba con rutas y hashes |
