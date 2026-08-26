@@ -3,6 +3,7 @@
 import { Component, useState, useCallback, useEffect, useRef, Suspense, type ErrorInfo, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
+import { resolveMesa, clearMesaTarget, peekMesaTarget } from '@/lib/pos-navigation'
 import {
   MESEROS,
   fetchMeseros,
@@ -1613,7 +1614,9 @@ function POSContent() {
   const { lock } = usePOSLock()
   const initialCuenta = searchParams.get('cuenta') || ''
   // Cuenta por nombre (estilo POS legado): sin mesa → mesa 0
-  const initialMesa = initialCuenta ? 0 : (Number(searchParams.get('mesa')) || 1)
+  // La mesa puede llegar por el query o parqueada en sessionStorage (ver pos-navigation):
+  // offline el query no sobrevive y sin el respaldo esto caía a la mesa 1.
+  const initialMesa = initialCuenta ? 0 : resolveMesa(searchParams.get('mesa'))
 
   const [menuCategories, setMenuCategories] = useState<MenuCategory[]>([])
   const [selectedCategory, setSelectedCategory] = useState<string>('')
@@ -1622,7 +1625,8 @@ function POSContent() {
     // Pre-populate from cache to prevent blank flash on mount
     if (typeof window === 'undefined') return []
     try {
-      const m = Number(new URLSearchParams(window.location.search).get('mesa'))
+      // Mismo canal que initialMesa: offline el query viene vacío y se perdía la caché.
+      const m = Number(new URLSearchParams(window.location.search).get('mesa')) || peekMesaTarget()
       if (m > 0) {
         const cached = localStorage.getItem(`pos_order_${m}`)
         if (cached) {
@@ -1665,6 +1669,10 @@ function POSContent() {
       setMesa(urlMesa)
     }
   }, [urlMesa])
+
+  // El target parqueado ya cumplió su función al resolver initialMesa. Se limpia para que
+  // una visita posterior a /pos sin intención no reabra una mesa vieja.
+  useEffect(() => { clearMesaTarget() }, [])
 
   // Order loading is handled by the useEffect below (mesa + clienteNombre dependency)
   const [clienteNombre, setClienteNombre] = useState<string>(initialCuenta)
@@ -2254,7 +2262,7 @@ function POSContent() {
   const [orderId, setOrderId] = useState(() => {
     if (typeof window === 'undefined') return generateId()
     try {
-      const m = Number(new URLSearchParams(window.location.search).get('mesa'))
+      const m = Number(new URLSearchParams(window.location.search).get('mesa')) || peekMesaTarget()
       if (m > 0) {
         const cached = localStorage.getItem(`pos_order_${m}`)
         if (cached) {
