@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Bell, AlertTriangle, AlertCircle, Info, Sparkles, X } from 'lucide-react'
 
 import { getAuthToken, getActiveClientSlug } from '@/lib/data'
+import { traducir } from '@/lib/agentes/traducir'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -119,12 +120,21 @@ export default function NotificationBell() {
 
     const items: AgentAlert[] = []
 
+    // La campana volcaba `summary` tal cual, así que el dueño leía
+    // "18 issues: 0 critical, 12 high" y "ALERTAS: 225 sin stock, 0 critico".
+    // Eso es telemetría de la plataforma: su lugar es Herramientas → Agentes IA.
+    //
+    // `traducir()` pasa a español de restaurante lo que sí habla del negocio y
+    // DESCARTA lo que sólo cuenta su propia salida. Una auditoría de los 1,025
+    // registros publicados encontró que el 81.9% cae en ese segundo grupo.
     for (const r of results as { agent_id: string; summary: string; priority: string; updated_at: string }[]) {
+      const t = traducir({ agent_id: r.agent_id, summary: r.summary, priority: r.priority })
+      if (!t) continue
       items.push({
         id: `result-${r.agent_id}-${r.updated_at}`,
-        agent_id: r.agent_id,
-        summary: r.summary || 'Sin detalle',
-        priority: r.priority,
+        agent_id: t.agente,
+        summary: t.texto,
+        priority: t.severidad === 'alta' ? 'critical' : t.severidad === 'media' ? 'warning' : 'info',
         updated_at: r.updated_at,
         source: 'result',
       })
