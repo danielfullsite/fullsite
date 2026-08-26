@@ -1,0 +1,138 @@
+# Mantiene en el repositorio el esquema real de la base.
+#
+# Por qué existe: hoy `supabase/migrations/` describe 8 tablas y la base tiene 132.
+# Un clon nuevo se construye desde el repositorio, así que 24 tablas —entre ellas
+# agent_events, platform_admins y provisioning_tokens— y las 10 vistas simplemente no
+# existirían en un restaurante nuevo. Ver docs/platform/ESQUEMA-Y-CLONABILIDAD.md.
+#
+# El volcado lo hace la CLI oficial de Supabase (pg_dump por debajo), no un script
+# nuestro: un baseline transcrito a mano que la gente cree es peor que no tener
+# baseline — una errata en el predicado de una política es un hueco silencioso.
+#
+# Dos modos:
+#   · programado / manual sin `commitear`  → detecta deriva y falla. Nada se escribe.
+#   · manual con `commitear: true`         → abre un PR con el baseline actualizado.
+#
+# SECRETOS QUE NECESITA (no están puestos todavía):
+#   SUPABASE_ACCESS_TOKEN  — el token personal; Daniel ya lo tiene en su ~/.zshrc
+#   SUPABASE_DB_PASSWORD   — contraseña de la base (Dashboard → Settings → Database)
+# Sin ellos el workflow se detiene con un mensaje que lo explica, en vez de fallar feo.
+
+name: Esquema — baseline y deriva
+
+on:
+  workflow_dispatch:
+    inputs:
+      commitear:
+        description: 'Abrir un PR con el baseline actualizado'
+        type: boolean
+        default: false
+  schedule:
+    - cron: '0 12 * * 1'  # lunes 12:00 UTC — 06:00 en Monterrey
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  PROJECT_REF: qjiomlvudfmzuvqvhwpk
+  BASELINE: supabase/migrations/00000000000000_baseline_esquema.sql
+
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Comprobar que los secretos existen
+        env:
+          TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          DB_PASS: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          faltan=""
+          [ -n "$TOKEN" ]   || faltan="$faltan SUPABASE_ACCESS_TOKEN"
+          [ -n "$DB_PASS" ] || faltan="$faltan SUPABASE_DB_PASSWORD"
+          if [ -n "$faltan" ]; then
+            echo "::error::Faltan secretos del repositorio:$faltan"
+            echo "Agrégalos en Settings → Secrets and variables → Actions."
+            echo "SUPABASE_ACCESS_TOKEN sale de https://supabase.com/dashboard/account/tokens"
+            echo "SUPABASE_DB_PASSWORD sale de Project Settings → Database → Database password"
+            exit 1
+          fi
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - uses: actions/setup-python@v6
+        with: { python-version: '3.11' }
+
+      - name: Volcar el esquema
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          supabase link --project-ref "$PROJECT_REF"
+          # Sólo esquema: `db dump` no trae filas. `private` va incluido porque ahí
+          # vive user_has_client_access(), de la que dependen las 350 políticas RLS.
+          supabase db dump --schema public,private -f esquema_nuevo.sql
+          echo "volcado: $(wc -c < esquema_nuevo.sql) bytes, $(wc -l < esquema_nuevo.sql) renglones"
+
+      - name: Revisar secretos y deriva
+        id: revisar
+        run: |
+          set +e
+          python3 .github/scripts/revisar_dump_esquema.py esquema_nuevo.sql \
+                  --baseline "$BASELINE" | tee reporte.txt
+          codigo=${PIPESTATUS[0]}
+          echo "codigo=$codigo" >> "$GITHUB_OUTPUT"
+          # 0 = sin deriva · 1 = SECRETO (siempre fatal) · 3 = hay deriva
+          [ "$codigo" = "1" ] && exit 1
+          exit 0
+
+      - name: Resumen
+        run: |
+          {
+            echo '## Esquema — baseline y deriva'
+            echo '```'
+            cat reporte.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Abrir PR con el baseline actualizado
+        if: inputs.commitear == true && steps.revisar.outputs.codigo == '3'
+        run: |
+          mkdir -p "$(dirname "$BASELINE")"
+          mv esquema_nuevo.sql "$BASELINE"
+          rama="chore/baseline-esquema-${GITHUB_RUN_ID}"
+          git config user.name  'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git checkout -b "$rama"
+          git add "$BASELINE"
+          git commit \
+            -m 'chore(esquema): actualizar el baseline desde la base viva' \
+            -m 'Generado por la CLI oficial de Supabase (pg_dump), no transcrito a mano.' \
+            -m 'Revisado contra formas de credencial antes de commitear.' \
+            -m "Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          git push origin "$rama"
+          {
+            echo 'Deriva detectada entre la base y el repositorio.'
+            echo
+            echo 'Cada renglón con + es un objeto que un restaurante nuevo NO tendría al clonar.'
+            echo
+            echo '```'
+            cat reporte.txt
+            echo '```'
+          } > cuerpo_pr.md
+          gh pr create --base main --head "$rama" \
+            --title 'chore(esquema): actualizar el baseline desde la base viva' \
+            --body-file cuerpo_pr.md
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Fallar si hay deriva y no se pidió commitear
+        if: steps.revisar.outputs.codigo == '3' && inputs.commitear != true
+        run: |
+          echo "::error::La base y el repositorio no coinciden. Un clon nuevo nacería incompleto."
+          echo "Corre este workflow a mano con 'commitear: true' para abrir el PR."
+          exit 1
