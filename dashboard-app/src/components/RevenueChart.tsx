@@ -29,8 +29,16 @@ export default function RevenueChart({ data, title, highlightDate }: RevenueChar
     Ventas: d.ventas_dia,
   }))
 
-  const maxVal = Math.max(...chartData.map(d => d.Ventas))
-  const minVal = Math.min(...chartData.map(d => d.Ventas))
+  // `Math.max(...[])` devuelve -Infinity y `Math.min(...[])` +Infinity. Con un
+  // restaurante sin ventas —o sea, TODO cliente nuevo el día 1— la leyenda de la
+  // gráfica principal del dashboard decía, literal:
+  //
+  //     Alta -$∞        Baja $∞
+  //
+  // formatCurrency sólo filtra null y NaN; isNaN(-Infinity) es false, así que
+  // pasaba de largo. Es lo primero que vería un prospecto a 600px de scroll.
+  const maxVal = chartData.length > 0 ? Math.max(...chartData.map(d => d.Ventas)) : null
+  const minVal = chartData.length > 0 ? Math.min(...chartData.map(d => d.Ventas)) : null
   const total = chartData.reduce((s, d) => s + d.Ventas, 0)
 
   return (
@@ -44,11 +52,14 @@ export default function RevenueChart({ data, title, highlightDate }: RevenueChar
         <div className="flex flex-col sm:flex-row gap-1 sm:gap-3.5 text-[10px] sm:text-[11px]">
           <div className="flex items-center gap-1.5">
             <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full" style={{ background: 'var(--accent-bright)' }} />
-            <span className="text-[var(--text-2)]">Alta {formatCurrency(maxVal)}</span>
+            {/* Sin ventas no hay alta ni baja. formatCurrency(null) daría '$0',
+                que se leería como "tu mejor día fueron cero pesos" — y eso no es
+                lo mismo que "todavía no hay días". */}
+            <span className="text-[var(--text-2)]">Alta {maxVal === null ? '—' : formatCurrency(maxVal)}</span>
           </div>
           <div className="flex items-center gap-1.5">
             <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full" style={{ background: '#f87171' }} />
-            <span className="text-[var(--text-2)]">Baja {formatCurrency(minVal)}</span>
+            <span className="text-[var(--text-2)]">Baja {minVal === null ? '—' : formatCurrency(minVal)}</span>
           </div>
         </div>
       </div>

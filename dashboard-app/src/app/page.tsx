@@ -703,23 +703,36 @@ export default function DashboardPage() {
       {(show('kpis') || show('extra_kpis')) && (() => {
         const mxToday = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' })
         const fechaVista = viewDay ? String(viewDay.fecha).slice(0, 10) : null
+
+        // `periodData` normaliza todo a 0 con `|| 0`. ResumenDia tiene una guarda
+        // —"un dato ausente es un guion, nunca un cero"— que NUNCA se ejecutaba,
+        // porque el cero le llegaba antes. Resultado en un restaurante nuevo:
+        // "$0" en 46 px en vez de "—", que es exactamente el defecto que ese
+        // componente vino a quitar.
+        //
+        // Sin día no hay datos que enseñar. Con día, el cero SÍ es legítimo: un
+        // día real con cero ventas es información.
+        const hayDia = period !== 'dia' ? recentData.length > 0 : !!viewDay
+        const oNada = (v: number) => (hayDia ? v : null)
+
         return (
           <ResumenDia
             fecha={fechaVista}
             esUltimoCierre={period === 'dia' && !!fechaVista && fechaVista !== mxToday && selectedDayIdx === 0}
             periodo={period}
-            ventas={periodData.ventas}
-            ordenes={periodData.tickets}
-            personas={periodData.personas}
-            ticketPersona={periodData.tp}
-            ticketOrden={periodData.tpOrden}
-            propinas={periodData.propinas}
-            descuentos={periodData.descuentos}
+            ventas={oNada(periodData.ventas)}
+            ordenes={oNada(periodData.tickets)}
+            personas={oNada(periodData.personas)}
+            ticketPersona={oNada(periodData.tp)}
+            ticketOrden={oNada(periodData.tpOrden)}
+            propinas={oNada(periodData.propinas)}
+            descuentos={oNada(periodData.descuentos)}
             promedioMismoDia={periodData.prevVentas}
             muestraMismoDia={period === 'dia' ? sameDOWAvg.n : 1}
             tipoComparacion={period === 'dia' ? 'promedio' : 'periodo'}
             etiquetaComparacion={
-              period === 'dia' ? `los ${todayDOWName.toLowerCase()}`
+              period === 'dia'
+                ? (todayDOWName ? `los ${todayDOWName.toLowerCase()}` : 'días iguales')
                 : period === 'semana' ? 'la semana anterior'
                 : 'el mes anterior'
             }
