@@ -29,7 +29,7 @@ razón de este documento.
 | `RAPPI_WEBHOOK_SECRET` | ✅ | — | Firma de webhooks de Rappi |
 | `POS_FALLBACK_CLIENT_ID` | ✅ | cerrada | Puesto el 2026-08-26 |
 | **`KITCHEN_TOKEN_SECRET`** | 🔴 | **ABIERTA** | **Demostrado explotable** |
-| ~~`CRON_SECRET`~~ | 🔴 | **cerrada** en `main` | Corregida (#130). **Aún no en producción** |
+| ~~`CRON_SECRET`~~ | 🔴 | **cerrada** ✅ | Corregida (#130) y **verificada en producción** |
 | `CANCEL_APPROVAL_STRICT` | 🔴 | observa | Registra pero no bloquea |
 | `POS_APPROVAL_STRICT` | 🔴 | observa | Registra pero no bloquea |
 | `PLATFORM_2FA_ENFORCED` | 🔴 | abierta *(a propósito)* | Rollout sin segundo factor |
@@ -40,14 +40,13 @@ razón de este documento.
 **5 activadas · 1 apagada fallando abierta · 2 en modo observación · 1 apagada a propósito ·
 4 apagadas fallando cerradas.**
 
-> Al 2026-08-26 quedaba **una** fallando abierta: `KITCHEN_TOKEN_SECRET`. `CRON_SECRET` se
-> corrigió el mismo día —no encendiéndola, sino invirtiendo el default— pero el arreglo está
-> en `main`, **no desplegado**: Vercel rechazó el build de producción con *"Deployment rate
-> limited — retry in 24 hours"*. Mientras no despliegue, **producción sigue con las dos**.
+> Al cierre del 2026-08-26 queda **una** fallando abierta: `KITCHEN_TOKEN_SECRET`.
+> `CRON_SECRET` se corrigió el mismo día —no encendiéndola, sino invirtiendo el default— y
+> está **verificada en producción**.
 
 ---
 
-## Las dos que fallan abiertas
+## Las que fallaban abiertas — queda una
 
 ### 1. `KITCHEN_TOKEN_SECRET` — comprobado en vivo
 
@@ -81,10 +80,37 @@ cabecera solo.
 
 5 pruebas de regresión; prueba de mutantes confirmada. Mergeada en #130.
 
-> ⚠️ **Implementado y probado, no desplegado.** El build de producción del merge falló con
-> *"Deployment rate limited — retry in 24 hours"* — el límite diario de deploys de Vercel,
-> quemado la madrugada del 26. Hasta que despliegue, producción sigue sirviendo la ruta sin
-> puerta. Verificar en vivo cuando se libere: `GET /api/agents/cron` sin cabecera → **503**.
+**Verificado en producción** el 2026-08-26 a las 04:55:
+
+```
+GET https://app.fullsite.mx/api/agents/cron
+→ 503  {"error":"Cron no configurado"}     · x-matched-path: /api/agents/cron
+```
+
+Sin correr ningún agente. Smoke test post-deploy verde.
+
+### Lo que costó desplegarlo, que conviene recordar
+
+El merge de #130 **no llegó a producción**: la integración de Git de Vercel lo rechazó con
+*"Deployment rate limited — retry in 24 hours"*. Un segundo merge, 25 minutos después, igual.
+
+Lo importante es la asimetría, porque no es obvia y sirve para un hotfix:
+
+| Vía | Estado esa madrugada |
+|---|---|
+| Integración de Git (push a `main`) | 🔴 rechazada — *rate limited, retry in 24 hours* |
+| Previews de rama | ✅ construían normal |
+| **`vercel deploy --prod` desde el CLI** | ✅ **pasó sin problema** |
+
+> Si algún día la integración de Git está bloqueada y necesitas subir un hotfix, el CLI es la
+> salida. Desde un worktree limpio en `main`, con `.vercel/project.json` copiado para vincular
+> el proyecto.
+
+**Caveat de este deploy:** al hacerse por CLI desde un worktree en *detached HEAD*, la
+deployment **no lleva metadata de commit** — en el panel de Vercel no se ve de qué SHA salió.
+Se construyó desde `b5fe8bb2` (`main`), worktree limpio, 0 cambios locales. Y el *commit status*
+de `main` en GitHub sigue marcado en rojo por el intento fallido de la integración: **es
+cosmético**, producción ya tiene el código.
 
 ---
 
@@ -93,7 +119,8 @@ cabecera solo.
 `ONBOARDING_SECRET` devuelve `503` y `INTERNAL_ADMIN_PASSWORD` devuelve `500` cuando no están
 configuradas. Eso es exactamente lo correcto: sin secreto, la función no existe.
 
-**Sirven de patrón.** Las dos que fallan abiertas deberían verse así.
+**Sirven de patrón.** Es exactamente la forma que se le dio a `CRON_SECRET`, y la que le falta
+a `KITCHEN_TOKEN_SECRET`.
 
 ---
 
