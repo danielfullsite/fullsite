@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { usePathname } from 'next/navigation'
-import { getActiveTurnoWithStaleCheck, autoCloseStaleTurno, openTurno, logAudit } from '@/lib/pos-data'
+import { getActiveTurnoWithStaleCheck, openTurno, logAudit } from '@/lib/pos-data'
 import { getPermissions } from '@/lib/pos-permissions'
 import { Clock, DoorOpen, AlertTriangle } from 'lucide-react'
 
@@ -17,7 +17,7 @@ interface TurnoGateProps {
   children: React.ReactNode
 }
 
-type TurnoStatus = 'loading' | 'active' | 'none' | 'stale'
+type TurnoStatus = 'loading' | 'active' | 'none' | 'stale' | 'conflict'
 
 interface ActiveTurno {
   id: string
@@ -33,9 +33,9 @@ export default function TurnoGate({ staff, children }: TurnoGateProps) {
   const pathname = usePathname()
   const [status, setStatus] = useState<TurnoStatus>('loading')
   const [turno, setTurno] = useState<ActiveTurno | null>(null)
+  const [activeCount, setActiveCount] = useState(0)
   const [fondoInicial, setFondoInicial] = useState('')
   const [opening, setOpening] = useState(false)
-  const [closing, setClosing] = useState(false)
   const [error, setError] = useState('')
 
   const permissions = getPermissions(staff.role)
@@ -48,6 +48,7 @@ export default function TurnoGate({ staff, children }: TurnoGateProps) {
   const checkTurno = useCallback(async () => {
     try {
       const result = await getActiveTurnoWithStaleCheck()
+      setActiveCount(result.activeCount)
       if (result.turno) {
         // Online + turno found → cache it for offline use
         try {
@@ -56,15 +57,12 @@ export default function TurnoGate({ staff, children }: TurnoGateProps) {
         } catch {}
         setIsOfflineMode(false)
         setOfflineSince(null)
-        if (result.isStale) {
-          // Si el gerente ya eligió "Continuar" para ESTE turno en la sesión,
-          // no volver a preguntar en cada mesa. La navegación de mesa es dura
-          // (window.location) → re-monta el gate en cada tap; sin este ack el
-          // aviso saldría una y otra vez. Se limpia al cerrar la pestaña / login.
-          let acked = false
-          try { acked = sessionStorage.getItem('pos_turno_stale_ack') === result.turno.id } catch {}
+        if (result.activeCount > 1) {
           setTurno(result.turno)
-          setStatus(acked ? 'active' : 'stale')
+          setStatus('conflict')
+        } else if (result.isStale) {
+          setTurno(result.turno)
+          setStatus('stale')
         } else {
           setTurno(result.turno)
           setStatus('active')
@@ -109,10 +107,10 @@ export default function TurnoGate({ staff, children }: TurnoGateProps) {
 
   // Poll every 5s when waiting for turno
   useEffect(() => {
-    if (status !== 'none' && status !== 'stale') return
+    if (status !== 'none' && status !== 'stale' && status !== 'conflict') return
     const interval = setInterval(async () => {
       const result = await getActiveTurnoWithStaleCheck()
-      if (result.turno && !result.isStale) {
+      if (result.turno && !result.isStale && result.activeCount === 1) {
         setTurno(result.turno)
         setStatus('active')
       }
@@ -172,6 +170,27 @@ export default function TurnoGate({ staff, children }: TurnoGateProps) {
       )
     }
     return <>{children}</>
+  }
+
+  // Multiple active shifts make totals and KDS routing ambiguous. Block sales
+  // until an authorized operator resolves every open shift with a real Corte Z.
+  if (status === 'conflict') {
+    return (
+      <div className="h-dvh flex items-center justify-center select-none" style={{ background: 'linear-gradient(180deg, #200a0a 0%, #160808 100%)' }}>
+        <div className="text-center w-full max-w-sm mx-4">
+          <AlertTriangle size={64} className="mx-auto mb-6 text-red-400" strokeWidth={1.5} />
+          <h2 className="text-2xl font-bold text-white mb-2">Hay {activeCount} turnos abiertos</h2>
+          <p className="text-red-200/70 text-sm mb-8">El POS queda bloqueado para evitar mezclar comandas y cortes. Cierra cada turno pendiente con Corte Z.</p>
+          {canCloseTurno ? (
+            <button onClick={() => { window.location.href = '/pos/turno' }} className="w-full py-4 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold min-h-[56px]">
+              Ir a resolver turnos
+            </button>
+          ) : (
+            <p className="text-slate-400 text-sm">Solicita a un encargado que realice los cortes.</p>
+          )}
+        </div>
+      </div>
+    )
   }
 
   // ── No turno — gerente/admin/cajero can open ──
@@ -265,38 +284,6 @@ export default function TurnoGate({ staff, children }: TurnoGateProps) {
     const dateStr = openedDate.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' })
     const timeStr = openedDate.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true })
 
-    const handleCloseAndOpen = async () => {
-      if (!turno) return
-      setClosing(true)
-      setError('')
-      // Sync barrier: block close if there are pending offline writes
-      try {
-        const { getPendingQueue } = await import('@/lib/pos-offline-db')
-        const pending = await getPendingQueue()
-        const unsynced = pending.filter(p => !p.synced)
-        if (unsynced.length > 0) {
-          setError(`${unsynced.length} operaciones pendientes de sincronizar. Espera a que terminen antes de cerrar turno.`)
-          setClosing(false)
-          return
-        }
-      } catch { /* IndexedDB unavailable — proceed */ }
-      const closed = await autoCloseStaleTurno(turno.id, staff.name)
-      if (closed) {
-        logAudit({ action: 'status_changed', actor: staff.name, mesa: 0, details: { type: 'turno_auto_closed', turno_id: turno.id } })
-        setTurno(null)
-        setStatus('none')
-      } else {
-        setError('Error al cerrar turno anterior')
-      }
-      setClosing(false)
-    }
-
-    const handleContinue = () => {
-      // Recordar la elección por sesión — no volver a preguntar en cada mesa.
-      try { if (turno) sessionStorage.setItem('pos_turno_stale_ack', turno.id) } catch {}
-      setStatus('active')
-    }
-
     return (
       <div className="h-dvh flex items-center justify-center select-none" style={{ background: 'linear-gradient(180deg, #1a1000 0%, #1f1800 100%)' }}>
         <div className="text-center w-full max-w-sm mx-4">
@@ -308,18 +295,10 @@ export default function TurnoGate({ staff, children }: TurnoGateProps) {
           <p className="text-amber-300/50 text-xs mb-8">{dateStr} a las {timeStr}</p>
 
           <button
-            onClick={handleCloseAndOpen}
-            disabled={closing}
+            onClick={() => { window.location.href = '/pos/turno' }}
             className="w-full py-4 rounded-xl bg-amber-600 hover:bg-amber-500 active:scale-[0.97] disabled:bg-slate-700 text-white font-bold text-base transition-all min-h-[56px] mb-3"
           >
-            {closing ? 'Cerrando...' : 'Cerrar anterior y abrir nuevo'}
-          </button>
-
-          <button
-            onClick={handleContinue}
-            className="w-full py-3 rounded-xl bg-transparent hover:bg-slate-800 text-slate-400 hover:text-slate-300 text-sm transition-all"
-          >
-            Continuar con turno actual
+            Ir a realizar Corte Z
           </button>
 
           <p className="text-slate-500 text-xs mt-4">{staff.name} · {staff.role}</p>

@@ -417,23 +417,28 @@ async function _getPaymentMethodsFromCache(): Promise<PaymentMethodDB[]> {
   return []
 }
 
-/** Turno activo (pos_turnos sin closed_at). Devuelve null si no hay turno abierto. */
-export async function getActiveTurno(): Promise<{ id: string; fondo_inicial: number; opened_by: string; opened_at: string } | null> {
+type ActiveTurnoRecord = { id: string; fondo_inicial: number; opened_by: string; opened_at: string }
+
+/** Turnos activos (pos_turnos sin closed_at), del más reciente al más antiguo. */
+export async function getActiveTurnos(): Promise<ActiveTurnoRecord[]> {
   const fromCache = () => {
-    if (typeof localStorage === 'undefined') return null
+    if (typeof localStorage === 'undefined') return []
     try {
       const raw = localStorage.getItem('pos_turno_cache')
       if (raw) {
-        const { turno, ts } = JSON.parse(raw)
-        if (turno && Date.now() - ts < 24 * 3600 * 1000) return turno
+        const { turno, turnos, ts } = JSON.parse(raw)
+        if (Date.now() - ts < 24 * 3600 * 1000) {
+          if (Array.isArray(turnos)) return turnos
+          if (turno) return [turno]
+        }
       }
     } catch {}
-    return null
+    return []
   }
 
   try {
     const res = await fetchWithTimeout(
-      `${_SUPABASE_URL}/rest/v1/pos_turnos?client_id=eq.${_getClientId()}&closed_at=is.null&select=id,fondo_inicial,opened_by,opened_at&order=opened_at.desc&limit=1`,
+      `${_SUPABASE_URL}/rest/v1/pos_turnos?client_id=eq.${_getClientId()}&closed_at=is.null&select=id,fondo_inicial,opened_by,opened_at&order=opened_at.desc&limit=10`,
       { headers: _SB_HEADERS, cache: 'no-store' }
     )
     // Service Worker network-first resolves offline Supabase requests as a 503
@@ -441,23 +446,29 @@ export async function getActiveTurno(): Promise<{ id: string; fondo_inicial: num
     // never ran and TurnoGate incorrectly blocked a valid cold-offline shift.
     if (!res.ok) return fromCache()
     const rows = await res.json()
-    const turno = rows[0] || null
-    if (turno && typeof window !== 'undefined') {
-      try { localStorage.setItem('pos_turno_cache', JSON.stringify({ turno, ts: Date.now() })) } catch {}
+    if (typeof window !== 'undefined') {
+      try { localStorage.setItem('pos_turno_cache', JSON.stringify({ turno: rows[0] || null, turnos: rows, ts: Date.now() })) } catch {}
     }
-    return turno
+    return rows
   } catch {
     // Offline o timeout — usar turno cacheado del mismo día
     return fromCache()
   }
 }
 
+/** Turno activo más reciente. Devuelve null si no hay turno abierto. */
+export async function getActiveTurno(): Promise<ActiveTurnoRecord | null> {
+  const turnos = await getActiveTurnos()
+  return turnos[0] || null
+}
+
 /** Turno activo + detección de turno stale (>18h sin cerrar = probablemente del día anterior) */
-export async function getActiveTurnoWithStaleCheck(): Promise<{ turno: { id: string; fondo_inicial: number; opened_by: string; opened_at: string } | null; isStale: boolean }> {
-  const turno = await getActiveTurno()
-  if (!turno) return { turno: null, isStale: false }
+export async function getActiveTurnoWithStaleCheck(): Promise<{ turno: ActiveTurnoRecord | null; isStale: boolean; activeCount: number }> {
+  const turnos = await getActiveTurnos()
+  const turno = turnos[0] || null
+  if (!turno) return { turno: null, isStale: false, activeCount: 0 }
   const hoursSinceOpen = (Date.now() - new Date(turno.opened_at).getTime()) / (1000 * 60 * 60)
-  return { turno, isStale: hoursSinceOpen > 18 }
+  return { turno, isStale: hoursSinceOpen > 18, activeCount: turnos.length }
 }
 
 /** Cerrar turno stale automáticamente (sin wizard de conteo) */
