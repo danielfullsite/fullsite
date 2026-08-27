@@ -212,6 +212,7 @@
     <h2>Terminal sin configurar</h2>
     <p>Esta terminal no tiene una identidad válida. Necesita configurarse antes de operar.</p>
     <div id="legacyAlert"></div>
+    <div id="computerInfo"></div>
     <div class="alert alert-warn">
       <span class="alert-icon">⚠</span>
       <span>Sin configuración válida, el POS no puede abrir turnos, crear órdenes ni sincronizar datos.</span>
@@ -514,7 +515,8 @@ function onStepEnter(n) {
 async function init() {
   renderStepsBar()
   if (!window.setupBridge) {
-    showAlert('legacyAlert', 'warn', 'No se detectó el bridge de configuración. ¿Estás en Electron?')
+    showAlert('legacyAlert', 'error', 'Esta pantalla se abrió sin acceso nativo a la computadora. Ciérrala y abre la aplicación Fullsite POS/KDS instalada; el archivo setup.html abierto en Chrome o Safari no puede escanear la red.')
+    document.querySelectorAll('button').forEach(button => { button.disabled = true })
     return
   }
   try {
@@ -522,6 +524,9 @@ async function init() {
     MAX_PRINTER_ID_LENGTH = info.schemaConstants?.MAX_PRINTER_ID_LENGTH ?? 50
     state.legacy   = info.legacy || null
     state.hostname = info.hostname || 'terminal'
+    const ips = (info.network_interfaces || []).map(item => item.address).join(', ') || 'sin red IPv4 detectada'
+    const printerCount = (info.system_printers || []).length
+    showAlert('computerInfo', 'ok', `Equipo detectado: ${esc(state.hostname)} · ${esc(info.platform || '?')} ${esc(info.arch || '')} · IP ${esc(ips)} · ${printerCount} impresora(s) del sistema`)
 
     if (state.legacy) {
       state.restaurantId = state.legacy.restaurant_id || state.legacy.restaurantId || state.legacy.clientId || ''
@@ -630,6 +635,10 @@ function setupStep3() {
 
 async function scanLan() {
   const results = document.getElementById('scanResults')
+  if (!window.setupBridge?.scanLan) {
+    results.innerHTML = '<div class="alert alert-error"><span class="alert-icon">✕</span><span>El escaneo requiere la aplicación Fullsite instalada. Cierra esta página y abre Fullsite POS/KDS.</span></div>'
+    return
+  }
   results.innerHTML = '<div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text3);margin:10px 0"><div class="spinner"></div> Escaneando red local...</div>'
   try {
     const servers = await window.setupBridge.scanLan()
