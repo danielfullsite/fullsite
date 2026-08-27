@@ -726,8 +726,7 @@ function createWindow() {
     mainWindow.webContents.executeJavaScript(scripts.join('; ')).catch(() => {});
   });
 
-  // Listen for IPC from renderer (via preload bridge)
-  ipcMain.on('app-quit', () => { allowClose = true; app.quit(); });
+  // Window-specific IPC from renderer (via preload bridge).
   ipcMain.on('exit-kiosk', () => {
     if (mainWindow) { mainWindow.setKiosk(false); mainWindow.setFullScreen(false); }
   });
@@ -961,6 +960,11 @@ app.whenReady().then(async () => {
   // Validate config BEFORE starting any operational services.
   // NOT_PROVISIONED = show setup wizard, block POS/KDS/Local Server.
   registerProvisioningIpc();
+
+  // Register quit before branching into POS or kds_only. When this lived inside
+  // createWindow(), a dedicated KDS never installed the channel exposed by
+  // preload-kds.js, so its visible close button could not reliably quit Electron.
+  ipcMain.on('app-quit', () => { allowClose = true; app.quit(); });
 
   const configResult = loadAndValidateConfig();
   if (!configResult.valid) {
