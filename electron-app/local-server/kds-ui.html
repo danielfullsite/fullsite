@@ -34,6 +34,10 @@
   .conn{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text-3)}
   .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;background:var(--text-4)}
   .hright{display:flex;align-items:center;gap:18px}
+  .view-switch{display:flex;align-items:center;padding:3px;background:var(--surface);border:1px solid var(--line);border-radius:10px}
+  .view-switch button{min-height:32px;padding:0 10px;border:0;border-radius:7px;background:transparent;color:var(--text-3);font-size:11px;font-weight:800;cursor:pointer}
+  .view-switch button.on{background:var(--text-1);color:var(--bg)}
+  .view-switch button:focus-visible{outline:2px solid var(--prep);outline-offset:2px}
   .counts{display:flex;align-items:center;gap:16px;font-size:13px;color:var(--text-3)}
   .counts b{color:var(--text-1);font-variant-numeric:tabular-nums;font-size:15px}
   .counts .c-new{color:#93c5fd} .counts .c-prep{color:#fcd34d} .counts .c-lista{color:#6ee7b7}
@@ -142,7 +146,35 @@
   .modal-f button{flex:1;padding:13px;border-radius:10px;font-size:15px;font-weight:800;cursor:pointer;border:1px solid var(--line-2);background:var(--surface);color:var(--text-2)}
   .modal-f .save{background:var(--lista);border-color:var(--lista);color:#04140d}
 
-  @media(max-width:640px){ aside{display:none} main{grid-template-columns:repeat(auto-fill,minmax(280px,1fr))} }
+  /* Vista compacta: lectura de cocina de arriba hacia abajo y después a la derecha.
+     Conserva cada comanda completa y usa el alto disponible antes de pedir navegación. */
+  body.v-compact aside{display:none}
+  body.v-compact main{display:block;height:100%;overflow-x:auto;overflow-y:hidden;padding:8px;column-width:250px;column-gap:8px;column-fill:auto}
+  body.v-compact .card{display:inline-flex;width:250px;max-width:none;margin:0 0 8px;break-inside:avoid-column;border-radius:9px;border-top-width:4px}
+  body.v-compact .card-h{padding:7px 9px 6px;gap:5px}
+  body.v-compact .mesa{font-size:19px}
+  body.v-compact .mesa .mesero{font-size:10px;margin-top:1px}
+  body.v-compact .folio{font-size:11px;padding:1px 6px}
+  body.v-compact .round,body.v-compact .badge{font-size:8px}
+  body.v-compact .time{font-size:11px}
+  body.v-compact .items{padding:2px 5px 4px}
+  body.v-compact .item{gap:6px;padding:5px 3px;border-radius:6px}
+  body.v-compact .tick{width:22px;height:22px;border-radius:5px;font-size:12px}
+  body.v-compact .qty{font-size:15px;min-width:17px}
+  body.v-compact .it-name{font-size:13px;line-height:1.15}
+  body.v-compact .mods,body.v-compact .note{font-size:11px;line-height:1.18;margin-top:1px}
+  body.v-compact .onote{padding:5px 8px;font-size:11px}
+  body.v-compact .fbtn{padding:7px;font-size:11px}
+  body.v-expo aside{display:none}
+  body.v-expo .card:not(.s-lista){display:none}
+
+  @media(max-width:900px){.counts{display:none}.hright{gap:7px}.view-switch button{padding:0 8px}}
+  @media(max-width:640px){
+    header{padding:8px}.brand .chef,.brand .stn,.conn{display:none}.brand h1{font-size:16px}
+    aside{display:none}.view-switch button{font-size:10px;padding:0 6px}.gear{width:34px;height:34px}
+    body.v-compact main,body.v-operation main,body.v-expo main{display:flex;height:auto;overflow-y:auto;overflow-x:hidden;padding:8px;column-width:auto}
+    body.v-compact .card,body.v-operation .card,body.v-expo .card{display:flex;width:100%;max-width:none;flex:1 1 100%}
+  }
 </style>
 </head>
 <body>
@@ -155,6 +187,9 @@
       <span class="conn"><span class="dot" id="conn-dot"></span><span id="conn-txt">conectando…</span></span>
     </div>
     <div class="hright">
+      <div class="view-switch" aria-label="Vista del tablero">
+        <button data-view="compact">Compacta</button><button data-view="operation">Operación</button><button data-view="expo">Expo</button>
+      </div>
       <div class="counts">
         <span class="c-new">Nuevas <b id="n-new">0</b></span>
         <span class="c-prep">Preparando <b id="n-prep">0</b></span>
@@ -224,9 +259,14 @@
   var SOUND     = _s.sound !== false;   // default ON
   var SCALE     = Number(_s.scale) || 1;   // tamaño de letra = zoom del board (chefs medio ciegos, KDS-03)
   var THEME     = _s.theme === "light" ? "light" : "dark";   // default oscuro
-  function saveSettings(){ try{ localStorage.setItem(SKEY, JSON.stringify({ station:STATION, alert_min:ALERT_MIN, sound:SOUND, scale:SCALE, theme:THEME })); }catch(e){} }
+  var VIEW      = /^(compact|operation|expo)$/.test(_s.view) ? _s.view : "compact";
+  function saveSettings(){ try{ localStorage.setItem(SKEY, JSON.stringify({ station:STATION, alert_min:ALERT_MIN, sound:SOUND, scale:SCALE, theme:THEME, view:VIEW })); }catch(e){} }
   function applyScale(){ try{ var b=document.getElementById("board"); if(b) b.style.zoom=String(SCALE); }catch(e){} }
   function applyTheme(){ try{ document.body.classList.toggle("light", THEME==="light"); }catch(e){} }
+  function applyView(){
+    document.body.classList.remove("v-compact","v-operation","v-expo"); document.body.classList.add("v-"+VIEW);
+    Array.prototype.forEach.call(document.querySelectorAll("[data-view]"),function(b){ b.classList.toggle("on",b.getAttribute("data-view")===VIEW); });
+  }
 
   var boardEl = document.getElementById("board");
   var demandEl = document.getElementById("demand");
@@ -237,8 +277,24 @@
   applyStationLabel();
   applyScale();
   applyTheme();
+  applyView();
 
   var lastGood = [];
+  // Vista previa segura para diseño: al abrir este archivo directamente no existe
+  // Pedro (/state). Carga órdenes ficticias para poder revisar el KDS sin tocar datos
+  // reales. Electron siempre lo sirve por http, por lo que esta rama nunca corre en
+  // una terminal instalada.
+  if(location.protocol==="file:"){
+    var ago=function(min){ return new Date(Date.now()-min*60000).toISOString(); };
+    lastGood=[
+      {id:"demo-12",mesa:12,mesero:"Daniel",personas:3,status:"enviada",created_at:ago(18),updated_at:ago(18),items:[{id:"12a",nombre:"Tacos de rib eye",cantidad:2,station:"cocina",modificadores:["Sin cebolla","Término medio"]},{id:"12b",nombre:"Papas trufadas",cantidad:1,station:"cocina",notas:"Extra crujientes"}]},
+      {id:"demo-7",mesa:7,mesero:"Mariana",personas:2,status:"enviada",created_at:ago(13),updated_at:ago(13),items:[{id:"7a",nombre:"Salmón al grill",cantidad:1,station:"cocina",modificadores:["Sin mantequilla"]},{id:"7b",nombre:"Ensalada de la casa",cantidad:1,station:"cocina"}]},
+      {id:"demo-21",mesa:21,mesero:"Omar",personas:4,status:"enviada",created_at:ago(9),updated_at:ago(9),items:[{id:"21a",nombre:"Hamburguesa Fullsite",cantidad:3,station:"cocina",modificadores:["1 sin queso","2 término 3/4"]},{id:"21b",nombre:"Aros de cebolla",cantidad:2,station:"cocina"}]},
+      {id:"demo-4",mesa:4,mesero:"Andrea",personas:1,status:"enviada",created_at:ago(6),updated_at:ago(6),items:[{id:"4a",nombre:"Chilaquiles verdes",cantidad:1,station:"cocina",modificadores:["Con pollo","Huevo estrellado"],notas:"Salsa aparte"}]},
+      {id:"demo-15",mesa:15,mesero:"Luis",personas:5,status:"enviada",created_at:ago(4),updated_at:ago(4),items:[{id:"15a",nombre:"Pizza margarita",cantidad:2,station:"cocina"},{id:"15b",nombre:"Pasta Alfredo",cantidad:2,station:"cocina",modificadores:["Extra parmesano"]},{id:"15c",nombre:"Sopa de tomate",cantidad:1,station:"cocina"}]},
+      {id:"demo-9",mesa:9,mesero:"Sofía",personas:2,status:"enviada",created_at:ago(2),updated_at:ago(2),items:[{id:"9a",nombre:"Ceviche tropical",cantidad:2,station:"cocina",modificadores:["Sin chile"],notas:"ALERGIA AL CACAHUATE"}]}
+    ];
+  }
   var seenBatches = null;
   var postedStatus = {};
   var online = false;
@@ -458,6 +514,7 @@
   document.getElementById("alert-up").addEventListener("click",function(){ draft.alert_min=Math.min(60,draft.alert_min+1); paintModal(); });
   document.getElementById("sound-sw").addEventListener("click",function(){ draft.sound=!draft.sound; paintModal(); });
   document.getElementById("theme-sw").addEventListener("click",function(){ draft.theme=draft.theme==="light"?"dark":"light"; paintModal(); });
+  document.querySelector(".view-switch").addEventListener("click",function(e){ var b=e.target.closest("[data-view]"); if(!b)return; VIEW=b.getAttribute("data-view"); saveSettings(); applyView(); render(false); });
   document.getElementById("m-save").addEventListener("click",function(){
     STATION=draft.station; ALERT_MIN=draft.alert_min; SOUND=draft.sound; SCALE=draft.scale; THEME=draft.theme; saveSettings();
     applyScale(); applyTheme(); applyStationLabel(); seenBatches=null; render(false); closeModal(); toast("Ajustes guardados");
@@ -498,6 +555,7 @@
   }
 
   function fetchState(){
+    if(location.protocol==="file:"){ setConn(true); connTxt.textContent="modo demo local"; render(false); return; }
     var ctrl=new AbortController(); var to=setTimeout(function(){ ctrl.abort(); },4000);
     fetch(STATE_BASE+"/state",{cache:"no-store",signal:ctrl.signal})
       .then(function(r){ return r.ok?r.json():Promise.reject(); })
