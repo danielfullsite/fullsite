@@ -50,7 +50,7 @@ Cada decisión de diseño, arquitectura o implementación debe responder estas 1
 | Q-07 | ¿Puede certificarse automáticamente? | Agrega al módulo Auto-Certification de FEOS |
 | Q-08 | ¿Puede recuperarse solo de fallos? | Diseña self-healing antes de declarar production-ready |
 | Q-09 | ¿Puede ser administrado por IA? | El agente existe, ¿tiene los datos para actuar? |
-| Q-10 | ¿Escala a 1,000 restaurantes sin cambiar código? | No escala — rediseña desde el contrato |
+| Q-10 | ¿Escala a 10,000 restaurantes sin cambiar código ni multiplicar soporte humano? | No escala — rediseña desde el contrato |
 
 **Si la respuesta a cualquier pregunta es "no":** documenta el gap, crea el item en FEOS backlog, y define el criterio de aceptación. El gap no es un fallo — es un item del roadmap de la plataforma.
 
@@ -89,6 +89,35 @@ These goals are permanent. Every PR, ADR, and design decision in Fullsite is eva
 | G-10 | **Enterprise-ready** | Audit log, RLS, role-based access, and data isolation that passes SOC 2 review. |
 | G-11 | **Wansoft reliability as minimum baseline** | Every module the platform shares with Wansoft must match or exceed Wansoft's operational reliability. Regressing below Wansoft is a P0. |
 | G-12 | **Modern SaaS architecture** | Multi-tenant DB, feature flags by plan, config in DB not code, automated CI/CD. |
+
+### 1.1 Scale invariant — 10,000 clients
+
+Every capability targets 10,000 clients. “Clonable” means one versioned platform plus declarative tenant and device configuration—not a repository, database, installer, or checklist copied per restaurant.
+
+- One codebase and release train; no client forks.
+- Tenant, branch, station, printer, branding, routing, roles, and feature differences are signed configuration or data.
+- Provisioning, certification, update, rollback, secret rotation, backup verification, and deprovisioning are idempotent machine-callable operations.
+- Fleet work is batched and observable; no workflow requires opening thousands of remote desktop sessions.
+- Every device reports version, configuration checksum, connectivity, queue depth, storage health, and last successful certification.
+- Rollouts support cohorts, maintenance windows, canaries, pause, and automatic rollback.
+- Support scales by exception: healthy clients require no human attention; failures arrive with diagnostics and a safe remediation path.
+
+**Scale gate:** before reaching Skeleton, document per-client state, fleet operation, failure isolation, observability, and zero-touch provisioning. If a step says “Daniel connects manually,” it remains platform debt.
+
+### 1.2 Interface quality floor (POS + KDS)
+
+- The service shell uses `100dvh`; the document never scrolls. Only bounded lists or boards may move.
+- Primary touch targets are at least 48×48 px; destructive actions require a named confirmation.
+- POS adapts by surface: phone alternates menu/order, tablet shows two panes, terminal uses the full workspace.
+- KDS provides persisted Compacta, Operación, and Expo views with stable chronological priority.
+- Modifiers, notes, allergies, elapsed time, station, and offline state remain legible at every density.
+- Branding changes approved tokens and identity; it cannot weaken operational semantics.
+
+**Responsive gate:** iPhone SE, iPad portrait/landscape, 1366×768 terminal, and 1920×1080 KDS.
+
+### 1.3 Offline KDS invariant
+
+The KDS must boot from bundled local assets, receive orders over LAN, persist before ACK, rebuild after restart, preserve per-item preparation state, reconcile idempotently, and clearly distinguish WAN loss from caja/LAN loss. A visual redesign cannot merge if KDS WebSocket, offline service flow, multi-terminal LAN, reconstruction, or idempotency tests regress.
 
 ---
 
