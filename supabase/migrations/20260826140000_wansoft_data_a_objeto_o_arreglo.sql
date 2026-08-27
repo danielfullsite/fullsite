@@ -41,6 +41,39 @@
 -- ESTO NO ES OBLIGATORIO PARA QUE EL DASHBOARD FUNCIONE. Todos los lectores (TS y
 -- Python) toleran las dos formas. Lo que desbloquea es poder consultar el histórico
 -- desde SQL y desde las vistas OCM.
+--
+-- ── EJECUCIÓN ───────────────────────────────────────────────────────────────────
+--
+-- YA CORRIÓ. En producción de AMALAY, con autorización de Daniel, el
+-- 2026-08-27 02:47:42 UTC (2026-08-26 20:47 hora de Monterrey).
+--
+-- El mensaje del commit que trajo este archivo dice "NO ejecutada". Se escribió
+-- ANTES de correrla y no se corrigió al correrla. Lo cierto es esto de aquí; la
+-- comprobación está abajo.
+--
+-- Evidencia, toda de lecturas:
+--   · get_project_url → https://qjiomlvudfmzuvqvhwpk.supabase.co (el proyecto AMALAY).
+--   · list_branches → [] : no hay ramas de Supabase, la conexión era a la base primaria.
+--   · Conteos hoy, en conexión nueva: 0 string · 529 array · 173 object.
+--     Antes eran 670 · 32 · 0. Persistió → no fue transacción revertida ni simulación.
+--   · wansoft_data_respaldo_jsonb existe con 670 filas y un único valor de
+--     respaldado_en = 2026-08-27 02:47:42.876934+00 → una sola transacción.
+--   · pg_stat_user_tables: el respaldo tiene n_tup_ins = 670; autovacuum analizó las
+--     dos tablas a las 02:48:27, 45 s después del commit.
+--   · max(wansoft_data.updated_at) sigue en 2026-07-20 → sólo se tocó `data`, tal como
+--     está escrito aquí.
+--   · Huella md5 del contenido desenvuelto, antes y después: a77eb6c0fe031c9c45a2f78fb82954ef
+--     en los dos lados → no cambió un solo byte del dato, sólo la envoltura.
+--
+-- OJO — DEUDA ABIERTA: se corrió con `execute_sql`, no con `apply_migration`, así que
+-- NO quedó registrada en `supabase_migrations.schema_migrations`. Verificado hoy: la
+-- versión 20260826140000 no aparece en el ledger. O sea que la base ya está convertida
+-- pero el libro de migraciones dice que esto nunca pasó. Hay que registrarla a mano
+-- para que el ledger no mienta. No se hizo aquí porque es otra escritura a producción
+-- y necesita su propia autorización.
+--
+-- Volver a correr este archivo es inocuo: el WHERE filtra por jsonb_typeof = 'string'
+-- y el CREATE TABLE lleva IF NOT EXISTS.
 
 begin;
 
