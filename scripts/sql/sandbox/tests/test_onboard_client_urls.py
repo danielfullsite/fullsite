@@ -22,6 +22,16 @@ class _Log:
 
 
 class RestUrlTests(unittest.TestCase):
+    def test_dry_run_never_calls_auth_admin_api(self):
+        with patch.object(onboard, "post") as post_mock:
+            status, user = onboard.create_auth_user(
+                "https://sandbox.supabase.co/auth/v1", "demo@example.com", "secret", "service-key", True
+            )
+
+        self.assertEqual(status, onboard.SKIPPED)
+        self.assertIsNone(user)
+        post_mock.assert_not_called()
+
     def test_upsert_row_does_not_duplicate_rest_prefix(self):
         rest_url = "https://sandbox.supabase.co/rest/v1"
         with patch.object(onboard, "get", return_value=(200, [])) as get_mock, \

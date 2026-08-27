@@ -273,6 +273,22 @@ def delete(url, headers):
     return _req("DELETE", url, None, headers)
 
 
+def create_auth_user(auth_url, email, password, svc_key, dry_run):
+    """Create an auth user only during a real onboarding run.
+
+    Keeping the dry-run guard inside this helper prevents a caller from logging a
+    simulated action while accidentally issuing the admin mutation.
+    """
+    if dry_run:
+        return SKIPPED, None
+    return post(f"{auth_url}/admin/users", {
+        "email": email,
+        "password": password,
+        "email_confirm": True,
+    }, {"apikey": svc_key, "Authorization": f"Bearer {svc_key}",
+        "Content-Type": "application/json"})
+
+
 # ── Checkpoint state ──────────────────────────────────────────────────────────
 class State:
     def __init__(self, client_id):
@@ -756,14 +772,12 @@ def run_onboarding(args):
     user_id = None
 
     if not state.stage_done("auth_user_create") or not do_resume:
-        s, r = post(f"{auth}/admin/users", {
-            "email": email,
-            "password": owner_pwd,
-            "email_confirm": True,
-        }, {"apikey": svc_key, "Authorization": f"Bearer {svc_key}",
-            "Content-Type": "application/json"})
+        s, r = create_auth_user(auth, email, owner_pwd, svc_key, dry_run)
 
-        if s in (200, 201) and isinstance(r, dict):
+        if s == SKIPPED:
+            log.item(SKIPPED, f"auth user: {email} (dry-run)")
+            state.mark_done("auth_user_create", {"dry_run": True})
+        elif s in (200, 201) and isinstance(r, dict):
             user_id = r["id"]
             state.record("auth_users", user_id)
             log.item(CREATED, f"auth user: {email}")
