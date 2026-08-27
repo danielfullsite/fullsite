@@ -120,6 +120,17 @@ describe('PanelAgente — enseña con qué lo sostiene', () => {
     expect(onCerrar).toHaveBeenCalled()
   })
 
+  it('mantiene la tacha fuera de la barra de estado de iOS y con área táctil suficiente', () => {
+    render(<PanelAgente deteccion={det()} onCerrar={() => {}} />)
+    const dialog = screen.getByRole('dialog')
+    const cerrar = screen.getByLabelText('Cerrar')
+
+    expect(dialog.className).toContain('pt-[env(safe-area-inset-top)]')
+    expect(dialog.className).toContain('h-dvh')
+    expect(cerrar.className).toContain('h-11')
+    expect(cerrar.className).toContain('w-11')
+  })
+
   it('cada acción deja un acuse distinto', () => {
     const { rerender } = render(<PanelAgente deteccion={det()} onCerrar={() => {}} />)
     fireEvent.click(screen.getByText('Recuérdamelo'))

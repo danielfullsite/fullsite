@@ -101,7 +101,7 @@ export default function PanelAgente({ deteccion, onCerrar, onAccion }: PanelAgen
         role="dialog"
         aria-modal="true"
         aria-label={`${deteccion.agente}: ${deteccion.linea}`}
-        className="ag-entra-panel fixed inset-y-0 right-0 flex w-full max-w-[440px] flex-col border-l border-[var(--line)] shadow-2xl"
+        className="ag-entra-panel fixed top-0 right-0 flex h-dvh w-full max-w-[440px] flex-col border-l border-[var(--line)] pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] shadow-2xl"
         style={{ zIndex: LAYER.dialog + 1, background: 'var(--panel)' }}
       >
         {/* Encabezado */}
@@ -117,11 +117,12 @@ export default function PanelAgente({ deteccion, onCerrar, onAccion }: PanelAgen
             <p className="mt-0.5 text-[12px] text-[var(--text-3)]">{deteccion.agenteQueHace}</p>
           </div>
           <button
+            type="button"
             onClick={onCerrar}
             aria-label="Cerrar"
-            className="-mr-1 -mt-1 grid h-8 w-8 shrink-0 place-items-center rounded-lg text-[var(--text-3)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text-1)]"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-[var(--text-2)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text-1)] active:bg-[var(--surface-2)]"
           >
-            <X size={17} />
+            <X size={20} />
           </button>
         </div>
 
