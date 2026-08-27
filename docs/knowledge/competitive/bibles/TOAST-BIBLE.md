@@ -308,7 +308,55 @@ Home = tarjetas KPI apiladas con el selector "Today vs Sun Nov 20" arriba: Net s
 - Tema oscuro para KDS y table-service nocturno es estándar; nuestro POS debería ofrecerlo (el KDS ya lo tiene).
 - El export asíncrono por email es fricción que nosotros no tenemos — punto de demo.
 
-## 15. Material de estudio [HECHO — enlaces verificados por búsqueda]
+## 15. El diseño de Toast — sistema, tokens y decisiones [HECHO — buffet.toasttab.com + pantallas de §14]
+
+### 15.1 Buffet — su design system es PÚBLICO
+
+`buffet.toasttab.com` (zeroheight): Foundations (color, brand expression, tipografía, iconos, ilustración, motion, elevation, radius, layout, borders, writing style, accesibilidad, i18n, design tokens) · Components (para Toast Web) · Native · Patterns (navegación, layouts, settings, errores) · **AI** y **POS** como secciones dedicadas — ambas aún en construcción ("letting the dough rise") a 2026-08. Que un POS tenga design system público con secciones para IA y POS dice cuánto invierten en esto.
+
+### 15.2 Los tokens núcleo (paleta primaria oficial)
+
+| Token | Hex | Rol |
+|---|---|---|
+| brand-50 | **#FF4C00** | Color de marca — y SOLO selección (tabs, nav activa) |
+| primary blue-75 | **#2B4FB9** | **Color interactivo** (botones, links, acciones) |
+| gray-0 | #F7F7F7 | Fondo principal |
+| white | #FFFFFF | Superficies/cards |
+| info-0 | #E3F0FB | Fondo de alertas informativas |
+| gray-100 | #666666 | Texto secundario, iconos default |
+| gray-125 | #252525 | Texto principal |
+
+**La decisión maestra:** el naranja de marca NO se usa para acciones — **identidad ≠ interacción**. Por eso el botón "Pay" del POS es AZUL: la marca señala dónde estás; el azul señala qué puedes hacer. Guía explícita de Buffet: "limitar tintes y sombras ayuda al usuario a enfocarse en lo importante".
+
+### 15.3 Tipografía (oficial)
+
+- **Effra** — fuente de marca (humanista, sans): titulares y subtítulos, **nunca body copy**.
+- **Source Sans Pro** — body y datos. Elegida explícitamente porque "features **tabular numerals** that allow for uniform display in reports and tables" — es LA fuente de todos los reportes. Una decisión de diseño de datos, no de estética: los números alinean en columnas.
+- **Roboto en el POS** (razón técnica: Android nativo) · Helvetica en email. Escala tipográfica de 11 estilos.
+
+### 15.4 El diseño por superficie (de las pantallas de §14)
+
+- **Dashboard (Toast Web):** fondo #F7F7F7, cards blancas, sidebar con ítem activo en pill naranja claro + texto naranja, labels de sección en small-caps, KPIs grandes con badge de delta rojo/verde. Denso en datos, ligero en cromo.
+- **POS claro (Quick Order):** tiles con color pastel POR CATEGORÍA (el color codifica jerarquía, no decora), botones pill con icono+texto (Hold/Stay/Send), CTA de pago azul y grande. Targets de dedo generosos.
+- **POS oscuro (Table Order):** near-black, tiles saturados, texto blanco — **el dark es contextual: comedor con luz baja**. Mismo layout que el claro (cero re-aprendizaje al cambiar de modo).
+- **KDS:** el COLOR ES ESTADO — header del ticket rojo=tarde, amarillo=alerta, contorno naranja=online, gris=preview; modificadores siempre en rojo. Dark por default en cocina. Legible a 2 metros: tipografía grande, cronómetro arriba, sin adornos.
+- **Toast Now (móvil):** cards apiladas, la tripleta valor+delta+sparkline en CADA KPI, naranja solo en acentos de gráfica.
+- **Marketing:** mundo aparte — crema cálido, naranja de marca, titulares con acentos en script manuscrito ("running smoothly"), fotos de comida. El producto es sobrio; la marca es cálida. No se contaminan.
+
+### 15.5 El diseño del offline (el estado degradado como ciudadano de primera)
+
+Del §3.4: el apagón tiene UX diseñada, no improvisada — **banner persistente** arriba (estado + causa: red local vs internet vs nube Toast, cada una con su mensaje), **diálogo automático al entrar** al modo ("qué puedes hacer y qué evitar", adaptado a los productos que usas), botón "What to do" para REABRIR la guía, y troubleshooting inline por tipo de falla. Diseñar el peor momento del restaurante es diseño de confianza.
+
+### 15.6 Lecciones para nuestro DS [INFERENCIA — aplicables al redesign ds-v2.x]
+
+1. **Separar identidad de interacción**: nuestro acento de marca no debería ser el color de los botones de acción. Un token `interactive` distinto del token `brand`.
+2. **Tabular numerals en TODO reporte** — un cambio de una línea (`font-variant-numeric: tabular-nums`) que Toast consideró digno de justificar la elección de su fuente de datos.
+3. **Dark contextual, mismo layout**: KDS y POS de mesa oscuros, mostrador claro — sin cambiar la disposición entre temas.
+4. **Color = semántica compartida POS↔KDS**: el mismo rojo significa "tarde" en toda la casa.
+5. **Diseñar el estado degradado**: nuestro offline ya es superior técnicamente; merece la UX de banner+guía de Toast para que también se SIENTA superior.
+6. Publicar nuestro DS algún día = señal de seriedad (Toast lo hace hasta con secciones vacías).
+
+## 16. Material de estudio [HECHO — enlaces verificados por búsqueda]
 
 - **Canal oficial YouTube "Toast, Inc."**: tutoriales POS, payroll, xtraCHEF, menu engineering — youtube.com/channel/UC6oFqFPZ5AbrkJmKHfh3C5A
 - Playlist "Toast Point of Sale": youtube.com/playlist?list=PLM4kOja-yPM6cfyINeEZDUuMRw1msUUyP
@@ -316,10 +364,11 @@ Home = tarjetas KPI apiladas con el selector "Today vs Sun Nov 20" arriba: Net s
 - Demo walkthrough oficial: pos.toasttab.com/request-demo-video (pide correo).
 - Front-of-House Skills 101: support.toasttab.com/en/front-of-house-skills-101 (así entrenan meseros — útil para nuestro onboarding).
 - Docs de plataforma (arquitectura, offline, API): doc.toasttab.com — **lectura obligada de ingeniería**.
+- **Design system Buffet**: buffet.toasttab.com — tokens, tipografía, patrones; lectura obligada de diseño.
 - Reviews con capturas: posusa.com/toast-pos-review, fitsmallbusiness, NerdWallet.
 - Videos independientes: "Toast Restaurant POS System - How it Works" (youtube VL6aD1i9LB4), "TOAST POS Demo and Honest Review" (bcsiKtTa0TM), "Get Started With Menus" (XqebkNDpeoA), unboxing z8h3C4PkpMY.
 
-## 16. Qué falta por verificar
+## 17. Qué falta por verificar
 
 - [x] ~~Ver demos y capturar el back-office~~ — hecho 2026-08-27 desde screenshots oficiales de soporte + App Store, ver §14.
 - [x] ~~Toast API pública~~ — hecho 2026-08-27, ver §8 (las 17 APIs + stack).
