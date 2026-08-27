@@ -50,7 +50,7 @@ Cada decisión de diseño, arquitectura o implementación debe responder estas 1
 | Q-07 | ¿Puede certificarse automáticamente? | Agrega al módulo Auto-Certification de FEOS |
 | Q-08 | ¿Puede recuperarse solo de fallos? | Diseña self-healing antes de declarar production-ready |
 | Q-09 | ¿Puede ser administrado por IA? | El agente existe, ¿tiene los datos para actuar? |
-| Q-10 | ¿Escala a 1,000 restaurantes sin cambiar código? | No escala — rediseña desde el contrato |
+| Q-10 | ¿Escala a 10,000 restaurantes sin cambiar código ni multiplicar soporte humano? | No escala — rediseña desde el contrato |
 
 **Si la respuesta a cualquier pregunta es "no":** documenta el gap, crea el item en FEOS backlog, y define el criterio de aceptación. El gap no es un fallo — es un item del roadmap de la plataforma.
 
@@ -89,6 +89,21 @@ These goals are permanent. Every PR, ADR, and design decision in Fullsite is eva
 | G-10 | **Enterprise-ready** | Audit log, RLS, role-based access, and data isolation that passes SOC 2 review. |
 | G-11 | **Wansoft reliability as minimum baseline** | Every module the platform shares with Wansoft must match or exceed Wansoft's operational reliability. Regressing below Wansoft is a P0. |
 | G-12 | **Modern SaaS architecture** | Multi-tenant DB, feature flags by plan, config in DB not code, automated CI/CD. |
+
+### 1.0 Scale invariant — 10,000 clients
+
+Every platform capability is designed against a 10,000-client operating target. “Clonable” does not mean copying a repository, database, installer, or support checklist per restaurant. It means one versioned platform plus declarative tenant and device configuration.
+
+- One codebase and release train; no client forks.
+- Tenant, branch, station, printer, branding, menu routing, roles, and feature differences are data or signed configuration.
+- Provisioning, migration, certification, update, rollback, secret rotation, backup verification, and deprovisioning expose idempotent machine-callable operations.
+- Fleet work is batched and observable; no workflow requires opening 10,000 remote desktop sessions.
+- Every device reports version, configuration checksum, connectivity, queue depth, storage health, and last successful certification.
+- Rollouts support cohorts, maintenance windows, canaries, pause, and automatic rollback.
+- Per-client background work is bounded, backpressured, and isolated so one tenant cannot exhaust shared capacity.
+- Support scales by exception: healthy clients require no human attention; failures arrive with diagnostics and a safe remediation path.
+
+**Scale gate:** before a capability reaches Skeleton, document the per-client state, fleet operation, failure isolation, observability signal, and zero-touch provisioning path. If any step says “Daniel connects manually,” it remains platform debt.
 
 ### 1.1 Interface quality floor (POS + KDS)
 
