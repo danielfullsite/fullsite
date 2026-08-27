@@ -447,7 +447,7 @@
   function closeModal(){ modal.classList.remove("show"); }
   document.getElementById("gear").addEventListener("click",openModal);
   // X de salir (visible para todos) — confirma para evitar cierres por accidente en cocina
-  (function(){ var cb=document.getElementById("closebtn"); if(cb) cb.addEventListener("click",function(){ if(confirm("¿Cerrar el KDS?")){ try{ window.close(); }catch(e){} setTimeout(function(){ try{ window.location.href="about:blank"; }catch(e){} },150); } }); })();
+  (function(){ var cb=document.getElementById("closebtn"); if(cb) cb.addEventListener("click",function(){ if(confirm("¿Cerrar el KDS?")){ if(window.fullsiteApp && typeof window.fullsiteApp.quit==="function"){ window.fullsiteApp.quit(); return; } try{ window.close(); }catch(e){} setTimeout(function(){ try{ window.location.href="about:blank"; }catch(e){} },150); } }); })();
   document.getElementById("m-close").addEventListener("click",closeModal);
   document.getElementById("m-cancel").addEventListener("click",closeModal);
   modal.addEventListener("click",function(e){ if(e.target===modal) closeModal(); });
