@@ -23,7 +23,6 @@ test('offline KDS close button prefers the native preload bridge', () => {
   assert.match(html, /window\.fullsiteApp\.quit\(\)/)
   assert.match(html, /window\.close\(\)/, 'browser fallback remains available')
 })
-
 test('Golden Skeleton KDS ships compact, operation, and expo views', () => {
   const html = fs.readFileSync(path.join(electronRoot, 'local-server', 'kds-ui.html'), 'utf8')
 
