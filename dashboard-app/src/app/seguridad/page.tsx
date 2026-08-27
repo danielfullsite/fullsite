@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { ArrowUpRight, CircleDot, FileCheck2, Fingerprint, KeyRound, LockKeyhole, Network, Radar, ServerCog, ShieldCheck } from 'lucide-react'
+import { ArrowUpRight, Award, CircleDot, FileCheck2, Fingerprint, KeyRound, LockKeyhole, Network, Radar, ServerCog, ShieldCheck } from 'lucide-react'
 
 export const metadata: Metadata = {
   title: 'Seguridad y confianza | Fullsite',
@@ -27,6 +27,15 @@ const status = [
   ['Divulgación responsable', 'Activo', 'Canal directo para reportar hallazgos de buena fe.'],
   ['Assessment de cliente', 'Disponible', 'Atendemos cuestionarios de TI y seguridad durante el proceso comercial.'],
   ['SOC 2 / ISO 27001', 'No certificado', 'No presentamos estas certificaciones como obtenidas.'],
+] as const
+
+const teamCredentialPath = [
+  { issuer: 'Microsoft', name: 'Secure AI Solutions in the Cloud', topic: 'Seguridad de IA y nube', state: 'En curso', href: 'https://learn.microsoft.com/en-us/credentials/applied-skills/secure-ai-solutions-in-the-cloud/' },
+  { issuer: 'Salesforce', name: 'User Authentication Troubleshooting Superbadge', topic: 'Identidad, MFA y SSO', state: 'Programado', href: 'https://trailhead.salesforce.com/content/learn/superbadges/superbadge-user-authentication-troubleshooting/superbadge-user-authentication-troubleshooting-get-ready' },
+  { issuer: 'IBM', name: 'Cybersecurity Fundamentals', topic: 'Ciberseguridad', state: 'Programado', href: 'https://skillsbuild.org/' },
+  { issuer: 'HubSpot', name: 'Revenue Operations Certification', topic: 'Operación comercial', state: 'Programado', href: 'https://academy.hubspot.com/courses/revenue-operations' },
+  { issuer: 'Google', name: 'Google Analytics Certification', topic: 'Datos y analítica', state: 'Programado', href: 'https://skillshop.withgoogle.com/' },
+  { issuer: 'IBM', name: 'Artificial Intelligence Fundamentals', topic: 'Inteligencia artificial', state: 'Programado', href: 'https://skillsbuild.org/' },
 ] as const
 
 function EvidenceCard({ item }: { item: (typeof evidence)[number] }) {
@@ -73,6 +82,28 @@ export default function SeguridadPage() {
           <p className="max-w-md text-sm leading-6 text-slate-500">Son evaluaciones técnicas del dominio indicado; no sustituyen una certificación corporativa SOC 2 o ISO 27001.</p>
         </div>
         <div className="grid gap-4 md:grid-cols-3">{evidence.map((item) => <EvidenceCard item={item} key={item.label} />)}</div>
+      </section>
+
+      <section className="border-y border-slate-200 bg-white">
+        <div className="mx-auto max-w-6xl px-6 py-20">
+          <div className="grid gap-10 lg:grid-cols-[320px_1fr]">
+            <div>
+              <Award className="h-10 w-10 text-blue-600" strokeWidth={1.6} />
+              <p className="mt-6 font-mono text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">Desarrollo del equipo</p>
+              <h2 className="mt-2 text-3xl font-black tracking-[-0.04em]">Ruta de acreditación</h2>
+              <p className="mt-4 text-sm leading-6 text-slate-500">Estas credenciales son personales y todavía no están obtenidas. Al completarse, publicaremos únicamente el certificado o la URL verificable emitida a nombre de su titular.</p>
+            </div>
+            <div className="overflow-hidden rounded-3xl border border-slate-200">
+              {teamCredentialPath.map((credential) => (
+                <a className="group grid gap-2 border-b border-slate-200 p-5 last:border-b-0 hover:bg-slate-50 sm:grid-cols-[130px_1fr_130px] sm:items-center" href={credential.href} key={`${credential.issuer}-${credential.name}`} rel="noreferrer" target="_blank">
+                  <p className="font-mono text-xs font-bold uppercase tracking-wide text-slate-500">{credential.issuer}</p>
+                  <div><p className="text-sm font-bold text-slate-950">{credential.name}</p><p className="mt-1 text-xs text-slate-500">{credential.topic}</p></div>
+                  <div className="flex items-center justify-between gap-2 sm:justify-end"><span className={`rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${credential.state === 'En curso' ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-600'}`}>{credential.state}</span><ArrowUpRight className="h-4 w-4 text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" /></div>
+                </a>
+              ))}
+            </div>
+          </div>
+        </div>
       </section>
 
       <section className="border-y border-slate-200 bg-white">

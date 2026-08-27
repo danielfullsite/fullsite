@@ -22,4 +22,13 @@ describe('public security trust center', () => {
     expect(securityTxt).toContain('Canonical: https://app.fullsite.mx/.well-known/security.txt')
     expect(securityTxt).toContain('Policy: https://app.fullsite.mx/seguridad')
   })
+
+  it('labels the team credential path as unearned until issuer evidence exists', () => {
+    const page = readFileSync(join(appRoot, 'src/app/seguridad/page.tsx'), 'utf8')
+
+    expect(page).toContain('Estas credenciales son personales y todavía no están obtenidas')
+    expect(page).toContain("state: 'En curso'")
+    expect(page).toContain("state: 'Programado'")
+    expect(page).not.toContain("state: 'Obtenido'")
+  })
 })
