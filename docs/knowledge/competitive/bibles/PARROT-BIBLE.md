@@ -115,7 +115,40 @@ La pieza más importante para nosotros. Marketing automático por WhatsApp:
 - **Reservas nativas** (amalay_reservaciones ya existe) vs su dependencia de OpenTable.
 - Donde ellos ganan hoy y hay que reconocerlo: agregación de delivery madura (Uber/Rappi/DiDi estable — nuestra integración Uber sigue en cert), terminal con autoconciliación (nuestro gap de pagos), y marca/pipeline YC.
 
-## 9. Material de estudio [HECHO]
+## 9. Así se ve — recorrido visual del POS y la terminal (2026-08-27) [HECHO — tour interactivo oficial recorrido pantalla por pantalla]
+
+Recorrí completo su demo Arcade oficial ("Crear nueva orden", `demo.arcade.software/CCdAuXAK7oXAYWW3T7SC`). Lo que se ve:
+
+**1. Vista Mesas (home del POS):**
+- Nav superior negro: Menú · **Mesas** · Pedidos · Configuración · Cajas + iconos de sync/usuario/ayuda + "Cerrar sesión". Corre sobre Android (barra de estado visible).
+- Áreas como tabs (Comedor / Terraza) + botón Historial. Grid de mesas como tarjetas blancas planas (B01–B24) **paginado en 5 páginas** — no hay plano del piso, solo lista cuadriculada; con 100+ mesas se navega por paginación.
+- Estética: fondo gris claro, tarjetas blancas, acento rojo Parrot. Limpia pero plana; sin estados visuales ricos por mesa (solo la ocupada muestra total + folio + "2P" en verde/amarillo).
+
+**2. Abrir mesa:** modal "Elige el número de personas" (1–5 y "+") → Aceptar. Los comensales son dato obligatorio de entrada.
+
+**3. Pantalla de orden (el corazón):**
+- Header: selector de **marca** ("ParrotFood Tacos" con dropdown — el multimarca/dark-kitchen es real y visible) + búsqueda de artículo.
+- Tres niveles de filtro apilados: MENÚ (comida/bebida/total/promoción/sucursal) → CATEGORÍA (chips de colores: Tacos verde, Entrada rosa, etc.) → ARTÍCULO (tarjetas nombre+precio con franja de color por categoría).
+- Ticket a la derecha: mesa/área/personas + tipo de servicio ("Comer aquí") + botón Acciones · secciones Artículos/Resumen · "+ Notas" y "+ Descuentos" · Total · CTA negro "Enviar a cocina" (deshabilitado hasta tener items).
+- El tap en el artículo suma cantidad directo (2 taps = 2×) — sin modal de modificadores en el flujo feliz.
+
+**4. Enviar a cocina:** regresa a Mesas; la mesa ocupada muestra total ($45.00), folio (060125-P0006) y "2P". Toast verde: "La orden de la mesa B06 fue creada con éxito" + tooltip: **"sincronizada automáticamente a la terminal Parrot Pay"** — el POS→terminal es EL momento que su demo vende.
+
+**5. Terminal Parrot Pay (hardware propio, marca "parrotconnect | pay"):**
+- Pantalla de la terminal: usuaria logueada ("Andrea H."), botón Sync, y **lista de órdenes abiertas por mesa con folio, hora y total** — la terminal VE las mesas del POS sin reteclear nada. Tabs: Órdenes / Movimientos / Ayuda.
+- Cobro: teclado numérico con **"Dividir"** (split desde la terminal), Limpiar, Total → "Continuar a propina".
+- Propina la elige el comensal en la terminal: **5% / 10% / 15% / Otro / Sin propina** (sugerencias BAJAS vs Toast 18/20/22% — calibradas a México).
+- "Pago exitoso": desglose Consumo $45.00 + Propina $4.50 = $49.50, tarjeta •••• 1987 → Imprimir voucher / Enviar por correo / Cerrar.
+
+**6. Cierre:** en el POS, la mesa refleja el pago (Subtotal $40.00 + IVA $5.00 = $45.00, faltante $0.00 en rojo→verde) con botones Reimprimir / Editar / **Cerrar orden** / Pagar. Cerrar libera la mesa.
+
+**Lecturas [INFERENCIA]:**
+- Su demo entero es la venta de UNA cosa: cero recaptura entre POS y terminal (la autoconciliación). El flujo de orden en sí es estándar.
+- El IVA se muestra desglosado en el ticket del POS ($40 + $5) — desglose fiscal visible al mesero.
+- No aparecen en el tour: modificadores, tiempos de platillo, cursos, KDS, ni transferencia de mesa. El segundo tour (Parrot Pay, `demo.arcade.software/1aFAWESVHJZJ55KsKauk`) repite el ángulo de cobro.
+- Grid de mesas paginado y sin plano = experiencia pobre para salones grandes; nuestro table map tiene ventaja visual ahí.
+
+## 10. Material de estudio [HECHO]
 
 - Interactive demo en su homepage: parrotsoftware.com.mx ("Prueba este Demo en tiempo real").
 - YouTube: canal de Parrot con tutoriales en español — ej. "Cómo establecer descuentos" (kRI24RieRGw), "Cómo actualizar tu POS Parrot 2025" (J9XeSDPpg3U). Recorrer el canal completo = ver el producto pantalla por pantalla.
@@ -125,7 +158,7 @@ La pieza más importante para nosotros. Marketing automático por WhatsApp:
 - Parrot Academy: parrotsoftware.com.mx/parrot-academy (cómo entrenan a clientes).
 - Comparativa de Last.app (sesgada pero con datos): last.app/mx/last-lessons/last-app-vs-parrot-...
 
-## 10. Qué falta por verificar
+## 11. Qué falta por verificar
 
 - [ ] Recorrer el interactive demo del sitio y capturar pantallas del POS a `assets/`.
 - [ ] Recorrer el flujo completo de facturacion.parrot.rest/mochomos-mty (cronometrar los "45 segundos").
