@@ -484,6 +484,49 @@ ul { list-style: none; }
   border-radius: 12px;
   box-shadow: 0 12px 40px rgba(0,0,0,0.06);
 }
+
+/* ===== OPERATING FLOW VISUALS ===== */
+.operating-visual { position:relative; overflow:hidden; min-height:470px; padding:26px; border:1px solid #e7e9e8; border-radius:32px; background:#f4f5f4; box-shadow:0 24px 70px rgba(13,30,23,.08); isolation:isolate; }
+.operating-visual::before { content:''; position:absolute; width:300px; height:300px; left:50%; top:48%; transform:translate(-50%,-50%); border-radius:50%; background:rgba(16,185,129,.1); filter:blur(55px); z-index:-1; }
+.operating-visual.dark { color:#fff; border-color:#202523; background:#101412; box-shadow:0 24px 70px rgba(13,30,23,.16); }
+.operating-visual.dark::before { background:rgba(16,185,129,.18); }
+.visual-topline { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px; }
+.visual-kicker { font-size:11px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:#6f7873; }
+.dark .visual-kicker { color:#96a09a; }
+.visual-status { display:inline-flex; align-items:center; gap:7px; padding:7px 10px; border:1px solid rgba(16,185,129,.18); border-radius:999px; background:rgba(255,255,255,.72); color:#167454; font-size:11px; font-weight:650; }
+.dark .visual-status { border-color:rgba(110,231,183,.18); background:rgba(255,255,255,.05); color:#6ee7b7; }
+.status-dot { width:7px; height:7px; border-radius:50%; background:#10b981; box-shadow:0 0 0 0 rgba(16,185,129,.45); animation:statusPulse 2.2s ease-out infinite; }
+.flow-diagram { display:block; width:100%; height:auto; }
+.flow-diagram .wire { fill:none; stroke:#cbd2ce; stroke-width:2; }
+.flow-diagram .wire.active { stroke:#10b981; stroke-dasharray:7 10; animation:flowDash 2.2s linear infinite; }
+.flow-diagram .node-card { fill:rgba(255,255,255,.96); stroke:#e1e5e3; stroke-width:1.5; filter:drop-shadow(0 8px 12px rgba(20,35,29,.06)); }
+.flow-diagram .core-card { fill:#141817; stroke:#2e3632; stroke-width:1.5; filter:drop-shadow(0 16px 20px rgba(10,20,16,.22)); }
+.flow-diagram .node-title { fill:#151817; font:650 14px 'Inter',sans-serif; }
+.flow-diagram .node-meta { fill:#89918d; font:500 10px 'Inter',sans-serif; letter-spacing:.03em; }
+.flow-diagram .core-title { fill:#fff; font:700 18px 'Inter',sans-serif; letter-spacing:-.03em; }
+.flow-diagram .core-meta { fill:#6ee7b7; font:600 10px 'Inter',sans-serif; letter-spacing:.08em; }
+.visual-caption { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-top:14px; padding-top:16px; border-top:1px solid rgba(20,30,25,.08); color:#727b76; font-size:12px; }
+.dark .visual-caption { border-top-color:rgba(255,255,255,.08); color:#8e9993; }
+.visual-caption strong { color:#252a27; font-weight:650; }
+.dark .visual-caption strong { color:#ecfdf5; }
+.offline-stage { padding-top:8px; }
+.offline-alert { display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; padding:14px 16px; border:1px solid rgba(248,113,113,.18); border-radius:14px; background:rgba(248,113,113,.07); color:#fecaca; font-size:12px; }
+.offline-alert b { color:#fff; font-weight:650; }
+.offline-route { display:grid; grid-template-columns:repeat(4,1fr); align-items:center; gap:10px; min-height:210px; }
+.route-node { position:relative; display:flex; flex-direction:column; align-items:center; gap:10px; text-align:center; color:#cbd5d0; font-size:11px; font-weight:600; }
+.route-node:not(:last-child)::after { content:''; position:absolute; top:29px; left:calc(50% + 31px); width:calc(100% - 52px); height:2px; background:linear-gradient(90deg,#10b981 0 45%,rgba(16,185,129,.18) 45% 100%); background-size:20px 100%; animation:routeMove 1.3s linear infinite; }
+.route-icon { position:relative; display:grid; place-items:center; width:58px; height:58px; border:1px solid rgba(255,255,255,.12); border-radius:18px; background:rgba(255,255,255,.06); color:#fff; box-shadow:inset 0 1px rgba(255,255,255,.06); z-index:1; }
+.route-icon.core { background:#ecfdf5; color:#0c6044; border-color:#a7f3d0; box-shadow:0 0 38px rgba(16,185,129,.2); }
+.route-icon svg { width:24px; height:24px; }
+.local-proof { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:10px; }
+.proof-chip { padding:10px 8px; border:1px solid rgba(255,255,255,.08); border-radius:10px; background:rgba(255,255,255,.035); color:#91a099; font-size:10px; text-align:center; }
+.proof-chip span { display:block; margin-bottom:2px; color:#6ee7b7; font-size:12px; font-weight:700; }
+@keyframes flowDash { to { stroke-dashoffset:-34; } }
+@keyframes routeMove { to { background-position:20px 0; } }
+@keyframes statusPulse { 70% { box-shadow:0 0 0 7px rgba(16,185,129,0); } 100% { box-shadow:0 0 0 0 rgba(16,185,129,0); } }
+@media (prefers-reduced-motion: reduce) {
+  .flow-diagram .wire.active, .status-dot, .route-node:not(:last-child)::after { animation:none; }
+}
 .feature-icon-box {
   width: 100%;
   aspect-ratio: 4/3;
@@ -835,6 +878,11 @@ ul { list-style: none; }
   .feature-row.reverse .feature-visual { order: 1; }
   .feature-title { font-size: 24px; }
   .feature-desc { font-size: 14px; }
+  .operating-visual { min-height:400px; padding:18px; border-radius:24px; }
+  .offline-route { gap:4px; min-height:180px; }
+  .route-node { font-size:9px; }
+  .route-icon { width:46px; height:46px; border-radius:14px; }
+  .route-node:not(:last-child)::after { top:23px; left:calc(50% + 25px); width:calc(100% - 38px); }
 
   .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 24px; }
   .stat-number { font-size: 28px; }
@@ -925,7 +973,19 @@ ul { list-style: none; }
   <div class="container">
     <div class="feature-row reveal">
       <div class="feature-visual">
-        <img src="/img-dashboard.png" alt="Fullsite Dashboard" class="feature-img">
+        <div class="operating-visual" aria-label="Una venta conecta cocina, inventario y alertas en Fullsite">
+          <div class="visual-topline"><span class="visual-kicker">Un evento, toda la operación</span><span class="visual-status"><span class="status-dot"></span>Conectado</span></div>
+          <svg class="flow-diagram" viewBox="0 0 640 390" role="img" aria-labelledby="flow-title flow-desc">
+            <title id="flow-title">Flujo operativo conectado por Fullsite</title><desc id="flow-desc">Una venta entra a Fullsite y actualiza cocina, inventario y alertas.</desc>
+            <path class="wire active" d="M164 195 C220 195 225 195 272 195"/><path class="wire active" d="M390 195 C432 195 432 72 478 72"/><path class="wire active" d="M390 195 C438 195 438 195 478 195"/><path class="wire active" d="M390 195 C432 195 432 318 478 318"/>
+            <rect class="node-card" x="24" y="153" width="140" height="84" rx="18"/><circle cx="52" cy="180" r="10" fill="#d1fae5"/><path d="M47 180h10M52 175v10" stroke="#059669" stroke-width="2" stroke-linecap="round"/><text class="node-title" x="48" y="210">Venta registrada</text><text class="node-meta" x="48" y="226">Mesa 12 · $486</text>
+            <rect class="core-card" x="272" y="134" width="118" height="122" rx="30"/><circle cx="331" cy="174" r="20" fill="#21332b"/><path d="M319 174h24M331 162v24" stroke="#6ee7b7" stroke-width="2.2" stroke-linecap="round"/><text class="core-title" text-anchor="middle" x="331" y="217">fullsite.</text><text class="core-meta" text-anchor="middle" x="331" y="237">NÚCLEO LOCAL</text>
+            <rect class="node-card" x="478" y="30" width="138" height="84" rx="18"/><text class="node-title" x="501" y="70">Cocina</text><text class="node-meta" x="501" y="88">KDS + impresión</text>
+            <rect class="node-card" x="478" y="153" width="138" height="84" rx="18"/><text class="node-title" x="501" y="193">Inventario</text><text class="node-meta" x="501" y="211">Receta descontada</text>
+            <rect class="node-card" x="478" y="276" width="138" height="84" rx="18"/><text class="node-title" x="501" y="316">Inteligencia</text><text class="node-meta" x="501" y="334">Contexto actualizado</text>
+          </svg>
+          <div class="visual-caption"><span>Cada venta se convierte en contexto.</span><strong>Sin capturar dos veces.</strong></div>
+        </div>
       </div>
       <div class="feature-text">
         <span class="feature-tag">Un solo sistema</span>
@@ -943,16 +1003,29 @@ ul { list-style: none; }
       <div class="feature-text">
         <span class="feature-tag">Funciona sin internet</span>
         <h2 class="feature-title">El internet se cae. Tu restaurante no.</h2>
-        <p class="feature-desc">Fullsite es offline-first. Si pierdes conexión, cada terminal sigue tomando órdenes, enviando a cocina y cobrando. Cuando regresa el internet, todo se sincroniza solo.</p>
+        <p class="feature-desc">Fullsite es local-first. Si pierdes conexión a internet, la red del restaurante conserva el camino crítico: tomar órdenes, enviarlas a cocina e imprimir. Cuando vuelve la conexión, las operaciones pendientes pueden sincronizarse con la nube.</p>
         <ul class="feature-list">
-          <li>Sin servidores locales. Corre en cualquier computadora o tablet con Chrome.</li>
+          <li>La operación local no depende de que la nube esté disponible.</li>
           <li>Sin hardware propietario. Usa el equipo que ya tienes.</li>
           <li>Autenticación por huella digital para aprobaciones de gerente.</li>
           <li>Facturación CFDI integrada. Delivery con Uber Eats y Rappi.</li>
         </ul>
       </div>
       <div class="feature-visual">
-        <img src="/img-bartender.png" alt="Fullsite funciona offline" class="feature-img">
+        <div class="operating-visual dark" aria-label="El flujo local de Fullsite continúa cuando se pierde Internet">
+          <div class="visual-topline"><span class="visual-kicker">Ruta local</span><span class="visual-status"><span class="status-dot"></span>Operación activa</span></div>
+          <div class="offline-stage">
+            <div class="offline-alert"><span>Internet</span><b>Sin conexión</b></div>
+            <div class="offline-route">
+              <div class="route-node"><div class="route-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div><span>POS</span></div>
+              <div class="route-node"><div class="route-icon core"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="8"/></svg></div><span>Núcleo local</span></div>
+              <div class="route-node"><div class="route-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></div><span>KDS</span></div>
+              <div class="route-node"><div class="route-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="7"/></svg></div><span>Impresión</span></div>
+            </div>
+            <div class="local-proof"><div class="proof-chip"><span>✓</span>Órdenes</div><div class="proof-chip"><span>✓</span>Cocina</div><div class="proof-chip"><span>✓</span>Impresión</div></div>
+          </div>
+          <div class="visual-caption"><span>La nube queda fuera del camino crítico.</span><strong>LAN activa</strong></div>
+        </div>
       </div>
     </div>
   </div>
@@ -1123,7 +1196,7 @@ ul { list-style: none; }
       </details>
       <details class="faq-item">
         <summary>¿Necesito comprar equipo especial?</summary>
-        <div class="faq-answer">No. Fullsite corre en cualquier computadora o tablet con navegador. Sin servidores locales, sin terminales propietarias. Usas el hardware que ya tienes.</div>
+        <div class="faq-answer">No necesitas terminales propietarias. Fullsite usa computadoras y tablets compatibles, junto con un coordinador local para mantener conectados POS, cocina e impresión cuando no hay internet.</div>
       </details>
       <details class="faq-item">
         <summary>¿Funciona sin internet?</summary>
