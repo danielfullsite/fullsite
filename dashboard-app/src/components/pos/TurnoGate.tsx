@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { usePathname } from 'next/navigation'
-import { getActiveTurnoWithStaleCheck, openTurno } from '@/lib/pos-data'
+import { getActiveTurnoWithStaleCheck, openTurno, logAudit } from '@/lib/pos-data'
 import { getPermissions } from '@/lib/pos-permissions'
 import { Clock, DoorOpen, AlertTriangle } from 'lucide-react'
 
