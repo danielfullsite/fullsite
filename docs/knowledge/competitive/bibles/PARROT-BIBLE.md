@@ -146,7 +146,10 @@ Recorrí completo su demo Arcade oficial ("Crear nueva orden", `demo.arcade.soft
 - Pantalla de Descuentos: tabla blanca minimal con columnas Restringido / En Uso / Acciones (duplicar, borrar) + botón negro "Agregar descuento". Mismo lenguaje visual plano del POS.
 - Concepto que su tutorial explica: descuento "abierto" (el personal fija el monto en el POS) vs restringido — el permiso viaja del admin al POS.
 - En el POS, el panel de orden tiene "Agregar descuento a la orden / Agregar una nota / Agregar cargo por servicio" + selector de tipo de consumo ("Consumo en el lugar").
-- PENDIENTE: los reportes de ParrotConnect (las ~30 pantallas) siguen sin verse — el tutorial es viejo y el canal tiene más material por minar.
+- **Navegación completa de ParrotConnect revelada** (tutorial "Asignar roles y permisos"): sidebar negro con logo parrotconnect, selector de marca/restaurante arriba ("[PARROT] - Rojo Parrot"), y CINCO secciones: **Menú · Personal · Facturación · Configuración · Reportes**. Personal tiene tabs Roles/Empleados con buscador — los permisos se definen como ROLES nombrados, no checkboxes sueltos.
+- **Menu Maker** (tutorial "Cómo crear un menú"): selector de marca ("Curry Ramen" dropdown — multimarca hasta en el menú), botón "Nuevo menú", columna de estado **"Publicación: No publicado"** — el menú se edita y luego se PUBLICA a los canales de venta (POS, delivery, pedidos online). Modelo editorial draft→publish, no edición en vivo.
+- Playlist oficial "Tutoriales ParrotConnect" (17 videos): roles/permisos, tipos de orden, crear menú, agregar artículos, personalizar comandas (por marca!), cuadrícula de mesas, descuentos. = el mapa de configuración completo de su back-office, video por video.
+- PENDIENTE solo: las pantallas de REPORTES en su versión actual (los tutoriales son de ~2021-2022) y el KDS — se cierran con la demo comercial (ver `GUION-DEMOS-COMPETENCIA.md`).
 
 **Lecturas [INFERENCIA]:**
 - Su demo entero es la venta de UNA cosa: cero recaptura entre POS y terminal (la autoconciliación). El flujo de orden en sí es estándar.
@@ -166,9 +169,9 @@ Recorrí completo su demo Arcade oficial ("Crear nueva orden", `demo.arcade.soft
 
 ## 11. Qué falta por verificar
 
-- [ ] Recorrer el interactive demo del sitio y capturar pantallas del POS a `assets/`.
+- [x] ~~Recorrer el interactive demo del sitio~~ — hecho 2026-08-27, ver §9.
 - [ ] Recorrer el flujo completo de facturacion.parrot.rest/mochomos-mty (cronometrar los "45 segundos").
 - [ ] ¿Series B o revenue? — monitorear prensa/LinkedIn (headcount) trimestralmente.
 - [ ] Precio real de Parrot Grow cuando salga de waitlist.
-- [ ] Profundidad real del offline (preguntar a un cliente actual de Parrot o ex-empleado; Alejandro puede saber).
+- [ ] Profundidad real del offline → pregunta 1 del `GUION-DEMOS-COMPETENCIA.md` (demo + Alejandro).
 - [ ] ¿Tienen ya pedidos en línea GA (pedidos.parrot.rest sugiere que sí, al menos en beta)?

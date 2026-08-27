@@ -48,6 +48,19 @@ Las cuatro biblias ya tienen sección **"Así se ve"** con pantallas reales (dem
 - **Dark mode es estándar** en KDS (Toast) y llega al table-service; SR12 lo acaba de añadir. 
 - GTM: **Parrot compra ads de YouTube sobre las búsquedas de tutoriales de Soft Restaurant** — la caza del incumbente ya empezó y valida el flanco "dueño joven que hereda un SR".
 
+## Estado de cobertura (2026-08-27, segunda pasada)
+
+| Pieza | Toast | Parrot | Soft Restaurant | Square |
+|---|---|---|---|---|
+| Estructura/módulos | ✅ | ✅ | ✅ | ✅ |
+| POS visto | ✅ 2 modos | ✅ flujo completo + terminal | ✅ venta + comandero + login SR12 | ✅ |
+| KDS visto | ✅ 2 temas | ❌ demo | ❌ demo | ❌ (benchmark, no aplica) |
+| Back-office visto | ✅ nav + app dueño | ✅ nav + roles + Menu Maker (reportes actuales: demo) | ✅ admin completo | 🟡 |
+| Pricing | ✅ | ✅ (cotización formal: demo) | ✅ base (add-ons: demo) | ✅ |
+| Offline | ✅ docs oficiales | ❌ demo + Alejandro | ✅ | 🟡 |
+
+Lo que queda vive en UN documento: [`GUION-DEMOS-COMPETENCIA.md`](GUION-DEMOS-COMPETENCIA.md) — dos llamadas de demo (Parrot + distribuidor SR) y tres preguntas a Alejandro cierran todos los ❌.
+
 ## Cómo se mantienen vivas
 
 - **Trigger de actualización:** noticia de funding/lanzamiento de un competidor, un prospecto que los menciona, o revisión trimestral (la que toque primero).

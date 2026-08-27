@@ -165,7 +165,14 @@ Visto directamente de los screenshots oficiales de support.toasttab.com (imágen
 - Tickets en columnas: cabecera con #orden + **cronómetro transcurrido**, color por urgencia (rojo = tarde, amarillo = alerta), **contorno naranja = orden de Online Ordering/Takeout**, gris = preview. Badge **"NOT PAID"** por ticket.
 - Dentro del ticket: origen (Table 13 / Online Ordering), **secciones por curso** (Appetizers/Entrees/Desserts), modificadores en rojo, marcas "Not Fulfilled", items ya cumplidos en gris itálico. Paginación (llegan a 13+ páginas en volumen).
 
+**Toast Now (app del dueño, screenshots oficiales del App Store):**
+- Home = tarjetas KPI apiladas, cada una con COMPARATIVO SIEMPRE visible: Net sales ($14,940.22, ↑5% verde, sparkline de barras naranjas), Labor cost ($2,592.05, 17% de ventas, ↓2%, barras azules), Time (12 clocked-in con chips de iniciales de empleados), SPLH ($38.92 ↑3%), Guests, Avg/Guest.
+- Selector de periodo arriba: "Today vs Sun Nov 20" — el comparativo es parte del dato, no un filtro opcional.
+- Only for iPhone, gratis. Naranja Toast sobre fondo claro.
+
 **Lecturas [INFERENCIA]:**
+- Toast Now nunca muestra un número solo: SIEMPRE valor + % vs referencia + minigráfica. Esa tripleta es el estándar que nuestro dashboard móvil debe igualar en cada KPI.
+- SPLH (sales per labor hour) como KPI de primera pantalla — métrica que nuestro dashboard aún no expone y el dueño-operador entiende al instante.
 - El layout POS de la industria convergió: ticket izquierda + jerarquía menú→grupo→item derecha. Nadie lo reinventa; la diferencia está en densidad, color y qué dato extra viven en el tile (Toast: stock restante; Square: foto; Parrot: franja de color).
 - Tema oscuro para KDS y para table-service nocturno es estándar en Toast — nuestro KDS ya lo tiene, el POS debería ofrecerlo.
 - El "NOT PAID" en cada ticket de KDS une cocina y caja — cocina sabe qué cuenta sigue abierta.
@@ -184,7 +191,7 @@ Visto directamente de los screenshots oficiales de support.toasttab.com (imágen
 
 ## 11. Qué falta por verificar
 
-- [ ] Ver 2-3 demos completas en video y capturar screenshots del back-office a `docs/knowledge/competitive/bibles/assets/` (tarea manual o sesión con navegador).
+- [x] ~~Ver demos y capturar el back-office~~ — hecho 2026-08-27 desde screenshots oficiales de soporte + App Store, ver §9.
 - [ ] Toast API pública (doc.toasttab.com) — mapear objetos expuestos vs nuestro modelo de datos.
 - [ ] Detalle de xtraCHEF (OCR de facturas): flujo exacto — es el espejo de nuestra Fase 1 de recepción CFDI.
 - [ ] Precio y adopción real de ToastIQ (¿incluido o add-on?).

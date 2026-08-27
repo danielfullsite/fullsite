@@ -100,6 +100,15 @@ Visto de screen-recordings de tutoriales (curso "Softrestaurant" de Puntos de ve
 - Detrás, el módulo comedor estilo MDI (ventanas dentro de ventanas): panel de cuentas abiertas (Cuenta/Mesa/Mesero/Orden) + la comanda en TABLA (columnas Mov/Comanda/Cant/Precio/Importe/**Tiempo de preparación**/Comentario) + pie con Subtotal/Monedero/Descuento/Impuestos/Propina.
 - Paleta naranja/beige uniforme. Es un ERP de captura, no un POS táctil: el contraste con cualquier grid touch (el nuestro, Parrot, Square) es brutal a simple vista.
 
+**El COMANDERO (estación táctil del mesero, visto en video de capacitación):**
+- Login con teclado numérico + ENTRAR; al abrir cuenta, modal con **teclado QWERTY EN PANTALLA** + numpad (se teclea el nombre/mesa, no se toca un plano). Panel lateral de ÁREAS (Todas las áreas / Comedor). Botones Siguiente/Abandonar.
+- El temario de capacitación de un distribuidor enumera las capacidades del comandero: abrir mesa, captura de comanda, comentarios de preparación, productos múltiples, descuentos a productos, eliminar productos, favoritos, enviar comanda, consultar cuenta, **cambio de mesa, juntar mesas, traspasar productos**, imprimir cuenta, descuento general a cuenta. (Las tres del medio son las que operadores tipo AMALAY usan a diario — paridad obligatoria.)
+- Es touch-adaptado, no touch-nativo: paradigma de formulario con teclado en pantalla.
+
+**SR 12 — la piel nueva (video presentación oficial de distribuidor, 2025):**
+- Login renovado: PIN pad de tiles blancos grandes, acento naranja, limpio — un salto visual real vs SR11.
+- La estructura de fondo (menús + módulos) se mantiene; lo nuevo es cosmético + los features listados en §3 [INFERENCIA por la comparativa oficial SR11→SR12].
+
 **El ecosistema de aprendizaje alrededor:** el curso de 12 lecciones de un DISTRIBUIDOR cubre exactamente la operación diaria: agregar cajeros con restricciones, inventario/existencias, crear insumos, registrar propina, **corte de caja**, salidas/entradas de dinero. Que un tercero venda cursos de SR = hay demanda de capacitación (= fricción del producto) y un canal de contenido que nosotros podemos atacar con "en Fullsite esto no necesita curso".
 
 **Hallazgo de GTM colateral [HECHO]:** al buscar "soft restaurant 12 tutorial" en YouTube, el primer resultado es un **anuncio pagado de Parrot** ("Con Parrot vendés más, operás mejor..."). Parrot está cazando la base instalada de SR con ads sobre sus búsquedas de soporte — la misma jugada que nosotros podemos correr más barato con contenido orgánico de migración.
