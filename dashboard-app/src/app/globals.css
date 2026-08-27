@@ -71,6 +71,12 @@ details[name="posnav"][open] > summary .nav-caret { transform: rotate(180deg); }
 body:has(.pos-kiosk) {
   overscroll-behavior: none;
 }
+/* La superficie principal del POS es una estación de trabajo de una sola pantalla.
+ * El documento no se mueve: sólo las listas internas declaradas pueden desplazarse. */
+body:has(.pos-service-shell) {
+  height: 100dvh;
+  overflow: hidden;
+}
 /* Scroll suave y fluido en todas las áreas scrolleables del POS */
 .pos-kiosk [class*="overflow-y-auto"],
 .pos-kiosk [class*="overflow-x-auto"] {
