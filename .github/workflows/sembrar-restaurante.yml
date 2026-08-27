@@ -1,0 +1,60 @@
+name: Sembrar restaurante (demo)
+
+# Corre una semilla de dashboard-app/seeds/ contra Supabase.
+#
+# Existe porque SUPABASE_SERVICE_KEY no vive en las máquinas de nadie —sólo aquí,
+# como secreto del repo— así que `npx tsx seeds/run.ts` no se puede correr en
+# local. Antes de esto el framework de semillas en TypeScript no tenía forma de
+# ejecutarse en CI; las demos se sembraban con scripts de Python aparte.
+#
+# SÓLO dispatch manual, nunca cron: escribe un tenant nuevo en la base de
+# producción y eso siempre debe ser una decisión de alguien, no de un horario.
+
+on:
+  workflow_dispatch:
+    inputs:
+      semilla:
+        description: 'Nombre de la semilla (carpeta en dashboard-app/seeds/)'
+        required: true
+        type: choice
+        options:
+          - rosta
+          - coffee-shop
+          - demo
+      confirmo:
+        description: 'Escribe SEMBRAR para confirmar que esto escribe en producción'
+        required: true
+        type: string
+
+jobs:
+  sembrar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      # La confirmación va ANTES del checkout: si alguien disparó esto por error,
+      # que muera antes de tocar credenciales.
+      - name: Verificar confirmación
+        run: |
+          if [ "${{ inputs.confirmo }}" != "SEMBRAR" ]; then
+            echo "::error::Confirmación incorrecta. Escribe SEMBRAR para continuar."
+            exit 1
+          fi
+          echo "Sembrando '${{ inputs.semilla }}' en producción."
+
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Instalar dependencias
+        working-directory: dashboard-app
+        run: npm ci --prefer-offline --no-audit
+
+      - name: Sembrar
+        working-directory: dashboard-app
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY:     ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: npx tsx seeds/run.ts "${{ inputs.semilla }}"

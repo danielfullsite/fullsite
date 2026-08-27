@@ -15,13 +15,15 @@ if (!target) {
   console.error('\nUsage: npx tsx seeds/run.ts <restaurant>\n')
   console.error('Available:')
   console.error('  demo         Café Central — restaurante de demostración')
-  console.error('  coffee-shop  Espresso Lab — specialty coffee\n')
+  console.error('  coffee-shop  Espresso Lab — specialty coffee')
+  console.error('  rosta        ROSTA — demo Diezmex (Daniel Olivares)\n')
   process.exit(1)
 }
 
 const SEEDS: Record<string, () => Promise<{ seed: () => Promise<void> }>> = {
   'demo':         () => import('./demo/index.ts'),
   'coffee-shop':  () => import('./coffee-shop/index.ts'),
+  'rosta':        () => import('./rosta/index.ts'),
 }
 
 const loader = SEEDS[target]
