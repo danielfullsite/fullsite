@@ -150,6 +150,43 @@ describe('getAllPlans', () => {
       expect(plan.priceAnnual).toBeGreaterThan(0)
     }
   })
+
+  // Los precios son un contrato comercial, no un detalle de implementación.
+  // Antes sólo se afirmaba "> 0", y por eso el encabezado del archivo pudo decir
+  // "$17,999/año, ahorra $0" mientras el código cobraba 14,999 sin que nada lo
+  // detectara. Estos casos fijan los números de docs/strategy/PRICING.md para que
+  // moverlos sea una decisión explícita y no una deriva silenciosa.
+  it('los precios son exactamente los de PRICING.md', () => {
+    const esperado: Record<string, { mes: number; anio: number; hardware?: number }> = {
+      reporteador:       { mes: 1999, anio: 19999 },
+      fullsite_software: { mes: 4999, anio: 49999 },
+      fullsite_completo: { mes: 4999, anio: 49999, hardware: 45000 },
+    }
+    for (const plan of getAllPlans()) {
+      const e = esperado[plan.id]
+      expect(e, `plan ${plan.id} sin precio esperado — actualiza PRICING.md y esta prueba`).toBeDefined()
+      expect(plan.priceMonthly, `${plan.id} mensual`).toBe(e.mes)
+      expect(plan.priceAnnual, `${plan.id} anual`).toBe(e.anio)
+      if (e.hardware) expect(plan.hardwareKit, `${plan.id} hardware`).toBe(e.hardware)
+    }
+  })
+
+  it('el anual descuenta entre 15% y 20% en los tres planes', () => {
+    for (const plan of getAllPlans()) {
+      const descuento = 1 - plan.priceAnnual / (plan.priceMonthly * 12)
+      expect(descuento, `${plan.id} descuenta ${(descuento * 100).toFixed(1)}%`).toBeGreaterThan(0.15)
+      expect(descuento, `${plan.id} descuenta ${(descuento * 100).toFixed(1)}%`).toBeLessThan(0.20)
+    }
+  })
+
+  // La escalera tiene que seguir siendo escalera: la cuña entra barato y el
+  // producto completo cuesta más. Si se invierte, el movimiento de venta —entrar
+  // con Inteligencia y subir a Fullsite— deja de tener sentido.
+  it('la cuña cuesta menos que el producto completo', () => {
+    const porId = Object.fromEntries(getAllPlans().map(p => [p.id, p]))
+    expect(porId.reporteador.priceMonthly).toBeLessThan(porId.fullsite_software.priceMonthly)
+    expect(porId.reporteador.priceAnnual).toBeLessThan(porId.fullsite_software.priceAnnual)
+  })
 })
 
 describe('AMALAY backward compatibility', () => {

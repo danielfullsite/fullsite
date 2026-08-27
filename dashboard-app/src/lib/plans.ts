@@ -6,10 +6,14 @@
  *   - "fullsite_software": full software suite (POS + IA + dashboard, no hardware)
  *   - "fullsite_completo": everything + hardware kit
  *
- * Pricing (annual, per sucursal):
- *   - reporteador:       $17,999/año ($1,499/mes equiv, ahorra $0 vs monthly)
- *   - fullsite_software:  $49,999/año ($4,166/mes equiv, ahorra $10K vs monthly $4,999×12)
- *   - fullsite_completo:  $49,999/año + hardware kit $45,000 (one-time)
+ * Pricing (per sucursal, MXN). El anual descuenta ~2 meses en los tres.
+ *   - reporteador:        $1,999/mes · $19,999/año  (ahorra $3,989 vs 1,999×12)
+ *   - fullsite_software:  $4,999/mes · $49,999/año  (ahorra $9,989 vs 4,999×12)
+ *   - fullsite_completo:  $4,999/mes · $49,999/año  + hardware kit $45,000 (one-time)
+ *
+ * El encabezado anterior decía "reporteador $17,999/año, ahorra $0" mientras el
+ * código cobraba 14999. Comentario y código llevaban meses en desacuerdo; ahora
+ * cuadran y el descuento anual es el mismo ~17% en los tres planes.
  *
  * Competitor: el sistema anterior = $1,500/mes software + $130K hardware = $148K first year
  * Fullsite completo = $95K first year (36% cheaper)
@@ -42,11 +46,14 @@ export interface PlanDefinition {
 
 const PLAN_DEFINITIONS: Record<PlanId, PlanDefinition> = {
   reporteador: {
+    // El id se queda como 'reporteador' A PROPÓSITO: está guardado en la config de
+    // clientes y en restaurant-manifest. Cambiarlo sería una migración de datos por
+    // un tema de marca. Lo que el cliente ve es `name`.
     id: 'reporteador',
-    name: 'Reporteador IA',
-    description: 'Inteligencia IA sobre tu POS actual — sin cambiar nada',
-    priceMonthly: 1499,
-    priceAnnual: 14999,
+    name: 'Fullsite Inteligencia',
+    description: 'El experto de IA sobre el POS que ya tienes — sin cambiar nada',
+    priceMonthly: 1999,
+    priceAnnual: 19999,
     pages: [
       '/',
       '/ventas', '/cortes', '/meseros', '/platillos', '/tendencias', '/propinas',
