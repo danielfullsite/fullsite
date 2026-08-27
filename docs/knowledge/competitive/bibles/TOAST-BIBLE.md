@@ -260,49 +260,49 @@ Navegación: menú izquierdo → **Reports** → abre Weekly Overview → flecha
 
 ## 14. Así se ve — pantallas reales, ilustrado (2026-08-27) [HECHO — imágenes oficiales de Toast, descargadas a `assets/`]
 
-### 13.1 Toast Web — navegación del back-office
+### 14.1 Toast Web — navegación del back-office
 
 ![Navegación de Toast Web](assets/toast-web-nav.jpg)
 
 Sidebar naranja: Home · **Reports** · Employees · Payroll · Menus · Takeout & delivery · Catering & events · Payments. Al abrir Reports aparece el **segundo panel con el árbol de reportes** (Sales · Employee performance → Time entries / Hourly sales / Employee productivity / Labor summary...). El dashboard de inicio es de tarjetas KPI ("Net sales" con % vs periodo en badge).
 **Qué mirar:** dos niveles de navegación (módulo → reporte) mantienen las 9 categorías navegables sin megamenú. El export pesado NO es en vivo: botón "Email Export" → correo "Your report is ready".
 
-### 13.2 POS — Quick Order (mostrador, tema claro)
+### 14.2 POS — Quick Order (mostrador, tema claro)
 
 ![POS Quick Order](assets/toast-pos-quickorder.jpg)
 
 Ticket a la izquierda (tab name, dining option, Hold/Stay/Send, Subtotal+Tax, "Fast $$", Discount, Pay). A la derecha la jerarquía de TRES niveles siempre visible — la imagen oficial de Toast la anota: fila de **Menus** (FOOD rojo, DRINKS azul...) → fila de **Groups** (Appetizers rosa, Sandwiches amarillo...) → grid de **Items**.
 **Qué mirar:** color-coding fuerte por categoría; búsqueda + "Open Item" arriba; los tres niveles colapsan la navegación a cero taps de profundidad — nunca "entras" a una categoría, todo está en pantalla.
 
-### 13.3 POS — Table Order (servicio a mesa, tema OSCURO)
+### 14.3 POS — Table Order (servicio a mesa, tema OSCURO)
 
 ![POS Table Order dark](assets/toast-pos-tableorder-dark.jpg)
 
 Header del check: #orden, mesa A5, comensales, mesero ("Mariana D") y accesos directos **Svc charge / Split / Discount**. Banner "TEST MODE" cuando aplica. Botón "Back to classic POS" (la migración al New POS Experience es opt-out — conviven dos generaciones de UI).
 **Qué mirar:** los tiles de platillo llevan un **contador arriba (15, 14...)** = cuántos quedan antes del 86. El inventario vive EN el grid, visible al mesero. Es el detalle más robable de toda la pantalla.
 
-### 13.4 KDS — tema claro ("All prep stations")
+### 14.4 KDS — tema claro ("All prep stations")
 
 ![KDS claro](assets/toast-kds-light.jpg)
 
 Tickets en columnas: cabecera con #orden + **cronómetro**, color por urgencia (rojo = tarde, amarillo = alerta), **contorno naranja = orden online/takeout**, gris = preview. Badge **"NOT PAID"** por ticket. Dentro: origen (Table 13 / Online Ordering), secciones por curso (Appetizers/Entrees/Desserts), modificadores en rojo, "Not Fulfilled", items cumplidos en gris itálico. Botones: All day view · Recently fulfilled · **Recall**. Paginación (aquí va en la página 13).
 **Qué mirar:** el "NOT PAID" une cocina y caja — cocina sabe qué cuenta sigue abierta. Y el contorno naranja separa delivery de sala de un vistazo.
 
-### 13.5 KDS — tema oscuro (estación "Food, Hot, Cold")
+### 14.5 KDS — tema oscuro (estación "Food, Hot, Cold")
 
 ![KDS oscuro](assets/toast-kds-dark.jpg)
 
 La misma pantalla filtrada por estación, en dark mode (el default de cocina). Cronómetros largos visibles (1:42:58 — la demo tiene tickets viejos), grid de 2 filas.
 **Qué mirar:** el filtro de estación vive en el título; un dispositivo = una estación o el expeditor consolidado.
 
-### 13.6 Toast Now — la app del dueño
+### 14.6 Toast Now — la app del dueño
 
 ![Toast Now](assets/toast-now-app.jpg)
 
 Home = tarjetas KPI apiladas con el selector "Today vs Sun Nov 20" arriba: Net sales ($14,940.22 ↑5% + sparkline), Labor cost ($2,592.05, 17% de ventas, ↓2%), Time (12 clocked-in con chips de empleados), SPLH ($38.92 ↑3%), Guests, Avg/Guest.
 **Qué mirar:** **ningún número aparece solo** — siempre valor + % vs referencia + minigráfica. Esa tripleta es el estándar que nuestro dashboard móvil debe igualar. Y SPLH como métrica de primera pantalla.
 
-### 13.7 Las lecturas transversales [INFERENCIA]
+### 14.7 Las lecturas transversales [INFERENCIA]
 
 - El layout POS de la industria convergió (ticket + jerarquía a la derecha); la diferencia competitiva está en QUÉ dato extra vive en el tile — Toast: stock restante; Square: foto; Parrot: franja de color.
 - Tema oscuro para KDS y table-service nocturno es estándar; nuestro POS debería ofrecerlo (el KDS ya lo tiene).
