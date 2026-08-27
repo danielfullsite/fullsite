@@ -47,29 +47,52 @@ Signup online ~10 min, sin fricción → hardware llega en 3-5 días **preconfig
 5. **Pago**: split hasta 50, propina sugerida en pantalla del cliente, tarjeta/Apple/Google/gift/loyalty. Si el comensal paga con tarjeta vinculada, **acumula lealtad sin decir nada** (card-linked).
 6. **Cada paso emite datos** — la orden no termina en el pago: alimenta reportes, CRM, IQ y el flujo fiscal del dueño en tiempo real.
 
-### 3.3 El flujo del dinero (donde vive el negocio de Toast)
+**El turno del mesero, de principio a fin [HECHO — artículos de soporte]:** clock-in con PIN de 4 dígitos en el mismo POS (el turno viene programado desde Sling) → el dispositivo abre en su modo (Table Service con mesas, o Quick Order de mostrador) → abrir mesa + comensales → construir el check (búsqueda, "Open Item" para fuera de menú, modificadores obligatorios que BLOQUEAN hasta resolverse, asientos por comensal) → **Hold / Stay / Send** decide qué viaja a cocina y cuándo → durante el servicio: agregar rondas, mover el check a otro mesero, service charge, transferir/juntar mesas → cobro: Print → Pay → split (por item, porcentaje o partes iguales, hasta 50) → propina en la pantalla del cliente o en el Go 3 (que cobra hasta en la banqueta, por celular) → clock-out con declaración de propinas. Todo el turno sucede sin salir del POS.
+
+### 3.3 El flujo del ticket en cocina (KDS, ciclo de vida completo)
+
+1. **Send** en el POS dispara el ticket → **routing automático**: cada item está mapeado a su prep station (parrilla, freidora, ensaladas...) y solo aparece donde se prepara.
+2. **Firing**: inmediato, por curso (los postres no se disparan con las entradas), o **auto-fire por prep time** — la estación con preparación más larga arranca primero para que todo el curso salga JUNTO.
+3. **En pantalla**: cronómetro por ticket con umbrales de color (verde→amarillo→rojo), modificadores en rojo, **"NOT PAID"** visible (cocina sabe qué cuenta sigue abierta), contorno naranja = orden online/takeout, origen visible (Mesa 13 / Online Ordering).
+4. **Bump por estación** → cuando TODAS las estaciones terminaron, el ticket se consolida en el **expeditor** → el expo bumpea → **Order-Ready Board** muestra el nombre al comensal/repartidor.
+5. Herramientas de servicio: **Recall** (des-bumpear un error) · **All Day View** (conteos agregados por item: "van 14 croissant sandwiches") · Recently Fulfilled (auditar lo que ya salió).
+6. **Cada bump alimenta analytics**: fulfillment time por estación y por hora → los 3 reportes de Kitchen Ops → y el auto-fire aprende de esos prep times. El KDS no es una pantalla: es el sensor de throughput de la cocina.
+
+### 3.4 El flujo del apagón (offline, minuto a minuto) [HECHO — docs oficiales]
+
+1. Se cae el internet → **banner** arriba del POS + diálogo automático: qué puedes hacer y qué evitar.
+2. Con "local sync": el **hub único** (auto-elegido por Toast: Ethernet, no handheld, uno por red) releva POS→KDS. Pero **las órdenes de un POS NO aparecen en otro POS** — cada mesero debe operar en UN solo dispositivo todo el apagón.
+3. Cobros: efectivo sí; tarjeta solo **banda magnética** (EMV apagado), guardada localmente; gift cards, loyalty y house accounts NO funcionan. Guardar recibos firmados por si el pago se pierde.
+4. Reglas de supervivencia (suyas, textuales): no cerrar sesión (no podrás volver a entrar), no reinstalar la app ni limpiar caché (**borra los pagos almacenados permanentemente**), no apagar el router, no cambiar de red.
+5. Regresa el internet → sync automático de la cola → los pagos almacenados se capturan. Si NO reconectaste antes del fin del día: **llamar a soporte** para pausar el auto-capture.
+6. Riesgo residual asumido por el restaurante: tarjetas que declinan al capturarse horas después = pérdida. **Contraste Fullsite**: nuestro Bridge es un servidor local con estado COMPARTIDO — dos cajas y tres comanderas se siguen viendo entre sí sin internet. En el apagón, un Toast opera como islas; un Fullsite opera como restaurante.
+
+
+### 3.5 El flujo del dinero (donde vive el negocio de Toast)
 
 Venta con tarjeta → **procesamiento Toast obligatorio** (2.49% + 15¢, o 3.09-3.69% en Starter) → depósito al día siguiente, o **Instant Deposit** (segundos, fee 1.75%) → **Toast Checking** aparta automático impuestos y nómina → **Payroll** paga (mediana 15 min de proceso), tips del POS ya pooleados por **Tips Manager** → empleado puede cobrar en **Pay Card** → y si el restaurante necesita capital, **Toast Capital** presta con repago como % de ventas futuras — que Toast ve y cobra en la fuente porque procesa cada transacción. **El círculo se cierra: cada dólar del restaurante pasa por Toast en 4 momentos distintos** (cobro, banco, nómina, crédito). El POS de $69/mes es la puerta; esto es la casa.
 
-### 3.4 El flujo del dato → decisión
+### 3.6 El flujo del dato → decisión
 
 Transacción → **74 reportes en 9 categorías** (tiempo real, comparativos YoY) → **Benchmarking** contra restaurantes similares (moat de 130K locations) → **ToastIQ** encima de todo: feed "For you" con recomendaciones proactivas, preguntas en lenguaje natural hasta nivel modificador, y ACCIONES con confirmación (editar menú, 86, turnos, drafts de campañas) → el dueño ejecuta desde **Toast Now** en el celular (throttle de delivery, 86, turnos) sin abrir la laptop. El loop completo dato→insight→acción vive dentro de Toast.
 
-### 3.5 El flujo del comensal (el flywheel de demanda)
+**El día del dueño, como lo diseñó Toast:** 7 am — Toast Now en el celular: ventas de ayer vs mismo día de la semana pasada, labor %, quién ya está clocked-in · media mañana — se acabó un platillo: 86 desde el celular; cocina saturada: throttle del online ordering · lunes — Toast Web: Weekly Overview → drill al Sales Summary → PMIX para decidir menú → Cash & Loss para cuadrar descuentos/voids → email export al contador · duda suelta — se la pregunta a ToastIQ y ejecuta con confirmación · quincena — Payroll en ~15 min porque los tips ya vienen pooleados y las horas ya están en el sistema. **El dueño nunca sale del ecosistema para decidir.**
+
+### 3.7 El flujo del comensal (el flywheel de demanda)
 
 Primera visita → paga con tarjeta → **Guest CRM** crea el perfil (órdenes+visitas+reservas unificadas) → loyalty acumula (card-linked, puntos fraccionales pre-tax) → **email/SMS marketing** — que ToastIQ redacta y el dueño aprueba — lo trae de vuelta → reserva por **Google/Toast Tables** → el host lo recibe sabiendo qué pidió la vez pasada → repite. Cada vuelta engorda el perfil y afina la siguiente campaña.
 
-### 3.6 El flujo de costos (el espejo de nuestra recepción CFDI)
+### 3.8 El flujo de costos (el espejo de nuestra recepción CFDI)
 
 Factura del proveedor → foto/email a **xtraCHEF** → OCR línea por línea (<24 h) → GL auto-coding → sync contable (QuickBooks/Sage) → costos de ingredientes actualizados → **recipe costing** cruza con el mix de ventas del POS → margen real por platillo → menu engineering (PMIX) → reprecio. Entradas (facturas) y salidas (ventas) cerradas en un solo sistema — la "verdad de inventario" de Alejandro, versión gringa con OCR.
 
-### 3.7 La síntesis en una frase
+### 3.9 La síntesis en una frase
 
 **Toast convierte cada orden en cuatro negocios** (procesamiento, banca, nómina, crédito) **y cada dato en retención** (reportes→IQ→acción; comensal→CRM→campaña→regreso). El POS casi se regala porque no es el producto — es el punto de captura. Nuestra versión de esta lógica: el POS captura, la IA decide, WhatsApp conversa — y el CFDI nos da gratis lo que a ellos les cuesta OCR y 24 horas.
 
 ## 4. El POS de pies a cabeza
 
-### 3.1 Flujo de cobro [HECHO — docs + demos públicas]
+### 4.1 Flujo de cobro [HECHO — docs + demos públicas]
 - Grid de categorías touch con imágenes; búsqueda rápida por nombre.
 - Modificadores en modal: obligatorios vs opcionales.
 - Split checks nativo: por item o porcentaje, hasta 50 divisiones.
@@ -77,21 +100,21 @@ Factura del proveedor → foto/email a **xtraCHEF** → OCR línea por línea (<
 - Pagos: cash, tarjeta, Apple/Google Pay, gift cards.
 - <2 segundos por transacción en su hardware.
 
-### 3.2 Permisos y roles [HECHO]
+### 4.2 Permisos y roles [HECHO]
 - Niveles Employee/Manager/Admin/Owner + **100+ permisos granulares** ("puede aplicar descuento >20%", "puede ver food cost", "puede cerrar caja").
 - PIN de 4 dígitos por empleado; fingerprint en hardware nuevo. Clock-in/out integrado al POS.
 - Audit trail de toda acción (quién, cuándo, qué).
 
-### 3.3 Hardware [HECHO]
+### 4.3 Hardware [HECHO]
 - **Toast Go 3** (global desde 2026-04-28): 6.52", >24 h batería (carga 4.5 h), IP65, caídas 1.5 m, 16% más ligero que Go 2, cámaras frontal+trasera, **WiFi + CELULAR nativo**, ToastIQ integrado. El mesero cobra en la banqueta sin red del local.
 - Flex (terminal), Flex for Guest (pantalla al cliente), Flex for Kitchen, Tap (lector), Kiosk, KDS propio. Todo Android propietario.
 
-### 3.4 KDS [HECHO]
+### 4.4 KDS [HECHO]
 - Routing por estación (parrilla/freidora/ensaladas) automático por item.
 - Timers con semáforo (verde→amarillo→rojo). Bump por estación; la orden se completa cuando todas terminan.
 - **Expeditor mode**: vista unificada para coordinar estaciones. Prep-time analytics por estación.
 
-### 3.5 Offline — su talón de Aquiles arquitectónico [HECHO — doc.toasttab.com]
+### 4.5 Offline — su talón de Aquiles arquitectónico [HECHO — doc.toasttab.com]
 
 **Modo básico:** si no hay cloud, **los dispositivos NO se comunican entre sí** (comunicación mediada por nube, no P2P). Pagos offline solo banda magnética (EMV deshabilitado), almacenados localmente. Checks offline numerados: `(device_id + 2) × 1000 + secuencial`.
 
