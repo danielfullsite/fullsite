@@ -90,6 +90,21 @@ These goals are permanent. Every PR, ADR, and design decision in Fullsite is eva
 | G-11 | **Wansoft reliability as minimum baseline** | Every module the platform shares with Wansoft must match or exceed Wansoft's operational reliability. Regressing below Wansoft is a P0. |
 | G-12 | **Modern SaaS architecture** | Multi-tenant DB, feature flags by plan, config in DB not code, automated CI/CD. |
 
+### 1.1 Interface quality floor (POS + KDS)
+
+Every provisioned restaurant inherits the same operational interface contract. Branding may change logos and approved tokens; it may not weaken usability.
+
+- The application shell uses `100dvh`; the document itself never scrolls during service. Only bounded lists or boards may move.
+- Every primary touch target is at least 48×48 px; destructive actions require a clearly named confirmation.
+- POS adapts by work surface: phone alternates menu/order, tablet shows two panes, terminal uses the full two-pane workspace.
+- KDS ships with three persisted views: **Compacta** (maximum density), **Operación** (large touch controls), and **Expo** (ready orders only).
+- KDS order priority is chronological and stable. Older orders never jump behind newer work because of card height.
+- Modifiers, notes, allergies, elapsed time, station, and offline state remain legible in every density.
+- Light/dark mode, type scale, station, alert threshold, and board view are declarative installation settings—not client-specific branches.
+- Empty, degraded, offline, printing, and reconciliation states must explain what is happening and what the operator can do.
+
+**Certification gate:** iPhone SE (375×667), iPad portrait (768×1024), iPad landscape (1024×768), 1366×768 terminal, and 1920×1080 KDS. A layout is not Skeleton-ready until the critical flow passes at all five sizes without clipped actions.
+
 ---
 
 ## 2. Platform Lifecycle
