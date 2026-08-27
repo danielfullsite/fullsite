@@ -141,6 +141,15 @@ async function startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, servi
       const t = setTimeout(() => controller.abort(), 6000)
 
       const bearer = await getBearer()
+      const turnoRes = await fetch(
+        `${supabaseUrl}/rest/v1/pos_turnos?client_id=eq.${encodeURIComponent(restaurantId)}&closed_at=is.null&select=id,opened_by,opened_at&order=opened_at.desc`,
+        {
+          headers: { apikey: supabaseKey, Authorization: `Bearer ${bearer}` },
+          signal: controller.signal,
+        }
+      )
+      const activeTurnos = turnoRes.ok ? await turnoRes.json() : []
+      const activeTurno = activeTurnos[0] || null
       const res = await fetch(
         `${supabaseUrl}/rest/v1/pos_orders?client_id=eq.${encodeURIComponent(restaurantId)}&status=neq.closed&select=id,mesa,status,items,turno_id,updated_at`,
         {
@@ -152,6 +161,13 @@ async function startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, servi
       if (!res.ok) return
 
       const orders = await res.json()
+      // A restaurant can have historical/open-order residue from an older shift.
+      // Only the newest active shift belongs on today's operational surfaces. A
+      // duplicate active shift is reported in the turno snapshot for remediation,
+      // but its orders must never bleed into the current KDS.
+      const operationalOrders = activeTurno
+        ? orders.filter(order => order.turno_id === activeTurno.id)
+        : []
 
       // Marketplace orders live in delivery_orders. Mirror them into the same
       // durable ORDER_SENT protocol consumed by Electron KDS and printer queues.
@@ -181,16 +197,21 @@ async function startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, servi
 
       // Build mesa state from active orders
       const mesaMap = {}
-      for (const o of orders) {
+      for (const o of operationalOrders) {
         mesaMap[String(o.mesa)] = { status: o.status === 'pagando' ? 'pagando' : 'ocupada', order_id: o.id }
       }
 
       const event = await eventStore.appendInternal(EVENT.STATE_SYNC, {
         mesas:      Object.entries(mesaMap).map(([mesa, v]) => ({ mesa, ...v })),
-        kds_queue:  orders.filter(o => o.status === 'enviada' || o.status === 'preparando').map(o => ({
-          order_id: o.id, mesa: o.mesa, items_sent: o.items, sent_at: o.updated_at,
+        kds_queue:  operationalOrders.filter(o => o.status === 'enviada' || o.status === 'preparando').map(o => ({
+          order_id: o.id, mesa: o.mesa, items_sent: o.items, sent_at: o.updated_at, turno_id: o.turno_id,
         })),
-        turno:      null, // TODO: fetch active turno separately
+        turno:      activeTurno ? {
+          id: activeTurno.id,
+          opened_by: activeTurno.opened_by,
+          opened_at: activeTurno.opened_at,
+          conflict_count: activeTurnos.length,
+        } : null,
         synced_at:  new Date().toISOString(),
       }, { restaurantId })
 
