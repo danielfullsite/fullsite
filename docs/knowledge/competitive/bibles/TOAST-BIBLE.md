@@ -104,9 +104,55 @@ Navegación: menú izquierdo → **Reports** → abre Weekly Overview → flecha
 - Motor: 130K+ locations, millones de transacciones — su moat es la ESCALA de datos.
 - Go 3 lleva ToastIQ en el handheld.
 
+### ToastIQ por dentro (artículo oficial de soporte, 2026) [HECHO]
+
+- **Dónde vive:** esquina superior izquierda de Toast Web + barra inferior de Toast Now. Mid-Market/Enterprise requieren aprobación de su CSM.
+- **Permisos:** mínimo "4.1 Sales Reports" o "4.3 Labor Reports"; cada ACCIÓN exige el permiso correspondiente (editar menú requiere permisos de menú). La IA hereda el modelo de permisos existente — no lo brinca.
+- **Preguntas que responde:** ventas ("¿cuántas hamburguesas vendimos la semana pasada?"), reportes A NIVEL MODIFICADOR ("¿qué add-ons son más populares con la Cheeseburger?"), labor/turnos, políticas de propinas, settings de cocina (prep times, estaciones), configuración FOH, estatus de Toast Delivery (orden, repartidor, refunds).
+- **Acciones que ejecuta (con confirmación explícita del usuario):** actualizar items, ajustar stock, marcar 86, editar turnos, configurar upsells, cambiar settings de FOH y cocina (estación, assembly line, sort order, prep time), redactar campañas de email (US/UK/IE/CA) y SMS (US).
+- **Límite clave:** las campañas las deja en BORRADOR — "no enviará ni programará una campaña por sí sola". El humano publica.
+- **Datos:** instancia enterprise dedicada del proveedor LLM; "no se usan para entrenamiento general"; sin mezcla entre clientes. No se puede desactivar del todo a nivel cuenta.
+- **UX:** multiidioma (español incluido, por sesión), historial de chats, rating por respuesta, descarga de tablas, y el disclaimer "AI tools can make mistakes".
+
 **Lectura para Fullsite:** Toast validó nuestra tesis completa — IA operativa nativa del POS con feed de recomendaciones (= agentes), chat en lenguaje natural (= copiloto) y acciones desde el chat (ahí van adelante; nuestro chat aún no ejecuta acciones). Su ventaja: datos. La nuestra: México — CFDI, WhatsApp como canal (ellos usan app propia), español operativo, ticket de $2K MXN vs $10K USD de entrada, y offline real.
 
-## 6. Pricing 2026 [HECHO — guías públicas]
+## 6. xtraCHEF por dentro — el espejo de nuestra recepción CFDI [HECHO — soporte oficial]
+
+**Flujo factura→insight:** (1) captura por app móvil (iOS/Android), escáner de escritorio, o **email a un inbox dedicado por sucursal**; (2) OCR+ML lee proveedor, número de factura, producto, unidad, cantidad y costo **línea por línea**; (3) los datos aparecen en la cuenta **en <24 h** (no es instantáneo — hay humanos en el loop [INFERENCIA]); (4) sincroniza ventas de Toast diario → COGS real vs presupuesto; (5) costeo de recetas por platillo combinando precios fluctuantes + mix de ventas on/off-premise → margen bruto por item.
+- **GL auto-coding:** asignas código contable y categoría UNA vez; las siguientes facturas del mismo item se codifican solas. Sync a QuickBooks Online y Sage Intacct.
+- **Tiers:** Essentials (facturas, sync contable, food cost, price tracker, vendors) vs Pro (+ costeo de recetas + inventario con conteo móvil y varianza — "waste, theft, breakage, shrinkage").
+- **Solo US.** Precio: cotización custom.
+- **Lectura:** nuestro equivalente mexicano es MEJOR de raíz: el CFDI XML ya trae los datos estructurados — no necesitamos OCR ni 24 h ni humanos. La factura electrónica obligatoria convierte su feature premium en nuestra ingesta directa. OP-21 con esta referencia deja de ser "pendiente fiscal" y se vuelve "xtraCHEF gratis y al instante".
+
+## 7. La API y la arquitectura técnica [HECHO — doc.toasttab.com + technology.toasttab.com]
+
+**Superficie completa de APIs (17):** analytics (era) · cash management · configuration (GUIDs de revenue centers, dining options, pagos) · credit cards (ccpartner) · device details · gift cards (outbound) · **kitchen** (prep stations + fulfillment) · **labor** (CRUD completo de empleados, jobs, turnos, time entries) · loyalty (outbound) · menus (menú resuelto completo) · **orders** (GET/POST/PATCH de órdenes, checks, pagos) · order mgmt config · packaging · partners · restaurant availability · restaurants · **stock** (GET/POST/PUT de inventario por item/modificador) · tender (outbound).
+- Patrón notable: gift cards, loyalty y tender son **outbound** — TÚ hospedas el endpoint y Toast te llama. Así integran proveedores de terceros sin abrir su núcleo.
+- 4 tipos de acceso: partner / custom / standard API / analytics API — permisos por integración, no todo-o-nada.
+- **Stack** (blog de ingeniería oficial): POS Android en **Java/Kotlin** · backend de microservicios contenedorizados REST + gRPC (Java/Kotlin) · integraciones sobre **Apache Camel** · mensajería **Apache Pulsar** · frontends **React + GraphQL**.
+- **Lectura:** la API pública de Toast es el catálogo de lo que un POS maduro DEBE exponer. Cuando abramos la nuestra, esta lista es el checklist — y labor/stock/orders con escritura son el mínimo para partners serios.
+
+## 8. Guest Suite por dentro — Tables, Loyalty, CRM [HECHO — soporte oficial]
+
+**Toast Tables** (2023→): app de host en iPad o tablet Android + config/reportes en Toast Web.
+- **Estado de mesa alimentado por el POS y el KDS en tiempo real**: el host ve qué ordenó cada mesa, cuándo salió de cocina y cuándo pagaron — reservas y operación en el MISMO sistema (su ventaja estructural vs OpenTable).
+- Waitlist con SMS configurable (confirmaciones, avisos, recordatorios) · perfiles de comensal (ocasiones, VIPs, preferencias) que alimentan Marketing/Loyalty · **reserva directa desde Google Business Profile**.
+- Pricing: tarifa plana mensual, **sin fee por cover** (ataque directo al modelo OpenTable de $1-7.50/cover).
+
+**Toast Loyalty** — mecánica exacta:
+- Puntos por dólar PRE-impuestos y sin descuentos (ni tips, ni taxes, ni gift cards) · puntos FRACCIONALES (gasta $10 con regla de 1 pto/$15 → 0.66 pts) · sin tope de puntos ni de saldo.
+- Alta con email O teléfono (uno basta) en POS, online, kiosk, pantalla de cliente o link · **la tarjeta bancaria puede quedar vinculada como identificador** (pagas con la misma tarjeta = acumulas sin decir nada).
+- Configurable: ganar por gasto o por visitas; recompensas de item gratis a cashback.
+- **Lectura:** card-linked loyalty es la fricción CERO — nadie en MX lo hace. Y Tables demuestra que reservas+POS+cocina en un solo sistema es el argumento contra los OpenTable/CoverManager: nosotros ya tenemos esa unión nativa con amalay_reservaciones.
+
+## 9. Payroll & Team por dentro [HECHO]
+
+- **Sling** (adquirida 2022): scheduling con templates, forecast de labor % contra ventas importadas del POS (presupuesto ANTES de publicar el horario, alertas de overtime), shift trades/disponibilidad/time-off, mensajería de equipo, multi-sucursal. Timesheets editados en Sling → Toast Web → Payroll.
+- **Tips Manager:** pools de propinas del POS sincronizados DIRECTO a payroll — "elimina el Excel". (El Excel de propinas es exactamente lo que AMALAY hace hoy — dolor validado.)
+- **Pay Card / PayOut:** tarjeta de nómina + adelantos de sueldo para empleados — retención de staff como feature del POS.
+- Payroll: mediana de procesamiento 15 min; bundle $90/mes + $9/empleado.
+
+## 10. Pricing 2026 [HECHO — guías públicas]
 
 | Plan | Software | Procesamiento |
 |---|---|---|
@@ -120,14 +166,14 @@ Navegación: menú izquierdo → **Reports** → abre Weekly Overview → flecha
 - **Contratos 1–3 años · early termination $5,000–10,000 · procesamiento Toast EXCLUSIVO.**
 - Costo real todo incluido: café de 10 mesas ~$250–500 USD/mes; full-service de 30 asientos $700–1,200 USD/mes, ANTES de fees de procesamiento.
 
-## 7. Debilidades documentadas (2026) [HECHO]
+## 11. Debilidades documentadas (2026) [HECHO]
 
 1. **Fees ocultos — queja #1**: comisión extra de 2.5–3.5% en online ordering encima del procesamiento; subidas de precio unilaterales en add-ons.
 2. **Outages**: 317+ desde ago-2022; 16 incidentes en los últimos 90 días medidos; oct-2026 dos caídas consecutivas de >10 horas. Con offline débil, cada outage es servicio parado.
 3. **Soporte**: Trustpilot 3.1/5 (1,402 reviews), 235 quejas BBB; ventas agresivas.
 4. **Lock-in**: hardware propietario + procesamiento obligatorio + contrato multianual con penalización de miles de dólares.
 
-## 8. Qué copiar · qué evitar · cómo ganarle
+## 12. Qué copiar · qué evitar · cómo ganarle
 
 **Copiar:**
 - "Cash & Loss Management" como categoría de primer nivel del dashboard (15 reportes) — nuestro antifraude merece ese rango, no un rincón.
@@ -136,6 +182,11 @@ Navegación: menú izquierdo → **Reports** → abre Weekly Overview → flecha
 - ToastIQ "For you" feed: recomendaciones oportunas, no reportes crudos. (Ya es nuestra dirección — Toast la valida.)
 - El QR de mesa (Mobile Order & Pay) como expansión natural del ticket.
 - Benchmarking vs peers: cuando tengamos 20+ clientes, "tu café vs cafés similares" es un moat de datos que nadie en MX tiene.
+- **Card-linked loyalty** (§8): la tarjeta como identificador de lealtad = fricción cero. Nadie en MX lo hace.
+- **El framing xtraCHEF→CFDI** (§6): su feature premium con OCR y 24 h de espera es nuestra ingesta CFDI directa e instantánea. Ese contraste es una diapositiva de venta.
+- **El patrón de APIs outbound** (§7): loyalty/gift-cards/tender donde el partner hospeda el endpoint — así se integran terceros sin abrir el núcleo. Modelo para nuestra API pública.
+- **Tables sin fee por cover** contra los modelos por-comensal — mismo ataque nuestro contra OpenTable/CoverManager si empujamos reservas.
+- **La IA hereda permisos y deja campañas en borrador** (§5): dos decisiones de diseño correctas que nuestro copiloto debe adoptar tal cual — el agente no brinca el modelo de permisos y el humano publica.
 
 **Evitar:**
 - El resentimiento por fees ocultos: nuestra promesa de precio fijo transparente es un arma directa contra el modelo Toast/Parrot Pay.
@@ -147,7 +198,7 @@ Navegación: menú izquierdo → **Reports** → abre Weekly Overview → flecha
 - CFDI + WhatsApp + español: Toast no lo tiene ni lo tendrá pronto; sus imitadores MX tampoco tienen la capa IA.
 - Velocidad: ellos actualizan trimestral con burocracia pública; nosotros en días.
 
-## 9. Así se ve — pantallas reales (2026-08-27) [HECHO — capturas de sus artículos oficiales de soporte]
+## 13. Así se ve — pantallas reales (2026-08-27) [HECHO — capturas de sus artículos oficiales de soporte]
 
 Visto directamente de los screenshots oficiales de support.toasttab.com (imágenes en su CDN, sin login):
 
@@ -178,7 +229,7 @@ Visto directamente de los screenshots oficiales de support.toasttab.com (imágen
 - El "NOT PAID" en cada ticket de KDS une cocina y caja — cocina sabe qué cuenta sigue abierta.
 - El export por email asíncrono es fricción que nosotros no tenemos (reportes en vivo) — punto de demo.
 
-## 10. Material de estudio [HECHO — enlaces verificados por búsqueda]
+## 14. Material de estudio [HECHO — enlaces verificados por búsqueda]
 
 - **Canal oficial YouTube "Toast, Inc."**: tutoriales POS, payroll, xtraCHEF, menu engineering — youtube.com/channel/UC6oFqFPZ5AbrkJmKHfh3C5A
 - Playlist "Toast Point of Sale": youtube.com/playlist?list=PLM4kOja-yPM6cfyINeEZDUuMRw1msUUyP
@@ -189,9 +240,11 @@ Visto directamente de los screenshots oficiales de support.toasttab.com (imágen
 - Reviews con capturas: posusa.com/toast-pos-review, fitsmallbusiness, NerdWallet.
 - Videos independientes: "Toast Restaurant POS System - How it Works" (youtube VL6aD1i9LB4), "TOAST POS Demo and Honest Review" (bcsiKtTa0TM), "Get Started With Menus" (XqebkNDpeoA), unboxing z8h3C4PkpMY.
 
-## 11. Qué falta por verificar
+## 15. Qué falta por verificar
 
 - [x] ~~Ver demos y capturar el back-office~~ — hecho 2026-08-27 desde screenshots oficiales de soporte + App Store, ver §9.
-- [ ] Toast API pública (doc.toasttab.com) — mapear objetos expuestos vs nuestro modelo de datos.
-- [ ] Detalle de xtraCHEF (OCR de facturas): flujo exacto — es el espejo de nuestra Fase 1 de recepción CFDI.
-- [ ] Precio y adopción real de ToastIQ (¿incluido o add-on?).
+- [x] ~~Toast API pública~~ — hecho 2026-08-27, ver §7 (las 17 APIs + stack).
+- [x] ~~Detalle de xtraCHEF~~ — hecho 2026-08-27, ver §6.
+- [x] ~~ToastIQ a detalle~~ — hecho 2026-08-27, ver §5 (precio público no existe; parece incluido con gating por CSM en enterprise [INFERENCIA]).
+
+**Estado: 100% de lo que existe en fuentes públicas.** Lo único no capturable sin cuenta de Toast US: operar ToastIQ en vivo y el detalle fino de configuración por módulo. No hay demo call posible desde MX (no venden aquí); si algún día hace falta más, la ruta es un restaurantero conocido en US o un trial con entidad US.
