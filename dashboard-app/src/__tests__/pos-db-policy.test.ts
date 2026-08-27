@@ -137,4 +137,21 @@ describe('las dos rutas comparten la política — no puede haber una laxa', () 
     expect(catchAll).toContain('MANAGER_ONLY_WRITE.has(')
     expect(catchAll).toContain('isManager(')
   })
+
+  it('ninguna exime a los RPC de sus protecciones', () => {
+    // El agujero del 2026-08-27: el catch-all tenía las SEIS protecciones escritas
+    // como una negación de "¿es RPC?", así que cada una nacía ya saltada para
+    // `/rest/v1/rpc/*`. La condición se eliminó; los RPC se rechazan de entrada.
+    //
+    // Se comparan los archivos SIN comentarios a propósito: la aserción es sobre lo
+    // que el código hace, no sobre lo que la prosa menciona — este mismo archivo y la
+    // cabecera del proxy explican el bug nombrando la condición que se eliminó.
+    const soloCodigo = (src: string) =>
+      src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+
+    for (const [nombre, src] of [['catch-all', catchAll], ['directa', directa]] as const) {
+      expect(soloCodigo(src), `${nombre} vuelve a eximir a los RPC de una protección`)
+        .not.toMatch(/!\s*isRpc/)
+    }
+  })
 })
