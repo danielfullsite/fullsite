@@ -742,9 +742,22 @@ un `REVOKE` a `PUBLIC` no toca.
 Permitía que cualquier usuario con sesión iniciada, de cualquier restaurante, borrara las
 órdenes de otro tenant llamando el RPC directo. Lo detectó el linter de Supabase, no yo.
 
-Detalle, barrido del patrón y las tres funciones preexistentes con la misma exposición —
-incluida `r1_save_order`, que **sigue abierta** — en
+Detalle y barrido del patrón en
 [`SECDEF-GRANTS-AUTHENTICATED-2026-08-26.md`](../audit/SECDEF-GRANTS-AUTHENTICATED-2026-08-26.md).
+
+> **Corrección del 2026-08-27.** Ese documento afirmaba que `r1_save_order` tampoco validaba
+> tenant y que su grant a `authenticated` permitía escritura cruzada. **Era falso** — la
+> función abre con `IF NOT private.can_write_client(p_client_id) THEN … FORBIDDEN_CLIENT`, y
+> ejecutarlo lo confirma: un llamador `authenticated` es rechazado. El error fue buscar
+> cuatro cadenas en el cuerpo en vez de leerlo; la comprobación entra por una indirección
+> que no busqué.
+>
+> Al verificarlo apareció el camino que sí estaba abierto, y es peor: el proxy
+> `/api/pos/db/[...path]` prestaba `service_role` a cualquier RPC, y el guardián deja pasar
+> a `service_role` por diseño. Cerrado en
+> [PR #169](https://github.com/danielfullsite/fullsite/pull/169).
+>
+> **Un `REVOKE` a `authenticated` no protege de quien llega como `service_role`.**
 
 ## Rollback
 
