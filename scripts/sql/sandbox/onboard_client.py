@@ -408,11 +408,11 @@ def apply_migrations_via_psql(db_url, log):
 
 
 # ── REST upsert helpers ───────────────────────────────────────────────────────
-def upsert_row(url, table, row, pk_field, svc_h, state, kind, log, dry_run):
+def upsert_row(rest_url, table, row, pk_field, svc_h, state, kind, log, dry_run):
     """Check if row exists (by pk_field), create if not. Returns (status, id)."""
     pk_val = row[pk_field]
     encoded = urllib.parse.quote(str(pk_val))
-    s, existing = get(f"{url}/rest/v1/{table}?{pk_field}=eq.{encoded}&select={pk_field}&limit=1", svc_h)
+    s, existing = get(f"{rest_url}/{table}?{pk_field}=eq.{encoded}&select={pk_field}&limit=1", svc_h)
 
     if s == 200 and isinstance(existing, list) and existing:
         log.item(ALREADY_EXISTS, f"{table}: {pk_val}")
@@ -423,7 +423,7 @@ def upsert_row(url, table, row, pk_field, svc_h, state, kind, log, dry_run):
         return SKIPPED, pk_val
 
     h = {**svc_h, "Content-Type": "application/json", "Prefer": "return=representation"}
-    s2, resp = post(f"{url}/rest/v1/{table}", row, h)
+    s2, resp = post(f"{rest_url}/{table}", row, h)
     if s2 in (200, 201):
         state.record(kind, pk_val)
         log.item(CREATED, f"{table}: {pk_val}")
@@ -433,10 +433,10 @@ def upsert_row(url, table, row, pk_field, svc_h, state, kind, log, dry_run):
         return FAILED, pk_val
 
 
-def upsert_compound_pk(url, table, row, pk_fields, svc_h, state, kind, log, dry_run):
+def upsert_compound_pk(rest_url, table, row, pk_fields, svc_h, state, kind, log, dry_run):
     """Upsert for tables with compound PKs (e.g. pos_item_modifier_groups)."""
     filters = "&".join(f"{k}=eq.{urllib.parse.quote(str(row[k]))}" for k in pk_fields)
-    s, existing = get(f"{url}/rest/v1/{table}?{filters}&limit=1", svc_h)
+    s, existing = get(f"{rest_url}/{table}?{filters}&limit=1", svc_h)
     label = "_".join(str(row[k]) for k in pk_fields)
 
     if s == 200 and isinstance(existing, list) and existing:
@@ -448,7 +448,7 @@ def upsert_compound_pk(url, table, row, pk_fields, svc_h, state, kind, log, dry_
         return SKIPPED
 
     h = {**svc_h, "Content-Type": "application/json", "Prefer": "return=representation"}
-    s2, resp = post(f"{url}/rest/v1/{table}", row, h)
+    s2, resp = post(f"{rest_url}/{table}", row, h)
     if s2 in (200, 201):
         state.record(kind, label)
         log.item(CREATED, f"{table}: {label}")
