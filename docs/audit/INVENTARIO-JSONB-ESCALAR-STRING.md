@@ -37,7 +37,12 @@ un reporte, una vista OCM o un agente encima del histórico.
 - **HECHO:** 2 columnas seguían escribiéndose mal el día de la medición. `agent_insights.evidence`
   subió de 2,057 a 2,058 filas durante la propia sesión de trabajo.
 - **HECHO:** `wansoft_data.data` ya está corregido y migrado (PR #170 + migración
-  `20260826140000`, corrida el 2026-08-27: 670 → 0 filas string, huella de contenido idéntica).
+  `20260826140000`, corrida en producción de AMALAY el 2026-08-27 02:47:42 UTC: 670 → 0 filas
+  string, huella de contenido idéntica, respaldo de 670 filas con RLS prendida).
+- **HECHO, y es deuda abierta:** esa migración se corrió con `execute_sql` en vez de
+  `apply_migration`, así que **no** quedó registrada en `supabase_migrations.schema_migrations`.
+  La base está convertida pero el ledger dice que nunca pasó. Registrarla a mano es una
+  escritura a producción y necesita su propia autorización.
 
 ## Estado por columna
 
@@ -134,6 +139,6 @@ Ya se cayó dos veces en ella y las dos veces costó meses:
 
 | PR / rama | Alcance | Estado |
 |---|---|---|
-| #170 `fix/wansoft-data-jsonb` | `wansoft_data.data` — 14 payloads, 9 scripts + 1 workflow | Abierto. Migración **ejecutada** el 2026-08-27 con respaldo. |
+| #170 `fix/wansoft-data-jsonb` | `wansoft_data.data` — 14 payloads, 9 scripts + 1 workflow | Abierto. Migración **ejecutada** el 2026-08-27 02:47:42 UTC con respaldo — pero **sin registrar en el ledger de migraciones**. |
 | `fix/agent-results-jsonb` | `agent_results.data` — 19 agentes | Sin pushear. Migración **no** ejecutada. |
 | Este PR | `agent_insights.evidence`, `agent_events.evidence`, `pos_audit_log.details` | Sin migración: no se tocó ningún dato de AMALAY. |
