@@ -248,7 +248,7 @@ function forwardPost(targetUrl, bodyStr) {
 
 // Keep identity and routing configuration explicit so every cloned terminal can
 // discover the caja without relying on process-global or customer-specific state.
-function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, version, serverId, restaurantId, config = {}, instanceName = '', branchId = null, posServerIp = null, port = 7717 }) {
+function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, version, serverId, restaurantId, config = {}, instanceName = '', branchId = config.branchId || null, posServerIp = config.posServerIp || null, port = 7717 }) {
   return async function router(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
