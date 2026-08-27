@@ -26,6 +26,37 @@ paquete "POS sin IA"** — eso sería competir como commodity contra Wansoft, ju
 | **Fullsite Completo** | **$4,999 MXN/mes + $45,000 hardware** (una vez) | Todo lo anterior + kit de hardware llave en mano. | 🏆 **El premium** — llave en mano |
 
 - **Terminal adicional:** +$499 MXN/mes (Fullsite Software/Completo).
+
+### Multi-sucursal — la primera paga la entrada, las demás la operación
+
+| | Primera sucursal | Cada adicional (2-9) |
+|---|---|---|
+| Fullsite Inteligencia | $1,999 | **$1,199** |
+| Fullsite Software | $4,999 | **$2,999** |
+| Fullsite Completo | $4,999 | **$2,999** + $45,000 de hardware **por sucursal** |
+
+**10+ sucursales: cotización manual.** No es un descuento por volumen más — arriba de 10 el trato
+cambia de naturaleza (implementación por fases, SLA, facturación consolidada, a veces integración con
+su ERP). Grupo Galería son 200+ restaurantes: a precio de lista serían ~$600K/mes, un número que no
+significa nada.
+
+**Por qué la adicional cuesta menos.** El costo marginal de la sucursal 2 es casi cero: mismo menú,
+misma relación, una sola implementación. Cobrarle lo mismo que a la primera no se sostiene ante un
+dueño que sabe sumar.
+
+**Por qué vale más.** La sucursal adicional es la que ENCIENDE la vista consolidada. El dolor
+documentado de Atope es literal: *"inconsistencia de calidad entre sucursales"*, *"3 sucursales con
+menús diferentes, difícil comparar"*. Wansoft les deja tres islas; el producto es poder compararlas.
+**Multi-sucursal no es el mismo producto tres veces — es la razón de comprarlo.**
+
+**El anual no descuenta dos veces:** la primera sucursal lleva el descuento anual; las adicionales ya
+vienen rebajadas por ser adicionales y van a 12 meses completos.
+
+En código: `cotizarGrupo(planId, sucursales)` en `lib/plans.ts`. **No multiplicar `priceMonthly`.**
+
+**Cotización viva que NO empata:** a Atope (3 sucursales) se le ofreció **$3,000/sucursal = $9,000/mes**.
+Con este esquema serían **$10,997**. Si se honra el número anterior, va como **precio fundador** — no se
+baja la lista.
 - **Hardware BYOD** en Software: el restaurante compra su tablet/impresoras (~$8-12K en Amazon) o sube a Completo.
 - **Sin contrato** en todos. **Precio fundador** (primeros 10 en Fullsite) se respeta de por vida.
 
