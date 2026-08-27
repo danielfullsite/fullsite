@@ -59,6 +59,8 @@ Las cuatro biblias ya tienen sección **"Así se ve"** con pantallas reales (dem
 | Pricing | ✅ | ✅ (cotización formal: demo) | ✅ base (add-ons: demo) | ✅ |
 | Offline | ✅ docs oficiales | ❌ demo + Alejandro | ✅ | 🟡 |
 
+**El plan de acción derivado de todo esto**: [`../../strategy/SUPERIORIDAD-COMPETITIVA.md`](../../strategy/SUPERIORIDAD-COMPETITIVA.md) — dónde ya ganamos, los 3 gaps, los 20 robos priorizados, las 5 jugadas de GTM y los 4 vicios que nunca copiamos.
+
 **Para VER las pantallas lado a lado**: [`GALERIA-PANTALLAS.md`](GALERIA-PANTALLAS.md) — POS, KDS y dashboard de los cuatro, con imágenes en `assets/`.
 
 Lo que queda vive en UN documento: [`GUION-DEMOS-COMPETENCIA.md`](GUION-DEMOS-COMPETENCIA.md) — dos llamadas de demo (Parrot + distribuidor SR) y tres preguntas a Alejandro cierran todos los ❌.
