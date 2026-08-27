@@ -518,10 +518,20 @@ async function init() {
     return
   }
   try {
-    const info = await window.setupBridge.getInfo()
+    const [info, hidInfo] = await Promise.all([
+      window.setupBridge.getInfo(),
+      window.setupBridge.getHidDevices?.() || Promise.resolve({ supported: false, devices: [] }),
+    ])
     MAX_PRINTER_ID_LENGTH = info.schemaConstants?.MAX_PRINTER_ID_LENGTH ?? 50
     state.legacy   = info.legacy || null
     state.hostname = info.hostname || 'terminal'
+    const ips = (info.network_interfaces || []).map(item => item.address).join(', ') || 'sin red IPv4 detectada'
+    const printerCount = (info.system_printers || []).length
+    const hidCount = (hidInfo.devices || []).length
+    const fingerprintReady = info.fingerprint?.service_installed && info.fingerprint?.driver_installed
+    const hidStatus = hidInfo.supported ? `${hidCount} HID autorizado(s)` : 'WebHID no disponible'
+    const fingerprintStatus = fingerprintReady ? 'lector de huella listo' : 'lector de huella no instalado'
+    showAlert('computerInfo', 'ok', `Equipo detectado: ${esc(state.hostname)} · ${esc(info.platform || '?')} ${esc(info.arch || '')} · IP ${esc(ips)} · ${printerCount} impresora(s) · ${hidStatus} · ${fingerprintStatus}`)
 
     if (state.legacy) {
       state.restaurantId = state.legacy.restaurant_id || state.legacy.restaurantId || state.legacy.clientId || ''

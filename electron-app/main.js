@@ -260,15 +260,42 @@ function registerProvisioningIpc() {
   const { randomUUID } = require('crypto');
 
   /** Return system info + any legacy config raw data for the wizard. */
-  ipcMain.handle('provision:get-info', () => {
+  ipcMain.handle('provision:get-info', async () => {
     let legacy = null;
     try {
       if (fs.existsSync(LEGACY_CONFIG_PATH)) legacy = JSON.parse(fs.readFileSync(LEGACY_CONFIG_PATH, 'utf8'));
     } catch {}
+    const network_interfaces = [];
+    for (const [name, addresses] of Object.entries(os.networkInterfaces())) {
+      for (const address of addresses || []) {
+        if (address.family === 'IPv4' && !address.internal) {
+          network_interfaces.push({ name, address: address.address, netmask: address.netmask });
+        }
+      }
+    }
+    let system_printers = [];
+    try {
+      if (setupWindow && !setupWindow.isDestroyed()) {
+        system_printers = (await setupWindow.webContents.getPrintersAsync()).map(printer => ({
+          name: printer.name,
+          displayName: printer.displayName || printer.name,
+          isDefault: !!printer.isDefault,
+        }));
+      }
+    } catch (error) {
+      console.warn('[provision] Could not enumerate system printers:', error.message);
+    }
     return {
       hostname: os.hostname(),
       platform: process.platform,
-      legacy,
+      arch: process.arch,
+      release: os.release(),
+      network_interfaces,
+      system_printers,
+      fingerprint: {
+        service_installed: fs.existsSync('C:\\fullsite\\fingerprint-service.exe'),
+        driver_installed: fs.existsSync('C:\\fullsite\\DPUruNet.dll'),
+      },      legacy,
       schemaConstants: { MAX_PRINTER_ID_LENGTH: printerConfigSchema.MAX_PRINTER_ID_LENGTH },
     };
   });
