@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, ShieldCheck, Search, RefreshCw, Clock, User, FileText, Ban, CreditCard, ChefHat, Pencil, Plus, Percent } from 'lucide-react'
-import { getAuditLog, type AuditLogEntry } from '@/lib/pos-data'
+import { getAuditLog, parseAuditDetails, auditDetailsText, type AuditLogEntry } from '@/lib/pos-data'
 
 const ACTION_CONFIG: Record<string, { icon: typeof ShieldCheck; color: string; label: string }> = {
   order_created: { icon: Plus, color: 'text-emerald-400', label: 'Orden creada' },
@@ -33,11 +33,11 @@ function formatTime(dateStr: string): string {
   })
 }
 
-function parseDetails(details: string | null): Record<string, unknown> | null {
-  if (!details) return null
-  try { return typeof details === 'string' ? JSON.parse(details) : details }
-  catch { return null }
-}
+// `details` se lee con los ayudantes de pos-data, que toleran las dos formas en que
+// está guardado (objeto y texto). Antes el filtro hacía `e.details?.toLowerCase()`,
+// que sobre una fila con `details` en forma de objeto no devolvía "sin coincidencia":
+// reventaba con "toLowerCase is not a function" y tumbaba la pantalla entera. El `?.`
+// sólo protege de null, no de que el valor no sea texto.
 
 export default function AuditoriaPage() {
   const [entries, setEntries] = useState<AuditLogEntry[]>([])
@@ -61,7 +61,7 @@ export default function AuditoriaPage() {
       const matchActor = e.actor.toLowerCase().includes(term)
       const matchOrder = e.order_id?.toLowerCase().includes(term)
       const matchReason = e.reason?.toLowerCase().includes(term)
-      const matchDetails = e.details?.toLowerCase().includes(term)
+      const matchDetails = auditDetailsText(e.details).toLowerCase().includes(term)
       if (!matchActor && !matchOrder && !matchReason && !matchDetails) return false
     }
     return true
@@ -140,7 +140,7 @@ export default function AuditoriaPage() {
             {filtered.map(entry => {
               const config = ACTION_CONFIG[entry.action] || { icon: FileText, color: 'text-[var(--text-3)]', label: entry.action }
               const Icon = config.icon
-              const details = parseDetails(entry.details)
+              const details = parseAuditDetails(entry.details)
               const isAlert = entry.action === 'item_cancelled' || entry.action === 'order_cancelled'
 
               return (

@@ -1781,7 +1781,11 @@ export async function logAudit(event: AuditEvent): Promise<boolean> {
     action: event.action,
     actor: typeof event.actor === 'string' && event.actor.trim() ? event.actor.trim() : 'POS Offline',
     mesa: event.mesa ?? null,
-    details: event.details ? JSON.stringify(event.details) : null,
+    // `details` es jsonb y este body ya se serializa entero con JSON.stringify más
+    // abajo. Al serializar aquí también, PostgREST recibía texto y Postgres guardaba
+    // un ESCALAR de tipo string: `details->>'campo'` devolvía NULL y el log de
+    // auditoría quedaba inconsultable desde SQL. El objeto va directo.
+    details: event.details ?? null,
     reason: event.reason || null,
     approved_by: event.approved_by || null,
   }
@@ -1820,10 +1824,41 @@ export interface AuditLogEntry {
   action: string
   actor: string
   mesa: number | null
-  details: string | null
+  // La columna es jsonb, así que PostgREST devuelve el OBJETO. Decía `string | null`
+  // porque `logAudit` serializaba de más y todo lo que escribía el POS llegaba como
+  // texto; el tipo describía el bug, no la columna. El string sigue en la unión por
+  // las 1,314 filas históricas que quedaron así — no las migramos.
+  details: string | Record<string, unknown> | null
   reason: string | null
   approved_by: string | null
   created_at: string
+}
+
+// `details` llega de dos formas y las dos son reales:
+//   · OBJETO   — lo que escriben las rutas de /api/pos, y lo que escribe `logAudit`
+//                desde 2026-08-27.
+//   · STRING   — las 1,314 filas que `logAudit` guardó mientras serializaba de más.
+//                Siguen así: no se migró ningún dato.
+// Estos dos ayudantes viven aquí, junto al lector, para que nadie que lea el log de
+// auditoría tenga que acordarse de la historia.
+
+/** El objeto de `details`, venga como objeto o como texto. `null` si no se puede. */
+export function parseAuditDetails(
+  details: AuditLogEntry['details'],
+): Record<string, unknown> | null {
+  if (!details) return null
+  if (typeof details !== 'string') return details
+  try {
+    const parsed = JSON.parse(details)
+    return parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : null
+  } catch { return null }
+}
+
+/** Texto de `details` para buscar dentro. Nunca lanza, nunca devuelve undefined. */
+export function auditDetailsText(details: AuditLogEntry['details']): string {
+  if (!details) return ''
+  if (typeof details === 'string') return details
+  try { return JSON.stringify(details) } catch { return '' }
 }
 
 export async function getAuditLog(limit = 100, offset = 0): Promise<AuditLogEntry[]> {

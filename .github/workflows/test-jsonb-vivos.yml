@@ -1,0 +1,36 @@
+name: jsonb vivos — Pruebas
+
+# SIN filtro `paths`, por la misma razón que Dashboard Tests: un check que sólo
+# reporta a veces no sirve como check requerido, y un PR que nunca lo recibe queda
+# BLOCKED para siempre. El costo aquí es de segundos.
+#
+# Para que esto BLOQUEE de verdad hay que agregar el contexto `jsonb-vivos` a la
+# protección de rama de main — pero sólo DESPUÉS de que este workflow haya reportado
+# verde al menos una vez, si no se arma justo la trampa que se describe arriba.
+on:
+  push:
+  pull_request:
+
+jobs:
+  jsonb-vivos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with: { python-version: '3.11' }
+
+      # La prueba importa agent_common e intercepta requests.post para mirar el
+      # payload real que saldría por el cable. No hay red: `requests` se necesita
+      # sólo porque el módulo lo importa.
+      - run: pip install requests
+
+      # `agent_insights.evidence` y `agent_events.evidence` son jsonb. Un agente que
+      # mande json.dumps({...}) guarda un escalar de tipo string y deja el hallazgo
+      # inconsultable desde SQL (`evidence->>'campo'` devuelve NULL) sin romper nada
+      # visible. Es un fallo silencioso — y duró 2,057 filas porque agent_insights
+      # NO TIENE LECTOR. Por eso se atrapa aquí y no en producción.
+      - run: python .github/scripts/test_jsonb_escritores_vivos.py
+
+      # El resolvedor también escribe a agent_events.evidence. Su prueba llegó a
+      # asertar el bug (hacía json.loads del payload); ahora exige el dict.
+      - run: python .github/scripts/test_resolver_predicciones.py

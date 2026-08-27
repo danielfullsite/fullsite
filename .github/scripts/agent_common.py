@@ -170,7 +170,10 @@ def create_insight(
         "severity": severity,
         "title": title,
         "summary": summary,
-        "evidence": json.dumps(evidence) if evidence else None,
+        # La columna es jsonb y `requests(json=...)` ya serializa el cuerpo. Al pasar
+        # por json.dumps aqui tambien, PostgREST guardaba un ESCALAR de tipo string:
+        # `evidence->>'campo'` devolvia NULL y el hallazgo quedaba inconsultable.
+        "evidence": evidence or None,
         "recommended_action": recommended_action,
         "deep_link": deep_link,
         "data_freshness": data_freshness,
@@ -242,7 +245,10 @@ def log_event(
         "agent_id": agent_id, "client_id": client_id, "type": event_type,
         "title": title, "severity": severity, "status": "new", "outcome": None,
         "estimated_value": estimated_value, "confidence": confidence,
-        "evidence": json.dumps(evidence) if evidence else None,
+        # La columna es jsonb y `requests(json=...)` ya serializa el cuerpo. Al pasar
+        # por json.dumps aqui tambien, PostgREST guardaba un ESCALAR de tipo string:
+        # `evidence->>'campo'` devolvia NULL y el hallazgo quedaba inconsultable.
+        "evidence": evidence or None,
         "explanation": explanation, "suggested_action": suggested_action,
         "expires_at": expires_at,
     }
