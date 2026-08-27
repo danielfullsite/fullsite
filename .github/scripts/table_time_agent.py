@@ -13,7 +13,6 @@ Por ahora estima desde tickets/hora y personas/mesa.
 
 import os
 import sys
-import json
 import time
 import requests
 from datetime import datetime, timedelta, timezone
@@ -389,7 +388,7 @@ def main():
                 "client_id": CLIENT["id"],
                 "agent_id": "table-time",
                 "fecha": today_str,
-                "data": json.dumps(structured_data),
+                "data": structured_data,
                 "summary": summary,
                 "priority": priority,
                 "updated_at": datetime.now(timezone.utc).isoformat(),
