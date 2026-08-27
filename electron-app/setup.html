@@ -626,13 +626,16 @@ function validateStep2() {
 // ─── Step 3 ───────────────────────────────────────────────────────────────────
 function setupStep3() {
   const role = state.terminalRole
-  document.getElementById('serverHost').value = state.serverHost || (role === 'kds' ? '' : '127.0.0.1')
+  const needsCaja = role !== 'server_pos'
+  document.getElementById('serverHost').value = state.serverHost || (needsCaja ? '' : '127.0.0.1')
   document.getElementById('serverPort').value = state.serverPort || 7717
   const desc = document.getElementById('step3Desc')
-  if (role === 'kds') {
-    desc.textContent = 'Este KDS necesita la IP del servidor POS principal en la red local.'
+  if (needsCaja) {
+    desc.textContent = role === 'kds'
+      ? 'Este KDS necesita la caja principal. Puedes detectarla automáticamente en la red local.'
+      : 'Esta terminal se conecta a la caja principal. Puedes detectarla automáticamente en la red local.'
   } else {
-    desc.textContent = 'Para esta terminal (Servidor POS), el Local Server corre localmente en 127.0.0.1.'
+    desc.textContent = 'Esta es la caja principal: el servidor local correrá en este equipo.'
     document.getElementById('serverHost').value = '127.0.0.1'
   }
 }
@@ -658,8 +661,8 @@ async function scanLan() {
       item.className = 'server-item'
       item.innerHTML = `
         <div>
-          <div class="server-item-name">${s.instance_name || s.host}</div>
-          <div class="server-item-meta">${s.host}:${s.port} · v${s.version || '?'} · ${s.restaurant_id || '?'}</div>
+          <div class="server-item-name">${esc(s.instance_name || s.host)}</div>
+          <div class="server-item-meta">${esc(s.host)}:${esc(s.port)} · v${esc(s.version || '?')} · ${esc(s.restaurant_id || '?')}</div>
         </div>
         <span class="server-item-badge">Online</span>`
       item.onclick = () => {
@@ -672,6 +675,19 @@ async function scanLan() {
       list.appendChild(item)
     }
     results.appendChild(list)
+
+    // Prefer the only server that belongs to this restaurant. This makes the
+    // normal installation zero-IP while still requiring an explicit click when
+    // several matching cajas exist on the same network.
+    const matching = servers.filter(s => s.restaurant_id === state.restaurantId)
+    if (matching.length === 1) {
+      const selected = matching[0]
+      document.getElementById('serverHost').value = selected.host
+      document.getElementById('serverPort').value = selected.port
+      state.serverInfo = selected
+      const selectedIndex = servers.indexOf(selected)
+      list.children[selectedIndex]?.classList.add('selected')
+    }
   } catch (e) {
     results.innerHTML = `<div class="alert alert-error"><span class="alert-icon">✕</span><span>Error al escanear: ${e.message}</span></div>`
   }
@@ -1174,14 +1190,19 @@ async function runValidation() {
     renderChecks(checks)
   }
 
-  const critical = checks[0].ok && checks[1].ok
+  const needsCaja = state.terminalRole !== 'server_pos'
+  const remoteReady = serverOk && checks[3].ok && checks[4].ok && checks[5].ok
+  const critical = checks[0].ok && checks[1].ok && (!needsCaja || remoteReady)
   if (critical) {
     document.getElementById('btnToSave').disabled = false
-    if (!serverOk) {
+    if (!serverOk && !needsCaja) {
       showAlert('step6Alert', 'warn', 'Identidad válida pero el servidor no respondió. Puedes guardar la configuración; el POS conectará cuando el servidor esté disponible.')
     }
   } else {
-    showAlert('step6Alert', 'error', 'Corrije los errores antes de continuar.')
+    const message = needsCaja && !remoteReady
+      ? 'Esta terminal necesita conectarse a una caja Fullsite del mismo restaurante antes de continuar.'
+      : 'Corrige los errores antes de continuar.'
+    showAlert('step6Alert', 'error', message)
   }
 }
 
@@ -1238,7 +1259,7 @@ async function saveAndRestart() {
     instance_name:     state.terminalName,
     kds:               state.terminalRole === 'kds' ? true : (state.legacy?.kds || false),
     kds_only:          state.terminalRole === 'kds' ? true : (state.legacy?.kds_only || false),
-    pos_server_ip:     state.terminalRole === 'kds' ? state.serverHost : (state.legacy?.pos_server_ip || null),
+    pos_server_ip:     state.terminalRole !== 'server_pos' ? state.serverHost : null,
     supabaseUrl:       state.legacy?.supabaseUrl || null,
     supabaseAnonKey:   state.legacy?.supabaseAnonKey || null,
   }

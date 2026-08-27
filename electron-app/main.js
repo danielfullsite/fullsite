@@ -320,7 +320,7 @@ function registerProvisioningIpc() {
     }
     const results = [];
     const probes = [...subnets].map(ip => new Promise(resolve => {
-      const req = http.get(`http://${ip}:${LOCAL_SERVER_PORT}/state`, { timeout: 500 }, res => {
+      const req = http.get(`http://${ip}:${LOCAL_SERVER_PORT}/identity`, { timeout: 500 }, res => {
         let body = '';
         res.on('data', d => { body += d; if (body.length > 4096) req.destroy(); });
         res.on('end', () => {
@@ -351,7 +351,7 @@ function registerProvisioningIpc() {
   ipcMain.handle('provision:test-server', async (_, host, port) => {
     const p = port || LOCAL_SERVER_PORT;
     return new Promise(resolve => {
-      const req = http.get(`http://${host}:${p}/state`, { timeout: 3000 }, res => {
+      const req = http.get(`http://${host}:${p}/identity`, { timeout: 3000 }, res => {
         let body = '';
         res.on('data', d => { body += d; });
         res.on('end', () => {
