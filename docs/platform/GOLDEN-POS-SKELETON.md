@@ -465,7 +465,7 @@ Ownership taxonomy:
 | Configuración | `/configuracion` | IMPL | Requires restaurant data | → FEOS |
 | Sucursales | `/sucursales` | IMPL | Requires restaurant data | → FEOS |
 | Seguridad | `/seguridad` | IMPL | — | → FEOS |
-| Certificados | `/certificados` | IMPL | — | → FEOS |
+| ~~Certificados~~ | ~~`/certificados`~~ | RETIRADA 2026-08-26 | Auto-emitía certificados de cumplimiento con folio y fecha del día | — |
 | Mission Control | `/mission-control` | IMPL | — | → FEOS |
 
 ---
@@ -818,7 +818,7 @@ What currently lives in the app that belongs in FEOS. Migration is incremental �
 | `/configuracion` | Restaurant configuration | Restaurant Manager | 2 |
 | `/sucursales` | Branch management | Restaurant Manager | 2 |
 | `/seguridad` | IAM, MFA, permissions | IAM & Security | 2 |
-| `/certificados` | Installation certification | Auto-Certification | 3 |
+| ~~`/certificados`~~ | ~~Installation certification~~ | RETIRADA 2026-08-26 — ver nota arriba | — |
 | `/mission-control` | Real-time restaurant state | Observability Hub | 2 |
 | `/admin/usuarios` | Team access management | Staff Manager + IAM | 2 |
 | Electron `config.json` | Terminal configuration | Terminal Manager | 2 |

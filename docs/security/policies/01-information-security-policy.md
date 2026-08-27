@@ -67,7 +67,9 @@ Esta politica aplica a:
 - **Hosting**: Vercel (SOC 2 certificado) con CDN global
 - **Base de datos**: Supabase PostgreSQL (SOC 2 Type II) con encriptacion AES-256 en reposo
 - **DNS/WAF**: Cloudflare con proteccion DDoS, WAF y DNSSEC
-- **IA**: Anthropic Claude API (SOC 2) con zero-retention policy
+- **IA**: Anthropic Claude API (SOC 2). La retencion del proveedor **no se afirma aqui**: se
+  evalua contra sus Commercial Terms of Service vigentes
+  (https://www.anthropic.com/legal/commercial-terms) al negociar el contrato
 
 ### Aplicacion
 - Row Level Security (RLS) para aislamiento multi-tenant

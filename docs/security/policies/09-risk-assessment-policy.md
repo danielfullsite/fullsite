@@ -68,11 +68,27 @@ Cada riesgo se evalua en dos dimensiones:
 | R3 | Dependencia con vulnerabilidad critica | 3 | 3 | 9 | Dependabot, actualizaciones rapidas | Mitigado |
 | R4 | Caida de Supabase | 2 | 4 | 8 | Backups diarios, PITR, SLA de Supabase | Mitigado |
 | R5 | Empleado de cliente roba datos | 2 | 3 | 6 | Roles POS, audit trail, PIN por accion | Mitigado |
-| R6 | DDoS attack | 2 | 3 | 6 | Cloudflare DDoS protection, WAF | Mitigado |
-| R7 | Error humano borra datos | 3 | 3 | 9 | Backups, PITR, confirmaciones en UI | Mitigado |
+| R6 | DDoS attack | 2 | 3 | 6 | Mitigacion de la plataforma de hosting | **Sin verificar** (1) |
+| R7 | Error humano borra datos | 3 | 3 | 9 | Respaldos diarios, confirmaciones en UI | **Sin verificar** (2) |
 | R8 | Proveedor de IA (Anthropic) no disponible | 3 | 2 | 6 | Degradacion graciosa, POS funciona sin IA | Aceptado |
-| R9 | Fuga de datos via API de IA | 2 | 3 | 6 | Zero-retention, no enviar datos criticos | Mitigado |
-| R10 | Phishing a empleado de Fullsite | 3 | 3 | 9 | MFA obligatorio, capacitacion | Mitigado |
+| R9 | Fuga de datos via API de IA | 2 | 3 | 6 | No enviar datos criticos en el prompt | **Parcial** (3) |
+| R10 | Phishing a empleado de Fullsite | 3 | 3 | 9 | Capacitacion | **Sin verificar** (4) |
+
+> **Por que cuatro filas dejaron de decir "Mitigado" (2026-08-26).** Se revisaron contra el
+> sistema real y su mitigacion no estaba comprobada. Un registro de riesgos que marca
+> "Mitigado" sin evidencia es peor que no tenerlo: da por cerrado lo que sigue abierto.
+>
+> 1. **R6** — la mitigacion citaba un WAF de Cloudflare. `app.fullsite.mx` responde
+>    `server: Vercel` y no devuelve cabecera `cf-ray`: Cloudflare cubre el dominio publico,
+>    no la aplicacion. Queda la mitigacion propia de la plataforma de hosting, que no se ha
+>    medido.
+> 2. **R7** — citaba PITR. No esta confirmado que este contratado, y **nunca se ha ejecutado
+>    una restauracion**. Ver `04-business-continuity-disaster-recovery.md`.
+> 3. **R9** — la mitigacion real y demostrable es nuestra: no enviar datos criticos en el
+>    prompt. Lo que hace el proveedor con lo que recibe **no es una mitigacion nuestra** y no
+>    se afirma aqui; se evalua contra sus terminos vigentes.
+> 4. **R10** — citaba MFA obligatorio. No es verificable desde el repositorio: vive en la
+>    consola de cada cuenta y no se ha comprobado una por una.
 
 ## 5. Tratamiento de riesgos
 
