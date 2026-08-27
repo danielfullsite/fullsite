@@ -256,14 +256,38 @@ function registerProvisioningIpc() {
   const { randomUUID } = require('crypto');
 
   /** Return system info + any legacy config raw data for the wizard. */
-  ipcMain.handle('provision:get-info', () => {
+  ipcMain.handle('provision:get-info', async () => {
     let legacy = null;
     try {
       if (fs.existsSync(LEGACY_CONFIG_PATH)) legacy = JSON.parse(fs.readFileSync(LEGACY_CONFIG_PATH, 'utf8'));
     } catch {}
+    const network_interfaces = [];
+    for (const [name, addresses] of Object.entries(os.networkInterfaces())) {
+      for (const address of addresses || []) {
+        if (address.family === 'IPv4' && !address.internal) {
+          network_interfaces.push({ name, address: address.address, netmask: address.netmask });
+        }
+      }
+    }
+    let system_printers = [];
+    try {
+      if (setupWindow && !setupWindow.isDestroyed()) {
+        system_printers = (await setupWindow.webContents.getPrintersAsync()).map(printer => ({
+          name: printer.name,
+          displayName: printer.displayName || printer.name,
+          isDefault: !!printer.isDefault,
+        }));
+      }
+    } catch (error) {
+      console.warn('[provision] Could not enumerate system printers:', error.message);
+    }
     return {
       hostname: os.hostname(),
       platform: process.platform,
+      arch: process.arch,
+      release: os.release(),
+      network_interfaces,
+      system_printers,
       legacy,
       schemaConstants: { MAX_PRINTER_ID_LENGTH: printerConfigSchema.MAX_PRINTER_ID_LENGTH },
     };
@@ -861,10 +885,14 @@ function createSetupWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      sandbox: false,
       preload: path.join(__dirname, 'preload-setup.js'),
     },
   });
   setupWindow.loadFile('setup.html');
+  setupWindow.webContents.on('preload-error', (_event, preloadPath, error) => {
+    console.error('[setup] Preload failed:', preloadPath, error.message);
+  });
   setupWindow.on('closed', () => { setupWindow = null; });
   console.log('[main] NOT_PROVISIONED — setup window opened');
 }

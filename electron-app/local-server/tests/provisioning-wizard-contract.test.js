@@ -29,3 +29,15 @@ test('a single same-restaurant caja is selected automatically', () => {
   assert.match(setup, /servers\.filter\(s => s\.restaurant_id === state\.restaurantId\)/)
   assert.match(setup, /matching\.length === 1/)
 })
+
+test('browser-opened setup fails safely instead of calling an undefined bridge', () => {
+  assert.match(setup, /if \(!window\.setupBridge\?\.scanLan\)/)
+  assert.match(setup, /El escaneo requiere la aplicación Fullsite instalada/)
+  assert.match(setup, /document\.querySelectorAll\('button'\)/)
+})
+
+test('native setup reports computer network and printer inventory', () => {
+  assert.match(main, /network_interfaces/)
+  assert.match(main, /getPrintersAsync\(\)/)
+  assert.match(setup, /Equipo detectado:/)
+})
