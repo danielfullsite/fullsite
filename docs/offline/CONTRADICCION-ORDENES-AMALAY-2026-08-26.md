@@ -20,8 +20,13 @@ tocó producción, y está detallada al final.
 > **INFERENCIA FUERTE — el evento observado provino de esa ruta.** La firma coincide (dos
 > peticiones, mismo filtro, 26 ms, `service_role`) y es la única ruta del repositorio que la
 > produce. Pero *coincidencia de firma no es correlación causal*: haría falta empatar el
-> evento con una petición concreta de Vercel — identificador, despliegue, sesión. Se intentó.
-> **No se pudo** (ver *"Lo que no se pudo correlacionar"*).
+> evento con una petición concreta de Vercel — identificador, despliegue, sesión.
+>
+> **NO VERIFICABLE — la correlación con Vercel.** Se intentó y no se pudo. La razón exacta,
+> reproducida: la retención del plan no alcanza el momento del evento, y pedir esa ventana
+> devuelve `400 — ExceedsBillingLimitError`, que es un error, no un resultado vacío. Un
+> borrador anterior dio otra razón ("1 línea en 24 h") que era **falsa**; la medición real
+> está en *"Lo que no se pudo correlacionar"*.
 >
 > **NO VERIFICADO — quién lo ejecutó, con qué intención, y de dónde salieron los otros
 > borrados.** El guardián de la ruta exige nombre `daniel`, pero eso demuestra *quién puede
@@ -113,14 +118,28 @@ Trazando cinco operaciones `COMMITTED` recientes de AMALAY de punta a punta
 **HECHO:** el libro dice `COMMITTED`, con revisión asignada y hora de término, y la fila no
 está. La última se confirmó **87 segundos antes** del `DELETE` de las 20:49:03.
 
-### El control que valida el método
+### El control que valida el método — y lo que escondía
 
 El `client_id` vacío tiene **7 operaciones `COMMITTED`** y `pos_orders` tiene **7 filas** con
 ese mismo `client_id`. **Cuadran 1:1.**
 
-Eso importa: demuestra que el mecanismo *puede* funcionar y que el libro *sí* refleja la
-realidad cuando la inserción ocurre. El problema es específico de AMALAY, no del diseño del
-libro ni de mi forma de consultarlo.
+Como control sirve: demuestra que el mecanismo *puede* funcionar y que el libro *sí* refleja
+la realidad cuando la inserción ocurre. El problema es específico de AMALAY, no del diseño
+del libro ni de mi forma de consultarlo.
+
+> **Pero un borrador de este documento lo dejó ahí, como una curiosidad benigna. No lo es.**
+>
+> Al verificar de quién son esas 7 filas, `pos_audit_log` y `pos_print_jobs` responden
+> `client_id = 'amalay'`, y el actor registrado es un mesero real de AMALAY. **Son órdenes de
+> AMALAY que perdieron su tenant al guardarse**, en una ventana de 5 horas del 26–27 de julio.
+> Sobrevivieron a la limpieza del 25-ago precisamente por eso: el `DELETE` filtró
+> `client_id=eq.amalay` y ellas no lo tienen.
+>
+> Es un hallazgo aparte, con su propia causa raíz y su propio fix pendiente:
+> [`TENANT-ATRIBUCION-2026-08-26.md`](../audit/TENANT-ATRIBUCION-2026-08-26.md).
+>
+> La lección de método: **"cuadra 1:1" contesta si el mecanismo funciona, no si el dato es
+> correcto.** Dos columnas pueden coincidir perfectamente y ambas estar mal.
 
 ---
 
@@ -263,17 +282,43 @@ afirmarlo como hecho haría falta empatar el evento con una petición concreta d
 aplicación: identificador de petición, despliegue, registro de la función, sesión. Eso es lo
 que no se pudo obtener.
 
-### Lo que NO se pudo correlacionar
+### Lo que NO se pudo correlacionar — `NO VERIFICABLE`
 
-Se intentó empatar el evento con Vercel. **No fue posible, y la razón es concreta:**
+Se intentó empatar el evento con Vercel. **No fue posible.** El veredicto se sostiene, pero
+la razón que dio un borrador anterior de este documento **era falsa** y hay que corregirla.
 
-```
-Consulta de registros de ejecución, ventana de 24 h → 1 (una) línea en total
-```
+> **Corrección.** Se afirmó *"los registros de ejecución guardan 1 línea en 24 horas"*.
+> **No es cierto.** Vueltos a medir el 2026-08-27 01:33 UTC:
+>
+> | Medición | Resultado |
+> |---|---|
+> | Líneas en las últimas 6 h | **378**, de un solo despliegue |
+> | Rutas distintas en 24 h | **40** |
+> | ¿Se registran las rutas de API? | **Sí** — p. ej. `GET /api/health 200`, con método, ruta, estado, despliegue y rama |
+>
+> La instrumentación funciona bien. Lo que falla es otra cosa.
 
-Reproducido con dos consultas distintas. El plan actual conserva registros de ejecución de
-forma tan limitada que el `DELETE` no tiene contraparte consultable. **Estado: NO VERIFICABLE
-con la instrumentación de hoy** — no "verificado como negativo".
+**Las dos razones reales, ambas reproducidas:**
+
+1. **La retención no llega hasta el evento.** `since: 24h` y `since: 12h` devuelven
+   prácticamente el mismo conjunto — no hay nada más viejo que ~12 h. Pedir explícitamente la
+   ventana que contiene el `DELETE` (2026-08-26 01:00–12:00 UTC) **falla**:
+
+   ```
+   400 Bad Request — {"name":"ExceedsBillingLimitError"}
+   ```
+
+   Es un límite del plan, no una ausencia de datos. Y es un error, no un resultado vacío: la
+   diferencia importa, porque un resultado vacío se podría leer como "no pasó nada".
+
+2. **Aun dentro de la ventana consultable, `cleanup-orders` no aparece.** Buscar esa cadena
+   en las últimas 24 h devuelve cero — pero eso sólo cubre las ~12 h que sí se conservan, no
+   el momento del evento.
+
+**Estado: NO VERIFICABLE con la retención contratada hoy** — no "verificado como negativo".
+Y es corregible: subir la retención del plan volvería consultable este tipo de evento.
+Mientras tanto, la operación nueva se auto-correlaciona (guarda `x-vercel-id` y el
+despliegue en su propia fila), así que el próximo evento no dependerá de esto.
 
 Lo que eso implica, dicho sin adornos:
 
@@ -317,37 +362,99 @@ las 24 horas.** Un día más tarde habría sido irreconstruible.
 
 ---
 
-## Los identificadores — qué órdenes, exactamente
+## Los identificadores — el desglose completo
 
-Daniel pidió los identificadores que ligan las 303 operaciones `COMMITTED` con las órdenes
-afectadas, en vez de un número suelto. Consultado directamente:
+Daniel puso una condición explícita: **no cerrar causa raíz hasta terminar esta tabla**, y no
+confundir *operaciones* con *órdenes*. Tenía razón en que no son lo mismo: 303 operaciones
+`COMMITTED` **no** son 303 órdenes.
+
+### Operaciones vs. identificadores
+
+| Medida | n |
+|---|---:|
+| Filas de `pos_save_operations` para `amalay` | **353** |
+| — de ellas `COMMITTED` | **303** |
+| — de ellas `REJECTED` | **50** |
+| `save_operation_id` únicos entre las `COMMITTED` | **303** |
+| **`order_id` únicos entre las `COMMITTED`** | **143** |
+| `save_operation_id` únicos entre las `REJECTED` | **50** |
+| `order_id` únicos entre las `REJECTED` | **25** |
+| `order_id` únicos en todo el libro | **145** |
+
+**Sobre reintentos e idempotencia:** los 303 `save_operation_id` son **todos distintos**. No
+hay una sola llave repetida, así que **ninguna fila del libro es un reintento del mismo
+comando**. La razón de que 303 operaciones den 143 órdenes es otra y es normal: **una orden
+recibe varias operaciones a lo largo de su vida** — abrirla, agregar platillos, cobrarla. El
+promedio es 2.1 operaciones por orden, y hay al menos una con `committed_revision = 3`.
+
+### Evidencia histórica de inserción — el punto clave
+
+Hasta aquí, todo se apoyaba en un solo libro. La pregunta adversarial es: **¿existe evidencia
+independiente de que esas órdenes se insertaron de verdad?**
+
+Sí, y sobrevivió al borrado — porque `pos_orders` **no tiene llaves foráneas** hacia esas
+tablas (verificado), así que el `DELETE` no las arrastró:
+
+| Fuente independiente | Cuántas de las 143 corrobora |
+|---|---:|
+| `pos_reconciliation_results` | **143 / 143** |
+| `pos_audit_log` | **143 / 143** |
+| `pos_market_movements` | 59 |
+| `pos_print_jobs` | 58 |
+| `pos_inventory_movements` | 21 |
+| `pos_customer_visits` | 0 |
+| **Con al menos una corroboración** | **143 / 143** |
+| **Sin ninguna corroboración** | **0** |
+
+**Dos fuentes distintas del libro corroboran las 143.** Eso saca la afirmación *"las órdenes
+sí se insertaron"* del terreno de "lo dice el libro" y la pone en "lo dicen tres sistemas
+que no se escriben entre sí".
+
+### Clasificación de cada identificador
+
+| Clase | n | Qué significa |
+|---|---:|---|
+| **Insertadas y borradas** | **143** | `COMMITTED` + corroboración independiente + hoy no están |
+| **Descartadas por conflicto, pero la orden existió** | 23 | Tienen `REJECTED` *y* `COMMITTED`: el conflicto fue posterior a una inserción buena |
+| **Descartadas por conflicto, nunca entraron** | **2** | Sólo `REJECTED`, todas `ORDER_NOT_FOUND` (3 y 4 intentos). Tienen actividad de mesero en `pos_audit_log` pero **cero** rastro en reconciliación, inventario o impresión |
+| **No correlacionables** | **0** | No queda ninguna `COMMITTED` sin explicación |
+
+Los dos que nunca entraron:
+
+```
+d3a21c8a-…  ORDER_NOT_FOUND ×3   actor: Mario García Ramírez   2026-07-23
+fe2a2d52-…  ORDER_NOT_FOUND ×4   actor: Aldo Ruiz Ramirez      2026-07-16
+```
+
+Son el caso que el acta del 24-ago describe: el mesero trabajó la orden, el guardado falló
+con `ORDER_NOT_FOUND`, el POS lo presentó como conflicto y *"conservar nube"* descartó la
+operación local. **La orden existió en la pantalla, nunca en el servidor.**
+
+### Ninguna es posterior al borrado
 
 | | |
 |---|---|
-| Operaciones `COMMITTED` | **303** |
-| Órdenes distintas que representan | **143** (varias operaciones por orden: guardar, agregar, cobrar) |
-| Primera | 2026-07-14 20:53:51 `America/Monterrey` |
-| Última | **2026-08-25 20:47:36** — 87 s antes del `DELETE` |
-| Cuántas sobreviven hoy | **0** |
-| ¿Alguna es posterior al `DELETE`? | **Ninguna.** Todas caen antes de las 20:49:03 |
+| Primera `COMMITTED` | 2026-07-14 20:53:51 `America/Monterrey` |
+| Última `COMMITTED` | **2026-08-25 20:47:36** — 87 s antes del `DELETE` |
+| Cuántas de las 143 sobreviven | **0** |
+| ¿Alguna `COMMITTED` es posterior a las 20:49:03? | **Ninguna** |
 
-Ese último renglón importa más de lo que parece: **el borrado explica el 100 % de las
-ausencias.** No queda ni una orden `COMMITTED` cuya desaparición haya que atribuir a otra
-cosa. Si alguna fuera posterior al `DELETE` y aun así faltara, habría un segundo problema —
-no lo hay.
+Ese último renglón es el que cierra: **el borrado explica el 100 % de las ausencias.** Si
+alguna orden confirmada después del `DELETE` faltara, habría un segundo problema. No lo hay.
 
-Muestra de `order_id` afectados (los mismos que la tabla de trazado, más uno con tres
-guardados y revisión 3, que confirma que el ciclo de vida completo funcionaba):
+### Lo que el libro NO alcanza a ver
 
-```
-2381109f…   0bfe7a43…   c3130c56…   f1841449…   f1ff74d6…
-85144b39…   ← 3 operaciones COMMITTED, committed_revision = 3
-```
+Barriendo las tablas corroborantes sin pasar por el libro aparecen **255 `order_id` de
+AMALAY con evidencia independiente** — o sea **110 más** de los 145 que el libro conoce.
+Probablemente son anteriores al envoltorio idempotente, o entraron por otra ruta.
 
-La lista completa de los 143 vive en el respaldo que ahora guarda la propia operación
-(`pos_cleanup_operations.backup`); para este evento **no existe**, porque el respaldo se
-descargó al navegador del operador y la ruta de entonces no conservaba copia. Es
-exactamente el agujero que cierra el rediseño.
+De esos 255, **247 ya no existen** y **8 siguen vivos** — pero bajo *otro* `client_id`. Eso
+resultó ser un hallazgo aparte y serio, documentado en
+[`TENANT-ATRIBUCION-2026-08-26.md`](../audit/TENANT-ATRIBUCION-2026-08-26.md).
+
+**Conclusión sobre el conteo:** el evento borró **al menos 143** órdenes; la cifra exacta no
+se conoce, porque la respuesta fue `204` sin conteo y pudo llevarse órdenes que nunca pasaron
+por el libro. Es justo el número que la operación nueva sí deja escrito (`deleted_count`).
 
 ---
 
@@ -435,144 +542,221 @@ Lo que sí queda tocado:
 
 # La corrección
 
-## Por qué el primer arreglo no servía
+## Los dos intentos que no servían
 
-El primer intento escribía la auditoría **después** del `DELETE`, envuelta en `try/catch`
-para no convertir un borrado exitoso en un `500`. Daniel lo rechazó con el argumento correcto:
+**Primero:** escribir la auditoría *después* del `DELETE`, envuelta en `try/catch` para no
+convertir un borrado exitoso en un `500`. Daniel lo rechazó:
 
 > *"Si el borrado termina y la auditoría falla, vuelve a quedar invisible exactamente como
 > ahora."*
 
-Es exacto. Un registro *best-effort* de una acción destructiva **no es un registro**: es una
-esperanza. El modo de falla que hay que cubrir no es "la ruta se le olvidó auditar" —es "la
-auditoría no llegó"— y `try/catch` lo garantiza en vez de impedirlo.
+Correcto. Un registro *best-effort* de una acción destructiva **no es un registro**: es una
+esperanza. El modo de falla a cubrir no es "se me olvidó auditar" — es "la auditoría no
+llegó" — y `try/catch` lo garantiza en vez de impedirlo.
 
-## Qué se construyó
+**Segundo:** meter `STARTED`, el `DELETE` y `FAILED` en una sola función plpgsql. Se ve
+atómico y correcto. Daniel también lo rechazó, y también tenía razón:
 
-`supabase/migrations/20260826200000_cleanup_orders_transaccional.sql` — el borrado se movió
-adentro de la base, donde puede ser atómico con su constancia.
+> *"No metas ingenuamente `STARTED`, DELETE y `FAILED` en una sola transacción: si la
+> transacción falla, el estado `FAILED` también se revierte."*
 
-| Propiedad | Cómo se logra |
+Y con él se revierte el `STARTED`. **La migración anterior presumía en su comentario que
+"una interrupción deja huella en vez de silencio". Era falso**, y era el mismo defecto que
+venía a corregir.
+
+### Demostrado, no argumentado
+
+Se ejecutaron los dos diseños contra la misma caída — una excepción justo después del
+`DELETE`, que es lo que pasa cuando revienta el `statement_timeout` o se cae la conexión:
+
+| Diseño | Filas en el libro tras la caída |
+|---|---:|
+| Una sola transacción (el anterior) | **0** |
+| Tres fases (el actual) | **1**, en estado `STARTED` |
+
+```
+-- El contrafactual, corrido en producción sobre un tenant sintético:
+do $$ begin
+  insert into pos_cleanup_operations (...) values (..., 'STARTED', ...);
+  delete from pos_orders where client_id='__t_alfa__';
+  raise exception 'misma caida, diseno viejo (habia borrado % filas)', v_n;
+end $$;
+--  → rastro_del_diseno_viejo: 0
+--  → rastro_del_diseno_nuevo: 1
+```
+
+> **La regla que sale de aquí**, y que vale para cualquier operación destructiva:
+>
+> La intención se registra en una transacción. El efecto, en otra. El fracaso, en una
+> tercera. **Un registro que comparte transacción con lo que describe no puede describir el
+> fracaso de esa transacción.**
+
+## El protocolo
+
+`supabase/migrations/20260826230000_cleanup_orders_protocolo_tres_fases.sql`
+
+```
+Fase 1 · r1_cleanup_begin()    transacción propia → respaldo + 'STARTED'. Confirma.
+Fase 2 · r1_cleanup_commit()   transacción propia → FOR UPDATE, valida, DELETE, 'COMMITTED'
+Fase 3 · r1_cleanup_fail()     transacción propia → 'FAILED', sólo si la 2 falló
+```
+
+La fase 2 es la única que necesita ser atómica, y lo es: o quedan el `DELETE` y el
+`COMMITTED`, o no queda ninguno de los dos.
+
+**La propiedad que se sigue: si no se pudo escribir la constancia, no se borra.** La fase 1
+es un requisito, no un adorno — la inversión exacta del diseño *best-effort*, donde el
+borrado iba primero y la constancia era una esperanza.
+
+| Lo que pediste | Cómo se cumple |
 |---|---|
-| **Idempotente** | `operation_id` es la llave primaria del libro. Repetirlo devuelve el resultado anterior, sin volver a borrar |
-| **Registro duradero de inicio** | Se inserta `STARTED` **antes** de leer o borrar nada |
-| **Actor, tenant, motivo, digest, cantidad esperada** | Columnas de `pos_cleanup_operations`, obligatorias al iniciar |
-| **Borrado y constancia atómicos** | `DELETE` y `UPDATE … 'COMMITTED'` en la misma función plpgsql ⇒ misma transacción. O quedan los dos, o ninguno |
-| **`STARTED` / `COMMITTED` / `FAILED`** | Restricción `CHECK` en la columna `state` |
-| **Reintento seguro** | Consulta por `operation_id` antes de actuar; responde `replay: true` |
-| **Respaldo con restauración probada** | El respaldo completo se guarda en la propia fila; `r1_cleanup_restore()` lo repone sin pisar órdenes que ya existan |
-| **Alerta de `STARTED` sin resolver** | Índice parcial `WHERE state = 'STARTED'` — ver más abajo |
+| `STARTED` durable antes del borrado | Fase 1, transacción propia. Sobrevive a que la 2 aborte — demostrado arriba |
+| `operation_id` único, actor, `staff_id`, tenant, rol, motivo, confirmación, digest, cantidad esperada, timestamp | Columnas obligatorias de `pos_cleanup_operations` |
+| Metadata de petición no sensible | `request_metadata`: `x-vercel-id`, despliegue, user-agent. **Sin** token, cookie, PIN ni IP |
+| Una sola RPC transaccional que bloquee el `operation_id` | Fase 2 abre con `SELECT … FOR UPDATE` |
+| Valide tenant / digest / conteo | El tenant se compara contra lo que dejó la fase 1, no contra lo que dice quien llama. El digest es SHA-256 sobre las filas. El conteo se revalida dentro |
+| Impida doble ejecución | Estados terminales se responden, no se re-ejecutan |
+| Borre únicamente el tenant objetivo | `delete … where client_id = v_op.client_id`, tomado de la fila, nunca del parámetro |
+| `FAILED` en operación posterior independiente | Fase 3, y se niega a degradar un `COMMITTED` |
+| Reintento tras timeout devuelve `COMMITTED` | Fase 2 y fase 3 lo devuelven; la ruta lo traduce a éxito |
+| Detectar y alertar `STARTED` estancadas | Vista `pos_cleanup_atoradas` + índice parcial; el `GET` de la ruta la expone al operador antes de arrancar otra limpieza |
+| Respaldo antes de `STARTED`, con SHA-256 y restauración probada | El respaldo se toma del lado del servidor y queda en la misma fila que se confirma; su hash se verifica antes de restaurar |
+| Permisos: ningún cliente POS puede falsificar auditoría ni borrar | Ver abajo |
 
-La capa web ya no borra: valida el digest (que el operador vio esas órdenes) y delega. El
-control que de verdad protege —el conteo— vive **dentro** de la transacción, porque entre la
-lectura de la ruta y el borrado cabe una orden nueva.
+### El caso ambiguo se resuelve solo
 
-## Evidencia — seis modos de falla, contra la función real en producción
+Si la fase 2 se corta por red, no se sabe si borró. **La fase 3 lo resuelve sin adivinar:**
+`r1_cleanup_fail` se niega a degradar un `COMMITTED`, así que su respuesta *es* el veredicto.
+Si contesta `YA_ESTABA_COMMITTED`, el borrado ocurrió y la ruta reporta éxito; si marca
+`FAILED`, no ocurrió. En ningún punto hay que suponer.
 
-Ejecutados sobre un tenant sintético `__cleanup_test__`, nunca sobre datos de AMALAY:
+### Permisos — comprobados, no supuestos
 
-| # | Escenario | Resultado esperado | Observado |
+```
+r1_cleanup_begin     anon:false  authenticated:false  service_role:true
+r1_cleanup_commit    anon:false  authenticated:false  service_role:true
+r1_cleanup_fail      anon:false  authenticated:false  service_role:true
+r1_cleanup_restore   anon:false  authenticated:false  service_role:true
+
+pos_cleanup_operations   anon: sin lectura ni escritura · authenticated: igual · RLS activo, 0 políticas
+pos_cleanup_atoradas     igual
+```
+
+El POS escribe desde el navegador con la llave `anon` (ver `print-queue.ts`, `pos-data.ts`).
+Esa llave no llega ni a la tabla ni a las funciones, así que **no puede falsificar una
+auditoría ni ejecutar un borrado.**
+
+## Evidencia — trece escenarios contra las funciones reales en producción
+
+Sobre tenants sintéticos `__t_alfa__` (3 órdenes) y `__t_beta__` (1), nunca sobre datos de
+AMALAY:
+
+| # | Escenario | Esperado | Observado |
 |---|---|---|---|
-| P1 | Conteo equivocado (esperaba 5, había 3) | No borra, queda `FAILED` | `FAILED` · 3 órdenes intactas ✓ |
-| P2 | Conteo correcto | `COMMITTED`, borra, guarda respaldo | `COMMITTED` · `deleted:3` · respaldo de 3 ✓ |
-| P3 | Mismo `operation_id` otra vez | `replay`, sin volver a borrar | `replay:true` · sin segundo borrado ✓ |
-| P4 | Restaurar desde el respaldo | Reponer las 3 | `restored:3, del_respaldo:3` ✓ |
-| P5 | Nueva llave después de restaurar | `COMMITTED` normal | `COMMITTED` ✓ |
-| P6 | Carrera tardía: tabla ya vacía, esperaba 3 | `CONTEO_CAMBIO` | `CONTEO_CAMBIO/FAILED` ✓ |
+| **P0** | **Caída después del `DELETE`** | `STARTED` sobrevive, órdenes vuelven | `STARTED` · 3 órdenes · respaldo intacto ✓ |
+| **P0b** | **Contrafactual: el diseño de una transacción** | pierde todo | **0 filas en el libro** ✓ |
+| P1 | Fase 3 tras el fallo | `FAILED` | `FAILED` ✓ |
+| P2 | Commit sin fase 1 *(auditoría inaccesible)* | no borra | `SIN_FASE_1` ✓ |
+| P3 | Tenant cruzado: llave de alfa para borrar beta | rechazo | `TENANT_NO_COINCIDE` · ambos intactos ✓ |
+| **P4** | **Digest viejo con el MISMO conteo** | rechazo | `DIGEST_NO_COINCIDE` · `conteo_fase1: 3`, `conteo_ahora: 3` ✓ |
+| P5 | Conteo equivocado en la fase 1 | ni se abre | `CONTEO_CAMBIO` · **0 filas creadas** ✓ |
+| P6 | Confirmación inválida | rechazo | `CONFIRMACION_INVALIDA` ✓ |
+| P7 | Camino feliz | `COMMITTED` | `deleted: 3` ✓ |
+| P8 | Reintento con la misma llave | replay | `replay: true, deleted: 3` ✓ |
+| P9 | Fase 3 sobre un `COMMITTED` | se niega | `YA_ESTABA_COMMITTED` ✓ |
+| P10 | Fase 1 repetida tras `COMMITTED` | replay | `replay: true` ✓ |
+| **P11** | **Restauración** | fiel | `restored: 3` · **hash de lo restaurado == hash del respaldo** ✓ |
+| P12 | Respaldo manipulado | se niega | `RESPALDO_CORRUPTO` ✓ |
+| **P13** | **Concurrencia real, dos conexiones** | se serializa | ver abajo |
 
-Estado tras la limpieza de las pruebas — verificado en consulta aparte, porque una subconsulta
-en el mismo `SELECT` que el RPC lee la instantánea previa y da un número falso (ese error se
-cometió y se corrigió):
+**P4 merece atención:** el conteo era idéntico (3 y 3) y aun así lo detuvo el hash. Un
+control por conteo —el que tenía el diseño anterior— **habría borrado**.
+
+**P11 no se conformó con "aparecieron 3 filas".** Se recalculó el SHA-256 sobre las filas
+repuestas y se comparó con el del respaldo:
 
 ```
-sobra_prueba: 0 · filas_en_libro: 0 · total_global: 6,309 · amalay: 0
+hash_de_lo_restaurado : 55bfe7e0…390e260
+hash_del_respaldo     : 55bfe7e0…390e260
+restauracion_fiel     : true
 ```
 
-Idéntico al estado previo a aplicar la migración.
+**P13 — concurrencia real, no simulada.** Se usó `pg_cron` para tener una segunda conexión
+de verdad: un job ejecutó la fase 2 y retuvo la transacción abierta. Desde otra sesión se
+llamó la misma operación:
+
+```
+jobs_corriendo: 1 · bloqueos_exclusivos: 1 · estado visible desde mi sesión: STARTED
+→ segunda petición: BLOQUEADA 2.32 s
+→ al liberarse: { ok: true, state: 'COMMITTED', replay: true, deleted: 3 }
+```
+
+Se serializó, esperó, y **devolvió el resultado anterior en vez de volver a borrar.** El job
+se desprogramó de inmediato (`cron.unschedule`), verificado: quedan los 3 jobs preexistentes.
+
+**Estado tras limpiar las pruebas:** `residuo_mio: 0` · `filas_en_el_libro: 0` ·
+`amalay: 0` · los 3 `cron.job` de siempre. El total global subió de 6,309 a 6,316 por 12
+órdenes de `lab-resto` creadas por otro proceso en paralelo — verificado, no mío.
 
 ## Evidencia — la capa web
 
-`dashboard-app/src/__tests__/cleanup-orders-transaccional.test.ts` · **10 pruebas**, incluidas
-doble petición, timeout **después** del commit, digest vencido, tenant cruzado y RPC caído.
+`dashboard-app/src/__tests__/cleanup-orders-transaccional.test.ts` · **14 pruebas**.
 
-Prueba de mutantes, que es lo que distingue una prueba real de una decorativa:
+Incluye auditoría inaccesible, timeout después del commit, doble clic, replay, digest viejo,
+conteo cambiado a media operación, tenant cruzado, fase 3 caída, y **que la metadata no lleve
+credenciales**.
+
+Prueba de mutantes — lo que separa una prueba real de una decorativa:
 
 | Mutación | Pruebas que fallan |
 |---|---:|
-| Quitar la exigencia de `operation_id` | 1 |
-| **Volver al `DELETE` directo + auditoría best-effort** | **6** |
+| Saltarse la fase 1 e ir directo al `commit` | **9 de 14** |
+| No llamar la fase 3 ante un corte | **10 de 14** |
+| Permitir que la fase 3 degrade un `COMMITTED` | 1 de 14 |
 
-Suite completa del tablero: **2,415 pruebas en 99 archivos, todas verdes.** `tsc --noEmit`
-limpio. `eslint` limpio en los archivos tocados (los 7 avisos de `monitor/page.tsx` son
-preexistentes e idénticos en `HEAD`).
+Suite completa: **2,419 / 2,419** en 99 archivos · `tsc --noEmit` limpio · `eslint` limpio en
+los archivos tocados.
 
-## Lo que falta, dicho como pendiente y no como hecho
+## Lo que falta, dicho como pendiente
 
-- **La alerta de `STARTED` atorado no existe todavía.** El índice parcial que la hace barata
-  sí está; falta quien la consulte y avise. Hoy la consulta es esta, y hay que correrla a
-  mano:
+- **La alerta de `STARTED` atorado es pasiva.** La vista existe y el `GET` de la ruta la
+  muestra al operador antes de que arranque otra limpieza. **No hay aviso automático** — no
+  llega a Telegram ni a ningún lado. Un `STARTED` atorado a las 3 a.m. no despierta a nadie.
+- **La correlación con el lado de la aplicación queda resuelta hacia adelante, no hacia
+  atrás.** La operación guarda ahora `x-vercel-id` y el despliegue, así que el próximo evento
+  sí será correlacionable. El del 2026-08-25 no lo será nunca.
+- **Hasta 371 filas borradas siguen sin explicación**, y fuera de la retención de registros
+  no hay forma de investigarlas hoy.
+- **La carrera entre el `SELECT` y el `INSERT` de la fase 1** se cerró con un manejador de
+  `unique_violation` — pero **forzar ese entrelazado exacto no se probó**: requiere dos
+  conexiones colisionando en una ventana de microsegundos. Es correcto por construcción y es
+  el mismo patrón que ya usa `r1_save_order`; no está verificado por ejecución.
 
-  ```sql
-  select operation_id, client_id, actor, started_at, now() - started_at as lleva
-    from pos_cleanup_operations
-   where state = 'STARTED' and started_at < now() - interval '5 minutes';
-  ```
+## Un agujero que abrí, y cerré, la misma noche
 
-- **La correlación con el lado de la aplicación sigue sin resolverse.** Mientras los
-  registros de ejecución conserven una línea por día, el próximo evento tampoco será
-  correlacionable. Es un pendiente de plataforma, no de esta ruta.
-- **Las 371 filas borradas restantes siguen sin explicación**, y fuera de la ventana de 24 h
-  no hay forma de investigarlas con lo que existe hoy.
+Antes de este rediseño, la migración `20260826200000` hacía `REVOKE ALL … FROM PUBLIC, anon`
+y yo **di por hecho** que con eso la función quedaba sólo para `service_role`. Falso: Supabase
+otorga `EXECUTE` a `authenticated` por `ALTER DEFAULT PRIVILEGES`, como grant **directo**, que
+un `REVOKE` a `PUBLIC` no toca.
 
-## Un agujero que abrí y cerré la misma noche
+Permitía que cualquier usuario con sesión iniciada, de cualquier restaurante, borrara las
+órdenes de otro tenant llamando el RPC directo. Lo detectó el linter de Supabase, no yo.
 
-La revisión posterior a aplicar la migración —el linter de Supabase, regla 0029— encontró
-esto:
-
-```
-r1_cleanup_orders   proacl: postgres=X | authenticated=X | service_role=X
-                                          └── no debería estar ahí
-```
-
-La migración hacía `REVOKE ALL … FROM PUBLIC, anon` y yo di por hecho que con eso quedaba
-sólo para `service_role`. **Falso.** Supabase otorga `EXECUTE` a `authenticated` sobre las
-funciones nuevas de `public` mediante `ALTER DEFAULT PRIVILEGES`, y lo hace como grant
-**directo** — que un `REVOKE` a `PUBLIC` no toca.
-
-Lo que eso permitía: cualquier usuario con sesión iniciada, **de cualquier restaurante**,
-podía llamar `POST /rest/v1/rpc/r1_cleanup_orders` con el `p_client_id` de otro tenant y
-borrarle todas sus órdenes — saltándose el guardián de la ruta, el rol mínimo, la
-confirmación literal y el digest. **Peor que el defecto que venía a corregir.**
-
-Cerrado en `20260826213000_cleanup_orders_revocar_authenticated.sql`, y comprobado en vez de
-supuesto:
-
-```
-r1_cleanup_orders    anon:false  authenticated:false  service_role:true
-r1_cleanup_restore   anon:false  authenticated:false  service_role:true
-```
-
-Más humo bajo `service_role`, para no haber cerrado la puerta con la ruta adentro:
-`deleted:2` · `restored:2` · estado final sin residuo.
-
-**El barrido del patrón encontró tres funciones más con la misma exposición, todas
-preexistentes.** Una es seria —`r1_save_order` acepta `p_client_id` como argumento y evade
-RLS— y **no está corregida**: es un P0 de otra capacidad y va en su propia rama. Detalle,
-clasificación y fix propuesto en
-[`docs/audit/SECDEF-GRANTS-AUTHENTICATED-2026-08-26.md`](../audit/SECDEF-GRANTS-AUTHENTICATED-2026-08-26.md).
-
-> **La regla:** escribir el `REVOKE` no es verificar el permiso. La comprobación es
-> `has_function_privilege`, y hay que correrla.
+Detalle, barrido del patrón y las tres funciones preexistentes con la misma exposición —
+incluida `r1_save_order`, que **sigue abierta** — en
+[`SECDEF-GRANTS-AUTHENTICATED-2026-08-26.md`](../audit/SECDEF-GRANTS-AUTHENTICATED-2026-08-26.md).
 
 ## Rollback
 
 ```sql
--- 20260826213000 no se revierte: reabriría el agujero de arriba.
-DROP FUNCTION IF EXISTS public.r1_cleanup_orders(text,text,text,text,text,text,integer,text);
-DROP FUNCTION IF EXISTS public.r1_cleanup_restore(text);
-DROP TABLE IF EXISTS public.pos_cleanup_operations;
+drop function if exists public.r1_cleanup_begin(text,text,text,text,text,text,text,integer,jsonb);
+drop function if exists public.r1_cleanup_commit(text,text);
+drop function if exists public.r1_cleanup_fail(text,text);
+drop function if exists public.r1_cleanup_restore(text);
+drop view     if exists public.pos_cleanup_atoradas;
+drop table    if exists public.pos_cleanup_operations;
 ```
 
-La tabla es aditiva y nada existente depende de ella. Revertir la ruta y el cliente devuelve
-el comportamiento anterior — que es exactamente el defecto, así que revertir sólo tiene
-sentido si el RPC resulta estar roto.
+Todo es aditivo y nada existente depende de ello. Revertir la ruta y el cliente devuelve el
+comportamiento anterior — que es exactamente el defecto, así que revertir sólo tiene sentido
+si el protocolo resulta estar roto.
