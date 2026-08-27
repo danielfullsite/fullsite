@@ -3606,7 +3606,7 @@ function POSContent() {
   }
 
   return (
-    <div className="pos-kiosk h-dvh flex flex-col overflow-hidden select-none" style={{ background:'var(--bg)', color:'var(--text-1)' } as React.CSSProperties}>
+    <div className="pos-kiosk pos-service-shell h-dvh min-h-0 flex flex-col overflow-hidden select-none" style={{ background:'var(--bg)', color:'var(--text-1)' } as React.CSSProperties}>
 
       {/* COB-017: MP Payment Recovery Banner — shown when MP captured money but Fullsite failed to record */}
       {needsOperatorAttention(mpRecovery) && mpRecovery && (
@@ -3654,8 +3654,8 @@ function POSContent() {
       {/* Top Bar */}
       <header className="pos-safe-top flex flex-col bg-[var(--surface-2)] border-b border-[var(--line)] flex-shrink-0">
         {/* Row 1: Logo + Hamburger + Ready badge + Staff + Clock */}
-        <div className="flex items-center justify-between px-3 py-0.5">
-          <div className="flex items-center gap-2">
+        <div className="flex min-w-0 items-center justify-between gap-2 px-2 py-0.5 sm:px-3">
+          <div className="flex flex-shrink-0 items-center gap-2">
             <button onClick={() => setShowNav(!showNav)} className="w-11 h-11 rounded-lg bg-[var(--line)] hover:bg-[var(--line)] active:bg-[var(--surface-2)]0 flex items-center justify-center transition-colors">
               {showNav ? <X size={18} /> : <Menu size={18} />}
             </button>
@@ -3664,7 +3664,7 @@ function POSContent() {
               <span className="inline-block w-1.5 h-1.5 bg-emerald-500 ml-0.5 mb-0.5" />
             </span>
           </div>
-          <div className="flex items-center gap-3 text-[var(--text-3)] flex-shrink-0 ml-2">
+          <div className="flex min-w-0 items-center justify-end gap-1 overflow-hidden text-[var(--text-3)] sm:gap-2 lg:gap-3">
             <OfflineIndicator
               isOnline={online}
               pendingCount={pendingSync}
@@ -3726,36 +3726,36 @@ function POSContent() {
             )}
             <button
               onClick={handleToggleComandas}
-              className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm font-bold min-h-[44px] ${
+              className={`hidden sm:flex flex-shrink-0 items-center gap-1 px-2 lg:px-3 py-1 rounded-full text-sm font-bold min-h-[44px] ${
                 comandasOff ? 'bg-amber-600 text-white animate-pulse' : 'bg-[var(--line)] text-[var(--text-3)] hover:bg-[var(--line)]'
               }`}
               title={comandasOff ? 'Comandas APAGADAS (modo piloto) — toca para encender' : 'Comandas encendidas — toca para apagar (modo piloto)'}
             >
               <ChefHat size={16} />
-              {comandasOff ? 'Comandas OFF' : 'Comandas'}
+              <span className="hidden lg:inline">{comandasOff ? 'Comandas OFF' : 'Comandas'}</span>
             </button>
             {/* BT/USB buttons only on mobile (tablets/phones) — terminal uses bridge */}
             {hasBluetooth && isMobileDevice && (
               <button
                 onClick={handleConnectPrinter}
                 disabled={btConnecting}
-                className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm font-bold min-h-[44px] ${
+                className={`hidden sm:flex flex-shrink-0 items-center gap-1 px-2 lg:px-3 py-1 rounded-full text-sm font-bold min-h-[44px] ${
                   btPrinter ? 'bg-blue-600 text-white' : 'bg-[var(--line)] text-[var(--text-3)] hover:bg-[var(--line)]'
                 }`}
               >
                 <Bluetooth size={16} />
-                {btConnecting ? '...' : btPrinter ? btPrinter.slice(0, 8) : 'Printer'}
+                <span className="hidden lg:inline">{btConnecting ? '...' : btPrinter ? btPrinter.slice(0, 8) : 'Printer'}</span>
               </button>
             )}
             {hasUsb && !btPrinter && isMobileDevice && (
               <button
                 onClick={handleConnectUsbPrinter}
                 disabled={btConnecting}
-                className="flex items-center gap-1 px-3 py-1 rounded-full text-sm font-bold min-h-[44px] bg-[var(--line)] text-[var(--text-3)] hover:bg-[var(--line)]"
+                className="hidden sm:flex flex-shrink-0 items-center gap-1 px-2 lg:px-3 py-1 rounded-full text-sm font-bold min-h-[44px] bg-[var(--line)] text-[var(--text-3)] hover:bg-[var(--line)]"
                 title="Impresora térmica USB"
               >
                 <Usb size={16} />
-                {btConnecting ? '...' : 'USB'}
+                <span className="hidden lg:inline">{btConnecting ? '...' : 'USB'}</span>
               </button>
             )}
             <button
@@ -3764,17 +3764,17 @@ function POSContent() {
                 if (cfg) { setMpAccessToken(cfg.accessToken); setMpDeviceId(cfg.deviceId) }
                 setShowMPConfig(true)
               }}
-              className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm font-bold min-h-[44px] ${
+              className={`hidden sm:flex flex-shrink-0 items-center gap-1 px-2 lg:px-3 py-1 rounded-full text-sm font-bold min-h-[44px] ${
                 mpConfig ? 'bg-cyan-600 text-white' : 'bg-[var(--line)] text-[var(--text-3)] hover:bg-[var(--line)]'
               }`}
               title="Mercado Pago Point"
             >
               <Smartphone size={16} />
-              {mpConfig ? 'Point' : 'MP'}
+              <span className="hidden lg:inline">{mpConfig ? 'Point' : 'MP'}</span>
             </button>
-            {staffName && <span className="text-xs text-[var(--accent-ink)]">{staffName}</span>}
-            {isMobileRestricted && <span className="text-[10px] text-[var(--warn-ink)] bg-[var(--warn-soft)] px-2 py-0.5 rounded-full">Solo ordenes</span>}
-            <div className="flex items-center gap-1">
+            {staffName && <span className="hidden lg:inline text-xs text-[var(--accent-ink)] whitespace-nowrap">{staffName}</span>}
+            {isMobileRestricted && <span className="hidden sm:inline text-[10px] text-[var(--warn-ink)] bg-[var(--warn-soft)] px-2 py-0.5 rounded-full whitespace-nowrap">Solo órdenes</span>}
+            <div className="hidden lg:flex items-center gap-1">
               <Clock size={14} />
               <span className="text-xs font-mono">{clock}</span>
             </div>
@@ -3793,14 +3793,14 @@ function POSContent() {
                 window.location.reload()
               }}
               title="Bloquear pantalla"
-              className="w-11 h-11 rounded-lg bg-[var(--line)] hover:bg-[var(--crit-soft)] flex items-center justify-center transition-colors"
+              className="w-11 h-11 flex-shrink-0 rounded-lg bg-[var(--line)] hover:bg-[var(--crit-soft)] flex items-center justify-center transition-colors"
             >
               <Lock size={18} />
             </button>
           </div>
         </div>
         {/* Row 2: Selectors (compact for tablet) */}
-        <div className="flex items-center gap-1.5 px-3 py-1 border-t border-[var(--line)]/50 overflow-x-auto">
+        <div className="flex min-w-0 items-center gap-1.5 overflow-hidden border-t border-[var(--line)]/50 px-2 py-1 sm:px-3">
           {/* Back to mesa map — always visible in kiosk mode (no browser back button) */}
           <button
             type="button"
@@ -3810,8 +3810,8 @@ function POSContent() {
           >
             <ArrowLeft size={18} />
           </button>
-          <div className="flex items-center gap-1 bg-[var(--line)] rounded-lg px-3 py-0.5 border border-[var(--line)] min-h-[40px]">
-            <span className="text-[var(--text-1)] text-sm font-medium">Mesa</span>
+          <div className="flex flex-shrink-0 items-center gap-1 bg-[var(--line)] rounded-lg px-2 sm:px-3 py-0.5 border border-[var(--line)] min-h-[40px]">
+            <span className="hidden min-[360px]:inline text-[var(--text-1)] text-sm font-medium">Mesa</span>
             <input
               type="number"
               disabled={!!clienteNombre}
@@ -3827,10 +3827,10 @@ function POSContent() {
                 router.replace(`/pos?mesa=${newMesa}`)
               }}
               min={1} max={999}
-              className="w-14 bg-transparent text-[var(--text-1)] text-base font-bold text-center border-none outline-none"
+              className="w-11 sm:w-14 bg-transparent text-[var(--text-1)] text-base font-bold text-center border-none outline-none"
             />
           </div>
-          <select value={personas} onChange={(e) => setPersonas(Number(e.target.value))} className="bg-[var(--line)] text-[var(--text-1)] rounded-lg px-4 py-2 text-lg font-bold border border-[var(--line)] min-h-[48px]">
+          <select value={personas} onChange={(e) => setPersonas(Number(e.target.value))} className="flex-shrink-0 bg-[var(--line)] text-[var(--text-1)] rounded-lg px-2 sm:px-4 py-2 text-base sm:text-lg font-bold border border-[var(--line)] min-h-[48px]">
             {Array.from({ length: 20 }, (_, i) => (<option key={i + 1} value={i + 1}>{i + 1}p</option>))}
           </select>
           {/* Mesero — BLOQUEADO a la identidad logueada (anti-fraude). Reasignar
@@ -3888,7 +3888,7 @@ function POSContent() {
             onClick={() => setMobileView('menu')}
             className={`flex-1 py-3 min-h-[52px] text-base font-semibold text-center transition-colors ${mobileView === 'menu' ? 'bg-emerald-600 text-white' : 'text-[var(--text-3)]'}`}
           >
-            Menu
+            Menú
           </button>
           <button
             onClick={() => setMobileView('order')}
@@ -3924,8 +3924,8 @@ function POSContent() {
       {/* Nav overlay */}
       {showNav && (
         <div className="fixed inset-0 z-40 flex" onClick={() => setShowNav(false)}>
-          <div className="w-80 bg-[var(--surface-2)] border-r border-[var(--line)] p-4 shadow-2xl overflow-y-auto max-h-[100dvh] pos-fat-scroll" onClick={e => e.stopPropagation()}>
-            <p className="text-[var(--text-2)] text-xs font-semibold uppercase mb-2">Navegacion</p>
+          <div className="w-[min(20rem,88vw)] bg-[var(--surface-2)] border-r border-[var(--line)] p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl overflow-y-auto max-h-[100dvh] pos-fat-scroll" onClick={e => e.stopPropagation()}>
+            <p className="text-[var(--text-2)] text-xs font-semibold uppercase mb-2">Navegación</p>
             {/* Acordeón: un grupo abierto a la vez (details[name="posnav"]) → sin scroll.
              * Solo lo que un operador toca en servicio. El back-office (recetas, food-cost,
              * compras, inventario, XML/facturas proveedor, analítica) vive en el dashboard. */}
