@@ -1509,7 +1509,10 @@ export async function saveOrder(order: Order, saveOperationId?: string): Promise
     // this fetch hang forever and FREEZES the POS. On timeout we abort → the catch
     // below queues for replay and returns OFFLINE_QUEUED (prints via the local bridge).
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 7000)
+    // The operator may still be connected to the restaurant LAN while the WAN is
+    // down, so navigator.onLine can remain true. Fall back quickly to the durable,
+    // idempotent offline queue so local KDS/printer delivery is not held for 7s.
+    const timeoutId = setTimeout(() => controller.abort(), 1500)
     const res = await fetch('/api/pos/save-order', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...getPOSAuthHeaders() },
