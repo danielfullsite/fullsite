@@ -105,6 +105,19 @@ Every provisioned restaurant inherits the same operational interface contract. B
 
 **Certification gate:** iPhone SE (375×667), iPad portrait (768×1024), iPad landscape (1024×768), 1366×768 terminal, and 1920×1080 KDS. A layout is not Skeleton-ready until the critical flow passes at all five sizes without clipped actions.
 
+### 1.2 Offline KDS invariant
+
+The KDS is operational infrastructure, not a cloud dashboard. Every Skeleton installation must satisfy all of the following with the WAN disconnected:
+
+- Boot the KDS from the bundled local page; no CDN, hosted font, or cloud asset is required.
+- Receive new and updated orders from the caja over the LAN Local Server.
+- Persist the event log before acknowledging a command and rebuild the queue after restart.
+- Preserve per-item preparation state locally and reconcile it without duplicate commands.
+- Keep station routing, board view, text scale, alert threshold, and theme on the device.
+- Show an unmistakable connection state. Losing WAN must not look like losing kitchen orders; losing the caja/LAN must be a visible degraded state.
+
+**Required regression suites:** KDS WebSocket, full offline service flow, multi-terminal LAN, state reconstruction, idempotency, and UI contract. A visual redesign cannot merge if any offline suite regresses.
+
 ---
 
 ## 2. Platform Lifecycle
