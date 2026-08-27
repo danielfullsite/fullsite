@@ -1,0 +1,548 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Cocina — Fullsite KDS</title>
+<style>
+  :root{
+    --bg:#0a0e13; --surface:#111820; --surface-2:#161f2a; --surface-3:#1b2632; --line:#243040; --line-2:#2f3e4e;
+    --text-1:#f2f6fb; --text-2:#c4cfdc; --text-3:#8a97a8; --text-4:#5f6b7a;
+    --nueva:#3b82f6; --prep:#f59e0b; --lista:#10b981; --danger:#ef4444;
+    --nueva-bg:rgba(59,130,246,.13); --prep-bg:rgba(245,158,11,.13); --lista-bg:rgba(16,185,129,.12);
+  }
+  /* ── Modo claro (toggle en Ajustes) — override de las variables + los 2 hardcoded ── */
+  body.light{
+    --bg:#eef1f5; --surface:#ffffff; --surface-2:#f5f8fb; --surface-3:#e9eef4; --line:#dde4ec; --line-2:#cbd5e1;
+    --text-1:#0f1720; --text-2:#33414f; --text-3:#5b6875; --text-4:#8a97a5;
+    --nueva:#2563eb; --prep:#c2760a; --lista:#059669; --danger:#dc2626;
+    --nueva-bg:rgba(37,99,235,.10); --prep-bg:rgba(217,119,6,.13); --lista-bg:rgba(5,150,105,.11);
+  }
+  body.light .alerts{background:#fff7e6;border-bottom-color:#f0d9a8}
+  body.light .counts .c-new{color:#2563eb} body.light .counts .c-prep{color:#b45309} body.light .counts .c-lista{color:#047857}
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{background:var(--bg);color:var(--text-1);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;overflow:hidden;user-select:none}
+  #app{display:flex;flex-direction:column;height:100vh}
+
+  /* header */
+  header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:var(--surface-2);border-bottom:1px solid var(--line);flex-shrink:0}
+  .brand{display:flex;align-items:center;gap:12px}
+  .brand .chef{font-size:24px}
+  .brand h1{font-size:19px;font-weight:800;letter-spacing:.3px}
+  .brand .stn{font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--prep);background:rgba(245,158,11,.14);padding:3px 9px;border-radius:6px}
+  .conn{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text-3)}
+  .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;background:var(--text-4)}
+  .hright{display:flex;align-items:center;gap:18px}
+  .view-switch{display:flex;align-items:center;padding:3px;background:var(--surface);border:1px solid var(--line);border-radius:10px}
+  .view-switch button{min-height:32px;padding:0 10px;border:0;border-radius:7px;background:transparent;color:var(--text-3);font-size:11px;font-weight:800;cursor:pointer}
+  .view-switch button.on{background:var(--text-1);color:var(--bg)}
+  .view-switch button:focus-visible{outline:2px solid var(--prep);outline-offset:2px}
+  .counts{display:flex;align-items:center;gap:16px;font-size:13px;color:var(--text-3)}
+  .counts b{color:var(--text-1);font-variant-numeric:tabular-nums;font-size:15px}
+  .counts .c-new{color:#93c5fd} .counts .c-prep{color:#fcd34d} .counts .c-lista{color:#6ee7b7}
+  #clock{font-variant-numeric:tabular-nums;font-size:13px;color:var(--text-3)}
+  .gear{width:38px;height:38px;border-radius:9px;border:1px solid var(--line-2);background:var(--surface-3);color:var(--text-3);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .gear:active{background:var(--line)}
+  .gear:focus-visible{outline:2px solid var(--prep);outline-offset:2px}
+
+  /* body: rail + board */
+  .body{flex:1;display:flex;min-height:0}
+  aside{width:230px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden}
+  .rail-h{padding:14px 16px 9px;font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--text-4);border-bottom:1px solid var(--line)}
+  .demand{flex:1;overflow-y:auto;padding:8px 9px 16px}
+  .drow{display:flex;align-items:center;gap:11px;padding:9px 9px;border-radius:9px}
+  .drow+.drow{margin-top:3px}
+  .drow .dn{min-width:30px;height:30px;border-radius:7px;background:var(--surface-3);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;color:var(--prep);flex-shrink:0;font-variant-numeric:tabular-nums}
+  .drow .dl{flex:1;min-width:0;font-size:15px;color:var(--text-2);line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .drow.hot .dn{background:rgba(245,158,11,.24)}
+  .demand .none{color:var(--text-4);font-size:13px;padding:12px 9px}
+
+  /* Tablero: flujo horizontal (izq→der por tiempo), envuelve a la siguiente fila.
+     Sin encimarse y en orden de lectura natural de cocina. */
+  main{flex:1;overflow-y:auto;padding:16px;display:flex;flex-wrap:wrap;align-items:flex-start;align-content:flex-start;gap:14px}
+  .empty{flex:1 1 100%;display:flex;flex-direction:column;align-items:center;justify-content:center;height:72vh;color:var(--text-4);gap:14px}
+  .empty .chef{font-size:56px;opacity:.4}
+
+  /* card = one send (batch) */
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:15px;overflow:hidden;display:flex;flex-direction:column;border-top:5px solid var(--nueva);flex:1 1 320px;max-width:460px}
+  .card.s-preparando{border-top-color:var(--prep)}
+  .card.s-lista{border-top-color:var(--lista);opacity:.82}
+  .card.urgent{animation:pulse 1.5s infinite}
+  @keyframes pulse{0%,100%{border-top-color:var(--danger);box-shadow:0 0 0 0 rgba(239,68,68,0)}50%{border-top-color:#b91c1c;box-shadow:0 0 26px 0 rgba(239,68,68,.24)}}
+  @media (prefers-reduced-motion: reduce){.card.urgent{animation:none;border-top-color:var(--danger)}}
+  .card-h{display:flex;align-items:flex-start;justify-content:space-between;padding:12px 15px 10px;background:var(--surface-2);gap:10px}
+  .mesa{font-size:26px;font-weight:800;line-height:1.05}
+  .mesa .mesero{font-size:13px;font-weight:600;color:var(--text-3);display:block;margin-top:3px}
+  .rt{text-align:right;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:3px}
+  .folio{font-size:14px;font-weight:800;font-variant-numeric:tabular-nums;padding:2px 9px;border-radius:7px;letter-spacing:.3px;border:1px solid var(--line-2);color:var(--text-3)}
+  .folio.official{background:rgba(16,185,129,.16);border-color:transparent;color:#6ee7b7}
+  .round{font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--text-4)}
+  .round.extra{color:#fcd34d}
+  .time{font-size:14px;color:var(--text-3);font-variant-numeric:tabular-nums}
+  .time.warn{color:var(--prep)} .time.late{color:var(--danger);font-weight:800}
+  .badge{display:inline-block;padding:3px 9px;border-radius:999px;font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase}
+  .b-nueva{background:var(--nueva-bg);color:#93c5fd}
+  .b-preparando{background:var(--prep-bg);color:#fcd34d}
+  .b-lista{background:var(--lista-bg);color:#6ee7b7}
+
+  /* order-level note banner */
+  .onote{display:flex;gap:8px;align-items:flex-start;margin:0;padding:9px 15px;background:rgba(245,158,11,.1);border-bottom:1px solid rgba(245,158,11,.25);font-size:14px;color:#fcd34d;font-weight:600;line-height:1.3}
+  .onote .ic{flex-shrink:0}
+
+  .items{padding:5px 10px 7px;display:flex;flex-direction:column}
+  .item{display:flex;gap:12px;padding:11px 7px;align-items:flex-start;border-radius:10px;cursor:pointer;border-top:1px solid transparent}
+  .item+.item{border-top-color:var(--line)}
+  .item:active{background:var(--surface-3)}
+  .item.i-preparando{background:var(--prep-bg)}
+  .item.i-listo{opacity:.55}
+  .tick{width:30px;height:30px;border-radius:8px;border:2px solid var(--line-2);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px;font-weight:900;color:transparent;transition:background .12s,border-color .12s}
+  .item.i-preparando .tick{border-color:var(--prep);color:var(--prep)}
+  .item.i-listo .tick{border-color:var(--lista);background:var(--lista);color:#04140d}
+  .qty{font-weight:800;font-size:19px;color:var(--text-1);min-width:24px;text-align:center;flex-shrink:0}
+  .it-body{flex:1;min-width:0}
+  .it-name{font-size:17px;font-weight:600;line-height:1.24}
+  .item.i-listo .it-name{text-decoration:line-through;color:var(--text-3)}
+  .mods{font-size:14px;color:#fcd34d;margin-top:3px;line-height:1.3}
+  .note{font-size:14px;color:var(--text-3);font-style:italic;margin-top:2px;line-height:1.3}
+
+  .card-f{display:flex;border-top:1px solid var(--line)}
+  .fbtn{flex:1;padding:13px;border:none;background:transparent;color:var(--text-2);font-size:15px;font-weight:800;cursor:pointer;letter-spacing:.3px}
+  .fbtn:active{background:var(--line)}
+  .fbtn.ready{color:#6ee7b7}
+
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--surface-2);border:1px solid var(--line-2);padding:12px 20px;border-radius:10px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:60}
+  .toast.show{opacity:1}
+
+  /* settings modal */
+  .modal-bg{position:fixed;inset:0;background:rgba(4,8,12,.72);display:none;align-items:center;justify-content:center;z-index:80;padding:20px}
+  .modal-bg.show{display:flex}
+  .modal{width:100%;max-width:420px;background:var(--surface-2);border:1px solid var(--line-2);border-radius:16px;overflow:hidden}
+  .modal-h{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--line)}
+  .modal-h h2{font-size:17px;font-weight:800}
+  .modal-x{width:34px;height:34px;border-radius:8px;border:1px solid var(--line-2);background:var(--surface-3);color:var(--text-2);font-size:18px;cursor:pointer}
+  .modal-b{padding:20px;display:flex;flex-direction:column;gap:20px}
+  .fld label{display:block;font-size:12px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--text-4);margin-bottom:9px}
+  .seg{display:flex;gap:8px}
+  .seg button{flex:1;padding:11px;border:1px solid var(--line-2);background:var(--surface);color:var(--text-2);border-radius:9px;font-size:14px;font-weight:700;cursor:pointer;text-transform:capitalize}
+  .seg button.on{background:var(--prep);border-color:var(--prep);color:#1a1204}
+  .step{display:flex;align-items:center;gap:14px}
+  .step button{width:44px;height:44px;border-radius:10px;border:1px solid var(--line-2);background:var(--surface);color:var(--text-1);font-size:22px;font-weight:800;cursor:pointer}
+  .step .val{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;min-width:70px;text-align:center}
+  .step .val small{display:block;font-size:11px;font-weight:600;color:var(--text-4);text-transform:uppercase;letter-spacing:.5px}
+  .tgl{display:flex;align-items:center;justify-content:space-between}
+  .tgl .sw{width:52px;height:30px;border-radius:999px;background:var(--line-2);position:relative;cursor:pointer;transition:background .15s;flex-shrink:0}
+  .tgl .sw.on{background:var(--lista)}
+  .tgl .sw::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:left .15s}
+  .tgl .sw.on::after{left:25px}
+  .modal-f{padding:16px 20px;border-top:1px solid var(--line);display:flex;gap:10px}
+  .modal-f button{flex:1;padding:13px;border-radius:10px;font-size:15px;font-weight:800;cursor:pointer;border:1px solid var(--line-2);background:var(--surface);color:var(--text-2)}
+  .modal-f .save{background:var(--lista);border-color:var(--lista);color:#04140d}
+
+  /* Vista compacta: lectura de cocina de arriba hacia abajo y después a la derecha.
+     Conserva cada comanda completa y usa el alto disponible antes de pedir navegación. */
+  body.v-compact aside{display:none}
+  body.v-compact main{display:block;height:100%;overflow-x:auto;overflow-y:hidden;padding:8px;column-width:250px;column-gap:8px;column-fill:auto}
+  body.v-compact .card{display:inline-flex;width:250px;max-width:none;margin:0 0 8px;break-inside:avoid-column;border-radius:9px;border-top-width:4px}
+  body.v-compact .card-h{padding:7px 9px 6px;gap:5px}
+  body.v-compact .mesa{font-size:19px}
+  body.v-compact .mesa .mesero{font-size:10px;margin-top:1px}
+  body.v-compact .folio{font-size:11px;padding:1px 6px}
+  body.v-compact .round,body.v-compact .badge{font-size:8px}
+  body.v-compact .time{font-size:11px}
+  body.v-compact .items{padding:2px 5px 4px}
+  body.v-compact .item{gap:6px;padding:5px 3px;border-radius:6px}
+  body.v-compact .tick{width:22px;height:22px;border-radius:5px;font-size:12px}
+  body.v-compact .qty{font-size:15px;min-width:17px}
+  body.v-compact .it-name{font-size:13px;line-height:1.15}
+  body.v-compact .mods,body.v-compact .note{font-size:11px;line-height:1.18;margin-top:1px}
+  body.v-compact .onote{padding:5px 8px;font-size:11px}
+  body.v-compact .fbtn{padding:7px;font-size:11px}
+  body.v-expo aside{display:none}
+  body.v-expo .card:not(.s-lista){display:none}
+
+  @media(max-width:900px){.counts{display:none}.hright{gap:7px}.view-switch button{padding:0 8px}}
+  @media(max-width:640px){
+    header{padding:8px}.brand .chef,.brand .stn,.conn{display:none}.brand h1{font-size:16px}
+    aside{display:none}.view-switch button{font-size:10px;padding:0 6px}.gear{width:34px;height:34px}
+    body.v-compact main,body.v-operation main,body.v-expo main{display:flex;height:auto;overflow-y:auto;overflow-x:hidden;padding:8px;column-width:auto}
+    body.v-compact .card,body.v-operation .card,body.v-expo .card{display:flex;width:100%;max-width:none;flex:1 1 100%}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="brand">
+      <span class="chef">👨‍🍳</span>
+      <h1 id="title">Cocina</h1>
+      <span class="stn" id="stn">cocina</span>
+      <span class="conn"><span class="dot" id="conn-dot"></span><span id="conn-txt">conectando…</span></span>
+    </div>
+    <div class="hright">
+      <div class="view-switch" aria-label="Vista del tablero">
+        <button data-view="compact">Compacta</button><button data-view="operation">Operación</button><button data-view="expo">Expo</button>
+      </div>
+      <div class="counts">
+        <span class="c-new">Nuevas <b id="n-new">0</b></span>
+        <span class="c-prep">Preparando <b id="n-prep">0</b></span>
+        <span class="c-lista">Listas <b id="n-lista">0</b></span>
+        <span id="clock">--:--</span>
+      </div>
+      <button class="gear" id="gear" title="Ajustes" aria-label="Ajustes">⚙</button>
+      <button class="gear" id="closebtn" title="Salir" aria-label="Salir">✕</button>
+    </div>
+  </header>
+  <div class="body">
+    <aside>
+      <div class="rail-h">Pendientes por platillo</div>
+      <div class="demand" id="demand"><div class="none">—</div></div>
+    </aside>
+    <main id="board">
+      <div class="empty"><span class="chef">👨‍🍳</span><div>Sin órdenes pendientes</div></div>
+    </main>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<!-- settings -->
+<div class="modal-bg" id="modal">
+  <div class="modal" role="dialog" aria-modal="true" aria-label="Ajustes">
+    <div class="modal-h"><h2>Ajustes</h2><button class="modal-x" id="m-close" aria-label="Cerrar">✕</button></div>
+    <div class="modal-b">
+      <div class="fld"><label>Estación de esta pantalla</label>
+        <div class="seg" id="seg-station">
+          <button data-st="cocina">Cocina</button><button data-st="barra">Barra</button><button data-st="caja">Caja</button><button data-st="todas">Todas · expo</button>
+        </div>
+      </div>
+      <div class="fld"><label>Tamaño de letra</label>
+        <div class="seg" id="seg-scale">
+          <button data-sc="1">Normal</button><button data-sc="1.25">Grande</button><button data-sc="1.5">XL</button>
+        </div>
+      </div>
+      <div class="fld"><label>Alerta de tiempo</label>
+        <div class="step">
+          <button id="alert-dn" aria-label="Menos">−</button>
+          <div class="val"><span id="alert-val">10</span><small>minutos</small></div>
+          <button id="alert-up" aria-label="Más">+</button>
+        </div>
+      </div>
+      <div class="fld"><div class="tgl"><label style="margin:0">Sonido de nueva orden</label><div class="sw" id="sound-sw"></div></div></div>
+      <div class="fld"><div class="tgl"><label style="margin:0">Modo claro</label><div class="sw" id="theme-sw"></div></div></div>
+    </div>
+    <div class="modal-f"><button id="m-cancel">Cancelar</button><button class="save" id="m-save">Guardar</button></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var CFG = window.__KDS_CFG__ || {};
+  var STATE_BASE = (CFG.bridge_base || "").replace(/\/$/,"");
+  var POLL_MS = 2000;
+  var LKEY = "kds_local_v3";           // per-item touch state
+  var SKEY = "kds_settings_v1";         // station / alert_min / sound
+
+  // ── settings (persisted, override CFG defaults) ──
+  function loadSettings(){ try{ return JSON.parse(localStorage.getItem(SKEY)||"null"); }catch(e){ return null; } }
+  var _s = loadSettings() || {};
+  var STATION   = String(_s.station || CFG.station || "cocina").toLowerCase();
+  var ALERT_MIN = Number(_s.alert_min || CFG.alert_min) || 10;
+  var SOUND     = _s.sound !== false;   // default ON
+  var SCALE     = Number(_s.scale) || 1;   // tamaño de letra = zoom del board (chefs medio ciegos, KDS-03)
+  var THEME     = _s.theme === "light" ? "light" : "dark";   // default oscuro
+  var VIEW      = /^(compact|operation|expo)$/.test(_s.view) ? _s.view : "compact";
+  function saveSettings(){ try{ localStorage.setItem(SKEY, JSON.stringify({ station:STATION, alert_min:ALERT_MIN, sound:SOUND, scale:SCALE, theme:THEME, view:VIEW })); }catch(e){} }
+  function applyScale(){ try{ var b=document.getElementById("board"); if(b) b.style.zoom=String(SCALE); }catch(e){} }
+  function applyTheme(){ try{ document.body.classList.toggle("light", THEME==="light"); }catch(e){} }
+  function applyView(){
+    document.body.classList.remove("v-compact","v-operation","v-expo"); document.body.classList.add("v-"+VIEW);
+    Array.prototype.forEach.call(document.querySelectorAll("[data-view]"),function(b){ b.classList.toggle("on",b.getAttribute("data-view")===VIEW); });
+  }
+
+  var boardEl = document.getElementById("board");
+  var demandEl = document.getElementById("demand");
+  var connDot = document.getElementById("conn-dot");
+  var connTxt = document.getElementById("conn-txt");
+  var toastEl = document.getElementById("toast");
+  function applyStationLabel(){ document.getElementById("title").textContent = STATION.charAt(0).toUpperCase()+STATION.slice(1); document.getElementById("stn").textContent = STATION; }
+  applyStationLabel();
+  applyScale();
+  applyTheme();
+  applyView();
+
+  var lastGood = [];
+  // Vista previa segura para diseño: al abrir este archivo directamente no existe
+  // Pedro (/state). Carga órdenes ficticias para poder revisar el KDS sin tocar datos
+  // reales. Electron siempre lo sirve por http, por lo que esta rama nunca corre en
+  // una terminal instalada.
+  if(location.protocol==="file:"){
+    var ago=function(min){ return new Date(Date.now()-min*60000).toISOString(); };
+    lastGood=[
+      {id:"demo-12",mesa:12,mesero:"Daniel",personas:3,status:"enviada",created_at:ago(18),updated_at:ago(18),items:[{id:"12a",nombre:"Tacos de rib eye",cantidad:2,station:"cocina",modificadores:["Sin cebolla","Término medio"]},{id:"12b",nombre:"Papas trufadas",cantidad:1,station:"cocina",notas:"Extra crujientes"}]},
+      {id:"demo-7",mesa:7,mesero:"Mariana",personas:2,status:"enviada",created_at:ago(13),updated_at:ago(13),items:[{id:"7a",nombre:"Salmón al grill",cantidad:1,station:"cocina",modificadores:["Sin mantequilla"]},{id:"7b",nombre:"Ensalada de la casa",cantidad:1,station:"cocina"}]},
+      {id:"demo-21",mesa:21,mesero:"Omar",personas:4,status:"enviada",created_at:ago(9),updated_at:ago(9),items:[{id:"21a",nombre:"Hamburguesa Fullsite",cantidad:3,station:"cocina",modificadores:["1 sin queso","2 término 3/4"]},{id:"21b",nombre:"Aros de cebolla",cantidad:2,station:"cocina"}]},
+      {id:"demo-4",mesa:4,mesero:"Andrea",personas:1,status:"enviada",created_at:ago(6),updated_at:ago(6),items:[{id:"4a",nombre:"Chilaquiles verdes",cantidad:1,station:"cocina",modificadores:["Con pollo","Huevo estrellado"],notas:"Salsa aparte"}]},
+      {id:"demo-15",mesa:15,mesero:"Luis",personas:5,status:"enviada",created_at:ago(4),updated_at:ago(4),items:[{id:"15a",nombre:"Pizza margarita",cantidad:2,station:"cocina"},{id:"15b",nombre:"Pasta Alfredo",cantidad:2,station:"cocina",modificadores:["Extra parmesano"]},{id:"15c",nombre:"Sopa de tomate",cantidad:1,station:"cocina"}]},
+      {id:"demo-9",mesa:9,mesero:"Sofía",personas:2,status:"enviada",created_at:ago(2),updated_at:ago(2),items:[{id:"9a",nombre:"Ceviche tropical",cantidad:2,station:"cocina",modificadores:["Sin chile"],notas:"ALERGIA AL CACAHUATE"}]}
+    ];
+  }
+  var seenBatches = null;
+  var postedStatus = {};
+  var online = false;
+
+  // ── local per-item state ──
+  function loadLocal(){ try{ return JSON.parse(localStorage.getItem(LKEY)||"{}"); }catch(e){ return {}; } }
+  function saveLocal(m){ try{ localStorage.setItem(LKEY, JSON.stringify(m)); }catch(e){} }
+  var local = loadLocal();
+  function itemKey(oid, it, i){ return String(it.id || (oid+":"+(it.comanda_batch_seq==null?0:it.comanda_batch_seq)+":"+(it.nombre||it.name||"")+":"+i)); }
+  function getIState(oid, key){ return (local[oid] && local[oid][key]) || "nueva"; }
+  function setIState(oid, key, st){ (local[oid]=local[oid]||{})[key]=st; saveLocal(local); }
+  function pruneLocal(activeIds){ var ch=false; Object.keys(local).forEach(function(oid){ if(!activeIds.has(oid)){ delete local[oid]; ch=true; } }); if(ch) saveLocal(local); }
+
+  function toast(msg){ toastEl.textContent=msg; toastEl.classList.add("show"); clearTimeout(toast._t); toast._t=setTimeout(function(){ toastEl.classList.remove("show"); },2200); }
+
+  function beep(){ // soft, single — respects the sound setting
+    if(!SOUND) return;
+    try{
+      var ctx=new (window.AudioContext||window.webkitAudioContext)();
+      var o=ctx.createOscillator(), g=ctx.createGain();
+      o.connect(g); g.connect(ctx.destination); o.type="sine"; o.frequency.value=940; g.gain.value=.16;
+      o.start(); g.gain.exponentialRampToValueAtTime(.008, ctx.currentTime+.32); o.stop(ctx.currentTime+.34);
+      setTimeout(function(){ ctx.close().catch(function(){}); }, 500);
+    }catch(e){}
+  }
+
+  function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+  function parseItems(raw){ if(Array.isArray(raw)) return raw; if(typeof raw==="string"){ try{ return JSON.parse(raw)||[]; }catch(e){ return []; } } return []; }
+  function parseBatches(raw){ if(raw && typeof raw==="object" && !Array.isArray(raw)) return raw; if(typeof raw==="string"){ try{ return JSON.parse(raw)||{}; }catch(e){ return {}; } } return {}; }
+  function resolveStation(it){ return String(it.station || "cocina").toLowerCase(); }
+  function isSkippable(it){ return it.cancelled === true || it.menuItemId === "__tiempo__"; }
+  function elapsed(iso){ var t=Date.parse(iso)||Date.now(); var m=Math.max(0,Math.floor((Date.now()-t)/60000)); return m<60? (m+" min") : (Math.floor(m/60)+"h "+(m%60)+"m"); }
+
+  // folio: nº oficial del servidor si ya existe; si no, folio local mesa·envío (offline)
+  function folio(order, seq){
+    if(order.order_number) return { txt:"#"+order.order_number, official:true };
+    var base = order.mesa ? String(order.mesa) : "L";
+    return { txt:"#"+base+"·"+((Number(seq)||0)+1), official:false };
+  }
+
+  // Corte por tiempo SOLO de la VISTA (no toca el estado de Pedro ni /state): oculta
+  // órdenes sin actividad en >18h (updated_at) para que las de prueba/abandonadas no se
+  // acumulen en pantalla. NO borra nada — la orden sigue en el estado, sincroniza,
+  // imprime, y si le llega una ronda nueva (updated_at se refresca) reaparece. Fail-safe:
+  // si la fecha no se puede leer, se DEJA (nunca oculta trabajo activo).
+  var STALE_MS = 18*60*60*1000;
+  function isStale(o){ var u=Date.parse((o&&(o.updated_at||o.created_at))||""); return !isNaN(u) && (Date.now()-u)>STALE_MS; }
+  function buildCards(orders){
+    var cards=[]; var orderMeta={};
+    orders.filter(function(o){ return !isStale(o); }).forEach(function(o){
+      var items = parseItems(o.items).filter(function(it){ return !isSkippable(it) && (STATION==="todas"||resolveStation(it)===STATION); });
+      if(!items.length) return;
+      var bmeta = parseBatches(o.comanda_batches);
+      var groups={};
+      items.forEach(function(it,i){ var bid = it.comanda_batch_id || ("seq"+(it.comanda_batch_seq==null?0:it.comanda_batch_seq)); (groups[bid]=groups[bid]||[]).push(it); });
+      var allKeys = items.map(function(it,i){ return itemKey(o.id,it,i); });
+      orderMeta[o.id] = { keys: allKeys };
+      Object.keys(groups).forEach(function(bid){
+        var m = bmeta[bid] || {}; var first = groups[bid][0];
+        var seq = (m.seq!=null) ? m.seq : (first.comanda_batch_seq!=null ? first.comanda_batch_seq : 0);
+        cards.push({ order:o, batchId:bid, seq:Number(seq)||0, createdAt:(m.created_at||o.created_at), serverStatus:(m.status||o.status||"enviada"), items:groups[bid] });
+      });
+    });
+    // Orden: rondas de una MISMA mesa juntas; las mesas que esperan más, primero.
+    var tmin={};
+    cards.forEach(function(c){ var k=String(c.order.mesa||c.order.id); var t=Date.parse(c.createdAt)||0; if(tmin[k]===undefined||t<tmin[k]) tmin[k]=t; });
+    cards.sort(function(a,b){
+      var ka=String(a.order.mesa||a.order.id), kb=String(b.order.mesa||b.order.id);
+      if(tmin[ka]!==tmin[kb]) return tmin[ka]-tmin[kb];
+      if(ka!==kb) return ka.localeCompare(kb,undefined,{numeric:true});
+      return (Number(a.seq)||0)-(Number(b.seq)||0);
+    });
+    return { cards:cards, orderMeta:orderMeta };
+  }
+
+  function cardStatus(card){
+    if(card.serverStatus==="lista"||card.serverStatus==="entregada") return "lista";
+    var sts = card.items.map(function(it,i){ return getIState(card.order.id, itemKey(card.order.id,it,i)); });
+    if(sts.length && sts.every(function(s){ return s==="listo"; })) return "lista";
+    if(sts.some(function(s){ return s==="preparando"||s==="listo"; })) return "preparando";
+    return "nueva";
+  }
+
+  function render(allowBeep){
+    var built = buildCards(lastGood);
+    var cards = built.cards, orderMeta = built.orderMeta;
+    pruneLocal(new Set(lastGood.map(function(o){ return o.id; })));
+
+    var nNew=0,nPrep=0,nLista=0;
+    cards.forEach(function(c){ var s=cardStatus(c); if(s==="lista")nLista++; else if(s==="preparando")nPrep++; else nNew++; });
+    document.getElementById("n-new").textContent=nNew;
+    document.getElementById("n-prep").textContent=nPrep;
+    document.getElementById("n-lista").textContent=nLista;
+
+    var demand={};
+    cards.forEach(function(c){ c.items.forEach(function(it,i){
+      if(getIState(c.order.id,itemKey(c.order.id,it,i))==="listo") return;
+      var name=String(it.nombre||it.name||"—"); var q=Number(it.cantidad||it.quantity||1)||1;
+      demand[name]=(demand[name]||0)+q;
+    }); });
+    var drows=Object.keys(demand).map(function(k){ return {name:k,n:demand[k]}; }).sort(function(a,b){ return b.n-a.n || a.name.localeCompare(b.name); });
+    demandEl.innerHTML = drows.length ? drows.map(function(d){ return '<div class="drow'+(d.n>=3?' hot':'')+'"><span class="dn">'+d.n+'</span><span class="dl">'+esc(d.name)+'</span></div>'; }).join("")
+      : '<div class="none">Nada pendiente</div>';
+
+    if(!cards.length){ boardEl.innerHTML='<div class="empty"><span class="chef">👨‍🍳</span><div>Sin órdenes pendientes</div></div>'; }
+    else {
+      var html="";
+      cards.forEach(function(c){
+       try{
+        var st=cardStatus(c);
+        var mins=Math.floor((Date.now()-(Date.parse(c.createdAt)||Date.now()))/60000);
+        var urgent = mins>=ALERT_MIN && st!=="lista";
+        var timeCls = mins>=ALERT_MIN?"late":(mins>=ALERT_MIN*0.6?"warn":"");
+        var roundLbl = c.seq===0 ? "Comanda" : ("Ronda "+c.seq);
+        var f = folio(c.order, c.seq);
+
+        var body="";
+        c.items.forEach(function(it,i){
+          var ist=getIState(c.order.id,itemKey(c.order.id,it,i));
+          var mods=Array.isArray(it.modificadores)?it.modificadores.filter(Boolean):(it.modificadores?[String(it.modificadores)]:[]);
+          var check = ist==="listo"?"✓":(ist==="preparando"?"•":"");
+          body+='<div class="item i-'+ist+'" data-o="'+esc(c.order.id)+'" data-k="'+esc(itemKey(c.order.id,it,i))+'">'+
+            '<div class="tick">'+check+'</div>'+
+            '<div class="qty">'+esc(it.cantidad||it.quantity||1)+'</div>'+
+            '<div class="it-body"><div class="it-name">'+esc(it.nombre||it.name||"—")+'</div>'+
+              (mods.length?'<div class="mods">'+esc(mods.join(" · "))+'</div>':'')+
+              (it.notas?'<div class="note">“'+esc(it.notas)+'”</div>':'')+
+            '</div></div>';
+        });
+
+        // order-level note (solo en la 1a tarjeta del pedido — la comanda inicial)
+        var oNote = (c.seq===0 && c.order.notas) ? '<div class="onote"><span class="ic">📝</span><span>'+esc(c.order.notas)+'</span></div>' : '';
+
+        var badge='<span class="badge b-'+st+'">'+(st==="lista"?"Lista":st==="preparando"?"Preparando":"Nueva")+'</span>';
+        html+='<div class="card s-'+st+(urgent?' urgent':'')+'">'+
+          '<div class="card-h"><div class="mesa">'+(c.order.mesa?("Mesa "+esc(c.order.mesa)):"Para llevar")+
+            '<span class="mesero">'+esc(c.order.mesero||"")+(c.order.personas?(' · 👥 '+esc(c.order.personas)):"")+'</span></div>'+
+            '<div class="rt"><span class="folio'+(f.official?" official":"")+'">'+esc(f.txt)+'</span>'+
+            '<span class="round'+(c.seq>0?" extra":"")+'">'+roundLbl+'</span>'+
+            '<span class="time '+timeCls+'">'+elapsed(c.createdAt)+'</span>'+badge+'</div></div>'+
+          oNote+
+          '<div class="items">'+body+'</div>'+
+          (st!=="lista"?'<div class="card-f"><button class="fbtn ready" data-ready="'+esc(c.order.id)+'" data-batch="'+esc(c.batchId)+'">✓ Todo listo</button></div>':'')+
+        '</div>';
+       }catch(cardErr){ try{ console.error('[kds] tarjeta con error, se omite:', (c&&c.order&&c.order.id), cardErr); }catch(_){} }
+      });
+      boardEl.innerHTML=html;
+    }
+
+    if(allowBeep){
+      var cur=new Set(); cards.forEach(function(c){ if(cardStatus(c)!=="lista") cur.add(c.batchId); });
+      if(seenBatches!==null){ var isNew=false; cur.forEach(function(b){ if(!seenBatches.has(b)) isNew=true; }); if(isNew) beep(); }
+      seenBatches=cur;
+    }
+    render._meta = orderMeta;
+  }
+
+  function syncOrder(order){
+    var meta = (render._meta||{})[order.id]; if(!meta) return;
+    var states = meta.keys.map(function(k){ return getIState(order.id,k); });
+    var anyTouched = states.some(function(s){ return s!=="nueva"; });
+    var allListo = states.length>0 && states.every(function(s){ return s==="listo"; });
+    if(allListo) postStatus(order,"lista");
+    else if(anyTouched) postStatus(order,"preparando");
+  }
+  function postStatus(order,status){
+    var key=order.id+":"+status; if(postedStatus[key]) return; postedStatus[key]=1;
+    var cmd={ command_id:(order.id+"-"+status+"-"+Math.floor(Date.now()/1000)), command_type:"ORDER_UPSERTED", order_id:order.id, mesa:order.mesa, status:status, client_id:(CFG.client_id||"") };
+    fetch(STATE_BASE+"/events",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(cmd)})
+      .then(function(r){ if(!r.ok) throw 0; }).catch(function(){ postedStatus[key]=0; toast("Sin conexión al servidor — se reintentará"); });
+  }
+
+  // ── interactions ──
+  document.addEventListener("click",function(e){
+    var ready=e.target.closest("[data-ready]");
+    if(ready){
+      var oid=ready.getAttribute("data-ready"); var order=lastGood.find(function(x){ return x.id===oid; }); if(!order) return;
+      var batch=ready.getAttribute("data-batch");
+      parseItems(order.items).filter(function(it){ return !isSkippable(it) && (STATION==="todas"||resolveStation(it)===STATION); }).forEach(function(it,i){
+        var bid=it.comanda_batch_id||("seq"+(it.comanda_batch_seq==null?0:it.comanda_batch_seq));
+        if(bid===batch) setIState(oid,itemKey(oid,it,i),"listo");
+      });
+      render(false); syncOrder(order); return;
+    }
+    var item=e.target.closest(".item[data-o]");
+    if(item){
+      var oid2=item.getAttribute("data-o"), k=item.getAttribute("data-k");
+      var cur=getIState(oid2,k);
+      var next = cur==="nueva"?"preparando":cur==="preparando"?"listo":"nueva";
+      setIState(oid2,k,next); render(false);
+      var order2=lastGood.find(function(x){ return x.id===oid2; }); if(order2) syncOrder(order2);
+    }
+  });
+
+  // ── settings modal ──
+  var modal=document.getElementById("modal");
+  var draft={ station:STATION, alert_min:ALERT_MIN, sound:SOUND, scale:SCALE, theme:THEME };
+  function paintModal(){
+    Array.prototype.forEach.call(document.querySelectorAll("#seg-station button"),function(b){ b.classList.toggle("on", b.getAttribute("data-st")===draft.station); });
+    Array.prototype.forEach.call(document.querySelectorAll("#seg-scale button"),function(b){ b.classList.toggle("on", Number(b.getAttribute("data-sc"))===Number(draft.scale)); });
+    document.getElementById("alert-val").textContent=draft.alert_min;
+    document.getElementById("sound-sw").classList.toggle("on", draft.sound);
+    document.getElementById("theme-sw").classList.toggle("on", draft.theme==="light");
+  }
+  function openModal(){ draft={ station:STATION, alert_min:ALERT_MIN, sound:SOUND, scale:SCALE, theme:THEME }; paintModal(); modal.classList.add("show"); }
+  function closeModal(){ modal.classList.remove("show"); }
+  document.getElementById("gear").addEventListener("click",openModal);
+  // X de salir (visible para todos) — confirma para evitar cierres por accidente en cocina
+  (function(){ var cb=document.getElementById("closebtn"); if(cb) cb.addEventListener("click",function(){ if(confirm("¿Cerrar el KDS?")){ if(window.fullsiteApp && typeof window.fullsiteApp.quit==="function"){ window.fullsiteApp.quit(); return; } try{ window.close(); }catch(e){} setTimeout(function(){ try{ window.location.href="about:blank"; }catch(e){} },150); } }); })();
+  document.getElementById("m-close").addEventListener("click",closeModal);
+  document.getElementById("m-cancel").addEventListener("click",closeModal);
+  modal.addEventListener("click",function(e){ if(e.target===modal) closeModal(); });
+  document.addEventListener("keydown",function(e){ if(e.key==="Escape") closeModal(); });
+  document.getElementById("seg-station").addEventListener("click",function(e){ var b=e.target.closest("[data-st]"); if(b){ draft.station=b.getAttribute("data-st"); paintModal(); } });
+  document.getElementById("seg-scale").addEventListener("click",function(e){ var b=e.target.closest("[data-sc]"); if(b){ draft.scale=Number(b.getAttribute("data-sc"))||1; paintModal(); } });
+  document.getElementById("alert-dn").addEventListener("click",function(){ draft.alert_min=Math.max(1,draft.alert_min-1); paintModal(); });
+  document.getElementById("alert-up").addEventListener("click",function(){ draft.alert_min=Math.min(60,draft.alert_min+1); paintModal(); });
+  document.getElementById("sound-sw").addEventListener("click",function(){ draft.sound=!draft.sound; paintModal(); });
+  document.getElementById("theme-sw").addEventListener("click",function(){ draft.theme=draft.theme==="light"?"dark":"light"; paintModal(); });
+  document.querySelector(".view-switch").addEventListener("click",function(e){ var b=e.target.closest("[data-view]"); if(!b)return; VIEW=b.getAttribute("data-view"); saveSettings(); applyView(); render(false); });
+  document.getElementById("m-save").addEventListener("click",function(){
+    STATION=draft.station; ALERT_MIN=draft.alert_min; SOUND=draft.sound; SCALE=draft.scale; THEME=draft.theme; saveSettings();
+    applyScale(); applyTheme(); applyStationLabel(); seenBatches=null; render(false); closeModal(); toast("Ajustes guardados");
+  });
+
+  function setConn(ok){ online=ok; connDot.style.background=ok?"var(--lista)":"var(--danger)"; connTxt.textContent=ok?"conectado":"sin conexión — reintentando"; }
+
+  // Adaptador robusto: el KDS pinta órdenes con forma {id, mesa, items,...}. Prefiere la
+  // fuente offline-nativa (kds_orders) si viene poblada; si no, normaliza kds_queue —el
+  // campo que SÍ llena la caja (incl. 1.3.3)— a esa misma forma. Así jala online y offline
+  // sin tocar la caja ni romper el flujo probado caja→KDS por LAN.
+  function adaptOrders(data){
+    if(!data) return [];
+    if(Array.isArray(data.kds_orders) && data.kds_orders.length) return data.kds_orders;
+    if(Array.isArray(data.kds_queue) && data.kds_queue.length){
+      return data.kds_queue.map(function(q){
+        return { id:q.order_id, mesa:q.mesa, items:q.items_sent||[], created_at:q.sent_at, updated_at:q.sent_at, status:"enviada" };
+      });
+    }
+    return [];
+  }
+
+  function fetchState(){
+    if(location.protocol==="file:"){ setConn(true); connTxt.textContent="modo demo local"; render(false); return; }
+    var ctrl=new AbortController(); var to=setTimeout(function(){ ctrl.abort(); },4000);
+    fetch(STATE_BASE+"/state",{cache:"no-store",signal:ctrl.signal})
+      .then(function(r){ return r.ok?r.json():Promise.reject(); })
+      .then(function(data){ clearTimeout(to); lastGood=adaptOrders(data); setConn(true); render(true); })
+      .catch(function(){ clearTimeout(to); setConn(false); render(false); });
+  }
+
+  function tick(){ var d=new Date(); document.getElementById("clock").textContent=("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2); }
+  tick(); setInterval(tick,15000);
+  // El primer render con datos (seenBatches===null) fija el baseline SIN sonar.
+  fetchState(); setInterval(fetchState,POLL_MS);
+})();
+</script>
+</body>
+</html>

@@ -6,7 +6,10 @@ const fs   = require('fs');
 const { execSync } = require('child_process');
 
 const POS_URL = 'https://app.fullsite.mx/pos';
-const KDS_URL = 'https://app.fullsite.mx/kds';
+// KDS de Eduardo (sesión de campo Jul 21): panel de demanda, toque por item, tarjeta
+// por envío, FIFO, alertas. login-less (KDS_PATHS en pos/layout) + bridge offline.
+// El /kds standalone (598 líneas) es una versión simplificada sin esos cambios.
+const KDS_URL = 'https://app.fullsite.mx/pos/cocina';
 
 // Modo dev/desk-lab: con FULLSITE_DEV=1 las ventanas abren en modo VENTANA (no
 // kiosco/fullscreen) para poder probar en una Mac/PC sin quedar atrapado. En
@@ -229,6 +232,10 @@ async function startLocalServer() {
     queueFilePath,
     clientId:           appConfig.client_id      || appConfig.clientId,
     terminalId:         appConfig.terminal_id    || appConfig.terminalId,
+    // Where the /kds page should read /state from: the caja's LAN IP for a dedicated
+    // KDS/POS terminal, or same-origin ('') for the caja itself (server_pos).
+    posServerIp:        appConfig.pos_server_ip  || null,
+    terminalRole:       appConfig.terminal_role  || null,
   };
 
   try {
@@ -620,8 +627,11 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
-      webSecurity: true,
-      allowRunningInsecureContent: false,
+      // Secondary POS (role 'pos') reach the caja's Local Server over the LAN via
+      // ws://<lan-ip>:7717 — blocked as mixed content from an https page. Relax it only
+      // for LAN-bridge terminals; the caja (server_pos) uses localhost and stays locked.
+      webSecurity: !(appConfig && appConfig.terminal_role === 'pos'),
+      allowRunningInsecureContent: !!(appConfig && appConfig.terminal_role === 'pos'),
     },
   });
 
@@ -643,11 +653,22 @@ function createWindow() {
     if (terminalId) {
       scripts.push(`localStorage.setItem('pos_terminal_id', ${JSON.stringify(String(terminalId))})`);
     }
+    // Secondary POS (role 'pos'): its https page CANNOT POST to the caja's http LAN
+    // IP (mixed-content wall — webSecurity:false does NOT bypass it, proven in field).
+    // So it posts print/events to its OWN local server on 127.0.0.1 (localhost is
+    // exempt from the wall), and that local server FORWARDS to the caja over Node
+    // (see local-server /print,/events forward, gated on config.posServerIp).
+    if (appConfig.terminal_role === 'pos') {
+      scripts.push(`localStorage.setItem('FULLSITE_BRIDGE_URL', ${JSON.stringify('http://127.0.0.1:' + LOCAL_SERVER_PORT)})`);
+      // Drop any stale caja IP a previous build/manual config may have left, which
+      // would send the ws bridge-client to ws://<caja> (blocked) and print to the caja
+      // directly (blocked). Everything must go through localhost now.
+      scripts.push(`localStorage.removeItem('pos_bridge_host')`);
+    }
     mainWindow.webContents.executeJavaScript(scripts.join('; ')).catch(() => {});
   });
 
-  // Listen for IPC from renderer (via preload bridge)
-  ipcMain.on('app-quit', () => { allowClose = true; app.quit(); });
+  // Window-specific IPC from renderer (via preload bridge).
   ipcMain.on('exit-kiosk', () => {
     if (mainWindow) { mainWindow.setKiosk(false); mainWindow.setFullScreen(false); }
   });
@@ -747,13 +768,57 @@ function createKdsWindow(x, y, width, height, urlOverride) {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload-kds.js'),
-      webSecurity: true,
-      allowRunningInsecureContent: false,
+      // KDS connects to the caja's Local Server over the LAN via ws://<lan-ip>:7717.
+      // A ws:// to a non-localhost host from an https page is blocked as mixed content,
+      // so the bridge never connects and no orders arrive (clients_connected stays 0).
+      // This window only loads our own origin (app.fullsite.mx/pos/cocina) + the trusted
+      // LAN bridge → relaxing web security here is scoped and safe for a kitchen kiosk.
+      webSecurity: false,
+      allowRunningInsecureContent: true,
     },
   });
+  // Allow the KDS→local-server WebSocket (ws://<host>:7717) through the page CSP.
+  // The deployed connect-src allows http://127.0.0.1:7717 but NOT the ws:// scheme,
+  // so the bridge WebSocket is refused → the KDS never connects to the local server
+  // → orders pushed over LAN while offline never arrive. Rewriting the header here
+  // guarantees the WS connects regardless of deploy/Service-Worker cache timing.
+  // Scoped to the KDS window's session and the :7717 bridge port.
+  kdsWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+    const headers = details.responseHeaders || {};
+    for (const key of Object.keys(headers)) {
+      if (key.toLowerCase() === 'content-security-policy') {
+        headers[key] = headers[key].map(v =>
+          v.includes('connect-src') && !v.includes('ws://*:7717')
+            ? v.replace(/connect-src ([^;]*)/, (_m, s) => `connect-src ${s} ws://127.0.0.1:7717 http://*:7717 ws://*:7717`)
+            : v
+        );
+      }
+    }
+    callback({ responseHeaders: headers });
+  });
+
   const targetUrl = urlOverride || KDS_URL;
   kdsWindow.setMenu(null);
   kdsWindow.loadURL(targetUrl);
+
+  // Inject provisioned identity into the KDS window (mirror of mainWindow).
+  // Essential: getKitchenOrders() filters by localStorage 'fullsite_client_id',
+  // and the KDS route never does a Supabase login to set it. Without this the
+  // KDS shows 0 orders even though they exist in pos_orders for this tenant.
+  kdsWindow.webContents.on('did-finish-load', () => {
+    const clientId   = (appConfig.restaurant_id || appConfig.client_id || appConfig.restaurantId || appConfig.clientId || '').toLowerCase().trim();
+    const terminalId = appConfig.terminal_id || appConfig.terminalId;
+    const scripts = [];
+    if (clientId)   scripts.push(`localStorage.setItem('fullsite_client_id', ${JSON.stringify(String(clientId))})`);
+    if (terminalId) scripts.push(`localStorage.setItem('pos_terminal_id', ${JSON.stringify(String(terminalId))})`);
+    if (scripts.length) kdsWindow.webContents.executeJavaScript(scripts.join('; ')).catch(() => {});
+    // TEMP DIAG
+    kdsWindow.webContents.executeJavaScript(`JSON.stringify({cid: localStorage.getItem('fullsite_client_id'), bh: localStorage.getItem('pos_bridge_host'), tid: localStorage.getItem('pos_terminal_id'), electron: navigator.userAgent.includes('Electron'), url: location.href})`).then(v => console.log('[kds-diag]', v)).catch(e => console.log('[kds-diag ERR]', e.message));
+  });
+  // TEMP DIAG: pipe renderer console to main stdout
+  kdsWindow.webContents.on('console-message', (_e, _level, message) => {
+    if (/bridge|discover|ws|socket|identity|client|7717|\bSW\b|CACHE_VERSION|v2\d|activat/i.test(message)) console.log('[kds-console]', message);
+  });
 
   let kdsFailCount = 0;
   kdsWindow.webContents.on('did-fail-load', (_event, errorCode) => {
@@ -809,6 +874,10 @@ function createSetupWindow() {
 // Enable WebAuthn (Windows Hello + DigitalPersona 4500 fingerprint reader)
 app.commandLine.appendSwitch('enable-features', 'WebAuthenticationWin10');
 app.commandLine.appendSwitch('enable-web-authentication');
+// Allow the https POS/KDS pages to reach the Local Server on a private LAN IP
+// (Chromium Private Network Access can block https→private-IP). No-op if the feature
+// name isn't present on this Chromium build, so it's safe to leave in.
+app.commandLine.appendSwitch('disable-features', 'BlockInsecurePrivateNetworkRequests');
 
 app.whenReady().then(async () => {
   // Grant WebAuthn/HID permissions automatically (no popup)
@@ -826,6 +895,11 @@ app.whenReady().then(async () => {
   // Validate config BEFORE starting any operational services.
   // NOT_PROVISIONED = show setup wizard, block POS/KDS/Local Server.
   registerProvisioningIpc();
+
+  // Register quit before branching into POS or kds_only. When this lived inside
+  // createWindow(), a dedicated KDS never installed the channel exposed by
+  // preload-kds.js, so its visible close button could not reliably quit Electron.
+  ipcMain.on('app-quit', () => { allowClose = true; app.quit(); });
 
   const configResult = loadAndValidateConfig();
   if (!configResult.valid) {
@@ -859,12 +933,18 @@ app.whenReady().then(async () => {
     const { screen } = require('electron');
     const primary = screen.getPrimaryDisplay();
     const { bounds } = primary;
-    // Inject the POS server LAN IP so the KDS bridge connects cross-device
-    const kdsUrlWithBridge = appConfig.pos_server_ip
-      ? `${KDS_URL}?bridge=${appConfig.pos_server_ip}`
-      : KDS_URL;
-    createKdsWindow(bounds.x, bounds.y, bounds.width, bounds.height, kdsUrlWithBridge);
-    console.log('[main] kds_only mode — POS window skipped');
+    // OFFLINE-NATIVE KDS: load the self-contained kitchen page served by the caja's
+    // local server over HTTP (http://<caja>:7717/kds). An http page can fetch the
+    // bridge's /state over the LAN without the https mixed-content wall, so it works
+    // fully offline — no internet needed to load the screen OR receive new orders.
+    // pos_server_ip points at the caja (the data source); a KDS running on the caja
+    // itself falls back to 127.0.0.1.
+    // Load from THIS machine's own local server (127.0.0.1) so the page always loads
+    // even at cold boot / brief LAN blips. That local server injects the caja's IP as
+    // bridge_base (from config.pos_server_ip), so the page reads the caja's /state.
+    const kdsUrl = `http://127.0.0.1:${LOCAL_SERVER_PORT}/kds`;
+    createKdsWindow(bounds.x, bounds.y, bounds.width, bounds.height, kdsUrl);
+    console.log(`[main] kds_only mode — loading local KDS UI (${kdsUrl}), data from ${appConfig.pos_server_ip || '127.0.0.1'}`);
     return;
   }
 
@@ -881,7 +961,8 @@ app.whenReady().then(async () => {
     const secondary = displays.find(d => d.id !== primary.id);
     if (secondary) {
       const { bounds } = secondary;
-      createKdsWindow(bounds.x, bounds.y, bounds.width, bounds.height);
+      // Second-screen KDS on the caja itself → local server is on this machine.
+      createKdsWindow(bounds.x, bounds.y, bounds.width, bounds.height, `http://127.0.0.1:${LOCAL_SERVER_PORT}/kds`);
     } else {
       console.log('[kds] config.kds=true but no second display found — connect a second screen and restart');
     }
@@ -891,7 +972,9 @@ app.whenReady().then(async () => {
 app.on('window-all-closed', () => app.quit());
 
 app.on('will-quit', () => {
-  globalShortcut.unregisterAll();
+  // globalShortcut solo existe tras 'ready' — si salimos antes (ej. no obtuvimos el
+  // single-instance lock) unregisterAll() truena con "cannot be used before the app is ready".
+  if (app.isReady()) { try { globalShortcut.unregisterAll(); } catch {} }
   if (localServer) { try { localServer.close(); } catch {} }
   if (fingerprintProcess) { fingerprintProcess.kill(); fingerprintProcess = null; }
 });
