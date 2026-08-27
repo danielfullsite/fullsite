@@ -295,7 +295,8 @@ function registerProvisioningIpc() {
       fingerprint: {
         service_installed: fs.existsSync('C:\\fullsite\\fingerprint-service.exe'),
         driver_installed: fs.existsSync('C:\\fullsite\\DPUruNet.dll'),
-      },      legacy,
+      },
+      legacy,
       schemaConstants: { MAX_PRINTER_ID_LENGTH: printerConfigSchema.MAX_PRINTER_ID_LENGTH },
     };
   });
@@ -922,10 +923,14 @@ function createSetupWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      sandbox: false,
       preload: path.join(__dirname, 'preload-setup.js'),
     },
   });
   setupWindow.loadFile('setup.html');
+  setupWindow.webContents.on('preload-error', (_event, preloadPath, error) => {
+    console.error('[setup] Preload failed:', preloadPath, error.message);
+  });
   setupWindow.on('closed', () => { setupWindow = null; });
   console.log('[main] NOT_PROVISIONED — setup window opened');
 }
