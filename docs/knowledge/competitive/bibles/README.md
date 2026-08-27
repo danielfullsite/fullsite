@@ -38,6 +38,16 @@
 5. **El offline sigue siendo nuestro terreno**: el único cloud-POS con offline serio documentado somos nosotros. Toast lo parcha, Parrot no lo documenta, SR lo tiene pero anclado a Windows.
 6. **Anti-fraude es categoría de primer nivel** (Toast: 15 reportes) — no esconder el nuestro en un submenú.
 
+## Lo que se ve al poner las cuatro pantallas juntas (pase visual 2026-08-27)
+
+Las cuatro biblias ya tienen sección **"Así se ve"** con pantallas reales (demo interactivo de Parrot recorrido completo; screenshots oficiales de soporte de Toast; assets de producto de Square; video-tutoriales de SR):
+
+- **El layout del POS convergió**: ticket a un lado + jerarquía menú→grupo→item al otro, en Toast, Parrot, Square y Fullsite. Nadie compite por el layout — compiten por **qué dato extra vive en el tile**: Toast pone el stock restante (contador pre-86), Square pone la FOTO del platillo, Parrot una franja de color. Nosotros deberíamos robar los dos primeros.
+- **El 86 es un buen medidor de madurez UX**: Square lo tiene a un long-press desde el grid; Toast en la app del dueño; Parrot no lo enseña; SR lo esconde en menús. 
+- **SR es de otra década a simple vista** (menús Windows en cascada + ribbon naranja) — la demo contra SR se gana mostrando, no argumentando.
+- **Dark mode es estándar** en KDS (Toast) y llega al table-service; SR12 lo acaba de añadir. 
+- GTM: **Parrot compra ads de YouTube sobre las búsquedas de tutoriales de Soft Restaurant** — la caza del incumbente ya empezó y valida el flanco "dueño joven que hereda un SR".
+
 ## Cómo se mantienen vivas
 
 - **Trigger de actualización:** noticia de funding/lanzamiento de un competidor, un prospecto que los menciona, o revisión trimestral (la que toque primero).

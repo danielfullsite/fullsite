@@ -41,12 +41,26 @@
 - Su modelo de negocio (subsidiar software con procesamiento) no nos aplica hasta tener la pata de pagos.
 - Coursing/seat management fino: nuestro ICP (café/brunch/casual MX) no lo pide hoy.
 
-## 5. Material de estudio
+## 5. Así se ve — pantallas reales (2026-08-27) [HECHO — assets oficiales de su sitio]
+
+**POS (pantalla de menú "Lunch", iPad):**
+- Mismo patrón de industria: grid a la izquierda, check a la derecha (#14, tabs **Check / Actions / Guest**, items+precios, Subtotal/Tax/Total, botón azul gigante "Pay").
+- Lo distintivo: **tiles de categoría en colores saturados** (Salads, Sandwiches, Beer & wine, Beverages, Bowls, Desserts — cada uno con conteo de items) y **tiles de platillo con FOTO del platillo** — el POS más "visual" de los cuatro; Parrot y Toast usan tiles de texto con color.
+- **Edición inline desde el POS**: menú contextual sobre un platillo con "Edit POS layout / Edit item / **Make item unavailable**" — el 86 y la edición de menú a un long-press de distancia, sin ir al back-office.
+- Barra inferior: Log out · Menu · Orders · Transactions · Items · More — navegación plana de app.
+- Diseño: bordes redondeados, mucho blanco, tipografía humanista — lenguaje Square idéntico al de su ecosistema retail.
+
+**Lecturas [INFERENCIA]:**
+- La foto en el tile vende: para cafés/brunch con menú visual (nuestro ICP) es un upgrade barato y vistoso — nuestro POS ya soporta imágenes; la lección es hacerlas protagonistas, no thumbnail.
+- "Make item unavailable" a un toque desde el grid es el mejor 86 de los cuatro. El nuestro debería estar a esa distancia.
+- Square optimiza para que el DUEÑO configure solo (edición inline, self-service) — coherente con su GTM sin vendedores.
+
+## 6. Material de estudio
 
 - squareup.com/us/en/point-of-sale/restaurants (producto) · Square YouTube channel (demos oficiales).
 - Reviews con capturas: fitsmallbusiness.com/square-for-restaurants, NerdWallet, posusa.com.
 
-## 6. Qué falta por verificar
+## 7. Qué falta por verificar
 
 - [ ] Demo del custom report builder (video).
 - [ ] Detalle técnico del AI Voice Ordering (¿qué stack, qué precio?).

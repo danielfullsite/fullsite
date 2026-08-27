@@ -84,7 +84,25 @@
 - NO atacar por precio base ($799 es imbatible) — atacar por **costo total real** (hardware Windows + add-ons + distribuidor) y por **lo que no tienen ni tendrán: IA**.
 - Respetar su offline: es tan bueno como el nuestro (servidor local). El argumento contra SR no es offline — es inteligencia, movilidad y modernidad.
 
-## 8. Material de estudio [HECHO]
+## 8. Así se ve — pantallas reales (2026-08-27) [HECHO — video-tutoriales públicos del producto]
+
+Visto de screen-recordings de tutoriales (curso "Softrestaurant" de Puntos de venta Decuir, 12 lecciones):
+
+**El back-office/admin (módulo de administración, Windows):**
+- **Barra de menús Windows clásica** arriba (Configuración · Catálogos · ... · Mantenimiento · Ayuda) con **menús en cascada**: Catálogos → Productos por venta, Clientes, Monedas... hasta "**Catálogo de SAT - México**" (el catálogo fiscal del SAT integrado como menú de primer nivel).
+- Debajo, un **ribbon naranja de botones grandes cuadrados**: PRODUCTOS · PRESENTACIONES · COMANDERO/CAJA · MONITOR/VENTA · COMPRAS · TURNO/ALMACÉN · INVENTARIO FÍSICO... — la navegación primaria es por iconos de módulo, estilo ERP 2010.
+- Barra de estado inferior con datos de conexión/estación. Todo mouse-first: la densidad y los targets son de escritorio, no de dedo.
+- Tema naranja corporativo. El SR11→SR12 promete "Look & Feel renovado (Light/Classic/Dark)" — la estructura (menús + ribbon) se mantiene [INFERENCIA por su propia comparativa].
+
+**El ecosistema de aprendizaje alrededor:** el curso de 12 lecciones de un DISTRIBUIDOR cubre exactamente la operación diaria: agregar cajeros con restricciones, inventario/existencias, crear insumos, registrar propina, **corte de caja**, salidas/entradas de dinero. Que un tercero venda cursos de SR = hay demanda de capacitación (= fricción del producto) y un canal de contenido que nosotros podemos atacar con "en Fullsite esto no necesita curso".
+
+**Hallazgo de GTM colateral [HECHO]:** al buscar "soft restaurant 12 tutorial" en YouTube, el primer resultado es un **anuncio pagado de Parrot** ("Con Parrot vendés más, operás mejor..."). Parrot está cazando la base instalada de SR con ads sobre sus búsquedas de soporte — la misma jugada que nosotros podemos correr más barato con contenido orgánico de migración.
+
+**Lecturas [INFERENCIA]:**
+- La distancia UX entre SR y cualquier cloud-POS moderno es de una década: menús en cascada + ribbon vs touch-first. El dueño joven que hereda un SR lo SIENTE al instante — nuestra demo debe explotar ese contraste visual sin decirlo.
+- El "Catálogo de SAT" como menú de primer nivel confirma: en México el POS es un instrumento fiscal antes que operativo. Nuestro CFDI debe verse igual de ciudadano de primera.
+
+## 9. Material de estudio [HECHO]
 
 - Videotutoriales oficiales: softrestaurant.com/videotutoriales (el producto pantalla por pantalla).
 - Academia gratuita: softrestaurant.com/academia-gratuita-soft-restaurant.
@@ -94,7 +112,7 @@
 - Integraciones: softrestaurant.com/integraciones.
 - Requisitos de sistema (arquitectura): softrestaurant.com/soft-restaurant-precio (sección requerimientos).
 
-## 9. Qué falta por verificar
+## 10. Qué falta por verificar
 
 - [ ] Precios reales de cada add-on en nationalsoft.store (la tienda carga con sesión; el WebFetch falló por certificado — entrar con navegador).
 - [ ] SR Cloud (/cloud): qué es exactamente — ¿SaaS real o VDI del desktop? [pendiente]

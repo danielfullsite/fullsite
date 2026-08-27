@@ -10,7 +10,7 @@
 - CDMX. YC S20. Funding: $2.1M seed (dic-2020: Liquid2/Joe Montana, Foundation Capital, Superhuman angels, Ed Baker de Uber) + **$9.5M Series A ene-2022 (F Prime Capital)** = $11.7M total. **Sin Series B anunciada a 2026-08** [HECHO] — 4.5 años sin ronda nueva: o hay revenue sano, o hay presión [HIPÓTESIS].
 - **1,500+ restaurantes** (marketing dice "más de 1,000 dueños") [HECHO].
 - Clientes notables visibles en su portal de facturación: **Mochomos MTY (Grupo Costeño)**, Rosso Vivo, RamenYa, Lázaro y Diego, Casa de Huésped, Mata de Chile [HECHO]. Que Mochomos use Parrot = ya venden a grupos serios de Monterrey.
-- Venta: WhatsApp directo (+52 1 55 3473 8304) + demo agendada + account manager. Marketing de contenido agresivo (blog HubSpot en blog.parrotsoftware.io).
+- Venta: WhatsApp directo (+52 1 55 3473 8304) + demo agendada + account manager. Marketing de contenido agresivo (blog HubSpot en blog.parrotsoftware.io). **Compran ads de YouTube contra las búsquedas de Soft Restaurant** (verificado 2026-08-27: buscar "soft restaurant 12 tutorial" muestra anuncio de Parrot arriba) — cazan la base instalada del incumbente sobre sus propias búsquedas de soporte [HECHO].
 - **Ecosistema de dominios** [HECHO]: `admin.parrot.rest` (back-office **"ParrotConnect"**) · `facturacion.parrot.rest/{restaurante}` (portal CFDI de autofactura por cliente) · `pedidos.parrot.rest/{restaurante}` (ordering online por cliente).
 
 ## 2. Mapa completo del producto [HECHO]

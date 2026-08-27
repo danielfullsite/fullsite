@@ -147,7 +147,31 @@ Navegación: menú izquierdo → **Reports** → abre Weekly Overview → flecha
 - CFDI + WhatsApp + español: Toast no lo tiene ni lo tendrá pronto; sus imitadores MX tampoco tienen la capa IA.
 - Velocidad: ellos actualizan trimestral con burocracia pública; nosotros en días.
 
-## 9. Material de estudio [HECHO — enlaces verificados por búsqueda]
+## 9. Así se ve — pantallas reales (2026-08-27) [HECHO — capturas de sus artículos oficiales de soporte]
+
+Visto directamente de los screenshots oficiales de support.toasttab.com (imágenes en su CDN, sin login):
+
+**Toast Web (back-office):**
+- Sidebar izquierdo naranja/blanco: Home · **Reports** · Employees · Payroll · Menus · Takeout & delivery · Catering & events · Payments. Al entrar a Reports se abre un **segundo panel con el árbol de reportes** (Sales · Employee performance → Time entries / Hourly sales / Employee productivity / Labor summary...). Arriba: selector de sucursal.
+- El dashboard de inicio es de tarjetas: "KEY METRICS" con Net sales y % vs periodo anterior en badge rojo/verde.
+- Los reportes largos no se descargan en vivo: botón "Email Export" → llega correo "Your report is ready" con link. Asíncrono, no instantáneo.
+
+**POS — pantalla de orden (dos modos, el patrón es idéntico al de Parrot y al nuestro: ticket izquierda, grid derecha):**
+- **Quick Order (tema claro, mostrador):** check a la izquierda (tab name, dining option, schedule order; items con qty/precio; botones **Hold / Stay / Send**; Subtotal+Tax; CTAs "Fast $$", "Discount", "Pay $21.40" azul). Derecha: búsqueda + "Open Item" y una jerarquía de TRES niveles siempre visible: fila de **MENUS** (FOOD rojo, DRINKS azul...) → fila de **GROUPS** (Appetizers rosa, Sandwiches amarillo...) → grid de **ITEMS**. Todo con color-coding fuerte por categoría.
+- **Table Order (tema OSCURO, servicio a mesa):** header del check con #orden, mesa (A5), comensales, mesero ("Mariana D") y accesos rápidos **Svc charge / Split / Discount**. Los tiles de platillo muestran un **contador arriba (15, 14...)** = cuántos quedan antes del 86 — inventario visible al mesero en el grid. Banner "TEST MODE" cuando aplica. Botón "Back to classic POS" (la migración al "New POS Experience" es opt-out, conviven dos generaciones de UI).
+
+**KDS ("New KDS Experience", 1920×1080, temas claro y oscuro):**
+- Header: estación activa ("All prep stations" / "Food, Hot, Cold") + **All day view** · **Recently fulfilled** · **Recall**.
+- Tickets en columnas: cabecera con #orden + **cronómetro transcurrido**, color por urgencia (rojo = tarde, amarillo = alerta), **contorno naranja = orden de Online Ordering/Takeout**, gris = preview. Badge **"NOT PAID"** por ticket.
+- Dentro del ticket: origen (Table 13 / Online Ordering), **secciones por curso** (Appetizers/Entrees/Desserts), modificadores en rojo, marcas "Not Fulfilled", items ya cumplidos en gris itálico. Paginación (llegan a 13+ páginas en volumen).
+
+**Lecturas [INFERENCIA]:**
+- El layout POS de la industria convergió: ticket izquierda + jerarquía menú→grupo→item derecha. Nadie lo reinventa; la diferencia está en densidad, color y qué dato extra viven en el tile (Toast: stock restante; Square: foto; Parrot: franja de color).
+- Tema oscuro para KDS y para table-service nocturno es estándar en Toast — nuestro KDS ya lo tiene, el POS debería ofrecerlo.
+- El "NOT PAID" en cada ticket de KDS une cocina y caja — cocina sabe qué cuenta sigue abierta.
+- El export por email asíncrono es fricción que nosotros no tenemos (reportes en vivo) — punto de demo.
+
+## 10. Material de estudio [HECHO — enlaces verificados por búsqueda]
 
 - **Canal oficial YouTube "Toast, Inc."**: tutoriales POS, payroll, xtraCHEF, menu engineering — youtube.com/channel/UC6oFqFPZ5AbrkJmKHfh3C5A
 - Playlist "Toast Point of Sale": youtube.com/playlist?list=PLM4kOja-yPM6cfyINeEZDUuMRw1msUUyP
@@ -158,7 +182,7 @@ Navegación: menú izquierdo → **Reports** → abre Weekly Overview → flecha
 - Reviews con capturas: posusa.com/toast-pos-review, fitsmallbusiness, NerdWallet.
 - Videos independientes: "Toast Restaurant POS System - How it Works" (youtube VL6aD1i9LB4), "TOAST POS Demo and Honest Review" (bcsiKtTa0TM), "Get Started With Menus" (XqebkNDpeoA), unboxing z8h3C4PkpMY.
 
-## 10. Qué falta por verificar
+## 11. Qué falta por verificar
 
 - [ ] Ver 2-3 demos completas en video y capturar screenshots del back-office a `docs/knowledge/competitive/bibles/assets/` (tarea manual o sesión con navegador).
 - [ ] Toast API pública (doc.toasttab.com) — mapear objetos expuestos vs nuestro modelo de datos.
