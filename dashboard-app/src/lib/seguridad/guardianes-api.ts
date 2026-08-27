@@ -43,6 +43,7 @@ export const GUARDIANES_DE_SECRETO = [
   'CRON_SECRET',
   'verifyRappiSignature',
   'verifyRappiOnboardingSignature',
+  'RAPPI_ONBOARDING_REGISTRATION_TOKEN',
   // El webhook de Uber verifica con un ayudante local (`verifySignature`). Registramos
   // el nombre del secreto y no el de la función: `verifySignature` es un nombre genérico
   // y cualquiera podría declarar uno que no verifique nada y pasar el barrido. El
