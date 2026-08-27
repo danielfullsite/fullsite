@@ -288,6 +288,10 @@ function registerProvisioningIpc() {
       release: os.release(),
       network_interfaces,
       system_printers,
+      fingerprint: {
+        service_installed: fs.existsSync('C:\\fullsite\\fingerprint-service.exe'),
+        driver_installed: fs.existsSync('C:\\fullsite\\DPUruNet.dll'),
+      },
       legacy,
       schemaConstants: { MAX_PRINTER_ID_LENGTH: printerConfigSchema.MAX_PRINTER_ID_LENGTH },
     };

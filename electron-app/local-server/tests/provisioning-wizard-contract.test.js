@@ -41,3 +41,13 @@ test('native setup reports computer network and printer inventory', () => {
   assert.match(main, /getPrintersAsync\(\)/)
   assert.match(setup, /Equipo detectado:/)
 })
+
+test('native setup reports authorized HID and dedicated fingerprint readiness', () => {
+  const preload = fs.readFileSync(path.join(electronRoot, 'preload-setup.js'), 'utf8')
+  assert.match(preload, /navigator\.hid\.getDevices\(\)/)
+  assert.match(preload, /vendorId/)
+  assert.match(main, /fingerprint-service\.exe/)
+  assert.match(main, /DPUruNet\.dll/)
+  assert.match(setup, /HID autorizado\(s\)/)
+  assert.match(setup, /lector de huella listo/)
+})
