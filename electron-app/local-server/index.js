@@ -270,7 +270,9 @@ function forwardPost(targetUrl, bodyStr) {
 const edgeWatcher = require('./core/edge-watcher')
 const EDGE_SLOW_MINUTES = Number(process.env.FULLSITE_EDGE_SLOW_MIN) || 15
 
-function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, version, serverId, restaurantId, instanceName, branchId, posServerIp, port }) {
+// Keep identity and routing configuration explicit so every cloned terminal can
+// discover the caja without relying on process-global or customer-specific state.
+function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, version, serverId, restaurantId, config = {}, instanceName = '', branchId = config.branchId || null, posServerIp = config.posServerIp || null, port = 7717 }) {
   return async function router(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
