@@ -94,6 +94,12 @@ Visto de screen-recordings de tutoriales (curso "Softrestaurant" de Puntos de ve
 - Barra de estado inferior con datos de conexión/estación. Todo mouse-first: la densidad y los targets son de escritorio, no de dedo.
 - Tema naranja corporativo. El SR11→SR12 promete "Look & Feel renovado (Light/Classic/Dark)" — la estructura (menús + ribbon) se mantiene [INFERENCIA por su propia comparativa].
 
+**La pantalla de VENTA (módulo "SERVICIO COMEDOR", visto en video de uso básico SR11):**
+- Barra de menús completa confirmada: Configuración · Catálogos · Caja · Ventas · Operaciones · Almacén · Consultas · Reportes · Seguridad · Mantenimiento · Ayuda.
+- Abrir una cuenta de comedor = **modal de formulario Windows** ("Abrir cuenta comedor") con campos CUENTA, MESERO, PERSONAS, COMENSALISTA, CLIENTE y botonera de iconos — se captura con TECLADO, no con grid táctil.
+- Detrás, el módulo comedor estilo MDI (ventanas dentro de ventanas): panel de cuentas abiertas (Cuenta/Mesa/Mesero/Orden) + la comanda en TABLA (columnas Mov/Comanda/Cant/Precio/Importe/**Tiempo de preparación**/Comentario) + pie con Subtotal/Monedero/Descuento/Impuestos/Propina.
+- Paleta naranja/beige uniforme. Es un ERP de captura, no un POS táctil: el contraste con cualquier grid touch (el nuestro, Parrot, Square) es brutal a simple vista.
+
 **El ecosistema de aprendizaje alrededor:** el curso de 12 lecciones de un DISTRIBUIDOR cubre exactamente la operación diaria: agregar cajeros con restricciones, inventario/existencias, crear insumos, registrar propina, **corte de caja**, salidas/entradas de dinero. Que un tercero venda cursos de SR = hay demanda de capacitación (= fricción del producto) y un canal de contenido que nosotros podemos atacar con "en Fullsite esto no necesita curso".
 
 **Hallazgo de GTM colateral [HECHO]:** al buscar "soft restaurant 12 tutorial" en YouTube, el primer resultado es un **anuncio pagado de Parrot** ("Con Parrot vendés más, operás mejor..."). Parrot está cazando la base instalada de SR con ads sobre sus búsquedas de soporte — la misma jugada que nosotros podemos correr más barato con contenido orgánico de migración.

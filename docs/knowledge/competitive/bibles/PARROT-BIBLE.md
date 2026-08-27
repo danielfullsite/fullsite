@@ -142,6 +142,12 @@ Recorrí completo su demo Arcade oficial ("Crear nueva orden", `demo.arcade.soft
 
 **6. Cierre:** en el POS, la mesa refleja el pago (Subtotal $40.00 + IVA $5.00 = $45.00, faltante $0.00 en rojo→verde) con botones Reimprimir / Editar / **Cerrar orden** / Pagar. Cerrar libera la mesa.
 
+**ParrotConnect (back-office) — primer vistazo real (tutorial oficial en video, UI de ~2022):**
+- Pantalla de Descuentos: tabla blanca minimal con columnas Restringido / En Uso / Acciones (duplicar, borrar) + botón negro "Agregar descuento". Mismo lenguaje visual plano del POS.
+- Concepto que su tutorial explica: descuento "abierto" (el personal fija el monto en el POS) vs restringido — el permiso viaja del admin al POS.
+- En el POS, el panel de orden tiene "Agregar descuento a la orden / Agregar una nota / Agregar cargo por servicio" + selector de tipo de consumo ("Consumo en el lugar").
+- PENDIENTE: los reportes de ParrotConnect (las ~30 pantallas) siguen sin verse — el tutorial es viejo y el canal tiene más material por minar.
+
 **Lecturas [INFERENCIA]:**
 - Su demo entero es la venta de UNA cosa: cero recaptura entre POS y terminal (la autoconciliación). El flujo de orden en sí es estándar.
 - El IVA se muestra desglosado en el ticket del POS ($40 + $5) — desglose fiscal visible al mesero.
