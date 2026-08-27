@@ -71,7 +71,7 @@ describe('pos-offline-db — cola de sync (el corazón del offline)', () => {
     expect((await getPendingQueue()).length).toBe(3)
 
     const summary = await getSyncQueueSummary()
-    expect(summary.pending ?? summary.total ?? 3).toBeGreaterThan(0)
+    expect(summary.pending).toBe(3)
 
     // sincroniza todas → limpia las synced
     for (const it of await getPendingQueue()) await markSynced(it.id)
