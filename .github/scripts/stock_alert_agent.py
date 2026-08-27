@@ -52,18 +52,54 @@ def sb_post(table, data):
         json=data, timeout=15)
     r.raise_for_status()
 
+CLAVE_CONFLICTO = ("client_id", "agent_id", "fecha")
+
+
 def sb_upsert(table, data):
-    headers_upsert = {**sb_headers, "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates,return=minimal"}
-    r = requests.post(f"{SUPABASE_URL}/rest/v1/{table}", headers=headers_upsert, json=data, timeout=15)
+    """Upsert contra la llave única real de la tabla.
+
+    DOS DEFECTOS QUE ARREGLA, los dos vivos desde antes:
+
+    1. `resolution=merge-duplicates` SIN `on_conflict`. PostgREST necesita que se
+       le diga cuál es el objetivo del conflicto cuando NO es la llave primaria.
+       agent_results tiene PK (id, autogenerado) y UNIQUE (client_id, agent_id,
+       fecha) — sin `on_conflict` apunta a la PK, que nunca choca porque el id no
+       va en el payload. El agente venía tronando con 400 todos los días
+       (2026-08-22 al 26 verificados en agent_runs).
+
+    2. El PATCH de respaldo filtraba por agent_id y fecha PERO NO por client_id.
+       Con dos restaurantes en la misma base, la fila de uno sobrescribía la del
+       otro. Es la clase de fuga que CLAUDE.md §12 prohíbe, y estaba en el camino
+       de recuperación, o sea justo donde nadie mira.
+
+    Además se levanta el CUERPO de la respuesta en el error: `raise_for_status()`
+    sólo da el código y la URL, y por eso el 400 llevaba días sin diagnosticarse.
+    """
+    faltantes = [c for c in CLAVE_CONFLICTO if not data.get(c)]
+    if faltantes:
+        # Fallar cerrado: sin tenant no se escribe. Un client_id vacío escribiría
+        # una fila que después nadie puede atribuir ni aislar.
+        raise ValueError(f"sb_upsert a {table} sin {', '.join(faltantes)}")
+
+    destino = ",".join(CLAVE_CONFLICTO)
+    r = requests.post(
+        f"{SUPABASE_URL}/rest/v1/{table}?on_conflict={destino}",
+        headers={**sb_headers, "Content-Type": "application/json",
+                 "Prefer": "resolution=merge-duplicates,return=minimal"},
+        json=data, timeout=15)
+
     if r.status_code == 409:
-        agent_id = data.get("agent_id", "")
-        fecha = data.get("fecha", "")
+        filtro = "&".join(f"{c}=eq.{data[c]}" for c in CLAVE_CONFLICTO)
         r = requests.patch(
-            f"{SUPABASE_URL}/rest/v1/{table}?agent_id=eq.{agent_id}&fecha=eq.{fecha}",
-            headers={**sb_headers, "Content-Type": "application/json", "Prefer": "return=minimal"},
-            json={k: v for k, v in data.items() if k not in ("agent_id", "fecha")},
+            f"{SUPABASE_URL}/rest/v1/{table}?{filtro}",
+            headers={**sb_headers, "Content-Type": "application/json",
+                     "Prefer": "return=minimal"},
+            json={k: v for k, v in data.items() if k not in CLAVE_CONFLICTO},
             timeout=15)
-    r.raise_for_status()
+
+    if not r.ok:
+        raise requests.HTTPError(
+            f"{r.status_code} en {table}: {r.text[:300]}", response=r)
 
 def send_telegram(text):
     for chat_id in TG_CHAT_IDS:
