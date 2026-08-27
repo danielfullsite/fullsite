@@ -74,7 +74,7 @@ def estado_anterior(agent_id: str) -> str | None:
         return None
 
 
-def _enviar_correo(asunto: str, cuerpo: str) -> bool:
+def enviar_correo(asunto: str, cuerpo: str) -> bool:
     if not RESEND_API_KEY:
         print("[notify] sin RESEND_API_KEY — no se manda correo", file=sys.stderr)
         return False
@@ -129,5 +129,5 @@ def avisar_si_cambio(agent_id: str, estado_actual: str,
     else:
         return "sin_cambio"
 
-    _enviar_correo(asunto, cuerpo)
+    enviar_correo(asunto, cuerpo)
     return transicion
