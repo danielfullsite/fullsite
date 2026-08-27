@@ -1,245 +1,111 @@
-import { Shield, Lock, Server, Eye, Database, Brain, HardDrive, Fingerprint, Globe, FileCheck, CheckCircle2, Clock, ExternalLink, Download } from 'lucide-react'
+import type { Metadata } from 'next'
+import { ArrowUpRight, CircleDot, FileCheck2, Fingerprint, KeyRound, LockKeyhole, Network, Radar, ServerCog, ShieldCheck } from 'lucide-react'
 
-const certifications = [
-  {
-    name: 'PCI-DSS SAQ-A',
-    status: 'compliant' as const,
-    description: 'Tokenización de pagos — nunca almacenamos datos de tarjeta',
-    detail: 'Procesamos pagos exclusivamente a través de Stripe, Clip y MercadoPago. Los datos de tarjeta nunca tocan nuestros servidores. Cumplimos con PCI-DSS SAQ-A como comerciantes que no almacenan, procesan ni transmiten datos de tarjetahabiente.',
-    doc: '/policies/pci-dss-saq-a.pdf',
-  },
-  {
-    name: 'CFDI 4.0',
-    status: 'active' as const,
-    description: 'Facturación electrónica conforme al SAT',
-    detail: 'Generamos CFDI 4.0 vía PAC autorizado. El cliente escanea un QR en su ticket, ingresa sus datos fiscales (RFC, régimen, CP, uso CFDI) y la factura se emite automáticamente. XML y PDF disponibles.',
-  },
-  {
-    name: 'LFPDPPP',
-    status: 'compliant' as const,
-    description: 'Ley Federal de Protección de Datos Personales',
-    detail: 'Cumplimos con la LFPDPPP y su Reglamento. Implementamos derechos ARCO completos (Acceso, Rectificación, Cancelación, Oposición). Aviso de privacidad publicado y accesible.',
-    link: '/privacidad',
-  },
-  {
-    name: 'SOC 2 Type II',
-    status: 'in_progress' as const,
-    description: '10 políticas implementadas — auditoría programada',
-    detail: 'Hemos implementado las 10 políticas requeridas: Seguridad de la Información, Control de Acceso, Gestión de Incidentes, Continuidad del Negocio, Gestión de Riesgos, Gestión de Cambios, Seguridad Física, Privacidad de Datos, Gestión de Proveedores, Gestión de Activos. Auditoría con Vanta en proceso.',
-  },
-  {
-    name: 'AES-256 + TLS 1.3',
-    status: 'active' as const,
-    description: 'Encriptación de grado bancario en tránsito y reposo',
-    detail: 'Todos los datos se transmiten con TLS 1.3 (HTTPS forzado). Los datos en reposo están encriptados con AES-256 en Supabase PostgreSQL. Credenciales y tokens nunca se exponen en logs ni respuestas de API.',
-  },
-  {
-    name: 'RLS (Row Level Security)',
-    status: 'active' as const,
-    description: 'Aislamiento total de datos entre clientes',
-    detail: 'Cada cliente accede únicamente a sus propios datos. Row Level Security habilitado en las 55+ tablas de Supabase. Imposible acceder a datos de otro cliente, ni siquiera con acceso directo a la API.',
-  },
-]
+export const metadata: Metadata = {
+  title: 'Seguridad y confianza | Fullsite',
+  description: 'Evidencia pública, controles técnicos y alcance de seguridad de la plataforma Fullsite.',
+}
 
-const infrastructure = [
-  { provider: 'Supabase', cert: 'SOC 2 Type II', role: 'Base de datos PostgreSQL + Auth + Storage' },
-  { provider: 'Vercel', cert: 'SOC 2 Type II', role: 'Hosting + CDN global + Edge Functions' },
-  { provider: 'Cloudflare', cert: 'SOC 2 Type II', role: 'DNS + WAF + DDoS protection + DNSSEC' },
-  { provider: 'GitHub', cert: 'SOC 2 Type II', role: 'Código fuente + CI/CD + GitHub Actions' },
-  { provider: 'Anthropic', cert: 'SOC 2 Type II', role: 'IA con zero-retention policy' },
-  { provider: 'Groq', cert: 'SOC 2', role: 'Agentes autónomos + briefings' },
-]
+const evidence = [
+  { label: 'Mozilla Observatory', target: 'Aplicación', value: 'B+', detail: '80/100 · 9 de 10 controles', date: '27 ago 2026', href: 'https://developer.mozilla.org/en-US/observatory/analyze?host=app.fullsite.mx', tone: 'emerald' },
+  { label: 'Qualys SSL Labs', target: 'Cifrado TLS', value: 'A', detail: 'Endpoint público evaluado', date: '27 ago 2026', href: 'https://www.ssllabs.com/ssltest/analyze.html?d=fullsite.mx', tone: 'blue' },
+  { label: 'HTTPS', target: 'app.fullsite.mx', value: 'TLS', detail: 'Certificado público vigente', date: 'Verificación continua', href: 'https://app.fullsite.mx', tone: 'slate' },
+] as const
 
 const controls = [
-  { name: 'Encriptación en tránsito', status: true, detail: 'TLS 1.3 forzado en todas las conexiones' },
-  { name: 'Encriptación en reposo', status: true, detail: 'AES-256 en Supabase PostgreSQL' },
-  { name: 'Autenticación multi-capa', status: true, detail: 'JWT + PIN por empleado + PIN gerente para acciones críticas' },
-  { name: 'Row Level Security', status: true, detail: '55+ tablas con aislamiento por cliente' },
-  { name: 'Audit trail inmutable', status: true, detail: 'Cada acción POS registrada con timestamp + actor + detalles' },
-  { name: 'Anti-fraude automático', status: true, detail: 'Agente IA detecta cancelaciones y descuentos sospechosos' },
-  { name: 'Backups automáticos', status: true, detail: 'Diarios con retención 30 días + point-in-time recovery' },
-  { name: 'WAF (Web Application Firewall)', status: true, detail: 'Cloudflare protege contra OWASP Top 10' },
-  { name: 'Rate limiting', status: true, detail: 'Protección contra abuso en APIs públicas' },
-  { name: 'CSP Headers', status: true, detail: 'Content Security Policy previene XSS e inyección' },
-  { name: 'Zero data retention (IA)', status: true, detail: 'Anthropic/Groq no almacenan prompts ni respuestas' },
-  { name: 'HTTPS Only', status: true, detail: 'Redirección automática HTTP → HTTPS' },
-  { name: '5 roles de acceso', status: true, detail: 'Dueño, gerente, capitán, cajero, mesero — cada uno con permisos específicos' },
-  { name: 'Aviso de privacidad LFPDPPP', status: true, detail: 'Publicado con derechos ARCO completos' },
-  { name: 'Exportación de datos', status: true, detail: 'El cliente puede exportar toda su información en CSV en cualquier momento' },
-  { name: 'MFA en infraestructura', status: true, detail: 'Activo en GitHub, Supabase, Vercel y Cloudflare' },
-  { name: 'Rate limiting en APIs', status: true, detail: '100 requests/min por IP en rutas /api/' },
-  { name: 'Input sanitization', status: true, detail: 'XSS prevention, SQL injection protection, validación de RFC/email/CP' },
-  { name: 'Permissions-Policy', status: true, detail: 'Cámara, geolocation, USB, payment — restringidos por política' },
-  { name: 'HSTS Preload', status: true, detail: 'Strict-Transport-Security con max-age 2 años + includeSubDomains + preload' },
-  { name: 'X-Frame-Options DENY', status: true, detail: 'Previene clickjacking — el sitio no puede ser embebido en iframes' },
-  { name: 'Agent Audit Trail', status: true, detail: '23 agentes registran START, SELECT, INSERT, END en log inmutable (agent_audit_log)' },
-  { name: 'AI Action Controls', status: true, detail: 'Bot constreñido a 23 tablas whitelisted. SQL injection patterns bloqueados automáticamente.' },
-  { name: 'Safe Execution Architecture', status: true, detail: 'Input sanitizado (2,000 chars max), ejecución aislada por agente en GitHub Actions.' },
-  { name: 'Least Privilege DB Roles', status: true, detail: 'Roles fullsite_readonly (solo SELECT) y fullsite_agent (SELECT + log) creados en PostgreSQL.' },
-  { name: 'Table Whitelist (Bot)', status: true, detail: 'El bot de queries solo puede leer 23 tablas específicas. Acceso a tablas fuera de lista es bloqueado y registrado.' },
-  { name: 'Injection Protection', status: true, detail: 'Queries via Supabase REST parametrizado (no SQL directo). Patrones DROP/DELETE/TRUNCATE filtrados en input.' },
-]
+  { icon: LockKeyhole, title: 'Cifrado en tránsito', copy: 'HTTPS obligatorio, HSTS por dos años y certificados TLS públicos vigentes.' },
+  { icon: KeyRound, title: 'Acceso por función', copy: 'Roles operativos y autorización adicional para acciones sensibles del punto de venta.' },
+  { icon: Network, title: 'Separación por cliente', copy: 'Las operaciones y consultas se acotan por tenant; los límites se verifican con pruebas de autorización.' },
+  { icon: Radar, title: 'Trazabilidad', copy: 'Las operaciones críticas incorporan actor, momento y contexto para reconstruir qué ocurrió.' },
+  { icon: ServerCog, title: 'Continuidad local', copy: 'El flujo crítico del POS puede operar por la red local cuando la conexión a Internet no está disponible.' },
+  { icon: Fingerprint, title: 'Identidad operativa', copy: 'PIN individual y soporte biométrico para identificar al personal dentro de la operación.' },
+] as const
 
-const statusConfig = {
-  active: { label: 'Activo', color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200', icon: CheckCircle2 },
-  compliant: { label: 'Compliant', color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200', icon: CheckCircle2 },
-  in_progress: { label: 'En proceso', color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-200', icon: Clock },
+const status = [
+  ['Evaluaciones web públicas', 'Activo', 'Los resultados enlazan directamente al evaluador independiente.'],
+  ['Revisión interna de seguridad', 'Activo', 'Pruebas de autorización, aislamiento y flujos administrativos sensibles.'],
+  ['Divulgación responsable', 'Activo', 'Canal directo para reportar hallazgos de buena fe.'],
+  ['Assessment de cliente', 'Disponible', 'Atendemos cuestionarios de TI y seguridad durante el proceso comercial.'],
+  ['SOC 2 / ISO 27001', 'No certificado', 'No presentamos estas certificaciones como obtenidas.'],
+] as const
+
+function EvidenceCard({ item }: { item: (typeof evidence)[number] }) {
+  const color = { emerald: 'border-emerald-200 bg-emerald-50/70 text-emerald-950', blue: 'border-blue-200 bg-blue-50/70 text-blue-950', slate: 'border-slate-200 bg-slate-50 text-slate-950' }[item.tone]
+  return (
+    <a href={item.href} target="_blank" rel="noreferrer" className={`group flex min-h-64 flex-col rounded-[1.75rem] border p-6 transition-transform hover:-translate-y-1 ${color}`}>
+      <div className="flex items-start justify-between gap-4">
+        <div><p className="font-mono text-[11px] font-semibold uppercase tracking-[0.18em] opacity-55">{item.label}</p><p className="mt-1 text-sm opacity-70">{item.target}</p></div>
+        <ArrowUpRight className="h-4 w-4 opacity-45 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+      </div>
+      <p className="mt-8 text-6xl font-black tracking-[-0.07em]">{item.value}</p>
+      <div className="mt-auto border-t border-current/10 pt-4"><p className="text-sm font-semibold">{item.detail}</p><p className="mt-1 text-xs opacity-55">{item.date}</p></div>
+    </a>
+  )
 }
 
 export default function SeguridadPage() {
-  const activeControls = controls.filter(c => c.status).length
-  const totalControls = controls.length
-
   return (
-    <div className="min-h-screen bg-white">
-      {/* Header — Trust Center style */}
-      <div className="bg-gray-950">
-        <div className="max-w-5xl mx-auto px-6 py-16">
-          <a href="/login" className="inline-block mb-8">
-            <span className="text-white font-black text-2xl tracking-tight">
-              fullsite
-              <span className="inline-block w-2.5 h-2.5 bg-emerald-400 ml-0.5 mb-0.5 rounded-none" />
-            </span>
-          </a>
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-              <Shield className="w-6 h-6 text-emerald-400" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-white">Trust Center</h1>
-              <p className="text-white/40 text-sm">Seguridad y cumplimiento</p>
-            </div>
-          </div>
-          <p className="text-white/60 text-base max-w-2xl leading-relaxed">
-            Protegemos los datos de nuestros clientes con encriptación de grado bancario,
-            aislamiento total entre cuentas, y monitoreo continuo por agentes de IA.
-          </p>
+    <main className="min-h-screen bg-[#f7f9fc] text-[#101828]">
+      <header className="border-b border-slate-200/80 bg-white">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
+          <a href="/login" className="text-xl font-black tracking-[-0.04em]">fullsite<span className="text-emerald-500">.</span></a>
+          <a href="mailto:seguridad@fullsite.mx" className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold transition-colors hover:border-slate-950 hover:bg-slate-950 hover:text-white">Contactar a seguridad</a>
+        </div>
+      </header>
 
-          {/* Quick stats */}
-          <div className="flex gap-8 mt-8">
+      <section className="relative overflow-hidden bg-[#07111f] text-white">
+        <div className="absolute inset-0 opacity-25 [background-image:linear-gradient(rgba(255,255,255,.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.08)_1px,transparent_1px)] [background-size:48px_48px]" />
+        <div className="relative mx-auto max-w-6xl px-6 py-24 md:py-32">
+          <div className="grid gap-14 lg:grid-cols-[1fr_320px] lg:items-end">
             <div>
-              <p className="text-2xl font-bold text-white">{activeControls}/{totalControls}</p>
-              <p className="text-xs text-white/40">Controles activos</p>
+              <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.16em] text-emerald-200"><CircleDot className="h-3 w-3" /> Evidencia verificable</div>
+              <h1 className="max-w-4xl text-5xl font-black leading-[0.96] tracking-[-0.06em] sm:text-6xl md:text-7xl">La confianza se demuestra.</h1>
+              <p className="mt-7 max-w-2xl text-lg leading-8 text-slate-300">Publicamos lo que está activo, quién lo evaluó y qué todavía está pendiente. Sin sellos inventados ni alcances ambiguos.</p>
             </div>
-            <div>
-              <p className="text-2xl font-bold text-white">6</p>
-              <p className="text-xs text-white/40">Certificaciones</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-white">6</p>
-              <p className="text-xs text-white/40">Proveedores SOC 2</p>
-            </div>
+            <div className="border-l border-white/15 pl-6 font-mono text-xs leading-6 text-slate-400"><p className="text-white">Estado del centro de confianza</p><p>Actualizado: 27 agosto 2026</p><p>Superficies: web + POS</p><p>Contacto: seguridad@fullsite.mx</p></div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <div className="max-w-5xl mx-auto px-6 py-12">
-        {/* Certifications */}
-        <h2 className="text-lg font-bold text-gray-900 mb-4">Certificaciones y cumplimiento</h2>
-        <div className="grid gap-4 md:grid-cols-2 mb-12">
-          {certifications.map(cert => {
-            const s = statusConfig[cert.status]
-            const Icon = s.icon
-            return (
-              <div key={cert.name} className={`rounded-xl border ${s.border} p-5`}>
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-bold text-gray-900">{cert.name}</h3>
-                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${s.bg} ${s.color}`}>
-                    <Icon size={12} />
-                    {s.label}
-                  </span>
-                </div>
-                <p className="text-sm text-gray-500 mb-2">{cert.description}</p>
-                <p className="text-xs text-gray-400 leading-relaxed">{cert.detail}</p>
-                {cert.link && (
-                  <a href={cert.link} className="inline-flex items-center gap-1 text-xs text-emerald-600 hover:underline mt-2 font-medium">
-                    Ver documento <ExternalLink size={10} />
-                  </a>
-                )}
-              </div>
-            )
-          })}
+      <section className="mx-auto max-w-6xl px-6 py-20">
+        <div className="mb-8 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
+          <div><p className="font-mono text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">Resultados públicos</p><h2 className="mt-2 text-3xl font-black tracking-[-0.04em]">Evaluaciones independientes</h2></div>
+          <p className="max-w-md text-sm leading-6 text-slate-500">Son evaluaciones técnicas del dominio indicado; no sustituyen una certificación corporativa SOC 2 o ISO 27001.</p>
         </div>
+        <div className="grid gap-4 md:grid-cols-3">{evidence.map((item) => <EvidenceCard item={item} key={item.label} />)}</div>
+      </section>
 
-        {/* Infrastructure */}
-        <h2 className="text-lg font-bold text-gray-900 mb-4">Infraestructura certificada</h2>
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-12">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-gray-50 text-left">
-                <th className="px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Proveedor</th>
-                <th className="px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Certificación</th>
-                <th className="px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Rol</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {infrastructure.map(inf => (
-                <tr key={inf.provider} className="hover:bg-gray-50">
-                  <td className="px-5 py-3 text-sm font-medium text-gray-900">{inf.provider}</td>
-                  <td className="px-5 py-3">
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-600">
-                      <CheckCircle2 size={10} /> {inf.cert}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3 text-sm text-gray-500">{inf.role}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Controls checklist */}
-        <h2 className="text-lg font-bold text-gray-900 mb-4">Controles de seguridad ({activeControls}/{totalControls})</h2>
-        <div className="grid gap-2 md:grid-cols-2 mb-12">
-          {controls.map(ctrl => (
-            <div key={ctrl.name} className={`flex items-start gap-3 rounded-lg border px-4 py-3 ${ctrl.status ? 'border-gray-200 bg-white' : 'border-amber-200 bg-amber-50'}`}>
-              {ctrl.status ? (
-                <CheckCircle2 size={16} className="text-emerald-500 mt-0.5 flex-shrink-0" />
-              ) : (
-                <Clock size={16} className="text-amber-500 mt-0.5 flex-shrink-0" />
-              )}
-              <div>
-                <p className="text-sm font-medium text-gray-900">{ctrl.name}</p>
-                <p className="text-xs text-gray-400">{ctrl.detail}</p>
-              </div>
+      <section className="border-y border-slate-200 bg-white">
+        <div className="mx-auto max-w-6xl px-6 py-20">
+          <div className="grid gap-12 lg:grid-cols-[320px_1fr]">
+            <div><ShieldCheck className="h-10 w-10 text-emerald-600" strokeWidth={1.6} /><h2 className="mt-6 text-3xl font-black tracking-[-0.04em]">Controles en operación</h2><p className="mt-4 text-sm leading-6 text-slate-500">Un resumen público. Los detalles sensibles se comparten dentro de un assessment formal con el equipo de TI del cliente.</p></div>
+            <div className="grid gap-px overflow-hidden rounded-3xl border border-slate-200 bg-slate-200 sm:grid-cols-2">
+              {controls.map(({ icon: Icon, title, copy }) => <article className="bg-white p-6" key={title}><Icon className="h-5 w-5 text-emerald-600" strokeWidth={1.8} /><h3 className="mt-5 font-bold">{title}</h3><p className="mt-2 text-sm leading-6 text-slate-500">{copy}</p></article>)}
             </div>
-          ))}
-        </div>
-
-        {/* Responsible disclosure */}
-        <div className="bg-gray-50 rounded-xl border border-gray-200 p-8 mb-12">
-          <h2 className="text-lg font-semibold text-gray-900 mb-3">Divulgación responsable</h2>
-          <p className="text-sm text-gray-500 leading-relaxed max-w-2xl">
-            Si descubres una vulnerabilidad de seguridad en nuestra plataforma, te pedimos que nos la
-            reportes de manera responsable a{' '}
-            <a href="mailto:seguridad@fullsite.mx" className="text-emerald-600 hover:underline font-medium">
-              seguridad@fullsite.mx
-            </a>
-            . Nos comprometemos a investigar y responder dentro de 48 horas hábiles. No tomaremos
-            acciones legales contra investigadores de seguridad que actúen de buena fe.
-          </p>
-        </div>
-
-        {/* Footer */}
-        <div className="pt-8 border-t border-gray-100 text-center">
-          <p className="text-xs text-gray-400">
-            Última actualización: 27 de mayo de 2026
-          </p>
-          <p className="text-xs text-gray-400 mt-2">
-            Preguntas sobre seguridad?{' '}
-            <a href="mailto:seguridad@fullsite.mx" className="text-emerald-600 hover:underline">
-              seguridad@fullsite.mx
-            </a>
-          </p>
-          <div className="mt-4 flex justify-center gap-4 text-xs text-gray-400">
-            <a href="/privacidad" className="hover:text-emerald-600 transition-colors">Privacidad</a>
-            <span>|</span>
-            <a href="/terminos" className="hover:text-emerald-600 transition-colors">Términos</a>
-            <span>|</span>
-            <a href="/login" className="hover:text-emerald-600 transition-colors">Iniciar sesión</a>
           </div>
         </div>
-      </div>
-    </div>
+      </section>
+
+      <section className="mx-auto max-w-6xl px-6 py-20">
+        <div className="grid gap-10 lg:grid-cols-[1fr_360px]">
+          <div>
+            <p className="font-mono text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">Alcance declarado</p><h2 className="mt-2 text-3xl font-black tracking-[-0.04em]">Estado, sin letra pequeña</h2>
+            <div className="mt-8 divide-y divide-slate-200 border-y border-slate-200">
+              {status.map(([name, state, detail]) => <div className="grid gap-2 py-5 sm:grid-cols-[220px_130px_1fr] sm:items-start" key={name}><p className="text-sm font-bold">{name}</p><p className={`text-xs font-bold uppercase tracking-wide ${state === 'No certificado' ? 'text-slate-500' : 'text-emerald-700'}`}>{state}</p><p className="text-sm leading-6 text-slate-500">{detail}</p></div>)}
+            </div>
+          </div>
+          <aside className="h-fit rounded-3xl bg-[#07111f] p-7 text-white"><FileCheck2 className="h-8 w-8 text-emerald-300" strokeWidth={1.6} /><h2 className="mt-6 text-2xl font-black tracking-[-0.03em]">¿Tienen un assessment?</h2><p className="mt-4 text-sm leading-6 text-slate-300">Podemos responder el cuestionario de seguridad de su organización y entregar evidencia disponible bajo confidencialidad.</p><a href="mailto:seguridad@fullsite.mx?subject=Assessment%20de%20seguridad%20Fullsite" className="mt-7 inline-flex items-center gap-2 rounded-full bg-emerald-300 px-4 py-2.5 text-sm font-bold text-emerald-950 transition-colors hover:bg-emerald-200">Solicitar assessment <ArrowUpRight className="h-4 w-4" /></a></aside>
+        </div>
+      </section>
+
+      <section className="border-t border-slate-200 bg-white">
+        <div className="mx-auto grid max-w-6xl gap-10 px-6 py-16 md:grid-cols-2">
+          <div><h2 className="text-xl font-black tracking-[-0.03em]">Divulgación responsable</h2><p className="mt-3 max-w-xl text-sm leading-6 text-slate-500">Si encontraste una vulnerabilidad, repórtala de buena fe con pasos de reproducción y superficie afectada. Confirmaremos recepción en un máximo de dos días hábiles.</p><a className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-emerald-700" href="mailto:seguridad@fullsite.mx?subject=Reporte%20responsable%20de%20seguridad">seguridad@fullsite.mx <ArrowUpRight className="h-4 w-4" /></a></div>
+          <div className="md:border-l md:border-slate-200 md:pl-10"><h2 className="text-xl font-black tracking-[-0.03em]">Principio de publicación</h2><p className="mt-3 text-sm leading-6 text-slate-500">Un proveedor certificado no convierte automáticamente a Fullsite en una empresa certificada. Cada evidencia en esta página identifica su emisor, fecha y alcance.</p></div>
+        </div>
+      </section>
+
+      <footer className="bg-[#07111f] text-slate-400"><div className="mx-auto flex max-w-6xl flex-col justify-between gap-5 px-6 py-8 text-xs sm:flex-row"><p>© 2026 Fullsite Technologies</p><div className="flex gap-5"><a className="hover:text-white" href="/privacidad">Privacidad</a><a className="hover:text-white" href="/terminos">Términos</a><a className="hover:text-white" href="/login">Acceso</a></div></div></footer>
+    </main>
   )
 }

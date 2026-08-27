@@ -38,6 +38,7 @@ const securityHeaders = [
       "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://vercel.live https://*.vercel.com https://*.posthog.com https://us-assets.i.posthog.com https://static.cloudflareinsights.com wss://api.deepgram.com https://api.deepgram.com https://api.elevenlabs.io https://*.google.com https://*.googleapis.com wss://*.google.com http://127.0.0.1:7717 ws://127.0.0.1:7717 http://*:7717 ws://*:7717",
       "media-src 'self' blob:",
       "frame-src 'self' https://vercel.live",
+      "object-src 'none'",
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",

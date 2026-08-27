@@ -1,4 +1,16 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "ignoreCommand": "git rev-parse HEAD^ >/dev/null 2>&1 || exit 1; git diff --quiet HEAD^ HEAD -- . ':(exclude)docs/' ':(exclude)Legal/' ':(exclude)AMALAY X FULLSITE/' ':(exclude)electron-app/' ':(exclude)electron-kds/' ':(exclude)electron-dashboard/' ':(exclude)print-bridge/' ':(exclude)agents/' ':(exclude)scripts/' ':(exclude)graphify-out/' ':(exclude)ios/' ':(exclude)fullsite-web/' ':(exclude)tests/' ':(exclude).github/'"
+  "ignoreCommand": "git rev-parse HEAD^ >/dev/null 2>&1 || exit 1; git diff --quiet HEAD^ HEAD -- . ':(exclude)docs/' ':(exclude)Legal/' ':(exclude)AMALAY X FULLSITE/' ':(exclude)electron-app/' ':(exclude)electron-kds/' ':(exclude)electron-dashboard/' ':(exclude)print-bridge/' ':(exclude)agents/' ':(exclude)scripts/' ':(exclude)graphify-out/' ':(exclude)ios/' ':(exclude)fullsite-web/' ':(exclude)tests/' ':(exclude).github/'",
+  "headers": [{
+    "source": "/(.*)",
+    "headers": [
+      { "key": "Strict-Transport-Security", "value": "max-age=63072000; includeSubDomains; preload" },
+      { "key": "X-Frame-Options", "value": "DENY" },
+      { "key": "X-Content-Type-Options", "value": "nosniff" },
+      { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+      { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=(), payment=(), usb=()" },
+      { "key": "Cross-Origin-Resource-Policy", "value": "same-site" },
+      { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://cloudflareinsights.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests" }
+    ]
+  }]
 }
