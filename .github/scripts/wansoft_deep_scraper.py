@@ -265,7 +265,7 @@ def main():
         if data:
             sb_upsert("wansoft_data", {
                 "client_id": CLIENT["id"], "fecha": today_str, "data_key": key,
-                "data": json.dumps(data), "updated_at": datetime.now(timezone.utc).isoformat(),
+                "data": data, "updated_at": datetime.now(timezone.utc).isoformat(),
             })
 
     areas = scrape_endpoint(session, "SalesByArea", "Reports/SalesByArea", base_params,

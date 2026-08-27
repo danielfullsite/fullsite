@@ -31,7 +31,7 @@ jobs:
               items = json.load(f)
           print(f'Inventory items: {len(items)}')
 
-          row = {'client_id': 'amalay', 'data_key': 'inventory_parsed', 'fecha': '2026-06-11', 'data': json.dumps(items, ensure_ascii=False)}
+          row = {'client_id': 'amalay', 'data_key': 'inventory_parsed', 'fecha': '2026-06-11', 'data': items}
           r = requests.post(f'{url}/rest/v1/wansoft_data', headers=h, json=row)
           print(f'inventory_parsed POST: {r.status_code}')
           if r.status_code >= 300:

@@ -697,7 +697,7 @@ async def run():
             sb_upsert("wansoft_data", {
                 "client_id": CLIENT["id"], "fecha": today_str,
                 "data_key": "food_cost_browser",
-                "data": json.dumps(cost_items),
+                "data": cost_items,
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             })
             results["food_cost"] = len(cost_items)
@@ -714,7 +714,7 @@ async def run():
             sb_upsert("wansoft_data", {
                 "client_id": CLIENT["id"], "fecha": today_str,
                 "data_key": "saucers_cost_browser",
-                "data": json.dumps(saucer_items),
+                "data": saucer_items,
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             })
             results["saucers_cost"] = len(saucer_items)
@@ -731,7 +731,7 @@ async def run():
             sb_upsert("wansoft_data", {
                 "client_id": CLIENT["id"], "fecha": today_str,
                 "data_key": "tips_browser",
-                "data": json.dumps(tips_items),
+                "data": tips_items,
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             })
             results["tips"] = len(tips_items)
@@ -753,7 +753,7 @@ async def run():
                 sb_upsert("wansoft_data", {
                     "client_id": CLIENT["id"], "fecha": today_str,
                     "data_key": data_key,
-                    "data": json.dumps(items),
+                    "data": items,
                     "updated_at": datetime.now(timezone.utc).isoformat(),
                 })
                 results[data_key] = count
@@ -930,7 +930,7 @@ async def run():
             sb_upsert("wansoft_data", {
                 "client_id": CLIENT["id"], "fecha": today_str,
                 "data_key": "promotions_browser",
-                "data": json.dumps(promos_parsed),
+                "data": promos_parsed,
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             })
             results["promociones"] = len(promos_parsed)
@@ -954,7 +954,7 @@ async def run():
                 sb_upsert("wansoft_data", {
                     "client_id": CLIENT["id"], "fecha": today_str,
                     "data_key": data_key,
-                    "data": json.dumps(parsed),
+                    "data": parsed,
                     "updated_at": datetime.now(timezone.utc).isoformat(),
                 })
                 results[data_key] = len(parsed)
