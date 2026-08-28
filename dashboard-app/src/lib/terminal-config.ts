@@ -36,6 +36,13 @@ export interface TerminalConfig {
   protocol_version: string
   provisioned_at: string
   client_id: string
+  /**
+   * Sucursal (client_locations.id) del mismo tenant. Se estampa como campo ADICIONAL: el
+   * schema del Electron (config-schema.js validate()) sólo exige su lista `required[]` y
+   * acepta campos extra, así que las instalaciones actuales lo aceptan sin instalador nuevo.
+   * Volverlo obligatorio en el Electron es otro PR (offline), fuera de este bloque.
+   */
+  location_id: string
   channel: string
   kds_only?: boolean
   pos_server_ip?: string | null
@@ -43,15 +50,24 @@ export interface TerminalConfig {
 
 export interface GenerateInput {
   clientId: string
+  /** Sucursal destino. Obligatoria: no se emite config sin sucursal. */
+  locationId: string
   role: TerminalRole
   name?: string
   /** IP LAN de la caja/Pedro. Requerida para pos/kds en máquinas distintas a la caja. */
   bridgeHost?: string
 }
 
-/** Genera un TerminalConfig válido (mismo shape que el wizard del Electron). */
+/**
+ * Genera un TerminalConfig válido (mismo shape que el wizard del Electron) atado a una
+ * sucursal. Lanza si falta clientId o locationId — la validación de que la sucursal
+ * pertenece al tenant se hace en la ruta (server-side, contra client_locations).
+ */
 export function generateTerminalConfig(input: GenerateInput): TerminalConfig {
   const { clientId, role } = input
+  const locationId = input.locationId?.trim() || ''
+  if (!clientId) throw new Error('generateTerminalConfig: clientId requerido')
+  if (!locationId) throw new Error('generateTerminalConfig: locationId requerido')
   const bridge = input.bridgeHost?.trim() || ''
   // La caja (server_pos) corre Pedro local → 127.0.0.1. Las demás (pos/kds/admin) le
   // hablan a la caja por la LAN → IP de la caja.
@@ -68,6 +84,7 @@ export function generateTerminalConfig(input: GenerateInput): TerminalConfig {
     protocol_version: '1.0',
     provisioned_at: now,
     client_id: clientId,
+    location_id: locationId,
     channel: 'stable',
   }
   // Terminales remotas (pos/kds) hablan con la caja por la LAN → pos_server_ip.

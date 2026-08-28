@@ -27,6 +27,8 @@ export default function PlatformConfigPage() {
   const [terminals, setTerminals] = useState<Terminal[]>([])
   const [newDev, setNewDev] = useState('')
   const [newLabel, setNewLabel] = useState('')
+  const [locations, setLocations] = useState<{ id: string; name: string }[]>([])
+  const [newLocation, setNewLocation] = useState('')
   const [termBusy, setTermBusy] = useState(false)
 
   useEffect(() => {
@@ -35,6 +37,28 @@ export default function PlatformConfigPage() {
       .then(j => setClients(Array.isArray(j.clients) ? j.clients : []))
       .catch(() => {})
       .finally(() => setLoading(false))
+  }, [])
+
+  // Loaders declarados ANTES de loadTenant, que los invoca: el compilador de React marca
+  // el acceso a un callback antes de su declaración.
+  const loadTerminals = useCallback((cid: string) => {
+    fetch(`/api/platform/terminals?clientId=${encodeURIComponent(cid)}`, { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(j => setTerminals(Array.isArray(j?.terminals) ? j.terminals : []))
+      .catch(() => setTerminals([]))
+  }, [])
+
+  // Sucursales del cliente, para exigir una al enrolar (la API la valida server-side).
+  const loadLocations = useCallback((cid: string) => {
+    if (!cid) { setLocations([]); setNewLocation(''); return }
+    fetch(`/api/platform/locations?clientId=${encodeURIComponent(cid)}`, { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(j => {
+        const list = Array.isArray(j?.locations) ? j.locations : []
+        setLocations(list)
+        setNewLocation(list[0]?.id || '')
+      })
+      .catch(() => { setLocations([]); setNewLocation('') })
   }, [])
 
   const loadTenant = useCallback((cid: string) => {
@@ -51,14 +75,8 @@ export default function PlatformConfigPage() {
       .catch(() => {})
       .finally(() => setLoadingTenant(false))
     loadTerminals(cid)
-  }, [])
-
-  const loadTerminals = useCallback((cid: string) => {
-    fetch(`/api/platform/terminals?clientId=${encodeURIComponent(cid)}`, { credentials: 'include' })
-      .then(r => r.ok ? r.json() : null)
-      .then(j => setTerminals(Array.isArray(j?.terminals) ? j.terminals : []))
-      .catch(() => setTerminals([]))
-  }, [])
+    loadLocations(cid)
+  }, [loadTerminals, loadLocations])
 
   const saveRequire = async (next: boolean) => {
     setRequireEnrolled(next)
@@ -71,13 +89,13 @@ export default function PlatformConfigPage() {
 
   const enroll = async () => {
     const dev = newDev.trim()
-    if (!clientId || !dev) return
+    if (!clientId || !dev || !newLocation) return
     setTermBusy(true)
     try {
       const res = await fetch('/api/platform/terminals', {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clientId, device_id: dev, label: newLabel.trim() || undefined }),
+        body: JSON.stringify({ clientId, device_id: dev, location_id: newLocation, label: newLabel.trim() || undefined }),
       })
       if (res.ok) { setNewDev(''); setNewLabel(''); loadTerminals(clientId) }
     } finally { setTermBusy(false) }
@@ -220,6 +238,15 @@ export default function PlatformConfigPage() {
               className="flex-1 min-w-[200px] rounded-lg px-3 py-2.5 text-sm min-h-[44px]"
               style={{ background: 'var(--surface)', border: '1px solid var(--line)', color: 'var(--text-1)' }}
             />
+            <select
+              value={newLocation} onChange={e => setNewLocation(e.target.value)}
+              disabled={locations.length === 0}
+              className="w-44 rounded-lg px-3 py-2.5 text-sm min-h-[44px]"
+              style={{ background: 'var(--surface)', border: '1px solid var(--line)', color: 'var(--text-1)' }}
+            >
+              {locations.length === 0 && <option value="">— sin sucursales —</option>}
+              {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+            </select>
             <input
               value={newLabel} onChange={e => setNewLabel(e.target.value)}
               placeholder="Etiqueta (ej. Caja 1)"
@@ -227,7 +254,7 @@ export default function PlatformConfigPage() {
               style={{ background: 'var(--surface)', border: '1px solid var(--line)', color: 'var(--text-1)' }}
             />
             <button
-              onClick={enroll} disabled={termBusy || !newDev.trim()}
+              onClick={enroll} disabled={termBusy || !newDev.trim() || !newLocation}
               className="px-4 py-2.5 rounded-lg text-sm font-semibold min-h-[44px] inline-flex items-center gap-1.5 disabled:opacity-50"
               style={{ background: 'var(--accent)', color: '#fff' }}
             >
