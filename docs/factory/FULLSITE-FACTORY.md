@@ -17,7 +17,7 @@ archivo:línea) antes de lo que falta, para no reconstruir.
 
 ## Reglas de coordinación (no negociables)
 
-1. No tocar producción ni AMALAY. Único remoto de inspección: staging `jkcnxfbbuyyfhwfjizgw`,
+1. No tocar producción ni AMALAY. Único remoto de inspección: staging `<STAGING_PROJECT_REF>`,
    **solo lectura** hasta revisión explícita. Sin merge/deploy/migración remota sin aprobación.
 2. No tocar el worktree de Codex `/.codex/worktrees/electron-amalay-qa` ni sus cambios sin commit
    (contiene el fix de `data.ts` multisucursal, que aterriza por su PR; ver #194).
@@ -107,10 +107,10 @@ PR stacked, revisado aparte (toca una tabla compartida con fuga conocida).
 ### 7. Skeleton multisucursal
 - **YA EXISTE:** `AuthContext` carga `locations` + selector, `app/sucursales/page.tsx`,
   `getActiveClientSlug()`, `clients.data_source` (demo/wansoft/fullsite). #174 demo-diezmex.
-  **`daniel@fullsite.mx` NO está hardcodeado** (super-admin por 2FA) ✓.
+  **`<ADMIN_EMAIL>` NO está hardcodeado** (super-admin por 2FA) ✓.
 - **GAP:** home grupo/marca/sucursal, selector global visible, **provenance/freshness/real-vs-demo
   por fila**, cero alertas inventadas. Admin multisucursal por **permisos**, nunca email hardcodeado
-  (hay un `demo@fullsite.mx` fallback en `client-config.ts:173` a documentar).
+  (hay un `<DEMO_EMAIL>` fallback en `client-config.ts:173` a documentar).
 - **PR-14** `factory/skeleton-provenance`: etiquetado demo/real + freshness en las lecturas
   existentes; selector global; sin inventar alertas.
 
@@ -174,4 +174,3 @@ tenant+location+device+shift. 5. Sin PII/secretos en logs. 6. Tests proporcional
 (unit/integration; e2e/soak/chaos donde el riesgo lo pida). 7. Datos demo etiquetados y aislados.
 8. Responsive iPhone/iPad/desktop + accesibilidad + latencia medible. 9. tsc + lint + build verdes.
 10. Sin merge/deploy/migración remota; rollback documentado.
-</content>
