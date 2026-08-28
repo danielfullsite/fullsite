@@ -110,9 +110,9 @@ function mapPaymentLabel(method: string): string {
 }
 
 // Also fetch from wansoft_daily as fallback
-async function fetchWansoftDaily(fecha: string) {
+async function fetchWansoftDaily(fecha: string, clientId: string) {
   const res = await fetch(
-    `${SB_URL}/rest/v1/wansoft_daily?fecha=eq.${fecha}&select=*&limit=1`,
+    `${SB_URL}/rest/v1/wansoft_daily?client_slug=eq.${encodeURIComponent(clientId)}&fecha=eq.${fecha}&select=*&limit=1`,
     OPTS
   )
   return res.ok ? (await res.json())[0] || null : null
@@ -151,7 +151,7 @@ export async function GET(request: NextRequest) {
         `${SB_URL}/rest/v1/pos_market_movements?client_id=eq.${cid}&created_at=gte.${startOfDay}&created_at=lte.${endOfDay}&select=id,created_at,type,product_name,quantity,cost_per_unit,total_cost,reason&order=created_at.asc&limit=500`,
         OPTS
       ),
-      fetchWansoftDaily(fecha),
+      fetchWansoftDaily(fecha, clientId),
       fetch(`${SB_URL}/rest/v1/clients?id=eq.${cid}&select=rfc&limit=1`, OPTS),
     ])
 
@@ -464,7 +464,7 @@ async function getResumenMensual(mes: string, formato: string, clientId: string)
       OPTS
     ),
     fetch(
-      `${SB_URL}/rest/v1/wansoft_daily?fecha=gte.${startDate}&fecha=lte.${endDate}&select=fecha,ventas_dia,ventas_brutas,descuentos,pago_metodos&order=fecha.asc`,
+      `${SB_URL}/rest/v1/wansoft_daily?client_slug=eq.${cid}&fecha=gte.${startDate}&fecha=lte.${endDate}&select=fecha,ventas_dia,ventas_brutas,descuentos,pago_metodos&order=fecha.asc`,
       OPTS
     ),
     fetch(

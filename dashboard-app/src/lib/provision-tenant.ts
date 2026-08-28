@@ -34,6 +34,7 @@ export interface ProvisionInput {
   logo_url?: string
   plan?: string
   mesas?: number
+  locations?: Array<{ id?: string; name: string; address?: string }>
   template?: OnboardingTemplate // optional override; defaults to code template
 }
 
@@ -53,6 +54,11 @@ export interface ProvisionResult {
 }
 
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+
+function slugifyLocation(value: string): string {
+  return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+}
 
 function serviceKey(): string {
   // service_role ONLY — never fall back to anon for writes.
@@ -165,13 +171,17 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
   }])
 
   // ── 2. default location ────────────────────────────────────────────────────
-  const locationsCount = await upsert('client_locations', [{
-    id: `${clientId}-principal`,
+  const locationInputs = input.locations?.length
+    ? input.locations
+    : [{ id: `${clientId}-principal`, name: 'Principal', address: '' }]
+  const locationRows = locationInputs.map((location, index) => ({
+    id: location.id || `${clientId}-${slugifyLocation(location.name) || `sucursal-${index + 1}`}`,
     client_id: clientId,
-    name: 'Principal',
-    address: '',
+    name: location.name.trim(),
+    address: location.address?.trim() || '',
     active: true,
-  }])
+  }))
+  const locationsCount = await upsert('client_locations', locationRows)
 
   // ── 3. menu categories + items ─────────────────────────────────────────────
   const catRows = tpl.menu.map(cat => ({
