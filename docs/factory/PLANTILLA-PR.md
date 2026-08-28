@@ -28,11 +28,11 @@ Diseñado · **Implementado · Probado localmente** · Validado en staging · De
 > Recordatorio: un PR abierto NO es "terminado".
 
 ## Verificación (clon limpio)
-- tsc --noEmit: 
+- tsc --noEmit:
 - vitest run: (archivos / pruebas)
-- eslint (archivos tocados): 
-- bun run build: 
-- mutación (propiedad crítica): 
+- eslint (archivos tocados):
+- bun run build:
+- mutación (propiedad crítica):
 
 ## Migración / rollback
 - Migración: (nombre) — aditiva/idempotente · aplicada a remoto: **No**
