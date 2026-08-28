@@ -202,7 +202,7 @@ function locationFilter(locationId?: string | null): string {
 
 export async function getRecentDays(days: number = 30, clientSlug: string = getActiveClientSlug(), locationId?: string | null): Promise<WansoftDaily[]> {
   // Try pos_orders first for recent data (last 7 days) — this is the live POS data
-  const posRecent = await getDashboardFromPosOrders(Math.min(days, 90), clientSlug)
+  const posRecent = await getDashboardFromPosOrders(Math.min(days, 90), clientSlug, locationId)
   // Then get wansoft_daily for historical data
   const data = await sbFetch('wansoft_daily', `select=*&client_slug=eq.${clientSlug}${locationFilter(locationId)}&ventas_dia=gt.0&order=fecha.desc&limit=${days * 2}`) as Record<string, unknown>[]
   const wansoftData = dedupeByFecha(data).slice(0, days).reverse().map(parseRow)
@@ -218,7 +218,7 @@ export async function getRecentDays(days: number = 30, clientSlug: string = getA
 
 export async function getLatestDay(clientSlug: string = getActiveClientSlug(), locationId?: string | null): Promise<WansoftDaily | null> {
   // Try pos_orders first — live POS data takes priority
-  const posData = await getDashboardFromPosOrders(7, clientSlug)
+  const posData = await getDashboardFromPosOrders(7, clientSlug, locationId)
   if (posData.length > 0) return posData[posData.length - 1]
   // Fallback to wansoft_daily
   const data = await sbFetch('wansoft_daily', `select=*&client_slug=eq.${clientSlug}${locationFilter(locationId)}&ventas_dia=gt.0&order=fecha.desc&limit=5`) as Record<string, unknown>[]
@@ -238,7 +238,7 @@ export async function getMonthlyData(clientSlug: string = getActiveClientSlug(),
   const rows = dedupeByFecha(data).map(parseRow)
   if (rows.length > 0) return rows
   // POS fallback
-  return getDashboardFromPosOrders(365, clientSlug)
+  return getDashboardFromPosOrders(365, clientSlug, locationId)
 }
 
 export async function getWaiterCategories(days: number = 7, clientSlug: string = getActiveClientSlug()) {
@@ -292,7 +292,7 @@ export async function getDateRange(from: string, to: string, clientSlug: string 
   const fromDate = new Date(from + 'T00:00:00')
   const toDate = new Date(to + 'T23:59:59')
   const days = Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
-  const posData = await getDashboardFromPosOrders(days, clientSlug)
+  const posData = await getDashboardFromPosOrders(days, clientSlug, locationId)
   return posData.filter(d => d.fecha >= from && d.fecha <= to)
 }
 
@@ -468,13 +468,13 @@ function classifyItemGroup(lower: string): string {
   return 'OTROS'
 }
 
-export async function getDashboardFromPosOrders(days: number = 30, clientId: string = getActiveClientSlug()): Promise<WansoftDaily[]> {
+export async function getDashboardFromPosOrders(days: number = 30, clientId: string = getActiveClientSlug(), locationId?: string | null): Promise<WansoftDaily[]> {
   const cutoff = nowMX()
   cutoff.setDate(cutoff.getDate() - days)
   const cutoffStr = fmtDateMX(cutoff)
 
   const orders = await sbFetch('pos_orders',
-    `select=mesa,mesero,personas,total,subtotal,iva,descuento,propina,metodo_pago,pagos,items,status,created_at&client_id=eq.${clientId}&status=eq.cerrada&created_at=gte.${cutoffStr}T00:00:00-06:00&order=created_at.asc&limit=5000`
+    `select=mesa,mesero,personas,total,subtotal,iva,descuento,propina,metodo_pago,pagos,items,status,created_at&client_id=eq.${clientId}${locationFilter(locationId)}&status=eq.cerrada&created_at=gte.${cutoffStr}T00:00:00-06:00&order=created_at.asc&limit=5000`
   ) as { mesa: number; mesero: string; personas: number; total: number; subtotal: number; iva: number; descuento: number; propina: number; metodo_pago: string; pagos: { metodo: string; monto: number }[] | null; items: { nombre: string; precio: number; cantidad: number }[] | null; status: string; created_at: string }[]
 
   if (orders.length === 0) return []
