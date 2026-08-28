@@ -66,6 +66,9 @@ export const RUTAS_PUBLICAS: Record<string, string> = {
   // Endpoints que SON la autenticación — no pueden exigir sesión previa.
   'POST /internal-auth': 'Es el propio endpoint de contraseña del panel interno.',
   'POST /pos/pin': 'Es el login del POS: PIN → shift token. Sin sesión previa por definición.',
+  'POST /platform/terminal-claim':
+    'La terminal canjea su código de enrolamiento de un solo uso. El código ES la ' +
+    'autenticación (no hay sesión previa). Falla cerrado: código inexistente/vencido/usado → 400.',
 
   // El navegador de un tercero llega aquí sin sesión nuestra.
   'GET /integrations/uber-eats/auth/initiate':

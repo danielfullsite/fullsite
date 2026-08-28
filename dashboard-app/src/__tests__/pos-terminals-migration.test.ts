@@ -7,10 +7,9 @@ import { fileURLToPath } from 'url'
 import path from 'path'
 
 const dir = path.dirname(fileURLToPath(import.meta.url))
-const sql = readFileSync(
-  path.resolve(dir, '../../../supabase/migrations/20260827120000_pos_terminals_por_sucursal.sql'),
-  'utf8',
-).toLowerCase()
+const mig = (f: string) => readFileSync(path.resolve(dir, '../../../supabase/migrations/', f), 'utf8').toLowerCase()
+const sql = mig('20260827120000_pos_terminals_por_sucursal.sql')
+const enroll = mig('20260827130000_pos_terminal_enrollments.sql')
 
 describe('migración pos_terminals — aditiva e idempotente', () => {
   it('captura la tabla sin destruir (create if not exists, nunca drop table)', () => {
@@ -72,5 +71,34 @@ describe('migración pos_terminals — metadata sin secretos', () => {
 
   it('location_id queda NULLABLE (transición legacy — no NOT NULL en esta migración)', () => {
     expect(sql).not.toMatch(/location_id[\s\S]{0,40}not null/)
+  })
+})
+
+describe('migración pos_terminal_enrollments — código de un solo uso', () => {
+  it('sólo persiste el hash del código (code_hash), único; nada de código en claro', () => {
+    expect(enroll).toContain('code_hash')
+    expect(enroll).toContain('unique')
+    // No hay una columna que guarde el código sin hashear.
+    expect(enroll).not.toMatch(/\bcode\s+text\b/)
+  })
+
+  it('tiene expiración y sello de canje (claimed_at)', () => {
+    expect(enroll).toContain('expires_at')
+    expect(enroll).toContain('claimed_at')
+  })
+
+  it('la sucursal del enrolamiento es del mismo tenant (FK compuesto)', () => {
+    expect(enroll).toContain('foreign key (client_id, location_id)')
+    expect(enroll).toContain('references public.client_locations (client_id, id)')
+  })
+
+  it('RLS fail-closed: habilitada y sin política (sólo service_role)', () => {
+    expect(enroll).toContain('enable row level security')
+    expect(enroll).not.toContain('create policy')
+    expect(enroll).not.toContain('to anon')
+  })
+
+  it('location_id del enrolamiento es NOT NULL (toda alta nueva nace con sucursal)', () => {
+    expect(enroll).toMatch(/location_id\s+text\s+not null/)
   })
 })

@@ -6,7 +6,29 @@
 //      esto da un 400 claro en vez de un 500 de Postgres.
 //   2. metadata no lleva secretos. La whitelist de aquí calca EXACTAMENTE el CHECK
 //      pos_terminals_metadata_ck de la migración; si una cambia, cambiar la otra.
+import { randomUUID, randomBytes, createHash } from 'crypto'
 import { platformServiceFetch } from './platform-auth'
+
+// ── Identidad generada por el servidor ───────────────────────────────────────
+// El dispositivo nunca elige su device_id. Lo genera el servidor al crear el enrolamiento.
+
+/** device_id opaco generado por el servidor. Cumple DEVICE_RE (^[\w-]{1,64}$). */
+export function generateDeviceId(): string {
+  return `dev-${randomUUID()}`
+}
+
+/**
+ * Código de enrolamiento de un solo uso. Alta entropía (24 bytes), legible/tecleable en
+ * base64url. Se devuelve UNA vez y jamás se persiste en claro; en la base sólo vive su hash.
+ */
+export function generateEnrollmentCode(): string {
+  return randomBytes(24).toString('base64url')
+}
+
+/** Hash con el que se guarda y se busca el código. Nunca el código en claro. */
+export function hashEnrollmentCode(code: string): string {
+  return createHash('sha256').update(code).digest('hex')
+}
 
 /** Llaves permitidas en metadata. Espejo del CHECK en la migración. */
 export const METADATA_ALLOWED_KEYS = [

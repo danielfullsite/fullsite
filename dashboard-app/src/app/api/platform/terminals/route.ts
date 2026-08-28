@@ -1,23 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requirePlatformAdmin2FA, platformServiceFetch } from '@/lib/platform-auth'
-import { locationBelongsToClient, validateMetadata, MetadataInvalida } from '@/lib/terminal-enrollment'
+import {
+  locationBelongsToClient, validateMetadata, MetadataInvalida,
+  generateDeviceId, generateEnrollmentCode, hashEnrollmentCode,
+} from '@/lib/terminal-enrollment'
 
-// ── Control Plane · terminales enroladas (device binding) ────────────────────
-// El super-admin da de alta / baja las terminales autorizadas de un cliente.
-// Con pos.require_enrolled_terminal activado, solo estas terminales pueden
-// llegar al login por PIN. Admin-gated (2FA) + service_role.
-//   GET    ?clientId=amalay                              → { terminals: [...] }
-//   POST   { clientId, device_id, location_id, ... }      → enrola (upsert active=true)
-//   PATCH  { clientId, device_id, active }                → activa/desactiva
+// ── Control Plane · alta de terminales ───────────────────────────────────────
+// La PLATAFORMA genera la identidad. El dispositivo nunca elige device_id, client_id ni
+// location_id. Admin-gated (2FA) + service_role.
+//   GET    ?clientId=amalay                       → { terminals: [...] }  (incluye legacy)
+//   POST   { clientId, location_id, role?, ... }   → crea un enrolamiento: el servidor
+//          genera device_id + un CÓDIGO de un solo uso, guarda sólo su hash, y devuelve el
+//          código UNA vez. La terminal lo canjea en POST /api/platform/terminal-claim.
+//   PATCH  { clientId, device_id, active }         → activa/desactiva (fila ya existente)
 //
-// Toda alta NUEVA exige location_id de una sucursal del mismo tenant (se valida server-side
-// contra client_locations). PATCH sólo cambia `active`: no puede mover tenant ni sucursal.
+// device_id en el body se RECHAZA: un alta nueva no acepta un identificador aportado por el
+// cliente. Las filas legacy (enroladas antes de esto) siguen leyéndose y alternándose por
+// GET/PATCH — ése es su camino explícito y separado.
 
 export const dynamic = 'force-dynamic'
 
-const DEVICE_RE = /^[\w-]{1,64}$/
 const LOCATION_RE = /^[\w-]{1,64}$/
 const ROLE_RE = /^[a-z_]{1,24}$/
+const ENROLL_TTL_MIN = 15  // el código vive 15 minutos
 
 export async function GET(req: NextRequest) {
   const gate = await requirePlatformAdmin2FA(req)
@@ -40,15 +45,21 @@ export async function POST(req: NextRequest) {
   const gate = await requirePlatformAdmin2FA(req)
   if ('error' in gate) return gate.error
   let body: {
-    clientId?: string; device_id?: string; label?: string
+    clientId?: string; label?: string
     location_id?: string; role?: string; metadata?: unknown
+    device_id?: unknown
   }
   try { body = await req.json() } catch { return NextResponse.json({ error: 'bad json' }, { status: 400 }) }
-  const { clientId, device_id, label, location_id, role } = body
-  if (!clientId || !device_id) return NextResponse.json({ error: 'missing clientId/device_id' }, { status: 400 })
-  if (!DEVICE_RE.test(device_id)) return NextResponse.json({ error: 'device_id inválido' }, { status: 400 })
+  const { clientId, label, location_id, role } = body
 
-  // Alta nueva: sucursal obligatoria y del mismo tenant (decisión 2 + 8).
+  // El dispositivo NO elige su identidad. Un device_id aportado por el cliente se rechaza,
+  // no se ignora: deja claro que este endpoint no lo acepta.
+  if ('device_id' in body) {
+    return NextResponse.json({ error: 'device_id lo genera la plataforma; no se acepta en el alta' }, { status: 400 })
+  }
+  if (!clientId) return NextResponse.json({ error: 'missing clientId' }, { status: 400 })
+
+  // Sucursal obligatoria y del mismo tenant (decisión 2 + 8).
   if (!location_id || !LOCATION_RE.test(location_id)) {
     return NextResponse.json({ error: 'location_id requerido para dar de alta una terminal' }, { status: 400 })
   }
@@ -58,26 +69,35 @@ export async function POST(req: NextRequest) {
   if (role !== undefined && !ROLE_RE.test(role)) {
     return NextResponse.json({ error: 'role inválido' }, { status: 400 })
   }
-  // metadata: whitelist + sin secretos + tope de tamaño (decisión 9).
-  let metadata: Record<string, string | number | boolean>
-  try { metadata = validateMetadata(body.metadata) }
+  // metadata: whitelist + sin secretos + tope de tamaño (decisión 9). Aunque el alta ya no
+  // escribe metadata directo, se valida por si viene, para no arrastrar entrada no saneada.
+  try { validateMetadata(body.metadata) }
   catch (e) {
     if (e instanceof MetadataInvalida) return NextResponse.json({ error: e.message }, { status: 400 })
     throw e
   }
 
+  // Identidad y código: los genera el servidor. El código en claro se devuelve una vez y
+  // sólo se persiste su hash.
+  const device_id = generateDeviceId()
+  const code = generateEnrollmentCode()
+  const codeHash = hashEnrollmentCode(code)
+  const expiresAt = new Date(Date.now() + ENROLL_TTL_MIN * 60_000).toISOString()
+
   try {
-    const res = await platformServiceFetch('pos_terminals', {
+    const res = await platformServiceFetch('pos_terminal_enrollments', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+      headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
       body: JSON.stringify({
-        client_id: clientId, device_id, location_id,
-        label: label || null, role: role || null,
-        metadata, active: true,
+        client_id: clientId, location_id, role: role || null,
+        label: label || null, device_id,
+        code_hash: codeHash, expires_at: expiresAt,
       }),
     })
     if (!res.ok) return NextResponse.json({ error: `write failed ${res.status}` }, { status: 500 })
-    return NextResponse.json({ ok: true })
+    // El código va en la respuesta UNA vez. device_id no es secreto (es un identificador).
+    // NO se registra el código en ningún log.
+    return NextResponse.json({ device_id, enrollment_code: code, expires_at: expiresAt })
   } catch {
     return NextResponse.json({ error: 'write failed' }, { status: 500 })
   }

@@ -5,8 +5,12 @@
 // el config trae TODOS los campos de su required[] (calcado de config-schema.js) más
 // location_id como campo adicional — que validate() acepta por ser extra.
 import { describe, it, expect } from 'vitest'
+import { createHash } from 'crypto'
 import { generateTerminalConfig } from '../lib/terminal-config'
-import { validateMetadata, MetadataInvalida } from '../lib/terminal-enrollment'
+import {
+  validateMetadata, MetadataInvalida,
+  generateDeviceId, generateEnrollmentCode, hashEnrollmentCode,
+} from '../lib/terminal-enrollment'
 
 // Espejo de electron-app/local-server/config-schema.js → required[]. Si cambia allá, aquí.
 const ELECTRON_REQUIRED = [
@@ -82,5 +86,30 @@ describe('validateMetadata — sin secretos, whitelist, escalares, tope', () => 
 
   it('rechaza metadata que excede 4KB', () => {
     expect(() => validateMetadata({ notes: 'x'.repeat(5000) })).toThrow(/4KB/)
+  })
+})
+
+describe('identidad y código generados por el servidor', () => {
+  it('generateDeviceId produce ids únicos con el formato esperado', () => {
+    const a = generateDeviceId()
+    const b = generateDeviceId()
+    expect(a).toMatch(/^dev-[0-9a-f-]{36}$/)
+    expect(a).not.toBe(b)
+    // Cumple el DEVICE_RE del sistema (^[\w-]{1,64}$).
+    expect(a).toMatch(/^[\w-]{1,64}$/)
+  })
+
+  it('generateEnrollmentCode tiene alta entropía y no se repite', () => {
+    const codes = new Set(Array.from({ length: 200 }, () => generateEnrollmentCode()))
+    expect(codes.size).toBe(200)
+    for (const c of codes) expect(c.length).toBeGreaterThanOrEqual(16)
+  })
+
+  it('hashEnrollmentCode es sha256 determinista y no reversible al código', () => {
+    const code = generateEnrollmentCode()
+    expect(hashEnrollmentCode(code)).toBe(createHash('sha256').update(code).digest('hex'))
+    expect(hashEnrollmentCode(code)).toBe(hashEnrollmentCode(code))
+    expect(hashEnrollmentCode(code)).not.toBe(code)
+    expect(hashEnrollmentCode(code)).toHaveLength(64)
   })
 })
