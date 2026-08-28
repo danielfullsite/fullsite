@@ -253,11 +253,16 @@ function NewTenantModal({ onClose, onDone, toast, tenantCount }: {
   const [theme, setTheme] = useState<'light' | 'dark'>('light')
   const [logo, setLogo] = useState('')
   const [mesas, setMesas] = useState('10')
+  const [locationsText, setLocationsText] = useState('Principal')
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [busy, setBusy] = useState(false)
 
   const autoSlug = (v: string) => v.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
   const valid = name && slug && email && password.length >= 6
+  const locations = locationsText.split('\n').map(line => line.trim()).filter(Boolean).map(line => {
+    const [locationName, ...addressParts] = line.split('|')
+    return { name: locationName.trim(), address: addressParts.join('|').trim() }
+  })
 
   async function submit() {
     setBusy(true)
@@ -269,6 +274,7 @@ function NewTenantModal({ onClose, onDone, toast, tenantCount }: {
           clientId: slug, email, password, display_name: name,
           accent_color: accent, default_theme: theme,
           logo_url: logo || undefined, mesas: parseInt(mesas, 10) || 10,
+          locations,
         }),
       })
       if (res.ok) { toast('success', `Tenant "${slug}" dado de alta`); onDone(); onClose() }
@@ -351,6 +357,17 @@ function NewTenantModal({ onClose, onDone, toast, tenantCount }: {
                 className="mt-1 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2.5 text-[var(--text-1)] outline-none focus:border-[var(--accent-line)] text-sm tabular-nums" />
             </label>
           </div>
+          <label className="block">
+            <span className="text-xs text-[var(--text-3)]">Sucursales</span>
+            <textarea
+              value={locationsText}
+              onChange={e => setLocationsText(e.target.value)}
+              rows={5}
+              placeholder={'Principal | Av. Ejemplo 100\nSucursal Centro | Centro, Monterrey'}
+              className="mt-1 w-full resize-y rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2.5 text-[var(--text-1)] outline-none focus:border-[var(--accent-line)] text-sm"
+            />
+            <span className="mt-1 block text-[11px] text-[var(--text-4)]">Una por línea. Usa “Nombre | Dirección”. Se crearán {locations.length}.</span>
+          </label>
           <button disabled={!valid} onClick={() => setConfirmOpen(true)}
             className="w-full py-3 rounded-xl bg-[var(--accent)] text-[#04120c] font-bold disabled:opacity-40 flex items-center justify-center gap-2">
             <Plus size={16} /> Dar de alta cliente

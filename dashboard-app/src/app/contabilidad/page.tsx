@@ -127,6 +127,8 @@ export default function ContabilidadPage() {
   async function loadFiscalAnalysis(mes: string) {
     try {
       const headers = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+      const clientId = encodeURIComponent(_cid())
+      if (!clientId) return
       const startDate = `${mes}-01`
       const [y, m] = mes.split('-').map(Number)
       const lastDay = new Date(y, m, 0).getDate()
@@ -135,15 +137,15 @@ export default function ContabilidadPage() {
       // Fetch POS sales and CFDI invoices in parallel
       const [posRes, cfdiRes, wansoftRes] = await Promise.all([
         fetch(
-          `${SUPABASE_URL}/rest/v1/pos_orders?created_at=gte.${startDate}T00:00:00&created_at=lte.${endDate}T23:59:59&status=neq.cancelled&select=total,subtotal,iva&limit=5000`,
+          `${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${clientId}&created_at=gte.${startDate}T00:00:00&created_at=lte.${endDate}T23:59:59&status=neq.cancelled&select=total,subtotal,iva&limit=5000`,
           { headers }
         ),
         fetch(
-          `${SUPABASE_URL}/rest/v1/pos_invoices?created_at=gte.${startDate}T00:00:00&created_at=lte.${endDate}T23:59:59&select=total,subtotal,tax,status&limit=5000`,
+          `${SUPABASE_URL}/rest/v1/pos_invoices?client_id=eq.${clientId}&created_at=gte.${startDate}T00:00:00&created_at=lte.${endDate}T23:59:59&select=total,subtotal,tax,status&limit=5000`,
           { headers }
         ),
         fetch(
-          `${SUPABASE_URL}/rest/v1/wansoft_daily?fecha=gte.${startDate}&fecha=lte.${endDate}&select=ventas_dia&limit=50`,
+          `${SUPABASE_URL}/rest/v1/wansoft_daily?client_slug=eq.${clientId}&fecha=gte.${startDate}&fecha=lte.${endDate}&select=ventas_dia&limit=50`,
           { headers }
         ),
       ])

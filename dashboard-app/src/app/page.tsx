@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { DollarSign, TrendingDown, TrendingUp, Award, ArrowRight, CreditCard, FileBarChart, ClipboardList, Target, Settings, Eye, EyeOff, GripVertical, Clock, Activity, ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react'
+import { DollarSign, TrendingDown, TrendingUp, Award, ArrowRight, CreditCard, FileBarChart, ClipboardList, Target, Settings, Eye, EyeOff, GripVertical, Clock, Activity, ChevronLeft, ChevronRight, CalendarDays, Building2 } from 'lucide-react'
 import RevenueChart from '@/components/RevenueChart'
 import RevenueDistributionChart from '@/components/RevenueDistributionChart'
 import { getRecentDays, getLatestDay, getDashboardFromPosOrders, aggregateMeseros, getDeteccionesAgentes, getTurnoAbierto, type TurnoAbierto } from '@/lib/data'
@@ -18,6 +18,7 @@ import ListaAtencion from '@/components/dashboard/ListaAtencion'
 import { formatCurrency, formatPercent, formatDate, percentChange } from '@/lib/format'
 import PredictionWidget from '@/components/PredictionWidget'
 import type { WansoftDaily, GrupoEntry, PagoMetodoEntry } from '@/lib/types'
+import { useAuth } from '@/contexts/AuthContext'
 
 const CATEGORY_NAMES: Record<string, string> = {
   'CHILAQUILES & ENCHILADAS': 'Chilaquiles',
@@ -137,6 +138,7 @@ function saveWidgetConfig(config: WidgetConfig) {
 }
 
 export default function DashboardPage() {
+  const { clientId, locations, locationId, setLocationId } = useAuth()
   const [recentData, setRecentData] = useState<WansoftDaily[]>([])
   const [latestDay, setLatestDay] = useState<WansoftDaily | null>(null)
   const [prevDay, setPrevDay] = useState<WansoftDaily | null>(null)
@@ -192,15 +194,15 @@ export default function DashboardPage() {
         // telemetría GLOBAL de la plataforma en cada carga del dashboard de cada
         // restaurante, y ninguno la usaba para decidir nada.
         const [recentRaw, latestRaw] = await Promise.all([
-          Promise.race([getRecentDays(1000), timeoutP]).catch(() => [] as WansoftDaily[]),
-          Promise.race([getLatestDay(), timeoutP]).catch(() => null as WansoftDaily | null),
+          Promise.race([getRecentDays(1000, clientId || undefined, locationId), timeoutP]).catch(() => [] as WansoftDaily[]),
+          Promise.race([getLatestDay(clientId || undefined, locationId), timeoutP]).catch(() => null as WansoftDaily | null),
         ])
         let recent = recentRaw
         let latest = latestRaw
 
         // Fallback: if no wansoft_daily data, build from pos_orders
         if (recent.length === 0) {
-          recent = await getDashboardFromPosOrders(30)
+          recent = await getDashboardFromPosOrders(30, clientId || undefined, locationId)
           latest = recent.length > 0 ? recent[recent.length - 1] : null
         }
 
@@ -231,7 +233,7 @@ export default function DashboardPage() {
       clearInterval(interval)
       window.removeEventListener('focus', onFocus)
     }
-  }, [])
+  }, [clientId, locationId])
 
   if (loading) {
     return (
@@ -476,6 +478,50 @@ export default function DashboardPage() {
 
   return (
     <>
+      {locations.length > 1 && (
+        <section className="mb-5 rounded-[20px] border border-[var(--line)] bg-[var(--surface)] p-3 sm:p-4" aria-label="Sucursales del grupo">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]">
+                <Building2 size={16} />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[13px] font-bold text-[var(--text-1)]">Vista del grupo</p>
+                <p className="truncate text-[11px] text-[var(--text-3)]">
+                  {locationId ? locations.find(loc => loc.id === locationId)?.name : `${locations.length} sucursales consolidadas`}
+                </p>
+              </div>
+            </div>
+            <Link href="/sucursales" className="shrink-0 text-[12px] font-semibold text-[var(--accent)] hover:underline">
+              Comparar todas →
+            </Link>
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-1" role="list">
+            <button
+              type="button"
+              onClick={() => setLocationId(null)}
+              aria-pressed={!locationId}
+              className={`min-h-10 shrink-0 rounded-xl border px-3 text-left transition-colors ${!locationId ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--text-1)]' : 'border-[var(--line)] bg-[var(--surface-2)] text-[var(--text-2)] hover:border-[var(--accent)]'}`}
+            >
+              <span className="block text-[12px] font-bold">Todo el grupo</span>
+              <span className="block text-[10px] text-[var(--text-3)]">{locations.length} sucursales</span>
+            </button>
+            {locations.map(loc => (
+              <button
+                key={loc.id}
+                type="button"
+                role="listitem"
+                onClick={() => setLocationId(loc.id)}
+                aria-pressed={locationId === loc.id}
+                className={`min-h-10 shrink-0 rounded-xl border px-3 text-left transition-colors ${locationId === loc.id ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--text-1)]' : 'border-[var(--line)] bg-[var(--surface-2)] text-[var(--text-2)] hover:border-[var(--accent)]'}`}
+              >
+                <span className="block text-[12px] font-bold">{loc.name}</span>
+                <span className="block text-[10px] text-[var(--text-3)]">Ver operación</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
       {/* ── Dashboard «Turno» ──────────────────────────────────────────────
           Lo primero de la pantalla deja de ser "cómo vamos" y pasa a ser "qué
           hago". Va arriba del encabezado a propósito: si hay algo crítico, se
