@@ -16,6 +16,7 @@
 
 import { DEFAULT_ONBOARDING_TEMPLATE, type OnboardingTemplate } from './onboarding-template'
 import type { ClientFeatures } from './client-config'
+import { resolveVerticalPreset, type VerticalId } from './vertical-presets'
 
 // Kept in sync with DEFAULT_FEATURES in src/lib/client-config.ts (which is not
 // exported). New tenants get the standard feature set.
@@ -36,6 +37,9 @@ export interface ProvisionInput {
   mesas?: number
   locations?: Array<{ id?: string; name: string; address?: string }>
   template?: OnboardingTemplate // optional override; defaults to code template
+  /** Tipo de restaurante — resuelve un preset de src/lib/vertical-presets.ts
+   *  (features + menú semilla + mesas). Ver docs/strategy/BIBLE-SQUARE.md. */
+  vertical?: VerticalId
 }
 
 export interface ProvisionResult {
@@ -147,9 +151,13 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
   if (!SB_URL) throw new Error('[provision] NEXT_PUBLIC_SUPABASE_URL not configured')
   if (!serviceKey()) throw new Error('[provision] SUPABASE_SERVICE_KEY not configured')
 
-  const tpl = input.template || DEFAULT_ONBOARDING_TEMPLATE
+  const preset = input.vertical ? resolveVerticalPreset(input.vertical) : null
+  const tpl = input.template || preset?.template || DEFAULT_ONBOARDING_TEMPLATE
   const displayName = input.display_name || clientId
-  const mesas = input.mesas ?? 10
+  const mesas = input.mesas ?? preset?.defaultMesas ?? 10
+  const features: ClientFeatures = preset
+    ? { ...DEFAULT_FEATURES, ...preset.features }
+    : DEFAULT_FEATURES
 
   // ── 1. clients row ─────────────────────────────────────────────────────────
   const clientsCount = await upsert('clients', [{
@@ -161,8 +169,10 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     iva_rate: 0.16,
     timezone: 'America/Mexico_City',
     active: true,
-    features: JSON.stringify(DEFAULT_FEATURES),
+    features: JSON.stringify(features),
     mesas,
+    // Tipo de restaurante (vertical preset). Columna `type` ya existe en `clients`.
+    ...(input.vertical ? { type: input.vertical } : {}),
     data_source: 'fullsite',
     // Requerido por el cálculo de día de negocio (ops_aggregate.get_business_day_config).
     // Sin esto, los agentes de IA crashean para el clon. Default 05:00 (día empieza a las 5am).

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Store, Plus, Activity, AlertTriangle, ArrowUpRight, Bot, RefreshCw, X, Sparkles, Circle, Power } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { ToastProvider, useToast, ConfirmModal } from '@/components/platform/PlatformFeedback'
+import { VERTICAL_PRESETS, VERTICAL_IDS, type VerticalId } from '@/lib/vertical-presets'
 
 // Control Plane: sin anon key. Todo pasa por /api/platform/* (admin-gated + service_role).
 // Fase 4: alta de tenant (POST /api/platform/onboard), activar/desactivar
@@ -253,6 +254,8 @@ function NewTenantModal({ onClose, onDone, toast, tenantCount }: {
   const [theme, setTheme] = useState<'light' | 'dark'>('light')
   const [logo, setLogo] = useState('')
   const [mesas, setMesas] = useState('10')
+  const [vertical, setVertical] = useState<VerticalId>('casual_dining')
+  const [mesasTouched, setMesasTouched] = useState(false)
   const [locationsText, setLocationsText] = useState('Principal')
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -273,7 +276,10 @@ function NewTenantModal({ onClose, onDone, toast, tenantCount }: {
         body: JSON.stringify({
           clientId: slug, email, password, display_name: name,
           accent_color: accent, default_theme: theme,
-          logo_url: logo || undefined, mesas: parseInt(mesas, 10) || 10,
+          logo_url: logo || undefined,
+          // Solo mandar mesas si el operador las editó; si no, aplica el default del preset.
+          mesas: mesasTouched ? (parseInt(mesas, 10) || 0) : undefined,
+          vertical,
           locations,
         }),
       })
@@ -316,6 +322,19 @@ function NewTenantModal({ onClose, onDone, toast, tenantCount }: {
               <span className="px-3 text-[var(--text-4)] text-sm font-mono border-l border-[var(--line)]">.app.fullsite.mx</span>
             </div>
           </label>
+          <label className="block">
+            <span className="text-xs text-[var(--text-3)]">Tipo de restaurante</span>
+            <select value={vertical}
+              onChange={e => {
+                const v = e.target.value as VerticalId
+                setVertical(v)
+                if (!mesasTouched) setMesas(String(VERTICAL_PRESETS[v].defaultMesas))
+              }}
+              className="mt-1 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2.5 text-[var(--text-1)] outline-none focus:border-[var(--accent-line)] text-sm">
+              {VERTICAL_IDS.map(v => <option key={v} value={v}>{VERTICAL_PRESETS[v].label}</option>)}
+            </select>
+            <span className="mt-1 block text-[11px] text-[var(--text-4)]">{VERTICAL_PRESETS[vertical].description}</span>
+          </label>
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
               <span className="text-xs text-[var(--text-3)]">Email del dueño</span>
@@ -353,7 +372,7 @@ function NewTenantModal({ onClose, onDone, toast, tenantCount }: {
             </label>
             <label className="block">
               <span className="text-xs text-[var(--text-3)]">Mesas</span>
-              <input value={mesas} onChange={e => setMesas(e.target.value.replace(/\D/g, ''))} inputMode="numeric"
+              <input value={mesas} onChange={e => { setMesasTouched(true); setMesas(e.target.value.replace(/\D/g, '')) }} inputMode="numeric"
                 className="mt-1 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2.5 text-[var(--text-1)] outline-none focus:border-[var(--accent-line)] text-sm tabular-nums" />
             </label>
           </div>
@@ -378,7 +397,7 @@ function NewTenantModal({ onClose, onDone, toast, tenantCount }: {
       <ConfirmModal
         open={confirmOpen}
         title={`Dar de alta "${slug}"`}
-        message={`Se creará el usuario dueño, el mapping y el skeleton completo. Es idempotente. Actualmente hay ${tenantCount} tenants.`}
+        message={`Se creará el usuario dueño, el mapping y el skeleton de "${VERTICAL_PRESETS[vertical].label}" (menú semilla, módulos y mesas del tipo). Es idempotente. Actualmente hay ${tenantCount} tenants.`}
         confirmLabel="Crear tenant"
         busy={busy}
         onCancel={() => { if (!busy) setConfirmOpen(false) }}
