@@ -53,6 +53,24 @@ export interface VerticalPreset {
   /** Combos semilla (pos_combos) — sin esto, el speed screen de un tenant
    *  counter nace vacío (gap Minute-0 #12, visto en campo con carls-jr). */
   combos?: SeedCombo[]
+  /** Umbrales de industria del vertical (Lazo 1 de aprendizaje, docs/ai/
+   *  APRENDIZAJE-AGENTES-DESIGN.md): el prior con el que los agentes alertan
+   *  desde el DÍA 1, sin histórico propio. Fuentes en LOGICA-POR-VERTICAL.md.
+   *  El tuner (Lazo 2) los ajusta ±30% máx por tenant con evidencia. */
+  thresholds: VerticalThresholds
+}
+
+export interface VerticalThresholds {
+  /** % máximo sano de mano de obra sobre ventas */
+  labor_pct_max: number
+  /** % máximo sano de food cost */
+  food_cost_pct_max: number
+  /** prime cost (labor + food) — techo universal ~60, se declara por claridad */
+  prime_cost_pct_max: number
+  /** minutos objetivo de vida de una orden en cocina antes de alertar */
+  kds_sla_min: number
+  /** % máximo de pour cost (solo giros con barra significativa) */
+  pour_cost_pct_max?: number
 }
 
 // ─── Seed menus per vertical ─────────────────────────────────────────────────
@@ -219,6 +237,7 @@ const COMBOS_CAFETERIA: SeedCombo[] = [
 export const VERTICAL_PRESETS: Record<VerticalId, VerticalPreset> = {
   fast_food: {
     id: 'fast_food',
+    thresholds: { labor_pct_max: 30, food_cost_pct_max: 32, prime_cost_pct_max: 60, kds_sla_min: 6 },
     label: 'Fast Food / QSR',
     description: 'Mostrador, combos, velocidad. Sin meseros ni mesas.',
     serviceModel: 'counter',
@@ -229,6 +248,7 @@ export const VERTICAL_PRESETS: Record<VerticalId, VerticalPreset> = {
   },
   fast_casual: {
     id: 'fast_casual',
+    thresholds: { labor_pct_max: 30, food_cost_pct_max: 32, prime_cost_pct_max: 60, kds_sla_min: 8 },
     label: 'Fast Casual',
     description: 'Ordenas en fila, comes en mesa. Builder de producto.',
     serviceModel: 'counter',
@@ -239,6 +259,7 @@ export const VERTICAL_PRESETS: Record<VerticalId, VerticalPreset> = {
   },
   casual_dining: {
     id: 'casual_dining',
+    thresholds: { labor_pct_max: 35, food_cost_pct_max: 35, prime_cost_pct_max: 62, kds_sla_min: 15 },
     label: 'Casual Dining',
     description: 'Mesas, meseros, servicio completo. El default.',
     serviceModel: 'tables',
@@ -247,6 +268,7 @@ export const VERTICAL_PRESETS: Record<VerticalId, VerticalPreset> = {
   },
   fine_dining: {
     id: 'fine_dining',
+    thresholds: { labor_pct_max: 40, food_cost_pct_max: 38, prime_cost_pct_max: 65, kds_sla_min: 20, pour_cost_pct_max: 32 },
     label: 'Fine Dining / High-end',
     description: 'Cursos, reservas, vinos, ticket alto.',
     serviceModel: 'tables',
@@ -256,6 +278,7 @@ export const VERTICAL_PRESETS: Record<VerticalId, VerticalPreset> = {
   },
   bar_cantina: {
     id: 'bar_cantina',
+    thresholds: { labor_pct_max: 30, food_cost_pct_max: 30, prime_cost_pct_max: 60, kds_sla_min: 8, pour_cost_pct_max: 24 },
     label: 'Bar / Cantina',
     description: 'Cuentas abiertas, barra como estación principal, control de licor.',
     serviceModel: 'tabs',
@@ -265,6 +288,7 @@ export const VERTICAL_PRESETS: Record<VerticalId, VerticalPreset> = {
   },
   cafeteria_panaderia: {
     id: 'cafeteria_panaderia',
+    thresholds: { labor_pct_max: 32, food_cost_pct_max: 32, prime_cost_pct_max: 60, kds_sla_min: 6 },
     label: 'Cafetería / Panadería',
     description: 'Mostrador, vitrina, producción propia.',
     serviceModel: 'counter',
@@ -275,6 +299,7 @@ export const VERTICAL_PRESETS: Record<VerticalId, VerticalPreset> = {
   },
   hibrido_restaurante_tienda: {
     id: 'hibrido_restaurante_tienda',
+    thresholds: { labor_pct_max: 35, food_cost_pct_max: 33, prime_cost_pct_max: 62, kds_sla_min: 15 },
     label: 'Híbrido Restaurante + Tienda',
     description: 'Mesas y meseros + market con venta directa (modelo AMALAY).',
     serviceModel: 'tables',
@@ -283,6 +308,7 @@ export const VERTICAL_PRESETS: Record<VerticalId, VerticalPreset> = {
   },
   dark_kitchen: {
     id: 'dark_kitchen',
+    thresholds: { labor_pct_max: 28, food_cost_pct_max: 32, prime_cost_pct_max: 58, kds_sla_min: 10 },
     label: 'Dark Kitchen / Delivery',
     description: 'Sin sala: las órdenes llegan de Rappi/Uber/web directo al KDS.',
     serviceModel: 'channels',
