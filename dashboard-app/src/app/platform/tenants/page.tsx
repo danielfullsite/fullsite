@@ -328,6 +328,10 @@ function NewTenantModal({ onClose, onDone, toast, tenantCount }: {
           <div className="p-5 space-y-4">
             <p className="text-sm font-semibold text-[var(--text-1)]">Guarda estas credenciales — no se volverán a mostrar</p>
             <div className="rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3 text-sm">
+              <p className="text-xs text-[var(--text-3)] mb-1">URL del KDS (ábrela una vez en la tablet de cocina; queda configurada)</p>
+              <p className="font-mono break-all text-[var(--text-1)]">app.fullsite.mx/kds?client={slug}</p>
+            </div>
+            <div className="rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3 text-sm">
               <p className="text-xs text-[var(--text-3)] mb-1">Login del dueño</p>
               <p className="font-mono text-[var(--text-1)]">{email} · {password}</p>
             </div>
