@@ -148,7 +148,14 @@ async function startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, servi
           signal: controller.signal,
         }
       )
-      const activeTurnos = turnoRes.ok ? await turnoRes.json() : []
+      // Fail-SAFE simétrico al de delivery (revisión adversarial 2026-08-29,
+      // hallazgo 1): si el fetch de turnos falla UN ciclo (JWT vencido, 503,
+      // RLS momentáneo), abortar el poll completo. Sin esto, activeTurno=null
+      // vaciaba operationalOrders y el reconcile segaba del KDS órdenes VIVAS
+      // (reproducido: 1 orden → 0, perdiendo kds_item_status). Mejor un poll
+      // perdido que comida desapareciendo de la pantalla de cocina.
+      if (!turnoRes.ok) { clearTimeout(t); return }
+      const activeTurnos = await turnoRes.json()
       const activeTurno = activeTurnos[0] || null
       const res = await fetch(
         `${supabaseUrl}/rest/v1/pos_orders?client_id=eq.${encodeURIComponent(restaurantId)}&status=neq.closed&select=id,mesa,status,items,turno_id,updated_at`,
@@ -172,10 +179,16 @@ async function startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, servi
       // Marketplace orders live in delivery_orders. Mirror them into the same
       // durable ORDER_SENT protocol consumed by Electron KDS and printer queues.
       // Stable command IDs make every 5s poll and every restart exactly-once.
+      // Timeout PROPIO (hallazgo 2): el timer del controller de arriba ya se
+      // limpió en el .finally del fetch de pos_orders — reusarlo dejaba este
+      // fetch sin límite y un STATE_SYNC viejo podía aplicarse fuera de orden
+      // sobre estado más fresco de polls posteriores.
+      const dCtrl = new AbortController()
+      const dT = setTimeout(() => dCtrl.abort(), 6000)
       const deliveryRes = await fetch(
         `${supabaseUrl}/rest/v1/delivery_orders?client_id=eq.${encodeURIComponent(restaurantId)}&platform=in.(ubereats,rappi)&status=in.(nueva,aceptada,preparando)&select=id,platform,platform_order_id,status,customer_name,total,notes,items,created_at`,
-        { headers: { apikey: supabaseKey, Authorization: `Bearer ${bearer}` }, signal: controller.signal }
-      )
+        { headers: { apikey: supabaseKey, Authorization: `Bearer ${bearer}` }, signal: dCtrl.signal }
+      ).catch(() => ({ ok: false, json: async () => [] })).finally(() => clearTimeout(dT))
       const deliveryOrders = deliveryRes.ok ? await deliveryRes.json() : []
       // For the STATE_SYNC turno reconcile: ids of the delivery orders that are STILL
       // active upstream. null (fetch failed) = unknown → the state must not reap any
