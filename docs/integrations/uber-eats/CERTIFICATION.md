@@ -26,52 +26,66 @@ Ticket siguiente: abrir nuevo ticket mencionando `#D5FEA8`.
 
 ## ⚠️ 2026-08-29 — el "UBER-SIDE BLOCKER" de abajo YA NO APLICA
 
-Todo lo que sigue quedó congelado el 2026-08-03. Tres cosas lo desmienten, verificadas hoy:
+Todo lo que sigue quedó congelado el 2026-08-03. Lo desmiente la evidencia de hoy.
+
+> **Antes de leer nada aquí: la tienda vigente es `a4f298f4-202f-47f5-b375-d2eefec0126c`.**
+> Uber dio de baja la anterior el 2026-08-25. El correo de Uber del 2026-08-20 todavía cita la
+> vieja, así que ese correo **ya nació caduco cinco días después**. La prueba
+> `dashboard-app/src/__tests__/uber-store-id-vigente.test.ts` falla si algún archivo operativo
+> vuelve a nombrar la dada de baja — por eso aquí no se escribe su UUID.
 
 **1. Uber contestó el 2026-08-20.** Case #59128344 (antes `#D5FEA8`), UET GSS Support a
 `daniel@fullsite.mx`: *"Please refer to the documentation below for instructions on placing test
-orders **from your end**"* → `developer.uber.com/docs/eats/guides/order-integration#testing-orders`,
-con `Store UUID: 0f655507-7337-41e9-b536-5fd6171bb0da` y
-`Client ID: k2DPoUeXuBdLd6gV7W5VMFR7fSnmnEaq`. Se le había pedido a Uber que **ellos** generaran la
-orden; la respuesta es que se hace de nuestro lado. Caso cerrado el 21; la ventana de reapertura
-(5 días) venció el 25.
+orders **from your end**"* → `developer.uber.com/docs/eats/guides/order-integration#testing-orders`.
+Se le había pedido a Uber que **ellos** generaran la orden de prueba; la respuesta es que se hace de
+nuestro lado. Caso cerrado el 21; la ventana de reapertura (5 días) venció el 25. Volver a Uber
+requiere caso nuevo.
 
-**2. Los scopes SÍ están concedidos.** Sondeando la tienda **real** con el workflow `UBER Activate`
-(337521171):
+**2. El `scopes_granted: []` era falta de credencial, no negativa de Uber.** El sondeo del
+2026-08-03 y su repetición de hoy devolvían vacío porque la tienda vigente **no tenía fila** en
+`integration_providers` (`db_status: "no_row_found"`, *"no stored token — run USL first"*). Nunca se
+había corrido la autorización USL para ella. En cuanto se corrió (2026-08-29 20:35), `db_status`
+pasó a `ok`.
 
-```json
-{ "p1_scopes": ["eats.pos_provisioning", "offline_access"],
-  "p1_db": "ok",
-  "p1_probe": { "ok": false, "status": 401 },
-  "p2_endpoint": { "ok": true } }
-```
+**3. Con la credencial puesta, la integración opera contra Uber en vivo.** Corrida
+`Uber Cert — Sandbox Sequence` sobre la tienda vigente, con evidencia en `integration_audit_log`:
 
-El `scopes_granted: []` que originó el diagnóstico de "UBER-SIDE BLOCKER" sale de que
-`uber-cert-day3.yml` sondea `a4f298f4-202f-47f5-b375-d2eefec0126c`, que **no es** la tienda que
-Uber confirmó. Sondear la tienda equivocada devuelve vacío.
+| Acción | HTTP | Respuesta |
+|---|---|---|
+| `usl.connected` | — | `scope: eats.pos_provisioning offline_access`, `expires_in: 2592000` |
+| `delivery.store.update_status ACTIVATE` | 200 | `{status: "active"}` |
+| `menu.upload` (PUT) | **204** | `{status: "accepted"}` |
+| `promotions.create` | 200 | `{status: "created"}` |
+| `reporting.request` | 200 | `workflow_id` devuelto |
+| Marketplace M2M | — | `granted_scope: eats.store.status.write eats.order eats.store eats.store.orders.read`, `blocker: null` |
 
-**3. El token tampoco está expirado** — `integration_providers` para `0f655507`: vence 2026-09-18,
-con refresh token, actualizado 2026-08-19.
+### Lo que de verdad falta
 
-### Lo único que queda: el 401 de `accept_pos_order`
+**a) El menú no aparece en el storefront.** `menu.upload` devuelve 204 = *aceptado*, que no es
+*publicado*, y Uber no manda webhook de resultado. Se descartaron por lectura del código: método
+(`PUT`, correcto), token (`uberFetch` usa `marketplace` con `eats.store`, correcto) y payload
+(`normalizeMenuPayload` produce el shape de `example-menu-payloads`). Para salir de la conjetura se
+agregó `getMenu()` + acción `get_menu` — leen lo que Uber almacenó y lo devuelven junto al payload
+enviado, para diffear. **Ése es el siguiente paso.**
 
-Con scope concedido y token vigente, el probe
-(`POST /v1/eats/orders/SCOPE-PROBE-USL/accept_pos_order`, donde 404 = scope OK) devuelve **401**.
-La lectura más probable es que el grant USL se invalidó del lado de Uber. La recuperación es
-**re-autorizar**, y la URL está verificada y funcionando:
+**b) `store_status` reporta `is_open: false`** pese a que el menú lleva `service_availability` 24/7.
+La doc de Uber dice que las horas de tienda son *"the union of service_availability across all
+menus"*, así que (a) y (b) probablemente son el mismo problema.
 
-```
-https://app.fullsite.mx/api/integrations/uber-eats/auth/initiate?store_id=0f655507-7337-41e9-b536-5fd6171bb0da&client_id=amalay
-```
+**c) `eats.deliveries` → `scope(s) are invalid`.** Único punto genuinamente del lado de Uber, y es
+de la API de Delivery (repartidores), no de Eats Marketplace.
 
-Redirige a `sandbox-login.uber.com/oauth/v2/authorize` con el `client_id` que Uber confirmó por
-correo y el `redirect_uri` correcto. Requiere que **una persona** dé el consentimiento como comercio
-— es un flujo de consentimiento por diseño, no se automatiza. Tras autorizar, el callback guarda
-tokens frescos y el probe debe pasar a 404.
+### El 401 de `accept_pos_order` NO es un bloqueo
 
-**Ojo con la nomenclatura:** en `integration_providers`, la columna `client_id` guarda el *tenant de
-Fullsite* (`amalay`) en la fila de `0f655507`, pero el *client id de Uber* (`k2DPo…`) en la fila de
-`633b57d4`. Son dos significados en la misma columna y hay que normalizarlo.
+El probe llama a la orden inventada `SCOPE-PROBE-USL` y asume *404 = scope OK*. Pero el audit log
+muestra que Uber responde **400 `"The provided Order ID was not a valid UUID"`** a los ids
+sintéticos `CERT-…`. El id del probe tampoco es UUID: el 401 lo explica el id, no los scopes.
+**El probe no puede distinguir "scope denegado" de "orden inexistente", así que no sirve como
+señal de bloqueo.** Se resuelve solo con una orden real.
+
+**Ojo con la nomenclatura:** en `integration_providers` la columna `client_id` guarda el *tenant de
+Fullsite* (`amalay`) en una fila y el *client id de Uber* (`k2DPo…`) en la de `633b57d4`. Dos
+significados en la misma columna; hay que normalizarlo.
 
 **Y `633b57d4` NO es un fixture sintético** — tiene credencial real creada el 2026-08-19, aunque
 aparezca junto a `CERT_ORDER_ID: CERT-…` en los workflows.
