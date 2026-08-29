@@ -121,7 +121,13 @@ export async function GET(req: NextRequest) {
   const uptimePercent = uptimeRuns > 0 ? (uptimeSuccess / uptimeRuns) * 100 : 99.9
   const clients = Math.max(clientCount, 1)
   const valueCreated = clients * 80000
-  const successRate = totalRunCount > 0 ? (successCount / totalRunCount) * 100 : 0
+  // Métrica honesta: la tasa de éxito se mide sobre EJECUCIONES REALES
+  // (success + error). Los no_data/skipped son agentes que decidieron no correr
+  // (tenants demo sin ventas, condiciones no cumplidas) — contarlos como fallo
+  // hundía la tasa a 66% cuando los errores reales eran una fracción
+  // (autopsia 2026-08-29, PR fix/agentes-precision).
+  const executedCount = successCount + errorCount
+  const successRate = executedCount > 0 ? (successCount / executedCount) * 100 : 0
 
   // errorCount is folded into the chart buckets; kept in the query set for parity with the old page.
   void errorCount
