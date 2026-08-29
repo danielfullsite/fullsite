@@ -129,6 +129,54 @@ export async function uploadMenu(
   }
 }
 
+/**
+ * Lee el menú que Uber tiene guardado para la tienda — `GET /v2/eats/stores/{id}/menus`.
+ *
+ * POR QUÉ EXISTE
+ * --------------
+ * `uploadMenu` responde **204 No Content** cuando Uber acepta el PUT, y eso es todo lo que
+ * sabíamos: aceptado ≠ publicado. El 2026-08-29 el menú se subió con 204 sobre la tienda de
+ * prueba correcta y el storefront siguió mostrando "Nothing to eat here", sin webhook de
+ * Uber ni forma de saber qué había del otro lado. Sin lectura, el único diagnóstico posible
+ * era abrir un navegador con la cuenta correcta y mirar — que no es diagnóstico, es adivinar.
+ *
+ * Devuelve el cuerpo crudo tal como lo manda Uber: el objetivo es COMPARARLO contra lo que
+ * enviamos, así que normalizarlo aquí escondería justo la diferencia que se busca.
+ */
+export async function getMenu(
+  storeId: string,
+  correlationId: string
+): Promise<{ ok: boolean; status?: number; menu?: unknown; error?: string }> {
+  const t0 = Date.now()
+  try {
+    const r = await uberFetch(`/v2/eats/stores/${storeId}/menus`, { method: 'GET', storeId })
+    const text = await r.text()
+    let parsed: unknown
+    try { parsed = text ? JSON.parse(text) : null } catch { parsed = text }
+
+    // Resumen para el audit log: contar entidades sin volcar el menú completo (puede ser grande).
+    const m = parsed as { menus?: unknown[]; categories?: unknown[]; items?: unknown[] } | null
+    await auditLog({
+      provider: 'ubereats', correlation_id: correlationId, action: 'menu.get',
+      request: { store_id: storeId },
+      response: r.ok
+        ? { menus: m?.menus?.length ?? 0, categories: m?.categories?.length ?? 0, items: m?.items?.length ?? 0 }
+        : { error: text.slice(0, 500) },
+      status_code: r.status, duration_ms: Date.now() - t0,
+    })
+
+    return r.ok
+      ? { ok: true, status: r.status, menu: parsed }
+      : { ok: false, status: r.status, error: text.slice(0, 1000) }
+  } catch (e) {
+    await auditLog({
+      provider: 'ubereats', correlation_id: correlationId, action: 'menu.get',
+      request: { store_id: storeId }, response: { error: String(e) }, duration_ms: Date.now() - t0,
+    })
+    return { ok: false, error: String(e) }
+  }
+}
+
 export async function markItemsOOS(
   storeId: string,
   items: OOSItem[],
