@@ -15,7 +15,7 @@ const PROTOCOL_VERSION = '1.0'
  * @property {string}  terminal_id         — stable UUID for this physical terminal
  * @property {string}  terminal_role       — 'server_pos' | 'pos' | 'kds' | 'admin'
  * @property {string}  terminal_name       — human label (e.g. "Caja Principal")
- * @property {string}  local_server_host   — '127.0.0.1' for server_pos; caja LAN host for pos/kds/admin
+ * @property {string}  local_server_host   — '127.0.0.1' for server_pos/pos; LAN IP for kds
  * @property {number}  local_server_port   — typically 7717
  * @property {string}  protocol_version    — e.g. '1.0'
  * @property {string}  provisioned_at      — ISO 8601
@@ -25,7 +25,7 @@ const PROTOCOL_VERSION = '1.0'
  * @property {string}  [instance_name]     — display name for mDNS advertisement
  * @property {boolean} [kds]               — open KDS window on second display (server_pos only)
  * @property {boolean} [kds_only]          — this machine is a dedicated KDS terminal
- * @property {string}  [pos_server_ip]     — LAN IP of the server_pos (pos/kds/admin machines)
+ * @property {string}  [pos_server_ip]     — LAN IP of the server_pos (kds_only machines)
  * @property {string}  [supabaseUrl]       — override Supabase URL
  * @property {string}  [supabaseAnonKey]   — override Supabase anon key
  */

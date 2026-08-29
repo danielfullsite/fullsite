@@ -1,12 +1,14 @@
 {
   "name": "fullsite-pos",
-  "version": "1.3.6",
+  "version": "1.3.8",
   "description": "Fullsite POS — kiosk wrapper for app.fullsite.mx/pos",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "build:win": "electron-builder --win",
-    "build:mac": "electron-builder --mac"
+    "build:mac": "electron-builder --mac",
+    "build:pos": "electron-builder --win -c electron-builder-pos.json",
+    "build:kds": "electron-builder --win -c electron-builder-kds.json"
   },
   "author": "Fullsite",
   "license": "UNLICENSED",
@@ -19,11 +21,21 @@
     "electron-builder": "^25.0.0"
   },
   "build": {
-    "appId": "mx.fullsite.pos",
-    "productName": "Fullsite POS",
+    "appId": "mx.fullsite.kds",
+    "productName": "Fullsite KDS",
     "directories": {
       "output": "dist"
     },
+    "extraResources": [
+      {
+        "from": "fingerprint",
+        "to": "fingerprint",
+        "filter": [
+          "**/*.exe",
+          "**/*.dll"
+        ]
+      }
+    ],
     "win": {
       "target": "nsis",
       "icon": "icon.ico"

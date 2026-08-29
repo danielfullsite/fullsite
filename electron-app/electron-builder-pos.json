@@ -4,6 +4,13 @@
   "directories": {
     "output": "dist-pos"
   },
+  "extraResources": [
+    {
+      "from": "fingerprint",
+      "to": "fingerprint",
+      "filter": ["**/*.exe", "**/*.dll"]
+    }
+  ],
   "files": [
     "**/*",
     "!dist/**",

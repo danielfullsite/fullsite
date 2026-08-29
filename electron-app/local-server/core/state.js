@@ -93,7 +93,7 @@ class RestaurantState {
   // On subsequent sends: replace items (preserving kds_item_status — new indices
   //   are absent from the map which the KDS treats as not-done).
   _applyOrderSent(payload) {
-    const { order_id, mesa, mesero, status, notas, comanda_batches, personas, total, turno_id } = payload
+    const { order_id, mesa, mesero, status, notas, comanda_batches, personas, total } = payload
     // Accept both 'items' (POS broadcast) and 'items_sent' (legacy test fixture / old protocol)
     const items = payload.items ?? payload.items_sent ?? []
     const itemsStr = typeof items === 'string' ? items : JSON.stringify(items)
@@ -125,7 +125,6 @@ class RestaurantState {
         comanda_batches:  combatStr,
         personas:         personas ?? 1,
         total:            total    ?? 0,
-        turno_id:         turno_id ?? null,
         kds_item_status:  null,
         created_at:       now,
         updated_at:       now,
@@ -228,18 +227,6 @@ class RestaurantState {
     })
     const protectedMesas    = new Set(protectedOrders.map((o) => (o.mesa != null ? String(o.mesa) : null)).filter(Boolean))
     const protectedOrderIds = new Set(protectedOrders.map((o) => o.order_id))
-
-    // Reconcile the full KDS projection too. Previously STATE_SYNC replaced only
-    // kds_queue, while stale full orders remained in _orders indefinitely and won
-    // in kds-ui's source preference. That is how orders from a previous shift could
-    // reappear even when Supabase no longer returned them.
-    const activeTurnoId = turno && turno.id ? turno.id : null
-    for (const [orderId, order] of this._orders) {
-      if (!order._kds_sent) continue
-      const belongsToAnotherTurno = activeTurnoId && order.turno_id && order.turno_id !== activeTurnoId
-      const absentAndPastGrace = !pollOrderIds.has(orderId) && !protectedOrderIds.has(orderId)
-      if (belongsToAnotherTurno || absentAndPastGrace) this._orders.delete(orderId)
-    }
 
     if (mesas) {
       const keep = new Map()

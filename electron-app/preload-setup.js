@@ -9,27 +9,6 @@ contextBridge.exposeInMainWorld('setupBridge', {
   /** Get system info + any legacy config for pre-filling the wizard */
   getInfo: () => ipcRenderer.invoke('provision:get-info'),
 
-  /** List only HID devices the user has already authorized for Fullsite. */
-  getHidDevices: async () => {
-    if (!navigator.hid || typeof navigator.hid.getDevices !== 'function') {
-      return { supported: false, devices: [] }
-    }
-    try {
-      const devices = await navigator.hid.getDevices()
-      return {
-        supported: true,
-        devices: devices.map(device => ({
-          productName: device.productName || 'Dispositivo HID',
-          vendorId: device.vendorId,
-          productId: device.productId,
-          opened: !!device.opened,
-        })),
-      }
-    } catch (error) {
-      return { supported: true, devices: [], error: error.message }
-    }
-  },
-
   /**
    * Probe the local subnet (and 127.0.0.1) for Fullsite Local Servers.
    * Returns Array<{ host, port, restaurant_id, instance_name, version, protocol_version }>

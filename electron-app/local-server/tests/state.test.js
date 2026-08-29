@@ -183,29 +183,4 @@ describe('Clobber / STATE_SYNC merge (GAP-002)', () => {
     assert.ok(kdsBefore, 'ORDER_SENT debe encolar en KDS')
     assert.ok(kdsAfter, 'la orden fresca debe seguir en el KDS tras el poll')
   })
-
-  test('un turno nuevo elimina comandas completas del turno anterior', () => {
-    const state = new RestaurantState()
-    state.apply(makeEvent(EVENT.ORDER_SENT, {
-      order_id: 'old-order', mesa: '4', turno_id: 'turno-anterior', items: [{ n: 'taco' }],
-    }))
-
-    state.apply(makeEvent(EVENT.STATE_SYNC, {
-      mesas: [], kds_queue: [],
-      turno: { id: 'turno-actual', opened_at: new Date().toISOString() },
-      synced_at: new Date().toISOString(),
-    }))
-
-    assert.equal(state.toSnapshot().kds_orders.length, 0)
-  })
-
-  test('STATE_SYNC conserva la identidad real del turno y su conflicto', () => {
-    const state = new RestaurantState()
-    state.apply(makeEvent(EVENT.STATE_SYNC, {
-      mesas: [], kds_queue: [],
-      turno: { id: 't2', opened_by: 'Eduardo', opened_at: new Date().toISOString(), conflict_count: 2 },
-    }))
-    assert.equal(state.getTurno().id, 't2')
-    assert.equal(state.getTurno().conflict_count, 2)
-  })
 })

@@ -141,15 +141,6 @@ async function startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, servi
       const t = setTimeout(() => controller.abort(), 6000)
 
       const bearer = await getBearer()
-      const turnoRes = await fetch(
-        `${supabaseUrl}/rest/v1/pos_turnos?client_id=eq.${encodeURIComponent(restaurantId)}&closed_at=is.null&select=id,opened_by,opened_at&order=opened_at.desc`,
-        {
-          headers: { apikey: supabaseKey, Authorization: `Bearer ${bearer}` },
-          signal: controller.signal,
-        }
-      )
-      const activeTurnos = turnoRes.ok ? await turnoRes.json() : []
-      const activeTurno = activeTurnos[0] || null
       const res = await fetch(
         `${supabaseUrl}/rest/v1/pos_orders?client_id=eq.${encodeURIComponent(restaurantId)}&status=neq.closed&select=id,mesa,status,items,turno_id,updated_at`,
         {
@@ -161,13 +152,6 @@ async function startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, servi
       if (!res.ok) return
 
       const orders = await res.json()
-      // A restaurant can have historical/open-order residue from an older shift.
-      // Only the newest active shift belongs on today's operational surfaces. A
-      // duplicate active shift is reported in the turno snapshot for remediation,
-      // but its orders must never bleed into the current KDS.
-      const operationalOrders = activeTurno
-        ? orders.filter(order => order.turno_id === activeTurno.id)
-        : []
 
       // Marketplace orders live in delivery_orders. Mirror them into the same
       // durable ORDER_SENT protocol consumed by Electron KDS and printer queues.
@@ -197,21 +181,16 @@ async function startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, servi
 
       // Build mesa state from active orders
       const mesaMap = {}
-      for (const o of operationalOrders) {
+      for (const o of orders) {
         mesaMap[String(o.mesa)] = { status: o.status === 'pagando' ? 'pagando' : 'ocupada', order_id: o.id }
       }
 
       const event = await eventStore.appendInternal(EVENT.STATE_SYNC, {
         mesas:      Object.entries(mesaMap).map(([mesa, v]) => ({ mesa, ...v })),
-        kds_queue:  operationalOrders.filter(o => o.status === 'enviada' || o.status === 'preparando').map(o => ({
-          order_id: o.id, mesa: o.mesa, items_sent: o.items, sent_at: o.updated_at, turno_id: o.turno_id,
+        kds_queue:  orders.filter(o => o.status === 'enviada' || o.status === 'preparando').map(o => ({
+          order_id: o.id, mesa: o.mesa, items_sent: o.items, sent_at: o.updated_at,
         })),
-        turno:      activeTurno ? {
-          id: activeTurno.id,
-          opened_by: activeTurno.opened_by,
-          opened_at: activeTurno.opened_at,
-          conflict_count: activeTurnos.length,
-        } : null,
+        turno:      null, // TODO: fetch active turno separately
         synced_at:  new Date().toISOString(),
       }, { restaurantId })
 
@@ -267,9 +246,10 @@ function forwardPost(targetUrl, bodyStr) {
   })
 }
 
-// Keep identity and routing configuration explicit so every cloned terminal can
-// discover the caja without relying on process-global or customer-specific state.
-function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, version, serverId, restaurantId, config = {}, instanceName = '', branchId = config.branchId || null, posServerIp = config.posServerIp || null, port = 7717 }) {
+const edgeWatcher = require('./core/edge-watcher')
+const EDGE_SLOW_MINUTES = Number(process.env.FULLSITE_EDGE_SLOW_MIN) || 15
+
+function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, version, serverId, restaurantId, instanceName, branchId, posServerIp, port }) {
   return async function router(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
@@ -345,6 +325,14 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, versio
     if (url === '/state' && req.method === 'GET') {
       const seq = await eventStore.getLastSequence()
       json(res, 200, { sequence: seq, ...state.toSnapshot() })
+      return
+    }
+
+    // ── GET /alerts — Edge Agent v0: el experto local vigilando en vivo (offline, determinista) ──
+    if (url === '/alerts' && req.method === 'GET') {
+      let alerts = []
+      try { alerts = edgeWatcher.evaluate(state.toSnapshot(), { slowMinutes: EDGE_SLOW_MINUTES }, Date.now()) } catch (e) {}
+      json(res, 200, { alerts, generated_at: new Date().toISOString() })
       return
     }
 
@@ -570,27 +558,23 @@ async function startLocalServer({ dataDir, port = 7717, config = {} }) {
   wsHub.onCommand((msg, clientId) => cmdHandler.handle(msg, clientId))
 
   // ── HTTP server ──────────────────────────────────────────────────────────
-  const router = buildHttpRouter({
-    state,
-    eventStore,
-    wsHub,
-    cmdHandler,
-    printer: printerAdapter,
-    version,
-    serverId,
-    restaurantId,
-    config,
-    instanceName,
-    branchId: config.branchId || null,
-    posServerIp: config.posServerIp || null,
-    port,
-  })
+  const router = buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer: printerAdapter, version, serverId, restaurantId, instanceName, branchId: config.branchId || null, posServerIp: config.posServerIp || null, port })
   const httpServer = http.createServer(router)
 
   wsHub.attach(httpServer)
 
   // ── Lock GC every 30s ────────────────────────────────────────────────────
   setInterval(() => state.gcLocks(), 30_000)
+
+  // ── Edge Agent v0: vigila el estado local y loguea alertas nuevas (offline, determinista) ──
+  let _edgeSeen = new Set()
+  setInterval(() => {
+    try {
+      const alerts = edgeWatcher.evaluate(state.toSnapshot(), { slowMinutes: EDGE_SLOW_MINUTES }, Date.now())
+      for (const a of alerts) if (!_edgeSeen.has(a.id)) console.log(`  [edge] ${a.level.toUpperCase()} · ${a.message}`)
+      _edgeSeen = new Set(alerts.map(a => a.id))
+    } catch (e) {}
+  }, 30_000)
 
   // ── Listen ───────────────────────────────────────────────────────────────
   await new Promise((resolve, reject) => {
@@ -657,6 +641,4 @@ async function startLocalServer({ dataDir, port = 7717, config = {} }) {
   return { httpServer, close, serverId, lanIp, wsHub }
 }
 
-// buildHttpRouter se exporta para poder probar las rutas sin levantar el servidor
-// completo (mDNS + heartbeat + polling quedarían corriendo y colgarían el test).
-module.exports = { startLocalServer, buildHttpRouter, deliveryStation, deliveryOrderCommand, buildDeliveryTicket }
+module.exports = { startLocalServer, deliveryStation, deliveryOrderCommand, buildDeliveryTicket }
