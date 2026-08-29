@@ -956,7 +956,7 @@ export default function CocinaPage() {
                 <input
                   type="password"
                   inputMode="numeric"
-                  maxLength={4}
+                  maxLength={10}
                   value={cancelPin}
                   onChange={(e) => { setCancelPin(e.target.value.replace(/\D/g, '')); setCancelError('') }}
                   placeholder="••••"

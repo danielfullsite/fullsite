@@ -69,6 +69,24 @@ function serviceKey(): string {
   return process.env.SUPABASE_SERVICE_KEY || ''
 }
 
+/**
+ * PIN determinístico de 10 dígitos a partir de una semilla (tenant:rol).
+ * FNV-1a doble pasada → 10 dígitos, primer dígito nunca 0. No es secreto
+ * criptográfico: es el PIN inicial de plantilla que el dueño debe rotar; su
+ * único requisito es longitud 10 y estabilidad entre corridas del provision.
+ */
+export function deterministicPin10(seed: string): string {
+  let h1 = 0x811c9dc5, h2 = 0x01000193
+  for (let i = 0; i < seed.length; i++) {
+    h1 = Math.imul(h1 ^ seed.charCodeAt(i), 0x01000193) >>> 0
+    h2 = Math.imul(h2 ^ seed.charCodeAt(seed.length - 1 - i), 0x01000193) >>> 0
+  }
+  // 9 dígitos mezclando ambos hashes sin productos de 64 bits (precisión JS).
+  const nine = String(h1 % 100000).padStart(5, '0') + String(h2 % 10000).padStart(4, '0')
+  const first = String((h1 % 9) + 1) // 1-9: nunca empieza en 0
+  return first + nine
+}
+
 function headers() {
   const key = serviceKey()
   return {
@@ -231,23 +249,29 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
 
   // ── 5. role placeholders (pos_staff) ───────────────────────────────────────
   // One placeholder staff row per role so the new tenant has a starting role set.
-  // Deterministic id + pin per role keeps this idempotent. Shape mirrors
-  // seed-restaurant.ts pos_staff (id = `${clientId}-${pin}`).
-  const staffRows = tpl.roles.map((role, i) => {
-    const pin = String(1001 + i)
-    return {
-      id: `${clientId}-${pin}`,
-      client_id: clientId,
-      name: `${role} (plantilla)`,
-      pin,
-      role,
-      role_display: role,
-      active: true,
-      hourly_rate: 0,
-      weekly_salary: 0,
-    }
-  })
-  const staffCount = await upsert('pos_staff', staffRows)
+  // PINs de 10 dígitos (regla 2026-08-29: la huella es el método primario; el
+  // PIN es respaldo y debe ser largo, no un 4 dígitos observable). Deterministas
+  // por tenant+rol para que re-correr el provision dé el mismo resultado, y
+  // sembrados SOLO si el tenant no tiene staff (idempotente por conteo — así un
+  // re-provision de un tenant viejo con PINs de 4 dígitos no duplica filas).
+  let staffCount = 0
+  if ((await countFor('pos_staff', clientId)) === 0) {
+    const staffRows = tpl.roles.map((role) => {
+      const pin = deterministicPin10(`${clientId}:${role}`)
+      return {
+        id: `${clientId}-${pin}`,
+        client_id: clientId,
+        name: `${role} (plantilla)`,
+        pin,
+        role,
+        role_display: role,
+        active: true,
+        hourly_rate: 0,
+        weekly_salary: 0,
+      }
+    })
+    staffCount = await upsert('pos_staff', staffRows)
+  }
 
   // ── 6. mesas (floor plan) ──────────────────────────────────────────────────
   // Sin esto el POS del tenant nuevo abre con plano vacío (no se puede sentar
