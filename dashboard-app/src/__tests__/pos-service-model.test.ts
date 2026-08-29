@@ -29,6 +29,12 @@ describe('pos-service-model', () => {
     expect(peekServiceModel()).toBe('tables')
   })
 
+  it('counterHomePath: counter va a orden de mostrador, channels al despacho', async () => {
+    const { counterHomePath } = await import('@/lib/pos-service-model')
+    expect(counterHomePath('counter')).toBe('/pos?mostrador=1')
+    expect(counterHomePath('channels')).toBe('/pos/delivery')
+  })
+
   it('isCounterModel: counter y channels operan sin mapa; tables y tabs no', () => {
     expect(isCounterModel('counter')).toBe(true)
     expect(isCounterModel('channels')).toBe(true)

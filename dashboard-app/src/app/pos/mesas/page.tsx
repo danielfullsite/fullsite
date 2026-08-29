@@ -10,7 +10,7 @@ import { getActiveClientSlug as _cid } from '@/lib/data'
 import { getPosConfigSync } from '@/lib/pos-config'
 import { shouldUsePersistedFloorCoordinates } from '@/lib/floorplan-coordinates'
 import { setMesaTarget } from '@/lib/pos-navigation'
-import { getServiceModel, isCounterModel } from '@/lib/pos-service-model'
+import { counterHomePath, getServiceModel, isCounterModel } from '@/lib/pos-service-model'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -169,7 +169,7 @@ export default function MesasPage() {
   useEffect(() => {
     let alive = true
     getServiceModel().then(model => {
-      if (alive && isCounterModel(model)) router.replace('/pos?mostrador=1')
+      if (alive && isCounterModel(model)) router.replace(counterHomePath(model))
     })
     return () => { alive = false }
   }, [router])
