@@ -42,7 +42,7 @@ export async function getAuthToken(): Promise<string> {
     //
     // Ahora, sin sesión se devuelve la anon key SIN cachearla: la siguiente
     // llamada vuelve a intentar, y en cuanto la sesión existe se cachea de verdad.
-    const token = session?.access_token
+    const token = session?.access_token || readSessionTokenFromStorage()
     if (!token) return SUPABASE_KEY
 
     _cachedToken = token
@@ -50,8 +50,33 @@ export async function getAuthToken(): Promise<string> {
     return token
   } catch {
     // Tampoco se cachea el error: reintentar es barato, quedarse ciego 30 s no.
-    return SUPABASE_KEY
+    return readSessionTokenFromStorage() || SUPABASE_KEY
   }
+}
+
+/**
+ * Fallback directo al storage del SDK. `supabase.auth.getSession()` puede
+ * colgarse en App Router (falla conocida, ver AGENTS.md) y el timeout de 3 s
+ * degradaba a la anon key AUNQUE la sesión existiera — con RLS eso es cero
+ * filas y cada pantalla caía a su fallback en silencio (visto en campo
+ * 2026-08-29: "[client-config] Sin configuración para carls-jr" con sesión
+ * válida en localStorage). El token vive en `sb-<ref>-auth-token`; leerlo
+ * directo no depende del SDK. Se valida expiración antes de usarlo.
+ */
+function readSessionTokenFromStorage(): string | null {
+  if (typeof window === 'undefined') return null
+  try {
+    for (const k of Object.keys(localStorage)) {
+      if (!k.startsWith('sb-') || !k.endsWith('-auth-token')) continue
+      const raw = localStorage.getItem(k)
+      if (!raw) continue
+      const parsed = JSON.parse(raw) as { access_token?: string; expires_at?: number }
+      if (!parsed?.access_token) continue
+      if (parsed.expires_at && parsed.expires_at * 1000 < Date.now() + 30_000) continue
+      return parsed.access_token
+    }
+  } catch { /* storage bloqueado o JSON corrupto */ }
+  return null
 }
 
 /**

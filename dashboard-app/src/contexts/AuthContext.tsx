@@ -126,7 +126,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Persist for data.ts getActiveClientSlug() — allows data functions to auto-resolve client
     if (cid) {
-      try { localStorage.setItem('fullsite_client_id', cid) } catch { /* SSR */ }
+      try {
+        // Cambio de tenant en el MISMO navegador: purgar los cachés de identidad
+        // y turno del tenant anterior. Sin esto, el turno cacheado de un
+        // restaurante aparecía en el POS de otro ("Turno del día anterior —
+        // Daniel, 25 ago" de amalay dentro de carls-jr, visto en campo
+        // 2026-08-29) y su botón de Corte Z apuntaba a la caja equivocada.
+        // NO se tocan las colas (print/offline): son operaciones pendientes que
+        // deben sincronizar aunque cambie la sesión.
+        const prev = localStorage.getItem('fullsite_client_id')
+        if (prev && prev !== cid) {
+          for (const k of ['pos_cached_turno', 'pos_turno_cache', 'pos_staff_cache', 'pos_manager_credentials_v2', 'pos_service_model']) {
+            try { localStorage.removeItem(k) } catch { /* — */ }
+          }
+        }
+        localStorage.setItem('fullsite_client_id', cid)
+      } catch { /* SSR */ }
     }
 
     // Load full client config from Supabase (with fallback to hardcoded)
