@@ -54,6 +54,16 @@ export function isCounterModel(model: ServiceModel): boolean {
 }
 
 /**
+ * Home operativo de un tenant sin mapa de mesas:
+ * - counter (fast food, cafetería) → la siguiente orden de mostrador.
+ * - channels (dark kitchen) → el tablero de despacho: sus órdenes nacen en
+ *   Rappi/Uber y caen a delivery_orders, no se capturan en el POS.
+ */
+export function counterHomePath(model: ServiceModel): string {
+  return model === 'channels' ? '/pos/delivery' : '/pos?mostrador=1'
+}
+
+/**
  * Nombre de cuenta para una orden nueva de mostrador. Único por orden: la
  * deduplicación de órdenes busca por customer_name, así que dos órdenes
  * llamadas igual se fusionarían. Legible en ticket y KDS ("Mostrador 1435-k2").

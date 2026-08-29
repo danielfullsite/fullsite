@@ -1,4 +1,4 @@
-import { isCounterModel, peekServiceModel } from './pos-service-model'
+import { counterHomePath, isCounterModel, peekServiceModel } from './pos-service-model'
 
 export const POS_MESA_MAP_PATH = '/pos/mesas'
 
@@ -17,8 +17,9 @@ export function navigateToMesaMap(
   // al salir de una orden se abre la siguiente orden de mostrador. peek es
   // síncrono y sin red (ver pos-service-model.ts); su default 'tables' deja
   // este flujo exactamente como siempre para todos los demás tenants.
-  if (isCounterModel(peekServiceModel())) {
-    location.replace('/pos?mostrador=1')
+  const model = peekServiceModel()
+  if (isCounterModel(model)) {
+    location.replace(counterHomePath(model))
     return
   }
   location.replace(POS_MESA_MAP_PATH)
