@@ -4,7 +4,7 @@ import { Component, useState, useCallback, useEffect, useRef, Suspense, type Err
 import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { resolveMesa, clearMesaTarget, peekMesaTarget } from '@/lib/pos-navigation'
-import { nextMostradorCuenta } from '@/lib/pos-service-model'
+import { nextMostradorCuenta, getServiceModel } from '@/lib/pos-service-model'
 import {
   MESEROS,
   fetchMeseros,
@@ -1627,6 +1627,14 @@ function POSContent() {
   const initialMesa = initialCuenta ? 0 : resolveMesa(searchParams.get('mesa'))
 
   const [menuCategories, setMenuCategories] = useState<MenuCategory[]>([])
+  // Speed screen (Fase 2b): en tenants de mostrador los combos van al frente
+  // del grid como botones de un toque. Default false = grid de siempre.
+  const [speedMode, setSpeedMode] = useState(false)
+  useEffect(() => {
+    let alive = true
+    getServiceModel().then(m => { if (alive) setSpeedMode(m === 'counter') }).catch(() => {})
+    return () => { alive = false }
+  }, [])
   const [selectedCategory, setSelectedCategory] = useState<string>('')
   const [categorySearch, setCategorySearch] = useState('')
   const [orderItems, setOrderItems] = useState<OrderItem[]>(() => {
@@ -2481,6 +2489,32 @@ function POSContent() {
       setModifierCategoryId(cat?.id ?? '')
     }
   }, [])
+
+  // Agregar un combo a la orden — misma lógica que el modal de combos; extraída
+  // para que el speed screen (modo mostrador) la reuse con botones de un toque.
+  const addComboToOrder = useCallback((combo: Combo) => {
+    const menuPrices = new Map<string, number>()
+    for (const cat of menuCategories) {
+      for (const item of cat.items) menuPrices.set(item.id, item.price)
+    }
+    const comboItems = applyCombo(combo, menuPrices)
+    setOrderItems(prev => {
+      const currentCourse = prev.filter(isTiempoItem).length + 1
+      return [...prev, ...comboItems.map(ci => ({
+        ...ci,
+        silla: sillaActual,
+        courseId: currentCourse,
+        courseStatus: 'pending' as const,
+      }))]
+    })
+    logAudit({
+      order_id: orderId, action: 'combo_added', actor: mesero, mesa,
+      details: { combo: combo.name, price: combo.price, items: combo.items.map(i => i.name) },
+    })
+    showToast(`${combo.name} agregado`)
+    setMobileView('order')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [menuCategories, sillaActual, orderId, mesero, mesa])
 
   // Open modifier modal to edit an existing order item
   const handleEditOrderItem = useCallback((orderItem: OrderItem) => {
@@ -4627,6 +4661,18 @@ function POSContent() {
                       <span className="text-[10px] font-normal opacity-70">{allCombos.length}</span>
                     </button>
                   )}
+                  {/* Speed screen (mostrador): cada combo es un botón de UN toque al
+                      frente del grid — la venta de un fast food vive aquí. */}
+                  {speedMode && allCombos.map(combo => (
+                    <button
+                      key={`speed-${combo.id}`}
+                      onClick={() => addComboToOrder(combo)}
+                      className="px-3 py-3 rounded-xl text-sm font-bold text-center transition-all min-h-[72px] leading-tight flex flex-col items-center justify-center gap-0.5 bg-gradient-to-br from-amber-500/90 to-orange-500/90 text-white hover:opacity-100 active:scale-95"
+                    >
+                      <span className="leading-tight">{combo.name}</span>
+                      <span className="text-xs font-mono tabular-nums opacity-90">${Math.round(combo.price)}</span>
+                    </button>
+                  ))}
                   {menuCategories.length === 0 && (
                     <div className="col-span-full flex flex-col items-center justify-center py-16 text-center">
                       <Package size={48} className="text-[var(--text-3)] mb-4 opacity-40" />
@@ -4728,29 +4774,7 @@ function POSContent() {
                           return (
                             <button
                               key={combo.id}
-                              onClick={() => {
-                                const menuPrices = new Map<string, number>()
-                                for (const cat of menuCategories) {
-                                  for (const item of cat.items) menuPrices.set(item.id, item.price)
-                                }
-                                const comboItems = applyCombo(combo, menuPrices)
-                                setOrderItems(prev => {
-                                  const currentCourse = prev.filter(isTiempoItem).length + 1
-                                  return [...prev, ...comboItems.map(ci => ({
-                                    ...ci,
-                                    silla: sillaActual,
-                                    courseId: currentCourse,
-                                    courseStatus: 'pending' as const,
-                                  }))]
-                                })
-                                logAudit({
-                                  order_id: orderId, action: 'combo_added', actor: mesero, mesa,
-                                  details: { combo: combo.name, price: combo.price, items: combo.items.map(i => i.name) },
-                                })
-                                showToast(`${combo.name} agregado`)
-                                setShowComboModal(false)
-                                setMobileView('order')
-                              }}
+                              onClick={() => { addComboToOrder(combo); setShowComboModal(false) }}
                               className="w-full bg-[var(--surface-2)] hover:bg-[var(--raised)] active:scale-[0.97] border border-[var(--line-soft)] hover:border-[color-mix(in_srgb,var(--warn)_40%,transparent)] rounded-2xl text-left transition-all p-4 shadow-sm"
                             >
                               <div className="flex items-center justify-between mb-2">
