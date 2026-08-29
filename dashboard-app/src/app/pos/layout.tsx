@@ -717,6 +717,15 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
         '--text-1':'#fff','--text-2':'rgba(255,255,255,0.7)','--text-3':'rgba(255,255,255,0.45)',
         '--text-4':'rgba(255,255,255,0.25)',
       }}>
+        {/* Ritual de onboarding: los PINs de plantilla se muestran UNA vez en el
+            alta; si alguien sigue operando con la cuenta "(plantilla)" el banner
+            empuja a rotarlos. Solo visual — no toca la ruta de login offline. */}
+        {staff?.name?.includes('(plantilla)') && (
+          <div className="flex items-center justify-center gap-2 bg-amber-500/15 border-b border-amber-500/30 px-3 py-1.5 text-[12px] text-amber-300">
+            <span>Estás usando un PIN de plantilla — crea a tu equipo y rota los PINs.</span>
+            <a href="/pos/staff" className="font-bold underline underline-offset-2 hover:text-amber-200">Ir a Personal</a>
+          </div>
+        )}
         <TurnoGate staff={staff!}>
           {children}
         </TurnoGate>
