@@ -88,9 +88,10 @@ describe('vertical-presets', () => {
       expect(t.labor_pct_max, `${id} sin labor`).toBeGreaterThan(0)
       expect(t.food_cost_pct_max).toBeGreaterThan(0)
       expect(t.kds_sla_min).toBeGreaterThan(0)
-      // El prime cost debe ser un techo real: menor que la suma de sus partes
-      // (si no, nunca alertaría) y en el rango sano de la industria (55-65).
-      expect(t.prime_cost_pct_max).toBeLessThan(t.labor_pct_max + t.food_cost_pct_max)
+      // El prime cost debe ser un techo real: no mayor que la suma de sus
+      // partes (≤ es válido: bar 30+30 con techo 60 alerta justo cuando ambos
+      // topan) y en el rango sano de la industria (55-65).
+      expect(t.prime_cost_pct_max).toBeLessThanOrEqual(t.labor_pct_max + t.food_cost_pct_max)
       expect(t.prime_cost_pct_max).toBeGreaterThanOrEqual(55)
       expect(t.prime_cost_pct_max).toBeLessThanOrEqual(65)
     }
