@@ -364,6 +364,106 @@ Square trataría eso como un solo catálogo con features de los dos lados encend
 
 ---
 
+## 7-bis. Impresión — perfiles, no impresoras
+
+Square no asigna categorías a una impresora. Asigna categorías a un **perfil de
+impresión**, y el perfil a uno o varios dispositivos. *"A collection of settings used to
+configure one or more devices with preset printer settings."*
+
+**Varios perfiles pueden apuntar a la misma impresora física.** El ejemplo de su propia
+documentación: un perfil "Hot" con las categorías de cocina caliente y otro "Cold" con
+las frías, ambos imprimiendo en el mismo aparato. El perfil es la unidad lógica; la
+impresora es sólo el destino.
+
+Tipos de trabajo de impresión: **recibos**, **tickets de orden en persona**, **tickets
+de orden en línea y de kiosko**, **tickets de cancelación** y **etiquetas de código de
+barras**.
+
+Fuentes: [Set up printer profiles](https://squareup.com/help/us/en/article/8245-set-up-printer-profiles) ·
+[Assign item categories to printers](https://squareup.com/help/us/en/article/8148-create-and-assign-item-categories-with-square-for-restaurants) ·
+[Connect printers](https://squareup.com/help/us/en/article/5771-create-and-manage-printer-stations)
+
+### El detalle que evita el bug clásico
+
+Cada perfil tiene una **política para las categorías nuevas**:
+
+- **"Print all new categories automatically"** (por omisión) — toda categoría nueva se
+  rutea sola
+- **"Don't print new categories"** — hay que asignarla a mano
+
+Ése es el bug que rompe restaurantes: alguien agrega un platillo, nadie lo asigna a una
+impresora, y **no sale en cocina hasta que un cliente reclama**. Square lo convierte en
+una decisión explícita del dueño, con un default seguro.
+
+Y los tickets imprimen con el **`kitchen_name`** del §2, no con el nombre de venta.
+
+**Fullsite hoy:** ruteo por estación en `printers.json`, sin concepto de perfil ni
+política para categorías nuevas. El punto 4 del spec pide "categoría → estación →
+impresora"; el modelo de Square sugiere meter el perfil como capa intermedia, que es lo
+que permite dos ruteos distintos sobre un mismo aparato.
+
+---
+
+## 7-ter. Personal y permisos — el mismo patrón que el catálogo
+
+`TeamMember.assigned_locations` usa `TeamMemberAssignedLocations`, con dos modos:
+
+| Modo | Qué hace |
+|---|---|
+| `ALL_CURRENT_AND_FUTURE_LOCATIONS` | acceso a todas, **incluidas las que se abran después** |
+| `EXPLICIT_LOCATIONS` | sólo a la lista dada |
+
+Fuente: [TeamMember](https://developer.squareup.com/reference/square/objects/TeamMember)
+
+**Es exactamente la misma forma que `present_at_all_locations` / `present_at_location_ids`
+del catálogo.** Square usa el patrón "todas o lista explícita" en el catálogo, en el
+personal, y en los perfiles de impresión.
+
+Esa consistencia es la lección: **un solo idioma para expresar alcance**, reusado en
+cada entidad. No tres mecanismos distintos según el módulo.
+
+Y `wage_setting` cuelga del miembro, con el puesto asociado — el sueldo es por
+combinación de persona y puesto, no un campo suelto.
+
+---
+
+## 7-quater. Inventario — un libro mayor, no un número
+
+Éste es el diseño más elegante que se encontró, y el que más lejos está de Fullsite.
+
+**El inventario de Square no es una cantidad que se muta. Es la suma de transiciones de
+estado.**
+
+| Objeto | Qué es |
+|---|---|
+| `InventoryAdjustment` | *"the quantity of an item variation transitioning from one inventory state to another"* |
+| `InventoryPhysicalCount` | conteo verificado a mano que **sobreescribe** lo calculado |
+| `InventoryCount` | la cantidad **calculada**, recomputada tras cada ajuste |
+
+Estados: `IN_STOCK`, `SOLD`, `WASTE`, entre otros.
+
+Fuente: [Inventory API](https://developer.squareup.com/docs/inventory-api/what-it-does)
+
+Así, **vender, mermar, recibir y transferir son la misma operación** con distinto par
+origen→destino. Y lo mejor:
+
+> Las transferencias entre sucursales son ajustes *"where `from_location_id` and
+> `to_location_id` differ"* — **no existe un objeto de transferencia**.
+
+### Por qué importa para Fullsite
+
+Un stock mutable no puede contestar "¿por qué tengo 3 y no 7?". Un libro mayor sí:
+cada unidad tiene un renglón que dice de qué estado a cuál se movió, cuándo y por qué.
+
+Es la diferencia entre un inventario que cuadra y uno que se audita. Y para los agentes
+de merma y variación de costo, es la diferencia entre adivinar y demostrar.
+
+**Recomendación:** cuando toque inventario multi-sucursal, no construir "stock por
+sucursal" como número. Construir el libro y derivar el número. Es más trabajo la primera
+vez y menos para siempre.
+
+---
+
 ## 8. Qué copiar, en orden
 
 1. **`location_overrides` en vez de árbol de herencia.** Un arreglo de excepciones sobre
@@ -393,13 +493,12 @@ Marcado honestamente, no rellenado:
 
 - Valores de `Location.type`
 - Límite de categorías de cocina y de estaciones; si un ítem puede ir a dos estaciones
-- Su modelo de **impresión** y ruteo a impresoras
-- Su modelo de **permisos y roles** por ubicación
-- Cómo hacen la **transferencia de inventario entre sucursales** (existe en Retail, no
-  se investigó el modelo)
 - El objeto **`Timecard`**, que está reemplazando a `Shift`
 - Qué pasa con **`idempotency_key` repetida con cuerpo distinto** en Orders
   específicamente (la regla general está documentada, la de Orders no se confirmó)
+- El **catálogo completo de estados de inventario** (se confirmaron `IN_STOCK`, `SOLD`,
+  `WASTE`; la documentación sugiere que hay más)
+- Cómo modela Square los **cursos / coursing** en servicio completo
 
 ---
 
@@ -419,3 +518,31 @@ Marcado honestamente, no rellenado:
 | §5-bis | menús como árbol de categorías + `CatalogAvailabilityPeriod` | medio |
 | §5-ter | **`location_id` en `pos_turnos`** — hoy no existe | medio |
 | §5-ter | `breaks[]` y propina en efectivo declarada por turno | bajo |
+| §7-bis | **perfil de impresión** como capa entre categoría e impresora | medio |
+| §7-bis | política de categorías nuevas: rutear solas o exigir asignación | trivial |
+| §7-bis | ticket de **cancelación** como tipo de impresión propio | bajo |
+| §7-ter | un solo idioma de alcance: `TODAS` vs `LISTA_EXPLÍCITA`, reusado | medio |
+| §7-quater | **inventario como libro mayor**, no como número mutable | alto |
+
+---
+
+## 10. La lección que atraviesa todo
+
+Square repite **el mismo patrón** en cada entidad, y ahí está su verdadera ventaja:
+
+1. **Un objeto base + un arreglo de excepciones.** Catálogo con `location_overrides`,
+   nada de árboles de herencia.
+2. **Un solo idioma de alcance.** `ALL_CURRENT_AND_FUTURE` vs `EXPLICIT_LIST`, igual en
+   catálogo, en personal y en impresión.
+3. **Discriminador de tipo antes que entidad nueva.** Los menús son categorías con
+   `category_type`. Las transferencias son ajustes con distinto origen y destino.
+4. **Libro mayor antes que número mutable.** El inventario se deriva, no se guarda.
+5. **Dos máquinas de estado cuando hay dos ciclos.** Comercial y operativo separados.
+6. **Defaults explícitos en los bordes.** La política de categorías nuevas es una
+   decisión del dueño, no un accidente.
+
+Ninguno es una feature. Los seis son **decisiones de forma**, y por eso pueden vender a
+restaurantes, tiendas y servicios sobre el mismo núcleo.
+
+**Si Fullsite quiere ser clonable a mil restaurantes —y a tiendas— el trabajo no es
+agregar features: es adoptar estas seis formas antes de que el modelo se endurezca.**
