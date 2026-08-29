@@ -234,7 +234,7 @@ export default function StaffShiftPanel({ onShiftChange }: StaffShiftPanelProps)
               <input
                 type="password"
                 inputMode="numeric"
-                maxLength={4}
+                maxLength={10}
                 value={pin}
                 onChange={(e) => { setPin(e.target.value); setPinError('') }}
                 placeholder="••••"

@@ -105,7 +105,7 @@ export default function StaffPage() {
                 className="flex-1 min-w-[140px] bg-transparent text-sm font-medium text-[var(--text-1)] outline-none border-b border-transparent focus:border-[var(--line)]" />
               <span className="text-[11px] text-[var(--text-4)] w-24 truncate">{row.role_display || row.role}</span>
               <input value={row.pin} onChange={e => setField(row.id, 'pin', e.target.value.replace(/\D/g, ''))}
-                type={showPins ? 'text' : 'password'} inputMode="numeric" maxLength={8} placeholder="PIN"
+                type={showPins ? 'text' : 'password'} inputMode="numeric" maxLength={10} placeholder="PIN"
                 className="w-20 rounded-md border border-[var(--line)] bg-[var(--surface-2)] px-2 py-1.5 text-center text-sm font-mono tracking-widest text-[var(--text-1)] outline-none focus:border-[var(--accent)]" />
               <button onClick={() => save(row)} disabled={saving === row.id}
                 className="inline-flex items-center gap-1.5 rounded-md bg-[var(--accent)] px-3 py-1.5 text-xs font-semibold text-[#04130d] disabled:opacity-50">

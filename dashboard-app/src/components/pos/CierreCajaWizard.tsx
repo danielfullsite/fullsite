@@ -507,7 +507,7 @@ export default function CierreCajaWizard({
                   <input
                     type="password"
                     inputMode="numeric"
-                    maxLength={8}
+                    maxLength={10}
                     value={escalationPin}
                     onChange={(e) => { setEscalationPin(e.target.value.replace(/\D/g, '')); setEscalationError('') }}
                     placeholder="PIN"
@@ -695,7 +695,7 @@ export default function CierreCajaWizard({
                 <input
                   type="password"
                   inputMode="numeric"
-                  maxLength={8}
+                  maxLength={10}
                   value={pin}
                   onChange={(e) => { setPin(e.target.value.replace(/\D/g, '')); setPinError('') }}
                   placeholder="PIN"
