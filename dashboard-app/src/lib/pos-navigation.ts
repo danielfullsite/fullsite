@@ -1,3 +1,5 @@
+import { isCounterModel, peekServiceModel } from './pos-service-model'
+
 export const POS_MESA_MAP_PATH = '/pos/mesas'
 
 /**
@@ -11,6 +13,14 @@ export const POS_MESA_MAP_PATH = '/pos/mesas'
 export function navigateToMesaMap(
   location: Pick<Location, 'replace'> = window.location,
 ): void {
+  // Tenants de mostrador (fast food / dark kitchen) no tienen mapa de mesas:
+  // al salir de una orden se abre la siguiente orden de mostrador. peek es
+  // síncrono y sin red (ver pos-service-model.ts); su default 'tables' deja
+  // este flujo exactamente como siempre para todos los demás tenants.
+  if (isCounterModel(peekServiceModel())) {
+    location.replace('/pos?mostrador=1')
+    return
+  }
   location.replace(POS_MESA_MAP_PATH)
 }
 
