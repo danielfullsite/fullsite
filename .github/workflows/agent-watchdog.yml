@@ -1,0 +1,50 @@
+name: Agent Watchdog
+
+# Vigila a TODOS los agentes desde afuera leyendo agent_runs, y manda correo
+# SÓLO cuando alguno cambia de estado. Ver .github/scripts/agent_watchdog.py.
+#
+# Una vez al día a propósito: la regla es avisar por transición, no por estado,
+# así que correrlo más seguido no adelanta nada y sí multiplica el riesgo de ruido.
+
+on:
+  schedule:
+    - cron: '0 15 * * *'   # 09:00 MX (UTC-6)
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Ensayo: diagnostica y dice qué mandaría, sin escribir ni enviar'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  watchdog:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - run: pip install requests
+
+      # Las pruebas corren aquí porque el repo no tiene runner de pytest: es el
+      # único lugar donde se garantiza que se ejecuten antes de usar el módulo.
+      - name: Pruebas del vigilante
+        run: |
+          python .github/scripts/test_agent_notify.py
+          python .github/scripts/test_agent_watchdog.py
+
+      - name: Vigilar agentes
+        env:
+          SUPABASE_URL:         ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          RESEND_API_KEY:       ${{ secrets.RESEND_API_KEY }}
+          ALERT_EMAIL_TO:       ${{ vars.ALERT_EMAIL_TO || 'daniel@fullsite.mx' }}
+          ALERT_EMAIL_FROM:     ${{ vars.ALERT_EMAIL_FROM || 'alertas@fullsite.mx' }}
+          TRIGGER_TYPE:         ${{ github.event_name }}
+          WATCHDOG_DRY_RUN:     ${{ inputs.dry_run && '1' || '' }}
+        run: python .github/scripts/agent_watchdog.py

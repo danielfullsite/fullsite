@@ -61,6 +61,45 @@ describe('vertical-presets', () => {
     }
   })
 
+  it('combos semilla: los presets counter con menú los traen y referencian items existentes', () => {
+    for (const id of ['fast_food', 'fast_casual', 'cafeteria_panaderia'] as const) {
+      const p = VERTICAL_PRESETS[id]
+      expect(p.combos?.length, `${id} sin combos → speed screen vacío (gap #12)`).toBeGreaterThan(0)
+      const suffixes = new Set(p.template!.menu.flatMap(c => c.items.map(i => i.idSuffix)))
+      for (const combo of p.combos!) {
+        expect(combo.price).toBeGreaterThan(0)
+        for (const it of combo.items) {
+          expect(suffixes.has(it.itemIdSuffix), `${id}/${combo.idSuffix}: item ${it.itemIdSuffix} no existe en el template`).toBe(true)
+          for (const s of it.substitutions || []) {
+            expect(suffixes.has(s.itemIdSuffix), `${id}/${combo.idSuffix}: sustitución ${s.itemIdSuffix} no existe`).toBe(true)
+          }
+        }
+        // El combo debe AHORRAR vs comprar los items sueltos
+        const priceOf = new Map(p.template!.menu.flatMap(c => c.items.map(i => [i.idSuffix, i.price] as const)))
+        const suelto = combo.items.reduce((s, it) => s + (priceOf.get(it.itemIdSuffix) ?? 0), 0)
+        expect(combo.price, `${id}/${combo.idSuffix} no ahorra`).toBeLessThan(suelto)
+      }
+    }
+  })
+
+  it('umbrales día-0: todos los presets nacen con KPIs de industria coherentes', () => {
+    for (const id of VERTICAL_IDS) {
+      const t = VERTICAL_PRESETS[id].thresholds
+      expect(t.labor_pct_max, `${id} sin labor`).toBeGreaterThan(0)
+      expect(t.food_cost_pct_max).toBeGreaterThan(0)
+      expect(t.kds_sla_min).toBeGreaterThan(0)
+      // El prime cost debe ser un techo real: no mayor que la suma de sus
+      // partes (≤ es válido: bar 30+30 con techo 60 alerta justo cuando ambos
+      // topan) y en el rango sano de la industria (55-65).
+      expect(t.prime_cost_pct_max).toBeLessThanOrEqual(t.labor_pct_max + t.food_cost_pct_max)
+      expect(t.prime_cost_pct_max).toBeGreaterThanOrEqual(55)
+      expect(t.prime_cost_pct_max).toBeLessThanOrEqual(65)
+    }
+    // Los giros de barra traen pour cost; QSR no.
+    expect(VERTICAL_PRESETS.bar_cantina.thresholds.pour_cost_pct_max).toBeDefined()
+    expect(VERTICAL_PRESETS.fast_food.thresholds.pour_cost_pct_max).toBeUndefined()
+  })
+
   it('casual_dining es el default: sin parche de features ni template propio', () => {
     expect(VERTICAL_PRESETS.casual_dining.features).toEqual({})
     expect(VERTICAL_PRESETS.casual_dining.template).toBeUndefined()

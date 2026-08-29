@@ -52,6 +52,7 @@ export interface ProvisionResult {
     pos_payment_methods: number
     pos_staff: number
     pos_mesas: number
+    pos_combos: number
     pos_mutation_authority: number
     pos_item_inventory_policy: number
   }
@@ -173,6 +174,18 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
   if (!serviceKey()) throw new Error('[provision] SUPABASE_SERVICE_KEY not configured')
 
   const preset = input.vertical ? resolveVerticalPreset(input.vertical) : null
+
+  // ¿El tenant ya existe? Los umbrales día-0 (Lazo 1) solo se siembran en el
+  // alta ORIGINAL: un re-provision no debe pisar pos_settings que el tenant o
+  // el tuner (Lazo 2) ya ajustaron.
+  let clientExists = false
+  try {
+    const chk = await fetch(`${SB_URL}/rest/v1/clients?id=eq.${encodeURIComponent(clientId)}&select=id&limit=1`,
+      { headers: headers(), cache: 'no-store' })
+    const rows = chk.ok ? await chk.json().catch(() => []) : []
+    clientExists = Array.isArray(rows) && rows.length > 0
+  } catch { /* si no se pudo verificar, tratar como existente = no pisar settings */ clientExists = true }
+
   const tpl = input.template || preset?.template || DEFAULT_ONBOARDING_TEMPLATE
   const displayName = input.display_name || clientId
   const mesas = input.mesas ?? preset?.defaultMesas ?? 10
@@ -194,6 +207,10 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     mesas,
     // Tipo de restaurante (vertical preset). Columna `type` ya existe en `clients`.
     ...(input.vertical ? { type: input.vertical } : {}),
+    // Lazo 1 (docs/ai/APRENDIZAJE-AGENTES-DESIGN.md): umbrales de industria del
+    // vertical como prior de los agentes — SOLO en el alta original, para no
+    // pisar ajustes del tenant/tuner en un re-provision.
+    ...(!clientExists && preset ? { pos_settings: { 'agents.thresholds': { ...preset.thresholds, source: `vertical:${preset.id}`, seeded_at: new Date().toISOString() } } } : {}),
     data_source: 'fullsite',
     // Requerido por el cálculo de día de negocio (ops_aggregate.get_business_day_config).
     // Sin esto, los agentes de IA crashean para el clon. Default 05:00 (día empieza a las 5am).
@@ -278,6 +295,30 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     staffCount = await upsert('pos_staff', staffRows)
   }
 
+  // ── 5b. combos semilla (pos_combos) ────────────────────────────────────────
+  // Sin esto, el speed screen de un tenant counter nace vacío (gap Minute-0 #12
+  // — visto en campo con carls-jr, cuyos combos se sembraron a mano el
+  // 2026-08-29; este bloque hace lo mismo para todo tenant nuevo). Idempotente
+  // por conteo: un re-provision no duplica ni pisa combos editados.
+  let combosCount = 0
+  if (preset?.combos?.length && (await countFor('pos_combos', clientId)) === 0) {
+    const comboRows = preset.combos.map(c => ({
+      id: `${clientId}-${c.idSuffix}`,
+      client_id: clientId,
+      name: c.name,
+      price: c.price,
+      items: c.items.map(it => ({
+        menu_item_id: `${clientId}-${it.itemIdSuffix}`,
+        name: it.name,
+        substitutions: (it.substitutions || []).map(s => ({ id: `${clientId}-${s.itemIdSuffix}`, name: s.name })),
+      })),
+      upsell: c.upsell || null,
+      active: true,
+      schedule: null,
+    }))
+    combosCount = await upsert('pos_combos', comboRows)
+  }
+
   // ── 6. mesas (floor plan) ──────────────────────────────────────────────────
   // Sin esto el POS del tenant nuevo abre con plano vacío (no se puede sentar
   // ni cobrar en mesa). Se siembra SOLO si el tenant aún no tiene mesas
@@ -345,6 +386,7 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
       pos_payment_methods: pmCount,
       pos_staff: staffCount,
       pos_mesas: mesasCount,
+      pos_combos: combosCount,
       pos_mutation_authority: authorityCount,
       pos_item_inventory_policy: policyCount,
     },

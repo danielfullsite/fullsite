@@ -30,6 +30,16 @@ export type VerticalId =
 /** How orders are born on this kind of floor. Consumed by the POS shell (Fase 2). */
 export type ServiceModel = 'tables' | 'counter' | 'tabs' | 'channels'
 
+/** Combo semilla — referencia items del template por idSuffix; provisionTenant
+ *  resuelve los ids finales (`${clientId}-${itemIdSuffix}`) al sembrar pos_combos. */
+export interface SeedCombo {
+  idSuffix: string
+  name: string
+  price: number
+  items: Array<{ itemIdSuffix: string; name: string; substitutions?: Array<{ itemIdSuffix: string; name: string }> }>
+  upsell?: { label: string; price_add: number }
+}
+
 export interface VerticalPreset {
   id: VerticalId
   label: string
@@ -40,6 +50,27 @@ export interface VerticalPreset {
   /** Seed skeleton; falls back to the generic template when omitted. */
   template?: OnboardingTemplate
   defaultMesas: number
+  /** Combos semilla (pos_combos) — sin esto, el speed screen de un tenant
+   *  counter nace vacío (gap Minute-0 #12, visto en campo con carls-jr). */
+  combos?: SeedCombo[]
+  /** Umbrales de industria del vertical (Lazo 1 de aprendizaje, docs/ai/
+   *  APRENDIZAJE-AGENTES-DESIGN.md): el prior con el que los agentes alertan
+   *  desde el DÍA 1, sin histórico propio. Fuentes en LOGICA-POR-VERTICAL.md.
+   *  El tuner (Lazo 2) los ajusta ±30% máx por tenant con evidencia. */
+  thresholds: VerticalThresholds
+}
+
+export interface VerticalThresholds {
+  /** % máximo sano de mano de obra sobre ventas */
+  labor_pct_max: number
+  /** % máximo sano de food cost */
+  food_cost_pct_max: number
+  /** prime cost (labor + food) — techo universal ~60, se declara por claridad */
+  prime_cost_pct_max: number
+  /** minutos objetivo de vida de una orden en cocina antes de alertar */
+  kds_sla_min: number
+  /** % máximo de pour cost (solo giros con barra significativa) */
+  pour_cost_pct_max?: number
 }
 
 // ─── Seed menus per vertical ─────────────────────────────────────────────────
@@ -158,29 +189,77 @@ function withMenu(menu: TemplateMenuCategory[]): OnboardingTemplate {
   return { ...DEFAULT_ONBOARDING_TEMPLATE, menu }
 }
 
+// ─── Combos semilla ──────────────────────────────────────────────────────────
+// Mismos combos que se validaron a mano en carls-jr (2026-08-29): el precio del
+// combo < suma de los items para que el POS muestre el ahorro.
+
+const COMBOS_FAST_FOOD: SeedCombo[] = [
+  {
+    idSuffix: 'combo-clasico', name: 'Combo Clásico', price: 129,
+    items: [
+      { itemIdSuffix: 'item-hamburguesa', name: 'Hamburguesa' },
+      { itemIdSuffix: 'item-papas', name: 'Papas' },
+      { itemIdSuffix: 'item-refresco-ch', name: 'Refresco Chico', substitutions: [{ itemIdSuffix: 'item-malteada', name: 'Malteada' }] },
+    ],
+    upsell: { label: 'Agrandar combo', price_add: 20 },
+  },
+  {
+    idSuffix: 'combo-doble', name: 'Combo Doble', price: 199,
+    items: [
+      { itemIdSuffix: 'item-hamburguesa', name: 'Hamburguesa' },
+      { itemIdSuffix: 'item-hamburguesa', name: 'Hamburguesa' },
+      { itemIdSuffix: 'item-papas', name: 'Papas' },
+      { itemIdSuffix: 'item-refresco-gd', name: 'Refresco Grande' },
+    ],
+  },
+  {
+    idSuffix: 'combo-nuggets', name: 'Combo Nuggets', price: 119,
+    items: [
+      { itemIdSuffix: 'item-nuggets', name: 'Nuggets' },
+      { itemIdSuffix: 'item-papas', name: 'Papas' },
+      { itemIdSuffix: 'item-refresco-ch', name: 'Refresco Chico' },
+    ],
+  },
+]
+
+const COMBOS_CAFETERIA: SeedCombo[] = [
+  {
+    idSuffix: 'combo-desayuno', name: 'Café + Pan', price: 65,
+    items: [
+      { itemIdSuffix: 'item-americano', name: 'Americano', substitutions: [{ itemIdSuffix: 'item-latte', name: 'Latte' }] },
+      { itemIdSuffix: 'item-croissant', name: 'Croissant', substitutions: [{ itemIdSuffix: 'item-concha', name: 'Concha' }] },
+    ],
+  },
+]
+
 // ─── The preset library ──────────────────────────────────────────────────────
 
 export const VERTICAL_PRESETS: Record<VerticalId, VerticalPreset> = {
   fast_food: {
     id: 'fast_food',
+    thresholds: { labor_pct_max: 30, food_cost_pct_max: 32, prime_cost_pct_max: 60, kds_sla_min: 6 },
     label: 'Fast Food / QSR',
     description: 'Mostrador, combos, velocidad. Sin meseros ni mesas.',
     serviceModel: 'counter',
     features: { delivery: true, nomina: true, resenas: false, giftCards: false },
     template: withMenu(MENU_FAST_FOOD),
     defaultMesas: 0,
+    combos: COMBOS_FAST_FOOD,
   },
   fast_casual: {
     id: 'fast_casual',
+    thresholds: { labor_pct_max: 30, food_cost_pct_max: 32, prime_cost_pct_max: 60, kds_sla_min: 8 },
     label: 'Fast Casual',
     description: 'Ordenas en fila, comes en mesa. Builder de producto.',
     serviceModel: 'counter',
     features: { delivery: true, nomina: true, resenas: true },
     template: withMenu(MENU_FAST_FOOD),
     defaultMesas: 8,
+    combos: COMBOS_FAST_FOOD,
   },
   casual_dining: {
     id: 'casual_dining',
+    thresholds: { labor_pct_max: 35, food_cost_pct_max: 35, prime_cost_pct_max: 62, kds_sla_min: 15 },
     label: 'Casual Dining',
     description: 'Mesas, meseros, servicio completo. El default.',
     serviceModel: 'tables',
@@ -189,6 +268,7 @@ export const VERTICAL_PRESETS: Record<VerticalId, VerticalPreset> = {
   },
   fine_dining: {
     id: 'fine_dining',
+    thresholds: { labor_pct_max: 40, food_cost_pct_max: 38, prime_cost_pct_max: 65, kds_sla_min: 20, pour_cost_pct_max: 32 },
     label: 'Fine Dining / High-end',
     description: 'Cursos, reservas, vinos, ticket alto.',
     serviceModel: 'tables',
@@ -198,6 +278,7 @@ export const VERTICAL_PRESETS: Record<VerticalId, VerticalPreset> = {
   },
   bar_cantina: {
     id: 'bar_cantina',
+    thresholds: { labor_pct_max: 30, food_cost_pct_max: 30, prime_cost_pct_max: 60, kds_sla_min: 8, pour_cost_pct_max: 24 },
     label: 'Bar / Cantina',
     description: 'Cuentas abiertas, barra como estación principal, control de licor.',
     serviceModel: 'tabs',
@@ -207,15 +288,18 @@ export const VERTICAL_PRESETS: Record<VerticalId, VerticalPreset> = {
   },
   cafeteria_panaderia: {
     id: 'cafeteria_panaderia',
+    thresholds: { labor_pct_max: 32, food_cost_pct_max: 32, prime_cost_pct_max: 60, kds_sla_min: 6 },
     label: 'Cafetería / Panadería',
     description: 'Mostrador, vitrina, producción propia.',
     serviceModel: 'counter',
     features: { posTienda: true, bakery_station: true, nomina: true },
     template: withMenu(MENU_CAFETERIA),
     defaultMesas: 6,
+    combos: COMBOS_CAFETERIA,
   },
   hibrido_restaurante_tienda: {
     id: 'hibrido_restaurante_tienda',
+    thresholds: { labor_pct_max: 35, food_cost_pct_max: 33, prime_cost_pct_max: 62, kds_sla_min: 15 },
     label: 'Híbrido Restaurante + Tienda',
     description: 'Mesas y meseros + market con venta directa (modelo AMALAY).',
     serviceModel: 'tables',
@@ -224,6 +308,7 @@ export const VERTICAL_PRESETS: Record<VerticalId, VerticalPreset> = {
   },
   dark_kitchen: {
     id: 'dark_kitchen',
+    thresholds: { labor_pct_max: 28, food_cost_pct_max: 32, prime_cost_pct_max: 58, kds_sla_min: 10 },
     label: 'Dark Kitchen / Delivery',
     description: 'Sin sala: las órdenes llegan de Rappi/Uber/web directo al KDS.',
     serviceModel: 'channels',
