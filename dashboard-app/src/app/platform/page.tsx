@@ -109,7 +109,8 @@ export default function PlatformPage() {
     {
       label: 'Success Rate',
       value: `${data.successRate.toFixed(1)}%`,
-      sub: `${formatNumber(data.totalRuns - Math.round(data.totalRuns * data.successRate / 100))} errors`,
+      // Sobre ejecuciones reales (success+error); los skips/no_data no son fallos.
+      sub: 'de ejecuciones reales (excluye skips)',
       icon: CheckCircle,
       color: data.successRate >= 95 ? 'text-emerald-400' : data.successRate >= 80 ? 'text-amber-400' : 'text-red-400',
       bg: data.successRate >= 95 ? 'from-emerald-500/10 to-emerald-500/5' : 'from-amber-500/10 to-amber-500/5',
@@ -125,9 +126,11 @@ export default function PlatformPage() {
       border: data.alertsCritical > 0 ? 'border-red-500/20' : 'border-amber-500/20',
     },
     {
-      label: 'Value Created',
+      // PUBLIC-CLAIMS: es un MODELO (clientes × $80K), no una medición — decirlo
+      // en la tarjeta misma, no solo en el pie de página.
+      label: 'Value Created (estimado)',
       value: formatCurrency(data.valueCreated),
-      sub: `~${formatCurrency(80000)}/client/yr`,
+      sub: `modelo: ${formatCurrency(80000)}/cliente/año — no medido`,
       icon: DollarSign,
       color: 'text-emerald-400',
       bg: 'from-emerald-500/10 to-emerald-500/5',
