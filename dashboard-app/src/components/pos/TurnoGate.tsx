@@ -271,6 +271,9 @@ export default function TurnoGate({ staff, children }: TurnoGateProps) {
             <div className="w-2 h-2 rounded-full bg-blue-400 animate-bounce" style={{ animationDelay: '300ms' }} />
           </div>
 
+          <p className="text-slate-400 text-xs mb-4">¿Eres el encargado? Entra con tu PIN de dueño o gerente
+            y abre el turno en <span className="font-mono text-slate-300">POS → Turno</span>.</p>
+          <a href="/pos/turno" className="inline-block px-4 py-2 rounded-lg border border-slate-600 text-slate-300 text-sm hover:border-slate-400 hover:text-white transition-colors mb-6">Ir a abrir turno</a>
           <p className="text-slate-500 text-xs">Sesion: {staff.name}</p>
           <p className="text-slate-600 text-xs mt-1">Se desbloqueará automáticamente cuando el turno se abra</p>
         </div>
