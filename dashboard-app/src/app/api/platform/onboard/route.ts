@@ -175,6 +175,9 @@ export async function POST(req: NextRequest) {
       userId,
       clientId,
       provisioned: provision.created,
+      // PINs de plantilla (solo cuando se sembraron en ESTA corrida). El alta
+      // los muestra UNA vez — el dueño debe guardarlos/rotarlos (gap Minute-0 #2).
+      staff_pins: provision.staffPins,
       audited,
       // Credenciales del Local Server (solo al crear). Guárdalas en el setup del
       // servidor local del restaurante. Si es null, ya existía (rota el password).

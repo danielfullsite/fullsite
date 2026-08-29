@@ -55,6 +55,9 @@ export interface ProvisionResult {
     pos_mutation_authority: number
     pos_item_inventory_policy: number
   }
+  /** PINs de plantilla sembrados en ESTA corrida (vacío si el tenant ya tenía
+   *  staff). El alta los muestra una vez — no vuelven a viajar por la red. */
+  staffPins: Array<{ role: string; pin: string }>
 }
 
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
@@ -255,9 +258,11 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
   // sembrados SOLO si el tenant no tiene staff (idempotente por conteo — así un
   // re-provision de un tenant viejo con PINs de 4 dígitos no duplica filas).
   let staffCount = 0
+  const staffPins: Array<{ role: string; pin: string }> = []
   if ((await countFor('pos_staff', clientId)) === 0) {
     const staffRows = tpl.roles.map((role) => {
       const pin = deterministicPin10(`${clientId}:${role}`)
+      staffPins.push({ role, pin })
       return {
         id: `${clientId}-${pin}`,
         client_id: clientId,
@@ -343,5 +348,6 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
       pos_mutation_authority: authorityCount,
       pos_item_inventory_policy: policyCount,
     },
+    staffPins,
   }
 }

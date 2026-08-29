@@ -122,7 +122,7 @@ export default function StaffPage() {
       const raw = sessionStorage.getItem('pos_staff')
       if (raw) {
         const parsed = JSON.parse(raw) as StaffMember
-        if (parsed.role === 'admin' || parsed.role === 'gerente') {
+        if (parsed.role === 'admin' || parsed.role === 'gerente' || parsed.role === 'dueño') {
           setCurrentStaff(parsed)
           setAuthorized(true)
           return
@@ -354,7 +354,7 @@ export default function StaffPage() {
         <div className="text-center">
           <Shield size={48} className="text-red-500 mx-auto mb-4" />
           <p className="text-white text-xl font-semibold mb-2">Sin permiso</p>
-          <p className="text-gray-400 mb-6">Solo admin y gerente pueden acceder a esta página.</p>
+          <p className="text-gray-400 mb-6">Solo dueño, admin y gerente pueden acceder a esta página.</p>
           <Link href="/pos" className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-semibold min-h-[48px] inline-flex items-center">
             Regresar al POS
           </Link>

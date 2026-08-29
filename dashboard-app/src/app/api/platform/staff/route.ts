@@ -9,7 +9,9 @@ import { auditLog } from '@/lib/platform-writes'
 export const dynamic = 'force-dynamic'
 
 const CLIENT_RE = /^[a-z0-9_-]{1,40}$/i
-const PIN_RE = /^\d{3,8}$/
+// 4–10: los seeds del provisioning son de 10 dígitos; con el tope viejo de 8
+// esta pantalla rechazaba los PINs que ella misma provisionó (gap Minute-0 #4).
+const PIN_RE = /^\d{4,10}$/
 
 export async function GET(req: NextRequest) {
   const gate = await requirePlatformAdmin2FA(req)
@@ -37,7 +39,7 @@ export async function PATCH(req: NextRequest) {
 
   const changes: Record<string, unknown> = {}
   if (typeof body.pin === 'string') {
-    if (!PIN_RE.test(body.pin)) return Response.json({ error: 'PIN debe ser 3–8 dígitos' }, { status: 400 })
+    if (!PIN_RE.test(body.pin)) return Response.json({ error: 'PIN debe ser 4–10 dígitos' }, { status: 400 })
     changes.pin = body.pin
   }
   if (typeof body.name === 'string' && body.name.trim()) changes.name = body.name.trim()

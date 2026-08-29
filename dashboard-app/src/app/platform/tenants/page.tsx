@@ -255,6 +255,10 @@ function NewTenantModal({ onClose, onDone, toast, tenantCount }: {
   const [logo, setLogo] = useState('')
   const [mesas, setMesas] = useState('10')
   const [vertical, setVertical] = useState<VerticalId>('casual_dining')
+  const [creds, setCreds] = useState<{
+    staffPins: Array<{ role: string; pin: string }>
+    localServer: { email: string; password: string } | null
+  } | null>(null)
   const [mesasTouched, setMesasTouched] = useState(false)
   const [locationsText, setLocationsText] = useState('Principal')
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -283,7 +287,18 @@ function NewTenantModal({ onClose, onDone, toast, tenantCount }: {
           locations,
         }),
       })
-      if (res.ok) { toast('success', `Tenant "${slug}" dado de alta`); onDone(); onClose() }
+      if (res.ok) {
+        // NO cerrar todavía: las credenciales (PINs de plantilla + service
+        // account del Local Server) solo viajan UNA vez. Mostrarlas para que
+        // el operador las guarde (gap Minute-0 #2/#3).
+        const j = await res.json().catch(() => ({})) as {
+          staff_pins?: Array<{ role: string; pin: string }>
+          local_server?: { email: string; password: string } | null
+        }
+        toast('success', `Tenant "${slug}" dado de alta`)
+        setCreds({ staffPins: j.staff_pins || [], localServer: j.local_server || null })
+        onDone()
+      }
       else if (res.status === 429) toast('error', 'Límite de escrituras excedido.')
       else {
         const j = await res.json().catch(() => ({}))
@@ -307,6 +322,51 @@ function NewTenantModal({ onClose, onDone, toast, tenantCount }: {
           </div>
           <button onClick={onClose} className="ml-auto text-[var(--text-3)] hover:text-[var(--text-1)]"><X size={18} /></button>
         </div>
+        {creds ? (
+          // Pantalla de credenciales — se muestran UNA vez; el server no las
+          // vuelve a mandar. El operador debe guardarlas antes de cerrar.
+          <div className="p-5 space-y-4">
+            <p className="text-sm font-semibold text-[var(--text-1)]">Guarda estas credenciales — no se volverán a mostrar</p>
+            <div className="rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3 text-sm">
+              <p className="text-xs text-[var(--text-3)] mb-1">Login del dueño</p>
+              <p className="font-mono text-[var(--text-1)]">{email} · {password}</p>
+            </div>
+            {creds.staffPins.length > 0 && (
+              <div className="rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3 text-sm">
+                <p className="text-xs text-[var(--text-3)] mb-2">PINs de plantilla del POS (rotarlos en Personal &amp; PINs)</p>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                  {creds.staffPins.map(sp => (
+                    <p key={sp.role} className="flex justify-between gap-2"><span className="capitalize text-[var(--text-2)]">{sp.role}</span><span className="font-mono tabular-nums text-[var(--text-1)]">{sp.pin}</span></p>
+                  ))}
+                </div>
+              </div>
+            )}
+            {creds.localServer && (
+              <div className="rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3 text-sm">
+                <p className="text-xs text-[var(--text-3)] mb-1">Service account del Local Server (Pedro)</p>
+                <p className="font-mono break-all text-[var(--text-1)]">{creds.localServer.email}</p>
+                <p className="font-mono text-[var(--text-1)]">{creds.localServer.password}</p>
+              </div>
+            )}
+            <button
+              onClick={() => {
+                const lines = [
+                  `Tenant: ${slug}`,
+                  `Dueño: ${email} / ${password}`,
+                  ...creds.staffPins.map(sp => `PIN ${sp.role}: ${sp.pin}`),
+                  ...(creds.localServer ? [`Local Server: ${creds.localServer.email} / ${creds.localServer.password}`] : []),
+                ]
+                navigator.clipboard?.writeText(lines.join('\n')).then(() => toast('success', 'Credenciales copiadas'))
+              }}
+              className="w-full py-2.5 rounded-xl border border-[var(--line)] text-sm font-semibold text-[var(--text-1)] hover:border-[var(--accent-line)]">
+              Copiar todo
+            </button>
+            <button onClick={onClose}
+              className="w-full py-3 rounded-xl bg-[var(--accent)] text-[#04120c] font-bold">
+              Listo, ya las guardé
+            </button>
+          </div>
+        ) : (
         <div className="p-5 space-y-4">
           <label className="block">
             <span className="text-xs text-[var(--text-3)]">Nombre del restaurante</span>
@@ -392,6 +452,7 @@ function NewTenantModal({ onClose, onDone, toast, tenantCount }: {
             <Plus size={16} /> Dar de alta cliente
           </button>
         </div>
+        )}
       </div>
 
       <ConfirmModal
