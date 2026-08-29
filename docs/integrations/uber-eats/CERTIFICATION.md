@@ -24,6 +24,75 @@ Ticket siguiente: abrir nuevo ticket mencionando `#D5FEA8`.
 
 ---
 
+## ⚠️ ACTUALIZACIÓN 2026-08-29 — el bloqueo YA NO es de Uber
+
+Todo lo de arriba quedó congelado el 2026-08-03 y dice "UBER-SIDE BLOCKER". **Eso ya no es cierto.**
+Verificado leyendo el hilo real de correo (Case #59128344, prev. `#D5FEA8`):
+
+**Uber respondió el 2026-08-20 05:46** (UET GSS Support → `daniel@fullsite.mx`):
+
+> *"Please refer to the documentation below for instructions on placing test orders **from your end**:*
+> *https://developer.uber.com/docs/eats/guides/order-integration#testing-orders*
+> *Store UUID: `0f655507-7337-41e9-b536-5fd6171bb0da`*
+> *Client ID: `k2DPoUeXuBdLd6gV7W5VMFR7fSnmnEaq`"*
+
+Se le había pedido a Uber que **ellos** generaran la orden de prueba. La respuesta es que se hace
+**de nuestro lado**. El caso se marcó *resolved* el 2026-08-21 y la ventana de reapertura (5 días)
+**venció el 2026-08-25** — si hace falta volver a Uber, ya es caso nuevo.
+
+**Procedimiento oficial que falta ejecutar** (de la doc de Uber, sección *Testing Orders*):
+
+1. Entrar a Uber Eats con una cuenta de cliente de prueba; poner la dirección de entrega en la tienda
+2. Entrar a **Uber Eats Orders** con las credenciales de la tienda y dejarla en **Open**
+3. Colocar la orden como cliente — **sin pago ni repartidor**; dispara el webhook
+4. Nuestro endpoint responde HTTP 200
+5. Ejercitar **Accept** y **Deny**
+
+Los pasos 1 y 2 exigen sesión en cuentas de Uber (cliente y tienda) → los ejecuta Daniel.
+Del 3 al 5 se verifican por audit log y API una vez que llegue el webhook.
+
+### Sondas frescas 2026-08-29 — el "UBER-SIDE BLOCKER" era un artefacto
+
+Se corrió `UBER Activate` (workflow 337521171) contra la tienda **real**
+`0f655507-7337-41e9-b536-5fd6171bb0da`, en vez de contra la que traen hardcodeada los
+workflows de cert. Resultado:
+
+```json
+{ "p1_scopes": ["eats.pos_provisioning", "offline_access"],
+  "p1_db": "ok",
+  "p1_probe": { "ok": false, "status": 401,
+                "interpretation": "eats.pos_provisioning DENIED or token expired" },
+  "p2_endpoint": { "ok": true } }
+```
+
+**Los scopes SÍ están concedidos.** El `scopes_granted: []` del Day 3 (2026-08-03 y repetido
+hoy) sale de que `uber-cert-day3.yml` sondea `a4f298f4-202f-47f5-b375-d2eefec0126c`, que **no es**
+la tienda que Uber confirmó por correo. Sondear la tienda equivocada devuelve vacío, y de ahí
+nació la conclusión de que Uber bloqueaba.
+
+**Y el token tampoco está expirado.** En `integration_providers` (consultado 2026-08-29):
+
+| `provider_account_id` | `client_id` | expira | refresh |
+|---|---|---|---|
+| `0f655507-…` (tienda real) | `amalay` | 2026-09-18 | sí |
+| `633b57d4-…` | **`k2DPoUeXuBdLd6gV7W5VMFR7fSnmnEaq`** | 2026-09-18 | sí |
+
+Dos cosas que quedan abiertas y no se deben dar por entendidas:
+
+1. **`633b57d4` NO es un fixture sintético.** Tiene credencial real creada el 2026-08-19. Una
+   versión previa de esta nota afirmaba lo contrario a partir de ver `CERT_ORDER_ID: CERT-…`
+   junto a él en un workflow; era inferencia, no dato.
+2. **La columna `client_id` de la segunda fila trae el *client id de Uber*, no el tenant de
+   Fullsite.** En la primera fila esa columna dice `amalay`. Son dos significados distintos en
+   la misma columna. Hasta resolver eso, cualquier resolución de credencial por tenant es
+   sospechosa — y es candidata a explicar el 401 de `accept_pos_order` con scopes válidos y
+   token vigente.
+
+**Siguiente paso real:** entender por qué `accept_pos_order` da 401 con scope concedido y token
+no expirado. La hipótesis principal ya no es Uber, es nuestra resolución de credenciales.
+
+---
+
 ## Day 3 — Scope Probe + Delivery APIs + Evidencia Fresca (2026-08-03)
 
 Run ID: `30847395120` | Duración: 11s | Todos los pasos: PASS

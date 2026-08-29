@@ -164,8 +164,11 @@ Fullsite
 
 Marcar cuando se reciba confirmación escrita:
 
-- [ ] `RAPPI_CLIENT_ID` recibido
-- [ ] `RAPPI_CLIENT_SECRET` recibido
+- [x] `RAPPI_CLIENT_ID` recibido — 2026-08-29 vía self-onboarding. **El valor NO se escribe aquí**
+      (§13): va a Vercel env / GitHub secrets como `RAPPI_CLIENT_ID`.
+- [ ] `RAPPI_CLIENT_SECRET` recibido — **PENDIENTE.** Ojo: lo que llegó el 2026-08-29 fue usuario y
+      contraseña del *portal* de self-onboarding, que **no** es el `client_secret` del flujo
+      `client_credentials`. Hay que sacarlo del portal.
 - [x] `storeId` de AMALAY confirmado — `MX1930030014` (brandId: `MX491066`) — extraído de URL partners.rappi.com 2026-08-03
 - [ ] Formato de `Rappi-Signature` documentado oficialmente — **ECR ABIERTO** (no en doc pública)
 - [x] String firmado para HMAC: pendiente, pero secreto lo da Rappi en respuesta `POST webhook` — confirmado por doc pública
@@ -174,6 +177,28 @@ Marcar cuando se reciba confirmación escrita:
 - [x] Payload de ejemplo de orden recibido — disponible en doc pública `GET /orders`
 - [x] Unidad monetaria: **centavos** — confirmado por muestras de payload (28900 = $289 MXN)
 - [x] Semántica del polling: `GET /orders` devuelve órdenes "nuevas" (persisten hasta ser tomadas/rechazadas) — confirmado por doc pública
-- [ ] Sandbox disponible: dev domain `microservices.dev.rappi.com` + `rests-integrations-dev.auth0.com` — credenciales dev separadas, pendiente confirmar
+- [x] Sandbox disponible: dev domain `microservices.dev.rappi.com` + `rests-integrations-dev.auth0.com`
+      — **credenciales dev de self-onboarding recibidas 2026-08-29** (usuario `admon@cafeamalay.com`).
+      Confirma que el ambiente separado existe y que tenemos acceso.
 
 **Cuando todos estén marcados → abrir RAPPI-001.**
+
+---
+
+## Estado 2026-08-29 — faltan 3 ítems, los tres están dentro del portal
+
+Las credenciales de self-onboarding cerraron `client_id` y sandbox. Lo que queda **no se puede
+inferir ni asumir** (regla del DESIGN: *NO asumir contratos de API*), y los tres viven en la
+documentación privada del portal:
+
+| # | Qué falta | Dónde buscarlo |
+|---|---|---|
+| 1 | `RAPPI_CLIENT_SECRET` del flujo `client_credentials` | Sección de credenciales/API keys del portal. **No** es la contraseña de login. |
+| 2 | Formato exacto del header `Rappi-Signature` | Doc privada de webhooks. Confirmar si el valor es `t=<unix_ts>,sign=<hex>` **y** si el string firmado es `<timestamp>.<raw_body>` o sólo `<raw_body>`. |
+| 3 | Especificación del PING | Método (GET/POST), ruta esperada, cuerpo de respuesta (`{"status":"OK"}` vs 200 pelón) y frecuencia. |
+
+Con esos tres, el checklist queda completo y **se autoriza abrir RAPPI-001**. La reutilización del
+framework de Uber es ~68%, así que el camino de código ya está trazado en el DESIGN §Arquitectura.
+
+**Seguridad:** las credenciales del 2026-08-29 llegaron por chat en texto plano → considerarlas
+expuestas. Rotar al terminar y dejarlas sólo en el secret store.
