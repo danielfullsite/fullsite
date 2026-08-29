@@ -70,6 +70,8 @@ export function counterHomePath(model: ServiceModel): string {
  */
 export function nextMostradorCuenta(now: Date = new Date()): string {
   const hhmm = `${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`
-  const salt = Math.random().toString(36).slice(2, 5)
+  // 5 chars alfanuméricos (~60M combinaciones) y con padding: slice(2,5) de 3
+  // chars daba ~2.7% de colisión al generar 50 (cumpleaños) — test flaky en CI.
+  const salt = Math.random().toString(36).slice(2, 7).padEnd(5, '0')
   return `Mostrador ${hhmm}-${salt}`
 }
