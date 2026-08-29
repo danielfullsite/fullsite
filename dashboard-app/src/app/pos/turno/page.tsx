@@ -229,6 +229,8 @@ interface Cierre {
   created_at: string
   fondo_inicial: number
   total_contado: number
+  /** Consecutivo fiscal por cliente; lo asigna un trigger al insertar. Null en cierres previos a la migración. */
+  folio_z?: number | null
 }
 
 function HistorialCierres() {
@@ -239,10 +241,12 @@ function HistorialCierres() {
   useEffect(() => {
     async function fetch_() {
       try {
-        const res = await fetch(
-          `${SUPABASE_URL}/rest/v1/pos_cierres?client_id=eq.${_cid()}&order=created_at.desc&limit=10&select=id,fecha,total_ventas,tickets_count,diferencia,closed_by,created_at,fondo_inicial,total_contado`,
-          { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
-        )
+        const base = `${SUPABASE_URL}/rest/v1/pos_cierres?client_id=eq.${_cid()}&order=created_at.desc&limit=10&select=id,fecha,total_ventas,tickets_count,diferencia,closed_by,created_at,fondo_inicial,total_contado`
+        // folio_z existe cuando la migración pos_cierres_folio_z_consecutivo está
+        // aplicada; si la base aún no la tiene, PostgREST rechaza el select entero,
+        // así que se reintenta sin la columna (el chip Z simplemente no aparece).
+        let res = await fetch(`${base},folio_z`, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } })
+        if (!res.ok) res = await fetch(base, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } })
         if (res.ok) setCierres(await res.json())
       } catch { /* */ }
       setLoading(false)
@@ -266,6 +270,9 @@ function HistorialCierres() {
             >
               <div className="flex items-center gap-3">
                 {isOpen ? <ChevronDown size={14} className="text-[var(--text-3)]" /> : <ChevronRight size={14} className="text-[var(--text-3)]" />}
+                {typeof c.folio_z === 'number' && (
+                  <span className="text-[10px] font-mono font-bold tabular-nums px-1.5 py-0.5 rounded-md bg-[var(--accent-soft)] text-[var(--accent-ink)]">Z #{c.folio_z}</span>
+                )}
                 <span className="font-medium text-[var(--text-1)]">{new Date(c.created_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
                 <span className="text-[var(--text-3)]">{new Date(c.created_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</span>
               </div>
