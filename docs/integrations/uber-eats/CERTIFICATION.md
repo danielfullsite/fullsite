@@ -24,6 +24,60 @@ Ticket siguiente: abrir nuevo ticket mencionando `#D5FEA8`.
 
 ---
 
+## ⚠️ 2026-08-29 — el "UBER-SIDE BLOCKER" de abajo YA NO APLICA
+
+Todo lo que sigue quedó congelado el 2026-08-03. Tres cosas lo desmienten, verificadas hoy:
+
+**1. Uber contestó el 2026-08-20.** Case #59128344 (antes `#D5FEA8`), UET GSS Support a
+`daniel@fullsite.mx`: *"Please refer to the documentation below for instructions on placing test
+orders **from your end**"* → `developer.uber.com/docs/eats/guides/order-integration#testing-orders`,
+con `Store UUID: 0f655507-7337-41e9-b536-5fd6171bb0da` y
+`Client ID: k2DPoUeXuBdLd6gV7W5VMFR7fSnmnEaq`. Se le había pedido a Uber que **ellos** generaran la
+orden; la respuesta es que se hace de nuestro lado. Caso cerrado el 21; la ventana de reapertura
+(5 días) venció el 25.
+
+**2. Los scopes SÍ están concedidos.** Sondeando la tienda **real** con el workflow `UBER Activate`
+(337521171):
+
+```json
+{ "p1_scopes": ["eats.pos_provisioning", "offline_access"],
+  "p1_db": "ok",
+  "p1_probe": { "ok": false, "status": 401 },
+  "p2_endpoint": { "ok": true } }
+```
+
+El `scopes_granted: []` que originó el diagnóstico de "UBER-SIDE BLOCKER" sale de que
+`uber-cert-day3.yml` sondea `a4f298f4-202f-47f5-b375-d2eefec0126c`, que **no es** la tienda que
+Uber confirmó. Sondear la tienda equivocada devuelve vacío.
+
+**3. El token tampoco está expirado** — `integration_providers` para `0f655507`: vence 2026-09-18,
+con refresh token, actualizado 2026-08-19.
+
+### Lo único que queda: el 401 de `accept_pos_order`
+
+Con scope concedido y token vigente, el probe
+(`POST /v1/eats/orders/SCOPE-PROBE-USL/accept_pos_order`, donde 404 = scope OK) devuelve **401**.
+La lectura más probable es que el grant USL se invalidó del lado de Uber. La recuperación es
+**re-autorizar**, y la URL está verificada y funcionando:
+
+```
+https://app.fullsite.mx/api/integrations/uber-eats/auth/initiate?store_id=0f655507-7337-41e9-b536-5fd6171bb0da&client_id=amalay
+```
+
+Redirige a `sandbox-login.uber.com/oauth/v2/authorize` con el `client_id` que Uber confirmó por
+correo y el `redirect_uri` correcto. Requiere que **una persona** dé el consentimiento como comercio
+— es un flujo de consentimiento por diseño, no se automatiza. Tras autorizar, el callback guarda
+tokens frescos y el probe debe pasar a 404.
+
+**Ojo con la nomenclatura:** en `integration_providers`, la columna `client_id` guarda el *tenant de
+Fullsite* (`amalay`) en la fila de `0f655507`, pero el *client id de Uber* (`k2DPo…`) en la fila de
+`633b57d4`. Son dos significados en la misma columna y hay que normalizarlo.
+
+**Y `633b57d4` NO es un fixture sintético** — tiene credencial real creada el 2026-08-19, aunque
+aparezca junto a `CERT_ORDER_ID: CERT-…` en los workflows.
+
+---
+
 ## Day 3 — Scope Probe + Delivery APIs + Evidencia Fresca (2026-08-03)
 
 Run ID: `30847395120` | Duración: 11s | Todos los pasos: PASS
