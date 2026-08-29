@@ -61,6 +61,27 @@ describe('vertical-presets', () => {
     }
   })
 
+  it('combos semilla: los presets counter con menú los traen y referencian items existentes', () => {
+    for (const id of ['fast_food', 'fast_casual', 'cafeteria_panaderia'] as const) {
+      const p = VERTICAL_PRESETS[id]
+      expect(p.combos?.length, `${id} sin combos → speed screen vacío (gap #12)`).toBeGreaterThan(0)
+      const suffixes = new Set(p.template!.menu.flatMap(c => c.items.map(i => i.idSuffix)))
+      for (const combo of p.combos!) {
+        expect(combo.price).toBeGreaterThan(0)
+        for (const it of combo.items) {
+          expect(suffixes.has(it.itemIdSuffix), `${id}/${combo.idSuffix}: item ${it.itemIdSuffix} no existe en el template`).toBe(true)
+          for (const s of it.substitutions || []) {
+            expect(suffixes.has(s.itemIdSuffix), `${id}/${combo.idSuffix}: sustitución ${s.itemIdSuffix} no existe`).toBe(true)
+          }
+        }
+        // El combo debe AHORRAR vs comprar los items sueltos
+        const priceOf = new Map(p.template!.menu.flatMap(c => c.items.map(i => [i.idSuffix, i.price] as const)))
+        const suelto = combo.items.reduce((s, it) => s + (priceOf.get(it.itemIdSuffix) ?? 0), 0)
+        expect(combo.price, `${id}/${combo.idSuffix} no ahorra`).toBeLessThan(suelto)
+      }
+    }
+  })
+
   it('casual_dining es el default: sin parche de features ni template propio', () => {
     expect(VERTICAL_PRESETS.casual_dining.features).toEqual({})
     expect(VERTICAL_PRESETS.casual_dining.template).toBeUndefined()

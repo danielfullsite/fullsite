@@ -52,6 +52,7 @@ export interface ProvisionResult {
     pos_payment_methods: number
     pos_staff: number
     pos_mesas: number
+    pos_combos: number
     pos_mutation_authority: number
     pos_item_inventory_policy: number
   }
@@ -278,6 +279,30 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     staffCount = await upsert('pos_staff', staffRows)
   }
 
+  // ── 5b. combos semilla (pos_combos) ────────────────────────────────────────
+  // Sin esto, el speed screen de un tenant counter nace vacío (gap Minute-0 #12
+  // — visto en campo con carls-jr, cuyos combos se sembraron a mano el
+  // 2026-08-29; este bloque hace lo mismo para todo tenant nuevo). Idempotente
+  // por conteo: un re-provision no duplica ni pisa combos editados.
+  let combosCount = 0
+  if (preset?.combos?.length && (await countFor('pos_combos', clientId)) === 0) {
+    const comboRows = preset.combos.map(c => ({
+      id: `${clientId}-${c.idSuffix}`,
+      client_id: clientId,
+      name: c.name,
+      price: c.price,
+      items: c.items.map(it => ({
+        menu_item_id: `${clientId}-${it.itemIdSuffix}`,
+        name: it.name,
+        substitutions: (it.substitutions || []).map(s => ({ id: `${clientId}-${s.itemIdSuffix}`, name: s.name })),
+      })),
+      upsell: c.upsell || null,
+      active: true,
+      schedule: null,
+    }))
+    combosCount = await upsert('pos_combos', comboRows)
+  }
+
   // ── 6. mesas (floor plan) ──────────────────────────────────────────────────
   // Sin esto el POS del tenant nuevo abre con plano vacío (no se puede sentar
   // ni cobrar en mesa). Se siembra SOLO si el tenant aún no tiene mesas
@@ -345,6 +370,7 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
       pos_payment_methods: pmCount,
       pos_staff: staffCount,
       pos_mesas: mesasCount,
+      pos_combos: combosCount,
       pos_mutation_authority: authorityCount,
       pos_item_inventory_policy: policyCount,
     },

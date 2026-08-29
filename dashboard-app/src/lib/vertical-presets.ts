@@ -30,6 +30,16 @@ export type VerticalId =
 /** How orders are born on this kind of floor. Consumed by the POS shell (Fase 2). */
 export type ServiceModel = 'tables' | 'counter' | 'tabs' | 'channels'
 
+/** Combo semilla — referencia items del template por idSuffix; provisionTenant
+ *  resuelve los ids finales (`${clientId}-${itemIdSuffix}`) al sembrar pos_combos. */
+export interface SeedCombo {
+  idSuffix: string
+  name: string
+  price: number
+  items: Array<{ itemIdSuffix: string; name: string; substitutions?: Array<{ itemIdSuffix: string; name: string }> }>
+  upsell?: { label: string; price_add: number }
+}
+
 export interface VerticalPreset {
   id: VerticalId
   label: string
@@ -40,6 +50,9 @@ export interface VerticalPreset {
   /** Seed skeleton; falls back to the generic template when omitted. */
   template?: OnboardingTemplate
   defaultMesas: number
+  /** Combos semilla (pos_combos) — sin esto, el speed screen de un tenant
+   *  counter nace vacío (gap Minute-0 #12, visto en campo con carls-jr). */
+  combos?: SeedCombo[]
 }
 
 // ─── Seed menus per vertical ─────────────────────────────────────────────────
@@ -158,6 +171,49 @@ function withMenu(menu: TemplateMenuCategory[]): OnboardingTemplate {
   return { ...DEFAULT_ONBOARDING_TEMPLATE, menu }
 }
 
+// ─── Combos semilla ──────────────────────────────────────────────────────────
+// Mismos combos que se validaron a mano en carls-jr (2026-08-29): el precio del
+// combo < suma de los items para que el POS muestre el ahorro.
+
+const COMBOS_FAST_FOOD: SeedCombo[] = [
+  {
+    idSuffix: 'combo-clasico', name: 'Combo Clásico', price: 129,
+    items: [
+      { itemIdSuffix: 'item-hamburguesa', name: 'Hamburguesa' },
+      { itemIdSuffix: 'item-papas', name: 'Papas' },
+      { itemIdSuffix: 'item-refresco-ch', name: 'Refresco Chico', substitutions: [{ itemIdSuffix: 'item-malteada', name: 'Malteada' }] },
+    ],
+    upsell: { label: 'Agrandar combo', price_add: 20 },
+  },
+  {
+    idSuffix: 'combo-doble', name: 'Combo Doble', price: 199,
+    items: [
+      { itemIdSuffix: 'item-hamburguesa', name: 'Hamburguesa' },
+      { itemIdSuffix: 'item-hamburguesa', name: 'Hamburguesa' },
+      { itemIdSuffix: 'item-papas', name: 'Papas' },
+      { itemIdSuffix: 'item-refresco-gd', name: 'Refresco Grande' },
+    ],
+  },
+  {
+    idSuffix: 'combo-nuggets', name: 'Combo Nuggets', price: 119,
+    items: [
+      { itemIdSuffix: 'item-nuggets', name: 'Nuggets' },
+      { itemIdSuffix: 'item-papas', name: 'Papas' },
+      { itemIdSuffix: 'item-refresco-ch', name: 'Refresco Chico' },
+    ],
+  },
+]
+
+const COMBOS_CAFETERIA: SeedCombo[] = [
+  {
+    idSuffix: 'combo-desayuno', name: 'Café + Pan', price: 65,
+    items: [
+      { itemIdSuffix: 'item-americano', name: 'Americano', substitutions: [{ itemIdSuffix: 'item-latte', name: 'Latte' }] },
+      { itemIdSuffix: 'item-croissant', name: 'Croissant', substitutions: [{ itemIdSuffix: 'item-concha', name: 'Concha' }] },
+    ],
+  },
+]
+
 // ─── The preset library ──────────────────────────────────────────────────────
 
 export const VERTICAL_PRESETS: Record<VerticalId, VerticalPreset> = {
@@ -169,6 +225,7 @@ export const VERTICAL_PRESETS: Record<VerticalId, VerticalPreset> = {
     features: { delivery: true, nomina: true, resenas: false, giftCards: false },
     template: withMenu(MENU_FAST_FOOD),
     defaultMesas: 0,
+    combos: COMBOS_FAST_FOOD,
   },
   fast_casual: {
     id: 'fast_casual',
@@ -178,6 +235,7 @@ export const VERTICAL_PRESETS: Record<VerticalId, VerticalPreset> = {
     features: { delivery: true, nomina: true, resenas: true },
     template: withMenu(MENU_FAST_FOOD),
     defaultMesas: 8,
+    combos: COMBOS_FAST_FOOD,
   },
   casual_dining: {
     id: 'casual_dining',
@@ -213,6 +271,7 @@ export const VERTICAL_PRESETS: Record<VerticalId, VerticalPreset> = {
     features: { posTienda: true, bakery_station: true, nomina: true },
     template: withMenu(MENU_CAFETERIA),
     defaultMesas: 6,
+    combos: COMBOS_CAFETERIA,
   },
   hibrido_restaurante_tienda: {
     id: 'hibrido_restaurante_tienda',
