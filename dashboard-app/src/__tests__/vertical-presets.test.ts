@@ -82,6 +82,24 @@ describe('vertical-presets', () => {
     }
   })
 
+  it('umbrales día-0: todos los presets nacen con KPIs de industria coherentes', () => {
+    for (const id of VERTICAL_IDS) {
+      const t = VERTICAL_PRESETS[id].thresholds
+      expect(t.labor_pct_max, `${id} sin labor`).toBeGreaterThan(0)
+      expect(t.food_cost_pct_max).toBeGreaterThan(0)
+      expect(t.kds_sla_min).toBeGreaterThan(0)
+      // El prime cost debe ser un techo real: no mayor que la suma de sus
+      // partes (≤ es válido: bar 30+30 con techo 60 alerta justo cuando ambos
+      // topan) y en el rango sano de la industria (55-65).
+      expect(t.prime_cost_pct_max).toBeLessThanOrEqual(t.labor_pct_max + t.food_cost_pct_max)
+      expect(t.prime_cost_pct_max).toBeGreaterThanOrEqual(55)
+      expect(t.prime_cost_pct_max).toBeLessThanOrEqual(65)
+    }
+    // Los giros de barra traen pour cost; QSR no.
+    expect(VERTICAL_PRESETS.bar_cantina.thresholds.pour_cost_pct_max).toBeDefined()
+    expect(VERTICAL_PRESETS.fast_food.thresholds.pour_cost_pct_max).toBeUndefined()
+  })
+
   it('casual_dining es el default: sin parche de features ni template propio', () => {
     expect(VERTICAL_PRESETS.casual_dining.features).toEqual({})
     expect(VERTICAL_PRESETS.casual_dining.template).toBeUndefined()

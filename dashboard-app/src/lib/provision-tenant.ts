@@ -174,6 +174,18 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
   if (!serviceKey()) throw new Error('[provision] SUPABASE_SERVICE_KEY not configured')
 
   const preset = input.vertical ? resolveVerticalPreset(input.vertical) : null
+
+  // ¿El tenant ya existe? Los umbrales día-0 (Lazo 1) solo se siembran en el
+  // alta ORIGINAL: un re-provision no debe pisar pos_settings que el tenant o
+  // el tuner (Lazo 2) ya ajustaron.
+  let clientExists = false
+  try {
+    const chk = await fetch(`${SB_URL}/rest/v1/clients?id=eq.${encodeURIComponent(clientId)}&select=id&limit=1`,
+      { headers: headers(), cache: 'no-store' })
+    const rows = chk.ok ? await chk.json().catch(() => []) : []
+    clientExists = Array.isArray(rows) && rows.length > 0
+  } catch { /* si no se pudo verificar, tratar como existente = no pisar settings */ clientExists = true }
+
   const tpl = input.template || preset?.template || DEFAULT_ONBOARDING_TEMPLATE
   const displayName = input.display_name || clientId
   const mesas = input.mesas ?? preset?.defaultMesas ?? 10
@@ -195,6 +207,10 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     mesas,
     // Tipo de restaurante (vertical preset). Columna `type` ya existe en `clients`.
     ...(input.vertical ? { type: input.vertical } : {}),
+    // Lazo 1 (docs/ai/APRENDIZAJE-AGENTES-DESIGN.md): umbrales de industria del
+    // vertical como prior de los agentes — SOLO en el alta original, para no
+    // pisar ajustes del tenant/tuner en un re-provision.
+    ...(!clientExists && preset ? { pos_settings: { 'agents.thresholds': { ...preset.thresholds, source: `vertical:${preset.id}`, seeded_at: new Date().toISOString() } } } : {}),
     data_source: 'fullsite',
     // Requerido por el cálculo de día de negocio (ops_aggregate.get_business_day_config).
     // Sin esto, los agentes de IA crashean para el clon. Default 05:00 (día empieza a las 5am).
