@@ -10,6 +10,7 @@ import { getActiveClientSlug as _cid } from '@/lib/data'
 import { getPosConfigSync } from '@/lib/pos-config'
 import { shouldUsePersistedFloorCoordinates } from '@/lib/floorplan-coordinates'
 import { setMesaTarget } from '@/lib/pos-navigation'
+import { getServiceModel, isCounterModel } from '@/lib/pos-service-model'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -160,6 +161,18 @@ export default function MesasPage() {
   const [turnoNum, setTurnoNum] = useState<number | null>(null)
   const [showNewCuenta, setShowNewCuenta] = useState(false)
   const [newCuentaName, setNewCuentaName] = useState('')
+
+  // Tenants de mostrador (fast food / dark kitchen) no tienen mapa de mesas:
+  // URL directa, PWA o marcador viejo aterrizan aquí → mandar a la orden de
+  // mostrador. getServiceModel cae a 'tables' ante cualquier duda (sin red usa
+  // el caché local), así que para todos los demás tenants esto es un no-op.
+  useEffect(() => {
+    let alive = true
+    getServiceModel().then(model => {
+      if (alive && isCounterModel(model)) router.replace('/pos?mostrador=1')
+    })
+    return () => { alive = false }
+  }, [router])
 
   // Fetch mesa list from DB (pos_mesas).
   // OP-40: el mapa (posición + forma) ahora viene de pos_mesas (x_pct/y_pct/shape),

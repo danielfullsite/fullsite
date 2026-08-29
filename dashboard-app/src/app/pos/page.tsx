@@ -4,6 +4,7 @@ import { Component, useState, useCallback, useEffect, useRef, Suspense, type Err
 import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { resolveMesa, clearMesaTarget, peekMesaTarget } from '@/lib/pos-navigation'
+import { nextMostradorCuenta } from '@/lib/pos-service-model'
 import {
   MESEROS,
   fetchMeseros,
@@ -1612,7 +1613,14 @@ function POSContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const { lock } = usePOSLock()
-  const initialCuenta = searchParams.get('cuenta') || ''
+  // Mostrador (tenants counter/channels): abre una cuenta nueva sin mesa con
+  // nombre único — reutiliza intacto el flujo "cuenta por nombre" de abajo.
+  // El nombre se genera UNA vez (inicializador de estado): regenerarlo en cada
+  // render cambiaría la cuenta a media orden y rompería la deduplicación.
+  const [mostradorCuenta] = useState<string>(() =>
+    searchParams.get('mostrador') ? nextMostradorCuenta() : ''
+  )
+  const initialCuenta = searchParams.get('cuenta') || mostradorCuenta
   // Cuenta por nombre (estilo POS legado): sin mesa → mesa 0
   // La mesa puede llegar por el query o parqueada en sessionStorage (ver pos-navigation):
   // offline el query no sobrevive y sin el respaldo esto caía a la mesa 1.
