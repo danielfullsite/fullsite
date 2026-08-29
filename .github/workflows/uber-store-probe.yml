@@ -1,0 +1,49 @@
+name: UBER — Store Probe (SOLO LECTURA)
+
+# Sonda no destructiva contra la tienda REAL de prueba que Uber confirmó por
+# correo el 2026-08-20 (Case #59128344): 0f655507-7337-41e9-b536-5fd6171bb0da.
+#
+# Responde una sola pregunta: ¿tenemos acceso funcional a esa tienda hoy?
+# Si sí, publicar el menú tiene sentido. Si devuelve 401/403, el bloqueo sigue
+# siendo de scopes y subir menú sólo generaría ruido.
+#
+# NO muta nada. Sólo GET. El menú se publica en un workflow aparte, a propósito.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    env:
+      APP_URL: https://app.fullsite.mx
+      INTEGRATION_ADMIN_SECRET: ${{ secrets.INTEGRATION_ADMIN_SECRET }}
+      REAL_STORE_ID: 0f655507-7337-41e9-b536-5fd6171bb0da
+    steps:
+      - name: GET /stores — ¿qué tiendas ve nuestra app?
+        run: |
+          RESP=$(curl -s -w "\n%{http_code}" \
+            "$APP_URL/api/integrations/uber-eats/stores" \
+            -H "Authorization: Bearer $INTEGRATION_ADMIN_SECRET")
+          CODE=$(echo "$RESP" | tail -1)
+          BODY=$(echo "$RESP" | head -n -1)
+          echo "HTTP $CODE"
+          echo "$BODY" | head -c 3000
+          echo
+          if [ "$CODE" != "200" ]; then echo "::warning::/stores devolvió $CODE"; fi
+
+      - name: GET /store — estado de la tienda real de prueba
+        run: |
+          RESP=$(curl -s -w "\n%{http_code}" \
+            "$APP_URL/api/integrations/uber-eats/store?store_id=$REAL_STORE_ID" \
+            -H "Authorization: Bearer $INTEGRATION_ADMIN_SECRET")
+          CODE=$(echo "$RESP" | tail -1)
+          BODY=$(echo "$RESP" | head -n -1)
+          echo "HTTP $CODE"
+          echo "$BODY" | head -c 3000
+          echo
+          echo "---"
+          echo "Lectura del resultado:"
+          echo "  200 → hay acceso; publicar el menú es el siguiente paso."
+          echo "  401 → el guard de admin rechazó (secreto mal configurado en Vercel)."
+          echo "  403/422 → Uber rechazó; los scopes siguen sin otorgarse."
