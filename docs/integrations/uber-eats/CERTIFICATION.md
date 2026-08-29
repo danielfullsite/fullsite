@@ -24,6 +24,74 @@ Ticket siguiente: abrir nuevo ticket mencionando `#D5FEA8`.
 
 ---
 
+## ⚠️ 2026-08-29 — el "UBER-SIDE BLOCKER" de abajo YA NO APLICA
+
+Todo lo que sigue quedó congelado el 2026-08-03. Lo desmiente la evidencia de hoy.
+
+> **Antes de leer nada aquí: la tienda vigente es `a4f298f4-202f-47f5-b375-d2eefec0126c`.**
+> Uber dio de baja la anterior el 2026-08-25. El correo de Uber del 2026-08-20 todavía cita la
+> vieja, así que ese correo **ya nació caduco cinco días después**. La prueba
+> `dashboard-app/src/__tests__/uber-store-id-vigente.test.ts` falla si algún archivo operativo
+> vuelve a nombrar la dada de baja — por eso aquí no se escribe su UUID.
+
+**1. Uber contestó el 2026-08-20.** Case #59128344 (antes `#D5FEA8`), UET GSS Support a
+`daniel@fullsite.mx`: *"Please refer to the documentation below for instructions on placing test
+orders **from your end**"* → `developer.uber.com/docs/eats/guides/order-integration#testing-orders`.
+Se le había pedido a Uber que **ellos** generaran la orden de prueba; la respuesta es que se hace de
+nuestro lado. Caso cerrado el 21; la ventana de reapertura (5 días) venció el 25. Volver a Uber
+requiere caso nuevo.
+
+**2. El `scopes_granted: []` era falta de credencial, no negativa de Uber.** El sondeo del
+2026-08-03 y su repetición de hoy devolvían vacío porque la tienda vigente **no tenía fila** en
+`integration_providers` (`db_status: "no_row_found"`, *"no stored token — run USL first"*). Nunca se
+había corrido la autorización USL para ella. En cuanto se corrió (2026-08-29 20:35), `db_status`
+pasó a `ok`.
+
+**3. Con la credencial puesta, la integración opera contra Uber en vivo.** Corrida
+`Uber Cert — Sandbox Sequence` sobre la tienda vigente, con evidencia en `integration_audit_log`:
+
+| Acción | HTTP | Respuesta |
+|---|---|---|
+| `usl.connected` | — | `scope: eats.pos_provisioning offline_access`, `expires_in: 2592000` |
+| `delivery.store.update_status ACTIVATE` | 200 | `{status: "active"}` |
+| `menu.upload` (PUT) | **204** | `{status: "accepted"}` |
+| `promotions.create` | 200 | `{status: "created"}` |
+| `reporting.request` | 200 | `workflow_id` devuelto |
+| Marketplace M2M | — | `granted_scope: eats.store.status.write eats.order eats.store eats.store.orders.read`, `blocker: null` |
+
+### Lo que de verdad falta
+
+**a) El menú no aparece en el storefront.** `menu.upload` devuelve 204 = *aceptado*, que no es
+*publicado*, y Uber no manda webhook de resultado. Se descartaron por lectura del código: método
+(`PUT`, correcto), token (`uberFetch` usa `marketplace` con `eats.store`, correcto) y payload
+(`normalizeMenuPayload` produce el shape de `example-menu-payloads`). Para salir de la conjetura se
+agregó `getMenu()` + acción `get_menu` — leen lo que Uber almacenó y lo devuelven junto al payload
+enviado, para diffear. **Ése es el siguiente paso.**
+
+**b) `store_status` reporta `is_open: false`** pese a que el menú lleva `service_availability` 24/7.
+La doc de Uber dice que las horas de tienda son *"the union of service_availability across all
+menus"*, así que (a) y (b) probablemente son el mismo problema.
+
+**c) `eats.deliveries` → `scope(s) are invalid`.** Único punto genuinamente del lado de Uber, y es
+de la API de Delivery (repartidores), no de Eats Marketplace.
+
+### El 401 de `accept_pos_order` NO es un bloqueo
+
+El probe llama a la orden inventada `SCOPE-PROBE-USL` y asume *404 = scope OK*. Pero el audit log
+muestra que Uber responde **400 `"The provided Order ID was not a valid UUID"`** a los ids
+sintéticos `CERT-…`. El id del probe tampoco es UUID: el 401 lo explica el id, no los scopes.
+**El probe no puede distinguir "scope denegado" de "orden inexistente", así que no sirve como
+señal de bloqueo.** Se resuelve solo con una orden real.
+
+**Ojo con la nomenclatura:** en `integration_providers` la columna `client_id` guarda el *tenant de
+Fullsite* (`amalay`) en una fila y el *client id de Uber* (`k2DPo…`) en la de `633b57d4`. Dos
+significados en la misma columna; hay que normalizarlo.
+
+**Y `633b57d4` NO es un fixture sintético** — tiene credencial real creada el 2026-08-19, aunque
+aparezca junto a `CERT_ORDER_ID: CERT-…` en los workflows.
+
+---
+
 ## Day 3 — Scope Probe + Delivery APIs + Evidencia Fresca (2026-08-03)
 
 Run ID: `30847395120` | Duración: 11s | Todos los pasos: PASS
