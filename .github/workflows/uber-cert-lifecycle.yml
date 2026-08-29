@@ -19,6 +19,7 @@ jobs:
             "$APP_URL/api/integrations/uber-eats/sandbox" \
             -H "Authorization: Bearer $INTEGRATION_ADMIN_SECRET" \
             -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $INTEGRATION_ADMIN_SECRET" \
             -d "{\"action\":\"test_store_status\",\"store_id\":\"$CERT_STORE_ID\",\"is_open\":true}")
           HTTP_CODE=$(echo "$RESP" | tail -1)
           BODY=$(echo "$RESP" | head -n -1)
@@ -31,6 +32,7 @@ jobs:
           RESP=$(curl -s -w "\n%{http_code}" -X POST \
             "$APP_URL/api/integrations/uber-eats/order" \
             -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $INTEGRATION_ADMIN_SECRET" \
             -d "{\"order_id\":\"$CERT_ORDER_ID\",\"action\":\"deny\",\"reason\":\"ITEM_UNAVAILABLE\"}")
           HTTP_CODE=$(echo "$RESP" | tail -1)
           BODY=$(echo "$RESP" | head -n -1)
@@ -43,6 +45,7 @@ jobs:
           RESP=$(curl -s -w "\n%{http_code}" -X POST \
             "$APP_URL/api/integrations/uber-eats/order" \
             -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $INTEGRATION_ADMIN_SECRET" \
             -d "{\"order_id\":\"$CERT_ORDER_ID\",\"action\":\"cancel\",\"reason\":\"CUSTOMER_CALLED_TO_CANCEL\"}")
           HTTP_CODE=$(echo "$RESP" | tail -1)
           BODY=$(echo "$RESP" | head -n -1)
@@ -55,6 +58,7 @@ jobs:
           RESP=$(curl -s -w "\n%{http_code}" -X POST \
             "$APP_URL/api/integrations/uber-eats/order" \
             -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $INTEGRATION_ADMIN_SECRET" \
             -d "{\"order_id\":\"$CERT_ORDER_ID\",\"action\":\"ready\"}")
           HTTP_CODE=$(echo "$RESP" | tail -1)
           BODY=$(echo "$RESP" | head -n -1)
@@ -68,6 +72,7 @@ jobs:
             "$APP_URL/api/integrations/uber-eats/sandbox" \
             -H "Authorization: Bearer $INTEGRATION_ADMIN_SECRET" \
             -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $INTEGRATION_ADMIN_SECRET" \
             -d "{\"action\":\"test_dlq\",\"store_id\":\"$CERT_STORE_ID\"}")
           HTTP_CODE=$(echo "$RESP" | tail -1)
           BODY=$(echo "$RESP" | head -n -1)
@@ -80,6 +85,7 @@ jobs:
           RESP=$(curl -s -w "\n%{http_code}" -X POST \
             "$APP_URL/api/integrations/uber-eats/reconcile" \
             -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $INTEGRATION_ADMIN_SECRET" \
             -d '{"client_id":"amalay","threshold_minutes":0}')
           HTTP_CODE=$(echo "$RESP" | tail -1)
           BODY=$(echo "$RESP" | head -n -1)

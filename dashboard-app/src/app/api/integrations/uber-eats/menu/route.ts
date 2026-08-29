@@ -4,9 +4,12 @@
 
 import { type NextRequest, NextResponse } from 'next/server'
 import { uploadMenu, markItemsOOS, restoreItems } from '@/lib/integrations/uber-eats/menu'
+import { checkAdminAuth } from '@/lib/integrations/admin-auth'
 
 export async function POST(request: NextRequest) {
   const correlationId = crypto.randomUUID()
+  const auth = checkAdminAuth(request)
+  if (!auth.ok) return NextResponse.json({ error: auth.error, correlation_id: correlationId }, { status: auth.status })
   try {
     const { store_id, menu } = await request.json() as { store_id: string; menu: Parameters<typeof uploadMenu>[1] }
     if (!store_id || !menu) return NextResponse.json({ error: 'store_id and menu required' }, { status: 400 })
@@ -19,6 +22,8 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   const correlationId = crypto.randomUUID()
+  const auth = checkAdminAuth(request)
+  if (!auth.ok) return NextResponse.json({ error: auth.error, correlation_id: correlationId }, { status: auth.status })
   try {
     const { store_id, action, items, item_ids } = await request.json() as {
       store_id: string

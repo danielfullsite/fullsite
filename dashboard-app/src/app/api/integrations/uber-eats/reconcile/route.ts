@@ -6,6 +6,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { getOrderDetails } from '@/lib/integrations/uber-eats/adapter'
 import { auditLog } from '@/lib/integrations/audit-logger'
+import { checkAdminAuth } from '@/lib/integrations/admin-auth'
 
 const SB_URL = () => process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SB_KEY = () => process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -17,6 +18,9 @@ function sbHeaders() {
 const STUCK_THRESHOLD_MINUTES = 30
 
 export async function POST(request: NextRequest) {
+  const auth = checkAdminAuth(request)
+  if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status })
+
   if (!process.env.SUPABASE_SERVICE_KEY) {
     return NextResponse.json({ ok: false, error: 'SUPABASE_SERVICE_KEY not configured' }, { status: 503 })
   }

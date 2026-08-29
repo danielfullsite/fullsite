@@ -10,6 +10,7 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { getOrderAdapter, type UberChannel } from '@/lib/integrations/uber-eats/adapter-factory'
 import type { UberDenyReason, UberCancelReason } from '@/lib/integrations/uber-eats/reasons'
 import { UBER_DENY_REASONS, UBER_CANCEL_REASONS } from '@/lib/integrations/uber-eats/reasons'
+import { checkAdminAuth } from '@/lib/integrations/admin-auth'
 
 const SB_URL = () => process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SB_KEY = () => process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -31,6 +32,8 @@ async function resolveOrderContext(platformOrderId: string): Promise<{ storeId?:
 
 export async function POST(request: NextRequest) {
   const correlationId = crypto.randomUUID()
+  const auth = checkAdminAuth(request)
+  if (!auth.ok) return NextResponse.json({ error: auth.error, correlation_id: correlationId }, { status: auth.status })
   try {
     const { order_id, action, reason, minutes_to_ready } = await request.json() as {
       order_id: string

@@ -10,9 +10,11 @@ jobs:
       - name: Upload test menu to Uber sandbox
         env:
           APP_URL: https://app.fullsite.mx
+          INTEGRATION_ADMIN_SECRET: ${{ secrets.INTEGRATION_ADMIN_SECRET }}
         run: |
           RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$APP_URL/api/integrations/uber-eats/menu" \
             -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $INTEGRATION_ADMIN_SECRET" \
             -d '{
               "store_id": "633b57d4-237a-5a32-b249-7ceb795f1d35",
               "menu": {

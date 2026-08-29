@@ -4,9 +4,12 @@
 
 import { type NextRequest, NextResponse } from 'next/server'
 import { pauseStore, activateStore, getStoreStatus } from '@/lib/integrations/uber-eats/store'
+import { checkAdminAuth } from '@/lib/integrations/admin-auth'
 
 export async function GET(request: NextRequest) {
   const correlationId = crypto.randomUUID()
+  const auth = checkAdminAuth(request)
+  if (!auth.ok) return NextResponse.json({ error: auth.error, correlation_id: correlationId }, { status: auth.status })
   const storeId = request.nextUrl.searchParams.get('store_id') ?? ''
   if (!storeId) return NextResponse.json({ error: 'store_id required' }, { status: 400 })
   const result = await getStoreStatus(storeId, correlationId)
@@ -15,6 +18,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const correlationId = crypto.randomUUID()
+  const auth = checkAdminAuth(request)
+  if (!auth.ok) return NextResponse.json({ error: auth.error, correlation_id: correlationId }, { status: auth.status })
   try {
     const { store_id, action, duration_minutes } = await request.json() as {
       store_id: string
