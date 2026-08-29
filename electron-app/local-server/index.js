@@ -177,6 +177,11 @@ async function startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, servi
         { headers: { apikey: supabaseKey, Authorization: `Bearer ${bearer}` }, signal: controller.signal }
       )
       const deliveryOrders = deliveryRes.ok ? await deliveryRes.json() : []
+      // For the STATE_SYNC turno reconcile: ids of the delivery orders that are STILL
+      // active upstream. null (fetch failed) = unknown → the state must not reap any
+      // delivery order this cycle. A closed/finished delivery order stops appearing
+      // here and gets reaped like any stale order — it never revives on the KDS.
+      const deliveryOrderIds = deliveryRes.ok ? deliveryOrders.map(row => row.id).filter(Boolean) : null
       if (cmdHandler) {
         for (const row of deliveryOrders) {
           const command = deliveryOrderCommand(row, restaurantId)
@@ -212,6 +217,7 @@ async function startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, servi
           opened_at: activeTurno.opened_at,
           conflict_count: activeTurnos.length,
         } : null,
+        delivery_order_ids: deliveryOrderIds,
         synced_at:  new Date().toISOString(),
       }, { restaurantId })
 
