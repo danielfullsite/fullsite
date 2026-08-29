@@ -1,6 +1,6 @@
 {
   "name": "fullsite-pos",
-  "version": "1.3.8",
+  "version": "1.3.12",
   "description": "Fullsite POS — kiosk wrapper for app.fullsite.mx/pos",
   "main": "main.js",
   "scripts": {
