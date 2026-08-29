@@ -307,6 +307,8 @@ export default function TurnoPage() {
   const [showCorteX, setShowCorteX] = useState(false)
   // GUARD-08: banner if the previous cierre had open orders
   const [orphanCierre, setOrphanCierre] = useState<{ count: number; nota: string | null } | null>(null)
+  // Turnos abiertos ADEMÁS del operativo (huérfanos de días anteriores)
+  const [staleTurnos, setStaleTurnos] = useState<Turno[]>([])
 
   // Open shift state
   const [fondoInicial, setFondoInicial] = useState('')
@@ -318,13 +320,18 @@ export default function TurnoPage() {
     setLoading(true)
     try {
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/pos_turnos?closed_at=is.null&client_id=eq.${_cid()}&order=opened_at.desc&limit=1`,
+        `${SUPABASE_URL}/rest/v1/pos_turnos?closed_at=is.null&client_id=eq.${_cid()}&order=opened_at.desc&limit=10`,
         { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
       )
       if (res.ok) {
         const rows = await res.json()
         const turno = rows[0] || null
         setActiveTurno(turno)
+        // Verdad de campo AMALAY 2026-08-27 (Eduardo): quedaron DOS turnos
+        // abiertos y el Corte Z entraba en conflicto. El más reciente es el
+        // operativo; los demás son huérfanos de días/pruebas anteriores y se
+        // ofrecen para cierre administrativo aquí mismo.
+        setStaleTurnos(Array.isArray(rows) && rows.length > 1 ? rows.slice(1) : [])
         // Keep IDB in sync so we have a fallback when offline
         if (turno) {
           await cacheTurno({ ...turno, client_id: _cid(), synced_at: new Date().toISOString() })
@@ -523,6 +530,43 @@ export default function TurnoPage() {
                 <p className="text-center text-xs text-[var(--text-3)]">
                   Corte X: snapshot sin cerrar — Cierre: wizard completo + PIN gerente
                 </p>
+
+                {/* Turnos huérfanos: más de un turno abierto rompe el Corte Z
+                    (visto en campo AMALAY 2026-08-27). El operativo es el más
+                    reciente; los demás se cierran administrativamente aquí. */}
+                {staleTurnos.length > 0 && (
+                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 space-y-2">
+                    <p className="text-amber-400 font-bold text-sm">
+                      Hay {staleTurnos.length + 1} turnos abiertos — el Corte Z entra en conflicto
+                    </p>
+                    <p className="text-[var(--text-3)] text-xs">
+                      El turno operativo es el más reciente (arriba). Cierra los anteriores para poder hacer el Corte Z del día.
+                    </p>
+                    {staleTurnos.map(t => (
+                      <div key={t.id} className="flex items-center justify-between bg-[var(--surface)]/50 rounded-lg px-3 py-2 text-sm">
+                        <span className="text-[var(--text-2)]">
+                          {t.opened_by} · {new Date(t.opened_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' })} {new Date(t.opened_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                        <button
+                          onClick={async () => {
+                            try {
+                              const r = await fetch(`${SUPABASE_URL}/rest/v1/pos_turnos?id=eq.${encodeURIComponent(t.id)}&client_id=eq.${_cid()}`, {
+                                method: 'PATCH',
+                                headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+                                body: JSON.stringify({ closed_at: new Date().toISOString(), closed_by: 'cierre administrativo', notas: 'Turno huérfano cerrado desde /pos/turno (duplicado)' }),
+                              })
+                              if (r.ok) { showToast('Turno huérfano cerrado'); fetchTurno() }
+                              else showToast('No se pudo cerrar — revisa permisos')
+                            } catch { showToast('Sin conexión — inténtalo de nuevo') }
+                          }}
+                          className="px-3 py-1 rounded-md border border-amber-500/40 text-amber-400 text-xs font-semibold hover:bg-amber-500/20"
+                        >
+                          Cerrar
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {/* Historial de cierres */}
                 <div className="mt-6">
