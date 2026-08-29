@@ -550,3 +550,125 @@ restaurantes, tiendas y servicios sobre el mismo núcleo.
 
 **Si Fullsite quiere ser clonable a mil restaurantes —y a tiendas— el trabajo no es
 agregar features: es adoptar estas seis formas antes de que el modelo se endurezca.**
+
+---
+
+## 11. Su negocio real: el software es el anzuelo
+
+Square no vende software. Vende procesamiento de pagos y **regala el software para
+conseguirlo**.
+
+| Concepto | Tarifa (2026) |
+|---|---|
+| Presencial | **2.6% + 15¢ USD** |
+| En línea (plan gratis) | **3.3% + 30¢** — subió de 2.9% el 13 de enero de 2026 |
+| En línea (Plus/Premium) | 2.9% + 30¢ |
+| Software | **$0** / $49 / $149 USD al mes |
+| Depósito instantáneo | **1.75%** por cobrar hoy en vez de mañana |
+
+Fuentes: [Square Fees Explained](https://www.swipesum.com/insights/square-fees-explained-understanding-your-payment-costs) ·
+[Square Fees & Pricing 2026](https://www.posusa.com/square-fees-pricing/)
+
+### La aritmética que explica todo
+
+Un restaurante que factura **$500,000 MXN al mes en tarjeta**, con ticket promedio de
+$400 (unas 1,250 transacciones):
+
+```
+2.6% de $500,000                    ≈ $13,000 MXN
+15¢ USD × 1,250 transacciones       ≈  $3,475 MXN
+                                      ───────────
+Square se lleva                     ≈ $16,475 MXN/mes
+```
+
+Con el software en **$0**.
+
+Fullsite Software cuesta $4,999 MXN. **Square extrae 3.3x eso de una sola sucursal, y
+el dueño siente que el sistema le salió gratis.**
+
+Ése es el modelo Toast que el propio `docs/strategy/PRICING.md` de Fullsite pone como
+endgame post-200 restaurantes. Aquí están los números de quien ya lo hace.
+
+### El costo escondido del modelo: congelan tu dinero
+
+Square **no hace underwriting al dar de alta** — te registras en minutos. Compensa el
+riesgo por detrás, **reteniendo fondos**.
+
+- Retenciones típicas de **30 a 90 días**; hay reportes de hasta **180**
+- Tres tipos de reserva: por adelantado (negocios nuevos), acumulada (un % de la venta
+  diaria) y rodante (un % del mes, retenido varios meses)
+- Disparadores: cobrar antes de entregar, anticipos, licencias faltantes, RFC que no
+  empata, o simplemente no tener historial
+- Y según los propios comercios, el soporte no da abasto para responder
+
+Fuentes: [Square Reserves Explained](https://www.smartservice.com/blog/square-withholding-money-from-small-businesses) ·
+[Square Account Frozen 2026](https://www.sleftpayments.com/learning-hub/square-account-frozen-what-to-do-2026)
+
+**No es un bug: es la consecuencia estructural de dejar entrar a cualquiera en minutos.**
+El alta sin fricción se paga con congelamientos después.
+
+---
+
+## 12. Lo que odian los dueños — el hueco de mercado
+
+De reseñas verificadas y foros, 2026:
+
+| Queja | Qué revela |
+|---|---|
+| **Modificadores complejos** — "build your own bowl" hace que el constructor de menú *"se sienta apretado"* | su modelo de modificadores no aguanta menús armables |
+| **El editor de plano** *"parece diseñado por alguien que nunca trabajó un servicio de cena"* | no lo hizo gente de operación |
+| **Dividir cuenta por asiento toma demasiados taps** | el flujo de servicio completo es de segunda |
+| **5-10 clics por cambio de bebida, cada semana** (una cervecería) | cambiar el menú es caro en tiempo |
+| **Cambiar entre tickets y órdenes para llevar** — *"lo más frustrante"* | el manejo de canales no está resuelto |
+| **Ajustar ítems en un ticket ya capturado** es difícil | corregir cuesta más que capturar |
+| **"Retienen fondos sin explicación clara"** | el modelo de reservas, arriba |
+
+Fuentes: [Capterra — Square POS reviews](https://www.capterra.com/p/175628/Square-Point-of-Sale/reviews/) ·
+[Smart Restaurant Owner — review 2026](https://smartrestaurantowner.com/blog/square-pos-review)
+
+**El patrón:** Square es excelente en **modelo de datos** y mediocre en **flujo de
+servicio**. Diseñaron bien las entidades y menos bien los minutos de un viernes lleno.
+
+Ahí hay hueco — y es justo donde Fullsite tiene ventaja natural: Daniel es tercera
+generación de restauranteros y valida en campo.
+
+---
+
+## 13. El hallazgo que reordena todo: Square NO opera en México
+
+**Square no procesa pagos en México.** La app de punto de venta se puede usar para
+registrar ventas e inventario, pero **el procesamiento de tarjetas —su negocio entero—
+no está disponible.**
+
+Regiones con procesamiento: Estados Unidos, Australia, Canadá, Francia, Irlanda, Japón,
+España y Reino Unido. México no aparece.
+
+Fuentes: [Square Community — Disponibilidad en México](https://community.squareup.com/t5/Foro-de-la-Comunidad-Square/Disponibilidad-en-Mexico/td-p/832421) ·
+[International availability](https://squareup.com/help/us/en/article/5747-international-availability)
+
+Verificado por dos vías el 2026-08-29.
+
+### Qué significa esto
+
+**1. Square no es competencia de Fullsite hoy.** Los rivales reales en Monterrey son
+Wansoft ($1,500/mes), PoloTab y Clip. Square no está en la mesa.
+
+**2. Su modelo no se puede copiar en México — todavía.** Regalar el software y vivir de
+los pagos exige ser procesador. Square no lo es aquí. **Ese lugar está vacío.**
+
+**3. Es una ventana, no una ventaja permanente.** Cuando Square entre a México va a
+traer el mismo movimiento: software gratis, 2.6% de cada transacción. Un restaurante que
+paga $4,999 al mes va a ver "gratis" y no va a hacer la cuenta.
+
+**4. Por eso la jugada de pagos importa más de lo que parece.** No es el endgame
+post-200 restaurantes que dice `PRICING.md`: es **la defensa** contra el día que Square
+cruce la frontera. Quien tenga la relación de pagos con el restaurante gana; quien
+venda licencias de software pierde.
+
+### La lectura estratégica honesta
+
+Estudiar a Square **para copiar su modelo de datos**: correctísimo, y este documento
+existe para eso.
+
+Estudiarlo **como competidor**: hoy no lo es. El tiempo de investigación competitiva
+rinde más en Wansoft, PoloTab y Clip, que sí le están cobrando a tus prospectos ahora.
