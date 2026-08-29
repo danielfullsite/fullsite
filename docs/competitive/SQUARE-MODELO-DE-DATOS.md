@@ -28,7 +28,11 @@ Esto valida la dirección de `dashboard-app/src/lib/vertical-presets.ts`, que ya
 ocho verticales (`fast_food`, `fast_casual`, `casual_dining`, `fine_dining`,
 `bar_cantina`, `cafeteria_panaderia`, `hibrido_restaurante_tienda`, `dark_kitchen`)
 como un patch de `features` sobre los defaults, aplicado al aprovisionar. Es el mismo
-patrón. Al 2026-08-29 ese archivo está **sin commitear**.
+patrón.
+
+**Corrección del 2026-08-29:** una versión anterior de este documento decía que ese
+archivo seguía sin commitear. Ya está en `main` **y ya lo consume `provisionTenant()`**
+(6 referencias). Se verificó comparando disco contra `origin/main`: idénticos.
 
 ---
 
@@ -513,7 +517,7 @@ Marcado honestamente, no rellenado:
 | §5 | tipo de estación Prep vs Expo | bajo |
 | §5 | conteos "All Day" en el KDS | bajo |
 | §3 | verificar idempotencia con cuerpo distinto | bajo (investigación) |
-| §1 | commitear `vertical-presets.ts` y conectarlo a `provisionTenant()` | bajo |
+| §1 | ~~commitear `vertical-presets.ts` y conectarlo a `provisionTenant()`~~ **YA HECHO** | — |
 | §3 | **separar `status` en dos campos**: comercial y operativo | medio-alto |
 | §5-bis | menús como árbol de categorías + `CatalogAvailabilityPeriod` | medio |
 | §5-ter | **`location_id` en `pos_turnos`** — hoy no existe | medio |
