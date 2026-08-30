@@ -1,5 +1,5 @@
 Contact: mailto:seguridad@fullsite.mx
 Preferred-Languages: es, en
-Canonical: https://app.fullsite.mx/.well-known/security.txt
+Canonical: https://fullsite.mx/.well-known/security.txt
 Policy: https://app.fullsite.mx/seguridad
 Expires: 2027-08-27T00:00:00.000Z
