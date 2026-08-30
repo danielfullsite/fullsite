@@ -119,6 +119,68 @@ export async function cancelOrder(
   }
 }
 
+/** Un problema de fulfillment: qué item no se puede surtir y qué se propone hacer. */
+export interface FulfillmentIssue {
+  /** id del item en la orden de Uber (no el `external_data` nuestro). */
+  item_id: string
+  /** OUT_OF_STOCK cuando no hay; los demás valores los define Uber por item. */
+  reason: 'OUT_OF_STOCK' | 'INVALID_ITEM' | 'OTHER'
+  /** Cantidad realmente surtible. 0 = no se puede surtir nada de ese item. */
+  fulfillable_quantity?: number
+  /** Sustituto propuesto, si aplica. */
+  substitute_item_id?: string
+}
+
+/**
+ * Resolve Order Fulfillment Issue — `POST /v1/delivery/order/{id}/resolve-fulfillment-issues`.
+ *
+ * Se llama cuando NO se puede surtir parte de la orden (típico: se acabó un platillo).
+ * Uber le avisa al cliente en su app; si el cliente acepta el cambio, nos llega el webhook
+ * `orders.fulfillment_issues.resolved` y ahí hay que **releer** la orden — el webhook no
+ * trae la versión resuelta.
+ *
+ * Ojo operativo, de la doc de Uber: *"Customers can only resolve fulfillment issues through
+ * the Uber Eats mobile app (iOS/Android), not via web browsers."* Un cliente en web no puede
+ * responder, así que la orden se queda esperando hasta que expire. No es falla nuestra, pero
+ * hay que saberlo antes de culpar a la integración.
+ *
+ * Operación Tipo A (efecto externo visible para el cliente final): el caller debe envolverla
+ * en RecoverableOperation — ver `docs/integrations/EXTERNAL-SIDE-EFFECTS.md`.
+ */
+export async function resolveFulfillmentIssues(
+  orderId: string,
+  issues: FulfillmentIssue[],
+  correlationId: string,
+  storeId?: string
+): Promise<{ ok: boolean; status?: number; error?: string }> {
+  const t0 = Date.now()
+  try {
+    const r = await withRetry(
+      () => uberFetch(`/v1/delivery/order/${orderId}/resolve-fulfillment-issues`, {
+        method: 'POST',
+        body: JSON.stringify({ fulfillment_issues: issues }),
+        tokenType: 'marketplace',
+        storeId,
+      }),
+      { maxAttempts: 3, baseDelayMs: 500 }
+    )
+    const errText = r.ok ? undefined : await r.text()
+    await auditLog({
+      provider: 'ubereats', correlation_id: correlationId, action: 'order.resolve_fulfillment_issues',
+      request: { order_id: orderId, issues: issues.length },
+      response: errText ? { error: errText } : { status: 'submitted' },
+      status_code: r.status, duration_ms: Date.now() - t0,
+    })
+    return r.ok ? { ok: true, status: r.status } : { ok: false, status: r.status, error: errText }
+  } catch (e) {
+    await auditLog({
+      provider: 'ubereats', correlation_id: correlationId, action: 'order.resolve_fulfillment_issues',
+      request: { order_id: orderId }, response: { error: String(e) }, duration_ms: Date.now() - t0,
+    })
+    return { ok: false, error: String(e) }
+  }
+}
+
 export async function markOrderReady(
   orderId: string,
   correlationId: string,

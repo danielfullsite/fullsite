@@ -16,7 +16,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { normalizeUberOrder } from '@/lib/integrations/uber-eats/order-adapter'
 import { getPosData } from '@/lib/integrations/uber-eats/provisioning'
-import { getOrderAdapterForPayload } from '@/lib/integrations/uber-eats/adapter-factory'
+import { getOrderAdapterForPayload, getOrderAdapter } from '@/lib/integrations/uber-eats/adapter-factory'
 import { uploadMenu, type UberMenuUpload } from '@/lib/integrations/uber-eats/menu'
 import { auditLog } from '@/lib/integrations/audit-logger'
 
@@ -355,6 +355,18 @@ export async function POST(request: NextRequest) {
       const url = (data.download_url ?? meta.download_url ?? meta.resource_href ?? b.download_url) as string | undefined
       await auditLog({ provider: 'ubereats', client_id: clientId, correlation_id: correlationId, action: 'reporting.webhook_success', response: { download_url: url ?? null } })
       await markEventProcessed(eventRow.id)
+    } else if (eventType === 'orders.scheduled.notification') {
+      // Aviso anticipado: el cliente programó una orden para más tarde. NO es la orden
+      // que se cocina — la real llega como `orders.notification` al liberarse, y ésa
+      // maneja el ciclo de vida como siempre. Aquí sólo se registra para que la cocina
+      // pueda planear. Mandarla al KDS ahora sacaría un ticket por comida que nadie pidió.
+      await handleScheduledOrder(orderId, storeId, clientId, body, eventRow.id, correlationId)
+    } else if (eventType === 'orders.fulfillment_issues.resolved') {
+      // El cliente resolvió el problema de fulfillment en la app de Uber (aceptó la
+      // sustitución o el faltante). La doc de Uber es explícita: "fetch the updated order
+      // details to proceed with fulfillment" — el payload del webhook NO trae la orden
+      // resuelta, hay que volver a pedirla.
+      await handleFulfillmentIssuesResolved(orderId, storeId, clientId, eventRow.id, correlationId)
     } else {
       // Unknown event type — ACK 200 without DLQ (don't penalize unknown future events)
       console.log(`[uber-webhook-v2] Unknown event type: ${eventType}`)
@@ -372,6 +384,122 @@ export async function POST(request: NextRequest) {
 }
 
 // ─── Event handlers ───────────────────────────────────────────────────────────
+
+/**
+ * `orders.scheduled.notification` — aviso anticipado de una orden programada.
+ *
+ * Contrato de Uber: *"notification to retrieve scheduled order. This event is only
+ * triggered if you are at minimum the API version 1.0.0."*
+ *
+ * DECISIÓN DE DISEÑO: esto NO entra al KDS. La orden que se cocina llega después como
+ * `orders.notification` cuando Uber la libera, y ese camino ya maneja el ciclo completo.
+ * Si mandáramos la programada al KDS ahora, la cocina sacaría comida horas antes y con
+ * precios provisionales. Se registra en `delivery_orders` con `status='programada'` para
+ * que el restaurante pueda planear, y el dedup por `provider_event_id` evita que el
+ * aviso y la orden real se pisen.
+ */
+async function handleScheduledOrder(
+  orderId: string,
+  storeId: string,
+  clientId: string,
+  rawPayload: unknown,
+  eventId: string,
+  correlationId: string
+): Promise<void> {
+  const envelope = rawPayload as Record<string, unknown>
+  const meta = (envelope.meta ?? {}) as Record<string, unknown>
+  const resource = (meta.resource ?? {}) as Record<string, unknown>
+  // `place_at` es la hora para la que el cliente programó; es el dato que la cocina necesita.
+  const placeAt = (resource.place_at ?? resource.scheduled_for ?? meta.place_at ?? null) as string | null
+
+  // Se reutiliza la misma normalización y persistencia que una orden normal — no se
+  // inventa un camino paralelo. La diferencia está en el estado y en NO llamar accept.
+  const canonicalOrder = normalizeUberOrder(resource, storeId, clientId, correlationId)
+  const persistResult = await persistOrder(canonicalOrder, eventId)
+  if (!persistResult.ok && !persistResult.was_duplicate) {
+    throw new Error(`Failed to persist scheduled order ${orderId}`)
+  }
+
+  if (!persistResult.was_duplicate) {
+    // `delivery_orders` no tiene columna para la hora programada; `estimated_pickup` es
+    // texto y es semánticamente lo mismo (cuándo debe estar lista). El payload completo
+    // queda en `raw_payload` para no perder nada.
+    await fetch(
+      `${SB_URL()}/rest/v1/delivery_orders?platform_order_id=eq.${encodeURIComponent(orderId)}&platform=eq.ubereats`,
+      {
+        method: 'PATCH',
+        headers: { ...sbHeaders(), Prefer: 'return=minimal' },
+        body: JSON.stringify({
+          status: 'programada',
+          estimated_pickup: placeAt,
+          updated_at: new Date().toISOString(),
+        }),
+      }
+    )
+  }
+
+  await auditLog({
+    provider: 'ubereats', client_id: clientId, correlation_id: correlationId,
+    action: 'order.scheduled_notification',
+    request: { order_id: orderId, store_id: storeId },
+    response: { status: 'programada', place_at: placeAt, sent_to_kds: false, was_duplicate: persistResult.was_duplicate },
+  })
+  await markEventProcessed(eventId)
+}
+
+/**
+ * `orders.fulfillment_issues.resolved` — el cliente resolvió el problema en la app de Uber.
+ *
+ * Contrato de Uber: *"If the customer accepts the proposed changes, you will receive the
+ * order.fulfillment_issues.resolved webhook. At that point, **fetch the updated order
+ * details** to proceed with fulfillment."*
+ *
+ * O sea que el payload del webhook NO trae la orden resuelta: hay que volver a pedirla.
+ * Escribir el estado a partir del webhook sería cocinar con la carta vieja.
+ */
+async function handleFulfillmentIssuesResolved(
+  orderId: string,
+  storeId: string,
+  clientId: string,
+  eventId: string,
+  correlationId: string
+): Promise<void> {
+  const adapter = getOrderAdapter('eats')
+  const details = await adapter.getOrderDetails(orderId, correlationId, storeId)
+
+  if (!details.ok || !details.order) {
+    // Falla cerrado: si no se puede releer la orden, NO se toca el estado local. Dejarla
+    // como está y mandar a DLQ es preferible a que la cocina prepare algo desactualizado.
+    throw new Error(`[uber-webhook-v2] fulfillment_issues.resolved: no se pudo releer la orden ${orderId}: ${details.error ?? 'sin detalle'}`)
+  }
+
+  // Se re-normaliza con la orden fresca para que items y totales queden como quedaron
+  // tras la resolución del cliente, no como llegaron originalmente.
+  const canonicalOrder = normalizeUberOrder(details.order, storeId, clientId, correlationId)
+
+  await fetch(
+    `${SB_URL()}/rest/v1/delivery_orders?platform_order_id=eq.${encodeURIComponent(orderId)}&platform=eq.ubereats`,
+    {
+      method: 'PATCH',
+      headers: { ...sbHeaders(), Prefer: 'return=minimal' },
+      body: JSON.stringify({
+        items: canonicalOrder.items,
+        subtotal: canonicalOrder.subtotal,
+        total: canonicalOrder.total,
+        raw_payload: details.order,
+        updated_at: new Date().toISOString(),
+      }),
+    }
+  )
+
+  await auditLog({
+    provider: 'ubereats', client_id: clientId, correlation_id: correlationId,
+    action: 'order.fulfillment_issues_resolved',
+    request: { order_id: orderId, store_id: storeId },
+    response: { refetched: true, items: canonicalOrder.items?.length ?? 0 },
+  })
+  await markEventProcessed(eventId)
+}
 
 async function handleNewOrder(
   orderId: string,
