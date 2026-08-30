@@ -480,6 +480,41 @@ F5-25 — Arqueo post-cierre
 
 ### T+225 — T+240: Restaurar WAN + Replay
 
+> ## ⚠️ Cola en 0 **no** es entrega
+>
+> `F5-27` pasa cuando el `OfflineIndicator` baja a 0 y `sync_queue_size` llega a 0. Eso
+> significa que el POS **soltó** el pendiente. **No significa que Supabase lo recibió.**
+>
+> Quien decide es `F5-28`, que cuenta las órdenes **en `pos_orders`**. Un `F5-27` en verde
+> con `F5-28` sin llenar no es evidencia de nada.
+>
+> **Esto no es teórico.** Medido el 2026-08-26 contra producción, read-only:
+>
+> | | |
+> |---|---:|
+> | Órdenes de `amalay` en `pos_orders` | **0** — nunca, desde siempre |
+> | Eventos de `amalay` en `pos_audit_log` | 1,324, incluidos 39 `payment_processed` |
+> | `pos_local_events` (todos los tenants) | **0** |
+>
+> Los `skimming_suspect` de AMALAY apuntan a `order_id`s que **no existen** en
+> `pos_orders`. El bloque que los escribe vive dentro de `/api/pos/save-order`, **antes**
+> del guardado — así que la ruta corrió y la orden se perdió después.
+>
+> Y en la prueba de campo del 23-24 de agosto la cola llegó a 0 (*"está en 0"*) y se tomó
+> como sincronización exitosa. **Con este dato, ese PASS no vale.**
+>
+> ### Consecuencia para agendar
+>
+> **`F5-28` va a fallar hoy**, sin importar qué tan bien salga todo lo anterior. Correr las
+> 4 horas del protocolo antes de arreglar la entrega de órdenes es gastar un turno para
+> confirmar algo que ya sabemos.
+>
+> El orden correcto es: arreglar la entrega → comprobar que una orden aparece en
+> `pos_orders` → **entonces** agendar la certificación.
+>
+> *(Nota agregada el 2026-08-26. El protocolo no cambia: `F5-28`/`F5-29`/`F5-30` siempre
+> midieron contra Supabase y eran correctos. Lo que falló fue una sesión que no los usó.)*
+
 ```
 F5-26 — Restaurar WAN
   Hora de reconexión: ________
