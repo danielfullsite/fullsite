@@ -20,6 +20,8 @@ Todos llegaron a nuestra tesis (IA + datos del POS) pero cada uno cubrió un ped
 | **Precio todo incluido** | Toast: add-ons de $25–100 USD c/u + fees ocultos (queja #1). SR: 6 SKUs sueltos + distribuidor. Parrot: $2,800 el completo. | Tabla de costo total real (la del guion de demos alimenta esto con cotizaciones escritas). |
 | **Reservas nativas** | Parrot depende de OpenTable (solo planes altos); Toast Tables valida que reservas+POS unidos ganan (TOAST-BIBLE §9). | Contar la unión reservas↔mesa↔cocina como feature, no como tabla. |
 | **Table map real** | Parrot: grid paginado sin plano (GALERIA §1). | Mostrarlo junto al grid de Parrot en comparativas. |
+| **Dashboard remoto EDITABLE** | SR Admin es solo-lectura: "editar un producto, receta o precio te obliga a estar en el restaurante" (reseña verificada, SR-BIBLE §4); Parrot App: 1K+ descargas. | Demo: cambiar un precio desde el celular en vivo. El incumbente no puede. |
+| **Cloud-POS que sí funciona** | SR Cloud: 3.9★, "te obligan a comprar sus terminales", sin inventario ni recetas (reviews verificadas). | La transición cloud del incumbente fracasó — el hueco es NUESTRO mercado natural. |
 | **KDS ya arriba del promedio MX** | Parrot y SR ni lo enseñan en público (GALERIA §2). | Dejar de tratarlo como "módulo" — es arma de demo. |
 
 ## 2. Los TRES gaps que sí duelen — cerrar (ya están en el roadmap; esto los re-prioriza)

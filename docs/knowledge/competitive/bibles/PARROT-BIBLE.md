@@ -49,6 +49,9 @@ Claims de marketing: recupera 10 h/semana · +28% ventas · recupera $276,000 MX
 - Título de su página de reportes: "El patrón de los restaurantes rentables" — venden el reporte como insight, no como tabla [HECHO].
 - Autoconciliación de pagos visible desde el celular (cobros, cancelaciones, conciliaciones).
 - API: **solo en tiers premium** [HECHO — per Last.app].
+- **Parrot App en Google Play** (io.parrotsoftware.parrotconnect, dev "S3 Software SA de CV" — su razón social) [HECHO 2026-08-31]: solo **1K+ descargas** contra 1,500+ restaurantes que presumen — adopción bajísima de la app del dueño. Activa (actualizada ago-2026). Estructura oficial según su propia ficha: home con 4 KPIs (venta total, ticket promedio, órdenes abiertas, órdenes cerradas) con delta % en verde/rojo (SIN sparkline — la tripleta completa sigue siendo solo de Toast), gráficas por periodo/canal/categoría/top-5 artículos, resúmenes con drill-down de 5 reportes (ventas, órdenes, cancelaciones, pagos, cajas), vista multi-sucursal consolidada. Capturas en `assets/parrot-app-01.jpg` y `-02.jpg` (los assets de marketing datan de 2021).
+- **El POS y el KDS NO existen en ninguna tienda de apps** — S3 Software solo publica ParrotApp; el POS va sideloaded en su hardware [HECHO — página de desarrollador en Play]. Consistente con el ecosistema cerrado.
+- **Huella de reviews públicas casi nula** [HECHO — agregadores: "user reviews are limited"]: ni quejas ni elogios verificables. La ausencia de quejas de offline no es evidencia de calidad — es que nadie reseña.
 
 ## 5. Parrot Grow — su jugada de IA (2026, en lista de espera) [HECHO]
 
