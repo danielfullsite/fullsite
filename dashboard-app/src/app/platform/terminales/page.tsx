@@ -9,6 +9,7 @@ import { useState, useEffect } from 'react'
 import { MonitorSmartphone, Loader2, Download, Copy, Check, AlertTriangle, ChefHat, Server, Monitor } from 'lucide-react'
 
 interface Tenant { id: string; name: string }
+interface Location { id: string; name: string }
 type Role = 'server_pos' | 'pos' | 'kds' | 'admin'
 
 const ROLE_OPTS: { value: Role; label: string; icon: typeof Server; needsBridge: boolean }[] = [
@@ -21,6 +22,8 @@ const ROLE_OPTS: { value: Role; label: string; icon: typeof Server; needsBridge:
 export default function TerminalesPage() {
   const [tenants, setTenants] = useState<Tenant[]>([])
   const [clientId, setClientId] = useState('')
+  const [locations, setLocations] = useState<Location[]>([])
+  const [locationId, setLocationId] = useState('')
   const [role, setRole] = useState<Role>('server_pos')
   const [name, setName] = useState('')
   const [bridgeHost, setBridgeHost] = useState('')
@@ -31,6 +34,26 @@ export default function TerminalesPage() {
   const [copied, setCopied] = useState(false)
 
   const needsBridge = ROLE_OPTS.find(r => r.value === role)?.needsBridge ?? false
+
+  // Sucursales del cliente elegido. Se recargan al cambiar de cliente; el selector queda
+  // vacío hasta que carguen, y no se puede generar config sin sucursal (la API lo exige).
+  useEffect(() => {
+    let cancelado = false
+    ;(async () => {
+      // El reset y la carga van dentro del flujo async: setState sincrónico en el cuerpo del
+      // effect dispara renders en cascada (react-hooks/set-state-in-effect).
+      if (!clientId) { if (!cancelado) { setLocations([]); setLocationId('') } return }
+      try {
+        const res = await fetch(`/api/platform/locations?clientId=${encodeURIComponent(clientId)}`, { credentials: 'include' })
+        const j = await res.json().catch(() => ({}))
+        if (cancelado) return
+        const list: Location[] = Array.isArray(j.locations) ? j.locations : []
+        setLocations(list)
+        setLocationId(list[0]?.id || '')
+      } catch { if (!cancelado) { setLocations([]); setLocationId('') } }
+    })()
+    return () => { cancelado = true }
+  }, [clientId])
 
   useEffect(() => {
     (async () => {
@@ -51,7 +74,7 @@ export default function TerminalesPage() {
       const res = await fetch('/api/platform/terminal-config', {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clientId, role, name: name || undefined, bridgeHost: bridgeHost || undefined }),
+        body: JSON.stringify({ clientId, locationId, role, name: name || undefined, bridgeHost: bridgeHost || undefined }),
       })
       const j = await res.json().catch(() => ({}))
       if (!res.ok) { setError(j.error || `Error ${res.status}`); return }
@@ -101,6 +124,14 @@ export default function TerminalesPage() {
         </div>
 
         <div>
+          <label className="block text-xs text-[var(--text-3)] mb-1.5">Sucursal</label>
+          <select value={locationId} onChange={e => setLocationId(e.target.value)} className={input} disabled={locations.length === 0}>
+            {locations.length === 0 && <option value="">— sin sucursales —</option>}
+            {locations.map(l => <option key={l.id} value={l.id}>{l.name} ({l.id})</option>)}
+          </select>
+        </div>
+
+        <div>
           <label className="block text-xs text-[var(--text-3)] mb-1.5">Tipo de terminal</label>
           <div className="grid grid-cols-2 gap-2">
             {ROLE_OPTS.map(o => {
@@ -130,7 +161,7 @@ export default function TerminalesPage() {
 
         {error && <div className="rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm px-3 py-2">{error}</div>}
 
-        <button onClick={generate} disabled={busy || !clientId || (needsBridge && !bridgeHost.trim())} className="w-full rounded-xl bg-[var(--accent)] hover:opacity-90 text-white font-medium py-2.5 text-sm disabled:opacity-40 inline-flex items-center justify-center gap-2">
+        <button onClick={generate} disabled={busy || !clientId || !locationId || (needsBridge && !bridgeHost.trim())} className="w-full rounded-xl bg-[var(--accent)] hover:opacity-90 text-white font-medium py-2.5 text-sm disabled:opacity-40 inline-flex items-center justify-center gap-2">
           {busy ? <><Loader2 size={15} className="animate-spin" /> Generando…</> : 'Generar config'}
         </button>
       </div>

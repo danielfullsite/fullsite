@@ -25,8 +25,11 @@ export default function PlatformConfigPage() {
   // Device binding
   const [requireEnrolled, setRequireEnrolled] = useState(false)
   const [terminals, setTerminals] = useState<Terminal[]>([])
-  const [newDev, setNewDev] = useState('')
   const [newLabel, setNewLabel] = useState('')
+  const [locations, setLocations] = useState<{ id: string; name: string }[]>([])
+  const [newLocation, setNewLocation] = useState('')
+  // Resultado del alta: código de un solo uso a mostrar UNA vez (la plataforma lo genera).
+  const [enrollResult, setEnrollResult] = useState<{ code: string; device_id: string; expires_at: string } | null>(null)
   const [termBusy, setTermBusy] = useState(false)
 
   useEffect(() => {
@@ -35,6 +38,28 @@ export default function PlatformConfigPage() {
       .then(j => setClients(Array.isArray(j.clients) ? j.clients : []))
       .catch(() => {})
       .finally(() => setLoading(false))
+  }, [])
+
+  // Loaders declarados ANTES de loadTenant, que los invoca: el compilador de React marca
+  // el acceso a un callback antes de su declaración.
+  const loadTerminals = useCallback((cid: string) => {
+    fetch(`/api/platform/terminals?clientId=${encodeURIComponent(cid)}`, { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(j => setTerminals(Array.isArray(j?.terminals) ? j.terminals : []))
+      .catch(() => setTerminals([]))
+  }, [])
+
+  // Sucursales del cliente, para exigir una al enrolar (la API la valida server-side).
+  const loadLocations = useCallback((cid: string) => {
+    if (!cid) { setLocations([]); setNewLocation(''); return }
+    fetch(`/api/platform/locations?clientId=${encodeURIComponent(cid)}`, { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(j => {
+        const list = Array.isArray(j?.locations) ? j.locations : []
+        setLocations(list)
+        setNewLocation(list[0]?.id || '')
+      })
+      .catch(() => { setLocations([]); setNewLocation('') })
   }, [])
 
   const loadTenant = useCallback((cid: string) => {
@@ -51,14 +76,8 @@ export default function PlatformConfigPage() {
       .catch(() => {})
       .finally(() => setLoadingTenant(false))
     loadTerminals(cid)
-  }, [])
-
-  const loadTerminals = useCallback((cid: string) => {
-    fetch(`/api/platform/terminals?clientId=${encodeURIComponent(cid)}`, { credentials: 'include' })
-      .then(r => r.ok ? r.json() : null)
-      .then(j => setTerminals(Array.isArray(j?.terminals) ? j.terminals : []))
-      .catch(() => setTerminals([]))
-  }, [])
+    loadLocations(cid)
+  }, [loadTerminals, loadLocations])
 
   const saveRequire = async (next: boolean) => {
     setRequireEnrolled(next)
@@ -70,16 +89,20 @@ export default function PlatformConfigPage() {
   }
 
   const enroll = async () => {
-    const dev = newDev.trim()
-    if (!clientId || !dev) return
+    // La plataforma genera device_id y el código. Aquí sólo se elige sucursal y etiqueta.
+    if (!clientId || !newLocation) return
     setTermBusy(true)
     try {
       const res = await fetch('/api/platform/terminals', {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clientId, device_id: dev, label: newLabel.trim() || undefined }),
+        body: JSON.stringify({ clientId, location_id: newLocation, label: newLabel.trim() || undefined }),
       })
-      if (res.ok) { setNewDev(''); setNewLabel(''); loadTerminals(clientId) }
+      const j = await res.json().catch(() => ({}))
+      if (res.ok && j.enrollment_code) {
+        setEnrollResult({ code: j.enrollment_code, device_id: j.device_id, expires_at: j.expires_at })
+        setNewLabel(''); loadTerminals(clientId)
+      }
     } finally { setTermBusy(false) }
   }
 
@@ -212,28 +235,47 @@ export default function PlatformConfigPage() {
             </span>
           </button>
 
-          {/* Enrolar nueva */}
-          <div className="flex flex-wrap gap-2 mb-4">
-            <input
-              value={newDev} onChange={e => setNewDev(e.target.value)}
-              placeholder="ID de terminal (aparece en la pantalla del POS)"
-              className="flex-1 min-w-[200px] rounded-lg px-3 py-2.5 text-sm min-h-[44px]"
+          {/* Enrolar nueva — la plataforma genera device_id y un código de un solo uso */}
+          <div className="flex flex-wrap gap-2 mb-2">
+            <select
+              value={newLocation} onChange={e => setNewLocation(e.target.value)}
+              disabled={locations.length === 0}
+              className="w-44 rounded-lg px-3 py-2.5 text-sm min-h-[44px]"
               style={{ background: 'var(--surface)', border: '1px solid var(--line)', color: 'var(--text-1)' }}
-            />
+            >
+              {locations.length === 0 && <option value="">— sin sucursales —</option>}
+              {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+            </select>
             <input
               value={newLabel} onChange={e => setNewLabel(e.target.value)}
               placeholder="Etiqueta (ej. Caja 1)"
-              className="w-40 rounded-lg px-3 py-2.5 text-sm min-h-[44px]"
+              className="flex-1 min-w-[160px] rounded-lg px-3 py-2.5 text-sm min-h-[44px]"
               style={{ background: 'var(--surface)', border: '1px solid var(--line)', color: 'var(--text-1)' }}
             />
             <button
-              onClick={enroll} disabled={termBusy || !newDev.trim()}
+              onClick={enroll} disabled={termBusy || !newLocation}
               className="px-4 py-2.5 rounded-lg text-sm font-semibold min-h-[44px] inline-flex items-center gap-1.5 disabled:opacity-50"
               style={{ background: 'var(--accent)', color: '#fff' }}
             >
-              <Plus size={16} /> Enrolar
+              <Plus size={16} /> Generar código
             </button>
           </div>
+
+          {/* Código de un solo uso — se muestra UNA vez. Cerrarlo lo descarta. */}
+          {enrollResult && (
+            <div className="mb-4 rounded-xl border px-4 py-3" style={{ background: 'var(--surface)', border: '1px solid var(--accent)' }}>
+              <p className="text-xs mb-1" style={{ color: 'var(--text-3)' }}>
+                Cópialo ahora: no se vuelve a mostrar. La terminal lo canjea al iniciar.
+              </p>
+              <div className="flex items-center justify-between gap-3">
+                <code className="text-sm font-mono break-all" style={{ color: 'var(--text-1)' }}>{enrollResult.code}</code>
+                <button onClick={() => setEnrollResult(null)} className="text-xs px-2 py-1 rounded" style={{ color: 'var(--text-3)' }}>Cerrar</button>
+              </div>
+              <p className="text-[11px] mt-1" style={{ color: 'var(--text-3)' }}>
+                Terminal <span className="font-mono">{enrollResult.device_id}</span> · vence {new Date(enrollResult.expires_at).toLocaleTimeString('es-MX')}
+              </p>
+            </div>
+          )}
 
           {/* Lista */}
           {terminals.length === 0 ? (
