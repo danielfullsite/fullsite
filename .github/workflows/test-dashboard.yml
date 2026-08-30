@@ -28,6 +28,13 @@ jobs:
 
       - run: npm ci
 
+      # El guard de comandos vive en .claude/hooks/. Su suite corre DENTRO del check
+      # requerido `test` a propósito: así un guard roto bloquea el merge sin inventar
+      # un contexto nuevo que volvería ambiguo el check obligatorio.
+      - name: Guard de comandos (suite)
+        working-directory: .
+        run: ./.claude/hooks/guard-bash.test.sh
+
       - name: TypeScript check
         run: npx tsc --noEmit
 
