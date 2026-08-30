@@ -126,6 +126,7 @@ class RestaurantState {
         personas:         personas ?? 1,
         total:            total    ?? 0,
         turno_id:         turno_id ?? null,
+        delivery:         payload.delivery === true,
         kds_item_status:  null,
         created_at:       now,
         updated_at:       now,
@@ -210,13 +211,19 @@ class RestaurantState {
   // una ventana de gracia) que el poll todavía no refleja; reconcilian solas cuando
   // Supabase ya las conoce o cuando expira la gracia (Supabase sigue siendo autoridad
   // en Phase 1, así que no divergimos permanentemente).
-  _applyStateSync({ mesas, kds_queue, turno, synced_at }) {
+  _applyStateSync({ mesas, kds_queue, turno, synced_at, delivery_order_ids }) {
     const now = Date.now()
 
     // order_ids que el poll ya conoce (ya están en Supabase)
     const pollOrderIds = new Set()
     if (Array.isArray(mesas))     for (const m of mesas)     if (m && m.order_id) pollOrderIds.add(m.order_id)
     if (Array.isArray(kds_queue)) for (const k of kds_queue) if (k && k.order_id) pollOrderIds.add(k.order_id)
+    // Delivery orders (Rappi/Uber) live in delivery_orders, not pos_orders: the poll
+    // reports the ACTIVE ones here so the turno reconcile below treats them as known.
+    // They carry no turno_id — their lifecycle is delivery_orders.status.
+    if (Array.isArray(delivery_order_ids)) for (const id of delivery_order_ids) if (id) pollOrderIds.add(id)
+    // If the delivery fetch failed this cycle, fail safe: don't reap delivery orders.
+    const deliveryPollKnown = Array.isArray(delivery_order_ids)
 
     // Órdenes locales activas + frescas + aún no vistas por el poll → proteger del clobber
     const isActive = (o) => o && o.status !== 'cerrada' && o.status !== 'cancelada' && o.status !== 'pagada'
@@ -238,6 +245,9 @@ class RestaurantState {
       if (!order._kds_sent) continue
       const belongsToAnotherTurno = activeTurnoId && order.turno_id && order.turno_id !== activeTurnoId
       const absentAndPastGrace = !pollOrderIds.has(orderId) && !protectedOrderIds.has(orderId)
+      // A delivery order is only reaped when THIS cycle's delivery poll succeeded and
+      // no longer lists it (finished/cancelled upstream). A failed fetch never reaps.
+      if (order.delivery && !deliveryPollKnown) continue
       if (belongsToAnotherTurno || absentAndPastGrace) this._orders.delete(orderId)
     }
 

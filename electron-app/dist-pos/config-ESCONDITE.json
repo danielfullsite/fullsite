@@ -1,0 +1,14 @@
+{
+  "config_version": 1,
+  "restaurant_id": "amalay",
+  "terminal_id": "4446AA39-9A8C-4F35-935A-27E0EBECDF19",
+  "terminal_role": "pos",
+  "terminal_name": "Escondite",
+  "local_server_host": "192.168.1.71",
+  "local_server_port": 7717,
+  "protocol_version": "1.0",
+  "provisioned_at": "2026-08-18T06:51:37Z",
+  "client_id": "amalay",
+  "channel": "stable",
+  "pos_server_ip": "192.168.1.71"
+}

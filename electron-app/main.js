@@ -243,7 +243,11 @@ async function startLocalServer() {
     console.log('[main] Local server started.');
   } catch (e) {
     if (e.code === 'EADDRINUSE') {
-      console.log('[main] Port 7717 already in use — another server running, skipping.');
+      // KNOWN FIELD BUG (AMALAY jul-12): un `start-bridge.bat` en el Startup de Windows
+      // ocupaba 7717 antes que Electron → el bridge/proxy /fp no se exponía y el POS se
+      // quedaba "solo PIN, sin huella". Si ves esto, revisa el Startup por un .bat intruso.
+      console.warn('[main] ⚠ Port 7717 OCUPADO por otro proceso (¿start-bridge.bat en Startup?).');
+      console.warn('[main] ⚠ El bridge/impresión/LAN de ESTA app no arrancó. Revisa Startup y reinicia.');
     } else {
       console.error('[main] Local server failed to start:', e.message);
     }
@@ -593,6 +597,25 @@ function startFingerprintService() {
   const fpExe = 'C:\\fullsite\\fingerprint-service.exe';
   const fpDll = 'C:\\fullsite\\DPUruNet.dll';
 
+  // Auto-instalar desde el paquete si no están en C:\fullsite\ (clonable: el instalador
+  // trae el servicio; no hay que copiarlo a mano en cada caja). Requiere que el build
+  // incluya electron-app/fingerprint/{fingerprint-service.exe,DPUruNet.dll} vía extraResources.
+  if (!fs.existsSync(fpExe) || !fs.existsSync(fpDll)) {
+    try {
+      const bundledDir = path.join(process.resourcesPath || __dirname, 'fingerprint');
+      const bExe = path.join(bundledDir, 'fingerprint-service.exe');
+      const bDll = path.join(bundledDir, 'DPUruNet.dll');
+      if (fs.existsSync(bExe) && fs.existsSync(bDll)) {
+        fs.mkdirSync('C:\\fullsite', { recursive: true });
+        if (!fs.existsSync(fpExe)) fs.copyFileSync(bExe, fpExe);
+        if (!fs.existsSync(fpDll)) fs.copyFileSync(bDll, fpDll);
+        console.log('[fingerprint] Servicio instalado desde el paquete a C:\\fullsite\\');
+      }
+    } catch (e) {
+      console.warn('[fingerprint] No se pudo auto-instalar desde el paquete:', e.message);
+    }
+  }
+
   // Check if files exist
   if (!fs.existsSync(fpExe) || !fs.existsSync(fpDll)) {
     console.log('[fingerprint] fingerprint-service.exe or DPUruNet.dll not found in C:\\fullsite\\');
@@ -664,7 +687,14 @@ function createWindow() {
   });
 
   mainWindow.setMenu(null);
-  mainWindow.loadURL(POS_URL);
+  // P1-1 fix: para el POS secundario (rol 'pos'), pasar el rol en la URL para que
+  // preload.js fije el bridge a localhost ANTES de que monte React (evita que
+  // server-discovery lea un 'pos_bridge_host' viejo = IP de la caja → ws://<caja>
+  // bloqueado por mixed-content → "print bridge offline"). Espeja el patrón del KDS.
+  const posUrl = (appConfig && appConfig.terminal_role === 'pos')
+    ? POS_URL + (POS_URL.includes('?') ? '&' : '?') + 'terminal_role=pos'
+    : POS_URL;
+  mainWindow.loadURL(posUrl);
 
   // Save last successful boot time for offline.html display
   mainWindow.webContents.on('did-finish-load', () => {
@@ -839,6 +869,9 @@ function createKdsWindow(x, y, width, height, urlOverride) {
     const scripts = [];
     if (clientId)   scripts.push(`localStorage.setItem('fullsite_client_id', ${JSON.stringify(String(clientId))})`);
     if (terminalId) scripts.push(`localStorage.setItem('pos_terminal_id', ${JSON.stringify(String(terminalId))})`);
+    // Token de cocina por-tenant (si está en la config): el KDS lo manda a /api/pos/kitchen.
+    const kitchenToken = appConfig.kitchen_token || appConfig.kitchenToken;
+    if (kitchenToken) scripts.push(`localStorage.setItem('pos_kitchen_token', ${JSON.stringify(String(kitchenToken))})`);
     if (scripts.length) kdsWindow.webContents.executeJavaScript(scripts.join('; ')).catch(() => {});
     // TEMP DIAG
     kdsWindow.webContents.executeJavaScript(`JSON.stringify({cid: localStorage.getItem('fullsite_client_id'), bh: localStorage.getItem('pos_bridge_host'), tid: localStorage.getItem('pos_terminal_id'), electron: navigator.userAgent.includes('Electron'), url: location.href})`).then(v => console.log('[kds-diag]', v)).catch(e => console.log('[kds-diag ERR]', e.message));

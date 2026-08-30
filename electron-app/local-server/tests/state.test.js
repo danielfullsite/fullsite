@@ -199,6 +199,57 @@ describe('Clobber / STATE_SYNC merge (GAP-002)', () => {
     assert.equal(state.toSnapshot().kds_orders.length, 0)
   })
 
+  test('una orden delivery activa sobrevive la reconciliación de turno (aun pasada la gracia)', () => {
+    const state = new RestaurantState()
+    state.apply(makeEvent(EVENT.ORDER_SENT, {
+      order_id: 'dlv-1', mesa: null, delivery: true, platform: 'rappi', items: [{ n: 'burrito' }],
+    }, 1))
+    const o = state._orders.get('dlv-1')
+    o.updated_at = new Date(Date.now() - (RestaurantState.SYNC_GRACE_MS + 5000)).toISOString()
+    state.apply(makeEvent(EVENT.STATE_SYNC, {
+      mesas: [], kds_queue: [],
+      turno: { id: 'turno-actual', opened_at: new Date().toISOString() },
+      delivery_order_ids: ['dlv-1'],
+      synced_at: new Date().toISOString(),
+    }, 2))
+    assert.ok(state.toSnapshot().kds_orders.some(k => k.order_id === 'dlv-1'),
+      'una orden Rappi/Uber activa upstream no debe borrarse por el reconcile de turno')
+  })
+
+  test('una orden delivery que upstream ya cerró se limpia y no revive en el KDS', () => {
+    const state = new RestaurantState()
+    state.apply(makeEvent(EVENT.ORDER_SENT, {
+      order_id: 'dlv-2', mesa: null, delivery: true, platform: 'rappi', items: [{ n: 'taco' }],
+    }, 1))
+    const o = state._orders.get('dlv-2')
+    o.updated_at = new Date(Date.now() - (RestaurantState.SYNC_GRACE_MS + 5000)).toISOString()
+    state.apply(makeEvent(EVENT.STATE_SYNC, {
+      mesas: [], kds_queue: [],
+      turno: { id: 'turno-actual', opened_at: new Date().toISOString() },
+      delivery_order_ids: [],
+      synced_at: new Date().toISOString(),
+    }, 2))
+    assert.equal(state.toSnapshot().kds_orders.some(k => k.order_id === 'dlv-2'), false,
+      'una delivery terminada upstream no debe revivir en el KDS')
+  })
+
+  test('si el fetch de delivery falló, NINGUNA orden delivery se limpia (fail-safe)', () => {
+    const state = new RestaurantState()
+    state.apply(makeEvent(EVENT.ORDER_SENT, {
+      order_id: 'dlv-3', mesa: null, delivery: true, platform: 'ubereats', items: [{ n: 'bowl' }],
+    }, 1))
+    const o = state._orders.get('dlv-3')
+    o.updated_at = new Date(Date.now() - (RestaurantState.SYNC_GRACE_MS + 5000)).toISOString()
+    state.apply(makeEvent(EVENT.STATE_SYNC, {
+      mesas: [], kds_queue: [],
+      turno: { id: 'turno-actual', opened_at: new Date().toISOString() },
+      delivery_order_ids: null,
+      synced_at: new Date().toISOString(),
+    }, 2))
+    assert.ok(state.toSnapshot().kds_orders.some(k => k.order_id === 'dlv-3'),
+      'un fetch fallido de delivery_orders no debe tumbar órdenes delivery vivas')
+  })
+
   test('STATE_SYNC conserva la identidad real del turno y su conflicto', () => {
     const state = new RestaurantState()
     state.apply(makeEvent(EVENT.STATE_SYNC, {

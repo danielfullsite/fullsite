@@ -148,7 +148,14 @@ async function startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, servi
           signal: controller.signal,
         }
       )
-      const activeTurnos = turnoRes.ok ? await turnoRes.json() : []
+      // Fail-SAFE simétrico al de delivery (revisión adversarial 2026-08-29,
+      // hallazgo 1): si el fetch de turnos falla UN ciclo (JWT vencido, 503,
+      // RLS momentáneo), abortar el poll completo. Sin esto, activeTurno=null
+      // vaciaba operationalOrders y el reconcile segaba del KDS órdenes VIVAS
+      // (reproducido: 1 orden → 0, perdiendo kds_item_status). Mejor un poll
+      // perdido que comida desapareciendo de la pantalla de cocina.
+      if (!turnoRes.ok) { clearTimeout(t); return }
+      const activeTurnos = await turnoRes.json()
       const activeTurno = activeTurnos[0] || null
       const res = await fetch(
         `${supabaseUrl}/rest/v1/pos_orders?client_id=eq.${encodeURIComponent(restaurantId)}&status=neq.closed&select=id,mesa,status,items,turno_id,updated_at`,
@@ -172,11 +179,22 @@ async function startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, servi
       // Marketplace orders live in delivery_orders. Mirror them into the same
       // durable ORDER_SENT protocol consumed by Electron KDS and printer queues.
       // Stable command IDs make every 5s poll and every restart exactly-once.
+      // Timeout PROPIO (hallazgo 2): el timer del controller de arriba ya se
+      // limpió en el .finally del fetch de pos_orders — reusarlo dejaba este
+      // fetch sin límite y un STATE_SYNC viejo podía aplicarse fuera de orden
+      // sobre estado más fresco de polls posteriores.
+      const dCtrl = new AbortController()
+      const dT = setTimeout(() => dCtrl.abort(), 6000)
       const deliveryRes = await fetch(
         `${supabaseUrl}/rest/v1/delivery_orders?client_id=eq.${encodeURIComponent(restaurantId)}&platform=in.(ubereats,rappi)&status=in.(nueva,aceptada,preparando)&select=id,platform,platform_order_id,status,customer_name,total,notes,items,created_at`,
-        { headers: { apikey: supabaseKey, Authorization: `Bearer ${bearer}` }, signal: controller.signal }
-      )
+        { headers: { apikey: supabaseKey, Authorization: `Bearer ${bearer}` }, signal: dCtrl.signal }
+      ).catch(() => ({ ok: false, json: async () => [] })).finally(() => clearTimeout(dT))
       const deliveryOrders = deliveryRes.ok ? await deliveryRes.json() : []
+      // For the STATE_SYNC turno reconcile: ids of the delivery orders that are STILL
+      // active upstream. null (fetch failed) = unknown → the state must not reap any
+      // delivery order this cycle. A closed/finished delivery order stops appearing
+      // here and gets reaped like any stale order — it never revives on the KDS.
+      const deliveryOrderIds = deliveryRes.ok ? deliveryOrders.map(row => row.id).filter(Boolean) : null
       if (cmdHandler) {
         for (const row of deliveryOrders) {
           const command = deliveryOrderCommand(row, restaurantId)
@@ -212,6 +230,7 @@ async function startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, servi
           opened_at: activeTurno.opened_at,
           conflict_count: activeTurnos.length,
         } : null,
+        delivery_order_ids: deliveryOrderIds,
         synced_at:  new Date().toISOString(),
       }, { restaurantId })
 
@@ -266,6 +285,9 @@ function forwardPost(targetUrl, bodyStr) {
     r.write(bodyStr); r.end()
   })
 }
+
+const edgeWatcher = require('./core/edge-watcher')
+const EDGE_SLOW_MINUTES = Number(process.env.FULLSITE_EDGE_SLOW_MIN) || 15
 
 // Keep identity and routing configuration explicit so every cloned terminal can
 // discover the caja without relying on process-global or customer-specific state.
@@ -345,6 +367,14 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, versio
     if (url === '/state' && req.method === 'GET') {
       const seq = await eventStore.getLastSequence()
       json(res, 200, { sequence: seq, ...state.toSnapshot() })
+      return
+    }
+
+    // ── GET /alerts — Edge Agent v0: el experto local vigilando en vivo (offline, determinista) ──
+    if (url === '/alerts' && req.method === 'GET') {
+      let alerts = []
+      try { alerts = edgeWatcher.evaluate(state.toSnapshot(), { slowMinutes: EDGE_SLOW_MINUTES }, Date.now()) } catch (e) {}
+      json(res, 200, { alerts, generated_at: new Date().toISOString() })
       return
     }
 
@@ -570,27 +600,23 @@ async function startLocalServer({ dataDir, port = 7717, config = {} }) {
   wsHub.onCommand((msg, clientId) => cmdHandler.handle(msg, clientId))
 
   // ── HTTP server ──────────────────────────────────────────────────────────
-  const router = buildHttpRouter({
-    state,
-    eventStore,
-    wsHub,
-    cmdHandler,
-    printer: printerAdapter,
-    version,
-    serverId,
-    restaurantId,
-    config,
-    instanceName,
-    branchId: config.branchId || null,
-    posServerIp: config.posServerIp || null,
-    port,
-  })
+  const router = buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer: printerAdapter, version, serverId, restaurantId, instanceName, branchId: config.branchId || null, posServerIp: config.posServerIp || null, port })
   const httpServer = http.createServer(router)
 
   wsHub.attach(httpServer)
 
   // ── Lock GC every 30s ────────────────────────────────────────────────────
   setInterval(() => state.gcLocks(), 30_000)
+
+  // ── Edge Agent v0: vigila el estado local y loguea alertas nuevas (offline, determinista) ──
+  let _edgeSeen = new Set()
+  setInterval(() => {
+    try {
+      const alerts = edgeWatcher.evaluate(state.toSnapshot(), { slowMinutes: EDGE_SLOW_MINUTES }, Date.now())
+      for (const a of alerts) if (!_edgeSeen.has(a.id)) console.log(`  [edge] ${a.level.toUpperCase()} · ${a.message}`)
+      _edgeSeen = new Set(alerts.map(a => a.id))
+    } catch (e) {}
+  }, 30_000)
 
   // ── Listen ───────────────────────────────────────────────────────────────
   await new Promise((resolve, reject) => {
@@ -657,6 +683,4 @@ async function startLocalServer({ dataDir, port = 7717, config = {} }) {
   return { httpServer, close, serverId, lanIp, wsHub }
 }
 
-// buildHttpRouter se exporta para poder probar las rutas sin levantar el servidor
-// completo (mDNS + heartbeat + polling quedarían corriendo y colgarían el test).
-module.exports = { startLocalServer, buildHttpRouter, deliveryStation, deliveryOrderCommand, buildDeliveryTicket }
+module.exports = { startLocalServer, deliveryStation, deliveryOrderCommand, buildDeliveryTicket }

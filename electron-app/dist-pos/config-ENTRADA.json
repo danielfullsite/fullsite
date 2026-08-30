@@ -1,0 +1,14 @@
+{
+  "config_version": 1,
+  "restaurant_id": "amalay",
+  "terminal_id": "716D060E-D3A4-42F5-A5D9-648B561F4EA2",
+  "terminal_role": "pos",
+  "terminal_name": "Entrada",
+  "local_server_host": "192.168.1.71",
+  "local_server_port": 7717,
+  "protocol_version": "1.0",
+  "provisioned_at": "2026-08-18T06:51:37Z",
+  "client_id": "amalay",
+  "channel": "stable",
+  "pos_server_ip": "192.168.1.71"
+}
