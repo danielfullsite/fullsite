@@ -94,6 +94,9 @@ describe('/api/agents/cron falla cerrado', () => {
     const res = await GET(req(`Bearer ${SECRETO}`))
 
     expect(res.status).toBe(200)
-    expect(agentesCorrieron).toHaveBeenCalledWith('amalay')
+    // El segundo argumento se agregó el 2026-08-30: marca la corrida como 'cron' en
+    // `agent_runs`. Sin él no se puede distinguir lo que corre solo de lo que alguien
+    // disparó a mano desde la página, que es la mitad del valor de tener bitácora.
+    expect(agentesCorrieron).toHaveBeenCalledWith('amalay', 'cron')
   })
 })

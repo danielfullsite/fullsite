@@ -70,7 +70,60 @@ export async function sbPatch(table: string, query: string, data: Record<string,
 }
 
 /** Run a single agent, store its events, return the result. */
-export async function runAgent(agentId: AgentId, clientId: string): Promise<AgentResult> {
+/**
+ * Deja constancia de la corrida en `agent_runs`.
+ *
+ * POR QUÉ EXISTE
+ * --------------
+ * Hasta el 2026-08-30 los cinco agentes del dashboard NO escribían aquí. Los de Python sí
+ * (lab-simulator, intraday-sales, fraud-watcher… cientos de corridas), y por eso de ésos se
+ * sabe si viven. De éstos no: `agent_events` vacío podía significar "corrió y no halló nada"
+ * o "nunca corrió", y no había forma de distinguirlo. Resultó ser lo segundo — nada los
+ * disparaba — y nadie lo notó en nueve días.
+ *
+ * Un agente que no deja rastro de haber corrido es indistinguible de uno que no existe.
+ *
+ * `skip_reason` y `data_status` ya estaban en el esquema de `agent_runs` precisamente para
+ * esto; sólo faltaba escribirlos.
+ *
+ * NO BLOQUEA. Si el registro falla, el agente ya hizo su trabajo: perder la bitácora es malo,
+ * perder el hallazgo es peor.
+ */
+async function logAgentRun(params: {
+  agentId: AgentId
+  clientId: string
+  triggerType: string
+  status: 'ok' | 'error' | 'skipped'
+  durationMs: number
+  eventsCount: number
+  skipReason?: string | null
+  errorMessage?: string | null
+}): Promise<void> {
+  try {
+    await sbInsert('agent_runs', {
+      // Prefijo `dashboard:` para no confundirlos con los agentes de Python, que usan
+      // nombres sueltos como 'fraud-watcher'. Sin él, 'fraud' y 'fraud-watcher' se leen
+      // como el mismo agente en cualquier consulta agregada.
+      agent_id: `dashboard:${params.agentId}`,
+      trigger_type: params.triggerType,
+      status: params.status,
+      duration_ms: params.durationMs,
+      rows_processed: params.eventsCount,
+      skip_reason: params.skipReason ?? null,
+      error_message: params.errorMessage ?? null,
+      data_status: params.status === 'error' ? 'error' : 'ok',
+      output_summary: `${params.clientId}: ${params.eventsCount} hallazgo(s)`,
+    })
+  } catch {
+    /* No bloquea: el hallazgo ya se guardó. */
+  }
+}
+
+export async function runAgent(
+  agentId: AgentId,
+  clientId: string,
+  triggerType = 'manual',
+): Promise<AgentResult> {
   const start = Date.now()
   let events: AgentEvent[] = []
   let error: string | undefined
@@ -90,11 +143,18 @@ export async function runAgent(agentId: AgentId, clientId: string): Promise<Agen
   // tocar código. `esDuenoDelHistoricoWansoft` falla CERRADO — si la consulta truena,
   // devuelve false y el agente no corre.
   if (agentId === 'finance' && !(await esDuenoDelHistoricoWansoft(clientId))) {
+    const durationMs = Date.now() - start
+    // Se registra como 'skipped', no 'error': no falló nada, este restaurante simplemente
+    // no es dueño del histórico. Contarlo como error dispararía alertas todos los días.
+    await logAgentRun({
+      agentId, clientId, triggerType, status: 'skipped', durationMs, eventsCount: 0,
+      skipReason: 'no es dueño del histórico de Wansoft',
+    })
     return {
       agent_id: agentId,
       events: [],
       ran_at: new Date().toISOString(),
-      duration_ms: Date.now() - start,
+      duration_ms: durationMs,
       error: 'finance no disponible para este restaurante',
     }
   }
@@ -148,11 +208,25 @@ export async function runAgent(agentId: AgentId, clientId: string): Promise<Agen
     error = err instanceof Error ? err.message : String(err)
   }
 
+  const durationMs = Date.now() - start
+
+  // El caso que motivó todo esto: el agente corrió, no falló, y no emitió nada. Sin
+  // `skip_reason` eso queda como una fila igual a "todo bien", que es justo la ambigüedad
+  // que hizo que nadie notara nueve días de agentes muertos.
+  await logAgentRun({
+    agentId, clientId, triggerType,
+    status: error ? 'error' : 'ok',
+    durationMs,
+    eventsCount: events.length,
+    skipReason: !error && events.length === 0 ? 'corrió sin hallazgos' : null,
+    errorMessage: error ?? null,
+  })
+
   return {
     agent_id: agentId,
     events,
     ran_at: new Date().toISOString(),
-    duration_ms: Date.now() - start,
+    duration_ms: durationMs,
     error,
   }
 }
@@ -169,13 +243,13 @@ export async function runAgent(agentId: AgentId, clientId: string): Promise<Agen
  * del cuerpo de la petición.
  */
 /** Run all agents concurrently (finance solo para el dueño del histórico de Wansoft). */
-export async function runAllAgents(clientId: string): Promise<AgentResult[]> {
+export async function runAllAgents(clientId: string, triggerType = 'manual'): Promise<AgentResult[]> {
   const agentIds: AgentId[] = ['operations', 'inventory', 'fraud', 'staff']
   // Antes: `clientId === 'amalay'`. Ahora se pregunta por la propiedad, no por el
   // nombre — así el día que otro restaurante migre desde Wansoft, su agente de
   // finanzas corre sin tocar código. Ver src/lib/wansoft-legacy.ts.
   if (await esDuenoDelHistoricoWansoft(clientId)) agentIds.push('finance')
-  return Promise.all(agentIds.map(id => runAgent(id, clientId)))
+  return Promise.all(agentIds.map(id => runAgent(id, clientId, triggerType)))
 }
 
 /** Fetch latest events for display. */
