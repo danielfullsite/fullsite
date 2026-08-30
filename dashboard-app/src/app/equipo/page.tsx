@@ -59,6 +59,7 @@ export default function EquipoPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [permsFor, setPermsFor] = useState<DashUser | null>(null)
 
   const canElevate = callerRole === 'dueño' || callerRole === 'admin'
   const staffRoleOptions = canElevate ? [...STAFF_BASE, ...STAFF_ELEVATED] : STAFF_BASE
@@ -236,6 +237,7 @@ export default function EquipoPage() {
                         </select>
                       </td>
                       <td className="px-4 py-3 text-right whitespace-nowrap">
+                        <button onClick={() => setPermsFor(u)} className="px-2 py-1.5 rounded-md hover:bg-[var(--surface-2)] text-[var(--text-3)] hover:text-[var(--text-1)] inline-flex items-center gap-1 text-xs"><Shield size={12} /> Permisos</button>
                         <button onClick={() => resetPass(u)} className="px-2 py-1.5 rounded-md hover:bg-[var(--surface-2)] text-[var(--text-3)] hover:text-[var(--text-1)] inline-flex items-center gap-1 text-xs"><KeyRound size={12} /> Reset</button>
                         <button onClick={() => removeUser(u)} className="px-2 py-1.5 rounded-md hover:bg-[var(--surface-2)] text-red-400 inline-flex items-center gap-1 text-xs"><Trash2 size={12} /> Quitar</button>
                       </td>
@@ -316,6 +318,94 @@ export default function EquipoPage() {
           </div>
         </div>
       )}
+
+      {permsFor && <PermissionsModal user={permsFor} onClose={() => setPermsFor(null)} onSaved={() => { setPermsFor(null) }} />}
     </>
+  )
+}
+
+// ─── Modal de permisos por empleado ──────────────────────────────────────────
+const PERM_SECTIONS: { key: string; label: string; hint: string }[] = [
+  { key: 'operacion', label: 'Operación', hint: 'Ventas, meseros, platillos, tendencias, reportes' },
+  { key: 'finanzas', label: 'Finanzas', hint: 'Estado de resultados, nómina, ingresos, ROI' },
+  { key: 'inventario', label: 'Inventario', hint: 'Existencias, compras, recepción, merma' },
+  { key: 'cortes', label: 'Cortes y caja', hint: 'Cortes, control de efectivo, conciliación' },
+  { key: 'agentes', label: 'Agentes IA', hint: 'Agentes, coach, chat' },
+  { key: 'pos', label: 'Punto de venta', hint: 'Acceso al POS' },
+  { key: 'admin', label: 'Administración', hint: 'Configuración y gestión del equipo' },
+]
+
+function PermissionsModal({ user, onClose, onSaved }: { user: DashUser; onClose: () => void; onSaved: () => void }) {
+  const [sections, setSections] = useState<Record<string, boolean> | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      try {
+        const res = await fetch('/api/owner/permissions', { credentials: 'same-origin', cache: 'no-store' })
+        const data = await res.json().catch(() => ({}))
+        const row = (data.permissions || []).find((p: { staff_id: string }) => p.staff_id === user.user_id)
+        if (!alive) return
+        if (row?.sections && Object.keys(row.sections).length > 0) {
+          setSections(row.sections)
+        } else {
+          // Sin override guardado → precargar con el default del rol (para que el
+          // dueño parta de lo que hoy ve esa persona y solo ajuste).
+          const { defaultSectionsForRole } = await import('@/lib/roles')
+          const role = (user.role === 'admin' ? 'dueño' : user.role) as Parameters<typeof defaultSectionsForRole>[0]
+          setSections(defaultSectionsForRole(role))
+        }
+      } catch { if (alive) setSections({}) }
+    })()
+    return () => { alive = false }
+  }, [user])
+
+  async function save(clear = false) {
+    setBusy(true); setErr('')
+    try {
+      const res = await fetch('/api/owner/permissions', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ staff_id: user.user_id, sections: clear ? null : sections }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { setErr(data.error || 'No se pudo guardar'); return }
+      onSaved()
+    } catch { setErr('Error de red') } finally { setBusy(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl border border-[var(--line)] bg-[var(--bg)] shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="px-5 py-4 border-b border-[var(--line)] flex items-center gap-3">
+          <Shield size={18} className="text-[var(--accent-bright)]" />
+          <div><div className="font-bold text-[var(--text-1)]">Permisos</div><div className="text-[11px] text-[var(--text-3)]">{user.display_name || user.email}</div></div>
+          <button onClick={onClose} className="ml-auto text-[var(--text-3)] hover:text-[var(--text-1)]"><X size={18} /></button>
+        </div>
+        <div className="p-5 space-y-2">
+          <p className="text-[11px] text-[var(--text-4)] mb-3">Lo que apagues aquí desaparece de su menú y de su acceso. No puede darle más de lo que su rol permite.</p>
+          {sections === null ? (
+            <div className="flex justify-center py-8"><div className="w-5 h-5 border-2 border-[var(--text-3)] border-t-transparent rounded-full animate-spin" /></div>
+          ) : PERM_SECTIONS.map(s => (
+            <label key={s.key} className="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-[var(--surface-2)] cursor-pointer">
+              <input type="checkbox" checked={sections[s.key] === true}
+                onChange={e => setSections(prev => ({ ...(prev || {}), [s.key]: e.target.checked }))}
+                className="w-4 h-4 accent-[var(--accent)]" />
+              <div className="min-w-0">
+                <div className="text-sm text-[var(--text-1)]">{s.label}</div>
+                <div className="text-[11px] text-[var(--text-4)] truncate">{s.hint}</div>
+              </div>
+            </label>
+          ))}
+          {err && <p className="text-xs text-red-400">{err}</p>}
+          <div className="flex gap-2 pt-2">
+            <button onClick={() => save(true)} disabled={busy} className="px-3 py-2.5 rounded-lg border border-[var(--line)] text-xs font-semibold text-[var(--text-3)] hover:text-[var(--text-1)] disabled:opacity-50">Usar rol por defecto</button>
+            <button onClick={() => save(false)} disabled={busy || sections === null} className="flex-1 py-2.5 rounded-lg bg-[var(--accent)] text-[#04120c] font-bold disabled:opacity-50">{busy ? 'Guardando…' : 'Guardar permisos'}</button>
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
