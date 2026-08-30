@@ -45,6 +45,7 @@ jobs:
       # si su lógica está mal, o deja pasar datos podridos, o acusa de descuadre a un
       # restaurante que está bien.
       - run: python .github/scripts/test_cuadre.py
+      - run: python .github/scripts/test_log_event.py
 
       - run: python .github/scripts/cuadre.py | tee salida.txt
 
