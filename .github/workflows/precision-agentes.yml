@@ -39,7 +39,17 @@ jobs:
       # para decidir si los agentes sirven.
       - run: python .github/scripts/test_resolver_predicciones.py
 
+      # Mismo criterio para el calificador de inventario: sus pruebas corren ANTES que él.
+      # Un calificador con la lógica mal no produce un número malo — produce un número
+      # falso, que es peor, porque se ve igual de bien que uno cierto.
+      - run: python .github/scripts/test_resolver_inventario.py
+
       - run: python .github/scripts/resolver_predicciones.py | tee salida.txt
+
+      # Inventario es, al 2026-08-30, el único flujo con datos frescos
+      # (pos_inventory_movements: 4 días de atraso, contra 41–51 de las ventas).
+      # Es el único agente que hoy se puede calificar solo contra la realidad.
+      - run: python .github/scripts/resolver_inventario.py | tee -a salida.txt
 
       - name: Resumen
         if: always()
