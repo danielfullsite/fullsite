@@ -42,6 +42,8 @@ export const GUARDIANES_DE_SECRETO = [
   'ONBOARDING_SECRET',
   'CRON_SECRET',
   'verifyRappiSignature',
+  'verifyRappiOnboardingSignature',
+  'RAPPI_ONBOARDING_REGISTRATION_TOKEN',
   // El webhook de Uber verifica con un ayudante local (`verifySignature`). Registramos
   // el nombre del secreto y no el de la función: `verifySignature` es un nombre genérico
   // y cualquiera podría declarar uno que no verifique nada y pasar el barrido. El
@@ -79,6 +81,8 @@ export const RUTAS_PUBLICAS: Record<string, string> = {
   'POST /integrations/rappi/health': 'Ping de disponibilidad. Devuelve una constante.',
   'POST /prospect': 'Captura de prospectos desde la landing pública.',
   'GET /integrations/rappi/webhook': 'Ping del webhook: devuelve una constante. El POST sí verifica firma.',
+  'GET /integrations/rappi/onboarding/callback':
+    'Sonda del callback de self-onboarding de Rappi. Devuelve una constante; el POST exige firma HMAC.',
   'GET /integrations/uber-eats/webhook': 'Ping del webhook: devuelve una constante. El POST sí verifica firma.',
   'GET /webhook/ubereats': 'Ping del webhook: devuelve una constante. El POST sí verifica firma.',
 

@@ -16,12 +16,14 @@ if (!target) {
   console.error('Available:')
   console.error('  demo         Café Central — restaurante de demostración')
   console.error('  coffee-shop  Espresso Lab — specialty coffee\n')
+  console.error('  diezmex      Diezmex — demo ejecutivo sintético\n')
   process.exit(1)
 }
 
 const SEEDS: Record<string, () => Promise<{ seed: () => Promise<void> }>> = {
   'demo':         () => import('./demo/index.ts'),
   'coffee-shop':  () => import('./coffee-shop/index.ts'),
+  'diezmex':      () => import('./diezmex/index.ts'),
 }
 
 const loader = SEEDS[target]

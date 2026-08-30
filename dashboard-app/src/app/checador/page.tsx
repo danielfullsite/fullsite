@@ -39,7 +39,7 @@ export default function ChecadorPage() {
     setError('')
     if (d === 'del') { setPin(p => p.slice(0, -1)); return }
     if (d === 'ok') { if (pin.length >= 3) submit(pin); return }
-    if (pin.length < 8) setPin(p => p + d)
+    if (pin.length < 10) setPin(p => p + d)
   }
 
   async function huella() {

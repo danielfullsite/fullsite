@@ -26,6 +26,7 @@ Evidencia automatizada: workflow **Rappi Cert — DEV Readiness**, corrida
 ## Endpoints Fullsite
 
 - Webhook firmado: `https://app.fullsite.mx/api/integrations/rappi/webhook`
+- Callback self-onboarding: `https://app.fullsite.mx/api/integrations/rappi/onboarding/callback`
 - Health: `https://app.fullsite.mx/api/integrations/rappi/health`
 - Estado/OAuth: `/api/integrations/rappi/status?probe=oauth` (admin)
 - Menú DEV: `/api/integrations/rappi/menu` (admin)
@@ -82,6 +83,47 @@ tienda configurada. No fabricar un `order_id` ni llamar acciones contra producci
 No cambiar `RAPPI_ENV=prod` hasta completar el ciclo DEV anterior y acordar el cutover. Antes de
 producción se debe validar el mapping de la tienda real, la suscripción del webhook, modo de
 `READY_FOR_PICKUP`, impresoras/KDS en sitio y que Wansoft no consuma simultáneamente las órdenes.
+
+## Callback requerido para self-onboarding
+
+El callback que desbloquea el aprovisionamiento de PROD es distinto al webhook `NEW_ORDER`.
+Rappi envía el evento de integración `STORE_PROVISIONING_STATUS` cuando termina un lote de
+provisioning o deprovisioning.
+
+Fullsite implementa el receptor en:
+
+`https://app.fullsite.mx/api/integrations/rappi/onboarding/callback`
+
+Configuración requerida antes del deploy:
+
+```text
+RAPPI_ONBOARDING_WEBHOOK_SECRET=<secreto aleatorio dedicado, mínimo 32 bytes>
+```
+
+No reutilizar `RAPPI_CLIENT_SECRET` ni `RAPPI_WEBHOOK_SECRET`. El mismo valor se envía una sola
+vez a Rappi al registrar el callback y se guarda de forma segura como variable de entorno.
+
+Registro en DEV, usando el token M2M de Fullsite_DEV:
+
+```http
+POST https://api.dev.rappi.com/api/v2/restaurants-integrations-public-api/clients/{clientId}/webhooks
+X-Authorization: Bearer <integrator JWT>
+Content-Type: application/json
+
+{
+  "event": "STORE_PROVISIONING_STATUS",
+  "url": "https://app.fullsite.mx/api/integrations/rappi/onboarding/callback",
+  "secret": "<mismo valor de RAPPI_ONBOARDING_WEBHOOK_SECRET>"
+}
+```
+
+Rappi debe responder `201 Created` al crear o `200 OK` al actualizar. Después se valida con un
+evento real o prueba oficial: Fullsite exige `Rappi-Signature`, verifica HMAC-SHA256 sobre
+`<timestamp>.<body crudo>`, rechaza replay y devuelve `200 {"ok":true,"accepted":true,...}`.
+
+Además del callback, el flujo completo de self-onboarding requiere que Rodrigo registre para
+Fullsite_DEV el `redirect_uri` OAuth2 + PKCE. Ese redirect corresponde a la siguiente fase del
+portal de autoservicio; no es necesario para que Rappi pruebe este callback.
 
 Referencias: `docs/integrations/rappi/DESIGN.md` y
 `docs/integrations/rappi/RAPPI-ONBOARDING-REQUEST.md`.

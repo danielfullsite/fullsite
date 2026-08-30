@@ -45,7 +45,25 @@ export async function GET(request: NextRequest) {
   // up — but filter on updated_at, NOT created_at: a table opened >12h ago that just
   // had an item added (e.g. a bowl) is still active and must appear. On creation
   // updated_at == created_at, so new orders are covered too.
-  const cutoff = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString()
+  //
+  // ADEMÁS: si el tenant tiene un turno abierto, el KDS solo muestra comandas
+  // de ESE turno (updated_at >= opened_at). Verdad de campo AMALAY 2026-08-27
+  // (Eduardo): comandas de pruebas de turnos anteriores seguían vivas en el
+  // KDS y se "cruzaban" con las del turno nuevo. La ventana de 12 h queda como
+  // respaldo cuando no hay turno abierto (el tablero no se queda ciego).
+  let cutoff = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString()
+  try {
+    const tRes = await fetch(
+      `${SB_URL}/rest/v1/pos_turnos?client_id=eq.${encodeURIComponent(clientId)}` +
+      `&closed_at=is.null&select=opened_at&order=opened_at.desc&limit=1`,
+      { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }, cache: 'no-store' }
+    )
+    if (tRes.ok) {
+      const tRows = await tRes.json().catch(() => []) as Array<{ opened_at?: string }>
+      const openedAt = Array.isArray(tRows) ? tRows[0]?.opened_at : undefined
+      if (openedAt && openedAt > cutoff) cutoff = openedAt
+    }
+  } catch { /* sin turno resoluble → ventana de 12 h */ }
   const url =
     `${SB_URL}/rest/v1/pos_orders` +
     `?status=in.(enviada,preparando,lista)` +

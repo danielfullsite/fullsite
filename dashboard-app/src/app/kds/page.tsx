@@ -100,6 +100,25 @@ export default function KDSStandalone() {
   const kdsClient = useKdsWsClient()
   const orders = kdsClient.orders
 
+  // Registrar ?client= (y ?bridge=) en la primera visita — mismo patrón que
+  // /pos/cocina. Una tablet virgen de un tenant nuevo no tiene login ni
+  // localStorage: sin esto el KDS consulta client_id vacío y muestra 0 órdenes
+  // sin explicación (gap Minute-0 #11). La URL canónica del KDS de un tenant es
+  // /kds?client=<slug> — se persiste y se limpia de la barra.
+  const [kdsTenant, setKdsTenant] = useState('')
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const params = new URLSearchParams(window.location.search)
+      const clientParam = params.get('client')
+      if (clientParam) {
+        localStorage.setItem('fullsite_client_id', clientParam.toLowerCase().trim())
+        window.history.replaceState({}, '', window.location.pathname)
+      }
+      setKdsTenant(localStorage.getItem('fullsite_client_id') || '')
+    } catch { /* private browsing */ }
+  }, [])
+
   useEffect(() => {
     const n = orders.filter(o => o.status === 'enviada').length
     if (prevEnviadaRef.current > 0 && n > prevEnviadaRef.current) playAlert()
@@ -359,6 +378,11 @@ export default function KDSStandalone() {
         <div className="flex items-center gap-3">
           <span className="text-white font-black text-xl tracking-widest uppercase">
             {station.charAt(0).toUpperCase() + station.slice(1)}
+          </span>
+          {/* Tenant visible: un tablero en blanco se diagnostica de un vistazo.
+              Sin tenant, decir CÓMO configurarlo en vez de fallar en silencio. */}
+          <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded ${kdsTenant ? 'text-slate-500 bg-white/5' : 'text-amber-400 bg-amber-500/10'}`}>
+            {kdsTenant || 'sin restaurante — abre /kds?client=<tu-slug>'}
           </span>
           <div className="flex items-center gap-3 text-sm ml-4">
             <span className="flex items-center gap-1.5 text-slate-400">

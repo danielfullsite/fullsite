@@ -10,6 +10,7 @@ import { getActiveClientSlug as _cid } from '@/lib/data'
 import { getPosConfigSync } from '@/lib/pos-config'
 import { shouldUsePersistedFloorCoordinates } from '@/lib/floorplan-coordinates'
 import { setMesaTarget } from '@/lib/pos-navigation'
+import { counterHomePath, getServiceModel, isCounterModel } from '@/lib/pos-service-model'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -160,6 +161,18 @@ export default function MesasPage() {
   const [turnoNum, setTurnoNum] = useState<number | null>(null)
   const [showNewCuenta, setShowNewCuenta] = useState(false)
   const [newCuentaName, setNewCuentaName] = useState('')
+
+  // Tenants de mostrador (fast food / dark kitchen) no tienen mapa de mesas:
+  // URL directa, PWA o marcador viejo aterrizan aquí → mandar a la orden de
+  // mostrador. getServiceModel cae a 'tables' ante cualquier duda (sin red usa
+  // el caché local), así que para todos los demás tenants esto es un no-op.
+  useEffect(() => {
+    let alive = true
+    getServiceModel().then(model => {
+      if (alive && isCounterModel(model)) router.replace(counterHomePath(model))
+    })
+    return () => { alive = false }
+  }, [router])
 
   // Fetch mesa list from DB (pos_mesas).
   // OP-40: el mapa (posición + forma) ahora viene de pos_mesas (x_pct/y_pct/shape),
@@ -1149,7 +1162,7 @@ export default function MesasPage() {
               value={pinInput}
               onChange={e => setPinInput(e.target.value.replace(/\D/g, ''))}
               onKeyDown={e => { if (e.key === 'Enter' && pinInput) { pinPrompt.onSubmit(pinInput) } }}
-              maxLength={6}
+              maxLength={10}
               className="w-full bg-[var(--line)] border border-[var(--line)] rounded-xl px-4 py-3 text-[var(--text-1)] text-center text-2xl tracking-[0.3em] font-bold focus:outline-none focus:border-[var(--accent)] mb-4"
               placeholder="****"
             />

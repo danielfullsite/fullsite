@@ -29,7 +29,7 @@ let _client: SupabaseClient | null = null
 
 export function getAdminClient(): SupabaseClient {
   if (_client) return _client
-  loadEnvLocal()
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) loadEnvLocal()
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_KEY
   if (!url || !key) {

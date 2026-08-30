@@ -1,9 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Store, Plus, Activity, AlertTriangle, ArrowUpRight, Bot, RefreshCw, X, Sparkles, Circle, Power } from 'lucide-react'
+import { Store, Plus, Activity, AlertTriangle, ArrowUpRight, Bot, RefreshCw, X, Sparkles, Circle, Power, KeyRound } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { ToastProvider, useToast, ConfirmModal } from '@/components/platform/PlatformFeedback'
+import { VERTICAL_PRESETS, VERTICAL_IDS, type VerticalId } from '@/lib/vertical-presets'
 
 // Control Plane: sin anon key. Todo pasa por /api/platform/* (admin-gated + service_role).
 // Fase 4: alta de tenant (POST /api/platform/onboard), activar/desactivar
@@ -24,6 +25,7 @@ function TenantsInner() {
   const [loading, setLoading] = useState(true)
   const [denied, setDenied] = useState(false)
   const [showNew, setShowNew] = useState(false)
+  const [ownerTenant, setOwnerTenant] = useState<Tenant | null>(null)
   const [confirm, setConfirm] = useState<null | { title: string; message?: string; run: () => Promise<void> }>(null)
   const [busy, setBusy] = useState(false)
 
@@ -187,6 +189,13 @@ function TenantsInner() {
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-3">
                           <button
+                            onClick={() => setOwnerTenant(t)}
+                            title="Crear o resetear el login del dueño (no toca la operación)"
+                            className="inline-flex items-center gap-1 text-[var(--text-3)] font-semibold text-xs hover:text-[var(--text-1)]"
+                          >
+                            <KeyRound size={13} /> Acceso
+                          </button>
+                          <button
                             onClick={() => setConfirm({
                               title: `${isActive ? 'Desactivar' : 'Activar'} "${t.name}"`,
                               message: isActive
@@ -222,6 +231,7 @@ function TenantsInner() {
       </p>
 
       {showNew && <NewTenantModal onClose={() => setShowNew(false)} onDone={load} toast={toast} tenantCount={tenants.length} />}
+      {ownerTenant && <OwnerAccessModal tenant={ownerTenant} onClose={() => setOwnerTenant(null)} toast={toast} />}
 
       <ConfirmModal
         open={!!confirm}
@@ -239,6 +249,56 @@ function TenantsInner() {
   )
 }
 
+// Acceso del dueño de un tenant EXISTENTE: crea o resetea el login sin tocar la
+// operación (a diferencia de "Nuevo cliente", que siembra el skeleton completo).
+// Rescatado del WIP local 2026-08-30; el server hace el trabajo en
+// /api/platform/tenant-owner.
+function OwnerAccessModal({ tenant, onClose, toast }: {
+  tenant: Tenant
+  onClose: () => void
+  toast: (k: 'success' | 'error', m: string) => void
+}) {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    try {
+      const res = await fetch('/api/platform/tenant-owner', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientId: tenant.id, email, password }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) { toast('error', json.error || 'No se pudo crear el acceso.'); return }
+      toast('success', `Acceso dueño listo para ${tenant.name}`)
+      onClose()
+    } catch {
+      toast('error', 'Error de red al crear el acceso.')
+    } finally { setBusy(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
+      <form onSubmit={submit} className="w-full max-w-sm rounded-xl border border-[var(--line)] bg-[var(--bg)] shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="px-5 py-4 border-b border-[var(--line)] flex items-center gap-3">
+          <KeyRound size={18} className="text-[var(--accent-bright)]" />
+          <div><div className="font-bold text-[var(--text-1)]">Acceso dueño</div><div className="text-[11px] text-[var(--text-3)]">{tenant.name} · {tenant.id}</div></div>
+          <button type="button" onClick={onClose} className="ml-auto text-[var(--text-3)]"><X size={18} /></button>
+        </div>
+        <div className="p-5 space-y-4">
+          <label className="block"><span className="text-xs text-[var(--text-3)]">Correo del dueño</span><input type="email" required value={email} onChange={e => setEmail(e.target.value)} className="mt-1 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-sm text-[var(--text-1)] outline-none focus:border-[var(--accent-line)]" /></label>
+          <label className="block"><span className="text-xs text-[var(--text-3)]">Contraseña inicial (mín. 8)</span><input type="password" required minLength={8} value={password} onChange={e => setPassword(e.target.value)} className="mt-1 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-sm text-[var(--text-1)] outline-none focus:border-[var(--accent-line)]" /></label>
+          <p className="text-[11px] text-[var(--text-4)]">Crea o repara únicamente Auth y la membresía de dueño. No modifica la operación del tenant.</p>
+          <button disabled={busy} className="w-full rounded-lg bg-[var(--accent)] px-4 py-2.5 text-sm font-bold text-[#04120c] disabled:opacity-50">{busy ? 'Guardando…' : 'Crear o reparar acceso'}</button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
 const ACCENT_OPTIONS = ['emerald', 'blue', 'violet', 'amber', 'pink', 'cyan']
 
 function NewTenantModal({ onClose, onDone, toast, tenantCount }: {
@@ -253,11 +313,22 @@ function NewTenantModal({ onClose, onDone, toast, tenantCount }: {
   const [theme, setTheme] = useState<'light' | 'dark'>('light')
   const [logo, setLogo] = useState('')
   const [mesas, setMesas] = useState('10')
+  const [vertical, setVertical] = useState<VerticalId>('casual_dining')
+  const [creds, setCreds] = useState<{
+    staffPins: Array<{ role: string; pin: string }>
+    localServer: { email: string; password: string } | null
+  } | null>(null)
+  const [mesasTouched, setMesasTouched] = useState(false)
+  const [locationsText, setLocationsText] = useState('Principal')
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [busy, setBusy] = useState(false)
 
   const autoSlug = (v: string) => v.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
   const valid = name && slug && email && password.length >= 6
+  const locations = locationsText.split('\n').map(line => line.trim()).filter(Boolean).map(line => {
+    const [locationName, ...addressParts] = line.split('|')
+    return { name: locationName.trim(), address: addressParts.join('|').trim() }
+  })
 
   async function submit() {
     setBusy(true)
@@ -268,10 +339,25 @@ function NewTenantModal({ onClose, onDone, toast, tenantCount }: {
         body: JSON.stringify({
           clientId: slug, email, password, display_name: name,
           accent_color: accent, default_theme: theme,
-          logo_url: logo || undefined, mesas: parseInt(mesas, 10) || 10,
+          logo_url: logo || undefined,
+          // Solo mandar mesas si el operador las editó; si no, aplica el default del preset.
+          mesas: mesasTouched ? (parseInt(mesas, 10) || 0) : undefined,
+          vertical,
+          locations,
         }),
       })
-      if (res.ok) { toast('success', `Tenant "${slug}" dado de alta`); onDone(); onClose() }
+      if (res.ok) {
+        // NO cerrar todavía: las credenciales (PINs de plantilla + service
+        // account del Local Server) solo viajan UNA vez. Mostrarlas para que
+        // el operador las guarde (gap Minute-0 #2/#3).
+        const j = await res.json().catch(() => ({})) as {
+          staff_pins?: Array<{ role: string; pin: string }>
+          local_server?: { email: string; password: string } | null
+        }
+        toast('success', `Tenant "${slug}" dado de alta`)
+        setCreds({ staffPins: j.staff_pins || [], localServer: j.local_server || null })
+        onDone()
+      }
       else if (res.status === 429) toast('error', 'Límite de escrituras excedido.')
       else {
         const j = await res.json().catch(() => ({}))
@@ -295,6 +381,55 @@ function NewTenantModal({ onClose, onDone, toast, tenantCount }: {
           </div>
           <button onClick={onClose} className="ml-auto text-[var(--text-3)] hover:text-[var(--text-1)]"><X size={18} /></button>
         </div>
+        {creds ? (
+          // Pantalla de credenciales — se muestran UNA vez; el server no las
+          // vuelve a mandar. El operador debe guardarlas antes de cerrar.
+          <div className="p-5 space-y-4">
+            <p className="text-sm font-semibold text-[var(--text-1)]">Guarda estas credenciales — no se volverán a mostrar</p>
+            <div className="rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3 text-sm">
+              <p className="text-xs text-[var(--text-3)] mb-1">URL del KDS (ábrela una vez en la tablet de cocina; queda configurada)</p>
+              <p className="font-mono break-all text-[var(--text-1)]">app.fullsite.mx/kds?client={slug}</p>
+            </div>
+            <div className="rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3 text-sm">
+              <p className="text-xs text-[var(--text-3)] mb-1">Login del dueño</p>
+              <p className="font-mono text-[var(--text-1)]">{email} · {password}</p>
+            </div>
+            {creds.staffPins.length > 0 && (
+              <div className="rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3 text-sm">
+                <p className="text-xs text-[var(--text-3)] mb-2">PINs de plantilla del POS (rotarlos en Personal &amp; PINs)</p>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                  {creds.staffPins.map(sp => (
+                    <p key={sp.role} className="flex justify-between gap-2"><span className="capitalize text-[var(--text-2)]">{sp.role}</span><span className="font-mono tabular-nums text-[var(--text-1)]">{sp.pin}</span></p>
+                  ))}
+                </div>
+              </div>
+            )}
+            {creds.localServer && (
+              <div className="rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3 text-sm">
+                <p className="text-xs text-[var(--text-3)] mb-1">Service account del Local Server (Pedro)</p>
+                <p className="font-mono break-all text-[var(--text-1)]">{creds.localServer.email}</p>
+                <p className="font-mono text-[var(--text-1)]">{creds.localServer.password}</p>
+              </div>
+            )}
+            <button
+              onClick={() => {
+                const lines = [
+                  `Tenant: ${slug}`,
+                  `Dueño: ${email} / ${password}`,
+                  ...creds.staffPins.map(sp => `PIN ${sp.role}: ${sp.pin}`),
+                  ...(creds.localServer ? [`Local Server: ${creds.localServer.email} / ${creds.localServer.password}`] : []),
+                ]
+                navigator.clipboard?.writeText(lines.join('\n')).then(() => toast('success', 'Credenciales copiadas'))
+              }}
+              className="w-full py-2.5 rounded-xl border border-[var(--line)] text-sm font-semibold text-[var(--text-1)] hover:border-[var(--accent-line)]">
+              Copiar todo
+            </button>
+            <button onClick={onClose}
+              className="w-full py-3 rounded-xl bg-[var(--accent)] text-[#04120c] font-bold">
+              Listo, ya las guardé
+            </button>
+          </div>
+        ) : (
         <div className="p-5 space-y-4">
           <label className="block">
             <span className="text-xs text-[var(--text-3)]">Nombre del restaurante</span>
@@ -309,6 +444,19 @@ function NewTenantModal({ onClose, onDone, toast, tenantCount }: {
                 className="flex-1 bg-transparent px-3 py-2.5 text-[var(--text-1)] outline-none font-mono text-sm" />
               <span className="px-3 text-[var(--text-4)] text-sm font-mono border-l border-[var(--line)]">.app.fullsite.mx</span>
             </div>
+          </label>
+          <label className="block">
+            <span className="text-xs text-[var(--text-3)]">Tipo de restaurante</span>
+            <select value={vertical}
+              onChange={e => {
+                const v = e.target.value as VerticalId
+                setVertical(v)
+                if (!mesasTouched) setMesas(String(VERTICAL_PRESETS[v].defaultMesas))
+              }}
+              className="mt-1 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2.5 text-[var(--text-1)] outline-none focus:border-[var(--accent-line)] text-sm">
+              {VERTICAL_IDS.map(v => <option key={v} value={v}>{VERTICAL_PRESETS[v].label}</option>)}
+            </select>
+            <span className="mt-1 block text-[11px] text-[var(--text-4)]">{VERTICAL_PRESETS[vertical].description}</span>
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
@@ -347,21 +495,33 @@ function NewTenantModal({ onClose, onDone, toast, tenantCount }: {
             </label>
             <label className="block">
               <span className="text-xs text-[var(--text-3)]">Mesas</span>
-              <input value={mesas} onChange={e => setMesas(e.target.value.replace(/\D/g, ''))} inputMode="numeric"
+              <input value={mesas} onChange={e => { setMesasTouched(true); setMesas(e.target.value.replace(/\D/g, '')) }} inputMode="numeric"
                 className="mt-1 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2.5 text-[var(--text-1)] outline-none focus:border-[var(--accent-line)] text-sm tabular-nums" />
             </label>
           </div>
+          <label className="block">
+            <span className="text-xs text-[var(--text-3)]">Sucursales</span>
+            <textarea
+              value={locationsText}
+              onChange={e => setLocationsText(e.target.value)}
+              rows={5}
+              placeholder={'Principal | Av. Ejemplo 100\nSucursal Centro | Centro, Monterrey'}
+              className="mt-1 w-full resize-y rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2.5 text-[var(--text-1)] outline-none focus:border-[var(--accent-line)] text-sm"
+            />
+            <span className="mt-1 block text-[11px] text-[var(--text-4)]">Una por línea. Usa “Nombre | Dirección”. Se crearán {locations.length}.</span>
+          </label>
           <button disabled={!valid} onClick={() => setConfirmOpen(true)}
             className="w-full py-3 rounded-xl bg-[var(--accent)] text-[#04120c] font-bold disabled:opacity-40 flex items-center justify-center gap-2">
             <Plus size={16} /> Dar de alta cliente
           </button>
         </div>
+        )}
       </div>
 
       <ConfirmModal
         open={confirmOpen}
         title={`Dar de alta "${slug}"`}
-        message={`Se creará el usuario dueño, el mapping y el skeleton completo. Es idempotente. Actualmente hay ${tenantCount} tenants.`}
+        message={`Se creará el usuario dueño, el mapping y el skeleton de "${VERTICAL_PRESETS[vertical].label}" (menú semilla, módulos y mesas del tipo). Es idempotente. Actualmente hay ${tenantCount} tenants.`}
         confirmLabel="Crear tenant"
         busy={busy}
         onCancel={() => { if (!busy) setConfirmOpen(false) }}

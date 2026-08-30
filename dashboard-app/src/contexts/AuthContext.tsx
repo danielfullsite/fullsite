@@ -101,8 +101,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const actas = typeof window !== 'undefined' ? localStorage.getItem('fullsite_actas') : null
       if (actas) {
-        cid = actas
-        setRole(resolveRole('dueño', userEmail)) // ve el tenant con acceso completo
+        // localStorage es por-origen, no por-cuenta: un act-as dejado por un admin
+        // sobrevive a un cambio de cuenta en el mismo navegador y contaminaba la
+        // sesión de un usuario normal (cid ajeno + rol dueño forzado → RLS deja los
+        // dashboards vacíos y el banner "viendo X" aparece a quien nunca impersonó;
+        // visto en campo 2026-08-28 con demo.diezmex heredando amalay). Antes de
+        // honrar el flag se verifica contra el server que ESTA sesión es admin de
+        // plataforma; si no, el flag es huérfano y se limpia (self-healing).
+        let isAdmin = false
+        try {
+          const probe = await fetch('/api/platform/2fa/status', { credentials: 'include', cache: 'no-store' })
+          isAdmin = probe.ok
+        } catch { /* red caída → no elevar */ }
+        if (isAdmin) {
+          cid = actas
+          setRole(resolveRole('dueño', userEmail)) // ve el tenant con acceso completo
+        } else {
+          try { localStorage.removeItem('fullsite_actas') } catch { /* SSR */ }
+        }
       }
     } catch { /* SSR */ }
 
@@ -110,7 +126,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Persist for data.ts getActiveClientSlug() — allows data functions to auto-resolve client
     if (cid) {
-      try { localStorage.setItem('fullsite_client_id', cid) } catch { /* SSR */ }
+      try {
+        // Cambio de tenant en el MISMO navegador: purgar los cachés de identidad
+        // y turno del tenant anterior. Sin esto, el turno cacheado de un
+        // restaurante aparecía en el POS de otro ("Turno del día anterior —
+        // Daniel, 25 ago" de amalay dentro de carls-jr, visto en campo
+        // 2026-08-29) y su botón de Corte Z apuntaba a la caja equivocada.
+        // NO se tocan las colas (print/offline): son operaciones pendientes que
+        // deben sincronizar aunque cambie la sesión.
+        const prev = localStorage.getItem('fullsite_client_id')
+        if (prev && prev !== cid) {
+          for (const k of ['pos_cached_turno', 'pos_turno_cache', 'pos_staff_cache', 'pos_manager_credentials_v2', 'pos_service_model']) {
+            try { localStorage.removeItem(k) } catch { /* — */ }
+          }
+        }
+        localStorage.setItem('fullsite_client_id', cid)
+      } catch { /* SSR */ }
     }
 
     // Load full client config from Supabase (with fallback to hardcoded)

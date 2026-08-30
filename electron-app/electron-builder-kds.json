@@ -1,0 +1,32 @@
+{
+  "appId": "mx.fullsite.kds",
+  "productName": "Fullsite KDS",
+  "directories": {
+    "output": "dist-kds"
+  },
+  "files": [
+    "**/*",
+    "!dist/**",
+    "!dist-pos/**",
+    "!dist-kds/**",
+    "!fullsite-pos-win-*/**",
+    "!fullsite-pos@*",
+    "!**/*.log",
+    "!electron-builder*.json"
+  ],
+  "win": {
+    "target": "nsis",
+    "icon": "icon.ico"
+  },
+  "mac": {
+    "target": "dmg",
+    "icon": "icon.ico"
+  },
+  "nsis": {
+    "oneClick": true,
+    "perMachine": true,
+    "allowToChangeInstallationDirectory": false,
+    "installerIcon": "icon.ico",
+    "uninstallerIcon": "icon.ico"
+  }
+}

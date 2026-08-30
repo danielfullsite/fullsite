@@ -155,14 +155,20 @@ export async function POST(request: NextRequest) {
       // 4: POS orders (conditional)
       wantsOrders ? fetch(`${sbUrl}/rest/v1/pos_orders?client_id=eq.${encodeURIComponent(client_id || '')}&select=status,total,mesa,mesero,metodo_pago,created_at&order=created_at.desc&limit=50`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
       // 5: Recipes + insumos (conditional — for food cost, receta, ingrediente questions)
-      wantsFoodCost ? fetch(`${sbUrl}/rest/v1/pos_recipes?select=nombre,precio_venta,costo_total,pct_costo,ingredientes&order=nombre.asc&limit=120`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
+      wantsFoodCost ? fetch(`${sbUrl}/rest/v1/pos_recipes?select=nombre,precio_venta,costo_total,pct_costo,ingredientes&client_id=eq.${encodeURIComponent(client_id || '')}&order=nombre.asc&limit=120`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
       // 6: Insumos (conditional)
-      wantsFoodCost ? fetch(`${sbUrl}/rest/v1/pos_insumos?select=nombre,categoria,proveedor,um,precio_limpio,merma_pct&order=nombre.asc&limit=500`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
+      wantsFoodCost ? fetch(`${sbUrl}/rest/v1/pos_insumos?select=nombre,categoria,proveedor,um,precio_limpio,merma_pct&client_id=eq.${encodeURIComponent(client_id || '')}&order=nombre.asc&limit=500`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
+      // 8: Sucursales del grupo (SIEMPRE). Son ~5 filas; sin esto el chat no sabe
+      //    que el cliente tiene sucursales y responde "dime cuáles son".
+      fetch(`${sbUrl}/rest/v1/client_locations?client_id=eq.${encodeURIComponent(client_id || '')}&select=id,name&active=eq.true&order=name.asc&limit=100`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []),
+      // 9: Órdenes con sucursal, para poder comparar entre ellas. Se piden sólo
+      //    location_id y total: PostgREST no agrupa, la suma se hace abajo en JS.
+      fetch(`${sbUrl}/rest/v1/pos_orders?client_id=eq.${encodeURIComponent(client_id || '')}&select=location_id,total,created_at&status=eq.cerrada&created_at=gte.${new Date(Date.now() - 30 * 864e5).toISOString()}&order=created_at.desc&limit=3000`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []),
       // 7: Market stock (conditional)
       wantsMarket ? fetch(`${sbUrl}/rest/v1/pos_market_stock?select=menu_item_id,stock,reorder_point&client_id=eq.${encodeURIComponent(client_id || '')}&order=stock.asc&limit=100`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
     ]
 
-    const [recentDaysRaw, waiterRowsRaw, fcRowsRaw, reservasRaw, ordersRaw, recipesRaw, insumosRaw, marketStockRaw] = await Promise.all(fetches) as [Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[]]
+    const [recentDaysRaw, waiterRowsRaw, fcRowsRaw, reservasRaw, ordersRaw, recipesRaw, insumosRaw, sucursalesRaw, ordenesPorSucursalRaw, marketStockRaw] = await Promise.all(fetches) as Record<string, unknown>[][]
 
     // OCM Fase 3: si el tenant no tiene histórico en wansoft_daily (todo cliente clonado
     // del esqueleton), sintetizamos las filas diarias desde su pos_orders vivo. Mismo shape
@@ -232,7 +238,7 @@ export async function POST(request: NextRequest) {
     // 3. Waiter × platillo data — process results from parallel fetch
     let waiterContext = ''
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let waiterRows = (waiterRowsRaw || []) as Array<{ fecha: string; data: any }>
+    const waiterRows = (waiterRowsRaw || []) as Array<{ fecha: string; data: any }>
     if (wantsMeseros) {
 
     if (waiterRows && waiterRows.length > 0) {
@@ -545,6 +551,48 @@ export async function POST(request: NextRequest) {
     }
 
     // 2d-2. Market inventory
+    // ── SUCURSALES ──────────────────────────────────────────────────────────
+    // Antes el chat no sabía que un cliente podía tener sucursales: a "¿cuál es
+    // mi mejor restaurante?" contestaba "dime cuáles son". Se le dan los nombres
+    // y el desempeño de cada una para que compare solo.
+    let sucursalesContext = ''
+    if (Array.isArray(sucursalesRaw) && sucursalesRaw.length > 0) {
+      const nombrePorId = new Map<string, string>()
+      for (const l of sucursalesRaw as { id?: string; name?: string }[]) {
+        if (l.id && l.name) nombrePorId.set(l.id, l.name)
+      }
+
+      const acum = new Map<string, { ventas: number; tickets: number }>()
+      for (const o of (ordenesPorSucursalRaw || []) as { location_id?: string; total?: number | string }[]) {
+        const id = o.location_id || '(sin sucursal)'
+        const monto = Number(o.total) || 0   // PostgREST devuelve numeric como STRING
+        const a = acum.get(id) || { ventas: 0, tickets: 0 }
+        a.ventas += monto; a.tickets += 1
+        acum.set(id, a)
+      }
+
+      const filas = [...acum.entries()]
+        .map(([id, a]) => ({
+          nombre: nombrePorId.get(id) || id,
+          ventas: a.ventas,
+          tickets: a.tickets,
+          promedio: a.tickets ? a.ventas / a.tickets : 0,
+        }))
+        .sort((x, y) => y.ventas - x.ventas)
+
+      const listado = [...nombrePorId.values()].join(', ')
+      sucursalesContext = `\nSUCURSALES DE ESTE CLIENTE (${nombrePorId.size}): ${listado}\n`
+
+      if (filas.length > 0) {
+        sucursalesContext += `\nDESEMPEÑO POR SUCURSAL — ÚLTIMOS 30 DÍAS (ya calculado, NO lo recalcules):\n`
+        for (const f of filas) {
+          sucursalesContext += `  ${f.nombre}: $${Math.round(f.ventas).toLocaleString('es-MX')} en ${f.tickets} tickets, ticket promedio $${Math.round(f.promedio).toLocaleString('es-MX')}\n`
+        }
+        sucursalesContext += `La mejor por ventas es ${filas[0].nombre}. La de menor venta es ${filas[filas.length - 1].nombre}.\n`
+        sucursalesContext += `Si te preguntan cuál es la mejor, contesta con estos números y di por qué (ventas totales vs ticket promedio pueden dar ganadores distintos).\n`
+      }
+    }
+
     let marketContext = ''
     if (wantsMarket && Array.isArray(marketStockRaw) && marketStockRaw.length > 0) {
       const agotados = marketStockRaw.filter((m: Record<string, unknown>) => Number(m.stock) <= 0)
@@ -701,7 +749,7 @@ NOTA RANGO DE DATOS: los datos diarios abajo cubren EXACTAMENTE del ${(recentDay
       if (q.includes('hora') || q.includes('pico') || q.includes('horario')) {
         try {
           const hourlyRes = await fetch(
-            `${sbUrl}/rest/v1/wansoft_hourly?select=fecha,data&order=fecha.desc&limit=3`,
+            `${sbUrl}/rest/v1/wansoft_hourly?select=fecha,data&client_id=eq.${encodeURIComponent(client_id || '')}&order=fecha.desc&limit=3`,
             { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
           )
           if (hourlyRes.ok) {
@@ -1020,6 +1068,7 @@ Brecha: Julio vende 2.4x más. Christopher necesita coaching en H&H y postres.
 3. 2da bebida siempre — "¿otro café? ¿refresco?"
 Si lo hacen = +$5,000-6,000 hoy. Hazlo ahora.
 
+${sucursalesContext}
 ${waiterContext}
 ${foodCostContext}
 ${reservasContext}

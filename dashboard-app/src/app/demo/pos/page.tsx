@@ -141,7 +141,7 @@ function CancelModal({ itemName, onConfirm, onCancel }: { itemName: string; onCo
         </div>
         <div className="mb-4">
           <p className="text-sm text-zinc-400 mb-1">PIN de gerente</p>
-          <input type="password" inputMode="numeric" maxLength={4} value={pin} onChange={e => setPin(e.target.value)}
+          <input type="password" inputMode="numeric" maxLength={10} value={pin} onChange={e => setPin(e.target.value)}
             placeholder="••••" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-center text-xl tracking-[0.5em] focus:outline-none focus:border-red-500" />
         </div>
         <div className="flex gap-2">
@@ -183,7 +183,7 @@ function DiscountModal({ subtotal, onApply, onClose }: { subtotal: number; onApp
         {amount > 0 && <p className="text-center text-amber-400 text-sm mb-3">Descuento: -{formatDemoMXN(Math.min(amount, subtotal))}</p>}
         <div className="mb-4">
           <p className="text-sm text-zinc-400 mb-1">PIN de gerente</p>
-          <input type="password" inputMode="numeric" maxLength={4} value={pin} onChange={e => setPin(e.target.value)}
+          <input type="password" inputMode="numeric" maxLength={10} value={pin} onChange={e => setPin(e.target.value)}
             placeholder="••••" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-center text-xl tracking-[0.5em] focus:outline-none focus:border-amber-500" />
         </div>
         <div className="flex gap-2">

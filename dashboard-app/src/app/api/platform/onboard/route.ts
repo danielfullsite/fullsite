@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { requirePlatformAdmin2FA } from '@/lib/platform-auth'
 import { rateLimit, auditLog } from '@/lib/platform-writes'
 import { provisionTenant } from '@/lib/provision-tenant'
+import { isVerticalId } from '@/lib/vertical-presets'
 import { randomUUID } from 'crypto'
 
 // ── Control Plane · POST /api/platform/onboard ───────────────────────────────
@@ -38,15 +39,23 @@ export async function POST(req: NextRequest) {
     default_theme?: 'light' | 'dark'
     logo_url?: string
     mesas?: number
+    locations?: Array<{ id?: string; name: string; address?: string }>
+    vertical?: string
   }
   try {
     body = await req.json()
   } catch {
     return Response.json({ error: 'JSON inválido' }, { status: 400 })
   }
-  const { clientId, email, password, display_name, accent_color, default_theme, logo_url, mesas } = body
+  const { clientId, email, password, display_name, accent_color, default_theme, logo_url, mesas, locations, vertical } = body
   if (!clientId || !email || !password) {
     return Response.json({ error: 'clientId, email y password requeridos' }, { status: 400 })
+  }
+  if (vertical !== undefined && !isVerticalId(vertical)) {
+    return Response.json({ error: `vertical inválido: ${vertical}` }, { status: 400 })
+  }
+  if (locations && (!Array.isArray(locations) || locations.length > 100 || locations.some(location => !location?.name?.trim()))) {
+    return Response.json({ error: 'Sucursales inválidas (máximo 100 y todas requieren nombre)' }, { status: 400 })
   }
 
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey)
@@ -116,6 +125,8 @@ export async function POST(req: NextRequest) {
       default_theme,
       logo_url,
       mesas,
+      locations,
+      vertical,
     })
 
     const audited = await auditLog(gate.ctx, {
@@ -164,6 +175,9 @@ export async function POST(req: NextRequest) {
       userId,
       clientId,
       provisioned: provision.created,
+      // PINs de plantilla (solo cuando se sembraron en ESTA corrida). El alta
+      // los muestra UNA vez — el dueño debe guardarlos/rotarlos (gap Minute-0 #2).
+      staff_pins: provision.staffPins,
       audited,
       // Credenciales del Local Server (solo al crear). Guárdalas en el setup del
       // servidor local del restaurante. Si es null, ya existía (rota el password).

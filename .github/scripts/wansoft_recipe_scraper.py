@@ -165,6 +165,23 @@ def sb_upsert_recipe(saucer_id, name, ingredients, raw, extra):
 
 # ── Catálogos (insumos + unidades) → wansoft_data ───────────────────────────
 
+def a_jsonb(valor):
+    """Deja `valor` listo para la columna jsonb `wansoft_data.data`.
+
+    `requests(json=...)` ya serializa el cuerpo entero. Si aqui se manda un str,
+    PostgREST guarda un ESCALAR JSON de tipo string en vez de un objeto, y
+    `data->>'campo'` devuelve NULL: el dato entra pero queda inconsultable desde
+    SQL. Un str que ya venia serializado desde arriba se vuelve a leer.
+
+    El viaje dumps/loads ocupa el lugar del `default=str` que traia el json.dumps
+    original: sigue tolerando fechas y decimales, solo que ahora entran como
+    objeto y no como texto.
+    """
+    if isinstance(valor, str):
+        valor = json.loads(valor)
+    return json.loads(json.dumps(valor, default=str))
+
+
 def save_catalog(session, path, data_key):
     data = post_json(session, path, {"subsidiaryId": SUBSIDIARY_ID})
     if not data:
@@ -182,7 +199,7 @@ def save_catalog(session, path, data_key):
         "client_id": CLIENT["id"],
         "fecha": datetime.now(timezone.utc).date().isoformat(),
         "data_key": data_key,
-        "data": json.dumps(items, ensure_ascii=False, default=str),
+        "data": a_jsonb(items),
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
     r = requests.post(

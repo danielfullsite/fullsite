@@ -229,6 +229,8 @@ interface Cierre {
   created_at: string
   fondo_inicial: number
   total_contado: number
+  /** Consecutivo fiscal por cliente; lo asigna un trigger al insertar. Null en cierres previos a la migración. */
+  folio_z?: number | null
 }
 
 function HistorialCierres() {
@@ -239,10 +241,12 @@ function HistorialCierres() {
   useEffect(() => {
     async function fetch_() {
       try {
-        const res = await fetch(
-          `${SUPABASE_URL}/rest/v1/pos_cierres?client_id=eq.${_cid()}&order=created_at.desc&limit=10&select=id,fecha,total_ventas,tickets_count,diferencia,closed_by,created_at,fondo_inicial,total_contado`,
-          { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
-        )
+        const base = `${SUPABASE_URL}/rest/v1/pos_cierres?client_id=eq.${_cid()}&order=created_at.desc&limit=10&select=id,fecha,total_ventas,tickets_count,diferencia,closed_by,created_at,fondo_inicial,total_contado`
+        // folio_z existe cuando la migración pos_cierres_folio_z_consecutivo está
+        // aplicada; si la base aún no la tiene, PostgREST rechaza el select entero,
+        // así que se reintenta sin la columna (el chip Z simplemente no aparece).
+        let res = await fetch(`${base},folio_z`, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } })
+        if (!res.ok) res = await fetch(base, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } })
         if (res.ok) setCierres(await res.json())
       } catch { /* */ }
       setLoading(false)
@@ -266,6 +270,9 @@ function HistorialCierres() {
             >
               <div className="flex items-center gap-3">
                 {isOpen ? <ChevronDown size={14} className="text-[var(--text-3)]" /> : <ChevronRight size={14} className="text-[var(--text-3)]" />}
+                {typeof c.folio_z === 'number' && (
+                  <span className="text-[10px] font-mono font-bold tabular-nums px-1.5 py-0.5 rounded-md bg-[var(--accent-soft)] text-[var(--accent-ink)]">Z #{c.folio_z}</span>
+                )}
                 <span className="font-medium text-[var(--text-1)]">{new Date(c.created_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
                 <span className="text-[var(--text-3)]">{new Date(c.created_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</span>
               </div>
@@ -300,6 +307,8 @@ export default function TurnoPage() {
   const [showCorteX, setShowCorteX] = useState(false)
   // GUARD-08: banner if the previous cierre had open orders
   const [orphanCierre, setOrphanCierre] = useState<{ count: number; nota: string | null } | null>(null)
+  // Turnos abiertos ADEMÁS del operativo (huérfanos de días anteriores)
+  const [staleTurnos, setStaleTurnos] = useState<Turno[]>([])
 
   // Open shift state
   const [fondoInicial, setFondoInicial] = useState('')
@@ -311,13 +320,18 @@ export default function TurnoPage() {
     setLoading(true)
     try {
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/pos_turnos?closed_at=is.null&client_id=eq.${_cid()}&order=opened_at.desc&limit=1`,
+        `${SUPABASE_URL}/rest/v1/pos_turnos?closed_at=is.null&client_id=eq.${_cid()}&order=opened_at.desc&limit=10`,
         { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
       )
       if (res.ok) {
         const rows = await res.json()
         const turno = rows[0] || null
         setActiveTurno(turno)
+        // Verdad de campo AMALAY 2026-08-27 (Eduardo): quedaron DOS turnos
+        // abiertos y el Corte Z entraba en conflicto. El más reciente es el
+        // operativo; los demás son huérfanos de días/pruebas anteriores y se
+        // ofrecen para cierre administrativo aquí mismo.
+        setStaleTurnos(Array.isArray(rows) && rows.length > 1 ? rows.slice(1) : [])
         // Keep IDB in sync so we have a fallback when offline
         if (turno) {
           await cacheTurno({ ...turno, client_id: _cid(), synced_at: new Date().toISOString() })
@@ -516,6 +530,43 @@ export default function TurnoPage() {
                 <p className="text-center text-xs text-[var(--text-3)]">
                   Corte X: snapshot sin cerrar — Cierre: wizard completo + PIN gerente
                 </p>
+
+                {/* Turnos huérfanos: más de un turno abierto rompe el Corte Z
+                    (visto en campo AMALAY 2026-08-27). El operativo es el más
+                    reciente; los demás se cierran administrativamente aquí. */}
+                {staleTurnos.length > 0 && (
+                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 space-y-2">
+                    <p className="text-amber-400 font-bold text-sm">
+                      Hay {staleTurnos.length + 1} turnos abiertos — el Corte Z entra en conflicto
+                    </p>
+                    <p className="text-[var(--text-3)] text-xs">
+                      El turno operativo es el más reciente (arriba). Cierra los anteriores para poder hacer el Corte Z del día.
+                    </p>
+                    {staleTurnos.map(t => (
+                      <div key={t.id} className="flex items-center justify-between bg-[var(--surface)]/50 rounded-lg px-3 py-2 text-sm">
+                        <span className="text-[var(--text-2)]">
+                          {t.opened_by} · {new Date(t.opened_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' })} {new Date(t.opened_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                        <button
+                          onClick={async () => {
+                            try {
+                              const r = await fetch(`${SUPABASE_URL}/rest/v1/pos_turnos?id=eq.${encodeURIComponent(t.id)}&client_id=eq.${_cid()}`, {
+                                method: 'PATCH',
+                                headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+                                body: JSON.stringify({ closed_at: new Date().toISOString(), closed_by: 'cierre administrativo', notas: 'Turno huérfano cerrado desde /pos/turno (duplicado)' }),
+                              })
+                              if (r.ok) { showToast('Turno huérfano cerrado'); fetchTurno() }
+                              else showToast('No se pudo cerrar — revisa permisos')
+                            } catch { showToast('Sin conexión — inténtalo de nuevo') }
+                          }}
+                          className="px-3 py-1 rounded-md border border-amber-500/40 text-amber-400 text-xs font-semibold hover:bg-amber-500/20"
+                        >
+                          Cerrar
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {/* Historial de cierres */}
                 <div className="mt-6">
