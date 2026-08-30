@@ -11,6 +11,8 @@
 - **INFERENCIA** = derivado de datos verificados mediante calculo o logica
 - **HIPOTESIS** = requiere validacion — puede estar equivocado
 
+> **2026-08-27 — Biblias de producto:** la anatomía "de pies a cabeza" (POS, dashboard, pricing, debilidades, material de estudio) de Toast, Parrot, Soft Restaurant y Square vive en [`bibles/`](bibles/README.md). Este documento sigue siendo la capa estratégica; las biblias son el zoom de producto y se mantienen vivas por separado.
+
 ---
 
 # SECCION 1: PANORAMA COMPETITIVO (100+ EMPRESAS)
