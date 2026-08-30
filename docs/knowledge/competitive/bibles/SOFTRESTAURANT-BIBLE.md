@@ -44,6 +44,11 @@
 | Monitor de cocina (KDS) | Módulo clásico |
 | Reservaciones | Módulo |
 
+**El ecosistema móvil, resuelto vía Google Play [HECHO 2026-08-31]:**
+- **SR Cloud** (`softrestaurant.cloud`): NO es la nube de SR12 — es un **POS Android independiente y débil**: 5K+ descargas, **3.9★ (11 opiniones)**, ventas rápidas/comedor, integración Uber/Rappi/DiDi reciente. Reseñas verificadas demoledoras: *"no permite la impresión de ticket... prácticamente te obligan a comprar sus terminales... no permite controlar inventario de insumos ni costear recetas"* (8 votos útiles) · *"requiere hardware especial"*. **La transición cloud del incumbente está fracasando en público.** Captura: `assets/sr-cloud-01.jpg`.
+- **SR Admin** (`com.nationalsoft.nsreportesweb`): 10K+ descargas (vs 42K restaurantes), **3.6★**. La app es SOLO LECTURA — reseña clave: *"editar un producto, receta o precio **te obliga a estar en el restaurante**"*; facturas PDF rotas (mar-2026) y *"soporte técnico IMPOSIBLE, nunca contestan"*. Captura: `assets/sr-admin-app-01.jpg`.
+- **NS POS**: su tercer POS (generalista), **3.2★**. Tres POS distintos mal calificados = estrategia móvil fragmentada.
+
 **Lectura:** el modelo es **fragmentación** — todo lo que Parrot/Fullsite incluyen, SR lo vende en pedazos. El precio base engaña: un SR "completo" (PRO + Móvil + Delivery Manager + KDS + folios + hardware Windows + distribuidor) se acerca o rebasa el costo de los cloud-POS [INFERENCIA].
 
 ## 5. Pricing [HECHO]
@@ -53,7 +58,8 @@
 | SR 12 LITE | $799 (promo "tiempo limitado") | 2 |
 | SR 12 PRO | $1,099 (promo) | 10 |
 
-- También licencia anual. Add-ons, folios CFDI, instalación/capacitación/configuración: **todo aparte, cotizado por distribuidor**.
+- **Precios REALES de su tienda (2026-08-31, IVA incluido)** [HECHO — nationalsoft.store]: SR12 PRO renta mensual **$1,274.84 MXN** (licencia por establecimiento, 10 nodos) · **nodo adicional $139.20/mes** · promo "paga 11 recibe 12". El PRO INCLUYE: POS (comedor/rápido/domicilio), inventarios, facturación electrónica, **autofactura**, reservaciones y comisionistas, **monitor de producción (KDS)** y fidelización. **Analytics y Delivery Hub son rentas mensuales APARTE** (hoy gratis "por tiempo limitado" — el precio real del sistema completo es mayor cuando la promo muera). Timbres CFDI aparte. Cambio de equipo (PC): solo 1 vez al año.
+- También licencia anual. Instalación/capacitación/configuración: **todo aparte, cotizado por distribuidor**.
 - Soporte técnico + academia en línea: incluidos sin costo extra [HECHO — su claim].
 - El costo REAL de entrada incluye el hardware Windows (~$130K MXN en un caso Wansoft comparable — ver `project_wansoft_real_costs`) y los servicios del distribuidor [INFERENCIA por analogía].
 
@@ -64,7 +70,8 @@
 3. **Fragmentación de add-ons** — el dueño compra 6 SKUs para tener lo que un cloud-POS da en uno.
 4. **Dependencia del distribuidor** — la calidad de instalación/soporte varía por región; el dueño no le compra a National Soft, le compra a un intermediario.
 5. **Windows + no-ARM** — hardware caro, sin tablets baratas, sin Android.
-6. **Movilidad tardía** — SR Admin iOS apenas en SR 12 (2026); Toast Now existe desde 2022, Parrot App desde el inicio.
+6. **Movilidad tardía y SOLO LECTURA** — SR Admin no edita nada remoto ("te obliga a estar en el restaurante" — reseña verificada); las 3 apps móviles promedian 3.2–3.9★. Nuestro dashboard remoto editable es contraste directo.
+7. **La transición cloud fracasó** (por ahora): SR Cloud 3.9★, sin inventario ni recetas, atado a sus terminales — el incumbente NO tiene aún un cloud-POS serio [HECHO reviews].
 
 ## 7. Qué copiar · qué evitar · cómo ganarle
 
@@ -129,8 +136,8 @@ Visto de screen-recordings de tutoriales (curso "Softrestaurant" de Puntos de ve
 
 ## 10. Qué falta por verificar
 
-- [ ] Precios reales de cada add-on en nationalsoft.store (la tienda carga con sesión; el WebFetch falló por certificado — entrar con navegador).
-- [ ] SR Cloud (/cloud): qué es exactamente — ¿SaaS real o VDI del desktop? [pendiente]
+- [x] ~~Precios base en tienda~~ — SR12 PRO $1,274.84/mes y nodo $139.20/mes capturados (2026-08-31); rentas de Analytics/Delivery Hub y demás módulos siguen tras login → distribuidor.
+- [x] ~~SR Cloud~~ — resuelto 2026-08-31: POS Android aparte, débil (3.9★), ver §4.
 - [ ] Costo de paquetes de folios CFDI.
 - [ ] Demo de SR 12: conseguir video completo o demo con distribuidor (anónimo).
 - [ ] Cuánto cobra un distribuidor típico de MTY por instalación + capacitación.

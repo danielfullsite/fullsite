@@ -63,8 +63,8 @@ Mismo patrón convergente (ticket + grid). Nuestras ventajas visibles hoy: table
 ### Parrot — ❌ sin material público
 Ni el demo ni el canal muestran su KDS. Se cierra en la demo comercial (pregunta 2 del guion). Sospecha [HIPÓTESIS]: básico — lista de comandas por tiempos, sin routing por estación.
 
-### Soft Restaurant — ❌ sin captura aún
-El "Monitor de producción" existe (módulo clásico + Recall en SR12) pero no hay screen-recording público decente. Se cierra con el distribuidor (pregunta 2 del guion).
+### Soft Restaurant — módulo confirmado, captura decente pendiente
+El "Monitor de producción" EXISTE y viene **incluido en SR12 PRO** (confirmado en su tienda). Material público: solo videos de distribuidores con branding encima — sin frame limpio. En el comandero SR aparecen los botones "MONITOR PEDIDOS" (`sr-comandero.jpg`).
 
 ---
 
@@ -78,12 +78,23 @@ El "Monitor de producción" existe (módulo clásico + Recall en SR12) pero no h
 
 **Qué mirar:** sidebar naranja con árbol de reportes (74 en 9 categorías) · en el celular, **cada KPI = valor + % vs referencia + sparkline** (nunca un número solo) · SPLH en primera pantalla.
 
-### Parrot — ParrotConnect (visto en tutoriales; sin captura descargable de reportes actuales)
-Navegación confirmada: **Menú · Personal · Facturación · Configuración · Reportes** con selector de marca. Pantallas vistas en video: Descuentos (tabla minimal, restringido/abierto), Menu Maker (draft→publicar a canales). Los REPORTES actuales (~30 pantallas): demo comercial (pregunta 1 del guion).
+### Parrot — ParrotConnect + Parrot App (la app del dueño, capturas oficiales de Play)
+
+![Parrot App resumen](assets/parrot-app-01.jpg)
+
+**Qué mirar:** home "Todas las sucursales" con 4 KPI cards (Venta total +23% verde, Ticket promedio −14% rojo, Órdenes abiertas/cerradas) + "Venta por canal". Delta % sí, **sparkline no** — la tripleta completa sigue siendo exclusiva de Toast. Solo **1K+ descargas** (adopción bajísima del app del dueño). Navegación de ParrotConnect web confirmada en tutoriales: Menú · Personal · Facturación · Configuración · Reportes. Los reportes web actuales: sin material público.
 
 ### Soft Restaurant — el admin Windows
 
 La imagen de arriba (`sr-admin.jpg`) es también su "dashboard": menús en cascada hasta "Catálogo de SAT - México", MONITOR VENTAS y CORTE CAJA X como botones F-key. Analytics 3.0 (SR12, 25+ reportes) sin captura pública — demo con distribuidor.
+
+### Soft Restaurant — las apps móviles (Play Store, capturas oficiales)
+
+![SR Cloud](assets/sr-cloud-01.jpg)
+
+![SR Admin app](assets/sr-admin-app-01.jpg)
+
+**Qué mirar:** SR Cloud (3.9★, 5K descargas) es un POS-celular simple — ticket con subtotal/impuestos y tabs Comedor/Rápido/Cuentas; las reseñas lo destrozan ("te obligan a comprar sus terminales", sin inventario ni recetas). SR Admin (3.6★) es el dashboard móvil **solo-lectura**: "editar un producto, receta o precio te obliga a estar en el restaurante" (reseña verificada). El dashboard remoto EDITABLE es diferenciador nuestro directo.
 
 ### Square — ❌ sin captura buena
 Su Dashboard web (reportes, close-of-day) no tiene screenshots públicos decentes; benchmark secundario, baja prioridad.
