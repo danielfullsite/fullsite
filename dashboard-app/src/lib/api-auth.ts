@@ -60,6 +60,14 @@ export async function withPOSAuth(request: NextRequest): Promise<POSAuthContext 
   // Try POS shift token first — avoids an outbound Supabase call for kiosk requests
   const shift = await verifyShiftToken(token)
   if (shift) {
+    // FUGA F-7 CERRADA (2026-08-30): el shift token se validaba ANTES que la
+    // sesión y no se borraba al cambiar de tenant, así que un token viejo seguía
+    // enrutando lecturas/escrituras al restaurante anterior — evadiendo el fix
+    // del header. Si el cliente declara un tenant distinto al del token, es un
+    // token huérfano de otra sesión: se rechaza (fail-closed), y el logout ahora
+    // lo purga (AuthContext).
+    const hint = request.headers.get('x-fullsite-tenant')?.toLowerCase().trim()
+    if (hint && hint !== shift.cid.toLowerCase()) return null
     return {
       clientId: shift.cid,
       staffId: shift.sub,

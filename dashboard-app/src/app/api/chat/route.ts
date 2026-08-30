@@ -4,6 +4,7 @@ import { buildDailyFromOrders } from '@/lib/pos-daily'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { esDuenoDelHistoricoWansoft } from '@/lib/wansoft-legacy'
+import { requireTenant } from '@/lib/api-auth'
 
 async function getAuthUser() {
   const cookieStore = await cookies()
@@ -90,18 +91,23 @@ function parseJsonb(val: unknown): unknown[] {
 
 export async function POST(request: NextRequest) {
   try {
-    // Auth: solo usuarios con sesión válida de Supabase
-    const userId = await getSessionUserId(request)
-    if (!userId) {
-      return Response.json({ error: 'No autorizado' }, { status: 401 })
-    }
+    const { message, history = [], client_id: pedido } = await request.json()
+
+    // FUGA F-2 CERRADA (2026-08-30): el auth solo comprobaba "hay sesión" y el
+    // client_id salía del BODY sin validar membresía — cualquier usuario logueado
+    // mandaba {client_id:"amalay"} y el chat le devolvía ventas, recetas, costos y
+    // NOMBRES DEL STAFF de otro restaurante (el síntoma que Daniel vio). requireTenant
+    // valida la membresía server-side y falla cerrado; el client_id de confianza es
+    // auth.clientId, NUNCA el del body.
+    const auth = await requireTenant(request, pedido)
+    if (auth instanceof Response) return auth
+    const client_id = auth.clientId
+    const userId = auth.staffId
 
     // Rate limiting por usuario
     if (!checkRateLimit(userId)) {
       return Response.json({ response: 'Demasiadas consultas. Espera un momento.' }, { status: 429 })
     }
-
-    const { message, history = [], client_id } = await request.json()
 
     if (!message || typeof message !== 'string') {
       return Response.json({ error: 'Mensaje requerido' }, { status: 400 })
@@ -149,7 +155,7 @@ export async function POST(request: NextRequest) {
       // nombre, y falla cerrado. Ver src/lib/wansoft-legacy.ts.
       (wantsMeseros && duenoDelHistorico) ? fetch(`${sbUrl}/rest/v1/wansoft_waiter_categories?select=fecha,data&order=fecha.desc&limit=7`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
       // 2: Food cost (conditional)
-      wantsFoodCost ? fetch(`${sbUrl}/rest/v1/wansoft_food_cost?select=fecha,data&order=fecha.desc&limit=1`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
+      wantsFoodCost ? fetch(`${sbUrl}/rest/v1/wansoft_food_cost?client_id=eq.${encodeURIComponent(client_id)}&select=fecha,data&order=fecha.desc&limit=1`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
       // 3: Reservaciones (conditional)
       wantsReservas ? fetch(`${sbUrl}/rest/v1/reservaciones?client_id=eq.${encodeURIComponent(client_id || '')}&select=nombre,fecha,espacio,horario_inicio,guests,paquete,total,status,codigo_reserva&order=fecha.asc&fecha=gte.${new Date().toISOString().split('T')[0]}&limit=20`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
       // 4: POS orders (conditional)

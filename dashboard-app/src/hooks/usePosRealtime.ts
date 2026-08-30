@@ -55,7 +55,7 @@ export function usePosRealtime(): RealtimeState {
 
     // Orders channel
     const channel = getSupabase()
-      .channel('pos-orders-live')
+      .channel(`pos-orders-live:${clientId}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'pos_orders', filter: `client_id=eq.${clientId}` },
@@ -100,7 +100,9 @@ export function usePosRealtime(): RealtimeState {
 
     // Presence channel for device tracking
     const presenceChannel = getSupabase()
-      .channel('pos-presence')
+      // R-4: el topic de presencia era global — todos los tenants se veían los
+      // dispositivos entre sí. Namespaciado por cliente.
+      .channel(`pos-presence:${clientId}`)
       .on('presence', { event: 'sync' }, () => {
         const state = presenceChannel.presenceState()
         setConnectedDevices(Object.keys(state).length)
