@@ -311,6 +311,78 @@ búsqueda dirigida: usar `rg` y lecturas por secciones, y resumir con rutas y l�
 
 > No tratar memorias ni documentación vieja como verdad superior al código y las pruebas actuales.
 
+### La regla de la cita
+
+La regla de arriba dice *no confíes*, pero no dice **cuándo dejaste de confiar** — y por eso
+se incumple sin querer. Ésta es su versión operativa:
+
+> **Antes de afirmar un número o un hecho que mueva una decisión, di de dónde salió.
+> Si no puedes citar `archivo:línea`, una tabla, o el comando que corriste — no es un
+> hecho, es un recuerdo. Dilo como recuerdo o ve a verificarlo.**
+
+Se aplica igual a memorias, a `docs/`, a resúmenes de conversaciones anteriores y a lo que
+uno "ya sabe" del proyecto. Un resumen de sesión es la fuente **menos** confiable de todas:
+no tiene fecha visible, nadie lo revisó, y se lee igual que un hecho.
+
+Casos reales del 2026-08-26, los tres corregidos frente a Daniel el mismo día:
+
+| Se afirmó | La verdad al ir a ver |
+|---|---|
+| "17 pasos manuales de aprovisionamiento" | `provisionTenant()` existe, 303 líneas, siembra 9 tablas |
+| "Las reservaciones se guardan todas como AMALAY" | `reservar/page.tsx:295` bloquea la página para otros tenants |
+| "`fetchPosMesas` no funciona nunca" | `supabase-fetch-patch.ts` la intercepta y le pone credencial |
+
+Los tres tienen la misma forma: **conclusión sobre un fragmento, sin abrir la fuente
+completa.** Ninguno habría sobrevivido a citar el archivo.
+
+**Al escribir una memoria**, ponerle la fecha en que se verificó. Una nota sin fecha se lee
+como un hecho permanente. Medido ese día: 22 de 148 memorias traían marca de verificación.
+
+### La regla del descubrimiento
+
+> Establecida el 2026-08-26, después de declarar que dos documentos "no se encuentran en la
+> máquina" cuando existían, eran legibles y estaban en `~/Documents`.
+
+La regla de la cita dice que un hecho necesita fuente. Ésta dice lo simétrico:
+
+> **Un resultado negativo hereda el alcance de la búsqueda que lo produjo, no el de la frase
+> que uno quiere escribir.** Si se buscó en un directorio, la conclusión es sobre ese
+> directorio.
+
+**El alcance de búsqueda no está limitado al repositorio.** Buscar en toda la carpeta del
+usuario cuando haga falta: `~/Documents`, `~/Downloads`, `~/Desktop`, `~/Library`,
+`~/Documents/Codex`, worktrees, y los `outputs/` y `work/` de sesiones de otras herramientas.
+
+**Antes de decir que un archivo no existe**, agotar en este orden y registrar qué se corrió:
+
+1. Repositorio y sus worktrees · 2. Outputs y adjuntos de sesiones · 3. `~/Downloads` ·
+4. `~/Documents` · 5. `~/Documents/Codex` · 6. `~/Desktop` · 7. Búsqueda global en `~` ·
+8. Coincidencias parciales, insensibles a mayúsculas y variantes del nombre.
+
+Hay un procedimiento probado que hace los ocho pasos:
+[`scripts/buscar-evidencia.sh`](scripts/buscar-evidencia.sh).
+
+**Estados permitidos.** No existen otros, y no son intercambiables:
+
+| Estado | Qué exige para decirse |
+|---|---|
+| `ENCONTRADO Y LEGIBLE` | Ruta, `stat`, `file` y SHA-256 |
+| `ENCONTRADO PERO NO LEGIBLE` | Ruta + el error exacto al abrirlo |
+| `ACCESO BLOQUEADO` | La regla o permiso concreto que lo bloquea, **reproducido** |
+| `NO BUSCADO FUERA DEL REPO` | Honesto y barato: casi siempre es el correcto |
+| `NO LOCALIZADO DESPUÉS DE BÚSQUEDA GLOBAL` | Los ocho pasos, con el comando a la vista |
+| `AUSENCIA CONFIRMADA` | Lo anterior más una razón positiva para creer que no existe |
+
+*"No apareció en mi primera búsqueda"* **jamás** equivale a *"no existe"*.
+
+**Nunca afirmar que hay una restricción sin reproducirla.** Medido el 2026-08-26: las 23
+reglas `deny` del proyecto son de seguridad (`rm -rf`, `sudo`, `curl`, llaves, secretos) y
+**ninguna** limita la lectura de la carpeta del usuario. Las cuatro raíces son legibles.
+
+**Al localizar una fuente, registrar en el documento su ruta real y su SHA-256.** Si hay
+copias con el mismo hash, elegir una canónica y marcar las demás como copias — no como
+evidencia independiente.
+
 ## 18. Trabajo con otros agentes
 
 Antes de comenzar: revisar ramas y worktrees, identificar archivos que otros agentes

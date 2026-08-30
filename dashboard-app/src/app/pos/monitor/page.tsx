@@ -69,9 +69,18 @@ export default function MonitorPage() {
       const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
       const a = document.createElement('a'); a.href = URL.createObjectURL(blob)
       a.download = `amalay-orders-backup-${Date.now()}.json`; a.click(); URL.revokeObjectURL(a.href)
+      // Llave de idempotencia: se genera una vez por clic. Si la petición se corta a
+      // medio camino, reintentar con la MISMA llave devuelve el resultado anterior en
+      // lugar de borrar dos veces. Sin ella el servidor rechaza la petición.
+      const operationId = crypto.randomUUID()
       const del = await fetch('/api/pos/admin/cleanup-orders', {
         method: 'DELETE', headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ confirm: 'BORRAR TODAS LAS ORDENES', digest: backup.digest }),
+        body: JSON.stringify({
+          confirm: 'BORRAR TODAS LAS ORDENES',
+          digest: backup.digest,
+          operation_id: operationId,
+          reason: 'Limpieza de órdenes desde /pos/monitor',
+        }),
       })
       const result = await del.json()
       if (!del.ok) throw new Error(result.error || 'No se pudo limpiar')
