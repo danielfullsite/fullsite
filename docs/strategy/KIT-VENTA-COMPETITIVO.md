@@ -96,9 +96,9 @@ Parrot ya compra ads sobre las búsquedas de tutoriales de SR. Nuestra versión,
 1. **"De Soft Restaurant a Fullsite: la guía honesta"** — qué se migra (catálogo, recetas, históricos), cuánto tarda, qué se siente el día 1. CTA: mes gratis.
 2. **"El costo real de Soft Restaurant en 2026"** — la tabla del §3 en artículo, con capturas de su propia tienda.
 3. **"¿Por qué no puedo cambiar un precio desde mi casa?"** — el dolor del dueño multi-tarea, con la reseña real citada.
-4. Comparativa visual: el comandero SR (captura en `bibles/assets/sr-comandero.jpg`) junto a nuestro POS — un carrusel que se explica solo.
+4. **Comparativa visual (lista para el carrusel):** el comandero Windows de SR (`bibles/assets/sr-comandero.jpg`) junto a nuestro dashboard en pesos (`bibles/assets/nuestro-dashboard.jpg`) — dos décadas de distancia en una imagen. Y la pantalla de offline (`nuestro-offline.jpg`) para el post de "¿qué pasa cuando se cae el internet?".
 
 ## 6. Pendientes de este kit (para que quede redondo)
-- [ ] Capturas de NUESTRO POS/KDS/dashboard en calidad de galería (hoy solo tenemos las de ellos) — sesión de 30 min contra el tenant demo.
+- [x] ~~Capturas de NUESTRO producto~~ — hechas 2026-08-31 contra el tenant demo `diezmex-demo` (E2E Playwright headed, staging). En `bibles/assets/nuestro-*.jpg`: dashboard multi-sucursal en pesos (la estrella), pantalla de offline, costos, antifraude. **Pendiente menor:** el grid del POS/KDS pide PIN de mesero — falta sembrar un PIN demo para capturarlo.
 - [ ] Ensayar el guion §1 completo UNA vez contra el sandbox antes de usarlo con prospecto real (que el teatro no falle en vivo).
 - [ ] Pasar el copy del §4 a la landing (repo fullsite-web) — PR aparte cuando Daniel lo apruebe.

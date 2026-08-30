@@ -38,9 +38,19 @@
 
 **Qué mirar:** el POS más visual de todos — categorías en colores saturados con conteo de items, **fotos de platillo como protagonistas**, check a la derecha con tabs Check/Actions/Guest, y menú contextual "Edit item / **Make item unavailable**" — el 86 a un long-press.
 
-### Fullsite — dónde estamos parados [INFERENCIA]
+### Fullsite — NUESTRO producto (capturas reales, tenant demo diezmex, 2026-08-31)
 
-Mismo patrón convergente (ticket + grid). Nuestras ventajas visibles hoy: table map real (vs grid paginado de Parrot), web/PWA sin lock-in de hardware. Robar: contador pre-86 en tile (Toast), fotos protagonistas (Square), IVA visible en ticket (Parrot ya lo hace, nosotros también — mantener).
+El POS pide **PIN de mesero** antes de abrir el grid (gate de seguridad — buena señal de producto; captura del grid pendiente de un PIN demo sembrado). Lo que SÍ capturamos, y vende solo:
+
+![Nuestro dashboard multi-sucursal](assets/nuestro-dashboard.jpg)
+
+**Qué mirar (ESTA es la imagen de venta):** dashboard de grupo con 5 sucursales + **"7 cosas por atender" cada una con el peso al lado** ($14,250 · $13,704 · $11,179…) y frases de negocio en español de dueño: *"Tacos Manteca es el único que no crece"*, *"Ahí está el dinero más fácil del grupo"*. Ningún competidor tiene esto — Parrot/SR muestran tablas; nosotros mostramos DECISIONES en pesos. Y arriba, la notificación proactiva: *"Un viernes flojo — cerraste $592, un viernes normal son $2,972"*.
+
+![Nuestra pantalla de offline](assets/nuestro-offline.jpg)
+
+**Qué mirar:** *"Sin conexión — El POS sigue funcionando en modo offline. Los pedidos se guardan localmente y se sincronizan cuando vuelva el internet."* Esta es la pantalla del **"apaga el módem"** hecha producto — el asset visual del argumento offline.
+
+Nuestras ventajas visibles: table map real (vs grid paginado de Parrot), web/PWA sin lock-in de hardware, dashboard en pesos con lenguaje de negocio. Robar aún: contador pre-86 en tile (Toast), fotos protagonistas (Square).
 
 ---
 
@@ -95,6 +105,16 @@ La imagen de arriba (`sr-admin.jpg`) es también su "dashboard": menús en casca
 ![SR Admin app](assets/sr-admin-app-01.jpg)
 
 **Qué mirar:** SR Cloud (3.9★, 5K descargas) es un POS-celular simple — ticket con subtotal/impuestos y tabs Comedor/Rápido/Cuentas; las reseñas lo destrozan ("te obligan a comprar sus terminales", sin inventario ni recetas). SR Admin (3.6★) es el dashboard móvil **solo-lectura**: "editar un producto, receta o precio te obliga a estar en el restaurante" (reseña verificada). El dashboard remoto EDITABLE es diferenciador nuestro directo.
+
+### Fullsite — NUESTRO dashboard (capturas reales)
+
+![Nuestros costos](assets/nuestro-costos.jpg)
+
+**Qué mirar:** Costos de ingredientes con KPIs (subieron/bajaron), proveedor por insumo, y en el sidebar la PROFUNDIDAD de Finanzas: Estado de Resultados, Nómina, **Facturación CFDI**, **Facturas Proveedores**, Conciliación, Cuentas por Cobrar. El back-office más completo del comparativo, en español, moderno, editable desde donde sea.
+
+![Nuestro antifraude](assets/nuestro-antifraude.jpg)
+
+**Qué mirar:** el agente anti-fraude como pantalla propia (Risk Score, hallazgos por nivel) — lo que Toast trata como su categoría #1 de reportes, nosotros lo tenemos como agente que corre solo. (En esta captura el tenant demo no tiene hallazgos sembrados; muestra el layout limpio.)
 
 ### Square — ❌ sin captura buena
 Su Dashboard web (reportes, close-of-day) no tiene screenshots públicos decentes; benchmark secundario, baja prioridad.
