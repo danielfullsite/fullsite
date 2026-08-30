@@ -63,7 +63,56 @@ export async function runFinanceAgent(
   ])
 
   const kpis = kpisArr[0] ?? null
-  if (history.length < 7) return events // Necesitamos al menos una semana de historia
+
+  // ── Fuente insuficiente: se DICE, no se calla ────────────────────────────
+  //
+  // Antes esto era `if (history.length < 7) return events`, un return silencioso. El
+  // problema no es el corte —hace falta una semana para comparar— sino que un agente que
+  // devuelve [] porque su fuente está muerta se ve EXACTAMENTE igual que uno que devuelve
+  // [] porque todo está bien. Nadie puede distinguirlos desde afuera.
+  //
+  // Medido el 2026-08-30: `wansoft_daily` no tiene una sola fila en los últimos 28 días
+  // (última fecha 2026-07-20). O sea que este agente llevaba 41 días devolviendo vacío en
+  // cada corrida, y en el tablero se leía como "sin hallazgos". Un agente mudo que parece
+  // sano es peor que uno que falla: el que falla se arregla.
+  //
+  // Ahora emite un hallazgo que dice que no puede opinar y desde cuándo. Vale como
+  // detector de fuente muerta para cualquier restaurante, no sólo para éste.
+  if (history.length < 7) {
+    const ultima = history[0]?.fecha ?? null
+    const diasSinDatos = ultima
+      ? Math.floor((Date.parse(`${today}T12:00:00`) - Date.parse(`${ultima}T12:00:00`)) / 86_400_000)
+      : null
+
+    events.push({
+      client_id: clientId,
+      agent_id: 'finance',
+      type: 'fuente_sin_datos',
+      // warning y no critical: no hay evidencia de que el negocio esté mal — lo que está
+      // mal es nuestra capacidad de verlo. Escalarlo a critical entrena a ignorar criticals.
+      severity: 'warning',
+      title: 'El agente de finanzas no tiene datos para analizar',
+      explanation: ultima
+        ? `La fuente histórica sólo trae ${history.length} día(s) en la ventana de 28, y el más reciente es del ${ultima}` +
+          `${diasSinDatos != null ? ` (hace ${diasSinDatos} días)` : ''}. Se necesitan 7 días para comparar contra el mismo día de la semana. ` +
+          `Mientras tanto este agente no puede afirmar nada: su silencio NO significa que las ventas estén bien.`
+        : 'La fuente histórica no devolvió ninguna fila en los últimos 28 días. Este agente no puede afirmar nada, ' +
+          'y su silencio NO significa que las ventas estén bien.',
+      evidence: {
+        dias_disponibles: history.length,
+        dias_requeridos: 7,
+        ventana_dias: 28,
+        fecha_mas_reciente: ultima,
+        dias_sin_datos: diasSinDatos,
+        fuente: 'wansoft_daily',
+      },
+      suggested_action: 'Revisar el pipeline que alimenta la fuente histórica. Sin eso, el agente de finanzas queda ciego.',
+      confidence: 1, // No es una inferencia: o hay filas o no las hay.
+      status: 'new',
+      estimated_value: null, // No hay nada que cuantificar: el problema es la ausencia de datos.
+    })
+    return events
+  }
 
   // ── 1. Ventas de hoy vs mismo DOW ────────────────────────────────────────
   const sameDOW = history.filter(d => dayOfWeek(d.fecha) === todayDOW)
