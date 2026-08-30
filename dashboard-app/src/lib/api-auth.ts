@@ -74,20 +74,43 @@ export async function withPOSAuth(request: NextRequest): Promise<POSAuthContext 
   if (!userId) return null
 
   // Resolve clientId from client_users — not from user_metadata (user-writable)
+  //
+  // FUGA CERRADA (2026-08-30, vista en campo): esto era `limit=1` sin `order` —
+  // para un usuario con VARIAS membresías (Daniel: 8; mañana cualquier dueño
+  // multi-marca) Postgres devolvía una fila ARBITRARIA (en la práctica amalay),
+  // así que /api/owner/* y time-clock leían Y ESCRIBÍAN sobre otro restaurante
+  // sin importar cuál estaba viendo el usuario (el Equipo de tekila-rg mostró
+  // los 40 meseros reales de AMALAY). Contrato nuevo:
+  //   · El cliente puede SUGERIR tenant con el header `x-fullsite-tenant`; se
+  //     honra SOLO si hay membresía para ese tenant (mismo patrón sancionado
+  //     que requireTenant con body.client_id). Sin membresía → null (401).
+  //   · Sin header: si el usuario tiene UNA membresía real, esa. Si tiene
+  //     varias → FALLA CERRADO (null): adivinar es exactamente la fuga.
   const sbKey = process.env.SUPABASE_SERVICE_KEY || SB_ANON
   try {
     const res = await fetch(
-      `${SB_URL}/rest/v1/client_users?user_id=eq.${encodeURIComponent(userId)}&select=client_id,role&limit=1`,
+      `${SB_URL}/rest/v1/client_users?user_id=eq.${encodeURIComponent(userId)}&select=client_id,role&order=client_id.asc&limit=50`,
       { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
     )
     if (!res.ok) return null
-    const rows = await res.json()
+    const rows = await res.json() as Array<{ client_id: string; role: string }>
     if (!Array.isArray(rows) || rows.length === 0) return null
+
+    const hint = request.headers.get('x-fullsite-tenant')?.toLowerCase().trim()
+    let membership: { client_id: string; role: string } | undefined
+    if (hint) {
+      membership = rows.find(r => r.client_id === hint)
+      if (!membership) return null // pidió un tenant del que NO es miembro → fuera
+    } else {
+      const reales = rows.filter(r => r.role !== 'platform_actas')
+      membership = reales.length === 1 ? reales[0] : (rows.length === 1 ? rows[0] : undefined)
+      if (!membership) return null // multi-membresía sin header → jamás adivinar
+    }
     return {
-      clientId: rows[0].client_id,
+      clientId: membership.client_id,
       staffId: userId,
       staffName: '',
-      role: rows[0].role,
+      role: membership.role,
       authType: 'supabase_session',
     }
   } catch {

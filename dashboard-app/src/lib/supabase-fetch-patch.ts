@@ -65,6 +65,24 @@ export function patchSupabaseFetch() {
       return originalFetch(input, { ...init, headers })
     }
 
+    // FUGA CERRADA (2026-08-30): withPOSAuth ya no ADIVINA el tenant de un
+    // usuario con varias membresías — exige el header `x-fullsite-tenant`
+    // (validado contra client_users en el server; sin membresía → 401).
+    // Se inyecta aquí, en el choke point, para que TODO fetch same-origin a
+    // /api/ lo lleve — llamadores presentes y futuros — con el tenant activo
+    // que el usuario está VIENDO (getActiveClientSlug). Sin tenant activo no
+    // se manda nada y el server aplica su default de una-sola-membresía.
+    if ((url.startsWith('/api/') || url.startsWith(`${window.location.origin}/api/`)) ) {
+      try {
+        const cid = localStorage.getItem('fullsite_client_id')?.toLowerCase().trim()
+        if (cid) {
+          const headers = new Headers(init?.headers)
+          if (!headers.has('x-fullsite-tenant')) headers.set('x-fullsite-tenant', cid)
+          return originalFetch(input, { ...init, headers })
+        }
+      } catch { /* storage bloqueado → sin header, el server decide fail-closed */ }
+    }
+
     return originalFetch(input, init)
   }
 }
