@@ -7,7 +7,7 @@ import { getClientConfig, getClientIdFromEmail, fetchClientConfig, type ClientCo
 import { applyAccent } from '@/lib/accent'
 import { applyTenantDefaultTheme } from '@/lib/tenant-theme'
 
-import { canAccessPage, resolveRole, ROLE_MAP, type DashboardRole } from '@/lib/roles'
+import { canAccessPage, resolveRole, ROLE_MAP, type DashboardRole, type StaffPermissions } from '@/lib/roles'
 
 // Re-export para compatibilidad (Sidebar, tests importan desde aquí)
 export { canAccessPage, type DashboardRole }
@@ -19,6 +19,8 @@ export interface ClientLocation {
 }
 
 interface AuthContextType {
+  /** Permisos por empleado (override opcional del rol). undefined = usar rol. */
+  permissions?: StaffPermissions
   user: User | null
   role: DashboardRole
   clientId: string | null
@@ -52,6 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [clientConfig, setClientConfig] = useState<ClientConfig | null>(null)
   const [locations, setLocations] = useState<ClientLocation[]>([])
   const [locationId, setLocationId] = useState<string | null>(null)
+  const [permissions, setPermissions] = useState<StaffPermissions | undefined>(undefined)
   const [role, setRole] = useState<DashboardRole>('staff')
   const [loading, setLoading] = useState(true)
 
@@ -198,6 +201,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLocationId(locList[0].id)
       }
     } catch { /* locations table might not exist */ }
+
+    // Permisos por empleado (override opcional del rol). staffId es el auth user
+    // en sesión dashboard. Sin fila → permissions queda undefined → canAccessPage
+    // cae al rol (comportamiento de siempre). La tabla puede no existir aún.
+    try {
+      const { data: perm } = await supabase
+        .from('pos_staff_permissions')
+        .select('sections')
+        .eq('client_id', cid)
+        .eq('staff_id', userId)
+        .maybeSingle()
+      const sections = (perm as { sections?: StaffPermissions } | null)?.sections
+      setPermissions(sections && Object.keys(sections).length > 0 ? sections : undefined)
+    } catch { setPermissions(undefined) }
   }, [supabase])
 
   useEffect(() => {
@@ -305,7 +322,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, role, clientId, clientConfig, locations, locationId, setLocationId, loading, signOut }}>
+    <AuthContext.Provider value={{ user, role, clientId, clientConfig, locations, locationId, setLocationId, loading, signOut, permissions }}>
       {children}
     </AuthContext.Provider>
   )

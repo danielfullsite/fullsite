@@ -229,7 +229,7 @@ function getTodayFormatted(): string {
 export default function Sidebar() {
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
-  const { user, role, clientConfig, locations, locationId, setLocationId, signOut } = useAuth()
+  const { user, role, clientConfig, locations, locationId, setLocationId, signOut, permissions } = useAuth()
   // Avatar del usuario logueado (iniciales, ej. Daniel Ramonfaur → DR)
   const _u = user as { email?: string; name?: string; user_metadata?: { full_name?: string } } | null
   const userLabel = _u?.name || _u?.user_metadata?.full_name || _u?.email || 'Usuario'
@@ -284,7 +284,7 @@ export default function Sidebar() {
           const visibleItems = isPlatform
             ? section.items
             : section.items.filter(item =>
-                canAccessPage(role, item.href) && canPlanAccessPage(clientConfig?.plan, item.href)
+                canAccessPage(role, item.href, permissions) && canPlanAccessPage(clientConfig?.plan, item.href)
               )
           if (visibleItems.length === 0) return null
           const isExpanded = expandedSections.has(sectionIdx)
