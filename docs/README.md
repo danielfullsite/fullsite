@@ -33,6 +33,7 @@ El modelo: plataforma SaaS multi-tenant, un solo Supabase, particionamiento por 
 | Certificaciones (⚠️ congeladas 07-31) | [`state/CERTIFICATIONS.md`](state/CERTIFICATIONS.md) |
 | Entender qué sigue | [`feos/INITIATIVES.md`](feos/INITIATIVES.md) + [`feos/EXECUTION-PLAN.md`](feos/EXECUTION-PLAN.md) |
 | Entender la arquitectura offline | [`architecture/LOCAL-FIRST.md`](architecture/LOCAL-FIRST.md) |
+| **Fullsite Factory — programa vivo (estado, contratos, ADRs, runbooks)** | [`factory/README.md`](factory/README.md) |
 
 ---
 
