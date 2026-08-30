@@ -9,6 +9,7 @@ import { runFraudAgent } from './fraud'
 import { runStaffAgent } from './staff'
 import { runFinanceAgent } from './finance'
 import { esDuenoDelHistoricoWansoft } from '@/lib/wansoft-legacy'
+import { applyLearning, tallyVerdicts, verdictsQuery } from './learning'
 
 const SB_URL = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/$/, '')
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || ''
@@ -127,6 +128,7 @@ export async function runAgent(
   const start = Date.now()
   let events: AgentEvent[] = []
   let error: string | undefined
+  let learningSummary: { downgraded: number; suppressed: string[] } = { downgraded: 0, suppressed: [] }
 
   // El guardian de las tablas legacy vivia solo en runAllAgents, y eso dejaba
   // una puerta: /api/agents/run acepta agent_id del cuerpo y llama aqui DIRECTO.
@@ -184,6 +186,28 @@ export async function runAgent(
     ).catch(() => [] as { type: string; severity: string }[])
     const existingTypes = new Set(existingRaw.map(r => `${r.type}:${r.severity}`))
 
+    // ── Aprendizaje: el veredicto humano pondera el hallazgo ──────────────────
+    //
+    // Se aplica aquí, en el engine, y no dentro de cada agente: así los cinco aprenden sin
+    // tocar su lógica, y un agente nuevo lo hereda el día que se escriba.
+    //
+    // La cuenta es `confianza × precisión histórica de ese type en ESTE restaurante`. Un
+    // tipo que aquí siempre resultó cierto no se toca; uno que falla seguido se hunde solo.
+    // No suprime salvo el caso extremo — degradar y explicar es preferible a callar, que es
+    // el error que costó nueve días de agentes muertos sin que nadie lo viera.
+    //
+    // Falla ABIERTO a propósito: si no se puede leer el historial, los hallazgos pasan sin
+    // ponderar. Perder la ponderación es un ajuste fino; perder el hallazgo es perder el
+    // aviso de que se están robando el efectivo.
+    const verdictRows = await sbGet<{ type: string; outcome: string | null }>(
+      'agent_events',
+      verdictsQuery(clientId, agentId),
+    ).catch(() => [] as { type: string; outcome: string | null }[])
+
+    const learned = applyLearning(events, tallyVerdicts(verdictRows))
+    learningSummary = { downgraded: learned.downgraded, suppressed: learned.suppressed }
+    events = learned.events
+
     // Insert new events
     const toInsert = events.filter(e => !existingTypes.has(`${e.type}:${e.severity}`))
     await Promise.allSettled(
@@ -213,12 +237,26 @@ export async function runAgent(
   // El caso que motivó todo esto: el agente corrió, no falló, y no emitió nada. Sin
   // `skip_reason` eso queda como una fila igual a "todo bien", que es justo la ambigüedad
   // que hizo que nadie notara nueve días de agentes muertos.
+  // El aprendizaje queda en la bitácora. Suprimir en silencio sería el mismo pecado que
+  // veníamos arreglando: si alguien pregunta "¿por qué dejó de avisarme de esto?", la
+  // respuesta tiene que estar en una fila, no en el código.
+  const notaAprendizaje =
+    learningSummary.suppressed.length > 0
+      ? `suprimidos por historial: ${learningSummary.suppressed.join(', ')}`
+      : learningSummary.downgraded > 0
+        ? `${learningSummary.downgraded} hallazgo(s) con confianza ajustada por historial`
+        : null
+
   await logAgentRun({
     agentId, clientId, triggerType,
     status: error ? 'error' : 'ok',
     durationMs,
     eventsCount: events.length,
-    skipReason: !error && events.length === 0 ? 'corrió sin hallazgos' : null,
+    skipReason: error
+      ? null
+      : events.length === 0
+        ? ['corrió sin hallazgos', notaAprendizaje].filter(Boolean).join(' — ')
+        : notaAprendizaje,
     errorMessage: error ?? null,
   })
 
