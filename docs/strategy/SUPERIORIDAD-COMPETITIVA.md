@@ -107,7 +107,7 @@ Todos llegaron a nuestra tesis (IA + datos del POS) pero cada uno cubrió un ped
 
 ## 6. Secuencia propuesta (respetando governance)
 
-- **Ahora (sin decisión nueva):** explotar §1 en venta (slides/demo/copy) · cerrar Uber cert (GAP 3) · ratificar los principios de IA (#15) en docs de arquitectura.
+- **Ahora (sin decisión nueva):** ✅ HECHO 2026-08-31 — el material de §1/§4 está ejecutado en [`KIT-VENTA-COMPETITIVO.md`](KIT-VENTA-COMPETITIVO.md) (guion de demo de 5 momentos, battlecards, tabla de costo total, copy en pesos, cola de contenido) · cerrar Uber cert (GAP 3) · ratificar los principios de IA (#15) en docs de arquitectura.
 - **Próxima ola de producto (decisión Daniel — los P0):** #2 86-long-press · #3 fotos · #6 NOT PAID · #7 color delivery en KDS · #10 tripleta KPI · #12 antifraude de primer nivel · #17 tabular-nums. Siete cosas chicas, todas visibles en demo.
 - **Decisiones estratégicas pendientes [DANIEL]:** terminal/pagos (GAP 1 — la grande) · demo interactivo público (GTM 3) · prioridad de OP-21 (GAP 2).
 - **Después:** P1s (§3), académico (GTM 5), P2s.
