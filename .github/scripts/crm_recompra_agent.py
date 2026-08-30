@@ -194,7 +194,7 @@ try:
         "fecha": today_str,
         "priority": "warning" if (ventas_change < -5 or dropping_meseros) else "info",
         "summary": output_sum,
-        "data": json.dumps({
+        "data": {
             "ventas_avg_recent": round(avg_recent),
             "ventas_avg_prev": round(avg_prev),
             "ventas_change_pct": round(ventas_change, 1),
@@ -203,7 +203,7 @@ try:
             "tp_recent": round(avg_tp_recent),
             "dropping_meseros": dropping_meseros[:5],
             "revenue_at_risk_weekly": round(total_drop),
-        }),
+        },
     })
 
 except SystemExit:

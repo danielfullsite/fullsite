@@ -384,7 +384,7 @@ def main():
                 "client_id": CLIENT["id"],
                 "agent_id": "anomaly",
                 "fecha": today_str,
-                "data": json.dumps(structured_data),
+                "data": structured_data,
                 "summary": f"{len(anomalies)} anomalías detectadas" if anomalies else "Sin anomalías",
                 "priority": priority,
                 "updated_at": datetime.now(timezone.utc).isoformat(),

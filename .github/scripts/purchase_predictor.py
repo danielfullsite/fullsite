@@ -429,7 +429,7 @@ try:
         "fecha": today_str,
         "priority": "info",
         "summary": output_sum,
-        "data": json.dumps({
+        "data": {
             "week_of": week_label,
             "days_analyzed": days_with_data,
             "purchase_days": n_purchase_days,
@@ -447,7 +447,7 @@ try:
                  "cost": r["estimated_cost"]}
                 for r in recommendations[:20]
             ],
-        }),
+        },
     })
 
 except SystemExit:

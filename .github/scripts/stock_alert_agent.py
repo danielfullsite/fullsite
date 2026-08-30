@@ -269,7 +269,7 @@ try:
         "fecha": today_str,
         "priority": "critical" if sin_stock else ("warning" if critico or bajo_minimo else "info"),
         "summary": output_sum,
-        "data": json.dumps({
+        "data": {
             "inventory_items_checked": len(inventory_raw),
             "reorder_configs": len(reorder_config),
             "sin_stock": len(sin_stock),
@@ -280,7 +280,7 @@ try:
             "sin_stock_items": sin_stock[:10],
             "critico_items": critico[:10],
             "bajo_minimo_items": bajo_minimo[:10],
-        }),
+        },
     })
 
     # 7. Create insights for critical/low stock
