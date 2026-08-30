@@ -311,6 +311,33 @@ búsqueda dirigida: usar `rg` y lecturas por secciones, y resumir con rutas y l�
 
 > No tratar memorias ni documentación vieja como verdad superior al código y las pruebas actuales.
 
+### La regla de la cita
+
+La regla de arriba dice *no confíes*, pero no dice **cuándo dejaste de confiar** — y por eso
+se incumple sin querer. Ésta es su versión operativa:
+
+> **Antes de afirmar un número o un hecho que mueva una decisión, di de dónde salió.
+> Si no puedes citar `archivo:línea`, una tabla, o el comando que corriste — no es un
+> hecho, es un recuerdo. Dilo como recuerdo o ve a verificarlo.**
+
+Se aplica igual a memorias, a `docs/`, a resúmenes de conversaciones anteriores y a lo que
+uno "ya sabe" del proyecto. Un resumen de sesión es la fuente **menos** confiable de todas:
+no tiene fecha visible, nadie lo revisó, y se lee igual que un hecho.
+
+Casos reales del 2026-08-26, los tres corregidos frente a Daniel el mismo día:
+
+| Se afirmó | La verdad al ir a ver |
+|---|---|
+| "17 pasos manuales de aprovisionamiento" | `provisionTenant()` existe, 303 líneas, siembra 9 tablas |
+| "Las reservaciones se guardan todas como AMALAY" | `reservar/page.tsx:295` bloquea la página para otros tenants |
+| "`fetchPosMesas` no funciona nunca" | `supabase-fetch-patch.ts` la intercepta y le pone credencial |
+
+Los tres tienen la misma forma: **conclusión sobre un fragmento, sin abrir la fuente
+completa.** Ninguno habría sobrevivido a citar el archivo.
+
+**Al escribir una memoria**, ponerle la fecha en que se verificó. Una nota sin fecha se lee
+como un hecho permanente. Medido ese día: 22 de 148 memorias traían marca de verificación.
+
 ## 18. Trabajo con otros agentes
 
 Antes de comenzar: revisar ramas y worktrees, identificar archivos que otros agentes
