@@ -134,11 +134,28 @@ describe('toda ruta de API tiene guardián o está declarada pública', () => {
       'POST /agents/ack/[id]', 'POST /agents/outcome/[id]',
       'POST /agents/run', 'POST /coach',
       'GET /dashboard/hourly-distribution',
+      // Guardan y borran órdenes. `save-order` nunca acepta el tenant del cuerpo, y los
+      // dos proxies llaman a Supabase con service_role — o sea que si el tenant no sale
+      // de la sesión, no sale de ningún lado.
+      'POST /pos/save-order',
+      'GET /pos/db', 'POST /pos/db',
+      'GET /pos/db/[...path]', 'POST /pos/db/[...path]',
+      'PATCH /pos/db/[...path]', 'DELETE /pos/db/[...path]',
     ]
+
+    // Una llave mal escrita aquí se ignoraba en silencio, y una prueba que no puede
+    // ver es peor que no tener prueba. Ahora una entrada muerta falla.
+    const inexistentes = CRITICAS.filter(k => !HANDLERS.some(h => h.llave === k))
+    expect(inexistentes, `CRITICAS nombra rutas que no existen: ${inexistentes.join(', ')}`).toEqual([])
+
     const sinSesion = CRITICAS.filter(llave => {
-      const h = HANDLERS.find(x => x.llave === llave)
-      if (!h) return false // cubierto por la prueba de entradas muertas
-      return !['requireTenant', 'withPOSAuth'].some(g => h.cuerpo.includes(g))
+      const h = HANDLERS.find(x => x.llave === llave)!
+      // El archivo COMPLETO, no sólo el trozo del handler: en /pos/db los cuatro
+      // métodos son `export const GET = handle` y el `withPOSAuth` vive dentro de
+      // `handle`. Mirar sólo el trozo da el falso positivo que la cabecera de este
+      // archivo ya documenta para el barrido de guardianes.
+      const fuente = readFileSync(join(RAIZ_API, h.ruta.slice(1), 'route.ts'), 'utf8')
+      return !['requireTenant', 'withPOSAuth'].some(g => fuente.includes(g))
     })
     expect(sinSesion).toEqual([])
   })
