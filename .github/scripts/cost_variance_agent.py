@@ -238,7 +238,7 @@ try:
         "fecha": today_str,
         "priority": "critical" if cost_changes else ("warning" if (zero_cost or high_cost) else "info"),
         "summary": output_sum,
-        "data": json.dumps({
+        "data": {
             "total_ingredients": total_ingredients,
             "configured": configured,
             "zero_cost_count": len(zero_cost),
@@ -248,7 +248,7 @@ try:
             "zero_cost_items": zero_cost[:20],
             "high_cost_items": high_cost[:10],
             "ingredient_snapshot": ingredient_snapshot,
-        }),
+        },
     })
 
 except Exception as e:

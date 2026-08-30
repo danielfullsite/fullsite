@@ -50,7 +50,7 @@ import {
 import { buildUberAuthUrl, USL_SCOPES, MARKETPLACE_M2M_SCOPES, DELIVERY_M2M_SCOPES, PROMOTIONS_M2M_SCOPES, probeM2MToken } from '@/lib/integrations/uber-eats/oauth'
 import { createPromotion, buildSamplePromotion, promotionsScope } from '@/lib/integrations/uber-eats/promotions'
 import { requestReport, buildSampleReportRequest, getReportFile } from '@/lib/integrations/uber-eats/reporting'
-import { uploadMenu } from '@/lib/integrations/uber-eats/menu'
+import { uploadMenu, getMenu, normalizeMenuPayload } from '@/lib/integrations/uber-eats/menu'
 
 // Menú mínimo válido para probar el cert "Menu: Update Item/modifier" (PUT full menu).
 function buildSampleMenu() {
@@ -368,6 +368,19 @@ export async function POST(request: NextRequest) {
     const corrId = crypto.randomUUID()
     const result = await uploadMenu(storeId, buildSampleMenu(), corrId)
     return NextResponse.json({ action, correlation_id: corrId, store_id: storeId, ts: new Date().toISOString(), result })
+  }
+
+  // Lee de vuelta lo que Uber tiene. `upload_menu` responde 204 (aceptado) y hasta ahora no
+  // había forma de saber si eso se tradujo en un menú publicado. Devuelve además `sent`, el
+  // payload exacto que mandamos ya normalizado, para poder diffear enviado vs almacenado.
+  if (action === 'get_menu') {
+    const corrId = crypto.randomUUID()
+    const result = await getMenu(storeId, corrId)
+    return NextResponse.json({
+      action, correlation_id: corrId, store_id: storeId, ts: new Date().toISOString(),
+      result,
+      sent: normalizeMenuPayload(buildSampleMenu()),
+    })
   }
 
   if (action === 'create_promotion') {

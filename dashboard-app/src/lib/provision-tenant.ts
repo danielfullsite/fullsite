@@ -16,6 +16,7 @@
 
 import { DEFAULT_ONBOARDING_TEMPLATE, type OnboardingTemplate } from './onboarding-template'
 import type { ClientFeatures } from './client-config'
+import { resolveVerticalPreset, type VerticalId } from './vertical-presets'
 
 // Kept in sync with DEFAULT_FEATURES in src/lib/client-config.ts (which is not
 // exported). New tenants get the standard feature set.
@@ -34,7 +35,11 @@ export interface ProvisionInput {
   logo_url?: string
   plan?: string
   mesas?: number
+  locations?: Array<{ id?: string; name: string; address?: string }>
   template?: OnboardingTemplate // optional override; defaults to code template
+  /** Tipo de restaurante — resuelve un preset de src/lib/vertical-presets.ts
+   *  (features + menú semilla + mesas). Ver docs/strategy/BIBLE-SQUARE.md. */
+  vertical?: VerticalId
 }
 
 export interface ProvisionResult {
@@ -47,16 +52,43 @@ export interface ProvisionResult {
     pos_payment_methods: number
     pos_staff: number
     pos_mesas: number
+    pos_combos: number
     pos_mutation_authority: number
     pos_item_inventory_policy: number
   }
+  /** PINs de plantilla sembrados en ESTA corrida (vacío si el tenant ya tenía
+   *  staff). El alta los muestra una vez — no vuelven a viajar por la red. */
+  staffPins: Array<{ role: string; pin: string }>
 }
 
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 
+function slugifyLocation(value: string): string {
+  return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+}
+
 function serviceKey(): string {
   // service_role ONLY — never fall back to anon for writes.
   return process.env.SUPABASE_SERVICE_KEY || ''
+}
+
+/**
+ * PIN determinístico de 10 dígitos a partir de una semilla (tenant:rol).
+ * FNV-1a doble pasada → 10 dígitos, primer dígito nunca 0. No es secreto
+ * criptográfico: es el PIN inicial de plantilla que el dueño debe rotar; su
+ * único requisito es longitud 10 y estabilidad entre corridas del provision.
+ */
+export function deterministicPin10(seed: string): string {
+  let h1 = 0x811c9dc5, h2 = 0x01000193
+  for (let i = 0; i < seed.length; i++) {
+    h1 = Math.imul(h1 ^ seed.charCodeAt(i), 0x01000193) >>> 0
+    h2 = Math.imul(h2 ^ seed.charCodeAt(seed.length - 1 - i), 0x01000193) >>> 0
+  }
+  // 9 dígitos mezclando ambos hashes sin productos de 64 bits (precisión JS).
+  const nine = String(h1 % 100000).padStart(5, '0') + String(h2 % 10000).padStart(4, '0')
+  const first = String((h1 % 9) + 1) // 1-9: nunca empieza en 0
+  return first + nine
 }
 
 function headers() {
@@ -141,9 +173,25 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
   if (!SB_URL) throw new Error('[provision] NEXT_PUBLIC_SUPABASE_URL not configured')
   if (!serviceKey()) throw new Error('[provision] SUPABASE_SERVICE_KEY not configured')
 
-  const tpl = input.template || DEFAULT_ONBOARDING_TEMPLATE
+  const preset = input.vertical ? resolveVerticalPreset(input.vertical) : null
+
+  // ¿El tenant ya existe? Los umbrales día-0 (Lazo 1) solo se siembran en el
+  // alta ORIGINAL: un re-provision no debe pisar pos_settings que el tenant o
+  // el tuner (Lazo 2) ya ajustaron.
+  let clientExists = false
+  try {
+    const chk = await fetch(`${SB_URL}/rest/v1/clients?id=eq.${encodeURIComponent(clientId)}&select=id&limit=1`,
+      { headers: headers(), cache: 'no-store' })
+    const rows = chk.ok ? await chk.json().catch(() => []) : []
+    clientExists = Array.isArray(rows) && rows.length > 0
+  } catch { /* si no se pudo verificar, tratar como existente = no pisar settings */ clientExists = true }
+
+  const tpl = input.template || preset?.template || DEFAULT_ONBOARDING_TEMPLATE
   const displayName = input.display_name || clientId
-  const mesas = input.mesas ?? 10
+  const mesas = input.mesas ?? preset?.defaultMesas ?? 10
+  const features: ClientFeatures = preset
+    ? { ...DEFAULT_FEATURES, ...preset.features }
+    : DEFAULT_FEATURES
 
   // ── 1. clients row ─────────────────────────────────────────────────────────
   const clientsCount = await upsert('clients', [{
@@ -155,8 +203,14 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     iva_rate: 0.16,
     timezone: 'America/Mexico_City',
     active: true,
-    features: JSON.stringify(DEFAULT_FEATURES),
+    features: JSON.stringify(features),
     mesas,
+    // Tipo de restaurante (vertical preset). Columna `type` ya existe en `clients`.
+    ...(input.vertical ? { type: input.vertical } : {}),
+    // Lazo 1 (docs/ai/APRENDIZAJE-AGENTES-DESIGN.md): umbrales de industria del
+    // vertical como prior de los agentes — SOLO en el alta original, para no
+    // pisar ajustes del tenant/tuner en un re-provision.
+    ...(!clientExists && preset ? { pos_settings: { 'agents.thresholds': { ...preset.thresholds, source: `vertical:${preset.id}`, seeded_at: new Date().toISOString() } } } : {}),
     data_source: 'fullsite',
     // Requerido por el cálculo de día de negocio (ops_aggregate.get_business_day_config).
     // Sin esto, los agentes de IA crashean para el clon. Default 05:00 (día empieza a las 5am).
@@ -165,13 +219,17 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
   }])
 
   // ── 2. default location ────────────────────────────────────────────────────
-  const locationsCount = await upsert('client_locations', [{
-    id: `${clientId}-principal`,
+  const locationInputs = input.locations?.length
+    ? input.locations
+    : [{ id: `${clientId}-principal`, name: 'Principal', address: '' }]
+  const locationRows = locationInputs.map((location, index) => ({
+    id: location.id || `${clientId}-${slugifyLocation(location.name) || `sucursal-${index + 1}`}`,
     client_id: clientId,
-    name: 'Principal',
-    address: '',
+    name: location.name.trim(),
+    address: location.address?.trim() || '',
     active: true,
-  }])
+  }))
+  const locationsCount = await upsert('client_locations', locationRows)
 
   // ── 3. menu categories + items ─────────────────────────────────────────────
   const catRows = tpl.menu.map(cat => ({
@@ -211,23 +269,55 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
 
   // ── 5. role placeholders (pos_staff) ───────────────────────────────────────
   // One placeholder staff row per role so the new tenant has a starting role set.
-  // Deterministic id + pin per role keeps this idempotent. Shape mirrors
-  // seed-restaurant.ts pos_staff (id = `${clientId}-${pin}`).
-  const staffRows = tpl.roles.map((role, i) => {
-    const pin = String(1001 + i)
-    return {
-      id: `${clientId}-${pin}`,
+  // PINs de 10 dígitos (regla 2026-08-29: la huella es el método primario; el
+  // PIN es respaldo y debe ser largo, no un 4 dígitos observable). Deterministas
+  // por tenant+rol para que re-correr el provision dé el mismo resultado, y
+  // sembrados SOLO si el tenant no tiene staff (idempotente por conteo — así un
+  // re-provision de un tenant viejo con PINs de 4 dígitos no duplica filas).
+  let staffCount = 0
+  const staffPins: Array<{ role: string; pin: string }> = []
+  if ((await countFor('pos_staff', clientId)) === 0) {
+    const staffRows = tpl.roles.map((role) => {
+      const pin = deterministicPin10(`${clientId}:${role}`)
+      staffPins.push({ role, pin })
+      return {
+        id: `${clientId}-${pin}`,
+        client_id: clientId,
+        name: `${role} (plantilla)`,
+        pin,
+        role,
+        role_display: role,
+        active: true,
+        hourly_rate: 0,
+        weekly_salary: 0,
+      }
+    })
+    staffCount = await upsert('pos_staff', staffRows)
+  }
+
+  // ── 5b. combos semilla (pos_combos) ────────────────────────────────────────
+  // Sin esto, el speed screen de un tenant counter nace vacío (gap Minute-0 #12
+  // — visto en campo con carls-jr, cuyos combos se sembraron a mano el
+  // 2026-08-29; este bloque hace lo mismo para todo tenant nuevo). Idempotente
+  // por conteo: un re-provision no duplica ni pisa combos editados.
+  let combosCount = 0
+  if (preset?.combos?.length && (await countFor('pos_combos', clientId)) === 0) {
+    const comboRows = preset.combos.map(c => ({
+      id: `${clientId}-${c.idSuffix}`,
       client_id: clientId,
-      name: `${role} (plantilla)`,
-      pin,
-      role,
-      role_display: role,
+      name: c.name,
+      price: c.price,
+      items: c.items.map(it => ({
+        menu_item_id: `${clientId}-${it.itemIdSuffix}`,
+        name: it.name,
+        substitutions: (it.substitutions || []).map(s => ({ id: `${clientId}-${s.itemIdSuffix}`, name: s.name })),
+      })),
+      upsell: c.upsell || null,
       active: true,
-      hourly_rate: 0,
-      weekly_salary: 0,
-    }
-  })
-  const staffCount = await upsert('pos_staff', staffRows)
+      schedule: null,
+    }))
+    combosCount = await upsert('pos_combos', comboRows)
+  }
 
   // ── 6. mesas (floor plan) ──────────────────────────────────────────────────
   // Sin esto el POS del tenant nuevo abre con plano vacío (no se puede sentar
@@ -296,8 +386,10 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
       pos_payment_methods: pmCount,
       pos_staff: staffCount,
       pos_mesas: mesasCount,
+      pos_combos: combosCount,
       pos_mutation_authority: authorityCount,
       pos_item_inventory_policy: policyCount,
     },
+    staffPins,
   }
 }

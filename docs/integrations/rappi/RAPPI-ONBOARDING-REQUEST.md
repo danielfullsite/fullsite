@@ -164,16 +164,66 @@ Fullsite
 
 Marcar cuando se reciba confirmación escrita:
 
-- [ ] `RAPPI_CLIENT_ID` recibido
-- [ ] `RAPPI_CLIENT_SECRET` recibido
+- [x] `RAPPI_CLIENT_ID` recibido — 2026-08-29, vía self-onboarding. **El valor NO va en este archivo**
+      (§13): vive en el secret store como `RAPPI_CLIENT_ID`.
+- [ ] `RAPPI_CLIENT_SECRET` recibido — **ÚNICO PENDIENTE REAL.** Ojo: lo que llegó el 2026-08-29 fue
+      usuario y contraseña del *portal* de self-onboarding, que **no** es el `client_secret` del flujo
+      `client_credentials`. Se saca de la sección de credenciales del portal.
 - [x] `storeId` de AMALAY confirmado — `MX1930030014` (brandId: `MX491066`) — extraído de URL partners.rappi.com 2026-08-03
-- [ ] Formato de `Rappi-Signature` documentado oficialmente — **ECR ABIERTO** (no en doc pública)
+- [x] Formato de `Rappi-Signature` **CONFIRMADO 2026-08-29** en `dev-portal.rappi.com/en/webhook-events/`,
+      sección *Validating Your Signature*. Sí estaba en la doc pública; la nota anterior decía que no.
+      · Header: `Rappi-Signature` (los headers **no** son case-sensitive según el portal)
+      · Valor: `t=123456,sign=d74b65c2e68c1a84a4d5843a69ef5faf1d82f28df2dd3723e8e0dad9c54abc79`
+      · String firmado: **`<timestamp>.<raw_payload>`** — ej. `123456.{ "message" : "this is an example" }`
+      · HMAC-SHA256. Se parsea el header separando por `,` y luego por `=`.
+      Coincide exactamente con lo que el DESIGN v0.2 había hipotetizado.
 - [x] String firmado para HMAC: pendiente, pero secreto lo da Rappi en respuesta `POST webhook` — confirmado por doc pública
 - [x] Secreto HMAC: Rappi lo devuelve en `POST /webhook` response campo `secret` — confirmado
-- [ ] URL/método del PING confirmado — **ECR ABIERTO** (no en doc pública)
+- [x] PING **CONFIRMADO 2026-08-29** en `dev-portal.rappi.com/en/webhook-events/`, evento `PING`:
+      · Recibe: `{"store_id": 999}`
+      · Debe responder: `{"status":"OK","description":"Store on"}` — `status` obligatorio;
+        si es `null` o distinto de `OK`, Rappi da la tienda por **no disponible**. `description` opcional.
+      · Frecuencia: **cada 3 minutos** con webhook configurado (igual con Order Pulling).
+      · 2 strikes por defecto antes de generar incidente; 1 minuto de tiempo de gracia.
+      · **Requisito de arquitectura que el DESIGN no tenía:** *"This Ping must be implemented for each
+        store and not on a central server."* Es por-tienda, no un `/health` global.
+      Falta sólo el método HTTP explícito (el portal dice "will send the payload", lo que implica POST
+      pero no lo escribe). Se resuelve al registrar el webhook y observar la primera llamada.
 - [x] Payload de ejemplo de orden recibido — disponible en doc pública `GET /orders`
 - [x] Unidad monetaria: **centavos** — confirmado por muestras de payload (28900 = $289 MXN)
 - [x] Semántica del polling: `GET /orders` devuelve órdenes "nuevas" (persisten hasta ser tomadas/rechazadas) — confirmado por doc pública
-- [ ] Sandbox disponible: dev domain `microservices.dev.rappi.com` + `rests-integrations-dev.auth0.com` — credenciales dev separadas, pendiente confirmar
+- [x] Sandbox disponible: dev domain `microservices.dev.rappi.com` + `rests-integrations-dev.auth0.com`
+      — **credenciales dev de self-onboarding recibidas 2026-08-29** (usuario `admon@cafeamalay.com`).
+      Confirma que el ambiente separado existe y que tenemos acceso.
 
 **Cuando todos estén marcados → abrir RAPPI-001.**
+
+---
+
+## Estado 2026-08-29 — 10 de 11 cerrados, y los 2 ECRs cayeron con doc pública
+
+Los dos puntos que estaban marcados **"ECR ABIERTO (no en doc pública)"** sí estaban en la doc
+pública, en `dev-portal.rappi.com/en/webhook-events/`. Nadie los había ido a leer; la nota anterior
+afirmaba una ausencia sin haberla comprobado.
+
+**Queda un solo pendiente: `RAPPI_CLIENT_SECRET`**, que es una credencial y sale del portal.
+
+### Qué desbloquea esto
+
+La regla del DESIGN (*NO escribir código · NO asumir contratos de API*) existía para no construir
+sobre suposiciones. **Ya no hay suposiciones en el contrato**: firma, string firmado, PING, unidad
+monetaria, semántica del polling y payload de orden están todos confirmados por fuente oficial.
+
+El `client_secret` es un asunto de despliegue, no de diseño: el código se escribe leyéndolo de
+variable de entorno y no cambia según su valor. **Se puede abrir RAPPI-001 y escribir la
+integración; lo único que no se puede es ejecutarla en vivo hasta tener el secreto.**
+
+### Correcciones al DESIGN v0.2.2 que salen de esto
+
+1. El PING es **por tienda, no un endpoint central** (`/health` global no cumple). Esto cambia el
+   módulo que el DESIGN §Arquitectura contemplaba.
+2. El formato de firma que el DESIGN hipotetizó resultó exacto — se puede quitar el marcador ECR.
+3. Falta sólo el método HTTP del PING; se observa en la primera llamada tras registrar el webhook.
+
+**Seguridad:** las credenciales del 2026-08-29 llegaron por chat en texto plano → considerarlas
+expuestas, rotar al terminar y dejarlas sólo en el secret store.

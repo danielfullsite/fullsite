@@ -141,6 +141,15 @@ async function startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, servi
       const t = setTimeout(() => controller.abort(), 6000)
 
       const bearer = await getBearer()
+      const turnoRes = await fetch(
+        `${supabaseUrl}/rest/v1/pos_turnos?client_id=eq.${encodeURIComponent(restaurantId)}&closed_at=is.null&select=id,opened_by,opened_at&order=opened_at.desc`,
+        {
+          headers: { apikey: supabaseKey, Authorization: `Bearer ${bearer}` },
+          signal: controller.signal,
+        }
+      )
+      const activeTurnos = turnoRes.ok ? await turnoRes.json() : []
+      const activeTurno = activeTurnos[0] || null
       const res = await fetch(
         `${supabaseUrl}/rest/v1/pos_orders?client_id=eq.${encodeURIComponent(restaurantId)}&status=neq.closed&select=id,mesa,status,items,turno_id,updated_at`,
         {
@@ -152,6 +161,13 @@ async function startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, servi
       if (!res.ok) return
 
       const orders = await res.json()
+      // A restaurant can have historical/open-order residue from an older shift.
+      // Only the newest active shift belongs on today's operational surfaces. A
+      // duplicate active shift is reported in the turno snapshot for remediation,
+      // but its orders must never bleed into the current KDS.
+      const operationalOrders = activeTurno
+        ? orders.filter(order => order.turno_id === activeTurno.id)
+        : []
 
       // Marketplace orders live in delivery_orders. Mirror them into the same
       // durable ORDER_SENT protocol consumed by Electron KDS and printer queues.
@@ -181,16 +197,21 @@ async function startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, servi
 
       // Build mesa state from active orders
       const mesaMap = {}
-      for (const o of orders) {
+      for (const o of operationalOrders) {
         mesaMap[String(o.mesa)] = { status: o.status === 'pagando' ? 'pagando' : 'ocupada', order_id: o.id }
       }
 
       const event = await eventStore.appendInternal(EVENT.STATE_SYNC, {
         mesas:      Object.entries(mesaMap).map(([mesa, v]) => ({ mesa, ...v })),
-        kds_queue:  orders.filter(o => o.status === 'enviada' || o.status === 'preparando').map(o => ({
-          order_id: o.id, mesa: o.mesa, items_sent: o.items, sent_at: o.updated_at,
+        kds_queue:  operationalOrders.filter(o => o.status === 'enviada' || o.status === 'preparando').map(o => ({
+          order_id: o.id, mesa: o.mesa, items_sent: o.items, sent_at: o.updated_at, turno_id: o.turno_id,
         })),
-        turno:      null, // TODO: fetch active turno separately
+        turno:      activeTurno ? {
+          id: activeTurno.id,
+          opened_by: activeTurno.opened_by,
+          opened_at: activeTurno.opened_at,
+          conflict_count: activeTurnos.length,
+        } : null,
         synced_at:  new Date().toISOString(),
       }, { restaurantId })
 
@@ -229,11 +250,26 @@ function json(res, statusCode, payload) {
   res.end(JSON.stringify(payload))
 }
 
-// `config` e `instanceName` son parámetros de verdad, no opcionales: GET /identity los
-// usa (branch_id, instance_name) y antes NO estaban en este scope — vivían dentro de
-// startLocalServer. Cada llamada a /identity tiraba ReferenceError, y ése es el endpoint
-// con el que las terminales descubren y verifican la caja por LAN.
-function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, version, serverId, restaurantId, config = {}, instanceName = '' }) {
+// Forward a POST to another local server (the caja) over Node http — no browser
+// mixed-content wall applies here. Used by secondary POS terminals so their https
+// page can reach the caja's printers/state via their own localhost server.
+function forwardPost(targetUrl, bodyStr) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(targetUrl)
+    const r = http.request(
+      { hostname: u.hostname, port: u.port, path: u.pathname, method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(bodyStr) }, timeout: 5000 },
+      (resp) => { let d = ''; resp.on('data', c => { d += c }); resp.on('end', () => resolve({ status: resp.statusCode, body: d })) }
+    )
+    r.on('error', reject)
+    r.on('timeout', () => { r.destroy(); reject(new Error('timeout')) })
+    r.write(bodyStr); r.end()
+  })
+}
+
+// Keep identity and routing configuration explicit so every cloned terminal can
+// discover the caja without relying on process-global or customer-specific state.
+function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, version, serverId, restaurantId, config = {}, instanceName = '', branchId = config.branchId || null, posServerIp = config.posServerIp || null, port = 7717 }) {
   return async function router(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
@@ -241,6 +277,24 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, versio
     if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return }
 
     const url = req.url?.split('?')[0]
+
+    // ── Secondary-POS forward (role 'pos', posServerIp set) ───────────────────
+    // A secondary POS has no physical printers and its state isn't the KDS source
+    // of truth. Its POS page is https and CANNOT POST to the caja's http LAN IP
+    // (mixed content). So it POSTs to THIS local server (127.0.0.1, exempt from the
+    // wall) and we forward /print, /events and /drawer to the caja over Node http.
+    if (posServerIp && req.method === 'POST' && (url === '/print' || url === '/events' || url === '/drawer')) {
+      try {
+        const body = await parseBody(req)
+        const up = await forwardPost(`http://${posServerIp}:${port || 7717}${url}`, JSON.stringify(body))
+        res.writeHead(up.status || 502, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
+        res.end(up.body || '{}')
+      } catch (e) {
+        console.error('[forward→caja] failed:', e.message)
+        json(res, 502, { error: 'forward to caja failed: ' + e.message })
+      }
+      return
+    }
 
     // ── GET /identity ─────────────────────────────────────────────────────────
     // Fast identity check for discovery. Returns only the fields needed to
@@ -251,8 +305,8 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, versio
         ok:               true,
         server_id:        serverId,
         restaurant_id:    restaurantId,
-        branch_id:        config.branchId || null,
-        instance_name:    instanceName,
+        branch_id:        branchId || null,
+        instance_name:    instanceName || null,
         version,
         protocol_version: PROTOCOL_VERSION,
         capabilities:     ['orders', 'kds', 'printing', 'mesa-lock', 'sync-queue'],
@@ -291,6 +345,30 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, versio
     if (url === '/state' && req.method === 'GET') {
       const seq = await eventStore.getLastSequence()
       json(res, 200, { sequence: seq, ...state.toSnapshot() })
+      return
+    }
+
+    // ── GET /kds — self-contained kitchen display, served over http on the LAN ──
+    // Renders kds_orders from /state without Supabase. Served over http so the page
+    // can reach the bridge without the https mixed-content wall (an http page may
+    // freely fetch http://<lan-ip>:7717/state). Works fully offline: page + data are
+    // both local/LAN, no internet needed to load the screen OR receive new orders.
+    if (url === '/kds' && req.method === 'GET') {
+      try {
+        const fsMod = require('fs')
+        const pathMod = require('path')
+        let html = fsMod.readFileSync(pathMod.join(__dirname, 'kds-ui.html'), 'utf8')
+        // Where the page reads /state from: the caja's LAN IP for a dedicated KDS
+        // terminal (so it pulls the caja's orders), or same-origin ('') for the caja.
+        const bridgeBase = posServerIp ? `http://${posServerIp}:${port || 7717}` : ''
+        const cfg = JSON.stringify({ bridge_base: bridgeBase, client_id: restaurantId })
+        html = html.replace('<script>', `<script>window.__KDS_CFG__=${cfg};</script>\n<script>`)
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' })
+        res.end(html)
+      } catch (e) {
+        res.writeHead(500, { 'Content-Type': 'text/plain' })
+        res.end('KDS UI unavailable: ' + e.message)
+      }
       return
     }
 
@@ -492,7 +570,21 @@ async function startLocalServer({ dataDir, port = 7717, config = {} }) {
   wsHub.onCommand((msg, clientId) => cmdHandler.handle(msg, clientId))
 
   // ── HTTP server ──────────────────────────────────────────────────────────
-  const router = buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer: printerAdapter, version, serverId, restaurantId, config, instanceName })
+  const router = buildHttpRouter({
+    state,
+    eventStore,
+    wsHub,
+    cmdHandler,
+    printer: printerAdapter,
+    version,
+    serverId,
+    restaurantId,
+    config,
+    instanceName,
+    branchId: config.branchId || null,
+    posServerIp: config.posServerIp || null,
+    port,
+  })
   const httpServer = http.createServer(router)
 
   wsHub.attach(httpServer)

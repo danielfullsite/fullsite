@@ -205,7 +205,7 @@ def main():
                 "client_id": CLIENT["id"],
                 "agent_id": "config-validator",
                 "fecha": today_str,
-                "data": json.dumps({"issues": issues}),
+                "data": {"issues": issues},
                 "summary": f"{len(issues)} issues",
                 "priority": "warning" if issues else "info",
                 "updated_at": datetime.now(timezone.utc).isoformat(),

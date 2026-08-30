@@ -9,7 +9,6 @@ Output: mapa completo página → endpoints en logs + wansoft_data (endpoint_map
 
 import os
 import re
-import json
 import time
 import requests
 from datetime import datetime, timezone
@@ -198,7 +197,7 @@ def main():
         "client_id": CLIENT["id"],
         "fecha": datetime.now(timezone.utc).date().isoformat(),
         "data_key": "endpoint_map",
-        "data": json.dumps(full_map, ensure_ascii=False),
+        "data": full_map,
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
     r = requests.post(

@@ -185,9 +185,22 @@ export const PERMISSION_PROFILES: Record<string, POSPermissions> = {
   },
 }
 
+/**
+ * Aliases de rol → perfil. El provisioning y roles.ts usan 'dueño'/'staff'
+ * (DashboardRole), pero los perfiles se definieron con 'admin'. Sin este mapeo
+ * un dueño recién provisionado caía al perfil de MESERO y no podía ni abrir
+ * turno (bloqueo #1 del Minute-0, visto en campo 2026-08-29 con carls-jr).
+ */
+const ROLE_ALIASES: Record<string, string> = {
+  'dueño': 'admin',
+  dueno: 'admin',
+  owner: 'admin',
+  staff: 'mesero',
+}
+
 /** Get permissions for a role. Falls back to mesero if unknown. */
 export function getPermissions(role: string): POSPermissions {
-  return PERMISSION_PROFILES[role] || PERMISSION_PROFILES.mesero
+  return PERMISSION_PROFILES[role] || PERMISSION_PROFILES[ROLE_ALIASES[role]] || PERMISSION_PROFILES.mesero
 }
 
 /** Check if a role has a specific permission */

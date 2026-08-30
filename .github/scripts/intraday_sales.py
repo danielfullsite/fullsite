@@ -79,15 +79,25 @@ def wansoft_session():
     Uses stored cookies from Supabase (set via wansoft_auth.py store).
     Falls back to legacy login if cookie relay is not configured.
     """
+    # Se CONSERVA por qué falló el relevo de cookie. Antes se imprimía y se
+    # perdía: si el respaldo también fallaba, el error que quedaba registrado era
+    # "Wansoft login failed. URL: ..." — el del login viejo. Eso mandó a depurar
+    # la contraseña durante días cuando la causa real era la cookie vencida.
+    # Verificado en agent_runs: el 2026-08-25 y 26, ~15 corridas diarias, todas
+    # con ese mensaje y ninguna mencionando la cookie.
+    motivo_cookie = None
     try:
         return _get_wansoft_session(CLIENT["id"])
-    except WansoftAuthExpired:
-        print("[intraday] Cookie relay expired/missing, trying legacy login...")
+    except WansoftAuthExpired as e:
+        motivo_cookie = f"cookie vencida o ausente ({e})"
+        print(f"[intraday] {motivo_cookie}, intentando login viejo...")
     except Exception as e:
-        print(f"[intraday] Cookie relay error: {e}, trying legacy login...")
+        motivo_cookie = f"error del relevo de cookie ({e})"
+        print(f"[intraday] {motivo_cookie}, intentando login viejo...")
 
-    # Legacy fallback — will fail if Turnstile is active, but keeps
-    # the script runnable in environments without cookie relay.
+    # Respaldo con contraseña. Cloudflare Turnstile lo bloquea desde julio de
+    # 2026 (ver docs/knowledge/wansoft/AUTH-DIAGNOSIS.md), así que en la práctica
+    # ya no entra: se conserva para entornos sin relevo configurado.
     s = requests.Session()
     s.get(f"{WANSOFT_URL}/")
     resp = s.post(f"{WANSOFT_URL}/", data={
@@ -95,6 +105,15 @@ def wansoft_session():
         "Password": WANSOFT_PASS,
     }, allow_redirects=True)
     if "Dashboard" not in resp.url and "MyDocumentsList" not in resp.url:
+        if motivo_cookie:
+            # La causa REAL primero, y qué hacer al respecto. Este texto termina
+            # en agent_runs.error_message, que es lo único que se ve después.
+            raise Exception(
+                f"Wansoft sin sesión: {motivo_cookie}. "
+                f"El login con contraseña tampoco entra (Turnstile). "
+                f"Refrescar: python3 .github/scripts/wansoft_auth.py store "
+                f"--client-id {CLIENT['id']} --aspxauth '<valor>'"
+            )
         raise Exception(f"Wansoft login failed. URL: {resp.url}")
     return s
 

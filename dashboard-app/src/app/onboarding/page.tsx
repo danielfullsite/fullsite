@@ -366,7 +366,7 @@ export default function OnboardingPage() {
                     <input value={s.name} onChange={e => { const n = [...staff]; n[i].name = e.target.value; setStaff(n) }}
                       placeholder="Nombre" className="flex-1 border border-[var(--line)] rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500" />
                     <input value={s.pin} onChange={e => { const n = [...staff]; n[i].pin = e.target.value.replace(/\D/g, '').slice(0, 4); setStaff(n) }}
-                      placeholder="PIN (4 dig)" maxLength={4}
+                      placeholder="PIN (hasta 10 díg)" maxLength={10}
                       className="w-28 border border-[var(--line)] rounded-xl px-4 py-3 text-sm text-center font-mono focus:outline-none focus:border-emerald-500" />
                     <select value={s.role} onChange={e => { const n = [...staff]; n[i].role = e.target.value; setStaff(n) }}
                       className="w-32 border border-[var(--line)] rounded-xl px-3 py-3 text-sm">

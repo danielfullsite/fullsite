@@ -7,7 +7,6 @@ Flow: pos_inventory + pos_recipes + pos_ingredients → analysis → Telegram al
 
 import os
 import sys
-import json
 import time
 import requests
 from datetime import datetime, timezone
@@ -169,13 +168,13 @@ try:
             "fecha": today_str,
             "priority": "critical" if len(zero_stock) >= 3 else "warning",
             "summary": output_sum,
-            "data": json.dumps({
+            "data": {
                 "zero_stock": zero_stock,
                 "affected_items": {k: list(v) for k, v in affected.items()},
                 "total_critical": len(critical),
                 "total_zero": len(zero_stock),
                 "total_affected": len(affected),
-            }),
+            },
         })
 
         # 6. Create insight for 86'd items

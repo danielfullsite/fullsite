@@ -42,7 +42,7 @@ export async function getAuthToken(): Promise<string> {
     //
     // Ahora, sin sesión se devuelve la anon key SIN cachearla: la siguiente
     // llamada vuelve a intentar, y en cuanto la sesión existe se cachea de verdad.
-    const token = session?.access_token
+    const token = session?.access_token || readSessionTokenFromStorage()
     if (!token) return SUPABASE_KEY
 
     _cachedToken = token
@@ -50,8 +50,33 @@ export async function getAuthToken(): Promise<string> {
     return token
   } catch {
     // Tampoco se cachea el error: reintentar es barato, quedarse ciego 30 s no.
-    return SUPABASE_KEY
+    return readSessionTokenFromStorage() || SUPABASE_KEY
   }
+}
+
+/**
+ * Fallback directo al storage del SDK. `supabase.auth.getSession()` puede
+ * colgarse en App Router (falla conocida, ver AGENTS.md) y el timeout de 3 s
+ * degradaba a la anon key AUNQUE la sesión existiera — con RLS eso es cero
+ * filas y cada pantalla caía a su fallback en silencio (visto en campo
+ * 2026-08-29: "[client-config] Sin configuración para carls-jr" con sesión
+ * válida en localStorage). El token vive en `sb-<ref>-auth-token`; leerlo
+ * directo no depende del SDK. Se valida expiración antes de usarlo.
+ */
+function readSessionTokenFromStorage(): string | null {
+  if (typeof window === 'undefined') return null
+  try {
+    for (const k of Object.keys(localStorage)) {
+      if (!k.startsWith('sb-') || !k.endsWith('-auth-token')) continue
+      const raw = localStorage.getItem(k)
+      if (!raw) continue
+      const parsed = JSON.parse(raw) as { access_token?: string; expires_at?: number }
+      if (!parsed?.access_token) continue
+      if (parsed.expires_at && parsed.expires_at * 1000 < Date.now() + 30_000) continue
+      return parsed.access_token
+    }
+  } catch { /* storage bloqueado o JSON corrupto */ }
+  return null
 }
 
 /**
@@ -202,7 +227,7 @@ function locationFilter(locationId?: string | null): string {
 
 export async function getRecentDays(days: number = 30, clientSlug: string = getActiveClientSlug(), locationId?: string | null): Promise<WansoftDaily[]> {
   // Try pos_orders first for recent data (last 7 days) — this is the live POS data
-  const posRecent = await getDashboardFromPosOrders(Math.min(days, 90), clientSlug)
+  const posRecent = await getDashboardFromPosOrders(Math.min(days, 90), clientSlug, locationId)
   // Then get wansoft_daily for historical data
   const data = await sbFetch('wansoft_daily', `select=*&client_slug=eq.${clientSlug}${locationFilter(locationId)}&ventas_dia=gt.0&order=fecha.desc&limit=${days * 2}`) as Record<string, unknown>[]
   const wansoftData = dedupeByFecha(data).slice(0, days).reverse().map(parseRow)
@@ -218,7 +243,7 @@ export async function getRecentDays(days: number = 30, clientSlug: string = getA
 
 export async function getLatestDay(clientSlug: string = getActiveClientSlug(), locationId?: string | null): Promise<WansoftDaily | null> {
   // Try pos_orders first — live POS data takes priority
-  const posData = await getDashboardFromPosOrders(7, clientSlug)
+  const posData = await getDashboardFromPosOrders(7, clientSlug, locationId)
   if (posData.length > 0) return posData[posData.length - 1]
   // Fallback to wansoft_daily
   const data = await sbFetch('wansoft_daily', `select=*&client_slug=eq.${clientSlug}${locationFilter(locationId)}&ventas_dia=gt.0&order=fecha.desc&limit=5`) as Record<string, unknown>[]
@@ -238,7 +263,7 @@ export async function getMonthlyData(clientSlug: string = getActiveClientSlug(),
   const rows = dedupeByFecha(data).map(parseRow)
   if (rows.length > 0) return rows
   // POS fallback
-  return getDashboardFromPosOrders(365, clientSlug)
+  return getDashboardFromPosOrders(365, clientSlug, locationId)
 }
 
 export async function getWaiterCategories(days: number = 7, clientSlug: string = getActiveClientSlug()) {
@@ -292,7 +317,7 @@ export async function getDateRange(from: string, to: string, clientSlug: string 
   const fromDate = new Date(from + 'T00:00:00')
   const toDate = new Date(to + 'T23:59:59')
   const days = Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
-  const posData = await getDashboardFromPosOrders(days, clientSlug)
+  const posData = await getDashboardFromPosOrders(days, clientSlug, locationId)
   return posData.filter(d => d.fecha >= from && d.fecha <= to)
 }
 
@@ -359,6 +384,10 @@ export async function getDeepTable(table: string, limit: number = 30, filter: st
 }
 
 export async function getLatestDeep(table: string): Promise<{ fecha: string; data: unknown; [key: string]: unknown } | null> {
+  // Las tablas wansoft_* pertenecen al conector legacy. Un tenant que opera con
+  // Fullsite POS no debe caer a esos datos cuando su módulo aún no tiene historia:
+  // además de ser engañoso, podía mostrar el último registro de otro restaurante.
+  if (table.startsWith('wansoft_') && isFullsitePOS()) return null
   // Try fecha first, fall back to updated_at, then periodo
   for (const orderCol of ['fecha', 'updated_at', 'periodo']) {
     const data = await sbFetch(table, `select=*&order=${orderCol}.desc&limit=1`) as Record<string, unknown>[]
@@ -468,13 +497,13 @@ function classifyItemGroup(lower: string): string {
   return 'OTROS'
 }
 
-export async function getDashboardFromPosOrders(days: number = 30, clientId: string = getActiveClientSlug()): Promise<WansoftDaily[]> {
+export async function getDashboardFromPosOrders(days: number = 30, clientId: string = getActiveClientSlug(), locationId?: string | null): Promise<WansoftDaily[]> {
   const cutoff = nowMX()
   cutoff.setDate(cutoff.getDate() - days)
   const cutoffStr = fmtDateMX(cutoff)
 
   const orders = await sbFetch('pos_orders',
-    `select=mesa,mesero,personas,total,subtotal,iva,descuento,propina,metodo_pago,pagos,items,status,created_at&client_id=eq.${clientId}&status=eq.cerrada&created_at=gte.${cutoffStr}T00:00:00-06:00&order=created_at.asc&limit=5000`
+    `select=mesa,mesero,personas,total,subtotal,iva,descuento,propina,metodo_pago,pagos,items,status,created_at&client_id=eq.${clientId}${locationFilter(locationId)}&status=eq.cerrada&created_at=gte.${cutoffStr}T00:00:00-06:00&order=created_at.asc&limit=5000`
   ) as { mesa: number; mesero: string; personas: number; total: number; subtotal: number; iva: number; descuento: number; propina: number; metodo_pago: string; pagos: { metodo: string; monto: number }[] | null; items: { nombre: string; precio: number; cantidad: number }[] | null; status: string; created_at: string }[]
 
   if (orders.length === 0) return []

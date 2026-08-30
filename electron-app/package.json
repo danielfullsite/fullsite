@@ -1,6 +1,6 @@
 {
   "name": "fullsite-pos",
-  "version": "1.3.3",
+  "version": "1.3.6",
   "description": "Fullsite POS — kiosk wrapper for app.fullsite.mx/pos",
   "main": "main.js",
   "scripts": {
@@ -19,8 +19,8 @@
     "electron-builder": "^25.0.0"
   },
   "build": {
-    "appId": "mx.fullsite.kds",
-    "productName": "Fullsite KDS",
+    "appId": "mx.fullsite.pos",
+    "productName": "Fullsite POS",
     "directories": {
       "output": "dist"
     },

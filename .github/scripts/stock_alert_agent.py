@@ -53,8 +53,13 @@ def sb_post(table, data):
     r.raise_for_status()
 
 def sb_upsert(table, data):
+    # on_conflict explícito: agent_results tiene UNIQUE(client_id,agent_id,fecha),
+    # no solo el PK. Sin on_conflict, merge-duplicates resuelve contra el PK y el
+    # choque con la UNIQUE secundaria falla (el agente venía tronando con 400/409
+    # intermitente al reescribir el resultado del día).
+    on_conflict = "?on_conflict=client_id,agent_id,fecha" if table == "agent_results" else ""
     headers_upsert = {**sb_headers, "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates,return=minimal"}
-    r = requests.post(f"{SUPABASE_URL}/rest/v1/{table}", headers=headers_upsert, json=data, timeout=15)
+    r = requests.post(f"{SUPABASE_URL}/rest/v1/{table}{on_conflict}", headers=headers_upsert, json=data, timeout=15)
     if r.status_code == 409:
         agent_id = data.get("agent_id", "")
         fecha = data.get("fecha", "")
@@ -63,6 +68,10 @@ def sb_upsert(table, data):
             headers={**sb_headers, "Content-Type": "application/json", "Prefer": "return=minimal"},
             json={k: v for k, v in data.items() if k not in ("agent_id", "fecha")},
             timeout=15)
+    if not r.ok:
+        # El body del error nunca llegaba a agent_runs (solo la URL) — imprimirlo
+        # para que el PRÓXIMO fallo se diagnostique solo desde los logs del run.
+        print(f"[stock-alert] {table} upsert {r.status_code}: {r.text[:300]}", file=sys.stderr)
     r.raise_for_status()
 
 def send_telegram(text):
@@ -260,7 +269,7 @@ try:
         "fecha": today_str,
         "priority": "critical" if sin_stock else ("warning" if critico or bajo_minimo else "info"),
         "summary": output_sum,
-        "data": json.dumps({
+        "data": {
             "inventory_items_checked": len(inventory_raw),
             "reorder_configs": len(reorder_config),
             "sin_stock": len(sin_stock),
@@ -271,7 +280,7 @@ try:
             "sin_stock_items": sin_stock[:10],
             "critico_items": critico[:10],
             "bajo_minimo_items": bajo_minimo[:10],
-        }),
+        },
     })
 
     # 7. Create insights for critical/low stock

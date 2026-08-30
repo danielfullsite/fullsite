@@ -425,7 +425,7 @@ def main():
                 "client_id": CLIENT["id"],
                 "agent_id": "menu-engineering",
                 "fecha": today_str,
-                "data": json.dumps(structured_data),
+                "data": structured_data,
                 "summary": summary,
                 "priority": "info",
                 "updated_at": datetime.now(timezone.utc).isoformat(),
