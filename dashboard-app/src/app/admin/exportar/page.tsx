@@ -73,25 +73,12 @@ export default function ExportarPage() {
         return
       }
 
-      // Retry without client_id
-      const res2 = await fetch(`${SUPABASE_URL}/rest/v1/${exp.table}?select=${exp.select}&limit=10000`, { headers: { ...baseHeaders, Accept: 'text/csv' } })
-      const text2 = await res2.text()
-      if (res2.ok && !text2.includes('"code"') && text2.length > 5) {
-        downloadFile(text2, `${exp.id}_${new Date().toISOString().slice(0, 10)}.csv`)
-        setDownloading(null)
-        return
-      }
-
-      // Fallback: fetch as JSON and convert to CSV
+      // FUGA F-6 CERRADA (2026-08-30): aquí había dos reintentos que QUITABAN el
+      // filtro de tenant a propósito (res2/res4). Para un usuario multi-membresía
+      // la RLS deja pasar TODOS sus tenants → el CSV salía mezclado. Si la query
+      // filtrada falla, es un error, no una excusa para exportar de más.
       const res3 = await fetch(`${SUPABASE_URL}/rest/v1/${exp.table}?select=${exp.select}${clientFilter}&limit=10000`, { headers: { ...baseHeaders, Accept: 'application/json' } })
-      if (!res3.ok) {
-        const res4 = await fetch(`${SUPABASE_URL}/rest/v1/${exp.table}?select=${exp.select}&limit=10000`, { headers: { ...baseHeaders, Accept: 'application/json' } })
-        if (!res4.ok) { alert(`Error exportando ${exp.label}`); setDownloading(null); return }
-        const json4 = await res4.json()
-        downloadFile(jsonToCsv(json4), `${exp.id}_${new Date().toISOString().slice(0, 10)}.csv`)
-        setDownloading(null)
-        return
-      }
+      if (!res3.ok) { alert(`Error exportando ${exp.label}`); setDownloading(null); return }
       const json3 = await res3.json()
       downloadFile(jsonToCsv(json3), `${exp.id}_${new Date().toISOString().slice(0, 10)}.csv`)
     } catch (e) {

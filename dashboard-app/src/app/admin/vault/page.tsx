@@ -89,7 +89,7 @@ export default function VaultPage() {
   const fetchCredentials = async () => {
     setLoading(true)
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/credentials_vault?order=category.asc,name.asc`,
+      `${SUPABASE_URL}/rest/v1/credentials_vault?client_id=eq.${getActiveClientSlug()}&order=category.asc,name.asc`,
       { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
     )
     if (res.ok) setCredentials(await res.json())

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
+import { getActiveClientSlug } from '@/lib/data'
 import { MessageCircle, AlertTriangle, Clock, Search, Filter, ChevronDown, ChevronUp } from 'lucide-react'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -34,6 +35,9 @@ export default function ChatLogsPage() {
       const params = new URLSearchParams({
         order: 'created_at.desc',
         limit: String(limit),
+        // R-5: sin este filtro un usuario multi-membresía veía las conversaciones
+        // de TODOS sus tenants (la RLS deja pasar todas sus membresías).
+        client_id: `eq.${getActiveClientSlug()}`,
       })
       if (filter === 'errors') params.append('had_error', 'eq.true')
       if (search) params.append('user_message', `ilike.*${search}*`)

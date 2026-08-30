@@ -136,7 +136,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // deben sincronizar aunque cambie la sesión.
         const prev = localStorage.getItem('fullsite_client_id')
         if (prev && prev !== cid) {
-          for (const k of ['pos_cached_turno', 'pos_turno_cache', 'pos_staff_cache', 'pos_manager_credentials_v2', 'pos_service_model']) {
+          // Al cambiar de tenant hay que barrer TODO caché de negocio del
+          // anterior. El crítico es pos_shift_token (fuga F-7): withPOSAuth lo
+          // valida antes que la sesión, así que un token viejo seguía leyendo/
+          // escribiendo en el restaurante anterior. Se incluyen aquí todas las
+          // llaves con datos de un tenant; las de prefijo (pos_order_*) se
+          // barren por recorrido abajo. NO se tocan las colas de sincronización
+          // (print/offline): son operaciones pendientes que deben subir.
+          const exactKeys = [
+            'pos_cached_turno', 'pos_turno_cache', 'pos_staff_cache',
+            'pos_manager_credentials_v2', 'pos_service_model',
+            'pos_shift_token', 'pos_turno_id', 'pos_manager_pin_cache',
+            'pos_meseros_cache', 'pos_mesero', 'pos_last_turno_sync',
+            'pos_fingerprint_staff', 'pos_terminal_id',
+          ]
+          for (const k of exactKeys) {
+            try { localStorage.removeItem(k) } catch { /* — */ }
+          }
+          // Cachés por-mesa/orden con prefijo de tenant anterior.
+          try {
+            for (const k of Object.keys(localStorage)) {
+              if (/^pos_(order|draft|plano)_/.test(k)) localStorage.removeItem(k)
+            }
+          } catch { /* — */ }
+          for (const k of [] as string[]) {
             try { localStorage.removeItem(k) } catch { /* — */ }
           }
         }
