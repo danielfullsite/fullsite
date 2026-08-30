@@ -114,11 +114,18 @@ export async function withPOSAuth(request: NextRequest): Promise<POSAuthContext 
       membership = reales.length === 1 ? reales[0] : (rows.length === 1 ? rows[0] : undefined)
       if (!membership) return null // multi-membresía sin header → jamás adivinar
     }
+    // Una membresía 'platform_actas' SOLO la crea /api/platform/act-as, que está
+    // gateado por requirePlatformAdmin(+2FA). Es decir: su existencia PRUEBA que
+    // un admin de plataforma entró deliberadamente a este tenant. En ese modo el
+    // admin opera con acceso de dueño (igual que AuthContext, que fija rol 'dueño'
+    // en act-as). Sin esta elevación, /api/owner/* daba 403 al propio admin
+    // impersonando — regresión del fix de fugas, vista en campo 2026-08-30.
+    const effectiveRole = membership.role === 'platform_actas' ? 'dueño' : membership.role
     return {
       clientId: membership.client_id,
       staffId: userId,
       staffName: '',
-      role: membership.role,
+      role: effectiveRole,
       authType: 'supabase_session',
     }
   } catch {

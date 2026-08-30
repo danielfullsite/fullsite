@@ -71,6 +71,18 @@ describe('withPOSAuth — resolución de tenant multi-membresía (fuga 2026-08-3
     expect(auth?.clientId).toBe('tekila-rg')
   })
 
+  it('act-as: header a un tenant donde SOLO es platform_actas → entra como dueño', async () => {
+    // La existencia de la fila actas prueba que un admin entró vía act-as
+    // (endpoint gated); debe operar con acceso de dueño, no rebotar en /owner/*.
+    mockMemberships([
+      { client_id: 'amalay', role: 'dueño' },
+      { client_id: 'tekila-rg', role: 'platform_actas' },
+    ])
+    const auth = await withPOSAuth(reqWith({ 'x-fullsite-tenant': 'tekila-rg' }))
+    expect(auth?.clientId).toBe('tekila-rg')
+    expect(auth?.role).toBe('dueño')
+  })
+
   it('una membresía real + una actas, sin header → la real (el actas no es home)', async () => {
     mockMemberships([
       { client_id: 'carls-jr', role: 'platform_actas' },
