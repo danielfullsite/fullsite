@@ -74,7 +74,13 @@ gh workflow run daily-briefing.yml --repo ramonfaurdaniel-png/fullsite
 gh run list --repo ramonfaurdaniel-png/fullsite --limit=10
 
 # Aprovisionar nuevo cliente (sandbox)
-python scripts/onboard_client.py --client-id nombre --confirm-ref jkcnxfbb...
+python3 scripts/sql/sandbox/onboard_client.py \
+  --client-id nombre \
+  --name "Nombre del cliente" \
+  --owner-email owner@example.com \
+  --template cafe \
+  --confirm-ref jkcnxfbbuyyfhwfjizgw \
+  --dry-run
 ```
 
 ---

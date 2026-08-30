@@ -91,7 +91,7 @@ El Manager Panel es la herramienta de diagnóstico del gerente. Accesible desde 
 ### Fase 1: Preparación (día -7)
 
 1. Confirmar hardware: tablet(s) con Chrome, impresora térmica compatible, cajón de dinero, terminal bancaria.
-2. Crear tenant en sandbox: `python onboard_client.py --client-id nombre --confirm-ref jkcnxfbb...`
+2. Validar el plan del tenant en sandbox: `python3 scripts/sql/sandbox/onboard_client.py --client-id nombre --name "Nombre del cliente" --owner-email owner@example.com --template cafe --confirm-ref jkcnxfbbuyyfhwfjizgw --dry-run`
 3. Importar menú desde Wansoft o cargar manualmente.
 4. Configurar recetas y precios.
 5. Crear cuentas de staff (dueño, gerente, meseros, cocina).
