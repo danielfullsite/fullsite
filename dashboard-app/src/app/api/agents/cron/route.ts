@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
   if (!clientId) return NextResponse.json({ error: 'No client configured' }, { status: 400 })
 
   try {
-    const results = await runAllAgents(clientId)
+    const results = await runAllAgents(clientId, 'cron')
     const totalEvents = results.reduce((s, r) => s + r.events.length, 0)
     const errors = results.filter(r => r.error).map(r => ({ agent: r.agent_id, error: r.error }))
     return NextResponse.json({

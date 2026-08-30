@@ -1,0 +1,82 @@
+name: Agentes del dashboard — corrida periódica
+
+# POR QUÉ EXISTE
+# --------------
+# Los cinco agentes del dashboard (operations, inventory, fraud, staff, finance)
+# NO tenían quién los disparara. Ningún workflow llamaba a /api/agents/cron y no hay
+# cron de Vercel. Corrían sólo si una persona abría la página.
+#
+# Medido el 2026-08-30: 23 hallazgos en toda la historia, los últimos del 21 y 28 de
+# agosto. Los agentes de Python del mismo repo llevaban cientos de corridas en 14 días
+# porque ellos SÍ tienen workflow. La diferencia no era el código, era el disparador.
+#
+# CONDICIÓN PARA QUE ESTO SIRVA
+# -----------------------------
+# /api/agents/cron falla CERRADO: sin `CRON_SECRET` devuelve 503 y no corre nada.
+# Al 2026-08-30 esa variable NO está puesta en producción, así que este workflow va a
+# reportar 503 hasta que se configure:
+#
+#   1. Vercel  → variable de entorno `CRON_SECRET` en el proyecto fullsite
+#   2. GitHub  → secret `CRON_SECRET` con el MISMO valor
+#
+# Se deja el workflow igual, y avisando el 503 de forma explícita, porque un cron que
+# grita "no estoy configurado" cada media hora es mejor que la ausencia silenciosa que
+# tuvimos nueve días.
+
+on:
+  schedule:
+    # Cada 30 min dentro del horario de servicio de Monterrey (UTC-6):
+    # 13:00–05:59 UTC ≈ 07:00–23:59 hora local. Fuera de eso los agentes
+    # devuelven vacío por diseño y sólo gastarían corridas.
+    - cron: '*/30 13-23 * * *'
+    - cron: '*/30 0-5 * * *'
+  workflow_dispatch:
+
+# Si una corrida se empalma con la anterior, gana la nueva: los agentes miran el estado
+# actual del restaurante, así que un análisis viejo a medias no vale la pena terminarlo.
+concurrency:
+  group: agentes-dashboard-cron
+  cancel-in-progress: true
+
+jobs:
+  correr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Disparar los 5 agentes
+        env:
+          APP_URL: https://app.fullsite.mx
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::warning title=CRON_SECRET no configurado::El secret no existe en GitHub. Los agentes NO corrieron."
+            echo "Configurar en Vercel Y en GitHub Secrets con el mismo valor. Ver el encabezado de este workflow."
+            exit 0
+          fi
+
+          RESP=$(curl -s -w "\n%{http_code}" "$APP_URL/api/agents/cron" \
+            -H "Authorization: Bearer $CRON_SECRET")
+          CODE=$(echo "$RESP" | tail -1)
+          BODY=$(echo "$RESP" | head -n -1)
+
+          echo "HTTP $CODE"
+          echo "$BODY" | head -c 2000
+          echo
+
+          case "$CODE" in
+            200)
+              # `total_events: 0` es un resultado válido — fuera de horario o sin hallazgos.
+              # Lo que importa es que quedó constancia en agent_runs, que es el punto de todo esto.
+              echo "::notice title=Agentes ejecutados::$(echo "$BODY" | head -c 300)"
+              ;;
+            503)
+              echo "::warning title=CRON_SECRET falta en Vercel::GitHub sí tiene el secret, pero la app responde 503. Falta ponerlo en Vercel."
+              ;;
+            401)
+              echo "::error title=CRON_SECRET no coincide::El valor en GitHub y en Vercel son distintos."
+              exit 1
+              ;;
+            *)
+              echo "::error title=Fallo al correr agentes::HTTP $CODE"
+              exit 1
+              ;;
+          esac
