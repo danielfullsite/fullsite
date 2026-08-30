@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Store, Plus, Activity, AlertTriangle, ArrowUpRight, Bot, RefreshCw, X, Sparkles, Circle, Power } from 'lucide-react'
+import { Store, Plus, Activity, AlertTriangle, ArrowUpRight, Bot, RefreshCw, X, Sparkles, Circle, Power, KeyRound } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { ToastProvider, useToast, ConfirmModal } from '@/components/platform/PlatformFeedback'
 import { VERTICAL_PRESETS, VERTICAL_IDS, type VerticalId } from '@/lib/vertical-presets'
@@ -25,6 +25,7 @@ function TenantsInner() {
   const [loading, setLoading] = useState(true)
   const [denied, setDenied] = useState(false)
   const [showNew, setShowNew] = useState(false)
+  const [ownerTenant, setOwnerTenant] = useState<Tenant | null>(null)
   const [confirm, setConfirm] = useState<null | { title: string; message?: string; run: () => Promise<void> }>(null)
   const [busy, setBusy] = useState(false)
 
@@ -188,6 +189,13 @@ function TenantsInner() {
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-3">
                           <button
+                            onClick={() => setOwnerTenant(t)}
+                            title="Crear o resetear el login del dueño (no toca la operación)"
+                            className="inline-flex items-center gap-1 text-[var(--text-3)] font-semibold text-xs hover:text-[var(--text-1)]"
+                          >
+                            <KeyRound size={13} /> Acceso
+                          </button>
+                          <button
                             onClick={() => setConfirm({
                               title: `${isActive ? 'Desactivar' : 'Activar'} "${t.name}"`,
                               message: isActive
@@ -223,6 +231,7 @@ function TenantsInner() {
       </p>
 
       {showNew && <NewTenantModal onClose={() => setShowNew(false)} onDone={load} toast={toast} tenantCount={tenants.length} />}
+      {ownerTenant && <OwnerAccessModal tenant={ownerTenant} onClose={() => setOwnerTenant(null)} toast={toast} />}
 
       <ConfirmModal
         open={!!confirm}
@@ -237,6 +246,56 @@ function TenantsInner() {
         }}
       />
     </>
+  )
+}
+
+// Acceso del dueño de un tenant EXISTENTE: crea o resetea el login sin tocar la
+// operación (a diferencia de "Nuevo cliente", que siembra el skeleton completo).
+// Rescatado del WIP local 2026-08-30; el server hace el trabajo en
+// /api/platform/tenant-owner.
+function OwnerAccessModal({ tenant, onClose, toast }: {
+  tenant: Tenant
+  onClose: () => void
+  toast: (k: 'success' | 'error', m: string) => void
+}) {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    try {
+      const res = await fetch('/api/platform/tenant-owner', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientId: tenant.id, email, password }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) { toast('error', json.error || 'No se pudo crear el acceso.'); return }
+      toast('success', `Acceso dueño listo para ${tenant.name}`)
+      onClose()
+    } catch {
+      toast('error', 'Error de red al crear el acceso.')
+    } finally { setBusy(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
+      <form onSubmit={submit} className="w-full max-w-sm rounded-xl border border-[var(--line)] bg-[var(--bg)] shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="px-5 py-4 border-b border-[var(--line)] flex items-center gap-3">
+          <KeyRound size={18} className="text-[var(--accent-bright)]" />
+          <div><div className="font-bold text-[var(--text-1)]">Acceso dueño</div><div className="text-[11px] text-[var(--text-3)]">{tenant.name} · {tenant.id}</div></div>
+          <button type="button" onClick={onClose} className="ml-auto text-[var(--text-3)]"><X size={18} /></button>
+        </div>
+        <div className="p-5 space-y-4">
+          <label className="block"><span className="text-xs text-[var(--text-3)]">Correo del dueño</span><input type="email" required value={email} onChange={e => setEmail(e.target.value)} className="mt-1 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-sm text-[var(--text-1)] outline-none focus:border-[var(--accent-line)]" /></label>
+          <label className="block"><span className="text-xs text-[var(--text-3)]">Contraseña inicial (mín. 8)</span><input type="password" required minLength={8} value={password} onChange={e => setPassword(e.target.value)} className="mt-1 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-sm text-[var(--text-1)] outline-none focus:border-[var(--accent-line)]" /></label>
+          <p className="text-[11px] text-[var(--text-4)]">Crea o repara únicamente Auth y la membresía de dueño. No modifica la operación del tenant.</p>
+          <button disabled={busy} className="w-full rounded-lg bg-[var(--accent)] px-4 py-2.5 text-sm font-bold text-[#04120c] disabled:opacity-50">{busy ? 'Guardando…' : 'Crear o reparar acceso'}</button>
+        </div>
+      </form>
+    </div>
   )
 }
 
