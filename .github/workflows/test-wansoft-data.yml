@@ -1,0 +1,31 @@
+name: wansoft_data — Pruebas
+
+# SIN filtro `paths`, por la misma razón que Dashboard Tests: un check que sólo
+# reporta a veces no sirve como check requerido. El costo aquí es de segundos —
+# no hay red, no hay dependencias, sólo se lee el AST de los scripts.
+#
+# Para que esto BLOQUEE de verdad hay que agregar el contexto `wansoft-data` a la
+# protección de rama de main. Mientras no esté, avisa pero no detiene.
+#
+# NOTA para quien mergee la rama fix/agent-results-jsonb: ese PR trae un
+# `test-agentes.yml` idéntico en forma que corre test_agent_results_jsonb.py. Los
+# dos son el mismo tipo de guarda sobre tablas distintas; cuando ambos estén en
+# main conviene juntarlos en un solo workflow con dos pasos.
+on:
+  push:
+  pull_request:
+
+jobs:
+  wansoft-data:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with: { python-version: '3.11' }
+
+      # `wansoft_data.data` es jsonb. Un scraper que mande json.dumps([...]) guarda
+      # un escalar de tipo string y deja el dato inconsultable desde SQL
+      # (`data->>'campo'` devuelve NULL, `jsonb_array_elements(data)` revienta) sin
+      # romper nada visible en el dashboard. Es un fallo silencioso: por eso se
+      # atrapa aquí y no en producción.
+      - run: python .github/scripts/test_wansoft_data_jsonb.py

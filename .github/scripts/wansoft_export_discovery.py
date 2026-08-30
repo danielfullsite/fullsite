@@ -9,7 +9,6 @@ Usage: python wansoft_export_discovery.py
 
 import os
 import sys
-import json
 import requests
 import time
 from datetime import datetime, timedelta, timezone
@@ -228,7 +227,7 @@ def main():
                 "client_id": CLIENT["id"],
                 "fecha": today,
                 "data_key": "export_discovery",
-                "data": json.dumps(working),
+                "data": working,
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             })
         print("\n[✓] Saved discovery results to Supabase")

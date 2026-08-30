@@ -53,12 +53,29 @@ def wansoft_session():
     return s
 
 
+def a_jsonb(valor):
+    """Deja `valor` listo para la columna jsonb `wansoft_data.data`.
+
+    `requests(json=...)` ya serializa el cuerpo entero. Si aqui se manda un str,
+    PostgREST guarda un ESCALAR JSON de tipo string en vez de un objeto, y
+    `data->>'campo'` devuelve NULL: el dato entra pero queda inconsultable desde
+    SQL. Un str que ya venia serializado desde arriba se vuelve a leer.
+
+    El viaje dumps/loads ocupa el lugar del `default=str` que traia el json.dumps
+    original: sigue tolerando fechas y decimales, solo que ahora entran como
+    objeto y no como texto.
+    """
+    if isinstance(valor, str):
+        valor = json.loads(valor)
+    return json.loads(json.dumps(valor, default=str))
+
+
 def save_data(key, data):
     row = {
         "client_id": CLIENT["id"],
         "data_key": key,
         "fecha": TODAY,
-        "data": json.dumps(data, ensure_ascii=False) if not isinstance(data, str) else data,
+        "data": a_jsonb(data),
     }
     r = requests.post(f"{SUPABASE_URL}/rest/v1/wansoft_data", headers=SB_HEADERS, json=row)
     if r.status_code >= 300:
