@@ -5,7 +5,12 @@
 
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const path = require('node:path')
 const { buildHttpRouter } = require('../index')
+
+const electronRoot = path.resolve(__dirname, '..', '..')
+const mainSource = fs.readFileSync(path.join(electronRoot, 'main.js'), 'utf8')
 
 function mkRes() {
   return {
@@ -42,4 +47,11 @@ test('OPTIONS authorizes HTTPS renderer access to the private localhost bridge',
   assert.match(res.headers['access-control-allow-methods'], /GET/)
   assert.equal(res.headers['access-control-allow-private-network'], 'true')
   assert.match(res.headers.vary, /Access-Control-Request-Private-Network/)
+})
+
+test('Electron 33 disables only the legacy PNA gates, not all web security', () => {
+  assert.match(mainSource, /BlockInsecurePrivateNetworkRequests/)
+  assert.match(mainSource, /PrivateNetworkAccessSendPreflights/)
+  assert.match(mainSource, /PrivateNetworkAccessRespectPreflightResults/)
+  assert.doesNotMatch(mainSource, /appendSwitch\(['"]disable-web-security/)
 })
