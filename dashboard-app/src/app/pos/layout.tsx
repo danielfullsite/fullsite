@@ -348,17 +348,24 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
       const data = await res.json()
 
       if (data.ok && data.staffId) {
-        // Look up staff member by ID from pos_staff via API
-        const staffRes = await fetch(apiUrl('/api/pos/pin'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pin: '___fingerprint___', client_id: _cid(), fingerprint_id: data.staffId, device_id: getTerminalId() }),
-          signal: AbortSignal.timeout(4000),
-        })
+        // Look up staff member by ID from pos_staff via API.
+        // Offline: ni lo intentamos — son 4s de espera garantizada. Mismo guard
+        // que ya usa la ruta de PIN mas abajo.
+        let staffRes: Response | null = null
+        if (navigator.onLine) {
+          try {
+            staffRes = await fetch(apiUrl('/api/pos/pin'), {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ pin: '___fingerprint___', client_id: _cid(), fingerprint_id: data.staffId, device_id: getTerminalId() }),
+              signal: AbortSignal.timeout(4000),
+            })
+          } catch { staffRes = null }
+        }
 
         // Try API first (validates active status), fall back to local cache
         let member: StaffMember | null = null
-        if (staffRes.ok) {
+        if (staffRes?.ok) {
           try {
             const staffData = await staffRes.json()
             if (staffData.staff) {
@@ -380,7 +387,11 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
         }
 
         if (!member) {
-          setSessionError('Huella reconocida pero usuario no vinculado. Entra con PIN primero.')
+          setSessionError(
+            navigator.onLine
+              ? 'Huella reconocida pero usuario no vinculado. Entra con PIN primero.'
+              : 'Huella reconocida, pero sin internet esta terminal aun no la conoce. Entra con PIN una vez y la huella queda lista para offline.'
+          )
           setBiometricChecking(false)
           return
         }
@@ -467,6 +478,15 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
           setShowFingerprintRegister(true)
           return
         }
+
+        // Re-arm the offline fingerprint map. Sin esto solo se escribia al enrolar,
+        // asi que un localStorage limpio dejaba la huella offline muerta para siempre
+        // (el match 1:N del servicio C# es local y si funciona sin red).
+        try {
+          const fpMap = JSON.parse(localStorage.getItem('pos_fingerprint_staff') || '{}')
+          fpMap[member.id] = { id: member.id, name: member.name, role: member.role }
+          localStorage.setItem('pos_fingerprint_staff', JSON.stringify(fpMap))
+        } catch {}
       }
 
       setUnlocked(true)
