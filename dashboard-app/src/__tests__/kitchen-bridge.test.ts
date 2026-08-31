@@ -67,6 +67,7 @@ describe('Cocina — rama ONLINE', () => {
     expect(init.method).toBe('POST')
     expect(init.headers['Content-Type']).toBe('application/json')
     expect(JSON.parse(init.body)).toMatchObject({ command_type: 'ORDER_SENT', mesa: 5 })
+    expect(init.targetAddressSpace).toBe('local')
   })
 
   it('REGRESION: un HTTP 500 es FALLO, no éxito', async () => {

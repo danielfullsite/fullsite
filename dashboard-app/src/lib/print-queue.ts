@@ -13,6 +13,7 @@
 // Retries only count real print attempts. Bridge-down skips don't consume retries.
 
 import { getBridgeUrl } from './bridge-url'
+import { localNetworkFetch } from './local-network-fetch'
 import { getActiveClientSlug } from './data'
 
 export interface PrintJob {
@@ -254,7 +255,7 @@ async function isBridgeHealthy(): Promise<boolean> {
   try {
     const ctrl = new AbortController()
     const t = setTimeout(() => ctrl.abort(), BRIDGE_HEALTH_TIMEOUT_MS)
-    const res = await fetch(`${getBridgeUrl()}/health`, { signal: ctrl.signal })
+    const res = await localNetworkFetch(`${getBridgeUrl()}/health`, { signal: ctrl.signal })
     clearTimeout(t)
     _bridgeUp = res.ok
     // Leer si hay impresoras CONFIGURADAS. Sin esto, "sin impresora" se trataba
@@ -273,7 +274,7 @@ async function isBridgeHealthy(): Promise<boolean> {
 async function attemptPrint(job: PrintJob): Promise<boolean> {
   try {
     if (job.type === 'drawer') {
-      const res = await fetch(`${getBridgeUrl()}/drawer`, {
+      const res = await localNetworkFetch(`${getBridgeUrl()}/drawer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ station: job.station }),
@@ -281,7 +282,7 @@ async function attemptPrint(job: PrintJob): Promise<boolean> {
       return res.ok
     }
 
-    const res = await fetch(`${getBridgeUrl()}/print`, {
+    const res = await localNetworkFetch(`${getBridgeUrl()}/print`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ station: job.station, data: job.data }),
