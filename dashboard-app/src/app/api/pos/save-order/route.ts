@@ -32,6 +32,84 @@ interface SaveResult {
   idempotent_replay?: boolean
 }
 
+type TurnoResolution =
+  | { ok: true; turnoId: string; reassigned: boolean }
+  | { ok: false; error: 'TURN_NOT_FOUND' | 'TURN_CLOSED_NO_ACTIVE' | 'TURN_CLOSED_CONFLICT' }
+
+/**
+ * Resolve the shift at the application boundary before an offline save reaches the RPC.
+ *
+ * A queued order can carry a shift that was open when captured but closed before replay.
+ * New orders are moved only to the currently-open shift at the same location. Existing
+ * writes and updates fail closed so money is never silently moved between cash closures.
+ * A previously committed idempotent operation is allowed through unchanged; the RPC will
+ * return its original result without executing the write again.
+ */
+async function resolveTurnoForSave(
+  body: Record<string, unknown>,
+  clientId: string,
+  sbUrl: string,
+  headers: Record<string, string>,
+): Promise<TurnoResolution> {
+  const requestedTurnoId = typeof body.turno_id === 'string' ? body.turno_id : ''
+  if (!requestedTurnoId) return { ok: false, error: 'TURN_NOT_FOUND' }
+
+  const turnoRes = await fetch(
+    `${sbUrl}/rest/v1/pos_turnos?id=eq.${encodeURIComponent(requestedTurnoId)}` +
+      `&client_id=eq.${encodeURIComponent(clientId)}&select=id,closed_at,location_id&limit=1`,
+    { headers },
+  )
+  if (!turnoRes.ok) return { ok: false, error: 'TURN_NOT_FOUND' }
+  const turnos = await turnoRes.json() as Array<{ id: string; closed_at: string | null; location_id: string | null }>
+  const requested = turnos[0]
+  if (!requested) return { ok: false, error: 'TURN_NOT_FOUND' }
+  if (!requested.closed_at) return { ok: true, turnoId: requested.id, reassigned: false }
+
+  const operationId = typeof body.save_operation_id === 'string' ? body.save_operation_id : ''
+  const orderId = typeof body.order_id === 'string' ? body.order_id : ''
+  if (operationId && orderId) {
+    const opRes = await fetch(
+      `${sbUrl}/rest/v1/pos_save_operations?client_id=eq.${encodeURIComponent(clientId)}` +
+        `&order_id=eq.${encodeURIComponent(orderId)}` +
+        `&save_operation_id=eq.${encodeURIComponent(operationId)}&state=eq.COMMITTED&select=state&limit=1`,
+      { headers },
+    )
+    if (opRes.ok) {
+      const operations = await opRes.json() as Array<{ state: string }>
+      if (operations.length > 0) {
+        return { ok: true, turnoId: requested.id, reassigned: false }
+      }
+    }
+  }
+
+  // Only a brand-new order may move to the replacement shift. Updates/cobros require
+  // an operator-visible conflict because changing their accounting period is material.
+  if (body.expected_revision !== 0) return { ok: false, error: 'TURN_CLOSED_CONFLICT' }
+
+  // Reassignment is safe only when the captured timestamp proves the sale happened
+  // after the old shift closed. A late sync captured before closure belongs to the old
+  // accounting period and needs explicit manager reconciliation instead.
+  const capturedMs = typeof body.captured_at === 'string' ? Date.parse(body.captured_at) : Number.NaN
+  const closedMs = Date.parse(requested.closed_at)
+  if (!Number.isFinite(capturedMs) || !Number.isFinite(closedMs) || capturedMs <= closedMs) {
+    return { ok: false, error: 'TURN_CLOSED_CONFLICT' }
+  }
+
+  const locationFilter = requested.location_id
+    ? `&location_id=eq.${encodeURIComponent(requested.location_id)}`
+    : '&location_id=is.null'
+  const activeRes = await fetch(
+    `${sbUrl}/rest/v1/pos_turnos?client_id=eq.${encodeURIComponent(clientId)}` +
+      `${locationFilter}&closed_at=is.null&select=id&order=opened_at.desc&limit=1`,
+    { headers },
+  )
+  if (!activeRes.ok) return { ok: false, error: 'TURN_CLOSED_NO_ACTIVE' }
+  const active = await activeRes.json() as Array<{ id: string }>
+  if (!active[0]?.id) return { ok: false, error: 'TURN_CLOSED_NO_ACTIVE' }
+
+  return { ok: true, turnoId: active[0].id, reassigned: true }
+}
+
 /**
  * Tasa de IVA del tenant, resuelta SIEMPRE del servidor.
  *
@@ -174,8 +252,24 @@ export async function POST(request: NextRequest) {
       } catch { /* detección best-effort — NUNCA bloquea el guardado */ }
     }
 
-    // ── Step 1: Save order via idempotent wrapper (or legacy direct) ──
+    // ── Shift validation: replay must never write into a closed cash period ──
     const hasOperationId = typeof body.save_operation_id === 'string' && body.save_operation_id.length > 0
+    const turno = await resolveTurnoForSave(body, clientId, sbUrl, headers)
+    if (!turno.ok) {
+      return Response.json(
+        { ok: false, conflict: true, error: turno.error } satisfies SaveResult,
+        { status: 409 },
+      )
+    }
+    if (turno.reassigned) {
+      console.warn('[save-order] offline order reassigned from closed turno', {
+        orderId: order_id,
+        previousTurnoId: body.turno_id,
+        activeTurnoId: turno.turnoId,
+      })
+    }
+
+    // ── Step 1: Save order via idempotent wrapper (or legacy direct) ──
     const rpcName = hasOperationId ? 'r1_save_order_idempotent' : 'r1_save_order'
 
     const rpcParams: Record<string, unknown> = {
@@ -194,7 +288,7 @@ export async function POST(request: NextRequest) {
       p_propina: body.propina ?? null,
       p_metodo_pago: body.metodo_pago ?? null,
       p_pagos: body.pagos ?? null,
-      p_turno_id: body.turno_id ?? null,
+      p_turno_id: turno.turnoId,
       p_notas: body.notas ?? null,
       p_items: body.items ?? null,
       p_closed_at: body.closed_at ?? null,
@@ -223,16 +317,26 @@ export async function POST(request: NextRequest) {
       return Response.json(saveResult satisfies SaveResult)
     }
 
-    // Eduardo Jul 21 (Batch 5): persist comanda_batches alongside the order
-    // Written as separate PATCH to avoid modifying the RPC function
-    if (body.comanda_batches) {
+    // Persist fields that predate the RPC signature. captured_at is client supplied but
+    // accepted only as a valid timestamp no more than five minutes in the future.
+    const capturedMs = typeof body.captured_at === 'string' ? Date.parse(body.captured_at) : Number.NaN
+    const capturedAt = Number.isFinite(capturedMs) && capturedMs <= Date.now() + 5 * 60_000
+      ? new Date(capturedMs).toISOString()
+      : null
+    const supplementalPatch: Record<string, unknown> = {}
+    if (body.comanda_batches) supplementalPatch.comanda_batches = body.comanda_batches
+    // captured_at is immutable provenance: only the create operation may set it.
+    if (capturedAt && body.expected_revision === 0) supplementalPatch.captured_at = capturedAt
+
+    // Written as a separate PATCH to avoid breaking the deployed RPC signature.
+    if (Object.keys(supplementalPatch).length > 0) {
       try {
         await fetch(`${sbUrl}/rest/v1/pos_orders?id=eq.${order_id}&client_id=eq.${clientId}`, {
           method: 'PATCH',
           headers: { ...headers, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-          body: JSON.stringify({ comanda_batches: body.comanda_batches }),
+          body: JSON.stringify(supplementalPatch),
         })
-      } catch (err) { console.error('[save-order] comanda_batches patch error (non-blocking):', err) }
+      } catch (err) { console.error('[save-order] supplemental patch error (non-blocking):', err) }
     }
 
     // ── Step 2: Reconciliation ──

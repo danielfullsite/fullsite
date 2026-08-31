@@ -684,6 +684,16 @@ async function replayViaAppApi(item: SyncQueueItem, accessToken: string): Promis
       const errText = await res.text().catch(() => '')
       return { ok: false, errorClass: 'TERMINAL_NON_RETRYABLE', detail: `HTTP 403${errText ? `: ${errText}` : ''}` }
     }
+    // A closed/missing shift is an accounting conflict, not a connectivity failure.
+    // Preserve the payload for operator recovery and do not retry it into a closed cut.
+    if (res.status === 409) {
+      const conflictBody = await res.json().catch(() => ({})) as { error?: string }
+      return {
+        ok: false,
+        errorClass: 'TERMINAL_NON_RETRYABLE',
+        detail: conflictBody.error || 'TURN_CONFLICT',
+      }
+    }
     if (res.status >= 500) {
       return { ok: false, errorClass: 'TRANSIENT_RETRYABLE', detail: `HTTP ${res.status}` }
     }

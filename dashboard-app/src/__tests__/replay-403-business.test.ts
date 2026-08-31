@@ -140,6 +140,25 @@ describe('P0-1 — 403 de negocio vs 401 de auth en el replay', () => {
     expect(item!.conflict).toBe(true)
   })
 
+  it('APP_API: 409 por turno cerrado preserva la orden como conflicto y no reintenta', async () => {
+    installFetch(() => ({ ok: false, status: 409, body: { ok: false, error: 'TURN_CLOSED_NO_ACTIVE' } }))
+    const db = await loadModule()
+    await db.queueOperation('pos_orders', 'POST', {
+      order_id: 'offline-turn', turno_id: 'closed-turn', total: 665.84,
+    }, '/api/pos/save-order', undefined, 'APP_API')
+
+    const result = await db.syncAll()
+    await flush()
+
+    expect(result).toEqual({ synced: 0, failed: 1 })
+    const item = (await db.getPendingQueue()).find((i) => i.table === 'pos_orders')
+    expect(item).toBeDefined()
+    expect(item!.error_class).toBe('TERMINAL_NON_RETRYABLE')
+    expect(item!.error_detail).toBe('TURN_CLOSED_NO_ACTIVE')
+    expect(item!.conflict).toBe(true)
+    expect((item!.data as Record<string, unknown>).total).toBe(665.84)
+  })
+
   it('el bucle de deslogueo no reaparece: un segundo syncAll tras re-PIN no reintenta el item terminal', async () => {
     installFetch((url) =>
       url.includes('pos_cash_movements')
