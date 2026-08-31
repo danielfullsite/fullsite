@@ -52,6 +52,7 @@ async function ensureAttendanceEntry(staffId: string, staffName: string, method:
 
 const MAX_ATTEMPTS = 5
 const LOCKOUT_MS = 60000 // 1 minute lockout
+const FP_AVAILABLE_KEY = 'pos_fingerprint_service_available'
 // Resolved at startup from settings contract; fallback = 30 min (registry default)
 let IDLE_TIMEOUT_MS = 30 * 60 * 1000
 
@@ -305,7 +306,10 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
   }, [unlocked, resetIdleTimer])
 
   const isLocked = lockedUntil > Date.now()
-  const [biometricAvailable, setBiometricAvailable] = useState(false)
+  const [biometricAvailable, setBiometricAvailable] = useState(() => {
+    if (typeof window === 'undefined') return false
+    try { return localStorage.getItem(FP_AVAILABLE_KEY) === '1' } catch { return false }
+  })
   const [biometricChecking, setBiometricChecking] = useState(false)
 
   const FINGERPRINT_URL = getFingerprintUrl()
@@ -319,12 +323,14 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
           const r = await fetch(`${FINGERPRINT_URL}/health`, { signal: AbortSignal.timeout(1000) })
           const data = r.ok ? await r.json() : null
           if (data?.ok) {
+            try { localStorage.setItem(FP_AVAILABLE_KEY, '1') } catch {}
             if (!cancelled) setBiometricAvailable(true)
             return
           }
         } catch { /* service may still be starting */ }
         if (attempt < 5) await new Promise(resolve => setTimeout(resolve, 500))
       }
+      try { localStorage.removeItem(FP_AVAILABLE_KEY) } catch {}
       if (!cancelled) setBiometricAvailable(false)
     }
     checkFingerprint()

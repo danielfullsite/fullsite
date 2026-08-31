@@ -1,7 +1,7 @@
 // Service Worker — Fullsite POS offline-first
 // Caches app shell, static assets, and API responses for true offline operation
 
-const CACHE_VERSION = 'v40'
+const CACHE_VERSION = 'v41'
 const STATIC_CACHE = `fullsite-static-${CACHE_VERSION}`
 const DYNAMIC_CACHE = `fullsite-dynamic-${CACHE_VERSION}`
 const API_CACHE = `fullsite-api-${CACHE_VERSION}`
@@ -163,7 +163,7 @@ self.addEventListener('fetch', (event) => {
 
   // HTML pages: network-first (always try fresh)
   if (request.headers.get('accept')?.includes('text/html')) {
-    event.respondWith(networkFirstWithCache(request, DYNAMIC_CACHE))
+    event.respondWith(navigationFromCache(request, event))
     return
   }
 
@@ -211,6 +211,26 @@ async function networkFirstWithCache(request, cacheName) {
     }
     return new Response('Offline', { status: 503 })
   }
+}
+
+// POS navigation must remain touch-fast during a WAN outage. If a shell already
+// exists locally, return it immediately and refresh it in the background. Fresh
+// installs (no cache yet) still use the bounded network-first path.
+async function navigationFromCache(request, event) {
+  const cached = await caches.match(request) ||
+    await caches.match(request, { ignoreSearch: true, ignoreVary: true })
+  if (!cached) return networkFirstWithCache(request, DYNAMIC_CACHE)
+
+  const refresh = fetchWithTimeout(request)
+    .then(async (response) => {
+      if (response.ok) {
+        const cache = await caches.open(DYNAMIC_CACHE)
+        await cache.put(request, response.clone())
+      }
+    })
+    .catch(() => {})
+  event.waitUntil(refresh)
+  return cached
 }
 
 async function cacheFirstWithNetwork(request, cacheName) {

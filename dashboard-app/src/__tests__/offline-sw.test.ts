@@ -71,4 +71,15 @@ describe('sw.js structure', () => {
     expect(content).toContain('const controller = new AbortController()')
     expect(content).toContain('const response = await fetchWithTimeout(request)')
   })
+
+  it('serves cached HTML navigation immediately and refreshes it in the background', async () => {
+    const fs = await import('fs')
+    const path = await import('path')
+    const swPath = path.resolve(__dirname, '../../public/sw.js')
+    const content = fs.readFileSync(swPath, 'utf-8')
+
+    expect(content).toContain('navigationFromCache(request, event)')
+    expect(content).toContain('event.waitUntil(refresh)')
+    expect(content).toContain("const CACHE_VERSION = 'v41'")
+  })
 })

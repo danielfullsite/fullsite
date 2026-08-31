@@ -200,6 +200,63 @@ export async function getCachedOrders(status?: string): Promise<Record<string, u
   })
 }
 
+const ACTIVE_ORDER_STATUSES = new Set(['enviada', 'preparando', 'lista', 'abierta', 'entregada'])
+
+/**
+ * Orders safe to paint as occupied while offline. The generic order cache also
+ * contains closed/cancelled history, so consumers must not interpret every row
+ * as a live table.
+ */
+export async function getCachedActiveOrders(clientId?: string): Promise<Record<string, unknown>[]> {
+  const all = await getCachedOrders()
+  return all
+    .filter(order => {
+      if (!ACTIVE_ORDER_STATUSES.has(String(order.status))) return false
+      const owner = String(order.client_id ?? '')
+      return !clientId || !owner || owner === clientId
+    })
+    .sort((a, b) => {
+      const bt = Date.parse(String(b.updated_at ?? b.created_at ?? '')) || 0
+      const at = Date.parse(String(a.updated_at ?? a.created_at ?? '')) || 0
+      return bt - at
+    })
+}
+
+/**
+ * Reconcile the live-table portion of IndexedDB with the authoritative online
+ * snapshot. Pending offline IDs are preserved because their queue has not reached
+ * the server yet. Historical closed/cancelled rows are left intact for recovery.
+ */
+export async function reconcileCachedActiveOrders(
+  serverOrders: Record<string, unknown>[],
+  clientId: string,
+  preserveIds: string[] = [],
+): Promise<void> {
+  const db = await openDB()
+  const keep = new Set([
+    ...serverOrders.map(order => String(order.id ?? '')).filter(Boolean),
+    ...preserveIds.map(String).filter(Boolean),
+  ])
+  await new Promise<void>((resolve) => {
+    const tx = db.transaction('orders', 'readwrite')
+    const store = tx.objectStore('orders')
+    const request = store.getAll()
+    request.onsuccess = () => {
+      for (const order of (request.result || []) as Record<string, unknown>[]) {
+        const id = String(order.id ?? '')
+        const owner = String(order.client_id ?? '')
+        const belongsHere = !clientId || !owner || owner === clientId
+        if (belongsHere && ACTIVE_ORDER_STATUSES.has(String(order.status)) && !keep.has(id)) {
+          store.delete(order.id as IDBValidKey)
+        }
+      }
+      for (const order of serverOrders) store.put(order)
+    }
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => resolve()
+  })
+}
+
 export async function deleteCachedOrder(id: string): Promise<void> {
   const db = await openDB()
   const tx = db.transaction('orders', 'readwrite')

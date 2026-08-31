@@ -270,9 +270,9 @@ export default function MesasPage() {
     // When offline: skip network entirely, serve from cache immediately.
     // Avoids cascading timeouts that degrade the UI after hours without internet.
     if (!navigator.onLine) {
-      import('@/lib/pos-offline-db').then(({ getCachedOrders }) =>
-        getCachedOrders().then(cached => {
-          if (cached.length > 0) setActiveOrders(cached as unknown as ActiveOrder[])
+      import('@/lib/pos-offline-db').then(({ getCachedActiveOrders }) =>
+        getCachedActiveOrders(_cid()).then(cached => {
+          setActiveOrders(cached as unknown as ActiveOrder[])
         })
       ).catch(() => {})
       setLoading(false)
@@ -295,6 +295,7 @@ export default function MesasPage() {
       // going UP), which would flip an occupied mesa back to Disponible and risk a
       // double-booking. Keep those mesas occupied until the order actually syncs. (#37)
       let merged: ActiveOrder[] = orders
+      const pendingOrderIds: string[] = []
       try {
         const { getPendingQueue } = await import('@/lib/pos-offline-db')
         const pending = await getPendingQueue()
@@ -308,6 +309,8 @@ export default function MesasPage() {
           const d = p.data as Record<string, unknown>
           if (p.table !== 'pos_orders' || typeof d?.mesa !== 'number') continue
           if (!ACTIVE.has(String(d.status)) || syncedMesas.has(d.mesa)) continue
+          const pendingId = String(d.order_id ?? d.id ?? '')
+          if (pendingId) pendingOrderIds.push(pendingId)
           byMesa.set(d.mesa, d) // last pending op per mesa wins
         }
         if (byMesa.size > 0) {
@@ -327,18 +330,22 @@ export default function MesasPage() {
       } catch { /* queue unavailable — show synced orders only */ }
       setActiveOrders(merged)
       try { localStorage.setItem('pos_mesas_orders', JSON.stringify({ orders, ts: Date.now() })) } catch {}
-      // Persist to IndexedDB so offline access survives beyond the 30s localStorage TTL
-      if (orders.length > 0) {
-        import('@/lib/pos-offline-db').then(({ cacheOrder }) =>
-          Promise.all((orders as unknown as Record<string, unknown>[]).map(o => cacheOrder(o)))
-        ).catch(() => {})
-      }
+      // Reconcile, don't append forever: stale active snapshots otherwise return
+      // as phantom occupied mesas on the next offline login. Preserve IDs that are
+      // still queued locally and therefore absent from the server snapshot.
+      import('@/lib/pos-offline-db').then(({ reconcileCachedActiveOrders }) =>
+        reconcileCachedActiveOrders(
+          orders as unknown as Record<string, unknown>[],
+          _cid(),
+          pendingOrderIds,
+        )
+      ).catch(() => {})
       setReservas(resRes.ok ? await resRes.json() : [])
     } catch {
       // Offline fallback: IndexedDB has orders from last successful online fetch
-      import('@/lib/pos-offline-db').then(({ getCachedOrders }) =>
-        getCachedOrders().then(cached => {
-          if (cached.length > 0) setActiveOrders(cached as unknown as ActiveOrder[])
+      import('@/lib/pos-offline-db').then(({ getCachedActiveOrders }) =>
+        getCachedActiveOrders(_cid()).then(cached => {
+          setActiveOrders(cached as unknown as ActiveOrder[])
         })
       ).catch(() => {})
     }
