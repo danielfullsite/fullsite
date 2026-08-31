@@ -44,7 +44,7 @@ import { getIvaRate, TIEMPO_ITEM_ID, isTiempoItem, getStationForItem, setCategor
 import { calcSplitParejo, calcSplitItems } from '@/lib/pos-calculations'
 import { publishEvent, getDeviceId } from '@/lib/events'
 import { apiUrl } from '@/lib/api-base'
-import { getBridgeUrl } from '@/lib/bridge-url'
+import { sendOrderToKitchen, kitchenFailureMessage } from '@/lib/kitchen-bridge'
 import type { OrderItem, MenuItem, Order } from '@/lib/pos-data'
 import {
   printByStation,
@@ -148,18 +148,9 @@ import { getActiveClientSlug as _cid } from '@/lib/data'
 import { usePOSLock } from './pos-lock-context'
 import { layerZ } from '@/components/ui/layers'
 
-// POST al local-server (bridge) con reintento. El KDS en otras terminales LAN recibe
-// la orden por /events; si la caja está reiniciando o hay un blip de LAN, un solo POST
-// fire-and-forget se pierde y el KDS NO ve la comanda (offline no tiene poll de respaldo,
-// a diferencia de la impresión que sí reintenta por print-queue). Reintenta hasta 3 veces
-// con backoff. NUNCA rechaza (best-effort) — el .catch() existente en los call sites queda
-// como no-op inofensivo. NO toca a Pedro ni el contrato de /events.
-function retryFetch(url: string, init: RequestInit, attempt = 0): Promise<void> {
-  const again = () => new Promise<void>(res => setTimeout(res, 400 * (attempt + 1))).then(() => retryFetch(url, init, attempt + 1))
-  return fetch(url, init)
-    .then(r => { if (!r.ok && attempt < 3) return again() })
-    .catch(() => { if (attempt < 3) return again() })
-}
+// El reintento del bridge y la validacion de la respuesta viven ahora en
+// lib/kitchen-bridge.ts (sendOrderToKitchen), que SI reporta el resultado.
+// El retryFetch anterior devolvia Promise<void> y se rendia en silencio.
 
 const BarcodeScanner = dynamic(() => import('@/components/BarcodeScanner'), { ssr: false })
 
@@ -1739,6 +1730,10 @@ function POSContent() {
   // Getnet standalone (spec 14.1): el cajero teclea el monto a mano en la terminal roja
   // → mostrar el monto GIGANTE + confirmación para evitar descuadres
   const [showCardConfirm, setShowCardConfirm] = useState(false)
+  // Cocina no confirmo la comanda. Bloqueo que el mesero DEBE reconocer: la orden
+  // quedo guardada pero la cocina no la tiene, y sin esto nadie se entera.
+  const [kitchenFailure, setKitchenFailure] = useState<{ msg: string; mesa: number } | null>(null)
+  const afterKitchenAck = useRef<(() => void) | null>(null)
   const [cashAmount, setCashAmount] = useState('')
   const [showLeaderboard, setShowLeaderboard] = useState(false)
   const [sentToKitchen, setSentToKitchen] = useState(false)
@@ -3185,30 +3180,37 @@ function POSContent() {
         // Immediate count refresh: interval only fires every 30s, but IDB is local.
         getPendingQueue().then(q => setPendingSync(q.length)).catch(() => {})
         // Broadcast to local server so KDS on other LAN devices receives the order offline
-        retryFetch(`${getBridgeUrl()}/events`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            command_id: opId,
-            command_type: 'ORDER_SENT',
-            order_id: order.id,
-            mesa: order.mesa,
-            mesero: order.mesero,
-            status: 'enviada',
-            items: order.items,
-            personas: order.personas,
-            total: order.total,
-            turno_id: order.turnoId || null,
-            notas: order.notas || null,
-            comanda_batches: order.comandaBatches || null,
-            client_id: _cid(),
-          }),
-        }).catch(() => {})
-        // Enviado (offline queue). Al mapa de mesas al instante + bloqueo. Sin espera.
-        sessionStorage.removeItem('pos_staff')
-        sessionStorage.removeItem('pos_last_activity')
-        navigateToMesaMap()
-        lock()
+        // Cocina: se ESPERA la confirmacion. Sin WAN la LAN sigue viva, asi que
+        // este envio tiene que funcionar igual — y si no, el mesero debe saberlo
+        // ANTES de irse de la mesa. Ver lib/kitchen-bridge.ts.
+        const kitchen = await sendOrderToKitchen({
+          command_id: opId,
+          command_type: 'ORDER_SENT',
+          order_id: order.id,
+          mesa: order.mesa,
+          mesero: order.mesero,
+          status: 'enviada',
+          items: order.items,
+          personas: order.personas,
+          total: order.total,
+          turno_id: order.turnoId || null,
+          notas: order.notas || null,
+          comanda_batches: order.comandaBatches || null,
+          client_id: _cid(),
+        })
+        const finish = () => {
+          sessionStorage.removeItem('pos_staff')
+          sessionStorage.removeItem('pos_last_activity')
+          navigateToMesaMap()
+          lock()
+        }
+        if (!kitchen.ok) {
+          afterKitchenAck.current = finish
+          setKitchenFailure({ msg: kitchenFailureMessage(kitchen), mesa: order.mesa })
+          setSaving(false); operationLock.current = false
+          return
+        }
+        finish()
       } else if (saveResult.error === 'SESSION_EXPIRED') {
         showToast('Sesión expirada — ingresa tu PIN de nuevo')
         setSaving(false); operationLock.current = false
@@ -3227,25 +3229,27 @@ function POSContent() {
     const ok = true
 
     // Broadcast to local server so KDS on LAN devices updates immediately (not on 5s Supabase poll)
-    retryFetch(`${getBridgeUrl()}/events`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        command_id: opId,
-        command_type: 'ORDER_SENT',
-        order_id: order.id,
-        mesa: order.mesa,
-        mesero: order.mesero,
-        status: 'enviada',
-        items: order.items,
-        personas: order.personas,
-        total: order.total,
-        turno_id: order.turnoId || null,
-        notas: order.notas || null,
-        comanda_batches: order.comandaBatches || null,
-        client_id: _cid(),
-      }),
-    }).catch(() => {})
+    // Cocina: se ESPERA la confirmacion y se valida response.ok. En la caja este
+    // envio es redundante (Pedro es local); en un POS secundario es el UNICO
+    // camino a la cocina. Ver lib/kitchen-bridge.ts.
+    const kitchen = await sendOrderToKitchen({
+      command_id: opId,
+      command_type: 'ORDER_SENT',
+      order_id: order.id,
+      mesa: order.mesa,
+      mesero: order.mesero,
+      status: 'enviada',
+      items: order.items,
+      personas: order.personas,
+      total: order.total,
+      turno_id: order.turnoId || null,
+      notas: order.notas || null,
+      comanda_batches: order.comandaBatches || null,
+      client_id: _cid(),
+    })
+    if (!kitchen.ok) {
+      setKitchenFailure({ msg: kitchenFailureMessage(kitchen), mesa: order.mesa })
+    }
 
     // Only print NEW items (not already sent to kitchen)
     const newItems = activeItems.filter(i => !sentItemIds.has(i.id))
@@ -3339,10 +3343,22 @@ function POSContent() {
       } catch {}
       // Tras enviar: al mapa de mesas AL INSTANTE + bloqueo (re-identificación por
       // PIN/huella = cada comanda atada a quien la envió). Sin la espera de 15s.
-      sessionStorage.removeItem('pos_staff')
-      sessionStorage.removeItem('pos_last_activity')
-      navigateToMesaMap()
-      lock()
+      //
+      // PERO si cocina no confirmó, el bloqueo se DIFIERE hasta que el mesero lo
+      // reconozca. `lock()` pone unlocked=false y layout.tsx:727 DESMONTA a los
+      // hijos — o sea que el aviso no quedaria tapado, desapareceria antes de
+      // que nadie lo lea. El camino feliz se veia bien; la rama de falla no.
+      const finishOnline = () => {
+        sessionStorage.removeItem('pos_staff')
+        sessionStorage.removeItem('pos_last_activity')
+        navigateToMesaMap()
+        lock()
+      }
+      if (!kitchen.ok) {
+        afterKitchenAck.current = finishOnline
+      } else {
+        finishOnline()
+      }
     } finally {
       operationLock.current = false
       setSaving(false)
@@ -5049,6 +5065,41 @@ function POSContent() {
       {toast && (
         <div style={{ zIndex: layerZ('toast') }} className="fixed top-6 left-1/2 -translate-x-1/2 bg-[var(--line)] border border-[var(--line)] text-[var(--text-1)] px-6 py-3 rounded-xl shadow-2xl text-sm font-medium animate-fade-in">
           {toast}
+        </div>
+      )}
+
+      {/* Cocina no confirmo la comanda. Capa 'blocking': el mesero DEBE reconocerlo.
+          Un toast de 2.5s no sirve — la consecuencia es comida que nunca se cocina. */}
+      {kitchenFailure && (
+        <div
+          style={{ zIndex: layerZ('blocking') }}
+          className="fixed inset-0 bg-black/80 flex items-center justify-center p-6"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="kitchen-fail-title"
+        >
+          <div className="bg-[var(--surface-2)] border-2 border-red-500 rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl">
+            <p id="kitchen-fail-title" className="text-red-400 text-sm font-bold uppercase tracking-wide text-center">
+              Mesa {kitchenFailure.mesa} — cocina no confirmó
+            </p>
+            <p className="text-[var(--text-1)] text-lg font-bold text-center leading-snug">
+              {kitchenFailure.msg}
+            </p>
+            <p className="text-[var(--text-3)] text-xs text-center">
+              La cuenta está guardada y se cobra normal. Lo que no llegó es la comanda.
+            </p>
+            <button
+              onClick={() => {
+                const next = afterKitchenAck.current
+                afterKitchenAck.current = null
+                setKitchenFailure(null)
+                next?.()
+              }}
+              className="w-full py-4 rounded-xl bg-red-600 hover:bg-red-500 text-white font-black text-lg min-h-[56px] transition-colors"
+            >
+              Entendido, aviso a cocina
+            </button>
+          </div>
         </div>
       )}
 
