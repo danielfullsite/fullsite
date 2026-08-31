@@ -1452,9 +1452,13 @@ export async function saveOrder(order: Order, saveOperationId?: string): Promise
     }
   }
 
+  const expectedRevision = order.orderRevision ?? 0
   const payload: Record<string, unknown> = {
     order_id: order.id,
-    expected_revision: order.orderRevision ?? 0,
+    // Generated once for the create operation, before any network attempt, and then
+    // preserved unchanged in the queue. Later edits must not rewrite capture time.
+    ...(expectedRevision === 0 ? { captured_at: new Date().toISOString() } : {}),
+    expected_revision: expectedRevision,
     mesa: order.mesa,
     customer_name: order.clienteNombre ?? null,
     mesero: order.mesero,
