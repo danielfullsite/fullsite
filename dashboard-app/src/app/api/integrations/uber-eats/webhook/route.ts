@@ -19,6 +19,7 @@ import { getPosData } from '@/lib/integrations/uber-eats/provisioning'
 import { getOrderAdapterForPayload, getOrderAdapter } from '@/lib/integrations/uber-eats/adapter-factory'
 import { uploadMenu, type UberMenuUpload } from '@/lib/integrations/uber-eats/menu'
 import { auditLog } from '@/lib/integrations/audit-logger'
+import { normalizeStoreOpen, type UberStatusShape } from '@/lib/integrations/uber-eats/store-status'
 
 const SB_URL = () => process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SB_KEY = () => process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -677,9 +678,13 @@ async function handleStoreStatus(
   eventId: string,
   correlationId: string
 ): Promise<void> {
-  const p = payload as { store_status?: string; is_open?: boolean }
-  const isOpen = p.store_status === 'ACTIVE' || p.is_open === true
-  if (storeId) {
+  const p = payload as UberStatusShape
+  // Uber manda ONLINE/PAUSED, no ACTIVE — comparar contra 'ACTIVE' marcaba CERRADA
+  // toda tienda abierta y lo persistia en integration_store_mappings.store_open.
+  const isOpen = normalizeStoreOpen(p)
+  // Estado no reconocido: NO se escribe. Persistir null borraria el ultimo estado
+  // bueno y dejaria a la tienda en un limbo que nadie mira. Queda en la auditoria.
+  if (storeId && isOpen !== null) {
     await fetch(
       `${SB_URL()}/rest/v1/integration_store_mappings?provider=eq.ubereats&provider_store_id=eq.${encodeURIComponent(storeId)}`,
       {
