@@ -274,6 +274,12 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, versio
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+    // Chrome/Electron sends a Private Network Access preflight when the POS
+    // loaded from https://app.fullsite.mx calls its bridge on localhost/LAN.
+    // A top-level navigation to /health works without this header, while fetch()
+    // is rejected as a network error — exactly the AMALAY Entrada field failure.
+    res.setHeader('Access-Control-Allow-Private-Network', 'true')
+    res.setHeader('Vary', 'Origin, Access-Control-Request-Private-Network')
     if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return }
 
     const url = req.url?.split('?')[0]
