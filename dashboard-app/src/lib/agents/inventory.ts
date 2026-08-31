@@ -43,7 +43,9 @@ export async function runInventoryAgent(
   const now = Date.now()
 
   // Try pos_inventory_products first (newer multi-tenant table)
-  let products: { name: string; unit: string; stock: number; reorder_point: number; category: string | null; cost_per_unit: number | null }[] = []
+  // `id` se agregó el 2026-08-30: es el mismo que `pos_inventory_movements.ingredient_id`
+  // y sin él los hallazgos no se pueden calificar contra la realidad.
+  let products: { id: string; name: string; unit: string; stock: number; reorder_point: number; category: string | null; cost_per_unit: number | null }[] = []
 
   try {
     const rows = await sbGet<InventoryProduct>(
@@ -51,6 +53,7 @@ export async function runInventoryAgent(
       `client_id=eq.${encodeURIComponent(clientId)}&active=eq.true&reorder_point=gt.0&select=id,name,unit,stock,reorder_point,category,cost_per_unit&order=stock.asc&limit=200`,
     )
     products = rows.map(r => ({
+      id: r.id,
       name: r.name,
       unit: r.unit,
       stock: r.stock ?? 0,
@@ -76,6 +79,10 @@ export async function runInventoryAgent(
         .map(ing => {
           const inv = invMap.get(ing.id)
           return {
+            // El camino de respaldo descartaba el `id` aunque lo tenía a la mano. Es el
+            // mismo que usa `pos_inventory_movements.ingredient_id`, así que sin él los
+            // hallazgos emitidos por esta rama no se podían calificar solos.
+            id: ing.id,
             name: ing.name,
             unit: ing.unit,
             stock: inv?.stock ?? 0,
@@ -105,8 +112,33 @@ export async function runInventoryAgent(
       title: `${outOfStock.length} ingrediente${outOfStock.length > 1 ? 's' : ''} sin stock — auto-86 activo`,
       explanation: `Sin existencias: ${names}${more}. Los platillos que los requieren no se pueden preparar.`,
       evidence: {
-        items: outOfStock.map(p => ({ name: p.name, unit: p.unit, stock: p.stock, category: p.category })),
+        // `id` se agregó el 2026-08-30: sin él el hallazgo no se podía cruzar contra
+        // `pos_inventory_movements` y por lo tanto no se podía calificar solo.
+        items: outOfStock.map(p => ({ id: p.id, name: p.name, unit: p.unit, stock: p.stock, category: p.category })),
         count: outOfStock.length,
+
+        // ── Cómo calificarme ──────────────────────────────────────────────────
+        //
+        // La regla se escribe AQUÍ, al momento de afirmar, no en el calificador. Es el
+        // mismo principio que ya usa `close-predictor` con su `tolerancia_pct`: si la
+        // regla viviera del lado de quien califica, se podría aflojar después de ver los
+        // resultados y convertir un fallo en acierto. Quien afirma fija la vara.
+        //
+        // Verdad de campo para "no hay stock de X":
+        //   · salió X (deduction / recipe_deduction / waste)  → SÍ había  → me equivoqué
+        //   · entró X (restock / entry / invoice_entry)       → sí faltaba → acerté
+        //   · se ajustó X (adjustment)                        → el número estaba mal → me equivoqué
+        //   · no pasó nada                                    → no se puede saber → no se califica
+        //
+        // Ese último caso importa: dejarlo sin calificar es más honesto que empujarlo a
+        // un bucket. Una precisión inflada con casos indeterminados no sirve para nada.
+        verificacion: {
+          metodo: 'pos_inventory_movements',
+          ventana_dias: 3,
+          ingrediente_ids: outOfStock.map(p => p.id),
+          desmiente: ['deduction', 'recipe_deduction', 'waste', 'adjustment'],
+          confirma: ['restock', 'entry', 'invoice_entry'],
+        },
       },
       suggested_action: 'Verificar en cocina si hay stock físico no registrado. Notificar a meseros para desactivar platillos afectados.',
       confidence: 0.95,
