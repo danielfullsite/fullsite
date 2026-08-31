@@ -906,10 +906,16 @@ function createSetupWindow() {
 // Enable WebAuthn (Windows Hello + DigitalPersona 4500 fingerprint reader)
 app.commandLine.appendSwitch('enable-features', 'WebAuthenticationWin10');
 app.commandLine.appendSwitch('enable-web-authentication');
-// Allow the https POS/KDS pages to reach the Local Server on a private LAN IP
-// (Chromium Private Network Access can block https→private-IP). No-op if the feature
-// name isn't present on this Chromium build, so it's safe to leave in.
-app.commandLine.appendSwitch('disable-features', 'BlockInsecurePrivateNetworkRequests');
+// Allow the trusted https POS/KDS shell to reach its own Local Server.
+// Electron 33 embeds Chromium 130: webSecurity:false and
+// BlockInsecurePrivateNetworkRequests alone are insufficient there. Chromium
+// still sends/enforces a PNA retry and fails localhost before the request
+// reaches Pedro. Disable only the three legacy PNA gates; do not use the global
+// --disable-web-security switch.
+app.commandLine.appendSwitch(
+  'disable-features',
+  'BlockInsecurePrivateNetworkRequests,PrivateNetworkAccessSendPreflights,PrivateNetworkAccessRespectPreflightResults',
+);
 
 app.whenReady().then(async () => {
   // Grant WebAuthn/HID permissions automatically (no popup)
