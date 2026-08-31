@@ -30,6 +30,7 @@
 // docs/offline/OFFLINE-LAN-FIELD-PROVEN-AND-CLONE.md §4).
 
 import { getBridgeUrl } from './bridge-url'
+import { localNetworkFetch } from './local-network-fetch'
 
 /** Presupuesto total del envio. Mas alla de esto el mesero se queda esperando. */
 const DEADLINE_MS = 6_000
@@ -81,7 +82,7 @@ export async function sendOrderToKitchen(
     let error: string | null = null
 
     try {
-      const res = await fetch(url, {
+      const res = await localNetworkFetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

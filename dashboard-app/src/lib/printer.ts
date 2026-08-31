@@ -10,6 +10,7 @@ import { enqueueFailedPrint } from './print-queue'
 import { getPosConfigSync } from './pos-config'
 import { qrToDataURL } from './qr'
 import { getBridgeUrl } from './bridge-url'
+import { localNetworkFetch } from './local-network-fetch'
 
 // BLINDAJE P1-8: escapa texto dinámico (nombres de platillos/mesero/config, controlados
 // por el tenant) antes de interpolarlo en el HTML del ticket. Sin esto, un nombre como
@@ -189,7 +190,7 @@ async function isBridgeAvailable(): Promise<boolean> {
   try {
     const ctrl = new AbortController()
     const t = setTimeout(() => ctrl.abort(), 800)
-    const res = await fetch(`${bridgeUrl}/health`, { signal: ctrl.signal })
+    const res = await localNetworkFetch(`${bridgeUrl}/health`, { signal: ctrl.signal })
     clearTimeout(t)
     bridgeAvailable = res.ok
   } catch {
@@ -240,7 +241,7 @@ function bytesToBase64(data: Uint8Array): string {
 async function bridgePrint(bytes: Uint8Array, station?: StationName): Promise<boolean> {
   if (!(await isBridgeAvailable())) return false
   try {
-    const res = await fetch(`${getBridgeUrl()}/print`, {
+    const res = await localNetworkFetch(`${getBridgeUrl()}/print`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...(station ? { station } : {}), data: bytesToBase64(bytes) }),
@@ -263,7 +264,7 @@ async function bridgePrint(bytes: Uint8Array, station?: StationName): Promise<bo
 async function bridgeDrawer(): Promise<boolean> {
   if (!(await isBridgeAvailable())) return false
   try {
-    const res = await fetch(`${getBridgeUrl()}/drawer`, {
+    const res = await localNetworkFetch(`${getBridgeUrl()}/drawer`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: '{}',
