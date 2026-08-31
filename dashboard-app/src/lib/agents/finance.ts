@@ -110,6 +110,11 @@ export async function runFinanceAgent(
       confidence: 1, // No es una inferencia: o hay filas o no las hay.
       status: 'new',
       estimated_value: null, // No hay nada que cuantificar: el problema es la ausencia de datos.
+      // 12h: una fuente muerta no cambia de estado cada media hora. Sin esto el aviso se
+      // repetía en cada corrida del cron — medido el 2026-08-31: 4 copias en 12 horas, y
+      // con el cron completo serían ~34 al día del mismo texto. Un aviso correcto repetido
+      // 34 veces deja de leerse, y entonces tampoco se lee el día que sí cambie algo.
+      expires_at: new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString(),
     })
     return events
   }

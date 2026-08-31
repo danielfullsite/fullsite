@@ -170,20 +170,52 @@ export async function runAgent(
       case 'finance':    events = await runFinanceAgent(clientId, sbGet);    break
     }
 
-    // Expire stale events for this agent before inserting new ones
-    const expireCutoff = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString() // 6h TTL
+    // Manda el `expires_at` que declaró el agente; 6h es sólo el respaldo.
+    //
+    // Antes se cerraba TODO a las 6 horas, ignorando lo que cada hallazgo decía de sí
+    // mismo. Medido el 2026-08-31 sobre los 18 `expires_at` del código, el TTL fijo estaba
+    // mal en las dos direcciones:
+    //
+    //   · 8 de 18 declaran 8h, 12h, 24h o 48h  → se cerraban ANTES de tiempo, y el agente
+    //     los volvía a emitir en la siguiente corrida. De ahí las 4 copias de
+    //     `fuente_sin_datos` en 12 horas.
+    //   · Una mesa esperando cobro declara 45 min → seguía marcada como pendiente 6 horas
+    //     después, cuando hacía rato que se había cobrado. Alerta vieja que ya no es cierta.
+    //
+    // Quien emite el hallazgo sabe cuánto vale: un stock crítico dura la jornada, una mesa
+    // sin cobrar dura minutos. El engine no tiene por qué opinar sobre eso.
+    const expireCutoff = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString()
+    const ahoraIso = new Date().toISOString()
     await sbPatch(
       'agent_events',
-      `client_id=eq.${encodeURIComponent(clientId)}&agent_id=eq.${agentId}&status=eq.new&created_at=lt.${expireCutoff}`,
+      `client_id=eq.${encodeURIComponent(clientId)}&agent_id=eq.${agentId}&status=eq.new` +
+        `&or=(expires_at.lt.${ahoraIso},and(expires_at.is.null,created_at.lt.${expireCutoff}))`,
       { status: 'resolved' },
     ).catch(() => {/* Non-blocking */})
 
     // Deduplicate: if same type+severity event exists as 'new' in last 30min, skip insert
+    // El dedupe pregunta si el hallazgo SIGUE VIGENTE, no si es reciente.
+    //
+    // Antes comparaba sólo contra los últimos 30 minutos. Con el cron corriendo cada 30
+    // min eso produce una copia por corrida de todo lo que dure más que la ventana:
+    // medido el 2026-08-31, `fuente_sin_datos` ya llevaba 4 copias en 12 horas, y con el
+    // cron completo serían ~34 al día del MISMO aviso. Un tablero con 34 veces la misma
+    // alerta se ignora entero, y entonces las de verdad tampoco se ven.
+    //
+    // La pregunta correcta es otra: si ya hay un hallazgo `new` de este tipo que todavía
+    // no expira, el estado no cambió y no hace falta repetirlo. Se respeta `expires_at`,
+    // que es donde cada agente declara cuánto vale su afirmación — un stock crítico dura
+    // 8 horas, una mesa esperando cobro dura minutos.
+    //
+    // Los que no traen `expires_at` conservan la ventana de 30 minutos de antes, así que
+    // para ellos no cambia nada.
     const dedupeWindow = new Date(Date.now() - 30 * 60 * 1000).toISOString()
-    const existingRaw = await sbGet<{ type: string; severity: string }>(
+    const ahora = new Date().toISOString()
+    const existingRaw = await sbGet<{ type: string; severity: string; expires_at: string | null; created_at: string }>(
       'agent_events',
-      `client_id=eq.${encodeURIComponent(clientId)}&agent_id=eq.${agentId}&status=eq.new&created_at=gte.${dedupeWindow}&select=type,severity`,
-    ).catch(() => [] as { type: string; severity: string }[])
+      `client_id=eq.${encodeURIComponent(clientId)}&agent_id=eq.${agentId}&status=eq.new` +
+        `&or=(expires_at.gte.${ahora},created_at.gte.${dedupeWindow})&select=type,severity,expires_at,created_at`,
+    ).catch(() => [] as { type: string; severity: string; expires_at: string | null; created_at: string }[])
     const existingTypes = new Set(existingRaw.map(r => `${r.type}:${r.severity}`))
 
     // ── Aprendizaje: el veredicto humano pondera el hallazgo ──────────────────
