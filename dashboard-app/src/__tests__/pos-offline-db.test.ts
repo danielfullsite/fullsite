@@ -7,10 +7,11 @@
 // (queue → mark synced → clear), y retries — la lógica de escritura offline.
 import 'fake-indexeddb/auto'
 import { IDBFactory } from 'fake-indexeddb'
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import {
   cacheMenu, getCachedMenu,
   cacheOrder, getCachedOrders, getCachedActiveOrders, reconcileCachedActiveOrders, deleteCachedOrder,
+  warmActiveOrdersCache,
   clearLocalOrderData,
   queueOperation, getPendingQueue, markSynced, incrementRetry, clearSyncedItems, getSyncQueueSummary,
   getSyncQueueDiagnostics, resolveSyncConflictKeepServer, resolveSyncConflictApplyLocal,
@@ -248,5 +249,120 @@ describe('pos-offline-db — movimientos de efectivo (respaldan el fix del Corte
     const movs = await getCachedCashMovsByTurno('T1')
     expect(movs.length).toBe(2)                         // cacheado + encolado
     expect(movs.some((m) => m.type === 'deposito' && m.amount === 50)).toBe(true)
+  })
+})
+
+
+// ─── T-26: el mapa de mesas dice la VERDAD tras un arranque en frio ──────────
+//
+// Campo AMALAY 2026-08-31, terminal Entrada: el plano salio perfecto (33 mesas,
+// distribucion correcta) con las 15 mesas ocupadas marcadas "Disponible". La
+// matriz ya cubria que el mesero pudiera ENTRAR sin red (T-24) y que apareciera
+// el PLANO (T-25) — nadie cubria que ese plano dijera la verdad.
+//
+// El riesgo de este calentamiento no es que no caliente: es que BORRE. Reconciliar
+// elimina del cache toda orden activa ausente del snapshot del servidor, y una
+// orden creada offline todavia esta subiendo. Por eso casi todas estas pruebas
+// son de la rama de falla.
+
+const ORDENES_SERVIDOR = [
+  { id: 'srv-1', client_id: 'amalay', mesa: 1, status: 'enviada', total: 725 },
+  { id: 'srv-2', client_id: 'amalay', mesa: 8, status: 'enviada', total: 713.4 },
+]
+
+function fetchOk(rows: unknown) {
+  return vi.fn().mockResolvedValue(new Response(JSON.stringify(rows), { status: 200 }))
+}
+
+beforeEach(() => {
+  // Sin esto warmActiveOrdersCache sale por 'skipped' y las pruebas no ejercitan nada.
+  process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://ejemplo.supabase.co'
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'anon-de-prueba'
+})
+
+// restoreAllMocks NO deshace stubGlobal. Sin unstubAllGlobals, un
+// navigator.onLine=false se filtraba a los tests siguientes y los hacia pasar por
+// la rama equivocada — pasaban en verde probando otra cosa. Aplica a toda la suite.
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals() })
+
+describe('T-26 — calentar el mapa de mesas al entrar con red', () => {
+  it('deja las mesas ocupadas en cache para el proximo arranque sin red', async () => {
+    vi.stubGlobal('fetch', fetchOk(ORDENES_SERVIDOR))
+    expect(await warmActiveOrdersCache('amalay')).toBe('ok')
+
+    const cached = await getCachedActiveOrders('amalay')
+    expect(cached.map(o => o.mesa).sort()).toEqual([1, 8])
+  })
+
+  it('REGRESION: una orden encolada offline NO se borra al calentar', async () => {
+    // La mesa 20 se levanto sin red: esta en la cola, todavia no en el servidor.
+    // Si el calentamiento la borra, la mesa se ve libre y se pierde la cuenta.
+    await cacheOrder({ id: 'local-20', client_id: 'amalay', mesa: 20, status: 'enviada', total: 603.2 })
+    await queueOperation('pos_orders', 'POST', { order_id: 'local-20', mesa: 20, status: 'enviada' })
+
+    vi.stubGlobal('fetch', fetchOk(ORDENES_SERVIDOR))
+    expect(await warmActiveOrdersCache('amalay')).toBe('ok')
+
+    const mesas = (await getCachedActiveOrders('amalay'))
+      .map(o => o.mesa as number)
+      .sort((a, b) => a - b)
+    expect(mesas).toContain(20)          // la encolada sobrevive
+    expect(mesas).toEqual([1, 8, 20])    // y ademas llegaron las del servidor
+  })
+
+  it('sin red no toca el cache — devuelve offline', async () => {
+    await cacheOrder({ id: 'viejo', client_id: 'amalay', mesa: 5, status: 'enviada', total: 100 })
+    vi.stubGlobal('navigator', { onLine: false })
+    const fetchSpy = vi.fn()
+    vi.stubGlobal('fetch', fetchSpy)
+
+    expect(await warmActiveOrdersCache('amalay')).toBe('offline')
+    expect(fetchSpy).not.toHaveBeenCalled()
+    expect((await getCachedActiveOrders('amalay')).length).toBe(1)
+  })
+
+  it('si el servidor responde error, NO vacia el cache que ya habia', async () => {
+    await cacheOrder({ id: 'viejo', client_id: 'amalay', mesa: 5, status: 'enviada', total: 100 })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('boom', { status: 500 })))
+
+    expect(await warmActiveOrdersCache('amalay')).toBe('error')
+    expect((await getCachedActiveOrders('amalay')).length).toBe(1)
+  })
+
+  it('si la red se cae a medio fetch, tampoco vacia el cache', async () => {
+    await cacheOrder({ id: 'viejo', client_id: 'amalay', mesa: 5, status: 'enviada', total: 100 })
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
+
+    expect(await warmActiveOrdersCache('amalay')).toBe('error')
+    expect((await getCachedActiveOrders('amalay')).length).toBe(1)
+  })
+
+  it('sin client_id no hace nada — nunca escribe sin tenant', async () => {
+    const fetchSpy = vi.fn()
+    vi.stubGlobal('fetch', fetchSpy)
+    expect(await warmActiveOrdersCache('')).toBe('skipped')
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('una respuesta que no es lista se rechaza en vez de borrar todo', async () => {
+    await cacheOrder({ id: 'viejo', client_id: 'amalay', mesa: 5, status: 'enviada', total: 100 })
+    vi.stubGlobal('fetch', fetchOk({ error: 'jwt expired' }))
+
+    expect(await warmActiveOrdersCache('amalay')).toBe('error')
+    expect((await getCachedActiveOrders('amalay')).length).toBe(1)
+  })
+
+  it('el escenario de AMALAY: cache frio + login con red = mapa con la verdad', async () => {
+    // Cache vacio, como quedo Entrada tras la limpieza de storage.
+    expect((await getCachedActiveOrders('amalay')).length).toBe(0)
+
+    vi.stubGlobal('fetch', fetchOk(ORDENES_SERVIDOR))
+    await warmActiveOrdersCache('amalay')
+
+    // Ahora, ya sin red, el mapa tiene con que pintar.
+    vi.stubGlobal('navigator', { onLine: false })
+    const cached = await getCachedActiveOrders('amalay')
+    expect(cached.length).toBe(2)
+    expect(cached.map(o => o.total).sort((a, b) => (a as number) - (b as number))).toEqual([713.4, 725])
   })
 })

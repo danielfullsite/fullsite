@@ -589,6 +589,52 @@ síncrona y se llama dentro del inicializador de un `useState`.
 
 ---
 
+### T-26: Arranque en frío sin WAN — el ESTADO de las mesas
+
+**Preconditions**: terminal con el storage recién limpiado (reinstalación o "clear site data"). Sin WAN al entrar.
+
+**Steps**:
+1. Entrar al POS sin internet.
+2. Abrir el mapa de mesas, con órdenes abiertas en la nube.
+
+**Expected Result**:
+- Las mesas ocupadas salen ocupadas, con su mesero y su total.
+
+**Hallazgo de campo 2026-08-31, terminal Entrada (AMALAY):** el plano salió **perfecto** —33 mesas,
+distribución correcta, T-25 cumplido— y las **15 mesas ocupadas aparecieron como "Disponible"**, con
+$6,172.36 abiertos en Supabase. Al volver el internet, aparecieron las 15 correctas.
+
+Este escenario es distinto de los dos anteriores y por eso faltaba:
+
+| | Pregunta que responde |
+|---|---|
+| T-24 | ¿puede el mesero **entrar**? |
+| T-25 | ¿aparece el **plano**? |
+| **T-26** | ¿ese plano dice la **verdad**? |
+
+**Por qué es peor que T-25:** un plano ausente se ve roto y alguien lo reporta. Un plano que dice
+"todo libre" **se ve bien y miente** — el mesero sienta gente en una mesa que debe $713, o le abre
+segunda cuenta a una que ya tenía.
+
+**Causa raíz:** `getCachedActiveOrders()` lee de IndexedDB, y a IndexedDB sólo lo llenaba
+`reconcileCachedActiveOrders()` cuando alguien abría el mapa **estando online**. Tras limpiar el
+storage nadie lo volvía a llenar hasta que por casualidad se entraba con red. El mapa offline valía
+lo que valiera el último calentamiento, y nadie sabía cuándo se enfrió.
+
+**No se resuelve en el Service Worker a propósito:** `sw.js` tiene `/rest/v1/pos_orders` en
+`NEVER_CACHE_PATTERNS` porque servir esa respuesta vieja ya rompió el phantom-check y la comanda no
+llegaba al KDS. El calentamiento va por IndexedDB, que es el fallback que el propio SW espera.
+
+**Corregido**: `warmActiveOrdersCache()` en `pos-offline-db.ts`, invocada al hacer login **con red**.
+Preserva los IDs que siguen en la cola local — sin eso, calentar borraría una venta encolada y la
+mesa se vería libre.
+
+| Impl | Test | Cert | Pendiente |
+|---|---|---|---|
+| ✓ | ✓ (8 casos, rama de falla incluida) | ✗ | Validación física: limpiar storage, entrar **con** red, apagar la WAN y confirmar que las mesas ocupadas siguen ocupadas |
+
+---
+
 ## Resumen de la Matriz
 
 | Grupo | Escenarios | Impl ✓ | Test ✓ | Cert ✓ | Blocker |
@@ -602,12 +648,12 @@ síncrona y se llama dentro del inicializador de un `useState`.
 | 7 — Impresora | 2 | 2 | 2 | 0 | Sin test con hardware real |
 | 8 — Multi-terminal | 3 | 3 | 1 | 0 | Sin test concurrente real |
 | 9 — Recovery | 2 | 2 | 0 | 0 | Requiere Supabase staging |
-| 10 — Arranque y sesión | 2 | 2 | 1 | 0 | T-24 cerrado en #133 (TTL 16 h + varias credenciales); T-25 corregido en #128, falta validar |
-| **Total** | **25** | **24** | **14** | **0** | |
+| 10 — Arranque y sesión | 3 | 3 | 2 | 0 | T-24 cerrado en #133 (TTL 16 h + varias credenciales); T-25 corregido en #128, falta validar; T-26 corregido y con test, falta validar |
+| **Total** | **26** | **25** | **15** | **0** | |
 
-**Escenarios Implementados**: 24/25 (96%) — +1 el 2026-08-26 (T-24, PR #133)
-**Escenarios con Test Automatizado**: 14/25 (56%) — +7 el 2026-08-26 (T-01, T-04, T-07 en el navegador; T-12, T-13, T-14 a nivel de transporte; T-24 el cableado del login)
-**Escenarios Certificados**: 0/25 (0%)
+**Escenarios Implementados**: 25/26 (96%) — +1 el 2026-08-26 (T-24, PR #133), +1 el 2026-08-31 (T-26)
+**Escenarios con Test Automatizado**: 15/26 (58%) — +7 el 2026-08-26 (T-01, T-04, T-07 en el navegador; T-12, T-13, T-14 a nivel de transporte; T-24 el cableado del login); +1 el 2026-08-31 (T-26)
+**Escenarios Certificados**: 0/26 (0%)
 
 > **El cuello de botella ya no es código.** 24 de 25 implementados, 14 con prueba automatizada,
 > y **cero certificados** — porque certificar quiere decir ejecutarlo físicamente, y eso no lo

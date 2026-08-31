@@ -547,16 +547,26 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
         const { staff: member, shiftToken } = await res.json()
         if (member?.id) {
           try {
-            if (shiftToken) {
-              localStorage.setItem('pos_shift_token', shiftToken)
-              // Sesión fresca: darle un re-intento limpio al backlog de sync con el
-              // token nuevo (resetea reintentos agotados y dispara syncAll). Drena las
-              // comandas/turnos/caja que se atoraron con el token vencido. No bloquea.
-              import('@/lib/pos-offline-db').then(async m => {
+            if (shiftToken) localStorage.setItem('pos_shift_token', shiftToken)
+            // Una sola cadena, SECUENCIAL a proposito. Con dos import() separados el
+            // drenado y el calentamiento corrian concurrentes, y eso abre una carrera
+            // que borra ventas: warm hace su fetch (la orden X aun no esta en el
+            // servidor) -> syncAll sube X y la saca de la cola -> warm lee la cola y ya
+            // no la ve -> X no esta en ninguna lista y el reconcile la BORRA del cache,
+            // dejando la mesa libre. Encadenarlas cierra esa ventana.
+            //
+            // - Drenado (solo con token): reintento limpio del backlog que se atoro con
+            //   el token vencido.
+            // - Calentamiento (T-26, SIEMPRE): una terminal sin turno abierto tambien
+            //   necesita ver las mesas ocupadas manana sin internet, y ahi no hay token.
+            // Ninguna de las dos bloquea el login.
+            import('@/lib/pos-offline-db').then(async m => {
+              if (shiftToken) {
                 await m.resetSyncQueueRetries()
                 await m.syncAll()
-              }).catch(() => {})
-            }
+              }
+              await m.warmActiveOrdersCache(_cid())
+            }).catch(() => {})
             const pinHash = await hashPin(pin, member.id)
             localStorage.setItem('pos_staff_cache', JSON.stringify({
               id: member.id, name: member.name, role: member.role,

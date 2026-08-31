@@ -257,6 +257,93 @@ export async function reconcileCachedActiveOrders(
   })
 }
 
+/**
+ * T-26 — Calienta el cache de MESAS OCUPADAS para el arranque en frio sin WAN.
+ *
+ * POR QUE EXISTE
+ *
+ * La matriz de certificacion ya cubre dos escenarios de arranque en frio, y
+ * ninguno es este:
+ *   - T-24: que el mesero pueda ENTRAR sin red        (cerrado en #133)
+ *   - T-25: que aparezca el PLANO de mesas sin red    (cerrado en #128)
+ * Falta el tercero: que esas mesas digan la VERDAD. Campo AMALAY 2026-08-31,
+ * terminal Entrada: el plano salio perfecto —33 mesas, distribucion correcta—
+ * con las 15 ocupadas marcadas "Disponible". Un plano ausente se ve roto; un
+ * plano que dice "todo libre" se ve bien y miente. El mesero sienta gente en
+ * una mesa que debe $713, o le abre segunda cuenta.
+ *
+ * CAUSA: `getCachedActiveOrders` lee de IndexedDB, y a IndexedDB solo lo
+ * llenaba `reconcileCachedActiveOrders` cuando alguien abria el mapa ESTANDO
+ * ONLINE. Tras una reinstalacion o una limpieza de storage, el cache queda
+ * vacio y nadie lo vuelve a llenar hasta que por casualidad se entra con red.
+ * O sea: el mapa offline valia lo que valiera el ultimo calentamiento, y nadie
+ * sabia cuando se enfrio.
+ *
+ * QUE HACE: al hacer login CON red, deja el cache listo para el proximo
+ * arranque sin ella. Deterministico, no por casualidad.
+ *
+ * NO se cachea en el Service Worker a proposito: `sw.js` tiene
+ * `/rest/v1/pos_orders` en NEVER_CACHE_PATTERNS porque servir esa respuesta
+ * vieja ya rompio el phantom-check y la comanda no llegaba al KDS. Este
+ * calentamiento va por IndexedDB, que es el fallback que el propio SW espera.
+ */
+export async function warmActiveOrdersCache(
+  clientId: string,
+): Promise<'ok' | 'offline' | 'error' | 'skipped'> {
+  if (!clientId) return 'skipped'
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return 'offline'
+  // Se lee al LLAMAR, no al cargar el modulo. Next inlinea NEXT_PUBLIC_* en el
+  // bundle igual en ambos casos, y asi la funcion se puede verificar.
+  const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!sbUrl || !sbKey) return 'skipped'
+
+  let serverOrders: Record<string, unknown>[]
+  try {
+    const res = await fetch(
+      `${sbUrl}/rest/v1/pos_orders?client_id=eq.${encodeURIComponent(clientId)}` +
+        `&status=in.(enviada,preparando,lista,abierta,entregada)&order=created_at.desc&limit=50`,
+      { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' },
+    )
+    if (!res.ok) return 'error'
+    serverOrders = await res.json()
+    if (!Array.isArray(serverOrders)) return 'error'
+  } catch {
+    return 'error'
+  }
+
+  // RAMA DE FALLA — la que importa. `reconcileCachedActiveOrders` BORRA del cache
+  // toda orden activa que no venga en el snapshot del servidor. Una orden creada
+  // offline todavia esta subiendo: no aparece ahi. Sin preservarla, calentar
+  // BORRARIA una venta real y la mesa se veria libre. Misma regla que usa el mapa
+  // en app/pos/mesas/page.tsx (#37): se saltan los items con error terminal
+  // —getPendingQueue(true) ya los filtra— y las mesas que el servidor ya conoce.
+  const preserveIds: string[] = []
+  try {
+    const pending = await getPendingQueue(true)
+    const syncedMesas = new Set(
+      serverOrders.map((o) => o.mesa).filter((m): m is number => typeof m === 'number'),
+    )
+    for (const item of pending) {
+      const d = item.data as Record<string, unknown>
+      if (item.table !== 'pos_orders' || typeof d?.mesa !== 'number') continue
+      if (!ACTIVE_ORDER_STATUSES.has(String(d.status)) || syncedMesas.has(d.mesa)) continue
+      const id = String(d.order_id ?? d.id ?? '')
+      if (id) preserveIds.push(id)
+    }
+  } catch {
+    // Cola ilegible: preferimos NO reconciliar antes que borrar ordenes encoladas.
+    return 'error'
+  }
+
+  try {
+    await reconcileCachedActiveOrders(serverOrders, clientId, preserveIds)
+    return 'ok'
+  } catch {
+    return 'error'
+  }
+}
+
 export async function deleteCachedOrder(id: string): Promise<void> {
   const db = await openDB()
   const tx = db.transaction('orders', 'readwrite')
