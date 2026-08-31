@@ -2293,7 +2293,23 @@ function POSContent() {
   // Auto-save draft items to localStorage on every change (prevents loss on refresh)
   useEffect(() => {
     if (mesa > 0 && orderItems.length > 0) {
-      try { localStorage.setItem(`pos_draft_${mesa}`, JSON.stringify({ items: orderItems, orderId, mesero, personas, ts: Date.now() })) } catch {}
+      // El `ts` mide "desde la ultima edicion del mesero", NO "desde la ultima vez
+      // que alguien abrio la mesa". Antes se ponia Date.now() en cada corrida del
+      // efecto, incluida la que dispara la propia restauracion del draft — asi el
+      // TTL de 4h se reiniciaba solo y una orden fantasma no caducaba jamas.
+      // Si el contenido es identico al guardado, se conserva el ts anterior.
+      try {
+        const payload = { items: orderItems, orderId, mesero, personas }
+        let ts = Date.now()
+        const prevRaw = localStorage.getItem(`pos_draft_${mesa}`)
+        if (prevRaw) {
+          const prev = JSON.parse(prevRaw)
+          const same = prev && typeof prev.ts === 'number' &&
+            JSON.stringify({ items: prev.items, orderId: prev.orderId, mesero: prev.mesero, personas: prev.personas }) === JSON.stringify(payload)
+          if (same) ts = prev.ts
+        }
+        localStorage.setItem(`pos_draft_${mesa}`, JSON.stringify({ ...payload, ts }))
+      } catch {}
     } else if (mesa > 0) {
       try { localStorage.removeItem(`pos_draft_${mesa}`) } catch {}
     }
