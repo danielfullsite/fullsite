@@ -108,12 +108,11 @@ def calificar(client_id: str) -> tuple[int, int, int]:
         e["error_pct"] = round(error_pct, 2)
         e["calificado_el"] = datetime.now(timezone.utc).isoformat()
 
-        import json
         try:
             sb_patch(
                 "agent_events",
                 f"id=eq.{ev['id']}",
-                {"status": "resolved", "outcome": resultado, "evidence": json.dumps(e)},
+                {"status": "resolved", "outcome": resultado, "evidence": e},
             )
         except Exception as err:
             print(f"[resolver] no se pudo calificar {ev['id']}: {err}", file=sys.stderr)

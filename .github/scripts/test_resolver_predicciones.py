@@ -111,9 +111,13 @@ class EventosViejos(unittest.TestCase):
 
 class LoQueSeGuarda(unittest.TestCase):
     def test_guarda_la_venta_real_y_el_error_para_poder_auditarlo(self):
-        import json
+        # Esta prueba hacia `json.loads(...["evidence"])`, o sea daba por bueno que el
+        # resolvedor mandara TEXTO a una columna jsonb. Con eso PostgREST guardaba un
+        # escalar de tipo string y `evidence->>'venta_real'` devolvia NULL: la prueba
+        # confirmaba el bug en vez de atraparlo. Ahora se exige el dict directo.
         (_, _, _), parches = correr([evento(10000, AYER, 10)], {AYER: 12000})
-        ev = json.loads(parches[0][1]["evidence"])
+        ev = parches[0][1]["evidence"]
+        self.assertIsInstance(ev, dict, "evidence va a una columna jsonb: dict, no str")
         self.assertEqual(ev["venta_real"], 12000)
         self.assertAlmostEqual(ev["error_pct"], 16.67, places=1)
         self.assertIn("calificado_el", ev)
