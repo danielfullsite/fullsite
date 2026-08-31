@@ -557,6 +557,14 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
                 await m.syncAll()
               }).catch(() => {})
             }
+            // T-26: dejar el mapa de mesas listo para el proximo arranque SIN red.
+            // FUERA del if(shiftToken) a proposito: una terminal sin turno abierto
+            // tambien necesita ver las mesas ocupadas manana sin internet, y ahi el
+            // login no emite token. Corre despues del drenado de arriba (el import es
+            // el mismo modulo, ya resuelto) para que el snapshot incluya lo que subio.
+            import('@/lib/pos-offline-db')
+              .then(m => m.warmActiveOrdersCache(_cid()))
+              .catch(() => {})
             const pinHash = await hashPin(pin, member.id)
             localStorage.setItem('pos_staff_cache', JSON.stringify({
               id: member.id, name: member.name, role: member.role,
