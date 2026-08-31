@@ -68,11 +68,17 @@ export async function sendOrderToKitchen(
   opts: { deadlineMs?: number; now?: () => number } = {},
 ): Promise<KitchenSendResult> {
   const url = `${getBridgeUrl()}/events`
+  // navigator.onLine=false can mean WAN is down while the restaurant LAN still
+  // works. Keep one short attempt so Entrada can reach Caja locally, but do not
+  // burn the full retry budget when the cable/LAN is gone too.
+  const offline = typeof navigator !== 'undefined' && navigator.onLine === false
+  const backoffs = offline ? [] : BACKOFF_MS
+  const attemptTimeoutMs = offline ? 800 : ATTEMPT_TIMEOUT_MS
   const now = opts.now ?? (() => Date.now())
   const deadline = now() + (opts.deadlineMs ?? DEADLINE_MS)
   const attempts: KitchenAttempt[] = []
 
-  for (let i = 0; i <= BACKOFF_MS.length; i++) {
+  for (let i = 0; i <= backoffs.length; i++) {
     if (now() >= deadline) {
       console.warn(`${LOG} sin tiempo — la comanda NO llego a cocina`, { url, attempts })
       return { ok: false, url, attempts, reason: 'deadline' }
@@ -86,7 +92,7 @@ export async function sendOrderToKitchen(
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS),
+        signal: AbortSignal.timeout(attemptTimeoutMs),
       })
       status = res.status
       if (res.ok) {
@@ -102,7 +108,7 @@ export async function sendOrderToKitchen(
     attempts.push({ attempt: i, status, error })
     console.warn(`${LOG} intento ${i + 1} fallo`, { url, status, error })
 
-    const backoff = BACKOFF_MS[i]
+    const backoff = backoffs[i]
     if (backoff == null) break
     const remaining = deadline - now()
     if (remaining <= 0) break

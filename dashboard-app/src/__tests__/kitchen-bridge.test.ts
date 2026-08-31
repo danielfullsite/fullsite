@@ -42,7 +42,27 @@ beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {})
 })
 
-afterEach(() => vi.restoreAllMocks())
+afterEach(() => {
+  vi.restoreAllMocks()
+  vi.unstubAllGlobals()
+})
+
+describe('Cocina — rama OFFLINE', () => {
+  it('hace un solo intento LAN y no consume seis segundos de reintentos', async () => {
+    vi.stubGlobal('navigator', { onLine: false })
+    const fetchMock = vi.fn().mockRejectedValue(new TypeError('sin red'))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const r = await sendOrderToKitchen(ORDEN)
+
+    expect(r.ok).toBe(false)
+    if (!r.ok) {
+      expect(r.reason).toBe('network')
+      expect(r.attempts).toHaveLength(1)
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+})
 
 describe('Cocina — rama ONLINE', () => {
   it('un 200 confirma la comanda al primer intento', async () => {

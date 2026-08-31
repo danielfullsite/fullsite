@@ -36,12 +36,17 @@ import { getActiveClientSlug as getClientId } from '@/lib/data'
  */
 export async function checkActiveSession(staffId: string): Promise<string | null> {
   if (!SB_URL || !SB_KEY) return null // can't check — allow login
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return null
   const terminalId = getTerminalId()
   const cutoff = new Date(Date.now() - SESSION_TIMEOUT_MS).toISOString()
   try {
     const res = await fetch(
       `${SB_URL}/rest/v1/pos_sessions?staff_id=eq.${encodeURIComponent(staffId)}&client_id=eq.${encodeURIComponent(getClientId())}&terminal_id=neq.${encodeURIComponent(terminalId)}&last_heartbeat=gte.${encodeURIComponent(cutoff)}&select=terminal_id&limit=1`,
-      { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }, cache: 'no-store' }
+      {
+        headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+        cache: 'no-store',
+        signal: AbortSignal.timeout(1200),
+      }
     )
     if (res.ok) {
       const rows = await res.json()
@@ -63,6 +68,7 @@ export async function checkActiveSession(staffId: string): Promise<string | null
  */
 export async function registerSession(staffId: string, staffName: string): Promise<boolean> {
   if (!SB_URL || !SB_KEY) return true
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return true
   const terminalId = getTerminalId()
   const clientId = getClientId()
   const now = new Date().toISOString()
@@ -83,6 +89,7 @@ export async function registerSession(staffId: string, staffName: string): Promi
         started_at: now,
         last_heartbeat: now,
       }),
+      signal: AbortSignal.timeout(1200),
     })
     return res.ok || res.status === 201 || res.status === 204
   } catch {
