@@ -64,6 +64,58 @@ describe('pos-offline-db — órdenes offline', () => {
     expect(active.map(order => order.id)).toEqual(['activa'])
   })
 
+  // ─── Aislamiento multi-tenant del mapa offline ────────────────────────────
+  //
+  // El filtro tenia dos comodines: `!owner` (orden sin client_id) y `!clientId`
+  // (terminal sin identidad). Los dos pintaban mesas ajenas. En prod hay 7 ordenes
+  // con client_id vacio (jul-2026, $1,879), asi que un segundo cliente en la misma
+  // base veria mesas de AMALAY ocupadas.
+
+  it('FUGA: una orden sin client_id no se pinta en el mapa de nadie', async () => {
+    await cacheOrder({ id: 'huerfana', client_id: '', mesa: 12, status: 'enviada' })
+    await cacheOrder({ id: 'propia', client_id: 'amalay', mesa: 1, status: 'enviada' })
+
+    expect((await getCachedActiveOrders('amalay')).map(o => o.id)).toEqual(['propia'])
+    expect((await getCachedActiveOrders('boruca')).map(o => o.id)).toEqual([])
+  })
+
+  it('FUGA: client_id nulo o ausente tampoco es comodín', async () => {
+    await cacheOrder({ id: 'nula', client_id: null, mesa: 7, status: 'enviada' })
+    await cacheOrder({ id: 'ausente', mesa: 8, status: 'enviada' })
+
+    expect(await getCachedActiveOrders('amalay')).toEqual([])
+  })
+
+  it('una terminal sin client_id no pinta NADA — falla cerrado, no muestra todo', async () => {
+    await cacheOrder({ id: 'a', client_id: 'amalay', mesa: 1, status: 'enviada' })
+    await cacheOrder({ id: 'b', client_id: 'boruca', mesa: 2, status: 'enviada' })
+
+    expect(await getCachedActiveOrders('')).toEqual([])
+    expect(await getCachedActiveOrders(undefined)).toEqual([])
+  })
+
+  it('no se excluye en silencio: cada exclusión queda reportada', async () => {
+    // Esconder una mesa ocupada es el mismo fallo que costo la noche del 30-ago.
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    await cacheOrder({ id: 'huerfana', client_id: '', mesa: 12, status: 'enviada' })
+    await cacheOrder({ id: 'ajena', client_id: 'boruca', mesa: 3, status: 'enviada' })
+    await getCachedActiveOrders('amalay')
+    expect(warn).toHaveBeenCalled()
+
+    await getCachedActiveOrders('')
+    expect(error).toHaveBeenCalled()
+  })
+
+  it('el caso sano no cambia: cada restaurante ve sólo lo suyo', async () => {
+    await cacheOrder({ id: 'a1', client_id: 'amalay', mesa: 1, status: 'enviada' })
+    await cacheOrder({ id: 'b1', client_id: 'boruca', mesa: 1, status: 'enviada' })
+
+    expect((await getCachedActiveOrders('amalay')).map(o => o.id)).toEqual(['a1'])
+    expect((await getCachedActiveOrders('boruca')).map(o => o.id)).toEqual(['b1'])
+  })
+
   it('reconciliación elimina ocupaciones fantasma pero preserva una orden offline pendiente', async () => {
     await cacheOrder({ id: 'fantasma', client_id: 'amalay', mesa: 1, status: 'enviada' })
     await cacheOrder({ id: 'pendiente-local', client_id: 'amalay', mesa: 2, status: 'enviada' })
