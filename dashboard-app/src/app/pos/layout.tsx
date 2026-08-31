@@ -310,10 +310,25 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
 
   const FINGERPRINT_URL = getFingerprintUrl()
   useEffect(() => {
-    fetch(`${FINGERPRINT_URL}/health`, { signal: AbortSignal.timeout(1000) })
-      .then(r => r.ok ? r.json() : null)
-      .then(data => { if (data?.ok) setBiometricAvailable(true) })
-      .catch(() => setBiometricAvailable(false))
+    let cancelled = false
+    const checkFingerprint = async () => {
+      // The reader service starts beside Electron. Slow terminals can lose the
+      // first race and used to hide the button until a manual Ctrl+R.
+      for (let attempt = 0; attempt < 6 && !cancelled; attempt++) {
+        try {
+          const r = await fetch(`${FINGERPRINT_URL}/health`, { signal: AbortSignal.timeout(1000) })
+          const data = r.ok ? await r.json() : null
+          if (data?.ok) {
+            if (!cancelled) setBiometricAvailable(true)
+            return
+          }
+        } catch { /* service may still be starting */ }
+        if (attempt < 5) await new Promise(resolve => setTimeout(resolve, 500))
+      }
+      if (!cancelled) setBiometricAvailable(false)
+    }
+    checkFingerprint()
+    return () => { cancelled = true }
   }, [])
 
   // Register fingerprint via DigitalPersona service (port 7718)
