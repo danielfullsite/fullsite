@@ -80,6 +80,16 @@ describe('sw.js structure', () => {
 
     expect(content).toContain('navigationFromCache(request, event)')
     expect(content).toContain('event.waitUntil(refresh)')
-    expect(content).toContain("const CACHE_VERSION = 'v41'")
+    expect(content).toContain("const CACHE_VERSION = 'v42'")
+  })
+
+  it('strips the redirect flag on navigations (Safari iOS login bug 2026-08-31)', async () => {
+    const fs = await import('fs')
+    const path = await import('path')
+    const content = fs.readFileSync(path.resolve(__dirname, '../../public/sw.js'), 'utf-8')
+    // El helper existe y networkFirstWithCache lo aplica al fetch de red — sin esto
+    // Safari rechaza la respuesta redirigida del login ("has redirections").
+    expect(content).toContain('function stripRedirect(')
+    expect(content).toContain('stripRedirect(await fetchWithTimeout(request))')
   })
 })
