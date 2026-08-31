@@ -14,6 +14,10 @@ import {
 import { formatMXN, logAudit, getClientId } from '@/lib/pos-data'
 import { CANCEL_REASON_LABELS, UBER_CANCEL_REASONS } from '@/lib/integrations/uber-eats/reasons'
 import type { UberCancelReason } from '@/lib/integrations/uber-eats/reasons'
+import {
+  detectarCancelacionesExternas, mensajeCancelacion, sonarAlerta,
+  type CancelacionExterna,
+} from '@/lib/integrations/delivery-cancel-alert'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
@@ -86,6 +90,13 @@ export default function DeliveryPage() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<PlatformFilter>('todas')
   const [actorName, setActorName] = useState('Caja')
+  // Cancelaciones que hizo la PLATAFORMA. Se muestran hasta que el operador las
+  // reconozca: si la cocina ya estaba preparando, desaparecer en silencio es el peor
+  // resultado posible. Ver lib/integrations/delivery-cancel-alert.ts.
+  const [cancelAlerts, setCancelAlerts] = useState<CancelacionExterna[]>([])
+  const prevOrdersRef = useRef<DeliveryOrder[]>([])
+  const cancelledHereRef = useRef<Set<string>>(new Set())
+  const alertedRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
     try {
@@ -107,7 +118,18 @@ export default function DeliveryPage() {
       if (res.ok) {
         const data: DeliveryOrder[] = await res.json()
         // Filter out test/invalid orders
-        setOrders(data.filter(o => o.customer_name && !o.customer_name.startsWith('TEST') && o.total > 0))
+        const visibles = data.filter(o => o.customer_name && !o.customer_name.startsWith('TEST') && o.total > 0)
+
+        const nuevas = detectarCancelacionesExternas(
+          prevOrdersRef.current, visibles, cancelledHereRef.current, alertedRef.current,
+        )
+        if (nuevas.length) {
+          nuevas.forEach(c => alertedRef.current.add(c.id))
+          setCancelAlerts(prev => [...prev, ...nuevas])
+          if (nuevas.some(c => c.cocinaEnCurso)) sonarAlerta()
+        }
+        prevOrdersRef.current = visibles
+        setOrders(visibles)
       }
     } catch { /* sin red */ } finally {
       fetchingRef.current = false
@@ -176,6 +198,8 @@ export default function DeliveryPage() {
   }
 
   const handleCancel = async (order: DeliveryOrder, reason: UberCancelReason) => {
+    // El operador ya sabe: no debe dispararse la alerta por su propia accion.
+    cancelledHereRef.current.add(order.id)
     await patchOrder(order.id, { status: 'cancelada', updated_at: new Date().toISOString() })
     if (order.platform === 'ubereats' && order.platform_order_id) {
       fetch('/api/integrations/uber-eats/order', {
@@ -189,6 +213,39 @@ export default function DeliveryPage() {
 
   return (
     <div className="h-dvh flex flex-col overflow-hidden" style={{ background: '#0a0a0f' }}>
+      {/* Cancelaciones de la plataforma. Persistente: se queda hasta que alguien la
+          reconoce. Uber pregunto explicitamente como se le avisa al operador cuando
+          ellos cancelan; antes la orden solo desaparecia de la cola. */}
+      {cancelAlerts.length > 0 && (
+        <div className="shrink-0 bg-red-600 text-white" role="alert" aria-live="assertive">
+          {cancelAlerts.map(c => (
+            <div key={c.id} className="flex items-center gap-3 px-4 py-3 border-b border-red-500/40 last:border-0">
+              <Ban size={22} className="shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="font-black text-sm leading-tight">{mensajeCancelacion(c)}</p>
+                <p className="text-white/80 text-xs mt-0.5">
+                  {formatMXN(c.total)}
+                  {c.platform_order_id && ` · ${c.platform_order_id}`}
+                  {` · estaba en «${c.estadoPrevio}»`}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  logAudit({
+                    action: 'delivery_cancel_alert_ack',
+                    actor: actorName,
+                    details: { delivery_id: c.id, platform: c.platform, estado_previo: c.estadoPrevio, cocina_en_curso: c.cocinaEnCurso },
+                  })
+                  setCancelAlerts(prev => prev.filter(x => x.id !== c.id))
+                }}
+                className="shrink-0 px-4 py-2 rounded-lg bg-white text-red-700 font-black text-sm min-h-[44px]"
+              >
+                Enterado
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
       {/* Header */}
       <div className="flex-shrink-0 z-20 bg-[#12121a] border-b border-white/10 px-4 py-3 flex items-center gap-3">
         <Link href="/pos" className="w-11 h-11 rounded-lg bg-white/10 flex items-center justify-center text-white">

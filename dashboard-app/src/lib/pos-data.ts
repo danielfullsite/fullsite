@@ -1744,6 +1744,8 @@ export async function getKitchenOrders(): Promise<KitchenOrderFromDB[]> {
 // ─── BLINDAJE: Audit Trail (nothing deleteable) ────────────────────────────
 
 export type AuditAction =
+  // Delivery: el operador reconocio que la plataforma cancelo una orden.
+  | 'delivery_cancel_alert_ack'
   | 'order_created'
   | 'order_sent_kitchen'
   | 'order_closed'
