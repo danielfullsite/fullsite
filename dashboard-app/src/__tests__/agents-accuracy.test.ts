@@ -18,6 +18,7 @@
 import { describe, it, expect } from 'vitest'
 import { runFinanceAgent } from '@/lib/agents/finance'
 import type { AgentEvent } from '@/lib/agents/types'
+import { nowMX } from '@/lib/date-mx'
 
 // ─── Fixture ──────────────────────────────────────────────────────────────────
 
@@ -27,10 +28,13 @@ interface Dia { fecha: string; ventas_dia: number; tickets_count: number; ticket
 function historia(n: number, ventasPorDia = 10_000): Dia[] {
   const out: Dia[] = []
   for (let i = 1; i <= n; i++) {
-    const d = new Date()
+    // nowMX y no new Date(): el agente arma su "hoy" en hora de Mexico
+    // (finance.ts todayStr). Con UTC los dias se corren uno entre las 18:00 y
+    // las 24:00 de Monterrey, y eso mueve el dia-de-la-semana que el agente compara.
+    const d = nowMX()
     d.setDate(d.getDate() - i)
     out.push({
-      fecha: d.toISOString().slice(0, 10),
+      fecha: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
       ventas_dia: ventasPorDia,
       tickets_count: 100,
       ticket_promedio_restaurant: ventasPorDia / 100,
@@ -75,8 +79,13 @@ describe('Agentes — un agente sin datos lo DICE, no se calla', () => {
 
   it('cuenta los días de atraso de la fuente — el dato que delata una tubería muerta', async () => {
     // Un solo día, de hace 41 — el caso real de AMALAY el 2026-08-30.
-    const d = new Date(); d.setDate(d.getDate() - 41)
-    const dias = [{ fecha: d.toISOString().slice(0, 10), ventas_dia: 5000, tickets_count: 50, ticket_promedio_restaurant: 100 }]
+    // La fecha se construye en hora de Mexico, igual que todayStr() del agente.
+    // Con new Date() + toISOString() se construia en UTC, y entre las 18:00 y las
+    // 24:00 de Monterrey (00:00-06:00 UTC) las dos bases caen en dias distintos:
+    // el agente restaba contra el dia MX y salia 40 donde el test pedia 41.
+    const d = nowMX(); d.setDate(d.getDate() - 41)
+    const fecha = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    const dias = [{ fecha, ventas_dia: 5000, tickets_count: 50, ticket_promedio_restaurant: 100 }]
     const ev = find(await runFinanceAgent('amalay', fakeSbGet(dias, null)), 'fuente_sin_datos')!
     expect(ev.evidence.dias_sin_datos).toBe(41)
     expect(ev.evidence.fecha_mas_reciente).toBe(dias[0].fecha)
