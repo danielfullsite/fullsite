@@ -10,7 +10,7 @@ import { IDBFactory } from 'fake-indexeddb'
 import { describe, it, expect, beforeEach } from 'vitest'
 import {
   cacheMenu, getCachedMenu,
-  cacheOrder, getCachedOrders, deleteCachedOrder,
+  cacheOrder, getCachedOrders, getCachedActiveOrders, reconcileCachedActiveOrders, deleteCachedOrder,
   clearLocalOrderData,
   queueOperation, getPendingQueue, markSynced, incrementRetry, clearSyncedItems, getSyncQueueSummary,
   getSyncQueueDiagnostics, resolveSyncConflictKeepServer, resolveSyncConflictApplyLocal,
@@ -51,6 +51,32 @@ describe('pos-offline-db — órdenes offline', () => {
     await deleteCachedOrder('o1')
     orders = await getCachedOrders()
     expect(orders.find((o) => o.id === 'o1')).toBeFalsy()
+  })
+
+  it('el mapa offline nunca pinta órdenes cerradas o canceladas como mesas ocupadas', async () => {
+    await cacheOrder({ id: 'activa', client_id: 'amalay', mesa: 4, status: 'enviada', updated_at: '2026-08-31T01:00:00Z' })
+    await cacheOrder({ id: 'cerrada', client_id: 'amalay', mesa: 5, status: 'cerrada', updated_at: '2026-08-31T02:00:00Z' })
+    await cacheOrder({ id: 'cancelada', client_id: 'amalay', mesa: 6, status: 'cancelada', updated_at: '2026-08-31T03:00:00Z' })
+
+    const active = await getCachedActiveOrders('amalay')
+
+    expect(active.map(order => order.id)).toEqual(['activa'])
+  })
+
+  it('reconciliación elimina ocupaciones fantasma pero preserva una orden offline pendiente', async () => {
+    await cacheOrder({ id: 'fantasma', client_id: 'amalay', mesa: 1, status: 'enviada' })
+    await cacheOrder({ id: 'pendiente-local', client_id: 'amalay', mesa: 2, status: 'enviada' })
+    await cacheOrder({ id: 'historial', client_id: 'amalay', mesa: 3, status: 'cerrada' })
+
+    await reconcileCachedActiveOrders(
+      [{ id: 'servidor', client_id: 'amalay', mesa: 4, status: 'preparando' }],
+      'amalay',
+      ['pendiente-local'],
+    )
+
+    const all = await getCachedOrders()
+    expect(all.map(order => order.id).sort()).toEqual(['historial', 'pendiente-local', 'servidor'])
+    expect((await getCachedActiveOrders('amalay')).map(order => order.id).sort()).toEqual(['pendiente-local', 'servidor'])
   })
 
   it('limpieza total purga órdenes y su replay, pero conserva operaciones de caja', async () => {
