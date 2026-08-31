@@ -87,7 +87,13 @@ describe('Cocina — rama ONLINE', () => {
     expect(init.method).toBe('POST')
     expect(init.headers['Content-Type']).toBe('application/json')
     expect(JSON.parse(init.body)).toMatchObject({ command_type: 'ORDER_SENT', mesa: 5 })
-    expect(init.targetAddressSpace).toBe('local')
+    // 'loopback' y NO 'local': el bridge de un POS secundario es 127.0.0.1, y
+    // Chromium rechaza el request si se declara el espacio equivocado —
+    // "target IP address space of `local` yet the resource is in address space
+    // `loopback`", visto en la consola de Entrada el 2026-08-31. Esta asercion
+    // decia 'local' y estaba fijando el comportamiento con el bug.
+    // Ver lib/local-network-fetch.ts.
+    expect(init.targetAddressSpace).toBe('loopback')
   })
 
   it('REGRESION: un HTTP 500 es FALLO, no éxito', async () => {
