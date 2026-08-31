@@ -3343,10 +3343,22 @@ function POSContent() {
       } catch {}
       // Tras enviar: al mapa de mesas AL INSTANTE + bloqueo (re-identificación por
       // PIN/huella = cada comanda atada a quien la envió). Sin la espera de 15s.
-      sessionStorage.removeItem('pos_staff')
-      sessionStorage.removeItem('pos_last_activity')
-      navigateToMesaMap()
-      lock()
+      //
+      // PERO si cocina no confirmó, el bloqueo se DIFIERE hasta que el mesero lo
+      // reconozca. `lock()` pone unlocked=false y layout.tsx:727 DESMONTA a los
+      // hijos — o sea que el aviso no quedaria tapado, desapareceria antes de
+      // que nadie lo lea. El camino feliz se veia bien; la rama de falla no.
+      const finishOnline = () => {
+        sessionStorage.removeItem('pos_staff')
+        sessionStorage.removeItem('pos_last_activity')
+        navigateToMesaMap()
+        lock()
+      }
+      if (!kitchen.ok) {
+        afterKitchenAck.current = finishOnline
+      } else {
+        finishOnline()
+      }
     } finally {
       operationLock.current = false
       setSaving(false)
