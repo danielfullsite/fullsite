@@ -1,7 +1,7 @@
 // Service Worker — Fullsite POS offline-first
 // Caches app shell, static assets, and API responses for true offline operation
 
-const CACHE_VERSION = 'v41'
+const CACHE_VERSION = 'v42'
 const STATIC_CACHE = `fullsite-static-${CACHE_VERSION}`
 const DYNAMIC_CACHE = `fullsite-dynamic-${CACHE_VERSION}`
 const API_CACHE = `fullsite-api-${CACHE_VERSION}`
@@ -183,12 +183,28 @@ async function fetchWithTimeout(request, timeoutMs = NETWORK_TIMEOUT_MS) {
   }
 }
 
+// Safari iOS rechaza que un SW devuelva a una NAVEGACIÓN una respuesta con la
+// bandera `redirected` ("Response served by service worker has redirections"), y
+// Cache.put() la RECHAZA también. El login pega justo aquí: la navegación sigue
+// un redirect (/, trailing-slash, o login→destino) y el fetch la trae con
+// redirected=true. Como el navegador YA siguió el redirect, el body es la página
+// final: reconstruir una respuesta idéntica SIN la bandera es correcto y seguro.
+// Bug de campo iPhone 2026-08-31 (bloqueaba TODO login iOS). No cambia qué se cachea.
+function stripRedirect(response) {
+  if (!response || !response.redirected) return response
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  })
+}
+
 async function networkFirstWithCache(request, cacheName) {
   try {
     // A Windows terminal can keep its LAN link while WAN is down. In that state
     // navigator.onLine remains true and a raw fetch may hang on TCP for minutes.
     // Bound the network attempt so cached POS HTML wins in operational time.
-    const response = await fetchWithTimeout(request)
+    const response = stripRedirect(await fetchWithTimeout(request))
     if (response.ok) {
       const cache = await caches.open(cacheName)
       cache.put(request, response.clone())
@@ -222,7 +238,8 @@ async function navigationFromCache(request, event) {
   if (!cached) return networkFirstWithCache(request, DYNAMIC_CACHE)
 
   const refresh = fetchWithTimeout(request)
-    .then(async (response) => {
+    .then(async (raw) => {
+      const response = stripRedirect(raw)
       if (response.ok) {
         const cache = await caches.open(DYNAMIC_CACHE)
         await cache.put(request, response.clone())
