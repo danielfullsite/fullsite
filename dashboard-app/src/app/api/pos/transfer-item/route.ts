@@ -69,7 +69,27 @@ export async function POST(request: NextRequest) {
       `${sbUrl}/rest/v1/pos_orders?client_id=eq.${clientId}&mesa=eq.${target_mesa}&status=in.(abierta,enviada,preparando,lista)&order=created_at.desc&limit=1&select=id,items,updated_at,order_revision`,
       { headers, cache: 'no-store' }
     )
-    const targetRows = targetRes.ok ? await targetRes.json() : []
+    /**
+     * Una lectura FALLIDA no es "la mesa destino no tiene cuenta".
+     *
+     * Antes era `targetRes.ok ? await targetRes.json() : []`. Ante un 401 o un 500,
+     * `targetRows` quedaba vacio, `target` quedaba null, y el paso 5 se iba al else:
+     * CREAR UNA ORDEN NUEVA. Resultado con la mesa ya ocupada: el item se quitaba de
+     * la orden origen y aparecia una SEGUNDA cuenta en esa mesa. Cuenta partida en
+     * dos, y el mesero sin saber cual cobrar.
+     *
+     * Es la misma familia de los cuatro fallos del 2026-08-31: un fallo leido como si
+     * fuera otro. Aqui se aborta ANTES de tocar nada — el PATCH del origen es el paso
+     * 4, asi que en este punto no hay nada que deshacer.
+     */
+    if (!targetRes.ok) {
+      return Response.json({
+        ok: false,
+        error: 'TARGET_READ_FAILED',
+        message: 'No se pudo leer la mesa destino. No se movio nada — reintenta.',
+      }, { status: 502 })
+    }
+    const targetRows = await targetRes.json()
     const hasTarget = Array.isArray(targetRows) && targetRows.length > 0
     const target = hasTarget ? targetRows[0] : null
     const targetUpdatedAt = target?.updated_at
