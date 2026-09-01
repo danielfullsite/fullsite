@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { X, ArrowRight, ArrowLeft, Check, AlertTriangle, Printer, DollarSign, ShieldAlert } from 'lucide-react'
-import { formatMXN, verifyManagerPinWithRole, logAudit } from '@/lib/pos-data'
+import { Fingerprint, X, ArrowRight, ArrowLeft, Check, AlertTriangle, Printer, DollarSign, ShieldAlert } from 'lucide-react'
+import { formatMXN, verifyManagerPinWithRole, verifyManagerHuella, hayHuellasDadasDeAlta, logAudit } from '@/lib/pos-data'
 import { hasPermission } from '@/lib/pos-permissions'
 import { getActiveClientSlug as _cid } from '@/lib/data'
 import {
@@ -201,22 +201,41 @@ export default function CierreCajaWizard({
     totalContado,
   )
 
-  const handleSave = async () => {
+  // Huella para cerrar turno. Pedido por Daniel el 2026-08-31 ("tambien para cierre
+  // de caja"). La identidad entra por el MISMO embudo que el PIN: se sigue exigiendo
+  // `hasPermission(role, 'corte_z')` abajo, asi que la huella no salta el permiso.
+  const [huellaDisponible, setHuellaDisponible] = useState(false)
+  const [huellaVerificando, setHuellaVerificando] = useState(false)
+
+  useEffect(() => { hayHuellasDadasDeAlta().then(setHuellaDisponible).catch(() => {}) }, [])
+
+  const cerrarConHuella = async () => {
+    if (huellaVerificando || closingRef.current || saving) return
+    setHuellaVerificando(true)
+    setPinError('')
+    const g = await verifyManagerHuella('gerente')
+    setHuellaVerificando(false)
+    if (!g) { setPinError('Huella no reconocida o sin permiso de gerente'); return }
+    await handleSave(g)
+  }
+
+  /** `identidad` viene de la huella; sin ella se valida el PIN escrito. */
+  const handleSave = async (identidad?: { name: string; role: string }) => {
     // Prevent double-tap / concurrent close attempts
     if (closingRef.current || saving) return
     closingRef.current = true
     setSaving(true)
     setPinError('')
 
-    const result = await verifyManagerPinWithRole(pin)
+    const result = identidad ?? await verifyManagerPinWithRole(pin)
     if (!result) {
-      setPinError('PIN invalido')
+      setPinError(identidad ? 'Huella no reconocida' : 'PIN invalido')
       setSaving(false)
       closingRef.current = false
       return
     }
     if (!hasPermission(result.role, 'corte_z')) {
-      setPinError('Este PIN no tiene permiso para cerrar turno')
+      setPinError(`${identidad ? 'Esta huella' : 'Este PIN'} no tiene permiso para cerrar turno`)
       setSaving(false)
       closingRef.current = false
       return
@@ -691,7 +710,25 @@ export default function CierreCajaWizard({
           {step === 2 && (
             <>
               <div className="mt-6 mb-4">
-                <label className="text-sm text-[var(--text-3)] block mb-2">Huella o PIN de gerente para aprobar</label>
+                <label className="text-sm text-[var(--text-3)] block mb-2">
+                  {huellaDisponible ? 'Huella o PIN de gerente para aprobar' : 'PIN de gerente para aprobar'}
+                </label>
+                {/* El label ya prometia huella desde antes, pero no habia boton: la
+                    unica forma de aprobar era el PIN. Reportado por Daniel el
+                    2026-08-31 ("tambien para cierre de caja"). */}
+                {huellaDisponible && (
+                  <>
+                    <button
+                      onClick={cerrarConHuella}
+                      disabled={huellaVerificando || saving}
+                      className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 font-bold py-3 rounded-xl transition-colors mb-3"
+                    >
+                      <Fingerprint size={20} className={huellaVerificando ? 'animate-pulse' : ''} />
+                      {huellaVerificando ? 'Esperando huella...' : 'Aprobar con huella'}
+                    </button>
+                    <p className="text-xs text-[var(--text-4)] mb-2">o con PIN</p>
+                  </>
+                )}
                 <input
                   type="password"
                   inputMode="numeric"
@@ -713,7 +750,7 @@ export default function CierreCajaWizard({
                   Imprimir
                 </button>
                 <button
-                  onClick={handleSave}
+                  onClick={() => { void handleSave() }}
                   disabled={saving || !pin || pin.length < 4}
                   className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-emerald-500 text-white font-bold hover:bg-emerald-600 transition-colors disabled:opacity-50"
                 >

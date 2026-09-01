@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Receipt, RefreshCw, Clock, DollarSign, Users, CreditCard, Banknote, Ban, Percent, ChefHat, RotateCcw, ShieldAlert, AlertTriangle, X, Download, Printer } from 'lucide-react'
-import { formatMXN, getAuditLog, reopenOrder, logAudit, getClientId, verifyManagerPin, consumeManagerApproval, getActiveTurnoTolerante, getPaymentMethodsFromDB, type AuditLogEntry, type PagoForma, type PaymentMethodDB } from '@/lib/pos-data'
+import { Fingerprint, ArrowLeft, Receipt, RefreshCw, Clock, DollarSign, Users, CreditCard, Banknote, Ban, Percent, ChefHat, RotateCcw, ShieldAlert, AlertTriangle, X, Download, Printer } from 'lucide-react'
+import { formatMXN, getAuditLog, reopenOrder, logAudit, getClientId, verifyManagerPin, verifyManagerHuella, hayHuellasDadasDeAlta, consumeManagerApproval, getActiveTurnoTolerante, getPaymentMethodsFromDB, type AuditLogEntry, type PagoForma, type PaymentMethodDB } from '@/lib/pos-data'
 import { isTiempoItem } from '@/lib/pos-constants'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -216,6 +216,32 @@ export default function CortePage() {
   const [accessError, setAccessError] = useState('')
   const [accessChecking, setAccessChecking] = useState(false)
 
+  // Huella para entrar al corte. Pedido por Daniel el 2026-08-31: el PIN de gerente
+  // se teclea a la vista de todos, la huella exige presencia fisica.
+  const [huellaDisponible, setHuellaDisponible] = useState(false)
+  const [huellaVerificando, setHuellaVerificando] = useState(false)
+
+  useEffect(() => { hayHuellasDadasDeAlta().then(setHuellaDisponible).catch(() => {}) }, [])
+
+  /** Comparte TODO el camino de exito con el PIN — misma auditoria, misma sesion. */
+  const concederAcceso = (manager: string) => {
+    sessionStorage.setItem('corte_access', '1')
+    logAudit({ order_id: 'corte', action: 'status_changed', actor: manager, details: { type: 'corte_viewed', date: selectedDate } })
+    setAccessGranted(true)
+  }
+
+  const handleAccesoHuella = async () => {
+    if (huellaVerificando) return
+    setHuellaVerificando(true)
+    setAccessError('')
+    // Pide rol de gerente al SERVIDOR, igual que el PIN. Hasta el 2026-08-31 la rama
+    // de huella de /api/pos/pin ignoraba `min_role`; se tapo antes de cablear esto.
+    const g = await verifyManagerHuella('gerente')
+    setHuellaVerificando(false)
+    if (!g) { setAccessError('Huella no reconocida o sin permiso de gerente'); return }
+    concederAcceso(g.name)
+  }
+
   const handleAccess = async () => {
     if (!accessPin || accessChecking) return
     setAccessChecking(true)
@@ -223,9 +249,7 @@ export default function CortePage() {
     const manager = await verifyManagerPin(accessPin)
     setAccessChecking(false)
     if (!manager) { setAccessError('PIN inválido'); setAccessPin(''); return }
-    sessionStorage.setItem('corte_access', '1')
-    logAudit({ order_id: 'corte', action: 'status_changed', actor: manager, details: { type: 'corte_viewed', date: selectedDate } })
-    setAccessGranted(true)
+    concederAcceso(manager)
   }
 
   useEffect(() => { if (accessGranted) fetchData() }, [selectedDate, accessGranted, corteMode])
@@ -440,11 +464,26 @@ export default function CortePage() {
         <div className="bg-[var(--surface-2)] border border-slate-700 rounded-2xl p-8 w-full max-w-sm text-center">
           <ShieldAlert size={40} className="mx-auto mb-4 text-amber-400" />
           <h1 className="text-lg font-bold mb-1">Corte de turno</h1>
-          <p className="text-sm text-slate-400 mb-6">Acceso solo con PIN de gerente</p>
+          <p className="text-sm text-slate-400 mb-6">
+            {huellaDisponible ? 'Huella o PIN de gerente' : 'Acceso solo con PIN de gerente'}
+          </p>
+          {huellaDisponible && (
+            <>
+              <button
+                onClick={handleAccesoHuella}
+                disabled={huellaVerificando}
+                className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 font-bold py-3 rounded-xl transition-colors mb-3"
+              >
+                <Fingerprint size={20} className={huellaVerificando ? 'animate-pulse' : ''} />
+                {huellaVerificando ? 'Esperando huella...' : 'Entrar con huella'}
+              </button>
+              <p className="text-xs text-slate-500 mb-3">o con PIN</p>
+            </>
+          )}
           <input
             type="password"
             inputMode="numeric"
-            autoFocus
+            autoFocus={!huellaDisponible}
             value={accessPin}
             onChange={e => { setAccessPin(e.target.value); setAccessError('') }}
             onKeyDown={e => { if (e.key === 'Enter') handleAccess() }}
