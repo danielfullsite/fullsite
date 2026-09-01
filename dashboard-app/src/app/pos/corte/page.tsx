@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Receipt, RefreshCw, Clock, DollarSign, Users, CreditCard, Banknote, Ban, Percent, ChefHat, RotateCcw, ShieldAlert, AlertTriangle, X, Download, Printer } from 'lucide-react'
-import { formatMXN, getAuditLog, reopenOrder, logAudit, getClientId, verifyManagerPin, consumeManagerApproval, getActiveTurno, getPaymentMethodsFromDB, type AuditLogEntry, type PagoForma, type PaymentMethodDB } from '@/lib/pos-data'
+import { formatMXN, getAuditLog, reopenOrder, logAudit, getClientId, verifyManagerPin, consumeManagerApproval, getActiveTurnoTolerante, getPaymentMethodsFromDB, type AuditLogEntry, type PagoForma, type PaymentMethodDB } from '@/lib/pos-data'
 import { isTiempoItem } from '@/lib/pos-constants'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -116,22 +116,23 @@ export default function CortePage() {
       const [a, pct, t, pm] = await Promise.all([
         getAuditLog(200),
         getCardCommissionPct(),
-        getActiveTurno(),
+        getActiveTurnoTolerante(),
         getPaymentMethodsFromDB(),
       ])
       // Por turno si hay turno abierto; si no, fallback a fecha
-      const o = corteMode === 'turno' && t
-        ? await getOrdersByTurno(t.id)
+      const turnoActivo = t.turno
+      const o = corteMode === 'turno' && turnoActivo
+        ? await getOrdersByTurno(turnoActivo.id)
         : await getOrders(selectedDate)
-      const cm = corteMode === 'turno' && t
-        ? await getCashMovementsByTurno(t.id)
+      const cm = corteMode === 'turno' && turnoActivo
+        ? await getCashMovementsByTurno(turnoActivo.id)
         : await getCashMovementsByDate(selectedDate)
       // Overlay de movimientos AÚN sin sincronizar (cola offline): el path online solo
       // trae lo de Supabase, y con el SW sirviendo cache viejo el corte "cree" estar
       // online -> un retiro/deposito offline en la cola no aparecia en el arqueo hasta
       // sincronizar. Merge por id (dedup). (auditoria I-C)
       let cmMerged: CashMovement[] = cm as CashMovement[]
-      if (corteMode === 'turno' && t) {
+      if (corteMode === 'turno' && turnoActivo) {
         try {
           const { getPendingQueue } = await import('@/lib/pos-offline-db')
           const pending = await getPendingQueue()
@@ -139,7 +140,7 @@ export default function CortePage() {
           const queuedCm = pending
             .filter(p => p.table === 'pos_cash_movements')
             .map(p => p.data as unknown as (CashMovement & { turno_id?: string }))
-            .filter(d => d && d.turno_id === t.id && d.id && !seenIds.has(d.id))
+            .filter(d => d && d.turno_id === turnoActivo.id && d.id && !seenIds.has(d.id))
           if (queuedCm.length) cmMerged = [...(cm as CashMovement[]), ...queuedCm]
         } catch { /* cola no disponible → solo lo de Supabase */ }
       }
@@ -147,7 +148,7 @@ export default function CortePage() {
       setCashMovements(cmMerged)
       setAuditLog(a)
       setCardPct(pct)
-      setTurno(t)
+      setTurno(turnoActivo)
       setPaymentMethods(pm)
       setOfflineMode(false)
     } catch {

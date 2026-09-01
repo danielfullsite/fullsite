@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { getActiveTurnoWithStaleCheck, openTurno, logAudit } from '@/lib/pos-data'
 import { getPermissions } from '@/lib/pos-permissions'
 import { Clock, DoorOpen, AlertTriangle } from 'lucide-react'
+import { ErrorDeSesion } from '@/lib/clasificar-fallo'
 
 interface StaffMember {
   id: string
@@ -17,7 +18,7 @@ interface TurnoGateProps {
   children: React.ReactNode
 }
 
-type TurnoStatus = 'loading' | 'active' | 'none' | 'stale' | 'conflict'
+type TurnoStatus = 'loading' | 'active' | 'none' | 'stale' | 'conflict' | 'sesion'
 
 interface ActiveTurno {
   id: string
@@ -75,6 +76,20 @@ export default function TurnoGate({ staff, children }: TurnoGateProps) {
         setStatus('none')
       }
     } catch (err) {
+      /**
+       * Una sesion vencida NO es "no hay turno".
+       *
+       * Antes los dos casos caian aqui y terminaban en `status = 'none'`, que
+       * ofrece ABRIR TURNO. Con un turno ya abierto en el servidor, aceptar eso
+       * crea un turno duplicado: asi aparecieron los 11 turnos basura de AMALAY
+       * el 2026-08-31, varios con `closed_at` anterior a `opened_at`.
+       * Ante un 401/403 hay que volver a autenticar, no abrir nada.
+       */
+      if (err instanceof ErrorDeSesion) {
+        setTurno(null)
+        setStatus('sesion')
+        return
+      }
       console.error('[TurnoGate] Error verificando turno (offline?):', err)
       // Offline fallback: try cached turno from localStorage
       try {
@@ -174,6 +189,27 @@ export default function TurnoGate({ staff, children }: TurnoGateProps) {
 
   // Multiple active shifts make totals and KDS routing ambiguous. Block sales
   // until an authorized operator resolves every open shift with a real Corte Z.
+  // Sesion vencida: ni abrir turno ni Corte Z — volver a autenticar.
+  if (status === 'sesion') {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--bg-0)] p-6">
+        <div className="max-w-sm text-center">
+          <h2 className="text-2xl font-bold text-white mb-2">Tu sesion vencio</h2>
+          <p className="text-white/60 text-sm mb-6">
+            No se pudo verificar el turno porque la sesion ya no es valida. Vuelve a
+            entrar con tu huella o PIN. Las comandas guardadas no se pierden.
+          </p>
+          <button
+            onClick={() => { void checkTurno() }}
+            className="w-full rounded-xl bg-white/10 px-4 py-3 text-white hover:bg-white/15"
+          >
+            Reintentar
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   if (status === 'conflict') {
     return (
       <div className="h-dvh flex items-center justify-center select-none" style={{ background: 'linear-gradient(180deg, #200a0a 0%, #160808 100%)' }}>
