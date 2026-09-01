@@ -1,6 +1,23 @@
 # PCI-DSS SAQ-A — Self-Assessment Questionnaire
 
-**Fullsite Technologies S.A. de C.V.**
+> ⚠️ **BORRADOR INTERNO — SIN FIRMAR.** La linea de firma de la seccion "Declaracion de
+> cumplimiento" esta en blanco. Este documento **no debe presentarse como una autoevaluacion
+> completada** ante un cliente, un auditor ni una pagina publica, hasta que este firmado.
+>
+> Existe ademas un segundo archivo `pci-dss-saq-a.md` en esta misma carpeta, con contenido
+> distinto. **El canonico es este** (es el indexado en el README).
+>
+> Dos referencias cruzadas de este documento apuntan a controles que no existen tal como se
+> citan, y hay que resolverlas antes de firmar:
+> - El control 8.5 cita una regla de desactivacion de cuentas inactivas a los 90 dias que **no
+>   existe** en `02-access-control-policy.md`.
+> - El control 12.8 cita una clasificacion "P0-P3" cuando `03-incident-response-plan.md` usa
+>   **S1-S4**.
+>
+> Un auditor verifica la evidencia citada, no la respuesta.
+
+**Fullsite Technologies, S.A.S.**
+RFC: FTE260611PI8 · Sociedad por Acciones Simplificada
 Version: 1.0
 Fecha: 2026-05-25
 Proxima revision: 2027-05-25
@@ -100,11 +117,16 @@ Fullsite POS  <-- Fullsite SOLO recibe:
 
 ## Declaracion de cumplimiento
 
-Declaro que Fullsite Technologies S.A. de C.V. ha completado esta autoevaluacion SAQ-A de manera veraz y completa. Fullsite no almacena, procesa ni transmite datos de tarjeta de credito o debito, delegando estas funciones completamente a proveedores certificados PCI-DSS Level 1.
+Declaro que Fullsite Technologies, S.A.S. ha completado esta autoevaluacion SAQ-A de manera veraz y completa. Fullsite no almacena, procesa ni transmite datos de tarjeta de credito o debito, delegando estas funciones completamente a proveedores certificados PCI-DSS Level 1.
+
+> **SIN FIRMAR.** Mientras esta linea siga en blanco, la declaracion de arriba no esta hecha
+> por nadie. El hecho de fondo —que no tocamos datos de tarjeta— si esta verificado: no existe
+> ninguna columna de numero de tarjeta, CVV ni expiracion en la base de datos. Lo que falta es
+> que alguien firme haberlo evaluado.
 
 **Firma:** ________________________________
 **Nombre:** Daniel Ramonfaur
-**Cargo:** CEO, Fullsite Technologies S.A. de C.V.
+**Cargo:** CEO, Fullsite Technologies, S.A.S.
 **Fecha:** 2026-05-25
 
 ## Acciones pendientes
