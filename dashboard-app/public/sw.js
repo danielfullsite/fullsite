@@ -1,7 +1,7 @@
 // Service Worker — Fullsite POS offline-first
 // Caches app shell, static assets, and API responses for true offline operation
 
-const CACHE_VERSION = 'v43'
+const CACHE_VERSION = 'v44'
 const STATIC_CACHE = `fullsite-static-${CACHE_VERSION}`
 const DYNAMIC_CACHE = `fullsite-dynamic-${CACHE_VERSION}`
 const API_CACHE = `fullsite-api-${CACHE_VERSION}`
@@ -151,7 +151,12 @@ self.addEventListener('fetch', (event) => {
 
   // Next.js data/API: network-first
   if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/_next/data/')) {
-    event.respondWith(networkFirstWithCache(request, DYNAMIC_CACHE, true))
+    // OJO: esApi=false a proposito. `/_next/data/` alimenta la navegacion, y ahi el
+    // emparejamiento flexible (ignoreSearch/ignoreVary) es lo que permite que
+    // /pos?mesa=1 empate con /pos cacheado durante un corte. Quitarselo golpea el
+    // arranque en frio, que es justo lo que no se puede romper. La marca de dato
+    // viejo solo hace falta donde hay ESTADO VIVO: Supabase.
+    event.respondWith(networkFirstWithCache(request, DYNAMIC_CACHE))
     return
   }
 
@@ -202,12 +207,21 @@ function stripRedirect(response) {
 /**
  * `esApi`: la respuesta guardada se ENTREGA, pero MARCADA.
  *
- * INCIDENTE 2026-08-31, AMALAY. La terminal Entrada mostraba solo las mesas 1 a 5
- * con la 7 abierta desde hacia rato, aunque el plano refresca cada 3 s. Entrada iba
- * lenta: la peticion se pasaba del limite, caia al catch, y aqui se devolvia la
- * copia guardada CON SU 200 ORIGINAL. Para la pagina era indistinguible de un dato
- * fresco, asi que la pintaba como verdad y ademas la reconciliaba a IndexedDB,
- * volviendo permanente lo viejo.
+ * CORRECCION 2026-08-31 (el commit anterior contaba mal esta historia).
+ *
+ * Se dijo que el SW le habia servido MESAS viejas a la terminal Entrada. Es FALSO:
+ * `/rest/v1/pos_orders` y `/rest/v1/pos_mesas` estan en NEVER_CACHE_PATTERNS desde
+ * antes, precisamente porque servirlas viejas ya habia roto el phantom-check y la
+ * comanda no llegaba al KDS. El SW ni siquiera intercepta esa consulta.
+ *
+ * Lo que de verdad paso en Entrada esta documentado como T-26 en
+ * docs/offline/TEST-MATRIX.md: la terminal iba lenta, el fetch se paso del limite,
+ * cayo al catch de la PAGINA y sirvio IndexedDB viejo. Nada que ver con el SW.
+ *
+ * Esta marca SI hace falta, pero para otra cosa: `pos_turnos` SI esta en
+ * API_CACHE_PATTERNS, asi que un turno cerrado puede volver como 200 desde el cache
+ * del SW. Ese es el mismo turno fantasma del Corte Z (#279), por otra via. Servir
+ * cache sin red se conserva; lo que se prohibe es servirla sin decirlo.
  *
  * Servir cache sin red es correcto y hay que conservarlo — es lo que sostiene el
  * modo offline. Lo que NO se vale es servirla sin decirlo. Con la marca

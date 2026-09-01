@@ -29,10 +29,13 @@ export function evaluarRespuestaDeMesas(
   /**
    * Un 200 del Service Worker puede ser una respuesta GUARDADA, no fresca.
    *
-   * Cuando la red tarda mas del limite, el SW cae a su cache y devuelve la copia
-   * con su 200 original. Antes eso era indistinguible de un dato fresco: asi fue
-   * como Entrada mostro las mesas 1 a 5 con la 7 abierta, refrescando cada 3 s.
-   * El SW (v43) ahora marca esas respuestas con `X-Fullsite-Stale`.
+   * CORRECCION: NO fue esto lo que le paso a Entrada. `pos_orders` esta en
+   * NEVER_CACHE_PATTERNS del SW, asi que el plano nunca se sirve de ese cache. Lo de
+   * Entrada fue el timeout del fetch cayendo a IndexedDB (T-26 en TEST-MATRIX.md).
+   *
+   * La marca sigue valiendo por otras consultas que el SW SI cachea —`pos_turnos`
+   * entre ellas— y porque este guard debe seguir siendo correcto si mañana alguien
+   * mueve una tabla de una lista a la otra. Es barato y falla del lado seguro.
    *
    * Se pinta igual —tener el dato viejo es mejor que no tener nada— pero NO se
    * reconcilia contra el cache local y se avisa en pantalla.
