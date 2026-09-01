@@ -419,21 +419,78 @@ async function _getPaymentMethodsFromCache(): Promise<PaymentMethodDB[]> {
 
 type ActiveTurnoRecord = { id: string; fondo_inicial: number; opened_by: string; opened_at: string }
 
+/**
+ * De dónde salió el conteo de turnos de la última llamada.
+ *
+ * POR QUÉ EXISTE. Campo AMALAY, 2026-08-31: sin red, TurnoGate mostró
+ * "Hay 16 turnos abiertos" y BLOQUEÓ el POS. La base tenía 1 turno abierto.
+ * Se descartaron cuatro orígenes leyendo el código —el caché de `openTurno`
+ * guarda uno solo; el de `getActiveTurnos` topa en `limit=10`; la consulta del
+ * mapa daría 8 como máximo según las fechas reales; y el filtro `closed_at`
+ * existe desde el 12-jun— y ninguno produce 16.
+ *
+ * El dato que falta vive en la máquina, no en el repositorio. Esto lo captura
+ * para que el próximo bloqueo diga de dónde salió el número en vez de que
+ * haya que adivinarlo.
+ */
+export interface TurnoFetchDiag {
+  at: string
+  /** server = respondió la nube · cache-* = se usó el respaldo local y por qué */
+  source: 'server' | 'cache-http' | 'cache-error' | 'cache-sin-storage'
+  count: number
+  ids: string[]
+  online: boolean
+  httpStatus: number | null
+  /** Contenido crudo de pos_turno_cache, recortado. La pieza que faltaba. */
+  cacheRaw: string | null
+}
+
+let _lastTurnoDiag: TurnoFetchDiag | null = null
+
+/** Diagnóstico de la última llamada a getActiveTurnos. Sólo lectura. */
+export function getLastTurnoDiag(): TurnoFetchDiag | null {
+  return _lastTurnoDiag
+}
+
 /** Turnos activos (pos_turnos sin closed_at), del más reciente al más antiguo. */
 export async function getActiveTurnos(): Promise<ActiveTurnoRecord[]> {
-  const fromCache = () => {
-    if (typeof localStorage === 'undefined') return []
+  const online = typeof navigator === 'undefined' ? true : navigator.onLine !== false
+  const cacheRaw = () => {
+    if (typeof localStorage === 'undefined') return null
+    // 2000 y no 600: con 600 el recorte se comía justo el final cuando hay muchos
+    // turnos — es decir, se perdía en el único caso para el que esto existe.
+    try { return (localStorage.getItem('pos_turno_cache') || '').slice(0, 2000) || null } catch { return null }
+  }
+  const recordar = (source: TurnoFetchDiag['source'], rows: unknown[], httpStatus: number | null) => {
+    _lastTurnoDiag = {
+      at: new Date().toISOString(),
+      source,
+      count: Array.isArray(rows) ? rows.length : -1,
+      ids: Array.isArray(rows) ? rows.slice(0, 20).map(r => String((r as { id?: unknown })?.id ?? '?')) : [],
+      online,
+      httpStatus,
+      cacheRaw: cacheRaw(),
+    }
+    // Un conteo >1 bloquea el POS entero. Si va a pasar, que quede dicho.
+    if (_lastTurnoDiag.count > 1) {
+      console.error('[turno] conteo que BLOQUEA el POS', _lastTurnoDiag)
+    }
+    return rows
+  }
+
+  const fromCache = (source: TurnoFetchDiag['source'], httpStatus: number | null) => {
+    if (typeof localStorage === 'undefined') return recordar('cache-sin-storage', [], httpStatus) as ActiveTurnoRecord[]
     try {
       const raw = localStorage.getItem('pos_turno_cache')
       if (raw) {
         const { turno, turnos, ts } = JSON.parse(raw)
         if (Date.now() - ts < 24 * 3600 * 1000) {
-          if (Array.isArray(turnos)) return turnos
-          if (turno) return [turno]
+          if (Array.isArray(turnos)) return recordar(source, turnos, httpStatus) as ActiveTurnoRecord[]
+          if (turno) return recordar(source, [turno], httpStatus) as ActiveTurnoRecord[]
         }
       }
     } catch {}
-    return []
+    return recordar(source, [], httpStatus) as ActiveTurnoRecord[]
   }
 
   try {
@@ -444,15 +501,15 @@ export async function getActiveTurnos(): Promise<ActiveTurnoRecord[]> {
     // Service Worker network-first resolves offline Supabase requests as a 503
     // Response. fetch() therefore does NOT throw, so the catch fallback below
     // never ran and TurnoGate incorrectly blocked a valid cold-offline shift.
-    if (!res.ok) return fromCache()
+    if (!res.ok) return fromCache('cache-http', res.status)
     const rows = await res.json()
     if (typeof window !== 'undefined') {
       try { localStorage.setItem('pos_turno_cache', JSON.stringify({ turno: rows[0] || null, turnos: rows, ts: Date.now() })) } catch {}
     }
-    return rows
+    return recordar('server', rows, res.status) as ActiveTurnoRecord[]
   } catch {
     // Offline o timeout — usar turno cacheado del mismo día
-    return fromCache()
+    return fromCache('cache-error', null)
   }
 }
 

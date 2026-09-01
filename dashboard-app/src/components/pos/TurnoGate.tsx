@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { usePathname } from 'next/navigation'
-import { getActiveTurnoWithStaleCheck, openTurno, logAudit } from '@/lib/pos-data'
+import { getActiveTurnoWithStaleCheck, openTurno, logAudit, getLastTurnoDiag } from '@/lib/pos-data'
 import { getPermissions } from '@/lib/pos-permissions'
 import { Clock, DoorOpen, AlertTriangle } from 'lucide-react'
 
@@ -188,6 +188,21 @@ export default function TurnoGate({ staff, children }: TurnoGateProps) {
           ) : (
             <p className="text-slate-400 text-sm">Solicita a un encargado que realice los cortes.</p>
           )}
+          {/* Este bloqueo detiene la venta. Si el conteo viene de un dato local
+              dudoso, el operador tiene que poder fotografiar de dónde salió sin
+              abrir DevTools — en campo nadie los abre. Campo AMALAY 2026-08-31:
+              decía 16 con 1 solo turno abierto en la base. */}
+          {(() => {
+            const d = getLastTurnoDiag()
+            if (!d) return null
+            return (
+              <p className="mt-6 text-[11px] leading-relaxed text-red-200/40 font-mono break-words">
+                origen: {d.source} · online: {d.online ? 'sí' : 'no'}
+                {d.httpStatus != null ? ` · http ${d.httpStatus}` : ''} · n={d.count}
+                {d.ids.length ? <><br />ids: {d.ids.join(', ')}</> : null}
+              </p>
+            )
+          })()}
         </div>
       </div>
     )
