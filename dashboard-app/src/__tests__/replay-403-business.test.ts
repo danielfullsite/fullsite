@@ -82,7 +82,13 @@ describe('P0-1 — 403 de negocio vs 401 de auth en el replay', () => {
         : { ok: true, status: 200, body: { ok: true } })
     const db = await loadModule()
     await db.queueOperation('pos_cash_movements', 'POST', { id: 'cm1', client_id: 'tenantA', amount: 3000 }, undefined, undefined, 'SUPABASE_REST')
-    await db.queueOperation('pos_turnos', 'PATCH', { id: 't1', client_id: 'tenantA' }, undefined, undefined, 'SUPABASE_REST')
+        // El PATCH lleva filtro a proposito. Antes este fixture iba SIN endpoint —
+    // `queueOperation('pos_turnos','PATCH',{...}, undefined, undefined, ...)`— que es
+    // exactamente la forma que el 2026-08-31 cerro los ONCE turnos de AMALAY de un
+    // golpe: el replay arma `endpoint || table` y sin filtro el PATCH toca toda la
+    // tabla. El replay ahora la bloquea, asi que el fixture tenia que dejar de usarla.
+    // La afirmacion de esta prueba no cambia: un 403 aisla UN item y el drenado sigue.
+    await db.queueOperation('pos_turnos', 'PATCH', { id: 't1', client_id: 'tenantA' }, `pos_turnos?id=eq.t1`, undefined, 'SUPABASE_REST')
 
     const res = await db.syncAll()
     await flush()
@@ -110,7 +116,7 @@ describe('P0-1 — 403 de negocio vs 401 de auth en el replay', () => {
     installFetch(() => ({ ok: false, status: 401, body: { error: 'unauthorized' } }))
     const db = await loadModule()
     await db.queueOperation('pos_cash_movements', 'POST', { id: 'cm2', client_id: 'tenantA' }, undefined, undefined, 'SUPABASE_REST')
-    await db.queueOperation('pos_turnos', 'PATCH', { id: 't2', client_id: 'tenantA' }, undefined, undefined, 'SUPABASE_REST')
+            await db.queueOperation('pos_turnos', 'PATCH', { id: 't2', client_id: 'tenantA' }, `pos_turnos?id=eq.t2`, undefined, 'SUPABASE_REST')
 
     await db.syncAll()
     await flush()
