@@ -40,11 +40,24 @@ type TurnoResolution =
  * Resolve the shift at the application boundary before an offline save reaches the RPC.
  *
  * A queued order can carry a shift that was open when captured but closed before replay.
- * New orders are moved only to the currently-open shift at the same location. Existing
- * writes and updates fail closed so money is never silently moved between cash closures.
- * A previously committed idempotent operation is allowed through unchanged; the RPC will
- * return its original result without executing the write again.
+ * New orders are moved only to the currently-open shift. Existing writes and updates fail
+ * closed so money is never silently moved between cash closures. A previously committed
+ * idempotent operation is allowed through unchanged; the RPC will return its original
+ * result without executing the write again.
+ *
+ * INCIDENTE 2026-08-31 — este select pedia `location_id`, que NO EXISTE en pos_turnos.
+ * PostgREST responde 400 ante una columna inexistente, `turnoRes.ok` era false, y la
+ * funcion devolvia TURN_NOT_FOUND -> HTTP 409 en CADA orden, con turno abierto o sin el.
+ * El POS de AMALAY quedo sin poder enviar comandas. Columnas reales de pos_turnos:
+ *   id, client_id, opened_by, fondo_inicial, opened_at,
+ *   closed_by, fondo_final, efectivo_sistema, diferencia, closed_at, notas
+ * Por eso el filtro por sucursal se retira: esa columna no existe en esta tabla (si en
+ * pos_orders). Cuando pos_turnos tenga location_id, se vuelve a agregar CON su prueba.
  */
+
+/** Columnas que este endpoint pide de pos_turnos. Deben existir de verdad — ver
+ *  `src/__tests__/pos-turnos-columnas.test.ts`, que las contrasta con el esquema real. */
+export const TURNO_SELECT_COLUMNS = ['id', 'closed_at'] as const
 async function resolveTurnoForSave(
   body: Record<string, unknown>,
   clientId: string,
@@ -56,11 +69,11 @@ async function resolveTurnoForSave(
 
   const turnoRes = await fetch(
     `${sbUrl}/rest/v1/pos_turnos?id=eq.${encodeURIComponent(requestedTurnoId)}` +
-      `&client_id=eq.${encodeURIComponent(clientId)}&select=id,closed_at,location_id&limit=1`,
+      `&client_id=eq.${encodeURIComponent(clientId)}&select=${TURNO_SELECT_COLUMNS.join(',')}&limit=1`,
     { headers },
   )
   if (!turnoRes.ok) return { ok: false, error: 'TURN_NOT_FOUND' }
-  const turnos = await turnoRes.json() as Array<{ id: string; closed_at: string | null; location_id: string | null }>
+  const turnos = await turnoRes.json() as Array<{ id: string; closed_at: string | null }>
   const requested = turnos[0]
   if (!requested) return { ok: false, error: 'TURN_NOT_FOUND' }
   if (!requested.closed_at) return { ok: true, turnoId: requested.id, reassigned: false }
@@ -95,12 +108,11 @@ async function resolveTurnoForSave(
     return { ok: false, error: 'TURN_CLOSED_CONFLICT' }
   }
 
-  const locationFilter = requested.location_id
-    ? `&location_id=eq.${encodeURIComponent(requested.location_id)}`
-    : '&location_id=is.null'
+  // Sin filtro por sucursal: pos_turnos no tiene location_id (ver nota del incidente
+  // arriba). Filtrar por una columna inexistente devolvia 400 y rompia todo el endpoint.
   const activeRes = await fetch(
     `${sbUrl}/rest/v1/pos_turnos?client_id=eq.${encodeURIComponent(clientId)}` +
-      `${locationFilter}&closed_at=is.null&select=id&order=opened_at.desc&limit=1`,
+      `&closed_at=is.null&select=id&order=opened_at.desc&limit=1`,
     { headers },
   )
   if (!activeRes.ok) return { ok: false, error: 'TURN_CLOSED_NO_ACTIVE' }
