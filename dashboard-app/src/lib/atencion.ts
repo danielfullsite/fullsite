@@ -28,6 +28,17 @@ export interface Atencion {
   /** A dónde va el botón. */
   href?: string
   accion?: string
+  // ── Detalle para el panel al picar el renglón ──────────────────────────────
+  // `detalle` es una sola línea para la fila (acción sugerida O explicación). El
+  // panel muestra las DOS por separado —qué pasa y qué hacer— cuando existen, sin
+  // inventar nada: si el agente no lo reportó, la sección no aparece. Opcionales
+  // para no romper a quien construya un Atencion a mano.
+  /** Por qué pasa (explanation del agente). */
+  explicacion?: string
+  /** Qué hacer (suggested_action del agente). */
+  accionSugerida?: string
+  /** Tipo de detección, por si el panel quiere etiquetarlo. */
+  tipo?: string | null
 }
 
 /** Fila cruda de `agent_events`. */
@@ -111,6 +122,9 @@ export function desdeEventos(eventos: EventoAgente[], ahora: Date = new Date()):
         confianza: typeof e.confidence === 'number' ? e.confidence : null,
         href: destino?.href,
         accion: destino?.accion,
+        explicacion: e.explanation || '',
+        accionSugerida: e.suggested_action || '',
+        tipo: e.type ?? null,
       }
     })
     .sort((a, b) => {

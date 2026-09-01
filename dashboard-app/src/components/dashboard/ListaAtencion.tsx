@@ -1,7 +1,10 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
+import { ChevronRight } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
+import PanelAtencion from '@/components/dashboard/PanelAtencion'
 import type { Atencion, Severidad } from '@/lib/atencion'
 
 /**
@@ -33,6 +36,11 @@ export default function ListaAtencion({
   items: Atencion[]
   cargando?: boolean
 }) {
+  // Picar un renglón abre su detalle en un panel lateral (mismo gesto que las
+  // detecciones "para hoy"). El botón de acción (Ver inventario…) sigue siendo
+  // un atajo aparte: no abre el panel, va directo a su pantalla.
+  const [abierta, setAbierta] = useState<Atencion | null>(null)
+
   // Mientras carga no se muestra un esqueleto: aparecer y desaparecer arriba de
   // la pantalla es más molesto que llegar un segundo después.
   if (cargando) return null
@@ -55,29 +63,38 @@ export default function ListaAtencion({
 
       <div className="rounded-[12px] border border-[var(--line)] overflow-hidden divide-y divide-[var(--line)]">
         {items.map(i => (
-          <div key={i.id} className="flex items-center gap-3 bg-[var(--panel)] px-4 py-3">
+          <div key={i.id} className="flex items-center bg-[var(--panel)] pl-4">
             <span
               aria-hidden="true"
               className="w-[3px] self-stretch rounded-full flex-none"
               style={{ background: TONO[i.severidad].barra }}
             />
-            <span className="sr-only">{TONO[i.severidad].texto}:</span>
-            <div className="min-w-0 flex-1">
-              <p className="text-[14px] font-semibold text-[var(--text-1)] leading-snug">{i.titulo}</p>
-              {i.detalle && (
-                <p className="text-[12.5px] text-[var(--text-3)] mt-0.5 leading-snug">{i.detalle}</p>
-              )}
-            </div>
-            {/* El dinero en juego es lo que convierte un aviso en una prioridad. */}
-            {i.valor != null && (
-              <span className="hidden sm:block text-[13px] font-bold text-[var(--text-2)] tabular-nums flex-none">
-                {formatCurrency(i.valor)}
+            {/* Todo el renglón (menos el botón de acción) abre el detalle. */}
+            <button
+              type="button"
+              onClick={() => setAbierta(i)}
+              aria-label={`Ver detalle: ${i.titulo}`}
+              className="flex min-w-0 flex-1 items-center gap-3 py-3 pl-3 pr-2 text-left transition-colors hover:bg-[var(--surface-2)]"
+            >
+              <span className="sr-only">{TONO[i.severidad].texto}:</span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[14px] font-semibold text-[var(--text-1)] leading-snug">{i.titulo}</span>
+                {i.detalle && (
+                  <span className="block text-[12.5px] text-[var(--text-3)] mt-0.5 leading-snug">{i.detalle}</span>
+                )}
               </span>
-            )}
+              {/* El dinero en juego es lo que convierte un aviso en una prioridad. */}
+              {i.valor != null && (
+                <span className="hidden sm:block text-[13px] font-bold text-[var(--text-2)] tabular-nums flex-none">
+                  {formatCurrency(i.valor)}
+                </span>
+              )}
+              <ChevronRight size={16} className="flex-none text-[var(--text-4)]" aria-hidden="true" />
+            </button>
             {i.href && i.accion && (
               <Link
                 href={i.href}
-                className="flex-none text-[12.5px] font-semibold px-3 py-1.5 rounded-lg border border-[var(--line)] text-[var(--text-2)] hover:text-[var(--text-1)] hover:border-[var(--accent-line)] transition-colors"
+                className="flex-none ml-1 mr-4 text-[12.5px] font-semibold px-3 py-1.5 rounded-lg border border-[var(--line)] text-[var(--text-2)] hover:text-[var(--text-1)] hover:border-[var(--accent-line)] transition-colors"
               >
                 {i.accion}
               </Link>
@@ -85,6 +102,8 @@ export default function ListaAtencion({
           </div>
         ))}
       </div>
+
+      <PanelAtencion atencion={abierta} onCerrar={() => setAbierta(null)} />
     </section>
   )
 }
