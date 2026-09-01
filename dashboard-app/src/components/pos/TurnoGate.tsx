@@ -6,6 +6,12 @@ import { getActiveTurnoWithStaleCheck, openTurno, logAudit } from '@/lib/pos-dat
 import { getPermissions } from '@/lib/pos-permissions'
 import { Clock, DoorOpen, AlertTriangle } from 'lucide-react'
 import { ErrorDeSesion } from '@/lib/clasificar-fallo'
+import { evaluarAperturaDeTurno, totalDeCuentas, openOrderStatusLabel,
+  type VeredictoApertura, type LecturaDeCuentas } from '@/lib/pos-cierre-guard'
+import { esFalloDeAutenticacion } from '@/lib/clasificar-fallo'
+import { fetchWithTimeout, getPOSAuthHeaders, getClientId, formatMXN, logAudit as _logAudit } from '@/lib/pos-data'
+
+const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 
 interface StaffMember {
   id: string
@@ -45,6 +51,73 @@ export default function TurnoGate({ staff, children }: TurnoGateProps) {
 
   const [isOfflineMode, setIsOfflineMode] = useState(false)
   const [offlineSince, setOfflineSince] = useState<string | null>(null)
+
+  /**
+   * Regla de Eduardo: no se abre turno con cuentas abiertas del anterior.
+   *
+   *   "No puedes abrir un turno si sigues teniendo cuentas abiertas del turno
+   *    anterior… hay que matarlas todas."  — Eduardo Esquivel, AMALAY
+   *
+   * Si NO hay turno abierto, cualquier orden viva pertenece por definicion a un
+   * turno pasado. La POLITICA vive en `evaluarAperturaDeTurno` (probada aparte);
+   * aqui solo se consulta, se pinta y se ofrece cerrarlas.
+   *
+   * REGLA DURA #3: abrir el dia NUNCA se bloquea por red. Si la consulta falla,
+   * `evaluarAperturaDeTurno` devuelve permitido=true con aviso. Esa decision no
+   * esta aqui a proposito — asi se puede probar sin montar el componente.
+   */
+  const [veredicto, setVeredicto] = useState<VeredictoApertura | null>(null)
+  const [cerrandoCuentas, setCerrandoCuentas] = useState(false)
+  const [errorCerrar, setErrorCerrar] = useState('')
+
+  const revisarCuentasHuerfanas = useCallback(async () => {
+    let lectura: LecturaDeCuentas
+    try {
+      const res = await fetchWithTimeout(
+        `${SB_URL}/rest/v1/pos_orders?client_id=eq.${getClientId()}` +
+        `&status=in.(enviada,preparando,lista)&select=id,mesa,mesero,status,total&order=created_at.asc&limit=50`,
+        { headers: getPOSAuthHeaders(), cache: 'no-store' },
+      )
+      lectura = res.ok
+        ? { determinado: true, cuentas: await res.json() }
+        : { determinado: false, motivo: esFalloDeAutenticacion(res.status) ? 'tu sesion vencio' : `HTTP ${res.status}` }
+    } catch {
+      lectura = { determinado: false, motivo: 'sin conexion' }
+    }
+    setVeredicto(evaluarAperturaDeTurno(lectura))
+  }, [])
+
+  /** "Hay que matarlas todas" — cancelacion auditada, NUNCA un DELETE. */
+  const cerrarCuentasHuerfanas = useCallback(async () => {
+    if (cerrandoCuentas || !veredicto?.bloqueantes.length) return
+    setCerrandoCuentas(true)
+    setErrorCerrar('')
+    const headers = { ...getPOSAuthHeaders(), 'Content-Type': 'application/json' }
+    const fallidas: string[] = []
+    for (const c of veredicto.bloqueantes) {
+      try {
+        // Filtro por id SIEMPRE. Un PATCH sin filtro toca toda la tabla — asi se
+        // cerraron los once turnos de AMALAY el 2026-08-31 (ver esMutacionSinFiltro).
+        const res = await fetchWithTimeout(
+          `${SB_URL}/rest/v1/pos_orders?id=eq.${encodeURIComponent(c.id)}&client_id=eq.${getClientId()}`,
+          { method: 'PATCH', headers, body: JSON.stringify({
+              status: 'cancelada',
+              closed_at: new Date().toISOString(),
+              notas: `Cancelada al abrir turno: cuenta abierta del turno anterior (${staff.name})`,
+            }) },
+        )
+        if (!res.ok) fallidas.push(`mesa ${c.mesa}`)
+        else _logAudit({ order_id: c.id, action: 'status_changed', actor: staff.name,
+                         details: { type: 'cuenta_huerfana_cancelada', mesa: c.mesa, total: c.total } })
+      } catch { fallidas.push(`mesa ${c.mesa}`) }
+    }
+    setCerrandoCuentas(false)
+    if (fallidas.length) {
+      // Falla PARCIAL: se dice cuales quedaron. Nunca se declara exito a medias.
+      setErrorCerrar(`No se pudieron cerrar: ${fallidas.join(', ')}. Reintenta o ciérralas desde la caja.`)
+    }
+    await revisarCuentasHuerfanas()
+  }, [cerrandoCuentas, veredicto, staff.name, revisarCuentasHuerfanas])
 
   const checkTurno = useCallback(async () => {
     try {
@@ -119,6 +192,12 @@ export default function TurnoGate({ staff, children }: TurnoGateProps) {
   useEffect(() => {
     checkTurno()
   }, [checkTurno])
+
+  // Sin turno abierto = momento de revisar cuentas huerfanas (regla de Eduardo).
+  useEffect(() => {
+    if (status === 'none') void revisarCuentasHuerfanas()
+    else setVeredicto(null)
+  }, [status, revisarCuentasHuerfanas])
 
   // Poll every 5s when waiting for turno
   useEffect(() => {
@@ -230,6 +309,76 @@ export default function TurnoGate({ staff, children }: TurnoGateProps) {
   }
 
   // ── No turno — gerente/admin/cajero can open ──
+  // REGLA DE EDUARDO — bloquea ANTES de la pantalla de abrir turno.
+  // Solo cuando la consulta SI se pudo hacer y encontro cuentas; un fallo de red
+  // devuelve permitido=true y cae al flujo normal con aviso (regla dura #3).
+  if (status === 'none' && veredicto && !veredicto.permitido) {
+    const total = totalDeCuentas(veredicto.bloqueantes)
+    return (
+      <div className="h-dvh flex items-center justify-center select-none p-6" style={{ background: 'linear-gradient(180deg, #2a1a05 0%, #1a1004 100%)' }}>
+        <div className="w-full max-w-md">
+          <AlertTriangle size={40} className="mx-auto mb-4 text-amber-400" />
+          <h2 className="text-2xl font-bold text-white text-center mb-2">
+            Cuentas abiertas del turno anterior
+          </h2>
+          <p className="text-amber-200/80 text-sm text-center mb-5">
+            {veredicto.aviso}
+          </p>
+
+          <div className="rounded-xl border border-amber-500/25 bg-black/25 divide-y divide-amber-500/10 mb-4 max-h-64 overflow-y-auto">
+            {veredicto.bloqueantes.map(c => (
+              <div key={c.id} className="flex items-center justify-between px-4 py-3 text-sm">
+                <div>
+                  <div className="text-white font-semibold">Mesa {c.mesa}</div>
+                  <div className="text-white/45 text-xs">
+                    {openOrderStatusLabel(c.status)}{c.mesero ? ` · ${c.mesero}` : ''}
+                  </div>
+                </div>
+                <div className="text-amber-300 font-mono">{formatMXN(c.total)}</div>
+              </div>
+            ))}
+          </div>
+
+          <p className="text-white/45 text-xs text-center mb-4">
+            Total colgando: <span className="text-amber-300 font-mono">{formatMXN(total)}</span>
+          </p>
+
+          {errorCerrar && (
+            <p className="text-red-300 text-sm text-center mb-3">{errorCerrar}</p>
+          )}
+
+          {canCloseTurno ? (
+            <>
+              <button
+                onClick={() => { void cerrarCuentasHuerfanas() }}
+                disabled={cerrandoCuentas}
+                className="w-full rounded-xl bg-amber-600 hover:bg-amber-500 disabled:opacity-50 px-4 py-3 font-bold text-white"
+              >
+                {cerrandoCuentas
+                  ? 'Cerrando…'
+                  : `Cancelar ${veredicto.bloqueantes.length === 1 ? 'la cuenta' : `las ${veredicto.bloqueantes.length} cuentas`} y abrir turno`}
+              </button>
+              <p className="text-white/35 text-[11px] text-center mt-2">
+                Se cancelan, no se borran. Cada una queda en la auditoría a tu nombre.
+              </p>
+            </>
+          ) : (
+            <p className="text-white/50 text-sm text-center">
+              Pide a un encargado que las cierre. Tu perfil no tiene ese permiso.
+            </p>
+          )}
+
+          <button
+            onClick={() => { void revisarCuentasHuerfanas() }}
+            className="w-full mt-3 text-white/50 hover:text-white text-sm py-2"
+          >
+            Volver a revisar
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   if (status === 'none' && canOpenTurno) {
     const handleOpen = async () => {
       const fondo = parseFloat(fondoInicial)
