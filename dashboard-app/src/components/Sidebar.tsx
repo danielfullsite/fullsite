@@ -58,7 +58,6 @@ import {
   ArrowLeft,
   BookOpen,
   MessageSquare,
-  Mic,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
@@ -183,7 +182,6 @@ const navSections = [
       { href: '/roi', label: 'ROI Agentes', icon: TrendingUp },
       { href: '/coach', label: 'Coach', icon: Sparkles },
       { href: '/chat', label: 'Chat IA', icon: MessageCircle },
-      { href: '/voice', label: 'Voice Agent', icon: Mic },
       { href: '/encuestas', label: 'Encuestas', icon: MessageSquare },
       { href: '/ecommerce', label: 'E-commerce', icon: Store },
     ],
