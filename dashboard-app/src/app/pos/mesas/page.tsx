@@ -11,6 +11,7 @@ import { getPosConfigSync } from '@/lib/pos-config'
 import { shouldUsePersistedFloorCoordinates } from '@/lib/floorplan-coordinates'
 import { setMesaTarget } from '@/lib/pos-navigation'
 import { counterHomePath, getServiceModel, isCounterModel } from '@/lib/pos-service-model'
+import { evaluarRespuestaDeMesas } from '@/lib/plano-mesas'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -150,6 +151,8 @@ export default function MesasPage() {
   const [reservas, setReservas] = useState<Reserva[]>([])
   const [loading, setLoading] = useState(true)
   const [soloMisMesas, setSoloMisMesas] = useState(false)
+  // Motivo por el que el plano NO refleja el servidor. `null` = el plano es de fiar.
+  const [planoNoVerificado, setPlanoNoVerificado] = useState<string | null>(null)
   const [currentMesero, setCurrentMesero] = useState<string>('')
   const [viewMode, setViewMode] = useState<'planograma' | 'grid'>('grid')
   const [staffName, setStaffName] = useState<string>('')
@@ -289,7 +292,32 @@ export default function MesasPage() {
           { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
         ),
       ])
-      const orders: ActiveOrder[] = ordersRes.ok ? await ordersRes.json() : []
+      /**
+       * Una respuesta fallida NO es "no hay mesas ocupadas".
+       *
+       * Antes esta linea era `ordersRes.ok ? await ordersRes.json() : []`. Con un
+       * 401 el plano pintaba TODAS las mesas libres, y peor: la lista vacia se le
+       * pasaba a `reconcileCachedActiveOrders`, que entonces BORRA del cache local
+       * todas las ordenes activas. Una sola peticion fallida destruia el registro
+       * de mesas ocupadas — justo la doble reserva contra la que advierte el
+       * comentario (#37) tres lineas arriba.
+       *
+       * Visto en campo el 2026-08-31 en la terminal Entrada de AMALAY: la caja
+       * tenia 5 mesas con cuenta abierta y Entrada las mostraba todas vacias.
+       *
+       * Ante cualquier fallo se sirve el cache y se AVISA. Nunca se reconcilia con
+       * datos que el servidor no confirmo.
+       */
+      const lectura = evaluarRespuestaDeMesas(ordersRes)
+      if (!lectura.confiable) {
+        setPlanoNoVerificado(lectura.motivo)
+        const { getCachedActiveOrders } = await import('@/lib/pos-offline-db')
+        setActiveOrders(await getCachedActiveOrders(_cid()) as unknown as ActiveOrder[])
+        setLoading(false)
+        return
+      }
+      setPlanoNoVerificado(null)
+      const orders: ActiveOrder[] = await ordersRes.json()
       // Overlay unsynced offline orders still in the sync queue. On reconnect the
       // poll comes DOWN (Supabase doesn't have the offline order yet — it's queued
       // going UP), which would flip an occupied mesa back to Disponible and risk a
@@ -342,7 +370,9 @@ export default function MesasPage() {
       ).catch(() => {})
       setReservas(resRes.ok ? await resRes.json() : [])
     } catch {
-      // Offline fallback: IndexedDB has orders from last successful online fetch
+      // Offline fallback: IndexedDB has orders from last successful online fetch.
+      // Se avisa igual: el plano puede estar viejo y no debe leerse como verdad.
+      setPlanoNoVerificado('Sin conexion — el plano puede estar desactualizado')
       import('@/lib/pos-offline-db').then(({ getCachedActiveOrders }) =>
         getCachedActiveOrders(_cid()).then(cached => {
           setActiveOrders(cached as unknown as ActiveOrder[])
@@ -803,6 +833,21 @@ export default function MesasPage() {
 
   return (
     <div className="h-screen flex flex-col text-[var(--text-1)]" style={{ background:"var(--bg)" }}>
+      {/* El plano no pudo confirmarse contra el servidor. Se avisa en vez de pintar
+          mesas libres en silencio: una mesa que se ve libre sin poder verificarlo es
+          como se sienta gente encima de una cuenta abierta. */}
+      {planoNoVerificado && (
+        <div className="flex items-center gap-2 px-4 lg:px-6 py-2 bg-amber-500/15 border-b border-amber-500/30 text-amber-200 text-sm flex-shrink-0">
+          <AlertTriangle size={16} className="flex-shrink-0" />
+          <span>
+            <strong>{planoNoVerificado}.</strong> El plano puede no reflejar las cuentas
+            abiertas — confirma en la caja antes de sentar.
+          </span>
+          <button onClick={fetchData} className="ml-auto underline underline-offset-2 hover:no-underline">
+            Reintentar
+          </button>
+        </div>
+      )}
       <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 lg:px-6 py-3 lg:py-4 bg-[var(--surface-2)] border-b border-[var(--line)] flex-shrink-0">
         <div className="flex flex-wrap items-center gap-3 min-w-0">
           <Link href="/pos" className="w-10 h-10 rounded-lg bg-[var(--line)] hover:bg-[var(--surface-2)] flex items-center justify-center transition-colors flex-shrink-0">
