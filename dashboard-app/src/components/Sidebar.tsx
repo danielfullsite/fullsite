@@ -58,6 +58,7 @@ import {
   ArrowLeft,
   BookOpen,
   MessageSquare,
+  Gauge,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
@@ -179,6 +180,7 @@ const navSections = [
     items: [
       { href: '/crm', label: 'CRM', icon: Users },
       { href: '/mission-control', label: 'Agentes IA', icon: Bot },
+      { href: '/mano-de-obra', label: 'Mano de obra', icon: Gauge },
       { href: '/roi', label: 'ROI Agentes', icon: TrendingUp },
       { href: '/coach', label: 'Coach', icon: Sparkles },
       { href: '/chat', label: 'Chat IA', icon: MessageCircle },
