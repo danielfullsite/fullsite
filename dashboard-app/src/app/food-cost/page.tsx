@@ -347,17 +347,24 @@ export default function FoodCostPage() {
         // ACTUAL (costo_total/pct_costo/ingredientes, cargado del Excel del cliente).
         // Wansoft (SOURCE 1/2) está vacío para todo tenant nuevo; sin esto la página
         // de food cost salía en blanco para cualquiera que no fuera AMALAY.
-        // Margen = 1 − costo/precio (mismo criterio que el resto del producto).
+        // Margen: si la receta trae `pct_costo` (el food cost que el cliente
+        // computa en su propio costeo — típicamente contra el precio SIN IVA,
+        // el estándar en MX porque el IVA no es ingreso propio), lo respetamos.
+        // Recalcular 1 − costo/precio_con_IVA sobreestima el margen y no cuadra
+        // con el Excel del restaurante. Sin pct_costo, caemos a 1 − costo/precio.
         // -------------------------------------------------------
         {
-          const pr: Array<{ nombre?: string; precio_venta?: number; costo_total?: number; ingredientes?: unknown }> =
+          const pr: Array<{ nombre?: string; precio_venta?: number; costo_total?: number; pct_costo?: number; ingredientes?: unknown }> =
             api?.posRecipes || []
           const conCosto = pr.filter(r => Number(r.costo_total) > 0)
           if (conCosto.length > 0) {
             const costItems: CostItem[] = conCosto.map(r => {
               const precio = Number(r.precio_venta) || 0
               const costo = Math.round((Number(r.costo_total) || 0) * 100) / 100
-              const margen = precio > 0 ? Math.round((1 - costo / precio) * 1000) / 10 : 0
+              const pctCosto = Number(r.pct_costo)
+              const margen = pctCosto > 0
+                ? Math.round((1 - pctCosto) * 1000) / 10
+                : precio > 0 ? Math.round((1 - costo / precio) * 1000) / 10 : 0
               const ings = Array.isArray(r.ingredientes) ? r.ingredientes : deepParse(r.ingredientes)
               return {
                 platillo: String(r.nombre || ''),
