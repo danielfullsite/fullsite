@@ -29,7 +29,7 @@ import {
   getModifierGroupsForItem,
   getPaymentMethodsFromDB,
   prefetchOfflineData,
-  getActiveTurno,
+  getActiveTurnoTolerante,
   getClientId,
   type RecipeRow,
   type Ingredient,
@@ -1769,7 +1769,7 @@ function POSContent() {
       if (!navigator.onLine) return
 
       const [r, i, dbMenu, pm, turno] = await Promise.all([
-        getRecipes(), getIngredients(), getMenuCategoriesFromDB(), getPaymentMethodsFromDB(), getActiveTurno(),
+        getRecipes(), getIngredients(), getMenuCategoriesFromDB(), getPaymentMethodsFromDB(), getActiveTurnoTolerante(),
       ])
       setAllRecipes(r)
       setAllIngredients(i)
@@ -1783,10 +1783,12 @@ function POSContent() {
         cacheMenu(dbMenu as unknown as Record<string, unknown>[]).catch(() => {})
       }
       setPaymentMethodsDB(pm)
-      if (turno) {
-        setTurnoId(turno.id)
-        try { localStorage.setItem('pos_turno_id', turno.id) } catch { /* ignore */ }
-      } else if (navigator.onLine) {
+      if (turno.turno) {
+        setTurnoId(turno.turno.id)
+        try { localStorage.setItem('pos_turno_id', turno.turno.id) } catch { /* ignore */ }
+      } else if (navigator.onLine && turno.determinado) {
+        // `determinado` es obligatorio: ante un 401 pasajero NO se borra el seed —
+        // habria dejado la terminal sin turno con uno abierto en el servidor.
         // Only clear the cached turno id when we are actually online and confirmed
         // there is no open turno. Clearing while offline would wipe the localStorage
         // seed that makes turnoId available after a cold offline restart.

@@ -269,6 +269,8 @@ export function getModifierTypeFromCategoryName(catName: string): 'none' | 'coff
 import { _categoryNameCache } from '@/lib/pos-constants'
 import { getActiveClientSlug } from '@/lib/data'
 import { inventoryPolicyService, logPolicyGateFailure } from '@/lib/inventory-policy'
+import { mismoDiaDeVenta, inicioDiaConfigurado } from '@/lib/dia-de-venta'
+import { esFalloDeRed, esFalloDeAutenticacion, ErrorDeSesion, ErrorDeContrato } from '@/lib/clasificar-fallo'
 
 export function getModifiersForCategory(categoryId: string): {
   quitarOptions: string[]
@@ -421,39 +423,70 @@ type ActiveTurnoRecord = { id: string; fondo_inicial: number; opened_by: string;
 
 /** Turnos activos (pos_turnos sin closed_at), del más reciente al más antiguo. */
 export async function getActiveTurnos(): Promise<ActiveTurnoRecord[]> {
-  const fromCache = () => {
+  /**
+   * El cache de turno vence por DIA DE VENTA, no por reloj.
+   *
+   * Antes vencia con `Date.now() - ts < 24h`. Un turno abierto a las 19:55 seguia
+   * sirviendose a las 22:00 del dia siguiente — 26 horas de vida util real, porque
+   * lo que se medía era cuando se guardó, no a qué día pertenece. Eso produjo la
+   * pantalla "Turno del dia anterior / Corte Z" en Entrada, sobre un turno que el
+   * servidor ya tenia cerrado. TurnoGate SI tenia guarda de mismo dia en su propio
+   * cache; este de aca abajo la puenteaba.
+   */
+  const fromCache = (): ActiveTurnoRecord[] => {
     if (typeof localStorage === 'undefined') return []
     try {
       const raw = localStorage.getItem('pos_turno_cache')
-      if (raw) {
-        const { turno, turnos, ts } = JSON.parse(raw)
-        if (Date.now() - ts < 24 * 3600 * 1000) {
-          if (Array.isArray(turnos)) return turnos
-          if (turno) return [turno]
-        }
-      }
-    } catch {}
-    return []
+      if (!raw) return []
+      const { turno, turnos, ts } = JSON.parse(raw)
+      const filas: ActiveTurnoRecord[] = Array.isArray(turnos) ? turnos : turno ? [turno] : []
+      if (filas.length === 0) return []
+      const inicio = inicioDiaConfigurado()
+      const ahora = Date.now()
+      // El sello de guardado y la apertura del turno deben caer los DOS en el dia
+      // de venta de hoy. El sello descarta un cache viejo; la apertura descarta un
+      // turno de anoche que se re-guardo hace un rato.
+      if (typeof ts === 'number' && !mismoDiaDeVenta(ts, ahora, inicio)) return []
+      return filas.filter(f => f?.opened_at && mismoDiaDeVenta(f.opened_at, ahora, inicio))
+    } catch {
+      return []
+    }
   }
 
+  let res: Response
   try {
-    const res = await fetchWithTimeout(
+    res = await fetchWithTimeout(
       `${_SUPABASE_URL}/rest/v1/pos_turnos?client_id=eq.${_getClientId()}&closed_at=is.null&select=id,fondo_inicial,opened_by,opened_at&order=opened_at.desc&limit=10`,
       { headers: _SB_HEADERS, cache: 'no-store' }
     )
-    // Service Worker network-first resolves offline Supabase requests as a 503
-    // Response. fetch() therefore does NOT throw, so the catch fallback below
-    // never ran and TurnoGate incorrectly blocked a valid cold-offline shift.
-    if (!res.ok) return fromCache()
-    const rows = await res.json()
-    if (typeof window !== 'undefined') {
-      try { localStorage.setItem('pos_turno_cache', JSON.stringify({ turno: rows[0] || null, turnos: rows, ts: Date.now() })) } catch {}
-    }
-    return rows
   } catch {
-    // Offline o timeout — usar turno cacheado del mismo día
+    // No hubo respuesta: red caida o timeout. Aqui SI vale el cache.
     return fromCache()
   }
+
+  if (!res.ok) {
+    /**
+     * Antes esta linea era `if (!res.ok) return fromCache()`, a secas.
+     *
+     * Se escribio para un caso legitimo: sin red, el Service Worker resuelve la
+     * peticion como un 503 sintetico, asi que `fetch` NO lanza y el catch nunca
+     * corria. Pero se aplico a TODOS los status. Un 401 de sesion vencida servia
+     * un turno viejo en silencio; un 400 por columna inexistente, tambien.
+     *
+     * Un fallo de contrato tiene que SUBIR. Servir cache ante un 401 no es
+     * tolerancia a fallos: es operar con datos viejos sin decirselo a nadie.
+     */
+    if (esFalloDeRed(res.status)) return fromCache()
+    const detalle = await res.text().catch(() => '')
+    if (esFalloDeAutenticacion(res.status)) throw new ErrorDeSesion(res.status, detalle.slice(0, 200))
+    throw new ErrorDeContrato(res.status, detalle.slice(0, 200))
+  }
+
+  const rows = await res.json()
+  if (typeof window !== 'undefined') {
+    try { localStorage.setItem('pos_turno_cache', JSON.stringify({ turno: rows[0] || null, turnos: rows, ts: Date.now() })) } catch {}
+  }
+  return rows
 }
 
 /** Turno activo más reciente. Devuelve null si no hay turno abierto. */
@@ -463,6 +496,32 @@ export async function getActiveTurno(): Promise<ActiveTurnoRecord | null> {
 }
 
 /** Turno activo + detección de turno stale (>18h sin cerrar = probablemente del día anterior) */
+/**
+ * Version TOLERANTE para pantallas que solo necesitan etiquetar con el turno.
+ *
+ * `getActiveTurnos` lanza ante 400/401/403 — correcto para TurnoGate, cuyo trabajo
+ * es decidir si se puede operar. Pero /pos y /pos/corte la llaman DENTRO de un
+ * `Promise.all` junto al menu, recetas y formas de pago: si lanzara ahi, un 401
+ * pasajero dejaria el POS entero sin cargar. Eso seria peor que el bug original.
+ *
+ * `determinado` distingue los dos "sin turno" que antes se confundian:
+ *   - `{ turno: null, determinado: true }`  -> el servidor confirmo que no hay turno
+ *   - `{ turno: null, determinado: false }` -> no se pudo saber (401, red, timeout)
+ *
+ * Quien limpie estado persistente DEBE exigir `determinado === true`. Borrar el
+ * `pos_turno_id` cacheado ante un 401 pasajero deja la terminal sin turno con uno
+ * abierto en el servidor.
+ */
+export async function getActiveTurnoTolerante(): Promise<{ turno: ActiveTurnoRecord | null; determinado: boolean }> {
+  try {
+    const turnos = await getActiveTurnos()
+    return { turno: turnos[0] || null, determinado: true }
+  } catch (err) {
+    console.warn('[pos-data] No se pudo determinar el turno activo:', err)
+    return { turno: null, determinado: false }
+  }
+}
+
 export async function getActiveTurnoWithStaleCheck(): Promise<{ turno: ActiveTurnoRecord | null; isStale: boolean; activeCount: number }> {
   const turnos = await getActiveTurnos()
   const turno = turnos[0] || null
