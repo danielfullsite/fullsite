@@ -18,6 +18,26 @@ export default function LoginPage() {
     sb.setStyle({ style: 'LIGHT' })
     return () => sb.setStyle({ style: 'DARK' })
   }, [])
+
+  // Auto-sanación del service worker en el login.
+  // Un dispositivo iOS puede quedar atascado en un SW viejo cuyo bug de redirect en
+  // navegaciones rompe TODO login ("Response served by service worker has redirections",
+  // arreglado en el SW v42 / #269). Como el registro y el auto-reload viven en /pos,
+  // un usuario atascado en /login nunca tomaba la versión nueva. Aquí forzamos el
+  // chequeo del SW y, si entra una versión nueva, recargamos UNA vez para correr bajo
+  // ella. No cambia qué se cachea; el reload en /login no pierde datos.
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return
+    navigator.serviceWorker.getRegistration().then((reg) => { reg?.update().catch(() => {}) }).catch(() => {})
+    const onControllerChange = () => {
+      if (sessionStorage.getItem('sw-reloaded-login') === '1') return // una sola vez → sin loop
+      sessionStorage.setItem('sw-reloaded-login', '1')
+      window.location.reload()
+    }
+    navigator.serviceWorker.addEventListener('controllerchange', onControllerChange)
+    return () => navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange)
+  }, [])
+
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
