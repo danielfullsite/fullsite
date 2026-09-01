@@ -1,6 +1,11 @@
 # ADR: Ciclo de Vida del Turno (Abrir, Operar, Cerrar)
 
 > Status: APROBADO por founder 2026-06-30 con 6 ajustes
+>
+> ⚠️ **2026-09-01 — ver el addendum:** [`ADR-003-ADDENDUM-REGLAS-EDUARDO.md`](ADR-003-ADDENDUM-REGLAS-EDUARDO.md).
+> Trae las reglas de dominio de Eduardo y **dónde el código diverge de este diseño**
+> (entre otras: `pos_turnos` NO tiene `terminal_id`, así que el turno es global por
+> restaurante, no por terminal como dice aquí abajo).
 > Fecha: 2026-06-30
 > Cubre: P0-1 (Abrir turno), P0-2 (Cerrar turno), P0-3 (Persistir arqueo)
 > Principios: auditado, sobrevive refresh, multi-device, compatible con Realtime
