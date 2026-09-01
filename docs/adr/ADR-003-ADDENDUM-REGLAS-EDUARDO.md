@@ -212,6 +212,87 @@ Salen de la evidencia de arriba, no de preferencia:
 
 ---
 
+## 5-bis. Deuda de clonabilidad — la regla de un restaurante como si fuera ley
+
+> Anotado el 2026-09-01, a raíz de una pregunta de Daniel: *"para los siguientes clientes
+> no pasará ningún problema?"*
+
+### Lo que se implementó mal, y se hizo el mismo día
+
+**R1 quedó fija para todos los tenants.** La función de política no recibe configuración
+del restaurante:
+
+```ts
+export function evaluarAperturaDeTurno(lectura: LecturaDeCuentas): VeredictoApertura
+```
+
+CLAUDE.md §12 lo prohíbe explícitamente: *"Una solución para AMALAY debe poder
+configurarse para otro restaurante sin modificar código."*
+
+**Dónde muerde:** un restaurante 24 horas, o una barra que deja cuentas abiertas toda la
+noche a propósito, quedaría bloqueado **sin manera de desactivarlo** salvo tocando código.
+Eso deja de ser un bug del cliente y pasa a ser un bloqueo de la clonabilidad.
+
+**Riesgo hoy: ninguno.** Ningún cliente actual opera 24 h. Por eso se anota en vez de
+corregirse de inmediato: el camino crítico está congelado hasta la prueba de humo, y
+sumar otro cambio sin validar a los diez que ya esperan sería peor.
+
+### El hallazgo que importa más: no es un caso aislado
+
+Medido el 2026-09-01:
+
+| | Estado |
+|---|---|
+| **La plomería** — `clients.pos_settings` (JSONB), API de plataforma para ver y editar los settings de cualquier tenant, claves ya en uso (`support.consent`, `onboarding.progress`) | ✅ **Existe y está bien hecha** |
+| **Lo que `pos-config.ts` expone** — `address`, `city`, `display_name`, `iva_rate`, `logo_url`, `phone`, `razon_social`, `receipt_footer`, `rfc`, `social_media`, `type` | Sólo **cosmético y fiscal** |
+| **Reglas de OPERACIÓN configurables** | ❌ **Ninguna** |
+
+O sea: **el mecanismo está construido y la política no lo usa.** R1 es el ejemplo más
+reciente, no el único.
+
+### Reglas de operación que deberían salir de `pos_settings`
+
+| Clave propuesta | Hoy | Default |
+|---|---|---|
+| `turno.bloquear_apertura_con_cuentas_abiertas` | fijo en código (R1) | `true` |
+| `turno.horas_maximas` | avisa a las 18 h, fijo (R4) | `24` |
+| `turno.bloquear_cierre_con_mesas_abiertas` | fijo, con override auditado | `true` |
+| `kds.campos_visibles_por_estacion` | fijo (R6) | — |
+| `folio.reinicia_por` | ya sale de `business_day_start_local` ✅ | `dia_venta` |
+
+Todos los defaults preservan el comportamiento actual: activarlos no cambia nada para
+AMALAY, sólo abre la puerta para el siguiente.
+
+### Lo que sí quedó bien para un cliente nuevo
+
+No todo es deuda. Verificado el 2026-09-01:
+
+- `provisionTenant()` siembra `timezone`, `business_day_start_local` e `iva_rate`, así que
+  un restaurante nuevo nace con su propia hora y su propio día de venta.
+- El folio **se numera en la zona horaria de cada cliente**. No es teoría: `tekila-rg`
+  corre en `America/Chicago` y funciona.
+- El índice único es parcial desde el 2026-09-02, así que un cliente nuevo queda cubierto
+  **desde el día uno**.
+- La restricción de `client_id` no vacío aplica a todos.
+
+**Detalle a limpiar:** el trigger cae a `America/Monterrey` cuando no hay zona, pero
+`provisionTenant` usa `America/Mexico_City`. En la práctica da igual —las dos son UTC-6
+todo el año desde que México quitó el horario de verano— pero son dos defaults distintos
+para lo mismo, y confunde a quien lo lea después.
+
+**Cinco tenants antiguos** (`coffee-shop`, `demo`, `esqueleton-demo`, `nomada`,
+`sushi-zen`) tienen `business_day_start_local` en nulo y heredan 05:00 del trigger.
+Funciona, pero nadie lo decidió.
+
+### La regla que queda
+
+> **Antes de escribir una regla de operación, preguntarse: ¿esto vale para todo
+> restaurante, o sólo para éste?** Si es lo segundo, va en `pos_settings` con un default
+> que preserve el comportamiento actual. El mecanismo ya existe; el costo de usarlo es un
+> parámetro.
+
+---
+
 ## 6. Lo que sigue, en orden
 
 | # | Qué | Por qué primero |
@@ -222,6 +303,7 @@ Salen de la evidencia de arriba, no de preferencia:
 | 4 | **Corte X como acto propio** (R5) | Hoy no se puede arquear sin cerrar |
 | 5 | **Verificación WebAuthn server-side** | La huella cierra escalada, no suplantación |
 | 6 | **Límite duro de 24 h** (R4) | Hoy sólo avisa a las 18 h |
+| 7 | **Mover las reglas de operación a `pos_settings`** (§5-bis) | R1 hoy es ley para todos; la plomería ya existe |
 
 **Nada de esto está certificado en campo.** El vocabulario aplica: *implementado* ≠ *probado
 localmente* ≠ *validado en campo* ≠ *cerrado*.
