@@ -110,7 +110,16 @@ export async function proxy(req: NextRequest) {
   const token = req.cookies.get('fs-at')?.value
   const loginUrl = new URL('/login', req.url)
 
-  if (!token) return NextResponse.redirect(loginUrl)
+  // Sin sesión: servir el shell (200) y que el cliente (AppShell) mande a /login
+  // por router.push. NUNCA redirigir en el servidor aquí: una NAVEGACIÓN que sigue
+  // un 307 la rompen los Service Workers viejos de Safari iOS con "Response served
+  // by service worker has redirections" — y como el error tapa la página, el SW
+  // nunca se actualiza solo: deja el login bloqueado para CUALQUIER dispositivo con
+  // un SW previo (incidente de campo Billy/ChickIn, 2026-09-01). Servir 200 elimina
+  // el redirect de raíz, así ningún SW (viejo o nuevo) recibe una respuesta
+  // redirigida. El shell no trae datos server-side; el gate real es el token + RLS
+  // en cada fetch, y AppShell no renderiza contenido protegido sin sesión.
+  if (!token) return NextResponse.next()
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
