@@ -1,7 +1,7 @@
 // Service Worker — Fullsite POS offline-first
 // Caches app shell, static assets, and API responses for true offline operation
 
-const CACHE_VERSION = 'v44'
+const CACHE_VERSION = 'v45'
 const STATIC_CACHE = `fullsite-static-${CACHE_VERSION}`
 const DYNAMIC_CACHE = `fullsite-dynamic-${CACHE_VERSION}`
 const API_CACHE = `fullsite-api-${CACHE_VERSION}`
@@ -278,9 +278,36 @@ async function networkFirstWithCache(request, cacheName, esApi = false) {
 // POS navigation must remain touch-fast during a WAN outage. If a shell already
 // exists locally, return it immediately and refresh it in the background. Fresh
 // installs (no cache yet) still use the bounded network-first path.
+/**
+ * Una respuesta RSC NO sirve como pagina.
+ *
+ * INCIDENTE 2026-08-31, AMALAY: /pos/staff mostraba el payload de Next en crudo
+ * —`:HL["/_next/static/..."]`, `{"children":["staff",...]}`— como texto plano.
+ *
+ * Cadena: al navegar dentro del POS, Next pide la MISMA URL con cabecera RSC. Esa
+ * peticion trae `accept: *​/*`, asi que no entra por la rama de navegacion: cae al
+ * catch-all stale-while-revalidate, que la guarda bajo la URL. Su content-type es
+ * `text/x-component`.
+ *
+ * Despues, al abrir esa URL como pagina, el match exacto falla (la entrada trae
+ * `Vary: RSC, Next-Router-State-Tree`) pero el respaldo con `ignoreVary: true`
+ * empata igual — y devuelve el flight como si fuera HTML. El navegador lo pinta
+ * como texto.
+ *
+ * `ignoreVary` se agrego por una buena razon (que /pos?mesa=1 empate con /pos
+ * cacheado durante un corte) y se conserva. Lo que se agrega es el filtro: para una
+ * NAVEGACION, una entrada `text/x-component` se descarta y se va a la red.
+ */
+function esRespuestaRSC(res) {
+  const ct = res?.headers?.get('content-type') || ''
+  return ct.includes('text/x-component')
+}
+
 async function navigationFromCache(request, event) {
-  const cached = await caches.match(request) ||
-    await caches.match(request, { ignoreSearch: true, ignoreVary: true })
+  const exacto = await caches.match(request)
+  const flexible = exacto || await caches.match(request, { ignoreSearch: true, ignoreVary: true })
+  // Un payload RSC no se le puede entregar al navegador como documento.
+  const cached = flexible && !esRespuestaRSC(flexible) ? flexible : null
   if (!cached) return networkFirstWithCache(request, DYNAMIC_CACHE)
 
   const refresh = fetchWithTimeout(request)
@@ -312,6 +339,11 @@ async function cacheFirstWithNetwork(request, cacheName) {
   }
 }
 
+/**
+ * Defensa 2: no meter respuestas RSC al cache compartido con las paginas. Aunque
+ * `navigationFromCache` ya las descarta al servir, no guardarlas evita que ocupen la
+ * llave de una pagina y dejen la navegacion offline sin nada que servir.
+ */
 async function staleWhileRevalidate(request, cacheName) {
   const cache = await caches.open(cacheName)
   const cached = await cache.match(request)
