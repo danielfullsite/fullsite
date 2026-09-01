@@ -477,6 +477,14 @@ export async function queueOperation(
     retries: 0,
     base_version,
   }
+  // Se avisa al encolar ademas de bloquear al reproducir: aqui todavia se sabe QUIEN
+  // la creo. En el replay ya no hay pista del origen.
+  if (esMutacionSinFiltro(method, endpoint || table)) {
+    console.error(
+      `[offline-sync] ${method} a "${table}" SIN filtro: tocaria toda la tabla. ` +
+      `Pasa un endpoint con filtro, p. ej. "${table}?id=eq.<id>". No se reproducira.`,
+    )
+  }
   const tx = db.transaction('sync_queue', 'readwrite')
   tx.objectStore('sync_queue').put(item)
   return id
@@ -875,6 +883,35 @@ async function replayViaAppApi(item: SyncQueueItem, accessToken: string): Promis
   return { ok: false, errorClass: 'TERMINAL_NON_RETRYABLE', detail: body.error || 'UNKNOWN_REJECTION' }
 }
 
+// ─── Guardia de mutaciones sin filtro ───────────────────────────────────────
+/**
+ * Un PATCH o DELETE sin filtro en la ruta toca TODAS las filas del tenant.
+ *
+ * INCIDENTE 2026-08-31, AMALAY. Once turnos quedaron con
+ * `closed_at = 20:07:00.918` — el MISMO milisegundo — varios de ellos abiertos
+ * despues de esa hora. Once clics no caen en el mismo milisegundo: fue UNA sola
+ * escritura tocando once filas.
+ *
+ * La ruta se arma asi en el replay:
+ *
+ *   const restPath = item.endpoint || item.table   // -> "pos_turnos"
+ *   fetch(`${SUPABASE_URL}/rest/v1/${restPath}`, { method: item.method })
+ *
+ * Si el item se encolo sin `endpoint`, la URL queda sin filtro y PostgREST aplica
+ * el PATCH a todo lo que la credencial alcance. Con DELETE seria un borrado total.
+ *
+ * `queueOperation` acepta `endpoint` opcional, y hay llamadas que lo omiten — o sea
+ * que la forma peligrosa es facil de escribir sin darse cuenta.
+ *
+ * REGLA: un POST no necesita filtro (inserta). Un PATCH o un DELETE sin `?` en la
+ * ruta NO se envia nunca: se marca terminal y queda para revision humana, con el
+ * payload intacto.
+ */
+export function esMutacionSinFiltro(method: string, restPath: string): boolean {
+  if (method !== 'PATCH' && method !== 'DELETE') return false
+  return !String(restPath ?? '').includes('?')
+}
+
 // ─── Conflict State Writer ─────────────────────────────────────────────────
 // Marks a queue item with classified error state. Payload is PRESERVED for operator recovery.
 async function markConflict(
@@ -1023,6 +1060,17 @@ async function _syncAllInner(): Promise<{ synced: number; failed: number }> {
         //    estados-KDS offline NUNCA subían (quedaban como "N pendientes" para
         //    siempre). Este es el cierre del gap.
         const restPath = item.endpoint || item.table
+        // Falla cerrado: nunca se manda una mutacion que pueda tocar toda la tabla.
+        // El payload se conserva para que un humano decida (ver markConflict).
+        if (esMutacionSinFiltro(item.method, restPath)) {
+          await markConflict(
+            item.id,
+            'TERMINAL_NON_RETRYABLE',
+            `MUTACION_SIN_FILTRO: ${item.method} ${restPath} habria tocado toda la tabla`,
+          )
+          failed++
+          continue
+        }
         let url: string
         let reqHeaders: Record<string, string>
         if (accessToken) {

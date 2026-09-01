@@ -292,7 +292,16 @@ export default function CierreCajaWizard({
     // 2. Enqueue both writes to the durable sync queue
     try {
       await queueOperation('pos_cierres', 'POST', cierreData, undefined, undefined, 'SUPABASE_REST')
-      await queueOperation('pos_turnos', 'PATCH', turnoClosePayload, undefined, `pos_turnos?id=eq.${turnoId}`, 'SUPABASE_REST')
+      // El filtro va en `endpoint` (4o parametro), NO en `base_version` (5o).
+      //
+      // INCIDENTE 2026-08-31, AMALAY: aqui el filtro estaba corrido un lugar, asi que
+      // `endpoint` quedaba undefined y el replay armaba la URL como
+      // `/rest/v1/pos_turnos` — SIN filtro. Ese PATCH cerro los ONCE turnos abiertos
+      // del restaurante de un solo golpe: todos con closed_at = 20:07:00.918, el mismo
+      // milisegundo, varios de ellos abiertos DESPUES de esa hora.
+      //
+      // TypeScript no lo veia: los dos parametros son `string | undefined`.
+      await queueOperation('pos_turnos', 'PATCH', turnoClosePayload, `pos_turnos?id=eq.${turnoId}`, undefined, 'SUPABASE_REST')
       // Turno cerrado -> se suelta el id pendiente, para que el proximo "Abrir turno"
       // genere uno nuevo en vez de reescribir este. (Ver idParaAbrirTurno.)
       olvidarTurnoPendiente()
