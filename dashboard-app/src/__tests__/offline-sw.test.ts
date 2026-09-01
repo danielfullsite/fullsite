@@ -80,7 +80,13 @@ describe('sw.js structure', () => {
 
     expect(content).toContain('navigationFromCache(request, event)')
     expect(content).toContain('event.waitUntil(refresh)')
-    expect(content).toContain("const CACHE_VERSION = 'v42'")
+    // La version se FIJABA en 'v42', asi que esta prueba se rompia en cada bump y
+    // empujaba a no subirla — justo lo contrario de lo que hay que hacer: sin bump,
+    // las terminales no adoptan el SW nuevo. Ahora se exige que exista y que no
+    // RETROCEDA. (Subida a v43 el 2026-08-31 al marcar las respuestas de cache.)
+    const version = /const CACHE_VERSION = 'v(\d+)'/.exec(content)
+    expect(version, 'sw.js debe declarar CACHE_VERSION').not.toBeNull()
+    expect(Number(version![1])).toBeGreaterThanOrEqual(43)
   })
 
   it('strips the redirect flag on navigations (Safari iOS login bug 2026-08-31)', async () => {
