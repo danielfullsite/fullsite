@@ -35,3 +35,57 @@ export function verifyKitchenToken(clientId: string, token: string | null | unde
   const b = Buffer.from(expected)
   return a.length === b.length && timingSafeEqual(a, b)
 }
+
+// ─── Rollout grace → strict ──────────────────────────────────────────────────
+//
+// El problema de encender esto no es el código: es que el token vive en el
+// localStorage de cada pantalla (`pos_kitchen_token`, pos-data.ts:1606). En cuanto
+// existe el secreto, TODA pantalla sin provisionar recibe 401 y se queda sin
+// comandas. En una cocina eso no es un error de log: es que dejan de salir los
+// platillos.
+//
+// Por eso el mismo patrón que ya usa el enforcement antifraude
+// (docs/security/FRAUD-ENFORCEMENT-FLAGS.md): observar antes de bloquear.
+//
+//   off    — sin secreto. Abierto, como hoy. Es el default y no cambia nada.
+//   grace  — con secreto: verifica, PERMITE y reporta quién no trae token.
+//            Sirve para ver qué pantallas faltan por provisionar SIN dejar la
+//            cocina sin tickets.
+//   strict — con secreto: 401 sin token válido.
+//
+// Con secreto y sin `KITCHEN_TOKEN_MODE`, el default es `strict` — que es
+// exactamente lo que hace hoy el endpoint. Encender el secreto no cambia de
+// comportamiento por accidente; `grace` hay que pedirlo.
+export type ModoTokenCocina = 'off' | 'grace' | 'strict'
+
+export function modoTokenCocina(): ModoTokenCocina {
+  if (!kitchenTokenEnabled()) return 'off'
+  const m = (process.env.KITCHEN_TOKEN_MODE ?? '').trim().toLowerCase()
+  return m === 'grace' ? 'grace' : 'strict'
+}
+
+export interface VeredictoCocina {
+  /** ¿Se sirve la respuesta? */
+  permitir: boolean
+  modo: ModoTokenCocina
+  /** ¿El token venía y era correcto? En modo `off` siempre es false: no se pidió. */
+  tokenValido: boolean
+  /** true cuando se dejó pasar una pantalla sin token válido y hay que reportarlo. */
+  reportar: boolean
+}
+
+export function evaluarTokenCocina(
+  clientId: string,
+  token: string | null | undefined,
+): VeredictoCocina {
+  const modo = modoTokenCocina()
+  if (modo === 'off') {
+    return { permitir: true, modo, tokenValido: false, reportar: false }
+  }
+  const tokenValido = verifyKitchenToken(clientId, token)
+  if (tokenValido) return { permitir: true, modo, tokenValido: true, reportar: false }
+  if (modo === 'grace') {
+    return { permitir: true, modo, tokenValido: false, reportar: true }
+  }
+  return { permitir: false, modo, tokenValido: false, reportar: false }
+}
