@@ -26,15 +26,24 @@ export async function GET(request: NextRequest) {
     const days = Math.min(Math.max(parseInt(request.nextUrl.searchParams.get('days') || '30', 10) || 30, 1), 120)
     const fromDate = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10)
 
-    const [shiftsRes, staffRes, ordersRes] = await Promise.all([
+    const [shiftsRes, staffRes] = await Promise.all([
       fetch(`${sbUrl}/rest/v1/pos_staff_shifts?client_id=eq.${clientId}&clock_in=gte.${fromDate}&select=staff_id,staff_name,clock_in,clock_out,hours_worked`, opts),
       fetch(`${sbUrl}/rest/v1/pos_staff?client_id=eq.${clientId}&select=id,name,role,hourly_rate,weekly_salary`, opts),
-      fetch(`${sbUrl}/rest/v1/pos_orders?client_id=eq.${clientId}&status=eq.cerrada&created_at=gte.${fromDate}&select=created_at,total`, opts),
     ])
 
     const shifts: ShiftRow[] = shiftsRes.ok ? await shiftsRes.json() : []
     const staff: StaffRow[] = staffRes.ok ? await staffRes.json() : []
-    const orders: Array<{ created_at: string; total: number | null }> = ordersRes.ok ? await ordersRes.json() : []
+
+    // Órdenes paginadas: PostgREST corta en 1000 filas, así que sin paginar la
+    // venta sale truncada (y algunos días sin match). Tope de 60k por seguridad.
+    const orders: Array<{ created_at: string; total: number | null }> = []
+    for (let offset = 0; offset < 60000; offset += 1000) {
+      const r = await fetch(`${sbUrl}/rest/v1/pos_orders?client_id=eq.${clientId}&status=eq.cerrada&created_at=gte.${fromDate}&select=created_at,total&order=created_at.asc&limit=1000&offset=${offset}`, opts)
+      if (!r.ok) break
+      const page: Array<{ created_at: string; total: number | null }> = await r.json()
+      orders.push(...page)
+      if (page.length < 1000) break
+    }
 
     // Fecha de calendario en zona MX (UTC-6, sin DST) — mismo criterio para turnos
     // y ventas, así el cruce día-a-día alinea (no usar business_day de otra capa).
