@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Fingerprint, X, ArrowRight, ArrowLeft, Check, AlertTriangle, Printer, DollarSign, ShieldAlert } from 'lucide-react'
-import { formatMXN, verifyManagerPinWithRole, verifyManagerHuella, hayHuellasDadasDeAlta, logAudit } from '@/lib/pos-data'
+import { formatMXN, verifyManagerPinWithRole, verifyManagerHuella, hayHuellasDadasDeAlta, olvidarTurnoPendiente, logAudit } from '@/lib/pos-data'
 import { hasPermission } from '@/lib/pos-permissions'
 import { getActiveClientSlug as _cid } from '@/lib/data'
 import {
@@ -293,6 +293,9 @@ export default function CierreCajaWizard({
     try {
       await queueOperation('pos_cierres', 'POST', cierreData, undefined, undefined, 'SUPABASE_REST')
       await queueOperation('pos_turnos', 'PATCH', turnoClosePayload, undefined, `pos_turnos?id=eq.${turnoId}`, 'SUPABASE_REST')
+      // Turno cerrado -> se suelta el id pendiente, para que el proximo "Abrir turno"
+      // genere uno nuevo en vez de reescribir este. (Ver idParaAbrirTurno.)
+      olvidarTurnoPendiente()
     } catch { /* sync queue unavailable — proceed */ }
 
     // 3. Best-effort Supabase — we don't block onComplete on network

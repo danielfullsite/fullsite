@@ -538,17 +538,71 @@ export async function autoCloseStaleTurno(turnoId: string, closedBy: string): Pr
       { method: 'PATCH', headers: { ..._SB_HEADERS, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
         body: JSON.stringify({ closed_at: new Date().toISOString(), closed_by: closedBy, notas: 'Auto-cerrado (turno del dia anterior)' }) }
     )
+    // Cerrado el turno, se suelta el id: el siguiente que se abra sera otro.
+    if (res.ok) olvidarTurnoPendiente()
     return res.ok
   } catch { return false }
 }
 
 /** Abrir turno nuevo */
+/**
+ * Ventana en la que dos toques de "Abrir turno" son EL MISMO turno.
+ *
+ * Un cambio de turno legitimo el mismo dia (matutino -> vespertino) queda fuera de
+ * esta ventana y genera su propio id, como debe ser.
+ */
+const VENTANA_MISMO_TURNO_MS = 10 * 60 * 1000
+const KEY_ID_PENDIENTE = 'pos_turno_id_pendiente'
+
+/**
+ * Id del turno a crear, ESTABLE ante toques repetidos.
+ *
+ * INCIDENTE 2026-08-31, AMALAY: quedaron ONCE turnos abiertos en 25 minutos, varios
+ * con `closed_at` anterior a `opened_at`. Daniel: "abri turno y me dice que abra
+ * turno otra vez".
+ *
+ * El id se generaba con `Date.now() + Math.random()` en CADA llamada. El comentario
+ * de abajo decia "id client-side = idempotente, sin duplicar", y es cierto solo para
+ * los reintentos de UNA llamada: cada toque nuevo generaba un id nuevo, o sea una
+ * fila nueva.
+ *
+ * El guard `getActiveTurno()` de arriba protege solo cuando ALCANZA A VER el turno.
+ * En una terminal lenta —Entrada, la P0 #1 del pipeline— el fetch se pasa del limite
+ * y el cache puede estar vacio: el guard no ve nada y se crea otro.
+ *
+ * Aqui el id se persiste: dentro de la ventana, N toques colapsan en UNA fila. No
+ * bloquea nada (regla dura #3: abrir el dia nunca se bloquea por red); solo evita
+ * que la insistencia del operador se convierta en filas basura.
+ */
+function idParaAbrirTurno(): string {
+  const nuevo = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
+  if (typeof localStorage === 'undefined') return nuevo()
+  try {
+    const raw = localStorage.getItem(KEY_ID_PENDIENTE)
+    if (raw) {
+      const { id, ts } = JSON.parse(raw)
+      if (typeof id === 'string' && id && typeof ts === 'number' && Date.now() - ts < VENTANA_MISMO_TURNO_MS) {
+        return id
+      }
+    }
+  } catch { /* cache corrupto — se genera uno nuevo */ }
+  const id = nuevo()
+  try { localStorage.setItem(KEY_ID_PENDIENTE, JSON.stringify({ id, ts: Date.now() })) } catch { /* ignore */ }
+  return id
+}
+
+/** Al cerrar un turno se suelta el id, para que el siguiente sea otro. */
+export function olvidarTurnoPendiente(): void {
+  if (typeof localStorage === 'undefined') return
+  try { localStorage.removeItem(KEY_ID_PENDIENTE) } catch { /* ignore */ }
+}
+
 export async function openTurno(fondoInicial: number, openedBy: string): Promise<{ id: string; fondo_inicial: number; opened_by: string; opened_at: string } | null> {
   // Guard: verificar que no exista turno activo (race condition)
   const existing = await getActiveTurno()
   if (existing) return existing // Ya hay uno abierto, retornarlo
 
-  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
+  const id = idParaAbrirTurno()
   const openedAt = new Date().toISOString()
   const localTurno = { id, fondo_inicial: fondoInicial, opened_by: openedBy, opened_at: openedAt }
   const body = { id, client_id: _getClientId(), opened_by: openedBy, fondo_inicial: fondoInicial, opened_at: openedAt }
@@ -575,7 +629,10 @@ export async function openTurno(fondoInicial: number, openedBy: string): Promise
 
   try {
     const res = await fetch(`${_SUPABASE_URL}/rest/v1/pos_turnos`, {
-      method: 'POST', headers: { ..._SB_HEADERS, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      // `merge-duplicates`: con el id estable, un segundo toque reescribe la MISMA
+      // fila en vez de devolver 409 y caer al camino de "abrir local + encolar",
+      // que es donde se multiplicaban los turnos.
+      method: 'POST', headers: { ..._SB_HEADERS, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=representation' },
       body: JSON.stringify(body),
     })
     if (!res.ok) throw new Error('post failed')
