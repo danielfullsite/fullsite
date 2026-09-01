@@ -294,7 +294,22 @@ Operador → acepta → adapter.acceptOrder() → auditLog(actor, response_time_
 | String firmado | `<timestamp>.<raw_body>` **ECR** |
 | Algoritmo | HMAC-SHA256 **ECR** |
 | Secret | Retornado al registrar el webhook, rotatable **ECR** |
-| Health check | PING a `/api/integrations/rappi/health` cada 3 min; responder `{"status":"OK"}` **ECR** |
+| Health check | ~~PING a `/api/integrations/rappi/health`~~ — **CORREGIDO 2026-08-31**, ver abajo |
+
+> **El PING NO va en `/health`.** Esta línea era la hipótesis original y resultó equivocada;
+> es la razón por la que `/health` respondía `{"status":"OK"}` a ciegas y se leía como si
+> fuera el PING de Rappi.
+>
+> Lo que dice la doc oficial (`dev-portal.rappi.com/en/webhook-events/`, evento `PING`,
+> confirmado 2026-08-29): *"This Ping must be implemented **for each store** and not on a
+> central server."* Rappi manda `{ "store_id": 999 }` y espera
+> `{"status":"OK","description":"Store on"}`; si `status` falta o no es `OK`, **da la tienda
+> por no disponible**.
+>
+> Implementación real: `lib/integrations/rappi/ping.ts`, respondido desde el webhook y
+> resuelto **por tienda** contra `integration_store_mappings`. `/health` es el health de la
+> **integración** (lo usa monitoreo) y ya no comparte forma con el PING, justo para que
+> nadie lo registre por error.
 
 > **ECR — No implementar verifyRappiSignature() hasta tener el formato exacto documentado oficialmente o confirmado por escrito por Rappi.** Formato estimado basado en research de dev portal; puede diferir en producción.
 
