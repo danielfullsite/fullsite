@@ -633,6 +633,24 @@ mesa se vería libre.
 |---|---|---|---|
 | ✓ | ✓ (8 casos, rama de falla incluida) | ✗ | Validación física: limpiar storage, entrar **con** red, apagar la WAN y confirmar que las mesas ocupadas siguen ocupadas |
 
+**Evidencia de campo 2026-08-31 (AMALAY, terminal Entrada) — el síntoma se reprodujo CON internet.**
+Daniel observó, ya restablecida la WAN, que la caja mostraba las mesas 1-5 y 7 abiertas mientras
+Entrada mostraba sólo 1-5. La base confirmó 6 órdenes abiertas: la caja tenía razón. El plano de
+Entrada refresca cada 3 s, así que "no había refrescado" no lo explica.
+
+Causa: Entrada iba lenta (reportado por Daniel el mismo día). El `fetch` a Supabase se pasó del
+límite de `fetchWithTimeout`, cayó al `catch` de la página y sirvió IndexedDB viejo — la misma
+rama de T-26, pero disparada por latencia en vez de por falta de red.
+
+> **Corrección de registro.** Al diagnosticarlo se afirmó que el Service Worker había servido
+> mesas viejas. **Es falso:** `pos_orders` y `pos_mesas` están en `NEVER_CACHE_PATTERNS` y el SW
+> ni siquiera intercepta esa consulta. La afirmación se hizo leyendo `sw.js` sin leer este
+> documento, que ya lo decía. Queda como prueba en `mesas-cache-marcada.test.ts`.
+
+Mitigación entregada (PR #280): ante una lectura no confiable el plano **avisa en ámbar**
+("confirma en la caja antes de sentar") y **no reconcilia** el caché. No cura la latencia —
+la vuelve visible en vez de silenciosa. La latencia de Entrada sigue **sin medir**.
+
 ---
 
 ## Resumen de la Matriz

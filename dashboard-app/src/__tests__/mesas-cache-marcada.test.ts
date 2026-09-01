@@ -98,3 +98,41 @@ describe('Las consultas del plano piden datos frescos', () => {
     expect((hasta.match(/no-store/g) || []).length).toBe(2)
   })
 })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CORRECCION 2026-08-31. El commit anterior conto mal la historia.
+//
+// Se afirmo que el SW le habia servido MESAS viejas a la terminal Entrada. Falso:
+// `pos_orders` y `pos_mesas` estan en NEVER_CACHE_PATTERNS desde antes, porque
+// servirlas viejas ya habia roto el phantom-check y la comanda no llegaba al KDS.
+// El SW ni siquiera intercepta esa consulta.
+//
+// Lo de Entrada es T-26 (docs/offline/TEST-MATRIX.md): terminal lenta -> timeout del
+// fetch -> catch de la pagina -> IndexedDB viejo. El aviso ambar de #280 cubre eso.
+//
+// Estas pruebas fijan lo que el diagnostico equivocado casi rompe.
+describe('Lo que el SW NO debe cachear, y lo que NO debe dejar de emparejar', () => {
+  const sw = readFileSync(join(process.cwd(), 'public/sw.js'), 'utf8')
+
+  it('pos_orders y pos_mesas siguen en NEVER_CACHE_PATTERNS', () => {
+    // En el codigo las diagonales van escapadas: /\/rest\/v1\/pos_orders/. Buscar el
+    // texto sin escapar no empata — se busca el nombre de la tabla dentro del bloque.
+    const bloque = sw.slice(sw.indexOf('const NEVER_CACHE_PATTERNS'))
+    const lista = bloque.slice(0, bloque.indexOf('\n]'))
+    expect(lista).toMatch(/rest.{0,4}v1.{0,4}pos_orders/)
+    expect(lista).toMatch(/rest.{0,4}v1.{0,4}pos_mesas/)
+  })
+
+  it('pos_turnos SI se cachea — por eso la marca de dato viejo hace falta', () => {
+    const bloque = sw.slice(sw.indexOf('const API_CACHE_PATTERNS'))
+    expect(bloque.slice(0, bloque.indexOf('\n]'))).toMatch(/rest.{0,4}v1.{0,4}pos_turnos/)
+  })
+
+  it('REGRESION: /_next/data/ NO va como API — le quitaria el emparejamiento flexible', () => {
+    // Marcarlo como API le quita ignoreSearch/ignoreVary, que es justo lo que permite
+    // que /pos?mesa=1 empate con /pos cacheado durante un corte. Eso golpea el
+    // arranque en frio (T-25), que es lo que no se puede romper.
+    expect(sw).toMatch(/networkFirstWithCache\(request,\s*DYNAMIC_CACHE\)/)
+    expect(sw).not.toMatch(/networkFirstWithCache\(request,\s*DYNAMIC_CACHE,\s*true\)/)
+  })
+})
