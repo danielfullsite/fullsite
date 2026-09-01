@@ -120,13 +120,20 @@ export default function DeliveryPage() {
         // Filter out test/invalid orders
         const visibles = data.filter(o => o.customer_name && !o.customer_name.startsWith('TEST') && o.total > 0)
 
-        const nuevas = detectarCancelacionesExternas(
-          prevOrdersRef.current, visibles, cancelledHereRef.current, alertedRef.current,
-        )
-        if (nuevas.length) {
-          nuevas.forEach(c => alertedRef.current.add(c.id))
-          setCancelAlerts(prev => [...prev, ...nuevas])
-          if (nuevas.some(c => c.cocinaEnCurso)) sonarAlerta()
+        // La alerta va aislada: un fallo suyo NO puede impedir que la lista se
+        // actualice. Todo esto vive dentro del catch de red de arriba, asi que sin
+        // este try un throw aqui dejaria la pantalla congelada con datos viejos.
+        try {
+          const nuevas = detectarCancelacionesExternas(
+            prevOrdersRef.current, visibles, cancelledHereRef.current, alertedRef.current,
+          )
+          if (nuevas.length) {
+            nuevas.forEach(c => alertedRef.current.add(c.id))
+            setCancelAlerts(prev => [...prev, ...nuevas])
+            if (nuevas.some(c => c.cocinaEnCurso)) sonarAlerta()
+          }
+        } catch (e) {
+          console.warn('[delivery] alerta de cancelacion fallo:', e)
         }
         prevOrdersRef.current = visibles
         setOrders(visibles)
