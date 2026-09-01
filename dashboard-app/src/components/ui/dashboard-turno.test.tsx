@@ -9,7 +9,7 @@
 // "$4,197 de nómina" para periodos sin datos, y ese es el defecto que estos
 // componentes no pueden repetir.
 import { describe, it, expect, afterEach } from 'vitest'
-import { render, screen, cleanup } from '@testing-library/react'
+import { render, screen, cleanup, fireEvent, within } from '@testing-library/react'
 import ListaAtencion from '@/components/dashboard/ListaAtencion'
 import type { Atencion } from '@/lib/atencion'
 
@@ -72,13 +72,32 @@ describe('ListaAtencion — lo que muestra', () => {
     expect(screen.queryByRole('link')).toBeNull()
   })
 
-  it('sin detalle no deja un párrafo vacío', () => {
+  it('sin detalle no deja un renglón vacío', () => {
+    // El título y el detalle son las dos líneas 'leading-snug' del renglón; sin
+    // detalle sólo debe quedar una (la del título), no un segundo renglón vacío.
     const { container } = render(<ListaAtencion items={[item({ detalle: '' })]} />)
-    expect(container.querySelectorAll('p')).toHaveLength(1)
+    expect(container.querySelectorAll('.leading-snug')).toHaveLength(1)
   })
 
   it('la gravedad se anuncia a lectores de pantalla, no sólo por color', () => {
     render(<ListaAtencion items={[item({ severidad: 'critical' })]} />)
     expect(screen.getByText('Crítico:')).toBeTruthy()
+  })
+})
+
+describe('ListaAtencion — picar abre el detalle', () => {
+  it('sin picar no hay panel; al picar el renglón se abre con su título', () => {
+    render(<ListaAtencion items={[item({ titulo: 'Se acabó la arrachera' })]} />)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /Ver detalle/ }))
+    const panel = screen.getByRole('dialog')
+    expect(within(panel).getByText('Se acabó la arrachera')).toBeTruthy()
+  })
+
+  it('el botón de acción NO abre el panel — es un atajo directo', () => {
+    render(<ListaAtencion items={[item()]} />)
+    fireEvent.click(screen.getByRole('link', { name: 'Ver inventario' }))
+    // El link navega (jsdom no cambia de página), pero NO debe abrir el panel.
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 })
