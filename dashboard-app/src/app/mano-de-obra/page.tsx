@@ -10,7 +10,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Gauge, Clock, Users, DollarSign, AlertTriangle, ChevronDown, Calendar } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import EmptyState from '@/components/EmptyState'
-import { getDashboardFromPosOrders } from '@/lib/data'
 import { formatCurrency } from '@/lib/format'
 import { buildTacometro, DEFAULT_THRESHOLDS, type LaborPayload, type TacometroSummary, type LaborZone } from '@/lib/labor'
 import { getPOSAuthHeaders } from '@/lib/pos-data'
@@ -44,14 +43,13 @@ export default function ManoDeObraPage() {
   const load = useCallback(async (n: PeriodDays) => {
     setLoading(true)
     try {
-      const [laborRes, sales] = await Promise.all([
-        fetch(`/api/labor?days=${n}`, { cache: 'no-store', headers: getPOSAuthHeaders() }),
-        getDashboardFromPosOrders(n),
-      ])
+      const laborRes = await fetch(`/api/labor?days=${n}`, { cache: 'no-store', headers: getPOSAuthHeaders() })
       const labor: LaborPayload = laborRes.ok
         ? await laborRes.json()
-        : { days: n, laborByDay: [], employees: [], totalCost: 0, totalHours: 0, hasWageData: false }
-      const salesByDay = (sales || []).map(s => ({ fecha: s.fecha, ventas_dia: Number(s.ventas_dia) || 0 }))
+        : { days: n, laborByDay: [], employees: [], totalCost: 0, totalHours: 0, totalSales: 0, hasWageData: false }
+      // La venta viene del mismo route (mismo criterio de fecha que el labor) para
+      // que el cruce por día alinee — NO de getDashboardFromPosOrders (business_day).
+      const salesByDay = labor.laborByDay.map(d => ({ fecha: d.fecha, ventas_dia: d.sales }))
       setSummary(buildTacometro(labor, salesByDay, DEFAULT_THRESHOLDS))
     } catch (err) {
       console.error('[mano-de-obra] error:', err)

@@ -34,7 +34,10 @@ export function zoneFor(pct: number | null, t: LaborThresholds = DEFAULT_THRESHO
 }
 
 // ── Tipos del payload de /api/labor ─────────────────────────────────────────
-export interface LaborDay { fecha: string; cost: number; hours: number; headcount: number }
+// El route calcula labor Y venta con el MISMO criterio de fecha (calendario MX),
+// para que crucen día a día. No mezclar con getDashboardFromPosOrders (usa
+// business_day y desalinea).
+export interface LaborDay { fecha: string; cost: number; hours: number; headcount: number; sales: number }
 export interface LaborEmployee { staff_id: string; name: string; role: string; hours: number; cost: number }
 export interface LaborPayload {
   days: number
@@ -42,6 +45,7 @@ export interface LaborPayload {
   employees: LaborEmployee[]
   totalCost: number
   totalHours: number
+  totalSales: number
   hasWageData: boolean // false si todos los sueldos son 0 → el % no es confiable
 }
 

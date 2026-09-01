@@ -48,8 +48,8 @@ describe('buildTacometro', () => {
   const labor: LaborPayload = {
     days: 2,
     laborByDay: [
-      { fecha: '2026-08-10', cost: 1500, hours: 30, headcount: 3 },
-      { fecha: '2026-08-11', cost: 3000, hours: 30, headcount: 3 }, // venta baja → rojo
+      { fecha: '2026-08-10', cost: 1500, hours: 30, headcount: 3, sales: 15000 },
+      { fecha: '2026-08-11', cost: 3000, hours: 30, headcount: 3, sales: 8000 }, // venta baja → rojo
     ],
     employees: [
       { staff_id: 's1', name: 'Ana', role: 'cajero', hours: 40, cost: 2500 },
@@ -57,6 +57,7 @@ describe('buildTacometro', () => {
     ],
     totalCost: 4500,
     totalHours: 60,
+    totalSales: 23000,
     hasWageData: true,
   }
   const sales = [
