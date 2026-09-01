@@ -105,10 +105,40 @@ export async function POST(request: NextRequest) {
       // en la verificación de device; el PIN + throttle + RLS siguen aplicando).
     }
 
+    // Role hierarchy filter
+    const ROLE_HIERARCHY: Record<string, number> = { mesero: 1, cajero: 2, capitan: 3, gerente: 4, admin: 5 }
+    const effectiveMinRole = min_role || (manager === true ? 'gerente' : null)
+    let roleFilter = ''
+    if (effectiveMinRole && ROLE_HIERARCHY[effectiveMinRole]) {
+      const minLevel = ROLE_HIERARCHY[effectiveMinRole]
+      const allowedRoles = Object.entries(ROLE_HIERARCHY)
+        .filter(([, level]) => level >= minLevel)
+        .map(([role]) => role)
+      roleFilter = `&role=in.(${allowedRoles.join(',')})`
+    }
+
+    /**
+     * La huella IGNORABA el rol pedido — escalada de privilegio.
+     *
+     * Esta rama resolvia y devolvia ANTES de que se calculara `roleFilter`, asi que
+     * `manager: true` y `min_role` no se aplicaban. Y como el endpoint no verifica
+     * ninguna firma WebAuthn —confia en el id que le mandan— bastaba con conocer el
+     * UUID de un gerente para pedir un shiftToken de gerente SIN huella y SIN PIN.
+     * Esos UUID viven en `pos_staff_cache`, en el localStorage de cualquier terminal.
+     *
+     * Encontrado el 2026-08-31 al ir a extender la huella al corte de caja. Montar
+     * esa funcion encima habria llevado el bypass justo a la autorizacion del dinero.
+     *
+     * LO QUE ESTE ARREGLO NO HACE: sigue sin verificarse la firma WebAuthn del lado
+     * del servidor; el id sigue siendo una afirmacion del cliente. Lo que se cierra
+     * es la ESCALADA: una huella solo puede obtener el rol que su propio empleado ya
+     * tiene. La verificacion real exige guardar las llaves publicas en el servidor y
+     * validar la assertion — va aparte, y sigue haciendo falta.
+     */
     // Fingerprint (WebAuthn) login — look up by staff ID, validate active status + tenant
     if (fingerprint_id && typeof fingerprint_id === 'string') {
       const fpRes = await fetch(
-        `${sbUrl}/rest/v1/pos_staff?id=eq.${encodeURIComponent(fingerprint_id)}&active=eq.true&client_id=eq.${encodeURIComponent(clientId)}&select=id,name,role&limit=1`,
+        `${sbUrl}/rest/v1/pos_staff?id=eq.${encodeURIComponent(fingerprint_id)}&active=eq.true&client_id=eq.${encodeURIComponent(clientId)}${roleFilter}&select=id,name,role&limit=1`,
         { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
       )
       if (fpRes.ok) {
@@ -125,18 +155,6 @@ export async function POST(request: NextRequest) {
     // PINs while each person is migrated to a unique 10-digit emergency PIN.
     if (typeof pin !== 'string' || !/^\d{4,10}$/.test(pin)) {
       return Response.json({ error: 'PIN inválido' }, { status: 400 })
-    }
-
-    // Role hierarchy filter
-    const ROLE_HIERARCHY: Record<string, number> = { mesero: 1, cajero: 2, capitan: 3, gerente: 4, admin: 5 }
-    const effectiveMinRole = min_role || (manager === true ? 'gerente' : null)
-    let roleFilter = ''
-    if (effectiveMinRole && ROLE_HIERARCHY[effectiveMinRole]) {
-      const minLevel = ROLE_HIERARCHY[effectiveMinRole]
-      const allowedRoles = Object.entries(ROLE_HIERARCHY)
-        .filter(([, level]) => level >= minLevel)
-        .map(([role]) => role)
-      roleFilter = `&role=in.(${allowedRoles.join(',')})`
     }
 
     const res = await fetch(
