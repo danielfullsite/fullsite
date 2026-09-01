@@ -26,13 +26,27 @@ export async function GET(request: NextRequest) {
     const days = Math.min(Math.max(parseInt(request.nextUrl.searchParams.get('days') || '30', 10) || 30, 1), 120)
     const fromDate = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10)
 
-    const [shiftsRes, staffRes] = await Promise.all([
+    const [shiftsRes, staffRes, ordersRes] = await Promise.all([
       fetch(`${sbUrl}/rest/v1/pos_staff_shifts?client_id=eq.${clientId}&clock_in=gte.${fromDate}&select=staff_id,staff_name,clock_in,clock_out,hours_worked`, opts),
       fetch(`${sbUrl}/rest/v1/pos_staff?client_id=eq.${clientId}&select=id,name,role,hourly_rate,weekly_salary`, opts),
+      fetch(`${sbUrl}/rest/v1/pos_orders?client_id=eq.${clientId}&status=eq.cerrada&created_at=gte.${fromDate}&select=created_at,total`, opts),
     ])
 
     const shifts: ShiftRow[] = shiftsRes.ok ? await shiftsRes.json() : []
     const staff: StaffRow[] = staffRes.ok ? await staffRes.json() : []
+    const orders: Array<{ created_at: string; total: number | null }> = ordersRes.ok ? await ordersRes.json() : []
+
+    // Fecha de calendario en zona MX (UTC-6, sin DST) — mismo criterio para turnos
+    // y ventas, así el cruce día-a-día alinea (no usar business_day de otra capa).
+    const mxDate = (iso: string): string => new Date(new Date(iso).getTime() - 6 * 3600000).toISOString().slice(0, 10)
+
+    // Venta por día (MX) desde las órdenes cerradas.
+    const salesByDay = new Map<string, number>()
+    for (const o of orders) {
+      if (!o.created_at) continue
+      const f = mxDate(o.created_at)
+      salesByDay.set(f, (salesByDay.get(f) || 0) + (Number(o.total) || 0))
+    }
 
     // $/hora efectivo por empleado (hourly_rate directo, o derivado del semanal).
     const rateById = new Map<string, number>()
@@ -68,7 +82,7 @@ export async function GET(request: NextRequest) {
 
       const rate = rateById.get(sid) || 0
       const cost = Math.round(hours * rate * 100) / 100
-      const fecha = sh.clock_in.slice(0, 10)
+      const fecha = mxDate(sh.clock_in)
 
       const d = byDay.get(fecha) || { cost: 0, hours: 0, staffSet: new Set<string>() }
       d.cost += cost; d.hours += hours; if (sid) d.staffSet.add(sid)
@@ -81,7 +95,13 @@ export async function GET(request: NextRequest) {
     }
 
     const laborByDay: LaborDay[] = [...byDay.entries()]
-      .map(([fecha, d]) => ({ fecha, cost: Math.round(d.cost * 100) / 100, hours: Math.round(d.hours * 10) / 10, headcount: d.staffSet.size }))
+      .map(([fecha, d]) => ({
+        fecha,
+        cost: Math.round(d.cost * 100) / 100,
+        hours: Math.round(d.hours * 10) / 10,
+        headcount: d.staffSet.size,
+        sales: Math.round((salesByDay.get(fecha) || 0) * 100) / 100,
+      }))
       .sort((a, b) => a.fecha.localeCompare(b.fecha))
 
     const employees: LaborEmployee[] = [...byEmp.values()]
@@ -94,10 +114,11 @@ export async function GET(request: NextRequest) {
       employees,
       totalCost: Math.round(laborByDay.reduce((s, d) => s + d.cost, 0) * 100) / 100,
       totalHours: Math.round(laborByDay.reduce((s, d) => s + d.hours, 0) * 10) / 10,
+      totalSales: Math.round(laborByDay.reduce((s, d) => s + d.sales, 0) * 100) / 100,
       hasWageData,
     }
     return Response.json(payload)
   } catch {
-    return Response.json({ days: 0, laborByDay: [], employees: [], totalCost: 0, totalHours: 0, hasWageData: false } as LaborPayload)
+    return Response.json({ days: 0, laborByDay: [], employees: [], totalCost: 0, totalHours: 0, totalSales: 0, hasWageData: false } as LaborPayload)
   }
 }
