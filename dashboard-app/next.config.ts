@@ -109,6 +109,31 @@ const nextConfig: NextConfig = isCapacitorOffline
           },
         ];
       },
+      // La puerta oficial es app.fullsite.mx. La URL cruda de Vercel
+      // (fullsite-sage.vercel.app) es OTRO ORIGEN: guarda su propio Service
+      // Worker, que se puede atorar por separado y romper el login ahí (bug de
+      // campo 2026-09-01). Mandar sus navegaciones a la puerta oficial evita que
+      // alguien opere en el origen equivocado y se quede con un SW viejo aparte.
+      //
+      // Condicionado por Host: SOLO dispara cuando el Host es exactamente
+      // fullsite-sage.vercel.app → app.fullsite.mx NUNCA se redirige a sí misma,
+      // y los previews (*-git-*.vercel.app) tampoco se tocan.
+      //
+      // Se excluyen /reset.html y /sw.js para que la RECUPERACIÓN (abrir
+      // fullsite-sage.vercel.app/reset.html desde un equipo ya atascado) y la
+      // actualización del Service Worker sigan funcionando EN ese origen; y
+      // _next / api para no redirigir assets ni API entre orígenes. 307 (no
+      // permanente) para que sea reversible sin pelear con la caché del navegador.
+      async redirects() {
+        return [
+          {
+            source: '/:path((?!reset\\.html|sw\\.js|_next|api).*)',
+            has: [{ type: 'host', value: 'fullsite-sage.vercel.app' }],
+            destination: 'https://app.fullsite.mx/:path',
+            permanent: false,
+          },
+        ];
+      },
     };
 
 export default withSentryConfig(nextConfig, {
