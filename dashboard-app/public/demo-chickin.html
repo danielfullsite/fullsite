@@ -1,0 +1,607 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ChickIn · Inteligencia de Costeo — Fullsite</title>
+<meta name="robots" content="noindex">
+<meta name="description" content="El costeo de ChickIn, vivo. Cortesía de Fullsite.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=Schibsted+Grotesk:wght@600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#1a1310; --ink2:#5c5048; --ink3:#8a7d73; --line:#ecdfd3;
+    --cream:#fff8f0; --card:#ffffff; --chick:#e4442e; --gold:#f2a81d;
+    --v:#10b981; --a:#f59e0b; --r:#ef4444; --emerald:#10b981; --emink:#047857;
+    --shadow:0 1px 2px rgba(60,40,20,.04),0 8px 30px rgba(60,40,20,.06);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{font-family:'Public Sans',system-ui,sans-serif;color:var(--ink);background:var(--cream);line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:920px;margin:0 auto;padding:0 20px}
+  h1,h2,h3,.disp{font-family:'Schibsted Grotesk','Public Sans',sans-serif;letter-spacing:-.02em;line-height:1.05}
+  .num{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}
+
+  /* top bar */
+  .top{display:flex;align-items:center;justify-content:space-between;padding:16px 0;border-bottom:1px solid var(--line)}
+  .brand{display:flex;align-items:center;gap:10px;font-family:'Schibsted Grotesk';font-weight:800;font-size:20px}
+  .chip{display:inline-block;width:11px;height:11px;background:var(--chick);border-radius:3px;transform:rotate(8deg)}
+  .byf{font-size:12px;color:var(--ink3);font-weight:600}
+  .byf b{color:var(--emink)}
+
+  /* hero */
+  .hero{padding:52px 0 30px}
+  .kicker{font-size:12.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--chick)}
+  .hero h1{font-size:clamp(38px,7vw,62px);font-weight:800;margin:14px 0 16px}
+  .hero p.lead{font-size:clamp(16px,2.4vw,19px);color:var(--ink2);max-width:640px}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:34px 0 6px}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px 16px 14px;box-shadow:var(--shadow)}
+  .stat .n{font-family:'IBM Plex Mono';font-weight:600;font-size:26px;letter-spacing:-.02em}
+  .stat .l{font-size:12.5px;color:var(--ink3);margin-top:2px}
+  .stat.hot .n{color:var(--chick)}
+
+  section{padding:34px 0;border-top:1px solid var(--line)}
+  .eyebrow{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--gold)}
+  h2{font-size:clamp(24px,4vw,34px);font-weight:800;margin:8px 0 6px}
+  .sub{color:var(--ink2);max-width:660px;margin-bottom:22px}
+
+  /* semáforo */
+  .legend{display:flex;gap:16px;flex-wrap:wrap;margin:-8px 0 18px;font-size:13px;color:var(--ink2)}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle}
+  .dot.v{background:var(--v)} .dot.a{background:var(--a)} .dot.r{background:var(--r)}
+  .table{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden}
+  .thead,.row{display:grid;grid-template-columns:1fr 26% 52px 52px 66px;align-items:center;gap:10px;padding:9px 16px}
+  .thead{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);border-bottom:1px solid var(--line);font-weight:700}
+  .row{border-top:1px solid #f4ebe1}
+  .row:first-child{border-top:none}
+  .row .nm{font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .barwrap{height:8px;background:#f1e7db;border-radius:99px;overflow:hidden}
+  .bar{height:100%;border-radius:99px}
+  .row.v .bar{background:var(--v)} .row.a .bar{background:var(--a)} .row.r .bar{background:var(--r)}
+  .row .fc{font-family:'IBM Plex Mono';font-weight:600;font-size:13px;text-align:right}
+  .row.v .fc{color:var(--emink)} .row.a .fc{color:#b45309} .row.r .fc{color:#b91c1c}
+  .row .mg{font-family:'IBM Plex Mono';font-size:12.5px;color:var(--ink3);text-align:right}
+  .row .pr{font-family:'IBM Plex Mono';font-weight:600;font-size:13px;text-align:right}
+  @media(max-width:640px){
+    .thead,.row{grid-template-columns:1fr 44px 48px;}
+    .thead .h-bar,.thead .h-mg,.row .barwrap,.row .mg{display:none}
+  }
+
+  /* fugas */
+  .fuga{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--r);border-radius:14px;padding:16px 18px;margin-bottom:12px;box-shadow:var(--shadow)}
+  .fh{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .ft{font-family:'Schibsted Grotesk';font-weight:700;font-size:17px}
+  .fbadge{font-family:'IBM Plex Mono';font-weight:600;font-size:12.5px;color:#b91c1c;background:#fee2e2;padding:3px 9px;border-radius:99px;white-space:nowrap}
+  .fnums{display:flex;gap:16px;flex-wrap:wrap;margin:8px 0 8px;font-size:12.5px;color:var(--ink3)}
+  .fnums b{font-family:'IBM Plex Mono';color:var(--ink)}
+  .fuga p{font-size:14px;color:var(--ink2)}
+
+  /* estrellas */
+  .stars{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .star{background:linear-gradient(180deg,#ecfdf5,#fff);border:1px solid #bbf7d0;border-radius:14px;padding:15px 16px}
+  .snm{font-weight:600;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .smg{font-family:'IBM Plex Mono';font-weight:600;font-size:30px;color:var(--emink);letter-spacing:-.02em;margin-top:4px}
+  .ssub{font-size:11.5px;color:var(--ink3)}
+  @media(max-width:640px){.stars{grid-template-columns:repeat(2,1fr)} .stats{grid-template-columns:repeat(2,1fr)}}
+
+  /* combos */
+  .crow{display:grid;grid-template-columns:1fr 70px 74px 78px;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 16px;margin-bottom:8px}
+  .cnm{font-weight:600;font-size:14px}
+  .cco{display:block;font-weight:400;font-size:11.5px;color:var(--ink3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cpr{font-family:'IBM Plex Mono';font-weight:600;font-size:14px;text-align:right}
+  .cfc{font-family:'IBM Plex Mono';font-size:12.5px;color:var(--ink3);text-align:right}
+  .cmg{font-family:'IBM Plex Mono';font-weight:600;font-size:20px;color:var(--emink);text-align:right;line-height:1}
+  .cmg span{display:block;font-family:'Public Sans';font-weight:400;font-size:10px;color:var(--ink3)}
+  @media(max-width:640px){.crow{grid-template-columns:1fr 64px} .crow .cpr,.crow .cfc{display:none}}
+
+  /* rendimiento */
+  .yield{background:linear-gradient(135deg,#1a1310,#3a241a);color:#fff;border-radius:20px;padding:26px 24px}
+  .yield .flow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:18px 0}
+  .ynode{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:12px 14px;min-width:120px}
+  .ynode .yn{font-family:'IBM Plex Mono';font-weight:600;font-size:20px}
+  .ynode .yl{font-size:11.5px;color:#d9c9bd;margin-top:2px}
+  .yarrow{color:var(--gold);font-size:20px;font-weight:700}
+  .ybig{font-family:'IBM Plex Mono';font-weight:600;font-size:44px;color:var(--gold);letter-spacing:-.02em}
+  .yield p{color:#e8dbd0;font-size:14px;max-width:600px;margin-top:8px}
+
+  /* proveedores */
+  .provgrid{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+  .prov{background:var(--card);border:1px solid var(--line);border-radius:99px;padding:7px 14px;font-size:13px;font-weight:600}
+  .prov span{color:var(--ink3);font-weight:400}
+  .caros{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+  .caro{display:flex;justify-content:space-between;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 14px;font-size:13.5px}
+  .caro b{font-family:'IBM Plex Mono'}
+  @media(max-width:640px){.caros{grid-template-columns:1fr}}
+
+  /* vs */
+  .vs{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .vscard{border-radius:16px;padding:20px 20px;border:1px solid var(--line)}
+  .vscard.x{background:#fff}
+  .vscard.f{background:#06251b;color:#fff;border-color:#06251b}
+  .vscard h3{font-size:18px;font-weight:800;margin-bottom:12px}
+  .vscard.f h3{color:#6ee7b7}
+  .vscard ul{list-style:none;display:flex;flex-direction:column;gap:9px}
+  .vscard li{font-size:13.5px;display:flex;gap:9px;align-items:flex-start}
+  .vscard.x li{color:var(--ink2)} .vscard.f li{color:#d1fae5}
+  .vscard .mk{flex:none;font-weight:700} .vscard.x .mk{color:var(--ink3)} .vscard.f .mk{color:#34d399}
+  @media(max-width:640px){.vs{grid-template-columns:1fr}}
+
+  /* cta */
+  .cta{background:linear-gradient(135deg,var(--chick),#c9331f);color:#fff;border-radius:22px;padding:40px 28px;text-align:center;margin:36px 0}
+  .cta h2{color:#fff;font-size:clamp(26px,4.5vw,38px)}
+  .cta p{color:#ffe4dd;max-width:520px;margin:10px auto 0;font-size:15.5px}
+  .free{display:inline-block;background:#fff;color:var(--chick);font-weight:700;font-size:13px;padding:6px 14px;border-radius:99px;margin-bottom:14px;letter-spacing:.02em}
+  .btns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:22px}
+  .btn{display:inline-flex;align-items:center;gap:8px;font-weight:700;font-size:15px;padding:13px 22px;border-radius:12px;text-decoration:none}
+  .btn.wa{background:#111;color:#fff}
+  .btn.gh{background:rgba(255,255,255,.16);color:#fff;border:1px solid rgba(255,255,255,.35)}
+
+  footer{padding:28px 0 60px;color:var(--ink3);font-size:12.5px;text-align:center}
+  footer .fw{font-family:'Schibsted Grotesk';font-weight:800;color:var(--ink);font-size:15px}
+  footer .em{display:inline-block;width:8px;height:8px;background:var(--emerald);border-radius:2px;margin-left:2px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="brand"><span class="chip"></span>ChickIn</div>
+    <div class="byf">Inteligencia de costeo · cortesía de <b>Fullsite</b></div>
+  </div>
+
+  <div class="hero">
+    <div class="kicker">Tu costeo · edición ChickIn 2026</div>
+    <h1>Tu costeo, vivo.</h1>
+    <p class="lead">Tomamos tu archivo <b>ChickIn COSTEO 2026</b> y lo convertimos en decisiones. Esto es lo que Fullsite ve de ChickIn — pero en tiempo real, no una vez al mes en una hoja de Excel.</p>
+    <div class="stats">
+      <div class="stat"><div class="n">34</div><div class="l">platillos costeados</div></div>
+      <div class="stat"><div class="n">12</div><div class="l">combos</div></div>
+      <div class="stat"><div class="n">163</div><div class="l">insumos con proveedor</div></div>
+      <div class="stat hot"><div class="n">42.9%</div><div class="l">food cost promedio</div></div>
+    </div>
+  </div>
+
+  <section>
+    <div class="eyebrow">El semáforo del menú</div>
+    <h2>Dónde está cada platillo</h2>
+    <p class="sub">Ordenado por food cost. La meta sana ronda el 30%. Hoy: <b>3 en verde, 12 en ámbar, 19 en rojo</b>. No es que estén mal — es que <b>nadie los está mirando todos los días</b>.</p>
+    <div class="legend"><span><span class="dot v"></span>Sano &lt;30%</span><span><span class="dot a"></span>Vigilar 30–40%</span><span><span class="dot r"></span>Fuga &gt;40%</span></div>
+    <div class="table">
+      <div class="thead"><div>Platillo</div><div class="h-bar">Food cost</div><div style="text-align:right">FC</div><div class="h-mg" style="text-align:right">Margen</div><div style="text-align:right">Precio</div></div>
+      <div class="row r">
+      <div class="nm">Mac &amp; Cheese</div>
+      <div class="barwrap"><div class="bar" style="width:78.9%"></div></div>
+      <div class="fc">79%</div>
+      <div class="mg">32%</div>
+      <div class="pr">$75</div>
+    </div>
+<div class="row r">
+      <div class="nm">1 Pza Chickin Tender</div>
+      <div class="barwrap"><div class="bar" style="width:76.9%"></div></div>
+      <div class="fc">77%</div>
+      <div class="mg">34%</div>
+      <div class="pr">$35</div>
+    </div>
+<div class="row r">
+      <div class="nm">Sweet Spicy Sriracha 2oz</div>
+      <div class="barwrap"><div class="bar" style="width:66.8%"></div></div>
+      <div class="fc">67%</div>
+      <div class="mg">42%</div>
+      <div class="pr">$19</div>
+    </div>
+<div class="row r">
+      <div class="nm">Chickin Greens</div>
+      <div class="barwrap"><div class="bar" style="width:52.6%"></div></div>
+      <div class="fc">53%</div>
+      <div class="mg">55%</div>
+      <div class="pr">$150</div>
+    </div>
+<div class="row r">
+      <div class="nm">Hot Honey 2oz</div>
+      <div class="barwrap"><div class="bar" style="width:51.5%"></div></div>
+      <div class="fc">51%</div>
+      <div class="mg">56%</div>
+      <div class="pr">$19</div>
+    </div>
+<div class="row r">
+      <div class="nm">Sidral Mundet 355 ml</div>
+      <div class="barwrap"><div class="bar" style="width:49.9%"></div></div>
+      <div class="fc">50%</div>
+      <div class="mg">57%</div>
+      <div class="pr">$39</div>
+    </div>
+<div class="row r">
+      <div class="nm">Coca Cola Light 355 ml</div>
+      <div class="barwrap"><div class="bar" style="width:49.6%"></div></div>
+      <div class="fc">50%</div>
+      <div class="mg">57%</div>
+      <div class="pr">$39</div>
+    </div>
+<div class="row r">
+      <div class="nm">Coca Cola 355 ml</div>
+      <div class="barwrap"><div class="bar" style="width:49.4%"></div></div>
+      <div class="fc">49%</div>
+      <div class="mg">57%</div>
+      <div class="pr">$39</div>
+    </div>
+<div class="row r">
+      <div class="nm">Coca Cola Zero 355 ml</div>
+      <div class="barwrap"><div class="bar" style="width:49.4%"></div></div>
+      <div class="fc">49%</div>
+      <div class="mg">57%</div>
+      <div class="pr">$39</div>
+    </div>
+<div class="row r">
+      <div class="nm">Fresca 355 ml</div>
+      <div class="barwrap"><div class="bar" style="width:49.3%"></div></div>
+      <div class="fc">49%</div>
+      <div class="mg">57%</div>
+      <div class="pr">$39</div>
+    </div>
+<div class="row r">
+      <div class="nm">Sprite 355 ml</div>
+      <div class="barwrap"><div class="bar" style="width:49.3%"></div></div>
+      <div class="fc">49%</div>
+      <div class="mg">57%</div>
+      <div class="pr">$39</div>
+    </div>
+<div class="row r">
+      <div class="nm">Fanta Naranja 355 ml</div>
+      <div class="barwrap"><div class="bar" style="width:49.3%"></div></div>
+      <div class="fc">49%</div>
+      <div class="mg">57%</div>
+      <div class="pr">$39</div>
+    </div>
+<div class="row r">
+      <div class="nm">Fanta Fresa 355 ml</div>
+      <div class="barwrap"><div class="bar" style="width:49.3%"></div></div>
+      <div class="fc">49%</div>
+      <div class="mg">57%</div>
+      <div class="pr">$39</div>
+    </div>
+<div class="row r">
+      <div class="nm">5 Pzas Tenders</div>
+      <div class="barwrap"><div class="bar" style="width:46.4%"></div></div>
+      <div class="fc">46%</div>
+      <div class="mg">60%</div>
+      <div class="pr">$120</div>
+    </div>
+<div class="row r">
+      <div class="nm">7 Pzas Tenders</div>
+      <div class="barwrap"><div class="bar" style="width:46.2%"></div></div>
+      <div class="fc">46%</div>
+      <div class="mg">60%</div>
+      <div class="pr">$170</div>
+    </div>
+<div class="row r">
+      <div class="nm">Chickin Bites</div>
+      <div class="barwrap"><div class="bar" style="width:45.0%"></div></div>
+      <div class="fc">45%</div>
+      <div class="mg">61%</div>
+      <div class="pr">$80</div>
+    </div>
+<div class="row r">
+      <div class="nm">3 Pzas Tenders</div>
+      <div class="barwrap"><div class="bar" style="width:43.8%"></div></div>
+      <div class="fc">44%</div>
+      <div class="mg">62%</div>
+      <div class="pr">$90</div>
+    </div>
+<div class="row r">
+      <div class="nm">Not a Sandwich Full</div>
+      <div class="barwrap"><div class="bar" style="width:42.1%"></div></div>
+      <div class="fc">42%</div>
+      <div class="mg">64%</div>
+      <div class="pr">$200</div>
+    </div>
+<div class="row r">
+      <div class="nm">Sunny Chickin</div>
+      <div class="barwrap"><div class="bar" style="width:40.8%"></div></div>
+      <div class="fc">41%</div>
+      <div class="mg">65%</div>
+      <div class="pr">$130</div>
+    </div>
+<div class="row a">
+      <div class="nm">Not a Sandwich Single</div>
+      <div class="barwrap"><div class="bar" style="width:39.8%"></div></div>
+      <div class="fc">40%</div>
+      <div class="mg">66%</div>
+      <div class="pr">$150</div>
+    </div>
+<div class="row a">
+      <div class="nm">Honey Mustard 2oz</div>
+      <div class="barwrap"><div class="bar" style="width:39.6%"></div></div>
+      <div class="fc">40%</div>
+      <div class="mg">66%</div>
+      <div class="pr">$19</div>
+    </div>
+<div class="row a">
+      <div class="nm">Nutella Sandwich</div>
+      <div class="barwrap"><div class="bar" style="width:37.8%"></div></div>
+      <div class="fc">38%</div>
+      <div class="mg">67%</div>
+      <div class="pr">$75</div>
+    </div>
+<div class="row a">
+      <div class="nm">Spicy Deluxe Sandwich</div>
+      <div class="barwrap"><div class="bar" style="width:36.7%"></div></div>
+      <div class="fc">37%</div>
+      <div class="mg">66%</div>
+      <div class="pr">$155</div>
+    </div>
+<div class="row a">
+      <div class="nm">Chickin Sauce 2oz</div>
+      <div class="barwrap"><div class="bar" style="width:35.2%"></div></div>
+      <div class="fc">35%</div>
+      <div class="mg">70%</div>
+      <div class="pr">$19</div>
+    </div>
+<div class="row a">
+      <div class="nm">Wild Chickin</div>
+      <div class="barwrap"><div class="bar" style="width:34.6%"></div></div>
+      <div class="fc">35%</div>
+      <div class="mg">70%</div>
+      <div class="pr">$155</div>
+    </div>
+<div class="row a">
+      <div class="nm">Delux Chickin Sandwich</div>
+      <div class="barwrap"><div class="bar" style="width:33.6%"></div></div>
+      <div class="fc">34%</div>
+      <div class="mg">69%</div>
+      <div class="pr">$140</div>
+    </div>
+<div class="row a">
+      <div class="nm">Banana Pudding</div>
+      <div class="barwrap"><div class="bar" style="width:33.3%"></div></div>
+      <div class="fc">33%</div>
+      <div class="mg">71%</div>
+      <div class="pr">$65</div>
+    </div>
+<div class="row a">
+      <div class="nm">Chickin Sandwich</div>
+      <div class="barwrap"><div class="bar" style="width:32.3%"></div></div>
+      <div class="fc">32%</div>
+      <div class="mg">70%</div>
+      <div class="pr">$130</div>
+    </div>
+<div class="row a">
+      <div class="nm">Spicy Chickin Sandwich</div>
+      <div class="barwrap"><div class="bar" style="width:31.8%"></div></div>
+      <div class="fc">32%</div>
+      <div class="mg">71%</div>
+      <div class="pr">$135</div>
+    </div>
+<div class="row a">
+      <div class="nm">Ranch 2oz</div>
+      <div class="barwrap"><div class="bar" style="width:30.6%"></div></div>
+      <div class="fc">31%</div>
+      <div class="mg">74%</div>
+      <div class="pr">$19</div>
+    </div>
+<div class="row a">
+      <div class="nm">Chickin Fries</div>
+      <div class="barwrap"><div class="bar" style="width:30.6%"></div></div>
+      <div class="fc">31%</div>
+      <div class="mg">74%</div>
+      <div class="pr">$69</div>
+    </div>
+<div class="row v">
+      <div class="nm">Agua Ciel 600 ml</div>
+      <div class="barwrap"><div class="bar" style="width:25.2%"></div></div>
+      <div class="fc">25%</div>
+      <div class="mg">78%</div>
+      <div class="pr">$39</div>
+    </div>
+<div class="row v">
+      <div class="nm">Chipotle Habanero 2oz</div>
+      <div class="barwrap"><div class="bar" style="width:17.3%"></div></div>
+      <div class="fc">17%</div>
+      <div class="mg">85%</div>
+      <div class="pr">$19</div>
+    </div>
+<div class="row v">
+      <div class="nm">Ice Tea Lemon 16oz</div>
+      <div class="barwrap"><div class="bar" style="width:12.7%"></div></div>
+      <div class="fc">13%</div>
+      <div class="mg">89%</div>
+      <div class="pr">$40</div>
+    </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow" style="color:var(--chick)">Dónde se te fuga el dinero</div>
+    <h2>Los 4 que hay que atacar</h2>
+    <p class="sub">Tus sándwiches core (Chickin Sandwich 32%, Spicy 32%, Deluxe 34%) están sanos. El dinero se fuga en otro lado:</p>
+    <div class="fuga">
+      <div class="fh"><span class="ft">Mac &amp; Cheese</span><span class="fbadge">79% food cost</span></div>
+      <div class="fnums"><span>Precio <b>$75</b></span><span>Insumo <b>$51.03</b></span><span>Margen <b>32%</b></span></div>
+      <p>Una guarnición que casi no deja: <b>$51.03 de insumo sobre $75</b> de precio. O sube el precio, o ajusta la porción, o que vaya sólo dentro de un combo.</p>
+    </div>
+<div class="fuga">
+      <div class="fh"><span class="ft">1 Pza Chickin Tender (suelta)</span><span class="fbadge">77% food cost</span></div>
+      <div class="fnums"><span>Precio <b>$35</b></span><span>Insumo <b>$23.19</b></span><span>Margen <b>34%</b></span></div>
+      <p>La pieza suelta sangra. El <b>combo de tenders deja 66%</b> de margen. La suelta funciona como gancho — que jale al combo, no que se venda sola.</p>
+    </div>
+<div class="fuga">
+      <div class="fh"><span class="ft">Salsas sueltas — Sweet Spicy Sriracha</span><span class="fbadge">67% food cost</span></div>
+      <div class="fnums"><span>Precio <b>$19</b></span><span>Insumo <b>$10.93</b></span><span>Margen <b>42%</b></span></div>
+      <p>A $19 con <b>$10.93 de insumo</b>. Tus salsas propias Ranch y Chipotle están al 30% — ésta se salió de meta. La subreceta pide revisión.</p>
+    </div>
+<div class="fuga">
+      <div class="fh"><span class="ft">Refrescos de lata (los 8, ~49%)</span><span class="fbadge">49% food cost</span></div>
+      <div class="fnums"><span>Precio <b>$39</b></span><span>Insumo <b>$16.60</b></span><span>Margen <b>57%</b></span></div>
+      <p>La lata a $39 cuesta <b>~$16.60</b>. Es el food cost más alto fuera de la cocina. El margen del refresco vive dentro del combo, no en la lata suelta.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow" style="color:var(--emink)">Tus estrellas</div>
+    <h2>Empuja estos</h2>
+    <p class="sub">Los de mayor margen. Cada vez que uno de éstos entra al ticket, ganas más:</p>
+    <div class="stars"><div class="star"><div class="snm">Ice Tea Lemon 16oz</div><div class="smg">89%</div><div class="ssub">margen · FC 13% · $40</div></div>
+<div class="star"><div class="snm">Chipotle Habanero 2oz</div><div class="smg">85%</div><div class="ssub">margen · FC 17% · $19</div></div>
+<div class="star"><div class="snm">Agua Ciel 600 ml</div><div class="smg">78%</div><div class="ssub">margen · FC 25% · $39</div></div>
+<div class="star"><div class="snm">Chickin Fries</div><div class="smg">74%</div><div class="ssub">margen · FC 31% · $69</div></div>
+<div class="star"><div class="snm">Ranch 2oz</div><div class="smg">74%</div><div class="ssub">margen · FC 31% · $19</div></div>
+<div class="star"><div class="snm">Banana Pudding</div><div class="smg">71%</div><div class="ssub">margen · FC 33% · $65</div></div></div>
+  </section>
+
+  <section>
+    <div class="eyebrow">El motor</div>
+    <h2>Los combos son tu utilidad</h2>
+    <p class="sub">Un Chickin Sandwich suelto: $130, 32% food cost. El mismo dentro de combo: <b>$230 y 71% de margen</b>. El combo sube el ticket y baja el food cost. Todos tus combos entre <b>57% y 71%</b> de margen:</p>
+    <div class="crow">
+      <div class="cnm">Spicy Chickin Sandwich<span class="cco">Sandwich · Chickin Fries · Te helado · Aderezo</span></div>
+      <div class="cpr">$235</div>
+      <div class="cfc">FC 31%</div>
+      <div class="cmg">71%<span>margen</span></div>
+    </div>
+<div class="crow">
+      <div class="cnm">Chickin Sandwich<span class="cco">Chickin Sandwich · Chickin Fries · Te helado · Aderezo</span></div>
+      <div class="cpr">$230</div>
+      <div class="cfc">FC 32%</div>
+      <div class="cmg">71%<span>margen</span></div>
+    </div>
+<div class="crow">
+      <div class="cnm">Delux Chickin Sandwich<span class="cco">Chickin Sandwich Deluxe · Chickin Fries · Te helado · Aderezo</span></div>
+      <div class="cpr">$240</div>
+      <div class="cfc">FC 32%</div>
+      <div class="cmg">70%<span>margen</span></div>
+    </div>
+<div class="crow">
+      <div class="cnm">OG COMBO<span class="cco">Chickin Sandwich · Chickin Fries</span></div>
+      <div class="cpr">$140</div>
+      <div class="cfc">FC 36%</div>
+      <div class="cmg">69%<span>margen</span></div>
+    </div>
+<div class="crow">
+      <div class="cnm">Wild Chickin<span class="cco">Sandwich · Chickin Fries · Te helado · Aderezo</span></div>
+      <div class="cpr">$240</div>
+      <div class="cfc">FC 36%</div>
+      <div class="cmg">69%<span>margen</span></div>
+    </div>
+<div class="crow">
+      <div class="cnm">Sunny Chickin<span class="cco">Sandwich · Chickin Fries · Te helado · Aderezo</span></div>
+      <div class="cpr">$230</div>
+      <div class="cfc">FC 37%</div>
+      <div class="cmg">68%<span>margen</span></div>
+    </div>
+<div class="crow">
+      <div class="cnm">Spicy Deluxe Sandwich<span class="cco">Sandwich · Chickin Fries · Te helado · Aderezo</span></div>
+      <div class="cpr">$250</div>
+      <div class="cfc">FC 35%</div>
+      <div class="cmg">68%<span>margen</span></div>
+    </div>
+<div class="crow">
+      <div class="cnm">3 Pzas Tenders<span class="cco">Tenders · Chickin Fries · Te helado · Aderezo</span></div>
+      <div class="cpr">$185</div>
+      <div class="cfc">FC 39%</div>
+      <div class="cmg">66%<span>margen</span></div>
+    </div>
+<div class="crow">
+      <div class="cnm">1 Pza Chickin Tender<span class="cco">Tenders · Chickin Fries · Te helado · Aderezo</span></div>
+      <div class="cpr">$150</div>
+      <div class="cfc">FC 39%</div>
+      <div class="cmg">66%<span>margen</span></div>
+    </div>
+<div class="crow">
+      <div class="cnm">5 Pzas Tenders<span class="cco">Tenders · Chickin Fries · Te helado · Aderezo</span></div>
+      <div class="cpr">$200</div>
+      <div class="cfc">FC 44%</div>
+      <div class="cmg">62%<span>margen</span></div>
+    </div>
+<div class="crow">
+      <div class="cnm">7 Pzas Tenders<span class="cco">Tenders · Chickin Fries · Te helado · Aderezo</span></div>
+      <div class="cpr">$249</div>
+      <div class="cfc">FC 45%</div>
+      <div class="cmg">61%<span>margen</span></div>
+    </div>
+<div class="crow">
+      <div class="cnm">FRESH DEALS<span class="cco">Tenders · Chickin Fries</span></div>
+      <div class="cpr">$120</div>
+      <div class="cfc">FC 50%</div>
+      <div class="cmg">57%<span>margen</span></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow" style="color:var(--gold)">El corazón del negocio</div>
+    <h2>El rendimiento del pollo</h2>
+    <p class="sub">De aquí sale todo. Tu propia hoja de rendimientos, en un vistazo:</p>
+    <div class="yield">
+      <div class="flow">
+        <div class="ynode"><div class="yn">15 kg</div><div class="yl">pechuga cruda · $1,095</div></div>
+        <div class="yarrow">→</div>
+        <div class="ynode"><div class="yn">21.4 kg</div><div class="yl">empanizado final</div></div>
+        <div class="yarrow">→</div>
+        <div class="ynode"><div class="yn">248</div><div class="yl">porciones · 86 g c/u</div></div>
+      </div>
+      <div class="ybig">$6.00 <span style="font-size:18px;color:#e8dbd0;font-family:Public Sans;font-weight:400">costo por porción</span></div>
+      <p>Si un proveedor sube la pechuga, o el rendimiento cae unos puntos, tu costo por pieza se mueve — y <b>hoy no lo ves hasta el corte de mes</b>. Con Fullsite el costo por porción se recalcula solo cada vez que cambia un precio, y un agente te avisa qué platillo se salió de meta el mismo día.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">De dónde viene el costo</div>
+    <h2>Insumos y proveedores</h2>
+    <p class="sub">163 insumos activos, tus 6 proveedores clave, y los que más pesan en tu costo:</p>
+    <div class="provgrid">
+      <div class="prov">COSTCO <span>41 insumos</span></div>
+      <div class="prov">CHICK IN <span>28</span></div>
+      <div class="prov">DON TIMO <span>21</span></div>
+      <div class="prov">BRENDAS <span>11</span></div>
+      <div class="prov">CALIMAX <span>10</span></div>
+      <div class="prov">COCA COLA <span>10</span></div>
+    </div>
+    <div class="caros">
+      <div class="caro"><span>Empanizador</span><b>$1,500</b></div>
+      <div class="caro"><span>Pechuga s/hueso</span><b>$1,095</b></div>
+      <div class="caro"><span>Manteca Vegetal</span><b>$776</b></div>
+      <div class="caro"><span>Papa Congelada</span><b>$750</b></div>
+    </div>
+    <p class="sub" style="margin-top:16px">Cuando cualquiera de éstos sube de precio, el food cost de <b>cada</b> platillo que lo usa se mueve. En Excel lo recalculas a mano. En Fullsite se recalcula solo — y te dice cuáles platillos se salieron de meta.</p>
+  </section>
+
+  <section>
+    <div class="eyebrow" style="color:var(--emink)">La diferencia</div>
+    <h2>Excel vs. Fullsite</h2>
+    <p class="sub">Tu costeo está excelente. El problema no es el cálculo — es que vive en una hoja que sólo tú abres, una vez al mes.</p>
+    <div class="vs">
+      <div class="vscard x">
+        <h3>Hoy · el Excel</h3>
+        <ul>
+          <li><span class="mk">•</span>Una foto de un día. Cuando cambia un precio, hay que actualizar a mano.</li>
+          <li><span class="mk">•</span>Lo abre una persona. Si no está, nadie ve el costeo.</li>
+          <li><span class="mk">•</span>No sabe cuánto VENDES de cada cosa — sólo cuánto cuesta.</li>
+          <li><span class="mk">•</span>Nadie te avisa cuando un platillo se sale de meta.</li>
+        </ul>
+      </div>
+      <div class="vscard f">
+        <h3>Con Fullsite</h3>
+        <ul>
+          <li><span class="mk">✓</span>Vivo: cambia un precio de proveedor y todo el food cost se recalcula solo.</li>
+          <li><span class="mk">✓</span>El costeo se cruza con tus <b>ventas reales del POS</b>: qué se vende y cuánto deja.</li>
+          <li><span class="mk">✓</span>Un agente te avisa: "Mac & Cheese se salió a 79%", el mismo día.</li>
+          <li><span class="mk">✓</span>Y además: POS, cocina (KDS), cortes de caja e inventario, en un solo lugar.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <div class="cta">
+    <span class="free">Primer mes gratis</span>
+    <h2>Montamos ChickIn en Fullsite</h2>
+    <p>Con este mismo costeo. Lo dejamos vivo, conectado a tu punto de venta, y tú sólo ves las decisiones. Sin costo el primer mes.</p>
+    <div class="btns">
+      <a class="btn wa" href="https://wa.me/528115324371?text=Hola%20Daniel%2C%20vi%20el%20demo%20de%20ChickIn%20en%20Fullsite%20y%20me%20interesa.">Hablar por WhatsApp</a>
+    </div>
+  </div>
+
+  <footer>
+    <div class="fw">fullsite<span class="em"></span></div>
+    <p style="margin-top:8px">Panel armado con datos de tu archivo <b>ChickIn COSTEO 2026</b>. Números tomados tal cual de tus hojas FOOD COST, COMBOS, PRODUCTOS y RENDIMIENTOS.<br>El sistema operativo con IA para tu restaurante.</p>
+  </footer>
+</div>
+</body>
+</html>
