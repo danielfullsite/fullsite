@@ -14,82 +14,61 @@ describe('service-worker registration', () => {
     const result = await registerServiceWorker()
     expect(result).toBeNull()
   })
+
+  it('never registers a service worker — it unregisters (offline paused, P0 login iOS)', async () => {
+    // registerServiceWorker() quedó neutralizado: en vez de register('/sw.js'),
+    // desregistra los SW existentes y borra sus cachés. Verificamos el contrato en
+    // la fuente para que nadie lo vuelva a poner a registrar sin revertir a propósito.
+    const fs = await import('fs')
+    const path = await import('path')
+    const src = fs.readFileSync(path.resolve(__dirname, '../lib/service-worker.ts'), 'utf-8')
+    const fn = src.slice(src.indexOf('export async function registerServiceWorker'))
+    const body = fn.slice(0, fn.indexOf('\n}\n') + 2)
+    expect(body).not.toContain("navigator.serviceWorker.register(")
+    expect(body).toContain('getRegistrations()')
+    expect(body).toContain('unregister()')
+  })
 })
 
-// Test the service worker file itself exists and has correct structure
-describe('sw.js structure', () => {
+// El Service Worker está DESACTIVADO a propósito (kill switch) por el P0 de login iOS
+// 2026-08-31: un SW viejo servía navegaciones con bandera `redirected` → Safari/Chrome
+// iOS "Response served by service worker has redirections" al iniciar sesión. Estos
+// tests fijan el contrato del kill switch para que el offline no regrese por accidente
+// sin una reversión deliberada.
+describe('sw.js kill switch', () => {
+  const readSw = async () => {
+    const fs = await import('fs')
+    const path = await import('path')
+    return fs.readFileSync(path.resolve(__dirname, '../../public/sw.js'), 'utf-8')
+  }
+
   it('sw.js file exists in public/', async () => {
     const fs = await import('fs')
     const path = await import('path')
-    const swPath = path.resolve(__dirname, '../../public/sw.js')
-    expect(fs.existsSync(swPath)).toBe(true)
+    expect(fs.existsSync(path.resolve(__dirname, '../../public/sw.js'))).toBe(true)
   })
 
-  it('sw.js contains install, activate, and fetch handlers', async () => {
-    const fs = await import('fs')
-    const path = await import('path')
-    const swPath = path.resolve(__dirname, '../../public/sw.js')
-    const content = fs.readFileSync(swPath, 'utf-8')
-
+  it('self-destructs: skipWaiting + unregister + clears all caches on activate', async () => {
+    const content = await readSw()
     expect(content).toContain("self.addEventListener('install'")
     expect(content).toContain("self.addEventListener('activate'")
-    expect(content).toContain("self.addEventListener('fetch'")
-    expect(content).toContain("self.addEventListener('sync'")
+    expect(content).toContain('self.skipWaiting()')
+    expect(content).toContain('self.registration.unregister()')
+    expect(content).toContain('caches.keys()')
+    expect(content).toContain('caches.delete(')
   })
 
-  it('sw.js caches all POS routes', async () => {
-    const fs = await import('fs')
-    const path = await import('path')
-    const swPath = path.resolve(__dirname, '../../public/sw.js')
-    const content = fs.readFileSync(swPath, 'utf-8')
-
-    const requiredRoutes = ['/pos', '/pos/mesas', '/pos/cocina', '/pos/barra', '/pos/kds', '/pos/corte']
-    for (const route of requiredRoutes) {
-      expect(content).toContain(`'${route}'`)
-    }
+  it('does NOT intercept navigations — no fetch handler, no route/asset caching', async () => {
+    const content = await readSw()
+    // Sin fetch handler el navegador va directo a la red para TODA navegación → nunca
+    // puede volver a servir una respuesta redirigida y romper el login.
+    expect(content).not.toContain("self.addEventListener('fetch'")
+    expect(content).not.toContain('STATIC_ASSETS')
+    expect(content).not.toContain('navigationFromCache')
   })
 
-  it('sw.js has NEVER_CACHE_PATTERNS for auth and payment', async () => {
-    const fs = await import('fs')
-    const path = await import('path')
-    const swPath = path.resolve(__dirname, '../../public/sw.js')
-    const content = fs.readFileSync(swPath, 'utf-8')
-
-    // The SW uses regex patterns in NEVER_CACHE_PATTERNS
-    expect(content).toContain('NEVER_CACHE_PATTERNS')
-    expect(content).toContain('auth')
-    expect(content).toContain('mp-point')
-  })
-
-  it('bounds runtime network-first requests so WAN loss cannot freeze a mesa navigation', async () => {
-    const fs = await import('fs')
-    const path = await import('path')
-    const swPath = path.resolve(__dirname, '../../public/sw.js')
-    const content = fs.readFileSync(swPath, 'utf-8')
-
-    expect(content).toContain('const NETWORK_TIMEOUT_MS = 2500')
-    expect(content).toContain('const controller = new AbortController()')
-    expect(content).toContain('const response = await fetchWithTimeout(request)')
-  })
-
-  it('serves cached HTML navigation immediately and refreshes it in the background', async () => {
-    const fs = await import('fs')
-    const path = await import('path')
-    const swPath = path.resolve(__dirname, '../../public/sw.js')
-    const content = fs.readFileSync(swPath, 'utf-8')
-
-    expect(content).toContain('navigationFromCache(request, event)')
-    expect(content).toContain('event.waitUntil(refresh)')
-    expect(content).toContain("const CACHE_VERSION = 'v42'")
-  })
-
-  it('strips the redirect flag on navigations (Safari iOS login bug 2026-08-31)', async () => {
-    const fs = await import('fs')
-    const path = await import('path')
-    const content = fs.readFileSync(path.resolve(__dirname, '../../public/sw.js'), 'utf-8')
-    // El helper existe y networkFirstWithCache lo aplica al fetch de red — sin esto
-    // Safari rechaza la respuesta redirigida del login ("has redirections").
-    expect(content).toContain('function stripRedirect(')
-    expect(content).toContain('stripRedirect(await fetchWithTimeout(request))')
+  it('documents that it is an intentional kill switch (P0 login iOS)', async () => {
+    const content = await readSw()
+    expect(content.toUpperCase()).toContain('KILL SWITCH')
   })
 })

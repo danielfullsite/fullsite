@@ -1,80 +1,37 @@
 // Service Worker registration and lifecycle management
 
+// ⚠️ Offline PAUSADO — Service Worker neutralizado (P0 login iOS 2026-08-31).
+//
+// Un SW viejo atascado servía las navegaciones con bandera `redirected` → Safari/
+// Chrome iOS: "Response served by service worker has redirections" al iniciar sesión
+// (todas las cuentas menos admin). En vez de REGISTRAR el SW, esta función ahora
+// DESREGISTRA cualquier SW existente y borra sus cachés en cada carga que la invoque
+// (/pos/layout). No registra ninguno nuevo. Complementa el kill switch de
+// public/sw.js (que se auto-elimina vía el update-check del navegador) y /reset.html
+// (recuperación manual). Re-habilitar offline = revertir esto + public/sw.js, y mover
+// la navegación offline al servidor local del Electron para que no vuelva a romper
+// el login. Ver también el flag legacy FULLSITE_OFFLINE_DISABLED (ya redundante).
 export async function registerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
     return null
   }
 
-  // Rollback: DevTools → localStorage.setItem('FULLSITE_OFFLINE_DISABLED','1') → reload
-  if (localStorage.getItem('FULLSITE_OFFLINE_DISABLED') === '1') {
-    try {
-      const registrations = await navigator.serviceWorker.getRegistrations()
-      for (const reg of registrations) await reg.unregister()
-      if (registrations.length > 0) console.log('[SW] Disabled via flag, unregistered', registrations.length, 'workers')
-    } catch {}
-    return null
-  }
-
   try {
-    const registration = await navigator.serviceWorker.register('/sw.js', {
-      scope: '/',
-    })
-
-    console.log('[SW] Registered, scope:', registration.scope)
-
-    // Listen for updates
-    registration.addEventListener('updatefound', () => {
-      const newWorker = registration.installing
-      if (!newWorker) return
-
-      newWorker.addEventListener('statechange', () => {
-        if (newWorker.state === 'activated') {
-          console.log('[SW] New version activated')
-        }
-      })
-    })
-
-    // Auto-update: check every 30 min so mid-day deploys are picked up even if offline
-    setInterval(() => { registration.update().catch(() => {}) }, 30 * 60 * 1000)
-
-    // Also check when the tab comes back to foreground
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') registration.update().catch(() => {})
-    })
-
-    // When a new SW takes control, reload automatically if on a safe page (not mid-order)
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      const path = window.location.pathname
-      if (path === '/pos/mesas') {
-        console.log('[SW] New version ready — reloading mesas')
-        window.location.reload()
-      } else {
-        console.log('[SW] New version ready — will activate on next navigation to mesas')
-      }
-    })
-
-    // Register for background sync if supported
-    if ('sync' in registration) {
-      try {
-        await (registration as unknown as { sync: { register: (tag: string) => Promise<void> } }).sync.register('sync-orders')
-      } catch {
-        // Background sync not supported in all browsers
-      }
+    const registrations = await navigator.serviceWorker.getRegistrations()
+    for (const reg of registrations) {
+      try { await reg.unregister() } catch { /* seguir */ }
     }
-
-    // Listen for sync messages from SW
-    navigator.serviceWorker.addEventListener('message', (event) => {
-      if (event.data?.type === 'SYNC_REQUESTED') {
-        // Trigger sync from the main thread
-        window.dispatchEvent(new CustomEvent('sw-sync-requested'))
-      }
-    })
-
-    return registration
+    if (typeof caches !== 'undefined') {
+      const keys = await caches.keys()
+      await Promise.all(keys.map((k) => caches.delete(k).catch(() => {})))
+    }
+    if (registrations.length > 0) {
+      console.log('[SW] Offline pausado — desregistrados', registrations.length, 'service worker(s) y cachés limpiadas')
+    }
   } catch (error) {
-    console.error('[SW] Registration failed:', error)
-    return null
+    console.error('[SW] Limpieza de service worker falló:', error)
   }
+  return null
 }
 
 export async function updateServiceWorker() {
