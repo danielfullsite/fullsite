@@ -29,6 +29,71 @@ function parseJsonbArr(val: unknown): unknown[] {
 const MX_OFFSET_MS = 6 * 60 * 60 * 1000
 
 /**
+ * COMPATIBILIDAD. Se conserva con el MISMO contrato de antes —devuelve `[]` y nunca
+ * lanza— porque el chat no puede fallar: seis llamadas vivas dependen de eso.
+ *
+ * Lo nuevo esta en `buildDailyConEstado`, que SI distingue "no hay datos" de "no
+ * pude leer". Toda pantalla que le reporte numeros a una persona deberia usar esa.
+ */
+export async function buildDailyFromOrders(
+  sbUrl: string,
+  sbHeaders: Record<string, string>,
+  clientId: string,
+  days: number,
+): Promise<Record<string, unknown>[]> {
+  return (await buildDailyConEstado(sbUrl, sbHeaders, clientId, days)).dias
+}
+
+/**
+ * La lectura de ventas fallo. NO es lo mismo que "no hubo ventas".
+ *
+ * INCIDENTE DE DISENO, encontrado el 2026-09-01 barriendo la familia del 2026-08-31:
+ *
+ *   orders = res.ok ? await res.json() : []
+ *   if (orders.length === 0) return []
+ *
+ * Esta funcion alimenta el chat de IA, el coach y la voz. Con esa linea, un 401 o un
+ * timeout hacian que la IA respondiera "no hubo ventas" — afirmandolo, no dudandolo.
+ *
+ * Es la misma clase que el dashboard que truncaba en 5,000 ordenes y acusaba
+ * falsamente al POS de estar caido. Un numero equivocado dicho con seguridad es peor
+ * que no tener el numero.
+ */
+export class LecturaDiariaFallida extends Error {
+  constructor(public readonly motivo: string) {
+    super(`No se pudieron leer las ventas: ${motivo}`)
+    this.name = 'LecturaDiariaFallida'
+  }
+}
+
+/** Resultado que SI distingue "no hay datos" de "no pude leer". */
+export type EstadoDiario =
+  | { determinado: true; dias: Record<string, unknown>[] }
+  | { determinado: false; dias: []; motivo: string }
+
+/**
+ * Version con estado, para todo lo que le reporta numeros a una persona.
+ *
+ * Nunca lanza: el chat no puede fallar (regla del producto). Devuelve
+ * `determinado: false` para que quien la llame diga "no pude consultar" en vez de
+ * dar por bueno un cero.
+ */
+export async function buildDailyConEstado(
+  sbUrl: string,
+  sbHeaders: Record<string, string>,
+  clientId: string,
+  days: number,
+): Promise<EstadoDiario> {
+  try {
+    return { determinado: true, dias: await leerDiasOLanzar(sbUrl, sbHeaders, clientId, days) }
+  } catch (e) {
+    const motivo = e instanceof LecturaDiariaFallida ? e.motivo : 'error inesperado'
+    console.warn('[pos-daily] no se pudieron leer las ventas:', motivo)
+    return { determinado: false, dias: [], motivo }
+  }
+}
+
+/**
  * Agrega el pos_orders vivo de un tenant a filas diarias tipo wansoft_daily.
  * @param sbUrl     NEXT_PUBLIC_SUPABASE_URL
  * @param sbHeaders headers con apikey/Authorization (service o anon key)
@@ -36,7 +101,7 @@ const MX_OFFSET_MS = 6 * 60 * 60 * 1000
  * @param days      ventana en días hacia atrás (14 / 90 / 365)
  * @returns filas ordenadas por fecha DESC (como wansoft_daily). [] si no hay órdenes.
  */
-export async function buildDailyFromOrders(
+async function leerDiasOLanzar(
   sbUrl: string,
   sbHeaders: Record<string, string>,
   clientId: string,
@@ -52,8 +117,15 @@ export async function buildDailyFromOrders(
   let orders: Record<string, unknown>[] = []
   try {
     const res = await fetch(url, { headers: sbHeaders, cache: 'no-store' })
-    orders = res.ok ? await res.json() : []
-  } catch { return [] }
+    if (!res.ok) {
+      // NO se traga como "no hubo ventas". Ver buildDailyConEstado.
+      throw new LecturaDiariaFallida(`HTTP ${res.status}`)
+    }
+    orders = await res.json()
+  } catch (e) {
+    if (e instanceof LecturaDiariaFallida) throw e
+    throw new LecturaDiariaFallida('sin conexion')
+  }
   if (!Array.isArray(orders) || orders.length === 0) return []
 
   type Bucket = {

@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { createServiceClient } from '@/lib/supabase'
-import { buildDailyFromOrders } from '@/lib/pos-daily'
+import { buildDailyFromOrders, buildDailyConEstado } from '@/lib/pos-daily'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { esDuenoDelHistoricoWansoft } from '@/lib/wansoft-legacy'
@@ -180,8 +180,15 @@ export async function POST(request: NextRequest) {
     // del esqueleton), sintetizamos las filas diarias desde su pos_orders vivo. Mismo shape
     // → todo el análisis de abajo (día top, meseros, platillos, pagos, tendencias) sigue igual.
     let recentDays = recentDaysRaw
+    // `false` = la lectura FALLO. No es lo mismo que "no hubo ventas", y la IA tiene
+    // que poder decir la diferencia. Ver pos-daily.ts / LecturaDiariaFallida.
+    let ventasDeterminadas = true
+    let motivoVentas = ''
     if (!recentDays || recentDays.length === 0) {
-      recentDays = await buildDailyFromOrders(sbUrl, sbHeaders, client_id || '', histLimit)
+      const estado = await buildDailyConEstado(sbUrl, sbHeaders, client_id || '', histLimit)
+      recentDays = estado.dias
+      ventasDeterminadas = estado.determinado
+      if (!estado.determinado) motivoVentas = estado.motivo
     }
 
     // 2. Detect date from question
@@ -657,7 +664,13 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Build daily context
-    let dailyContext = 'No hay datos disponibles.'
+    // Sin esto, la IA veia una lista vacia y respondia "no hubo ventas" — afirmandolo.
+    // Un numero equivocado dicho con seguridad es peor que no tener el numero.
+    let dailyContext = ventasDeterminadas
+      ? 'No hay datos disponibles.'
+      : `LAS VENTAS NO SE PUDIERON CONSULTAR (${motivoVentas}). NO tienes los datos: `
+        + 'no digas que no hubo ventas ni des ninguna cifra. Di que no pudiste consultarlas '
+        + 'y sugiere reintentar o revisar en la caja.'
     if (recentDays && recentDays.length > 0) {
       const lines = recentDays.map((d: Record<string, unknown>) => {
         const dowNames = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado']
