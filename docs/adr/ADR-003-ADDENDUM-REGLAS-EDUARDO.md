@@ -94,7 +94,7 @@ Verificado contra `information_schema` y contra `origin/main` el 2026-09-01.
 |---|---|---|
 | **R1** — no abrir con cuentas abiertas | ❌ **No** | `filterOpenOrders` (`pos-cierre-guard.ts`) sólo lo consume `CierreCajaWizard.tsx:188`. La guarda existe **al cerrar**, no al abrir. |
 | **R2** — ninguna cuenta cruza el día | ⚠️ **Parcial** | El cierre bloquea con mesas abiertas y permite override auditado (`pos_cierres.cierre_con_ordenes_abiertas`, `ordenes_pendientes`, `cierre_autorizado_por`). Nada impide que el día termine sin cierre. |
-| **R3** — folio de orden por día | ⚠️ **Incorrecta** | `set_pos_order_number()` reinicia por **fecha de calendario**, ignorando `clients.business_day_start_local` (AMALAY: `05:00`). Una orden de la 1 a.m. abre folio nuevo cuando aún es el día de venta anterior. **No hay índice único** sobre `(client_id, día, order_number)`: el 2026-08-31 hubo un `#1` duplicado. |
+| **R3** — folio de orden por día | ✅ **Corregida 2026-09-01** | ~~Reinicia por fecha de calendario~~ — **eso era falso**, ver corrección abajo. Reiniciaba **por turno**. Migración `20260901180000_folio_por_dia_de_venta.sql`: columna `dia_venta`, folio por día de venta, e índice único parcial desde `2026-09-02`. |
 | **R3b** — consecutivo de movimiento | ❌ **No existe** | No hay contador de movimientos/pagos en el esquema. |
 | **R4** — máximo 24 horas | ⚠️ **Sólo se avisa** | `getActiveTurnoWithStaleCheck` marca `isStale` a las **18 h** y `TurnoGate` ofrece Corte Z. Es un aviso, no un límite. |
 | **R5** — corte X vs Z | ⚠️ **Parcial** | Existe `pos_cierres.folio_z`. No hay corte X como acto propio y repetible. |
@@ -155,6 +155,44 @@ TypeScript no podía verlo: los dos parámetros son `string | undefined`.
 Defensas: [`mutacion-sin-filtro-toca-todo.test.ts`](../../dashboard-app/src/__tests__/mutacion-sin-filtro-toca-todo.test.ts)
 — la llamada corregida, un guard que se niega a mandar `PATCH`/`DELETE` sin filtro, y un barrido
 de todo `src/`.
+
+---
+
+### Corrección 2026-09-01 — el folio no reiniciaba por calendario, reiniciaba por turno
+
+Este mismo documento afirmaba que `set_pos_order_number()` reiniciaba el folio por
+**fecha de calendario**. Al ir a arreglarlo, la fuente de la función dijo otra cosa:
+
+```sql
+where client_id = new.client_id and turno_id = new.turno_id
+```
+
+Reiniciaba **por turno**. La rama de calendario es un *fallback legacy* que sólo corre
+cuando `turno_id IS NULL`. La afirmación salió de leer la migración base sin leer la
+función viva en producción.
+
+El defecto real era **peor** que el documentado: con dos turnos en un día, el folio
+volvía a empezar en 1. Evidencia en AMALAY, día de venta 2026-08-30:
+
+| Turno | Folios |
+|---|---|
+| `mtgl6c29pkyt` | 1 – 15 |
+| `mt9etv39o35q` | 2 – 4 |
+
+Dos órdenes «#2» el mismo día, indistinguibles en un ticket o una factura.
+
+**Sobre el índice único.** Medido en producción antes de crearlo: 129,016 órdenes con
+folio, **115,227 filas involucradas en duplicados** (89%), peor caso el mismo folio
+**167 veces**. Casi todo es data semilla de demos — `scyf-demo` (110,789),
+`tekila-rg` (5,520), `diezmex-demo` (5,013). AMALAY tiene 24 órdenes y 2 filas
+duplicadas. Un índice total habría fallado al crearse; renumerar historia de otros
+tenants no corresponde a este arreglo. Por eso es **parcial desde 2026-09-02**, fecha
+desde la cual el campo está limpio.
+
+**Verificado en staging antes de producción:** folio continuo al cambiar de turno,
+la 1 a.m. cuenta como el día anterior, las 9 a.m. abren día nuevo con folio 1, y el
+índice rechaza un duplicado forzado. Al probar salió además que **staging no tenía el
+trigger** `trg_pos_order_number` que producción sí tiene — deriva entre entornos.
 
 ---
 
