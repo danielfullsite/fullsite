@@ -342,6 +342,42 @@ export default function FoodCostPage() {
           }
         }
 
+        // -------------------------------------------------------
+        // SOURCE 3 (tenants fullsite/clonados): pos_recipes — el motor de costeo
+        // ACTUAL (costo_total/pct_costo/ingredientes, cargado del Excel del cliente).
+        // Wansoft (SOURCE 1/2) está vacío para todo tenant nuevo; sin esto la página
+        // de food cost salía en blanco para cualquiera que no fuera AMALAY.
+        // Margen = 1 − costo/precio (mismo criterio que el resto del producto).
+        // -------------------------------------------------------
+        {
+          const pr: Array<{ nombre?: string; precio_venta?: number; costo_total?: number; ingredientes?: unknown }> =
+            api?.posRecipes || []
+          const conCosto = pr.filter(r => Number(r.costo_total) > 0)
+          if (conCosto.length > 0) {
+            const costItems: CostItem[] = conCosto.map(r => {
+              const precio = Number(r.precio_venta) || 0
+              const costo = Math.round((Number(r.costo_total) || 0) * 100) / 100
+              const margen = precio > 0 ? Math.round((1 - costo / precio) * 1000) / 10 : 0
+              const ings = Array.isArray(r.ingredientes) ? r.ingredientes : deepParse(r.ingredientes)
+              return {
+                platillo: String(r.nombre || ''),
+                ingredientes: Array.isArray(ings) ? ings.length : 0,
+                costo,
+                precio,
+                margen_pct: margen,
+                matched: precio > 0,
+                market: false,
+              }
+            }).filter(p => p.platillo && p.precio > 0 && p.margen_pct > -100)
+            if (costItems.length > 0) {
+              setItems(costItems.sort((a, b) => a.margen_pct - b.margen_pct))
+              setSource(`${costItems.length} recetas · costeo del menú`)
+              setLoading(false)
+              return
+            }
+          }
+        }
+
         setError('No se encontraron datos de food cost')
       } catch (err) {
         console.error('Food cost load error:', err)

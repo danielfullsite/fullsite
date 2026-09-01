@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     const [recipesRes, menuRes, posRecipesRes, menuConfigRes, costeoRes, modsRes, invRes] = await Promise.all([
       fetch(`${sbUrl}/rest/v1/wansoft_recipes?client_id=eq.${clientId}&select=saucer_id,saucer_name,budget_cost,ingredients`, opts),
       fetch(`${sbUrl}/rest/v1/pos_menu_items?client_id=eq.${clientId}&select=name,price,category_id`, opts),
-      fetch(`${sbUrl}/rest/v1/pos_recipes?client_id=eq.${clientId}&select=nombre,precio_venta&precio_venta=gt.0`, opts),
+      fetch(`${sbUrl}/rest/v1/pos_recipes?client_id=eq.${clientId}&select=nombre,precio_venta,costo_total,pct_costo,ingredientes&precio_venta=gt.0`, opts),
       fetch(`${sbUrl}/rest/v1/wansoft_menu_config?client_id=eq.${clientId}&select=fecha,saucers&order=fecha.desc&limit=10`, opts),
       fetch(`${sbUrl}/rest/v1/wansoft_data?tipo=eq.costeo_por_platillo&client_id=eq.${clientId}&order=fecha.desc&limit=1&select=data,fecha`, opts),
       fetch(`${sbUrl}/rest/v1/pos_modifiers?client_id=eq.${clientId}&id=like.wsm-*&select=name,price`, opts),
