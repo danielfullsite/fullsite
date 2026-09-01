@@ -14,11 +14,14 @@ import { NextRequest } from 'next/server'
 // kitchen-relevant columns — never totals, payments, tips or customer data — so the
 // surface is the least-sensitive slice of the order (what is being cooked).
 //
-// SECURITY: además del client_id, se ata a un token de cocina por-tenant
-// (x-kitchen-token = HMAC(client_id, KITCHEN_TOKEN_SECRET)) para que no se pueda
-// enumerar entre tenants. OPT-IN: si KITCHEN_TOKEN_SECRET no está seteado, opera
-// abierto igual que antes (backward-compatible). Ver lib/kitchen-token.ts.
-import { kitchenTokenEnabled, verifyKitchenToken } from '@/lib/kitchen-token'
+// SECURITY: el client_id es un slug adivinable, así que NO basta. La lectura se ata a un
+// token por-tenant (x-kitchen-token = HMAC(client_id, KITCHEN_TOKEN_SECRET)).
+//
+// Se exige SIEMPRE. Sin KITCHEN_TOKEN_SECRET no se autoriza a nadie — antes era opt-in y
+// sin secreto servía abierto, con el resultado de que cualquiera con un slug leía la
+// operación en vivo de otro restaurante. Ver lib/kitchen-token.ts y
+// docs/security/ACTIVAR-KITCHEN-TOKEN.md.
+import { kitchenSecretPresente, verifyKitchenToken } from '@/lib/kitchen-token'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,8 +39,20 @@ export async function GET(request: NextRequest) {
     return Response.json({ error: 'client_id inválido' }, { status: 400 })
   }
 
-  // Token de cocina por-tenant (solo se exige si KITCHEN_TOKEN_SECRET está activo).
-  if (kitchenTokenEnabled() && !verifyKitchenToken(clientId, request.headers.get('x-kitchen-token'))) {
+  // Token de cocina por-tenant. Se exige siempre.
+  //
+  // El log distingue los dos motivos porque en operación se ven igual —la pantalla dice
+  // "sin comandas"— pero se arreglan distinto: uno es provisionar la pantalla, el otro es
+  // que falta la variable en el despliegue y NINGUNA pantalla va a funcionar.
+  if (!kitchenSecretPresente()) {
+    console.error(
+      '[pos/kitchen] KITCHEN_TOKEN_SECRET no está configurada: se deniega todo. ' +
+        'Ver docs/security/ACTIVAR-KITCHEN-TOKEN.md'
+    )
+    return Response.json({ error: 'no autorizado' }, { status: 401 })
+  }
+  if (!verifyKitchenToken(clientId, request.headers.get('x-kitchen-token'))) {
+    console.warn(`[pos/kitchen] token inválido o ausente para client_id=${clientId}`)
     return Response.json({ error: 'no autorizado' }, { status: 401 })
   }
 
