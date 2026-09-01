@@ -69,10 +69,67 @@ export function targetAddressSpaceFor(input: RequestInfo | URL): TargetAddressSp
   return 'local'
 }
 
-export function localNetworkFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+/**
+ * `loopback` NO existe en todos los Chromium.
+ *
+ * INCIDENTE 2026-08-31, caja de AMALAY: el POS guardaba la orden pero la comanda no
+ * llegaba a cocina, con el modal "no hay conexion con la caja". Pedro estaba vivo y
+ * aceptaba POST desde fuera — el request moria dentro del navegador.
+ *
+ * Local Network Access renombro los espacios de direcciones: lo que antes era `local`
+ * paso a `loopback`, y `private` paso a `local`. Ese renombre es reciente. Las
+ * terminales corren Electron 33 = **Chromium 130**, donde `targetAddressSpace` YA
+ * existe pero sus valores validos son `local`/`private`/`public`. Un valor invalido en
+ * un campo CONOCIDO de RequestInit lanza TypeError — no se ignora — y el fetch nunca
+ * sale.
+ *
+ * El error que motivo el cambio a `loopback` se capturo en **Chrome** (que se
+ * autoactualiza y ya conoce el nombre nuevo). Arreglarlo para el navegador rompio las
+ * terminales, donde justamente vive el POS.
+ *
+ * Por eso el valor se DEGRADA en vez de fijarse: si el motor no acepta la declaracion,
+ * se reintenta sin ella. En las terminales eso es inocuo — el build 1.3.9 desactiva las
+ * tres puertas de PNA (`main.js`), asi que ahi la declaracion nunca hizo falta.
+ */
+export async function localNetworkFetch(
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+): Promise<Response> {
   const localInit: LocalNetworkRequestInit = {
     ...init,
     targetAddressSpace: targetAddressSpaceFor(input),
   }
-  return fetch(input, localInit)
+
+  // Un init invalido puede llegar de DOS formas segun el motor: como throw sincrono del
+  // constructor de Request, o como promesa rechazada. Se cubren las dos — atrapar solo
+  // una deja el arreglo sin efecto justo en el motor que se quiere rescatar.
+  try {
+    return await fetch(input, localInit)
+  } catch (e) {
+    if (!esEnumNoSoportado(e)) throw e
+    console.warn('[lna] targetAddressSpace no soportado por este motor; reintento sin declararlo')
+    return fetch(input, init)
+  }
+}
+
+/**
+ * ¿El motor rechazó el VALOR del enum, o de verdad no hay red?
+ *
+ * Los dos casos llegan como TypeError, así que hay que mirar el mensaje. Un fallo de red
+ * real dice "Failed to fetch" / "NetworkError"; el rechazo del enum nombra el campo o el
+ * valor. Ante la duda se trata como fallo de red y NO se reintenta: reintentar sin la
+ * declaracion en un navegador que si la exige seria pedirle al bloqueo que nos deje pasar
+ * por la puerta de atras, y ademas escondería el problema real.
+ */
+function esEnumNoSoportado(e: unknown): boolean {
+  if (!(e instanceof TypeError)) return false
+  const msg = e.message.toLowerCase()
+  if (msg.includes('failed to fetch') || msg.includes('networkerror') || msg.includes('load failed')) {
+    return false
+  }
+  return msg.includes('targetaddressspace')
+    || msg.includes('address space')
+    || msg.includes('loopback')
+    || msg.includes('not a valid value')
+    || msg.includes('enum')
 }
