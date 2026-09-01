@@ -209,17 +209,57 @@ const ACTIVE_ORDER_STATUSES = new Set(['enviada', 'preparando', 'lista', 'abiert
  */
 export async function getCachedActiveOrders(clientId?: string): Promise<Record<string, unknown>[]> {
   const all = await getCachedOrders()
-  return all
+
+  // El filtro por tenant FALLA CERRADO. Antes era
+  //   `return !clientId || !owner || owner === clientId`
+  // y las dos primeras condiciones eran comodines:
+  //
+  //   `!owner`     -> una orden con client_id vacio se pintaba en el mapa de
+  //                   CUALQUIER restaurante. En prod hay 7 asi (jul-2026, $1,879,
+  //                   huerfanas de cuando getActiveClientSlug devolvia ''), de modo
+  //                   que hoy un segundo cliente en la misma base veria mesas de
+  //                   AMALAY ocupadas.
+  //   `!clientId`  -> una terminal que no sabe de quien es pintaba las mesas de
+  //                   TODOS los tenants del cache.
+  //
+  // Contra la regla multi-tenant del proyecto: impedir fallback a otro restaurante
+  // y fallar cerrado cuando no haya mapping (CLAUDE.md §12).
+  //
+  // Se excluye en silencio NO: esconder una mesa ocupada es exactamente el fallo
+  // que costo la noche del 30-ago (un plano que dice "libre" se ve bien y miente).
+  // Por eso cada exclusion se reporta.
+  const sinTenant: string[] = []
+  const deOtroTenant: string[] = []
+
+  const result = all
     .filter(order => {
       if (!ACTIVE_ORDER_STATUSES.has(String(order.status))) return false
       const owner = String(order.client_id ?? '')
-      return !clientId || !owner || owner === clientId
+      const id = String(order.id ?? '?')
+      if (!owner) { sinTenant.push(id); return false }
+      if (!clientId) return false
+      if (owner !== clientId) { deOtroTenant.push(id); return false }
+      return true
     })
     .sort((a, b) => {
       const bt = Date.parse(String(b.updated_at ?? b.created_at ?? '')) || 0
       const at = Date.parse(String(a.updated_at ?? a.created_at ?? '')) || 0
       return bt - at
     })
+
+  if (!clientId) {
+    // La terminal no sabe a que restaurante pertenece. No se pinta NADA: pintar
+    // el cache completo mezclaria restaurantes. Es ruidoso a proposito — con este
+    // estado el POS tampoco puede guardar bien, asi que hay que verlo.
+    console.error('[mesas] la terminal no tiene client_id — no se pinta ninguna mesa del cache')
+  }
+  if (sinTenant.length) {
+    console.warn(`[mesas] ${sinTenant.length} orden(es) en cache sin client_id, excluidas del mapa`, sinTenant)
+  }
+  if (deOtroTenant.length) {
+    console.warn(`[mesas] ${deOtroTenant.length} orden(es) de otro restaurante en este cache`, deOtroTenant)
+  }
+  return result
 }
 
 /**
