@@ -1,7 +1,7 @@
 // Service Worker — Fullsite POS offline-first
 // Caches app shell, static assets, and API responses for true offline operation
 
-const CACHE_VERSION = 'v42'
+const CACHE_VERSION = 'v43'
 const STATIC_CACHE = `fullsite-static-${CACHE_VERSION}`
 const DYNAMIC_CACHE = `fullsite-dynamic-${CACHE_VERSION}`
 const API_CACHE = `fullsite-api-${CACHE_VERSION}`
@@ -145,13 +145,13 @@ self.addEventListener('fetch', (event) => {
 
   // API requests: network-first with cache fallback
   if (url.hostname.includes('supabase.co') && API_CACHE_PATTERNS.some((p) => p.test(url.pathname))) {
-    event.respondWith(networkFirstWithCache(request, API_CACHE))
+    event.respondWith(networkFirstWithCache(request, API_CACHE, true))
     return
   }
 
   // Next.js data/API: network-first
   if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/_next/data/')) {
-    event.respondWith(networkFirstWithCache(request, DYNAMIC_CACHE))
+    event.respondWith(networkFirstWithCache(request, DYNAMIC_CACHE, true))
     return
   }
 
@@ -199,7 +199,37 @@ function stripRedirect(response) {
   })
 }
 
-async function networkFirstWithCache(request, cacheName) {
+/**
+ * `esApi`: la respuesta guardada se ENTREGA, pero MARCADA.
+ *
+ * INCIDENTE 2026-08-31, AMALAY. La terminal Entrada mostraba solo las mesas 1 a 5
+ * con la 7 abierta desde hacia rato, aunque el plano refresca cada 3 s. Entrada iba
+ * lenta: la peticion se pasaba del limite, caia al catch, y aqui se devolvia la
+ * copia guardada CON SU 200 ORIGINAL. Para la pagina era indistinguible de un dato
+ * fresco, asi que la pintaba como verdad y ademas la reconciliaba a IndexedDB,
+ * volviendo permanente lo viejo.
+ *
+ * Servir cache sin red es correcto y hay que conservarlo — es lo que sostiene el
+ * modo offline. Lo que NO se vale es servirla sin decirlo. Con la marca
+ * `X-Fullsite-Stale` la pagina puede mostrar el dato Y avisar que no esta
+ * confirmado, en vez de tener que elegir entre mentir o quedarse en blanco.
+ *
+ * Tambien: `ignoreSearch` NO aplica a API. Para HTML es correcto (/pos?mesa=3 debe
+ * empatar con /pos), pero en una consulta REST el query string ES la consulta:
+ * con ignoreSearch, un `pos_orders?status=in.(enviada)` podia responderse con el
+ * cache de un `pos_orders?` completamente distinto.
+ */
+/**
+ * Copia la respuesta agregando la marca. No se puede mutar `headers` de una
+ * Response del Cache API, asi que se reconstruye.
+ */
+function marcarComoGuardada(res) {
+  const headers = new Headers(res.headers)
+  headers.set('X-Fullsite-Stale', '1')
+  return new Response(res.body, { status: res.status, statusText: res.statusText, headers })
+}
+
+async function networkFirstWithCache(request, cacheName, esApi = false) {
   try {
     // A Windows terminal can keep its LAN link while WAN is down. In that state
     // navigator.onLine remains true and a raw fetch may hang on TCP for minutes.
@@ -216,9 +246,11 @@ async function networkFirstWithCache(request, cacheName) {
     // → una navegación cliente (router.push a /pos?mesa=1 con headers RSC) NO empataba
     // con el /pos cacheado (Vary mismatch) → caía a la página offline aunque /pos SÍ
     // estaba en cache. ignoreVary hace que empate sin importar esos headers.
-    const cached = await caches.match(request) ||
-      await caches.match(request, { ignoreSearch: true, ignoreVary: true })
-    if (cached) return cached
+    const cached = esApi
+      ? await caches.match(request)
+      : (await caches.match(request) ||
+         await caches.match(request, { ignoreSearch: true, ignoreVary: true }))
+    if (cached) return esApi ? marcarComoGuardada(cached) : cached
     // Return offline page for HTML requests
     if (request.headers.get('accept')?.includes('text/html')) {
       return new Response(offlineHTML(), {

@@ -283,13 +283,22 @@ export default function MesasPage() {
     }
     try {
       const [ordersRes, resRes] = await Promise.all([
+        // `no-store` NO es cosmetico aqui. Sin el, el Service Worker puede resolver
+        // esta consulta con una respuesta GUARDADA y codigo 200, y el codigo de abajo
+        // no tiene como distinguirla de una fresca: la trata como verdad y la
+        // reconcilia al cache de IndexedDB, volviendo permanente lo viejo.
+        //
+        // Visto en campo el 2026-08-31: con la mesa 7 abierta desde las 22:45 y un
+        // poll cada 3 s, la terminal Entrada seguia mostrando solo las mesas 1 a 5.
+        // La caja, correcta. `pos-data.ts` ya usa `no-store` en 33 consultas; estas
+        // dos —las que deciden que mesas estan ocupadas— eran las que no lo tenian.
         fetchWithTimeout(
           `${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${_cid()}&status=in.(enviada,preparando,lista,abierta,entregada)&order=created_at.desc&limit=50`,
-          { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
+          { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
         ),
         fetchWithTimeout(
           `${SUPABASE_URL}/rest/v1/reservaciones?client_id=eq.${_cid()}&fecha=eq.${new Date().toISOString().split('T')[0]}&status=neq.cancelled&order=horario_inicio.asc&select=codigo_reserva,nombre,guests,horario_inicio,espacio,status`,
-          { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
+          { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
         ),
       ])
       /**

@@ -23,7 +23,23 @@ export type LecturaDelPlano =
   /** No se pudo confirmar. Sirve cache, avisa, y NUNCA reconcilies. */
   | { confiable: false; motivo: string }
 
-export function evaluarRespuestaDeMesas(res: { ok: boolean; status: number }): LecturaDelPlano {
+export function evaluarRespuestaDeMesas(
+  res: { ok: boolean; status: number; headers?: { get(n: string): string | null } },
+): LecturaDelPlano {
+  /**
+   * Un 200 del Service Worker puede ser una respuesta GUARDADA, no fresca.
+   *
+   * Cuando la red tarda mas del limite, el SW cae a su cache y devuelve la copia
+   * con su 200 original. Antes eso era indistinguible de un dato fresco: asi fue
+   * como Entrada mostro las mesas 1 a 5 con la 7 abierta, refrescando cada 3 s.
+   * El SW (v43) ahora marca esas respuestas con `X-Fullsite-Stale`.
+   *
+   * Se pinta igual —tener el dato viejo es mejor que no tener nada— pero NO se
+   * reconcilia contra el cache local y se avisa en pantalla.
+   */
+  if (res.headers?.get('X-Fullsite-Stale') === '1') {
+    return { confiable: false, motivo: 'Mostrando datos guardados, sin confirmar' }
+  }
   if (res.ok) return { confiable: true }
   if (esFalloDeAutenticacion(res.status)) return { confiable: false, motivo: 'Tu sesion vencio' }
   if (esFalloDeRed(res.status)) return { confiable: false, motivo: 'Sin conexion con el servidor' }
