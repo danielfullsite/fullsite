@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Fullsite — Reparar acceso</title>
+  <meta name="robots" content="noindex" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      background: #0a0a0a; color: #e5e5e5;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      display: flex; align-items: center; justify-content: center; padding: 2rem; text-align: center;
+    }
+    .card { max-width: 420px; width: 100%; }
+    .spin {
+      width: 40px; height: 40px; margin: 0 auto 1.25rem; border-radius: 50%;
+      border: 3px solid rgba(16,185,129,0.25); border-top-color: #10b981;
+      animation: sp 0.8s linear infinite;
+    }
+    @keyframes sp { to { transform: rotate(360deg); } }
+    h1 { font-size: 1.4rem; font-weight: 700; margin-bottom: 0.5rem; }
+    p { color: #9ca3af; font-size: 0.9rem; line-height: 1.6; margin-bottom: 1.5rem; }
+    a.btn {
+      display: inline-block; background: #10b981; color: #fff; font-weight: 600; font-size: 0.95rem;
+      text-decoration: none; padding: 0.75rem 1.5rem; border-radius: 10px;
+    }
+    .log { margin-top: 1.5rem; font-size: 0.72rem; color: #4b5563; text-align: left; line-height: 1.6; }
+    .ok .spin { display: none; }
+  </style>
+</head>
+<body>
+  <div class="card" id="card">
+    <div class="spin" id="spin"></div>
+    <h1 id="title">Reparando la app…</h1>
+    <p id="msg">Quitando la versión vieja guardada en este dispositivo. Toma un segundo.</p>
+    <a class="btn" id="go" href="/login">Ir a iniciar sesión</a>
+    <div class="log" id="log"></div>
+  </div>
+
+  <script>
+    // Recuperación de un Service Worker VIEJO atascado (iOS Safari/Chrome):
+    // "Response served by service worker has redirections" al iniciar sesión.
+    // Esta página es un archivo ESTÁTICO nuevo: no pasa por auth ni rewrites y el
+    // SW viejo no la tiene cacheada, así que corre este código fresco que
+    // desregistra el SW y borra TODAS las cachés. Un dispositivo sin SW y sin
+    // cachés se comporta como un navegador limpio → login funciona (el servidor
+    // no redirige nada).
+    (function () {
+      var logEl = document.getElementById('log');
+      function log(t) { var d = document.createElement('div'); d.textContent = '· ' + t; logEl.appendChild(d); }
+
+      function goLogin() {
+        try { window.location.replace('/login'); } catch (e) { window.location.href = '/login'; }
+      }
+
+      function done() {
+        document.getElementById('card').className = 'card ok';
+        document.getElementById('title').textContent = 'Listo, entrando…';
+        document.getElementById('msg').textContent = 'Ya puedes iniciar sesión con cualquier cuenta.';
+        setTimeout(goLogin, 1200);
+      }
+
+      var tasks = [];
+
+      // 1) Desregistrar todos los service workers de este origen.
+      if ('serviceWorker' in navigator) {
+        tasks.push(
+          navigator.serviceWorker.getRegistrations().then(function (regs) {
+            if (!regs.length) { log('No había service worker registrado.'); return; }
+            return Promise.all(regs.map(function (r) {
+              return r.unregister().then(function (ok) { log('Service worker desregistrado (' + (ok ? 'ok' : 'ya estaba fuera') + ').'); });
+            }));
+          }).catch(function () { log('No se pudo desregistrar el service worker (continuo).'); })
+        );
+      }
+
+      // 2) Borrar todas las cachés (ahí viven /login y las navegaciones viejas).
+      if (typeof caches !== 'undefined') {
+        tasks.push(
+          caches.keys().then(function (keys) {
+            if (!keys.length) { log('No había cachés que borrar.'); return; }
+            return Promise.all(keys.map(function (k) {
+              return caches.delete(k).then(function () { log('Caché borrada: ' + k); });
+            }));
+          }).catch(function () { log('No se pudieron borrar las cachés (continuo).'); })
+        );
+      }
+
+      if (!tasks.length) { log('Este navegador no tenía nada que limpiar.'); done(); return; }
+
+      // Nunca colgarse: pase lo que pase, en ~4s manda a login.
+      var safety = setTimeout(goLogin, 4000);
+      Promise.all(tasks).then(function () { clearTimeout(safety); done(); }).catch(function () { clearTimeout(safety); done(); });
+    })();
+  </script>
+</body>
+</html>
