@@ -27,9 +27,29 @@
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
+/**
+ * Token del usuario logueado (JWT) para que RLS scope por SU tenant. Antes se usaba
+ * la anon key cruda y las tablas pos_inventory/pos_ingredients (RLS solo-authenticated)
+ * devolvían 0 filas salvo que el fetch-patch global la subiera al JWT. Leerlo aquí
+ * directo blinda la página de Inventario para el usuario real (Billy ve sus insumos)
+ * sin depender del patch. Cae a la anon key en SSR o si no hay sesión.
+ */
+function getAuthToken(): string {
+  if (typeof window === 'undefined') return SUPABASE_KEY
+  try {
+    const hostname = new URL(SUPABASE_URL).hostname.split('.')[0]
+    const stored = localStorage.getItem(`sb-${hostname}-auth-token`)
+    if (stored) {
+      const parsed = JSON.parse(stored)
+      if (parsed?.access_token) return parsed.access_token
+    }
+  } catch {}
+  return SUPABASE_KEY
+}
+
 const headers = (extra?: Record<string, string>) => ({
   apikey: SUPABASE_KEY,
-  Authorization: `Bearer ${SUPABASE_KEY}`,
+  Authorization: `Bearer ${getAuthToken()}`,
   ...extra,
 })
 
