@@ -199,7 +199,72 @@ Distinguir esto es lo que separa un plan de una lista de deseos.
 
 ---
 
-## 6. Lo que este documento NO dice
+## 6. Plan de ejecución
+
+> Aprobado por Daniel el 2026-09-01. Se actualiza conforme avanza.
+
+### La llave: el auto-update
+
+Todo lo anterior dice que **lo que arregla la escala vive del lado que exige una visita física**.
+Eso es cierto **hoy**, y deja de serlo en cuanto el servidor local se actualice solo.
+
+**El auto-update convierte cada cambio futuro del servidor local de "una visita por restaurante"
+a "un deploy".** Es lo único que quita el muro 1 de raíz.
+
+Y estaba a medio construir, con el diseño correcto ya escrito en
+[`update/manager.js`](../../electron-app/local-server/update/manager.js): canales
+`development → pilot → stable`, instalar **sólo cuando no hay turno activo ni órdenes abiertas**,
+versiones bloqueables desde Supabase, rollback.
+
+### ⚠️ Queda exactamente UNA visita obligatoria por terminal
+
+Las terminales que hoy corren **1.3.9** no se van a auto-actualizar por mucho que se arregle el
+código: **les falta la capacidad misma de actualizarse**. Necesitan una última instalación manual
+— la que se las mete.
+
+> **Después de esa, ninguna.** Es el precio de entrada, y sólo se paga una vez por terminal.
+>
+> **Corolario operativo:** hasta que esa visita ocurra, **todo cambio del servidor local se
+> acumula y viaja junto en ese mismo instalador.** Cada instalador que se suelta antes cuesta un
+> viaje que no era necesario.
+
+### El orden, y por qué
+
+| # | Paso | Estado | Por qué en ese lugar |
+|---|---|---|---|
+| **0** | **Cimientos del auto-update**: repo correcto, canal de publicación, releases por etiqueta | ✅ **Hecho** — PR #309 | Sin esto lo demás no tiene dónde apoyarse |
+| **1** | **Electron de prueba en CI**: arranca sin red, manda comanda, corta WAN, verifica | ⏳ **En curso** | **No se puede auto-actualizar lo que no se puede probar** |
+| **2** | **Auto-update Fase 2**: `electron-updater` + descarga/instalación, con AMALAY en canal `pilot` | Pendiente | La llave. Requiere el paso 1 antes |
+| **3** | **Encender latidos** | Pendiente | Gratis una vez que hay auto-update. Viaja en el mismo instalador |
+| **4** | **Local-first** (el servidor local como autoridad durante el servicio) | Pendiente | Ya se puede enviar y probar |
+| **5** | **Config como datos** (reglas de operación en `pos_settings`) | Pendiente | Deja de ser un deploy por cliente |
+| **6** | **Aprovisionamiento sin humano** | Pendiente | El resto del muro 1 |
+
+**Lo que cambia con el paso 2:** hoy los pasos 3 al 6 cuestan **una visita por restaurante cada
+uno**. Después, cuestan **un deploy**. Ése es todo el juego.
+
+### Por qué el paso 1 va antes que el 2, y no al revés
+
+**Auto-update sin pruebas automáticas es un arma cargada.** Publicas una versión mala y **cien
+restaurantes se rompen a la vez**, sin poder revertir solos.
+
+Los dos son un par inseparable. Y el paso 1 tiene valor propio aunque el 2 se retrase: es lo que
+hoy obliga a mandar a una persona a AMALAY para saber si el POS arranca sin internet.
+
+El mínimo que ya vale: **arrancar sin red y llegar al PIN**. Es el paso 3 de la
+[hoja de humo](../offline/HUMO-AMALAY-2026-09-01.md), el único que no se puede hacer en remoto.
+
+### Lo que este plan NO promete
+
+- **Ninguna fecha.** El orden está fijado por dependencias reales, no por un calendario.
+- **Que el auto-update funcione.** Los cimientos están; que un release publicado **se instale de
+  verdad** exige publicar uno y verlo llegar a una máquina. Eso no ha pasado.
+- **Que sea suficiente para 100,000.** Quita el muro 1 y hace atacables el 2 y el 5. Los muros 4
+  (particionar) y 5 (geografía) siguen enteros — pero ésos son ingeniería conocida.
+
+---
+
+## 7. Lo que este documento NO dice
 
 - **No es un plan con fechas.** Los rangos de los muros ("10–50", "200–1,000") son estimaciones de
   ingeniería, **no mediciones**. El único dato duro de escala es el de la tabla: 128,006 filas en
