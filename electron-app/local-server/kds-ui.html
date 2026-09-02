@@ -151,6 +151,13 @@
   body.v-compact .round,body.v-compact .badge{font-size:8px}
   body.v-compact .time{font-size:11px}
   body.v-compact .items{padding:2px 5px 4px}
+  /* Una comanda mas alta que la pantalla (banquete, mesa grande) se RECORTABA:
+     las columnas van con overflow-y:hidden y la tarjeta no tenia tope, asi que
+     los platillos de abajo quedaban invisibles E INALCANZABLES para cocina
+     (encontrado en stress visual 2026-09-02: 50 items, se veian ~17).
+     Tope a la tarjeta + scroll interno en su lista de items. */
+  body.v-compact .card{max-height:calc(100vh - 76px)}
+  body.v-compact .card .items{overflow-y:auto;min-height:0}
   body.v-compact .item{gap:6px;padding:5px 3px;border-radius:6px}
   body.v-compact .tick{width:22px;height:22px;border-radius:5px;font-size:12px}
   body.v-compact .qty{font-size:15px;min-width:17px}
