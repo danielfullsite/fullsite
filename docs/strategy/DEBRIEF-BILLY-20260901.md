@@ -116,6 +116,48 @@
   herramienta, abre puertas. "Cada consultoría es un animal diferente" → cada cliente hace el sistema
   más robusto. Sin ask ni equity definidos aún (consistente con [[project_jc_tame_brand_partner]]).
 
+## 5b. Sesión 2 (2026-09-01 tarde) — de DEMO a CLIENTE OPERATIVO como AMALAY
+
+Cambio de objetivo (directiva textual de Daniel): **"Hay que meter todo el excel para poder empezar a
+operar con ellos (como AMALAY)... que funcione OFFLINE igual que AMALAY, cargue recetas platillos etc."**
+ChickIn deja de ser demo → cliente que va a OPERAR. Estrategia de Daniel: *"ya existe el esqueleto de
+AMALAY, nada más ligo los datos de ChickIn ahí — está toda la arquitectura, nada más pongo tus datos."*
+(Ver [[project_p1_golden_skeleton]] / [[project_skeleton_productization]].)
+
+Requerimientos técnicos para "operar como AMALAY":
+1. **Receta ↔ inventario ligados:** vender un platillo DESCUENTA sus insumos del stock; cuando un insumo
+   se agota, el POS BLOQUEA el platillo. Historial de consumo por venta. (AMALAY: `pos_menu_item_recipes`
+   mapea menu_item→recipe, 69 filas; el descuento cruza receta→ingredientes→`pos_inventory`.)
+2. **Offline como AMALAY** (SW/LAN/local server ya existen a nivel app; validar en su hardware real).
+3. **Costo de receta ligado a materia prima** → se actualiza solo cuando cambia el precio del insumo.
+4. **Modificadores = ingredientes REALES de cada receta** (curados uno por uno): sin/extra SOLO de lo
+   removible (pepinillos, salsa, lechuga, tomate, queso); NUNCA sin pan/pechuga/empanizador/paprika (batter).
+   Deluxe lleva lechuga+tomate → esos sí son sin/extra. Los genéricos que puse estaban mal.
+5. **Fast food NO lleva mesas/meseros** — quitar selección de mesa del POS de ChickIn.
+6. **Fotos de producto** en el POS (por platillo).
+7. **Usuarios reales:** sucursal ChickIn = gerente + auxiliares (no cajero fijo), 4–6 personas. Para el demo
+   Billy autorizó meter a Billy + Daniel + Luisa con accesos, y **ventas chicas (3,8,12,14 uds)** para que
+   se vean las gráficas (matiz vs "todo en cero" — CONFIRMAR con Daniel antes de re-meter ventas).
+
+Migración Polo (contexto de campo):
+- ChickIn corre **Polo** en terminales Windows táctiles BLOQUEADas (solo abre Polo; el back-office está
+  candado por falta de pago). Quieren migrar a Fullsite en el MISMO hardware (desbloquear, instalar la
+  extensión Chrome). Sí se le puede conectar teclado (confirmado por Raúl chico). Visita a la sucursal
+  **Plaza Bonita, Av. Acapulco** con teclado para desbloquear; Billy coordina. ~40 sucursales.
+- Migrar **historial de Polo** (ventas 2024–2025, por sucursal). Dashboard multi-sucursal (corporativo ve
+  todo, sucursal ve la suya, por permisos).
+- Fraude/merma detectado en el costeo: ~**12% de food cost sin contabilizar** (roban producto / merma no
+  registrada; rinden 8 de 10 pechugas = 80%). Gancho: el sistema predice merma y la vigila. 80/20: 5
+  productos = 80% del valor del inventario (proteína) → contarlos diario.
+
+Leads nuevos de la sesión:
+- **Grupo Cuauhtémoc**: comedores industriales + piden **plataforma de eventos** (empleados reservan eventos
+  privados ligados al POS). Piden protocolo de ciberseguridad (Fullsite tiene ~5 certificados). Posible add-on.
+- **Tequila Group** (K): restaurantes en EE.UU. sobre Toast; dando feedback del sistema.
+- Clonabilidad: para escalar, el cliente sube su receta en **formato estándar** (producto, rendimiento, costo…)
+  o el equipo de implementación se lo formatea. "Fullsite: dame la info, la organizo en el formato que el
+  sistema lee." El AI que auto-detecta un Excel arbitrario se atora cuando hay data que no existe en el sistema.
+
 ## 6. Entregable inmediato (pedido para HOY)
 
 Billy se va **mañana a CDMX** a ver sucursales; quiere **el demo del POS de ChickIn HOY** para
