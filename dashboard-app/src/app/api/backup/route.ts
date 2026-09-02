@@ -14,17 +14,37 @@ const BACKUP_ADMINS = new Set(
   (process.env.BACKUP_ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
 )
 
-/** Valida el Bearer token contra Supabase Auth y exige email de admin */
-async function isAuthorized(request: NextRequest): Promise<boolean> {
+/** Valida el Bearer token contra Supabase Auth y exige email de admin.
+ *  Devuelve el user id (para validar membresía del tenant) o null si no autorizado.
+ *  (Guardián registrado como `isAuthorized` en lib/seguridad/guardianes-api.ts.) */
+async function isAuthorized(request: NextRequest): Promise<string | null> {
   const authHeader = request.headers.get('authorization')
-  if (!authHeader?.startsWith('Bearer ')) return false
+  if (!authHeader?.startsWith('Bearer ')) return null
   try {
     const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
       headers: { apikey: SUPABASE_ANON_KEY, Authorization: authHeader },
     })
-    if (!res.ok) return false
+    if (!res.ok) return null
     const user = await res.json()
-    return BACKUP_ADMINS.has(String(user?.email || '').toLowerCase())
+    if (!BACKUP_ADMINS.has(String(user?.email || '').toLowerCase())) return null
+    return typeof user?.id === 'string' ? user.id : null
+  } catch {
+    return null
+  }
+}
+
+/** El usuario debe tener membresía (client_users) en el tenant solicitado.
+ *  Esto evita que un admin válido descargue el backup de un tenant al que NO
+ *  pertenece (defensa en profundidad sobre el allowlist de correos). */
+async function userHasClientAccess(userId: string, clientId: string): Promise<boolean> {
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/client_users?user_id=eq.${encodeURIComponent(userId)}&client_id=eq.${encodeURIComponent(clientId)}&select=client_id&limit=1`,
+      { headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` } }
+    )
+    if (!res.ok) return false
+    const rows = await res.json()
+    return Array.isArray(rows) && rows.length > 0
   } catch {
     return false
   }
@@ -42,9 +62,11 @@ const BACKUP_TABLES = [
   'pos_audit_log',
 ]
 
-async function fetchTable(table: string): Promise<unknown[]> {
+async function fetchTable(table: string, clientId: string): Promise<unknown[]> {
+  // Service key bypassa RLS → el filtro client_id es OBLIGATORIO para no volcar
+  // todos los tenants. Todas las BACKUP_TABLES tienen columna client_id.
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/${table}?limit=50000&order=created_at.desc`,
+    `${SUPABASE_URL}/rest/v1/${table}?client_id=eq.${encodeURIComponent(clientId)}&limit=50000&order=created_at.desc`,
     {
       headers: {
         apikey: SUPABASE_SERVICE_KEY,
@@ -57,7 +79,8 @@ async function fetchTable(table: string): Promise<unknown[]> {
 }
 
 export async function GET(request: NextRequest) {
-  if (!(await isAuthorized(request))) {
+  const userId = await isAuthorized(request)
+  if (!userId) {
     return Response.json({ error: 'No autorizado' }, { status: 401 })
   }
   // Fail-closed: sin service key no se hace backup (jamás con anon).
@@ -69,6 +92,17 @@ export async function GET(request: NextRequest) {
   const format = searchParams.get('format') || 'json'
   const table = searchParams.get('table')
 
+  // Aislamiento de tenant OBLIGATORIO: el backup es por-restaurante. Exigir
+  // client_id y validar que el admin tenga membresía en ese tenant (no basta
+  // el allowlist de correos: un admin no debe bajar el backup de un tenant ajeno).
+  const clientId = searchParams.get('client_id')
+  if (!clientId) {
+    return Response.json({ error: 'Falta client_id (el backup es por tenant)' }, { status: 400 })
+  }
+  if (!(await userHasClientAccess(userId, clientId))) {
+    return Response.json({ error: 'Sin acceso a ese tenant' }, { status: 403 })
+  }
+
   try {
     // Single table export
     if (table) {
@@ -76,7 +110,7 @@ export async function GET(request: NextRequest) {
         return Response.json({ error: 'Tabla no valida' }, { status: 400 })
       }
 
-      const data = await fetchTable(table)
+      const data = await fetchTable(table, clientId)
 
       if (format === 'csv') {
         if (data.length === 0) {
@@ -120,7 +154,7 @@ export async function GET(request: NextRequest) {
 
     await Promise.all(
       BACKUP_TABLES.map(async (t) => {
-        const rows = await fetchTable(t)
+        const rows = await fetchTable(t, clientId)
         backup[t] = rows
         counts[t] = rows.length
       })

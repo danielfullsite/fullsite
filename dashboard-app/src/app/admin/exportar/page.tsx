@@ -18,7 +18,7 @@ const EXPORTS = [
   { id: 'categories', label: 'Categorías', icon: Layers, table: 'pos_menu_categories', select: '*', filter: true, desc: 'Categorías del menú' },
   { id: 'staff', label: 'Staff', icon: Users, table: 'pos_staff', select: 'id,name,role,active', filter: true, desc: 'Empleados y roles (sin PINs)' },
   { id: 'market', label: 'Market (stock)', icon: ShoppingCart, table: 'pos_market_stock', select: '*', filter: true, desc: 'Stock de productos Market' },
-  { id: 'wansoft_recipes', label: 'Recetas Wansoft', icon: ChefHat, table: 'wansoft_recipes', select: 'saucer_id,saucer_name,budget_cost', filter: false, desc: '574 recetas originales de Wansoft' },
+  { id: 'wansoft_recipes', label: 'Recetas Wansoft', icon: ChefHat, table: 'wansoft_recipes', select: 'saucer_id,saucer_name,budget_cost', filter: true, desc: '574 recetas originales de Wansoft' },
 ]
 
 export default function ExportarPage() {

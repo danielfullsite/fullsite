@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Package, AlertTriangle, Search, Truck, ArrowDown, Clock } from 'lucide-react'
 import { sbApi } from '@/lib/supabase-api'
+import { getActiveClientSlug } from '@/lib/data'
 import { formatCurrency } from '@/lib/format'
 import PageHeader from '@/components/PageHeader'
 
@@ -37,9 +38,13 @@ export default function ComprasPage() {
   useEffect(() => {
     async function load() {
       try {
+        // Aislamiento de tenant: filtrar SIEMPRE por el client_id activo, no confiar
+        // solo en RLS. Un usuario con acceso a >1 tenant (admin de plataforma en act-as)
+        // recibiría la unión de todos sus tenants sin este filtro (fuga cross-tenant).
+        const cid = encodeURIComponent(getActiveClientSlug())
         const [prods, movs] = await Promise.all([
-          sbApi('pos_inventory_products?active=eq.true&reorder_point=gt.0&order=category.asc,name.asc&select=id,name,unit,cost_per_unit,stock,reorder_point,category'),
-          sbApi('pos_inventory_movements?order=created_at.desc&limit=50&select=id,product_id,movement_type,quantity,actor,notes,created_at'),
+          sbApi(`pos_inventory_products?client_id=eq.${cid}&active=eq.true&reorder_point=gt.0&order=category.asc,name.asc&select=id,name,unit,cost_per_unit,stock,reorder_point,category`),
+          sbApi(`pos_inventory_movements?client_id=eq.${cid}&order=created_at.desc&limit=50&select=id,product_id,movement_type,quantity,actor,notes,created_at`),
         ])
         if (Array.isArray(prods)) {
           setProducts(prods.map((p: any) => ({
