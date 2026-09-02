@@ -6,6 +6,7 @@ import {
   Trash2, CheckCircle, AlertTriangle, Loader2, ChevronDown,
 } from 'lucide-react'
 import { getWansoftDataLatest, getActiveClientSlug } from '@/lib/data'
+import { getWarehouseLabels } from '@/lib/warehouses'
 import { formatCurrency } from '@/lib/format'
 import { sbPost, sbGet } from '@/lib/supabase-helpers'
 import PageHeader from '@/components/PageHeader'
@@ -70,7 +71,7 @@ type ProductionStatus = 'completada' | 'en_proceso' | 'cancelada'
 
 // ── Constants ──────────────────────────────────────────────────────
 
-const ALMACENES = ['Cocina', 'Barra', 'Panaderia', 'Market']
+// Almacenes ahora POR TENANT (ver getWarehouseLabels); ya no hardcode de amalay.
 
 const STATUS_CONFIG: Record<ProductionStatus, { label: string; bg: string; text: string }> = {
   completada: { label: 'Completada', bg: 'bg-emerald-500/15', text: 'text-emerald-400' },
@@ -111,6 +112,7 @@ function deepParse(val: unknown): unknown {
 // ── Component ──────────────────────────────────────────────────────
 
 export default function ProduccionPage() {
+  const ALMACENES = getWarehouseLabels() // almacenes del tenant activo
   const [inventory, setInventory] = useState<InventoryItem[]>([])
   const [products, setProducts] = useState<ProductOption[]>([])
   const [lines, setLines] = useState<ProductionLine[]>([])

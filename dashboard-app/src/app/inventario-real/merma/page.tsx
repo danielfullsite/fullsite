@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { Search, Save, Trash2, Plus, AlertTriangle, Loader2, PackageX, ChevronDown, Clock, TrendingDown, DollarSign, BarChart3 } from 'lucide-react'
 import { getActiveClientSlug } from '@/lib/data'
+import { getWarehouses } from '@/lib/warehouses'
 import { formatCurrency, formatNumber } from '@/lib/format'
 import PageHeader from '@/components/PageHeader'
 import KPICard from '@/components/KPICard'
@@ -56,13 +57,7 @@ interface WasteEntry {
 
 // ── Constants ───────────────────────────────────────────────────────
 
-const WAREHOUSES = [
-  { key: 'cocina', label: 'Cocina' },
-  { key: 'barra', label: 'Barra' },
-  { key: 'panaderia', label: 'Panaderia' },
-  { key: 'market', label: 'Market' },
-  { key: 'venta_terceros', label: 'Venta Terceros' },
-]
+// Almacenes ahora POR TENANT (ver getWarehouses); ya no hardcode de amalay.
 
 const MOTIVOS = [
   'Caducado',
@@ -100,6 +95,7 @@ function todayISO() {
 // ── Component ───────────────────────────────────────────────────────
 
 export default function MermaPage() {
+  const WAREHOUSES = getWarehouses() // almacenes del tenant activo
   // Data
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([])
   const [wasteHistory, setWasteHistory] = useState<WasteEntry[]>([])
