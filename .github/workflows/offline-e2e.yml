@@ -1,0 +1,82 @@
+name: Offline E2E (arranque del POS sin internet)
+
+# LA PRUEBA YA EXISTIA. NADIE LA CORRIA.
+#
+# `dashboard-app/e2e/offline.spec.ts` cubre justo lo que hoy obliga a mandar a una
+# persona a un restaurante: que el POS arranque sin internet, que sus rutas carguen
+# desde el cache, y que IndexedDB responda sin red.
+#
+# Pero no habia ningun workflow que la ejecutara — los unicos `playwright` en
+# .github/workflows son de Python, para raspar Wansoft. Y aunque alguien corriera
+# `npm run test:e2e`, la suite se SKIPEA sola: el config normal levanta `npm run dev`,
+# donde el Service Worker NO corre.
+#
+# Por eso este workflow usa `playwright.config.offline.ts`, que levanta el build de
+# PRODUCCION. Ahi el SW si toma control y la prueba mide algo.
+#
+# POR QUE IMPORTA
+#
+# Los siete bugs de produccion del 2026-08-31 estaban TODOS en la capa del navegador
+# —Service Worker, caches, localStorage— o en Vercel. Ninguno en el servidor local,
+# que tiene 238 pruebas verdes y aguanto la noche entera.
+#
+# La capa probada no fallo. Fallo la que no se prueba. Esto la empieza a probar.
+
+on:
+  pull_request:
+    paths:
+      - 'dashboard-app/public/sw.js'
+      - 'dashboard-app/src/lib/pos-data.ts'
+      - 'dashboard-app/src/lib/pos-offline-db.ts'
+      - 'dashboard-app/src/app/pos/**'
+      - 'dashboard-app/e2e/offline.spec.ts'
+      - 'dashboard-app/playwright.config.offline.ts'
+      - '.github/workflows/offline-e2e.yml'
+  workflow_dispatch:
+
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: dashboard-app
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: dashboard-app/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Instalar Chromium
+        run: npx playwright install --with-deps chromium
+
+      # El build de produccion necesita las NEXT_PUBLIC_* presentes. Estos son
+      # valores de relleno a proposito: la suite offline prueba el Service Worker y
+      # el cache, no consultas reales. Poner credenciales de verdad aqui expondria
+      # produccion a cada PR sin ganar nada.
+      - name: Correr la suite offline contra el build de PRODUCCION
+        run: npx playwright test --config playwright.config.offline.ts
+        env:
+          CI: 'true'
+          NEXT_PUBLIC_SUPABASE_URL: 'https://ci-placeholder.supabase.co'
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: 'ci-placeholder-anon-key'
+          NEXT_PUBLIC_DEFAULT_CLIENT_ID: 'amalay'
+
+      # Video y trazas de lo que fallo. Sin esto, un fallo intermitente del SW no se
+      # puede diagnosticar sin reproducirlo a mano.
+      - name: Guardar evidencia del fallo
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: offline-e2e-evidencia
+          path: |
+            dashboard-app/playwright-report/
+            dashboard-app/test-results/
+          retention-days: 14
