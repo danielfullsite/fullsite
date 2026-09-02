@@ -664,7 +664,12 @@ async function startLocalServer({ dataDir, port = 7717, config = {} }) {
     console.log('[server] Shut down cleanly.')
   }
 
-  return { httpServer, close, serverId, lanIp, wsHub }
+  // `state` se expone para que el proceso main de Electron pueda preguntar si el
+  // restaurante esta en reposo ANTES de instalar una actualizacion (regla dura #4:
+  // Pedro muere con Electron). Sin esto, el auto-instalador recibe undefined, la
+  // politica falla cerrado, y NUNCA se instala — en silencio. Ver
+  // update/auto-installer.js y la prueba del contrato en update-contrato.test.js.
+  return { httpServer, close, serverId, lanIp, wsHub, state }
 }
 
 // buildHttpRouter se exporta para poder probar las rutas sin levantar el servidor
