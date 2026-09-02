@@ -31,6 +31,7 @@ const LEGACY_CONFIG_PATH  = path.join('C:\\fullsite', 'config.json');
 // All terminals must have a validated TerminalConfig before operational use.
 // An invalid or missing config puts the terminal in NOT_PROVISIONED state,
 // blocking the Local Server, POS, and KDS from starting.
+let autoInstaller = null;   // handle del auto-update; null si no arranco
 const configSchema        = require('./local-server/config-schema');
 const printerConfigSchema = require('./local-server/adapters/printer-config-schema');
 
@@ -962,6 +963,45 @@ app.whenReady().then(async () => {
   try { globalShortcut.register('F12', () => { const w = BrowserWindow.getFocusedWindow(); if (w) w.webContents.toggleDevTools(); }); } catch {}
 
   await startLocalServer();   // Local server starts first (provides WS hub for KDS events)
+
+  // ── Auto-update (Fase 2) ──────────────────────────────────────────────────
+  // Descarga en segundo plano; instala SOLO cuando el restaurante esta en reposo.
+  // Instalar reinicia Electron, y Pedro muere con Electron (regla dura #4): un
+  // reinicio a media operacion deja sin imprimir y sin KDS. En la practica esto
+  // instala DESPUES DEL CORTE, que es cuando un restaurante quiere que pase.
+  //
+  // Todo el bloque va en try/catch: un fallo del updater JAMAS puede impedir que
+  // el POS arranque.
+  try {
+    const { iniciar } = require('./update/auto-installer');
+    const supabaseUrl = appConfig.supabaseUrl || process.env.SUPABASE_URL || '';
+    const supabaseKey = appConfig.supabaseAnonKey || process.env.SUPABASE_ANON_KEY || '';
+
+    autoInstaller = iniciar({
+      canal: appConfig.channel || process.env.FULLSITE_CHANNEL || 'stable',
+      // Estado VIVO del restaurante. Si el servidor local no arranco, devuelve null
+      // y la politica falla CERRADO — no instala.
+      // `state` lo expone local-server/index.js a proposito para esto. Si algun dia
+      // dejara de exportarlo, esto devuelve null y la politica falla CERRADO — no
+      // instala, en vez de instalar a ciegas. Hay prueba del contrato.
+      getSnapshot: () => (localServer && localServer.state ? localServer.state.toSnapshot() : null),
+      // Freno de emergencia. Falla CERRADO a proposito: si no se puede consultar,
+      // no se instala. Una cosa es dejar OPERAR sin Supabase, otra instalar a ciegas.
+      estaBloqueada: async (version) => {
+        if (!supabaseUrl || !supabaseKey) throw new Error('sin config de Supabase');
+        const res = await fetch(
+          `${supabaseUrl}/rest/v1/local_server_blocked_versions?version=eq.${encodeURIComponent(version)}&select=version`,
+          { headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` }, signal: AbortSignal.timeout(5000) }
+        );
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const filas = await res.json();
+        return Array.isArray(filas) && filas.length > 0;
+      },
+      onEvento: (info) => { try { localServer?.wsHub?.broadcastUpdateAvailable?.(info) } catch {} },
+    });
+  } catch (e) {
+    console.warn('[main] Auto-update no se pudo iniciar (no fatal):', e.message);
+  }
 
   // ── kds_only mode: dedicated kitchen display machine ──────────────────────
   // config.json: { "kds_only": true, "pos_server_ip": "192.168.1.71" }
