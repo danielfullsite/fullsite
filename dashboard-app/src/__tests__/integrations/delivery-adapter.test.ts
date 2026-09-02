@@ -382,7 +382,7 @@ describe('DAY2-019..020: Delivery adapter contract', () => {
 // Verifies that each operation uses the correct token grant type.
 // provisioning (USL) → supabase integration_providers lookup (not sandbox-login)
 // marketplace  (M2M) → sandbox-login token req with eats.store/eats.order scopes
-// delivery     (M2M) → sandbox-login token req with eats.deliveries scope
+//   (delivery order lifecycle /v1/delivery/order/* is authorized by eats.order)
 
 describe('DAY2-021..024: Token grant type routing', () => {
   it('DAY2-021: listDeliveryStores uses marketplace M2M — no integration_providers lookup', async () => {
@@ -400,7 +400,7 @@ describe('DAY2-021..024: Token grant type routing', () => {
     expect(body.get('scope')).not.toContain('eats.deliveries')
   })
 
-  it('DAY2-022: delivery acceptOrder uses delivery M2M — eats.deliveries scope in token request', async () => {
+  it('DAY2-022: delivery acceptOrder uses marketplace M2M — eats.order scope, not eats.deliveries', async () => {
     const { spy, calls } = makeFetchSpyWithInit()
     vi.spyOn(globalThis, 'fetch').mockImplementation(spy as unknown as typeof fetch)
     const adapter = getOrderAdapter('delivery')
@@ -408,7 +408,11 @@ describe('DAY2-021..024: Token grant type routing', () => {
     const tokenCall = calls.find(c => c.url.includes('sandbox-login.uber.com'))
     expect(tokenCall).toBeDefined()
     const body = new URLSearchParams(tokenCall!.init?.body as string)
-    expect(body.get('scope')).toContain('eats.deliveries')
+    // Uber GTS (case #58972404, 2026-08-09): /v1/delivery/order/* is authorized by
+    // eats.order, NOT eats.deliveries (an Uber Direct scope Uber does not whitelist
+    // for this app → 400 invalid_scope on every order-lifecycle call).
+    expect(body.get('scope')).toContain('eats.order')
+    expect(body.get('scope')).not.toContain('eats.deliveries')
     // No provisioning lookup — delivery is M2M only
     expect(calls.some(c => c.url.includes('integration_providers'))).toBe(false)
   })
