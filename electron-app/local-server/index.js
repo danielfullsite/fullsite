@@ -629,6 +629,10 @@ async function startLocalServer({ dataDir, port = 7717, config = {} }) {
   updater.init({
     channel, currentVersion: version, supabaseUrl, supabaseKey, restaurantId,
     onUpdateAvailable: (info) => wsHub.broadcastUpdateAvailable(info),
+    // Instalar reinicia Electron, y Pedro muere con Electron (regla dura #4). El
+    // updater consulta el estado VIVO para no reiniciar a media operacion. Si esto
+    // no se pasara, `puedeInstalarAhora` recibe null y falla CERRADO — no instala.
+    getSnapshot: () => state.toSnapshot(),
   })
 
   // ── Supabase poll (Phase 1 bridge) ────────────────────────────────────────
