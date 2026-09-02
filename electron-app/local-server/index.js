@@ -269,7 +269,11 @@ function forwardPost(targetUrl, bodyStr) {
 
 // Keep identity and routing configuration explicit so every cloned terminal can
 // discover the caja without relying on process-global or customer-specific state.
-function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, version, serverId, restaurantId, config = {}, instanceName = '', branchId = config.branchId || null, posServerIp = config.posServerIp || null, port = 7717 }) {
+function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, version, serverId, restaurantId, config = {}, instanceName = '', branchId = config.branchId || null, posServerIp = config.posServerIp || null, port = 7717, posServerPort = config.posServerPort || null }) {
+  // Puerto de la CAJA al reenviar. Antes se usaba `port` — el puerto PROPIO del
+  // secundario — lo que acopla ambos al 7717: dos Pedros en una misma maquina
+  // (pruebas, demos) o una terminal en puerto distinto rompian el forward.
+  const cajaPort = posServerPort || port || 7717
   return async function router(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
@@ -292,7 +296,7 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, versio
     if (posServerIp && req.method === 'POST' && (url === '/print' || url === '/events' || url === '/drawer')) {
       try {
         const body = await parseBody(req)
-        const up = await forwardPost(`http://${posServerIp}:${port || 7717}${url}`, JSON.stringify(body))
+        const up = await forwardPost(`http://${posServerIp}:${cajaPort}${url}`, JSON.stringify(body))
         res.writeHead(up.status || 502, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
         res.end(up.body || '{}')
       } catch (e) {
@@ -366,7 +370,7 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, versio
         let html = fsMod.readFileSync(pathMod.join(__dirname, 'kds-ui.html'), 'utf8')
         // Where the page reads /state from: the caja's LAN IP for a dedicated KDS
         // terminal (so it pulls the caja's orders), or same-origin ('') for the caja.
-        const bridgeBase = posServerIp ? `http://${posServerIp}:${port || 7717}` : ''
+        const bridgeBase = posServerIp ? `http://${posServerIp}:${cajaPort}` : ''
         const cfg = JSON.stringify({ bridge_base: bridgeBase, client_id: restaurantId })
         html = html.replace('<script>', `<script>window.__KDS_CFG__=${cfg};</script>\n<script>`)
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' })
