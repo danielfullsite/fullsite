@@ -110,6 +110,24 @@ describe('Turno', () => {
     assert.equal(state.hasActiveTurno(), false)
   })
 
+  test('una orden CANCELADA (o pagada) sale del tablero de cocina', () => {
+    // Bateria adversarial 2026-09-02: cancelar en el POS dejaba la tarjeta viva
+    // en el KDS LAN — cocina preparando un platillo muerto.
+    const state = new RestaurantState()
+    state.apply(makeEvent(EVENT.ORDER_SENT, {
+      command_id: 'cx1', order_id: 'oc1', mesa: 4, mesero: 'm',
+      items: [{ nombre: 'Bowl', station: 'cocina' }], status: 'enviada',
+    }, 1))
+    state.apply(makeEvent(EVENT.ORDER_SENT, {
+      command_id: 'cx2', order_id: 'oc2', mesa: 6, mesero: 'm',
+      items: [{ nombre: 'Sopa', station: 'cocina' }], status: 'enviada',
+    }, 2))
+    state.apply(makeEvent(EVENT.ORDER_UPSERTED, { order_id: 'oc1', mesa: 4, status: 'cancelada' }, 3))
+    state.apply(makeEvent(EVENT.ORDER_UPSERTED, { order_id: 'oc2', mesa: 6, status: 'pagada' }, 4))
+    const snap = state.toSnapshot()
+    assert.equal(snap.kds_orders.length, 0)
+  })
+
   test('TURNO_CLOSED limpia el piso: ordenes, KDS y mesas no sobreviven al cierre', () => {
     // Regresion del empalme: el KDS en modo LAN amanecia con las comandas de
     // ayer porque el cierre solo soltaba el turno.

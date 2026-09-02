@@ -296,8 +296,14 @@ class RestaurantState {
   toSnapshot() {
     // kds_orders: full order objects for every order that has been sent to kitchen
     // and is not yet closed/cancelled. KDS uses this to render without Supabase.
+    // El comentario de arriba prometia "not yet closed/CANCELLED", pero el filtro
+    // solo quitaba entregada/cerrada: una orden CANCELADA (o ya PAGADA) seguia en
+    // el tablero de cocina en modo LAN — cocina preparando un platillo muerto.
+    // Encontrado en bateria adversarial 2026-09-02. `_applyStateSync` (isActive)
+    // ya excluia cancelada/pagada; este filtro queda igual de estricto.
+    const KDS_HIDDEN_STATUS = new Set(['entregada', 'cerrada', 'cancelada', 'pagada'])
     const kds_orders = [...this._orders.values()]
-      .filter(o => o._kds_sent && o.status !== 'entregada' && o.status !== 'cerrada')
+      .filter(o => o._kds_sent && !KDS_HIDDEN_STATUS.has(o.status))
       .map(({ _kds_sent, ...rest }) => rest)  // strip internal flag before sending
 
     return {
