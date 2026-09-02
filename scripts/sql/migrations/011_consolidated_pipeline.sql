@@ -18,7 +18,7 @@ CREATE INDEX IF NOT EXISTS idx_sync_log_codigo ON public.calendar_sync_log USING
 CREATE INDEX IF NOT EXISTS idx_sync_log_created ON public.calendar_sync_log USING btree (created_at DESC);
 CREATE TABLE IF NOT EXISTS delivery_platform_payments (
   id TEXT NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   platform TEXT NOT NULL,
   lot_id TEXT,
   period_start DATE,
@@ -77,9 +77,9 @@ CREATE TABLE IF NOT EXISTS wansoft_daily (
   personas_restaurant INTEGER,
   cuentas_restaurant INTEGER,
   ticket_promedio_restaurant NUMERIC,
-  client_slug TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_slug TEXT NOT NULL,
   report_type TEXT DEFAULT 'cierre'::text NOT NULL,
-  location_id TEXT DEFAULT 'amalay-spgg'::text,
+  location_id TEXT,
   PRIMARY KEY (client_slug, fecha, report_type)
 );
 DO 21423 BEGIN
@@ -98,7 +98,7 @@ CREATE TABLE IF NOT EXISTS wansoft_data (
 CREATE INDEX IF NOT EXISTS idx_wansoft_data_key ON public.wansoft_data USING btree (client_id, data_key, fecha DESC);
 CREATE TABLE IF NOT EXISTS wansoft_food_cost (
   id BIGSERIAL,
-  client_id TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_id TEXT NOT NULL,
   fecha DATE NOT NULL,
   data JSONB NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT now(),
@@ -109,14 +109,14 @@ DO 21423 BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
 CREATE TABLE IF NOT EXISTS wansoft_hourly (
   fecha DATE NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_id TEXT NOT NULL,
   data JSONB,
   updated_at TIMESTAMPTZ DEFAULT now(),
   PRIMARY KEY (fecha, client_id)
 );
 CREATE TABLE IF NOT EXISTS wansoft_inventory (
   id BIGSERIAL,
-  client_id TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_id TEXT NOT NULL,
   fecha DATE NOT NULL,
   data JSONB NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT now(),
@@ -126,7 +126,7 @@ DO 21423 BEGIN
   ALTER TABLE wansoft_inventory ADD CONSTRAINT wansoft_inventory_client_id_fecha_key UNIQUE (client_id, fecha);
 EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
 CREATE TABLE IF NOT EXISTS wansoft_kpis (
-  id TEXT DEFAULT 'amalay'::text NOT NULL,
+  id TEXT NOT NULL,
   ordenes_abiertas INTEGER,
   total_ordenes_mxn NUMERIC,
   ultima_venta TEXT,
@@ -168,7 +168,7 @@ CREATE TABLE IF NOT EXISTS wansoft_kpis (
 );
 CREATE TABLE IF NOT EXISTS wansoft_labor (
   id BIGSERIAL,
-  client_id TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_id TEXT NOT NULL,
   fecha DATE NOT NULL,
   data JSONB NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT now(),
@@ -190,7 +190,7 @@ CREATE TABLE IF NOT EXISTS wansoft_menu_config (
 );
 CREATE TABLE IF NOT EXISTS wansoft_persons_hourly (
   id BIGSERIAL,
-  client_id TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_id TEXT NOT NULL,
   fecha DATE NOT NULL,
   data JSONB NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT now(),
@@ -201,7 +201,7 @@ DO 21423 BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
 CREATE TABLE IF NOT EXISTS wansoft_pnl (
   id BIGSERIAL,
-  client_id TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_id TEXT NOT NULL,
   periodo TEXT NOT NULL,
   data JSONB NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT now(),
@@ -212,7 +212,7 @@ DO 21423 BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
 CREATE TABLE IF NOT EXISTS wansoft_recipes (
   id BIGSERIAL,
-  client_id TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_id TEXT NOT NULL,
   saucer_id TEXT NOT NULL,
   saucer_name TEXT,
   budget_cost NUMERIC,
@@ -226,7 +226,7 @@ DO 21423 BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
 CREATE TABLE IF NOT EXISTS wansoft_shrinkage (
   id BIGSERIAL,
-  client_id TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_id TEXT NOT NULL,
   fecha DATE NOT NULL,
   data JSONB NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT now(),
@@ -237,7 +237,7 @@ DO 21423 BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
 CREATE TABLE IF NOT EXISTS wansoft_suppliers (
   id BIGSERIAL,
-  client_id TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_id TEXT NOT NULL,
   fecha DATE NOT NULL,
   periodo TEXT DEFAULT 'month'::text NOT NULL,
   data JSONB NOT NULL,
@@ -249,7 +249,7 @@ DO 21423 BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
 CREATE TABLE IF NOT EXISTS wansoft_tips (
   id BIGSERIAL,
-  client_id TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_id TEXT NOT NULL,
   fecha DATE NOT NULL,
   data JSONB NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT now(),

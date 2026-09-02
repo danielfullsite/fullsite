@@ -226,7 +226,7 @@ CREATE TABLE IF NOT EXISTS memories (
   sector TEXT DEFAULT 'episodic'::text,
   mission_context TEXT,
   keywords TEXT,
-  client TEXT DEFAULT 'AMALAY'::text,
+  client TEXT,
   created_at TIMESTAMP DEFAULT now(),
   accessed_at TIMESTAMP DEFAULT now(),
   PRIMARY KEY (id)
