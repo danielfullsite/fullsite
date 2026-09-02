@@ -16,7 +16,11 @@
 
 const https = require('https')
 
-const GITHUB_REPO     = 'ramonfaurdaniel-png/fullsite'
+// El repo REAL es danielfullsite/fullsite. Estaba apuntando a
+// 'ramonfaurdaniel-png/fullsite', que no es este proyecto: la mitad que YA existe
+// —detectar que hay version nueva— nunca pudo funcionar, porque preguntaba en el
+// lugar equivocado. Verificado el 2026-09-01 contra `git remote get-url origin`.
+const GITHUB_REPO     = 'danielfullsite/fullsite'
 const CHECK_INTERVAL  = 60 * 60 * 1000  // check once per hour
 
 let _channel       = 'stable'

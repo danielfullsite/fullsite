@@ -1,0 +1,90 @@
+name: Publicar instaladores (release versionado)
+
+# Publica los instaladores de POS y KDS a GitHub Releases para que el auto-update
+# de las terminales los encuentre.
+#
+# POR QUE UNA ETIQUETA Y NO CADA PUSH A MAIN
+#
+# `electron-build.yml` ya construye en cada push a main y sube un artefacto de 30
+# dias. Eso es CI: comprueba que compila. Esto es OTRA cosa — lo que publique aqui
+# se le va a INSTALAR SOLO a terminales de restaurantes en operacion.
+#
+# Publicar en cada push convertiria cualquier merge en un despliegue a produccion
+# fisica. Una etiqueta es un acto deliberado, que es lo que corresponde cuando el
+# blast radius es "cien restaurantes a la vez".
+#
+# CANALES (electron-app/local-server/update/manager.js): development -> pilot -> stable
+#   v1.4.0-pilot.1  -> prerelease -> solo terminales en canal `pilot` (AMALAY)
+#   v1.4.0          -> release    -> canal `stable`
+#
+# El manager ya sabe consultar releases y respeta las versiones bloqueadas desde
+# Supabase. Lo que faltaba era que hubiera releases que consultar.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Construir sin publicar (para probar el workflow)'
+        type: boolean
+        default: true
+
+permissions:
+  contents: write   # necesario para crear el release y subirle los .exe
+
+jobs:
+  publicar:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: electron-app
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: electron-app/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      # La etiqueta manda. Si package.json dice otra cosa, el auto-update compararia
+      # contra una version que no existe y nunca se actualizaria — falla silenciosa.
+      - name: La etiqueta debe coincidir con package.json
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF#refs/tags/v}"
+          PKG=$(node -p "require('./package.json').version")
+          echo "etiqueta=$TAG · package.json=$PKG"
+          if [ "${TAG%%-*}" != "$PKG" ]; then
+            echo "::error::La etiqueta v$TAG no coincide con package.json ($PKG). Sube la version antes de etiquetar."
+            exit 1
+          fi
+
+      # SIEMPRE --x64. En Mac con Apple Silicon los defaults salen arm64 y NO corren
+      # en Windows (OFFLINE-LAN-FIELD-PROVEN §5.2). Aqui corre en windows-latest,
+      # pero se declara explicito para que no dependa del runner.
+      - name: Construir instalador del POS
+        run: npx electron-builder --win --x64 --config electron-builder-pos.json --publish ${{ (github.event_name == 'push' && 'always') || 'never' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Construir instalador del KDS
+        run: npx electron-builder --win --x64 --config electron-builder-kds.json --publish ${{ (github.event_name == 'push' && 'always') || 'never' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Se conservan aunque se haya publicado: si el release se borra o se rehace,
+      # el binario exacto que se probo sigue disponible.
+      - name: Guardar los instaladores como artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: instaladores-${{ github.ref_name }}
+          path: electron-app/dist/*.exe
+          retention-days: 90

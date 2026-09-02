@@ -28,5 +28,13 @@
     "allowToChangeInstallationDirectory": false,
     "installerIcon": "icon.ico",
     "uninstallerIcon": "icon.ico"
-  }
+  },
+  "publish": [
+    {
+      "provider": "github",
+      "owner": "danielfullsite",
+      "repo": "fullsite",
+      "releaseType": "release"
+    }
+  ]
 }
