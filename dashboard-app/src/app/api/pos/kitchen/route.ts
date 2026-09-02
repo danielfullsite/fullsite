@@ -41,34 +41,48 @@ export async function GET(request: NextRequest) {
     return Response.json({ error: 'no autorizado' }, { status: 401 })
   }
 
-  // Show orders with activity in the last 12h so ancient "enviada" rows don't pile
-  // up — but filter on updated_at, NOT created_at: a table opened >12h ago that just
-  // had an item added (e.g. a bowl) is still active and must appear. On creation
-  // updated_at == created_at, so new orders are covered too.
+  // Qué muestra el KDS — regla de la junta 2026-09-01: las comandas del TURNO
+  // ABIERTO, y nada más. Tres casos:
   //
-  // ADEMÁS: si el tenant tiene un turno abierto, el KDS solo muestra comandas
-  // de ESE turno (updated_at >= opened_at). Verdad de campo AMALAY 2026-08-27
-  // (Eduardo): comandas de pruebas de turnos anteriores seguían vivas en el
-  // KDS y se "cruzaban" con las del turno nuevo. La ventana de 12 h queda como
-  // respaldo cuando no hay turno abierto (el tablero no se queda ciego).
-  let cutoff = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString()
+  //   1. Turno abierto  → filtro exacto `turno_id = <turno abierto>`. La versión
+  //      anterior filtraba `updated_at >= opened_at`, y una orden de AYER que
+  //      cocina tocaba (toggle de item escribe kds_item_status) actualizaba su
+  //      updated_at y SE RECALIFICABA como de hoy — ese era el mecanismo del
+  //      "empalme" de órdenes de días distintos en el tablero.
+  //   2. Sin turno abierto (tras el Corte Z, o antes de abrir) → tablero VACÍO.
+  //      El POS no puede mandar comandas sin turno (TurnoGate + save-order las
+  //      rechaza), así que aquí no hay nada legítimo que mostrar; la ventana de
+  //      12 h que había de respaldo era la que resucitaba órdenes viejas.
+  //   3. Turno IRRESOLUBLE (falló la consulta) → modo degradado: ventana de
+  //      12 h por updated_at, como antes, para que un blip de red no deje a
+  //      cocina ciega en plena operación.
+  let turnoFilter: string | null = null
+  let degradado = false
   try {
     const tRes = await fetch(
       `${SB_URL}/rest/v1/pos_turnos?client_id=eq.${encodeURIComponent(clientId)}` +
-      `&closed_at=is.null&select=opened_at&order=opened_at.desc&limit=1`,
+      `&closed_at=is.null&select=id&order=opened_at.desc&limit=1`,
       { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }, cache: 'no-store' }
     )
     if (tRes.ok) {
-      const tRows = await tRes.json().catch(() => []) as Array<{ opened_at?: string }>
-      const openedAt = Array.isArray(tRows) ? tRows[0]?.opened_at : undefined
-      if (openedAt && openedAt > cutoff) cutoff = openedAt
+      const tRows = await tRes.json().catch(() => []) as Array<{ id?: string }>
+      const turnoId = Array.isArray(tRows) ? tRows[0]?.id : undefined
+      if (turnoId) {
+        turnoFilter = `&turno_id=eq.${encodeURIComponent(turnoId)}`
+      } else {
+        // Caso 2: el server CONFIRMÓ que no hay turno → tablero limpio.
+        return Response.json([], { headers: { 'Cache-Control': 'no-store' } })
+      }
+    } else {
+      degradado = true
     }
-  } catch { /* sin turno resoluble → ventana de 12 h */ }
+  } catch { degradado = true }
+  const cutoff12h = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString()
   const url =
     `${SB_URL}/rest/v1/pos_orders` +
     `?status=in.(enviada,preparando,lista)` +
     `&client_id=eq.${encodeURIComponent(clientId)}` +
-    `&updated_at=gte.${encodeURIComponent(cutoff)}` +
+    (degradado ? `&updated_at=gte.${encodeURIComponent(cutoff12h)}` : turnoFilter!) +
     `&select=${KITCHEN_SELECT}` +
     `&order=created_at.desc`
 
