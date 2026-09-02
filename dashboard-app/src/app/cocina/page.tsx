@@ -11,6 +11,7 @@ import {
   type KitchenOrderFromDB, type RecipeDetail,
 } from '@/lib/pos-data'
 import { isBebida, POLL_INTERVAL_KITCHEN, getStationByName, type StationName } from '@/lib/pos-constants'
+import { useVisibleInterval } from '@/lib/use-visible-interval'
 import { getActiveClientSlug as _cid } from '@/lib/data'
 
 
@@ -197,9 +198,9 @@ export default function CocinaPage() {
   useEffect(() => {
     setMounted(true)
     fetchOrders()
-    const interval = setInterval(fetchOrders, POLL_INTERVAL_KITCHEN)
-    return () => clearInterval(interval)
   }, [])
+  // Refresco solo cuando la pantalla está visible (pausa tabs en segundo plano).
+  useVisibleInterval(fetchOrders, POLL_INTERVAL_KITCHEN)
 
   // Wall clock tick (display only)
   useEffect(() => {

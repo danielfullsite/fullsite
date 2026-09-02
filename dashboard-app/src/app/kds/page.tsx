@@ -7,7 +7,8 @@ import {
   type KitchenOrderFromDB, type OrderItem,
 } from '@/lib/pos-data'
 import { reprintByStation, type ReprintOrderContext } from '@/lib/printer'
-import { type StationName, getStationByName } from '@/lib/pos-constants'
+import { type StationName, getStationByName, POLL_INTERVAL_KITCHEN } from '@/lib/pos-constants'
+import { useVisibleInterval } from '@/lib/use-visible-interval'
 import { setPosServerHost } from '@/lib/bridge-client'
 import { useKdsWsClient } from '@/hooks/useKdsWsClient'
 import { mismoDiaDeVenta, inicioDiaConfigurado } from '@/lib/dia-de-venta'
@@ -228,9 +229,10 @@ export default function KDSStandalone() {
       return
     }
     fetchOrdersForFallback()
-    const interval = setInterval(fetchOrdersForFallback, 2000)
-    return () => clearInterval(interval)
   }, [kdsClient.mode, fetchOrdersForFallback])
+  // Fallback cloud: refresca solo si el tab está visible y NO estamos en LAN
+  // (en LAN el Local Server empuja updates, no hace falta poll).
+  useVisibleInterval(fetchOrdersForFallback, POLL_INTERVAL_KITCHEN, kdsClient.mode !== 'LAN_PRIMARY')
 
   const advance = async (id: string, currentStatus: string, mesa: number, mesero: string) => {
     if (advancingRef.current.has(id)) return

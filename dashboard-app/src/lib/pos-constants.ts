@@ -11,8 +11,12 @@ export function getIvaRate(): number { return _dynamicIvaRate ?? IVA_RATE }
 
 export const KITCHEN_ARCHIVE_HOURS = 4
 
-export const POLL_INTERVAL_KITCHEN = 2000  // 2 seconds — fast for real-time feel
-export const POLL_INTERVAL_KDS = 1500     // 1.5 seconds — near-instant for cocina
+// 10s: en LAN la cocina recibe órdenes en tiempo real por el bridge (Pedro); este
+// poll a /api/pos/kitchen es el fallback CLOUD. A 2s cada pantalla generaba ~20k
+// requests/día (driver #1 del gasto Vercel+Supabase). 10s + pausa-si-oculto lo baja
+// ~5x sin afectar la cocina en LAN. Ajustable si se quiere más rápido.
+export const POLL_INTERVAL_KITCHEN = 10000  // 10 seconds — fallback cloud (LAN es realtime vía bridge)
+export const POLL_INTERVAL_KDS = 10000      // 10 seconds — idem
 
 // Beverage keywords — used by both Cocina (to exclude) and Barra (to include)
 export const BEBIDA_KEYWORDS = [
