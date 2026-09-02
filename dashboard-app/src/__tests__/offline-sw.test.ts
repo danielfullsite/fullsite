@@ -49,6 +49,27 @@ describe('sw.js structure', () => {
     }
   })
 
+  it('sw.js precaches the build manifest to cover dynamic-import chunks (fuga #45)', async () => {
+    const fs = await import('fs')
+    const path = await import('path')
+    const swPath = path.resolve(__dirname, '../../public/sw.js')
+    const content = fs.readFileSync(swPath, 'utf-8')
+
+    // El warm-crawl solo ve chunks referenciados en el HTML — los de dynamic
+    // import (modales) se pierden. El SW debe unir el manifiesto de precache.
+    expect(content).toContain('/precache-manifest.json')
+    expect(content).toMatch(/man\?\.assets|man\.assets/)
+  })
+
+  it('gen-precache-manifest script exists and is wired into build', async () => {
+    const fs = await import('fs')
+    const path = await import('path')
+    const appRoot = path.resolve(__dirname, '../..')
+    expect(fs.existsSync(path.join(appRoot, 'scripts/gen-precache-manifest.mjs'))).toBe(true)
+    const pkg = JSON.parse(fs.readFileSync(path.join(appRoot, 'package.json'), 'utf-8'))
+    expect(pkg.scripts.build).toContain('gen-precache-manifest')
+  })
+
   it('sw.js has NEVER_CACHE_PATTERNS for auth and payment', async () => {
     const fs = await import('fs')
     const path = await import('path')

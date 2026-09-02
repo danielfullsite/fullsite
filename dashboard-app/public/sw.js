@@ -1,7 +1,7 @@
 // Service Worker — Fullsite POS offline-first
 // Caches app shell, static assets, and API responses for true offline operation
 
-const CACHE_VERSION = 'v46'
+const CACHE_VERSION = 'v47'
 const STATIC_CACHE = `fullsite-static-${CACHE_VERSION}`
 const DYNAMIC_CACHE = `fullsite-dynamic-${CACHE_VERSION}`
 const API_CACHE = `fullsite-api-${CACHE_VERSION}`
@@ -91,6 +91,27 @@ self.addEventListener('install', (event) => {
             } catch { /* ruta individual falla → seguimos con las demás */ }
           })
         )
+
+        // Phase 2b: unión con el manifiesto de precache (fuga #45). El warm-crawl
+        // de arriba solo ve los chunks referenciados como string en el HTML —
+        // NO los de dynamic import (modal de modificadores, panel de cuenta…),
+        // que el runtime de Turbopack pide bajo demanda y que un chunk visto solo
+        // tras una interacción nunca precachea. scripts/gen-precache-manifest.mjs
+        // enumera en build TODOS los assets de /_next/static (única fuente
+        // determinista con Turbopack) y los publica aquí. Ausente → nos quedamos
+        // con el warm-crawl (dev/local). Best-effort: nunca tumba el install.
+        try {
+          const manRes = await fetch('/precache-manifest.json', { cache: 'reload' })
+          if (manRes.ok) {
+            const man = await manRes.json()
+            if (Array.isArray(man?.assets)) {
+              for (const a of man.assets) {
+                if (typeof a === 'string' && a.startsWith('/_next/static/')) chunkUrls.add(a)
+              }
+            }
+          }
+        } catch { /* sin manifiesto → warm-crawl cubre lo básico */ }
+
         const urls = [...chunkUrls]
         const results = await Promise.allSettled(
           urls.map((url) =>
