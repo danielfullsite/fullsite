@@ -30,6 +30,15 @@ interface CostItem {
 
 type SortKey = 'platillo' | 'margen_pct' | 'precio' | 'costo' | 'ingredientes'
 
+/** Estudio de rendimiento (yield) de un insumo procesado — ej. pollo empanizado. */
+interface YieldStudy {
+  slug: string
+  label: string
+  unit_label?: string | null
+  inputs: Record<string, number>
+  outputs: Record<string, number>
+}
+
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
@@ -110,6 +119,35 @@ function fuzzyMatch(a: string, b: string): boolean {
   return ratio >= 0.6 && matched >= minMatched
 }
 
+/** Etiquetas legibles para las métricas de un estudio de rendimiento. */
+const YIELD_LABELS: Record<string, string> = {
+  peso_pechuga_cruda_g: 'Pechuga cruda',
+  costo_pechuga: 'Pechuga',
+  peso_limpio_g: 'Peso limpio',
+  costo_marinado: 'Marinado',
+  costo_harina: 'Harina',
+  costo_huevo: 'Huevo',
+  costo_empanizador: 'Empanizador',
+  peso_empanizado_final_g: 'Peso empanizado',
+  peso_estandar_pieza_g: 'Peso por pieza',
+  merma_pct: 'Merma',
+  rendimiento_empanizado_pct: 'Rendimiento empanizado',
+  costo_total_lote: 'Costo del lote',
+  numero_porciones: 'Porciones por lote',
+  costo_por_porcion: 'Costo por porción',
+  costo_por_gramo_empanizado: 'Costo por gramo',
+}
+function yieldLabel(key: string): string {
+  return YIELD_LABELS[key] || key.replace(/_/g, ' ')
+}
+function fmtYield(key: string, val: number): string {
+  if (key.endsWith('_pct')) return `${val}%`
+  if (key.endsWith('_g')) return `${val.toLocaleString('es-MX')} g`
+  if (key === 'numero_porciones') return val.toLocaleString('es-MX')
+  if (key.includes('costo')) return formatCurrency(val)
+  return String(val)
+}
+
 /* ------------------------------------------------------------------ */
 /*  Page component                                                     */
 /* ------------------------------------------------------------------ */
@@ -125,6 +163,7 @@ export default function FoodCostPage() {
   const [showMarket, setShowMarket] = useState(false)
   const [showMods, setShowMods] = useState(false)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [yieldStudies, setYieldStudies] = useState<YieldStudy[]>([])
 
   function toggleExpand(platillo: string) {
     setExpanded(prev => {
@@ -143,6 +182,7 @@ export default function FoodCostPage() {
         // -------------------------------------------------------
         const apiRes = await fetch('/api/food-cost', { cache: 'no-store' })
         const api = apiRes.ok ? await apiRes.json() : null
+        if (api && Array.isArray(api.yieldStudies)) setYieldStudies(api.yieldStudies)
 
         if (api && Array.isArray(api.recipes) && api.recipes.length > 0) {
           const recipes: Array<{
@@ -504,6 +544,65 @@ export default function FoodCostPage() {
           <p className="text-2xl font-bold text-amber-600">{noPrice.length}</p>
         </div>
       </div>
+
+      {/* Rendimiento (yield) — cuánto rinde y cuánto cuesta un lote procesado */}
+      {yieldStudies.map((y) => {
+        const inp = y.inputs || {}
+        const out = y.outputs || {}
+        const headline: Array<{ key: string; accent: string }> = [
+          { key: 'numero_porciones', accent: 'text-blue-600' },
+          { key: 'costo_por_porcion', accent: 'text-emerald-600' },
+          { key: 'costo_total_lote', accent: 'text-[var(--text-1)]' },
+        ]
+        const costKeys = Object.keys(inp).filter(k => k.includes('costo'))
+        const pesoKeys = ['peso_pechuga_cruda_g', 'peso_empanizado_final_g', 'peso_estandar_pieza_g'].filter(k => inp[k] != null)
+        const rendKeys = ['rendimiento_empanizado_pct', 'merma_pct'].filter(k => out[k] != null)
+        return (
+          <div key={y.slug} className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm mb-6 p-5">
+            <div className="flex items-center gap-2 mb-1">
+              <ChefHat size={16} className="text-orange-500" />
+              <h3 className="text-sm font-bold text-[var(--text-1)]">{y.label}</h3>
+            </div>
+            <p className="text-xs text-[var(--text-3)] mb-4">
+              Rendimiento real de un lote — cuánto rinde y cuánto cuesta cada {y.unit_label || 'porción'}.
+            </p>
+            <div className="grid grid-cols-3 gap-4 mb-5">
+              {headline.filter(h => out[h.key] != null).map(h => (
+                <div key={h.key} className="rounded-lg border border-[var(--line)] p-4">
+                  <p className="text-xs text-[var(--text-2)] mb-1">{yieldLabel(h.key)}</p>
+                  <p className={`text-2xl font-bold ${h.accent}`}>{fmtYield(h.key, out[h.key])}</p>
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1 text-sm">
+              <div>
+                <p className="text-xs font-semibold text-[var(--text-2)] uppercase tracking-wide mb-2">Insumos del lote</p>
+                {costKeys.map(k => (
+                  <div key={k} className="flex justify-between py-1 border-b border-[var(--line)]">
+                    <span className="text-[var(--text-2)]">{yieldLabel(k)}</span>
+                    <span className="tabular-nums text-[var(--text-1)]">{fmtYield(k, inp[k])}</span>
+                  </div>
+                ))}
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-[var(--text-2)] uppercase tracking-wide mb-2">Rendimiento</p>
+                {pesoKeys.map(k => (
+                  <div key={k} className="flex justify-between py-1 border-b border-[var(--line)]">
+                    <span className="text-[var(--text-2)]">{yieldLabel(k)}</span>
+                    <span className="tabular-nums text-[var(--text-1)]">{fmtYield(k, inp[k])}</span>
+                  </div>
+                ))}
+                {rendKeys.map(k => (
+                  <div key={k} className="flex justify-between py-1 border-b border-[var(--line)]">
+                    <span className="text-[var(--text-2)]">{yieldLabel(k)}</span>
+                    <span className="tabular-nums text-[var(--text-1)]">{fmtYield(k, out[k])}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )
+      })}
 
       {/* Recetas con costo sospechoso (error de captura en el sistema anterior) */}
       {suspicious.length > 0 && (
