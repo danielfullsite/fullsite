@@ -8,6 +8,8 @@ const BACKUP_INTERVAL_MS = 4 * 60 * 60 * 1000 // Every 4 hours
 const MAX_BACKUPS = 30 // Keep last 30 backups
 const BACKUP_KEY = 'last_backup_time'
 
+import { getActiveClientSlug } from './data'
+
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
@@ -45,10 +47,13 @@ function openBackupDB(): Promise<IDBDatabase> {
 
 // ─── Fetch data from Supabase ──────────────────────────────────────────────
 
-async function fetchTable(table: string, limit = 10000): Promise<unknown[]> {
+async function fetchTable(table: string, cid: string, limit = 10000): Promise<unknown[]> {
   try {
+    // Aislamiento de tenant: el backup se descarga a IndexedDB/archivo, así que
+    // DEBE contener solo el tenant activo. Sin este filtro, un token multi-tenant
+    // respaldaría datos de otros restaurantes (fuga cross-tenant).
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/${table}?limit=${limit}&order=created_at.desc`,
+      `${SUPABASE_URL}/rest/v1/${table}?client_id=eq.${cid}&limit=${limit}&order=created_at.desc`,
       {
         headers: {
           apikey: SUPABASE_KEY,
@@ -70,11 +75,12 @@ export async function createBackup(type: 'auto' | 'manual' = 'manual'): Promise<
 
   const data: Record<string, unknown[]> = {}
   let ordersCount = 0
+  const cid = encodeURIComponent(getActiveClientSlug())
 
   // Fetch all tables in parallel
   const results = await Promise.allSettled(
     tables.map(async (table) => {
-      const rows = await fetchTable(table)
+      const rows = await fetchTable(table, cid)
       data[table] = rows
       if (table === 'pos_orders') ordersCount = rows.length
     })
