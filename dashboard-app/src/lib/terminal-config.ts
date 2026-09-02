@@ -46,6 +46,14 @@ export interface TerminalConfig {
   channel: string
   kds_only?: boolean
   pos_server_ip?: string | null
+  /**
+   * Zona horaria IANA de la sucursal (p.ej. America/Tijuana). El Electron la inyecta
+   * a localStorage `fullsite_timezone` al arrancar (main.js) para que el día/cortes/
+   * reportes usen la zona de ESTA sucursal, no México centro. Si viene vacía, el shell
+   * cae a la zona de la propia máquina (Intl) — la sucursal donde está instalada.
+   * Campo ADICIONAL: el schema del Electron acepta extras, no requiere instalador nuevo.
+   */
+  timezone?: string
 }
 
 export interface GenerateInput {
@@ -56,6 +64,8 @@ export interface GenerateInput {
   name?: string
   /** IP LAN de la caja/Pedro. Requerida para pos/kds en máquinas distintas a la caja. */
   bridgeHost?: string
+  /** Zona IANA de la sucursal (client_locations.timezone). Vacía = el shell auto-detecta. */
+  timezone?: string
 }
 
 /**
@@ -87,6 +97,10 @@ export function generateTerminalConfig(input: GenerateInput): TerminalConfig {
     location_id: locationId,
     channel: 'stable',
   }
+  // Zona de la sucursal: se estampa para que la terminal use el día/cortes de su huso.
+  // Vacía → el shell (main.js) cae a la zona de la máquina donde está instalada.
+  const tz = input.timezone?.trim()
+  if (tz) config.timezone = tz
   // Terminales remotas (pos/kds) hablan con la caja por la LAN → pos_server_ip.
   // Es EL campo que hace funcionar el offline: el POS secundario REENVÍA prints/eventos
   // a la caja, y el KDS dedicado lee /state de la caja. Coincide con los configs de

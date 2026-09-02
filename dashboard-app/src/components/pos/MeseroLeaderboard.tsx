@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { Trophy, TrendingUp, Flame, Target } from 'lucide-react'
 import { formatMXN } from '@/lib/pos-data'
 import { getActiveClientSlug as _cid } from '@/lib/data'
+import { getActiveTimezone } from '@/lib/date-mx'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -39,7 +40,7 @@ export default function MeseroLeaderboard({ currentMesero, compact = false, meta
   async function fetchLeaderboard() {
     try {
       const today = new Date()
-      const todayStr = new Date(today.toLocaleString('en-US', { timeZone: 'America/Monterrey' })).toISOString().split('T')[0]
+      const todayStr = new Date(today.toLocaleString('en-US', { timeZone: getActiveTimezone() })).toISOString().split('T')[0]
       const nowMs = Date.now()
 
       const [ordersRes, attendanceRes] = await Promise.all([

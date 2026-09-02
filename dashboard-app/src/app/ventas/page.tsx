@@ -15,7 +15,7 @@ import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
 import { Table, type ColumnDef } from '@/components/ui/Table'
 import { getDateRange, aggregatePayments, aggregateGrupos, getWansoftData, getDashboardFromPosOrders } from '@/lib/data'
-import { fmtDateMX } from '@/lib/date-mx'
+import { fmtDateMX, getActiveTimezone } from '@/lib/date-mx'
 import { formatCurrency, formatPercent, percentChange } from '@/lib/format'
 import type { WansoftDaily } from '@/lib/types'
 
@@ -23,7 +23,7 @@ type Preset = 'hoy' | 'ayer' | 'semana' | 'mes' | 'custom'
 
 function getPresetDates(preset: Preset): { from: string; to: string } {
   // Use Mexico City timezone for "today" calculation
-  const nowMX = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }))
+  const nowMX = new Date(new Date().toLocaleString('en-US', { timeZone: getActiveTimezone() }))
   const today = nowMX
   const fmt = (d: Date) => {
     const y = d.getFullYear()

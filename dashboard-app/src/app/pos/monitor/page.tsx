@@ -6,6 +6,7 @@ import { ArrowLeft, Activity, Printer, Wifi, WifiOff, AlertTriangle, CheckCircle
 import { getActiveClientSlug as _cid } from '@/lib/data'
 
 import { getBridgeUrl } from '@/lib/bridge-url'
+import { getActiveTimezone } from '@/lib/date-mx'
 import { canCleanupAllOrders } from '@/lib/order-cleanup-auth'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -161,7 +162,7 @@ export default function MonitorPage() {
         syncPending = queue.filter((i: { synced?: boolean }) => !i.synced).length
         syncFailed = queue.filter((i: { retries?: number }) => (i.retries || 0) >= 5).length
         const lastSync = localStorage.getItem('pos_last_sync')
-        if (lastSync) lastSyncTime = new Date(lastSync).toLocaleString('es-MX', { timeZone: 'America/Monterrey' })
+        if (lastSync) lastSyncTime = new Date(lastSync).toLocaleString('es-MX', { timeZone: getActiveTimezone() })
       } catch { /* */ }
 
       // Local print queue (needs_attention + bridge_unavailable)
@@ -327,7 +328,7 @@ export default function MonitorPage() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-[var(--text-3)]">Desde</span>
-                    <span className="text-[var(--text-1)]">{new Date(data.turno.opened_at).toLocaleString('es-MX', { timeZone: 'America/Monterrey' })}</span>
+                    <span className="text-[var(--text-1)]">{new Date(data.turno.opened_at).toLocaleString('es-MX', { timeZone: getActiveTimezone() })}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-[var(--text-3)]">Fondo de caja</span>
