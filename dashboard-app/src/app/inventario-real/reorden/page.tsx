@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { Package, AlertTriangle, CheckCircle, Settings, Search, Save, Wand2 } from 'lucide-react'
 import { getWansoftDataLatest, getActiveClientSlug } from '@/lib/data'
+import { getWarehouses } from '@/lib/warehouses'
 import PageHeader from '@/components/PageHeader'
 import KPICard from '@/components/KPICard'
 
@@ -31,13 +32,7 @@ type Status = 'bajo_minimo' | 'ok' | 'sobre_maximo' | 'sin_configurar'
 
 // ── Constants ──────────────────────────────────────────────────────
 
-const WAREHOUSE_TABS = [
-  { key: 'todos', label: 'Todos' },
-  { key: 'cocina', label: 'Cocina' },
-  { key: 'barra', label: 'Barra' },
-  { key: 'panaderia', label: 'Panaderia' },
-  { key: 'market', label: 'Market' },
-]
+// WAREHOUSE_TABS ahora POR TENANT dentro del componente (ya no hardcode de amalay).
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -77,6 +72,7 @@ function statusBadge(status: Status) {
 // ── Page ───────────────────────────────────────────────────────────
 
 export default function ReordenPage() {
+  const WAREHOUSE_TABS = [{ key: 'todos', label: 'Todos' }, ...getWarehouses()] // por tenant
   const [items, setItems] = useState<InventoryItem[]>([])
   const [configs, setConfigs] = useState<Map<string, ReorderConfig>>(new Map())
   const [loading, setLoading] = useState(true)

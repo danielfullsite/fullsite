@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { Warehouse, Package, AlertTriangle, Search, ChevronUp, ChevronDown, DollarSign } from 'lucide-react'
 import { getWansoftDataLatest } from '@/lib/data'
+import { getWarehouses } from '@/lib/warehouses'
 import { formatCurrency, formatNumber } from '@/lib/format'
 import PageHeader from '@/components/PageHeader'
 import KPICard from '@/components/KPICard'
@@ -27,14 +28,7 @@ interface InventoryItem {
 
 type SortKey = 'codigo' | 'producto' | 'departamento' | 'critico' | 'inv_inicial_qty' | 'entradas_qty' | 'salidas_qty' | 'inv_final_qty' | 'costo_promedio' | 'saldo_actual'
 
-const WAREHOUSE_TABS = [
-  { key: 'todos', label: 'Todos' },
-  { key: 'cocina', label: 'Cocina' },
-  { key: 'barra', label: 'Barra' },
-  { key: 'panaderia', label: 'Panaderia' },
-  { key: 'market', label: 'Market' },
-  { key: 'venta_terceros', label: 'Venta Terceros' },
-]
+// WAREHOUSE_TABS ahora POR TENANT dentro del componente (ya no hardcode de amalay).
 
 function matchWarehouse(almacen: string, tab: string): boolean {
   if (tab === 'todos') return true
@@ -48,6 +42,7 @@ function matchWarehouse(almacen: string, tab: string): boolean {
 }
 
 export default function InventarioRealPage() {
+  const WAREHOUSE_TABS = [{ key: 'todos', label: 'Todos' }, ...getWarehouses()] // por tenant
   const [items, setItems] = useState<InventoryItem[]>([])
   const [loading, setLoading] = useState(true)
   const [fecha, setFecha] = useState('')

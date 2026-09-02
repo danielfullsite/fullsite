@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { Search, Trash2, Save, ArrowRight, Loader2, PackageCheck, Plus, Clock } from 'lucide-react'
 import { getWansoftDataLatest, getActiveClientSlug } from '@/lib/data'
+import { getWarehouseLabels } from '@/lib/warehouses'
 import { formatCurrency } from '@/lib/format'
 import PageHeader from '@/components/PageHeader'
 import { sbPost, sbGet } from '@/lib/supabase-helpers'
@@ -41,7 +42,7 @@ interface RecentTransfer {
 
 // ── Constants ───────────────────────────────────────────────────────
 
-const WAREHOUSES = ['Cocina', 'Barra', 'Panaderia', 'Market', 'Venta Terceros']
+// Almacenes ahora POR TENANT (ver getWarehouseLabels); ya no hardcode de amalay.
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
@@ -86,6 +87,7 @@ function formatDateTime(iso: string) {
 // ── Component ───────────────────────────────────────────────────────
 
 export default function TransferenciasPage() {
+  const WAREHOUSES = getWarehouseLabels() // almacenes del tenant activo
   // Data
   const [inventory, setInventory] = useState<InventoryItem[]>([])
   const [loading, setLoading] = useState(true)
