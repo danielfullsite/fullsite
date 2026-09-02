@@ -47,7 +47,11 @@ export async function syncQueue(): Promise<{ synced: number; failed: number }> {
   if (!isOnline()) return { synced: 0, failed: 0 }
 
   const queue = getQueue()
-  const pending = queue.filter(q => !q.synced)
+  // Los turnos van PRIMERO: una orden que llegue al server antes que su propio
+  // turno recibe 409 TURN_NOT_FOUND. Dentro de esta cola el orden sí se controla.
+  const pending = queue
+    .filter(q => !q.synced)
+    .sort((a, b) => Number(b.table === 'pos_turnos') - Number(a.table === 'pos_turnos'))
   let synced = 0
   let failed = 0
 
@@ -85,17 +89,22 @@ export async function syncQueue(): Promise<{ synced: number; failed: number }> {
         const url = item.endpoint
           ? `${SUPABASE_URL}/rest/v1/${item.endpoint}`
           : `${SUPABASE_URL}/rest/v1/${item.table}`
+        // merge-duplicates: el replay usa el MISMO id client-side que el POST
+        // original (openTurno). Sin esto, un turno que sí llegó al server hacía
+        // 409 aquí en cada ciclo, contado como `failed` para siempre.
         const res = await fetch(url, {
           method: 'POST',
           headers: {
             apikey: SUPABASE_KEY,
             Authorization: `Bearer ${SUPABASE_KEY}`,
             'Content-Type': 'application/json',
-            Prefer: 'return=minimal',
+            Prefer: 'resolution=merge-duplicates,return=minimal',
           },
           body: JSON.stringify(item.data),
         })
-        if (res.ok) {
+        // 409 pese a merge-duplicates = la fila ya existe y no se puede upsertar
+        // (p. ej. RLS sin UPDATE): el dato YA está en el server — es éxito.
+        if (res.ok || res.status === 409) {
           item.synced = true
           synced++
         } else {

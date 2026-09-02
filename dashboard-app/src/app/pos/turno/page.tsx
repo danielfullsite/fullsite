@@ -3,10 +3,10 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, DoorOpen, DoorClosed, DollarSign, Clock, Users, FileText, Printer, X, ChevronDown, ChevronRight, AlertTriangle } from 'lucide-react'
-import { formatMXN, logAudit } from '@/lib/pos-data'
+import { formatMXN, logAudit, openTurno } from '@/lib/pos-data'
 import dynamic from 'next/dynamic'
 import { getActiveClientSlug as _cid } from '@/lib/data'
-import { cacheTurno, getCachedActiveTurno, queueOperation, getCachedOrdersByTurno } from '@/lib/pos-offline-db'
+import { cacheTurno, getCachedActiveTurno, getCachedOrdersByTurno } from '@/lib/pos-offline-db'
 
 const StaffShiftPanel = dynamic(() => import('@/components/pos/StaffShiftPanel'), { ssr: false })
 const CierreCajaWizard = dynamic(() => import('@/components/pos/CierreCajaWizard'), { ssr: false })
@@ -366,49 +366,46 @@ export default function TurnoPage() {
 
   useEffect(() => { fetchTurno() }, [])
 
+  /**
+   * VERDAD ÚNICA DEL TURNO. Antes esta página tenía SU PROPIA apertura
+   * (crypto.randomUUID + IndexedDB + su propia cola), invisible para TurnoGate,
+   * que lee de `pos_turno_cache`/servidor via getActiveTurnos. Resultado en campo:
+   * "Turno abierto" aquí y "No hay turno abierto" al volver al POS — dos verdades.
+   *
+   * Ahora TODA apertura pasa por `openTurno()` (id estable ante toques repetidos,
+   * merge-duplicates, cache que el gate sí lee, cola de sync). El IDB `cacheTurno`
+   * se conserva solo como cache de RENDER de esta página offline — ya no es una
+   * fuente de verdad paralela.
+   */
   const handleOpenTurno = async () => {
     if (!openedBy.trim() || !fondoInicial) return
-    // Stable UUID: generated once locally, never changes during sync
-    const id = crypto.randomUUID()
-    const openedAt = new Date().toISOString()
     const fondo = Number(fondoInicial)
-    const turnoData = {
-      id, client_id: _cid(), opened_by: openedBy, fondo_inicial: fondo,
-      opened_at: openedAt,
+
+    const turno = await openTurno(fondo, openedBy)
+    if (!turno) {
+      showToast('Error al abrir turno')
+      return
     }
+    const sincronizado = turno.sincronizado !== false
 
-    // 1. Write to IDB immediately — shift is open regardless of internet
-    await cacheTurno({ ...turnoData, synced_at: undefined })
+    await cacheTurno({
+      id: turno.id, client_id: _cid(), opened_by: turno.opened_by,
+      fondo_inicial: turno.fondo_inicial, opened_at: turno.opened_at,
+      synced_at: sincronizado ? new Date().toISOString() : undefined,
+    })
 
-    // 2. Optimistically update UI
-    logAudit({ action: 'status_changed', actor: openedBy, details: { type: 'turno_opened', fondo } })
-    showToast(`Turno abierto — Fondo: ${formatMXN(fondo)}`)
+    logAudit({ action: 'status_changed', actor: openedBy, details: { type: 'turno_opened', fondo, turno_id: turno.id, sincronizado } })
+    // No se "dice" confirmado lo que solo quedó local: el operador ve la diferencia.
+    showToast(sincronizado
+      ? `Turno abierto — Fondo: ${formatMXN(fondo)}`
+      : `Turno abierto LOCAL (sin conexión) — se sincroniza al volver el internet`)
     setActiveTurno({
-      id, opened_by: openedBy, fondo_inicial: fondo, opened_at: openedAt,
-      closed_by: null, fondo_final: null, efectivo_sistema: null, diferencia: null,
-      closed_at: null, notas: null,
+      id: turno.id, opened_by: turno.opened_by, fondo_inicial: turno.fondo_inicial,
+      opened_at: turno.opened_at, closed_by: null, fondo_final: null,
+      efectivo_sistema: null, diferencia: null, closed_at: null, notas: null,
     })
     setFondoInicial('')
     setOpenedBy('')
-
-    // 3. Try to sync to Supabase; if offline, queue for later
-    try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/pos_turnos`, {
-        method: 'POST',
-        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify(turnoData),
-      })
-      if (res.ok) {
-        await cacheTurno({ ...turnoData, synced_at: new Date().toISOString() })
-      } else {
-        const err = await res.text().catch(() => res.statusText)
-        console.warn(`[turno] Supabase sync failed (${res.status}): ${err} — queued for retry`)
-        await queueOperation('pos_turnos', 'POST', turnoData, undefined, undefined, 'SUPABASE_REST')
-      }
-    } catch {
-      // Offline — queue for sync when internet returns
-      await queueOperation('pos_turnos', 'POST', turnoData, undefined, undefined, 'SUPABASE_REST')
-    }
   }
 
   // Get staff name from session
