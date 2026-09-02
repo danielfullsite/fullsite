@@ -132,29 +132,47 @@ describe('BUG-019 dep patch — backup usa service key, no anon', () => {
   function makeReq() {
     return {
       headers: { get: (k: string) => (k.toLowerCase() === 'authorization' ? 'Bearer user-token' : null) },
-      url: `${URLBASE}/api/backup?table=pos_orders`,
+      // El backup es por-tenant: client_id obligatorio + membresía validada.
+      url: `${URLBASE}/api/backup?table=pos_orders&client_id=amalay`,
     } as unknown as import('next/server').NextRequest
+  }
+  // El admin autorizado tiene id + membresía en el tenant solicitado (client_users).
+  const backupFetch = (u: string) => {
+    if (u.includes('/auth/v1/user')) return { id: 'admin-1', email: 'admin@test.com' }
+    if (u.includes('client_users')) return [{ client_id: 'amalay' }]
+    return []
   }
   it('lectura de tablas tenant con Bearer service; el apikey de /auth/v1/user es anon (legítimo)', async () => {
     setEnv({ service: true })
     process.env.BACKUP_ADMIN_EMAILS = 'admin@test.com'
-    installFetch((u) => u.includes('/auth/v1/user') ? { email: 'admin@test.com' } : [])
+    installFetch(backupFetch)
     const { GET } = await import('@/app/api/backup/route')
     const res = await GET(makeReq())
     const authCall = calls.find(c => c.url.includes('/auth/v1/user'))
     const posCall = restCalls().find(c => c.url.includes('pos_orders'))
     expect(authCall!.apikey).toBe(ANON)                 // apikey no privilegiado para validar el user JWT
     expect(posCall).toBeTruthy()
+    expect(posCall!.url).toContain('client_id=eq.amalay')      // aislamiento de tenant obligatorio
     expect(posCall!.authorization).toBe(`Bearer ${SERVICE}`)   // datos tenant → service role
     expect(posCall!.apikey).toBe(SERVICE)
     expect(res.status).not.toBe(503)
     expect(JSON.stringify(await res.json())).not.toContain(SERVICE)
   })
 
+  it('admin sin membresía en el tenant solicitado → 403, sin leer tablas tenant', async () => {
+    setEnv({ service: true })
+    process.env.BACKUP_ADMIN_EMAILS = 'admin@test.com'
+    installFetch((u) => u.includes('/auth/v1/user') ? { id: 'admin-1', email: 'admin@test.com' } : []) // client_users → []
+    const { GET } = await import('@/app/api/backup/route')
+    const res = await GET(makeReq())
+    expect(res.status).toBe(403)
+    expect(restCalls().some(c => c.url.includes('pos_orders'))).toBe(false)
+  })
+
   it('SIN service key (usuario autorizado) → 503 fail-closed, sin leer tablas tenant', async () => {
     setEnv({ service: false })
     process.env.BACKUP_ADMIN_EMAILS = 'admin@test.com'
-    installFetch((u) => u.includes('/auth/v1/user') ? { email: 'admin@test.com' } : [])
+    installFetch(backupFetch)
     const { GET } = await import('@/app/api/backup/route')
     const res = await GET(makeReq())
     expect(res.status).toBe(503)

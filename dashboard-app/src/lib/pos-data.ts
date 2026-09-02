@@ -3384,10 +3384,13 @@ export interface RecipeDetail {
 }
 
 export async function getRecipeDetail(name: string): Promise<RecipeDetail | null> {
-  // Search by name (partial match)
+  // Search by name (partial match) — SIEMPRE acotado al tenant activo: sin el
+  // filtro client_id, un admin multi-tenant recibiría la receta de otro
+  // restaurante por coincidencia de nombre (fuga cross-tenant).
   const encoded = encodeURIComponent(name)
+  const cid = encodeURIComponent(_getClientId())
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/pos_recipe_details?name=ilike.*${encoded}*&limit=1`,
+    `${SUPABASE_URL}/rest/v1/pos_recipe_details?client_id=eq.${cid}&name=ilike.*${encoded}*&limit=1`,
     { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
   )
   if (!res.ok) return null

@@ -5,7 +5,7 @@ import { Bike, TrendingUp, DollarSign, Package, Banknote, Calendar, CheckCircle 
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts'
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
-import { getRecentDays } from '@/lib/data'
+import { getRecentDays, getActiveClientSlug } from '@/lib/data'
 import { formatCurrency } from '@/lib/format'
 import type { WansoftDaily } from '@/lib/types'
 
@@ -30,7 +30,10 @@ export default function DeliveryPage() {
     // Fetch real platform payments from Supabase
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
     const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    fetch(`${sbUrl}/rest/v1/delivery_platform_payments?order=period_start.desc&limit=20`, {
+    // Aislamiento de tenant: filtrar por client_id, no confiar solo en RLS
+    // (un admin multi-tenant recibiría la unión de sus restaurantes).
+    const cid = encodeURIComponent(getActiveClientSlug())
+    fetch(`${sbUrl}/rest/v1/delivery_platform_payments?client_id=eq.${cid}&order=period_start.desc&limit=20`, {
       headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` },
     }).then(r => r.ok ? r.json() : []).then(setPayments).catch(() => {})
   }, [])
