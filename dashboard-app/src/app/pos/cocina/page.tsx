@@ -11,6 +11,7 @@ import {
   type KitchenOrderFromDB, type RecipeDetail, type OrderItem,
 } from '@/lib/pos-data'
 import { isBebida, POLL_INTERVAL_KITCHEN, getStationByName, type StationName } from '@/lib/pos-constants'
+import { useVisibleInterval } from '@/lib/use-visible-interval'
 import { reprintByStation, type ReprintOrderContext } from '@/lib/printer'
 import { getActiveClientSlug as _cid } from '@/lib/data'
 import { useBridgeClient, setPosServerHost } from '@/lib/bridge-client'
@@ -299,9 +300,9 @@ export default function CocinaPage() {
   useEffect(() => {
     setMounted(true)
     fetchOrders()
-    const interval = setInterval(fetchOrders, POLL_INTERVAL_KITCHEN)
-    return () => clearInterval(interval)
   }, [])
+  // Refresco solo cuando la pantalla está visible (pausa tabs en segundo plano).
+  useVisibleInterval(fetchOrders, POLL_INTERVAL_KITCHEN)
 
   // Cancel an item from a sent order
   const handleCancelItem = async () => {

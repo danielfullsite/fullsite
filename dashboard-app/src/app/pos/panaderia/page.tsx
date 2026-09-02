@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { ArrowLeft, Clock, Check, Flame, RefreshCw, CakeSlice } from 'lucide-react'
 import { getKitchenOrders, updateOrderStatus, logAudit, type KitchenOrderFromDB } from '@/lib/pos-data'
 import { POLL_INTERVAL_KITCHEN, getStationByName } from '@/lib/pos-constants'
+import { useVisibleInterval } from '@/lib/use-visible-interval'
 import { fetchClientConfig } from '@/lib/client-config'
 import { getActiveClientSlug } from '@/lib/data'
 
@@ -68,9 +69,9 @@ export default function PanaderiaPage() {
   useEffect(() => {
     setMounted(true)
     fetchOrders()
-    const interval = setInterval(fetchOrders, POLL_INTERVAL_KITCHEN)
-    return () => clearInterval(interval)
   }, [])
+  // Refresco solo cuando la pantalla está visible (pausa tabs en segundo plano).
+  useVisibleInterval(fetchOrders, POLL_INTERVAL_KITCHEN)
 
   const advanceStatus = async (id: string, currentStatus: string, mesa: number, mesero: string) => {
     let newStatus = ''

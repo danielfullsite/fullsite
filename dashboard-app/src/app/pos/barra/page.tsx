@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { ArrowLeft, Clock, Check, Flame, RefreshCw, Wine, Printer } from 'lucide-react'
 import { getKitchenOrders, updateOrderStatus, logAudit, type KitchenOrderFromDB, type OrderItem } from '@/lib/pos-data'
 import { isBebida as isBeverage, POLL_INTERVAL_KITCHEN, KITCHEN_ARCHIVE_HOURS, resolveItemStation, type StationName } from '@/lib/pos-constants'
+import { useVisibleInterval } from '@/lib/use-visible-interval'
 import { reprintByStation, type ReprintOrderContext } from '@/lib/printer'
 import { getActiveClientSlug as _cid } from '@/lib/data'
 import { useBridgeClient, setPosServerHost } from '@/lib/bridge-client'
@@ -158,9 +159,9 @@ export default function BarraPage() {
   useEffect(() => {
     setMounted(true)
     fetchOrders()
-    const interval = setInterval(fetchOrders, POLL_INTERVAL_KITCHEN)
-    return () => clearInterval(interval)
   }, [])
+  // Refresco solo cuando la pantalla está visible (pausa tabs en segundo plano).
+  useVisibleInterval(fetchOrders, POLL_INTERVAL_KITCHEN)
 
   const STATUS_ORDER: Record<string, number> = { enviada: 1, preparando: 2, lista: 3, entregada: 4 }
   const [toast, setToast] = useState<string | null>(null)
