@@ -16,6 +16,8 @@
 # next.js
 /.next/
 /out/
+# generado en build por scripts/gen-precache-manifest.mjs
+/public/precache-manifest.json
 
 # production
 /build
