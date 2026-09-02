@@ -143,7 +143,9 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ path: string[] 
     const ct = r.headers.get('content-type')
     // El PIN nunca sale por aquí, sin importar qué pidió el `select`.
     const text = redactResponse(table, raw2, ct)
-    const res = new NextResponse(text, { status: r.status })
+    // 204/205/304 no admiten body — Response() truena con string aunque sea "".
+    const bodyless = r.status === 204 || r.status === 205 || r.status === 304
+    const res = new NextResponse(bodyless ? null : text, { status: r.status })
     if (ct) res.headers.set('content-type', ct)
     const cr = r.headers.get('content-range'); if (cr) res.headers.set('content-range', cr)
     return res

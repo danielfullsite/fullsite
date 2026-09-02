@@ -228,18 +228,29 @@ Da entre 5 y 7. "area" es una etiqueta corta (ej. "Datos", "Impresión", "Person
       method: 'POST',
       headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: model(), max_tokens: 1500, system,
+        model: model(), max_tokens: 3000, system,
         messages: [{ role: 'user', content: `Fecha: ${today}. Estado actual de la plataforma:\n${state}\n\nDame las recomendaciones priorizadas de qué nos falta o podríamos mejorar.` }],
       }),
       cache: 'no-store',
     })
-    if (!res.ok) return { recommendations: [], error: `anthropic ${res.status}` }
+    if (!res.ok) {
+      console.error('[advisor] anthropic', res.status, await res.text().catch(() => ''))
+      return { recommendations: [], error: `anthropic ${res.status}` }
+    }
     const data = await res.json()
+    if (data.stop_reason === 'max_tokens') console.error('[advisor] respuesta truncada por max_tokens')
     const text: string = (data.content || []).filter((b: { type: string }) => b.type === 'text').map((b: { text?: string }) => b.text || '').join('')
     const m = text.match(/\{[\s\S]*\}/)
-    if (!m) return { recommendations: [], error: 'sin json' }
+    if (!m) {
+      console.error('[advisor] sin json en respuesta:', text.slice(0, 500))
+      return { recommendations: [], error: 'sin json' }
+    }
     const parsed = JSON.parse(m[0]) as { recommendations?: Recommendation[] }
     const recs = Array.isArray(parsed.recommendations) ? parsed.recommendations.slice(0, 8) : []
+    if (recs.length === 0) {
+      console.error('[advisor] json sin recommendations:', m[0].slice(0, 500))
+      return { recommendations: [], error: 'respuesta sin recomendaciones' }
+    }
     return { recommendations: recs }
   } catch (e) {
     return { recommendations: [], error: e instanceof Error ? e.message : String(e) }

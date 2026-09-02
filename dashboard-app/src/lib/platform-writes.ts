@@ -64,7 +64,8 @@ export async function auditLog(ctx: PlatformAdminContext, entry: AuditEntry): Pr
         action: entry.action,
         scope: entry.scope,
         target_tenant: entry.target_tenant ?? null,
-        detail: entry.detail ?? null,
+        // La columna es NOT NULL: un null perdía el registro completo de auditoría.
+        detail: entry.detail ?? {},
         affected_count: entry.affected_count ?? null,
       }]),
     })
