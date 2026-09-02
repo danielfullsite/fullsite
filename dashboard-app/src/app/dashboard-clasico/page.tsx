@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { DollarSign, Ticket, Users, Receipt, TrendingDown, TrendingUp, Award, ArrowRight, CreditCard, FileBarChart, ClipboardList, Target, Settings, Eye, EyeOff, GripVertical, Clock, Zap, Activity, ChevronLeft, ChevronRight, CalendarDays, TriangleAlert } from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import RevenueChart from '@/components/RevenueChart'
+import { getActiveTimezone } from '@/lib/date-mx'
 import RevenueDistributionChart from '@/components/RevenueDistributionChart'
 import { getRecentDays, getLatestDay, getDashboardFromPosOrders, aggregateMeseros } from '@/lib/data'
 import AgentBriefing from '@/components/AgentBriefing'
@@ -412,7 +413,7 @@ export default function DashboardPage() {
                   <span className="flex items-center gap-2">
                     <span className="font-mono text-[13px] text-[var(--text-2)] font-semibold">{formatDate(viewDay.fecha)}</span>
                     {(() => {
-                      const mxToday = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' })
+                      const mxToday = new Date().toLocaleDateString('en-CA', { timeZone: getActiveTimezone() })
                       const fecha = String(viewDay.fecha).slice(0, 10)
                       if (fecha === mxToday) return <span className="inline-flex items-center text-[11px] font-semibold leading-none px-2.5 py-1 rounded-full border border-[var(--accent-line)] bg-[var(--accent-soft)] text-[var(--accent-ink)]">HOY</span>
                       if (selectedDayIdx === 0) return <span className="inline-flex items-center text-[11px] font-semibold leading-none px-2.5 py-1 rounded-full border border-[var(--line)] bg-[var(--surface-2)] text-[var(--text-2)]">ÚLTIMO CIERRE</span>
@@ -535,10 +536,10 @@ export default function DashboardPage() {
 
       {/* Data freshness: warn when showing a past day as the default view, show sync time for today */}
       {period === 'dia' && viewDay && (() => {
-        const mxToday = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' })
+        const mxToday = new Date().toLocaleDateString('en-CA', { timeZone: getActiveTimezone() })
         const fecha = String(viewDay.fecha).slice(0, 10)
         const syncTime = viewDay.updated_at
-          ? new Date(viewDay.updated_at).toLocaleTimeString('es-MX', { timeZone: 'America/Mexico_City', hour: 'numeric', minute: '2-digit' })
+          ? new Date(viewDay.updated_at).toLocaleTimeString('es-MX', { timeZone: getActiveTimezone(), hour: 'numeric', minute: '2-digit' })
           : null
         if (fecha !== mxToday && selectedDayIdx === 0) {
           return (

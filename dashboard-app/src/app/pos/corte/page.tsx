@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Fingerprint, ArrowLeft, Receipt, RefreshCw, Clock, DollarSign, Users, CreditCard, Banknote, Ban, Percent, ChefHat, RotateCcw, ShieldAlert, AlertTriangle, X, Download, Printer } from 'lucide-react'
 import { formatMXN, getAuditLog, reopenOrder, logAudit, getClientId, verifyManagerPin, verifyManagerHuella, hayHuellasDadasDeAlta, consumeManagerApproval, getActiveTurnoTolerante, getPaymentMethodsFromDB, type AuditLogEntry, type PagoForma, type PaymentMethodDB } from '@/lib/pos-data'
 import { isTiempoItem } from '@/lib/pos-constants'
+import { getActiveTimezone } from '@/lib/date-mx'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -95,7 +96,7 @@ export default function CortePage() {
   const [selectedDate, setSelectedDate] = useState(() => {
     // Use Mexico timezone to get correct local date
     const now = new Date()
-    const mxDate = new Date(now.toLocaleString('en-US', { timeZone: 'America/Monterrey' }))
+    const mxDate = new Date(now.toLocaleString('en-US', { timeZone: getActiveTimezone() }))
     return mxDate.toISOString().split('T')[0]
   })
 
@@ -580,7 +581,7 @@ export default function CortePage() {
                     Este turno lleva {Math.floor(hoursOpen)} horas abierto. ¿Olvidaste cerrarlo?
                   </p>
                   <p className="text-red-400/70 text-xs mt-1">
-                    Abierto por {turno.opened_by} el {new Date(turno.opened_at).toLocaleString('es-MX', { timeZone: 'America/Monterrey' })}
+                    Abierto por {turno.opened_by} el {new Date(turno.opened_at).toLocaleString('es-MX', { timeZone: getActiveTimezone() })}
                   </p>
                 </div>
               </div>
@@ -742,7 +743,7 @@ export default function CortePage() {
               </h3>
               <p className="text-[var(--text-2)] text-xs mb-4">
                 {turno
-                  ? `Turno abierto por ${turno.opened_by} · ${new Date(turno.opened_at).toLocaleString('es-MX', { timeZone: 'America/Monterrey' })} · Fondo ${formatMXN(Number(turno.fondo_inicial) || 0)}`
+                  ? `Turno abierto por ${turno.opened_by} · ${new Date(turno.opened_at).toLocaleString('es-MX', { timeZone: getActiveTimezone() })} · Fondo ${formatMXN(Number(turno.fondo_inicial) || 0)}`
                   : 'Sin turno abierto — fondo de caja $0.00'}
               </p>
               <div className="grid md:grid-cols-3 gap-6 font-mono text-sm">

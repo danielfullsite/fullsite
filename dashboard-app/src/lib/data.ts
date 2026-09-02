@@ -1,6 +1,6 @@
 import type { WansoftDaily } from './types'
 import { supabase } from './supabase'
-import { nowMX, fmtDateMX } from './date-mx'
+import { nowMX, fmtDateMX, zonedStartOfDayISO } from './date-mx'
 import { fetchWithTimeout } from './fetch-with-timeout'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -503,7 +503,7 @@ export async function getDashboardFromPosOrders(days: number = 30, clientId: str
   const cutoffStr = fmtDateMX(cutoff)
 
   const orders = await sbFetch('pos_orders',
-    `select=mesa,mesero,personas,total,subtotal,iva,descuento,propina,metodo_pago,pagos,items,status,created_at&client_id=eq.${clientId}${locationFilter(locationId)}&status=eq.cerrada&created_at=gte.${cutoffStr}T00:00:00-06:00&order=created_at.asc&limit=5000`
+    `select=mesa,mesero,personas,total,subtotal,iva,descuento,propina,metodo_pago,pagos,items,status,created_at&client_id=eq.${clientId}${locationFilter(locationId)}&status=eq.cerrada&created_at=gte.${zonedStartOfDayISO(cutoffStr)}&order=created_at.asc&limit=5000`
   ) as { mesa: number; mesero: string; personas: number; total: number; subtotal: number; iva: number; descuento: number; propina: number; metodo_pago: string; pagos: { metodo: string; monto: number }[] | null; items: { nombre: string; precio: number; cantidad: number }[] | null; status: string; created_at: string }[]
 
   if (orders.length === 0) return []
@@ -511,7 +511,10 @@ export async function getDashboardFromPosOrders(days: number = 30, clientId: str
   // Group by date
   const byDate = new Map<string, typeof orders>()
   for (const o of orders) {
-    const fecha = o.created_at.slice(0, 10)
+    // Agrupar por la fecha LOCAL del negocio, no por la fecha UTC del timestamp
+    // (created_at.slice(0,10) = fecha UTC → una venta de la tarde/noche caía en
+    // el día siguiente para cualquier zona ≠ centro). fmtDateMX usa la zona activa.
+    const fecha = fmtDateMX(new Date(o.created_at))
     if (!byDate.has(fecha)) byDate.set(fecha, [])
     byDate.get(fecha)!.push(o)
   }

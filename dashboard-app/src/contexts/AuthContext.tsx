@@ -6,6 +6,7 @@ import type { User } from '@supabase/supabase-js'
 import { getClientConfig, getClientIdFromEmail, fetchClientConfig, type ClientConfig } from '@/lib/client-config'
 import { applyAccent } from '@/lib/accent'
 import { applyTenantDefaultTheme } from '@/lib/tenant-theme'
+import { setActiveTimezone } from '@/lib/date-mx'
 
 import { canAccessPage, resolveRole, ROLE_MAP, type DashboardRole, type StaffPermissions } from '@/lib/roles'
 
@@ -151,7 +152,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             'pos_manager_credentials_v2', 'pos_service_model',
             'pos_shift_token', 'pos_turno_id', 'pos_manager_pin_cache',
             'pos_meseros_cache', 'pos_mesero', 'pos_last_turno_sync',
-            'pos_fingerprint_staff', 'pos_terminal_id',
+            'pos_fingerprint_staff', 'pos_terminal_id', 'fullsite_timezone',
           ]
           for (const k of exactKeys) {
             try { localStorage.removeItem(k) } catch { /* — */ }
@@ -173,6 +174,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Load full client config from Supabase (with fallback to hardcoded)
     const config = await fetchClientConfig(cid)
     setClientConfig(config)
+    // Zona horaria del negocio → localStorage, para que date-mx.ts (día, cortes,
+    // reportes) use la zona de ESTE tenant/sucursal y no la de México centro.
+    setActiveTimezone(config?.timezone)
     // Contrato multi-tenant (Hallazgo #1): marca + tema por cliente en runtime.
     // Acento: AMALAY=emerald → no-op; otros heredan su color. Tema: adopta default_theme si el usuario no eligió.
     applyAccent(config?.accent_color)

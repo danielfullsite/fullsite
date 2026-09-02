@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { DollarSign, TrendingDown, TrendingUp, Award, ArrowRight, CreditCard, FileBarChart, ClipboardList, Target, Settings, Eye, EyeOff, GripVertical, Clock, Activity, ChevronLeft, ChevronRight, CalendarDays, Building2 } from 'lucide-react'
 import RevenueChart from '@/components/RevenueChart'
 import RevenueDistributionChart from '@/components/RevenueDistributionChart'
+import { getActiveTimezone } from '@/lib/date-mx'
 import { getRecentDays, getLatestDay, getDashboardFromPosOrders, aggregateMeseros, getDeteccionesAgentes, getTurnoAbierto, type TurnoAbierto } from '@/lib/data'
 import { desdeEventos, type Atencion } from '@/lib/atencion'
 import EstadoOperacion from '@/components/dashboard/EstadoOperacion'
@@ -543,10 +544,10 @@ export default function DashboardPage() {
               abiertoAt: turnoAbierto.abiertoAt ?? null,
             } : null}
             ultimaFecha={recentData.length > 0 ? String(recentData[recentData.length - 1].fecha).slice(0, 10) : null}
-            hoy={new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' })}
+            hoy={new Date().toLocaleDateString('en-CA', { timeZone: getActiveTimezone() })}
             syncTime={
               recentData.length > 0 && recentData[recentData.length - 1].updated_at
-                ? new Date(recentData[recentData.length - 1].updated_at as string).toLocaleTimeString('es-MX', { timeZone: 'America/Mexico_City', hour: 'numeric', minute: '2-digit' })
+                ? new Date(recentData[recentData.length - 1].updated_at as string).toLocaleTimeString('es-MX', { timeZone: getActiveTimezone(), hour: 'numeric', minute: '2-digit' })
                 : null
             }
             cargando={cargandoTurno}
@@ -571,7 +572,7 @@ export default function DashboardPage() {
                   <span className="flex items-center gap-2">
                     <span className="font-mono text-[13px] text-[var(--text-2)] font-semibold">{formatDate(viewDay.fecha)}</span>
                     {(() => {
-                      const mxToday = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' })
+                      const mxToday = new Date().toLocaleDateString('en-CA', { timeZone: getActiveTimezone() })
                       const fecha = String(viewDay.fecha).slice(0, 10)
                       if (fecha === mxToday) return <span className="inline-flex items-center text-[11px] font-semibold leading-none px-2.5 py-1 rounded-full border border-[var(--accent-line)] bg-[var(--accent-soft)] text-[var(--accent-ink)]">HOY</span>
                       if (selectedDayIdx === 0) return <span className="inline-flex items-center text-[11px] font-semibold leading-none px-2.5 py-1 rounded-full border border-[var(--line)] bg-[var(--surface-2)] text-[var(--text-2)]">ÚLTIMO CIERRE</span>
@@ -747,7 +748,7 @@ export default function DashboardPage() {
 
           Se respetan los interruptores del panel de personalización. */}
       {(show('kpis') || show('extra_kpis')) && (() => {
-        const mxToday = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' })
+        const mxToday = new Date().toLocaleDateString('en-CA', { timeZone: getActiveTimezone() })
         const fechaVista = viewDay ? String(viewDay.fecha).slice(0, 10) : null
 
         // `periodData` normaliza todo a 0 con `|| 0`. ResumenDia tiene una guarda
@@ -794,7 +795,7 @@ export default function DashboardPage() {
         <RitmoSemana
           filas={ritmoSemana}
           hoyDow={(() => {
-            const hoyMX = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' })
+            const hoyMX = new Date().toLocaleDateString('en-CA', { timeZone: getActiveTimezone() })
             const d = new Date(hoyMX + 'T12:00:00')
             return d.getDay() === 0 ? 7 : d.getDay()
           })()}

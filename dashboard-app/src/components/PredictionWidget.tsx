@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { TrendingUp, TrendingDown, Target, Zap } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import { getActiveClientSlug } from '@/lib/data'
+import { getActiveTimezone } from '@/lib/date-mx'
 
 interface PredictionWidgetProps {
   currentVentas: number
@@ -24,7 +25,7 @@ function predict(
   const mxMinute = now.getUTCMinutes()
 
   if (dataFecha) {
-    const mxNow = new Date(now.toLocaleString('en-US', { timeZone: 'America/Monterrey' }))
+    const mxNow = new Date(now.toLocaleString('en-US', { timeZone: getActiveTimezone() }))
     const todayStr = mxNow.toISOString().slice(0, 10)
     if (dataFecha !== todayStr) return { projected: 0, pctDone: 0, remaining: 0 }
   }
