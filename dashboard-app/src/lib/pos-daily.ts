@@ -112,7 +112,7 @@ async function leerDiasOLanzar(
     .toISOString().slice(0, 10)
   const url = `${sbUrl}/rest/v1/pos_orders?client_id=eq.${encodeURIComponent(clientId)}`
     + `&status=in.(cerrada,pagada,cobrada,entregada)&created_at=gte.${sinceDate}T00:00:00`
-    + `&select=created_at,total,subtotal,descuento,propina,mesero,metodo_pago,personas,items`
+    + `&select=created_at,dia_venta,total,subtotal,descuento,propina,mesero,metodo_pago,personas,items`
     + `&order=created_at.desc&limit=8000`
   let orders: Record<string, unknown>[] = []
   try {
@@ -138,8 +138,31 @@ async function leerDiasOLanzar(
   for (const o of orders) {
     const ts = new Date(o.created_at as string)
     if (isNaN(ts.getTime())) continue
-    // Fecha de negocio en MX (UTC-6) para agrupar por día calendario local.
-    const fecha = new Date(ts.getTime() - MX_OFFSET_MS).toISOString().slice(0, 10)
+    // ── DIA DE VENTA, no dia de calendario ────────────────────────────────
+    //
+    // Antes esto era `new Date(ts - MX_OFFSET_MS)` — un desfase fijo de UTC-6 SIN
+    // corrimiento de dia de venta. Resultado: toda venta entre medianoche y las 5
+    // a.m. se le atribuia al DIA SIGUIENTE. Y eso es justo el cierre de un
+    // restaurante.
+    //
+    // Medido en produccion el 2026-09-01, ordenes agrupadas en el dia equivocado:
+    //
+    //   scyf-demo   38,866 de 110,789   35.1%
+    //   boruca          62 de     240   25.8%
+    //   lab-resto      486 de   4,402   11.0%
+    //
+    // Hasta un TERCIO de las ventas caian en el dia equivocado en los numeros que
+    // ve la IA — el "como vamos hoy", las comparaciones dia contra dia, el coach.
+    //
+    // `dia_venta` lo calcula la base por tenant, con SU zona horaria y SU hora de
+    // inicio (`clients.business_day_start_local`). Se lee en vez de recalcularlo:
+    // una sola definicion de "que dia es" para todo el sistema.
+    //
+    // El respaldo conserva el comportamiento viejo para filas anteriores al backfill
+    // — mal agrupadas, pero es lo que habia; no se inventa un dato que no existe.
+    const fecha = typeof o.dia_venta === 'string' && o.dia_venta
+      ? o.dia_venta
+      : new Date(ts.getTime() - MX_OFFSET_MS).toISOString().slice(0, 10)
     let b = byDay.get(fecha)
     if (!b) {
       b = { ventas: 0, brutas: 0, descuentos: 0, propinas: 0, tickets: 0, personas: 0, meseros: {}, pagos: {}, platillos: {} }
