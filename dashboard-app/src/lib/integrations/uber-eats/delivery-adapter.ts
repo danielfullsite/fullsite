@@ -7,9 +7,11 @@
 //   POST /v1/delivery/order/{id}/cancel  — cancel order
 //   POST /v1/delivery/order/{id}/ready   — mark ready for pickup
 //
-// Token: client_credentials / delivery (eats.deliveries).
-// NOT the USL authorization_code token — eats.deliveries is an M2M scope
-// for the Delivery/Direct API product, separate from the Eats Marketplace product.
+// Token: client_credentials / marketplace (eats.order). Per Uber GTS (case
+// #58972404, 2026-08-09): the /v1/delivery/order/* family — get/accept/deny/
+// cancel/ready — is authorized by eats.order, NOT a separate scope. The prior
+// tokenType 'delivery' requested eats.deliveries (an Uber Direct scope Uber does
+// not whitelist for this app), which returned 400 invalid_scope on every call.
 
 import { uberFetch } from './oauth'
 import { withRetry } from '../retry'
@@ -26,7 +28,7 @@ export async function getDeliveryOrderDetails(
   const t0 = Date.now()
   try {
     const r = await withRetry(
-      () => uberFetch(`/v1/delivery/order/${encodeURIComponent(orderId)}`, { method: 'GET', tokenType: 'delivery' }),
+      () => uberFetch(`/v1/delivery/order/${encodeURIComponent(orderId)}`, { method: 'GET', tokenType: 'marketplace' }),
       { maxAttempts: 3, baseDelayMs: 500 }
     )
     if (!r.ok) {
@@ -53,7 +55,7 @@ export async function acceptDeliveryOrder(
       () => uberFetch(`/v1/delivery/order/${encodeURIComponent(orderId)}/accept`, {
         method: 'POST',
         body: JSON.stringify({}),
-        tokenType: 'delivery',
+        tokenType: 'marketplace',
       }),
       { maxAttempts: 3, baseDelayMs: 500 }
     )
@@ -77,7 +79,7 @@ export async function denyDeliveryOrder(
       () => uberFetch(`/v1/delivery/order/${encodeURIComponent(orderId)}/deny`, {
         method: 'POST',
         body: JSON.stringify({ deny_reason: toDeliveryReason(reason) }),
-        tokenType: 'delivery',
+        tokenType: 'marketplace',
       }),
       { maxAttempts: 2, baseDelayMs: 500 }
     )
@@ -101,7 +103,7 @@ export async function cancelDeliveryOrder(
       () => uberFetch(`/v1/delivery/order/${encodeURIComponent(orderId)}/cancel`, {
         method: 'POST',
         body: JSON.stringify({ cancellation_reason: toDeliveryReason(reason) }),
-        tokenType: 'delivery',
+        tokenType: 'marketplace',
       }),
       { maxAttempts: 2, baseDelayMs: 500 }
     )
@@ -124,7 +126,7 @@ export async function markDeliveryOrderReady(
       () => uberFetch(`/v1/delivery/order/${encodeURIComponent(orderId)}/ready`, {
         method: 'POST',
         body: JSON.stringify({}),
-        tokenType: 'delivery',
+        tokenType: 'marketplace',
       }),
       { maxAttempts: 3, baseDelayMs: 500 }
     )
