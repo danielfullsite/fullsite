@@ -86,7 +86,7 @@ CREATE TABLE IF NOT EXISTS prospects (
 -- Auto-generated from production schema export (2026-07-21)
 CREATE TABLE IF NOT EXISTS pos_staff (
   id TEXT DEFAULT (gen_random_uuid())::text NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   name TEXT NOT NULL,
   pin TEXT NOT NULL,
   role TEXT DEFAULT 'mesero'::text NOT NULL,
@@ -103,7 +103,7 @@ ALTER TABLE pos_staff ADD CONSTRAINT IF NOT EXISTS unique_pin_per_client UNIQUE 
 -- Auto-generated from production schema export (2026-07-21)
 CREATE TABLE IF NOT EXISTS pos_staff_audit (
   id BIGSERIAL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   staff_id TEXT NOT NULL,
   action TEXT NOT NULL,
   changed_fields JSONB,
@@ -115,7 +115,7 @@ CREATE TABLE IF NOT EXISTS pos_staff_audit (
 -- Auto-generated from production schema export (2026-07-21)
 CREATE TABLE IF NOT EXISTS pos_attendance (
   id UUID DEFAULT gen_random_uuid() NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_id TEXT NOT NULL,
   staff_id TEXT NOT NULL,
   staff_name TEXT NOT NULL,
   type TEXT NOT NULL,
@@ -131,7 +131,7 @@ CREATE INDEX IF NOT EXISTS idx_attendance_staff ON public.pos_attendance USING b
 -- Auto-generated from production schema export (2026-07-21)
 CREATE TABLE IF NOT EXISTS pos_fingerprint_templates (
   id TEXT NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_id TEXT NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT now(),
   template TEXT
 );
@@ -140,7 +140,7 @@ CREATE TABLE IF NOT EXISTS pos_fingerprint_templates (
 -- Auto-generated from production schema export (2026-07-21)
 CREATE TABLE IF NOT EXISTS pos_turnos (
   id TEXT NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   opened_by TEXT NOT NULL,
   fondo_inicial NUMERIC DEFAULT 0 NOT NULL,
   opened_at TIMESTAMPTZ DEFAULT now(),
@@ -156,7 +156,7 @@ CREATE TABLE IF NOT EXISTS pos_turnos (
 -- Auto-generated from production schema export (2026-07-21)
 CREATE TABLE IF NOT EXISTS pos_cash_movements (
   id BIGSERIAL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   turno_id TEXT,
   type TEXT NOT NULL,
   amount NUMERIC NOT NULL,
@@ -192,7 +192,7 @@ CREATE INDEX IF NOT EXISTS idx_agent_runs_agent_created ON public.agent_runs USI
 -- Auto-generated from production schema export (2026-07-21)
 CREATE TABLE IF NOT EXISTS agent_results (
   id BIGSERIAL,
-  client_id TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_id TEXT NOT NULL,
   agent_id TEXT NOT NULL,
   fecha DATE NOT NULL,
   data JSONB NOT NULL,
@@ -208,7 +208,7 @@ CREATE INDEX IF NOT EXISTS idx_agent_results_agent ON public.agent_results USING
 -- Group: CORE
 -- Auto-generated from production schema export (2026-07-21)
 CREATE TABLE IF NOT EXISTS pos_item_modifier_groups (
-  client_id TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_id TEXT NOT NULL,
   item_id TEXT NOT NULL,
   group_id TEXT NOT NULL
 );
@@ -217,7 +217,7 @@ CREATE TABLE IF NOT EXISTS pos_item_modifier_groups (
 -- Auto-generated from production schema export (2026-07-21)
 CREATE TABLE IF NOT EXISTS pos_inventory_alerts (
   id UUID DEFAULT gen_random_uuid() NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_id TEXT NOT NULL,
   message TEXT NOT NULL,
   order_id TEXT,
   actor TEXT,
@@ -229,7 +229,7 @@ CREATE TABLE IF NOT EXISTS pos_inventory_alerts (
 -- Auto-generated from production schema export (2026-07-21)
 CREATE TABLE IF NOT EXISTS pos_recipes (
   id BIGINT NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   nombre TEXT NOT NULL,
   precio_venta NUMERIC DEFAULT 0,
   costo_total NUMERIC DEFAULT 0,
@@ -243,7 +243,7 @@ CREATE TABLE IF NOT EXISTS pos_recipes (
 -- Auto-generated from production schema export (2026-07-21)
 CREATE TABLE IF NOT EXISTS pos_insumos (
   id BIGINT NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   nombre TEXT NOT NULL,
   categoria TEXT,
   merma_pct NUMERIC DEFAULT 0,
@@ -260,7 +260,7 @@ CREATE TABLE IF NOT EXISTS pos_insumos (
 -- Auto-generated from production schema export (2026-07-21)
 CREATE TABLE IF NOT EXISTS pos_cfdi_requests (
   id TEXT NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   order_id TEXT,
   rfc TEXT NOT NULL,
   razon_social TEXT NOT NULL,
@@ -291,7 +291,7 @@ CREATE INDEX IF NOT EXISTS idx_cfdi_status ON public.pos_cfdi_requests USING btr
 -- Auto-generated from production schema export (2026-07-21)
 CREATE TABLE IF NOT EXISTS pos_gastos (
   id UUID DEFAULT gen_random_uuid() NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_id TEXT NOT NULL,
   tipo TEXT DEFAULT 'factura'::text NOT NULL,
   proveedor TEXT NOT NULL,
   concepto TEXT,
@@ -382,7 +382,7 @@ ALTER TABLE events ADD CONSTRAINT IF NOT EXISTS events_id_key UNIQUE (id);
 -- Auto-generated from production schema export (2026-07-21)
 CREATE TABLE IF NOT EXISTS chat_logs (
   id UUID DEFAULT gen_random_uuid() NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_id TEXT NOT NULL,
   user_id TEXT,
   user_message TEXT NOT NULL,
   ai_response TEXT NOT NULL,
@@ -402,7 +402,7 @@ CREATE INDEX IF NOT EXISTS idx_chat_logs_error ON public.chat_logs USING btree (
 -- Auto-generated from production schema export (2026-07-21)
 CREATE TABLE IF NOT EXISTS push_subscriptions (
   id BIGSERIAL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   endpoint TEXT NOT NULL,
   keys JSONB NOT NULL,
   user_agent TEXT,
@@ -417,7 +417,7 @@ CREATE INDEX IF NOT EXISTS idx_push_client ON public.push_subscriptions USING bt
 -- Auto-generated from production schema export (2026-07-21)
 CREATE TABLE IF NOT EXISTS delivery_orders (
   id TEXT DEFAULT gen_random_uuid() NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_id TEXT NOT NULL,
   platform TEXT NOT NULL,
   platform_order_id TEXT,
   status TEXT DEFAULT 'nueva'::text NOT NULL,
@@ -491,7 +491,7 @@ CREATE TABLE IF NOT EXISTS memories (
   sector TEXT DEFAULT 'episodic'::text,
   mission_context TEXT,
   keywords TEXT,
-  client TEXT DEFAULT 'AMALAY'::text,
+  client TEXT,
   created_at TIMESTAMP DEFAULT now(),
   accessed_at TIMESTAMP DEFAULT now()
 );
@@ -542,7 +542,7 @@ CREATE TABLE IF NOT EXISTS whatsapp_whitelist (
   id BIGSERIAL,
   phone_number TEXT NOT NULL,
   user_name TEXT NOT NULL,
-  restaurante TEXT DEFAULT 'amalay'::text,
+  restaurante TEXT,
   role TEXT DEFAULT 'viewer'::text,
   active BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT now()

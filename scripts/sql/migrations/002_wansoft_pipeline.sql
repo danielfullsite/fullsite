@@ -25,7 +25,7 @@ CREATE INDEX IF NOT EXISTS idx_sync_log_created ON public.calendar_sync_log USIN
 -- Auto-generated from production schema export (2026-07-21)
 CREATE TABLE IF NOT EXISTS delivery_platform_payments (
   id TEXT NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   platform TEXT NOT NULL,
   lot_id TEXT,
   period_start DATE,
@@ -87,9 +87,9 @@ CREATE TABLE IF NOT EXISTS wansoft_daily (
   personas_restaurant INTEGER,
   cuentas_restaurant INTEGER,
   ticket_promedio_restaurant NUMERIC,
-  client_slug TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_slug TEXT NOT NULL,
   report_type TEXT DEFAULT 'cierre'::text NOT NULL,
-  location_id TEXT DEFAULT 'amalay-spgg'::text
+  location_id TEXT
 );
 
 -- Unique constraint: wansoft_daily_fecha_key
@@ -102,7 +102,7 @@ CREATE UNIQUE INDEX idx_wansoft_daily_fecha ON public.wansoft_daily USING btree 
 -- Auto-generated from production schema export (2026-07-21)
 CREATE TABLE IF NOT EXISTS wansoft_food_cost (
   id BIGSERIAL,
-  client_id TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_id TEXT NOT NULL,
   fecha DATE NOT NULL,
   data JSONB NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT now()
@@ -114,7 +114,7 @@ ALTER TABLE wansoft_food_cost ADD CONSTRAINT IF NOT EXISTS wansoft_food_cost_cli
 -- Auto-generated from production schema export (2026-07-21)
 CREATE TABLE IF NOT EXISTS wansoft_hourly (
   fecha DATE NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_id TEXT NOT NULL,
   data JSONB,
   updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -123,7 +123,7 @@ CREATE TABLE IF NOT EXISTS wansoft_hourly (
 -- Auto-generated from production schema export (2026-07-21)
 CREATE TABLE IF NOT EXISTS wansoft_inventory (
   id BIGSERIAL,
-  client_id TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_id TEXT NOT NULL,
   fecha DATE NOT NULL,
   data JSONB NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT now()
@@ -134,7 +134,7 @@ ALTER TABLE wansoft_inventory ADD CONSTRAINT IF NOT EXISTS wansoft_inventory_cli
 -- Group: WANSOFT_PIPELINE
 -- Auto-generated from production schema export (2026-07-21)
 CREATE TABLE IF NOT EXISTS wansoft_kpis (
-  id TEXT DEFAULT 'amalay'::text NOT NULL,
+  id TEXT NOT NULL,
   ordenes_abiertas INTEGER,
   total_ordenes_mxn NUMERIC,
   ultima_venta TEXT,
@@ -178,7 +178,7 @@ CREATE TABLE IF NOT EXISTS wansoft_kpis (
 -- Auto-generated from production schema export (2026-07-21)
 CREATE TABLE IF NOT EXISTS wansoft_labor (
   id BIGSERIAL,
-  client_id TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_id TEXT NOT NULL,
   fecha DATE NOT NULL,
   data JSONB NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT now()
@@ -190,7 +190,7 @@ ALTER TABLE wansoft_labor ADD CONSTRAINT IF NOT EXISTS wansoft_labor_client_id_f
 -- Auto-generated from production schema export (2026-07-21)
 CREATE TABLE IF NOT EXISTS wansoft_persons_hourly (
   id BIGSERIAL,
-  client_id TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_id TEXT NOT NULL,
   fecha DATE NOT NULL,
   data JSONB NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT now()
@@ -202,7 +202,7 @@ ALTER TABLE wansoft_persons_hourly ADD CONSTRAINT IF NOT EXISTS wansoft_persons_
 -- Auto-generated from production schema export (2026-07-21)
 CREATE TABLE IF NOT EXISTS wansoft_pnl (
   id BIGSERIAL,
-  client_id TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_id TEXT NOT NULL,
   periodo TEXT NOT NULL,
   data JSONB NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT now()
@@ -214,7 +214,7 @@ ALTER TABLE wansoft_pnl ADD CONSTRAINT IF NOT EXISTS wansoft_pnl_client_id_perio
 -- Auto-generated from production schema export (2026-07-21)
 CREATE TABLE IF NOT EXISTS wansoft_recipes (
   id BIGSERIAL,
-  client_id TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_id TEXT NOT NULL,
   saucer_id TEXT NOT NULL,
   saucer_name TEXT,
   budget_cost NUMERIC,
@@ -229,7 +229,7 @@ ALTER TABLE wansoft_recipes ADD CONSTRAINT IF NOT EXISTS wansoft_recipes_client_
 -- Auto-generated from production schema export (2026-07-21)
 CREATE TABLE IF NOT EXISTS wansoft_shrinkage (
   id BIGSERIAL,
-  client_id TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_id TEXT NOT NULL,
   fecha DATE NOT NULL,
   data JSONB NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT now()
@@ -241,7 +241,7 @@ ALTER TABLE wansoft_shrinkage ADD CONSTRAINT IF NOT EXISTS wansoft_shrinkage_cli
 -- Auto-generated from production schema export (2026-07-21)
 CREATE TABLE IF NOT EXISTS wansoft_suppliers (
   id BIGSERIAL,
-  client_id TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_id TEXT NOT NULL,
   fecha DATE NOT NULL,
   periodo TEXT DEFAULT 'month'::text NOT NULL,
   data JSONB NOT NULL,
@@ -254,7 +254,7 @@ ALTER TABLE wansoft_suppliers ADD CONSTRAINT IF NOT EXISTS wansoft_suppliers_cli
 -- Auto-generated from production schema export (2026-07-21)
 CREATE TABLE IF NOT EXISTS wansoft_tips (
   id BIGSERIAL,
-  client_id TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_id TEXT NOT NULL,
   fecha DATE NOT NULL,
   data JSONB NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT now()

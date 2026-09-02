@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS agent_audit_log (
 CREATE INDEX IF NOT EXISTS idx_audit_agent_ts ON public.agent_audit_log USING btree (agent_name, ts DESC);
 CREATE TABLE IF NOT EXISTS agent_results (
   id BIGSERIAL,
-  client_id TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_id TEXT NOT NULL,
   agent_id TEXT NOT NULL,
   fecha DATE NOT NULL,
   data JSONB NOT NULL,
@@ -82,7 +82,7 @@ CREATE INDEX IF NOT EXISTS idx_res_status ON public.amalay_reservaciones USING b
 CREATE UNIQUE INDEX IF NOT EXISTS no_double_booking ON public.amalay_reservaciones USING btree (fecha, espacio, horario_inicio) WHERE (status = ANY (ARRAY['pending'::text, 'confirmed'::text]));
 CREATE TABLE IF NOT EXISTS chat_logs (
   id UUID DEFAULT gen_random_uuid() NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_id TEXT NOT NULL,
   user_id TEXT,
   user_message TEXT NOT NULL,
   ai_response TEXT NOT NULL,
@@ -180,7 +180,7 @@ CREATE TABLE IF NOT EXISTS credentials_vault (
 CREATE INDEX IF NOT EXISTS idx_vault_client ON public.credentials_vault USING btree (client_id, category);
 CREATE TABLE IF NOT EXISTS delivery_orders (
   id TEXT DEFAULT gen_random_uuid() NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_id TEXT NOT NULL,
   platform TEXT NOT NULL,
   platform_order_id TEXT,
   status TEXT DEFAULT 'nueva'::text NOT NULL,
@@ -241,7 +241,7 @@ CREATE TABLE IF NOT EXISTS memories (
   sector TEXT DEFAULT 'episodic'::text,
   mission_context TEXT,
   keywords TEXT,
-  client TEXT DEFAULT 'AMALAY'::text,
+  client TEXT,
   created_at TIMESTAMP DEFAULT now(),
   accessed_at TIMESTAMP DEFAULT now(),
   PRIMARY KEY (id)
@@ -285,7 +285,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_ops_daily_close ON public.ops_daily USING b
 CREATE UNIQUE INDEX IF NOT EXISTS uq_ops_daily_snapshot ON public.ops_daily USING btree (client_id, fecha, bucket_start) WHERE (record_type = 'snapshot'::text);
 CREATE TABLE IF NOT EXISTS pos_attendance (
   id UUID DEFAULT gen_random_uuid() NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_id TEXT NOT NULL,
   staff_id TEXT NOT NULL,
   staff_name TEXT NOT NULL,
   type TEXT NOT NULL,
@@ -298,7 +298,7 @@ CREATE TABLE IF NOT EXISTS pos_attendance (
 CREATE INDEX IF NOT EXISTS idx_attendance_staff ON public.pos_attendance USING btree (client_id, staff_id, registered_at DESC);
 CREATE TABLE IF NOT EXISTS pos_audit_log (
   id BIGSERIAL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   order_id TEXT,
   action TEXT NOT NULL,
   actor TEXT NOT NULL,
@@ -314,7 +314,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_created ON public.pos_audit_log USING btree
 CREATE INDEX IF NOT EXISTS idx_audit_order ON public.pos_audit_log USING btree (order_id);
 CREATE TABLE IF NOT EXISTS pos_billing_clients (
   id TEXT DEFAULT (gen_random_uuid())::text NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_id TEXT NOT NULL,
   nombre TEXT NOT NULL,
   rfc TEXT NOT NULL,
   regimen_fiscal TEXT,
@@ -337,7 +337,7 @@ DO 21423 BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
 CREATE TABLE IF NOT EXISTS pos_cash_movements (
   id BIGSERIAL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   turno_id TEXT,
   type TEXT NOT NULL,
   amount NUMERIC NOT NULL,
@@ -349,7 +349,7 @@ CREATE TABLE IF NOT EXISTS pos_cash_movements (
 );
 CREATE TABLE IF NOT EXISTS pos_category_modifiers (
   id BIGSERIAL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   category_id TEXT NOT NULL,
   modifier_group_id TEXT NOT NULL,
   PRIMARY KEY (id)
@@ -359,7 +359,7 @@ DO 21423 BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
 CREATE TABLE IF NOT EXISTS pos_cfdi_requests (
   id TEXT NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   order_id TEXT,
   rfc TEXT NOT NULL,
   razon_social TEXT NOT NULL,
@@ -385,7 +385,7 @@ CREATE INDEX IF NOT EXISTS idx_cfdi_rfc ON public.pos_cfdi_requests USING btree 
 CREATE INDEX IF NOT EXISTS idx_cfdi_status ON public.pos_cfdi_requests USING btree (status);
 CREATE TABLE IF NOT EXISTS pos_cierres (
   id TEXT NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   turno_id TEXT,
   fecha DATE NOT NULL,
   fondo_inicial NUMERIC DEFAULT 0,
@@ -412,7 +412,7 @@ CREATE INDEX IF NOT EXISTS idx_cierres_turno ON public.pos_cierres USING btree (
 CREATE UNIQUE INDEX IF NOT EXISTS uq_cierres_turno_id ON public.pos_cierres USING btree (turno_id) WHERE (turno_id IS NOT NULL);
 CREATE TABLE IF NOT EXISTS pos_combos (
   id TEXT NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   name TEXT NOT NULL,
   items JSONB NOT NULL,
   price NUMERIC NOT NULL,
@@ -424,7 +424,7 @@ CREATE TABLE IF NOT EXISTS pos_combos (
 );
 CREATE TABLE IF NOT EXISTS pos_customer_notes (
   id TEXT NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   mesa INTEGER NOT NULL,
   note TEXT NOT NULL,
   type TEXT DEFAULT 'general'::text,
@@ -435,7 +435,7 @@ CREATE TABLE IF NOT EXISTS pos_customer_notes (
 CREATE INDEX IF NOT EXISTS idx_notes_mesa ON public.pos_customer_notes USING btree (mesa, client_id);
 CREATE TABLE IF NOT EXISTS pos_customers (
   id BIGSERIAL,
-  client_id TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_id TEXT NOT NULL,
   name TEXT NOT NULL,
   phone TEXT,
   email TEXT,
@@ -458,7 +458,7 @@ CREATE INDEX IF NOT EXISTS idx_pos_customers_last_visit ON public.pos_customers 
 CREATE INDEX IF NOT EXISTS idx_pos_customers_phone ON public.pos_customers USING btree (client_id, phone);
 CREATE TABLE IF NOT EXISTS pos_customer_visits (
   id BIGSERIAL,
-  client_id TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_id TEXT NOT NULL,
   customer_id BIGINT NOT NULL,
   order_id UUID,
   amount NUMERIC DEFAULT 0 NOT NULL,
@@ -474,7 +474,7 @@ CREATE INDEX IF NOT EXISTS idx_pos_customer_visits_customer ON public.pos_custom
 CREATE INDEX IF NOT EXISTS idx_pos_customer_visits_date ON public.pos_customer_visits USING btree (visited_at DESC);
 CREATE TABLE IF NOT EXISTS pos_delivery_zones (
   id TEXT DEFAULT (gen_random_uuid())::text NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   name TEXT NOT NULL,
   min_order NUMERIC DEFAULT 0,
   delivery_fee NUMERIC DEFAULT 0,
@@ -485,7 +485,7 @@ CREATE TABLE IF NOT EXISTS pos_delivery_zones (
 );
 CREATE TABLE IF NOT EXISTS pos_facturas (
   id TEXT NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   purchase_order_id TEXT,
   supplier TEXT NOT NULL,
   folio TEXT,
@@ -505,7 +505,7 @@ CREATE TABLE IF NOT EXISTS pos_facturas (
 );
 CREATE TABLE IF NOT EXISTS pos_gastos (
   id UUID DEFAULT gen_random_uuid() NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_id TEXT NOT NULL,
   tipo TEXT DEFAULT 'factura'::text NOT NULL,
   proveedor TEXT NOT NULL,
   concepto TEXT,
@@ -523,7 +523,7 @@ CREATE TABLE IF NOT EXISTS pos_gastos (
 );
 CREATE TABLE IF NOT EXISTS pos_gift_cards (
   id TEXT DEFAULT (gen_random_uuid())::text NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   code TEXT NOT NULL,
   balance NUMERIC DEFAULT 0,
   original_amount NUMERIC DEFAULT 0,
@@ -533,7 +533,7 @@ CREATE TABLE IF NOT EXISTS pos_gift_cards (
 );
 CREATE TABLE IF NOT EXISTS pos_presentations (
   id TEXT DEFAULT ('pres-'::text || (gen_random_uuid())::text) NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_id TEXT NOT NULL,
   code TEXT NOT NULL,
   name TEXT NOT NULL,
   active BOOLEAN DEFAULT true,
@@ -545,7 +545,7 @@ DO 21423 BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
 CREATE TABLE IF NOT EXISTS pos_ingredient_presentations (
   id BIGSERIAL,
-  client_id TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_id TEXT NOT NULL,
   ingredient_id TEXT NOT NULL,
   presentation_id TEXT NOT NULL,
   contains_quantity NUMERIC NOT NULL,
@@ -564,7 +564,7 @@ EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
 CREATE INDEX IF NOT EXISTS idx_ip_ingredient ON public.pos_ingredient_presentations USING btree (ingredient_id);
 CREATE TABLE IF NOT EXISTS pos_ingredients (
   id TEXT NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   name TEXT NOT NULL,
   unit TEXT NOT NULL,
   cost_per_unit NUMERIC DEFAULT 0,
@@ -586,7 +586,7 @@ DO 21423 BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
 CREATE TABLE IF NOT EXISTS pos_insumos (
   id BIGINT NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   nombre TEXT NOT NULL,
   categoria TEXT,
   merma_pct NUMERIC DEFAULT 0,
@@ -601,7 +601,7 @@ CREATE TABLE IF NOT EXISTS pos_insumos (
 );
 CREATE TABLE IF NOT EXISTS pos_inventory (
   id BIGSERIAL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   ingredient_id TEXT NOT NULL,
   stock NUMERIC DEFAULT 0 NOT NULL,
   reorder_point NUMERIC DEFAULT 0,
@@ -616,7 +616,7 @@ DO 21423 BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
 CREATE TABLE IF NOT EXISTS pos_inventory_alerts (
   id UUID DEFAULT gen_random_uuid() NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_id TEXT NOT NULL,
   message TEXT NOT NULL,
   order_id TEXT,
   actor TEXT,
@@ -626,7 +626,7 @@ CREATE TABLE IF NOT EXISTS pos_inventory_alerts (
 );
 CREATE TABLE IF NOT EXISTS pos_inventory_products (
   id BIGSERIAL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   name TEXT NOT NULL,
   unit TEXT NOT NULL,
   cost_per_unit NUMERIC,
@@ -644,7 +644,7 @@ CREATE INDEX IF NOT EXISTS idx_inv_products_client ON public.pos_inventory_produ
 CREATE INDEX IF NOT EXISTS idx_inv_products_name ON public.pos_inventory_products USING btree (name);
 CREATE TABLE IF NOT EXISTS pos_market_stock (
   id BIGSERIAL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   menu_item_id TEXT NOT NULL,
   stock NUMERIC DEFAULT 0 NOT NULL,
   reorder_point NUMERIC DEFAULT 0,
@@ -662,7 +662,7 @@ EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
 CREATE INDEX IF NOT EXISTS idx_market_stock_item ON public.pos_market_stock USING btree (menu_item_id);
 CREATE TABLE IF NOT EXISTS pos_menu_categories (
   id TEXT NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   name TEXT NOT NULL,
   color TEXT DEFAULT 'bg-slate-500'::text,
   sort_order INTEGER DEFAULT 0,
@@ -673,7 +673,7 @@ CREATE TABLE IF NOT EXISTS pos_menu_categories (
 CREATE INDEX IF NOT EXISTS idx_menu_cat_client ON public.pos_menu_categories USING btree (client_id);
 CREATE TABLE IF NOT EXISTS pos_menu_items (
   id TEXT NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   category_id TEXT NOT NULL,
   name TEXT NOT NULL,
   price NUMERIC DEFAULT 0,
@@ -753,7 +753,7 @@ EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
 CREATE INDEX IF NOT EXISTS idx_recon_results_order ON public.pos_reconciliation_results USING btree (client_id, order_id);
 CREATE TABLE IF NOT EXISTS pos_inventory_movements (
   id BIGSERIAL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   product_id BIGINT,
   movement_type TEXT NOT NULL,
   quantity NUMERIC NOT NULL,
@@ -798,14 +798,14 @@ DO 21423 BEGIN
   ALTER TABLE pos_item_inventory_policy ADD CONSTRAINT pos_item_inventory_policy_client_id_menu_item_id_market_st_fkey FOREIGN KEY (client_id, client_id, client_id, menu_item_id, menu_item_id, menu_item_id, market_stock_id, market_stock_id, market_stock_id) REFERENCES pos_market_stock(id, client_id, menu_item_id, client_id, menu_item_id, id, id, client_id, menu_item_id);
 EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
 CREATE TABLE IF NOT EXISTS pos_item_modifier_groups (
-  client_id TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_id TEXT NOT NULL,
   item_id TEXT NOT NULL,
   group_id TEXT NOT NULL,
   PRIMARY KEY (client_id, item_id, group_id)
 );
 CREATE TABLE IF NOT EXISTS pos_market_movements (
   id BIGSERIAL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   menu_item_id TEXT NOT NULL,
   movement_type TEXT NOT NULL,
   quantity NUMERIC NOT NULL,
@@ -825,7 +825,7 @@ CREATE INDEX IF NOT EXISTS idx_market_mov_item ON public.pos_market_movements US
 CREATE INDEX IF NOT EXISTS idx_mkt_mov_reconciliation ON public.pos_market_movements USING btree (reconciliation_result_id) WHERE (reconciliation_result_id IS NOT NULL);
 CREATE TABLE IF NOT EXISTS pos_modifier_groups (
   id TEXT NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   name TEXT NOT NULL,
   sort_order INTEGER DEFAULT 0,
   active BOOLEAN DEFAULT true,
@@ -838,7 +838,7 @@ CREATE TABLE IF NOT EXISTS pos_modifier_groups (
 );
 CREATE TABLE IF NOT EXISTS pos_modifiers (
   id TEXT NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   group_id TEXT NOT NULL,
   name TEXT NOT NULL,
   price NUMERIC DEFAULT 0,
@@ -863,7 +863,7 @@ DO 21423 BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
 CREATE TABLE IF NOT EXISTS pos_orders (
   id TEXT DEFAULT (gen_random_uuid())::text NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   mesa INTEGER,
   mesero TEXT,
   personas INTEGER DEFAULT 1,
@@ -879,7 +879,7 @@ CREATE TABLE IF NOT EXISTS pos_orders (
   closed_at TIMESTAMPTZ,
   propina NUMERIC DEFAULT 0,
   updated_at TIMESTAMPTZ DEFAULT now(),
-  location_id TEXT DEFAULT 'amalay-spgg'::text,
+  location_id TEXT,
   customer_name TEXT,
   order_number INTEGER,
   pagos JSONB,
@@ -894,7 +894,7 @@ CREATE INDEX IF NOT EXISTS idx_pos_orders_mesa ON public.pos_orders USING btree 
 CREATE INDEX IF NOT EXISTS idx_pos_orders_status ON public.pos_orders USING btree (client_id, status, created_at DESC);
 CREATE TABLE IF NOT EXISTS pos_payment_methods (
   id TEXT DEFAULT (gen_random_uuid())::text NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   name TEXT NOT NULL,
   type TEXT DEFAULT 'cash'::text,
   commission_pct NUMERIC DEFAULT 0,
@@ -905,7 +905,7 @@ CREATE TABLE IF NOT EXISTS pos_payment_methods (
 );
 CREATE TABLE IF NOT EXISTS pos_print_jobs (
   id TEXT NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   order_id TEXT,
   station TEXT NOT NULL,
   type TEXT NOT NULL,
@@ -921,7 +921,7 @@ CREATE TABLE IF NOT EXISTS pos_print_jobs (
 CREATE INDEX IF NOT EXISTS idx_print_jobs_status ON public.pos_print_jobs USING btree (client_id, status);
 CREATE TABLE IF NOT EXISTS pos_promotions (
   id TEXT NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_id TEXT NOT NULL,
   name TEXT NOT NULL,
   type TEXT NOT NULL,
   value NUMERIC DEFAULT 0,
@@ -951,7 +951,7 @@ CREATE TABLE IF NOT EXISTS pos_purchase_order_items (
 );
 CREATE TABLE IF NOT EXISTS pos_purchase_orders (
   id TEXT NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   supplier TEXT NOT NULL,
   status TEXT DEFAULT 'borrador'::text,
   created_by TEXT NOT NULL,
@@ -990,7 +990,7 @@ DO 21423 BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
 CREATE TABLE IF NOT EXISTS pos_recipes (
   id BIGINT NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   nombre TEXT NOT NULL,
   precio_venta NUMERIC DEFAULT 0,
   costo_total NUMERIC DEFAULT 0,
@@ -1002,7 +1002,7 @@ CREATE TABLE IF NOT EXISTS pos_recipes (
 );
 CREATE TABLE IF NOT EXISTS pos_recipes_old (
   id BIGSERIAL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   menu_item_id TEXT NOT NULL,
   menu_item_name TEXT NOT NULL,
   ingredient_id TEXT NOT NULL,
@@ -1017,7 +1017,7 @@ DO 21423 BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
 CREATE TABLE IF NOT EXISTS pos_retail_items (
   id TEXT DEFAULT (gen_random_uuid())::text NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   name TEXT NOT NULL,
   code TEXT,
   department TEXT,
@@ -1044,7 +1044,7 @@ CREATE TABLE IF NOT EXISTS pos_save_operations (
 );
 CREATE TABLE IF NOT EXISTS pos_schedules (
   id TEXT DEFAULT (gen_random_uuid())::text NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   name TEXT NOT NULL,
   start_time TIME WITHOUT TIME ZONE,
   end_time TIME WITHOUT TIME ZONE,
@@ -1055,7 +1055,7 @@ CREATE TABLE IF NOT EXISTS pos_schedules (
 );
 CREATE TABLE IF NOT EXISTS pos_sizes (
   id TEXT DEFAULT (gen_random_uuid())::text NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   name TEXT NOT NULL,
   multiplier NUMERIC DEFAULT 1,
   active BOOLEAN DEFAULT true,
@@ -1064,7 +1064,7 @@ CREATE TABLE IF NOT EXISTS pos_sizes (
 );
 CREATE TABLE IF NOT EXISTS pos_staff (
   id TEXT DEFAULT (gen_random_uuid())::text NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   name TEXT NOT NULL,
   pin TEXT NOT NULL,
   role TEXT DEFAULT 'mesero'::text NOT NULL,
@@ -1080,7 +1080,7 @@ DO 21423 BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
 CREATE TABLE IF NOT EXISTS pos_staff_audit (
   id BIGSERIAL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   staff_id TEXT NOT NULL,
   action TEXT NOT NULL,
   changed_fields JSONB,
@@ -1090,7 +1090,7 @@ CREATE TABLE IF NOT EXISTS pos_staff_audit (
 );
 CREATE TABLE IF NOT EXISTS pos_staff_shifts (
   id TEXT NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   staff_id TEXT NOT NULL,
   staff_name TEXT NOT NULL,
   clock_in TIMESTAMPTZ NOT NULL,
@@ -1108,7 +1108,7 @@ CREATE INDEX IF NOT EXISTS idx_shifts_date ON public.pos_staff_shifts USING btre
 CREATE INDEX IF NOT EXISTS idx_shifts_staff ON public.pos_staff_shifts USING btree (staff_id, clock_in DESC);
 CREATE TABLE IF NOT EXISTS pos_sub_recipes (
   id TEXT DEFAULT ('sub-'::text || (gen_random_uuid())::text) NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_id TEXT NOT NULL,
   name TEXT NOT NULL,
   yield_quantity NUMERIC DEFAULT 1 NOT NULL,
   yield_unit TEXT DEFAULT 'KG'::text NOT NULL,
@@ -1139,7 +1139,7 @@ CREATE INDEX IF NOT EXISTS idx_sri_ingredient ON public.pos_sub_recipe_ingredien
 CREATE INDEX IF NOT EXISTS idx_sri_sub_recipe ON public.pos_sub_recipe_ingredients USING btree (sub_recipe_id);
 CREATE TABLE IF NOT EXISTS pos_suppliers (
   id TEXT NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   name TEXT NOT NULL,
   contact TEXT,
   phone TEXT,
@@ -1165,7 +1165,7 @@ DO 21423 BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
 CREATE TABLE IF NOT EXISTS pos_turnos (
   id TEXT NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   opened_by TEXT NOT NULL,
   fondo_inicial NUMERIC DEFAULT 0 NOT NULL,
   opened_at TIMESTAMPTZ DEFAULT now(),
@@ -1179,7 +1179,7 @@ CREATE TABLE IF NOT EXISTS pos_turnos (
 );
 CREATE TABLE IF NOT EXISTS pos_unit_conversions (
   id BIGSERIAL,
-  client_id TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_id TEXT NOT NULL,
   from_unit TEXT NOT NULL,
   to_unit TEXT NOT NULL,
   factor NUMERIC NOT NULL,
@@ -1203,7 +1203,7 @@ CREATE TABLE IF NOT EXISTS prospects (
 );
 CREATE TABLE IF NOT EXISTS push_subscriptions (
   id BIGSERIAL,
-  client_id TEXT DEFAULT 'amalay'::text,
+  client_id TEXT,
   endpoint TEXT NOT NULL,
   keys JSONB NOT NULL,
   user_agent TEXT,
@@ -1216,7 +1216,7 @@ EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
 CREATE INDEX IF NOT EXISTS idx_push_client ON public.push_subscriptions USING btree (client_id);
 CREATE TABLE IF NOT EXISTS reservaciones (
   id UUID DEFAULT gen_random_uuid() NOT NULL,
-  client_id TEXT DEFAULT 'amalay'::text NOT NULL,
+  client_id TEXT NOT NULL,
   codigo_reserva TEXT,
   nombre TEXT,
   telefono TEXT,
@@ -1288,7 +1288,7 @@ CREATE TABLE IF NOT EXISTS whatsapp_whitelist (
   id BIGSERIAL,
   phone_number TEXT NOT NULL,
   user_name TEXT NOT NULL,
-  restaurante TEXT DEFAULT 'amalay'::text,
+  restaurante TEXT,
   role TEXT DEFAULT 'viewer'::text,
   active BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT now(),
