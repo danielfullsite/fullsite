@@ -819,15 +819,11 @@ async function replayViaAppApi(item: SyncQueueItem, accessToken: string): Promis
       const errText = await res.text().catch(() => '')
       return { ok: false, errorClass: 'TERMINAL_NON_RETRYABLE', detail: `HTTP 403${errText ? `: ${errText}` : ''}` }
     }
-    // A closed/missing shift is an accounting conflict, not a connectivity failure.
+    // A closed shift is an accounting conflict, not a connectivity failure.
     // Preserve the payload for operator recovery and do not retry it into a closed cut.
     if (res.status === 409) {
       const conflictBody = await res.json().catch(() => ({})) as { error?: string }
-      return {
-        ok: false,
-        errorClass: 'TERMINAL_NON_RETRYABLE',
-        detail: conflictBody.error || 'TURN_CONFLICT',
-      }
+      return { ok: false, ...clasificarConflicto409(conflictBody.error) }
     }
     if (res.status >= 500) {
       return { ok: false, errorClass: 'TRANSIENT_RETRYABLE', detail: `HTTP ${res.status}` }
@@ -881,6 +877,28 @@ async function replayViaAppApi(item: SyncQueueItem, accessToken: string): Promis
   }
 
   return { ok: false, errorClass: 'TERMINAL_NON_RETRYABLE', detail: body.error || 'UNKNOWN_REJECTION' }
+}
+
+// ─── Clasificación del 409 de save-order ────────────────────────────────────
+/**
+ * No todos los 409 de turno son terminales.
+ *
+ * TURN_NOT_FOUND incluye el caso "el turno se abrió OFFLINE y su POST todavía no
+ * llega a Supabase": el server no puede distinguirlo de un id inventado. Antes se
+ * marcaba TERMINAL_NON_RETRYABLE y el item se saltaba PARA SIEMPRE — la orden se
+ * descartaba en silencio por haber ganado la carrera contra su propio turno.
+ * Reintentable: en cuanto la cola suba el turno, el replay de la orden pasa. El
+ * tope de reintentos de la cola sigue aplicando, así que un id realmente huérfano
+ * no reintenta infinito y su payload queda para revisión.
+ *
+ * TURN_CLOSED_* sí son conflictos contables reales: mover dinero de un corte
+ * cerrado exige decisión humana, nunca un reintento automático.
+ */
+export function clasificarConflicto409(error?: string): { errorClass: SyncErrorClass; detail: string } {
+  if (error === 'TURN_NOT_FOUND') {
+    return { errorClass: 'TRANSIENT_RETRYABLE', detail: 'TURN_NOT_FOUND (turno aún no sincronizado)' }
+  }
+  return { errorClass: 'TERMINAL_NON_RETRYABLE', detail: error || 'TURN_CONFLICT' }
 }
 
 // ─── Guardia de mutaciones sin filtro ───────────────────────────────────────

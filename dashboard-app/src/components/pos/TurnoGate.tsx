@@ -9,6 +9,7 @@ import { ErrorDeSesion } from '@/lib/clasificar-fallo'
 import { evaluarAperturaDeTurno, totalDeCuentas, openOrderStatusLabel,
   type VeredictoApertura, type LecturaDeCuentas } from '@/lib/pos-cierre-guard'
 import { esFalloDeAutenticacion } from '@/lib/clasificar-fallo'
+import { mismoDiaDeVenta, inicioDiaConfigurado } from '@/lib/dia-de-venta'
 import { fetchWithTimeout, getPOSAuthHeaders, getClientId, formatMXN, logAudit as _logAudit } from '@/lib/pos-data'
 
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -164,14 +165,24 @@ export default function TurnoGate({ staff, children }: TurnoGateProps) {
         return
       }
       console.error('[TurnoGate] Error verificando turno (offline?):', err)
-      // Offline fallback: try cached turno from localStorage
+      // Offline fallback: try cached turno from localStorage.
+      // Se lee el MISMO cache que escribe openTurno/getActiveTurnos
+      // (`pos_turno_cache`) — el legado `pos_cached_turno` queda de respaldo.
+      // Un turno abierto offline en /pos/turno tiene que ser visible AQUI;
+      // dos caches distintos fue una de las causas del "no hay turno activo".
       try {
-        const cached = localStorage.getItem('pos_cached_turno')
-        if (cached) {
-          const cachedTurno = JSON.parse(cached)
-          const openedAt = new Date(cachedTurno.opened_at)
-          const now = new Date()
-          const sameDay = openedAt.toDateString() === now.toDateString()
+        let cachedTurno: ActiveTurno | null = null
+        const unificado = localStorage.getItem('pos_turno_cache')
+        if (unificado) cachedTurno = JSON.parse(unificado)?.turno ?? null
+        if (!cachedTurno) {
+          const legado = localStorage.getItem('pos_cached_turno')
+          if (legado) cachedTurno = JSON.parse(legado)
+        }
+        if (cachedTurno?.opened_at) {
+          // Dia de VENTA, no dia natural: con toDateString(), entre las 00:00 y
+          // las 05:00 un turno legitimo de anoche se declaraba "de otro dia" y
+          // bloqueaba la operacion nocturna.
+          const sameDay = mismoDiaDeVenta(cachedTurno.opened_at, Date.now(), inicioDiaConfigurado())
           if (sameDay) {
             // Same day → use cached turno (offline mode)
             setTurno(cachedTurno)

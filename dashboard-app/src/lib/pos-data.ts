@@ -526,8 +526,11 @@ export async function getActiveTurnoWithStaleCheck(): Promise<{ turno: ActiveTur
   const turnos = await getActiveTurnos()
   const turno = turnos[0] || null
   if (!turno) return { turno: null, isStale: false, activeCount: 0 }
-  const hoursSinceOpen = (Date.now() - new Date(turno.opened_at).getTime()) / (1000 * 60 * 60)
-  return { turno, isStale: hoursSinceOpen > 18, activeCount: turnos.length }
+  // Stale = de OTRO dia de venta, no ">18 horas de reloj". Con 18h, un turno
+  // abierto a las 07:00 se declaraba "del dia anterior" a la 01:00 — en plena
+  // operacion nocturna del MISMO dia de venta (AMALAY corta a las 05:00).
+  const isStale = !mismoDiaDeVenta(turno.opened_at, Date.now(), inicioDiaConfigurado())
+  return { turno, isStale, activeCount: turnos.length }
 }
 
 /** Cerrar turno stale automáticamente (sin wizard de conteo) */
@@ -597,10 +600,15 @@ export function olvidarTurnoPendiente(): void {
   try { localStorage.removeItem(KEY_ID_PENDIENTE) } catch { /* ignore */ }
 }
 
-export async function openTurno(fondoInicial: number, openedBy: string): Promise<{ id: string; fondo_inicial: number; opened_by: string; opened_at: string } | null> {
+/**
+ * `sincronizado: false` = el turno quedó SOLO local (offline o POST fallido) y
+ * está encolado. La UI debe decirlo — "abrió" y "quedó registrado en el server"
+ * no son lo mismo, y confundirlos produjo el "abrí turno y luego no había turno".
+ */
+export async function openTurno(fondoInicial: number, openedBy: string): Promise<{ id: string; fondo_inicial: number; opened_by: string; opened_at: string; sincronizado?: boolean } | null> {
   // Guard: verificar que no exista turno activo (race condition)
   const existing = await getActiveTurno()
-  if (existing) return existing // Ya hay uno abierto, retornarlo
+  if (existing) return { ...existing, sincronizado: true } // Ya hay uno abierto, retornarlo
 
   const id = idParaAbrirTurno()
   const openedAt = new Date().toISOString()
@@ -624,7 +632,7 @@ export async function openTurno(fondoInicial: number, openedBy: string): Promise
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
     await queueForSync()
     cacheLocal()
-    return localTurno
+    return { ...localTurno, sincronizado: false }
   }
 
   try {
@@ -638,13 +646,13 @@ export async function openTurno(fondoInicial: number, openedBy: string): Promise
     if (!res.ok) throw new Error('post failed')
     const rows = await res.json()
     cacheLocal()
-    return rows[0] || localTurno
+    return { ...(rows[0] || localTurno), sincronizado: true }
   } catch {
     // "Online" pero el POST falló (LAN degradada / timeout) — abrir local + encolar
     // en vez de bloquear el día con "Error al abrir turno".
     await queueForSync()
     cacheLocal()
-    return localTurno
+    return { ...localTurno, sincronizado: false }
   }
 }
 
