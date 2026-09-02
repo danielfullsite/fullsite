@@ -15,6 +15,7 @@
 //          Until then, the manager checks GitHub Releases and notifies the WS hub.
 
 const https = require('https')
+const { compararVersiones, puedeInstalarAhora } = require('./politica')
 
 // El repo REAL es danielfullsite/fullsite. Estaba apuntando a
 // 'ramonfaurdaniel-png/fullsite', que no es este proyecto: la mitad que YA existe
@@ -28,12 +29,17 @@ let _currentVersion = '0.0.0'
 let _stagedUpdate  = null  // { version, releaseNotes, downloadedAt } when available
 let _checkTimer    = null
 let _onUpdate      = null  // callback when update is staged
+// Proveedor del estado del restaurante. Sin el, `puedeInstalarAhora` recibe null y
+// FALLA CERRADO (no instala) — que es lo correcto: no saber si hay mesas abiertas
+// nunca puede autorizar un reinicio.
+let _getSnapshot   = null
 
 /** @param {{ channel: string, currentVersion: string, supabaseUrl: string, supabaseKey: string, restaurantId: string, onUpdateAvailable: (info: object) => void }} opts */
-function init({ channel, currentVersion, supabaseUrl, supabaseKey, restaurantId, onUpdateAvailable }) {
+function init({ channel, currentVersion, supabaseUrl, supabaseKey, restaurantId, onUpdateAvailable, getSnapshot }) {
   _channel        = channel        || 'stable'
   _currentVersion = currentVersion || '0.0.0'
   _onUpdate       = onUpdateAvailable || null
+  _getSnapshot    = typeof getSnapshot === 'function' ? getSnapshot : null
 
   console.log(`[updater] Channel: ${_channel} | Current: v${_currentVersion}`)
 
@@ -70,11 +76,34 @@ async function _checkForUpdate({ supabaseUrl, supabaseKey, restaurantId }) {
       return
     }
 
-    // Step 3: stage the update (signal Electron's auto-updater in Phase 2)
+    // Step 3: dejar la actualizacion LISTA, y decir si se puede instalar ahora.
+    //
+    // Instalar reinicia Electron, y Pedro muere con Electron (regla dura #4). Hacerlo
+    // a media operacion deja al restaurante sin imprimir y sin KDS en el peor momento.
+    // La decision vive en politica.js, pura y probada; aqui solo se consulta el estado.
     console.log(`[updater] Update available: ${_currentVersion} → ${latest.version} (channel: ${_channel})`)
-    _stagedUpdate = { version: latest.version, releaseNotes: latest.body, stagedAt: Date.now() }
 
-    if (_onUpdate) _onUpdate({ available: true, version: latest.version, releaseNotes: latest.body })
+    const snapshot = _getSnapshot ? _getSnapshot() : null
+    const cuando = puedeInstalarAhora(snapshot)
+
+    _stagedUpdate = {
+      version: latest.version,
+      releaseNotes: latest.body,
+      stagedAt: Date.now(),
+      instalable: cuando.permitido,
+      motivo: cuando.motivo,
+    }
+    if (!cuando.permitido) {
+      console.log(`[updater] Descargada pero NO se instala: ${cuando.motivo}`)
+    }
+
+    if (_onUpdate) _onUpdate({
+      available: true,
+      version: latest.version,
+      releaseNotes: latest.body,
+      instalable: cuando.permitido,
+      motivo: cuando.motivo,
+    })
   } catch (err) {
     console.warn('[updater] Check failed (non-fatal):', err.message)
   }
@@ -133,13 +162,10 @@ async function _isVersionBlocked(version, { supabaseUrl, supabaseKey }) {
   }
 }
 
-function _compareVersions(a, b) {
-  const parse = v => (v || '0.0.0').replace(/^v/, '').split('.').map(Number)
-  const [aMaj, aMin, aPatch] = parse(a)
-  const [bMaj, bMin, bPatch] = parse(b)
-  if (aMaj !== bMaj) return aMaj - bMaj
-  if (aMin !== bMin) return aMin - bMin
-  return aPatch - bPatch
-}
+// Delega en politica.js. La version que vivia aqui rompia el canal piloto: hacia
+// `.split('.').map(Number)`, y con '1.4.0-pilot.1' eso da NaN en el patch. Toda
+// comparacion con NaN es falsa, asi que un piloto NUNCA se veia como mas nuevo — ni
+// siquiera para graduar a estable. Medido el 2026-09-01. Ver politica.js.
+const _compareVersions = compararVersiones
 
-module.exports = { init, stop, getStagedUpdate, getChannel }
+module.exports = { init, stop, getStagedUpdate, getChannel, compararVersiones, puedeInstalarAhora }
