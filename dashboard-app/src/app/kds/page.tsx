@@ -10,6 +10,7 @@ import { reprintByStation, type ReprintOrderContext } from '@/lib/printer'
 import { type StationName, getStationByName } from '@/lib/pos-constants'
 import { setPosServerHost } from '@/lib/bridge-client'
 import { useKdsWsClient } from '@/hooks/useKdsWsClient'
+import { mismoDiaDeVenta, inicioDiaConfigurado } from '@/lib/dia-de-venta'
 
 declare global { interface Window { fullsiteApp?: { quit: () => void; isElectron?: boolean } } }
 
@@ -171,14 +172,23 @@ export default function KDSStandalone() {
           getCachedOrders('preparando'),
           getCachedOrders('lista'),
         ])
-        const cached = [...env, ...prep, ...lst] as unknown as KitchenOrderFromDB[]
+        // El cache IDB no distingue días: sin este corte, tras varios días de
+        // operación el fallback offline pintaba órdenes 'lista' de fechas viejas.
+        const inicioIdb = inicioDiaConfigurado()
+        const cached = ([...env, ...prep, ...lst] as unknown as KitchenOrderFromDB[])
+          .filter(o => mismoDiaDeVenta(o.created_at, Date.now(), inicioIdb))
         if (cached.length > 0) kdsClient.setFallbackOrders(cached)
       } catch { /* IndexedDB not available */ }
       return
     }
     const now = Date.now()
     const fourHours = 4 * 60 * 60 * 1000
+    const inicio = inicioDiaConfigurado()
     const fresh = data.filter(o => {
+      // Nada de OTRO día de venta, sin importar su status. El `|| status==='lista'`
+      // sin corte temporal mantenía una orden 'lista' en pantalla PARA SIEMPRE —
+      // era una de las vías del empalme de días en el tablero.
+      if (!mismoDiaDeVenta(o.created_at, now, inicio)) return false
       const age = now - new Date(o.created_at).getTime()
       return age <= fourHours || o.status === 'lista'
     })
