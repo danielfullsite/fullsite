@@ -1,16 +1,19 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
-import { PieChart, Search, ArrowUpDown, TrendingUp, TrendingDown, DollarSign, ChefHat, AlertTriangle } from 'lucide-react'
+import { useEffect, useState, useMemo, Fragment } from 'react'
+import { PieChart, Search, ArrowUpDown, TrendingUp, TrendingDown, DollarSign, ChefHat, AlertTriangle, ChevronRight } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
+interface RecipeIngredient { nombre?: string; um?: string; porcion?: number; costo_um?: number; total?: number }
+
 interface CostItem {
   platillo: string
   ingredientes: number
+  ingredientesList?: RecipeIngredient[]  // desglose completo (el "+"): se muestra al expandir
   costo: number
   precio: number
   margen_pct: number
@@ -121,6 +124,15 @@ export default function FoodCostPage() {
   const [error, setError] = useState('')
   const [showMarket, setShowMarket] = useState(false)
   const [showMods, setShowMods] = useState(false)
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+
+  function toggleExpand(platillo: string) {
+    setExpanded(prev => {
+      const next = new Set(prev)
+      if (next.has(platillo)) next.delete(platillo); else next.add(platillo)
+      return next
+    })
+  }
 
   useEffect(() => {
     async function load() {
@@ -369,6 +381,7 @@ export default function FoodCostPage() {
               return {
                 platillo: String(r.nombre || ''),
                 ingredientes: Array.isArray(ings) ? ings.length : 0,
+                ingredientesList: Array.isArray(ings) ? (ings as RecipeIngredient[]) : [],
                 costo,
                 precio,
                 margen_pct: margen,
@@ -609,12 +622,16 @@ export default function FoodCostPage() {
                     : item.margen_pct > 70
                     ? 'bg-emerald-500/10'
                     : ''
+                  const isOpen = expanded.has(item.platillo)
+                  const canExpand = (item.ingredientesList?.length ?? 0) > 0
                   return (
+                    <Fragment key={i}>
                     <tr
-                      key={i}
-                      className={`border-b border-[var(--line-soft)] hover:bg-[var(--surface-2)] ${rowBg}`}
+                      className={`border-b border-[var(--line-soft)] hover:bg-[var(--surface-2)] ${rowBg} ${canExpand ? 'cursor-pointer' : ''}`}
+                      onClick={() => canExpand && toggleExpand(item.platillo)}
                     >
                       <td className="px-4 py-3 font-medium text-[var(--text-1)]">
+                        {canExpand && <ChevronRight size={13} className={`inline mr-1.5 -mt-0.5 text-[var(--text-3)] transition-transform ${isOpen ? 'rotate-90' : ''}`} />}
                         {item.platillo}
                         {item.market && (
                           <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-violet-500/15 text-violet-500">
@@ -688,6 +705,35 @@ export default function FoodCostPage() {
                         )}
                       </td>
                     </tr>
+                    {isOpen && item.ingredientesList && (
+                      <tr className="bg-[var(--surface-2)]">
+                        <td colSpan={5} className="px-4 py-0">
+                          <div className="py-3">
+                            <table className="w-full text-xs">
+                              <thead>
+                                <tr className="text-[var(--text-3)]">
+                                  <th className="text-left font-medium py-1.5 pl-6">Ingrediente</th>
+                                  <th className="text-right font-medium py-1.5">Porción</th>
+                                  <th className="text-left font-medium py-1.5 pl-4">Unidad</th>
+                                  <th className="text-right font-medium py-1.5 pr-1">Costo</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {item.ingredientesList.map((ing, j) => (
+                                  <tr key={j}>
+                                    <td className="py-1 pl-6 text-[var(--text-2)]">{ing.nombre}</td>
+                                    <td className="py-1 text-right tabular-nums text-[var(--text-2)]">{ing.porcion ?? ''}</td>
+                                    <td className="py-1 pl-4 text-[var(--text-3)]">{ing.um}</td>
+                                    <td className="py-1 text-right tabular-nums text-[var(--text-1)] pr-1">{formatCurrency(Number(ing.total) || 0)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
                   )
                 })}
               </tbody>
