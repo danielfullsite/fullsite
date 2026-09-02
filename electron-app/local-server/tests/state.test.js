@@ -109,6 +109,22 @@ describe('Turno', () => {
     state.apply(makeEvent(EVENT.TURNO_CLOSED, { turno_id: 't1' }, 2))
     assert.equal(state.hasActiveTurno(), false)
   })
+
+  test('TURNO_CLOSED limpia el piso: ordenes, KDS y mesas no sobreviven al cierre', () => {
+    // Regresion del empalme: el KDS en modo LAN amanecia con las comandas de
+    // ayer porque el cierre solo soltaba el turno.
+    const state = new RestaurantState()
+    state.apply(makeEvent(EVENT.TURNO_OPENED, { turno_id: 't1', opened_by: 'e', ts: Date.now() }, 1))
+    state.apply(makeEvent(EVENT.ORDER_SENT, {
+      command_id: 'c1', order_id: 'o1', mesa: 5, mesero: 'm',
+      items: [{ nombre: 'Bowl', station: 'cocina' }], status: 'enviada',
+    }, 2))
+    const result = state.apply(makeEvent(EVENT.TURNO_CLOSED, { turno_id: 't1' }, 3))
+    assert.equal(state.hasActiveTurno(), false)
+    const snap = state.toSnapshot()
+    assert.equal(snap.kds_orders.length, 0)
+    assert.deepEqual(result.changed.sort(), ['kds', 'mesas', 'orders', 'turno'])
+  })
 })
 
 describe('STATE_SYNC (Supabase poll)', () => {

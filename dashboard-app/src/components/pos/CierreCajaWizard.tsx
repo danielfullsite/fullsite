@@ -12,6 +12,8 @@ import {
   getCachedCashMovsByTurno,
 } from '@/lib/pos-offline-db'
 import { getPosConfigSync } from '@/lib/pos-config'
+import { sendOrderToKitchen } from '@/lib/kitchen-bridge'
+import { getPOSAuthHeaders, fetchWithTimeout } from '@/lib/pos-data'
 import { computeOrderSummary, summaryToArqueoInput, calcEfectivoEsperado } from '@/lib/pos-arqueo'
 import {
   filterOpenOrders,
@@ -368,11 +370,79 @@ export default function CierreCajaWizard({
       }
     } catch { /* non-blocking */ }
 
-    // 6. Clear the turnoId from localStorage so next session starts clean
-    try { localStorage.removeItem('pos_turno_id') } catch { /* */ }
+    // 6. Clear ALL local turno caches so next session starts clean. Antes solo se
+    // quitaba pos_turno_id y los demas caches seguian sirviendo el turno cerrado.
+    try {
+      localStorage.removeItem('pos_turno_id')
+      localStorage.removeItem('pos_turno_cache')
+      localStorage.removeItem('pos_cached_turno')
+      localStorage.removeItem('pos_last_turno_sync')
+    } catch { /* */ }
 
-    // 7. Always complete — the restaurant must be able to close the shift offline
+    // 7. Avisar al local-server (modo LAN): TURNO_CLOSED purga ordenes/KDS/mesas
+    // en Pedro para que el tablero amanezca limpio. Best-effort con presupuesto
+    // corto — el cierre NUNCA se bloquea por la LAN (regla dura #3).
+    try {
+      await sendOrderToKitchen({
+        command_id: `turno-closed:${turnoId}`,
+        command_type: 'TURNO_CLOSED',
+        turno_id: turnoId,
+        client_id: _cid(),
+      }, { deadlineMs: 2500 })
+    } catch { /* sin bridge — el KDS online ya filtra por turno */ }
+
+    // 8. Always complete — the restaurant must be able to close the shift offline
     onComplete()
+  }
+
+  /**
+   * Resolver en LOTE desde la misma pantalla (junta 2026-09-01): las cuentas de
+   * prueba u huerfanas se CANCELAN aqui mismo con PIN de gerente, en vez de
+   * mandarte de vuelta al POS mesa por mesa. Cancelar, no borrar: cada una queda
+   * en pos_orders como 'cancelada' y en la auditoria a nombre del gerente.
+   * Es la contraparte al CERRAR de `cerrarCuentasHuerfanas` (TurnoGate, al abrir).
+   */
+  const [batchSaving, setBatchSaving] = useState(false)
+  const handleCancelarEnLote = async () => {
+    setEscalationError('')
+    const notaValidation = validateEscalationNota(escalationNota)
+    if (!notaValidation.valid) { setEscalationError(notaValidation.error!); return }
+    if (!escalationPin || escalationPin.length < 4) { setEscalationError('PIN inválido'); return }
+    setBatchSaving(true)
+    const gerente = await verifyManagerPinWithRole(escalationPin)
+    if (!gerente || !hasPermission(gerente.role, 'corte_z')) {
+      setEscalationError(gerente ? 'Este PIN no tiene permiso para cancelar en lote' : 'PIN inválido')
+      setBatchSaving(false)
+      return
+    }
+    const fallidas: string[] = []
+    for (const o of openOrders) {
+      try {
+        // Filtro por id SIEMPRE (leccion de los once turnos del 2026-08-31).
+        const res = await fetchWithTimeout(
+          `${SUPABASE_URL}/rest/v1/pos_orders?id=eq.${encodeURIComponent(o.id)}&client_id=eq.${_cid()}`,
+          { method: 'PATCH', headers: { ...getPOSAuthHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              status: 'cancelada',
+              closed_at: new Date().toISOString(),
+              notas: `Cancelada en lote al cerrar turno por ${gerente.name}: ${escalationNota.trim()}`,
+            }) },
+        )
+        if (!res.ok) fallidas.push(`mesa ${o.mesa}`)
+        else logAudit({ order_id: o.id, action: 'status_changed', actor: gerente.name,
+          details: { type: 'cancelada_en_lote_cierre', mesa: o.mesa, total: o.total, motivo: escalationNota.trim() } })
+      } catch { fallidas.push(`mesa ${o.mesa}`) }
+    }
+    // Releer del server — nunca declarar exito a medias.
+    try {
+      const openRes = await fetchWithTimeout(
+        `${SUPABASE_URL}/rest/v1/pos_orders?select=id,mesa,mesero,status,total&client_id=eq.${_cid()}&turno_id=eq.${turnoId}&status=in.(enviada,preparando,lista)`,
+        { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } },
+      )
+      if (openRes.ok) setOpenOrders(filterOpenOrders(await openRes.json()))
+    } catch { /* se queda la lista anterior */ }
+    setBatchSaving(false)
+    if (fallidas.length) setEscalationError(`No se pudieron cancelar: ${fallidas.join(', ')}. Reintenta o ciérralas desde la caja.`)
   }
 
   // GUARD-08: verify manager PIN + note before allowing close with open orders
@@ -572,16 +642,31 @@ export default function CierreCajaWizard({
                   </button>
                   <button
                     onClick={handleEscalation}
-                    disabled={escalationSaving || escalationPin.length < 4 || !escalationNota.trim()}
+                    disabled={escalationSaving || batchSaving || escalationPin.length < 4 || !escalationNota.trim()}
                     className="flex-1 py-2.5 rounded-lg bg-amber-500 text-black font-bold text-sm hover:bg-amber-400 transition-colors disabled:opacity-50"
                   >
                     {escalationSaving ? (
                       <span className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin inline-block" />
                     ) : (
-                      'Confirmar autorización'
+                      'Cerrar dejándolas abiertas'
                     )}
                   </button>
                 </div>
+                {/* Resolver en lote: cancela las cuentas AQUI y el cierre sigue limpio. */}
+                <button
+                  onClick={() => { void handleCancelarEnLote() }}
+                  disabled={batchSaving || escalationSaving || escalationPin.length < 4 || !escalationNota.trim()}
+                  className="w-full py-2.5 rounded-lg bg-red-600 text-white font-bold text-sm hover:bg-red-500 transition-colors disabled:opacity-50"
+                >
+                  {batchSaving ? (
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin inline-block" />
+                  ) : (
+                    `Cancelar las ${openOrders.length} cuentas y continuar`
+                  )}
+                </button>
+                <p className="text-[11px] text-[var(--text-4)]">
+                  Se cancelan, no se borran: quedan en la auditoría a nombre del gerente.
+                </p>
               </div>
             )}
           </div>

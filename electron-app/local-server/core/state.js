@@ -52,8 +52,16 @@ class RestaurantState {
         return { changed: ['turno'] }
 
       case EVENT.TURNO_CLOSED:
+        // El cierre del dia LIMPIA el piso. Antes solo se soltaba el turno y
+        // _orders/_kds/_mesas sobrevivian (incluso a reinicios, via event store):
+        // el KDS en modo LAN amanecia con las comandas de ayer — el "empalme"
+        // reportado en campo. Con _turno=null ademas _applyStateSync no filtraba
+        // nada (belongsToAnotherTurno siempre false), asi que nada lo corregia.
         this._turno = null
-        return { changed: ['turno'] }
+        this._orders.clear()
+        this._kds = []
+        this._mesas.clear()
+        return { changed: ['turno', 'orders', 'kds', 'mesas'] }
 
       case EVENT.STATE_SYNC:
         return this._applyStateSync(payload)
