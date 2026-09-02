@@ -82,7 +82,9 @@ async function handle(request: NextRequest, method: string) {
   const ct = res.headers.get('content-type')
   // El PIN nunca sale por el proxy, pida lo que pida el `select`.
   const text = redactResponse(table, rawOut, ct)
-  const out = new NextResponse(text, { status: res.status })
+  // 204/205/304 no admiten body — Response() truena con string aunque sea "".
+  const bodyless = res.status === 204 || res.status === 205 || res.status === 304
+  const out = new NextResponse(bodyless ? null : text, { status: res.status })
   if (ct) out.headers.set('content-type', ct)
   const cr = res.headers.get('content-range'); if (cr) out.headers.set('content-range', cr)
   return out

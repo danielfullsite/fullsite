@@ -10,7 +10,9 @@
  */
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
-const GROQ_MODEL = 'llama-3.3-70b-versatile'
+// llama-3.3-70b-versatile devuelve 404 (model_not_found) para esta cuenta desde
+// 2026-08-17; override por env para no redeployar en la próxima baja de modelo.
+const GROQ_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b'
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages'
 const ANTHROPIC_MODEL = 'claude-haiku-4-5-20251001'
 
