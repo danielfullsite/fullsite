@@ -230,3 +230,54 @@ export async function restoreItems(
     return { ok: false, error: String(e) }
   }
 }
+
+/** Cuerpo sparse para el update per-item; todos los campos son opcionales (Uber hace update parcial). */
+export interface UberItemUpdate {
+  price_info?: { price: number; currency_code?: string; [k: string]: unknown }
+  suspension_info?: {
+    suspension?: { suspend_until?: number; reason?: string }
+    [k: string]: unknown
+  }
+  [k: string]: unknown
+}
+
+/**
+ * Actualiza un item/modificador individual — `POST /v2/eats/stores/{id}/menus/items/{itemId}`.
+ *
+ * DISTINTO de `markItemsOOS`/`restoreItems` (bulk `items/deactivations|activations`): este es el
+ * endpoint per-item que exige el checklist de certificación POS de Uber ("Menu: Update
+ * Item/modifier"). Update sparse: cualquier subconjunto de `price_info`/`suspension_info`/etc.
+ * El item debe existir ya en el menú publicado (correr `uploadMenu` antes). Uber responde
+ * **204 No Content** al aceptar.
+ */
+export async function updateMenuItem(
+  storeId: string,
+  itemId: string,
+  update: UberItemUpdate,
+  correlationId: string
+): Promise<{ ok: boolean; status?: number; error?: string }> {
+  const t0 = Date.now()
+  try {
+    const r = await withRetry(
+      () => uberFetch(`/v2/eats/stores/${storeId}/menus/items/${itemId}`, {
+        method: 'POST', storeId,
+        body: JSON.stringify(update),
+      }),
+      { maxAttempts: 3, baseDelayMs: 500 }
+    )
+    const errText = r.ok ? undefined : await r.text()
+    await auditLog({
+      provider: 'ubereats', correlation_id: correlationId, action: 'menu.update_item',
+      request: { store_id: storeId, item_id: itemId, fields: Object.keys(update) },
+      response: errText ? { error: errText } : { status: 'updated' },
+      status_code: r.status, duration_ms: Date.now() - t0,
+    })
+    return r.ok ? { ok: true, status: r.status } : { ok: false, status: r.status, error: errText }
+  } catch (e) {
+    await auditLog({
+      provider: 'ubereats', correlation_id: correlationId, action: 'menu.update_item',
+      request: { store_id: storeId, item_id: itemId }, response: { error: String(e) }, duration_ms: Date.now() - t0,
+    })
+    return { ok: false, error: String(e) }
+  }
+}

@@ -50,7 +50,7 @@ import {
 import { buildUberAuthUrl, USL_SCOPES, MARKETPLACE_M2M_SCOPES, DELIVERY_M2M_SCOPES, PROMOTIONS_M2M_SCOPES, probeM2MToken } from '@/lib/integrations/uber-eats/oauth'
 import { createPromotion, buildSamplePromotion, promotionsScope } from '@/lib/integrations/uber-eats/promotions'
 import { requestReport, buildSampleReportRequest, getReportFile } from '@/lib/integrations/uber-eats/reporting'
-import { uploadMenu, getMenu, normalizeMenuPayload } from '@/lib/integrations/uber-eats/menu'
+import { uploadMenu, getMenu, normalizeMenuPayload, updateMenuItem } from '@/lib/integrations/uber-eats/menu'
 
 // Menú mínimo válido para probar el cert "Menu: Update Item/modifier" (PUT full menu).
 function buildSampleMenu() {
@@ -176,6 +176,8 @@ export async function POST(request: NextRequest) {
     store_id?: string
     order_id?: string
     download_url?: string
+    item_id?: string
+    update?: Record<string, unknown>
   }
 
   const storeId = body.store_id || 'a4f298f4-202f-47f5-b375-d2eefec0126c'
@@ -380,6 +382,25 @@ export async function POST(request: NextRequest) {
       action, correlation_id: corrId, store_id: storeId, ts: new Date().toISOString(),
       result,
       sent: normalizeMenuPayload(buildSampleMenu()),
+    })
+  }
+
+  // Cert "Menu: Update Item/modifier" — POST /v2/eats/stores/{id}/menus/items/{itemId}.
+  // Endpoint per-item (NO el PUT full-menu ni items/deactivations). El item debe existir:
+  // correr `upload_menu` antes. Update no destructivo: re-afirma el precio del item de prueba.
+  if (action === 'update_item') {
+    const corrId = crypto.randomUUID()
+    const itemId = typeof body.item_id === 'string' && body.item_id ? body.item_id : 'fs-item-1'
+    const update = body.update && typeof body.update === 'object'
+      ? body.update as Record<string, unknown>
+      : { price_info: { price: 5000, currency_code: 'MXN' } }
+    const result = await updateMenuItem(storeId, itemId, update, corrId)
+    return NextResponse.json({
+      action, correlation_id: corrId, store_id: storeId, item_id: itemId, ts: new Date().toISOString(),
+      result,
+      hint: result.ok
+        ? 'Update Item OK (204).'
+        : 'Si 404, corre `upload_menu` primero para crear fs-item-1 en la tienda.',
     })
   }
 
