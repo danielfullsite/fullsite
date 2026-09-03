@@ -45,6 +45,7 @@ import { calcSplitParejo, calcSplitItems } from '@/lib/pos-calculations'
 import { publishEvent, getDeviceId } from '@/lib/events'
 import { apiUrl } from '@/lib/api-base'
 import { sendOrderToKitchen, kitchenFailureMessage } from '@/lib/kitchen-bridge'
+import { avisarCierreDeOrden } from '@/lib/aviso-lan'
 import type { OrderItem, MenuItem, Order } from '@/lib/pos-data'
 import {
   printByStation,
@@ -3509,6 +3510,11 @@ function POSContent() {
     }
     // Offline: cobro guardado en cola — tratar como éxito, imprimir ticket y limpiar UI
     if (!saveResult.ok && saveResult.error === 'OFFLINE_QUEUED') {
+      // Avisar a la LAN es MAS importante aqui que en la salida feliz: sin
+      // internet, la nube no le va a contar a nadie que esta mesa se cerro, y
+      // cocina/barra/plano se quedarian con la orden hasta el proximo login.
+      // No se espera: un aviso jamas frena un cobro. Ver lib/aviso-lan.ts.
+      void avisarCierreDeOrden({ opId, orderId: order.id, clientId: _cid(), mesa: order.mesa, turnoId: order.turnoId ?? null })
       if (pagos.some(p => p.metodo.toLowerCase().includes('efectivo'))) openCashDrawer()
       handlePrintTicket(order)
       showToast('Sin conexión — cobro guardado localmente, se sincronizará al reconectar')
@@ -3525,6 +3531,10 @@ function POSContent() {
     }
     const ok = saveResult.ok
     if (ok) {
+      // Los tableros no se enteran por la nube a tiempo: cocina/barra/plano
+      // reaccionan a ORDER_CLOSED por la LAN. Sin esto la orden se les queda
+      // pegada (Eduardo, AMALAY, 2026-09-02).
+      void avisarCierreDeOrden({ opId, orderId: order.id, clientId: _cid(), mesa: order.mesa, turnoId: order.turnoId ?? null })
       // Open cash drawer for cash payments (incluye mixto con componente efectivo)
       if (pagos.some(p => p.metodo.toLowerCase().includes('efectivo'))) {
         openCashDrawer()
