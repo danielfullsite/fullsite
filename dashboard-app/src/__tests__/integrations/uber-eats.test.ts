@@ -93,12 +93,27 @@ describe('UBER-002: Store Mapping', () => {
 
 // ─── UBER-003/004: Menu Upload / Update ───────────────────────────────────────
 
-describe('UBER-003/004: Menu Upload', () => {
-  it('uploadMenu is exported from menu module', async () => {
-    const { uploadMenu, markItemsOOS, restoreItems } = await import('@/lib/integrations/uber-eats/menu')
+describe('UBER-003/004: Menu Upload / Update', () => {
+  it('uploadMenu + per-item updateMenuItem are exported from menu module', async () => {
+    const { uploadMenu, markItemsOOS, restoreItems, updateMenuItem } = await import('@/lib/integrations/uber-eats/menu')
     expect(typeof uploadMenu).toBe('function')
     expect(typeof markItemsOOS).toBe('function')
     expect(typeof restoreItems).toBe('function')
+    // Cert "Menu: Update Item/modifier" — endpoint per-item POST /menus/items/{itemId},
+    // distinto del PUT full-menu y de items/deactivations|activations (bulk 86).
+    expect(typeof updateMenuItem).toBe('function')
+    expect(updateMenuItem.length).toBe(4) // (storeId, itemId, update, correlationId)
+  })
+
+  it('UberItemUpdate accepts sparse price_info / suspension_info', async () => {
+    const mod = await import('@/lib/integrations/uber-eats/menu')
+    const update: import('@/lib/integrations/uber-eats/menu').UberItemUpdate = {
+      price_info: { price: 5000, currency_code: 'MXN' },
+      suspension_info: { suspension: { suspend_until: 1893456000, reason: 'test' } },
+    }
+    expect(update.price_info?.price).toBe(5000)
+    expect(update.suspension_info?.suspension?.reason).toBe('test')
+    expect(mod).toBeTruthy()
   })
 })
 
