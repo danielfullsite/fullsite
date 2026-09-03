@@ -69,6 +69,11 @@ jobs:
 
           # ── Independientes (no requieren orden) — usan el store test correcto ──
           call scope_probe        '{"action":"scope_probe"}'
+          # Integration Activation Suite (cert REQ): POST pos_data = "Activate Integration";
+          # el ejercicio hace get_before(GET pos_data) → activate(POST pos_data) → get_after,
+          # así que cubre "Activate Integration" + "Get Integration Details" en una llamada.
+          # (Distinto de delivery_store_activate, que solo prende/pausa la tienda.)
+          call activate_integration "{\"action\":\"activate\",\"store_id\":\"$STORE\"}"
           call activate           "{\"action\":\"delivery_store_activate\",\"store_id\":\"$STORE\"}"
           call get_details        "{\"action\":\"delivery_store_get\",\"store_id\":\"$STORE\"}"
           call store_status       "{\"action\":\"delivery_store_status\",\"store_id\":\"$STORE\"}"
@@ -77,6 +82,10 @@ jobs:
           # publicado, y Uber no manda webhook de resultado. Va inmediatamente después del PUT
           # para que la evidencia muestre el par enviado→almacenado de la misma corrida.
           call get_menu           "{\"action\":\"get_menu\",\"store_id\":\"$STORE\"}"
+          # Cert REQ "Menu: Update Item/modifier": POST /v2/eats/stores/{id}/menus/items/{itemId}
+          # (per-item, NO el PUT full-menu ni items/deactivations). El item fs-item-1 lo creó
+          # upload_menu arriba; update no destructivo (re-afirma precio) → Uber responde 204.
+          call update_item        "{\"action\":\"update_item\",\"store_id\":\"$STORE\"}"
           call create_promotion   "{\"action\":\"create_promotion\",\"store_id\":\"$STORE\"}"
           call request_report     "{\"action\":\"request_report\",\"store_id\":\"$STORE\"}"
           call sandbox_order      "{\"action\":\"delivery_sandbox_order\",\"store_id\":\"$STORE\"}"
