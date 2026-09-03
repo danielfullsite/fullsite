@@ -267,6 +267,45 @@ function forwardPost(targetUrl, bodyStr) {
   })
 }
 
+/**
+ * Reenvío de LECTURA hacia la caja. La mitad que faltaba.
+ *
+ * POR QUÉ EXISTE: hasta 2026-09-02 el reenvío entre terminales era
+ * `req.method === 'POST'` y nada más — tres rutas de escritura (/print, /events,
+ * /drawer) y ninguna forma de PREGUNTAR. Una terminal secundaria podía avisar,
+ * no consultar. Su única fuente de estado era la nube, así que sin internet cada
+ * caja quedaba con lo suyo.
+ *
+ * En campo, con tres cajas y el WAN caído (Eduardo Esquivel, AMALAY):
+ *   «no hay comunicación correcta entre los puntos de venta, no muestran lo mismo»
+ *
+ * La caja ya sabía contestar `GET /state` y `GET /events?since=N`. Nadie podía
+ * alcanzarlas. Esto abre esa dirección.
+ *
+ * Se conserva `query` porque `/events?since=N` no sirve de nada sin ella: es
+ * justo el parámetro que permite a una terminal ponerse al día tras reconectar.
+ */
+function forwardGet(targetUrl) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(targetUrl)
+    const r = http.request(
+      { hostname: u.hostname, port: u.port, path: u.pathname + u.search, method: 'GET',
+        // Más corto que el POST (5 s) a propósito: una lectura la está esperando
+        // una pantalla con alguien enfrente. Si la caja no contesta en 2 s, el
+        // consumidor cae a su caché local, que es lo correcto — mejor mostrar
+        // algo viejo y decirlo que congelar el mapa de mesas.
+        timeout: 2000 },
+      (resp) => { let d = ''; resp.on('data', c => { d += c }); resp.on('end', () => resolve({ status: resp.statusCode, body: d })) }
+    )
+    r.on('error', reject)
+    r.on('timeout', () => { r.destroy(); reject(new Error('timeout')) })
+    r.end()
+  })
+}
+
+/** Lecturas que una terminal secundaria puede hacerle a la caja. */
+const LECTURAS_REENVIADAS = ['/state', '/events']
+
 // Keep identity and routing configuration explicit so every cloned terminal can
 // discover the caja without relying on process-global or customer-specific state.
 function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, version, serverId, restaurantId, config = {}, instanceName = '', branchId = config.branchId || null, posServerIp = config.posServerIp || null, port = 7717, posServerPort = config.posServerPort || null }) {
@@ -302,6 +341,46 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, versio
       } catch (e) {
         console.error('[forward→caja] failed:', e.message)
         json(res, 502, { error: 'forward to caja failed: ' + e.message })
+      }
+      return
+    }
+
+    // ── Reenvío de LECTURA hacia la caja (rol 'pos') ─────────────────────────
+    // La mitad que faltaba del bloque de arriba. Una terminal secundaria no es
+    // la fuente de verdad del salón: su propio `state` sólo conoce lo que ella
+    // misma hizo. Preguntarle a la caja es lo único que hace que las tres
+    // terminales vean lo mismo sin internet.
+    //
+    // Va DESPUÉS del reenvío de escritura y ANTES de las rutas locales, para que
+    // en un secundario `/state` signifique «el salón» y no «lo que yo vi».
+    //
+    // `/identity` y `/health` NO se reenvían a propósito: preguntan por ESTA
+    // máquina. Reenviarlas haría que un secundario se presentara como la caja,
+    // y el descubrimiento de terminales dejaría de funcionar.
+    if (posServerIp && req.method === 'GET' &&
+        LECTURAS_REENVIADAS.some(p => url === p || url.startsWith(p + '?'))) {
+      try {
+        const up = await forwardGet(`http://${posServerIp}:${cajaPort}${url}`)
+        res.writeHead(up.status || 502, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
+        res.end(up.body || '{}')
+      } catch (e) {
+        // Falla ABIERTO hacia el estado local, y lo DICE en una cabecera. Si la
+        // caja está apagada o la LAN se cortó, devolver un error dejaría el mapa
+        // de mesas en blanco — peor que mostrar lo que esta terminal sabe. Pero
+        // el consumidor tiene que poder distinguir «el salón» de «lo que yo vi»:
+        // confundirlos es exactamente la familia de bugs que costó la semana.
+        console.warn('[forward→caja GET] falló, sirvo estado local:', e.message)
+        if (url === '/state' || url.startsWith('/state?')) {
+          const seq = await eventStore.getLastSequence()
+          res.writeHead(200, {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'X-Fullsite-Origen': 'local-degradado',
+          })
+          res.end(JSON.stringify({ sequence: seq, ...state.toSnapshot() }))
+          return
+        }
+        json(res, 502, { error: 'no se pudo consultar a la caja: ' + e.message })
       }
       return
     }
