@@ -145,6 +145,7 @@ import {
 } from '@/lib/mercadopago'
 import dynamic from 'next/dynamic'
 import { getActiveClientSlug as _cid } from '@/lib/data'
+import { computeOutOfStockItems } from '@/lib/stock-availability'
 import { usePOSLock } from './pos-lock-context'
 import { layerZ } from '@/components/ui/layers'
 
@@ -1802,29 +1803,20 @@ function POSContent() {
       getActivePromos(_cid()).then(setAllPromos).catch(() => {})
       getActiveCombos(_cid()).then(setAllCombos).catch(() => {})
 
-      // Check which menu items are out of stock
-      try {
-        const invRes = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_inventory?select=ingredient_id,stock&client_id=eq.${_cid()}&stock=lte.0`, {
-          headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` },
-        })
-        if (invRes.ok) {
-          const zeroStock = await invRes.json()
-          const zeroIds = new Set(zeroStock.map((z: { ingredient_id: string }) => z.ingredient_id))
-          // Find menu items whose ALL key ingredients are at zero
-          const oos = new Set<string>()
-          const recipesGrouped = new Map<string, { ingredient_id: string }[]>()
-          for (const recipe of r) {
-            const list = recipesGrouped.get(recipe.menu_item_id) || []
-            list.push(recipe)
-            recipesGrouped.set(recipe.menu_item_id, list)
-          }
-          for (const [menuItemId, ingredients] of recipesGrouped) {
-            const hasZero = ingredients.some(ing => zeroIds.has(ing.ingredient_id))
-            if (hasZero) oos.add(menuItemId)
-          }
-          setOutOfStockItems(oos)
-        }
-      } catch { /* */ }
+      // Que platillos salen AGOTADO. La regla vive en lib/stock-availability.ts:
+      // si el restaurante NO lleva inventario (ningun insumo con stock > 0), no se
+      // marca nada — un cliente recien dado de alta trae todo en 0 y tachar el menu
+      // completo lo deja sin vender el dia 1 (le paso a ChickIn: 46/46 AGOTADO).
+      // Offline no se consulta: no hay verdad de stock y colgaria el arranque (P0-1).
+      if (navigator.onLine) {
+        try {
+          const invRes = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_inventory?select=ingredient_id,stock&client_id=eq.${_cid()}`, {
+            headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` },
+            signal: AbortSignal.timeout(7000),
+          })
+          if (invRes.ok) setOutOfStockItems(computeOutOfStockItems(await invRes.json(), r))
+        } catch { /* */ }
+      }
     })()
   }, [])
 
