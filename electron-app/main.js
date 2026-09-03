@@ -5,23 +5,74 @@ const os   = require('os');
 const fs   = require('fs');
 const { execSync } = require('child_process');
 
-const POS_URL = 'https://app.fullsite.mx/pos';
+// ─── Puntos de anclaje del laboratorio multi-terminal ────────────────────────
+//
+// Los DEFAULTS SON LOS DE PRODUCCIÓN y no cambian: una terminal instalada en un
+// restaurante se comporta exactamente igual que antes de esto. Las variables sólo
+// existen para poder levantar varias terminales en UNA sola máquina y apuntarlas a
+// una copia local de la app.
+//
+// POR QUÉ HACEN FALTA. Para probar de verdad tres POS + KDS + caja hay que correr
+// cinco procesos Electron a la vez, y hoy los cinco:
+//   · escucharían en el mismo 7717 (sólo el primero arranca; el resto ve EADDRINUSE),
+//   · compartirían userData (misma config, misma identidad, mismos eventos),
+//   · cargarían https://app.fullsite.mx, es decir PRODUCCIÓN — o sea que un
+//     laboratorio automatizado escribiría en los datos de un restaurante real.
+//
+// Ese último punto es el que las vuelve obligatorias, no cómodas: sin
+// FULLSITE_POS_URL no existe forma de ejercitar la UI real sin tocar producción.
+//
+// Regla al usarlas: si defines una, define las cuatro. Dos terminales con puertos
+// distintos pero el mismo userData comparten identidad y el laboratorio miente.
+const POS_URL = process.env.FULLSITE_POS_URL || 'https://app.fullsite.mx/pos';
 // KDS de Eduardo (sesión de campo Jul 21): panel de demanda, toque por item, tarjeta
 // por envío, FIFO, alertas. login-less (KDS_PATHS en pos/layout) + bridge offline.
 // El /kds standalone (598 líneas) es una versión simplificada sin esos cambios.
-const KDS_URL = 'https://app.fullsite.mx/pos/cocina';
+const KDS_URL = process.env.FULLSITE_KDS_URL || 'https://app.fullsite.mx/pos/cocina';
 
 // Modo dev/desk-lab: con FULLSITE_DEV=1 las ventanas abren en modo VENTANA (no
 // kiosco/fullscreen) para poder probar en una Mac/PC sin quedar atrapado. En
 // producción (sin el flag) sigue en kiosco, como debe ser en una terminal real.
 const DEV = process.env.FULLSITE_DEV === '1';
 
+// userData separado por terminal. Se aplica AQUÍ, en la carga del módulo, porque
+// `app.setPath` sólo surte efecto antes de que algo llame a `getPath('userData')`
+// — y config.json, printers.json y el event store salen todos de ahí.
+//
+// Sin esto, cinco Electron en una máquina comparten config, identidad y log de
+// eventos: el laboratorio parecería funcionar y estaría probando UNA terminal
+// cinco veces. Un falso verde, que es peor que no probar.
+//
+// Si la variable no está, no se toca nada: producción usa la ruta de siempre.
+if (process.env.FULLSITE_USER_DATA_DIR) {
+  try {
+    const dir = path.resolve(process.env.FULLSITE_USER_DATA_DIR);
+    fs.mkdirSync(dir, { recursive: true });
+    app.setPath('userData', dir);
+    console.log('[lab] userData:', dir);
+  } catch (e) {
+    // Se GRITA y se sigue con el default. Fallar el arranque por una variable de
+    // laboratorio dejaría una terminal sin abrir; seguir en silencio haría que
+    // dos terminales compartieran estado sin que nadie lo notara.
+    console.error('[lab] FULLSITE_USER_DATA_DIR inservible, uso el default:', e.message);
+  }
+}
+
 // ─── LOCAL SERVER ─────────────────────────────────────────────────────────────
 // Fullsite Local Server (WS hub + print bridge + mDNS + heartbeat).
 // Runs inside the Electron main process — no separate Node.js process needed.
 // Replaces the previous embedded print bridge.
 
-const LOCAL_SERVER_PORT   = 7717;
+// 7717 es el puerto de producción y sigue siéndolo. La variable sólo permite
+// levantar varias terminales en una máquina: sin ella, el segundo proceso muere
+// con EADDRINUSE y no hay laboratorio multi-terminal posible.
+//
+// Se valida el rango: un puerto basura dejaría a Pedro sin arrancar y el POS se
+// quedaría sin impresión ni KDS — falla peor que ignorar la variable.
+const LOCAL_SERVER_PORT   = (() => {
+  const crudo = Number(process.env.FULLSITE_LOCAL_SERVER_PORT);
+  return Number.isInteger(crudo) && crudo > 0 && crudo < 65536 ? crudo : 7717;
+})();
 const LEGACY_CONFIG_PATH  = path.join('C:\\fullsite', 'config.json');
 // CFG-01: printers config lives in Electron userData (same as config.json),
 // with C:\fullsite\ as a read-only migration source only.

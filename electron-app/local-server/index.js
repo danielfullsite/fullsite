@@ -322,10 +322,29 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, versio
     // A top-level navigation to /health works without this header, while fetch()
     // is rejected as a network error — exactly the AMALAY Entrada field failure.
     res.setHeader('Access-Control-Allow-Private-Network', 'true')
+    // Sin exponerla, `fetch()` NO puede leer esta cabecera cross-origin: existiría
+    // en el cable y sería invisible para el POS. Es la que avisa que el dato NO
+    // viene de la caja. (El cuerpo también lo declara — ver `authoritative`; la
+    // cabecera es la vía barata para un consumidor que no parsea el JSON.)
+    res.setHeader('Access-Control-Expose-Headers', 'X-Fullsite-Origen')
     res.setHeader('Vary', 'Origin, Access-Control-Request-Private-Network')
     if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return }
 
+    // `url` es SÓLO la ruta, para enrutar. `rutaCompleta` conserva la query, para
+    // REENVIAR.
+    //
+    // Antes había una sola variable, `req.url.split('?')[0]`, y el reenvío usaba
+    // ésa — así que `GET /events?since=57` salía hacia la caja como `/events` y el
+    // cursor se perdía: la terminal recibía el historial completo en cada
+    // reconexión, sin forma de saber qué ya había visto. Es justo lo que `since`
+    // existe para resolver.
+    //
+    // El bug sobrevivió a una prueba en verde porque esa prueba comprobaba que el
+    // código CONTUVIERA `u.pathname + u.search`, no que la query llegara. Ver
+    // `tests/reenvio-lectura-integracion.test.js`, que levanta dos servidores
+    // reales y afirma sobre lo que recibió el de enfrente.
     const url = req.url?.split('?')[0]
+    const rutaCompleta = req.url || url
 
     // ── Secondary-POS forward (role 'pos', posServerIp set) ───────────────────
     // A secondary POS has no physical printers and its state isn't the KDS source
@@ -357,11 +376,15 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, versio
     // `/identity` y `/health` NO se reenvían a propósito: preguntan por ESTA
     // máquina. Reenviarlas haría que un secundario se presentara como la caja,
     // y el descubrimiento de terminales dejaría de funcionar.
-    if (posServerIp && req.method === 'GET' &&
-        LECTURAS_REENVIADAS.some(p => url === p || url.startsWith(p + '?'))) {
+    if (posServerIp && req.method === 'GET' && LECTURAS_REENVIADAS.includes(url)) {
       try {
-        const up = await forwardGet(`http://${posServerIp}:${cajaPort}${url}`)
-        res.writeHead(up.status || 502, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
+        // `rutaCompleta`, NO `url`: sin la query se pierde `?since=N`.
+        const up = await forwardGet(`http://${posServerIp}:${cajaPort}${rutaCompleta}`)
+        res.writeHead(up.status || 502, {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Expose-Headers': 'X-Fullsite-Origen',
+        })
         res.end(up.body || '{}')
       } catch (e) {
         // Falla ABIERTO hacia el estado local, y lo DICE en una cabecera. Si la
@@ -370,14 +393,25 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, versio
         // el consumidor tiene que poder distinguir «el salón» de «lo que yo vi»:
         // confundirlos es exactamente la familia de bugs que costó la semana.
         console.warn('[forward→caja GET] falló, sirvo estado local:', e.message)
-        if (url === '/state' || url.startsWith('/state?')) {
+        if (url === '/state') {
           const seq = await eventStore.getLastSequence()
           res.writeHead(200, {
             'Content-Type': 'application/json',
             'Access-Control-Allow-Origin': '*',
+            'Access-Control-Expose-Headers': 'X-Fullsite-Origen',
             'X-Fullsite-Origen': 'local-degradado',
           })
-          res.end(JSON.stringify({ sequence: seq, ...state.toSnapshot() }))
+          // En el CUERPO, no sólo en la cabecera. Una cabecera cross-origin es
+          // invisible para `fetch()` salvo que se exponga, y un consumidor puede
+          // no mirarla nunca. `authoritative: false` viaja con el dato y obliga a
+          // quien lo lea a decidir qué hace — que es el punto: este snapshot es
+          // lo que ESTA terminal vio, no el salón.
+          res.end(JSON.stringify({
+            sequence: seq,
+            authoritative: false,
+            source: 'local-degradado',
+            ...state.toSnapshot(),
+          }))
           return
         }
         json(res, 502, { error: 'no se pudo consultar a la caja: ' + e.message })
@@ -433,7 +467,11 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, versio
     // ── GET /state ───────────────────────────────────────────────────────────
     if (url === '/state' && req.method === 'GET') {
       const seq = await eventStore.getLastSequence()
-      json(res, 200, { sequence: seq, ...state.toSnapshot() })
+      // La simétrica del degradado. Si sólo se marcara el caso malo, un consumidor
+      // no podría distinguir "esto es autoritativo" de "esto lo sirvió una versión
+      // vieja de Pedro que aún no sabía marcarlo" — y ante la duda tendría que
+      // asumir lo peor de un dato bueno.
+      json(res, 200, { sequence: seq, authoritative: true, source: 'caja', ...state.toSnapshot() })
       return
     }
 
