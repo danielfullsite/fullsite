@@ -29,6 +29,7 @@ const { CoreEventStore }    = require('./core/event-store')
 const { RestaurantState }   = require('./core/state')
 const { WsHub }             = require('./core/ws-hub')
 const { CommandHandler }    = require('./core/command-handler')
+const { conectarConLaCaja } = require('./core/enlace-con-caja')
 const { OutboxWorker }      = require('./core/outbox')
 const mdns      = require('./discovery/mdns')
 const heartbeat = require('./telemetry/heartbeat')
@@ -773,10 +774,60 @@ async function startLocalServer({ dataDir, port = 7717, config = {} }) {
     console.log('[server] Outbox Worker: SHADOW MODE activo')
   }
 
+  // ── Enlace ascendente con la caja (sólo terminales secundarias) ───────────
+  //
+  // Cierra el hueco de campo del 2026-09-02: una comanda de POS 3 no llegaba
+  // nunca a los tableros de POS 2, porque este Pedro no era cliente de nadie.
+  //
+  // SE ACTIVA SÓLO en una terminal secundaria: `terminal_role === 'pos'` Y con
+  // `pos_server_ip` configurado. Las dos condiciones, no una:
+  //   · La CAJA (`server_pos`) no debe conectarse a sí misma — sería un bucle
+  //     de retransmisión que se multiplica solo.
+  //   · Un KDS dedicado ya recibe por su propio WebSocket; abrirle otro canal
+  //     le entregaría cada evento dos veces.
+  //   · Un rol nulo o desconocido NO activa nada: falla cerrado. Una terminal
+  //     mal aprovisionada se queda como estaba, no en un estado a medias.
+  let _enlaceCaja = null
+  const _rolTerminal = config.terminalRole || null
+  if (_rolTerminal === 'pos' && config.posServerIp) {
+    // El cursor vive en el dataDir de ESTA terminal. Sin persistirlo, un reinicio
+    // vuelve con -1 y el hub no manda catch-up (ws-hub.js:88): se pierde en
+    // silencio todo lo ocurrido mientras estuvo apagada.
+    // `fs` y `path` viven dentro de otras funciones en este archivo, no a nivel
+    // de modulo. Se requieren aqui en vez de mover los de arriba: cambio minimo.
+    const fsCursor = require('fs')
+    const pathCursor = require('path')
+    const rutaCursor = pathCursor.join(dataDir, 'cursor-caja.json')
+    const cajaWs = `ws://${config.posServerIp}:${config.posServerPort || port || 7717}`
+    _enlaceCaja = conectarConLaCaja({
+      cajaUrl: cajaWs,
+      serverId,
+      restaurantId,
+      leerCursor: () => {
+        try { return JSON.parse(fsCursor.readFileSync(rutaCursor, 'utf8')).cursor } catch { return -1 }
+      },
+      guardarCursor: (n) => {
+        try { fsCursor.writeFileSync(rutaCursor, JSON.stringify({ cursor: n, ts: Date.now() })) } catch {}
+      },
+      alRecibirEvento: (ev) => {
+        // Se aplica al estado local Y se retransmite a los clientes de ESTA
+        // terminal: cocina, barra y plano escuchan aquí, no en la caja.
+        try { state.apply(ev) } catch (e) { console.warn('[enlace-caja] no se pudo aplicar:', e.message) }
+        wsHub.broadcast(ev).catch(() => {})
+      },
+    })
+    console.log(`[server] Enlace con la caja: ${cajaWs} (rol ${_rolTerminal})`)
+  } else {
+    console.log(`[server] Sin enlace ascendente (rol ${_rolTerminal || 'sin definir'}, caja ${config.posServerIp || 'no configurada'})`)
+  }
+
   // ── Shutdown ──────────────────────────────────────────────────────────────
   function close() {
     if (_supabasePolling) clearInterval(_supabasePolling)
     if (_outbox) _outbox.stop()
+    // Antes que el hub: `detener()` cancela el reintento agendado. Si no, el
+    // 'close' del socket agenda otro y el proceso no termina nunca.
+    if (_enlaceCaja) _enlaceCaja.detener()
     mdns.stop()
     heartbeat.stop()
     updater.stop()

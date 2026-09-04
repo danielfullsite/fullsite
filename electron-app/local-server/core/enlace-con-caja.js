@@ -74,6 +74,10 @@ function conectarConLaCaja({ cajaUrl, serverId, restaurantId, alRecibirEvento, l
   let intento = 0
   let vivo = true
   let abierto = false
+  let temporizador = null
+  let ultimoMotivo = null
+  let conectadoDesde = null
+  let eventosRecibidos = 0
 
   // El hub escucha SOLO en /ws (ws-hub.js:35: `if (req.url === '/ws')`, si no
   // `socket.destroy()`). Conectarse a la raiz da "socket hang up" sin ningun
@@ -92,6 +96,8 @@ function conectarConLaCaja({ cajaUrl, serverId, restaurantId, alRecibirEvento, l
     socket.on('open', () => {
       abierto = true
       intento = 0
+      ultimoMotivo = null
+      conectadoDesde = Date.now()
       // Se manda el cursor: la caja contesta con lo que falta desde ahí. Es el
       // catch-up de la terminal que estuvo apagada.
       socket.send(JSON.stringify({
@@ -160,6 +166,7 @@ function conectarConLaCaja({ cajaUrl, serverId, restaurantId, alRecibirEvento, l
   }
 
   const entregar = (ev) => {
+    eventosRecibidos++
     try { alRecibirEvento(ev) } catch (e) {
       // Un consumidor que truena no puede tumbar el enlace ni detener el resto
       // del catch-up.
@@ -169,18 +176,42 @@ function conectarConLaCaja({ cajaUrl, serverId, restaurantId, alRecibirEvento, l
 
   const reintentar = (motivo) => {
     if (!vivo) return
-    const espera = RECONEXION_MS[Math.min(intento, RECONEXION_MS.length - 1)]
+    if (temporizador) return   // ya hay un reintento en vuelo: 'close' y 'error'
+                               // llegan juntos y agendarian dos.
+    const base = RECONEXION_MS[Math.min(intento, RECONEXION_MS.length - 1)]
+    // JITTER. Sin el, las tres terminales de un restaurante se caen juntas cuando
+    // se reinicia la caja y vuelven a golpearla EXACTAMENTE al mismo milisegundo,
+    // una y otra vez. +-25% las separa.
+    const espera = Math.round(base * (0.75 + Math.random() * 0.5))
     intento++
-    console.warn(`${LOG} sin caja (${motivo}) — reintento en ${espera}ms`)
-    setTimeout(abrir, espera)
+    ultimoMotivo = motivo
+    console.warn(`${LOG} sin caja (${motivo}) — reintento ${intento} en ${espera}ms`)
+    temporizador = setTimeout(() => { temporizador = null; abrir() }, espera)
   }
 
   abrir()
 
   return {
-    detener: () => { vivo = false; try { socket?.close() } catch {} },
+    /** Cierre limpio: corta el reintento agendado ANTES de cerrar el socket, si no
+     *  el 'close' agenda otro y el proceso no termina nunca. */
+    detener: () => {
+      vivo = false
+      if (temporizador) { clearTimeout(temporizador); temporizador = null }
+      try { socket?.close() } catch {}
+      abierto = false
+    },
     cursor: () => cursor,
     conectado: () => abierto,
+    /** Estado observable, para /health y para diagnosticar en el restaurante. */
+    estado: () => ({
+      conectado: abierto,
+      caja: urlDelHub,
+      cursor,
+      eventos_recibidos: eventosRecibidos,
+      reintentos: intento,
+      ultimo_motivo: ultimoMotivo,
+      conectado_desde: conectadoDesde,
+    }),
   }
 }
 
