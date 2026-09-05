@@ -42,7 +42,9 @@ async function findExisting(platformOrderId: string) {
   return res.rows[0]?.id ?? null
 }
 
-async function resolveClientId(providerStoreId: string): Promise<string | null> {
+/** provider_store_id -> client_id. Exportado: el PING lo necesita para responder
+ *  por tienda en vez de decir OK a ciegas. */
+export async function resolveClientId(providerStoreId: string): Promise<string | null> {
   const encoded = encodeURIComponent(providerStoreId)
   const res = await sbJson<{ client_id: string }>(
     `integration_store_mappings?provider=eq.rappi&provider_store_id=eq.${encoded}&select=client_id&limit=1`
