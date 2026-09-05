@@ -51,6 +51,7 @@ import { buildUberAuthUrl, USL_SCOPES, MARKETPLACE_M2M_SCOPES, DELIVERY_M2M_SCOP
 import { createPromotion, buildSamplePromotion, promotionsScope } from '@/lib/integrations/uber-eats/promotions'
 import { requestReport, buildSampleReportRequest, getReportFile } from '@/lib/integrations/uber-eats/reporting'
 import { uploadMenu, getMenu, normalizeMenuPayload, updateMenuItem } from '@/lib/integrations/uber-eats/menu'
+import { resolveFulfillmentIssues } from '@/lib/integrations/uber-eats/adapter'
 
 // Menú mínimo válido para probar el cert "Menu: Update Item/modifier" (PUT full menu).
 function buildSampleMenu() {
@@ -183,6 +184,7 @@ export async function POST(request: NextRequest) {
   const storeId = body.store_id || 'a4f298f4-202f-47f5-b375-d2eefec0126c'
   const orderId = body.order_id || `CERT-${Date.now()}`
   const action = body.action || 'test_webhook'
+  const itemId = body.item_id
 
   const webhookSecret = process.env.UBER_WEBHOOK_SECRET
   if (!webhookSecret) {
@@ -346,6 +348,43 @@ export async function POST(request: NextRequest) {
     const corrId = crypto.randomUUID()
     const result = await markDeliveryOrderReady(orderId, corrId, storeId)
     return NextResponse.json({ action, correlation_id: corrId, order_id: orderId, ts: new Date().toISOString(), result })
+  }
+
+  // Cert "Order: Resolve for Fulfillment Issues" — merchant-initiated call on an ACTIVE
+  // order: mark an item OUT_OF_STOCK (fulfillable_quantity 0) →
+  // POST /v1/delivery/order/{id}/resolve-fulfillment-issues. Uber GTS (case #59731873)
+  // asked us to trigger this from our end. item_id must be Uber's cart item id (not our
+  // external_data); if not passed, we read the order and take the first cart item id.
+  if (action === 'resolve_fulfillment') {
+    if (!orderId || orderId.startsWith('CERT-')) {
+      return NextResponse.json({ error: 'provide a real order_id from Uber sandbox panel' }, { status: 400 })
+    }
+    const corrId = crypto.randomUUID()
+    let resolvedItemId = itemId
+    let orderPeek: unknown
+    if (!resolvedItemId) {
+      const details = await getDeliveryOrderDetails(orderId, `${corrId}-get`, storeId)
+      orderPeek = details.order
+      const o = details.order as { cart?: { items?: Array<{ id?: string }> }; items?: Array<{ id?: string }> } | undefined
+      resolvedItemId = o?.cart?.items?.[0]?.id ?? o?.items?.[0]?.id
+    }
+    if (!resolvedItemId) {
+      return NextResponse.json({
+        action, order_id: orderId, correlation_id: corrId,
+        error: 'no item_id found in order — pass item_id explicitly',
+        order_peek: orderPeek,
+      }, { status: 422 })
+    }
+    const result = await resolveFulfillmentIssues(
+      orderId,
+      [{ item_id: resolvedItemId, reason: 'OUT_OF_STOCK', fulfillable_quantity: 0 }],
+      corrId,
+      storeId,
+    )
+    return NextResponse.json({
+      action, order_id: orderId, item_id: resolvedItemId, correlation_id: corrId,
+      ts: new Date().toISOString(), result,
+    }, { status: result.ok ? 200 : 422 })
   }
 
   // ─── Diagnostic: scope probe (3 phases, by grant type) ───────────────────
