@@ -37,3 +37,11 @@ Ningun competidor en el vertical de POS para restaurantes en Mexico
 Contratar plataforma de compliance automatizado (Vanta, Drata, Secureframe o Scytale)
 para mapear estos controles a los Trust Service Criteria de SOC 2 y conectar evidencia
 automatica desde GitHub, Supabase, Vercel y Cloudflare.
+
+## Plan de certificaciones (gratis vs pagado)
+
+- [**Plan de Certificaciones**](../PLAN-CERTIFICACIONES.md) — las cuentas (qué es gratis, qué se
+  paga, cuánto y cuándo) + los pasos exactos para obtener los free certs (CSA STAR L1, PCI SAQ-A
+  AOC, escaneos públicos, ISC2 CC).
+- [**CAIQ — CSA STAR Nivel 1**](../CAIQ-STAR-L1.md) — autoevaluación contestada, lista para subir
+  al STAR Registry (certificación pública gratis).
