@@ -1,270 +1,136 @@
 'use strict'
-// ─── Print Queue ──────────────────────────────────────────────────────────────
-// Persistent print job queue backed by a JSON file.
-//
-// Guarantees:
-//   - A job is written to disk BEFORE the print attempt
-//   - POS or Local Server restart does not lose pending jobs
-//   - Each job has a stable UUID — retries do not generate new jobs
-//   - Manual reprint is distinguished from automatic retry (reprint: true)
-//   - Changing printer config while jobs are pending does not auto-reroute them
-//     (job stores printer_id + connection snapshot at enqueue time)
-//
-// Job status lifecycle:
-//   pending → printing → printed
-//          ↘ retrying ↗ ↘ failed        (content error — non-recoverable)
-//                        ↘ recoverable  (printer unavailable — re-queued on health restore)
-//   Any state → cancelled (manual)
-//
-// File format: single JSON array (queue is small; NDJSON not warranted here).
-// File is rewritten on every status change (atomic write via tmp + rename).
-
-const fs      = require('fs')
-const path    = require('path')
-const os      = require('os')
+// Durable print jobs. A restart during printing means outcome unknown: keep the
+// job visible for operator reconciliation, never automatically print it again.
+const fs = require('fs')
 const { randomUUID } = require('crypto')
-
-const VALID_STATUSES = ['pending', 'printing', 'printed', 'retrying', 'failed', 'recoverable', 'cancelled']
-const MAX_ATTEMPTS   = 3
-const JOB_TTL_MS     = 24 * 60 * 60 * 1000   // drop printed/failed jobs older than 24h on load
-
+const { replaceFile } = require('./storage/durable-file')
+const VALID_STATUSES = ['pending', 'printing', 'printed', 'retrying', 'failed', 'recoverable', 'uncertain', 'cancelled']
+const MAX_ATTEMPTS = 3
+const JOB_TTL_MS = 24 * 60 * 60 * 1000
+const clone = value => JSON.parse(JSON.stringify(value))
 let _filePath = null
-let _jobs     = []  // in-memory mirror
+let _jobs = []
+let _fault = null
 
-// ── Init ──────────────────────────────────────────────────────────────────────
-
-/**
- * Initialize the queue. Loads any pending jobs from disk.
- * Call once on server startup before processing any print jobs.
- *
- * @param {{ filePath: string }} opts
- */
 function init({ filePath }) {
   _filePath = filePath
-  _jobs = _load()
+  _fault = null
+  const loaded = _load()
+  const recovered = loaded.map(j => j.status === 'printing' ? {
+    ...j, status: 'uncertain', updated_at: new Date().toISOString(),
+    last_error: 'El proceso se interrumpió durante la impresión. Verifica el papel antes de reimprimir.',
+  } : j)
+  _jobs = loaded
+  if (recovered.some((j, i) => j !== loaded[i])) _commit(recovered)
   _gcOld()
-  console.log(`[print-queue] Loaded ${_jobs.length} jobs from disk (${_getPending().length} pending/retrying)`)
 }
-
-// ── Enqueue ───────────────────────────────────────────────────────────────────
-
-/**
- * Add a new print job to the queue.
- * The job is persisted to disk before returning.
- *
- * @param {{
- *   station_id: string,
- *   printer_id: string,
- *   printer_name: string,
- *   connection: object,         — snapshot of printer connection at enqueue time
- *   document_type: string,
- *   data_b64: string,           — base64 ESC/POS bytes
- *   copies?: number,
- *   reprint?: boolean,
- * }} opts
- * @returns {string} job_id
- */
-function enqueue(opts) {
-  const job = {
-    job_id:        randomUUID(),
-    station_id:    opts.station_id,
-    printer_id:    opts.printer_id,
-    printer_name:  opts.printer_name,
-    connection:    opts.connection,   // snapshot — not live config reference
-    document_type: opts.document_type || 'receipt',
-    data_b64:      opts.data_b64,
-    copies:        opts.copies || 1,
-    reprint:       opts.reprint || false,
-    status:        'pending',
-    created_at:    new Date().toISOString(),
-    updated_at:    new Date().toISOString(),
-    attempts:      0,
-    last_error:    null,
-  }
-  _jobs.push(job)
-  _persist()
-  return job.job_id
-}
-
-// ── Status transitions ────────────────────────────────────────────────────────
-
-function markPrinting(jobId) {
-  return _transition(jobId, 'printing', j => {
-    j.attempts += 1
-  })
-}
-
-function markPrinted(jobId) {
-  return _transition(jobId, 'printed', j => {
-    j.last_error = null
-  })
-}
-
-function markFailed(jobId, errorMsg) {
-  return _transition(jobId, 'failed', j => {
-    j.last_error = errorMsg || 'Unknown error'
-  })
-}
-
-function markRetrying(jobId, errorMsg) {
-  return _transition(jobId, 'retrying', j => {
-    j.last_error = errorMsg || null
-  })
-}
-
-function markCancelled(jobId) {
-  return _transition(jobId, 'cancelled')
-}
-
-/**
- * Mark a job as recoverable — printer was unavailable (connection error), not a content error.
- * Unlike `failed`, recoverable jobs are preserved by GC and can be re-queued via retryRecoverableJobs().
- * Call this instead of markFailed() when the print error is infrastructure (bridge down, printer offline).
- */
-function markRecoverable(jobId, errorMsg) {
-  return _transition(jobId, 'recoverable', j => {
-    j.last_error = errorMsg || 'Printer unavailable'
-  })
-}
-
-/**
- * Re-queue all recoverable jobs as pending (resets attempts to 0).
- * Call this when printer health is restored — bridge reconnect, USB re-plug, etc.
- * Returns array of revived job_ids.
- */
-function retryRecoverableJobs() {
-  const recoverable = _jobs.filter(j => j.status === 'recoverable')
-  if (recoverable.length === 0) return []
-  for (const job of recoverable) {
-    const idx = _jobs.findIndex(j => j.job_id === job.job_id)
-    if (idx >= 0) {
-      _jobs[idx] = {
-        ..._jobs[idx],
-        status: 'pending',
-        attempts: 0,
-        updated_at: new Date().toISOString(),
+function enqueueMany(options) {
+  const jobs = clone(_jobs)
+  const ids = []
+  for (const opts of options) {
+    const jobId = opts.job_id || randomUUID()
+    const existing = jobs.find(j => j.job_id === jobId)
+    if (existing) {
+      for (const key of ['station_id', 'printer_id', 'data_b64', 'document_type', 'copies']) {
+        const proposed = key === 'document_type' ? (opts[key] || 'receipt') : key === 'copies' ? (opts[key] || 1) : opts[key]
+        if (existing[key] !== proposed) throw new Error('PRINT_JOB_ID_REUSED: job content differs')
       }
+      ids.push(jobId)
+      continue
     }
+    const now = new Date().toISOString()
+    jobs.push({
+      job_id: jobId, command_id: opts.command_id || null,
+      station_id: opts.station_id, printer_id: opts.printer_id,
+      printer_name: opts.printer_name, connection: clone(opts.connection),
+      document_type: opts.document_type || 'receipt', data_b64: opts.data_b64,
+      copies: opts.copies || 1, copies_printed: 0, reprint: opts.reprint || false,
+      status: 'pending', created_at: now, updated_at: now, attempts: 0, last_error: null,
+    })
+    ids.push(jobId)
   }
-  _persist()
-  const ids = recoverable.map(j => j.job_id)
-  console.log(`[print-queue] Revived ${ids.length} recoverable job(s):`, ids)
+  if (jobs.length !== _jobs.length) _commit(jobs)
+  else _assertHealthy()
   return ids
 }
-
-function getRecoverableJobs() {
-  return _jobs.filter(j => j.status === 'recoverable')
+function enqueue(opts) { return enqueueMany([opts])[0] }
+function markPrinting(id) { return _transition(id, 'printing', j => { j.attempts++ }) }
+function markCopyPrinted(id) { return _transition(id, 'printing', j => { j.copies_printed = (j.copies_printed || 0) + 1 }) }
+function markPrinted(id) { return _transition(id, 'printed', j => { j.last_error = null }) }
+function markFailed(id, error) { return _transition(id, 'failed', j => { j.last_error = error || 'Unknown error' }) }
+function markRetrying(id, error) { return _transition(id, 'retrying', j => { j.last_error = error || null }) }
+function markRecoverable(id, error) { return _transition(id, 'recoverable', j => { j.last_error = error || 'Printer unavailable' }) }
+function markUncertain(id, error) { return _transition(id, 'uncertain', j => { j.last_error = error || 'Print outcome unknown; verify paper before reprinting' }) }
+function markCancelled(id) { return _transition(id, 'cancelled') }
+function resolveUncertain(id, outcome) {
+  if (getJob(id)?.status !== 'uncertain') return false
+  if (outcome === 'printed') return markPrinted(id)
+  if (outcome === 'reprint') return _transition(id, 'pending', j => {
+    j.reprint = true; j.attempts = 0; j.last_error = 'Reimpresión solicitada tras verificar el resultado incierto'
+  })
+  throw new Error('Expected printed or reprint reconciliation')
 }
-
-// ── Queries ───────────────────────────────────────────────────────────────────
-
-function getJob(jobId) {
-  return _jobs.find(j => j.job_id === jobId) || null
+function retryRecoverableJobs() {
+  const ids = _jobs.filter(j => j.status === 'recoverable').map(j => j.job_id)
+  if (ids.length) _commit(_jobs.map(j => ids.includes(j.job_id) ? {
+    ...j, status: 'pending', attempts: 0, updated_at: new Date().toISOString(),
+  } : j))
+  return ids
 }
-
-function getAllJobs() {
-  return [..._jobs]
+function getJob(id) { const j = _jobs.find(j => j.job_id === id); return j ? clone(j) : null }
+function getAllJobs() { return clone(_jobs) }
+function getPendingJobs() { return clone(_getPending()) }
+function getJobsByStatus(status) { return clone(_jobs.filter(j => j.status === status)) }
+function getRecoverableJobs() { return getJobsByStatus('recoverable') }
+function getUncertainJobs() { return getJobsByStatus('uncertain') }
+function canRetry(id) {
+  const job = getJob(id)
+  return !!job && job.attempts < MAX_ATTEMPTS && ['pending', 'retrying', 'printing', 'recoverable'].includes(job.status)
 }
-
-function getPendingJobs() {
-  return _getPending()
-}
-
-function getJobsByStatus(status) {
-  return _jobs.filter(j => j.status === status)
-}
-
-// ── Retry logic ───────────────────────────────────────────────────────────────
-
-/**
- * Should this job be automatically retried?
- * Returns false if max attempts reached or job was manually cancelled.
- */
-function canRetry(jobId) {
-  const job = getJob(jobId)
-  if (!job) return false
-  return job.attempts < MAX_ATTEMPTS && job.status !== 'cancelled'
-}
-
-// ── Internal ─────────────────────────────────────────────────────────────────
-
-function _getPending() {
-  return _jobs.filter(j => j.status === 'pending' || j.status === 'retrying')
-}
-
-function _transition(jobId, newStatus, mutate) {
-  const idx = _jobs.findIndex(j => j.job_id === jobId)
-  if (idx < 0) {
-    console.warn(`[print-queue] Job not found: ${jobId}`)
-    return false
-  }
-  if (!VALID_STATUSES.includes(newStatus)) {
-    console.warn(`[print-queue] Invalid status: ${newStatus}`)
-    return false
-  }
-  _jobs[idx] = { ..._jobs[idx], status: newStatus, updated_at: new Date().toISOString() }
-  if (mutate) mutate(_jobs[idx])
-  _persist()
+function _getPending() { return _jobs.filter(j => j.status === 'pending' || j.status === 'retrying') }
+function _transition(id, status, mutate) {
+  _assertHealthy()
+  const idx = _jobs.findIndex(j => j.job_id === id)
+  if (idx < 0 || !VALID_STATUSES.includes(status)) return false
+  const jobs = clone(_jobs)
+  jobs[idx] = { ...jobs[idx], status, updated_at: new Date().toISOString() }
+  if (mutate) mutate(jobs[idx])
+  _commit(jobs)
   return true
 }
-
 function _load() {
-  if (!_filePath) return []
-  try {
-    if (!fs.existsSync(_filePath)) return []
-    const raw = fs.readFileSync(_filePath, 'utf8')
-    const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return []
-    return parsed.filter(j => j && j.job_id && j.status)
-  } catch (e) {
-    console.warn('[print-queue] Error loading queue file:', e.message)
-    return []
-  }
+  if (!_filePath || !fs.existsSync(_filePath)) return []
+  const jobs = JSON.parse(fs.readFileSync(_filePath, 'utf8'))
+  const ids = new Set()
+  if (!Array.isArray(jobs) || jobs.some(j => {
+    if (!j || !j.job_id || !VALID_STATUSES.includes(j.status) || ids.has(j.job_id)) return true
+    ids.add(j.job_id); return false
+  })) throw new Error('PRINT_QUEUE_CORRUPT: refusing to discard unresolved jobs')
+  return jobs
 }
-
-function _persist() {
-  if (!_filePath) return
-  try {
-    const tmp = _filePath + '.tmp'
-    fs.writeFileSync(tmp, JSON.stringify(_jobs, null, 2), 'utf8')
-    fs.renameSync(tmp, _filePath)
-  } catch (e) {
-    console.error('[print-queue] Error persisting queue:', e.message)
-  }
+function _assertHealthy() {
+  if (!_filePath) throw new Error('PRINT_QUEUE_NOT_INITIALIZED')
+  if (_fault) throw new Error(`PRINT_QUEUE_UNAVAILABLE: ${_fault.message}`)
 }
-
+function _commit(jobs) {
+  _assertHealthy()
+  try { replaceFile(_filePath, JSON.stringify(jobs, null, 2)) } catch (error) {
+    _fault = error // a rename might already have succeeded; reload before further effects.
+    throw error
+  }
+  _jobs = jobs
+}
+function _persist() { _commit(_jobs) }
 function _gcOld() {
   const cutoff = Date.now() - JOB_TTL_MS
-  const before = _jobs.length
-  _jobs = _jobs.filter(j => {
-    if (j.status === 'pending' || j.status === 'retrying' || j.status === 'recoverable') return true
-    return new Date(j.created_at).getTime() > cutoff
-  })
-  if (_jobs.length < before) {
-    _persist()
-    console.log(`[print-queue] GC: removed ${before - _jobs.length} old jobs`)
-  }
+  // Command-owned receipts must survive as long as their event can be replayed.
+  const jobs = _jobs.filter(j => j.command_id || !['printed', 'failed', 'cancelled'].includes(j.status) || new Date(j.created_at).getTime() > cutoff)
+  if (jobs.length !== _jobs.length) _commit(jobs)
 }
-
-// ── Exports ───────────────────────────────────────────────────────────────────
-
 module.exports = {
-  init,
-  enqueue,
-  markPrinting,
-  markPrinted,
-  markFailed,
-  markRetrying,
-  markCancelled,
-  markRecoverable,
-  retryRecoverableJobs,
-  getRecoverableJobs,
-  getJob,
-  getAllJobs,
-  getPendingJobs,
-  getJobsByStatus,
-  canRetry,
-  MAX_ATTEMPTS,
-  VALID_STATUSES,
+  init, enqueue, enqueueMany, markPrinting, markCopyPrinted, markPrinted, markFailed,
+  markRetrying, markCancelled, markRecoverable, markUncertain, resolveUncertain,
+  retryRecoverableJobs, getRecoverableJobs, getUncertainJobs, getJob, getAllJobs,
+  getPendingJobs, getJobsByStatus, canRetry, MAX_ATTEMPTS, VALID_STATUSES,
   _forTesting: { _load, _persist, _gcOld, _getPending },
 }
