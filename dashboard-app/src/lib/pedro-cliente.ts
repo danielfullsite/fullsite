@@ -60,6 +60,53 @@ const SIN_PEDRO: LecturaDelSalon = {
 }
 
 /**
+ * Qué mesas están OCUPADAS, según Pedro.
+ *
+ * ── POR QUÉ NO BASTA `kds_orders` ────────────────────────────────────────────
+ *
+ * `kds_orders` contesta «¿qué está cocinando?», no «¿qué mesas están ocupadas?».
+ * Son dos preguntas distintas y `toSnapshot` (state.js) filtra la primera con
+ * `KDS_HIDDEN_STATUS = ['entregada','cerrada','cancelada','pagada']`.
+ *
+ * O sea: una mesa que YA COMIÓ y espera la cuenta —`entregada`, sin pagar— no
+ * aparece ahí. Leyendo sólo `kds_orders`, el mapa la pintaba LIBRE y el host
+ * sentaba gente encima de una cuenta abierta.
+ *
+ * Es un P0 que introdujo la primera versión de este archivo: antes del cambio el
+ * mapa le pedía a Supabase `status=in.(enviada,preparando,lista,abierta,
+ * entregada)` — un superconjunto. Pasar a `kds_orders` PERDIÓ estados.
+ *
+ * ── LA UNIÓN, Y DE DÓNDE SALE ────────────────────────────────────────────────
+ *
+ * `mesas` sí responde la pregunta correcta: Pedro sólo la marca `libre` al
+ * cerrar o cancelar (state.js:158,166). Se unen las dos fuentes por id, que es
+ * exactamente lo que ya hacía `pos/monitor/page.tsx:59-67`. Se sigue ese patrón
+ * en vez de inventar otro: si mañana cambia, cambian los dos juntos.
+ */
+function ocupacionDelSalon(cuerpo: Record<string, unknown>): Record<string, unknown>[] {
+  const porId = new Map<string, Record<string, unknown>>()
+
+  // Las que cocina conoce llegan completas (mesero, total, items…).
+  for (const o of (Array.isArray(cuerpo.kds_orders) ? cuerpo.kds_orders : []) as Record<string, unknown>[]) {
+    const id = String(o?.id ?? o?.order_id ?? '')
+    if (id) porId.set(id, o)
+  }
+
+  // Y las que ya no cocina pero SIGUEN debiendo. Traen menos datos —sólo mesa y
+  // id— y aun así la mesa tiene que verse ocupada: media verdad es infinitamente
+  // mejor que pintarla libre.
+  const mesas = (cuerpo.mesas ?? {}) as Record<string, { status?: string; order_id?: string }>
+  for (const [mesa, entrada] of Object.entries(mesas)) {
+    const id = String(entrada?.order_id ?? '')
+    if (!id || porId.has(id)) continue
+    if (entrada?.status === 'libre') continue
+    porId.set(id, { id, mesa: Number(mesa) || null, status: entrada?.status ?? 'ocupada' })
+  }
+
+  return [...porId.values()]
+}
+
+/**
  * El salón, preguntándole a Pedro.
  *
  * NUNCA lanza: el mapa de mesas no puede quedarse en blanco porque el servidor
@@ -88,9 +135,7 @@ export async function leerSalon(): Promise<LecturaDelSalon> {
   // cross-origin salvo que el servidor la exponga — y un consumidor puede no
   // mirarla nunca. El cuerpo obliga a decidir.
   const autoritativa = cuerpo.authoritative === true
-  const ordenes = Array.isArray(cuerpo.kds_orders)
-    ? (cuerpo.kds_orders as Record<string, unknown>[])
-    : []
+  const ordenes = ocupacionDelSalon(cuerpo)
 
   return {
     procedencia: autoritativa ? 'caja' : 'local-degradado',
@@ -130,6 +175,49 @@ export async function leerEventosDesde(cursor: number): Promise<LecturaDeEventos
   } catch (e) {
     return { eventos: [], determinado: false, motivo: e instanceof Error ? e.message : String(e) }
   }
+}
+
+/**
+ * La orden COMPLETA de una mesa, según la caja — con sus platillos.
+ *
+ * ── POR QUÉ EXISTE ───────────────────────────────────────────────────────────
+ *
+ * El mapa empezó a pintar mesas ocupadas con lo que dice Pedro, pero el editor
+ * (`pos/page.tsx`) nunca le pregunta: sólo mira Supabase y, sin internet,
+ * `localStorage.pos_order_N`. Una terminal que nunca abrió esa mesa no tiene esa
+ * llave, así que el mesero veía la mesa ocupada, la tocaba… y se le abría una
+ * cuenta VACÍA, idéntica a una mesa nueva.
+ *
+ * Lo caro no es la pantalla vacía: es lo que hace el mesero después. Recaptura,
+ * envía, y al reconectar sube una SEGUNDA orden abierta para la misma mesa. El
+ * repo ya se lo había documentado a sí mismo (pos-offline-db.ts): «El mesero
+ * sienta gente en una mesa que debe $713, o le abre segunda cuenta».
+ *
+ * Pedro YA mandaba los platillos —`kds_orders[].items`, un JSON en texto— y este
+ * archivo los descartaba al traducir. No hay que cambiar el servidor: hay que
+ * dejar de tirar el dato.
+ *
+ * Devuelve `null` cuando no se pudo saber Y cuando la mesa no tiene orden. Quien
+ * llama DEBE distinguirlo mirando `procedencia`: tratar «no pude preguntar» como
+ * «no hay nada» es la familia de bugs que costó la semana.
+ */
+export async function leerOrdenDeMesa(mesa: number): Promise<{
+  lectura: LecturaDelSalon
+  orden: Record<string, unknown> | null
+}> {
+  const lectura = await leerSalon()
+  if (!lectura.autoritativa) return { lectura, orden: null }
+
+  const orden = lectura.ordenes.find((o) => Number(o.mesa) === Number(mesa)) ?? null
+  if (!orden) return { lectura, orden: null }
+
+  // `items` viaja como texto JSON (state.js lo guarda serializado). Se parsea
+  // aquí para que quien llame reciba lo mismo que recibiría de Supabase.
+  let items: unknown = orden.items
+  if (typeof items === 'string') {
+    try { items = JSON.parse(items) } catch { items = [] }
+  }
+  return { lectura, orden: { ...orden, items: Array.isArray(items) ? items : [] } }
 }
 
 /** Lo que el mapa de mesas necesita de cada orden. */

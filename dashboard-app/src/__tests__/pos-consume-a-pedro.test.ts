@@ -143,6 +143,114 @@ describe('Cuando Pedro no está', () => {
   })
 })
 
+describe('Una mesa entregada SIN pagar sigue ocupada (P0)', () => {
+  // `kds_orders` contesta «que esta cocinando», no «que mesas estan ocupadas», y
+  // toSnapshot lo filtra con KDS_HIDDEN_STATUS = entregada/cerrada/cancelada/pagada.
+  // Leyendo solo de ahi, una mesa que ya comio y espera la cuenta se pintaba
+  // LIBRE — y el host sentaba gente encima de una cuenta abierta.
+  //
+  // Antes del cambio, el mapa le pedia a Supabase
+  // status=in.(enviada,preparando,lista,abierta,entregada): un superconjunto.
+  const ENTREGADA_SIN_PAGAR = {
+    sequence: 9, authoritative: true, source: 'caja',
+    // Cocina ya no la tiene: fue entregada.
+    kds_orders: [],
+    // Pero la mesa NO esta libre: debe dinero.
+    mesas: { '12': { status: 'ocupada', order_id: 'o-debe' } },
+  }
+
+  it('REGRESION: la mesa entregada aparece OCUPADA, no libre', async () => {
+    respuesta = { status: 200, cuerpo: ENTREGADA_SIN_PAGAR }
+    const { leerSalon } = await cargar()
+
+    const s = await leerSalon()
+
+    expect(s.ordenes, 'una mesa que debe dinero NO puede desaparecer del mapa').toHaveLength(1)
+    expect(Number(s.ordenes[0].mesa)).toBe(12)
+    expect(String(s.ordenes[0].id)).toBe('o-debe')
+  })
+
+  it('una mesa LIBRE no se inventa como ocupada', async () => {
+    respuesta = { status: 200, cuerpo: {
+      sequence: 1, authoritative: true, source: 'caja', kds_orders: [],
+      mesas: { '3': { status: 'libre', order_id: null }, '4': { status: 'libre', order_id: 'viejo' } },
+    } }
+    const { leerSalon } = await cargar()
+    expect((await leerSalon()).ordenes).toHaveLength(0)
+  })
+
+  it('no se duplica: la misma orden en kds_orders y en mesas cuenta una vez', async () => {
+    respuesta = { status: 200, cuerpo: {
+      sequence: 1, authoritative: true, source: 'caja',
+      kds_orders: [{ id: 'o-1', mesa: 5, mesero: 'Ana', total: 300 }],
+      mesas: { '5': { status: 'ocupada', order_id: 'o-1' } },
+    } }
+    const { leerSalon } = await cargar()
+    const s = await leerSalon()
+    expect(s.ordenes).toHaveLength(1)
+    expect(s.ordenes[0].mesero, 'gana la version RICA, la de cocina').toBe('Ana')
+  })
+})
+
+describe('El editor puede pedirle la orden a la caja', () => {
+  // El mapa pintaba la mesa ocupada y el editor abria una cuenta VACIA: solo
+  // miraba Supabase y localStorage. Pedro YA mandaba los platillos y este
+  // archivo los tiraba al traducir.
+  const CON_PLATILLOS = {
+    sequence: 9, authoritative: true, source: 'caja',
+    kds_orders: [{
+      id: 'o-12', mesa: 12, mesero: 'Eduardo', status: 'enviada', total: 865,
+      // Pedro los guarda SERIALIZADOS (state.js).
+      items: JSON.stringify([{ nombre: 'Arrachera', cantidad: 2 }, { nombre: 'Agua', cantidad: 4 }]),
+    }],
+    mesas: { '12': { status: 'ocupada', order_id: 'o-12' } },
+  }
+
+  it('REGRESION: devuelve la orden CON sus platillos, parseados', async () => {
+    respuesta = { status: 200, cuerpo: CON_PLATILLOS }
+    const { leerOrdenDeMesa } = await cargar()
+
+    const { orden, lectura } = await leerOrdenDeMesa(12)
+
+    expect(lectura.autoritativa).toBe(true)
+    expect(orden, 'la mesa 12 tiene orden en la caja').not.toBeNull()
+    expect(Array.isArray(orden!.items), 'los items llegan como arreglo, no como texto').toBe(true)
+    expect((orden!.items as unknown[]).length).toBe(2)
+    expect(orden!.total).toBe(865)
+  })
+
+  it('una mesa sin orden devuelve null, pero con lectura AUTORITATIVA', async () => {
+    // La diferencia que importa: aqui SI se sabe que no hay nada.
+    respuesta = { status: 200, cuerpo: CON_PLATILLOS }
+    const { leerOrdenDeMesa } = await cargar()
+    const { orden, lectura } = await leerOrdenDeMesa(99)
+    expect(orden).toBeNull()
+    expect(lectura.autoritativa, 'se pudo preguntar: la mesa 99 de verdad esta libre').toBe(true)
+  })
+
+  it('REGRESION: sin caja devuelve null pero NO autoritativa', async () => {
+    // Quien llame DEBE distinguir «no hay orden» de «no pude preguntar». Tratar
+    // lo segundo como lo primero es la familia de bugs que costo la semana.
+    respuesta = { status: 503, cuerpo: {} }
+    const { leerOrdenDeMesa } = await cargar()
+    const { orden, lectura } = await leerOrdenDeMesa(12)
+    expect(orden).toBeNull()
+    expect(lectura.autoritativa).toBe(false)
+    expect(lectura.procedencia).toBe('sin-pedro')
+  })
+
+  it('items corruptos no tumban al editor', async () => {
+    respuesta = { status: 200, cuerpo: {
+      sequence: 1, authoritative: true, source: 'caja',
+      kds_orders: [{ id: 'o-1', mesa: 7, items: 'no soy json' }],
+      mesas: {},
+    } }
+    const { leerOrdenDeMesa } = await cargar()
+    const { orden } = await leerOrdenDeMesa(7)
+    expect(orden!.items).toEqual([])
+  })
+})
+
 describe('El cursor y los eventos', () => {
   it('REGRESION: se pide con `since` — sin él la caja devuelve el día entero', async () => {
     pedidos.length = 0

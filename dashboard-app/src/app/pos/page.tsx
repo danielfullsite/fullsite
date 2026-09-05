@@ -2188,6 +2188,40 @@ function POSContent() {
           }
         }
       } catch (err) {
+        // ── Antes del caché local: PREGUNTARLE A LA CAJA ──────────────────
+        //
+        // El mapa de mesas ya pinta ocupado con lo que dice Pedro. Si el editor
+        // sólo mira Supabase y `pos_order_N`, una terminal que nunca abrió esa
+        // mesa muestra la mesa ocupada y abre una cuenta VACÍA — idéntica a una
+        // mesa nueva.
+        //
+        // Lo caro no es la pantalla: el mesero recaptura, envía, y al reconectar
+        // sube una SEGUNDA orden abierta para la misma mesa. El repo ya se lo
+        // había documentado a sí mismo (pos-offline-db.ts): «El mesero sienta
+        // gente en una mesa que debe $713, o le abre segunda cuenta».
+        //
+        // La caja es la autoridad dentro del restaurante, así que va ANTES que
+        // el caché de esta terminal. Si no contesta, se sigue como siempre.
+        if (!cancelled) {
+          try {
+            const { leerOrdenDeMesa } = await import('@/lib/pedro-cliente')
+            const { orden } = await leerOrdenDeMesa(mesa)
+            const itemsDeLaCaja = Array.isArray(orden?.items) ? orden!.items as OrderItem[] : []
+            if (itemsDeLaCaja.length > 0) {
+              setOrderItems(itemsDeLaCaja)
+              setOrderId(String(orden!.id ?? orden!.order_id ?? generateId()))
+              if (orden!.mesero) setMesero(String(orden!.mesero))
+              if (orden!.personas) setPersonas(Number(orden!.personas))
+              // Los items ya están en cocina: se marcan como enviados para que
+              // "Enviar" no los duplique. Sin esto, el mesero reimprime la mesa
+              // entera y la cocina hace todo dos veces.
+              setSentItemIds(new Set(itemsDeLaCaja.map(i => i.id)))
+              setLoadingMesa(false)
+              return
+            }
+          } catch { /* la caja no contesta: se sigue con el caché local */ }
+        }
+
         // Network error — fall back to localStorage cache (stale is better than blank)
         console.warn('[loadMesaOrder] network error, using cached order:', err)
         if (!cancelled) {
