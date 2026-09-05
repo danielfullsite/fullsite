@@ -26,7 +26,7 @@ class CoreEventStore {
    * @param {{ eventType: string, ts?: number }} opts
    * @returns {Promise<{ event: LocalEvent, duplicate: boolean }>}
    */
-  async processCommand(cmd, { eventType, buildEffects }) {
+  async processCommand(cmd, { eventType, buildEffects, buildResult }) {
     const event = {
       id: cmd.command_id,
       type: eventType,
@@ -43,12 +43,12 @@ class CoreEventStore {
       const result = await inFlight.promise
       return { ...result, duplicate: true }
     }
-    const promise = this._procesarComando(event, buildEffects)
+    const promise = this._procesarComando(event, buildEffects, buildResult)
     this._enVuelo.set(cmd.command_id, { event, promise })
     try { return await promise } finally { this._enVuelo.delete(cmd.command_id) }
   }
 
-  async _procesarComando(event, buildEffects) {
+  async _procesarComando(event, buildEffects, buildResult) {
     const existing = await this._store.getProcessedCommand(event.id)
     if (existing) {
       if (!sameCommand(existing, event)) throw new Error('IDEMPOTENCY_KEY_REUSED: command content differs')
@@ -57,6 +57,7 @@ class CoreEventStore {
     // Effect intents (including printer routing snapshots) are part of the same
     // durable transaction. Preparing them may validate, but must perform no IO effects.
     if (buildEffects) event.effects = await buildEffects()
+    if (buildResult) event.result = await buildResult()
     return this._store.commitCommand(event)
   }
 
