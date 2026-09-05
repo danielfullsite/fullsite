@@ -362,15 +362,40 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'provide a real order_id from Uber sandbox panel' }, { status: 400 })
     }
     const corrId = crypto.randomUUID()
-    const resolvedItemId = itemId || 'fs-item-1'
     const issueType = body.issue_type || 'OUT_OF_ITEM'
     const actionType = body.action_type || 'REMOVE_ITEM'
     const itemName = body.item_name || 'Cafe Americano'
+    // The v1 delivery order GET does NOT include line items. Uber's resolve wants the
+    // per-order cart_item_id, so fetch the full order (v2) and extract it. body.item_id
+    // (other than the menu default) overrides.
+    let cartItemId = itemId && itemId !== 'fs-item-1' ? itemId : undefined
+    let v2peek: unknown
+    if (!cartItemId) {
+      const vr = await uberFetch(`/v2/eats/orders/${encodeURIComponent(orderId)}`, { method: 'GET', tokenType: 'marketplace', storeId })
+      const vt = await vr.text()
+      try { v2peek = vt ? JSON.parse(vt) : vt } catch { v2peek = vt }
+      const found: string[] = []
+      const hunt = (x: unknown): void => {
+        if (Array.isArray(x)) { x.forEach(hunt); return }
+        if (x && typeof x === 'object') {
+          const o = x as Record<string, unknown>
+          if (typeof o.cart_item_id === 'string') found.push(o.cart_item_id)
+          if (typeof o.instance_id === 'string') found.push(o.instance_id)
+          Object.values(o).forEach(hunt)
+        }
+      }
+      hunt(v2peek)
+      cartItemId = found[0]
+    }
+    if (!cartItemId) {
+      return NextResponse.json({ action, order_id: orderId, correlation_id: corrId,
+        error: 'no cart_item_id found — pass item_id explicitly', v2_order: v2peek }, { status: 422 })
+    }
     const fbody = {
       fulfillment_issues: [{
         issue_type: issueType,
         action_type: actionType,
-        item: { id: resolvedItemId, name: itemName },
+        item: { cart_item_id: cartItemId, name: itemName },
       }],
     }
     const r = await uberFetch(`/v1/delivery/order/${encodeURIComponent(orderId)}/resolve-fulfillment-issues`, {
@@ -380,7 +405,7 @@ export async function POST(request: NextRequest) {
     let parsed: unknown
     try { parsed = text ? JSON.parse(text) : null } catch { parsed = text }
     return NextResponse.json({
-      action, order_id: orderId, item_id: resolvedItemId, correlation_id: corrId,
+      action, order_id: orderId, cart_item_id: cartItemId, correlation_id: corrId,
       sent: fbody, http_status: r.status, response: parsed, ts: new Date().toISOString(),
     }, { status: r.ok ? 200 : 422 })
   }
