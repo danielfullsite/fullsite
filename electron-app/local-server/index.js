@@ -109,9 +109,11 @@ function buildDeliveryTicket(command, station) {
   )
 }
 
-async function startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, serviceEmail, servicePassword, state, eventStore, wsHub, cmdHandler }) {
+async function startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, branchId, serviceEmail, servicePassword, state, eventStore, wsHub, cmdHandler }) {
   if (!supabaseUrl || !supabaseKey) return
   const POLL_INTERVAL = 5000
+  const { readOperationalOrders } = require('./core/operational-order-poll')
+  let polling = false
 
   // Auth SCOPED al tenant. Si hay una service-account (usuario Supabase miembro
   // SOLO de este client_id), se usa su JWT (role authenticated) → la RLS deja leer
@@ -120,49 +122,47 @@ async function startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, servi
   // configurada — tras el RLS lockdown ese fallback devuelve 0 filas, por eso se
   // recomienda configurar la service-account por restaurante.
   let _tok = null, _tokExp = 0
-  async function getBearer() {
+  async function getBearer(signal) {
     if (!serviceEmail || !servicePassword) return supabaseKey
     if (_tok && Date.now() < _tokExp - 60000) return _tok
     try {
       const r = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
         method: 'POST',
+        signal,
         headers: { apikey: supabaseKey, 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: serviceEmail, password: servicePassword }),
       })
-      if (!r.ok) return supabaseKey
+      if (!r.ok) return null
       const j = await r.json()
       _tok = j.access_token
       _tokExp = Date.now() + (Number(j.expires_in) || 3600) * 1000
-      return _tok || supabaseKey
-    } catch { return supabaseKey }
+      return _tok || null
+    } catch { return null }
   }
 
   async function poll() {
+    if (polling) return
+    polling = true
+    const controller = new AbortController()
+    const t = setTimeout(() => controller.abort(), 6000)
     try {
-      const controller = new AbortController()
-      const t = setTimeout(() => controller.abort(), 6000)
-
-      const bearer = await getBearer()
+      const bearer = await getBearer(controller.signal)
+      if (!bearer) return
+      const locationFilter = branchId ? `&location_id=eq.${encodeURIComponent(branchId)}` : ''
       const turnoRes = await fetch(
-        `${supabaseUrl}/rest/v1/pos_turnos?client_id=eq.${encodeURIComponent(restaurantId)}&closed_at=is.null&select=id,opened_by,opened_at&order=opened_at.desc`,
+        `${supabaseUrl}/rest/v1/pos_turnos?client_id=eq.${encodeURIComponent(restaurantId)}&closed_at=is.null&select=id,opened_by,opened_at&order=opened_at.desc${locationFilter}`,
         {
           headers: { apikey: supabaseKey, Authorization: `Bearer ${bearer}` },
           signal: controller.signal,
         }
       )
-      const activeTurnos = turnoRes.ok ? await turnoRes.json() : []
+      if (!turnoRes.ok) return
+      const activeTurnos = await turnoRes.json()
+      if (!Array.isArray(activeTurnos)) return
       const activeTurno = activeTurnos[0] || null
-      const res = await fetch(
-        `${supabaseUrl}/rest/v1/pos_orders?client_id=eq.${encodeURIComponent(restaurantId)}&status=neq.closed&select=id,mesa,status,items,turno_id,updated_at`,
-        {
-          headers: { apikey: supabaseKey, Authorization: `Bearer ${bearer}` },
-          signal:  controller.signal,
-        }
-      ).finally(() => clearTimeout(t))
-
-      if (!res.ok) return
-
-      const orders = await res.json()
+      const orders = await readOperationalOrders({ supabaseUrl, restaurantId, branchId,
+        turnoId: activeTurno?.id,
+        headers: { apikey: supabaseKey, Authorization: `Bearer ${bearer}` }, signal: controller.signal })
       // A restaurant can have historical/open-order residue from an older shift.
       // Only the newest active shift belongs on today's operational surfaces. A
       // duplicate active shift is reported in the turno snapshot for remediation,
@@ -184,7 +184,7 @@ async function startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, servi
           const command = deliveryOrderCommand(row, restaurantId)
           const ingestResult = await cmdHandler.handle({ protocol_version: PROTOCOL_VERSION, type: 'COMMAND', restaurant_id: restaurantId, payload: command }, 'delivery-poll')
           // This event originated in Supabase; do not echo it back through the outbox.
-          if (ingestResult.event?.sequence) await eventStore.markSynced(ingestResult.event.sequence)
+          if (ingestResult.event?.sequence) await eventStore.markSynced([ingestResult.event.sequence])
           for (const station of ['cocina', 'barra', 'caja']) {
             const ticket = buildDeliveryTicket(command, station)
             if (!ticket) continue
@@ -192,7 +192,7 @@ async function startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, servi
               protocol_version: PROTOCOL_VERSION, type: 'COMMAND', restaurant_id: restaurantId,
               payload: { command_id: `delivery-print:${row.platform}:${row.platform_order_id}:${station}`, command_type: 'PRINT_COMMAND', station, data_b64: ticket.toString('base64') },
             }, 'delivery-poll')
-            if (printResult.event?.sequence) await eventStore.markSynced(printResult.event.sequence)
+            if (printResult.event?.sequence) await eventStore.markSynced([printResult.event.sequence])
           }
         }
       }
@@ -200,12 +200,15 @@ async function startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, servi
       // Build mesa state from active orders
       const mesaMap = {}
       for (const o of operationalOrders) {
+        if (['cerrada', 'pagada', 'cancelada', 'closed'].includes(o.status)) continue
         mesaMap[String(o.mesa)] = { status: o.status === 'pagando' ? 'pagando' : 'ocupada', order_id: o.id }
       }
 
       const event = await eventStore.appendInternal(EVENT.STATE_SYNC, {
+        orders:     operationalOrders,
+        order_snapshot_complete: true,
         mesas:      Object.entries(mesaMap).map(([mesa, v]) => ({ mesa, ...v })),
-        kds_queue:  operationalOrders.filter(o => o.status === 'enviada' || o.status === 'preparando').map(o => ({
+        kds_queue:  operationalOrders.filter(o => o.status === 'enviada' || o.status === 'preparando' || o.status === 'lista').map(o => ({
           order_id: o.id, mesa: o.mesa, items_sent: o.items, sent_at: o.updated_at, turno_id: o.turno_id,
         })),
         turno:      activeTurno ? {
@@ -227,10 +230,8 @@ async function startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, servi
 
       heartbeat.recordSync()
     } catch (err) {
-      if (err.name !== 'AbortError') {
-        console.warn('[supabase-poll] Error (non-fatal):', err.message)
-      }
-    }
+      console.warn('[supabase-poll] Snapshot omitido:', err.name === 'AbortError' ? 'deadline total de 6s excedido' : err.message)
+    } finally { clearTimeout(t); polling = false }
   }
 
   await poll() // immediate first poll
@@ -310,7 +311,7 @@ function forwardGet(targetUrl, credenciales = {}) {
 }
 
 /** Lecturas que una terminal secundaria puede hacerle a la caja. */
-const LECTURAS_REENVIADAS = ['/state', '/events']
+const LECTURAS_REENVIADAS = ['/state', '/events', '/print/uncertain']
 
 // Keep identity and routing configuration explicit so every cloned terminal can
 // discover the caja without relying on process-global or customer-specific state.
@@ -322,14 +323,14 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, versio
   // Se calcula UNA vez, no por peticion: es el mismo secreto toda la vida del
   // proceso y recalcularlo en cada comanda no aporta nada.
   const credencialesHaciaLaCaja = credLan.cabecerasDeCredencial({
-    secreto: config.lanSecret || null, restaurantId, terminalId: config.terminalId,
+    secreto: config.lanSecret || null, restaurantId, terminalId: config.terminalId, branchId,
   })
   return async function router(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
     // Sin listar la cabecera de credencial, el preflight la rechaza y el POS
     // recibe un error de red sin explicacion.
-    res.setHeader('Access-Control-Allow-Headers', `Content-Type, ${credLan.CABECERA}, x-fullsite-restaurante, x-fullsite-terminal`)
+    res.setHeader('Access-Control-Allow-Headers', `Content-Type, ${credLan.CABECERA}, x-fullsite-restaurante, x-fullsite-terminal, x-fullsite-sucursal`)
     // Chrome/Electron sends a Private Network Access preflight when the POS
     // loaded from https://app.fullsite.mx calls its bridge on localhost/LAN.
     // A top-level navigation to /health works without this header, while fetch()
@@ -367,7 +368,7 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, versio
     // puente. Ver core/credencial-lan.js.
     const credencial = credLan.verificarCredencial({
       ruta: url, metodo: req.method, cabeceras: req.headers,
-      secreto: config.lanSecret || null, restaurantId,
+      secreto: config.lanSecret || null, restaurantId, branchId,
     })
     if (!credencial.permitido) {
       console.warn(`${credLan.LOG} rechazada ${req.method} ${url} desde ${req.socket?.remoteAddress}: ${credencial.motivo}`)
@@ -383,7 +384,7 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, versio
     // of truth. Its POS page is https and CANNOT POST to the caja's http LAN IP
     // (mixed content). So it POSTs to THIS local server (127.0.0.1, exempt from the
     // wall) and we forward /print, /events and /drawer to the caja over Node http.
-    if (posServerIp && req.method === 'POST' && (url === '/print' || url === '/events' || url === '/drawer')) {
+    if (posServerIp && req.method === 'POST' && (url === '/print' || url === '/events' || url === '/drawer' || url === '/print/resolve')) {
       try {
         const body = await parseBody(req)
         const up = await forwardPost(`http://${posServerIp}:${cajaPort}${url}`, JSON.stringify(body), credencialesHaciaLaCaja)
@@ -520,7 +521,7 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, versio
         // Where the page reads /state from: the caja's LAN IP for a dedicated KDS
         // terminal (so it pulls the caja's orders), or same-origin ('') for the caja.
         const bridgeBase = posServerIp ? `http://${posServerIp}:${cajaPort}` : ''
-        const cfg = JSON.stringify({ bridge_base: bridgeBase, client_id: restaurantId })
+        const cfg = JSON.stringify({ bridge_base: bridgeBase, client_id: restaurantId, headers: credencialesHaciaLaCaja }).replace(/</g, '\\u003c')
         html = html.replace('<script>', `<script>window.__KDS_CFG__=${cfg};</script>\n<script>`)
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' })
         res.end(html)
@@ -537,6 +538,8 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, versio
       try {
         const body = await parseBody(req)
         const events = Array.isArray(body) ? body : [body]
+        const fueraDeScope = events.some(ev => credLan.verificarScope(ev, { restaurantId, branchId }))
+        if (fueraDeScope) { json(res, 403, { error: 'scope de otra instalacion' }); return }
         const results = []
         for (const ev of events) {
           if (!ev.command_id || !ev.command_type) {
@@ -567,6 +570,26 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, versio
       return
     }
 
+    // Resolver papel incierto exige credencial; nunca se reimprime automáticamente.
+    if (url === '/print/uncertain' && req.method === 'GET') {
+      if (typeof printer.getUncertainJobs !== 'function') { json(res, 503, { error: 'reconciliacion no disponible' }); return }
+      json(res, 200, { jobs: await printer.getUncertainJobs() })
+      return
+    }
+    if (url === '/print/resolve' && req.method === 'POST') {
+      const body = await parseBody(req)
+      if (!body.job_id || !['printed', 'reprint'].includes(body.resolution)) {
+        json(res, 400, { error: 'job_id y resolution printed/reprint requeridos' }); return
+      }
+      if (typeof printer.resolveUncertain !== 'function') { json(res, 503, { error: 'reconciliacion no disponible' }); return }
+      try {
+        const resolved = await printer.resolveUncertain(body.job_id, body.resolution)
+        json(res, resolved ? 200 : 409, resolved ? { ok: true, status: body.resolution === 'reprint' ? 'queued' : 'resolved' } : { error: 'trabajo no incierto o inexistente' })
+      }
+      catch (error) { json(res, 409, { error: error.message }) }
+      return
+    }
+
     // ── Print endpoints (backwards compatible) ───────────────────────────────
     if (url === '/print' && req.method === 'POST') {
       try {
@@ -574,7 +597,7 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, versio
         const station = body.station || 'caja'
         if (!body.data) { json(res, 400, { error: 'Missing data' }); return }
         const bytes = Buffer.from(body.data, 'base64')
-        await printer.printToStation(station, bytes)
+        await printer.printToStation(station, bytes, undefined, { commandId: body.command_id || body.idempotency_key })
         console.log(`[server] ${bytes.length}B → ${station}`)
         json(res, 200, { ok: true, station, bytes: bytes.length })
       } catch (e) {
@@ -670,6 +693,11 @@ async function startLocalServer({ dataDir, port = 7717, config = {} }) {
     )
   }
 
+  // Antes de capturar credenciales en el router/hub y ANTES de abrir el puerto.
+  credLan.prepararCredencial({ dataDir, config })
+  console.log(`[server] Credencial LAN: ${credLan.paraLog(config.lanSecret)}`)
+  if (!config.lanSecret) console.warn('[server] Terminal sin emparejar: operacion bloqueada, diagnostico disponible')
+
   const {
     channel            = config.channel || 'stable',
     instanceName       = config.instanceName || `Fullsite POS — ${os.hostname()}`,
@@ -688,7 +716,7 @@ async function startLocalServer({ dataDir, port = 7717, config = {} }) {
 
   // ── Init adapters ────────────────────────────────────────────────────────
   processAdapter.init({ dataDir })
-  printerAdapter.init({ printersConfig, configPath: printerConfigPath, queueFilePath })
+  printerAdapter.init({ printersConfig, configPath: printerConfigPath, queueFilePath: queueFilePath || require('path').join(dataDir, 'print-queue.json') })
 
   const version  = processAdapter.getVersion()
   const serverId = loadOrCreateServerId(dataDir)
@@ -712,6 +740,8 @@ async function startLocalServer({ dataDir, port = 7717, config = {} }) {
   const wsHub = new WsHub({
     serverId,
     restaurantId,
+    branchId: config.branchId || config.locationId || null,
+    lanSecret: config.lanSecret,
     getState:        () => state.toSnapshot(),
     getLastSequence: () => eventStore.getLastSequence(),
     readAfter:       (seq) => eventStore.readAfter(seq),
@@ -726,6 +756,7 @@ async function startLocalServer({ dataDir, port = 7717, config = {} }) {
     restaurantId,
   })
 
+  if (typeof cmdHandler.recoverPendingEffects === 'function') await cmdHandler.recoverPendingEffects()
   wsHub.onCommand((msg, clientId) => cmdHandler.handle(msg, clientId))
 
   // ── HTTP server ──────────────────────────────────────────────────────────
@@ -789,8 +820,8 @@ async function startLocalServer({ dataDir, port = 7717, config = {} }) {
   })
 
   // ── Supabase poll (Phase 1 bridge) ────────────────────────────────────────
-  if (supabaseUrl && supabaseKey) {
-    startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, serviceEmail, servicePassword, state, eventStore, wsHub, cmdHandler })
+  if (supabaseUrl && supabaseKey && !config.posServerIp) {
+    startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, branchId: config.branchId || config.locationId || null, serviceEmail, servicePassword, state, eventStore, wsHub, cmdHandler })
       .catch(e => console.warn('[server] Supabase poll start error:', e.message))
   }
 
@@ -803,35 +834,6 @@ async function startLocalServer({ dataDir, port = 7717, config = {} }) {
     _outbox = new OutboxWorker({ eventStore, supabaseUrl, supabaseKey, restaurantId })
     _outbox.start()
     console.log('[server] Outbox Worker: SHADOW MODE activo')
-  }
-
-  // ── Secreto de la red local ───────────────────────────────────────────────
-  //
-  // La CAJA lo genera en su primer arranque y lo guarda. Las terminales
-  // secundarias NO lo generan: lo reciben al aprovisionarse. Si una secundaria
-  // se lo inventara, tendria uno distinto al de la caja y el reenvio moriria con
-  // 401 — un fallo dificil de diagnosticar en el piso.
-  //
-  // Se imprime SOLO el prefijo. Un secreto en un log es un secreto filtrado.
-  if (!config.lanSecret && (config.terminalRole === 'server_pos' || !config.posServerIp)) {
-    const fsSec = require('fs')
-    const pathSec = require('path')
-    const rutaSecreto = pathSec.join(dataDir, 'lan-secret')
-    try {
-      if (fsSec.existsSync(rutaSecreto)) {
-        config.lanSecret = fsSec.readFileSync(rutaSecreto, 'utf8').trim() || null
-      } else {
-        config.lanSecret = credLan.generarSecreto()
-        fsSec.writeFileSync(rutaSecreto, config.lanSecret, { mode: 0o600 })
-        console.log('[server] Secreto de red local GENERADO. Copialo a las terminales secundarias.')
-      }
-    } catch (e) {
-      console.warn('[server] no se pudo leer/crear el secreto de red local:', e.message)
-    }
-  }
-  console.log(`[server] Credencial LAN: ${credLan.paraLog(config.lanSecret)}`)
-  if (!config.lanSecret) {
-    console.warn('[server] ⚠ SIN CREDENCIAL: las rutas operativas quedan abiertas a toda la red local.')
   }
 
   // ── Enlace ascendente con la caja (sólo terminales secundarias) ───────────
@@ -863,6 +865,8 @@ async function startLocalServer({ dataDir, port = 7717, config = {} }) {
       cajaUrl: cajaWs,
       serverId,
       restaurantId,
+      lanSecret: config.lanSecret,
+      branchId: config.branchId || config.locationId || null,
       leerCursor: () => {
         try { return JSON.parse(fsCursor.readFileSync(rutaCursor, 'utf8')).cursor } catch { return -1 }
       },
@@ -912,7 +916,7 @@ async function startLocalServer({ dataDir, port = 7717, config = {} }) {
   // Pedro muere con Electron). Sin esto, el auto-instalador recibe undefined, la
   // politica falla cerrado, y NUNCA se instala — en silencio. Ver
   // update/auto-installer.js y la prueba del contrato en update-contrato.test.js.
-  return { httpServer, close, serverId, lanIp, wsHub, state }
+  return { httpServer, close, serverId, lanIp, wsHub, state, lanSecret: config.lanSecret }
 }
 
 // buildHttpRouter se exporta para poder probar las rutas sin levantar el servidor

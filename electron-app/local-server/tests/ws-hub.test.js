@@ -1,4 +1,5 @@
 'use strict'
+const { SECRET, wsOptions, localFetch: fetch } = require('./fixtures/lan-credential.cjs')
 // Tests for WsHub — WebSocket connection manager
 // Run: node --test electron-app/local-server/tests/ws-hub.test.js
 //
@@ -37,6 +38,7 @@ before(async () => {
   state = new RestaurantState()
 
   hub = new WsHub({
+    lanSecret: SECRET,
     serverId:        'test-server',
     restaurantId:    'test-rest',
     getState:        () => state.toSnapshot(),
@@ -57,7 +59,7 @@ after(() => {
 
 function connect(clientId, clientType = 'pos', lastSeq = -1) {
   return new Promise((resolve, reject) => {
-    const ws = new WebSocket(`ws://127.0.0.1:${TEST_PORT}/ws`)
+    const ws = new WebSocket(`ws://127.0.0.1:${TEST_PORT}/ws`, wsOptions)
     ws.on('open', () => {
       ws.send(JSON.stringify({
         protocol_version: PROTOCOL_VERSION,
@@ -163,7 +165,7 @@ describe('WsHub — PING/PONG keepalive', () => {
 
 describe('WsHub — restaurant_id mismatch rejection (CFG-02)', () => {
   test('SUBSCRIBE with wrong restaurant_id is rejected with close code 1008', async () => {
-    const ws = new WebSocket(`ws://127.0.0.1:${TEST_PORT}/ws`)
+    const ws = new WebSocket(`ws://127.0.0.1:${TEST_PORT}/ws`, wsOptions)
     await new Promise(resolve => ws.on('open', resolve))
     ws.send(JSON.stringify({
       protocol_version: PROTOCOL_VERSION,
@@ -175,11 +177,11 @@ describe('WsHub — restaurant_id mismatch rejection (CFG-02)', () => {
     }))
     const { code, reason } = await new Promise(resolve => ws.on('close', (c, r) => resolve({ code: c, reason: r.toString() })))
     assert.equal(code, 1008, 'server should close with policy violation (1008)')
-    assert.ok(reason.includes('mismatch'), `close reason should mention mismatch (got: "${reason}")`)
+    assert.ok(reason.includes('restaurante'), `close reason should mention mismatch (got: "${reason}")`)
   })
 
   test('SUBSCRIBE without restaurant_id is accepted (legacy terminals)', async () => {
-    const ws = new WebSocket(`ws://127.0.0.1:${TEST_PORT}/ws`)
+    const ws = new WebSocket(`ws://127.0.0.1:${TEST_PORT}/ws`, wsOptions)
     await new Promise(resolve => ws.on('open', resolve))
     ws.send(JSON.stringify({
       protocol_version: PROTOCOL_VERSION,
@@ -199,7 +201,7 @@ describe('WsHub — restaurant_id mismatch rejection (CFG-02)', () => {
   })
 
   test('SUBSCRIBE with matching restaurant_id is accepted', async () => {
-    const ws = new WebSocket(`ws://127.0.0.1:${TEST_PORT}/ws`)
+    const ws = new WebSocket(`ws://127.0.0.1:${TEST_PORT}/ws`, wsOptions)
     await new Promise(resolve => ws.on('open', resolve))
     ws.send(JSON.stringify({
       protocol_version: PROTOCOL_VERSION,
