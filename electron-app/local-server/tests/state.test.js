@@ -56,11 +56,12 @@ describe('KDS queue', () => {
     assert.equal(kds[0].items_sent[0].id, 'i2')
   })
 
-  test('ORDER_CLOSED removes entry from KDS queue', () => {
+  test('D2 ORDER_CLOSED conserva trabajo pendiente en KDS', () => {
     const state = new RestaurantState()
     state.apply(makeEvent(EVENT.ORDER_SENT,   { order_id: 'o1', mesa: '2', items_sent: [{ id: 'i1' }] }, 1))
     state.apply(makeEvent(EVENT.ORDER_CLOSED, { order_id: 'o1', mesa: '2' }, 2))
-    assert.equal(state.getKdsQueue().length, 0)
+    assert.equal(state.getKdsQueue().length, 1)
+    assert.equal(state.toSnapshot().salon_orders.length, 0)
   })
 })
 
@@ -110,7 +111,7 @@ describe('Turno', () => {
     assert.equal(state.hasActiveTurno(), false)
   })
 
-  test('una orden CANCELADA (o pagada) sale del tablero de cocina', () => {
+  test('D2 cancelada sale de cocina, pagada sigue pendiente', () => {
     // Bateria adversarial 2026-09-02: cancelar en el POS dejaba la tarjeta viva
     // en el KDS LAN — cocina preparando un platillo muerto.
     const state = new RestaurantState()
@@ -125,7 +126,8 @@ describe('Turno', () => {
     state.apply(makeEvent(EVENT.ORDER_UPSERTED, { order_id: 'oc1', mesa: 4, status: 'cancelada' }, 3))
     state.apply(makeEvent(EVENT.ORDER_UPSERTED, { order_id: 'oc2', mesa: 6, status: 'pagada' }, 4))
     const snap = state.toSnapshot()
-    assert.equal(snap.kds_orders.length, 0)
+    assert.equal(snap.kds_orders.length, 1)
+    assert.equal(snap.kds_orders[0].id, 'oc2')
   })
 
   test('TURNO_CLOSED limpia el piso: ordenes, KDS y mesas no sobreviven al cierre', () => {
@@ -197,7 +199,7 @@ describe('Clobber / STATE_SYNC merge (GAP-002)', () => {
     assert.equal(state.getMesa('7').order_id, 'remote-9')
   })
 
-  test('orden local VIEJA ausente del poll SÍ se reconcilia (Supabase manda tras la gracia)', () => {
+  test('D1 una orden aceptada local no desaparece por ausencia en nube después de 45s', () => {
     const state = new RestaurantState()
     state.apply(makeEvent(EVENT.ORDER_UPSERTED, { order_id: 'stale-1', mesa: '9', items: [] }, 1))
     // envejecemos la orden más allá de la ventana de gracia
@@ -205,7 +207,7 @@ describe('Clobber / STATE_SYNC merge (GAP-002)', () => {
     o.updated_at = new Date(Date.now() - (RestaurantState.SYNC_GRACE_MS + 5000)).toISOString()
     // el poll ya no la ve (fue cerrada en otra terminal) → debe liberarse
     state.apply(makeEvent(EVENT.STATE_SYNC, { mesas: [], kds_queue: [], synced_at: new Date().toISOString() }, 2))
-    assert.equal(state.getMesa('9').status, 'libre', 'orden vieja ausente del poll se reconcilia')
+    assert.equal(state.getMesa('9').status, 'ocupada', 'la ausencia cloud no es un recibo de cierre')
   })
 
   test('la orden protegida sigue en el KDS tras el poll', () => {
@@ -218,7 +220,7 @@ describe('Clobber / STATE_SYNC merge (GAP-002)', () => {
     assert.ok(kdsAfter, 'la orden fresca debe seguir en el KDS tras el poll')
   })
 
-  test('un turno nuevo elimina comandas completas del turno anterior', () => {
+  test('un poll de otro turno no borra comandas locales sin cierre autorizado', () => {
     const state = new RestaurantState()
     state.apply(makeEvent(EVENT.ORDER_SENT, {
       order_id: 'old-order', mesa: '4', turno_id: 'turno-anterior', items: [{ n: 'taco' }],
@@ -230,7 +232,7 @@ describe('Clobber / STATE_SYNC merge (GAP-002)', () => {
       synced_at: new Date().toISOString(),
     }))
 
-    assert.equal(state.toSnapshot().kds_orders.length, 0)
+    assert.equal(state.toSnapshot().kds_orders.length, 1)
   })
 
   test('STATE_SYNC conserva la identidad real del turno y su conflicto', () => {
