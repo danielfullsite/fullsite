@@ -168,6 +168,8 @@ export interface OrderItem {
   precio: number
   cantidad: number
   modificadores: string[]  // ["Sin cebolla", "Extra queso +$25"]
+  modifier_ids?: string[]  // Stable catalog identities; labels never authorize price.
+  sent_quantity?: number  // Consumption already confirmed to kitchen by Caja.
   notas: string
   precioExtra: number      // sum of extra modifiers
   subtotal: number         // (precio + precioExtra) * cantidad
@@ -193,6 +195,7 @@ export interface OrderItemLegacy {
 }
 
 export interface ModificadorAgregar {
+  id?: string
   name: string
   price: number
 }
@@ -432,6 +435,17 @@ type ActiveTurnoRecord = { id: string; fondo_inicial: number; opened_by: string;
 
 /** Turnos activos (pos_turnos sin closed_at), del más reciente al más antiguo. */
 export async function getActiveTurnos(): Promise<ActiveTurnoRecord[]> {
+  if (requiereCaja()) {
+    const { leerSalon } = await import('./pedro-cliente')
+    const local = await leerSalon()
+    if (!local.autoritativa) throw new Error('Sin conexión con Caja. No se puede confirmar el turno.')
+    if (local.writeAuthority === 'caja') {
+      if (!local.turno) return []
+      const t = local.turno
+      if (!t.id || !t.opened_at || !Number.isSafeInteger(t.opening_cash_cents)) throw new Error('Caja no confirmó los datos completos del turno.')
+      return [{ id: String(t.id), fondo_inicial: Number(t.opening_cash_cents) / 100, opened_by: String(t.opened_by), opened_at: String(t.opened_at) }]
+    }
+  }
   /**
    * El cache de turno vence por DIA DE VENTA, no por reloj.
    *
@@ -615,6 +629,25 @@ export function olvidarTurnoPendiente(): void {
  * no son lo mismo, y confundirlos produjo el "abrí turno y luego no había turno".
  */
 export async function openTurno(fondoInicial: number, openedBy: string): Promise<{ id: string; fondo_inicial: number; opened_by: string; opened_at: string; sincronizado?: boolean } | null> {
+  if (requiereCaja()) {
+    const { leerSalon } = await import('./pedro-cliente')
+    const local = await leerSalon()
+    if (!local.autoritativa) throw new Error('Sin conexión con Caja. El turno no se abrió.')
+    if (local.writeAuthority === 'caja') {
+      const { ejecutarComandoCaja } = await import('./pedro-comandos')
+      if (local.turno) return (await getActiveTurnos())[0] ?? null
+      const opening = Math.round(fondoInicial * 100)
+      if (!Number.isSafeInteger(opening) || opening < 0 || Math.abs(fondoInicial * 100 - opening) > 1e-7) throw new Error('El fondo debe ser un importe válido con hasta dos decimales.')
+      const receipt = await ejecutarComandoCaja('turn:open', 'TURN_OPEN', { turno_id: idParaAbrirTurno(), opening_cash_cents: opening })
+      const t = receipt.result.turno as Record<string, unknown> | undefined
+      if (!t?.id || !t.opened_at || !Number.isSafeInteger(t.opening_cash_cents)) throw new Error('Caja no confirmó la apertura de turno.')
+      const confirmed = { id: String(t.id), fondo_inicial: Number(t.opening_cash_cents) / 100, opened_by: String(t.opened_by), opened_at: String(t.opened_at), sincronizado: false }
+      // Cache is a display convenience; every operational read still asks Caja.
+      localStorage.setItem('pos_turno_cache', JSON.stringify({ turno: confirmed, turnos: [confirmed], ts: Date.now() }))
+      olvidarTurnoPendiente()
+      return confirmed
+    }
+  }
   // Guard: verificar que no exista turno activo (race condition)
   const existing = await getActiveTurno()
   if (existing) return { ...existing, sincronizado: true } // Ya hay uno abierto, retornarlo

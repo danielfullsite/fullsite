@@ -1,0 +1,3 @@
+# Generated public UI ships inside the installer, not in Git.
+/ui-bundle/
+/ui-bundle.staging-*/

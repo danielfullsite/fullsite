@@ -45,6 +45,9 @@
   .gear{width:38px;height:38px;border-radius:9px;border:1px solid var(--line-2);background:var(--surface-3);color:var(--text-3);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
   .gear:active{background:var(--line)}
   .gear:focus-visible{outline:2px solid var(--prep);outline-offset:2px}
+  #actor-button{min-height:38px;padding:6px 10px;background:var(--surface-3);color:var(--text-2);border:1px solid var(--line-2);border-radius:9px;cursor:pointer}
+  #actor-pin{width:100%;padding:12px;background:var(--surface);color:var(--text-1);border:1px solid var(--line-2);border-radius:8px;font-size:22px}
+  #actor-error{color:var(--danger);font-size:14px;min-height:20px}
 
   /* body: rail + board */
   .body{flex:1;display:flex;min-height:0}
@@ -187,6 +190,7 @@
       <span class="conn"><span class="dot" id="conn-dot"></span><span id="conn-txt">conectando…</span></span>
     </div>
     <div class="hright">
+      <button id="actor-button" type="button">Entrar con PIN</button>
       <div class="view-switch" aria-label="Vista del tablero">
         <button data-view="compact">Compacta</button><button data-view="operation">Operación</button><button data-view="expo">Expo</button>
       </div>
@@ -211,6 +215,13 @@
   </div>
 </div>
 <div class="toast" id="toast"></div>
+<div class="modal-bg" id="actor-modal" role="dialog" aria-modal="true" aria-labelledby="actor-title">
+  <form class="modal" id="actor-form">
+    <div class="modal-h"><h2 id="actor-title">Acceso de cocina</h2><button class="modal-x" id="actor-close" type="button" aria-label="Cerrar acceso">×</button></div>
+    <div class="modal-b"><p>Ingresa tu PIN para confirmar la preparación en Caja.</p><label for="actor-pin">PIN del empleado</label><input id="actor-pin" type="password" inputmode="numeric" autocomplete="off" minlength="4" maxlength="8" required /><p id="actor-error" role="alert"></p></div>
+    <div class="modal-f"><button id="actor-lock" type="button">Bloquear sesión</button><button class="save" id="actor-submit" type="submit">Entrar</button></div>
+  </form>
+</div>
 
 <!-- settings -->
 <div class="modal-bg" id="modal">
@@ -247,7 +258,26 @@
   var CFG = window.__KDS_CFG__ || {};
   var STATE_BASE = (CFG.bridge_base || "").replace(/\/$/,"");
   var POLL_MS = 2000;
-  function authHeaders(extra){ return Object.assign({}, CFG.headers || {}, extra || {}); }
+  var ACTOR_KEY = 'pos_actor_session';
+  var cajaWrites = false;
+  function actorSession(){ try { var s=JSON.parse(sessionStorage.getItem(ACTOR_KEY)||'null'); return s&&s.staff&&s.staff.id&&typeof s.actor_token==='string'&&s.expires_at>Date.now()?s:null; }catch(e){ return null; } }
+  function authHeaders(extra){ var s=actorSession(); return Object.assign({}, CFG.headers || {}, s?{'x-fullsite-actor':s.actor_token}:{}, extra || {}); }
+  function paintActor(){ var s=actorSession(); document.getElementById('actor-button').textContent=s?s.staff.name+' · Bloquear':'Entrar con PIN'; }
+  function openActor(){ document.getElementById('actor-error').textContent=''; document.getElementById('actor-modal').classList.add('show'); document.getElementById('actor-pin').focus(); }
+  function lockActor(){ sessionStorage.removeItem(ACTOR_KEY); paintActor(); }
+  document.getElementById('actor-button').addEventListener('click',function(){ if(actorSession()) lockActor(); openActor(); });
+  document.getElementById('actor-close').addEventListener('click',function(){ document.getElementById('actor-modal').classList.remove('show'); document.getElementById('actor-pin').value=''; });
+  document.getElementById('actor-lock').addEventListener('click',function(){ lockActor(); document.getElementById('actor-pin').value=''; });
+  document.getElementById('actor-form').addEventListener('submit',function(e){
+    e.preventDefault(); var input=document.getElementById('actor-pin'), button=document.getElementById('actor-submit');
+    var pin=input.value; input.value=''; button.disabled=true;
+    fetch(STATE_BASE+'/auth/pin',{method:'POST',headers:authHeaders({'Content-Type':'application/json'}),signal:AbortSignal.timeout(6500),body:JSON.stringify({pin:pin})})
+      .then(function(r){ return r.json().then(function(data){ if(!r.ok||!data.staff||!data.staff.id||typeof data.actor_token!=='string'||!(data.expires_at>Date.now())) throw new Error(data.error||'Caja no confirmó la sesión'); return data; }); })
+      .then(function(data){ sessionStorage.setItem(ACTOR_KEY,JSON.stringify({staff:data.staff,actor_token:data.actor_token,expires_at:data.expires_at,offline:data.offline})); paintActor(); document.getElementById('actor-modal').classList.remove('show'); })
+      .catch(function(error){ document.getElementById('actor-error').textContent=error.message||'Sin conexión con Caja'; })
+      .finally(function(){ button.disabled=false; });
+  });
+  paintActor();
   var LKEY = "kds_local_v3";           // per-item touch state
   var SKEY = "kds_settings_v1";         // station / alert_min / sound
 
@@ -304,7 +334,11 @@
   function saveLocal(m){ try{ localStorage.setItem(LKEY, JSON.stringify(m)); }catch(e){} }
   var local = loadLocal();
   function itemKey(oid, it, i){ return String(it.id || (oid+":"+(it.comanda_batch_seq==null?0:it.comanda_batch_seq)+":"+(it.nombre||it.name||"")+":"+i)); }
-  function getIState(oid, key){ return (local[oid] && local[oid][key]) || "nueva"; }
+  function getIState(oid, key){
+    var order=lastGood.find(function(o){return o.id===oid;});
+    if(order&&order.authority==='caja') { var it=parseItems(order.items).find(function(i){return i.id===key;}); var status=it&&it.preparation_status; return status==='lista'||status==='entregada'?'listo':status==='preparando'?'preparando':'nueva'; }
+    return (local[oid] && local[oid][key]) || "nueva";
+  }
   function setIState(oid, key, st){ (local[oid]=local[oid]||{})[key]=st; saveLocal(local); }
   function pruneLocal(activeIds){ var ch=false; Object.keys(local).forEach(function(oid){ if(!activeIds.has(oid)){ delete local[oid]; ch=true; } }); if(ch) saveLocal(local); }
 
@@ -344,8 +378,8 @@
   function isStale(o){ var u=Date.parse((o&&(o.updated_at||o.created_at))||""); return !isNaN(u) && (Date.now()-u)>STALE_MS; }
   function buildCards(orders){
     var cards=[]; var orderMeta={};
-    orders.filter(function(o){ return !isStale(o); }).forEach(function(o){
-      var items = parseItems(o.items).filter(function(it){ return !isSkippable(it) && (STATION==="todas"||resolveStation(it)===STATION); });
+    orders.filter(function(o){ return o.authority==='caja'||!isStale(o); }).forEach(function(o){
+      var items = parseItems(o.items).filter(function(it){ return !isSkippable(it) && it.preparation_status!=='entregada' && (STATION==="todas"||resolveStation(it)===STATION); });
       if(!items.length) return;
       var bmeta = parseBatches(o.comanda_batches);
       var groups={};
@@ -437,7 +471,7 @@
             '<span class="time '+timeCls+'">'+elapsed(c.createdAt)+'</span>'+badge+'</div></div>'+
           oNote+
           '<div class="items">'+body+'</div>'+
-          (st!=="lista"?'<div class="card-f"><button class="fbtn ready" data-ready="'+esc(c.order.id)+'" data-batch="'+esc(c.batchId)+'">✓ Todo listo</button></div>':'')+
+          (st!=="lista"?'<div class="card-f"><button class="fbtn ready" data-ready="'+esc(c.order.id)+'" data-batch="'+esc(c.batchId)+'">✓ Todo listo</button></div>':c.order.authority==='caja'?'<div class="card-f"><button class="fbtn ready" data-deliver="'+esc(c.order.id)+'" data-batch="'+esc(c.batchId)+'">Entregar ronda</button></div>':'')+
         '</div>';
        }catch(cardErr){ try{ console.error('[kds] tarjeta con error, se omite:', (c&&c.order&&c.order.id), cardErr); }catch(_){} }
       });
@@ -468,7 +502,7 @@
       .then(function(data){
         var result=Array.isArray(data.results)&&data.results.length===1?data.results[0]:null;
         var id=result&&((result.event&&result.event.id)||(result.duplicate&&result.receipt&&result.receipt.event_id));
-        if(!result||result.error||id!==cmd.command_id) throw new Error("Caja no confirmó el cambio");
+        if(!result||result.error||id!==cmd.command_id) { if(result&&result.code==='ACTOR_REQUIRED'){lockActor();openActor();} throw new Error(result&&result.error||"Caja no confirmó el cambio"); }
         fetchState();
       }).catch(function(){
         postedStatus[key]=0;
@@ -478,13 +512,34 @@
         toast("Cambio sin confirmar en Caja. Revisa y vuelve a intentar.");
       });
   }
+  var kitchenPending={};
+  function commandUuid(){if(crypto.randomUUID)return crypto.randomUUID();var bytes=new Uint32Array(4);crypto.getRandomValues(bytes);return 'kds-'+Array.prototype.map.call(bytes,function(n){return n.toString(16).padStart(8,'0');}).join('');}
+  function postKitchen(order,ids,status){
+    if(!actorSession()){openActor();return;}
+    if(kitchenPending[order.id]) return;
+    kitchenPending[order.id]=true;
+    var cmd={command_type:'KITCHEN_SET',command_id:commandUuid(),order_id:order.id,turno_id:order.turno_id,expected_kitchen_revision:order.kitchen_revision||0,item_ids:ids,status:status};
+    fetch(STATE_BASE+'/events',{method:'POST',headers:authHeaders({'Content-Type':'application/json'}),signal:AbortSignal.timeout(4000),body:JSON.stringify(cmd)})
+      .then(function(r){if(!r.ok)throw new Error('Sin conexión con Caja');return r.json();})
+      .then(function(data){var result=Array.isArray(data.results)&&data.results.length===1?data.results[0]:null;
+        if(!result||result.error||!result.receipt||result.receipt.command_id!==cmd.command_id){if(result&&result.code==='ACTOR_REQUIRED'){lockActor();openActor();}throw new Error(result&&result.error||'Caja no confirmó el cambio');}
+        fetchState();
+      }).catch(function(error){toast(error.message||'Cambio sin confirmar en Caja');fetchState();})
+      .finally(function(){kitchenPending[order.id]=false;});
+  }
 
   // ── interactions ──
   document.addEventListener("click",function(e){
+    var deliver=e.target.closest('[data-deliver]');
+    if(deliver){ var deliveredOrder=lastGood.find(function(o){return o.id===deliver.getAttribute('data-deliver');});if(!deliveredOrder)return;
+      var deliveredIds=parseItems(deliveredOrder.items).filter(function(i){return i.comanda_batch_id===deliver.getAttribute('data-batch')&&i.preparation_status!=='entregada'&&(STATION==='todas'||resolveStation(i)===STATION);}).map(function(i){return i.id;});
+      postKitchen(deliveredOrder,deliveredIds,'entregada');return; }
     var ready=e.target.closest("[data-ready]");
     if(ready){
       var oid=ready.getAttribute("data-ready"); var order=lastGood.find(function(x){ return x.id===oid; }); if(!order) return;
       var batch=ready.getAttribute("data-batch");
+      if(order.authority==='caja') { postKitchen(order,parseItems(order.items).filter(function(i){return i.comanda_batch_id===batch&&i.preparation_status!=='entregada'&&(STATION==='todas'||resolveStation(i)===STATION);}).map(function(i){return i.id;}),'lista');return; }
+      if(cajaWrites&&!actorSession()){openActor();return;}
       parseItems(order.items).filter(function(it){ return !isSkippable(it) && (STATION==="todas"||resolveStation(it)===STATION); }).forEach(function(it,i){
         var bid=it.comanda_batch_id||("seq"+(it.comanda_batch_seq==null?0:it.comanda_batch_seq));
         if(bid===batch) setIState(oid,itemKey(oid,it,i),"listo");
@@ -495,6 +550,9 @@
     if(item){
       var oid2=item.getAttribute("data-o"), k=item.getAttribute("data-k");
       var cur=getIState(oid2,k);
+      var currentOrder=lastGood.find(function(o){return o.id===oid2;});
+      if(currentOrder&&currentOrder.authority==='caja'){if(cur==='listo')return;postKitchen(currentOrder,[k],cur==='nueva'?'preparando':'lista');return;}
+      if(cajaWrites&&!actorSession()){openActor();return;}
       var next = cur==="nueva"?"preparando":cur==="preparando"?"listo":"nueva";
       setIState(oid2,k,next); render(false);
       var order2=lastGood.find(function(x){ return x.id===oid2; }); if(order2) syncOrder(order2);
@@ -554,7 +612,7 @@
     var ctrl=new AbortController(); var to=setTimeout(function(){ ctrl.abort(); },4000);
     fetch(STATE_BASE+"/state",{cache:"no-store",signal:ctrl.signal,headers:authHeaders()})
       .then(function(r){ return r.ok?r.json():Promise.reject(); })
-      .then(function(data){ clearTimeout(to); lastGood=adaptOrders(data); setConn(true); render(true); })
+      .then(function(data){ clearTimeout(to); cajaWrites=data.write_authority==='caja'; lastGood=adaptOrders(data); setConn(data.authoritative!==false); paintActor(); render(true); })
       .catch(function(){ clearTimeout(to); setConn(false); render(false); });
   }
 

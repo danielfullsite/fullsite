@@ -29,6 +29,17 @@ function moneyFromOrder(order) {
   if (!Number.isSafeInteger(rounded) || Math.abs(scaled - rounded) > 1e-7) fail('INVALID_ORDER_TOTAL', 'Order total has fractions smaller than one cent')
   return rounded
 }
+function requireSentConsumption(order) {
+  let items = order.items
+  if (typeof items === 'string') {
+    try { items = JSON.parse(items) } catch { items = null }
+  }
+  if (!Array.isArray(items) || !items.length || items.some(item => !item ||
+    !Number.isSafeInteger(item.cantidad) || item.cantidad <= 0 ||
+    !Number.isSafeInteger(item.sent_quantity) || item.sent_quantity !== item.cantidad)) {
+    fail('ORDER_SEND_REQUIRED', 'Envía todos los productos guardados a cocina antes de preparar el cobro. No es necesario esperar su preparación.')
+  }
+}
 function canonical(value) {
   if (Array.isArray(value)) return value.map(canonical)
   if (value && typeof value === 'object') return Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])]))
@@ -139,6 +150,12 @@ class FinancialDomain {
     revision(payload.expected_revision)
     const orderId = id(payload.order_id, 'order_id')
     const existing = this.getOrder(orderId)
+    // Match operational ownership, including new command IDs for repeated
+    // payments. A waiter cannot freeze or split another employee's account.
+    // Authentication and the command permission are enforced by the runtime.
+    if (actor && operationalOrder?.created_by !== actor.id && !actor.permissions?.includes('ver_todas_cuentas')) {
+      fail('PERMISSION_DENIED', 'No tienes permiso para modificar la cuenta de otro empleado')
+    }
     if (type === 'FINANCIAL_OPEN') {
       if (existing) fail('FINANCIAL_ORDER_EXISTS', 'Order already has durable accounts; reload them')
       if (!operationalOrder || operationalOrder.order_id !== orderId && operationalOrder.id !== orderId) fail('ORDER_NOT_FOUND', 'Save the operational order before opening accounts')
@@ -153,6 +170,7 @@ class FinancialDomain {
       const total = moneyFromOrder(operationalOrder)
       if (cents(payload.total_cents, 'total_cents', false) !== total) fail('ORDER_TOTAL_CONFLICT', 'Payment total differs from saved order')
       if (payload.currency !== 'MXN') fail('INVALID_CURRENCY', 'Only MXN is supported')
+      requireSentConsumption(operationalOrder)
       return { financial_order: summarize({
         order_id: orderId, turno_id: turno.id, currency: 'MXN', revision: 1, order_revision: orderRevision,
         total_cents: total, ...(actor ? { opened_by: actor.id } : {}), accounts: [{ account_id: id(`${orderId}:full`, 'account_id'), total_cents: total }], payments: [],

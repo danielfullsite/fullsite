@@ -98,6 +98,8 @@ const nextConfig: NextConfig = isCapacitorOffline
       turbopack: { root: path.join(__dirname) },
     }
   : {
+      // Keep development chrome from covering touch controls in the isolated UI lab.
+      devIndicators: process.env.FULLSITE_UI_LAB === '1' ? false : undefined,
       // Pin Turbopack workspace root to dashboard-app/ so @/ aliases resolve
       // correctly when built from a monorepo root (Vercel, CI).
       turbopack: { root: path.join(__dirname) },

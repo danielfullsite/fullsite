@@ -11,6 +11,7 @@ const { NdjsonEventStore } = require('../adapters/storage/ndjson')
 const { CoreEventStore } = require('../core/event-store')
 const { RestaurantState } = require('../core/state')
 const { CommandHandler } = require('../core/command-handler')
+const prepareCatalog = require('./fixtures/financial-service-catalog.cjs')
 const cred = require('../core/credencial-lan')
 const restaurantId = 'auth-lab', branchId = 'branch-A'
 
@@ -30,14 +31,16 @@ test('PIN and payments forwarded through a secondary retain verified employee/de
   async function server(name, config = {}, authority = null) {
     const eventStore = new CoreEventStore(new NdjsonEventStore({ eventLogPath: path.join(directory, name + '.ndjson') }))
     await eventStore.load()
-    const state = new RestaurantState()
+    const localAuthorityEnabled = !config.posServerIp
+    const state = new RestaurantState({ localAuthorityEnabled })
+    const catalog = localAuthorityEnabled ? await prepareCatalog(path.join(directory, name + '-catalog'), restaurantId, branchId) : null
     const wsHub = { broadcast: async () => {} }
-    const cmdHandler = new CommandHandler({ eventStore, state, wsHub, restaurantId })
+    const cmdHandler = new CommandHandler({ eventStore, state, wsHub, restaurantId, localAuthorityEnabled, catalogStore: catalog })
     const app = http.createServer(buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority: authority,
-      restaurantId, branchId, config: { lanSecret: secret, terminalId: name, ...config }, printer: {} }))
+      restaurantId, branchId, config: { lanSecret: secret, terminalId: name, localAuthorityEnabled, ...config }, printer: {} }))
     await new Promise(resolve => app.listen(0, '127.0.0.1', resolve))
     t.after(() => new Promise(resolve => { app.closeAllConnections(); app.close(resolve) }))
-    return { port: app.address().port, state, eventStore, cmdHandler }
+    return { port: app.address().port, state, eventStore, cmdHandler, catalog }
   }
   const caja = await server('Caja', {}, actorAuthority)
   const secondary = await server('Secondary', { posServerIp: '127.0.0.1', posServerPort: caja.port })
@@ -57,13 +60,18 @@ test('PIN and payments forwarded through a secondary retain verified employee/de
   const local = await (await request('/auth/pin', { pin: '1234567890' })).json()
   assert.equal(local.offline, true)
   assert.equal((await (await request('/auth/status')).json()).prepared_users, 2)
-  await caja.cmdHandler.handle({ payload: { command_id: 'shift', command_type: 'TURNO_OPENED', turno_id: 't1' } }, 'fixture')
-  await caja.cmdHandler.handle({ payload: { command_id: 'order', command_type: 'ORDER_SENT', order_id: 'mother', turno_id: 't1', order_revision: 4, mesa: 1, total: 100, items: [{ id: 'coffee', nombre: 'Café' }] } }, 'fixture')
   const money = async (payload, token = local.actor_token, extra = {}) => {
     const response = await request('/events', payload, { ...(token ? { 'x-fullsite-actor': token } : {}), ...extra })
     return (await response.json()).results[0]
   }
-  const open = { command_id: 'open', command_type: 'FINANCIAL_OPEN', order_id: 'mother', turno_id: 't1', expected_revision: 0, expected_order_revision: 4, total_cents: 10000, currency: 'MXN' }
+  assert.ok((await money({ command_id: 'shift', command_type: 'TURN_OPEN', turno_id: 't1', opening_cash_cents: 0 })).result.turno)
+  const saved = await money({ command_id: 'save', command_type: 'ORDER_SAVE', order_id: 'mother', turno_id: 't1', expected_revision: 0,
+    catalog_revision: caja.catalog.read().revision, mesa: 1, items: [{ line_id: 'soup-line', product_id: 'soup', quantity: 1 }] }, waiter.actor_token)
+  assert.equal(saved.result.operational_order.created_by, 'waiter', 'authenticated waiter owns the consumption')
+  const sent = await money({ command_id: 'send', command_type: 'ORDER_SEND', order_id: 'mother', turno_id: 't1', expected_revision: 1 }, waiter.actor_token)
+  assert.equal(sent.result.operational_order.authority, 'caja')
+  assert.equal(JSON.parse(sent.result.operational_order.items)[0].sent_quantity, 1)
+  const open = { command_id: 'open', command_type: 'FINANCIAL_OPEN', order_id: 'mother', turno_id: 't1', expected_revision: 0, expected_order_revision: 2, total_cents: 10000, currency: 'MXN' }
   assert.equal((await money(open, null)).code, 'ACTOR_REQUIRED')
   assert.equal((await money(open, local.actor_token, { 'x-fullsite-terminal': 'Other' })).code, 'ACTOR_REQUIRED')
   assert.equal((await money(open)).result.financial_order.total_cents, 10000)

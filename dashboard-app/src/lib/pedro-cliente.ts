@@ -9,6 +9,7 @@ export interface LecturaDelSalon {
   procedencia: ProcedenciaDelSalon
   autoritativa: boolean
   completa?: boolean
+  writeAuthority?: 'caja' | 'legacy'
   sequence: number | null
   ordenes: Record<string, unknown>[]
   turno: Record<string, unknown> | null
@@ -21,7 +22,7 @@ const SIN_PEDRO: LecturaDelSalon = {
 /** Local terminals must not silently switch authority to cloud. */
 export function requiereCaja(): boolean {
   if (typeof window === 'undefined') return false
-  if (typeof navigator !== 'undefined' && navigator.userAgent.includes('Electron')) return true
+  if (typeof navigator !== 'undefined' && typeof navigator.userAgent === 'string' && navigator.userAgent.includes('Electron')) return true
   try {
     return !!(localStorage.getItem('FULLSITE_BRIDGE_URL') || localStorage.getItem('FULLSITE_LAN_SECRET') || localStorage.getItem('pos_bridge_host'))
   } catch { return true }
@@ -59,6 +60,7 @@ export async function leerSalon(): Promise<LecturaDelSalon> {
     }
     return {
       procedencia: autoritativa ? 'caja' : 'local-degradado', autoritativa, completa,
+      writeAuthority: cuerpo.write_authority === 'caja' ? 'caja' : 'legacy',
       sequence: typeof cuerpo.sequence === 'number' ? cuerpo.sequence : null,
       ordenes, turno: cuerpo.turno ?? null,
       motivo: !autoritativa ? String(cuerpo.source ?? 'la caja no contestó')

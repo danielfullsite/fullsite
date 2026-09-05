@@ -1,18 +1,28 @@
 {
   "appId": "mx.fullsite.pos",
   "productName": "Fullsite POS",
+  "beforePack": "./scripts/verify-offline-ui.cjs",
   "directories": {
     "output": "dist-pos"
   },
   "files": [
-    "**/*",
-    "!dist/**",
-    "!dist-pos/**",
-    "!dist-kds/**",
-    "!fullsite-pos-win-*/**",
-    "!fullsite-pos@*",
+    "main.js",
+    "preload*.js",
+    "setup.html",
+    "offline.html",
+    "icon.ico",
+    "icon.png",
+    "local-server/**/*.js",
+    "local-server/core/permission-profiles.json",
+    "local-server/kds-ui.html",
+    "offline-ui/*.js",
+    "ui-bundle/**/*",
+    "update/*.js",
+    "!**/tests/**",
+    "!**/*.test.js",
+    "!**/.env*",
     "!**/*.log",
-    "!electron-builder*.json"
+    "!local-server/telemetry/latency-harness.js"
   ],
   "win": {
     "target": "nsis",

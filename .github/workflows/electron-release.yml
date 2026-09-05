@@ -48,10 +48,22 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: electron-app/package-lock.json
+          cache-dependency-path: |
+            electron-app/package-lock.json
+            dashboard-app/package-lock.json
 
       - name: Instalar dependencias
         run: npm ci
+
+      - name: Instalar dependencias del POS
+        working-directory: dashboard-app
+        run: npm ci
+
+      - name: Construir paquete offline completo
+        run: npm run build:ui
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
       # La etiqueta manda. Si package.json dice otra cosa, el auto-update compararia
       # contra una version que no existe y nunca se actualizaria — falla silenciosa.
@@ -86,5 +98,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: instaladores-${{ github.ref_name }}
-          path: electron-app/dist/*.exe
+          path: |
+            electron-app/dist-pos/*.exe
+            electron-app/dist-kds/*.exe
           retention-days: 90

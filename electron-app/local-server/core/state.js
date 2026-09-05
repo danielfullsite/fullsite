@@ -36,12 +36,15 @@ function balanceOf(order) {
 }
 
 class RestaurantState {
-  constructor() {
+  constructor({ localAuthorityEnabled = false } = {}) {
+    this._writeAuthority = localAuthorityEnabled === true ? 'caja' : 'legacy'
     this._mesas  = new Map()  // mesa → { status, order_id, locked_by, locked_at }
     this._orders = new Map()  // order_id → order object
     this._kds    = []         // [{order_id, mesa, items_sent, sent_at, station}]
     this._locks  = new Map()  // mesa → { client_id, expires_ms }
     this._turno  = null       // { id, opened_by, opened_at } | null
+    this._turnIdentities = new Set()
+    this._turnSummaries = new Map()
     this._lastSupabaseSync = null
     this._orderSnapshotComplete = false
     this._financialOrders = new Map()
@@ -52,6 +55,29 @@ class RestaurantState {
   /** Apply one event to the state. Returns the fields that changed. */
   apply(event) {
     const { type, payload } = event
+    if (['ORDER_SAVE', 'ORDER_SEND', 'ORDER_MOVE', 'ORDER_VOID', 'KITCHEN_SET'].includes(type) && event.result?.operational_order) {
+      const order = JSON.parse(JSON.stringify(event.result.operational_order))
+      const previous = this._orders.get(order.order_id)
+      if (previous?.mesa != null && this._mesas.get(String(previous.mesa))?.order_id === order.order_id) {
+        this._mesas.set(String(previous.mesa), { status: 'libre', order_id: null, locked_by: null })
+      }
+      order._from_cloud = false
+      this._orders.set(order.order_id, order)
+      if (order.mesa != null && !cancelled(order) && !settled(order)) this._mesas.set(String(order.mesa), { status: 'ocupada', order_id: order.order_id, locked_by: null })
+      this._kds = this._kds.filter(k => k.order_id !== order.order_id)
+      if (order._kds_sent && !cancelled(order) && order.preparation_status !== 'entregada') {
+        this._kds.push({ order_id: order.order_id, mesa: order.mesa, items_sent: order.kitchen_items, sent_at: Date.parse(order.updated_at) })
+      }
+      this._orderSnapshotComplete = true
+      return { changed: ['orders', 'mesas', 'kds'] }
+    }
+    if (['TURN_OPEN', 'TURN_CLOSE'].includes(type) && event.result && 'turno' in event.result) {
+      this._turno = event.result.turno ? JSON.parse(JSON.stringify(event.result.turno)) : null
+      if (this._turno?.id) this._turnIdentities.add(this._turno.id)
+      if (event.result.closed_turno?.id) this._turnSummaries.set(event.result.closed_turno.id, JSON.parse(JSON.stringify(event.result.closed_turno)))
+      this._orderSnapshotComplete = true
+      return { changed: ['turno'] }
+    }
     // FinancialDomain validates commands before durable commit. The projector
     // only consumes that persisted result; it never infers acceptance from UI
     // counters or fabricates payments. Financial revision is independent of OCC.
@@ -94,6 +120,7 @@ class RestaurantState {
 
       case EVENT.TURNO_OPENED:
         this._turno = { id: payload.turno_id, opened_by: payload.opened_by, opened_at: payload.ts }
+        this._turnIdentities.add(payload.turno_id)
         this._orderSnapshotComplete = true
         return { changed: ['turno'] }
 
@@ -293,6 +320,12 @@ class RestaurantState {
   // for an accepted LAN command. Only explicit complete reads establish that an
   // unknown table/name has no account.
   _applyStateSync({ mesas, kds_queue, turno, synced_at, orders, order_snapshot_complete }) {
+    // With the explicit cutover active, polling is observational only. It may
+    // not reopen closed shifts, resurrect voids or invent a second order writer.
+    if (this._writeAuthority === 'caja') {
+      if (synced_at) this._lastSupabaseSync = synced_at
+      return { changed: ['last_supabase_sync'] }
+    }
     const now = Date.now()
     // Polling cloud is an observation, never a receipt that closes a local
     // financial shift. Losing the current shift would strand accepted debt and
@@ -432,11 +465,14 @@ class RestaurantState {
    */
   hidratarDesdeSnapshot(snap) {
     if (!snap || typeof snap !== 'object') return false
+    this._writeAuthority = snap.write_authority === 'caja' ? 'caja' : 'legacy'
 
     this._mesas = new Map(Object.entries(snap.mesas || {}))
     this._locks = new Map(Object.entries(snap.locks || {}))
     this._kds   = Array.isArray(snap.kds_queue) ? [...snap.kds_queue] : []
     this._turno = snap.turno ?? null
+    this._turnIdentities = new Set(Array.isArray(snap.turn_identities) ? snap.turn_identities : [])
+    this._turnSummaries = new Map((Array.isArray(snap.turn_summaries) ? snap.turn_summaries : []).filter(t => t?.id).map(t => [t.id, JSON.parse(JSON.stringify(t))]))
     this._lastSupabaseSync = snap.last_supabase_sync ?? null
     this._financialOrders = new Map((Array.isArray(snap.financial_orders) ? snap.financial_orders : [])
       .filter(o => o?.order_id).map(o => [o.order_id, JSON.parse(JSON.stringify(o))]))
@@ -466,12 +502,13 @@ class RestaurantState {
         (o.preparation_status ?? o.status) !== 'entregada' &&
         // Legacy financial-only status without preparation cannot invent work.
         (!FINANCIAL_CLOSED.has(o.status) || !!o.preparation_status))
-      .map(o => ({ ...clean(o), status: o.preparation_status ?? o.status }))
+      .map(o => ({ ...clean(o), ...(o.authority === 'caja' ? { items: JSON.stringify(o.kitchen_items || []) } : {}), status: o.preparation_status ?? o.status }))
     const salon_orders = [...this._orders.values()].filter(o => !cancelled(o) && !settled(o)).map(clean)
     const order_snapshot_complete = this._orderSnapshotComplete && [...this._mesas.values()].every(m =>
       !m.order_id || m.status === 'libre' || this._orders.get(m.order_id)?.items != null)
 
     return {
+      write_authority: this._writeAuthority,
       mesas:              Object.fromEntries(this._mesas),
       kds_queue:          [...this._kds],
       kds_orders,
@@ -479,6 +516,8 @@ class RestaurantState {
       order_snapshot_complete,
       financial_orders: this.getFinancialOrders(),
       turno:              this._turno,
+      turn_identities: [...this._turnIdentities],
+      turn_summaries: [...this._turnSummaries.values()].map(t => JSON.parse(JSON.stringify(t))),
       locks:              Object.fromEntries(this._locks),
       last_supabase_sync: this._lastSupabaseSync,
     }
@@ -492,6 +531,7 @@ class RestaurantState {
   getTurno()       { return this._turno }
   getLock(mesa)    { return this._locks.get(String(mesa)) || null }
   hasActiveTurno() { return this._turno !== null }
+  hasTurnIdentity(id) { return this._turnIdentities.has(id) }
 }
 
 // Ventana de gracia (ms) para proteger órdenes locales recién creadas del clobber del

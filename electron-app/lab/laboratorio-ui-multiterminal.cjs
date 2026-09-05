@@ -31,32 +31,41 @@ const { CatalogStore } = require('../local-server/core/catalog-store')
 const WebSocket = require(path.join(ELECTRON_APP, 'node_modules/ws'))
 
 const tenant = 'closure-lab'
+const operationalMode = process.env.FULLSITE_LAB_OPERATIONAL === '1'
+const packagedBundle = process.env.FULLSITE_LAB_UI_BUNDLE ? path.resolve(process.env.FULLSITE_LAB_UI_BUNDLE) : null
+const packagedManifest = packagedBundle ? require('../offline-ui/package-store').verifyPackage(packagedBundle).manifest : null
+if (packagedBundle && !operationalMode) throw new Error('Packaged service lab requires operational mode')
 const secret = cred.generarSecreto()
 const headers = cred.cabecerasDeCredencial({ secreto: secret, restaurantId: tenant })
 const base = fs.mkdtempSync(path.join(os.tmpdir(), 'fullsite-ui-'))
-const output = path.join(ROOT, 'output/closure/ui')
+const output = path.join(ROOT, packagedBundle ? 'output/closure/ui-paquete-operacion' : operationalMode ? 'output/closure/ui-operacion' : 'output/closure/ui')
 fs.mkdirSync(output, { recursive: true })
 const terminals = []
 const results = []
 const prepared = new Map()
+const reservedPorts = new Map()
 let nextProcess
 let nextLog = ''
-let wan = true
+let wan = !packagedBundle
 
 function cleanEnv(extra = {}) {
   const env = { PATH: process.env.PATH, HOME: process.env.HOME, TMPDIR: base,
-    LANG: 'en_US.UTF-8', NODE_ENV: 'development', NEXT_TELEMETRY_DISABLED: '1' }
+    LANG: 'en_US.UTF-8', NODE_ENV: 'development', NEXT_TELEMETRY_DISABLED: '1', FULLSITE_UI_LAB: '1' }
   for (const key of ['DISPLAY', 'XAUTHORITY', 'SystemRoot', 'APPDATA', 'LOCALAPPDATA']) {
     if (process.env[key]) env[key] = process.env[key]
   }
   return { ...env, ...extra }
 }
 
-async function freePort() {
+async function freePort(reserve = false) {
   return new Promise((resolve, reject) => {
     const s = net.createServer()
     s.once('error', reject)
-    s.listen(0, '127.0.0.1', () => { const port = s.address().port; s.close(() => resolve(port)) })
+    s.listen(0, '127.0.0.1', () => {
+      const port = s.address().port
+      if (reserve) { reservedPorts.set(port, s); resolve(port) }
+      else s.close(() => resolve(port))
+    })
   })
 }
 async function until(fn, label, timeout = 30000) {
@@ -110,7 +119,8 @@ async function commandWs(terminal, type, payload) {
   })
 }
 
-const staff = { id: '00000000-0000-4000-8000-000000000071', name: 'Mesero de laboratorio', role: 'gerente' }
+const labPin = '9876543210'
+const staff = { id: '00000000-0000-4000-8000-000000000071', name: 'Operador de laboratorio', role: operationalMode ? 'admin' : 'gerente' }
 const turno = { id: '00000000-0000-4000-8000-000000000072', client_id: tenant,
   fondo_inicial: 500, opened_by: staff.name, opened_at: new Date().toISOString(), closed_at: null }
 const fixture = {
@@ -129,6 +139,9 @@ async function fixtureRoute(route, uiOrigin, pedroPorts) {
   const request = route.request()
   const url = new URL(request.url())
   const local = ['127.0.0.1', 'localhost'].includes(url.hostname)
+  // Only verified package files may use this origin. The Electron protocol
+  // serves them from disk; API requests and every other WAN origin stay blocked.
+  if (packagedBundle && url.origin === uiOrigin && !/^\/(api|rest|auth)(\/|$)/.test(url.pathname)) return route.continue()
   // Nunca enviar tráfico de este laboratorio a un restaurante o proveedor real.
   if (!local && !['data:', 'blob:', 'about:'].includes(url.protocol)) return route.abort('blockedbyclient')
   if (pedroPorts.includes(Number(url.port))) return route.continue()
@@ -163,9 +176,33 @@ async function startTerminal(name, role, port, cajaPort, uiOrigin, ports) {
     local_server_port: port, protocol_version: '1.0', provisioned_at: new Date().toISOString(),
     pos_server_ip: role === 'server_pos' ? null : '127.0.0.1',
     pos_server_port: role === 'server_pos' ? null : cajaPort, lan_secret: secret, instance_name: name,
+    localAuthorityEnabled: operationalMode,
   }))
-  const app = await _electron.launch({ executablePath: electronBinary, args: [path.join(ELECTRON_APP, 'main.js')],
+  let entry = path.join(ELECTRON_APP, 'main.js')
+  if (packagedBundle) {
+    entry = path.join(base, 'packaged-bootstrap.cjs')
+    fs.writeFileSync(entry, `const fs = require('node:fs');
+const startupLog = require('node:path').join(process.env.FULLSITE_USER_DATA_DIR, 'lab-startup.log');
+for (const stream of [process.stdout, process.stderr]) {
+  const originalWrite = stream.write.bind(stream);
+  stream.write = (chunk, ...args) => { fs.appendFileSync(startupLog, chunk); return originalWrite(chunk, ...args); };
+}
+const originalFetch = global.fetch;
+global.fetch = (input, init) => {
+  const url = new URL(typeof input === 'string' ? input : input.url);
+  if (!['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname)) return Promise.reject(new TypeError('Laboratorio sin WAN'));
+  return originalFetch(input, init);
+};
+require(${JSON.stringify(path.join(ELECTRON_APP, 'main.js'))});\n`)
+  }
+  // Keep not-yet-started server ports reserved while earlier terminals make
+  // outbound LAN connections, which can otherwise claim the same ephemeral port.
+  if (reservedPorts.has(port)) {
+    await new Promise(resolve => reservedPorts.get(port).close(resolve)); reservedPorts.delete(port)
+  }
+  const app = await _electron.launch({ executablePath: electronBinary, args: [entry],
     env: cleanEnv({ FULLSITE_DEV: '1', FULLSITE_USER_DATA_DIR: userData, FULLSITE_LOCAL_SERVER_PORT: String(port),
+      ...(packagedBundle ? { FULLSITE_UI_BUNDLE_DIR: packagedBundle } : {}),
       // Arranque inerte del mismo origen: instalar interceptores antes del JS de
       // producto impide que la precarga del SW escape al aislamiento de pruebas.
       FULLSITE_POS_URL: `${uiOrigin}/icon-192v2.png`, FULLSITE_KDS_URL: `${uiOrigin}/icon-192v2.png` }), timeout: 60000,
@@ -176,8 +213,8 @@ async function startTerminal(name, role, port, cajaPort, uiOrigin, ports) {
   terminal.process.stderr.on('data', d => terminal.log.push(String(d)))
   const context = app.context()
   await context.route('**/*', route => fixtureRoute(route, uiOrigin, ports))
-  await context.addInitScript(({ tenant, staff, turno, terminalId, port, secret, actorSession }) => {
-    if (!['localhost', '127.0.0.1'].includes(location.hostname)) return
+  await context.addInitScript(({ tenant, staff, turno, terminalId, port, secret, actorSession, operationalMode, uiOrigin }) => {
+    if (!['localhost', '127.0.0.1'].includes(location.hostname) && location.origin !== uiOrigin) return
     localStorage.setItem('fullsite_client_id', tenant)
     localStorage.setItem('pos_terminal_id', terminalId)
     localStorage.setItem('FULLSITE_BRIDGE_URL', `http://127.0.0.1:${port}`)
@@ -186,12 +223,14 @@ async function startTerminal(name, role, port, cajaPort, uiOrigin, ports) {
     localStorage.setItem('FULLSITE_OFFLINE_DISABLED', '1')
     localStorage.setItem('kds_settings_v1', JSON.stringify({ station: 'todas' }))
     localStorage.setItem('pos_shift_token', 'synthetic-lab-session')
-    localStorage.setItem('pos_turno_id', turno.id)
-    localStorage.setItem('pos_turno_cache', JSON.stringify({ turno, turnos: [turno], ts: Date.now() }))
+    if (!operationalMode) {
+      localStorage.setItem('pos_turno_id', turno.id)
+      localStorage.setItem('pos_turno_cache', JSON.stringify({ turno, turnos: [turno], ts: Date.now() }))
+    }
     sessionStorage.setItem('pos_staff', JSON.stringify(staff))
     sessionStorage.setItem('pos_actor_session', JSON.stringify(actorSession))
     sessionStorage.setItem('pos_last_activity', String(Date.now()))
-  }, { tenant, staff, turno, terminalId, port, secret, actorSession })
+  }, { tenant, staff, turno, terminalId, port, secret, actorSession, operationalMode, uiOrigin })
   const page = await app.firstWindow()
   terminal.page = page
   page.on('pageerror', error => terminal.errors.push(error.stack || error.message))
@@ -221,9 +260,10 @@ async function check(name, run) {
 async function main() {
   const uiPort = await freePort()
   const ports = []
-  for (let i = 0; i < 4; i++) ports.push(await freePort())
+  for (let i = 0; i < 4; i++) ports.push(await freePort(true))
   assert.equal(new Set([uiPort, ...ports]).size, 5, 'Puertos independientes')
-  const uiOrigin = `http://127.0.0.1:${uiPort}`
+  const uiOrigin = packagedBundle ? 'https://app.fullsite.mx' : `http://127.0.0.1:${uiPort}`
+  if (!packagedBundle) {
   nextProcess = spawn(process.execPath, [path.join(APP, 'node_modules/next/dist/bin/next'), 'dev', '--webpack',
     '--hostname', '127.0.0.1', '--port', String(uiPort)], {
     cwd: APP, env: cleanEnv({ NEXT_PUBLIC_SUPABASE_URL: uiOrigin,
@@ -238,6 +278,7 @@ async function main() {
     await until(async () => (await fetch(`${uiOrigin}${route}`, { signal: AbortSignal.timeout(15000) })).ok,
       `Preparar compilación ${route}`, 90000)
   }
+  }
   // Prepare real signed sessions in the synthetic Caja profile before it boots.
   // Only the HTTPS PIN provider response is a fixture; token verification in
   // the running servers and the financial transport are real.
@@ -245,14 +286,17 @@ async function main() {
     fetchImpl: async () => Response.json({ staff }) })
   for (const name of ['Caja', 'POS 2', 'POS 3', 'Cocina']) {
     const terminalId = randomUUID()
-    const actorSession = await actors.login({ pin: '9876543210', deviceId: terminalId, restaurantId: tenant })
+    const actorSession = await actors.login({ pin: labPin, deviceId: terminalId, restaurantId: tenant })
     prepared.set(name, { terminalId, actorSession })
   }
   // Prepare ONE complete catalog on Caja. POS 3 never gets a private fixture
   // cache; its menu/config/modifier readers must retrieve this over real LAN.
   const catalog = new CatalogStore({ directory: path.join(base, 'Caja', 'catalog'), restaurantId: tenant,
     fetchImpl: async () => Response.json({ schema_version: 1, complete: true, catalog_scope: 'restaurant', restaurant_id: tenant,
-      refreshed_at: new Date().toISOString(), config: fixture.clients[0], settings: {},
+      refreshed_at: new Date().toISOString(), config: fixture.clients[0], settings: {
+        'pos.station_routing': { barra: ['lab-bebidas'] },
+        'pos.no_print_stations': ['cocina', 'barra', 'caja'],
+      },
       categories: [{ ...fixture.pos_menu_categories[0], items: fixture.pos_menu_items }], payment_methods: fixture.pos_payment_methods,
       modifiers: { groups: [{ id: 'lab-temperature', name: 'Preparación de laboratorio', level: 1, min_selections: 1, max_selections: 1, required: true }],
         mods: [{ id: 'lab-hot', group_id: 'lab-temperature', name: 'Caliente de laboratorio', price: 0 }],
@@ -263,6 +307,12 @@ async function main() {
   const pos2 = await startTerminal('POS 2', 'pos', ports[1], ports[0], uiOrigin, ports)
   const pos3 = await startTerminal('POS 3', 'pos', ports[2], ports[0], uiOrigin, ports)
   const kds = await startTerminal('Cocina', 'kds', ports[3], ports[0], uiOrigin, ports)
+  if (operationalMode) {
+    wan = false
+    await require('./recorrido-operacional-ui')({ caja, pos2, pos3, kds, check, expect, assert, until, request,
+      tenant, output, uiOrigin, labPin, restartCaja: () => startTerminal('Caja', 'server_pos', ports[0], ports[0], uiOrigin, ports) })
+    return
+  }
   const orderId = randomUUID()
   await command(caja, 'TURNO_OPENED', { ...turno, turno_id: turno.id, ts: turno.opened_at })
   await command(pos2, 'ORDER_SENT', { order_id: orderId, mesa: 1, mesero: staff.name,
@@ -301,52 +351,33 @@ async function main() {
     await pos3.page.screenshot({ path: path.join(output, 'catalogo-compartido-sin-internet.png'), fullPage: true })
     await pos3.page.getByRole('button', { name: 'Cancelar', exact: true }).click()
   })
-  let finance
-  const money = async (terminal, type, payload) => {
-    const response = await command(terminal, type, { order_id: orderId, expected_revision: finance?.revision || 0, ...payload })
-    finance = response.results[0].result.financial_order
-  }
-  const collect = async (terminal, accountId, paymentId, amount) => {
-    await money(terminal, 'FINANCIAL_PAYMENT_START', { account_id: accountId, payment_id: paymentId, amount_cents: amount, method: 'cash' })
-    await money(terminal, 'FINANCIAL_PAYMENT_RESULT', { payment_id: paymentId, status: 'accepted', evidence: { kind: 'cash_received', received_by: staff.id, received_cents: amount } })
-  }
-  await check('Sin WAN, un pago parcial desde POS 2 actualiza el saldo visible en POS 3', async () => {
-    await money(pos2, 'FINANCIAL_OPEN', { turno_id: turno.id, expected_order_revision: 4, total_cents: 11600, currency: 'MXN' })
-    await money(pos2, 'FINANCIAL_SPLIT', { accounts: [{ account_id: 'A', total_cents: 5800 }, { account_id: 'B', total_cents: 5800 }] })
-    await collect(pos2, 'A', 'partial', 2900)
-    assert.equal(finance.balance_cents, 8700)
-    await expect(pos3.page.locator('body')).toContainText(/Saldo confirmado en Caja:.*87[.,]00/)
+  await check('Una instalación sin transición rechaza crear otra autoridad monetaria', async () => {
+    const response = await request(pos2, '/events', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ command_type: 'FINANCIAL_OPEN', command_id: randomUUID(), order_id: orderId,
+        turno_id: turno.id, expected_revision: 0, expected_order_revision: 4, total_cents: 11600, currency: 'MXN' }) })
+    assert.equal((await response.json()).results[0].code, 'LOCAL_AUTHORITY_DISABLED')
+    assert.equal((await (await request(caja, '/state')).json()).financial_orders.length, 0)
   })
-  await check('Reiniciar Caja recupera cuentas, pago parcial y preparación pendiente', async () => {
+  await check('Reiniciar Caja recupera la misma cuenta y preparación de la instalación anterior', async () => {
     const crashed = caja
     crashed.process.kill('SIGKILL')
     await until(() => crashed.process.exitCode !== null || crashed.process.signalCode !== null, 'Termina el binario real de Caja')
     caja = await startTerminal('Caja', 'server_pos', ports[0], ports[0], uiOrigin, ports)
     const snapshot = await (await request(caja, '/state')).json()
-    const recovered = snapshot.financial_orders.find(o => o.order_id === orderId)
-    assert.equal(recovered.accounts.length, 2)
-    assert.equal(recovered.paid_cents, 2900)
-    assert.equal(recovered.balance_cents, 8700)
+    const recovered = snapshot.salon_orders.find(o => o.id === orderId || o.order_id === orderId)
+    assert.equal(recovered.total, 116)
     assert(snapshot.kds_orders.some(o => o.id === orderId || o.order_id === orderId))
-    await expect(pos3.page.locator('body')).toContainText(/Saldo confirmado en Caja:.*87[.,]00/)
+    await expect(pos3.page.locator('body')).toContainText(/Saldo confirmado en Caja:.*116[.,]00/)
   })
-  await check('Una cuenta pagada sigue en cocina mientras no se entregue', async () => {
-    await collect(pos3, 'A', 'finish-A', 2900)
-    await collect(pos3, 'B', 'finish-B', 5800)
-    assert.equal(finance.paid_cents, 11600)
-    await expect(kds.page.locator('body')).toContainText('Café de laboratorio', { timeout: 10000 })
-    const snapshot = await (await request(caja, '/state')).json()
-    assert(snapshot.kds_orders.some(o => o.order_id === orderId || o.id === orderId))
-    await kds.page.screenshot({ path: path.join(output, 'pagada-pendiente-en-cocina.png'), fullPage: true })
-  })
-  await check('Cocina confirma preparación después del pago sin alterar el dinero', async () => {
+  await check('Cocina legacy confirma preparación sin inventar liquidación', async () => {
     await kds.page.locator('.card').filter({ hasText: 'Café de laboratorio' }).getByRole('button', { name: /Todo listo/ }).click()
     await until(async () => {
       const snapshot = await (await request(caja, '/state')).json()
       return snapshot.kds_orders.find(o => o.id === orderId || o.order_id === orderId)?.status === 'lista'
     }, 'Caja registra el toque real de cocina')
     const snapshot = await (await request(caja, '/state')).json()
-    assert.equal(snapshot.financial_orders.find(o => o.order_id === orderId).paid_cents, 11600)
+    assert(snapshot.salon_orders.some(o => o.id === orderId || o.order_id === orderId))
+    assert.equal(snapshot.financial_orders.length, 0)
   })
   await check('Al apagarse Caja, POS 2 muestra que la cuenta no está confirmada', async () => {
     caja.process.kill('SIGKILL')
@@ -370,6 +401,7 @@ main().catch(error => {
   console.error(error.stack)
   process.exitCode = 1
 }).finally(async () => {
+  for (const server of reservedPorts.values()) await new Promise(resolve => server.close(resolve))
   for (const terminal of terminals) {
     try {
       if (!terminal.page.isClosed()) {
@@ -384,8 +416,9 @@ main().catch(error => {
   if (nextProcess && nextProcess.exitCode === null) nextProcess.kill('SIGTERM')
   fs.writeFileSync(path.join(output, 'next.log'), nextLog)
   fs.writeFileSync(path.join(output, 'results.json'), JSON.stringify({ results, fixture: base,
+    ui_source: packagedBundle ? 'verified-installed-package' : 'next-dev', ui_revision: packagedManifest?.revision ?? null,
     limitations: ['Sesión preparada: no prueba PIN o enrolamiento', 'No certifica impresoras, Windows o huella',
-      'Assets servidos por Next local: esta suite no certifica el paquete offline ni Service Worker',
+      packagedBundle ? 'Paquete instalado sin Next ni WAN; sesión previamente preparada' : 'Assets servidos por Next local: esta suite no certifica el paquete offline ni Service Worker',
       'La nube está simulada; órdenes y réplicas usan Pedro real'],
     errors: terminals.flatMap(t => t.errors.map(error => ({ terminal: t.name, error }))),
   }, null, 2))

@@ -5,6 +5,7 @@ import type { ClientConfig } from './client-config'
 import type { MenuCategory, PaymentMethodDB, ModifierGroupDef } from './pos-data'
 
 export interface CatalogoDeCaja {
+  catalog_revision?: string
   schema_version: 1; complete: true; restaurant_id: string; catalog_scope: 'restaurant'; refreshed_at: string
   categories: MenuCategory[]; payment_methods: PaymentMethodDB[]; config: ClientConfig
   settings: Record<string, unknown>
@@ -36,8 +37,9 @@ export async function leerCatalogoCaja(clientId = getActiveClientSlug()): Promis
           !body.catalog?.modifiers || body.catalog?.config?.id !== clientId || !Number.isFinite(body.catalog.config.iva_rate)) {
         throw new Error('Catálogo sin preparar en Caja. Conecta internet e ingresa con PIN para prepararlo.')
       }
-      cached.set(key, { catalog: body.catalog, at: Date.now() })
-      return body.catalog as CatalogoDeCaja
+      const catalog = { ...body.catalog, catalog_revision: body.revision } as CatalogoDeCaja
+      cached.set(key, { catalog, at: Date.now() })
+      return catalog
     }
     pending.set(key, read().finally(() => { pending.delete(key) }))
   }
@@ -51,5 +53,5 @@ export function gruposDelCatalogo(catalog: CatalogoDeCaja, itemId: string, categ
   ids.delete('quitar') // Existing separate removal control.
   return data.groups.filter(g => ids.has(g.id)).map(g => ({ id: g.id, name: g.name, level: g.level,
     minSelections: g.min_selections, maxSelections: g.max_selections, required: g.required,
-    options: data.mods.filter(m => m.group_id === g.id).map(m => ({ name: m.name, price: m.price })) }))
+    options: data.mods.filter(m => m.group_id === g.id).map(m => ({ id: m.id, name: m.name, price: m.price })) }))
 }

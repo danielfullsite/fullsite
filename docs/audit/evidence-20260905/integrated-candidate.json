@@ -1,0 +1,255 @@
+{
+  "recorded_date": "2026-09-05",
+  "status": "local_candidate_not_deployed",
+  "baseline_commit": "0de0b59a",
+  "note": "The commit containing this file is the integrated candidate; these are observed local results, not AMALAY certification.",
+  "environment": {
+    "os": "macOS",
+    "fixtures": "synthetic",
+    "amalay_access": false,
+    "cloud_migrations_applied": false
+  },
+  "suites": [
+    {
+      "name": "frontend_node",
+      "passed": 2989,
+      "failed": 0,
+      "source_log": "frontend-operaciones-full.log"
+    },
+    {
+      "name": "frontend_dom",
+      "passed": 230,
+      "failed": 0,
+      "source_log": "dom-operaciones-full.log"
+    },
+    {
+      "name": "pedro_node",
+      "passed": 405,
+      "failed": 0,
+      "source_log": "pedro-full-current.log"
+    },
+    {
+      "name": "pedro_electron",
+      "passed": 405,
+      "failed": 0,
+      "source_log": "pedro-electron-final.log"
+    }
+  ],
+  "typescript": {
+    "passed": true,
+    "source_log": "output/closure/receipt-projection-tsc.log",
+    "command": "tsc --noEmit --incremental false"
+  },
+  "packaged_ui": {
+    "results": [
+      {
+        "name": "Sin WAN se abre turno desde el botón de Caja y lo comparten tres terminales",
+        "passed": true
+      },
+      {
+        "name": "POS 2 captura y guarda; POS 3 ve la misma cuenta antes de enviarla a cocina",
+        "passed": true
+      },
+      {
+        "name": "Cobrar una cuenta aún sin enviar no bloquea sus productos pendientes",
+        "passed": true
+      },
+      {
+        "name": "POS 3 agrega otra ronda y Enviar confirma los dos cafés a cocina",
+        "passed": true
+      },
+      {
+        "name": "Transferir mesa con PIN conserva la cuenta y la ronda en todos los puntos",
+        "passed": true
+      },
+      {
+        "name": "Anular otra cuenta con PIN libera su mesa sin alterar el consumo anterior",
+        "passed": true
+      },
+      {
+        "name": "Dividir desde la pantalla persiste dos cuentas de 58 pesos",
+        "passed": true
+      },
+      {
+        "name": "Cobrar 29 pesos desde el botón actualiza el saldo de POS 3",
+        "passed": true
+      },
+      {
+        "name": "Reiniciar Caja recupera el cobro y se continúa desde otra terminal",
+        "passed": true
+      },
+      {
+        "name": "Sin Caja se bloquea la confirmación de cobros y se conserva la última cuenta",
+        "passed": true
+      },
+      {
+        "name": "Cocina prepara y entrega la ronda desde sus botones sin alterar los cobros",
+        "passed": true
+      },
+      {
+        "name": "El cierre de turno desde la pantalla concilia 500 de fondo y 116 de ventas",
+        "passed": true
+      },
+      {
+        "name": "Ninguna pantalla registra errores JavaScript durante el recorrido de botones",
+        "passed": true
+      }
+    ],
+    "ui_source": "verified-installed-package",
+    "ui_revision": "956010a8d72fb426125651b64e112e08c0c8c51c2c3a5245b09216cd2414e9fb",
+    "limitations": [
+      "Sesión preparada: no prueba PIN o enrolamiento",
+      "No certifica impresoras, Windows o huella",
+      "Paquete instalado sin Next ni WAN; sesión previamente preparada",
+      "La nube está simulada; órdenes y réplicas usan Pedro real"
+    ],
+    "errors": []
+  },
+  "cold_boot": {
+    "revision": "956010a8d72fb426125651b64e112e08c0c8c51c2c3a5245b09216cd2414e9fb",
+    "results": [
+      {
+        "name": "Cold boot loads packaged POS with empty Chromium profile and no Next server or WAN",
+        "passed": true
+      },
+      {
+        "name": "Typed PIN is verified by prepared Caja and real static RSC navigation mounts the turno gate",
+        "passed": true
+      },
+      {
+        "name": "Secondary cold boot reads Caja catalog over LAN and verifies PIN without private browser cache",
+        "passed": true
+      },
+      {
+        "name": "Killing real Electron then restarting offline retains package and demands a fresh typed PIN",
+        "passed": true
+      },
+      {
+        "name": "All tested screens keep running without unhandled renderer errors",
+        "passed": true
+      }
+    ]
+  },
+  "legacy_ui": {
+    "results": [
+      {
+        "name": "La comanda llega a la pantalla de cocina por LAN",
+        "passed": true
+      },
+      {
+        "name": "Un comando WebSocket del POS secundario se confirma en Caja",
+        "passed": true
+      },
+      {
+        "name": "Sin internet, POS 3 abre los productos y el total de la misma cuenta",
+        "passed": true
+      },
+      {
+        "name": "POS 3 sin caché obtiene menú y opciones obligatorias de Caja sin internet",
+        "passed": true
+      },
+      {
+        "name": "Una instalación sin transición rechaza crear otra autoridad monetaria",
+        "passed": true
+      },
+      {
+        "name": "Reiniciar Caja recupera la misma cuenta y preparación de la instalación anterior",
+        "passed": true
+      },
+      {
+        "name": "Cocina legacy confirma preparación sin inventar liquidación",
+        "passed": true
+      },
+      {
+        "name": "Al apagarse Caja, POS 2 muestra que la cuenta no está confirmada",
+        "passed": true
+      },
+      {
+        "name": "Las pantallas completan el recorrido sin errores sin manejar",
+        "passed": true
+      }
+    ],
+    "ui_source": "next-dev",
+    "ui_revision": null,
+    "limitations": [
+      "Sesión preparada: no prueba PIN o enrolamiento",
+      "No certifica impresoras, Windows o huella",
+      "Assets servidos por Next local: esta suite no certifica el paquete offline ni Service Worker",
+      "La nube está simulada; órdenes y réplicas usan Pedro real"
+    ],
+    "errors": []
+  },
+  "local_postgres_materializer": {
+    "results": [
+      {
+        "name": "Wrong credential and out-of-order event never create a business receipt",
+        "passed": true
+      },
+      {
+        "name": "Commit with lost HTTP response retries safely and materializes complete operational and financial results",
+        "passed": true
+      },
+      {
+        "name": "Exact retries are receipts while altered history and reused command IDs are rejected",
+        "passed": true
+      },
+      {
+        "name": "Restart verifies local history before using checkpoint; divergent restored history cannot send",
+        "passed": true
+      },
+      {
+        "name": "Database fence rejects legacy writes, forged transaction markers and cross-branch adoption",
+        "passed": true
+      },
+      {
+        "name": "A second branch has its own sequence; globally reused order identity cannot cross branch scope",
+        "passed": true
+      },
+      {
+        "name": "Invalid projection rolls back receipt and stream progress in the same transaction",
+        "passed": true
+      },
+      {
+        "name": "Unknown cash attempt reserves balance without counting a sale and is retained in cloud",
+        "passed": true
+      },
+      {
+        "name": "Full settlement materializes once and preserves pending kitchen work",
+        "passed": true
+      },
+      {
+        "name": "Kitchen delivery and counted cash closure persist independently of settlement",
+        "passed": true
+      },
+      {
+        "name": "Revoking a stream blocks later synchronization and preserves pending local events",
+        "passed": true
+      }
+    ]
+  },
+  "windows_packaging": {
+    "status": "verified-package-lab-installer-not-executed",
+    "platform": "win32",
+    "architecture": "x64",
+    "version": "1.4.1-offline.1",
+    "app_id": "mx.fullsite.pos.lab",
+    "ui_revision": "956010a8d72fb426125651b64e112e08c0c8c51c2c3a5245b09216cd2414e9fb",
+    "app_files": 600,
+    "required_runtime_files": 17,
+    "installed": false,
+    "published": false,
+    "signed": false,
+    "installer_tested": false,
+    "installer": {
+      "name": "Fullsite-POS-LAB-SYNTHETIC-1.4.1-offline.1-x64.exe",
+      "bytes": 83875655,
+      "sha256": "7b91c50894e23879d019b9314dfe9896bfd1a732486f6e073f0f0db7b0867cd2"
+    }
+  },
+  "remaining": [
+    "Real Windows execution, installer acceptance, drivers, printers, fingerprint and AMALAY network",
+    "Production-configured release and coordinated branch data migration",
+    "Card provider, tips, adjustments, cash movements, new receipt/drawer and uncertain-print resolution",
+    "Inventory and legacy business reports integration"
+  ]
+}

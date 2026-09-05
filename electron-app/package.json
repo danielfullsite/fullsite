@@ -5,8 +5,9 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build:win": "electron-builder --win",
-    "build:mac": "electron-builder --mac"
+    "build:ui": "node scripts/build-offline-ui.cjs",
+    "build:win": "npm run build:ui && electron-builder --win --x64 --publish never",
+    "build:mac": "npm run build:ui && electron-builder --mac --publish never"
   },
   "author": "Fullsite",
   "license": "UNLICENSED",
@@ -20,8 +21,28 @@
     "electron-builder": "^25.0.0"
   },
   "build": {
+    "beforePack": "./scripts/verify-offline-ui.cjs",
     "appId": "mx.fullsite.pos",
     "productName": "Fullsite POS",
+    "files": [
+      "main.js",
+      "preload*.js",
+      "setup.html",
+      "offline.html",
+      "icon.ico",
+      "icon.png",
+      "local-server/**/*.js",
+      "local-server/core/permission-profiles.json",
+      "local-server/kds-ui.html",
+      "offline-ui/*.js",
+      "ui-bundle/**/*",
+      "update/*.js",
+      "!**/tests/**",
+      "!**/*.test.js",
+      "!**/.env*",
+      "!**/*.log",
+      "!local-server/telemetry/latency-harness.js"
+    ],
     "directories": {
       "output": "dist"
     },

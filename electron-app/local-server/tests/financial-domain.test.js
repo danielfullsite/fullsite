@@ -5,7 +5,7 @@ const { FinancialDomain } = require('../core/financial-domain')
 
 function setup(orderId = 'order-1', total = 10000) {
   const domain = new FinancialDomain()
-  const context = { order: { order_id: orderId, total_cents: total, turno_id: 'turno-1', order_revision: 4, status: 'enviada' }, turno: { id: 'turno-1' } }
+  const context = { order: { order_id: orderId, total_cents: total, turno_id: 'turno-1', order_revision: 4, status: 'enviada', items: [{ id: 'line', cantidad: 1, sent_quantity: 1 }] }, turno: { id: 'turno-1' } }
   const execute = (type, payload = {}) => {
     const result = domain.prepare({ command_type: type, order_id: orderId, expected_revision: domain.getOrder(orderId)?.revision ?? 0, ...payload }, context)
     domain.apply(result.financial_order)
@@ -117,7 +117,7 @@ test('the same payment identity or provider authorization cannot settle two moth
   const domain = new FinancialDomain()
   function run(orderId, type, payload) {
     const result = domain.prepare({ command_type: type, order_id: orderId, expected_revision: domain.getOrder(orderId)?.revision ?? 0, ...payload }, {
-      order: { order_id: orderId, total_cents: 10000, order_revision: 1, turno_id: 't1' }, turno: { id: 't1' },
+      order: { order_id: orderId, total_cents: 10000, order_revision: 1, turno_id: 't1', items: [{ id: 'line', cantidad: 1, sent_quantity: 1 }] }, turno: { id: 't1' },
     })
     domain.apply(result.financial_order)
   }

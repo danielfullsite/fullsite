@@ -155,14 +155,28 @@ test('KDS autenticado conserva HTTP local y añade credenciales a lectura y env�
   assert.equal(cfg.headers['x-fullsite-lan'], SECRET)
   // Ejecutar los dos calls reales del archivo, sin reemplazar su construcción de headers.
   const calls = []
-  const context = { CFG: cfg, Object }
+  const context = { CFG: cfg, Object, Date, JSON, ACTOR_KEY: 'pos_actor_session', sessionStorage: { getItem: () => null } }
+  vm.runInNewContext(html.match(/function actorSession\(\)\{[^\n]*\}/)[0], context)
   vm.runInNewContext(html.match(/function authHeaders\(extra\)\{[^\n]*\}/)[0], context)
   for (const extra of [undefined, { 'Content-Type': 'application/json' }]) {
     calls.push(await fetch(f.base + '/state', { headers: context.authHeaders(extra) }))
   }
   assert.ok(calls.every(r => r.status === 200))
+  context.sessionStorage.getItem = () => JSON.stringify({ staff: { id: 'synthetic-employee' }, actor_token: 'synthetic-signed-session', expires_at: Date.now() + 60000 })
+  assert.equal(context.authHeaders()['x-fullsite-actor'], 'synthetic-signed-session')
   assert.match(html, /fetch\(STATE_BASE\+"\/state",\{[^\n]*headers:authHeaders\(\)/)
   assert.match(html, /fetch\(STATE_BASE\+"\/events",\{[^\n]*headers:authHeaders\(/)
+})
+
+test('Caja transport credential alone cannot open drawer, inject print bytes or alter printing configuration', async t => {
+  const f = await fixture(t, { localAuthorityEnabled: true })
+  for (const route of ['/drawer', '/print', '/test', '/config', '/print/resolve']) {
+    const response = await fetch(f.base + route, { method: 'POST', headers: { ...auth, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: Buffer.from([0x1b, 0x70]).toString('base64'), resolution: 'reprint', job_id: 'old' }) })
+    assert.equal(response.status, 409, route)
+    assert.equal((await response.json()).code, 'CONTROLLED_PRINT_REQUIRED')
+  }
+  assert.equal(f.printCalls(), 0)
 })
 
 test('preloads disponen identidad antes del primer fetch, nunca desde URL o navegación ajena', async t => {

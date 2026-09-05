@@ -55,3 +55,18 @@ export function cuentaEditableDe(orden: Record<string, unknown>): CuentaEditable
     notas: typeof orden.notas === 'string' ? orden.notas : '',
   }
 }
+
+/** A command receipt and /state describe the same confirmation even though
+ * the projector strips private flags and adds an empty financial aggregate.
+ * Keep every business field (including financial revisions and balances) in
+ * this comparison so an actual concurrent update still needs confirmation. */
+export function mismaConfirmacionDeCuenta(before: Record<string, unknown> | null, after: Record<string, unknown> | null): boolean {
+  const normalized = (order: Record<string, unknown> | null) => {
+    if (!order) return null
+    const { _kds_sent, _from_cloud, financial_order, ...business } = order
+    let items = business.items
+    if (typeof items === 'string') { try { items = JSON.parse(items) } catch { /* invalid details remain unequal to valid arrays */ } }
+    return { ...business, items, financial_order: financial_order ?? null }
+  }
+  return equal(normalized(before), normalized(after))
+}

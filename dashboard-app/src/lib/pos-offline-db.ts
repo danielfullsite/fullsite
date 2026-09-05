@@ -1,5 +1,6 @@
 // IndexedDB offline storage for POS
 // Stores menu, orders, inventory, and sync queue for offline-first operation
+import { leerSalon, requiereCaja } from './pedro-cliente'
 
 const DB_NAME = 'fullsite_pos'
 const DB_VERSION = 4
@@ -959,14 +960,28 @@ async function markConflict(
 // Without this, two concurrent runs can race: the second reads the queue before the first's markConflict
 // completes, causing conflicted items to be re-processed and potentially lost.
 let syncAllRunning = false
+type SyncResult = { synced: number; failed: number; blocked?: 'CAJA_AUTHORITY' | 'CAJA_UNAVAILABLE' }
 
-export async function syncAll(options: { retryExhausted?: boolean } = {}): Promise<{ synced: number; failed: number }> {
+// This queue belongs to the previous cloud writer. After cutover its entries
+// must be reconciled, not replayed over accounts committed by Caja. Keep their
+// payloads and retry counts intact, including when Caja cannot be reached.
+async function replayAuthorityBlock(): Promise<SyncResult['blocked']> {
+  if (!requiereCaja()) return undefined
+  const state = await leerSalon()
+  if (!state.autoritativa) return 'CAJA_UNAVAILABLE'
+  if (state.writeAuthority === 'caja') return 'CAJA_AUTHORITY'
+  return undefined
+}
+
+export async function syncAll(options: { retryExhausted?: boolean } = {}): Promise<SyncResult> {
   if (syncAllRunning) {
     console.log('[offline-sync] syncAll already running — skipping duplicate call')
     return { synced: 0, failed: 0 }
   }
   syncAllRunning = true
   try {
+    const blocked = await replayAuthorityBlock()
+    if (blocked) return { synced: 0, failed: 0, blocked }
     if (options.retryExhausted) {
       const reset = await resetSyncQueueRetries()
       if (reset > 0) console.log(`[offline-sync] Reactivated ${reset} transient item(s) for a fresh connectivity cycle`)
@@ -977,7 +992,7 @@ export async function syncAll(options: { retryExhausted?: boolean } = {}): Promi
   }
 }
 
-async function _syncAllInner(): Promise<{ synced: number; failed: number }> {
+async function _syncAllInner(): Promise<SyncResult> {
   const queue = await getPendingQueue()
   let synced = 0
   let failed = 0
@@ -1006,6 +1021,10 @@ async function _syncAllInner(): Promise<{ synced: number; failed: number }> {
   }
 
   for (const item of queue) {
+    // Recheck between entries: a long replay must stop if the installation
+    // changes authority or loses Caja. The database fence covers in-flight IO.
+    const blocked = await replayAuthorityBlock()
+    if (blocked) return { synced, failed, blocked }
     // Skip items in terminal error state — they require operator intervention
     if (item.error_class === 'STALE_WRITE_CONFLICT' || item.error_class === 'TERMINAL_NON_RETRYABLE') {
       continue

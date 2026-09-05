@@ -8,25 +8,33 @@ const { CoreEventStore } = require('../core/event-store')
 const { NdjsonEventStore } = require('../adapters/storage/ndjson')
 const { CommandHandler } = require('../core/command-handler')
 const { RestaurantState } = require('../core/state')
-const actor = { id: 'cashier', name: 'Test cashier', permissions: ['pos.accounts.manage', 'pos.payments.collect', 'pos.payments.reconcile'], expires_at: Date.now() + 3600000 }
+const prepareCatalog = require('./fixtures/financial-service-catalog.cjs')
+const actor = { id: 'cashier', name: 'Test cashier', permissions: ['pos.accounts.manage', 'pos.payments.collect', 'pos.payments.reconcile',
+  'pos.orders.write', 'pos.orders.send', 'pos.turns.open', 'pos.turns.close', 'abrir_cuentas_restaurante', 'actualizar_estatus_orden'], expires_at: Date.now() + 3600000 }
 let dir; let counter
 beforeEach(() => { dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fullsite-money-')); counter = 0 })
 afterEach(() => { fs.rmSync(dir, { recursive: true, force: true }) })
-async function restart() {
+async function restart(enabled = true) {
   const store = new CoreEventStore(new NdjsonEventStore({ eventLogPath: path.join(dir, 'events.ndjson') }))
   await store.load()
-  const state = new RestaurantState()
+  const catalog = await prepareCatalog(path.join(dir, 'catalog'), 'test')
+  const state = new RestaurantState({ localAuthorityEnabled: enabled })
   for (const event of await store.readAfter(0)) state.apply(event)
   const broadcasts = []
-  const handler = new CommandHandler({ eventStore: store, state, wsHub: { async broadcast(event) { broadcasts.push(event) } }, restaurantId: 'test' })
+  const handler = new CommandHandler({ eventStore: store, state, wsHub: { async broadcast(event) { broadcasts.push(event) } }, restaurantId: 'test', localAuthorityEnabled: enabled, catalogStore: catalog })
   const send = (type, fields = {}, clientId = 'POS-A') => handler.handle({ restaurant_id: 'test', payload: { command_type: type, command_id: `cmd-${++counter}`, ...fields } }, clientId, { actor })
-  return { store, state, handler, send, broadcasts }
+  return { store, state, handler, send, broadcasts, catalog }
 }
 async function service() {
   const stack = await restart()
-  await stack.send('TURNO_OPENED', { turno_id: 't1', opened_by: 'cashier' })
-  await stack.send('ORDER_SENT', { order_id: 'mother', mesa: 7, total: 100, order_revision: 4, turno_id: 't1', items: [{ id: 'soup', name: 'Sopa', cantidad: 1, precio: 100 }], status: 'enviada' })
-  const open = await stack.send('FINANCIAL_OPEN', { order_id: 'mother', turno_id: 't1', expected_revision: 0, expected_order_revision: 4, currency: 'MXN', total_cents: 10000 })
+  assert.ok((await stack.send('TURN_OPEN', { turno_id: 't1', opening_cash_cents: 0 })).event)
+  const saved = await stack.send('ORDER_SAVE', { order_id: 'mother', turno_id: 't1', expected_revision: 0,
+    catalog_revision: stack.catalog.read().revision, mesa: 7, items: [{ line_id: 'soup-line', product_id: 'soup', quantity: 1 }] })
+  assert.equal(saved.result?.operational_order.created_by, actor.id)
+  const sent = await stack.send('ORDER_SEND', { order_id: 'mother', turno_id: 't1', expected_revision: 1 })
+  assert.equal(sent.result?.operational_order.authority, 'caja')
+  assert.equal(JSON.parse(sent.result.operational_order.items)[0].sent_quantity, 1)
+  const open = await stack.send('FINANCIAL_OPEN', { order_id: 'mother', turno_id: 't1', expected_revision: 0, expected_order_revision: 2, currency: 'MXN', total_cents: 10000 })
   assert.ok(open.event, JSON.stringify(open))
   return stack
 }
@@ -83,16 +91,18 @@ test('legacy close/status/edit/cancel/shift changes cannot bypass durable outsta
   for (const [type, fields, code] of [
     ['ORDER_CLOSED', { order_id: 'mother', mesa: 7 }, 'FINANCIAL_CLOSE_REQUIRED'],
     ['ORDER_CLOSED', { order_id: 'invented', mesa: 7 }, 'FINANCIAL_CLOSE_REQUIRED'],
-    ['ORDER_UPSERTED', { order_id: 'mother', status: 'pagada' }, 'FINANCIAL_ORDER_LOCKED'],
-    ['ORDER_UPSERTED', { order_id: 'mother', items: [], total: 0 }, 'FINANCIAL_ORDER_LOCKED'],
-    ['ORDER_CANCELLED', { order_id: 'mother', mesa: 7 }, 'FINANCIAL_ORDER_LOCKED'],
-    ['TURNO_CLOSED', { turno_id: 't1' }, 'UNSETTLED_FINANCIAL_ACCOUNTS'],
-    ['TURNO_OPENED', { turno_id: 'other' }, 'UNSETTLED_FINANCIAL_ACCOUNTS'],
+    ['ORDER_UPSERTED', { order_id: 'mother', status: 'pagada' }, 'KITCHEN_COMMAND_REQUIRED'],
+    ['ORDER_UPSERTED', { order_id: 'mother', items: [], total: 0 }, 'KITCHEN_COMMAND_REQUIRED'],
+    ['ORDER_CANCELLED', { order_id: 'mother', mesa: 7 }, 'AUTHORITATIVE_COMMAND_REQUIRED'],
+    ['TURNO_CLOSED', { turno_id: 't1' }, 'AUTHORITATIVE_COMMAND_REQUIRED'],
+    ['TURNO_OPENED', { turno_id: 'other' }, 'AUTHORITATIVE_COMMAND_REQUIRED'],
+    ['TURN_CLOSE', { turno_id: 't1', counted_cash_cents: 0 }, 'UNSETTLED_FINANCIAL_ACCOUNTS'],
   ]) assert.equal((await stack.send(type, fields)).code, code)
   assert.equal(await stack.store.getLastSequence(), before)
   assert.equal(stack.state.getFinancialOrder('mother').balance_cents, 10000)
   assert.equal(stack.state.toSnapshot().kds_orders.length, 1)
-  const preparation = await stack.send('ORDER_UPSERTED', { order_id: 'mother', status: 'lista' })
+  const preparation = await stack.send('KITCHEN_SET', { order_id: 'mother', turno_id: 't1', expected_kitchen_revision: 1,
+    item_ids: stack.state.getOrder('mother').kitchen_items.map(item => item.id), status: 'lista' })
   assert.ok(preparation.event)
   assert.equal(stack.state.toSnapshot().salon_orders.length, 1)
 })
@@ -116,7 +126,7 @@ test('duplicate result survives lost broadcast ACK and returns its original dura
   const start = { command_id: 'start-p1', order_id: 'mother', expected_revision: 1, account_id: 'mother:full', payment_id: 'p1', amount_cents: 10000, method: 'cash' }
   await stack.send('FINANCIAL_PAYMENT_START', start)
   const msg = { restaurant_id: 'test', payload: { command_type: 'FINANCIAL_PAYMENT_RESULT', command_id: 'cash-result', order_id: 'mother', expected_revision: 2, payment_id: 'p1', status: 'accepted', evidence: received(10000) } }
-  const lostAck = new CommandHandler({ eventStore: stack.store, state: stack.state, wsHub: { async broadcast() { throw new Error('socket lost') } }, restaurantId: 'test' })
+  const lostAck = new CommandHandler({ eventStore: stack.store, state: stack.state, wsHub: { async broadcast() { throw new Error('socket lost') } }, restaurantId: 'test', localAuthorityEnabled: true, catalogStore: stack.catalog })
   await assert.rejects(lostAck.handle(msg, 'POS-A', { actor }), /socket lost/)
   const recovered = await restart()
   const result = await recovered.handler.handle(msg, 'POS-B', { actor })
@@ -136,6 +146,34 @@ test('money requires a server authenticated actor; client supplied roles and exp
   assert.equal(await stack.store.getLastSequence(), before)
 })
 
+test('activating Caja cannot adopt legacy money implicitly and disabling it rejects even a durable payment retry', async () => {
+  let stack = await restart(false)
+  assert.ok((await stack.send('TURNO_OPENED', { turno_id: 'legacy-turn', opened_by: actor.id })).event)
+  assert.ok((await stack.send('ORDER_SENT', { order_id: 'legacy-order', turno_id: 'legacy-turn', mesa: 1, total: 100,
+    order_revision: 1, items: [{ id: 'legacy-soup', name: 'Sopa', cantidad: 1, precio: 100 }] })).event)
+  const open = { command_id: 'legacy-open', order_id: 'legacy-order', turno_id: 'legacy-turn',
+    expected_revision: 0, expected_order_revision: 1, total_cents: 10000, currency: 'MXN' }
+  const before = await stack.store.getLastSequence()
+  assert.equal((await stack.send('FINANCIAL_OPEN', open)).code, 'LOCAL_AUTHORITY_DISABLED')
+  stack = await restart(true)
+  assert.equal((await stack.send('FINANCIAL_OPEN', open)).code, 'LEGACY_ORDER_REQUIRES_CUTOVER')
+  assert.equal(await stack.store.getLastSequence(), before)
+  assert.equal(stack.state.getFinancialOrder('legacy-order'), null)
+
+  // A separate, correctly activated installation already has a real receipt.
+  const legacyDirectory = dir
+  try {
+    dir = path.join(legacyDirectory, 'modern')
+    const modern = await service()
+    const payment = await collect(modern, 'mother:full', 'paid', 10000, 'POS-A')
+    const disabled = await restart(false)
+    const committed = await disabled.store.getLastSequence()
+    assert.equal((await disabled.send('FINANCIAL_PAYMENT_RESULT', payment.resultCommand)).code, 'LOCAL_AUTHORITY_DISABLED')
+    assert.equal(await disabled.store.getLastSequence(), committed)
+    assert.equal(disabled.state.getFinancialOrder('mother').paid_cents, 10000)
+  } finally { dir = legacyDirectory }
+})
+
 test('cash attribution and external results cannot be forged with a cashier session', async () => {
   const stack = await service()
   await stack.send('FINANCIAL_PAYMENT_START', { order_id: 'mother', expected_revision: 1, account_id: 'mother:full', payment_id: 'cash', amount_cents: 5000, method: 'cash' })
@@ -152,19 +190,23 @@ test('legacy edits cannot change discounts, attribution, revisions or shift unde
   const before = await stack.store.getLastSequence()
   for (const fields of [{ descuento: 100 }, { subtotal: 0 }, { iva: 0 }, { turno_id: 'other' }, { order_revision: 99 }, { mesero: 'manager' }, { status: 'abierta' }]) {
     const response = await stack.send('ORDER_UPSERTED', { order_id: 'mother', ...fields })
-    assert.equal(response.code, 'FINANCIAL_ORDER_LOCKED', JSON.stringify(fields))
+    assert.equal(response.code, 'KITCHEN_COMMAND_REQUIRED', JSON.stringify(fields))
   }
   assert.equal(await stack.store.getLastSequence(), before)
 })
 
-test('kitchen legacy status after defining accounts may repeat the existing table, never move it', async () => {
+test('only the kitchen command advances preparation after defining accounts; legacy status cannot move tables', async () => {
   const stack = await service()
-  const ready = await stack.send('ORDER_UPSERTED', { order_id: 'mother', mesa: 7, status: 'lista', client_id: 'test' })
+  assert.equal((await stack.send('ORDER_UPSERTED', { order_id: 'mother', mesa: 7, status: 'lista', client_id: 'test' })).code, 'KITCHEN_COMMAND_REQUIRED')
+  const ready = await stack.send('KITCHEN_SET', { order_id: 'mother', turno_id: 't1', expected_kitchen_revision: 1,
+    item_ids: stack.state.getOrder('mother').kitchen_items.map(item => item.id), status: 'lista' })
   assert.ok(ready.event, JSON.stringify(ready))
   assert.equal(stack.state.toSnapshot().kds_orders[0].status, 'lista')
   assert.equal(stack.state.getFinancialOrder('mother').balance_cents, 10000)
   const move = await stack.send('ORDER_UPSERTED', { order_id: 'mother', mesa: 8, status: 'lista', client_id: 'test' })
-  assert.equal(move.code, 'FINANCIAL_ORDER_LOCKED')
+  assert.equal(move.code, 'KITCHEN_COMMAND_REQUIRED')
+  assert.equal(stack.state.getOrder('mother').mesa, 7)
+  assert.equal(stack.state.getOrder('mother').order_revision, 2)
 })
 
 test('a stale cloud shift observation cannot strand a durable unpaid account in another shift', async () => {

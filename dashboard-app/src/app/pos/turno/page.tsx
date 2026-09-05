@@ -7,6 +7,8 @@ import { formatMXN, logAudit, openTurno } from '@/lib/pos-data'
 import dynamic from 'next/dynamic'
 import { getActiveClientSlug as _cid } from '@/lib/data'
 import { cacheTurno, getCachedActiveTurno, getCachedOrdersByTurno } from '@/lib/pos-offline-db'
+import { leerSalon, requiereCaja } from '@/lib/pedro-cliente'
+import TurnoDeCaja from '@/components/pos/TurnoDeCaja'
 
 const StaffShiftPanel = dynamic(() => import('@/components/pos/StaffShiftPanel'), { ssr: false })
 const CierreCajaWizard = dynamic(() => import('@/components/pos/CierreCajaWizard'), { ssr: false })
@@ -299,6 +301,23 @@ function HistorialCierres() {
 }
 
 export default function TurnoPage() {
+  const [mode, setMode] = useState<'loading' | 'caja' | 'legacy' | 'error'>('loading')
+  const [attempt, setAttempt] = useState(0)
+  useEffect(() => {
+    let alive = true
+    if (!requiereCaja()) { setMode('legacy'); return }
+    void leerSalon().then(state => {
+      if (alive) setMode(!state.autoritativa ? 'error' : state.writeAuthority === 'caja' ? 'caja' : 'legacy')
+    }).catch(() => { if (alive) setMode('error') })
+    return () => { alive = false }
+  }, [attempt])
+  if (mode === 'caja') return <TurnoDeCaja />
+  if (mode === 'legacy') return <TurnoPageLegacy />
+  return <main className="p-8 text-[var(--text-1)]"><p>{mode === 'error' ? 'No se pudo confirmar el turno con Caja.' : 'Consultando turno…'}</p>
+    {mode === 'error' && <button className="mt-4 rounded-xl border p-3" onClick={() => { setMode('loading'); setAttempt(n => n + 1) }}>Volver a consultar</button>}</main>
+}
+
+function TurnoPageLegacy() {
   const [activeTurno, setActiveTurno] = useState<Turno | null>(null)
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState<string | null>(null)
@@ -380,7 +399,7 @@ export default function TurnoPage() {
   const handleOpenTurno = async () => {
     if (!openedBy.trim() || !fondoInicial) return
     const fondo = Number(fondoInicial)
-
+    try {
     const turno = await openTurno(fondo, openedBy)
     if (!turno) {
       showToast('Error al abrir turno')
@@ -406,6 +425,7 @@ export default function TurnoPage() {
     })
     setFondoInicial('')
     setOpenedBy('')
+    } catch (e) { showToast(e instanceof Error ? e.message : 'Caja no confirmó la apertura de turno.') }
   }
 
   // Get staff name from session

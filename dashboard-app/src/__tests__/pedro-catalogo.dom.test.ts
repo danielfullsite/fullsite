@@ -19,7 +19,7 @@ it('menu, config and modifiers share one LAN read with required choices intact',
   expect(menu).toBe(config)
   expect(config.config.iva_rate).toBe(0)
   expect(gruposDelCatalogo(menu, 'coffee', 'drinks')).toEqual([{ id: 'milk', name: 'Leche', level: 1,
-    minSelections: 1, maxSelections: 1, required: true, options: [{ name: 'Avena', price: 15 }] }])
+    minSelections: 1, maxSelections: 1, required: true, options: [{ id: 'oat', name: 'Avena', price: 15 }] }])
 })
 it('rejects another branch and cannot use a previously cached tenant catalog after scope changes', async () => {
   vi.mocked(localNetworkFetch).mockImplementation(async () => Response.json(body()))

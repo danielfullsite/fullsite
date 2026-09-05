@@ -20,7 +20,7 @@ export function actorDeCaja(): SesionDeCaja | null {
 export function cerrarActorDeCaja(): void {
   try { sessionStorage.removeItem(KEY) } catch {}
 }
-export async function ingresarConPinEnCaja(pin: string, minRole?: string): Promise<SesionDeCaja> {
+async function solicitarSesionCaja(pin: string, minRole?: string): Promise<SesionDeCaja> {
   const res = await localNetworkFetch(`${getBridgeUrl()}/auth/pin`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ pin, ...(minRole ? { min_role: minRole } : {}) }),
@@ -30,7 +30,16 @@ export async function ingresarConPinEnCaja(pin: string, minRole?: string): Promi
   if (!res.ok || !data.staff?.id || typeof data.actor_token !== 'string' || !(data.expires_at > Date.now())) {
     throw Object.assign(new Error(data.error || 'Caja no confirmó la sesión'), { code: data.code, status: res.status })
   }
-  // Manager approvals are not a login change for the operator.
-  if (!minRole) sessionStorage.setItem(KEY, JSON.stringify(data))
   return data
+}
+export async function ingresarConPinEnCaja(pin: string, minRole?: string): Promise<SesionDeCaja> {
+  const session = await solicitarSesionCaja(pin, minRole)
+  if (!minRole) sessionStorage.setItem(KEY, JSON.stringify(session))
+  return session
+}
+/** An approval belongs to the immediate command only. It does not replace the
+ * operator, enter browser storage, or authorize by a role supplied by the UI.
+ * Caja checks the signer's canonical permission on the command itself. */
+export async function autorizarOperacionConPinEnCaja(pin: string): Promise<SesionDeCaja> {
+  return solicitarSesionCaja(pin)
 }

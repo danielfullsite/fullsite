@@ -24,6 +24,13 @@ const C2S = {
 
 // Operational event types (Phase 1 — observe only; Phase 2 — authoritative)
 const EVENT = {
+  ORDER_SAVE:      'ORDER_SAVE',
+  ORDER_SEND:      'ORDER_SEND',
+  ORDER_MOVE:      'ORDER_MOVE',
+  ORDER_VOID:      'ORDER_VOID',
+  TURN_OPEN:       'TURN_OPEN',
+  TURN_CLOSE:      'TURN_CLOSE',
+  KITCHEN_SET:     'KITCHEN_SET',
   ORDER_UPSERTED:  'ORDER_UPSERTED',
   ORDER_SENT:      'ORDER_SENT',
   ORDER_CLOSED:    'ORDER_CLOSED',

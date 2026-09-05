@@ -3,7 +3,10 @@ let registrationTask: Promise<ServiceWorkerRegistration | null> | null = null
 let stopLifecycle: (() => void) | null = null
 
 function offlineDisabled() {
-  return localStorage.getItem('FULLSITE_OFFLINE_DISABLED') === '1'
+  // Electron serves one verified installed release. A web SW must never mix
+  // older cached HTML/chunks into that release. Main clears this marker on exit
+  // from packaged mode; browser installations keep the existing SW lifecycle.
+  return localStorage.getItem('FULLSITE_OFFLINE_DISABLED') === '1' || Boolean(localStorage.getItem('FULLSITE_UI_PACKAGE'))
 }
 
 export async function registerServiceWorker(): Promise<ServiceWorkerRegistration | null> {

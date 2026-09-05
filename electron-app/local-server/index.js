@@ -35,6 +35,7 @@ const { handleAuthenticatedCommand } = require('./core/command-authority')
 const { conectarConLaCaja } = require('./core/enlace-con-caja')
 const credLan = require('./core/credencial-lan')
 const { OutboxWorker }      = require('./core/outbox')
+const { BusinessOutbox } = require('./core/business-outbox')
 const mdns      = require('./discovery/mdns')
 const heartbeat = require('./telemetry/heartbeat')
 const updater   = require('./update/manager')
@@ -314,11 +315,11 @@ function forwardGet(targetUrl, credenciales = {}) {
 }
 
 /** Lecturas que una terminal secundaria puede hacerle a la caja. */
-const LECTURAS_REENVIADAS = ['/state', '/events', '/print/uncertain', '/auth/status', '/catalog', '/catalog/status']
+const LECTURAS_REENVIADAS = ['/state', '/events', '/print/uncertain', '/auth/status', '/catalog', '/catalog/status', '/sync/status']
 
 // Keep identity and routing configuration explicit so every cloned terminal can
 // discover the caja without relying on process-global or customer-specific state.
-function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority = null, catalogStore = null, printer, version, serverId, restaurantId, config = {}, instanceName = '', branchId = config.branchId || config.locationId || null, posServerIp = config.posServerIp || null, port = 7717, posServerPort = config.posServerPort || null }) {
+function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority = null, catalogStore = null, getBusinessSyncStatus = () => ({ configured: false }), printer, version, serverId, restaurantId, config = {}, instanceName = '', branchId = config.branchId || config.locationId || null, posServerIp = config.posServerIp || null, port = 7717, posServerPort = config.posServerPort || null }) {
   // Puerto de la CAJA al reenviar. Antes se usaba `port` — el puerto PROPIO del
   // secundario — lo que acopla ambos al 7717: dos Pedros en una misma maquina
   // (pruebas, demos) o una terminal en puerto distinto rompian el forward.
@@ -380,6 +381,15 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority 
       // el secreto ni si el restaurante acerto — quien no tiene la llave no
       // merece pistas.
       json(res, 401, { error: credencial.motivo })
+      return
+    }
+
+    // Installation credentials establish transport, not permission to open a
+    // drawer or execute arbitrary ESC/POS bytes. Until these controls have an
+    // actor-authorized domain command, disable every legacy printing bypass.
+    if (req.method === 'POST' && ['/print', '/drawer', '/test', '/config', '/print/resolve'].includes(url) &&
+      (config.localAuthorityEnabled === true || state?.toSnapshot?.().write_authority === 'caja')) {
+      json(res, 409, { code: 'CONTROLLED_PRINT_REQUIRED', error: 'Esta acción de impresión requiere una operación autorizada en Caja' })
       return
     }
 
@@ -668,6 +678,11 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority 
       return
     }
 
+    if (url === '/sync/status' && req.method === 'GET') {
+      json(res, 200, getBusinessSyncStatus())
+      return
+    }
+
     if (url === '/config' && req.method === 'GET') {
       json(res, 200, { stations: printer.getStations() })
       return
@@ -720,7 +735,9 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority 
  *             printersConfig, printerConfigPath, queueFilePath, clientId }
  * @returns {{ httpServer, close }}
  */
-async function startLocalServer({ dataDir, port = 7717, config = {} }) {
+async function startLocalServer({ dataDir, port = 7717, config = {}, businessSync = null }) {
+  let _businessOutbox = null
+  let businessSyncIssue = businessSync ? 'BUSINESS_SYNC_NOT_STARTED' : 'BUSINESS_SYNC_NOT_CONFIGURED'
   // CFG-02: refuse to start if restaurant identity is missing or invalid.
   // The Electron main process gate (loadAndValidateConfig) should prevent this,
   // but the Local Server is the last line of defense.
@@ -769,8 +786,12 @@ async function startLocalServer({ dataDir, port = 7717, config = {} }) {
   await eventStore.load()
 
   // ── State machine: rebuild from event log ────────────────────────────────
-  const state  = new RestaurantState()
+  const state  = new RestaurantState({ localAuthorityEnabled: config.localAuthorityEnabled === true && !config.posServerIp })
   const events = await eventStore.readAfter(0)
+  if (!config.posServerIp && config.localAuthorityEnabled !== true && events.some(event =>
+    event.result?.operational_order?.authority === 'caja' || event.result?.turno?.authority === 'caja')) {
+    throw new Error('LOCAL_AUTHORITY_CUTOVER_REQUIRED: este log ya tiene escritura de Caja; no se puede volver al escritor legacy sin migración validada')
+  }
   console.log(`[server] Replaying ${events.length} events to rebuild state...`)
   for (const ev of events) state.apply(ev)
   console.log('[server] State ready.')
@@ -802,6 +823,8 @@ async function startLocalServer({ dataDir, port = 7717, config = {} }) {
     wsHub,
     printer:      printerAdapter,
     restaurantId,
+    catalogStore,
+    localAuthorityEnabled: config.localAuthorityEnabled === true && !config.posServerIp,
   })
 
   if (typeof cmdHandler.recoverPendingEffects === 'function') await cmdHandler.recoverPendingEffects()
@@ -831,6 +854,7 @@ async function startLocalServer({ dataDir, port = 7717, config = {} }) {
     cmdHandler,
     actorAuthority,
     catalogStore,
+    getBusinessSyncStatus: () => _businessOutbox?.status() || { configured: !!businessSync, error: businessSyncIssue },
     printer: printerAdapter,
     version,
     serverId,
@@ -886,9 +910,27 @@ async function startLocalServer({ dataDir, port = 7717, config = {} }) {
   })
 
   // ── Supabase poll (Phase 1 bridge) ────────────────────────────────────────
-  if (supabaseUrl && supabaseKey && !config.posServerIp) {
+  if (supabaseUrl && supabaseKey && !config.posServerIp && config.localAuthorityEnabled !== true) {
     startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, branchId: config.branchId || config.locationId || null, serviceEmail, servicePassword, state, eventStore, wsHub, cmdHandler })
       .catch(e => console.warn('[server] Supabase poll start error:', e.message))
+  }
+
+  // Business receipts require the matching cloud branch fence and an explicit
+  // reconciled stream. A secondary and a legacy installation never start it.
+  if (businessSync && config.localAuthorityEnabled === true && config.terminalRole === 'server_pos' && !config.posServerIp) {
+    try {
+      _businessOutbox = new BusinessOutbox({ eventStore, directory: dataDir, supabaseUrl, anonKey: supabaseKey,
+        restaurantId, locationId: config.branchId || config.locationId,
+        streamId: businessSync.stream_id, credential: businessSync.credential,
+        baselineSequence: businessSync.baseline_sequence, baselineHistoryHash: businessSync.baseline_history_hash })
+      _businessOutbox.start()
+      businessSyncIssue = null
+    } catch {
+      // No credential/config dump; LAN service stays available with visible sync
+      // pending status. It must not call this a confirmed cloud publication.
+      businessSyncIssue = 'BUSINESS_SYNC_CONFIG_INVALID'
+      console.warn('[server] Business sync configuration invalid; local data retained')
+    }
   }
 
   // ── Outbox Worker (Phase 2 — SHADOW MODE, OFF por default) ─────────────────
@@ -966,6 +1008,7 @@ async function startLocalServer({ dataDir, port = 7717, config = {} }) {
   function close() {
     if (_supabasePolling) clearInterval(_supabasePolling)
     if (_outbox) _outbox.stop()
+    if (_businessOutbox) _businessOutbox.stop()
     // Antes que el hub: `detener()` cancela el reintento agendado. Si no, el
     // 'close' del socket agenda otro y el proceso no termina nunca.
     if (_enlaceCaja) _enlaceCaja.detener()

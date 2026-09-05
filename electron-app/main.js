@@ -297,12 +297,15 @@ async function startLocalServer() {
     // pasaban `posServerPort` explicitamente y no podian ver el hueco.
     posServerPort:      appConfig.pos_server_port || null,
     terminalRole:       appConfig.terminal_role  || null,
+    localAuthorityEnabled: appConfig.localAuthorityEnabled === true,
     branchId:           appConfig.location_id || appConfig.branch_id || appConfig.branchId || null,
     lanSecret:          appConfig.lan_secret     || appConfig.lanSecret || null,
   };
 
   try {
-    localServer = await start({ dataDir, port: LOCAL_SERVER_PORT, config: cfg });
+    localServer = await start({ dataDir, port: LOCAL_SERVER_PORT, config: cfg,
+      // Dedicated cloud credential stays in main, outside renderer identity.
+      businessSync: appConfig.business_sync || null });
     // Incluye el secreto que Caja acaba de generar/persistir, no sólo config.json.
     appConfig.lan_secret = localServer.lanSecret || null;
     console.log('[main] Local server started.');
@@ -710,8 +713,13 @@ let allowClose = false;
 const { rendererIdentity } = require('./local-server/core/renderer-identity');
 const { withLocalBridgeCsp } = require('./local-server/core/bridge-csp');
 const lanCspSessions = new WeakSet();
+let installedUiRevision = '';
 function identityForUrl(url) {
-  return rendererIdentity({ url, config: appConfig, port: LOCAL_SERVER_PORT, dev: DEV, posUrl: POS_URL });
+  const identity = rendererIdentity({ url, config: appConfig, port: LOCAL_SERVER_PORT, dev: DEV, posUrl: POS_URL });
+  if (!identity) return null;
+  // Preload writes this before any application script. Empty removes a stale
+  // marker when a developer intentionally returns to the remote UI.
+  return { ...identity, FULLSITE_UI_PACKAGE: installedUiRevision };
 }
 function configureLocalBridgeCsp(session) {
   if (lanCspSessions.has(session)) return;
@@ -1027,6 +1035,34 @@ app.whenReady().then(async () => {
 
   await startLocalServer();   // Local server starts first (provides WS hub for KDS events)
 
+  // Install a complete public-code package only at process startup. Keeping the
+  // app.fullsite.mx origin preserves existing browser identity and order drafts;
+  // API requests still use the network and operational commands still use Pedro.
+  // Dedicated /kds remains on its own local HTTP server.
+  if (new URL(POS_URL).origin === 'https://app.fullsite.mx') {
+    const { PackageStore } = require('./offline-ui/package-store');
+    const { installProtocol } = require('./offline-ui/protocol');
+    const store = new PackageStore(path.join(app.getPath('userData'), 'ui-packages'));
+    const bundledPath = DEV && process.env.FULLSITE_UI_BUNDLE_DIR
+      ? path.resolve(process.env.FULLSITE_UI_BUNDLE_DIR) : path.join(__dirname, 'ui-bundle');
+    let bundle = null;
+    try {
+      bundle = fs.existsSync(bundledPath) ? store.install(bundledPath) : store.load();
+    } catch (error) {
+      console.error('[offline-ui] Candidate rejected:', error.message);
+      try { bundle = store.load(); } catch (recoveryError) {
+        console.error('[offline-ui] No verified recovery package:', recoveryError.message);
+      }
+    }
+    if (bundle) {
+      await installProtocol(defaultSession, bundle, LOCAL_SERVER_PORT);
+      installedUiRevision = bundle.manifest.revision;
+      console.log(`[offline-ui] Serving verified revision ${installedUiRevision}${bundle.recovered ? ' (recovered)' : ''}`);
+    } else {
+      console.warn('[offline-ui] No installed UI package; cold boot without internet is unavailable.');
+    }
+  }
+
   // ── Auto-update (Fase 2) ──────────────────────────────────────────────────
   // Descarga en segundo plano; instala SOLO cuando el restaurante esta en reposo.
   // Instalar reinicia Electron, y Pedro muere con Electron (regla dura #4): un
@@ -1042,6 +1078,7 @@ app.whenReady().then(async () => {
 
     autoInstaller = iniciar({
       canal: appConfig.channel || process.env.FULLSITE_CHANNEL || 'stable',
+      requiredStoreFormat: 'fullsite-command-transactions-v1',
       // Estado VIVO del restaurante. Si el servidor local no arranco, devuelve null
       // y la politica falla CERRADO — no instala.
       // `state` lo expone local-server/index.js a proposito para esto. Si algun dia
