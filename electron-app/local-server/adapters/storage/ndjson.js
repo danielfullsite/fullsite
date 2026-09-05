@@ -1,165 +1,141 @@
 'use strict'
-// ─── NdjsonEventStore — Phase 1 Implementation ───────────────────────────────
-// Append-only NDJSON log for events. Suitable for restaurant-scale volumes (~500 events/day).
-// Swap for SqliteEventStore in Phase 2 without touching the rest of the system.
-//
-// Format: one JSON object per line in events.ndjson.
-// Processed commands: separate processed-commands.ndjson file.
-// Corruption detection: each line is independently parseable; corrupt lines are skipped with a log.
-
-const fs   = require('fs')
-const path = require('path')
+// One checksummed transaction per line: event(s), command receipt and pending
+// effects share one commit boundary. The old command index is not authoritative.
+// Legacy single-event lines remain readable; corrupt committed data fails closed.
+const fs = require('fs')
+const crypto = require('crypto')
 const { EventStore } = require('./base')
+const { syncDirectory, writeAll, replaceFile } = require('./durable-file')
 
+const digest = value => crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex')
+const frame = events => JSON.stringify({ transaction_version: 1, events, checksum: digest(events) }) + '\n'
+const copy = value => JSON.parse(JSON.stringify(value))
+const { sameCommand } = require('../../core/command-identity')
 class NdjsonEventStore extends EventStore {
-  /**
-   * @param {{ eventLogPath: string, processedCommandsPath: string }} opts
-   */
-  constructor({ eventLogPath, processedCommandsPath }) {
+  constructor({ eventLogPath }) {
     super()
     this._logPath = eventLogPath
-    this._cmdPath = processedCommandsPath
+    this._events = []
+    this._processedCommands = new Map()
     this._sequence = 0
-    this._processedCommands = new Map() // key → { eventId, sequence }
     this._unsyncedCount = 0
     this._loaded = false
+    this._fault = null
   }
-
-  // ─── Init ────────────────────────────────────────────────────────────────
-
   async load() {
     if (this._loaded) return
-    this._loaded = true
-
-    // Replay event log to determine last sequence + unsynced count
+    const events = []
     if (fs.existsSync(this._logPath)) {
-      const lines = fs.readFileSync(this._logPath, 'utf8').split('\n').filter(Boolean)
-      let corrupt = 0
-      for (const line of lines) {
-        try {
-          const ev = JSON.parse(line)
-          if (typeof ev.sequence === 'number' && ev.sequence > this._sequence) {
-            this._sequence = ev.sequence
+      const bytes = fs.readFileSync(this._logPath)
+      const boundary = bytes.lastIndexOf(10) + 1
+      // Only a missing final newline denotes an uncommitted append. Preserve its
+      // bytes for diagnosis; never skip an invalid committed line.
+      if (boundary < bytes.length) {
+        replaceFile(this._logPath + '.torn-tail', bytes.subarray(boundary))
+        const fd = fs.openSync(this._logPath, 'r+')
+        try { fs.ftruncateSync(fd, boundary); fs.fsyncSync(fd) } finally { fs.closeSync(fd) }
+      }
+      const ids = new Set()
+      for (const [lineNumber, line] of bytes.subarray(0, boundary).toString('utf8').split('\n').entries()) {
+        if (!line) continue
+        let record
+        try { record = JSON.parse(line) } catch { throw new Error(`EVENT_LOG_CORRUPT: invalid JSON at line ${lineNumber + 1}`) }
+        const batch = record.transaction_version === 1 ? record.events : [record]
+        if (!Array.isArray(batch) || !batch.length || (record.transaction_version === 1 && digest(batch) !== record.checksum)) {
+          throw new Error(`EVENT_LOG_CORRUPT: invalid transaction at line ${lineNumber + 1}`)
+        }
+        for (const event of batch) {
+          if (!event || typeof event.id !== 'string' || !event.id || event.sequence !== events.length + 1 || ids.has(event.id)) {
+            throw new Error(`EVENT_LOG_CORRUPT: invalid sequence or identity at line ${lineNumber + 1}`)
           }
-          if (!ev.synced) this._unsyncedCount++
-        } catch {
-          corrupt++
+          ids.add(event.id)
+          events.push(event)
         }
       }
-      if (corrupt > 0) {
-        console.warn(`[event-store] ${corrupt} corrupt line(s) skipped in ${this._logPath}`)
-      }
     }
-
-    // Load processed commands index
-    if (fs.existsSync(this._cmdPath)) {
-      const lines = fs.readFileSync(this._cmdPath, 'utf8').split('\n').filter(Boolean)
-      for (const line of lines) {
-        try {
-          const { key, eventId, sequence } = JSON.parse(line)
-          if (key) this._processedCommands.set(key, { eventId, sequence })
-        } catch {}
-      }
-    }
-
-    console.log(`[event-store] Loaded. lastSequence=${this._sequence} unsynced=${this._unsyncedCount} processedCmds=${this._processedCommands.size}`)
+    this._adopt(events)
+    this._loaded = true
   }
-
-  // ─── EventStore interface ────────────────────────────────────────────────
-
+  _adopt(events) {
+    this._events = events
+    this._sequence = events.length ? events[events.length - 1].sequence : 0
+    this._unsyncedCount = events.filter(e => !e.synced).length
+    this._processedCommands = new Map(events.map(e => [e.id, e]))
+  }
+  _assertHealthy() {
+    if (this._fault) throw new Error(`EVENT_STORE_UNAVAILABLE: restart and inspect storage (${this._fault.message})`)
+  }
   async append(events) {
     if (!this._loaded) await this.load()
-    const sequences = []
-    const lines = []
-
-    for (const ev of events) {
-      this._sequence++
-      const full = { ...ev, sequence: this._sequence, synced: false }
-      sequences.push(this._sequence)
-      lines.push(JSON.stringify(full))
-      this._unsyncedCount++
-    }
-
-    // Append all lines atomically (single write syscall)
-    fs.appendFileSync(this._logPath, lines.join('\n') + '\n', 'utf8')
-
-    return { sequences }
+    this._assertHealthy()
+    if (!Array.isArray(events) || !events.length) return { sequences: [] }
+    const ids = new Set()
+    const full = copy(events).map((e, i) => {
+      if (!e.id || this._processedCommands.has(e.id) || ids.has(e.id)) throw new Error('Duplicate or missing event identity')
+      ids.add(e.id)
+      return { ...e, sequence: this._sequence + i + 1, synced: false }
+    })
+    const existed = fs.existsSync(this._logPath)
+    const fd = fs.openSync(this._logPath, 'a', 0o600)
+    const previousSize = fs.fstatSync(fd).size
+    try {
+      writeAll(fd, frame(full))
+      fs.fsyncSync(fd)
+      if (!existed) syncDirectory(this._logPath)
+    } catch (error) {
+      // Failed writes never advance memory/ACK. If rollback also fails, stop all
+      // writes until recovery determines the actual durable commit boundary.
+      try { fs.ftruncateSync(fd, previousSize); fs.fsyncSync(fd) } catch (rollbackError) { this._fault = rollbackError }
+      throw error
+    } finally { fs.closeSync(fd) }
+    this._adopt(this._events.concat(full))
+    return { sequences: full.map(e => e.sequence) }
   }
-
+  async commitCommand(event) {
+    if (!this._loaded) await this.load()
+    this._assertHealthy()
+    const existing = this._processedCommands.get(event.id)
+    if (existing) {
+      if (!sameCommand(existing, event)) throw new Error('IDEMPOTENCY_KEY_REUSED: command content differs')
+      return { duplicate: true, event: copy(existing) }
+    }
+    await this.append([event])
+    return { duplicate: false, event: copy(this._processedCommands.get(event.id)) }
+  }
+  async getProcessedCommand(id) {
+    if (!this._loaded) await this.load()
+    this._assertHealthy()
+    const event = this._processedCommands.get(id)
+    return event ? copy(event) : null
+  }
+  async hasProcessedCommand(id) { return !!(await this.getProcessedCommand(id)) }
+  // Compatibility: the event is already the durable receipt. Never trust a
+  // second file to decide whether an event was committed.
+  async saveProcessedCommand(id, eventId, sequence) {
+    const event = await this.getProcessedCommand(id)
+    if (!event || event.id !== eventId || event.sequence !== sequence) throw new Error('Command receipt must match a committed event')
+  }
   async readAfter(sequence) {
     if (!this._loaded) await this.load()
-    if (!fs.existsSync(this._logPath)) return []
-
-    const lines = fs.readFileSync(this._logPath, 'utf8').split('\n').filter(Boolean)
-    const result = []
-    for (const line of lines) {
-      try {
-        const ev = JSON.parse(line)
-        if (typeof ev.sequence === 'number' && ev.sequence > sequence) {
-          result.push(ev)
-        }
-      } catch {}
-    }
-    return result
+    this._assertHealthy()
+    return copy(this._events.filter(e => e.sequence > sequence))
   }
-
-  async getLastSequence() {
-    if (!this._loaded) await this.load()
-    return this._sequence
-  }
-
-  async hasProcessedCommand(idempotencyKey) {
-    if (!this._loaded) await this.load()
-    return this._processedCommands.has(idempotencyKey)
-  }
-
-  async saveProcessedCommand(idempotencyKey, eventId, sequence) {
-    if (!this._loaded) await this.load()
-    this._processedCommands.set(idempotencyKey, { eventId, sequence })
-    const line = JSON.stringify({ key: idempotencyKey, eventId, sequence }) + '\n'
-    fs.appendFileSync(this._cmdPath, line, 'utf8')
-  }
-
-  async unsyncedCount() {
-    if (!this._loaded) await this.load()
-    return this._unsyncedCount
-  }
-
+  async getLastSequence() { if (!this._loaded) await this.load(); this._assertHealthy(); return this._sequence }
+  async unsyncedCount() { if (!this._loaded) await this.load(); this._assertHealthy(); return this._unsyncedCount }
   async markSynced(sequences) {
     if (!this._loaded) await this.load()
-    // NDJSON: rewrite the file with updated synced flags.
-    // At restaurant scale this is fast enough; SQLite will handle this with an UPDATE.
-    if (!fs.existsSync(this._logPath)) return
-    const seqSet = new Set(sequences)
-    const lines = fs.readFileSync(this._logPath, 'utf8').split('\n').filter(Boolean)
-    const updated = lines.map(line => {
-      try {
-        const ev = JSON.parse(line)
-        if (seqSet.has(ev.sequence) && !ev.synced) {
-          ev.synced = true
-          this._unsyncedCount = Math.max(0, this._unsyncedCount - 1)
-          return JSON.stringify(ev)
-        }
-        return line
-      } catch {
-        return line
-      }
-    })
-    // Atomic write: write to tmp then rename so a crash mid-write never corrupts the log.
-    const tmp = this._logPath + '.tmp'
-    fs.writeFileSync(tmp, updated.join('\n') + '\n', 'utf8')
-    fs.renameSync(tmp, this._logPath)
-  }
-
-  // ─── Diagnostic ─────────────────────────────────────────────────────────
-
-  getStats() {
-    return {
-      lastSequence: this._sequence,
-      unsyncedCount: this._unsyncedCount,
-      processedCommands: this._processedCommands.size,
+    this._assertHealthy()
+    const selected = new Set(sequences)
+    const updated = this._events.map(e => selected.has(e.sequence) ? { ...e, synced: true } : e)
+    if (!updated.length) return
+    try { replaceFile(this._logPath, updated.map(e => frame([e])).join('')) } catch (error) {
+      this._fault = error // rename may already have committed; do not use stale memory.
+      throw error
     }
+    this._adopt(updated)
+  }
+  getStats() {
+    return { lastSequence: this._sequence, unsyncedCount: this._unsyncedCount, processedCommands: this._processedCommands.size, storageUnavailable: !!this._fault }
   }
 }
-
 module.exports = { NdjsonEventStore }
