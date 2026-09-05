@@ -13,8 +13,13 @@ const fs = require('fs'), os = require('os'), path = require('path')
 const WebSocket = require('ws')
 const { startLocalServer } = require('../index.js')
 const { PROTOCOL_VERSION } = require('../protocol')
+const credLan = require('../core/credencial-lan')
 
 const R = 'testtenant'
+// El secreto de la instalacion. En un restaurante real lo genera la caja en su
+// primer arranque y el asistente lo copia a las secundarias.
+const SECRETO = credLan.generarSecreto()
+const CRED = credLan.cabecerasDeCredencial({ secreto: SECRETO, restaurantId: R })
 const esperar = (ms) => new Promise(r => setTimeout(r, ms))
 const fallos = []
 const ok = (cond, msg) => { if (!cond) fallos.push(msg); console.log(`${cond ? 'PASS' : 'FAIL'} ${msg}`) }
@@ -28,7 +33,7 @@ async function hasta(cond, ms = 6000) {
 const arrancar = (dir, port, extra = {}) => {
   fs.mkdirSync(dir, { recursive: true })
   return startLocalServer({ dataDir: dir, port,
-    config: { restaurantId: R, instanceName: `pedro-${port}`, supabaseUrl: '', supabaseKey: '', printersConfig: null, ...extra } })
+    config: { restaurantId: R, instanceName: `pedro-${port}`, supabaseUrl: '', supabaseKey: '', printersConfig: null, lanSecret: SECRETO, ...extra } })
 }
 
 function tableroEn(port, nombre) {
@@ -46,7 +51,7 @@ function tableroEn(port, nombre) {
 }
 
 const comanda = (port, id, mesa) => fetch(`http://127.0.0.1:${port}/events`, {
-  method: 'POST', headers: { 'Content-Type': 'application/json' },
+  method: 'POST', headers: { 'Content-Type': 'application/json', ...CRED },
   body: JSON.stringify({ command_id: `cmd-${id}`, command_type: 'ORDER_SENT', order_id: id,
     mesa, mesero: 'test', status: 'enviada', items: [{ nombre: 'Prueba', station: 'cocina' }] }),
 }).then(r => r.status)
@@ -98,6 +103,27 @@ const idDe = e => e?.payload?.order_id || e?.order_id
   ok(await hasta(() => cierre !== null, 2500), 'un SUBSCRIBE sin protocol_version se rechaza')
   ok(cierre && cierre.code === 1008 && /protocol_version/.test(cierre.motivo),
      `el rechazo dice por que (${cierre ? cierre.code + ' ' + cierre.motivo : 'sin cierre'})`)
+
+  // 6. SEGURIDAD: sin credencial no se entra, con credencial si.
+  const sinCred = await fetch(`http://127.0.0.1:${CAJA}/state`)
+  ok(sinCred.status === 401, `sin credencial /state da 401 (dio ${sinCred.status})`)
+
+  const conCred = await fetch(`http://127.0.0.1:${CAJA}/state`, { headers: CRED })
+  ok(conCred.status === 200, `con credencial /state da 200 (dio ${conCred.status})`)
+
+  // 7. El cajon de dinero es lo mas sensible de la lista.
+  const cajonSinCred = await fetch(`http://127.0.0.1:${CAJA}/drawer`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+  ok(cajonSinCred.status === 401, `sin credencial NO se abre el cajon (dio ${cajonSinCred.status})`)
+
+  // 8. Una credencial de OTRA instalacion no sirve.
+  const otra = credLan.cabecerasDeCredencial({ secreto: credLan.generarSecreto(), restaurantId: R })
+  const conOtra = await fetch(`http://127.0.0.1:${CAJA}/state`, { headers: otra })
+  ok(conOtra.status === 401, `una credencial ajena se rechaza (dio ${conOtra.status})`)
+
+  // 9. /health sigue abierto: hace falta justo cuando la credencial es el problema.
+  const salud = await fetch(`http://127.0.0.1:${CAJA}/health`)
+  ok(salud.status === 200, `/health sigue accesible sin credencial (dio ${salud.status})`)
 
   cocina.cerrar(); tabCaja.cerrar()
   for (const p of [pos3, pos2, caja]) p.close()

@@ -91,6 +91,38 @@ export function targetAddressSpaceFor(input: RequestInfo | URL): TargetAddressSp
  * se reintenta sin ella. En las terminales eso es inocuo — el build 1.3.9 desactiva las
  * tres puertas de PNA (`main.js`), asi que ahi la declaracion nunca hizo falta.
  */
+/**
+ * La credencial de la red local, si esta terminal la tiene.
+ *
+ * Pedro escucha en 0.0.0.0 y desde 2026-09-04 exige credencial en las rutas
+ * operativas. Electron la inyecta en `localStorage` al arrancar, igual que ya
+ * hacía con `FULLSITE_BRIDGE_URL`.
+ *
+ * Se pone AQUÍ, en el paso único por el que salen todas las llamadas a Pedro
+ * (impresión, cajón, comandas, avisos, lectura del salón), en vez de repetirla
+ * en cinco módulos. Uno que se olvidara recibiría 401 sin explicación.
+ *
+ * Sin credencial guardada NO se manda nada: una instalación anterior a la
+ * seguridad sigue funcionando, y Pedro la deja pasar con una advertencia en su
+ * log. Es el mismo compromiso, del mismo lado.
+ */
+function credencialDeLaRedLocal(): Record<string, string> {
+  try {
+    const secreto = localStorage.getItem('FULLSITE_LAN_SECRET')
+    if (!secreto) return {}
+    const cabeceras: Record<string, string> = { 'x-fullsite-lan': secreto }
+    const tenant = localStorage.getItem('fullsite_client_id')
+    if (tenant) cabeceras['x-fullsite-restaurante'] = tenant
+    const terminal = localStorage.getItem('FULLSITE_TERMINAL_ID')
+    if (terminal) cabeceras['x-fullsite-terminal'] = terminal
+    return cabeceras
+  } catch {
+    // `localStorage` puede lanzar (ventana privada, almacenamiento bloqueado).
+    // Sin credencial es mejor que sin POS.
+    return {}
+  }
+}
+
 export async function localNetworkFetch(
   input: RequestInfo | URL,
   init: RequestInit = {},
@@ -98,6 +130,8 @@ export async function localNetworkFetch(
   const localInit: LocalNetworkRequestInit = {
     ...init,
     targetAddressSpace: targetAddressSpaceFor(input),
+    // Las de quien llama ganan: un caso concreto puede necesitar otra identidad.
+    headers: { ...credencialDeLaRedLocal(), ...(init.headers as Record<string, string> | undefined) },
   }
 
   // Un init invalido puede llegar de DOS formas segun el motor: como throw sincrono del

@@ -50,6 +50,6 @@ describe('Arranque real de Pedro · enlace ascendente', () => {
     // saliera con 0 sin ejecutar nada pasaría en verde — la forma exacta del
     // falso positivo que costó esta semana.
     const pases = (salida.match(/^PASS /gm) || []).length
-    assert.ok(pases >= 7, `sólo corrieron ${pases} comprobaciones de 7`)
+    assert.ok(pases >= 12, `sólo corrieron ${pases} comprobaciones de 12`)
   })
 })

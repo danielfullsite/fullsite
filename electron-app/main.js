@@ -288,6 +288,7 @@ async function startLocalServer() {
     // KDS/POS terminal, or same-origin ('') for the caja itself (server_pos).
     posServerIp:        appConfig.pos_server_ip  || null,
     terminalRole:       appConfig.terminal_role  || null,
+    lanSecret:          appConfig.lan_secret     || appConfig.lanSecret || null,
   };
 
   try {
@@ -740,6 +741,17 @@ function createWindow() {
     // (see local-server /print,/events forward, gated on config.posServerIp).
     if (appConfig.terminal_role === 'pos') {
       scripts.push(`localStorage.setItem('FULLSITE_BRIDGE_URL', ${JSON.stringify('http://127.0.0.1:' + LOCAL_SERVER_PORT)})`);
+      // La credencial de la red local. Pedro la exige en las rutas operativas
+      // desde 2026-09-04; sin inyectarla, el POS recibiria 401 al imprimir, al
+      // mandar comanda y al leer el salon — y no tendria como saber por que.
+      // Se lee del config de ESTA terminal: la caja la genera, el asistente la
+      // copia a las secundarias.
+      if (appConfig.lan_secret || appConfig.lanSecret) {
+        scripts.push(`localStorage.setItem('FULLSITE_LAN_SECRET', ${JSON.stringify(appConfig.lan_secret || appConfig.lanSecret)})`);
+      }
+      if (appConfig.terminal_id || appConfig.terminalId) {
+        scripts.push(`localStorage.setItem('FULLSITE_TERMINAL_ID', ${JSON.stringify(appConfig.terminal_id || appConfig.terminalId)})`);
+      }
       // Drop any stale caja IP a previous build/manual config may have left, which
       // would send the ws bridge-client to ws://<caja> (blocked) and print to the caja
       // directly (blocked). Everything must go through localhost now.

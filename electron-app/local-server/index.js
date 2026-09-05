@@ -30,6 +30,7 @@ const { RestaurantState }   = require('./core/state')
 const { WsHub }             = require('./core/ws-hub')
 const { CommandHandler }    = require('./core/command-handler')
 const { conectarConLaCaja } = require('./core/enlace-con-caja')
+const credLan = require('./core/credencial-lan')
 const { OutboxWorker }      = require('./core/outbox')
 const mdns      = require('./discovery/mdns')
 const heartbeat = require('./telemetry/heartbeat')
@@ -254,12 +255,15 @@ function json(res, statusCode, payload) {
 // Forward a POST to another local server (the caja) over Node http — no browser
 // mixed-content wall applies here. Used by secondary POS terminals so their https
 // page can reach the caja's printers/state via their own localhost server.
-function forwardPost(targetUrl, bodyStr) {
+function forwardPost(targetUrl, bodyStr, credenciales = {}) {
   return new Promise((resolve, reject) => {
     const u = new URL(targetUrl)
     const r = http.request(
       { hostname: u.hostname, port: u.port, path: u.pathname, method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(bodyStr) }, timeout: 5000 },
+        // La credencial viaja al reenviar: la caja exige la misma que este Pedro.
+        // Sin esto, activar la seguridad dejaria a las terminales secundarias sin
+        // imprimir ni mandar comandas — el reenvio moriria con 401.
+        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(bodyStr), ...credenciales }, timeout: 5000 },
       (resp) => { let d = ''; resp.on('data', c => { d += c }); resp.on('end', () => resolve({ status: resp.statusCode, body: d })) }
     )
     r.on('error', reject)
@@ -286,11 +290,12 @@ function forwardPost(targetUrl, bodyStr) {
  * Se conserva `query` porque `/events?since=N` no sirve de nada sin ella: es
  * justo el parámetro que permite a una terminal ponerse al día tras reconectar.
  */
-function forwardGet(targetUrl) {
+function forwardGet(targetUrl, credenciales = {}) {
   return new Promise((resolve, reject) => {
     const u = new URL(targetUrl)
     const r = http.request(
       { hostname: u.hostname, port: u.port, path: u.pathname + u.search, method: 'GET',
+        headers: { ...credenciales },
         // Más corto que el POST (5 s) a propósito: una lectura la está esperando
         // una pantalla con alguien enfrente. Si la caja no contesta en 2 s, el
         // consumidor cae a su caché local, que es lo correcto — mejor mostrar
@@ -314,10 +319,17 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, versio
   // secundario — lo que acopla ambos al 7717: dos Pedros en una misma maquina
   // (pruebas, demos) o una terminal en puerto distinto rompian el forward.
   const cajaPort = posServerPort || port || 7717
+  // Se calcula UNA vez, no por peticion: es el mismo secreto toda la vida del
+  // proceso y recalcularlo en cada comanda no aporta nada.
+  const credencialesHaciaLaCaja = credLan.cabecerasDeCredencial({
+    secreto: config.lanSecret || null, restaurantId, terminalId: config.terminalId,
+  })
   return async function router(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+    // Sin listar la cabecera de credencial, el preflight la rechaza y el POS
+    // recibe un error de red sin explicacion.
+    res.setHeader('Access-Control-Allow-Headers', `Content-Type, ${credLan.CABECERA}, x-fullsite-restaurante, x-fullsite-terminal`)
     // Chrome/Electron sends a Private Network Access preflight when the POS
     // loaded from https://app.fullsite.mx calls its bridge on localhost/LAN.
     // A top-level navigation to /health works without this header, while fetch()
@@ -347,6 +359,25 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, versio
     const url = req.url?.split('?')[0]
     const rutaCompleta = req.url || url
 
+    // ── Credencial de la red local ──────────────────────────────────────────
+    // Pedro escucha en 0.0.0.0: sin esto, cualquier equipo del WiFi puede leer
+    // las ordenes del dia, emitir un cierre, imprimir o ABRIR EL CAJON. Va antes
+    // que TODO lo operativo, incluido el reenvio: una peticion que no puede
+    // entrar aqui tampoco debe poder salir hacia la caja usando a este Pedro de
+    // puente. Ver core/credencial-lan.js.
+    const credencial = credLan.verificarCredencial({
+      ruta: url, metodo: req.method, cabeceras: req.headers,
+      secreto: config.lanSecret || null, restaurantId,
+    })
+    if (!credencial.permitido) {
+      console.warn(`${credLan.LOG} rechazada ${req.method} ${url} desde ${req.socket?.remoteAddress}: ${credencial.motivo}`)
+      // 401 y no 403: falta credencial, no permiso. El mensaje NO dice cual es
+      // el secreto ni si el restaurante acerto — quien no tiene la llave no
+      // merece pistas.
+      json(res, 401, { error: credencial.motivo })
+      return
+    }
+
     // ── Secondary-POS forward (role 'pos', posServerIp set) ───────────────────
     // A secondary POS has no physical printers and its state isn't the KDS source
     // of truth. Its POS page is https and CANNOT POST to the caja's http LAN IP
@@ -355,7 +386,7 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, versio
     if (posServerIp && req.method === 'POST' && (url === '/print' || url === '/events' || url === '/drawer')) {
       try {
         const body = await parseBody(req)
-        const up = await forwardPost(`http://${posServerIp}:${cajaPort}${url}`, JSON.stringify(body))
+        const up = await forwardPost(`http://${posServerIp}:${cajaPort}${url}`, JSON.stringify(body), credencialesHaciaLaCaja)
         res.writeHead(up.status || 502, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
         res.end(up.body || '{}')
       } catch (e) {
@@ -380,7 +411,7 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, versio
     if (posServerIp && req.method === 'GET' && LECTURAS_REENVIADAS.includes(url)) {
       try {
         // `rutaCompleta`, NO `url`: sin la query se pierde `?since=N`.
-        const up = await forwardGet(`http://${posServerIp}:${cajaPort}${rutaCompleta}`)
+        const up = await forwardGet(`http://${posServerIp}:${cajaPort}${rutaCompleta}`, credencialesHaciaLaCaja)
         res.writeHead(up.status || 502, {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*',
@@ -772,6 +803,35 @@ async function startLocalServer({ dataDir, port = 7717, config = {} }) {
     _outbox = new OutboxWorker({ eventStore, supabaseUrl, supabaseKey, restaurantId })
     _outbox.start()
     console.log('[server] Outbox Worker: SHADOW MODE activo')
+  }
+
+  // ── Secreto de la red local ───────────────────────────────────────────────
+  //
+  // La CAJA lo genera en su primer arranque y lo guarda. Las terminales
+  // secundarias NO lo generan: lo reciben al aprovisionarse. Si una secundaria
+  // se lo inventara, tendria uno distinto al de la caja y el reenvio moriria con
+  // 401 — un fallo dificil de diagnosticar en el piso.
+  //
+  // Se imprime SOLO el prefijo. Un secreto en un log es un secreto filtrado.
+  if (!config.lanSecret && (config.terminalRole === 'server_pos' || !config.posServerIp)) {
+    const fsSec = require('fs')
+    const pathSec = require('path')
+    const rutaSecreto = pathSec.join(dataDir, 'lan-secret')
+    try {
+      if (fsSec.existsSync(rutaSecreto)) {
+        config.lanSecret = fsSec.readFileSync(rutaSecreto, 'utf8').trim() || null
+      } else {
+        config.lanSecret = credLan.generarSecreto()
+        fsSec.writeFileSync(rutaSecreto, config.lanSecret, { mode: 0o600 })
+        console.log('[server] Secreto de red local GENERADO. Copialo a las terminales secundarias.')
+      }
+    } catch (e) {
+      console.warn('[server] no se pudo leer/crear el secreto de red local:', e.message)
+    }
+  }
+  console.log(`[server] Credencial LAN: ${credLan.paraLog(config.lanSecret)}`)
+  if (!config.lanSecret) {
+    console.warn('[server] ⚠ SIN CREDENCIAL: las rutas operativas quedan abiertas a toda la red local.')
   }
 
   // ── Enlace ascendente con la caja (sólo terminales secundarias) ───────────
