@@ -869,6 +869,17 @@ async function startLocalServer({ dataDir, port = 7717, config = {} }) {
       guardarCursor: (n) => {
         try { fsCursor.writeFileSync(rutaCursor, JSON.stringify({ cursor: n, ts: Date.now() })) } catch {}
       },
+      // El salón completo al (re)conectar. Sin esto, una terminal reiniciada se
+      // queda sin las órdenes de las demás y su KDS aparece en blanco.
+      alRecibirEstado: (snap) => {
+        try {
+          state.hidratarDesdeSnapshot(snap)
+          // Se reparte a los tableros de ESTA terminal: si no, siguen pintando lo
+          // que tenían antes del reinicio.
+          wsHub.broadcast({ type: 'STATE_SYNC', payload: {} }).catch(() => {})
+          console.log('[enlace-caja] estado hidratado desde la caja')
+        } catch (e) { console.warn('[enlace-caja] no se pudo hidratar:', e.message) }
+      },
       alRecibirEvento: (ev) => {
         // Se aplica al estado local Y se retransmite a los clientes de ESTA
         // terminal: cocina, barra y plano escuchan aquí, no en la caja.

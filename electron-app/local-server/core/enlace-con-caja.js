@@ -40,11 +40,12 @@ const LOG = '[enlace-caja]'
  * @param {string} opts.serverId       identidad de ESTA terminal
  * @param {string} opts.restaurantId
  * @param {(ev:object)=>void} opts.alRecibirEvento  qué hacer con cada evento nuevo
+ * @param {(estado:object)=>void} [opts.alRecibirEstado] el salón completo, al (re)conectar
  * @param {() => number} [opts.leerCursor]      cursor guardado del arranque anterior
  * @param {(n:number) => void} [opts.guardarCursor] persistir el cursor al avanzar
  * @param {object} [opts.wsInyectado]  sólo para pruebas
  */
-function conectarConLaCaja({ cajaUrl, serverId, restaurantId, alRecibirEvento, leerCursor, guardarCursor, wsInyectado }) {
+function conectarConLaCaja({ cajaUrl, serverId, restaurantId, alRecibirEvento, alRecibirEstado, leerCursor, guardarCursor, wsInyectado }) {
   let WS
   try {
     WS = wsInyectado || require('ws')
@@ -122,6 +123,16 @@ function conectarConLaCaja({ cajaUrl, serverId, restaurantId, alRecibirEvento, l
 
       // SNAPSHOT trae el estado y los deltas que faltaban tras reconectar.
       if (msg.type === 'SNAPSHOT') {
+        // EL ESTADO COMPLETO, PRIMERO. Se ignoraba, y era un P0: una terminal
+        // secundaria no escribe en su propio log los eventos que vienen de la
+        // caja, asi que al REINICIAR su estado queda sin las ordenes de las demas.
+        // Con el cursor persistido pedia "dame desde N", la caja contestaba "nada
+        // nuevo" con razon, y el salon se quedaba vacio PARA SIEMPRE.
+        // El hub siempre lo mando (ws-hub.js:99-102); nadie lo recogia.
+        if (msg.payload?.state && typeof alRecibirEstado === 'function') {
+          try { alRecibirEstado(msg.payload.state) }
+          catch (e) { console.warn(`${LOG} no se pudo hidratar el estado:`, e.message) }
+        }
         const deltas = Array.isArray(msg.payload?.deltas) ? msg.payload.deltas : []
         for (const ev of deltas) aplicar(ev)
         // La secuencia del sobre manda: si no venían deltas (primera conexión sin
