@@ -13,6 +13,8 @@ Cada decisión de arquitectura significativa tiene un ADR. Un ADR documenta el c
 | [ADR-001](ADR-001-CONCURRENCY.md) | Modelo de concurrencia en el POS | ACTIVE |
 | [ADR-002](ADR-002-FISCAL-MODEL.md) | Modelo fiscal y CFDI | ACTIVE |
 | [ADR-003](ADR-003-TURNO-LIFECYCLE.md) | Ciclo de vida del turno | ACTIVE |
+| [ADR-004](ADR-004-CANONICAL-MODULE.md) | Módulo canónico por dominio | Ver documento |
+| [ADR-005](ADR-005-AUTORIDAD-OFFLINE-Y-ESTADOS.md) | Autoridad offline y separación de cobro/entrega | ACTIVE como decisión; implementación pendiente |
 
 ---
 
@@ -56,4 +58,4 @@ Cada decisión de arquitectura significativa tiene un ADR. Un ADR documenta el c
 
 ## Cómo numerar
 
-El siguiente ADR disponible es **ADR-004**. Numeración consecutiva, sin saltos.
+El siguiente ADR disponible es **ADR-006**. Numeración consecutiva, sin saltos.

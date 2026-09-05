@@ -1,0 +1,7 @@
+[lna] targetAddressSpace no soportado por este motor; reintento sin declararlo
+{"scenario":"Electron enum fallback drops injected LAN authentication","evidence":{"firstCallHasLanSecret":true,"retryHasLanSecret":false,"simulatedProtectedServerStatus":401}}
+{"scenario":"POS B offline with empty localStorage: occupied salon but empty editor","evidence":{"salon":[{"id":"order-from-A","mesa":7,"mesero":"Ana","status":"enviada","total":713,"created_at":null}],"stateB":{"orderItems":[],"orderId":"new-order-B","loadedOrderId":null,"loadingMesa":false}}}
+{"scenario":"H3 drops fields required to discover named accounts","evidence":{"adapted":[{"id":"counter-order","mesa":0,"mesero":null,"status":"enviada","total":120,"created_at":null}],"visibleNamedAccounts":0}}
+{"scenario":"Unpaid delivered order disappears from H3 salon because KDS hides it","evidence":{"mesaState":{"status":"ocupada","order_id":"order-from-A","locked_by":null},"kds_orders":[],"salon":[]}}
+{"scenario":"Fresh Pedro cloud STATE_SYNC populates mesas and kds_queue but H3 reads only empty kds_orders","evidence":{"mesas":{"7":{"status":"ocupada","order_id":"order-from-A","locked_by":null}},"kitchenQueueCount":1,"salon":[]}}
+5 deterministic defects reproduced using candidate logic; not a browser/Electron UI certification.

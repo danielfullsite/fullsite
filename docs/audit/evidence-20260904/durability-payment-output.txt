@@ -1,0 +1,6 @@
+[event-store] Loaded. lastSequence=0 unsynced=0 processedCmds=0
+[event-store] Loaded. lastSequence=1 unsynced=1 processedCmds=0
+REPRODUCED: same command_id survives twice after failed dedup-index write and restart; sequences=1,2
+LIMIT: injected process boundary, not a physical power cut; no printer or payment provider was invoked.
+REPRODUCED: actual page calculation emits closure using zero account totals and zero accepted payments; domain with real unpaid balance correctly refuses closure.
+LIMIT: isolated real TypeScript logic; not an end-to-end UI payment test. Offline branch unconditional closure is separately evidenced in page.tsx:3513-3541.

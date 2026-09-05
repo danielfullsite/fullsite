@@ -22,6 +22,8 @@ Marcadores: 🏆 = probado en campo (máxima autoridad) · ✅ = verificado en c
 
 | Fuente | Autoridad | Qué fundamenta |
 |---|---|---|
+| `docs/audit/FULLSITE-CIERRE-PUNTA-A-PUNTA-2026-09-04.md` | ✅ código y reproducciones locales; 📐 implementación propuesta | Auditoría main 4fa12e6f + candidato de904d71. Cierre R1 AMALAY, R2 cliente nuevo y pruebas pendientes; no certificación de producción. |
+| `docs/adr/ADR-005-AUTORIDAD-OFFLINE-Y-ESTADOS.md` | ✅ decisiones explícitas de Daniel | Con LAN/Caja, operación completa; sin Caja, borradores sin cobro/split/traslado. Cobro y preparación separados. Implementación pendiente. |
 | `docs/audit/AUDITORIA-FULL-FULLSITE-2026-08-19.md` | ✅ | **Auditoría full de los 6 dominios.** Tesis: el núcleo es sólido, pero la verdad se bifurcó (rama vs main, docs vs código). Estado por dominio + registro de docs viejos. |
 | `docs/PLAN-AHORA.md` | ✅ | **Qué hacer ahora, priorizado en olas** (0: AMALAY 100% + fraude; 1: reconverger la verdad; 2: prod/Cliente #2; 3: IA; 4: negocio). |
 
