@@ -64,33 +64,55 @@ class CommandHandler {
       }
     }
 
-    // Append to event log (idempotent — duplicate command_id returns cached result)
+    if (commandType === 'PRINT_COMMAND' && (!cmdPayload.station || !cmdPayload.data_b64)) {
+      return { error: 'PRINT_COMMAND requires station and data_b64' }
+    }
+
     const { duplicate, event } = await this._store.processCommand(
       { command_id: commandId, type: commandType, client_id: fromClientId, restaurant_id: this._restaurantId, payload: cmdPayload },
-      { eventType: COMMAND_TO_EVENT[commandType] }
+      {
+        eventType: COMMAND_TO_EVENT[commandType],
+        buildEffects: commandType === 'PRINT_COMMAND' ? () => {
+          if (!this._printer?.prepareJobs) throw new Error('Durable printer adapter unavailable')
+          return { print_jobs: this._printer.prepareJobs(
+            cmdPayload.station, Buffer.from(cmdPayload.data_b64, 'base64'), cmdPayload.document_type,
+            { commandId, reprint: cmdPayload.reprint === true }
+          ) }
+        } : undefined,
+      }
     )
 
-    if (duplicate) return { duplicate: true }
-
-    // Apply to in-memory state
+    // Idempotent materialization runs on retries too: a crash may have committed
+    // the event but not yet populated the printer queue. The original routing and
+    // bytes, held in event.effects, must survive config changes and restart.
+    await this._recoverEffect(event)
+    if (duplicate) return { duplicate: true, receipt: { event_id: event.id, sequence: event.sequence } }
     this._state.apply(event)
-
-    // Side effects
-    if (commandType === 'PRINT_COMMAND' && this._printer) {
-      setImmediate(() => {
-        const { station, data_b64 } = cmdPayload
-        if (station && data_b64) {
-          this._printer.printToStation(station, Buffer.from(data_b64, 'base64'))
-            .catch(e => console.error('[cmd-handler] Print side-effect failed:', e.message))
-        }
-      })
-    }
 
     // Broadcast the new event to all connected clients
     await this._hub.broadcast(event)
 
     return { event }
   }
+  async _recoverEffect(event) {
+    if (!event?.effects?.print_jobs) return
+    if (!this._printer?.enqueuePreparedJobs) throw new Error('Durable printer adapter unavailable')
+    await this._printer.enqueuePreparedJobs(event.effects.print_jobs)
+  }
+
+  // Call at startup after event-store replay, before accepting new commands.
+  // Legacy PRINT_COMMAND events without intents are not replayed: they may already
+  // have printed and cannot be deduplicated safely.
+  async recoverPendingEffects() {
+    let recovered = 0
+    for (const event of await this._store.readAfter(0)) {
+      if (!event.effects?.print_jobs) continue
+      await this._recoverEffect(event)
+      recovered++
+    }
+    return { recovered }
+  }
+
 }
 
 module.exports = { CommandHandler }

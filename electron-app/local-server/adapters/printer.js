@@ -17,7 +17,7 @@
 //
 // Print queue guarantees:
 //   - Job is written to disk BEFORE the print attempt
-//   - Restart does not lose pending jobs
+//   - Restart preserves pending jobs; interrupted sends require reconciliation
 //   - Each job has a stable UUID; retries do not generate new jobs
 //   - Manual reprint is flagged as reprint:true
 
@@ -26,6 +26,7 @@ const fs         = require('fs')
 const path       = require('path')
 const os         = require('os')
 const { execSync } = require('child_process')
+const { createHash, randomUUID } = require('crypto')
 const printerSchema = require('./printer-config-schema')
 const printQueue    = require('./print-queue')
 
@@ -33,18 +34,7 @@ let _config       = null   // v2 printers config object
 let _configPath   = null   // path to persist config changes
 let _printJobsFailed = 0
 let _recoveryInterval = null
-
-// Errors that mean "printer unreachable" — infrastructure, not content.
-// These jobs park as `recoverable` and are re-queued when the printer comes back.
-const RECOVERABLE_ERROR_PATTERNS = [
-  'ECONNREFUSED', 'ECONNRESET', 'ENOTFOUND', 'ENETUNREACH',
-  'ETIMEDOUT', 'TCP timeout', 'EHOSTUNREACH',
-]
-
-function _isRecoverableError(errorMsg) {
-  if (!errorMsg) return false
-  return RECOVERABLE_ERROR_PATTERNS.some(p => errorMsg.includes(p))
-}
+let _drain = Promise.resolve()
 
 // ── Init ─────────────────────────────────────────────────────────────────────
 
@@ -67,11 +57,9 @@ function init({ printersConfig, configPath, queueFilePath }) {
     // This ensures printer-unavailable jobs are retried without manual intervention.
     if (_recoveryInterval) clearInterval(_recoveryInterval)
     _recoveryInterval = setInterval(() => {
-      const revived = printQueue.retryRecoverableJobs()
-      if (revived.length > 0) {
-        _retryPendingJobs().catch(e => console.warn('[printer] Recovery retry error:', e.message))
-      }
+      _retryPendingJobs().catch(e => console.warn('[printer] Recovery retry error:', e.message))
     }, 60_000)
+    _recoveryInterval.unref?.()
   }
 }
 
@@ -119,76 +107,69 @@ function setStations(newConfig) {
  * @throws {Error} with code 'STATION_NOT_CONFIGURED' if station has no printers
  * @throws {Error} with code 'ALL_PRINTERS_FAILED' if every printer attempt failed
  */
-async function printToStation(stationId, data, documentType, opts = {}) {
-  if (!_config || !Array.isArray(_config.printers) || _config.printers.length === 0) {
-    throw Object.assign(
-      new Error(`PRINTER_NOT_CONFIGURED: No printer configuration loaded. Use the setup wizard to configure printers.`),
-      { code: 'PRINTER_NOT_CONFIGURED', station: stationId }
-    )
+// Pure preparation: routing and bytes are captured inside the durable command
+// transaction before any job is sent to a printer.
+function prepareJobs(stationId, data, documentType, opts = {}) {
+  if (!_config || !Array.isArray(_config.printers) || !_config.printers.length) {
+    throw Object.assign(new Error('PRINTER_NOT_CONFIGURED'), { code: 'PRINTER_NOT_CONFIGURED', station: stationId })
   }
-
   const { printers, diagnostic } = printerSchema.resolveStation(_config.printers, stationId, documentType)
+  if (!printers.length) throw Object.assign(new Error(`STATION_NOT_CONFIGURED: ${stationId}: ${diagnostic}`), { code: 'STATION_NOT_CONFIGURED' })
+  return printers.map(printer => ({
+    job_id: opts.commandId ? createHash('sha256').update(`${opts.commandId}:${printer.printer_id}`).digest('hex') : randomUUID(),
+    command_id: opts.commandId || null,
+    station_id: stationId, printer_id: printer.printer_id, printer_name: printer.name,
+    connection: JSON.parse(JSON.stringify(printer.connection)),
+    document_type: documentType || 'receipt', data_b64: data.toString('base64'),
+    copies: printer.copies || 1, reprint: opts.reprint || false,
+  }))
+}
 
-  if (printers.length === 0) {
-    throw Object.assign(
-      new Error(`STATION_NOT_CONFIGURED: No enabled printers found for station "${stationId}". Diagnostic: ${diagnostic}`),
-      { code: 'STATION_NOT_CONFIGURED', station: stationId, diagnostic }
-    )
+// Returns only after all jobs/receipts are durable. Actual printing is asynchronous
+// for commands; ACK means accepted for printing, never proof of physical paper.
+function enqueuePreparedJobs(jobs) {
+  const ids = printQueue.enqueueMany(jobs)
+  _scheduleDrain(ids).catch(e => console.error('[printer] Queue drain failed:', e.message))
+  return ids
+}
+
+async function printToStation(stationId, data, documentType, opts = {}) {
+  const ids = printQueue.enqueueMany(prepareJobs(stationId, data, documentType, opts))
+  await _scheduleDrain(ids)
+  const jobs = ids.map(id => printQueue.getJob(id))
+  if (!jobs.some(job => job.status === 'printed')) {
+    throw Object.assign(new Error(`ALL_PRINTERS_FAILED for station "${stationId}"`), { code: 'ALL_PRINTERS_FAILED', jobs })
   }
+}
 
-  const data_b64 = data.toString('base64')
-  const errors   = []
-  let   succeeded = 0
+function _scheduleDrain(ids) {
+  const run = _drain.then(() => _processJobs(ids))
+  _drain = run.catch(() => {})
+  return run
+}
 
-  for (const printer of printers) {
-    const copies = printer.copies || 1
-    const jobId = printQueue.enqueue({
-      station_id:    stationId,
-      printer_id:    printer.printer_id,
-      printer_name:  printer.name,
-      connection:    printer.connection,
-      document_type: documentType || 'receipt',
-      data_b64,
-      copies,
-      reprint:       opts.reprint || false,
-    })
-
-    printQueue.markPrinting(jobId)
-    let lastError = null
-
-    for (let copy = 0; copy < copies; copy++) {
-      try {
-        await _physicalPrint(printer.connection, data)
-      } catch (e) {
-        lastError = e.message
+async function _processJobs(ids) {
+  for (const id of ids) {
+    let job = printQueue.getJob(id)
+    if (!job || !['pending', 'retrying'].includes(job.status)) continue
+    if (!printQueue.canRetry(id)) { printQueue.markRecoverable(id, 'Retry limit reached; awaiting printer recovery'); continue }
+    printQueue.markPrinting(id) // durable BEFORE bytes can leave this process
+    try {
+      for (let copy = job.copies_printed || 0; copy < job.copies; copy++) {
+        await _physicalPrint(job.connection, Buffer.from(job.data_b64, 'base64'))
+        // Failure after a physical send remains uncertain, including disk errors.
+        printQueue.markCopyPrinted(id)
       }
-    }
-
-    if (lastError) {
+      printQueue.markPrinted(id)
+    } catch (error) {
       _printJobsFailed++
-      errors.push({ printer: printer.name, error: lastError })
-
-      if (printQueue.canRetry(jobId)) {
-        printQueue.markRetrying(jobId, lastError)
-      } else if (_isRecoverableError(lastError)) {
-        // Infrastructure failure (printer unreachable) — park as recoverable.
-        // The 60s recovery interval will re-queue when the printer comes back.
-        printQueue.markRecoverable(jobId, lastError)
+      if (error.safeToRetry === true) {
+        if (printQueue.canRetry(id)) printQueue.markRetrying(id, error.message)
+        else printQueue.markRecoverable(id, error.message)
       } else {
-        printQueue.markFailed(jobId, lastError)
+        printQueue.markUncertain(id, error.message)
       }
-    } else {
-      printQueue.markPrinted(jobId)
-      succeeded++
     }
-  }
-
-  if (succeeded === 0) {
-    const msg = errors.map(e => `${e.printer}: ${e.error}`).join('; ')
-    throw Object.assign(
-      new Error(`ALL_PRINTERS_FAILED for station "${stationId}": ${msg}`),
-      { code: 'ALL_PRINTERS_FAILED', station: stationId, errors }
-    )
   }
 }
 
@@ -218,11 +199,8 @@ async function _physicalPrint(connection, data) {
     await _printTcp(connection.host, connection.port, data)
   } else if (connection.type === 'usb' || connection.type === 'windows') {
     const names = connection.names || []
-    let lastErr
-    for (const name of names) {
-      try { _printUsb(name, data); return } catch (e) { lastErr = e }
-    }
-    throw lastErr || new Error('No USB printer names configured')
+    if (!names.length) throw Object.assign(new Error('No USB printer names configured'), { safeToRetry: true })
+    _printUsb(names[0], data)
   } else {
     throw new Error(`Unknown connection type: ${connection.type}`)
   }
@@ -230,13 +208,23 @@ async function _physicalPrint(connection, data) {
 
 function _printTcp(host, port, data) {
   return new Promise((resolve, reject) => {
-    const socket  = new net.Socket()
-    const timeout = setTimeout(() => { socket.destroy(); reject(new Error(`TCP timeout ${host}:${port}`)) }, 5000)
-    socket.connect(port, host, () => {
+    const socket = new net.Socket()
+    let submitted = false
+    let settled = false
+    const finish = (error) => {
+      if (settled) return
+      settled = true
       clearTimeout(timeout)
-      socket.write(data, () => { socket.end(); resolve() })
+      if (error) { error.safeToRetry = !submitted; socket.destroy(); reject(error) }
+      else { socket.end(); resolve() }
+    }
+    const timeout = setTimeout(() => finish(new Error(`TCP timeout ${host}:${port}`)), 5000)
+    socket.on('error', finish)
+    socket.on('close', () => { if (!settled) finish(new Error('TCP closed before write completion')) })
+    socket.connect(port, host, () => {
+      submitted = true
+      socket.write(data, finish)
     })
-    socket.on('error', (err) => { clearTimeout(timeout); reject(err) })
   })
 }
 
@@ -244,16 +232,9 @@ function _printUsb(printerName, data) {
   const tmpFile = path.join(os.tmpdir(), `fs_print_${Date.now()}.bin`)
   try {
     fs.writeFileSync(tmpFile, data)
-    try {
-      execSync(`copy /b "${tmpFile}" "\\\\%COMPUTERNAME%\\${printerName}"`, {
-        timeout: 5000, windowsHide: true, shell: 'cmd.exe',
-      })
-    } catch {
-      execSync(
-        `powershell -Command "Get-Content '${tmpFile}' -Encoding Byte -ReadCount 0 | Out-Printer '${printerName}'"`,
-        { timeout: 8000, windowsHide: true }
-      )
-    }
+    execSync(`copy /b "${tmpFile}" "\\\\%COMPUTERNAME%\\${printerName}"`, {
+      timeout: 5000, windowsHide: true, shell: 'cmd.exe',
+    })
   } finally {
     try { fs.unlinkSync(tmpFile) } catch {}
   }
@@ -262,37 +243,14 @@ function _printUsb(printerName, data) {
 // ── Pending job retry on startup ──────────────────────────────────────────────
 
 async function _retryPendingJobs() {
-  // On startup, also revive recoverable jobs from previous run — printer may be back.
   printQueue.retryRecoverableJobs()
+  await _scheduleDrain(printQueue.getPendingJobs().map(job => job.job_id))
+}
 
-  const pending = printQueue.getPendingJobs()
-  if (pending.length === 0) return
-
-  console.log(`[printer] Retrying ${pending.length} pending jobs from previous run...`)
-
-  for (const job of pending) {
-    if (!printQueue.canRetry(job.job_id)) {
-      printQueue.markFailed(job.job_id, 'Max retry attempts exceeded on startup')
-      continue
-    }
-
-    printQueue.markPrinting(job.job_id)
-    try {
-      const data = Buffer.from(job.data_b64, 'base64')
-      await _physicalPrint(job.connection, data)
-      printQueue.markPrinted(job.job_id)
-      console.log(`[printer] Recovered job ${job.job_id} (${job.printer_name})`)
-    } catch (e) {
-      if (printQueue.canRetry(job.job_id)) {
-        printQueue.markRetrying(job.job_id, e.message)
-      } else if (_isRecoverableError(e.message)) {
-        printQueue.markRecoverable(job.job_id, e.message)
-      } else {
-        printQueue.markFailed(job.job_id, e.message)
-      }
-      console.warn(`[printer] Could not recover job ${job.job_id}:`, e.message)
-    }
-  }
+function resolveUncertain(jobId, outcome) {
+  const resolved = printQueue.resolveUncertain(jobId, outcome)
+  if (resolved && outcome === 'reprint') _scheduleDrain([jobId]).catch(e => console.error('[printer] Reprint failed:', e.message))
+  return resolved
 }
 
 // ── Exports ───────────────────────────────────────────────────────────────────
@@ -303,10 +261,14 @@ module.exports = {
   getPrintJobsFailed,
   setStations,
   printToStation,
+  prepareJobs,
+  enqueuePreparedJobs,
+  resolveUncertain,
   kickDrawer,
   buildTestTicket,
   // Exposed for /print-queue HTTP endpoint
   getQueue: printQueue.getAllJobs,
   getPendingJobs: printQueue.getPendingJobs,
   getRecoverableJobs: printQueue.getRecoverableJobs,
+  getUncertainJobs: printQueue.getUncertainJobs,
 }

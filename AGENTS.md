@@ -88,3 +88,7 @@ python3 scripts/sql/sandbox/onboard_client.py \
 Ver [`docs/ai/OVERVIEW.md`](docs/ai/OVERVIEW.md) para el mapa del War Room multi-agente.
 Ver [`docs/feos/OVERVIEW.md`](docs/feos/OVERVIEW.md) para las 9 iniciativas FEOS.
 Ver [`docs/state/CERTIFICATIONS.md`](docs/state/CERTIFICATIONS.md) para el estado actual de certificaciones.
+
+## Comandos locales durables (candidato septiembre)
+
+Antes de modificar almacenamiento o impresión de Pedro, leer [`docs/architecture/DURABLE-COMMANDS-2026-09-05.md`](docs/architecture/DURABLE-COMMANDS-2026-09-05.md). Un ACK exige commit durable; impresión incierta exige verificación del operador. El nuevo formato de log requiere una migración validada para downgrade.

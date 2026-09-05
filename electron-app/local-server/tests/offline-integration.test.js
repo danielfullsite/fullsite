@@ -44,7 +44,11 @@ async function buildStack(dir) {
   const broadcasts = []
   const prints = []
   const fakeHub = { broadcast: async (ev) => { broadcasts.push(ev) } }
-  const fakePrinter = { printToStation: async (station, buf) => { prints.push({ station, len: buf.length }) } }
+  const queued = new Set()
+  const fakePrinter = {
+    prepareJobs: (station, buf, type, opts) => [{ job_id: opts.commandId, station, len: buf.length }],
+    enqueuePreparedJobs: async jobs => { for (const job of jobs) if (!queued.has(job.job_id)) { queued.add(job.job_id); prints.push(job) } },
+  }
 
   const cmd = new CommandHandler({ eventStore, state, wsHub: fakeHub, printer: fakePrinter, restaurantId: R })
 
