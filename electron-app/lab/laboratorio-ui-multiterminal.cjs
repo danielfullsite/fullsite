@@ -6,8 +6,9 @@
  * Next sirve el POS real. Sólo catálogo, personal y turno son fixtures HTTP;
  * órdenes, snapshots, enlace, credenciales y reinicios pasan por Pedro real.
  * No se acepta una URL remota ni se heredan credenciales de la máquina.
- * Esta suite funcional no certifica el paquete/SW offline, PIN, huella,
- * cobro bancario ni impresoras físicas. El servidor local sirve los assets.
+ * Esta suite funcional no certifica el paquete/SW offline, huella, cobro
+ * bancario ni impresoras físicas. El servidor local sirve los assets. Con
+ * FULLSITE_LAB_PIN=1 POS 3 arranca sin sesión y teclea el PIN en el escondite.
  *
  * node electron-app/lab/laboratorio-ui-multiterminal.cjs
  */
@@ -16,6 +17,7 @@ const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
 const net = require('node:net')
+const http = require('node:http')
 const { spawn } = require('node:child_process')
 const { randomUUID } = require('node:crypto')
 const ROOT = path.resolve(__dirname, '../..')
@@ -47,6 +49,10 @@ const reservedPorts = new Map()
 let nextProcess
 let nextLog = ''
 let wan = !packagedBundle
+// La «nube» del laboratorio: un stub HTTP local al que el bootstrap de cada
+// Electron redirige `https://app.fullsite.mx`. Registra cada petición SIN el PIN.
+let nube = null
+const nubeRequests = []
 
 function cleanEnv(extra = {}) {
   const env = { PATH: process.env.PATH, HOME: process.env.HOME, TMPDIR: base,
@@ -120,6 +126,49 @@ async function commandWs(terminal, type, payload) {
 }
 
 const labPin = '9876543210'
+
+// ── PIN desde la pantalla ─────────────────────────────────────────────────────
+//
+// Con FULLSITE_LAB_PIN=1, POS 3 arranca SIN sesión sembrada y el recorrido teclea
+// el PIN en el teclado real. Cubre lo que este laboratorio declaraba como no
+// probado: «Sesión preparada: no prueba PIN». Es la puerta por la que entra
+// todo lo demás, y donde Eduardo reportó lentitud en campo el 2026-09-02.
+//
+// El camino real en Electron NO es el del navegador. `requiereCaja()`
+// (pedro-cliente.ts:23) es verdadero bajo Electron y pos/layout.tsx:531 manda el
+// PIN a `POST /auth/pin` del Pedro local (pedro-actor.ts:24). Un POS secundario lo
+// reenvía a Caja (index.js:401) y Caja lo valida en `ActorAuthority._login`:
+// con nube, contra `https://app.fullsite.mx/api/pos/pin` desde el proceso Node;
+// sin nube, contra el verificador scrypt que dejó el último login online de ESA
+// persona en ESA terminal. Ni `verifyPinOffline` ni `pos_manager_credentials_v2`
+// ni `pos_staff_cache` participan.
+//
+// Consecuencia para el laboratorio: la ruta de Playwright NO ve ese fetch (es
+// Node, no el renderer). Sin el bootstrap de `startTerminal`, un PIN tecleado
+// aquí viajaba al restaurante real. Por eso cada Electron arranca con
+// `lab-bootstrap.cjs`, que redirige `https://app.fullsite.mx` a la nube del
+// laboratorio y bloquea todo lo demás, con bitácora en `<userData>/lab-egress.log`.
+//
+// El PIN del laboratorio es dato de prueba; nunca sale de esta máquina. No se
+// imprime ni se registra (CLAUDE.md §13).
+const pinDesdePantalla = process.env.FULLSITE_LAB_PIN === '1'
+// El default es SINTÉTICO a propósito. El PIN real de una instalación se pasa
+// por FULLSITE_LAB_PIN_VALUE en la corrida y no se escribe en el repo (§13):
+// un PIN de producción en código fuente es un PIN filtrado.
+const pinDelLab = process.env.FULLSITE_LAB_PIN_VALUE || '2468'
+const pinIncorrecto = pinDelLab === '9999' ? '8888' : '9999'
+// Otra persona que el operador sembrado: si la nube devolviera el MISMO staff,
+// `ActorAuthority._login` reemplazaría su credencial y revocaría las sesiones
+// preparadas de Caja, POS 2 y Cocina a media corrida.
+const staffPantalla = { id: '00000000-0000-4000-8000-000000000073', name: 'Cajera de laboratorio', role: 'gerente' }
+const shiftTokenPantalla = 'lab-shift-desde-pantalla'
+// Una sola verdad para las dos nubes (la del renderer y la del proceso Node). La
+// forma del rechazo copia a la ruta real (api/pos/pin/route.ts:155).
+function respuestaDePin(pin) {
+  if (!pinDesdePantalla) return { status: 200, json: { staff, shiftToken: 'synthetic-lab-session' } }
+  if (pin !== pinDelLab) return { status: 401, json: { error: 'Empleado no encontrado o desactivado' } }
+  return { status: 200, json: { staff: staffPantalla, shiftToken: shiftTokenPantalla } }
+}
 const staff = { id: '00000000-0000-4000-8000-000000000071', name: 'Operador de laboratorio', role: operationalMode ? 'admin' : 'gerente' }
 const turno = { id: '00000000-0000-4000-8000-000000000072', client_id: tenant,
   fondo_inicial: 500, opened_by: staff.name, opened_at: new Date().toISOString(), closed_at: null }
@@ -133,6 +182,59 @@ const fixture = {
   pos_mesas: [1, 2, 3].map(number => ({ id: `mesa-${number}`, client_id: tenant, number,
     capacity: 4, active: true, x_pct: 15 + number * 20, y_pct: 40, shape: 'square', zone: 'Salón' })),
   pos_turnos: [turno], pos_staff: [staff], pos_orders: [],
+}
+// Un solo catálogo completo: lo consume la preparación de Caja antes de arrancar
+// y lo sirve la nube del laboratorio cuando Caja lo refresca tras un PIN online.
+const catalogoDeLab = () => ({ schema_version: 1, complete: true, catalog_scope: 'restaurant', restaurant_id: tenant,
+  refreshed_at: new Date().toISOString(), config: fixture.clients[0], settings: {
+    'pos.station_routing': { barra: ['lab-bebidas'] },
+    'pos.no_print_stations': ['cocina', 'barra', 'caja'],
+  },
+  categories: [{ ...fixture.pos_menu_categories[0], items: fixture.pos_menu_items }], payment_methods: fixture.pos_payment_methods,
+  modifiers: { groups: [{ id: 'lab-temperature', name: 'Preparación de laboratorio', level: 1, min_selections: 1, max_selections: 1, required: true }],
+    mods: [{ id: 'lab-hot', group_id: 'lab-temperature', name: 'Caliente de laboratorio', price: 0 }],
+    item_links: [{ item_id: 'lab-cafe', group_id: 'lab-temperature' }], category_links: [] },
+})
+
+// ── Nube del laboratorio ──────────────────────────────────────────────────────
+// Sirve lo que Caja pide a `app.fullsite.mx` desde su proceso Node: validación de
+// PIN y catálogo. Con `wan = false` corta la conexión (ECONNRESET), que es lo que
+// ve Caja cuando el módem pierde WAN; así ActorAuthority cae a su verificador
+// local en vez de recibir una respuesta.
+async function startNube() {
+  const server = http.createServer((req, res) => {
+    const url = new URL(req.url, 'http://127.0.0.1')
+    if (!wan) { nubeRequests.push({ ruta: url.pathname, wan: false, ts: Date.now() }); req.socket.destroy(); return }
+    let body = ''
+    req.on('data', chunk => { body += chunk })
+    req.on('end', () => {
+      const responder = (status, json) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(json)) }
+      if (req.method === 'POST' && url.pathname === '/api/pos/pin') {
+        let cuerpo = {}
+        try { cuerpo = JSON.parse(body || '{}') } catch {}
+        const r = respuestaDePin(cuerpo.pin)
+        // Se registra a quién y con qué resultado; nunca el PIN.
+        nubeRequests.push({ ruta: url.pathname, wan: true, ts: Date.now(), status: r.status,
+          device_id: cuerpo.device_id ?? null, client_id: cuerpo.client_id ?? null })
+        return responder(r.status, r.json)
+      }
+      if (req.method === 'GET' && url.pathname === '/api/pos/menu') {
+        nubeRequests.push({ ruta: url.pathname, wan: true, ts: Date.now(), status: 200,
+          authorization: req.headers.authorization || null, tenant: req.headers['x-fullsite-tenant'] || null })
+        return responder(200, catalogoDeLab())
+      }
+      nubeRequests.push({ ruta: url.pathname, wan: true, ts: Date.now(), status: 404 })
+      responder(404, { error: 'La nube del laboratorio no sirve esta ruta' })
+    })
+  })
+  server.keepAliveTimeout = 1000
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+  return { server, origin: `http://127.0.0.1:${server.address().port}` }
+}
+function leerEgreso(userData) {
+  const archivo = path.join(userData, 'lab-egress.log')
+  if (!fs.existsSync(archivo)) return []
+  return fs.readFileSync(archivo, 'utf8').split('\n').filter(Boolean).map(linea => JSON.parse(linea))
 }
 
 async function fixtureRoute(route, uiOrigin, pedroPorts) {
@@ -155,7 +257,14 @@ async function fixtureRoute(route, uiOrigin, pedroPorts) {
   }
   if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/auth/')) {
     if (!wan) return route.abort('internetdisconnected')
-    if (url.pathname === '/api/pos/pin') return route.fulfill({ json: { staff, shiftToken: 'synthetic-lab-session' } })
+    if (url.pathname === '/api/pos/pin') {
+      // Bajo Electron este camino no se usa (el PIN va a Caja); se mantiene
+      // coherente con la nube del laboratorio por si el renderer lo llamara.
+      let pinRecibido = null
+      try { pinRecibido = JSON.parse(request.postData() || '{}').pin ?? null } catch {}
+      const r = respuestaDePin(pinRecibido)
+      return route.fulfill({ status: r.status, json: r.json })
+    }
     // Unexpected order mutations must not silently succeed in the fixture.
     if (/save-order|add-items|payment|merge-orders|transfer|split|liquidar/.test(url.pathname)) {
       return route.fulfill({ status: 503, json: { error: 'El laboratorio exige escritura por Caja' } })
@@ -166,7 +275,7 @@ async function fixtureRoute(route, uiOrigin, pedroPorts) {
   return route.abort('blockedbyclient')
 }
 
-async function startTerminal(name, role, port, cajaPort, uiOrigin, ports) {
+async function startTerminal(name, role, port, cajaPort, uiOrigin, ports, opts = {}) {
   const userData = path.join(base, name)
   fs.mkdirSync(userData, { recursive: true })
   const { terminalId, actorSession } = prepared.get(name)
@@ -178,23 +287,35 @@ async function startTerminal(name, role, port, cajaPort, uiOrigin, ports) {
     pos_server_port: role === 'server_pos' ? null : cajaPort, lan_secret: secret, instance_name: name,
     localAuthorityEnabled: operationalMode,
   }))
-  let entry = path.join(ELECTRON_APP, 'main.js')
-  if (packagedBundle) {
-    entry = path.join(base, 'packaged-bootstrap.cjs')
-    fs.writeFileSync(entry, `const fs = require('node:fs');
-const startupLog = require('node:path').join(process.env.FULLSITE_USER_DATA_DIR, 'lab-startup.log');
+  // Todo Electron del laboratorio arranca por este bootstrap, que envuelve
+  // `global.fetch` del proceso main ANTES del JS de producto. Lo que Pedro pida
+  // a `https://app.fullsite.mx` va a la nube del laboratorio; cualquier otro
+  // host queda bloqueado. Cada decisión se escribe en `lab-egress.log` con
+  // método y ruta — nunca cuerpo ni cabeceras. Sólo cubre `global.fetch`:
+  // `https.request`/`net.request` no pasan por aquí (ver límites en el doc).
+  const entry = path.join(base, 'lab-bootstrap.cjs')
+  if (!fs.existsSync(entry)) fs.writeFileSync(entry, `const fs = require('node:fs');
+const path = require('node:path');
+const userData = process.env.FULLSITE_USER_DATA_DIR;
+const startupLog = path.join(userData, 'lab-startup.log');
 for (const stream of [process.stdout, process.stderr]) {
   const originalWrite = stream.write.bind(stream);
   stream.write = (chunk, ...args) => { fs.appendFileSync(startupLog, chunk); return originalWrite(chunk, ...args); };
 }
+const egressLog = path.join(userData, 'lab-egress.log');
+const nube = process.env.FULLSITE_LAB_NUBE;
 const originalFetch = global.fetch;
 global.fetch = (input, init) => {
-  const url = new URL(typeof input === 'string' ? input : input.url);
-  if (!['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname)) return Promise.reject(new TypeError('Laboratorio sin WAN'));
-  return originalFetch(input, init);
+  const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
+  if (['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname)) return originalFetch(input, init);
+  const redirigido = url.origin === 'https://app.fullsite.mx' && !!nube;
+  fs.appendFileSync(egressLog, JSON.stringify({ ts: new Date().toISOString(), metodo: (init && init.method) || (input && input.method) || 'GET',
+    url: url.origin + url.pathname, decision: redirigido ? 'redirigido-a-la-nube-del-lab' : 'bloqueado' }) + '\\n');
+  if (!redirigido) return Promise.reject(new TypeError('Laboratorio sin WAN'));
+  const destino = nube + url.pathname + url.search;
+  return originalFetch(typeof input === 'string' || input instanceof URL ? destino : new Request(destino, input), init);
 };
 require(${JSON.stringify(path.join(ELECTRON_APP, 'main.js'))});\n`)
-  }
   // Keep not-yet-started server ports reserved while earlier terminals make
   // outbound LAN connections, which can otherwise claim the same ephemeral port.
   if (reservedPorts.has(port)) {
@@ -202,6 +323,7 @@ require(${JSON.stringify(path.join(ELECTRON_APP, 'main.js'))});\n`)
   }
   const app = await _electron.launch({ executablePath: electronBinary, args: [entry],
     env: cleanEnv({ FULLSITE_DEV: '1', FULLSITE_USER_DATA_DIR: userData, FULLSITE_LOCAL_SERVER_PORT: String(port),
+      FULLSITE_LAB_NUBE: nube.origin,
       ...(packagedBundle ? { FULLSITE_UI_BUNDLE_DIR: packagedBundle } : {}),
       // Arranque inerte del mismo origen: instalar interceptores antes del JS de
       // producto impide que la precarga del SW escape al aislamiento de pruebas.
@@ -213,7 +335,7 @@ require(${JSON.stringify(path.join(ELECTRON_APP, 'main.js'))});\n`)
   terminal.process.stderr.on('data', d => terminal.log.push(String(d)))
   const context = app.context()
   await context.route('**/*', route => fixtureRoute(route, uiOrigin, ports))
-  await context.addInitScript(({ tenant, staff, turno, terminalId, port, secret, actorSession, operationalMode, uiOrigin }) => {
+  await context.addInitScript(({ tenant, staff, turno, terminalId, port, secret, actorSession, operationalMode, uiOrigin, sinSesion }) => {
     if (!['localhost', '127.0.0.1'].includes(location.hostname) && location.origin !== uiOrigin) return
     localStorage.setItem('fullsite_client_id', tenant)
     localStorage.setItem('pos_terminal_id', terminalId)
@@ -227,10 +349,15 @@ require(${JSON.stringify(path.join(ELECTRON_APP, 'main.js'))});\n`)
       localStorage.setItem('pos_turno_id', turno.id)
       localStorage.setItem('pos_turno_cache', JSON.stringify({ turno, turnos: [turno], ts: Date.now() }))
     }
-    sessionStorage.setItem('pos_staff', JSON.stringify(staff))
-    sessionStorage.setItem('pos_actor_session', JSON.stringify(actorSession))
-    sessionStorage.setItem('pos_last_activity', String(Date.now()))
-  }, { tenant, staff, turno, terminalId, port, secret, actorSession, operationalMode, uiOrigin })
+    // Sin sesión sembrada la terminal arranca en el escondite, y el recorrido de
+    // PIN teclea de verdad. Con sesión sembrada se conserva el comportamiento
+    // original de este laboratorio.
+    if (!sinSesion) {
+      sessionStorage.setItem('pos_staff', JSON.stringify(staff))
+      sessionStorage.setItem('pos_actor_session', JSON.stringify(actorSession))
+      sessionStorage.setItem('pos_last_activity', String(Date.now()))
+    }
+  }, { tenant, staff, turno, terminalId, port, secret, actorSession, operationalMode, uiOrigin, sinSesion: !!opts.sinSesion })
   const page = await app.firstWindow()
   terminal.page = page
   page.on('pageerror', error => terminal.errors.push(error.stack || error.message))
@@ -292,20 +419,12 @@ async function main() {
   // Prepare ONE complete catalog on Caja. POS 3 never gets a private fixture
   // cache; its menu/config/modifier readers must retrieve this over real LAN.
   const catalog = new CatalogStore({ directory: path.join(base, 'Caja', 'catalog'), restaurantId: tenant,
-    fetchImpl: async () => Response.json({ schema_version: 1, complete: true, catalog_scope: 'restaurant', restaurant_id: tenant,
-      refreshed_at: new Date().toISOString(), config: fixture.clients[0], settings: {
-        'pos.station_routing': { barra: ['lab-bebidas'] },
-        'pos.no_print_stations': ['cocina', 'barra', 'caja'],
-      },
-      categories: [{ ...fixture.pos_menu_categories[0], items: fixture.pos_menu_items }], payment_methods: fixture.pos_payment_methods,
-      modifiers: { groups: [{ id: 'lab-temperature', name: 'Preparación de laboratorio', level: 1, min_selections: 1, max_selections: 1, required: true }],
-        mods: [{ id: 'lab-hot', group_id: 'lab-temperature', name: 'Caliente de laboratorio', price: 0 }],
-        item_links: [{ item_id: 'lab-cafe', group_id: 'lab-temperature' }], category_links: [] },
-    }) })
+    fetchImpl: async () => Response.json(catalogoDeLab()) })
   await catalog.refresh('synthetic-lab-session')
+  nube = await startNube()
   let caja = await startTerminal('Caja', 'server_pos', ports[0], ports[0], uiOrigin, ports)
   const pos2 = await startTerminal('POS 2', 'pos', ports[1], ports[0], uiOrigin, ports)
-  const pos3 = await startTerminal('POS 3', 'pos', ports[2], ports[0], uiOrigin, ports)
+  const pos3 = await startTerminal('POS 3', 'pos', ports[2], ports[0], uiOrigin, ports, { sinSesion: pinDesdePantalla })
   const kds = await startTerminal('Cocina', 'kds', ports[3], ports[0], uiOrigin, ports)
   if (operationalMode) {
     wan = false
@@ -313,6 +432,173 @@ async function main() {
       tenant, output, uiOrigin, labPin, restartCaja: () => startTerminal('Caja', 'server_pos', ports[0], ports[0], uiOrigin, ports) })
     return
   }
+  if (pinDesdePantalla) {
+    // El teclado real: botones con texto 1–9 y 0, y «Entrar» por aria-label
+    // (pos/layout.tsx:905-940). No se escribe en un input: se toca como en la
+    // terminal. El PIN nunca se imprime (CLAUDE.md §13).
+    // Cuántos puntos del PIN están llenos: los puntos se pintan con fondo #10b981
+    // (pos/layout.tsx:895) → rgb(16, 185, 129) en el DOM. Es la única lectura
+    // del estado `pin` posible desde afuera sin exponer el PIN.
+    // Los puntos son <span> (pos/layout.tsx:889), no <div>. La primera versión
+    // de este contador buscaba `div`, devolvía SIEMPRE 0, y el reintento —engañado
+    // por él— tecleó dígitos de más. Lo delató la sonda de Borrar, que lee
+    // `pin.length` por otra vía. Se selecciona por el estilo, sin asumir etiqueta.
+    const puntosLlenos = page => page.evaluate(() =>
+      [...document.querySelectorAll('[style]')].filter(el => /16,\s*185,\s*129/.test(el.style.background || el.style.backgroundColor || '')).length)
+    const entrarDeshabilitado = page => page.getByRole('button', { name: 'Entrar' }).isDisabled()
+
+    // Se afirma DESPUÉS de cada dígito que el punto se llenó. En la primera corrida
+    // los cuatro clics "llegaron" (Playwright los dio por buenos) y aun así «Entrar»
+    // siguió deshabilitado con pin.length < 4: sin esta lectura por dígito no hay
+    // forma de saber en qué clic se perdió el estado.
+    // HIDRATACIÓN. Next sirve el HTML del escondite antes de que React cuelgue
+    // los `onClick`. Playwright ve el botón "habilitado" (sin atributo disabled)
+    // y clica al vacío: en la corrida diagnóstica el PRIMER dígito ya dejaba
+    // llenos=0. Las diez pruebas originales nunca lo sufrieron porque no clican
+    // el escondite — estos son los primeros clics tras el `goto`.
+    //
+    // React marca el nodo con una clave `__reactProps$…` que contiene `onClick`
+    // sólo cuando el handler está colgado. Se espera ESO, no un sleep.
+    const hidratado = (page, nombre) => page.evaluate(nombre => {
+      const boton = [...document.querySelectorAll('button')].find(b => b.textContent.trim() === nombre)
+      if (!boton) return 'sin-boton'
+      const clave = Object.keys(boton).find(k => k.startsWith('__reactProps'))
+      return clave && typeof boton[clave]?.onClick === 'function' ? 'hidratado' : 'sin-handler'
+    }, nombre)
+
+    const teclear = async (page, digitos) => {
+      await until(async () => (await hidratado(page, digitos[0])) === 'hidratado',
+        `el teclado no se hidrató (estado=${await hidratado(page, digitos[0])})`, 30000)
+      const antes = await puntosLlenos(page)
+      for (let i = 0; i < digitos.length; i++) {
+        const boton = page.getByRole('button', { name: digitos[i], exact: true })
+        await expect(boton).toBeEnabled({ timeout: 10000 })
+        // UN clic, y se espera el punto. Sin reintentos: la hidratación ya se
+        // esperó arriba, así que un punto que no se llena es un fallo real. La
+        // versión anterior reintentaba hasta 3 veces con un contador ciego y
+        // tecleó dígitos de más — un PIN "9999" acabó siendo "99999".
+        await boton.click()
+        let lleno = await until(async () => (await puntosLlenos(page)) === antes + i + 1, '', 4000).then(() => true, () => false)
+        if (!lleno) {
+          // DIAGNÓSTICO DISCRIMINANTE. Con el handler hidratado, un solo escondite y
+          // tres clics CDP sin efecto, hay que separar "el evento no llega" de "el
+          // estado no cambia". Tres caminos distintos hasta el mismo handler, y la
+          // señal de Borrar (disabled ⇔ pin.length === 0, pos/layout.tsx:917) como
+          // lectura independiente del contador de puntos.
+          const sonda = await page.evaluate(async nombre => {
+            const boton = [...document.querySelectorAll('button')].find(b => b.textContent.trim() === nombre)
+            const borrar = document.querySelector('button[aria-label="Borrar"]')
+            // Mismo selector que `puntosLlenos`: por estilo, sin asumir etiqueta.
+            const puntos = () => [...document.querySelectorAll('[style]')].filter(el => /16,\s*185,\s*129/.test(el.style.background || el.style.backgroundColor || '')).length
+            const espera = () => new Promise(r => setTimeout(r, 400))
+            const foto = etiqueta => ({ etiqueta, puntos: puntos(), borrarDeshabilitado: borrar?.disabled ?? null })
+            const fotos = [foto('antes')]
+            // camino 2: evento DOM real (bubbles), sin pasar por CDP
+            boton.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+            await espera(); fotos.push(foto('tras dispatchEvent'))
+            // camino 3: el handler de React directo, sin evento
+            const clave = Object.keys(boton).find(k => k.startsWith('__reactProps'))
+            try { boton[clave].onClick({ preventDefault() {}, stopPropagation() {} }) } catch (e) { fotos.push({ etiqueta: 'onClick directo lanzó', error: String(e) }) }
+            await espera(); fotos.push(foto('tras onClick directo'))
+            return { botonesConEseTexto: [...document.querySelectorAll('button')].filter(b => b.textContent.trim() === nombre).length,
+              activo: document.activeElement?.tagName, fotos }
+          }, digitos[i])
+          console.log(`[pin] SONDA dígito ${i + 1}: ${JSON.stringify(sonda)}`)
+          fs.writeFileSync(path.join(output, `pin-sonda-digito-${i + 1}.json`), JSON.stringify(sonda, null, 2))
+          lleno = (await puntosLlenos(page)) >= antes + i + 1
+        }
+        assert(lleno, `dígito ${i + 1}/${digitos.length}: el punto no se llenó con el clic ni con las sondas (llenos=${await puntosLlenos(page)}, hidratación=${await hidratado(page, digitos[i])}) — ver pin-sonda-digito-${i + 1}.json`)
+      }
+      console.log(`[pin] tecleados ${digitos.length} dígitos · puntos llenos=${await puntosLlenos(page)} · Entrar deshabilitado=${await entrarDeshabilitado(page)}`)
+    }
+    const entrar = async page => {
+      await page.screenshot({ path: path.join(output, `pin-antes-de-entrar-${Date.now()}.png`), fullPage: true })
+      await page.getByRole('button', { name: 'Entrar' }).click()
+    }
+    const escondite = page => page.getByRole('button', { name: 'Entrar' })
+    const sesionDeCaja = () => pos3.page.evaluate(() => JSON.parse(sessionStorage.getItem('pos_actor_session') || 'null'))
+    const pinsEnLaNube = () => nubeRequests.filter(r => r.ruta === '/api/pos/pin')
+    const credencialesDeCaja = () => JSON.parse(fs.readFileSync(path.join(base, 'Caja', 'actor-authority', 'actor-credentials.json'), 'utf8'))
+
+    await check('POS 3 sin sesión sembrada arranca en el escondite', async () => {
+      await pos3.page.goto(`${uiOrigin}/pos`, { waitUntil: 'domcontentloaded', timeout: 60000 })
+      await expect(escondite(pos3.page)).toBeVisible({ timeout: 20000 })
+      assert.equal(await pos3.page.evaluate(() => sessionStorage.getItem('pos_staff')), null, 'no debe haber sesión previa')
+      assert.equal(await sesionDeCaja(), null, 'no debe haber sesión de Caja previa')
+      assert.equal(pinsEnLaNube().length, 0, 'premisa: la nube del laboratorio no ha visto ningún PIN')
+    })
+    await check('Con internet, Caja rechaza el PIN incorrecto y la terminal sigue en el escondite', async () => {
+      await teclear(pos3.page, pinIncorrecto); await entrar(pos3.page)
+      // Texto de `ActorAuthority._login` (rama 401), que pos/layout.tsx:537 muestra
+      // tal cual. Aquí no aparece «PIN incorrecto»: ése es el texto del camino de
+      // navegador, que Electron no recorre.
+      await expect(pos3.page.locator('body')).toContainText(/PIN rechazado por la autoridad/, { timeout: 10000 })
+      await expect(escondite(pos3.page)).toBeVisible()
+      assert.equal(await sesionDeCaja(), null)
+      const intento = pinsEnLaNube().at(-1)
+      assert.equal(intento?.status, 401, `la nube debió rechazar: ${JSON.stringify(intento)}`)
+      assert.equal(intento.device_id, pos3.terminalId, 'Caja presenta a la nube la terminal que tecleó, no la suya')
+      assert.equal(intento.client_id, tenant)
+    })
+    await check('Con internet, el PIN correcto entra por Caja y deja preparada la credencial sin red', async () => {
+      await teclear(pos3.page, pinDelLab); await entrar(pos3.page)
+      await expect(escondite(pos3.page)).toBeHidden({ timeout: 20000 })
+      const sesion = await sesionDeCaja()
+      assert.equal(sesion?.staff?.id, staffPantalla.id, 'la sesión es de la persona que la nube confirmó')
+      assert.equal(sesion.offline, false)
+      assert.equal(await pos3.page.evaluate(() => JSON.parse(sessionStorage.getItem('pos_staff') || 'null')?.name), staffPantalla.name)
+      // pos/layout.tsx:534 guarda el token de turno que emitió la nube; con él
+      // Caja refresca el catálogo (index.js `/auth/pin`). La cadena completa:
+      // PIN → nube → shiftToken → renderer y catálogo.
+      assert.equal(await pos3.page.evaluate(() => localStorage.getItem('pos_shift_token')), shiftTokenPantalla)
+      assert.equal(pinsEnLaNube().at(-1)?.status, 200)
+      await until(() => nubeRequests.some(r => r.ruta === '/api/pos/menu' && r.authorization === `Bearer ${shiftTokenPantalla}` && r.tenant === tenant),
+        'Caja refresca el catálogo con el token de turno recién emitido', 10000)
+      // Lo que permitirá entrar sin red: el verificador de ESTA persona en ESTA
+      // terminal, en disco de Caja (`ActorAuthority._persist`).
+      const preparada = Object.values(credencialesDeCaja().credentials).find(c => c.staff.id === staffPantalla.id)
+      assert(preparada, 'Caja debe conservar la credencial preparada')
+      assert(preparada.devices?.[pos3.terminalId] > Date.now(), 'preparada para la terminal que tecleó')
+      assert(typeof preparada.hash === 'string' && !Object.values(preparada).includes(pinDelLab), 'el PIN no se guarda en claro')
+      await pos3.page.screenshot({ path: path.join(output, 'pin-online-entra.png'), fullPage: true })
+    })
+    await check('Sin internet, Caja rechaza el PIN sin preparar y acepta el preparado sin consultar la nube', async () => {
+      // Cierre de turno: se vacía la sesión y se recarga, como al reabrir la
+      // terminal. Luego se corta la WAN de Caja (la nube cierra la conexión).
+      await pos3.page.evaluate(() => sessionStorage.clear())
+      wan = false
+      const vistosAntes = pinsEnLaNube().length
+      await pos3.page.goto(`${uiOrigin}/pos`, { waitUntil: 'domcontentloaded', timeout: 60000 })
+      await expect(escondite(pos3.page)).toBeVisible({ timeout: 20000 })
+
+      await teclear(pos3.page, pinIncorrecto); await entrar(pos3.page)
+      // Sin nube, un PIN que nadie preparó no puede entrar y cuenta como intento
+      // (`ActorAuthority._login`, rama offline).
+      await expect(pos3.page.locator('body')).toContainText(/sin preparar|valida PIN con internet/, { timeout: 10000 })
+      await expect(escondite(pos3.page)).toBeVisible()
+
+      await teclear(pos3.page, pinDelLab); await entrar(pos3.page)
+      await expect(escondite(pos3.page)).toBeHidden({ timeout: 20000 })
+      const sesion = await sesionDeCaja()
+      assert.equal(sesion?.staff?.id, staffPantalla.id)
+      assert.equal(sesion.offline, true, 'Caja debe declarar que autorizó sin nube')
+      const sinNube = pinsEnLaNube().slice(vistosAntes)
+      assert.equal(sinNube.length, 2, `Caja intentó la nube en ambos PIN: ${JSON.stringify(sinNube)}`)
+      assert(sinNube.every(r => r.wan === false), 'ninguna llegó a responderse: la nube estaba caída')
+      await pos3.page.screenshot({ path: path.join(output, 'pin-offline-entra.png'), fullPage: true })
+      wan = true
+      // El resto del recorrido usa la sesión firmada preparada (comandos
+      // financieros por HTTP con actor_token). El PIN ya probó la ENTRADA; se
+      // restaura la sesión preparada para no cambiar lo que las 10 pruebas
+      // originales verifican.
+      await pos3.page.evaluate(({ staff, actorSession }) => {
+        sessionStorage.setItem('pos_staff', JSON.stringify(staff))
+        sessionStorage.setItem('pos_actor_session', JSON.stringify(actorSession))
+        sessionStorage.setItem('pos_last_activity', String(Date.now()))
+      }, { staff, actorSession: pos3.actorSession })
+    })
+  }
+
   const orderId = randomUUID()
   await command(caja, 'TURNO_OPENED', { ...turno, turno_id: turno.id, ts: turno.opened_at })
   await command(pos2, 'ORDER_SENT', { order_id: orderId, mesa: 1, mesero: staff.name,
@@ -395,6 +681,20 @@ async function main() {
         `${terminal.name}: ningún componente debe ignorar FULLSITE_OFFLINE_DISABLED`)
     }
   })
+  if (pinDesdePantalla) {
+    await check('Ningún PIN del recorrido salió de esta máquina', async () => {
+      // Bitácora del bootstrap de cada Electron: toda petición del proceso Node a
+      // un host que no es loopback, con su decisión. Un PIN rumbo al
+      // `app.fullsite.mx` real aparecería aquí como «bloqueado».
+      const egreso = terminals.map(t => ({ terminal: t.name, entradas: leerEgreso(t.userData) }))
+      const pins = egreso.flatMap(e => e.entradas.filter(x => x.url.endsWith('/api/pos/pin')).map(x => ({ terminal: e.terminal, ...x })))
+      assert(pins.length >= 4, `Caja debió consultar la nube por cada PIN tecleado: ${JSON.stringify(pins)}`)
+      assert(pins.every(p => p.decision === 'redirigido-a-la-nube-del-lab' && p.terminal === 'Caja'),
+        `todo PIN va de Caja a la nube del laboratorio, y de ninguna otra terminal: ${JSON.stringify(pins)}`)
+      const bloqueado = egreso.flatMap(e => e.entradas.filter(x => x.decision === 'bloqueado').map(x => `${e.terminal} ${x.metodo} ${x.url}`))
+      if (bloqueado.length) console.log(`[egreso] bloqueado por el bootstrap (no es PIN): ${JSON.stringify([...new Set(bloqueado)])}`)
+    })
+  }
 }
 
 main().catch(error => {
@@ -414,10 +714,17 @@ main().catch(error => {
     if (terminal.process.exitCode === null && terminal.process.signalCode === null) terminal.process.kill('SIGKILL')
   }
   if (nextProcess && nextProcess.exitCode === null) nextProcess.kill('SIGTERM')
+  if (nube) { nube.server.closeAllConnections(); nube.server.close() }
   fs.writeFileSync(path.join(output, 'next.log'), nextLog)
   fs.writeFileSync(path.join(output, 'results.json'), JSON.stringify({ results, fixture: base,
     ui_source: packagedBundle ? 'verified-installed-package' : 'next-dev', ui_revision: packagedManifest?.revision ?? null,
-    limitations: ['Sesión preparada: no prueba PIN o enrolamiento', 'No certifica impresoras, Windows o huella',
+    pin_desde_pantalla: pinDesdePantalla,
+    // Evidencia de egreso: qué pidió cada proceso Pedro fuera de loopback y qué
+    // vio la nube del laboratorio. Sin PIN ni cabeceras.
+    nube: nubeRequests, egreso: terminals.map(t => ({ terminal: t.name, entradas: leerEgreso(t.userData) })),
+    limitations: [pinDesdePantalla
+      ? 'PIN tecleado en pantalla en POS 3: rechazo y entrada con nube, rechazo y entrada sin nube; enrolamiento de terminal y huella siguen sin probar; TLS hacia la nube no se prueba (el bootstrap redirige a HTTP local)'
+      : 'Sesión preparada: no prueba PIN o enrolamiento', 'No certifica impresoras, Windows o huella',
       packagedBundle ? 'Paquete instalado sin Next ni WAN; sesión previamente preparada' : 'Assets servidos por Next local: esta suite no certifica el paquete offline ni Service Worker',
       'La nube está simulada; órdenes y réplicas usan Pedro real'],
     errors: terminals.flatMap(t => t.errors.map(error => ({ terminal: t.name, error }))),
