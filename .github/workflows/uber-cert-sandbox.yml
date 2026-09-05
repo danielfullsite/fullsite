@@ -34,6 +34,13 @@ on:
       cancel_order_id:
         description: "order_id para probar Cancel (orden fresca)"
         required: false
+      resolve_order_id:
+        description: "order_id para Resolve Fulfillment (get→accept→resolve, item OOS)"
+        required: false
+      resolve_item_id:
+        description: "item_id del menú a marcar OOS en Resolve (default fs-item-1)"
+        required: false
+        default: "fs-item-1"
       download_url:
         description: "download_url del webhook eats.report.success (para get_report_file)"
         required: false
@@ -103,6 +110,17 @@ jobs:
           if [ -n "$DOID" ]; then call order_deny "{\"action\":\"delivery_order_deny\",\"order_id\":\"$DOID\"}"; fi
           COID="${{ github.event.inputs.cancel_order_id }}"
           if [ -n "$COID" ]; then call order_cancel "{\"action\":\"delivery_order_cancel\",\"order_id\":\"$COID\"}"; fi
+
+          # ── Resolve Fulfillment (get → accept → resolve, marca un item OOS) ──
+          # Cert "Order: Resolve for Fulfillment Issues" — Uber GTS (case #59731873) pidió
+          # dispararlo desde nuestro lado. resolve_fulfillment auto-lee el item_id de la orden.
+          ROID="${{ github.event.inputs.resolve_order_id }}"
+          RITEM="${{ github.event.inputs.resolve_item_id }}"
+          if [ -n "$ROID" ]; then
+            call resolve_get     "{\"action\":\"delivery_order_get\",\"order_id\":\"$ROID\"}"
+            call resolve_accept  "{\"action\":\"delivery_order_accept\",\"order_id\":\"$ROID\"}"
+            call resolve_fulfill "{\"action\":\"resolve_fulfillment\",\"order_id\":\"$ROID\",\"item_id\":\"$RITEM\"}"
+          fi
 
           # ── Reporte: descargar archivo ──
           DURL="${{ github.event.inputs.download_url }}"

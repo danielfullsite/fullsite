@@ -47,11 +47,10 @@ import {
   cancelDeliveryOrder,
   markDeliveryOrderReady,
 } from '@/lib/integrations/uber-eats/delivery-adapter'
-import { buildUberAuthUrl, USL_SCOPES, MARKETPLACE_M2M_SCOPES, DELIVERY_M2M_SCOPES, PROMOTIONS_M2M_SCOPES, probeM2MToken } from '@/lib/integrations/uber-eats/oauth'
+import { buildUberAuthUrl, USL_SCOPES, MARKETPLACE_M2M_SCOPES, DELIVERY_M2M_SCOPES, PROMOTIONS_M2M_SCOPES, probeM2MToken, uberFetch } from '@/lib/integrations/uber-eats/oauth'
 import { createPromotion, buildSamplePromotion, promotionsScope } from '@/lib/integrations/uber-eats/promotions'
 import { requestReport, buildSampleReportRequest, getReportFile } from '@/lib/integrations/uber-eats/reporting'
 import { uploadMenu, getMenu, normalizeMenuPayload, updateMenuItem } from '@/lib/integrations/uber-eats/menu'
-import { resolveFulfillmentIssues } from '@/lib/integrations/uber-eats/adapter'
 
 // Menú mínimo válido para probar el cert "Menu: Update Item/modifier" (PUT full menu).
 function buildSampleMenu() {
@@ -178,6 +177,9 @@ export async function POST(request: NextRequest) {
     order_id?: string
     download_url?: string
     item_id?: string
+    item_name?: string
+    issue_type?: string
+    action_type?: string
     update?: Record<string, unknown>
   }
 
@@ -351,40 +353,36 @@ export async function POST(request: NextRequest) {
   }
 
   // Cert "Order: Resolve for Fulfillment Issues" — merchant-initiated call on an ACTIVE
-  // order: mark an item OUT_OF_STOCK (fulfillable_quantity 0) →
-  // POST /v1/delivery/order/{id}/resolve-fulfillment-issues. Uber GTS (case #59731873)
-  // asked us to trigger this from our end. item_id must be Uber's cart item id (not our
-  // external_data); if not passed, we read the order and take the first cart item id.
+  // order → POST /v1/delivery/order/{id}/resolve-fulfillment-issues. Uber GTS (case
+  // #59731873) asked us to trigger this from our end. Uber's RESTAURANT schema per
+  // fulfillment_issue is {issue_type, action_type, item{id,name}} — NOT the older
+  // {item_id, reason}. All three are overridable via body for cert iteration.
   if (action === 'resolve_fulfillment') {
     if (!orderId || orderId.startsWith('CERT-')) {
       return NextResponse.json({ error: 'provide a real order_id from Uber sandbox panel' }, { status: 400 })
     }
     const corrId = crypto.randomUUID()
-    let resolvedItemId = itemId
-    let orderPeek: unknown
-    if (!resolvedItemId) {
-      const details = await getDeliveryOrderDetails(orderId, `${corrId}-get`, storeId)
-      orderPeek = details.order
-      const o = details.order as { cart?: { items?: Array<{ id?: string }> }; items?: Array<{ id?: string }> } | undefined
-      resolvedItemId = o?.cart?.items?.[0]?.id ?? o?.items?.[0]?.id
+    const resolvedItemId = itemId || 'fs-item-1'
+    const issueType = body.issue_type || 'OUT_OF_ITEM'
+    const actionType = body.action_type || 'REMOVE_ITEM'
+    const itemName = body.item_name || 'Cafe Americano'
+    const fbody = {
+      fulfillment_issues: [{
+        issue_type: issueType,
+        action_type: actionType,
+        item: { id: resolvedItemId, name: itemName },
+      }],
     }
-    if (!resolvedItemId) {
-      return NextResponse.json({
-        action, order_id: orderId, correlation_id: corrId,
-        error: 'no item_id found in order — pass item_id explicitly',
-        order_peek: orderPeek,
-      }, { status: 422 })
-    }
-    const result = await resolveFulfillmentIssues(
-      orderId,
-      [{ item_id: resolvedItemId, reason: 'OUT_OF_STOCK', fulfillable_quantity: 0 }],
-      corrId,
-      storeId,
-    )
+    const r = await uberFetch(`/v1/delivery/order/${encodeURIComponent(orderId)}/resolve-fulfillment-issues`, {
+      method: 'POST', body: JSON.stringify(fbody), tokenType: 'marketplace', storeId,
+    })
+    const text = await r.text()
+    let parsed: unknown
+    try { parsed = text ? JSON.parse(text) : null } catch { parsed = text }
     return NextResponse.json({
       action, order_id: orderId, item_id: resolvedItemId, correlation_id: corrId,
-      ts: new Date().toISOString(), result,
-    }, { status: result.ok ? 200 : 422 })
+      sent: fbody, http_status: r.status, response: parsed, ts: new Date().toISOString(),
+    }, { status: r.ok ? 200 : 422 })
   }
 
   // ─── Diagnostic: scope probe (3 phases, by grant type) ───────────────────
