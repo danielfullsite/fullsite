@@ -287,6 +287,15 @@ async function startLocalServer() {
     // Where the /kds page should read /state from: the caja's LAN IP for a dedicated
     // KDS/POS terminal, or same-origin ('') for the caja itself (server_pos).
     posServerIp:        appConfig.pos_server_ip  || null,
+    // El PUERTO de la caja. Sin esto, `cajaPort` cae a `port` — el puerto PROPIO
+    // de la terminal— y el secundario se reenvia A SI MISMO. En una instalacion
+    // normal los dos son 7717 y funciona por accidente; con puertos distintos
+    // (laboratorio multi-terminal, dos Pedros en una maquina, un despliegue con
+    // el puerto cambiado) la comanda nunca sale de la terminal.
+    //
+    // Lo encontro el laboratorio de procesos reales: las pruebas en proceso le
+    // pasaban `posServerPort` explicitamente y no podian ver el hueco.
+    posServerPort:      appConfig.pos_server_port || null,
     terminalRole:       appConfig.terminal_role  || null,
     lanSecret:          appConfig.lan_secret     || appConfig.lanSecret || null,
   };
