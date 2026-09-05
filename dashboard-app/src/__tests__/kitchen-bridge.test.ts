@@ -65,8 +65,8 @@ describe('Cocina — rama OFFLINE', () => {
 })
 
 describe('Cocina — rama ONLINE', () => {
-  it('un 200 confirma la comanda al primer intento', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 200 }))
+  it('un recibo de Caja confirma la comanda al primer intento', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ results: [{ event: { id: ORDEN.command_id } }] }))
     vi.stubGlobal('fetch', fetchMock)
 
     const r = await sendOrderToKitchen(ORDEN)
@@ -77,7 +77,7 @@ describe('Cocina — rama ONLINE', () => {
   })
 
   it('postea al bridge con POST y JSON — el contrato de /events no cambia', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 200 }))
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ results: [{ event: { id: ORDEN.command_id } }] }))
     vi.stubGlobal('fetch', fetchMock)
 
     await sendOrderToKitchen(ORDEN)
@@ -114,7 +114,7 @@ describe('Cocina — rama ONLINE', () => {
     sinEspera()
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response('', { status: 502 }))
-      .mockResolvedValueOnce(new Response('{}', { status: 200 }))
+      .mockResolvedValueOnce(Response.json({ results: [{ event: { id: ORDEN.command_id } }] }))
     vi.stubGlobal('fetch', fetchMock)
 
     const r = await sendOrderToKitchen(ORDEN)
@@ -142,7 +142,7 @@ describe('Cocina — rama OFFLINE (sin WAN, con LAN)', () => {
     // impedir el envío: Pedro vive en la LAN. Ver
     // docs/offline/OFFLINE-LAN-FIELD-PROVEN-AND-CLONE.md §4.
     vi.stubGlobal('navigator', { onLine: false })
-    const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 200 }))
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ results: [{ event: { id: ORDEN.command_id } }] }))
     vi.stubGlobal('fetch', fetchMock)
 
     const r = await sendOrderToKitchen(ORDEN)
@@ -190,7 +190,7 @@ describe('Cocina — el mensaje al mesero', () => {
   it('dice que la orden SÍ se guardó — para que no la recapture y duplique', () => {
     const msg = kitchenFailureMessage({ ...base, reason: 'network' })
     expect(msg).toMatch(/se guardó/i)
-    expect(msg).toMatch(/NO llegó a cocina/i)
+    expect(msg).toMatch(/envío a cocina no está confirmado/i)
   })
 
   it('distingue sin conexión de respuesta con error', () => {
@@ -204,5 +204,29 @@ describe('Cocina — el mensaje al mesero', () => {
     for (const reason of ['network', 'http', 'deadline'] as const) {
       expect(kitchenFailureMessage({ ...base, reason })).toMatch(/avisa a cocina/i)
     }
+  })
+})
+
+describe('Cocina — recibo del comando', () => {
+  it('HTTP 200 con rechazo no confirma ni repite el mismo rechazo', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ results: [{ error: 'Revision conflict', code: 'STALE_WRITE_CONFLICT' }] }))
+    vi.stubGlobal('fetch', fetchMock)
+    const result = await sendOrderToKitchen(ORDEN)
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.reason).toBe('rejected')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+  it('una respuesta vacía o recibo de otro comando queda sin confirmar', async () => {
+    sinEspera()
+    for (const body of [{}, { results: [] }, { results: [{ event: { id: 'otro' } }] }, { results: [{ duplicate: true }] }]) {
+      vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => Response.json(body)))
+      const result = await sendOrderToKitchen(ORDEN)
+      expect(result.ok).toBe(false)
+      if (!result.ok) expect(result.reason).toBe('unconfirmed')
+    }
+  })
+  it('reintentar un comando confirmado acepta sólo su recibo durable de duplicado', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ results: [{ duplicate: true, receipt: { event_id: ORDEN.command_id, sequence: 9 } }] })))
+    expect((await sendOrderToKitchen(ORDEN)).ok).toBe(true)
   })
 })

@@ -463,8 +463,20 @@
   function postStatus(order,status){
     var key=order.id+":"+status; if(postedStatus[key]) return; postedStatus[key]=1;
     var cmd={ command_id:(order.id+"-"+status+"-"+Math.floor(Date.now()/1000)), command_type:"ORDER_UPSERTED", order_id:order.id, mesa:order.mesa, status:status, client_id:(CFG.client_id||"") };
-    fetch(STATE_BASE+"/events",{method:"POST",headers:authHeaders({"Content-Type":"application/json"}),body:JSON.stringify(cmd)})
-      .then(function(r){ if(!r.ok) throw 0; }).catch(function(){ postedStatus[key]=0; toast("Sin conexión al servidor — se reintentará"); });
+    fetch(STATE_BASE+"/events",{method:"POST",signal:AbortSignal.timeout(4000),headers:authHeaders({"Content-Type":"application/json"}),body:JSON.stringify(cmd)})
+      .then(function(r){ if(!r.ok) throw new Error("Sin conexión con Caja"); return r.json(); })
+      .then(function(data){
+        var result=Array.isArray(data.results)&&data.results.length===1?data.results[0]:null;
+        var id=result&&((result.event&&result.event.id)||(result.duplicate&&result.receipt&&result.receipt.event_id));
+        if(!result||result.error||id!==cmd.command_id) throw new Error("Caja no confirmó el cambio");
+        fetchState();
+      }).catch(function(){
+        postedStatus[key]=0;
+        // Undo the optimistic local overlay. A rejected/unknown write must not
+        // leave this kitchen showing preparation that Caja never confirmed.
+        delete local[order.id]; saveLocal(local); render(false);
+        toast("Cambio sin confirmar en Caja. Revisa y vuelve a intentar.");
+      });
   }
 
   // ── interactions ──

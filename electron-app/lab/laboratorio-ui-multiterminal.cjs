@@ -247,7 +247,7 @@ async function main() {
     const actorSession = await actors.login({ pin: '9876543210', deviceId: terminalId, restaurantId: tenant })
     prepared.set(name, { terminalId, actorSession })
   }
-  const caja = await startTerminal('Caja', 'server_pos', ports[0], ports[0], uiOrigin, ports)
+  let caja = await startTerminal('Caja', 'server_pos', ports[0], ports[0], uiOrigin, ports)
   const pos2 = await startTerminal('POS 2', 'pos', ports[1], ports[0], uiOrigin, ports)
   const pos3 = await startTerminal('POS 3', 'pos', ports[2], ports[0], uiOrigin, ports)
   const kds = await startTerminal('Cocina', 'kds', ports[3], ports[0], uiOrigin, ports)
@@ -296,6 +296,19 @@ async function main() {
     assert.equal(finance.balance_cents, 8700)
     await expect(pos3.page.locator('body')).toContainText(/Saldo confirmado en Caja:.*87[.,]00/)
   })
+  await check('Reiniciar Caja recupera cuentas, pago parcial y preparación pendiente', async () => {
+    const crashed = caja
+    crashed.process.kill('SIGKILL')
+    await until(() => crashed.process.exitCode !== null || crashed.process.signalCode !== null, 'Termina el binario real de Caja')
+    caja = await startTerminal('Caja', 'server_pos', ports[0], ports[0], uiOrigin, ports)
+    const snapshot = await (await request(caja, '/state')).json()
+    const recovered = snapshot.financial_orders.find(o => o.order_id === orderId)
+    assert.equal(recovered.accounts.length, 2)
+    assert.equal(recovered.paid_cents, 2900)
+    assert.equal(recovered.balance_cents, 8700)
+    assert(snapshot.kds_orders.some(o => o.id === orderId || o.order_id === orderId))
+    await expect(pos3.page.locator('body')).toContainText(/Saldo confirmado en Caja:.*87[.,]00/)
+  })
   await check('Una cuenta pagada sigue en cocina mientras no se entregue', async () => {
     await collect(pos3, 'A', 'finish-A', 2900)
     await collect(pos3, 'B', 'finish-B', 5800)
@@ -304,6 +317,15 @@ async function main() {
     const snapshot = await (await request(caja, '/state')).json()
     assert(snapshot.kds_orders.some(o => o.order_id === orderId || o.id === orderId))
     await kds.page.screenshot({ path: path.join(output, 'pagada-pendiente-en-cocina.png'), fullPage: true })
+  })
+  await check('Cocina confirma preparación después del pago sin alterar el dinero', async () => {
+    await kds.page.locator('.card').filter({ hasText: 'Café de laboratorio' }).getByRole('button', { name: /Todo listo/ }).click()
+    await until(async () => {
+      const snapshot = await (await request(caja, '/state')).json()
+      return snapshot.kds_orders.find(o => o.id === orderId || o.order_id === orderId)?.status === 'lista'
+    }, 'Caja registra el toque real de cocina')
+    const snapshot = await (await request(caja, '/state')).json()
+    assert.equal(snapshot.financial_orders.find(o => o.order_id === orderId).paid_cents, 11600)
   })
   await check('Al apagarse Caja, POS 2 muestra que la cuenta no está confirmada', async () => {
     caja.process.kill('SIGKILL')
@@ -316,6 +338,10 @@ async function main() {
   })
   await check('Las pantallas completan el recorrido sin errores sin manejar', async () => {
     assert.deepEqual(terminals.flatMap(t => t.errors.map(error => ({ terminal: t.name, error }))), [])
+    for (const terminal of [pos2, pos3]) {
+      assert.equal(await terminal.page.evaluate(async () => (await navigator.serviceWorker.getRegistrations()).length), 0,
+        `${terminal.name}: ningún componente debe ignorar FULLSITE_OFFLINE_DISABLED`)
+    }
   })
 }
 

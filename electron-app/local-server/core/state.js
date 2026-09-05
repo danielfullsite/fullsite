@@ -294,6 +294,14 @@ class RestaurantState {
   // unknown table/name has no account.
   _applyStateSync({ mesas, kds_queue, turno, synced_at, orders, order_snapshot_complete }) {
     const now = Date.now()
+    // Polling cloud is an observation, never a receipt that closes a local
+    // financial shift. Losing the current shift would strand accepted debt and
+    // make every subsequent payment fail TURNO_MISMATCH after WAN recovery.
+    if (turno !== undefined && this._turno && turno?.id !== this._turno.id &&
+      this.getFinancialOrders().some(order => order.turno_id === this._turno.id &&
+        (order.balance_cents > 0 || order.reserved_cents > 0))) {
+      turno = this._turno
+    }
 
     // order_ids que el poll ya conoce (ya están en Supabase)
     const pollOrderIds = new Set()

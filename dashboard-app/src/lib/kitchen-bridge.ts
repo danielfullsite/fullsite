@@ -47,7 +47,7 @@ export interface KitchenAttempt {
 
 export type KitchenSendResult =
   | { ok: true; url: string; attempts: KitchenAttempt[] }
-  | { ok: false; url: string; attempts: KitchenAttempt[]; reason: 'network' | 'http' | 'deadline' }
+  | { ok: false; url: string; attempts: KitchenAttempt[]; reason: 'network' | 'http' | 'deadline' | 'rejected' | 'unconfirmed' }
 
 const LOG = '[cocina]'
 
@@ -60,8 +60,8 @@ function describe(e: unknown): string {
  * Manda un comando a la cocina por el bridge local y ESPERA la confirmacion.
  *
  * Nunca lanza: devuelve un resultado tipado para que el call site decida si
- * bloquea al mesero. Un fallo aqui significa que la comanda NO esta en cocina,
- * aunque la orden si se haya guardado.
+ * bloquea al mesero. Una respuesta perdida deja el resultado sin confirmar;
+ * se reintenta el mismo command_id para recuperar el recibo, sin recapturar.
  */
 export async function sendOrderToKitchen(
   payload: Record<string, unknown>,
@@ -96,11 +96,22 @@ export async function sendOrderToKitchen(
       })
       status = res.status
       if (res.ok) {
-        attempts.push({ attempt: i, status, error: null })
-        if (i > 0) console.warn(`${LOG} confirmada tras ${i + 1} intentos`, { url })
-        return { ok: true, url, attempts }
+        const body = await res.json()
+        const result = Array.isArray(body?.results) && body.results.length === 1 ? body.results[0] : null
+        if (result?.error) {
+          attempts.push({ attempt: i, status, error: String(result.error) })
+          return { ok: false, url, attempts, reason: 'rejected' }
+        }
+        const confirmedId = result?.event?.id || (result?.duplicate === true ? result.receipt?.event_id : null)
+        if (typeof payload.command_id === 'string' && confirmedId === payload.command_id) {
+          attempts.push({ attempt: i, status, error: null })
+          if (i > 0) console.warn(`${LOG} confirmada tras ${i + 1} intentos`, { url })
+          return { ok: true, url, attempts }
+        }
+        error = 'Caja no devolvió el recibo de este comando'
+      } else {
+        error = `HTTP ${res.status}`
       }
-      error = `HTTP ${res.status}`
     } catch (e) {
       error = describe(e)
     }
@@ -116,16 +127,18 @@ export async function sendOrderToKitchen(
   }
 
   const last = attempts[attempts.length - 1]
-  const reason: 'network' | 'http' = last && last.status != null ? 'http' : 'network'
-  console.error(`${LOG} la comanda NO llego a cocina`, { url, reason, attempts })
+  const reason = last?.status != null ? last.status >= 200 && last.status < 300 ? 'unconfirmed' : 'http' : 'network'
+  console.error(`${LOG} envío a cocina sin confirmar`, { url, reason, attempts })
   return { ok: false, url, attempts, reason }
 }
 
 /** Mensaje para el mesero. Dice que pasó y qué hacer — no un código de error. */
 export function kitchenFailureMessage(r: Extract<KitchenSendResult, { ok: false }>): string {
-  const base = 'La orden se guardó, pero NO llegó a cocina'
+  const base = 'La orden se guardó, pero su envío a cocina no está confirmado'
   if (r.reason === 'network') return `${base} — no hay conexión con la caja. Avisa a cocina.`
   if (r.reason === 'deadline') return `${base} — la caja no respondió a tiempo. Avisa a cocina.`
+  if (r.reason === 'rejected') return `${base} — Caja rechazó el envío. Revisa la cuenta antes de reintentar.`
+  if (r.reason === 'unconfirmed') return `${base} — consulta la cuenta en Caja antes de volver a enviar.`
   const status = r.attempts[r.attempts.length - 1]?.status
   return `${base} — la caja respondió ${status ?? 'error'}. Avisa a cocina.`
 }

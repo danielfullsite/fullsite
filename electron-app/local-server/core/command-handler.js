@@ -133,7 +133,8 @@ class CommandHandler {
     // Once accounts exist, a legacy full-order patch must not change any
     // financial inputs or identity. Kitchen can still advance preparation.
     const preparationOnly = Object.keys(cmdPayload).every(key =>
-      ['command_id', 'command_type', 'restaurant_id', 'location_id', 'order_id', 'status'].includes(key)) &&
+      ['command_id', 'command_type', 'restaurant_id', 'location_id', 'client_id', 'order_id', 'mesa', 'status'].includes(key)) &&
+      (cmdPayload.mesa === undefined || cmdPayload.mesa === this._state.getOrder?.(cmdPayload.order_id)?.mesa) &&
       ['enviada', 'preparando', 'lista', 'entregada'].includes(cmdPayload.status)
     if (financial && (commandType === 'ORDER_CANCELLED' || commandType === 'ORDER_SENT' ||
       commandType === 'ORDER_UPSERTED' && !preparationOnly)) {

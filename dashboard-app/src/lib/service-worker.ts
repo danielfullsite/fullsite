@@ -1,4 +1,10 @@
 // Service Worker registration and lifecycle management
+let registrationTask: Promise<ServiceWorkerRegistration | null> | null = null
+let stopLifecycle: (() => void) | null = null
+
+function offlineDisabled() {
+  return localStorage.getItem('FULLSITE_OFFLINE_DISABLED') === '1'
+}
 
 export async function registerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
@@ -6,7 +12,13 @@ export async function registerServiceWorker(): Promise<ServiceWorkerRegistration
   }
 
   // Rollback: DevTools → localStorage.setItem('FULLSITE_OFFLINE_DISABLED','1') → reload
-  if (localStorage.getItem('FULLSITE_OFFLINE_DISABLED') === '1') {
+  if (offlineDisabled()) {
+    // Wait out a registration already started by another mounted component.
+    // Otherwise it could finish AFTER unregister and silently undo rollback.
+    await registrationTask
+    stopLifecycle?.()
+    stopLifecycle = null
+    registrationTask = null
     try {
       const registrations = await navigator.serviceWorker.getRegistrations()
       for (const reg of registrations) await reg.unregister()
@@ -15,15 +27,30 @@ export async function registerServiceWorker(): Promise<ServiceWorkerRegistration
     return null
   }
 
+  if (!registrationTask) {
+    registrationTask = registerAndManageWorker().then(registration => {
+      if (!registration) registrationTask = null // transient failures may retry
+      return registration
+    })
+  }
+  return registrationTask
+}
+
+async function registerAndManageWorker(): Promise<ServiceWorkerRegistration | null> {
   try {
     const registration = await navigator.serviceWorker.register('/sw.js', {
       scope: '/',
     })
 
+    if (offlineDisabled()) {
+      await registration.unregister()
+      return null
+    }
+
     console.log('[SW] Registered, scope:', registration.scope)
 
     // Listen for updates
-    registration.addEventListener('updatefound', () => {
+    const onUpdateFound = () => {
       const newWorker = registration.installing
       if (!newWorker) return
 
@@ -32,18 +59,20 @@ export async function registerServiceWorker(): Promise<ServiceWorkerRegistration
           console.log('[SW] New version activated')
         }
       })
-    })
+    }
+    registration.addEventListener('updatefound', onUpdateFound)
 
     // Auto-update: check every 30 min so mid-day deploys are picked up even if offline
-    setInterval(() => { registration.update().catch(() => {}) }, 30 * 60 * 1000)
+    const update = () => { if (!offlineDisabled()) void registration.update().catch(() => {}) }
+    const updateTimer = setInterval(update, 30 * 60 * 1000)
 
     // Also check when the tab comes back to foreground
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') registration.update().catch(() => {})
-    })
+    const onVisibility = () => { if (document.visibilityState === 'visible') update() }
+    document.addEventListener('visibilitychange', onVisibility)
 
     // When a new SW takes control, reload automatically if on a safe page (not mid-order)
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
+    const onControllerChange = () => {
+      if (offlineDisabled()) return
       const path = window.location.pathname
       if (path === '/pos/mesas') {
         console.log('[SW] New version ready — reloading mesas')
@@ -51,7 +80,8 @@ export async function registerServiceWorker(): Promise<ServiceWorkerRegistration
       } else {
         console.log('[SW] New version ready — will activate on next navigation to mesas')
       }
-    })
+    }
+    navigator.serviceWorker.addEventListener('controllerchange', onControllerChange)
 
     // Register for background sync if supported
     if ('sync' in registration) {
@@ -63,12 +93,20 @@ export async function registerServiceWorker(): Promise<ServiceWorkerRegistration
     }
 
     // Listen for sync messages from SW
-    navigator.serviceWorker.addEventListener('message', (event) => {
-      if (event.data?.type === 'SYNC_REQUESTED') {
+    const onMessage = (event: MessageEvent) => {
+      if (!offlineDisabled() && event.data?.type === 'SYNC_REQUESTED') {
         // Trigger sync from the main thread
         window.dispatchEvent(new CustomEvent('sw-sync-requested'))
       }
-    })
+    }
+    navigator.serviceWorker.addEventListener('message', onMessage)
+    stopLifecycle = () => {
+      clearInterval(updateTimer)
+      registration.removeEventListener('updatefound', onUpdateFound)
+      document.removeEventListener('visibilitychange', onVisibility)
+      navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange)
+      navigator.serviceWorker.removeEventListener('message', onMessage)
+    }
 
     return registration
   } catch (error) {
@@ -78,7 +116,7 @@ export async function registerServiceWorker(): Promise<ServiceWorkerRegistration
 }
 
 export async function updateServiceWorker() {
-  if (!('serviceWorker' in navigator)) return
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator) || offlineDisabled()) return
 
   const registration = await navigator.serviceWorker.getRegistration()
   if (registration) {
@@ -91,7 +129,7 @@ export async function updateServiceWorker() {
 }
 
 export async function precacheUrls(urls: string[]) {
-  if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) return
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator) || offlineDisabled() || !navigator.serviceWorker.controller) return
   navigator.serviceWorker.controller.postMessage({ type: 'CACHE_URLS', urls })
 }
 

@@ -156,3 +156,23 @@ test('legacy edits cannot change discounts, attribution, revisions or shift unde
   }
   assert.equal(await stack.store.getLastSequence(), before)
 })
+
+test('kitchen legacy status after defining accounts may repeat the existing table, never move it', async () => {
+  const stack = await service()
+  const ready = await stack.send('ORDER_UPSERTED', { order_id: 'mother', mesa: 7, status: 'lista', client_id: 'test' })
+  assert.ok(ready.event, JSON.stringify(ready))
+  assert.equal(stack.state.toSnapshot().kds_orders[0].status, 'lista')
+  assert.equal(stack.state.getFinancialOrder('mother').balance_cents, 10000)
+  const move = await stack.send('ORDER_UPSERTED', { order_id: 'mother', mesa: 8, status: 'lista', client_id: 'test' })
+  assert.equal(move.code, 'FINANCIAL_ORDER_LOCKED')
+})
+
+test('a stale cloud shift observation cannot strand a durable unpaid account in another shift', async () => {
+  const stack = await service()
+  stack.state.apply({ type: 'STATE_SYNC', payload: { turno: null, mesas: [], kds_queue: [], orders: [], order_snapshot_complete: true } })
+  assert.equal(stack.state.getTurno()?.id, 't1')
+  stack.state.apply({ type: 'STATE_SYNC', payload: { turno: { id: 'other' }, mesas: [], kds_queue: [], orders: [], order_snapshot_complete: true } })
+  assert.equal(stack.state.getTurno()?.id, 't1')
+  await collect(stack, 'mother:full', 'p1', 10000, 'POS-B')
+  assert.equal(stack.state.getFinancialOrder('mother').balance_cents, 0)
+})
