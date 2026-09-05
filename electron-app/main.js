@@ -708,8 +708,21 @@ let kdsWindow = null;
 let allowClose = false;
 
 const { rendererIdentity } = require('./local-server/core/renderer-identity');
+const { withLocalBridgeCsp } = require('./local-server/core/bridge-csp');
+const lanCspSessions = new WeakSet();
 function identityForUrl(url) {
   return rendererIdentity({ url, config: appConfig, port: LOCAL_SERVER_PORT, dev: DEV, posUrl: POS_URL });
+}
+function configureLocalBridgeCsp(session) {
+  if (lanCspSessions.has(session)) return;
+  lanCspSessions.add(session);
+  // POS and KDS share a session. Electron retains only one listener per event;
+  // installing a separate KDS listener used to replace the POS configuration.
+  session.webRequest.onHeadersReceived((details, callback) => {
+    const headers = details.responseHeaders || {};
+    callback({ responseHeaders: identityForUrl(details.url)
+      ? withLocalBridgeCsp(headers, LOCAL_SERVER_PORT) : headers });
+  });
 }
 ipcMain.on('local-network:identity', (event) => {
   event.returnValue = null;
@@ -743,6 +756,7 @@ function createWindow() {
   });
 
   mainWindow.setMenu(null);
+  configureLocalBridgeCsp(mainWindow.webContents.session);
   mainWindow.loadURL(POS_URL);
 
   // Save last successful boot time for offline.html display
@@ -867,25 +881,7 @@ function createKdsWindow(x, y, width, height, urlOverride) {
       allowRunningInsecureContent: true,
     },
   });
-  // Allow the KDS→local-server WebSocket (ws://<host>:7717) through the page CSP.
-  // The deployed connect-src allows http://127.0.0.1:7717 but NOT the ws:// scheme,
-  // so the bridge WebSocket is refused → the KDS never connects to the local server
-  // → orders pushed over LAN while offline never arrive. Rewriting the header here
-  // guarantees the WS connects regardless of deploy/Service-Worker cache timing.
-  // Scoped to the KDS window's session and the :7717 bridge port.
-  kdsWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
-    const headers = details.responseHeaders || {};
-    for (const key of Object.keys(headers)) {
-      if (key.toLowerCase() === 'content-security-policy') {
-        headers[key] = headers[key].map(v =>
-          v.includes('connect-src') && !v.includes('ws://*:7717')
-            ? v.replace(/connect-src ([^;]*)/, (_m, s) => `connect-src ${s} ws://127.0.0.1:7717 http://*:7717 ws://*:7717`)
-            : v
-        );
-      }
-    }
-    callback({ responseHeaders: headers });
-  });
+  configureLocalBridgeCsp(kdsWindow.webContents.session);
 
   const targetUrl = urlOverride || KDS_URL;
   kdsWindow.setMenu(null);

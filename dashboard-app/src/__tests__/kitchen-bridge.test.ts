@@ -85,7 +85,7 @@ describe('Cocina — rama ONLINE', () => {
     const [url, init] = fetchMock.mock.calls[0]
     expect(url).toBe('http://127.0.0.1:7717/events')
     expect(init.method).toBe('POST')
-    expect(init.headers['Content-Type']).toBe('application/json')
+    expect(new Headers(init.headers).get('Content-Type')).toBe('application/json')
     expect(JSON.parse(init.body)).toMatchObject({ command_type: 'ORDER_SENT', mesa: 5 })
     // 'loopback' y NO 'local': el bridge de un POS secundario es 127.0.0.1, y
     // Chromium rechaza el request si se declara el espacio equivocado —
