@@ -1,8 +1,15 @@
 # Cómo funciona TODO el producto — Fullsite
 
 > Doc maestro único: de la caja registradora al dashboard, pasando por offline, KDS,
-> impresoras, HID y agentes IA. Anclado al **código real** (rutas verificadas 2026-09-02).
+> impresoras, HID, pagos, CFDI, delivery, seguridad, inventario, turnos, personal, CRM,
+> agentes IA e infraestructura. Anclado al **código real** (file:line, verificado 2026-09-02).
 > Es el mapa de entrada; cada sección apunta al doc profundo de su dominio.
+>
+> **Convención:** las secciones con `[VERIFICADO ✓]` fueron confirmadas leyendo el código, no
+> docs. Los bloques ⚠️ marcan **deuda, bugs o features aspiracionales** (que se ven presentes
+> en la UI pero NO están cableadas — ej. visitas de cliente, puntos de lealtad, redención de
+> gift cards). Grado de evidencia: HECHO ✓ / INFERIDO / PENDIENTE.
+>
 > Fuente de verdad del código: el repo. Si este doc y el código difieren, gana el código —
 > corrige el doc.
 
@@ -309,17 +316,29 @@ PAC único: **Facturama** ([facturama.ts](../dashboard-app/src/lib/facturama.ts)
 
 ---
 
-## 10. AGENTES IA
+## 10. AGENTES IA `[VERIFICADO ✓]`
 
-### Cómo funciona
-~40 scripts Python (`.github/scripts/*.py`) corren en cron (GitHub Actions) o on-demand vía el
-orquestador de Telegram. Leen datos (Supabase/OCM), razonan con Groq/Claude, y alertan por Telegram,
-logueando en `agent_runs`. En la app: chat/coach/voz.
+Dos motores distintos, no confundir:
 
-### Archivos clave
-Fraude/ops: `antifraud_agent.py`, `anomaly_detector.py`, `close_predictor.py`, `menu_engineering.py`…
-Orquestación: `orquestador.py`, `agent_common.py`, `tenants_activos.py`.
-Motor en app: `src/lib/agents/{engine,finance,fraud,inventory,operations,staff}.ts`, `src/lib/pos-daily.ts`.
+### A. Motor en la app (`src/lib/agents/`) — reglas, no LLM
+- **5 agentes tipados:** `operations | inventory | fraud | staff | finance` ([types.ts](../dashboard-app/src/lib/agents/types.ts)). Cada uno es una función pura `run…Agent(clientId, sbGet) → AgentEvent[]` con umbrales (ej. `fraud.ts` `CANCEL_THRESHOLD=4`, `DISCOUNT_PCT=35`). **No usan LLM.**
+- **[engine.ts](../dashboard-app/src/lib/agents/engine.ts):** `runAgent`/`runAllAgents` (server-side, service key), deduplica por `type:severity`, resuelve expirados, aplica **aprendizaje** ([learning.ts](../dashboard-app/src/lib/agents/learning.ts): el veredicto humano `correct|false_positive` pondera la confianza; por default **degrada y explica**, no suprime).
+- **Producen `agent_events`** (NO `agent_results`). Corren por Vercel Cron cada 30 min (`api/agents/cron`, Bearer `CRON_SECRET`, falla cerrado).
+- `finance` solo corre si el tenant es dueño del histórico Wansoft (`esDuenoDelHistoricoWansoft`, falla cerrado) — `wansoft_daily/kpis` son globales de AMALAY.
+- Endpoints: `agents/run` (requireTenant), `agents/cron`, `agents/chat` (chat por insight), `agents/feedback` (`agent_feedback`), `agents/metrics`.
+
+### B. Agentes Python (crons `.github/scripts/`) — con LLM
+- ~40 scripts, patrón común en [agent_common.py](../.github/scripts/agent_common.py): `sb_get/post/patch` (service key, nunca silencioso) → LLM Groq → `send_telegram` → `log_run` en `agent_runs`. `create_insight`→`agent_insights`, `log_event`→`agent_events`. `client_config.get_client()` toma `CLIENT_ID` del env (**hoy default 'amalay'**, gap G1b).
+- **Orquestador Telegram** ([orquestador.py](../.github/scripts/orquestador.py)): clasifica el mensaje con Groq (JSON `{tentacle,intent,workflow}`) y **despacha un workflow de GitHub Actions** (`workflow_dispatch`). El bot vive en Cloudflare (§17).
+
+### LLM y fallback ([groq.ts](../dashboard-app/src/lib/groq.ts))
+- Primario **Groq** (`GROQ_MODEL || openai/gpt-oss-120b`), **fallback Anthropic Claude Haiku** (`claude-haiku-4-5`). `groqChat` cae a Claude en 429/timeout — **el chat nunca falla**. `groqStream` (voz) es Groq-only. TTS = ElevenLabs (fallback browser_tts). *(Los agentes Python parecen Groq-only — fallback no confirmado.)*
+
+### Fuente de datos clonable
+[pos-daily.ts](../dashboard-app/src/lib/pos-daily.ts) sintetiza el shape de `wansoft_daily` desde el `pos_orders` **vivo** del tenant → cualquier clon lee su propio POS; AMALAY usa su histórico Wansoft. Regla: los agentes **nunca** se reacoplan a `wansoft_daily`.
+
+### Tablas ✓verificado
+`agent_events` (bucle de valor real), `agent_runs` (bitácora), `agent_insights`, `agent_feedback`. **`agent_results` y `agent_audit_log` existen en el schema pero NINGÚN código vivo las escribe** (deuda / nombres heredados).
 
 ### Doc profundo
 `docs/ai/OVERVIEW.md`, `docs/ai/ARQUITECTURA-CRUCE.md`, `CLAUDE.md` §War Room.
@@ -381,6 +400,42 @@ Ambas integraciones comparten patrón: webhook con firma HMAC → normaliza a or
 - **Gate de turno** ([TurnoGate.tsx](../dashboard-app/src/components/pos/TurnoGate.tsx)) estados: `active | none | stale (día anterior→Corte Z) | conflict (>N turnos) | sesion (401/403, reautenticar)`. **Regla de Eduardo:** con cuentas abiertas vivas no se abre turno hasta cancelarlas (auditado, nunca DELETE).
 
 > ⚠️ **Incidente real documentado inline:** un filtro corrido un parámetro dejó un PATCH **sin filtro** que cerró los 11 turnos de AMALAY al mismo milisegundo. Por eso hoy todo PATCH de turno va con `id=eq.${turnoId}` y el estado `sesion` evita crear turnos duplicados.
+
+---
+
+## 15. PERSONAL — checador, nómina, mano de obra `[VERIFICADO ✓]`
+
+- **Mano de obra (tacómetro)** ([labor.ts](../dashboard-app/src/lib/labor.ts) + [api/labor](../dashboard-app/src/app/api/labor/route.ts)): `pct = costoLabor / venta`, umbrales **22% verde / 30% amarillo / >30% rojo**. El costo usa **sueldos reales** (`pos_staff.hourly_rate` o `weekly_salary/48`) × horas de `pos_staff_shifts`. Server-side (sueldos sensibles). Ventas de `pos_orders status=cerrada`.
+- **Clock-in/out staff:** [StaffShiftPanel.tsx](../dashboard-app/src/components/pos/StaffShiftPanel.tsx) → `pos_staff_shifts` (clock_in/out, breaks, `hours_worked`). Registro en vivo, **no planeación** de turnos.
+- **Nómina** ([nomina/page.tsx](../dashboard-app/src/app/nomina/page.tsx)): es una **PRE-nómina estimada** — lee datos importados de Wansoft, y donde falta **adivina la tarifa por nombre** (cocina 56.25, mesero 50, default 62.5) y estima 8h/día. Deducciones ~5.5% estimadas.
+
+> ⚠️ **Fragmentación ✓verificada (deuda):** hay **3 fuentes de asistencia desconectadas** — `pos_time_clock` (API, PIN), `pos_attendance` (página checador, escribe con anon key desde el cliente, sin enforcement server), y `pos_staff_shifts` (del que sale el labor). La Nómina NO usa el checador ni los turnos; el tacómetro usa `pos_staff_shifts`. No hay una verdad única de "horas trabajadas".
+
+---
+
+## 16. CRM, LEALTAD, PROPINAS, RESERVAS `[VERIFICADO ✓ — con GAPs]`
+
+- **CRM** ([crm/page.tsx](../dashboard-app/src/app/crm/page.tsx) + [clientes/page.tsx](../dashboard-app/src/app/clientes/page.tsx)): CRUD de `pos_customers`; importa desde `reservaciones` con dedupe. **Recompra por WhatsApp = link `wa.me` pre-llenado** ([whatsapp-crm.ts](../dashboard-app/src/lib/whatsapp-crm.ts)), NO la API de WhatsApp Business. Notas por mesa en `pos_customer_notes` ([CustomerMemory.tsx](../dashboard-app/src/components/pos/CustomerMemory.tsx), alergias destacadas).
+- **Propinas:** reparto real por mesero en [data.ts:590](../dashboard-app/src/lib/data.ts) (`propina` por `mesero` de `pos_orders`); la página `propinas` prefiere `wansoft_tips` (scraping) con fallback proporcional a ventas. Arqueo distingue propina efectivo (suma) vs no-efectivo (resta).
+
+> ⚠️ **Features que se ven presentes pero NO están cableadas ✓verificado (aspiracionales):**
+> - **Visitas de cliente:** `pos_customer_visits` **solo se lee, nunca se escribe.** La UI dice "se actualiza al pagar" pero no hay código que lo haga.
+> - **Lealtad** ([lealtad/page.tsx](../dashboard-app/src/app/lealtad/page.tsx)): puntos configurables, pero **sin integración con `pos_orders`** — no hay disparador que otorgue puntos al vender. Persiste blobs JSON en `wansoft_data`, no tabla relacional.
+> - **Gift cards** (`pos_gift_cards`): solo administración, **sin redención en el POS**.
+> - **Reservas** ([reservar/page.tsx](../dashboard-app/src/app/reservar/page.tsx)): **hardcodeada a `client_id:'amalay'`** (hardcode de clonabilidad). Escribe a `reservaciones` (la tabla `amalay_reservaciones` no se usa en código). **Sin sync a Google Calendar** en este repo.
+
+---
+
+## 17. DEPLOY E INFRAESTRUCTURA `[VERIFICADO ✓]`
+
+- **Vercel — dos proyectos, dos `vercel.json`:** raíz = landing estático `fullsite.mx` (con `ignoreCommand` que salta build si el diff solo toca docs/electron/agents); `dashboard-app/vercel.json` = la app Next (`bun run build`, URL cruda `fullsite-sage.vercel.app` → redirect a `app.fullsite.mx`). **El deploy es por integración Git de Vercel, NO hay workflow de deploy.** `next.config.ts` **truena el build** si faltan las env de Supabase o si un build sandbox apunta al proyecto AMALAY prod.
+- **Supabase:** prod AMALAY `qjiomlvudfmzuvqvhwpk`, staging `jkcnxfbbuyyfhwfjizgw`, sandbox aparte. Env: `NEXT_PUBLIC_SUPABASE_URL/ANON_KEY`, `SUPABASE_SERVICE_KEY`.
+- **Cloudflare Workers** (deploy manual `wrangler`, no CI): `telegram-orquestador-warroom` (bot Telegram → clasifica → dispara Actions) y `delivery-webhook` (Rappi/Didi → `delivery_orders`; Uber real lo maneja el Integration Framework de la app).
+- **GitHub Actions — 76 workflows:** CI principal `test-dashboard.yml` (`tsc --noEmit` + tests + build en push/PR); + electron-build/release; ~15 agentes cron; ~20 wansoft; ~9 delivery/cert (uber/rappi); demos; infra (fix-rls, esquema-baseline).
+- **DNS (Cloudflare):** `app.fullsite.mx` (app), `fullsite.mx` (landing), `sandbox.app.fullsite.mx` (sandbox) → CNAME `cname.vercel-dns.com`.
+
+### Doc profundo
+`docs/playbooks/DEPLOY-SANDBOX.md`, `CLAUDE.md` §War Room / Orquestador.
 
 ---
 
