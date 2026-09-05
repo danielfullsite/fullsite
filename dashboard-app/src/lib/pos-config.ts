@@ -18,18 +18,19 @@ export interface PosClientConfig {
 }
 
 let _posConfig: PosClientConfig | null = null
+let _posConfigClientId: string | null = null
 
 /** Get POS config (cached singleton). Call once at POS startup. */
 export async function getPosClientConfig(): Promise<PosClientConfig> {
-  if (_posConfig) return _posConfig
-
   const clientId = typeof window !== 'undefined'
     ? getActiveClientSlug()
     : null
 
   if (!clientId) return getPosConfigSync()
+  if (_posConfig && _posConfigClientId === clientId) return _posConfig
 
   const config = await fetchClientConfig(clientId)
+  _posConfigClientId = clientId
 
   _posConfig = {
     name: config.display_name, // "AMALAY Coffee & Market"
@@ -49,7 +50,7 @@ export async function getPosClientConfig(): Promise<PosClientConfig> {
 
 /** Sync version — returns cached config or empty defaults. Use getPosClientConfig() for initial load. */
 export function getPosConfigSync(): PosClientConfig {
-  return _posConfig || {
+  return (_posConfigClientId === getActiveClientSlug() ? _posConfig : null) || {
     name: '',
     subtitle: '',
     address: '',
@@ -64,4 +65,4 @@ export function getPosConfigSync(): PosClientConfig {
 }
 
 /** Clear cache (for testing or client switch) */
-export function clearPosConfig() { _posConfig = null }
+export function clearPosConfig() { _posConfig = null; _posConfigClientId = null }

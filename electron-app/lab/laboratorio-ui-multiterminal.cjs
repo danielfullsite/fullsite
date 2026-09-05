@@ -27,6 +27,7 @@ const electronBinary = require(path.join(ELECTRON_APP, 'node_modules/electron'))
 const { CURRENT_CONFIG_VERSION } = require('../local-server/config-schema')
 const cred = require('../local-server/core/credencial-lan')
 const { ActorAuthority } = require('../local-server/core/actor-authority')
+const { CatalogStore } = require('../local-server/core/catalog-store')
 const WebSocket = require(path.join(ELECTRON_APP, 'node_modules/ws'))
 
 const tenant = 'closure-lab'
@@ -247,6 +248,17 @@ async function main() {
     const actorSession = await actors.login({ pin: '9876543210', deviceId: terminalId, restaurantId: tenant })
     prepared.set(name, { terminalId, actorSession })
   }
+  // Prepare ONE complete catalog on Caja. POS 3 never gets a private fixture
+  // cache; its menu/config/modifier readers must retrieve this over real LAN.
+  const catalog = new CatalogStore({ directory: path.join(base, 'Caja', 'catalog'), restaurantId: tenant,
+    fetchImpl: async () => Response.json({ schema_version: 1, complete: true, catalog_scope: 'restaurant', restaurant_id: tenant,
+      refreshed_at: new Date().toISOString(), config: fixture.clients[0], settings: {},
+      categories: [{ ...fixture.pos_menu_categories[0], items: fixture.pos_menu_items }], payment_methods: fixture.pos_payment_methods,
+      modifiers: { groups: [{ id: 'lab-temperature', name: 'Preparación de laboratorio', level: 1, min_selections: 1, max_selections: 1, required: true }],
+        mods: [{ id: 'lab-hot', group_id: 'lab-temperature', name: 'Caliente de laboratorio', price: 0 }],
+        item_links: [{ item_id: 'lab-cafe', group_id: 'lab-temperature' }], category_links: [] },
+    }) })
+  await catalog.refresh('synthetic-lab-session')
   let caja = await startTerminal('Caja', 'server_pos', ports[0], ports[0], uiOrigin, ports)
   const pos2 = await startTerminal('POS 2', 'pos', ports[1], ports[0], uiOrigin, ports)
   const pos3 = await startTerminal('POS 3', 'pos', ports[2], ports[0], uiOrigin, ports)
@@ -279,6 +291,15 @@ async function main() {
     assert.equal(visible?.id, orderId, 'El editor conservó el ID de la cuenta de Caja')
     assert.equal(visible?.items?.[0]?.cantidad, 2)
     await pos3.page.screenshot({ path: path.join(output, 'cuenta-compartida-sin-internet.png'), fullPage: true })
+  })
+  await check('POS 3 sin caché obtiene menú y opciones obligatorias de Caja sin internet', async () => {
+    await pos3.page.getByRole('button', { name: /Bebidas laboratorio/ }).click()
+    await pos3.page.getByRole('button', { name: /Café de laboratorio.*50/ }).click()
+    await expect(pos3.page.getByRole('button', { name: 'Elige Preparación de laboratorio' })).toBeDisabled()
+    await pos3.page.getByText('Caliente de laboratorio', { exact: true }).click()
+    await expect(pos3.page.getByRole('button', { name: /Agregar.*50/ })).toBeEnabled()
+    await pos3.page.screenshot({ path: path.join(output, 'catalogo-compartido-sin-internet.png'), fullPage: true })
+    await pos3.page.getByRole('button', { name: 'Cancelar', exact: true }).click()
   })
   let finance
   const money = async (terminal, type, payload) => {

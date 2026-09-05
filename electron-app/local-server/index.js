@@ -30,6 +30,7 @@ const { RestaurantState }   = require('./core/state')
 const { WsHub }             = require('./core/ws-hub')
 const { CommandHandler }    = require('./core/command-handler')
 const { ActorAuthority } = require('./core/actor-authority')
+const { CatalogStore } = require('./core/catalog-store')
 const { handleAuthenticatedCommand } = require('./core/command-authority')
 const { conectarConLaCaja } = require('./core/enlace-con-caja')
 const credLan = require('./core/credencial-lan')
@@ -313,11 +314,11 @@ function forwardGet(targetUrl, credenciales = {}) {
 }
 
 /** Lecturas que una terminal secundaria puede hacerle a la caja. */
-const LECTURAS_REENVIADAS = ['/state', '/events', '/print/uncertain', '/auth/status']
+const LECTURAS_REENVIADAS = ['/state', '/events', '/print/uncertain', '/auth/status', '/catalog', '/catalog/status']
 
 // Keep identity and routing configuration explicit so every cloned terminal can
 // discover the caja without relying on process-global or customer-specific state.
-function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority = null, printer, version, serverId, restaurantId, config = {}, instanceName = '', branchId = config.branchId || null, posServerIp = config.posServerIp || null, port = 7717, posServerPort = config.posServerPort || null }) {
+function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority = null, catalogStore = null, printer, version, serverId, restaurantId, config = {}, instanceName = '', branchId = config.branchId || config.locationId || null, posServerIp = config.posServerIp || null, port = 7717, posServerPort = config.posServerPort || null }) {
   // Puerto de la CAJA al reenviar. Antes se usaba `port` — el puerto PROPIO del
   // secundario — lo que acopla ambos al 7717: dos Pedros en una misma maquina
   // (pruebas, demos) o una terminal en puerto distinto rompian el forward.
@@ -539,6 +540,14 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority 
       return
     }
 
+    if ((url === '/catalog' || url === '/catalog/status') && req.method === 'GET') {
+      try {
+        if (!catalogStore) throw Object.assign(new Error('Catálogo no preparado en Caja'), { code: 'CATALOG_NOT_READY' })
+        if (url === '/catalog' && !catalogStore.status().ready && catalogStore.pending) await catalogStore.pending.catch(() => {})
+        json(res, 200, url === '/catalog' ? catalogStore.read() : catalogStore.status())
+      } catch (error) { json(res, 503, { error: error.message, code: error.code }) }
+      return
+    }
     if (url === '/auth/status' && req.method === 'GET') {
       try { json(res, actorAuthority ? 200 : 503, actorAuthority ? actorAuthority.status() : { error: 'Autorización no preparada' }) }
       catch (error) { json(res, error.status || 503, { error: error.message, code: error.code }) }
@@ -551,6 +560,10 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority 
         if (credLan.verificarScope(body, { restaurantId, branchId })) { json(res, 403, { error: 'Scope de otra instalación' }); return }
         const result = await actorAuthority.login({ pin: body.pin, restaurantId,
           deviceId: req.headers['x-fullsite-terminal'], minRole: body.min_role })
+        // Server-issued token only, held for acquisition, never persisted.
+        if (!result.offline && result.shiftToken && catalogStore) {
+          void catalogStore.refresh(result.shiftToken).catch(() => {})
+        }
         json(res, 200, result)
       } catch (error) { json(res, error.status || 500, { error: error.message, code: error.code }) }
       return
@@ -766,6 +779,10 @@ async function startLocalServer({ dataDir, port = 7717, config = {} }) {
     directory: require('path').join(dataDir, 'actor-authority'), restaurantId,
     branchId: config.branchId || config.locationId || null,
   })
+  const catalogStore = config.posServerIp ? null : new CatalogStore({
+    directory: require('path').join(dataDir, 'catalog'), restaurantId,
+    branchId: config.branchId || config.locationId || null,
+  })
 
   // ── WebSocket hub ────────────────────────────────────────────────────────
   const wsHub = new WsHub({
@@ -813,13 +830,14 @@ async function startLocalServer({ dataDir, port = 7717, config = {} }) {
     wsHub,
     cmdHandler,
     actorAuthority,
+    catalogStore,
     printer: printerAdapter,
     version,
     serverId,
     restaurantId,
     config,
     instanceName,
-    branchId: config.branchId || null,
+    branchId: config.branchId || config.locationId || null,
     posServerIp: config.posServerIp || null,
     port,
   })

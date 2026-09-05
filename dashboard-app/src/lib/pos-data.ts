@@ -268,6 +268,7 @@ export function getModifierTypeFromCategoryName(catName: string): 'none' | 'coff
 // Cache of category id → name (populated by POS on menu load via setCategoryNameCache)
 import { _categoryNameCache } from '@/lib/pos-constants'
 import { getActiveClientSlug } from '@/lib/data'
+import { requiereCaja } from './pedro-cliente'
 import { inventoryPolicyService, logPolicyGateFailure } from '@/lib/inventory-policy'
 import { mismoDiaDeVenta, inicioDiaConfigurado } from '@/lib/dia-de-venta'
 import { esFalloDeRed, esFalloDeAutenticacion, ErrorDeSesion, ErrorDeContrato } from '@/lib/clasificar-fallo'
@@ -332,6 +333,10 @@ export function getPOSAuthHeaders(): Record<string, string> {
 }
 
 export async function getMenuCategoriesFromDB(): Promise<MenuCategory[]> {
+  if (requiereCaja()) {
+    const { leerCatalogoCaja } = await import('./pedro-catalogo')
+    return (await leerCatalogoCaja()).categories
+  }
   try {
     const clientId = _getClientId()
     if (!clientId) return []
@@ -395,6 +400,10 @@ export interface PaymentMethodDB {
 }
 
 export async function getPaymentMethodsFromDB(): Promise<PaymentMethodDB[]> {
+  if (requiereCaja()) {
+    const { leerCatalogoCaja } = await import('./pedro-catalogo')
+    return (await leerCatalogoCaja()).payment_methods
+  }
   try {
     const res = await fetch(
       `${_SUPABASE_URL}/rest/v1/pos_payment_methods?client_id=eq.${_getClientId()}&active=eq.true&select=id,name,type,commission_pct&order=name.asc`,
@@ -694,6 +703,10 @@ function isGroupCompatible(groupName: string, categoryId: string): boolean {
  * Devuelve [] si no hay grupos configurados — el modal cae al sistema legacy.
  */
 export async function getModifierGroupsForItem(itemId: string, categoryId: string): Promise<ModifierGroupDef[]> {
+  if (requiereCaja()) {
+    const { leerCatalogoCaja, gruposDelCatalogo } = await import('./pedro-catalogo')
+    return gruposDelCatalogo(await leerCatalogoCaja(), itemId, categoryId)
+  }
   try {
     const cid = _getClientId()
     const [itemAssignRes, catAssignRes] = await Promise.all([

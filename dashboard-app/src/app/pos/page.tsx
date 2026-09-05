@@ -47,6 +47,7 @@ import { apiUrl } from '@/lib/api-base'
 import { sendOrderToKitchen, kitchenFailureMessage } from '@/lib/kitchen-bridge'
 import { avisarCierreDeOrden } from '@/lib/aviso-lan'
 import { leerCuenta, requiereCaja, cuentaConfirmada, type LecturaDeCuenta } from '@/lib/pedro-cliente'
+import { leerCatalogoCaja } from '@/lib/pedro-catalogo'
 import { reconciliarCuenta, cuentaEditableDe, type CuentaEditable } from '@/lib/pos-order-reconciliation'
 import { evaluarLiquidacion, cuentasDe, intentoDePago } from '@/lib/liquidacion-de-orden'
 import type { OrderItem, MenuItem, Order } from '@/lib/pos-data'
@@ -254,6 +255,8 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
 
   // ── Grupos multinivel (el POS legado: "NIVEL 1: PROTEINA, opcional, máx 2") ──
   const [modGroups, setModGroups] = useState<ModifierGroupDef[]>([])
+  const [modLoading, setModLoading] = useState(true)
+  const [modError, setModError] = useState('')
   const [currentLevel, setCurrentLevel] = useState(0)
   const [groupChecked, setGroupChecked] = useState<Map<string, Set<string>>>(() => {
     // Restore selections when editing: match existing modifier strings to options later
@@ -261,8 +264,9 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
   })
   useEffect(() => {
     let alive = true
+    setModLoading(true); setModError('')
     getModifierGroupsForItem(item.id, categoryId).then(groups => {
-      if (!alive || groups.length === 0) return
+      if (!alive) return
       setModGroups(groups)
       if (existingOrder) {
         // Re-marcar opciones ya elegidas (strings "Nombre +$50" → nombre)
@@ -274,13 +278,14 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
         }
         setGroupChecked(restored)
       }
-    })
+    }).catch(() => { if (alive) setModError('No se pudieron confirmar las opciones del producto en Caja. Cierra y vuelve a intentar.') })
+      .finally(() => { if (alive) setModLoading(false) })
     return () => { alive = false }
   }, [item.id, categoryId, existingOrder])
 
   const hasGroups = modGroups.length > 0
   // Con grupos configurados, el legacy "Agregar" se oculta (los grupos lo reemplazan)
-  const agregarOptions = hasGroups ? [] : legacyAgregar
+  const agregarOptions = hasGroups || requiereCaja() ? [] : legacyAgregar
 
   const toggleGroupOption = (group: ModifierGroupDef, optName: string) => {
     setGroupChecked(prev => {
@@ -378,6 +383,7 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
   }
 
   const handleConfirm = () => {
+    if (modLoading || modError || unmetGroups.length > 0) return
     onConfirm({
       id: existingOrder?.id ?? generateId(),
       menuItemId: item.id,
@@ -403,6 +409,8 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
           <div>
             <h3 className="text-lg font-bold text-[var(--text-1)]">{item.name}</h3>
             <p className="text-[var(--accent-ink)] font-semibold">{formatMXN(item.price)}</p>
+            {modLoading && <p role="status">Cargando opciones del producto…</p>}
+            {modError && <p role="alert">{modError}</p>}
           </div>
           <button
             onClick={onCancel}
@@ -622,7 +630,7 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
             </button>
             <button
               onClick={handleConfirm}
-              disabled={unmetGroups.length > 0}
+              disabled={modLoading || !!modError || unmetGroups.length > 0}
               className="flex-[2] py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-[var(--raised)] disabled:text-[var(--text-4)] text-white font-bold text-lg transition-colors min-h-[56px]"
             >
               {unmetGroups.length > 0
@@ -695,7 +703,7 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
                 })()}
                 <button
                   onClick={handleConfirm}
-                  disabled={unmetGroups.length > 0}
+                  disabled={modLoading || !!modError || unmetGroups.length > 0}
                   className="flex-[2] py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-[var(--raised)] disabled:text-[var(--text-4)] text-white font-bold text-lg transition-colors min-h-[56px]"
                 >
                   {unmetGroups.length > 0
@@ -1720,6 +1728,7 @@ function POSContent() {
   const [mixtoMonto, setMixtoMonto] = useState('')
   // Formas de pago custom desde pos_payment_methods (Rappi, Ubereats, Cortesía...)
   const [paymentMethodsDB, setPaymentMethodsDB] = useState<PaymentMethodDB[]>([])
+  const [catalogoError, setCatalogoError] = useState('')
   // Turno activo — se adjunta turno_id a cada orden cerrada
   // Seeded from localStorage so it's available synchronously on cold Electron restart
   const [turnoId, setTurnoId] = useState<string | null>(() => {
@@ -1771,7 +1780,12 @@ function POSContent() {
       } catch { /* ignore */ }
 
       // When offline: IDB cache is already shown above — skip all network calls.
-      if (!navigator.onLine) return
+      if (!navigator.onLine && !requiereCaja()) return
+      if (requiereCaja()) {
+        const catalog = await leerCatalogoCaja()
+        const { setIvaRate } = await import('@/lib/pos-constants')
+        setIvaRate(catalog.config.iva_rate)
+      }
 
       // A working LAN keeps navigator.onLine=true during a WAN outage. Recipe
       // suggestions must not reject the whole bootstrap (including cached menu).
@@ -1828,7 +1842,7 @@ function POSContent() {
           if (invRes.ok) setOutOfStockItems(computeOutOfStockItems(await invRes.json(), r))
         } catch { /* */ }
       }
-    })()
+    })().catch(() => setCatalogoError('Catálogo sin preparar en Caja. Conecta internet e ingresa con PIN; después vuelve a abrir la cuenta.'))
   }, [])
 
   // Get ingredient names for a specific menu item
@@ -2420,6 +2434,15 @@ function POSContent() {
 
   const validarCuentaCaja = async (permiteNueva = false): Promise<boolean> => {
     if (!requiereCaja()) return true
+    try {
+      const catalog = await leerCatalogoCaja()
+      if (catalog.config.iva_rate !== getIvaRate()) {
+        const { setIvaRate } = await import('@/lib/pos-constants')
+        setIvaRate(catalog.config.iva_rate)
+        setAvisoCuentaCaja('La configuración de la cuenta cambió. Revisa el total y vuelve a confirmar.')
+        return false
+      }
+    } catch { setCatalogoError('Catálogo sin confirmar en Caja. Sólo se conservan borradores.'); return false }
     const before = cuentaActual.current.orderRevision
     const beforeOrder = JSON.stringify(cuentaRemotaCaja.current)
     const result = await refrescarCuentaCaja.current()
@@ -4913,6 +4936,7 @@ function POSContent() {
             <>
               {/* Category grid — full area, alphabetical left→right, large touch targets */}
               <div className="flex-1 bg-[var(--surface-2)]/50 p-1 overflow-hidden">
+                {catalogoError && <p role="alert" className="p-3 text-[var(--warn-ink)]">{catalogoError}</p>}
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-1 h-full" style={{ gridAutoRows: '1fr' }}>
                   {allCombos.length > 0 && (
                     <button
@@ -4939,9 +4963,9 @@ function POSContent() {
                   {menuCategories.length === 0 && (
                     <div className="col-span-full flex flex-col items-center justify-center py-16 text-center">
                       <Package size={48} className="text-[var(--text-3)] mb-4 opacity-40" />
-                      <p className="text-lg font-semibold text-[var(--text-1)] mb-2">Sin menú configurado</p>
+                      <p className="text-lg font-semibold text-[var(--text-1)] mb-2">{catalogoError ? 'Menú no disponible' : 'Sin menú configurado'}</p>
                       <p className="text-sm text-[var(--text-3)] max-w-md">
-                        Importa el menú desde Administración → Carga Masiva o contacta a soporte para configurar tu restaurante.
+                        {catalogoError || 'Importa el menú desde Administración → Carga Masiva o contacta a soporte para configurar tu restaurante.'}
                       </p>
                     </div>
                   )}

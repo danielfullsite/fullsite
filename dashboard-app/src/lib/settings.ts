@@ -154,12 +154,19 @@ const REGISTRY: { [K in SettingKey]: SettingDefinition<SettingValue<K>> } = {
 }
 
 // ─── Cache ───────────────────────────────────────────────────────────────────
+// Only registered public POS settings travel with the offline catalog.
+export const POS_SETTING_KEYS = Object.freeze(Object.keys(REGISTRY))
 
 // In-memory cache: clientId → { settings: object, fetchedAt: timestamp }
 const _settingsCache: Record<string, { data: Record<string, unknown>; fetchedAt: number }> = {}
 const SETTINGS_CACHE_TTL = 5 * 60 * 1000  // 5 min — same as client-config
 
 async function _fetchRaw(clientId: string): Promise<Record<string, unknown>> {
+  const { requiereCaja } = await import('./pedro-cliente')
+  if (requiereCaja()) {
+    const { leerCatalogoCaja } = await import('./pedro-catalogo')
+    return (await leerCatalogoCaja(clientId)).settings
+  }
   const cached = _settingsCache[clientId]
   if (cached && Date.now() - cached.fetchedAt < SETTINGS_CACHE_TTL) {
     return cached.data
@@ -184,7 +191,8 @@ async function _fetchRaw(clientId: string): Promise<Record<string, unknown>> {
 /**
  * Resolve the effective value of a setting for a client.
  * Resolution order: clients.pos_settings[key] → registry default.
- * Always returns a value — never throws.
+ * On a configured LAN terminal, an unavailable Caja catalog is an explicit
+ * preparation error. Callers must not call a default a confirmed local setting.
  */
 export async function getEffectiveSetting<K extends SettingKey>(
   clientId: string,
