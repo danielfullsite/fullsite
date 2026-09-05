@@ -57,7 +57,7 @@ async function buildStack(dir) {
   let online = true
   const fetchImpl = async (_url, opts) => {
     fetchCalls.push(JSON.parse(opts.body))
-    return { ok: online, status: online ? 201 : 503 }
+    return { ok: online, status: online ? 201 : 503, json: async () => [JSON.parse(opts.body)] }
   }
   const outbox = new OutboxWorker({
     eventStore, supabaseUrl: 'https://sb.test', supabaseKey: 'k',

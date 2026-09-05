@@ -22,7 +22,7 @@ function mockFetch(responder) {
     const body = JSON.parse(opts.body)
     calls.push({ url, body })
     const res = responder(body, calls.length)
-    return { ok: res.status >= 200 && res.status < 300, status: res.status }
+    return { ok: res.status >= 200 && res.status < 300, status: res.status, json: async () => res.rows ?? [body] }
   }
   fn.calls = calls
   return fn
@@ -105,14 +105,15 @@ describe('OutboxWorker.flush', () => {
     assert.equal(store.unsynced().length, 0)
   })
 
-  test('409 (browser ya sincronizó) → marca synced sin sobreescribir', async () => {
+  test('409 no demuestra aplicación: conserva el evento y detiene el FIFO', async () => {
     const store = new FakeStore([ev(1, 'ORDER_SENT')])
     const fetchImpl = mockFetch(() => ({ status: 409 }))
     const w = makeWorker(store, fetchImpl)
     const r = await w.flush()
     assert.equal(r.conflicts, 1)
-    assert.equal(r.sent, 1)
-    assert.equal(store.unsynced().length, 0)  // resuelto (no se reintenta infinito)
+    assert.equal(r.sent, 0)
+    assert.equal(r.failedAt, 1)
+    assert.equal(store.unsynced().length, 1)
   })
 
   test('store vacío → no-op', async () => {
@@ -120,6 +121,56 @@ describe('OutboxWorker.flush', () => {
     const w = makeWorker(store, mockFetch(() => ({ status: 201 })))
     const r = await w.flush()
     assert.deepEqual(r, { pending: 0, sent: 0, conflicts: 0, failedAt: null })
+  })
+
+  test('200 con otra operación nunca confirma este evento ni sobreescribe la fila', async () => {
+    const store = new FakeStore([ev(1, 'ORDER_SENT')])
+    const worker = makeWorker(store, async (_url, opts) => {
+      assert.match(opts.headers.Prefer, /ignore-duplicates/)
+      return { ok: true, status: 201, json: async () => [{ ...JSON.parse(opts.body), payload: { otra: true } }] }
+    })
+    const result = await worker.flush()
+    assert.equal(result.conflicts, 1)
+    assert.equal(result.sent, 0)
+    assert.equal(store.unsynced().length, 1)
+  })
+
+  test('respuesta perdida: al repetir verifica el registro original antes de confirmar', async () => {
+    const store = new FakeStore([ev(1, 'ORDER_SENT')])
+    let stored
+    let calls = 0
+    const worker = makeWorker(store, async (url, opts) => {
+      calls++
+      if (opts.method === 'POST') {
+        if (!stored) { stored = JSON.parse(opts.body); throw new Error('respuesta perdida tras commit cloud') }
+        return { ok: true, status: 200, json: async () => [] }
+      }
+      assert.match(url, /restaurant_id=eq.r1/)
+      return { ok: true, status: 200, json: async () => [stored] }
+    })
+    assert.equal((await worker.flush()).sent, 0)
+    assert.equal((await worker.flush()).sent, 1)
+    assert.equal(calls, 3)
+    assert.equal(store.unsynced().length, 0)
+  })
+
+  test('red colgada termina y deja la operación pendiente para reconectar', async () => {
+    const store = new FakeStore([ev(1, 'ORDER_SENT')])
+    const worker = new OutboxWorker({ eventStore: store, restaurantId: 'r1',
+      supabaseUrl: 'https://sb.test', supabaseKey: 'k', timeoutMs: 20,
+      fetchImpl: (_url, { signal }) => new Promise((_resolve, reject) => {
+        signal.addEventListener('abort', () => reject(new Error('timeout')), { once: true })
+      }), logger: () => {},
+    })
+    assert.equal((await worker.flush()).failedAt, 1)
+    assert.equal(store.unsynced().length, 1)
+  })
+
+  test('el worker no envía eventos de otro restaurante', async () => {
+    const store = new FakeStore([ev(1, 'ORDER_SENT', { restaurant_id: 'ajeno' })])
+    const fetchImpl = mockFetch(() => ({ status: 201 }))
+    assert.equal((await makeWorker(store, fetchImpl).flush()).sent, 0)
+    assert.equal(fetchImpl.calls.length, 0)
   })
 
   test('respeta batchSize', async () => {
