@@ -1,12 +1,14 @@
 # Fullsite — Knowledge Base
 
-> Única fuente de verdad. Última actualización: 2026-08-19 (auditoría full + saneo de docs).
+> Única fuente de verdad. Última actualización: 2026-09-04 (plan de cierre y auditoría offline).
 > Flujo permanente: Artifact → Revisión → Consolidación → **docs/** → Commit.
 >
 > ⚠️ Muchos docs individuales son de julio y llevan banner "DOCUMENTO HISTÓRICO". El estado
 > vigente vive en: [`DECISION-BRAIN.md`](DECISION-BRAIN.md) (router de decisiones),
-> [`PLAN-AHORA.md`](PLAN-AHORA.md) (qué hacer), [`audit/AUDITORIA-FULL-FULLSITE-2026-08-19.md`](audit/AUDITORIA-FULL-FULLSITE-2026-08-19.md)
-> (estado completo) y [`state/OPEN-ITEMS.md`](state/OPEN-ITEMS.md) (todo lo abierto).
+> [`PLAN-CIERRE-FULLSITE-2026-09-04.md`](PLAN-CIERRE-FULLSITE-2026-09-04.md) (cierre operativo y prioridades),
+> [`audit/FULLSITE-CIERRE-PUNTA-A-PUNTA-2026-09-04.md`](audit/FULLSITE-CIERRE-PUNTA-A-PUNTA-2026-09-04.md)
+> (auditoría de cierre) y [`state/OPEN-ITEMS.md`](state/OPEN-ITEMS.md) (índice de pendientes).
+> [`PLAN-AHORA.md`](PLAN-AHORA.md) conserva el plan general de agosto como contexto.
 
 ---
 
@@ -28,8 +30,10 @@ El modelo: plataforma SaaS multi-tenant, un solo Supabase, particionamiento por 
 | Entender la filosofía y restricciones | [`constitution/PRINCIPLES.md`](constitution/PRINCIPLES.md) |
 | Entender cómo está construido | [`architecture/SYSTEM-ARCHITECTURE.md`](architecture/SYSTEM-ARCHITECTURE.md) |
 | **Qué está abierto (índice único)** | [`state/OPEN-ITEMS.md`](state/OPEN-ITEMS.md) |
-| **Qué hacer ahora (priorizado)** | [`PLAN-AHORA.md`](PLAN-AHORA.md) |
-| **Estado completo auditado** | [`audit/AUDITORIA-FULL-FULLSITE-2026-08-19.md`](audit/AUDITORIA-FULL-FULLSITE-2026-08-19.md) |
+| **Plan de cierre operativo (septiembre)** | [`PLAN-CIERRE-FULLSITE-2026-09-04.md`](PLAN-CIERRE-FULLSITE-2026-09-04.md) |
+| Plan general anterior (agosto) | [`PLAN-AHORA.md`](PLAN-AHORA.md) |
+| **Auditoría de cierre punta a punta (septiembre)** | [`audit/FULLSITE-CIERRE-PUNTA-A-PUNTA-2026-09-04.md`](audit/FULLSITE-CIERRE-PUNTA-A-PUNTA-2026-09-04.md) |
+| Auditoría general anterior (agosto) | [`audit/AUDITORIA-FULL-FULLSITE-2026-08-19.md`](audit/AUDITORIA-FULL-FULLSITE-2026-08-19.md) |
 | Certificaciones (⚠️ congeladas 07-31) | [`state/CERTIFICATIONS.md`](state/CERTIFICATIONS.md) |
 | Entender qué sigue | [`feos/INITIATIVES.md`](feos/INITIATIVES.md) + [`feos/EXECUTION-PLAN.md`](feos/EXECUTION-PLAN.md) |
 | Entender la arquitectura offline | [`architecture/LOCAL-FIRST.md`](architecture/LOCAL-FIRST.md) |
