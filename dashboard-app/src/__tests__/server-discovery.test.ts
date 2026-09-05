@@ -271,7 +271,7 @@ describe('TC-05 — branch_id mismatch → identity_mismatch', () => {
     expect(result.diagnostic).toBe('server_found_wrong_branch')
   })
 
-  it('allows connection when branch_id is null on the server side', async () => {
+  it('rejects an unconfigured branch when the terminal is provisioned for a branch', async () => {
     vi.stubGlobal('fetch', mockFetch({
       'http://192.168.1.71:7717': {
         status: 200,
@@ -286,8 +286,8 @@ describe('TC-05 — branch_id mismatch → identity_mismatch', () => {
     })
     const result = await disc.discover()
 
-    // branch_id null on server = not yet configured; allow through
-    expect(result.state).toBe('found')
+    expect(result.state).toBe('identity_mismatch')
+    expect(result.diagnostic).toBe('server_found_wrong_branch')
   })
 })
 
@@ -604,5 +604,29 @@ describe('buildDiscoveryConfig', () => {
     const cfg = buildDiscoveryConfig(REST_ID)
     const count = cfg.preferredEndpoints!.filter(ep => ep === 'http://127.0.0.1:7717').length
     expect(count).toBe(1)
+  })
+})
+
+describe('provisioned local bridge', () => {
+  it('uses the configured port and branch before every remembered/default endpoint', () => {
+    localStorage.setItem('FULLSITE_BRIDGE_URL', 'http://127.0.0.1:58765/')
+    localStorage.setItem('FULLSITE_LOCATION_ID', BRANCH_ID)
+    localStorage.setItem('pos_bridge_host', '192.168.1.71')
+    const config = buildDiscoveryConfig(REST_ID, { permitSubnetScan: true })
+    expect(config.preferredEndpoints).toEqual(['http://127.0.0.1:58765'])
+    expect(config.branchId).toBe(BRANCH_ID)
+    expect(config.permitSubnetScan).toBe(false)
+    expect(config.allowRegistryFallback).toBe(false)
+  })
+  it('a dead provisioned bridge never elects a reachable remembered server', async () => {
+    localStorage.setItem('FULLSITE_BRIDGE_URL', 'http://127.0.0.1:58765')
+    ServerRegistry.recordSuccess({ restaurantId: REST_ID, endpoint: 'http://192.168.1.71:7717', serverId: SERVER_ID,
+      branchId: BRANCH_ID, instanceName: 'Remembered', protocolVersion: PROTOCOL, version: VERSION, lastSeen: Date.now(), lastLatencyMs: 1 })
+    const fetchMock = mockFetch({ 'http://192.168.1.71:7717': { status: 200, body: makeIdentity() } })
+    vi.stubGlobal('fetch', fetchMock)
+    const result = await new ServerDiscovery(buildDiscoveryConfig(REST_ID)).discover()
+    expect(result.state).toBe('not_found')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(String(fetchMock.mock.calls[0][0])).toContain('127.0.0.1:58765')
   })
 })

@@ -26,6 +26,8 @@ const { expect } = require(path.join(APP, 'node_modules/@playwright/test'))
 const electronBinary = require(path.join(ELECTRON_APP, 'node_modules/electron'))
 const { CURRENT_CONFIG_VERSION } = require('../local-server/config-schema')
 const cred = require('../local-server/core/credencial-lan')
+const { ActorAuthority } = require('../local-server/core/actor-authority')
+const WebSocket = require(path.join(ELECTRON_APP, 'node_modules/ws'))
 
 const tenant = 'closure-lab'
 const secret = cred.generarSecreto()
@@ -35,6 +37,7 @@ const output = path.join(ROOT, 'output/closure/ui')
 fs.mkdirSync(output, { recursive: true })
 const terminals = []
 const results = []
+const prepared = new Map()
 let nextProcess
 let nextLog = ''
 let wan = true
@@ -66,7 +69,10 @@ async function until(fn, label, timeout = 30000) {
 }
 function request(terminal, route, init = {}) {
   return fetch(`http://127.0.0.1:${terminal.port}${route}`, {
-    ...init, headers: { ...headers, ...init.headers }, signal: AbortSignal.timeout(3000),
+    ...init, headers: { ...headers,
+      ...(terminal.terminalId ? { 'x-fullsite-terminal': terminal.terminalId } : {}),
+      ...(terminal.actorSession ? { 'x-fullsite-actor': terminal.actorSession.actor_token } : {}),
+      ...init.headers }, signal: AbortSignal.timeout(3000),
   })
 }
 async function command(terminal, type, payload = {}, commandId = randomUUID()) {
@@ -76,7 +82,31 @@ async function command(terminal, type, payload = {}, commandId = randomUUID()) {
   })
   const data = await response.json()
   assert.equal(response.ok, true, `Comando ${type}: ${JSON.stringify(data)}`)
+  assert.equal(data.results?.length, 1, `Recibo ${type}: ${JSON.stringify(data)}`)
+  assert(!data.results[0].error, `Rechazo ${type}: ${JSON.stringify(data)}`)
   return data
+}
+
+async function commandWs(terminal, type, payload) {
+  const ws = new WebSocket(`ws://127.0.0.1:${terminal.port}/ws`)
+  const commandId = randomUUID()
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => { ws.terminate(); reject(new Error('Caja no confirmó el comando WS')) }, 6000)
+    ws.on('open', () => ws.send(JSON.stringify({ protocol_version: '1.0', type: 'SUBSCRIBE',
+      restaurant_id: tenant, client_id: `ws-${terminal.terminalId}`, terminal_id: terminal.terminalId, client_type: 'pos', lan_secret: secret })))
+    ws.on('message', raw => {
+      const msg = JSON.parse(raw.toString())
+      if (msg.type === 'SNAPSHOT') ws.send(JSON.stringify({ protocol_version: '1.0', type: 'COMMAND',
+        restaurant_id: tenant, actor_token: terminal.actorSession.actor_token,
+        payload: { ...payload, command_id: commandId, command_type: type } }))
+      if (['ACK', 'REJECT'].includes(msg.type)) {
+        clearTimeout(timer); ws.close()
+        if (msg.type === 'REJECT') reject(new Error(msg.payload.reason))
+        else resolve(msg.payload)
+      }
+    })
+    ws.on('error', error => { clearTimeout(timer); reject(error) })
+  })
 }
 
 const staff = { id: '00000000-0000-4000-8000-000000000071', name: 'Mesero de laboratorio', role: 'gerente' }
@@ -125,7 +155,7 @@ async function fixtureRoute(route, uiOrigin, pedroPorts) {
 async function startTerminal(name, role, port, cajaPort, uiOrigin, ports) {
   const userData = path.join(base, name)
   fs.mkdirSync(userData, { recursive: true })
-  const terminalId = randomUUID()
+  const { terminalId, actorSession } = prepared.get(name)
   fs.writeFileSync(path.join(userData, 'config.json'), JSON.stringify({
     config_version: CURRENT_CONFIG_VERSION, restaurant_id: tenant, terminal_id: terminalId,
     terminal_role: role, kds_only: role === 'kds', terminal_name: name, local_server_host: '127.0.0.1',
@@ -139,13 +169,13 @@ async function startTerminal(name, role, port, cajaPort, uiOrigin, ports) {
       // producto impide que la precarga del SW escape al aislamiento de pruebas.
       FULLSITE_POS_URL: `${uiOrigin}/icon-192v2.png`, FULLSITE_KDS_URL: `${uiOrigin}/icon-192v2.png` }), timeout: 60000,
   })
-  const terminal = { name, role, port, app, process: app.process(), userData, log: [], errors: [] }
+  const terminal = { name, role, port, app, process: app.process(), userData, terminalId, actorSession, log: [], errors: [] }
   terminals.push(terminal)
   terminal.process.stdout.on('data', d => terminal.log.push(String(d)))
   terminal.process.stderr.on('data', d => terminal.log.push(String(d)))
   const context = app.context()
   await context.route('**/*', route => fixtureRoute(route, uiOrigin, ports))
-  await context.addInitScript(({ tenant, staff, turno, terminalId, port, secret }) => {
+  await context.addInitScript(({ tenant, staff, turno, terminalId, port, secret, actorSession }) => {
     if (!['localhost', '127.0.0.1'].includes(location.hostname)) return
     localStorage.setItem('fullsite_client_id', tenant)
     localStorage.setItem('pos_terminal_id', terminalId)
@@ -158,8 +188,9 @@ async function startTerminal(name, role, port, cajaPort, uiOrigin, ports) {
     localStorage.setItem('pos_turno_id', turno.id)
     localStorage.setItem('pos_turno_cache', JSON.stringify({ turno, turnos: [turno], ts: Date.now() }))
     sessionStorage.setItem('pos_staff', JSON.stringify(staff))
+    sessionStorage.setItem('pos_actor_session', JSON.stringify(actorSession))
     sessionStorage.setItem('pos_last_activity', String(Date.now()))
-  }, { tenant, staff, turno, terminalId, port, secret })
+  }, { tenant, staff, turno, terminalId, port, secret, actorSession })
   const page = await app.firstWindow()
   terminal.page = page
   page.on('pageerror', error => terminal.errors.push(error.stack || error.message))
@@ -206,6 +237,16 @@ async function main() {
     await until(async () => (await fetch(`${uiOrigin}${route}`, { signal: AbortSignal.timeout(15000) })).ok,
       `Preparar compilación ${route}`, 90000)
   }
+  // Prepare real signed sessions in the synthetic Caja profile before it boots.
+  // Only the HTTPS PIN provider response is a fixture; token verification in
+  // the running servers and the financial transport are real.
+  const actors = new ActorAuthority({ directory: path.join(base, 'Caja', 'actor-authority'), restaurantId: tenant,
+    fetchImpl: async () => Response.json({ staff }) })
+  for (const name of ['Caja', 'POS 2', 'POS 3', 'Cocina']) {
+    const terminalId = randomUUID()
+    const actorSession = await actors.login({ pin: '9876543210', deviceId: terminalId, restaurantId: tenant })
+    prepared.set(name, { terminalId, actorSession })
+  }
   const caja = await startTerminal('Caja', 'server_pos', ports[0], ports[0], uiOrigin, ports)
   const pos2 = await startTerminal('POS 2', 'pos', ports[1], ports[0], uiOrigin, ports)
   const pos3 = await startTerminal('POS 3', 'pos', ports[2], ports[0], uiOrigin, ports)
@@ -214,12 +255,20 @@ async function main() {
   await command(caja, 'TURNO_OPENED', { ...turno, turno_id: turno.id, ts: turno.opened_at })
   await command(pos2, 'ORDER_SENT', { order_id: orderId, mesa: 1, mesero: staff.name,
     customer_name: 'Familia laboratorio', personas: 3, status: 'enviada', total: 116,
-    subtotal: 100, iva: 16, saldo: 116, turno_id: turno.id,
+    subtotal: 100, iva: 16, saldo: 116, turno_id: turno.id, order_revision: 4,
     items: [{ id: 'lab-line-1', nombre: 'Café de laboratorio', cantidad: 2, precio: 50,
       subtotal: 100, precioExtra: 0, modificadores: [], notas: '', station: 'barra', menuItemId: 'lab-cafe' }],
   })
   await check('La comanda llega a la pantalla de cocina por LAN', async () => {
     await expect(kds.page.locator('body')).toContainText('Café de laboratorio', { timeout: 20000 })
+  })
+  await check('Un comando WebSocket del POS secundario se confirma en Caja', async () => {
+    const id = randomUUID()
+    await commandWs(pos2, 'ORDER_SENT', { order_id: id, mesa: 2, total: 20, turno_id: turno.id,
+      items: [{ id: 'water', nombre: 'Agua por WebSocket', cantidad: 1, precio: 20, subtotal: 20 }] })
+    const snapshot = await (await request(caja, '/state')).json()
+    assert(snapshot.salon_orders.some(o => o.id === id || o.order_id === id))
+    await expect(kds.page.locator('body')).toContainText('Agua por WebSocket')
   })
   wan = false
   await check('Sin internet, POS 3 abre los productos y el total de la misma cuenta', async () => {
@@ -231,8 +280,26 @@ async function main() {
     assert.equal(visible?.items?.[0]?.cantidad, 2)
     await pos3.page.screenshot({ path: path.join(output, 'cuenta-compartida-sin-internet.png'), fullPage: true })
   })
+  let finance
+  const money = async (terminal, type, payload) => {
+    const response = await command(terminal, type, { order_id: orderId, expected_revision: finance?.revision || 0, ...payload })
+    finance = response.results[0].result.financial_order
+  }
+  const collect = async (terminal, accountId, paymentId, amount) => {
+    await money(terminal, 'FINANCIAL_PAYMENT_START', { account_id: accountId, payment_id: paymentId, amount_cents: amount, method: 'cash' })
+    await money(terminal, 'FINANCIAL_PAYMENT_RESULT', { payment_id: paymentId, status: 'accepted', evidence: { kind: 'cash_received', received_by: staff.id, received_cents: amount } })
+  }
+  await check('Sin WAN, un pago parcial desde POS 2 actualiza el saldo visible en POS 3', async () => {
+    await money(pos2, 'FINANCIAL_OPEN', { turno_id: turno.id, expected_order_revision: 4, total_cents: 11600, currency: 'MXN' })
+    await money(pos2, 'FINANCIAL_SPLIT', { accounts: [{ account_id: 'A', total_cents: 5800 }, { account_id: 'B', total_cents: 5800 }] })
+    await collect(pos2, 'A', 'partial', 2900)
+    assert.equal(finance.balance_cents, 8700)
+    await expect(pos3.page.locator('body')).toContainText(/Saldo confirmado en Caja:.*87[.,]00/)
+  })
   await check('Una cuenta pagada sigue en cocina mientras no se entregue', async () => {
-    await command(caja, 'ORDER_CLOSED', { order_id: orderId, mesa: 1, payment_status: 'pagada', saldo: 0 })
+    await collect(pos3, 'A', 'finish-A', 2900)
+    await collect(pos3, 'B', 'finish-B', 5800)
+    assert.equal(finance.paid_cents, 11600)
     await expect(kds.page.locator('body')).toContainText('Café de laboratorio', { timeout: 10000 })
     const snapshot = await (await request(caja, '/state')).json()
     assert(snapshot.kds_orders.some(o => o.order_id === orderId || o.id === orderId))

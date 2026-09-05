@@ -21,6 +21,7 @@ La tabla distingue dos casos:
 | Inventario / stock | **Formal** | `src/lib/inventory.ts` → `recordMovement()` | Escribir directamente a `pos_inventory` o `pos_ingredients.cost_per_unit` |
 | Datos de Supabase | **Formal** | `fetch()` directo a PostgREST | Usar el Supabase SDK — causa hang silencioso en App Router |
 | Autenticación / client_id | **Formal** | `src/lib/auth.ts` o helper `_cid()` | Hardcodear un `client_id`; consultar sin filtrar por cliente |
+| Empleado / permisos en Caja | **Formal** | `src/lib/pedro-actor.ts` → `/auth/pin`; Caja verifica cada comando. Perfiles compartidos en `electron-app/local-server/core/permission-profiles.json`, leídos también por `pos-permissions.ts`. | Autorizar dinero con roles de localStorage; copiar otra matriz de permisos; guardar PIN/token de actor en eventos |
 | Food cost / costeo | **Formal** | `src/lib/cost-engine/` + `/api/food-cost/calculate` | Calcular costos de platillo o sub-receta en el cliente |
 | Impresión | **Formal** | Print bridge `127.0.0.1:7717` | Llamar a impresoras directamente desde el page |
 | Event store (POS) | **Formal** | `bridge-client.ts` → `sendCommand()` genera `command_id` estable → Local Server `CoreEventStore` persiste el evento inmutable en `events.ndjson` antes del ACK. `src/lib/event-store.ts` no existe ni debe crearse — ver `docs/reference/PERSISTENCE-LAYER.md`. | Enviar comandos POS sin `command_id` estable; crear un event store en el browser; mutar Supabase sin generar primero un `command_id` que identifique la operación |

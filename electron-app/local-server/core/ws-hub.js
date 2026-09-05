@@ -69,6 +69,7 @@ class WsHub {
   async _onConnection(ws, req) {
     const remoteIp = req.socket?.remoteAddress || 'unknown'
     let clientId   = null
+    let terminalId = null
     let autenticado = false
     const authTimeout = setTimeout(() => { if (!autenticado) ws.close(1008, 'falta credencial SUBSCRIBE') }, 5000)
     authTimeout.unref?.()
@@ -97,6 +98,7 @@ class WsHub {
           return
         }
         clientId = msg.client_id
+        terminalId = req.headers['x-fullsite-terminal'] || msg.terminal_id || clientId
         if (!clientId) { ws.close(1008, 'Missing client_id'); return }
 
         // CFG-02: reject terminals with mismatched or missing restaurant_id.
@@ -155,17 +157,17 @@ class WsHub {
       if (msg.type === C2S.COMMAND) {
         if (!this._onCommand) return
         try {
-          const result = await this._onCommand(msg, clientId)
+          const result = await this._onCommand(msg, clientId, { terminalId, actorToken: msg.actor_token })
           const seq = await this._getLastSeq()
           if (result.duplicate) {
-            ws.send(this._envelope(S2C.ACK, { command_id: msg.payload?.command_id, duplicate: true }, seq))
+            ws.send(this._envelope(S2C.ACK, { command_id: msg.payload?.command_id, duplicate: true, receipt: result.receipt, result: result.result }, seq))
           } else if (result.error) {
-            ws.send(this._envelope(S2C.REJECT, { command_id: msg.payload?.command_id, reason: result.error }, seq))
+            ws.send(this._envelope(S2C.REJECT, { command_id: msg.payload?.command_id, reason: result.error, code: result.code }, seq))
           } else {
-            ws.send(this._envelope(S2C.ACK, { command_id: msg.payload?.command_id, event: result.event }, seq))
+            ws.send(this._envelope(S2C.ACK, { command_id: msg.payload?.command_id, event: result.event, result: result.result }, seq))
           }
         } catch (e) {
-          ws.send(this._envelope(S2C.REJECT, { reason: e.message }, 0))
+          ws.send(this._envelope(S2C.REJECT, { command_id: msg.payload?.command_id, reason: e.message }, 0))
         }
         return
       }

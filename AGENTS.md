@@ -46,6 +46,7 @@ docs/                 Knowledge base completo
 - Nunca escribir tokens reales en diffs visibles.
 - El proyecto `fullsite-amalay` es producción — no modificar directamente.
 - Transporte de Pedro: HTTP y WebSocket exigen credencial de instalación antes de operar o entregar estado. Contrato y enrolamiento: [`docs/architecture/LAN-TRANSPORT-AUTH.md`](docs/architecture/LAN-TRANSPORT-AUTH.md).
+- Autoridad de empleado en Caja: [`docs/architecture/ACTOR-AUTHORITY-2026-09-05.md`](docs/architecture/ACTOR-AUTHORITY-2026-09-05.md). PIN se valida en Caja; los roles del navegador no autorizan dinero. Perfiles compartidos: `electron-app/local-server/core/permission-profiles.json`.
 
 ---
 
@@ -93,3 +94,5 @@ Ver [`docs/state/CERTIFICATIONS.md`](docs/state/CERTIFICATIONS.md) para el estad
 ## Comandos locales durables (candidato septiembre)
 
 Antes de modificar almacenamiento o impresión de Pedro, leer [`docs/architecture/DURABLE-COMMANDS-2026-09-05.md`](docs/architecture/DURABLE-COMMANDS-2026-09-05.md). Un ACK exige commit durable; impresión incierta exige verificación del operador. El nuevo formato de log requiere una migración validada para downgrade.
+
+Dinero usa [`docs/architecture/FINANCIAL-COMMANDS-2026-09-05.md`](docs/architecture/FINANCIAL-COMMANDS-2026-09-05.md): centavos, reservas y resultados durables con actor verificado. Liquidación no significa entrega. La UI de pago y el materializador cloud requieren integración; el candidato no está habilitado para producción.

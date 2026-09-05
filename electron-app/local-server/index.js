@@ -29,6 +29,8 @@ const { CoreEventStore }    = require('./core/event-store')
 const { RestaurantState }   = require('./core/state')
 const { WsHub }             = require('./core/ws-hub')
 const { CommandHandler }    = require('./core/command-handler')
+const { ActorAuthority } = require('./core/actor-authority')
+const { handleAuthenticatedCommand } = require('./core/command-authority')
 const { conectarConLaCaja } = require('./core/enlace-con-caja')
 const credLan = require('./core/credencial-lan')
 const { OutboxWorker }      = require('./core/outbox')
@@ -311,11 +313,11 @@ function forwardGet(targetUrl, credenciales = {}) {
 }
 
 /** Lecturas que una terminal secundaria puede hacerle a la caja. */
-const LECTURAS_REENVIADAS = ['/state', '/events', '/print/uncertain']
+const LECTURAS_REENVIADAS = ['/state', '/events', '/print/uncertain', '/auth/status']
 
 // Keep identity and routing configuration explicit so every cloned terminal can
 // discover the caja without relying on process-global or customer-specific state.
-function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, version, serverId, restaurantId, config = {}, instanceName = '', branchId = config.branchId || null, posServerIp = config.posServerIp || null, port = 7717, posServerPort = config.posServerPort || null }) {
+function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority = null, printer, version, serverId, restaurantId, config = {}, instanceName = '', branchId = config.branchId || null, posServerIp = config.posServerIp || null, port = 7717, posServerPort = config.posServerPort || null }) {
   // Puerto de la CAJA al reenviar. Antes se usaba `port` — el puerto PROPIO del
   // secundario — lo que acopla ambos al 7717: dos Pedros en una misma maquina
   // (pruebas, demos) o una terminal en puerto distinto rompian el forward.
@@ -330,7 +332,8 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, versio
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
     // Sin listar la cabecera de credencial, el preflight la rechaza y el POS
     // recibe un error de red sin explicacion.
-    res.setHeader('Access-Control-Allow-Headers', `Content-Type, ${credLan.CABECERA}, x-fullsite-restaurante, x-fullsite-terminal, x-fullsite-sucursal`)
+    res.setHeader('Access-Control-Allow-Headers', `Content-Type, ${credLan.CABECERA}, x-fullsite-restaurante, x-fullsite-terminal, x-fullsite-sucursal, x-fullsite-actor`)
+    res.setHeader('Cache-Control', 'no-store')
     // Chrome/Electron sends a Private Network Access preflight when the POS
     // loaded from https://app.fullsite.mx calls its bridge on localhost/LAN.
     // A top-level navigation to /health works without this header, while fetch()
@@ -384,10 +387,14 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, versio
     // of truth. Its POS page is https and CANNOT POST to the caja's http LAN IP
     // (mixed content). So it POSTs to THIS local server (127.0.0.1, exempt from the
     // wall) and we forward /print, /events and /drawer to the caja over Node http.
-    if (posServerIp && req.method === 'POST' && (url === '/print' || url === '/events' || url === '/drawer' || url === '/print/resolve')) {
+    if (posServerIp && req.method === 'POST' && (url === '/print' || url === '/events' || url === '/drawer' || url === '/print/resolve' || url === '/auth/pin')) {
       try {
         const body = await parseBody(req)
-        const up = await forwardPost(`http://${posServerIp}:${cajaPort}${url}`, JSON.stringify(body), credencialesHaciaLaCaja)
+        const up = await forwardPost(`http://${posServerIp}:${cajaPort}${url}`, JSON.stringify(body), {
+          ...credencialesHaciaLaCaja,
+          ...(req.headers['x-fullsite-terminal'] ? { 'x-fullsite-terminal': req.headers['x-fullsite-terminal'] } : {}),
+          ...(req.headers['x-fullsite-actor'] ? { 'x-fullsite-actor': req.headers['x-fullsite-actor'] } : {}),
+        })
         res.writeHead(up.status || 502, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
         res.end(up.body || '{}')
       } catch (e) {
@@ -532,6 +539,23 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, versio
       return
     }
 
+    if (url === '/auth/status' && req.method === 'GET') {
+      try { json(res, actorAuthority ? 200 : 503, actorAuthority ? actorAuthority.status() : { error: 'Autorización no preparada' }) }
+      catch (error) { json(res, error.status || 503, { error: error.message, code: error.code }) }
+      return
+    }
+    if (url === '/auth/pin' && req.method === 'POST') {
+      if (!actorAuthority) { json(res, 503, { error: 'Autorización no preparada en Caja' }); return }
+      try {
+        const body = await parseBody(req)
+        if (credLan.verificarScope(body, { restaurantId, branchId })) { json(res, 403, { error: 'Scope de otra instalación' }); return }
+        const result = await actorAuthority.login({ pin: body.pin, restaurantId,
+          deviceId: req.headers['x-fullsite-terminal'], minRole: body.min_role })
+        json(res, 200, result)
+      } catch (error) { json(res, error.status || 500, { error: error.message, code: error.code }) }
+      return
+    }
+
     // ── POST /events ─────────────────────────────────────────────────────────
     // Accepts events from terminals that are not connected via WS.
     if (url === '/events' && req.method === 'POST') {
@@ -552,7 +576,9 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, versio
             restaurant_id:    ev.restaurant_id || restaurantId,
             payload:          ev,
           }
-          const result = await cmdHandler.handle(fakeMsg, ev.client_id || 'rest-api')
+          const result = await handleAuthenticatedCommand({ cmdHandler, actorAuthority, msg: fakeMsg,
+            clientId: req.headers['x-fullsite-terminal'] || ev.client_id || 'rest-api',
+            terminalId: req.headers['x-fullsite-terminal'], actorToken: req.headers['x-fullsite-actor'] })
           results.push(result)
         }
         json(res, 200, { results })
@@ -736,6 +762,11 @@ async function startLocalServer({ dataDir, port = 7717, config = {} }) {
   for (const ev of events) state.apply(ev)
   console.log('[server] State ready.')
 
+  const actorAuthority = config.posServerIp ? null : new ActorAuthority({
+    directory: require('path').join(dataDir, 'actor-authority'), restaurantId,
+    branchId: config.branchId || config.locationId || null,
+  })
+
   // ── WebSocket hub ────────────────────────────────────────────────────────
   const wsHub = new WsHub({
     serverId,
@@ -757,7 +788,23 @@ async function startLocalServer({ dataDir, port = 7717, config = {} }) {
   })
 
   if (typeof cmdHandler.recoverPendingEffects === 'function') await cmdHandler.recoverPendingEffects()
-  wsHub.onCommand((msg, clientId) => cmdHandler.handle(msg, clientId))
+  wsHub.onCommand(async (msg, clientId, transport = {}) => {
+    // A WS command at a secondary must reach the same Caja as HTTP writes.
+    // Committing it locally would create a second writer and a private account.
+    if (config.posServerIp) {
+      const credentials = credLan.cabecerasDeCredencial({ secreto: config.lanSecret, restaurantId,
+        terminalId: transport.terminalId, branchId: config.branchId || config.locationId || null })
+      if (transport.actorToken) credentials['x-fullsite-actor'] = transport.actorToken
+      const up = await forwardPost(`http://${config.posServerIp}:${config.posServerPort || port}/events`,
+        JSON.stringify(msg.payload), credentials)
+      const body = JSON.parse(up.body || '{}')
+      if (up.status !== 200 || !Array.isArray(body.results) || body.results.length !== 1) {
+        return { error: body.error || 'Caja no confirmó el comando', code: 'CAJA_UNAVAILABLE' }
+      }
+      return body.results[0]
+    }
+    return handleAuthenticatedCommand({ cmdHandler, actorAuthority, msg, clientId, ...transport })
+  })
 
   // ── HTTP server ──────────────────────────────────────────────────────────
   const router = buildHttpRouter({
@@ -765,6 +812,7 @@ async function startLocalServer({ dataDir, port = 7717, config = {} }) {
     eventStore,
     wsHub,
     cmdHandler,
+    actorAuthority,
     printer: printerAdapter,
     version,
     serverId,

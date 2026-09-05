@@ -13,6 +13,8 @@ import { inventoryPolicyService } from '@/lib/inventory-policy'
 import { getFingerprintUrl } from '@/lib/fingerprint-url'
 import { provisionManagerCredential, verifyPinOffline, estadoCredencialesOffline } from '@/lib/pos-manager-auth'
 import { POSLockContext } from './pos-lock-context'
+import { requiereCaja } from '@/lib/pedro-cliente'
+import { actorDeCaja, cerrarActorDeCaja, ingresarConPinEnCaja } from '@/lib/pedro-actor'
 
 async function hashPin(pin: string, staffId: string): Promise<string> {
   try {
@@ -201,7 +203,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
   useEffect(() => {
     const onAuthRequired = () => {
       if (!unlockedRef.current) return // ya está en la pantalla de PIN
-      try { sessionStorage.removeItem('pos_staff') } catch {}
+      try { sessionStorage.removeItem('pos_staff'); cerrarActorDeCaja() } catch {}
       setSessionError('Tu sesión expiró — vuelve a ingresar tu PIN. Tus comandas están guardadas y se enviarán al reingresar.')
       setUnlocked(false)
     }
@@ -239,18 +241,20 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
       const lastActivity = sessionStorage.getItem('pos_last_activity')
       if (saved && lastActivity) {
         const elapsed = Date.now() - parseInt(lastActivity)
-        if (elapsed < IDLE_TIMEOUT_MS) {
+        const localActor = requiereCaja() ? actorDeCaja() : null
+        if (elapsed < IDLE_TIMEOUT_MS && (!requiereCaja() || localActor)) {
           try {
-            const parsed = JSON.parse(saved)
+            const parsed = localActor?.staff || JSON.parse(saved)
             setStaff(parsed)
             setUnlocked(true)
             // Restart heartbeat for restored session
-            registerSession(parsed.id, parsed.name).then(() => startHeartbeat(parsed.id)).catch(() => {})
+            if (!requiereCaja() || !localActor?.offline) registerSession(parsed.id, parsed.name).then(() => startHeartbeat(parsed.id)).catch(() => {})
             // Don't auto-redirect — let the page handle navigation
           } catch { /* ignore */ }
         } else {
           // Session expired — clean up server session too
           sessionStorage.removeItem('pos_staff')
+          cerrarActorDeCaja()
           sessionStorage.removeItem('pos_last_activity')
           removeSession().catch(() => {})
         }
@@ -284,7 +288,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
         if (elapsed >= IDLE_TIMEOUT_MS) {
           // Don't lock while offline — staff can't re-auth without network
           // and we don't want to lose an active shift due to a cable outage.
-          if (!navigator.onLine) {
+          if (!navigator.onLine && !requiereCaja()) {
             sessionStorage.setItem('pos_last_activity', Date.now().toString())
             return
           }
@@ -294,6 +298,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
           setStaff(null)
           setPin('')
           sessionStorage.removeItem('pos_staff')
+          cerrarActorDeCaja()
           sessionStorage.removeItem('pos_last_activity')
         }
       }
@@ -363,6 +368,10 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
 
   // Authenticate with fingerprint via DigitalPersona service (port 7718)
   const handleBiometricLogin = async () => {
+    if (requiereCaja()) {
+      setSessionError('Ingresa con PIN para autorizar operaciones en Caja. La huella de esta terminal aún requiere validación.')
+      return
+    }
     setBiometricChecking(true)
     try {
       const res = await fetch(`${FINGERPRINT_URL}/identify`, { method: 'GET', signal: AbortSignal.timeout(20000) })
@@ -455,10 +464,10 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
     setChecking(true)
     setError(false)
 
-    const unlock = async (member: StaffMember) => {
+    const unlock = async (member: StaffMember, localSession = false) => {
       // ── Session locking: prevent concurrent login on multiple terminals ──
       setSessionError('')
-      const conflict = await checkActiveSession(member.id)
+      const conflict = localSession ? null : await checkActiveSession(member.id)
       if (conflict) {
         setSessionError('Usuario activo en otra terminal. Cierra esa sesion primero.')
         setChecking(false)
@@ -466,8 +475,10 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
         return
       }
       // Register session and start heartbeat
-      await registerSession(member.id, member.name)
-      startHeartbeat(member.id)
+      if (!localSession) {
+        await registerSession(member.id, member.name)
+        startHeartbeat(member.id)
+      }
       ensureAttendanceEntry(member.id, member.name, 'pin')
 
       setStaff(member)
@@ -515,6 +526,19 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
       if (window.location.pathname === '/pos' && !window.location.search) {
         router.push('/pos/mesas')
       }
+    }
+
+    if (requiereCaja()) {
+      try {
+        const session = await ingresarConPinEnCaja(pin)
+        if (session.shiftToken) localStorage.setItem('pos_shift_token', session.shiftToken)
+        await unlock(session.staff, session.offline)
+      } catch (error) {
+        setSessionError(error instanceof TypeError ? 'Sin conexión con Caja. Reconecta para ingresar con PIN.'
+          : error instanceof Error ? error.message : 'Caja no confirmó el acceso')
+        setPin('')
+      } finally { setChecking(false) }
+      return
     }
 
     try {
@@ -756,7 +780,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
   }
 
   if (unlocked) return (
-    <POSLockContext.Provider value={{ lock: () => { setUnlocked(false); setPin('') } }}>
+    <POSLockContext.Provider value={{ lock: () => { cerrarActorDeCaja(); setUnlocked(false); setPin('') } }}>
       <div className="pos-kiosk" style={{
         background:'#0a0a0f', color:'#fff', minHeight:'100dvh', overflow:'auto',
         colorScheme:'dark',

@@ -34,7 +34,7 @@ El evento y ese resultado se confirman juntos. Un reintento por `command_id` obt
 - Efectivo rechazado/desconocido: `{kind:'operator_record', recorded_by, reason}`.
 - Externo: `{kind:'provider_result', provider, reference, currency:'MXN', amount_cents, status}`. Proveedor, importe, moneda y estado deben coincidir con el intento reservado.
 
-**Validar esa estructura no prueba autenticidad del banco.** La integración de actor/permisos y el adaptador confiable deben derivar identidades de sesión y entregar resultados externos; un body del POS no equivale a confirmación bancaria. Permisos propuestos para el siguiente paquete: `pos.accounts.manage`, `pos.payments.collect`, `pos.payments.reconcile` y `pos.payments.external_result` reservado al adaptador.
+**Validar esa estructura no prueba autenticidad del banco.** La integración de actor/permisos y el adaptador confiable deben derivar identidades de sesión y entregar resultados externos; un body del POS no equivale a confirmación bancaria. Permisos comprobados por el contexto autenticado del servidor: `pos.accounts.manage`, `pos.payments.collect`, `pos.payments.reconcile` y `pos.payments.external_result` reservado al adaptador.
 
 ## Proyección y concurrencia
 
@@ -46,7 +46,7 @@ Una orden con cuentas durables rechaza `ORDER_CLOSED` como sustituto de pago y b
 
 ## Límites explícitos de esta entrega
 
-- No incluye conexión bancaria, confianza criptográfica de proveedor ni autorización de empleados: se conectan con el paquete de acceso antes de habilitar dinero.
+- No incluye conexión bancaria ni confianza criptográfica de proveedor. La autorización de empleados se conecta por el paquete de acceso de Caja; la UI financiera todavía requiere integración.
 - Apertura financiera exige una orden operacional guardada y un turno coherente. Aún se requiere certificar el cálculo de precios/impuestos/descuentos que produjo ese total.
 - No incluye ajustes a cuentas después de iniciar cobros, reembolsos, propina, cortesías, reasignación de consumos ni cancelación financiera. Se bloquean cambios incompatibles; no se corrigen saldos retroactivamente.
 - Órdenes legacy sin cuenta financiera conservan su ruta anterior hasta el cambio de escritor por sucursal. La nueva autoridad no debe habilitarse parcialmente con otro escritor cloud activo.
@@ -54,6 +54,6 @@ Una orden con cuentas durables rechaza `ORDER_CLOSED` como sustituto de pago y b
 
 ## Verificación local integrada
 
-El manejador exige `context.actor` derivado por el servidor, sesión no vencida y permisos. Ignora identidades/roles enviados en el body. Efectivo exige atribución al empleado autenticado; conciliar un resultado desconocido exige permiso de conciliación. Ningún permiso ordinario de cajero autoriza resultados externos. El transporte aún debe conectar este contexto con la autoridad de PIN antes de habilitar los comandos al POS.
+El manejador exige `context.actor` derivado por el servidor, sesión no vencida y permisos. Ignora identidades/roles enviados en el body. Efectivo exige atribución al empleado autenticado; conciliar un resultado desconocido exige permiso de conciliación. Ningún permiso ordinario de cajero autoriza resultados externos. HTTP y WS conectan este contexto con la [autoridad de PIN en Caja](ACTOR-AUTHORITY-2026-09-05.md); la UI de pago sigue pendiente.
 
 Pruebas integradas: **355/355** del servidor; **18** del dominio/runtime financiero. Casos adicionales reproducidos y corregidos: revisión operativa ausente aceptada como cero; descuentos y cambio de turno/revisión por una edición legacy después de definir cuentas. No se aplicó migración ni se conectó banco alguno.

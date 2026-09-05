@@ -14,6 +14,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { credencialDeLaRedLocal } from './local-network-fetch'
+import { getBridgeUrl as getHttpBridgeUrl } from './bridge-url'
+import { actorDeCaja } from './pedro-actor'
 import { ServerDiscovery, buildDiscoveryConfig, type DiscoveryDiagnostic } from './server-discovery'
 
 const PROTOCOL_VERSION = '1.0'
@@ -26,6 +28,7 @@ const RECONNECT_MAX_MS = 30_000
 function getBridgeUrl(wsUrlOverride?: string): string {
   if (wsUrlOverride) return wsUrlOverride
   if (typeof window === 'undefined') return `ws://127.0.0.1:${LOCAL_PORT}/ws`
+  if (localStorage.getItem('FULLSITE_BRIDGE_URL')) return httpToWs(getHttpBridgeUrl())
   const stored = localStorage.getItem('pos_bridge_host')
   if (stored) return `ws://${stored}:${LOCAL_PORT}/ws`
   return `ws://127.0.0.1:${LOCAL_PORT}/ws`
@@ -33,7 +36,7 @@ function getBridgeUrl(wsUrlOverride?: string): string {
 
 /** Convert a discovered HTTP endpoint to the WS URL. */
 function httpToWs(httpEndpoint: string): string {
-  return httpEndpoint.replace(/^http:/, 'ws:').replace(/\/$/, '') + '/ws'
+  return httpEndpoint.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:').replace(/\/$/, '') + '/ws'
 }
 
 /** Call once (e.g. from ?bridge= URL param) to register the POS server IP for this device */
@@ -104,6 +107,7 @@ export class BridgeClient {
           lan_secret: credencialDeLaRedLocal()['x-fullsite-lan'],
           location_id: credencialDeLaRedLocal()['x-fullsite-sucursal'],
           client_id: this.clientId,
+          terminal_id: credencialDeLaRedLocal()['x-fullsite-terminal'],
           client_type: this.clientType,
           restaurant_id: this.restaurantId,
           last_sequence: this._lastSequence,
@@ -161,10 +165,11 @@ export class BridgeClient {
    */
   sendCommand(commandType: string, payload: Record<string, unknown>): string | null {
     if (!this._connected || this.ws?.readyState !== WebSocket.OPEN) return null
-    const commandId = `${this.clientId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+    const commandId = typeof payload.command_id === 'string' ? payload.command_id : crypto.randomUUID()
     this._send({
       type: 'COMMAND',
       restaurant_id: this.restaurantId,
+      actor_token: actorDeCaja()?.actor_token,
       payload: {
         command_id: commandId,
         command_type: commandType,
@@ -212,7 +217,7 @@ export function useBridgeClient(
   useEffect(() => {
     if (typeof window === 'undefined') return
     const isElectron = navigator.userAgent.includes('Electron')
-    const hasBridgeHost = !!localStorage.getItem('pos_bridge_host')
+    const hasBridgeHost = !!(localStorage.getItem('FULLSITE_BRIDGE_URL') || localStorage.getItem('pos_bridge_host'))
     if (!isElectron && !hasBridgeHost) return
 
     const restaurantId = localStorage.getItem('fullsite_client_id') || undefined

@@ -4,13 +4,15 @@ Ejecutar desde la raíz: `node electron-app/lab/laboratorio-ui-multiterminal.cjs
 
 El laboratorio arranca el POS real con Next local y cuatro procesos Electron independientes: Caja, POS 2, POS 3 y cocina. Cada proceso tiene perfil, puerto y Pedro propios. Catálogo, personal y turno usan datos sintéticos; las órdenes, credenciales LAN, retransmisión y snapshots pasan por los servidores reales. El corte WAN aborta peticiones de API/REST mientras conserva la red local y `navigator.onLine=true`.
 
-Resultado verificado: **5/5**.
+Resultado verificado: **7/7**.
 
 1. Comanda enviada desde POS 2 aparece en cocina.
 2. POS 3 abre la misma cuenta sin WAN: mismo ID, dos cafés y total de $116.00.
-3. Liquidar por el evento legacy de cierre conserva la preparación pendiente en cocina.
-4. Apagar el binario real de Caja provoca el aviso de sólo borradores en POS 2.
-5. El recorrido no deja errores de JavaScript sin manejar.
+3. Un comando WS del secundario se confirma en Caja.
+4. Sin WAN, dividir $116 en dos cuentas y cobrar $29 desde POS 2 deja saldo $87 visible en POS 3.
+5. Liquidar desde POS 3 por los comandos financieros durables conserva la preparación pendiente en cocina.
+6. Apagar el binario real de Caja provoca el aviso de sólo borradores en POS 2.
+7. El recorrido no deja errores de JavaScript sin manejar.
 
 Encontró dos defectos de integración: CSP permitía sólo el puerto 7717, bloqueando instalaciones con otro puerto; la carga opcional de recetas rechazaba todo el arranque cuando la LAN estaba viva pero no había WAN. Ambos corregidos. La consulta de recetas para inventario conserva su error; únicamente su uso como sugerencia de pantalla degrada.
 
@@ -18,6 +20,6 @@ La evidencia se guarda en `output/closure/ui/`: resultados, capturas en el momen
 
 ## Alcance preciso
 
-La sesión está preparada: no prueba PIN, enrolamiento ni permisos. Assets servidos por Next: no certifica arranque frío sin internet, Service Worker ni paquete offline. No pulsa un cobro ni prueba proveedor bancario; la semántica financiera durable tiene su suite separada. No certifica Windows, huella ni impresoras físicas.
+La sesión está preparada: no prueba PIN, enrolamiento ni permisos. Assets servidos por Next: no certifica arranque frío sin internet, Service Worker ni paquete offline. No pulsa un cobro ni prueba proveedor bancario; envía los comandos financieros por HTTP real y verifica el saldo en la pantalla. La semántica financiera durable tiene además su suite separada. No certifica Windows, huella ni impresoras físicas.
 
-La cuenta del fixture no tiene revisión: puede leerse y conservar borradores, pero no cobrar ni modificar la orden confirmada. El catálogo del POS 3 no estaba preparado antes del corte: la captura documenta esa falta. Todavía se debe verificar preparar catálogo completo, iniciar sesión offline, crear/modificar/enviar desde las pantallas, cobrar, reiniciar y conciliar contra nube. Este laboratorio no equivale al cierre del turno completo.
+La cuenta del fixture tiene una revisión explícita; los comandos financieros usan sesiones firmadas preparadas en la Caja sintética antes de arrancar. No se acepta un rol enviado por el body. El catálogo del POS 3 no estaba preparado antes del corte: la captura documenta esa falta. Todavía se debe verificar preparar catálogo completo, iniciar sesión offline, crear/modificar/enviar desde las pantallas, cobrar, reiniciar y conciliar contra nube. Este laboratorio no equivale al cierre del turno completo.
