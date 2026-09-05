@@ -134,7 +134,7 @@ interface ActiveOrder {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-import { leerSalon, debeUsarPedro, aOrdenesDelSalon, avisoDeProcedencia, type LecturaDelSalon } from '@/lib/pedro-cliente'
+import { leerSalon, debeUsarPedro, aOrdenesDelSalon, avisoDeProcedencia, requiereCaja, type LecturaDelSalon } from '@/lib/pedro-cliente'
 
 export default function MesasPage() {
   const router = useRouter()
@@ -295,11 +295,19 @@ export default function MesasPage() {
       if (debeUsarPedro(salon)) {
         const deLaCaja = aOrdenesDelSalon(salon.ordenes)
         setActiveOrders(deLaCaja.map(o => ({
-          id: o.id, mesa: o.mesa ?? 0, customer_name: null, order_number: null,
-          mesero: o.mesero ?? '', personas: 0, total: o.total,
+          id: o.id, mesa: o.mesa ?? 0, customer_name: o.customer_name, order_number: null,
+          mesero: o.mesero ?? '', personas: o.personas, total: o.total,
           status: o.status ?? 'enviada',
           created_at: o.created_at ?? new Date().toISOString(),
         })) as unknown as ActiveOrder[])
+        setPlanoNoVerificado(salon.completa ? null : 'La caja todavía no confirmó todas las cuentas')
+        setLoading(false)
+        return
+      }
+      if (requiereCaja()) {
+        // Keep the last confirmed picture; cloud/cache cannot declare a table
+        // free after losing the restaurant authority.
+        setPlanoNoVerificado('Sin conexión con la caja — mesas sin confirmar')
         setLoading(false)
         return
       }
@@ -491,7 +499,7 @@ export default function MesasPage() {
     ocupada: 'bg-[var(--info-soft)] border-[color-mix(in_srgb,var(--info)_45%,transparent)] hover:border-[var(--info)]',
     cuenta: 'bg-[var(--warn-soft)] border-[color-mix(in_srgb,var(--warn)_45%,transparent)] hover:border-[var(--warn)]',
   }
-  const statusLabel: Record<string, string> = { disponible: 'Disponible', ocupada: 'Ocupada', cuenta: 'Lista' }
+  const statusLabel: Record<string, string> = { disponible: planoNoVerificado ? 'Sin confirmar' : 'Disponible', ocupada: 'Ocupada', cuenta: 'Lista' }
   const statusDot: Record<string, string> = { disponible: 'bg-[var(--accent)]', ocupada: 'bg-[var(--info)]', cuenta: 'bg-[var(--warn)]' }
 
   const counts = {
@@ -619,7 +627,9 @@ export default function MesasPage() {
     // mesa correcta aunque el query se pierda. El ?mesa= se conserva para que la URL siga
     // siendo compartible y para que Back/adelante funcionen igual.
     setMesaTarget(mesaNum)
-    router.push(`/pos?mesa=${mesaNum}`)
+    const orderId = ordersByMesa.get(mesaNum)?.id
+    sessionStorage.setItem('pos_cuenta_target', JSON.stringify({ mesa: mesaNum, orderId: orderId ?? null }))
+    router.push(`/pos?mesa=${mesaNum}${orderId ? `&order=${encodeURIComponent(orderId)}` : ''}`)
   }
 
   // ─── Mesa Card (shared between views) ─────────────────────────────────────
@@ -1142,7 +1152,10 @@ export default function MesasPage() {
                     return (
                       <button
                         key={o.id}
-                        onClick={() => router.push(`/pos?cuenta=${encodeURIComponent(o.customer_name || '')}`)}
+                        onClick={() => {
+                          sessionStorage.setItem('pos_cuenta_target', JSON.stringify({ mesa: 0, customerName: o.customer_name, orderId: o.id }))
+                          router.push(`/pos?cuenta=${encodeURIComponent(o.customer_name || '')}&order=${encodeURIComponent(o.id)}`)
+                        }}
                         className="bg-teal-900/40 border-2 border-teal-600/60 hover:bg-teal-800/50 rounded-2xl p-3 text-left transition-all active:scale-95"
                       >
                         <div className="flex items-start justify-between">

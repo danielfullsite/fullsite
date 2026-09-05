@@ -84,10 +84,10 @@ describe('Cuando la caja contesta', () => {
     expect(ordenes[0].mesero).toBe('Ana')
   })
 
-  it('no hay nada que avisarle al operador', async () => {
+  it('un Pedro legacy sin detalle completo pide confirmación', async () => {
     respuesta = { status: 200, cuerpo: SALON_DE_LA_CAJA }
     const { leerSalon, avisoDeProcedencia } = await cargar()
-    expect(avisoDeProcedencia(await leerSalon())).toBeNull()
+    expect(avisoDeProcedencia(await leerSalon())).toMatch(/confirmó/)
   })
 })
 
@@ -201,7 +201,7 @@ describe('El editor puede pedirle la orden a la caja', () => {
     kds_orders: [{
       id: 'o-12', mesa: 12, mesero: 'Eduardo', status: 'enviada', total: 865,
       // Pedro los guarda SERIALIZADOS (state.js).
-      items: JSON.stringify([{ nombre: 'Arrachera', cantidad: 2 }, { nombre: 'Agua', cantidad: 4 }]),
+      items: JSON.stringify([{ id: 'item-1', nombre: 'Arrachera', cantidad: 2 }, { id: 'item-2', nombre: 'Agua', cantidad: 4 }]),
     }],
     mesas: { '12': { status: 'ocupada', order_id: 'o-12' } },
   }
@@ -219,13 +219,14 @@ describe('El editor puede pedirle la orden a la caja', () => {
     expect(orden!.total).toBe(865)
   })
 
-  it('una mesa sin orden devuelve null, pero con lectura AUTORITATIVA', async () => {
+  it('una foto legacy sin orden no certifica una mesa libre', async () => {
     // La diferencia que importa: aqui SI se sabe que no hay nada.
     respuesta = { status: 200, cuerpo: CON_PLATILLOS }
     const { leerOrdenDeMesa } = await cargar()
-    const { orden, lectura } = await leerOrdenDeMesa(99)
+    const { orden, lectura, estado } = await leerOrdenDeMesa(99)
     expect(orden).toBeNull()
-    expect(lectura.autoritativa, 'se pudo preguntar: la mesa 99 de verdad esta libre').toBe(true)
+    expect(lectura.autoritativa).toBe(true)
+    expect(estado).toBe('incierta')
   })
 
   it('REGRESION: sin caja devuelve null pero NO autoritativa', async () => {
@@ -246,8 +247,9 @@ describe('El editor puede pedirle la orden a la caja', () => {
       mesas: {},
     } }
     const { leerOrdenDeMesa } = await cargar()
-    const { orden } = await leerOrdenDeMesa(7)
-    expect(orden!.items).toEqual([])
+    const { orden, estado } = await leerOrdenDeMesa(7)
+    expect(orden).toBeNull()
+    expect(estado).toBe('incierta')
   })
 })
 

@@ -46,6 +46,8 @@ import { publishEvent, getDeviceId } from '@/lib/events'
 import { apiUrl } from '@/lib/api-base'
 import { sendOrderToKitchen, kitchenFailureMessage } from '@/lib/kitchen-bridge'
 import { avisarCierreDeOrden } from '@/lib/aviso-lan'
+import { leerCuenta, requiereCaja, cuentaConfirmada, type LecturaDeCuenta } from '@/lib/pedro-cliente'
+import { reconciliarCuenta, cuentaEditableDe, type CuentaEditable } from '@/lib/pos-order-reconciliation'
 import { evaluarLiquidacion, cuentasDe, intentoDePago } from '@/lib/liquidacion-de-orden'
 import type { OrderItem, MenuItem, Order } from '@/lib/pos-data'
 import {
@@ -2081,6 +2083,8 @@ function POSContent() {
   const [orderRevision, setOrderRevision] = useState<number>(0)
   const [loadingMesa, setLoadingMesa] = useState(false)
   useEffect(() => {
+    // Local authority has its own live reader below; cloud never races it.
+    if (requiereCaja()) return
     let cancelled = false
     setLoadingMesa(true)
     // Desde aquí los orderItems representan a ESTA mesa (instant-cache la puebla abajo).
@@ -2180,40 +2184,6 @@ function POSContent() {
           }
         }
       } catch (err) {
-        // ── Antes del caché local: PREGUNTARLE A LA CAJA ──────────────────
-        //
-        // El mapa de mesas ya pinta ocupado con lo que dice Pedro. Si el editor
-        // sólo mira Supabase y `pos_order_N`, una terminal que nunca abrió esa
-        // mesa muestra la mesa ocupada y abre una cuenta VACÍA — idéntica a una
-        // mesa nueva.
-        //
-        // Lo caro no es la pantalla: el mesero recaptura, envía, y al reconectar
-        // sube una SEGUNDA orden abierta para la misma mesa. El repo ya se lo
-        // había documentado a sí mismo (pos-offline-db.ts): «El mesero sienta
-        // gente en una mesa que debe $713, o le abre segunda cuenta».
-        //
-        // La caja es la autoridad dentro del restaurante, así que va ANTES que
-        // el caché de esta terminal. Si no contesta, se sigue como siempre.
-        if (!cancelled) {
-          try {
-            const { leerOrdenDeMesa } = await import('@/lib/pedro-cliente')
-            const { orden } = await leerOrdenDeMesa(mesa)
-            const itemsDeLaCaja = Array.isArray(orden?.items) ? orden!.items as OrderItem[] : []
-            if (itemsDeLaCaja.length > 0) {
-              setOrderItems(itemsDeLaCaja)
-              setOrderId(String(orden!.id ?? orden!.order_id ?? generateId()))
-              if (orden!.mesero) setMesero(String(orden!.mesero))
-              if (orden!.personas) setPersonas(Number(orden!.personas))
-              // Los items ya están en cocina: se marcan como enviados para que
-              // "Enviar" no los duplique. Sin esto, el mesero reimprime la mesa
-              // entera y la cocina hace todo dos veces.
-              setSentItemIds(new Set(itemsDeLaCaja.map(i => i.id)))
-              setLoadingMesa(false)
-              return
-            }
-          } catch { /* la caja no contesta: se sigue con el caché local */ }
-        }
-
         // Network error — fall back to localStorage cache (stale is better than blank)
         console.warn('[loadMesaOrder] network error, using cached order:', err)
         if (!cancelled) {
@@ -2314,6 +2284,152 @@ function POSContent() {
     } catch {}
     return generateId()
   })
+
+  const [lecturaCuentaCaja, setLecturaCuentaCaja] = useState<LecturaDeCuenta | null>(null)
+  const [avisoCuentaCaja, setAvisoCuentaCaja] = useState<string | null>(null)
+  const [ultimaLecturaCaja, setUltimaLecturaCaja] = useState<number | null>(null)
+  const [conflictoCuentaCaja, setConflictoCuentaCaja] = useState(false)
+  const baseCuentaCaja = useRef<CuentaEditable | null>(null)
+  const idCuentaCaja = useRef<string | null>(null)
+  const cuentaRemotaCaja = useRef<Record<string, unknown> | null>(null)
+  const conflictoCuentaRef = useRef(false)
+  const cuentaCacheLista = useRef(false)
+  const cuentaActual = useRef({ items: orderItems, mesero, personas, discount, notas: orderNotes, orderRevision, sentItemIds })
+  cuentaActual.current = { items: orderItems, mesero, personas, discount, notas: orderNotes, orderRevision, sentItemIds }
+  const aplicarCuentaCaja = (cuenta: CuentaEditable) => {
+    setOrderItems(cuenta.items); setMesero(cuenta.mesero); setPersonas(cuenta.personas)
+    setDiscount(cuenta.discount); setOrderNotes(cuenta.notas)
+  }
+  const refrescarCuentaCaja = useRef<() => Promise<LecturaDeCuenta | null>>(async () => null)
+  const claveCuentaCaja = `pos_cuenta_${_cid()}_${clienteNombre ? `nombre:${clienteNombre}` : `mesa:${mesa}`}`
+
+  useEffect(() => {
+    if (!requiereCaja()) return
+    let disposed = false
+    let pending: Promise<LecturaDeCuenta | null> | null = null
+    let target: string | null = new URLSearchParams(window.location.search).get('order')
+    try {
+      const selected = JSON.parse(sessionStorage.getItem('pos_cuenta_target') || 'null')
+      if (selected && selected.mesa === mesa && (selected.customerName || '') === clienteNombre) target ||= selected.orderId
+      sessionStorage.removeItem('pos_cuenta_target')
+    } catch {}
+    idCuentaCaja.current = target
+    cuentaCacheLista.current = false
+    conflictoCuentaRef.current = false
+    orderItemsMesaRef.current = mesa
+    baseCuentaCaja.current = null
+    cuentaRemotaCaja.current = null
+    setLecturaCuentaCaja(null); setConflictoCuentaCaja(false); setUltimaLecturaCaja(null)
+    setAvisoCuentaCaja('Confirmando cuenta con la caja…'); setLoadingMesa(true)
+    // Keep a complete last confirmed snapshot plus the independent operator draft.
+    // Recovery never turns this cache into authority or refreshes its timestamp.
+    try {
+      let saved = JSON.parse(localStorage.getItem(claveCuentaCaja) || 'null')
+      // Migration of the existing per-table cache. It is only a merge baseline,
+      // never authority; its age and identity remain intact.
+      if (!saved?.confirmed && !clienteNombre) {
+        const legacy = JSON.parse(localStorage.getItem(`pos_order_${mesa}`) || 'null')
+        if (legacy?.id && Array.isArray(legacy.items)) saved = { confirmed: {
+          ...legacy, descuento: legacy.discount, order_revision: legacy.revision,
+        }, confirmedAt: legacy.ts }
+      }
+      if (saved?.confirmed?.id && (!target || saved.confirmed.id === target)) {
+        idCuentaCaja.current = saved.confirmed.id
+        baseCuentaCaja.current = saved.base || cuentaEditableDe(saved.confirmed)
+        aplicarCuentaCaja(saved.draft || baseCuentaCaja.current)
+        setOrderId(saved.confirmed.id); setLoadedOrderId(saved.confirmed.id)
+        setUltimaLecturaCaja(saved.confirmedAt ?? null)
+      } else if (!target && saved?.draft && Array.isArray(saved.draft.items)) {
+        aplicarCuentaCaja(saved.draft)
+        if (saved.draftOrderId) setOrderId(saved.draftOrderId)
+      }
+    } catch {}
+    async function read(): Promise<LecturaDeCuenta | null> {
+      const result = await leerCuenta({ orderId: idCuentaCaja.current, mesa, customerName: clienteNombre })
+      if (disposed) return null
+      cuentaCacheLista.current = true
+      setLecturaCuentaCaja(result); setLoadingMesa(false)
+      if (result.estado === 'incierta') { setAvisoCuentaCaja(result.motivo || 'Cuenta sin confirmar — sólo borradores'); return result }
+      if (result.estado === 'cerrada') {
+        setAvisoCuentaCaja('Esta cuenta ya no está abierta en Caja. Conservamos tu borrador; vuelve al salón.')
+        return result
+      }
+      setUltimaLecturaCaja(Date.now())
+      if (result.estado === 'libre') { setAvisoCuentaCaja(null); return result }
+      const order = result.orden!
+      const remote = cuentaEditableDe(order)
+      const current = cuentaActual.current
+      const oldBase = baseCuentaCaja.current
+      // On the first read, preserve only locally unsent items. Later reads use a
+      // three-way merge, so an edit to an existing item cannot be overwritten.
+      const merged = oldBase ? reconciliarCuenta(oldBase, current, remote) : {
+        cuenta: { ...remote, items: [...remote.items, ...current.items.filter(i =>
+          !current.sentItemIds.has(i.id) && !remote.items.some(r => r.id === i.id))] }, conflictos: [],
+      }
+      cuentaRemotaCaja.current = order
+      idCuentaCaja.current = String(order.id)
+      aplicarCuentaCaja(merged.cuenta)
+      setCancelledItems(new Set(merged.cuenta.items.filter(i => i.cancelled).map(i => i.id)))
+      setOrderId(String(order.id)); setLoadedOrderId(String(order.id))
+      setOrderNumber(typeof order.order_number === 'number' ? order.order_number : null)
+      setLoadedUpdatedAt(typeof order.updated_at === 'string' ? order.updated_at : null)
+      if (result.lectura.turno?.id) setTurnoId(String(result.lectura.turno.id))
+      setConflictoCuentaCaja(merged.conflictos.length > 0)
+      conflictoCuentaRef.current = merged.conflictos.length > 0
+      if (merged.conflictos.length) {
+        setAvisoCuentaCaja('Otra terminal cambió los mismos datos. Tu borrador está conservado; revisa antes de enviar o cobrar.')
+      } else {
+        baseCuentaCaja.current = remote
+        if (Number.isInteger(order.order_revision)) setOrderRevision(Number(order.order_revision))
+        setAvisoCuentaCaja(cuentaConfirmada(result) ? null : 'Cuenta recibida sin revisión confirmada — sólo lectura y borradores')
+      }
+      const sent = order.status !== 'abierta' ? remote.items : []
+      setSentItemIds(new Set(sent.map(i => i.id)))
+      setSentItemSnapshots(Object.fromEntries(sent.map(i => [i.id, {
+        cantidad: i.cantidad, modificadores: [...(i.modificadores || [])], notas: i.notas || '', silla: i.silla,
+      }])))
+      try { localStorage.setItem(claveCuentaCaja, JSON.stringify({ confirmed: order,
+        base: baseCuentaCaja.current, confirmedAt: Date.now(), draft: merged.cuenta })) } catch {}
+      return result
+    }
+    const refresh = () => pending ?? (pending = read().finally(() => { pending = null }))
+    refrescarCuentaCaja.current = refresh
+    void refresh()
+    const timer = setInterval(() => { if (!operationLock.current) void refresh() }, 1000)
+    const onFocus = () => { if (!operationLock.current) void refresh() }
+    window.addEventListener('focus', onFocus)
+    return () => { disposed = true; clearInterval(timer); window.removeEventListener('focus', onFocus); refrescarCuentaCaja.current = async () => null }
+  }, [mesa, clienteNombre])
+
+  useEffect(() => {
+    if (!requiereCaja() || !cuentaCacheLista.current || orderItemsMesaRef.current !== mesa) return
+    try {
+      const saved = JSON.parse(localStorage.getItem(claveCuentaCaja) || '{}')
+      localStorage.setItem(claveCuentaCaja, JSON.stringify({ ...saved, draftOrderId: orderId, draft: {
+        items: orderItems, mesero, personas, discount, notas: orderNotes,
+      } }))
+    } catch {}
+  }, [orderItems, mesero, personas, discount, orderNotes, claveCuentaCaja, mesa, orderId])
+
+  const validarCuentaCaja = async (permiteNueva = false): Promise<boolean> => {
+    if (!requiereCaja()) return true
+    const before = cuentaActual.current.orderRevision
+    const beforeOrder = JSON.stringify(cuentaRemotaCaja.current)
+    const result = await refrescarCuentaCaja.current()
+    if (!result || conflictoCuentaRef.current || result.estado === 'incierta' || result.estado === 'cerrada') return false
+    if (permiteNueva && result.estado === 'libre') return true
+    if (!cuentaConfirmada(result)) return false
+    // An authoritative update must render before a handler uses its captured
+    // items/totals. The operator confirms the updated account on the next touch.
+    if (result.orden!.order_revision !== before || beforeOrder !== JSON.stringify(cuentaRemotaCaja.current)) {
+      setAvisoCuentaCaja('La cuenta se actualizó desde otra terminal. Revisa y vuelve a confirmar.')
+      return false
+    }
+    return true
+  }
+  const cuentaCajaBloqueada = requiereCaja() && (!lecturaCuentaCaja ||
+    lecturaCuentaCaja.estado === 'incierta' || lecturaCuentaCaja.estado === 'cerrada' || conflictoCuentaCaja ||
+    (lecturaCuentaCaja.estado === 'existente' && !cuentaConfirmada(lecturaCuentaCaja)))
 
   // Auto-save draft items to localStorage on every change (prevents loss on refresh)
   useEffect(() => {
@@ -2625,6 +2741,7 @@ function POSContent() {
   // Cancel item (requires reason + manager PIN — NEVER delete)
   const handleCancelItem = useCallback(async (reason: string, managerName: string, options: { prepared: boolean; voided: boolean }) => {
     if (!cancellingItem) return
+    if (!await validarCuentaCaja()) return
     const { prepared, voided } = options
     const action = voided ? 'item_voided' as const : 'item_cancelled' as const
     logAudit({
@@ -2716,12 +2833,13 @@ function POSContent() {
         }
       }
     }
-  }, [cancellingItem, orderId, mesero, mesa, loadedOrderId])
+  }, [cancellingItem, orderId, mesero, mesa, loadedOrderId, validarCuentaCaja])
 
   // Void entire order
   // Eduardo Jul 21 (Batch 8): Transfer individual platillo to another mesa
   // Uses server-side OCC API to prevent race conditions and data loss
   const handleTransferItem = useCallback(async (pin: string, targetMesa: number) => {
+    if (!await validarCuentaCaja()) return
     if (operationLock.current) return
     if (!transferringItem || !loadedOrderId) return
     // Verify supervisor PIN (capitan+)
@@ -2773,9 +2891,10 @@ function POSContent() {
 
     operationLock.current = false
     setTransferringItem(null)
-  }, [transferringItem, loadedOrderId, mesero, mesa])
+  }, [transferringItem, loadedOrderId, mesero, mesa, validarCuentaCaja])
 
   const handleVoidOrder = useCallback(async (reason: string, managerName: string) => {
+    if (!await validarCuentaCaja()) return
     if (operationLock.current) return
     operationLock.current = true
     setSaving(true)
@@ -2855,7 +2974,7 @@ function POSContent() {
     setShowVoidOrder(false)
     showToast(`Orden anulada — aprobado por ${managerName}`)
     setSaving(false); operationLock.current = false
-  }, [orderId, mesero, mesa, orderItems, loadedOrderId, saving, sentItemIds])
+  }, [orderId, mesero, mesa, orderItems, loadedOrderId, saving, sentItemIds, validarCuentaCaja])
 
   // Cash movement confirmed (already saved to Supabase in modal)
   const handleCashMovement = useCallback((type: 'retiro' | 'deposito', amount: number, reason: string, managerName: string) => {
@@ -2999,6 +3118,7 @@ function POSContent() {
 
   const handleSendToKitchen = async () => {
     if (activeItems.length === 0 || operationLock.current) return
+    if (!await validarCuentaCaja(true) || operationLock.current) return
     operationLock.current = true
     setSaving(true)
     const opId = genOpId()
@@ -3216,6 +3336,9 @@ function POSContent() {
         const kitchen = await sendOrderToKitchen({
           command_id: opId,
           command_type: 'ORDER_SENT',
+          customer_name: order.clienteNombre ?? null,
+          subtotal: order.subtotal, iva: order.iva, descuento: order.descuento,
+          ...(saveResult.revision != null ? { order_revision: saveResult.revision } : {}),
           order_id: order.id,
           mesa: order.mesa,
           mesero: order.mesero,
@@ -3265,6 +3388,9 @@ function POSContent() {
     const kitchen = await sendOrderToKitchen({
       command_id: opId,
       command_type: 'ORDER_SENT',
+      customer_name: order.clienteNombre ?? null,
+      subtotal: order.subtotal, iva: order.iva, descuento: order.descuento,
+      ...(saveResult.revision != null ? { order_revision: saveResult.revision } : {}),
       order_id: order.id,
       mesa: order.mesa,
       mesero: order.mesero,
@@ -3418,7 +3544,8 @@ function POSContent() {
     showToast('Pre-cuenta impresa')
   }
 
-  const handleCloseOrder = () => {
+  const handleCloseOrder = async () => {
+    if (!await validarCuentaCaja()) return
     if (orderItems.length === 0) return
     if (!turnoId) { showToast('No hay turno activo. Un encargado debe abrir turno.'); return }
     // Block payment if order was never sent to kitchen (no items sent, no loaded order from DB)
@@ -3438,6 +3565,7 @@ function POSContent() {
 
   // _mpOpId: provided by the MP Point recovery flow — same opId reused on retry for idempotent write
   const handlePayment = async (method: string, _mpOpId?: string) => {
+    if (!await validarCuentaCaja()) return
     // COB-017: block a new normal payment while an MP recovery requires attention.
     // When _mpOpId is provided, this IS the recovery retry — skip the guard.
     if (!_mpOpId && needsOperatorAttention(mpRecovery)) {
@@ -4162,6 +4290,30 @@ function POSContent() {
         </div>
       )}
 
+      {requiereCaja() && avisoCuentaCaja && (
+        <div role="status" className="px-4 py-3 bg-amber-950 text-amber-100 text-sm flex flex-wrap items-center gap-3">
+          <span>{avisoCuentaCaja}{ultimaLecturaCaja ? ` Última confirmación: ${new Date(ultimaLecturaCaja).toLocaleTimeString('es-MX')}.` : ''}</span>
+          {conflictoCuentaCaja && (
+            <button type="button" className="border border-amber-300 rounded px-3 py-2" onClick={() => {
+              const remote = cuentaRemotaCaja.current
+              if (!remote) return
+              try {
+                // Explicit operator recovery preserves a downloadable/recoverable
+                // draft before loading the authoritative conflicting version.
+                localStorage.setItem(`${claveCuentaCaja}_conflicto`, JSON.stringify({
+                  orderId, draft: cuentaActual.current, ts: Date.now(),
+                }))
+              } catch { setAvisoCuentaCaja('No se pudo conservar el borrador. Libera almacenamiento antes de continuar.'); return }
+              const accepted = cuentaEditableDe(remote)
+              baseCuentaCaja.current = accepted
+              aplicarCuentaCaja(accepted)
+              cuentaActual.current = { ...cuentaActual.current, ...accepted }
+              conflictoCuentaRef.current = false; setConflictoCuentaCaja(false)
+              void refrescarCuentaCaja.current()
+            }}>Conservar borrador y cargar cuenta de Caja</button>
+          )}
+        </div>
+      )}
       <div className="flex flex-1 overflow-hidden">
         {/* Left Panel -- Current Order (50% on tablet, full on mobile when active) */}
         <div className={`md:w-[50%] lg:w-[45%] md:flex flex-col border-r border-[var(--line)] bg-[var(--surface)] ${mobileView === 'order' ? 'flex w-full' : 'hidden'}`}>
@@ -4184,6 +4336,12 @@ function POSContent() {
               <span className="text-[var(--accent-ink)] font-extrabold text-xl font-mono tabular-nums tracking-tight">{formatMXN(total)}</span>
             </div>
           </div>
+
+          {requiereCaja() && lecturaCuentaCaja?.orden?.saldo != null && (
+            <div className="px-3 py-1 text-sm text-[var(--text-3)]">
+              Saldo confirmado en Caja: {formatMXN(Number(lecturaCuentaCaja.orden.saldo))}
+            </div>
+          )}
 
           {/* Order items list — MAIN AREA, takes all available space */}
           <div className="flex-1 overflow-y-auto px-3 py-1 min-h-0 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
@@ -4509,6 +4667,7 @@ function POSContent() {
                   setPinPrompt({
                     title: 'Transferir a mesa #:',
                     onSubmit: async (input: string) => {
+                      if (!await validarCuentaCaja()) return
                       const newMesa = parseInt(input, 10)
                       if (isNaN(newMesa) || newMesa <= 0) { showToast('Numero de mesa invalido'); return }
                       const oldMesa = mesa
@@ -4605,7 +4764,7 @@ function POSContent() {
             </button>
             <button
               onClick={handleSendToKitchen}
-              disabled={activeItems.length === 0 || saving || loadingMesa}
+              disabled={activeItems.length === 0 || saving || loadingMesa || cuentaCajaBloqueada}
               className="flex-1 flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-2.5 rounded-xl text-base transition-all min-h-[52px]"
             >
               {saving ? <div className="w-[18px] h-[18px] border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Send size={18} />}
@@ -4613,15 +4772,15 @@ function POSContent() {
             </button>
             <button
               onClick={handlePreTicket}
-              disabled={activeItems.length === 0 || saving || loadingMesa}
+              disabled={activeItems.length === 0 || saving || loadingMesa || cuentaCajaBloqueada}
               className="flex-[0.6] flex items-center justify-center gap-1 bg-amber-600 hover:bg-amber-500 active:bg-amber-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-2.5 rounded-xl text-base transition-all min-h-[52px]"
             >
               <Receipt size={16} />
               Cuenta
             </button>
             <button
-              onClick={() => { if (activeItems.length >= 2) { setSplitMode(null); setSplitCount(0); setSplitParejoN(0); setSplitAssignments({}); setShowSplit(true) } else handleCloseOrder() }}
-              disabled={activeItems.length === 0 || saving || !can('cerrar_cuentas')}
+              onClick={async () => { if (!await validarCuentaCaja()) return; if (activeItems.length >= 2) { setSplitMode(null); setSplitCount(0); setSplitParejoN(0); setSplitAssignments({}); setShowSplit(true) } else handleCloseOrder() }}
+              disabled={activeItems.length === 0 || saving || cuentaCajaBloqueada || !can('cerrar_cuentas')}
               className="flex-[0.4] flex items-center justify-center bg-purple-600 hover:bg-purple-500 active:bg-purple-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-2.5 rounded-xl text-base transition-all min-h-[52px]"
               title={!can('cerrar_cuentas') ? 'Sin permiso para cobrar' : ''}
             >
@@ -4629,7 +4788,7 @@ function POSContent() {
             </button>
             <button
               onClick={handleCloseOrder}
-              disabled={activeItems.length === 0 || saving || !can('cerrar_cuentas')}
+              disabled={activeItems.length === 0 || saving || cuentaCajaBloqueada || !can('cerrar_cuentas')}
               className="flex-1 flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-2.5 rounded-xl text-base transition-all min-h-[52px]"
               title={!can('cerrar_cuentas') ? 'Sin permiso para cobrar' : ''}
             >

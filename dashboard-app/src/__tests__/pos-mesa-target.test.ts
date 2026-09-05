@@ -122,7 +122,9 @@ describe('POS mesa target — cableado real de las páginas', () => {
     expect(src, 'falta el import de setMesaTarget').toContain("from '@/lib/pos-navigation'")
 
     const park = src.indexOf('setMesaTarget(mesaNum)')
-    const push = src.indexOf('router.push(`/pos?mesa=${mesaNum}`)')
+    // Account identity now travels alongside mesa; query suffixes must not
+    // invalidate the invariant that navigation happens after parking the target.
+    const push = src.indexOf('router.push(`/pos?mesa=${mesaNum}')
     expect(park, 'handleMesaClick ya no parquea la mesa — el bug offline vuelve').toBeGreaterThan(-1)
     expect(push, 'handleMesaClick ya no navega por cliente').toBeGreaterThan(-1)
     expect(park, 'parquear DESPUÉS de navegar llega tarde: /pos ya resolvió la mesa').toBeLessThan(push)
