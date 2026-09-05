@@ -153,7 +153,7 @@ describe('CoreEventStore — idempotency', () => {
 })
 
 describe('Fault tolerance', () => {
-  test('corrupt lines in log are skipped gracefully', async () => {
+  test('corrupt committed lines fail closed without pretending the log is complete', async () => {
     const id = ++_counter
     const corruptLogPath = path.join(tmpDir, `events-${id}.ndjson`)
     // Inject a valid line then a corrupt line
@@ -161,8 +161,7 @@ describe('Fault tolerance', () => {
     fs.appendFileSync(corruptLogPath, '{ this is not valid JSON\n', 'utf8')
 
     const store = makeStore(id)
-    await store.load() // should not throw
-    // Valid line is readable; corrupt line is skipped
-    assert.equal(await store.getLastSequence(), 1)
+    await assert.rejects(store.load(), /EVENT_LOG_CORRUPT/)
+    await assert.rejects(store.getLastSequence(), /EVENT_LOG_CORRUPT/)
   })
 })

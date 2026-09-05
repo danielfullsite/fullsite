@@ -44,7 +44,11 @@ async function buildStack(dir) {
   const broadcasts = []
   const prints = []
   const fakeHub = { broadcast: async (ev) => { broadcasts.push(ev) } }
-  const fakePrinter = { printToStation: async (station, buf) => { prints.push({ station, len: buf.length }) } }
+  const queued = new Set()
+  const fakePrinter = {
+    prepareJobs: (station, buf, type, opts) => [{ job_id: opts.commandId, station, len: buf.length }],
+    enqueuePreparedJobs: async jobs => { for (const job of jobs) if (!queued.has(job.job_id)) { queued.add(job.job_id); prints.push(job) } },
+  }
 
   const cmd = new CommandHandler({ eventStore, state, wsHub: fakeHub, printer: fakePrinter, restaurantId: R })
 
@@ -53,7 +57,7 @@ async function buildStack(dir) {
   let online = true
   const fetchImpl = async (_url, opts) => {
     fetchCalls.push(JSON.parse(opts.body))
-    return { ok: online, status: online ? 201 : 503 }
+    return { ok: online, status: online ? 201 : 503, json: async () => [JSON.parse(opts.body)] }
   }
   const outbox = new OutboxWorker({
     eventStore, supabaseUrl: 'https://sb.test', supabaseKey: 'k',

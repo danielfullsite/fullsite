@@ -1,4 +1,5 @@
 'use strict'
+const { SECRET, wsOptions, localFetch: fetch } = require('./fixtures/lan-credential.cjs')
 
 // HTTPS POS -> localhost bridge preflight (Private Network Access).
 // A browser navigation to /health does not exercise this path; fetch() does.

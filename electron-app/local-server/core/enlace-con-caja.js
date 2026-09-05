@@ -31,6 +31,7 @@
 
 const RECONEXION_MS = [500, 1000, 2000, 5000, 10000]
 const { PROTOCOL_VERSION } = require('../protocol')
+const { cabecerasDeCredencial } = require('./credencial-lan')
 
 const LOG = '[enlace-caja]'
 
@@ -45,7 +46,7 @@ const LOG = '[enlace-caja]'
  * @param {(n:number) => void} [opts.guardarCursor] persistir el cursor al avanzar
  * @param {object} [opts.wsInyectado]  sólo para pruebas
  */
-function conectarConLaCaja({ cajaUrl, serverId, restaurantId, alRecibirEvento, alRecibirEstado, leerCursor, guardarCursor, wsInyectado }) {
+function conectarConLaCaja({ cajaUrl, serverId, restaurantId, lanSecret, branchId, alRecibirEvento, alRecibirEstado, leerCursor, guardarCursor, wsInyectado }) {
   let WS
   try {
     WS = wsInyectado || require('ws')
@@ -89,13 +90,13 @@ function conectarConLaCaja({ cajaUrl, serverId, restaurantId, alRecibirEvento, a
   const abrir = () => {
     if (!vivo) return
     try {
-      socket = new WS(urlDelHub)
+      socket = new WS(urlDelHub, { headers: cabecerasDeCredencial({ secreto: lanSecret, restaurantId, terminalId: serverId, branchId }) })
     } catch (e) {
       return reintentar(e.message)
     }
 
     socket.on('open', () => {
-      abierto = true
+      // Conectar TCP no significa estar autenticado: esperar SNAPSHOT.
       intento = 0
       ultimoMotivo = null
       conectadoDesde = Date.now()
@@ -123,6 +124,7 @@ function conectarConLaCaja({ cajaUrl, serverId, restaurantId, alRecibirEvento, a
 
       // SNAPSHOT trae el estado y los deltas que faltaban tras reconectar.
       if (msg.type === 'SNAPSHOT') {
+        abierto = true
         // EL ESTADO COMPLETO, PRIMERO. Se ignoraba, y era un P0: una terminal
         // secundaria no escribe en su propio log los eventos que vienen de la
         // caja, asi que al REINICIAR su estado queda sin las ordenes de las demas.

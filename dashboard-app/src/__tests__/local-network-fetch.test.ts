@@ -82,7 +82,7 @@ describe('localNetworkFetch — lo que realmente se le pasa a fetch', () => {
     })
 
     const [, init] = spy.mock.calls[0]
-    expect(init.headers['Content-Type']).toBe('application/json')
+    expect(new Headers(init.headers).get('content-type')).toBe('application/json')
     expect(JSON.parse(init.body).command_type).toBe('ORDER_SENT')
     expect(init.targetAddressSpace).toBe('loopback')
   })

@@ -1,20 +1,18 @@
 'use strict'
-// Outbox Worker — Phase 2 del modelo local-first (Pedro).
-//
-// Convierte al Local Server en la AUTORIDAD de escritura: en vez de que el browser
-// escriba directo a Supabase, el Local Server acumula eventos en events.ndjson y este
-// worker los sube a Supabase (tabla pos_local_events) de forma confiable y ordenada.
+// Outbox shadow: conserva una copia inmutable de eventos en pos_local_events.
+// Un evento copiado NO demuestra que existan su orden, pago o inventario cloud.
+// La materialización de negocio exige un recibo distinto (cloud-materializer).
 //
 // Contrato (OFFLINE-GAP-001):
 //   - Lee eventos con synced:false, en orden FIFO (por sequence).
 //   - EXCLUYE eventos STATE_SYNC (son observaciones internas del poll de Phase 1;
 //     el schema de pos_local_events tiene CHECK (type <> 'STATE_SYNC')).
-//   - Idempotencia por event.id (= command_id del terminal). Upsert con
-//     Prefer: resolution=merge-duplicates → reenviar es seguro (mismo resultado).
-//   - Marca cada evento confirmado con markSynced([sequence]).
+//   - Idempotencia por event.id: insertar sin sobrescribir y comparar el registro
+//     recibido. Un ID igual con contenido distinto es conflicto, nunca éxito.
+//   - Marca la COPIA confirmada con markSynced([sequence]).
 //   - Recovery: al reiniciar, los eventos synced:false se reenvían (idempotentes).
-//   - Conflicto Phase 1 (browser ya sincronizó): 409 → se marca synced igual, sin
-//     sobreescribir (GAP-001 §7).
+//   - Un 409 también puede ser otra operación con la misma secuencia. No prueba
+//     que esta operación se guardó: se conserva pendiente y se detiene el FIFO.
 //
 // Nota: este módulo es SOLO el worker (el motor). Voltear la autoridad de escritura
 // (que el browser deje de escribir a Supabase) es un paso aparte, gateado por
@@ -23,6 +21,7 @@
 
 const DEFAULT_INTERVAL_MS = 5000
 const DEFAULT_BATCH = 200
+const { sameCommand } = require('./command-identity')
 
 class OutboxWorker {
   /**
@@ -36,7 +35,7 @@ class OutboxWorker {
    * @param {number}   [opts.batchSize]
    * @param {function} [opts.logger]
    */
-  constructor({ eventStore, supabaseUrl, supabaseKey, restaurantId, fetchImpl, intervalMs, batchSize, logger }) {
+  constructor({ eventStore, supabaseUrl, supabaseKey, restaurantId, fetchImpl, intervalMs, batchSize, logger, timeoutMs = 8000 }) {
     if (!eventStore) throw new Error('OutboxWorker: eventStore requerido')
     if (!restaurantId) throw new Error('OutboxWorker: restaurantId requerido')
     this._store = eventStore
@@ -49,6 +48,7 @@ class OutboxWorker {
     this._log = logger || ((...a) => console.log('[outbox]', ...a))
     this._timer = null
     this._running = false
+    this._timeoutMs = timeoutMs
   }
 
   start() {
@@ -93,8 +93,9 @@ class OutboxWorker {
       if (res.ok) {
         confirmed.push(ev.sequence)
       } else if (res.conflict) {
-        confirmed.push(ev.sequence)     // browser ya lo sincronizó → márcalo, no sobreescribas
         conflicts++
+        failedAt = ev.sequence
+        break
       } else {
         failedAt = ev.sequence
         break
@@ -110,6 +111,7 @@ class OutboxWorker {
     if (!this._fetch || !this._url || !this._key) {
       return { ok: false }   // sin config no podemos subir; se reintenta al reconectar
     }
+    if (ev.restaurant_id && ev.restaurant_id !== this._restaurantId) return { ok: false, conflict: true }
     const body = {
       id:            ev.id,
       sequence:      ev.sequence,
@@ -119,24 +121,45 @@ class OutboxWorker {
       restaurant_id: ev.restaurant_id || this._restaurantId,
       payload:       ev.payload != null ? ev.payload : {},
     }
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), this._timeoutMs)
+    const auth = { apikey: this._key, Authorization: `Bearer ${this._key}` }
     try {
       const r = await this._fetch(`${this._url}/rest/v1/pos_local_events`, {
         method: 'POST',
         headers: {
-          apikey: this._key,
-          Authorization: `Bearer ${this._key}`,
+          ...auth,
           'Content-Type': 'application/json',
-          Prefer: 'resolution=merge-duplicates,return=minimal',
+          Prefer: 'resolution=ignore-duplicates,return=representation',
         },
         body: JSON.stringify(body),
+        signal: controller.signal,
       })
-      if (r.status === 409) return { ok: false, conflict: true }  // GAP-001 §7
-      if (r.ok) return { ok: true }
-      this._log(`send failed seq=${ev.sequence} http=${r.status}`)
-      return { ok: false }
+      if (r.status === 409) return { ok: false, conflict: true }
+      if (!r.ok) {
+        this._log(`send failed seq=${ev.sequence} http=${r.status}`)
+        return { ok: false }
+      }
+      let rows = await r.json()
+      // ignore-duplicates returns [] for an existing row. Verify what is stored;
+      // an empty HTTP success is not a receipt for this immutable operation.
+      if (Array.isArray(rows) && rows.length === 0) {
+        const existing = await this._fetch(`${this._url}/rest/v1/pos_local_events` +
+          `?id=eq.${encodeURIComponent(body.id)}&restaurant_id=eq.${encodeURIComponent(this._restaurantId)}&limit=1`,
+        { headers: auth, signal: controller.signal })
+        if (!existing.ok) return { ok: false }
+        rows = await existing.json()
+      }
+      if (!Array.isArray(rows) || rows.length !== 1) return { ok: false }
+      const stored = rows[0]
+      const matches = stored.id === body.id && Number(stored.sequence) === body.sequence &&
+        Number(stored.ts) === body.ts && (stored.terminal_id ?? null) === body.terminal_id && sameCommand(stored, body)
+      return matches ? { ok: true } : { ok: false, conflict: true }
     } catch (e) {
       // offline / red caída → reintenta en el próximo flush
       return { ok: false }
+    } finally {
+      clearTimeout(timer)
     }
   }
 }

@@ -1,4 +1,5 @@
 'use strict'
+const { SECRET, wsOptions, localFetch: fetch } = require('./fixtures/lan-credential.cjs')
 // KDS-02 tests: Local Server as KDS primary data source
 // Run: node --test electron-app/local-server/tests/kds-ws.test.js
 //
@@ -52,6 +53,7 @@ before(async () => {
   state = new RestaurantState()
 
   hub = new WsHub({
+    lanSecret: SECRET,
     serverId:        'test-server',
     restaurantId:    RESTAURANT_ID,
     getState:        () => state.toSnapshot(),
@@ -75,7 +77,7 @@ after(() => {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function openWs() { return new WebSocket(`ws://127.0.0.1:${TEST_PORT}/ws`) }
+function openWs() { return new WebSocket(`ws://127.0.0.1:${TEST_PORT}/ws`, wsOptions) }
 
 function waitOpen(ws) {
   return new Promise((resolve, reject) => {

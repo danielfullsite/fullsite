@@ -247,6 +247,7 @@
   var CFG = window.__KDS_CFG__ || {};
   var STATE_BASE = (CFG.bridge_base || "").replace(/\/$/,"");
   var POLL_MS = 2000;
+  function authHeaders(extra){ return Object.assign({}, CFG.headers || {}, extra || {}); }
   var LKEY = "kds_local_v3";           // per-item touch state
   var SKEY = "kds_settings_v1";         // station / alert_min / sound
 
@@ -462,7 +463,7 @@
   function postStatus(order,status){
     var key=order.id+":"+status; if(postedStatus[key]) return; postedStatus[key]=1;
     var cmd={ command_id:(order.id+"-"+status+"-"+Math.floor(Date.now()/1000)), command_type:"ORDER_UPSERTED", order_id:order.id, mesa:order.mesa, status:status, client_id:(CFG.client_id||"") };
-    fetch(STATE_BASE+"/events",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(cmd)})
+    fetch(STATE_BASE+"/events",{method:"POST",headers:authHeaders({"Content-Type":"application/json"}),body:JSON.stringify(cmd)})
       .then(function(r){ if(!r.ok) throw 0; }).catch(function(){ postedStatus[key]=0; toast("Sin conexión al servidor — se reintentará"); });
   }
 
@@ -539,7 +540,7 @@
   function fetchState(){
     if(location.protocol==="file:"){ setConn(true); connTxt.textContent="modo demo local"; render(false); return; }
     var ctrl=new AbortController(); var to=setTimeout(function(){ ctrl.abort(); },4000);
-    fetch(STATE_BASE+"/state",{cache:"no-store",signal:ctrl.signal})
+    fetch(STATE_BASE+"/state",{cache:"no-store",signal:ctrl.signal,headers:authHeaders()})
       .then(function(r){ return r.ok?r.json():Promise.reject(); })
       .then(function(data){ clearTimeout(to); lastGood=adaptOrders(data); setConn(true); render(true); })
       .catch(function(){ clearTimeout(to); setConn(false); render(false); });

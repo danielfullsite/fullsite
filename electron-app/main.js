@@ -297,11 +297,14 @@ async function startLocalServer() {
     // pasaban `posServerPort` explicitamente y no podian ver el hueco.
     posServerPort:      appConfig.pos_server_port || null,
     terminalRole:       appConfig.terminal_role  || null,
+    branchId:           appConfig.location_id || appConfig.branch_id || appConfig.branchId || null,
     lanSecret:          appConfig.lan_secret     || appConfig.lanSecret || null,
   };
 
   try {
     localServer = await start({ dataDir, port: LOCAL_SERVER_PORT, config: cfg });
+    // Incluye el secreto que Caja acaba de generar/persistir, no sólo config.json.
+    appConfig.lan_secret = localServer.lanSecret || null;
     console.log('[main] Local server started.');
   } catch (e) {
     if (e.code === 'EADDRINUSE') {
@@ -704,6 +707,20 @@ let mainWindow = null;
 let kdsWindow = null;
 let allowClose = false;
 
+const { rendererIdentity } = require('./local-server/core/renderer-identity');
+function identityForUrl(url) {
+  return rendererIdentity({ url, config: appConfig, port: LOCAL_SERVER_PORT, dev: DEV, posUrl: POS_URL });
+}
+ipcMain.on('local-network:identity', (event) => {
+  event.returnValue = null;
+  const ownWindow = [mainWindow, kdsWindow].some(w => w && !w.isDestroyed() && w.webContents === event.sender);
+  const frame = event.senderFrame;
+  const mainFrame = event.sender.mainFrame;
+  if (!ownWindow || !frame || !mainFrame || frame.routingId !== mainFrame.routingId || frame.processId !== mainFrame.processId) return;
+  event.returnValue = identityForUrl(frame.url);
+});
+
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     title: 'Fullsite POS',
@@ -733,38 +750,10 @@ function createWindow() {
     loadFailCount = 0; // Reset on successful load
     const bootTime = new Date().toISOString();
     const scripts = [`localStorage.setItem('pos_last_boot', ${JSON.stringify(bootTime)})`];
-    // Inject validated identity from provisioned config into localStorage.
-    // Both new schema keys (restaurant_id, terminal_id) and legacy keys (clientId, terminalId) are supported.
-    const clientId   = (appConfig.restaurant_id || appConfig.client_id   || appConfig.restaurantId || appConfig.clientId || '').toLowerCase().trim();
-    const terminalId = appConfig.terminal_id   || appConfig.terminalId;
-    if (clientId) {
-      scripts.push(`localStorage.setItem('fullsite_client_id', ${JSON.stringify(String(clientId))})`);
-    }
-    if (terminalId) {
-      scripts.push(`localStorage.setItem('pos_terminal_id', ${JSON.stringify(String(terminalId))})`);
-    }
-    // Secondary POS (role 'pos'): its https page CANNOT POST to the caja's http LAN
-    // IP (mixed-content wall — webSecurity:false does NOT bypass it, proven in field).
-    // So it posts print/events to its OWN local server on 127.0.0.1 (localhost is
-    // exempt from the wall), and that local server FORWARDS to the caja over Node
-    // (see local-server /print,/events forward, gated on config.posServerIp).
-    if (appConfig.terminal_role === 'pos') {
-      scripts.push(`localStorage.setItem('FULLSITE_BRIDGE_URL', ${JSON.stringify('http://127.0.0.1:' + LOCAL_SERVER_PORT)})`);
-      // La credencial de la red local. Pedro la exige en las rutas operativas
-      // desde 2026-09-04; sin inyectarla, el POS recibiria 401 al imprimir, al
-      // mandar comanda y al leer el salon — y no tendria como saber por que.
-      // Se lee del config de ESTA terminal: la caja la genera, el asistente la
-      // copia a las secundarias.
-      if (appConfig.lan_secret || appConfig.lanSecret) {
-        scripts.push(`localStorage.setItem('FULLSITE_LAN_SECRET', ${JSON.stringify(appConfig.lan_secret || appConfig.lanSecret)})`);
-      }
-      if (appConfig.terminal_id || appConfig.terminalId) {
-        scripts.push(`localStorage.setItem('FULLSITE_TERMINAL_ID', ${JSON.stringify(appConfig.terminal_id || appConfig.terminalId)})`);
-      }
-      // Drop any stale caja IP a previous build/manual config may have left, which
-      // would send the ws bridge-client to ws://<caja> (blocked) and print to the caja
-      // directly (blocked). Everything must go through localhost now.
-      scripts.push(`localStorage.removeItem('pos_bridge_host')`);
+    const identity = identityForUrl(mainWindow.webContents.getURL());
+    if (!identity) return;
+    for (const [key, value] of Object.entries(identity)) {
+      scripts.push(value ? `localStorage.setItem(${JSON.stringify(key)}, ${JSON.stringify(String(value))})` : `localStorage.removeItem(${JSON.stringify(key)})`);
     }
     mainWindow.webContents.executeJavaScript(scripts.join('; ')).catch(() => {});
   });
@@ -846,7 +835,7 @@ function setupOfflineRetry() {
     const url = mainWindow.webContents.getURL();
     // QW9: offline.html (file://) gestiona sus PROPIOS reintentos; si aqui tambien
     // recargamos POS_URL, ambos compiten -> parpadeo/ping-pong. No tocar file://.
-    if (!url.startsWith('https://') && !url.startsWith('file://')) mainWindow.loadURL(POS_URL);
+    if (!url.startsWith('https://') && !url.startsWith('file://') && !identityForUrl(url)) mainWindow.loadURL(POS_URL);
   }, 10000);
 }
 
@@ -900,18 +889,24 @@ function createKdsWindow(x, y, width, height, urlOverride) {
 
   const targetUrl = urlOverride || KDS_URL;
   kdsWindow.setMenu(null);
-  kdsWindow.loadURL(targetUrl);
+  const localKds = targetUrl === `http://127.0.0.1:${LOCAL_SERVER_PORT}/kds`;
+  const kdsHeaders = localKds ? require('./local-server/core/credencial-lan').cabecerasDeCredencial({
+    secreto: appConfig.lan_secret || appConfig.lanSecret,
+    restaurantId: appConfig.restaurant_id || appConfig.restaurantId || appConfig.client_id || appConfig.clientId,
+    terminalId: appConfig.terminal_id || appConfig.terminalId,
+    branchId: appConfig.location_id || appConfig.branch_id || appConfig.branchId,
+  }) : {};
+  const loadKds = () => kdsWindow.loadURL(targetUrl, { extraHeaders: Object.entries(kdsHeaders).map(([key, value]) => `${key}: ${value}`).join('\r\n') });
+  loadKds();
 
   // Inject provisioned identity into the KDS window (mirror of mainWindow).
   // Essential: getKitchenOrders() filters by localStorage 'fullsite_client_id',
   // and the KDS route never does a Supabase login to set it. Without this the
   // KDS shows 0 orders even though they exist in pos_orders for this tenant.
   kdsWindow.webContents.on('did-finish-load', () => {
-    const clientId   = (appConfig.restaurant_id || appConfig.client_id || appConfig.restaurantId || appConfig.clientId || '').toLowerCase().trim();
-    const terminalId = appConfig.terminal_id || appConfig.terminalId;
-    const scripts = [];
-    if (clientId)   scripts.push(`localStorage.setItem('fullsite_client_id', ${JSON.stringify(String(clientId))})`);
-    if (terminalId) scripts.push(`localStorage.setItem('pos_terminal_id', ${JSON.stringify(String(terminalId))})`);
+    const identity = identityForUrl(kdsWindow.webContents.getURL());
+    if (!identity) return;
+    const scripts = Object.entries(identity).map(([key, value]) => value ? `localStorage.setItem(${JSON.stringify(key)}, ${JSON.stringify(String(value))})` : `localStorage.removeItem(${JSON.stringify(key)})`);
     if (scripts.length) kdsWindow.webContents.executeJavaScript(scripts.join('; ')).catch(() => {});
     // TEMP DIAG
     kdsWindow.webContents.executeJavaScript(`JSON.stringify({cid: localStorage.getItem('fullsite_client_id'), bh: localStorage.getItem('pos_bridge_host'), tid: localStorage.getItem('pos_terminal_id'), electron: navigator.userAgent.includes('Electron'), url: location.href})`).then(v => console.log('[kds-diag]', v)).catch(e => console.log('[kds-diag ERR]', e.message));
@@ -934,7 +929,7 @@ function createKdsWindow(x, y, width, height, urlOverride) {
     if (kdsFailCount <= 3) {
       // Give SW time to activate from previous session (progressive backoff)
       setTimeout(() => {
-        if (kdsWindow && !kdsWindow.isDestroyed()) kdsWindow.loadURL(targetUrl);
+        if (kdsWindow && !kdsWindow.isDestroyed()) loadKds();
       }, kdsFailCount * 800);
     } else {
       kdsFailCount = 0;
@@ -1024,8 +1019,8 @@ app.whenReady().then(async () => {
   }
 
   appConfig = configResult.config;
-  // Dedicated KDS build always opens in kds_only mode regardless of saved config
-  if (app.getName() === 'Fullsite KDS') appConfig.kds_only = true;
+  // A provisioned KDS role and the dedicated build both open the kitchen UI.
+  if (app.getName() === 'Fullsite KDS' || appConfig.terminal_role === 'kds') appConfig.kds_only = true;
   console.log(`[main] Provisioned: restaurant_id=${appConfig.restaurant_id} terminal_id=${appConfig.terminal_id} role=${appConfig.terminal_role}`);
 
   // QW11: shortcuts de recuperacion registrados AQUI (no dentro de createWindow, que

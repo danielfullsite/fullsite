@@ -1,4 +1,5 @@
 'use strict'
+const { SECRET, wsOptions, localFetch: fetch } = require('./fixtures/lan-credential.cjs')
 // El reenvío de LECTURA, probado con dos servidores HTTP de verdad.
 //
 // ── POR QUÉ ESTA PRUEBA EXISTE, Y POR QUÉ LA ANTERIOR NO SERVÍA ──────────────
@@ -55,7 +56,7 @@ async function levantarPedro(dir, port, config = {}) {
   const cmdHandler = new CommandHandler({ eventStore, state, wsHub: hub, printer, restaurantId: R })
   const router = buildHttpRouter({
     state, eventStore, wsHub: hub, cmdHandler, printer,
-    version: 'test', serverId: `srv-${port}`, restaurantId: R, config, port,
+    version: 'test', serverId: `srv-${port}`, restaurantId: R, config: { lanSecret: SECRET, ...config }, port,
   })
   const server = http.createServer(router)
   await new Promise((r) => server.listen(port, '127.0.0.1', r))

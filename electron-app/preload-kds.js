@@ -1,20 +1,15 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-// ── Inject provisioned identity from URL params BEFORE the page's React mounts ──
-// useBridgeClient() reads localStorage 'fullsite_client_id' on mount and bails
-// PERMANENTLY (it never retries) if it's missing → the KDS WebSocket to the local
-// server never connects → orders pushed over LAN while offline never arrive
-// (online polling of Supabase masks this). The main-process injection
-// (did-finish-load) runs AFTER the page mounts — too late for that gate. Preload
-// runs before any page script, so setting these here guarantees they're present
-// in time. Values come from the KDS URL (?client=&bridge=, added by main.js).
+
+// Se ejecuta antes del JS de la página: el primer fetch/SUBSCRIBE ya lleva credencial.
+// Main valida ventana, top frame y origen; la identidad nunca viene de la URL.
 try {
-  const params = new URLSearchParams(window.location.search);
-  const client = params.get('client');
-  const bridge = params.get('bridge');
-  if (client) window.localStorage.setItem('fullsite_client_id', String(client).toLowerCase().trim());
-  if (bridge) window.localStorage.setItem('pos_bridge_host', String(bridge));
-} catch (e) { /* localStorage not ready this early — main-process injection is the fallback */ }
+  const identity = ipcRenderer.sendSync('local-network:identity');
+  if (identity) for (const [key, value] of Object.entries(identity)) {
+    if (value) window.localStorage.setItem(key, String(value));
+    else window.localStorage.removeItem(key);
+  }
+} catch { /* el diagnóstico sigue disponible; Pedro falla cerrado sin credencial */ }
 
 contextBridge.exposeInMainWorld('fullsiteApp', {
   quit: () => ipcRenderer.send('app-quit'),
