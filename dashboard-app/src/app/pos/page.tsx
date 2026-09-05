@@ -1773,8 +1773,15 @@ function POSContent() {
       // When offline: IDB cache is already shown above — skip all network calls.
       if (!navigator.onLine) return
 
+      // A working LAN keeps navigator.onLine=true during a WAN outage. Recipe
+      // suggestions must not reject the whole bootstrap (including cached menu).
+      // Only this optional presentation read degrades; inventory callers still
+      // receive the original error instead of treating missing recipes as truth.
+      const suggestionsDeadline = AbortSignal.timeout(6000)
       const [r, i, dbMenu, pm, turno] = await Promise.all([
-        getRecipes(), getIngredients(), getMenuCategoriesFromDB(), getPaymentMethodsFromDB(), getActiveTurnoTolerante(),
+        getRecipes(suggestionsDeadline).catch(() => [] as RecipeRow[]),
+        getIngredients(suggestionsDeadline).catch(() => [] as Ingredient[]),
+        getMenuCategoriesFromDB(), getPaymentMethodsFromDB(), getActiveTurnoTolerante(),
       ])
       setAllRecipes(r)
       setAllIngredients(i)

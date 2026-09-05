@@ -2310,10 +2310,10 @@ export interface InventoryMovement {
 
 // ─── Ingredients CRUD ───────────────────────────────────────────────────────
 
-export async function getIngredients(): Promise<Ingredient[]> {
+export async function getIngredients(signal?: AbortSignal): Promise<Ingredient[]> {
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/pos_ingredients?client_id=eq.${_getClientId()}&active=eq.true&order=name.asc&limit=2000`,
-    { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
+    { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store', signal }
   )
   if (!res.ok) return []
   return res.json()
@@ -2321,7 +2321,7 @@ export async function getIngredients(): Promise<Ingredient[]> {
 
 // ─── Recipes CRUD ───────────────────────────────────────────────────────────
 
-export async function getRecipes(): Promise<RecipeRow[]> {
+export async function getRecipes(signal?: AbortSignal): Promise<RecipeRow[]> {
   // Supabase has a 1000-row default limit. Use Range header to get all rows.
   // pos_recipes_old has 4000+ rows for AMALAY.
   const all: RecipeRow[] = []
@@ -2330,7 +2330,7 @@ export async function getRecipes(): Promise<RecipeRow[]> {
   while (true) {
     const res = await fetch(
       `${SUPABASE_URL}/rest/v1/pos_recipes_old?client_id=eq.${_getClientId()}&order=menu_item_name.asc&select=*`,
-      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, Range: `${offset}-${offset + pageSize - 1}` }, cache: 'no-store' }
+      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, Range: `${offset}-${offset + pageSize - 1}` }, cache: 'no-store', signal }
     )
     if (!res.ok) break
     const rows = await res.json()

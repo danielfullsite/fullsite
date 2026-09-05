@@ -1,4 +1,7 @@
 node_modules/
+# Local worktrees may link their dependencies instead of installing a directory.
+**/node_modules
+output/closure/
 .DS_Store
 .env
 .env.local
