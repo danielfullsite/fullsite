@@ -4,7 +4,7 @@
 // One WebSocketServer instance, attached to the existing HTTP server via 'upgrade'.
 
 const { WebSocketServer } = require('ws')
-const { S2C, C2S, parseClientMessage, serverEnvelope } = require('../protocol')
+const { S2C, C2S, revisarMensajeDeCliente, serverEnvelope } = require('../protocol')
 
 const PING_INTERVAL_MS   = 15_000
 const PONG_TIMEOUT_MS    = 10_000
@@ -58,9 +58,16 @@ class WsHub {
     let clientId   = null
 
     ws.on('message', async (raw) => {
-      let msg
-      try { msg = parseClientMessage(raw.toString()) } catch { return }
-      if (!msg) return
+      // Se RECHAZA con motivo y se cierra, en vez de ignorar en silencio. Un
+      // cliente ignorado queda conectado y mudo sin saber por que; uno cerrado
+      // con codigo 1008 y un texto puede arreglarse. Ver protocol.js/RECHAZO.
+      const revision = revisarMensajeDeCliente(raw.toString())
+      if (revision.rechazo) {
+        console.warn(`[ws-hub] mensaje rechazado de ${clientId || remoteIp}: ${revision.rechazo}`)
+        try { ws.close(1008, revision.rechazo) } catch {}
+        return
+      }
+      const msg = revision.msg
 
       if (msg.type === C2S.SUBSCRIBE) {
         clientId = msg.client_id

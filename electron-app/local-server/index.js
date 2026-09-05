@@ -29,6 +29,8 @@ const { CoreEventStore }    = require('./core/event-store')
 const { RestaurantState }   = require('./core/state')
 const { WsHub }             = require('./core/ws-hub')
 const { CommandHandler }    = require('./core/command-handler')
+const { conectarConLaCaja } = require('./core/enlace-con-caja')
+const credLan = require('./core/credencial-lan')
 const { OutboxWorker }      = require('./core/outbox')
 const mdns      = require('./discovery/mdns')
 const heartbeat = require('./telemetry/heartbeat')
@@ -253,12 +255,15 @@ function json(res, statusCode, payload) {
 // Forward a POST to another local server (the caja) over Node http — no browser
 // mixed-content wall applies here. Used by secondary POS terminals so their https
 // page can reach the caja's printers/state via their own localhost server.
-function forwardPost(targetUrl, bodyStr) {
+function forwardPost(targetUrl, bodyStr, credenciales = {}) {
   return new Promise((resolve, reject) => {
     const u = new URL(targetUrl)
     const r = http.request(
       { hostname: u.hostname, port: u.port, path: u.pathname, method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(bodyStr) }, timeout: 5000 },
+        // La credencial viaja al reenviar: la caja exige la misma que este Pedro.
+        // Sin esto, activar la seguridad dejaria a las terminales secundarias sin
+        // imprimir ni mandar comandas — el reenvio moriria con 401.
+        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(bodyStr), ...credenciales }, timeout: 5000 },
       (resp) => { let d = ''; resp.on('data', c => { d += c }); resp.on('end', () => resolve({ status: resp.statusCode, body: d })) }
     )
     r.on('error', reject)
@@ -267,6 +272,46 @@ function forwardPost(targetUrl, bodyStr) {
   })
 }
 
+/**
+ * Reenvío de LECTURA hacia la caja. La mitad que faltaba.
+ *
+ * POR QUÉ EXISTE: hasta 2026-09-02 el reenvío entre terminales era
+ * `req.method === 'POST'` y nada más — tres rutas de escritura (/print, /events,
+ * /drawer) y ninguna forma de PREGUNTAR. Una terminal secundaria podía avisar,
+ * no consultar. Su única fuente de estado era la nube, así que sin internet cada
+ * caja quedaba con lo suyo.
+ *
+ * En campo, con tres cajas y el WAN caído (Eduardo Esquivel, AMALAY):
+ *   «no hay comunicación correcta entre los puntos de venta, no muestran lo mismo»
+ *
+ * La caja ya sabía contestar `GET /state` y `GET /events?since=N`. Nadie podía
+ * alcanzarlas. Esto abre esa dirección.
+ *
+ * Se conserva `query` porque `/events?since=N` no sirve de nada sin ella: es
+ * justo el parámetro que permite a una terminal ponerse al día tras reconectar.
+ */
+function forwardGet(targetUrl, credenciales = {}) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(targetUrl)
+    const r = http.request(
+      { hostname: u.hostname, port: u.port, path: u.pathname + u.search, method: 'GET',
+        headers: { ...credenciales },
+        // Más corto que el POST (5 s) a propósito: una lectura la está esperando
+        // una pantalla con alguien enfrente. Si la caja no contesta en 2 s, el
+        // consumidor cae a su caché local, que es lo correcto — mejor mostrar
+        // algo viejo y decirlo que congelar el mapa de mesas.
+        timeout: 2000 },
+      (resp) => { let d = ''; resp.on('data', c => { d += c }); resp.on('end', () => resolve({ status: resp.statusCode, body: d })) }
+    )
+    r.on('error', reject)
+    r.on('timeout', () => { r.destroy(); reject(new Error('timeout')) })
+    r.end()
+  })
+}
+
+/** Lecturas que una terminal secundaria puede hacerle a la caja. */
+const LECTURAS_REENVIADAS = ['/state', '/events']
+
 // Keep identity and routing configuration explicit so every cloned terminal can
 // discover the caja without relying on process-global or customer-specific state.
 function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, version, serverId, restaurantId, config = {}, instanceName = '', branchId = config.branchId || null, posServerIp = config.posServerIp || null, port = 7717, posServerPort = config.posServerPort || null }) {
@@ -274,19 +319,64 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, versio
   // secundario — lo que acopla ambos al 7717: dos Pedros en una misma maquina
   // (pruebas, demos) o una terminal en puerto distinto rompian el forward.
   const cajaPort = posServerPort || port || 7717
+  // Se calcula UNA vez, no por peticion: es el mismo secreto toda la vida del
+  // proceso y recalcularlo en cada comanda no aporta nada.
+  const credencialesHaciaLaCaja = credLan.cabecerasDeCredencial({
+    secreto: config.lanSecret || null, restaurantId, terminalId: config.terminalId,
+  })
   return async function router(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+    // Sin listar la cabecera de credencial, el preflight la rechaza y el POS
+    // recibe un error de red sin explicacion.
+    res.setHeader('Access-Control-Allow-Headers', `Content-Type, ${credLan.CABECERA}, x-fullsite-restaurante, x-fullsite-terminal`)
     // Chrome/Electron sends a Private Network Access preflight when the POS
     // loaded from https://app.fullsite.mx calls its bridge on localhost/LAN.
     // A top-level navigation to /health works without this header, while fetch()
     // is rejected as a network error — exactly the AMALAY Entrada field failure.
     res.setHeader('Access-Control-Allow-Private-Network', 'true')
+    // Sin exponerla, `fetch()` NO puede leer esta cabecera cross-origin: existiría
+    // en el cable y sería invisible para el POS. Es la que avisa que el dato NO
+    // viene de la caja. (El cuerpo también lo declara — ver `authoritative`; la
+    // cabecera es la vía barata para un consumidor que no parsea el JSON.)
+    res.setHeader('Access-Control-Expose-Headers', 'X-Fullsite-Origen')
     res.setHeader('Vary', 'Origin, Access-Control-Request-Private-Network')
     if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return }
 
+    // `url` es SÓLO la ruta, para enrutar. `rutaCompleta` conserva la query, para
+    // REENVIAR.
+    //
+    // Antes había una sola variable, `req.url.split('?')[0]`, y el reenvío usaba
+    // ésa — así que `GET /events?since=57` salía hacia la caja como `/events` y el
+    // cursor se perdía: la terminal recibía el historial completo en cada
+    // reconexión, sin forma de saber qué ya había visto. Es justo lo que `since`
+    // existe para resolver.
+    //
+    // El bug sobrevivió a una prueba en verde porque esa prueba comprobaba que el
+    // código CONTUVIERA `u.pathname + u.search`, no que la query llegara. Ver
+    // `tests/reenvio-lectura-integracion.test.js`, que levanta dos servidores
+    // reales y afirma sobre lo que recibió el de enfrente.
     const url = req.url?.split('?')[0]
+    const rutaCompleta = req.url || url
+
+    // ── Credencial de la red local ──────────────────────────────────────────
+    // Pedro escucha en 0.0.0.0: sin esto, cualquier equipo del WiFi puede leer
+    // las ordenes del dia, emitir un cierre, imprimir o ABRIR EL CAJON. Va antes
+    // que TODO lo operativo, incluido el reenvio: una peticion que no puede
+    // entrar aqui tampoco debe poder salir hacia la caja usando a este Pedro de
+    // puente. Ver core/credencial-lan.js.
+    const credencial = credLan.verificarCredencial({
+      ruta: url, metodo: req.method, cabeceras: req.headers,
+      secreto: config.lanSecret || null, restaurantId,
+    })
+    if (!credencial.permitido) {
+      console.warn(`${credLan.LOG} rechazada ${req.method} ${url} desde ${req.socket?.remoteAddress}: ${credencial.motivo}`)
+      // 401 y no 403: falta credencial, no permiso. El mensaje NO dice cual es
+      // el secreto ni si el restaurante acerto — quien no tiene la llave no
+      // merece pistas.
+      json(res, 401, { error: credencial.motivo })
+      return
+    }
 
     // ── Secondary-POS forward (role 'pos', posServerIp set) ───────────────────
     // A secondary POS has no physical printers and its state isn't the KDS source
@@ -296,12 +386,67 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, versio
     if (posServerIp && req.method === 'POST' && (url === '/print' || url === '/events' || url === '/drawer')) {
       try {
         const body = await parseBody(req)
-        const up = await forwardPost(`http://${posServerIp}:${cajaPort}${url}`, JSON.stringify(body))
+        const up = await forwardPost(`http://${posServerIp}:${cajaPort}${url}`, JSON.stringify(body), credencialesHaciaLaCaja)
         res.writeHead(up.status || 502, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
         res.end(up.body || '{}')
       } catch (e) {
         console.error('[forward→caja] failed:', e.message)
         json(res, 502, { error: 'forward to caja failed: ' + e.message })
+      }
+      return
+    }
+
+    // ── Reenvío de LECTURA hacia la caja (rol 'pos') ─────────────────────────
+    // La mitad que faltaba del bloque de arriba. Una terminal secundaria no es
+    // la fuente de verdad del salón: su propio `state` sólo conoce lo que ella
+    // misma hizo. Preguntarle a la caja es lo único que hace que las tres
+    // terminales vean lo mismo sin internet.
+    //
+    // Va DESPUÉS del reenvío de escritura y ANTES de las rutas locales, para que
+    // en un secundario `/state` signifique «el salón» y no «lo que yo vi».
+    //
+    // `/identity` y `/health` NO se reenvían a propósito: preguntan por ESTA
+    // máquina. Reenviarlas haría que un secundario se presentara como la caja,
+    // y el descubrimiento de terminales dejaría de funcionar.
+    if (posServerIp && req.method === 'GET' && LECTURAS_REENVIADAS.includes(url)) {
+      try {
+        // `rutaCompleta`, NO `url`: sin la query se pierde `?since=N`.
+        const up = await forwardGet(`http://${posServerIp}:${cajaPort}${rutaCompleta}`, credencialesHaciaLaCaja)
+        res.writeHead(up.status || 502, {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Expose-Headers': 'X-Fullsite-Origen',
+        })
+        res.end(up.body || '{}')
+      } catch (e) {
+        // Falla ABIERTO hacia el estado local, y lo DICE en una cabecera. Si la
+        // caja está apagada o la LAN se cortó, devolver un error dejaría el mapa
+        // de mesas en blanco — peor que mostrar lo que esta terminal sabe. Pero
+        // el consumidor tiene que poder distinguir «el salón» de «lo que yo vi»:
+        // confundirlos es exactamente la familia de bugs que costó la semana.
+        console.warn('[forward→caja GET] falló, sirvo estado local:', e.message)
+        if (url === '/state') {
+          const seq = await eventStore.getLastSequence()
+          res.writeHead(200, {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Expose-Headers': 'X-Fullsite-Origen',
+            'X-Fullsite-Origen': 'local-degradado',
+          })
+          // En el CUERPO, no sólo en la cabecera. Una cabecera cross-origin es
+          // invisible para `fetch()` salvo que se exponga, y un consumidor puede
+          // no mirarla nunca. `authoritative: false` viaja con el dato y obliga a
+          // quien lo lea a decidir qué hace — que es el punto: este snapshot es
+          // lo que ESTA terminal vio, no el salón.
+          res.end(JSON.stringify({
+            sequence: seq,
+            authoritative: false,
+            source: 'local-degradado',
+            ...state.toSnapshot(),
+          }))
+          return
+        }
+        json(res, 502, { error: 'no se pudo consultar a la caja: ' + e.message })
       }
       return
     }
@@ -354,7 +499,11 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, versio
     // ── GET /state ───────────────────────────────────────────────────────────
     if (url === '/state' && req.method === 'GET') {
       const seq = await eventStore.getLastSequence()
-      json(res, 200, { sequence: seq, ...state.toSnapshot() })
+      // La simétrica del degradado. Si sólo se marcara el caso malo, un consumidor
+      // no podría distinguir "esto es autoritativo" de "esto lo sirvió una versión
+      // vieja de Pedro que aún no sabía marcarlo" — y ante la duda tendría que
+      // asumir lo peor de un dato bueno.
+      json(res, 200, { sequence: seq, authoritative: true, source: 'caja', ...state.toSnapshot() })
       return
     }
 
@@ -656,10 +805,100 @@ async function startLocalServer({ dataDir, port = 7717, config = {} }) {
     console.log('[server] Outbox Worker: SHADOW MODE activo')
   }
 
+  // ── Secreto de la red local ───────────────────────────────────────────────
+  //
+  // La CAJA lo genera en su primer arranque y lo guarda. Las terminales
+  // secundarias NO lo generan: lo reciben al aprovisionarse. Si una secundaria
+  // se lo inventara, tendria uno distinto al de la caja y el reenvio moriria con
+  // 401 — un fallo dificil de diagnosticar en el piso.
+  //
+  // Se imprime SOLO el prefijo. Un secreto en un log es un secreto filtrado.
+  if (!config.lanSecret && (config.terminalRole === 'server_pos' || !config.posServerIp)) {
+    const fsSec = require('fs')
+    const pathSec = require('path')
+    const rutaSecreto = pathSec.join(dataDir, 'lan-secret')
+    try {
+      if (fsSec.existsSync(rutaSecreto)) {
+        config.lanSecret = fsSec.readFileSync(rutaSecreto, 'utf8').trim() || null
+      } else {
+        config.lanSecret = credLan.generarSecreto()
+        fsSec.writeFileSync(rutaSecreto, config.lanSecret, { mode: 0o600 })
+        console.log('[server] Secreto de red local GENERADO. Copialo a las terminales secundarias.')
+      }
+    } catch (e) {
+      console.warn('[server] no se pudo leer/crear el secreto de red local:', e.message)
+    }
+  }
+  console.log(`[server] Credencial LAN: ${credLan.paraLog(config.lanSecret)}`)
+  if (!config.lanSecret) {
+    console.warn('[server] ⚠ SIN CREDENCIAL: las rutas operativas quedan abiertas a toda la red local.')
+  }
+
+  // ── Enlace ascendente con la caja (sólo terminales secundarias) ───────────
+  //
+  // Cierra el hueco de campo del 2026-09-02: una comanda de POS 3 no llegaba
+  // nunca a los tableros de POS 2, porque este Pedro no era cliente de nadie.
+  //
+  // SE ACTIVA SÓLO en una terminal secundaria: `terminal_role === 'pos'` Y con
+  // `pos_server_ip` configurado. Las dos condiciones, no una:
+  //   · La CAJA (`server_pos`) no debe conectarse a sí misma — sería un bucle
+  //     de retransmisión que se multiplica solo.
+  //   · Un KDS dedicado ya recibe por su propio WebSocket; abrirle otro canal
+  //     le entregaría cada evento dos veces.
+  //   · Un rol nulo o desconocido NO activa nada: falla cerrado. Una terminal
+  //     mal aprovisionada se queda como estaba, no en un estado a medias.
+  let _enlaceCaja = null
+  const _rolTerminal = config.terminalRole || null
+  if (_rolTerminal === 'pos' && config.posServerIp) {
+    // El cursor vive en el dataDir de ESTA terminal. Sin persistirlo, un reinicio
+    // vuelve con -1 y el hub no manda catch-up (ws-hub.js:88): se pierde en
+    // silencio todo lo ocurrido mientras estuvo apagada.
+    // `fs` y `path` viven dentro de otras funciones en este archivo, no a nivel
+    // de modulo. Se requieren aqui en vez de mover los de arriba: cambio minimo.
+    const fsCursor = require('fs')
+    const pathCursor = require('path')
+    const rutaCursor = pathCursor.join(dataDir, 'cursor-caja.json')
+    const cajaWs = `ws://${config.posServerIp}:${config.posServerPort || port || 7717}`
+    _enlaceCaja = conectarConLaCaja({
+      cajaUrl: cajaWs,
+      serverId,
+      restaurantId,
+      leerCursor: () => {
+        try { return JSON.parse(fsCursor.readFileSync(rutaCursor, 'utf8')).cursor } catch { return -1 }
+      },
+      guardarCursor: (n) => {
+        try { fsCursor.writeFileSync(rutaCursor, JSON.stringify({ cursor: n, ts: Date.now() })) } catch {}
+      },
+      // El salón completo al (re)conectar. Sin esto, una terminal reiniciada se
+      // queda sin las órdenes de las demás y su KDS aparece en blanco.
+      alRecibirEstado: (snap) => {
+        try {
+          state.hidratarDesdeSnapshot(snap)
+          // Se reparte a los tableros de ESTA terminal: si no, siguen pintando lo
+          // que tenían antes del reinicio.
+          wsHub.broadcast({ type: 'STATE_SYNC', payload: {} }).catch(() => {})
+          console.log('[enlace-caja] estado hidratado desde la caja')
+        } catch (e) { console.warn('[enlace-caja] no se pudo hidratar:', e.message) }
+      },
+      alRecibirEvento: (ev) => {
+        // Se aplica al estado local Y se retransmite a los clientes de ESTA
+        // terminal: cocina, barra y plano escuchan aquí, no en la caja.
+        try { state.apply(ev) } catch (e) { console.warn('[enlace-caja] no se pudo aplicar:', e.message) }
+        wsHub.broadcast(ev).catch(() => {})
+      },
+    })
+    console.log(`[server] Enlace con la caja: ${cajaWs} (rol ${_rolTerminal})`)
+  } else {
+    console.log(`[server] Sin enlace ascendente (rol ${_rolTerminal || 'sin definir'}, caja ${config.posServerIp || 'no configurada'})`)
+  }
+
   // ── Shutdown ──────────────────────────────────────────────────────────────
   function close() {
     if (_supabasePolling) clearInterval(_supabasePolling)
     if (_outbox) _outbox.stop()
+    // Antes que el hub: `detener()` cancela el reintento agendado. Si no, el
+    // 'close' del socket agenda otro y el proceso no termina nunca.
+    if (_enlaceCaja) _enlaceCaja.detener()
     mdns.stop()
     heartbeat.stop()
     updater.stop()

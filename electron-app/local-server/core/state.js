@@ -293,6 +293,55 @@ class RestaurantState {
 
   // ─── Snapshot ────────────────────────────────────────────────────────────
 
+  /**
+   * Reconstruye este estado desde el snapshot de OTRO Pedro (la caja).
+   *
+   * ── POR QUE EXISTE ────────────────────────────────────────────────────────
+   *
+   * Una terminal secundaria aplica en memoria los eventos que le llegan de la
+   * caja, pero NO los escribe en su propio event store — ese log es de lo que
+   * ELLA origino. Al reiniciar, su estado se reconstruye desde su log y queda
+   * SIN las ordenes de las demas terminales.
+   *
+   * Y como el cursor SI se persiste, al reconectar pide "dame desde N", la caja
+   * contesta "nada nuevo" con toda razon, y el salon se queda vacio PARA
+   * SIEMPRE. Un tablero de cocina en blanco con mesas servidas.
+   *
+   * Encontrado el 2026-09-04 en revision cruzada. El hub siempre mando el estado
+   * completo en el SNAPSHOT (ws-hub.js:99-102); el enlace lo tiraba y aplicaba
+   * solo los deltas.
+   *
+   * ── POR QUE NO SE REUSA STATE_SYNC ────────────────────────────────────────
+   *
+   * `_applyStateSync` espera `mesas` como ARREGLO y no consume `kds_orders`;
+   * `toSnapshot` devuelve `mesas` como OBJETO y las ordenes van en `kds_orders`.
+   * Pasarle uno al otro perderia las ordenes en silencio. Esta es la inversa
+   * EXACTA de `toSnapshot`, y por eso vive pegada a ella: si una cambia, la otra
+   * tiene que cambiar en la misma pantalla.
+   *
+   * REEMPLAZA, no fusiona: la caja es la autoridad y su foto es la verdad. Lo
+   * local que no este ahi es residuo de una sesion anterior.
+   */
+  hidratarDesdeSnapshot(snap) {
+    if (!snap || typeof snap !== 'object') return false
+
+    this._mesas = new Map(Object.entries(snap.mesas || {}))
+    this._locks = new Map(Object.entries(snap.locks || {}))
+    this._kds   = Array.isArray(snap.kds_queue) ? [...snap.kds_queue] : []
+    this._turno = snap.turno ?? null
+    this._lastSupabaseSync = snap.last_supabase_sync ?? null
+
+    // `toSnapshot` quita el flag interno `_kds_sent` antes de mandar. Se repone:
+    // sin el, `toSnapshot` de ESTA terminal filtraria las ordenes y el KDS local
+    // se quedaria vacio aunque el estado si las tenga.
+    this._orders = new Map()
+    for (const o of (Array.isArray(snap.kds_orders) ? snap.kds_orders : [])) {
+      if (!o || !o.order_id) continue
+      this._orders.set(o.order_id, { ...o, _kds_sent: true })
+    }
+    return true
+  }
+
   toSnapshot() {
     // kds_orders: full order objects for every order that has been sent to kitchen
     // and is not yet closed/cancelled. KDS uses this to render without Supabase.

@@ -45,6 +45,8 @@ import { calcSplitParejo, calcSplitItems } from '@/lib/pos-calculations'
 import { publishEvent, getDeviceId } from '@/lib/events'
 import { apiUrl } from '@/lib/api-base'
 import { sendOrderToKitchen, kitchenFailureMessage } from '@/lib/kitchen-bridge'
+import { avisarCierreDeOrden } from '@/lib/aviso-lan'
+import { evaluarLiquidacion, cuentasDe, intentoDePago } from '@/lib/liquidacion-de-orden'
 import type { OrderItem, MenuItem, Order } from '@/lib/pos-data'
 import {
   printByStation,
@@ -2178,6 +2180,40 @@ function POSContent() {
           }
         }
       } catch (err) {
+        // ── Antes del caché local: PREGUNTARLE A LA CAJA ──────────────────
+        //
+        // El mapa de mesas ya pinta ocupado con lo que dice Pedro. Si el editor
+        // sólo mira Supabase y `pos_order_N`, una terminal que nunca abrió esa
+        // mesa muestra la mesa ocupada y abre una cuenta VACÍA — idéntica a una
+        // mesa nueva.
+        //
+        // Lo caro no es la pantalla: el mesero recaptura, envía, y al reconectar
+        // sube una SEGUNDA orden abierta para la misma mesa. El repo ya se lo
+        // había documentado a sí mismo (pos-offline-db.ts): «El mesero sienta
+        // gente en una mesa que debe $713, o le abre segunda cuenta».
+        //
+        // La caja es la autoridad dentro del restaurante, así que va ANTES que
+        // el caché de esta terminal. Si no contesta, se sigue como siempre.
+        if (!cancelled) {
+          try {
+            const { leerOrdenDeMesa } = await import('@/lib/pedro-cliente')
+            const { orden } = await leerOrdenDeMesa(mesa)
+            const itemsDeLaCaja = Array.isArray(orden?.items) ? orden!.items as OrderItem[] : []
+            if (itemsDeLaCaja.length > 0) {
+              setOrderItems(itemsDeLaCaja)
+              setOrderId(String(orden!.id ?? orden!.order_id ?? generateId()))
+              if (orden!.mesero) setMesero(String(orden!.mesero))
+              if (orden!.personas) setPersonas(Number(orden!.personas))
+              // Los items ya están en cocina: se marcan como enviados para que
+              // "Enviar" no los duplique. Sin esto, el mesero reimprime la mesa
+              // entera y la cocina hace todo dos veces.
+              setSentItemIds(new Set(itemsDeLaCaja.map(i => i.id)))
+              setLoadingMesa(false)
+              return
+            }
+          } catch { /* la caja no contesta: se sigue con el caché local */ }
+        }
+
         // Network error — fall back to localStorage cache (stale is better than blank)
         console.warn('[loadMesaOrder] network error, using cached order:', err)
         if (!cancelled) {
@@ -3501,6 +3537,21 @@ function POSContent() {
     }
     // Offline: cobro guardado en cola — tratar como éxito, imprimir ticket y limpiar UI
     if (!saveResult.ok && saveResult.error === 'OFFLINE_QUEUED') {
+      // Avisar a la LAN es MÁS importante aquí que en la salida feliz: sin
+      // internet, la nube no le va a contar a nadie que esta mesa se cerró, y
+      // cocina/barra/plano se quedarían con la orden hasta el próximo login.
+      // No se espera: un aviso jamás frena un cobro. Ver lib/aviso-lan.ts.
+      //
+      // Con `orderId` —la orden MADRE—, nunca `order.id`, que en un split es el
+      // id del COBRO (`{orden}-C2`) y no coincide con lo que guarda cocina.
+      //
+      // LIMITACIÓN CONOCIDA, y es a propósito: esta rama SÍ avisa aunque queden
+      // cuentas por cobrar. Offline, este camino ya reseteaba el split completo
+      // (más abajo, `setSplitPayingCuenta(0)`), o sea que el flujo de cuenta
+      // dividida no existe sin red desde antes de este cambio. Emitir el cierre
+      // es consistente con ese comportamiento previo. Arreglar el split offline
+      // exige estado durable compartido — es el muro 2, no esto.
+      void avisarCierreDeOrden({ opId, orderId, clientId: _cid(), mesa: order.mesa, turnoId: order.turnoId ?? null })
       if (pagos.some(p => p.metodo.toLowerCase().includes('efectivo'))) openCashDrawer()
       handlePrintTicket(order)
       showToast('Sin conexión — cobro guardado localmente, se sincronizará al reconectar')
@@ -3517,6 +3568,11 @@ function POSContent() {
     }
     const ok = saveResult.ok
     if (ok) {
+      // NO se avisa el cierre aquí. Éste es el punto por el que pasa CADA cobro,
+      // incluidos los pagos parciales de una cuenta dividida — avisar aquí le
+      // borraba a la cocina la comida de los demás comensales, que no ha salido.
+      // El aviso vive más abajo, en la salida de "todas las cuentas cobradas".
+      // Ver lib/liquidacion-de-orden.ts.
       // Open cash drawer for cash payments (incluye mixto con componente efectivo)
       if (pagos.some(p => p.metodo.toLowerCase().includes('efectivo'))) {
         openCashDrawer()
@@ -3570,6 +3626,37 @@ function POSContent() {
       }
 
       // Fully done (no split, or last cuenta paid)
+      //
+      // AQUÍ va el aviso a la cocina, y sólo aquí. Se llega a este punto cuando
+      // no hubo split, o cuando se acaba de cobrar la ÚLTIMA cuenta — nunca en un
+      // pago parcial, porque ésos salieron por el `return` de arriba.
+      //
+      // Dos cosas que no se pueden cambiar sin romper el tablero:
+      //   · Se emite `orderId`, la orden MADRE. `order.id` es el id del COBRO
+      //     (`{orden}-C2` en un split) y cocina guarda el de la madre: con sufijo
+      //     no coincide con nada y el tablero no se limpia jamás.
+      //   · La decisión pasa por `evaluarLiquidacion`, no por comparar contadores
+      //     aquí. La regla vive en un módulo probado con los diez escenarios
+      //     (lib/liquidacion-de-orden.ts) y no se reimplementa en la pantalla.
+      const cuentasDelSplit = splitPayingCuenta > 0
+        ? Array.from({ length: splitMode === 'parejo' ? splitParejoN : splitCount }, () => 0)
+        : null
+      const liquidacion = evaluarLiquidacion({
+        order_id: orderId,
+        cuentas: cuentasDe(orderId, cuentasDelSplit, 0),
+        // Se llegó aquí tras cobrar la última: todas las cuentas quedaron cubiertas.
+        pagos: cuentasDe(orderId, cuentasDelSplit, 0).map((c, i) => ({
+          payment_id: intentoDePago(c.account_id, `${opId}-${i}`),
+          account_id: c.account_id, monto: 0, estado: 'aceptado' as const,
+        })),
+      })
+      if (liquidacion.debeEmitirCierre) {
+        void avisarCierreDeOrden({
+          opId, orderId: liquidacion.order_id, clientId: _cid(),
+          mesa: order.mesa, turnoId: order.turnoId ?? null,
+        })
+      }
+
       showToast(`Todas las cuentas cobradas — ${method}${propina > 0 ? ` + propina ${formatMXN(propina)}` : ''}`)
 
       setSaving(false); operationLock.current = false

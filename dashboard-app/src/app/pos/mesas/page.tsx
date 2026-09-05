@@ -134,8 +134,14 @@ interface ActiveOrder {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
+import { leerSalon, debeUsarPedro, aOrdenesDelSalon, avisoDeProcedencia, type LecturaDelSalon } from '@/lib/pedro-cliente'
+
 export default function MesasPage() {
   const router = useRouter()
+  // Procedencia de lo que se está pintando. Se guarda para AVISARLE al operador
+  // cuando el salón viene degradado: presentar un dato parcial como si fuera la
+  // verdad es exactamente el bug que costó la semana.
+  const [procedenciaSalon, setProcedenciaSalon] = useState<LecturaDelSalon | null>(null)
   const [activeOrders, setActiveOrders] = useState<ActiveOrder[]>(() => {
     // Pre-populate from localStorage cache for instant render
     if (typeof window === 'undefined') return []
@@ -270,6 +276,35 @@ export default function MesasPage() {
   }, [])
 
   const fetchData = useCallback(async () => {
+    // ── Pedro primero, la nube después ────────────────────────────────────
+    //
+    // La caja es la autoridad DENTRO del restaurante. Si contesta, su respuesta
+    // gana y no se consulta Supabase para las mesas: es lo que hace que las tres
+    // terminales vean lo mismo aunque no haya internet — el defecto de campo del
+    // 2026-09-02.
+    //
+    // NO son dos estados: `setActiveOrders` sigue siendo el único sumidero, y
+    // sólo cambia quién lo llena. Cuando Pedro no está o su lectura no es
+    // autoritativa, se cae ENTERO al camino de antes, sin mezclar.
+    //
+    // Mezclar sería peor que cualquiera de los dos por separado: dos fuentes
+    // parciales producen un salón que no existe en ninguna de las dos.
+    try {
+      const salon = await leerSalon()
+      setProcedenciaSalon(salon)
+      if (debeUsarPedro(salon)) {
+        const deLaCaja = aOrdenesDelSalon(salon.ordenes)
+        setActiveOrders(deLaCaja.map(o => ({
+          id: o.id, mesa: o.mesa ?? 0, customer_name: null, order_number: null,
+          mesero: o.mesero ?? '', personas: 0, total: o.total,
+          status: o.status ?? 'enviada',
+          created_at: o.created_at ?? new Date().toISOString(),
+        })) as unknown as ActiveOrder[])
+        setLoading(false)
+        return
+      }
+    } catch { /* Pedro no puede tumbar el mapa de mesas: se sigue como antes */ }
+
     // When offline: skip network entirely, serve from cache immediately.
     // Avoids cascading timeouts that degrade the UI after hours without internet.
     if (!navigator.onLine) {
@@ -842,6 +877,19 @@ export default function MesasPage() {
 
   return (
     <div className="h-screen flex flex-col text-[var(--text-1)]" style={{ background:"var(--bg)" }}>
+      {/* Se perdió la caja. Este Pedro contestó con SU estado, que sólo conoce lo
+          que pasó en ESTA terminal — no el salón. Se dice, en vez de pintarlo como
+          si fuera la verdad: con tres cajas, lo que falta son justo las mesas de
+          las otras dos. */}
+      {procedenciaSalon && avisoDeProcedencia(procedenciaSalon) && (
+        <div className="flex items-center gap-2 px-4 lg:px-6 py-2 bg-amber-500/15 border-b border-amber-500/30 text-amber-200 text-sm flex-shrink-0">
+          <AlertTriangle size={16} className="flex-shrink-0" />
+          <span><strong>{avisoDeProcedencia(procedenciaSalon)}.</strong> Confirma en la caja antes de sentar.</span>
+          <button onClick={fetchData} className="ml-auto underline underline-offset-2 hover:no-underline">
+            Reintentar
+          </button>
+        </div>
+      )}
       {/* El plano no pudo confirmarse contra el servidor. Se avisa en vez de pintar
           mesas libres en silencio: una mesa que se ve libre sin poder verificarlo es
           como se sienta gente encima de una cuenta abierta. */}
