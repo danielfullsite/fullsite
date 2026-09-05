@@ -45,6 +45,7 @@ docs/                 Knowledge base completo
 - Nunca imprimir el contenido de `.mcp.json`, `.env`, `~/.zshrc` en el chat ni en logs.
 - Nunca escribir tokens reales en diffs visibles.
 - El proyecto `fullsite-amalay` es producción — no modificar directamente.
+- Transporte de Pedro: HTTP y WebSocket exigen credencial de instalación antes de operar o entregar estado. Contrato y enrolamiento: [`docs/architecture/LAN-TRANSPORT-AUTH.md`](docs/architecture/LAN-TRANSPORT-AUTH.md).
 
 ---
 

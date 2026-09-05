@@ -24,7 +24,7 @@ beforeEach(() => {
   vi.restoreAllMocks()
   vi.spyOn(console, 'warn').mockImplementation(() => {})
 })
-afterEach(() => vi.restoreAllMocks())
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals() })
 
 describe('El espacio de direcciones se deriva del destino', () => {
   it('loopback para 127.0.0.0/8, localhost y ::1', () => {
@@ -53,6 +53,33 @@ describe('Motor MODERNO: acepta la declaración', () => {
 })
 
 describe('Motor VIEJO (Chromium 130): no conoce `loopback`', () => {
+  it('conserva credencial, Headers, señal, cuerpo y método en el primer request y fallback', async () => {
+    const values: Record<string, string> = { FULLSITE_LAN_SECRET: 'synthetic-lan-secret', fullsite_client_id: 'test', FULLSITE_TERMINAL_ID: 'pos2', FULLSITE_LOCATION_ID: 'principal' }
+    vi.stubGlobal('localStorage', { getItem: (key: string) => values[key] || null })
+    const f = vi.fn()
+      .mockRejectedValueOnce(new TypeError("Invalid targetAddressSpace enum loopback"))
+      .mockResolvedValueOnce(OK())
+    vi.stubGlobal('fetch', f)
+    const signal = new AbortController().signal
+    const body = '{"command_id":"stable","command_type":"ORDER_SENT"}'
+    await localNetworkFetch('http://127.0.0.1:7717/events', {
+      method: 'POST', headers: new Headers({ 'Content-Type': 'application/json', 'X-Trace': 'test-trace' }), signal, body,
+    })
+    expect(f).toHaveBeenCalledTimes(2)
+    for (const [, init] of f.mock.calls) {
+      const h = new Headers(init.headers)
+      expect(h.get('x-fullsite-lan')).toBe(values.FULLSITE_LAN_SECRET)
+      expect(h.get('x-fullsite-restaurante')).toBe('test')
+      expect(h.get('x-fullsite-sucursal')).toBe('principal')
+      expect(h.get('content-type')).toBe('application/json')
+      expect(h.get('x-trace')).toBe('test-trace')
+      expect(init.signal).toBe(signal)
+      expect(init.body).toBe(body)
+      expect(init.method).toBe('POST')
+    }
+    expect(f.mock.calls[1][1]).not.toHaveProperty('targetAddressSpace')
+  })
+
   it('REGRESION: reintenta sin la declaración y la comanda sale', async () => {
     // Ésta es la caja de AMALAY. Antes, este TypeError llegaba al POS como
     // "no hay conexión con la caja" y la comanda nunca salía.

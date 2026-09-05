@@ -102,11 +102,10 @@ export function targetAddressSpaceFor(input: RequestInfo | URL): TargetAddressSp
  * (impresión, cajón, comandas, avisos, lectura del salón), en vez de repetirla
  * en cinco módulos. Uno que se olvidara recibiría 401 sin explicación.
  *
- * Sin credencial guardada NO se manda nada: una instalación anterior a la
- * seguridad sigue funcionando, y Pedro la deja pasar con una advertencia en su
- * log. Es el mismo compromiso, del mismo lado.
+ * Sin credencial guardada Pedro rechaza la operación: la terminal debe
+ * completar el emparejamiento. El diagnóstico permanece disponible.
  */
-function credencialDeLaRedLocal(): Record<string, string> {
+export function credencialDeLaRedLocal(): Record<string, string> {
   try {
     const secreto = localStorage.getItem('FULLSITE_LAN_SECRET')
     if (!secreto) return {}
@@ -115,10 +114,12 @@ function credencialDeLaRedLocal(): Record<string, string> {
     if (tenant) cabeceras['x-fullsite-restaurante'] = tenant
     const terminal = localStorage.getItem('FULLSITE_TERMINAL_ID')
     if (terminal) cabeceras['x-fullsite-terminal'] = terminal
+    const sucursal = localStorage.getItem('FULLSITE_LOCATION_ID')
+    if (sucursal) cabeceras['x-fullsite-sucursal'] = sucursal
     return cabeceras
   } catch {
     // `localStorage` puede lanzar (ventana privada, almacenamiento bloqueado).
-    // Sin credencial es mejor que sin POS.
+    // El servidor falla cerrado sin credencial; no inventar una identidad.
     return {}
   }
 }
@@ -127,11 +128,14 @@ export async function localNetworkFetch(
   input: RequestInfo | URL,
   init: RequestInit = {},
 ): Promise<Response> {
+  const headers = new Headers(input instanceof Request ? input.headers : undefined)
+  for (const [key, value] of Object.entries(credencialDeLaRedLocal())) headers.set(key, value)
+  new Headers(init.headers).forEach((value, key) => headers.set(key, value))
   const localInit: LocalNetworkRequestInit = {
     ...init,
     targetAddressSpace: targetAddressSpaceFor(input),
     // Las de quien llama ganan: un caso concreto puede necesitar otra identidad.
-    headers: { ...credencialDeLaRedLocal(), ...(init.headers as Record<string, string> | undefined) },
+    headers,
   }
 
   // Un init invalido puede llegar de DOS formas segun el motor: como throw sincrono del
@@ -142,7 +146,9 @@ export async function localNetworkFetch(
   } catch (e) {
     if (!esEnumNoSoportado(e)) throw e
     console.warn('[lna] targetAddressSpace no soportado por este motor; reintento sin declararlo')
-    return fetch(input, init)
+    const fallback: RequestInit & { targetAddressSpace?: TargetAddressSpace } = { ...localInit }
+    delete fallback.targetAddressSpace
+    return fetch(input, fallback)
   }
 }
 

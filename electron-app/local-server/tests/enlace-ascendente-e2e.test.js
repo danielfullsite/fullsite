@@ -1,4 +1,5 @@
 'use strict'
+const { SECRET, wsOptions, localFetch: fetch } = require('./fixtures/lan-credential.cjs')
 // POS 3 → Pedro local → Caja → WebSocket → POS 2 / KDS. Con servidores reales.
 //
 // ── QUÉ DEMUESTRA ────────────────────────────────────────────────────────────
@@ -51,6 +52,7 @@ async function levantarPedro(dir, port, config = {}) {
   await eventStore.load()
   const state = new RestaurantState()
   const wsHub = new WsHub({
+    lanSecret: SECRET,
     serverId: `srv-${port}`,
     restaurantId: R,
     getState: () => state.toSnapshot(),
@@ -66,7 +68,7 @@ async function levantarPedro(dir, port, config = {}) {
 
   const server = http.createServer(buildHttpRouter({
     state, eventStore, wsHub, cmdHandler, printer,
-    version: 'test', serverId: `srv-${port}`, restaurantId: R, config, port,
+    version: 'test', serverId: `srv-${port}`, restaurantId: R, config: { lanSecret: SECRET, ...config }, port,
   }))
   wsHub.attach(server)
   await new Promise((r) => server.listen(port, '127.0.0.1', r))
@@ -76,7 +78,7 @@ async function levantarPedro(dir, port, config = {}) {
 /** Un tablero (cocina/plano) conectado a SU Pedro local. Apunta lo que recibe. */
 function tableroConectadoA(port, nombre) {
   const recibidos = []
-  const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`)
+  const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`, wsOptions)
   ws.on('open', () => ws.send(JSON.stringify({
     protocol_version: PROTOCOL_VERSION,   // sin esto el hub lo descarta en silencio
     type: 'SUBSCRIBE', client_id: nombre, client_type: 'kds', restaurant_id: R,
@@ -125,6 +127,7 @@ describe('E2E · POS 3 → Pedro local → Caja → WebSocket → POS 2', () => 
 
     // El enlace: el Pedro de POS 2 escucha a la caja y retransmite a los suyos.
     const enlace = conectarConLaCaja({
+      lanSecret: SECRET,
       cajaUrl: `ws://127.0.0.1:${CAJA}`,
       serverId: `srv-${POS2}`, restaurantId: R,
       alRecibirEvento: (ev) => { pos2.state.apply(ev); pos2.wsHub.broadcast(ev) },
@@ -164,6 +167,7 @@ describe('E2E · Desconexión, reconexión y cursor', () => {
 
     const vistos = []
     const enlace = conectarConLaCaja({
+      lanSecret: SECRET,
       cajaUrl: `ws://127.0.0.1:${CAJA}`,
       serverId: `srv-${POS2}`, restaurantId: R,
       alRecibirEvento: (ev) => vistos.push(ev),
@@ -186,6 +190,7 @@ describe('E2E · Desconexión, reconexión y cursor', () => {
       // reinicio. Sin esto el hub no manda catch-up y se pierde lo de en medio.
       const vistosTrasVolver = []
       const enlace2 = conectarConLaCaja({
+      lanSecret: SECRET,
         cajaUrl: `ws://127.0.0.1:${CAJA}`,
         serverId: `srv-${POS2}`, restaurantId: R,
         leerCursor: () => cursorAntes,
@@ -221,6 +226,7 @@ describe('E2E · Desconexión, reconexión y cursor', () => {
 
     const vistos = []
     const enlace = conectarConLaCaja({
+      lanSecret: SECRET,
       cajaUrl: `ws://127.0.0.1:${CAJA}`,
       serverId: `srv-${POS2}`, restaurantId: R,
       alRecibirEvento: (ev) => vistos.push(ev),
@@ -236,6 +242,7 @@ describe('E2E · Desconexión, reconexión y cursor', () => {
       // Se reconecta CON el cursor al día: la caja no debe reenviarle nada viejo.
       enlace.detener()
       const enlace2 = conectarConLaCaja({
+      lanSecret: SECRET,
         cajaUrl: `ws://127.0.0.1:${CAJA}`,
         serverId: `srv-${POS2}`, restaurantId: R,
         alRecibirEvento: (ev) => vistos.push(ev),
@@ -262,6 +269,7 @@ describe('E2E · El enlace no puede tumbar la terminal', () => {
     const POS2 = 7842
     const pos2 = await levantarPedro(path.join(tmp, 'pos2'), POS2, { posServerIp: '127.0.0.1', posServerPort: 7899 })
     const enlace = conectarConLaCaja({
+      lanSecret: SECRET,
       cajaUrl: 'ws://127.0.0.1:7899',            // nadie escucha
       serverId: `srv-${POS2}`, restaurantId: R,
       alRecibirEvento: () => {},
@@ -285,6 +293,7 @@ describe('E2E · El enlace no puede tumbar la terminal', () => {
     const caja = await levantarPedro(path.join(tmp, 'caja'), CAJA)
     let entregados = 0
     const enlace = conectarConLaCaja({
+      lanSecret: SECRET,
       cajaUrl: `ws://127.0.0.1:${CAJA}`, serverId: 'srv-roto', restaurantId: R,
       alRecibirEvento: () => { entregados++; throw new Error('consumidor roto') },
     })

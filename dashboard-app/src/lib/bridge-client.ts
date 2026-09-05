@@ -13,6 +13,7 @@
 //   persisted in the ServerRegistry for faster subsequent connections.
 
 import { useEffect, useRef, useState } from 'react'
+import { credencialDeLaRedLocal } from './local-network-fetch'
 import { ServerDiscovery, buildDiscoveryConfig, type DiscoveryDiagnostic } from './server-discovery'
 
 const PROTOCOL_VERSION = '1.0'
@@ -96,10 +97,12 @@ export class BridgeClient {
       this.ws = new WebSocket(getBridgeUrl(this._wsUrl))
 
       this.ws.onopen = () => {
-        this._connected = true
+        this._connected = false
         this._reconnectDelay = RECONNECT_INITIAL_MS  // reset backoff on successful connection
         this._send({
           type: 'SUBSCRIBE',
+          lan_secret: credencialDeLaRedLocal()['x-fullsite-lan'],
+          location_id: credencialDeLaRedLocal()['x-fullsite-sucursal'],
           client_id: this.clientId,
           client_type: this.clientType,
           restaurant_id: this.restaurantId,
@@ -111,6 +114,7 @@ export class BridgeClient {
       this.ws.onmessage = (ev) => {
         try {
           const msg = JSON.parse(ev.data as string) as ServerMsg
+          if (msg.type === 'SNAPSHOT') this._connected = true
           // Track the highest sequence seen for catch-up on reconnect
           const seq = (msg as { sequence?: number }).sequence
           if (typeof seq === 'number' && seq > this._lastSequence) {
@@ -156,7 +160,7 @@ export class BridgeClient {
    * No-op (returns null) if the WS is not open.
    */
   sendCommand(commandType: string, payload: Record<string, unknown>): string | null {
-    if (this.ws?.readyState !== WebSocket.OPEN) return null
+    if (!this._connected || this.ws?.readyState !== WebSocket.OPEN) return null
     const commandId = `${this.clientId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
     this._send({
       type: 'COMMAND',

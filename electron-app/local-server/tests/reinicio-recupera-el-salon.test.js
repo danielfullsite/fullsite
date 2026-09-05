@@ -1,4 +1,5 @@
 'use strict'
+const { SECRET, wsOptions, localFetch: fetch } = require('./fixtures/lan-credential.cjs')
 // Una terminal que REINICIA tiene que recuperar el salón, no sólo el cursor.
 //
 // ── EL DEFECTO (P0), encontrado en revisión cruzada el 2026-09-04 ────────────
@@ -60,6 +61,7 @@ async function levantarCaja(dir, port) {
   await eventStore.load()
   const state = new RestaurantState()
   const wsHub = new WsHub({
+    lanSecret: SECRET,
     serverId: `srv-${port}`, restaurantId: R,
     getState: () => state.toSnapshot(),
     getLastSequence: () => eventStore.getLastSequence(),
@@ -73,7 +75,7 @@ async function levantarCaja(dir, port) {
   wsHub.onCommand((m, c) => cmdHandler.handle(m, c))
   const server = http.createServer(buildHttpRouter({
     state, eventStore, wsHub, cmdHandler, printer,
-    version: 'test', serverId: `srv-${port}`, restaurantId: R, config: {}, port,
+    version: 'test', serverId: `srv-${port}`, restaurantId: R, config: { lanSecret: SECRET }, port,
   }))
   wsHub.attach(server)
   await new Promise((r) => server.listen(port, '127.0.0.1', r))
@@ -103,6 +105,7 @@ describe('Reinicio de una terminal secundaria', () => {
     let cursorGuardado = -1
     const estado1 = new RestaurantState()
     const enlace1 = conectarConLaCaja({
+      lanSecret: SECRET,
       cajaUrl: `ws://127.0.0.1:${CAJA}`, serverId: 'sec', restaurantId: R,
       guardarCursor: (n) => { cursorGuardado = n },
       alRecibirEstado: (snap) => estado1.hidratarDesdeSnapshot(snap),
@@ -123,6 +126,7 @@ describe('Reinicio de una terminal secundaria', () => {
     assert.equal(estado2.toSnapshot().kds_orders.length, 0, 'premisa: arranca vacía')
 
     const enlace2 = conectarConLaCaja({
+      lanSecret: SECRET,
       cajaUrl: `ws://127.0.0.1:${CAJA}`, serverId: 'sec', restaurantId: R,
       leerCursor: () => cursorGuardado,
       alRecibirEstado: (snap) => estado2.hidratarDesdeSnapshot(snap),

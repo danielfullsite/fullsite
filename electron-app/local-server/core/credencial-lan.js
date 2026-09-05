@@ -38,7 +38,7 @@ const CABECERA = 'x-fullsite-lan'
 const LOG = '[credencial-lan]'
 
 /** Rutas que exigen credencial. Todo lo que lee o mueve dinero, comida o papel. */
-const RUTAS_PROTEGIDAS = ['/state', '/events', '/print', '/drawer']
+const RUTAS_PROTEGIDAS = ['/state', '/events', '/print', '/drawer', '/ws', '/kds', '/config', '/test']
 
 /**
  * Rutas que NO la exigen, y por qué. La lista es corta a propósito: cada entrada
@@ -48,11 +48,10 @@ const RUTAS_PROTEGIDAS = ['/state', '/events', '/print', '/drawer']
  *              que es justo cuando la credencial puede ser el problema.
  *   /identity  descubrimiento. Una terminal necesita saber a quién encontró
  *              ANTES de poder autenticarse contra ella.
- *   /kds       la pantalla de cocina se sirve por HTTP a un navegador sin
- *              cabeceras propias. Protegerla exigiría rediseñar cómo carga —
- *              queda anotado como deuda, no como decisión final.
+ * El KDS enrolado carga /kds con cabeceras desde Electron. La página autenticada
+ * recibe la credencial para su poll HTTP; nunca se entrega en una página abierta.
  */
-const RUTAS_ABIERTAS = ['/health', '/identity', '/kds', '/config', '/test']
+const RUTAS_ABIERTAS = ['/health', '/identity']
 
 /** Genera el secreto de una instalación. 32 bytes: no se adivina. */
 function generarSecreto() {
@@ -80,23 +79,16 @@ function igualesEnTiempoConstante(a, b) {
  * @param {string} args.restaurantId
  * @returns {{permitido: boolean, motivo?: string, terminalId?: string}}
  */
-function verificarCredencial({ ruta, metodo, cabeceras = {}, secreto, restaurantId }) {
+function verificarCredencial({ ruta, metodo, cabeceras = {}, secreto, restaurantId, branchId }) {
   // OPTIONS es el preflight de CORS: si se rechazara, el navegador nunca llegaría
   // a mandar la petición real con su cabecera.
   if (metodo === 'OPTIONS') return { permitido: true }
 
-  if (RUTAS_ABIERTAS.includes(ruta)) return { permitido: true }
-  if (!RUTAS_PROTEGIDAS.includes(ruta)) return { permitido: true }
+  if (metodo === 'GET' && RUTAS_ABIERTAS.includes(ruta)) return { permitido: true }
 
-  // SIN SECRETO CONFIGURADO SE DEJA PASAR, y es deliberado. Una instalación
-  // existente que se actualiza no tiene secreto todavía: exigirlo dejaría al
-  // restaurante sin imprimir ni KDS en cuanto instale la versión nueva. Se
-  // ADVIERTE en cada arranque para que el estado no se vuelva permanente.
-  //
-  // El compromiso es explícito: la seguridad se activa al aprovisionar, no al
-  // actualizar. Romper un restaurante en marcha es peor que la ventana que esto
-  // deja abierta — pero la ventana existe y hay que cerrarla.
-  if (!secreto) return { permitido: true, motivo: 'sin-secreto-configurado' }
+  // Cualquier ruta nueva queda cerrada también, incluidas /fp/*. Una secundaria
+  // aún no emparejada ofrece diagnóstico, nunca operación anónima.
+  if (!secreto) return { permitido: false, motivo: 'terminal sin emparejar' }
 
   const presentado = cabeceras[CABECERA] || cabeceras[CABECERA.toUpperCase()]
   if (!presentado) {
@@ -112,26 +104,56 @@ function verificarCredencial({ ruta, metodo, cabeceras = {}, secreto, restaurant
   if (tenantPedido && restaurantId && tenantPedido !== restaurantId) {
     return { permitido: false, motivo: 'esa peticion es de otro restaurante' }
   }
+  const sucursalPedida = cabeceras['x-fullsite-sucursal']
+  if (sucursalPedida && (!branchId || sucursalPedida !== branchId)) {
+    return { permitido: false, motivo: 'esa peticion es de otra sucursal' }
+  }
 
   return { permitido: true, terminalId: cabeceras['x-fullsite-terminal'] || undefined }
 }
 
 /** Lo que una terminal manda en cada petición operativa. */
-function cabecerasDeCredencial({ secreto, restaurantId, terminalId }) {
+function cabecerasDeCredencial({ secreto, restaurantId, terminalId, branchId }) {
   if (!secreto) return {}
   const h = { [CABECERA]: secreto }
   if (restaurantId) h['x-fullsite-restaurante'] = restaurantId
   if (terminalId) h['x-fullsite-terminal'] = terminalId
+  if (branchId) h['x-fullsite-sucursal'] = branchId
   return h
 }
 
 /**
- * NUNCA registrar el secreto. Se deja ver el principio para poder confirmar que
- * dos máquinas tienen el mismo, sin poder reconstruirlo.
+ * NUNCA registrar el secreto ni fragmentos. Sólo informar si está configurado.
  */
 function paraLog(secreto) {
   if (!secreto) return '(sin configurar)'
-  return `${String(secreto).slice(0, 6)}… (${String(secreto).length} car.)`
+  return '(configurada)'
+}
+
+/** La instalación autoriza el transporte; el scope declarado tampoco puede mentir. */
+function verificarScope(mensaje, { restaurantId, branchId }) {
+  const payload = mensaje?.payload || mensaje || {}
+  const scope = payload.scope || mensaje?.scope || {}
+  const tenants = [mensaje?.restaurant_id, payload.restaurant_id, scope.clientId, scope.client_id]
+  if (tenants.some(id => id !== undefined && id !== restaurantId)) return 'otro restaurante'
+  const sucursales = [mensaje?.location_id, payload.location_id, scope.locationId, scope.location_id]
+  if (sucursales.some(id => id !== undefined && (!branchId || id !== branchId))) return 'otra sucursal'
+  return null
+}
+
+/** Resolver antes de crear el router/hub; un error de disco nunca abre la LAN. */
+function prepararCredencial({ dataDir, config }) {
+  if (config.lanSecret) return config.lanSecret
+  if (config.terminalRole !== 'server_pos' && (config.posServerIp || config.terminalRole)) return null
+  const fs = require('fs')
+  const ruta = require('path').join(dataDir, 'lan-secret')
+  fs.mkdirSync(dataDir, { recursive: true })
+  try { fs.writeFileSync(ruta, generarSecreto(), { flag: 'wx', mode: 0o600 }) }
+  catch (error) { if (error.code !== 'EEXIST') throw error }
+  const secreto = fs.readFileSync(ruta, 'utf8').trim()
+  if (!secreto) throw new Error('Credencial LAN persistida vacia; requiere recuperar el emparejamiento')
+  config.lanSecret = secreto
+  return secreto
 }
 
 module.exports = {
@@ -142,5 +164,7 @@ module.exports = {
   verificarCredencial,
   cabecerasDeCredencial,
   paraLog,
+  verificarScope,
+  prepararCredencial,
   LOG,
 }

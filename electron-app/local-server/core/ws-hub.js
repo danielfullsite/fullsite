@@ -5,6 +5,7 @@
 
 const { WebSocketServer } = require('ws')
 const { S2C, C2S, revisarMensajeDeCliente, serverEnvelope } = require('../protocol')
+const credLan = require('./credencial-lan')
 
 const PING_INTERVAL_MS   = 15_000
 const PONG_TIMEOUT_MS    = 10_000
@@ -14,9 +15,11 @@ class WsHub {
   /**
    * @param {{ serverId: string, restaurantId: string, getState: () => object, getLastSequence: () => Promise<number>, readAfter: (seq: number) => Promise<object[]> }} opts
    */
-  constructor({ serverId, restaurantId, getState, getLastSequence, readAfter }) {
+  constructor({ serverId, restaurantId, branchId, lanSecret, getState, getLastSequence, readAfter }) {
     this._serverId      = serverId
     this._restaurantId  = restaurantId
+    this._branchId      = branchId
+    this._lanSecret     = lanSecret
     this._getState      = getState
     this._getLastSeq    = getLastSequence
     this._readAfter     = readAfter
@@ -33,6 +36,16 @@ class WsHub {
 
     httpServer.on('upgrade', (req, socket, head) => {
       if (req.url === '/ws') {
+        // Node puede autenticar el upgrade; browsers lo hacen en SUBSCRIBE.
+        // El handshake abierto NO registra un cliente ni autoriza datos/comandos.
+        if (req.headers[credLan.CABECERA]) {
+          const auth = credLan.verificarCredencial({ ruta: '/ws', metodo: 'GET', cabeceras: req.headers,
+            secreto: this._lanSecret, restaurantId: this._restaurantId, branchId: this._branchId })
+          if (!auth.permitido) {
+            socket.end('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\nContent-Length: 0\r\n\r\n')
+            return
+          }
+        }
         this._wss.handleUpgrade(req, socket, head, (ws) => {
           this._wss.emit('connection', ws, req)
         })
@@ -56,8 +69,12 @@ class WsHub {
   async _onConnection(ws, req) {
     const remoteIp = req.socket?.remoteAddress || 'unknown'
     let clientId   = null
+    let autenticado = false
+    const authTimeout = setTimeout(() => { if (!autenticado) ws.close(1008, 'falta credencial SUBSCRIBE') }, 5000)
+    authTimeout.unref?.()
+    let mensajes = Promise.resolve()
 
-    ws.on('message', async (raw) => {
+    const recibir = async (raw) => {
       // Se RECHAZA con motivo y se cierra, en vez de ignorar en silencio. Un
       // cliente ignorado queda conectado y mudo sin saber por que; uno cerrado
       // con codigo 1008 y un texto puede arreglarse. Ver protocol.js/RECHAZO.
@@ -70,6 +87,15 @@ class WsHub {
       const msg = revision.msg
 
       if (msg.type === C2S.SUBSCRIBE) {
+        const cabeceras = { ...req.headers }
+        if (msg.lan_secret !== undefined) cabeceras[credLan.CABECERA] = msg.lan_secret
+        const auth = credLan.verificarCredencial({ ruta: '/ws', metodo: 'GET', cabeceras,
+          secreto: this._lanSecret, restaurantId: this._restaurantId, branchId: this._branchId })
+        const scopeError = credLan.verificarScope(msg, { restaurantId: this._restaurantId, branchId: this._branchId })
+        if (!auth.permitido || scopeError) {
+          ws.close(1008, auth.motivo || scopeError)
+          return
+        }
         clientId = msg.client_id
         if (!clientId) { ws.close(1008, 'Missing client_id'); return }
 
@@ -83,6 +109,10 @@ class WsHub {
           return
         }
 
+        const anterior = this._clients.get(clientId)
+        if (anterior && anterior.ws !== ws) anterior.ws.close(1008, 'conexion reemplazada')
+        autenticado = true
+        clearTimeout(authTimeout)
         this._clients.set(clientId, {
           ws,
           meta:     { client_id: clientId, client_type: msg.client_type, remote_ip: remoteIp, connected_at: Date.now(), restaurant_id: remoteRestaurantId || null },
@@ -101,6 +131,16 @@ class WsHub {
           deltas,
         }, serverSeq))
 
+        return
+      }
+
+      if (!autenticado || !clientId || this._clients.get(clientId)?.ws !== ws) {
+        ws.close(1008, 'SUBSCRIBE autenticado requerido')
+        return
+      }
+      const scopeError = credLan.verificarScope(msg, { restaurantId: this._restaurantId, branchId: this._branchId })
+      if (scopeError || (msg.client_id && msg.client_id !== clientId)) {
+        ws.close(1008, scopeError || 'otra terminal')
         return
       }
 
@@ -129,6 +169,11 @@ class WsHub {
         }
         return
       }
+    }
+    // Un COMMAND pipelined no puede adelantar la autenticación/SNAPSHOT.
+    ws.on('message', raw => {
+      mensajes = mensajes.then(() => ws.readyState === ws.OPEN && recibir(raw))
+        .catch(() => { try { ws.close(1011, 'no se pudo procesar el mensaje') } catch {} })
     })
 
     ws.on('pong', () => {
@@ -138,7 +183,8 @@ class WsHub {
     })
 
     ws.on('close', () => {
-      if (clientId) {
+      clearTimeout(authTimeout)
+      if (clientId && this._clients.get(clientId)?.ws === ws) {
         this._clients.delete(clientId)
         console.log(`[ws-hub] Client disconnected: ${clientId}`)
       }
@@ -205,6 +251,7 @@ class WsHub {
 
   close() {
     if (this._pingTimer) clearInterval(this._pingTimer)
+    if (this._wss) for (const ws of this._wss.clients) ws.terminate()
     if (this._wss)       this._wss.close()
   }
 }

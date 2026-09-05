@@ -38,7 +38,7 @@ const arrancar = (dir, port, extra = {}) => {
 
 function tableroEn(port, nombre) {
   const recibidos = []
-  const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`)
+  const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`, { headers: CRED })
   ws.on('open', () => ws.send(JSON.stringify({
     protocol_version: PROTOCOL_VERSION, type: 'SUBSCRIBE',
     client_id: nombre, client_type: 'kds', restaurant_id: R })))
