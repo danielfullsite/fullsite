@@ -1009,11 +1009,18 @@ async function startLocalServer({ dataDir, port = 7717, config = {}, businessSyn
       restaurantId,
       lanSecret: config.lanSecret,
       branchId: config.branchId || config.locationId || null,
+      // El cursor viaja junto a la identidad de la caja que lo emitió: un número
+      // suelto no dice de qué historia es, y al reinstalar la Caja esta terminal
+      // se quedaba descartando todo lo vivo. Un archivo de la versión anterior
+      // sólo trae el número; se lee igual y la identidad se aprende al conectar.
       leerCursor: () => {
-        try { return JSON.parse(fsCursor.readFileSync(rutaCursor, 'utf8')).cursor } catch { return -1 }
+        try {
+          const g = JSON.parse(fsCursor.readFileSync(rutaCursor, 'utf8'))
+          return { cursor: g.cursor, cajaId: typeof g.caja_id === 'string' ? g.caja_id : null }
+        } catch { return { cursor: -1, cajaId: null } }
       },
-      guardarCursor: (n) => {
-        try { fsCursor.writeFileSync(rutaCursor, JSON.stringify({ cursor: n, ts: Date.now() })) } catch {}
+      guardarCursor: (n, cajaId) => {
+        try { fsCursor.writeFileSync(rutaCursor, JSON.stringify({ cursor: n, caja_id: cajaId || null, ts: Date.now() })) } catch {}
       },
       // El salón completo al (re)conectar. Sin esto, una terminal reiniciada se
       // queda sin las órdenes de las demás y su KDS aparece en blanco.

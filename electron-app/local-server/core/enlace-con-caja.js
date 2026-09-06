@@ -66,12 +66,28 @@ function conectarConLaCaja({ cajaUrl, serverId, restaurantId, lanSecret, branchI
   // escenario "POS 3 apagado durante el servicio".
   //
   // Quién lo guarda es decisión de quien llama — este módulo no toca disco.
-  let cursor = (() => {
-    try {
-      const guardado = typeof leerCursor === 'function' ? Number(leerCursor()) : NaN
-      return Number.isInteger(guardado) && guardado >= 0 ? guardado : -1
-    } catch { return -1 }
+  //
+  // EL CURSOR ES UN NÚMERO DENTRO DE LA HISTORIA DE **UNA** CAJA. Sin atarlo a
+  // cuál, reinstalar la Caja (o cambiarla de máquina, o borrarle su carpeta)
+  // deja su historia arrancando otra vez desde cero: esta terminal pedía "dame
+  // desde 500", la Caja nueva iba en 3, y todo lo vivo se descartaba por
+  // `seq <= cursor` hasta que la Caja rebasara los 500. El mapa de mesas
+  // sobrevivía porque va por HTTP; los tableros de esta terminal se quedaban
+  // ciegos. El sobre ya traía `server_id` (protocol.js:71); sólo faltaba mirarlo.
+  const guardadoInicial = (() => {
+    try { return typeof leerCursor === 'function' ? leerCursor() : null } catch { return null }
   })()
+  // Formato anterior: sólo el número. Se acepta, y la identidad se aprende en el
+  // primer SNAPSHOT.
+  // OJO con el "no hay cursor": tiene que quedar en -1, no en 0. Con 0 el hub sí
+  // manda catch-up (ws-hub.js: `lastClientSeq >= 0 ? readAfter(...) : []`) y la
+  // terminal reprocesa el historial entero en cada arranque. `Number(null)` es 0,
+  // así que aquí sólo se acepta un número de verdad.
+  const normalizar = g => (g !== null && typeof g === 'object')
+    ? { cursor: Number(g.cursor), cajaId: typeof g.cajaId === 'string' ? g.cajaId : null }
+    : { cursor: typeof g === 'number' ? g : NaN, cajaId: null }
+  let { cursor, cajaId } = normalizar(guardadoInicial)
+  if (!Number.isInteger(cursor) || cursor < 0) cursor = -1
   let socket = null
   let intento = 0
   let vivo = true
@@ -125,6 +141,19 @@ function conectarConLaCaja({ cajaUrl, serverId, restaurantId, lanSecret, branchI
       // SNAPSHOT trae el estado y los deltas que faltaban tras reconectar.
       if (msg.type === 'SNAPSHOT') {
         abierto = true
+        // ¿Seguimos hablando con la misma historia? Dos señales independientes:
+        // la identidad de la Caja cambió, o su última secuencia es MENOR que
+        // nuestro cursor, cosa que sólo puede pasar si su log volvió a empezar.
+        // En ambos casos el cursor guardado ya no significa nada: el estado que
+        // viene en este mismo SNAPSHOT es la nueva línea base.
+        const cajaDelSobre = typeof msg.server_id === 'string' && msg.server_id ? msg.server_id : null
+        const cambioDeCaja = cajaId !== null && cajaDelSobre !== null && cajaDelSobre !== cajaId
+        const secuenciaRetrocedio = typeof msg.sequence === 'number' && msg.sequence < cursor
+        if (cambioDeCaja || secuenciaRetrocedio) {
+          console.warn(`${LOG} la caja reinició su historia (${cambioDeCaja ? 'otra instalación' : `secuencia ${msg.sequence} < cursor ${cursor}`}); se reinicia el cursor`)
+          cursor = -1
+        }
+        if (cajaDelSobre) cajaId = cajaDelSobre
         // EL ESTADO COMPLETO, PRIMERO. Se ignoraba, y era un P0: una terminal
         // secundaria no escribe en su propio log los eventos que vienen de la
         // caja, asi que al REINICIAR su estado queda sin las ordenes de las demas.
@@ -175,7 +204,9 @@ function conectarConLaCaja({ cajaUrl, serverId, restaurantId, lanSecret, branchI
     // Se persiste ANTES de entregar: si el consumidor truena, el cursor ya avanzó
     // y no se reprocesa. Perder un evento en un consumidor roto es preferible a
     // reproducir el día entero en cada arranque.
-    try { guardarCursor?.(seq) } catch (e) { console.warn(`${LOG} no se pudo guardar el cursor:`, e.message) }
+    // Se guarda junto a la identidad de la Caja: un número suelto no dice de
+    // qué historia es, que fue justo el defecto.
+    try { guardarCursor?.(seq, cajaId) } catch (e) { console.warn(`${LOG} no se pudo guardar el cursor:`, e.message) }
   }
 
   const entregar = (ev) => {
