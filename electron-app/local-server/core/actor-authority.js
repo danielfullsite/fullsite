@@ -12,6 +12,16 @@ const LEVEL = { mesero: 1, cajero: 2, capitan: 3, gerente: 4, admin: 5 }
 const normalizedRole = role => permissionContract.aliases[role] || role
 const fail = (message, status = 401, code = 'ACTOR_REQUIRED') => Object.assign(new Error(message), { status, code })
 const equal = (a, b) => { const x = Buffer.from(a || ''), y = Buffer.from(b || ''); return x.length === y.length && crypto.timingSafeEqual(x, y) }
+// El presupuesto de intentos es POR TERMINAL. Cuando era uno solo para toda la
+// instalación, diez errores en la Entrada dejaban sin poder entrar a la Caja y al
+// Escondite: las tres terminales autorizan contra esta misma clase. Un empleado
+// que teclea su PIN correcto en una terminal donde nunca se preparó también
+// gastaba de ese presupuesto común.
+// El tope de instalación se conserva más alto porque la cabecera que identifica
+// la terminal la declara el propio cliente: sin él, rotarla daría intentos sin fin.
+const VENTANA_INTENTOS_MS      = 10 * 60000
+const INTENTOS_POR_TERMINAL    = 10
+const INTENTOS_POR_INSTALACION = 30
 function permissionsFor(role) {
   const profile = permissionContract.profiles[normalizedRole(role)]
   if (!profile) return []
@@ -45,11 +55,16 @@ class ActorAuthority {
     this.key = fs.readFileSync(keyPath, 'utf8').trim()
     if (!/^[a-f0-9]{64}$/.test(this.key)) throw new Error('Clave de autoridad inválida')
     this.file = path.join(directory, 'actor-credentials.json')
-    this.data = { credentials: {}, failures: [], denied_devices: {}, last_seen: 0 }
+    this.data = { credentials: {}, failures: {}, denied_devices: {}, last_seen: 0 }
     if (fs.existsSync(this.file)) {
       this.data = JSON.parse(fs.readFileSync(this.file, 'utf8'))
+      // Formato anterior: una lista plana sin terminal. No se puede repartir
+      // entre terminales, así que se descarta. Son marcas de diez minutos como
+      // mucho, y sólo ocurre una vez, al actualizar.
+      if (Array.isArray(this.data.failures)) this.data.failures = {}
       if (this.data.restaurant_id !== restaurantId || this.data.location_id !== this.branchId ||
-        !this.data.credentials || !Array.isArray(this.data.failures) || !this.data.denied_devices || !Number.isFinite(this.data.last_seen)) {
+        !this.data.credentials || !this.data.failures || typeof this.data.failures !== 'object' ||
+        !this.data.denied_devices || !Number.isFinite(this.data.last_seen)) {
         throw new Error('Credenciales dañadas o pertenecientes a otra instalación')
       }
     }
@@ -61,6 +76,24 @@ class ActorAuthority {
     this.data.last_seen = Math.max(this.data.last_seen || 0, this.now())
     try { replaceFile(this.file, JSON.stringify(this.data)) }
     catch (error) { this._faulted = true; throw fail('No se pudo guardar la autorización en Caja', 503, 'ACTOR_STORAGE_UNAVAILABLE') }
+  }
+  // ── Presupuesto de intentos ────────────────────────────────────────────────
+  /** Intentos vivos de una terminal, podando de paso los que ya vencieron. */
+  _fallosDe(deviceId, now) {
+    const vivos = (this.data.failures[deviceId] || []).filter(at => at > now - VENTANA_INTENTOS_MS)
+    if (vivos.length) this.data.failures[deviceId] = vivos
+    else delete this.data.failures[deviceId]
+    return vivos
+  }
+  /** Poda todas las terminales y devuelve el total vivo de la instalación. */
+  _fallosDeLaInstalacion(now) {
+    let total = 0
+    for (const deviceId of Object.keys(this.data.failures)) total += this._fallosDe(deviceId, now).length
+    return total
+  }
+  _anotarFallo(deviceId, now) {
+    if (!Array.isArray(this.data.failures[deviceId])) this.data.failures[deviceId] = []
+    this.data.failures[deviceId].push(now)
   }
   _time() {
     if (this._faulted) throw fail('Reinicia y verifica el almacenamiento de Caja antes de autorizar', 503, 'ACTOR_STORAGE_UNAVAILABLE')
@@ -90,8 +123,13 @@ class ActorAuthority {
     if (restaurantId !== this.restaurantId || !/^[\w-]{1,64}$/.test(deviceId || '')) throw fail('Scope de acceso inválido', 403, 'ACTOR_SCOPE_INVALID')
     if (!/^\d{4,10}$/.test(pin || '')) throw fail('PIN inválido', 400, 'INVALID_PIN')
     if (minRole && !LEVEL[normalizedRole(minRole)]) throw fail('Permiso solicitado inválido', 400, 'INVALID_ROLE')
-    this.data.failures = this.data.failures.filter(at => at > now - 10 * 60000)
-    if (this.data.failures.length >= 10) throw fail('Demasiados intentos; espera diez minutos', 429, 'PIN_RATE_LIMITED')
+    const vivosEnLaInstalacion = this._fallosDeLaInstalacion(now)
+    if (this._fallosDe(deviceId, now).length >= INTENTOS_POR_TERMINAL) {
+      throw fail('Demasiados intentos en esta terminal; espera diez minutos', 429, 'PIN_RATE_LIMITED')
+    }
+    if (vivosEnLaInstalacion >= INTENTOS_POR_INSTALACION) {
+      throw fail('Demasiados intentos en el restaurante; espera diez minutos', 429, 'PIN_RATE_LIMITED')
+    }
     const index = this._index(pin)
     let credential = this.data.credentials[index], offline = false, shiftToken
     try {
@@ -123,14 +161,17 @@ class ActorAuthority {
       this.data.credentials[index] = credential
       delete this.data.denied_devices[deviceId]
     } catch (error) {
-      if (error.status) { this.data.failures.push(now); this._persist(); throw error }
+      if (error.status) { this._anotarFallo(deviceId, now); this._persist(); throw error }
       offline = true
       if (this.data.denied_devices[deviceId]) throw fail('Terminal revocada; requiere autorización con internet', 403, 'terminal_not_enrolled')
       if (!credential || credential.expires_at <= now || !(credential.devices?.[deviceId] > now) || !equal(crypto.scryptSync(pin, credential.salt, 32).toString('hex'), credential.hash)) {
-        this.data.failures.push(now); this._persist()
+        this._anotarFallo(deviceId, now); this._persist()
         throw fail('Usuario o terminal sin preparar, o credencial vencida; valida PIN con internet', 401, 'OFFLINE_USER_NOT_PREPARED')
       }
     }
+    // Entrar bien limpia el presupuesto de ESTA terminal: si no, los errores de
+    // quien tecleó mal antes seguían contando contra quien ya se identificó.
+    delete this.data.failures[deviceId]
     this._persist()
     if (minRole && LEVEL[normalizedRole(credential.staff.role)] < LEVEL[normalizedRole(minRole)]) throw fail('Este usuario no tiene el permiso solicitado', 403, 'PERMISSION_DENIED')
     const expiresAt = Math.min(now + 8 * 3600000, credential.expires_at)
