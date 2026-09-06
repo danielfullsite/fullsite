@@ -8,14 +8,30 @@ const { S2C, C2S, revisarMensajeDeCliente, serverEnvelope } = require('../protoc
 const credLan = require('./credencial-lan')
 
 const PING_INTERVAL_MS   = 15_000
-const PONG_TIMEOUT_MS    = 10_000
+// Un cliente pasivo —el enlace de una terminal secundaria, un tablero de cocina—
+// sólo refresca su marca cuando CONTESTA un ping. Si el plazo no cubre varios
+// intervalos, el hub mata al cliente sano antes de darle ocasión de contestar.
+// Con 15 s de intervalo y 10 s de plazo, TODO cliente moría en el primer barrido:
+// su marca era la del SUBSCRIBE, 15 s atrás, y el plazo eran 10. La terminal
+// volvía a entrar pidiendo el snapshot completo cada 15 segundos.
+// INVARIANTE: el plazo debe cubrir varios intervalos. La verifica el constructor.
+const PONG_TIMEOUT_MS    = 45_000
 const LOCK_EXPIRY_MS     = 30_000
 
 class WsHub {
   /**
    * @param {{ serverId: string, restaurantId: string, getState: () => object, getLastSequence: () => Promise<number>, readAfter: (seq: number) => Promise<object[]> }} opts
    */
-  constructor({ serverId, restaurantId, branchId, lanSecret, getState, getLastSequence, readAfter }) {
+  constructor({ serverId, restaurantId, branchId, lanSecret, getState, getLastSequence, readAfter,
+    pingIntervalMs = PING_INTERVAL_MS, pongTimeoutMs = PONG_TIMEOUT_MS }) {
+    // Configurables para poder probar el keepalive sin esperar minutos. La
+    // invariante se comprueba aquí para que nadie los vuelva a cruzar: un plazo
+    // que no cubre dos intervalos desconecta clientes sanos.
+    if (!(pingIntervalMs > 0) || !(pongTimeoutMs > pingIntervalMs * 2)) {
+      throw new Error('Keepalive inválido: el plazo del pong debe cubrir más de dos intervalos de ping')
+    }
+    this._pingIntervalMs = pingIntervalMs
+    this._pongTimeoutMs  = pongTimeoutMs
     this._serverId      = serverId
     this._restaurantId  = restaurantId
     this._branchId      = branchId
@@ -55,7 +71,7 @@ class WsHub {
     })
 
     this._wss.on('connection', (ws, req) => this._onConnection(ws, req))
-    this._pingTimer = setInterval(() => this._pingAll(), PING_INTERVAL_MS)
+    this._pingTimer = setInterval(() => this._pingAll(), this._pingIntervalMs)
 
     console.log('[ws-hub] WebSocket hub attached on /ws')
   }
@@ -224,7 +240,7 @@ class WsHub {
   // ─── Keepalive ───────────────────────────────────────────────────────────
 
   _pingAll() {
-    const deadline = Date.now() - PONG_TIMEOUT_MS
+    const deadline = Date.now() - this._pongTimeoutMs
     for (const [clientId, client] of this._clients) {
       if (client.lastPong < deadline) {
         console.warn(`[ws-hub] Client timed out: ${clientId}`)
