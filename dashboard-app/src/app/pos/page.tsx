@@ -46,6 +46,7 @@ import { publishEvent, getDeviceId } from '@/lib/events'
 import { apiUrl } from '@/lib/api-base'
 import { sendOrderToKitchen, kitchenFailureMessage } from '@/lib/kitchen-bridge'
 import { avisarCierreDeOrden } from '@/lib/aviso-lan'
+import { cacheTrasElCierre } from '@/lib/cache-de-cuenta'
 import { leerCuenta, requiereCaja, cuentaConfirmada, type LecturaDeCuenta } from '@/lib/pedro-cliente'
 import { leerCatalogoCaja } from '@/lib/pedro-catalogo'
 import { guardarCuentaEnCaja, enviarCuentaEnCaja, moverCuentaEnCaja, anularCuentaEnCaja, GuardadoAnteriorRecuperado, firmaBorradorParaCaja, type OrdenConfirmada } from '@/lib/pedro-operaciones'
@@ -2341,6 +2342,23 @@ function POSContent() {
   }
   const refrescarCuentaCaja = useRef<() => Promise<LecturaDeCuenta | null>>(async () => null)
   const claveCuentaCaja = `pos_cuenta_${_cid()}_${clienteNombre ? `nombre:${clienteNombre}` : `mesa:${mesa}`}`
+  // La caché de la mesa NO se limpiaba al cobrar. La mesa se veía libre en el
+  // mapa, pero al abrirla el editor readoptaba el id de la orden liquidada,
+  // pintaba sus platillos y la lectura devolvía «cerrada» para siempre: mesa
+  // inservible y platillos de una cuenta cerrada en pantalla, que es el síntoma
+  // reportado en campo. Se limpia por los dos lados: al cobrar aquí, y al
+  // enterarnos por Caja de que la cuenta ya no está abierta.
+  const olvidarCuentaCerrada = useCallback((motivo: 'cobrada-aqui' | 'cerrada-en-caja') => {
+    try {
+      const guardado = JSON.parse(localStorage.getItem(claveCuentaCaja) || 'null')
+      const queda = cacheTrasElCierre(guardado, motivo)
+      if (queda) localStorage.setItem(claveCuentaCaja, JSON.stringify(queda))
+      else localStorage.removeItem(claveCuentaCaja)
+    } catch {}
+    idCuentaCaja.current = null
+    baseCuentaCaja.current = null
+    cuentaRemotaCaja.current = null
+  }, [claveCuentaCaja])
 
   useEffect(() => {
     if (!requiereCaja()) return
@@ -2390,7 +2408,10 @@ function POSContent() {
       setLecturaCuentaCaja(result); setLoadingMesa(false)
       if (result.estado === 'incierta') { setAvisoCuentaCaja(result.motivo || 'Cuenta sin confirmar — sólo borradores'); return result }
       if (result.estado === 'cerrada') {
-        setAvisoCuentaCaja('Esta cuenta ya no está abierta en Caja. Conservamos tu borrador; vuelve al salón.')
+        // Se suelta la identidad de la cuenta liquidada. Si sobrevive en la
+        // caché, al reabrir la mesa el editor la readopta y queda trabada.
+        olvidarCuentaCerrada('cerrada-en-caja')
+        setAvisoCuentaCaja('Esta cuenta ya se cerró en Caja. Conservamos lo que tecleaste aquí; vuelve al salón.')
         return result
       }
       setUltimaLecturaCaja(Date.now())
@@ -3842,6 +3863,7 @@ function POSContent() {
       setOrderItems([]); setCancelledItems(new Set()); setSentItemIds(new Set()); setSentItemSnapshots({})
       setDiscount(0); setPropina(0)
       try { localStorage.removeItem(`pos_order_${mesa}`) } catch {}
+      olvidarCuentaCerrada('cobrada-aqui')
       setOrderNotes(''); setShowPayment(false); setShowCashFlow(false); setCashAmount('')
       setShowMixto(false); setMixtoPagos([]); setMixtoMonto(''); setSillaActual(1)
       setTiempoFired(0); setSplitPayingCuenta(0); setSplitAssignments({})
@@ -3951,6 +3973,7 @@ function POSContent() {
       setPropina(0)
       // Clear localStorage cache for this mesa
       try { localStorage.removeItem(`pos_order_${mesa}`) } catch {}
+      olvidarCuentaCerrada('cobrada-aqui')
       setOrderNotes('')
       setShowPayment(false)
       setShowCashFlow(false)
