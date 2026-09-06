@@ -42,13 +42,19 @@ function permissionsFor(role) {
 }
 
 class ActorAuthority {
-  constructor({ directory, restaurantId, branchId, cloudOrigin = 'https://app.fullsite.mx', fetchImpl = fetch, now = Date.now, credentialTtlMs = 7 * 86400000 }) {
+  constructor({ directory, restaurantId, branchId, cloudOrigin = 'https://app.fullsite.mx', fetchImpl = fetch, now = Date.now, credentialTtlMs = 7 * 86400000, cloudTimeoutMs = 5000 }) {
     this.restaurantId = restaurantId; this.branchId = branchId || null; this.now = now; this.fetch = fetchImpl
     const origin = new URL(cloudOrigin)
     if (origin.protocol !== 'https:') throw new Error('La autoridad de PIN requiere HTTPS')
     this.cloudOrigin = origin.origin
     if (!Number.isSafeInteger(credentialTtlMs) || credentialTtlMs <= 0 || credentialTtlMs > 7 * 86400000) throw new Error('Vigencia de credenciales inválida')
     this.ttl = credentialTtlMs
+    // La ruta de PIN en la nube encadena varias consultas y puede arrancar en
+    // frío. Con 1.8 s, una conexión lenta se declaraba caída y a un empleado sin
+    // preparar en esa terminal se le pedía "valida PIN con internet" teniendo
+    // internet. El plazo lo acota el reenvío de las terminales secundarias.
+    if (!Number.isSafeInteger(cloudTimeoutMs) || cloudTimeoutMs <= 0 || cloudTimeoutMs > 15000) throw new Error('Plazo de la autoridad inválido')
+    this.cloudTimeoutMs = cloudTimeoutMs
     fs.mkdirSync(directory, { recursive: true })
     const keyPath = path.join(directory, 'actor-signing-key')
     if (!fs.existsSync(keyPath)) replaceFile(keyPath, crypto.randomBytes(32).toString('hex'))
@@ -136,12 +142,18 @@ class ActorAuthority {
       const response = await this.fetch(this.cloudOrigin + '/api/pos/pin', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, redirect: 'error',
         body: JSON.stringify({ pin, client_id: this.restaurantId, device_id: deviceId }),
-        signal: AbortSignal.timeout(1800),
+        signal: AbortSignal.timeout(this.cloudTimeoutMs),
       })
-      if ([400, 401, 403, 429].includes(response.status)) {
+      // Un 429 NO es un veredicto sobre este PIN: la nube limita por IP pública,
+      // que en un restaurante comparten las tres terminales y cualquier navegador.
+      // Tratarlo como rechazo le decía "PIN rechazado" a quien tecleó el correcto,
+      // y encima era peor que estar sin internet, porque con la nube caída ese
+      // mismo empleado sí entraba con su credencial preparada. Cae abajo, al
+      // camino sin nube, junto con el resto de las respuestas no útiles.
+      if ([400, 401, 403].includes(response.status)) {
         const rejection = await response.json().catch(() => ({}))
         if (rejection.code === 'terminal_not_enrolled') this.data.denied_devices[deviceId] = true
-        // A device rejection or throttle is not an employee revocation. A firm
+        // A device rejection is not an employee revocation. A firm
         // invalid PIN does revoke its cached verifier and every issued session.
         else if (response.status === 401) delete this.data.credentials[index]
         throw fail(rejection.code === 'terminal_not_enrolled' ? 'Terminal no autorizada' : 'PIN rechazado por la autoridad', response.status, rejection.code || 'PIN_REJECTED')
