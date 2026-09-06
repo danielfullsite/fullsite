@@ -319,7 +319,7 @@ const LECTURAS_REENVIADAS = ['/state', '/events', '/print/uncertain', '/auth/sta
 
 // Keep identity and routing configuration explicit so every cloned terminal can
 // discover the caja without relying on process-global or customer-specific state.
-function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority = null, catalogStore = null, getBusinessSyncStatus = () => ({ configured: false }), printer, version, serverId, restaurantId, config = {}, instanceName = '', branchId = config.branchId || config.locationId || null, posServerIp = config.posServerIp || null, port = 7717, posServerPort = config.posServerPort || null }) {
+function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority = null, catalogStore = null, authorityReason = null, catalogReason = null, getBusinessSyncStatus = () => ({ configured: false }), printer, version, serverId, restaurantId, config = {}, instanceName = '', branchId = config.branchId || config.locationId || null, posServerIp = config.posServerIp || null, port = 7717, posServerPort = config.posServerPort || null }) {
   // Puerto de la CAJA al reenviar. Antes se usaba `port` — el puerto PROPIO del
   // secundario — lo que acopla ambos al 7717: dos Pedros en una misma maquina
   // (pruebas, demos) o una terminal en puerto distinto rompian el forward.
@@ -508,6 +508,10 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority 
         last_sequence:    seq,
         sync_queue_size:  await eventStore.unsyncedCount(),
         print_jobs_failed: printer.getPrintJobsFailed(),
+        // Sin esto, una Caja que arrancó sin autoridad se ve idéntica a una sana
+        // hasta que alguien intenta entrar con su PIN en plena comida.
+        authority:        { ready: !!actorAuthority, reason: authorityReason },
+        catalog:          { ready: !!catalogStore, reason: catalogReason },
         staged_update:    updater.getStagedUpdate(),
         update_channel:   updater.getChannel(),
         stations:         Object.keys(printer.getStations()),
@@ -559,12 +563,20 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority 
       return
     }
     if (url === '/auth/status' && req.method === 'GET') {
-      try { json(res, actorAuthority ? 200 : 503, actorAuthority ? actorAuthority.status() : { error: 'Autorización no preparada' }) }
+      try {
+        json(res, actorAuthority ? 200 : 503, actorAuthority ? actorAuthority.status()
+          : { error: 'Autorización no preparada', reason: authorityReason, code: 'ACTOR_AUTHORITY_UNAVAILABLE' })
+      }
       catch (error) { json(res, error.status || 503, { error: error.message, code: error.code }) }
       return
     }
     if (url === '/auth/pin' && req.method === 'POST') {
-      if (!actorAuthority) { json(res, 503, { error: 'Autorización no preparada en Caja' }); return }
+      // El motivo viaja para que la pantalla y el soporte puedan distinguir
+      // "todavía no arranca" de "el archivo de credenciales está dañado".
+      if (!actorAuthority) {
+        json(res, 503, { error: 'Autorización no preparada en Caja', reason: authorityReason, code: 'ACTOR_AUTHORITY_UNAVAILABLE' })
+        return
+      }
       try {
         const body = await parseBody(req)
         if (credLan.verificarScope(body, { restaurantId, branchId })) { json(res, 403, { error: 'Scope de otra instalación' }); return }
@@ -796,14 +808,34 @@ async function startLocalServer({ dataDir, port = 7717, config = {}, businessSyn
   for (const ev of events) state.apply(ev)
   console.log('[server] State ready.')
 
-  const actorAuthority = config.posServerIp ? null : new ActorAuthority({
-    directory: require('path').join(dataDir, 'actor-authority'), restaurantId,
-    branchId: config.branchId || config.locationId || null,
-  })
-  const catalogStore = config.posServerIp ? null : new CatalogStore({
-    directory: require('path').join(dataDir, 'catalog'), restaurantId,
-    branchId: config.branchId || config.locationId || null,
-  })
+  // La autoridad lanza si su archivo quedó a medias por un apagón, o si alguien
+  // cambió el restaurante o la sucursal en la configuración. Construirla sin
+  // resguardo tumbaba TODO el arranque de Pedro: la ventana del POS abría igual
+  // (main.js atrapa el error y sigue), pero sin impresión, sin KDS, sin reenvío
+  // para las otras terminales y sin PIN, y el operador sólo leía "Sin conexión
+  // con Caja" sin una sola pista de la causa. Se degrada como ya hace su hermano
+  // CatalogStore: se guarda el motivo, se contesta 503 y se publica en /health.
+  const construirODegradar = (que, construir) => {
+    try { return { instancia: construir(), motivo: null } }
+    catch (error) {
+      console.error(`[server] ${que} no disponible: ${error.message}`)
+      return { instancia: null, motivo: error.message }
+    }
+  }
+  const autoridad = config.posServerIp
+    ? { instancia: null, motivo: 'Esta terminal autoriza contra la Caja' }
+    : construirODegradar('Autoridad de PIN', () => new ActorAuthority({
+      directory: require('path').join(dataDir, 'actor-authority'), restaurantId,
+      branchId: config.branchId || config.locationId || null,
+    }))
+  const catalogo = config.posServerIp
+    ? { instancia: null, motivo: 'Esta terminal lee el catálogo de la Caja' }
+    : construirODegradar('Catálogo', () => new CatalogStore({
+      directory: require('path').join(dataDir, 'catalog'), restaurantId,
+      branchId: config.branchId || config.locationId || null,
+    }))
+  const actorAuthority = autoridad.instancia
+  const catalogStore = catalogo.instancia
 
   // ── WebSocket hub ────────────────────────────────────────────────────────
   const wsHub = new WsHub({
@@ -854,6 +886,8 @@ async function startLocalServer({ dataDir, port = 7717, config = {}, businessSyn
     cmdHandler,
     actorAuthority,
     catalogStore,
+    authorityReason: autoridad.motivo,
+    catalogReason: catalogo.motivo,
     getBusinessSyncStatus: () => _businessOutbox?.status() || { configured: !!businessSync, error: businessSyncIssue },
     printer: printerAdapter,
     version,
