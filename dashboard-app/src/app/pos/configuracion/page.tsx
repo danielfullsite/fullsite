@@ -190,6 +190,8 @@ export default function ConfigPage() {
   const [bridgeOnline, setBridgeOnline] = useState<boolean | null>(null)
   const [bridgeStations, setBridgeStations] = useState<string[]>([])
   const [bridgeUptime, setBridgeUptime] = useState(0)
+  const [bridgeBuild, setBridgeBuild] = useState<string | null>(null)
+  const [bridgeEmparejada, setBridgeEmparejada] = useState<boolean | null>(null)
   const [staff, setStaff] = useState<{ id: string; name: string; role: string; active: boolean }[]>([])
   const [promos, setPromos] = useState<{ id: string; name: string; type: string; active: boolean }[]>([])
   const [deviceInfo, setDeviceInfo] = useState({ width: 0, height: 0, userAgent: '', online: true, pwa: false })
@@ -238,7 +240,14 @@ export default function ConfigPage() {
       .then(d => {
         setBridgeOnline(true)
         setBridgeStations(d.stations || [])
-        setBridgeUptime(d.uptime || 0)
+        // El servidor manda `uptime_s`, no `uptime`: por eso esta pantalla
+        // llevaba mostrando «Online (0min)» siempre.
+        setBridgeUptime(d.uptime_s ?? d.uptime ?? 0)
+        // Qué ejecutable es exactamente éste. Sin esto, una queja desde el
+        // restaurante no se puede atar a una versión, y no hay forma de
+        // comprobar que las terminales quedaron con el mismo instalador.
+        setBridgeBuild(d.build?.etiqueta || null)
+        setBridgeEmparejada(typeof d.emparejada === 'boolean' ? d.emparejada : null)
       })
       .catch(() => setBridgeOnline(false))
 
@@ -344,6 +353,10 @@ export default function ConfigPage() {
           {bridgeOnline ? (
             <>
               <p className="text-sm mb-3" style={{ color: 'var(--text-2)' }}>Conectado en <span className="font-mono" style={{ color: 'var(--text-1)' }}>{getBridgeUrl()}</span> — <b style={{ color: 'var(--text-1)' }}>{bridgeStations.length} estación(es)</b>.</p>
+              <p className="text-sm mb-3" style={{ color: 'var(--text-2)' }}>
+                Versión <span className="font-mono" style={{ color: 'var(--text-1)' }}>{bridgeBuild || 'sin sellar'}</span>
+                {bridgeEmparejada === false && <b style={{ color: 'var(--danger-ink, #dc2626)' }}> · terminal sin emparejar</b>}
+              </p>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {bridgeStations.map(s => {
                   const t = stationTint(s)

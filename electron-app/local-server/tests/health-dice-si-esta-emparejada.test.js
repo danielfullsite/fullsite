@@ -113,3 +113,13 @@ test('la Caja no tiene enlace hacia arriba, y eso no es un fallo', async () => {
   assert.equal(cuerpo.enlace, null)
   assert.equal(cuerpo.emparejada, true)
 })
+
+test('/health dice qué ejecutable es, no sólo el número de versión', async () => {
+  // `version` sola no distingue producción de un candidato: ambas dicen 1.4.0.
+  const { cuerpo } = await pedirSalud(servidorFalso({ config: { lanSecret: 'g'.repeat(64), terminalRole: 'server_pos' } }))
+  assert.equal(cuerpo.build.version, '1.5.0')
+  assert.equal(typeof cuerpo.build.etiqueta, 'string')
+  // La etiqueta siempre empieza por la versión; el commit se añade sólo si el
+  // ejecutable fue sellado. Sin sello dice "(sin sellar)" en vez de inventarlo.
+  assert.match(cuerpo.build.etiqueta, /^1\.5\.0( · [0-9a-f]{7,12}(\+cambios)?| \(sin sellar\))$/)
+})

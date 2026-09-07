@@ -6,8 +6,9 @@
   "scripts": {
     "start": "electron .",
     "build:ui": "node scripts/build-offline-ui.cjs",
-    "build:win": "npm run build:ui && electron-builder --win --x64 --publish never",
-    "build:mac": "npm run build:ui && electron-builder --mac --publish never"
+    "build:win": "npm run build:ui && npm run sellar && electron-builder --win --x64 --publish never",
+    "build:mac": "npm run build:ui && npm run sellar && electron-builder --mac --publish never",
+    "sellar": "node scripts/sellar-version.cjs"
   },
   "author": "Fullsite",
   "license": "UNLICENSED",
@@ -26,6 +27,7 @@
     "productName": "Fullsite POS",
     "files": [
       "main.js",
+      "build-info.json",
       "preload*.js",
       "setup.html",
       "offline.html",

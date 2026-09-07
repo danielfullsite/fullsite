@@ -26,6 +26,7 @@ const printerAdapter = require('./adapters/printer')
 const networkAdapter = require('./adapters/network')
 const { NdjsonEventStore }  = require('./adapters/storage/ndjson')
 const { CoreEventStore }    = require('./core/event-store')
+const { identidadDeBuild } = require('./core/identidad-de-build')
 const { RestaurantState }   = require('./core/state')
 const { WsHub }             = require('./core/ws-hub')
 const { CommandHandler }    = require('./core/command-handler')
@@ -522,6 +523,11 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority 
         // cuándo y por qué se cayó. El secreto NUNCA se publica, sólo si existe.
         emparejada:       !!config.lanSecret,
         enlace:           getEnlaceStatus(),
+        // Qué ejecutable es exactamente éste. `version` sola no distingue: dice
+        // 1.4.0 igual en producción que en un candidato. Sin el commit no se
+        // puede atar una queja de campo a una versión, ni comprobar que las
+        // cuatro terminales quedaron iguales.
+        build:            identidadDeBuild(version),
       })
       return
     }
