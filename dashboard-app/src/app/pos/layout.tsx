@@ -11,6 +11,8 @@ import { getEffectiveSetting } from '@/lib/settings'
 import { initStationRouting, initNoPrintStations, initCancellationReasons, initDiscountCatalog, initKdsStations } from '@/lib/pos-constants'
 import { inventoryPolicyService } from '@/lib/inventory-policy'
 import { getFingerprintUrl } from '@/lib/fingerprint-url'
+import { localNetworkFetch } from '@/lib/local-network-fetch'
+import { decidirHuella, modoDeAutoridadRecordado } from '@/lib/modo-autoridad'
 import { provisionManagerCredential, verifyPinOffline, estadoCredencialesOffline } from '@/lib/pos-manager-auth'
 import { POSLockContext } from './pos-lock-context'
 import { requiereCaja } from '@/lib/pedro-cliente'
@@ -325,7 +327,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
       // first race and used to hide the button until a manual Ctrl+R.
       for (let attempt = 0; attempt < 6 && !cancelled; attempt++) {
         try {
-          const r = await fetch(`${FINGERPRINT_URL}/health`, { signal: AbortSignal.timeout(1000) })
+          const r = await localNetworkFetch(`${FINGERPRINT_URL}/health`, { signal: AbortSignal.timeout(1000) })
           const data = r.ok ? await r.json() : null
           if (data?.ok) {
             try { localStorage.setItem(FP_AVAILABLE_KEY, '1') } catch {}
@@ -346,7 +348,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
   const handleBiometricRegister = async (staffMember: StaffMember) => {
     try {
       // Call fingerprint service to enroll (captures 4 samples)
-      const res = await fetch(`${FINGERPRINT_URL}/enroll?id=${encodeURIComponent(staffMember.id)}`, {
+      const res = await localNetworkFetch(`${FINGERPRINT_URL}/enroll?id=${encodeURIComponent(staffMember.id)}`, {
         method: 'GET',
         signal: AbortSignal.timeout(90000), // 90 sec for 4 captures
       })
@@ -368,13 +370,20 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
 
   // Authenticate with fingerprint via DigitalPersona service (port 7718)
   const handleBiometricLogin = async () => {
-    if (requiereCaja()) {
-      setSessionError('Ingresa con PIN para autorizar operaciones en Caja. La huella de esta terminal aún requiere validación.')
+    // Antes se preguntaba `requiereCaja()`, que responde por el userAgent: bajo
+    // Electron es SIEMPRE verdadero, así que la huella quedaba rechazada en las
+    // tres terminales de un restaurante que la usa a diario. La pregunta correcta
+    // no es «¿soy una aplicación de escritorio?» sino «¿esta instalación exige un
+    // permiso firmado por Caja?». Ese dato lo publica Pedro en su estado.
+    // Con autoridad de Caja la huella sigue sirviendo para saber quién eres, pero
+    // el permiso lo firma Caja a partir de un PIN y el lector no trae PIN.
+    if (decidirHuella(modoDeAutoridadRecordado()) === 'identificar-y-pedir-pin') {
+      setSessionError('Esta caja pide tu PIN para firmar el turno. La huella sirve para identificarte, no para autorizar cobros.')
       return
     }
     setBiometricChecking(true)
     try {
-      const res = await fetch(`${FINGERPRINT_URL}/identify`, { method: 'GET', signal: AbortSignal.timeout(20000) })
+      const res = await localNetworkFetch(`${FINGERPRINT_URL}/identify`, { method: 'GET', signal: AbortSignal.timeout(20000) })
       const data = await res.json()
 
       if (data.ok && data.staffId) {
@@ -495,7 +504,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
       if (biometricAvailable) {
         let serviceHasTemplates = true
         try {
-          const listRes = await fetch(`${getFingerprintUrl()}/list`, { signal: AbortSignal.timeout(2000) })
+          const listRes = await localNetworkFetch(`${getFingerprintUrl()}/list`, { signal: AbortSignal.timeout(2000) })
           const listData = await listRes.json()
           serviceHasTemplates = listData.count > 0 && listData.enrolled?.includes(member.id)
         } catch { serviceHasTemplates = false }

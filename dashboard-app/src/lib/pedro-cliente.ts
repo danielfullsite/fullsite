@@ -2,6 +2,7 @@
 // of the same order (ADR-005); an unreadable reply never means "free".
 import { getBridgeUrl } from './bridge-url'
 import { localNetworkFetch } from './local-network-fetch'
+import { recordarAutoridad } from './modo-autoridad'
 
 const TIMEOUT_MS = 1_500
 export type ProcedenciaDelSalon = 'caja' | 'local-degradado' | 'sin-pedro'
@@ -58,6 +59,9 @@ export async function leerSalon(): Promise<LecturaDelSalon> {
     if (ordenes.some((o: unknown) => !o || typeof o !== 'object' || Array.isArray(o))) {
       return { ...SIN_PEDRO, motivo: 'respuesta de órdenes ilegible' }
     }
+    // Se recuerda para que la pantalla de acceso sepa si esta instalación exige
+    // un permiso firmado por Caja, sin tener que esperar su propia lectura.
+    recordarAutoridad(cuerpo.write_authority)
     return {
       procedencia: autoritativa ? 'caja' : 'local-degradado', autoritativa, completa,
       writeAuthority: cuerpo.write_authority === 'caja' ? 'caja' : 'legacy',
