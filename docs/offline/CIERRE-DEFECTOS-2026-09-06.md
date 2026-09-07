@@ -1,6 +1,6 @@
 # Cierre de defectos del candidato — 2026-09-06
 
-Rama `lab/pin-real-desde-pantalla`, seis commits sobre `b5791890`. Nada de esto
+Rama `lab/pin-real-desde-pantalla`, ocho commits sobre `b5791890`. Nada de esto
 está desplegado ni validado en campo: AMALAY sigue operando con Wansoft.
 
 ## De dónde salió la lista
@@ -51,9 +51,9 @@ Quedó cubierto con su propio caso.
 
 - Servidor local: **133/133** sobre 17 archivos de prueba, incluidos los que
   levantan Pedros reales.
-- Aplicación: **102/102** sobre las siete suites relacionadas.
-- TypeScript: los mismos 25 errores preexistentes, todos en archivos de prueba
-  por `@testing-library/react` y `jsdom` ausentes. Ninguno en lo tocado.
+- Aplicación: **3014/3014** sobre las 161 suites del carril Node.
+- TypeScript: los mismos 25 errores preexistentes, todos en archivos de prueba,
+  por `@testing-library/react` ausente. Ninguno en lo tocado.
 - `node --test tests/` sobre el directorio completo no reporta bien en este
   entorno; la verificación es por archivo.
 
