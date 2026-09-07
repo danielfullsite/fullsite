@@ -319,7 +319,7 @@ const LECTURAS_REENVIADAS = ['/state', '/events', '/print/uncertain', '/auth/sta
 
 // Keep identity and routing configuration explicit so every cloned terminal can
 // discover the caja without relying on process-global or customer-specific state.
-function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority = null, catalogStore = null, authorityReason = null, catalogReason = null, getBusinessSyncStatus = () => ({ configured: false }), printer, version, serverId, restaurantId, config = {}, instanceName = '', branchId = config.branchId || config.locationId || null, posServerIp = config.posServerIp || null, port = 7717, posServerPort = config.posServerPort || null }) {
+function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority = null, catalogStore = null, authorityReason = null, catalogReason = null, getBusinessSyncStatus = () => ({ configured: false }), getEnlaceStatus = () => null, printer, version, serverId, restaurantId, config = {}, instanceName = '', branchId = config.branchId || config.locationId || null, posServerIp = config.posServerIp || null, port = 7717, posServerPort = config.posServerPort || null }) {
   // Puerto de la CAJA al reenviar. Antes se usaba `port` — el puerto PROPIO del
   // secundario — lo que acopla ambos al 7717: dos Pedros en una misma maquina
   // (pruebas, demos) o una terminal en puerto distinto rompian el forward.
@@ -515,6 +515,13 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority 
         staged_update:    updater.getStagedUpdate(),
         update_channel:   updater.getChannel(),
         stations:         Object.keys(printer.getStations()),
+        // Sin esto no hay forma de diagnosticar una terminal en el restaurante.
+        // `emparejada` es la primera pregunta cuando una secundaria "no hace
+        // nada": sin secreto de red, todo responde 401 salvo esta ruta.
+        // `enlace` es la segunda: dice si está enganchada a la Caja, desde
+        // cuándo y por qué se cayó. El secreto NUNCA se publica, sólo si existe.
+        emparejada:       !!config.lanSecret,
+        enlace:           getEnlaceStatus(),
       })
       return
     }
@@ -889,6 +896,7 @@ async function startLocalServer({ dataDir, port = 7717, config = {}, businessSyn
     authorityReason: autoridad.motivo,
     catalogReason: catalogo.motivo,
     getBusinessSyncStatus: () => _businessOutbox?.status() || { configured: !!businessSync, error: businessSyncIssue },
+    getEnlaceStatus: () => _enlaceCaja?.estado() || null,
     printer: printerAdapter,
     version,
     serverId,
