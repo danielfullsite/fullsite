@@ -32,6 +32,7 @@ descartar que sea tautológica.
 | `57fc7ede` | Un archivo de credenciales dañado dejaba la terminal sin Pedro | 11 comprobaciones | sí, en la primera |
 | `7e408def` | Reinstalar la Caja dejaba ciegas a las secundarias | 7/7 | 2 de 7 |
 | `18eff681` | La mesa quedaba inservible después de cobrar | 6/6 | n/a, función nueva |
+| `9e95ae08` | La huella, rota por transporte y por el guard del login | 19/19 | n/a, módulo nuevo |
 
 **El del hub ya está en producción hoy**, idéntico en `origin/main`. Es candidato
 directo al «no muestran lo mismo» que Eduardo reportó el 2026-09-02. Medido con
@@ -58,26 +59,21 @@ Quedó cubierto con su propio caso.
 
 ## Pendientes, con su diagnóstico
 
-**La huella, bloqueante.** Funciona hoy en producción y esta rama la rompió por
-dos lados independientes, cualquiera de los dos basta:
+**La huella quedó devuelta** en `9e95ae08`, por los dos lados. El transporte
+ahora lleva la credencial de red en las ocho llamadas al lector, y el guard del
+login pregunta por el modo de la instalación en vez de por el navegador. Se
+descartó exentar `/fp` por loopback, que era lo obvio: rompe una prueba viva,
+contradice una decisión escrita, y con el comodín de origen que responde el proxy
+dejaría enrolar huellas bajo un identificador ajeno desde cualquier página
+abierta en esa máquina.
 
-1. `getFingerprintUrl()` apunta al proxy de Pedro en `/fp`, y esta rama puso
-   credencial LAN en Pedro dejando abiertas sólo `/health` e `/identity`. Las
-   llamadas de la aplicación usan `fetch` plano sin credencial, así que reciben
-   401: el listado al entrar, el `identify` del login y las de alta de huellas.
-   Arreglo: usar `localNetworkFetch`, que inyecta la credencial.
-2. `handleBiometricLogin` empieza con `if (requiereCaja()) return`, y bajo
-   Electron eso es siempre verdadero. En `origin/main` ese guard no existe.
-
-La decisión de diseño no es mecánica. El modelo nuevo dice que Caja es la
-autoridad y emite un token firmado a partir de un PIN; el lector de huella hace
-match localmente y devuelve un identificador de empleado, sin PIN. Recomendación:
-condicionar por MODO y no por Electron, o sea permitir la huella cuando la
-autoridad de escritura es legacy, que es el modo con el que se instalaría, y
-pedir PIN cuando la autoridad es Caja. Para que la huella sobreviva a la
-transición hace falta una ruta de autorización por huella en Pedro, que reciba el
-empleado identificado por el lector y emita token si esa persona tiene credencial
-preparada para esa terminal. Eso es trabajo posterior, no de esta visita.
+Queda un límite dicho sin adornos: con autoridad de Caja la huella seguirá
+pidiendo PIN mientras no exista una ruta de autorización por huella en Pedro. No
+se construyó a propósito. El servicio del lector no firma su respuesta ni recibe
+un desafío, y la pantalla de alta acepta el identificador de cualquiera sin
+verificar rol, así que un permiso nacido de ahí valdría menos que el PIN al que
+sustituye. El siguiente paso tiene nombre: que el servicio firme su respuesta con
+una llave que Pedro le entregue al arrancar.
 
 **La identidad al cambiar de mesa, diagnosticado y no arreglado.** El reset de
 `orderId`, `loadedOrderId` y `sentItemIds` empieza con `if (requiereCaja()) return`,
