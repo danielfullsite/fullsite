@@ -49,8 +49,45 @@ export interface TypeVerdicts {
 /** Mínimo de veredictos para que el historial pese. Con menos, es anécdota, no señal. */
 export const MIN_VERDICTS = 3
 
-/** Con esta muestra y precisión 0 —nunca acertó ni una vez— el tipo se suprime. */
+/** Con esta muestra y precisión 0 —nunca acertó ni una vez— el tipo puede callarse. */
 export const SUPPRESS_MIN_VERDICTS = 5
+
+/** Lo protegido baja hasta aquí, no hasta cero. Ver la nota en `decideWithHistory`. */
+export const PISO_DE_CONFIANZA_PROTEGIDA = 0.5
+
+/**
+ * Qué NUNCA se calla solo.
+ *
+ * Silenciar era el comportamiento por omisión: cinco veredictos de «falso
+ * positivo» sobre un tipo y dejaba de emitirse para ese restaurante, sin que
+ * nadie aprobara nada y sin dejar rastro en pantalla.
+ *
+ * Con una alerta de fraude eso es un problema distinto al de las demás, porque
+ * quien marca los veredictos es exactamente la persona a la que la alerta
+ * vigila. «Me molesta» y «ya no me cachan» producen el mismo clic, y desde aquí
+ * se ven idénticos. Cinco clics y el vigilado apaga a su vigilante.
+ *
+ * Lo mismo con cualquier hallazgo crítico: si de verdad es un falso positivo
+ * recurrente, el arreglo es corregir al agente, no enseñarle al sistema a
+ * callarse lo grave.
+ *
+ * Ahora el permiso está invertido: callar exige estar en esta lista. Bajar la
+ * confianza se conserva para todos, porque degradar explica —dice por qué y
+ * cuánto— mientras que callar simplemente desaparece.
+ */
+const SE_PUEDEN_CALLAR: ReadonlySet<AgentId> = new Set<AgentId>(['operations', 'inventory', 'staff', 'finance'])
+
+/**
+ * ¿Este hallazgo puede dejar de emitirse solo?
+ *
+ * Exportada para que la prueba pueda afirmarlo directamente y para que quien
+ * cambie la lista tenga que pasar por aquí.
+ */
+export function puedeCallarse(event: Pick<AgentEvent, 'agent_id' | 'severity'>): boolean {
+  if (event.agent_id === 'fraud') return false
+  if (event.severity === 'critical') return false
+  return SE_PUEDEN_CALLAR.has(event.agent_id)
+}
 
 export type LearningDecision =
   | { action: 'keep'; event: AgentEvent }
@@ -95,14 +132,21 @@ export function decideWithHistory(event: AgentEvent, verdicts?: TypeVerdicts): L
   const total = verdicts.correct + verdicts.false_positive
   if (total < MIN_VERDICTS || verdicts.precision === null) return { action: 'keep', event }
 
-  // Nunca acertó, y ya hay muestra suficiente para afirmarlo.
-  if (verdicts.precision === 0 && total >= SUPPRESS_MIN_VERDICTS) {
+  // Nunca acertó, y ya hay muestra suficiente para afirmarlo. Pero callar exige
+  // permiso: lo de fraude y lo crítico se degrada, nunca se apaga. Ver
+  // `puedeCallarse`.
+  if (verdicts.precision === 0 && total >= SUPPRESS_MIN_VERDICTS && puedeCallarse(event)) {
     return { action: 'suppress', event, verdicts }
   }
 
   if (verdicts.precision >= 1) return { action: 'keep', event }
 
-  const ajustada = Math.round(event.confidence * verdicts.precision * 100) / 100
+  // Piso de confianza para lo que no se puede callar. Sin esto, un tipo
+  // protegido con precisión 0 saldría con confianza 0, y el umbral de la lista
+  // de pendientes lo escondería igual: callarlo por la puerta de atrás. Se
+  // degrada hasta el piso y ahí se queda, visible y con su historial escrito.
+  const factor = verdicts.precision === 0 ? PISO_DE_CONFIANZA_PROTEGIDA : verdicts.precision
+  const ajustada = Math.round(event.confidence * factor * 100) / 100
   const nota =
     `\n\nHistorial en este restaurante: de ${total} veces que se evaluó este tipo de hallazgo, ` +
     `${verdicts.correct} resultó certero y ${verdicts.false_positive} falso positivo. ` +

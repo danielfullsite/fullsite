@@ -18,8 +18,13 @@ import {
 } from '@/lib/agents/learning'
 import type { AgentEvent } from '@/lib/agents/types'
 
+// El agente de ejemplo era 'fraud', elegido como un valor cualquiera para
+// rellenar el campo. Desde que lo de fraude ya no puede callarse solo, ese valor
+// dejó de ser neutro: hacía fallar las dos pruebas de supresión de abajo, que no
+// tienen nada que ver con fraude. Se cambia a un agente que sí admite ser
+// callado; la protección tiene su propio archivo, no-se-calla-el-fraude.
 const ev = (type: string, confidence = 0.9): AgentEvent => ({
-  client_id: 'amalay', agent_id: 'fraud', type, severity: 'warning',
+  client_id: 'amalay', agent_id: 'operations', type, severity: 'warning',
   title: 't', explanation: 'razón original', evidence: { dato: 1 },
   suggested_action: 'a', confidence, status: 'new',
 })
