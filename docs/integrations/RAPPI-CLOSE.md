@@ -191,11 +191,13 @@ Repuntar la URL del webhook de la integración FullSite PROD a
 ### Checklist "listo para activar"
 - [x] Código env-driven, sin hardcode DEV — verificado 2026-09-02
 - [x] Mapeo PROD redactado (Paso 1) y constraint confirmado (`UNIQUE (provider, provider_store_id)`)
-- [x] Rappi rutea `1930030014`/`MX1930030014` a FullSite PROD — Rodrigo entregó creds PROD 2026-09-07
 - [x] Credenciales prod recibidas (2026-09-07: Client ID + Secret + Client ID Self — en secret store, NO aquí)
 - [x] Mapeo PROD aplicado en `integration_store_mappings` (`rappi/MX1930030014→amalay`) 2026-09-08
-- [x] Env vars PROD puestas en Vercel (`RAPPI_ENV=prod`, CLIENT_ID/SECRET/STORE_ID)
-- [ ] Webhook `NEW_ORDER` prod suscrito + secret capturado (`RAPPI_WEBHOOK_SECRET`)
+- [x] Env vars PROD base en Vercel (`RAPPI_ENV=prod`, CLIENT_ID/SECRET/STORE_ID) + OAuth PROD `oauth_ok=true`
+- [x] Flujo self-onboarding construido (PR #348): merchant OAuth PKCE + `POST /stores/provisioning`; host public-api corregido a `api.rappi.com.mx`
+- [x] Env vars self-onboarding en Vercel 2026-09-08 (`RAPPI_SELF_CLIENT_ID`, `RAPPI_ONBOARDING_WEBHOOK_SECRET`, `RAPPI_ONBOARDING_REGISTRATION_TOKEN`)
+- [ ] **Tienda `1930030014` provisionada** — correr `/onboarding/authorize?secret=…` + login del merchant AMALAY → `POST /stores/provisioning` (la asociación es NUESTRA vía self, Rappi NO la rutea)
+- [ ] Webhook `NEW_ORDER` prod suscrito + secret capturado (`RAPPI_WEBHOOK_SECRET`) — se habilita al haber ≥1 tienda
 - [ ] Ciclo de orden validado en prod
 
 ### Gotcha de activación 2026-09-08 — "Redeploy" NO toma env nuevas
