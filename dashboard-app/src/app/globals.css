@@ -147,6 +147,12 @@ body:has(.pos-service-shell) {
   --info: #38bdf8; --info-soft: rgba(56,189,248,0.13); --info-ink: #a7e3ff;
   /* Aliases legacy (compatibilidad de componentes) */
   --emerald: #10b981;
+  /* Acentos de sección. Vivían como `text-violet-300` y `#67e8f9` dentro del
+   * markup, valores elegidos contra fondo carbón. Sobre papel daban 1.85:1 y
+   * 1.45:1, cuando el mínimo legible es 3:1. Como token, cada tema pone el
+   * suyo. */
+  --violeta: #a78bfa;      --violeta-soft: rgba(139, 92, 246, 0.14);
+  --cian: #67e8f9;         --cian-soft: rgba(34, 211, 238, 0.12);
   --rose: var(--crit);
   --amber: var(--warn);
   --sky: var(--info);
@@ -211,6 +217,9 @@ body:has(.pos-service-shell) {
   --crit: #e11d48; --crit-soft: rgba(225,29,72,0.10); --crit-ink: #be123c;
   --info: #0ea5e9; --info-soft: rgba(14,165,233,0.11); --info-ink: #0369a1;
   --emerald: #10b981;
+  /* Oscurecidos para el papel: 4.9:1 y 4.6:1 sobre tarjeta blanca. */
+  --violeta: #6d28d9;      --violeta-soft: rgba(109, 40, 217, 0.10);
+  --cian: #0e7490;         --cian-soft: rgba(14, 116, 144, 0.10);
   --rose: var(--crit);
   --amber: var(--warn);
   --sky: var(--info);

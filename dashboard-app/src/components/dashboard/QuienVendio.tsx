@@ -49,7 +49,7 @@ export default function QuienVendio({ filas, totalPeriodo, titulo = 'Quién vend
   const sinAsignar = totalPeriodo != null && totalPeriodo > sumaFilas ? totalPeriodo - sumaFilas : 0
 
   return (
-    <div className="rounded-[18px] border border-[var(--line)] p-5" style={{ background: 'var(--bento-card)' }}>
+    <div className="rounded-xl border border-[var(--line)] p-5" style={{ background: 'var(--bento-card)' }}>
       <h3 className="text-[15px] font-bold tracking-[-0.015em] text-[var(--text-1)]">{titulo}</h3>
 
       {filas.length === 0 ? (

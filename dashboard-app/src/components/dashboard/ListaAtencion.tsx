@@ -61,7 +61,7 @@ export default function ListaAtencion({
         )}
       </div>
 
-      <div className="rounded-[12px] border border-[var(--line)] overflow-hidden divide-y divide-[var(--line)]">
+      <div className="rounded-xl border border-[var(--line)] overflow-hidden divide-y divide-[var(--line)]">
         {items.map(i => (
           <div key={i.id} className="flex items-center bg-[var(--panel)] pl-4">
             <span

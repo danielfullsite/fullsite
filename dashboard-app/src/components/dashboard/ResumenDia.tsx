@@ -123,7 +123,7 @@ export default function ResumenDia({
   ]
 
   return (
-    <section className="mb-5 overflow-hidden rounded-[18px] border border-[var(--line)]" style={{ background: 'var(--bento-card)' }}>
+    <section className="mb-5 overflow-hidden rounded-xl border border-[var(--line)]" style={{ background: 'var(--bento-card)' }}>
       {/* ── El número, una sola vez y en grande ─────────────────────────── */}
       <div className="px-5 pt-5 pb-4 sm:px-6 sm:pt-6">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">

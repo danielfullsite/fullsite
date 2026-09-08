@@ -87,7 +87,7 @@ export default function PanelAtencion({ atencion, onCerrar }: PanelAtencionProps
         {/* Encabezado */}
         <div className="flex items-start gap-3 border-b border-[var(--line)] px-5 py-4">
           <span
-            className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-[11px]"
+            className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg"
             style={{ background: 'var(--accent-soft)', color: 'var(--accent-ink)' }}
           >
             <Sparkles size={16} />
@@ -109,7 +109,7 @@ export default function PanelAtencion({ atencion, onCerrar }: PanelAtencionProps
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           {/* 1 — el hecho */}
           <div
-            className="rounded-[14px] border-l-[3px] px-4 py-3"
+            className="rounded-xl border-l-[3px] px-4 py-3"
             style={{ background: 'var(--surface-2)', borderLeftColor: tono.barra }}
           >
             <p className="text-[14px] font-semibold leading-[1.5] text-[var(--text-1)]">{atencion.titulo}</p>
@@ -154,7 +154,7 @@ export default function PanelAtencion({ atencion, onCerrar }: PanelAtencionProps
           {atencion.href && atencion.accion && (
             <Link
               href={atencion.href}
-              className="mt-5 inline-flex items-center gap-1.5 rounded-[10px] px-3.5 py-2 text-[13px] font-semibold transition-opacity hover:opacity-90"
+              className="mt-5 inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[13px] font-semibold transition-opacity hover:opacity-90"
               style={{ background: 'var(--accent)', color: 'var(--on-accent, #06120d)' }}
             >
               {atencion.accion} <ArrowRight size={14} />
@@ -176,14 +176,14 @@ export default function PanelAtencion({ atencion, onCerrar }: PanelAtencionProps
               value={pregunta}
               onChange={e => setBorrador({ id: atencion.id, pregunta: e.target.value })}
               placeholder="¿Por qué crees que pasó?"
-              className="min-w-0 flex-1 rounded-[10px] border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-[13px] text-[var(--text-1)] outline-none placeholder:text-[var(--text-4)] focus:border-[var(--accent-line)]"
+              className="min-w-0 flex-1 rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-[13px] text-[var(--text-1)] outline-none placeholder:text-[var(--text-4)] focus:border-[var(--accent-line)]"
             />
             <button
               type="submit"
               disabled
               aria-label="Enviar pregunta"
               title="Todavía no disponible"
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] border border-[var(--line)] text-[var(--text-4)] disabled:cursor-not-allowed"
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-[var(--line)] text-[var(--text-4)] disabled:cursor-not-allowed"
             >
               <Send size={15} />
             </button>

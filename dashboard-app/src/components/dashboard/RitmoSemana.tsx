@@ -70,7 +70,7 @@ export default function RitmoSemana({ filas, hoyDow }: RitmoSemanaProps) {
   const flojo = ordenados[ordenados.length - 1]
 
   return (
-    <div className="mb-5 rounded-[18px] border border-[var(--line)] p-5" style={{ background: 'var(--bento-card)' }}>
+    <div className="mb-5 rounded-xl border border-[var(--line)] p-5" style={{ background: 'var(--bento-card)' }}>
       <h3 className="text-[15px] font-bold tracking-[-0.015em] text-[var(--text-1)]">Qué esperar hoy</h3>
 
       <p className="mt-1.5 text-[13.5px] leading-[1.5] text-[var(--text-2)]">

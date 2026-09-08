@@ -89,7 +89,7 @@ export default function EstadoOperacion({
   // ── Operando ────────────────────────────────────────────────────────────
   if (turno) {
     return (
-      <div className="mb-5 flex flex-wrap items-center gap-x-2.5 gap-y-1 rounded-[18px] border border-[var(--ok-soft)] bg-[var(--ok-soft)] px-4 py-3">
+      <div className="mb-5 flex flex-wrap items-center gap-x-2.5 gap-y-1 rounded-xl border border-[var(--ok-soft)] bg-[var(--ok-soft)] px-4 py-3">
         <span className="grid h-6 w-6 place-items-center rounded-full text-[var(--ok-ink)]">
           <Radio size={14} />
         </span>
@@ -110,7 +110,7 @@ export default function EstadoOperacion({
   // ── Nunca ha mandado datos ──────────────────────────────────────────────
   if (dias === null) {
     return (
-      <div className="mb-5 rounded-[18px] border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3">
+      <div className="mb-5 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3">
         <p className="text-[14px] font-semibold text-[var(--text-1)]">Todavía no hay ventas registradas</p>
         <p className="mt-0.5 text-[13px] text-[var(--text-3)]">
           En cuanto cierres la primera cuenta en el POS, aquí aparece el resumen del día.
@@ -122,7 +122,7 @@ export default function EstadoOperacion({
   // ── Cerrado, pero al día ────────────────────────────────────────────────
   if (dias <= 0) {
     return (
-      <div className="mb-5 flex flex-wrap items-center gap-x-2.5 gap-y-1 rounded-[18px] border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3">
+      <div className="mb-5 flex flex-wrap items-center gap-x-2.5 gap-y-1 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3">
         <span className="grid h-6 w-6 place-items-center rounded-full text-[var(--text-3)]">
           <CircleCheck size={14} />
         </span>
@@ -145,7 +145,7 @@ export default function EstadoOperacion({
   const tinta = grave ? 'text-[var(--crit-ink)]' : 'text-[var(--warn-ink)]'
 
   return (
-    <div className={`mb-5 flex flex-wrap items-start gap-x-3 gap-y-1.5 rounded-[18px] border px-4 py-3 ${marco}`}>
+    <div className={`mb-5 flex flex-wrap items-start gap-x-3 gap-y-1.5 rounded-xl border px-4 py-3 ${marco}`}>
       <span className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full ${tinta}`}>
         <CircleAlert size={14} />
       </span>

@@ -477,7 +477,7 @@ export default function DashboardPage() {
   return (
     <>
       {locations.length > 1 && (
-        <section className="mb-5 rounded-[20px] border border-[var(--line)] bg-[var(--surface)] p-3 sm:p-4" aria-label="Sucursales del grupo">
+        <section className="mb-5 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-3 sm:p-4" aria-label="Sucursales del grupo">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-2.5">
               <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]">
@@ -565,7 +565,7 @@ export default function DashboardPage() {
             if (period === 'dia' && viewDay) {
               return (
                 <div className="flex items-center gap-2">
-                  <button onClick={() => setSelectedDayIdx(i => Math.min(i + 1, recentData.length - 1))} disabled={selectedDayIdx >= recentData.length - 1} aria-label="Día anterior" className="w-9 h-9 rounded-[10px] bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-2)] hover:bg-[var(--raised)] hover:border-[var(--accent-line)] flex items-center justify-center transition-colors disabled:opacity-30"><ChevronLeft size={16} /></button>
+                  <button onClick={() => setSelectedDayIdx(i => Math.min(i + 1, recentData.length - 1))} disabled={selectedDayIdx >= recentData.length - 1} aria-label="Día anterior" className="w-9 h-9 rounded-lg bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-2)] hover:bg-[var(--raised)] hover:border-[var(--accent-line)] flex items-center justify-center transition-colors disabled:opacity-30"><ChevronLeft size={16} /></button>
                   <span className="flex items-center gap-2">
                     <span className="font-mono text-[13px] text-[var(--text-2)] font-semibold">{formatDate(viewDay.fecha)}</span>
                     {(() => {
@@ -576,9 +576,9 @@ export default function DashboardPage() {
                       return null
                     })()}
                   </span>
-                  <button onClick={() => setSelectedDayIdx(i => Math.max(i - 1, 0))} disabled={selectedDayIdx <= 0} aria-label="Día siguiente" className="w-9 h-9 rounded-[10px] bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-2)] hover:bg-[var(--raised)] hover:border-[var(--accent-line)] flex items-center justify-center transition-colors disabled:opacity-30"><ChevronRight size={16} /></button>
+                  <button onClick={() => setSelectedDayIdx(i => Math.max(i - 1, 0))} disabled={selectedDayIdx <= 0} aria-label="Día siguiente" className="w-9 h-9 rounded-lg bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-2)] hover:bg-[var(--raised)] hover:border-[var(--accent-line)] flex items-center justify-center transition-colors disabled:opacity-30"><ChevronRight size={16} /></button>
                   <div className="relative w-9 h-9">
-                    <div className="w-9 h-9 rounded-[10px] bg-[var(--surface-2)] border border-[var(--line)] flex items-center justify-center pointer-events-none">
+                    <div className="w-9 h-9 rounded-lg bg-[var(--surface-2)] border border-[var(--line)] flex items-center justify-center pointer-events-none">
                       <CalendarDays size={16} className="text-[var(--text-2)]" />
                     </div>
                     <input
@@ -607,14 +607,14 @@ export default function DashboardPage() {
               const label = `${weekStart.getDate()} ${MESES[weekStart.getMonth()].slice(0,3)} - ${weekEnd.getDate()} ${MESES[weekEnd.getMonth()].slice(0,3)} ${weekEnd.getFullYear()}`
               return (
                 <div className="flex items-center gap-2">
-                  <button onClick={() => setWeekOffset(w => w + 1)} disabled={weekOffset >= 130} aria-label="Semana anterior" className="w-9 h-9 rounded-[10px] bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-2)] hover:bg-[var(--raised)] hover:border-[var(--accent-line)] flex items-center justify-center transition-colors disabled:opacity-30"><ChevronLeft size={16} /></button>
+                  <button onClick={() => setWeekOffset(w => w + 1)} disabled={weekOffset >= 130} aria-label="Semana anterior" className="w-9 h-9 rounded-lg bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-2)] hover:bg-[var(--raised)] hover:border-[var(--accent-line)] flex items-center justify-center transition-colors disabled:opacity-30"><ChevronLeft size={16} /></button>
                   <span className="flex items-center gap-2 text-center">
                     <span className="font-mono text-[13px] text-[var(--text-2)] font-semibold">{label}</span>
                     {weekOffset === 0 && <span className="inline-flex items-center text-[11px] font-semibold leading-none px-2.5 py-1 rounded-full border border-[var(--accent-line)] bg-[var(--accent-soft)] text-[var(--accent-ink)]">ACTUAL</span>}
                   </span>
-                  <button onClick={() => setWeekOffset(w => Math.max(w - 1, 0))} disabled={weekOffset <= 0} aria-label="Semana siguiente" className="w-9 h-9 rounded-[10px] bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-2)] hover:bg-[var(--raised)] hover:border-[var(--accent-line)] flex items-center justify-center transition-colors disabled:opacity-30"><ChevronRight size={16} /></button>
+                  <button onClick={() => setWeekOffset(w => Math.max(w - 1, 0))} disabled={weekOffset <= 0} aria-label="Semana siguiente" className="w-9 h-9 rounded-lg bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-2)] hover:bg-[var(--raised)] hover:border-[var(--accent-line)] flex items-center justify-center transition-colors disabled:opacity-30"><ChevronRight size={16} /></button>
                   <div className="relative w-9 h-9">
-                    <div className="w-9 h-9 rounded-[10px] bg-[var(--surface-2)] border border-[var(--line)] flex items-center justify-center pointer-events-none"><CalendarDays size={16} className="text-[var(--text-2)]" /></div>
+                    <div className="w-9 h-9 rounded-lg bg-[var(--surface-2)] border border-[var(--line)] flex items-center justify-center pointer-events-none"><CalendarDays size={16} className="text-[var(--text-2)]" /></div>
                     <input type="date" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={(e) => {
                       const picked = new Date(e.target.value + 'T12:00:00')
                       const today = new Date()
@@ -631,14 +631,14 @@ export default function DashboardPage() {
               const label = `${MESES[viewMonth.getMonth()]} ${viewMonth.getFullYear()}`
               return (
                 <div className="flex items-center gap-2">
-                  <button onClick={() => setMonthOffset(m => m + 1)} disabled={monthOffset >= 36} aria-label="Mes anterior" className="w-9 h-9 rounded-[10px] bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-2)] hover:bg-[var(--raised)] hover:border-[var(--accent-line)] flex items-center justify-center transition-colors disabled:opacity-30"><ChevronLeft size={16} /></button>
+                  <button onClick={() => setMonthOffset(m => m + 1)} disabled={monthOffset >= 36} aria-label="Mes anterior" className="w-9 h-9 rounded-lg bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-2)] hover:bg-[var(--raised)] hover:border-[var(--accent-line)] flex items-center justify-center transition-colors disabled:opacity-30"><ChevronLeft size={16} /></button>
                   <span className="flex items-center gap-2 text-center">
                     <span className="font-mono text-[13px] text-[var(--text-2)] font-semibold">{label}</span>
                     {monthOffset === 0 && <span className="inline-flex items-center text-[11px] font-semibold leading-none px-2.5 py-1 rounded-full border border-[var(--accent-line)] bg-[var(--accent-soft)] text-[var(--accent-ink)]">ACTUAL</span>}
                   </span>
-                  <button onClick={() => setMonthOffset(m => Math.max(m - 1, 0))} disabled={monthOffset <= 0} aria-label="Mes siguiente" className="w-9 h-9 rounded-[10px] bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-2)] hover:bg-[var(--raised)] hover:border-[var(--accent-line)] flex items-center justify-center transition-colors disabled:opacity-30"><ChevronRight size={16} /></button>
+                  <button onClick={() => setMonthOffset(m => Math.max(m - 1, 0))} disabled={monthOffset <= 0} aria-label="Mes siguiente" className="w-9 h-9 rounded-lg bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-2)] hover:bg-[var(--raised)] hover:border-[var(--accent-line)] flex items-center justify-center transition-colors disabled:opacity-30"><ChevronRight size={16} /></button>
                   <div className="relative w-9 h-9">
-                    <div className="w-9 h-9 rounded-[10px] bg-[var(--surface-2)] border border-[var(--line)] flex items-center justify-center pointer-events-none"><CalendarDays size={16} className="text-[var(--text-2)]" /></div>
+                    <div className="w-9 h-9 rounded-lg bg-[var(--surface-2)] border border-[var(--line)] flex items-center justify-center pointer-events-none"><CalendarDays size={16} className="text-[var(--text-2)]" /></div>
                     <input type="date" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={(e) => {
                       const picked = new Date(e.target.value + 'T12:00:00')
                       const now = new Date()
@@ -656,7 +656,7 @@ export default function DashboardPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowSettings(!showSettings)}
-              className={`w-9 h-9 rounded-[10px] border flex items-center justify-center transition-colors ${
+              className={`w-9 h-9 rounded-lg border flex items-center justify-center transition-colors ${
                 showSettings
                   ? 'bg-[var(--accent-soft)] border-[var(--accent-line)] text-[var(--accent-ink)]'
                   : 'bg-[var(--surface-2)] border-[var(--line)] text-[var(--text-2)] hover:bg-[var(--raised)] hover:border-[var(--accent-line)]'
@@ -696,10 +696,10 @@ export default function DashboardPage() {
 
       {/* Settings panel — toggle widgets */}
       {showSettings && (
-        <div className="mb-6 rounded-[14px] border border-[var(--line)] p-[18px] animate-in slide-in-from-top-2" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' }}>
+        <div className="mb-6 rounded-xl border border-[var(--line)] p-5 animate-in slide-in-from-top-2" style={{ background: 'var(--bento-card)' }}>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-[9px]">
-              <span className="w-7 h-7 rounded-[9px] grid place-items-center bg-[var(--surface-2)] text-[var(--text-2)]">
+              <span className="w-7 h-7 rounded-lg grid place-items-center bg-[var(--surface-2)] text-[var(--text-2)]">
                 <Settings size={14} />
               </span>
               <h3 className="text-sm font-bold text-[var(--text-1)]">Personalizar dashboard</h3>
@@ -716,7 +716,7 @@ export default function DashboardPage() {
               <button
                 key={w.id}
                 onClick={() => toggleWidget(w.id)}
-                className={`flex items-center gap-2 px-[11px] py-[9px] rounded-[10px] text-left text-xs font-semibold transition-all border ${
+                className={`flex items-center gap-2 px-[11px] py-[9px] rounded-lg text-left text-xs font-semibold transition-all border ${
                   widgets[w.id]
                     ? 'bg-[var(--accent-soft)] border-[var(--accent-line)] text-[var(--accent-ink)]'
                     : 'bg-[var(--surface-2)] border-[var(--line)] text-[var(--text-3)]'
@@ -802,10 +802,10 @@ export default function DashboardPage() {
 
       {/* Month progress — premium card */}
       {show('month_progress') && monthProgress && monthProgress.monthVentas > 0 && (
-        <div className="mb-4 sm:mb-6 bg-gradient-to-br from-emerald-500/10 via-[var(--panel)] to-[var(--surface-2)] rounded-[18px] border border-[var(--accent-line)] px-4 sm:px-5 py-4 sm:py-[18px]" style={{ boxShadow: 'var(--shadow-mid)' }}>
+        <div className="mb-4 sm:mb-6 bg-gradient-to-br from-emerald-500/10 via-[var(--panel)] to-[var(--surface-2)] rounded-xl border border-[var(--accent-line)] px-4 sm:px-5 py-4 sm:py-[18px]" style={{ boxShadow: 'var(--shadow-mid)' }}>
           <div className="flex items-center justify-between mb-2 sm:mb-3">
             <div className="flex items-center gap-[9px]">
-              <div className="w-7 h-7 rounded-[9px] grid place-items-center bg-[var(--accent-soft)] text-[var(--accent-bright)]">
+              <div className="w-7 h-7 rounded-lg grid place-items-center bg-[var(--accent-soft)] text-[var(--accent-bright)]">
                 <Target size={15} />
               </div>
               <span className="text-[15px] font-bold text-[var(--text-1)]">
@@ -874,7 +874,7 @@ export default function DashboardPage() {
 
       {/* Week comparison banner — like el POS legado */}
       {show('week_comparison') && vsLastWeek !== null && vsLastWeekAmount !== null && sameDayLastWeek && (
-        <div className={`mb-4 sm:mb-6 rounded-[14px] border px-4 py-3.5 sm:px-[18px] ${vsLastWeek >= 0 ? 'bg-[var(--accent-soft)] border-[var(--accent-line)]' : 'bg-[var(--crit-soft)] border-[color-mix(in_srgb,var(--crit)_40%,transparent)]'}`}>
+        <div className={`mb-4 sm:mb-6 rounded-xl border px-4 py-3.5 sm:px-[18px] ${vsLastWeek >= 0 ? 'bg-[var(--accent-soft)] border-[var(--accent-line)]' : 'bg-[var(--crit-soft)] border-[color-mix(in_srgb,var(--crit)_40%,transparent)]'}`}>
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-[11px]">
               {vsLastWeek >= 0
@@ -944,9 +944,9 @@ export default function DashboardPage() {
 
       {/* Payment methods */}
       {show('payment_methods') && <div className="mb-6">
-        <div className="rounded-[14px] border border-[var(--line)] p-[18px]" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' }}>
+        <div className="rounded-xl border border-[var(--line)] p-5" style={{ background: 'var(--bento-card)' }}>
           <div className="flex items-center gap-[9px] mb-0.5">
-            <div className="w-7 h-7 rounded-[9px] grid place-items-center bg-violet-500/12 text-violet-300">
+            <div className="w-7 h-7 rounded-lg grid place-items-center" style={{ background: 'var(--violeta-soft)', color: 'var(--violeta)' }}>
               <CreditCard size={14} />
             </div>
             <h3 className="text-sm font-bold text-[var(--text-1)]">
@@ -1009,9 +1009,9 @@ export default function DashboardPage() {
       {show('hora_pico') && latestDay && (
         <div className="mb-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Hora pico */}
-          <div className="rounded-[14px] border border-[var(--line)] p-[18px]" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' }}>
+          <div className="rounded-xl border border-[var(--line)] p-5" style={{ background: 'var(--bento-card)' }}>
             <div className="flex items-center gap-[9px] mb-3">
-              <div className="w-7 h-7 rounded-[9px] grid place-items-center bg-[var(--warn-soft)] text-[var(--warn-ink)]">
+              <div className="w-7 h-7 rounded-lg grid place-items-center bg-[var(--warn-soft)] text-[var(--warn-ink)]">
                 <Clock size={15} />
               </div>
               <h3 className="text-sm font-bold text-[var(--text-1)]">Mejor día de la semana</h3>
@@ -1042,9 +1042,9 @@ export default function DashboardPage() {
           </div>
 
           {/* Efficiency metrics */}
-          <div className="rounded-[14px] border border-[var(--line)] p-[18px]" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' }}>
+          <div className="rounded-xl border border-[var(--line)] p-5" style={{ background: 'var(--bento-card)' }}>
             <div className="flex items-center gap-[9px] mb-2">
-              <div className="w-7 h-7 rounded-[9px] grid place-items-center" style={{ background: 'rgba(34,211,238,.12)', color: '#67e8f9' }}>
+              <div className="w-7 h-7 rounded-lg grid place-items-center" style={{ background: 'var(--cian-soft)', color: 'var(--cian)' }}>
                 <Activity size={15} />
               </div>
               <h3 className="text-sm font-bold text-[var(--text-1)]">Eficiencia del día</h3>
@@ -1073,10 +1073,10 @@ export default function DashboardPage() {
       {/* Quick actions row */}
       {show('quick_actions') && <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
         {[
-          { href: '/ventas', label: 'Ventas', desc: 'Detalle diario', icon: DollarSign, color: 'text-blue-400', bg: 'bg-blue-500/10', gradient: 'from-blue-500/15' },
-          { href: '/meseros', label: 'Meseros', desc: 'Rankings y KPIs', icon: Award, color: 'text-[var(--accent-bright)]', bg: 'bg-emerald-500/10', gradient: 'from-emerald-500/15' },
-          { href: '/cortes', label: 'Cortes', desc: 'Cierres de caja', icon: ClipboardList, color: 'text-amber-400', bg: 'bg-amber-500/10', gradient: 'from-amber-500/15' },
-          { href: '/reportes', label: 'Reportes', desc: 'Exportar datos', icon: FileBarChart, color: 'text-purple-400', bg: 'bg-purple-500/10', gradient: 'from-purple-500/15' },
+          { href: '/ventas', label: 'Ventas', desc: 'Detalle diario', icon: DollarSign, color: 'var(--info-ink)', bg: 'var(--info-soft)' },
+          { href: '/meseros', label: 'Meseros', desc: 'Rankings y KPIs', icon: Award, color: 'var(--accent-ink)', bg: 'var(--accent-soft)' },
+          { href: '/cortes', label: 'Cortes', desc: 'Cierres de caja', icon: ClipboardList, color: 'var(--warn-ink)', bg: 'var(--warn-soft)' },
+          { href: '/reportes', label: 'Reportes', desc: 'Exportar datos', icon: FileBarChart, color: 'var(--violeta)', bg: 'var(--violeta-soft)' },
         ].map(action => {
           const ActionIcon = action.icon
           return (
@@ -1086,8 +1086,8 @@ export default function DashboardPage() {
               className="rounded-xl border border-[var(--line)] p-3 sm:p-3.5 hover:border-[var(--accent-line)] transition-all group active:scale-[0.98]"
               style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-soft)' }}
             >
-              <div className={`w-8 h-8 sm:w-[34px] sm:h-[34px] rounded-[10px] grid place-items-center mb-2 sm:mb-2.5 ${action.bg}`}>
-                <ActionIcon size={17} className={action.color} />
+              <div className="w-8 h-8 sm:w-[34px] sm:h-[34px] rounded-lg grid place-items-center mb-2 sm:mb-2.5" style={{ background: action.bg }}>
+                <ActionIcon size={17} style={{ color: action.color }} />
               </div>
               <p className="text-xs sm:text-sm font-bold text-[var(--text-1)] mb-0.5">{action.label}</p>
               <div className="flex items-center justify-between">
