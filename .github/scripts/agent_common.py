@@ -351,8 +351,13 @@ def get_monitoring_context(client_id: str = None, eval_threshold: float = 0.70) 
         # inicio del día local en UTC (MX 00:00 = UTC 06:00)
         day_start_mx = now_mx.replace(hour=0, minute=0, second=0, microsecond=0)
         day_start_utc = (day_start_mx - MX_OFFSET).replace(tzinfo=timezone.utc)
+        # `.isoformat()` a secas termina en `+00:00`, y en una URL el `+` es un ESPACIO:
+        # PostgREST recibe una fecha invalida y responde 400. Como toda esta funcion vive
+        # dentro de un try, el fallo no se veria — se devolveria el contexto degradado en
+        # silencio, que es justo lo que esta funcion existe para evitar.
+        desde = day_start_utc.isoformat().replace("+00:00", "Z")
         rows = sb_get("pos_orders",
-            f"client_id=eq.{client_id}&created_at=gte.{day_start_utc.isoformat()}"
+            f"client_id=eq.{client_id}&created_at=gte.{desde}"
             f"&status=neq.cancelada&select=total,created_at,status")
         ctx["orders_today"] = len(rows)
         ctx["sales_today"] = round(sum(float(r.get("total") or 0) for r in rows), 2)

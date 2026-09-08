@@ -23,3 +23,8 @@ jobs:
       # (`data->>'campo'` devuelve NULL) sin romper nada visible en el dashboard.
       # Es un fallo silencioso: por eso se atrapa aquí y no en producción.
       - run: python .github/scripts/test_agent_results_jsonb.py
+
+      # El barrido del `+00:00` en URLs de PostgREST. Corre aqui, en cada push, y no
+      # dentro del workflow que califica: si esa prueba solo viviera junto al calificador,
+      # el bug podria volver por cualquier otro script sin que nada lo dijera.
+      - run: python .github/scripts/test_url_timestamps.py

@@ -23,6 +23,15 @@ on:
 jobs:
   calificar:
     runs-on: ubuntu-latest
+
+    # `python ... | tee salida.txt` sin pipefail reporta el codigo de salida de `tee`,
+    # que siempre es 0. Los dos calificadores llevaban 7 dias fallando —uno con 500 y el
+    # otro con un traceback— y GitHub marcaba verde todos los dias. El unico bucle que
+    # mide la precision de este sistema estuvo muerto una semana sin que nada lo dijera.
+    defaults:
+      run:
+        shell: bash -euo pipefail {0}
+
     env:
       CLIENT_ID: ${{ github.event.inputs.client_id || 'ALL' }}
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}

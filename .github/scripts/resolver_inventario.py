@@ -52,7 +52,16 @@ DIAS_ATRAS_MAX = 30  # no re-mirar historia vieja en cada corrida
 
 
 def _iso(dt: datetime) -> str:
-    return dt.astimezone(timezone.utc).isoformat()
+    """ISO en UTC, seguro para meterlo en una URL de PostgREST.
+
+    `isoformat()` termina en `+00:00`. En un query string el `+` SIGNIFICA ESPACIO, asi
+    que PostgREST recibe `2026-08-09T13:12:57.754113 00:00`, Postgres no lo puede castear
+    a timestamptz y devuelve 400. Este script llevaba 7 dias fallando asi en produccion, y
+    nunca ha calificado un solo hallazgo: la excepcion tumbaba el primer tenant del ciclo.
+
+    La `Z` significa lo mismo y no tiene significado especial en una URL.
+    """
+    return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 def eventos_pendientes(client_id: str) -> list[dict]:
