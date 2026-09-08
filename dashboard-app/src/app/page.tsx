@@ -20,6 +20,7 @@ import { formatCurrency, formatPercent, formatDate, percentChange } from '@/lib/
 import PredictionWidget from '@/components/PredictionWidget'
 import type { WansoftDaily, GrupoEntry, PagoMetodoEntry } from '@/lib/types'
 import { useAuth } from '@/contexts/AuthContext'
+import BotonCalendario from '@/components/ui/BotonCalendario'
 import { Tarjeta, Hueso, CifraEsqueleto, TarjetaEsqueleto, FilasEsqueleto, Cargando } from '@/components/ui/Superficie'
 
 const CATEGORY_NAMES: Record<string, string> = {
@@ -577,22 +578,18 @@ export default function DashboardPage() {
                     })()}
                   </span>
                   <button onClick={() => setSelectedDayIdx(i => Math.max(i - 1, 0))} disabled={selectedDayIdx <= 0} aria-label="Día siguiente" className="w-9 h-9 rounded-lg bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-2)] hover:bg-[var(--raised)] hover:border-[var(--accent-line)] flex items-center justify-center transition-colors disabled:opacity-30"><ChevronRight size={16} /></button>
-                  <div className="relative w-9 h-9">
-                    <div className="w-9 h-9 rounded-lg bg-[var(--surface-2)] border border-[var(--line)] flex items-center justify-center pointer-events-none">
-                      <CalendarDays size={16} className="text-[var(--text-2)]" />
-                    </div>
-                    <input
-                      type="date"
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                      value={viewDay.fecha}
-                      min={recentData[0]?.fecha}
-                      max={recentData[recentData.length - 1]?.fecha}
-                      onChange={(e) => {
-                        const idx = recentData.findIndex(d => d.fecha === e.target.value)
-                        if (idx >= 0) setSelectedDayIdx(recentData.length - 1 - idx)
-                      }}
-                    />
-                  </div>
+                  <BotonCalendario
+                    etiqueta="Elegir día en el calendario"
+                    valor={viewDay.fecha}
+                    min={recentData[0]?.fecha}
+                    max={recentData[recentData.length - 1]?.fecha}
+                    alElegir={(fecha) => {
+                      const idx = recentData.findIndex(d => d.fecha === fecha)
+                      if (idx >= 0) setSelectedDayIdx(recentData.length - 1 - idx)
+                    }}
+                  >
+                    <CalendarDays size={16} />
+                  </BotonCalendario>
                 </div>
               )
             }
@@ -613,15 +610,17 @@ export default function DashboardPage() {
                     {weekOffset === 0 && <span className="inline-flex items-center text-[11px] font-semibold leading-none px-2.5 py-1 rounded-full border border-[var(--accent-line)] bg-[var(--accent-soft)] text-[var(--accent-ink)]">ACTUAL</span>}
                   </span>
                   <button onClick={() => setWeekOffset(w => Math.max(w - 1, 0))} disabled={weekOffset <= 0} aria-label="Semana siguiente" className="w-9 h-9 rounded-lg bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-2)] hover:bg-[var(--raised)] hover:border-[var(--accent-line)] flex items-center justify-center transition-colors disabled:opacity-30"><ChevronRight size={16} /></button>
-                  <div className="relative w-9 h-9">
-                    <div className="w-9 h-9 rounded-lg bg-[var(--surface-2)] border border-[var(--line)] flex items-center justify-center pointer-events-none"><CalendarDays size={16} className="text-[var(--text-2)]" /></div>
-                    <input type="date" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={(e) => {
-                      const picked = new Date(e.target.value + 'T12:00:00')
+                  <BotonCalendario
+                    etiqueta="Elegir semana en el calendario"
+                    alElegir={(fecha) => {
+                      const picked = new Date(fecha + 'T12:00:00')
                       const today = new Date()
                       const diffDays = Math.round((today.getTime() - picked.getTime()) / (1000 * 60 * 60 * 24))
                       setWeekOffset(Math.max(0, Math.round(diffDays / 7)))
-                    }} />
-                  </div>
+                    }}
+                  >
+                    <CalendarDays size={16} />
+                  </BotonCalendario>
                 </div>
               )
             }
@@ -637,14 +636,16 @@ export default function DashboardPage() {
                     {monthOffset === 0 && <span className="inline-flex items-center text-[11px] font-semibold leading-none px-2.5 py-1 rounded-full border border-[var(--accent-line)] bg-[var(--accent-soft)] text-[var(--accent-ink)]">ACTUAL</span>}
                   </span>
                   <button onClick={() => setMonthOffset(m => Math.max(m - 1, 0))} disabled={monthOffset <= 0} aria-label="Mes siguiente" className="w-9 h-9 rounded-lg bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-2)] hover:bg-[var(--raised)] hover:border-[var(--accent-line)] flex items-center justify-center transition-colors disabled:opacity-30"><ChevronRight size={16} /></button>
-                  <div className="relative w-9 h-9">
-                    <div className="w-9 h-9 rounded-lg bg-[var(--surface-2)] border border-[var(--line)] flex items-center justify-center pointer-events-none"><CalendarDays size={16} className="text-[var(--text-2)]" /></div>
-                    <input type="date" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={(e) => {
-                      const picked = new Date(e.target.value + 'T12:00:00')
+                  <BotonCalendario
+                    etiqueta="Elegir mes en el calendario"
+                    alElegir={(fecha) => {
+                      const picked = new Date(fecha + 'T12:00:00')
                       const now = new Date()
                       setMonthOffset((now.getFullYear() - picked.getFullYear()) * 12 + (now.getMonth() - picked.getMonth()))
-                    }} />
-                  </div>
+                    }}
+                  >
+                    <CalendarDays size={16} />
+                  </BotonCalendario>
                 </div>
               )
             }
