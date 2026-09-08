@@ -9,6 +9,8 @@ import { getActiveTimezone } from '@/lib/date-mx'
 import { getRecentDays, getLatestDay, getDashboardFromPosOrders, aggregateMeseros, getDeteccionesAgentes, getResultadosAgentes, getTurnoAbierto, getTurnoCerradoDelDia, type TurnoAbierto } from '@/lib/data'
 import { desdeEventos, desdeResultados, ordenar, type Atencion } from '@/lib/atencion'
 import { cuadreDeTurno, tonoDeCuadre, type Cuadre } from '@/lib/cuadre'
+import { nominaDelDia, type NominaDelDia, type LaborPayload } from '@/lib/labor'
+import { apiUrl } from '@/lib/api-base'
 import EstadoOperacion from '@/components/dashboard/EstadoOperacion'
 import ResumenDia from '@/components/dashboard/ResumenDia'
 import QuienVendio from '@/components/dashboard/QuienVendio'
@@ -161,6 +163,7 @@ export default function DashboardPage() {
   const [turnoAbierto, setTurnoAbierto] = useState<TurnoAbierto | null>(null)
   const [cargandoTurno, setCargandoTurno] = useState(true)
   const [cuadre, setCuadre] = useState<Cuadre>(() => cuadreDeTurno(null))
+  const [nomina, setNomina] = useState<NominaDelDia | null>(null)
 
   useEffect(() => {
     let vivo = true
@@ -407,10 +410,24 @@ export default function DashboardPage() {
   const fechaVista = viewDay ? String(viewDay.fecha).slice(0, 10) : null
   useEffect(() => {
     let vivo = true
-    if (!fechaVista) { setCuadre(cuadreDeTurno(null)); return }
+    if (!fechaVista) { setCuadre(cuadreDeTurno(null)); setNomina(null); return }
     getTurnoCerradoDelDia(fechaVista)
       .then(t => { if (vivo) setCuadre(cuadreDeTurno(t)) })
       .catch(() => { if (vivo) setCuadre(cuadreDeTurno(null)) })
+
+    // El costo de personal contra la venta. El cálculo ya vivía completo en
+    // /api/labor; lo que faltaba era que llegara a esta pantalla en vez de a una
+    // página a la que hay que entrar a propósito.
+    fetch(apiUrl('/api/labor?days=30'), { signal: AbortSignal.timeout(6000) })
+      .then(r => r.ok ? r.json() : null)
+      .then((p: LaborPayload | null) => {
+        if (!vivo) return
+        // Un fallo NO es «no hay nómina»: se deja en null y la tarjeta no aparece,
+        // que es distinto de decir que costó cero.
+        if (!p) { setNomina(null); return }
+        setNomina(nominaDelDia(p.laborByDay?.find(d => d.fecha === fechaVista), p.hasWageData))
+      })
+      .catch(() => { if (vivo) setNomina(null) })
     return () => { vivo = false }
   }, [fechaVista])
 
@@ -853,6 +870,47 @@ export default function DashboardPage() {
             >
               Ver cortes →
             </Link>
+          </Tarjeta>
+        </div>
+      )}
+
+      {/* Costo de personal contra la venta. El segundo gasto más grande y el
+          único que se corrige mañana. Si nadie tiene sueldo cargado NO dice
+          cero: dice qué falta capturar, porque «$0 · 0%» en verde se lee como
+          «no gastas en nómina», que es lo contrario de la verdad. */}
+      {show('cuadre_caja') && nomina && (
+        <div className="mb-6">
+          <Tarjeta>
+            <TarjetaEncabezado
+              titulo="Personal del día"
+              ayuda={nomina.estado === 'medido' && nomina.horas != null
+                ? `${nomina.horas.toFixed(0)} horas · ${nomina.personas} personas`
+                : undefined}
+              derecha={nomina.estado === 'medido' && nomina.pctVenta != null
+                ? (
+                  <Pastilla tono={nomina.zona === 'verde' ? 'bien' : nomina.zona === 'amarillo' ? 'aviso' : 'grave'}>
+                    {(nomina.pctVenta * 100).toFixed(1)}% de la venta
+                  </Pastilla>
+                )
+                : <Pastilla tono="neutro">Sin medir</Pastilla>}
+            />
+            {nomina.estado === 'medido' && nomina.costo != null ? (
+              <>
+                <div className="mt-2 text-[24px] font-semibold leading-none tabular-nums" style={{ color: 'var(--text-1)' }}>
+                  {formatCurrency(nomina.costo)}
+                </div>
+                <p className="mt-2 text-[12.5px]" style={{ color: 'var(--text-3)' }}>{nomina.mensaje}</p>
+              </>
+            ) : (
+              <>
+                <p className="mt-3 text-[13.5px]" style={{ color: 'var(--text-2)' }}>{nomina.mensaje}</p>
+                {nomina.estado === 'sin-sueldos' && (
+                  <Link href="/equipo" className="mt-3 inline-block text-[12.5px] font-medium" style={{ color: 'var(--accent-ink)' }}>
+                    Cargar sueldos →
+                  </Link>
+                )}
+              </>
+            )}
           </Tarjeta>
         </div>
       )}

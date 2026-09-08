@@ -101,3 +101,65 @@ export function buildTacometro(
     hasWageData: labor.hasWageData,
   }
 }
+
+// ── Lo que la portada necesita saber ────────────────────────────────────────
+
+export type EstadoNomina =
+  /** Hay sueldos y hay venta: la cifra significa algo. */
+  | 'medido'
+  /** Nadie tiene sueldo cargado. Medido en AMALAY: 40 empleados activos, cero con tarifa. */
+  | 'sin-sueldos'
+  /** Hay sueldos pero nadie fichó ese día, o no hubo venta contra la cual medir. */
+  | 'sin-turnos'
+
+export interface NominaDelDia {
+  estado: EstadoNomina
+  costo: number | null
+  /** Fracción de la venta, no porcentaje: 0.232 es 23.2%. */
+  pctVenta: number | null
+  zona: LaborZone
+  horas: number | null
+  personas: number | null
+  /** Una línea lista para pintar. */
+  mensaje: string
+}
+
+/**
+ * El costo de personal de un día, listo para la portada.
+ *
+ * El cálculo ya existía completo en /api/labor y sus umbrales en este archivo;
+ * lo que faltaba era que la cifra llegara a la pantalla que se abre a diario, en
+ * vez de vivir sólo en una página a la que hay que entrar a propósito.
+ *
+ * EL CASO QUE OBLIGA A NO PINTAR UN NÚMERO. Si nadie tiene sueldo cargado, el
+ * costo da cero, y «$0 · 0% de la venta» se lee como «no gastas en nómina», que
+ * es exactamente lo contrario de la verdad. Un cero que en realidad es un dato
+ * ausente es peor que no enseñar nada: aquí ese caso dice qué falta capturar y a
+ * dónde ir, en vez de mentir en verde.
+ */
+export function nominaDelDia(
+  dia: LaborDay | undefined,
+  hasWageData: boolean,
+  t: LaborThresholds = DEFAULT_THRESHOLDS,
+): NominaDelDia {
+  const vacio = { costo: null, pctVenta: null, horas: null, personas: null, zona: 'sin-dato' as LaborZone }
+
+  if (!hasWageData) {
+    return { ...vacio, estado: 'sin-sueldos',
+      mensaje: 'Falta cargar los sueldos del equipo para poder medir la nómina.' }
+  }
+  if (!dia || !(dia.sales > 0) || !(dia.hours > 0)) {
+    return { ...vacio, estado: 'sin-turnos',
+      mensaje: 'Sin turnos registrados ese día, o sin venta contra la cual medir.' }
+  }
+
+  const pct = dia.cost / dia.sales
+  const zona = zoneFor(pct, t)
+  return {
+    estado: 'medido', costo: dia.cost, pctVenta: pct, zona,
+    horas: dia.hours, personas: dia.headcount,
+    mensaje: zona === 'rojo' ? 'La nómina se comió más de lo esperado de la venta.'
+      : zona === 'amarillo' ? 'La nómina está arriba de lo cómodo.'
+      : 'La nómina está en rango.',
+  }
+}
