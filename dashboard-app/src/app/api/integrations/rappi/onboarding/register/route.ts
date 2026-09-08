@@ -1,6 +1,7 @@
 import { timingSafeEqual } from 'node:crypto'
 import { type NextRequest, NextResponse } from 'next/server'
-import { assertRappiConfigured, getRappiAccessToken, rappiBaseUrl } from '@/lib/integrations/rappi/auth'
+import { assertRappiConfigured, rappiPublicApiBaseUrl } from '@/lib/integrations/rappi/auth'
+import { getIntegratorPublicApiToken } from '@/lib/integrations/rappi/self-onboarding'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,9 +28,9 @@ export async function POST(request: NextRequest) {
 
   try {
     const { clientId } = assertRappiConfigured()
-    const token = await getRappiAccessToken()
+    const token = await getIntegratorPublicApiToken()
     const upstream = await fetch(
-      `${rappiBaseUrl()}/api/v2/restaurants-integrations-public-api/clients/${encodeURIComponent(clientId)}/webhooks`,
+      `${rappiPublicApiBaseUrl()}/api/v2/restaurants-integrations-public-api/clients/${encodeURIComponent(clientId)}/webhooks`,
       {
         method: 'POST',
         headers: {
