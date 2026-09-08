@@ -62,24 +62,37 @@ function EventCard({ event, onOutcome }: {
 }) {
   const [expanded, setExpanded] = useState(false)
   const [pending, setPending] = useState<string | null>(null)
+  const [noSeGuardo, setNoSeGuardo] = useState(false)
   const sev = SEV[event.severity]
   const SevIcon = sev.icon
   const AgentIcon = AGENT_ICONS[event.agent_id]
 
+  // Este es el ÚNICO camino por el que este sistema aprende algo. Nadie más convierte una
+  // opinión humana en comportamiento.
+  //
+  // Antes no se miraba la respuesta: `await fetch(...)` y acto seguido `onOutcome`, que
+  // quita la tarjeta del feed. Con la ruta caída, con 400, o sin red, el clic se veía
+  // EXACTAMENTE igual que uno exitoso — la tarjeta desaparecía, la persona quedaba
+  // convencida de haber calificado, y en la base no quedaba nada. Un veredicto perdido no
+  // se puede repetir porque el hallazgo ya no está en pantalla.
+  //
+  // Ahora la tarjeta sólo se va si el servidor confirmó. Si no, se queda y lo dice.
   async function submitOutcome(outcome: Outcome | 'ack') {
     if (!event.id) return
     setPending(outcome)
+    setNoSeGuardo(false)
     try {
-      if (outcome === 'ack') {
-        await fetch(`/api/agents/ack/${event.id}`, { method: 'POST' })
-      } else {
-        await fetch(`/api/agents/outcome/${event.id}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ outcome }),
-        })
-      }
+      const res = outcome === 'ack'
+        ? await fetch(`/api/agents/ack/${event.id}`, { method: 'POST' })
+        : await fetch(`/api/agents/outcome/${event.id}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ outcome }),
+          })
+      if (!res.ok) { setNoSeGuardo(true); return }
       onOutcome(event.id, outcome)
+    } catch {
+      setNoSeGuardo(true)
     } finally {
       setPending(null)
     }
@@ -182,6 +195,12 @@ function EventCard({ event, onOutcome }: {
                 {pending === 'ack' ? '…' : 'Solo reconocer'}
               </button>
             </div>
+
+            {noSeGuardo && (
+              <p role="alert" className="text-[12px] font-semibold text-amber-500">
+                No se guardó tu respuesta. El hallazgo sigue aquí — vuelve a intentarlo.
+              </p>
+            )}
           </div>
         </div>
       )}

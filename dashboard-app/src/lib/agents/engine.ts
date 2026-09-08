@@ -9,7 +9,7 @@ import { runFraudAgent } from './fraud'
 import { runStaffAgent } from './staff'
 import { runFinanceAgent } from './finance'
 import { esDuenoDelHistoricoWansoft } from '@/lib/wansoft-legacy'
-import { applyLearning, tallyVerdicts, verdictsQuery } from './learning'
+import { applyLearning, tallyVerdicts, verdictsQuery, puedeCallarse } from './learning'
 
 const SB_URL = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/$/, '')
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || ''
@@ -68,6 +68,20 @@ export async function sbPatch(table: string, query: string, data: Record<string,
     const body = await res.text().catch(() => '')
     throw new Error(`sbPatch ${table}: ${res.status} ${body.slice(0, 200)}`)
   }
+}
+
+/**
+ * ¿Puede este agente archivar sus hallazgos solo, sin que nadie los juzgue?
+ *
+ * Archivar y callar son el mismo acto visto desde dos lugares: en los dos casos el
+ * hallazgo deja de estar en pantalla sin que un humano decidiera nada. Por eso comparten
+ * la lista, y la lista vive en un solo archivo.
+ *
+ * La severidad se filtra aparte, en la consulta, porque un agente que sí puede archivar
+ * sus avisos sigue sin poder archivar sus críticos.
+ */
+export function puedeArchivarseSinVeredicto(agentId: AgentId): boolean {
+  return puedeCallarse({ agent_id: agentId, severity: 'warning' })
 }
 
 /** Run a single agent, store its events, return the result. */
@@ -184,14 +198,30 @@ export async function runAgent(
     //
     // Quien emite el hallazgo sabe cuánto vale: un stock crítico dura la jornada, una mesa
     // sin cobrar dura minutos. El engine no tiene por qué opinar sobre eso.
+    //
+    // PERO ARCHIVAR SOLO ES UNA FORMA DE CALLAR, Y NO TODO SE PUEDE CALLAR.
+    //
+    // El feed de /agentes pide `status=new`. Un hallazgo archivado desaparece de la
+    // pantalla, y con él la única oportunidad de que alguien lo juzgue: nadie puede
+    // opinar sobre lo que ya no ve. Medido en la base el 2026-09-08, con el archivado
+    // sin excepciones: 155 hallazgos, 6 veredictos. **54 de severidad crítica se
+    // archivaron solos sin que nadie los viera**, y 3 de ellos eran de fraude.
+    //
+    // Se aplica la misma regla que ya rige el silenciamiento (`puedeCallarse`): fraude
+    // y cualquier hallazgo crítico esperan veredicto humano, por viejos que estén. Que
+    // una alerta crítica siga en pantalla al día siguiente es incómodo — ése es el
+    // punto. Que se borre sola a las 6 horas es peor y no se nota.
     const expireCutoff = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString()
     const ahoraIso = new Date().toISOString()
-    await sbPatch(
-      'agent_events',
-      `client_id=eq.${encodeURIComponent(clientId)}&agent_id=eq.${agentId}&status=eq.new` +
-        `&or=(expires_at.lt.${ahoraIso},and(expires_at.is.null,created_at.lt.${expireCutoff}))`,
-      { status: 'resolved' },
-    ).catch(() => {/* Non-blocking */})
+    if (puedeArchivarseSinVeredicto(agentId)) {
+      await sbPatch(
+        'agent_events',
+        `client_id=eq.${encodeURIComponent(clientId)}&agent_id=eq.${agentId}&status=eq.new` +
+          `&severity=neq.critical` +
+          `&or=(expires_at.lt.${ahoraIso},and(expires_at.is.null,created_at.lt.${expireCutoff}))`,
+        { status: 'resolved' },
+      ).catch(() => {/* Non-blocking */})
+    }
 
     // Deduplicate: if same type+severity event exists as 'new' in last 30min, skip insert
     // El dedupe pregunta si el hallazgo SIGUE VIGENTE, no si es reciente.
