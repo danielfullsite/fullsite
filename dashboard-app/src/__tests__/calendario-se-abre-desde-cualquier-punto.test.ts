@@ -57,6 +57,20 @@ describe('el calendario se abre desde cualquier punto del botón', () => {
     expect(comp).toMatch(/\.focus\(\)/)
   })
 
+  it('el respaldo MUESTRA el campo antes de enfocarlo', () => {
+    // La primera versión enfocaba el campo escondido, que reproducía el bug
+    // original en la rama menos transitada: el foco se iba a algo invisible y
+    // marcado como oculto para lectores de pantalla, sin contorno visible.
+    const comp = soloCodigo(leer('components/ui/BotonCalendario.tsx'))
+    const iFoco = comp.indexOf('.focus()')
+    const iMostrar = comp.indexOf('setConRespaldo(true)')
+    expect(iMostrar).toBeGreaterThan(-1)
+    expect(iFoco).toBeGreaterThan(iMostrar)   // primero se muestra, luego se enfoca
+    // Y con el respaldo encendido el campo deja de estar oculto y gana nombre.
+    expect(comp).toMatch(/conRespaldo[\s\S]{0,120}?'aria-label': etiqueta/)
+    expect(comp).toMatch(/tabIndex: -1, 'aria-hidden': true/)
+  })
+
   it('el campo sigue en el documento: uno oculto no puede abrir su calendario', () => {
     const comp = soloCodigo(leer('components/ui/BotonCalendario.tsx'))
     expect(comp).not.toMatch(/display:\s*none/)
