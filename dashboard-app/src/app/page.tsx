@@ -6,8 +6,8 @@ import { DollarSign, TrendingDown, TrendingUp, Award, ArrowRight, CreditCard, Fi
 import RevenueChart from '@/components/RevenueChart'
 import RevenueDistributionChart from '@/components/RevenueDistributionChart'
 import { getActiveTimezone } from '@/lib/date-mx'
-import { getRecentDays, getLatestDay, getDashboardFromPosOrders, aggregateMeseros, getDeteccionesAgentes, getTurnoAbierto, type TurnoAbierto } from '@/lib/data'
-import { desdeEventos, type Atencion } from '@/lib/atencion'
+import { getRecentDays, getLatestDay, getDashboardFromPosOrders, aggregateMeseros, getDeteccionesAgentes, getResultadosAgentes, getTurnoAbierto, type TurnoAbierto } from '@/lib/data'
+import { desdeEventos, desdeResultados, ordenar, type Atencion } from '@/lib/atencion'
 import EstadoOperacion from '@/components/dashboard/EstadoOperacion'
 import ResumenDia from '@/components/dashboard/ResumenDia'
 import QuienVendio from '@/components/dashboard/QuienVendio'
@@ -163,10 +163,15 @@ export default function DashboardPage() {
     let vivo = true
     Promise.all([
       getDeteccionesAgentes().catch(() => []),
+      // El segundo cajón: catorce agentes más que ya trabajaban y cuyo hallazgo
+      // no llegaba a esta pantalla.
+      getResultadosAgentes().catch(() => []),
       getTurnoAbierto().catch(() => null),
-    ]).then(([eventos, turno]) => {
+    ]).then(([eventos, resultados, turno]) => {
       if (!vivo) return
-      setAtencion(desdeEventos(eventos))
+      // Los dos orígenes se juntan y se ordenan como uno solo: para quien mira,
+      // un pendiente es un pendiente, no importa qué agente lo escribió.
+      setAtencion(ordenar([...desdeEventos(eventos), ...desdeResultados(resultados)]))
       setTurnoAbierto(turno)
       setCargandoTurno(false)
     })

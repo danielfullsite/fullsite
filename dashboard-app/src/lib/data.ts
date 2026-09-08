@@ -631,7 +631,7 @@ export async function getDashboardFromPosOrders(days: number = 30, clientId: str
 // timeout de 10s, mismo manejo de error (devolver [] en vez de reventar la
 // pantalla completa).
 
-import type { EventoAgente } from '@/lib/atencion'
+import type { EventoAgente, ResultadoAgente } from '@/lib/atencion'
 
 /**
  * Detecciones de los agentes para el tenant activo.
@@ -647,10 +647,44 @@ export async function getDeteccionesAgentes(
 ): Promise<EventoAgente[]> {
   const rows = await sbFetch(
     'agent_events',
-    `select=id,severity,title,explanation,suggested_action,estimated_value,confidence,status,created_at,expires_at,type` +
+    // `evidence` es donde el agente guarda CUÁLES son las órdenes o los insumos
+    // del hallazgo. Sin ella el panel puede decir «3 órdenes descuadradas» y ser
+    // incapaz de decir cuáles, que es la mitad de un pendiente.
+    `select=id,severity,title,explanation,suggested_action,estimated_value,confidence,status,created_at,expires_at,type,evidence` +
       `&client_id=eq.${encodeURIComponent(clientSlug)}&order=created_at.desc&limit=40`,
   )
   return rows as EventoAgente[]
+}
+
+/**
+ * El segundo cajón de los agentes.
+ *
+ * Diecinueve agentes escriben en `agent_results` y esta pantalla sólo leía
+ * `agent_events`, donde escriben cinco: mil cien hallazgos guardados que nadie
+ * veía. Aquí se traen; el filtrado con criterio vive en `desdeResultados`.
+ *
+ * El filtro por cliente va en la consulta, no después. Un bloque anterior que
+ * leía tablas de agentes acabó enseñando alertas de un restaurante en el panel
+ * de otro (P0 ya corregido, ver el comentario de page.tsx). Filtrar en memoria
+ * es filtrar tarde: los datos ya viajaron.
+ *
+ * Nunca lanza: si esta consulta falla, la lista de pendientes se queda con lo
+ * que ya tenía en vez de tumbar la pantalla.
+ */
+export async function getResultadosAgentes(
+  clientSlug: string = getActiveClientSlug(),
+): Promise<ResultadoAgente[]> {
+  if (!clientSlug) return []
+  try {
+    const rows = await sbFetch(
+      'agent_results',
+      `select=id,agent_id,fecha,summary,priority,updated_at` +
+        `&client_id=eq.${encodeURIComponent(clientSlug)}&order=updated_at.desc&limit=60`,
+    )
+    return rows as ResultadoAgente[]
+  } catch {
+    return []
+  }
 }
 
 export interface TurnoAbierto {
