@@ -54,7 +54,6 @@ const AGENT_META: Record<string, { name: string; icon: typeof Bot; color: string
   'crm-recompra': { name: 'CRM Recompra', icon: Users, color: 'text-emerald-400', tentacle: 'Personal' },
 }
 
-const ACTION_SET = new Set(['aplicado', 'recordar', 'descartado'])
 
 function timeAgo(ts: string): string {
   const diff = Date.now() - new Date(ts).getTime()
@@ -222,7 +221,6 @@ export default function MissionControlPage() {
   const [chats, setChats] = useState<Record<string, ChatMsg[]>>({})
   const [chatInput, setChatInput] = useState('')
   const [chatLoading, setChatLoading] = useState(false)
-  const [actioned, setActioned] = useState<Record<string, 'aplicado' | 'recordar' | 'descartado'>>({})
   const latestResultsRef = useRef<Map<string, AgentResultFull>>(new Map())
 
   const load = useCallback(async () => {
@@ -235,31 +233,15 @@ export default function MissionControlPage() {
       ])
       setRuns(runsData as unknown as AgentRun[])
       setResults(resultsData as unknown as AgentResult[])
-      // Restaura el feedback guardado (Aplicado/Recordar/Descartado) por agente.
-      try {
-        const fb = await fetch('/api/agents/feedback', { credentials: 'include' }).then(r => r.ok ? r.json() : null)
-        if (fb?.feedback) {
-          const map: Record<string, 'aplicado' | 'recordar' | 'descartado'> = {}
-          for (const row of fb.feedback) if (ACTION_SET.has(row.action)) map[row.agent_id] = row.action
-          setActioned(map)
-        }
-      } catch {}
+      // Aquí se leía el feedback de Aplicado/Recordar/Descartado por agente.
+      // Se retira junto con el resto de ese circuito: la tabla `agent_feedback`
+      // que consultaba NO EXISTE en la base, así que siempre devolvía vacío, y
+      // la función que escribía en ella no la llamaba nadie.
     } catch (e) {
       console.error('Mission control load error:', e)
     } finally {
       setLoading(false)
     }
-  }, [])
-
-  // Persiste el feedback del dueño — se vuelve señal para mejorar el producto.
-  const saveAction = useCallback((agentId: string, action: 'aplicado' | 'recordar' | 'descartado') => {
-    setActioned(a => ({ ...a, [agentId]: action }))
-    const r = latestResultsRef.current.get(agentId)
-    fetch('/api/agents/feedback', {
-      method: 'POST', credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ agent_id: agentId, action, insight_fecha: r?.fecha, insight_summary: r?.summary }),
-    }).catch(() => {})
   }, [])
 
   useEffect(() => { load() }, [load])
@@ -474,7 +456,6 @@ export default function MissionControlPage() {
             : result?.priority === 'warning'
               ? 'Vale la pena revisarlo hoy. Toca Aplicar para darle seguimiento.'
               : 'Para tu información. Pregúntale al agente si quieres el detalle.'
-          const act = actioned[selectedAgent]
           return (
             <>
               {/* dhead */}

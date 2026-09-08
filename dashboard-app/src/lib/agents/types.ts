@@ -23,14 +23,34 @@ export interface AgentEvent {
   expires_at?: string | null
 }
 
+/**
+ * Con menos de esto, un porcentaje de precisión es anécdota disfrazada de
+ * medición: con 4 veredictos, un 25% se lee igual de firme que con 400, y con
+ * ese número alguien apaga un agente por ruido muestral.
+ */
+export const MUESTRA_MINIMA_PRECISION = 20
+
 export interface AgentMetrics {
   total_decisions: number
   correct: number
   false_positives: number
-  precision_rate: number               // correct / (correct + false_positive)
+  /**
+   * correct / (correct + false_positive), o null si NADIE ha opinado.
+   *
+   * Era `number` y la ruta devolvía `precisionRate ?? 0`: sin un solo veredicto
+   * reportaba 0%, que no se lee como «sin datos» sino como «los agentes fallan
+   * siempre». Cero y ausencia no son lo mismo.
+   */
+  precision_rate: number | null
+  /** El denominador. Un porcentaje sin su muestra no se puede juzgar. */
+  juzgados: number
+  /** true mientras `juzgados` no alcance MUESTRA_MINIMA_PRECISION. */
+  muestra_insuficiente: boolean
   total_value_estimated: number        // MXN sum where estimated_value is set
   total_value_validated: number        // MXN sum where outcome = 'correct'
   avg_time_to_action_min: number | null
+  /** true si la consulta topó el límite: lo que se ve NO es todo. */
+  truncado: boolean
 }
 
 export interface AgentResult {

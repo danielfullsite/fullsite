@@ -7,7 +7,7 @@ import {
   Play, ThumbsUp, ThumbsDown, DollarSign,
 } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
-import type { AgentId, AgentEvent, AgentMetrics, Severity, Outcome } from '@/lib/agents/types'
+import { AgentId, AgentEvent, AgentMetrics, MUESTRA_MINIMA_PRECISION, Severity, Outcome } from '@/lib/agents/types'
 import { AGENT_META } from '@/lib/agents/types'
 
 /* ── Helpers ──────────────────────────────────────────────────────── */
@@ -208,8 +208,13 @@ function MetricsWidget({ clientId }: { clientId: string }) {
   if (!loaded || !metrics) return null
   if (metrics.total_decisions === 0) return null
 
-  const hasOutcomes = metrics.correct + metrics.false_positives > 0
-  const precisionPct = hasOutcomes ? Math.round(metrics.precision_rate * 100) : null
+  // El porcentaje sólo se pinta con muestra suficiente. Con 4 veredictos, un
+  // 25% se lee igual de firme que con 400, y con ese número alguien apaga un
+  // agente por ruido. Debajo del mínimo se enseña el conteo, que es lo que de
+  // verdad se sabe.
+  const precisionPct = metrics.precision_rate !== null && !metrics.muestra_insuficiente
+    ? Math.round(metrics.precision_rate * 100)
+    : null
 
   return (
     <div className="mb-6 p-4 rounded-xl border border-[var(--border)] bg-[var(--surface-1)]">
@@ -219,7 +224,12 @@ function MetricsWidget({ clientId }: { clientId: string }) {
       <div className="grid grid-cols-3 gap-4">
         <div>
           <p className="text-[11px] text-[var(--text-3)] mb-0.5">Decisiones</p>
-          <p className="text-xl font-bold tabular-nums text-[var(--text-1)]">{metrics.total_decisions}</p>
+          <p className="text-xl font-bold tabular-nums text-[var(--text-1)]">
+            {metrics.total_decisions}{metrics.truncado ? '+' : ''}
+          </p>
+          {metrics.truncado && (
+            <p className="text-[10px] text-[var(--text-3)]">hay más de las que caben en la consulta</p>
+          )}
         </div>
         <div>
           <p className="text-[11px] text-[var(--text-3)] mb-0.5">Precisión</p>
@@ -231,7 +241,14 @@ function MetricsWidget({ clientId }: { clientId: string }) {
             <p className="text-xl font-bold text-[var(--text-3)]">—</p>
           )}
           {precisionPct === null && (
-            <p className="text-[10px] text-[var(--text-3)]">sin feedback aún</p>
+            <p className="text-[10px] text-[var(--text-3)]">
+              {metrics.juzgados === 0
+                ? 'nadie ha evaluado todavía'
+                : `${metrics.correct} de ${metrics.juzgados} evaluados · muestra corta para un porcentaje`}
+            </p>
+          )}
+          {precisionPct !== null && (
+            <p className="text-[10px] text-[var(--text-3)]">sobre {metrics.juzgados} evaluados</p>
           )}
         </div>
         <div>
@@ -245,9 +262,11 @@ function MetricsWidget({ clientId }: { clientId: string }) {
           )}
         </div>
       </div>
-      {!hasOutcomes && (
+      {metrics.muestra_insuficiente && (
         <p className="mt-3 text-[11px] text-[var(--text-3)]">
-          Usa "Si, funcionó" o "Falso positivo" en cada decisión para que el sistema aprenda y puedas ver su precision real.
+          {metrics.juzgados === 0
+            ? 'Marca «Sí, funcionó» o «Falso positivo» en cada decisión para que el sistema aprenda y puedas ver su precisión real.'
+            : `Faltan ${MUESTRA_MINIMA_PRECISION - metrics.juzgados} evaluaciones para que el porcentaje signifique algo. Marca «Sí, funcionó» o «Falso positivo» en cada decisión.`}
         </p>
       )}
     </div>

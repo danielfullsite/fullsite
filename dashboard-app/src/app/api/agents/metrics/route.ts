@@ -5,7 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sbGet } from '@/lib/agents/engine'
 import { requireTenant } from '@/lib/api-auth'
-import type { AgentMetrics } from '@/lib/agents/types'
+import { AgentMetrics, MUESTRA_MINIMA_PRECISION } from '@/lib/agents/types'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,11 +27,15 @@ export async function GET(req: NextRequest) {
   const clientId = ctx.clientId
 
   const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+  const LIMITE = 500
 
   try {
     const rows = await sbGet<EventRow>(
       'agent_events',
-      `client_id=eq.${encodeURIComponent(clientId)}&created_at=gte.${cutoff}&select=outcome,estimated_value,created_at,status,agent_id&limit=500`,
+      // El límite se declara para poder saber si se topó. Antes era 500 fijo y
+      // truncaba en silencio: exactamente el patrón que ya mordió en el panel,
+      // donde una consulta leía las 5,000 órdenes MÁS VIEJAS sin decirlo.
+      `client_id=eq.${encodeURIComponent(clientId)}&created_at=gte.${cutoff}&select=outcome,estimated_value,created_at,status,agent_id&limit=${LIMITE}`,
     )
 
     const withOutcome = rows.filter(r => r.outcome !== null)
@@ -48,10 +52,14 @@ export async function GET(req: NextRequest) {
       total_decisions: rows.length,
       correct,
       false_positives: falsePositive,
-      precision_rate: precisionRate ?? 0,
+      // null, no 0. Sin un solo veredicto, cero se lee como «fallan siempre».
+      precision_rate: precisionRate,
+      juzgados: withOutcome.length,
+      muestra_insuficiente: withOutcome.length < MUESTRA_MINIMA_PRECISION,
       total_value_estimated: Math.round(totalEstimated),
       total_value_validated: Math.round(totalValidated),
       avg_time_to_action_min: null, // requires acknowledged_at column — future
+      truncado: rows.length >= LIMITE,
     }
 
     // Per-agent breakdown
