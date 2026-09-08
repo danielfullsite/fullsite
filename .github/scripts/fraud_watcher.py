@@ -175,6 +175,7 @@ def main():
             },
             explanation=LABELS.get(ev["action"], ev["action"]),
             client_id=CLIENT_ID,
+            datos_hasta=ev.get("created_at"),   # la hora del hecho, no la de la corrida
         )
 
     msg = format_alert(events, total_value)

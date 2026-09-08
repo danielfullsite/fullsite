@@ -449,9 +449,19 @@ def main():
     #
     # Lo resuelve resolver_predicciones.py al cierre del día.
     fecha_predicha = get_current_business_date(CLIENT)
+    # De cuándo es el dato con el que se está proyectando.
+    #
+    # Entre el 2026-06-20 y el 2026-08-03 este agente recibió el MISMO `current_ventas`
+    # 34 días seguidos —$68,421— porque su fuente había dejado de actualizarse y repetía
+    # la última fila. Proyectó los 34 días como si nada, y sus proyecciones se ven igual
+    # que cualquier otra. Con esto declarado, esos días habrían salido fechados y a la
+    # vista desde el primero.
+    frescura_de_la_fuente = (today_data or {}).get("data_freshness") or \
+                            (today_data or {}).get("generated_at")
     log_event(
         agent_id="close-predictor",
         event_type="forecast",
+        datos_hasta=frescura_de_la_fuente,
         title=f"Proyección de cierre para {fecha_predicha}: ${projected:,.0f}",
         severity="info",
         estimated_value=float(projected),

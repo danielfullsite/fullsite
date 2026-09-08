@@ -28,3 +28,8 @@ jobs:
       # dentro del workflow que califica: si esa prueba solo viviera junto al calificador,
       # el bug podria volver por cualquier otro script sin que nada lo dijera.
       - run: python .github/scripts/test_url_timestamps.py
+
+      # Barrido: ningun hallazgo llega a la pantalla sin decir de cuando es su dato.
+      # Si alguien escribe un agente nuevo y se le olvida, esta prueba lo nombra.
+      - run: python .github/scripts/test_edad_del_dato.py
+      - run: python .github/scripts/test_log_event.py

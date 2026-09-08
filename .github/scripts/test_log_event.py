@@ -64,8 +64,23 @@ class LosDefaultsDeLaBaseSeRespetan(unittest.TestCase):
     def test_suggested_action_omitida_NO_viaja(self):
         self.assertNotIn("suggested_action", enviado())
 
-    def test_evidence_omitida_NO_viaja(self):
-        self.assertNotIn("evidence", enviado())
+    def test_evidence_SI_viaja_aunque_el_agente_no_la_mande(self):
+        # Cambió a propósito el 2026-09-08: `evidence` ahora SIEMPRE carga la frescura del
+        # dato, incluso cuando el agente no declaró ninguna — y ese "no declarada" es
+        # justamente la señal que hay que poder ver.
+        #
+        # No contradice la regla de esta clase. El bug documentado era mandar NULL, que
+        # anula el DEFAULT de la columna y produce 23502. Aquí viaja un objeto real, y
+        # test_ninguna_llave_viaja_en_None_salvo_outcome sigue siendo el guardián de eso.
+        cuerpo = enviado()
+        self.assertIn("evidence", cuerpo)
+        self.assertIsNotNone(cuerpo["evidence"])
+        self.assertIn("frescura", json.loads(cuerpo["evidence"]))
+
+    def test_la_frescura_no_declarada_no_se_lee_como_fresca(self):
+        frescura = json.loads(enviado()["evidence"])["frescura"]
+        self.assertFalse(frescura["declarada"])
+        self.assertFalse(frescura["en_presente"])
 
     def test_ninguna_llave_viaja_en_None_salvo_outcome(self):
         cuerpo = enviado()
@@ -92,7 +107,10 @@ class LoQueSIseManda(unittest.TestCase):
         self.assertEqual(cuerpo["confidence"], 0.9)
         self.assertEqual(cuerpo["explanation"], "porque sí")
         self.assertEqual(cuerpo["suggested_action"], "revisar")
-        self.assertEqual(json.loads(cuerpo["evidence"]), {"a": 1})
+        # La evidencia del agente llega intacta; la frescura se agrega sin pisarla.
+        ev = json.loads(cuerpo["evidence"])
+        self.assertEqual(ev["a"], 1)
+        self.assertIn("frescura", ev)
 
     def test_el_status_nace_en_new_no_en_open(self):
         # 'open' no existe en el CHECK de la tabla; escribirlo rechazaba TODO.

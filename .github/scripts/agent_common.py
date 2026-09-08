@@ -91,6 +91,99 @@ def check_freshness(rows: list, date_field: str = "fecha", max_stale_hours: int 
     return {"fresh": hours <= max_stale_hours, "latest": str(latest), "hours_stale": round(hours, 1), "status": status}
 
 
+# ─── La edad del dato viaja con la afirmación ─────────────────
+#
+# Un hallazgo dice algo en PRESENTE: "las ventas cayeron 30%", "hay 12 ingredientes
+# agotados". Quien lo lee asume que habla de hoy. Si el dato de atrás tiene 58 días, la
+# frase es falsa aunque el cálculo esté perfecto — y suena igual de creíble.
+#
+# No es hipotético: wansoft_daily no recibe datos desde el 2026-07-20 y ops_daily desde el
+# 2026-07-12, porque los 17 workflows de Wansoft están apagados. Medido el 2026-09-08: de
+# los 41 agentes que le hablan a una persona, DOS revisan si su dato está fresco.
+#
+# La respuesta NO es callar al agente — eso ya se decidió con el fraude: lo que se esconde
+# no se puede juzgar, y un hallazgo suprimido se ve igual que un restaurante sano. La
+# respuesta es FECHAR la afirmación. Un hallazgo viejo sigue sirviendo si dice que es
+# viejo; deja de servir cuando se disfraza de hoy.
+
+# Un hallazgo sobre la operación de hoy se cocina en horas, no en días. Más allá de esto
+# la frase deja de ser sobre el presente y tiene que decir de cuándo habla.
+HORAS_PARA_HABLAR_EN_PRESENTE = 24
+
+
+def edad_del_dato(datos_hasta=None):
+    """Qué tan viejo es el dato detrás de una afirmación.
+
+    `datos_hasta` es la fecha o timestamp del registro MÁS NUEVO que se usó para concluir.
+    Devuelve `declarada=False` cuando el agente no lo dijo — que NO es lo mismo que decir
+    que el dato está fresco, y no debe leerse así.
+    """
+    if not datos_hasta:
+        return {"declarada": False, "horas": None, "dias": None,
+                "en_presente": False, "hasta": None}
+    try:
+        txt = str(datos_hasta).replace("Z", "+00:00").replace(" ", "T")
+        dt = datetime.fromisoformat(txt if ("T" in txt) else txt + "T23:59:59+00:00")
+    except Exception:
+        return {"declarada": False, "horas": None, "dias": None,
+                "en_presente": False, "hasta": str(datos_hasta)}
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    horas = (datetime.now(timezone.utc) - dt).total_seconds() / 3600
+    return {
+        "declarada": True,
+        "horas": round(horas, 1),
+        "dias": round(horas / 24, 1),
+        "en_presente": horas <= HORAS_PARA_HABLAR_EN_PRESENTE,
+        "hasta": str(datos_hasta),
+    }
+
+
+def mas_reciente(filas, *campos):
+    """El valor de fecha más nuevo entre unas filas, para pasarlo como `datos_hasta`.
+
+    Prueba los campos en orden. Devuelve None si no hay ninguno — y None significa "no lo
+    declaré", nunca "está fresco".
+    """
+    if not campos:
+        campos = ("data_freshness", "generated_at", "created_at", "updated_at", "fecha")
+    vistos = []
+    for f in (filas or []):
+        if not isinstance(f, dict):
+            continue
+        for c in campos:
+            v = f.get(c)
+            if v:
+                vistos.append(str(v))
+                break
+    return max(vistos) if vistos else None
+
+
+def fechar_afirmacion(texto, edad):
+    """Antepone la edad del dato cuando la afirmación ya no es sobre hoy.
+
+    No suaviza el hallazgo ni lo esconde: lo fecha. "Las ventas cayeron 30%" pasa a
+    "Con datos al 2026-07-12 (hace 58 días): las ventas cayeron 30%".
+    """
+    # None se conserva como None, NUNCA como "".
+    #
+    # `explanation` y `suggested_action` son NOT NULL CON DEFAULT en agent_events, y
+    # log_event filtra los None justamente para que el DEFAULT actúe. Devolver "" haría
+    # viajar el campo y anularía ese default: el mismo patrón que en agosto perdió los 25
+    # descuadres de boruca. Lo cachó test_log_event.
+    if texto is None:
+        return None
+    if not edad.get("declarada") or edad.get("en_presente"):
+        return texto
+    dias = edad.get("dias")
+    cuando = str(edad.get("hasta") or "")[:10]
+    if dias is None:
+        sello = "Con datos al " + cuando + ": "
+    else:
+        sello = "Con datos al " + cuando + " (hace " + format(dias, ".0f") + " días): "
+    return sello + texto
+
+
 # ─── Agent run logging (truthful) ─────────────────────────────
 
 def log_run(
@@ -224,6 +317,7 @@ def log_event(
     suggested_action: str = None,
     expires_at: str = None,         # ISO — cuándo deja de ser relevante
     client_id: str = None,
+    datos_hasta: str = None,        # fecha del registro MÁS NUEVO que sustenta el hallazgo
 ):
     """Registra un evento medible en agent_events (status='new', outcome=None).
 
@@ -238,6 +332,17 @@ def log_event(
     if not client_id:
         print(f"[{agent_id}] log_event sin client_id — se omite (aislamiento tenant)", file=sys.stderr)
         return
+    # La edad del dato viaja CON la afirmación, no aparte.
+    #
+    # Se fecha el texto en vez de callar el hallazgo: uno viejo que dice que es viejo
+    # sigue sirviendo; uno viejo disfrazado de hoy es una mentira que se lee igual de bien
+    # que la verdad. Y cuando el agente no declara su frescura, eso queda escrito como
+    # "declarada: false" — que NO significa fresco.
+    edad = edad_del_dato(datos_hasta)
+    evidence = {**(evidence or {}), "frescura": edad}
+    explanation = fechar_afirmacion(explanation, edad)
+    title = fechar_afirmacion(title, edad)
+
     row = {
         "agent_id": agent_id, "client_id": client_id, "type": event_type,
         "title": title, "severity": severity, "status": "new", "outcome": None,

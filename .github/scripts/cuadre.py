@@ -39,7 +39,7 @@ from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from agent_common import sb_get, log_run, log_event  # noqa: E402
+from agent_common import sb_get, log_run, log_event, mas_reciente  # noqa: E402
 
 # Un centavo de tolerancia. No es laxitud: `numeric` y los redondeos de IVA producen
 # diferencias de fracciones de centavo que no son un descuadre real. Más ancho que esto
@@ -187,6 +187,9 @@ def main() -> int:
                     explanation=casos[0][1],
                     suggested_action="Revisar esas órdenes en el POS antes de confiar en los reportes del día.",
                     client_id=cid,
+                    # De cuándo es la orden más nueva que se revisó. Sin esto, un descuadre
+                    # de hace mes y medio se lee como si fuera de anoche.
+                    datos_hasta=mas_reciente(ordenes, "created_at"),
                 )
             for f, vista, crudo in r["dias_descuadrados"]:
                 print(f"    dia_vs_ordenes: {f} la vista dice ${vista:,.2f}, las órdenes suman ${crudo:,.2f}")
@@ -199,6 +202,7 @@ def main() -> int:
                     explanation=f"ops_daily_history dice ${vista:,.2f} y las órdenes suman ${crudo:,.2f}",
                     suggested_action="Revisar la vista o las órdenes de ese día.",
                     client_id=cid,
+                    datos_hasta=f,   # la afirmación es sobre ESE día, no sobre hoy
                 )
     except Exception as e:
         ms = int((time.time() - inicio) * 1000)

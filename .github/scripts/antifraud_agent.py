@@ -14,7 +14,7 @@ from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 
 sys.path.insert(0, os.path.dirname(__file__))
-from agent_common import sb_get as _sb_get, log_run as _log_run, create_insight, log_event
+from agent_common import sb_get as _sb_get, log_run as _log_run, create_insight, log_event, mas_reciente
 from client_config import get_client, get_tz, get_chat_ids, is_mesero
 try:
     from audit_log import AuditLogger
@@ -586,7 +586,8 @@ def main():
                   estimated_value=float(_f.get("faltante_mxn") or 0), confidence=0.7,
                   evidence={"actor": _f.get("actor"), "tickets": _f.get("count")},
                   suggested_action="Cruzar order_id contra arqueo del mesero; pedir explicación.",
-                  client_id=CLIENT["id"])
+                  client_id=CLIENT["id"],
+                  datos_hasta=mas_reciente(data, "fecha"))
 
     if len(data) < 3 and not skimming_findings:
         print("[antifraud] Not enough data and no skimming, skipping")
