@@ -6,8 +6,9 @@ import { DollarSign, TrendingDown, TrendingUp, Award, ArrowRight, CreditCard, Fi
 import RevenueChart from '@/components/RevenueChart'
 import RevenueDistributionChart from '@/components/RevenueDistributionChart'
 import { getActiveTimezone } from '@/lib/date-mx'
-import { getRecentDays, getLatestDay, getDashboardFromPosOrders, aggregateMeseros, getDeteccionesAgentes, getResultadosAgentes, getTurnoAbierto, type TurnoAbierto } from '@/lib/data'
+import { getRecentDays, getLatestDay, getDashboardFromPosOrders, aggregateMeseros, getDeteccionesAgentes, getResultadosAgentes, getTurnoAbierto, getTurnoCerradoDelDia, type TurnoAbierto } from '@/lib/data'
 import { desdeEventos, desdeResultados, ordenar, type Atencion } from '@/lib/atencion'
+import { cuadreDeTurno, tonoDeCuadre, type Cuadre } from '@/lib/cuadre'
 import EstadoOperacion from '@/components/dashboard/EstadoOperacion'
 import ResumenDia from '@/components/dashboard/ResumenDia'
 import QuienVendio from '@/components/dashboard/QuienVendio'
@@ -21,7 +22,7 @@ import PredictionWidget from '@/components/PredictionWidget'
 import type { WansoftDaily, GrupoEntry, PagoMetodoEntry } from '@/lib/types'
 import { useAuth } from '@/contexts/AuthContext'
 import BotonCalendario from '@/components/ui/BotonCalendario'
-import { Tarjeta, Hueso, CifraEsqueleto, TarjetaEsqueleto, FilasEsqueleto, Cargando } from '@/components/ui/Superficie'
+import { Tarjeta, TarjetaEncabezado, Pastilla, Hueso, CifraEsqueleto, TarjetaEsqueleto, FilasEsqueleto, Cargando } from '@/components/ui/Superficie'
 
 const CATEGORY_NAMES: Record<string, string> = {
   'CHILAQUILES & ENCHILADAS': 'Chilaquiles',
@@ -109,6 +110,7 @@ const WIDGET_DEFS = [
   { id: 'top_meseros', label: 'Top meseros', defaultOn: true },
   { id: 'categories', label: 'Distribución por categoría', defaultOn: false },
   { id: 'hora_pico', label: 'Mejor día y eficiencia', defaultOn: true },
+  { id: 'cuadre_caja', label: 'Cuadre de caja', defaultOn: true },
   { id: 'payment_methods', label: 'Métodos de pago', defaultOn: false },
   { id: 'quick_actions', label: 'Acciones rápidas', defaultOn: false },
 ] as const
@@ -158,6 +160,7 @@ export default function DashboardPage() {
   const [atencion, setAtencion] = useState<Atencion[]>([])
   const [turnoAbierto, setTurnoAbierto] = useState<TurnoAbierto | null>(null)
   const [cargandoTurno, setCargandoTurno] = useState(true)
+  const [cuadre, setCuadre] = useState<Cuadre>(() => cuadreDeTurno(null))
 
   useEffect(() => {
     let vivo = true
@@ -398,6 +401,19 @@ export default function DashboardPage() {
   // amalay y de boruca y CERO de coffee-shop, y el bloque que las leía acabó
   // enseñando las alertas de AMALAY aquí (P0 corregido aparte). `recentData` ya
   // viene acotado al tenant activo, así que no hay forma de que se crucen.
+  // El cuadre de caja del día que se está viendo. Va en su propio efecto porque
+  // depende de la fecha elegida, no sólo del cliente: al navegar a otro día hay
+  // que releerlo.
+  const fechaVista = viewDay ? String(viewDay.fecha).slice(0, 10) : null
+  useEffect(() => {
+    let vivo = true
+    if (!fechaVista) { setCuadre(cuadreDeTurno(null)); return }
+    getTurnoCerradoDelDia(fechaVista)
+      .then(t => { if (vivo) setCuadre(cuadreDeTurno(t)) })
+      .catch(() => { if (vivo) setCuadre(cuadreDeTurno(null)) })
+    return () => { vivo = false }
+  }, [fechaVista])
+
   const detecciones = detectar(recentData, viewDay)
 
   // Ritmo por día de la semana. Sale de `recentData`, que la página ya tiene:
@@ -790,6 +806,56 @@ export default function DashboardPage() {
           />
         )
       })()}
+
+      {/* Cuadre de caja — la cuenta ya estaba hecha y guardada al cerrar el turno;
+          ninguna pantalla del panel la mostraba. Tiene tres estados y no dos: el
+          del medio existe porque en la práctica se cierra sin contar, y decir
+          «faltan $5,957» cuando nadie contó es una acusación falsa que se come
+          una persona con nombre y apellido. */}
+      {show('cuadre_caja') && cuadre.estado !== 'abierto' && (
+        <div className="mb-6">
+          <Tarjeta>
+            <TarjetaEncabezado
+              titulo="Cuadre de caja"
+              ayuda={cuadre.cerradoPor ? `Cerró ${cuadre.cerradoPor}` : undefined}
+              derecha={
+                <Pastilla tono={tonoDeCuadre(cuadre.estado)}>
+                  {cuadre.estado === 'cuadra' ? 'Cuadra'
+                    : cuadre.estado === 'descuadra' ? 'No cuadra'
+                    : 'Sin conteo'}
+                </Pastilla>
+              }
+            />
+            <p className="mt-3 text-[13.5px]" style={{ color: 'var(--text-2)' }}>{cuadre.mensaje}</p>
+            {cuadre.estado === 'descuadra' && (
+              <div className="mt-4 grid grid-cols-3 gap-3">
+                {[
+                  ['Según el sistema', cuadre.sistema],
+                  ['Contaron', cuadre.contado],
+                  ['Diferencia', cuadre.diferencia],
+                ].map(([etiqueta, valor], i) => (
+                  <div key={etiqueta as string}>
+                    <div className="text-[11.5px]" style={{ color: 'var(--text-3)' }}>{etiqueta}</div>
+                    <div
+                      className="mt-1 text-[15px] font-semibold tabular-nums"
+                      style={{ color: i === 2 ? 'var(--crit-ink)' : 'var(--text-1)' }}
+                    >
+                      {typeof valor === 'number' ? formatCurrency(valor) : '—'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <Link
+              href="/cortes"
+              className="mt-4 inline-block text-[12.5px] font-medium"
+              style={{ color: 'var(--accent-ink)' }}
+            >
+              Ver cortes →
+            </Link>
+          </Tarjeta>
+        </div>
+      )}
 
       {/* Qué esperar hoy — la pieza nueva. Contesta "¿con cuánta gente abro?",
           que es la decisión que un dueño toma antes de abrir la cortina y que

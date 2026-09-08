@@ -632,6 +632,7 @@ export async function getDashboardFromPosOrders(days: number = 30, clientId: str
 // pantalla completa).
 
 import type { EventoAgente, ResultadoAgente } from '@/lib/atencion'
+import type { TurnoCerrado } from '@/lib/cuadre'
 
 /**
  * Detecciones de los agentes para el tenant activo.
@@ -671,6 +672,37 @@ export async function getDeteccionesAgentes(
  * Nunca lanza: si esta consulta falla, la lista de pendientes se queda con lo
  * que ya tenía en vez de tumbar la pantalla.
  */
+/**
+ * El turno cerrado de un día, con su cuadre de caja.
+ *
+ * `getTurnoAbierto` sólo mira el turno ABIERTO y sólo su fondo inicial, así que
+ * el cuadre —que se calcula y se guarda al CERRAR— no llegaba a ninguna pantalla
+ * del panel. Hay 38 turnos cerrados con esas columnas llenas.
+ *
+ * Se pide el más reciente del día: si hubo varios turnos, el cuadre que importa
+ * al abrir el panel es el del último cierre.
+ */
+export async function getTurnoCerradoDelDia(
+  fecha: string,
+  clientSlug: string = getActiveClientSlug(),
+): Promise<TurnoCerrado | null> {
+  if (!clientSlug || !fecha) return null
+  try {
+    const rows = (await sbFetch(
+      'pos_turnos',
+      `select=id,opened_at,closed_at,closed_by,fondo_inicial,efectivo_sistema,fondo_final,diferencia` +
+        `&client_id=eq.${encodeURIComponent(clientSlug)}` +
+        `&closed_at=not.is.null&closed_at=gte.${fecha}T00:00:00&closed_at=lt.${fecha}T23:59:59.999` +
+        `&order=closed_at.desc&limit=1`,
+    )) as TurnoCerrado[]
+    return rows[0] ?? null
+  } catch {
+    // Un fallo de red no es «no hubo turno»: se devuelve null y la tarjeta se
+    // comporta como sin dato, que es distinto de decir que cuadró.
+    return null
+  }
+}
+
 export async function getResultadosAgentes(
   clientSlug: string = getActiveClientSlug(),
 ): Promise<ResultadoAgente[]> {
