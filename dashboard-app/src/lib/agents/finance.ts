@@ -10,6 +10,7 @@
  * No filtrar por cliente — son exclusivas de AMALAY.
  */
 import type { AgentEvent } from './types'
+import { masReciente } from './edad-del-dato'
 
 interface WansoftDay {
   fecha: string
@@ -64,6 +65,18 @@ export async function runFinanceAgent(
 
   const kpis = kpisArr[0] ?? null
 
+  // DE CUÁNDO ES ESTE DINERO.
+  //
+  // La fuente de este agente es `wansoft_daily`, que NO RECIBE DATOS DESDE EL 2026-07-20:
+  // los 17 workflows de Wansoft están apagados en GitHub y el más reciente corrió el 13 de
+  // julio. Todo lo que sigue —caída de ventas, ticket promedio, costo de comida— se
+  // redacta en presente sobre un histórico que se detuvo hace casi dos meses.
+  //
+  // Es la mentira más cara de las que puede decir este sistema, porque es la única que
+  // habla de dinero y la única que suena perfectamente razonable. No se calla el hallazgo:
+  // se fecha, y quien lo lea sabrá que está viendo julio.
+  const datosHasta = masReciente(history, 'fecha')
+
   // ── Fuente insuficiente: se DICE, no se calla ────────────────────────────
   //
   // Antes esto era `if (history.length < 7) return events`, un return silencioso. El
@@ -86,6 +99,7 @@ export async function runFinanceAgent(
 
     events.push({
       client_id: clientId,
+      datos_hasta: datosHasta,
       agent_id: 'finance',
       type: 'fuente_sin_datos',
       // warning y no critical: no hay evidencia de que el negocio esté mal — lo que está
@@ -132,6 +146,7 @@ export async function runFinanceAgent(
       const isPositive = pct > 0
       events.push({
         client_id: clientId,
+        datos_hasta: datosHasta,
         agent_id: 'finance',
         type: 'sales_vs_dow',
         severity: isPositive ? 'info' : (pct < -30 ? 'critical' : 'warning'),
@@ -177,6 +192,7 @@ export async function runFinanceAgent(
     if (trend < -12) {
       events.push({
         client_id: clientId,
+        datos_hasta: datosHasta,
         agent_id: 'finance',
         type: 'ticket_declining',
         severity: trend < -22 ? 'critical' : 'warning',
@@ -199,6 +215,7 @@ export async function runFinanceAgent(
     } else if (trend > 12) {
       events.push({
         client_id: clientId,
+        datos_hasta: datosHasta,
         agent_id: 'finance',
         type: 'ticket_growing',
         severity: 'info',
@@ -236,6 +253,7 @@ export async function runFinanceAgent(
         const gap = Math.round(best.avg - worst.avg)
         events.push({
           client_id: clientId,
+          datos_hasta: datosHasta,
           agent_id: 'finance',
           type: 'dow_insight',
           severity: 'info',

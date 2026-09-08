@@ -7,6 +7,7 @@
  * Inputs:  pos_orders (today)
  */
 import type { AgentEvent } from './types'
+import { masReciente } from './edad-del-dato'
 
 interface PosOrder {
   mesa: number | null
@@ -42,6 +43,10 @@ export async function runStaffAgent(
     'pos_orders',
     `client_id=eq.${encodeURIComponent(clientId)}&created_at=gte.${todayCutoff}&status=neq.cancelada&select=mesa,mesero,total,status,created_at&limit=500`,
   )
+
+  // La orden más nueva que se leyó. Un juicio sobre el desempeño de una persona no
+  // puede presentarse como si fuera de hoy cuando el dato es de hace semanas.
+  const datosHasta = masReciente(orders, 'created_at')
 
   const closedOrders = orders.filter(o => ['cerrada', 'pagada', 'lista'].includes(o.status))
   if (closedOrders.length < 3) return events // No hay suficiente data
@@ -86,6 +91,7 @@ export async function runStaffAgent(
     const pct = Math.round((topByRevenue.totalRevenue / teamTotal) * 100)
     events.push({
       client_id: clientId,
+      datos_hasta: datosHasta,
       agent_id: 'staff',
       type: 'top_performer',
       severity: 'info',
@@ -117,6 +123,7 @@ export async function runStaffAgent(
     if (idleStaff.length > 0 && activeCount >= idleStaff.length) {
       events.push({
         client_id: clientId,
+        datos_hasta: datosHasta,
         agent_id: 'staff',
         type: 'idle_during_peak',
         severity: 'warning',
@@ -148,6 +155,7 @@ export async function runStaffAgent(
 
     events.push({
       client_id: clientId,
+      datos_hasta: datosHasta,
       agent_id: 'staff',
       type: 'low_ticket',
       severity: 'info',
@@ -179,6 +187,7 @@ export async function runStaffAgent(
   if (ratio > 5 && activeMeseros >= 2 && openTables >= 8) {
     events.push({
       client_id: clientId,
+      datos_hasta: datosHasta,
       agent_id: 'staff',
       type: 'understaffed',
       severity: 'warning',

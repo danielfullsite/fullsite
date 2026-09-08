@@ -10,6 +10,7 @@ import { runStaffAgent } from './staff'
 import { runFinanceAgent } from './finance'
 import { esDuenoDelHistoricoWansoft } from '@/lib/wansoft-legacy'
 import { applyLearning, tallyVerdicts, verdictsQuery, puedeCallarse } from './learning'
+import { edadDelDato, fecharAfirmacion } from './edad-del-dato'
 
 const SB_URL = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/$/, '')
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || ''
@@ -273,22 +274,31 @@ export async function runAgent(
     // Insert new events
     const toInsert = events.filter(e => !existingTypes.has(`${e.type}:${e.severity}`))
     await Promise.allSettled(
-      toInsert.map(event =>
-        sbInsert('agent_events', {
+      toInsert.map(event => {
+        // LA EDAD DEL DATO VIAJA CON LA AFIRMACION.
+        //
+        // Aqui pasan TODOS los hallazgos de los cinco agentes del panel, asi que la regla
+        // vive en un solo lugar en vez de repartida en cinco archivos.
+        //
+        // Sin esto, el agente de inventario lleva dos meses diciendo en presente y en
+        // rojo que 41 ingredientes estan agotados hoy, leyendo una tabla cuyo ultimo
+        // movimiento es del 2026-07-10. No se calla al agente: se fecha la frase.
+        const edad = edadDelDato(event.datos_hasta)
+        return sbInsert('agent_events', {
           client_id: event.client_id,
           agent_id: event.agent_id,
           type: event.type,
           severity: event.severity,
-          title: event.title,
-          explanation: event.explanation,
-          evidence: event.evidence,
+          title: fecharAfirmacion(event.title, edad),
+          explanation: fecharAfirmacion(event.explanation, edad),
+          evidence: { ...event.evidence, frescura: edad },
           suggested_action: event.suggested_action,
           confidence: event.confidence,
           status: 'new',
           estimated_value: event.estimated_value ?? null,
           expires_at: event.expires_at ?? null,
-        }),
-      ),
+        })
+      }),
     )
   } catch (err) {
     error = err instanceof Error ? err.message : String(err)

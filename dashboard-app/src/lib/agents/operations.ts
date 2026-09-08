@@ -8,6 +8,7 @@
  * Outputs: AgentEvent[]
  */
 import type { AgentEvent } from './types'
+import { masReciente } from './edad-del-dato'
 
 interface PosOrder {
   id: string
@@ -58,6 +59,11 @@ export async function runOperationsAgent(
     `client_id=eq.${encodeURIComponent(clientId)}&created_at=gte.${todayCutoff}&select=id,mesa,mesero,total,status,created_at,updated_at,descuento&order=created_at.desc&limit=500`,
   )
 
+  // De cuándo es la orden más nueva que se leyó. Todo lo que sigue habla del servicio
+  // de HOY —mesas, carga, ticket promedio—, así que si el POS lleva días sin registrar
+  // nada, la frase tiene que decirlo. La fecha la pone el engine al insertar.
+  const datosHasta = masReciente(orders, 'created_at')
+
   if (orders.length === 0) return events
 
   // ── 1. Mesas esperando cobro (usa updated_at — cuando cambió a "lista") ──
@@ -82,6 +88,7 @@ export async function runOperationsAgent(
 
     events.push({
       client_id: clientId,
+      datos_hasta: datosHasta,
       agent_id: 'operations',
       type: 'slow_payment',
       severity: listaOrders.length >= 3 ? 'critical' : 'warning',
@@ -120,6 +127,7 @@ export async function runOperationsAgent(
 
     events.push({
       client_id: clientId,
+      datos_hasta: datosHasta,
       agent_id: 'operations',
       type: 'cancel_spike',
       severity: cancelRate > 0.25 ? 'critical' : 'warning',
@@ -152,6 +160,7 @@ export async function runOperationsAgent(
     if (openMesas.size >= 10) {
       events.push({
         client_id: clientId,
+        datos_hasta: datosHasta,
         agent_id: 'operations',
         type: 'peak_load',
         severity: 'info',

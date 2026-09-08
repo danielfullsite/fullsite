@@ -21,6 +21,14 @@ export interface AgentEvent {
   outcome?: Outcome | null
   created_at?: string
   expires_at?: string | null
+  /**
+   * Fecha o timestamp del registro MAS NUEVO que sustenta este hallazgo.
+   *
+   * Lo lee el engine al insertar: si el dato ya no es de hoy, fecha el titulo y la
+   * explicacion en vez de dejar que la frase pase por presente. Sin declarar, queda
+   * escrito como `declarada: false` en la evidencia — que NO significa fresco.
+   */
+  datos_hasta?: string | null
 }
 
 /**

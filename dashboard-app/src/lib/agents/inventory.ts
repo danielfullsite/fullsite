@@ -8,6 +8,7 @@
  * Freq:    Cada hora
  */
 import type { AgentEvent } from './types'
+import { masReciente } from './edad-del-dato'
 
 interface InventoryProduct {
   id: string
@@ -18,6 +19,8 @@ interface InventoryProduct {
   category: string | null
   cost_per_unit: number | null
   active: boolean
+  /** Cuándo se movió esta fila por última vez. Es la frescura del hallazgo. */
+  updated_at?: string | null
 }
 
 interface Ingredient {
@@ -33,6 +36,7 @@ interface InventoryRow {
   ingredient_id: string
   stock: number
   reorder_point: number | null
+  updated_at?: string | null
 }
 
 export async function runInventoryAgent(
@@ -45,12 +49,12 @@ export async function runInventoryAgent(
   // Try pos_inventory_products first (newer multi-tenant table)
   // `id` se agregó el 2026-08-30: es el mismo que `pos_inventory_movements.ingredient_id`
   // y sin él los hallazgos no se pueden calificar contra la realidad.
-  let products: { id: string; name: string; unit: string; stock: number; reorder_point: number; category: string | null; cost_per_unit: number | null }[] = []
+  let products: { id: string; name: string; unit: string; stock: number; reorder_point: number; category: string | null; cost_per_unit: number | null; updated_at?: string | null }[] = []
 
   try {
     const rows = await sbGet<InventoryProduct>(
       'pos_inventory_products',
-      `client_id=eq.${encodeURIComponent(clientId)}&active=eq.true&reorder_point=gt.0&select=id,name,unit,stock,reorder_point,category,cost_per_unit&order=stock.asc&limit=200`,
+      `client_id=eq.${encodeURIComponent(clientId)}&active=eq.true&reorder_point=gt.0&select=id,name,unit,stock,reorder_point,category,cost_per_unit,updated_at&order=stock.asc&limit=200`,
     )
     products = rows.map(r => ({
       id: r.id,
@@ -60,6 +64,7 @@ export async function runInventoryAgent(
       reorder_point: r.reorder_point ?? 0,
       category: r.category,
       cost_per_unit: r.cost_per_unit,
+      updated_at: r.updated_at,
     }))
   } catch {
     // Fallback: pos_ingredients + pos_inventory join
@@ -71,7 +76,7 @@ export async function runInventoryAgent(
         ),
         sbGet<InventoryRow>(
           'pos_inventory',
-          `client_id=eq.${encodeURIComponent(clientId)}&select=ingredient_id,stock,reorder_point&limit=300`,
+          `client_id=eq.${encodeURIComponent(clientId)}&select=ingredient_id,stock,reorder_point,updated_at&limit=300`,
         ),
       ])
       const invMap = new Map(inventory.map(r => [r.ingredient_id, r]))
@@ -89,6 +94,7 @@ export async function runInventoryAgent(
             reorder_point: inv?.reorder_point ?? 0,
             category: ing.category,
             cost_per_unit: ing.cost_per_unit,
+            updated_at: inv?.updated_at,
           }
         })
         .filter(p => p.reorder_point > 0)
@@ -99,6 +105,17 @@ export async function runInventoryAgent(
 
   if (products.length === 0) return events
 
+  // DE CUÁNDO ES ESTE INVENTARIO.
+  //
+  // Todo lo que sigue habla en presente: qué está agotado HOY, qué no se puede cocinar
+  // HOY. Medido el 2026-09-08, el último `updated_at` de pos_inventory_products para
+  // AMALAY es del 2026-07-10 — hace 60 días. Este agente lleva dos meses emitiendo 71 de
+  // los 155 hallazgos del sistema, 56 de ellos en rojo, sobre una tabla que no se mueve.
+  //
+  // No se calla el hallazgo: un almacén congelado sigue siendo información. Se fecha,
+  // para que nadie lo lea como si fuera de esta mañana. Lo hace el engine al insertar.
+  const datosHasta = masReciente(products, 'updated_at')
+
   // ── 1. Out of stock (auto-86) ────────────────────────────────────────────
   const outOfStock = products.filter(p => p.stock <= 0)
   if (outOfStock.length > 0) {
@@ -106,6 +123,7 @@ export async function runInventoryAgent(
     const more = outOfStock.length > 5 ? ` y ${outOfStock.length - 5} más` : ''
     events.push({
       client_id: clientId,
+      datos_hasta: datosHasta,
       agent_id: 'inventory',
       type: 'out_of_stock',
       severity: 'critical',
@@ -157,6 +175,7 @@ export async function runInventoryAgent(
       const names = critical.slice(0, 4).map(p => `${p.name} (${p.stock.toFixed(1)} ${p.unit})`).join(', ')
       events.push({
         client_id: clientId,
+        datos_hasta: datosHasta,
         agent_id: 'inventory',
         type: 'critical_low_stock',
         severity: 'critical',
@@ -177,6 +196,7 @@ export async function runInventoryAgent(
       const names = warning.slice(0, 4).map(p => p.name).join(', ')
       events.push({
         client_id: clientId,
+        datos_hasta: datosHasta,
         agent_id: 'inventory',
         type: 'low_stock',
         severity: 'warning',
@@ -201,6 +221,7 @@ export async function runInventoryAgent(
   if (nearMin.length >= 3) {
     events.push({
       client_id: clientId,
+      datos_hasta: datosHasta,
       agent_id: 'inventory',
       type: 'approaching_minimum',
       severity: 'info',

@@ -10,6 +10,7 @@
  * Inputs:  pos_orders (last 24h)
  */
 import type { AgentEvent } from './types'
+import { masReciente } from './edad-del-dato'
 
 interface PosOrder {
   id: string
@@ -44,6 +45,11 @@ export async function runFraudAgent(
     `client_id=eq.${encodeURIComponent(clientId)}&created_at=gte.${cutoff}&select=id,mesa,mesero,total,subtotal,descuento,status,created_at&limit=500`,
   )
 
+  // La orden más nueva del periodo revisado. Un patrón de cancelaciones de hace seis
+  // semanas sigue importando; lo que no puede es leerse como si fuera de anoche, porque
+  // de eso depende a quién se le pregunta y con qué urgencia.
+  const datosHasta = masReciente(orders, 'created_at')
+
   if (orders.length === 0) return events
 
   const cancelled   = orders.filter(o => o.status === 'cancelada')
@@ -68,6 +74,7 @@ export async function runFraudAgent(
 
       events.push({
         client_id: clientId,
+        datos_hasta: datosHasta,
         agent_id: 'fraud',
         type: 'cancel_concentration',
         severity,
@@ -107,6 +114,7 @@ export async function runFraudAgent(
       const pct = Math.round((data.amount / totalDiscounts) * 100)
       events.push({
         client_id: clientId,
+        datos_hasta: datosHasta,
         agent_id: 'fraud',
         type: 'discount_concentration',
         severity: 'warning',
@@ -137,6 +145,7 @@ export async function runFraudAgent(
       const totalLarge = largeDiscounts.reduce((s, o) => s + (o.descuento || 0), 0)
       events.push({
         client_id: clientId,
+        datos_hasta: datosHasta,
         agent_id: 'fraud',
         type: 'large_discounts',
         severity: 'warning',
