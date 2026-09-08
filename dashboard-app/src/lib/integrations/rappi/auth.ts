@@ -46,6 +46,19 @@ export function rappiLegacyBaseUrl(): string {
     : 'https://microservices.dev.rappi.com'
 }
 
+// Self-onboarding and the restaurants-integrations-public-api live on Rappi's NEW
+// country domains (dev-portal.rappi.com → Rests API → Country Domains), NOT on
+// services.mxgrability. MX prod = api.rappi.com.mx; dev = api.dev.rappi.com. The
+// integrator token for these endpoints is issued by the same domain and its audience
+// is fixed to {domain}/api/v2/restaurants-integrations-public-api.
+export function rappiPublicApiBaseUrl(): string {
+  const override = process.env.RAPPI_PUBLIC_API_BASE_URL?.trim()
+  if (override) return trimSlash(override)
+  return rappiEnv() === 'prod'
+    ? 'https://api.rappi.com.mx'
+    : 'https://api.dev.rappi.com'
+}
+
 export function rappiOrdersBasePath(): string {
   return '/restaurants/orders/v1'
 }
