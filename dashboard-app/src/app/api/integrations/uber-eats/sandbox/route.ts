@@ -365,15 +365,17 @@ export async function POST(request: NextRequest) {
     const issueType = body.issue_type || 'OUT_OF_ITEM'
     const actionType = body.action_type || 'REMOVE_ITEM'
     const itemName = body.item_name || 'Cafe Americano'
-    // The v1 delivery order GET does NOT include line items. Uber's resolve wants the
-    // per-order cart_item_id, so fetch the full order (v2) and extract it. body.item_id
-    // (other than the menu default) overrides.
+    // Uber GTS (case #59731873, 2026-09-07) confirmed the cart_item_id is carried in the
+    // delivery order's carts and is retrievable via GET /v1/delivery/order/{id}?expand=carts.
+    // The plain v1 GET omits line items and the v2 eats order GET returns 404 for delivery
+    // orders — so ?expand=carts is the source. body.item_id (other than the menu default)
+    // overrides.
     let cartItemId = itemId && itemId !== 'fs-item-1' ? itemId : undefined
-    let v2peek: unknown
+    let cartsPeek: unknown
     if (!cartItemId) {
-      const vr = await uberFetch(`/v2/eats/orders/${encodeURIComponent(orderId)}`, { method: 'GET', tokenType: 'marketplace', storeId })
+      const vr = await uberFetch(`/v1/delivery/order/${encodeURIComponent(orderId)}?expand=carts`, { method: 'GET', tokenType: 'marketplace', storeId })
       const vt = await vr.text()
-      try { v2peek = vt ? JSON.parse(vt) : vt } catch { v2peek = vt }
+      try { cartsPeek = vt ? JSON.parse(vt) : vt } catch { cartsPeek = vt }
       const found: string[] = []
       const hunt = (x: unknown): void => {
         if (Array.isArray(x)) { x.forEach(hunt); return }
@@ -384,12 +386,12 @@ export async function POST(request: NextRequest) {
           Object.values(o).forEach(hunt)
         }
       }
-      hunt(v2peek)
+      hunt(cartsPeek)
       cartItemId = found[0]
     }
     if (!cartItemId) {
       return NextResponse.json({ action, order_id: orderId, correlation_id: corrId,
-        error: 'no cart_item_id found — pass item_id explicitly', v2_order: v2peek }, { status: 422 })
+        error: 'no cart_item_id found — pass item_id explicitly', order_carts: cartsPeek }, { status: 422 })
     }
     const fbody = {
       fulfillment_issues: [{
