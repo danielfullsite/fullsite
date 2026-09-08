@@ -31,7 +31,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, [isOfflineBuild, pathname, router, user, role, loading, isPlatformAdmin])
 
-  const publicPages = ['/login', '/onboarding', '/seguridad', '/privacidad', '/terminos', '/reservar', '/factura', '/demo-live', '/cocina', '/barra']
+  // '/rediseno' es la galería del rediseño y sólo existe en desarrollo: la propia
+  // página responde 404 en producción, así que no agrega superficie pública.
+  const publicPages = ['/login', '/onboarding', '/seguridad', '/privacidad', '/terminos', '/reservar', '/factura', '/demo-live', '/cocina', '/barra',
+    ...(process.env.NODE_ENV === 'production' ? [] : ['/rediseno'])]
   const isPosRoute = pathname.startsWith('/pos')
   const isKdsRoute = pathname.startsWith('/cocina') || pathname.startsWith('/barra') || pathname.startsWith('/kds')
   const isDemoRoute = pathname.startsWith('/demo')

@@ -20,6 +20,7 @@ import { formatCurrency, formatPercent, formatDate, percentChange } from '@/lib/
 import PredictionWidget from '@/components/PredictionWidget'
 import type { WansoftDaily, GrupoEntry, PagoMetodoEntry } from '@/lib/types'
 import { useAuth } from '@/contexts/AuthContext'
+import { Tarjeta, Hueso, CifraEsqueleto, TarjetaEsqueleto, FilasEsqueleto, Cargando } from '@/components/ui/Superficie'
 
 const CATEGORY_NAMES: Record<string, string> = {
   'CHILAQUILES & ENCHILADAS': 'Chilaquiles',
@@ -236,16 +237,12 @@ export default function DashboardPage() {
     }
   }, [clientId, locationId])
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-center">
-          <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-[var(--text-2)] text-sm font-medium">Cargando datos...</p>
-        </div>
-      </div>
-    )
-  }
+  // Mientras cargan los datos se dibuja el esqueleto de la pantalla, no un
+  // disco girando en medio del vacío. Dos razones, y ninguna es estética:
+  // la página no salta cuando entran los datos porque el espacio ya está
+  // reservado, y quien mira sabe QUÉ está por llegar, que es lo que un disco
+  // girando no dice. El azul de ese disco además no era de ninguna paleta.
+  if (loading) return <DashboardEsqueleto />
 
   // Selected day for navigation (0=latest day, 1=yesterday, etc.)
   // recentData is sorted ASC (oldest first), so latest = last element
@@ -1102,5 +1099,49 @@ export default function DashboardPage() {
         })}
       </div>}
     </>
+  )
+}
+
+/**
+ * El esqueleto de esta pantalla.
+ *
+ * Copia la forma real: encabezado, fila de cifras, gráfica y las dos columnas
+ * de abajo. Las alturas están tomadas de los bloques verdaderos para que al
+ * llegar los datos nada se recorra hacia abajo.
+ *
+ * No intenta adivinar qué widgets están encendidos: dibuja el armazón común,
+ * que es el que se ve en cualquier configuración.
+ */
+function DashboardEsqueleto() {
+  return (
+    <div className="space-y-4">
+      <Cargando que="el panel" />
+
+      {/* Encabezado: título, fecha y pestañas de periodo */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <Hueso className="h-6" ancho="190px" />
+          <Hueso className="mt-2 h-3" ancho="130px" />
+        </div>
+        <Hueso className="h-8 w-[190px] rounded-lg" />
+      </div>
+
+      {/* Cuatro cifras */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {[0, 1, 2, 3].map(i => <CifraEsqueleto key={i} />)}
+      </div>
+
+      {/* La gráfica de los últimos días */}
+      <TarjetaEsqueleto alto="h-[240px]" />
+
+      {/* Quién vendió y la distribución */}
+      <div className="grid gap-3 lg:grid-cols-2">
+        <Tarjeta>
+          <Hueso className="h-3.5" ancho="38%" />
+          <div className="mt-4"><FilasEsqueleto filas={5} /></div>
+        </Tarjeta>
+        <TarjetaEsqueleto alto="h-[190px]" />
+      </div>
+    </div>
   )
 }

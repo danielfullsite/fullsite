@@ -178,21 +178,24 @@ body:has(.pos-service-shell) {
 }
 
 [data-theme="light"] {
-  /* DS v2.1 "Servicio · Día": papel neutro cálido con leve sesgo verde (elegido, no gris).
-   * Fondo un poco más profundo + bordes más definidos → las tarjetas blancas destacan
-   * y el texto secundario se lee mejor (dashboard "más visible y amigable"). */
-  --bg: #f4f6f3;
+  /* DS v3.1 "Papel": gris neutro frío, tarjetas blancas y bordes finos.
+   * Antes el papel tenía un sesgo verde (#f4f6f3) que teñía cada tarjeta y
+   * peleaba con el verde de marca: el acento dejaba de destacar porque el
+   * fondo ya era, un poco, del mismo color. Con el papel neutro el verde
+   * vuelve a ser lo único verde de la pantalla, que es de lo que se trata.
+   * El contraste del texto sube, no baja: --text-2 pasa de 8.9:1 a 9.7:1. */
+  --bg: #f7f8fa;
   --surface: #ffffff;
-  --surface-2: #f1f4ef;
+  --surface-2: #f2f4f7;
   --panel: #ffffff;
-  --raised: #fbfdfa;
-  --line: #e3e8e2;
-  --line-soft: #eef1ec;
+  --raised: #fbfcfd;
+  --line: #e6e8ee;
+  --line-soft: #eef0f4;
 
-  --text-1: #0e1613;
-  --text-2: #364039;
-  --text-3: #57625a;
-  --text-4: #8a958e;
+  --text-1: #0d1117;
+  --text-2: #363b45;
+  --text-3: #5c626e;
+  --text-4: #8b909b;
 
   --accent: #0ea371;
   --accent-bright: #10b981;
@@ -590,32 +593,18 @@ body {
  * selector y retirar el flag. Si se rechaza: borrar este bloque completo.
  * ══════════════════════════════════════════════════════════════════════════ */
 
-/* ── 1. Riel oscuro también en tema claro ──────────────────────────────────
- * Es el rasgo más reconocible de Haze: el sidebar no cambia con el tema, así
- * que el ojo tiene un ancla fija y el contenido es lo único que se aclara. */
-[data-theme="light"] [data-ds="v3"] .sidebar-rail {
-  --surface: #0f1a15;
-  --surface-2: #18271f;
-  --panel: #18271f;
-  --raised: #18271f;
-  --line: #25352c;
-  --line-soft: #1f2e26;
-  --text-1: #eef3f0;
-  --text-2: #c2d0c8;
-  --text-3: #8ba095;
-  --text-4: #61756a;
-  --accent-ink: #34d399;
-  --crit-ink: #f87171;
-  background: #0f1a15;
-  scrollbar-color: rgba(255,255,255,0.14) transparent;
-}
-/* El logo sigue al riel, no al tema: sobre carbón va la f blanca. */
-/* Acotado a `.sidebar-rail`. Antes aplicaba a cualquier elemento con esas clases
- * bajo [data-ds="v3"] — y cuando el rediseño dejó de ser piloto, eso pasó a ser
- * TODA la app. Una excepción del riel no puede alcanzar a un aviso flotante que
- * vive sobre otra superficie. */
-[data-theme="light"] [data-ds="v3"] .sidebar-rail .sidebar-logo-black { display: none; }
-[data-theme="light"] [data-ds="v3"] .sidebar-rail .sidebar-logo-white { display: block; }
+/* ── 1. El riel acompaña al tema ───────────────────────────────────────────
+ * Aquí vivía una excepción que dejaba el sidebar OSCURO incluso en tema claro,
+ * como ancla fija de la pantalla. Se retira con el panel claro por omisión: un
+ * riel negro junto a papel parte la vista en dos productos distintos y se lleva
+ * la atención hacia la navegación, que es lo que menos se mira. Ahora el riel
+ * es papel y lo que separa es una línea fina, así que el peso visual se lo
+ * llevan los datos.
+ *
+ * Se BORRA en vez de dejarse inerte: una prueba de este repo comprueba que toda
+ * clase declarada exista en algún componente, precisamente para que el CSS
+ * muerto no se acumule. El bloque completo está en el historial de git si
+ * alguna vez se quiere volver al riel oscuro. */
 
 /* ── 2. Densidad medida ────────────────────────────────────────────────────
  * Ritmo de Haze: radio 12px y celdas de tabla a 16×12. Las tarjetas dejan de
