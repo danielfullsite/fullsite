@@ -150,7 +150,19 @@ class CommandHandler {
     let permission = ['FINANCIAL_OPEN', 'FINANCIAL_SPLIT'].includes(type) ? 'pos.accounts.manage' : 'pos.payments.collect'
     if (type === 'FINANCIAL_PAYMENT_RESULT') {
       const payment = this._state.getFinancialOrder?.(payload.order_id)?.payments.find(p => p.payment_id === payload.payment_id)
-      if (payment?.method === 'external') permission = 'pos.payments.external_result'
+      // EL ESTADO QUE SE QUIERE ESCRIBIR MANDA SOBRE EL METODO DEL PAGO.
+      //
+      // Al reves --que es como estaba-- un intento con tarjeta quedaba atrapado: como el
+      // permiso se elegia por `method === 'external'`, RECHAZAR el intento costaba el
+      // mismo permiso imposible que aprobarlo, y la reserva no se podia soltar por
+      // ningun camino. Mesa ocupada, saldo retenido, turno sin cerrar.
+      //
+      // Rechazar no crea dinero: dice que NO entro. Bloquearlo solo deja mesas trabadas,
+      // asi que cuesta lo mismo que cobrar. 'unknown' si aparta dinero sin confirmar y
+      // por eso sigue pidiendo conciliacion.
+      if (payload.status === 'rejected') permission = 'pos.payments.collect'
+      else if (payload.status === 'unknown') permission = 'pos.payments.reconcile'
+      else if (payment?.method === 'external') permission = 'pos.payments.external_result'
       else if (payment?.status === 'unknown') permission = 'pos.payments.reconcile'
       const attributed = payload.evidence?.received_by ?? payload.evidence?.recorded_by
       if (payment?.method === 'cash' && attributed !== actor.id) throw new FinancialError('ACTOR_MISMATCH', 'Payment evidence must identify the authenticated employee')

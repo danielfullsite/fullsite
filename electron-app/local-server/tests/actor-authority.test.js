@@ -124,9 +124,35 @@ test('stored credentials cannot be reused after changing tenant or branch', asyn
   assert.throws(() => authority({ branchId: 'branch-B' }), /otra instalación/)
 })
 
-test('employee roles never grant trusted-provider privileges and minRole cannot promote a cashier', async () => {
+// LA REGLA CAMBIO EL 2026-09-08, Y ESTA PRUEBA CAMBIO CON ELLA -- a proposito.
+//
+// Antes afirmaba que NINGUNO de los cinco roles tiene `pos.payments.external_result`.
+// Era cierto y era el diseno: el permiso se reservaba al adaptador de proveedor, que
+// confirma el cobro solo. Pero ese adaptador no existe (OP-38) y el 2026-09-05 se agrego
+// el cobro con terminal bancaria OPERADA A MANO, porque asi cobran en AMALAY.
+//
+// El resultado fue una trampa sin salida, reproducida contra el stack real: el cajero
+// aparta $1,240, pasa la tarjeta, el banco APRUEBA, y al teclear la autorizacion recibe
+// PERMISSION_DENIED. Con PIN de gerente, lo mismo. Con el de dueno, lo mismo. Rechazar el
+// intento para liberar la mesa costaba el mismo permiso imposible. Cobrar en efectivo:
+// OVERPAYMENT. Cancelar: FINANCIAL_ORDER_LOCKED. Cerrar el turno: UNSETTLED_FINANCIAL_
+// ACCOUNTS. La mesa se quedaba ocupada y el corte Z no salia.
+//
+// Lo que NO cambio: `minRole` sigue sin poder promover a un cajero. Esa parte de la
+// prueba es la que siempre importo y sigue igual.
+test('cerrar cuentas alcanza para registrar el resultado de una terminal bancaria', async () => {
   const a = authority()
-  for (const role of ['mesero', 'cajero', 'capitan', 'gerente', 'admin']) assert(!permissionsFor(role).includes('pos.payments.external_result'))
+  // Quien puede cerrar cuentas puede cerrar un cobro con tarjeta: el efectivo ya
+  // funciona asi, y un voucher deja mas rastro que un billete.
+  for (const role of ['cajero', 'capitan', 'gerente', 'admin']) {
+    assert(permissionsFor(role).includes('pos.payments.external_result'), `${role} deberia poder`)
+  }
+  // Un mesero no cierra cuentas, y por lo tanto tampoco cobros con tarjeta.
+  assert(!permissionsFor('mesero').includes('pos.payments.external_result'))
+  // Conciliar un cobro dudoso sigue siendo cosa de gerente.
+  for (const role of ['mesero', 'cajero', 'capitan']) {
+    assert(!permissionsFor(role).includes('pos.payments.reconcile'), `${role} no deberia conciliar`)
+  }
   await assert.rejects(a.login({ ...login, minRole: 'gerente' }), { code: 'PERMISSION_DENIED' })
   await assert.rejects(a.login({ ...login, minRole: 'made-up' }), { code: 'INVALID_ROLE' })
 })

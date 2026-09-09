@@ -34,6 +34,18 @@ function permissionsFor(role) {
     'pos.orders.discount': profile.descuentos_ordenes_monto,
     'pos.accounts.manage': profile.abrir_cuentas_restaurante || profile.cerrar_cuentas,
     'pos.payments.collect': profile.cerrar_cuentas,
+    // Nadie tenia `external_result`, ni el dueno. El diseno lo reservaba "al adaptador"
+    // --una integracion que confirma sola-- pero el adaptador no existe (OP-38) y en
+    // AMALAY la terminal bancaria se opera A MANO: el cajero pasa la tarjeta y teclea el
+    // numero de autorizacion. Sin este mapeo, ese cobro no se podia cerrar ni cancelar.
+    //
+    // Va a `cerrar_cuentas` --lo mismo que el efectivo-- y no a gerente, porque el
+    // efectivo ya funciona asi: el cajero afirma que recibio $500 sin comprobante alguno.
+    // Un voucher de tarjeta deja MAS rastro, no menos: queda en el banco y se concilia
+    // despues. Pedir gerente por cada tarjeta, en un restaurante que cobra tarjeta todo
+    // el dia, termina en el PIN del gerente compartido con la caja --que es justo el
+    // control que se queria proteger.
+    'pos.payments.external_result': profile.cerrar_cuentas,
     'pos.payments.reconcile': profile.gerente,
     'pos.turns.open': profile.abrir_dia_operaciones,
     'pos.turns.close': profile.corte_z,
