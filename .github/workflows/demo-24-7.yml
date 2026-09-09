@@ -104,6 +104,7 @@ jobs:
       - run: python .github/scripts/test_pos_client.py
       - run: python .github/scripts/test_pos_turno.py
       - run: python .github/scripts/test_identidad_de_renglon.py
+      - run: python .github/scripts/test_pos_estaciones.py
 
       - name: Comprobar que el PIN esta puesto
         run: |

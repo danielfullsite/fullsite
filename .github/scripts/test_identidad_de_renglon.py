@@ -44,8 +44,8 @@ import lab_simulator as sim  # noqa: E402
 import pos_client  # noqa: E402
 
 CARTA = [
-    ("menu-latte", "Latte", 60.0, "cocina"),
-    ("menu-espresso", "Espresso", 35.0, "cocina"),
+    ("menu-latte", "Latte", 60.0, "barra"),
+    ("menu-espresso", "Espresso", 35.0, "barra"),
 ]
 
 
@@ -114,7 +114,7 @@ class CadaRenglonSePuedeIdentificar(unittest.TestCase):
     def test_no_se_perdio_nada_de_lo_que_ya_llevaba_el_renglon(self):
         # El KDS y el arqueo leen estos campos; agregar identidad no debe quitarlos.
         for it in una_orden()["items"]:
-            for campo in ("nombre", "precio", "cantidad", "estacion"):
+            for campo in ("nombre", "precio", "cantidad", "station"):
                 self.assertIn(campo, it)
 
     def test_todo_renglon_trae_subtotal(self):
@@ -141,6 +141,8 @@ class CadaRenglonSePuedeIdentificar(unittest.TestCase):
 
 class ElPayloadViejoEraElProblema(unittest.TestCase):
     VIEJO = {"nombre": "Latte", "precio": 60, "cantidad": 1, "estacion": "cocina"}
+    # `estacion` es parte de lo viejo: el campo que ninguna pantalla leía. Hoy el
+    # renglón manda `station`, que es el que sí leen (ver test_pos_estaciones.py).
 
     def test_al_renglon_viejo_le_faltaba_la_pareja(self):
         self.assertNotIn("id", self.VIEJO)
@@ -168,7 +170,7 @@ class ElLabNoCambia(unittest.TestCase):
         with carta([(None, "Wagyu A5 200g", 1280, "cocina")]):
             for it in sim.make_order(0, "t")["items"]:
                 self.assertEqual(set(it), {"nombre", "precio", "cantidad", "subtotal",
-                                           "estacion"})
+                                           "station"})
 
 
 # ── 6. La guarda: vender sin descontar no puede salir verde ──────────────────

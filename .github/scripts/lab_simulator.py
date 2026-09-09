@@ -23,6 +23,7 @@ from urllib.parse import quote
 sys.path.insert(0, os.path.dirname(__file__))
 from agent_common import sb_get, sb_post, sb_patch, log_run
 import pos_client
+import pos_estaciones
 import pos_turno
 
 CLIENT_ID = os.environ.get("CLIENT_ID", "lab-resto")
@@ -84,13 +85,27 @@ def menu_del_tenant():
     try:
         filas = sb_get(
             "pos_menu_items",
-            f"client_id=eq.{CLIENT_ID}&active=eq.true&select=id,name,price&limit=200",
+            f"client_id=eq.{CLIENT_ID}&active=eq.true"
+            f"&select=id,name,price,category_id&limit=200",
         )
-        propio = [(f["id"], f["name"], float(f["price"]), "cocina")
+        # La estación se RESUELVE como la resuelve el POS. Antes se ponía "cocina" en
+        # todos: mientras el campo se llamaba `estacion` daba igual, porque ninguna
+        # pantalla lo leía. Al mandarlo como `station` pasa a ser la verdad, y un Latte
+        # marcado "cocina" se iría a la cocina.
+        cats = pos_estaciones.nombres_de_categorias(CLIENT_ID)
+        ruteo = pos_estaciones.override_del_tenant(CLIENT_ID)
+        propio = [(f["id"], f["name"], float(f["price"]),
+                   pos_estaciones.estacion_de(f.get("category_id"),
+                                              cats.get(f.get("category_id")),
+                                              f["name"], ruteo))
                   for f in filas if f.get("id") and f.get("name") and f.get("price")]
         if propio:
+            reparto = {}
+            for _, _, _, est in propio:
+                reparto[est] = reparto.get(est, 0) + 1
             print(f"[lab-simulator] menú de {CLIENT_ID}: {len(propio)} platillos "
-                  f"(promedio ${sum(p for _, _, p, _ in propio)/len(propio):,.0f})")
+                  f"(promedio ${sum(p for _, _, p, _ in propio)/len(propio):,.0f}) · "
+                  f"estaciones: {', '.join(f'{v} {k}' for k, v in sorted(reparto.items()))}")
             _menu_cache = propio
             return _menu_cache
     except Exception as e:
@@ -131,8 +146,11 @@ def make_order(seq, turno_id):
         # denominador que evita confundir "catálogo incompleto" con merma. Medido el
         # 2026-09-09: amalay 80/80 renglones con subtotal, chickin-demo 46/46, demo 1/138.
         # Sin modificadores, subtotal = precio × cantidad (el POS suma `precioExtra`).
+        # `station`, no `estacion`: es el campo que leen las tres pantallas de cocina
+        # (kds, cocina y pos/kds). `estacion` no lo leía NADIE — era escritura muerta, y
+        # el KDS caía en su fallback "for legacy orders that predate item.station".
         item = {"nombre": nombre, "precio": precio, "cantidad": cant,
-                "subtotal": round(precio * cant, 2), "estacion": est}
+                "subtotal": round(precio * cant, 2), "station": est}
         if menu_item_id:
             # La identidad que exige `r1_reconcile_order`. Su STEP 4 hace:
             #     IF v_item_id IS NULL OR v_menu_item_id IS NULL THEN CONTINUE;
