@@ -121,9 +121,40 @@ export const MANAGER_ONLY_DELETE = new Set<string>(['pos_orders'])
  * se puede afirmar que no toca el dinero. Devuelve la marca de ilegible para que quien
  * llama lo rechace con un mensaje claro.
  */
+/**
+ * REABRIR NO ES ESCRIBIR, Y POR ESO NO BASTA CON PROHIBIR LA TABLA.
+ *
+ * `pos_turnos` no está en MANAGER_ONLY_WRITE, y no puede estarlo: el cierre de caja se
+ * ENCOLA (CierreCajaWizard.tsx:315) y la cola lo reproduce con el shift token de quien
+ * esté logueado. Si esa terminal opera con rol `cajero` —que es lo normal en una caja—
+ * un candado por tabla haría que el corte Z muriera en 403 y no llegara nunca a la nube.
+ * Cerrar el hueco por ahí abriría uno peor: el dinero del turno sin subir.
+ *
+ * Pero dejar la tabla abierta permite esto con un shift token de mesero:
+ *
+ *     PATCH pos_turnos?id=eq.<turno>   { "closed_at": null }
+ *
+ * y el turno ya cortado vuelve a estar abierto. Se cobra dentro de él, después del Z, y
+ * esas ventas quedan fuera del corte que ya se imprimió y se entregó.
+ *
+ * La asimetría es la clave: CERRAR un turno es una operación de todos los días que la cola
+ * tiene que poder reproducir; REABRIRLO es una corrección administrativa. Se prohíbe el
+ * valor, no la columna — poner `closed_at` con una fecha sigue pasando.
+ */
+export const REABRIR_SOLO_GERENTE: Record<string, string> = {
+  pos_turnos: 'closed_at',
+}
+
+/** ¿Este cuerpo intenta reabrir algo cerrado? */
+function intentaReabrir(table: string, fila: Record<string, unknown>): boolean {
+  const col = REABRIR_SOLO_GERENTE[table]
+  return !!col && col in fila && fila[col] === null
+}
+
 export function camposProhibidos(table: string, role: string | null | undefined, cuerpo: string | undefined): string[] {
   const vetadas = CAMPOS_SOLO_DE_GERENTE[table]
-  if (!vetadas || isManager(role)) return []
+  const puedeReabrir = !(table in REABRIR_SOLO_GERENTE)
+  if ((!vetadas && puedeReabrir) || isManager(role)) return []
   if (!cuerpo) return []
   let dato: unknown
   try {
@@ -135,7 +166,10 @@ export function camposProhibidos(table: string, role: string | null | undefined,
   const encontradas = new Set<string>()
   for (const fila of filas) {
     if (!fila || typeof fila !== 'object') continue
-    for (const col of Object.keys(fila as Record<string, unknown>)) {
+    const obj = fila as Record<string, unknown>
+    if (intentaReabrir(table, obj)) encontradas.add(`${REABRIR_SOLO_GERENTE[table]} (reabrir)`)
+    if (!vetadas) continue
+    for (const col of Object.keys(obj)) {
       if (vetadas.includes(col)) encontradas.add(col)
     }
   }
