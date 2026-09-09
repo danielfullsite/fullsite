@@ -34,6 +34,7 @@ const { ActorAuthority } = require('./core/actor-authority')
 const { CatalogStore } = require('./core/catalog-store')
 const { handleAuthenticatedCommand } = require('./core/command-authority')
 const { conectarConLaCaja } = require('./core/enlace-con-caja')
+const { buscarLaCaja } = require('./core/buscar-la-caja')
 const credLan = require('./core/credencial-lan')
 const { OutboxWorker }      = require('./core/outbox')
 const { BusinessOutbox } = require('./core/business-outbox')
@@ -1016,7 +1017,39 @@ async function startLocalServer({ dataDir, port = 7717, config = {}, businessSyn
     const fsCursor = require('fs')
     const pathCursor = require('path')
     const rutaCursor = pathCursor.join(dataDir, 'cursor-caja.json')
-    const cajaWs = `ws://${config.posServerIp}:${config.posServerPort || port || 7717}`
+
+    // SE ARRANCA DONDE SE DEJO, NO DONDE DECIA EL INSTALADOR.
+    //
+    // Si en una sesion anterior la caja se movio y esta terminal la encontro sola
+    // (T-09), la IP nueva quedo anotada. Sin leerla aqui, cada reinicio vuelve a la
+    // IP muerta del `config.json` y hay que barrer la red otra vez — y peor: entre
+    // el arranque y los cinco fracasos, la terminal esta ciega.
+    //
+    // PERO UNA DECISION HUMANA RECIENTE LE GANA A LA NOTA. La nota guarda cual era
+    // el `pos_server_ip` del config cuando se escribio (`anterior`). Si el de hoy
+    // es OTRO, alguien reinstalo o reconfiguro a proposito despues: manda el
+    // config y la nota se ignora.
+    //
+    // Se compara contra `anterior` y no contra fechas de archivo porque un
+    // instalador reescribe timestamps y ahi la comparacion mentiria.
+    const cajaAnotada = (() => {
+      try {
+        const g = JSON.parse(require('fs').readFileSync(pathCursor.join(dataDir, 'caja-conocida.json'), 'utf8'))
+        if (typeof g.pos_server_ip !== 'string' || !g.pos_server_ip) return null
+        // `anterior` ausente = nota de una version vieja: se acepta, no hay con
+        // que compararla y el enlace se corrige solo si esta mal.
+        if (g.anterior != null && g.anterior !== config.posServerIp) {
+          console.warn(`[server] nota de caja descartada (${g.pos_server_ip}): el config cambio de ${g.anterior} a ${config.posServerIp}`)
+          return null
+        }
+        return g.pos_server_ip
+      } catch { return null }
+    })()
+    const ipDeLaCaja = cajaAnotada || config.posServerIp
+    if (cajaAnotada && cajaAnotada !== config.posServerIp) {
+      console.warn(`[server] usando la caja anotada ${cajaAnotada} en vez de ${config.posServerIp} (config.json)`)
+    }
+    const cajaWs = `ws://${ipDeLaCaja}:${config.posServerPort || port || 7717}`
     _enlaceCaja = conectarConLaCaja({
       cajaUrl: cajaWs,
       serverId,
@@ -1052,6 +1085,50 @@ async function startLocalServer({ dataDir, port = 7717, config = {}, businessSyn
         // terminal: cocina, barra y plano escuchan aquí, no en la caja.
         try { state.apply(ev) } catch (e) { console.warn('[enlace-caja] no se pudo aplicar:', e.message) }
         wsHub.broadcast(ev).catch(() => {})
+      },
+
+      // ── T-09: la caja puede amanecer en otra IP ────────────────────────────
+      //
+      // `cajaWs` se construye UNA VEZ desde `config.pos_server_ip`. Cuando el
+      // router renueva la concesion DHCP, esta terminal reintenta una direccion
+      // muerta cada diez segundos para siempre. La operacion local aguanta —el
+      // enlace es aditivo— pero las terminales dejan de verse entre ellas.
+      //
+      // Tras cinco fracasos SEGUIDOS, `enlace-con-caja` llama aqui. Se barre la
+      // subred de ESTA maquina buscando un Pedro cuyo `/identity` traiga el mismo
+      // `restaurant_id` y el mismo `protocol_version`. Pedro conoce sus propias
+      // IPs (`getAllLanIps`), asi que no adivina la subred como hace el navegador.
+      //
+      // Devolver `null` no es un error: es el caso normal cuando la caja esta
+      // apagada. El enlace sigue reintentando donde estaba.
+      resolverCaja: async ({ urlActual }) => {
+        const yaProbada = /\/\/([^:/]+)/.exec(urlActual || '')
+        const encontrada = await buscarLaCaja({
+          restaurantId,
+          puerto: config.posServerPort || port || 7717,
+          ipsLocales: networkAdapter.getAllLanIps(),
+          yaProbadas: yaProbada ? [yaProbada[1]] : [],
+        })
+        if (!encontrada) return null
+        return `ws://${encontrada.ip}:${config.posServerPort || port || 7717}`
+      },
+
+      // La direccion nueva se guarda para que el PROXIMO arranque no tenga que
+      // barrer la red otra vez. Best-effort: si el disco no deja, el enlace ya
+      // esta funcionando y la busqueda se repetira mañana.
+      alCambiarDeCaja: (nuevaUrl) => {
+        const m = /\/\/([^:/]+)/.exec(nuevaUrl)
+        if (!m) return
+        try {
+          const fsCfg = require('fs')
+          const rutaCfg = pathCursor.join(dataDir, 'caja-conocida.json')
+          fsCfg.writeFileSync(rutaCfg, JSON.stringify({
+            pos_server_ip: m[1], ts: Date.now(), anterior: config.posServerIp || null,
+          }))
+          console.warn(`[server] caja reubicada en ${m[1]} — anotado en caja-conocida.json`)
+        } catch (e) {
+          console.warn('[server] no se pudo anotar la caja nueva:', e.message)
+        }
       },
     })
     console.log(`[server] Enlace con la caja: ${cajaWs} (rol ${_rolTerminal})`)

@@ -210,26 +210,59 @@ Un escenario es **CERTIFIED** solo cuando las 3 columnas están marcadas: Impl �
 - mDNS reanuncia con nueva IP.
 - Tablets reconectan en <60s sin intervención manual.
 
-**Actual Result (auditado 2026-07-27)**:
+**Auditoría 2026-07-27 (obsoleta — se conserva porque su conclusión era la equivocada)**:
 
-`BridgeClient.connect()` implementa reconexión automática con backoff (1s → 30s), pero reconecta siempre a la URL baked en construcción (`this._wsUrl` readonly, fijada desde el resultado de discovery).
+Decía que el arreglo iba en el navegador: `BridgeClient` reconecta a la URL fijada en
+construcción, `useBridgeClient` corre `ServerDiscovery` una sola vez, y el subnet scan
+existe pero `permitSubnetScan = false` en todos los callers.
 
-`useBridgeClient` corre `ServerDiscovery` una sola vez al montar el componente. Si la IP del servidor cambia mid-session y el WS cae, el cliente reintenta a la IP obsoleta indefinidamente (hasta 30s entre intentos) sin re-correr discovery.
+**Por qué ese análisis quedó viejo (2026-09-09)**: la arquitectura posterior puso a cada
+terminal a hablar con **su propio Pedro en `127.0.0.1`** — ver
+[`OFFLINE-LAN-FIELD-PROVEN-AND-CLONE.md`](OFFLINE-LAN-FIELD-PROVEN-AND-CLONE.md),
+"REGLA (corrige §5.1)". El navegador de una terminal secundaria **nunca ve la IP de la
+caja**: la ve su Pedro, en `config.pos_server_ip`. Arreglar `useBridgeClient` habría sido
+construir la cosa correcta en el lugar equivocado.
 
-El subnet scan existe en `server-discovery.ts` (`_subnetScan`) pero `permitSubnetScan = false` en todos los callers de producción — nunca se activa.
+**Dónde estaba de verdad**: `local-server/core/enlace-con-caja.js`. Recibía `cajaUrl` una
+vez y su propia documentación lo decía — *"Reconecta solo, con espera creciente, para
+siempre"*. Siempre a la misma IP. Cuando el router renueva la concesión DHCP, cada
+terminal secundaria golpea una dirección muerta cada diez segundos hasta que alguien la
+reinstala. La operación local aguanta (el enlace es aditivo) pero **las terminales dejan
+de verse entre ellas** — el síntoma de campo del 2026-09-02, con otra causa.
 
-**Resolución actual**: el operador debe recargar la página. Eso remonta `useBridgeClient`, re-corre `ServerDiscovery` desde cero, y si el registry tiene algún candidato reciente, reconecta.
+**Implementado 2026-09-09**:
+- `core/buscar-la-caja.js` — barre la /24 de las IPs locales de ESTA máquina
+  (`getAllLanIps()`, sin adivinar la subred como hace el navegador) buscando un Pedro
+  cuyo `GET /identity` traiga el mismo `restaurant_id` y `protocol_version`. Prioriza
+  direcciones probables, topa en 64 hosts, y ante **dos cajas del mismo restaurante no
+  elige ninguna**: eso parte el restaurante en dos historias y lo resuelve una persona.
+- `enlace-con-caja.js` — tras 5 fracasos **seguidos** (~18 s con la escalera actual)
+  pregunta por la dirección; si cambió, se muda y reinicia la cuenta. Si no encuentra
+  nada, sigue reintentando donde estaba: **la regla 2 manda**, no encontrar la caja
+  nunca puede volverse un error.
+- La cuenta de intentos se reinicia en **SNAPSHOT**, no en `open`. Antes se reiniciaba al
+  abrir el TCP, así que un servidor que *escucha pero rechaza* (credencial LAN
+  equivocada, o el Pedro de otro restaurante en esa IP) daba un ciclo cerrado a 500 ms
+  para siempre, sin escalera y sin llegar nunca al umbral.
+- La IP encontrada se anota en `caja-conocida.json` para que el siguiente arranque no
+  barra la red. Un `config.json` reconfigurado a mano le gana a la nota.
+- `estado()` expone `cambios_de_direccion` y `buscando_caja` — sin eso, "se movió y la
+  encontramos sola" es invisible desde `/health`.
 
-**Gap**: no existe re-discovery automático en el ciclo de vida de la conexión WS.
+**mDNS no se usó**: `bonjour-service` está en las dependencias desde hace tiempo y **no
+se usa en ningún lado** —ni anuncia ni busca— aunque el comentario de `/identity` diga
+que la información "ya está en los registros TXT de mDNS". Encenderlo pide que la caja
+anuncie, que las terminales busquen y que el multicast sobreviva al AP del restaurante:
+tres cosas que no se comprueban sin estar ahí.
 
-**Implementación requerida para PASS**:
-- Después de N reconexiones fallidas consecutivas (sugerido: 5 intentos = ~30s con backoff maxed), `BridgeClient` debe emitir un evento `connection_exhausted`
-- `useBridgeClient` escucha ese evento y re-corre `ServerDiscovery`
-- Si discovery encuentra una nueva IP, crea un nuevo `BridgeClient` con la IP actualizada
+**Pruebas**: 21 en `local-server/tests/t09-la-caja-se-movio.test.js`, 6 fallan contra el
+código anterior. Cubren restaurante ajeno en la misma red, protocolo incompatible, dos
+cajas (no elige), red muda, tope de hosts, no sondearse a sí mismo, que la búsqueda que
+truena no rompa el enlace, y que `detener()` corte una búsqueda en vuelo.
 
 | Impl | Test | Cert | Pendiente |
 |---|---|---|---|
-| ✗ | ✗ | ✗ | Implementar re-discovery automático; ver descripción arriba |
+| ✓ | ✓ (`t09-la-caja-se-movio.test.js`, 21 casos) | ✗ | **Falta lo único que importa: renovar el DHCP de la caja en AMALAY y ver si las terminales vuelven solas.** El código no puede probar que un router real reasigne una IP. Requiere INSTALADOR NUEVO en las tres terminales. |
 
 ---
 
@@ -659,7 +692,7 @@ la vuelve visible en vez de silenciosa. La latencia de Entrada sigue **sin medir
 |---|---|---|---|---|---|
 | 1 — Caída de Internet | 3 | 3 | 1 | 0 | T-01 con test; T-02/T-03 sin e2e |
 | 2 — Reinicios | 4 | 4 | 3 | 0 | T-04 y T-07 con test de recuperación; falta lanzar Electron real |
-| 3 — LAN | 2 | 1 | 0 | 0 | T-09: rediscovery de IP no confirmado |
+| 3 — LAN | 2 | 2 | 0 | 0 | T-09 implementado y probado el 2026-09-09; sin confirmar en campo |
 | 4 — Volumen | 2 | 2 | 0 | 0 | Sin scripts de carga |
 | 5 — Idempotencia | 3 | 3 | 3 | 0 | Ampliado a HTTP y WS el 2026-08-26. Destapó una carrera real (corregida) |
 | 6 — Timeout/Retry | 2 | 2 | 1 | 0 | Reconexión cliente WS auditada: reconecta a IP fija, sin re-discovery |
@@ -688,7 +721,7 @@ la vuelve visible en vez de silenciosa. La latencia de Entrada sigue **sin medir
 > configuración. Un denominador honesto vale más que un porcentaje bonito.
 
 
-> T-09: auditado 2026-07-27. Re-discovery automático en cambio de IP NO implementado (`BridgeClient` reconecta a URL fija; `useBridgeClient` corre discovery una sola vez al montar; subnet scan existe pero desactivado). Requiere nueva funcionalidad antes de poder ejecutar o certificar.
+> T-09: **implementado el 2026-09-09**, en el sitio correcto. La auditoría de julio apuntaba al navegador (`BridgeClient` / `useBridgeClient`) y ese análisis quedó viejo: desde la "REGLA (corrige §5.1)" cada terminal habla con su propio Pedro en `127.0.0.1`, así que el navegador nunca ve la IP de la caja. El hueco vivía en `local-server/core/enlace-con-caja.js`, que reintentaba para siempre a la misma URL. Ver la descripción de T-09 arriba. Falta ejecutarlo con un router de verdad.
 
 ---
 
@@ -731,7 +764,7 @@ Dos límites del código que una prueba de una noche no alcanza a tocar:
 
 ## Ruta Crítica hacia 23/23 Certificados
 
-1. **T-09 requiere implementación nueva**: detectar reconexiones fallidas consecutivas → re-correr `ServerDiscovery` → crear nuevo `BridgeClient` con nueva IP. No es solo un test — es un gap funcional.
+1. ~~**T-09 requiere implementación nueva**~~ — hecho el 2026-09-09, aunque no donde decía esta línea: el arreglo va en el servidor local (`enlace-con-caja.js` + `buscar-la-caja.js`), no en el navegador. Lo que falta es ejecutarlo: renovar el DHCP de la caja en AMALAY con las tres terminales encendidas.
 2. **Ejecutar T-12, T-13, T-14** primero: son los más simples, los tests unitarios ya existen, solo falta ejecución a nivel de proceso real.
 3. **Montar entorno staging**: Supabase staging con rollback para T-22, T-23.
 4. **Tests e2e con Playwright Electron**: T-01, T-04, T-07 son automatizables con bajo esfuerzo.

@@ -83,6 +83,10 @@ try {
   const entries = asar.listPackage(archive).map(name => name.replaceAll('\\', '/').replace(/^\//, ''))
   const required = ['main.js', 'preload.js', 'preload-kds.js', 'preload-setup.js', 'setup.html', 'offline.html',
     'local-server/index.js', 'local-server/core/business-outbox.js', 'local-server/core/permission-profiles.json',
+    // T-09: sin este, una terminal cuya caja cambio de IP se queda ciega hasta que
+    // alguien la reinstala. Lo cubre el glob `local-server/**/*.js`, pero un glob
+    // que deja de coincidir no avisa: aqui si.
+    'local-server/core/buscar-la-caja.js', 'local-server/core/enlace-con-caja.js',
     'local-server/kds-ui.html', 'update/auto-installer.js', 'offline-ui/package-store.js', 'offline-ui/protocol.js',
     'node_modules/ws/package.json', 'node_modules/bonjour-service/package.json', 'node_modules/electron-updater/package.json',
     'ui-bundle/fullsite-ui-manifest.json']
