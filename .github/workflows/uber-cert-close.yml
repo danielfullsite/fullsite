@@ -84,13 +84,7 @@ jobs:
       - name: Resolve fulfillment (?expand=carts)
         if: ${{ env.FINAL_ORDER != '' }}
         run: |
-          PAYLOAD=$(python3 -c 'import json,os
-d={"action":"resolve_fulfillment","store_id":os.environ["STORE"],"order_id":os.environ["FINAL_ORDER"],"item_name":os.environ["ITEM_NAME"]}
-a=os.environ.get("ACTION_TYPE","").strip()
-if a: d["action_type"]=a
-q=os.environ.get("ITEM_QTY","").strip()
-if q: d["item_quantity"]=int(q)
-print(json.dumps(d))')
+          PAYLOAD=$(python3 -c 'import json,os; d={"action":"resolve_fulfillment","store_id":os.environ["STORE"],"order_id":os.environ["FINAL_ORDER"],"item_name":os.environ["ITEM_NAME"]}; a=os.environ.get("ACTION_TYPE","").strip(); d.update({"action_type":a} if a else {}); q=os.environ.get("ITEM_QTY","").strip(); d.update({"item_quantity":int(q)} if q else {}); print(json.dumps(d))')
           echo "payload: $PAYLOAD"
           RESP=$(curl -s -w "\n%{http_code}" -X POST "$APP_URL/api/integrations/uber-eats/sandbox" \
             -H "Authorization: Bearer $INTEGRATION_ADMIN_SECRET" -H "Content-Type: application/json" \
