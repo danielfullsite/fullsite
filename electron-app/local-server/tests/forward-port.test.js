@@ -1,4 +1,5 @@
 'use strict'
+const { SECRET, wsOptions, localFetch: fetch } = require('./fixtures/lan-credential.cjs')
 // posServerPort: el POS secundario reenvía a la caja al puerto CONFIGURADO,
 // no a su propio puerto. Antes `forwardPost` usaba el puerto del secundario,
 // acoplando a todos al 7717 — dos Pedros en una misma máquina (pruebas
@@ -35,7 +36,7 @@ async function buildServer(dir, port, config = {}) {
   const cmdHandler = new CommandHandler({ eventStore, state, wsHub: fakeHub, printer: fakePrinter, restaurantId: R })
   const router = buildHttpRouter({
     state, eventStore, wsHub: fakeHub, cmdHandler, printer: fakePrinter,
-    version: 'test', serverId: `srv-${port}`, restaurantId: R, config, port,
+    version: 'test', serverId: `srv-${port}`, restaurantId: R, config: { lanSecret: SECRET, ...config }, port,
   })
   const server = http.createServer(router)
   await new Promise((r) => server.listen(port, '127.0.0.1', r))

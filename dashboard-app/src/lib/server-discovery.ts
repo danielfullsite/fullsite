@@ -94,6 +94,8 @@ export interface DiscoveryConfig {
   permitSubnetScan?: boolean
   /** Per-candidate timeout in ms. Default: 2000ms. */
   timeoutMs?: number
+  /** Provisioned local bridge: never silently switch to another writer. */
+  allowRegistryFallback?: boolean
 }
 
 // ── ServerDiscovery ───────────────────────────────────────────────────────────
@@ -104,6 +106,7 @@ export class ServerDiscovery {
   private readonly preferredEndpoints: string[]
   private readonly permitSubnetScan: boolean
   private readonly timeoutMs: number
+  private readonly allowRegistryFallback: boolean
 
   constructor(config: DiscoveryConfig) {
     this.restaurantId = config.restaurantId
@@ -111,6 +114,7 @@ export class ServerDiscovery {
     this.preferredEndpoints = config.preferredEndpoints ?? []
     this.permitSubnetScan = config.permitSubnetScan ?? false
     this.timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS
+    this.allowRegistryFallback = config.allowRegistryFallback ?? true
   }
 
   /**
@@ -134,7 +138,7 @@ export class ServerDiscovery {
     }
 
     // ── 2. Registry (previous successful connections) ──────────────────────
-    const records = ServerRegistry.getAll(this.restaurantId)
+    const records = this.allowRegistryFallback ? ServerRegistry.getAll(this.restaurantId) : []
     for (const record of records) {
       if (tried.has(record.endpoint)) continue
       tried.add(record.endpoint)
@@ -186,8 +190,7 @@ export class ServerDiscovery {
       }
     }
 
-    // branch_id check (future-ready; skip if either side is null)
-    if (this.branchId && identity.branch_id && identity.branch_id !== this.branchId) {
+    if (this.branchId && identity.branch_id !== this.branchId) {
       ServerRegistry.recordFailure(this.restaurantId, endpoint)
       return {
         state: 'identity_mismatch',
@@ -343,6 +346,14 @@ export function buildDiscoveryConfig(restaurantId: string, opts?: {
   const endpoints: string[] = []
 
   if (typeof localStorage !== 'undefined') {
+    const configured = localStorage.getItem('FULLSITE_BRIDGE_URL')
+    if (configured) return {
+      restaurantId,
+      branchId: opts?.branchId || localStorage.getItem('FULLSITE_LOCATION_ID') || undefined,
+      preferredEndpoints: [configured.replace(/\/$/, '')],
+      permitSubnetScan: false, allowRegistryFallback: false,
+      timeoutMs: opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+    }
     const storedHost = localStorage.getItem('pos_bridge_host')
     if (storedHost) {
       endpoints.push(`http://${storedHost}:${LOCAL_PORT}`)

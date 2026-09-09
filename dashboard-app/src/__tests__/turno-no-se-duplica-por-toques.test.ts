@@ -20,6 +20,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
 vi.mock('@/lib/data', () => ({ getActiveClientSlug: () => 'amalay' }))
 vi.mock('@/lib/offline-sync', () => ({ addToQueue: vi.fn() }))
+// This suite retains the web/legacy contract. Caja authority has separate
+// transport/runtime tests and a real multi-terminal screen acceptance run.
+vi.mock('@/lib/pedro-cliente', () => ({ requiereCaja: () => false }))
 
 class AlmacenFalso {
   private datos = new Map<string, string>()

@@ -54,18 +54,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, [loading, user, pathname, router, isPublicPage, isDemoUser, isDemoRoute, isOfflineBuild])
 
-  // POS pages: full screen, dark theme, no sidebar
+  // POS owns its PIN/terminal gate. Cloud dashboard authentication must not
+  // prevent that gate from mounting while the restaurant operates over LAN.
   if (isPosRoute) {
-    if (!showContent && loading) {
-      return (
-        <div className="flex items-center justify-center h-screen bg-[var(--bg)]">
-          <div className="text-center">
-            <div className="w-10 h-10 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-            <p className="text-[var(--text-3)] text-sm">Cargando POS...</p>
-          </div>
-        </div>
-      )
-    }
     return <main className="min-h-screen bg-[var(--surface)]">{children}</main>
   }
 

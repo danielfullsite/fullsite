@@ -53,7 +53,13 @@ export async function POST(request: NextRequest) {
     }
     if (!approvalMode) {
       if (offline_approved === true) {
-        approvalMode = 'offline_device_trust'
+        // El rol viene del shift token FIRMADO, no del cuerpo. Sin esto,
+        // `offline_device_trust` de un mesero que se autoaprobó y de un gerente
+        // aprobando en la terminal del mesero se veían IDÉNTICOS en la bitácora.
+        // No se bloquea: bloquear aquí rompería la cancelación sin WAN, y un 403 en
+        // el replay de la cola es terminal (pos-offline-db.ts:821) — la cancelación
+        // se perdería para siempre. Ver manager-approval.ts para el cierre real.
+        approvalMode = `offline_device_trust:${auth.role || 'desconocido'}`
       } else {
         // Sin ninguna aprobación. ROLLOUT EN 2 FASES para no romper clientes viejos (SW
         // cacheado que aún no manda la aprobación):
@@ -70,7 +76,7 @@ export async function POST(request: NextRequest) {
 
     // ── Step 1: Read order with current updated_at ──
     const readRes = await fetch(
-      `${sbUrl}/rest/v1/pos_orders?id=eq.${order_id}&client_id=eq.${clientId}&select=id,items,updated_at&limit=1`,
+      `${sbUrl}/rest/v1/pos_orders?id=eq.${order_id}&client_id=eq.${clientId}&select=id,items,updated_at,order_revision&limit=1`,
       { headers, cache: 'no-store' }
     )
     if (!readRes.ok) return Response.json({ ok: false, error: 'READ_FAILED' }, { status: 502 })
@@ -79,7 +85,7 @@ export async function POST(request: NextRequest) {
       return Response.json({ ok: false, error: 'ORDER_NOT_FOUND' }, { status: 404 })
     }
 
-    const { items: rawItems, updated_at: updatedAt } = rows[0]
+    const { items: rawItems, updated_at: updatedAt, order_revision: revisionActual } = rows[0]
     const items: Array<Record<string, unknown>> =
       typeof rawItems === 'string' ? JSON.parse(rawItems) : (rawItems || [])
 
@@ -104,6 +110,26 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify({
           items: JSON.stringify(newItems),
           updated_at: new Date().toISOString(),
+          // UNA CANCELACION ES UNA REVISION DE LA ORDEN, Y NO LO ERA.
+          //
+          // Esta ruta escribia `items` sin tocar `order_revision`. `r1_save_order`
+          // (la RPC que guarda TODO lo demas) solo escribe cuando
+          // `order_revision = p_expected_revision` y despues la incrementa. Al no
+          // moverla aqui, una terminal que traia la revision ANTERIOR seguia
+          // empatando: su siguiente guardado pasaba el filtro y su `items` --sin la
+          // marca de cancelado, porque es de antes-- pisaba el arreglo entero
+          // (`items = coalesce(p_items, items)`).
+          //
+          // O sea: el gerente cancelaba un platillo servido, la bitacora lo
+          // registraba, y el siguiente guardado de cualquier terminal con copia
+          // vieja lo devolvia a la cuenta EN SILENCIO. Comprobado leyendo la
+          // definicion de r1_save_order en produccion.
+          //
+          // Avanzarla convierte ese pisotón silencioso en el conflicto que la UI ya
+          // sabe resolver. Va en el MISMO PATCH, protegido por el filtro de
+          // `updated_at`: si otra escritura gano la carrera, no afecta filas y esto
+          // devuelve 409 igual que antes.
+          order_revision: (Number(revisionActual) || 0) + 1,
         }),
       }
     )
@@ -130,13 +156,44 @@ export async function POST(request: NextRequest) {
           client_id: clientId,
           order_id,
           action: voided ? 'item_voided' : 'item_cancelled',
-          actor: mesero || 'POS',
+          // EL ACTOR SALE DEL TOKEN, NO DEL CUERPO. Antes era `mesero || 'POS'`, y
+          // `mesero` lo mandaba el cliente: la bitácora entera la dictaba quien cancelaba.
+          // Igual que `manager`, que dejaba el robo firmado con el nombre del gerente.
+          actor: auth.staffName || auth.staffId || 'POS',
           details: {
             item_id,
             item_name: targetItem.nombre || targetItem.name,
             reason,
-            manager,
+            // EL MONTO SE CAPTURA AQUI PORQUE DESPUES YA NO EXISTE.
+            //
+            // El `cancelled: true` si se guarda en `items`... hasta que se cobra: al
+            // cerrar, handlePayment manda `items: payingItems`, que EXCLUYE los
+            // cancelados, y r1_save_order hace `items = coalesce(p_items, items)`. El
+            // renglon desaparece del ticket y con el la evidencia.
+            //
+            // Por eso el detector de skimming de save-order no ve nada: recomputa el
+            // total desde los items que recibio, que son exactamente los que se
+            // cobraron, y la resta da cero. El guion es cobrar $2,320 en efectivo,
+            // cancelar dos platos ya comidos "por error de captura", cobrar $1,392 y
+            // quedarse $928 -- con un ticket limpio en la base.
+            //
+            // No se persisten los renglones cancelados en `items` a proposito: eso
+            // rompe tres consumidores a la vez (el corte suma platillos desde `items`,
+            // `platillos_top` los explota, y r1_reconcile_order los volveria a
+            // descontar). El log es el lugar correcto para la evidencia.
+            monto: Number(targetItem.subtotal) || 0,
+            cantidad: Number(targetItem.cantidad) || 0,
+            // Cancelar algo que la cocina ya mando es lo que distingue un error de
+            // captura de una cancelacion despues de servir y cobrar.
+            ya_enviado_a_cocina: Number(targetItem.sent_quantity) > 0,
             approval_mode: approvalMode,
+            solicitante_rol: auth.role,
+            // Lo que el cliente AFIRMÓ. En el camino offline es el único dato de quién
+            // autorizó, así que se conserva — pero como afirmación, no como hecho.
+            manager_declarado: typeof manager === 'string' ? manager : null,
+            mesero_declarado: typeof mesero === 'string' ? mesero : null,
+            revisar: approvalMode.startsWith('offline_device_trust')
+              && (ROLE_LVL[String(auth.role)] || 0) < 4,
             voided: !!voided,
             operation_id,
           },
@@ -144,7 +201,13 @@ export async function POST(request: NextRequest) {
       })
     } catch { /* audit is best-effort */ }
 
-    return Response.json({ ok: true, item_name: targetItem.nombre || targetItem.name })
+    // La revision nueva viaja de vuelta para que quien cancelo actualice su copia y
+    // su PROXIMO guardado no choque contra el avance que acaba de provocar.
+    return Response.json({
+      ok: true,
+      item_name: targetItem.nombre || targetItem.name,
+      revision: (Number(revisionActual) || 0) + 1,
+    })
   } catch (err) {
     console.error('[cancel-item] Unhandled error:', err)
     return Response.json({ ok: false, error: 'INTERNAL_ERROR' }, { status: 500 })

@@ -143,7 +143,7 @@ describe('computeOrderSummary', () => {
 describe('summaryToArqueoInput', () => {
   it('mapea todos los campos correctamente', () => {
     const summary = {
-      efectivo: 1000, tarjeta: 500, transferencias: 200, totalVentas: 1700,
+      efectivo: 1000, tarjeta: 500, transferencias: 200, otros: 0, totalVentas: 1700,
       ticketsCount: 10, cancelaciones: 1, descuentos: 50,
       propinas: 120, propinaEfectivo: 80, propinasNoEfectivo: 40,
       depositos: 100, retiros: 50,

@@ -78,7 +78,9 @@ export async function POST(request: NextRequest) {
         `${sbUrl}/rest/v1/clients?id=eq.${encodeURIComponent(clientId)}&select=pos_settings&limit=1`,
         { headers: sbHeaders, cache: 'no-store' }
       )
-      const cfgRows = cfgRes.ok ? await cfgRes.json() : []
+      if (!cfgRes.ok) return Response.json({ error: 'No se pudo verificar la política de acceso', code: 'authority_unavailable' }, { status: 503 })
+      const cfgRows = await cfgRes.json()
+      if (!Array.isArray(cfgRows) || cfgRows.length !== 1) return Response.json({ error: 'No se pudo confirmar la instalación', code: 'authority_unavailable' }, { status: 503 })
       const requireEnrolled = cfgRows?.[0]?.pos_settings?.['pos.require_enrolled_terminal'] === true
       if (requireEnrolled) {
         const dev = typeof device_id === 'string' ? device_id : ''
@@ -88,10 +90,10 @@ export async function POST(request: NextRequest) {
             `${sbUrl}/rest/v1/pos_terminals?client_id=eq.${encodeURIComponent(clientId)}&device_id=eq.${encodeURIComponent(dev)}&active=eq.true&select=device_id&limit=1`,
             { headers: sbHeaders, cache: 'no-store' }
           )
-          if (tRes.ok) {
-            const tRows = await tRes.json()
-            enrolled = Array.isArray(tRows) && tRows.length > 0
-          }
+          if (!tRes.ok) return Response.json({ error: 'No se pudo verificar la terminal', code: 'authority_unavailable' }, { status: 503 })
+          const tRows = await tRes.json()
+          if (!Array.isArray(tRows)) return Response.json({ error: 'Registro de terminales ilegible', code: 'authority_unavailable' }, { status: 503 })
+          enrolled = tRows.length > 0
         }
         if (!enrolled) {
           return Response.json(
@@ -101,8 +103,10 @@ export async function POST(request: NextRequest) {
         }
       }
     } catch {
-      // Fallo de infra al verificar enrolamiento: no bloquear el login (fail-open
-      // en la verificación de device; el PIN + throttle + RLS siguen aplicando).
+      // A transport failure is neither permission nor employee revocation.
+      // Prepared users can use Caja's bounded verifier while this authority is
+      // unavailable; a new terminal cannot self-enroll through an outage.
+      return Response.json({ error: 'No se pudo verificar el acceso', code: 'authority_unavailable' }, { status: 503 })
     }
 
     // Role hierarchy filter
@@ -197,6 +201,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    if (!res.ok) return Response.json({ error: 'No se pudo verificar al empleado', code: 'authority_unavailable' }, { status: 503 })
     await pinRecord(throttleKey, false)
     return Response.json({ error: 'PIN incorrecto' }, { status: 401 })
   } catch {

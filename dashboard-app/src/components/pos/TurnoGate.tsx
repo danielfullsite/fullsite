@@ -11,6 +11,7 @@ import { evaluarAperturaDeTurno, totalDeCuentas, openOrderStatusLabel,
 import { esFalloDeAutenticacion } from '@/lib/clasificar-fallo'
 import { mismoDiaDeVenta, inicioDiaConfigurado } from '@/lib/dia-de-venta'
 import { fetchWithTimeout, getPOSAuthHeaders, getClientId, formatMXN, logAudit as _logAudit } from '@/lib/pos-data'
+import { leerSalon, requiereCaja } from '@/lib/pedro-cliente'
 
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 
@@ -74,6 +75,13 @@ export default function TurnoGate({ staff, children }: TurnoGateProps) {
   const revisarCuentasHuerfanas = useCallback(async () => {
     let lectura: LecturaDeCuentas
     try {
+      if (requiereCaja()) {
+        const local = await leerSalon()
+        if (local.writeAuthority === 'caja') {
+          setVeredicto(evaluarAperturaDeTurno({ determinado: true, cuentas: local.ordenes as unknown as Extract<LecturaDeCuentas, { determinado: true }>['cuentas'] }))
+          return
+        }
+      }
       const res = await fetchWithTimeout(
         `${SB_URL}/rest/v1/pos_orders?client_id=eq.${getClientId()}` +
         `&status=in.(enviada,preparando,lista)&select=id,mesa,mesero,status,total&order=created_at.asc&limit=50`,
@@ -399,6 +407,7 @@ export default function TurnoGate({ staff, children }: TurnoGateProps) {
       }
       setOpening(true)
       setError('')
+      try {
       const result = await openTurno(fondo, staff.name)
       if (result) {
         logAudit({ action: 'status_changed', actor: staff.name, mesa: 0, details: { type: 'turno_opened', fondo_inicial: fondo, turno_id: result.id } })
@@ -407,7 +416,8 @@ export default function TurnoGate({ staff, children }: TurnoGateProps) {
       } else {
         setError('Error al abrir turno')
       }
-      setOpening(false)
+      } catch (e) { setError(e instanceof Error ? e.message : 'Caja no confirmó la apertura de turno.') }
+      finally { setOpening(false) }
     }
 
     return (

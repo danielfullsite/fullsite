@@ -5,23 +5,74 @@ const os   = require('os');
 const fs   = require('fs');
 const { execSync } = require('child_process');
 
-const POS_URL = 'https://app.fullsite.mx/pos';
+// ─── Puntos de anclaje del laboratorio multi-terminal ────────────────────────
+//
+// Los DEFAULTS SON LOS DE PRODUCCIÓN y no cambian: una terminal instalada en un
+// restaurante se comporta exactamente igual que antes de esto. Las variables sólo
+// existen para poder levantar varias terminales en UNA sola máquina y apuntarlas a
+// una copia local de la app.
+//
+// POR QUÉ HACEN FALTA. Para probar de verdad tres POS + KDS + caja hay que correr
+// cinco procesos Electron a la vez, y hoy los cinco:
+//   · escucharían en el mismo 7717 (sólo el primero arranca; el resto ve EADDRINUSE),
+//   · compartirían userData (misma config, misma identidad, mismos eventos),
+//   · cargarían https://app.fullsite.mx, es decir PRODUCCIÓN — o sea que un
+//     laboratorio automatizado escribiría en los datos de un restaurante real.
+//
+// Ese último punto es el que las vuelve obligatorias, no cómodas: sin
+// FULLSITE_POS_URL no existe forma de ejercitar la UI real sin tocar producción.
+//
+// Regla al usarlas: si defines una, define las cuatro. Dos terminales con puertos
+// distintos pero el mismo userData comparten identidad y el laboratorio miente.
+const POS_URL = process.env.FULLSITE_POS_URL || 'https://app.fullsite.mx/pos';
 // KDS de Eduardo (sesión de campo Jul 21): panel de demanda, toque por item, tarjeta
 // por envío, FIFO, alertas. login-less (KDS_PATHS en pos/layout) + bridge offline.
 // El /kds standalone (598 líneas) es una versión simplificada sin esos cambios.
-const KDS_URL = 'https://app.fullsite.mx/pos/cocina';
+const KDS_URL = process.env.FULLSITE_KDS_URL || 'https://app.fullsite.mx/pos/cocina';
 
 // Modo dev/desk-lab: con FULLSITE_DEV=1 las ventanas abren en modo VENTANA (no
 // kiosco/fullscreen) para poder probar en una Mac/PC sin quedar atrapado. En
 // producción (sin el flag) sigue en kiosco, como debe ser en una terminal real.
 const DEV = process.env.FULLSITE_DEV === '1';
 
+// userData separado por terminal. Se aplica AQUÍ, en la carga del módulo, porque
+// `app.setPath` sólo surte efecto antes de que algo llame a `getPath('userData')`
+// — y config.json, printers.json y el event store salen todos de ahí.
+//
+// Sin esto, cinco Electron en una máquina comparten config, identidad y log de
+// eventos: el laboratorio parecería funcionar y estaría probando UNA terminal
+// cinco veces. Un falso verde, que es peor que no probar.
+//
+// Si la variable no está, no se toca nada: producción usa la ruta de siempre.
+if (process.env.FULLSITE_USER_DATA_DIR) {
+  try {
+    const dir = path.resolve(process.env.FULLSITE_USER_DATA_DIR);
+    fs.mkdirSync(dir, { recursive: true });
+    app.setPath('userData', dir);
+    console.log('[lab] userData:', dir);
+  } catch (e) {
+    // Se GRITA y se sigue con el default. Fallar el arranque por una variable de
+    // laboratorio dejaría una terminal sin abrir; seguir en silencio haría que
+    // dos terminales compartieran estado sin que nadie lo notara.
+    console.error('[lab] FULLSITE_USER_DATA_DIR inservible, uso el default:', e.message);
+  }
+}
+
 // ─── LOCAL SERVER ─────────────────────────────────────────────────────────────
 // Fullsite Local Server (WS hub + print bridge + mDNS + heartbeat).
 // Runs inside the Electron main process — no separate Node.js process needed.
 // Replaces the previous embedded print bridge.
 
-const LOCAL_SERVER_PORT   = 7717;
+// 7717 es el puerto de producción y sigue siéndolo. La variable sólo permite
+// levantar varias terminales en una máquina: sin ella, el segundo proceso muere
+// con EADDRINUSE y no hay laboratorio multi-terminal posible.
+//
+// Se valida el rango: un puerto basura dejaría a Pedro sin arrancar y el POS se
+// quedaría sin impresión ni KDS — falla peor que ignorar la variable.
+const LOCAL_SERVER_PORT   = (() => {
+  const crudo = Number(process.env.FULLSITE_LOCAL_SERVER_PORT);
+  return Number.isInteger(crudo) && crudo > 0 && crudo < 65536 ? crudo : 7717;
+})();
 const LEGACY_CONFIG_PATH  = path.join('C:\\fullsite', 'config.json');
 // CFG-01: printers config lives in Electron userData (same as config.json),
 // with C:\fullsite\ as a read-only migration source only.
@@ -236,11 +287,27 @@ async function startLocalServer() {
     // Where the /kds page should read /state from: the caja's LAN IP for a dedicated
     // KDS/POS terminal, or same-origin ('') for the caja itself (server_pos).
     posServerIp:        appConfig.pos_server_ip  || null,
+    // El PUERTO de la caja. Sin esto, `cajaPort` cae a `port` — el puerto PROPIO
+    // de la terminal— y el secundario se reenvia A SI MISMO. En una instalacion
+    // normal los dos son 7717 y funciona por accidente; con puertos distintos
+    // (laboratorio multi-terminal, dos Pedros en una maquina, un despliegue con
+    // el puerto cambiado) la comanda nunca sale de la terminal.
+    //
+    // Lo encontro el laboratorio de procesos reales: las pruebas en proceso le
+    // pasaban `posServerPort` explicitamente y no podian ver el hueco.
+    posServerPort:      appConfig.pos_server_port || null,
     terminalRole:       appConfig.terminal_role  || null,
+    localAuthorityEnabled: appConfig.localAuthorityEnabled === true,
+    branchId:           appConfig.location_id || appConfig.branch_id || appConfig.branchId || null,
+    lanSecret:          appConfig.lan_secret     || appConfig.lanSecret || null,
   };
 
   try {
-    localServer = await start({ dataDir, port: LOCAL_SERVER_PORT, config: cfg });
+    localServer = await start({ dataDir, port: LOCAL_SERVER_PORT, config: cfg,
+      // Dedicated cloud credential stays in main, outside renderer identity.
+      businessSync: appConfig.business_sync || null });
+    // Incluye el secreto que Caja acaba de generar/persistir, no sólo config.json.
+    appConfig.lan_secret = localServer.lanSecret || null;
     console.log('[main] Local server started.');
   } catch (e) {
     if (e.code === 'EADDRINUSE') {
@@ -594,6 +661,33 @@ function startFingerprintService() {
   const fpExe = 'C:\\fullsite\\fingerprint-service.exe';
   const fpDll = 'C:\\fullsite\\DPUruNet.dll';
 
+  // AUTO-INSTALAR EL SERVICIO DESDE EL PAQUETE. Es lo que hace clonable la huella.
+  //
+  // Esta rama habia perdido este bloque y el `extraResources` que lo alimenta; los dos
+  // siguen vivos en la linea instalada en AMALAY (1.3.12). Sin ellos la huella depende de
+  // que alguien haya copiado a mano `fingerprint-service.exe` y `DPUruNet.dll` a
+  // C:\fullsite\ en esa caja — o sea que funciona donde ya funcionaba y en ninguna caja
+  // nueva. Daniel lo dijo sin margen: la huella es indispensable.
+  //
+  // Los binarios NO se commitean (DLL propietario del SDK DigitalPersona U.are.U). El
+  // instalador solo los empaqueta si estan presentes al correr electron-builder; si no,
+  // este bloque no encuentra nada, no rompe, y el arranque sigue como antes.
+  if (!fs.existsSync(fpExe) || !fs.existsSync(fpDll)) {
+    try {
+      const bundledDir = path.join(process.resourcesPath || __dirname, 'fingerprint');
+      const bExe = path.join(bundledDir, 'fingerprint-service.exe');
+      const bDll = path.join(bundledDir, 'DPUruNet.dll');
+      if (fs.existsSync(bExe) && fs.existsSync(bDll)) {
+        fs.mkdirSync('C:\\fullsite', { recursive: true });
+        if (!fs.existsSync(fpExe)) fs.copyFileSync(bExe, fpExe);
+        if (!fs.existsSync(fpDll)) fs.copyFileSync(bDll, fpDll);
+        console.log('[fingerprint] Servicio instalado desde el paquete a C:\\fullsite\\');
+      }
+    } catch (e) {
+      console.warn('[fingerprint] No se pudo auto-instalar desde el paquete:', e.message);
+    }
+  }
+
   // Check if files exist
   if (!fs.existsSync(fpExe) || !fs.existsSync(fpDll)) {
     console.log('[fingerprint] fingerprint-service.exe or DPUruNet.dll not found in C:\\fullsite\\');
@@ -643,6 +737,38 @@ let mainWindow = null;
 let kdsWindow = null;
 let allowClose = false;
 
+const { rendererIdentity } = require('./local-server/core/renderer-identity');
+const { withLocalBridgeCsp } = require('./local-server/core/bridge-csp');
+const lanCspSessions = new WeakSet();
+let installedUiRevision = '';
+function identityForUrl(url) {
+  const identity = rendererIdentity({ url, config: appConfig, port: LOCAL_SERVER_PORT, dev: DEV, posUrl: POS_URL });
+  if (!identity) return null;
+  // Preload writes this before any application script. Empty removes a stale
+  // marker when a developer intentionally returns to the remote UI.
+  return { ...identity, FULLSITE_UI_PACKAGE: installedUiRevision };
+}
+function configureLocalBridgeCsp(session) {
+  if (lanCspSessions.has(session)) return;
+  lanCspSessions.add(session);
+  // POS and KDS share a session. Electron retains only one listener per event;
+  // installing a separate KDS listener used to replace the POS configuration.
+  session.webRequest.onHeadersReceived((details, callback) => {
+    const headers = details.responseHeaders || {};
+    callback({ responseHeaders: identityForUrl(details.url)
+      ? withLocalBridgeCsp(headers, LOCAL_SERVER_PORT) : headers });
+  });
+}
+ipcMain.on('local-network:identity', (event) => {
+  event.returnValue = null;
+  const ownWindow = [mainWindow, kdsWindow].some(w => w && !w.isDestroyed() && w.webContents === event.sender);
+  const frame = event.senderFrame;
+  const mainFrame = event.sender.mainFrame;
+  if (!ownWindow || !frame || !mainFrame || frame.routingId !== mainFrame.routingId || frame.processId !== mainFrame.processId) return;
+  event.returnValue = identityForUrl(frame.url);
+});
+
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     title: 'Fullsite POS',
@@ -665,6 +791,7 @@ function createWindow() {
   });
 
   mainWindow.setMenu(null);
+  configureLocalBridgeCsp(mainWindow.webContents.session);
   mainWindow.loadURL(POS_URL);
 
   // Save last successful boot time for offline.html display
@@ -672,27 +799,10 @@ function createWindow() {
     loadFailCount = 0; // Reset on successful load
     const bootTime = new Date().toISOString();
     const scripts = [`localStorage.setItem('pos_last_boot', ${JSON.stringify(bootTime)})`];
-    // Inject validated identity from provisioned config into localStorage.
-    // Both new schema keys (restaurant_id, terminal_id) and legacy keys (clientId, terminalId) are supported.
-    const clientId   = (appConfig.restaurant_id || appConfig.client_id   || appConfig.restaurantId || appConfig.clientId || '').toLowerCase().trim();
-    const terminalId = appConfig.terminal_id   || appConfig.terminalId;
-    if (clientId) {
-      scripts.push(`localStorage.setItem('fullsite_client_id', ${JSON.stringify(String(clientId))})`);
-    }
-    if (terminalId) {
-      scripts.push(`localStorage.setItem('pos_terminal_id', ${JSON.stringify(String(terminalId))})`);
-    }
-    // Secondary POS (role 'pos'): its https page CANNOT POST to the caja's http LAN
-    // IP (mixed-content wall — webSecurity:false does NOT bypass it, proven in field).
-    // So it posts print/events to its OWN local server on 127.0.0.1 (localhost is
-    // exempt from the wall), and that local server FORWARDS to the caja over Node
-    // (see local-server /print,/events forward, gated on config.posServerIp).
-    if (appConfig.terminal_role === 'pos') {
-      scripts.push(`localStorage.setItem('FULLSITE_BRIDGE_URL', ${JSON.stringify('http://127.0.0.1:' + LOCAL_SERVER_PORT)})`);
-      // Drop any stale caja IP a previous build/manual config may have left, which
-      // would send the ws bridge-client to ws://<caja> (blocked) and print to the caja
-      // directly (blocked). Everything must go through localhost now.
-      scripts.push(`localStorage.removeItem('pos_bridge_host')`);
+    const identity = identityForUrl(mainWindow.webContents.getURL());
+    if (!identity) return;
+    for (const [key, value] of Object.entries(identity)) {
+      scripts.push(value ? `localStorage.setItem(${JSON.stringify(key)}, ${JSON.stringify(String(value))})` : `localStorage.removeItem(${JSON.stringify(key)})`);
     }
     mainWindow.webContents.executeJavaScript(scripts.join('; ')).catch(() => {});
   });
@@ -774,7 +884,7 @@ function setupOfflineRetry() {
     const url = mainWindow.webContents.getURL();
     // QW9: offline.html (file://) gestiona sus PROPIOS reintentos; si aqui tambien
     // recargamos POS_URL, ambos compiten -> parpadeo/ping-pong. No tocar file://.
-    if (!url.startsWith('https://') && !url.startsWith('file://')) mainWindow.loadURL(POS_URL);
+    if (!url.startsWith('https://') && !url.startsWith('file://') && !identityForUrl(url)) mainWindow.loadURL(POS_URL);
   }, 10000);
 }
 
@@ -806,40 +916,28 @@ function createKdsWindow(x, y, width, height, urlOverride) {
       allowRunningInsecureContent: true,
     },
   });
-  // Allow the KDS→local-server WebSocket (ws://<host>:7717) through the page CSP.
-  // The deployed connect-src allows http://127.0.0.1:7717 but NOT the ws:// scheme,
-  // so the bridge WebSocket is refused → the KDS never connects to the local server
-  // → orders pushed over LAN while offline never arrive. Rewriting the header here
-  // guarantees the WS connects regardless of deploy/Service-Worker cache timing.
-  // Scoped to the KDS window's session and the :7717 bridge port.
-  kdsWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
-    const headers = details.responseHeaders || {};
-    for (const key of Object.keys(headers)) {
-      if (key.toLowerCase() === 'content-security-policy') {
-        headers[key] = headers[key].map(v =>
-          v.includes('connect-src') && !v.includes('ws://*:7717')
-            ? v.replace(/connect-src ([^;]*)/, (_m, s) => `connect-src ${s} ws://127.0.0.1:7717 http://*:7717 ws://*:7717`)
-            : v
-        );
-      }
-    }
-    callback({ responseHeaders: headers });
-  });
+  configureLocalBridgeCsp(kdsWindow.webContents.session);
 
   const targetUrl = urlOverride || KDS_URL;
   kdsWindow.setMenu(null);
-  kdsWindow.loadURL(targetUrl);
+  const localKds = targetUrl === `http://127.0.0.1:${LOCAL_SERVER_PORT}/kds`;
+  const kdsHeaders = localKds ? require('./local-server/core/credencial-lan').cabecerasDeCredencial({
+    secreto: appConfig.lan_secret || appConfig.lanSecret,
+    restaurantId: appConfig.restaurant_id || appConfig.restaurantId || appConfig.client_id || appConfig.clientId,
+    terminalId: appConfig.terminal_id || appConfig.terminalId,
+    branchId: appConfig.location_id || appConfig.branch_id || appConfig.branchId,
+  }) : {};
+  const loadKds = () => kdsWindow.loadURL(targetUrl, { extraHeaders: Object.entries(kdsHeaders).map(([key, value]) => `${key}: ${value}`).join('\r\n') });
+  loadKds();
 
   // Inject provisioned identity into the KDS window (mirror of mainWindow).
   // Essential: getKitchenOrders() filters by localStorage 'fullsite_client_id',
   // and the KDS route never does a Supabase login to set it. Without this the
   // KDS shows 0 orders even though they exist in pos_orders for this tenant.
   kdsWindow.webContents.on('did-finish-load', () => {
-    const clientId   = (appConfig.restaurant_id || appConfig.client_id || appConfig.restaurantId || appConfig.clientId || '').toLowerCase().trim();
-    const terminalId = appConfig.terminal_id || appConfig.terminalId;
-    const scripts = [];
-    if (clientId)   scripts.push(`localStorage.setItem('fullsite_client_id', ${JSON.stringify(String(clientId))})`);
-    if (terminalId) scripts.push(`localStorage.setItem('pos_terminal_id', ${JSON.stringify(String(terminalId))})`);
+    const identity = identityForUrl(kdsWindow.webContents.getURL());
+    if (!identity) return;
+    const scripts = Object.entries(identity).map(([key, value]) => value ? `localStorage.setItem(${JSON.stringify(key)}, ${JSON.stringify(String(value))})` : `localStorage.removeItem(${JSON.stringify(key)})`);
     if (scripts.length) kdsWindow.webContents.executeJavaScript(scripts.join('; ')).catch(() => {});
     // TEMP DIAG
     kdsWindow.webContents.executeJavaScript(`JSON.stringify({cid: localStorage.getItem('fullsite_client_id'), bh: localStorage.getItem('pos_bridge_host'), tid: localStorage.getItem('pos_terminal_id'), electron: navigator.userAgent.includes('Electron'), url: location.href})`).then(v => console.log('[kds-diag]', v)).catch(e => console.log('[kds-diag ERR]', e.message));
@@ -862,7 +960,7 @@ function createKdsWindow(x, y, width, height, urlOverride) {
     if (kdsFailCount <= 3) {
       // Give SW time to activate from previous session (progressive backoff)
       setTimeout(() => {
-        if (kdsWindow && !kdsWindow.isDestroyed()) kdsWindow.loadURL(targetUrl);
+        if (kdsWindow && !kdsWindow.isDestroyed()) loadKds();
       }, kdsFailCount * 800);
     } else {
       kdsFailCount = 0;
@@ -952,8 +1050,8 @@ app.whenReady().then(async () => {
   }
 
   appConfig = configResult.config;
-  // Dedicated KDS build always opens in kds_only mode regardless of saved config
-  if (app.getName() === 'Fullsite KDS') appConfig.kds_only = true;
+  // A provisioned KDS role and the dedicated build both open the kitchen UI.
+  if (app.getName() === 'Fullsite KDS' || appConfig.terminal_role === 'kds') appConfig.kds_only = true;
   console.log(`[main] Provisioned: restaurant_id=${appConfig.restaurant_id} terminal_id=${appConfig.terminal_id} role=${appConfig.terminal_role}`);
 
   // QW11: shortcuts de recuperacion registrados AQUI (no dentro de createWindow, que
@@ -963,6 +1061,34 @@ app.whenReady().then(async () => {
   try { globalShortcut.register('F12', () => { const w = BrowserWindow.getFocusedWindow(); if (w) w.webContents.toggleDevTools(); }); } catch {}
 
   await startLocalServer();   // Local server starts first (provides WS hub for KDS events)
+
+  // Install a complete public-code package only at process startup. Keeping the
+  // app.fullsite.mx origin preserves existing browser identity and order drafts;
+  // API requests still use the network and operational commands still use Pedro.
+  // Dedicated /kds remains on its own local HTTP server.
+  if (new URL(POS_URL).origin === 'https://app.fullsite.mx') {
+    const { PackageStore } = require('./offline-ui/package-store');
+    const { installProtocol } = require('./offline-ui/protocol');
+    const store = new PackageStore(path.join(app.getPath('userData'), 'ui-packages'));
+    const bundledPath = DEV && process.env.FULLSITE_UI_BUNDLE_DIR
+      ? path.resolve(process.env.FULLSITE_UI_BUNDLE_DIR) : path.join(__dirname, 'ui-bundle');
+    let bundle = null;
+    try {
+      bundle = fs.existsSync(bundledPath) ? store.install(bundledPath) : store.load();
+    } catch (error) {
+      console.error('[offline-ui] Candidate rejected:', error.message);
+      try { bundle = store.load(); } catch (recoveryError) {
+        console.error('[offline-ui] No verified recovery package:', recoveryError.message);
+      }
+    }
+    if (bundle) {
+      await installProtocol(defaultSession, bundle, LOCAL_SERVER_PORT);
+      installedUiRevision = bundle.manifest.revision;
+      console.log(`[offline-ui] Serving verified revision ${installedUiRevision}${bundle.recovered ? ' (recovered)' : ''}`);
+    } else {
+      console.warn('[offline-ui] No installed UI package; cold boot without internet is unavailable.');
+    }
+  }
 
   // ── Auto-update (Fase 2) ──────────────────────────────────────────────────
   // Descarga en segundo plano; instala SOLO cuando el restaurante esta en reposo.
@@ -979,6 +1105,7 @@ app.whenReady().then(async () => {
 
     autoInstaller = iniciar({
       canal: appConfig.channel || process.env.FULLSITE_CHANNEL || 'stable',
+      requiredStoreFormat: 'fullsite-command-transactions-v1',
       // Estado VIVO del restaurante. Si el servidor local no arranco, devuelve null
       // y la politica falla CERRADO — no instala.
       // `state` lo expone local-server/index.js a proposito para esto. Si algun dia

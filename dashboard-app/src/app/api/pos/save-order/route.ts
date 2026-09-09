@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server'
+import { esCuentaDeCobroDeSplit } from '@/lib/liquidacion-de-orden'
 import { withPOSAuth, unauthorized } from '@/lib/api-auth'
 import { verifyManagerApproval } from '@/lib/manager-approval'
 
@@ -159,6 +160,219 @@ async function ivaRateFor(
   }
 }
 
+/**
+ * ¿El total que quedó escrito corresponde a los renglones que quedaron escritos?
+ *
+ * Se llama DESPUÉS del RPC y lee la fila, nunca el cuerpo de la petición. Ésa es toda
+ * la diferencia: el cuerpo lo dicta quien cobra, y podía omitir `items` para apagar la
+ * comprobación entera, o inflar `descuento` para que la resta cuadrara sola.
+ *
+ * No bloquea ni lanza. Un rechazo aquí viajaría al replay de la cola offline, donde un
+ * 400 es terminal y el cobro se perdería para siempre.
+ */
+async function auditarCierreContraLaFila(o: {
+  orderId: string
+  clientId: string
+  sbUrl: string
+  headers: Record<string, string>
+  actor: string
+  rolSolicitante?: string
+}): Promise<void> {
+  try {
+    const ivaRate = await ivaRateFor(o.clientId, o.sbUrl, o.headers)
+    // Sin tasa resoluble no se audita: preferimos no reportar a reportar de más.
+    if (ivaRate === null) return
+
+    const res = await fetch(
+      `${o.sbUrl}/rest/v1/pos_orders?id=eq.${encodeURIComponent(o.orderId)}` +
+      `&client_id=eq.${encodeURIComponent(o.clientId)}&select=items,total,descuento,mesero,status&limit=1`,
+      { headers: o.headers, cache: 'no-store' },
+    )
+    if (!res.ok) return
+    const rows = await res.json() as Array<Record<string, unknown>>
+    const fila = rows?.[0]
+    if (!fila) return
+
+    const items = typeof fila.items === 'string'
+      ? JSON.parse(fila.items) as Array<Record<string, unknown>>
+      : (fila.items as Array<Record<string, unknown>> | null)
+    // Una orden cerrada SIN renglones no es un cierre normal, pero tampoco se puede
+    // afirmar un faltante: no hay contra qué comparar. Se deja pasar.
+    if (!Array.isArray(items) || items.length === 0) return
+
+    // UNA CUENTA DE SPLIT PAREJO ACUSA A UN MESERO HONESTO, y por eso no se audita sola.
+    //
+    // En `parejo`, `payingItems` NO se reasigna (pos/page.tsx:3814): cada cuenta guarda
+    // TODOS los renglones de la mesa y sólo cambia el total a 1/N. Así que la comparación
+    // de abajo ve, en una mesa de $2,816 dividida entre cuatro:
+    //
+    //     sum(items) = 281600¢   contra   total = 70400¢   →  faltante de $2,112
+    //
+    // Cuatro veces, una por cuenta. Y el agente antifraude reporta POR MESERO, así que el
+    // acusado sería quien dividió la cuenta bien. Es el mismo envenenamiento del falso
+    // positivo del IVA de agosto: quince eventos, todos falsos, que taparon el caso real.
+    //
+    // La suma sólo tiene sentido contra la MADRE, y ese punto existe desde hoy: al
+    // liquidarse se escribe con estado 'dividida', y ahí abajo se compara su total contra
+    // lo que de verdad cobraron sus cuentas.
+    if (esCuentaDeCobroDeSplit(o.orderId)) return
+
+    const cents = (n: unknown) => Math.round((Number(n) || 0) * 100)
+    const sumItems = items
+      .filter(it => !it?.cancelled)
+      .reduce((s, it) => s + cents(it?.subtotal ?? 0), 0)
+    const descuento = cents(fila.descuento ?? 0)
+    const base = sumItems - descuento
+    const expectedTotal = base + Math.round(base * ivaRate)
+
+    // LA MESA DIVIDIDA SE MIDE CONTRA LO QUE COBRARON SUS CUENTAS, no contra su propia
+    // fila: la madre queda con el total de la mesa pero NO cobró nada — el dinero entró
+    // por `{orden}-C1..CN`. Comparar contra su `total` sería medir el cobro contra sí
+    // mismo y no detectaría nada.
+    //
+    // Aquí sí sirve: si alguien divide en cuatro y registra sólo dos cuentas, la suma de
+    // lo cobrado queda corta contra los renglones servidos, y eso es exactamente el
+    // faltante. Es la variante que no deja rastro en el corte porque la mesa parece
+    // "cancelada por cliente que se fue".
+    let declaredTotal = cents(fila.total ?? 0)
+    if (String(fila.status) === 'dividida') {
+      const cuentas = await fetch(
+        `${o.sbUrl}/rest/v1/pos_orders?client_id=eq.${encodeURIComponent(o.clientId)}` +
+        `&id=like.${encodeURIComponent(o.orderId + '-C')}*&select=total,status`,
+        { headers: o.headers, cache: 'no-store' },
+      )
+      if (!cuentas.ok) return   // sin poder leerlas no se puede afirmar un faltante
+      const filas = await cuentas.json() as Array<{ total?: unknown; status?: unknown }>
+      if (!Array.isArray(filas) || filas.length === 0) return
+      declaredTotal = filas
+        .filter(c => c.status === 'cerrada' || c.status === 'completada')
+        .reduce((s, c) => s + cents(c.total), 0)
+    }
+
+    // ── EL ANCLA QUE FALTABA: EL PRECIO DEL MENU ────────────────────────────
+    //
+    // Todo lo de arriba compara `sum(items[].subtotal)` contra `total`. LAS DOS CIFRAS
+    // LAS ESCRIBIO EL CLIENTE. Detecta al que baja el total y deja los renglones -- que
+    // es el vector comun, porque bajar el total es un campo y editar los renglones son
+    // varios -- pero NO al que baja los dos a la vez: la resta da cero y todo cuadra.
+    //
+    // El unico dato que el POS no dicta es el precio del catalogo. Se compara contra el.
+    //
+    // ESTO SE MIDIO ANTES DE ESCRIBIRLO, porque un detector ruidoso ya costo caro dos
+    // veces en este repo (los quince falsos del IVA en agosto, y las cuentas de split
+    // esta manana). Sobre los 94 renglones que existen en `pos_orders` de AMALAY:
+    //
+    //     sin menuItemId ............ 0
+    //     sin fila en el menu ....... 0
+    //     precio por DEBAJO ......... 0
+    //     precio por ARRIBA ......... 0
+    //
+    // Cero falsos positivos sobre los datos reales de hoy.
+    //
+    // LO QUE NO PUEDE DISTINGUIR, y por eso es conservador: un precio de menu que SUBIO
+    // despues de que se cobro la orden se ve igual que un precio editado a la baja. No
+    // hay historial de precios. Mitigacion: solo cuenta un renglon cuando su precio esta
+    // por debajo del 90% del catalogo -- una actualizacion normal no llega ahi, partir a
+    // la mitad un corte de carne si.
+    let faltantePorPrecio = 0
+    const renglonesEditados: Array<{ menu_item_id: string; precio_cobrado: number; precio_menu: number; cantidad: number }> = []
+    try {
+      const ids = [...new Set(items
+        .filter(it => !it?.cancelled)
+        .map(it => String(it?.menuItemId ?? ''))
+        .filter(Boolean))]
+      if (ids.length > 0) {
+        const cat = await fetch(
+          `${o.sbUrl}/rest/v1/pos_menu_items?client_id=eq.${encodeURIComponent(o.clientId)}` +
+          `&id=in.(${ids.map(encodeURIComponent).join(',')})&select=id,price`,
+          { headers: o.headers, cache: 'no-store' },
+        )
+        // Sin catalogo legible NO se acusa. Mismo principio que con la tasa de IVA.
+        if (cat.ok) {
+          const precios = new Map<string, number>()
+          for (const m of (await cat.json()) as Array<{ id?: unknown; price?: unknown }>) {
+            if (typeof m?.id === 'string' && Number.isFinite(Number(m.price))) {
+              precios.set(m.id, Number(m.price))
+            }
+          }
+          for (const it of items) {
+            if (it?.cancelled) continue
+            const id = String(it?.menuItemId ?? '')
+            const delMenu = precios.get(id)
+            // Un renglon que no esta en el catalogo (producto abierto, item viejo) se
+            // salta: no hay contra que compararlo y adivinar seria inventar.
+            if (delMenu === undefined || !(delMenu > 0)) continue
+            const cobrado = Number(it?.precio) || 0
+            if (cobrado >= delMenu * 0.9) continue
+            const cantidad = Math.max(0, Number(it?.cantidad) || 0)
+            faltantePorPrecio += Math.round((delMenu - cobrado) * cantidad * 100)
+            renglonesEditados.push({
+              menu_item_id: id, precio_cobrado: cobrado, precio_menu: delMenu, cantidad,
+            })
+          }
+        }
+      }
+    } catch { /* el ancla de precio es un extra: nunca impide la deteccion de arriba */ }
+
+    if (faltantePorPrecio > 100 && renglonesEditados.length > 0) {
+      console.warn('[price-edit-suspect]', o.orderId, { faltantePorPrecio, renglonesEditados })
+      // Accion PROPIA, no `skimming_suspect`: son dos vectores distintos y mezclarlos
+      // impediria medir cual esta ocurriendo. El agente antifraude agrupa por accion.
+      await fetch(`${o.sbUrl}/rest/v1/pos_audit_log`, {
+        method: 'POST',
+        headers: { ...o.headers, Prefer: 'return=minimal' },
+        body: JSON.stringify({
+          client_id: o.clientId, order_id: o.orderId,
+          action: 'price_edit_suspect',
+          actor: o.actor,
+          details: {
+            diff_cents: faltantePorPrecio,
+            renglones: renglonesEditados,
+            solicitante_rol: o.rolSolicitante ?? null,
+            mesero_declarado: typeof fila.mesero === 'string' ? fila.mesero : null,
+            fuente: 'catalogo_pos_menu_items',
+            umbral_pct: 0.9,
+          },
+        }),
+      })
+    }
+
+    const diff = expectedTotal - declaredTotal
+
+    // Sólo la dirección del fraude: cobrar MENOS que los renglones. Un total mayor no
+    // es skimming —no hay faltante que embolsarse— y marcarlo duplicaba los falsos
+    // positivos. Tolerancia de $1 por redondeo, combos y promociones.
+    if (diff <= 100) return
+
+    console.warn('[skimming-suspect]', o.orderId,
+      { sumItems, descuento, ivaRate, expectedTotal, declaredTotal, diffCents: diff })
+    await fetch(`${o.sbUrl}/rest/v1/pos_audit_log`, {
+      method: 'POST',
+      headers: { ...o.headers, Prefer: 'return=minimal' },
+      body: JSON.stringify({
+        client_id: o.clientId, order_id: o.orderId,
+        action: 'skimming_suspect',
+        // El actor sale del shift token FIRMADO. Antes era `body.mesero`, que lo ponía
+        // el mismo que cobraba: la sospecha quedaba a nombre de quien él quisiera.
+        actor: o.actor,
+        details: {
+          sum_items_cents: sumItems,
+          descuento_cents: descuento,
+          iva_rate: ivaRate,
+          expected_total_cents: expectedTotal,
+          declared_total_cents: declaredTotal,
+          diff_cents: diff,
+          solicitante_rol: o.rolSolicitante ?? null,
+          mesero_declarado: typeof fila.mesero === 'string' ? fila.mesero : null,
+          // Deja constancia de que se midió contra la fila: si algún día alguien
+          // vuelve a evaluar el cuerpo, los eventos viejos y nuevos no se confunden.
+          fuente: 'fila_escrita',
+        },
+      }),
+    })
+  } catch { /* detección best-effort — NUNCA bloquea ni rompe el guardado */ }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const auth = await withPOSAuth(request)
@@ -228,41 +442,37 @@ export async function POST(request: NextRequest) {
     // todos ese falso positivo (1888 -> 2190.08 = x1.16 exacto).
     //
     // Un detector log-only que dispara siempre no es conservador: es ruido que tapa el caso real.
-    if (body.status === 'cerrada' && Array.isArray(body.items) && body.items.length > 0) {
-      try {
-        const ivaRate = await ivaRateFor(clientId, sbUrl, headers)
-        // Sin tasa resoluble no se audita: preferimos no reportar a reportar de mas.
-        if (ivaRate !== null) {
-          const cents = (n: unknown) => Math.round((Number(n) || 0) * 100)
-          const sumItems = (body.items as Array<{ subtotal?: number; cancelled?: boolean }>)
-            .filter(it => !it?.cancelled)
-            .reduce((s, it) => s + cents(it?.subtotal ?? 0), 0)
-          const base = sumItems - cents(body.descuento ?? 0)
-          const expectedTotal = base + Math.round(base * ivaRate)
-          const declaredTotal = cents(body.total ?? 0)
-          const diff = expectedTotal - declaredTotal
-          // Solo la direccion del fraude: cobrar MENOS que los items. Un total mayor al
-          // esperado no es skimming (no hay faltante que embolsarse), y marcarlo asi
-          // duplicaba la superficie de falsos positivos.
-          if (diff > 100) { // tolerancia $1 (redondeo/combos/promos)
-            console.warn('[skimming-suspect]', order_id, { sumItems, descuento: body.descuento, ivaRate, expectedTotal, declaredTotal, diffCents: diff })
-            fetch(`${sbUrl}/rest/v1/pos_audit_log`, {
-              method: 'POST',
-              headers: { ...headers, Prefer: 'return=minimal' },
-              body: JSON.stringify({
-                client_id: clientId, order_id,
-                action: 'skimming_suspect', actor: body.mesero || 'POS',
-                details: {
-                  sum_items_cents: sumItems, descuento: body.descuento ?? 0,
-                  iva_rate: ivaRate, expected_total_cents: expectedTotal,
-                  declared_total: body.total ?? 0, diff_cents: diff,
-                },
-              }),
-            }).catch(() => {})
-          }
-        }
-      } catch { /* detección best-effort — NUNCA bloquea el guardado */ }
-    }
+    // ── DOS HUECOS QUE TENIA ESTA DETECCION, cerrados el 2026-09-08 ──────────
+    //
+    // Los dos salen de lo mismo: se evaluaba con los insumos que manda el CLIENTE.
+    //
+    // HUECO 1 — omitir `items` apagaba el detector entero. La guarda era
+    // `Array.isArray(body.items) && body.items.length > 0`, y `Array.isArray(undefined)`
+    // es false, asi que este bloque completo no corria. Ni un console.warn, ni una fila
+    // en pos_audit_log. Cero rastro. Y `r1_save_order` hace `items = coalesce(NULL,
+    // items)`, o sea que los renglones reales se CONSERVAN: la orden queda presentable
+    // —platillos correctos, mesero correcto, hora correcta— con `total = 1.00`. El
+    // arqueo espera $1 por esa mesa y el resto se lo queda quien cobro. Es
+    // estrictamente mejor para quien roba que bajar el total con descuento, porque no
+    // deja ni la linea de descuentos en el corte Z.
+    //
+    // HUECO 2 — el `descuento` tambien lo pone el cliente, y se restaba ANTES de
+    // comparar: `base = sumItems - cents(body.descuento)`. Mandar `descuento: 1000`
+    // hacia que la aritmetica cuadrara sola. El robo se escondia justo en el campo que
+    // sirve de excusa.
+    //
+    // EL ARREGLO ES LEER LA FILA, NO EL CUERPO. Despues del RPC se relee `items`,
+    // `total` y `descuento` de `pos_orders` y se recomputa sobre eso. Omitir `items`
+    // deja de ser una salida —el servidor usa los que ya tiene— y el descuento que se
+    // resta es el que quedo ESCRITO, que es el que el corte va a cobrar.
+    //
+    // ADEMAS ARREGLA UN FALSO POSITIVO: cocina manda cierres sin `total` ni `subtotal`
+    // (pos/cocina/page.tsx:332), y con `cents(undefined) = 0` el detector veia un
+    // faltante del 100%. Leyendo la fila, el total es el real y no dispara.
+    //
+    // SIGUE SIN BLOQUEAR, a proposito. Un 400 en el replay de la cola se clasifica
+    // terminal (pos-offline-db.ts): el cobro se perderia para siempre. Fase 2 rechaza,
+    // y solo despues de observar el log.
 
     // ── Shift validation: replay must never write into a closed cash period ──
     const hasOperationId = typeof body.save_operation_id === 'string' && body.save_operation_id.length > 0
@@ -329,6 +539,25 @@ export async function POST(request: NextRequest) {
       return Response.json(saveResult satisfies SaveResult)
     }
 
+    // ── Detección de skimming (Fase 1 · log-only) ────────────────────────────
+    // Se evalúa contra LA FILA YA ESCRITA, no contra el cuerpo. Ver el bloque largo de
+    // arriba: leer el cuerpo permitía apagar el detector omitiendo `items`, y restaba
+    // un `descuento` que también dictaba el cliente.
+    // Se ESPERA, no se dispara y olvida: en serverless el trabajo que queda pendiente
+    // después de responder se corta, y la auditoría podría no escribirse nunca —
+    // justo en el caso que interesa. La función nunca lanza ni bloquea el guardado,
+    // que ya está commiteado en este punto; lo único que cuesta es latencia en el
+    // cierre.
+    // 'dividida' también se audita: es el cierre de una mesa que se cobró por partes, y
+    // el único punto donde la suma de los renglones tiene con qué compararse.
+    if (body.status === 'cerrada' || body.status === 'dividida') {
+      await auditarCierreContraLaFila({
+        orderId: order_id, clientId, sbUrl, headers,
+        actor: auth.staffName || auth.staffId || 'POS',
+        rolSolicitante: auth.role,
+      })
+    }
+
     // Persist fields that predate the RPC signature. captured_at is client supplied but
     // accepted only as a valid timestamp no more than five minutes in the future.
     const capturedMs = typeof body.captured_at === 'string' ? Date.parse(body.captured_at) : Number.NaN
@@ -358,9 +587,22 @@ export async function POST(request: NextRequest) {
     const isIdempotentReplay = saveResult.idempotent_replay === true
     const committedRevision = saveResult.revision
 
-    let shouldReconcile = isFirstExecution
+    // UNA CUENTA DE SPLIT NO CONSUME COMIDA: la consumio la orden madre.
+    //
+    // `r1_reconcile_order` recorre los items de ESTA orden y escribe en
+    // `pos_reconciliation_results`, cuya clave unica es
+    // (client_id, order_id, order_item_id). Como cada cuenta trae su propio
+    // `order_id` (`{orden}-C1`..`-CN`), estrenaba linaje y descontaba otra vez. En el
+    // split PAREJO cada cuenta lleva TODOS los renglones, asi que una mesa de 4
+    // descontaba cinco veces la misma comida: la madre al enviar a cocina, mas las
+    // cuatro cuentas al cobrar.
+    //
+    // No sale del cajon: sale del inventario y del numero que gobierna las compras.
+    const esCobroDeSplit = esCuentaDeCobroDeSplit(order_id)
 
-    if (isIdempotentReplay && committedRevision != null) {
+    let shouldReconcile = isFirstExecution && !esCobroDeSplit
+
+    if (isIdempotentReplay && committedRevision != null && !esCobroDeSplit) {
       // Check current inventory lineage for catch-up determination
       try {
         const lineageRes = await fetch(

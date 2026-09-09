@@ -138,6 +138,20 @@ describe('Con el restaurante en reposo SI instala', () => {
 })
 
 describe('Configuracion del updater', () => {
+  test('an idle Caja cannot auto-install an update that cannot read its durable format', async () => {
+    const listeners = {}; let installs = 0
+    const updater = { on: (name, fn) => { listeners[name] = fn }, quitAndInstall: () => { installs++ } }
+    const opts = { getSnapshot: () => enReposo, estaBloqueada: async () => false }
+    inst.iniciar({ ...opts, canal: 'pilot', updaterInyectado: updater, requiredStoreFormat: 'fullsite-command-transactions-v1' })
+    for (const metadata of [undefined, { supportedStoreFormats: ['legacy-event-v0'] }]) {
+      listeners['update-downloaded']({ version: '9.0.0', fullsite: metadata })
+      assert.equal((await inst.intentarInstalar(opts)).instalo, false)
+      assert.equal(installs, 0)
+    }
+    listeners['update-downloaded']({ version: '9.0.1', fullsite: { supportedStoreFormats: ['fullsite-command-transactions-v1'] } })
+    assert.equal((await inst.intentarInstalar(opts)).instalo, true)
+    assert.equal(installs, 1)
+  })
   test('el canal piloto acepta prereleases; el estable NO', () => {
     for (const [canal, esperado] of [['pilot', true], ['development', true], ['stable', false]]) {
       inst._reset()

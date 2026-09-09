@@ -2,7 +2,7 @@
 
 > **Qué es esto:** el mapa de las fuentes-oro para tomar decisiones en Fullsite. No es el índice de carpetas (eso es `README.md`) ni la tesis (eso es `strategy/COMPANY-BRAIN.md`). Esto responde una sola pregunta: *"antes de decidir/cambiar X, ¿qué documento ya probado debo leer y citar?"* — para que el conocimiento nunca se pierda y ninguna decisión se tome a ciegas.
 >
-> **Última actualización:** 2026-08-19.
+> **Última actualización:** 2026-09-04 (plan de cierre y decisiones offline).
 
 ---
 
@@ -22,6 +22,9 @@ Marcadores: 🏆 = probado en campo (máxima autoridad) · ✅ = verificado en c
 
 | Fuente | Autoridad | Qué fundamenta |
 |---|---|---|
+| [`docs/PLAN-CIERRE-FULLSITE-2026-09-04.md`](PLAN-CIERRE-FULLSITE-2026-09-04.md) | 📐 plan de ejecución; D1/D2 aprobadas | Seis hitos con criterios de salida: orden compartida, turno LAN, conciliación, R1 AMALAY y R2 repetible. Primera entrega UI A/B/C/KDS; implementación y certificación pendientes. |
+| `docs/audit/FULLSITE-CIERRE-PUNTA-A-PUNTA-2026-09-04.md` | ✅ código y reproducciones locales; 📐 implementación propuesta | Auditoría main 4fa12e6f + candidato de904d71. Cierre R1 AMALAY, R2 cliente nuevo y pruebas pendientes; no certificación de producción. |
+| `docs/adr/ADR-005-AUTORIDAD-OFFLINE-Y-ESTADOS.md` | ✅ decisiones explícitas de Daniel | Con LAN/Caja, operación completa; sin Caja, borradores sin cobro/split/traslado. Cobro y preparación separados. Implementación pendiente. |
 | `docs/audit/AUDITORIA-FULL-FULLSITE-2026-08-19.md` | ✅ | **Auditoría full de los 6 dominios.** Tesis: el núcleo es sólido, pero la verdad se bifurcó (rama vs main, docs vs código). Estado por dominio + registro de docs viejos. |
 | `docs/PLAN-AHORA.md` | ✅ | **Qué hacer ahora, priorizado en olas** (0: AMALAY 100% + fraude; 1: reconverger la verdad; 2: prod/Cliente #2; 3: IA; 4: negocio). |
 

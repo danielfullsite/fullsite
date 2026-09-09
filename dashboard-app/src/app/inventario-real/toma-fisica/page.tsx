@@ -8,6 +8,7 @@ import PageHeader from '@/components/PageHeader'
 import { sbPost } from '@/lib/supabase-helpers'
 import { recordMovement, loadInventoryWithStock, makeIdempotencyKey } from '@/lib/inventory'
 import type { MovementResult } from '@/lib/inventory'
+import { useClaveDeOperacion } from '@/lib/clave-de-operacion'
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -46,15 +47,14 @@ function todayISO(): string {
   return new Date().toISOString().split('T')[0]
 }
 
-function nowKey(): string {
-  const d = new Date()
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}`
-}
+// `nowKey()` se retiro: la clave con el MINUTO del reloj aplicaba los ajustes dos veces
+// si el reintento cruzaba el cambio de minuto. Ver `lib/clave-de-operacion.ts`.
 
 // ── Component ───────────────────────────────────────────────────────
 
 export default function TomaFisicaPage() {
+  // Estable entre reintentos del mismo guardado; se renueva al confirmar.
+  const { clave: claveDeOperacion, confirmar: confirmarOperacion } = useClaveDeOperacion()
   const [items, setItems] = useState<InventoryItem[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -172,8 +172,10 @@ export default function TomaFisicaPage() {
     setSaveMessage(null)
 
     const clientId = getActiveClientSlug()
-    const timestamp = nowKey()
-    const idempotencyKey = makeIdempotencyKey('adjustment', 'dashboard', timestamp, 'toma_fisica')
+    // La clave identifica la OPERACION, no el instante. Con el MINUTO del reloj, un
+    // reintento que cruzara el cambio de minuto aplicaba los ajustes DOS VECES -- y esta
+    // pantalla si mueve stock. En entradas ya paso en produccion el 2026-07-20.
+    const idempotencyKey = makeIdempotencyKey('adjustment', 'dashboard', claveDeOperacion, 'toma_fisica')
 
     // Only items that were counted AND have a difference
     const adjustments = countEntries
@@ -200,6 +202,7 @@ export default function TomaFisicaPage() {
         })
 
         if (movResult.was_duplicate) {
+          confirmarOperacion()   // terminal: quedo registrado antes
           setSaveMessage({ type: 'duplicate', text: 'Este conteo ya fue registrado anteriormente.' })
           setCounts({})
           setSaving(false)
@@ -236,7 +239,9 @@ export default function TomaFisicaPage() {
       }
 
       await sbPost('wansoft_data', clientId, {
-        data_key: `physical_count_${timestamp}`,
+        // Fecha delante para que siga siendo legible y consultable por prefijo; la
+        // unicidad la da la clave de operacion, estable entre reintentos.
+        data_key: `physical_count_${todayISO()}_${claveDeOperacion}`,
         fecha: todayISO(),
         data: payload,
       })
@@ -245,6 +250,7 @@ export default function TomaFisicaPage() {
         ? ` ${adjustments.length} ajustes aplicados al stock.`
         : ' Sin discrepancias.'
 
+      confirmarOperacion()   // guardado confirmado: el proximo conteo es otra operacion
       setSaveMessage({
         type: 'success',
         text: `Conteo guardado: ${summary.counted} productos.${adjMsg}`,

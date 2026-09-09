@@ -24,6 +24,13 @@ const C2S = {
 
 // Operational event types (Phase 1 — observe only; Phase 2 — authoritative)
 const EVENT = {
+  ORDER_SAVE:      'ORDER_SAVE',
+  ORDER_SEND:      'ORDER_SEND',
+  ORDER_MOVE:      'ORDER_MOVE',
+  ORDER_VOID:      'ORDER_VOID',
+  TURN_OPEN:       'TURN_OPEN',
+  TURN_CLOSE:      'TURN_CLOSE',
+  KITCHEN_SET:     'KITCHEN_SET',
   ORDER_UPSERTED:  'ORDER_UPSERTED',
   ORDER_SENT:      'ORDER_SENT',
   ORDER_CLOSED:    'ORDER_CLOSED',
@@ -34,6 +41,10 @@ const EVENT = {
   TURNO_OPENED:    'TURNO_OPENED',
   TURNO_CLOSED:    'TURNO_CLOSED',
   PRINT_COMMAND:   'PRINT_COMMAND',
+  FINANCIAL_OPEN: 'FINANCIAL_OPEN',
+  FINANCIAL_SPLIT: 'FINANCIAL_SPLIT',
+  FINANCIAL_PAYMENT_START: 'FINANCIAL_PAYMENT_START',
+  FINANCIAL_PAYMENT_RESULT: 'FINANCIAL_PAYMENT_RESULT',
   STATE_SYNC:      'STATE_SYNC',  // bulk sync from Supabase poll
 }
 
@@ -66,19 +77,50 @@ function serverEnvelope(type, payload, { serverId, restaurantId, sequence }) {
   })
 }
 
+/**
+ * Motivos de rechazo. Existen para que el hub pueda DECIRLE al cliente por que
+ * lo rechazo, en vez de ignorarlo.
+ *
+ * POR QUE: antes esta funcion devolvia `null` para los tres casos. El hub hacia
+ * `if (!msg) return` — sin error, sin cerrar el socket, sin log. Un cliente que
+ * olvidara `protocol_version` quedaba CONECTADO Y MUDO para siempre: el socket
+ * abierto, `clientCount()` en 0, y ninguna pista de por que. Costo dos corridas
+ * completas de la E2E del enlace ascendente el 2026-09-03.
+ *
+ * Es la misma familia que costo la semana: un fallo indistinguible de que no
+ * pase nada.
+ */
+const RECHAZO = {
+  ILEGIBLE:        'mensaje ilegible (JSON invalido)',
+  TIPO_DESCONOCIDO:'tipo de mensaje desconocido',
+  SIN_VERSION:     'falta protocol_version',
+}
+
+/**
+ * Igual que `parseClientMessage` pero DICE por que rechazo.
+ * Devuelve { msg } si es valido, o { rechazo } con el motivo.
+ */
+function revisarMensajeDeCliente(raw) {
+  let msg
+  try { msg = JSON.parse(raw) } catch { return { rechazo: RECHAZO.ILEGIBLE } }
+  if (!msg || !msg.type || !C2S[msg.type]) return { rechazo: RECHAZO.TIPO_DESCONOCIDO }
+  if (!msg.protocol_version) return { rechazo: RECHAZO.SIN_VERSION }
+  return { msg }
+}
+
+/**
+ * Se conserva con la MISMA firma y el mismo comportamiento (null al rechazar)
+ * para no romper a quien ya la usa. Delega en la de arriba: una sola definicion
+ * de que es valido.
+ */
 function parseClientMessage(raw) {
-  try {
-    const msg = JSON.parse(raw)
-    if (!msg.type || !C2S[msg.type]) return null
-    if (!msg.protocol_version) return null
-    return msg
-  } catch {
-    return null
-  }
+  return revisarMensajeDeCliente(raw).msg || null
 }
 
 module.exports = {
   PROTOCOL_VERSION,
+  RECHAZO,
+  revisarMensajeDeCliente,
   S2C,
   C2S,
   EVENT,

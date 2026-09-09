@@ -4,6 +4,7 @@
 // implementation. The rest of the system calls this wrapper, never storage directly.
 
 const crypto = require('crypto')
+const { sameCommand } = require('./command-identity')
 
 class CoreEventStore {
   /** @param {import('../adapters/storage/base').EventStore} store */
@@ -25,59 +26,39 @@ class CoreEventStore {
    * @param {{ eventType: string, ts?: number }} opts
    * @returns {Promise<{ event: LocalEvent, duplicate: boolean }>}
    */
-  async processCommand(cmd, { eventType }) {
-    const { command_id } = cmd
-
-    // Un comando ya en vuelo con el MISMO command_id es un duplicado, aunque todavía
-    // no esté marcado en disco. Sin esto hay una carrera: entre el chequeo de
-    // hasProcessedCommand y el saveProcessedCommand hay dos `await`, y todo reintento
-    // que caiga en esa ventana pasa el chequeo y escribe su propio evento.
-    //
-    // No es teórico: es justo el escenario T-14 (el POS reenvía porque no le llegó el
-    // ACK). Si el ACK viene lento en vez de perderse, el reenvío se traslapa con el
-    // original. Reproducido con 5 reintentos concurrentes: 5 eventos en vez de 1.
-    // En ORDER_CLOSED eso es un cobro duplicado.
-    //
-    // Se espera al que ya va en camino y se responde duplicate, que es exactamente lo
-    // que habría contestado si hubiera llegado un instante después.
-    const enVuelo = this._enVuelo.get(command_id)
-    if (enVuelo) {
-      await enVuelo.catch(() => {})
-      return { duplicate: true, event: null }
+  async processCommand(cmd, { eventType, buildEffects, buildResult }) {
+    const event = {
+      id: cmd.command_id,
+      type: eventType,
+      ts: Date.now(),
+      client_id: cmd.client_id,
+      restaurant_id: cmd.restaurant_id,
+      payload: cmd.payload,
     }
-
-    const promesa = this._procesarComando(cmd, { eventType })
-    this._enVuelo.set(command_id, promesa)
-    try {
-      return await promesa
-    } finally {
-      this._enVuelo.delete(command_id)
+    const inFlight = this._enVuelo.get(cmd.command_id)
+    if (inFlight) {
+      if (!sameCommand(inFlight.event, event)) throw new Error('IDEMPOTENCY_KEY_REUSED: command content differs')
+      // Propagate the original storage error. An uncommitted concurrent request
+      // cannot become a successful duplicate merely because another request failed.
+      const result = await inFlight.promise
+      return { ...result, duplicate: true }
     }
+    const promise = this._procesarComando(event, buildEffects, buildResult)
+    this._enVuelo.set(cmd.command_id, { event, promise })
+    try { return await promise } finally { this._enVuelo.delete(cmd.command_id) }
   }
 
-  /** @private Camino real de processCommand, serializado por command_id. */
-  async _procesarComando(cmd, { eventType }) {
-    const { command_id, client_id, restaurant_id, payload } = cmd
-
-    // Idempotency: reject duplicate commands
-    if (await this._store.hasProcessedCommand(command_id)) {
-      return { duplicate: true, event: null }
+  async _procesarComando(event, buildEffects, buildResult) {
+    const existing = await this._store.getProcessedCommand(event.id)
+    if (existing) {
+      if (!sameCommand(existing, event)) throw new Error('IDEMPOTENCY_KEY_REUSED: command content differs')
+      return { duplicate: true, event: existing }
     }
-
-    const event = {
-      id:            command_id, // command_id IS the event id (idempotent pairing)
-      type:          eventType,
-      ts:            Date.now(),
-      client_id,
-      restaurant_id,
-      payload,
-    }
-
-    const { sequences } = await this._store.append([event])
-    const sequence = sequences[0]
-    await this._store.saveProcessedCommand(command_id, event.id, sequence)
-
-    return { duplicate: false, event: { ...event, sequence, synced: false } }
+    // Effect intents (including printer routing snapshots) are part of the same
+    // durable transaction. Preparing them may validate, but must perform no IO effects.
+    if (buildEffects) event.effects = await buildEffects()
+    if (buildResult) event.result = await buildResult()
+    return this._store.commitCommand(event)
   }
 
   /**

@@ -1,5 +1,7 @@
 // IndexedDB offline storage for POS
 // Stores menu, orders, inventory, and sync queue for offline-first operation
+import { leerSalon, requiereCaja } from './pedro-cliente'
+import { CAMPOS_SOLO_DE_GERENTE } from './pos-db-policy'
 
 const DB_NAME = 'fullsite_pos'
 const DB_VERSION = 4
@@ -179,8 +181,15 @@ export async function getCachedMenu(): Promise<Record<string, unknown>[]> {
 
 export async function cacheOrder(order: Record<string, unknown>): Promise<void> {
   const db = await openDB()
-  const tx = db.transaction('orders', 'readwrite')
-  tx.objectStore('orders').put(order)
+  // Mismo defecto que `queueOperation`: se resolvía antes del commit. Aquí duele en el
+  // arranque en frío sin WAN — la orden que la caja cree tener cacheada puede no estar.
+  return new Promise<void>((resolve, reject) => {
+    const tx = db.transaction('orders', 'readwrite')
+    tx.objectStore('orders').put(order)
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error ?? new Error('orders: la transacción falló'))
+    tx.onabort = () => reject(tx.error ?? new Error('orders: la transacción se abortó'))
+  })
 }
 
 export async function getCachedOrders(status?: string): Promise<Record<string, unknown>[]> {
@@ -386,8 +395,13 @@ export async function warmActiveOrdersCache(
 
 export async function deleteCachedOrder(id: string): Promise<void> {
   const db = await openDB()
-  const tx = db.transaction('orders', 'readwrite')
-  tx.objectStore('orders').delete(id)
+  return new Promise<void>((resolve, reject) => {
+    const tx = db.transaction('orders', 'readwrite')
+    tx.objectStore('orders').delete(id)
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error ?? new Error('orders: el borrado fallo'))
+    tx.onabort = () => reject(tx.error ?? new Error('orders: el borrado se aborto'))
+  })
 }
 
 /**
@@ -485,9 +499,42 @@ export async function queueOperation(
       `Pasa un endpoint con filtro, p. ej. "${table}?id=eq.<id>". No se reproducira.`,
     )
   }
-  const tx = db.transaction('sync_queue', 'readwrite')
-  tx.objectStore('sync_queue').put(item)
-  return id
+  // POR QUÉ NO SE FILTRA AQUÍ POR CAMPOS DE DINERO, aunque parecía la defensa obvia.
+  //
+  // Se intentó y se retiró el 2026-09-08: rechazar al encolar lo que el proxy rechaza
+  // al escribir rompe DOS caminos legítimos, y por razones distintas.
+  //   · `saveOrder` encola su payload —con `total`, `status`, `pagos`— por APP_API hacia
+  //     `/api/pos/save-order`, donde el servidor RECALCULA. Es el cobro offline entero.
+  //   · `updateOrderStatus` encola un PATCH con `status`, que también está en la lista,
+  //     y es como el KDS mueve una comanda sin red.
+  //
+  // Acotarlo por transporte no salva la segunda, porque ahí `transport` va `undefined`.
+  // Y una guarda de cliente no detiene a quien tiene DevTools abiertas de todos modos.
+  //
+  // El control que sí manda es el del SERVIDOR, y está cerrado por los dos lados: el
+  // proxy aplica `camposProhibidos`, y el replay de las tablas con candado ya no puede
+  // rodearlo aunque haya JWT de dashboard (ver la elección de transporte más abajo).
+
+  // SE ESPERA EL COMMIT. Antes era `tx.put(item); return id`, y el `await` de quien
+  // llama se resolvía en el microtask siguiente — ANTES de que la transacción
+  // commiteara. Si Chromium fallaba la transacción, esta función no lanzaba, así que el
+  // catch de `queueForReplay` (pos-data.ts) —que existe justo para caer al buffer de
+  // localStorage— no se disparaba nunca.
+  //
+  // El resultado, sin que nadie haga nada malo: `saveOrder` devuelve OFFLINE_QUEUED, el
+  // POS abre el cajón, imprime el ticket y dice «cobro guardado localmente». El dinero
+  // entró y el registro no existe en ninguna parte. A ticket promedio de AMALAY son
+  // ~$790 por ocurrencia, y no deja rastro que permita descubrirlo después.
+  //
+  // El patrón correcto ya estaba en este mismo archivo, en `saveIDBPrintJob` y
+  // `cacheTurno`: el trabajo de IMPRESIÓN se guardaba con más cuidado que el cobro.
+  return new Promise<string>((resolve, reject) => {
+    const tx = db.transaction('sync_queue', 'readwrite')
+    tx.objectStore('sync_queue').put(item)
+    tx.oncomplete = () => resolve(id)
+    tx.onerror = () => reject(tx.error ?? new Error('sync_queue: la transacción falló'))
+    tx.onabort = () => reject(tx.error ?? new Error('sync_queue: la transacción se abortó'))
+  })
 }
 
 export function repairReplayData(
@@ -497,6 +544,26 @@ export function repairReplayData(
 ): Record<string, unknown> {
   if (table !== 'pos_audit_log' || (typeof data.actor === 'string' && data.actor.trim())) return data
   return { ...data, actor: sessionActor.trim() || 'POS Offline' }
+}
+
+/**
+ * Cada cuántos ticks de 20 s vuelve a intentarse un item con `r` reintentos.
+ *
+ * Un fallo de RED no es terminal: el tope existe para no martillar, no para rendirse.
+ * Por eso no hay caso "ya no" — el espaciado crece y se queda en 15 minutos, que son
+ * cuatro intentos por hora: suficiente para recuperar solo cuando el WAN vuelva, y poco
+ * como para no calentar nada durante el servicio.
+ */
+export function ticksEntreReintentos(r: number): number {
+  if (r < 5) return 1     // 20 s — el ritmo de siempre, mientras hay esperanza
+  if (r < 10) return 3    // 1 min
+  if (r < 20) return 15   // 5 min
+  return 45               // 15 min, para siempre
+}
+
+/** ¿A este item le toca reintentar en este tick? Pura, para poder probarla. */
+export function tocaReintentar(retries: number, tick: number): boolean {
+  return tick % ticksEntreReintentos(retries) === 0
 }
 
 export async function getPendingQueue(actionableOnly = false): Promise<SyncQueueItem[]> {
@@ -514,31 +581,47 @@ export async function getPendingQueue(actionableOnly = false): Promise<SyncQueue
 
 export async function markSynced(id: string): Promise<void> {
   const db = await openDB()
-  const tx = db.transaction('sync_queue', 'readwrite')
-  const store = tx.objectStore('sync_queue')
-  const request = store.get(id)
-  request.onsuccess = () => {
-    const item = request.result
-    if (item) {
-      item.synced = true
-      store.put(item)
+  // Se espera el commit, como en `queueOperation`. Si esta marca no cuaja, el item se
+  // vuelve a reproducir: la idempotencia por `save_operation_id` lo cubre en el camino
+  // de save-order, pero no todo lo que pasa por la cola tiene esa red.
+  return new Promise<void>((resolve, reject) => {
+    const tx = db.transaction('sync_queue', 'readwrite')
+    const store = tx.objectStore('sync_queue')
+    const request = store.get(id)
+    request.onsuccess = () => {
+      const item = request.result
+      if (item) {
+        item.synced = true
+        store.put(item)
+      }
     }
-  }
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error ?? new Error('sync_queue: no se pudo marcar como sincronizado'))
+    tx.onabort = () => reject(tx.error ?? new Error('sync_queue: la marca se abortó'))
+  })
 }
 
 export async function incrementRetry(id: string, detail = ''): Promise<void> {
   const db = await openDB()
-  const tx = db.transaction('sync_queue', 'readwrite')
-  const store = tx.objectStore('sync_queue')
-  const request = store.get(id)
-  request.onsuccess = () => {
-    const item = request.result
-    if (item) {
-      item.retries += 1
-      if (detail) item.error_detail = detail.slice(0, 500)
-      store.put(item)
+  // Si esta cuenta no cuaja, el item se reintenta con el MISMO contador: el drenado
+  // martillea el mismo elemento sin avanzar nunca hacia el tope, y el resto de la cola
+  // se queda esperando detrás.
+  return new Promise<void>((resolve, reject) => {
+    const tx = db.transaction('sync_queue', 'readwrite')
+    const store = tx.objectStore('sync_queue')
+    const request = store.get(id)
+    request.onsuccess = () => {
+      const item = request.result
+      if (item) {
+        item.retries += 1
+        if (detail) item.error_detail = detail.slice(0, 500)
+        store.put(item)
+      }
     }
-  }
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error ?? new Error('sync_queue: no se pudo contar el reintento'))
+    tx.onabort = () => reject(tx.error ?? new Error('sync_queue: el reintento se abortó'))
+  })
 }
 
 /** Reinicia el contador de reintentos de los items no-terminales de la cola.
@@ -568,15 +651,24 @@ export async function resetSyncQueueRetries(): Promise<number> {
 
 export async function clearAllPending(): Promise<void> {
   const db = await openDB()
-  const tx = db.transaction('sync_queue', 'readwrite')
-  tx.objectStore('sync_queue').clear()
+  return new Promise<void>((resolve, reject) => {
+    const tx = db.transaction('sync_queue', 'readwrite')
+    tx.objectStore('sync_queue').clear()
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error ?? new Error('sync_queue: el vaciado fallo'))
+    tx.onabort = () => reject(tx.error ?? new Error('sync_queue: el vaciado se aborto'))
+  })
 }
 
 export async function clearTerminalItems(): Promise<void> {
   const db = await openDB()
+  return new Promise<void>((resolve, reject) => {
   const tx = db.transaction('sync_queue', 'readwrite')
   const store = tx.objectStore('sync_queue')
   const request = store.getAll()
+  tx.oncomplete = () => resolve()
+  tx.onerror = () => reject(tx.error ?? new Error('sync_queue: la limpieza fallo'))
+  tx.onabort = () => reject(tx.error ?? new Error('sync_queue: la limpieza se aborto'))
   request.onsuccess = () => {
     for (const item of request.result) {
       // Only delete items that have been explicitly classified as terminal errors
@@ -586,6 +678,7 @@ export async function clearTerminalItems(): Promise<void> {
       }
     }
   }
+  })
 }
 
 export interface SyncQueueSummary {
@@ -699,14 +792,19 @@ export async function resolveSyncConflictApplyLocal(
 
 export async function clearSyncedItems(): Promise<void> {
   const db = await openDB()
+  return new Promise<void>((resolve, reject) => {
   const tx = db.transaction('sync_queue', 'readwrite')
   const store = tx.objectStore('sync_queue')
   const request = store.getAll()
+  tx.oncomplete = () => resolve()
+  tx.onerror = () => reject(tx.error ?? new Error('sync_queue: la purga fallo'))
+  tx.onabort = () => reject(tx.error ?? new Error('sync_queue: la purga se aborto'))
   request.onsuccess = () => {
     for (const item of request.result) {
       if (item.synced) store.delete(item.id)
     }
   }
+  })
 }
 
 // ─── Sync Engine ────────────────────────────────────────────────────────────
@@ -959,14 +1057,28 @@ async function markConflict(
 // Without this, two concurrent runs can race: the second reads the queue before the first's markConflict
 // completes, causing conflicted items to be re-processed and potentially lost.
 let syncAllRunning = false
+type SyncResult = { synced: number; failed: number; blocked?: 'CAJA_AUTHORITY' | 'CAJA_UNAVAILABLE' }
 
-export async function syncAll(options: { retryExhausted?: boolean } = {}): Promise<{ synced: number; failed: number }> {
+// This queue belongs to the previous cloud writer. After cutover its entries
+// must be reconciled, not replayed over accounts committed by Caja. Keep their
+// payloads and retry counts intact, including when Caja cannot be reached.
+async function replayAuthorityBlock(): Promise<SyncResult['blocked']> {
+  if (!requiereCaja()) return undefined
+  const state = await leerSalon()
+  if (!state.autoritativa) return 'CAJA_UNAVAILABLE'
+  if (state.writeAuthority === 'caja') return 'CAJA_AUTHORITY'
+  return undefined
+}
+
+export async function syncAll(options: { retryExhausted?: boolean } = {}): Promise<SyncResult> {
   if (syncAllRunning) {
     console.log('[offline-sync] syncAll already running — skipping duplicate call')
     return { synced: 0, failed: 0 }
   }
   syncAllRunning = true
   try {
+    const blocked = await replayAuthorityBlock()
+    if (blocked) return { synced: 0, failed: 0, blocked }
     if (options.retryExhausted) {
       const reset = await resetSyncQueueRetries()
       if (reset > 0) console.log(`[offline-sync] Reactivated ${reset} transient item(s) for a fresh connectivity cycle`)
@@ -977,7 +1089,7 @@ export async function syncAll(options: { retryExhausted?: boolean } = {}): Promi
   }
 }
 
-async function _syncAllInner(): Promise<{ synced: number; failed: number }> {
+async function _syncAllInner(): Promise<SyncResult> {
   const queue = await getPendingQueue()
   let synced = 0
   let failed = 0
@@ -1006,6 +1118,10 @@ async function _syncAllInner(): Promise<{ synced: number; failed: number }> {
   }
 
   for (const item of queue) {
+    // Recheck between entries: a long replay must stop if the installation
+    // changes authority or loses Caja. The database fence covers in-flight IO.
+    const blocked = await replayAuthorityBlock()
+    if (blocked) return { synced, failed, blocked }
     // Skip items in terminal error state — they require operator intervention
     if (item.error_class === 'STALE_WRITE_CONFLICT' || item.error_class === 'TERMINAL_NON_RETRYABLE') {
       continue
@@ -1091,9 +1207,44 @@ async function _syncAllInner(): Promise<{ synced: number; failed: number }> {
         }
         let url: string
         let reqHeaders: Record<string, string>
-        if (accessToken) {
+        // ── EL JWT DE DASHBOARD SE SALTABA EL CANDADO DE COLUMNAS ──────────────
+        //
+        // `if (accessToken)` ganaba siempre y mandaba el replay DIRECTO a PostgREST,
+        // rodeando `/api/pos/db` y con él `camposProhibidos` — el candado que impide
+        // que se toquen `total`, `pagos`, `status` y demás campos de dinero.
+        //
+        // La precondición se cumple sola: la sesión de Supabase existe en cuanto
+        // ALGUIEN entró una vez al dashboard en esa máquina, que es justo lo que se hace
+        // para ver el corte y los reportes. Y el refresh token dura semanas.
+        //
+        // El vector: agregar a mano un registro en `sync_queue` desde DevTools con
+        // `{table:'pos_orders', method:'PATCH', data:{total:1}, transport:'SUPABASE_REST'}`
+        // y esperar menos de 20 segundos a que el intervalo drene solo.
+        //
+        // Ahora las tablas con candado por columna van SIEMPRE por el proxy, aunque haya
+        // JWT. No se pierde nada: `withPOSAuth` sabe autenticar sesiones de Supabase.
+        //
+        // OJO CON EL HEADER, que es lo que hace que esto no rompa producción: con varias
+        // membresías y sin `x-fullsite-tenant`, `withPOSAuth` FALLA CERRADO (401) para no
+        // adivinar tenant — y Daniel tiene ocho. Sin este header, forzar el proxy
+        // desloguearía la caja y la cola dejaría de drenar.
+        const conCandadoDeColumnas = Object.prototype.hasOwnProperty.call(
+          CAMPOS_SOLO_DE_GERENTE, item.table,
+        )
+        let tenantDeLaTerminal = ''
+        try { tenantDeLaTerminal = localStorage.getItem('fullsite_client_id') || '' } catch {}
+
+        if (accessToken && !conCandadoDeColumnas) {
           url = `${SUPABASE_URL}/rest/v1/${restPath}`
           reqHeaders = { apikey: SUPABASE_KEY, Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' }
+        } else if (accessToken && conCandadoDeColumnas) {
+          const base = typeof window !== 'undefined' ? window.location.origin : ''
+          url = `${base}/api/pos/db?path=${encodeURIComponent(restPath)}`
+          reqHeaders = {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json', Prefer: 'return=minimal',
+            ...(tenantDeLaTerminal ? { 'x-fullsite-tenant': tenantDeLaTerminal } : {}),
+          }
         } else if (shiftToken) {
           const base = typeof window !== 'undefined' ? window.location.origin : ''
           url = `${base}/api/pos/db?path=${encodeURIComponent(restPath)}`
@@ -1262,10 +1413,22 @@ export async function getCachedPaymentMethods(): Promise<Record<string, unknown>
 
 export async function cacheStaff(staff: Record<string, unknown>[]): Promise<void> {
   const db = await openDB()
-  const tx = db.transaction('staff', 'readwrite')
-  const store = tx.objectStore('staff')
-  store.clear()
-  for (const s of staff) store.put(s)
+  // El más delicado de los cuatro: hace `clear()` y repuebla. Si la transacción se
+  // abortaba a medias y esto ya había resuelto, nadie se enteraba — y este caché es lo
+  // que permite entrar con PIN sin WAN. Un `staff` vacío deja la terminal sin acceso
+  // justo cuando no hay internet para arreglarlo.
+  //
+  // IndexedDB es transaccional: si aborta, el `clear()` también se revierte. Lo que
+  // faltaba no era atomicidad, era ENTERARSE.
+  return new Promise<void>((resolve, reject) => {
+    const tx = db.transaction('staff', 'readwrite')
+    const store = tx.objectStore('staff')
+    store.clear()
+    for (const s of staff) store.put(s)
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error ?? new Error('staff: la transacción falló'))
+    tx.onabort = () => reject(tx.error ?? new Error('staff: la transacción se abortó'))
+  })
 }
 
 export async function getCachedStaff(): Promise<Record<string, unknown>[]> {
@@ -1307,8 +1470,14 @@ export async function getCachedOrdersByTurno(turnoId: string): Promise<Record<st
 
 export async function cacheCashMovement(movement: Record<string, unknown>): Promise<void> {
   const db = await openDB()
-  const tx = db.transaction('cash_movements', 'readwrite')
-  tx.objectStore('cash_movements').put(movement)
+  // Es DINERO: un retiro o deposito que no cuaja desaparece del arqueo.
+  return new Promise<void>((resolve, reject) => {
+    const tx = db.transaction('cash_movements', 'readwrite')
+    tx.objectStore('cash_movements').put(movement)
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error ?? new Error('cash_movements: la transaccion fallo'))
+    tx.onabort = () => reject(tx.error ?? new Error('cash_movements: la transaccion se aborto'))
+  })
 }
 
 export async function getCachedCashMovsByTurno(turnoId: string): Promise<{ type: string; amount: number }[]> {
@@ -1573,16 +1742,42 @@ export function registerAutoSync() {
   // 3. Periodic safety net. El evento 'online' es poco confiable: puede NO
   //    dispararse en cada reconexión (quirk del navegador), dejando órdenes
   //    offline atoradas hasta una recarga manual. Cada 20s, si hay red y quedan
-  //    items ACCIONABLES (no synced, no terminal, no agotados en reintentos),
-  //    drena la cola. Garantiza que las comandas offline suban solas.
+  //    items ACCIONABLES (no synced, no terminal), drena la cola.
+  //
+  // ── LA RED DE SEGURIDAD SE APAGABA SOLA ────────────────────────────────────
+  //
+  // Antes: `queue.filter(i => (i.retries ?? 0) < 5)` y `if (actionable.length === 0)
+  // return`, con `syncAll()` SIN `retryExhausted`. El escenario que lo dispara es el
+  // documentado de AMALAY, y no hace falta que nadie se equivoque:
+  //
+  //   1. 21:10. El WAN se degrada pero la LAN sigue arriba. `navigator.onLine` se queda
+  //      en TRUE y el evento 'online' nunca se disparará, porque nunca hubo 'offline'.
+  //   2. Los cobros caen a la cola. Cada intento falla → `incrementRetry`.
+  //   3. A los ~100 segundos cada item está en retries=5.
+  //   4. Desde ahí el intervalo se apaga SOLO: `actionable.length === 0` → return, cada
+  //      20 segundos, para siempre.
+  //   5. 21:35 el WAN vuelve. No pasa nada. No hay evento, no hay recarga, y la caja no
+  //      vuelve a teclear PIN durante el servicio.
+  //
+  // El corte de esa noche lee la nube incompleta y nadie se entera.
+  //
+  // Un fallo de red NO es terminal: el tope de 5 tiene sentido para no martillar, no
+  // para rendirse. Ahora se espacian los reintentos y no se abandona nunca. Los items
+  // con `error_class` (conflicto real, rechazo de negocio) siguen fuera — ésos sí
+  // necesitan a una persona, y `getPendingQueue(true)` ya los excluye.
+  let tick = 0
   setInterval(async () => {
     if (isSyncing || !navigator.onLine) return
+    tick++
     try {
       const queue = await getPendingQueue(true) // excluye terminales (error_class)
-      const actionable = queue.filter(i => (i.retries ?? 0) < 5)
-      if (actionable.length === 0) return
+      if (queue.length === 0) return
+      const toca = queue.some(i => tocaReintentar(i.retries ?? 0, tick))
+      if (!toca) return
       isSyncing = true
-      const { synced, failed } = await syncAll()
+      // `retryExhausted` porque justamente los agotados son los que hay que revivir;
+      // sin esto `_syncAllInner` los salta y el arreglo no serviría de nada.
+      const { synced, failed } = await syncAll({ retryExhausted: true })
       if (synced > 0 || failed > 0) {
         console.log(`[offline-sync] Periodic sync: ${synced} synced, ${failed} failed`)
       }

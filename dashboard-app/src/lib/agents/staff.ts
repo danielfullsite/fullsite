@@ -7,6 +7,7 @@
  * Inputs:  pos_orders (today)
  */
 import type { AgentEvent } from './types'
+import { getActiveTimezone } from '@/lib/date-mx'
 
 interface PosOrder {
   mesa: number | null
@@ -16,8 +17,14 @@ interface PosOrder {
   created_at: string
 }
 
+/**
+ * Ahora, en la zona del NEGOCIO -- antes 'America/Monterrey' clavado.
+ *
+ * Solo se leen componentes locales (`getHours`, `getDay`...), que es para lo que esta
+ * bien: su INSTANTE esta corrido. Ver la advertencia en `date-mx.ts:nowMX`.
+ */
 function nowMX(): Date {
-  return new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Monterrey' }))
+  return new Date(new Date().toLocaleString('en-US', { timeZone: getActiveTimezone() }))
 }
 
 // Horas de servicio activo — fuera de estos rangos no aplica "idle" detection

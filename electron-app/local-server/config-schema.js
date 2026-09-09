@@ -44,6 +44,9 @@ function validate(config) {
   }
 
   const errors = []
+  if (config.localAuthorityEnabled !== undefined && typeof config.localAuthorityEnabled !== 'boolean') {
+    errors.push('localAuthorityEnabled must be an explicit boolean')
+  }
 
   const required = [
     'config_version', 'restaurant_id', 'terminal_id', 'terminal_role',
@@ -135,6 +138,7 @@ function fromLegacy(legacy) {
     pos_server_ip:  legacy.pos_server_ip || null,
     supabaseUrl:    legacy.supabaseUrl || null,
     supabaseAnonKey: legacy.supabaseAnonKey || null,
+    localAuthorityEnabled: legacy.localAuthorityEnabled === true,
   }
 
   const { valid, errors } = validate(migrated)

@@ -115,6 +115,12 @@ export async function POST(request: NextRequest) {
       return `${d.fecha}: Ventas $${d.ventas_dia}, ${tk} tickets, ${pr} personas, PromOrden $${tpO}, PromPersona $${tpP}, Propinas $${Math.round(Number(d.propinas_total) || 0)} | Meseros: ${topM}`
     }).join('\n')
 
+    // `dayNames` se conserva: lo usa `todayDOW`, que sale de la FECHA DEL DATO
+    // (`fecha + 'T12:00:00'`, mediodia, lejos de cualquier frontera de dia) y no del
+    // reloj. Ese indice siempre fue correcto; el defecto estaba en el otro uso, el que
+    // sacaba el dia de `mxNow.getDay()` con el -6 clavado.
+    const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
+
     // Compute same-DOW averages for today
     const today = days[0]
     const todayDate = new Date(today.fecha + 'T12:00:00')
@@ -142,14 +148,26 @@ export async function POST(request: NextRequest) {
     const prevWeekTP = sumField(prevWeek, 'personas_restaurant') > 0
       ? prevWeekVentas / sumField(prevWeek, 'personas_restaurant') : 0
 
-    const now = new Date()
-    const mxOffset = -6 * 60 * 60 * 1000
-    const mxNow = new Date(now.getTime() + mxOffset + now.getTimezoneOffset() * 60 * 1000)
-    const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
-
-    // Load client config for AI persona
+    // Load client config for AI persona (y para la zona horaria, abajo)
     const { fetchClientConfig } = await import('@/lib/client-config')
     const clientConfig = await fetchClientConfig(client_id || '')
+
+    // EL DIA DE LA SEMANA SALE DE LA ZONA DEL TENANT, NO DE UN -6 CLAVADO.
+    //
+    // Antes: `new Date(now.getTime() - 6h + now.getTimezoneOffset()*60000).getDay()`
+    // con un arreglo de nombres. Dos cosas mal: el -6 vale solo para el centro de
+    // Mexico --Tijuana es -7/-8 y ademas conserva horario de verano-- y
+    // `getTimezoneOffset()` es la zona DEL PROCESO, asi que la cuenta salia bien
+    // unicamente porque Vercel corre en UTC.
+    //
+    // El coach le dice al dueno "hoy es sabado y llevas X". Decirle el dia equivocado
+    // a la hora de la cena tira la credibilidad de todo lo demas que diga.
+    const zona = clientConfig.timezone || 'America/Mexico_City'
+    const diaDeLaSemana = (() => {
+      const d = new Intl.DateTimeFormat('es-MX', { timeZone: zona, weekday: 'long' })
+        .format(new Date())
+      return d.charAt(0).toUpperCase() + d.slice(1)
+    })()
     const restaurantName = clientConfig.display_name || client_id || 'el restaurante'
 
     const systemPrompt = `Eres el COACH OPERATIVO de ${restaurantName}. Tu trabajo es observar los datos del restaurante y dar consejos accionables al dueño. NO eres un chatbot — eres un socio que piensa 24/7 en cómo mejorar el negocio.
@@ -167,7 +185,7 @@ GENERA EXACTAMENTE 3 INSIGHTS en formato JSON array. Cada insight debe tener:
 - "priority": "high" | "medium" | "low"
 - "metric": número clave del insight (ej: "-18%", "$1,200", "3 días")
 
-CONTEXTO HOY (${dayNames[mxNow.getDay()]} ${today.fecha}):
+CONTEXTO HOY (${diaDeLaSemana} ${today.fecha}):
 - Ventas hoy: $${today.ventas_dia} (promedio ${dayNames[todayDOW]}: $${Math.round(avgVentas)}, ${avgVentas > 0 ? ((Number(today.ventas_dia) / avgVentas - 1) * 100).toFixed(0) + '%' : 'sin data'})
 - Tickets hoy: ${today.tickets_count} (promedio: ${Math.round(avgTickets)})
 - TP hoy: $${Number(today.tickets_count) > 0 ? Math.round(Number(today.ventas_dia) / Number(today.tickets_count)) : 0} (promedio: $${Math.round(avgTP)})

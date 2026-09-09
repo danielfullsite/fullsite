@@ -1,8 +1,31 @@
 import { test, expect } from '@playwright/test'
 
+// ATENCION: ESTE ARCHIVO ESCRIBE EN PRODUCCION. NO LO CORRAS SIN QUERERLO.
+//
+// `BASE` apunta a app.fullsite.mx —el restaurante de verdad— y el PIN tenia un valor
+// por omision EN EL CODIGO. Correrlo abre mesas, manda a cocina y cobra en AMALAY.
+//
+// Hasta el 2026-09-09 nadie lo corria y nadie lo sabia: `vitest.config.ts` excluye
+// `tests/**` y los dos configs de Playwright apuntan a `./e2e`. O sea que estos 29
+// casos existian, se veian como cobertura, no defendian nada, y bastaba un
+// `npx playwright test tests/` para cobrarle a un cliente.
+//
+// La guarda de abajo NO borra nada: los 29 casos siguen aqui y siguen sirviendo para
+// una verificacion manual deliberada. Solo exige decirlo en voz alta:
+//
+//     POS_E2E_PROD=1 POS_TEST_PIN=<el pin> npx playwright test tests/pos-e2e.spec.ts
+//
+// Ver `src/__tests__/ninguna-prueba-vive-donde-nadie-la-corre.test.ts`, que impide que
+// vuelva a aparecer un .spec fuera del alcance de un runner sin que nadie se entere.
+test.skip(
+  process.env.POS_E2E_PROD !== '1',
+  'Escribe en PRODUCCION. Corre con POS_E2E_PROD=1 y un PIN explicito.',
+)
+
 const BASE = 'https://app.fullsite.mx'
 
-const PIN = process.env.POS_TEST_PIN || '9012'
+// Sin valor por omision: un PIN quemado en el codigo es un PIN publicado.
+const PIN = process.env.POS_TEST_PIN || ''
 
 // Helper: login with PIN if needed
 async function loginIfNeeded(page: any) {

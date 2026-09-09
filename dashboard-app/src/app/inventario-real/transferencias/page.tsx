@@ -7,6 +7,7 @@ import { getWarehouseLabels } from '@/lib/warehouses'
 import { formatCurrency } from '@/lib/format'
 import PageHeader from '@/components/PageHeader'
 import { sbPost, sbGet } from '@/lib/supabase-helpers'
+import { useClaveDeOperacion } from '@/lib/clave-de-operacion'
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -59,11 +60,8 @@ function uid() {
   return Math.random().toString(36).slice(2, 10)
 }
 
-function nowKey() {
-  const d = new Date()
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}`
-}
+// `nowKey()` se retiro: la clave con el MINUTO del reloj registraba la operacion dos
+// veces si el reintento cruzaba el cambio de minuto. Ver `lib/clave-de-operacion.ts`.
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
@@ -87,6 +85,8 @@ function formatDateTime(iso: string) {
 // ── Component ───────────────────────────────────────────────────────
 
 export default function TransferenciasPage() {
+  // Estable entre reintentos del mismo guardado; se renueva al confirmar.
+  const { clave: claveDeOperacion, confirmar: confirmarOperacion } = useClaveDeOperacion()
   const WAREHOUSES = getWarehouseLabels() // almacenes del tenant activo
   // Data
   const [inventory, setInventory] = useState<InventoryItem[]>([])
@@ -251,13 +251,17 @@ export default function TransferenciasPage() {
 
     try {
       const clientId = getActiveClientSlug()
+      // La clave identifica la OPERACION, no el instante: con el minuto del reloj, un
+      // reintento que cruzara el cambio de minuto registraba la transferencia dos veces.
+      // Ver `lib/clave-de-operacion.ts` — en entradas ya paso en produccion.
       const ok = await sbPost('wansoft_data', clientId, {
-        data_key: `inventory_transfer_${nowKey()}`,
+        data_key: `inventory_transfer_${todayStr()}_${claveDeOperacion}`,
         fecha: todayStr(),
         data: payload,
       })
       setSaveResult(ok ? 'ok' : 'error')
       if (ok) {
+        confirmarOperacion()   // guardado confirmado: lo siguiente es otra operacion
         setItems([])
         setSource('')
         setDestination('')

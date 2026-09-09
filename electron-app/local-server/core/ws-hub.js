@@ -4,19 +4,38 @@
 // One WebSocketServer instance, attached to the existing HTTP server via 'upgrade'.
 
 const { WebSocketServer } = require('ws')
-const { S2C, C2S, parseClientMessage, serverEnvelope } = require('../protocol')
+const { S2C, C2S, revisarMensajeDeCliente, serverEnvelope } = require('../protocol')
+const credLan = require('./credencial-lan')
 
 const PING_INTERVAL_MS   = 15_000
-const PONG_TIMEOUT_MS    = 10_000
+// Un cliente pasivo —el enlace de una terminal secundaria, un tablero de cocina—
+// sólo refresca su marca cuando CONTESTA un ping. Si el plazo no cubre varios
+// intervalos, el hub mata al cliente sano antes de darle ocasión de contestar.
+// Con 15 s de intervalo y 10 s de plazo, TODO cliente moría en el primer barrido:
+// su marca era la del SUBSCRIBE, 15 s atrás, y el plazo eran 10. La terminal
+// volvía a entrar pidiendo el snapshot completo cada 15 segundos.
+// INVARIANTE: el plazo debe cubrir varios intervalos. La verifica el constructor.
+const PONG_TIMEOUT_MS    = 45_000
 const LOCK_EXPIRY_MS     = 30_000
 
 class WsHub {
   /**
    * @param {{ serverId: string, restaurantId: string, getState: () => object, getLastSequence: () => Promise<number>, readAfter: (seq: number) => Promise<object[]> }} opts
    */
-  constructor({ serverId, restaurantId, getState, getLastSequence, readAfter }) {
+  constructor({ serverId, restaurantId, branchId, lanSecret, getState, getLastSequence, readAfter,
+    pingIntervalMs = PING_INTERVAL_MS, pongTimeoutMs = PONG_TIMEOUT_MS }) {
+    // Configurables para poder probar el keepalive sin esperar minutos. La
+    // invariante se comprueba aquí para que nadie los vuelva a cruzar: un plazo
+    // que no cubre dos intervalos desconecta clientes sanos.
+    if (!(pingIntervalMs > 0) || !(pongTimeoutMs > pingIntervalMs * 2)) {
+      throw new Error('Keepalive inválido: el plazo del pong debe cubrir más de dos intervalos de ping')
+    }
+    this._pingIntervalMs = pingIntervalMs
+    this._pongTimeoutMs  = pongTimeoutMs
     this._serverId      = serverId
     this._restaurantId  = restaurantId
+    this._branchId      = branchId
+    this._lanSecret     = lanSecret
     this._getState      = getState
     this._getLastSeq    = getLastSequence
     this._readAfter     = readAfter
@@ -33,6 +52,16 @@ class WsHub {
 
     httpServer.on('upgrade', (req, socket, head) => {
       if (req.url === '/ws') {
+        // Node puede autenticar el upgrade; browsers lo hacen en SUBSCRIBE.
+        // El handshake abierto NO registra un cliente ni autoriza datos/comandos.
+        if (req.headers[credLan.CABECERA]) {
+          const auth = credLan.verificarCredencial({ ruta: '/ws', metodo: 'GET', cabeceras: req.headers,
+            secreto: this._lanSecret, restaurantId: this._restaurantId, branchId: this._branchId })
+          if (!auth.permitido) {
+            socket.end('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\nContent-Length: 0\r\n\r\n')
+            return
+          }
+        }
         this._wss.handleUpgrade(req, socket, head, (ws) => {
           this._wss.emit('connection', ws, req)
         })
@@ -42,7 +71,7 @@ class WsHub {
     })
 
     this._wss.on('connection', (ws, req) => this._onConnection(ws, req))
-    this._pingTimer = setInterval(() => this._pingAll(), PING_INTERVAL_MS)
+    this._pingTimer = setInterval(() => this._pingAll(), this._pingIntervalMs)
 
     console.log('[ws-hub] WebSocket hub attached on /ws')
   }
@@ -56,14 +85,36 @@ class WsHub {
   async _onConnection(ws, req) {
     const remoteIp = req.socket?.remoteAddress || 'unknown'
     let clientId   = null
+    let terminalId = null
+    let autenticado = false
+    const authTimeout = setTimeout(() => { if (!autenticado) ws.close(1008, 'falta credencial SUBSCRIBE') }, 5000)
+    authTimeout.unref?.()
+    let mensajes = Promise.resolve()
 
-    ws.on('message', async (raw) => {
-      let msg
-      try { msg = parseClientMessage(raw.toString()) } catch { return }
-      if (!msg) return
+    const recibir = async (raw) => {
+      // Se RECHAZA con motivo y se cierra, en vez de ignorar en silencio. Un
+      // cliente ignorado queda conectado y mudo sin saber por que; uno cerrado
+      // con codigo 1008 y un texto puede arreglarse. Ver protocol.js/RECHAZO.
+      const revision = revisarMensajeDeCliente(raw.toString())
+      if (revision.rechazo) {
+        console.warn(`[ws-hub] mensaje rechazado de ${clientId || remoteIp}: ${revision.rechazo}`)
+        try { ws.close(1008, revision.rechazo) } catch {}
+        return
+      }
+      const msg = revision.msg
 
       if (msg.type === C2S.SUBSCRIBE) {
+        const cabeceras = { ...req.headers }
+        if (msg.lan_secret !== undefined) cabeceras[credLan.CABECERA] = msg.lan_secret
+        const auth = credLan.verificarCredencial({ ruta: '/ws', metodo: 'GET', cabeceras,
+          secreto: this._lanSecret, restaurantId: this._restaurantId, branchId: this._branchId })
+        const scopeError = credLan.verificarScope(msg, { restaurantId: this._restaurantId, branchId: this._branchId })
+        if (!auth.permitido || scopeError) {
+          ws.close(1008, auth.motivo || scopeError)
+          return
+        }
         clientId = msg.client_id
+        terminalId = req.headers['x-fullsite-terminal'] || msg.terminal_id || clientId
         if (!clientId) { ws.close(1008, 'Missing client_id'); return }
 
         // CFG-02: reject terminals with mismatched or missing restaurant_id.
@@ -76,6 +127,10 @@ class WsHub {
           return
         }
 
+        const anterior = this._clients.get(clientId)
+        if (anterior && anterior.ws !== ws) anterior.ws.close(1008, 'conexion reemplazada')
+        autenticado = true
+        clearTimeout(authTimeout)
         this._clients.set(clientId, {
           ws,
           meta:     { client_id: clientId, client_type: msg.client_type, remote_ip: remoteIp, connected_at: Date.now(), restaurant_id: remoteRestaurantId || null },
@@ -97,6 +152,16 @@ class WsHub {
         return
       }
 
+      if (!autenticado || !clientId || this._clients.get(clientId)?.ws !== ws) {
+        ws.close(1008, 'SUBSCRIBE autenticado requerido')
+        return
+      }
+      const scopeError = credLan.verificarScope(msg, { restaurantId: this._restaurantId, branchId: this._branchId })
+      if (scopeError || (msg.client_id && msg.client_id !== clientId)) {
+        ws.close(1008, scopeError || 'otra terminal')
+        return
+      }
+
       if (msg.type === C2S.PING) {
         if (clientId && this._clients.has(clientId)) {
           this._clients.get(clientId).lastPong = Date.now()
@@ -108,20 +173,25 @@ class WsHub {
       if (msg.type === C2S.COMMAND) {
         if (!this._onCommand) return
         try {
-          const result = await this._onCommand(msg, clientId)
+          const result = await this._onCommand(msg, clientId, { terminalId, actorToken: msg.actor_token })
           const seq = await this._getLastSeq()
           if (result.duplicate) {
-            ws.send(this._envelope(S2C.ACK, { command_id: msg.payload?.command_id, duplicate: true }, seq))
+            ws.send(this._envelope(S2C.ACK, { command_id: msg.payload?.command_id, duplicate: true, receipt: result.receipt, result: result.result }, seq))
           } else if (result.error) {
-            ws.send(this._envelope(S2C.REJECT, { command_id: msg.payload?.command_id, reason: result.error }, seq))
+            ws.send(this._envelope(S2C.REJECT, { command_id: msg.payload?.command_id, reason: result.error, code: result.code }, seq))
           } else {
-            ws.send(this._envelope(S2C.ACK, { command_id: msg.payload?.command_id, event: result.event }, seq))
+            ws.send(this._envelope(S2C.ACK, { command_id: msg.payload?.command_id, event: result.event, result: result.result }, seq))
           }
         } catch (e) {
-          ws.send(this._envelope(S2C.REJECT, { reason: e.message }, 0))
+          ws.send(this._envelope(S2C.REJECT, { command_id: msg.payload?.command_id, reason: e.message }, 0))
         }
         return
       }
+    }
+    // Un COMMAND pipelined no puede adelantar la autenticación/SNAPSHOT.
+    ws.on('message', raw => {
+      mensajes = mensajes.then(() => ws.readyState === ws.OPEN && recibir(raw))
+        .catch(() => { try { ws.close(1011, 'no se pudo procesar el mensaje') } catch {} })
     })
 
     ws.on('pong', () => {
@@ -131,7 +201,8 @@ class WsHub {
     })
 
     ws.on('close', () => {
-      if (clientId) {
+      clearTimeout(authTimeout)
+      if (clientId && this._clients.get(clientId)?.ws === ws) {
         this._clients.delete(clientId)
         console.log(`[ws-hub] Client disconnected: ${clientId}`)
       }
@@ -169,7 +240,7 @@ class WsHub {
   // ─── Keepalive ───────────────────────────────────────────────────────────
 
   _pingAll() {
-    const deadline = Date.now() - PONG_TIMEOUT_MS
+    const deadline = Date.now() - this._pongTimeoutMs
     for (const [clientId, client] of this._clients) {
       if (client.lastPong < deadline) {
         console.warn(`[ws-hub] Client timed out: ${clientId}`)
@@ -198,6 +269,7 @@ class WsHub {
 
   close() {
     if (this._pingTimer) clearInterval(this._pingTimer)
+    if (this._wss) for (const ws of this._wss.clients) ws.terminate()
     if (this._wss)       this._wss.close()
   }
 }

@@ -13,13 +13,16 @@ import {
 } from '@/lib/pos-offline-db'
 import { getPosConfigSync } from '@/lib/pos-config'
 import { sendOrderToKitchen } from '@/lib/kitchen-bridge'
-import { getPOSAuthHeaders, fetchWithTimeout } from '@/lib/pos-data'
+import { getPOSAuthHeaders, fetchWithTimeout, getPaymentMethodsFromDB } from '@/lib/pos-data'
 import { computeOrderSummary, summaryToArqueoInput, calcEfectivoEsperado } from '@/lib/pos-arqueo'
 import {
   filterOpenOrders,
   validateEscalationNota,
   withEscalationPayload,
   openOrderStatusLabel,
+  evaluarArqueo,
+  leerContado,
+  UMBRAL_EXPLICACION_MXN,
   type OpenOrder,
 } from '@/lib/pos-cierre-guard'
 
@@ -98,10 +101,13 @@ export default function CierreCajaWizard({
   const [escalationError, setEscalationError] = useState('')
   const [escalationAuthorizedBy, setEscalationAuthorizedBy] = useState<string | null>(null)
   const [escalationSaving, setEscalationSaving] = useState(false)
+  /** Cobros que aun no llegan a la nube al momento de cerrar. 0 = el corte esta completo. */
+  const [colaPendiente, setColaPendiente] = useState(0)
   const [systemData, setSystemData] = useState({
     efectivo: 0,
     tarjeta: 0,
     transferencias: 0,
+    otros: 0,
     totalVentas: 0,
     ticketsCount: 0,
     cancelaciones: 0,
@@ -118,6 +124,28 @@ export default function CierreCajaWizard({
     async function fetchShiftData() {
       let orders: Record<string, unknown>[] = []
       let fromNetwork = false
+
+      // EL CORTE NO SE CALCULA SOBRE UNA COLA A MEDIO SUBIR.
+      //
+      // Si quedan cobros sin sincronizar, la consulta de abajo lee la nube SIN ellos y
+      // el arqueo espera menos efectivo del que hay en el cajón. La red de seguridad de
+      // 20 s ayuda, pero llega tarde si el cierre es ahora mismo: se fuerza un drenado
+      // aquí, incluyendo los agotados en reintentos, que son justo los que se quedaron
+      // atrás cuando el WAN se degradó.
+      //
+      // NO se bloquea el cierre si queda cola: a las 2 a.m. con la cola atorada, impedir
+      // el corte deja al restaurante sin cerrar la noche, y eso cuesta más que un número
+      // incompleto. Se AVISA con el conteo, y se guarda en el cierre para que mañana se
+      // pueda explicar una diferencia en vez de adivinarla.
+      try {
+        const { syncAll, getSyncQueueSummary } = await import('@/lib/pos-offline-db')
+        const antes = await getSyncQueueSummary()
+        if (antes.pending + antes.exhausted > 0) {
+          await syncAll({ retryExhausted: true })
+        }
+        const despues = await getSyncQueueSummary()
+        setColaPendiente(despues.pending + despues.exhausted + despues.terminal)
+      } catch { /* si la cola no se puede leer, el cierre sigue: avisar es mejor que trabar */ }
 
       // Try Supabase with a hard timeout so degraded LAN doesn't freeze the wizard.
       // Include pagos for accurate split-payment propina attribution.
@@ -144,8 +172,13 @@ export default function CierreCajaWizard({
       // Cash movements — Supabase first, IDB fallback
       let cashMovements: { type: string; amount: number }[] = []
       try {
+        // `client_id` NO estaba en este filtro y sí en el de órdenes, tres líneas
+        // arriba. La RLS tapa al extraño, pero no al usuario con varias membresías:
+        // `user_has_client_access` le dice que sí a TODOS sus restaurantes, y estos
+        // depósitos y retiros entran directo al efectivo esperado. Mismo patrón que
+        // se cerró en seis lecturas el 2026-08-30; ésta se quedó fuera.
         const movRes = await fetch(
-          `${SUPABASE_URL}/rest/v1/pos_cash_movements?turno_id=eq.${turnoId}&select=type,amount`,
+          `${SUPABASE_URL}/rest/v1/pos_cash_movements?client_id=eq.${_cid()}&turno_id=eq.${turnoId}&select=type,amount`,
           { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, signal: AbortSignal.timeout(4000) }
         )
         if (movRes.ok) cashMovements = await movRes.json()
@@ -157,16 +190,39 @@ export default function CierreCajaWizard({
         } catch { /* IDB unavailable */ }
       }
 
-      // Use the shared computeOrderSummary — same logic as Corte page
+      // EL CATÁLOGO SABE QUÉ ES CADA FORMA DE PAGO; ANTES NO SE LE PREGUNTABA.
+      //
+      // Este componente llamaba a `computeOrderSummary` SIN el mapa de tipos —
+      // el comentario decía "same logic as Corte page" y no lo era: la página de
+      // Corte sí lo construye desde `pos_payment_methods`. Sin mapa las formas se
+      // adivinan por el nombre, y `Dólares` (catalogado `cash`, billetes físicos
+      // en el cajón) caía en tarjeta: el efectivo esperado salía corto por ese
+      // monto y el conteo cerraba con SOBRANTE, que tapa un faltante igual.
+      //
+      // `getPaymentMethodsFromDB` ya resuelve los tres mundos: Caja autoritativa
+      // (catálogo de Pedro), nube, y caché de IndexedDB si no hay red. Si aun así
+      // vuelve vacío, se pasa `undefined` y se cae a la heurística de antes — un
+      // catálogo ilegible no puede impedir cerrar la caja.
+      let mapaDeFormas: Record<string, string> | undefined
+      try {
+        const formas = await getPaymentMethodsFromDB()
+        if (formas.length > 0) {
+          mapaDeFormas = {}
+          for (const f of formas) mapaDeFormas[f.name.toLowerCase()] = f.type
+        }
+      } catch { /* sin catálogo: heurística por nombre, como antes */ }
+
       const summary = computeOrderSummary(
         orders as unknown as Parameters<typeof computeOrderSummary>[0],
         cashMovements,
+        mapaDeFormas,
       )
 
       setSystemData({
         efectivo: summary.efectivo,
         tarjeta: summary.tarjeta,
         transferencias: summary.transferencias,
+        otros: summary.otros,
         totalVentas: summary.totalVentas,
         ticketsCount: summary.ticketsCount,
         cancelaciones: summary.cancelaciones,
@@ -197,11 +253,17 @@ export default function CierreCajaWizard({
     fetchShiftData()
   }, [turnoId])
 
-  const totalContado = Number(cashInput) || 0
+  // `Number(cashInput) || 0` convertia el campo VACIO en un 0 que se ve igual que
+  // un 0 contado. Asi se guardaron los ocho cierres de AMALAY, uno de ellos con
+  // -$5,957.76 de diferencia y sin una palabra. `leerContado` devuelve null cuando
+  // nadie escribio nada, y `evaluarArqueo` decide si eso alcanza para cerrar.
+  const contadoCapturado = leerContado(cashInput)
+  const totalContado = contadoCapturado ?? 0
   const { efectivoEsperado, diferencia } = calcEfectivoEsperado(
     summaryToArqueoInput(systemData, fondoInicial),
     totalContado,
   )
+  const arqueo = evaluarArqueo(contadoCapturado, diferencia, notas)
 
   // Huella para cerrar turno. Pedido por Daniel el 2026-08-31 ("tambien para cierre
   // de caja"). La identidad entra por el MISMO embudo que el PIN: se sigue exigiendo
@@ -261,12 +323,17 @@ export default function CierreCajaWizard({
         efectivo_sistema: efectivoEsperado,
         tarjeta_sistema: systemData.tarjeta,
         transferencias_sistema: systemData.transferencias,
+        // Plataformas y cortesias, fuera de `tarjeta_sistema`: ese numero se
+        // concilia a mano contra la terminal bancaria y con basura adentro no cuadra.
+        otros_sistema: systemData.otros,
         diferencia,
         total_ventas: systemData.totalVentas,
         tickets_count: systemData.ticketsCount,
         cancelaciones: systemData.cancelaciones,
         descuentos: systemData.descuentos,
         propinas: systemData.propinas,
+        // Queda EN el cierre: manana explica una diferencia en vez de adivinarla.
+        cola_pendiente_al_cerrar: colaPendiente,
         notas: notas || null,
         closed_by: manager,
         approved_by: manager,
@@ -496,6 +563,7 @@ export default function CierreCajaWizard({
       <div class="row"><span>Efectivo:</span><span>${formatMXN(systemData.efectivo)}</span></div>
       <div class="row"><span>Tarjeta:</span><span>${formatMXN(systemData.tarjeta)}</span></div>
       <div class="row"><span>Transferencia:</span><span>${formatMXN(systemData.transferencias)}</span></div>
+      ${systemData.otros > 0 ? `<div class="row"><span>Otros (plataformas/cortesias):</span><span>${formatMXN(systemData.otros)}</span></div>` : ''}
       <div class="row total"><span>Total ventas:</span><span>${formatMXN(systemData.totalVentas)}</span></div>
       <div class="line"></div>
       <p style="font-weight:bold;margin:4px 0">CONTROL DE EFECTIVO</p>
@@ -709,6 +777,23 @@ export default function CierreCajaWizard({
             <div>
               <h3 className="font-bold text-[var(--text-1)] mb-2">Resumen del sistema</h3>
 
+              {colaPendiente > 0 && (
+                // El gerente tiene que saber que este número está incompleto ANTES de
+                // contar el efectivo, no descubrirlo mañana como una diferencia.
+                <div className="rounded-xl p-3 mb-3 bg-amber-500/10 border border-amber-500/30">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle size={16} className="text-amber-400 flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-amber-300">
+                      <span className="font-semibold">
+                        {colaPendiente} {colaPendiente === 1 ? 'cobro no ha subido' : 'cobros no han subido'} a la nube.
+                      </span>{' '}
+                      El total de abajo no los incluye, así que puede haber más efectivo en el
+                      cajón del que dice el sistema. Se registrará en el cierre.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-1 mb-3">
                 <div className="flex justify-between py-1.5 border-b border-[var(--line)]">
                   <span className="text-[var(--text-3)]">Fondo inicial</span>
@@ -738,6 +823,12 @@ export default function CierreCajaWizard({
                   <span className="text-[var(--text-3)]">Transferencias</span>
                   <span className="text-[var(--text-1)] font-medium">{formatMXN(systemData.transferencias)}</span>
                 </div>
+                {systemData.otros > 0 && (
+                  <div className="flex justify-between py-1.5 border-b border-[var(--line)]">
+                    <span className="text-[var(--text-3)]">Otros (plataformas, cortesias)</span>
+                    <span className="text-[var(--text-1)] font-medium">{formatMXN(systemData.otros)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between py-1.5 border-b border-[var(--line)]">
                   <span className="text-[var(--text-3)]">Tickets cerrados</span>
                   <span className="text-[var(--text-1)] font-medium">{systemData.ticketsCount}</span>
@@ -781,17 +872,25 @@ export default function CierreCajaWizard({
                     {diferencia >= 0 ? '+' : ''}{formatMXN(diferencia)}
                   </span>
                 </div>
-                {Math.abs(diferencia) > 50 && (
-                  <div className="flex items-center gap-2 mt-3 text-sm text-red-400">
+                {arqueo.exigeExplicacion && (
+                  <div className={`flex items-center gap-2 mt-3 text-sm ${arqueo.puedeCerrar ? 'text-amber-400' : 'text-red-400'}`}>
                     <AlertTriangle size={16} />
-                    <span>Diferencia mayor a $50 — requiere explicacion</span>
+                    <span>
+                      {arqueo.puedeCerrar
+                        ? `Diferencia mayor a $${UMBRAL_EXPLICACION_MXN} — explicacion registrada`
+                        : `Diferencia mayor a $${UMBRAL_EXPLICACION_MXN} — escribe la explicacion abajo para poder cerrar`}
+                    </span>
                   </div>
                 )}
               </div>
 
               {/* Notes */}
               <div className="mt-4">
-                <label className="text-sm text-[var(--text-3)] block mb-1">Notas del cierre (opcional)</label>
+                <label className="text-sm text-[var(--text-3)] block mb-1">
+                  {arqueo.exigeExplicacion
+                    ? <>Explicacion de la diferencia <span className="text-red-400">(obligatoria)</span></>
+                    : 'Notas del cierre (opcional)'}
+                </label>
                 <textarea
                   value={notas}
                   onChange={(e) => setNotas(e.target.value)}
@@ -817,7 +916,8 @@ export default function CierreCajaWizard({
                   <>
                     <button
                       onClick={cerrarConHuella}
-                      disabled={huellaVerificando || saving}
+                      disabled={huellaVerificando || saving || !arqueo.puedeCerrar}
+                  title={arqueo.motivo ?? undefined}
                       className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 font-bold py-3 rounded-xl transition-colors mb-3"
                     >
                       <Fingerprint size={20} className={huellaVerificando ? 'animate-pulse' : ''} />
@@ -848,7 +948,8 @@ export default function CierreCajaWizard({
                 </button>
                 <button
                   onClick={() => { void handleSave() }}
-                  disabled={saving || !pin || pin.length < 4}
+                  disabled={saving || !pin || pin.length < 4 || !arqueo.puedeCerrar}
+                  title={arqueo.motivo ?? undefined}
                   className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-emerald-500 text-white font-bold hover:bg-emerald-600 transition-colors disabled:opacity-50"
                 >
                   {saving ? (
@@ -874,7 +975,9 @@ export default function CierreCajaWizard({
             </button>
             <button
               onClick={() => setStep(s => s + 1)}
-              className="flex items-center gap-1 px-4 py-2 rounded-lg bg-emerald-500 text-white text-sm font-medium hover:bg-emerald-600"
+              disabled={contadoCapturado === null}
+              title={contadoCapturado === null ? 'Escribe cuanto efectivo hay en caja' : undefined}
+              className="flex items-center gap-1 px-4 py-2 rounded-lg bg-emerald-500 text-white text-sm font-medium hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Siguiente <ArrowRight size={16} />
             </button>

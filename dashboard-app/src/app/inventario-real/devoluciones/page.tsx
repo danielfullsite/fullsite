@@ -6,6 +6,7 @@ import { getWansoftDataLatest, getActiveClientSlug } from '@/lib/data'
 import { formatCurrency } from '@/lib/format'
 import PageHeader from '@/components/PageHeader'
 import { sbPost } from '@/lib/supabase-helpers'
+import { useClaveDeOperacion } from '@/lib/clave-de-operacion'
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -77,11 +78,9 @@ function uid() {
   return Math.random().toString(36).slice(2, 10)
 }
 
-function nowKey() {
-  const d = new Date()
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}`
-}
+// `nowKey()` se retiro: armaba la clave con el MINUTO del reloj, y un reintento que
+// cruzara el cambio de minuto registraba la operacion dos veces. Ver
+// `lib/clave-de-operacion.ts`.
 
 function todayISO() {
   return new Date().toISOString().split('T')[0]
@@ -90,6 +89,8 @@ function todayISO() {
 // ── Component ───────────────────────────────────────────────────────
 
 export default function DevolucionesPage() {
+  // Estable entre reintentos del mismo guardado; se renueva al confirmar.
+  const { clave: claveDeOperacion, confirmar: confirmarOperacion } = useClaveDeOperacion()
   // Data
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([])
@@ -325,15 +326,27 @@ export default function DevolucionesPage() {
 
     try {
       const clientId = getActiveClientSlug()
+      // LA CLAVE IDENTIFICA LA OPERACION, NO EL INSTANTE.
+      //
+      // Antes iba `nowKey()`, con el MINUTO del reloj: si el guardado tardaba y el
+      // almacenista volvia a darle, la clave era OTRA y la devolucion se registraba dos
+      // veces. En entradas eso ya paso en produccion el 2026-07-20.
+      //
+      // Y aqui habia un segundo defecto propio de esta pantalla: `nowKey()` se llamaba
+      // DOS veces --una para la base y otra para el historial-- asi que al cambiar el
+      // minuto entre ambas, el historial en pantalla guardaba una clave distinta de la
+      // que quedo escrita. Una sola clave para las dos.
+      const dataKey = `inventory_return_${todayISO()}_${claveDeOperacion}`
       const ok = await sbPost('wansoft_data', clientId, {
-        data_key: `inventory_return_${nowKey()}`,
+        data_key: dataKey,
         fecha: todayISO(),
         data: payload,
       })
       if (ok) {
+        confirmarOperacion()   // guardado confirmado: lo siguiente es otra operacion
         setSaveMessage({ type: 'success', text: `Devolucion registrada: ${items.length} productos por ${formatCurrency(grandTotal)}` })
         setReturnHistory(prev => [{
-          data_key: `inventory_return_${nowKey()}`,
+          data_key: dataKey,
           fecha: todayISO(),
           data: payload,
         }, ...prev])

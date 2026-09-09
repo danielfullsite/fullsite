@@ -69,12 +69,155 @@ export const NO_CID = new Set<string>(['pos_purchase_order_items', 'pos_sub_reci
  * `pos_fingerprint_templates` van por lo mismo — dan de alta identidad.
  */
 export const MANAGER_ONLY_WRITE = new Set<string>([
-  'pos_cash_movements',
-  'pos_cierres',
   'pos_staff',
   'pos_terminals',
   'pos_fingerprint_templates',
+  // Los precios sólo se editan desde /admin/menu, que es pantalla de gerente. Sin esto,
+  // un shift token de mesero podía bajarle el precio a un platillo y cobrarlo barato.
+  'pos_menu_items',
 ])
+
+// ── LA CAJA LA OPERA UN CAJERO, Y NO PODÍA CERRARLA ─────────────────────────
+//
+// `pos_cash_movements` y `pos_cierres` estaban en MANAGER_ONLY_WRITE desde el
+// 2026-08-25 (commit 02ce02c2). El efecto, encontrado el 2026-09-08:
+//
+//   · Una terminal POS con shift token y SIN sesión de Supabase se rutea por
+//     `/api/pos/db` (supabase-fetch-patch.ts) — o sea, TODA caja de kiosco.
+//   · `isManager` es admin | gerente | dueño. `cajero` NO está.
+//   · Entonces el retiro de caja y el Corte Z de una caja logueada como cajero
+//     mueren en 403. Y un 403 en el replay de la cola se clasifica terminal
+//     (pos-offline-db.ts): no se reintenta jamás. El dinero del turno no sube nunca,
+//     y la terminal muestra el corte hecho.
+//
+// AMALAY tiene CUATRO cajeros activos (consultado en pos_staff). Los ocho cierres que
+// existen se guardaron bien porque los hizo Daniel, que es admin — por eso no se había
+// visto. El día del cutover lo ve el primer cajero que cierre.
+//
+// POR QUÉ SE BAJA A CAJERO Y NO SE RESUELVE CON UNA APROBACIÓN FIRMADA. El wizard ya
+// tiene el token firmado del gerente (`consumeManagerApproval`) y lo natural sería
+// mandarlo en una cabecera. No sirve: el cierre se ENCOLA, y el replay reproduce la
+// operación sin cabeceras. Quedaría igual de roto justo en el caso offline, que es el
+// que más importa.
+//
+// QUÉ SE PIERDE Y QUÉ NO. El que no debe poder inventar un cierre ni un retiro es el
+// MESERO, y sigue sin poder. Un cajero moviendo la caja que él mismo opera es la
+// operación normal — y su control real no es este proxy sino el arqueo, más el PIN de
+// gerente que `CierreCajaWizard` exige (`hasPermission(role, 'corte_z')`) antes de
+// llegar aquí. Este candado estaba duplicando ese control con el rol equivocado: el de
+// la sesión, no el de quien autoriza.
+const NIVEL: Record<string, number> = { mesero: 1, cajero: 2, capitan: 3, gerente: 4, admin: 5, 'dueño': 5 }
+
+/** Nivel mínimo para ESCRIBIR, cuando no basta con la lista de gerente. */
+export const NIVEL_MINIMO_DE_ESCRITURA: Record<string, number> = {
+  pos_cash_movements: NIVEL.cajero,
+  pos_cierres: NIVEL.cajero,
+}
+
+/** ¿Este rol alcanza para escribir en esta tabla? */
+export function puedeEscribirEn(table: string, role: string | null | undefined): boolean {
+  if (MANAGER_ONLY_WRITE.has(table)) return isManager(role)
+  const minimo = NIVEL_MINIMO_DE_ESCRITURA[table]
+  if (minimo === undefined) return true
+  return (NIVEL[String(role)] || 0) >= minimo
+}
+
+/**
+ * COLUMNAS QUE UN MESERO NO PUEDE ESCRIBIR, aunque la tabla sí sea suya.
+ *
+ * `pos_orders` no puede ser manager-only: los meseros escriben órdenes todo el día. Pero
+ * dentro de esa tabla viven las cifras del dinero, y por el proxy —que corre con
+ * service_role y se salta RLS— cualquiera con shift token podía mandar
+ *
+ *     PATCH pos_orders?id=eq.<orden>   { "total": 1 }
+ *
+ * y el arqueo cuadraba, porque `pagos == total`. La diferencia se la queda quien cobró.
+ * Es el mismo vector de skimming que `/api/pos/save-order` ya detecta recomputando el
+ * total desde los renglones — sólo que ese detector vive en la ruta de guardado, y este
+ * camino la rodea por completo.
+ *
+ * Se prohíben por COLUMNA y no por tabla a propósito: una lista de lo prohibido deja pasar
+ * cualquier columna legítima que aún no conozcamos, mientras que una lista de lo permitido
+ * rompería el POS en cuanto alguien agregue un campo. En un restaurante, un 403 a media
+ * comanda cuesta más que el hueco.
+ *
+ * Verificado el 2026-09-08: las ÚNICAS escrituras del cliente a `pos_orders` que pasan por
+ * aquí son `kds_item_status` (cocina marcando, kds/page.tsx:332) y `mesero`
+ * (pos/page.tsx:4295). El guardado de órdenes va por APP_API a `/api/pos/save-order`, que
+ * recalcula del lado del servidor, y la cola offline lo reproduce por ese mismo camino.
+ * Ninguna de estas columnas se escribe legítimamente desde el navegador.
+ */
+export const CAMPOS_SOLO_DE_GERENTE: Record<string, readonly string[]> = {
+  pos_orders: [
+    'total', 'subtotal', 'iva', 'descuento', 'propina', 'saldo', 'pagos',
+    'payment_status', 'status', 'order_revision', 'turno_id', 'client_id',
+  ],
+}
+
+/** Tablas donde BORRAR exige gerente, aunque escribir no. Una orden no se borra: se cancela. */
+export const MANAGER_ONLY_DELETE = new Set<string>(['pos_orders'])
+
+/**
+ * Qué columnas prohibidas trae este cuerpo. Vacío = puede pasar.
+ *
+ * Un cuerpo ilegible NO se deja pasar por las dudas: si no se puede leer qué escribe, no
+ * se puede afirmar que no toca el dinero. Devuelve la marca de ilegible para que quien
+ * llama lo rechace con un mensaje claro.
+ */
+/**
+ * REABRIR NO ES ESCRIBIR, Y POR ESO NO BASTA CON PROHIBIR LA TABLA.
+ *
+ * `pos_turnos` no está en MANAGER_ONLY_WRITE, y no puede estarlo: el cierre de caja se
+ * ENCOLA (CierreCajaWizard.tsx:315) y la cola lo reproduce con el shift token de quien
+ * esté logueado. Si esa terminal opera con rol `cajero` —que es lo normal en una caja—
+ * un candado por tabla haría que el corte Z muriera en 403 y no llegara nunca a la nube.
+ * Cerrar el hueco por ahí abriría uno peor: el dinero del turno sin subir.
+ *
+ * Pero dejar la tabla abierta permite esto con un shift token de mesero:
+ *
+ *     PATCH pos_turnos?id=eq.<turno>   { "closed_at": null }
+ *
+ * y el turno ya cortado vuelve a estar abierto. Se cobra dentro de él, después del Z, y
+ * esas ventas quedan fuera del corte que ya se imprimió y se entregó.
+ *
+ * La asimetría es la clave: CERRAR un turno es una operación de todos los días que la cola
+ * tiene que poder reproducir; REABRIRLO es una corrección administrativa. Se prohíbe el
+ * valor, no la columna — poner `closed_at` con una fecha sigue pasando.
+ */
+export const REABRIR_SOLO_GERENTE: Record<string, string> = {
+  pos_turnos: 'closed_at',
+}
+
+/** ¿Este cuerpo intenta reabrir algo cerrado? */
+function intentaReabrir(table: string, fila: Record<string, unknown>): boolean {
+  const col = REABRIR_SOLO_GERENTE[table]
+  return !!col && col in fila && fila[col] === null
+}
+
+export function camposProhibidos(table: string, role: string | null | undefined, cuerpo: string | undefined): string[] {
+  const vetadas = CAMPOS_SOLO_DE_GERENTE[table]
+  const puedeReabrir = !(table in REABRIR_SOLO_GERENTE)
+  if ((!vetadas && puedeReabrir) || isManager(role)) return []
+  if (!cuerpo) return []
+  let dato: unknown
+  try {
+    dato = JSON.parse(cuerpo)
+  } catch {
+    return ['(cuerpo ilegible)']
+  }
+  const filas = Array.isArray(dato) ? dato : [dato]
+  const encontradas = new Set<string>()
+  for (const fila of filas) {
+    if (!fila || typeof fila !== 'object') continue
+    const obj = fila as Record<string, unknown>
+    if (intentaReabrir(table, obj)) encontradas.add(`${REABRIR_SOLO_GERENTE[table]} (reabrir)`)
+    if (!vetadas) continue
+    for (const col of Object.keys(obj)) {
+      if (vetadas.includes(col)) encontradas.add(col)
+    }
+  }
+  return [...encontradas]
+}
 
 /**
  * Columnas que NUNCA salen por el proxy, pase lo que pase en el `select`.

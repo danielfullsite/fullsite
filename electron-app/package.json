@@ -1,12 +1,14 @@
 {
   "name": "fullsite-pos",
   "version": "1.4.0",
-  "description": "Fullsite POS — kiosk wrapper for app.fullsite.mx/pos",
+  "description": "Fullsite POS \u2014 kiosk wrapper for app.fullsite.mx/pos",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build:win": "electron-builder --win",
-    "build:mac": "electron-builder --mac"
+    "build:ui": "node scripts/build-offline-ui.cjs",
+    "build:win": "npm run build:ui && npm run sellar && electron-builder --win --x64 --publish never",
+    "build:mac": "npm run build:ui && npm run sellar && electron-builder --mac --publish never",
+    "sellar": "node scripts/sellar-version.cjs"
   },
   "author": "Fullsite",
   "license": "UNLICENSED",
@@ -20,8 +22,39 @@
     "electron-builder": "^25.0.0"
   },
   "build": {
+    "beforePack": "./scripts/verify-offline-ui.cjs",
     "appId": "mx.fullsite.pos",
     "productName": "Fullsite POS",
+    "files": [
+      "main.js",
+      "build-info.json",
+      "preload*.js",
+      "setup.html",
+      "offline.html",
+      "icon.ico",
+      "icon.png",
+      "local-server/**/*.js",
+      "local-server/core/permission-profiles.json",
+      "local-server/kds-ui.html",
+      "offline-ui/*.js",
+      "ui-bundle/**/*",
+      "update/*.js",
+      "!**/tests/**",
+      "!**/*.test.js",
+      "!**/.env*",
+      "!**/*.log",
+      "!local-server/telemetry/latency-harness.js"
+    ],
+    "extraResources": [
+      {
+        "from": "fingerprint",
+        "to": "fingerprint",
+        "filter": [
+          "**/*.exe",
+          "**/*.dll"
+        ]
+      }
+    ],
     "directories": {
       "output": "dist"
     },

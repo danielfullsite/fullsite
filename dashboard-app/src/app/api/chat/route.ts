@@ -5,6 +5,7 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { esDuenoDelHistoricoWansoft } from '@/lib/wansoft-legacy'
 import { requireTenant } from '@/lib/api-auth'
+import { hoyEnZona, sumarDias } from '@/lib/date-mx'
 
 async function getAuthUser() {
   const cookieStore = await cookies()
@@ -192,11 +193,29 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. Detect date from question
-    const now = new Date()
-    const mxOffset = -6 * 60 * 60 * 1000
-    const mxNow = new Date(now.getTime() + mxOffset + now.getTimezoneOffset() * 60 * 1000)
-    const todayStr = mxNow.toISOString().split('T')[0]
-    const yesterday = new Date(mxNow.getTime() - 86400000).toISOString().split('T')[0]
+    //
+    // LA ZONA SALE DEL TENANT, NO DE UNA CONSTANTE. Antes era:
+    //
+    //     const mxOffset = -6 * 60 * 60 * 1000
+    //     const mxNow = new Date(now.getTime() + mxOffset + now.getTimezoneOffset() * 60 * 1000)
+    //
+    // Dos problemas. El primero: -6 clavado para todos. `clients.timezone` existe y la
+    // app ya lo respeta desde el PR #335 (`getActiveTimezone`) -- pero esa funcion lee
+    // localStorage, asi que en una ruta API siempre devuelve el default. Un tenant en
+    // Tijuana (-7/-8) recibia la fecha de Monterrey: entre las 22:00 y la medianoche,
+    // preguntar "como nos fue hoy" le contestaba con MANANA.
+    //
+    // El segundo: `now.getTimezoneOffset()` es la zona DEL PROCESO. Hoy Vercel corre en
+    // UTC y da 0, asi que la cuenta salia bien de casualidad; en cualquier maquina que
+    // no fuera UTC quedaba corrida. Es el mismo idioma que le quitaba la comida al
+    // corte del dia.
+    //
+    // `clientConfig` ya viene cargado arriba y trae la zona.
+    const zona = clientConfig.timezone || 'America/Mexico_City'
+    const todayStr = hoyEnZona(zona)
+    // `sumarDias` opera sobre el calendario, no restando 86,400,000 ms: en una zona con
+    // horario de verano un dia dura 23 o 25 horas dos veces al ano.
+    const yesterday = sumarDias(todayStr, -1, zona)
 
     // Parse date ranges: "1 de mayo a 18 de mayo", "del 5 al 12 de mayo", "mayo", etc.
     const monthMap: Record<string, string> = {
@@ -230,7 +249,7 @@ export async function POST(request: NextRequest) {
       if (q.includes('ayer')) dateFilter = { start: yesterday, end: yesterday }
       else if (q.includes('hoy')) dateFilter = { start: todayStr, end: todayStr }
       else if (q.includes('semana')) {
-        const weekAgo = new Date(mxNow.getTime() - 7 * 86400000).toISOString().split('T')[0]
+        const weekAgo = sumarDias(todayStr, -7, zona)
         dateFilter = { start: weekAgo, end: todayStr }
       } else if (q.includes('mes')) {
         const monthStart = todayStr.slice(0, 8) + '01'
@@ -719,11 +738,19 @@ export async function POST(request: NextRequest) {
       })
 
       // Pre-calculate period aggregates so the model doesn't have to sum
-      const now = new Date()
-      const mxNowChat = new Date(now.getTime() - 6 * 60 * 60 * 1000 + now.getTimezoneOffset() * 60 * 1000)
-      const thisMonthPrefix = mxNowChat.toISOString().slice(0, 7)
-      const prevMonthDate = new Date(mxNowChat.getFullYear(), mxNowChat.getMonth() - 1, 1)
-      const prevMonthPrefix = prevMonthDate.toISOString().slice(0, 7)
+      //
+      // Segunda instancia del mismo patron que se corrigio arriba: -6 clavado mas la
+      // zona del proceso. Aqui decide QUE MES es "este mes" y cual "el anterior", asi
+      // que el 1 de cada mes, para un tenant que no este en el centro de Mexico, el
+      // comparativo mensual salia corrido un mes entero.
+      //
+      // `thisMonthPrefix` se saca de la fecha ya formateada en la zona del tenant
+      // (YYYY-MM-DD -> YYYY-MM). El mes anterior se calcula sobre los numeros de
+      // calendario, no restando milisegundos.
+      const thisMonthPrefix = todayStr.slice(0, 7)
+      const [anioActual, mesActual] = thisMonthPrefix.split('-').map(Number)
+      const prevMonthPrefix = `${mesActual === 1 ? anioActual - 1 : anioActual}-` +
+        String(mesActual === 1 ? 12 : mesActual - 1).padStart(2, '0')
 
       const thisMonthData = recentDays.filter((d: Record<string, unknown>) => (d.fecha as string).startsWith(thisMonthPrefix))
       const prevMonthData = recentDays.filter((d: Record<string, unknown>) => (d.fecha as string).startsWith(prevMonthPrefix))

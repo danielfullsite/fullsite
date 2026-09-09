@@ -168,6 +168,8 @@ export interface OrderItem {
   precio: number
   cantidad: number
   modificadores: string[]  // ["Sin cebolla", "Extra queso +$25"]
+  modifier_ids?: string[]  // Stable catalog identities; labels never authorize price.
+  sent_quantity?: number  // Consumption already confirmed to kitchen by Caja.
   notas: string
   precioExtra: number      // sum of extra modifiers
   subtotal: number         // (precio + precioExtra) * cantidad
@@ -193,6 +195,7 @@ export interface OrderItemLegacy {
 }
 
 export interface ModificadorAgregar {
+  id?: string
   name: string
   price: number
 }
@@ -268,6 +271,7 @@ export function getModifierTypeFromCategoryName(catName: string): 'none' | 'coff
 // Cache of category id → name (populated by POS on menu load via setCategoryNameCache)
 import { _categoryNameCache } from '@/lib/pos-constants'
 import { getActiveClientSlug } from '@/lib/data'
+import { requiereCaja } from './pedro-cliente'
 import { inventoryPolicyService, logPolicyGateFailure } from '@/lib/inventory-policy'
 import { mismoDiaDeVenta, inicioDiaConfigurado } from '@/lib/dia-de-venta'
 import { esFalloDeRed, esFalloDeAutenticacion, ErrorDeSesion, ErrorDeContrato } from '@/lib/clasificar-fallo'
@@ -332,6 +336,10 @@ export function getPOSAuthHeaders(): Record<string, string> {
 }
 
 export async function getMenuCategoriesFromDB(): Promise<MenuCategory[]> {
+  if (requiereCaja()) {
+    const { leerCatalogoCaja } = await import('./pedro-catalogo')
+    return (await leerCatalogoCaja()).categories
+  }
   try {
     const clientId = _getClientId()
     if (!clientId) return []
@@ -395,6 +403,10 @@ export interface PaymentMethodDB {
 }
 
 export async function getPaymentMethodsFromDB(): Promise<PaymentMethodDB[]> {
+  if (requiereCaja()) {
+    const { leerCatalogoCaja } = await import('./pedro-catalogo')
+    return (await leerCatalogoCaja()).payment_methods
+  }
   try {
     const res = await fetch(
       `${_SUPABASE_URL}/rest/v1/pos_payment_methods?client_id=eq.${_getClientId()}&active=eq.true&select=id,name,type,commission_pct&order=name.asc`,
@@ -423,6 +435,17 @@ type ActiveTurnoRecord = { id: string; fondo_inicial: number; opened_by: string;
 
 /** Turnos activos (pos_turnos sin closed_at), del más reciente al más antiguo. */
 export async function getActiveTurnos(): Promise<ActiveTurnoRecord[]> {
+  if (requiereCaja()) {
+    const { leerSalon } = await import('./pedro-cliente')
+    const local = await leerSalon()
+    if (!local.autoritativa) throw new Error('Sin conexión con Caja. No se puede confirmar el turno.')
+    if (local.writeAuthority === 'caja') {
+      if (!local.turno) return []
+      const t = local.turno
+      if (!t.id || !t.opened_at || !Number.isSafeInteger(t.opening_cash_cents)) throw new Error('Caja no confirmó los datos completos del turno.')
+      return [{ id: String(t.id), fondo_inicial: Number(t.opening_cash_cents) / 100, opened_by: String(t.opened_by), opened_at: String(t.opened_at) }]
+    }
+  }
   /**
    * El cache de turno vence por DIA DE VENTA, no por reloj.
    *
@@ -606,6 +629,25 @@ export function olvidarTurnoPendiente(): void {
  * no son lo mismo, y confundirlos produjo el "abrí turno y luego no había turno".
  */
 export async function openTurno(fondoInicial: number, openedBy: string): Promise<{ id: string; fondo_inicial: number; opened_by: string; opened_at: string; sincronizado?: boolean } | null> {
+  if (requiereCaja()) {
+    const { leerSalon } = await import('./pedro-cliente')
+    const local = await leerSalon()
+    if (!local.autoritativa) throw new Error('Sin conexión con Caja. El turno no se abrió.')
+    if (local.writeAuthority === 'caja') {
+      const { ejecutarComandoCaja } = await import('./pedro-comandos')
+      if (local.turno) return (await getActiveTurnos())[0] ?? null
+      const opening = Math.round(fondoInicial * 100)
+      if (!Number.isSafeInteger(opening) || opening < 0 || Math.abs(fondoInicial * 100 - opening) > 1e-7) throw new Error('El fondo debe ser un importe válido con hasta dos decimales.')
+      const receipt = await ejecutarComandoCaja('turn:open', 'TURN_OPEN', { turno_id: idParaAbrirTurno(), opening_cash_cents: opening })
+      const t = receipt.result.turno as Record<string, unknown> | undefined
+      if (!t?.id || !t.opened_at || !Number.isSafeInteger(t.opening_cash_cents)) throw new Error('Caja no confirmó la apertura de turno.')
+      const confirmed = { id: String(t.id), fondo_inicial: Number(t.opening_cash_cents) / 100, opened_by: String(t.opened_by), opened_at: String(t.opened_at), sincronizado: false }
+      // Cache is a display convenience; every operational read still asks Caja.
+      localStorage.setItem('pos_turno_cache', JSON.stringify({ turno: confirmed, turnos: [confirmed], ts: Date.now() }))
+      olvidarTurnoPendiente()
+      return confirmed
+    }
+  }
   // Guard: verificar que no exista turno activo (race condition)
   const existing = await getActiveTurno()
   if (existing) return { ...existing, sincronizado: true } // Ya hay uno abierto, retornarlo
@@ -643,11 +685,36 @@ export async function openTurno(fondoInicial: number, openedBy: string): Promise
       method: 'POST', headers: { ..._SB_HEADERS, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=representation' },
       body: JSON.stringify(body),
     })
+
+    // OTRA TERMINAL YA ABRIÓ EL TURNO. No es una falla: es la respuesta correcta.
+    //
+    // Con el índice `pos_turnos_uno_abierto_por_restaurante` (migración
+    // 20260909030000), un segundo terminal que intente abrir recibe 409 / 23505. Sin
+    // este bloque caería en el catch de abajo, que abre un turno LOCAL con OTRO id y lo
+    // encola — o sea que cambiaríamos dos turnos por un turno fantasma que no sincroniza
+    // nunca y con las comandas colgadas de él. Peor que el defecto original.
+    //
+    // Lo correcto es adoptar el que ya existe, que es lo mismo que hace el guard de
+    // arriba cuando sí alcanza a ver el turno ajeno. Aquí simplemente llegamos tarde.
+    if (res.status === 409 || res.status === 422) {
+      const yaAbierto = await getActiveTurno()
+      if (yaAbierto) {
+        olvidarTurnoPendiente()   // el id que preparamos ya no se va a usar
+        return { ...yaAbierto, sincronizado: true }
+      }
+      // 409 sin turno visible: no inventamos uno local con otro id, porque el índice lo
+      // volvería a rechazar en cada reintento. Que el operador lo vea.
+      throw new Error('Caja rechazó la apertura y no se pudo leer el turno abierto. Recarga la pantalla.')
+    }
+
     if (!res.ok) throw new Error('post failed')
     const rows = await res.json()
     cacheLocal()
     return { ...(rows[0] || localTurno), sincronizado: true }
-  } catch {
+  } catch (e) {
+    // Un conflicto ya se resolvió arriba; lo que llega aquí es red. Si el mensaje viene
+    // del bloque de conflicto, se propaga: abrir local ahí sería justo el error.
+    if (e instanceof Error && e.message.startsWith('Caja rechazó la apertura')) throw e
     // "Online" pero el POST falló (LAN degradada / timeout) — abrir local + encolar
     // en vez de bloquear el día con "Error al abrir turno".
     await queueForSync()
@@ -694,6 +761,10 @@ function isGroupCompatible(groupName: string, categoryId: string): boolean {
  * Devuelve [] si no hay grupos configurados — el modal cae al sistema legacy.
  */
 export async function getModifierGroupsForItem(itemId: string, categoryId: string): Promise<ModifierGroupDef[]> {
+  if (requiereCaja()) {
+    const { leerCatalogoCaja, gruposDelCatalogo } = await import('./pedro-catalogo')
+    return gruposDelCatalogo(await leerCatalogoCaja(), itemId, categoryId)
+  }
   try {
     const cid = _getClientId()
     const [itemAssignRes, catAssignRes] = await Promise.all([
@@ -978,7 +1049,12 @@ export interface Order {
   clienteNombre?: string
   mesero: string
   personas: number
-  status: 'abierta' | 'enviada' | 'preparando' | 'lista' | 'entregada' | 'cerrada' | 'cancelada'
+  /**
+   * `dividida`: la orden se liquido por sus cuentas de split, no por si misma. No es
+   * 'cerrada' a proposito -- con 'cerrada' el corte contaria la venta dos veces (las
+   * cuentas MAS la madre) y el arqueo pediria efectivo que nunca entro.
+   */
+  status: 'abierta' | 'enviada' | 'preparando' | 'lista' | 'entregada' | 'cerrada' | 'cancelada' | 'dividida'
   items: OrderItem[]
   subtotal: number
   iva: number
@@ -1983,6 +2059,42 @@ export async function getAuditLog(limit = 100, offset = 0): Promise<AuditLogEntr
   return res.json()
 }
 
+/**
+ * EL CORTE CONTABA CANCELACIONES CON UNA VENTANA QUE NO ERA DEL DIA.
+ *
+ * `pos/corte/page.tsx` llamaba a `getAuditLog(200)` -- los 200 eventos mas recientes
+ * DE TODA LA HISTORIA, sin filtro de fecha ni de turno -- y de ahi filtraba
+ * `item_cancelled`/`order_cancelled` para reportarlos como "las cancelaciones de este
+ * corte". Dos errores encima:
+ *
+ *   1. Sin ventana: el corte de una fecha vieja mostraba cancelaciones de otros dias,
+ *      o CERO, porque los 200 eventos mas nuevos no incluyen nada de esa fecha.
+ *   2. 200 no alcanza. En AMALAY, con la operacion apenas de prueba, `item_added` ya
+ *      lleva 788 filas y `order_sent_kitchen` 346. Con cien tickets al dia, 200
+ *      eventos son como veinte minutos de servicio.
+ *
+ * O sea que la seccion anti-fraude del corte estaba estructuralmente vacia -- y es
+ * justo donde un gerente buscaria una cancelacion despues de servir.
+ *
+ * Esta funcion pide la ventana y las acciones al servidor, en vez de traer lo ultimo
+ * y filtrarlo en el navegador.
+ */
+export async function getAuditLogRange(
+  desdeISO: string, hastaISO: string | null, actions: readonly string[], limit = 2000,
+): Promise<AuditLogEntry[]> {
+  const rango = hastaISO
+    ? `&created_at=gte.${encodeURIComponent(desdeISO)}&created_at=lt.${encodeURIComponent(hastaISO)}`
+    : `&created_at=gte.${encodeURIComponent(desdeISO)}`
+  const filtroAcciones = actions.length > 0 ? `&action=in.(${actions.join(',')})` : ''
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/pos_audit_log?client_id=eq.${_getClientId()}${rango}${filtroAcciones}` +
+    `&order=created_at.desc&limit=${limit}`,
+    { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
+  )
+  if (!res.ok) return []
+  return res.json()
+}
+
 export async function getAuditLogForOrder(orderId: string): Promise<AuditLogEntry[]> {
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/pos_audit_log?client_id=eq.${_getClientId()}&order_id=eq.${orderId}&order=created_at.asc`,
@@ -2310,10 +2422,10 @@ export interface InventoryMovement {
 
 // ─── Ingredients CRUD ───────────────────────────────────────────────────────
 
-export async function getIngredients(): Promise<Ingredient[]> {
+export async function getIngredients(signal?: AbortSignal): Promise<Ingredient[]> {
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/pos_ingredients?client_id=eq.${_getClientId()}&active=eq.true&order=name.asc&limit=2000`,
-    { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
+    { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store', signal }
   )
   if (!res.ok) return []
   return res.json()
@@ -2321,7 +2433,7 @@ export async function getIngredients(): Promise<Ingredient[]> {
 
 // ─── Recipes CRUD ───────────────────────────────────────────────────────────
 
-export async function getRecipes(): Promise<RecipeRow[]> {
+export async function getRecipes(signal?: AbortSignal): Promise<RecipeRow[]> {
   // Supabase has a 1000-row default limit. Use Range header to get all rows.
   // pos_recipes_old has 4000+ rows for AMALAY.
   const all: RecipeRow[] = []
@@ -2330,7 +2442,7 @@ export async function getRecipes(): Promise<RecipeRow[]> {
   while (true) {
     const res = await fetch(
       `${SUPABASE_URL}/rest/v1/pos_recipes_old?client_id=eq.${_getClientId()}&order=menu_item_name.asc&select=*`,
-      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, Range: `${offset}-${offset + pageSize - 1}` }, cache: 'no-store' }
+      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, Range: `${offset}-${offset + pageSize - 1}` }, cache: 'no-store', signal }
     )
     if (!res.ok) break
     const rows = await res.json()

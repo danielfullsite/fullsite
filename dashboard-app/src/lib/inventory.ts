@@ -106,6 +106,8 @@ interface InventoryRow {
   id: number
   ingredient_id: string
   stock: number
+  /** Version de la fila. Sin esto el PATCH pisa lo que haya cambiado en medio. */
+  updated_at?: string
 }
 
 interface IngredientRow {
@@ -185,7 +187,7 @@ export async function recordMovement(req: MovementRequest): Promise<MovementResu
     const chunk = ingredientIds.slice(i, i + 50)
     const filter = `ingredient_id=in.(${chunk.join(',')})`
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/pos_inventory?client_id=eq.${req.client_id}&${filter}&select=id,ingredient_id,stock`,
+      `${SUPABASE_URL}/rest/v1/pos_inventory?client_id=eq.${req.client_id}&${filter}&select=id,ingredient_id,stock,updated_at`,
       { headers: headers() }
     )
     if (res.ok) {
@@ -374,18 +376,70 @@ export async function recordMovement(req: MovementRequest): Promise<MovementResu
   for (const c of computed) {
     const current = stockMap.get(c.ingredient_id)!
 
-    // Update stock
-    const patchRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/pos_inventory?id=eq.${current.id}&client_id=eq.${req.client_id}`,
-      {
-        method: 'PATCH',
-        headers: headers({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
-        body: JSON.stringify({ stock: c.stock_after, updated_at: new Date().toISOString() }),
-      }
-    )
+    // LA VENTA QUE OCURRIO EN MEDIO SE BORRABA EN SILENCIO.
+    //
+    // Este PATCH escribia un stock ABSOLUTO (`c.stock_after`) calculado de una lectura
+    // hecha cientos de milisegundos antes, y filtraba SOLO por `id` y `client_id`: sin
+    // version, sin condicion. El guion, un sabado a las 14:00 con la cocina descontando
+    // por receta (~39 movimientos al dia, concentrados en horas pico):
+    //
+    //   1. Se lee aguacate: stock = 12. Se calcula 12 + 40 = 52 en memoria.
+    //   2. Entre esa lectura y este PATCH van varias llamadas HTTP (el POST al ledger
+    //      va antes). En esa ventana el POS manda dos rondas y descuenta 3: stock = 9.
+    //   3. El PATCH escribe 52. Pisa el 9.
+    //   4. El saldo queda en 52 cuando deberia ser 49. Las 3 piezas vendidas
+    //      desaparecieron del saldo aunque siguen en el ledger como 'recipe_deduction'.
+    //
+    // El ledger y el saldo se separan, y nadie se entera hasta que alguien cuenta.
+    //
+    // Ahora el PATCH exige que la fila siga en la version que se leyo. Si cambio, se
+    // relee y se aplica el DELTA sobre el valor nuevo -- que es lo unico correcto: el
+    // movimiento vale "40 mas", no "52". Tres intentos; si despues de eso sigue habiendo
+    // carrera, se reporta como error de verdad en vez de escribir un numero inventado.
+    //
+    // La solucion de fondo es un UPDATE relativo (`stock = stock + delta`) dentro de una
+    // RPC, que Postgres serializa sobre la fila y elimina la carrera de raiz. Eso es otro
+    // trabajo; esto cierra la perdida silenciosa mientras tanto.
+    let patchRes: Response | null = null
+    let version = current.updated_at
+    let objetivo = c.stock_after
 
-    if (patchRes.ok) {
+    for (let intento = 0; intento < 3; intento++) {
+      patchRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/pos_inventory?id=eq.${current.id}&client_id=eq.${req.client_id}` +
+        (version ? `&updated_at=eq.${encodeURIComponent(version)}` : ''),
+        {
+          method: 'PATCH',
+          headers: headers({ 'Content-Type': 'application/json', Prefer: 'return=representation' }),
+          body: JSON.stringify({ stock: objetivo, updated_at: new Date().toISOString() }),
+        }
+      )
+      if (!patchRes.ok) break
+
+      const filas = await patchRes.json().catch(() => []) as Array<{ stock?: unknown; updated_at?: string }>
+      if (Array.isArray(filas) && filas.length > 0) break   // escribio: listo
+
+      // Cero filas = otro escritor gano la carrera. Se relee y se recalcula con el DELTA.
+      const relectura = await fetch(
+        `${SUPABASE_URL}/rest/v1/pos_inventory?id=eq.${current.id}&client_id=eq.${req.client_id}` +
+        `&select=stock,updated_at&limit=1`,
+        { headers: headers() }
+      )
+      if (!relectura.ok) { patchRes = null; break }
+      const [fila] = await relectura.json().catch(() => []) as Array<{ stock?: unknown; updated_at?: string }>
+      if (!fila) { patchRes = null; break }
+      version = fila.updated_at
+      // El piso en 0 se conserva: una baja nunca deja el saldo negativo.
+      objetivo = Math.max(0, (Number(fila.stock) || 0) + c.quantity)
+      patchRes = null   // aun no escribio; si se agotan los intentos cuenta como error
+    }
+
+    if (patchRes && patchRes.ok) {
       result.stock_updates++
+    } else if (!patchRes) {
+      result.errors.push(
+        `Stock update failed for ${c.ingredient_id}: otra escritura gano la carrera tres veces`,
+      )
     } else {
       result.errors.push(`Stock update failed for ${c.ingredient_id}: ${patchRes.status}`)
     }

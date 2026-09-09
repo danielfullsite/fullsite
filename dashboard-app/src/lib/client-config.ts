@@ -75,6 +75,13 @@ let _cacheTime = 0
 const CACHE_TTL = 5 * 60 * 1000 // 5 min
 
 export async function fetchClientConfig(clientId: string): Promise<ClientConfig> {
+  const { requiereCaja } = await import('./pedro-cliente')
+  if (requiereCaja()) {
+    const { leerCatalogoCaja } = await import('./pedro-catalogo')
+    const config = (await leerCatalogoCaja(clientId)).config
+    _cache[clientId] = config
+    return config
+  }
   // Check cache
   if (_cache[clientId] && Date.now() - _cacheTime < CACHE_TTL) {
     return _cache[clientId]

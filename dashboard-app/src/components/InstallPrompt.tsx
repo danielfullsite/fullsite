@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Download, X } from 'lucide-react'
+import { registerServiceWorker } from '@/lib/service-worker'
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>
@@ -18,12 +19,8 @@ export default function InstallPrompt() {
     const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor
     if (cap?.isNativePlatform?.()) return
 
-    // Register Service Worker for offline support
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js', { scope: '/' })
-        .then((reg) => console.log('[SW] Registered:', reg.scope))
-        .catch((err) => console.warn('[SW] Registration failed:', err))
-    }
+    // Share lifecycle and the offline rollback flag with the POS layout.
+    void registerServiceWorker()
 
     // Check if already dismissed
     if (localStorage.getItem('pwa_prompt_dismissed')) return

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Fingerprint, CheckCircle, XCircle, Trash2, User, Search } from 'lucide-react'
 import { getFingerprintUrl } from '@/lib/fingerprint-url'
+import { localNetworkFetch } from '@/lib/local-network-fetch'
 
 interface StaffMember { id: string; name: string; role: string }
 
@@ -24,8 +25,8 @@ export default function HuellaPage() {
     const fingerprintUrl = getFingerprintUrl()
     // DigitalPersona is exposed through Pedro's CSP-safe local proxy.
     Promise.all([
-      fetch(`${fingerprintUrl}/health`, { signal: AbortSignal.timeout(3000) }).then(r => r.ok ? r.json() : null),
-      fetch(`${fingerprintUrl}/list`, { signal: AbortSignal.timeout(3000) }).then(r => r.ok ? r.json() : null),
+      localNetworkFetch(`${fingerprintUrl}/health`, { signal: AbortSignal.timeout(3000) }).then(r => r.ok ? r.json() : null),
+      localNetworkFetch(`${fingerprintUrl}/list`, { signal: AbortSignal.timeout(3000) }).then(r => r.ok ? r.json() : null),
     ]).then(([health, list]) => {
       setBiometricAvailable(health?.ok === true)
       const enrolled = Array.isArray(list?.enrolled) ? list.enrolled : []
@@ -44,7 +45,7 @@ export default function HuellaPage() {
     setMessage('')
     setError('')
     try {
-      const res = await fetch(`${getFingerprintUrl()}/enroll?id=${encodeURIComponent(member.id)}`, {
+      const res = await localNetworkFetch(`${getFingerprintUrl()}/enroll?id=${encodeURIComponent(member.id)}`, {
         signal: AbortSignal.timeout(90000),
       })
       const data = await res.json()
@@ -65,7 +66,7 @@ export default function HuellaPage() {
   const handleRemove = async (memberId: string) => {
     setError('')
     try {
-      const res = await fetch(`${getFingerprintUrl()}/delete?id=${encodeURIComponent(memberId)}`, {
+      const res = await localNetworkFetch(`${getFingerprintUrl()}/delete?id=${encodeURIComponent(memberId)}`, {
         signal: AbortSignal.timeout(5000),
       })
       const data = await res.json()

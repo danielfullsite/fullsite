@@ -15,45 +15,41 @@ import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
 import { Table, type ColumnDef } from '@/components/ui/Table'
 import { getDateRange, aggregatePayments, aggregateGrupos, getWansoftData, getDashboardFromPosOrders } from '@/lib/data'
-import { fmtDateMX, getActiveTimezone } from '@/lib/date-mx'
+import { fmtDateMX, getActiveTimezone, todayMX, sumarDias } from '@/lib/date-mx'
 import { formatCurrency, formatPercent, percentChange } from '@/lib/format'
 import type { WansoftDaily } from '@/lib/types'
 
 type Preset = 'hoy' | 'ayer' | 'semana' | 'mes' | 'custom'
 
 function getPresetDates(preset: Preset): { from: string; to: string } {
-  // Use Mexico City timezone for "today" calculation
-  const nowMX = new Date(new Date().toLocaleString('en-US', { timeZone: getActiveTimezone() }))
-  const today = nowMX
-  const fmt = (d: Date) => {
-    const y = d.getFullYear()
-    const m = String(d.getMonth() + 1).padStart(2, '0')
-    const day = String(d.getDate()).padStart(2, '0')
-    return `${y}-${m}-${day}`
-  }
+  // Los presets se calculan sobre el CALENDARIO de la zona del negocio.
+  //
+  // Antes se armaba una fecha con `new Date(x.toLocaleString(...))` y se leian sus
+  // componentes locales. Daba lo correcto, pero era otra copia del idioma cuyo instante
+  // esta corrido -- y basta que alguien le agregue un `toISOString` para romperlo, que
+  // es exactamente lo que le paso al corte del dia y al widget de prediccion.
+  const zona = getActiveTimezone()
+  const hoy = todayMX()
+  const [anio, mes] = hoy.split('-').map(Number)
 
   switch (preset) {
     case 'hoy':
-      return { from: fmt(today), to: fmt(today) }
+      return { from: hoy, to: hoy }
     case 'ayer': {
-      const y = new Date(today)
-      y.setDate(y.getDate() - 1)
-      return { from: fmt(y), to: fmt(y) }
+      const ayer = sumarDias(hoy, -1, zona)
+      return { from: ayer, to: ayer }
     }
     case 'semana': {
-      const start = new Date(today)
-      const dow = start.getDay()
-      // getDay: 0=Sun, 1=Mon... If Sunday, go back 6 days to Monday
-      const daysBack = dow === 0 ? 6 : dow - 1
-      start.setDate(start.getDate() - daysBack)
-      return { from: fmt(start), to: fmt(today) }
+      // Lunes de esta semana. `T12:00:00` para leer el dia de la semana lejos de
+      // cualquier frontera; el resto se hace por calendario.
+      const dow = new Date(`${hoy}T12:00:00`).getDay()
+      const diasAtras = dow === 0 ? 6 : dow - 1
+      return { from: sumarDias(hoy, -diasAtras, zona), to: hoy }
     }
-    case 'mes': {
-      const start = new Date(today.getFullYear(), today.getMonth(), 1)
-      return { from: fmt(start), to: fmt(today) }
-    }
+    case 'mes':
+      return { from: `${anio}-${String(mes).padStart(2, '0')}-01`, to: hoy }
     default:
-      return { from: fmt(today), to: fmt(today) }
+      return { from: hoy, to: hoy }
   }
 }
 

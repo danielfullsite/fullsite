@@ -39,6 +39,9 @@ let llamadas: Llamada[] = []
 /** Tasa que devuelve la tabla `clients`. `null` = fila sin iva_rate; `vacio` = sin fila. */
 let tasaEnBd: string | number | null | 'vacio' = '0.16'
 
+/** La fila de `pos_orders` DESPUÉS de guardar — que es lo que el detector lee ahora. */
+let filaEscrita: Record<string, unknown> = {}
+
 function instalarFetch() {
   vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
     const u = String(url)
@@ -51,10 +54,24 @@ function instalarFetch() {
       const filas = tasaEnBd === 'vacio' ? [] : [{ iva_rate: tasaEnBd }]
       return { ok: true, status: 200, json: async () => filas } as unknown as Response
     }
-    // El RPC devuelve ok:false para que la ruta corte justo después de guardar:
-    // lo que se prueba aquí es el bloque de detección, que corre antes.
+    // ARNÉS ACTUALIZADO EL 2026-09-08. Antes el RPC devolvía `ok: false` para cortar
+    // la ruta, porque la detección corría ANTES de guardar y con eso bastaba.
+    //
+    // Ahora la detección corre DESPUÉS del RPC y lee la FILA, no el cuerpo: ése fue el
+    // arreglo de los dos huecos —omitir `items` apagaba el detector entero, y el
+    // `descuento` del cuerpo se restaba antes de comparar—. Así que el arnés tiene que
+    // dejar pasar el guardado y servir la fila resultante.
+    //
+    // Las cuatro propiedades que fija este archivo NO cambiaron.
     if (u.includes('/rest/v1/rpc/')) {
-      return { ok: true, status: 200, json: async () => ({ ok: false }) } as unknown as Response
+      return { ok: true, status: 200, json: async () => ({ ok: true, revision: 2, first_execution: true }) } as unknown as Response
+    }
+    if (u.includes('/rest/v1/pos_turnos')) {
+      return { ok: true, status: 200, json: async () => [{ id: 't1', closed_at: null }] } as unknown as Response
+    }
+    // La fila ya escrita: es lo que el detector lee ahora.
+    if (u.includes('/rest/v1/pos_orders') && u.includes('select=items,total,descuento,mesero')) {
+      return { ok: true, status: 200, json: async () => [filaEscrita] } as unknown as Response
     }
     return { ok: true, status: 200, json: async () => ({}) } as unknown as Response
   })
@@ -79,11 +96,22 @@ const auditorias = () =>
 
 type Item = { subtotal: number; cancelled?: boolean }
 function pedido(opts: { items: Item[]; total: number; descuento?: number; extra?: Record<string, unknown> }) {
+  // El guardado deja la fila con lo que se mandó — que es el caso normal. Las pruebas
+  // del vector "omitir items" fijan `filaEscrita` aparte, para que la fila conserve los
+  // renglones reales aunque el cuerpo no los traiga (que es lo que hace el `coalesce`
+  // de r1_save_order).
+  filaEscrita = {
+    items: opts.items,
+    total: opts.total,
+    descuento: opts.descuento ?? 0,
+    mesero: 'Mesero',
+  }
   return {
     order_id: 'ord-1',
     expected_revision: 1,
     status: 'cerrada',
     mesero: 'Mesero',
+    turno_id: 't1',
     items: opts.items,
     total: opts.total,
     descuento: opts.descuento ?? 0,
@@ -102,6 +130,7 @@ beforeEach(() => {
   llamadas = []
   tenant = 'amalay'
   tasaEnBd = '0.16'
+  filaEscrita = {}
   process.env.NEXT_PUBLIC_SUPABASE_URL = URLBASE
   process.env.SUPABASE_SERVICE_KEY = SERVICE
   instalarFetch()
@@ -215,5 +244,86 @@ describe('detección de skimming — el IVA no es un faltante', () => {
 
     expect(auditorias()).toHaveLength(0)
     expect(llamadas.filter(c => c.url.includes('/rest/v1/clients'))).toHaveLength(0)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LOS DOS HUECOS QUE APAGABAN EL DETECTOR (cerrados el 2026-09-08)
+//
+// Estas prueban COMPORTAMIENTO, no texto: corren la ruta completa y miran si el evento
+// se escribió. Fallan contra el código anterior porque ahí el detector leía el cuerpo.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('omitir `items` ya no apaga el detector', () => {
+  it('EL VECTOR: cierre sin `items` y total de $1 sobre un ticket de $1,339.80', async () => {
+    // r1_save_order hace `items = coalesce(NULL, items)`: los renglones reales SE
+    // CONSERVAN en la fila. Antes, `Array.isArray(undefined)` era false y el bloque
+    // entero no corría — cero rastro, y el arqueo esperaba $1 por esa mesa.
+    filaEscrita = { items: [{ subtotal: 1155 }], total: 1, descuento: 0, mesero: 'Mesero' }
+    await guardar({
+      order_id: 'ord-1', expected_revision: 1, status: 'cerrada', turno_id: 't1',
+      total: 1, pagos: [{ metodo: 'Efectivo', monto: 1 }],
+      // sin `items`, a propósito
+    })
+
+    const evs = auditorias()
+    expect(evs, 'el cierre sin items tiene que auditarse').toHaveLength(1)
+    expect(evs[0].details.declared_total_cents).toBe(100)
+    expect(evs[0].details.sum_items_cents).toBe(115500)
+  })
+
+  it('y un cierre honesto sin `items` sigue sin auditarse', async () => {
+    // El caso de cocina: manda `status` sin total ni subtotal. Leyendo la fila, el
+    // total es el real y no dispara. Antes, `cents(undefined) = 0` habría visto un
+    // faltante del 100%.
+    filaEscrita = { items: [{ subtotal: 1888 }], total: 2190.08, descuento: 0, mesero: 'Mesero' }
+    await guardar({ order_id: 'ord-1', expected_revision: 1, status: 'cerrada', turno_id: 't1' })
+
+    expect(auditorias()).toHaveLength(0)
+  })
+})
+
+describe('el `descuento` del cuerpo ya no esconde el faltante', () => {
+  it('EL VECTOR: descuento inventado de $1,000 en el cuerpo', async () => {
+    // La fila guarda el descuento REAL (0). Antes se restaba el del cuerpo y la
+    // aritmética cuadraba sola.
+    filaEscrita = { items: [{ subtotal: 1155 }], total: 179.80, descuento: 0, mesero: 'Mesero' }
+    await guardar({
+      order_id: 'ord-1', expected_revision: 1, status: 'cerrada', turno_id: 't1',
+      items: [{ subtotal: 1155 }], subtotal: 1155, descuento: 1000, total: 179.80,
+      pagos: [{ metodo: 'Efectivo', monto: 179.80 }],
+    })
+
+    expect(auditorias(), 'el descuento del cuerpo no debe callar al detector').toHaveLength(1)
+  })
+
+  it('pero un descuento REAL sí se respeta', async () => {
+    // 1000 de items, 100 de descuento escrito en la fila → base 900, +16% = 1044.
+    // Si el descuento de la fila se ignorara, esto sería un falso positivo en cada
+    // cortesía legítima.
+    filaEscrita = { items: [{ subtotal: 1000 }], total: 1044, descuento: 100, mesero: 'Mesero' }
+    await guardar({
+      order_id: 'ord-1', expected_revision: 1, status: 'cerrada', turno_id: 't1',
+      items: [{ subtotal: 1000 }], descuento: 100, total: 1044,
+    })
+
+    expect(auditorias()).toHaveLength(0)
+  })
+})
+
+describe('la sospecha queda a nombre de quien la sesión dice', () => {
+  it('el actor sale del token, no del `mesero` del cuerpo', async () => {
+    filaEscrita = { items: [{ subtotal: 1888 }], total: 1500, descuento: 0, mesero: 'Otro' }
+    await guardar({
+      order_id: 'ord-1', expected_revision: 1, status: 'cerrada', turno_id: 't1',
+      items: [{ subtotal: 1888 }], total: 1500, mesero: 'El Gerente',
+    })
+
+    const ev = llamadas
+      .filter(c => c.url.includes('/rest/v1/pos_audit_log') && c.method === 'POST')
+      .map(c => c.body as { action: string; actor: string })
+      .find(b => b.action === 'skimming_suspect')
+    expect(ev?.actor).toBe('Mesero')          // withPOSAuth → staffName
+    expect(ev?.actor).not.toBe('El Gerente')  // lo que mandó el cuerpo
   })
 })

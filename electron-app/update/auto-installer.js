@@ -33,6 +33,7 @@ let _autoUpdater = null
 let _timer = null
 let _descargada = null      // { version } cuando ya está en disco, lista para instalar
 let _instalando = false
+let _requiredStoreFormat = null
 
 /**
  * @param {object} opts
@@ -42,7 +43,8 @@ let _instalando = false
  * @param {(info:object)=>void} [opts.onEvento]  para avisar a la UI por WS
  * @param {object} [opts.updaterInyectado]  sólo para pruebas
  */
-function iniciar({ canal, getSnapshot, estaBloqueada, onEvento, updaterInyectado }) {
+function iniciar({ canal, getSnapshot, estaBloqueada, onEvento, updaterInyectado, requiredStoreFormat = null }) {
+  _requiredStoreFormat = requiredStoreFormat
   try {
     _autoUpdater = updaterInyectado || require('electron-updater').autoUpdater
   } catch (e) {
@@ -62,7 +64,7 @@ function iniciar({ canal, getSnapshot, estaBloqueada, onEvento, updaterInyectado
   _autoUpdater.logger = { info: () => {}, warn: console.warn, error: console.error, debug: () => {} }
 
   _autoUpdater.on('update-downloaded', (info) => {
-    _descargada = { version: info?.version || 'desconocida' }
+    _descargada = { version: info?.version || 'desconocida', supportedStoreFormats: info?.fullsite?.supportedStoreFormats }
     console.log(`[auto-update] Descargada ${_descargada.version} — esperando a que el restaurante esté en reposo`)
     avisar({ descargada: true, version: _descargada.version })
   })
@@ -90,6 +92,12 @@ function iniciar({ canal, getSnapshot, estaBloqueada, onEvento, updaterInyectado
  */
 async function intentarInstalar({ getSnapshot, estaBloqueada, avisar = () => {} }) {
   if (!_descargada || _instalando) return { instalo: false, motivo: 'no hay nada descargado' }
+  // A quiet restaurant does not make an older event-log reader compatible.
+  // Candidate releases must explicitly declare the format in their verified
+  // update manifest; missing metadata holds the update for a reviewed cutover.
+  if (_requiredStoreFormat && (!Array.isArray(_descargada.supportedStoreFormats) || !_descargada.supportedStoreFormats.includes(_requiredStoreFormat))) {
+    return { instalo: false, motivo: 'la versión no declara compatibilidad con los comandos durables guardados' }
+  }
 
   const { puedeInstalarAhora } = require('../local-server/update/politica')
 
@@ -141,6 +149,7 @@ function _reset() {
   _autoUpdater = null
   _descargada = null
   _instalando = false
+  _requiredStoreFormat = null
 }
 
 /** Sólo para pruebas: simula que ya se descargó una versión. */

@@ -1,3 +1,27 @@
+// EL CONTRATO DE PERMISOS ES UNO SOLO, PERO NO SE PUEDE IMPORTAR DESDE FUERA.
+//
+// La fuente canonica vive en `electron-app/local-server/core/permission-profiles.json`
+// porque Pedro la lee en RUNTIME (`actor-authority.js`, `require('./permission-profiles.json')`)
+// y va empaquetada en el instalador (electron-builder-pos.json, verify-windows-package.cjs).
+// Ver docs/architecture/ACTOR-AUTHORITY-2026-09-05.md.
+//
+// Importarla desde aqui con `../../../electron-app/...` TRONABA EL BUILD. No era el
+// `.vercelignore` --que si excluye electron-app/ del deploy-- sino Next: Turbopack no
+// resuelve un modulo fuera de la raiz del proyecto. Comprobado local, con el archivo
+// presente en disco:
+//
+//     Module not found: Can't resolve '../../../electron-app/local-server/core/permission-profiles.json'
+//
+// Esta rama llevaba SIN PODER DESPLEGARSE desde `14ac4831`; todos los previews de
+// Vercel en ERROR.
+//
+// LA COPIA NO PUEDE DERIVAR: `el-contrato-de-permisos-es-uno-solo.test.ts` compara los
+// dos archivos byte a byte y truena si alguien edita uno. Si esa prueba falla, la
+// respuesta es copiar la canonica encima de esta, NO editar esta:
+//
+//     cp electron-app/local-server/core/permission-profiles.json dashboard-app/src/lib/permission-profiles.json
+import permissionContract from './permission-profiles.json'
+
 /**
  * POS Granular Permissions System
  * Based on Eduardo's Wansoft screenshots (~50 permissions)
@@ -78,112 +102,7 @@ export interface POSPermissions {
 }
 
 // Default permission profiles matching Wansoft's structure
-export const PERMISSION_PROFILES: Record<string, POSPermissions> = {
-  admin: {
-    abrir_cuentas_restaurante: true, abrir_cuentas_llevar: true, abrir_cuentas_domicilio: true,
-    abrir_cuentas_recoger: true, cerrar_cuentas: true, cancelar_ordenes: true, cancelar_facturas: true,
-    cambio_mesa: true, cambio_mesero: true, cambio_forma_pago: true, cambio_tipo_cuenta: true,
-    cambio_personas: true, juntar_mesas: true, liberar_ordenes: true, mesas_por_cobrar: true,
-    ver_todas_cuentas: true, ver_cuentas_propias: true,
-    descuentos_ordenes_pct: true, descuentos_ordenes_monto: true, descuentos_platillos_pct: true,
-    descuentos_platillos_monto: true, platillos_gratis: true, cerrar_cuentas_cortesia: true, platillos_2x1: true,
-    imprimir_cuentas: true, reimpresion_preticket: true, registro_comanda: true,
-    cajero: true, corte_turno: true, corte_x: true, corte_z: true, corte_mesero: true,
-    retiros_programados: true, propinas: true, tipo_cambio: true, vales: true,
-    ventas_mesero: true, ventas_globales: true, reportes: true,
-    abrir_dia_operaciones: true, administrar_cliente: true, borrar_platillos: true,
-    actualizar_informacion: true, actualizar_estatus_orden: true,
-    configurar_datos_terminal: true, configurar_funciones_terminal: true,
-    configurar_impresora: true, configurar_huella_digital: true,
-    configurar_numero_terminal: true, configurar_iva: true,
-    control_existencias_pos: true, happy_hour: true, modo_operacion: true,
-    operaciones_adicionales: true, gerente: true, mesero: true, repartidor: true,
-  },
-
-  gerente: {
-    abrir_cuentas_restaurante: true, abrir_cuentas_llevar: true, abrir_cuentas_domicilio: true,
-    abrir_cuentas_recoger: true, cerrar_cuentas: true, cancelar_ordenes: false, // NO — solo admin
-    cancelar_facturas: true, cambio_mesa: true, cambio_mesero: true, cambio_forma_pago: true,
-    cambio_tipo_cuenta: true, cambio_personas: true, juntar_mesas: true, liberar_ordenes: true,
-    mesas_por_cobrar: true, ver_todas_cuentas: true, ver_cuentas_propias: true,
-    descuentos_ordenes_pct: true, descuentos_ordenes_monto: true, descuentos_platillos_pct: true,
-    descuentos_platillos_monto: true, platillos_gratis: true, cerrar_cuentas_cortesia: true, platillos_2x1: true,
-    imprimir_cuentas: true, reimpresion_preticket: true, registro_comanda: true,
-    cajero: true, corte_turno: true, corte_x: true, corte_z: true, corte_mesero: true,
-    retiros_programados: true, propinas: true, tipo_cambio: true, vales: true,
-    ventas_mesero: true, ventas_globales: true, reportes: true,
-    abrir_dia_operaciones: true, administrar_cliente: false, borrar_platillos: false,
-    actualizar_informacion: true, actualizar_estatus_orden: true,
-    configurar_datos_terminal: false, configurar_funciones_terminal: false,
-    configurar_impresora: false, configurar_huella_digital: false,
-    configurar_numero_terminal: false, configurar_iva: false,
-    control_existencias_pos: true, happy_hour: true, modo_operacion: false,
-    operaciones_adicionales: true, gerente: true, mesero: true, repartidor: false,
-  },
-
-  capitan: {
-    abrir_cuentas_restaurante: true, abrir_cuentas_llevar: true, abrir_cuentas_domicilio: false,
-    abrir_cuentas_recoger: false, cerrar_cuentas: true, cancelar_ordenes: false,
-    cancelar_facturas: false, cambio_mesa: true, cambio_mesero: true, cambio_forma_pago: true,
-    cambio_tipo_cuenta: false, cambio_personas: true, juntar_mesas: true, liberar_ordenes: false,
-    mesas_por_cobrar: true, ver_todas_cuentas: true, ver_cuentas_propias: true,
-    descuentos_ordenes_pct: true, descuentos_ordenes_monto: false, descuentos_platillos_pct: true,
-    descuentos_platillos_monto: false, platillos_gratis: false, cerrar_cuentas_cortesia: true, platillos_2x1: true,
-    imprimir_cuentas: true, reimpresion_preticket: true, registro_comanda: true,
-    cajero: false, corte_turno: false, corte_x: false, corte_z: false, corte_mesero: true,
-    retiros_programados: false, propinas: true, tipo_cambio: false, vales: false,
-    ventas_mesero: true, ventas_globales: false, reportes: false,
-    abrir_dia_operaciones: false, administrar_cliente: false, borrar_platillos: false,
-    actualizar_informacion: false, actualizar_estatus_orden: true,
-    configurar_datos_terminal: false, configurar_funciones_terminal: false,
-    configurar_impresora: false, configurar_huella_digital: false,
-    configurar_numero_terminal: false, configurar_iva: false,
-    control_existencias_pos: false, happy_hour: false, modo_operacion: false,
-    operaciones_adicionales: false, gerente: false, mesero: true, repartidor: false,
-  },
-
-  cajero: {
-    abrir_cuentas_restaurante: false, abrir_cuentas_llevar: true, abrir_cuentas_domicilio: true,
-    abrir_cuentas_recoger: true, cerrar_cuentas: true, cancelar_ordenes: false,
-    cancelar_facturas: false, cambio_mesa: false, cambio_mesero: false, cambio_forma_pago: true,
-    cambio_tipo_cuenta: false, cambio_personas: false, juntar_mesas: false, liberar_ordenes: false,
-    mesas_por_cobrar: true, ver_todas_cuentas: true, ver_cuentas_propias: false,
-    descuentos_ordenes_pct: false, descuentos_ordenes_monto: false, descuentos_platillos_pct: false,
-    descuentos_platillos_monto: false, platillos_gratis: false, cerrar_cuentas_cortesia: false, platillos_2x1: false,
-    imprimir_cuentas: true, reimpresion_preticket: true, registro_comanda: true,
-    cajero: true, corte_turno: true, corte_x: true, corte_z: false, corte_mesero: false,
-    retiros_programados: false, propinas: true, tipo_cambio: false, vales: true,
-    ventas_mesero: false, ventas_globales: false, reportes: false,
-    abrir_dia_operaciones: true, administrar_cliente: false, borrar_platillos: false,
-    actualizar_informacion: false, actualizar_estatus_orden: false,
-    configurar_datos_terminal: false, configurar_funciones_terminal: false,
-    configurar_impresora: false, configurar_huella_digital: false,
-    configurar_numero_terminal: false, configurar_iva: false,
-    control_existencias_pos: false, happy_hour: false, modo_operacion: false,
-    operaciones_adicionales: false, gerente: false, mesero: false, repartidor: false,
-  },
-
-  mesero: {
-    abrir_cuentas_restaurante: true, abrir_cuentas_llevar: false, abrir_cuentas_domicilio: false,
-    abrir_cuentas_recoger: false, cerrar_cuentas: false, cancelar_ordenes: false,
-    cancelar_facturas: false, cambio_mesa: false, cambio_mesero: false, cambio_forma_pago: false,
-    cambio_tipo_cuenta: false, cambio_personas: true, juntar_mesas: false, liberar_ordenes: false,
-    mesas_por_cobrar: false, ver_todas_cuentas: false, ver_cuentas_propias: true,
-    descuentos_ordenes_pct: false, descuentos_ordenes_monto: false, descuentos_platillos_pct: false,
-    descuentos_platillos_monto: false, platillos_gratis: false, cerrar_cuentas_cortesia: false, platillos_2x1: false,
-    imprimir_cuentas: false, reimpresion_preticket: false, registro_comanda: true,
-    cajero: false, corte_turno: false, corte_x: false, corte_z: false, corte_mesero: false,
-    retiros_programados: false, propinas: false, tipo_cambio: false, vales: false,
-    ventas_mesero: false, ventas_globales: false, reportes: false,
-    abrir_dia_operaciones: false, administrar_cliente: false, borrar_platillos: false,
-    actualizar_informacion: false, actualizar_estatus_orden: false,
-    configurar_datos_terminal: false, configurar_funciones_terminal: false,
-    configurar_impresora: false, configurar_huella_digital: false,
-    configurar_numero_terminal: false, configurar_iva: false,
-    control_existencias_pos: false, happy_hour: false, modo_operacion: false,
-    operaciones_adicionales: false, gerente: false, mesero: true, repartidor: false,
-  },
-}
+export const PERMISSION_PROFILES: Record<string, POSPermissions> = permissionContract.profiles
 
 /**
  * Aliases de rol → perfil. El provisioning y roles.ts usan 'dueño'/'staff'
@@ -191,12 +110,7 @@ export const PERMISSION_PROFILES: Record<string, POSPermissions> = {
  * un dueño recién provisionado caía al perfil de MESERO y no podía ni abrir
  * turno (bloqueo #1 del Minute-0, visto en campo 2026-08-29 con carls-jr).
  */
-const ROLE_ALIASES: Record<string, string> = {
-  'dueño': 'admin',
-  dueno: 'admin',
-  owner: 'admin',
-  staff: 'mesero',
-}
+const ROLE_ALIASES: Record<string, string> = permissionContract.aliases
 
 /** Get permissions for a role. Falls back to mesero if unknown. */
 export function getPermissions(role: string): POSPermissions {

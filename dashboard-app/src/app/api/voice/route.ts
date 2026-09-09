@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { withPOSAuth } from '@/lib/api-auth'
+import { hoyEnZona, sumarDias } from '@/lib/date-mx'
 import { buildDailyFromOrders } from '@/lib/pos-daily'
 import { esDuenoDelHistoricoWansoft } from '@/lib/wansoft-legacy'
 
@@ -69,11 +70,21 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. Detect date from question
-    const now = new Date()
-    const mxOffset = -6 * 60 * 60 * 1000
-    const mxNow = new Date(now.getTime() + mxOffset + now.getTimezoneOffset() * 60 * 1000)
-    const todayStr = mxNow.toISOString().split('T')[0]
-    const yesterday = new Date(mxNow.getTime() - 86400000).toISOString().split('T')[0]
+    //
+    // LA ZONA SALE DEL TENANT. Mismo defecto que tenian `chat` y `coach`: un -6 clavado
+    // (solo vale para el centro de Mexico; Tijuana es -7/-8 y conserva horario de
+    // verano) mas `now.getTimezoneOffset()`, que es la zona DEL PROCESO -- la cuenta
+    // salia bien unicamente porque Vercel corre en UTC.
+    //
+    // `fetchClientConfig` se carga AQUI y no mas abajo, donde estaba: la fecha se
+    // necesita antes que la persona del asistente.
+    const { fetchClientConfig: cargarConfig } = await import('@/lib/client-config')
+    const configDelTenant = await cargarConfig(auth.clientId)
+    const zona = configDelTenant.timezone || 'America/Mexico_City'
+    const todayStr = hoyEnZona(zona)
+    // Por calendario, no restando 86,400,000 ms: un dia con cambio de horario dura 23
+    // o 25 horas.
+    const yesterday = sumarDias(todayStr, -1, zona)
 
     const monthMap: Record<string, string> = {
       enero: '01', febrero: '02', marzo: '03', abril: '04', mayo: '05', junio: '06',
@@ -105,7 +116,7 @@ export async function POST(request: NextRequest) {
       if (q.includes('ayer')) dateFilter = { start: yesterday, end: yesterday }
       else if (q.includes('hoy')) dateFilter = { start: todayStr, end: todayStr }
       else if (q.includes('semana')) {
-        const weekAgo = new Date(mxNow.getTime() - 7 * 86400000).toISOString().split('T')[0]
+        const weekAgo = sumarDias(todayStr, -7, zona)
         dateFilter = { start: weekAgo, end: todayStr }
       } else if (q.includes('mes')) {
         const monthStart = todayStr.slice(0, 8) + '01'
@@ -338,9 +349,8 @@ export async function POST(request: NextRequest) {
       })
 
       // Pre-calculate aggregates so the model doesn't have to sum
-      const nowV = new Date()
-      const mxNowV = new Date(nowV.getTime() - 6 * 60 * 60 * 1000 + nowV.getTimezoneOffset() * 60 * 1000)
-      const tmPrefix = mxNowV.toISOString().slice(0, 7)
+      // Mismo patron, segunda instancia: decidia que mes es "este mes".
+      const tmPrefix = todayStr.slice(0, 7)
       const sumF = (arr: Record<string, unknown>[], key: string) => arr.reduce((s, d) => s + (Number(d[key]) || 0), 0)
       const tmData = recentDays.filter((d: Record<string, unknown>) => (d.fecha as string).startsWith(tmPrefix))
       const tmV = sumF(tmData, 'ventas_dia')

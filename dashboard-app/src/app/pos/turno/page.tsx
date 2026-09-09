@@ -7,6 +7,12 @@ import { formatMXN, logAudit, openTurno } from '@/lib/pos-data'
 import dynamic from 'next/dynamic'
 import { getActiveClientSlug as _cid } from '@/lib/data'
 import { cacheTurno, getCachedActiveTurno, getCachedOrdersByTurno } from '@/lib/pos-offline-db'
+import { leerSalon, requiereCaja } from '@/lib/pedro-cliente'
+import TurnoDeCaja from '@/components/pos/TurnoDeCaja'
+import {
+  evaluarAvisoDeHuerfanas, OPEN_ORDER_STATUSES, evaluarFondoDeApertura, leerContado,
+  type AvisoDeHuerfanas, type LecturaDelCierreAnterior,
+} from '@/lib/pos-cierre-guard'
 
 const StaffShiftPanel = dynamic(() => import('@/components/pos/StaffShiftPanel'), { ssr: false })
 const CierreCajaWizard = dynamic(() => import('@/components/pos/CierreCajaWizard'), { ssr: false })
@@ -299,6 +305,23 @@ function HistorialCierres() {
 }
 
 export default function TurnoPage() {
+  const [mode, setMode] = useState<'loading' | 'caja' | 'legacy' | 'error'>('loading')
+  const [attempt, setAttempt] = useState(0)
+  useEffect(() => {
+    let alive = true
+    if (!requiereCaja()) { setMode('legacy'); return }
+    void leerSalon().then(state => {
+      if (alive) setMode(!state.autoritativa ? 'error' : state.writeAuthority === 'caja' ? 'caja' : 'legacy')
+    }).catch(() => { if (alive) setMode('error') })
+    return () => { alive = false }
+  }, [attempt])
+  if (mode === 'caja') return <TurnoDeCaja />
+  if (mode === 'legacy') return <TurnoPageLegacy />
+  return <main className="p-8 text-[var(--text-1)]"><p>{mode === 'error' ? 'No se pudo confirmar el turno con Caja.' : 'Consultando turno…'}</p>
+    {mode === 'error' && <button className="mt-4 rounded-xl border p-3" onClick={() => { setMode('loading'); setAttempt(n => n + 1) }}>Volver a consultar</button>}</main>
+}
+
+function TurnoPageLegacy() {
   const [activeTurno, setActiveTurno] = useState<Turno | null>(null)
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState<string | null>(null)
@@ -306,13 +329,27 @@ export default function TurnoPage() {
   const [showCierreWizard, setShowCierreWizard] = useState(false)
   const [showCorteX, setShowCorteX] = useState(false)
   // GUARD-08: banner if the previous cierre had open orders
-  const [orphanCierre, setOrphanCierre] = useState<{ count: number; nota: string | null } | null>(null)
+  const [orphanCierre, setOrphanCierre] = useState<AvisoDeHuerfanas | null>(null)
   // Turnos abiertos ADEMÁS del operativo (huérfanos de días anteriores)
   const [staleTurnos, setStaleTurnos] = useState<Turno[]>([])
 
   // Open shift state
   const [fondoInicial, setFondoInicial] = useState('')
   const [openedBy, setOpenedBy] = useState('')
+  /**
+   * EL DINERO ENTRE UN CORTE Y LA SIGUIENTE APERTURA NO TENIA CONTABILIDAD.
+   *
+   * El fondo se tecleaba y el sistema lo creia. Nadie lo comparaba contra lo que
+   * el corte anterior dejo CONTADO, y ese tramo es el unico del dia donde el
+   * efectivo no le rinde cuentas a nadie. Aqui se lee el ultimo cierre para poder
+   * confrontarlo; `evaluarFondoDeApertura` decide que hacer con la diferencia.
+   *
+   * Arranca en `determinado: false` a proposito: hasta que el servidor conteste,
+   * lo honesto es "no se sabe", no "no hay cierre anterior".
+   */
+  const [cierreAnterior, setCierreAnterior] = useState<LecturaDelCierreAnterior>(
+    { determinado: false, motivo: 'todavía cargando' })
+  const [notaDelFondo, setNotaDelFondo] = useState('')
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000) }
 
@@ -336,7 +373,13 @@ export default function TurnoPage() {
         if (turno) {
           await cacheTurno({ ...turno, client_id: _cid(), synced_at: new Date().toISOString() })
         }
-        // GUARD-08: check if previous cierre had open orders — show banner if so
+        // GUARD-08: aviso de ordenes huerfanas de un cierre anterior.
+        //
+        // Esta consulta pide el ultimo cierre que TUVO ordenes abiertas, que es un
+        // hecho historico y nunca deja de ser cierto. Antes se enseñaba tal cual, y
+        // en AMALAY el aviso del Z#2 (1-sep) llevaba SIETE DIAS en pantalla con dos
+        // cierres Z encima, pidiendo buscar 13 mesas de las que ya no quedaba
+        // ninguna abierta. Ahora se comprueba cuales siguen abiertas HOY.
         try {
           const cierreRes = await fetch(
             `${SUPABASE_URL}/rest/v1/pos_cierres?client_id=eq.${_cid()}&cierre_con_ordenes_abiertas=eq.true&order=created_at.desc&limit=1&select=ordenes_pendientes,cierre_nota`,
@@ -344,9 +387,26 @@ export default function TurnoPage() {
           )
           if (cierreRes.ok) {
             const [lastCierre] = await cierreRes.json()
-            if (lastCierre) {
-              const count = (lastCierre.ordenes_pendientes || []).length
-              setOrphanCierre({ count, nota: lastCierre.cierre_nota || null })
+            const declaradas: string[] = lastCierre?.ordenes_pendientes || []
+            if (declaradas.length > 0) {
+              // Que siguen abiertas de aquellas. Si no se puede saber, NO se calla:
+              // convertir un fallo de red en "ya no hay" es el error que costo caro
+              // el 2026-08-31.
+              let lectura: Parameters<typeof evaluarAvisoDeHuerfanas>[1]
+              try {
+                const ids = declaradas.map(id => `"${id}"`).join(',')
+                const abiertasRes = await fetch(
+                  `${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${_cid()}&id=in.(${ids})&status=in.(${OPEN_ORDER_STATUSES.join(',')})&select=id`,
+                  { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, signal: AbortSignal.timeout(3000) }
+                )
+                if (!abiertasRes.ok) throw new Error(`HTTP ${abiertasRes.status}`)
+                const filas: Array<{ id: string }> = await abiertasRes.json()
+                lectura = { determinado: true, abiertas: filas.map(f => f.id) }
+              } catch (e) {
+                lectura = { determinado: false, motivo: e instanceof Error ? e.message : 'sin conexion' }
+              }
+              const aviso = evaluarAvisoDeHuerfanas(declaradas, lectura, lastCierre?.cierre_nota || null)
+              setOrphanCierre(aviso.mostrar ? aviso : null)
             }
           }
         } catch { /* columns not yet migrated or offline — skip banner */ }
@@ -366,6 +426,52 @@ export default function TurnoPage() {
 
   useEffect(() => { fetchTurno() }, [])
 
+  // Lo que el corte anterior dejó contado. Se pide una sola vez al montar; si no
+  // se puede leer, la lectura se queda `determinado: false` y la apertura sigue
+  // permitida — el día no se traba por un fetch (misma regla que TurnoGate).
+  useEffect(() => {
+    let vivo = true
+    async function leerUltimoCierre() {
+      const base = `${SUPABASE_URL}/rest/v1/pos_cierres?client_id=eq.${_cid()}&order=created_at.desc&limit=1&select=fecha,total_contado,closed_by`
+      try {
+        // `folio_z` puede no existir en una base sin la migración: PostgREST
+        // rechaza el select entero, así que se reintenta sin él. Mismo patrón que
+        // HistorialCierres, arriba.
+        let res = await fetch(`${base},folio_z`, {
+          headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+          cache: 'no-store', signal: AbortSignal.timeout(5000),
+        })
+        if (!res.ok) res = await fetch(base, {
+          headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+          cache: 'no-store', signal: AbortSignal.timeout(5000),
+        })
+        if (!res.ok) {
+          if (vivo) setCierreAnterior({ determinado: false, motivo: `el servidor respondió ${res.status}` })
+          return
+        }
+        const filas = await res.json()
+        if (!vivo) return
+        const c = Array.isArray(filas) ? filas[0] : null
+        setCierreAnterior({
+          determinado: true,
+          cierre: c ? {
+            // PostgREST devuelve numeric como STRING. Sin Number() esto compara texto.
+            contado: Number(c.total_contado) || 0,
+            fecha: String(c.fecha), closedBy: String(c.closed_by || ''),
+            folioZ: c.folio_z ?? null,
+          } : null,
+        })
+      } catch {
+        if (vivo) setCierreAnterior({ determinado: false, motivo: 'sin conexión' })
+      }
+    }
+    leerUltimoCierre()
+    return () => { vivo = false }
+  }, [])
+
+  const veredictoDelFondo = evaluarFondoDeApertura(
+    leerContado(fondoInicial), cierreAnterior, notaDelFondo)
+
   /**
    * VERDAD ÚNICA DEL TURNO. Antes esta página tenía SU PROPIA apertura
    * (crypto.randomUUID + IndexedDB + su propia cola), invisible para TurnoGate,
@@ -378,9 +484,15 @@ export default function TurnoPage() {
    * fuente de verdad paralela.
    */
   const handleOpenTurno = async () => {
-    if (!openedBy.trim() || !fondoInicial) return
-    const fondo = Number(fondoInicial)
-
+    if (!openedBy.trim()) return
+    // El botón ya está deshabilitado, pero la puerta se cierra aquí también: un
+    // Enter o un doble toque no deben poder saltarse la confrontación del fondo.
+    if (!veredictoDelFondo.puedeAbrir) {
+      showToast(veredictoDelFondo.motivo || 'Revisa el fondo de caja.')
+      return
+    }
+    const fondo = leerContado(fondoInicial) ?? 0
+    try {
     const turno = await openTurno(fondo, openedBy)
     if (!turno) {
       showToast('Error al abrir turno')
@@ -394,7 +506,25 @@ export default function TurnoPage() {
       synced_at: sincronizado ? new Date().toISOString() : undefined,
     })
 
-    logAudit({ action: 'status_changed', actor: openedBy, details: { type: 'turno_opened', fondo, turno_id: turno.id, sincronizado } })
+    // LA CONFRONTACION QUEDA ESCRITA, NO SOLO EN PANTALLA.
+    //
+    // `logAudit` encola en IndexedDB cuando falla la red, asi que el rastro
+    // sobrevive a una apertura offline. Va por aqui y no por `pos_turnos.notas`
+    // porque en modo Caja el turno lo crea Pedro con el comando TURN_OPEN, que
+    // solo lleva `opening_cash_cents`: meter la nota ahi obligaria a cambiar el
+    // contrato del local-server y a reinstalar. La auditoria funciona en los dos
+    // caminos sin tocar nada.
+    logAudit({
+      action: 'status_changed', actor: openedBy,
+      reason: notaDelFondo.trim() || undefined,
+      details: {
+        type: 'turno_opened', fondo, turno_id: turno.id, sincronizado,
+        contado_al_cerrar: cierreAnterior.determinado ? (cierreAnterior.cierre?.contado ?? null) : null,
+        diferencia_contra_cierre: veredictoDelFondo.diferencia,
+        confrontado: cierreAnterior.determinado,
+        explicacion: notaDelFondo.trim() || null,
+      },
+    })
     // No se "dice" confirmado lo que solo quedó local: el operador ve la diferencia.
     showToast(sincronizado
       ? `Turno abierto — Fondo: ${formatMXN(fondo)}`
@@ -406,6 +536,8 @@ export default function TurnoPage() {
     })
     setFondoInicial('')
     setOpenedBy('')
+    setNotaDelFondo('')
+    } catch (e) { showToast(e instanceof Error ? e.message : 'Caja no confirmó la apertura de turno.') }
   }
 
   // Get staff name from session
@@ -474,14 +606,11 @@ export default function TurnoPage() {
                         <AlertTriangle size={18} className="text-amber-400 flex-shrink-0 mt-0.5" />
                         <div>
                           <p className="font-semibold text-amber-400 text-sm">
-                            Cierre anterior con {orphanCierre.count} orden{orphanCierre.count !== 1 ? 'es' : ''} abierta{orphanCierre.count !== 1 ? 's' : ''}
+                            {orphanCierre.siguenAbiertas === null
+                              ? 'Ordenes de un cierre anterior sin verificar'
+                              : `Quedan ${orphanCierre.siguenAbiertas} orden${orphanCierre.siguenAbiertas !== 1 ? 'es' : ''} sin cerrar`}
                           </p>
-                          {orphanCierre.nota && (
-                            <p className="text-xs text-[var(--text-3)] mt-0.5">Motivo: {orphanCierre.nota}</p>
-                          )}
-                          <p className="text-xs text-[var(--text-3)] mt-1">
-                            Verifica el mapa de mesas para localizar las órdenes huérfanas.
-                          </p>
+                          <p className="text-xs text-[var(--text-3)] mt-1">{orphanCierre.texto}</p>
                         </div>
                       </div>
                       <button onClick={() => setOrphanCierre(null)} className="text-[var(--text-3)] hover:text-[var(--text-1)] flex-shrink-0">
@@ -603,9 +732,38 @@ export default function TurnoPage() {
                         className="w-full bg-[var(--line)] border border-[var(--line)] rounded-lg px-4 py-3 text-[var(--text-1)] text-lg text-center focus:outline-none focus:border-blue-500"
                       />
                     </div>
+                    {/* LO QUE DEJO EL CORTE ANTERIOR, ENFRENTE DEL NUMERO QUE SE ESTA TECLEANDO.
+                        Que el fondo NO coincida es NORMAL -- el gerente se lleva la venta al
+                        banco. Lo que estaba mal era que no coincidiera EN SILENCIO. */}
+                    {veredictoDelFondo.aviso && (
+                      <div className={`rounded-xl p-3 text-sm border ${
+                        veredictoDelFondo.exigeExplicacion
+                          ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                          : 'bg-[var(--surface-2)] border-[var(--line)] text-[var(--text-3)]'
+                      }`}>
+                        {veredictoDelFondo.aviso}
+                      </div>
+                    )}
+                    {veredictoDelFondo.exigeExplicacion && (
+                      <div>
+                        <label className="text-sm text-amber-400 block mb-1">
+                          ¿A dónde se fue (o de dónde salió) la diferencia?
+                        </label>
+                        <textarea
+                          value={notaDelFondo}
+                          onChange={e => setNotaDelFondo(e.target.value)}
+                          rows={2}
+                          placeholder="Ej: el gerente depositó $2,000 en el banco al cerrar"
+                          className="w-full bg-[var(--line)] border border-[var(--line)] rounded-lg px-4 py-3 text-[var(--text-1)] text-sm focus:outline-none focus:border-amber-500 resize-none"
+                        />
+                      </div>
+                    )}
+                    {veredictoDelFondo.motivo && fondoInicial.trim() !== '' && (
+                      <p className="text-xs text-amber-400">{veredictoDelFondo.motivo}</p>
+                    )}
                     <button
                       onClick={handleOpenTurno}
-                      disabled={!openedBy.trim() || !fondoInicial}
+                      disabled={!openedBy.trim() || !veredictoDelFondo.puedeAbrir}
                       className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 disabled:bg-[var(--line)] disabled:text-[var(--text-3)] text-white font-bold rounded-xl text-lg transition-colors"
                     >
                       Abrir turno

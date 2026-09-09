@@ -11,8 +11,9 @@
 //  • Outbox transactional (append event + mark command processed atomically, or both fail)
 //  • Snapshot support (rebuild state from checkpoint instead of full replay)
 //
-// Phase 1 (NdjsonEventStore) satisfies: monotonic sequence, idempotency, basic durability.
-// Phase 2 (SqliteEventStore) must satisfy all guarantees above before payments migrate here.
+// NdjsonEventStore commits a checksummed transaction with fsync, deriving command
+// receipts and effect intents from that transaction. Snapshot/compaction, Windows
+// power-cut testing and authoritative money domain commands remain separate gates.
 
 /**
  * @typedef {Object} LocalEvent
@@ -32,6 +33,11 @@
  */
 
 class EventStore {
+  /** Atomically commit event + command receipt + event.effects. Return the original
+   * event on an identical retry; reject reuse with different command content. */
+  async commitCommand(event) { throw new Error('EventStore.commitCommand not implemented') }
+  async getProcessedCommand(idempotencyKey) { throw new Error('EventStore.getProcessedCommand not implemented') }
+
   /**
    * Append one or more events atomically.
    * Assigns monotonic sequence numbers starting from getLastSequence() + 1.
@@ -65,8 +71,8 @@ class EventStore {
   async hasProcessedCommand(idempotencyKey) { throw new Error('EventStore.hasProcessedCommand not implemented') }
 
   /**
-   * Record that a command has been processed, linking it to the resulting event.
-   * Must be called after append() succeeds for the same command.
+   * Legacy compatibility check only. A command receipt must already be committed
+   * atomically with its event via commitCommand; a separate write is not a commit.
    * @param {string} idempotencyKey
    * @param {string} eventId
    * @param {number} sequence

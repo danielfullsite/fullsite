@@ -1,0 +1,177 @@
+'use strict'
+
+/**
+ * EL BUILD DE WINDOWS SE CAIA POR UN ARCHIVO QUE EL FILTRO CREIA HABER EXCLUIDO.
+ *
+ * El 2026-09-09, la PRIMERA vez que este workflow llego a compilar en CI:
+ *
+ *     ./src/instrumentation.ts
+ *     Module not found: Can't resolve '../sentry.server.config'
+ *     > Build failed because of webpack errors
+ *
+ * El mismo script corre limpio en macOS -- comprobado el mismo dia: 456 archivos, 33
+ * rutas. La diferencia es el sistema operativo: `fs.cpSync` puede entregarle al filtro
+ * rutas con prefijo extendido (`\\?\C:\...`) en Windows, y entonces la comparacion
+ * contra la ruta relativa no casa. El archivo llega al build aislado, Next lo compila,
+ * y su `import '../sentry.server.config'` apunta a un archivo que este build NO copia a
+ * proposito: es configuracion de servidor, y esto es un export estatico.
+ *
+ * Por que importa mas alla del build roto: `instrumentation.ts` y `proxy.ts` son codigo
+ * de SERVIDOR. El paquete que se instala en la caja de un restaurante no debe llevarlos
+ * -- el encabezado del script lo dice desde el principio: "never bundle server API code
+ * or credentials".
+ *
+ * Run: node --test electron-app/local-server/tests/el-build-no-lleva-codigo-de-servidor.test.js
+ */
+
+const { test, describe } = require('node:test')
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const os = require('node:os')
+const path = require('node:path')
+
+const script = fs.readFileSync(
+  path.join(__dirname, '..', '..', 'scripts', 'build-offline-ui.cjs'), 'utf8')
+
+describe('la limpieza no depende de como el sistema entregue las rutas', () => {
+  // Tapar archivo por archivo era perseguir sintomas: al cerrar `instrumentation.ts` se
+  // colo `app/api/**` entero y el type check revento sobre `api/pos/save-order/route`.
+  // Ahora las reglas viven en UNA funcion y se aplican dos veces: al copiar (filtro) y
+  // sobre lo copiado (limpiar), donde las rutas ya son nuestras.
+
+  test('las reglas viven en una sola funcion', () => {
+    assert.match(script, /function fuera\(rel\)/)
+  })
+
+  test('el filtro de la copia consulta esa funcion, no su propia copia de las reglas', () => {
+    assert.match(script, /filter: value => \{[\s\S]{0,220}return !fuera\(relative\)/)
+  })
+
+  test('y se pasa otra vez sobre lo copiado', () => {
+    assert.match(script, /limpiar\(path\.join\(build, 'src'\)\)/)
+  })
+
+  test('la segunda pasada va DESPUES de la copia', () => {
+    const copia = script.indexOf("fs.cpSync(path.join(source, 'src')")
+    const limpieza = script.indexOf("limpiar(path.join(build, 'src'))")
+    assert.ok(copia > -1, 'no encontre la copia de src')
+    assert.ok(limpieza > copia, 'limpiar() tiene que ir DESPUES de la copia')
+  })
+
+  test('limpiar borra el directorio entero y no desciende en el', () => {
+    // `app/api` completo, no archivo por archivo: ahi viven rutas de servidor.
+    const i = script.indexOf('function limpiar(')
+    const cuerpo = script.slice(i, script.indexOf('function walk(', i))
+    assert.match(cuerpo, /fs\.rmSync\(path\.join\(raiz, rel\), \{ recursive: true, force: true \}\)/)
+    assert.match(cuerpo, /continue/)
+  })
+})
+
+describe('las reglas de exclusion, uno por uno', () => {
+  // Se carga la funcion real del script en vez de reimplementarla: una copia en la
+  // prueba se desincroniza y deja de proteger justo cuando cambian las reglas.
+  const fuera = eval('(' + script.match(/function fuera\(rel\)[\s\S]*?\n\}/)[0].replace('function fuera(rel)', '(rel) =>') + ')')
+
+  const casos = [
+    ['proxy.ts', true], ['instrumentation.ts', true],
+    ['__tests__', true], ['__tests__/algo.test.ts', true],
+    ['app', false],
+    ['app/api', true], ['app/api/pos/save-order/route.ts', true],
+    ['app/dashboard/page.tsx', true],
+    ['app/pos', false], ['app/pos/page.tsx', false], ['app/pos/mesas/page.tsx', false],
+    ['app/layout.tsx', false], ['app/globals.css', false],
+    ['app/not-found.tsx', false], ['app/favicon.ico', false],
+    ['lib/pos-data.ts', false], ['components/pos/CierreCajaWizard.tsx', false],
+  ]
+
+  for (const [rel, esperado] of casos) {
+    test(`${rel} ${esperado ? 'NO entra' : 'entra'}`, () => {
+      assert.equal(fuera(rel), esperado)
+    })
+  }
+
+  test('`app/api` es el que revento el build — queda anclado aparte', () => {
+    assert.equal(fuera('app/api/pos/save-order/route.ts'), true)
+    assert.equal(fuera('app/api/pos/db/route.ts'), true)
+  })
+})
+
+describe('el filtro solo, que era lo que habia, no alcanza', () => {
+  /** Lo que Windows puede entregarle al filtro: la misma ruta con prefijo extendido. */
+  test('con prefijo extendido, la comparacion del filtro NO casa', () => {
+    const source = 'C:\\repo\\dashboard-app'
+    const value = '\\\\?\\C:\\repo\\dashboard-app\\src\\instrumentation.ts'
+    // Reproduccion del filtro tal cual esta en el script.
+    const relative = path.relative(path.join(source, 'src'), value).split(path.sep).join('/')
+    assert.notEqual(relative, 'instrumentation.ts',
+      'si esto llegara a ser igual, el filtro bastaria y este arreglo sobraria')
+  })
+
+  test('sin prefijo si casa — por eso en macOS nunca se vio', () => {
+    const source = path.join(os.tmpdir(), 'repo', 'dashboard-app')
+    const value = path.join(source, 'src', 'instrumentation.ts')
+    const relative = path.relative(path.join(source, 'src'), value).split(path.sep).join('/')
+    assert.equal(relative, 'instrumentation.ts')
+  })
+})
+
+describe('el build aislado vive en la misma unidad que el repositorio', () => {
+  /**
+   * El SEGUNDO fallo del mismo dia, una vez arreglado el primero:
+   *
+   *   Can't resolve './D:/a/fullsite/fullsite/dashboard-app/node_modules/next/dist/client/next.js'
+   *     in 'C:\Users\RUNNER~1\AppData\Local\Temp\fullsite-offline-build-62Cz5t\dashboard-app'
+   *
+   * Una ruta absoluta de Windows pegada detras de `./`. En Windows `os.tmpdir()` esta en
+   * C: y el repositorio del runner en D:. El `node_modules` del build aislado es un
+   * junction al del repositorio, asi que webpack resuelve a rutas en D: y luego intenta
+   * hacerlas relativas a un contexto en C: -- y entre dos unidades NO existe ruta
+   * relativa. En macOS jamas se ve: un solo sistema de archivos.
+   */
+  test('el temporal se crea junto al repositorio, no en os.tmpdir()', () => {
+    assert.match(script, /path\.join\(path\.dirname\(repository\), '\.fullsite-offline-build-'\)/)
+  })
+
+  test('con respaldo al temporal del sistema si el padre no es escribible', () => {
+    // No se puede asumir que el directorio padre del repo sea escribible en toda
+    // maquina. El respaldo es el comportamiento de antes, que funciona en macOS.
+    assert.match(script, /catch \{ return fs\.mkdtempSync\(path\.join\(os\.tmpdir\(\), 'fullsite-offline-build-'\)\) \}/)
+  })
+
+  test('y se sigue borrando al terminar', () => {
+    // Vive al lado del checkout: si no se limpiara, `git status` de quien lo corra
+    // empezaria a mostrar basura.
+    assert.match(script, /finally \{\s*\n\s*fs\.rmSync\(temporary, \{ recursive: true, force: true \}\)/)
+  })
+
+  test('NO se crea dentro del repositorio', () => {
+    // Dentro ensuciaria el checkout del desarrollador.
+    assert.doesNotMatch(script, /mkdtempSync\(path\.join\(repository,/)
+  })
+})
+
+describe('lo que el paquete NO debe llevar a la caja de un restaurante', () => {
+  test('el script lo declara en su encabezado', () => {
+    assert.match(script, /never bundle server API code or credentials/)
+  })
+
+  test('y el bundle generado no trae ninguno de los dos', () => {
+    // Si ya se construyo en esta maquina, se comprueba sobre el resultado real. Si no,
+    // la prueba lo dice en vez de pasar en verde sobre nada.
+    const bundle = path.join(__dirname, '..', '..', 'ui-bundle')
+    if (!fs.existsSync(bundle)) {
+      console.log('  (sin ui-bundle local — se omite la comprobacion sobre el resultado)')
+      return
+    }
+    const sospechosos = []
+    const recorrer = (dir) => {
+      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+        const p = path.join(dir, e.name)
+        if (e.isDirectory()) recorrer(p)
+        else if (/instrumentation\.(ts|js)$|sentry\..*\.config\./.test(e.name)) sospechosos.push(p)
+      }
+    }
+    recorrer(bundle)
+    assert.deepEqual(sospechosos, [], `el bundle lleva codigo de servidor: ${sospechosos.join(', ')}`)
+  })
+})

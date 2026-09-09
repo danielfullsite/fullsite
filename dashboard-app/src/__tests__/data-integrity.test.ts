@@ -34,12 +34,33 @@ describe('Data Integrity — parseRow sanitization', () => {
 
 describe('Data Integrity — timezone', () => {
   it('Mexico City is UTC-6', () => {
-    const now = new Date()
-    const mxStr = now.toLocaleString('en-US', { timeZone: 'America/Mexico_City' })
-    const mx = new Date(mxStr)
-    // MX should be 5-7 hours behind UTC depending on DST
-    const diffHours = (now.getTime() - mx.getTime()) / 3600000
-    expect(Math.abs(diffHours)).toBeLessThan(9) // 8+ with millisecond drift is normal
+    // ESTA PRUEBA MEDIA LA ZONA DEL PROCESO, NO LA DE MEXICO.
+    //
+    // Antes hacia `new Date(now.toLocaleString('en-US', { timeZone: 'America/Mexico_City' }))`,
+    // que toma los numeros de pared de Mexico y los reinterpreta como hora LOCAL DEL
+    // PROCESO. El resultado dependia de donde corriera: en UTC y en Monterrey pasaba,
+    // en Asia/Tokyo daba ~15 h y fallaba. Comprobado el 2026-09-09 corriendo la suite
+    // completa con TZ=Asia/Tokyo.
+    //
+    // Es exactamente el idioma roto que el corte del dia dejo de usar (`todayMX()`,
+    // `zonedStartOfDayISO`). Una prueba que lo consagra como correcto es peor que no
+    // tenerla: el siguiente que necesite convertir zonas la copia.
+    //
+    // El desfase de verdad se saca comparando los numeros de pared contra el instante,
+    // sin pasar por la zona del proceso.
+    const ahora = new Date()
+    const partes = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Mexico_City',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+    }).formatToParts(ahora)
+    const n = (t: string) => Number(partes.find(x => x.type === t)!.value)
+    const paredComoUTC = Date.UTC(n('year'), n('month') - 1, n('day'), n('hour') % 24, n('minute'), n('second'))
+    const horas = (paredComoUTC - ahora.getTime()) / 3600000
+    // -6 sin horario de verano, -5 con el. Mexico lo abolio en 2022, pero se acepta
+    // el rango por si vuelve o por si la base de zonas del runner es vieja.
+    expect(horas).toBeGreaterThanOrEqual(-6.01)
+    expect(horas).toBeLessThanOrEqual(-4.99)
   })
 
   it('fmt produces YYYY-MM-DD', () => {

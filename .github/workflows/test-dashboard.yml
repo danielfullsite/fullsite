@@ -37,6 +37,26 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder
 
+      # LA MISMA SUITE, EN ORDEN ALEATORIO.
+      #
+      # El 2026-09-09 se midio que dos archivos solo pasaban en el orden en que estan
+      # ESCRITOS: `pos-consume-a-pedro` (un bloque final re-mockeaba `bridge-url` a un
+      # puerto muerto y contaminaba lo que viniera despues) y `config-por-tenant` (tres
+      # pruebas comparten `clientId` y el cache de modulo hacia que solo la primera
+      # llegara a la red). Entre 3 y 13 pruebas fallaban por ronda.
+      #
+      # Ninguna era un defecto del producto -- pero `pos-consume-a-pedro` guarda el P0
+      # de Eduardo del 2026-09-02 ("una mesa entregada SIN pagar sigue ocupada"), y una
+      # guarda cuya validez depende de que nadie mueva un bloque de sitio es una guarda
+      # que deja de guardar sin avisar.
+      #
+      # Este paso lo vuelve imposible de reintroducir en silencio. Tarda lo mismo.
+      - name: Unit tests (orden aleatorio)
+        run: npx vitest run --sequence.shuffle
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder
+
       # Pruebas de componente (jsdom). Van en su propio config para no
       # ralentizar la suite de Node, y en su propio paso para que una prueba
       # que nunca corre no pueda pasar por verde.

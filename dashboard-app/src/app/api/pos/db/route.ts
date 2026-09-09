@@ -15,7 +15,7 @@
  * directo con su JWT. Solo las terminales POS (shiftToken) se rutean aquí.
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { ALLOW, MANAGER_ONLY_WRITE, NO_CID, isManager, redactResponse, tableOf } from '@/lib/pos-db-policy'
+import { ALLOW, MANAGER_ONLY_WRITE, puedeEscribirEn, MANAGER_ONLY_DELETE, NO_CID, camposProhibidos, isManager, redactResponse, tableOf } from '@/lib/pos-db-policy'
 import { withPOSAuth } from '@/lib/api-auth'
 
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -42,8 +42,15 @@ async function handle(request: NextRequest, method: string) {
   if (!ALLOW.has(table)) return NextResponse.json({ error: `table not allowed: ${table}` }, { status: 403 })
 
   const isWrite = method !== 'GET'
-  if (isWrite && MANAGER_ONLY_WRITE.has(table) && !isManager(auth.role)) {
+  // `puedeEscribirEn` cubre las dos listas: las tablas de identidad siguen pidiendo
+  // gerente, y las de caja piden cajero+ — antes pedían gerente y el Corte Z de una
+  // caja logueada como cajero moría en 403 sin reintento. Ver pos-db-policy.ts.
+  if (isWrite && !puedeEscribirEn(table, auth.role)) {
     return NextResponse.json({ error: 'manager required' }, { status: 403 })
+  }
+  // Una orden no se borra, se cancela: el borrado deja el arqueo sin rastro.
+  if (method === 'DELETE' && MANAGER_ONLY_DELETE.has(table) && !isManager(auth.role)) {
+    return NextResponse.json({ error: 'borrar requiere rol de gerente; cancela la orden en su lugar' }, { status: 403 })
   }
 
   // Tenant scope: fuerza client_id del token en el query (reads y writes).
@@ -74,6 +81,14 @@ async function handle(request: NextRequest, method: string) {
         body = raw
       }
       headers['Content-Type'] = 'application/json'
+    }
+
+    // Las cifras del dinero no se escriben desde el navegador. Se comprueba aquí, con el
+    // cuerpo ya leído, y en LOS DOS proxies: gatear uno solo deja la puerta abierta por el
+    // otro, que es exactamente como este hueco sobrevivió a la auditoría anterior.
+    const prohibidas = camposProhibidos(table, auth.role, body)
+    if (prohibidas.length) {
+      return NextResponse.json({ error: `estas columnas requieren rol de gerente: ${prohibidas.join(', ')}` }, { status: 403 })
     }
   }
 
