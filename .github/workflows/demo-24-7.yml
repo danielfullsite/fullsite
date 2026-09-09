@@ -103,6 +103,7 @@ jobs:
       - run: python .github/scripts/test_menu_del_tenant.py
       - run: python .github/scripts/test_pos_client.py
       - run: python .github/scripts/test_pos_turno.py
+      - run: python .github/scripts/test_identidad_de_renglon.py
 
       - name: Comprobar que el PIN esta puesto
         run: |
@@ -152,6 +153,9 @@ jobs:
           grep -F 'órdenes,' /tmp/lab-simulator.log 2>/dev/null | tail -1 >> "$GITHUB_STEP_SUMMARY" || true
           # El turno con el que se trabajó — reutilizado, auto-cerrado o recién abierto.
           grep -F '[turno]' /tmp/lab-simulator.log 2>/dev/null >> "$GITHUB_STEP_SUMMARY" || true
+          # Si el inventario NO quedó conciliado, el motivo — arriba del todo, porque es
+          # la diferencia entre "vendió" y "vendió y descontó".
+          grep -F 'INVENTARIO SIN CONCILIAR' /tmp/lab-simulator.log 2>/dev/null >> "$GITHUB_STEP_SUMMARY" || true
 
       - name: Una corrida forzada que no crea nada es un fallo
         if: github.event.inputs.forzar_horario == 'true'
@@ -169,5 +173,19 @@ jobs:
           fi
           if grep -qE '\+0 órdenes' /tmp/lab-simulator.log; then
             echo "::error::corrida forzada con 0 órdenes creadas. Verde en vacío."
+            exit 1
+          fi
+          # Vender sin descontar es el MISMO verde en vacío, un paso más adelante: la
+          # corrida 34375190026 creó 5 órdenes, las cobró las 5 y dejó
+          # `pos_inventory_movements` en cero — y salió `success`. El simulador ya truena
+          # solo en ese caso; esto lo vuelve a comprobar desde el log por si alguien le
+          # quitara la guarda de adentro.
+          if grep -q 'INVENTARIO SIN CONCILIAR' /tmp/lab-simulator.log; then
+            echo "::error::se cobraron órdenes sin conciliar inventario"
+            grep -F 'INVENTARIO SIN CONCILIAR' /tmp/lab-simulator.log | head -3
+            exit 1
+          fi
+          if grep -qE '0 movimiento\(s\) de inventario' /tmp/lab-simulator.log; then
+            echo "::error::se vendió y el inventario no se movió ni una fila."
             exit 1
           fi
