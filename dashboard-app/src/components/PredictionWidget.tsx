@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { TrendingUp, TrendingDown, Target, Zap } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import { getActiveClientSlug } from '@/lib/data'
-import { getActiveTimezone } from '@/lib/date-mx'
+import { getActiveTimezone, todayMX } from '@/lib/date-mx'
 
 interface PredictionWidgetProps {
   currentVentas: number
@@ -25,8 +25,16 @@ function predict(
   const mxMinute = now.getUTCMinutes()
 
   if (dataFecha) {
-    const mxNow = new Date(now.toLocaleString('en-US', { timeZone: getActiveTimezone() }))
-    const todayStr = mxNow.toISOString().slice(0, 10)
+    // ESTE WIDGET SE IBA EN BLANCO CADA NOCHE.
+    //
+    // `new Date(x.toLocaleString(...)).toISOString()` esta corrido por la diferencia
+    // entre la zona del proceso y la del negocio: en la terminal de AMALAY, a la hora
+    // de la cena, `todayStr` daba MANANA. La comparacion de abajo fallaba y la funcion
+    // devolvia ceros -- o sea que la proyeccion de ventas dejaba de verse justo en el
+    // horario en que sirve para algo.
+    //
+    // `todayMX()` formatea directo en la zona del negocio, sin reinterpretar nada.
+    const todayStr = todayMX()
     if (dataFecha !== todayStr) return { projected: 0, pctDone: 0, remaining: 0 }
   }
 

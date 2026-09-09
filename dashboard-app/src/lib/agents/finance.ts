@@ -10,6 +10,7 @@
  * No filtrar por cliente — son exclusivas de AMALAY.
  */
 import type { AgentEvent } from './types'
+import { getActiveTimezone } from '@/lib/date-mx'
 
 interface WansoftDay {
   fecha: string
@@ -29,8 +30,15 @@ function dayOfWeek(iso: string): number {
   return new Date(iso + 'T12:00:00').getDay()
 }
 
+/**
+ * Ahora, en la zona del NEGOCIO -- antes 'America/Monterrey' clavado.
+ *
+ * Solo se leen componentes locales (`getHours`, `getDay`, `getFullYear`...), que es
+ * para lo que esta bien: su INSTANTE esta corrido. Ver la advertencia en
+ * `date-mx.ts:nowMX`. No se usa para `toISOString` ni para restar milisegundos.
+ */
 function nowMX(): Date {
-  return new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Monterrey' }))
+  return new Date(new Date().toLocaleString('en-US', { timeZone: getActiveTimezone() }))
 }
 
 function todayStr(): string {

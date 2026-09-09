@@ -3,6 +3,7 @@
 
 import type { OrderItem } from './pos-data'
 import { generateId } from './pos-data'
+import { getActiveTimezone, fmtDateEnZona } from '@/lib/date-mx'
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -91,10 +92,24 @@ function isActiveNow(combo: Combo): boolean {
 
   if (!sched) return true // no schedule = always active
 
-  const mx = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Monterrey' }))
+  // LA VIGENCIA DE UNA PROMOCION SE DECIDIA CON UNA FECHA CORRIDA.
+  //
+  // `mx` son los numeros de pared reinterpretados como hora local del proceso: sus
+  // getters LOCALES (`getDay`, `getHours`, `getMinutes`) dan lo correcto, pero
+  // `mx.toISOString()` esta corrido por la diferencia entre la zona del proceso y la del
+  // negocio. En la terminal de AMALAY, a la hora de la cena, `today` daba MANANA.
+  //
+  // Con eso se comparan `start_date` y `end_date`: un 2x1 que termina hoy se apagaba
+  // horas antes, o uno que empieza manana se encendia esta noche. Es dinero: el
+  // descuento se aplica o no se aplica.
+  //
+  // La zona tambien estaba clavada en Monterrey; `getActiveTimezone()` es la del tenant.
+  const zona = getActiveTimezone()
+  const mx = new Date(new Date().toLocaleString('en-US', { timeZone: zona }))
   const day = mx.getDay()
   const hhmm = `${String(mx.getHours()).padStart(2, '0')}:${String(mx.getMinutes()).padStart(2, '0')}`
-  const today = mx.toISOString().slice(0, 10)
+  // La fecha se formatea EN la zona, no se saca de un instante corrido.
+  const today = fmtDateEnZona(new Date(), zona)
 
   if (sched.days && sched.days.length > 0 && !sched.days.includes(day)) return false
   if (sched.start_time && hhmm < sched.start_time) return false

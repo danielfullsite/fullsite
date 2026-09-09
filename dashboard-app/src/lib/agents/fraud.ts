@@ -10,6 +10,7 @@
  * Inputs:  pos_orders (last 24h)
  */
 import type { AgentEvent } from './types'
+import { getActiveTimezone } from '@/lib/date-mx'
 
 interface PosOrder {
   id: string
@@ -27,8 +28,17 @@ const CANCEL_THRESHOLD_CRITICAL = 7
 const DISCOUNT_PCT_THRESHOLD    = 35  // descuento > 35% del subtotal
 const DISCOUNT_CONCENTRATION    = 0.72
 
+/**
+ * La HORA de un instante, en la zona del negocio -- antes 'America/Monterrey' clavado.
+ *
+ * El agente busca descuentos concentrados en ciertas horas. Con la zona equivocada, la
+ * concentracion se mide en el horario equivocado y el patron se diluye.
+ *
+ * Se lee el componente local de una fecha reinterpretada, que para la hora es correcto.
+ * No se use este valor para nada mas: ver `date-mx.ts:nowMX`.
+ */
 function hour(iso: string): number {
-  return new Date(new Date(iso).toLocaleString('en-US', { timeZone: 'America/Monterrey' })).getHours()
+  return new Date(new Date(iso).toLocaleString('en-US', { timeZone: getActiveTimezone() })).getHours()
 }
 
 export async function runFraudAgent(
