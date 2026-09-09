@@ -53,31 +53,24 @@ try {
   fs.symlinkSync(fs.realpathSync(path.join(source, 'node_modules')), path.join(build, 'node_modules'), 'junction')
   fs.cpSync(path.join(source, 'src'), path.join(build, 'src'), { recursive: true, filter: value => {
     const relative = path.relative(path.join(source, 'src'), value).split(path.sep).join('/')
-    if (relative === 'proxy.ts' || relative === 'instrumentation.ts' || relative.startsWith('__tests__')) return false
-    if (relative.startsWith('app/')) return relative === 'app/pos' || relative.startsWith('app/pos/') ||
-      ['app/layout.tsx', 'app/globals.css', 'app/not-found.tsx', 'app/favicon.ico'].includes(relative)
-    return true
+    return !fuera(relative)
   } })
-  // EL FILTRO DE ARRIBA NO BASTA EN WINDOWS, y esto es lo que rompía el build en CI.
+  // EL FILTRO NO ES DE FIAR EN WINDOWS, así que se pasa otra vez por lo copiado.
   //
-  // La primera vez que este workflow llegó a compilar (2026-09-09) fallo con:
+  // Tres fallos seguidos en CI el 2026-09-09 y los tres eran lo mismo: el `filter` de
+  // `fs.cpSync` excluye bien en macOS y deja pasar cosas en Windows. Primero se coló
+  // `src/instrumentation.ts`; una vez tapado ése, se coló `src/app/api/**` entero y el
+  // type check reventó sobre `api/pos/save-order/route`.
   //
-  //     ./src/instrumentation.ts
-  //     Module not found: Can't resolve '../sentry.server.config'
+  // La causa es del sistema operativo, no de las reglas: `fs.cpSync` puede entregarle al
+  // filtro rutas con prefijo extendido (`\\?\C:\...`), y entonces `path.relative` no
+  // produce la ruta que las reglas esperan. Tapar archivo por archivo era perseguir
+  // síntomas — `api/` tiene rutas de servidor con acceso a la base.
   //
-  // El mismo script corre limpio en macOS —comprobado: 456 archivos, 33 rutas— porque
-  // ahí el filtro sí excluye el archivo. En Windows se cuela: `fs.cpSync` puede entregar
-  // al filtro rutas con prefijo extendido (`\\?\C:\...`), y entonces la comparación
-  // contra la ruta relativa no casa. El archivo llega al build aislado, Next lo compila,
-  // y su `import '../sentry.server.config'` apunta a un archivo que este build no copia
-  // a propósito (es configuración de servidor, y esto es un export estático).
-  //
-  // Borrarlos DESPUÉS de copiar no depende de cómo el sistema operativo entregue las
-  // rutas al filtro: si están, se van. Es el mismo patrón que el script ya usa tres
-  // líneas más abajo para `sw.js`, donde también se prefirió la garantía dura.
-  for (const name of ['instrumentation.ts', 'proxy.ts']) {
-    fs.rmSync(path.join(build, 'src', name), { force: true })
-  }
+  // `limpiar()` aplica LAS MISMAS reglas sobre lo que quedó en el destino, donde las
+  // rutas ya son nuestras. El filtro se conserva porque ahorra copiar cientos de
+  // archivos, pero la garantía es ésta.
+  limpiar(path.join(build, 'src'))
   fs.cpSync(path.join(source, 'public'), path.join(build, 'public'), { recursive: true })
   // Static package owns its version; no SW may overlay another version on it.
   for (const name of ['sw.js', 'precache-manifest.json']) fs.rmSync(path.join(build, 'public', name), { force: true })
@@ -120,6 +113,45 @@ try {
   console.log(`[offline-ui] Output ${output}`)
 } finally {
   fs.rmSync(temporary, { recursive: true, force: true })
+}
+
+/**
+ * QUÉ NO ENTRA AL PAQUETE QUE SE INSTALA EN UN RESTAURANTE.
+ *
+ * Una sola definición, consultada por el filtro de la copia y por `limpiar()`. Estaban
+ * en línea dentro del filtro; se sacaron aquí para que las dos pasadas no puedan
+ * divergir — que es exactamente cómo se cuela lo que se creía excluido.
+ *
+ * `rel` es relativo a `src/`, con `/` como separador.
+ */
+function fuera(rel) {
+  if (rel === 'proxy.ts' || rel === 'instrumentation.ts') return true
+  if (rel === '__tests__' || rel.startsWith('__tests__/')) return true
+  // De `app/` sólo viaja el POS y el armazón mínimo. Todo lo demás —y `api/` sobre
+  // todo, que son rutas de servidor con acceso a la base— se queda fuera.
+  if (rel.startsWith('app/')) {
+    return !(rel === 'app/pos' || rel.startsWith('app/pos/') ||
+      ['app/layout.tsx', 'app/globals.css', 'app/not-found.tsx', 'app/favicon.ico'].includes(rel))
+  }
+  return false
+}
+
+/**
+ * Segunda pasada sobre lo YA copiado, con las mismas reglas.
+ *
+ * Aquí las rutas son nuestras —las construimos nosotros al recorrer el destino— así que
+ * no dependen de cómo el sistema operativo se las entregue a un `filter`. Si un
+ * directorio entero sobra, se borra completo y no se desciende.
+ */
+function limpiar(raiz, relative = '') {
+  for (const entry of fs.readdirSync(path.join(raiz, relative), { withFileTypes: true })) {
+    const rel = relative ? `${relative}/${entry.name}` : entry.name
+    if (fuera(rel)) {
+      fs.rmSync(path.join(raiz, rel), { recursive: true, force: true })
+      continue
+    }
+    if (entry.isDirectory()) limpiar(raiz, rel)
+  }
 }
 
 function walk(directory, relative = '') {

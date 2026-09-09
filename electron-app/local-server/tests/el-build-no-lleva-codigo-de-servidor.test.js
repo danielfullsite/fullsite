@@ -33,24 +33,66 @@ const path = require('node:path')
 const script = fs.readFileSync(
   path.join(__dirname, '..', '..', 'scripts', 'build-offline-ui.cjs'), 'utf8')
 
-describe('el borrado no depende de como el sistema entregue las rutas', () => {
-  test('los dos archivos de servidor se borran DESPUES de copiar', () => {
-    assert.match(script, /for \(const name of \['instrumentation\.ts', 'proxy\.ts'\]\) \{\s*\n\s*fs\.rmSync\(path\.join\(build, 'src', name\), \{ force: true \}\)/)
+describe('la limpieza no depende de como el sistema entregue las rutas', () => {
+  // Tapar archivo por archivo era perseguir sintomas: al cerrar `instrumentation.ts` se
+  // colo `app/api/**` entero y el type check revento sobre `api/pos/save-order/route`.
+  // Ahora las reglas viven en UNA funcion y se aplican dos veces: al copiar (filtro) y
+  // sobre lo copiado (limpiar), donde las rutas ya son nuestras.
+
+  test('las reglas viven en una sola funcion', () => {
+    assert.match(script, /function fuera\(rel\)/)
   })
 
-  test('el borrado va despues del cpSync de src, no antes', () => {
-    // Antes no serviria de nada: la copia los volveria a poner.
+  test('el filtro de la copia consulta esa funcion, no su propia copia de las reglas', () => {
+    assert.match(script, /filter: value => \{[\s\S]{0,220}return !fuera\(relative\)/)
+  })
+
+  test('y se pasa otra vez sobre lo copiado', () => {
+    assert.match(script, /limpiar\(path\.join\(build, 'src'\)\)/)
+  })
+
+  test('la segunda pasada va DESPUES de la copia', () => {
     const copia = script.indexOf("fs.cpSync(path.join(source, 'src')")
-    const borrado = script.indexOf("for (const name of ['instrumentation.ts', 'proxy.ts'])")
+    const limpieza = script.indexOf("limpiar(path.join(build, 'src'))")
     assert.ok(copia > -1, 'no encontre la copia de src')
-    assert.ok(borrado > copia, 'el borrado tiene que ir DESPUES de la copia')
+    assert.ok(limpieza > copia, 'limpiar() tiene que ir DESPUES de la copia')
   })
 
-  test('y el filtro se conserva: hace el trabajo grueso de app/', () => {
-    // El borrado es el cinturon, no el reemplazo. El filtro sigue decidiendo que rutas
-    // de `app/` entran, que es la mayor parte de lo que este build excluye.
-    assert.match(script, /relative === 'instrumentation\.ts'/)
-    assert.match(script, /relative\.startsWith\('app\/'\)/)
+  test('limpiar borra el directorio entero y no desciende en el', () => {
+    // `app/api` completo, no archivo por archivo: ahi viven rutas de servidor.
+    const i = script.indexOf('function limpiar(')
+    const cuerpo = script.slice(i, script.indexOf('function walk(', i))
+    assert.match(cuerpo, /fs\.rmSync\(path\.join\(raiz, rel\), \{ recursive: true, force: true \}\)/)
+    assert.match(cuerpo, /continue/)
+  })
+})
+
+describe('las reglas de exclusion, uno por uno', () => {
+  // Se carga la funcion real del script en vez de reimplementarla: una copia en la
+  // prueba se desincroniza y deja de proteger justo cuando cambian las reglas.
+  const fuera = eval('(' + script.match(/function fuera\(rel\)[\s\S]*?\n\}/)[0].replace('function fuera(rel)', '(rel) =>') + ')')
+
+  const casos = [
+    ['proxy.ts', true], ['instrumentation.ts', true],
+    ['__tests__', true], ['__tests__/algo.test.ts', true],
+    ['app', false],
+    ['app/api', true], ['app/api/pos/save-order/route.ts', true],
+    ['app/dashboard/page.tsx', true],
+    ['app/pos', false], ['app/pos/page.tsx', false], ['app/pos/mesas/page.tsx', false],
+    ['app/layout.tsx', false], ['app/globals.css', false],
+    ['app/not-found.tsx', false], ['app/favicon.ico', false],
+    ['lib/pos-data.ts', false], ['components/pos/CierreCajaWizard.tsx', false],
+  ]
+
+  for (const [rel, esperado] of casos) {
+    test(`${rel} ${esperado ? 'NO entra' : 'entra'}`, () => {
+      assert.equal(fuera(rel), esperado)
+    })
+  }
+
+  test('`app/api` es el que revento el build — queda anclado aparte', () => {
+    assert.equal(fuera('app/api/pos/save-order/route.ts'), true)
+    assert.equal(fuera('app/api/pos/db/route.ts'), true)
   })
 })
 
