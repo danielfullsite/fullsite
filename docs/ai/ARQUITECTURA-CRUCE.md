@@ -189,6 +189,55 @@ aritmética no opina.
 Por eso el orden del roadmap cambia: el cuadre va antes que cualquier detector
 estadístico, no después.
 
+#### El propio cuadre estuvo ciego una semana en verde (2026-09-02 → 09-08)
+
+El caso que la regla 10 describe, ocurrido dentro del agente que la vigila. Siete
+corridas seguidas reportaron `success` **sin haber comprobado un solo restaurante**.
+
+Dos fallas independientes, y hacían falta las dos:
+
+| | Qué pasó | Por qué no se vio |
+|---|---|---|
+| **1** | Un `statement timeout` de Postgres al leer `ops_daily_history` para `amalay` | `cuadre.py` sí devolvía `1`, pero el paso era `cuadre.py \| tee salida.txt`: el shell por defecto de un `run:` es `bash -e`, **sin `pipefail`**, así que el código de salida del job era el de `tee` — siempre 0 |
+| **2** | El `try` envolvía el bucle entero de tenants | `amalay` va primero en orden alfabético. Su timeout abortaba los otros doce, y también tiraba los hallazgos de Nivel 1 de `amalay` que ya estaban calculados |
+
+Y un tercer agujero que hizo el diagnóstico caro: `sb_get` usaba `raise_for_status()`,
+que **tira el cuerpo de la respuesta**. El log decía `500 Server Error: Internal Server
+Error` y nada más; el cuerpo decía `canceling statement due to statement timeout`.
+Saberlo requirió ir a los logs de Postgres.
+
+**Lo que se arregló:** `pipefail` en el workflow, aislamiento por tenant y por nivel, el
+motivo del servidor dentro de la excepción, reintento con espera para errores
+transitorios, y un tercer veredicto —`NO SE PUDO COMPROBAR`— distinto de `CUADRA`. Un
+descuadre sigue saliendo en verde (es un hallazgo); **no haber podido comprobar sale en
+rojo.**
+
+#### La lectura del contrato es cara, y sigue siéndolo
+
+Medido el 2026-09-09 sobre producción. `ops_daily_history` no puede empujar el filtro de
+fecha a tres de sus cuatro ramas: `meseros`, `pago_metodos` y `platillos_top` cuelgan del
+lado nulable de un `LEFT JOIN`, y Postgres no baja un `qual` por ahí. Resultado: **cada
+lectura recorre el historial completo del tenant cuatro veces**, aunque se pidan siete
+días y sólo tres columnas.
+
+| Tenant | Órdenes | Tiempo (caché caliente) | Buffers para devolver 1 fila |
+|---|---|---|---|
+| `amalay` | 9 | 10 ms | 172 |
+| `scyf-demo` | 110,790 | 575 ms | 37,872 (~296 MB) |
+
+El techo es el `statement_timeout` de **8 s** que `service_role` hereda de
+`authenticator`. `amalay` no lo alcanza por sí solo —10 ms— así que **el timeout del
+09-02 al 09-08 fue por contención o caché frío, no por el costo propio de esa consulta**;
+no se pudo reproducir. Pero el costo crece con el historial del tenant, no con la ventana
+pedida: `scyf-demo` ya va en 575 ms calientes y nadie lo vigila.
+
+Arreglarlo de raíz es rediseñar una vista del contrato que leen todos los consumidores
+—`LATERAL` correlado + índice por expresión, o materializar— y eso necesita su propia
+medición y su propia auditoría de consumidores. **Materializar choca con el diseño
+vigente**: `ops_daily_history` se hizo viva a propósito en `20260826_ops_daily_fuente_viva.sql`
+para dejar de leer una tabla que se congelaba. Queda como trabajo aparte, no como parche
+del cuadre.
+
 ---
 
 ### Capa 1 · Contrato de datos

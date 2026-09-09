@@ -9,6 +9,8 @@
 #
 # Un descuadre NO pone la corrida en rojo: es un hallazgo, no un fallo del verificador.
 # Que saliera en rojo escondería el día que el verificador sí se rompa.
+#
+# No haber podido comprobar SÍ la pone en rojo. Es la otra mitad de la misma regla.
 
 name: Cuadre — que los números cierren
 
@@ -47,7 +49,16 @@ jobs:
       - run: python .github/scripts/test_cuadre.py
       - run: python .github/scripts/test_log_event.py
 
-      - run: python .github/scripts/cuadre.py | tee salida.txt
+      # `set -o pipefail` NO es decorativo: sin él, `cuadre.py | tee` devuelve el
+      # código de salida de `tee` —siempre 0— y la corrida sale verde aunque el
+      # verificador haya fallado. El shell por defecto de un `run:` es `bash -e`,
+      # que NO trae pipefail. Así estuvo del 2026-09-02 al 09-08: el script devolvía
+      # 1, el job decía success, y el Nivel 4 llevaba una semana sin correr.
+      - name: Cuadrar
+        shell: bash
+        run: |
+          set -o pipefail
+          python .github/scripts/cuadre.py | tee salida.txt
 
       - name: Resumen
         if: always()

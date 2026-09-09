@@ -13,7 +13,10 @@ Las que más importan:
 """
 from __future__ import annotations
 
+import contextlib
+import io
 import json
+import os
 import sys
 import unittest
 from pathlib import Path
@@ -195,6 +198,133 @@ class ElCaminoDelDescuento(unittest.TestCase):
         o = orden(**self.como_el_pos(1888.00, 0.0, 0.16))
         o["total"] = 1500.00
         self.assertIn("aritmetica_del_total", codigos(o))
+
+class UnaLecturaCaidaNoPuedeVerseComoQueCuadro(unittest.TestCase):
+    """Del 2026-09-02 al 09-08 el cuadre reportó `success` siete días seguidos con el
+    Nivel 4 sin correr: un 500 de PostgREST en el primer restaurante abortaba el bucle
+    entero, y `cuadre.py | tee` se comía el código de salida.
+
+    Es exactamente lo que prohíbe la regla 10 de docs/ai/ARQUITECTURA-CRUCE.md. Estas
+    pruebas son la cerca: silencio y éxito no pueden verse igual."""
+
+    def setUp(self):
+        self._env = dict(os.environ)
+        os.environ["CLIENT_ID"] = "ALL"
+        os.environ["DIAS"] = "7"
+
+    def tearDown(self):
+        os.environ.clear()
+        os.environ.update(self._env)
+
+    @staticmethod
+    def _lecturas(**por_tabla):
+        """Falsea sb_get: por_tabla['pos_orders'] puede ser una lista o una excepción."""
+        def fake(table, params, *a, **kw):
+            v = por_tabla.get(table, [])
+            if isinstance(v, Exception):
+                raise v
+            return v
+        return fake
+
+    def _correr(self, sb, log_event=None):
+        salida = io.StringIO()
+        with mock.patch.object(cuadre, "sb_get", sb), \
+             mock.patch.object(cuadre, "log_run") as log_run, \
+             mock.patch.object(cuadre, "log_event", log_event or mock.Mock(return_value=True)), \
+             contextlib.redirect_stdout(salida), contextlib.redirect_stderr(io.StringIO()):
+            codigo = cuadre.main()
+        return codigo, salida.getvalue(), log_run
+
+    def test_si_el_contrato_no_se_puede_leer_la_corrida_sale_en_rojo(self):
+        sb = self._lecturas(
+            clients=[{"id": "amalay"}],
+            pos_orders=[orden()],
+            ops_daily_history=cuadre.SupabaseError("ops_daily_history: HTTP 500 — timeout"),
+        )
+        codigo, texto, _ = self._correr(sb)
+        self.assertEqual(codigo, 1, "una lectura caída tiene que devolver != 0")
+        self.assertIn("NO SE PUDO COMPROBAR", texto)
+        self.assertNotIn("CUADRA", texto)
+
+    def test_el_motivo_del_servidor_llega_al_log(self):
+        # El cuerpo del 500 decía `canceling statement due to statement timeout` y se
+        # tiraba. Sin él hubo que ir a los logs de Postgres para saber qué pasaba.
+        sb = self._lecturas(
+            clients=[{"id": "amalay"}],
+            pos_orders=[orden()],
+            ops_daily_history=cuadre.SupabaseError(
+                "ops_daily_history: HTTP 500 — canceling statement due to statement timeout"),
+        )
+        _, texto, _ = self._correr(sb)
+        self.assertIn("canceling statement due to statement timeout", texto)
+
+    def test_un_restaurante_caido_no_deja_ciegos_a_los_demas(self):
+        # amalay va primero en orden alfabético; su timeout abortaba el bucle entero.
+        llamadas = []
+
+        def sb(table, params, *a, **kw):
+            llamadas.append((table, params))
+            if table == "clients":
+                return [{"id": "amalay"}, {"id": "boruca"}, {"id": "zzz"}]
+            if table == "ops_daily_history" and "amalay" in params:
+                raise cuadre.SupabaseError("ops_daily_history: HTTP 500 — timeout")
+            if table == "pos_orders":
+                return [orden()]
+            return []
+
+        codigo, texto, _ = self._correr(sb)
+        self.assertEqual(codigo, 1)
+        # Los otros dos SÍ se comprobaron: su Nivel 4 se leyó.
+        leidos = {p.split("client_id=eq.")[1].split("&")[0]
+                  for t, p in llamadas if t == "ops_daily_history"}
+        self.assertEqual(leidos, {"amalay", "boruca", "zzz"})
+        self.assertIn("boruca", texto)
+        self.assertIn("zzz", texto)
+
+    def test_un_descuadre_real_sigue_saliendo_en_verde(self):
+        # La otra mitad de la regla: si un descuadre pusiera la corrida en rojo, el día
+        # que el verificador se rompa de verdad se vería igual y no se distinguiría.
+        mala = orden(total=1500.00)
+        sb = self._lecturas(clients=[{"id": "amalay"}], pos_orders=[mala],
+                            ops_daily_history=[])
+        codigo, texto, _ = self._correr(sb)
+        self.assertEqual(codigo, 0, "un descuadre es un hallazgo, no un fallo")
+        self.assertIn("DESCUADRE", texto)
+
+    def test_un_hallazgo_que_no_se_pudo_guardar_pone_la_corrida_en_rojo(self):
+        # 2026-08-26: 25 descuadres reales en boruca, agent_events los rechazó todos,
+        # y la corrida salió verde. Un hallazgo perdido es un hallazgo que no existió.
+        sb = self._lecturas(clients=[{"id": "amalay"}], pos_orders=[orden(total=1500.00)],
+                            ops_daily_history=[])
+        codigo, _, _ = self._correr(sb, log_event=mock.Mock(return_value=False))
+        self.assertEqual(codigo, 1)
+
+    def test_si_la_lectura_topa_en_el_limite_no_se_juzga_el_dia(self):
+        # Con la lectura recortada la suma de órdenes queda corta y el Nivel 4 acusaría
+        # de descuadre a un restaurante que está bien. No medir es mejor que mentir.
+        muchas = [orden(id=f"o{i}") for i in range(cuadre.LIMITE_ORDENES)]
+        sb = self._lecturas(clients=[{"id": "grande"}], pos_orders=muchas,
+                            ops_daily_history=[{"fecha": "2026-08-25", "ventas_dia": 1.0,
+                                                "tickets_count": 1}])
+        codigo, texto, _ = self._correr(sb)
+        self.assertEqual(codigo, 1)
+        self.assertIn("NO SE PUDO COMPROBAR", texto)
+        self.assertNotIn("dia_vs_ordenes", texto)
+
+    def test_todo_bien_sigue_saliendo_en_verde_y_se_registra_como_success(self):
+        sb = self._lecturas(clients=[{"id": "amalay"}], pos_orders=[orden()],
+                            ops_daily_history=[])
+        codigo, texto, log_run = self._correr(sb)
+        self.assertEqual(codigo, 0)
+        self.assertIn("CUADRA", texto)
+        self.assertEqual(log_run.call_args[0][1], "success")
+
+    def test_si_no_se_puede_ni_listar_los_restaurantes_es_rojo(self):
+        sb = self._lecturas(clients=cuadre.SupabaseError("clients: HTTP 500 — timeout"))
+        codigo, _, log_run = self._correr(sb)
+        self.assertEqual(codigo, 1)
+        self.assertEqual(log_run.call_args[0][1], "error")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
