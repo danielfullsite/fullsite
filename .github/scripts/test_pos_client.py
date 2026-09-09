@@ -143,7 +143,10 @@ class Diagnostico(unittest.TestCase):
             "inventory_results": [{"r_applied": -0.022}, {"r_applied": -0.15}],
         })
         self.assertIn("COMPLETE", txt)
-        self.assertIn("2 ingrediente", txt)
+        # "renglón", no "ingrediente": cada fila de inventory_results es un ítem de la
+        # orden y puede haber movido varios ingredientes. Decir "ingrediente" hizo leer
+        # "0 ingrediente(s)" como "receta vacía" cuando era "ningún renglón llegó".
+        self.assertIn("2 renglón(es)", txt)
 
     def test_sin_inventario_lo_dice(self):
         self.assertIn("sin inventario", pc.diagnostico_inventario({}))

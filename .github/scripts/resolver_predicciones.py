@@ -27,27 +27,58 @@ quien predice, no quien califica.
 NO califica el día en curso. Sólo días ya cerrados; si no, castigaría una predicción
 hecha a las 2pm contra las ventas de las 2pm.
 
+"Cerrado" se mide en DÍAS DE NEGOCIO del tenant (su zona + su corte de las 05:00), que
+es la misma unidad en la que `ops_daily_history.fecha` publica la venta desde el #360.
+No en días de calendario UTC-6: a las 03:00, que es cuando corre este script, el día de
+negocio en curso todavía es el de ayer en calendario.
+
 Env: SUPABASE_URL, SUPABASE_SERVICE_KEY, CLIENT_ID (o ALL para todos)
 """
 from __future__ import annotations
 
 import os
+import re
 import sys
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from agent_common import sb_get, sb_patch, log_run  # noqa: E402
+from ops_aggregate import business_date_con_defaults_de_la_base  # noqa: E402
 
 TOLERANCIA_POR_OMISION = 10.0   # % — sólo si el evento no trae la suya
 DIAS_ATRAS = 7                  # ventana de días cerrados a calificar
 
 
-def dias_cerrados(dias: int = DIAS_ATRAS) -> list[str]:
-    """Días de negocio ya terminados, del más viejo al más nuevo. Hoy NO entra."""
-    hoy_mx = (datetime.now(timezone.utc) + timedelta(hours=-6)).date()
-    return [str(hoy_mx - timedelta(days=d)) for d in range(dias, 0, -1)]
+def _dia_de_negocio_en_curso(client: dict) -> str:
+    """El día de negocio que está corriendo AHORA para este cliente.
+
+    Delega en el ayudante compartido de `ops_aggregate`: la regla de defaults tiene que
+    vivir en UN solo lugar. `cuadre.py` la necesita para lo mismo —cruzar contra
+    `dia_venta`— y dos copias de una regla sutil se separan tarde o temprano, que es
+    justo el defecto que originó toda esta serie.
+    """
+    return business_date_con_defaults_de_la_base(client)
+
+
+def dias_cerrados(client: dict, dias: int = DIAS_ATRAS) -> list[str]:
+    """Días de NEGOCIO ya terminados, del más viejo al más nuevo. El de hoy NO entra.
+
+    Antes esto era `(now_utc - 6h).date()`: offset fijo, sin la zona del tenant y sin el
+    corte de las 05:00. Con el día de calendario funcionaba de casualidad, porque un día
+    de calendario ya cerró a la medianoche.
+
+    Deja de funcionar en cuanto `ops_daily_history.fecha` pasa a ser el día de venta
+    (PR #360). Este script corre a las 03:00 (`precision-agentes.yml`) y a esa hora el
+    día de negocio en curso es el de AYER en calendario — empezó a las 05:00 de ayer y
+    termina a las 05:00 de hoy. La regla vieja lo daba por cerrado y calificaba la
+    predicción contra un día a medias: convertía aciertos en `false_positive` y hacía
+    PATCH a `status='resolved'`, envenenando en silencio el único número de precisión
+    que este workflow existe para producir.
+    """
+    hoy = date.fromisoformat(_dia_de_negocio_en_curso(client))
+    return [str(hoy - timedelta(days=d)) for d in range(dias, 0, -1)]
 
 
 def ventas_reales(client_id: str, fechas: list[str]) -> dict[str, float]:
@@ -73,9 +104,14 @@ def evidencia_de(evento: dict) -> dict:
     return ev or {}
 
 
-def calificar(client_id: str) -> tuple[int, int, int]:
-    """Devuelve (calificados, aciertos, sin_dato_real)."""
-    fechas = dias_cerrados()
+def calificar(client: dict) -> tuple[int, int, int]:
+    """Devuelve (calificados, aciertos, sin_dato_real).
+
+    Recibe la fila del cliente, no sólo el id, porque la ventana de días depende de la
+    zona y del corte de ese tenant.
+    """
+    client_id = client["id"]
+    fechas = dias_cerrados(client)
     reales = ventas_reales(client_id, fechas)
 
     abiertos = sb_get(
@@ -127,21 +163,34 @@ def calificar(client_id: str) -> tuple[int, int, int]:
     return calificados, aciertos, sin_dato
 
 
-def tenants() -> list[str]:
+def tenants() -> list[dict]:
+    """Filas de cliente con lo que hace falta para fijar su día de negocio."""
+    campos = "select=id,timezone,business_day_start_local"
     pedido = (os.environ.get("CLIENT_ID") or "").strip()
     if pedido and pedido.upper() != "ALL":
-        return [pedido]
-    filas = sb_get("clients", "active=eq.true&select=id")
-    return sorted(r["id"] for r in filas if r.get("id"))
+        # `CLIENT_ID` viene de `workflow_dispatch` y aquí entra a una cadena de consulta
+        # de PostgREST. Los ids reales son slugs; cualquier otra cosa se rechaza antes de
+        # concatenar, no después.
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", pedido):
+            raise ValueError(f"CLIENT_ID='{pedido}' no tiene forma de id de cliente")
+        filas = sb_get("clients", f"id=eq.{pedido}&{campos}")
+        if not filas:
+            # Antes se devolvía el id a ciegas y el tenant inexistente calificaba cero
+            # sin decir nada. Un CLIENT_ID mal escrito tiene que verse.
+            raise ValueError(f"CLIENT_ID='{pedido}' no existe en clients")
+        return filas
+    filas = sb_get("clients", f"active=eq.true&{campos}")
+    return sorted((r for r in filas if r.get("id")), key=lambda r: r["id"])
 
 
 def main() -> int:
     inicio = time.time()
     total = total_ok = total_sin = 0
     try:
-        for cid in tenants():
+        for fila in tenants():
+            cid = fila["id"]
             os.environ["CLIENT_ID"] = cid    # para que log_run etiquete bien
-            c, ok, sin = calificar(cid)
+            c, ok, sin = calificar(fila)
             total += c
             total_ok += ok
             total_sin += sin

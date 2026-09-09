@@ -12,16 +12,23 @@ donde el fenómeno no ocurre — se puede escribir, pero no se puede saber si si
 Este script le da a `demo` la mitad que le falta, para que el laboratorio 24/7 ejercite
 el loop completo: vender → descontar inventario → detectar merma.
 
-LA TABLA QUE IMPORTA ES `pos_recipes_old`, NO `pos_recipes`
-Se ve al revés, y por poco lo siembro mal. La función que descuenta inventario de verdad
-—`reconcile_order_inventory()`— hace:
+QUÉ TABLA DESCUENTA DE VERDAD — CORREGIDO EL 2026-09-09
+Esta nota decía que la tabla que importa es `pos_recipes_old`, empatando por NOMBRE del
+platillo. Eso era cierto de `reconcile_order_inventory()`, y dejó de serlo: `save-order`
+llama hoy a `r1_reconcile_order` → `r1_reconcile_item`, que NO empata por nombre y NO
+lee `pos_recipes_old`. Resuelve todo por `menu_item_id` contra otras cuatro tablas:
 
-    JOIN pos_recipes_old r ON r.client_id = ... AND lower(r.menu_item_name) = lower(elem->>'nombre')
+    pos_mutation_authority.sale_authority = 'r1'   ← si no, BLOCKED_OWNER_MISSING
+    pos_item_inventory_policy(menu_item_id)        ← si no, BLOCKED_UNCLASSIFIED
+    pos_recipe_versions(menu_item_id, active)      ← si no, BLOCKED_RECIPE_MISSING
+    pos_recipe_lines(recipe_version_id) JOIN pos_inventory(ingredient_id)
 
-O sea: empata por NOMBRE del platillo (en minúsculas), una fila por par
-(platillo, ingrediente). `pos_recipes` existe y tiene otra forma —un jsonb de
-ingredientes— pero el descuento en vivo NO la usa. Verificado leyendo la función en
-producción el 2026-08-26.
+Costo de la nota vieja: `demo` quedó con 75 renglones en `pos_recipes_old` y CERO en las
+cuatro de arriba. Se veía sembrado y no descontaba nada. Medido el 2026-09-09: 1,223
+órdenes, 0 filas en `pos_inventory_movements`. `amalay` sí tiene la cadena completa
+(687 políticas, 178 versiones activas, 2,768 movimientos) — por eso ahí sí funciona.
+
+Se sigue escribiendo `pos_recipes_old` porque de ahí leen el food cost y varios agentes.
 
 SEGURIDAD
 Escribe SOLO en la lista blanca de tenants de prueba. Sembrarle recetas inventadas a un
@@ -36,10 +43,11 @@ from __future__ import annotations
 
 import os
 import sys
+from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from agent_common import sb_get, sb_post  # noqa: E402
+from agent_common import sb_get, sb_patch, sb_post  # noqa: E402
 
 TENANTS_PERMITIDOS = {"demo", "lab-resto", "esqueleton-demo"}
 
@@ -52,6 +60,31 @@ TENANTS_PERMITIDOS = {"demo", "lab-resto", "esqueleton-demo"}
 # ML/GR/gramos, más BTA/paq/PQ/BL/porción. Cualquier cálculo que agrupe por unidad ahí
 # está mal. Medido el 2026-08-26. Aquí se usa el conjunto canónico y punto.
 UNIDADES_VALIDAS = {"kg", "g", "lt", "ml", "pz"}
+
+# Grafías que significan la MISMA unidad. Sirven para REPARAR renglones viejos de
+# `pos_recipes_old`, no para escribir nuevos: aquí sólo se renombra la etiqueta, nunca
+# se convierte la cantidad.
+#
+# POR QUÉ HACE FALTA SI R1 YA SE SIEMBRA BIEN
+# `sembrar_r1()` escribe `recipe_unit` desde la constante, así que la cadena que
+# descuenta hoy nace correcta. Pero `pos_recipes_old` es la fuente que reproyecta
+# `/api/pos/recipe-sync` CADA VEZ que alguien edita una receta en /recetas o
+# /pos/recetas: lee `unit` de ahí y lo copia tal cual a `pos_recipe_lines`.
+#
+# O sea que un renglón con "pza" no rompe nada hoy y rompe todo el día que un usuario
+# toque esa receta en la UI: `convert_recipe_to_stock('pza','pz')` devuelve NULL y
+# `r1_reconcile_item` lo marca BLOCKED_UNIT_MISSING. La receta existe, el ingrediente
+# existe, y el platillo deja de descontar sin un solo error visible.
+#
+# `demo` tenía 18 renglones así (medidos el 2026-09-09), heredados de la corrida que
+# reventó a medias. Se repararon; esto evita que vuelvan.
+ALIAS_UNIDAD = {
+    "pza": "pz", "pzas": "pz", "pieza": "pz", "piezas": "pz", "pz.": "pz", "pza.": "pz",
+    "l": "lt", "lts": "lt", "litro": "lt", "litros": "lt",
+    "grs": "g", "gr": "g", "gramo": "g", "gramos": "g",
+    "kgs": "kg", "kilo": "kg", "kilos": "kg",
+    "mls": "ml", "mililitro": "ml", "mililitros": "ml",
+}
 
 # ─── Despensa ────────────────────────────────────────────────────────────────
 # (id, nombre, unidad, costo por unidad MXN, categoría)
@@ -132,6 +165,165 @@ DIAS_DE_STOCK = 21
 
 def ing_id(cid: str, slug: str) -> str:
     return f"{cid}-{slug}"
+
+
+def _convierte(receta: str, stock: str) -> bool:
+    """Espejo de convert_recipe_to_stock(): las únicas parejas que la base sabe convertir."""
+    return (receta, stock) in {("g", "kg"), ("kg", "g"), ("ml", "lt"), ("lt", "ml")}
+
+
+def normalizar_unidades(cid: str) -> int:
+    """Repara renglones de `pos_recipes_old` cuya unidad no convierte contra el stock.
+
+    Sólo renombra cuando el alias apunta EXACTAMENTE a la unidad del inventario ("pza"
+    con stock en "pz"). Un renglón en "g" contra stock en "kg" NO se toca: sí convierte,
+    y reetiquetarlo multiplicaría el consumo por mil — un error mucho peor que el que
+    esto arregla, y silencioso igual.
+
+    Lo que no tiene alias se reporta en vez de adivinarse: inventar una equivalencia es
+    inventar consumo.
+
+    Devuelve cuántos renglones quedaron rotos y sin arreglo automático.
+    """
+    stock = {r["ingredient_id"]: r["stock_unit"] for r in sb_get(
+        "pos_inventory", f"client_id=eq.{cid}&select=ingredient_id,stock_unit&limit=1000")}
+    filas = sb_get("pos_recipes_old",
+                   f"client_id=eq.{cid}&select=id,menu_item_name,ingredient_id,unit&limit=2000")
+
+    arreglados, rotos = 0, []
+    for f in filas:
+        um, destino = (f.get("unit") or "").strip(), stock.get(f["ingredient_id"])
+        if destino is None or um == destino or _convierte(um, destino):
+            continue
+        if ALIAS_UNIDAD.get(um.lower()) == destino:
+            sb_patch("pos_recipes_old", f"id=eq.{f['id']}", {"unit": destino})
+            arreglados += 1
+        else:
+            rotos.append(f"{f['menu_item_name']}/{f['ingredient_id']}: '{um}' vs stock '{destino}'")
+
+    print(f"[sembrar] unidades: {arreglados} renglón(es) renombrados a la unidad del stock")
+    for r in rotos:
+        print(f"[sembrar]   SIN ARREGLO AUTOMÁTICO — {r}", file=sys.stderr)
+    return len(rotos)
+
+
+def sembrar_r1(cid: str, menu: dict, unidades: dict) -> int:
+    """Le da al tenant las cuatro piezas que `r1_reconcile_item` exige para descontar.
+
+    Sin ellas la venta entra, se cobra y no mueve un gramo — que es exactamente el estado
+    en que estaba `demo`. Cada pieza que falta tiene su propio `BLOCKED_*`, y ninguno
+    llega al usuario: `save-order` responde 200 con inventory_status y sigue.
+
+    Idempotente: lee lo que ya hay y sólo escribe lo que falta.
+    """
+    errores = 0
+    quien = "sembrar_recetas_demo"
+    ahora = datetime.now(timezone.utc).isoformat()
+
+    # 4a) Autoridad de mutación. Sin 'r1' TODOS los renglones salen
+    # BLOCKED_OWNER_MISSING: el reconciliador se niega a tocar stock de un tenant que no
+    # ha hecho cutover. Es una bandera por tenant y este es de pruebas.
+    autoridad = sb_get("pos_mutation_authority", f"client_id=eq.{cid}&select=sale_authority")
+    actual = autoridad[0]["sale_authority"] if autoridad else None
+    if actual != "r1":
+        sb_post("pos_mutation_authority", {
+            "client_id": cid, "sale_authority": "r1",
+            "cutover_at": ahora, "cutover_by": quien,
+        }, upsert=True)
+        print(f"[sembrar] autoridad de venta: {actual or 'sin fila'} → r1")
+    else:
+        print("[sembrar] autoridad de venta: ya estaba en r1")
+
+    platillos = [p for p in RECETAS if p in menu]
+
+    # 4b) Política por platillo. El CHECK exige approved_at/approved_by cuando el modo
+    # no es 'unclassified', así que se mandan siempre.
+    previas = {r["menu_item_id"]: r["inventory_mode"] for r in sb_get(
+        "pos_item_inventory_policy", f"client_id=eq.{cid}&select=menu_item_id,inventory_mode&limit=500")}
+    nuevas, corregidas = [], 0
+    for platillo in platillos:
+        mid = menu[platillo]["id"]
+        if mid not in previas:
+            nuevas.append({"client_id": cid, "menu_item_id": mid, "inventory_mode": "recipe",
+                           "approved_at": ahora, "approved_by": quien})
+        elif previas[mid] == "unclassified":
+            # 'unclassified' bloquea igual que no tener fila. Se corrige en su sitio.
+            sb_patch("pos_item_inventory_policy", f"client_id=eq.{cid}&menu_item_id=eq.{mid}",
+                     {"inventory_mode": "recipe", "approved_at": ahora, "approved_by": quien})
+            corregidas += 1
+    if nuevas:
+        sb_post("pos_item_inventory_policy", nuevas)
+    print(f"[sembrar] políticas: {len(nuevas)} nuevas, {corregidas} sacadas de 'unclassified'")
+
+    # 4c) Versión de receta activa por platillo. El CHECK obliga a que una versión activa
+    # traiga activated_at/activated_by y no traiga deactivated_*.
+    todas = sb_get("pos_recipe_versions",
+                   f"client_id=eq.{cid}&select=id,menu_item_id,version,active&limit=2000")
+    activas = {r["menu_item_id"]: r["id"] for r in todas if r.get("active")}
+    # La versión NO se fija en 1: si el platillo ya tuvo una receta que luego se
+    # desactivó, repetir el 1 choca con UNIQUE (client_id, menu_item_id, version) y el
+    # INSERT devuelve 409. Se toma la siguiente libre.
+    ultima: dict[str, int] = {}
+    for r in todas:
+        mid = r["menu_item_id"]
+        ultima[mid] = max(ultima.get(mid, 0), int(r.get("version") or 0))
+    faltan = [p for p in platillos if menu[p]["id"] not in activas]
+    if faltan:
+        sb_post("pos_recipe_versions", [
+            {"client_id": cid, "menu_item_id": menu[p]["id"],
+             "version": ultima.get(menu[p]["id"], 0) + 1, "active": True,
+             "source": "sembrar_recetas_demo", "source_batch": f"demo-{ahora[:10]}",
+             "created_by": quien,
+             "activated_by": quien, "activated_at": ahora}
+            for p in faltan
+        ])
+        activas = {r["menu_item_id"]: r["id"] for r in sb_get(
+            "pos_recipe_versions", f"client_id=eq.{cid}&active=is.true&select=id,menu_item_id&limit=500")}
+    print(f"[sembrar] versiones de receta activas: {len(faltan)} nuevas, {len(activas)} en total")
+
+    # 4d) Renglones de receta.
+    #
+    # OJO — un renglón cuyo ingrediente NO tenga fila en `pos_inventory` no se ignora:
+    # `r1_reconcile_item` cuenta los candados que logró tomar y, si no cuadran con los
+    # renglones de la receta, hace RAISE. Eso aborta la transacción y `save-order`
+    # devuelve error para toda la orden. Por eso se filtra ANTES de escribir.
+    con_stock = {r["ingredient_id"] for r in sb_get(
+        "pos_inventory", f"client_id=eq.{cid}&select=ingredient_id&limit=500")}
+    ids_activas = sorted(activas.values())
+    ya_lineas = set()
+    if ids_activas:
+        lote = ",".join(str(i) for i in ids_activas)
+        ya_lineas = {(r["recipe_version_id"], r["ingredient_id"]) for r in sb_get(
+            "pos_recipe_lines", f"client_id=eq.{cid}&recipe_version_id=in.({lote})"
+                                f"&select=recipe_version_id,ingredient_id&limit=5000")}
+
+    lineas, sin_stock = [], set()
+    for platillo in platillos:
+        vid = activas.get(menu[platillo]["id"])
+        if vid is None:
+            continue
+        for slug, cant in RECETAS[platillo]:
+            iid = ing_id(cid, slug)
+            if iid not in con_stock:
+                sin_stock.add(iid)
+                continue
+            if (vid, iid) in ya_lineas:
+                continue
+            # `recipe_unit` == la unidad de stock del ingrediente, así
+            # `convert_recipe_to_stock` es identidad y no hay conversión que se pueda
+            # equivocar. El CHECK sólo acepta kg/g/lt/ml/pz.
+            lineas.append({"client_id": cid, "recipe_version_id": vid,
+                           "ingredient_id": iid, "quantity": cant,
+                           "recipe_unit": unidades[slug]})
+    if sin_stock:
+        print(f"[sembrar]   AVISO: {len(sin_stock)} ingrediente(s) sin fila en pos_inventory "
+              f"— se omiten para no hacer reventar el reconciliador: {sorted(sin_stock)}",
+              file=sys.stderr)
+        errores += 1
+    if lineas:
+        sb_post("pos_recipe_lines", lineas)
+    print(f"[sembrar] renglones de receta R1: {len(lineas)} nuevos")
+    return errores
 
 
 def sembrar(cid: str) -> int:
@@ -217,7 +409,14 @@ def sembrar(cid: str) -> int:
         sb_post("pos_inventory", inv)
     print(f"[sembrar] inventario: {len(inv)} ingredientes con stock inicial ({DIAS_DE_STOCK} días)")
 
-    # 4) Food cost — que se vea, porque es el número que hace creíble el demo
+    # 4) Reparar unidades viejas de la tabla plana. Va DESPUÉS del inventario porque se
+    # compara contra `pos_inventory.stock_unit`, que tiene que existir ya.
+    errores += normalizar_unidades(cid)
+
+    # 5) La cadena que usa el descuento EN VIVO (R1)
+    errores += sembrar_r1(cid, menu, unidades)
+
+    # 6) Food cost — que se vea, porque es el número que hace creíble el demo
     print("\n[sembrar] food cost por platillo:")
     fuera = 0
     for nombre, precio, costo, pct in sorted(resumen, key=lambda x: -x[3]):

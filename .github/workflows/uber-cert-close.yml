@@ -1,0 +1,94 @@
+name: UBER Cert Close - sandbox order + resolve fulfillment
+
+# Cierra los 2 endpoints recomendados de Uber (case #59731873):
+#  - Resolve for Fulfillment Issues (usa GET /v1/delivery/order/{id}?expand=carts, PR #347)
+#  - (Scheduled se valida recibiendo el webhook; no requiere este workflow)
+#
+# Modo A (sin order_id): intenta crear una orden sandbox de delivery vía Uber.
+# Modo B (con order_id, de una orden real colocada en el consumer app): get -> accept -> resolve.
+
+on:
+  workflow_dispatch:
+    inputs:
+      order_id:
+        description: "order_id real de una orden colocada en el sandbox (deja vacío para intentar crear una)"
+        required: false
+        default: ""
+      item_name:
+        description: "nombre del item para el resolve (default Cafe Americano)"
+        required: false
+        default: "Cafe Americano"
+      item_quantity:
+        description: "cantidad parcial a resolver (ej. 1 sobre una orden qty 2) — vacío = quitar el item completo"
+        required: false
+        default: ""
+      action_type:
+        description: "action_type del resolve (default REMOVE_ITEM)"
+        required: false
+        default: "REMOVE_ITEM"
+
+jobs:
+  close:
+    runs-on: ubuntu-latest
+    env:
+      APP_URL: https://app.fullsite.mx
+      INTEGRATION_ADMIN_SECRET: ${{ secrets.INTEGRATION_ADMIN_SECRET }}
+      STORE: a4f298f4-202f-47f5-b375-d2eefec0126c
+      ORDER_IN: ${{ github.event.inputs.order_id }}
+      ITEM_NAME: ${{ github.event.inputs.item_name }}
+      ITEM_QTY: ${{ github.event.inputs.item_quantity }}
+      ACTION_TYPE: ${{ github.event.inputs.action_type }}
+
+    steps:
+      - name: Health check
+        run: |
+          curl -s -w "\nHTTP %{http_code}\n" "$APP_URL/api/integrations/uber-eats/webhook"
+
+      - name: Attempt sandbox order creation (solo si no se pasó order_id)
+        if: ${{ github.event.inputs.order_id == '' }}
+        run: |
+          RESP=$(curl -s -w "\n%{http_code}" -X POST "$APP_URL/api/integrations/uber-eats/sandbox" \
+            -H "Authorization: Bearer $INTEGRATION_ADMIN_SECRET" -H "Content-Type: application/json" \
+            -d "{\"action\":\"delivery_sandbox_order\",\"store_id\":\"$STORE\"}")
+          CODE=$(echo "$RESP" | tail -1); BODY=$(echo "$RESP" | head -n -1)
+          echo "sandbox_order HTTP $CODE"; echo "$BODY"
+          OID=$(echo "$BODY" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("created_order_id") or "")' 2>/dev/null || echo "")
+          echo "ORDER=$OID" >> $GITHUB_ENV
+
+      - name: Resolve ORDER from input or created
+        run: |
+          ORDER="${ORDER_IN}"
+          if [ -z "$ORDER" ]; then ORDER="${ORDER}"; fi
+          # ORDER_IN wins; else the env ORDER set by the previous step
+          FINAL="${ORDER_IN:-$ORDER}"
+          echo "FINAL_ORDER=$FINAL" >> $GITHUB_ENV
+          echo "order a usar: '${FINAL:-<ninguna>}'"
+
+      - name: Get order details
+        if: ${{ env.FINAL_ORDER != '' }}
+        run: |
+          RESP=$(curl -s -w "\n%{http_code}" -X POST "$APP_URL/api/integrations/uber-eats/sandbox" \
+            -H "Authorization: Bearer $INTEGRATION_ADMIN_SECRET" -H "Content-Type: application/json" \
+            -d "{\"action\":\"delivery_order_get\",\"store_id\":\"$STORE\",\"order_id\":\"$FINAL_ORDER\"}")
+          echo "get HTTP $(echo "$RESP" | tail -1)"; echo "$RESP" | head -n -1
+
+      - name: Accept order (idempotente)
+        if: ${{ env.FINAL_ORDER != '' }}
+        continue-on-error: true
+        run: |
+          RESP=$(curl -s -w "\n%{http_code}" -X POST "$APP_URL/api/integrations/uber-eats/sandbox" \
+            -H "Authorization: Bearer $INTEGRATION_ADMIN_SECRET" -H "Content-Type: application/json" \
+            -d "{\"action\":\"delivery_order_accept\",\"store_id\":\"$STORE\",\"order_id\":\"$FINAL_ORDER\"}")
+          echo "accept HTTP $(echo "$RESP" | tail -1)"; echo "$RESP" | head -n -1
+
+      - name: Resolve fulfillment (?expand=carts)
+        if: ${{ env.FINAL_ORDER != '' }}
+        run: |
+          PAYLOAD=$(python3 -c 'import json,os; d={"action":"resolve_fulfillment","store_id":os.environ["STORE"],"order_id":os.environ["FINAL_ORDER"],"item_name":os.environ["ITEM_NAME"]}; a=os.environ.get("ACTION_TYPE","").strip(); d.update({"action_type":a} if a else {}); q=os.environ.get("ITEM_QTY","").strip(); d.update({"item_quantity":int(q)} if q else {}); print(json.dumps(d))')
+          echo "payload: $PAYLOAD"
+          RESP=$(curl -s -w "\n%{http_code}" -X POST "$APP_URL/api/integrations/uber-eats/sandbox" \
+            -H "Authorization: Bearer $INTEGRATION_ADMIN_SECRET" -H "Content-Type: application/json" \
+            -d "$PAYLOAD")
+          CODE=$(echo "$RESP" | tail -1); BODY=$(echo "$RESP" | head -n -1)
+          echo "=== RESOLVE HTTP $CODE ==="; echo "$BODY"
+          echo "$BODY" | python3 -c 'import sys,json; d=json.load(sys.stdin); print("cart_item_id:", d.get("cart_item_id"), "| http_status:", d.get("http_status"))' 2>/dev/null || true

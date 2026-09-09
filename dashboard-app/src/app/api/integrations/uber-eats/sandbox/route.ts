@@ -178,6 +178,7 @@ export async function POST(request: NextRequest) {
     download_url?: string
     item_id?: string
     item_name?: string
+    item_quantity?: number | string
     issue_type?: string
     action_type?: string
     update?: Record<string, unknown>
@@ -362,15 +363,49 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'provide a real order_id from Uber sandbox panel' }, { status: 400 })
     }
     const corrId = crypto.randomUUID()
-    const resolvedItemId = itemId || 'fs-item-1'
     const issueType = body.issue_type || 'OUT_OF_ITEM'
     const actionType = body.action_type || 'REMOVE_ITEM'
     const itemName = body.item_name || 'Cafe Americano'
+    // Optional partial quantity: on a qty>=2 line, resolving only part of the quantity
+    // leaves the order non-empty, so Uber does not treat it as a cancel-after-accept.
+    const itemQty = body.item_quantity != null ? Number(body.item_quantity) : undefined
+    // Uber GTS (case #59731873, 2026-09-07) confirmed the cart_item_id is carried in the
+    // delivery order's carts and is retrievable via GET /v1/delivery/order/{id}?expand=carts.
+    // The plain v1 GET omits line items and the v2 eats order GET returns 404 for delivery
+    // orders — so ?expand=carts is the source. body.item_id (other than the menu default)
+    // overrides.
+    let cartItemId = itemId && itemId !== 'fs-item-1' ? itemId : undefined
+    let cartsPeek: unknown
+    if (!cartItemId) {
+      const vr = await uberFetch(`/v1/delivery/order/${encodeURIComponent(orderId)}?expand=carts`, { method: 'GET', tokenType: 'marketplace', storeId })
+      const vt = await vr.text()
+      try { cartsPeek = vt ? JSON.parse(vt) : vt } catch { cartsPeek = vt }
+      const found: string[] = []
+      const hunt = (x: unknown): void => {
+        if (Array.isArray(x)) { x.forEach(hunt); return }
+        if (x && typeof x === 'object') {
+          const o = x as Record<string, unknown>
+          if (typeof o.cart_item_id === 'string') found.push(o.cart_item_id)
+          if (typeof o.instance_id === 'string') found.push(o.instance_id)
+          Object.values(o).forEach(hunt)
+        }
+      }
+      hunt(cartsPeek)
+      cartItemId = found[0]
+    }
+    if (!cartItemId) {
+      return NextResponse.json({ action, order_id: orderId, correlation_id: corrId,
+        error: 'no cart_item_id found — pass item_id explicitly', order_carts: cartsPeek }, { status: 422 })
+    }
     const fbody = {
       fulfillment_issues: [{
         issue_type: issueType,
         action_type: actionType,
-        item: { id: resolvedItemId, name: itemName },
+        item: {
+          cart_item_id: cartItemId,
+          name: itemName,
+          ...(itemQty != null && Number.isFinite(itemQty) ? { quantity: itemQty } : {}),
+        },
       }],
     }
     const r = await uberFetch(`/v1/delivery/order/${encodeURIComponent(orderId)}/resolve-fulfillment-issues`, {
@@ -380,7 +415,7 @@ export async function POST(request: NextRequest) {
     let parsed: unknown
     try { parsed = text ? JSON.parse(text) : null } catch { parsed = text }
     return NextResponse.json({
-      action, order_id: orderId, item_id: resolvedItemId, correlation_id: corrId,
+      action, order_id: orderId, cart_item_id: cartItemId, correlation_id: corrId,
       sent: fbody, http_status: r.status, response: parsed, ts: new Date().toISOString(),
     }, { status: r.ok ? 200 : 422 })
   }

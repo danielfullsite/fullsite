@@ -17,7 +17,8 @@ porque ahí el NULL significa algo ("todavía no calificado").
 """
 from __future__ import annotations
 
-import json
+import contextlib
+import io
 import os
 import sys
 import unittest
@@ -50,6 +51,30 @@ def enviado(**kw) -> dict:
          mock.patch.object(ac, "SUPABASE_URL", "https://x.supabase.co"), \
          mock.patch.object(ac, "SUPABASE_KEY", "k"):
         ac.log_event(**base)
+    return capturado
+
+
+def enviado_insight(**kw) -> dict:
+    """Devuelve el cuerpo que create_insight le mandaria a PostgREST."""
+    capturado = {}
+
+    class RespOK:
+        ok = True
+        status_code = 201
+        text = ""
+
+    def post_falso(url, headers=None, json=None, timeout=None):
+        capturado.update(json or {})
+        return RespOK()
+
+    base = {"agent_id": "cuadre", "category": "operations", "severity": "info",
+            "title": "T", "client_id": "demo"}
+    base.update(kw)
+    with mock.patch.dict(os.environ, {"CLIENT_ID": "demo"}, clear=False), \
+         mock.patch.object(ac, "requests", mock.Mock(post=post_falso)), \
+         mock.patch.object(ac, "SUPABASE_URL", "https://x.supabase.co"), \
+         mock.patch.object(ac, "SUPABASE_KEY", "k"):
+        ac.create_insight(**base)
     return capturado
 
 
@@ -92,7 +117,7 @@ class LoQueSIseManda(unittest.TestCase):
         self.assertEqual(cuerpo["confidence"], 0.9)
         self.assertEqual(cuerpo["explanation"], "porque sí")
         self.assertEqual(cuerpo["suggested_action"], "revisar")
-        self.assertEqual(json.loads(cuerpo["evidence"]), {"a": 1})
+        self.assertEqual(cuerpo["evidence"], {"a": 1})
 
     def test_el_status_nace_en_new_no_en_open(self):
         # 'open' no existe en el CHECK de la tabla; escribirlo rechazaba TODO.
@@ -107,12 +132,153 @@ class LoQueSIseManda(unittest.TestCase):
         self.assertEqual(enviado(estimated_value=0.0)["estimated_value"], 0.0)
 
 
+class LaEvidenciaViajaComoObjetoNoComoCadena(unittest.TestCase):
+    """`evidence` es jsonb en las dos tablas. Lo que se manda tiene que ser el dict,
+    no `json.dumps(dict)`.
+
+    POR QUE IMPORTA
+    Con la cadena, PostgREST guardaba un ESCALAR de tipo string ADENTRO del jsonb. La
+    fila se escribia y nadie se quejaba, pero `evidence->>'codigo'` devolvia NULL: la
+    evidencia quedaba escrita y no consultable. No se podia agrupar por codigo de
+    descuadre, ni filtrar por fecha dentro de la evidencia, ni medir el bucle de valor.
+
+    Verificado en produccion el 2026-09-09: agent_events tenia 74 filas 'string' (todas
+    de cuadre y close-predictor, los dos que pasan por estos helpers) contra 121
+    'object' (las de engine.ts, que siempre mando el objeto). agent_insights estaba
+    peor: 2,820 'string' y CERO 'object'.
+
+    Es el mismo bug que se cerro en agent_results el 2026-08-26. Estas pruebas existen
+    para que no vuelva por tercera vez."""
+
+    def test_log_event_manda_un_dict(self):
+        evidencia = {"codigo": "dia_vs_ordenes", "fecha": "2026-09-09", "vista": 65969.2}
+        cuerpo = enviado(evidence=evidencia)
+        self.assertIsInstance(cuerpo["evidence"], dict)
+        self.assertEqual(cuerpo["evidence"], evidencia)
+
+    def test_log_event_NO_manda_una_cadena(self):
+        # La forma exacta del bug: str en vez de dict.
+        self.assertNotIsInstance(enviado(evidence={"a": 1})["evidence"], str)
+
+    def test_create_insight_manda_un_dict(self):
+        evidencia = {"current_ventas": 65969.2, "projected": 97718.4, "hour": 16}
+        cuerpo = enviado_insight(evidence=evidencia)
+        self.assertIsInstance(cuerpo["evidence"], dict)
+        self.assertEqual(cuerpo["evidence"], evidencia)
+
+    def test_create_insight_NO_manda_una_cadena(self):
+        self.assertNotIsInstance(enviado_insight(evidence={"a": 1})["evidence"], str)
+
+    def test_las_llaves_anidadas_sobreviven(self):
+        # Un dict anidado es donde mas duele el doble escapado: si viajara como cadena,
+        # 'detalle' quedaria inalcanzable desde SQL a cualquier profundidad.
+        evidencia = {"codigo": "x", "detalle": {"vista": 1.5, "ordenes": [1, 2]}}
+        self.assertEqual(enviado(evidence=evidencia)["evidence"], evidencia)
+
+    def test_lo_que_se_manda_es_consultable_como_lo_haria_postgres(self):
+        # Espejo de `evidence->>'codigo'`: sobre un dict funciona; sobre la cadena que
+        # se mandaba antes, esto reventaria con TypeError — que es justo lo que Postgres
+        # expresaba devolviendo NULL.
+        cuerpo = enviado(evidence={"codigo": "dia_vs_ordenes"})
+        self.assertEqual(cuerpo["evidence"]["codigo"], "dia_vs_ordenes")
+
+
 class SinClientIdNoSeEscribe(unittest.TestCase):
     def test_se_omite_en_vez_de_estampar_el_evento_en_otro_tenant(self):
         with mock.patch.dict(os.environ, {"CLIENT_ID": ""}, clear=False):
             with mock.patch.object(ac, "requests", mock.Mock()) as req:
                 ac.log_event(agent_id="x", event_type="y", title="z", client_id=None)
                 req.post.assert_not_called()
+
+
+class SbGetNoPuedeTragarseElMotivo(unittest.TestCase):
+    """`sb_get` es la puerta por la que 45 scripts leen Supabase. Lo que no diga aquí,
+    no lo sabe nadie.
+
+    Del 2026-09-02 al 09-08 el cuadre reportó siete veces
+    `500 Server Error: Internal Server Error` y nada más. El cuerpo de esa respuesta
+    decía `canceling statement due to statement timeout` — la diferencia entre un
+    diagnóstico de un minuto y uno de una semana."""
+
+    class Resp:
+        def __init__(self, status, text="", payload=None):
+            self.status_code, self.text, self._payload = status, text, payload or []
+            self.ok = 200 <= status < 300
+
+        def json(self):
+            return self._payload
+
+    def setUp(self):
+        self._url, self._key = ac.SUPABASE_URL, ac.SUPABASE_KEY
+        ac.SUPABASE_URL, ac.SUPABASE_KEY = "https://x.supabase.co", "k"
+        # Los reintentos avisan por stderr, y en el log de CI esas lineas se leen
+        # igual que una falla de produccion. Se capturan: aqui son material de
+        # aserto, no ruido que haga dudar de una corrida sana.
+        self.stderr = io.StringIO()
+        self._silencio = contextlib.redirect_stderr(self.stderr)
+        self._silencio.__enter__()
+
+    def tearDown(self):
+        self._silencio.__exit__(None, None, None)
+        ac.SUPABASE_URL, ac.SUPABASE_KEY = self._url, self._key
+
+    def test_el_cuerpo_del_error_viaja_en_la_excepcion(self):
+        resp = self.Resp(500, "canceling statement due to statement timeout")
+        with mock.patch.object(ac.requests, "get", return_value=resp), \
+             mock.patch.object(ac.time, "sleep"):
+            with self.assertRaises(ac.SupabaseError) as cm:
+                ac.sb_get("ops_daily_history", "client_id=eq.amalay")
+        self.assertIn("canceling statement due to statement timeout", str(cm.exception))
+        self.assertIn("ops_daily_history", str(cm.exception))
+
+    def test_un_500_se_reintenta_y_si_pasa_devuelve_los_datos(self):
+        # Un timeout por contención no es un dato malo: es el mismo dato, más tarde.
+        respuestas = [self.Resp(500, "timeout"), self.Resp(200, payload=[{"fecha": "2026-09-08"}])]
+        with mock.patch.object(ac.requests, "get", side_effect=respuestas) as get, \
+             mock.patch.object(ac.time, "sleep"):
+            self.assertEqual(ac.sb_get("t", "p"), [{"fecha": "2026-09-08"}])
+        self.assertEqual(get.call_count, 2)
+        # Un reintento callado escondería que la base está sufriendo.
+        self.assertIn("reintento 1/2", self.stderr.getvalue())
+
+    def test_un_400_no_se_reintenta(self):
+        # Una consulta mal escrita repetida tres veces sólo tarda tres veces más en fallar.
+        with mock.patch.object(ac.requests, "get",
+                               return_value=self.Resp(400, 'column "x" does not exist')) as get, \
+             mock.patch.object(ac.time, "sleep"):
+            with self.assertRaises(ac.SupabaseError):
+                ac.sb_get("t", "p")
+        self.assertEqual(get.call_count, 1)
+
+    def test_se_agotan_los_reintentos_y_entonces_si_levanta(self):
+        with mock.patch.object(ac.requests, "get", return_value=self.Resp(503, "no")) as get, \
+             mock.patch.object(ac.time, "sleep"):
+            with self.assertRaises(ac.SupabaseError):
+                ac.sb_get("t", "p", reintentos=2)
+        self.assertEqual(get.call_count, 3)
+
+    def test_un_corte_de_conexion_tambien_se_reintenta(self):
+        # En estas pruebas `requests` es un MagicMock, así que sus "excepciones" no son
+        # excepciones de verdad. Se pone una real en su lugar para que el `except` de
+        # sb_get sea el mismo que corre en producción.
+        class CorteDeRed(Exception):
+            pass
+
+        with mock.patch.object(ac.requests.exceptions, "RequestException", CorteDeRed), \
+             mock.patch.object(ac.requests, "get",
+                               side_effect=[CorteDeRed("se acabó el tiempo"),
+                                            self.Resp(200, payload=[1])]) as get, \
+             mock.patch.object(ac.time, "sleep"):
+            self.assertEqual(ac.sb_get("t", "p"), [1])
+        self.assertEqual(get.call_count, 2)
+
+    def test_nunca_devuelve_vacio_en_vez_de_fallar(self):
+        # La regla que ya estaba y no se puede perder: [] significa "no hay filas",
+        # nunca "no se pudo leer". Un agente no distingue las dos si se confunden.
+        with mock.patch.object(ac.requests, "get", return_value=self.Resp(500, "x")), \
+             mock.patch.object(ac.time, "sleep"):
+            with self.assertRaises(ac.SupabaseError):
+                ac.sb_get("t", "p")
 
 
 if __name__ == "__main__":

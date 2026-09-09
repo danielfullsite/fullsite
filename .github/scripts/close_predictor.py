@@ -140,12 +140,20 @@ def build_snapshot_distribution(snapshots, open_hour=8, close_hour=22):
 
 
 # ── Projection ──────────────────────────────────────────────────────────────
-def project_close(current_ventas, current_hour, snapshot_curve=None):
-    """Project total close based on current ventas and hourly distribution.
+def project_close(current_ventas, current_hour, snapshot_curve=None, perfil=None):
+    """Proyecta el cierre a partir de lo vendido y de una curva de progreso del dia.
 
-    If snapshot_curve is provided (built from ops_daily snapshots), uses actual
-    intraday ventas progression instead of the hardcoded HOURLY_DISTRIBUTION.
-    Falls back to HOURLY_DISTRIBUTION when no snapshot data is available.
+    Tres fuentes, en orden de cuanto saben de ESTE restaurante:
+
+      1. `snapshot_curve` — como va HOY. Es lo mas fresco que existe.
+      2. `perfil` — su historia (perfil_horario.Perfil). Aprendida de `ops_hourly`, con
+         las tres etapas de arranque en frio.
+      3. `HOURLY_DISTRIBUTION` — la curva fija, cuyo comentario admite estar "adjusted for
+         AMALAY brunch cafe". Ultimo recurso: mide a todos con el ritmo de un cafe de
+         brunch, y una taqueria de cena a las 3pm escucha "llevas el 86% de tu dia".
+
+    El paso 2 es el que faltaba. Sin el, un restaurante sin snapshots del dia caia directo
+    al ritmo de otro restaurante, aunque tuviera meses de historia propia.
     """
     if current_hour < 8 or current_ventas <= 0:
         return 0
@@ -159,9 +167,15 @@ def project_close(current_ventas, current_hour, snapshot_curve=None):
             pct_captured = snapshot_curve[max(past_hours)] if past_hours else None
         if pct_captured and pct_captured > 0.05:
             return round(current_ventas / pct_captured)
-        # If snapshot curve doesn't cover current hour yet, fall through to hardcoded
+        # Si la curva del dia no cubre esta hora todavia, se cae al perfil de abajo.
 
-    # Hardcoded distribution fallback
+    # 2. El perfil del propio restaurante.
+    if perfil is not None:
+        pct = perfil.acumulado_a(current_hour)
+        if pct and pct > 0.05:
+            return round(current_ventas / pct)
+
+    # 3. Curva fija — el ritmo de AMALAY para todos. Ver el docstring.
     pct_captured = sum(
         pct for hour, pct in HOURLY_DISTRIBUTION.items()
         if hour < current_hour
@@ -334,11 +348,26 @@ def main():
     snapshot_curve = build_snapshot_distribution(snapshots) if snapshots else None
     if snapshot_curve:
         print(f"[close_predictor] Using snapshot curve ({len(snapshots)} snapshots)")
-    else:
+
+    # 2b. El perfil del restaurante, para cuando no haya curva del dia. Nunca lanza: sin
+    # datos devuelve la curva de arranque de su forma de servicio, diciendolo en `fuente`.
+    perfil = None
+    try:
+        from perfil_horario import perfil_horario
+        perfil = perfil_horario(CLIENT)   # get_client() hace select=*, trae id y type
+        print(f"[close_predictor] Perfil: {perfil.fuente} "
+              f"({perfil.dias_de_datos} dias, familia={perfil.familia})")
+    except Exception as e:
+        # Fallar callado esta prohibido: si el perfil no se pudo construir, se dice y se
+        # sigue con la curva fija, que es peor pero conocida.
+        print(f"[close_predictor] Sin perfil ({e}) — se usara la curva fija")
+
+    if not snapshot_curve and perfil is None:
         print("[close_predictor] No snapshots — using hardcoded HOURLY_DISTRIBUTION")
 
     # 3. Project close
-    projected = project_close(current_ventas, current_hour, snapshot_curve=snapshot_curve)
+    projected = project_close(current_ventas, current_hour,
+                              snapshot_curve=snapshot_curve, perfil=perfil)
     if projected <= 0:
         print("[close_predictor] Too early to project, skipping")
         elapsed = int((time.time() - start) * 1000)
