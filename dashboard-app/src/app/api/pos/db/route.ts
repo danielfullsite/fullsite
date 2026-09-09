@@ -15,7 +15,7 @@
  * directo con su JWT. Solo las terminales POS (shiftToken) se rutean aquí.
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { ALLOW, MANAGER_ONLY_WRITE, MANAGER_ONLY_DELETE, NO_CID, camposProhibidos, isManager, redactResponse, tableOf } from '@/lib/pos-db-policy'
+import { ALLOW, MANAGER_ONLY_WRITE, puedeEscribirEn, MANAGER_ONLY_DELETE, NO_CID, camposProhibidos, isManager, redactResponse, tableOf } from '@/lib/pos-db-policy'
 import { withPOSAuth } from '@/lib/api-auth'
 
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -42,7 +42,10 @@ async function handle(request: NextRequest, method: string) {
   if (!ALLOW.has(table)) return NextResponse.json({ error: `table not allowed: ${table}` }, { status: 403 })
 
   const isWrite = method !== 'GET'
-  if (isWrite && MANAGER_ONLY_WRITE.has(table) && !isManager(auth.role)) {
+  // `puedeEscribirEn` cubre las dos listas: las tablas de identidad siguen pidiendo
+  // gerente, y las de caja piden cajero+ — antes pedían gerente y el Corte Z de una
+  // caja logueada como cajero moría en 403 sin reintento. Ver pos-db-policy.ts.
+  if (isWrite && !puedeEscribirEn(table, auth.role)) {
     return NextResponse.json({ error: 'manager required' }, { status: 403 })
   }
   // Una orden no se borra, se cancela: el borrado deja el arqueo sin rastro.

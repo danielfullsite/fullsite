@@ -69,8 +69,6 @@ export const NO_CID = new Set<string>(['pos_purchase_order_items', 'pos_sub_reci
  * `pos_fingerprint_templates` van por lo mismo — dan de alta identidad.
  */
 export const MANAGER_ONLY_WRITE = new Set<string>([
-  'pos_cash_movements',
-  'pos_cierres',
   'pos_staff',
   'pos_terminals',
   'pos_fingerprint_templates',
@@ -78,6 +76,51 @@ export const MANAGER_ONLY_WRITE = new Set<string>([
   // un shift token de mesero podía bajarle el precio a un platillo y cobrarlo barato.
   'pos_menu_items',
 ])
+
+// ── LA CAJA LA OPERA UN CAJERO, Y NO PODÍA CERRARLA ─────────────────────────
+//
+// `pos_cash_movements` y `pos_cierres` estaban en MANAGER_ONLY_WRITE desde el
+// 2026-08-25 (commit 02ce02c2). El efecto, encontrado el 2026-09-08:
+//
+//   · Una terminal POS con shift token y SIN sesión de Supabase se rutea por
+//     `/api/pos/db` (supabase-fetch-patch.ts) — o sea, TODA caja de kiosco.
+//   · `isManager` es admin | gerente | dueño. `cajero` NO está.
+//   · Entonces el retiro de caja y el Corte Z de una caja logueada como cajero
+//     mueren en 403. Y un 403 en el replay de la cola se clasifica terminal
+//     (pos-offline-db.ts): no se reintenta jamás. El dinero del turno no sube nunca,
+//     y la terminal muestra el corte hecho.
+//
+// AMALAY tiene CUATRO cajeros activos (consultado en pos_staff). Los ocho cierres que
+// existen se guardaron bien porque los hizo Daniel, que es admin — por eso no se había
+// visto. El día del cutover lo ve el primer cajero que cierre.
+//
+// POR QUÉ SE BAJA A CAJERO Y NO SE RESUELVE CON UNA APROBACIÓN FIRMADA. El wizard ya
+// tiene el token firmado del gerente (`consumeManagerApproval`) y lo natural sería
+// mandarlo en una cabecera. No sirve: el cierre se ENCOLA, y el replay reproduce la
+// operación sin cabeceras. Quedaría igual de roto justo en el caso offline, que es el
+// que más importa.
+//
+// QUÉ SE PIERDE Y QUÉ NO. El que no debe poder inventar un cierre ni un retiro es el
+// MESERO, y sigue sin poder. Un cajero moviendo la caja que él mismo opera es la
+// operación normal — y su control real no es este proxy sino el arqueo, más el PIN de
+// gerente que `CierreCajaWizard` exige (`hasPermission(role, 'corte_z')`) antes de
+// llegar aquí. Este candado estaba duplicando ese control con el rol equivocado: el de
+// la sesión, no el de quien autoriza.
+const NIVEL: Record<string, number> = { mesero: 1, cajero: 2, capitan: 3, gerente: 4, admin: 5, 'dueño': 5 }
+
+/** Nivel mínimo para ESCRIBIR, cuando no basta con la lista de gerente. */
+export const NIVEL_MINIMO_DE_ESCRITURA: Record<string, number> = {
+  pos_cash_movements: NIVEL.cajero,
+  pos_cierres: NIVEL.cajero,
+}
+
+/** ¿Este rol alcanza para escribir en esta tabla? */
+export function puedeEscribirEn(table: string, role: string | null | undefined): boolean {
+  if (MANAGER_ONLY_WRITE.has(table)) return isManager(role)
+  const minimo = NIVEL_MINIMO_DE_ESCRITURA[table]
+  if (minimo === undefined) return true
+  return (NIVEL[String(role)] || 0) >= minimo
+}
 
 /**
  * COLUMNAS QUE UN MESERO NO PUEDE ESCRIBIR, aunque la tabla sí sea suya.

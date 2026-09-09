@@ -17,6 +17,7 @@ import { join } from 'node:path'
 import {
   ALLOW,
   MANAGER_ONLY_WRITE,
+  puedeEscribirEn,
   isManager,
   redactResponse,
   tableOf,
@@ -45,9 +46,32 @@ describe('escritura de tablas sensibles', () => {
     expect(MANAGER_ONLY_WRITE.has('pos_staff')).toBe(true)
   })
 
-  it('las tablas de dinero exigen gerente', () => {
-    expect(MANAGER_ONLY_WRITE.has('pos_cash_movements')).toBe(true)
-    expect(MANAGER_ONLY_WRITE.has('pos_cierres')).toBe(true)
+  // LA REGLA CAMBIO EL 2026-09-08, y esta prueba cambio con ella. Antes decia que las
+  // tablas de caja exigen GERENTE. Era cierto desde el 2026-08-25 (commit 02ce02c2) y
+  // rompia la operacion:
+  //
+  //   · Una terminal POS con shift token y sin sesion de Supabase se rutea por
+  //     `/api/pos/db` (supabase-fetch-patch.ts) — o sea, toda caja de kiosco.
+  //   · `isManager` no incluye `cajero`, asi que el retiro de caja y el Corte Z de una
+  //     caja logueada como cajero morian en 403.
+  //   · Un 403 en el replay de la cola es TERMINAL: no se reintenta jamas. El dinero
+  //     del turno no subia nunca y la terminal mostraba el corte hecho.
+  //
+  // AMALAY tiene cuatro cajeros activos; los ocho cierres que existen se guardaron bien
+  // solo porque los hizo un admin.
+  //
+  // El que no debe poder inventar un cierre es el MESERO, y sigue sin poder. El control
+  // real del Corte Z es el PIN de gerente que exige CierreCajaWizard antes de llegar
+  // aqui; este candado lo duplicaba con el rol equivocado — el de la sesion, no el de
+  // quien autoriza.
+  it('las tablas de caja piden cajero+, no gerente', () => {
+    expect(puedeEscribirEn('pos_cash_movements', 'cajero')).toBe(true)
+    expect(puedeEscribirEn('pos_cierres', 'cajero')).toBe(true)
+  })
+
+  it('pero un mesero sigue sin poder tocarlas', () => {
+    expect(puedeEscribirEn('pos_cash_movements', 'mesero')).toBe(false)
+    expect(puedeEscribirEn('pos_cierres', 'mesero')).toBe(false)
   })
 
   it('las tablas que dan de alta identidad exigen gerente', () => {
@@ -134,8 +158,11 @@ describe('las dos rutas comparten la política — no puede haber una laxa', () 
 
   it('el catch-all comprueba la lista blanca y el rol', () => {
     expect(catchAll).toContain('ALLOW.has(')
-    expect(catchAll).toContain('MANAGER_ONLY_WRITE.has(')
-    expect(catchAll).toContain('isManager(')
+    // La decisión de rol pasó a `puedeEscribirEn`, que consulta las DOS listas
+    // (gerente-only y nivel mínimo). Antes cada proxy leía `MANAGER_ONLY_WRITE` por su
+    // cuenta, y así es como uno queda protegido y el otro no.
+    expect(catchAll).toContain('puedeEscribirEn(')
+    expect(catchAll).toContain('isManager(')   // sigue usándose para el DELETE de órdenes
   })
 
   it('ninguna exime a los RPC de sus protecciones', () => {

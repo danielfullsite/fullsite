@@ -49,7 +49,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { withPOSAuth, unauthorized } from '@/lib/api-auth'
-import { ALLOW, MANAGER_ONLY_WRITE, MANAGER_ONLY_DELETE, camposProhibidos, isManager, redactResponse, tableOf } from '@/lib/pos-db-policy'
+import { ALLOW, MANAGER_ONLY_WRITE, puedeEscribirEn, MANAGER_ONLY_DELETE, camposProhibidos, isManager, redactResponse, tableOf } from '@/lib/pos-db-policy'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -97,7 +97,9 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ path: string[] 
   // sí existía; el de rol no.
   const table = tableOf(resource)
   if (!ALLOW.has(table)) return forbidden(`tabla no permitida: ${table}`)
-  if (req.method !== 'GET' && req.method !== 'HEAD' && MANAGER_ONLY_WRITE.has(table) && !isManager(auth.role)) {
+  // Mismo criterio que el otro proxy — se comparte la funcion para que no puedan
+  // divergir: uno protegido y el otro no ya paso antes.
+  if (req.method !== 'GET' && req.method !== 'HEAD' && !puedeEscribirEn(table, auth.role)) {
     return forbidden('se requiere rol de gerente')
   }
   // Una orden no se borra, se cancela: el borrado deja el arqueo sin rastro.
