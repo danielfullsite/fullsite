@@ -23,3 +23,9 @@ jobs:
       # (`data->>'campo'` devuelve NULL) sin romper nada visible en el dashboard.
       # Es un fallo silencioso: por eso se atrapa aquí y no en producción.
       - run: python .github/scripts/test_agent_results_jsonb.py
+
+      # El turno del simulador. `demo-24-7.yml` también corre esta prueba, pero ese
+      # workflow sólo dispara por cron o a mano: un PR que rompiera `pos_turno.py` no
+      # se enteraría hasta la siguiente corrida del demo, con las órdenes ya rechazadas.
+      # Aquí corre en cada push. Sin red, como el resto.
+      - run: python .github/scripts/test_pos_turno.py
