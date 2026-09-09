@@ -20,6 +20,9 @@ import {
   validateEscalationNota,
   withEscalationPayload,
   openOrderStatusLabel,
+  evaluarArqueo,
+  leerContado,
+  UMBRAL_EXPLICACION_MXN,
   type OpenOrder,
 } from '@/lib/pos-cierre-guard'
 
@@ -197,11 +200,17 @@ export default function CierreCajaWizard({
     fetchShiftData()
   }, [turnoId])
 
-  const totalContado = Number(cashInput) || 0
+  // `Number(cashInput) || 0` convertia el campo VACIO en un 0 que se ve igual que
+  // un 0 contado. Asi se guardaron los ocho cierres de AMALAY, uno de ellos con
+  // -$5,957.76 de diferencia y sin una palabra. `leerContado` devuelve null cuando
+  // nadie escribio nada, y `evaluarArqueo` decide si eso alcanza para cerrar.
+  const contadoCapturado = leerContado(cashInput)
+  const totalContado = contadoCapturado ?? 0
   const { efectivoEsperado, diferencia } = calcEfectivoEsperado(
     summaryToArqueoInput(systemData, fondoInicial),
     totalContado,
   )
+  const arqueo = evaluarArqueo(contadoCapturado, diferencia, notas)
 
   // Huella para cerrar turno. Pedido por Daniel el 2026-08-31 ("tambien para cierre
   // de caja"). La identidad entra por el MISMO embudo que el PIN: se sigue exigiendo
@@ -781,17 +790,25 @@ export default function CierreCajaWizard({
                     {diferencia >= 0 ? '+' : ''}{formatMXN(diferencia)}
                   </span>
                 </div>
-                {Math.abs(diferencia) > 50 && (
-                  <div className="flex items-center gap-2 mt-3 text-sm text-red-400">
+                {arqueo.exigeExplicacion && (
+                  <div className={`flex items-center gap-2 mt-3 text-sm ${arqueo.puedeCerrar ? 'text-amber-400' : 'text-red-400'}`}>
                     <AlertTriangle size={16} />
-                    <span>Diferencia mayor a $50 — requiere explicacion</span>
+                    <span>
+                      {arqueo.puedeCerrar
+                        ? `Diferencia mayor a $${UMBRAL_EXPLICACION_MXN} — explicacion registrada`
+                        : `Diferencia mayor a $${UMBRAL_EXPLICACION_MXN} — escribe la explicacion abajo para poder cerrar`}
+                    </span>
                   </div>
                 )}
               </div>
 
               {/* Notes */}
               <div className="mt-4">
-                <label className="text-sm text-[var(--text-3)] block mb-1">Notas del cierre (opcional)</label>
+                <label className="text-sm text-[var(--text-3)] block mb-1">
+                  {arqueo.exigeExplicacion
+                    ? <>Explicacion de la diferencia <span className="text-red-400">(obligatoria)</span></>
+                    : 'Notas del cierre (opcional)'}
+                </label>
                 <textarea
                   value={notas}
                   onChange={(e) => setNotas(e.target.value)}
@@ -817,7 +834,8 @@ export default function CierreCajaWizard({
                   <>
                     <button
                       onClick={cerrarConHuella}
-                      disabled={huellaVerificando || saving}
+                      disabled={huellaVerificando || saving || !arqueo.puedeCerrar}
+                  title={arqueo.motivo ?? undefined}
                       className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 font-bold py-3 rounded-xl transition-colors mb-3"
                     >
                       <Fingerprint size={20} className={huellaVerificando ? 'animate-pulse' : ''} />
@@ -848,7 +866,8 @@ export default function CierreCajaWizard({
                 </button>
                 <button
                   onClick={() => { void handleSave() }}
-                  disabled={saving || !pin || pin.length < 4}
+                  disabled={saving || !pin || pin.length < 4 || !arqueo.puedeCerrar}
+                  title={arqueo.motivo ?? undefined}
                   className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-emerald-500 text-white font-bold hover:bg-emerald-600 transition-colors disabled:opacity-50"
                 >
                   {saving ? (
@@ -874,7 +893,9 @@ export default function CierreCajaWizard({
             </button>
             <button
               onClick={() => setStep(s => s + 1)}
-              className="flex items-center gap-1 px-4 py-2 rounded-lg bg-emerald-500 text-white text-sm font-medium hover:bg-emerald-600"
+              disabled={contadoCapturado === null}
+              title={contadoCapturado === null ? 'Escribe cuanto efectivo hay en caja' : undefined}
+              className="flex items-center gap-1 px-4 py-2 rounded-lg bg-emerald-500 text-white text-sm font-medium hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Siguiente <ArrowRight size={16} />
             </button>

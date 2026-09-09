@@ -146,3 +146,90 @@ export function evaluarAperturaDeTurno(lectura: LecturaDeCuentas): VeredictoAper
 export function totalDeCuentas(cuentas: OpenOrder[]): number {
   return cuentas.reduce((acc, c) => acc + (Number(c.total) || 0), 0)
 }
+
+// ─── El arqueo de caja: lo que la pantalla prometía y no cumplía ─────────────
+//
+// Encontrado el 2026-09-08, leyendo `pos_cierres` de AMALAY en la caja real:
+//
+//   folio_z  fecha        total_ventas  total_contado  diferencia
+//        3   2026-09-03      5,957.76           0.00   -5,957.76
+//        4   2026-09-05           0.00          0.00       -1.00
+//   ...y así los OCHO cierres que existen, desde julio. `total_contado` = 0
+//   en todos, sin una sola excepción, y ninguno con nota.
+//
+// La causa no era que nadie contara el efectivo. Era el propio wizard:
+//
+//   1. `CierreCajaWizard.tsx:200` — `Number(cashInput) || 0`. El campo del paso 1
+//      no era obligatorio y el botón "Siguiente" no validaba nada, así que
+//      avanzar sin escribir dejaba un 0 que se ve igual que un 0 contado.
+//   2. `CierreCajaWizard.tsx:784` — con diferencia > $50 la pantalla decía
+//      "requiere explicacion"… junto a un campo rotulado "Notas (opcional)", y el
+//      botón de cerrar sólo pedía `pin.length >= 4`. La explicación se anunciaba
+//      y no se exigía.
+//
+// Una alerta que se puede ignorar con un clic no es un control: es decoración que
+// además enseña a ignorar las alertas de verdad. El corte de caja existe para
+// detectar un faltante; aceptando 0 en silencio detectaba exactamente nada.
+//
+// El patrón correcto ya vivía en este archivo — `validateEscalationNota`, que sí
+// bloquea el cierre con órdenes abiertas. Esto sólo lo aplica al dinero.
+
+/** Arriba de esto, la diferencia deja de ser redondeo y hay que explicarla. */
+export const UMBRAL_EXPLICACION_MXN = 50
+
+export interface VeredictoArqueo {
+  /** ¿Se puede cerrar la caja con lo capturado? */
+  puedeCerrar: boolean
+  /** ¿La diferencia obliga a escribir una explicación? */
+  exigeExplicacion: boolean
+  /** Qué le falta al cajero. `null` si no falta nada. */
+  motivo: string | null
+}
+
+/**
+ * ¿Se puede cerrar la caja?
+ *
+ * `contado` es `null` cuando el campo se dejó VACÍO. Es deliberado que sea
+ * distinto de `0`: "no conté" y "conté y no había nada" son hechos distintos, y
+ * confundirlos es lo que produjo ocho cierres con el mismo cero mudo. Un cero
+ * escrito a mano es una afirmación; un cero por omisión no dice nada.
+ *
+ * Pura: no toca red ni estado. Toda la política vive aquí para poder probarla sin
+ * montar el componente — que además es lo único posible hoy, porque el carril de
+ * jsdom está declarado y sin instalar.
+ */
+export function evaluarArqueo(contado: number | null, diferencia: number, nota: string): VeredictoArqueo {
+  if (contado === null || !Number.isFinite(contado)) {
+    return {
+      puedeCerrar: false,
+      exigeExplicacion: false,
+      motivo: 'Escribe cuánto efectivo hay en caja. Si no hay nada, escribe 0.',
+    }
+  }
+  if (contado < 0) {
+    return { puedeCerrar: false, exigeExplicacion: false, motivo: 'El efectivo contado no puede ser negativo.' }
+  }
+
+  const exigeExplicacion = Math.abs(diferencia) > UMBRAL_EXPLICACION_MXN
+  if (!exigeExplicacion) return { puedeCerrar: true, exigeExplicacion: false, motivo: null }
+
+  // Se reusa la misma regla que ya gobierna la escalación por órdenes abiertas,
+  // para que "explicar" signifique lo mismo en las dos puertas del cierre.
+  const v = validateEscalationNota(nota)
+  if (!v.valid) {
+    return {
+      puedeCerrar: false,
+      exigeExplicacion: true,
+      motivo: `Diferencia de más de $${UMBRAL_EXPLICACION_MXN} — ${v.error}`,
+    }
+  }
+  return { puedeCerrar: true, exigeExplicacion: true, motivo: null }
+}
+
+/** Lee el campo de texto del arqueo. Vacío o basura -> `null`, nunca 0. */
+export function leerContado(entrada: string): number | null {
+  const t = entrada.trim()
+  if (!t) return null
+  const n = Number(t)
+  return Number.isFinite(n) ? n : null
+}
