@@ -125,7 +125,14 @@ def make_order(seq, turno_id):
     for idx in range(n_items):
         menu_item_id, nombre, precio, est = random.choice(carta)
         cant = random.randint(1, 3)
-        item = {"nombre": nombre, "precio": precio, "cantidad": cant, "estacion": est}
+        # `subtotal` lo escribe el POS real en cada renglón y el simulador no lo mandaba.
+        # No es cosmético: `ops_consumo_cobertura` pondera la cobertura de recetas POR
+        # IMPORTE, y sin este campo `pct_importe_con_receta` sale NULL — se pierde el
+        # denominador que evita confundir "catálogo incompleto" con merma. Medido el
+        # 2026-09-09: amalay 80/80 renglones con subtotal, chickin-demo 46/46, demo 1/138.
+        # Sin modificadores, subtotal = precio × cantidad (el POS suma `precioExtra`).
+        item = {"nombre": nombre, "precio": precio, "cantidad": cant,
+                "subtotal": round(precio * cant, 2), "estacion": est}
         if menu_item_id:
             # La identidad que exige `r1_reconcile_order`. Su STEP 4 hace:
             #     IF v_item_id IS NULL OR v_menu_item_id IS NULL THEN CONTINUE;
