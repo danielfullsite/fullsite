@@ -303,3 +303,132 @@ export function evaluarAvisoDeHuerfanas(
            `sin cerrar de un cierre anterior${nota ? ` (motivo: ${nota})` : ''}. Búscalas en el mapa de mesas.`,
   }
 }
+
+// ─── El fondo de apertura no se confrontaba con nada ─────────────────────────
+//
+// Encontrado el 2026-09-09 leyendo `pos_turnos` y `pos_cierres` de AMALAY.
+//
+// Quien abre el turno teclea el fondo de caja y el sistema lo cree. Nadie lo
+// compara contra lo que el cierre anterior dejó CONTADO, y no hay ningún registro
+// de lo que pasó en medio. En los datos reales:
+//
+//   Z#3, 2026-09-03 03:27   total_contado = 0
+//   turno mtljbu4i0tsm, ese mismo día 13:02, fondo_inicial = 1
+//
+// Ese peso apareció de la nada y nadie lo notó. Con las cifras de un restaurante
+// de verdad, la ventana entre un corte y la siguiente apertura es el único tramo
+// del día donde el efectivo NO tiene contabilidad: se puede ir cualquier cantidad
+// y el sistema arranca el turno siguiente como si el número tecleado fuera un
+// hecho.
+//
+// POR QUÉ NO BASTA CON RESTAR Y BLOQUEAR. Que el fondo NO coincida con el conteo
+// anterior es lo NORMAL: al cerrar, el gerente se lleva la venta a la caja fuerte
+// o al banco y deja el fondo. La diferencia legítima es el depósito. Lo que está
+// mal no es que difieran — es que difieren EN SILENCIO.
+//
+// Por eso esto exige una explicación, no una coincidencia. Arriba del umbral hay
+// que escribir a dónde se fue el dinero, con la misma regla de nota que ya
+// gobierna el cierre. Abajo del umbral se abre y ya.
+//
+// Y NUNCA BLOQUEA POR NO HABER PODIDO LEER. Si el cierre anterior no se pudo
+// consultar (sin red, 401, timeout), se abre igual y se avisa. Trabar el arranque
+// del día por un fetch fallido es el error del 2026-08-31: un fallo leído como si
+// fuera un hecho. Misma postura que `evaluarAperturaDeTurno`, tres funciones
+// arriba.
+
+/** Lo último que el cierre anterior dejó contado en el cajón. */
+export interface CierreAnterior {
+  /** `total_contado` de ese cierre: el efectivo que se contó al terminar. */
+  contado: number
+  fecha: string
+  closedBy: string
+  folioZ: number | null
+}
+
+export type LecturaDelCierreAnterior =
+  /** El servidor contestó. `cierre` es `null` cuando de verdad no hay ninguno. */
+  | { determinado: true; cierre: CierreAnterior | null }
+  /** No se pudo saber. NO es lo mismo que "no hay cierre anterior". */
+  | { determinado: false; motivo: string }
+
+export interface VeredictoDelFondo {
+  /** ¿Se puede abrir el turno con lo capturado? */
+  puedeAbrir: boolean
+  /** Fondo declarado − lo que dejó contado el cierre. `null` = no hay con qué comparar. */
+  diferencia: number | null
+  /** ¿La diferencia obliga a escribir a dónde se fue el dinero? */
+  exigeExplicacion: boolean
+  /** Qué le falta al operador para poder abrir. `null` si no falta nada. */
+  motivo: string | null
+  /** Qué hay que enseñarle aunque pueda abrir. `null` si no hay nada que decir. */
+  aviso: string | null
+}
+
+/**
+ * ¿Se puede abrir el turno con este fondo?
+ *
+ * `fondo` es `null` cuando el campo se dejó vacío o trae basura — igual que en
+ * `evaluarArqueo`, "no escribí" y "escribí 0" son hechos distintos.
+ *
+ * Pura: no toca red ni estado.
+ */
+export function evaluarFondoDeApertura(
+  fondo: number | null,
+  lectura: LecturaDelCierreAnterior,
+  nota: string,
+): VeredictoDelFondo {
+  if (fondo === null || !Number.isFinite(fondo)) {
+    return {
+      puedeAbrir: false, diferencia: null, exigeExplicacion: false,
+      motivo: 'Cuenta el efectivo del cajón y escribe cuánto hay. Si no hay nada, escribe 0.',
+      aviso: null,
+    }
+  }
+  if (fondo < 0) {
+    return {
+      puedeAbrir: false, diferencia: null, exigeExplicacion: false,
+      motivo: 'El fondo no puede ser negativo.', aviso: null,
+    }
+  }
+
+  if (!lectura.determinado) {
+    return {
+      puedeAbrir: true, diferencia: null, exigeExplicacion: false, motivo: null,
+      aviso: `No se pudo leer el último corte (${lectura.motivo}), así que este fondo no se ` +
+             `comparó con nada. Anótalo en papel por si mañana hay que explicar una diferencia.`,
+    }
+  }
+
+  if (lectura.cierre === null) {
+    // Primer turno de la vida del restaurante: no hay contra qué confrontar y no
+    // hay nada sospechoso en eso.
+    return { puedeAbrir: true, diferencia: null, exigeExplicacion: false, motivo: null, aviso: null }
+  }
+
+  const { contado, fecha, folioZ } = lectura.cierre
+  const diferencia = fondo - contado
+  const referencia = folioZ ? `El corte Z#${folioZ} del ${fecha}` : `El último corte (${fecha})`
+
+  if (Math.abs(diferencia) <= UMBRAL_EXPLICACION_MXN) {
+    return {
+      puedeAbrir: true, diferencia, exigeExplicacion: false, motivo: null,
+      aviso: `${referencia} dejó $${contado.toFixed(2)} contados en el cajón.`,
+    }
+  }
+
+  const falta = diferencia < 0
+  const aviso =
+    `${referencia} dejó $${contado.toFixed(2)} contados y estás abriendo con $${fondo.toFixed(2)}: ` +
+    `${falta ? 'faltan' : 'sobran'} $${Math.abs(diferencia).toFixed(2)}. ` +
+    `${falta ? 'Si el gerente se llevó la venta al banco, escríbelo.' : 'Escribe de dónde salió ese dinero.'}`
+
+  const v = validateEscalationNota(nota)
+  if (!v.valid) {
+    return {
+      puedeAbrir: false, diferencia, exigeExplicacion: true,
+      motivo: `Diferencia de más de $${UMBRAL_EXPLICACION_MXN} contra el corte anterior — ${v.error}`,
+      aviso,
+    }
+  }
+  return { puedeAbrir: true, diferencia, exigeExplicacion: true, motivo: null, aviso }
+}

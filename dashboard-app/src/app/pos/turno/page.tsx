@@ -9,7 +9,10 @@ import { getActiveClientSlug as _cid } from '@/lib/data'
 import { cacheTurno, getCachedActiveTurno, getCachedOrdersByTurno } from '@/lib/pos-offline-db'
 import { leerSalon, requiereCaja } from '@/lib/pedro-cliente'
 import TurnoDeCaja from '@/components/pos/TurnoDeCaja'
-import { evaluarAvisoDeHuerfanas, OPEN_ORDER_STATUSES, type AvisoDeHuerfanas } from '@/lib/pos-cierre-guard'
+import {
+  evaluarAvisoDeHuerfanas, OPEN_ORDER_STATUSES, evaluarFondoDeApertura, leerContado,
+  type AvisoDeHuerfanas, type LecturaDelCierreAnterior,
+} from '@/lib/pos-cierre-guard'
 
 const StaffShiftPanel = dynamic(() => import('@/components/pos/StaffShiftPanel'), { ssr: false })
 const CierreCajaWizard = dynamic(() => import('@/components/pos/CierreCajaWizard'), { ssr: false })
@@ -333,6 +336,20 @@ function TurnoPageLegacy() {
   // Open shift state
   const [fondoInicial, setFondoInicial] = useState('')
   const [openedBy, setOpenedBy] = useState('')
+  /**
+   * EL DINERO ENTRE UN CORTE Y LA SIGUIENTE APERTURA NO TENIA CONTABILIDAD.
+   *
+   * El fondo se tecleaba y el sistema lo creia. Nadie lo comparaba contra lo que
+   * el corte anterior dejo CONTADO, y ese tramo es el unico del dia donde el
+   * efectivo no le rinde cuentas a nadie. Aqui se lee el ultimo cierre para poder
+   * confrontarlo; `evaluarFondoDeApertura` decide que hacer con la diferencia.
+   *
+   * Arranca en `determinado: false` a proposito: hasta que el servidor conteste,
+   * lo honesto es "no se sabe", no "no hay cierre anterior".
+   */
+  const [cierreAnterior, setCierreAnterior] = useState<LecturaDelCierreAnterior>(
+    { determinado: false, motivo: 'todavía cargando' })
+  const [notaDelFondo, setNotaDelFondo] = useState('')
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000) }
 
@@ -409,6 +426,52 @@ function TurnoPageLegacy() {
 
   useEffect(() => { fetchTurno() }, [])
 
+  // Lo que el corte anterior dejó contado. Se pide una sola vez al montar; si no
+  // se puede leer, la lectura se queda `determinado: false` y la apertura sigue
+  // permitida — el día no se traba por un fetch (misma regla que TurnoGate).
+  useEffect(() => {
+    let vivo = true
+    async function leerUltimoCierre() {
+      const base = `${SUPABASE_URL}/rest/v1/pos_cierres?client_id=eq.${_cid()}&order=created_at.desc&limit=1&select=fecha,total_contado,closed_by`
+      try {
+        // `folio_z` puede no existir en una base sin la migración: PostgREST
+        // rechaza el select entero, así que se reintenta sin él. Mismo patrón que
+        // HistorialCierres, arriba.
+        let res = await fetch(`${base},folio_z`, {
+          headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+          cache: 'no-store', signal: AbortSignal.timeout(5000),
+        })
+        if (!res.ok) res = await fetch(base, {
+          headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+          cache: 'no-store', signal: AbortSignal.timeout(5000),
+        })
+        if (!res.ok) {
+          if (vivo) setCierreAnterior({ determinado: false, motivo: `el servidor respondió ${res.status}` })
+          return
+        }
+        const filas = await res.json()
+        if (!vivo) return
+        const c = Array.isArray(filas) ? filas[0] : null
+        setCierreAnterior({
+          determinado: true,
+          cierre: c ? {
+            // PostgREST devuelve numeric como STRING. Sin Number() esto compara texto.
+            contado: Number(c.total_contado) || 0,
+            fecha: String(c.fecha), closedBy: String(c.closed_by || ''),
+            folioZ: c.folio_z ?? null,
+          } : null,
+        })
+      } catch {
+        if (vivo) setCierreAnterior({ determinado: false, motivo: 'sin conexión' })
+      }
+    }
+    leerUltimoCierre()
+    return () => { vivo = false }
+  }, [])
+
+  const veredictoDelFondo = evaluarFondoDeApertura(
+    leerContado(fondoInicial), cierreAnterior, notaDelFondo)
+
   /**
    * VERDAD ÚNICA DEL TURNO. Antes esta página tenía SU PROPIA apertura
    * (crypto.randomUUID + IndexedDB + su propia cola), invisible para TurnoGate,
@@ -421,8 +484,14 @@ function TurnoPageLegacy() {
    * fuente de verdad paralela.
    */
   const handleOpenTurno = async () => {
-    if (!openedBy.trim() || !fondoInicial) return
-    const fondo = Number(fondoInicial)
+    if (!openedBy.trim()) return
+    // El botón ya está deshabilitado, pero la puerta se cierra aquí también: un
+    // Enter o un doble toque no deben poder saltarse la confrontación del fondo.
+    if (!veredictoDelFondo.puedeAbrir) {
+      showToast(veredictoDelFondo.motivo || 'Revisa el fondo de caja.')
+      return
+    }
+    const fondo = leerContado(fondoInicial) ?? 0
     try {
     const turno = await openTurno(fondo, openedBy)
     if (!turno) {
@@ -437,7 +506,25 @@ function TurnoPageLegacy() {
       synced_at: sincronizado ? new Date().toISOString() : undefined,
     })
 
-    logAudit({ action: 'status_changed', actor: openedBy, details: { type: 'turno_opened', fondo, turno_id: turno.id, sincronizado } })
+    // LA CONFRONTACION QUEDA ESCRITA, NO SOLO EN PANTALLA.
+    //
+    // `logAudit` encola en IndexedDB cuando falla la red, asi que el rastro
+    // sobrevive a una apertura offline. Va por aqui y no por `pos_turnos.notas`
+    // porque en modo Caja el turno lo crea Pedro con el comando TURN_OPEN, que
+    // solo lleva `opening_cash_cents`: meter la nota ahi obligaria a cambiar el
+    // contrato del local-server y a reinstalar. La auditoria funciona en los dos
+    // caminos sin tocar nada.
+    logAudit({
+      action: 'status_changed', actor: openedBy,
+      reason: notaDelFondo.trim() || undefined,
+      details: {
+        type: 'turno_opened', fondo, turno_id: turno.id, sincronizado,
+        contado_al_cerrar: cierreAnterior.determinado ? (cierreAnterior.cierre?.contado ?? null) : null,
+        diferencia_contra_cierre: veredictoDelFondo.diferencia,
+        confrontado: cierreAnterior.determinado,
+        explicacion: notaDelFondo.trim() || null,
+      },
+    })
     // No se "dice" confirmado lo que solo quedó local: el operador ve la diferencia.
     showToast(sincronizado
       ? `Turno abierto — Fondo: ${formatMXN(fondo)}`
@@ -449,6 +536,7 @@ function TurnoPageLegacy() {
     })
     setFondoInicial('')
     setOpenedBy('')
+    setNotaDelFondo('')
     } catch (e) { showToast(e instanceof Error ? e.message : 'Caja no confirmó la apertura de turno.') }
   }
 
@@ -644,9 +732,38 @@ function TurnoPageLegacy() {
                         className="w-full bg-[var(--line)] border border-[var(--line)] rounded-lg px-4 py-3 text-[var(--text-1)] text-lg text-center focus:outline-none focus:border-blue-500"
                       />
                     </div>
+                    {/* LO QUE DEJO EL CORTE ANTERIOR, ENFRENTE DEL NUMERO QUE SE ESTA TECLEANDO.
+                        Que el fondo NO coincida es NORMAL -- el gerente se lleva la venta al
+                        banco. Lo que estaba mal era que no coincidiera EN SILENCIO. */}
+                    {veredictoDelFondo.aviso && (
+                      <div className={`rounded-xl p-3 text-sm border ${
+                        veredictoDelFondo.exigeExplicacion
+                          ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                          : 'bg-[var(--surface-2)] border-[var(--line)] text-[var(--text-3)]'
+                      }`}>
+                        {veredictoDelFondo.aviso}
+                      </div>
+                    )}
+                    {veredictoDelFondo.exigeExplicacion && (
+                      <div>
+                        <label className="text-sm text-amber-400 block mb-1">
+                          ¿A dónde se fue (o de dónde salió) la diferencia?
+                        </label>
+                        <textarea
+                          value={notaDelFondo}
+                          onChange={e => setNotaDelFondo(e.target.value)}
+                          rows={2}
+                          placeholder="Ej: el gerente depositó $2,000 en el banco al cerrar"
+                          className="w-full bg-[var(--line)] border border-[var(--line)] rounded-lg px-4 py-3 text-[var(--text-1)] text-sm focus:outline-none focus:border-amber-500 resize-none"
+                        />
+                      </div>
+                    )}
+                    {veredictoDelFondo.motivo && fondoInicial.trim() !== '' && (
+                      <p className="text-xs text-amber-400">{veredictoDelFondo.motivo}</p>
+                    )}
                     <button
                       onClick={handleOpenTurno}
-                      disabled={!openedBy.trim() || !fondoInicial}
+                      disabled={!openedBy.trim() || !veredictoDelFondo.puedeAbrir}
                       className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 disabled:bg-[var(--line)] disabled:text-[var(--text-3)] text-white font-bold rounded-xl text-lg transition-colors"
                     >
                       Abrir turno
