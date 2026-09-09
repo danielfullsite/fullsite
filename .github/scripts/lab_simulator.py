@@ -22,6 +22,7 @@ from datetime import datetime, timezone
 sys.path.insert(0, os.path.dirname(__file__))
 from agent_common import sb_get, sb_post, sb_patch, log_run
 import pos_client
+import pos_turno
 
 CLIENT_ID = os.environ.get("CLIENT_ID", "lab-resto")
 IVA_RATE = 0.16
@@ -93,7 +94,21 @@ def menu_del_tenant():
     return _menu_cache
 
 
-def make_order(seq):
+def turno_sintetico_del_lab():
+    """El turno inventado con el que lab-resto lleva meses escribiendo DIRECTO a la tabla.
+
+    Sirve ahí y sólo ahí: `pos_orders` únicamente exige que el campo no sea nulo
+    (constraint `orders_require_turno`), y lab-resto no tiene una sola fila en
+    `pos_turnos`. Por el camino real del POS este id es lo que producía el 409
+    `TURN_NOT_FOUND` — ese camino resuelve el turno con `pos_turno.turno_vigente()`.
+
+    Se conserva para no alterar la línea base del laboratorio, que es lo único que
+    depende de la escritura directa.
+    """
+    return f"lab-turno-{datetime.now(timezone.utc).strftime('%Y%m%d')}"
+
+
+def make_order(seq, turno_id):
     carta = menu_del_tenant()
     n_items = random.randint(2, 5)
     items = []
@@ -105,14 +120,12 @@ def make_order(seq):
     iva = round(subtotal * IVA_RATE, 2)
     total = round(subtotal + iva, 2)
     oid = f"lab-{int(time.time()*1000)}-{seq}-{random.randint(100,999)}"
-    # turno_id requerido por el constraint pos_orders_turno_id_check (salvo QR abierto).
-    turno = f"lab-turno-{datetime.now(timezone.utc).strftime('%Y%m%d')}"
     return {
         "id": oid, "client_id": CLIENT_ID, "mesa": random.randint(1, 24),
         "mesero": random.choice(MESEROS), "personas": random.randint(1, 6),
         "status": "abierta", "subtotal": subtotal, "iva": iva, "total": total,
         "descuento": 0, "items": items, "kds_item_status": {},
-        "turno_id": turno,
+        "turno_id": turno_id,
         "order_number": next_order_number() + seq, "created_at": now_iso(),
     }
 
@@ -173,7 +186,7 @@ def factor_de_la_hora() -> float:
     return CURVA_RESTAURANTE[hora % 24]
 
 
-def ciclo_por_el_pos(token: str, factor: float) -> tuple[int, int, int]:
+def ciclo_por_el_pos(token: str, factor: float, operador: str) -> tuple[int, int, int]:
     """Un servicio completo POR EL CAMINO REAL: crear → cocina → cobrar, vía save-order.
 
     Cada paso pasa por api/pos/save-order, que es donde vive el descuento de inventario
@@ -186,9 +199,18 @@ def ciclo_por_el_pos(token: str, factor: float) -> tuple[int, int, int]:
     """
     creadas = avanzadas = cobradas = 0
     n = 0 if factor == 0.0 else max(1, round(random.randint(2, 5) * factor))
+    if n == 0:
+        # Cerrado. No se resuelve el turno a propósito: abrir uno a las 3 de la mañana
+        # le inventaría al demo un corte que ningún restaurante habría abierto.
+        return 0, 0, 0
+
+    # El turno se resuelve UNA vez por corrida, como una terminal al arrancar: todas las
+    # órdenes del servicio cuelgan del mismo corte. Antes se inventaba uno por orden y
+    # `save-order` las rechazaba TODAS con TURN_NOT_FOUND (409).
+    turno = pos_turno.turno_vigente(CLIENT_ID, operador)
 
     for s in range(n):
-        orden = make_order(s)
+        orden = make_order(s, turno)
         oid = orden["id"]
         base = {
             "order_id": oid, "mesa": orden["mesa"], "mesero": orden["mesero"],
@@ -236,8 +258,11 @@ def main():
         # Apagado por omisión: lab-resto lleva meses con la escritura directa y este
         # cambio no debe alterarlo. Se enciende por tenant, desde el workflow.
         if os.environ.get("VIA_POS", "").strip().lower() in ("1", "true", "si", "sí"):
-            token, _ = pos_client.autenticar(CLIENT_ID, os.environ.get("POS_PIN", ""))
-            created, advanced, closed = ciclo_por_el_pos(token, factor)
+            # El turno se abre y se cierra a nombre de quien tecleó el PIN — igual que
+            # en la terminal, donde TurnoGate llama `openTurno(fondo, staff.name)`.
+            token, staff = pos_client.autenticar(CLIENT_ID, os.environ.get("POS_PIN", ""))
+            operador = staff.get("name") or "POS"
+            created, advanced, closed = ciclo_por_el_pos(token, factor, operador)
             dur = int((time.time() - start) * 1000)
             estado = "cerrado" if factor == 0.0 else f"factor {factor:.1f}"
             summary = (f"[{CLIENT_ID}] vía POS · {estado} · +{created} órdenes, "
@@ -256,7 +281,7 @@ def main():
             n_new = max(1, round(random.randint(4, 9) * factor))
         base_seq = 0
         for s in range(n_new):
-            order = make_order(base_seq + s)
+            order = make_order(base_seq + s, turno_sintetico_del_lab())
             sb_post("pos_orders", order)
             created += 1
 

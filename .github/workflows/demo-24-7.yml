@@ -102,6 +102,7 @@ jobs:
       - run: python .github/scripts/test_curva_horaria.py
       - run: python .github/scripts/test_menu_del_tenant.py
       - run: python .github/scripts/test_pos_client.py
+      - run: python .github/scripts/test_pos_turno.py
 
       - name: Comprobar que el PIN esta puesto
         run: |
@@ -131,7 +132,10 @@ jobs:
           # que truena saldria en verde con el error escondido en el log — la misma clase
           # de falso verde que este PR corrige.
           set -o pipefail
-          python .github/scripts/lab_simulator.py | tee /tmp/lab-simulator.log
+          # `2>&1`: las órdenes RECHAZADAS se imprimen en stderr, que el pipe NO capturaba.
+          # El log se quedaba con la mitad de la historia justo en la mitad que importa —
+          # la guarda de abajo y el resumen leen de este archivo.
+          python .github/scripts/lab_simulator.py 2>&1 | tee /tmp/lab-simulator.log
 
       - name: Resumen
         if: always()
@@ -146,3 +150,24 @@ jobs:
           # La cuenta de órdenes sólo vivía en el log del simulador. Subirla al resumen es
           # lo que deja ver de un vistazo si la corrida ejercitó algo o salió verde en vacío.
           grep -F 'órdenes,' /tmp/lab-simulator.log 2>/dev/null | tail -1 >> "$GITHUB_STEP_SUMMARY" || true
+          # El turno con el que se trabajó — reutilizado, auto-cerrado o recién abierto.
+          grep -F '[turno]' /tmp/lab-simulator.log 2>/dev/null >> "$GITHUB_STEP_SUMMARY" || true
+
+      - name: Una corrida forzada que no crea nada es un fallo
+        if: github.event.inputs.forzar_horario == 'true'
+        run: |
+          # Con la curva apagada SIEMPRE se deben crear órdenes. Si salen cero, el POS
+          # las está rechazando y la corrida sería otro verde en vacío — que es como
+          # el 409 TURN_NOT_FOUND pasó semanas sin que nadie lo viera (corrida
+          # 34324277618: 4 intentadas, 4 rechazadas, `success`).
+          #
+          # El cron NO lleva esta guarda: ahí cero órdenes en franja cerrada es correcto.
+          if grep -q 'RECHAZADA' /tmp/lab-simulator.log; then
+            echo "::error::el POS rechazó órdenes — revisa el log del simulador"
+            grep -F 'RECHAZADA' /tmp/lab-simulator.log | head -5
+            exit 1
+          fi
+          if grep -qE '\+0 órdenes' /tmp/lab-simulator.log; then
+            echo "::error::corrida forzada con 0 órdenes creadas. Verde en vacío."
+            exit 1
+          fi
