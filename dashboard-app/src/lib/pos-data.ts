@@ -685,11 +685,36 @@ export async function openTurno(fondoInicial: number, openedBy: string): Promise
       method: 'POST', headers: { ..._SB_HEADERS, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=representation' },
       body: JSON.stringify(body),
     })
+
+    // OTRA TERMINAL YA ABRIÓ EL TURNO. No es una falla: es la respuesta correcta.
+    //
+    // Con el índice `pos_turnos_uno_abierto_por_restaurante` (migración
+    // 20260909030000), un segundo terminal que intente abrir recibe 409 / 23505. Sin
+    // este bloque caería en el catch de abajo, que abre un turno LOCAL con OTRO id y lo
+    // encola — o sea que cambiaríamos dos turnos por un turno fantasma que no sincroniza
+    // nunca y con las comandas colgadas de él. Peor que el defecto original.
+    //
+    // Lo correcto es adoptar el que ya existe, que es lo mismo que hace el guard de
+    // arriba cuando sí alcanza a ver el turno ajeno. Aquí simplemente llegamos tarde.
+    if (res.status === 409 || res.status === 422) {
+      const yaAbierto = await getActiveTurno()
+      if (yaAbierto) {
+        olvidarTurnoPendiente()   // el id que preparamos ya no se va a usar
+        return { ...yaAbierto, sincronizado: true }
+      }
+      // 409 sin turno visible: no inventamos uno local con otro id, porque el índice lo
+      // volvería a rechazar en cada reintento. Que el operador lo vea.
+      throw new Error('Caja rechazó la apertura y no se pudo leer el turno abierto. Recarga la pantalla.')
+    }
+
     if (!res.ok) throw new Error('post failed')
     const rows = await res.json()
     cacheLocal()
     return { ...(rows[0] || localTurno), sincronizado: true }
-  } catch {
+  } catch (e) {
+    // Un conflicto ya se resolvió arriba; lo que llega aquí es red. Si el mensaje viene
+    // del bloque de conflicto, se propaga: abrir local ahí sería justo el error.
+    if (e instanceof Error && e.message.startsWith('Caja rechazó la apertura')) throw e
     // "Online" pero el POST falló (LAN degradada / timeout) — abrir local + encolar
     // en vez de bloquear el día con "Error al abrir turno".
     await queueForSync()
