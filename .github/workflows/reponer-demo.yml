@@ -1,0 +1,89 @@
+# El restaurante de pruebas recibe mercancía.
+#
+# PARA QUÉ
+# Desde que el simulador vende por el camino real, cada venta descuenta inventario y
+# `r1_reconcile_item` lo hace SIN tope ("allows negative"). El demo se vacía solo. Medido
+# el 2026-09-09 a ritmo de medio día: el primer insumo llegaba a cero en 8.7 días. Un
+# prospecto la semana entrante habría abierto el demo y visto el inventario en rojo.
+#
+# POR QUÉ DIARIO Y NO EN CADA CORRIDA
+# Rellenar cada hora dejaría el inventario clavado y el consumo invisible — se perdería
+# lo único nuevo que el demo puede enseñar. El script repone SÓLO lo que cayó bajo su
+# punto de reorden (4 días de cobertura), así que la mayoría de los días no escribe nada
+# y el demo enseña la curva completa: baja, entra mercancía, vuelve a bajar.
+#
+# HORARIO
+# 11:00 UTC = 5:00 en Monterrey, el arranque del día de venta. Es cuando un restaurante
+# recibe, y deja el inventario listo antes de que el simulador abra a las 7.
+
+name: Demo — reponer inventario
+
+on:
+  schedule:
+    - cron: '0 11 * * *'      # 5:00 en Monterrey, arranque del día de venta
+  workflow_dispatch:
+    inputs:
+      client_id:
+        description: 'Tenant de pruebas a reponer'
+        required: false
+        default: 'demo'
+
+concurrency:
+  # Que una reposición no se encime con otra: las dos leerían el mismo stock bajo y
+  # escribirían la entrada dos veces.
+  group: reponer-demo
+  cancel-in-progress: false
+
+jobs:
+  reponer:
+    runs-on: ubuntu-latest
+    env:
+      CLIENT_ID: ${{ github.event.inputs.client_id || 'demo' }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      TRIGGER_TYPE: ${{ github.event_name }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with: { python-version: '3.11' }
+      - run: pip install requests
+
+      - name: No tocar un restaurante real por accidente
+        run: |
+          # La misma lista blanca que el simulador y el sembrador. Regalarle inventario a
+          # un restaurante real le falsea el costo con el que fija precios.
+          case "$CLIENT_ID" in
+            demo|lab-resto|esqueleton-demo) echo "Tenant de pruebas: $CLIENT_ID" ;;
+            *) echo "::error::$CLIENT_ID no es un tenant de pruebas."
+               exit 1 ;;
+          esac
+
+      - run: python .github/scripts/test_reponer_demo.py
+
+      - name: Reponer
+        run: |
+          # `pipefail`: el shell de Actions es `bash -e {0}` y sin esto el código de
+          # salida sería el de `tee`. Una reposición que truena a la mitad saldría verde
+          # con el inventario a medio llenar.
+          set -o pipefail
+          python .github/scripts/reponer_demo.py 2>&1 | tee /tmp/reponer.log
+
+      - name: Resumen
+        if: always()
+        run: |
+          {
+            echo "Tenant: \`$CLIENT_ID\`"
+            echo ''
+            grep -F '[reponer]' /tmp/reponer.log 2>/dev/null || echo 'sin salida'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Que haya llegado a negativo es un aviso, no un detalle
+        if: always()
+        run: |
+          # Si un insumo tocó números negativos, la reposición lo levantó pero la ventana
+          # de 4 días ya no alcanza para el consumo real del demo. Se marca la corrida
+          # para que se vea, sin tumbarla: el inventario ya quedó bien.
+          if grep -q 'ATENCION' /tmp/reponer.log 2>/dev/null; then
+            echo "::warning::hubo inventario en negativo — el punto de reorden se quedó corto"
+            grep -F 'ATENCION' /tmp/reponer.log
+          fi
