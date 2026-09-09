@@ -226,13 +226,13 @@ class ElSimuladorMandaElTurnoResuelto(unittest.TestCase):
         with mock.patch.object(sim.pos_client, "guardar", guardar), \
                 mock.patch.object(sim.pos_turno, "turno_vigente", turno_vigente), \
                 mock.patch.object(sim, "menu_del_tenant",
-                                  lambda: [("Café", 45, "cocina")]), \
+                                  lambda: [("mi-cafe", "Café", 45, "cocina")]), \
                 mock.patch.object(sim, "next_order_number", lambda: 1), silencio():
             res = sim.ciclo_por_el_pos("token-falso", factor, "Ana García")
         return res, cuerpos, resueltos
 
     def test_todas_las_ordenes_llevan_el_turno_resuelto(self):
-        (creadas, _, cobradas), cuerpos, _ = self.correr(1.0)
+        (creadas, _, cobradas, _), cuerpos, _ = self.correr(1.0)
         self.assertGreater(creadas, 0, "no se creó ninguna orden")
         self.assertEqual(creadas, cobradas, "una orden creada debe quedar cobrada")
         self.assertTrue(cuerpos)
@@ -257,7 +257,8 @@ class ElSimuladorMandaElTurnoResuelto(unittest.TestCase):
         # factor 0.0 = franja cerrada de la curva. Abrir un corte a las 3 de la mañana
         # le inventaría al demo un turno que ningún restaurante habría abierto.
         res, cuerpos, resueltos = self.correr(0.0)
-        self.assertEqual(res, (0, 0, 0))
+        # El 4º valor son los estados de inventario de las órdenes cobradas: ninguna.
+        self.assertEqual(res, (0, 0, 0, []))
         self.assertEqual(cuerpos, [])
         self.assertEqual(resueltos, [], "resolvió turno con el restaurante cerrado")
 
@@ -270,8 +271,10 @@ class ElLabNoCambia(unittest.TestCase):
         self.assertRegex(t, r"^lab-turno-\d{8}$")
 
     def test_make_order_pone_el_turno_que_se_le_da(self):
+        # La carta es (menu_item_id, nombre, precio, estación): el id entró para que el
+        # reconciliador de inventario pueda encontrar la receta.
         with silencio(), mock.patch.object(sim, "menu_del_tenant",
-                                           lambda: [("Café", 45, "cocina")]), \
+                                           lambda: [("mi-1", "Café", 45, "cocina")]), \
                 mock.patch.object(sim, "next_order_number", lambda: 1):
             self.assertEqual(sim.make_order(0, "el-que-sea")["turno_id"], "el-que-sea")
 

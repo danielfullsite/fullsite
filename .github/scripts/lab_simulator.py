@@ -18,6 +18,7 @@ import sys
 import time
 import random
 from datetime import datetime, timezone
+from urllib.parse import quote
 
 sys.path.insert(0, os.path.dirname(__file__))
 from agent_common import sb_get, sb_post, sb_patch, log_run
@@ -70,27 +71,35 @@ _menu_cache = None
 
 
 def menu_del_tenant():
-    """[(nombre, precio, estación)] del restaurante, o el MENU de respaldo."""
+    """[(menu_item_id, nombre, precio, estación)] del restaurante, o el MENU de respaldo.
+
+    El `id` NO es decorativo: es por donde el reconciliador de inventario encuentra la
+    receta. `r1_reconcile_item` resuelve la política y la receta activa POR
+    `menu_item_id` — no por el nombre del platillo. Sin él la orden se cobra y no
+    consume un solo gramo.
+    """
     global _menu_cache
     if _menu_cache is not None:
         return _menu_cache
     try:
         filas = sb_get(
             "pos_menu_items",
-            f"client_id=eq.{CLIENT_ID}&active=eq.true&select=name,price&limit=200",
+            f"client_id=eq.{CLIENT_ID}&active=eq.true&select=id,name,price&limit=200",
         )
-        propio = [(f["name"], float(f["price"]), "cocina")
-                  for f in filas if f.get("name") and f.get("price")]
+        propio = [(f["id"], f["name"], float(f["price"]), "cocina")
+                  for f in filas if f.get("id") and f.get("name") and f.get("price")]
         if propio:
             print(f"[lab-simulator] menú de {CLIENT_ID}: {len(propio)} platillos "
-                  f"(promedio ${sum(p for _, p, _ in propio)/len(propio):,.0f})")
+                  f"(promedio ${sum(p for _, _, p, _ in propio)/len(propio):,.0f})")
             _menu_cache = propio
             return _menu_cache
     except Exception as e:
         print(f"[lab-simulator] no se pudo leer el menú de {CLIENT_ID}: {e}", file=sys.stderr)
 
     print(f"[lab-simulator] {CLIENT_ID} no tiene menú propio — se usa el de respaldo")
-    _menu_cache = MENU
+    # Sin id: el menú de respaldo no existe en `pos_menu_items`. Es el caso de lab-resto,
+    # que escribe directo a la tabla y nunca pasa por el reconciliador.
+    _menu_cache = [(None, nombre, precio, est) for nombre, precio, est in MENU]
     return _menu_cache
 
 
@@ -112,14 +121,29 @@ def make_order(seq, turno_id):
     carta = menu_del_tenant()
     n_items = random.randint(2, 5)
     items = []
-    for _ in range(n_items):
-        nombre, precio, est = random.choice(carta)
+    oid = f"lab-{int(time.time()*1000)}-{seq}-{random.randint(100,999)}"
+    for idx in range(n_items):
+        menu_item_id, nombre, precio, est = random.choice(carta)
         cant = random.randint(1, 3)
-        items.append({"nombre": nombre, "precio": precio, "cantidad": cant, "estacion": est})
+        item = {"nombre": nombre, "precio": precio, "cantidad": cant, "estacion": est}
+        if menu_item_id:
+            # La identidad que exige `r1_reconcile_order`. Su STEP 4 hace:
+            #     IF v_item_id IS NULL OR v_menu_item_id IS NULL THEN CONTINUE;
+            # o sea, descarta el renglón como malformado SIN decir nada. Con los ítems
+            # de sólo {nombre, precio, cantidad, estacion} se descartaban TODOS: la RPC
+            # devolvía cero filas, `save-order` reportaba inventory_status=SKIPPED y la
+            # orden se cobraba sin descontar nada. Es la misma pareja que manda el POS
+            # real (pos/page.tsx:379 — `id: generateId(), menuItemId: item.id`).
+            #
+            # El `id` es por RENGLÓN, no por platillo: es la llave de idempotencia
+            # (client_id, order_id, order_item_id) con la que el reconciliador evita
+            # descontar dos veces la misma línea cuando la orden se guarda varias veces.
+            item["id"] = f"{oid}-{idx}"
+            item["menuItemId"] = menu_item_id
+        items.append(item)
     subtotal = sum(i["precio"] * i["cantidad"] for i in items)
     iva = round(subtotal * IVA_RATE, 2)
     total = round(subtotal + iva, 2)
-    oid = f"lab-{int(time.time()*1000)}-{seq}-{random.randint(100,999)}"
     return {
         "id": oid, "client_id": CLIENT_ID, "mesa": random.randint(1, 24),
         "mesero": random.choice(MESEROS), "personas": random.randint(1, 6),
@@ -186,7 +210,7 @@ def factor_de_la_hora() -> float:
     return CURVA_RESTAURANTE[hora % 24]
 
 
-def ciclo_por_el_pos(token: str, factor: float, operador: str) -> tuple[int, int, int]:
+def ciclo_por_el_pos(token: str, factor: float, operador: str) -> tuple[int, int, int, list[str]]:
     """Un servicio completo POR EL CAMINO REAL: crear → cocina → cobrar, vía save-order.
 
     Cada paso pasa por api/pos/save-order, que es donde vive el descuento de inventario
@@ -198,11 +222,14 @@ def ciclo_por_el_pos(token: str, factor: float, operador: str) -> tuple[int, int
     aquí ejercita ese mecanismo, que es justo lo que no se estaba probando.
     """
     creadas = avanzadas = cobradas = 0
+    # El estado del inventario de cada orden COBRADA. Se junta para poder decidir al
+    # final si la corrida sirvió: vender sin descontar no es un éxito.
+    estados: list[str] = []
     n = 0 if factor == 0.0 else max(1, round(random.randint(2, 5) * factor))
     if n == 0:
         # Cerrado. No se resuelve el turno a propósito: abrir uno a las 3 de la mañana
         # le inventaría al demo un corte que ningún restaurante habría abierto.
-        return 0, 0, 0
+        return 0, 0, 0, []
 
     # El turno se resuelve UNA vez por corrida, como una terminal al arrancar: todas las
     # órdenes del servicio cuelgan del mismo corte. Antes se inventaba uno por orden y
@@ -237,6 +264,7 @@ def ciclo_por_el_pos(token: str, factor: float, operador: str) -> tuple[int, int
                 "closed_at": now_iso(),
             })
             cobradas += 1
+            estados.append(r.get("inventory_status") or "SIN_ESTADO")
             print(f"[lab-simulator]   {oid[:24]} cobrada · {pos_client.diagnostico_inventario(r)}")
         except pos_client.ErrorPOS as e:
             # Una orden rechazada NO tumba el servicio: se reporta y se sigue. Pero se
@@ -244,7 +272,75 @@ def ciclo_por_el_pos(token: str, factor: float, operador: str) -> tuple[int, int
             # 2,813 órdenes que el POS real nunca habría aceptado.
             print(f"[lab-simulator]   RECHAZADA {oid[:24]}: {e}", file=sys.stderr)
 
-    return creadas, avanzadas, cobradas
+    return creadas, avanzadas, cobradas, estados
+
+
+# Los estados de `save-order` que significan "esta venta SÍ movió el inventario".
+# `COMPLETE` es el único: todos los renglones terminaron en RECONCILED o en
+# NO_MUTATION_APPROVED (un platillo que a propósito no consume inventario).
+INVENTARIO_SANO = {"COMPLETE"}
+
+# Qué significa cada estado malo, en el idioma del problema y no del código.
+POR_QUE_DUELE = {
+    "SKIPPED": "la RPC no recibió un solo renglón válido — a los ítems les falta "
+               "`id`/`menuItemId` y `r1_reconcile_order` los descarta como malformados",
+    "BLOCKED": "el renglón llegó bien, pero al platillo le falta política de inventario "
+               "o receta activa (pos_item_inventory_policy / pos_recipe_versions)",
+    "PENDING": "la reconciliación no terminó — la RPC falló o quedó a medias",
+    "SIN_ESTADO": "`save-order` no devolvió inventory_status",
+}
+
+
+def movimientos_de_inventario_desde(desde_iso: str) -> int:
+    """Filas nuevas en `pos_inventory_movements` del tenant desde ese instante.
+
+    Es la evidencia que no se puede fingir. `inventory_status` dice qué INTENTÓ hacer
+    `save-order`; esto dice qué quedó ESCRITO. Se imprime en cada corrida porque el
+    criterio de que el laboratorio sirve es justo ese: que este número deje de ser cero.
+
+    Devuelve -1 si no se pudo medir, para no reportar un cero que en realidad es un
+    "no sé" — que es como se ven los fallos silenciosos desde afuera.
+    """
+    try:
+        filas = sb_get(
+            "pos_inventory_movements",
+            # `quote`: el `+00:00` del ISO se leería como espacio dentro del query string.
+            f"client_id=eq.{CLIENT_ID}&created_at=gte.{quote(desde_iso, safe='')}"
+            f"&select=id&limit=1000",
+        )
+        return len(filas)
+    except Exception as e:
+        print(f"[lab-simulator] no se pudieron contar los movimientos de inventario: {e}",
+              file=sys.stderr)
+        return -1
+
+
+def reclamo_del_inventario(cobradas: int, estados: list[str]) -> str | None:
+    """El motivo por el que la corrida NO puede pasar como buena, o None si todo bien.
+
+    POR QUÉ ESTO ES UNA GUARDA Y NO UN AVISO
+    Vender sin descontar es un fallo silencioso perfecto: la corrida sale verde,
+    `pos_orders` crece y `pos_inventory_movements` se queda quieto. Así el demo llegó a
+    1,218 órdenes con CERO movimientos de inventario sin que nadie se enterara — y así
+    el 409 TURN_NOT_FOUND pasó semanas en verde. `docs/ai/ARQUITECTURA-CRUCE.md`, regla
+    10: fallar callado está prohibido.
+
+    Se mide por ESTADO, no por cantidad descontada. Un platillo marcado `non_inventory`
+    descuenta cero y está bien; lo que nunca está bien es que el renglón ni siquiera
+    llegue al reconciliador.
+    """
+    if cobradas == 0 or not estados:
+        return None
+    malos = [e for e in estados if e not in INVENTARIO_SANO]
+    if not malos:
+        return None
+    conteo = {e: malos.count(e) for e in dict.fromkeys(malos)}
+    detalle = "; ".join(
+        f"{n} orden(es) {e} — {POR_QUE_DUELE.get(e, 'estado no esperado')}"
+        for e, n in conteo.items()
+    )
+    return (f"{len(malos)} de {cobradas} órdenes se cobraron sin que el inventario "
+            f"quedara conciliado. {detalle}")
 
 
 def main():
@@ -262,12 +358,28 @@ def main():
             # en la terminal, donde TurnoGate llama `openTurno(fondo, staff.name)`.
             token, staff = pos_client.autenticar(CLIENT_ID, os.environ.get("POS_PIN", ""))
             operador = staff.get("name") or "POS"
-            created, advanced, closed = ciclo_por_el_pos(token, factor, operador)
+            # Se marca ANTES de vender para poder contar sólo lo que dejó esta corrida.
+            antes_de_vender = now_iso()
+            created, advanced, closed, estados_inv = ciclo_por_el_pos(token, factor, operador)
             dur = int((time.time() - start) * 1000)
             estado = "cerrado" if factor == 0.0 else f"factor {factor:.1f}"
+            movs = movimientos_de_inventario_desde(antes_de_vender) if closed else 0
+            cuanto = "no medido" if movs < 0 else f"{movs} movimiento(s) de inventario"
             summary = (f"[{CLIENT_ID}] vía POS · {estado} · +{created} órdenes, "
-                       f"{advanced} a cocina, {closed} cobradas")
+                       f"{advanced} a cocina, {closed} cobradas · {cuanto}")
             print(f"[lab-simulator] {summary}")
+
+            reclamo = reclamo_del_inventario(closed, estados_inv)
+            if reclamo:
+                # No se degrada a aviso: el laboratorio existe para ejercitar el camino
+                # completo (vender → descontar → detectar merma). Si la mitad de atrás no
+                # corrió, la corrida no probó lo que dice probar.
+                print(f"[lab-simulator] INVENTARIO SIN CONCILIAR: {reclamo}", file=sys.stderr)
+                log_run("lab-simulator", "error", dur, output_summary=summary,
+                        error_message=reclamo[:500], tentacle="lab",
+                        data_status="partial", rows_processed=created + advanced + closed)
+                sys.exit(1)
+
             log_run("lab-simulator", "success", dur, output_summary=summary,
                     tentacle="lab", rows_processed=created + advanced + closed)
             return
