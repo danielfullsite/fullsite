@@ -34,15 +34,34 @@ function sbHeaders() {
 // ─── HMAC verification ──────────────────────────────────────────────────────
 
 async function verifySignature(rawBody: string, sigHeader: string): Promise<boolean> {
-  const secret = process.env.UBER_WEBHOOK_SECRET
-  if (!secret) return false
-  const key = await crypto.subtle.importKey(
-    'raw', new TextEncoder().encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']
-  )
-  const hex = sigHeader.replace(/^sha256=/, '')
+  // Uber signs X-Uber-Signature as hex HMAC-SHA256 of the raw body. The signing key
+  // depends on the app/webhook config: for BASIC_HMAC webhooks it is the dashboard
+  // "Signing Key" (primary or secondary), and for classic Eats webhooks it is the app
+  // client secret. We try every configured candidate and accept if ANY matches, so the
+  // verifier is robust to which key Uber actually used (and to key rotation).
+  const candidates = [
+    process.env.UBER_WEBHOOK_SECRET,
+    process.env.UBER_WEBHOOK_SECRET_SECONDARY,
+    process.env.UBER_CLIENT_SECRET,
+    process.env.UBER_SANDBOX_CLIENT_SECRET,
+  ].filter((s): s is string => Boolean(s && s.trim()))
+  if (candidates.length === 0) return false
+
+  const hex = sigHeader.replace(/^sha256=/, '').trim()
   const sigBytes = Buffer.from(hex, 'hex')
-  return crypto.subtle.verify('HMAC', key, sigBytes, new TextEncoder().encode(rawBody))
+  if (sigBytes.length === 0) return false
+  const data = new TextEncoder().encode(rawBody)
+
+  for (const secret of candidates) {
+    try {
+      const key = await crypto.subtle.importKey(
+        'raw', new TextEncoder().encode(secret),
+        { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']
+      )
+      if (await crypto.subtle.verify('HMAC', key, sigBytes, data)) return true
+    } catch { /* try next candidate */ }
+  }
+  return false
 }
 
 // ─── Store → Client mapping (DB-only, no fallback) ───────────────────────────
