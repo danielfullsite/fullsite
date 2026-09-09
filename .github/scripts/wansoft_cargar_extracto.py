@@ -67,8 +67,11 @@ COLS_OPS = [
 
 
 def upsert(tabla: str, filas: list[dict], on_conflict: str) -> None:
-    """UPSERT en lotes. Levanta con el cuerpo del error — un backfill que falla callado
-    dejaría el hueco abierto y la corrida en verde."""
+    """UPSERT en lotes contra una llave única COMPLETA.
+
+    Levanta con el cuerpo del error — un backfill que falla callado dejaría el hueco
+    abierto y la corrida en verde.
+    """
     if not filas:
         return
     r = requests.post(
@@ -80,6 +83,56 @@ def upsert(tabla: str, filas: list[dict], on_conflict: str) -> None:
     )
     if not r.ok:
         raise RuntimeError(f"{tabla}: HTTP {r.status_code} — {(r.text or '')[:400]}")
+
+
+def upsert_por_indice_parcial(tabla: str, filas: list[dict], claves: list[str]) -> tuple[int, int]:
+    """UPSERT cuando la llave única es un índice PARCIAL. Devuelve (insertadas, actualizadas).
+
+    `ops_daily` tiene `uq_ops_daily_close` sobre (client_id, fecha, record_type) pero
+    sólo `WHERE record_type IN ('cierre','cierre_wansoft')`. Postgres no acepta un
+    ON CONFLICT contra un índice parcial sin repetir su predicado, y PostgREST no expone
+    esa cláusula: responde 42P10, "no unique or exclusion constraint matching".
+
+    Así que se hace a mano: se lee qué filas ya están, se actualizan ésas y se insertan
+    las demás. Idempotente — correrlo dos veces no duplica.
+    """
+    if not filas:
+        return (0, 0)
+
+    fechas = sorted({f["fecha"] for f in filas})
+    r = requests.get(
+        f"{SUPABASE_URL}/rest/v1/{tabla}",
+        headers=_H,
+        params={"select": ",".join(claves),
+                **{k: f"eq.{filas[0][k]}" for k in claves if k != "fecha"},
+                "fecha": f"in.({','.join(fechas)})"},
+        timeout=60,
+    )
+    if not r.ok:
+        raise RuntimeError(f"{tabla} (lectura previa): HTTP {r.status_code} — {(r.text or '')[:300]}")
+    ya_estan = {row["fecha"] for row in r.json()}
+
+    nuevas = [f for f in filas if f["fecha"] not in ya_estan]
+    if nuevas:
+        r = requests.post(
+            f"{SUPABASE_URL}/rest/v1/{tabla}",
+            headers={**_H, "Content-Type": "application/json", "Prefer": "return=minimal"},
+            json=nuevas, timeout=60,
+        )
+        if not r.ok:
+            raise RuntimeError(f"{tabla} (insert): HTTP {r.status_code} — {(r.text or '')[:400]}")
+
+    for f in (x for x in filas if x["fecha"] in ya_estan):
+        r = requests.patch(
+            f"{SUPABASE_URL}/rest/v1/{tabla}",
+            headers={**_H, "Content-Type": "application/json", "Prefer": "return=minimal"},
+            params={k: f"eq.{f[k]}" for k in claves},
+            json=f, timeout=30,
+        )
+        if not r.ok:
+            raise RuntimeError(f"{tabla} (update {f['fecha']}): HTTP {r.status_code} — {(r.text or '')[:300]}")
+
+    return (len(nuevas), len(ya_estan))
 
 
 def main() -> int:
@@ -134,8 +187,9 @@ def main() -> int:
     try:
         upsert("wansoft_daily", filas_w, "client_slug,fecha,report_type")
         print(f"[backfill] wansoft_daily: {len(filas_w)} filas")
-        upsert("ops_daily", filas_o, "client_id,fecha,record_type")
-        print(f"[backfill] ops_daily: {len(filas_o)} filas")
+        ins, upd = upsert_por_indice_parcial(
+            "ops_daily", filas_o, ["client_id", "fecha", "record_type"])
+        print(f"[backfill] ops_daily: {ins} nuevas, {upd} actualizadas")
     except Exception as e:
         ms = int((time.time() - inicio) * 1000)
         print(f"[backfill] ERROR: {e}", file=sys.stderr)
