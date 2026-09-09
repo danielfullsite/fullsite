@@ -109,7 +109,12 @@ def _validate(session: requests.Session, attempts: int = 3) -> bool:
     from datetime import datetime as _dt
     import time as _time
 
-    today = _dt.now().strftime("%m/%d/%Y")
+    # ISO, no %m/%d/%Y. Wansoft interpreta las fechas con barras como DD/MM/YYYY:
+    # mandarle "09/08/2026" le pide el 9 de AGOSTO, no el 8 de septiembre. Y cuando el
+    # "mes" queda entre 13 y 31 no falla — devuelve un agregado fijo ($640,602.40 el
+    # 2026-09-09), o sea datos plausibles de otro periodo. Verificado contra el portal:
+    # ISO 2026-08-09 y US 09/08/2026 devuelven exactamente el mismo total.
+    today = _dt.now().strftime("%Y-%m-%d")
     for i in range(attempts):
         try:
             r = session.post(
@@ -282,8 +287,9 @@ def main():
                 f"{WANSOFT_URL}/Reports/GetConsolidatedSales",
                 data={
                     "subsidiaryId": "6043",
-                    "startDate": datetime.now().strftime("%m/%d/%Y"),
-                    "endDate": datetime.now().strftime("%m/%d/%Y"),
+                    # ISO — ver la nota en _validate(): las barras se leen DD/MM/YYYY.
+                    "startDate": datetime.now().strftime("%Y-%m-%d"),
+                    "endDate": datetime.now().strftime("%Y-%m-%d"),
                 },
                 timeout=15,
             )
