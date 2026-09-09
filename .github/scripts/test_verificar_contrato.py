@@ -39,10 +39,17 @@ def persona(ventas, tickets, con_tiempo, sin_cierre, descartado,
             "ordenes_tiempo_descartado": descartado, "pct_efectivo": pct_efectivo}
 
 
-def correr(ordenes, horas, personal):
+def cobertura(vendidas, con_receta, pct=None, dia="2026-09-01"):
+    return {"dia_venta": dia, "lineas_vendidas": vendidas, "lineas_con_receta": con_receta,
+            "pct_lineas_con_receta": pct if pct is not None
+            else (100.0 * con_receta / vendidas if vendidas else None)}
+
+
+def correr(ordenes, horas, personal, cob=None):
     """Ejecuta verificar_tenant con respuestas fijas por tabla."""
     def fake(tabla, query):
-        return {"pos_orders": ordenes, "ops_hourly": horas, "ops_personal": personal}[tabla]
+        return {"pos_orders": ordenes, "ops_hourly": horas, "ops_personal": personal,
+                "ops_consumo_cobertura": cob if cob is not None else []}[tabla]
     with mock.patch.object(vc, "sb_get", side_effect=fake):
         return vc.verificar_tenant("t1", "2026-09-01")
 
@@ -102,6 +109,18 @@ class UnDescuadreRealSeMarca(unittest.TestCase):
         # que falta menos señal de la que falta — la mentira silenciosa.
         fallas = correr([orden(100.0)], [hora(100.0)], [persona(100.0, 5, 2, 1, 0)])
         self.assertTrue(any("cobertura" in f for f in fallas))
+
+    def test_mas_lineas_con_receta_que_vendidas(self):
+        # Imposible por construcción. Si sale, la cobertura está inflada y el detector
+        # de merma va a llamar faltante a lo que nadie capturó.
+        fallas = correr([orden(100.0)], [hora(100.0)], [persona(100.0, 1, 1, 0, 0)],
+                        cob=[cobertura(vendidas=10, con_receta=12)])
+        self.assertTrue(any("no puede pasar del 100%" in f for f in fallas))
+
+    def test_una_cobertura_sana_no_se_acusa(self):
+        fallas = correr([orden(100.0)], [hora(100.0)], [persona(100.0, 1, 1, 0, 0)],
+                        cob=[cobertura(vendidas=10, con_receta=4)])
+        self.assertEqual(fallas, [])
 
     def test_un_porcentaje_imposible(self):
         fallas = correr([orden(100.0)], [hora(100.0)],

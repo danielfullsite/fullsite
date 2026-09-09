@@ -133,6 +133,27 @@ def verificar_tenant(cid: str, desde: str) -> list[str]:
         if descuadra(got, esp):
             fallas.append(f"{cid} {dia}: ops_personal suma {got:.2f}, las órdenes suman {esp:.2f}")
 
+    # 5 — ops_consumo_cobertura. Es el denominador de ops_consumo, y un denominador que
+    # miente es peor que ninguno: un detector de merma que crea que hay más receta
+    # capturada de la que hay reporta como faltante lo que nadie capturó, y eso acusa a
+    # una persona. Sólo se comprueba lo que no puede opinar.
+    cobertura = sb_get(
+        "ops_consumo_cobertura",
+        f"client_id=eq.{cid}&dia_venta=gte.{desde}"
+        f"&select=dia_venta,lineas_vendidas,lineas_con_receta,pct_lineas_con_receta&limit=10000",
+    )
+    for c in cobertura:
+        vendidas = int(c.get("lineas_vendidas") or 0)
+        con_receta = int(c.get("lineas_con_receta") or 0)
+        if con_receta > vendidas:
+            fallas.append(
+                f"{cid} {c['dia_venta']}: {con_receta} líneas con receta de {vendidas} "
+                f"vendidas — la cobertura no puede pasar del 100%"
+            )
+        pct = c.get("pct_lineas_con_receta")
+        if pct is not None and not (0 <= float(pct) <= 100):
+            fallas.append(f"{cid} {c['dia_venta']}: pct_lineas_con_receta = {pct}")
+
     return fallas
 
 
