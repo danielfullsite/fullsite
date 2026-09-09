@@ -56,6 +56,22 @@ export function setActiveTimezone(tz: string | null | undefined): void {
  * Use instead of new Date() when you need the local calendar date.
  */
 export function nowMX(): Date {
+  // CUIDADO: EL INSTANTE DE ESTA FECHA NO ES EL REAL, Y ESO ES A PROPOSITO.
+  //
+  // `toLocaleString` da los numeros de PARED de la zona del negocio, y `new Date(str)`
+  // los reinterpreta como hora local del proceso. Resultado: los getters LOCALES
+  // (`getFullYear`, `getMonth`, `getDate`, `getHours`) devuelven el calendario correcto
+  // del negocio -- que es para lo que existe y como la usan `gastos` y `ventas`.
+  //
+  // Pero `getTime()` y `toISOString()` estan CORRIDOS por la diferencia entre la zona
+  // del proceso y la del negocio. Nunca uses esta fecha para:
+  //   - `.toISOString()` ni `.toISOString().split('T')[0]`  -> usa `todayMX()`
+  //   - comparar contra otro `Date` o restar milisegundos    -> usa `sumarDias()`
+  //   - mandarla a la base                                   -> usa `zonedStartOfDayISO()`
+  //
+  // Es el mismo idioma que le quitaba la comida al corte del dia (ver
+  // `el-corte-del-dia-cubre-el-dia.test.ts`). Aqui es correcto porque sus llamadores
+  // solo leen componentes locales, y el contrato queda anclado en `date-mx.test.ts`.
   return new Date(new Date().toLocaleString('en-US', { timeZone: getActiveTimezone() }))
 }
 
@@ -65,6 +81,43 @@ export function nowMX(): Date {
  */
 export function fmtDateMX(d: Date): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: getActiveTimezone() }).format(d)
+}
+
+/**
+ * YYYY-MM-DD de un instante en una zona EXPLICITA.
+ *
+ * El encabezado de este archivo nombraba esto como follow-up: "Servidor / SSR cae al
+ * DEFAULT. Resolver la zona del tenant server-side (agentes, cron, algunas rutas API)
+ * requiere pasar la zona desde la config del cliente que ya cargan." Esto es esa
+ * funcion: no lee localStorage, asi que sirve igual en una ruta API que en el navegador.
+ *
+ * `fmtDateMX` sigue existiendo para el cliente, donde la zona se resuelve sola.
+ */
+export function fmtDateEnZona(d: Date, tz: string): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(d)
+}
+
+/** Hoy en una zona EXPLICITA, YYYY-MM-DD. Para servidor y agentes. */
+export function hoyEnZona(tz: string): string {
+  return fmtDateEnZona(new Date(), tz)
+}
+
+/**
+ * Suma (o resta) dias de CALENDARIO en una zona explicita, sobre una fecha YYYY-MM-DD.
+ *
+ * No se hace con `new Date(ms - 86400000)`: un dia no siempre dura 86,400,000 ms. En
+ * una zona con horario de verano --Tijuana lo conserva para alinearse con California--
+ * el dia del cambio dura 23 o 25 horas, y restar 86.4 millones de ms cae en el dia
+ * equivocado dos veces al ano.
+ *
+ * Se opera sobre los numeros de calendario, que es lo que significa "ayer".
+ */
+export function sumarDias(fechaISO: string, dias: number, tz: string): string {
+  const [y, m, d] = fechaISO.split('-').map(Number)
+  // Mediodia UTC como ancla: queda lejos de cualquier frontera de dia en cualquier
+  // zona, asi que el formateo posterior no se puede pasar de dia por el desfase.
+  const anclado = new Date(Date.UTC(y, m - 1, d + dias, 12, 0, 0))
+  return fmtDateEnZona(anclado, tz)
 }
 
 /** Today's date as YYYY-MM-DD en la zona activa del negocio. */

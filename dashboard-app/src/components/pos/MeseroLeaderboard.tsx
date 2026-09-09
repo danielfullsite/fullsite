@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { Trophy, TrendingUp, Flame, Target } from 'lucide-react'
 import { formatMXN } from '@/lib/pos-data'
 import { getActiveClientSlug as _cid } from '@/lib/data'
-import { getActiveTimezone } from '@/lib/date-mx'
+import { todayMX, zonedStartOfDayISO } from '@/lib/date-mx'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -39,17 +39,29 @@ export default function MeseroLeaderboard({ currentMesero, compact = false, meta
 
   async function fetchLeaderboard() {
     try {
-      const today = new Date()
-      const todayStr = new Date(today.toLocaleString('en-US', { timeZone: getActiveTimezone() })).toISOString().split('T')[0]
+      // LOS DOS ERRORES DEL CORTE DEL DIA, JUNTOS OTRA VEZ.
+      //
+      // Antes: `new Date(today.toLocaleString('en-US', {timeZone})).toISOString()`, que
+      // toma los numeros de pared de la zona del negocio y los reinterpreta como hora
+      // LOCAL DEL PROCESO -- en la terminal de AMALAY, a la hora de la cena, eso daba
+      // MANANA. Y esa fecha se pegaba a `T00:00:00` sin zona, o sea medianoche UTC, que
+      // en Monterrey son las 18:00 del dia anterior.
+      //
+      // El resultado es el mismo que le quitaba la comida al corte: la tabla de meseros
+      // arrancaba a las 18:00 de ayer y se cortaba a las 18:00 de hoy. Un mesero de la
+      // comida no aparecia; la cena de ayer se le sumaba a alguien mas. Es la pantalla
+      // con la que se decide a quien felicitar.
+      const todayStr = todayMX()
+      const desde = zonedStartOfDayISO(todayStr)
       const nowMs = Date.now()
 
       const [ordersRes, attendanceRes] = await Promise.all([
         fetch(
-          `${SUPABASE_URL}/rest/v1/pos_orders?select=mesero,total,personas&status=eq.cerrada&client_id=eq.${_cid()}&created_at=gte.${todayStr}T00:00:00`,
+          `${SUPABASE_URL}/rest/v1/pos_orders?select=mesero,total,personas&status=eq.cerrada&client_id=eq.${_cid()}&created_at=gte.${encodeURIComponent(desde)}`,
           { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
         ),
         fetch(
-          `${SUPABASE_URL}/rest/v1/pos_attendance?select=staff_name,type,registered_at&client_id=eq.${_cid()}&registered_at=gte.${todayStr}T00:00:00&order=registered_at.asc`,
+          `${SUPABASE_URL}/rest/v1/pos_attendance?select=staff_name,type,registered_at&client_id=eq.${_cid()}&registered_at=gte.${encodeURIComponent(desde)}&order=registered_at.asc`,
           { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
         ).catch(() => null), // attendance table may not exist yet
       ])
