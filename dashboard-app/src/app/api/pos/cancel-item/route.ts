@@ -144,6 +144,28 @@ export async function POST(request: NextRequest) {
             item_id,
             item_name: targetItem.nombre || targetItem.name,
             reason,
+            // EL MONTO SE CAPTURA AQUI PORQUE DESPUES YA NO EXISTE.
+            //
+            // El `cancelled: true` si se guarda en `items`... hasta que se cobra: al
+            // cerrar, handlePayment manda `items: payingItems`, que EXCLUYE los
+            // cancelados, y r1_save_order hace `items = coalesce(p_items, items)`. El
+            // renglon desaparece del ticket y con el la evidencia.
+            //
+            // Por eso el detector de skimming de save-order no ve nada: recomputa el
+            // total desde los items que recibio, que son exactamente los que se
+            // cobraron, y la resta da cero. El guion es cobrar $2,320 en efectivo,
+            // cancelar dos platos ya comidos "por error de captura", cobrar $1,392 y
+            // quedarse $928 -- con un ticket limpio en la base.
+            //
+            // No se persisten los renglones cancelados en `items` a proposito: eso
+            // rompe tres consumidores a la vez (el corte suma platillos desde `items`,
+            // `platillos_top` los explota, y r1_reconcile_order los volveria a
+            // descontar). El log es el lugar correcto para la evidencia.
+            monto: Number(targetItem.subtotal) || 0,
+            cantidad: Number(targetItem.cantidad) || 0,
+            // Cancelar algo que la cocina ya mando es lo que distingue un error de
+            // captura de una cancelacion despues de servir y cobrar.
+            ya_enviado_a_cocina: Number(targetItem.sent_quantity) > 0,
             approval_mode: approvalMode,
             solicitante_rol: auth.role,
             // Lo que el cliente AFIRMÓ. En el camino offline es el único dato de quién
