@@ -249,6 +249,94 @@ async function auditarCierreContraLaFila(o: {
         .reduce((s, c) => s + cents(c.total), 0)
     }
 
+    // ── EL ANCLA QUE FALTABA: EL PRECIO DEL MENU ────────────────────────────
+    //
+    // Todo lo de arriba compara `sum(items[].subtotal)` contra `total`. LAS DOS CIFRAS
+    // LAS ESCRIBIO EL CLIENTE. Detecta al que baja el total y deja los renglones -- que
+    // es el vector comun, porque bajar el total es un campo y editar los renglones son
+    // varios -- pero NO al que baja los dos a la vez: la resta da cero y todo cuadra.
+    //
+    // El unico dato que el POS no dicta es el precio del catalogo. Se compara contra el.
+    //
+    // ESTO SE MIDIO ANTES DE ESCRIBIRLO, porque un detector ruidoso ya costo caro dos
+    // veces en este repo (los quince falsos del IVA en agosto, y las cuentas de split
+    // esta manana). Sobre los 94 renglones que existen en `pos_orders` de AMALAY:
+    //
+    //     sin menuItemId ............ 0
+    //     sin fila en el menu ....... 0
+    //     precio por DEBAJO ......... 0
+    //     precio por ARRIBA ......... 0
+    //
+    // Cero falsos positivos sobre los datos reales de hoy.
+    //
+    // LO QUE NO PUEDE DISTINGUIR, y por eso es conservador: un precio de menu que SUBIO
+    // despues de que se cobro la orden se ve igual que un precio editado a la baja. No
+    // hay historial de precios. Mitigacion: solo cuenta un renglon cuando su precio esta
+    // por debajo del 90% del catalogo -- una actualizacion normal no llega ahi, partir a
+    // la mitad un corte de carne si.
+    let faltantePorPrecio = 0
+    const renglonesEditados: Array<{ menu_item_id: string; precio_cobrado: number; precio_menu: number; cantidad: number }> = []
+    try {
+      const ids = [...new Set(items
+        .filter(it => !it?.cancelled)
+        .map(it => String(it?.menuItemId ?? ''))
+        .filter(Boolean))]
+      if (ids.length > 0) {
+        const cat = await fetch(
+          `${o.sbUrl}/rest/v1/pos_menu_items?client_id=eq.${encodeURIComponent(o.clientId)}` +
+          `&id=in.(${ids.map(encodeURIComponent).join(',')})&select=id,price`,
+          { headers: o.headers, cache: 'no-store' },
+        )
+        // Sin catalogo legible NO se acusa. Mismo principio que con la tasa de IVA.
+        if (cat.ok) {
+          const precios = new Map<string, number>()
+          for (const m of (await cat.json()) as Array<{ id?: unknown; price?: unknown }>) {
+            if (typeof m?.id === 'string' && Number.isFinite(Number(m.price))) {
+              precios.set(m.id, Number(m.price))
+            }
+          }
+          for (const it of items) {
+            if (it?.cancelled) continue
+            const id = String(it?.menuItemId ?? '')
+            const delMenu = precios.get(id)
+            // Un renglon que no esta en el catalogo (producto abierto, item viejo) se
+            // salta: no hay contra que compararlo y adivinar seria inventar.
+            if (delMenu === undefined || !(delMenu > 0)) continue
+            const cobrado = Number(it?.precio) || 0
+            if (cobrado >= delMenu * 0.9) continue
+            const cantidad = Math.max(0, Number(it?.cantidad) || 0)
+            faltantePorPrecio += Math.round((delMenu - cobrado) * cantidad * 100)
+            renglonesEditados.push({
+              menu_item_id: id, precio_cobrado: cobrado, precio_menu: delMenu, cantidad,
+            })
+          }
+        }
+      }
+    } catch { /* el ancla de precio es un extra: nunca impide la deteccion de arriba */ }
+
+    if (faltantePorPrecio > 100 && renglonesEditados.length > 0) {
+      console.warn('[price-edit-suspect]', o.orderId, { faltantePorPrecio, renglonesEditados })
+      // Accion PROPIA, no `skimming_suspect`: son dos vectores distintos y mezclarlos
+      // impediria medir cual esta ocurriendo. El agente antifraude agrupa por accion.
+      await fetch(`${o.sbUrl}/rest/v1/pos_audit_log`, {
+        method: 'POST',
+        headers: { ...o.headers, Prefer: 'return=minimal' },
+        body: JSON.stringify({
+          client_id: o.clientId, order_id: o.orderId,
+          action: 'price_edit_suspect',
+          actor: o.actor,
+          details: {
+            diff_cents: faltantePorPrecio,
+            renglones: renglonesEditados,
+            solicitante_rol: o.rolSolicitante ?? null,
+            mesero_declarado: typeof fila.mesero === 'string' ? fila.mesero : null,
+            fuente: 'catalogo_pos_menu_items',
+            umbral_pct: 0.9,
+          },
+        }),
+      })
+    }
+
     const diff = expectedTotal - declaredTotal
 
     // Sólo la dirección del fraude: cobrar MENOS que los renglones. Un total mayor no

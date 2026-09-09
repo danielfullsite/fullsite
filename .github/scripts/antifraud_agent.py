@@ -93,6 +93,75 @@ def get_skimming_events(days=7):
         return []
 
 
+def get_precios_editados(days=7):
+    """Renglones cobrados MUY por debajo del precio del catalogo.
+
+    `save-order` compara la suma de renglones contra el total, y las dos cifras las
+    escribe el cliente: detecta al que baja el total dejando los platillos, pero no al
+    que baja los dos a la vez. El unico dato que el POS no dicta es el precio de
+    `pos_menu_items`, y desde el 2026-09-09 se compara contra el.
+
+    Vive en su propia accion --`price_edit_suspect`, no `skimming_suspect`-- porque son
+    dos vectores distintos y mezclarlos impide medir cual esta ocurriendo.
+
+    Si esto no se leyera aqui, seria otra deteccion muda: exactamente el defecto que se
+    cerro con las aprobaciones sospechosas."""
+    cutoff = (datetime.now(MX_TZ) - timedelta(days=days)).isoformat()
+    try:
+        return sb_get("pos_audit_log", {
+            "client_id": f"eq.{CLIENT['id']}",
+            "action": "eq.price_edit_suspect",
+            "created_at": f"gte.{cutoff}",
+            "select": "order_id,actor,mesa,details,created_at",
+            "order": "created_at.desc",
+            "limit": "500",
+        }) or []
+    except Exception as e:
+        print(f"[antifraud] price_edit fetch failed: {e}")
+        return []
+
+
+def analyze_precios_editados(events):
+    """Agrupa por actor. `diff_cents` es lo que se dejo de cobrar contra el catalogo."""
+    findings = []
+    by_actor = defaultdict(lambda: {"mxn": 0.0, "n": 0, "renglones": 0})
+    for ev in events:
+        d = ev.get("details") or {}
+        if not isinstance(d, dict):
+            continue
+        try:
+            faltante = float(d.get("diff_cents") or 0) / 100.0
+        except (TypeError, ValueError):
+            continue
+        if faltante <= 0:
+            continue
+        agg = by_actor[ev.get("actor") or "desconocido"]
+        agg["mxn"] += faltante
+        agg["n"] += 1
+        renglones = d.get("renglones")
+        agg["renglones"] += len(renglones) if isinstance(renglones, list) else 0
+
+    for actor, agg in sorted(by_actor.items(), key=lambda kv: kv[1]["mxn"], reverse=True):
+        if agg["mxn"] < SKIMMING_ALERT_MXN:
+            continue
+        findings.append({
+            "type": "precio_editado",
+            "actor": actor,
+            "faltante_mxn": round(agg["mxn"], 2),
+            "count": agg["n"],
+            "message": (
+                f"{actor}: ${agg['mxn']:,.0f} cobrados por DEBAJO del precio del menu "
+                f"en {agg['n']} ticket(s), {agg['renglones']} renglon(es)"
+            ),
+            "detail": (
+                "Vector: editar el precio del platillo en la terminal y bajar el total "
+                "para que cuadre. Cruzar contra el menu vigente; un cambio de precio "
+                "reciente al ALZA se ve parecido, por eso solo se marca por debajo del 90%."
+            ),
+        })
+    return findings
+
+
 def get_aprobaciones_sospechosas(days=7):
     """Cancelaciones y reaperturas aprobadas por confianza en el dispositivo POR ALGUIEN
     QUE NO TENIA EL NIVEL.
@@ -532,6 +601,9 @@ def calculate_risk_score(all_findings):
         # como el skimming porque es el MISMO robo, un paso antes: primero se consigue
         # el permiso, despues se baja el ticket.
         "aprobacion_sospechosa": 25,
+        # Editar el precio del platillo es skimming con un paso mas de trabajo: pesa
+        # igual, porque el dinero que falta es el mismo.
+        "precio_editado": 30,
         "cancellations": 15,
         "discount_high": 20,
         "discount_spike": 10,
@@ -691,6 +763,17 @@ def main():
     # Aprobaciones que el servidor marcó y hasta hoy nadie leía. Mismo trato que el
     # skimming: evidencia directa a nivel ticket, se lee ANTES del gate de Wansoft
     # porque un solo evento debe poder disparar sin histórico agregado.
+    precios = get_precios_editados(7)
+    precio_findings = analyze_precios_editados(precios)
+    print(f"[antifraud] precios editados: {len(precios)}, findings: {len(precio_findings)}")
+    for _p in precio_findings:
+        log_event(agent_id="antifraud-agent", event_type="fraud",
+                  title=(_p.get("message") or "precio editado")[:200], severity="high",
+                  estimated_value=float(_p.get("faltante_mxn") or 0), confidence=0.7,
+                  evidence={"actor": _p.get("actor"), "tickets": _p.get("count")},
+                  suggested_action="Comparar los renglones contra el menu vigente y pedir explicacion.",
+                  client_id=CLIENT["id"])
+
     aprobaciones = get_aprobaciones_sospechosas(7)
     aprobacion_findings = analyze_aprobaciones(aprobaciones)
     print(f"[antifraud] aprobaciones marcadas 'revisar': {len(aprobaciones)}, findings: {len(aprobacion_findings)}")
@@ -712,7 +795,7 @@ def main():
                   suggested_action="Cruzar order_id contra arqueo del mesero; pedir explicación.",
                   client_id=CLIENT["id"])
 
-    if len(data) < 3 and not skimming_findings and not aprobacion_findings:
+    if len(data) < 3 and not skimming_findings and not aprobacion_findings and not precio_findings:
         print("[antifraud] Not enough data and no skimming, skipping")
         elapsed = int((time.time() - start) * 1000)
         _log_run("antifraud-agent", "no_data", elapsed, skip_reason=f"only {len(data)} days available, need 3+", data_status="no_data", tentacle="ops")
@@ -729,6 +812,7 @@ def main():
     # Sin esto el hallazgo se registraba en agent_events y NO salia en el reporte de
     # Telegram: media deteccion otra vez.
     all_findings.extend(aprobacion_findings)
+    all_findings.extend(precio_findings)
 
     risk_score = calculate_risk_score(all_findings)
     print(f"[antifraud] Findings: {len(all_findings)}, Risk: {risk_score}/100")
