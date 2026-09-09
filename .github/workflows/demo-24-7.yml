@@ -20,6 +20,11 @@
 # es Python puro, sin llamadas a Groq: de los 71 scripts sólo 6 usan LLM, y ninguno es
 # éste. Prácticamente gratis.
 #
+# PROBAR FUERA DE HORARIO
+# Un disparo manual a las 3 de la mañana cae en la franja cerrada de la curva y termina
+# en verde sin crear nada. Para eso está el input `forzar_horario`: apaga la curva SÓLO
+# en esa corrida, sin tocar el cron.
+#
 # CÓMO APAGARLO
 # Actions → este workflow → "..." → Disable workflow. Nada más depende de él.
 
@@ -34,6 +39,11 @@ on:
         description: 'Tenant a simular'
         required: false
         default: 'demo'
+      forzar_horario:
+        description: 'Ignorar la curva horaria (para probar fuera de servicio)'
+        type: boolean
+        required: false
+        default: false
 
 concurrency:
   # Que dos corridas no escriban órdenes encima. Sin esto, un retraso de GitHub puede
@@ -46,7 +56,17 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CLIENT_ID: ${{ github.event.inputs.client_id || 'demo' }}
-      CURVA_HORARIA: '1'
+      # El cron la deja encendida — el demo tiene que verse como un restaurante.
+      #
+      # `forzar_horario` la apaga SÓLO en la corrida manual. Sin eso, un disparo a mano
+      # fuera de servicio cae en la franja cerrada (00–06 vale 0.0), termina en `success`
+      # con "+0 órdenes, 0 a cocina, 0 cobradas" y no ejercita nada: verde en vacío. Eso
+      # impidió verificar el descuento de inventario el 2026-09-09.
+      #
+      # En el cron `github.event.inputs` es nulo, así que la comparación es falsa y la
+      # curva queda en '1'. lab_simulator.py trata como apagado todo lo que no sea
+      # 1/true/si/sí, por eso basta con '0'.
+      CURVA_HORARIA: ${{ github.event.inputs.forzar_horario == 'true' && '0' || '1' }}
       TZ_LOCAL: 'America/Monterrey'
       # Por el camino real del POS: PIN -> shift token -> api/pos/save-order.
       #
@@ -92,9 +112,30 @@ jobs:
             exit 1
           fi
 
-      - run: python .github/scripts/lab_simulator.py
+      - name: El forzado llego a la variable
+        if: github.event.inputs.forzar_horario == 'true'
+        run: |
+          # Si la expresion del `env:` se rompiera, la corrida forzada volveria a salir
+          # verde sin crear nada — el bug que este input existe para evitar. Mejor tronar.
+          if [ "$CURVA_HORARIA" != "0" ]; then
+            echo "::error::forzar_horario=true pero CURVA_HORARIA='$CURVA_HORARIA'."
+            echo "::error::La corrida habria respetado la curva y creado 0 ordenes."
+            exit 1
+          fi
+          echo "Curva forzada a apagada para esta corrida."
+
+      - run: python .github/scripts/lab_simulator.py | tee /tmp/lab-simulator.log
 
       - name: Resumen
         if: always()
         run: |
-          echo "Tenant: \`$CLIENT_ID\` · curva horaria activa (zona $TZ_LOCAL)" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$CURVA_HORARIA" = "1" ]; then
+            modo="curva horaria activa (zona $TZ_LOCAL)"
+          else
+            modo="curva horaria FORZADA a apagada — corrida de prueba fuera de servicio"
+          fi
+          echo "Tenant: \`$CLIENT_ID\` · $modo" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          # La cuenta de órdenes sólo vivía en el log del simulador. Subirla al resumen es
+          # lo que deja ver de un vistazo si la corrida ejercitó algo o salió verde en vacío.
+          grep -F 'órdenes,' /tmp/lab-simulator.log 2>/dev/null | tail -1 >> "$GITHUB_STEP_SUMMARY" || true
