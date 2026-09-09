@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server'
+import { esCuentaDeCobroDeSplit } from '@/lib/liquidacion-de-orden'
 import { withPOSAuth, unauthorized } from '@/lib/api-auth'
 import { verifyManagerApproval } from '@/lib/manager-approval'
 
@@ -358,9 +359,22 @@ export async function POST(request: NextRequest) {
     const isIdempotentReplay = saveResult.idempotent_replay === true
     const committedRevision = saveResult.revision
 
-    let shouldReconcile = isFirstExecution
+    // UNA CUENTA DE SPLIT NO CONSUME COMIDA: la consumio la orden madre.
+    //
+    // `r1_reconcile_order` recorre los items de ESTA orden y escribe en
+    // `pos_reconciliation_results`, cuya clave unica es
+    // (client_id, order_id, order_item_id). Como cada cuenta trae su propio
+    // `order_id` (`{orden}-C1`..`-CN`), estrenaba linaje y descontaba otra vez. En el
+    // split PAREJO cada cuenta lleva TODOS los renglones, asi que una mesa de 4
+    // descontaba cinco veces la misma comida: la madre al enviar a cocina, mas las
+    // cuatro cuentas al cobrar.
+    //
+    // No sale del cajon: sale del inventario y del numero que gobierna las compras.
+    const esCobroDeSplit = esCuentaDeCobroDeSplit(order_id)
 
-    if (isIdempotentReplay && committedRevision != null) {
+    let shouldReconcile = isFirstExecution && !esCobroDeSplit
+
+    if (isIdempotentReplay && committedRevision != null && !esCobroDeSplit) {
       // Check current inventory lineage for catch-up determination
       try {
         const lineageRes = await fetch(

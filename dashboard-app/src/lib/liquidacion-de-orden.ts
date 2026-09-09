@@ -269,3 +269,40 @@ export function cuentasDe(
   }
   return totales.map((t, i) => ({ account_id: cuentaDeSplit(orderId, i + 1), total: t }))
 }
+
+// ── El inventario se descuenta UNA vez, en la madre ─────────────────────────
+//
+// Encontrado el 2026-09-08. Al cobrar cada cuenta de un split, `/api/pos/save-order`
+// llama a `r1_reconcile_order(client_id, order_id)`, que recorre los items de ESA
+// orden y escribe en `pos_reconciliation_results`. Y esa tabla tiene la clave única
+//
+//     UNIQUE (client_id, order_id, order_item_id)
+//
+// —comprobada en la base—, así que cada cuenta, al tener `order_id` propio
+// (`{orden}-C1`..`-CN`), estrena linaje y descuenta de nuevo. En el split PAREJO cada
+// cuenta lleva TODOS los renglones, de modo que una mesa de 4 descuenta:
+//
+//     la madre al enviar a cocina   1x
+//     C1, C2, C3, C4                4x
+//     ────────────────────────────────
+//     cinco veces la misma comida
+//
+// No sale del cajón: sale del inventario y del número que gobierna las compras. Un
+// food cost inflado ordena de más y esconde la merma real.
+//
+// La comida se consume una vez, cuando sale de la cocina. Una cuenta de split es una
+// forma de COBRAR esa misma comida, no comida nueva.
+
+/**
+ * ¿Este id es una cuenta de cobro de un split, y no una orden con comida propia?
+ *
+ * Se reconocen las dos formas que existen hoy:
+ *   `{orden}-C3`  la que produce el cobro (pos/page.tsx, `payId`)
+ *   `{orden}:c3`  la de este módulo (`cuentaDeSplit`), del modelo durable
+ *
+ * La `C` mayúscula del primer formato no colisiona con ningún id real: `generateId()`
+ * devuelve un UUID (hex minúscula) o `base36-base36`, ambos sin mayúsculas.
+ */
+export function esCuentaDeCobroDeSplit(orderId: string): boolean {
+  return typeof orderId === 'string' && (/-C\d+$/.test(orderId) || /:c\d+$/.test(orderId))
+}
