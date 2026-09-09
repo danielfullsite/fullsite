@@ -36,7 +36,14 @@ jobs:
         with: { python-version: '3.11' }
       - run: pip install requests
 
-      - run: python .github/scripts/sembrar_recetas_demo.py | tee salida.txt
+      - name: Sembrar
+        run: |
+          # `pipefail`: el shell de Actions es `bash -e {0}`, SIN pipefail, así que el
+          # codigo de salida del pipe es el de `tee` (0). Una siembra que truena a la
+          # mitad —le paso a la primera, con un 400 por la unidad "pza"— saldria verde
+          # y dejaria los datos incompletos sin que nadie se enterara.
+          set -o pipefail
+          python .github/scripts/sembrar_recetas_demo.py 2>&1 | tee salida.txt
 
       - name: Resumen
         if: always()
