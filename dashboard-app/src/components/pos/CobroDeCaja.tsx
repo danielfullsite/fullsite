@@ -3,7 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { abrirFinanzasCaja, leerFinanzasCaja, dividirParejoCaja, reservarEfectivoCaja,
   confirmarEfectivoCaja, liberarEfectivoNoRecibido, avisoAntesDeCobrarCaja, centavosDeTexto, pesosDeCentavos,
+  reservarCobroExterno, confirmarCobroExterno, rechazarCobroExterno, marcarCobroExternoIncierto,
   type FinanzasDeCaja, type PagoDeCaja } from '@/lib/pedro-finanzas'
+
+/** Nombre por omisión de la terminal bancaria. En AMALAY la tarjeta se pasa en el aparato
+ *  del banco y se registra aquí: son dos actos manuales, no una integración. */
+const TERMINAL_POR_OMISION = 'Terminal bancaria'
 
 interface Props {
   order: { id: string; turno_id: string; order_revision: number; total_cents: number; items?: unknown }
@@ -24,6 +29,8 @@ export default function CobroDeCaja({ order, onClose, onChanged }: Props) {
   const [accountId, setAccountId] = useState('')
   const [amount, setAmount] = useState('')
   const [received, setReceived] = useState<Record<string, string>>({})
+  const [referencias, setReferencias] = useState<Record<string, string>>({})
+  const [terminal, setTerminal] = useState(TERMINAL_POR_OMISION)
   const [split, setSplit] = useState('2')
   const [notice, setNotice] = useState('')
   const apply = useCallback((next: FinanzasDeCaja) => {
@@ -65,6 +72,18 @@ export default function CobroDeCaja({ order, onClose, onChanged }: Props) {
     if (paid?.status !== 'accepted') throw new Error('El intento se recuperó con otro resultado. Revisa los pagos confirmados antes de continuar.')
     return next
   }, 'Efectivo registrado en Caja y compartido con las terminales.')
+  // Resolver un cobro de terminal. El resultado que se guarda es el que el cajero VIO en
+  // el aparato, no el que conviene: por eso son tres botones y no dos.
+  const resolverTerminal = (payment: PagoDeCaja, como: 'aprobado' | 'rechazado' | 'incierto') => {
+    const ref = referencias[payment.payment_id] ?? ''
+    const acciones = {
+      aprobado:  { fn: () => confirmarCobroExterno(finance!, payment, ref),        ok: 'Cobro con terminal registrado y compartido con las terminales.' },
+      rechazado: { fn: () => rechazarCobroExterno(finance!, payment, ref),         ok: 'Rechazo registrado. La cuenta vuelve a quedar cobrable.' },
+      incierto:  { fn: () => marcarCobroExternoIncierto(finance!, payment, ref),   ok: 'Quedó como pendiente de aclarar. El importe sigue apartado y nadie lo puede cobrar dos veces.' },
+    }[como]
+    return run(acciones.fn, acciones.ok)
+  }
+
   const sendWarning = avisoAntesDeCobrarCaja(order)
   const disabled = busy || !connected
   const button = 'min-h-[48px] rounded-xl px-4 py-3 font-semibold disabled:opacity-40 disabled:cursor-not-allowed'
@@ -116,6 +135,22 @@ export default function CobroDeCaja({ order, onClose, onChanged }: Props) {
             <button className={`${button} w-full bg-blue-600 text-white`} disabled={disabled}
               onClick={() => run(() => reservarEfectivoCaja(finance, account.account_id,
                 centavosDeTexto(amount || ((account.balance_cents - account.reserved_cents) / 100).toFixed(2))), 'Cobro preparado. Confirma cuando hayas recibido el efectivo.')}>Preparar cobro en efectivo</button>
+
+            {/* COBRO CON TERMINAL BANCARIA.
+                Se aparta el importe ANTES de pasar la tarjeta para que otra terminal no lo
+                cobre otra vez mientras el cajero está en el aparato. El resultado se
+                registra después, con la referencia del voucher. */}
+            <div className="rounded-xl border border-[var(--line)] p-3">
+              <label className="block text-sm">Terminal donde se pasa la tarjeta
+                <input aria-label="Terminal bancaria" className={field} value={terminal}
+                  onChange={e => setTerminal(e.target.value)} /></label>
+              <button className={`${button} mt-3 w-full border border-blue-600 text-blue-600`} disabled={disabled || !terminal.trim()}
+                onClick={() => run(() => reservarCobroExterno(finance, account.account_id,
+                  centavosDeTexto(amount || ((account.balance_cents - account.reserved_cents) / 100).toFixed(2)), terminal),
+                  'Importe apartado. Pasa la tarjeta en la terminal y registra aquí el resultado.')}>
+                Cobrar con terminal bancaria</button>
+              <p className="mt-2 text-xs text-[var(--text-2)]">El importe queda apartado mientras pasas la tarjeta. Ninguna otra terminal lo puede cobrar.</p>
+            </div>
           </div>}
           {pendingPayments.map(payment => <section key={payment.payment_id} className="my-4 rounded-xl border border-amber-500 p-4">
             <h3 className="font-bold">Cobro por confirmar · {pesosDeCentavos(payment.amount_cents)}</h3>
@@ -129,12 +164,30 @@ export default function CobroDeCaja({ order, onClose, onChanged }: Props) {
                   onClick={() => run(() => liberarEfectivoNoRecibido(finance, payment), 'Resultado recuperado. Revisa el saldo antes de iniciar otro cobro.')}>No se recibió efectivo</button>
               </div>
             </>}
+            {payment.method === 'external' && <>
+              <p className="text-sm">Terminal: <strong>{payment.provider}</strong>{payment.status === 'unknown' ? ' · quedó pendiente de aclarar' : ''}</p>
+              <label className="mt-2 block">Referencia o número de autorización del voucher
+                <input aria-label={`Referencia del voucher ${payment.payment_id}`} className={field}
+                  value={referencias[payment.payment_id] ?? ''}
+                  onChange={e => setReferencias(prev => ({ ...prev, [payment.payment_id]: e.target.value }))} /></label>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button className={`${button} bg-emerald-700 text-white`} disabled={disabled}
+                  onClick={() => resolverTerminal(payment, 'aprobado')}>La terminal aprobó</button>
+                <button className={`${button} border border-[var(--line)]`} disabled={disabled}
+                  onClick={() => resolverTerminal(payment, 'rechazado')}>La terminal rechazó</button>
+                {/* El tercero es el que evita cobrar dos veces. Si nadie vio el voucher, el
+                    importe sigue apartado y se resuelve cuando aparezca. */}
+                <button className={`${button} border border-amber-600 text-amber-700`} disabled={disabled}
+                  onClick={() => resolverTerminal(payment, 'incierto')}>No sé qué pasó</button>
+              </div>
+              <p className="mt-2 text-xs text-[var(--text-2)]">Si no sabes si pasó, no adivines: déjalo pendiente. El importe sigue apartado y se resuelve después con el voucher.</p>
+            </>}
           </section>)}
         </>}
         {finance.payments.some(p => p.status === 'accepted') && <div className="mt-5 border-t border-[var(--line)] pt-4">
           <h3 className="font-bold">Pagos confirmados</h3>
           {finance.payments.filter(p => p.status === 'accepted').map(p => <p key={p.payment_id} className="mt-2 text-sm">
-            {pesosDeCentavos(p.amount_cents)} · {p.method === 'cash' ? 'Efectivo' : 'Proveedor'}{p.change_cents ? ` · Cambio ${pesosDeCentavos(p.change_cents)}` : ''}
+            {pesosDeCentavos(p.amount_cents)} · {p.method === 'cash' ? 'Efectivo' : (p.provider || 'Terminal')}{p.change_cents ? ` · Cambio ${pesosDeCentavos(p.change_cents)}` : ''}
           </p>)}
         </div>}
       </>}
