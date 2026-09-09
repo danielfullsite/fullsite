@@ -4,7 +4,14 @@
 > coincidían: `BUGS.md`, los 27 hallazgos PRR, los P0 de la Biblia Wansoft, la auditoría
 > `audit/AUDITORIA-FULL-2026-08-19.md` y la `audit/AUDITORIA-FULL-FULLSITE-2026-08-19.md`.
 > Organizado por las **olas** de `../PLAN-AHORA.md`. Estado: ✅ hecho · 🔶 grace/parcial · ⬜ abierto.
-> Última actualización: 2026-09-08 para el candidato `a01087e5`; las olas de agosto conservan su estado histórico salvo actualización explícita.
+> Última actualización: 2026-09-08 (noche) para el candidato `lab/pin-real-desde-pantalla`; las olas de agosto conservan su estado histórico salvo actualización explícita.
+>
+> **Ojo con la frescura de este documento.** Al revisarlo el 2026-09-08 con Daniel en el
+> restaurante, DOS de sus 🔴 P0 estaban desactualizados a favor nuestro: OP-10 ya tenía
+> cuatro capas de protección y OP-50 ya había cerrado la escalada de privilegio. Un
+> pendiente que se cierra sin actualizar aquí es peor que uno abierto: hace que se gaste la
+> noche persiguiendo algo resuelto mientras lo que sí falta sigue esperando. Al cerrar
+> algo, ciérralo AQUÍ el mismo día y con la prueba que lo sostiene.
 
 Regla: cuando cierres un item, márcalo aquí. Cuando aparezca uno nuevo, entra aquí — no en un doc suelto.
 
@@ -46,7 +53,7 @@ Fuente y aceptación de cada H: [Huecos actuales y condiciones de cierre](../aud
 | OP-07 | Escondite no imprime (config BOM) | 🟠 P0 | ⬜ config limpio listo; falta acceso | PLAN-JUEVES "Diagnóstico Escondite" |
 | OP-08 | Cold-boot sin internet = pantalla negra | 🟠 P0 | ⬜ fix diseñado (servir shell por Pedro) | OFFLINE-LAN-FIELD-PROVEN:173 |
 | OP-09 | OFF-01 impresoras: `station_id` texto libre, falla silenciosa | 🟠 P0 | ⬜ validar cobertura al arranque | PLAN-JUEVES §8 |
-| OP-10 | Doble cobro posible (`handlePayment` sin guard `updated_at`) | 🟠 P0 | ⬜ | MANUAL-OPERATIVO:235 (DT-1) |
+| OP-10 | Doble cobro posible (`handlePayment` sin guard `updated_at`) | 🟠 P0 | ✅ **CERRADO — el item estaba viejo** (verificado 2026-09-08). Hay CUATRO capas, no cero: `operationLock` (doble clic, `pos/page.tsx:3751`) · `checkOrderConflict('payment')` (:3250, aborta si otra terminal cerró o modificó — comprobación de cliente, con ventana entre leer y escribir) · `expected_revision` OCC server-side (`save-order/route.ts:173`) · `save_operation_id` + **PRIMARY KEY (client_id, order_id, save_operation_id)** en `pos_save_operations`, verificado contra la base. La capa 4 es la que cierra el caso: dos terminales cobrando offline reproducen contra esa llave y la segunda no puede insertar. Anclado por `__tests__/no-se-cobra-dos-veces.test.ts` (12/12) | MANUAL-OPERATIVO:235 (DT-1) |
 | OP-11 | Documentar flags `*_STRICT` en `.env.example`+runbook | 🟢 P2 | ✅ runbook + `.env.example` | FRAUD-ENFORCEMENT-FLAGS.md |
 
 ---
@@ -132,7 +139,7 @@ Hallados por las 3 investigaciones; no estaban rastreados. Verificar en campo lo
 | OP-47 | Split de cuenta por N personas (>3) + división pareja | 🟢 P2 | 🔶 parcial (C1/C2/C3) | pos/page.tsx |
 | OP-48 | Setear `FACTURAMA_USER/PASSWORD/EXPEDITION_PLACE` en prod | 🟢 P2 | ⬜ | facturama.ts |
 | OP-49 | Higiene: 6 tenants de prueba mezclados en `clients` + 2 valores data_source (`supabase` vs `fullsite`) | 🟢 P3 | ⬜ | clients (MCP) |
-| OP-50 | **`db` proxy = superficie de escritura real del POS; solo gatea 2 tablas** (`pos_cash_movements`, `pos_cierres`). Un shift token de **mesero** puede `PATCH pos_menu_items` (precio), `PATCH/DELETE pos_orders` (skimming directo del total), `PATCH pos_market_stock`/`pos_inventory_movements` (bypassa el gate de OP-39). Los gates por-ruta son bypasseables aquí. **NO tocar antes del jueves** (línea de vida del Offline Shell, path congelado). Fix medido post-instalación: (a) grace-audit de PATCH/DELETE sensibles sin bloquear, (b) expandir `MANAGER_ONLY` por tabla/columna con prueba de campo (ojo: `pos_orders` lo escriben meseros — gatear por columna `total`/DELETE, no blanket) | 🔴 P0 | ⬜ hallazgo 2026-08-20 (barrido OP-39) | `api/pos/db/route.ts`, `db/[...path]/route.ts` |
+| OP-50 | **`db` proxy = superficie de escritura real del POS; solo gatea 2 tablas** (`pos_cash_movements`, `pos_cierres`). Un shift token de **mesero** puede `PATCH pos_menu_items` (precio), `PATCH/DELETE pos_orders` (skimming directo del total), `PATCH pos_market_stock`/`pos_inventory_movements` (bypassa el gate de OP-39). Los gates por-ruta son bypasseables aquí. **NO tocar antes del jueves** (línea de vida del Offline Shell, path congelado). Fix medido post-instalación: (a) grace-audit de PATCH/DELETE sensibles sin bloquear, (b) expandir `MANAGER_ONLY` por tabla/columna con prueba de campo (ojo: `pos_orders` lo escriben meseros — gatear por columna `total`/DELETE, no blanket) | 🔴 P0 | 🔶 **CERRADO lo de dinero 2026-09-08**; el resto del item estaba viejo. Al verificarlo, el proxy ya gateaba 5 tablas (no 2), con lista blanca y el PIN redactado de la respuesta: la escalada de privilegio estaba cerrada. Faltaba lo de dinero, y se cerró POR COLUMNA en los DOS proxies (`CAMPOS_SOLO_DE_GERENTE` en `lib/pos-db-policy.ts`): total, subtotal, iva, descuento, propina, saldo, pagos, payment_status, status, order_revision, turno_id, client_id. Más borrado de orden solo-gerente (una orden se cancela, no se borra) y `pos_menu_items` solo-gerente. Por columna y no por tabla porque los meseros escriben `pos_orders` todo el día — verificado que sus únicas escrituras por ahí son `kds_item_status` y `mesero`. Anclado por `__tests__/proxy-no-deja-tocar-el-dinero.test.ts` (21/21, 20 fallan contra el código anterior) | `api/pos/db/route.ts`, `db/[...path]/route.ts` |
 
 ## Certificación (bloquea "milestone POS V2" → Golden Skeleton)
 
