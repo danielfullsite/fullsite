@@ -66,6 +66,36 @@ function cuerpoDeSubmitOutcome(): string {
   return pantalla.slice(desde, hasta)
 }
 
+describe('lo que no se archiva tampoco se duplica', () => {
+  // La consecuencia que no vi al quitar el archivado, y que encontró la auditoría
+  // adversarial del 2026-09-08: un crítico que se queda `new` para siempre deja de
+  // aparecer en el dedupe en cuanto vence su expires_at —4 horas para un desabasto—, y
+  // desde ahí cada corrida del cron inserta una copia. 48 duplicados al día del mismo
+  // aviso, en rojo, sin que nada los limpie. Es peor que el problema original.
+  it('el dedupe pregunta por veredicto pendiente, no sólo por vigencia', () => {
+    const motor = sinComentarios('lib/agents/engine.ts')
+    expect(motor).toMatch(/outcome\.is\.null/)
+  })
+
+  it('usa la MISMA lista que el archivado, para que no se puedan desincronizar', () => {
+    const motor = sinComentarios('lib/agents/engine.ts')
+    // Si un día alguien cambia quién archiva y no cambia quién deduplica, vuelve el bug.
+    const i = motor.indexOf('esperandoVeredicto')
+    expect(i).toBeGreaterThan(-1)
+    expect(motor.slice(i, i + 200)).toMatch(/puedeArchivarseSinVeredicto\(agentId\)/)
+  })
+
+  it('para fraude retiene todo; para los demás sólo sus críticos', () => {
+    const motor = sinComentarios('lib/agents/engine.ts')
+    expect(motor).toMatch(/and\(severity\.eq\.critical,outcome\.is\.null\)/)
+  })
+
+  it('el filtro entra en la consulta, no se queda en una variable suelta', () => {
+    const motor = sinComentarios('lib/agents/engine.ts')
+    expect(motor).toMatch(/dedupeWindow\}\$\{esperandoVeredicto\}/)
+  })
+})
+
 describe('el veredicto no se pierde en silencio', () => {
   it('submitOutcome revisa la respuesta antes de quitar la tarjeta', () => {
     expect(cuerpoDeSubmitOutcome()).toMatch(/if \(!res\.ok\)/)

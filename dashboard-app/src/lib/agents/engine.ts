@@ -240,12 +240,29 @@ export async function runAgent(
     //
     // Los que no traen `expires_at` conservan la ventana de 30 minutos de antes, así que
     // para ellos no cambia nada.
+    //
+    // Y HAY UNA TERCERA PREGUNTA, QUE APARECIÓ AL DEJAR DE ARCHIVAR LOS CRÍTICOS.
+    //
+    // Fraude y severidad crítica ya no se archivan solos: se quedan `new` esperando
+    // veredicto humano, por viejos que estén. Si el dedupe siguiera preguntando nada más
+    // por vigencia, en cuanto venciera su `expires_at` —4 horas para un desabasto— cada
+    // corrida insertaría una copia, y como tampoco se archivan, se acumularían para
+    // siempre: 48 duplicados al día del mismo aviso crítico. Sería exactamente el problema
+    // que este dedupe existe para evitar, sólo que peor y en rojo.
+    //
+    // Para ellos la pregunta correcta no es «¿sigue vigente?» sino «¿ya hay uno igual
+    // esperando veredicto?». Se descubrió en la auditoría adversarial del 2026-09-08,
+    // sobre el commit que quitó el archivado.
+    const esperandoVeredicto = puedeArchivarseSinVeredicto(agentId)
+      ? ',and(severity.eq.critical,outcome.is.null)'   // sólo sus críticos se quedan
+      : ',outcome.is.null'                              // fraude: todos se quedan
     const dedupeWindow = new Date(Date.now() - 30 * 60 * 1000).toISOString()
     const ahora = new Date().toISOString()
     const existingRaw = await sbGet<{ type: string; severity: string; expires_at: string | null; created_at: string }>(
       'agent_events',
       `client_id=eq.${encodeURIComponent(clientId)}&agent_id=eq.${agentId}&status=eq.new` +
-        `&or=(expires_at.gte.${ahora},created_at.gte.${dedupeWindow})&select=type,severity,expires_at,created_at`,
+        `&or=(expires_at.gte.${ahora},created_at.gte.${dedupeWindow}${esperandoVeredicto})` +
+        `&select=type,severity,expires_at,created_at`,
     ).catch(() => [] as { type: string; severity: string; expires_at: string | null; created_at: string }[])
     const existingTypes = new Set(existingRaw.map(r => `${r.type}:${r.severity}`))
 
