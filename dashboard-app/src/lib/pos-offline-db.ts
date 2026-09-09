@@ -180,8 +180,15 @@ export async function getCachedMenu(): Promise<Record<string, unknown>[]> {
 
 export async function cacheOrder(order: Record<string, unknown>): Promise<void> {
   const db = await openDB()
-  const tx = db.transaction('orders', 'readwrite')
-  tx.objectStore('orders').put(order)
+  // Mismo defecto que `queueOperation`: se resolvía antes del commit. Aquí duele en el
+  // arranque en frío sin WAN — la orden que la caja cree tener cacheada puede no estar.
+  return new Promise<void>((resolve, reject) => {
+    const tx = db.transaction('orders', 'readwrite')
+    tx.objectStore('orders').put(order)
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error ?? new Error('orders: la transacción falló'))
+    tx.onabort = () => reject(tx.error ?? new Error('orders: la transacción se abortó'))
+  })
 }
 
 export async function getCachedOrders(status?: string): Promise<Record<string, unknown>[]> {
@@ -387,8 +394,13 @@ export async function warmActiveOrdersCache(
 
 export async function deleteCachedOrder(id: string): Promise<void> {
   const db = await openDB()
-  const tx = db.transaction('orders', 'readwrite')
-  tx.objectStore('orders').delete(id)
+  return new Promise<void>((resolve, reject) => {
+    const tx = db.transaction('orders', 'readwrite')
+    tx.objectStore('orders').delete(id)
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error ?? new Error('orders: el borrado fallo'))
+    tx.onabort = () => reject(tx.error ?? new Error('orders: el borrado se aborto'))
+  })
 }
 
 /**
@@ -486,9 +498,26 @@ export async function queueOperation(
       `Pasa un endpoint con filtro, p. ej. "${table}?id=eq.<id>". No se reproducira.`,
     )
   }
-  const tx = db.transaction('sync_queue', 'readwrite')
-  tx.objectStore('sync_queue').put(item)
-  return id
+  // SE ESPERA EL COMMIT. Antes era `tx.put(item); return id`, y el `await` de quien
+  // llama se resolvía en el microtask siguiente — ANTES de que la transacción
+  // commiteara. Si Chromium fallaba la transacción, esta función no lanzaba, así que el
+  // catch de `queueForReplay` (pos-data.ts) —que existe justo para caer al buffer de
+  // localStorage— no se disparaba nunca.
+  //
+  // El resultado, sin que nadie haga nada malo: `saveOrder` devuelve OFFLINE_QUEUED, el
+  // POS abre el cajón, imprime el ticket y dice «cobro guardado localmente». El dinero
+  // entró y el registro no existe en ninguna parte. A ticket promedio de AMALAY son
+  // ~$790 por ocurrencia, y no deja rastro que permita descubrirlo después.
+  //
+  // El patrón correcto ya estaba en este mismo archivo, en `saveIDBPrintJob` y
+  // `cacheTurno`: el trabajo de IMPRESIÓN se guardaba con más cuidado que el cobro.
+  return new Promise<string>((resolve, reject) => {
+    const tx = db.transaction('sync_queue', 'readwrite')
+    tx.objectStore('sync_queue').put(item)
+    tx.oncomplete = () => resolve(id)
+    tx.onerror = () => reject(tx.error ?? new Error('sync_queue: la transacción falló'))
+    tx.onabort = () => reject(tx.error ?? new Error('sync_queue: la transacción se abortó'))
+  })
 }
 
 export function repairReplayData(
@@ -515,31 +544,47 @@ export async function getPendingQueue(actionableOnly = false): Promise<SyncQueue
 
 export async function markSynced(id: string): Promise<void> {
   const db = await openDB()
-  const tx = db.transaction('sync_queue', 'readwrite')
-  const store = tx.objectStore('sync_queue')
-  const request = store.get(id)
-  request.onsuccess = () => {
-    const item = request.result
-    if (item) {
-      item.synced = true
-      store.put(item)
+  // Se espera el commit, como en `queueOperation`. Si esta marca no cuaja, el item se
+  // vuelve a reproducir: la idempotencia por `save_operation_id` lo cubre en el camino
+  // de save-order, pero no todo lo que pasa por la cola tiene esa red.
+  return new Promise<void>((resolve, reject) => {
+    const tx = db.transaction('sync_queue', 'readwrite')
+    const store = tx.objectStore('sync_queue')
+    const request = store.get(id)
+    request.onsuccess = () => {
+      const item = request.result
+      if (item) {
+        item.synced = true
+        store.put(item)
+      }
     }
-  }
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error ?? new Error('sync_queue: no se pudo marcar como sincronizado'))
+    tx.onabort = () => reject(tx.error ?? new Error('sync_queue: la marca se abortó'))
+  })
 }
 
 export async function incrementRetry(id: string, detail = ''): Promise<void> {
   const db = await openDB()
-  const tx = db.transaction('sync_queue', 'readwrite')
-  const store = tx.objectStore('sync_queue')
-  const request = store.get(id)
-  request.onsuccess = () => {
-    const item = request.result
-    if (item) {
-      item.retries += 1
-      if (detail) item.error_detail = detail.slice(0, 500)
-      store.put(item)
+  // Si esta cuenta no cuaja, el item se reintenta con el MISMO contador: el drenado
+  // martillea el mismo elemento sin avanzar nunca hacia el tope, y el resto de la cola
+  // se queda esperando detrás.
+  return new Promise<void>((resolve, reject) => {
+    const tx = db.transaction('sync_queue', 'readwrite')
+    const store = tx.objectStore('sync_queue')
+    const request = store.get(id)
+    request.onsuccess = () => {
+      const item = request.result
+      if (item) {
+        item.retries += 1
+        if (detail) item.error_detail = detail.slice(0, 500)
+        store.put(item)
+      }
     }
-  }
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error ?? new Error('sync_queue: no se pudo contar el reintento'))
+    tx.onabort = () => reject(tx.error ?? new Error('sync_queue: el reintento se abortó'))
+  })
 }
 
 /** Reinicia el contador de reintentos de los items no-terminales de la cola.
@@ -569,15 +614,24 @@ export async function resetSyncQueueRetries(): Promise<number> {
 
 export async function clearAllPending(): Promise<void> {
   const db = await openDB()
-  const tx = db.transaction('sync_queue', 'readwrite')
-  tx.objectStore('sync_queue').clear()
+  return new Promise<void>((resolve, reject) => {
+    const tx = db.transaction('sync_queue', 'readwrite')
+    tx.objectStore('sync_queue').clear()
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error ?? new Error('sync_queue: el vaciado fallo'))
+    tx.onabort = () => reject(tx.error ?? new Error('sync_queue: el vaciado se aborto'))
+  })
 }
 
 export async function clearTerminalItems(): Promise<void> {
   const db = await openDB()
+  return new Promise<void>((resolve, reject) => {
   const tx = db.transaction('sync_queue', 'readwrite')
   const store = tx.objectStore('sync_queue')
   const request = store.getAll()
+  tx.oncomplete = () => resolve()
+  tx.onerror = () => reject(tx.error ?? new Error('sync_queue: la limpieza fallo'))
+  tx.onabort = () => reject(tx.error ?? new Error('sync_queue: la limpieza se aborto'))
   request.onsuccess = () => {
     for (const item of request.result) {
       // Only delete items that have been explicitly classified as terminal errors
@@ -587,6 +641,7 @@ export async function clearTerminalItems(): Promise<void> {
       }
     }
   }
+  })
 }
 
 export interface SyncQueueSummary {
@@ -700,14 +755,19 @@ export async function resolveSyncConflictApplyLocal(
 
 export async function clearSyncedItems(): Promise<void> {
   const db = await openDB()
+  return new Promise<void>((resolve, reject) => {
   const tx = db.transaction('sync_queue', 'readwrite')
   const store = tx.objectStore('sync_queue')
   const request = store.getAll()
+  tx.oncomplete = () => resolve()
+  tx.onerror = () => reject(tx.error ?? new Error('sync_queue: la purga fallo'))
+  tx.onabort = () => reject(tx.error ?? new Error('sync_queue: la purga se aborto'))
   request.onsuccess = () => {
     for (const item of request.result) {
       if (item.synced) store.delete(item.id)
     }
   }
+  })
 }
 
 // ─── Sync Engine ────────────────────────────────────────────────────────────
@@ -1281,10 +1341,22 @@ export async function getCachedPaymentMethods(): Promise<Record<string, unknown>
 
 export async function cacheStaff(staff: Record<string, unknown>[]): Promise<void> {
   const db = await openDB()
-  const tx = db.transaction('staff', 'readwrite')
-  const store = tx.objectStore('staff')
-  store.clear()
-  for (const s of staff) store.put(s)
+  // El más delicado de los cuatro: hace `clear()` y repuebla. Si la transacción se
+  // abortaba a medias y esto ya había resuelto, nadie se enteraba — y este caché es lo
+  // que permite entrar con PIN sin WAN. Un `staff` vacío deja la terminal sin acceso
+  // justo cuando no hay internet para arreglarlo.
+  //
+  // IndexedDB es transaccional: si aborta, el `clear()` también se revierte. Lo que
+  // faltaba no era atomicidad, era ENTERARSE.
+  return new Promise<void>((resolve, reject) => {
+    const tx = db.transaction('staff', 'readwrite')
+    const store = tx.objectStore('staff')
+    store.clear()
+    for (const s of staff) store.put(s)
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error ?? new Error('staff: la transacción falló'))
+    tx.onabort = () => reject(tx.error ?? new Error('staff: la transacción se abortó'))
+  })
 }
 
 export async function getCachedStaff(): Promise<Record<string, unknown>[]> {
@@ -1326,8 +1398,14 @@ export async function getCachedOrdersByTurno(turnoId: string): Promise<Record<st
 
 export async function cacheCashMovement(movement: Record<string, unknown>): Promise<void> {
   const db = await openDB()
-  const tx = db.transaction('cash_movements', 'readwrite')
-  tx.objectStore('cash_movements').put(movement)
+  // Es DINERO: un retiro o deposito que no cuaja desaparece del arqueo.
+  return new Promise<void>((resolve, reject) => {
+    const tx = db.transaction('cash_movements', 'readwrite')
+    tx.objectStore('cash_movements').put(movement)
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error ?? new Error('cash_movements: la transaccion fallo'))
+    tx.onabort = () => reject(tx.error ?? new Error('cash_movements: la transaccion se aborto'))
+  })
 }
 
 export async function getCachedCashMovsByTurno(turnoId: string): Promise<{ type: string; amount: number }[]> {
