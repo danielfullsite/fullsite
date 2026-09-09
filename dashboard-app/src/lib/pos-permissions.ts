@@ -1,4 +1,26 @@
-import permissionContract from '../../../electron-app/local-server/core/permission-profiles.json'
+// EL CONTRATO DE PERMISOS ES UNO SOLO, PERO NO SE PUEDE IMPORTAR DESDE FUERA.
+//
+// La fuente canonica vive en `electron-app/local-server/core/permission-profiles.json`
+// porque Pedro la lee en RUNTIME (`actor-authority.js`, `require('./permission-profiles.json')`)
+// y va empaquetada en el instalador (electron-builder-pos.json, verify-windows-package.cjs).
+// Ver docs/architecture/ACTOR-AUTHORITY-2026-09-05.md.
+//
+// Importarla desde aqui con `../../../electron-app/...` TRONABA EL BUILD. No era el
+// `.vercelignore` --que si excluye electron-app/ del deploy-- sino Next: Turbopack no
+// resuelve un modulo fuera de la raiz del proyecto. Comprobado local, con el archivo
+// presente en disco:
+//
+//     Module not found: Can't resolve '../../../electron-app/local-server/core/permission-profiles.json'
+//
+// Esta rama llevaba SIN PODER DESPLEGARSE desde `14ac4831`; todos los previews de
+// Vercel en ERROR.
+//
+// LA COPIA NO PUEDE DERIVAR: `el-contrato-de-permisos-es-uno-solo.test.ts` compara los
+// dos archivos byte a byte y truena si alguien edita uno. Si esa prueba falla, la
+// respuesta es copiar la canonica encima de esta, NO editar esta:
+//
+//     cp electron-app/local-server/core/permission-profiles.json dashboard-app/src/lib/permission-profiles.json
+import permissionContract from './permission-profiles.json'
 
 /**
  * POS Granular Permissions System
