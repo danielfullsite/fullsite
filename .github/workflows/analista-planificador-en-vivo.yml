@@ -1,0 +1,65 @@
+# Corre el planificador del analista contra un modelo REAL.
+#
+# POR QUÉ EXISTE
+# `analyst-plan.test.ts` (36 pruebas) comprueba que `validarPlan` rechaza lo que debe
+# rechazar. Ninguna comprueba lo que de verdad decide si el analista sirve: si un modelo,
+# viendo el catálogo del contrato, produce un plan que SOBREVIVE a esa validación. Un
+# planificador que siempre devolviera planes inválidos pasaría las 36 y no serviría.
+#
+# Esa prueba (`analyst-planner-live.test.ts`) se salta sola sin `GROQ_API_KEY`, así que el
+# CI normal la ignora — y por eso hacía falta un lugar donde sí corriera. Aquí, porque el
+# secreto ya vive en Actions y nadie tiene que copiarlo a una máquina.
+#
+# NO tiene cron a propósito: es una comprobación de calidad del planificador, no un
+# monitor. Se corre a mano cuando se toca el catálogo, el prompt de planeación o el modelo.
+#
+# Gasta cuota de Groq (unas 10 llamadas por corrida, plan gratuito: 14,400/día).
+
+name: Analista — planificador contra modelo real
+
+on:
+  workflow_dispatch:
+
+jobs:
+  planificador:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dashboard-app
+    env:
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      # El fallback del chat. Si Groq está caído o sin cuota, la prueba sigue siendo
+      # válida: lo que se mide es si UN modelo planea bien, no cuál.
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: dashboard-app/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Comprobar que el secreto está puesto
+        run: |
+          if [ -z "$GROQ_API_KEY" ]; then
+            echo "::error::Falta el secreto GROQ_API_KEY. Sin él la prueba se salta sola"
+            echo "y la corrida saldría verde sin haber probado nada — que es justo el"
+            echo "modo de fallo que este workflow existe para evitar."
+            exit 1
+          fi
+
+      - name: Planificador contra modelo real
+        run: npx vitest run src/__tests__/analyst-planner-live.test.ts --reporter=verbose
+
+      - name: Resumen
+        if: always()
+        run: |
+          echo "## Planificador del analista" >> "$GITHUB_STEP_SUMMARY"
+          echo "Resultado: ${{ job.status }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Prueba el paso que los mocks no cubren: que un modelo real, viendo el" >> "$GITHUB_STEP_SUMMARY"
+          echo "catálogo del contrato, produzca planes que sobrevivan a la validación." >> "$GITHUB_STEP_SUMMARY"

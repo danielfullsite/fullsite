@@ -50,17 +50,21 @@ class ElCargador(unittest.TestCase):
         os.environ.clear()
         os.environ.update(self._env)
 
-    def _correr(self, dias, upsert=None):
+    def _correr(self, dias, upsert=None, parcial=None):
         with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False,
                                          encoding="utf-8") as fh:
             json.dump(dias, fh)
             os.environ["ARCHIVO"] = fh.name
         salida = io.StringIO()
         up = upsert or mock.Mock()
-        with mock.patch.object(wb, "upsert", up), mock.patch.object(wb, "log_run"), \
+        par = parcial or mock.Mock(return_value=(0, 0))
+        with mock.patch.object(wb, "upsert", up), \
+             mock.patch.object(wb, "upsert_por_indice_parcial", par), \
+             mock.patch.object(wb, "log_run"), \
              contextlib.redirect_stdout(salida), contextlib.redirect_stderr(io.StringIO()):
             codigo = wb.main()
         os.unlink(os.environ["ARCHIVO"])
+        self._parcial = par
         return codigo, salida.getvalue(), up
 
     def test_el_dia_en_curso_no_se_carga(self):
@@ -74,20 +78,26 @@ class ElCargador(unittest.TestCase):
         filas = up.call_args_list[0][0][1]
         self.assertEqual([f["fecha"] for f in filas], [ayer])
 
-    def test_escribe_las_dos_tablas_con_su_propia_llave(self):
+    def test_escribe_las_dos_tablas_por_su_camino_correcto(self):
         # `ops_daily_history` —el contrato— une `ops_daily`, NO `wansoft_daily`.
         # Cargar sólo la primera dejaría a los agentes igual de ciegos.
+        #
+        # Y cada tabla va por su camino: wansoft_daily tiene una llave única completa
+        # (upsert normal), ops_daily la tiene PARCIAL y PostgREST responde 42P10 si se
+        # le manda on_conflict. Confundirlos fue justo lo que falló en la corrida
+        # 34405072285: wansoft_daily cargó y ops_daily no.
         ayer = (date.today() - timedelta(days=1)).isoformat()
         _, _, up = self._correr([dia(ayer)])
-        tablas = {c[0][0]: c[0][2] for c in up.call_args_list}
-        self.assertEqual(tablas, {"wansoft_daily": "client_slug,fecha,report_type",
-                                  "ops_daily": "client_id,fecha,record_type"})
+        self.assertEqual([c[0][0] for c in up.call_args_list], ["wansoft_daily"])
+        self.assertEqual(up.call_args_list[0][0][2], "client_slug,fecha,report_type")
+        self.assertEqual(self._parcial.call_args[0][0], "ops_daily")
+        self.assertEqual(self._parcial.call_args[0][2], ["client_id", "fecha", "record_type"])
 
     def test_las_filas_llevan_tenant_y_tipo(self):
         ayer = (date.today() - timedelta(days=1)).isoformat()
         _, _, up = self._correr([dia(ayer)])
         w = up.call_args_list[0][0][1][0]
-        o = up.call_args_list[1][0][1][0]
+        o = self._parcial.call_args[0][1][0]
         self.assertEqual((w["client_slug"], w["report_type"], w["location_id"]),
                          ("amalay", "cierre", "amalay-spgg"))
         self.assertEqual((o["client_id"], o["record_type"], o["source_system"]),
@@ -95,15 +105,26 @@ class ElCargador(unittest.TestCase):
 
     def test_una_escritura_fallida_devuelve_distinto_de_cero(self):
         ayer = (date.today() - timedelta(days=1)).isoformat()
-        malo = mock.Mock(side_effect=RuntimeError("ops_daily: HTTP 400 — columna X"))
+        malo = mock.Mock(side_effect=RuntimeError("wansoft_daily: HTTP 400 — columna X"))
         codigo, _, _ = self._correr([dia(ayer)], upsert=malo)
         self.assertEqual(codigo, 1)
+
+    def test_si_falla_SOLO_ops_daily_la_corrida_igual_sale_en_rojo(self):
+        # Es lo que pasó de verdad: wansoft_daily cargó sus 60 filas y ops_daily reventó
+        # con 42P10. Media carga no es una carga — y sobre todo, la que falló es la que
+        # lee el contrato.
+        ayer = (date.today() - timedelta(days=1)).isoformat()
+        malo = mock.Mock(side_effect=RuntimeError("ops_daily: HTTP 400 — 42P10"))
+        codigo, _, up = self._correr([dia(ayer)], parcial=malo)
+        self.assertEqual(codigo, 1)
+        up.assert_called_once()
 
     def test_si_todo_el_extracto_es_de_hoy_no_se_carga_nada_y_es_error(self):
         # Cargar cero filas y reportar éxito diría "el hueco está cerrado" sin estarlo.
         codigo, _, up = self._correr([dia(date.today().isoformat())])
         self.assertEqual(codigo, 1)
         up.assert_not_called()
+        self._parcial.assert_not_called()
 
     def test_dry_run_no_escribe(self):
         os.environ["DRY_RUN"] = "true"
@@ -119,9 +140,9 @@ class ElCargador(unittest.TestCase):
         ayer = (date.today() - timedelta(days=1)).isoformat()
         d = dia(ayer); d["campo_inventado"] = 1
         _, _, up = self._correr([d])
-        for c in up.call_args_list:
-            self.assertNotIn("campo_inventado", c[0][1][0])
-            self.assertNotIn("propinas_meseros", c[0][1][0])
+        for fila in (up.call_args_list[0][0][1][0], self._parcial.call_args[0][1][0]):
+            self.assertNotIn("campo_inventado", fila)
+            self.assertNotIn("propinas_meseros", fila)
 
 
 class ElExtractoReal(unittest.TestCase):
