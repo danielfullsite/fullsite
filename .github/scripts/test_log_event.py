@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import contextlib
 import io
-import json
 import os
 import sys
 import unittest
@@ -52,6 +51,30 @@ def enviado(**kw) -> dict:
          mock.patch.object(ac, "SUPABASE_URL", "https://x.supabase.co"), \
          mock.patch.object(ac, "SUPABASE_KEY", "k"):
         ac.log_event(**base)
+    return capturado
+
+
+def enviado_insight(**kw) -> dict:
+    """Devuelve el cuerpo que create_insight le mandaria a PostgREST."""
+    capturado = {}
+
+    class RespOK:
+        ok = True
+        status_code = 201
+        text = ""
+
+    def post_falso(url, headers=None, json=None, timeout=None):
+        capturado.update(json or {})
+        return RespOK()
+
+    base = {"agent_id": "cuadre", "category": "operations", "severity": "info",
+            "title": "T", "client_id": "demo"}
+    base.update(kw)
+    with mock.patch.dict(os.environ, {"CLIENT_ID": "demo"}, clear=False), \
+         mock.patch.object(ac, "requests", mock.Mock(post=post_falso)), \
+         mock.patch.object(ac, "SUPABASE_URL", "https://x.supabase.co"), \
+         mock.patch.object(ac, "SUPABASE_KEY", "k"):
+        ac.create_insight(**base)
     return capturado
 
 
@@ -94,7 +117,7 @@ class LoQueSIseManda(unittest.TestCase):
         self.assertEqual(cuerpo["confidence"], 0.9)
         self.assertEqual(cuerpo["explanation"], "porque sí")
         self.assertEqual(cuerpo["suggested_action"], "revisar")
-        self.assertEqual(json.loads(cuerpo["evidence"]), {"a": 1})
+        self.assertEqual(cuerpo["evidence"], {"a": 1})
 
     def test_el_status_nace_en_new_no_en_open(self):
         # 'open' no existe en el CHECK de la tabla; escribirlo rechazaba TODO.
@@ -107,6 +130,57 @@ class LoQueSIseManda(unittest.TestCase):
 
     def test_un_estimated_value_de_cero_SI_viaja(self):
         self.assertEqual(enviado(estimated_value=0.0)["estimated_value"], 0.0)
+
+
+class LaEvidenciaViajaComoObjetoNoComoCadena(unittest.TestCase):
+    """`evidence` es jsonb en las dos tablas. Lo que se manda tiene que ser el dict,
+    no `json.dumps(dict)`.
+
+    POR QUE IMPORTA
+    Con la cadena, PostgREST guardaba un ESCALAR de tipo string ADENTRO del jsonb. La
+    fila se escribia y nadie se quejaba, pero `evidence->>'codigo'` devolvia NULL: la
+    evidencia quedaba escrita y no consultable. No se podia agrupar por codigo de
+    descuadre, ni filtrar por fecha dentro de la evidencia, ni medir el bucle de valor.
+
+    Verificado en produccion el 2026-09-09: agent_events tenia 74 filas 'string' (todas
+    de cuadre y close-predictor, los dos que pasan por estos helpers) contra 121
+    'object' (las de engine.ts, que siempre mando el objeto). agent_insights estaba
+    peor: 2,820 'string' y CERO 'object'.
+
+    Es el mismo bug que se cerro en agent_results el 2026-08-26. Estas pruebas existen
+    para que no vuelva por tercera vez."""
+
+    def test_log_event_manda_un_dict(self):
+        evidencia = {"codigo": "dia_vs_ordenes", "fecha": "2026-09-09", "vista": 65969.2}
+        cuerpo = enviado(evidence=evidencia)
+        self.assertIsInstance(cuerpo["evidence"], dict)
+        self.assertEqual(cuerpo["evidence"], evidencia)
+
+    def test_log_event_NO_manda_una_cadena(self):
+        # La forma exacta del bug: str en vez de dict.
+        self.assertNotIsInstance(enviado(evidence={"a": 1})["evidence"], str)
+
+    def test_create_insight_manda_un_dict(self):
+        evidencia = {"current_ventas": 65969.2, "projected": 97718.4, "hour": 16}
+        cuerpo = enviado_insight(evidence=evidencia)
+        self.assertIsInstance(cuerpo["evidence"], dict)
+        self.assertEqual(cuerpo["evidence"], evidencia)
+
+    def test_create_insight_NO_manda_una_cadena(self):
+        self.assertNotIsInstance(enviado_insight(evidence={"a": 1})["evidence"], str)
+
+    def test_las_llaves_anidadas_sobreviven(self):
+        # Un dict anidado es donde mas duele el doble escapado: si viajara como cadena,
+        # 'detalle' quedaria inalcanzable desde SQL a cualquier profundidad.
+        evidencia = {"codigo": "x", "detalle": {"vista": 1.5, "ordenes": [1, 2]}}
+        self.assertEqual(enviado(evidence=evidencia)["evidence"], evidencia)
+
+    def test_lo_que_se_manda_es_consultable_como_lo_haria_postgres(self):
+        # Espejo de `evidence->>'codigo'`: sobre un dict funciona; sobre la cadena que
+        # se mandaba antes, esto reventaria con TypeError — que es justo lo que Postgres
+        # expresaba devolviendo NULL.
+        cuerpo = enviado(evidence={"codigo": "dia_vs_ordenes"})
+        self.assertEqual(cuerpo["evidence"]["codigo"], "dia_vs_ordenes")
 
 
 class SinClientIdNoSeEscribe(unittest.TestCase):
