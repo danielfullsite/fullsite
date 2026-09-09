@@ -42,6 +42,19 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
+      # LAS PRUEBAS CORREN EN WINDOWS, ANTES DE CONSTRUIR.
+      #
+      # Hasta hoy este workflow compilaba el instalador sin ejecutar una sola prueba: las
+      # 457 del local-server solo habian corrido en una Mac. Ese codigo vive de cosas que
+      # en macOS no existen — rutas C:\fullsite\, separadores, spawn de un .exe, CRLF,
+      # puertos ocupados. Un instalador que compila no es un instalador que funciona, y
+      # antes de la visita a AMALAY esa distincion es la que importa.
+      #
+      # Van ANTES del build a proposito: si algo falla aqui, no queremos un .exe esperando
+      # en los artefactos a que alguien lo lleve a una caja.
+      - name: Pruebas del local-server en Windows
+        run: node --test "local-server/tests/*.test.js"
+
       - name: Build Windows installer
         run: npx electron-builder --win --x64 --publish never
 
