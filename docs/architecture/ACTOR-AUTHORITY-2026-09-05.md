@@ -20,9 +20,9 @@ La pantalla Electron/configurada usa el PIN de Caja y conserva la sesión en ses
 
 La huella del cliente no constituye todavía una autenticación verificable por Caja: en este candidato se pide PIN para entrar al POS local. Falta conectar y certificar el lector y su prueba de presencia. No habilitar este candidato como actualización transparente de una instalación que dependa de huella sin completar esa aceptación.
 
-Sólo los comandos financieros nuevos exigen este contexto en el manejador actual. Las rutas legacy de órdenes, impresoras y cajón conservan la credencial de instalación; endurecer acciones/permisos y cambiar todos los escritores pertenece al cierre T4/T6/T8. No llamar a esta entrega autorización integral del producto. Un token local tampoco autoriza llamadas cloud ni demuestra un cobro bancario.
+En el candidato integrado `a01087e5`, operaciones y finanzas de Caja exigen contexto de empleado y permisos. Las rutas legacy de impresión cruda, cajón y resolución manual se bloquean en modo Caja; la impresión canónica de comandas sigue el resultado autorizado de `ORDER_SEND`. El recibo de cobro, cajón y resolución autorizada de impresión aún requieren integración. Las APIs cloud tienen su propia revisión de permisos pendiente: un token local no las autoriza ni demuestra un cobro bancario. Véanse [operaciones](OPERATIONAL-COMMANDS-2026-09-05.md) y [brechas vigentes](../audit/FULLSITE-HUECOS-ACTUALES-2026-09-08.md).
 
-## Evidencia
+## Evidencia inicial (histórica)
 
 - Servidor integrado: 367/367.
 - Frontend integrado: 2979/2979.
@@ -30,4 +30,4 @@ Sólo los comandos financieros nuevos exigen este contexto en el manejador actua
 - Laboratorio de cuatro procesos Electron y pantallas reales: 7/7; incluye pago parcial por HTTP de POS 2 reflejado en POS 3, liquidación sin retirar cocina y comando WS del secundario confirmado en Caja. Sesiones sintéticas preparadas; aún no pulsa PIN/cobro ni certifica banco.
 - TypeScript: 22 errores existentes en pruebas UI por dependencia `@testing-library/react` ausente y sus tipos derivados; ninguno en los archivos del cambio.
 
-No se aplicaron migraciones cloud ni se modificaron datos de clientes.
+Estos contadores describen la entrega inicial de autenticación. La [evidencia integrada posterior](../audit/evidence-20260905/integrated-candidate.json) incluye arranque frío 5/5 con PIN pulsado, operación UI 13/13 y TypeScript aprobado; todavía no certifica huella ni Windows. No se aplicaron migraciones cloud ni se modificaron datos de clientes.

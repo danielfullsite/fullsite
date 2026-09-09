@@ -4,9 +4,32 @@
 > coincidían: `BUGS.md`, los 27 hallazgos PRR, los P0 de la Biblia Wansoft, la auditoría
 > `audit/AUDITORIA-FULL-2026-08-19.md` y la `audit/AUDITORIA-FULL-FULLSITE-2026-08-19.md`.
 > Organizado por las **olas** de `../PLAN-AHORA.md`. Estado: ✅ hecho · 🔶 grace/parcial · ⬜ abierto.
-> Última actualización: 2026-08-19.
+> Última actualización: 2026-09-08 para el candidato `a01087e5`; las olas de agosto conservan su estado histórico salvo actualización explícita.
 
 Regla: cuando cierres un item, márcalo aquí. Cuando aparezca uno nuevo, entra aquí — no en un doc suelto.
+
+## Candidato de cierre: revisión del 8 de septiembre
+
+Fuente y aceptación de cada H: [Huecos actuales y condiciones de cierre](../audit/FULLSITE-HUECOS-ACTUALES-2026-09-08.md). No instalado en AMALAY. Estos estados distinguen código pendiente de falta de prueba; no vuelven a declarar abiertos los defectos ya corregidos en el candidato. El backlog heredado inferior no es una auditoría nueva de producción.
+
+| ID | Pendiente vigente del candidato | Estado |
+|---|---|---|
+| H01 | Corte y reportes omiten el nuevo modelo de pago separado | ⬜ defecto estático |
+| H02 | Ajustes de consumo después de preparar cuenta financiera | ⬜ función pendiente |
+| H03 | Tarjeta, pago mixto y propinas por Caja | ⬜ función pendiente |
+| H04 | Transferir consumo, unir cuentas, cancelación individual y otras acciones de salón | ⬜ funciones pendientes |
+| H05 | Recibo, precuenta, cajón y resolución autorizada de impresión incierta | ⬜ funciones y hardware |
+| H06 | Retiros, depósitos y X/Z completo | ⬜ función pendiente |
+| H07 | Entrada de delivery y otros canales al escritor Caja | ⬜ integración pendiente |
+| H08 | Inventario transaccional, recetas y depleción de ventas nuevas | ⬜ defecto e integración |
+| H09 | Permisos y campos inmutables en APIs cloud/proxies | ⬜ validación y enforcement |
+| H10 | Aislamiento y recuperación de MP/Clip/CFDI/delivery | ⬜ implementación y sandbox |
+| H11 | Alta reanudable, activación completa y credenciales iniciales | ⬜ defectos estáticos |
+| H12 | Sucursales, presencia de empleado y huella LAN | ⬜ integración y aceptación |
+| H13 | Conciliación, periodo completo y procedencia de datos de dashboard/IA | ⬜ integración y aceptación |
+| H14 | Migraciones reales y transición coordinada de AMALAY | 🔶 PostgreSQL local probado; destino pendiente |
+| H15 | Publicación real, Windows/hardware y restauración | 🔶 empaquetado sintético probado; campo pendiente |
+| H16 | Carga, diagnóstico accionable y actualización con pendientes | ⬜ aceptación y funciones de soporte |
 
 ---
 

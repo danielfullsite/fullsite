@@ -1,6 +1,6 @@
 # Fullsite — Knowledge Base
 
-> Única fuente de verdad. Última actualización: 2026-09-04 (plan de cierre y auditoría offline).
+> Única fuente de verdad. Última actualización: 2026-09-08 (brechas verificadas del candidato offline).
 > Flujo permanente: Artifact → Revisión → Consolidación → **docs/** → Commit.
 >
 > ⚠️ Muchos docs individuales son de julio y llevan banner "DOCUMENTO HISTÓRICO". El estado
@@ -30,6 +30,7 @@ El modelo: plataforma SaaS multi-tenant, un solo Supabase, particionamiento por 
 | Entender la filosofía y restricciones | [`constitution/PRINCIPLES.md`](constitution/PRINCIPLES.md) |
 | Entender cómo está construido | [`architecture/SYSTEM-ARCHITECTURE.md`](architecture/SYSTEM-ARCHITECTURE.md) |
 | **Qué está abierto (índice único)** | [`state/OPEN-ITEMS.md`](state/OPEN-ITEMS.md) |
+| **Huecos actuales del candidato y condiciones de cierre** | [`audit/FULLSITE-HUECOS-ACTUALES-2026-09-08.md`](audit/FULLSITE-HUECOS-ACTUALES-2026-09-08.md) |
 | **Plan de cierre operativo (septiembre)** | [`PLAN-CIERRE-FULLSITE-2026-09-04.md`](PLAN-CIERRE-FULLSITE-2026-09-04.md) |
 | **Qué instalar y comprobar en AMALAY (candidato, no desplegado)** | [`offline/AMALAY-INSTALACION-CANDIDATO-2026-09-05.md`](offline/AMALAY-INSTALACION-CANDIDATO-2026-09-05.md) |
 | **Operación, dinero y cocina desde Caja** | [`architecture/OPERATIONAL-COMMANDS-2026-09-05.md`](architecture/OPERATIONAL-COMMANDS-2026-09-05.md) |
