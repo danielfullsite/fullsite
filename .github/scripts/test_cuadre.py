@@ -33,7 +33,8 @@ def orden(**kw):
             "descuento": 0.0, "total": 116.0,
             "items": [{"nombre": "X", "subtotal": 100.0}],
             "pagos": [{"metodo": "Efectivo", "monto": 116.0}],
-            "metodo_pago": "Efectivo", "created_at": "2026-08-25T20:00:00Z"}
+            "metodo_pago": "Efectivo", "created_at": "2026-08-25T20:00:00Z",
+            "dia_venta": "2026-08-25"}
     base.update(kw)
     return base
 
@@ -198,6 +199,122 @@ class ElCaminoDelDescuento(unittest.TestCase):
         o = orden(**self.como_el_pos(1888.00, 0.0, 0.16))
         o["total"] = 1500.00
         self.assertIn("aritmetica_del_total", codigos(o))
+
+class ElNivel4CruzaPorDiaDeVenta(unittest.TestCase):
+    """El Nivel 4 sumaba las órdenes por `created_at[:10]` —día de calendario en UTC— y
+    las comparaba contra una vista que cortaba el día en otra parte. Eran peras contra
+    manzanas, tapadas con un 1% de tolerancia.
+
+    Desde el #360 la vista agrupa por `pos_orders.dia_venta` (zona del tenant + corte de
+    las 05:00). Si el comparador se hubiera quedado en UTC, el desfase pasaba de 6 a 11
+    horas — y como el #363 devolvió este nivel a la vida, cada diferencia se escribe como
+    un evento `descuadre`. O sea: el chequeo se habría vuelto la fuente del ruido."""
+
+    @staticmethod
+    def _sb(ordenes, diario, cliente=None):
+        def fake(table, params, *a, **kw):
+            if table == "pos_orders":
+                return ordenes
+            if table == "ops_daily_history":
+                return diario
+            if table == "clients":
+                return cliente if cliente is not None else [
+                    {"id": "t1", "timezone": "America/Monterrey",
+                     "business_day_start_local": "05:00:00"}]
+            return []
+        return fake
+
+    def _correr(self, ordenes, diario, en_curso="2026-09-30", cliente=None):
+        with mock.patch.object(cuadre, "sb_get", self._sb(ordenes, diario, cliente)), \
+             mock.patch.object(cuadre, "business_date_con_defaults_de_la_base",
+                               return_value=en_curso):
+            return cuadre.revisar_tenant("t1", 7)
+
+    def test_la_madrugada_no_descuadra_los_dos_dias_que_toca(self):
+        """La regresión concreta, con la forma que tiene en producción.
+
+        Un restaurante que vende la noche del 01 y hasta las 02:00 del 02 tiene UN día de
+        venta: el 01. El comparador viejo partía esas órdenes en dos días de calendario
+        UTC y ninguno cuadraba contra la vista — así se llegó a 28 de 31 días marcados en
+        `lab-resto`.
+
+        Ojo con la forma de la falla: cuando las llaves no coinciden, el nivel 4 se SALTA
+        el día en silencio. Por eso aquí los dos días existen en la vista, para que el
+        error salga como lo que es —una acusación falsa— y no como un hueco."""
+        ordenes = [
+            # Día de venta 01: la noche del 01 y la madrugada del 02.
+            orden(id="a", total=900.0, dia_venta="2026-09-01",
+                  created_at="2026-09-02T02:00:00Z"),   # 20:00 del 01 en Monterrey
+            orden(id="b", total=500.0, dia_venta="2026-09-01",
+                  created_at="2026-09-02T07:30:00Z"),   # 01:30 del 02 en Monterrey
+            # Día de venta 02: su propia tarde.
+            orden(id="c", total=700.0, dia_venta="2026-09-02",
+                  created_at="2026-09-03T01:00:00Z"),   # 19:00 del 02 en Monterrey
+        ]
+        diario = [
+            {"fecha": "2026-09-01", "ventas_dia": 1400.0, "tickets_count": 2},
+            {"fecha": "2026-09-02", "ventas_dia": 700.0, "tickets_count": 1},
+        ]
+        r = self._correr(ordenes, diario)
+        self.assertEqual(r["nivel4"], "ok")
+        self.assertEqual(r["dias_descuadrados"], [], "acusó a un restaurante que cuadra")
+
+        # Y que el día SÍ se comparó, no que se saltó en silencio: si la vista miente en
+        # uno de los dos, tiene que salir.
+        diario_mentiroso = [
+            {"fecha": "2026-09-01", "ventas_dia": 900.0, "tickets_count": 2},
+            {"fecha": "2026-09-02", "ventas_dia": 700.0, "tickets_count": 1},
+        ]
+        r2 = self._correr(ordenes, diario_mentiroso)
+        self.assertEqual([f for f, _, _ in r2["dias_descuadrados"]], ["2026-09-01"])
+
+    def test_un_descuadre_real_de_un_peso_si_se_marca(self):
+        """Con la misma columna en las dos partes, el 1% ya no hace falta. Un peso de
+        diferencia sobre un día de $1,400 es 0.07% — el 1% viejo lo dejaba pasar."""
+        ordenes = [orden(id="a", total=1400.0, dia_venta="2026-09-01")]
+        diario = [{"fecha": "2026-09-01", "ventas_dia": 1401.0, "tickets_count": 1}]
+        r = self._correr(ordenes, diario)
+        self.assertEqual(len(r["dias_descuadrados"]), 1)
+        fecha, vista, crudo = r["dias_descuadrados"][0]
+        self.assertEqual((fecha, vista, crudo), ("2026-09-01", 1401.0, 1400.0))
+
+    def test_un_centavo_de_redondeo_no_es_un_descuadre(self):
+        ordenes = [orden(id="a", total=1400.0, dia_venta="2026-09-01")]
+        diario = [{"fecha": "2026-09-01", "ventas_dia": 1400.01, "tickets_count": 1}]
+        self.assertEqual(self._correr(ordenes, diario)["dias_descuadrados"], [])
+
+    def test_el_dia_de_negocio_en_curso_no_se_juzga(self):
+        """A la 1am —cuando corre este workflow— el día que empezó a las 05:00 de ayer
+        sigue acumulando. Compararlo es una carrera contra las órdenes que entran."""
+        ordenes = [orden(id="a", total=500.0, dia_venta="2026-09-09")]
+        diario = [{"fecha": "2026-09-09", "ventas_dia": 999999.0, "tickets_count": 1}]
+        r = self._correr(ordenes, diario, en_curso="2026-09-09")
+        self.assertEqual(r["dias_descuadrados"], [], "juzgó un día todavía abierto")
+
+    def test_cancelada_y_dividida_se_excluyen_igual_que_en_la_vista(self):
+        """Si el comparador excluyera algo distinto que la vista, el descuadre lo
+        produciría él mismo."""
+        ordenes = [
+            orden(id="a", total=1400.0, dia_venta="2026-09-01"),
+            orden(id="b", total=999.0, dia_venta="2026-09-01", status="cancelada"),
+            orden(id="c", total=777.0, dia_venta="2026-09-01", status="dividida"),
+        ]
+        diario = [{"fecha": "2026-09-01", "ventas_dia": 1400.0, "tickets_count": 1}]
+        self.assertEqual(self._correr(ordenes, diario)["dias_descuadrados"], [])
+
+    def test_una_orden_sin_dia_de_venta_no_se_juzga_y_se_dice(self):
+        """Dejaría la suma corta. Callarlo acusaría de descuadre a un restaurante sano;
+        hoy son 0 en producción, pero el silencio es justo lo que este archivo prohíbe."""
+        ordenes = [
+            orden(id="a", total=1400.0, dia_venta="2026-09-01"),
+            orden(id="b", total=300.0, dia_venta=None),
+        ]
+        diario = [{"fecha": "2026-09-01", "ventas_dia": 1400.0, "tickets_count": 1}]
+        r = self._correr(ordenes, diario)
+        self.assertEqual(r["dias_descuadrados"], [])
+        self.assertTrue(any("sin `dia_venta`" in m for m in r["motivos"]),
+                        f"no reportó las órdenes sin día de venta: {r['motivos']}")
+
 
 class UnaLecturaCaidaNoPuedeVerseComoQueCuadro(unittest.TestCase):
     """Del 2026-09-02 al 09-08 el cuadre reportó `success` siete días seguidos con el

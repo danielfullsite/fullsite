@@ -40,6 +40,7 @@ from datetime import datetime, timedelta, timezone
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from agent_common import sb_get, log_run, log_event, SupabaseError  # noqa: E402
+from ops_aggregate import business_date_con_defaults_de_la_base  # noqa: E402
 
 # Un centavo de tolerancia. No es laxitud: `numeric` y los redondeos de IVA producen
 # diferencias de fracciones de centavo que no son un descuadre real. Más ancho que esto
@@ -128,7 +129,8 @@ def revisar_tenant(cid: str, dias: int) -> dict:
         ordenes = sb_get(
             "pos_orders",
             f"client_id=eq.{cid}&created_at=gte.{desde}"
-            f"&select=id,status,subtotal,iva,descuento,total,items,pagos,metodo_pago,created_at"
+            f"&select=id,status,subtotal,iva,descuento,total,items,pagos,metodo_pago,"
+            f"created_at,dia_venta"
             f"&limit={LIMITE_ORDENES}",
         )
     except SupabaseError as e:
@@ -167,22 +169,52 @@ def revisar_tenant(cid: str, dias: int) -> dict:
         r["motivos"].append(f"nivel 4: no se pudo leer el contrato — {e}")
         return r
 
+    # El día sale de `dia_venta`, la MISMA columna por la que agrupa la vista desde el
+    # #360. Antes era `created_at[:10]`, o sea el día de calendario en UTC: comparaba
+    # peras con manzanas y lo tapaba con un 1% de tolerancia. Con la vista partiendo por
+    # día de venta el desfase habría pasado de 6 a 11 horas, y como el #363 devolvió este
+    # nivel a la vida, cada diferencia se escribe como un evento `descuadre`.
     suma_por_dia: dict[str, float] = {}
+    sin_dia_venta = 0
     for o in ordenes:
-        if str(o.get("status") or "") == "cancelada":
+        # Mismo filtro que la vista: `cancelada` y `dividida`. Si aquí se excluyera otra
+        # cosa, el descuadre lo produciría el propio comparador.
+        if str(o.get("status") or "") in ("cancelada", "dividida"):
             continue
-        f = str(o.get("created_at", ""))[:10]
+        f = o.get("dia_venta")
+        if not f:
+            sin_dia_venta += 1
+            continue
         suma_por_dia[f] = suma_por_dia.get(f, 0) + dinero(o.get("total"))
+
+    if sin_dia_venta:
+        # Hoy son 0 en producción. Si aparecen, la suma del día queda corta y acusaría
+        # de descuadre a un restaurante sano: se dice y no se juzga.
+        r["motivos"].append(
+            f"nivel 4: {sin_dia_venta} órden(es) sin `dia_venta` — no se comparan")
+
+    # El día de negocio en curso NO se juzga: sigue acumulando. Este workflow corre a la
+    # 1am, cuando el día que empezó a las 05:00 de ayer todavía no cierra; compararlo
+    # sería una carrera contra las órdenes que están entrando.
+    try:
+        filas = sb_get("clients", f"id=eq.{cid}&select=id,timezone,business_day_start_local")
+        en_curso = business_date_con_defaults_de_la_base(filas[0]) if filas else None
+    except (SupabaseError, ValueError, KeyError) as e:
+        en_curso = None
+        r["motivos"].append(
+            f"nivel 4: no se pudo fijar el día en curso ({e}) — se comparan todos los días")
+
     for d in diario:
         f = d["fecha"]
-        if f not in suma_por_dia:
+        if f not in suma_por_dia or f == en_curso:
             continue
         vista = dinero(d.get("ventas_dia"))
         crudo = suma_por_dia[f]
-        # 1% de tolerancia: la vista usa la zona horaria del negocio para cortar el día
-        # y esta suma usa UTC, así que las órdenes del filo se mueven. Una diferencia
-        # mayor no es zona horaria, es un problema.
-        if crudo > 0 and abs(vista - crudo) / crudo > 0.01:
+        # Un centavo, igual que el Nivel 1. Ya no hace falta el 1% que cubría la
+        # diferencia de zona horaria: las dos partes agrupan por la misma columna, así
+        # que cualquier diferencia real es un descuadre. Un 1% sobre un día de $100,000
+        # escondía $1,000.
+        if abs(vista - crudo) > TOLERANCIA:
             r["dias_descuadrados"].append((f, vista, crudo))
 
     r["nivel4"] = "ok"
