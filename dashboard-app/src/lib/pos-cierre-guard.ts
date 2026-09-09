@@ -233,3 +233,73 @@ export function leerContado(entrada: string): number | null {
   const n = Number(t)
   return Number.isFinite(n) ? n : null
 }
+
+// ─── El aviso de órdenes huérfanas tenía que poder apagarse solo ─────────────
+//
+// Visto en la caja de AMALAY el 2026-09-08: la pantalla de Turnos llevaba SIETE
+// DÍAS mostrando "Cierre anterior con 13 ordenes abiertas — Verifica el mapa de
+// mesas para localizar las ordenes huérfanas".
+//
+// Comprobado contra la base ese mismo día: las 13 órdenes existen, y NINGUNA
+// sigue abierta. El aviso era falso, y llevaba dos cierres Z encima (Z#3 el 3 de
+// septiembre, Z#4 el 5) sin apagarse.
+//
+// La causa está en `pos/turno/page.tsx`: la consulta pedía
+// `cierre_con_ordenes_abiertas=eq.true&order=created_at.desc&limit=1`, o sea el
+// último cierre que TUVO órdenes abiertas — un hecho histórico que nunca deja de
+// ser cierto — y contaba la longitud del arreglo guardado aquel día. Nadie
+// preguntaba si esas órdenes seguían abiertas hoy.
+//
+// Un aviso que no se puede resolver trabajando deja de leerse, y se lleva por
+// delante la credibilidad de los avisos que sí importan. Peor: tenía una "X"
+// para cerrarlo, así que la única forma de quitarlo era ignorarlo.
+//
+// POR QUÉ NO SE ESCONDE CUANDO NO SE PUEDE COMPROBAR. Si la consulta de estado
+// falla (sin red, 401, timeout), no sabemos si quedan huérfanas. Callar sería
+// convertir un fallo en un "no hay", que es el error que ya costó caro el
+// 2026-08-31. Se muestra el aviso diciendo que no se pudo verificar.
+
+export interface AvisoDeHuerfanas {
+  /** ¿Hay que enseñar el aviso? */
+  mostrar: boolean
+  /** Cuántas siguen abiertas. `null` si no se pudo comprobar. */
+  siguenAbiertas: number | null
+  /** Texto para el operador. `null` si no hay nada que decir. */
+  texto: string | null
+}
+
+/**
+ * ¿Sigue vigente el aviso del último cierre con órdenes abiertas?
+ *
+ * `declaradas` son los ids que ese cierre guardó. `lectura` es lo que se pudo
+ * averiguar HOY sobre ellas. Pura: la política vive aquí, no en el componente.
+ */
+export function evaluarAvisoDeHuerfanas(
+  declaradas: string[],
+  lectura: { determinado: true; abiertas: string[] } | { determinado: false; motivo: string },
+  nota: string | null,
+): AvisoDeHuerfanas {
+  if (declaradas.length === 0) return { mostrar: false, siguenAbiertas: 0, texto: null }
+
+  if (!lectura.determinado) {
+    return {
+      mostrar: true,
+      siguenAbiertas: null,
+      texto: `Un cierre anterior dejó ${declaradas.length} ${declaradas.length === 1 ? 'orden abierta' : 'órdenes abiertas'}` +
+             `${nota ? ` (motivo: ${nota})` : ''}. No se pudo comprobar si siguen abiertas (${lectura.motivo}) — ` +
+             `revisa el mapa de mesas.`,
+    }
+  }
+
+  // Sólo cuentan las declaradas que de verdad siguen abiertas. Una orden abierta
+  // NUEVA no es huérfana de aquel cierre y no le toca a este aviso.
+  const vivas = lectura.abiertas.filter((id) => declaradas.includes(id))
+  if (vivas.length === 0) return { mostrar: false, siguenAbiertas: 0, texto: null }
+
+  return {
+    mostrar: true,
+    siguenAbiertas: vivas.length,
+    texto: `Quedan ${vivas.length} de ${declaradas.length} ${vivas.length === 1 ? 'orden' : 'órdenes'} ` +
+           `sin cerrar de un cierre anterior${nota ? ` (motivo: ${nota})` : ''}. Búscalas en el mapa de mesas.`,
+  }
+}

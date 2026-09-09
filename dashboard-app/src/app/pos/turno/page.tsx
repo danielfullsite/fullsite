@@ -9,6 +9,7 @@ import { getActiveClientSlug as _cid } from '@/lib/data'
 import { cacheTurno, getCachedActiveTurno, getCachedOrdersByTurno } from '@/lib/pos-offline-db'
 import { leerSalon, requiereCaja } from '@/lib/pedro-cliente'
 import TurnoDeCaja from '@/components/pos/TurnoDeCaja'
+import { evaluarAvisoDeHuerfanas, OPEN_ORDER_STATUSES, type AvisoDeHuerfanas } from '@/lib/pos-cierre-guard'
 
 const StaffShiftPanel = dynamic(() => import('@/components/pos/StaffShiftPanel'), { ssr: false })
 const CierreCajaWizard = dynamic(() => import('@/components/pos/CierreCajaWizard'), { ssr: false })
@@ -325,7 +326,7 @@ function TurnoPageLegacy() {
   const [showCierreWizard, setShowCierreWizard] = useState(false)
   const [showCorteX, setShowCorteX] = useState(false)
   // GUARD-08: banner if the previous cierre had open orders
-  const [orphanCierre, setOrphanCierre] = useState<{ count: number; nota: string | null } | null>(null)
+  const [orphanCierre, setOrphanCierre] = useState<AvisoDeHuerfanas | null>(null)
   // Turnos abiertos ADEMÁS del operativo (huérfanos de días anteriores)
   const [staleTurnos, setStaleTurnos] = useState<Turno[]>([])
 
@@ -355,7 +356,13 @@ function TurnoPageLegacy() {
         if (turno) {
           await cacheTurno({ ...turno, client_id: _cid(), synced_at: new Date().toISOString() })
         }
-        // GUARD-08: check if previous cierre had open orders — show banner if so
+        // GUARD-08: aviso de ordenes huerfanas de un cierre anterior.
+        //
+        // Esta consulta pide el ultimo cierre que TUVO ordenes abiertas, que es un
+        // hecho historico y nunca deja de ser cierto. Antes se enseñaba tal cual, y
+        // en AMALAY el aviso del Z#2 (1-sep) llevaba SIETE DIAS en pantalla con dos
+        // cierres Z encima, pidiendo buscar 13 mesas de las que ya no quedaba
+        // ninguna abierta. Ahora se comprueba cuales siguen abiertas HOY.
         try {
           const cierreRes = await fetch(
             `${SUPABASE_URL}/rest/v1/pos_cierres?client_id=eq.${_cid()}&cierre_con_ordenes_abiertas=eq.true&order=created_at.desc&limit=1&select=ordenes_pendientes,cierre_nota`,
@@ -363,9 +370,26 @@ function TurnoPageLegacy() {
           )
           if (cierreRes.ok) {
             const [lastCierre] = await cierreRes.json()
-            if (lastCierre) {
-              const count = (lastCierre.ordenes_pendientes || []).length
-              setOrphanCierre({ count, nota: lastCierre.cierre_nota || null })
+            const declaradas: string[] = lastCierre?.ordenes_pendientes || []
+            if (declaradas.length > 0) {
+              // Que siguen abiertas de aquellas. Si no se puede saber, NO se calla:
+              // convertir un fallo de red en "ya no hay" es el error que costo caro
+              // el 2026-08-31.
+              let lectura: Parameters<typeof evaluarAvisoDeHuerfanas>[1]
+              try {
+                const ids = declaradas.map(id => `"${id}"`).join(',')
+                const abiertasRes = await fetch(
+                  `${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${_cid()}&id=in.(${ids})&status=in.(${OPEN_ORDER_STATUSES.join(',')})&select=id`,
+                  { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, signal: AbortSignal.timeout(3000) }
+                )
+                if (!abiertasRes.ok) throw new Error(`HTTP ${abiertasRes.status}`)
+                const filas: Array<{ id: string }> = await abiertasRes.json()
+                lectura = { determinado: true, abiertas: filas.map(f => f.id) }
+              } catch (e) {
+                lectura = { determinado: false, motivo: e instanceof Error ? e.message : 'sin conexion' }
+              }
+              const aviso = evaluarAvisoDeHuerfanas(declaradas, lectura, lastCierre?.cierre_nota || null)
+              setOrphanCierre(aviso.mostrar ? aviso : null)
             }
           }
         } catch { /* columns not yet migrated or offline — skip banner */ }
@@ -494,14 +518,11 @@ function TurnoPageLegacy() {
                         <AlertTriangle size={18} className="text-amber-400 flex-shrink-0 mt-0.5" />
                         <div>
                           <p className="font-semibold text-amber-400 text-sm">
-                            Cierre anterior con {orphanCierre.count} orden{orphanCierre.count !== 1 ? 'es' : ''} abierta{orphanCierre.count !== 1 ? 's' : ''}
+                            {orphanCierre.siguenAbiertas === null
+                              ? 'Ordenes de un cierre anterior sin verificar'
+                              : `Quedan ${orphanCierre.siguenAbiertas} orden${orphanCierre.siguenAbiertas !== 1 ? 'es' : ''} sin cerrar`}
                           </p>
-                          {orphanCierre.nota && (
-                            <p className="text-xs text-[var(--text-3)] mt-0.5">Motivo: {orphanCierre.nota}</p>
-                          )}
-                          <p className="text-xs text-[var(--text-3)] mt-1">
-                            Verifica el mapa de mesas para localizar las órdenes huérfanas.
-                          </p>
+                          <p className="text-xs text-[var(--text-3)] mt-1">{orphanCierre.texto}</p>
                         </div>
                       </div>
                       <button onClick={() => setOrphanCierre(null)} className="text-[var(--text-3)] hover:text-[var(--text-1)] flex-shrink-0">
