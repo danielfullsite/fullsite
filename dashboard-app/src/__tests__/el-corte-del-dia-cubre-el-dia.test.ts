@@ -42,21 +42,82 @@ const TZ = 'America/Monterrey'
 const soloFecha = (d: Date) =>
   new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d)
 
+// EL DEFECTO DEPENDE DE LA ZONA DEL PROCESO, Y POR ESO ESTA PRUEBA NO PUEDE LEERLA.
+//
+// `new Date(d.toLocaleString('en-US', { timeZone: TZ }))` toma los numeros de PARED de
+// Monterrey y los reinterpreta como hora local DEL PROCESO. El resultado depende de la
+// maquina:
+//
+//   - Terminal de AMALAY (TZ del sistema = Monterrey): devuelve MAÑANA a la hora de la
+//     cena. Es el caso de campo.
+//   - Runner de CI (TZ = UTC): devuelve la fecha correcta por casualidad.
+//
+// La primera version de esta prueba llamaba al patron viejo directamente y afirmaba
+// '2026-09-08'. Pasaba en la Mac de Daniel (Monterrey) y fallaba en CI (UTC) --
+// verde en la maquina de quien lo escribio, rojo donde importa. Y de paso muestra por
+// que CI nunca iba a delatar este defecto sola.
+//
+// Se simula la zona del proceso en vez de leerla. `simuladorFiel` comprueba, en la
+// maquina que sea, que la simulacion coincide con el patron real.
+
+/** Los numeros de pared de un instante en una zona. */
+function pared(instante: Date, zona: string) {
+  const p = new Intl.DateTimeFormat('en-CA', {
+    timeZone: zona, year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+  }).formatToParts(instante)
+  const v = (t: string) => Number(p.find(x => x.type === t)!.value)
+  return { y: v('year'), m: v('month'), d: v('day'), h: v('hour') % 24, mi: v('minute'), s: v('second') }
+}
+
+/** Desfase de una zona respecto a UTC, en ms, en ese instante (respeta horario de verano). */
+function desfase(zona: string, instante: Date): number {
+  const w = pared(instante, zona)
+  return Date.UTC(w.y, w.m - 1, w.d, w.h, w.mi, w.s) - instante.getTime()
+}
+
+/** Lo que el patron viejo devuelve en un proceso cuya zona local es `zonaDelProceso`. */
+function patronViejoEn(ahora: Date, zonaDelProceso: string): string {
+  const w = pared(ahora, TZ)                                   // lo que dice toLocaleString
+  const comoSiFueraLocal = Date.UTC(w.y, w.m - 1, w.d, w.h, w.mi, w.s)
+  // `new Date(str)` interpreta esos numeros en la zona del proceso -> resta su desfase.
+  const aproximado = new Date(comoSiFueraLocal)
+  return new Date(comoSiFueraLocal - desfase(zonaDelProceso, aproximado))
+    .toISOString().split('T')[0]
+}
+
+/** La zona con la que corre este proceso ahora mismo. */
+const ZONA_DEL_PROCESO = Intl.DateTimeFormat().resolvedOptions().timeZone
+
 describe('ERROR 1: la fecha por defecto', () => {
   /** El patrón viejo, tal cual estaba en el corte. */
   const patronViejo = (ahora: Date) =>
     new Date(ahora.toLocaleString('en-US', { timeZone: TZ })).toISOString().split('T')[0]
 
-  it('el patrón viejo daba MAÑANA a la hora de la cena', () => {
-    // 7 de septiembre, 20:30 en Monterrey (UTC-6) = 8 de septiembre 02:30 UTC.
-    const cena = new Date(Date.UTC(2026, 8, 8, 2, 30))
-    expect(soloFecha(cena)).toBe('2026-09-07')          // en Monterrey es el 7
-    expect(patronViejo(cena)).toBe('2026-09-08')        // pero el corte decía el 8
+  it('simuladorFiel: la simulación coincide con el patrón real en ESTA máquina', () => {
+    // Ancla del simulador. Si esto pasa, lo de abajo es sobre el patron de verdad y no
+    // sobre una teoria mia. Corre igual en Monterrey, en UTC o donde sea.
+    for (const h of [2, 5, 12, 18, 23]) {
+      const instante = new Date(Date.UTC(2026, 8, 8, h, 30))
+      expect(patronViejoEn(instante, ZONA_DEL_PROCESO)).toBe(patronViejo(instante))
+    }
   })
 
-  it('y a mediodía acertaba — por eso pasaba desapercibido', () => {
+  it('en la terminal de AMALAY el patrón viejo daba MAÑANA a la hora de la cena', () => {
+    // 7 de septiembre, 20:30 en Monterrey (UTC-6) = 8 de septiembre 02:30 UTC.
+    const cena = new Date(Date.UTC(2026, 8, 8, 2, 30))
+    expect(soloFecha(cena)).toBe('2026-09-07')                       // en Monterrey es el 7
+    expect(patronViejoEn(cena, TZ)).toBe('2026-09-08')               // pero el corte decía el 8
+  })
+
+  it('en una máquina en UTC acertaba — por eso CI no lo iba a delatar', () => {
+    const cena = new Date(Date.UTC(2026, 8, 8, 2, 30))
+    expect(patronViejoEn(cena, 'UTC')).toBe('2026-09-07')
+  })
+
+  it('y a mediodía acertaba también en Monterrey — por eso pasaba desapercibido', () => {
     const comida = new Date(Date.UTC(2026, 8, 7, 18, 30)) // 12:30 en Monterrey
-    expect(patronViejo(comida)).toBe(soloFecha(comida))
+    expect(patronViejoEn(comida, TZ)).toBe(soloFecha(comida))
   })
 
   it('el corte ya no usa ese patrón', () => {
@@ -120,8 +181,8 @@ describe('ERROR 2: la ventana del día', () => {
     const ahora = new Date(Date.UTC(2026, 8, 8, 5, 30))
     expect(soloFecha(ahora)).toBe('2026-09-07')
 
-    // ERROR 1: la fecha por defecto le daba el 8.
-    const fechaVieja = new Date(ahora.toLocaleString('en-US', { timeZone: TZ })).toISOString().split('T')[0]
+    // ERROR 1: la fecha por defecto le daba el 8 EN LA TERMINAL (zona Monterrey).
+    const fechaVieja = patronViejoEn(ahora, TZ)
     expect(fechaVieja).toBe('2026-09-08')
 
     // ERROR 2: y esa fecha, sin zona, abría la ventana el 7 a las 18:00.
