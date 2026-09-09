@@ -1,0 +1,57 @@
+# Carga a mano de un extracto de Wansoft.
+#
+# NO reemplaza a `wansoft-backfill.yml`: ese re-scrapea fechas historicas y escribe
+# `wansoft_daily`, pero depende de `wansoft_login()`, que Turnstile bloquea. Este toma
+# un extracto ya sacado por una persona y escribe wansoft_daily Y ops_daily. NO tiene cron: se corre una vez, cuando alguien
+# acaba de sacar datos del portal (Turnstile bloquea el login automático, así que la
+# extracción siempre la inicia una persona).
+#
+# Arranca en DRY_RUN. Correr primero en seco, leer el resumen, y sólo entonces repetir
+# con dry_run=false. Un backfill escribe sobre el histórico: no se dispara a ciegas.
+
+name: Wansoft — cargar extracto manual
+
+on:
+  workflow_dispatch:
+    inputs:
+      archivo:
+        description: 'Ruta del extracto JSON'
+        required: false
+        default: 'data/backfill/amalay-wansoft-2026-07-11_2026-09-09.json'
+      dry_run:
+        description: 'true = sólo reporta, no escribe'
+        required: false
+        default: 'true'
+
+jobs:
+  cargar:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      ARCHIVO: ${{ github.event.inputs.archivo }}
+      DRY_RUN: ${{ github.event.inputs.dry_run }}
+      TRIGGER_TYPE: ${{ github.event_name }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with: { python-version: '3.11' }
+      - run: pip install requests
+
+      - run: python .github/scripts/test_wansoft_cargar_extracto.py
+
+      - name: Cargar
+        shell: bash
+        run: |
+          set -o pipefail
+          python .github/scripts/wansoft_cargar_extracto.py | tee salida.txt
+
+      - name: Resumen
+        if: always()
+        run: |
+          {
+            echo '## Carga de extracto Wansoft'
+            echo '```'
+            cat salida.txt 2>/dev/null || echo 'sin salida'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

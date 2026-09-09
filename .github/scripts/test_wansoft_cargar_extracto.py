@@ -26,7 +26,7 @@ from unittest import mock
 sys.path.insert(0, str(Path(__file__).parent))
 sys.modules.setdefault("requests", mock.MagicMock())
 
-import wansoft_backfill as wb  # noqa: E402
+import wansoft_cargar_extracto as wb  # noqa: E402
 
 
 def dia(fecha: str, ventas: float = 1000.0) -> dict:
