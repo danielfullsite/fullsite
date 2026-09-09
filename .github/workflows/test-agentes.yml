@@ -37,3 +37,10 @@ jobs:
       # volviera a envolver `evidence` en json.dumps no se enteraría hasta la
       # siguiente corrida, con la evidencia ya escrita e inconsultable. Sin red.
       - run: python .github/scripts/test_log_event.py
+
+      # Permisos en las migraciones. El 2026-09-09 se aplico desde `main` un
+      # `grant select ... to anon` sobre una vista sin `security_invoker`: `anon` es la
+      # llave publica y la vista se salta el RLS, asi que publicó 148 filas de 3
+      # restaurantes. El arreglo ya existia en un PR sin mergear — el archivo con el
+      # hueco seguia en main, y de ahi se aplico. Esto lo atrapa en el PR. Sin red.
+      - run: python .github/scripts/test_migraciones_no_exponen_a_anon.py
