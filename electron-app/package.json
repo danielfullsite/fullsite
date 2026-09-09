@@ -1,7 +1,7 @@
 {
   "name": "fullsite-pos",
   "version": "1.4.0",
-  "description": "Fullsite POS — kiosk wrapper for app.fullsite.mx/pos",
+  "description": "Fullsite POS \u2014 kiosk wrapper for app.fullsite.mx/pos",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -44,6 +44,16 @@
       "!**/.env*",
       "!**/*.log",
       "!local-server/telemetry/latency-harness.js"
+    ],
+    "extraResources": [
+      {
+        "from": "fingerprint",
+        "to": "fingerprint",
+        "filter": [
+          "**/*.exe",
+          "**/*.dll"
+        ]
+      }
     ],
     "directories": {
       "output": "dist"

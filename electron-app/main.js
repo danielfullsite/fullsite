@@ -661,6 +661,33 @@ function startFingerprintService() {
   const fpExe = 'C:\\fullsite\\fingerprint-service.exe';
   const fpDll = 'C:\\fullsite\\DPUruNet.dll';
 
+  // AUTO-INSTALAR EL SERVICIO DESDE EL PAQUETE. Es lo que hace clonable la huella.
+  //
+  // Esta rama habia perdido este bloque y el `extraResources` que lo alimenta; los dos
+  // siguen vivos en la linea instalada en AMALAY (1.3.12). Sin ellos la huella depende de
+  // que alguien haya copiado a mano `fingerprint-service.exe` y `DPUruNet.dll` a
+  // C:\fullsite\ en esa caja — o sea que funciona donde ya funcionaba y en ninguna caja
+  // nueva. Daniel lo dijo sin margen: la huella es indispensable.
+  //
+  // Los binarios NO se commitean (DLL propietario del SDK DigitalPersona U.are.U). El
+  // instalador solo los empaqueta si estan presentes al correr electron-builder; si no,
+  // este bloque no encuentra nada, no rompe, y el arranque sigue como antes.
+  if (!fs.existsSync(fpExe) || !fs.existsSync(fpDll)) {
+    try {
+      const bundledDir = path.join(process.resourcesPath || __dirname, 'fingerprint');
+      const bExe = path.join(bundledDir, 'fingerprint-service.exe');
+      const bDll = path.join(bundledDir, 'DPUruNet.dll');
+      if (fs.existsSync(bExe) && fs.existsSync(bDll)) {
+        fs.mkdirSync('C:\\fullsite', { recursive: true });
+        if (!fs.existsSync(fpExe)) fs.copyFileSync(bExe, fpExe);
+        if (!fs.existsSync(fpDll)) fs.copyFileSync(bDll, fpDll);
+        console.log('[fingerprint] Servicio instalado desde el paquete a C:\\fullsite\\');
+      }
+    } catch (e) {
+      console.warn('[fingerprint] No se pudo auto-instalar desde el paquete:', e.message);
+    }
+  }
+
   // Check if files exist
   if (!fs.existsSync(fpExe) || !fs.existsSync(fpDll)) {
     console.log('[fingerprint] fingerprint-service.exe or DPUruNet.dll not found in C:\\fullsite\\');

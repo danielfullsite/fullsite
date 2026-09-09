@@ -24,6 +24,16 @@
     "!**/*.log",
     "!local-server/telemetry/latency-harness.js"
   ],
+  "extraResources": [
+    {
+      "from": "fingerprint",
+      "to": "fingerprint",
+      "filter": [
+        "**/*.exe",
+        "**/*.dll"
+      ]
+    }
+  ],
   "win": {
     "target": "nsis",
     "icon": "icon.ico"
