@@ -87,8 +87,23 @@ jobs:
       #
       # Van ANTES del build a proposito: si algo falla aqui, no queremos un .exe esperando
       # en los artefactos a que alguien lo lleve a una caja.
+      # EN BASH, NO EN POWERSHELL, y no es cosmetico: el paso por defecto corre en pwsh,
+      # que no expande el glob entre comillas, y `node --test` tampoco lo expande en
+      # Windows (en macOS/Linux lo hace el shell). El resultado fue, la primera vez que
+      # este paso llego a ejecutarse (2026-09-09, run 34317547583):
+      #
+      #     Could not find 'D:\a\...\electron-app\local-server\tests\*.test.js'
+      #
+      # Se usa bash --que windows-latest trae-- para que el glob se expanda igual que en
+      # la maquina de quien desarrolla: 53 archivos, 503 pruebas, el mismo conjunto.
+      #
+      # `node --test` a secas tambien descubre esos mismos 53 (comprobado, no supuesto),
+      # asi que serviria igual. Se prefiere el glob explicito porque deja escrito QUE se
+      # corre: el dia que alguien agregue un runner que arranque procesos reales, el
+      # descubrimiento automatico se lo llevaria sin avisar y este paso no.
       - name: Pruebas del local-server en Windows
-        run: node --test "local-server/tests/*.test.js"
+        shell: bash
+        run: node --test local-server/tests/*.test.js
 
       - name: Build Windows installer
         run: npx electron-builder --win --x64 --publish never
