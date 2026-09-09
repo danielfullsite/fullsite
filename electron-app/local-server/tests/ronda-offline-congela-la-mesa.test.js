@@ -1,128 +1,143 @@
 'use strict'
 
 /**
- * LA RONDA ENVIADA SIN INTERNET CONGELA LA MESA.
+ * LA RONDA ENVIADA SIN INTERNET YA NO CONGELA LA MESA.
  *
- * Es el defecto que quedaba abierto del plan de cierre, y hasta hoy vivía en prosa. Esta
- * prueba lo fija: describe la cadena exacta y ancla el comportamiento de HOY, para que
- * quien lo arregle sepa qué tiene que cambiar y se entere si lo cambia sin querer.
+ * Este archivo nació como prueba de caracterización: anclaba el defecto para que el
+ * arreglo fuera deliberado, y decía "el día que exista la adopción, esta prueba se va a
+ * poner en rojo — a propósito". Ese día fue el mismo: 2026-09-08.
  *
- * LA CADENA, verificada el 2026-09-08 sobre la rama candidata:
+ * EL DEFECTO ERA UNA DIFERENCIA ENTRE CERO Y AUSENTE
  *
- *   1. dashboard-app/src/app/pos/page.tsx:3505
- *      Al enviar la ronda, el comando lleva
- *          ...(saveResult.revision != null ? { order_revision: saveResult.revision } : {})
- *      Sin internet la nube nunca contestó, así que `saveResult.revision` es null y el
- *      campo se OMITE. El envío a cocina sí sale — la comanda se imprime y el KDS la ve.
+ *   1. pos/page.tsx, al enviar la ronda, llevaba
+ *          ...(saveResult.revision != null ? { order_revision: ... } : {})
+ *      Sin internet la nube nunca contesta, así que el campo se OMITÍA. El envío a cocina
+ *      sí salía: la comanda se imprimía y el KDS la veía. Todo parecía bien.
  *
- *   2. electron-app/local-server/core/state.js:23
- *      `orderFields` copia sólo los campos presentes (`payload[k] !== undefined`), así que
- *      la orden queda guardada SIN `order_revision`.
+ *   2. state.js:23 — `orderFields` copia sólo los campos presentes, así que la orden
+ *      quedaba guardada SIN `order_revision`.
  *
- *   3. Y ahí se cierran las dos puertas:
+ *   3. Y se cerraban las dos puertas:
+ *        financial-domain.js:165    ORDER_REVISION_REQUIRED     → no se podía COBRAR
+ *        operational-domain.js:154  LEGACY_ORDER_REQUIRES_CUTOVER → no se podía EDITAR
  *
- *      financial-domain.js:165    ORDER_REVISION_REQUIRED
- *                                 no se puede abrir la cuenta → no se puede COBRAR
- *      operational-domain.js:154  LEGACY_ORDER_REQUIRES_CUTOVER
- *                                 la orden no tiene authority:'caja' → no se puede EDITAR
+ *      Mesa con comida servida, comanda en cocina, y sin forma de cobrarla ni modificarla
+ *      desde ninguna terminal.
  *
- * La mesa queda con comida servida, comanda en cocina, y sin forma de cobrarla ni
- * modificarla desde ninguna terminal. Eso es "congelada".
+ * EL ARREGLO, Y POR QUÉ NO HIZO FALTA EL COMANDO DE ADOPCIÓN
  *
- * POR QUÉ NO SE ARREGLA AQUÍ MISMO
+ * Al rastrearlo pensé que hacía falta un comando de adopción de órdenes legacy — un
+ * trabajo de código de dinero con revisión adversarial. Al mirar el eslabón que faltaba
+ * resultó más simple y más honesto: la orden nunca ha sido confirmada por la nube, y eso
+ * se dice con un CERO, no omitiendo el campo. Es exactamente lo que
+ * `operational-domain.js:156` ya asume para una orden nueva, y lo que la pantalla manda
+ * al cobrar, porque `orderRevision` arranca en 0.
  *
- * No es una línea. Es la costura entre dos modelos de autoridad: la orden nació por el
- * camino viejo (la nube manda) mientras no había nube, y el camino nuevo (Caja manda) se
- * niega a adoptarla. El propio mensaje de error nombra la solución — "requiere migración
- * de autoridad" — y el inventario de huecos la tiene anotada como H14: "No existe adopción
- * automática de órdenes legacy".
+ * QUÉ PROTECCIÓN SE PIERDE. La guarda de revisión era la tercera de tres, y las otras dos
+ * son las que cuidan el dinero de verdad. Esta prueba las ancla abajo, porque son las que
+ * ahora sostienen el caso:
  *
- * Arreglarlo es un comando de adopción con sus reglas (qué orden es segura de adoptar, en
- * qué turno, con qué revisión inicial), y es código de dinero: pide revisión adversarial
- * independiente antes de tocarlo. Media noche con el restaurante enfrente no es el momento.
+ *   FINANCIAL_ORDER_EXISTS   no se puede abrir dos veces la cuenta de la misma orden
+ *   ORDER_TOTAL_CONFLICT     no se cobra un total distinto del guardado — que es el caso
+ *                            real de "otra terminal agregó una ronda que yo no vi"
  *
- * QUÉ HACE ESTA PRUEBA
- *
- * Ancla el comportamiento actual. Hoy pasa en verde porque describe lo que ocurre. El día
- * que alguien implemente la adopción, ESTA PRUEBA SE VA A PONER EN ROJO — y eso es lo que
- * se busca: que el arreglo sea deliberado y que quien lo haga lea esta explicación antes
- * de borrarla.
+ * Pedirle una revisión de nube a una orden que nunca tocó la nube no protegía nada: sólo
+ * la volvía incobrable para siempre.
  *
  * Run: node --test electron-app/local-server/tests/ronda-offline-congela-la-mesa.test.js
  */
 
 const { test, describe } = require('node:test')
 const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const path = require('node:path')
 const { FinancialDomain, FinancialError } = require('../core/financial-domain')
 
-/** Una orden como la que deja el envío SIN internet: sin `order_revision`. */
+/** Una orden como la que deja el envío SIN internet, ya con el arreglo: revisión 0. */
 const ordenEnviadaSinInternet = () => ({
   order_id: 'mesa-7', turno_id: 'turno-1', status: 'enviada', total_cents: 45000,
+  order_revision: 0,
   items: [{ id: 'linea-1', cantidad: 2, sent_quantity: 2 }],
-  // order_revision: AUSENTE — la nube nunca confirmó, así que pos/page.tsx lo omitió.
 })
 
-/** La misma orden, con la revisión que sí llega cuando hay internet. */
+/** La misma orden cuando sí hubo internet: la nube le dio su revisión. */
 const ordenEnviadaConInternet = () => ({ ...ordenEnviadaSinInternet(), order_revision: 3 })
 
-function abrirCuenta(order, expectedOrderRevision) {
-  const domain = new FinancialDomain()
+function abrir(domain, order, expectedOrderRevision, totalCents) {
   return domain.prepare({
     command_type: 'FINANCIAL_OPEN', order_id: order.order_id, expected_revision: 0,
     turno_id: 'turno-1', expected_order_revision: expectedOrderRevision,
-    total_cents: order.total_cents, currency: 'MXN',
+    total_cents: totalCents ?? order.total_cents, currency: 'MXN',
   }, { order, turno: { id: 'turno-1' } })
 }
 
-describe('el envío sin internet deja la orden sin revisión', () => {
-  test('con internet la cuenta se abre y se puede cobrar', () => {
-    // El control. Si esto fallara, el problema sería otro y esta prueba estaría mintiendo.
-    const resultado = abrirCuenta(ordenEnviadaConInternet(), 3)
-    assert.equal(resultado.financial_order.order_revision, 3)
-    assert.equal(resultado.financial_order.total_cents, 45000)
+describe('la mesa se puede cobrar aunque se haya enviado sin internet', () => {
+  test('la cuenta abre con revisión cero', () => {
+    const r = abrir(new FinancialDomain(), ordenEnviadaSinInternet(), 0)
+    assert.equal(r.financial_order.order_revision, 0)
+    assert.equal(r.financial_order.total_cents, 45000)
   })
 
-  test('SIN internet la cuenta NO se puede abrir — la mesa queda sin forma de cobrarse', () => {
-    assert.throws(() => abrirCuenta(ordenEnviadaSinInternet(), 0), (e) => {
-      assert.ok(e instanceof FinancialError)
-      assert.equal(e.code, 'ORDER_REVISION_REQUIRED')
-      return true
-    })
+  test('y con internet sigue funcionando igual', () => {
+    // El control. Si esto fallara, el arreglo habría roto el camino normal.
+    const r = abrir(new FinancialDomain(), ordenEnviadaConInternet(), 3)
+    assert.equal(r.financial_order.order_revision, 3)
   })
 
-  test('y tampoco se salva mandando cero como revisión esperada', () => {
-    // La salida obvia —"si no hay revisión, manda 0"— tampoco funciona: la guarda mira la
-    // revisión de la ORDEN GUARDADA, no la que manda el cliente.
-    for (const esperada of [0, 1, 3]) {
-      assert.throws(() => abrirCuenta(ordenEnviadaSinInternet(), esperada),
-        { code: 'ORDER_REVISION_REQUIRED' },
-        `con expected_order_revision=${esperada} debería seguir fallando por la misma razón`)
-    }
+  test('una orden SIN el campo sigue rechazándose', () => {
+    // El arreglo es que el POS mande 0, no que el dominio acepte cualquier cosa. Si algún
+    // día llega una orden sin revisión —un cliente viejo, un camino que nadie migró—, la
+    // guarda tiene que seguir ahí.
+    const sinCampo = { ...ordenEnviadaSinInternet() }
+    delete sinCampo.order_revision
+    assert.throws(() => abrir(new FinancialDomain(), sinCampo, 0), { code: 'ORDER_REVISION_REQUIRED' })
   })
 
-  test('una revisión inválida se rechaza igual que una ausente', () => {
-    // Cierra la puerta de atrás: nadie debe poder colar una orden cobrable inventando el
-    // campo con basura.
-    for (const revision of [null, -1, 1.5, '3', NaN]) {
-      assert.throws(() => abrirCuenta({ ...ordenEnviadaSinInternet(), order_revision: revision }, 0),
+  test('y una revisión inventada también', () => {
+    for (const revision of [null, -1, 1.5, '0', NaN]) {
+      assert.throws(() => abrir(new FinancialDomain(), { ...ordenEnviadaSinInternet(), order_revision: revision }, 0),
         { code: 'ORDER_REVISION_REQUIRED' },
         `order_revision=${String(revision)} no debería abrir una cuenta`)
     }
   })
 })
 
-describe('lo que tendría que cambiar para descongelarla', () => {
-  test('CUANDO EXISTA LA ADOPCIÓN, esta prueba se pone en rojo — a propósito', () => {
-    // Hoy verde. El día que Caja sepa adoptar una orden legacy —darle authority:'caja' y
-    // una revisión inicial— este assert va a fallar, y quien lo vea tiene arriba la
-    // explicación completa de por qué existía.
-    //
-    // Lo que el arreglo debe resolver, y que NO es sólo dejar pasar el campo:
-    //   · qué orden es segura de adoptar (abierta, del turno actual, sin pagos)
-    //   · con qué revisión inicial, sin que choque con la que la nube asigne al sincronizar
-    //   · idempotencia: adoptar dos veces no puede duplicar ni reabrir nada
-    //   · que la orden adoptada siga siendo la MISMA para cocina, que ya tiene su comanda
-    assert.throws(() => abrirCuenta(ordenEnviadaSinInternet(), 0), { code: 'ORDER_REVISION_REQUIRED' },
-      'Si esto ya no lanza, la adopción de órdenes legacy existe: actualiza esta prueba en vez de borrarla.')
+describe('las dos guardas que ahora sostienen el caso', () => {
+  test('no se puede abrir dos veces la cuenta de la misma orden', () => {
+    // Dos cajeros cobrando la misma mesa a la vez. El segundo se topa con esto.
+    const domain = new FinancialDomain()
+    const orden = ordenEnviadaSinInternet()
+    domain.apply(abrir(domain, orden, 0).financial_order)
+    assert.throws(() => abrir(domain, orden, 0), { code: 'FINANCIAL_ORDER_EXISTS' })
+  })
+
+  test('no se cobra un total distinto del que quedó guardado', () => {
+    // Es el caso real que la revisión pretendía cubrir: otra terminal agregó una ronda que
+    // yo no vi, así que mi total está viejo. Lo atrapa la comparación de importes, que es
+    // más directa que una revisión — compara el dinero contra el dinero.
+    assert.throws(() => abrir(new FinancialDomain(), ordenEnviadaSinInternet(), 0, 30000),
+      { code: 'ORDER_TOTAL_CONFLICT' })
+  })
+
+  test('y la revisión esperada sigue teniendo que coincidir', () => {
+    assert.throws(() => abrir(new FinancialDomain(), ordenEnviadaConInternet(), 2),
+      { code: 'ORDER_REVISION_CONFLICT' })
+  })
+})
+
+describe('el origen: el POS manda cero, no omite el campo', () => {
+  const pos = fs.readFileSync(
+    path.join(__dirname, '..', '..', '..', 'dashboard-app', 'src', 'app', 'pos', 'page.tsx'), 'utf8')
+
+  test('ya no hay ningún envío que omita la revisión', () => {
+    // El patrón exacto que congelaba la mesa. Estaba en DOS sitios: el envío offline y el
+    // online. Arreglar uno solo habría dejado la mitad del defecto vivo.
+    assert.equal(
+      (pos.match(/saveResult\.revision != null \? \{ order_revision/g) || []).length, 0,
+      'volvió el patrón que omite order_revision cuando no hay revisión de nube')
+  })
+
+  test('y los dos sitios mandan cero por omisión', () => {
+    assert.equal((pos.match(/order_revision: saveResult\.revision \?\? 0/g) || []).length, 2)
   })
 })

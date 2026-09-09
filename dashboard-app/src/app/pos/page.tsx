@@ -3503,7 +3503,27 @@ function POSContent() {
           command_type: 'ORDER_SENT',
           customer_name: order.clienteNombre ?? null,
           subtotal: order.subtotal, iva: order.iva, descuento: order.descuento,
-          ...(saveResult.revision != null ? { order_revision: saveResult.revision } : {}),
+          // CERO NO ES LO MISMO QUE AUSENTE, y esa diferencia congelaba la mesa.
+          //
+          // Sin internet la nube nunca contesta, `saveResult.revision` es null, y esta linea
+          // OMITIA el campo. Entonces `orderFields` (state.js:23) copia solo lo presente, la
+          // orden queda guardada sin revision, y se cierran las dos puertas:
+          // `financial-domain.js:165` no abre la cuenta (ORDER_REVISION_REQUIRED) y
+          // `operational-domain.js:154` no la deja editar. Mesa con comida servida, comanda en
+          // cocina, y sin forma de cobrarla ni modificarla desde ninguna terminal.
+          //
+          // Cero es la respuesta correcta Y VERDADERA: la orden nunca ha sido confirmada por la
+          // nube. Es lo mismo que `operational-domain.js:156` ya asume para una orden nueva
+          // —`(existing?.order_revision ?? 0)`— y lo que la pantalla manda al cobrar, porque
+          // `orderRevision` arranca en 0 (pos/page.tsx:2121).
+          //
+          // QUE PROTECCION SE PIERDE Y POR QUE ES ACEPTABLE. La guarda de revision era la tercera
+          // capa de tres; quedan las dos que de verdad cuidan el dinero: FINANCIAL_ORDER_EXISTS
+          // impide abrir dos veces la cuenta, y ORDER_TOTAL_CONFLICT rechaza el cobro si el total
+          // guardado no coincide con el que se quiere cobrar — que es el caso real de "otra
+          // terminal agrego una ronda que yo no vi". Pedirle una revision de nube a una orden que
+          // nunca toco la nube no protege nada: solo la vuelve incobrable para siempre.
+          order_revision: saveResult.revision ?? 0,
           order_id: order.id,
           mesa: order.mesa,
           mesero: order.mesero,
@@ -3555,7 +3575,27 @@ function POSContent() {
       command_type: 'ORDER_SENT',
       customer_name: order.clienteNombre ?? null,
       subtotal: order.subtotal, iva: order.iva, descuento: order.descuento,
-      ...(saveResult.revision != null ? { order_revision: saveResult.revision } : {}),
+      // CERO NO ES LO MISMO QUE AUSENTE, y esa diferencia congelaba la mesa.
+      //
+      // Sin internet la nube nunca contesta, `saveResult.revision` es null, y esta linea
+      // OMITIA el campo. Entonces `orderFields` (state.js:23) copia solo lo presente, la
+      // orden queda guardada sin revision, y se cierran las dos puertas:
+      // `financial-domain.js:165` no abre la cuenta (ORDER_REVISION_REQUIRED) y
+      // `operational-domain.js:154` no la deja editar. Mesa con comida servida, comanda en
+      // cocina, y sin forma de cobrarla ni modificarla desde ninguna terminal.
+      //
+      // Cero es la respuesta correcta Y VERDADERA: la orden nunca ha sido confirmada por la
+      // nube. Es lo mismo que `operational-domain.js:156` ya asume para una orden nueva
+      // —`(existing?.order_revision ?? 0)`— y lo que la pantalla manda al cobrar, porque
+      // `orderRevision` arranca en 0 (pos/page.tsx:2121).
+      //
+      // QUE PROTECCION SE PIERDE Y POR QUE ES ACEPTABLE. La guarda de revision era la tercera
+      // capa de tres; quedan las dos que de verdad cuidan el dinero: FINANCIAL_ORDER_EXISTS
+      // impide abrir dos veces la cuenta, y ORDER_TOTAL_CONFLICT rechaza el cobro si el total
+      // guardado no coincide con el que se quiere cobrar — que es el caso real de "otra
+      // terminal agrego una ronda que yo no vi". Pedirle una revision de nube a una orden que
+      // nunca toco la nube no protege nada: solo la vuelve incobrable para siempre.
+      order_revision: saveResult.revision ?? 0,
       order_id: order.id,
       mesa: order.mesa,
       mesero: order.mesero,
