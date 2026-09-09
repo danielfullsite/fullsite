@@ -42,6 +42,10 @@ DISCOUNT_RATE_THRESHOLD = 0.08  # 8% discount rate is suspicious
 CASH_SHIFT_THRESHOLD = 0.15    # 15% shift in cash ratio is suspicious
 COURTESY_THRESHOLD = 500        # More than $500 in courtesies per week
 SKIMMING_ALERT_MXN = 50         # Suma por mesero > $50 en discrepancias → alerta (POS nativo)
+# Una sola aprobación sospechosa ya merece mirarse: el servidor sólo marca `revisar`
+# cuando quien pidió NO tenía el nivel requerido y se aprobó por confianza en el
+# dispositivo. No es una tasa, es un hecho puntual.
+APROBACIONES_SOSPECHOSAS_MINIMO = 1
 
 
 # ── Supabase helpers ────────────────────────────────────────────────────────
@@ -87,6 +91,107 @@ def get_skimming_events(days=7):
     except Exception as e:
         print(f"[antifraud] skimming fetch failed: {e}")
         return []
+
+
+def get_aprobaciones_sospechosas(days=7):
+    """Cancelaciones y reaperturas aprobadas por confianza en el dispositivo POR ALGUIEN
+    QUE NO TENIA EL NIVEL.
+
+    El servidor YA calcula esto. `manager-approval.ts:apruebaSospechosa()` devuelve True
+    cuando el modo fue `offline_device_trust` y el rol del solicitante --que sale del
+    shift token FIRMADO, no del cuerpo-- está por debajo de gerente. Lo guarda en
+    `pos_audit_log.details.revisar`.
+
+    Y hasta hoy NADIE lo leía. Este agente sólo miraba `skimming_suspect`, así que la
+    mitad de detección del control existía y estaba muda: el rastro se escribía en una
+    bitácora que nadie abre. Un control que marca y no avisa no es un control.
+
+    EL VECTOR QUE ESTO DELATA. `offline_approved: true` es una AFIRMACIÓN del cliente,
+    no una prueba (ver manager-approval.ts). Un mesero con su propio shift token puede
+    mandarla y aprobarse a sí mismo una cancelación o la reapertura de una cuenta ya
+    pagada. No se bloquea a propósito --un 403 en el replay de la cola es terminal y
+    perdería en silencio cada cancelación hecha sin internet-- así que la defensa que
+    queda es verlo. Esto es verlo.
+
+    Se traen las acciones por separado y se filtra en Python en vez de mandar
+    `details->>revisar=eq.true`: el `sb_get` de este archivo arma la query string
+    concatenando sin escapar, y los operadores jsonb llevan caracteres que no sobreviven
+    a eso."""
+    cutoff = (datetime.now(MX_TZ) - timedelta(days=days)).isoformat()
+    try:
+        filas = sb_get("pos_audit_log", {
+            "client_id": f"eq.{CLIENT['id']}",
+            "action": "in.(item_cancelled,item_voided,order_reopened,order_cancelled)",
+            "created_at": f"gte.{cutoff}",
+            "select": "order_id,action,actor,mesa,details,created_at",
+            "order": "created_at.desc",
+            "limit": "1000",
+        }) or []
+    except Exception as e:
+        print(f"[antifraud] aprobaciones fetch failed: {e}")
+        return []
+    sospechosas = []
+    for ev in filas:
+        d = ev.get("details") or {}
+        if not isinstance(d, dict):
+            continue
+        if d.get("revisar") is True:
+            sospechosas.append(ev)
+    return sospechosas
+
+
+def analyze_aprobaciones(events):
+    """Agrupa por actor. El monto sale de `details.monto` cuando la ruta lo guardó
+    (cancel-item lo hace desde el 2026-09-03); en una reapertura no hay monto porque
+    lo que se abre es la cuenta entera."""
+    if not events:
+        return []
+    por_actor = defaultdict(lambda: {"n": 0, "mxn": 0.0, "acciones": set(), "servido": 0})
+    for ev in events:
+        d = ev.get("details") or {}
+        # El criterio vive EN EL SERVIDOR (`apruebaSospechosa`), y se vuelve a exigir
+        # aqui: si algun dia alguien alimenta esta funcion sin filtrar --o cambia la
+        # consulta-- no debe empezar a acusar a gerentes que aprobaron sin red en su
+        # propia terminal. Y `details` puede no ser un objeto: la bitacora acepta lo
+        # que le manden.
+        if not isinstance(d, dict) or d.get("revisar") is not True:
+            continue
+        actor = ev.get("actor") or "desconocido"
+        agg = por_actor[actor]
+        agg["n"] += 1
+        agg["acciones"].add(ev.get("action") or "?")
+        try:
+            agg["mxn"] += float(d.get("monto") or 0)
+        except (TypeError, ValueError):
+            pass
+        # Cancelar algo que la cocina YA mandó separa un error de captura de una
+        # cancelación después de servir. Es el dato que más pesa.
+        if d.get("ya_enviado_a_cocina") is True:
+            agg["servido"] += 1
+
+    findings = []
+    for actor, agg in sorted(por_actor.items(), key=lambda kv: (-kv[1]["servido"], -kv[1]["mxn"])):
+        if agg["n"] < APROBACIONES_SOSPECHOSAS_MINIMO:
+            continue
+        monto = f" por ${agg['mxn']:,.0f}" if agg["mxn"] > 0 else ""
+        servido = f", {agg['servido']} de ellas YA SERVIDAS" if agg["servido"] else ""
+        findings.append({
+            "type": "aprobacion_sospechosa",
+            "actor": actor,
+            "count": agg["n"],
+            "faltante_mxn": round(agg["mxn"], 2),
+            "servido": agg["servido"],
+            "message": (
+                f"{actor}: {agg['n']} operacion(es){monto} aprobadas SIN nivel de gerente"
+                f"{servido} — se autorizaron por confianza en el dispositivo"
+            ),
+            "detail": (
+                "El servidor las marco 'revisar': el modo fue device-trust offline y quien "
+                "pedia no tenia el nivel. Vector: mandar offline_approved:true desde la "
+                "propia sesion y autoaprobarse. Cruzar contra el turno y pedir explicacion."
+            ),
+        })
+    return findings
 
 
 def get_waiter_categories():
@@ -423,6 +528,10 @@ def calculate_risk_score(all_findings):
     score = 0
     weights = {
         "skimming": 30,     # Evidencia directa a nivel ticket — el más grave
+        # Alguien sin nivel se autoaprobó una cancelación o una reapertura. Pesa casi
+        # como el skimming porque es el MISMO robo, un paso antes: primero se consigue
+        # el permiso, despues se baja el ticket.
+        "aprobacion_sospechosa": 25,
         "cancellations": 15,
         "discount_high": 20,
         "discount_spike": 10,
@@ -578,6 +687,21 @@ def main():
     skimming_events = get_skimming_events(7)
     skimming_findings = analyze_skimming(skimming_events)
     print(f"[antifraud] skimming events: {len(skimming_events)}, findings: {len(skimming_findings)}")
+
+    # Aprobaciones que el servidor marcó y hasta hoy nadie leía. Mismo trato que el
+    # skimming: evidencia directa a nivel ticket, se lee ANTES del gate de Wansoft
+    # porque un solo evento debe poder disparar sin histórico agregado.
+    aprobaciones = get_aprobaciones_sospechosas(7)
+    aprobacion_findings = analyze_aprobaciones(aprobaciones)
+    print(f"[antifraud] aprobaciones marcadas 'revisar': {len(aprobaciones)}, findings: {len(aprobacion_findings)}")
+    for _a in aprobacion_findings:
+        log_event(agent_id="antifraud-agent", event_type="fraud",
+                  title=(_a.get("message") or "aprobacion sospechosa")[:200], severity="high",
+                  estimated_value=float(_a.get("faltante_mxn") or 0), confidence=0.6,
+                  evidence={"actor": _a.get("actor"), "operaciones": _a.get("count"),
+                            "ya_servidas": _a.get("servido")},
+                  suggested_action="Cruzar contra el turno y pedir explicacion al gerente en turno.",
+                  client_id=CLIENT["id"])
     # Bucle de valor (Fase 0 IA): cada skimming se registra en agent_events con su $ faltante,
     # para poder medir/priorizar y no dejar la señal muda. Aditivo, aislado del POS.
     for _f in skimming_findings:
@@ -588,7 +712,7 @@ def main():
                   suggested_action="Cruzar order_id contra arqueo del mesero; pedir explicación.",
                   client_id=CLIENT["id"])
 
-    if len(data) < 3 and not skimming_findings:
+    if len(data) < 3 and not skimming_findings and not aprobacion_findings:
         print("[antifraud] Not enough data and no skimming, skipping")
         elapsed = int((time.time() - start) * 1000)
         _log_run("antifraud-agent", "no_data", elapsed, skip_reason=f"only {len(data)} days available, need 3+", data_status="no_data", tentacle="ops")
@@ -602,6 +726,9 @@ def main():
     all_findings.extend(analyze_cash_ratio(data))
     all_findings.extend(analyze_mesero_patterns(data))
     all_findings.extend(skimming_findings)
+    # Sin esto el hallazgo se registraba en agent_events y NO salia en el reporte de
+    # Telegram: media deteccion otra vez.
+    all_findings.extend(aprobacion_findings)
 
     risk_score = calculate_risk_score(all_findings)
     print(f"[antifraud] Findings: {len(all_findings)}, Risk: {risk_score}/100")

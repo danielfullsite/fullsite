@@ -114,13 +114,21 @@ describe('lo que NO se toco, y por que', () => {
     expect(src).toMatch(/const idempotencyKey = `cfdi_\$\{cfdiUuid\}`/)
   })
 
-  it('pos/merma sigue con clave por contenido — queda documentado aparte', () => {
-    // Esta tiene el defecto OPUESTO: `merma-${dia}-${insumo:cantidad}...` deduplica bien
-    // un reintento, pero descarta una SEGUNDA merma legitima identica el mismo dia. Y el
-    // `slice(0, 140)` trunca, asi que con muchos insumos dos mermas distintas colisionan.
-    // No se cambio en este PR: es otro arreglo, con otro riesgo.
+  it('pos/merma YA NO tiene el defecto opuesto — se cerro despues', () => {
+    // Esta nota decia que `pos/merma` quedaba pendiente: su clave era
+    // `merma-${dia}-${insumo:cantidad}...`, que deduplica bien un reintento pero
+    // DESCARTA una segunda merma legitima identica el mismo dia, y el `slice(0, 140)`
+    // hacia colisionar mermas distintas con muchos insumos.
+    //
+    // Se cerro el 2026-09-09 con el mismo hook que usan las cinco pantallas de
+    // inventario-real. La nota se conserva --en vez de borrarla-- porque el par de
+    // defectos espejo es lo que hay que recordar: una clave con el reloj aplica dos
+    // veces, una clave con el contenido aplica una sola. Detalle en
+    // `la-segunda-merma-del-dia-tambien-existe.test.ts`.
     const p = join(raiz, 'app/pos/merma/page.tsx')
     if (!existsSync(p)) return
-    expect(readFileSync(p, 'utf8')).toMatch(/const idempotency_key = `merma-\$\{today\}-`/)
+    const src = readFileSync(p, 'utf8')
+    expect(src).toMatch(/idempotency_key = `merma-\$\{today\}-\$\{claveDeOperacion\}`/)
+    expect(src).not.toMatch(/\.slice\(0, 140\)/)
   })
 })

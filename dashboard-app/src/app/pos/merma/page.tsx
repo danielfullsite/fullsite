@@ -6,6 +6,7 @@ import { getIngredients, logAudit } from '@/lib/pos-data'
 import { formatCurrency } from '@/lib/format'
 import Link from 'next/link'
 import { getActiveClientSlug as _cid } from '@/lib/data'
+import { useClaveDeOperacion } from '@/lib/clave-de-operacion'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -44,6 +45,7 @@ export default function MermaPage() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [loading, setLoading] = useState(true)
+  const { clave: claveDeOperacion, confirmar: confirmarOperacion } = useClaveDeOperacion()
 
   // Adding entry state
   const [selectedIngredient, setSelectedIngredient] = useState<Ingredient | null>(null)
@@ -95,7 +97,25 @@ export default function MermaPage() {
       // página hacía insert al ledger + PATCH directo a pos_inventory por separado — prohibido
       // (corrompe stock/costo, doble-click duplicaba, sin idempotencia). Ahora usa el contrato.
       const { recordMovement } = await import('@/lib/inventory')
-      const idempotency_key = `merma-${today}-` + entries.map(e => `${e.ingredient_id}:${e.quantity}`).join('|').slice(0, 140)
+      // LA CLAVE SE ARMABA CON EL CONTENIDO, Y EL CONTENIDO SE REPITE.
+      //
+      // Antes era `merma-<fecha>-` + los pares ingrediente:cantidad, cortados a 140
+      // caracteres. Eso descarta MERMAS LEGITIMAS por dos caminos distintos:
+      //
+      //   1. Se echan a perder 2 kg de lechuga en la manana y otros 2 kg en la tarde.
+      //      Mismo dia, mismo ingrediente, misma cantidad -> misma clave -> la segunda
+      //      se descarta como duplicado y esa merma nunca existio.
+      //   2. Con muchos renglones, el corte a 140 hace que dos mermas DISTINTAS que
+      //      comparten el principio choquen. La segunda tambien desaparece.
+      //
+      // Es el defecto espejo del que se arreglo en las cinco pantallas de
+      // `inventario-real/`: alla la clave llevaba el MINUTO y una entrada se aplicaba
+      // dos veces; aca es tan estable que dos entradas se aplican una vez. Las dos
+      // corrompen el inventario, en direcciones opuestas.
+      //
+      // `useClaveDeOperacion` identifica la OPERACION: la misma clave sobrevive a los
+      // reintentos del mismo guardado, y se renueva en cuanto uno se confirma.
+      const idempotency_key = `merma-${today}-${claveDeOperacion}`
       const invResult = await recordMovement({
         client_id: _cid(),
         movement_type: 'waste',
@@ -125,6 +145,8 @@ export default function MermaPage() {
         },
       })
 
+      // Guardado confirmado: lo siguiente que se capture es OTRA merma, con otra clave.
+      confirmarOperacion()
       setSaved(true)
       setEntries([])
       setTimeout(() => setSaved(false), 3000)
