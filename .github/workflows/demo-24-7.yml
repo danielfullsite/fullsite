@@ -124,7 +124,14 @@ jobs:
           fi
           echo "Curva forzada a apagada para esta corrida."
 
-      - run: python .github/scripts/lab_simulator.py | tee /tmp/lab-simulator.log
+      - name: Simular el servicio
+        run: |
+          # `pipefail` explicito: el shell por omision de Actions es `bash -e {0}`, SIN
+          # pipefail. Sin esta linea, `| tee` devuelve el codigo de tee (0) y un simulador
+          # que truena saldria en verde con el error escondido en el log — la misma clase
+          # de falso verde que este PR corrige.
+          set -o pipefail
+          python .github/scripts/lab_simulator.py | tee /tmp/lab-simulator.log
 
       - name: Resumen
         if: always()
