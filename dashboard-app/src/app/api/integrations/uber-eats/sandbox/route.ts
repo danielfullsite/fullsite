@@ -178,6 +178,7 @@ export async function POST(request: NextRequest) {
     download_url?: string
     item_id?: string
     item_name?: string
+    item_quantity?: number | string
     issue_type?: string
     action_type?: string
     update?: Record<string, unknown>
@@ -365,6 +366,9 @@ export async function POST(request: NextRequest) {
     const issueType = body.issue_type || 'OUT_OF_ITEM'
     const actionType = body.action_type || 'REMOVE_ITEM'
     const itemName = body.item_name || 'Cafe Americano'
+    // Optional partial quantity: on a qty>=2 line, resolving only part of the quantity
+    // leaves the order non-empty, so Uber does not treat it as a cancel-after-accept.
+    const itemQty = body.item_quantity != null ? Number(body.item_quantity) : undefined
     // Uber GTS (case #59731873, 2026-09-07) confirmed the cart_item_id is carried in the
     // delivery order's carts and is retrievable via GET /v1/delivery/order/{id}?expand=carts.
     // The plain v1 GET omits line items and the v2 eats order GET returns 404 for delivery
@@ -397,7 +401,11 @@ export async function POST(request: NextRequest) {
       fulfillment_issues: [{
         issue_type: issueType,
         action_type: actionType,
-        item: { cart_item_id: cartItemId, name: itemName },
+        item: {
+          cart_item_id: cartItemId,
+          name: itemName,
+          ...(itemQty != null && Number.isFinite(itemQty) ? { quantity: itemQty } : {}),
+        },
       }],
     }
     const r = await uberFetch(`/v1/delivery/order/${encodeURIComponent(orderId)}/resolve-fulfillment-issues`, {
