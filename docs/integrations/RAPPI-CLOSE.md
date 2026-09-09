@@ -207,3 +207,50 @@ Al activar prod, el probe `/status?probe=oauth` seguía devolviendo `env=dev` tr
 original** (de cuando `RAPPI_ENV=dev`) — no lee las env vars actuales. **Fix: forzar un
 deployment FRESCO desde git** (un commit nuevo a `main`), que sí lee el env actual. Lección:
 para aplicar env vars nuevas, redeploy de la cadena vieja NO basta — hace falta un deploy git nuevo.
+
+---
+
+## PLAN DE CUTOVER — Rappi (Wansoft `WANSOFTPAV2` → FullSite)
+
+> Estado: **HOLD planeado** (2026-09-08). AMALAY sigue en Wansoft para Rappi. Ejecutar SOLO
+> cuando se cumpla el gate. El flujo self-onboarding de FullSite ya está construido y verificado.
+
+### Hallazgo (verificado en vivo 2026-09-08 vía `GET /stores/integration-status`, merchant AMALAY PROD)
+La tienda de AMALAY **ya está integrada, pero con Wansoft**:
+```
+store_id: 1930030014 · "Amalay" / "AMALAY Coffee & Market" · integrated: true · integration_id: WANSOFTPAV2 · children: []
+```
+En Rappi una tienda tiene **una sola integración POS a la vez** → provisionarla a FullSite la
+**reasigna** (desconecta de Wansoft). Eso ES el cutover. El callback actual solo auto-provisiona
+`integrated:false`, por eso no hubo takeover accidental.
+
+### Gate (TODO debe cumplirse antes de ejecutar)
+- [ ] Offline + KDS/comandas de FullSite **validados en producción** en AMALAY (ver [[project_amalay_cutover_gate]] / offline cert v1).
+- [ ] `NEW_ORDER` PROD listo para suscribir + `RAPPI_WEBHOOK_SECRET` definido.
+- [ ] `integration_store_mappings` confirmado contra el `store.internal_id` real que mande Rappi (hoy `MX1930030014→amalay`; validar si viene con/sin prefijo `MX` — si DLQ `RAPPI_STORE_ID_MISSING`, ajustar).
+- [ ] Ventana de **bajo tráfico** acordada con AMALAY.
+- [ ] **Rollback confirmado con Rodrigo**: cómo revertir a Wansoft (`operation: DEPROVISION` de FullSite + re-provision `WANSOFTPAV2`), y si Wansoft re-reclama automático.
+
+### Build previo (cuando se apruebe ejecutar; ~1 endpoint, aún NO hecho)
+- **Force-provision**: extender authorize/callback con `&force=1` (opcional lista de `store_ids`) → en el
+  callback, provisionar el/los store(s) del merchant **aunque estén `integrated:true`** (reasignar de
+  `WANSOFTPAV2` a FullSite). Guardar el intent `force` en la cookie/state del PKCE. Sin `force`, se
+  mantiene el comportamiento actual (solo `integrated:false`).
+
+### Ejecución (día del cutover, ventana baja)
+1. Deploy git fresco con force-provision (cambio de archivo real, no commit vacío).
+2. Abrir `/api/integrations/rappi/onboarding/authorize?secret=<RAPPI_ONBOARDING_REGISTRATION_TOKEN>&force=1`
+   → login del merchant AMALAY → `POST /stores/provisioning` de la `1930030014` → **202 + `batch_id`** →
+   confirmar webhook `STORE_PROVISIONING_STATUS` (`operation: PROVISION`, `status: ACTIVE`, `httpCode 201`).
+3. Integrations Manager → **Stores**: `1930030014` ahora con integración **FullSite** (ya no WANSOFTPAV2).
+4. Suscribir `NEW_ORDER` → `https://app.fullsite.mx/api/integrations/rappi/webhook`, capturar `secret` →
+   `RAPPI_WEBHOOK_SECRET` (Config, Production) → deploy git fresco.
+5. Orden de prueba PROD → confirmar **1 fila** en `delivery_orders` (`client_id=amalay`, `platform=rappi`)
+   + HMAC verificado + POS→servidor local→**KDS/comandas**.
+6. Monitorear las primeras órdenes reales; Wansoft se mantiene como fallback hasta confirmar estabilidad.
+
+### Riesgos
+- Provisionar sobre una integración ajena (`WANSOFTPAV2`) podría **rechazarse** o exigir deprovision previo
+  del lado Wansoft — **confirmar el comportamiento con Rodrigo antes**.
+- Órdenes en vuelo durante el switch → ventana baja + monitoreo.
+- Doble consumidor del polling (Wansoft + FullSite) nunca simultáneo — coordinar el corte.
