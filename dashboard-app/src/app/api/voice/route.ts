@@ -349,7 +349,6 @@ export async function POST(request: NextRequest) {
       })
 
       // Pre-calculate aggregates so the model doesn't have to sum
-      const nowV = new Date()
       // Mismo patron, segunda instancia: decidia que mes es "este mes".
       const tmPrefix = todayStr.slice(0, 7)
       const sumF = (arr: Record<string, unknown>[], key: string) => arr.reduce((s, d) => s + (Number(d[key]) || 0), 0)

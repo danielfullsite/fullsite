@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { TrendingUp, TrendingDown, Target, Zap } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import { getActiveClientSlug } from '@/lib/data'
-import { getActiveTimezone, todayMX } from '@/lib/date-mx'
+import { todayMX } from '@/lib/date-mx'
 
 interface PredictionWidgetProps {
   currentVentas: number
