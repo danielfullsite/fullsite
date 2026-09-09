@@ -58,10 +58,16 @@ Un sistema frágil convierte errores pequeños en incidentes grandes.
 
 | Fecha | Descripción | Severidad | Restaurante | Postmortem |
 |---|---|---|---|---|
-| — | (Sin incidentes documentados todavía) | — | — | — |
+| 2026-08-26 → 09-09 | El demo estuvo 14 días muerto y el CI lo reportó en verde (5 causas encadenadas) | P2 | — (tenant `demo`) | [2026-09-09-demo-simulador-verde-en-vacio.md](2026-09-09-demo-simulador-verde-en-vacio.md) |
+| 2026-07-16 → 07-20 | Sobre-deducción de inventario al activar `deductIngredientsForOrder()` | P1 | AMALAY | [R0-INVENTORY-DEDUCTION.md](R0-INVENTORY-DEDUCTION.md) |
+
+**Análisis de causa raíz** (no son incidentes con impacto en operación, pero viven aquí):
+
+| Fecha | Descripción | Status | Documento |
+|---|---|---|---|
+| 2026-07-27 | Las 615 recetas no resuelven — dos reglas incompatibles para la misma clave | Pendiente aprobación | [ROOT-CAUSE-001-recipe-identifier-mismatch.md](ROOT-CAUSE-001-recipe-identifier-mismatch.md) |
 
 ---
 
-> La ausencia de incidentes en esta lista no significa que Fullsite nunca ha tenido problemas.
-> Significa que hasta ahora no los hemos documentado.
-> El primer postmortem que escribamos aquí es un paso hacia una cultura de ingeniería seria.
+> Esta lista arrancó vacía mucho después de que Fullsite tuviera su primer problema.
+> Que un incidente no esté aquí no significa que no ocurrió — significa que no lo escribimos.
