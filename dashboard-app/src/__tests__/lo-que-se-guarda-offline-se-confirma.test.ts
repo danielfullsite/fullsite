@@ -156,7 +156,11 @@ describe('el camino del cobro conserva su red de seguridad', () => {
     // Hay DOS bucles `for (const item of queue)`: el que cuenta el resumen y el que
     // drena. El que importa es el que llama a `markSynced`.
     const bucles = [...db.matchAll(/for \(const item of queue\) \{/g)].map(m => m.index!)
-    const drenado = bucles.map(i => db.slice(i, i + 6000)).find(b => b.includes('markSynced('))
+    // La ventana se mide hasta el siguiente bucle o el fin del archivo, no con un
+    // número fijo: un número fijo se queda corto en cuanto alguien agrega líneas.
+    const drenado = bucles
+      .map((i, n) => db.slice(i, bucles[n + 1] ?? db.length))
+      .find(b => b.includes('markSynced('))
     expect(drenado, 'no encontré el bucle de drenado').toBeTruthy()
     expect(drenado!, 'el drenado debe envolver cada item en try').toMatch(/^for \(const item of queue\) \{[\s\S]{0,400}try \{/)
     expect(drenado!).toMatch(/catch \(error\) \{[\s\S]{0,200}incrementRetry/)

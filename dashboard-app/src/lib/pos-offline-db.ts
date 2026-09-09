@@ -1,6 +1,7 @@
 // IndexedDB offline storage for POS
 // Stores menu, orders, inventory, and sync queue for offline-first operation
 import { leerSalon, requiereCaja } from './pedro-cliente'
+import { CAMPOS_SOLO_DE_GERENTE } from './pos-db-policy'
 
 const DB_NAME = 'fullsite_pos'
 const DB_VERSION = 4
@@ -498,6 +499,22 @@ export async function queueOperation(
       `Pasa un endpoint con filtro, p. ej. "${table}?id=eq.<id>". No se reproducira.`,
     )
   }
+  // POR QUÉ NO SE FILTRA AQUÍ POR CAMPOS DE DINERO, aunque parecía la defensa obvia.
+  //
+  // Se intentó y se retiró el 2026-09-08: rechazar al encolar lo que el proxy rechaza
+  // al escribir rompe DOS caminos legítimos, y por razones distintas.
+  //   · `saveOrder` encola su payload —con `total`, `status`, `pagos`— por APP_API hacia
+  //     `/api/pos/save-order`, donde el servidor RECALCULA. Es el cobro offline entero.
+  //   · `updateOrderStatus` encola un PATCH con `status`, que también está en la lista,
+  //     y es como el KDS mueve una comanda sin red.
+  //
+  // Acotarlo por transporte no salva la segunda, porque ahí `transport` va `undefined`.
+  // Y una guarda de cliente no detiene a quien tiene DevTools abiertas de todos modos.
+  //
+  // El control que sí manda es el del SERVIDOR, y está cerrado por los dos lados: el
+  // proxy aplica `camposProhibidos`, y el replay de las tablas con candado ya no puede
+  // rodearlo aunque haya JWT de dashboard (ver la elección de transporte más abajo).
+
   // SE ESPERA EL COMMIT. Antes era `tx.put(item); return id`, y el `await` de quien
   // llama se resolvía en el microtask siguiente — ANTES de que la transacción
   // commiteara. Si Chromium fallaba la transacción, esta función no lanzaba, así que el
@@ -1170,9 +1187,44 @@ async function _syncAllInner(): Promise<SyncResult> {
         }
         let url: string
         let reqHeaders: Record<string, string>
-        if (accessToken) {
+        // ── EL JWT DE DASHBOARD SE SALTABA EL CANDADO DE COLUMNAS ──────────────
+        //
+        // `if (accessToken)` ganaba siempre y mandaba el replay DIRECTO a PostgREST,
+        // rodeando `/api/pos/db` y con él `camposProhibidos` — el candado que impide
+        // que se toquen `total`, `pagos`, `status` y demás campos de dinero.
+        //
+        // La precondición se cumple sola: la sesión de Supabase existe en cuanto
+        // ALGUIEN entró una vez al dashboard en esa máquina, que es justo lo que se hace
+        // para ver el corte y los reportes. Y el refresh token dura semanas.
+        //
+        // El vector: agregar a mano un registro en `sync_queue` desde DevTools con
+        // `{table:'pos_orders', method:'PATCH', data:{total:1}, transport:'SUPABASE_REST'}`
+        // y esperar menos de 20 segundos a que el intervalo drene solo.
+        //
+        // Ahora las tablas con candado por columna van SIEMPRE por el proxy, aunque haya
+        // JWT. No se pierde nada: `withPOSAuth` sabe autenticar sesiones de Supabase.
+        //
+        // OJO CON EL HEADER, que es lo que hace que esto no rompa producción: con varias
+        // membresías y sin `x-fullsite-tenant`, `withPOSAuth` FALLA CERRADO (401) para no
+        // adivinar tenant — y Daniel tiene ocho. Sin este header, forzar el proxy
+        // desloguearía la caja y la cola dejaría de drenar.
+        const conCandadoDeColumnas = Object.prototype.hasOwnProperty.call(
+          CAMPOS_SOLO_DE_GERENTE, item.table,
+        )
+        let tenantDeLaTerminal = ''
+        try { tenantDeLaTerminal = localStorage.getItem('fullsite_client_id') || '' } catch {}
+
+        if (accessToken && !conCandadoDeColumnas) {
           url = `${SUPABASE_URL}/rest/v1/${restPath}`
           reqHeaders = { apikey: SUPABASE_KEY, Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' }
+        } else if (accessToken && conCandadoDeColumnas) {
+          const base = typeof window !== 'undefined' ? window.location.origin : ''
+          url = `${base}/api/pos/db?path=${encodeURIComponent(restPath)}`
+          reqHeaders = {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json', Prefer: 'return=minimal',
+            ...(tenantDeLaTerminal ? { 'x-fullsite-tenant': tenantDeLaTerminal } : {}),
+          }
         } else if (shiftToken) {
           const base = typeof window !== 'undefined' ? window.location.origin : ''
           url = `${base}/api/pos/db?path=${encodeURIComponent(restPath)}`
