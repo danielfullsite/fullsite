@@ -117,6 +117,19 @@ class CadaRenglonSePuedeIdentificar(unittest.TestCase):
             for campo in ("nombre", "precio", "cantidad", "estacion"):
                 self.assertIn(campo, it)
 
+    def test_todo_renglon_trae_subtotal(self):
+        # `ops_consumo_cobertura` pondera POR IMPORTE la fracción de lo vendido que tiene
+        # receta. Ese porcentaje es el denominador que separa "catálogo incompleto" de
+        # merma. Sin `subtotal` en el renglón sale NULL y la vista queda medio ciega.
+        for it in una_orden()["items"]:
+            self.assertIn("subtotal", it)
+            self.assertEqual(it["subtotal"], round(it["precio"] * it["cantidad"], 2))
+
+    def test_el_subtotal_de_los_renglones_suma_el_subtotal_de_la_orden(self):
+        orden = una_orden()
+        self.assertAlmostEqual(
+            sum(i["subtotal"] for i in orden["items"]), orden["subtotal"], places=2)
+
     def test_el_total_sigue_cuadrando_con_los_renglones(self):
         orden = una_orden()
         subtotal = sum(i["precio"] * i["cantidad"] for i in orden["items"])
@@ -154,7 +167,8 @@ class ElLabNoCambia(unittest.TestCase):
     def test_sin_id_de_menu_el_renglon_queda_como_siempre(self):
         with carta([(None, "Wagyu A5 200g", 1280, "cocina")]):
             for it in sim.make_order(0, "t")["items"]:
-                self.assertEqual(set(it), {"nombre", "precio", "cantidad", "estacion"})
+                self.assertEqual(set(it), {"nombre", "precio", "cantidad", "subtotal",
+                                           "estacion"})
 
 
 # ── 6. La guarda: vender sin descontar no puede salir verde ──────────────────
