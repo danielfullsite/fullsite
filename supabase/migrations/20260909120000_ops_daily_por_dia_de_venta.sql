@@ -59,10 +59,24 @@
 -- casi nunca cambia el resultado. Es una bandera de frescura, no una cifra de dinero, y
 -- moverla cambiaria una senal que leen los agentes sin evidencia de que hoy este mal.
 -- Queda anotado, no arreglado: un problema por rama.
+--
+-- APLICADO EN PRODUCCION EL 2026-09-09. Esta definicion se alineo con la que estaba
+-- viva en la base, que traia tres cosas que NINGUNA migracion del repositorio produce:
+-- `not materialized`, desempates deterministas en los agregados JSONB
+-- (`order by t desc, mesero` y `order by qty desc, nombre`) y el filtro de `dividida`.
+-- Alguien las aplico con SQL fuera de git. Aplicar la version anterior de este archivo
+-- las habria borrado en silencio; los desempates importan porque sin ellos dos meseros
+-- empatados salen en orden arbitrario y el JSONB cambia entre consultas.
+--
+-- Tambien se agrego `security_invoker = on`, que esta vista NO tenia aunque
+-- `ops_daily_history` y `ops_daily_live` —que leen de ella— si. Como la posee `postgres`
+-- (rolbypassrls = true), corria como dueno y se saltaba el RLS de `pos_orders` para
+-- cualquier usuario `authenticated`: la fuga de #104 seguia abierta en el eslabon de
+-- abajo. Verificado despues de aplicar: anon no lee y las tres vistas traen la opcion.
 
 create or replace view public.ops_daily_desde_pos
 with (security_invoker = on) as
-with base as (
+with base as not materialized (
   select o.client_id,
          -- Antes: (o.created_at at time zone 'America/Monterrey')::date
          o.dia_venta as fecha,
@@ -98,7 +112,7 @@ agg as (
 ),
 meseros as (
   select client_id, fecha,
-         jsonb_agg(jsonb_build_object('nombre', mesero, 'total', t) order by t desc) as meseros
+         jsonb_agg(jsonb_build_object('nombre', mesero, 'total', t) order by t desc, mesero) as meseros
   from (select client_id, fecha, coalesce(mesero, '(sin mesero)') as mesero, sum(total) as t
         from base group by 1,2,3) x
   group by 1,2
@@ -112,10 +126,10 @@ pagos as (
 platillos as (
   select client_id, fecha,
          jsonb_agg(jsonb_build_object('nombre', nombre, 'cantidad', qty, 'total', imp)
-                   order by qty desc) filter (where rn <= 10) as platillos_top
+                   order by qty desc, nombre) filter (where rn <= 10) as platillos_top
   from (
     select client_id, fecha, nombre, qty, imp,
-           row_number() over (partition by client_id, fecha order by qty desc) as rn
+           row_number() over (partition by client_id, fecha order by qty desc, nombre) as rn
     from (
       select b.client_id, b.fecha,
              it->>'nombre'                        as nombre,

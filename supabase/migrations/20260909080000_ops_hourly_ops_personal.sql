@@ -46,7 +46,8 @@
 --    `pagos`. El contrato existe justamente para que esa diferencia de captura no llegue
 --    a los agentes.
 
-create or replace view public.ops_hourly as
+create or replace view public.ops_hourly
+with (security_invoker = on) as
 with base as not materialized (
   select
     o.client_id,
@@ -107,7 +108,8 @@ comment on view public.ops_hourly is
 --     numero se apoya en 3 ordenes o en 300.
 -- Descartar en silencio seria el mismo error, con mejor cara.
 
-create or replace view public.ops_personal as
+create or replace view public.ops_personal
+with (security_invoker = on) as
 with base as not materialized (
   select
     o.client_id,
@@ -199,7 +201,26 @@ comment on view public.ops_personal is
   'captura no se confunda con un cero real. Ver docs/ai/ARQUITECTURA-CRUCE.md, Capas 1 y 3.';
 
 -- ---------------------------------------------------------------------------
--- Permisos — mismo criterio que el resto del contrato: lectura por la API.
+-- Aislamiento entre restaurantes — NO se otorga a `anon`.
 -- ---------------------------------------------------------------------------
-grant select on public.ops_hourly    to anon, authenticated, service_role;
-grant select on public.ops_personal  to anon, authenticated, service_role;
+-- La primera version de este archivo hacia
+--   grant select on public.ops_hourly to anon, authenticated, service_role;
+-- sin `security_invoker`. Las dos mitades importan y ninguna basta sola:
+--
+--   · Las tablas base tienen RLS, pero estas vistas las posee `postgres`, que tiene
+--     `rolbypassrls = true`. Sin `security_invoker = on` la vista corre como su dueno y
+--     el RLS de `pos_orders` no aplica.
+--   · `anon` es el rol de la llave publica del proyecto.
+--
+-- Juntas publicaban la venta por hora y por mesero, las propinas y las senales antifraude de TODOS los restaurantes a
+-- cualquiera con la llave publica. Es la misma propiedad que cerro #104, donde un
+-- usuario de boruca veia 1,415 dias de 5 restaurantes.
+--
+-- Se corrigio al aplicar en produccion el 2026-09-09; este archivo se alinea para que un
+-- clon construido desde el repositorio nazca cerrado y no reabra la fuga.
+alter view public.ops_hourly set (security_invoker = on);
+alter view public.ops_personal set (security_invoker = on);
+revoke all on public.ops_hourly from public, anon;
+revoke all on public.ops_personal from public, anon;
+grant select on public.ops_hourly to authenticated, service_role, fullsite_agent, fullsite_readonly;
+grant select on public.ops_personal to authenticated, service_role, fullsite_agent, fullsite_readonly;
