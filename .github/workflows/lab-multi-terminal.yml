@@ -1,0 +1,91 @@
+name: Laboratorio multi-terminal (Caja + POS 2 + POS 3 + KDS)
+
+# OTRO LABORATORIO QUE EXISTIA Y NADIE CORRIA.
+#
+# `electron-app/lab/` tiene seis laboratorios y NINGUN workflow ejecutaba uno solo.
+# Es el mismo patron que ya costo caro dos veces esta semana: `offline-e2e.yml` nacio
+# con la frase "LA PRUEBA YA EXISTIA. NADIE LA CORRIA.", y el 2026-09-09 aparecieron
+# 33 casos huerfanos en `dashboard-app/tests/` que ningun runner miraba.
+#
+# ── POR QUE ESTE, Y POR QUE ESTE PRIMERO ─────────────────────────────────────
+#
+# `laboratorio-multi-terminal.cjs` levanta CUATRO PROCESOS ELECTRON DE VERDAD —Caja,
+# POS 2, POS 3 y KDS— cada uno con su carpeta, su puerto y su rol, hablandose solo por
+# HTTP y WebSocket. Es lo mas cerca del restaurante que se puede llegar sin ir.
+#
+# Y comprueba justo el defecto de campo del 2026-09-02 (Eduardo, AMALAY, tres cajas):
+# «no hay comunicacion correcta entre los puntos de venta». La asercion se llama
+# "POS 2 VE la comanda que nacio en POS 3 (el defecto de campo, cerrado)".
+#
+# Tarda 3.2 segundos. Las pruebas de `local-server/tests/` levantan varios Pedro dentro
+# de UN proceso: eso demuestra el protocolo y esconde tres cosas que solo aparecen con
+# procesos separados —que no comparten `userData`, que no chocan de puerto, y que el
+# arranque real de Electron enciende lo que toca segun el rol.
+#
+# ── LO QUE ESTE WORKFLOW NO HACE ─────────────────────────────────────────────
+#
+# No certifica nada. La matriz offline (docs/offline/TEST-MATRIX.md) pide ejecucion
+# fisica para la columna Cert, y sigue en 0 de 21. Esto mueve la columna Test, que es
+# lo que un servidor de integracion puede mover.
+#
+# Los otros laboratorios NO se cablean aqui a proposito:
+#   · `laboratorio-arranque-frio` necesita el paquete de UI offline prearmado (~5 min
+#     de build de Next). Va como paso aparte cuando alguien lo pida.
+#   · `laboratorio-ui-multiterminal` levanta `next dev` y compila /pos, /pos/cocina,
+#     /pos/barra y /pos/plano: el primer compilado se pasa de los 90 s que el propio
+#     laboratorio se da, y en frio truena. Es de correr a mano antes de una visita.
+
+on:
+  pull_request:
+    paths:
+      - 'electron-app/local-server/**'
+      - 'electron-app/main.js'
+      - 'electron-app/lab/laboratorio-multi-terminal.cjs'
+      - '.github/workflows/lab-multi-terminal.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'electron-app/local-server/**'
+      - 'electron-app/main.js'
+  workflow_dispatch:
+
+jobs:
+  multi-terminal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: electron-app
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: electron-app/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      # Electron necesita un display aunque no se abra ninguna ventana util: sin esto
+      # el proceso muere al arrancar y el fallo se lee como "Pedro no escucha", que
+      # manda a buscar el defecto al lado equivocado.
+      - name: Instalar xvfb
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
+      - name: Pruebas del servidor local
+        run: node --test local-server/tests/*.test.js
+
+      - name: Cuatro terminales, cuatro procesos
+        run: xvfb-run --auto-servernum node lab/laboratorio-multi-terminal.cjs
+
+      - name: Guardar evidencia del fallo
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lab-multi-terminal-logs
+          path: /tmp/lab-multi-*
+          if-no-files-found: ignore
+          retention-days: 7
