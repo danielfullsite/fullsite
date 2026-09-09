@@ -28,8 +28,32 @@
 // 2. NO BLOQUEAR. Si la caja no está, el secundario sigue operando con lo suyo.
 //    Este enlace es aditivo: su caída degrada la vista compartida, no la
 //    operación local. Reconecta solo, con espera creciente, para siempre.
+//
+// ── T-09: "PARA SIEMPRE" ERA EL PROBLEMA ────────────────────────────────────
+//
+// Reconectaba para siempre A LA MISMA URL, la que `index.js` construye una vez
+// desde `config.pos_server_ip`. Cuando el router renueva la concesión DHCP y la
+// caja amanece en otra IP, esta terminal golpea una dirección muerta cada diez
+// segundos hasta que alguien la reinstala. La operación local aguanta —el enlace
+// es aditivo— pero las terminales dejan de verse entre ellas, que es justo el
+// síntoma de campo del 2026-09-02.
+//
+// Ahora, tras `INTENTOS_ANTES_DE_BUSCAR` fracasos SEGUIDOS, se le pide a quien
+// llama que vuelva a resolver la dirección (`resolverCaja`). Si aparece otra, se
+// cambia y se reinicia la cuenta. Si no aparece, se sigue reintentando donde
+// estaba: la regla 2 manda, y no encontrar la caja nunca puede volverse un error.
 
 const RECONEXION_MS = [500, 1000, 2000, 5000, 10000]
+
+/**
+ * Cuántos fracasos SEGUIDOS antes de sospechar de la dirección.
+ *
+ * Con la escalera de arriba, cinco intentos son ~18 s: bastante para descartar un
+ * parpadeo del AP o un reinicio de la caja, y poco para que un cambio de IP se
+ * note dentro del minuto que pide la matriz. Buscar antes desperdicia sondas en
+ * la red del restaurante cada vez que alguien tropieza con un cable.
+ */
+const INTENTOS_ANTES_DE_BUSCAR = 5
 const { PROTOCOL_VERSION } = require('../protocol')
 const { cabecerasDeCredencial } = require('./credencial-lan')
 
@@ -46,7 +70,14 @@ const LOG = '[enlace-caja]'
  * @param {(n:number) => void} [opts.guardarCursor] persistir el cursor al avanzar
  * @param {object} [opts.wsInyectado]  sólo para pruebas
  */
-function conectarConLaCaja({ cajaUrl, serverId, restaurantId, lanSecret, branchId, alRecibirEvento, alRecibirEstado, leerCursor, guardarCursor, wsInyectado }) {
+function conectarConLaCaja({ cajaUrl, serverId, restaurantId, lanSecret, branchId, alRecibirEvento, alRecibirEstado, leerCursor, guardarCursor, wsInyectado, resolverCaja, alCambiarDeCaja, intentosAntesDeBuscar }) {
+  // Con la escalera real, cinco intentos son ~18 s (500+1000+2000+5000+10000).
+  // Una prueba que quiera ver la mudanza sin esperar 19 segundos baja el umbral;
+  // esperar de verdad haría una prueba lenta y, con el jitter, intermitente.
+  // Misma convención que `wsInyectado`, que ya existía para eso.
+  const umbralDeBusqueda = Number.isInteger(intentosAntesDeBuscar) && intentosAntesDeBuscar >= 0
+    ? intentosAntesDeBuscar
+    : INTENTOS_ANTES_DE_BUSCAR
   let WS
   try {
     WS = wsInyectado || require('ws')
@@ -101,7 +132,11 @@ function conectarConLaCaja({ cajaUrl, serverId, restaurantId, lanSecret, branchI
   // `socket.destroy()`). Conectarse a la raiz da "socket hang up" sin ningun
   // mensaje util — costo una corrida entera de la E2E. Se normaliza aqui para que
   // quien llame pueda pasar la URL base de la caja, como en el resto del codigo.
-  const urlDelHub = /\/ws$/.test(cajaUrl) ? cajaUrl : `${cajaUrl.replace(/\/$/, '')}/ws`
+  const aUrlDeHub = (u) => (/\/ws$/.test(u) ? u : `${String(u).replace(/\/$/, '')}/ws`)
+  // `let`, no `const`: la dirección de la caja puede cambiar bajo los pies (T-09).
+  let urlDelHub = aUrlDeHub(cajaUrl)
+  let buscando = false
+  let cambiosDeDireccion = 0
 
   const abrir = () => {
     if (!vivo) return
@@ -113,7 +148,19 @@ function conectarConLaCaja({ cajaUrl, serverId, restaurantId, lanSecret, branchI
 
     socket.on('open', () => {
       // Conectar TCP no significa estar autenticado: esperar SNAPSHOT.
-      intento = 0
+      //
+      // Por eso `intento` YA NO se reinicia aqui. Lo hacia, y tenia dos costos:
+      //
+      //   1. Un servidor que ESCUCHA pero rechaza —credencial LAN equivocada, o
+      //      un Pedro de otro restaurante en la misma IP— abria el socket, moria
+      //      sin SNAPSHOT, y la cuenta volvia a cero: ciclo cerrado a 500 ms para
+      //      siempre, sin escalera de espera y sin llegar nunca al umbral de
+      //      busqueda. Un servidor equivocado se veia igual que uno bueno.
+      //   2. "Cinco fracasos seguidos" no significaba nada si abrir el TCP ya
+      //      contaba como exito.
+      //
+      // Se reinicia en SNAPSHOT, que es donde el resto del archivo ya define
+      // "conectado" (`abierto = true`).
       ultimoMotivo = null
       conectadoDesde = Date.now()
       // Se manda el cursor: la caja contesta con lo que falta desde ahí. Es el
@@ -141,6 +188,9 @@ function conectarConLaCaja({ cajaUrl, serverId, restaurantId, lanSecret, branchI
       // SNAPSHOT trae el estado y los deltas que faltaban tras reconectar.
       if (msg.type === 'SNAPSHOT') {
         abierto = true
+        // AQUI se reinicia la cuenta, no en 'open': esto es una conexion de verdad,
+        // autenticada y con estado. Ver el comentario largo en `socket.on('open')`.
+        intento = 0
         // ¿Seguimos hablando con la misma historia? Dos señales independientes:
         // la identidad de la Caja cambió, o su última secuencia es MENOR que
         // nuestro cursor, cosa que sólo puede pasar si su log volvió a empezar.
@@ -218,10 +268,46 @@ function conectarConLaCaja({ cajaUrl, serverId, restaurantId, lanSecret, branchI
     }
   }
 
+  /**
+   * ¿Seguirá la caja donde creemos? Se pregunta SÓLO tras varios fracasos seguidos.
+   *
+   * No bloquea ni se encadena con el reintento: se dispara aparte y, si encuentra
+   * otra dirección, la deja puesta para el siguiente intento. Si no encuentra
+   * nada, todo sigue igual — no encontrar la caja no es un error, es el martes.
+   */
+  const quizaSeMovio = () => {
+    if (buscando || typeof resolverCaja !== 'function') return
+    buscando = true
+    Promise.resolve()
+      .then(() => resolverCaja({ urlActual: urlDelHub, intentos: intento }))
+      .then((nueva) => {
+        if (!vivo || !nueva) return
+        const destino = aUrlDeHub(nueva)
+        if (destino === urlDelHub) return   // la misma: no es un cambio de IP
+        console.warn(`${LOG} la caja se movio: ${urlDelHub} -> ${destino}`)
+        urlDelHub = destino
+        cambiosDeDireccion++
+        // La cuenta se reinicia: la escalera de espera vuelve a 500 ms y la nueva
+        // dirección estrena sus propios cinco intentos antes de volver a dudar.
+        intento = 0
+        if (typeof alCambiarDeCaja === 'function') {
+          try { alCambiarDeCaja(destino) } catch (e) { console.warn(`${LOG} alCambiarDeCaja fallo:`, e.message) }
+        }
+        // Se adelanta el reintento pendiente: esperar los 10 s de la escalera
+        // vieja para estrenar una dirección que ya sabemos buena es tiempo regalado.
+        if (temporizador) { clearTimeout(temporizador); temporizador = null; abrir() }
+      })
+      .catch((e) => { console.warn(`${LOG} la busqueda fallo:`, e && e.message) })
+      .finally(() => { buscando = false })
+  }
+
   const reintentar = (motivo) => {
     if (!vivo) return
     if (temporizador) return   // ya hay un reintento en vuelo: 'close' y 'error'
                                // llegan juntos y agendarian dos.
+    // Tras varios fracasos SEGUIDOS, la dirección es sospechosa. Va antes de
+    // agendar para que la búsqueda corra durante la espera, no después.
+    if (intento >= umbralDeBusqueda) quizaSeMovio()
     const base = RECONEXION_MS[Math.min(intento, RECONEXION_MS.length - 1)]
     // JITTER. Sin el, las tres terminales de un restaurante se caen juntas cuando
     // se reinicia la caja y vuelven a golpearla EXACTAMENTE al mismo milisegundo,
@@ -255,8 +341,13 @@ function conectarConLaCaja({ cajaUrl, serverId, restaurantId, lanSecret, branchI
       reintentos: intento,
       ultimo_motivo: ultimoMotivo,
       conectado_desde: conectadoDesde,
+      // T-09. Sin esto, "la caja se movio y la encontramos sola" es invisible: se
+      // ve igual que si nunca hubiera pasado nada. En el restaurante, `/health`
+      // es lo unico que se puede mirar sin ir a la maquina.
+      cambios_de_direccion: cambiosDeDireccion,
+      buscando_caja: buscando,
     }),
   }
 }
 
-module.exports = { conectarConLaCaja, RECONEXION_MS }
+module.exports = { conectarConLaCaja, RECONEXION_MS, INTENTOS_ANTES_DE_BUSCAR }
