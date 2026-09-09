@@ -34,6 +34,41 @@ jobs:
         working-directory: dashboard-app
         run: npm ci
 
+      # LAS DOS VARIABLES QUE HACEN QUE ESTE BUILD EXISTA O NO.
+      #
+      # Verificado el 2026-09-08: no hay NINGUNA variable de repositorio configurada, y
+      # este paso —que solo existe en esta rama, main no lo tiene— nunca habia corrido en
+      # CI. O sea que el candidato NUNCA se ha podido construir aqui, y nadie lo sabia
+      # porque nadie habia disparado el workflow. Por eso el unico portable que existe
+      # (1.3.9, el que corre hoy en AMALAY) se armo a mano en una Mac.
+      #
+      # El script de abajo revienta con un stack trace de Node que no dice que hacer. Esta
+      # guarda convierte eso en una instruccion.
+      - name: Comprobar la configuracion publica del build
+        shell: bash
+        run: |
+          faltan=()
+          [ -n "${{ vars.NEXT_PUBLIC_SUPABASE_URL }}" ] || faltan+=(NEXT_PUBLIC_SUPABASE_URL)
+          [ -n "${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" ] || faltan+=(NEXT_PUBLIC_SUPABASE_ANON_KEY)
+          if [ ${#faltan[@]} -gt 0 ]; then
+            echo "::error::Faltan variables de repositorio: ${faltan[*]}"
+            echo ""
+            echo "Este build no puede producir una interfaz utilizable sin ellas: Next las"
+            echo "inlinea en el paquete y NO se pueden poner despues de instalar."
+            echo ""
+            echo "Son configuracion PUBLICA de navegador — la URL y la anon key, las mismas"
+            echo "que ya viajan en cualquier pagina del dashboard. Van como variables, no"
+            echo "como secretos. Para ponerlas:"
+            echo ""
+            echo "  gh variable set NEXT_PUBLIC_SUPABASE_URL      --body '<url>'"
+            echo "  gh variable set NEXT_PUBLIC_SUPABASE_ANON_KEY --body '<anon key>'"
+            echo ""
+            echo "NO poner aqui la service key ni ningun PIN, secreto de LAN o config de"
+            echo "sucursal: este paquete se instala en las terminales del restaurante."
+            exit 1
+          fi
+          echo "Configuracion publica presente."
+
       # Browser configuration only. No service role, PIN, LAN or branch config
       # belongs in this build. Missing values fail the build before packaging.
       - name: Build complete offline POS UI
