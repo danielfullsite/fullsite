@@ -2059,6 +2059,42 @@ export async function getAuditLog(limit = 100, offset = 0): Promise<AuditLogEntr
   return res.json()
 }
 
+/**
+ * EL CORTE CONTABA CANCELACIONES CON UNA VENTANA QUE NO ERA DEL DIA.
+ *
+ * `pos/corte/page.tsx` llamaba a `getAuditLog(200)` -- los 200 eventos mas recientes
+ * DE TODA LA HISTORIA, sin filtro de fecha ni de turno -- y de ahi filtraba
+ * `item_cancelled`/`order_cancelled` para reportarlos como "las cancelaciones de este
+ * corte". Dos errores encima:
+ *
+ *   1. Sin ventana: el corte de una fecha vieja mostraba cancelaciones de otros dias,
+ *      o CERO, porque los 200 eventos mas nuevos no incluyen nada de esa fecha.
+ *   2. 200 no alcanza. En AMALAY, con la operacion apenas de prueba, `item_added` ya
+ *      lleva 788 filas y `order_sent_kitchen` 346. Con cien tickets al dia, 200
+ *      eventos son como veinte minutos de servicio.
+ *
+ * O sea que la seccion anti-fraude del corte estaba estructuralmente vacia -- y es
+ * justo donde un gerente buscaria una cancelacion despues de servir.
+ *
+ * Esta funcion pide la ventana y las acciones al servidor, en vez de traer lo ultimo
+ * y filtrarlo en el navegador.
+ */
+export async function getAuditLogRange(
+  desdeISO: string, hastaISO: string | null, actions: readonly string[], limit = 2000,
+): Promise<AuditLogEntry[]> {
+  const rango = hastaISO
+    ? `&created_at=gte.${encodeURIComponent(desdeISO)}&created_at=lt.${encodeURIComponent(hastaISO)}`
+    : `&created_at=gte.${encodeURIComponent(desdeISO)}`
+  const filtroAcciones = actions.length > 0 ? `&action=in.(${actions.join(',')})` : ''
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/pos_audit_log?client_id=eq.${_getClientId()}${rango}${filtroAcciones}` +
+    `&order=created_at.desc&limit=${limit}`,
+    { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
+  )
+  if (!res.ok) return []
+  return res.json()
+}
+
 export async function getAuditLogForOrder(orderId: string): Promise<AuditLogEntry[]> {
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/pos_audit_log?client_id=eq.${_getClientId()}&order_id=eq.${orderId}&order=created_at.asc`,

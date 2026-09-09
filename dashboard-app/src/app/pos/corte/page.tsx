@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { Fingerprint, ArrowLeft, Receipt, RefreshCw, Clock, DollarSign, Users, CreditCard, Banknote, Ban, Percent, ChefHat, RotateCcw, ShieldAlert, AlertTriangle, X, Download, Printer } from 'lucide-react'
-import { formatMXN, getAuditLog, reopenOrder, logAudit, getClientId, verifyManagerPin, verifyManagerHuella, hayHuellasDadasDeAlta, consumeManagerApproval, getActiveTurnoTolerante, getPaymentMethodsFromDB, type AuditLogEntry, type PagoForma, type PaymentMethodDB } from '@/lib/pos-data'
+import { formatMXN, getAuditLogRange, reopenOrder, logAudit, getClientId, verifyManagerPin, verifyManagerHuella, hayHuellasDadasDeAlta, consumeManagerApproval, getActiveTurnoTolerante, getPaymentMethodsFromDB, type AuditLogEntry, type PagoForma, type PaymentMethodDB } from '@/lib/pos-data'
 import { isTiempoItem } from '@/lib/pos-constants'
 import { getActiveTimezone, todayMX, zonedStartOfDayISO } from '@/lib/date-mx'
 
@@ -84,7 +84,7 @@ async function getOrders(dateStr: string): Promise<OrderFromDB[]> {
     // siguiente se colaría una orden creada exactamente a las 00:00:00.000.
     `${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${getClientId()}` +
     `&created_at=gte.${encodeURIComponent(desde)}&created_at=lt.${encodeURIComponent(hasta)}` +
-    `&order=created_at.desc&limit=200`,
+    `&order=created_at.desc&limit=${TOPE_DE_ORDENES}`,
     { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
   )
   if (!res.ok) return []
@@ -95,7 +95,7 @@ async function getOrders(dateStr: string): Promise<OrderFromDB[]> {
 // Esto evita que un turno que cruza medianoche se parta en dos cortes.
 async function getOrdersByTurno(turnoId: string): Promise<OrderFromDB[]> {
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${getClientId()}&turno_id=eq.${encodeURIComponent(turnoId)}&order=created_at.desc&limit=500`,
+    `${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${getClientId()}&turno_id=eq.${encodeURIComponent(turnoId)}&order=created_at.desc&limit=${TOPE_DE_ORDENES}`,
     { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
   )
   if (!res.ok) return []
@@ -128,6 +128,28 @@ async function getCashMovementsByDate(dateStr: string): Promise<CashMovement[]> 
   return res.json()
 }
 
+/**
+ * `item_voided` ("anular") CUENTA COMO CANCELACION EN ESTE NUMERO, y antes no.
+ *
+ * El modal del POS ofrece tres botones: cancelar, cancelar-ya-preparado (merma) y
+ * ANULAR. Anular es el unico que no deja rastro de merma (`inventoryImpact: !voided`,
+ * pos/page.tsx). Dejarlo fuera del contador significaba que la opcion con MENOS
+ * rendicion de cuentas era tambien la que no aparecia en el corte.
+ */
+const ACCIONES_DE_CANCELACION = ['item_cancelled', 'item_voided', 'order_cancelled'] as const
+
+/**
+ * Tope de ordenes por corte. Estaba en 200 por fecha, con `order=created_at.desc`:
+ * o sea que en un dia grande se quedaba con las 200 MAS NUEVAS y tiraba el arranque
+ * del dia EN SILENCIO. AMALAY llego a 141 tickets el 2026-07-05, y las ordenes son
+ * mas que los tickets (canceladas, abiertas, cuentas divididas). 200 se alcanza.
+ *
+ * Se sube y, sobre todo, se DETECTA: si vuelven exactamente `TOPE_DE_ORDENES` filas,
+ * el corte esta incompleto y hay que decirlo en vez de presentar un total menor como
+ * si fuera el del dia.
+ */
+const TOPE_DE_ORDENES = 1000
+
 export default function CortePage() {
   const [orders, setOrders] = useState<OrderFromDB[]>([])
   const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([])
@@ -154,12 +176,13 @@ export default function CortePage() {
   const [corteMode, setCorteMode] = useState<'turno' | 'dia'>('turno')
 
   const [offlineMode, setOfflineMode] = useState(false)
+  /** El corte trajo justo el tope de filas: falta dia y no se puede presentar como completo. */
+  const [corteTruncado, setCorteTruncado] = useState(false)
 
   const fetchData = async () => {
     setLoading(true)
     try {
-      const [a, pct, t, pm] = await Promise.all([
-        getAuditLog(200),
+      const [pct, t, pm] = await Promise.all([
         getCardCommissionPct(),
         getActiveTurnoTolerante(),
         getPaymentMethodsFromDB(),
@@ -169,9 +192,28 @@ export default function CortePage() {
       const o = corteMode === 'turno' && turnoActivo
         ? await getOrdersByTurno(turnoActivo.id)
         : await getOrders(selectedDate)
+      setCorteTruncado(o.length >= TOPE_DE_ORDENES)
       const cm = corteMode === 'turno' && turnoActivo
         ? await getCashMovementsByTurno(turnoActivo.id)
         : await getCashMovementsByDate(selectedDate)
+      // LA BITACORA SE PIDE CON LA MISMA VENTANA QUE LAS ORDENES.
+      //
+      // Antes era `getAuditLog(200)`: los 200 eventos mas recientes de TODA la
+      // historia, sin fecha ni turno, filtrados despues en el navegador. El corte de
+      // una fecha vieja mostraba cancelaciones de otros dias, o cero; y 200 eventos
+      // en operacion real son como veinte minutos de servicio (AMALAY ya lleva 788
+      // `item_added` con la operacion apenas de prueba). La seccion anti-fraude del
+      // corte estaba estructuralmente vacia.
+      //
+      // `pos_audit_log` no tiene `turno_id`, asi que el modo turno se acota por
+      // tiempo desde la apertura -- que es exactamente lo que el turno abarca.
+      const a = corteMode === 'turno' && turnoActivo
+        ? await getAuditLogRange(turnoActivo.opened_at, null, ACCIONES_DE_CANCELACION)
+        : await getAuditLogRange(
+            zonedStartOfDayISO(selectedDate),
+            zonedStartOfDayISO(diaSiguiente(selectedDate)),
+            ACCIONES_DE_CANCELACION,
+          )
       // Overlay de movimientos AÚN sin sincronizar (cola offline): el path online solo
       // trae lo de Supabase, y con el SW sirviendo cache viejo el corte "cree" estar
       // online -> un retiro/deposito offline en la cola no aparecia en el arqueo hasta
@@ -384,9 +426,10 @@ export default function CortePage() {
       byMesero[o.mesero].propinas += Number(o.propina) || 0
     }
 
-    // Cancellations from audit log
+    // Cancellations from audit log. La consulta ya viene acotada por ventana y por
+    // accion; este filtro se queda como red de seguridad si la consulta cambia.
     const cancellations = auditLog.filter(e =>
-      e.action === 'item_cancelled' || e.action === 'order_cancelled'
+      (ACCIONES_DE_CANCELACION as readonly string[]).includes(e.action)
     )
 
     // Comisión estimada sobre lo cobrado con tarjeta/terminal (incluye propina — la terminal cobra comisión sobre el monto completo)
@@ -610,6 +653,15 @@ export default function CortePage() {
               <AlertTriangle size={18} className="text-amber-400 flex-shrink-0" />
               <p className="text-amber-300 text-sm font-medium">
                 Sin conexión — mostrando datos desde caché local. Los totales pueden estar incompletos.
+              </p>
+            </div>
+          )}
+          {corteTruncado && (
+            <div className="mb-6 bg-red-900/30 border border-red-600/50 rounded-xl px-5 py-3 flex items-center gap-3">
+              <AlertTriangle size={18} className="text-red-400 flex-shrink-0" />
+              <p className="text-red-300 text-sm font-medium">
+                Este corte trae {TOPE_DE_ORDENES} órdenes, que es el tope de la consulta:
+                faltan las más viejas del periodo. NO lo tomes como el total del día — avisa a soporte.
               </p>
             </div>
           )}
