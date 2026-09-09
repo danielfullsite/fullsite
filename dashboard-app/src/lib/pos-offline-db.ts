@@ -546,6 +546,26 @@ export function repairReplayData(
   return { ...data, actor: sessionActor.trim() || 'POS Offline' }
 }
 
+/**
+ * Cada cuántos ticks de 20 s vuelve a intentarse un item con `r` reintentos.
+ *
+ * Un fallo de RED no es terminal: el tope existe para no martillar, no para rendirse.
+ * Por eso no hay caso "ya no" — el espaciado crece y se queda en 15 minutos, que son
+ * cuatro intentos por hora: suficiente para recuperar solo cuando el WAN vuelva, y poco
+ * como para no calentar nada durante el servicio.
+ */
+export function ticksEntreReintentos(r: number): number {
+  if (r < 5) return 1     // 20 s — el ritmo de siempre, mientras hay esperanza
+  if (r < 10) return 3    // 1 min
+  if (r < 20) return 15   // 5 min
+  return 45               // 15 min, para siempre
+}
+
+/** ¿A este item le toca reintentar en este tick? Pura, para poder probarla. */
+export function tocaReintentar(retries: number, tick: number): boolean {
+  return tick % ticksEntreReintentos(retries) === 0
+}
+
 export async function getPendingQueue(actionableOnly = false): Promise<SyncQueueItem[]> {
   const db = await openDB()
   return new Promise((resolve) => {
@@ -1722,16 +1742,42 @@ export function registerAutoSync() {
   // 3. Periodic safety net. El evento 'online' es poco confiable: puede NO
   //    dispararse en cada reconexión (quirk del navegador), dejando órdenes
   //    offline atoradas hasta una recarga manual. Cada 20s, si hay red y quedan
-  //    items ACCIONABLES (no synced, no terminal, no agotados en reintentos),
-  //    drena la cola. Garantiza que las comandas offline suban solas.
+  //    items ACCIONABLES (no synced, no terminal), drena la cola.
+  //
+  // ── LA RED DE SEGURIDAD SE APAGABA SOLA ────────────────────────────────────
+  //
+  // Antes: `queue.filter(i => (i.retries ?? 0) < 5)` y `if (actionable.length === 0)
+  // return`, con `syncAll()` SIN `retryExhausted`. El escenario que lo dispara es el
+  // documentado de AMALAY, y no hace falta que nadie se equivoque:
+  //
+  //   1. 21:10. El WAN se degrada pero la LAN sigue arriba. `navigator.onLine` se queda
+  //      en TRUE y el evento 'online' nunca se disparará, porque nunca hubo 'offline'.
+  //   2. Los cobros caen a la cola. Cada intento falla → `incrementRetry`.
+  //   3. A los ~100 segundos cada item está en retries=5.
+  //   4. Desde ahí el intervalo se apaga SOLO: `actionable.length === 0` → return, cada
+  //      20 segundos, para siempre.
+  //   5. 21:35 el WAN vuelve. No pasa nada. No hay evento, no hay recarga, y la caja no
+  //      vuelve a teclear PIN durante el servicio.
+  //
+  // El corte de esa noche lee la nube incompleta y nadie se entera.
+  //
+  // Un fallo de red NO es terminal: el tope de 5 tiene sentido para no martillar, no
+  // para rendirse. Ahora se espacian los reintentos y no se abandona nunca. Los items
+  // con `error_class` (conflicto real, rechazo de negocio) siguen fuera — ésos sí
+  // necesitan a una persona, y `getPendingQueue(true)` ya los excluye.
+  let tick = 0
   setInterval(async () => {
     if (isSyncing || !navigator.onLine) return
+    tick++
     try {
       const queue = await getPendingQueue(true) // excluye terminales (error_class)
-      const actionable = queue.filter(i => (i.retries ?? 0) < 5)
-      if (actionable.length === 0) return
+      if (queue.length === 0) return
+      const toca = queue.some(i => tocaReintentar(i.retries ?? 0, tick))
+      if (!toca) return
       isSyncing = true
-      const { synced, failed } = await syncAll()
+      // `retryExhausted` porque justamente los agotados son los que hay que revivir;
+      // sin esto `_syncAllInner` los salta y el arreglo no serviría de nada.
+      const { synced, failed } = await syncAll({ retryExhausted: true })
       if (synced > 0 || failed > 0) {
         console.log(`[offline-sync] Periodic sync: ${synced} synced, ${failed} failed`)
       }

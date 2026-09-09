@@ -101,6 +101,8 @@ export default function CierreCajaWizard({
   const [escalationError, setEscalationError] = useState('')
   const [escalationAuthorizedBy, setEscalationAuthorizedBy] = useState<string | null>(null)
   const [escalationSaving, setEscalationSaving] = useState(false)
+  /** Cobros que aun no llegan a la nube al momento de cerrar. 0 = el corte esta completo. */
+  const [colaPendiente, setColaPendiente] = useState(0)
   const [systemData, setSystemData] = useState({
     efectivo: 0,
     tarjeta: 0,
@@ -121,6 +123,28 @@ export default function CierreCajaWizard({
     async function fetchShiftData() {
       let orders: Record<string, unknown>[] = []
       let fromNetwork = false
+
+      // EL CORTE NO SE CALCULA SOBRE UNA COLA A MEDIO SUBIR.
+      //
+      // Si quedan cobros sin sincronizar, la consulta de abajo lee la nube SIN ellos y
+      // el arqueo espera menos efectivo del que hay en el cajón. La red de seguridad de
+      // 20 s ayuda, pero llega tarde si el cierre es ahora mismo: se fuerza un drenado
+      // aquí, incluyendo los agotados en reintentos, que son justo los que se quedaron
+      // atrás cuando el WAN se degradó.
+      //
+      // NO se bloquea el cierre si queda cola: a las 2 a.m. con la cola atorada, impedir
+      // el corte deja al restaurante sin cerrar la noche, y eso cuesta más que un número
+      // incompleto. Se AVISA con el conteo, y se guarda en el cierre para que mañana se
+      // pueda explicar una diferencia en vez de adivinarla.
+      try {
+        const { syncAll, getSyncQueueSummary } = await import('@/lib/pos-offline-db')
+        const antes = await getSyncQueueSummary()
+        if (antes.pending + antes.exhausted > 0) {
+          await syncAll({ retryExhausted: true })
+        }
+        const despues = await getSyncQueueSummary()
+        setColaPendiente(despues.pending + despues.exhausted + despues.terminal)
+      } catch { /* si la cola no se puede leer, el cierre sigue: avisar es mejor que trabar */ }
 
       // Try Supabase with a hard timeout so degraded LAN doesn't freeze the wizard.
       // Include pagos for accurate split-payment propina attribution.
@@ -276,6 +300,8 @@ export default function CierreCajaWizard({
         cancelaciones: systemData.cancelaciones,
         descuentos: systemData.descuentos,
         propinas: systemData.propinas,
+        // Queda EN el cierre: manana explica una diferencia en vez de adivinarla.
+        cola_pendiente_al_cerrar: colaPendiente,
         notas: notas || null,
         closed_by: manager,
         approved_by: manager,
@@ -717,6 +743,23 @@ export default function CierreCajaWizard({
           {step === 2 && (
             <div>
               <h3 className="font-bold text-[var(--text-1)] mb-2">Resumen del sistema</h3>
+
+              {colaPendiente > 0 && (
+                // El gerente tiene que saber que este número está incompleto ANTES de
+                // contar el efectivo, no descubrirlo mañana como una diferencia.
+                <div className="rounded-xl p-3 mb-3 bg-amber-500/10 border border-amber-500/30">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle size={16} className="text-amber-400 flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-amber-300">
+                      <span className="font-semibold">
+                        {colaPendiente} {colaPendiente === 1 ? 'cobro no ha subido' : 'cobros no han subido'} a la nube.
+                      </span>{' '}
+                      El total de abajo no los incluye, así que puede haber más efectivo en el
+                      cajón del que dice el sistema. Se registrará en el cierre.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-1 mb-3">
                 <div className="flex justify-between py-1.5 border-b border-[var(--line)]">
