@@ -49,7 +49,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { withPOSAuth, unauthorized } from '@/lib/api-auth'
-import { ALLOW, MANAGER_ONLY_WRITE, isManager, redactResponse, tableOf } from '@/lib/pos-db-policy'
+import { ALLOW, MANAGER_ONLY_WRITE, MANAGER_ONLY_DELETE, camposProhibidos, isManager, redactResponse, tableOf } from '@/lib/pos-db-policy'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -100,6 +100,10 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ path: string[] 
   if (req.method !== 'GET' && req.method !== 'HEAD' && MANAGER_ONLY_WRITE.has(table) && !isManager(auth.role)) {
     return forbidden('se requiere rol de gerente')
   }
+  // Una orden no se borra, se cancela: el borrado deja el arqueo sin rastro.
+  if (req.method === 'DELETE' && MANAGER_ONLY_DELETE.has(table) && !isManager(auth.role)) {
+    return forbidden('borrar requiere rol de gerente; cancela la orden en su lugar')
+  }
 
   // Query params del request original + forzar client_id salvo en inserts.
   const params = new URLSearchParams(req.nextUrl.search)
@@ -125,6 +129,17 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ path: string[] 
       }
     } else {
       body = raw || undefined
+    }
+
+    // LAS CIFRAS DEL DINERO NO SE ESCRIBEN DESDE EL NAVEGADOR.
+    //
+    // Se comprueba DESPUÉS de leer el cuerpo, porque hasta aquí no se sabe qué columnas
+    // trae. Lo verificado el 2026-09-08: por este camino el cliente sólo escribe
+    // `kds_item_status` y `mesero`; los totales van por /api/pos/save-order, que los
+    // recalcula. Así que un `total` que llegue aquí no viene del POS.
+    const prohibidas = camposProhibidos(table, auth.role, body)
+    if (prohibidas.length) {
+      return forbidden(`estas columnas requieren rol de gerente: ${prohibidas.join(', ')}`)
     }
   }
 
