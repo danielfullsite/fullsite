@@ -21,7 +21,22 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 const getAuthToken = vi.fn()
 vi.mock('@/lib/data', () => ({ getAuthToken: () => getAuthToken() }))
 
-import { fetchClientConfig } from '@/lib/client-config'
+// SE IMPORTA POR PRUEBA, NO UNA VEZ.
+//
+// `client-config.ts` tiene un CACHE DE MODULO (`_cache` + TTL): la primera llamada para
+// un `clientId` guarda el resultado y las siguientes ni siquiera tocan la red. Es
+// comportamiento correcto del producto -- y hacia que estas pruebas dependieran del
+// orden en que estan escritas.
+//
+// Tres de las cinco piden 'coffee-shop'. La que corriera primero llenaba el cache; las
+// demas devolvian lo guardado sin llamar a `getAuthToken` ni a `fetch`. Con
+// `--sequence.shuffle`, medido el 2026-09-09, fallaba la del token en tres de cada
+// cinco rondas: `expected "vi.fn()" to be called at least once`. Pasaba siempre en el
+// orden por omision porque esta ESCRITA PRIMERA.
+//
+// `vi.resetModules()` + import dinamico le da a cada prueba un modulo limpio, sin tocar
+// el producto para que las pruebas funcionen. El cache, ademas, ahora se prueba.
+let fetchClientConfig: typeof import('@/lib/client-config')['fetchClientConfig']
 
 const FILA_REAL = {
   id: 'coffee-shop',
@@ -42,13 +57,28 @@ function responde(cuerpo: unknown, status = 200) {
   }) as unknown as typeof globalThis.fetch
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   fetchOriginal = globalThis.fetch
   ultimaLlamada = null
   getAuthToken.mockReset()
   getAuthToken.mockResolvedValue('token-de-sesion')
+  vi.resetModules()
+  ;({ fetchClientConfig } = await import('@/lib/client-config'))
 })
-afterEach(() => { globalThis.fetch = fetchOriginal; vi.restoreAllMocks() })
+// `vi.restoreAllMocks()` ESTABA AQUI Y ROMPIA EL MOCK DEL MODULO.
+//
+// Restaura TODO lo espiado, incluido el `vi.mock('@/lib/data', ...)` de arriba. A partir
+// de la primera prueba que terminaba, `fetchClientConfig` llamaba al `getAuthToken` de
+// verdad y el espia no se enteraba: la prueba del token fallaba con
+// `expected "vi.fn()" to be called at least once`.
+//
+// No se veia porque esa prueba esta ESCRITA PRIMERA, asi que corria antes de cualquier
+// afterEach. Medido el 2026-09-09 con `--sequence.shuffle`: falla en las tres rondas.
+// Una prueba que solo pasa si es la primera del archivo no esta defendiendo nada.
+//
+// Se restaura unicamente lo que este archivo reemplaza. El espia de `console.warn` lo
+// deshace la prueba que lo pone.
+afterEach(() => { globalThis.fetch = fetchOriginal })
 
 describe('fetchClientConfig', () => {
   it('consulta con el TOKEN DE SESIÓN, no con la anon key', async () => {
@@ -85,9 +115,32 @@ describe('fetchClientConfig', () => {
 
   it('si la fila no se puede leer, avisa en consola en vez de fallar callado', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    responde([])
-    await fetchClientConfig('restaurante-sin-fila')
-    expect(warn).toHaveBeenCalled()
-    expect(String(warn.mock.calls[0][0])).toMatch(/Sin configuración/)
+    try {
+      responde([])
+      await fetchClientConfig('restaurante-sin-fila')
+      expect(warn).toHaveBeenCalled()
+      expect(String(warn.mock.calls[0][0])).toMatch(/Sin configuración/)
+    } finally {
+      // Se deshace aqui, no en un afterEach global: dejar la consola espiada ensucia a
+      // las demas, y restaurarlo con `restoreAllMocks` se llevaba tambien el mock del
+      // modulo. `finally` para que un fallo de aserción tampoco deje el espia puesto.
+      warn.mockRestore()
+    }
+  })
+
+  it('la segunda consulta del mismo restaurante NO vuelve a la red', async () => {
+    // El cache que hacia fragiles a estas pruebas es comportamiento correcto y hasta hoy
+    // no estaba probado. Queda escrito: si alguien lo quita, esta prueba lo dice, y si
+    // alguien vuelve a escribir pruebas que comparten `clientId` sin aislar el modulo,
+    // esta explica por que fallan.
+    responde([FILA_REAL])
+    await fetchClientConfig('coffee-shop')
+    expect(getAuthToken).toHaveBeenCalledTimes(1)
+
+    ultimaLlamada = null
+    const c = await fetchClientConfig('coffee-shop')
+    expect(getAuthToken).toHaveBeenCalledTimes(1)   // no hubo segunda consulta
+    expect(ultimaLlamada).toBeNull()
+    expect(c.display_name).toBe('Espresso Lab')     // y devuelve lo mismo
   })
 })

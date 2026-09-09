@@ -302,30 +302,14 @@ describe('Traducción defensiva', () => {
   })
 })
 
-// AL FINAL A PROPOSITO: este bloque llama `vi.resetModules()` y re-mockea
-// `bridge-url` a un puerto muerto. Todo lo que se importe DESPUES hereda ese
-// mock — en medio del archivo dejaba a las pruebas del cursor apuntando a un
-// puerto donde nadie escucha. Costo una corrida; queda anotado para que nadie
-// lo suba de lugar.
-describe('Pedro inalcanzable (va al final: cambia el mock para el resto)', () => {
-  it('REGRESION: leerSalon NUNCA lanza aunque la conexión se rechace', async () => {
-    // El mapa de mesas no puede quedarse en blanco porque el servidor local no
-    // esté. `vi.resetModules()` + `doMock` ANTES del import: mockear después no
-    // afecta a un módulo ya cargado — la primera versión de esta prueba fallaba
-    // por eso, no por el producto.
-    vi.resetModules()
-    vi.doMock('@/lib/bridge-url', () => ({ getBridgeUrl: () => 'http://127.0.0.1:1' }))
-    vi.doMock('@/lib/local-network-fetch', () => ({
-      localNetworkFetch: (u: string, init?: RequestInit) => fetch(u, init),
-    }))
-    const { leerSalon: leerSinPedro } = await import('@/lib/pedro-cliente')
-
-    let lanzo = false
-    let r
-    try { r = await leerSinPedro() } catch { lanzo = true }
-
-    expect(lanzo, 'leerSalon jamás debe lanzar').toBe(false)
-    expect(r?.procedencia).toBe('sin-pedro')
-    expect(r?.autoritativa).toBe(false)
-  })
-})
+// EL BLOQUE DE "PEDRO INALCANZABLE" YA NO VIVE AQUI.
+//
+// Llamaba `vi.resetModules()` y re-mockeaba `bridge-url` a un puerto muerto, asi que
+// todo lo que se importara DESPUES heredaba ese mock. Iba al final a proposito, con un
+// comentario que lo advertia -- pero eso convertia el orden de escritura en parte del
+// contrato: con `--sequence.shuffle` fallaban entre 5 y 9 de estas 20 pruebas, todas
+// con `fetch failed` porque apuntaban a un puerto donde nadie escucha.
+//
+// Vitest aisla POR ARCHIVO. Se mudo a `pedro-inalcanzable.test.ts`, que elimina la
+// dependencia de orden en vez de documentarla. Este archivo guarda el P0 de Eduardo del
+// 2026-09-02 y no puede depender de que nadie mueva un bloque de sitio.
