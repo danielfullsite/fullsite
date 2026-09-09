@@ -34,6 +34,20 @@ jobs:
         run: |
           curl -s -w "\nHTTP %{http_code}\n" "$APP_URL/api/integrations/uber-eats/webhook"
 
+      - name: Activate store (status ONLINE — requisito de Testing Orders "store Open")
+        run: |
+          RESP=$(curl -s -w "\n%{http_code}" -X POST "$APP_URL/api/integrations/uber-eats/sandbox" \
+            -H "Authorization: Bearer $INTEGRATION_ADMIN_SECRET" -H "Content-Type: application/json" \
+            -d "{\"action\":\"delivery_store_activate\",\"store_id\":\"$STORE\"}")
+          echo "activate HTTP $(echo "$RESP" | tail -1)"; echo "$RESP" | head -n -1
+
+      - name: Get store status
+        run: |
+          RESP=$(curl -s -w "\n%{http_code}" -X POST "$APP_URL/api/integrations/uber-eats/sandbox" \
+            -H "Authorization: Bearer $INTEGRATION_ADMIN_SECRET" -H "Content-Type: application/json" \
+            -d "{\"action\":\"delivery_store_status\",\"store_id\":\"$STORE\"}")
+          echo "status HTTP $(echo "$RESP" | tail -1)"; echo "$RESP" | head -n -1
+
       - name: Attempt sandbox order creation (solo si no se pasó order_id)
         if: ${{ github.event.inputs.order_id == '' }}
         run: |
