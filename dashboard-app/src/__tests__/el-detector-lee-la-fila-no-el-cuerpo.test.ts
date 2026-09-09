@@ -44,7 +44,10 @@ describe('la deteccion ya no depende del cuerpo', () => {
   it('HUECO 1 CERRADO: omitir items ya no apaga nada', () => {
     // La guarda vieja miraba el arreglo del cuerpo. Si vuelve, esta prueba se pone roja.
     expect(codigo).not.toMatch(/body\.status === 'cerrada' && Array\.isArray\(body\.items\)/)
-    expect(codigo).toMatch(/if \(body\.status === 'cerrada'\) \{/)
+    // La condicion se amplio despues a 'dividida' —la orden madre de un split, que es el
+    // unico punto donde la suma tiene con que compararse—. Lo que importa aqui es que
+    // NADA de lo que decide auditar dependa de `body.items`.
+    expect(codigo).toMatch(/if \(body\.status === 'cerrada'( \|\| body\.status === 'dividida')?\) \{/)
   })
 
   it('HUECO 2 CERRADO: el descuento sale de la fila, no del cuerpo', () => {
@@ -58,7 +61,10 @@ describe('la deteccion ya no depende del cuerpo', () => {
   })
 
   it('y el total comparado tambien', () => {
-    expect(codigo).toMatch(/const declaredTotal = cents\(fila\.total \?\? 0\)/)
+    // Pasó de `const` a `let` cuando se agregó la rama de la orden madre de un split,
+    // que compara contra lo que cobraron sus cuentas en vez de contra su propia fila.
+    // Lo que se ancla es de DÓNDE sale el valor inicial: de la fila, nunca del cuerpo.
+    expect(codigo).toMatch(/(const|let) declaredTotal = cents\(fila\.total \?\? 0\)/)
   })
 
   it('la lectura es fresca — un cache serviria el estado anterior', () => {

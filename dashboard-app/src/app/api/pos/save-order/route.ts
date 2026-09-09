@@ -185,7 +185,7 @@ async function auditarCierreContraLaFila(o: {
 
     const res = await fetch(
       `${o.sbUrl}/rest/v1/pos_orders?id=eq.${encodeURIComponent(o.orderId)}` +
-      `&client_id=eq.${encodeURIComponent(o.clientId)}&select=items,total,descuento,mesero&limit=1`,
+      `&client_id=eq.${encodeURIComponent(o.clientId)}&select=items,total,descuento,mesero,status&limit=1`,
       { headers: o.headers, cache: 'no-store' },
     )
     if (!res.ok) return
@@ -200,6 +200,23 @@ async function auditarCierreContraLaFila(o: {
     // afirmar un faltante: no hay contra qué comparar. Se deja pasar.
     if (!Array.isArray(items) || items.length === 0) return
 
+    // UNA CUENTA DE SPLIT PAREJO ACUSA A UN MESERO HONESTO, y por eso no se audita sola.
+    //
+    // En `parejo`, `payingItems` NO se reasigna (pos/page.tsx:3814): cada cuenta guarda
+    // TODOS los renglones de la mesa y sólo cambia el total a 1/N. Así que la comparación
+    // de abajo ve, en una mesa de $2,816 dividida entre cuatro:
+    //
+    //     sum(items) = 281600¢   contra   total = 70400¢   →  faltante de $2,112
+    //
+    // Cuatro veces, una por cuenta. Y el agente antifraude reporta POR MESERO, así que el
+    // acusado sería quien dividió la cuenta bien. Es el mismo envenenamiento del falso
+    // positivo del IVA de agosto: quince eventos, todos falsos, que taparon el caso real.
+    //
+    // La suma sólo tiene sentido contra la MADRE, y ese punto existe desde hoy: al
+    // liquidarse se escribe con estado 'dividida', y ahí abajo se compara su total contra
+    // lo que de verdad cobraron sus cuentas.
+    if (esCuentaDeCobroDeSplit(o.orderId)) return
+
     const cents = (n: unknown) => Math.round((Number(n) || 0) * 100)
     const sumItems = items
       .filter(it => !it?.cancelled)
@@ -207,7 +224,31 @@ async function auditarCierreContraLaFila(o: {
     const descuento = cents(fila.descuento ?? 0)
     const base = sumItems - descuento
     const expectedTotal = base + Math.round(base * ivaRate)
-    const declaredTotal = cents(fila.total ?? 0)
+
+    // LA MESA DIVIDIDA SE MIDE CONTRA LO QUE COBRARON SUS CUENTAS, no contra su propia
+    // fila: la madre queda con el total de la mesa pero NO cobró nada — el dinero entró
+    // por `{orden}-C1..CN`. Comparar contra su `total` sería medir el cobro contra sí
+    // mismo y no detectaría nada.
+    //
+    // Aquí sí sirve: si alguien divide en cuatro y registra sólo dos cuentas, la suma de
+    // lo cobrado queda corta contra los renglones servidos, y eso es exactamente el
+    // faltante. Es la variante que no deja rastro en el corte porque la mesa parece
+    // "cancelada por cliente que se fue".
+    let declaredTotal = cents(fila.total ?? 0)
+    if (String(fila.status) === 'dividida') {
+      const cuentas = await fetch(
+        `${o.sbUrl}/rest/v1/pos_orders?client_id=eq.${encodeURIComponent(o.clientId)}` +
+        `&id=like.${encodeURIComponent(o.orderId + '-C')}*&select=total,status`,
+        { headers: o.headers, cache: 'no-store' },
+      )
+      if (!cuentas.ok) return   // sin poder leerlas no se puede afirmar un faltante
+      const filas = await cuentas.json() as Array<{ total?: unknown; status?: unknown }>
+      if (!Array.isArray(filas) || filas.length === 0) return
+      declaredTotal = filas
+        .filter(c => c.status === 'cerrada' || c.status === 'completada')
+        .reduce((s, c) => s + cents(c.total), 0)
+    }
+
     const diff = expectedTotal - declaredTotal
 
     // Sólo la dirección del fraude: cobrar MENOS que los renglones. Un total mayor no
@@ -419,7 +460,9 @@ export async function POST(request: NextRequest) {
     // justo en el caso que interesa. La función nunca lanza ni bloquea el guardado,
     // que ya está commiteado en este punto; lo único que cuesta es latencia en el
     // cierre.
-    if (body.status === 'cerrada') {
+    // 'dividida' también se audita: es el cierre de una mesa que se cobró por partes, y
+    // el único punto donde la suma de los renglones tiene con qué compararse.
+    if (body.status === 'cerrada' || body.status === 'dividida') {
       await auditarCierreContraLaFila({
         orderId: order_id, clientId, sbUrl, headers,
         actor: auth.staffName || auth.staffId || 'POS',
