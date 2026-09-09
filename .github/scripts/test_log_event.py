@@ -17,6 +17,8 @@ porque ahí el NULL significa algo ("todavía no calificado").
 """
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import os
 import sys
@@ -135,8 +137,15 @@ class SbGetNoPuedeTragarseElMotivo(unittest.TestCase):
     def setUp(self):
         self._url, self._key = ac.SUPABASE_URL, ac.SUPABASE_KEY
         ac.SUPABASE_URL, ac.SUPABASE_KEY = "https://x.supabase.co", "k"
+        # Los reintentos avisan por stderr, y en el log de CI esas lineas se leen
+        # igual que una falla de produccion. Se capturan: aqui son material de
+        # aserto, no ruido que haga dudar de una corrida sana.
+        self.stderr = io.StringIO()
+        self._silencio = contextlib.redirect_stderr(self.stderr)
+        self._silencio.__enter__()
 
     def tearDown(self):
+        self._silencio.__exit__(None, None, None)
         ac.SUPABASE_URL, ac.SUPABASE_KEY = self._url, self._key
 
     def test_el_cuerpo_del_error_viaja_en_la_excepcion(self):
@@ -155,6 +164,8 @@ class SbGetNoPuedeTragarseElMotivo(unittest.TestCase):
              mock.patch.object(ac.time, "sleep"):
             self.assertEqual(ac.sb_get("t", "p"), [{"fecha": "2026-09-08"}])
         self.assertEqual(get.call_count, 2)
+        # Un reintento callado escondería que la base está sufriendo.
+        self.assertIn("reintento 1/2", self.stderr.getvalue())
 
     def test_un_400_no_se_reintenta(self):
         # Una consulta mal escrita repetida tres veces sólo tarda tres veces más en fallar.
