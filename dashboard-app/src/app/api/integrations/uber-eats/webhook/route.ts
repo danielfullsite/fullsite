@@ -32,6 +32,8 @@ function sbHeaders() {
 }
 
 // ─── HMAC verification ──────────────────────────────────────────────────────
+// UBER_WEBHOOK_SECRET must equal the webhook's BASIC_HMAC "Signing Key" from the Uber
+// dashboard (that is the key Uber signs X-Uber-Signature with); set 2026-09-09.
 
 async function verifySignature(rawBody: string, sigHeader: string): Promise<boolean> {
   // Uber signs X-Uber-Signature as hex HMAC-SHA256 of the raw body. The signing key
