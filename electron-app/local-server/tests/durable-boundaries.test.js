@@ -223,7 +223,18 @@ test('real TCP adapter sends configured copies once despite retry and config cha
 test('SIGKILL after real TCP send leaves an uncertain job, never an automatic second send', { timeout: 10000 }, async () => {
   const net = require('net')
   const received = []
-  const server = net.createServer(socket => { socket.on('data', b => received.push(b.toString())); socket.on('end', () => socket.end()) })
+  const server = net.createServer(socket => {
+    socket.on('data', b => received.push(b.toString()))
+    socket.on('end', () => socket.end())
+    // La impresora de mentira tiene que sobrevivir a que el cliente muera de golpe,
+    // que es EXACTAMENTE lo que esta prueba provoca. En Windows un proceso muerto
+    // cierra el socket con RST y aqui llega ECONNRESET; sin este manejador, la
+    // excepcion escapa y tumba la prueba. En Unix el cierre es limpio y no se vio.
+    //
+    // Comprobado en CI el 2026-09-09 (run 34318404023): era el ULTIMO de los cinco
+    // fallos de Windows, y el unico que resulto ser de la prueba y no del POS.
+    socket.on('error', () => {})
+  })
   server.listen(0, '127.0.0.1'); await once(server, 'listening')
   const queuePath = path.join(dir, 'queue.json')
   const config = { schema_version: 2, printers: [{ printer_id: 'p1', name: 'Loopback', enabled: true, connection: { type: 'tcp', host: '127.0.0.1', port: server.address().port }, station_ids: ['cocina'], document_types: ['receipt'], copies: 1, encoding: 'cp850' }] }
