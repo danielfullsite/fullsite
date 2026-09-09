@@ -85,7 +85,34 @@ class NdjsonEventStore extends EventStore {
     } catch (error) {
       // Failed writes never advance memory/ACK. If rollback also fails, stop all
       // writes until recovery determines the actual durable commit boundary.
-      try { fs.ftruncateSync(fd, previousSize); fs.fsyncSync(fd) } catch (rollbackError) { this._fault = rollbackError }
+      //
+      // EN WINDOWS EL PRIMER INTENTO FALLA SIEMPRE, y por eso hay un segundo.
+      // `fd` está abierto en modo append ('a'), y ahí `ftruncate` devuelve EPERM en
+      // Windows — en Unix funciona, así que en macOS esto nunca se vio. Medido en CI el
+      // 2026-09-09, la primera vez que estas pruebas corrieron en Windows: cinco fallos,
+      // todos con
+      //
+      //     EVENT_STORE_UNAVAILABLE: restart and inspect storage
+      //       (EPERM: operation not permitted, ftruncate)
+      //
+      // El efecto en la caja de un restaurante no es de laboratorio: cualquier escritura
+      // fallida —disco lleno, antivirus, archivo tomado— dejaba `_fault` puesto y el
+      // event store MUERTO hasta reiniciar el POS. La guarda que existe para proteger el
+      // registro se volvía una parada garantizada.
+      //
+      // El segundo intento reabre el mismo archivo en 'r+', donde el truncado sí está
+      // permitido. Si TAMBIÉN falla, se conserva el comportamiento original: `_fault`
+      // puesto y todo detenido, que es lo correcto cuando de verdad no se puede
+      // determinar la frontera de lo comprometido.
+      try {
+        fs.ftruncateSync(fd, previousSize); fs.fsyncSync(fd)
+      } catch (rollbackError) {
+        try {
+          const fdRollback = fs.openSync(this._logPath, 'r+')
+          try { fs.ftruncateSync(fdRollback, previousSize); fs.fsyncSync(fdRollback) }
+          finally { fs.closeSync(fdRollback) }
+        } catch { this._fault = rollbackError }
+      }
       throw error
     } finally { fs.closeSync(fd) }
     this._adopt(this._events.concat(full))
