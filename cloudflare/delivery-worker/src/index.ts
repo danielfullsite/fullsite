@@ -112,8 +112,37 @@ function extractRappiStoreId(body: any): string {
   return String(body.restaurant?.id || body.store?.id || body.store_id || '')
 }
 
-function extractDidiStoreId(body: any): string {
-  return String(body.shop_id || body.store_id || body.data?.shop_id || '')
+export function extractDidiStoreId(body: any): string {
+  // DiDi carries the POS-side store id as `app_shop_id` (a quoted string, so it
+  // survives JSON.parse). Present top-level on webhooks and under order_info.shop.
+  return String(
+    body.app_shop_id ||
+    body.data?.order_info?.shop?.app_shop_id ||
+    body.data?.app_shop_id ||
+    body.shop_id || body.store_id || ''
+  )
+}
+
+// ─── DIDI SIGNATURE ──────────────────────────────────────────────────────────
+// DiDi signs webhooks with header `didi-header-sign` = hex MD5(rawBody + APP_SECRET).
+// (Uber uses HMAC-SHA256, Rappi its own scheme — DiDi is a plain MD5 concatenation.)
+// Cloudflare Workers' crypto.subtle supports the non-standard 'MD5' algorithm.
+async function md5Hex(input: string): Promise<string> {
+  const digest = await crypto.subtle.digest('MD5', new TextEncoder().encode(input))
+  return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+async function verifyDidiSignature(
+  rawBody: string,
+  headerSign: string | null,
+  appSecret: string,
+): Promise<boolean> {
+  if (!appSecret || !headerSign) return false
+  const expected = await md5Hex(rawBody + appSecret)
+  if (expected.length !== headerSign.length) return false
+  let diff = 0
+  for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ headerSign.charCodeAt(i)
+  return diff === 0
 }
 
 // ─── ORDER PARSERS ───────────────────────────────────────────────────────────
@@ -176,30 +205,61 @@ function parseRappiOrder(payload: any, clientId: string): DeliveryOrder {
   }
 }
 
-function parseDidiOrder(payload: any, clientId: string): DeliveryOrder {
-  const order = payload.order || payload.data || payload
-  const items: DeliveryItem[] = (order.items || order.order_items || []).map((item: any) => ({
-    name: item.name || item.item_name || 'Item',
-    qty: item.quantity || item.count || 1,
-    price: item.price || item.unit_price || 0,
-    notes: item.remark || item.notes || '',
-    modifiers: (item.attributes || item.options || []).map((m: any) => m.name || m.value || m).join(', '),
+// DiDi order webhook (`orderNew`) mirrors GET /order/order/detail:
+//   { data: { order_id, order_info: { price:{...cents}, receive_address:{...},
+//             order_items:[{ name, amount, total_price(cents), sub_item_list:[...] }] } } }
+// `orderIdStr` is the 64-bit order_id recovered as a string from the raw body
+// (JSON.parse corrupts longs), passed in by the handler.
+export function parseDidiOrder(payload: any, clientId: string, orderIdStr?: string): DeliveryOrder {
+  const info = payload.data?.order_info || payload.data || payload.order || payload
+  const price = info.price || {}
+  const cents = (n: any): number => (Number(n) || 0) / 100
+  const flattenMods = (subs: any[]): string =>
+    (subs || [])
+      .map((s: any) =>
+        [s.name, s.sub_item_list?.length ? flattenMods(s.sub_item_list) : '']
+          .filter(Boolean).join(' '))
+      .filter(Boolean)
+      .join(', ')
+  const items: DeliveryItem[] = (info.order_items || info.items || []).map((it: any) => ({
+    name: it.name || it.item_name || 'Item',
+    qty: Number(it.amount ?? it.quantity ?? 1) || 1,
+    price: cents(it.total_price ?? it.sku_price ?? 0),
+    notes: it.remark || it.notes || '',
+    modifiers: flattenMods(it.sub_item_list),
   }))
+  const addr = info.receive_address || {}
+  const customerName =
+    [addr.first_name, addr.last_name].filter(Boolean).join(' ').trim() ||
+    addr.name || info.customer_name || 'Cliente Didi'
+  const customerPhone = addr.phone
+    ? `${addr.calling_code || ''}${addr.phone}`.trim()
+    : (info.customer_phone || undefined)
+  const orderId = orderIdStr ||
+    String(info.order_id ?? payload.data?.order_id ?? payload.order_id ?? Date.now())
+  const subtotal = price.order_price != null
+    ? cents(price.order_price)
+    : items.reduce((s, i) => s + i.price * i.qty, 0)
+  const total = price.customer_need_paying_money != null
+    ? cents(price.customer_need_paying_money)
+    : (price.real_pay_price != null ? cents(price.real_pay_price) : subtotal)
   return {
-    id: `dd-${order.order_id || order.id || Date.now()}`,
+    id: `dd-${orderId}`,
     client_id: clientId,
     platform: 'didi',
-    platform_order_id: String(order.order_id || order.id || ''),
+    platform_order_id: orderId,
     status: 'nueva',
-    customer_name: order.customer_name || order.receiver_name || 'Cliente Didi',
-    customer_phone: order.customer_phone || order.receiver_phone,
+    customer_name: customerName,
+    customer_phone: customerPhone,
     items,
-    subtotal: items.reduce((s, i) => s + i.price * i.qty, 0),
-    delivery_fee: order.delivery_fee || 0,
-    platform_commission: order.commission_fee || 0,
-    total: order.total_amount || order.pay_amount || items.reduce((s, i) => s + i.price * i.qty, 0),
-    notes: order.remark || order.notes || '',
-    estimated_pickup: order.estimated_delivery_time || '',
+    subtotal,
+    delivery_fee: cents(price.delivery_price),
+    platform_commission: 0, // not in the order webhook; comes from reconciliation
+    total,
+    notes: info.remark || info.notes || '',
+    estimated_pickup: info.expected_cook_eta
+      ? new Date(Number(info.expected_cook_eta) * 1000).toISOString()
+      : '',
     raw_payload: payload,
   }
 }
@@ -217,7 +277,10 @@ export default {
     const correlationId = crypto.randomUUID()
 
     try {
-      const body = await request.json()
+      // Read the raw body once: needed for DiDi signature verification and to
+      // recover DiDi's 64-bit order_id before JSON.parse corrupts it.
+      const rawBody = await request.text()
+      const body = JSON.parse(rawBody)
 
       // Detect provider
       let provider: string
@@ -231,12 +294,23 @@ export default {
         provider = 'ubereats'
       } else if (body.client || body.store) {
         provider = 'rappi'
-      } else if (body.order_id && body.shop_id) {
+      } else if (body.type === 'orderNew' || body.app_shop_id || (body.order_id && body.shop_id)) {
         provider = 'didi'
       } else {
         return new Response(JSON.stringify({ error: 'Unknown platform. Use /ubereats, /rappi, or /didi path' }), {
           status: 400, headers: { 'Content-Type': 'application/json' },
         })
+      }
+
+      // DiDi webhook signature (this worker is the DiDi receiver). Fail-closed:
+      // reject anything not signed with MD5(rawBody + DIDI_APP_SECRET).
+      if (provider === 'didi') {
+        const ok = await verifyDidiSignature(rawBody, request.headers.get('didi-header-sign'), env.DIDI_APP_SECRET)
+        if (!ok) {
+          return new Response(JSON.stringify({ error: 'Invalid DiDi signature' }), {
+            status: 401, headers: { 'Content-Type': 'application/json' },
+          })
+        }
       }
 
       // Extract store ID for tenant lookup
@@ -258,7 +332,11 @@ export default {
       let order: DeliveryOrder
       if (provider === 'ubereats')   order = parseUberEatsOrder(body, clientId)
       else if (provider === 'rappi') order = parseRappiOrder(body, clientId)
-      else                           order = parseDidiOrder(body, clientId)
+      else {
+        // DiDi order_id is a 64-bit long; recover it as a string from the raw body.
+        const m = rawBody.match(/"order_id"\s*:\s*"?(\d+)"?/)
+        order = parseDidiOrder(body, clientId, m?.[1])
+      }
 
       // Save to Supabase
       const sbRes = await fetch(`${env.SUPABASE_URL}/rest/v1/delivery_orders`, {
