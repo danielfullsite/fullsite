@@ -11,13 +11,19 @@ Lo que fijan, en orden de importancia:
      del cierre contra las ventas de las 2pm la reprueba siempre.
 
   3. Que "nada que calificar" no se confunda con "todo salió bien".
+
+  4. Que "cerrado" se mida en DÍAS DE NEGOCIO del tenant y no en calendario UTC-6. La
+     versión anterior de esta prueba calculaba HOY con la misma regla equivocada que el
+     script, así que la afirmación "hoy no entra" era cierta por construcción y no podía
+     fallar nunca. Ahora se congela una hora real —las 03:00, que es cuando corre— y se
+     comprueba contra la primitiva canónica.
 """
 from __future__ import annotations
 
 import os
 import sys
 import unittest
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from unittest import mock
 
@@ -33,6 +39,42 @@ def evento(prediccion, fecha, tolerancia=None, eid="e1"):
     if tolerancia is not None:
         ev["tolerancia_pct"] = tolerancia
     return {"id": eid, "evidence": json.dumps(ev), "created_at": "2026-08-25T20:00:00Z"}
+
+
+# `demo` es uno de los clientes que tiene `business_day_start_local` en NULL en producción:
+# sirve para fijar que el default de las 05:00 se aplica igual que en la base.
+CLIENTE = {"id": "demo", "timezone": "America/Mexico_City", "business_day_start_local": None}
+
+
+# 09:00 UTC del 2026-09-10 = 03:00 en Monterrey, que es la hora a la que corre
+# `precision-agentes.yml`. A esa hora el día de negocio en curso es el 2026-09-09.
+CONGELADO = datetime(2026, 9, 10, 9, 0, tzinfo=timezone.utc)
+
+
+def reloj_congelado(instante: datetime = None):
+    """Congela `now()` en los DOS módulos que lo consultan.
+
+    `resolver_predicciones` y `ops_aggregate` importan `datetime` cada uno por su lado,
+    así que hay que parchear ambos: si sólo se congelara uno, la prueba mediría una
+    mezcla de reloj falso y reloj real.
+    """
+    fijo = instante or CONGELADO
+
+    class _Reloj(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return fijo.astimezone(tz) if tz else fijo.replace(tzinfo=None)
+
+    import contextlib
+    import ops_aggregate
+
+    @contextlib.contextmanager
+    def _ctx():
+        with mock.patch.object(rp, "datetime", _Reloj), \
+             mock.patch.object(ops_aggregate, "datetime", _Reloj):
+            yield
+
+    return _ctx()
 
 
 def correr(eventos, reales):
@@ -52,12 +94,12 @@ def correr(eventos, reales):
          mock.patch.object(rp, "sb_patch", sb_patch_falso):
         from io import StringIO
         with mock.patch("sys.stdout", StringIO()), mock.patch("sys.stderr", StringIO()):
-            res = rp.calificar("demo")
+            res = rp.calificar(CLIENTE)
     return res, parches
 
 
-AYER = str((datetime.now(timezone.utc) + timedelta(hours=-6)).date() - timedelta(days=1))
-HOY = str((datetime.now(timezone.utc) + timedelta(hours=-6)).date())
+HOY = rp._dia_de_negocio_en_curso(CLIENTE)              # día de negocio en curso
+AYER = str(date.fromisoformat(HOY) - timedelta(days=1))
 
 
 class LaToleranciaLaFijaQuienPredice(unittest.TestCase):
@@ -84,7 +126,68 @@ class LaToleranciaLaFijaQuienPredice(unittest.TestCase):
 
 class NoJuzgarDiasAbiertos(unittest.TestCase):
     def test_el_dia_de_hoy_no_entra_en_la_ventana(self):
-        self.assertNotIn(HOY, rp.dias_cerrados())
+        self.assertNotIn(HOY, rp.dias_cerrados(CLIENTE))
+
+    def test_a_las_3am_el_dia_en_curso_sigue_abierto_y_no_se_califica(self):
+        """La regresión concreta que este arreglo cierra.
+
+        `precision-agentes.yml` corre a las 03:00 de Monterrey = 09:00 UTC. A esa hora el
+        día de negocio en curso es el de AYER en calendario: empezó a las 05:00 de ayer y
+        no termina hasta las 05:00 de hoy. La regla vieja (`now_utc - 6h`) lo daba por
+        cerrado y calificaba la predicción contra un día que seguía acumulando ventas.
+
+        SE CONGELA EL RELOJ, no se mockea `_dia_de_negocio_en_curso`. Mockear el ayudante
+        haría que la prueba pasara igual con la regla vieja —que ni siquiera lo llama— y
+        además el resultado dependería del día real en que corriera. Congelando `now()`
+        las dos reglas ven el mismo instante y sólo una da la ventana correcta.
+        """
+        with reloj_congelado():
+            ventana = rp.dias_cerrados(CLIENTE)
+
+        self.assertNotIn("2026-09-09", ventana, "calificó un día que sigue abierto")
+        self.assertEqual(ventana[-1], "2026-09-08", "el último cerrado es el anterior")
+        self.assertEqual(ventana[0], "2026-09-02")
+        self.assertEqual(len(ventana), rp.DIAS_ATRAS)
+
+    def test_el_dia_en_curso_depende_de_la_zona_del_tenant(self):
+        """Mismo instante, dos tenants, dos días de negocio distintos.
+
+        A las 09:00 UTC son las 03:00 en Monterrey (día en curso: el 09) y las 04:00 en
+        Chicago, que en septiembre va una hora adelante porque observa horario de verano
+        y Monterrey dejó de observarlo en 2022. Sigue siendo antes de las 05:00, así que
+        `tekila-rg` también está en el 09 — pero por su propia cuenta, no por la de
+        Monterrey. Con la regla vieja los dos recibían la misma fecha clavada.
+        """
+        mty = dict(CLIENTE, timezone="America/Monterrey", business_day_start_local="05:00:00")
+        chi = dict(CLIENTE, timezone="America/Chicago", business_day_start_local="05:00:00")
+        with reloj_congelado():
+            self.assertEqual(rp._dia_de_negocio_en_curso(mty), "2026-09-09")
+            self.assertEqual(rp._dia_de_negocio_en_curso(chi), "2026-09-09")
+
+        # Una hora antes ya se separan: 08:00 UTC = 02:00 en Monterrey y 03:00 en Chicago.
+        with reloj_congelado(datetime(2026, 9, 10, 10, 30, tzinfo=timezone.utc)):
+            # 10:30 UTC = 04:30 en Monterrey (aún el 09) y 05:30 en Chicago (ya el 10).
+            self.assertEqual(rp._dia_de_negocio_en_curso(mty), "2026-09-09")
+            self.assertEqual(rp._dia_de_negocio_en_curso(chi), "2026-09-10")
+
+    def test_el_corte_de_las_5_se_aplica_aunque_el_cliente_no_lo_declare(self):
+        """La base escribe `dia_venta` con coalesce(business_day_start_local,'05:00').
+
+        Si aquí se usara otro default (o si reventara, que es lo que hace
+        `get_business_day_config` con un NULL), las llaves de fecha no cruzarían contra
+        `ops_daily_history` para los 5 clientes activos que lo tienen sin declarar.
+        """
+        sin_declarar = dict(CLIENTE, business_day_start_local=None)
+        declarado = dict(CLIENTE, business_day_start_local="05:00:00")
+        self.assertEqual(rp._dia_de_negocio_en_curso(sin_declarar),
+                         rp._dia_de_negocio_en_curso(declarado))
+
+    def test_sin_zona_declarada_usa_el_mismo_default_que_la_base(self):
+        sin_zona = dict(CLIENTE, timezone=None, business_day_start_local="05:00:00")
+        monterrey = dict(CLIENTE, timezone="America/Monterrey",
+                         business_day_start_local="05:00:00")
+        self.assertEqual(rp._dia_de_negocio_en_curso(sin_zona),
+                         rp._dia_de_negocio_en_curso(monterrey))
 
     def test_sin_venta_real_no_se_califica_se_cuenta_aparte(self):
         (cal, ok, sin), parches = correr([evento(10000, AYER, 10)], {})
