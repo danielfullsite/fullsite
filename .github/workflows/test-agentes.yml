@@ -29,3 +29,4 @@ jobs:
       # se enteraría hasta la siguiente corrida del demo, con las órdenes ya rechazadas.
       # Aquí corre en cada push. Sin red, como el resto.
       - run: python .github/scripts/test_pos_turno.py
+      - run: python .github/scripts/test_identidad_de_renglon.py
