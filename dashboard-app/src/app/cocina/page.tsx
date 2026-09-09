@@ -7,7 +7,7 @@ import {
   getKitchenOrders, updateOrderStatus, logAudit, saveOrder,
   updateInventoryStock, logInventoryMovement, getInventory, getRecipes,
   getRecipeDetail,
-  verifyManagerPin, RECIPE_ALIASES, formatMXN,
+  verifyManagerPin, consumeManagerApproval, RECIPE_ALIASES, formatMXN, getPOSAuthHeaders,
   type KitchenOrderFromDB, type RecipeDetail,
 } from '@/lib/pos-data'
 import { isBebida, POLL_INTERVAL_KITCHEN, getStationByName, type StationName } from '@/lib/pos-constants'
@@ -224,6 +224,14 @@ export default function CocinaPage() {
 
     const items: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
     if (!items[cancelTarget.itemIndex]) { setCancelError('Item no encontrado'); return }
+    const itemDelCancel = items[cancelTarget.itemIndex] as { id?: string }
+    if (!itemDelCancel?.id) {
+      // Sin id no se puede cancelar por la puerta auditada. NO se cae de vuelta al
+      // camino sin evidencia: eso reabriria justo lo que se esta cerrando. (Medido
+      // en produccion: 0 de 36 ordenes de AMALAY tienen un item sin `id`.)
+      setCancelError('Este platillo es de un formato viejo — cancelalo desde el punto de venta')
+      return
+    }
     items[cancelTarget.itemIndex] = {
       ...items[cancelTarget.itemIndex],
       cancelled: true,
@@ -231,19 +239,39 @@ export default function CocinaPage() {
       cancelledBy: manager,
     }
 
-    // 2. Update order items via revision-aware save boundary
-    // R2D1B: cocina cancel must advance order_revision to maintain reconciliation lineage
-    // R2D: save_operation_id for exactly-once idempotency
+    // LA CANCELACION DEL KDS PASA POR LA MISMA PUERTA AUDITADA QUE LA DEL POS.
+    //
+    // Antes esta pantalla marcaba el item y lo guardaba con `/api/pos/save-order`,
+    // que es la ruta de guardado ORDINARIO: no exige aprobacion de gerente y no
+    // registra evidencia. O sea que todo el endurecimiento anti-fraude de
+    // `/api/pos/cancel-item` (PERM-07) se podia rodear cancelando desde la cocina.
+    // El registro que dejaba no traia `monto`, ni `approval_mode`, ni
+    // `ya_enviado_a_cocina`, ni `solicitante_rol` -- justo los cuatro datos con los
+    // que se distingue un error de captura de una cancelacion despues de servir.
+    //
+    // Comprobado en `pos_audit_log` de AMALAY: de doce cancelaciones, ONCE tienen
+    // `approval_mode` nulo. (No se puede afirmar desde la base si salieron de esta
+    // pantalla o de una version anterior del POS -- lo que si es un hecho es que la
+    // pantalla podia producirlas.)
+    //
+    // `verifyManagerPin` ya pidio el PIN contra `/api/pos/pin` con `manager: true`,
+    // que filtra por rol gerente+ EN EL SERVIDOR y devuelve un token FIRMADO. Ese
+    // token ya estaba en la mano y no se usaba: aqui se consume.
     const cocinaOpId = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`
-    const saveRes = await fetch('/api/pos/save-order', {
+    const tokenDelGerente = consumeManagerApproval(manager)
+    const saveRes = await fetch('/api/pos/cancel-item', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getPOSAuthHeaders() },
       body: JSON.stringify({
         order_id: cancelTarget.orderId,
-        expected_revision: order.order_revision ?? 0,
-        save_operation_id: cocinaOpId,
-        items,
-        status: order.status,
+        item_id: itemDelCancel.id,
+        operation_id: cocinaOpId,
+        reason: cancelReason,
+        manager,
+        approval_token: tokenDelGerente || undefined,
+        // Sin token firmado (PIN validado contra el cache offline) se declara
+        // device-trust, igual que el POS. La ruta lo audita como tal.
+        offline_approved: tokenDelGerente ? undefined : true,
       }),
     })
     const saveResult = saveRes.ok ? await saveRes.json() : { ok: false }
@@ -251,7 +279,7 @@ export default function CocinaPage() {
       setCancelError('Orden modificada por otra terminal — recarga')
       return
     }
-    if (!saveResult.ok) {
+    if (!saveResult.ok && !saveResult.already_applied) {
       setCancelError('Error al guardar cancelación')
       return
     }

@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
 
     // ── Step 1: Read order with current updated_at ──
     const readRes = await fetch(
-      `${sbUrl}/rest/v1/pos_orders?id=eq.${order_id}&client_id=eq.${clientId}&select=id,items,updated_at&limit=1`,
+      `${sbUrl}/rest/v1/pos_orders?id=eq.${order_id}&client_id=eq.${clientId}&select=id,items,updated_at,order_revision&limit=1`,
       { headers, cache: 'no-store' }
     )
     if (!readRes.ok) return Response.json({ ok: false, error: 'READ_FAILED' }, { status: 502 })
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
       return Response.json({ ok: false, error: 'ORDER_NOT_FOUND' }, { status: 404 })
     }
 
-    const { items: rawItems, updated_at: updatedAt } = rows[0]
+    const { items: rawItems, updated_at: updatedAt, order_revision: revisionActual } = rows[0]
     const items: Array<Record<string, unknown>> =
       typeof rawItems === 'string' ? JSON.parse(rawItems) : (rawItems || [])
 
@@ -110,6 +110,26 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify({
           items: JSON.stringify(newItems),
           updated_at: new Date().toISOString(),
+          // UNA CANCELACION ES UNA REVISION DE LA ORDEN, Y NO LO ERA.
+          //
+          // Esta ruta escribia `items` sin tocar `order_revision`. `r1_save_order`
+          // (la RPC que guarda TODO lo demas) solo escribe cuando
+          // `order_revision = p_expected_revision` y despues la incrementa. Al no
+          // moverla aqui, una terminal que traia la revision ANTERIOR seguia
+          // empatando: su siguiente guardado pasaba el filtro y su `items` --sin la
+          // marca de cancelado, porque es de antes-- pisaba el arreglo entero
+          // (`items = coalesce(p_items, items)`).
+          //
+          // O sea: el gerente cancelaba un platillo servido, la bitacora lo
+          // registraba, y el siguiente guardado de cualquier terminal con copia
+          // vieja lo devolvia a la cuenta EN SILENCIO. Comprobado leyendo la
+          // definicion de r1_save_order en produccion.
+          //
+          // Avanzarla convierte ese pisotón silencioso en el conflicto que la UI ya
+          // sabe resolver. Va en el MISMO PATCH, protegido por el filtro de
+          // `updated_at`: si otra escritura gano la carrera, no afecta filas y esto
+          // devuelve 409 igual que antes.
+          order_revision: (Number(revisionActual) || 0) + 1,
         }),
       }
     )
@@ -181,7 +201,13 @@ export async function POST(request: NextRequest) {
       })
     } catch { /* audit is best-effort */ }
 
-    return Response.json({ ok: true, item_name: targetItem.nombre || targetItem.name })
+    // La revision nueva viaja de vuelta para que quien cancelo actualice su copia y
+    // su PROXIMO guardado no choque contra el avance que acaba de provocar.
+    return Response.json({
+      ok: true,
+      item_name: targetItem.nombre || targetItem.name,
+      revision: (Number(revisionActual) || 0) + 1,
+    })
   } catch (err) {
     console.error('[cancel-item] Unhandled error:', err)
     return Response.json({ ok: false, error: 'INTERNAL_ERROR' }, { status: 500 })

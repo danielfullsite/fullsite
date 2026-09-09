@@ -2978,7 +2978,15 @@ function POSContent() {
           // Local state already updated — the item is cancelled in UI.
           // OCC conflict means DB has a newer revision; the cancel will replay on next send.
           showToast('Conflicto de versión — cancelación local aplicada, se sincronizará al próximo envío')
-        } else if (!result.ok && !result.already_applied) {
+        } else if (result.ok && typeof result.revision === 'number') {
+          // La cancelacion AVANZA la revision en el servidor (si no, el siguiente
+          // guardado de una terminal con copia vieja pisa el arreglo de items y
+          // devuelve el platillo cancelado a la cuenta). Adoptar la revision que
+          // devuelve la ruta evita que ese avance nos choque a nosotros mismos en el
+          // proximo guardado.
+          setOrderRevision(result.revision)
+        }
+        if (!result.ok && !result.conflict && !result.already_applied) {
           throw new Error(`cancel-item API error: ${result.error || res.status}`)
         }
       } catch (err) {
