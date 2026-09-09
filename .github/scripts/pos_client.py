@@ -105,13 +105,22 @@ def pagos_que_cuadran(total: float, propina: float, metodo: str) -> list[dict]:
 
 
 def diagnostico_inventario(resultado: dict) -> str:
-    """Resume qué hizo el inventario. Es la prueba de que el camino real se ejercitó."""
+    """Resume qué hizo el inventario. Es la prueba de que el camino real se ejercitó.
+
+    Cada fila de `inventory_results` es un RENGLÓN de la orden, no un ingrediente:
+    `r1_reconcile_order` devuelve una por ítem, y cada una puede haber movido varios
+    ingredientes. Decía "ingrediente(s)" y eso confundió el diagnóstico del 2026-09-09,
+    donde "0 ingrediente(s)" en realidad quería decir "cero renglones llegaron".
+
+    `0 renglones` es el síntoma exacto de ítems sin `id`/`menuItemId`: la RPC los
+    descarta como malformados y devuelve vacío, así que la venta no descuenta nada.
+    """
     estado = resultado.get("inventory_status")
     if not estado:
         return "sin inventario"
     filas = resultado.get("inventory_results") or []
     aplicado = sum(abs(float(f.get("r_applied") or 0)) for f in filas)
-    return f"inventario {estado} ({len(filas)} ingrediente(s), {aplicado:.3f} aplicado)"
+    return f"inventario {estado} ({len(filas)} renglón(es), {aplicado:.3f} aplicado)"
 
 
 if __name__ == "__main__":
