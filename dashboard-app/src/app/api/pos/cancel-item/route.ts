@@ -53,7 +53,13 @@ export async function POST(request: NextRequest) {
     }
     if (!approvalMode) {
       if (offline_approved === true) {
-        approvalMode = 'offline_device_trust'
+        // El rol viene del shift token FIRMADO, no del cuerpo. Sin esto,
+        // `offline_device_trust` de un mesero que se autoaprobó y de un gerente
+        // aprobando en la terminal del mesero se veían IDÉNTICOS en la bitácora.
+        // No se bloquea: bloquear aquí rompería la cancelación sin WAN, y un 403 en
+        // el replay de la cola es terminal (pos-offline-db.ts:821) — la cancelación
+        // se perdería para siempre. Ver manager-approval.ts para el cierre real.
+        approvalMode = `offline_device_trust:${auth.role || 'desconocido'}`
       } else {
         // Sin ninguna aprobación. ROLLOUT EN 2 FASES para no romper clientes viejos (SW
         // cacheado que aún no manda la aprobación):
@@ -130,13 +136,22 @@ export async function POST(request: NextRequest) {
           client_id: clientId,
           order_id,
           action: voided ? 'item_voided' : 'item_cancelled',
-          actor: mesero || 'POS',
+          // EL ACTOR SALE DEL TOKEN, NO DEL CUERPO. Antes era `mesero || 'POS'`, y
+          // `mesero` lo mandaba el cliente: la bitácora entera la dictaba quien cancelaba.
+          // Igual que `manager`, que dejaba el robo firmado con el nombre del gerente.
+          actor: auth.staffName || auth.staffId || 'POS',
           details: {
             item_id,
             item_name: targetItem.nombre || targetItem.name,
             reason,
-            manager,
             approval_mode: approvalMode,
+            solicitante_rol: auth.role,
+            // Lo que el cliente AFIRMÓ. En el camino offline es el único dato de quién
+            // autorizó, así que se conserva — pero como afirmación, no como hecho.
+            manager_declarado: typeof manager === 'string' ? manager : null,
+            mesero_declarado: typeof mesero === 'string' ? mesero : null,
+            revisar: approvalMode.startsWith('offline_device_trust')
+              && (ROLE_LVL[String(auth.role)] || 0) < 4,
             voided: !!voided,
             operation_id,
           },

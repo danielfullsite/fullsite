@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { withPOSAuth, unauthorized } from '@/lib/api-auth'
-import { verifyManagerApproval } from '@/lib/manager-approval'
+import { verifyManagerApproval, apruebaSospechosa } from '@/lib/manager-approval'
 
 /**
  * Reabrir una cuenta PAGADA/cerrada (status → enviada, closed_at → null).
@@ -24,6 +24,9 @@ export async function POST(request: NextRequest) {
 
   const appr = await verifyManagerApproval({
     approvalToken: approval_token, offlineApproved: offline_approved, clientId, minLevel: 4,
+    // El rol sale del shift token FIRMADO, no del cuerpo. Con esto la bitácora
+    // distingue a un gerente aprobando en su terminal de un mesero que se autoaprobó.
+    solicitanteRol: auth.role,
   })
   if (!appr.ok) return Response.json({ ok: false, error: 'MANAGER_APPROVAL_REQUIRED' }, { status: 403 })
 
@@ -44,8 +47,19 @@ export async function POST(request: NextRequest) {
     method: 'POST', headers: { ...H, Prefer: 'return=minimal' },
     body: JSON.stringify({
       client_id: clientId, order_id, action: 'order_reopened',
-      actor: (typeof manager === 'string' && manager) || auth.staffName || 'POS',
-      details: { approval_mode: appr.mode },
+      // EL ACTOR SALE DEL TOKEN, NO DEL CUERPO. Antes era
+      // `(typeof manager === 'string' && manager) || auth.staffName`, o sea que quien
+      // reabría la cuenta escribía el nombre que quisiera: el robo quedaba firmado con
+      // el nombre del gerente y la bitácora acusaba a un inocente.
+      actor: auth.staffName || auth.staffId || 'POS',
+      details: {
+        approval_mode: appr.mode,
+        solicitante_rol: auth.role,
+        // Lo que el cliente AFIRMÓ. Se conserva porque en el camino offline es el único
+        // dato de quién autorizó — pero se guarda como afirmación, no como hecho.
+        manager_declarado: typeof manager === 'string' ? manager : null,
+        revisar: apruebaSospechosa(appr),
+      },
     }),
   }).catch(() => {})
 

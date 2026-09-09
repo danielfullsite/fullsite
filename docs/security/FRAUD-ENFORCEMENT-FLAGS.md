@@ -96,10 +96,23 @@ Y el servidor acepta `offline_approved` **antes** de consultar el flag
 ([manager-approval.ts:31](../../dashboard-app/src/lib/manager-approval.ts)):
 
 ```ts
-if (opts.offlineApproved === true) mode = 'offline_device_trust'
+if (opts.offlineApproved === true) {
+  mode = `offline_device_trust:${opts.solicitanteRol || 'desconocido'}`   // ← 2026-09-08
+}
 else if (process.env.POS_APPROVAL_STRICT === 'true') return { ok: false, mode: 'blocked' }
 else mode = 'legacy_no_approval'
 ```
+
+> **Actualizado el 2026-09-08.** El orden de las ramas **no cambió** —la rama offline sigue
+> esquivando el flag, y eso sigue siendo deliberado—, pero el modo ahora lleva pegado el rol
+> de quien pidió, tomado del shift token **firmado**. Antes, un mesero autoaprobándose y un
+> gerente aprobando en la terminal del mesero producían la misma cadena
+> `offline_device_trust`, así que el vector era invisible en la bitácora. Además el `actor`
+> del log ya no sale del cuerpo de la petición (era `manager` en `reopen-order` y `mesero` en
+> `cancel-item`), sino de `auth.staffName`: el robo ya no se puede firmar con el nombre del
+> gerente. Lo que el cliente afirma se conserva como `manager_declarado` / `mesero_declarado`,
+> marcado como afirmación, y `details.revisar` señala los casos con la forma del vector.
+> Ver `apruebaSospechosa()` en `manager-approval.ts`.
 
 De ahí se siguen dos cosas:
 
