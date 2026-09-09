@@ -8,6 +8,7 @@ import PageHeader from '@/components/PageHeader'
 import { sbPost, sbGet } from '@/lib/supabase-helpers'
 import { recordMovement, loadInventoryWithStock, makeIdempotencyKey } from '@/lib/inventory'
 import type { MovementResult } from '@/lib/inventory'
+import { useClaveDeOperacion } from '@/lib/clave-de-operacion'
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -49,15 +50,14 @@ function todayStr() {
   return new Date().toISOString().slice(0, 10)
 }
 
-function nowKey() {
-  const d = new Date()
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}`
-}
+// `nowKey()` se retiro: armaba la clave de idempotencia con el MINUTO del reloj y por
+// eso una factura entro dos veces el 2026-07-20. Ver `lib/clave-de-operacion.ts`.
 
 // ── Component ───────────────────────────────────────────────────────
 
 export default function EntradasPage() {
+  // Estable entre reintentos del mismo guardado; se renueva al confirmar.
+  const { clave: claveDeOperacion, confirmar: confirmarOperacion } = useClaveDeOperacion()
   // Data sources
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [products, setProducts] = useState<InventoryProduct[]>([])
@@ -191,9 +191,17 @@ export default function EntradasPage() {
     setSaveMessage(null)
 
     const clientId = getActiveClientSlug()
-    const timestamp = nowKey()
     const supplierKey = selectedSupplier.id.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 20)
-    const idempotencyKey = makeIdempotencyKey('entry', 'dashboard', timestamp, supplierKey)
+    // LA CLAVE IDENTIFICA LA OPERACION, NO EL INSTANTE.
+    //
+    // Antes iba `nowKey()`, con el MINUTO del reloj. El 2026-07-20 esta misma pantalla
+    // metio una factura de seis insumos DOS VECES --57 unidades fantasma-- porque el
+    // reintento cayo 1 min 12 s despues y la clave cambio de `..._16-59_...` a
+    // `..._17-00_...`: la comprobacion de duplicados no encontro la anterior.
+    //
+    // `claveDeOperacion` es estable entre reintentos y solo se renueva cuando la
+    // operacion se confirma, mas abajo.
+    const idempotencyKey = makeIdempotencyKey('entry', 'dashboard', claveDeOperacion, supplierKey)
 
     try {
       // ── 1. Record movements (updates pos_inventory + cost + ledger) ──
@@ -217,6 +225,10 @@ export default function EntradasPage() {
       })
 
       if (movResult.was_duplicate) {
+        // Terminal: quedo registrada (antes). Lo siguiente que se capture es otra
+        // operacion, asi que la clave se renueva -- si no, la proxima entrada legitima
+        // se descartaria como duplicado, que es el error opuesto y tambien cuesta.
+        confirmarOperacion()
         setSaveMessage({ type: 'duplicate', text: 'Esta entrada ya fue registrada anteriormente.' })
         setItems([])
         setSaving(false)
@@ -259,7 +271,11 @@ export default function EntradasPage() {
       }
 
       await sbPost('wansoft_data', clientId, {
-        data_key: `inventory_entry_${timestamp}`,
+        // Misma corrección que la clave de movimientos: el minuto del reloj no
+        // identifica la operación. Se conserva la FECHA delante para que siga siendo
+        // legible y consultable por prefijo, y la parte que da unicidad es la clave de
+        // operación, estable entre reintentos.
+        data_key: `inventory_entry_${fecha}_${claveDeOperacion}`,
         fecha,
         data: payload,
       })
@@ -274,6 +290,7 @@ export default function EntradasPage() {
       })
 
       // Reset form
+      confirmarOperacion()   // guardado confirmado: la proxima captura es otra operacion
       setItems([])
       setNotes('')
       setSelectedSupplier(null)

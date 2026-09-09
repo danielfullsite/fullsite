@@ -10,6 +10,7 @@ import KPICard from '@/components/KPICard'
 import { sbPost } from '@/lib/supabase-helpers'
 import { recordMovement, loadInventoryWithStock, makeIdempotencyKey } from '@/lib/inventory'
 import type { MovementResult } from '@/lib/inventory'
+import { useClaveDeOperacion } from '@/lib/clave-de-operacion'
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -82,11 +83,7 @@ function uid() {
   return Math.random().toString(36).slice(2, 10)
 }
 
-function nowKey() {
-  const d = new Date()
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}`
-}
+// `nowKey()` se retiro: ver `lib/clave-de-operacion.ts`.
 
 function todayISO() {
   return new Date().toISOString().split('T')[0]
@@ -95,6 +92,8 @@ function todayISO() {
 // ── Component ───────────────────────────────────────────────────────
 
 export default function MermaPage() {
+  // Estable entre reintentos del mismo guardado; se renueva al confirmar.
+  const { clave: claveDeOperacion, confirmar: confirmarOperacion } = useClaveDeOperacion()
   const WAREHOUSES = getWarehouses() // almacenes del tenant activo
   // Data
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([])
@@ -278,8 +277,11 @@ export default function MermaPage() {
     setSaveMessage(null)
 
     const clientId = getActiveClientSlug()
-    const timestamp = nowKey()
-    const idempotencyKey = makeIdempotencyKey('waste', 'dashboard', timestamp, activeWarehouse)
+    // La clave identifica la OPERACION, no el instante. Con el MINUTO del reloj, un
+    // reintento que cruzara el cambio de minuto registraba la merma DOS VECES -- y esta
+    // pantalla descuenta stock. En entradas ya paso en produccion el 2026-07-20, y una
+    // merma se duplico ese mismo dia con 1 min 18 s de separacion.
+    const idempotencyKey = makeIdempotencyKey('waste', 'dashboard', claveDeOperacion, activeWarehouse)
 
     try {
       // ── 1. Record movements (updates pos_inventory + ledger) ──
@@ -297,6 +299,7 @@ export default function MermaPage() {
       })
 
       if (movResult.was_duplicate) {
+        confirmarOperacion()   // terminal: quedo registrada antes
         setSaveMessage({ type: 'success', text: 'Esta merma ya fue registrada anteriormente.' })
         setItems([])
         setSaving(false)
@@ -332,7 +335,7 @@ export default function MermaPage() {
       }
 
       await sbPost('wansoft_data', clientId, {
-        data_key: `inventory_waste_${timestamp}`,
+        data_key: `inventory_waste_${todayISO()}_${claveDeOperacion}`,
         fecha: todayISO(),
         data: payload,
       })
@@ -342,7 +345,7 @@ export default function MermaPage() {
         text: `Merma registrada: ${items.length} productos por ${formatCurrency(grandTotal)}. Stock actualizado.`,
       })
       setWasteHistory(prev => [{
-        data_key: `inventory_waste_${timestamp}`,
+        data_key: `inventory_waste_${todayISO()}_${claveDeOperacion}`,
         fecha: todayISO(),
         data: payload,
       }, ...prev])
