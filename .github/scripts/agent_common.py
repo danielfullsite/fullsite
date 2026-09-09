@@ -6,7 +6,6 @@ Enforces truthful reporting: no silent success on empty/stale data.
 
 import os
 import sys
-import json
 import time
 import requests
 from datetime import datetime, timezone, timedelta
@@ -211,7 +210,11 @@ def create_insight(
         "severity": severity,
         "title": title,
         "summary": summary,
-        "evidence": json.dumps(evidence) if evidence else None,
+        # El dict va DIRECTO. Con `json.dumps` viajaba una cadena y la columna jsonb
+        # guardaba un ESCALAR string: `evidence->>'codigo'` devolvia NULL y la
+        # evidencia quedaba escrita pero no consultable. Mismo bug que se cerro en
+        # agent_results el 2026-08-26; lo fija test_agent_results_jsonb.py.
+        "evidence": evidence if evidence else None,
         "recommended_action": recommended_action,
         "deep_link": deep_link,
         "data_freshness": data_freshness,
@@ -283,7 +286,11 @@ def log_event(
         "agent_id": agent_id, "client_id": client_id, "type": event_type,
         "title": title, "severity": severity, "status": "new", "outcome": None,
         "estimated_value": estimated_value, "confidence": confidence,
-        "evidence": json.dumps(evidence) if evidence else None,
+        # El dict va DIRECTO. Con `json.dumps` viajaba una cadena y la columna jsonb
+        # guardaba un ESCALAR string: `evidence->>'codigo'` devolvia NULL y la
+        # evidencia quedaba escrita pero no consultable. Mismo bug que se cerro en
+        # agent_results el 2026-08-26; lo fija test_agent_results_jsonb.py.
+        "evidence": evidence if evidence else None,
         "explanation": explanation, "suggested_action": suggested_action,
         "expires_at": expires_at,
     }

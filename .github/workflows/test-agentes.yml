@@ -30,3 +30,9 @@ jobs:
       # Aquí corre en cada push. Sin red, como el resto.
       - run: python .github/scripts/test_pos_turno.py
       - run: python .github/scripts/test_identidad_de_renglon.py
+
+      # Lo que `log_event` y `create_insight` le mandan a PostgREST. `cuadre.yml`
+      # también corre esta prueba, pero sólo dispara a la 1am o a mano: un PR que
+      # volviera a envolver `evidence` en json.dumps no se enteraría hasta la
+      # siguiente corrida, con la evidencia ya escrita e inconsultable. Sin red.
+      - run: python .github/scripts/test_log_event.py

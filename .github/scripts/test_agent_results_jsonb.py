@@ -48,6 +48,21 @@ def _es_json_dumps(nodo: ast.AST) -> bool:
             and nodo.func.value.id == "json")
 
 
+def _contiene_json_dumps(nodo: ast.AST) -> bool:
+    """True si en CUALQUIER parte del valor hay un `json.dumps(...)`.
+
+    No basta mirar el nodo de arriba. El valor real que se escribia era
+
+        "evidence": json.dumps(evidence) if evidence else None
+
+    — un `IfExp`, no un `Call`. Un predicado que solo mirara la raiz lo daba por
+    bueno, y asi es como este mismo guardian dejo pasar el bug de `evidence` cuando
+    se comprobo contra el codigo con el bug puesto a proposito (2026-09-09).
+    Se recorre el subarbol para que la forma en que se escriba la condicion no
+    cambie el veredicto."""
+    return any(_es_json_dumps(n) for n in ast.walk(nodo))
+
+
 def _payloads_de_agent_results():
     """Devuelve (archivo, linea, nodo_valor_de_data) por cada payload de agent_results.
 
@@ -94,11 +109,50 @@ def flecha_texto(data, llave):
     return valor if isinstance(valor, str) else json.dumps(valor)
 
 
+# Al 2026-09-09 los payloads con `evidence` son 2: log_event y create_insight, ambos
+# en agent_common.py. Mismo criterio que MINIMO_PAYLOADS: es un piso, no un objetivo.
+MINIMO_PAYLOADS_EVIDENCIA = 2
+
+
+def _payloads_con_evidencia():
+    """Devuelve (archivo, linea, nodo_valor_de_evidence) por cada payload con `evidence`.
+
+    `agent_events.evidence` y `agent_insights.evidence` son jsonb, igual que
+    `agent_results.data`, y sufrieron el MISMO bug: `log_event()` y `create_insight()`
+    mandaban `json.dumps(evidence)`, asi que `evidence->>'codigo'` devolvia NULL.
+    Medido en produccion el 2026-09-09: 74 de 195 filas de agent_events y 2,820 de
+    2,820 con evidencia en agent_insights estaban guardadas como escalar string.
+
+    Se identifica el payload por la firma `agent_id` + `evidence`, igual que arriba se
+    usa `agent_id` + `data`: asi un escritor NUEVO queda cubierto sin acordarse de esta
+    prueba.
+    """
+    hallazgos = []
+    for ruta in sorted(SCRIPTS.glob("*.py")):
+        if ruta.name.startswith("test_"):
+            continue
+        try:
+            arbol = ast.parse(ruta.read_text(encoding="utf-8"))
+        except SyntaxError as e:
+            raise AssertionError(f"{ruta.name} no parsea: {e}") from e
+        for nodo in ast.walk(arbol):
+            if not isinstance(nodo, ast.Dict):
+                continue
+            llaves = {k.value for k in nodo.keys
+                      if isinstance(k, ast.Constant) and isinstance(k.value, str)}
+            if not {"agent_id", "evidence"} <= llaves:
+                continue
+            for k, v in zip(nodo.keys, nodo.values):
+                if isinstance(k, ast.Constant) and k.value == "evidence":
+                    hallazgos.append((ruta.name, v.lineno, v))
+    return hallazgos
+
+
 class EscritoresNoEnvuelvenData(unittest.TestCase):
 
     def test_ningun_payload_de_agent_results_usa_json_dumps(self):
         culpables = [f"{arch}:{ln}" for arch, ln, nodo in _payloads_de_agent_results()
-                     if _es_json_dumps(nodo)]
+                     if _contiene_json_dumps(nodo)]
         self.assertEqual(
             culpables, [],
             "Estos escritores envuelven `data` en json.dumps. La columna es jsonb: "
@@ -114,6 +168,33 @@ class EscritoresNoEnvuelvenData(unittest.TestCase):
             f"Solo se hallaron {len(hallados)} payloads de agent_results y se esperaban "
             f"al menos {MINIMO_PAYLOADS}. O el escaneo dejo de reconocer la firma "
             f"(agent_id + data), o se borraron agentes.")
+
+
+class EscritoresNoEnvuelvenEvidence(unittest.TestCase):
+    """La misma regla que arriba, para las otras dos columnas jsonb.
+
+    Esta clase existe porque el guardian de `data` NO cubria `evidence`, y por ese
+    hueco el bug volvio: se cerro en agent_results el 2026-08-26 y siguio abierto en
+    agent_events y agent_insights hasta el 2026-09-09. Un guardian que solo mira una
+    columna deja las otras libres de reincidir."""
+
+    def test_ningun_payload_con_evidencia_usa_json_dumps(self):
+        culpables = [f"{arch}:{ln}" for arch, ln, nodo in _payloads_con_evidencia()
+                     if _contiene_json_dumps(nodo)]
+        self.assertEqual(
+            culpables, [],
+            "Estos escritores envuelven `evidence` en json.dumps. La columna es jsonb "
+            "en agent_events y en agent_insights: hay que mandar el dict directo, si no "
+            "Postgres guarda un escalar de tipo string y `evidence->>'campo'` devuelve "
+            "NULL.\n  " + "\n  ".join(culpables))
+
+    def test_el_escaneo_no_pasa_en_vacio(self):
+        hallados = _payloads_con_evidencia()
+        self.assertGreaterEqual(
+            len(hallados), MINIMO_PAYLOADS_EVIDENCIA,
+            f"Solo se hallaron {len(hallados)} payloads con evidencia y se esperaban al "
+            f"menos {MINIMO_PAYLOADS_EVIDENCIA}. O el escaneo dejo de reconocer la firma "
+            f"(agent_id + evidence), o se borraron escritores.")
 
 
 class SemanticaJsonbDePostgrest(unittest.TestCase):
