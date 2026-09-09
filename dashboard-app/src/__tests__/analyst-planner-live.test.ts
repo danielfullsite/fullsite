@@ -24,7 +24,7 @@ async function planear(pregunta: string) {
       { role: 'system', content: promptDePlaneacion(HOY, 'America/Monterrey') },
       { role: 'user', content: pregunta },
     ],
-    maxTokens: 800,
+    maxTokens: 2000,   // el MISMO presupuesto que la ruta; con 800 el JSON se truncaba
     temperature: 0,
   })
   const plan = validarPlan(extraerJSON(crudo), HOY)
