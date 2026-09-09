@@ -61,6 +61,31 @@ TENANTS_PERMITIDOS = {"demo", "lab-resto", "esqueleton-demo"}
 # está mal. Medido el 2026-08-26. Aquí se usa el conjunto canónico y punto.
 UNIDADES_VALIDAS = {"kg", "g", "lt", "ml", "pz"}
 
+# Grafías que significan la MISMA unidad. Sirven para REPARAR renglones viejos de
+# `pos_recipes_old`, no para escribir nuevos: aquí sólo se renombra la etiqueta, nunca
+# se convierte la cantidad.
+#
+# POR QUÉ HACE FALTA SI R1 YA SE SIEMBRA BIEN
+# `sembrar_r1()` escribe `recipe_unit` desde la constante, así que la cadena que
+# descuenta hoy nace correcta. Pero `pos_recipes_old` es la fuente que reproyecta
+# `/api/pos/recipe-sync` CADA VEZ que alguien edita una receta en /recetas o
+# /pos/recetas: lee `unit` de ahí y lo copia tal cual a `pos_recipe_lines`.
+#
+# O sea que un renglón con "pza" no rompe nada hoy y rompe todo el día que un usuario
+# toque esa receta en la UI: `convert_recipe_to_stock('pza','pz')` devuelve NULL y
+# `r1_reconcile_item` lo marca BLOCKED_UNIT_MISSING. La receta existe, el ingrediente
+# existe, y el platillo deja de descontar sin un solo error visible.
+#
+# `demo` tenía 18 renglones así (medidos el 2026-09-09), heredados de la corrida que
+# reventó a medias. Se repararon; esto evita que vuelvan.
+ALIAS_UNIDAD = {
+    "pza": "pz", "pzas": "pz", "pieza": "pz", "piezas": "pz", "pz.": "pz", "pza.": "pz",
+    "l": "lt", "lts": "lt", "litro": "lt", "litros": "lt",
+    "grs": "g", "gr": "g", "gramo": "g", "gramos": "g",
+    "kgs": "kg", "kilo": "kg", "kilos": "kg",
+    "mls": "ml", "mililitro": "ml", "mililitros": "ml",
+}
+
 # ─── Despensa ────────────────────────────────────────────────────────────────
 # (id, nombre, unidad, costo por unidad MXN, categoría)
 # Costos de mayoreo en Monterrey, orden de magnitud realista.
@@ -140,6 +165,46 @@ DIAS_DE_STOCK = 21
 
 def ing_id(cid: str, slug: str) -> str:
     return f"{cid}-{slug}"
+
+
+def _convierte(receta: str, stock: str) -> bool:
+    """Espejo de convert_recipe_to_stock(): las únicas parejas que la base sabe convertir."""
+    return (receta, stock) in {("g", "kg"), ("kg", "g"), ("ml", "lt"), ("lt", "ml")}
+
+
+def normalizar_unidades(cid: str) -> int:
+    """Repara renglones de `pos_recipes_old` cuya unidad no convierte contra el stock.
+
+    Sólo renombra cuando el alias apunta EXACTAMENTE a la unidad del inventario ("pza"
+    con stock en "pz"). Un renglón en "g" contra stock en "kg" NO se toca: sí convierte,
+    y reetiquetarlo multiplicaría el consumo por mil — un error mucho peor que el que
+    esto arregla, y silencioso igual.
+
+    Lo que no tiene alias se reporta en vez de adivinarse: inventar una equivalencia es
+    inventar consumo.
+
+    Devuelve cuántos renglones quedaron rotos y sin arreglo automático.
+    """
+    stock = {r["ingredient_id"]: r["stock_unit"] for r in sb_get(
+        "pos_inventory", f"client_id=eq.{cid}&select=ingredient_id,stock_unit&limit=1000")}
+    filas = sb_get("pos_recipes_old",
+                   f"client_id=eq.{cid}&select=id,menu_item_name,ingredient_id,unit&limit=2000")
+
+    arreglados, rotos = 0, []
+    for f in filas:
+        um, destino = (f.get("unit") or "").strip(), stock.get(f["ingredient_id"])
+        if destino is None or um == destino or _convierte(um, destino):
+            continue
+        if ALIAS_UNIDAD.get(um.lower()) == destino:
+            sb_patch("pos_recipes_old", f"id=eq.{f['id']}", {"unit": destino})
+            arreglados += 1
+        else:
+            rotos.append(f"{f['menu_item_name']}/{f['ingredient_id']}: '{um}' vs stock '{destino}'")
+
+    print(f"[sembrar] unidades: {arreglados} renglón(es) renombrados a la unidad del stock")
+    for r in rotos:
+        print(f"[sembrar]   SIN ARREGLO AUTOMÁTICO — {r}", file=sys.stderr)
+    return len(rotos)
 
 
 def sembrar_r1(cid: str, menu: dict, unidades: dict) -> int:
@@ -344,10 +409,14 @@ def sembrar(cid: str) -> int:
         sb_post("pos_inventory", inv)
     print(f"[sembrar] inventario: {len(inv)} ingredientes con stock inicial ({DIAS_DE_STOCK} días)")
 
-    # 4) La cadena que usa el descuento EN VIVO (R1)
+    # 4) Reparar unidades viejas de la tabla plana. Va DESPUÉS del inventario porque se
+    # compara contra `pos_inventory.stock_unit`, que tiene que existir ya.
+    errores += normalizar_unidades(cid)
+
+    # 5) La cadena que usa el descuento EN VIVO (R1)
     errores += sembrar_r1(cid, menu, unidades)
 
-    # 5) Food cost — que se vea, porque es el número que hace creíble el demo
+    # 6) Food cost — que se vea, porque es el número que hace creíble el demo
     print("\n[sembrar] food cost por platillo:")
     fuera = 0
     for nombre, precio, costo, pct in sorted(resumen, key=lambda x: -x[3]):
