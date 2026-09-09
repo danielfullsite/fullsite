@@ -66,9 +66,11 @@ export function calcEfectivoEsperado(
 
 // ── Order + movement summary ──────────────────────────────────────────────────
 // Shared computation from raw DB rows → ArqueoInput + OrderSummary.
-// Both the Wizard and the Corte page call this; the only difference is whether
-// they pass a methodTypeMap from pos_payment_methods (richer) or rely on
-// name-heuristics (acceptable for the wizard's local-first flow).
+//
+// `methodTypeMap` (de `pos_payment_methods`) NO es un lujo opcional: sin él las
+// formas se adivinan por el nombre y `Dólares` —efectivo físico— cae en tarjeta.
+// El wizard lo pasaba vacío y ahí se cerraba la caja. Hoy lo pasa siempre, con
+// `getPaymentMethodsFromDB()`, que ya trae su propio caché offline.
 
 export interface PagoFormaLike {
   metodo: string
@@ -93,6 +95,12 @@ export interface OrderSummary {
   efectivo: number
   tarjeta: number
   transferencias: number
+  /**
+   * Plataformas (Rappi/Uber/DiDi) y "otros" del catálogo: cortesías, vales,
+   * venta a terceros. No es efectivo ni se concilia contra la terminal bancaria;
+   * vivía sumado dentro de `tarjeta` y ahí no lo podía explicar nadie.
+   */
+  otros: number
   totalVentas: number
   ticketsCount: number
   cancelaciones: number
@@ -104,21 +112,42 @@ export interface OrderSummary {
   retiros: number
 }
 
-function isEfectivoMethod(name: string, methodTypeMap?: Record<string, string>): boolean {
-  if (methodTypeMap) {
-    const t = methodTypeMap[name.toLowerCase()]
-    if (t) return t === 'cash'
-  }
-  const lower = name.toLowerCase()
-  return lower.includes('efectivo') || lower.includes('cash')
-}
+/**
+ * A QUÉ CAJÓN PERTENECE CADA FORMA DE PAGO.
+ *
+ * El catálogo `pos_payment_methods` YA sabe el tipo de cada forma. Cuando llega
+ * el mapa se usa el mapa; adivinar por el nombre es el último recurso, no el
+ * primero. AMALAY tiene 18 formas activas heredadas de Wansoft y sólo tres se
+ * pueden adivinar por el nombre: "Efectivo", "Transferencia" y las que digan
+ * "tarjeta". Las otras quince —Dólares, Cortesía, Vale Amalay, Rappi, Ubereats,
+ * DiDi, Venta Terceros, Mercadotecnia, Influencer…— no se parecen a nada.
+ *
+ * `Dólares` es el caso que cuesta dinero: está catalogado como `cash`, o sea
+ * billetes FÍSICOS en el cajón, y el nombre no contiene "efectivo" ni "cash".
+ * Sin mapa cae en `card`, el efectivo esperado sale corto por ese monto, y el
+ * conteo aparece con SOBRANTE — que además tapa un faltante del mismo tamaño.
+ */
+type TipoDeForma = 'cash' | 'transfer' | 'card' | 'otros'
 
-function isTransferenciaMethod(name: string, methodTypeMap?: Record<string, string>): boolean {
-  if (methodTypeMap) {
-    const t = methodTypeMap[name.toLowerCase()]
-    if (t) return t === 'transfer'
+function tipoDeForma(name: string, methodTypeMap?: Record<string, string>): TipoDeForma {
+  const t = methodTypeMap?.[name.toLowerCase()]
+  if (t) {
+    if (t === 'cash') return 'cash'
+    if (t === 'transfer') return 'transfer'
+    // `terminal` (Clip) es tarjeta: cobra la terminal bancaria y se concilia con ella.
+    if (t === 'card' || t === 'terminal') return 'card'
+    // `platform` (Rappi/Uber/DiDi) y `other` (cortesías, vales, venta a terceros) no
+    // son tarjeta. Meterlos ahí ensucia justo el número que se concilia contra la
+    // terminal, y la diferencia queda sin dueño.
+    return 'otros'
   }
-  return name.toLowerCase().includes('transferencia')
+  // Sin mapa: heurística por nombre, idéntica a la de antes. Se conserva porque un
+  // nombre suelto que el catálogo no tiene tiene que caer en algún lado, y cambiarle
+  // el destino movería cierres viejos de bucket sin ninguna razón.
+  const lower = name.toLowerCase()
+  if (lower.includes('efectivo') || lower.includes('cash')) return 'cash'
+  if (lower.includes('transferencia')) return 'transfer'
+  return 'card'
 }
 
 /**
@@ -131,7 +160,7 @@ export function computeOrderSummary(
   cashMovements: CashMovLike[],
   methodTypeMap?: Record<string, string>,
 ): OrderSummary {
-  let efectivo = 0, tarjeta = 0, transferencias = 0
+  let efectivo = 0, tarjeta = 0, transferencias = 0, otros = 0
   let totalVentas = 0, ticketsCount = 0, cancelaciones = 0, descuentos = 0
   let propinas = 0, propinaEfectivo = 0, propinasNoEfectivo = 0
 
@@ -162,14 +191,16 @@ export function computeOrderSummary(
       const ventaFrac = total * frac
       const propinaFrac = propina * frac
 
-      if (isEfectivoMethod(p.metodo, methodTypeMap)) {
+      const tipo = tipoDeForma(p.metodo, methodTypeMap)
+      if (tipo === 'cash') {
         efectivo += ventaFrac
         propinaEfectivo += propinaFrac
-      } else if (isTransferenciaMethod(p.metodo, methodTypeMap)) {
-        transferencias += ventaFrac
-        propinasNoEfectivo += propinaFrac
       } else {
-        tarjeta += ventaFrac
+        if (tipo === 'transfer') transferencias += ventaFrac
+        else if (tipo === 'card') tarjeta += ventaFrac
+        else otros += ventaFrac
+        // La propina de todo lo que NO es efectivo sale del cajón igual: se le paga
+        // al mesero en billetes. El reparto de la venta cambió; éste no.
         propinasNoEfectivo += propinaFrac
       }
     }
@@ -182,7 +213,7 @@ export function computeOrderSummary(
   }
 
   return {
-    efectivo, tarjeta, transferencias,
+    efectivo, tarjeta, transferencias, otros,
     totalVentas, ticketsCount, cancelaciones, descuentos,
     propinas, propinaEfectivo, propinasNoEfectivo,
     depositos, retiros,

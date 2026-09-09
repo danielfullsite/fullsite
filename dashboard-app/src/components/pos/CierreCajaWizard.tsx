@@ -13,7 +13,7 @@ import {
 } from '@/lib/pos-offline-db'
 import { getPosConfigSync } from '@/lib/pos-config'
 import { sendOrderToKitchen } from '@/lib/kitchen-bridge'
-import { getPOSAuthHeaders, fetchWithTimeout } from '@/lib/pos-data'
+import { getPOSAuthHeaders, fetchWithTimeout, getPaymentMethodsFromDB } from '@/lib/pos-data'
 import { computeOrderSummary, summaryToArqueoInput, calcEfectivoEsperado } from '@/lib/pos-arqueo'
 import {
   filterOpenOrders,
@@ -107,6 +107,7 @@ export default function CierreCajaWizard({
     efectivo: 0,
     tarjeta: 0,
     transferencias: 0,
+    otros: 0,
     totalVentas: 0,
     ticketsCount: 0,
     cancelaciones: 0,
@@ -171,8 +172,13 @@ export default function CierreCajaWizard({
       // Cash movements — Supabase first, IDB fallback
       let cashMovements: { type: string; amount: number }[] = []
       try {
+        // `client_id` NO estaba en este filtro y sí en el de órdenes, tres líneas
+        // arriba. La RLS tapa al extraño, pero no al usuario con varias membresías:
+        // `user_has_client_access` le dice que sí a TODOS sus restaurantes, y estos
+        // depósitos y retiros entran directo al efectivo esperado. Mismo patrón que
+        // se cerró en seis lecturas el 2026-08-30; ésta se quedó fuera.
         const movRes = await fetch(
-          `${SUPABASE_URL}/rest/v1/pos_cash_movements?turno_id=eq.${turnoId}&select=type,amount`,
+          `${SUPABASE_URL}/rest/v1/pos_cash_movements?client_id=eq.${_cid()}&turno_id=eq.${turnoId}&select=type,amount`,
           { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, signal: AbortSignal.timeout(4000) }
         )
         if (movRes.ok) cashMovements = await movRes.json()
@@ -184,16 +190,39 @@ export default function CierreCajaWizard({
         } catch { /* IDB unavailable */ }
       }
 
-      // Use the shared computeOrderSummary — same logic as Corte page
+      // EL CATÁLOGO SABE QUÉ ES CADA FORMA DE PAGO; ANTES NO SE LE PREGUNTABA.
+      //
+      // Este componente llamaba a `computeOrderSummary` SIN el mapa de tipos —
+      // el comentario decía "same logic as Corte page" y no lo era: la página de
+      // Corte sí lo construye desde `pos_payment_methods`. Sin mapa las formas se
+      // adivinan por el nombre, y `Dólares` (catalogado `cash`, billetes físicos
+      // en el cajón) caía en tarjeta: el efectivo esperado salía corto por ese
+      // monto y el conteo cerraba con SOBRANTE, que tapa un faltante igual.
+      //
+      // `getPaymentMethodsFromDB` ya resuelve los tres mundos: Caja autoritativa
+      // (catálogo de Pedro), nube, y caché de IndexedDB si no hay red. Si aun así
+      // vuelve vacío, se pasa `undefined` y se cae a la heurística de antes — un
+      // catálogo ilegible no puede impedir cerrar la caja.
+      let mapaDeFormas: Record<string, string> | undefined
+      try {
+        const formas = await getPaymentMethodsFromDB()
+        if (formas.length > 0) {
+          mapaDeFormas = {}
+          for (const f of formas) mapaDeFormas[f.name.toLowerCase()] = f.type
+        }
+      } catch { /* sin catálogo: heurística por nombre, como antes */ }
+
       const summary = computeOrderSummary(
         orders as unknown as Parameters<typeof computeOrderSummary>[0],
         cashMovements,
+        mapaDeFormas,
       )
 
       setSystemData({
         efectivo: summary.efectivo,
         tarjeta: summary.tarjeta,
         transferencias: summary.transferencias,
+        otros: summary.otros,
         totalVentas: summary.totalVentas,
         ticketsCount: summary.ticketsCount,
         cancelaciones: summary.cancelaciones,
@@ -294,6 +323,9 @@ export default function CierreCajaWizard({
         efectivo_sistema: efectivoEsperado,
         tarjeta_sistema: systemData.tarjeta,
         transferencias_sistema: systemData.transferencias,
+        // Plataformas y cortesias, fuera de `tarjeta_sistema`: ese numero se
+        // concilia a mano contra la terminal bancaria y con basura adentro no cuadra.
+        otros_sistema: systemData.otros,
         diferencia,
         total_ventas: systemData.totalVentas,
         tickets_count: systemData.ticketsCount,
@@ -531,6 +563,7 @@ export default function CierreCajaWizard({
       <div class="row"><span>Efectivo:</span><span>${formatMXN(systemData.efectivo)}</span></div>
       <div class="row"><span>Tarjeta:</span><span>${formatMXN(systemData.tarjeta)}</span></div>
       <div class="row"><span>Transferencia:</span><span>${formatMXN(systemData.transferencias)}</span></div>
+      ${systemData.otros > 0 ? `<div class="row"><span>Otros (plataformas/cortesias):</span><span>${formatMXN(systemData.otros)}</span></div>` : ''}
       <div class="row total"><span>Total ventas:</span><span>${formatMXN(systemData.totalVentas)}</span></div>
       <div class="line"></div>
       <p style="font-weight:bold;margin:4px 0">CONTROL DE EFECTIVO</p>
@@ -790,6 +823,12 @@ export default function CierreCajaWizard({
                   <span className="text-[var(--text-3)]">Transferencias</span>
                   <span className="text-[var(--text-1)] font-medium">{formatMXN(systemData.transferencias)}</span>
                 </div>
+                {systemData.otros > 0 && (
+                  <div className="flex justify-between py-1.5 border-b border-[var(--line)]">
+                    <span className="text-[var(--text-3)]">Otros (plataformas, cortesias)</span>
+                    <span className="text-[var(--text-1)] font-medium">{formatMXN(systemData.otros)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between py-1.5 border-b border-[var(--line)]">
                   <span className="text-[var(--text-3)]">Tickets cerrados</span>
                   <span className="text-[var(--text-1)] font-medium">{systemData.ticketsCount}</span>
