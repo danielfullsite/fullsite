@@ -152,7 +152,7 @@ class OperationalDomain {
     }
     const expected = int(payload.expected_revision, 'expected_revision')
     if (existing && existing.authority !== 'caja') fail('LEGACY_ORDER_REQUIRES_CUTOVER', 'Esta orden requiere migración de autoridad antes de editarla por LAN')
-    if (existing && (existing.turno_id !== turnoId || ['cancelada', 'pagada', 'cerrada'].includes(existing.status) || existing.payment_status === 'pagada')) fail('ORDER_NOT_OPEN', 'La cuenta ya no está abierta en este turno')
+    if (existing && (existing.turno_id !== turnoId || ['cancelada', 'pagada', 'cerrada', 'dividida'].includes(existing.status) || existing.payment_status === 'pagada')) fail('ORDER_NOT_OPEN', 'La cuenta ya no está abierta en este turno')
     if (expected !== (existing?.order_revision ?? 0)) fail('ORDER_REVISION_CONFLICT', 'La cuenta cambió en otra terminal; recárgala antes de confirmar')
     if (state.getFinancialOrder(orderId)) fail('FINANCIAL_ORDER_LOCKED', 'Ya hay cuentas de cobro; termina o concilia antes de modificar consumos')
     if (existing && existing.created_by !== actor.id && !actor.permissions.includes('ver_todas_cuentas')) fail('PERMISSION_DENIED', 'No tienes permiso para modificar la cuenta de otro empleado')

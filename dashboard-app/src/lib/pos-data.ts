@@ -1049,7 +1049,12 @@ export interface Order {
   clienteNombre?: string
   mesero: string
   personas: number
-  status: 'abierta' | 'enviada' | 'preparando' | 'lista' | 'entregada' | 'cerrada' | 'cancelada'
+  /**
+   * `dividida`: la orden se liquido por sus cuentas de split, no por si misma. No es
+   * 'cerrada' a proposito -- con 'cerrada' el corte contaria la venta dos veces (las
+   * cuentas MAS la madre) y el arqueo pediria efectivo que nunca entro.
+   */
+  status: 'abierta' | 'enviada' | 'preparando' | 'lista' | 'entregada' | 'cerrada' | 'cancelada' | 'dividida'
   items: OrderItem[]
   subtotal: number
   iva: number

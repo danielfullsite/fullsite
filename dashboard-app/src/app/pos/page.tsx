@@ -4000,6 +4000,73 @@ function POSContent() {
           opId, orderId: liquidacion.order_id, clientId: _cid(),
           mesa: order.mesa, turnoId: order.turnoId ?? null,
         })
+
+        // LA ORDEN MADRE TAMBIEN SE CIERRA. Antes no se le escribia NADA.
+        //
+        // Cada cuenta del split se guarda como fila propia (`{orden}-C1`..`-CN`), y a la
+        // madre solo se le mandaba `avisarCierreDeOrden`, que es un aviso a la LAN --un
+        // mensaje, no una escritura (lib/aviso-lan.ts lo dice explicito)--. La madre
+        // quedaba en `pos_orders` con status 'enviada' y su TOTAL COMPLETO.
+        //
+        // Consecuencia, en 10 toques y sin mala fe: al cobrar la ultima cuenta el POS
+        // navega al mapa (`navigateToMesaMap()` aqui abajo), y el mapa pide
+        // `status=in.(enviada,preparando,lista,abierta,entregada)` (mesas/page.tsx:339).
+        // La madre sigue 'enviada', asi que la mesa aparece OCUPADA con la cuenta entera.
+        // Quien la toque carga la madre (page.tsx:2138 pide los mismos status) y la cobra
+        // otra vez: la misma comida cobrada dos veces, y el corte suma el doble.
+        //
+        // La variante fea de lo mismo: cobrar la mesa completa en efectivo, dividir en 4
+        // y registrar solo la cuenta 1. La mesa queda abierta con el total completo, o sea
+        // indistinguible de una que se fue sin pagar, y al cierre se cancela en lote con
+        // una nota. El faltante queda documentado como merma, no como robo.
+        //
+        // POR QUE 'dividida' Y NO 'cerrada'. Con 'cerrada' el corte contaria la venta DOS
+        // veces (las cuentas mas la madre) y el arqueo exigiria efectivo que nunca entro
+        // -- peor que el defecto. Con total 0 ensuciaria ticket promedio y ranking de
+        // meseros con una orden de $0. 'dividida' dice la verdad: esta orden se liquido
+        // por sus cuentas. Sale de los 12 lugares que consideran una mesa ocupada y no
+        // entra en los 11 que suman ventas (barrido del 2026-09-08).
+        //
+        // POR QUE AQUI Y NO ANTES. Este bloque solo corre tras cobrar la ULTIMA cuenta, y
+        // ademas detras de `debeEmitirCierre`. Cerrar la madre al DEFINIR el split
+        // liberaria la mesa con dinero sin cobrar y le quitaria a cocina la comida de los
+        // comensales que faltan -- que es justo lo que `lib/liquidacion-de-orden.ts`
+        // existe para impedir.
+        //
+        // Va por `saveOrder` y no por un PATCH directo para heredar lo que ya funciona:
+        // control de concurrencia (`expected_revision`), idempotencia por
+        // `save_operation_id`, y encolado offline. Su validacion de reconciliacion de
+        // pagos no aplica porque solo corre sobre 'cerrada'.
+        const subtotalMadre = activeItems.reduce((s, i) => s + i.subtotal, 0)
+        const baseMadre = Math.max(0, subtotalMadre - discount)
+        const cierreMadre = await saveOrder({
+          id: orderId,
+          mesa,
+          clienteNombre: clienteNombre || undefined,
+          mesero,
+          personas,
+          status: 'dividida',
+          items: activeItems,
+          subtotal: subtotalMadre,
+          iva: baseMadre * getIvaRate(),
+          total: baseMadre + baseMadre * getIvaRate(),
+          descuento: discount,
+          // El dinero vive en las cuentas. La madre no cobro nada y no debe decir que si.
+          pagos: [],
+          turnoId: turnoId || undefined,
+          notas: `Liquidada en ${splitMode === 'parejo' ? splitParejoN : splitCount} cuentas`,
+          createdAt: new Date(),
+          closedAt: new Date(),
+          orderRevision,
+          orderNumber: orderNumber ?? undefined,
+        }, `${opId}-madre`)
+
+        // Si esto falla, el dinero YA se cobro y no se toca: lo unico que queda mal es que
+        // la mesa siga pintada ocupada, que es exactamente el estado de antes del arreglo.
+        // Se avisa para que alguien la libere a mano en vez de descubrirlo al cierre.
+        if (!cierreMadre.ok && cierreMadre.error !== 'OFFLINE_QUEUED') {
+          showToast('Cuentas cobradas. La mesa puede seguir marcada ocupada — avisa al gerente.')
+        }
       }
 
       showToast(`Todas las cuentas cobradas — ${method}${propina > 0 ? ` + propina ${formatMXN(propina)}` : ''}`)
