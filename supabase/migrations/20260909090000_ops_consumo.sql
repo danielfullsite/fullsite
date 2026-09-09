@@ -22,7 +22,8 @@
 -- y con la que la conversión devuelve NULL siempre. Medido el 2026-09-09 contra la
 -- correcta: 759/759 líneas convertibles en un tenant y 637/637 en otro.
 
-create or replace view public.ops_consumo as
+create or replace view public.ops_consumo
+with (security_invoker = on) as
 with vendido as not materialized (
   -- Una fila por línea vendida. `cantidad` puede venir ausente en capturas viejas; se
   -- asume 1 antes que descartar la venta, y eso se nota en `lineas` del resultado.
@@ -131,7 +132,8 @@ comment on view public.ops_consumo is
 -- detector de merma que ignore ese denominador acusa a alguien por el 72% del menu que
 -- nadie ha capturado.
 
-create or replace view public.ops_consumo_cobertura as
+create or replace view public.ops_consumo_cobertura
+with (security_invoker = on) as
 with vendido as not materialized (
   select
     o.client_id, o.dia_venta,
@@ -180,5 +182,27 @@ comment on view public.ops_consumo_cobertura is
   'teorico de una parte del menu contra los movimientos reales de TODO el menu, y el '
   'faltante resultante parece robo cuando es catalogo incompleto.';
 
-grant select on public.ops_consumo           to anon, authenticated, service_role;
-grant select on public.ops_consumo_cobertura to anon, authenticated, service_role;
+-- ---------------------------------------------------------------------------
+-- Aislamiento entre restaurantes — NO se otorga a `anon`.
+-- ---------------------------------------------------------------------------
+-- La primera version de este archivo hacia
+--   grant select on public.ops_consumo to anon, authenticated, service_role;
+-- sin `security_invoker`. Las dos mitades importan y ninguna basta sola:
+--
+--   · Las tablas base tienen RLS, pero estas vistas las posee `postgres`, que tiene
+--     `rolbypassrls = true`. Sin `security_invoker = on` la vista corre como su dueno y
+--     el RLS de `pos_orders` no aplica.
+--   · `anon` es el rol de la llave publica del proyecto.
+--
+-- Juntas publicaban las recetas y el consumo teorico de TODOS los restaurantes a
+-- cualquiera con la llave publica. Es la misma propiedad que cerro #104, donde un
+-- usuario de boruca veia 1,415 dias de 5 restaurantes.
+--
+-- Se corrigio al aplicar en produccion el 2026-09-09; este archivo se alinea para que un
+-- clon construido desde el repositorio nazca cerrado y no reabra la fuga.
+alter view public.ops_consumo set (security_invoker = on);
+alter view public.ops_consumo_cobertura set (security_invoker = on);
+revoke all on public.ops_consumo from public, anon;
+revoke all on public.ops_consumo_cobertura from public, anon;
+grant select on public.ops_consumo to authenticated, service_role, fullsite_agent, fullsite_readonly;
+grant select on public.ops_consumo_cobertura to authenticated, service_role, fullsite_agent, fullsite_readonly;
