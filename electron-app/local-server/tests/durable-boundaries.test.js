@@ -247,7 +247,16 @@ test('SIGKILL after real TCP send leaves an uncertain job, never an automatic se
   try {
     const child = spawn(process.execPath, ['-e', script, queuePath], { stdio: ['ignore', 'pipe', 'pipe'] })
     const [code, signal] = await once(child, 'exit')
-    assert.equal(signal, 'SIGKILL'); assert.equal(code, null)
+    // "Murio de golpe" se ve distinto segun el sistema, y lo que esta prueba defiende no
+    // es el mecanismo sino la consecuencia. En Unix llega signal='SIGKILL' y code=null;
+    // en Windows NO hay señales POSIX, asi que `process.kill(pid,'SIGKILL')` termina el
+    // proceso con TerminateProcess y llega signal=null con un code distinto de 0.
+    //
+    // Lo que NO se afloja: el proceso tiene que haber muerto sin salir limpio. Un exit 0
+    // significaria que el hijo alcanzo a terminar por su cuenta, y entonces la prueba no
+    // estaria probando nada -- de ahi el rechazo explicito.
+    assert.ok(signal === 'SIGKILL' || signal === null, `salida inesperada: signal=${signal}`)
+    assert.notEqual(code, 0, 'el hijo no debio salir limpio: la prueba simula una muerte abrupta')
     const printer = require('../adapters/printer')
     printer.init({ printersConfig: config, queueFilePath: queuePath })
     assert.equal(printer.getUncertainJobs().length, 1)
