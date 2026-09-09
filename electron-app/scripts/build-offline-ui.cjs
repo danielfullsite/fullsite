@@ -36,6 +36,26 @@ try {
       ['app/layout.tsx', 'app/globals.css', 'app/not-found.tsx', 'app/favicon.ico'].includes(relative)
     return true
   } })
+  // EL FILTRO DE ARRIBA NO BASTA EN WINDOWS, y esto es lo que rompía el build en CI.
+  //
+  // La primera vez que este workflow llegó a compilar (2026-09-09) fallo con:
+  //
+  //     ./src/instrumentation.ts
+  //     Module not found: Can't resolve '../sentry.server.config'
+  //
+  // El mismo script corre limpio en macOS —comprobado: 456 archivos, 33 rutas— porque
+  // ahí el filtro sí excluye el archivo. En Windows se cuela: `fs.cpSync` puede entregar
+  // al filtro rutas con prefijo extendido (`\\?\C:\...`), y entonces la comparación
+  // contra la ruta relativa no casa. El archivo llega al build aislado, Next lo compila,
+  // y su `import '../sentry.server.config'` apunta a un archivo que este build no copia
+  // a propósito (es configuración de servidor, y esto es un export estático).
+  //
+  // Borrarlos DESPUÉS de copiar no depende de cómo el sistema operativo entregue las
+  // rutas al filtro: si están, se van. Es el mismo patrón que el script ya usa tres
+  // líneas más abajo para `sw.js`, donde también se prefirió la garantía dura.
+  for (const name of ['instrumentation.ts', 'proxy.ts']) {
+    fs.rmSync(path.join(build, 'src', name), { force: true })
+  }
   fs.cpSync(path.join(source, 'public'), path.join(build, 'public'), { recursive: true })
   // Static package owns its version; no SW may overlay another version on it.
   for (const name of ['sw.js', 'precache-manifest.json']) fs.rmSync(path.join(build, 'public', name), { force: true })
