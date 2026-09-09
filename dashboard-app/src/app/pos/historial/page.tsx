@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { ArrowLeft, Search, RefreshCw, FileText, ChevronDown, ChevronRight, Printer } from 'lucide-react'
 import { formatMXN, getClientId } from '@/lib/pos-data'
 import { printTicketCSS } from '@/lib/printer'
+import { todayMX, zonedStartOfDayISO } from '@/lib/date-mx'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -29,7 +30,11 @@ interface OrderFromDB {
 export default function HistorialPage() {
   const [orders, setOrders] = useState<OrderFromDB[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0])
+  // Era `new Date().toISOString().split('T')[0]`: la fecha en UTC, sin siquiera
+  // intentar la zona del restaurante. Después de las 18:00 en Monterrey ya es el día
+  // siguiente en UTC, así que el historial abría en MAÑANA — vacío — justo a la hora
+  // de la cena. `todayMX()` formatea en la zona del tenant.
+  const [selectedDate, setSelectedDate] = useState(() => todayMX())
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
   const [expanded, setExpanded] = useState<string | null>(null)
@@ -37,8 +42,16 @@ export default function HistorialPage() {
   const fetchOrders = async () => {
     setLoading(true)
     try {
+      // La ventana se arma en la zona del restaurante. Con `${fecha}T00:00:00` desnudo,
+      // Postgres (que corre en UTC) devolvía del día anterior a las 18:00 hasta las
+      // 17:59 del día pedido: se perdía la cena del día y se colaba la de ayer.
+      const desde = zonedStartOfDayISO(selectedDate)
+      const [y, m, d] = selectedDate.split('-').map(Number)
+      const hasta = zonedStartOfDayISO(new Date(Date.UTC(y, m - 1, d + 1)).toISOString().split('T')[0])
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${getClientId()}&created_at=gte.${selectedDate}T00:00:00&created_at=lte.${selectedDate}T23:59:59&order=created_at.desc&limit=200`,
+        `${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${getClientId()}` +
+        `&created_at=gte.${encodeURIComponent(desde)}&created_at=lt.${encodeURIComponent(hasta)}` +
+        `&order=created_at.desc&limit=200`,
         { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
       )
       if (res.ok) {

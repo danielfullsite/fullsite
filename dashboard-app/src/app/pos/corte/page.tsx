@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { Fingerprint, ArrowLeft, Receipt, RefreshCw, Clock, DollarSign, Users, CreditCard, Banknote, Ban, Percent, ChefHat, RotateCcw, ShieldAlert, AlertTriangle, X, Download, Printer } from 'lucide-react'
 import { formatMXN, getAuditLog, reopenOrder, logAudit, getClientId, verifyManagerPin, verifyManagerHuella, hayHuellasDadasDeAlta, consumeManagerApproval, getActiveTurnoTolerante, getPaymentMethodsFromDB, type AuditLogEntry, type PagoForma, type PaymentMethodDB } from '@/lib/pos-data'
 import { isTiempoItem } from '@/lib/pos-constants'
-import { getActiveTimezone } from '@/lib/date-mx'
+import { getActiveTimezone, todayMX, zonedStartOfDayISO } from '@/lib/date-mx'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -51,9 +51,40 @@ async function getCardCommissionPct(): Promise<number> {
   } catch { return 0 }
 }
 
+/** El día siguiente de una fecha `YYYY-MM-DD`, sin tocar zonas: aritmética de calendario. */
+function diaSiguiente(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const t = new Date(Date.UTC(y, m - 1, d + 1))
+  return t.toISOString().split('T')[0]
+}
+
 async function getOrders(dateStr: string): Promise<OrderFromDB[]> {
+  // LA VENTANA ESTABA CORRIDA SEIS HORAS.
+  //
+  // El filtro era `created_at=gte.${dateStr}T00:00:00&lte.${dateStr}T23:59:59`, sin
+  // zona. Postgres corre en UTC (comprobado: `current_setting('TimeZone')` = UTC), así
+  // que pedir "2026-09-08" traía en hora de Monterrey:
+  //
+  //     del 2026-09-07 18:00:00  al  2026-09-08 17:59:59
+  //
+  // O sea que la CENA del día pedido quedaba fuera y se colaba la cena del día
+  // anterior. Y sumado al otro error —la fecha por defecto era mañana después de las
+  // 18:00, ver `selectedDate` abajo—, el gerente que abre el corte a las 23:30 pide sin
+  // saberlo el día siguiente y termina viendo un reporte al que le falta LA COMIDA del
+  // día que quería revisar. Compara ese total contra el sobre y le sobra dinero; y si
+  // alguien se llevó algo de la comida, este número no lo delata, porque la comida no
+  // está en él.
+  //
+  // `zonedStartOfDayISO` ya resuelve esto bien y es tenant-aware — data.ts:506 la usa
+  // desde antes. El corte era el único que no.
+  const desde = zonedStartOfDayISO(dateStr)
+  const hasta = zonedStartOfDayISO(diaSiguiente(dateStr))
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${getClientId()}&created_at=gte.${dateStr}T00:00:00&created_at=lte.${dateStr}T23:59:59&order=created_at.desc&limit=200`,
+    // `lt` en el extremo superior, no `lte`: con `lte` sobre el inicio del día
+    // siguiente se colaría una orden creada exactamente a las 00:00:00.000.
+    `${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${getClientId()}` +
+    `&created_at=gte.${encodeURIComponent(desde)}&created_at=lt.${encodeURIComponent(hasta)}` +
+    `&order=created_at.desc&limit=200`,
     { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
   )
   if (!res.ok) return []
@@ -81,8 +112,16 @@ async function getCashMovementsByTurno(turnoId: string): Promise<CashMovement[]>
 }
 
 async function getCashMovementsByDate(dateStr: string): Promise<CashMovement[]> {
+  // Mismo defecto de ventana que `getOrders`, y aquí pesa igual: estos son los retiros
+  // y depósitos que el arqueo resta del efectivo esperado. Con la ventana corrida seis
+  // horas, un retiro de la comida no contaba y uno de la cena anterior sí — la
+  // diferencia del corte salía mal por los dos lados.
+  const desde = zonedStartOfDayISO(dateStr)
+  const hasta = zonedStartOfDayISO(diaSiguiente(dateStr))
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/pos_cash_movements?client_id=eq.${getClientId()}&created_at=gte.${dateStr}T00:00:00&created_at=lte.${dateStr}T23:59:59&order=created_at.desc`,
+    `${SUPABASE_URL}/rest/v1/pos_cash_movements?client_id=eq.${getClientId()}` +
+    `&created_at=gte.${encodeURIComponent(desde)}&created_at=lt.${encodeURIComponent(hasta)}` +
+    `&order=created_at.desc`,
     { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
   )
   if (!res.ok) return []
@@ -93,12 +132,17 @@ export default function CortePage() {
   const [orders, setOrders] = useState<OrderFromDB[]>([])
   const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedDate, setSelectedDate] = useState(() => {
-    // Use Mexico timezone to get correct local date
-    const now = new Date()
-    const mxDate = new Date(now.toLocaleString('en-US', { timeZone: getActiveTimezone() }))
-    return mxDate.toISOString().split('T')[0]
-  })
+  // DESPUES DE LAS 18:00 ESTO DEVOLVIA MAÑANA.
+  //
+  // `new Date(now.toLocaleString('en-US', {timeZone}))` construye una fecha con los
+  // números locales pero interpretados como hora LOCAL DEL PROCESO, y luego
+  // `.toISOString()` la vuelve a convertir a UTC — el desfase se aplica dos veces.
+  // Medido: a las 18:30, 20:30 y 23:30 del 7 de septiembre en Monterrey devuelve
+  // "2026-09-08". Justo el horario de cena, que es cuando se hace el corte.
+  //
+  // `todayMX()` (lib/date-mx.ts) formatea directo en la zona del tenant y no tiene ese
+  // problema. Ya existía; el corte era el único que no la usaba.
+  const [selectedDate, setSelectedDate] = useState(() => todayMX())
 
   const [cardPct, setCardPct] = useState(0)
   const [cashMovements, setCashMovements] = useState<CashMovement[]>([])
