@@ -5,7 +5,9 @@ name: UBER Cert Close - sandbox order + resolve fulfillment
 #  - (Scheduled se valida recibiendo el webhook; no requiere este workflow)
 #
 # Modo A (sin order_id): intenta crear una orden sandbox de delivery vía Uber.
-# Modo B (con order_id, de una orden real colocada en el consumer app): get -> accept -> resolve.
+# Modo B (con order_id, de una orden real colocada en el consumer app): get -> resolve -> accept.
+# El resolve DEBE ir antes del accept (Uber GTS 2026-09-09): aceptar primero hace que
+# cualquier REMOVE_ITEM se lea como cancelar la orden ya aceptada -> 403.
 
 on:
   workflow_dispatch:
@@ -72,16 +74,10 @@ jobs:
             -d "{\"action\":\"delivery_order_get\",\"store_id\":\"$STORE\",\"order_id\":\"$FINAL_ORDER\"}")
           echo "get HTTP $(echo "$RESP" | tail -1)"; echo "$RESP" | head -n -1
 
-      - name: Accept order (idempotente)
-        if: ${{ env.FINAL_ORDER != '' }}
-        continue-on-error: true
-        run: |
-          RESP=$(curl -s -w "\n%{http_code}" -X POST "$APP_URL/api/integrations/uber-eats/sandbox" \
-            -H "Authorization: Bearer $INTEGRATION_ADMIN_SECRET" -H "Content-Type: application/json" \
-            -d "{\"action\":\"delivery_order_accept\",\"store_id\":\"$STORE\",\"order_id\":\"$FINAL_ORDER\"}")
-          echo "accept HTTP $(echo "$RESP" | tail -1)"; echo "$RESP" | head -n -1
-
-      - name: Resolve fulfillment (?expand=carts)
+      # Uber GTS (case #59731873, 2026-09-09): "the Resolve Fulfillment Issues
+      # endpoint must be called BEFORE accepting the order." Accepting first makes
+      # any REMOVE_ITEM read as canceling the accepted order -> 403. So: resolve first.
+      - name: Resolve fulfillment (?expand=carts) — BEFORE accept
         if: ${{ env.FINAL_ORDER != '' }}
         run: |
           PAYLOAD=$(python3 -c 'import json,os; d={"action":"resolve_fulfillment","store_id":os.environ["STORE"],"order_id":os.environ["FINAL_ORDER"],"item_name":os.environ["ITEM_NAME"]}; a=os.environ.get("ACTION_TYPE","").strip(); d.update({"action_type":a} if a else {}); q=os.environ.get("ITEM_QTY","").strip(); d.update({"item_quantity":int(q)} if q else {}); print(json.dumps(d))')
@@ -92,3 +88,12 @@ jobs:
           CODE=$(echo "$RESP" | tail -1); BODY=$(echo "$RESP" | head -n -1)
           echo "=== RESOLVE HTTP $CODE ==="; echo "$BODY"
           echo "$BODY" | python3 -c 'import sys,json; d=json.load(sys.stdin); print("cart_item_id:", d.get("cart_item_id"), "| http_status:", d.get("http_status"))' 2>/dev/null || true
+
+      - name: Accept order (idempotente) — AFTER resolve
+        if: ${{ env.FINAL_ORDER != '' }}
+        continue-on-error: true
+        run: |
+          RESP=$(curl -s -w "\n%{http_code}" -X POST "$APP_URL/api/integrations/uber-eats/sandbox" \
+            -H "Authorization: Bearer $INTEGRATION_ADMIN_SECRET" -H "Content-Type: application/json" \
+            -d "{\"action\":\"delivery_order_accept\",\"store_id\":\"$STORE\",\"order_id\":\"$FINAL_ORDER\"}")
+          echo "accept HTTP $(echo "$RESP" | tail -1)"; echo "$RESP" | head -n -1
