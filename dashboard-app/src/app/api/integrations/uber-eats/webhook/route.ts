@@ -320,7 +320,10 @@ export async function POST(request: NextRequest) {
 
   const eventType = (body.event_type ?? body.type ?? '') as string
   const orderId = (meta.resource_id ?? body.order_id ?? body.id ?? '') as string
-  const storeId = (store.store_id ?? body.store_id ?? '') as string
+  // Real Uber order webhooks are "thin": the store UUID arrives in meta.user_id (order id
+  // in meta.resource_id, details via resource_href). Synthetic/full payloads carry it in
+  // meta.resource.store.store_id. Try both so live orders resolve their tenant.
+  const storeId = (store.store_id ?? meta.user_id ?? body.store_id ?? '') as string
 
   // Generate a stable event ID for dedup: Uber sends event_id in some versions
   const providerEventId = (body.event_id ?? body.uuid ?? `${eventType}:${orderId}`) as string
