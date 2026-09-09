@@ -79,18 +79,59 @@ class BarridoDelPatronEnTodosLosScripts(unittest.TestCase):
 
 
 class ElVerdeNoPuedeMentir(unittest.TestCase):
-    def test_el_workflow_de_precision_usa_pipefail(self):
-        wf = (RAIZ.parent / "workflows" / "precision-agentes.yml").read_text()
-        self.assertIn("pipefail", wf,
-                      "sin pipefail, `python ... | tee` reporta el exito de tee y esconde el fallo")
+    """Barrido sobre TODOS los workflows, no sobre el que se arreglo primero.
 
-    def test_ningun_paso_que_califica_esconde_su_codigo_de_salida(self):
-        wf = (RAIZ.parent / "workflows" / "precision-agentes.yml").read_text()
-        # Si algun dia se quita el pipefail del job, que esta prueba lo cache.
-        tuberias = [l.strip() for l in wf.splitlines() if "resolver_" in l and "|" in l]
-        if tuberias:
-            self.assertIn("shell: bash -euo pipefail", wf,
-                          f"hay pasos con tuberia sin pipefail declarado: {tuberias}")
+    La primera version de esta prueba solo miraba precision-agentes.yml — el mismo error
+    que este archivo denuncia dos clases mas arriba. La auditoria adversarial del
+    2026-09-08 encontro otros tres workflows con el patron intacto: cuadre.yml,
+    esquema-baseline.yml y sembrar-demo.yml.
+    """
+
+    WORKFLOWS = RAIZ.parent / "workflows"
+
+    def test_ningun_workflow_esconde_el_fallo_detras_de_un_tee(self):
+        expuestos = []
+        for wf in sorted(self.WORKFLOWS.glob("*.yml")):
+            texto = wf.read_text()
+            tuberias = [l.strip() for l in texto.splitlines()
+                        if "| tee" in l and l.lstrip().startswith(("- run:", "run:"))]
+            if tuberias and "pipefail" not in texto:
+                expuestos.append(f"{wf.name}: {tuberias[0][:70]}")
+        self.assertEqual(
+            expuestos, [],
+            "`cmd | tee` reporta el codigo de salida de tee (siempre 0). Estos workflows "
+            "salen verdes aunque el script reviente:\n  " + "\n  ".join(expuestos))
+
+    @staticmethod
+    def _sin_comentarios(texto):
+        """Quitar los comentarios del YAML antes de buscar.
+
+        Sin esto la prueba se cree su propia explicacion: el comentario de
+        precision-agentes.yml MENCIONA `continue-on-error` para decir que NO lo lleva, y
+        una busqueda en el texto crudo lo cuenta como si estuviera puesto. Es el mismo
+        error que ya aparecio dos veces hoy en pruebas de este repo.
+        """
+        return "\n".join(l for l in texto.splitlines() if not l.lstrip().startswith("#"))
+
+    def test_los_dos_calificadores_corren_aunque_el_primero_falle(self):
+        # Al poner pipefail se introdujo lo contrario: con `bash -e`, el fallo del primer
+        # calificador mataba el job y el segundo ya ni se ejecutaba. Ver y bloquear no son
+        # lo mismo.
+        wf = self._sin_comentarios((self.WORKFLOWS / "precision-agentes.yml").read_text())
+        # Anclar en el paso que CALIFICA, no en el que corre sus pruebas: buscar el nombre
+        # del script a secas engancha primero `test_resolver_predicciones.py`.
+        i = wf.find("run: python .github/scripts/resolver_predicciones.py")
+        j = wf.find("run: python .github/scripts/resolver_inventario.py")
+        self.assertGreater(i, 0, "no encontre el paso que califica predicciones")
+        self.assertGreater(j, i, "el de inventario va despues del de predicciones")
+        self.assertIn("if: always()", wf[i:j],
+                      "el segundo calificador tiene que correr aunque el primero falle")
+
+    def test_pero_el_job_sigue_saliendo_rojo(self):
+        # `if: always()` hace que corra; `continue-on-error` haria que el fallo se perdone,
+        # que es justo lo que esta prueba existe para impedir.
+        wf = self._sin_comentarios((self.WORKFLOWS / "precision-agentes.yml").read_text())
+        self.assertNotIn("continue-on-error", wf)
 
 
 if __name__ == "__main__":

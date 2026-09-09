@@ -41,6 +41,13 @@ env:
 jobs:
   baseline:
     runs-on: ubuntu-latest
+
+    # `cmd | tee archivo` sin pipefail reporta el código de salida de `tee`, que siempre es
+    # 0. Un script que revienta sale verde. Costó 7 días de calificador muerto sin que
+    # nada lo dijera; se cierra en todos los workflows que usan el patrón, no sólo en aquél.
+    defaults:
+      run:
+        shell: bash -euo pipefail {0}
     steps:
       - uses: actions/checkout@v6
 

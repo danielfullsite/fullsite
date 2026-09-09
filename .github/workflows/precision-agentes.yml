@@ -53,12 +53,22 @@ jobs:
       # falso, que es peor, porque se ve igual de bien que uno cierto.
       - run: python .github/scripts/test_resolver_inventario.py
 
-      - run: python .github/scripts/resolver_predicciones.py | tee salida.txt
+      # Los dos calificadores son INDEPENDIENTES y los dos tienen que correr.
+      #
+      # Al poner pipefail (para que el fallo dejara de salir verde) introduje lo contrario:
+      # con `bash -e`, el 500 de resolver_predicciones mataba el job y resolver_inventario
+      # ya ni se ejecutaba. Cambié un fallo invisible por uno que bloquea. Lo encontró la
+      # auditoría adversarial del 2026-09-08.
+      #
+      # `if: always()` hace que el segundo corra pase lo que pase, y como no lleva
+      # continue-on-error el job SIGUE saliendo rojo si cualquiera de los dos falla. Ver y
+      # bloquear no son lo mismo: aquí hace falta lo primero, no lo segundo.
+      - name: Calificar predicciones
+        run: python .github/scripts/resolver_predicciones.py | tee salida.txt
 
-      # Inventario es, al 2026-08-30, el único flujo con datos frescos
-      # (pos_inventory_movements: 4 días de atraso, contra 41–51 de las ventas).
-      # Es el único agente que hoy se puede calificar solo contra la realidad.
-      - run: python .github/scripts/resolver_inventario.py | tee -a salida.txt
+      - name: Calificar inventario
+        if: always()
+        run: python .github/scripts/resolver_inventario.py | tee -a salida.txt
 
       - name: Resumen
         if: always()
