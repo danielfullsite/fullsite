@@ -60,6 +60,49 @@ anterior ya no lo lee.
 **3. Anotar qué versión hay hoy en cada máquina**, antes de tocarla. Si algo
 sale mal, es la única forma de saber a qué volver.
 
+**4. Decidir de dónde sale el instalador, porque el de CI NO trae la huella.**
+
+Ésta es la trampa y hay que verla antes de salir. El instalador ya sabe empaquetar
+el servicio de huella —`extraResources` copia `electron-app/fingerprint/` dentro
+del paquete, y al arrancar se instala solo a `C:\fullsite\`— pero **los binarios
+no están en el repositorio y no pueden estarlo**: `DPUruNet.dll` es del SDK
+DigitalPersona U.are.U y es propietario.
+
+O sea que el instalador que sale del workflow *Build Electron POS (Windows)* se
+construye en un runner de GitHub, donde `electron-app/fingerprint/` sólo tiene el
+`README.md` y el `.gitkeep`. **Ese instalador sale sin huella, siempre.**
+
+Y falla de la peor manera: en la caja de AMALAY los binarios ya están en
+`C:\fullsite\` de la instalación anterior, así que la huella va a funcionar y
+nadie se entera. Se rompe en la SIGUIENTE caja — el primer cliente nuevo, o esta
+misma si alguien formatea la máquina.
+
+Hay dos caminos y hay que elegir uno ANTES de ir:
+
+- **Construir en una máquina Windows que tenga el SDK.** Poner
+  `fingerprint-service.exe` y `DPUruNet.dll` en `electron-app/fingerprint/` y
+  correr `npm run build:win`. Si sólo se tiene el DLL, el `.exe` se compila con
+  `print-bridge/build-fingerprint.bat`, que usa el `csc.exe` que ya trae Windows
+  y no necesita Visual Studio. Es el único camino que produce un instalador
+  clonable.
+- **Usar el instalador de CI y aceptar que sólo sirve para AMALAY**, porque ahí
+  los binarios ya están puestos. Entonces hay que anotarlo: ese `.exe` NO se le
+  puede dar a otro cliente.
+
+**5. Comprobar que los binarios siguen en la caja de AMALAY.** Si se va por el
+segundo camino, esto deja de ser un detalle y pasa a ser el supuesto del que
+depende toda la visita. Se ve sin tocar nada:
+
+    dir C:\fullsite\fingerprint-service.exe
+    dir C:\fullsite\DPUruNet.dll
+
+O con el colector, que además levanta el resto del estado y no escribe nada:
+
+    powershell -ExecutionPolicy Bypass -File scripts/campo/recoger-estado-terminal.ps1
+
+Si no están, no hay visita hasta conseguir el SDK. Daniel lo dijo sin margen: la
+huella es indispensable.
+
 ---
 
 ## En sitio, en este orden

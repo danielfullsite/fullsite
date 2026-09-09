@@ -74,6 +74,39 @@ describe('El empaquetado lleva el servicio de huella', () => {
   })
 })
 
+describe('El código para construir el servicio viaja con la rama', () => {
+  // El .exe y el .dll no se commitean, pero la FUENTE sí tiene que estar, o esta rama no
+  // puede producir un instalador con huella ni siquiera en una máquina con el SDK.
+  //
+  // Medido el 2026-09-08: `print-bridge/fingerprint-service.cs` no estaba en main, ni en
+  // esta rama, ni en la de integración — sólo en `feat/pos-ui-kit`, en tres ramas de codex
+  // y en los respaldos `backup/pos-ui-kit-*`. Todas con el mismo blob, así que hay una
+  // sola versión canónica; lo que faltaba era que estuviera donde se construye.
+  const PB = path.join(EA, '..', 'print-bridge')
+
+  test('está el fuente del servicio de huella', () => {
+    assert.ok(fs.existsSync(path.join(PB, 'fingerprint-service.cs')),
+      'sin el .cs no se puede compilar el servicio en ninguna máquina')
+  })
+
+  test('está el script que lo compila sin Visual Studio', () => {
+    const bat = path.join(PB, 'build-fingerprint.bat')
+    assert.ok(fs.existsSync(bat), 'falta build-fingerprint.bat')
+    const texto = fs.readFileSync(bat, 'utf8')
+    assert.match(texto, /csc\.exe/, 'debe usar el compilador que ya trae Windows')
+    assert.match(texto, /DPUruNet\.dll/, 'debe avisar si falta el DLL del SDK')
+  })
+
+  test('el procedimiento de instalación advierte que el build de CI sale sin huella', () => {
+    // Es la trampa: en AMALAY funciona porque los binarios ya están en la caja, y se
+    // rompe en el siguiente cliente sin que nadie lo note.
+    const doc = fs.readFileSync(
+      path.join(EA, '..', 'docs', 'offline', 'PROCEDIMIENTO-INSTALACION-AMALAY.md'), 'utf8')
+    assert.match(doc, /sin huella/i, 'el procedimiento no advierte del instalador de CI')
+    assert.match(doc, /build-fingerprint\.bat/, 'no dice cómo compilar el servicio')
+  })
+})
+
 describe('El arranque instala el servicio desde el paquete', () => {
   const main = leer('main.js')
   const cuerpo = (() => {
