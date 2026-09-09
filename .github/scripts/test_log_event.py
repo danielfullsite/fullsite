@@ -17,6 +17,8 @@ porque ahí el NULL significa algo ("todavía no calificado").
 """
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import os
 import sys
@@ -113,6 +115,96 @@ class SinClientIdNoSeEscribe(unittest.TestCase):
             with mock.patch.object(ac, "requests", mock.Mock()) as req:
                 ac.log_event(agent_id="x", event_type="y", title="z", client_id=None)
                 req.post.assert_not_called()
+
+
+class SbGetNoPuedeTragarseElMotivo(unittest.TestCase):
+    """`sb_get` es la puerta por la que 45 scripts leen Supabase. Lo que no diga aquí,
+    no lo sabe nadie.
+
+    Del 2026-09-02 al 09-08 el cuadre reportó siete veces
+    `500 Server Error: Internal Server Error` y nada más. El cuerpo de esa respuesta
+    decía `canceling statement due to statement timeout` — la diferencia entre un
+    diagnóstico de un minuto y uno de una semana."""
+
+    class Resp:
+        def __init__(self, status, text="", payload=None):
+            self.status_code, self.text, self._payload = status, text, payload or []
+            self.ok = 200 <= status < 300
+
+        def json(self):
+            return self._payload
+
+    def setUp(self):
+        self._url, self._key = ac.SUPABASE_URL, ac.SUPABASE_KEY
+        ac.SUPABASE_URL, ac.SUPABASE_KEY = "https://x.supabase.co", "k"
+        # Los reintentos avisan por stderr, y en el log de CI esas lineas se leen
+        # igual que una falla de produccion. Se capturan: aqui son material de
+        # aserto, no ruido que haga dudar de una corrida sana.
+        self.stderr = io.StringIO()
+        self._silencio = contextlib.redirect_stderr(self.stderr)
+        self._silencio.__enter__()
+
+    def tearDown(self):
+        self._silencio.__exit__(None, None, None)
+        ac.SUPABASE_URL, ac.SUPABASE_KEY = self._url, self._key
+
+    def test_el_cuerpo_del_error_viaja_en_la_excepcion(self):
+        resp = self.Resp(500, "canceling statement due to statement timeout")
+        with mock.patch.object(ac.requests, "get", return_value=resp), \
+             mock.patch.object(ac.time, "sleep"):
+            with self.assertRaises(ac.SupabaseError) as cm:
+                ac.sb_get("ops_daily_history", "client_id=eq.amalay")
+        self.assertIn("canceling statement due to statement timeout", str(cm.exception))
+        self.assertIn("ops_daily_history", str(cm.exception))
+
+    def test_un_500_se_reintenta_y_si_pasa_devuelve_los_datos(self):
+        # Un timeout por contención no es un dato malo: es el mismo dato, más tarde.
+        respuestas = [self.Resp(500, "timeout"), self.Resp(200, payload=[{"fecha": "2026-09-08"}])]
+        with mock.patch.object(ac.requests, "get", side_effect=respuestas) as get, \
+             mock.patch.object(ac.time, "sleep"):
+            self.assertEqual(ac.sb_get("t", "p"), [{"fecha": "2026-09-08"}])
+        self.assertEqual(get.call_count, 2)
+        # Un reintento callado escondería que la base está sufriendo.
+        self.assertIn("reintento 1/2", self.stderr.getvalue())
+
+    def test_un_400_no_se_reintenta(self):
+        # Una consulta mal escrita repetida tres veces sólo tarda tres veces más en fallar.
+        with mock.patch.object(ac.requests, "get",
+                               return_value=self.Resp(400, 'column "x" does not exist')) as get, \
+             mock.patch.object(ac.time, "sleep"):
+            with self.assertRaises(ac.SupabaseError):
+                ac.sb_get("t", "p")
+        self.assertEqual(get.call_count, 1)
+
+    def test_se_agotan_los_reintentos_y_entonces_si_levanta(self):
+        with mock.patch.object(ac.requests, "get", return_value=self.Resp(503, "no")) as get, \
+             mock.patch.object(ac.time, "sleep"):
+            with self.assertRaises(ac.SupabaseError):
+                ac.sb_get("t", "p", reintentos=2)
+        self.assertEqual(get.call_count, 3)
+
+    def test_un_corte_de_conexion_tambien_se_reintenta(self):
+        # En estas pruebas `requests` es un MagicMock, así que sus "excepciones" no son
+        # excepciones de verdad. Se pone una real en su lugar para que el `except` de
+        # sb_get sea el mismo que corre en producción.
+        class CorteDeRed(Exception):
+            pass
+
+        with mock.patch.object(ac.requests.exceptions, "RequestException", CorteDeRed), \
+             mock.patch.object(ac.requests, "get",
+                               side_effect=[CorteDeRed("se acabó el tiempo"),
+                                            self.Resp(200, payload=[1])]) as get, \
+             mock.patch.object(ac.time, "sleep"):
+            self.assertEqual(ac.sb_get("t", "p"), [1])
+        self.assertEqual(get.call_count, 2)
+
+    def test_nunca_devuelve_vacio_en_vez_de_fallar(self):
+        # La regla que ya estaba y no se puede perder: [] significa "no hay filas",
+        # nunca "no se pudo leer". Un agente no distingue las dos si se confunden.
+        with mock.patch.object(ac.requests, "get", return_value=self.Resp(500, "x")), \
+             mock.patch.object(ac.time, "sleep"):
+            with self.assertRaises(ac.SupabaseError):
+                ac.sb_get("t", "p")
 
 
 if __name__ == "__main__":

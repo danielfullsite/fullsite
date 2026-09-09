@@ -7,6 +7,7 @@ Enforces truthful reporting: no silent success on empty/stale data.
 import os
 import sys
 import json
+import time
 import requests
 from datetime import datetime, timezone, timedelta
 
@@ -19,16 +20,56 @@ TELEGRAM_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 
 # ─── Supabase helpers ─────────────────────────────────────────
 
-def sb_get(table: str, params: str) -> list:
-    """Fetch from Supabase. Raises on HTTP error — never silently returns []."""
+class SupabaseError(RuntimeError):
+    """Una lectura de Supabase que no se pudo completar. Trae el motivo que dio el servidor."""
+
+
+# PostgREST devuelve estos cuando el problema es de momento, no de la consulta: el
+# statement_timeout de 8s que hereda `service_role` de `authenticator` sale como 500.
+_TRANSITORIOS = (408, 425, 429, 500, 502, 503, 504)
+_REINTENTOS = 2
+
+
+def sb_get(table: str, params: str, timeout: int = 15, reintentos: int = _REINTENTOS) -> list:
+    """Fetch from Supabase. Raises on HTTP error — never silently returns [].
+
+    DOS COSAS QUE ANTES SE PERDÍAN, Y COSTARON UNA SEMANA DE NIVEL 4 CIEGO:
+
+    1. **El motivo.** `raise_for_status()` tira el cuerpo de la respuesta, y ahí es donde
+       PostgREST explica qué pasó. Del 2026-09-02 al 09-08 el cuadre reportó
+       `500 Server Error: Internal Server Error` siete días seguidos; el cuerpo decía
+       `canceling statement due to statement timeout`. Saberlo requirió ir a los logs de
+       Postgres. Ahora el motivo viaja en la excepción.
+
+    2. **El reintento.** Un timeout por contención no es un dato malo: es el mismo dato,
+       más tarde. Se reintenta con espera creciente, y cada reintento se ve en el log —
+       un reintento callado escondería que la base está sufriendo.
+
+    Lo que NO se reintenta: 4xx que no sean de ritmo. Un 400 es una consulta mal escrita
+    y repetirla tres veces solo tarda tres veces más en fallar.
+    """
     if not SUPABASE_URL or not SUPABASE_KEY:
-        raise RuntimeError("SUPABASE_URL or SUPABASE_SERVICE_KEY not set")
-    r = requests.get(
-        f"{SUPABASE_URL}/rest/v1/{table}?{params}",
-        headers=_sb_headers, timeout=15,
-    )
-    r.raise_for_status()
-    return r.json()
+        raise SupabaseError("SUPABASE_URL or SUPABASE_SERVICE_KEY not set")
+
+    url = f"{SUPABASE_URL}/rest/v1/{table}?{params}"
+    for intento in range(reintentos + 1):
+        try:
+            r = requests.get(url, headers=_sb_headers, timeout=timeout)
+            if r.ok:
+                return r.json()
+            motivo = f"HTTP {r.status_code} — {(r.text or '').strip()[:300]}"
+            transitorio = r.status_code in _TRANSITORIOS
+        except requests.exceptions.RequestException as e:
+            # Corte de conexión o timeout del cliente: siempre vale reintentar.
+            motivo, transitorio = str(e)[:300], True
+
+        if not transitorio or intento == reintentos:
+            raise SupabaseError(f"{table}: {motivo}")
+
+        espera = 2 ** intento
+        print(f"[supabase] {table}: {motivo[:160]} — reintento "
+              f"{intento + 1}/{reintentos} en {espera}s", file=sys.stderr)
+        time.sleep(espera)
 
 
 def sb_post(table: str, data: dict, upsert: bool = False) -> dict:
