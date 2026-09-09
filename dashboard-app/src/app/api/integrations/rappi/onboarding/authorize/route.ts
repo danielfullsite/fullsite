@@ -6,14 +6,15 @@ import { buildAuthorizeUrl, generatePkce, randomState, rappiSelfClientId } from 
 export const dynamic = 'force-dynamic'
 
 // Step 2 of Rappi self-onboarding: kick off the merchant OAuth2 (Authorization Code +
-// PKCE) flow on Portal Partners. Admin-gated because it starts a privileged provisioning
-// flow — open it in a browser as:
-//   /api/integrations/rappi/onboarding/authorize?secret=<INTEGRATION_ADMIN_SECRET>
+// PKCE) flow on Portal Partners. Gated by RAPPI_ONBOARDING_REGISTRATION_TOKEN (the same
+// purpose-specific onboarding token used by /onboarding/register) because it starts a
+// privileged provisioning flow — open it in a browser as:
+//   /api/integrations/rappi/onboarding/authorize?secret=<RAPPI_ONBOARDING_REGISTRATION_TOKEN>
 // then authenticate with the MERCHANT's Rappi Portal Partners credentials. Rappi redirects
 // back to the whitelisted callback with ?code=, where the code is exchanged and the
 // merchant's un-integrated stores are provisioned.
 function authorized(request: NextRequest): boolean {
-  const expected = process.env.INTEGRATION_ADMIN_SECRET?.trim()
+  const expected = process.env.RAPPI_ONBOARDING_REGISTRATION_TOKEN?.trim()
   if (!expected) return false
   const received = (request.nextUrl.searchParams.get('secret')
     || request.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
@@ -25,8 +26,8 @@ function authorized(request: NextRequest): boolean {
 }
 
 export async function GET(request: NextRequest) {
-  if (!process.env.INTEGRATION_ADMIN_SECRET?.trim()) {
-    return NextResponse.json({ ok: false, error: 'INTEGRATION_ADMIN_SECRET_REQUIRED' }, { status: 503 })
+  if (!process.env.RAPPI_ONBOARDING_REGISTRATION_TOKEN?.trim()) {
+    return NextResponse.json({ ok: false, error: 'RAPPI_ONBOARDING_REGISTRATION_TOKEN_REQUIRED' }, { status: 503 })
   }
   if (!authorized(request)) {
     return NextResponse.json({ ok: false, error: 'UNAUTHORIZED' }, { status: 401 })
