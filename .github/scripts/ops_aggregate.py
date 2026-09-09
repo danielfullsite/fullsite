@@ -131,6 +131,30 @@ def get_current_business_date(client):
     return get_business_date(now_utc, tz, boundary)
 
 
+def business_date_con_defaults_de_la_base(client):
+    """Día de negocio en curso, aplicando los MISMOS defaults que la base.
+
+    `get_business_day_config()` falla cerrado a propósito: un productor que escribe
+    `ops_daily` debe negarse a inventar un corte. Pero un CONSUMIDOR que cruza contra
+    `pos_orders.dia_venta` tiene el problema opuesto — esa columna la escribió el trigger
+    con `coalesce(c.timezone,'America/Monterrey')` y
+    `coalesce(c.business_day_start_local,'05:00:00')`
+    (20260901180000_folio_por_dia_de_venta.sql). Si el consumidor usara otro default —o
+    reventara— sus llaves de fecha no cruzarían contra las del dato.
+
+    Hoy 5 de los 13 clientes activos tienen `business_day_start_local` en NULL y la base
+    ya les está calculando el día de venta con las 05:00.
+
+    Úsala SÓLO para leer/cruzar. Para escribir un cierre, `get_business_day_config()`.
+    """
+    con_defaults = dict(client)
+    con_defaults["timezone"] = con_defaults.get("timezone") or "America/Monterrey"
+    con_defaults["business_day_start_local"] = (
+        con_defaults.get("business_day_start_local") or "05:00:00"
+    )
+    return get_current_business_date(con_defaults)
+
+
 def aggregate_orders(orders, item_cat_map):
     """
     Aggregate closed pos_orders into ops_daily metrics.

@@ -45,7 +45,7 @@ from datetime import date, datetime, timedelta, timezone
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from agent_common import sb_get, sb_patch, log_run  # noqa: E402
-from ops_aggregate import get_current_business_date  # noqa: E402
+from ops_aggregate import business_date_con_defaults_de_la_base  # noqa: E402
 
 TOLERANCIA_POR_OMISION = 10.0   # % — sólo si el evento no trae la suya
 DIAS_ATRAS = 7                  # ventana de días cerrados a calificar
@@ -54,24 +54,12 @@ DIAS_ATRAS = 7                  # ventana de días cerrados a calificar
 def _dia_de_negocio_en_curso(client: dict) -> str:
     """El día de negocio que está corriendo AHORA para este cliente.
 
-    Los defaults son los MISMOS que aplica la base al escribir `pos_orders.dia_venta`
-    (`coalesce(c.timezone,'America/Monterrey')`, `coalesce(c.business_day_start_local,
-    '05:00:00')` — ver 20260901180000_folio_por_dia_de_venta.sql). Tienen que coincidir:
-    la `fecha` de `ops_daily_history` sale de esa columna, así que si aquí se usara otro
-    default las llaves no cruzarían.
-
-    Por eso NO se deja que `get_business_day_config()` falle cerrado: hoy 5 de los 13
-    clientes activos tienen `business_day_start_local` en NULL, y la base ya les está
-    calculando el día de venta con las 05:00. Reventar aquí abortaría el bucle de
-    `main()` para TODOS los tenants siguientes, que es peor que calificar con el mismo
-    default que usó quien escribió el dato.
+    Delega en el ayudante compartido de `ops_aggregate`: la regla de defaults tiene que
+    vivir en UN solo lugar. `cuadre.py` la necesita para lo mismo —cruzar contra
+    `dia_venta`— y dos copias de una regla sutil se separan tarde o temprano, que es
+    justo el defecto que originó toda esta serie.
     """
-    con_defaults = dict(client)
-    con_defaults["timezone"] = con_defaults.get("timezone") or "America/Monterrey"
-    con_defaults["business_day_start_local"] = (
-        con_defaults.get("business_day_start_local") or "05:00:00"
-    )
-    return get_current_business_date(con_defaults)
+    return business_date_con_defaults_de_la_base(client)
 
 
 def dias_cerrados(client: dict, dias: int = DIAS_ATRAS) -> list[str]:
