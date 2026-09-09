@@ -19,7 +19,29 @@ if (new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).protocol !== 'https:') throw n
 const repository = path.resolve(__dirname, '../..')
 const source = path.join(repository, 'dashboard-app')
 const output = path.resolve(process.argv[2] || path.join(__dirname, '../ui-bundle'))
-const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'fullsite-offline-build-'))
+// EL BUILD AISLADO TIENE QUE VIVIR EN LA MISMA UNIDAD QUE EL REPOSITORIO.
+//
+// En Windows, `os.tmpdir()` es `C:\Users\...\Temp` y el repositorio del runner está en
+// `D:\a\fullsite\fullsite`. El `node_modules` del build aislado es un junction hacia el
+// del repositorio, así que webpack resuelve los módulos a rutas en `D:` y luego intenta
+// hacerlas relativas al contexto, que está en `C:`. Entre dos unidades distintas NO
+// existe ruta relativa, y sale este engendro (visto en CI el 2026-09-09):
+//
+//     Can't resolve './D:/a/fullsite/fullsite/dashboard-app/node_modules/next/dist/client/next.js'
+//       in 'C:\Users\RUNNER~1\AppData\Local\Temp\fullsite-offline-build-62Cz5t\dashboard-app'
+//
+// Una ruta absoluta de Windows pegada detrás de `./`. En macOS no se ve nunca: hay un
+// solo sistema de archivos y la ruta relativa siempre existe.
+//
+// Se crea AL LADO del repositorio, no dentro: dentro ensuciaría el checkout de quien lo
+// corra en su máquina, y `git status` empezaría a mostrar basura si la limpieza fallara.
+// El `finally` de abajo lo borra igual. Si el directorio padre no fuera escribible, se
+// cae al temporal del sistema — que es el comportamiento de antes y funciona en macOS.
+const temporary = (() => {
+  const junto = path.join(path.dirname(repository), '.fullsite-offline-build-')
+  try { return fs.mkdtempSync(junto) }
+  catch { return fs.mkdtempSync(path.join(os.tmpdir(), 'fullsite-offline-build-')) }
+})()
 const build = path.join(temporary, 'dashboard-app')
 fs.mkdirSync(build)
 console.log('[offline-ui] Isolated build:', build)

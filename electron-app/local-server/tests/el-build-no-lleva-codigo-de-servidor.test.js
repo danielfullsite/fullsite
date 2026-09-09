@@ -73,6 +73,41 @@ describe('el filtro solo, que era lo que habia, no alcanza', () => {
   })
 })
 
+describe('el build aislado vive en la misma unidad que el repositorio', () => {
+  /**
+   * El SEGUNDO fallo del mismo dia, una vez arreglado el primero:
+   *
+   *   Can't resolve './D:/a/fullsite/fullsite/dashboard-app/node_modules/next/dist/client/next.js'
+   *     in 'C:\Users\RUNNER~1\AppData\Local\Temp\fullsite-offline-build-62Cz5t\dashboard-app'
+   *
+   * Una ruta absoluta de Windows pegada detras de `./`. En Windows `os.tmpdir()` esta en
+   * C: y el repositorio del runner en D:. El `node_modules` del build aislado es un
+   * junction al del repositorio, asi que webpack resuelve a rutas en D: y luego intenta
+   * hacerlas relativas a un contexto en C: -- y entre dos unidades NO existe ruta
+   * relativa. En macOS jamas se ve: un solo sistema de archivos.
+   */
+  test('el temporal se crea junto al repositorio, no en os.tmpdir()', () => {
+    assert.match(script, /path\.join\(path\.dirname\(repository\), '\.fullsite-offline-build-'\)/)
+  })
+
+  test('con respaldo al temporal del sistema si el padre no es escribible', () => {
+    // No se puede asumir que el directorio padre del repo sea escribible en toda
+    // maquina. El respaldo es el comportamiento de antes, que funciona en macOS.
+    assert.match(script, /catch \{ return fs\.mkdtempSync\(path\.join\(os\.tmpdir\(\), 'fullsite-offline-build-'\)\) \}/)
+  })
+
+  test('y se sigue borrando al terminar', () => {
+    // Vive al lado del checkout: si no se limpiara, `git status` de quien lo corra
+    // empezaria a mostrar basura.
+    assert.match(script, /finally \{\s*\n\s*fs\.rmSync\(temporary, \{ recursive: true, force: true \}\)/)
+  })
+
+  test('NO se crea dentro del repositorio', () => {
+    // Dentro ensuciaria el checkout del desarrollador.
+    assert.doesNotMatch(script, /mkdtempSync\(path\.join\(repository,/)
+  })
+})
+
 describe('lo que el paquete NO debe llevar a la caja de un restaurante', () => {
   test('el script lo declara en su encabezado', () => {
     assert.match(script, /never bundle server API code or credentials/)
