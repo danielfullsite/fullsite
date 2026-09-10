@@ -138,3 +138,35 @@ borrador vacío. Una generación de sesión ahora invalida la lectura y suspende
 persistencia antes de limpiar y navegar. Las pruebas focalizadas pasan; el
 laboratorio UI completo continúa en validación en este checkpoint. No se
 atribuye a H02 el resultado UI 16/16 del commit anterior.
+
+El recorrido posterior de H02 terminó **17/17**: conserva la caché correcta tras
+mover/anular, agrega $58 a la segunda cuenta después del abono de $29, confirma
+total $174 y saldo $145, envía sólo la nueva ronda, recupera tras reiniciar y
+cierra con $659 esperados/contados y diferencia cero. Evidencia local:
+`output/closure/ui-operacion/results.json`. El checkpoint enviado es **720d2148**;
+su CI se consulta por separado antes de trasladar esta evidencia a una publicación.
+
+CI **34460442174** sobre **720d2148** completó correctamente el laboratorio
+multi-terminal y PostgreSQL. También pasaron Dashboard Tests, Local Server Tests
+y Offline E2E del mismo commit. La siguiente tanda de impresión requiere su
+propio checkpoint y evidencia.
+
+## H05: documentos e impresión incierta en integración
+
+Se incorporan precuenta/recibo desde Caja y resolución por episodio, con copias
+explícitas y recuperación del mismo comando. La revisión encontró y corrigió
+dos ventanas: una segunda decisión comprometida mientras falla la cola y una
+copia sin envío cuando el transporte había confirmado todos los ejemplares.
+Contrato: [documentos canónicos](../architecture/CANONICAL-PRINT-2026-09-10.md).
+La integración UI/servidor/SQL continúa en validación; no es cierre físico de H05.
+
+Validación integrada de documentos: **20/20 UI** con Caja, POS 2, POS 3 y KDS,
+incluyendo los 17 casos previos. Un receptor TCP de laboratorio recibió precuenta,
+copia explícita, recibo de abono y recibo después de liquidar, sin cambios en los
+pagos. Evidencia: `output/closure/ui-operacion/results.json` y
+`synthetic-printed-documents.json`. El receptor es sintético, no papel físico.
+
+Web 3,679/3,679; DOM 265/265; servidor 579/579; materializador PostgreSQL
+14 grupos; selección de impresión dentro de Electron 15/15. El nuevo modo
+`FULLSITE_LAB_PRINT=1` queda incluido en el job de Caja de CI. Cajón y aceptación
+de impresoras reales continúan pendientes.

@@ -23,7 +23,7 @@ export function comandoPendienteCaja(operation: string): Readonly<Command> | nul
   try { const value = localStorage.getItem(claveDeIntento(operation)); return value ? JSON.parse(value) : null } catch { return null }
 }
 
-export function operacionesConsumoPendientesCaja(): Array<{ operation: string; command: Readonly<Command> }> {
+export function operacionesPendientesCaja(): Array<{ operation: string; command: Readonly<Command> }> {
   const pending: Array<{ operation: string; command: Readonly<Command> }> = []
   for (const key of Object.keys(localStorage)) {
     if (!key.startsWith('pos_comando_pendiente:')) continue
@@ -32,12 +32,15 @@ export function operacionesConsumoPendientesCaja(): Array<{ operation: string; c
       const operation = scope.at(-1)
       if (typeof operation !== 'string' || key !== claveDeIntento(operation)) continue
       const command = comandoPendienteCaja(operation)
-      if (command && typeof command.order_id === 'string' &&
-        ((command.command_type === 'ORDER_SAVE' && operation === `save:${command.order_id}`) ||
-         (command.command_type === 'ORDER_SEND' && operation === `send:${command.order_id}`))) pending.push({ operation, command })
+      if (command) pending.push({ operation, command })
     } catch {}
   }
   return pending
+}
+export function operacionesConsumoPendientesCaja() {
+  return operacionesPendientesCaja().filter(({ operation, command }) => typeof command.order_id === 'string' &&
+    ((command.command_type === 'ORDER_SAVE' && operation === `save:${command.order_id}`) ||
+     (command.command_type === 'ORDER_SEND' && operation === `send:${command.order_id}`)))
 }
 function actualizarIntentosCaja() {
   // Rendering notifications are best effort; the persisted journal remains the

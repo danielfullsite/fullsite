@@ -156,7 +156,7 @@ async function _processJobs(ids) {
     printQueue.markPrinting(id) // durable BEFORE bytes can leave this process
     try {
       for (let copy = job.copies_printed || 0; copy < job.copies; copy++) {
-        await _physicalPrint(job.connection, Buffer.from(job.data_b64, 'base64'))
+        await _physicalPrint(job.connection, Buffer.from(job.reprint_data_b64 || job.data_b64, 'base64'))
         // Failure after a physical send remains uncertain, including disk errors.
         printQueue.markCopyPrinted(id)
       }
@@ -253,6 +253,13 @@ function resolveUncertain(jobId, outcome) {
   return resolved
 }
 
+function applyPreparedResolution(effect) {
+  const receipt = printQueue.applyPreparedResolution(effect)
+  // The durable transition may predate a crash. Drain pending work on retries too.
+  if (effect.resolution === 'reprint') _scheduleDrain([effect.job_id]).catch(e => console.error('[printer] Resolution drain failed:', e.message))
+  return receipt
+}
+
 // ── Exports ───────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -264,6 +271,9 @@ module.exports = {
   prepareJobs,
   enqueuePreparedJobs,
   resolveUncertain,
+  applyPreparedResolution,
+  getJob: printQueue.getJob,
+  getUncertainJobSummaries: printQueue.getUncertainJobSummaries,
   kickDrawer,
   buildTestTicket,
   // Exposed for /print-queue HTTP endpoint

@@ -55,6 +55,7 @@ import { leerCatalogoCaja } from '@/lib/pedro-catalogo'
 import { guardarCuentaEnCaja, enviarCuentaEnCaja, moverCuentaEnCaja, anularCuentaEnCaja, GuardadoAnteriorRecuperado, firmaBorradorParaCaja, type OrdenConfirmada } from '@/lib/pedro-operaciones'
 import { type FinanzasDeCaja, pesosDeCentavos } from '@/lib/pedro-finanzas'
 import { crearSesionEditorCaja } from '@/lib/pos-editor-session'
+import DocumentoImpresoDeCaja from '@/components/pos/DocumentoImpresoDeCaja'
 import ConsumoPendienteDeCaja from '@/components/pos/ConsumoPendienteDeCaja'
 import CobroDeCaja from '@/components/pos/CobroDeCaja'
 import { reconciliarCuenta, cuentaEditableDe, mismaConfirmacionDeCuenta, type CuentaEditable } from '@/lib/pos-order-reconciliation'
@@ -2349,6 +2350,7 @@ function POSContent() {
   const [lecturaCuentaCaja, setLecturaCuentaCaja] = useState<LecturaDeCuenta | null>(null)
   const [destinoConsumoCaja, setDestinoConsumoCaja] = useState<{ orderId: string; accountId: string } | null>(null)
   const [finanzasConsumoCaja, setFinanzasConsumoCaja] = useState<FinanzasDeCaja | null>(null)
+  const [precuentaCaja, setPrecuentaCaja] = useState<OrdenConfirmada | null>(null)
   const [cobroDeCaja, setCobroDeCaja] = useState<OrdenConfirmada | null>(null)
   const [avisoCuentaCaja, setAvisoCuentaCaja] = useState<string | null>(null)
   const [ultimaLecturaCaja, setUltimaLecturaCaja] = useState<number | null>(null)
@@ -3753,7 +3755,13 @@ function POSContent() {
 
   // Pre-ticket (precuenta — antes de cobrar)
   const handlePreTicket = async () => {
-    if (accionPendienteEnCaja('La impresión de precuenta')) return
+    if (escribeEnCaja) {
+      if (!await validarCuentaCaja()) return
+      try { setPrecuentaCaja(cuentaGuardadaParaOperacion()) }
+      catch (error) { showToast(error instanceof Error ? error.message : 'Guarda la cuenta antes de imprimir.') }
+      return
+    }
+    if (bloqueaLegacyCaja) { showToast('Caja debe confirmar la cuenta antes de imprimir.'); return }
     if (activeItems.length === 0) return
     const order: Order = {
       id: orderId,
@@ -4617,6 +4625,10 @@ function POSContent() {
       )}
 
       {requiereCaja() && <ConsumoPendienteDeCaja disabled={saving} onRecovered={() => { void refrescarCuentaCaja.current() }} />}
+      {precuentaCaja && <section aria-label="Precuenta de Caja" className="border-b border-[var(--line)] bg-[var(--surface)] px-4 py-3">
+        <button className="mb-2 rounded border px-3 py-2" onClick={() => setPrecuentaCaja(null)}>Cerrar precuenta</button>
+        <DocumentoImpresoDeCaja order={precuentaCaja} />
+      </section>}
       {cobroDeCaja && <CobroDeCaja order={cobroDeCaja} onClose={() => { setCobroDeCaja(null); void refrescarCuentaCaja.current() }}
         onChanged={() => { void refrescarCuentaCaja.current() }} />}
       {escribeEnCaja && finanzasConsumoCaja && finanzasConsumoCaja.order_id === orderId && <div className="px-4 py-3 border-b border-[var(--line)] text-sm" aria-label="Saldo del consumo en Caja">

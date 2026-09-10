@@ -1,5 +1,6 @@
 'use client'
 
+import DocumentoImpresoDeCaja from './DocumentoImpresoDeCaja'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { abrirFinanzasCaja, leerEstadoCobroCaja, dividirParejoCaja, reservarEfectivoCaja,
   confirmarEfectivoCaja, liberarEfectivoNoRecibido, avisoAntesDeCobrarCaja, centavosDeTexto, pesosDeCentavos,
@@ -189,9 +190,9 @@ export default function CobroDeCaja({ order, onClose, onChanged }: Props) {
         </>}
         {finance.payments.some(p => p.status === 'accepted') && <div className="mt-5 border-t border-[var(--line)] pt-4">
           <h3 className="font-bold">Pagos confirmados</h3>
-          {finance.payments.filter(p => p.status === 'accepted').map(p => <p key={p.payment_id} className="mt-2 text-sm">
+          {finance.payments.filter(p => p.status === 'accepted').map(p => <div key={p.payment_id} className="mt-2 space-y-2 text-sm"><p>
             {pesosDeCentavos(p.amount_cents)} · {p.method === 'cash' ? 'Efectivo' : (p.provider || 'Terminal')}{p.change_cents ? ` · Cambio ${pesosDeCentavos(p.change_cents)}` : ''}
-          </p>)}
+          </p><DocumentoImpresoDeCaja order={{ id: finance.order_id, order_revision: finance.order_revision, financial_order: finance }} paymentId={p.payment_id} /></div>)}
         </div>}
       </>}
     </div>

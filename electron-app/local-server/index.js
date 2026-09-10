@@ -435,7 +435,7 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority 
       try {
         // `rutaCompleta`, NO `url`: sin la query se pierde `?since=N`.
         const readHeaders = { ...credencialesHaciaLaCaja }
-        if (url === '/reports/turn' && req.headers['x-fullsite-actor']) readHeaders['x-fullsite-actor'] = req.headers['x-fullsite-actor']
+        if (['/reports/turn', '/print/uncertain'].includes(url) && req.headers['x-fullsite-actor']) readHeaders['x-fullsite-actor'] = req.headers['x-fullsite-actor']
         const up = await forwardGet(`http://${posServerIp}:${cajaPort}${rutaCompleta}`, readHeaders)
         res.writeHead(up.status || 502, {
           'Content-Type': 'application/json',
@@ -670,6 +670,15 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority 
 
     // Resolver papel incierto exige credencial; nunca se reimprime automáticamente.
     if (url === '/print/uncertain' && req.method === 'GET') {
+      if (state.toSnapshot().write_authority === 'caja') {
+        try {
+          if (!actorAuthority || typeof printer.getUncertainJobSummaries !== 'function') { json(res, 503, { error: 'Revisión de impresión no disponible' }); return }
+          const actor = actorAuthority.verify(req.headers['x-fullsite-actor'], credencial.terminalId)
+          if (!actor.permissions.includes('imprimir_cuentas') && !actor.permissions.includes('gerente')) { json(res, 403, { error: 'Sin permiso para consultar impresiones' }); return }
+          json(res, 200, { authoritative: true, jobs: printer.getUncertainJobSummaries() })
+        } catch (error) { json(res, 403, { error: error.message || 'Consulta no autorizada' }) }
+        return
+      }
       if (typeof printer.getUncertainJobs !== 'function') { json(res, 503, { error: 'reconciliacion no disponible' }); return }
       json(res, 200, { jobs: await printer.getUncertainJobs() })
       return

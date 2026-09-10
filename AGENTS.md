@@ -99,6 +99,8 @@ Dinero usa [`docs/architecture/FINANCIAL-COMMANDS-2026-09-05.md`](docs/architect
 
 Consumo adicional con cuentas financieras abiertas exige revisión operacional y financiera, cuenta destino y un único commit con ambas proyecciones. Pagos y reservas se conservan. Una ronda pendiente bloquea nuevos cobros, pero permite resolver intentos previos. Reducir consumo o devolver dinero requiere su propio ajuste autorizado; no borrar las cuentas financieras para desbloquear la orden.
 
+Documentos e impresión incierta: [`docs/architecture/CANONICAL-PRINT-2026-09-10.md`](docs/architecture/CANONICAL-PRINT-2026-09-10.md). Precuenta y recibo usan datos canónicos; copias son explícitas. Resolver papel reserva el episodio en el log antes del efecto de cola y conserva un recibo idempotente. No autorizar impresión con bytes del navegador ni abrir cajón desde estos comandos.
+
 Operaciones autorizadas, rutas de cocina, impresión y cierre contado: [`docs/architecture/OPERATIONAL-COMMANDS-2026-09-05.md`](docs/architecture/OPERATIONAL-COMMANDS-2026-09-05.md). Interacción y límites de botones: [`docs/architecture/OPERATIONAL-UI-CAJA-2026-09-05.md`](docs/architecture/OPERATIONAL-UI-CAJA-2026-09-05.md). La autoridad es opt-in; no reenviar colas cloud legacy ni activar módulos sin comandos locales.
 
 Código de interfaz instalado y recuperación: [`docs/architecture/OFFLINE-UI-PACKAGE-2026-09-05.md`](docs/architecture/OFFLINE-UI-PACKAGE-2026-09-05.md). Recibos de negocio, barrera cloud y transición por sucursal: [`docs/architecture/CAJA-CLOUD-MATERIALIZATION-2026-09-05.md`](docs/architecture/CAJA-CLOUD-MATERIALIZATION-2026-09-05.md). Instalar un binario no activa una sucursal; el downgrade del log exige migración validada.

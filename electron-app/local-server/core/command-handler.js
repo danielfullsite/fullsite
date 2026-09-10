@@ -8,6 +8,7 @@ const { EVENT } = require('../protocol')
 const { FinancialDomain, FinancialError, FINANCIAL_COMMANDS } = require('./financial-domain')
 const { OperationalDomain, OperationalError, OPERATIONAL_COMMANDS, authorizeOperational } = require('./operational-domain')
 const { prepareOrderPrintEffects } = require('./operational-print')
+const canonicalPrint = require('./canonical-print')
 
 // Map from command_type (from client) → eventType (stored in log)
 const COMMAND_TO_EVENT = {
@@ -24,6 +25,7 @@ const COMMAND_TO_EVENT = {
   PRINT_COMMAND:   EVENT.PRINT_COMMAND,
   ...Object.fromEntries([...FINANCIAL_COMMANDS].map(type => [type, EVENT[type]])),
   ...Object.fromEntries([...OPERATIONAL_COMMANDS].map(type => [type, EVENT[type]])),
+  ...Object.fromEntries([...canonicalPrint.PRINT_COMMANDS].map(type => [type, EVENT[type]])),
 }
 
 class CommandHandler {
@@ -82,6 +84,10 @@ class CommandHandler {
     if (this._localAuthorityEnabled && commandType === 'PRINT_COMMAND') {
       throw new OperationalError('CONTROLLED_PRINT_REQUIRED', 'La impresión en Caja debe provenir de una operación autorizada; no se aceptan bytes del navegador')
     }
+    if (canonicalPrint.PRINT_COMMANDS.has(commandType)) {
+      if (!this._localAuthorityEnabled) throw new OperationalError('LOCAL_AUTHORITY_DISABLED', 'La impresión canónica requiere autoridad de Caja')
+      canonicalPrint.authorize(cmdPayload, { state: this._state, actor: context.actor, printer: this._printer })
+    }
     if (OPERATIONAL_COMMANDS.has(commandType)) {
       if (!this._localAuthorityEnabled) throw new OperationalError('LOCAL_AUTHORITY_DISABLED', 'La autoridad de escritura de Caja no está activada en esta instalación')
       // Recheck authorization even for a duplicate; a receipt is not permission.
@@ -93,7 +99,10 @@ class CommandHandler {
       return { error: 'PRINT_COMMAND requires station and data_b64' }
     }
 
-    let operationalResult, operationalCatalog
+    let operationalResult, operationalCatalog, printPrepared
+    const preparePrint = () => printPrepared ?? (printPrepared = canonicalPrint.prepare(cmdPayload, {
+      state: this._state, actor: context.actor, printer: this._printer, catalogEnvelope: this._catalog?.read(),
+    }))
     const prepareOperational = () => {
       if (!operationalResult) {
         this._validateCommandState(commandType, cmdPayload, fromClientId)
@@ -114,6 +123,7 @@ class CommandHandler {
         eventType: COMMAND_TO_EVENT[commandType],
         buildResult: () => {
           this._validateCommandState(commandType, cmdPayload, fromClientId)
+          if (canonicalPrint.PRINT_COMMANDS.has(commandType)) return preparePrint().result
           if (OPERATIONAL_COMMANDS.has(commandType)) return prepareOperational()
           if (!FINANCIAL_COMMANDS.has(commandType)) return undefined
           if (!this._state.getFinancialOrders || !this._state.getOrder) throw new FinancialError('FINANCIAL_PROJECTION_UNAVAILABLE', 'Financial projection is not ready')
@@ -127,7 +137,8 @@ class CommandHandler {
             cmdPayload.station, Buffer.from(cmdPayload.data_b64, 'base64'), cmdPayload.document_type,
             { commandId, reprint: cmdPayload.reprint === true }
           ) }
-        } : commandType === 'ORDER_SEND' ? () => prepareOrderPrintEffects(prepareOperational(), commandId, operationalCatalog, this._printer) : undefined,
+        } : commandType === 'ORDER_SEND' ? () => prepareOrderPrintEffects(prepareOperational(), commandId, operationalCatalog, this._printer)
+          : canonicalPrint.PRINT_COMMANDS.has(commandType) ? () => preparePrint().effects : undefined,
       }
     )
 
@@ -147,7 +158,7 @@ class CommandHandler {
     return { event, receipt, ...(event.result ? { result: event.result } : {}) }
   }
   requiresActor(commandType) {
-    return FINANCIAL_COMMANDS.has(commandType) || OPERATIONAL_COMMANDS.has(commandType) ||
+    return FINANCIAL_COMMANDS.has(commandType) || OPERATIONAL_COMMANDS.has(commandType) || canonicalPrint.PRINT_COMMANDS.has(commandType) ||
       this._localAuthorityEnabled && ['ORDER_UPSERTED', 'KDS_ITEM_STATUS'].includes(commandType)
   }
   _authorizeFinancial(type, payload, actor) {
@@ -234,9 +245,14 @@ class CommandHandler {
   }
 
   async _recoverEffect(event) {
-    if (!event?.effects?.print_jobs?.length) return
-    if (!this._printer?.enqueuePreparedJobs) throw new Error('Durable printer adapter unavailable')
-    await this._printer.enqueuePreparedJobs(event.effects.print_jobs)
+    if (event?.effects?.print_jobs?.length) {
+      if (!this._printer?.enqueuePreparedJobs) throw new Error('Durable printer adapter unavailable')
+      await this._printer.enqueuePreparedJobs(event.effects.print_jobs)
+    }
+    for (const resolution of event?.effects?.print_resolutions || []) {
+      if (!this._printer?.applyPreparedResolution) throw new Error('Durable print reconciliation unavailable')
+      await this._printer.applyPreparedResolution(resolution)
+    }
   }
 
   // Call at startup after event-store replay, before accepting new commands.
@@ -245,7 +261,7 @@ class CommandHandler {
   async recoverPendingEffects() {
     let recovered = 0
     for (const event of await this._store.readAfter(0)) {
-      if (!event.effects?.print_jobs) continue
+      if (!event.effects?.print_jobs && !event.effects?.print_resolutions) continue
       await this._recoverEffect(event)
       recovered++
     }

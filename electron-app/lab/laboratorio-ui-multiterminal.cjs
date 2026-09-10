@@ -36,6 +36,10 @@ const WebSocket = require(path.join(ELECTRON_APP, 'node_modules/ws'))
 const compileTimeout = process.env.CI ? 300000 : 90000
 const tenant = 'closure-lab'
 const operationalMode = process.env.FULLSITE_LAB_OPERATIONAL === '1'
+const printMode = process.env.FULLSITE_LAB_PRINT === '1'
+if (printMode && !operationalMode) throw new Error('Print UI lab requires operational mode')
+let syntheticPrinter = null
+const printedPackets = []
 const packagedBundle = process.env.FULLSITE_LAB_UI_BUNDLE ? path.resolve(process.env.FULLSITE_LAB_UI_BUNDLE) : null
 const packagedManifest = packagedBundle ? require('../offline-ui/package-store').verifyPackage(packagedBundle).manifest : null
 if (packagedBundle && !operationalMode) throw new Error('Packaged service lab requires operational mode')
@@ -309,6 +313,11 @@ async function fixtureRoute(route, uiOrigin, pedroPorts) {
 async function startTerminal(name, role, port, cajaPort, uiOrigin, ports, opts = {}) {
   const userData = path.join(base, name)
   fs.mkdirSync(userData, { recursive: true })
+  if (syntheticPrinter && role === 'server_pos') fs.writeFileSync(path.join(userData, 'printers.json'), JSON.stringify({
+    schema_version: 2, routing: { default_station: 'caja' }, printers: [{ printer_id: 'lab-tcp-caja', name: 'Caja laboratorio TCP', enabled: true,
+      connection: { type: 'tcp', host: '127.0.0.1', port: syntheticPrinter.address().port }, station_ids: ['caja'],
+      document_types: ['pre_ticket', 'receipt'], copies: 1, encoding: 'cp850' }],
+  }))
   const { terminalId, actorSession } = prepared.get(name)
   fs.writeFileSync(path.join(userData, 'config.json'), JSON.stringify({
     config_version: CURRENT_CONFIG_VERSION, restaurant_id: tenant, terminal_id: terminalId,
@@ -420,6 +429,14 @@ async function check(name, run) {
 }
 
 async function main() {
+  if (printMode) {
+    syntheticPrinter = net.createServer(socket => {
+      const chunks = []
+      socket.on('data', chunk => chunks.push(chunk))
+      socket.on('end', () => printedPackets.push(Buffer.concat(chunks).toString('ascii')))
+    })
+    await new Promise(resolve => syntheticPrinter.listen(0, '127.0.0.1', resolve))
+  }
   const uiPort = await freePort()
   const ports = []
   for (let i = 0; i < 4; i++) ports.push(await freePort(true))
@@ -464,7 +481,7 @@ async function main() {
   if (operationalMode) {
     wan = false
     await require('./recorrido-operacional-ui')({ caja, pos2, pos3, kds, check, expect, assert, until, request,
-      tenant, output, uiOrigin, labPin, restartCaja: () => startTerminal('Caja', 'server_pos', ports[0], ports[0], uiOrigin, ports) })
+      tenant, output, uiOrigin, labPin, printLab: printMode ? { packets: printedPackets } : null, restartCaja: () => startTerminal('Caja', 'server_pos', ports[0], ports[0], uiOrigin, ports) })
     return
   }
   if (pinDesdePantalla) {
@@ -766,6 +783,7 @@ main().catch(error => {
     try { await Promise.race([terminal.app.close(), new Promise(resolve => setTimeout(resolve, 2500))]) } catch {}
     if (terminal.process.exitCode === null && terminal.process.signalCode === null) terminal.process.kill('SIGKILL')
   }
+  if (syntheticPrinter) { syntheticPrinter.close(); fs.writeFileSync(path.join(output, 'synthetic-printed-documents.json'), JSON.stringify(printedPackets, null, 2)) }
   if (nextProcess && nextProcess.exitCode === null) nextProcess.kill('SIGTERM')
   if (nube) { nube.server.closeAllConnections(); nube.server.close() }
   fs.writeFileSync(path.join(output, 'next.log'), nextLog)

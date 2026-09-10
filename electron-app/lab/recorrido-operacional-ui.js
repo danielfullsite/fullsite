@@ -3,7 +3,7 @@ const path = require('node:path')
 
 /** Only screen gestures mutate the service. HTTP reads independently verify the
  * durable result; no helper command creates an order or records a payment. */
-module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert, until, request, output, uiOrigin, labPin, restartCaja }) {
+module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert, until, request, output, uiOrigin, labPin, restartCaja, printLab }) {
   const snapshot = async () => (await request(caja, '/state')).json()
   let orderId
   const ensureUnlocked = async terminal => {
@@ -86,6 +86,23 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     await expect(pos2.page.locator('body')).toContainText(/Saldo confirmado en Caja:.*116[.,]00/)
     await pos3.page.screenshot({ path: path.join(output, 'orden-creada-compartida.png'), fullPage: true })
   })
+  if (printLab) await check('Precuenta y copia salen por TCP local desde documentos canónicos sin cambiar deuda', async () => {
+    await ensureUnlocked(pos3)
+    const before = await snapshot()
+    await pos3.page.getByRole('button', { name: 'Cuenta', exact: true }).click()
+    const document = pos3.page.getByRole('region', { name: 'Impresión de precuenta', exact: true })
+    await document.getByRole('button', { name: 'Imprimir precuenta', exact: true }).click()
+    await until(() => printLab.packets.length === 1, 'Precuenta recibida en TCP sintético')
+    assert.match(printLab.packets[0], /PRECUENTA/)
+    assert.match(printLab.packets[0], /Total 116\.00/)
+    await document.getByLabel('Motivo de la copia', { exact: true }).fill('Cliente pide copia laboratorio')
+    await document.getByRole('button', { name: 'Imprimir copia de precuenta', exact: true }).click()
+    await until(() => printLab.packets.length === 2, 'Copia recibida en TCP sintético')
+    assert.match(printLab.packets[1], /COPIA/)
+    assert.match(printLab.packets[1], /Cliente pide copia laboratorio/)
+    assert.deepEqual((await snapshot()).financial_orders, before.financial_orders)
+    await pos3.page.getByRole('button', { name: 'Cerrar precuenta', exact: true }).click()
+  })
   await check('Transferir mesa con PIN conserva la cuenta y la ronda en todos los puntos', async () => {
     const move = async destination => {
       const source = (await snapshot()).salon_orders.find(order => order.id === orderId).mesa
@@ -140,6 +157,15 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     await ensureUnlocked(pos3)
     await expect(pos3.page.locator('body')).toContainText(/Saldo confirmado en Caja:.*87[.,]00/)
     await pos2.page.screenshot({ path: path.join(output, 'cobro-parcial-desde-botones.png'), fullPage: true })
+  })
+  if (printLab) await check('El recibo del abono se imprime sin registrar otro pago', async () => {
+    const before = (await snapshot()).financial_orders[0]
+    const count = printLab.packets.length
+    await modal(pos2).getByRole('button', { name: 'Imprimir recibo del abono', exact: true }).click()
+    await until(() => printLab.packets.length === count + 1, 'Recibo parcial en TCP sintético')
+    assert.match(printLab.packets.at(-1), /Importe recibido 29\.00/)
+    assert.match(printLab.packets.at(-1), /Saldo 87\.00/)
+    assert.deepEqual((await snapshot()).financial_orders[0], before)
   })
   await check('Después del abono se agrega consumo a la segunda cuenta sin cambiar pagos ni imprimir al guardar', async () => {
     const before = await snapshot()
@@ -207,6 +233,15 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     assert.equal(state.financial_orders[0].paid_cents, 17400)
     assert.equal(state.salon_orders.length, 0)
     assert.equal(state.kds_orders.length, 1)
+  })
+  if (printLab) await check('La cuenta liquidada conserva acceso al recibo del último abono', async () => {
+    const before = (await snapshot()).financial_orders[0]
+    const count = printLab.packets.length
+    await modal(pos3).getByRole('button', { name: 'Imprimir recibo del abono', exact: true }).last().click()
+    await until(() => printLab.packets.length === count + 1, 'Recibo liquidado en TCP sintético')
+    assert.match(printLab.packets.at(-1), /Importe recibido 116\.00/)
+    assert.match(printLab.packets.at(-1), /Saldo 0\.00/)
+    assert.deepEqual((await snapshot()).financial_orders[0], before)
   })
   await check('Corte X conserva el total liquidado mientras cocina sigue preparando', async () => {
     await pos2.page.goto(`${uiOrigin}/pos/corte`, { waitUntil: 'domcontentloaded' })

@@ -69,3 +69,18 @@ Evidencia local actualizada: 12 recorridos PostgreSQL (incluye retiro, depósito
 El materializador cubre órdenes, cuentas, intentos, turnos y movimientos de efectivo. **No confirma consumo de inventario**, receta ni food cost. Los contadores de conciliación de inventario no se adelantan. Hace falta conectar el módulo canónico de inventario mediante su propia evidencia sin permitir que vuelva a escribir órdenes por una ruta legacy fuera del fence.
 
 Los reportes que filtran únicamente `status=cerrada` deben adaptarse a `payment_status=pagada` y al modelo de cuentas: cambiar preparación para satisfacer ese filtro rompería la decisión de producto. Propinas, descuentos, reembolsos, promociones y resultados de terminal bancaria requieren sus resultados de dominio completos; no se inventan desde totales legacy. Tampoco se publica una página ni se activa ninguna instalación al aplicar este cambio de código.
+
+### Auditoría de papel (candidato H05, 10 de septiembre)
+
+`ORDER_PRECHECK_PRINT`, `PAYMENT_RECEIPT_PRINT` y `PRINT_UNCERTAIN_RESOLVE`
+avanzan el recibo del flujo con `materialized:false`: no actualizan órdenes,
+cuentas, pagos ni cierres. El materializador valida sucursal, orden, revisiones,
+importes y cantidades canónicas; un recibo de pago exige un intento aceptado.
+Las copias referencian el documento original del mismo flujo y conservan su
+contenido histórico. Una resolución referencia un trabajo publicado por un
+documento o por `ORDER_SEND`, y cada episodio admite una sola decisión; el
+reintento exacto sigue devolviendo el recibo original.
+
+Los bytes y destinos quedan en los efectos durables locales. La nube conserva
+el documento y la decisión declarada del operador; no certifica salida física
+de papel ni consulta la cola local para verificar el episodio incierto.

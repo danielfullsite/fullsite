@@ -6,6 +6,7 @@ import { registerServiceWorker, requestNotificationPermission } from '@/lib/serv
 import { apiUrl } from '@/lib/api-base'
 import { checkActiveSession, registerSession, startHeartbeat, removeSession, getTerminalId } from '@/lib/pos-sessions'
 import TurnoGate from '@/components/pos/TurnoGate'
+import ImpresionesPendientesDeCaja from '@/components/pos/ImpresionesPendientesDeCaja'
 import PendingOrderInventory from '@/components/pos/PendingOrderInventory'
 import { getActiveClientSlug as _cid } from '@/lib/data'
 import { getEffectiveSetting } from '@/lib/settings'
@@ -817,6 +818,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
             <a href="/pos/staff" className="font-bold underline underline-offset-2 hover:text-amber-200">Ir a Personal</a>
           </div>
         )}
+        <ImpresionesPendientesDeCaja />
         <TurnoGate staff={staff!}>
           {children}
           <PendingOrderInventory clientId={_cid()} />

@@ -149,6 +149,7 @@ declare
   event_seq bigint; event_type text; event_id text; result jsonb; op jsonb; fin jsonb; turno jsonb;
   existing public.pos_orders%rowtype; existing_turno public.pos_turnos%rowtype;
   old_fin jsonb; old_account jsonb; chosen_account text; dual boolean := false; delta bigint;
+  document jsonb; original_document jsonb; content jsonb; resolution jsonb;
   account jsonb; payment jsonb; movement jsonb; account_number integer := 0; affected integer;
   paid bigint := 0; reserved bigint := 0; total bigint; account_total bigint := 0;
   account_paid bigint; account_reserved bigint; materialized boolean := false;
@@ -175,7 +176,7 @@ begin
   if event_seq <> stream.last_sequence + 1 or p_previous_history_hash <> stream.last_history_hash then raise exception 'STREAM_SEQUENCE_GAP'; end if;
   materialized := event_type in ('TURN_OPEN', 'TURN_CLOSE', 'CASH_MOVEMENT', 'ORDER_SAVE', 'ORDER_SEND', 'ORDER_MOVE', 'ORDER_VOID', 'KITCHEN_SET',
     'FINANCIAL_OPEN', 'FINANCIAL_SPLIT', 'FINANCIAL_PAYMENT_START', 'FINANCIAL_PAYMENT_RESULT');
-  if not materialized and event_type not in ('STATE_SYNC', 'MESA_LOCK', 'MESA_UNLOCK', 'PRINT_COMMAND') then
+  if not materialized and event_type not in ('STATE_SYNC', 'MESA_LOCK', 'MESA_UNLOCK', 'PRINT_COMMAND', 'ORDER_PRECHECK_PRINT', 'PAYMENT_RECEIPT_PRINT', 'PRINT_UNCERTAIN_RESOLVE') then
     raise exception 'UNSUPPORTED_BUSINESS_EVENT: %', event_type;
   end if;
   insert into public.pos_caja_business_receipts(stream_id, sequence, event_id, client_id, location_id, event,
@@ -184,6 +185,79 @@ begin
       p_previous_history_hash, p_history_hash, txid_current(), materialized);
   perform set_config('fullsite.caja_stream', p_stream_id::text, true);
   perform set_config('fullsite.caja_sequence', event_seq::text, true);
+
+  -- Paper events advance only the audited stream receipt. They never replay
+  -- business snapshots into orders, accounts, payments, or closures.
+  if event_type in ('ORDER_PRECHECK_PRINT','PAYMENT_RECEIPT_PRINT') then
+    document := result->'print_document'; content := document->'content';
+    if jsonb_typeof(document) is distinct from 'object' or nullif(document->>'document_id','') is null or
+      document->>'document_id' is distinct from p_event->'payload'->>'command_id' or
+      document->>'order_id' is distinct from p_event->'payload'->>'order_id' or
+      nullif(document->>'original_document_id','') is distinct from nullif(p_event->'payload'->>'original_document_id','') or
+      nullif(document->>'recorded_by','') is null or nullif(document->>'created_at','') is null or
+      document->>'kind' is distinct from (case when event_type='ORDER_PRECHECK_PRINT' then 'precheck' else 'payment_receipt' end) or
+      jsonb_typeof(document->'job_ids') is distinct from 'array' or jsonb_array_length(document->'job_ids')=0 then raise exception 'INVALID_PRINT_DOCUMENT'; end if;
+    if exists(select 1 from jsonb_array_elements(document->'job_ids') j where jsonb_typeof(j) <> 'string' or length(j #>> '{}')=0) then raise exception 'INVALID_PRINT_DOCUMENT'; end if;
+    if exists(select 1 from public.pos_caja_business_receipts r where r.stream_id=p_stream_id and r.sequence<event_seq
+      and r.event->'result'->'print_document'->>'document_id'=document->>'document_id') then raise exception 'PRINT_DOCUMENT_ID_REUSED'; end if;
+    select * into existing from public.pos_orders where id=document->>'order_id';
+    if not found or existing.client_id is distinct from stream.client_id or existing.location_id is distinct from stream.location_id or
+      existing.caja_stream_id is distinct from p_stream_id then raise exception 'PRINT_ORDER_SCOPE'; end if;
+    if nullif(document->>'original_document_id','') is not null then
+      select r.event->'result'->'print_document' into original_document from public.pos_caja_business_receipts r
+        where r.stream_id=p_stream_id and r.sequence<event_seq and r.client_id=stream.client_id and r.location_id=stream.location_id
+          and r.event->'result'->'print_document'->>'document_id'=document->>'original_document_id';
+      if not found or nullif(original_document->>'original_document_id','') is not null or
+        nullif(document->>'reason','') is null or document->>'reason' is distinct from p_event->'payload'->>'reason' or
+        (document - 'document_id' - 'created_at' - 'recorded_by' - 'job_ids' - 'original_document_id' - 'reason') is distinct from
+        (original_document - 'document_id' - 'created_at' - 'recorded_by' - 'job_ids' - 'original_document_id' - 'reason')
+        then raise exception 'PRINT_ORIGINAL_SCOPE'; end if;
+    else
+      if public.pos_caja_cents(document->'order_revision') <> existing.order_revision or
+        public.pos_caja_cents(document->'financial_revision') <> existing.financial_revision then raise exception 'PRINT_REVISION_CONFLICT'; end if;
+      if event_type='ORDER_PRECHECK_PRINT' and existing.status='cancelada' then raise exception 'PRINT_ORDER_CANCELLED'; end if;
+      if public.pos_caja_cents(content->'subtotal_cents')::numeric <> existing.subtotal*100 or
+        public.pos_caja_cents(content->'iva_cents')::numeric <> existing.iva*100 or
+        public.pos_caja_cents(content->'total_cents')::numeric <> existing.total*100 or
+        public.pos_caja_cents(content->'discount_cents')::numeric <> (existing.subtotal+existing.iva-existing.total)*100 or
+        public.pos_caja_cents(content->'paid_cents') <> (case when existing.financial_revision>0 then public.pos_caja_cents(existing.caja_financial_snapshot->'paid_cents') else 0 end) or
+        public.pos_caja_cents(content->'reserved_cents') <> (case when existing.financial_revision>0 then public.pos_caja_cents(existing.caja_financial_snapshot->'reserved_cents') else 0 end) or
+        public.pos_caja_cents(content->'balance_cents')::numeric <> existing.saldo*100 then raise exception 'PRINT_AMOUNT_MISMATCH'; end if;
+      if jsonb_typeof(content->'items') is distinct from 'array' or
+        jsonb_array_length(content->'items') <> jsonb_array_length(existing.items) or exists(
+        select 1 from jsonb_array_elements(content->'items') with ordinality c(item,n)
+        join jsonb_array_elements(existing.items) with ordinality o(item,n) using(n)
+        where c.item->'quantity' is distinct from o.item->'cantidad' or c.item->'total_cents' is distinct from o.item->'total_cents')
+        then raise exception 'PRINT_ITEMS_MISMATCH'; end if;
+      if event_type='PAYMENT_RECEIPT_PRINT' then
+        select p.snapshot into payment from public.pos_payment_attempts p where p.payment_id=document->>'payment_id' and p.order_id=existing.id
+          and p.client_id=stream.client_id and p.location_id=stream.location_id and p.caja_stream_id=p_stream_id and p.estado='aceptado';
+        if not found or document->>'payment_id' is distinct from p_event->'payload'->>'payment_id' or
+          content->'payment'->>'payment_id' is distinct from payment->>'payment_id' or
+          content->'payment'->>'method' is distinct from payment->>'method' or
+          public.pos_caja_cents(content->'payment'->'amount_cents') <> public.pos_caja_cents(payment->'amount_cents') then raise exception 'PRINT_PAYMENT_SCOPE'; end if;
+        if payment->>'method'='cash' and (content->'payment'->'received_cents' is distinct from payment->'evidence'->'received_cents' or
+          content->'payment'->'change_cents' is distinct from payment->'change_cents') then raise exception 'PRINT_PAYMENT_SCOPE'; end if;
+      end if;
+    end if;
+  elsif event_type='PRINT_UNCERTAIN_RESOLVE' then
+    resolution := result->'print_resolution';
+    if nullif(resolution->>'job_id','') is null or nullif(resolution->>'uncertain_episode_id','') is null or
+      nullif(resolution->>'recorded_by','') is null or nullif(resolution->>'reason','') is null or
+      coalesce(resolution->>'resolution','') not in ('printed','reprint') or
+      resolution->>'job_id' is distinct from p_event->'payload'->>'job_id' or
+      resolution->>'uncertain_episode_id' is distinct from p_event->'payload'->>'uncertain_episode_id' or
+      resolution->>'resolution' is distinct from p_event->'payload'->>'resolution' or
+      resolution->>'reason' is distinct from p_event->'payload'->>'reason' then raise exception 'INVALID_PRINT_RESOLUTION'; end if;
+    if exists(select 1 from public.pos_caja_business_receipts r where r.stream_id=p_stream_id and r.sequence<event_seq
+      and r.event->'result'->'print_resolution'->>'job_id'=resolution->>'job_id'
+      and r.event->'result'->'print_resolution'->>'uncertain_episode_id'=resolution->>'uncertain_episode_id') then raise exception 'PRINT_EPISODE_ALREADY_RESOLVED'; end if;
+    if not exists(select 1 from public.pos_caja_business_receipts r where r.stream_id=p_stream_id and r.sequence<event_seq
+      and r.client_id=stream.client_id and r.location_id=stream.location_id and (
+        coalesce(r.event->'result'->'print_document'->'job_ids','[]'::jsonb) ? (resolution->>'job_id') or
+        exists(select 1 from jsonb_array_elements(coalesce(r.event->'result'->'preparation_delivery','[]'::jsonb)) d
+          where coalesce(d->'job_ids','[]'::jsonb) ? (resolution->>'job_id')))) then raise exception 'PRINT_JOB_SCOPE'; end if;
+  end if;
 
   if event_type in ('TURN_OPEN', 'TURN_CLOSE') then
     turno := case when event_type = 'TURN_OPEN' then result->'turno' else result->'closed_turno' end;

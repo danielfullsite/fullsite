@@ -217,6 +217,51 @@ async function main() {
     assert.equal(dual.fin.accounts[0].total_cents,row.fin.accounts[0].total_cents)
     assert.equal(dual.fin.accounts[1].total_cents,row.fin.accounts[1].total_cents+5800)
   })
+  await check('Paper documents, abono receipt, explicit copy and uncertain resolution audit without business mutations', async () => {
+    const printing=require('../local-server/core/canonical-print'),docs=[]
+    const op=state.getOrder(orderId),fin=state.getFinancialOrder(orderId)
+    const printState={getOrder:()=>op,getFinancialOrder:()=>fin,getPrintDocuments:()=>docs,getPrintDocument:id=>docs.find(d=>d.document_id===id)}
+    const context={state:printState,actor,catalogEnvelope:catalog.read(),printer:{prepareJobs:(_station,_bytes,_type,opts)=>[{job_id:opts.commandId+'-job'}]}}
+    const current=scalar(`select row_to_json(s) from (select last_sequence,last_history_hash from pos_caja_streams where stream_id=${quote(streamId)}) s`)
+    let seq=current.last_sequence,previous=current.last_history_hash
+    const make=(type,extra={})=>{
+      const payload={command_type:type,command_id:randomUUID(),order_id:orderId,expected_revision:op.order_revision,expected_financial_revision:fin.revision,...extra}
+      const result=printing.prepare(payload,context).result;if(result.print_document)docs.push(result.print_document)
+      const event={id:randomUUID(),sequence:++seq,type,restaurant_id:tenant,payload,result}
+      const args={p_stream_id:streamId,p_credential:credential,p_previous_history_hash:previous,p_history_hash:historyHash(previous,event),p_event:event};previous=args.p_history_hash;return args
+    }
+    const pre=make('ORDER_PRECHECK_PRINT'),receipt=make('PAYMENT_RECEIPT_PRINT',{payment_id:paymentId})
+    assert.equal(receipt.p_event.result.print_document.content.balance_cents,8700)
+    const copy=make('ORDER_PRECHECK_PRINT',{original_document_id:pre.p_event.result.print_document.document_id,reason:'Customer copy'})
+    const decision={job_id:pre.p_event.result.print_document.job_ids[0],uncertain_episode_id:'synthetic-episode',resolution:'printed',reason:'Paper verified',recorded_by:actor.id}
+    const resolutionEvent={id:randomUUID(),sequence:++seq,type:'PRINT_UNCERTAIN_RESOLVE',restaurant_id:tenant,
+      payload:{command_type:'PRINT_UNCERTAIN_RESOLVE',command_id:randomUUID(),...Object.fromEntries(Object.entries(decision).filter(([k])=>k!=='recorded_by'))},result:{print_resolution:decision}}
+    const resolution={p_stream_id:streamId,p_credential:credential,p_previous_history_hash:previous,p_history_hash:historyHash(previous,resolutionEvent),p_event:resolutionEvent}
+    const statement=a=>`select apply_pos_caja_event(${quote(a.p_stream_id)}::uuid,${quote(a.p_credential)},${quote(a.p_previous_history_hash)},${quote(a.p_history_hash)},${json(a.p_event)});`
+    const business=`select jsonb_build_object('orders',(select jsonb_agg(to_jsonb(o) order by id) from pos_orders o),'accounts',(select jsonb_agg(to_jsonb(a) order by account_id) from pos_order_accounts a),'payments',(select jsonb_agg(to_jsonb(p) order by payment_id) from pos_payment_attempts p))`
+    const before=scalar(business)
+    const output=sql('begin;'+[pre,receipt,copy,resolution,pre].map(statement).join('')+business+';rollback;').split('\n').map(JSON.parse)
+    assert(output.slice(0,4).every(r=>r.materialized===false));assert.equal(output[4].duplicate,true);assert.deepEqual(output[5],before)
+    for(const [modify,error] of [
+      [a=>a.p_event.result.print_document.content.total_cents++,/PRINT_AMOUNT_MISMATCH/],
+      [a=>a.p_event.result.print_document.order_revision++,/PRINT_REVISION_CONFLICT/],
+      [a=>a.p_event.result.print_document.content.items[0].quantity++,/PRINT_ITEMS_MISMATCH/],
+    ]){const bad=structuredClone(pre);modify(bad);assert.match(rpc(bad,true),error)}
+    const foreign=randomUUID();seedStream(foreign,'paper-other-branch')
+    const other=structuredClone(pre);other.p_stream_id=foreign;other.p_event.sequence=1;other.p_previous_history_hash=INITIAL_HASH
+    assert.match(rpc(other,true),/PRINT_ORDER_SCOPE/)
+    const foreignJob=structuredClone(resolution);foreignJob.p_stream_id=foreign;foreignJob.p_event.sequence=1;foreignJob.p_previous_history_hash=INITIAL_HASH
+    assert.match(sql('begin;'+statement(pre)+statement(foreignJob)+'rollback;',{allowError:true}),/PRINT_JOB_SCOPE/)
+    const invalidCopy=structuredClone(copy);invalidCopy.p_event.result.print_document.content.total_cents++
+    assert.match(sql('begin;'+statement(pre)+statement(receipt)+statement(invalidCopy)+'rollback;',{allowError:true}),/PRINT_ORIGINAL_SCOPE/)
+    const invalidPayment=structuredClone(receipt);invalidPayment.p_event.result.print_document.payment_id='other';invalidPayment.p_event.payload.payment_id='other'
+    assert.match(sql('begin;'+statement(pre)+statement(invalidPayment)+'rollback;',{allowError:true}),/PRINT_PAYMENT_SCOPE/)
+    const repeatResolution=structuredClone(resolution);repeatResolution.p_event.sequence++;repeatResolution.p_event.id=randomUUID()
+    repeatResolution.p_event.payload.command_id=randomUUID();repeatResolution.p_previous_history_hash=resolution.p_history_hash
+    assert.match(sql('begin;'+[pre,receipt,copy,resolution,repeatResolution].map(statement).join('')+'rollback;',{allowError:true}),/PRINT_EPISODE_ALREADY_RESOLVED/)
+    assert.deepEqual(scalar(business),before)
+    assert.equal(Number(sql(`select last_sequence from pos_caja_streams where stream_id=${quote(streamId)}`)),current.last_sequence)
+  })
   await check('Full settlement materializes once and preserves pending kitchen work', async () => {
     const reservedPayment = eighth.result.financial_order.payments.at(-1)
     await command('FINANCIAL_PAYMENT_RESULT', { expected_revision: state.getFinancialOrder(orderId).revision,

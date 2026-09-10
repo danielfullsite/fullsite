@@ -57,6 +57,9 @@ class RestaurantState {
     this._lastSupabaseSync = null
     this._orderSnapshotComplete = false
     this._financialOrders = new Map()
+    this._printDocuments = new Map()
+    this._printResolutions = new Map()
+    this._canonicalPrintJobs = new Map()
   }
 
   // ─── Projection ─────────────────────────────────────────────────────────
@@ -64,6 +67,21 @@ class RestaurantState {
   /** Apply one event to the state. Returns the fields that changed. */
   apply(event) {
     const { type, payload } = event
+    if (['ORDER_SEND', 'ORDER_PRECHECK_PRINT', 'PAYMENT_RECEIPT_PRINT'].includes(type)) {
+      for (const job of event.effects?.print_jobs || []) this._canonicalPrintJobs.set(job.job_id, {
+        job_id: job.job_id, command_id: payload.command_id, document_type: job.document_type,
+      })
+    }
+    if (type === 'PRINT_UNCERTAIN_RESOLVE' && event.result?.print_resolution) {
+      const resolution = JSON.parse(JSON.stringify(event.result.print_resolution))
+      this._printResolutions.set(JSON.stringify([resolution.job_id, resolution.uncertain_episode_id]), { ...resolution, command_id: payload.command_id })
+      return { changed: ['print_resolutions'] }
+    }
+    if (['ORDER_PRECHECK_PRINT', 'PAYMENT_RECEIPT_PRINT'].includes(type) && event.result?.print_document) {
+      const document = JSON.parse(JSON.stringify(event.result.print_document))
+      this._printDocuments.set(document.document_id, document)
+      return { changed: ['print_documents'] }
+    }
     if (['ORDER_SAVE', 'ORDER_SEND', 'ORDER_MOVE', 'ORDER_VOID', 'KITCHEN_SET'].includes(type) && event.result?.operational_order) {
       const order = JSON.parse(JSON.stringify(event.result.operational_order))
       const financial = event.result.financial_order
@@ -612,6 +630,12 @@ class RestaurantState {
     this._lastSupabaseSync = snap.last_supabase_sync ?? null
     this._financialOrders = new Map((Array.isArray(snap.financial_orders) ? snap.financial_orders : [])
       .filter(o => o?.order_id).map(o => [o.order_id, JSON.parse(JSON.stringify(o))]))
+    this._printDocuments = new Map((Array.isArray(snap.print_documents) ? snap.print_documents : [])
+      .filter(d => d?.document_id).map(d => [d.document_id, JSON.parse(JSON.stringify(d))]))
+    this._printResolutions = new Map((Array.isArray(snap.print_resolutions) ? snap.print_resolutions : [])
+      .filter(r => r?.job_id && r?.uncertain_episode_id).map(r => [JSON.stringify([r.job_id, r.uncertain_episode_id]), JSON.parse(JSON.stringify(r))]))
+    this._canonicalPrintJobs = new Map((Array.isArray(snap.canonical_print_jobs) ? snap.canonical_print_jobs : [])
+      .filter(j => j?.job_id && j?.command_id).map(j => [j.job_id, { ...j }]))
 
     // `toSnapshot` quita el flag interno `_kds_sent` antes de mandar. Se repone:
     // sin el, `toSnapshot` de ESTA terminal filtraria las ordenes y el KDS local
@@ -661,6 +685,9 @@ class RestaurantState {
       })),
       order_snapshot_complete,
       financial_orders: this.getFinancialOrders(),
+      print_documents: this.getPrintDocuments(),
+      print_resolutions: [...this._printResolutions.values()].map(resolution => JSON.parse(JSON.stringify(resolution))),
+      canonical_print_jobs: [...this._canonicalPrintJobs.values()].map(job => ({ ...job })),
       cash_movements: this.getCashMovements(),
       turno:              this._turno,
       turn_identities: [...this._turnIdentities],
@@ -675,6 +702,10 @@ class RestaurantState {
   getFinancialOrder(id) { const order = this._financialOrders.get(id); return order ? JSON.parse(JSON.stringify(order)) : null }
   getCashMovements() { return [...this._cashMovements.values()].map(m => JSON.parse(JSON.stringify(m))) }
   getFinancialOrders() { return [...this._financialOrders.values()].map(order => JSON.parse(JSON.stringify(order))) }
+  getPrintDocuments() { return [...this._printDocuments.values()].map(document => JSON.parse(JSON.stringify(document))) }
+  getPrintDocument(id) { const document = this._printDocuments.get(id); return document ? JSON.parse(JSON.stringify(document)) : null }
+  getPrintResolution(jobId, episodeId) { const resolution = this._printResolutions.get(JSON.stringify([jobId, episodeId])); return resolution ? JSON.parse(JSON.stringify(resolution)) : null }
+  getCanonicalPrintJob(jobId) { const job = this._canonicalPrintJobs.get(jobId); return job ? { ...job } : null }
   getKdsQueue()    { return [...this._kds] }
   getTurno()       { return this._turno }
   getLock(mesa)    { return this._locks.get(String(mesa)) || null }

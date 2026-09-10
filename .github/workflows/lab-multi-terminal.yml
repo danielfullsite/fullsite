@@ -142,6 +142,7 @@ jobs:
         env:
           CI: 'true'
           FULLSITE_LAB_OPERATIONAL: ${{ matrix.mode == 'caja' && '1' || '0' }}
+          FULLSITE_LAB_PRINT: ${{ matrix.mode == 'caja' && '1' || '0' }}
       - name: Conservar resultados y capturas
         if: always()
         uses: actions/upload-artifact@v4
