@@ -60,9 +60,11 @@ module.exports = async function mutacionesLleganAPedro({ caja, pos2, pos3, check
 
   // ── Transferir mesa (con internet: la ruta legacy escribe en nube) ──────────
   setWan(true)
+  let cloudMoveStatus = null
   const traceResponse = async response => {
     const req = response.request()
     if (req.method() === 'PATCH') {
+      if (decodeURIComponent(response.url()).includes(idMesa4)) cloudMoveStatus = response.status()
       const url = new URL(response.url())
       console.log(`[mutation-http] ${req.method()} ${url.origin}${url.pathname} ${response.status()} ${(await response.text()).slice(0, 350)}`)
     }
@@ -87,6 +89,7 @@ module.exports = async function mutacionesLleganAPedro({ caja, pos2, pos3, check
         const s = await salon()
         return s.mesas?.['4']?.status === 'libre' && s.mesas?.['7']?.order_id === idMesa4 && ordenesDeMesa(s, 7).length === 1
       }, 'Caja movió la cuenta de la mesa 4 a la 7 al recibir el ORDER_UPSERTED')
+      assert.equal(cloudMoveStatus, 200, 'la transferencia online recibió HTTP 200; no pasó sólo por el fallback offline')
       const movida = ordenesDeMesa(await salon(), 7)[0]
       assert.equal(Number(movida.total), 58, 'mover de mesa no toca el total')
       assert.equal(JSON.parse(movida.items).length, 1, 'mover de mesa no toca los platillos')
