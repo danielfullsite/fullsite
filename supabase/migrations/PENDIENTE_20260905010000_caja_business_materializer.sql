@@ -148,6 +148,7 @@ declare
   stream public.pos_caja_streams%rowtype; receipt public.pos_caja_business_receipts%rowtype;
   event_seq bigint; event_type text; event_id text; result jsonb; op jsonb; fin jsonb; turno jsonb;
   existing public.pos_orders%rowtype; existing_turno public.pos_turnos%rowtype;
+  old_fin jsonb; old_account jsonb; chosen_account text; dual boolean := false; delta bigint;
   account jsonb; payment jsonb; movement jsonb; account_number integer := 0; affected integer;
   paid bigint := 0; reserved bigint := 0; total bigint; account_total bigint := 0;
   account_paid bigint; account_reserved bigint; materialized boolean := false;
@@ -236,6 +237,36 @@ begin
     elsif public.pos_caja_cents(op->'order_revision') <> coalesce(existing.order_revision, 0) + 1 then raise exception 'ORDER_PROJECTION_GAP'; end if;
     total := public.pos_caja_cents(op->'total_cents');
     if total <> public.pos_caja_cents(op->'subtotal_cents') + public.pos_caja_cents(op->'iva_cents') then raise exception 'ORDER_TOTAL_MISMATCH'; end if;
+    dual := event_type in ('ORDER_SAVE', 'ORDER_SEND') and existing.financial_revision > 0;
+    if dual then
+      fin := result->'financial_order'; old_fin := existing.caja_financial_snapshot;
+      if jsonb_typeof(fin) is distinct from 'object' or old_fin->>'status' is distinct from 'open' or
+        existing.payment_status = 'pagada' or fin->>'status' is distinct from 'open' then raise exception 'DUAL_FINANCIAL_REQUIRED'; end if;
+      if fin->>'order_id' is distinct from op->>'order_id' or fin->>'order_id' is distinct from existing.id or
+        fin->>'turno_id' is distinct from old_fin->>'turno_id' or fin->>'turno_id' is distinct from op->>'turno_id' then raise exception 'DUAL_ORDER_SCOPE'; end if;
+      if (fin - 'revision' - 'order_revision' - 'total_cents' - 'balance_cents' - 'accounts' - 'payments') is distinct from
+        (old_fin - 'revision' - 'order_revision' - 'total_cents' - 'balance_cents' - 'accounts' - 'payments') then raise exception 'DUAL_METADATA_CHANGED'; end if;
+      if public.pos_caja_cents(p_event->'payload'->'expected_financial_revision') <> existing.financial_revision or
+        public.pos_caja_cents(fin->'revision') <> existing.financial_revision + 1 or
+        public.pos_caja_cents(fin->'order_revision') <> public.pos_caja_cents(op->'order_revision') then raise exception 'DUAL_REVISION_CONFLICT'; end if;
+      if fin->'payments' is distinct from old_fin->'payments' then raise exception 'DUAL_PAYMENT_CHANGED'; end if;
+      delta := total - public.pos_caja_cents(old_fin->'total_cents');
+      if delta < 0 or (event_type = 'ORDER_SEND' and delta <> 0) then raise exception 'DUAL_TOTAL_DECREASE'; end if;
+      chosen_account := p_event->'payload'->>'account_id';
+      if event_type = 'ORDER_SAVE' and (nullif(chosen_account,'') is null or not exists(
+        select 1 from jsonb_array_elements(old_fin->'accounts') x where x->>'account_id'=chosen_account)) then raise exception 'DUAL_ACCOUNT_REQUIRED'; end if;
+      if event_type = 'ORDER_SAVE' and (result->'financial_allocation'->>'account_id' is distinct from chosen_account or
+        public.pos_caja_cents(result->'financial_allocation'->'amount_cents') <> delta) then raise exception 'DUAL_ALLOCATION_MISMATCH'; end if;
+      if jsonb_typeof(fin->'accounts') is distinct from 'array' or jsonb_array_length(fin->'accounts') <> jsonb_array_length(old_fin->'accounts') then raise exception 'DUAL_ACCOUNT_CHANGED'; end if;
+      for old_account in select x from jsonb_array_elements(old_fin->'accounts') x loop
+        select x into account from jsonb_array_elements(fin->'accounts') x where x->>'account_id'=old_account->>'account_id';
+        if not found or (account - 'total_cents' - 'balance_cents') is distinct from (old_account - 'total_cents' - 'balance_cents') or
+          public.pos_caja_cents(account->'total_cents') <> public.pos_caja_cents(old_account->'total_cents') + (case when old_account->>'account_id'=chosen_account then delta else 0 end) or
+          public.pos_caja_cents(account->'balance_cents') <> public.pos_caja_cents(old_account->'balance_cents') + (case when old_account->>'account_id'=chosen_account then delta else 0 end)
+          then raise exception 'DUAL_ACCOUNT_CHANGED'; end if;
+      end loop;
+    elsif event_type in ('ORDER_SAVE','ORDER_SEND') and result ? 'financial_order' then raise exception 'UNEXPECTED_FINANCIAL_RESULT';
+    elsif existing.financial_revision > 0 and total::numeric <> existing.total * 100 then raise exception 'FINANCIAL_ORDER_MISMATCH'; end if;
     insert into public.pos_orders(id, client_id, location_id, turno_id, mesa, mesero, personas, customer_name, notas, status,
       subtotal, iva, total, items, created_at, updated_at, order_revision, preparation_status, payment_status, saldo,
       comanda_batches, kitchen_items, kitchen_revision, caja_stream_id, caja_operational_snapshot)
@@ -252,7 +283,8 @@ begin
       order_revision = excluded.order_revision, preparation_status = excluded.preparation_status,
       comanda_batches = excluded.comanda_batches, kitchen_items = excluded.kitchen_items,
       kitchen_revision = excluded.kitchen_revision, caja_operational_snapshot = excluded.caja_operational_snapshot;
-  elsif event_type like 'FINANCIAL_%' then
+  end if;
+  if event_type like 'FINANCIAL_%' or dual then
     fin := result->'financial_order';
     if fin->>'order_id' is null or fin->>'currency' is distinct from 'MXN' or jsonb_typeof(fin->'accounts') is distinct from 'array'
       or jsonb_array_length(fin->'accounts') = 0 or jsonb_typeof(fin->'payments') is distinct from 'array' then raise exception 'INVALID_FINANCIAL_RESULT'; end if;
@@ -298,11 +330,12 @@ begin
       insert into public.pos_order_accounts(account_id, order_id, client_id, location_id, numero, total, snapshot, caja_stream_id)
         values(account->>'account_id', fin->>'order_id', stream.client_id, stream.location_id, account_number,
           public.pos_caja_cents(account->'total_cents')::numeric / 100, account, p_stream_id)
-      on conflict(account_id) do update set snapshot = excluded.snapshot
+      on conflict(account_id) do update set snapshot = excluded.snapshot, total = excluded.total
         where pos_order_accounts.client_id = excluded.client_id and pos_order_accounts.location_id = excluded.location_id and
-          pos_order_accounts.order_id = excluded.order_id and pos_order_accounts.caja_stream_id = excluded.caja_stream_id and pos_order_accounts.total = excluded.total;
+          pos_order_accounts.order_id = excluded.order_id and pos_order_accounts.caja_stream_id = excluded.caja_stream_id and (pos_order_accounts.total = excluded.total or dual);
       get diagnostics affected = row_count; if affected <> 1 then raise exception 'ACCOUNT_ID_CONFLICT'; end if;
     end loop;
+    if not dual then
     for payment in select x from jsonb_array_elements(fin->'payments') x loop
       if payment->>'payment_id' is null or not exists(select 1 from jsonb_array_elements(fin->'accounts') x where x->>'account_id' = payment->>'account_id') then raise exception 'PAYMENT_ACCOUNT_MISSING'; end if;
       insert into public.pos_payment_attempts(payment_id, account_id, order_id, client_id, location_id, terminal_id, monto, metodo, estado, snapshot, caja_stream_id)
@@ -316,6 +349,7 @@ begin
           (pos_payment_attempts.estado in ('pendiente', 'desconocido') or pos_payment_attempts.snapshot = excluded.snapshot);
       get diagnostics affected = row_count; if affected <> 1 then raise exception 'PAYMENT_ID_CONFLICT'; end if;
     end loop;
+    end if;
     update public.pos_orders set financial_revision = public.pos_caja_cents(fin->'revision'), caja_financial_snapshot = fin,
       saldo = public.pos_caja_cents(fin->'balance_cents')::numeric / 100, payment_status = case when fin->>'status' = 'settled' then 'pagada' else 'pendiente' end,
       pagos = coalesce((select jsonb_agg(jsonb_build_object('payment_id', x->>'payment_id', 'account_id', x->>'account_id',

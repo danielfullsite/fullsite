@@ -436,7 +436,7 @@ async function main() {
   nextProcess.stderr.on('data', recordNext)
   await until(async () => (await fetch(`${uiOrigin}/pos/mesas`, { signal: AbortSignal.timeout(5000) })).ok,
     'Next sirve la pantalla real', Math.max(150000, compileTimeout))
-  for (const route of ['/pos', '/pos/cocina', '/pos/barra', '/pos/plano']) {
+  for (const route of ['/pos', '/pos/cocina', '/pos/barra', '/pos/plano', ...(operationalMode ? ['/pos/corte', '/pos/turno'] : [])]) {
     await until(async () => (await fetch(`${uiOrigin}${route}`, { signal: AbortSignal.timeout(15000) })).ok,
       `Preparar compilación ${route}`, compileTimeout)
   }
@@ -759,6 +759,10 @@ main().catch(error => {
       }
     } catch { /* también se captura el fallo cuando el proceso ya murió */ }
     fs.writeFileSync(path.join(output, `${terminal.name}.log`), terminal.log.join(''))
+  }
+  // Capture every screen before stopping Caja; otherwise secondary evidence
+  // depicts a disconnection caused by cleanup rather than the failing step.
+  for (const terminal of terminals) {
     try { await Promise.race([terminal.app.close(), new Promise(resolve => setTimeout(resolve, 2500))]) } catch {}
     if (terminal.process.exitCode === null && terminal.process.signalCode === null) terminal.process.kill('SIGKILL')
   }

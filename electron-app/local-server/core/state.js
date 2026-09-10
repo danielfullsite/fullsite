@@ -66,6 +66,12 @@ class RestaurantState {
     const { type, payload } = event
     if (['ORDER_SAVE', 'ORDER_SEND', 'ORDER_MOVE', 'ORDER_VOID', 'KITCHEN_SET'].includes(type) && event.result?.operational_order) {
       const order = JSON.parse(JSON.stringify(event.result.operational_order))
+      const financial = event.result.financial_order
+      if (financial) {
+        this._financialOrders.set(financial.order_id, JSON.parse(JSON.stringify(financial)))
+        order.saldo = financial.balance_cents / 100
+        order.payment_status = financial.status === 'settled' ? 'pagada' : 'pendiente'
+      }
       const previous = this._orders.get(order.order_id)
       if (previous?.mesa != null && this._mesas.get(String(previous.mesa))?.order_id === order.order_id) {
         this._mesas.set(String(previous.mesa), { status: 'libre', order_id: null, locked_by: null })
@@ -78,7 +84,7 @@ class RestaurantState {
         this._kds.push({ order_id: order.order_id, mesa: order.mesa, items_sent: order.kitchen_items, sent_at: Date.parse(order.updated_at) })
       }
       this._orderSnapshotComplete = true
-      return { changed: ['orders', 'mesas', 'kds'] }
+      return { changed: ['orders', 'mesas', 'kds', ...(financial ? ['financial_orders'] : [])] }
     }
     if (type === 'CASH_MOVEMENT' && event.result?.cash_movement) {
       const movement = JSON.parse(JSON.stringify(event.result.cash_movement))

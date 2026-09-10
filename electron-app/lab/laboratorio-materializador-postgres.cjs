@@ -163,6 +163,60 @@ async function main() {
     assert.equal(row.estado, 'desconocido'); assert.equal(row.monto, 29)
     assert.equal(Number(sql(`select saldo from public.pos_orders where id=${quote(orderId)};`)), 87)
   })
+  await check('Dual save/send commit both revisions, preserve accepted/unknown attempts, and reject divergent projections atomically', async () => {
+    const row = scalar(`select row_to_json(o) from (select caja_operational_snapshot as op,caja_financial_snapshot as fin from pos_orders where id=${quote(orderId)}) o`)
+    const stream = scalar(`select row_to_json(s) from (select last_sequence,last_history_hash from pos_caja_streams where stream_id=${quote(streamId)}) s`)
+    const paymentRows = scalar(`select jsonb_agg(to_jsonb(p) order by payment_id) from pos_payment_attempts p where order_id=${quote(orderId)}`)
+    const op = structuredClone(row.op), fin = structuredClone(row.fin)
+    op.order_revision++; op.subtotal_cents+=5000;op.iva_cents+=800;op.total_cents+=5800
+    fin.revision++;fin.order_revision=op.order_revision;fin.total_cents+=5800;fin.balance_cents+=5800
+    fin.accounts[1].total_cents+=5800;fin.accounts[1].balance_cents+=5800
+    const event = {id:randomUUID(),sequence:stream.last_sequence+1,type:'ORDER_SAVE',restaurant_id:tenant,
+      payload:{expected_financial_revision:row.fin.revision,account_id:accounts[1]},result:{operational_order:op,financial_order:fin,financial_allocation:{account_id:accounts[1],amount_cents:5800,lines:[]}}}
+    const envelope = e => ({p_stream_id:streamId,p_credential:credential,p_previous_history_hash:stream.last_history_hash,p_history_hash:historyHash(stream.last_history_hash,e),p_event:e})
+    for (const [mutate, error] of [
+      [e=>delete e.result.financial_order,/DUAL_FINANCIAL_REQUIRED/],
+      [e=>e.payload.expected_financial_revision--,/DUAL_REVISION_CONFLICT/],
+      [e=>e.result.financial_order.order_revision--,/DUAL_REVISION_CONFLICT/],
+      [e=>e.result.financial_order.payments[1].status='rejected',/DUAL_PAYMENT_CHANGED/],
+      [e=>e.result.financial_order.accounts[0].total_cents++,/DUAL_ACCOUNT_CHANGED/],
+      [e=>e.payload.account_id='missing',/DUAL_ACCOUNT_REQUIRED/],
+      [e=>e.type='ORDER_SEND',/DUAL_TOTAL_DECREASE/],
+      [e=>e.result.financial_order.balance_cents++,/FINANCIAL_SUM_MISMATCH/],
+      [e=>e.result.financial_allocation.amount_cents++,/DUAL_ALLOCATION_MISMATCH/],
+      [e=>e.result.financial_order.turno_id=randomUUID(),/DUAL_ORDER_SCOPE/],
+      [e=>e.result.financial_order.opened_by='forged',/DUAL_METADATA_CHANGED/],
+      [e=>e.result.financial_order.settled_at='2026-09-10',/DUAL_METADATA_CHANGED/],
+      [e=>e.result.financial_order.currency='USD',/DUAL_METADATA_CHANGED/],
+    ]) {
+      const bad=structuredClone(event);mutate(bad);assert.match(rpc(envelope(bad),true),error)
+      assert.equal(Number(sql(`select last_sequence from pos_caja_streams where stream_id=${quote(streamId)}`)),stream.last_sequence)
+      assert.deepEqual(scalar(`select caja_financial_snapshot from pos_orders where id=${quote(orderId)}`),row.fin)
+      assert.deepEqual(scalar(`select caja_operational_snapshot from pos_orders where id=${quote(orderId)}`),row.op)
+    }
+    const send=structuredClone(event);send.id=randomUUID();send.sequence++;send.type='ORDER_SEND'
+    delete send.result.financial_allocation
+    send.payload={expected_financial_revision:fin.revision};send.result.operational_order.order_revision++
+    send.result.financial_order.revision++;send.result.financial_order.order_revision++
+    const invoke=(e,previous)=>`select apply_pos_caja_event(${quote(streamId)}::uuid,${quote(credential)},${quote(previous)},${quote(historyHash(previous,e))},${json(e)});`
+    const otherOrder=randomUUID(), createOther=structuredClone(event)
+    createOther.id=randomUUID();createOther.payload={};createOther.result={operational_order:structuredClone(op)}
+    createOther.result.operational_order.order_id=otherOrder;createOther.result.operational_order.order_revision=1;createOther.result.operational_order.mesa=3
+    const cross=structuredClone(event);cross.id=randomUUID();cross.sequence++;cross.result.financial_order.order_id=otherOrder
+    const crossed=sql('begin;'+invoke(createOther,stream.last_history_hash)+invoke(cross,historyHash(stream.last_history_hash,createOther))+'rollback;', {allowError:true})
+    assert.match(crossed,/DUAL_ORDER_SCOPE/)
+    assert.equal(Number(sql(`select count(*) from pos_orders where id=${quote(otherOrder)}`)),0)
+    assert.deepEqual(scalar(`select caja_financial_snapshot from pos_orders where id=${quote(orderId)}`),row.fin)
+    // Exercise real atomic commits inside one disposable transaction; roll back
+    // the fixture so the existing settlement/close scenarios keep their amounts.
+    const output=sql('begin;'+invoke(event,stream.last_history_hash)+invoke(send,historyHash(stream.last_history_hash,event))+
+      `select jsonb_build_object('fin',caja_financial_snapshot,'op',caja_operational_snapshot,'total',total,'saldo',saldo,'revisions',jsonb_build_array(order_revision,financial_revision),'attempts',(select jsonb_agg(to_jsonb(p) order by payment_id) from pos_payment_attempts p where order_id=${quote(orderId)})) from pos_orders where id=${quote(orderId)};rollback;`).split('\n')
+    const dual=JSON.parse(output.at(-1));assert.equal(dual.total,174);assert.equal(dual.saldo,145)
+    assert.deepEqual(dual.attempts,paymentRows)
+    assert.deepEqual(dual.fin.payments,row.fin.payments);assert.deepEqual(dual.revisions,[row.op.order_revision+2,row.fin.revision+2])
+    assert.equal(dual.fin.accounts[0].total_cents,row.fin.accounts[0].total_cents)
+    assert.equal(dual.fin.accounts[1].total_cents,row.fin.accounts[1].total_cents+5800)
+  })
   await check('Full settlement materializes once and preserves pending kitchen work', async () => {
     const reservedPayment = eighth.result.financial_order.payments.at(-1)
     await command('FINANCIAL_PAYMENT_RESULT', { expected_revision: state.getFinancialOrder(orderId).revision,
@@ -177,6 +231,14 @@ async function main() {
     assert.equal(row.saldo, 0); assert.equal(row.payment_status, 'pagada')
     assert.equal(row.preparation_status, 'enviada'); assert.equal(row.status, 'enviada')
     assert.equal(row.kitchen_items.length, 1)
+    const projected=scalar(`select jsonb_build_object('operational_order',caja_operational_snapshot,'financial_order',caja_financial_snapshot) from pos_orders where id=${quote(orderId)}`)
+    const current=scalar(`select row_to_json(s) from (select last_sequence,last_history_hash from pos_caja_streams where stream_id=${quote(streamId)}) s`)
+    projected.operational_order.order_revision++;projected.financial_order.revision++;projected.financial_order.order_revision++
+    const reopen={id:randomUUID(),sequence:current.last_sequence+1,type:'ORDER_SEND',restaurant_id:tenant,
+      payload:{expected_financial_revision:projected.financial_order.revision-1},result:projected}
+    assert.match(rpc({p_stream_id:streamId,p_credential:credential,p_previous_history_hash:current.last_history_hash,
+      p_history_hash:historyHash(current.last_history_hash,reopen),p_event:reopen},true),/DUAL_FINANCIAL_REQUIRED/)
+
     assert.equal(Number(sql(`select sum(monto) from public.pos_payment_attempts where order_id=${quote(orderId)} and estado='aceptado';`)), 116)
   })
   await check('Cash movements materialize exactly once and reconcile the same Z close', async () => {

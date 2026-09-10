@@ -53,6 +53,9 @@ import { cacheTrasElCierre } from '@/lib/cache-de-cuenta'
 import { leerCuenta, requiereCaja, cuentaConfirmada, type LecturaDeCuenta } from '@/lib/pedro-cliente'
 import { leerCatalogoCaja } from '@/lib/pedro-catalogo'
 import { guardarCuentaEnCaja, enviarCuentaEnCaja, moverCuentaEnCaja, anularCuentaEnCaja, GuardadoAnteriorRecuperado, firmaBorradorParaCaja, type OrdenConfirmada } from '@/lib/pedro-operaciones'
+import { type FinanzasDeCaja, pesosDeCentavos } from '@/lib/pedro-finanzas'
+import { crearSesionEditorCaja } from '@/lib/pos-editor-session'
+import ConsumoPendienteDeCaja from '@/components/pos/ConsumoPendienteDeCaja'
 import CobroDeCaja from '@/components/pos/CobroDeCaja'
 import { reconciliarCuenta, cuentaEditableDe, mismaConfirmacionDeCuenta, type CuentaEditable } from '@/lib/pos-order-reconciliation'
 import { evaluarLiquidacion, cuentasDe, intentoDePago } from '@/lib/liquidacion-de-orden'
@@ -1696,13 +1699,14 @@ function POSContent() {
   // que carga. Evita que el persist escriba items de la mesa vieja en la caché de la
   // nueva durante una transición de mesa (fuga cross-mesa).
   const orderItemsMesaRef = useRef<number>(initialMesa)
+  const sesionEditorCaja = useRef(crearSesionEditorCaja())
 
   // Persist order items to localStorage on every change (8h TTL, survives offline navigation).
   // Merge into any existing cache entry to preserve fields (id, revision, mesero) written
   // by the success path, so the lazy-init still finds the order id on fast remounts.
   useEffect(() => {
     // Solo persistir si los items pertenecen a la mesa actual (no en plena transición).
-    if (mesa > 0 && orderItemsMesaRef.current === mesa) {
+    if (mesa > 0 && orderItemsMesaRef.current === mesa && (!requiereCaja() || sesionEditorCaja.current.puedePersistir())) {
       try {
         const existing = localStorage.getItem(`pos_order_${mesa}`)
         const prev = existing ? JSON.parse(existing) : {}
@@ -2343,6 +2347,8 @@ function POSContent() {
   })
 
   const [lecturaCuentaCaja, setLecturaCuentaCaja] = useState<LecturaDeCuenta | null>(null)
+  const [destinoConsumoCaja, setDestinoConsumoCaja] = useState<{ orderId: string; accountId: string } | null>(null)
+  const [finanzasConsumoCaja, setFinanzasConsumoCaja] = useState<FinanzasDeCaja | null>(null)
   const [cobroDeCaja, setCobroDeCaja] = useState<OrdenConfirmada | null>(null)
   const [avisoCuentaCaja, setAvisoCuentaCaja] = useState<string | null>(null)
   const [ultimaLecturaCaja, setUltimaLecturaCaja] = useState<number | null>(null)
@@ -2385,6 +2391,7 @@ function POSContent() {
   useEffect(() => {
     if (!requiereCaja()) return
     let disposed = false
+    const generation = sesionEditorCaja.current.iniciar()
     let pending: Promise<LecturaDeCuenta | null> | null = null
     let target: string | null = new URLSearchParams(window.location.search).get('order')
     try {
@@ -2425,7 +2432,7 @@ function POSContent() {
     } catch {}
     async function read(): Promise<LecturaDeCuenta | null> {
       const result = await leerCuenta({ orderId: idCuentaCaja.current, mesa, customerName: clienteNombre })
-      if (disposed) return null
+      if (disposed || !sesionEditorCaja.current.vigente(generation)) return null
       cuentaCacheLista.current = true
       setLecturaCuentaCaja(result); setLoadingMesa(false)
       if (result.estado === 'incierta') { setAvisoCuentaCaja(result.motivo || 'Cuenta sin confirmar — sólo borradores'); return result }
@@ -2462,6 +2469,7 @@ function POSContent() {
           !current.sentItemIds.has(i.id) && !remote.items.some(r => r.id === i.id))] }, conflictos: [],
       }
       cuentaRemotaCaja.current = order
+      setFinanzasConsumoCaja((order.financial_order as FinanzasDeCaja | null) ?? null)
       idCuentaCaja.current = String(order.id)
       aplicarCuentaCaja(merged.cuenta)
       setCancelledItems(new Set(merged.cuenta.items.filter(i => i.cancelled).map(i => i.id)))
@@ -2499,7 +2507,7 @@ function POSContent() {
   }, [mesa, clienteNombre])
 
   useEffect(() => {
-    if (!requiereCaja() || !cuentaCacheLista.current || orderItemsMesaRef.current !== mesa) return
+    if (!requiereCaja() || !cuentaCacheLista.current || !sesionEditorCaja.current.puedePersistir() || orderItemsMesaRef.current !== mesa) return
     try {
       const saved = JSON.parse(localStorage.getItem(claveCuentaCaja) || '{}')
       localStorage.setItem(claveCuentaCaja, JSON.stringify({ ...saved, draftOrderId: orderId, draft: {
@@ -2552,6 +2560,7 @@ function POSContent() {
       return false
     }
     const editable = cuentaEditableDe(order)
+    setFinanzasConsumoCaja(order.financial_order ?? null)
     cuentaRemotaCaja.current = order; idCuentaCaja.current = order.id; baseCuentaCaja.current = editable
     if (!conservarBorrador) aplicarCuentaCaja(editable)
     setOrderId(order.id); setLoadedOrderId(order.id); setOrderRevision(order.order_revision)
@@ -2571,7 +2580,10 @@ function POSContent() {
       if (!turnoId) throw new Error('Un encargado debe abrir el turno en Caja.')
       const draftBefore = firmaBorradorParaCaja(cuentaActual.current)
       const saved = await guardarCuentaEnCaja({ id: orderId, turnoId, revision: loadedOrderId ? orderRevision : 0,
-        mesa, clienteNombre: clienteNombre || undefined, personas, notas: orderNotes, items: activeItems, discount })
+        mesa, clienteNombre: clienteNombre || undefined, personas, notas: orderNotes, items: activeItems, discount,
+        financial: (cuentaRemotaCaja.current?.financial_order as FinanzasDeCaja | null) ?? null,
+        confirmedDiscount: Number(cuentaRemotaCaja.current?.descuento ?? 0),
+        accountId: destinoConsumoCaja && destinoConsumoCaja.orderId === orderId ? destinoConsumoCaja.accountId : undefined })
       const editedWhileWaiting = draftBefore !== firmaBorradorParaCaja(cuentaActual.current)
       if (!adoptarConfirmacionCaja(saved, editedWhileWaiting)) return
       if (editedWhileWaiting) { setAvisoCuentaCaja('Caja confirmó el guardado. Conservamos los cambios que hiciste mientras esperabas; guárdalos antes de enviar.'); return }
@@ -2605,6 +2617,8 @@ function POSContent() {
     operationLock.current = true; setSaving(true)
     try {
       await moverCuentaEnCaja(cuentaGuardadaParaOperacion(), mesaDestinoCaja, pin)
+      sesionEditorCaja.current.salir()
+      cuentaCacheLista.current = false
       setOrderItems([])
       try { localStorage.removeItem(claveCuentaCaja); localStorage.removeItem(`pos_draft_${mesa}`); localStorage.removeItem(`pos_order_${mesa}`) } catch {}
       setMesaDestinoCaja(null); setPinPrompt(null); setPinInput('')
@@ -2616,6 +2630,8 @@ function POSContent() {
     operationLock.current = true; setSaving(true)
     try {
       await anularCuentaEnCaja(cuentaGuardadaParaOperacion(), reason, pin)
+      sesionEditorCaja.current.salir()
+      cuentaCacheLista.current = false
       setOrderItems([])
       try { localStorage.removeItem(claveCuentaCaja); localStorage.removeItem(`pos_draft_${mesa}`); localStorage.removeItem(`pos_order_${mesa}`) } catch {}
       setShowVoidOrder(false)
@@ -2625,6 +2641,7 @@ function POSContent() {
 
   // Auto-save draft items to localStorage on every change (prevents loss on refresh)
   useEffect(() => {
+    if (requiereCaja() && !sesionEditorCaja.current.puedePersistir()) return
     if (mesa > 0 && orderItems.length > 0) {
       try { localStorage.setItem(`pos_draft_${mesa}`, JSON.stringify({ items: orderItems, orderId, mesero, personas, ts: Date.now() })) } catch {}
     } else if (mesa > 0) {
@@ -4599,8 +4616,21 @@ function POSContent() {
         </div>
       )}
 
+      {requiereCaja() && <ConsumoPendienteDeCaja disabled={saving} onRecovered={() => { void refrescarCuentaCaja.current() }} />}
       {cobroDeCaja && <CobroDeCaja order={cobroDeCaja} onClose={() => { setCobroDeCaja(null); void refrescarCuentaCaja.current() }}
         onChanged={() => { void refrescarCuentaCaja.current() }} />}
+      {escribeEnCaja && finanzasConsumoCaja && finanzasConsumoCaja.order_id === orderId && <div className="px-4 py-3 border-b border-[var(--line)] text-sm" aria-label="Saldo del consumo en Caja">
+        <p>Abonado {pesosDeCentavos(finanzasConsumoCaja.paid_cents)} · Reservado {pesosDeCentavos(finanzasConsumoCaja.reserved_cents)} · Saldo {pesosDeCentavos(finanzasConsumoCaja.balance_cents)}</p>
+        {finanzasConsumoCaja.accounts.length > 1 && <label className="block mt-2">Cuenta para el consumo nuevo
+          <select aria-label="Cuenta para el consumo nuevo" className="ml-2 rounded border p-2 bg-[var(--surface)]" disabled={saving}
+            value={destinoConsumoCaja && destinoConsumoCaja.orderId === orderId ? destinoConsumoCaja.accountId : ''}
+            onChange={event => setDestinoConsumoCaja({ orderId, accountId: event.target.value })}>
+            <option value="">Selecciona una cuenta</option>
+            {finanzasConsumoCaja.accounts.map((account, index) => <option key={account.account_id} value={account.account_id}>{account.label || `Cuenta ${index + 1}`} · Saldo {pesosDeCentavos(account.balance_cents)}</option>)}
+          </select>
+        </label>}
+        <p className="mt-1 text-[var(--text-2)]">El consumo nuevo aumenta la cuenta elegida. Los abonos y cobros en proceso se conservan.</p>
+      </div>}
       {requiereCaja() && avisoCuentaCaja && (
         <div role="status" className="px-4 py-3 bg-amber-950 text-amber-100 text-sm flex flex-wrap items-center gap-3">
           <span>{avisoCuentaCaja}{ultimaLecturaCaja ? ` Última confirmación: ${new Date(ultimaLecturaCaja).toLocaleTimeString('es-MX')}.` : ''}</span>

@@ -21,7 +21,23 @@ Todos los comandos financieros exigen la transición explícita y una orden cuya
 | `CASH_MOVEMENT` | Retiro o depósito con identidad estable, importe positivo en centavos y motivo. Exige turno abierto, actor con `retiros_programados`; rechazo por efectivo insuficiente. Snapshot, replay y nube conservan una sola operación. |
 | `TURN_CLOSE` | Turno, efectivo contado y notas. Rechaza deuda, reservas y preparación pendiente; conserva un cierre calculado y consultable después de reiniciar. |
 
-La revisión de cocina es independiente de la del consumo y de la financiera. `items` representa consumo completo; `kitchen_items` representa rondas enviadas. Salón presenta deuda y cocina presenta preparación. Abrir cuentas financieras bloquea cambios incompatibles de consumo; todavía no existe ajuste posterior al pago parcial.
+La revisión de cocina es independiente de la del consumo y de la financiera. `items` representa consumo completo; `kitchen_items` representa rondas enviadas. Salón presenta deuda y cocina presenta preparación. Abrir cuentas financieras bloquea cambios incompatibles de consumo; el candidato del 10 de septiembre añade únicamente consumo aditivo posterior al pago parcial.
+
+Con cuentas financieras abiertas, `ORDER_SAVE` y `ORDER_SEND` exigen también
+`expected_financial_revision`. Guardar exige `account_id` de la cuenta destino y
+no permite retirar ni reducir líneas existentes. El resultado único contiene
+`operational_order` y `financial_order`: revisiones enlazadas, saldo descontando
+abonos y todos los pagos/reservas conservados. `financial_allocation` registra
+cuenta destino, incremento en centavos, deltas de renglones y empleado verificado.
+Los importes previos y su IVA se conservan; sólo se calcula el consumo agregado.
+Guardar no imprime; enviar mantiene el algoritmo de rondas por cantidades pendientes.
+La materialización cloud también aplica las dos proyecciones en una transacción.
+
+Un nuevo intento de cobro exige todo el consumo enviado. Una reserva ya existente
+se puede resolver aunque haya una ronda pendiente: no se bloquea la aclaración de
+un resultado incierto. No se reabre una orden liquidada ni se habilitan todavía
+disminuciones, devoluciones, descuentos, fusiones o transferencias posteriores a
+la apertura financiera.
 
 ## Catálogo e impresión
 
@@ -37,7 +53,7 @@ En modo Caja se rechazan las rutas legacy de impresión cruda, cajón, prueba, c
 
 ## Cierre de turno y límites
 
-El cierre actual suma fondo inicial y pagos aceptados en efectivo del turno; compara contra el efectivo contado. Mantiene total cobrado por todos los medios del dominio y conserva diferencias en centavos. No sustituye el cierre X/Z completo con retiros, depósitos, propinas o conciliación de inventario.
+El cierre suma fondo inicial, pagos aceptados en efectivo y depósitos, y resta retiros; compara contra el efectivo contado. Mantiene total cobrado por todos los medios del dominio y conserva diferencias en centavos. Propinas, papel y conciliación de inventario conservan sus condiciones de cierre propias.
 
 Las acciones no integradas están bloqueadas en la pantalla nueva. También `syncAll` conserva sin reenviar las colas legacy cuando Caja es autoridad o no responde. El [materializador](CAJA-CLOUD-MATERIALIZATION-2026-09-05.md) añade la barrera en base de datos; la transición exige conciliar colas antes de activarla.
 

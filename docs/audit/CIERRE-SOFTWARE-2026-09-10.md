@@ -111,3 +111,30 @@ Validación conjunta de esta tanda: web 3,679/3,679 (sin proveedor IA real), DOM
 manual 7 grupos y conciliación de consumo 7 grupos. Se ejecutará el laboratorio
 multi-terminal en CI sobre el commit integrado; aún no se traslada evidencia del
 commit anterior a éste.
+
+CI 34457551266 sobre **647edd3e** completó todos los jobs: comunicación entre
+terminales/servidor, UI Caja 16/16, UI legacy 21/21 y los laboratorios PostgreSQL.
+Ésta es la evidencia del commit integrado; no corresponde todavía al siguiente
+incremento H02.
+
+## H02 aditivo: siguiente incremento en validación
+
+Guardar y enviar consumo adicional después de preparar cuentas o recibir un pago
+parcial compromete resultado operacional y financiero juntos. Se conserva cada
+pago y reserva; sólo aumenta el total de la cuenta seleccionada. Ambas revisiones
+se verifican y avanzan con un único recibo durable. La materialización SQL aplica
+ambas proyecciones o ninguna. Una nueva ronda sin enviar bloquea nuevos cobros,
+pero no bloquea resolver un pago ya pendiente. Disminuciones/reembolsos y las
+demás operaciones posteriores a la apertura financiera todavía siguen abiertas.
+
+Checkpoint H02: web 3,679/3,679, DOM previo a la corrección de navegación
+255/255, servidor 562/562 y PostgreSQL materializador 13 grupos aprobados.
+La selección operacional/aditiva también pasó 26/26 dentro de Electron.
+La revisión adversarial no identificó otro defecto concreto en ese alcance.
+
+El recorrido real encontró una carrera al salir de una mesa movida/anulada:
+una lectura en vuelo y el último efecto de React podían recrear la caché con
+borrador vacío. Una generación de sesión ahora invalida la lectura y suspende
+persistencia antes de limpiar y navegar. Las pruebas focalizadas pasan; el
+laboratorio UI completo continúa en validación en este checkpoint. No se
+atribuye a H02 el resultado UI 16/16 del commit anterior.

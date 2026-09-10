@@ -147,12 +147,15 @@ test('sent items cannot be deleted or changed; another waiter needs permission; 
   assert.equal((await s.send('ORDER_SAVE', saveFields(s, { expected_revision: 2, catalog_revision: before }))).code, 'CATALOG_REVISION_CONFLICT')
   assert.equal((await s.send('ORDER_SAVE', saveFields(s, { expected_revision: 2, items: items(2) }))).code, 'SENT_PRICE_CHANGED')
 })
-test('opening accounts locks consumption and preserves preparation independently from payment', async t => {
+test('opening accounts requires financial revision for additions and preserves preparation independently from payment', async t => {
   const s = await setup(t)
   await s.send('ORDER_SAVE', saveFields(s)); await s.send('ORDER_SEND', orderFields(1))
   assert.ok((await s.send('FINANCIAL_OPEN', { order_id: 'mother', turno_id: 't1', expected_revision: 0, expected_order_revision: 2, total_cents: 7540, currency: 'MXN' })).event)
-  for (const type of ['ORDER_SAVE', 'ORDER_SEND', 'ORDER_MOVE', 'ORDER_VOID']) {
+  for (const type of ['ORDER_MOVE', 'ORDER_VOID']) {
     assert.equal((await s.send(type, saveFields(s, { expected_revision: 2 }))).code, 'FINANCIAL_ORDER_LOCKED')
+  }
+  for (const type of ['ORDER_SAVE', 'ORDER_SEND']) {
+    assert.equal((await s.send(type, saveFields(s, { expected_revision: 2 }))).code, 'FINANCIAL_REVISION_CONFLICT')
   }
   assert.equal((await s.send('TURN_CLOSE', { turno_id: 't1' })).code, 'UNSETTLED_FINANCIAL_ACCOUNTS')
   assert.equal((await s.send('ORDER_UPSERTED', { order_id: 'mother', status: 'entregada' })).code, 'KITCHEN_COMMAND_REQUIRED')

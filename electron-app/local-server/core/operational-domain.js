@@ -170,7 +170,12 @@ class OperationalDomain {
     if (existing && existing.authority !== 'caja') fail('LEGACY_ORDER_REQUIRES_CUTOVER', 'Esta orden requiere migración de autoridad antes de editarla por LAN')
     if (existing && (existing.turno_id !== turnoId || ['cancelada', 'pagada', 'cerrada', 'dividida'].includes(existing.status) || existing.payment_status === 'pagada')) fail('ORDER_NOT_OPEN', 'La cuenta ya no está abierta en este turno')
     if (expected !== (existing?.order_revision ?? 0)) fail('ORDER_REVISION_CONFLICT', 'La cuenta cambió en otra terminal; recárgala antes de confirmar')
-    if (state.getFinancialOrder(orderId)) fail('FINANCIAL_ORDER_LOCKED', 'Ya hay cuentas de cobro; termina o concilia antes de modificar consumos')
+    const financial = state.getFinancialOrder(orderId)
+    if (financial) {
+      if (!['ORDER_SAVE', 'ORDER_SEND'].includes(type)) fail('FINANCIAL_ORDER_LOCKED', 'Esta operación requiere un ajuste de las cuentas de cobro')
+      if (financial.status === 'settled') fail('ORDER_NOT_OPEN', 'La cuenta ya está liquidada')
+      if (!Number.isSafeInteger(payload.expected_financial_revision) || payload.expected_financial_revision !== financial.revision) fail('FINANCIAL_REVISION_CONFLICT', 'Confirma la revisión actual de pagos conservando el borrador')
+    }
     if (existing && existing.created_by !== actor.id && !actor.permissions.includes('ver_todas_cuentas')) fail('PERMISSION_DENIED', 'No tienes permiso para modificar la cuenta de otro empleado')
     if (type !== 'ORDER_SAVE' && !existing) fail('ORDER_NOT_FOUND', 'Guarda la cuenta en Caja antes de continuar')
     let next = existing ? clone(existing) : { id: orderId, order_id: orderId, authority: 'caja', turno_id: turnoId,
@@ -180,7 +185,7 @@ class OperationalDomain {
     if (type === 'ORDER_SAVE') {
       if (!catalogEnvelope?.ready || !catalogEnvelope.catalog) fail('CATALOG_NOT_READY', 'Prepara el catálogo de Caja antes de operar')
       if (payload.catalog_revision !== catalogEnvelope.revision) fail('CATALOG_REVISION_CONFLICT', 'El catálogo cambió; revisa productos y precios')
-      if (Object.keys(payload).some(k => !['command_id', 'command_type', 'order_id', 'turno_id', 'expected_revision', 'catalog_revision', 'mesa', 'customer_name', 'personas', 'notas', 'items', 'restaurant_id', 'location_id', 'client_id'].includes(k))) fail('UNTRUSTED_ORDER_FIELDS', 'Caja calcula importes y atribución; ajustes requieren su comando autorizado')
+      if (Object.keys(payload).some(k => !['command_id', 'command_type', 'order_id', 'turno_id', 'expected_revision', 'expected_financial_revision', 'account_id', 'catalog_revision', 'mesa', 'customer_name', 'personas', 'notas', 'items', 'restaurant_id', 'location_id', 'client_id'].includes(k))) fail('UNTRUSTED_ORDER_FIELDS', 'Caja calcula importes y atribución; ajustes requieren su comando autorizado')
       if (!Array.isArray(payload.items) || !payload.items.length || payload.items.length > 1000) fail('INVALID_ITEMS', 'La cuenta requiere de 1 a 1000 renglones')
       const catalog = catalogEnvelope.catalog
       const mesa = table(payload.mesa, catalog)
@@ -194,7 +199,8 @@ class OperationalDomain {
         if (seen.has(line.id)) fail('DUPLICATE_LINE_ID', 'Cada renglón requiere identidad única')
         seen.add(line.id)
         const old = oldItems.find(i => i.id === line.id)
-        if (old?.sent_quantity > 0) {
+        if (old && (old.sent_quantity > 0 || financial)) {
+          if (financial && line.cantidad < old.cantidad) fail('FINANCIAL_ADDITION_ONLY', 'Las cuentas preparadas admiten consumo adicional; reducir requiere ajuste autorizado')
           if (line.cantidad < old.sent_quantity || line.menuItemId !== old.menuItemId ||
             line.notas !== old.notas || line.silla !== old.silla || JSON.stringify(line.modifier_ids) !== JSON.stringify(old.modifier_ids)) fail('SENT_ITEM_LOCKED', 'No se pueden quitar ni cambiar productos ya enviados; requiere cancelación autorizada')
           // A sent line retains its accepted price. Further units at changed
@@ -205,11 +211,16 @@ class OperationalDomain {
         }
         return line
       })
-      if (oldItems.some(i => i.sent_quantity > 0 && !seen.has(i.id))) fail('SENT_ITEM_LOCKED', 'No se pueden retirar productos enviados de la cuenta')
+      if (oldItems.some(i => (i.sent_quantity > 0 || financial) && !seen.has(i.id))) fail('SENT_ITEM_LOCKED', 'No se pueden retirar productos enviados o asignados a una cuenta de cobro')
       const subtotal = items.reduce((sum, line) => int(sum + line.total_cents, 'subtotal'), 0)
       const ivaRate = existing?.iva_rate ?? catalog.config.iva_rate
-      const iva = int(Math.round(subtotal * ivaRate), 'iva')
-      const total = int(subtotal + iva, 'total')
+      // Preserve the accepted tax/discount on prior consumption. Only the new
+      // round is priced now, using the order's pinned tax rate. Take the rounded
+      // cumulative difference so repeated small rounds cannot lose tax cents.
+      const addedSubtotal = financial ? int(subtotal - int(existing.subtotal_cents, 'subtotal anterior'), 'consumo adicional') : subtotal
+      const addedTax = financial ? Math.round(subtotal * ivaRate) - Math.round(existing.subtotal_cents * ivaRate) : Math.round(subtotal * ivaRate)
+      const iva = financial ? int(existing.iva_cents + addedTax, 'iva') : int(addedTax, 'iva')
+      const total = financial ? int(existing.total_cents + addedSubtotal + iva - existing.iva_cents, 'total') : int(subtotal + iva, 'total')
       Object.assign(next, { mesa, customer_name: note(payload.customer_name, 'customer_name', 200), personas: int(payload.personas ?? 1, 'personas', 1, 1000),
         notas: note(payload.notas, 'notas'), items: JSON.stringify(items), catalog_revision: catalogEnvelope.revision, iva_rate: ivaRate,
         subtotal_cents: subtotal, iva_cents: iva, total_cents: total, subtotal: subtotal / 100, iva: iva / 100, total: total / 100, saldo: total / 100 })

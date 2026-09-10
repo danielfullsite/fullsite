@@ -116,3 +116,62 @@ it('server normalization does not masquerade as a draft edit, while a new item d
   const changedWhileSending = { ...confirmed, items: [...confirmed.items, { ...line, id: 'second-line' }] }
   expect(firmaBorradorParaCaja(changedWhileSending)).not.toBe(firmaBorradorParaCaja(confirmed))
 })
+
+const financial = { order_id: order.id, turno_id: order.turno_id, currency: 'MXN' as const, revision: 5, order_revision: 1,
+  total_cents: 5800, paid_cents: 1000, reserved_cents: 2000, balance_cents: 4800, status: 'open' as const,
+  accounts: [{ account_id: 'full', total_cents: 5800, paid_cents: 1000, reserved_cents: 2000, balance_cents: 4800 }], payments: [] }
+const dual = (command: Record<string, unknown>, revision = 2) => Response.json({ results: [{ event: { payload: command }, result: {
+  operational_order: { ...order, order_revision: revision }, financial_order: { ...financial, revision: 6, order_revision: revision },
+} }] })
+it('an additive save selects the single account and sends the receipt financial revision for the incremental round', async () => {
+  request.mockImplementationOnce(async (_url, init) => {
+    const command = JSON.parse(String(init?.body))
+    expect(command).toMatchObject({ command_type: 'ORDER_SAVE', expected_financial_revision: 5, account_id: 'full' })
+    expect(command).not.toHaveProperty('payments')
+    return dual(command)
+  }).mockImplementationOnce(async (_url, init) => {
+    const command = JSON.parse(String(init?.body))
+    expect(command).toMatchObject({ command_type: 'ORDER_SEND', expected_revision: 2, expected_financial_revision: 6 })
+    return dual(command, 3)
+  })
+  const saved = await guardarCuentaEnCaja({ ...draft, financial })
+  expect(saved.financial_order).toMatchObject({ paid_cents: 1000, reserved_cents: 2000, balance_cents: 4800 })
+  await enviarCuentaEnCaja(saved)
+})
+it('split additions require an explicit existing destination and reject settled accounts before any command', async () => {
+  const split = { ...financial, accounts: [...financial.accounts, { ...financial.accounts[0], account_id: 'second' }] }
+  await expect(guardarCuentaEnCaja({ ...draft, financial: split })).rejects.toThrow('Selecciona la cuenta')
+  await expect(guardarCuentaEnCaja({ ...draft, financial: split, accountId: 'foreign' })).rejects.toThrow('Selecciona la cuenta')
+  await expect(guardarCuentaEnCaja({ ...draft, financial: { ...financial, status: 'settled' } })).rejects.toThrow('ya no admite')
+  expect(request).not.toHaveBeenCalled()
+  request.mockImplementationOnce(async (_url, init) => {
+    const command = JSON.parse(String(init?.body)); expect(command.account_id).toBe('second'); return dual(command)
+  })
+  await guardarCuentaEnCaja({ ...draft, financial: split, accountId: 'second' })
+})
+it('lost additive ACK recovers the original account and refuses to confirm a newly selected destination', async () => {
+  const split = { ...financial, accounts: [...financial.accounts, { ...financial.accounts[0], account_id: 'second' }] }
+  let original: Record<string, unknown> = {}
+  request.mockImplementationOnce(async (_url, init) => { original = JSON.parse(String(init?.body)); throw new Error('Lost') })
+  await expect(guardarCuentaEnCaja({ ...draft, financial: split, accountId: 'full' })).rejects.toMatchObject({ incierto: true })
+  request.mockImplementationOnce(async (_url, init) => {
+    expect(JSON.parse(String(init?.body))).toEqual(original); return dual(original)
+  })
+  await expect(guardarCuentaEnCaja({ ...draft, financial: { ...split, revision: 9 }, accountId: 'second' })).rejects.toBeInstanceOf(GuardadoAnteriorRecuperado)
+  expect(Object.keys(localStorage)).toHaveLength(0)
+})
+it('an incomplete dual receipt retains the same intent until both canonical revisions agree', async () => {
+  let original: Record<string, unknown> = {}
+  request.mockImplementationOnce(async (_url, init) => { original = JSON.parse(String(init?.body)); return success(original, order) })
+  await expect(guardarCuentaEnCaja({ ...draft, financial })).rejects.toMatchObject({ incierto: true })
+  expect(Object.keys(localStorage)).toHaveLength(1)
+  request.mockImplementationOnce(async (_url, init) => { expect(JSON.parse(String(init?.body))).toEqual(original); return dual(original) })
+  await expect(guardarCuentaEnCaja({ ...draft, financial: { ...financial, status: 'settled' } })).resolves.toMatchObject({ financial_order: { reserved_cents: 2000 } })
+})
+it('a financial conflict preserves the caller draft without a legacy fallback', async () => {
+  request.mockResolvedValueOnce(Response.json({ results: [{ code: 'FINANCIAL_REVISION_CONFLICT', error: 'Recarga el saldo' }] }))
+  const current = { ...draft, financial, items: [{ ...line, cantidad: 3 }] }
+  await expect(guardarCuentaEnCaja(current)).rejects.toMatchObject({ code: 'FINANCIAL_REVISION_CONFLICT' })
+  expect(current.items[0].cantidad).toBe(3)
+  expect(request).toHaveBeenCalledTimes(1)
+})

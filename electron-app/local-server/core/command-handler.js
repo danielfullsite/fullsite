@@ -99,6 +99,12 @@ class CommandHandler {
         this._validateCommandState(commandType, cmdPayload, fromClientId)
         operationalCatalog = ['ORDER_SAVE', 'ORDER_MOVE', 'ORDER_SEND'].includes(commandType) ? this._catalog?.read() : null
         operationalResult = new OperationalDomain().prepare(cmdPayload, { state: this._state, actor: context.actor, catalogEnvelope: operationalCatalog })
+        if (['ORDER_SAVE', 'ORDER_SEND'].includes(commandType) && this._state.getFinancialOrder?.(cmdPayload.order_id)) {
+          const financial = new FinancialDomain()
+          financial.hydrate(this._state.getFinancialOrders())
+          Object.assign(operationalResult, financial.prepareOperationalChange(cmdPayload, this._state.getOrder(cmdPayload.order_id), operationalResult.operational_order, context.actor))
+          operationalResult.operational_order.saldo = operationalResult.financial_order.balance_cents / 100
+        }
       }
       return operationalResult
     }

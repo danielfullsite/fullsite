@@ -48,3 +48,41 @@ it('a previously opened account remains recoverable even with an old UI snapshot
   await expect(abrirFinanzasCaja(saved)).resolves.toMatchObject({ order_id: 'order', revision: 1 })
   expect(network).toHaveBeenCalledTimes(1)
 })
+
+it('an existing financial account uses fresh send progress, blocks new money, and still resolves a pending payment', async () => {
+  const pending = { payment_id: 'pending-cash', account_id: 'order:full', amount_cents: 1000, method: 'cash', status: 'pending' }
+  const reserved = { ...finance, reserved_cents: 1000, accounts: [{ ...finance.accounts[0], reserved_cents: 1000 }], payments: [pending] }
+  network.mockImplementation(async (_url, init) => {
+    if (init?.method === 'POST') {
+      const command = JSON.parse(String(init.body))
+      expect(command).toMatchObject({ command_type: 'FINANCIAL_PAYMENT_RESULT', payment_id: pending.payment_id })
+      return Response.json({ results: [{ event: { payload: command }, result: { financial_order: reserved } }] })
+    }
+    return Response.json({ authoritative: true, write_authority: 'caja', financial_orders: [reserved], salon_orders: [saved] })
+  })
+  render(createElement(CobroDeCaja, { order: { ...saved, items: [{ cantidad: 2, sent_quantity: 2 }] }, onClose: () => {}, onChanged: () => {} }))
+  await screen.findByText('Cobro por confirmar · $10.00')
+  expect((screen.getByRole('button', { name: 'Preparar cobro en efectivo' }) as HTMLButtonElement).disabled).toBe(true)
+  expect((screen.getByRole('button', { name: 'Cobrar con terminal bancaria' }) as HTMLButtonElement).disabled).toBe(true)
+  expect(screen.getByText('Reservado')).toBeTruthy()
+  fireEvent.change(screen.getByLabelText('Efectivo recibido pending-cash'), { target: { value: '10' } })
+  fireEvent.click(screen.getByRole('button', { name: /Confirmar efectivo recibido/ }))
+  await vi.waitFor(() => expect(network.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(true))
+})
+
+it('opening uses the full fresh operational receipt rather than an old modal total or revision', async () => {
+  const fresh = { ...saved, order_revision: 9, total_cents: 17400, items: [{ cantidad: 3, sent_quantity: 3 }] }
+  network.mockImplementation(async (_url, init) => {
+    if (init?.method === 'POST') {
+      const command = JSON.parse(String(init.body))
+      expect(command).toMatchObject({ command_type: 'FINANCIAL_OPEN', expected_order_revision: 9, total_cents: 17400 })
+      return Response.json({ results: [{ event: { payload: command }, result: { financial_order: { ...finance, total_cents: 17400 } } }] })
+    }
+    return Response.json({ authoritative: true, write_authority: 'caja', financial_orders: [], salon_orders: [fresh] })
+  })
+  render(createElement(CobroDeCaja, { order: saved, onClose: () => {}, onChanged: () => {} }))
+  const button = await screen.findByRole('button', { name: 'Preparar cuenta para cobrar' })
+  await vi.waitFor(() => expect((button as HTMLButtonElement).disabled).toBe(false))
+  fireEvent.click(button)
+  await vi.waitFor(() => expect(network.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(true))
+})
