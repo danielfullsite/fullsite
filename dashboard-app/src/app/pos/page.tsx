@@ -2348,16 +2348,20 @@ function POSContent() {
   // inservible y platillos de una cuenta cerrada en pantalla, que es el síntoma
   // reportado en campo. Se limpia por los dos lados: al cobrar aquí, y al
   // enterarnos por Caja de que la cuenta ya no está abierta.
-  const olvidarCuentaCerrada = useCallback((motivo: 'cobrada-aqui' | 'cerrada-en-caja') => {
+  // Devuelve lo que sobrevive en caché (el borrador propio) para que quien llama
+  // pueda pintar exactamente eso, y no más.
+  const olvidarCuentaCerrada = useCallback((motivo: 'cobrada-aqui' | 'cerrada-en-caja'): ReturnType<typeof cacheTrasElCierre> => {
+    let queda: ReturnType<typeof cacheTrasElCierre> = null
     try {
       const guardado = JSON.parse(localStorage.getItem(claveCuentaCaja) || 'null')
-      const queda = cacheTrasElCierre(guardado, motivo)
+      queda = cacheTrasElCierre(guardado, motivo)
       if (queda) localStorage.setItem(claveCuentaCaja, JSON.stringify(queda))
       else localStorage.removeItem(claveCuentaCaja)
     } catch {}
     idCuentaCaja.current = null
     baseCuentaCaja.current = null
     cuentaRemotaCaja.current = null
+    return queda
   }, [claveCuentaCaja])
 
   useEffect(() => {
@@ -2410,8 +2414,20 @@ function POSContent() {
       if (result.estado === 'cerrada') {
         // Se suelta la identidad de la cuenta liquidada. Si sobrevive en la
         // caché, al reabrir la mesa el editor la readopta y queda trabada.
-        olvidarCuentaCerrada('cerrada-en-caja')
-        setAvisoCuentaCaja('Esta cuenta ya se cerró en Caja. Conservamos lo que tecleaste aquí; vuelve al salón.')
+        const queda = olvidarCuentaCerrada('cerrada-en-caja')
+        // Y LA PANTALLA TAMBIÉN. La caché ya sabía qué conservar —lo tecleado aquí
+        // que no estaba en la cuenta cerrada— pero los platillos de la cuenta
+        // liquidada seguían pintados hasta que alguien saliera al salón: «si vuelves
+        // a ingresar, hay un platillo» (Eduardo, 2026-08-24). Laboratorio
+        // 2026-09-10: el aviso de cierre llega tarde, Caja libera la mesa, y esta
+        // pantalla seguía mostrando el café cobrado con «Cobrar» a la vista
+        // (apagado, pero a la vista). Se pinta exactamente lo que la caché conserva.
+        const propios = (Array.isArray(queda?.draft?.items) ? queda!.draft!.items : []) as OrderItem[]
+        setOrderItems(propios)
+        setSentItemIds(new Set()); setSentItemSnapshots({}); setCancelledItems(new Set())
+        setAvisoCuentaCaja(propios.length > 0
+          ? 'Esta cuenta ya se cerró en Caja. Conservamos lo que tecleaste aquí; vuelve al salón.'
+          : 'Esta cuenta ya se cerró en Caja. Vuelve al salón.')
         return result
       }
       setUltimaLecturaCaja(Date.now())

@@ -19,6 +19,15 @@ Resultado verificado: **10/10**.
 
 > **Nota 2026-09-05.** Esta lista quedó escrita antes de `a01087e5`. Desde ese commit el modo Next corre **9** pruebas: las de dividir/cobrar (4) y liquidar desde POS 3 (6) se movieron, en otra forma, al recorrido operacional (`FULLSITE_LAB_OPERATIONAL=1`, 13 pruebas en `recorrido-operacional-ui.js`), y en su lugar el modo Next verifica que una instalación sin transición rechaza `FINANCIAL_OPEN` (`LOCAL_AUTHORITY_DISABLED`). Corrida de referencia en el worktree del PIN: `PASS: 9 · FAIL: 0` sin bandera; `14/14` con `FULLSITE_LAB_PIN=1`.
 
+> **Nota 2026-09-10.** El modo Next corre ahora **19** pruebas: las 9 de arriba más 10 que
+> reproducen los videos de Eduardo del 2026-08-24 con los botones reales —Enviar desde POS 2,
+> Cobrar en efectivo desde POS 3, reabrir, y un aviso de cierre que se pierde en la LAN—
+> ([`electron-app/lab/videos-de-eduardo-ui.cjs`](../../electron-app/lab/videos-de-eduardo-ui.cjs),
+> documentadas en [`VIDEOS-EDUARDO-2026-08-24.md`](VIDEOS-EDUARDO-2026-08-24.md)). Desde ese
+> día el laboratorio **sí pulsa un cobro**. Y todo `goto` espera la hidratación: Next sirve el
+> layout del POS como escondite del PIN hasta que React restaura la sesión sembrada, y con la
+> máquina cargada eso tardaba más de 20 s y se leía como «la terminal se bloqueó».
+
 Encontró dos defectos de integración: CSP permitía sólo el puerto 7717, bloqueando instalaciones con otro puerto; la carga opcional de recetas rechazaba todo el arranque cuando la LAN estaba viva pero no había WAN. Ambos corregidos. La consulta de recetas para inventario conserva su error; únicamente su uso como sugerencia de pantalla degrada.
 
 La ampliación encontró otros defectos: cocina añadía metadatos legítimos que el bloqueo financiero rechazaba; HTTP 200 podía contener un rechazo que la pantalla interpretaba como confirmación; el aviso de instalar PWA ignoraba la bandera de desactivación del SW y provocaba cargas/recargas; AppShell esperaba al login cloud antes de montar el gate de PIN del POS. Las correcciones verifican recibos por ID, respetan una única gestión del SW y permiten montar el POS mientras la autenticación cloud sigue pendiente. El PIN conserva su validación propia.
@@ -29,7 +38,7 @@ La evidencia se guarda en `output/closure/ui/`: resultados, capturas en el momen
 
 ## Alcance preciso
 
-La sesión está preparada: no prueba PIN, enrolamiento ni permisos. Assets servidos por Next: no certifica arranque frío sin internet, Service Worker ni paquete offline. No pulsa un cobro ni prueba proveedor bancario; envía los comandos financieros por HTTP real y verifica el saldo en la pantalla. La semántica financiera durable tiene además su suite separada. No certifica Windows, huella ni impresoras físicas.
+La sesión está preparada: no prueba PIN, enrolamiento ni permisos. Assets servidos por Next: no certifica arranque frío sin internet, Service Worker ni paquete offline. Desde el 2026-09-10 sí pulsa un cobro en efectivo con los controles reales (modo legacy, sin WAN); no prueba proveedor bancario ni tarjeta. El recorrido operacional envía los comandos financieros por HTTP real y verifica el saldo en la pantalla. La semántica financiera durable tiene además su suite separada. No certifica Windows, huella ni impresoras físicas.
 
 La cuenta del fixture tiene una revisión explícita; los comandos financieros usan sesiones firmadas preparadas en la Caja sintética antes de arrancar. No se acepta un rol enviado por el body. El catálogo se prepara una sola vez en el perfil de Caja; POS 3 lo obtiene por el [contrato compartido](CATALOGO-COMPARTIDO-2026-09-05.md). Todavía se debe verificar crear/modificar/enviar rondas, cobrar desde sus controles, cerrar turno y conciliar contra nube. Este laboratorio no equivale al cierre del turno completo.
 

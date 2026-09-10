@@ -72,7 +72,7 @@ Un escenario es **CERTIFIED** solo cuando las 3 columnas están marcadas: Impl �
 
 | Impl | Test | Cert | Pendiente |
 |---|---|---|---|
-| ✓ | ✗ | ✗ | Timing exacto difícil de automatizar; ejecutar manualmente |
+| ✓ | ✗ | ✗ | Timing exacto difícil de automatizar; ejecutar manualmente. Lo más cercano automatizado (2026-09-10, `lab/videos-de-eduardo-ui.cjs`): cobrar en efectivo con la WAN ya caída — encola UN cierre, imprime, libera la mesa en las tres pantallas y no admite segundo cobro. No cubre «cae exactamente al presionar Cobrar» |
 
 ---
 
@@ -479,7 +479,7 @@ truena no rompa el enlace, y que `detener()` corte una búsqueda en vuelo.
 
 | Impl | Test | Cert | Pendiente |
 |---|---|---|---|
-| ✓ | ✗ | ✗ | Script con 3 WS clients |
+| ✓ | ✓ (2026-09-10: `lab/videos-de-eduardo-ui.cjs` — tres Electron, mesas 1, 2 y 3 desde POS 2 y por WS; la mesa 3 con el botón «Enviar» real; las tres llegan a cocina y el mapa de Caja, POS 2 y POS 3 es idéntico. No es simultáneo: van en secuencia) | ✗ | Simultaneidad real con 3 tablets |
 
 ---
 
@@ -497,7 +497,7 @@ truena no rompa el enlace, y que `detener()` corte una búsqueda en vuelo.
 
 | Impl | Test | Cert | Pendiente |
 |---|---|---|---|
-| ✓ | ✓ (ws-hub.test.js cubre broadcast) | ✗ | Ejecutar con 2 terminales reales |
+| ✓ | ✓ (ws-hub.test.js cubre broadcast; 2026-09-10: `lab/videos-de-eduardo-ui.cjs` lo mira en las PANTALLAS — cobrar en POS 3 libera la mesa en el mapa de Caja, POS 2 y POS 3, y un aviso de cierre perdido se reintenta hasta que Caja la libera) | ✗ | Ejecutar con 2 terminales reales |
 
 ---
 
@@ -697,13 +697,13 @@ la vuelve visible en vez de silenciosa. La latencia de Entrada sigue **sin medir
 | 5 — Idempotencia | 3 | 3 | 3 | 0 | Ampliado a HTTP y WS el 2026-08-26. Destapó una carrera real (corregida) |
 | 6 — Timeout/Retry | 2 | 2 | 1 | 0 | Reconexión cliente WS auditada: reconecta a IP fija, sin re-discovery |
 | 7 — Impresora | 2 | 2 | 2 | 0 | Sin test con hardware real |
-| 8 — Multi-terminal | 3 | 3 | 1 | 0 | Sin test concurrente real |
+| 8 — Multi-terminal | 3 | 3 | 2 | 0 | T-20 y T-21 con tres Electron reales en pantalla (2026-09-10, videos de Eduardo); sin simultaneidad real (T-19) |
 | 9 — Recovery | 2 | 2 | 0 | 0 | Requiere Supabase staging |
 | 10 — Arranque y sesión | 3 | 3 | 2 | 0 | T-24 cerrado en #133 (TTL 16 h + varias credenciales); T-25 corregido en #128, falta validar; T-26 corregido y con test, falta validar |
-| **Total** | **26** | **25** | **15** | **0** | |
+| **Total** | **26** | **25** | **16** | **0** | |
 
 **Escenarios Implementados**: 25/26 (96%) — +1 el 2026-08-26 (T-24, PR #133), +1 el 2026-08-31 (T-26)
-**Escenarios con Test Automatizado**: 15/26 (58%) — +7 el 2026-08-26 (T-01, T-04, T-07 en el navegador; T-12, T-13, T-14 a nivel de transporte; T-24 el cableado del login); +1 el 2026-08-31 (T-26)
+**Escenarios con Test Automatizado**: 16/26 (62%) — +7 el 2026-08-26 (T-01, T-04, T-07 en el navegador; T-12, T-13, T-14 a nivel de transporte; T-24 el cableado del login); +1 el 2026-08-31 (T-26); +1 el 2026-09-10 (T-20, en el laboratorio UI con los videos de Eduardo — ver [`VIDEOS-EDUARDO-2026-08-24.md`](VIDEOS-EDUARDO-2026-08-24.md))
 **Escenarios Certificados**: 0/26 (0%)
 
 > **El cuello de botella ya no es código.** 24 de 25 implementados, 14 con prueba automatizada,

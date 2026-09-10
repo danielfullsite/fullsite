@@ -83,6 +83,20 @@ async function until(fn, label, timeout = 30000) {
   }
   throw new Error(`${label}: timeout${last ? ` (${last})` : ''}`)
 }
+// EL ESCONDITE FALSO. Next sirve el HTML del layout del POS con `unlocked=false`:
+// la pantalla del PIN. La sesión sembrada la restaura un efecto de React, o sea,
+// DESPUÉS de hidratar. En dev, con cuatro Electron y Next compilando a la vez,
+// hidratar puede tardar más de 20 s, y en ese hueco la pantalla dice «Ingresa tu
+// PIN para abrir» sin que haya pasado nada con la sesión. Costó dos corridas
+// (2026-09-10): una asercion de 20 s sobre el cuerpo de la página leía el
+// escondite y concluía que la terminal se había bloqueado. Tras cada `goto` se
+// espera a que algún botón tenga su onClick colgado —eso es hidratación, no un
+// sleep— antes de mirar cualquier cosa.
+const esperarHidratacion = page => until(() => page.evaluate(() =>
+  [...document.querySelectorAll('button')].some(b => {
+    const clave = Object.keys(b).find(k => k.startsWith('__reactProps'))
+    return !!clave && typeof b[clave]?.onClick === 'function'
+  })).catch(() => false), 'hidratación de la pantalla', 90000)
 function request(terminal, route, init = {}) {
   return fetch(`http://127.0.0.1:${terminal.port}${route}`, {
     ...init, headers: { ...headers,
@@ -621,6 +635,7 @@ async function main() {
   wan = false
   await check('Sin internet, POS 3 abre los productos y el total de la misma cuenta', async () => {
     await pos3.page.goto(`${uiOrigin}/pos?mesa=1`, { waitUntil: 'domcontentloaded', timeout: 60000 })
+    await esperarHidratacion(pos3.page)
     await expect(pos3.page.locator('body')).toContainText('Café de laboratorio', { timeout: 20000 })
     await expect(pos3.page.locator('body')).toContainText(/116[.,]00/, { timeout: 10000 })
     const visible = await pos3.page.evaluate(tenant => JSON.parse(localStorage.getItem(`pos_cuenta_${tenant}_mesa:1`) || 'null')?.confirmed, tenant)
@@ -665,6 +680,12 @@ async function main() {
     assert(snapshot.salon_orders.some(o => o.id === orderId || o.order_id === orderId))
     assert.equal(snapshot.financial_orders.length, 0)
   })
+  // Los videos de Eduardo del 2026-08-24, con los botones reales y sin internet.
+  // Van AQUÍ porque cobran la mesa 1: lo anterior la necesita abierta, lo de
+  // abajo apaga Caja y ya no lee cuentas. `caja` es `let` (se reinició arriba),
+  // por eso viaja como función y no como valor.
+  await require('./videos-de-eduardo-ui.cjs')({ caja: () => caja, pos2, pos3, kds, check, expect, assert, until, request,
+    esperarHidratacion, tenant, output, uiOrigin, orderId, path })
   await check('Al apagarse Caja, POS 2 muestra que la cuenta no está confirmada', async () => {
     caja.process.kill('SIGKILL')
     await until(async () => {
@@ -672,6 +693,7 @@ async function main() {
       return state.authoritative === false
     }, 'POS detecta Caja caída')
     await pos2.page.goto(`${uiOrigin}/pos/mesas`, { waitUntil: 'domcontentloaded' })
+    await esperarHidratacion(pos2.page)
     await expect(pos2.page.locator('body')).toContainText(/Sin conexión con la caja.*sólo borradores pendientes/i, { timeout: 15000 })
   })
   await check('Las pantallas completan el recorrido sin errores sin manejar', async () => {
