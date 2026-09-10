@@ -1,4 +1,6 @@
 'use client'
+import { readAuthHomeMembership } from '@/lib/auth-home-membership'
+
 
 import { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase-browser'
@@ -67,27 +69,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Fall back to user_metadata.client_id for users not yet migrated
     const metaClientId = (appMeta?.client_id ?? userMeta?.client_id) as string | undefined
 
-    // Priority 2: client_users table (DB lookup) — también es la fuente de verdad del rol
-    let dbClientId: string | null = null
-    try {
-      const { data: clientUser } = await supabase
-        .from('client_users')
-        .select('client_id, role')
-        .eq('user_id', userId)
-        .neq('role', 'platform_actas')           // una membresía de impersonación NUNCA es el "home"
-        .order('client_id', { ascending: true })  // determinista: si es dueño de varios, home estable (no aleatorio)
-        .limit(1)
-        .maybeSingle()
-      const cu = clientUser as { client_id: string; role: string | null } | null
-      dbClientId = cu?.client_id || null
-      // Role: DB row wins; fall back to app_metadata.role (admin-set, not user-writable)
-      const effectiveRole = cu?.role || (appMeta?.role as string | undefined) || null
-      setRole(resolveRole(effectiveRole, userEmail))
-    } catch { /* table might not exist for new installs */
-      // If DB query fails entirely, still try app_metadata.role
-      const metaRole = appMeta?.role as string | undefined
-      if (metaRole) setRole(resolveRole(metaRole, userEmail))
-    }
+    // A preferred home and its role must come from the same membership.
+    // The helper handles SDK error results as well as thrown network errors.
+    const home = await readAuthHomeMembership(supabase, userId, metaClientId, appMeta)
+    const dbClientId = home.clientId
+    setRole(resolveRole(home.role, userEmail))
 
     // Priority 3: email-to-client mapping
     const emailClientId = getClientIdFromEmail(userEmail || '')

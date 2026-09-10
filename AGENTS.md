@@ -110,3 +110,5 @@ Código de interfaz instalado y recuperación: [`docs/architecture/OFFLINE-UI-PA
 Inventario del candidato: [`docs/architecture/INVENTORY-CONFIRMED-2026-09-10.md`](docs/architecture/INVENTORY-CONFIRMED-2026-09-10.md). Movimiento manual usa recibo/stock/costo en una transacción. Venta y cancelación se concilian desde la orden confirmada; no devolver existencias por un borrador o una cancelación preparada.
 
 Lectura cloud de KDS: [`docs/architecture/KDS-CLOUD-SCOPE-2026-09-10.md`](docs/architecture/KDS-CLOUD-SCOPE-2026-09-10.md). Turno único por sucursal, sin ampliar consultas cuando falla su resolución. Caché exige procedencia de restaurante/sucursal.
+
+Alta reanudable: [`docs/architecture/TENANT-PROVISIONING-2026-09-10.md`](docs/architecture/TENANT-PROVISIONING-2026-09-10.md). Siembra sólo ausentes con plan inicial persistido; membresías y activación atómicas. Nunca reactivar suspendidos ni usar PINs calculables de plantilla.

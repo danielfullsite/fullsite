@@ -223,3 +223,32 @@ contados. Los intentos previos agotaron navegación/carga de Next; el laboratori
 acota el teclado PIN a su contenedor y alinea navegación con el presupuesto de
 compilación (CI 300 s/local 90 s), manteniendo aserciones de interacción de 30 s.
 Evidencia: `output/closure/ui-operacion/results.json`; receptor TCP sintético.
+
+El checkpoint KDS **a379bda4** pasó todos sus checks de PR, incluidos CI
+multi-terminal **34465179986**, Dashboard, servidor y Offline E2E.
+
+## H11: alta reanudable y activación atómica
+
+[Contrato de alta](../architecture/TENANT-PROVISIONING-2026-09-10.md).
+El restaurante nace inactivo con un plan durable. Los reintentos pendientes
+usan ese plan y conservan los datos ya sembrados. Un restaurante completo o
+legacy no vuelve a sembrar filas eliminadas. La activación verifica el skeleton
+y confirma ambas membresías en una sola transacción; un conflicto revierte
+membresías y activación. Las rutas comparten esa orquestación y no declaran éxito
+ante errores de Auth, siembra o membresía.
+
+Personal de plantilla inactivo con PIN criptográfico; el pendiente de personal
+se calcula en PostgreSQL, incluso tras reintentos. La UI distingue credenciales
+nuevas de existentes y conserva los datos del envío confirmado. El wizard
+anónimo incompleto dirige al alta autenticada. AuthContext ya no combina el
+restaurante preferido con el rol de otra membresía.
+
+Web **3,714/3,714**, DOM **284/284**, TypeScript aprobado; laboratorio PostgreSQL
+privado **6 grupos**, agregado al workflow multi-terminal. Revisión adversarial
+sin bloqueantes adicionales. Evidencia SQL:
+`output/closure/tenant-provisioning/runtime.log`. La migración
+`20260910070000_tenant_provisioning_atomic` permanece pendiente de producción.
+
+No cierra H11: falta la recuperación segura de credenciales de servicio cuya
+respuesta se perdió y la aceptación de enrolamiento/primera venta. La cuenta
+existente conserva su contraseña; el alta nunca la rota implícitamente.

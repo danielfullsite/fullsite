@@ -173,6 +173,8 @@ jobs:
         working-directory: electron-app
       - name: Probar recibos de negocio en PostgreSQL temporal
         run: node electron-app/lab/run-materializador-local.cjs
+      - name: Probar alta y activación atómica en PostgreSQL temporal
+        run: node electron-app/lab/run-tenant-provisioning-local.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -183,3 +185,4 @@ jobs:
             output/closure/scoped-upsert
             output/closure/inventory-movement
             output/closure/inventory-reconcile
+            output/closure/tenant-provisioning
