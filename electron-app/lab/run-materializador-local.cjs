@@ -23,7 +23,7 @@ async function main() {
   const port = String(server.address().port)
   await new Promise(resolve => server.close(resolve))
   run(path.join(bin, 'initdb'), ['-D', path.join(base, 'data'), '-A', 'trust', '-U', 'postgres'])
-  run(path.join(bin, 'pg_ctl'), ['-D', path.join(base, 'data'), '-l', path.join(base, 'postgres.log'), '-o', `-h 127.0.0.1 -p ${port}`, 'start'])
+  run(path.join(bin, 'pg_ctl'), ['-D', path.join(base, 'data'), '-l', path.join(base, 'postgres.log'), '-o', `-h 127.0.0.1 -p ${port} -k ${base}`, 'start'])
   started = true
   const baseline = fs.readFileSync(path.join(ROOT, 'supabase/migrations/00000000000000_baseline_esquema.sql'), 'utf8')
   let schema = 'create role anon; create role authenticated; create role service_role;\n'
@@ -49,5 +49,6 @@ main().catch(error => { console.error(error.message); process.exitCode = 1 }).fi
     try { run(path.join(bin, 'pg_ctl'), ['-D', path.join(base, 'data'), '-m', 'immediate', 'stop']) }
     catch (error) { console.error(error.message); process.exitCode = 1; return }
   }
+  if (fs.existsSync(path.join(base, 'postgres.log'))) fs.copyFileSync(path.join(base, 'postgres.log'), path.join(output, 'postgres.log'))
   fs.rmSync(base, { recursive: true, force: true })
 })
