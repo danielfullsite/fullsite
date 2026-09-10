@@ -60,6 +60,14 @@ module.exports = async function mutacionesLleganAPedro({ caja, pos2, pos3, check
 
   // ── Transferir mesa (con internet: la ruta legacy escribe en nube) ──────────
   setWan(true)
+  const traceResponse = async response => {
+    const req = response.request()
+    if (req.method() === 'PATCH') {
+      const url = new URL(response.url())
+      console.log(`[mutation-http] ${req.method()} ${url.origin}${url.pathname} ${response.status()} ${(await response.text()).slice(0, 350)}`)
+    }
+  }
+  pos2.page.on('response', traceResponse)
   try {
     await check('Mutaciones — «Transferir mesa» 4 → 7 desde POS 2 llega a Pedro: la 4 se libera y la 7 se ocupa en las tres pantallas', async () => {
       await abrirMesa(pos2, 4)
@@ -126,6 +134,7 @@ module.exports = async function mutacionesLleganAPedro({ caja, pos2, pos3, check
       await foto(pos3, 'mapa-tras-anular')
     })
   } finally {
+    pos2.page.off('response', traceResponse)
     setWan(false)
   }
 }
