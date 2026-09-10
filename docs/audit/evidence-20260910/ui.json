@@ -1,0 +1,99 @@
+{
+  "results": [
+    {
+      "name": "La comanda llega a la pantalla de cocina por LAN",
+      "passed": true
+    },
+    {
+      "name": "Un comando WebSocket del POS secundario se confirma en Caja",
+      "passed": true
+    },
+    {
+      "name": "Sin internet, POS 3 abre los productos y el total de la misma cuenta",
+      "passed": true
+    },
+    {
+      "name": "POS 3 sin caché obtiene menú y opciones obligatorias de Caja sin internet",
+      "passed": true
+    },
+    {
+      "name": "Una instalación sin transición rechaza crear otra autoridad monetaria",
+      "passed": true
+    },
+    {
+      "name": "Reiniciar Caja recupera la misma cuenta y preparación de la instalación anterior",
+      "passed": true
+    },
+    {
+      "name": "Cocina legacy confirma preparación sin inventar liquidación",
+      "passed": true
+    },
+    {
+      "name": "Video de Eduardo 1 — el mapa dice lo mismo en Caja, POS 2 y POS 3, y nadie pinta ceros",
+      "passed": true
+    },
+    {
+      "name": "Video de Eduardo 1 — al abrir la mesa 1 en POS 3, «por dentro» es lo mismo que «por fuera»",
+      "passed": true
+    },
+    {
+      "name": "Video de Eduardo 4 — «Enviar» real desde POS 2 sin internet: Caja recibe la cuenta con total, saldo y revisión",
+      "passed": true
+    },
+    {
+      "name": "Video de Eduardo 4 — esa cuenta se ve con $58.00 en el mapa de las tres terminales y llega a cocina",
+      "passed": true
+    },
+    {
+      "name": "Video de Eduardo 4 — POS 3 abre la mesa 3 que capturó POS 2 y ve el platillo, no una cuenta vacía",
+      "passed": true
+    },
+    {
+      "name": "Video de Eduardo 3 — cobrar la mesa 1 en efectivo sin internet: Caja la libera y el POS no deja platillos",
+      "passed": true
+    },
+    {
+      "name": "Video de Eduardo 2 — la mesa cobrada desaparece del mapa de las tres terminales (sin ceros)",
+      "passed": true
+    },
+    {
+      "name": "Video de Eduardo 3 — reabrir la mesa cobrada desde POS 3 y desde POS 2: vacía, y «Cobrar» apagado",
+      "passed": true
+    },
+    {
+      "name": "Video de Eduardo 3 — la cola de POS 3 tiene UN solo cierre de esa orden: no hay segundo cobro",
+      "passed": true
+    },
+    {
+      "name": "Video de Eduardo 3, adversarial — si el aviso de cierre se pierde en la LAN, se reintenta hasta que Caja libera la mesa",
+      "passed": true
+    },
+    {
+      "name": "Mutaciones — «Transferir mesa» 4 → 7 desde POS 2 llega a Pedro: la 4 se libera y la 7 se ocupa en las tres pantallas",
+      "passed": true
+    },
+    {
+      "name": "Mutaciones — «Anular orden» de la mesa 5 desde POS 3, sin internet, llega a Pedro: la mesa se libera en las tres pantallas",
+      "passed": true
+    },
+    {
+      "name": "Al apagarse Caja, POS 2 muestra que la cuenta no está confirmada",
+      "passed": true
+    },
+    {
+      "name": "Las pantallas completan el recorrido sin errores sin manejar",
+      "passed": true
+    }
+  ],
+  "ui_source": "next-dev",
+  "pin_desde_pantalla": false,
+  "limitations": [
+    "Sesión preparada: no prueba PIN o enrolamiento",
+    "No certifica impresoras, Windows o huella",
+    "Assets servidos por Next local: esta suite no certifica el paquete offline ni Service Worker",
+    "La nube está simulada; órdenes y réplicas usan Pedro real"
+  ],
+  "errors": [],
+  "run": "https://github.com/danielfullsite/fullsite/actions/runs/34449964970",
+  "commit": "fe444cb5dab158c5f7aeb2bb66e221bbcc934f99"
+}

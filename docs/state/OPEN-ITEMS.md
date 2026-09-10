@@ -19,7 +19,10 @@ Regla: cuando cierres un item, márcalo aquí. Cuando aparezca uno nuevo, entra 
 
 Rama `cert/instalador-2026-09-10`, base #391. [Evidencia y límites](../audit/CANDIDATO-POS-KDS-2026-09-10.md).
 Avisos de mutaciones recuperados y protección de anulaciones/reintentos probada localmente.
-Laboratorio UI y candidato Windows pendientes de aprobación; no instalado ni certificado.
+Windows empaquetado y sellado; arranque frío macOS 5/5; laboratorio UI tres POS y
+KDS **21/21** (run 34449964970). No instalado ni certificado en campo.
+Bloqueo H04 observado: `transfer-item` compensa el origen sin condición de versión
+si falla el destino; falta resolver la operación completa frente a concurrencia.
 Los H01–H16 inferiores siguen abiertos salvo evidencia posterior explícita.
 
 ## Candidato de cierre: revisión del 8 de septiembre
