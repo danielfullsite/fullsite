@@ -230,8 +230,9 @@ async function startNube() {
     req.on('data', chunk => { body += chunk })
     req.on('end', () => {
       const responder = (status, json) => { res.writeHead(status, {
-        'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': '*', 'Access-Control-Allow-Methods': 'GET,POST,PATCH,DELETE,OPTIONS',
+        'Content-Type': 'application/json', 'Access-Control-Allow-Origin': req.headers.origin || '*',
+        'Access-Control-Allow-Credentials': 'true',
+        'Access-Control-Allow-Headers': req.headers['access-control-request-headers'] || '*', 'Access-Control-Allow-Methods': 'GET,POST,PATCH,DELETE,OPTIONS',
       }); res.end(JSON.stringify(json)) }
       // A real HTTP response avoids the status=0 observed when Electron receives
       // Playwright's fulfilled PATCH response. Only synthetic renderer fixtures
@@ -239,6 +240,7 @@ async function startNube() {
       if (url.pathname.startsWith('/renderer/')) {
         if (req.method === 'OPTIONS') return responder(200, {})
         const pathname = url.pathname.slice('/renderer'.length)
+        nubeRequests.push({ ruta: pathname, method: req.method, fixture: 'renderer', wan: true, ts: Date.now() })
         const rest = pathname.startsWith('/rest/v1/') ? pathname.slice('/rest/v1/'.length)
           : pathname === '/api/pos/db' ? url.searchParams.get('path') || '' : null
         if (rest !== null) return responder(200, fixture[rest.split('?')[0]] || [])
@@ -291,6 +293,8 @@ async function fixtureRoute(route, uiOrigin, pedroPorts) {
   // Nunca enviar tráfico de este laboratorio a un restaurante o proveedor real.
   if (!local && !['data:', 'blob:', 'about:'].includes(url.protocol)) return route.abort('blockedbyclient')
   if (pedroPorts.includes(Number(url.port))) return route.continue()
+  // Chromium may issue a preflight at the redirected local origin.
+  if (nube && url.origin === nube.origin && url.pathname.startsWith('/renderer/')) return route.continue()
   if (url.pathname.startsWith('/rest/v1/') || url.pathname.startsWith('/api/') || url.pathname.startsWith('/auth/')) {
     if (!wan) return route.abort('internetdisconnected')
     return route.continue({ url: `${nube.origin}/renderer${url.pathname}${url.search}` })
@@ -386,7 +390,7 @@ require(${JSON.stringify(path.join(ELECTRON_APP, 'main.js'))});\n`)
   terminal.page = page
   page.on('requestfailed', request => {
     const url = new URL(request.url())
-    if (url.pathname.startsWith('/_next/')) terminal.log.push(`[asset-failed] ${url.pathname} ${request.failure()?.errorText}\n`)
+    if (url.pathname.startsWith('/_next/') || url.pathname.startsWith('/renderer/')) terminal.log.push(`[asset-failed] ${url.pathname} ${request.failure()?.errorText}\n`)
   })
   page.on('pageerror', error => terminal.errors.push(error.stack || error.message))
   page.on('console', message => {
