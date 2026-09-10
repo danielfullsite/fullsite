@@ -154,6 +154,7 @@ module.exports = async function mutacionesLleganAPedro({ caja, pos2, pos3, check
       // Fase 3: storage restored. Same account can now be queued and cancelled.
       await modal.locator('input[type="password"]').fill('2468')
       await modal.getByRole('button', { name: 'Anular orden', exact: true }).click()
+      await expect(pos3.page.locator('body')).toContainText('Inventario pendiente de conciliación.')
       await until(async () => {
         const s = await salon()
         return s.mesas?.['5']?.status === 'libre' && ordenesDeMesa(s, 5).length === 0

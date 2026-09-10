@@ -311,3 +311,37 @@ El laboratorio legacy inyecta fallo de IndexedDB al encolar una anulación offli
 Validación: web **3,714/3,714**, DOM **289/289**, TypeScript aprobado, UI Caja **23/23** con el transporte actualizado y legacy **21/21** con fallo/recuperación de almacenamiento. Las siete pruebas web añadidas cubren caché y clasificación/recuerdo de compatibilidad. Revisión adversarial sin nuevo bloqueo concreto. El servidor y SQL no cambian en esta tanda.
 
 El checkpoint anterior **56823cf1** pasó los workflows remotos de código; laboratorio multi-terminal **34471268530**. El instalador disponible sigue en **7f595aca** y debe reconstruirse antes de presentarlo como este código.
+
+## Apertura durable y devolución física al anular
+
+`TURN_OPEN` aceptaba una diferencia de efectivo sin el motivo exigido en la
+pantalla. La nueva prueba reprodujo el rechazo ausente. Ahora Caja compara con
+el último cierre comprometido, exige diez caracteres si la diferencia absoluta
+supera $50 y compromete conteo anterior, diferencia y motivo en el mismo recibo.
+El registro sobrevive al reinicio, al reintento del comando, al cierre siguiente
+y a la materialización SQL. La entrada de TurnoGate conduce a la pantalla completa
+de apertura; el recorrido verifica esa entrada tanto al iniciar como después de Z.
+
+La anulación completa también tenía una devolución especulativa: el RPC omitía
+los renglones al detectar `cancelada` y revertía consumos históricos como huérfanos.
+La prueba PostgreSQL falló antes del cambio y pasó después. Ahora exige disposición
+explícita; una omisión revierte la transacción y conserva stock/revisión anteriores.
+Se cubren preparado retenido, renglón retirado, devolución explícita y reintentos
+simultáneos. El cliente dejó de sumar existencias con recetas actuales al anular;
+el wrapper compatible sólo solicita conciliación por orden. Dos regresiones web
+reprodujeron la ruta incorrecta y el falso éxito ante inventario pendiente.
+
+La anulación comercial puede quedar confirmada con inventario pendiente y la
+pantalla lo comunica. Sigue abierta la captura/autorización de disposición por
+renglón para anulaciones completas, además del consumo del outbox Caja. Esta
+protección no declara H08 cerrado ni altera producción.
+
+Validación final: servidor **595/595**, web **3,716/3,716**, DOM **289/289**,
+TypeScript aprobado; PostgreSQL de materialización **17/17** y de conciliación
+de inventario **8/8**. Recorridos reales de Electron: Caja **23/23**, legacy
+**21/21**. Se adaptaron los selectores de apertura e hidratación del laboratorio
+al nuevo enlace de TurnoGate y se repitió todo el recorrido. La revisión
+adversarial detectó la entrada alternativa de apertura y no encontró otro
+bloqueo tras corregirla. El checkpoint anterior **28a866f0** también pasó CI,
+incluido multi-terminal **34472704800**. El instalador anterior no contiene esta
+tanda: requiere reconstrucción antes de presentarlo como el código actual.

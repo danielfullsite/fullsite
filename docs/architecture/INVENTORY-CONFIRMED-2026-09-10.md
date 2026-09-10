@@ -36,6 +36,17 @@ Errores de red, RPC ausente y clasificaciones bloqueadas dejan inventario pendie
 La venta/cancelación ya confirmada no se deshace por ese resultado. La interfaz
 ofrece reintento por identidad de orden sin enviar cantidades o ingredientes.
 
+La anulación completa también exige disposición por renglón. Un estado
+`cancelada` o una lista vacía no prueban devolución física: si el historial
+contiene consumo sin disposición, la transacción de conciliación falla y
+conserva stock y revisión completa anteriores. `retain_consumption` permanece
+consumido aun al retirar el renglón; `return_stock` revierte sólo el consumo
+histórico fijado. La pantalla legacy muestra inventario pendiente y ya no llama
+al cálculo por recetas actuales ni escribe existencias directamente al anular.
+La entrada de compatibilidad `reverseIngredientDeduction` sólo solicita R1 por
+identidad de orden y rechaza el resultado pendiente. Sigue faltando el flujo
+de autorización/captura de disposición para la anulación completa.
+
 ## Despliegue y evidencia
 
 Migraciones 20260910050000 y 20260910060000 permanecen PENDIENTES, junto con la

@@ -399,6 +399,17 @@ export default function TurnoGate({ staff, children }: TurnoGateProps) {
   }
 
   if (status === 'none' && canOpenTurno) {
+    // The turn screen confronts the opening cash with the previous Z and lets
+    // the operator supply the explanation required by Caja's durable command.
+    if (requiereCaja()) return (
+      <div className="h-dvh flex items-center justify-center bg-[var(--surface)] p-6">
+        <div className="max-w-sm text-center">
+          <h2 className="text-2xl font-bold mb-3">No hay turno abierto</h2>
+          <p className="mb-6">Revisa el último corte y registra el efectivo inicial para comenzar.</p>
+          <a href="/pos/turno" className="block rounded-xl bg-blue-600 px-4 py-4 font-bold text-white">Ir a abrir turno</a>
+        </div>
+      </div>
+    )
     const handleOpen = async () => {
       const fondo = parseFloat(fondoInicial)
       if (isNaN(fondo) || fondo < 0) {

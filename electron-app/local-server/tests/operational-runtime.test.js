@@ -408,7 +408,7 @@ test('Eduardo: shared order numbers survive retries/restart and restart at one a
   await s.send('ORDER_VOID', orderFields(2, { reason: 'Cancelar prueba' }))
   await s.send('ORDER_VOID', { order_id: 'second', turno_id: 't1', expected_revision: 1, reason: 'Cancelar prueba' })
   await s.send('TURN_CLOSE', { turno_id: 't1', counted_cash_cents: 10000 })
-  await s.send('TURN_OPEN', { turno_id: 't2', opening_cash_cents: 0 })
+  await s.send('TURN_OPEN', { turno_id: 't2', opening_cash_cents: 0, opening_reason: 'Resguardo después del corte' })
   const next = await s.send('ORDER_SAVE', saveFields(s, { order_id: 'new-turn', turno_id: 't2' }))
   assert.equal(next.result.operational_order.order_number, 1)
   assert.equal(s.state.getOrder('mother').order_number, 1)
@@ -420,6 +420,29 @@ test('Eduardo: shared order numbers survive retries/restart and restart at one a
   assert.equal(fourth.result.operational_order.order_number, 2)
 })
 
+
+test('Opening cash differences require a durable explanation against the last committed close', async t => {
+  let s = await setup(t)
+  await s.send('TURN_CLOSE', { turno_id: 't1', counted_cash_cents: 10000 })
+  s = await s.restart()
+  const fields = { turno_id: 'explained-turn', opening_cash_cents: 0 }
+  assert.equal((await s.send('TURN_OPEN', fields)).code, 'OPENING_REASON_REQUIRED')
+  assert.equal(s.state.getTurno(), null)
+  assert.equal((await s.send('TURN_OPEN', { ...fields, opening_reason: '   banco ' })).code, 'OPENING_REASON_REQUIRED')
+  const opened = await s.send('TURN_OPEN', { ...fields, command_id: 'explained-opening', opening_reason: '  Resguardo del efectivo en caja fuerte  ', previous_counted_cash_cents: 0 })
+  assert.ok(opened.result?.turno)
+  assert.deepEqual(opened.result.turno.opening_reconciliation, {
+    previous_turno_id: 't1', previous_counted_cash_cents: 10000, difference_cents: -10000,
+    reason: 'Resguardo del efectivo en caja fuerte',
+  })
+  s = await s.restart()
+  assert.deepEqual(s.state.getTurno(), opened.result.turno)
+  const retry = await s.send('TURN_OPEN', { ...fields, command_id: 'explained-opening', opening_reason: '  Resguardo del efectivo en caja fuerte  ', previous_counted_cash_cents: 0 })
+  assert.deepEqual(retry.result.turno, opened.result.turno)
+  const closed = await s.send('TURN_CLOSE', { turno_id: fields.turno_id, counted_cash_cents: 0 })
+  assert.deepEqual(closed.result.closed_turno.opening_reconciliation, opened.result.turno.opening_reconciliation)
+  assert.ok((await s.send('TURN_OPEN', { turno_id: 'small-difference', opening_cash_cents: 5000 })).result?.turno)
+})
 
 test('Order numbers serialize competing terminals, reject without consuming, and survive an empty salon snapshot', async t => {
   const s = await setup(t)

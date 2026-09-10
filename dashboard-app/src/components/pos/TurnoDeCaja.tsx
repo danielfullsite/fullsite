@@ -60,13 +60,11 @@ export default function TurnoDeCaja() {
           setError(veredictoDelFondo.motivo || 'Revisa el fondo de caja.')
           return
         }
-        await openTurno(cents / 100, '')
+        await openTurno(cents / 100, '', notes.trim())
         const abierto = (await leerTurnosCaja()).turno
         setTurno(abierto)
-        // El comando TURN_OPEN de Caja solo lleva `opening_cash_cents`, asi que la
-        // explicacion no cabe ahi sin cambiar el contrato del local-server y
-        // reinstalar. `logAudit` encola en IndexedDB si falla la red, asi que el
-        // rastro sobrevive igual a una apertura sin internet.
+        // La evidencia autoritativa ya viaja en TURN_OPEN. Esta auditoría es
+        // complementaria para las pantallas legacy; no confirma la apertura.
         logAudit({
           action: 'status_changed', actor: 'Caja',
           reason: notes.trim() || undefined,
@@ -105,6 +103,7 @@ export default function TurnoDeCaja() {
       <p className="mt-2">{connected ? turno ? 'Turno abierto y compartido con las terminales.' : 'No hay turno abierto.' : 'Sin conexión confirmada con Caja. La apertura y el cierre están bloqueados.'}</p>
       {error && <p role="alert" className="my-4 rounded-xl bg-red-500/10 p-3 text-red-600">{error}</p>}
       {turno && <p className="my-5">Fondo inicial: <strong>{pesosDeCentavos(turno.opening_cash_cents)}</strong></p>}
+      {turno?.opening_reconciliation?.reason && <p className="my-3">Motivo del fondo: {turno.opening_reconciliation.reason}</p>}
       <div className="my-6 rounded-2xl border border-[var(--line)] p-5 space-y-4">
         <label className="block">{turno ? 'Efectivo contado al cierre' : 'Fondo inicial en efectivo'}
           <input aria-label={turno ? 'Efectivo contado al cierre' : 'Fondo inicial en efectivo'} inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)}

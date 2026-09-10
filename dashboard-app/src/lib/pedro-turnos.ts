@@ -1,7 +1,10 @@
 import { getBridgeUrl } from './bridge-url'
 import { localNetworkFetch } from './local-network-fetch'
 import { ejecutarComandoCaja } from './pedro-comandos'
-export interface TurnoDeCaja { id: string; opened_at: string; opened_by: string; opening_cash_cents: number }
+export interface TurnoDeCaja {
+  id: string; opened_at: string; opened_by: string; opening_cash_cents: number
+  opening_reconciliation?: { previous_turno_id: string | null; previous_counted_cash_cents: number | null; difference_cents: number | null; reason: string }
+}
 export interface CierreDeCaja extends TurnoDeCaja {
   closed_at: string; closed_by: string; cash_sales_cents: number; total_paid_cents: number
   expected_cash_cents: number; counted_cash_cents: number; difference_cents: number; notes?: string

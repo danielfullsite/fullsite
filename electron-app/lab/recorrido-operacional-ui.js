@@ -14,7 +14,7 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     // current session. Wait for either the POS or a hydrated keypad.
     await until(async () => terminal.page.evaluate(() => {
       const enter = document.querySelector('button[aria-label="Entrar"]')
-      if (!enter) return [...document.querySelectorAll('button')].some(b => /Bebidas laboratorio|Cobrar|Confirmar cierre|Abrir turno|Confirmar movimiento/.test(b.textContent)) || /Corte de Caja|Último cierre confirmado/.test(document.body.innerText)
+      if (!enter) return [...document.querySelectorAll('button, a[href="/pos/turno"]')].some(b => /Bebidas laboratorio|Cobrar|Confirmar cierre|Abrir turno|Ir a abrir turno|Confirmar movimiento/.test(b.textContent)) || /Corte de Caja|Último cierre confirmado/.test(document.body.innerText)
       const digit = [...enter.parentElement.querySelectorAll('button')].find(b => b.textContent.trim() === '1')
       const props = digit && Object.keys(digit).find(k => k.startsWith('__reactProps'))
       return !!props && typeof digit[props]?.onClick === 'function'
@@ -54,10 +54,11 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
   }
   await check('Sin WAN se abre turno desde el botón de Caja y lo comparten tres terminales', async () => {
     await expect(caja.page.getByText('No hay turno abierto', { exact: true })).toBeVisible({ timeout: 30000 })
-    await caja.page.getByPlaceholder('0.00', { exact: true }).fill('500')
+    await caja.page.getByRole('link', { name: 'Ir a abrir turno', exact: true }).click()
+    await caja.page.getByLabel('Fondo inicial en efectivo', { exact: true }).fill('500')
     await caja.page.getByRole('button', { name: /Abrir turno/i }).click()
     await until(async () => (await snapshot()).turno?.opening_cash_cents === 50000, 'Turno durable desde UI')
-    for (const t of [pos2, pos3]) await t.page.goto(`${uiOrigin}/pos?mesa=1`, { waitUntil: 'domcontentloaded', timeout: navigationTimeout })
+    for (const t of [caja, pos2, pos3]) await t.page.goto(`${uiOrigin}/pos?mesa=1`, { waitUntil: 'domcontentloaded', timeout: navigationTimeout })
     await expect(pos2.page.getByRole('button', { name: /Bebidas laboratorio/ })).toBeVisible({ timeout: 30000 })
   })
   await check('POS 2 captura y guarda; POS 3 ve la misma cuenta antes de enviarla a cocina', async () => {
@@ -348,10 +349,18 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
       await ensureUnlocked(terminal)
       await expect(terminal.page.getByText('No hay turno abierto.', { exact: true })).toBeVisible()
     }
+    await caja.page.goto(`${uiOrigin}/pos/mesas`, { waitUntil: 'domcontentloaded', timeout: navigationTimeout })
+    await ensureUnlocked(caja)
+    await caja.page.getByRole('link', { name: 'Ir a abrir turno', exact: true }).click()
     await caja.page.getByLabel('Fondo inicial en efectivo', { exact: true }).fill('0')
     await caja.page.getByLabel('¿A dónde se fue (o de dónde salió) la diferencia?', { exact: true }).fill('Resguardo del efectivo después del corte de laboratorio')
     await caja.page.getByRole('button', { name: /Abrir turno/i }).click()
     await until(async () => (await snapshot()).turno !== null, 'Nuevo turno confirmado')
+    const opening = (await snapshot()).turno.opening_reconciliation
+    assert.equal(opening.previous_counted_cash_cents, 65900)
+    assert.equal(opening.difference_cents, -65900)
+    assert.equal(opening.reason, 'Resguardo del efectivo después del corte de laboratorio')
+    await expect(caja.page.getByText(`Motivo del fondo: ${opening.reason}`, { exact: true })).toBeVisible()
     await pos2.page.goto(`${uiOrigin}/pos?mesa=1`, { waitUntil: 'domcontentloaded', timeout: navigationTimeout })
     await addCoffee(pos2)
     await pos2.page.getByRole('button', { name: 'Guardar', exact: true }).click()

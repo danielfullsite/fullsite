@@ -12,7 +12,7 @@ Todos los comandos financieros exigen la transición explícita y una orden cuya
 
 | Comando | Intención y confirmación |
 | --- | --- |
-| `TURN_OPEN` | ID único de turno y fondo en centavos; exige permiso y ausencia de turno abierto. |
+| `TURN_OPEN` | ID único, fondo en centavos y `opening_reason`. Caja compara con el último cierre confirmado; una diferencia absoluta mayor a $50 exige al menos diez caracteres de motivo. El recibo conserva `opening_reconciliation` (turno anterior, conteo, diferencia y motivo), también al cerrar, reiniciar y materializar. Exige permiso y ausencia de turno abierto. |
 | `ORDER_SAVE` | ID de cuenta, turno, revisión, catálogo, mesa/nombre, personas, notas y líneas con ID de producto/opciones. Caja calcula precio e IVA desde su catálogo y confirma el consumo. Guardar no crea trabajo en cocina. |
 | `ORDER_SEND` | Cuenta y revisión. Confirma sólo las cantidades aún no enviadas, con IDs de ronda y renglón estables. |
 | `ORDER_MOVE` | Cuenta/revisión y destino libre. Conserva la identidad del consumo y libera la mesa anterior. |

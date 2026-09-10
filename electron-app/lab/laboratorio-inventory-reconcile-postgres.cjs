@@ -73,6 +73,25 @@ async function main(){
  assert.throws(()=>sql(call('prepared')),/CANCELLATION_DISPOSITION_REQUIRED/); assert.equal(stock(),9.5)
  console.log('PASS prepared cancellation retains physical consumption after removal; unspecified disposition stays pending')
 
+ sql(`insert into pos_orders(id,client_id,turno_id,items,order_revision) values('whole-void','a','test-turn',${quote(JSON.stringify([item]))}::jsonb,1);`)
+ sql(call('whole-void')); assert.equal(stock(),9)
+ sql("update pos_orders set status='cancelada',order_revision=2 where id='whole-void';")
+ assert.throws(()=>sql(call('whole-void')),/CANCELLATION_DISPOSITION_REQUIRED/)
+ assert.equal(stock(),9)
+ assert.equal(sql("select last_inventory_complete_revision from pos_orders where id='whole-void'"),'1')
+ sql(`update pos_orders set items=${quote(JSON.stringify([{...item,inventory_disposition:'retain_consumption'}]))}::jsonb where id='whole-void';`)
+ sql(call('whole-void')); sql(call('whole-void')); assert.equal(stock(),9)
+ sql("update pos_orders set items='[]'::jsonb,order_revision=3 where id='whole-void';")
+ sql(call('whole-void')); assert.equal(stock(),9)
+ sql(`insert into pos_orders(id,client_id,turno_id,items,order_revision) values('whole-return','a','test-turn',${quote(JSON.stringify([item]))}::jsonb,1);`)
+ sql(call('whole-return')); assert.equal(stock(),8.5)
+ sql("update pos_orders set status='cancelada',items='[]'::jsonb,order_revision=2 where id='whole-return';")
+ assert.throws(()=>sql(call('whole-return')),/CANCELLATION_DISPOSITION_REQUIRED/); assert.equal(stock(),8.5)
+ sql(`update pos_orders set items=${quote(JSON.stringify([{...item,inventory_disposition:'return_stock'}]))}::jsonb where id='whole-return';`)
+ const returns=await Promise.all([concurrent(call('whole-return')),concurrent(call('whole-return'))])
+ assert(returns.every(r=>r.code===0),JSON.stringify(returns)); assert.equal(stock(),9)
+ console.log('PASS whole-order void never invents a return; explicit disposition survives removal and concurrent retries')
+
 
 }
 main().catch(error=>{console.error(error);process.exitCode=1})

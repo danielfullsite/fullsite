@@ -53,17 +53,17 @@ BEGIN
   IF jsonb_typeof(v_items) != 'array' THEN RAISE EXCEPTION 'INVALID_ORDER_ITEMS'; END IF;
 
   -- ═══ STEP 4: Process current items ═══
-  IF NOT v_is_cancelled AND v_order.items IS NOT NULL THEN
+  IF v_order.items IS NOT NULL THEN
     FOR v_item IN SELECT * FROM jsonb_array_elements(v_items) LOOP
       v_item_id := v_item->>'id';
       v_menu_item_id := v_item->>'menuItemId';
       -- Canonical course separators have no merchandise or consumption.
       IF v_menu_item_id='__tiempo__' AND COALESCE((v_item->>'subtotal')::numeric,0)=0 THEN CONTINUE; END IF;
-      IF COALESCE((v_item->>'cancelled')::boolean, false) AND
+      IF (v_is_cancelled OR COALESCE((v_item->>'cancelled')::boolean, false)) AND
         COALESCE(v_item->>'inventory_disposition','pending') NOT IN ('return_stock','retain_consumption') THEN
         RAISE EXCEPTION 'CANCELLATION_DISPOSITION_REQUIRED';
       END IF;
-      v_desired := CASE WHEN COALESCE((v_item->>'cancelled')::boolean, false) AND v_item->>'inventory_disposition'='return_stock'
+      v_desired := CASE WHEN (v_is_cancelled OR COALESCE((v_item->>'cancelled')::boolean, false)) AND v_item->>'inventory_disposition'='return_stock'
         THEN 0 ELSE (v_item->>'cantidad')::numeric END;
 
       IF v_item_id IS NULL OR v_menu_item_id IS NULL THEN
@@ -77,7 +77,7 @@ BEGIN
       RETURN QUERY SELECT * FROM r1_reconcile_item(
         p_client_id, p_order_id, v_item_id, v_menu_item_id, v_desired, v_authority
       );
-      IF COALESCE((v_item->>'cancelled')::boolean, false) THEN
+      IF v_is_cancelled OR COALESCE((v_item->>'cancelled')::boolean, false) THEN
         UPDATE pos_reconciliation_results SET cancellation_disposition=v_item->>'inventory_disposition'
         WHERE client_id=p_client_id AND order_id=p_order_id AND order_item_id=v_item_id;
       END IF;
@@ -86,7 +86,7 @@ BEGIN
 
   -- ═══ STEP 5: Discover removed/cancelled items → desired=0 ═══
   FOR v_orphan IN
-    SELECT rr.order_item_id, rr.menu_item_id
+    SELECT rr.order_item_id, rr.menu_item_id, rr.cancellation_disposition
     FROM pos_reconciliation_results rr
     WHERE rr.client_id = p_client_id
       AND rr.order_id = p_order_id
@@ -94,6 +94,11 @@ BEGIN
       AND rr.cancellation_disposition IS DISTINCT FROM 'retain_consumption'
       AND (rr.applied_consumption > 0 OR rr.pinned_mode IS NOT NULL)
   LOOP
+    -- An empty cancelled order is not evidence that consumed goods came back.
+    -- Fail the entire transaction rather than infer a physical disposition.
+    IF v_is_cancelled AND v_orphan.cancellation_disposition IS DISTINCT FROM 'return_stock' THEN
+      RAISE EXCEPTION 'CANCELLATION_DISPOSITION_REQUIRED';
+    END IF;
     RETURN QUERY SELECT * FROM r1_reconcile_item(
       p_client_id, p_order_id, v_orphan.order_item_id, v_orphan.menu_item_id, 0::numeric, v_authority
     );

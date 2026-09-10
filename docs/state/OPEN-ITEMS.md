@@ -52,9 +52,9 @@ Fuente y aceptación de cada H: [Huecos actuales y condiciones de cierre](../aud
 | H03 | Tarjeta/proveedores, pago mixto y propinas por Caja | ⬜ función pendiente |
 | H04 | Transferencia legacy atómica; faltan transferir/unir/cancelar consumo individual en Caja | 🔶 parcial probado |
 | H05 | Papel/cajón y resolución autorizada implementados; falta aceptación de dispositivos físicos | 🔶 software probado; hardware pendiente |
-| H06 | Retiros, depósitos y X/Z integrados; falta cierre con todos los medios/propinas | 🔶 parcial probado |
+| H06 | Retiros, depósitos y X/Z integrados; apertura confrontada con motivo durable en Caja. Falta cierre con todos los medios/propinas | 🔶 parcial probado |
 | H07 | Entrada de delivery y otros canales al escritor Caja | ⬜ integración pendiente |
-| H08 | Movimiento manual atómico y conciliación legacy probados; falta consumo del outbox Caja y casos de recetas | 🔶 parcial probado |
+| H08 | Movimiento manual atómico y conciliación legacy probados; anulación completa sin disposición conserva stock y queda pendiente. Faltan captura/autorización de disposición, consumo del outbox Caja y casos de recetas | 🔶 parcial probado |
 | H09 | Proxy y relaciones acotados; falta matriz completa de APIs/empleados y enforcement restante | 🔶 parcial probado |
 | H10 | Aislamiento y recuperación de MP/Clip/CFDI/delivery | ⬜ implementación y sandbox |
 | H11 | Alta reanudable y activación atómica probadas; falta recuperación de credencial perdida y enrolamiento/primera venta | 🔶 parcial probado |

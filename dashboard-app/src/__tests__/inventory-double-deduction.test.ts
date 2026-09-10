@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { deductIngredientsForOrder, type OrderItem } from '@/lib/pos-data'
+import { deductIngredientsForOrder, reverseIngredientDeduction, type OrderItem } from '@/lib/pos-data'
 
 const item = { id: 'line-a', menuItemId: 'menu-a', nombre: 'Café', cantidad: 2 } as OrderItem
 const complete = () => Response.json({ inventory_pending: false, inventory_status: 'COMPLETE' })
@@ -10,6 +10,19 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks() })
 
 describe('automatic sale inventory uses canonical server reconciliation', () => {
+  it('whole-order reversal cannot use current recipes or browser quantities to return stock', async () => {
+    const requests = vi.fn(async () => complete())
+    vi.stubGlobal('fetch', requests)
+    await reverseIngredientDeduction({ ...item, cantidad: 999 }, 'void-a', 'browser-manager', 'void')
+    expect(requests).toHaveBeenCalledTimes(1)
+    const [url, options] = requests.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('/api/pos/inventory/reconcile')
+    expect(JSON.parse(String(options.body))).toEqual({ order_id: 'void-a' })
+  })
+  it('unresolved cancellation disposition does not report a successful stock return', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ inventory_pending: true, inventory_status: 'PENDING' })))
+    await expect(reverseIngredientDeduction(item, 'void-a', 'manager', 'void')).rejects.toThrow('pendiente')
+  })
   it('sends only order identity and authenticated session, never supplied items, actor, batch or stock', async () => {
     const requests = vi.fn(async () => complete())
     vi.stubGlobal('fetch', requests)

@@ -355,10 +355,12 @@ async function main() {
   })
   await check('Z resets the canonical ordinal in the same business day with the real daily trigger and index', async () => {
     const nextTurn = randomUUID(), nextOrder = randomUUID()
-    assert.ok((await command('TURN_OPEN', { turno_id: nextTurn, opening_cash_cents: 0 })).result)
+    const opening = await command('TURN_OPEN', { turno_id: nextTurn, opening_cash_cents: 0, opening_reason: 'Resguardo después del corte' })
+    assert.ok(opening.result)
     assert.ok((await command('ORDER_SAVE', { turno_id: nextTurn, order_id: nextOrder, expected_revision: 0,
       catalog_revision: catalog.read().revision, mesa: 1, items: [{ line_id: 'next-coffee', product_id: 'coffee', quantity: 1 }] })).result)
     assert.equal((await worker.flush()).confirmed, 2)
+    assert.deepEqual(scalar(`select caja_snapshot->'opening_reconciliation' from pos_turnos where id=${quote(nextTurn)}`), opening.result.turno.opening_reconciliation)
     const rows = scalar(`select json_agg(o order by id) from (select id,order_number,dia_venta from pos_orders where id in (${quote(orderId)},${quote(nextOrder)})) o`)
     assert.equal(rows.length, 2)
     assert(rows.every(o => o.order_number === 1))

@@ -21,7 +21,6 @@ import {
   addOrderItems,
   logAudit,
   deductIngredientsForOrder,
-  reverseIngredientDeduction,
   deductMarketStockForOrder,
   getRecipes,
   getIngredients,
@@ -3077,7 +3076,9 @@ function POSContent() {
     operationLock.current = true
     setSaving(true)
     // Mark order as cancelled via revision-aware boundary (reconciliation-relevant status)
+    let inventoryPending = false
     if (loadedOrderId) {
+      inventoryPending = true
       const voidOpId = genOpId()
       const voidPayload = {
         order_id: loadedOrderId,
@@ -3104,6 +3105,7 @@ function POSContent() {
           return
         }
         if (voidResult.revision != null) setOrderRevision(voidResult.revision)
+        inventoryPending = voidResult.inventory_status !== 'COMPLETE'
       } catch (err) {
         // Offline: un fetch desnudo dejaba operationLock=true para siempre (terminal
         // congelada) y perdia la anulacion. Encola el cancel para replay idempotente
@@ -3151,22 +3153,15 @@ function POSContent() {
         after: { qty: 0, cancelled: true },
       })
     }
-    // R0.5 RESOLVED: Reverse deductions for items that were sent to kitchen.
-    // Void = entire order cancelled before payment, stock should come back.
-    const sentItems = orderItems.filter(i => sentItemIds.has(i.id) && !cancelledItems.has(i.id) && !voidedItems.has(i.id))
-    if (sentItems.length > 0) {
-      for (const item of sentItems) {
-        reverseIngredientDeduction(item, loadedOrderId || '', managerName, reason)
-          .catch(err => console.error('[inventory] Order void reversal error (non-blocking):', err))
-      }
-    }
+    // save-order reconciles committed inventory. A paid/prepared dish is not
+    // physical stock returned; missing disposition remains explicitly pending.
     setOrderItems([])
     setCancelledItems(new Set())
     setVoidedItems(new Set())
     setDiscount(0)
     setOrderNotes('')
     setShowVoidOrder(false)
-    showToast(`Orden anulada — aprobado por ${managerName}`)
+    showToast(`Orden anulada — aprobado por ${managerName}${inventoryPending ? '. Inventario pendiente de conciliación.' : ''}`)
     setSaving(false); operationLock.current = false
   }, [orderId, mesero, mesa, orderItems, loadedOrderId, saving, sentItemIds, validarCuentaCaja, bloqueaLegacyCaja, turnoId, olvidarCuentaCerrada])
 

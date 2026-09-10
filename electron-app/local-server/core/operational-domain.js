@@ -107,7 +107,16 @@ class OperationalDomain {
     if (type === 'TURN_OPEN') {
       if (turno) fail('TURN_ALREADY_OPEN', 'Ya existe un turno; abre el turno actual')
       if (state.hasTurnIdentity?.(turnoId)) fail('TURN_ID_REUSED', 'El turno nuevo requiere una identidad nueva')
-      return { turno: { id: turnoId, opened_by: actor.id, opened_at: now, opening_cash_cents: int(payload.opening_cash_cents ?? 0, 'opening_cash_cents'), authority: 'caja' } }
+      const opening = int(payload.opening_cash_cents ?? 0, 'opening_cash_cents')
+      const reason = note(payload.opening_reason, 'opening_reason').trim()
+      // Compare with committed history, never a browser-provided balance. This
+      // evidence travels with the opening receipt, its replicas and its outbox.
+      const previous = state.toSnapshot().turn_summaries.at(-1)
+      const counted = previous ? int(previous.counted_cash_cents, 'previous_counted_cash_cents') : null
+      const difference = counted === null ? null : opening - counted
+      if (difference !== null && Math.abs(difference) > 5000 && reason.length < 10) fail('OPENING_REASON_REQUIRED', 'Explica con al menos 10 caracteres la diferencia de más de $50 contra el último corte.')
+      return { turno: { id: turnoId, opened_by: actor.id, opened_at: now, opening_cash_cents: opening, authority: 'caja',
+        opening_reconciliation: { previous_turno_id: previous?.id ?? null, previous_counted_cash_cents: counted, difference_cents: difference, reason } } }
     }
     if (!turno || turno.id !== turnoId) fail('TURNO_MISMATCH', 'La operación debe pertenecer al turno actual de Caja')
     if (type === 'CASH_MOVEMENT') {

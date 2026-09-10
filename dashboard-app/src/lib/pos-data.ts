@@ -628,7 +628,7 @@ export function olvidarTurnoPendiente(): void {
  * está encolado. La UI debe decirlo — "abrió" y "quedó registrado en el server"
  * no son lo mismo, y confundirlos produjo el "abrí turno y luego no había turno".
  */
-export async function openTurno(fondoInicial: number, openedBy: string): Promise<{ id: string; fondo_inicial: number; opened_by: string; opened_at: string; sincronizado?: boolean } | null> {
+export async function openTurno(fondoInicial: number, openedBy: string, openingReason = ''): Promise<{ id: string; fondo_inicial: number; opened_by: string; opened_at: string; sincronizado?: boolean } | null> {
   if (requiereCaja()) {
     const { leerSalon } = await import('./pedro-cliente')
     const local = await leerSalon()
@@ -638,7 +638,7 @@ export async function openTurno(fondoInicial: number, openedBy: string): Promise
       if (local.turno) return (await getActiveTurnos())[0] ?? null
       const opening = Math.round(fondoInicial * 100)
       if (!Number.isSafeInteger(opening) || opening < 0 || Math.abs(fondoInicial * 100 - opening) > 1e-7) throw new Error('El fondo debe ser un importe válido con hasta dos decimales.')
-      const receipt = await ejecutarComandoCaja('turn:open', 'TURN_OPEN', { turno_id: idParaAbrirTurno(), opening_cash_cents: opening })
+      const receipt = await ejecutarComandoCaja('turn:open', 'TURN_OPEN', { turno_id: idParaAbrirTurno(), opening_cash_cents: opening, opening_reason: openingReason })
       const t = receipt.result.turno as Record<string, unknown> | undefined
       if (!t?.id || !t.opened_at || !Number.isSafeInteger(t.opening_cash_cents)) throw new Error('Caja no confirmó la apertura de turno.')
       const confirmed = { id: String(t.id), fondo_inicial: Number(t.opening_cash_cents) / 100, opened_by: String(t.opened_by), opened_at: String(t.opened_at), sincronizado: false }
@@ -2688,64 +2688,16 @@ export async function deductIngredientsForOrder(
   } catch { return pending }
 }
 
-/** Reverse ingredient deduction for a cancelled item (return stock) */
+/** Compatibility entry point: only committed disposition and historical R1
+ * consumption may decide a return. Never rebuild stock from today's recipes. */
 export async function reverseIngredientDeduction(
-  item: OrderItem,
+  _item: OrderItem,
   orderId: string,
-  actor: string,
-  reason: string,
+  _actor: string,
+  _reason: string,
 ): Promise<void> {
-  try {
-    const recipes = await getRecipes()
-    const inventory = await getInventory()
-    const invMap = new Map(inventory.map(i => [i.ingredient_id, i]))
-
-    const normalizeRecipeName = (n: string) => n.toLowerCase()
-      .replace(/^sprw\s*-\s*/i, '').replace(/\s*\(.*?\)\s*/g, ' ')
-      .replace(/\s*(14oz|16oz|12oz|360\s*ml|240\s*ml|180\s*ml|450\s*ml)\s*/gi, ' ')
-      .replace(/\s*(caliente|frio|fría|helado|servido)\s*/gi, ' ')
-      .replace(/\s+/g, ' ').trim()
-
-    const recipesByName = new Map<string, typeof recipes>()
-    for (const r of recipes) {
-      const key = r.menu_item_name.toLowerCase()
-      if (!recipesByName.has(key)) recipesByName.set(key, [])
-      recipesByName.get(key)!.push(r)
-      const norm = normalizeRecipeName(r.menu_item_name)
-      if (!recipesByName.has(norm)) recipesByName.set(norm, [])
-      recipesByName.get(norm)!.push(r)
-    }
-
-    const itemName = item.nombre.toLowerCase()
-    const aliases = RECIPE_ALIASES[itemName]
-    let recipeRows: typeof recipes = []
-    if (aliases) {
-      for (const alias of aliases) {
-        const rows = recipesByName.get(alias.toLowerCase())
-        if (rows && rows.length > 0) { recipeRows = rows; break }
-      }
-    }
-    if (recipeRows.length === 0) recipeRows = recipesByName.get(itemName) ?? []
-    if (recipeRows.length === 0) recipeRows = recipesByName.get(normalizeRecipeName(item.nombre)) ?? []
-
-    for (const row of recipeRows) {
-      const qty = row.quantity * (item.cantidad || 1)
-      const inv = invMap.get(row.ingredient_id)
-      if (inv) {
-        await updateInventoryStock(row.ingredient_id, inv.stock + qty)
-        await logInventoryMovement({
-          ingredient_id: row.ingredient_id,
-          movement_type: 'adjustment',
-          quantity: qty,
-          order_id: orderId,
-          actor,
-          notes: `Cancelacion: ${item.nombre} — ${reason}`,
-        })
-      }
-    }
-  } catch (err) {
-    console.warn('[reverseIngredientDeduction] Failed:', err)
-  }
+  const result = await deductIngredientsForOrder([], orderId, '')
+  if (!result.success) throw new Error('Inventario pendiente de conciliación; no se confirmó devolución de existencias.')
 }
 
 export async function getInventoryMovements(limit = 50): Promise<InventoryMovement[]> {
