@@ -297,7 +297,10 @@ async function fixtureRoute(route, uiOrigin, pedroPorts) {
   if (nube && url.origin === nube.origin && url.pathname.startsWith('/renderer/')) return route.continue()
   if (url.pathname.startsWith('/rest/v1/') || url.pathname.startsWith('/api/') || url.pathname.startsWith('/auth/')) {
     if (!wan) return route.abort('internetdisconnected')
-    return route.continue({ url: `${nube.origin}/renderer${url.pathname}${url.search}` })
+    // The original full-page referrer violates Chromium's cross-origin policy
+    // after this test-only redirect. Strip it; keep browser security enabled.
+    return route.continue({ url: `${nube.origin}/renderer${url.pathname}${url.search}`,
+      headers: { ...request.headers(), referer: undefined } })
   }
   if (url.origin === uiOrigin) return route.continue()
   return route.abort('blockedbyclient')
