@@ -1,5 +1,7 @@
 'use client'
 
+import ReportUnavailable from '@/components/ReportUnavailable'
+
 import { useEffect, useState } from 'react'
 import { Building2, TrendingUp, Users, UtensilsCrossed, DollarSign } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
@@ -25,6 +27,7 @@ interface LocationStats {
 export default function SucursalesPage() {
   const { clientId, locations } = useAuth()
   const [stats, setStats] = useState<LocationStats[]>([])
+  const [reportError, setReportError] = useState(false)
   const [loading, setLoading] = useState(true)
   const [days, setDays] = useState(30)
 
@@ -35,7 +38,8 @@ export default function SucursalesPage() {
     }
 
     async function loadAll() {
-      setLoading(true)
+      setReportError(false)
+    setLoading(true)
       const results: LocationStats[] = []
 
       for (const loc of locations) {
@@ -70,8 +74,10 @@ export default function SucursalesPage() {
       setLoading(false)
     }
 
-    loadAll()
+    loadAll().catch(() => { setReportError(true); setLoading(false) })
   }, [clientId, locations, days])
+
+  if (reportError) return <ReportUnavailable />
 
   if (loading) {
     return <div className="flex items-center justify-center h-96"><div className="w-10 h-10 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>

@@ -1,6 +1,8 @@
 import { NextRequest } from 'next/server'
 import { withPOSAuth, unauthorized } from '@/lib/api-auth'
 import { verifyShiftToken } from '@/lib/shift-token'
+import { prepararCancelacionItem } from '@/lib/cancelacion-item'
+import { reconciliarInventarioConfirmado } from '@/lib/inventory-reconcile-server'
 
 // Nivel de rol por nombre (gerente/admin = manager+). Debe coincidir con pin/route.ts.
 const ROLE_LVL: Record<string, number> = { mesero: 1, cajero: 2, capitan: 3, gerente: 4, admin: 5 }
@@ -32,7 +34,7 @@ export async function POST(request: NextRequest) {
     const clientId = auth.clientId
 
     const body = await request.json()
-    const { order_id, item_id, voided, operation_id, mesero, reason, manager, approval_token, offline_approved } = body
+    const { order_id, item_id, prepared, voided, operation_id, mesero, reason, manager, approval_token, offline_approved } = body
 
     if (!order_id || !item_id) {
       return Response.json({ ok: false, error: 'MISSING_PARAMS' }, { status: 400 })
@@ -76,7 +78,7 @@ export async function POST(request: NextRequest) {
 
     // ── Step 1: Read order with current updated_at ──
     const readRes = await fetch(
-      `${sbUrl}/rest/v1/pos_orders?id=eq.${order_id}&client_id=eq.${clientId}&select=id,items,updated_at,order_revision&limit=1`,
+      `${sbUrl}/rest/v1/pos_orders?id=eq.${order_id}&client_id=eq.${clientId}&select=*&limit=1`,
       { headers, cache: 'no-store' }
     )
     if (!readRes.ok) return Response.json({ ok: false, error: 'READ_FAILED' }, { status: 502 })
@@ -85,21 +87,16 @@ export async function POST(request: NextRequest) {
       return Response.json({ ok: false, error: 'ORDER_NOT_FOUND' }, { status: 404 })
     }
 
-    const { items: rawItems, updated_at: updatedAt, order_revision: revisionActual } = rows[0]
-    const items: Array<Record<string, unknown>> =
-      typeof rawItems === 'string' ? JSON.parse(rawItems) : (rawItems || [])
-
-    const targetIndex = items.findIndex(i => i.id === item_id)
-    if (targetIndex === -1) {
-      // Item already gone — treat as success (idempotent)
-      return Response.json({ ok: true, already_applied: true })
+    const order = rows[0]
+    const { updated_at: updatedAt, order_revision: revisionActual } = order
+    let cancellation
+    try { cancellation = prepararCancelacionItem(order, item_id, { prepared, voided, reason }) }
+    catch (error) { return Response.json({ ok: false, error: error instanceof Error ? error.message : 'INVALID_ORDER' }, { status: 409 }) }
+    if (cancellation.alreadyApplied) {
+      const inventory = await reconciliarInventarioConfirmado(clientId, order_id)
+      return Response.json({ ok: true, already_applied: true, revision: order.order_revision, order, ...inventory })
     }
-    const targetItem = items[targetIndex]
-
-    // ── Step 2: Mark item cancelled or voided ──
-    const newItems = items.map((i, idx) =>
-      idx === targetIndex ? { ...i, cancelled: true } : i
-    )
+    const targetItem = cancellation.item!
 
     // ── Step 3: PATCH with OCC guard ──
     const patchRes = await fetch(
@@ -108,7 +105,7 @@ export async function POST(request: NextRequest) {
         method: 'PATCH',
         headers: { ...headers, Prefer: 'return=representation' },
         body: JSON.stringify({
-          items: JSON.stringify(newItems),
+          ...cancellation.patch,
           updated_at: new Date().toISOString(),
           // UNA CANCELACION ES UNA REVISION DE LA ORDEN, Y NO LO ERA.
           //
@@ -146,6 +143,10 @@ export async function POST(request: NextRequest) {
         message: 'La orden fue modificada por otra terminal. La cancelación se aplicó localmente y se reintentará.',
       }, { status: 409 })
     }
+
+    try {
+      if (patchRows[0].id !== order_id || !prepararCancelacionItem(patchRows[0], item_id).alreadyApplied) throw new Error('INVALID_RECEIPT')
+    } catch { return Response.json({ ok: false, error: 'PATCH_UNCONFIRMED' }, { status: 502 }) }
 
     // ── Step 4: Audit log (best-effort, non-blocking) ──
     try {
@@ -195,6 +196,7 @@ export async function POST(request: NextRequest) {
             revisar: approvalMode.startsWith('offline_device_trust')
               && (ROLE_LVL[String(auth.role)] || 0) < 4,
             voided: !!voided,
+            prepared: typeof prepared === 'boolean' ? prepared : null,
             operation_id,
           },
         }),
@@ -203,10 +205,13 @@ export async function POST(request: NextRequest) {
 
     // La revision nueva viaja de vuelta para que quien cancelo actualice su copia y
     // su PROXIMO guardado no choque contra el avance que acaba de provocar.
+    const inventory = await reconciliarInventarioConfirmado(clientId, order_id)
     return Response.json({
       ok: true,
       item_name: targetItem.nombre || targetItem.name,
-      revision: (Number(revisionActual) || 0) + 1,
+      revision: patchRows[0].order_revision,
+      order: patchRows[0],
+      ...inventory,
     })
   } catch (err) {
     console.error('[cancel-item] Unhandled error:', err)

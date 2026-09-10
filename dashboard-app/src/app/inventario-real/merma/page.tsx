@@ -1,5 +1,7 @@
 'use client'
 
+import PendingMovementRecovery from '@/components/inventory/PendingMovementRecovery'
+
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { Search, Save, Trash2, Plus, AlertTriangle, Loader2, PackageX, ChevronDown, Clock, TrendingDown, DollarSign, BarChart3 } from 'lucide-react'
 import { getActiveClientSlug } from '@/lib/data'
@@ -8,7 +10,7 @@ import { formatCurrency, formatNumber } from '@/lib/format'
 import PageHeader from '@/components/PageHeader'
 import KPICard from '@/components/KPICard'
 import { sbPost } from '@/lib/supabase-helpers'
-import { recordMovement, loadInventoryWithStock, makeIdempotencyKey } from '@/lib/inventory'
+import { confirmarMovimientoInventario, recordMovement, loadInventoryWithStock, makeIdempotencyKey } from '@/lib/inventory'
 import type { MovementResult } from '@/lib/inventory'
 import { useClaveDeOperacion } from '@/lib/clave-de-operacion'
 
@@ -299,6 +301,7 @@ export default function MermaPage() {
       })
 
       if (movResult.was_duplicate) {
+        await confirmarMovimientoInventario(clientId, idempotencyKey)
         confirmarOperacion()   // terminal: quedo registrada antes
         setSaveMessage({ type: 'success', text: 'Esta merma ya fue registrada anteriormente.' })
         setItems([])
@@ -344,6 +347,8 @@ export default function MermaPage() {
         type: 'success',
         text: `Merma registrada: ${items.length} productos por ${formatCurrency(grandTotal)}. Stock actualizado.`,
       })
+      await confirmarMovimientoInventario(clientId, idempotencyKey)
+      confirmarOperacion()
       setWasteHistory(prev => [{
         data_key: `inventory_waste_${todayISO()}_${claveDeOperacion}`,
         fecha: todayISO(),
@@ -372,6 +377,7 @@ export default function MermaPage() {
 
   return (
     <div className="space-y-6 pb-24">
+      <PendingMovementRecovery />
       <PageHeader
         title="Merma y Desperdicios"
         subtitle="Registro de perdidas"

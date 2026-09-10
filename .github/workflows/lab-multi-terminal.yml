@@ -162,6 +162,10 @@ jobs:
         run: node electron-app/lab/run-transfer-item-local.cjs
       - name: Probar aislamiento de proxy y tablas hijas en PostgreSQL temporal
         run: node electron-app/lab/run-scoped-upsert-local.cjs
+      - name: Probar movimientos y cancelaciones de inventario en PostgreSQL temporal
+        run: |
+          node electron-app/lab/run-inventory-movement-local.cjs
+          node electron-app/lab/run-inventory-reconcile-local.cjs
       - name: Instalar runtime del materializador
         run: npm ci
         working-directory: electron-app
@@ -175,3 +179,5 @@ jobs:
             output/closure/transfer-item
             output/closure/materializer
             output/closure/scoped-upsert
+            output/closure/inventory-movement
+            output/closure/inventory-reconcile

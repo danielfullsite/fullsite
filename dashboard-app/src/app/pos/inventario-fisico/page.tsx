@@ -1,6 +1,9 @@
 'use client'
 
+import PendingMovementRecovery from '@/components/inventory/PendingMovementRecovery'
+
 import { useState, useEffect } from 'react'
+import { useClaveDeOperacion } from '@/lib/clave-de-operacion'
 import { Search, Check, ArrowLeft, AlertTriangle, Package } from 'lucide-react'
 import { getIngredients, getInventory, logAudit } from '@/lib/pos-data'
 import { formatCurrency } from '@/lib/format'
@@ -21,6 +24,7 @@ interface InventoryItem {
 }
 
 export default function InventarioFisicoPage() {
+  const { clave: claveDeOperacion, confirmar: confirmarOperacion } = useClaveDeOperacion()
   const [items, setItems] = useState<InventoryItem[]>([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
@@ -70,7 +74,7 @@ export default function InventarioFisicoPage() {
       // Contrato de inventario (AGENTS.md): un solo recordMovement de ajuste (delta = físico −
       // sistema) escribe el ledger + fija el stock atómico + idempotencia. Antes: PATCH directo
       // a pos_inventory + insert al ledger por separado — prohibido (corrompe stock, sin idempotencia).
-      const { recordMovement } = await import('@/lib/inventory')
+      const { recordMovement, confirmarMovimientoInventario } = await import('@/lib/inventory')
       const lines = counted
         .map(item => ({ item, diff: (item.physical || 0) - item.stock }))
         .filter(x => Math.abs(x.diff) > 0.001)
@@ -79,9 +83,9 @@ export default function InventarioFisicoPage() {
           quantity: diff,   // + sube / − baja: ajuste al conteo físico
           notes: `Conteo físico: sistema ${item.stock.toFixed(2)} → físico ${(item.physical || 0).toFixed(2)} (diff: ${diff > 0 ? '+' : ''}${diff.toFixed(2)})`,
         }))
+      const idempotency_key = `conteo-${claveDeOperacion}`
+      const balances = new Map<string, number>()
       if (lines.length > 0) {
-        const idempotency_key = `conteo-${new Date().toISOString().split('T')[0]}-` +
-          lines.map(l => `${l.ingredient_id}:${l.quantity.toFixed(3)}`).join('|').slice(0, 140)
         const invResult = await recordMovement({
           client_id: _cid(), movement_type: 'adjustment', actor: 'almacén', idempotency_key, lines,
           metadata: { source: 'pos/inventario-fisico' },
@@ -91,12 +95,16 @@ export default function InventarioFisicoPage() {
           alert(`Error al guardar conteo: ${invResult.errors[0] || 'desconocido'}`)
           return
         }
+        for (const detail of invResult.details) balances.set(detail.ingredient_id, detail.stock_after)
       }
       logAudit({
         action: 'conteo_fisico' as any,
         actor: 'almacén',
         details: { items_counted: counted.length, differences: differences.length, cost_diff: totalDiffCost },
       })
+      await confirmarMovimientoInventario(_cid(), idempotency_key)
+      confirmarOperacion()
+      setItems(previous => previous.map(item => ({ ...item, stock: balances.get(item.ingredient_id) ?? item.stock, physical: undefined })))
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
     } catch (err) {
@@ -110,6 +118,7 @@ export default function InventarioFisicoPage() {
 
   return (
     <div className="h-dvh overflow-y-auto pos-fat-scroll max-w-4xl mx-auto">
+      <PendingMovementRecovery />
       <div className="flex items-center gap-3 mb-6">
         <Link href="/pos" className="p-2 rounded-lg hover:bg-[var(--surface-2)] text-[var(--text-3)]"><ArrowLeft size={16} /></Link>
         <div>

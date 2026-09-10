@@ -337,6 +337,12 @@
   function getIState(oid, key){
     var order=lastGood.find(function(o){return o.id===oid;});
     if(order&&order.authority==='caja') { var it=parseItems(order.items).find(function(i){return i.id===key;}); var status=it&&it.preparation_status; return status==='lista'||status==='entregada'?'listo':status==='preparando'?'preparando':'nueva'; }
+    if(order) {
+      var transferred=parseItems(order.items).find(function(i){return i.id===key;});
+      var confirmed=transferred&&transferred.preparation_status;
+      if(confirmed==='lista'||confirmed==='entregada') return 'listo';
+      if(confirmed==='preparando'&&!(local[oid]&&local[oid][key])) return 'preparando';
+    }
     return (local[oid] && local[oid][key]) || "nueva";
   }
   function setIState(oid, key, st){ (local[oid]=local[oid]||{})[key]=st; saveLocal(local); }

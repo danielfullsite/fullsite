@@ -143,10 +143,9 @@ export function puedeEscribirEn(table: string, role: string | null | undefined):
  * total desde los renglones — sólo que ese detector vive en la ruta de guardado, y este
  * camino la rodea por completo.
  *
- * Se prohíben por COLUMNA y no por tabla a propósito: una lista de lo prohibido deja pasar
- * cualquier columna legítima que aún no conozcamos, mientras que una lista de lo permitido
- * rompería el POS en cuanto alguien agregue un campo. En un restaurante, un 403 a media
- * comanda cuesta más que el hueco.
+ * El proxy no es una API de guardado: para roles operativos sólo admite
+ * kds_item_status y mesero. Nuevas columnas de consumo o finanzas deben usar
+ * el contrato de guardado, no heredar autorización por estar ausentes de una lista.
  *
  * Verificado el 2026-09-08: las ÚNICAS escrituras del cliente a `pos_orders` que pasan por
  * aquí son `kds_item_status` (cocina marcando, kds/page.tsx:332) y `mesero`
@@ -220,7 +219,7 @@ export function camposProhibidos(table: string, role: string | null | undefined,
     if (intentaReabrir(table, obj)) encontradas.add(`${REABRIR_SOLO_GERENTE[table]} (reabrir)`)
     if (!vetadas) continue
     for (const col of Object.keys(obj)) {
-      if (vetadas.includes(col)) encontradas.add(col)
+      if (vetadas.includes(col) || (table === 'pos_orders' && !['kds_item_status', 'mesero'].includes(col))) encontradas.add(col)
     }
   }
   return [...encontradas]

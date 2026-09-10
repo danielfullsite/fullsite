@@ -1,12 +1,14 @@
 'use client'
 
+import PendingMovementRecovery from '@/components/inventory/PendingMovementRecovery'
+
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { Plus, Trash2, Search, Save, PackageCheck, Loader2 } from 'lucide-react'
 import { getActiveClientSlug } from '@/lib/data'
 import { formatCurrency } from '@/lib/format'
 import PageHeader from '@/components/PageHeader'
 import { sbPost, sbGet } from '@/lib/supabase-helpers'
-import { recordMovement, loadInventoryWithStock, makeIdempotencyKey } from '@/lib/inventory'
+import { confirmarMovimientoInventario, recordMovement, loadInventoryWithStock, makeIdempotencyKey } from '@/lib/inventory'
 import type { MovementResult } from '@/lib/inventory'
 import { useClaveDeOperacion } from '@/lib/clave-de-operacion'
 
@@ -228,6 +230,7 @@ export default function EntradasPage() {
         // Terminal: quedo registrada (antes). Lo siguiente que se capture es otra
         // operacion, asi que la clave se renueva -- si no, la proxima entrada legitima
         // se descartaria como duplicado, que es el error opuesto y tambien cuesta.
+        await confirmarMovimientoInventario(clientId, idempotencyKey)
         confirmarOperacion()
         setSaveMessage({ type: 'duplicate', text: 'Esta entrada ya fue registrada anteriormente.' })
         setItems([])
@@ -290,6 +293,7 @@ export default function EntradasPage() {
       })
 
       // Reset form
+      await confirmarMovimientoInventario(clientId, idempotencyKey)
       confirmarOperacion()   // guardado confirmado: la proxima captura es otra operacion
       setItems([])
       setNotes('')
@@ -315,6 +319,7 @@ export default function EntradasPage() {
 
   return (
     <div className="space-y-6 pb-24">
+      <PendingMovementRecovery />
       <PageHeader
         title="Entrada de Mercancia"
         subtitle={`${products.length} productos disponibles · ${suppliers.length} proveedores`}

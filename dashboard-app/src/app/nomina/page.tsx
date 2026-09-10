@@ -1,5 +1,7 @@
 'use client'
 
+import ReportUnavailable from '@/components/ReportUnavailable'
+
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { Users, Clock, DollarSign, TrendingUp, Calendar, AlertTriangle, ChevronDown, Download, Wallet, Receipt, UserCheck, Timer } from 'lucide-react'
 import { getRecentDays, getLatestDeep, getWansoftData, getWansoftDataRange, getDateRange, aggregateMeseros, getDashboardFromPosOrders } from '@/lib/data'
@@ -93,6 +95,7 @@ export default function NominaPage() {
   const [hoursWorked, setHoursWorked] = useState<LaborEntry[]>([])
   const [hoursHistory, setHoursHistory] = useState<{ fecha: string; data: LaborEntry[] }[]>([])
   const [shifts, setShifts] = useState<ShiftEntry[]>([])
+  const [reportError, setReportError] = useState(false)
   const [loading, setLoading] = useState(true)
   const [fecha, setFecha] = useState('')
 
@@ -106,6 +109,7 @@ export default function NominaPage() {
   // ── Data fetching ──────────────────────────────────────────────────
 
   const loadData = useCallback(async (periodType: PeriodType) => {
+    setReportError(false)
     setLoading(true)
     try {
       const days = PERIOD_DAYS[periodType]
@@ -166,6 +170,7 @@ export default function NominaPage() {
       }
       if (shiftsRow?.data && Array.isArray(shiftsRow.data)) setShifts(shiftsRow.data as ShiftEntry[])
     } catch (err) {
+      setReportError(true)
       console.error('[nomina] Error:', err)
     } finally {
       setLoading(false)
@@ -323,6 +328,8 @@ export default function NominaPage() {
   }
 
   // ── Render ────────────────────────────────────────────────────────
+
+  if (reportError) return <ReportUnavailable onRetry={() => loadData(period)} />
 
   if (loading) {
     return (

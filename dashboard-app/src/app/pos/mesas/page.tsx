@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft, Users, Calendar, RefreshCw, Merge, X, Clock, AlertTriangle, LayoutGrid, Map, UserPlus, Lock as LockIcon, Power, PencilRuler } from 'lucide-react'
 import { getMesasConfig, formatMXN, logAudit, verifyManagerPin, fetchPosMesas, fetchWithTimeout, getPOSAuthHeaders } from '@/lib/pos-data'
 import type { Mesa } from '@/lib/pos-data'
-import { avisarCierreDeOrden, avisarCuentaActualizada } from '@/lib/aviso-lan'
+import { avisarCierreDeOrden, avisarCuentaConfirmada } from '@/lib/aviso-lan'
 import { getActiveClientSlug as _cid } from '@/lib/data'
 import { getPosConfigSync } from '@/lib/pos-config'
 import { shouldUsePersistedFloorCoordinates } from '@/lib/floorplan-coordinates'
@@ -601,9 +601,11 @@ export default function MesasPage() {
       const idDelMerge = `merge:${srcOrder.id}:${tgtOrder.id}`
       void avisarCierreDeOrden({ opId: idDelMerge, orderId: String(srcOrder.id), clientId: _cid(),
         mesa: mergeSource, turnoId: srcOrder.turno_id ?? null, cancelada: true })
-      void avisarCuentaActualizada({ opId: idDelMerge, orderId: String(tgtOrder.id), clientId: _cid(),
-        mesa: mergeTarget, turnoId: tgtOrder.turno_id ?? null, status: tgtOrder.status ?? 'enviada',
-        items: mergedItems, subtotal: newSubtotal, iva: newIva, total: newTotal, personas: newPersonas })
+      void avisarCuentaConfirmada({ opId: idDelMerge, clientId: _cid(), result: {
+        ok: mergeResult.ok,
+        order: mergeResult.target_order ? { ...mergeResult.target_order, mesa: mergeTarget,
+          turno_id: tgtOrder.turno_id, status: tgtOrder.status } : undefined,
+      } })
 
       showToast(`Mesa ${mergeSource} fusionada con mesa ${mergeTarget}`)
       setMergeMode(false); setMergeSource(null); setMergeTarget(null)

@@ -129,7 +129,7 @@ export default function BarraPage() {
 
   // G-06: push DELTA events from the POS local server — LAN-first resilience
   useBridgeClient((event) => {
-    const ORDER_EVENTS = ['ORDER_UPSERTED', 'ORDER_SENT', 'ORDER_CLOSED', 'KDS_ITEM_STATUS']
+    const ORDER_EVENTS = ['ORDER_UPSERTED', 'ORDER_SENT', 'ORDER_ITEMS_TRANSFERRED', 'ORDER_CLOSED', 'KDS_ITEM_STATUS']
     if (ORDER_EVENTS.includes(event.type)) {
       if ((event.type === 'ORDER_SENT' || event.type === 'ORDER_UPSERTED') && event.payload) {
         const p = event.payload as Record<string, unknown>

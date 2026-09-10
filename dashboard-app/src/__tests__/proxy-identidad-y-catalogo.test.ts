@@ -29,6 +29,10 @@ for (const proxy of ['query', 'path']) describe(`identidad y catálogo por ${pro
     expect(writes).toHaveLength(1)
     expect(new URL(writes[0].url).searchParams.get('client_id')).toBe('eq.tenant-lab')
   })
+  it.each(['items','cuentas','financial_revision','preparation_status','comanda_batches'])('mesero no altera consumo por columna alternativa %s', async field => {
+    expect((await patch('pos_orders', { [field]: [] })).status).toBe(403)
+    expect(writes).toHaveLength(0)
+  })
   it('mesero no modifica el dinero', async () => {
     expect((await patch('pos_orders', { total: 1 })).status).toBe(403)
     expect(writes).toHaveLength(0)

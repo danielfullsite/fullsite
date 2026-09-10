@@ -1,5 +1,7 @@
 'use client'
 
+import ReportUnavailable from '@/components/ReportUnavailable'
+
 import { useEffect, useState } from 'react'
 import { TrendingUp, Shield, AlertTriangle, DollarSign, Bot, RefreshCw, Zap, Eye } from 'lucide-react'
 import { getDeepTable, getRecentDays } from '@/lib/data'
@@ -20,12 +22,14 @@ interface AgentROI {
 export default function ROIPage() {
   const [roiData, setRoiData] = useState<AgentROI[]>([])
   const [totalSaved, setTotalSaved] = useState(0)
+  const [reportError, setReportError] = useState(false)
   const [loading, setLoading] = useState(true)
   const [daysActive, setDaysActive] = useState(0)
   const [totalRuns, setTotalRuns] = useState(0)
   const [monthlyValue, setMonthlyValue] = useState(0)
 
   async function load() {
+    setReportError(false)
     setLoading(true)
     try {
       const [agentResults, agentRuns, salesData] = await Promise.all([
@@ -185,6 +189,7 @@ export default function ROIPage() {
       setTotalSaved(total)
       setMonthlyValue(salesData.length > 0 ? total / Math.ceil(salesData.length / 30) : total)
     } catch (err) {
+      setReportError(true)
       console.error('Error loading ROI:', err)
     } finally {
       setLoading(false)
@@ -192,6 +197,8 @@ export default function ROIPage() {
   }
 
   useEffect(() => { load() }, [])
+
+  if (reportError) return <ReportUnavailable onRetry={load} />
 
   if (loading) {
     return <div className="flex items-center justify-center h-96"><div className="w-10 h-10 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>

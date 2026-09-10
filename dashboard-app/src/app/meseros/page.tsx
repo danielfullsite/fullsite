@@ -1,5 +1,7 @@
 'use client'
 
+import ReportUnavailable from '@/components/ReportUnavailable'
+
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import {
   ResponsiveContainer,
@@ -77,6 +79,7 @@ interface WaiterKpi {
 export default function MeserosPage() {
   const [recentData, setRecentData] = useState<WansoftDaily[]>([])
   const [waiterData, setWaiterData] = useState<{ fecha: string; data: WaiterCategoryData }[]>([])
+  const [reportError, setReportError] = useState(false)
   const [loading, setLoading] = useState(true)
   const [period, setPeriod] = useState<7 | 14 | 30>(7)
   const [range, setRange] = useState<DateRange | null>(null)
@@ -102,6 +105,7 @@ export default function MeserosPage() {
         setRecentData(recentResult)
         setWaiterData(waiterCats as { fecha: string; data: WaiterCategoryData }[])
       } catch (err) {
+        setReportError(true)
         console.error('Error loading meseros data:', err)
       } finally {
         setLoading(false)
@@ -289,6 +293,8 @@ export default function MeserosPage() {
     if (!selectedMesero) return null
     return waiterKpis.find(w => w.nombre === selectedMesero) || null
   }, [selectedMesero, waiterKpis])
+
+  if (reportError) return <ReportUnavailable />
 
   if (loading) {
     return (

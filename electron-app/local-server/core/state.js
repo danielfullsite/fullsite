@@ -53,6 +53,7 @@ class RestaurantState {
     this._turnIdentities = new Set()
     this._turnSummaries = new Map()
     this._cashMovements = new Map()
+    this._itemTransfers = new Set()
     this._lastSupabaseSync = null
     this._orderSnapshotComplete = false
     this._financialOrders = new Map()
@@ -110,6 +111,8 @@ class RestaurantState {
     }
 
     switch (type) {
+      case EVENT.ORDER_ITEMS_TRANSFERRED:
+        return this._applyItemsTransferred(payload)
       case EVENT.ORDER_UPSERTED:
         return this._applyOrderUpserted(payload)
 
@@ -199,6 +202,73 @@ class RestaurantState {
     }
     if (order.preparation_status === 'entregada' || cancelled(order)) this._kds = this._kds.filter(k => k.order_id !== order_id)
     return { changed: ['mesas', 'orders'] }
+  }
+
+  // A transfer is one projection transaction for both identities. It relocates
+  // existing preparation; unlike ORDER_SENT it never creates a print effect.
+  _applyItemsTransferred(payload) {
+    const { source_order: source, target_order: target, item_id, command_id } = payload
+    if (!source?.id || !target?.id || !Array.isArray(source.items) || !Array.isArray(target.items) ||
+      source.id === target.id || !item_id || this._itemTransfers.has(command_id)) return { changed: [] }
+    const parse = (value, fallback) => {
+      if (typeof value !== 'string') return value ?? fallback
+      try { return JSON.parse(value) } catch { return fallback }
+    }
+    const previousSource = this._orders.get(source.id)
+    const previousTarget = this._orders.get(target.id)
+    const previousItems = parse(previousSource?.items, [])
+    const movedIndex = previousItems.findIndex(i => i.id === item_id)
+    const moved = previousItems[movedIndex] || target.items.find(i => i.id === item_id)
+    const preparation = moved?.preparation_status || previousSource?.preparation_status || source.preparation_status || source.status
+    const wasSent = !!previousSource?._kds_sent || PREPARATION_STATUS.has(preparation)
+    const sourceDone = parse(previousSource?.kds_item_status, {})
+    const movedDone = sourceDone[movedIndex] ?? (preparation === 'lista' || preparation === 'entregada')
+    // Remap positional legacy completion flags by immutable item ID when a row
+    // leaves an account. Removing index 0 must not mark the next item done.
+    for (const [receipt, previous] of [[source, previousSource], [target, previousTarget]]) {
+      if (previous && (cancelled(previous) || staleAccountSnapshot(previous, receipt))) continue
+      this._applyOrderUpserted({ ...receipt, order_id: receipt.id })
+      const current = this._orders.get(receipt.id)
+      if (cancelled(current)) current._kds_sent = false
+      if (previous?.preparation_status) current.preparation_status = previous.preparation_status
+      const oldItems = parse(previous?.items, [])
+      const done = parse(previous?.kds_item_status, {})
+      const flags = {}
+      receipt.items.forEach((item, index) => {
+        const oldIndex = oldItems.findIndex(old => old.id === item.id)
+        if (oldIndex >= 0 && done[oldIndex] !== undefined) flags[index] = done[oldIndex]
+        else if (receipt.id === target.id && item.id === item_id && movedDone) flags[index] = true
+      })
+      current.kds_item_status = JSON.stringify(flags)
+    }
+    const destination = this._orders.get(target.id)
+    if (destination && !cancelled(destination) && wasSent) {
+      const items = parse(destination.items, [])
+      const index = items.findIndex(i => i.id === item_id)
+      if (index >= 0) {
+        // Preserve a newer destination's item metadata. Only carry preparation
+        // when this identity has not already advanced it independently.
+        if (!items[index].preparation_status && PREPARATION_STATUS.has(preparation)) {
+          items[index] = { ...items[index], preparation_status: movedDone && preparation !== 'entregada' ? 'lista' : preparation }
+        }
+        destination.items = JSON.stringify(items)
+        destination._kds_sent = true
+        if ((!previousTarget?._kds_sent || ['lista', 'entregada'].includes(previousTarget.preparation_status) && !movedDone) &&
+          !staleAccountSnapshot(previousTarget, target) && preparation !== 'entregada') destination.preparation_status = 'enviada'
+      }
+    }
+    // Rebuild both minimal queues from the resulting accounts, including when
+    // a newer snapshot made one side of the receipt stale.
+    for (const id of [source.id, target.id]) {
+      this._kds = this._kds.filter(k => k.order_id !== id)
+      const order = this._orders.get(id)
+      const items = parse(order?.items, []).filter(i => !i.cancelled && i.preparation_status !== 'entregada')
+      if (order?._kds_sent && !cancelled(order) && order.preparation_status !== 'entregada' && items.length) {
+        this._kds.push({ order_id: id, mesa: order.mesa, items_sent: items, sent_at: Date.parse(order.created_at) })
+      }
+    }
+    if (command_id) this._itemTransfers.add(command_id)
+    return { changed: ['orders', 'mesas', 'kds'] }
   }
 
   // ORDER_SENT: first round OR additional round from same order.
@@ -524,6 +594,7 @@ class RestaurantState {
   hidratarDesdeSnapshot(snap) {
     if (!snap || typeof snap !== 'object') return false
     this._writeAuthority = snap.write_authority === 'caja' ? 'caja' : 'legacy'
+    this._itemTransfers = new Set(Array.isArray(snap.item_transfers) ? snap.item_transfers : [])
 
     this._cashMovements = new Map((Array.isArray(snap.cash_movements) ? snap.cash_movements : []).map(m => [m.id, JSON.parse(JSON.stringify(m))]))
     this._mesas = new Map(Object.entries(snap.mesas || {}))
@@ -574,6 +645,7 @@ class RestaurantState {
 
     return {
       write_authority: this._writeAuthority,
+      item_transfers: [...this._itemTransfers],
       mesas:              Object.fromEntries(this._mesas),
       kds_queue:          [...this._kds],
       kds_orders,

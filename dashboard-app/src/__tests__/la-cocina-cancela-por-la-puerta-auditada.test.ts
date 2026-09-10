@@ -85,20 +85,20 @@ describe.each(KDS)('el KDS %s cancela por la puerta auditada', (_nombre, archivo
 
 describe('una cancelacion es una revision de la orden', () => {
   it('cancel-item lee la revision actual', () => {
-    expect(rutaLimpia).toMatch(/select=id,items,updated_at,order_revision/)
+    expect(rutaLimpia).toMatch(/select=\*/)
     expect(rutaLimpia).toMatch(/order_revision: revisionActual/)
   })
 
   it('y la avanza en el MISMO PATCH que escribe los items', () => {
     // En el mismo PATCH para que el filtro de `updated_at` proteja las dos cosas:
     // si otra escritura gano la carrera, no afecta filas y sale 409, como antes.
-    const i = rutaLimpia.indexOf('items: JSON.stringify(newItems)')
+    const i = rutaLimpia.indexOf('...cancellation.patch')
     expect(i).toBeGreaterThan(-1)
     expect(rutaLimpia.slice(i, i + 400)).toMatch(/order_revision: \(Number\(revisionActual\) \|\| 0\) \+ 1/)
   })
 
   it('devuelve la revision nueva a quien cancelo', () => {
-    expect(rutaLimpia).toMatch(/revision: \(Number\(revisionActual\) \|\| 0\) \+ 1/)
+    expect(rutaLimpia).toContain('revision: patchRows[0].order_revision')
   })
 
   it('el PATCH sigue protegido por updated_at', () => {
@@ -115,8 +115,8 @@ describe('el POS adopta la revision que provoco', () => {
   const pos = limpiar(readFileSync(
     join(__dirname, '..', 'app', 'pos', 'page.tsx'), 'utf8'))
   const ventana = (() => {
-    const i = pos.indexOf("fetch('/api/pos/cancel-item'")
-    return pos.slice(i, i + 1500)
+    const i = pos.indexOf('const handleCancelItem = useCallback')
+    return pos.slice(i, pos.indexOf('const handleTransferItem = useCallback', i))
   })()
 
   it('actualiza orderRevision con lo que devuelve la ruta', () => {
@@ -125,9 +125,9 @@ describe('el POS adopta la revision que provoco', () => {
     expect(ventana).toMatch(/setOrderRevision\(result\.revision\)/)
   })
 
-  it('un conflicto sigue avisando y no se trata como error duro', () => {
-    expect(ventana).toMatch(/if \(result\.conflict\)/)
-    expect(ventana).toMatch(/!result\.ok && !result\.conflict && !result\.already_applied/)
+  it('espera el recibo antes de marcar cancelado y no revierte inventario especulativamente', () => {
+    expect(ventana.indexOf('await confirmarCancelacionItem')).toBeLessThan(ventana.indexOf('setCancelledItems'))
+    expect(ventana).not.toContain('reverseIngredientDeduction(')
   })
 })
 

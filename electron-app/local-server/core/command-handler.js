@@ -12,6 +12,7 @@ const { prepareOrderPrintEffects } = require('./operational-print')
 // Map from command_type (from client) → eventType (stored in log)
 const COMMAND_TO_EVENT = {
   ORDER_UPSERTED:  EVENT.ORDER_UPSERTED,
+  ORDER_ITEMS_TRANSFERRED: EVENT.ORDER_ITEMS_TRANSFERRED,
   ORDER_SENT:      EVENT.ORDER_SENT,
   ORDER_CLOSED:    EVENT.ORDER_CLOSED,
   ORDER_CANCELLED: EVENT.ORDER_CANCELLED,
@@ -171,6 +172,21 @@ class CommandHandler {
   }
 
   _validateCommandState(commandType, cmdPayload, fromClientId) {
+    if (commandType === 'ORDER_ITEMS_TRANSFERRED') {
+      const accounts = [cmdPayload.source_order, cmdPayload.target_order]
+      if (this._localAuthorityEnabled || accounts.some(o => this._state.getOrder?.(o?.id)?.authority === 'caja')) {
+        throw new OperationalError('AUTHORITATIVE_COMMAND_REQUIRED', 'Las transferencias legacy no pueden modificar cuentas de Caja')
+      }
+      if (accounts.some(o => this._state.getFinancialOrder?.(o?.id))) {
+        throw new FinancialError('FINANCIAL_ORDER_LOCKED', 'Las cuentas con pagos no aceptan transferencias legacy')
+      }
+      if (!cmdPayload.item_id || accounts.some(o => !o?.id || !Array.isArray(o.items) ||
+        !Number.isSafeInteger(o.order_revision) || o.order_revision < 1) ||
+        accounts[0].id === accounts[1].id || accounts[0].items.some(i => i.id === cmdPayload.item_id) ||
+        accounts[1].items.filter(i => i.id === cmdPayload.item_id).length !== 1) {
+        throw new OperationalError('INVALID_TRANSFER_RECEIPT', 'La transferencia requiere los dos recibos confirmados')
+      }
+    }
     const operationalOrder = this._state.getOrder?.(cmdPayload.order_id)
     if (operationalOrder?.authority === 'caja' && ['ORDER_UPSERTED', 'KDS_ITEM_STATUS'].includes(commandType)) {
       throw new OperationalError('KITCHEN_COMMAND_REQUIRED', 'Confirma los productos enviados mediante el comando de cocina autorizado')

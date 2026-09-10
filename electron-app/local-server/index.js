@@ -42,6 +42,7 @@ const { BusinessOutbox } = require('./core/business-outbox')
 const mdns      = require('./discovery/mdns')
 const heartbeat = require('./telemetry/heartbeat')
 const updater   = require('./update/manager')
+const { buildInstallSnapshot } = require('./update/snapshot')
 
 // ─── Server ID (stable across restarts) ──────────────────────────────────────
 
@@ -970,6 +971,9 @@ async function startLocalServer({ dataDir, port = 7717, config = {}, businessSyn
     getDiskFreeMb:      () => processAdapter.getDiskFreeMb(),
   })
 
+  const getInstallSnapshot = () => buildInstallSnapshot({ state, eventStore, printer: printerAdapter, config, businessSync,
+    getBusinessSyncStatus: () => _businessOutbox?.status() || { configured: !!businessSync, error: businessSyncIssue } })
+
   // ── Update manager ────────────────────────────────────────────────────────
   updater.init({
     channel, currentVersion: version, supabaseUrl, supabaseKey, restaurantId,
@@ -977,7 +981,7 @@ async function startLocalServer({ dataDir, port = 7717, config = {}, businessSyn
     // Instalar reinicia Electron, y Pedro muere con Electron (regla dura #4). El
     // updater consulta el estado VIVO para no reiniciar a media operacion. Si esto
     // no se pasara, `puedeInstalarAhora` recibe null y falla CERRADO — no instala.
-    getSnapshot: () => state.toSnapshot(),
+    getSnapshot: getInstallSnapshot,
   })
 
   // ── Supabase poll (Phase 1 bridge) ────────────────────────────────────────
@@ -1179,7 +1183,7 @@ async function startLocalServer({ dataDir, port = 7717, config = {}, businessSyn
   // Pedro muere con Electron). Sin esto, el auto-instalador recibe undefined, la
   // politica falla cerrado, y NUNCA se instala — en silencio. Ver
   // update/auto-installer.js y la prueba del contrato en update-contrato.test.js.
-  return { httpServer, close, serverId, lanIp, wsHub, state, lanSecret: config.lanSecret }
+  return { httpServer, close, serverId, lanIp, wsHub, state, getInstallSnapshot, lanSecret: config.lanSecret }
 }
 
 // buildHttpRouter se exporta para poder probar las rutas sin levantar el servidor

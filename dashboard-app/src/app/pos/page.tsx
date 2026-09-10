@@ -1,6 +1,8 @@
 'use client'
 
 import { prepararTransferenciaItem } from '@/lib/transferencia-item'
+import { confirmarCancelacionItem } from '@/lib/cancelacion-cliente'
+import { setOrderInventoryPending } from '@/lib/order-inventory-pending'
 import { Component, useState, useCallback, useEffect, useRef, Suspense, type ErrorInfo, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
@@ -46,7 +48,7 @@ import { calcSplitParejo, calcSplitItems } from '@/lib/pos-calculations'
 import { publishEvent, getDeviceId } from '@/lib/events'
 import { apiUrl } from '@/lib/api-base'
 import { sendOrderToKitchen, kitchenFailureMessage } from '@/lib/kitchen-bridge'
-import { avisarCierreDeOrden, avisarCuentaActualizada, cuentaEnviadaParaLan } from '@/lib/aviso-lan'
+import { avisarCierreDeOrden, avisarCuentaActualizada, avisarTransferenciaItem, avisarCuentaConfirmada } from '@/lib/aviso-lan'
 import { cacheTrasElCierre } from '@/lib/cache-de-cuenta'
 import { leerCuenta, requiereCaja, cuentaConfirmada, type LecturaDeCuenta } from '@/lib/pedro-cliente'
 import { leerCatalogoCaja } from '@/lib/pedro-catalogo'
@@ -1060,7 +1062,7 @@ function DiscountModal({ subtotal, personas, items, onApply, onCancel }: Discoun
 
 interface CancelModalProps {
   itemName: string
-  onConfirm: (reason: string, managerName: string, options: { prepared: boolean; voided: boolean }) => void
+  onConfirm: (reason: string, managerName: string, options: { prepared: boolean; voided: boolean }) => Promise<void>
   onCancel: () => void
 }
 
@@ -1072,6 +1074,16 @@ function CancelModal({ itemName, onConfirm, onCancel }: CancelModalProps) {
   const [managerName, setManagerName] = useState('')
   const [biometricAvailable, setBiometricAvailable] = useState(false)
   const [biometricChecking, setBiometricChecking] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+  const confirmingRef = useRef(false)
+  const confirm = async (options: { prepared: boolean; voided: boolean }) => {
+    if (confirmingRef.current) return
+    confirmingRef.current = true
+    setConfirming(true); setError('')
+    try { await onConfirm(reason, managerName, options) }
+    catch (failure) { setError(failure instanceof Error ? failure.message : 'Cancelación sin confirmar') }
+    finally { confirmingRef.current = false; setConfirming(false) }
+  }
 
   useEffect(() => {
     // Check if there are manager/admin biometric credentials stored
@@ -1143,7 +1155,7 @@ function CancelModal({ itemName, onConfirm, onCancel }: CancelModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/60" onClick={onCancel} />
+      <div className="absolute inset-0 bg-black/60" onClick={confirming ? undefined : onCancel} />
       <div className="relative bg-[var(--surface-2)] border border-red-700/40 rounded-2xl w-full max-w-md shadow-2xl mx-4 p-5">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-full bg-[var(--crit-soft)] flex items-center justify-center">
@@ -1227,31 +1239,36 @@ function CancelModal({ itemName, onConfirm, onCancel }: CancelModalProps) {
 
         {step === 'prepared' && (
           <>
+            {error && <p role="alert" className="mb-3 text-[var(--crit-ink)]">{error}</p>}
+            {confirming && <p role="status">Confirmando cancelación…</p>}
             <p className="text-[var(--text-4)] text-sm mb-4">Si se preparo, queda registrado como merma. Si fue un error operativo, puedes anular (no afecta metricas).</p>
             <div className="space-y-2 mb-5">
               <button
-                onClick={() => onConfirm(reason, managerName, { prepared: false, voided: false })}
+                disabled={confirming}
+                onClick={() => void confirm({ prepared: false, voided: false })}
                 className="w-full py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold transition-colors min-h-[48px] flex items-center justify-center gap-2"
               >
                 <Ban size={18} />
                 Cancelar — No se preparo
               </button>
               <button
-                onClick={() => onConfirm(reason, managerName, { prepared: true, voided: false })}
+                disabled={confirming}
+                onClick={() => void confirm({ prepared: true, voided: false })}
                 className="w-full py-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-semibold transition-colors min-h-[48px] flex items-center justify-center gap-2"
               >
                 <ShieldAlert size={18} />
                 Cancelar — Si, se preparo (merma)
               </button>
               <button
-                onClick={() => onConfirm(reason, managerName, { prepared: false, voided: true })}
+                disabled={confirming}
+                onClick={() => void confirm({ prepared: false, voided: true })}
                 className="w-full py-3 rounded-xl bg-[var(--surface-2)] hover:bg-[var(--text-4)] text-[var(--text-1)] font-semibold transition-colors min-h-[48px] flex items-center justify-center gap-2"
               >
                 <X size={18} />
                 Anular — Error operativo
               </button>
             </div>
-            <button onClick={() => setStep('reason')} className="w-full py-2.5 rounded-xl bg-[var(--line)] hover:bg-[var(--line)] text-[var(--text-4)] font-semibold transition-colors min-h-[44px]">
+            <button disabled={confirming} onClick={() => setStep('reason')} className="w-full py-2.5 rounded-xl bg-[var(--line)] hover:bg-[var(--line)] text-[var(--text-4)] font-semibold transition-colors min-h-[44px]">
               Volver
             </button>
           </>
@@ -2914,121 +2931,42 @@ function POSContent() {
     setEditingOrderItem(null)
   }, [])
 
-  // Cancel item (requires reason + manager PIN — NEVER delete)
+  // A cancelled flag is a confirmed outcome, never an optimistic money edit.
   const handleCancelItem = useCallback(async (reason: string, managerName: string, options: { prepared: boolean; voided: boolean }) => {
-    if (!cancellingItem) return
-    if (accionPendienteEnCaja('La cancelación individual')) return
-    if (!await validarCuentaCaja()) return
-    const { prepared, voided } = options
-    const action = voided ? 'item_voided' as const : 'item_cancelled' as const
-    logAudit({
-      order_id: orderId, action, actor: mesero, mesa,
-      details: { item: cancellingItem.nombre, cantidad: cancellingItem.cantidad, precio: cancellingItem.subtotal, prepared, voided },
-      reason,
-      approved_by: managerName,
-    })
-    // Shadow mode: evento SENSIBLE — la BD lo rechaza sin audit.approvedBy
-    publishEvent(voided ? 'orders.item.voided.v1' : 'orders.item.cancelled.v1', 1, { userId: mesero, deviceId: getDeviceId() }, {
-      ticketId: orderId, itemId: cancellingItem.id, productId: cancellingItem.nombre,
-      qty: cancellingItem.cantidad, inventoryImpact: !voided, mesa, clientId: getClientId(),
-    }, {
-      requestedBy: mesero, approvedBy: managerName, reason,
-      before: { qty: cancellingItem.cantidad, subtotal: cancellingItem.subtotal, prepared, voided },
-      after: { qty: 0, cancelled: !voided, voided },
-    })
-    // R0.5 RESOLVED: Forward deduction is now active, so reversal is safe.
-    // Only reverse if item was prepared (sent to kitchen = stock was deducted).
-    // Voided items that were never sent don't need reversal.
-    if (!voided && prepared) {
-      reverseIngredientDeduction(cancellingItem, loadedOrderId || '', managerName, reason)
-        .catch(err => console.error('[inventory] Reversal error (non-blocking):', err))
-    }
-    if (voided) {
-      setVoidedItems(prev => new Set(prev).add(cancellingItem.id))
-    } else {
-      setCancelledItems(prev => new Set(prev).add(cancellingItem.id))
-    }
-    // H-4 FIX: persist cancelled flag ON the item in orderItems state
-    // so draft auto-save (pos_draft_${mesa}) includes it, and mesa switch preserves it
-    setOrderItems(prev => prev.map(i =>
-      i.id === cancellingItem.id ? { ...i, cancelled: true } : i
-    ))
-    setCancellingItem(null)
-    if (voided) {
-      showToast(`${cancellingItem.nombre} ANULADO — aprobado por ${managerName}`)
-    } else if (prepared) {
-      showToast(`${cancellingItem.nombre} cancelado — registrado como merma`)
-    } else {
-      showToast(`${cancellingItem.nombre} cancelado — aprobado por ${managerName}`)
-    }
-    // Persist to DB via OCC-safe endpoint so KDS reflects cancellation.
-    // APP_API transport required — SUPABASE_REST MUST NOT mutate pos_orders.
-    const effectiveOrderId = loadedOrderId || orderId
-    if (effectiveOrderId) {
-      const cancelOpId = genOpId()
-      // Aprobación server-verificable: si el PIN de gerente se validó online,
-      // consumeManagerApproval devuelve su token firmado (la ruta valida el rol =
-      // infalsificable). Offline no hay token → offline_approved (device-trust, "como
-      // Wansoft": el cancel se encoló tras verificar el PIN en el dispositivo).
-      const _approvalToken = consumeManagerApproval(managerName)
-      const cancelBody = {
-        client_id: _cid(),
-        order_id: effectiveOrderId,
-        item_id: cancellingItem.id,
-        voided,
-        operation_id: cancelOpId,
-        mesero,
-        reason,
-        manager: managerName,
-        approval_token: _approvalToken || undefined,
-        offline_approved: _approvalToken ? undefined : true,
+    if (!cancellingItem || accionPendienteEnCaja('La cancelación individual')) return
+    if (!await validarCuentaCaja() || operationLock.current) return
+    operationLock.current = true
+    const item = cancellingItem
+    try {
+      // Unsent local draft lines have no shared cancellation or stock effect.
+      if (!sentItemIds.has(item.id) && !(Number(item.sent_quantity) > 0)) {
+        setOrderItems(previous => previous.filter(row => row.id !== item.id))
+        setCancellingItem(null)
+        showToast('Artículo retirado del borrador. Guarda para compartir los cambios.')
+        return
       }
-      try {
-        const res = await fetch('/api/pos/cancel-item', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...getPOSAuthHeaders() },
-          body: JSON.stringify(cancelBody),
-          signal: AbortSignal.timeout(5000),
-        })
-        const result = res.ok ? await res.json() : { ok: false }
-        if (result.conflict) {
-          // Local state already updated — the item is cancelled in UI.
-          // OCC conflict means DB has a newer revision; the cancel will replay on next send.
-          showToast('Conflicto de versión — cancelación local aplicada, se sincronizará al próximo envío')
-        } else if (result.ok && typeof result.revision === 'number') {
-          // La cancelacion AVANZA la revision en el servidor (si no, el siguiente
-          // guardado de una terminal con copia vieja pisa el arreglo de items y
-          // devuelve el platillo cancelado a la cuenta). Adoptar la revision que
-          // devuelve la ruta evita que ese avance nos choque a nosotros mismos en el
-          // proximo guardado.
-          setOrderRevision(result.revision)
-        }
-        if (!result.ok && !result.conflict && !result.already_applied) {
-          throw new Error(`cancel-item API error: ${result.error || res.status}`)
-        }
-      } catch (err) {
-        // Offline or API error: queue for replay with APP_API transport
-        console.warn('[cancel] Queuing offline:', err)
-        try {
-          const { queueOperation } = await import('@/lib/pos-offline-db')
-          await queueOperation('pos_orders', 'POST', cancelBody as unknown as Record<string, unknown>, '/api/pos/cancel-item', '0', 'APP_API')
-        } catch {
-          // IDB unavailable — local state is the truth until next send overwrites DB
-          console.error('[cancel] Failed to queue offline — cancellation is local only until next send')
-        }
-      }
-      // Y QUE PEDRO LO SEPA. Hasta aqui la cancelacion iba solo a la nube; bajo
-      // Electron el mapa y el editor leen de Pedro, asi que el platillo cancelado
-      // seguia sumando en el mapa y saliendo en cocina. Se manda la cuenta completa
-      // con el renglon marcado `cancelled` (igual que la fila de nube) y los totales
-      // recalculados; durable, con el mismo opId del cancel. Ver lib/aviso-lan.ts.
-      void avisarCuentaActualizada({
-        opId: cancelOpId, orderId: effectiveOrderId, clientId: _cid(), mesa, turnoId: turnoId || null,
-        ...cuentaEnviadaParaLan(orderItems, sentItemIds,
-          new Set([...cancelledItems, ...voidedItems, cancellingItem.id]), discount),
-      })
-    }
-  }, [cancellingItem, orderId, mesero, mesa, loadedOrderId, validarCuentaCaja, bloqueaLegacyCaja, orderItems, cancelledItems, voidedItems, discount, turnoId, sentItemIds])
+      const receipt = await confirmarCancelacionItem({ client_id: _cid(), order_id: loadedOrderId || orderId,
+        item_id: item.id, mesero, reason, manager: managerName, ...options },
+        getPOSAuthHeaders(), consumeManagerApproval(managerName))
+      // The saved intent wins on recovery, even if the operator changed the
+      // options while the previous acknowledgment was unavailable.
+      const { intent, result } = receipt
+      setOrderRevision(result.revision)
+      if (result.order.descuento != null && Number.isFinite(Number(result.order.descuento))) setDiscount(Number(result.order.descuento))
+      if (intent.voided) setVoidedItems(previous => new Set(previous).add(intent.item_id))
+      else setCancelledItems(previous => new Set(previous).add(intent.item_id))
+      setOrderItems(previous => previous.map(row => row.id === intent.item_id ? { ...row, ...receipt.item } : row))
+      void avisarCuentaConfirmada({ opId: intent.operation_id!, clientId: _cid(), result })
+      receipt.confirmada()
+      setCancellingItem(null)
+      const inventoryPending = result.inventory_pending !== false
+      setOrderInventoryPending(_cid(), intent.order_id, inventoryPending, result.order.mesa ?? mesa)
+      showToast(`${receipt.recovered ? 'Cancelación recuperada' : 'Cancelación confirmada'}: ${item.nombre}${inventoryPending ? ' — inventario pendiente de conciliar' : ''}`)
+      // Inventory reconciliation belongs to the server's canonical receipt. The
+      // old fuzzy stock PATCH here could reverse before rejection or twice after
+      // a lost response; neither local stock nor a shadow cancellation is emitted.
+    } finally { operationLock.current = false }
+  }, [cancellingItem, orderId, mesero, mesa, loadedOrderId, validarCuentaCaja, bloqueaLegacyCaja, sentItemIds])
 
   // Void entire order
   // Eduardo Jul 21 (Batch 8): Transfer individual platillo to another mesa
@@ -3082,15 +3020,8 @@ function POSContent() {
         // creada) y los renglones que quedaron ahi. Ver lib/aviso-lan.ts.
         // Publish the committed receipts, never totals or snapshots rebuilt from
         // this terminal's potentially stale account (which may include drafts).
-        for (const [suffix, account] of [['origen', result.source_order], ['destino', result.target_order]] as const) {
-          if (!account || typeof account.id !== 'string' || !Array.isArray(account.items)) continue
-          void avisarCuentaActualizada({
-            opId: `${opId}-${suffix}`, orderId: account.id, clientId: _cid(), mesa: account.mesa,
-            turnoId: account.turno_id, status: account.status, items: account.items, mesero: account.mesero,
-            orderRevision: account.order_revision,
-            subtotal: Number(account.subtotal), iva: Number(account.iva), total: Number(account.total),
-          })
-        }
+        void avisarTransferenciaItem({ opId, clientId: _cid(), itemId,
+          source: result.source_order, target: result.target_order })
       } else if (result.error === 'SOURCE_CONFLICT' || result.error === 'TARGET_CONFLICT') {
         showToast(result.message || 'Conflicto — recarga y reintenta')
         // Reload order from DB to get fresh state
@@ -3507,6 +3438,11 @@ function POSContent() {
             })
             const conflictPrint = await printByStation({ ...order, items: conflictNewItems })
             if (conflictPrint.failed.length > 0) showToast(`⚠ Impresora sin conexión: ${conflictPrint.failed.join(', ')}`)
+            setOrderInventoryPending(_cid(), order.id, true, order.mesa)
+            try {
+              const inventory = await deductIngredientsForOrder(conflictNewItems, order.id, mesero || 'POS', batchId)
+              setOrderInventoryPending(_cid(), order.id, !inventory.success, order.mesa)
+            } catch { /* the confirmed append remains; the persistent banner offers retry */ }
             showToast(`${conflictNewItems.length} item${conflictNewItems.length !== 1 ? 's' : ''} enviados`)
             try {
               const freshRes = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${order.id}&select=updated_at`, {
@@ -3604,6 +3540,7 @@ function POSContent() {
           client_id: _cid(),
         })
         const finish = () => {
+          setOrderInventoryPending(_cid(), order.id, true, order.mesa)
           sessionStorage.removeItem('pos_staff')
           sessionStorage.removeItem('pos_last_activity')
           navigateToMesaMap()
@@ -3629,6 +3566,7 @@ function POSContent() {
     }
     if (saveResult.revision != null) setOrderRevision(saveResult.revision)
     if (saveResult.inventory_status === 'BLOCKED') {
+      setOrderInventoryPending(_cid(), order.id, true, order.mesa)
       showToast('Inventario: algunos ingredientes no se pudieron descontar')
     }
     const ok = true
@@ -3742,8 +3680,11 @@ function POSContent() {
 
       // Deduct ingredients at kitchen send time (only new items in this batch)
       if (newItems.length > 0) {
+        setOrderInventoryPending(_cid(), orderId, true, mesa)
         try {
-          await deductIngredientsForOrder(newItems, orderId, mesero || 'POS', batchId)
+          const inventory = await deductIngredientsForOrder(newItems, orderId, mesero || 'POS', batchId)
+          setOrderInventoryPending(_cid(), orderId, !inventory.success, mesa)
+          if (!inventory.success) showToast('Comanda confirmada — inventario pendiente de conciliar')
         } catch (err) {
           console.error('[inventory] Deduction error (non-blocking):', err)
         }

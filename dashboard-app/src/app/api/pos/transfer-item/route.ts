@@ -32,7 +32,8 @@ export async function POST(request: NextRequest) {
     if (!res.ok) {
       const known = ['SOURCE_NOT_FOUND', 'SAME_TABLE', 'SOURCE_NOT_OPEN', 'TARGET_NOT_OPEN', 'TARGET_AMBIGUOUS',
         'ITEM_NOT_IN_SOURCE', 'INVALID_ITEM', 'INVALID_ITEMS', 'INVALID_AMOUNTS', 'INVALID_DISCOUNT', 'OPERATION_ID_REUSED']
-      const error = known.find(e => result.message === e)
+      const error = result.code === '23505' && String(result.message).includes('pos_orders_una_cuenta_activa_por_mesa')
+        ? 'TARGET_OCCUPIED' : known.find(e => result.message === e)
       return Response.json({ ok: false, error: error || 'TRANSFER_UNAVAILABLE',
         message: error ? 'No se movió el platillo. Actualiza la cuenta y revisa el destino.'
           : 'No se confirmó el resultado. Reintenta la misma transferencia para recuperar su recibo.' }, { status: error ? 409 : 503 })

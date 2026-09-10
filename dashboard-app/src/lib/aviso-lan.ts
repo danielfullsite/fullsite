@@ -88,7 +88,7 @@ const TIMEOUT_MS = 1_200
 
 const LOG = '[aviso-lan]'
 
-export type TipoDeAviso = 'ORDER_CLOSED' | 'ORDER_CANCELLED' | 'ORDER_UPSERTED'
+export type TipoDeAviso = 'ORDER_CLOSED' | 'ORDER_CANCELLED' | 'ORDER_UPSERTED' | 'ORDER_ITEMS_TRANSFERRED'
 
 export interface Aviso {
   /**
@@ -116,6 +116,17 @@ export interface Aviso {
   mesero?: string
   order_revision?: number
   notas?: string | null
+  item_id?: string
+  source_order?: CuentaTransferida
+  target_order?: CuentaTransferida
+}
+
+export interface CuentaTransferida {
+  id: string; items: unknown[]; order_revision: number; [key: string]: unknown
+}
+function cuentasDelAviso(aviso: Aviso): string[] {
+  return [aviso.order_id, aviso.target_order?.id].filter((id): id is string => !!id)
+    .map(id => JSON.stringify([aviso.client_id, id]))
 }
 
 // ── Avisos pendientes: lo que no llego, se guarda ────────────────────────────
@@ -213,8 +224,9 @@ export async function avisarALaLan(aviso: Aviso): Promise<boolean> {
 
   // ANTES de mandar, no despues de fallar: si la pestaña muere a media llamada
   // (el cobro navega al mapa con `location.replace`), el aviso sobrevive igual.
+  const cuentas = cuentasDelAviso(aviso)
   const anteriorPendiente = leerAvisosPendientes().some(a =>
-    a.client_id === aviso.client_id && a.order_id === aviso.order_id && a.command_id !== aviso.command_id)
+    a.command_id !== aviso.command_id && cuentasDelAviso(a).some(id => cuentas.includes(id)))
   recordarPendiente(aviso)
   // Do not overtake an older snapshot of the same account. Otherwise its retry
   // would restore the previous items/total after this update was acknowledged.
@@ -238,10 +250,10 @@ export function reintentarAvisosPendientes(): Promise<{ pendientes: number; entr
     let entregados = 0
     const bloqueadas = new Set<string>()
     for (const aviso of leerAvisosPendientes()) {
-      const cuenta = JSON.stringify([aviso.client_id, aviso.order_id])
-      if (bloqueadas.has(cuenta)) continue
+      const cuentas = cuentasDelAviso(aviso)
+      if (cuentas.some(id => bloqueadas.has(id))) { cuentas.forEach(id => bloqueadas.add(id)); continue }
       if (await enviar(aviso)) { olvidarPendiente(aviso.command_id); entregados++ }
-      else bloqueadas.add(cuenta)
+      else cuentas.forEach(id => bloqueadas.add(id))
     }
     const pendientes = leerAvisosPendientes().length
     if (pendientes === 0) detenerReintentos()
@@ -360,6 +372,34 @@ export function avisarCuentaActualizada(args: {
     order_revision: args.orderRevision,
     notas: args.notas,
   }))
+}
+
+/** Publish only a committed row and its own revision. Failed, conflicted or
+ * response-lost mutations never authorize replacement from a terminal draft. */
+export function avisarCuentaConfirmada(args: {
+  opId: string; clientId: string; result: { ok?: boolean; order?: Record<string, unknown> }
+}): Promise<boolean> {
+  const order = args.result.order
+  if (args.result.ok !== true || !order || typeof order.id !== 'string' ||
+    !Number.isSafeInteger(order.order_revision) || Number(order.order_revision) < 1) return Promise.resolve(false)
+  let items = order.items
+  if (typeof items === 'string') { try { items = JSON.parse(items) } catch { return Promise.resolve(false) } }
+  if (!Array.isArray(items)) return Promise.resolve(false)
+  return avisarCuentaActualizada({ opId: args.opId, clientId: args.clientId, orderId: order.id,
+    items, orderRevision: Number(order.order_revision), mesa: order.mesa as number | undefined,
+    turnoId: order.turno_id as string | undefined, status: order.status as string | undefined,
+    subtotal: order.subtotal as number, iva: order.iva as number, total: order.total as number,
+    descuento: order.descuento as number | undefined, personas: order.personas as number | undefined,
+    notas: order.notas as string | undefined })
+}
+
+/** Both committed accounts travel in one durable event; no second send/print. */
+export function avisarTransferenciaItem(args: {
+  opId: string; clientId: string; itemId: string; source: CuentaTransferida; target: CuentaTransferida
+}): Promise<boolean> {
+  return avisarALaLan({ command_id: `transferencia:${args.opId}`, command_type: 'ORDER_ITEMS_TRANSFERRED',
+    order_id: args.source.id, client_id: args.clientId, item_id: args.itemId,
+    source_order: args.source, target_order: args.target })
 }
 
 

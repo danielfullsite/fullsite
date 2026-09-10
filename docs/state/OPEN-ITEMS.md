@@ -21,7 +21,9 @@ Instrucción vigente de Daniel: completar aquí el sistema; no usar la ausencia 
 hardware en AMALAY como motivo para dejar software pendiente. Ejecución y evidencia:
 [CIERRE-SOFTWARE-2026-09-10](../audit/CIERRE-SOFTWARE-2026-09-10.md).
 En implementación: H09 proxy real, H04 transferencia legacy transaccional con
-recibo, H01 reporte X/Z de Caja. Los H completos conservan su estado hasta cerrar
+recibo y continuidad de cocina/consumo, H01 reporte X/Z de Caja, H06 movimientos,
+H08 inventario atómico y recuperación, H13 datos disponibles explícitos y H16
+guard de actualización durable. Los H completos conservan su estado hasta cerrar
 sus demás condiciones; la tabla inferior es la base de trabajo, no un dictamen
 que sustituya revisar los cambios posteriores.
 
@@ -31,8 +33,9 @@ Rama `cert/instalador-2026-09-10`, base #391. [Evidencia y límites](../audit/CA
 Avisos de mutaciones recuperados y protección de anulaciones/reintentos probada localmente.
 Windows empaquetado y sellado; arranque frío macOS 5/5; laboratorio UI tres POS y
 KDS **21/21** (run 34449964970). No instalado ni certificado en campo.
-Bloqueo H04 observado: `transfer-item` compensa el origen sin condición de versión
-si falla el destino; falta resolver la operación completa frente a concurrencia.
+El bloqueo H04 de compensación incondicional se reemplazó por una transacción
+de ambas cuentas y recibo: 9 grupos PostgreSQL prueban concurrencia y rollback.
+La migración sigue PENDIENTE, y H04 nuevo modo Caja conserva sus demás huecos.
 Los H01–H16 inferiores siguen abiertos salvo evidencia posterior explícita.
 
 ## Candidato de cierre: revisión del 8 de septiembre

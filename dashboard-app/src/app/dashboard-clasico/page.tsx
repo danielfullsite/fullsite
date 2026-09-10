@@ -1,5 +1,7 @@
 'use client'
 
+import ReportUnavailable from '@/components/ReportUnavailable'
+
 import React, { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { DollarSign, Ticket, Users, Receipt, TrendingDown, TrendingUp, Award, ArrowRight, CreditCard, FileBarChart, ClipboardList, Target, Settings, Eye, EyeOff, GripVertical, Clock, Zap, Activity, ChevronLeft, ChevronRight, CalendarDays, TriangleAlert } from 'lucide-react'
@@ -133,6 +135,7 @@ export default function DashboardPage() {
   const [recentData, setRecentData] = useState<WansoftDaily[]>([])
   const [latestDay, setLatestDay] = useState<WansoftDaily | null>(null)
   const [prevDay, setPrevDay] = useState<WansoftDaily | null>(null)
+  const [reportError, setReportError] = useState(false)
   const [loading, setLoading] = useState(true)
   const [period, setPeriod] = useState<Period>('dia')
   const [selectedDayIdx, setSelectedDayIdx] = useState(0) // 0 = latest, 1 = yesterday, etc.
@@ -157,16 +160,16 @@ export default function DashboardPage() {
   useEffect(() => {
     async function load() {
       try {
-        // Timeout: if data doesn't load in 10s, show empty state instead of infinite spinner
-        const timeoutP = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000))
+        // Each source read has its own timeout. Let full pagination and a valid
+        // historical fallback finish instead of racing them against one page's budget.
         // Fetch all data in parallel instead of sequentially
         // Ya no se pide agent_runs aquí: alimentaba el widget de status de
         // agentes, que se movió a Herramientas → Agentes IA. Era una consulta a
         // telemetría GLOBAL de la plataforma en cada carga del dashboard de cada
         // restaurante, y ninguno la usaba para decidir nada.
         const [recentRaw, latestRaw] = await Promise.all([
-          Promise.race([getRecentDays(1000), timeoutP]).catch(() => [] as WansoftDaily[]),
-          Promise.race([getLatestDay(), timeoutP]).catch(() => null as WansoftDaily | null),
+          getRecentDays(1000),
+          getLatestDay(),
         ])
         let recent = recentRaw
         let latest = latestRaw
@@ -177,6 +180,7 @@ export default function DashboardPage() {
           latest = recent.length > 0 ? recent[recent.length - 1] : null
         }
 
+        setReportError(false)
         setRecentData(recent)
         setLatestDay(latest)
         if (recent.length >= 2) {
@@ -189,6 +193,7 @@ export default function DashboardPage() {
           }
         }
       } catch (err) {
+        setReportError(true)
         console.error('Error loading dashboard data:', err)
       } finally {
         setLoading(false)
@@ -205,6 +210,8 @@ export default function DashboardPage() {
       window.removeEventListener('focus', onFocus)
     }
   }, [])
+
+  if (reportError) return <ReportUnavailable />
 
   if (loading) {
     return (

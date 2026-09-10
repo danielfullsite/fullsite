@@ -27,14 +27,16 @@ async function main() {
   started = true
   const baseline = fs.readFileSync(path.join(ROOT, 'supabase/migrations/00000000000000_baseline_esquema.sql'), 'utf8')
   let schema = 'create role anon; create role authenticated; create role service_role;\n'
-  for (const table of ['pos_orders', 'clients']) {
+  for (const table of ['pos_orders', 'clients', 'pos_reconciliation_results']) {
     const start = baseline.indexOf(`CREATE TABLE IF NOT EXISTS "public"."${table}"`)
     if (start < 0) throw new Error('Baseline table missing: ' + table)
     const end = baseline.indexOf('\n);', start)
     if (end < 0) throw new Error('Baseline table definition incomplete: ' + table)
     schema += baseline.slice(start, end + 3) + `\nalter table public.${table} add primary key(id);\n`
   }
+  schema += 'alter table pos_reconciliation_results add unique(client_id,order_id,order_item_id);\n'
   schema += fs.readFileSync(path.join(ROOT, 'supabase/migrations/PENDIENTE_20260910010000_transfer_item_atomico.sql'), 'utf8')
+  schema += fs.readFileSync(path.join(ROOT, 'supabase/migrations/PENDIENTE_20260910040000_una_cuenta_activa_por_mesa.sql'), 'utf8')
   fs.writeFileSync(path.join(output, 'schema-run.log'), run(path.join(bin, 'psql'), ['-X', '-h', '127.0.0.1', '-p', port, '-U', 'postgres', '-d', 'postgres', '-v', 'ON_ERROR_STOP=1'], { input: schema }))
   const result = spawnSync(process.execPath, [path.join(__dirname, 'laboratorio-transfer-item-postgres.cjs'), port], {
     cwd: ROOT, encoding: 'utf8', env: { ...process.env, FULLSITE_TEST_PSQL: path.join(bin, 'psql') },

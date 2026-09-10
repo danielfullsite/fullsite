@@ -1,3 +1,5 @@
+-- Shared with Caja materialization; nullable preserves legacy closed-status semantics.
+ALTER TABLE public.pos_orders ADD COLUMN IF NOT EXISTS payment_status text;
 -- Candidate only. Apply with the coordinated rollout, never directly to production.
 -- The receipt and BOTH orders commit together. A failed target cannot require a
 -- destructive best-effort rollback; a lost HTTP response is recovered by op ID.
@@ -36,20 +38,21 @@ BEGIN
   END IF;
   -- Deterministic row lock order also avoids opposite-direction transfer deadlock.
   PERFORM id FROM public.pos_orders WHERE client_id=p_client_id
-    AND (id=p_source_order_id OR mesa=p_target_mesa) ORDER BY id FOR UPDATE;
+    AND (id=p_source_order_id OR (mesa=p_target_mesa AND status IN ('abierta','enviada','preparando','lista') AND coalesce(payment_status,'pendiente')<>'pagada')) ORDER BY id FOR UPDATE;
   SELECT * INTO src FROM public.pos_orders WHERE id=p_source_order_id AND client_id=p_client_id;
   IF NOT FOUND THEN RAISE EXCEPTION 'SOURCE_NOT_FOUND'; END IF;
   IF src.mesa=p_target_mesa THEN RAISE EXCEPTION 'SAME_TABLE'; END IF;
   IF coalesce(src.status,'') NOT IN ('abierta','enviada','preparando','lista') OR src.turno_id IS NULL
+    OR coalesce(src.payment_status,'pendiente')='pagada'
     OR coalesce(src.pagos,'[]'::jsonb) NOT IN ('[]'::jsonb,'null'::jsonb) THEN
     RAISE EXCEPTION 'SOURCE_NOT_OPEN';
   END IF;
   IF (SELECT count(*) FROM public.pos_orders WHERE client_id=p_client_id AND mesa=p_target_mesa
     AND location_id IS NOT DISTINCT FROM src.location_id
-    AND status IN ('abierta','enviada','preparando','lista')) > 1 THEN RAISE EXCEPTION 'TARGET_AMBIGUOUS'; END IF;
+    AND status IN ('abierta','enviada','preparando','lista') AND coalesce(payment_status,'pendiente')<>'pagada') > 1 THEN RAISE EXCEPTION 'TARGET_AMBIGUOUS'; END IF;
   SELECT * INTO dst FROM public.pos_orders WHERE client_id=p_client_id AND mesa=p_target_mesa
     AND location_id IS NOT DISTINCT FROM src.location_id
-    AND status IN ('abierta','enviada','preparando','lista');
+    AND status IN ('abierta','enviada','preparando','lista') AND coalesce(payment_status,'pendiente')<>'pagada';
   IF FOUND AND (dst.turno_id IS DISTINCT FROM src.turno_id OR
     coalesce(dst.pagos,'[]'::jsonb) NOT IN ('[]'::jsonb,'null'::jsonb)) THEN RAISE EXCEPTION 'TARGET_NOT_OPEN'; END IF;
   source_items := CASE WHEN jsonb_typeof(src.items)='string' THEN (src.items #>> '{}')::jsonb ELSE src.items END;
@@ -84,19 +87,28 @@ BEGIN
   target_items := target_items || jsonb_build_array(item);
   source_gross := source_gross-gross; target_gross := target_gross+gross;
   destination_id := coalesce(dst.id,gen_random_uuid()::text);
+  IF NOT EXISTS (SELECT 1 FROM jsonb_array_elements(source_items) x WHERE NOT coalesce((x->>'cancelled')::boolean,false))
+    AND round(source_gross-source_discount+source_tax,2)<>0 THEN RAISE EXCEPTION 'INVALID_AMOUNTS'; END IF;
   UPDATE public.pos_orders SET items=source_items, subtotal=source_gross, descuento=source_discount,
+    status=CASE WHEN NOT EXISTS (SELECT 1 FROM jsonb_array_elements(source_items) x WHERE NOT coalesce((x->>'cancelled')::boolean,false)) THEN 'cancelada' ELSE status END,
+    notas=CASE WHEN NOT EXISTS (SELECT 1 FROM jsonb_array_elements(source_items) x WHERE NOT coalesce((x->>'cancelled')::boolean,false)) THEN concat_ws(' ',notas,'[transferida a ' || destination_id || ']') ELSE notas END,
     iva=source_tax, total=round(source_gross-source_discount+source_tax,2),
     order_revision=order_revision+1, updated_at=clock_timestamp()
     WHERE id=src.id AND client_id=p_client_id;
   IF dst.id IS NULL THEN
     INSERT INTO public.pos_orders(id,client_id,location_id,turno_id,mesa,mesero,status,items,subtotal,descuento,iva,total,order_revision)
-    VALUES(destination_id,p_client_id,src.location_id,src.turno_id,p_target_mesa,src.mesero,'enviada',target_items,
+    VALUES(destination_id,p_client_id,src.location_id,src.turno_id,p_target_mesa,src.mesero,CASE WHEN src.status='abierta' THEN 'abierta' ELSE 'enviada' END,target_items,
       target_gross,target_discount,target_tax,round(target_gross-target_discount+target_tax,2),1);
   ELSE
     UPDATE public.pos_orders SET items=target_items, subtotal=target_gross, descuento=target_discount,
       iva=target_tax,total=round(target_gross-target_discount+target_tax,2),
       order_revision=order_revision+1, updated_at=clock_timestamp() WHERE id=dst.id AND client_id=p_client_id;
   END IF;
+  -- This is the same physical preparation, now billed on a different account.
+  -- Move its consumption intent, preserving its PK and historical recipe pin;
+  -- ledger provenance continues to reference that PK. Never reverse/re-deduct.
+  UPDATE public.pos_reconciliation_results SET order_id=destination_id, updated_at=clock_timestamp()
+    WHERE client_id=p_client_id AND order_id=src.id AND order_item_id=p_item_id;
   output := jsonb_build_object('ok',true,'item_name',coalesce(item->>'nombre',item->>'name'),
     'target_order_id',destination_id,'target_items',target_items,
     'source_order',(SELECT to_jsonb(o) FROM public.pos_orders o WHERE id=src.id),

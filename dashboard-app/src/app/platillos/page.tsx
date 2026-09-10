@@ -1,5 +1,7 @@
 'use client'
 
+import ReportUnavailable from '@/components/ReportUnavailable'
+
 import { useEffect, useState } from 'react'
 import {
   ResponsiveContainer,
@@ -27,6 +29,7 @@ const CATEGORY_COLORS = [
 export default function PlatillosPage() {
   const [recentData, setRecentData] = useState<WansoftDaily[]>([])
   const [modifiers, setModifiers] = useState<{ nombre: string; total: number; _cols?: string[] }[]>([])
+  const [reportError, setReportError] = useState(false)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -47,6 +50,7 @@ export default function PlatillosPage() {
           setModifiers(raw.filter((m: any) => m.nombre && m.total > 0).sort((a: any, b: any) => b.total - a.total))
         }
       } catch (err) {
+        setReportError(true)
         console.error('Error loading platillos data:', err)
       } finally {
         setLoading(false)
@@ -54,6 +58,8 @@ export default function PlatillosPage() {
     }
     load()
   }, [])
+
+  if (reportError) return <ReportUnavailable />
 
   if (loading) {
     return (

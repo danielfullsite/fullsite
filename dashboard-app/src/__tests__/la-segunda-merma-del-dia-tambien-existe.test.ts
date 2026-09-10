@@ -74,7 +74,7 @@ describe('lo que no cambio', () => {
   it('sigue pasando por recordMovement, que es el contrato', () => {
     // AGENTS.md: UN solo recordMovement escribe el ledger + descuenta stock + previene
     // underflow + idempotencia, ATOMICO. Esta pagina ya lo respetaba.
-    expect(codigo).toMatch(/const \{ recordMovement \} = await import\('@\/lib\/inventory'\)/)
+    expect(codigo).toMatch(/const \{ recordMovement, confirmarMovimientoInventario \} = await import\('@\/lib\/inventory'\)/)
   })
 
   it('las cantidades siguen entrando en negativo', () => {

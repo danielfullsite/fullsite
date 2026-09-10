@@ -19,6 +19,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { BridgeClient, type BridgeEvent } from '@/lib/bridge-client'
 import type { KitchenOrderFromDB } from '@/lib/pos-data'
+import { getBridgeUrl } from '@/lib/bridge-url'
+import { localNetworkFetch } from '@/lib/local-network-fetch'
 
 export type KdsMode = 'LAN_PRIMARY' | 'RECONCILING' | 'FALLBACK' | 'OFFLINE'
 
@@ -248,7 +250,31 @@ export function useKdsWsClient(restaurantId?: string): UseKdsWsClientResult {
     const client = new BridgeClient(clientId, 'kds', rid, initSeq)
     clientRef.current = client
 
+    let projectionGeneration = 0
+    let transferRefreshPending = false
+    let refreshingKitchen = false
+    const refreshTransferredKitchen = async () => {
+      if (refreshingKitchen) return
+      refreshingKitchen = true
+      const generation = projectionGeneration
+      try {
+        const response = await localNetworkFetch(`${getBridgeUrl()}/state`, { cache: 'no-store', signal: AbortSignal.timeout(4000) })
+        const state = await response.json()
+        if (clientRef.current !== client || !response.ok || state.authoritative !== true || !Array.isArray(state.kds_orders)) return
+        if (generation !== projectionGeneration) return
+        ordersMap.current.clear(); sentOrderIds.current.clear()
+        for (const raw of state.kds_orders) {
+          const order = normalizeOrder(raw)
+          ordersMap.current.set(order.id, order); sentOrderIds.current.add(order.id)
+        }
+        transferRefreshPending = false
+        flush()
+      } catch { /* retry alongside connection polling without clearing kitchen work */ }
+      finally { refreshingKitchen = false }
+    }
+
     const unsub = client.on((msg) => {
+      projectionGeneration++
       if (msg.type === 'SNAPSHOT') {
         setConnected(true)
         setMode('LAN_PRIMARY')
@@ -282,6 +308,7 @@ export function useKdsWsClient(restaurantId?: string): UseKdsWsClientResult {
 
       } else if (msg.type === 'DELTA') {
         const event = (msg as Extract<typeof msg, { type: 'DELTA' }>).payload.event
+        if (event.type === 'ORDER_ITEMS_TRANSFERRED') { transferRefreshPending = true; void refreshTransferredKitchen(); return }
         if (applyEvent({ ...event, sequence: msg.sequence })) flush()
 
       } else if (msg.type === 'PONG') {
@@ -296,6 +323,7 @@ export function useKdsWsClient(restaurantId?: string): UseKdsWsClientResult {
 
     // Poll connection state every 3s and switch mode on loss
     const statusInterval = setInterval(() => {
+      if (transferRefreshPending) void refreshTransferredKitchen()
       const nowConnected = client.connected
       setConnected(nowConnected)
       if (!nowConnected && modeRef.current === 'LAN_PRIMARY') {

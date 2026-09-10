@@ -127,6 +127,13 @@ async function intentarInstalar({ getSnapshot, estaBloqueada, avisar = () => {} 
     return { instalo: false, motivo: 'no se pudo consultar el freno de versiones' }
   }
 
+  // Network checks yield to incoming commands. Read state AND durable queues
+  // again immediately before the synchronous installation call.
+  let finalSnapshot = null
+  try { finalSnapshot = typeof getSnapshot === 'function' ? getSnapshot() : null } catch {}
+  const finalReadiness = puedeInstalarAhora(finalSnapshot)
+  if (!finalReadiness.permitido) return { instalo: false, motivo: finalReadiness.motivo }
+
   _instalando = true
   console.log(`[auto-update] Restaurante en reposo (${cuando.motivo}) — instalando ${_descargada.version}`)
   avisar({ instalando: true, version: _descargada.version })

@@ -43,6 +43,30 @@ afterEach(async () => { (await import('@/lib/aviso-lan')).detenerReintentos(); v
 const cargar = () => import('@/lib/aviso-lan')
 
 describe('avisarCuentaActualizada: lo que manda', () => {
+  it('cancelar o fusionar publica solo la fila confirmada con su revisión y nunca un borrador tras conflicto', async () => {
+    const { avisarCuentaConfirmada } = await cargar()
+    const order = { id: 'ord', items: [{ id: 'newer-cloud-line', subtotal: 100 }], order_revision: 7,
+      subtotal: 100, iva: 16, total: 116 }
+    expect(await avisarCuentaConfirmada({ opId: 'rejected', clientId: 'lab', result: { ok: false, order } })).toBe(false)
+    expect(await avisarCuentaConfirmada({ opId: 'lost', clientId: 'lab', result: {} })).toBe(false)
+    expect(await avisarCuentaConfirmada({ opId: 'unversioned', clientId: 'lab', result: { ok: true, order: { ...order, order_revision: undefined } } })).toBe(false)
+    expect(enviados).toHaveLength(0)
+    await avisarCuentaConfirmada({ opId: 'committed', clientId: 'lab', result: { ok: true, order } })
+    expect(enviados[0]).toMatchObject({ items: order.items, order_revision: 7, total: 116 })
+  })
+  it('una transferencia pendiente conserva los dos recibos y bloquea avisos posteriores de ambas cuentas', async () => {
+    responder = new Error('LAN caída')
+    const { avisarTransferenciaItem, avisarCuentaActualizada, reintentarAvisosPendientes } = await cargar()
+    const source = { id: 'src', items: [], order_revision: 2 }
+    const target = { id: 'dst', items: [{ id: 'coffee' }], order_revision: 1 }
+    await avisarTransferenciaItem({ opId: 'move', clientId: 'lab', itemId: 'coffee', source, target })
+    responder = { ok: true }
+    await avisarCuentaActualizada({ opId: 'newer', clientId: 'lab', orderId: 'dst', total: 116 })
+    expect(enviados).toHaveLength(1)
+    expect(enviados[0]).toMatchObject({ command_type: 'ORDER_ITEMS_TRANSFERRED', item_id: 'coffee', source_order: source, target_order: target })
+    expect(await reintentarAvisosPendientes()).toEqual({ pendientes: 0, entregados: 2 })
+    expect(enviados.map(e => e.command_id)).toEqual(['transferencia:move', 'transferencia:move', 'cuenta:newer'])
+  })
   it('REGRESION: es un ORDER_UPSERTED con la cuenta completa, y el id lleva el prefijo cuenta:', async () => {
     const { avisarCuentaActualizada } = await cargar()
     const items = [{ id: 'r1', nombre: 'Café', cantidad: 1, precio: 50, subtotal: 50 }, { id: 'r2', nombre: 'Té', cancelled: true }]
@@ -134,14 +158,14 @@ describe('cada mutación del POS avisa a Pedro', () => {
 
   it('REGRESION: cancelar un platillo avisa la cuenta completa con el renglón marcado', () => {
     const cancelar = bloque(pos, 'const handleCancelItem = useCallback', 'const handleTransferItem')
-    expect(cancelar).toMatch(/avisarCuentaActualizada\(\{/)
-    expect(cancelar).toMatch(/cuentaEnviadaParaLan/)
+    expect(cancelar).toMatch(/avisarCuentaConfirmada\(\{[^}]*result/)
+    expect(cancelar).not.toMatch(/cuentaEnviadaParaLan/)
   })
 
   it('REGRESION: transferir un platillo avisa origen y destino', () => {
     const transferir = bloque(pos, 'const handleTransferItem = useCallback', 'const handleVoidOrder')
-    expect(transferir).toContain("[['origen', result.source_order], ['destino', result.target_order]]")
-    expect(transferir).toContain('avisarCuentaActualizada(')
+    expect(transferir).toContain('avisarTransferenciaItem(')
+    expect(transferir).toContain('source: result.source_order, target: result.target_order')
     expect(transferir).toMatch(/result\.target_order/)
   })
 
@@ -162,7 +186,7 @@ describe('cada mutación del POS avisa a Pedro', () => {
     const mapa = leer('src/app/pos/mesas/page.tsx')
     const fusion = bloque(mapa, 'const handleMerge = async', 'setMerging(false)\n  }')
     expect(fusion).toMatch(/avisarCierreDeOrden\(\{[^}]*cancelada: true/)
-    expect(fusion).toMatch(/avisarCuentaActualizada\(\{[\s\S]*items: mergedItems/)
+    expect(fusion).toMatch(/avisarCuentaConfirmada\(\{[\s\S]*mergeResult\.target_order/)
   })
 
 

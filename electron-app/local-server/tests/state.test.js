@@ -12,6 +12,57 @@ function makeEvent(type, payload, seq = 1) {
 }
 
 describe('Delayed account snapshots across terminals', () => {
+  test('atomic full transfer moves pending kitchen work to a new destination and survives hydration', () => {
+    const state = new RestaurantState()
+    state.apply(makeEvent(EVENT.ORDER_SENT, { order_id: 'src', mesa: 1, items: [{ id: 'coffee' }], total: 58, order_revision: 1 }))
+    const transfer = makeEvent(EVENT.ORDER_ITEMS_TRANSFERRED, { command_id: 'move', item_id: 'coffee',
+      source_order: { id: 'src', mesa: 1, items: [], total: 0, status: 'cancelada', order_revision: 2 },
+      target_order: { id: 'dst', mesa: 2, items: [{ id: 'coffee' }], total: 58, status: 'enviada', order_revision: 1 } })
+    state.apply(transfer)
+    const secondary = new RestaurantState()
+    secondary.hidratarDesdeSnapshot(state.toSnapshot())
+    for (const replica of [state, secondary]) {
+      replica.apply(transfer)
+      replica.apply(makeEvent(EVENT.STATE_SYNC, { orders: [], mesas: [], kds_queue: [], order_snapshot_complete: true }))
+      assert.deepEqual(replica.getKdsQueue().map(q => [q.order_id, q.items_sent.map(i => i.id)]), [['dst', ['coffee']]])
+      assert.equal(JSON.parse(replica.toSnapshot().kds_orders.find(o => o.id === 'dst').items)[0].id, 'coffee')
+      assert.equal(replica.getOrder('dst').total, 58)
+      assert.equal(replica.getOrder('src').status, 'cancelada')
+      assert.notEqual(replica.getOrder('src').payment_status, 'pagada')
+      assert.equal(replica.getMesa(1).status, 'libre')
+      assert.deepEqual(replica.toSnapshot().salon_orders.map(o => o.id), ['dst'])
+    }
+  })
+
+  test('partial transfer remaps completed positions by item identity and retains other kitchen work', () => {
+    const state = new RestaurantState()
+    state.apply(makeEvent(EVENT.ORDER_SENT, { order_id: 'src', mesa: 1, items: [{ id: 'done' }, { id: 'pending' }], total: 116, order_revision: 1 }))
+    state.apply(makeEvent(EVENT.KDS_ITEM_STATUS, { order_id: 'src', kds_item_status: { 0: true, 1: false } }))
+    state.apply(makeEvent(EVENT.ORDER_ITEMS_TRANSFERRED, { command_id: 'move', item_id: 'done',
+      source_order: { id: 'src', mesa: 1, items: [{ id: 'pending' }], total: 58, status: 'enviada', order_revision: 2 },
+      target_order: { id: 'dst', mesa: 2, items: [{ id: 'done' }], total: 58, status: 'enviada', order_revision: 1 } }))
+    assert.deepEqual(JSON.parse(state.getOrder('src').kds_item_status), { 0: false })
+    assert.deepEqual(JSON.parse(state.getOrder('dst').kds_item_status), { 0: true })
+    assert.deepEqual(state.getKdsQueue().map(q => q.order_id), ['src', 'dst'])
+  })
+
+  test('delayed transfer preserves newer business snapshots and does not revive a cancelled destination', () => {
+    const state = new RestaurantState()
+    state.apply(makeEvent(EVENT.ORDER_SENT, { order_id: 'src', mesa: 1, items: [{ id: 'remaining' }], total: 58, order_revision: 4 }))
+    state.apply(makeEvent(EVENT.ORDER_SENT, { order_id: 'dst', mesa: 2, items: [{ id: 'moved' }, { id: 'new-round' }], total: 116, order_revision: 3 }))
+    const payload = { command_id: 'move', item_id: 'moved',
+      source_order: { id: 'src', mesa: 1, items: [], total: 0, status: 'enviada', order_revision: 2 },
+      target_order: { id: 'dst', mesa: 2, items: [{ id: 'moved' }], total: 58, status: 'enviada', order_revision: 1 } }
+    state.apply(makeEvent(EVENT.ORDER_ITEMS_TRANSFERRED, payload))
+    assert.equal(state.getOrder('src').total, 58)
+    assert.equal(state.getOrder('dst').total, 116)
+    assert.equal(state.getOrder('dst').order_revision, 3)
+    assert.equal(state.getKdsQueue().find(q => q.order_id === 'dst').items_sent.length, 2)
+    state.apply(makeEvent(EVENT.ORDER_CANCELLED, { order_id: 'dst', mesa: 2 }))
+    state.apply(makeEvent(EVENT.ORDER_ITEMS_TRANSFERRED, { ...payload, command_id: 'another-notice' }))
+    assert.equal(state.getOrder('dst').status, 'cancelada')
+    assert.equal(state.getKdsQueue().some(q => q.order_id === 'dst'), false)
+  })
   test('cancelled identities survive repeated snapshot hydration and reject late sends and upserts', () => {
     const caja = new RestaurantState()
     caja.apply(makeEvent(EVENT.ORDER_SENT, { order_id: 'old', mesa: 1, items: [{ id: 'a' }], total: 58 }))
@@ -342,9 +393,10 @@ describe('Clobber / STATE_SYNC merge (GAP-002)', () => {
     test('idempotente: el mismo poll dos veces deja el mismo estado', () => {
       const state = new RestaurantState()
       state.apply(makeEvent(EVENT.ORDER_SENT, { order_id: 'loc-5', mesa: '2', items: [] }, 1))
-      state.apply(poll([filaCerrada('loc-5', 2)], 2))
+      const samePoll = poll([filaCerrada('loc-5', 2)], 2)
+      state.apply(samePoll)
       const antes = JSON.stringify(state.toSnapshot())
-      state.apply(poll([filaCerrada('loc-5', 2)], 3))
+      state.apply({ ...samePoll, sequence: 3 })
       const despues = JSON.stringify(state.toSnapshot())
       assert.equal(despues, antes)
     })

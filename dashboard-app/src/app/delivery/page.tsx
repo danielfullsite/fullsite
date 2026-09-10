@@ -1,5 +1,7 @@
 'use client'
 
+import ReportUnavailable from '@/components/ReportUnavailable'
+
 import { useEffect, useState, useMemo } from 'react'
 import { Bike, TrendingUp, DollarSign, Package, Banknote, Calendar, CheckCircle } from 'lucide-react'
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts'
@@ -22,11 +24,12 @@ interface PlatformPayment {
 
 export default function DeliveryPage() {
   const [data, setData] = useState<WansoftDaily[]>([])
+  const [reportError, setReportError] = useState(false)
   const [loading, setLoading] = useState(true)
   const [payments, setPayments] = useState<PlatformPayment[]>([])
 
   useEffect(() => {
-    getRecentDays(90).then(d => { setData(d); setLoading(false) })
+    getRecentDays(90).then(d => { setData(d); setLoading(false) }).catch(() => { setReportError(true); setLoading(false) })
     // Fetch real platform payments from Supabase
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
     const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -96,6 +99,8 @@ export default function DeliveryPage() {
       Otros: Math.round(v.otros),
     }))
   }, [data])
+
+  if (reportError) return <ReportUnavailable />
 
   return (
     <>

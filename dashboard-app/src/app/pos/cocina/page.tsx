@@ -264,7 +264,7 @@ export default function CocinaPage() {
 
   // Push DELTA events from the POS local server — works cross-device over LAN
   useBridgeClient((event) => {
-    const ORDER_EVENTS = ['ORDER_UPSERTED', 'ORDER_SENT', 'ORDER_CLOSED', 'KDS_ITEM_STATUS']
+    const ORDER_EVENTS = ['ORDER_UPSERTED', 'ORDER_SENT', 'ORDER_ITEMS_TRANSFERRED', 'ORDER_CLOSED', 'KDS_ITEM_STATUS']
     if (!ORDER_EVENTS.includes(event.type)) return
     const p = event.payload as Record<string, unknown> | undefined
     if ((event.type === 'ORDER_SENT' || event.type === 'ORDER_UPSERTED') && p && p.order_id) {

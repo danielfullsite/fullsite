@@ -79,10 +79,10 @@ describe('lo que un mesero SÍ tiene que poder hacer sigue pasando', () => {
     expect(camposProhibidos('pos_orders', MESERO, JSON.stringify({ mesero: 'Ana' }))).toEqual([])
   })
 
-  it('una columna que nadie ha inventado todavía pasa', () => {
-    // La lista es de lo PROHIBIDO. Si fuera de lo permitido, agregar un campo al POS lo
-    // rompería en producción sin que nadie relacione una cosa con la otra.
-    expect(camposProhibidos('pos_orders', MESERO, JSON.stringify({ notas_de_alergia: 'sin nuez' }))).toEqual([])
+  it('una columna nueva requiere un permiso explícito antes de escribirse por el proxy', () => {
+    // Una columna nueva puede modificar autoridad o contabilidad. Los cambios de
+    // cuenta pasan por su operación autenticada; el proxy sólo admite sus campos explícitos.
+    expect(camposProhibidos('pos_orders', MESERO, JSON.stringify({ notas_de_alergia: 'sin nuez' }))).toEqual(['notas_de_alergia'])
   })
 
   it('las tablas sin cifras de dinero no se filtran', () => {

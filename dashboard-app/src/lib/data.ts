@@ -1,6 +1,6 @@
 import type { WansoftDaily } from './types'
 import { supabase } from './supabase'
-import { nowMX, fmtDateMX, zonedStartOfDayISO } from './date-mx'
+import { nowMX, fmtDateMX } from './date-mx'
 import { fetchWithTimeout } from './fetch-with-timeout'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -227,10 +227,12 @@ function locationFilter(locationId?: string | null): string {
 
 export async function getRecentDays(days: number = 30, clientSlug: string = getActiveClientSlug(), locationId?: string | null): Promise<WansoftDaily[]> {
   // Try pos_orders first for recent data (last 7 days) — this is the live POS data
-  const posRecent = await getDashboardFromPosOrders(Math.min(days, 90), clientSlug, locationId)
+  let posError: unknown
+  const posRecent = await getDashboardFromPosOrders(Math.min(days, 90), clientSlug, locationId).catch(error => { posError = error; return [] })
   // Then get wansoft_daily for historical data
   const data = await sbFetch('wansoft_daily', `select=*&client_slug=eq.${clientSlug}${locationFilter(locationId)}&ventas_dia=gt.0&order=fecha.desc&limit=${days * 2}`) as Record<string, unknown>[]
   const wansoftData = dedupeByFecha(data).slice(0, days).reverse().map(parseRow)
+  if (posError && !wansoftData.length) throw posError
   // Merge: for dates that exist in both, prefer pos_orders (live POS data)
   const posDateSet = new Set(posRecent.map(d => d.fecha))
   const merged = [
@@ -243,12 +245,14 @@ export async function getRecentDays(days: number = 30, clientSlug: string = getA
 
 export async function getLatestDay(clientSlug: string = getActiveClientSlug(), locationId?: string | null): Promise<WansoftDaily | null> {
   // Try pos_orders first — live POS data takes priority
-  const posData = await getDashboardFromPosOrders(7, clientSlug, locationId)
+  let posError: unknown
+  const posData = await getDashboardFromPosOrders(7, clientSlug, locationId).catch(error => { posError = error; return [] })
   if (posData.length > 0) return posData[posData.length - 1]
   // Fallback to wansoft_daily
   const data = await sbFetch('wansoft_daily', `select=*&client_slug=eq.${clientSlug}${locationFilter(locationId)}&ventas_dia=gt.0&order=fecha.desc&limit=5`) as Record<string, unknown>[]
   const deduped = dedupeByFecha(data)
   if (deduped.length > 0) return parseRow(deduped[0])
+  if (posError) throw posError
   return null
 }
 
@@ -315,8 +319,9 @@ export async function getDateRange(from: string, to: string, clientSlug: string 
   if (rows.length > 0) return rows
   // POS fallback: calculate days in range, fetch, then filter
   const fromDate = new Date(from + 'T00:00:00')
-  const toDate = new Date(to + 'T23:59:59')
-  const days = Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
+  // POS reader takes a lookback from today, not the requested interval length.
+  // A historical week must not accidentally read only the last seven days.
+  const days = Math.max(0, Math.ceil((Date.now() - fromDate.getTime()) / (1000 * 60 * 60 * 24))) + 1
   const posData = await getDashboardFromPosOrders(days, clientSlug, locationId)
   return posData.filter(d => d.fecha >= from && d.fecha <= to)
 }
@@ -497,24 +502,86 @@ function classifyItemGroup(lower: string): string {
   return 'OTROS'
 }
 
+interface PosDashboardOrder {
+  id: string; parent_order_id?: string | null; caja_stream_id?: string | null
+  payment_status?: string | null; dia_venta: string; mesa: number; mesero: string; personas: number
+  total: number; subtotal: number; iva: number; descuento: number; propina: number
+  metodo_pago?: string | null; pagos?: unknown; items?: unknown; status: string; created_at: string
+  caja_financial_snapshot?: { payments?: Array<{ payment_id: string; status: string; amount_cents: number; method: string; provider?: string }> }
+}
+type DashboardPayment = { metodo?: string; monto: number; estado?: string; status?: string }
+type DashboardItem = { nombre?: string; precio?: number; cantidad?: number; cancelled?: boolean }
+function reportArray<T>(value: unknown): T[] {
+  if (value == null) return []
+  try {
+    const rows: unknown = typeof value === 'string' ? JSON.parse(value) : value
+    if (!Array.isArray(rows)) throw new Error('not an array')
+    return rows as T[]
+  } catch { throw new Error('POS_REPORT_UNAVAILABLE: invalid financial detail') }
+}
+
+
+/** Settled sales by the database's materialized business day (folio migration
+ * 20260901180000). Kitchen completion never establishes payment. Legacy split
+ * parents marked dividida are not sales; explicit children replace legacy
+ * parents, while Caja represents accounts inside its single financial order.
+ * This is not a collections ledger: partial accepted payments are not sales.
+ * A failed/incomplete read must reject, never return a plausible zero report.
+ * Keyset pages avoid server row caps and offset shifts; this is a live cloud
+ * projection, not a transactionally frozen X/Z or synchronization receipt. */
 export async function getDashboardFromPosOrders(days: number = 30, clientId: string = getActiveClientSlug(), locationId?: string | null): Promise<WansoftDaily[]> {
+  if (!clientId || !Number.isInteger(days) || days < 0) throw new Error('POS_REPORT_UNAVAILABLE: invalid scope or period')
   const cutoff = nowMX()
   cutoff.setDate(cutoff.getDate() - days)
   const cutoffStr = fmtDateMX(cutoff)
-
-  const orders = await sbFetch('pos_orders',
-    `select=mesa,mesero,personas,total,subtotal,iva,descuento,propina,metodo_pago,pagos,items,status,created_at&client_id=eq.${clientId}${locationFilter(locationId)}&status=eq.cerrada&created_at=gte.${zonedStartOfDayISO(cutoffStr)}&order=created_at.asc&limit=5000`
-  ) as { mesa: number; mesero: string; personas: number; total: number; subtotal: number; iva: number; descuento: number; propina: number; metodo_pago: string; pagos: { metodo: string; monto: number }[] | null; items: { nombre: string; precio: number; cantidad: number }[] | null; status: string; created_at: string }[]
-
+  const token = await getAuthToken()
+  if (!token || token === SUPABASE_KEY) throw new Error('POS_REPORT_UNAVAILABLE: authenticated session required')
+  const all: PosDashboardOrder[] = []
+  const seen = new Set<string>()
+  let after: string | undefined
+  for (;;) {
+    // Select * tolerates additive Caja columns on legacy deployments. dia_venta
+    // is required: substituting created_at would silently move after-midnight sales.
+    const params = new URLSearchParams({ select: '*', client_id: `eq.${clientId}`,
+      dia_venta: `gte.${cutoffStr}`, order: 'id.asc', limit: '1000' })
+    if (locationId) params.set('location_id', `eq.${locationId}`)
+    if (after) params.set('id', `gt."${after.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`)
+    let page: PosDashboardOrder[]
+    try {
+      const response = await fetchWithTimeout(`${SUPABASE_URL}/rest/v1/pos_orders?${params}`, {
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}` }, cache: 'no-store',
+      }, 10_000)
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      const body: unknown = await response.json()
+      if (!Array.isArray(body)) throw new Error('invalid rows')
+      page = body
+      for (const row of page) {
+        if (!row || typeof row.id !== 'string' || !row.id || seen.has(row.id) ||
+          typeof row.dia_venta !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(row.dia_venta)) throw new Error('invalid or repeated row')
+        seen.add(row.id)
+      }
+    } catch { throw new Error('POS_REPORT_UNAVAILABLE: incomplete order read') }
+    if (!page.length) break
+    all.push(...page)
+    after = page[page.length - 1].id
+  }
+  const parentsWithChildren = new Set(all.map(o => o.parent_order_id).filter(Boolean))
+  const cajaParents = new Set(all.filter(o => o.caja_stream_id).map(o => o.id))
+  const orders = all.filter(o => {
+    if (['cancelada', 'void', 'dividida'].includes(o.status)) return false
+    if (o.parent_order_id && cajaParents.has(o.parent_order_id)) return false
+    if (!o.caja_stream_id && parentsWithChildren.has(o.id)) return false
+    return o.payment_status === 'pagada' || (!o.payment_status && !o.caja_stream_id && o.status === 'cerrada')
+  })
+  for (const o of orders) {
+    if (typeof o.total !== 'number' || !Number.isFinite(o.total) || o.total < 0) throw new Error('POS_REPORT_UNAVAILABLE: invalid sale amount')
+  }
   if (orders.length === 0) return []
 
   // Group by date
   const byDate = new Map<string, typeof orders>()
   for (const o of orders) {
-    // Agrupar por la fecha LOCAL del negocio, no por la fecha UTC del timestamp
-    // (created_at.slice(0,10) = fecha UTC → una venta de la tarde/noche caía en
-    // el día siguiente para cualquier zona ≠ centro). fmtDateMX usa la zona activa.
-    const fecha = fmtDateMX(new Date(o.created_at))
+    const fecha = o.dia_venta
     if (!byDate.has(fecha)) byDate.set(fecha, [])
     byDate.get(fecha)!.push(o)
   }
@@ -540,14 +607,27 @@ export async function getDashboardFromPosOrders(days: number = 30, clientId: str
     let efectivo = 0, tarjeta = 0, propinasTotal = 0
     for (const o of dayOrders) {
       propinasTotal += o.propina || 0
-      const pagos = Array.isArray(o.pagos) && o.pagos.length > 0
-        ? o.pagos
-        : [{ metodo: o.metodo_pago || 'Efectivo', monto: o.total }]
+      let pagos: DashboardPayment[]
+      if (o.caja_financial_snapshot?.payments) {
+        pagos = o.caja_financial_snapshot.payments.filter(p => p.status === 'accepted').map(p => {
+          if (!Number.isSafeInteger(p.amount_cents) || p.amount_cents < 0) throw new Error('POS_REPORT_UNAVAILABLE: invalid accepted payment')
+          return { metodo: p.method === 'external' ? `external:${p.provider || 'unknown'}` : p.method, monto: p.amount_cents / 100 }
+        })
+      } else {
+        const recorded = reportArray<DashboardPayment>(o.pagos)
+        pagos = recorded.filter(p =>
+          (!p.estado && !p.status) || p.estado === 'aceptado' || p.status === 'accepted')
+        // A legacy explicit method is evidence; absent methods and absent Caja
+        // payments cannot be fabricated as cash (or silently classified as card).
+        if (!recorded.length && !o.caja_stream_id && o.metodo_pago) pagos = [{ metodo: o.metodo_pago, monto: o.total }]
+      }
       for (const p of pagos) {
-        const m = (p.metodo || '').toLowerCase()
-        pagoMap.set(p.metodo || 'Efectivo', (pagoMap.get(p.metodo || 'Efectivo') || 0) + (p.monto || 0))
-        if (/efectivo|cash/.test(m)) efectivo += p.monto || 0
-        else tarjeta += p.monto || 0
+        if (typeof p.monto !== 'number' || !Number.isFinite(p.monto) || p.monto < 0) throw new Error('POS_REPORT_UNAVAILABLE: invalid payment amount')
+        const name = p.metodo || 'Sin identificar'
+        const m = name.toLowerCase()
+        pagoMap.set(name, (pagoMap.get(name) || 0) + p.monto)
+        if (/^(efectivo|cash)$/.test(m)) efectivo += p.monto
+        else if (/tarjeta|card|credito|crédito|debito|débito/.test(m) && !m.startsWith('external:')) tarjeta += p.monto
       }
     }
     const pagoMetodos = Array.from(pagoMap.entries())
@@ -558,9 +638,9 @@ export async function getDashboardFromPosOrders(days: number = 30, clientId: str
     const itemMap = new Map<string, { total: number; cantidad: number }>()
     const grupoMap = new Map<string, number>()
     for (const o of dayOrders) {
-      if (Array.isArray(o.items)) {
-        for (const item of o.items) {
-          if (!item.nombre) continue
+      {
+        for (const item of reportArray<DashboardItem>(o.items)) {
+          if (!item.nombre || item.cancelled) continue
           const itemTotal = (item.precio || 0) * (item.cantidad || 1)
           const qty = item.cantidad || 1
           const existing = itemMap.get(item.nombre)
@@ -622,7 +702,7 @@ export async function getDashboardFromPosOrders(days: number = 30, clientId: str
       updated_at: new Date().toISOString(),
     })
   }
-  return result
+  return result.sort((a, b) => a.fecha.localeCompare(b.fecha))
 }
 
 // ─── Dashboard «Turno» ──────────────────────────────────────────────────────

@@ -1,5 +1,7 @@
 'use client'
 
+import ReportUnavailable from '@/components/ReportUnavailable'
+
 import { useState, useCallback, useEffect, useMemo } from 'react'
 import { Upload, CheckCircle, AlertTriangle, DollarSign, CreditCard, Banknote, ArrowUpDown, FileSpreadsheet, TrendingUp } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
@@ -80,13 +82,14 @@ function normalizeFecha(raw: string): string {
 export default function ConciliacionPage() {
   const [salesData, setSalesData] = useState<WansoftDaily[]>([])
   const [bankData, setBankData] = useState<BankRow[]>([])
+  const [reportError, setReportError] = useState(false)
   const [loading, setLoading] = useState(true)
   const [fileName, setFileName] = useState('')
   const [sortBy, setSortBy] = useState<'fecha' | 'diferencia'>('fecha')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
   useEffect(() => {
-    getRecentDays(90).then(d => { setSalesData(d); setLoading(false) }).catch(() => setLoading(false))
+    getRecentDays(90).then(d => { setSalesData(d); setLoading(false) }).catch(() => { setReportError(true); setLoading(false) })
   }, [])
 
   const handleUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -165,6 +168,8 @@ export default function ConciliacionPage() {
   const alertas = conciliacion.filter(r => r.status === 'alerta').length
   const pendientes = conciliacion.filter(r => r.status === 'pendiente').length
   const conciliados = conciliacion.filter(r => r.status === 'ok').length
+
+  if (reportError) return <ReportUnavailable />
 
   if (loading) {
     return <div className="flex items-center justify-center h-96"><div className="w-10 h-10 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>

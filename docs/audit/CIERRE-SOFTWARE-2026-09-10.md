@@ -67,3 +67,47 @@ CI 34454000448 pasó protocolo/servidor, legacy 21/21 y PostgreSQL (transferenci
 materializador). Caja pasó 13 casos antes de que el selector accesible de tipo de
 movimiento no coincidiera con la etiqueta exacta del laboratorio. Se corrige el
 nombre accesible explícito del control y se repite el recorrido completo.
+
+## Tercera tanda: confirmación y recuperación
+
+CI 34454791513: Caja 16/16, legacy 21/21 y PostgreSQL aprobados. Una prueba
+del servidor construía dos polls con horas distintas para afirmar que eran el
+mismo mensaje; ahora reutiliza exactamente el mismo payload. La suite local
+posterior pasó 554/554 y DOM 235/235, antes de la integración de recuperación
+de cancelaciones/reportes/inventario que está en curso.
+
+- Transferencias: un solo evento durable transporta ambas cuentas confirmadas;
+  conserva preparación y remapea los estados de cocina por identidad del platillo.
+  Transferir el último platillo libera la cuenta origen sin inventar un pago.
+  PostgreSQL 9 grupos aprobados, incluida creación simultánea desde otra terminal
+  y mesa reutilizada cuando su cuenta pagada conserva historia en cocina.
+  El índice de una cuenta activa por mesa está PENDIENTE; duplicados existentes
+  bloquean su instalación y requieren resolución explícita, no borrado automático.
+- Cancelación: calcula descuento e IVA registrados en centavos; rechaza cuentas
+  pagadas o inconsistentes y devuelve fila/revisión confirmadas. Una respuesta
+  rechazada no autoriza sustituir el snapshot de LAN.
+- Inventario manual: operación autenticada y transacción única para recibo exacto,
+  ledger, stock y costo promedio. Reintentos conservan la identidad; no existe
+  fallback a PATCH de existencias. Migración PENDIENTE y laboratorio PostgreSQL.
+- Conciliación de venta: cancelar sin preparar devuelve el consumo fijado una
+  sola vez; cancelar preparado lo conserva aun después de retirar el renglón del
+  ticket. Transferir conserva el mismo registro de consumo y su provenance.
+  Siete grupos PostgreSQL aprobados. No cambia la autoridad ni clasifica productos
+  por aproximación de nombre: una clasificación ausente sigue BLOCKED.
+- Reportes: venta pagada independiente del estado de cocina, día de venta,
+  paginación completa, exclusión de padres divididos y métodos de pago registrados.
+  Los cobros parciales requieren su ledger separado y aún no cierran H01/H13.
+- Actualizador: verifica estado durable, comandos en vuelo, saldos, outbox y
+  trabajos de impresión; vuelve a comprobar inmediatamente antes de instalar.
+  No se activaron releases ni actualización automática.
+
+Las nuevas migraciones deben validarse juntas antes del despliegue coordinado.
+La deducción automática legacy se está integrando a la reconciliación canónica;
+los restantes H02–H16 y el nuevo instalador siguen en trabajo. Esta evidencia no declara cerrado
+el sistema ni sustituye las verificaciones físicas de la visita.
+
+Validación conjunta de esta tanda: web 3,679/3,679 (sin proveedor IA real), DOM
+245/245 y servidor local 554/554. PostgreSQL: transferencia 9 grupos, movimiento
+manual 7 grupos y conciliación de consumo 7 grupos. Se ejecutará el laboratorio
+multi-terminal en CI sobre el commit integrado; aún no se traslada evidencia del
+commit anterior a éste.

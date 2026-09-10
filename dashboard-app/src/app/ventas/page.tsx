@@ -1,5 +1,7 @@
 'use client'
 
+import ReportUnavailable from '@/components/ReportUnavailable'
+
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import {
   ResponsiveContainer,
@@ -14,7 +16,7 @@ import { DollarSign, Receipt, Tag, Gift, Store, ShoppingBag, Smartphone, ShieldA
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
 import { Table, type ColumnDef } from '@/components/ui/Table'
-import { getDateRange, aggregatePayments, aggregateGrupos, getWansoftData, getDashboardFromPosOrders } from '@/lib/data'
+import { getDateRange, aggregatePayments, aggregateGrupos, getWansoftData } from '@/lib/data'
 import { fmtDateMX, getActiveTimezone, todayMX, sumarDias } from '@/lib/date-mx'
 import { formatCurrency, formatPercent, percentChange } from '@/lib/format'
 import type { WansoftDaily } from '@/lib/types'
@@ -117,6 +119,7 @@ function TablaControl({
 export default function VentasPage() {
   const [data, setData] = useState<WansoftDaily[]>([])
   const [prevData, setPrevData] = useState<WansoftDaily[]>([])
+  const [reportError, setReportError] = useState(false)
   const [loading, setLoading] = useState(true)
   const [preset, setPreset] = useState<Preset>('mes')
   const [customFrom, setCustomFrom] = useState('')
@@ -134,16 +137,10 @@ export default function VentasPage() {
   }, [preset, customFrom, customTo])
 
   const loadData = useCallback(async () => {
+    setReportError(false)
     setLoading(true)
     try {
-      let result = await getDateRange(dates.from, dates.to)
-      // Fallback: if no wansoft_daily data, build from pos_orders
-      if (result.length === 0) {
-        const fromDate = new Date(dates.from + 'T12:00:00')
-        const toDate = new Date(dates.to + 'T12:00:00')
-        const diff = Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
-        result = await getDashboardFromPosOrders(diff)
-      }
+      const result = await getDateRange(dates.from, dates.to)
       setData(result)
 
       const fromDate = new Date(dates.from + 'T12:00:00')
@@ -171,6 +168,7 @@ export default function VentasPage() {
       setCortesias(courtesyRes?.data as {nombre: string; total: number}[] || [])
       setDescuentosDetalle(discountsRes?.data as {nombre: string; total: number}[] || [])
     } catch (err) {
+      setReportError(true)
       console.error('Error loading ventas data:', err)
     } finally {
       setLoading(false)
@@ -216,6 +214,8 @@ export default function VentasPage() {
     { key: 'mes', label: 'Mes' },
     { key: 'custom', label: 'Personalizado' },
   ]
+
+  if (reportError) return <ReportUnavailable onRetry={loadData} />
 
   return (
     <>

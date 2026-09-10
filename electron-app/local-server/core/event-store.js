@@ -82,7 +82,7 @@ class CoreEventStore {
   async getLastSequence()                            { return this._store.getLastSequence() }
   async unsyncedCount()                              { return this._store.unsyncedCount() }
   async markSynced(sequences)                        { return this._store.markSynced(sequences) }
-  getStats()                                         { return this._store.getStats ? this._store.getStats() : {} }
+  getStats()                                         { return { ...(this._store.getStats ? this._store.getStats() : {}), commandsInFlight: this._enVuelo.size } }
 }
 
 module.exports = { CoreEventStore }
