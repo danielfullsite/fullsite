@@ -229,7 +229,30 @@ async function startNube() {
     let body = ''
     req.on('data', chunk => { body += chunk })
     req.on('end', () => {
-      const responder = (status, json) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(json)) }
+      const responder = (status, json) => { res.writeHead(status, {
+        'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': '*', 'Access-Control-Allow-Methods': 'GET,POST,PATCH,DELETE,OPTIONS',
+      }); res.end(JSON.stringify(json)) }
+      // A real HTTP response avoids the status=0 observed when Electron receives
+      // Playwright's fulfilled PATCH response. Only synthetic renderer fixtures
+      // use this prefix; the real Caja PIN/catalog paths below stay separate.
+      if (url.pathname.startsWith('/renderer/')) {
+        if (req.method === 'OPTIONS') return responder(200, {})
+        const pathname = url.pathname.slice('/renderer'.length)
+        const rest = pathname.startsWith('/rest/v1/') ? pathname.slice('/rest/v1/'.length)
+          : pathname === '/api/pos/db' ? url.searchParams.get('path') || '' : null
+        if (rest !== null) return responder(200, fixture[rest.split('?')[0]] || [])
+        if (pathname === '/api/pos/pin') {
+          let input = {}
+          try { input = JSON.parse(body || '{}') } catch {}
+          const reply = respuestaDePin(input.pin)
+          return responder(reply.status, reply.json)
+        }
+        if (/save-order|add-items|payment|merge-orders|transfer|split|liquidar/.test(pathname)) {
+          return responder(503, { error: 'El laboratorio exige escritura por Caja' })
+        }
+        return responder(200, {})
+      }
       if (req.method === 'POST' && url.pathname === '/api/pos/pin') {
         let cuerpo = {}
         try { cuerpo = JSON.parse(body || '{}') } catch {}
@@ -268,29 +291,9 @@ async function fixtureRoute(route, uiOrigin, pedroPorts) {
   // Nunca enviar tráfico de este laboratorio a un restaurante o proveedor real.
   if (!local && !['data:', 'blob:', 'about:'].includes(url.protocol)) return route.abort('blockedbyclient')
   if (pedroPorts.includes(Number(url.port))) return route.continue()
-  const rest = url.pathname.startsWith('/rest/v1/') ? url.pathname.slice('/rest/v1/'.length)
-    : url.pathname === '/api/pos/db' ? url.searchParams.get('path') || '' : null
-  if (rest !== null) {
+  if (url.pathname.startsWith('/rest/v1/') || url.pathname.startsWith('/api/') || url.pathname.startsWith('/auth/')) {
     if (!wan) return route.abort('internetdisconnected')
-    const table = rest.split('?')[0]
-    const rows = fixture[table] || []
-    return route.fulfill({ status: 200, json: rows, headers: { 'access-control-allow-origin': '*' } })
-  }
-  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/auth/')) {
-    if (!wan) return route.abort('internetdisconnected')
-    if (url.pathname === '/api/pos/pin') {
-      // Bajo Electron este camino no se usa (el PIN va a Caja); se mantiene
-      // coherente con la nube del laboratorio por si el renderer lo llamara.
-      let pinRecibido = null
-      try { pinRecibido = JSON.parse(request.postData() || '{}').pin ?? null } catch {}
-      const r = respuestaDePin(pinRecibido)
-      return route.fulfill({ status: r.status, json: r.json })
-    }
-    // Unexpected order mutations must not silently succeed in the fixture.
-    if (/save-order|add-items|payment|merge-orders|transfer|split|liquidar/.test(url.pathname)) {
-      return route.fulfill({ status: 503, json: { error: 'El laboratorio exige escritura por Caja' } })
-    }
-    return route.fulfill({ json: {} })
+    return route.continue({ url: `${nube.origin}/renderer${url.pathname}${url.search}` })
   }
   if (url.origin === uiOrigin) return route.continue()
   return route.abort('blockedbyclient')
