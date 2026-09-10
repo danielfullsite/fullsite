@@ -31,7 +31,7 @@ export default function MovimientoDeCaja({ turnoId }: { turnoId: string }) {
   return <section aria-label="Movimientos de efectivo" className="space-y-3 rounded-2xl border border-[var(--line)] p-5">
     <h2 className="text-xl font-semibold">Retiro o depósito</h2>
     <p className="text-sm">Se registra en el turno y se incluye en el efectivo esperado. Requiere autorización.</p>
-    <label className="block">Tipo de movimiento<select disabled={busy} value={type} onChange={e => setType(e.target.value as typeof type)} className="ml-2 rounded border bg-[var(--surface)] p-2"><option value="retiro">Retiro</option><option value="deposito">Depósito</option></select></label>
+    <label className="block">Tipo de movimiento<select aria-label="Tipo de movimiento" disabled={busy} value={type} onChange={e => setType(e.target.value as typeof type)} className="ml-2 rounded border bg-[var(--surface)] p-2"><option value="retiro">Retiro</option><option value="deposito">Depósito</option></select></label>
     <label className="block">Importe del movimiento<input disabled={busy} inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)} className="ml-2 rounded border bg-transparent p-2" /></label>
     <label className="block">Motivo del movimiento<input disabled={busy} value={reason} onChange={e => setReason(e.target.value)} className="ml-2 rounded border bg-transparent p-2" /></label>
     <label className="block">PIN de autorización<input disabled={busy} type="password" inputMode="numeric" autoComplete="off" value={pin} onChange={e => setPin(e.target.value)} className="ml-2 rounded border bg-transparent p-2" /></label>

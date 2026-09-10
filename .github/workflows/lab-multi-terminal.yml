@@ -37,8 +37,8 @@ on:
       - 'electron-app/local-server/**'
       - 'electron-app/main.js'
       - 'electron-app/lab/**'
-      - 'dashboard-app/src/app/pos/**'
-      - 'dashboard-app/src/lib/aviso-lan.ts'
+      - 'dashboard-app/src/**'
+      - 'supabase/migrations/**'
       - '.github/workflows/lab-multi-terminal.yml'
   push:
     branches: [main]
@@ -160,6 +160,8 @@ jobs:
           node-version: '20'
       - name: Probar transferencia en PostgreSQL temporal
         run: node electron-app/lab/run-transfer-item-local.cjs
+      - name: Probar aislamiento de proxy y tablas hijas en PostgreSQL temporal
+        run: node electron-app/lab/run-scoped-upsert-local.cjs
       - name: Instalar runtime del materializador
         run: npm ci
         working-directory: electron-app
@@ -172,3 +174,4 @@ jobs:
           path: |
             output/closure/transfer-item
             output/closure/materializer
+            output/closure/scoped-upsert

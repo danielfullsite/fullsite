@@ -46,3 +46,24 @@ completo sólo por añadir un guard o pasar una suite parcial.
 - H14: corregida la incompatibilidad anon/service_role del outbox con una ruta fija del servidor; service key permanece fuera de Electron. Siete pruebas de handler, incluyendo eventos válidos superiores a 2 MB.
 - Revisión independiente encontró pérdida de tombstones al reconectar y sobrescritura por snapshots versionados atrasados. Se incorporan regresiones; las revisiones cero legacy aún no representan orden global.
 - H09: siguen en trabajo la normalización de rutas, selecciones de columnas sensibles, tablas hijas, upsert entre tenants y compatibilidad de deducción automática de inventario. Estos hallazgos impiden declarar el cierre global.
+
+## Aislamiento del proxy, siguiente tanda
+
+Se restringe el recurso a una tabla canónica y las selecciones a columnas planas;
+los alias/embeds no pertenecen al contrato genérico. También se rechazan filtros
+sobre secretos de identidad. Los upserts pasan a `pos_scoped_upsert`: el conflicto
+sólo actualiza una fila del tenant verificado y no reasigna id/client_id. Las tablas
+hijas pasan por `pos_scoped_child`, que comprueba padre e ingrediente dentro de
+PostgreSQL en cada lectura/escritura. Ambas migraciones permanecen PENDIENTES:
+la ausencia de RPC devuelve indisponibilidad y nunca abre un fallback privilegiado.
+Se deben aplicar en el entorno de validación antes de desplegar estos handlers.
+
+La deducción legacy de inventario todavía requiere integración con una operación
+confiable del servidor; restringir escrituras arbitrarias del navegador por sí
+solo no la termina. Tampoco se ha cerrado la pertenencia de todas las relaciones
+restantes de las tablas con client_id.
+
+CI 34454000448 pasó protocolo/servidor, legacy 21/21 y PostgreSQL (transferencias,
+materializador). Caja pasó 13 casos antes de que el selector accesible de tipo de
+movimiento no coincidiera con la etiqueta exacta del laboratorio. Se corrige el
+nombre accesible explícito del control y se repite el recorrido completo.

@@ -229,9 +229,9 @@ export function camposProhibidos(table: string, role: string | null | undefined,
 /**
  * Columnas que NUNCA salen por el proxy, pase lo que pase en el `select`.
  *
- * Se filtran del CUERPO de la respuesta, no del query: un `select=*`, un
- * `select=pin`, un embed o un RPC que devuelva la fila entera quedan cubiertos
- * por igual. Filtrar el query string se puede evadir; filtrar la salida no.
+ * Las consultas genéricas sólo admiten selección plana; alias, embeddings y
+ * filtros sobre secretos se rechazan. La salida se redacta además para cubrir
+ * select=* y los recibos de escritura de las rutas fijas.
  */
 export const REDACTED_COLUMNS: Record<string, readonly string[]> = {
   pos_staff: ['pin'],
@@ -244,7 +244,8 @@ export function isManager(role: string | undefined | null): boolean {
 
 /** Nombre de tabla a partir de `pos_orders?select=*` o `rest/v1/pos_orders?...`. */
 export function tableOf(path: string): string {
-  return (path.split('?')[0] || '').replace(/^rest\/v1\//, '').split('/')[0] || ''
+  const resource = (path.split('?')[0] || '').replace(/^rest\/v1\//, '')
+  return /^[a-z][a-z0-9_]*$/.test(resource) && !path.includes('#') ? resource : ''
 }
 
 /**
@@ -305,4 +306,16 @@ export function prepararCuerpoProxy(table: string, role: string | null | undefin
   if (forbidden.length) return { error: `estas columnas requieren rol de gerente: ${forbidden.join(', ')}`, status: 403 }
   const stamped = callerRows.map(row => method === 'POST' && !NO_CID.has(table) ? { ...row, client_id: clientId } : row)
   return { body: JSON.stringify(Array.isArray(data) ? stamped : stamped[0]) }
+}
+
+/** The generic POS proxy supports flat columns only. Aliases/embeds must use a
+ * domain endpoint with its own field and relationship authorization. Existing
+ * POS callers use flat selections; identity secrets cannot be renamed around
+ * response redaction or tested through filters/counts. */
+export function consultaProxyValida(table: string, params: URLSearchParams): boolean {
+  if (params.getAll('select').length > 1) return false
+  const select = params.get('select')
+  if (select !== null && !/^(?:\*|[a-z_][a-z0-9_]*)(?:,(?:\*|[a-z_][a-z0-9_]*))*$/i.test(select)) return false
+  const secrets = REDACTED_COLUMNS[table] || []
+  return !secrets.some(column => new RegExp(`\\b${column}\\b`, 'i').test(Array.from(params.entries()).flat().join(' ')))
 }
