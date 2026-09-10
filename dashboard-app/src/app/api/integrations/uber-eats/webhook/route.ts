@@ -227,7 +227,7 @@ async function sendToDLQ(eventId: string, eventType: string, clientId: string, p
 
 // ─── Order persistence (exactly-once) ────────────────────────────────────────
 
-async function persistOrder(
+export async function persistOrder(
   order: ReturnType<typeof normalizeUberOrder>,
   webhookEventId: string
 ): Promise<{ ok: boolean; was_duplicate: boolean }> {
@@ -262,8 +262,12 @@ async function persistOrder(
     method: 'POST',
     headers: {
       ...sbHeaders(),
-      // ON CONFLICT on (platform, platform_order_id) — exactly-once
-      Prefer: 'return=minimal,resolution=ignore-duplicates',
+      // return=representation (NOT minimal): a fresh insert comes back as [row]
+      // and a conflict suppressed by resolution=ignore-duplicates comes back as [].
+      // return=minimal returned an empty body for BOTH cases, so was_duplicate was
+      // always true and handleNewOrder skipped acceptOrder for genuinely new orders
+      // (the order showed on the KDS but Uber auto-cancelled it after the accept window).
+      Prefer: 'return=representation,resolution=ignore-duplicates',
     },
     body: JSON.stringify(row),
   })
@@ -273,10 +277,15 @@ async function persistOrder(
     return { ok: false, was_duplicate: err.includes('duplicate') || err.includes('conflict') }
   }
 
-  // 201 = created, 200 with empty body = duplicate ignored
-  const responseText = await r.text()
-  const wasDuplicate = responseText === '' || r.status === 200
-  return { ok: true, was_duplicate: wasDuplicate }
+  // [row] = newly inserted; [] = row already existed, conflict ignored (duplicate).
+  let insertedCount = 0
+  try {
+    const inserted = await r.json()
+    insertedCount = Array.isArray(inserted) ? inserted.length : inserted ? 1 : 0
+  } catch {
+    insertedCount = 0
+  }
+  return { ok: true, was_duplicate: insertedCount === 0 }
 }
 
 // ─── Main handler ─────────────────────────────────────────────────────────────
