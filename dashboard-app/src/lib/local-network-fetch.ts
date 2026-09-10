@@ -37,7 +37,7 @@
 type TargetAddressSpace = 'loopback' | 'local'
 
 type LocalNetworkRequestInit = RequestInit & {
-  targetAddressSpace: TargetAddressSpace
+  targetAddressSpace?: TargetAddressSpace
 }
 
 /** Extrae el host del destino, sea string, URL o Request. */
@@ -124,6 +124,10 @@ export function credencialDeLaRedLocal(): Record<string, string> {
   }
 }
 
+// Enum support is fixed for one browser runtime. Key by transport and value so
+// changing a polyfill cannot inherit a different engine's compatibility result.
+const unsupportedSpaces = new WeakMap<typeof fetch, Set<TargetAddressSpace>>()
+
 export async function localNetworkFetch(
   input: RequestInfo | URL,
   init: RequestInit = {},
@@ -131,9 +135,11 @@ export async function localNetworkFetch(
   const headers = new Headers(input instanceof Request ? input.headers : undefined)
   for (const [key, value] of Object.entries(credencialDeLaRedLocal())) headers.set(key, value)
   new Headers(init.headers).forEach((value, key) => headers.set(key, value))
+  const transport = fetch
+  const space = targetAddressSpaceFor(input)
   const localInit: LocalNetworkRequestInit = {
     ...init,
-    targetAddressSpace: targetAddressSpaceFor(input),
+    ...(unsupportedSpaces.get(transport)?.has(space) ? {} : { targetAddressSpace: space }),
     // Las de quien llama ganan: un caso concreto puede necesitar otra identidad.
     headers,
   }
@@ -142,13 +148,16 @@ export async function localNetworkFetch(
   // constructor de Request, o como promesa rechazada. Se cubren las dos — atrapar solo
   // una deja el arreglo sin efecto justo en el motor que se quiere rescatar.
   try {
-    return await fetch(input, localInit)
+    return await transport(input, localInit)
   } catch (e) {
-    if (!esEnumNoSoportado(e)) throw e
-    console.warn('[lna] targetAddressSpace no soportado por este motor; reintento sin declararlo')
+    if (!localInit.targetAddressSpace || !esEnumNoSoportado(e)) throw e
+    const unsupported = unsupportedSpaces.get(transport) || new Set<TargetAddressSpace>()
+    const first = !unsupported.has(space)
+    unsupported.add(space); unsupportedSpaces.set(transport, unsupported)
+    if (first) console.warn('[lna] targetAddressSpace no soportado por este motor; reintento sin declararlo')
     const fallback: RequestInit & { targetAddressSpace?: TargetAddressSpace } = { ...localInit }
     delete fallback.targetAddressSpace
-    return fetch(input, fallback)
+    return transport(input, fallback)
   }
 }
 
@@ -167,9 +176,8 @@ function esEnumNoSoportado(e: unknown): boolean {
   if (msg.includes('failed to fetch') || msg.includes('networkerror') || msg.includes('load failed')) {
     return false
   }
-  return msg.includes('targetaddressspace')
-    || msg.includes('address space')
-    || msg.includes('loopback')
-    || msg.includes('not a valid value')
-    || msg.includes('enum')
+  const declaration = msg.includes('targetaddressspace') || msg.includes('address space') || msg.includes('loopback')
+  const invalidValue = msg.includes('enum') || msg.includes('not a valid') || msg.includes('invalid')
+  return declaration && invalidValue
+
 }

@@ -300,3 +300,14 @@ Un segundo defecto se reprodujo en el HTML real de KDS: una respuesta vieja pued
 
 
 Validación final de este checkpoint: servidor **594/594**, web **3,707/3,707**, DOM **289/289**, TypeScript aprobado, PostgreSQL **17/17**, UI Caja **23/23** y legacy/Eduardo **21/21**. La suite legacy incluye transferencia, anulación offline, pérdida y reintento del aviso de cierre, mapas idénticos y ausencia de segundo cobro. Revisión adversarial sin nuevo bloqueo tras las correcciones.
+
+
+## Conservación de borrador y anulación sin almacenamiento
+
+La recuperación da prioridad al borrador actual frente a un formato legacy que conservaba una cuenta ya cerrada; también respeta una copia vacía intencional. Se reprodujeron y corrigieron ambos casos. El transporte LAN recuerda valores de enum no soportados por motor; los errores de red o política siguen propagándose sin reintento. Prueba sintética: veinte consultas requieren veintiún intentos frente a cuarenta antes del cambio.
+
+El laboratorio legacy inyecta fallo de IndexedDB al encolar una anulación offline. Antes mostraba éxito y vaciaba la cuenta sin comando durable. Ahora conserva la cuenta, libera el bloqueo para reintentar y no emite auditoría/shadow de cancelación ante rechazo HTTP o fallo de almacenamiento. Con almacenamiento restaurado, la anulación vuelve a completarse en las tres terminales. Esto no cierra H08: la disposición de inventario en anulación completa requiere corrección propia.
+
+Validación: web **3,714/3,714**, DOM **289/289**, TypeScript aprobado, UI Caja **23/23** con el transporte actualizado y legacy **21/21** con fallo/recuperación de almacenamiento. Las siete pruebas web añadidas cubren caché y clasificación/recuerdo de compatibilidad. Revisión adversarial sin nuevo bloqueo concreto. El servidor y SQL no cambian en esta tanda.
+
+El checkpoint anterior **56823cf1** pasó los workflows remotos de código; laboratorio multi-terminal **34471268530**. El instalador disponible sigue en **7f595aca** y debe reconstruirse antes de presentarlo como este código.

@@ -53,6 +53,16 @@ module.exports = async function mutacionesLleganAPedro({ caja, pos2, pos3, check
   // Material fresco: las mesas 1 y 3 ya se cobraron en los videos de Eduardo.
   const idMesa4 = randomUUID()
   const idMesa5 = randomUUID()
+  const cancellationSignals = []
+  const trackCancellation = req => {
+    if (req.method() !== 'POST') return
+    try {
+      const body = req.postDataJSON()
+      if ((body.action === 'order_cancelled' && body.order_id === idMesa5) ||
+        (body.type === 'orders.item.cancelled.v1' && body.payload?.ticketId === idMesa5)) cancellationSignals.push(body.action || body.type)
+    } catch {}
+  }
+  pos3.page.on('request', trackCancellation)
   await command(pos2, 'ORDER_SENT', comanda(idMesa4, 4, ['Café de laboratorio'], 58))
   await command(pos3, 'ORDER_SENT', comanda(idMesa5, 5, ['Café de laboratorio', 'Café de laboratorio'], 116))
   await until(async () => { const s = await salon(); return ordenesDeMesa(s, 4).length === 1 && ordenesDeMesa(s, 5).length === 1 },
@@ -120,8 +130,28 @@ module.exports = async function mutacionesLleganAPedro({ caja, pos2, pos3, check
       await modal.getByRole('button', { name: 'Anular orden', exact: true }).click()
       await expect(pos3.page.locator('body')).toContainText('la orden NO se anuló', { timeout: 15000 })
       assert.equal(ordenesDeMesa(await salon(), 5).length, 1, 'premisa: con la escritura rechazada, nada cambia en Caja')
-      // Fase 2: sin internet. PIN del caché, anulación encolada, aviso a Pedro.
+      assert.deepEqual(cancellationSignals, [], 'a rejected cancellation cannot publish success audit/events')
+      // Fase 2: disconnected and storage cannot commit. This must leave the
+      // order intact rather than pretending an undurable cancellation succeeded.
       setWan(false)
+      await pos3.page.evaluate(() => {
+        const original = IDBDatabase.prototype.transaction
+        window.__restoreVoidStorage = () => { IDBDatabase.prototype.transaction = original }
+        IDBDatabase.prototype.transaction = function(stores, mode, ...rest) {
+          const names = typeof stores === 'string' ? [stores] : Array.from(stores)
+          if (mode === 'readwrite' && names.includes('sync_queue')) throw new DOMException('Synthetic queue storage failure', 'QuotaExceededError')
+          return Reflect.apply(original, this, [stores, mode, ...rest])
+        }
+      })
+      try {
+        await modal.locator('input[type="password"]').fill('2468')
+        await modal.getByRole('button', { name: 'Anular orden', exact: true }).click()
+        await expect(pos3.page.locator('body')).toContainText('No se pudo guardar la anulación', { timeout: 15000 })
+        assert.equal(ordenesDeMesa(await salon(), 5).length, 1, 'failed durable storage cannot free the table')
+        assert.deepEqual(cancellationSignals, [], 'failed durable storage cannot publish cancellation audit/events')
+        await expect(pos3.page.locator('body')).toContainText('Café de laboratorio')
+      } finally { await pos3.page.evaluate(() => { window.__restoreVoidStorage(); delete window.__restoreVoidStorage }) }
+      // Fase 3: storage restored. Same account can now be queued and cancelled.
       await modal.locator('input[type="password"]').fill('2468')
       await modal.getByRole('button', { name: 'Anular orden', exact: true }).click()
       await until(async () => {
@@ -138,6 +168,7 @@ module.exports = async function mutacionesLleganAPedro({ caja, pos2, pos3, check
     })
   } finally {
     pos2.page.off('response', traceResponse)
+    pos3.page.off('request', trackCancellation)
     setWan(false)
   }
 }

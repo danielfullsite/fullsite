@@ -64,3 +64,10 @@ export function cacheTrasElCierre(
   const draft = { ...(guardado.draft as object), items: propios }
   return { draft: draft as CuentaGuardada }
 }
+
+
+/** Select the current account cache before consulting an older storage format. */
+export function cachePreferidaAlAbrir(guardado: CacheDeCuenta | null | undefined, migrarLegacy: () => CacheDeCuenta | null | undefined): CacheDeCuenta | null | undefined {
+  if (guardado?.confirmed?.id || Array.isArray(guardado?.draft?.items)) return guardado
+  return migrarLegacy()
+}

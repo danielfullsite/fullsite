@@ -39,7 +39,7 @@ de ambas cuentas y recibo: 9 grupos PostgreSQL prueban concurrencia y rollback.
 La migración sigue PENDIENTE, y H04 nuevo modo Caja conserva sus demás huecos.
 Los H01–H16 inferiores siguen abiertos salvo evidencia posterior explícita.
 
-Feedback reciente, defectos nuevos y aceptación por síntoma: [Eduardo 9 de septiembre](../audit/EDUARDO-2026-09-09.md). Numeración Caja por turno, identidad nueva tras cierre y descarte de lecturas KDS tardías probados; recorrido Caja 23/23. No implican cierre global.
+Feedback reciente, defectos nuevos y aceptación por síntoma: [Eduardo 9 de septiembre](../audit/EDUARDO-2026-09-09.md). Numeración Caja por turno, identidad nueva tras cierre y descarte de lecturas KDS tardías probados; recorrido Caja 23/23. No implican cierre global. Segunda tanda probada en UI Caja 23/23 y legacy 21/21: prioridad de borradores, compatibilidad de transporte memorizada y rechazo de anulación sin almacenamiento durable.
 
 ## Candidato de cierre: pendientes actualizados el 10 de septiembre
 

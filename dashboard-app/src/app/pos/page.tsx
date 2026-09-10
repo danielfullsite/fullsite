@@ -49,7 +49,7 @@ import { publishEvent, getDeviceId } from '@/lib/events'
 import { apiUrl } from '@/lib/api-base'
 import { sendOrderToKitchen, kitchenFailureMessage } from '@/lib/kitchen-bridge'
 import { avisarCierreDeOrden, avisarCuentaActualizada, avisarTransferenciaItem, avisarCuentaConfirmada } from '@/lib/aviso-lan'
-import { cacheTrasElCierre } from '@/lib/cache-de-cuenta'
+import { cacheTrasElCierre, cachePreferidaAlAbrir } from '@/lib/cache-de-cuenta'
 import { leerCuenta, requiereCaja, cuentaConfirmada, type LecturaDeCuenta } from '@/lib/pedro-cliente'
 import { leerCatalogoCaja } from '@/lib/pedro-catalogo'
 import { guardarCuentaEnCaja, enviarCuentaEnCaja, moverCuentaEnCaja, anularCuentaEnCaja, GuardadoAnteriorRecuperado, firmaBorradorParaCaja, type OrdenConfirmada } from '@/lib/pedro-operaciones'
@@ -2421,12 +2421,15 @@ function POSContent() {
       let saved = JSON.parse(localStorage.getItem(claveCuentaCaja) || 'null')
       // Migration of the existing per-table cache. It is only a merge baseline,
       // never authority; its age and identity remain intact.
-      if (!saved?.confirmed && !clienteNombre) {
-        const legacy = JSON.parse(localStorage.getItem(`pos_order_${mesa}`) || 'null')
-        if (legacy?.id && Array.isArray(legacy.items)) saved = { confirmed: {
-          ...legacy, descuento: legacy.discount, order_revision: legacy.revision,
-        }, confirmedAt: legacy.ts }
-      }
+      saved = cachePreferidaAlAbrir(saved, () => {
+        if (!clienteNombre) {
+          const legacy = JSON.parse(localStorage.getItem(`pos_order_${mesa}`) || 'null')
+          if (legacy?.id && Array.isArray(legacy.items)) return { confirmed: {
+            ...legacy, descuento: legacy.discount, order_revision: legacy.revision,
+          }, confirmedAt: legacy.ts }
+        }
+        return saved
+      })
       if (saved?.confirmed?.id && (!target || saved.confirmed.id === target)) {
         idCuentaCaja.current = saved.confirmed.id
         baseCuentaCaja.current = saved.base || cuentaEditableDe(saved.confirmed)
@@ -3073,24 +3076,6 @@ function POSContent() {
     if (operationLock.current) return
     operationLock.current = true
     setSaving(true)
-    const voidTotal = orderItems.reduce((sum, i) => sum + i.subtotal, 0)
-    logAudit({
-      order_id: orderId, action: 'order_cancelled', actor: mesero, mesa,
-      details: { items: orderItems.map(i => ({ nombre: i.nombre, cantidad: i.cantidad, subtotal: i.subtotal })), total: voidTotal },
-      reason,
-      approved_by: managerName,
-    })
-    // Shadow mode: anulación = un evento sensible por cada línea de la orden
-    for (const i of orderItems) {
-      publishEvent('orders.item.cancelled.v1', 1, { userId: mesero, deviceId: getDeviceId() }, {
-        ticketId: orderId, itemId: i.id, productId: i.nombre,
-        qty: i.cantidad, inventoryImpact: true, mesa, clientId: getClientId(), voidOrder: true,
-      }, {
-        requestedBy: mesero, approvedBy: managerName, reason: `ANULACIÓN ORDEN: ${reason}`,
-        before: { qty: i.cantidad, subtotal: i.subtotal },
-        after: { qty: 0, cancelled: true },
-      })
-    }
     // Mark order as cancelled via revision-aware boundary (reconciliation-relevant status)
     if (loadedOrderId) {
       const voidOpId = genOpId()
@@ -3128,7 +3113,11 @@ function POSContent() {
           const { queueOperation } = await import('@/lib/pos-offline-db')
           await queueOperation('pos_orders', 'POST', voidPayload, '/api/pos/save-order',
             String(orderRevision ?? 0), 'APP_API')
-        } catch { /* si falla el encolado, la limpieza local igual procede */ }
+        } catch {
+          showToast('No se pudo guardar la anulación. La cuenta se conserva; libera almacenamiento y reintenta.')
+          setSaving(false); operationLock.current = false
+          return
+        }
         showToast('Anulada offline — se sincroniza al reconectar')
       }
       // Y QUE PEDRO LO SEPA. Hasta aqui la anulacion iba solo a la nube; bajo
@@ -3142,6 +3131,25 @@ function POSContent() {
       // cobrar: si el lector de un segundo la readopta antes de que Pedro la borre,
       // los platillos anulados vuelven a pintarse un instante.
       olvidarCuentaCerrada('cobrada-aqui')
+    }
+    // Publish cancellation only after confirmation or durable offline enqueue.
+    const voidTotal = orderItems.reduce((sum, i) => sum + i.subtotal, 0)
+    logAudit({
+      order_id: orderId, action: 'order_cancelled', actor: mesero, mesa,
+      details: { items: orderItems.map(i => ({ nombre: i.nombre, cantidad: i.cantidad, subtotal: i.subtotal })), total: voidTotal },
+      reason,
+      approved_by: managerName,
+    })
+    // Shadow mode: anulación = un evento sensible por cada línea de la orden
+    for (const i of orderItems) {
+      publishEvent('orders.item.cancelled.v1', 1, { userId: mesero, deviceId: getDeviceId() }, {
+        ticketId: orderId, itemId: i.id, productId: i.nombre,
+        qty: i.cantidad, inventoryImpact: true, mesa, clientId: getClientId(), voidOrder: true,
+      }, {
+        requestedBy: mesero, approvedBy: managerName, reason: `ANULACIÓN ORDEN: ${reason}`,
+        before: { qty: i.cantidad, subtotal: i.subtotal },
+        after: { qty: 0, cancelled: true },
+      })
     }
     // R0.5 RESOLVED: Reverse deductions for items that were sent to kitchen.
     // Void = entire order cancelled before payment, stock should come back.
