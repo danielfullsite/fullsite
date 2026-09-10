@@ -49,7 +49,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { withPOSAuth, unauthorized } from '@/lib/api-auth'
-import { ALLOW, MANAGER_ONLY_WRITE, puedeEscribirEn, MANAGER_ONLY_DELETE, camposProhibidos, isManager, redactResponse, tableOf } from '@/lib/pos-db-policy'
+import { ALLOW, puedeEscribirEn, MANAGER_ONLY_DELETE, prepararCuerpoProxy, isManager, redactResponse, tableOf } from '@/lib/pos-db-policy'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -119,30 +119,10 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ path: string[] 
   let body: string | undefined
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     const raw = await req.text().catch(() => '')
-    if (raw && req.method === 'POST') {
-      try {
-        const parsed = JSON.parse(raw)
-        const withCid = Array.isArray(parsed)
-          ? parsed.map((r) => ({ ...r, client_id: clientId }))
-          : { ...parsed, client_id: clientId }
-        body = JSON.stringify(withCid)
-      } catch {
-        body = raw
-      }
-    } else {
-      body = raw || undefined
-    }
+    const prepared = prepararCuerpoProxy(table, auth.role, req.method, raw, clientId)
+    if (prepared.error !== undefined) return NextResponse.json({ error: prepared.error }, { status: prepared.status })
+    body = prepared.body
 
-    // LAS CIFRAS DEL DINERO NO SE ESCRIBEN DESDE EL NAVEGADOR.
-    //
-    // Se comprueba DESPUÉS de leer el cuerpo, porque hasta aquí no se sabe qué columnas
-    // trae. Lo verificado el 2026-09-08: por este camino el cliente sólo escribe
-    // `kds_item_status` y `mesero`; los totales van por /api/pos/save-order, que los
-    // recalcula. Así que un `total` que llegue aquí no viene del POS.
-    const prohibidas = camposProhibidos(table, auth.role, body)
-    if (prohibidas.length) {
-      return forbidden(`estas columnas requieren rol de gerente: ${prohibidas.join(', ')}`)
-    }
   }
 
   // Headers que respeta PostgREST del request original (Prefer, Range, Content-Type).

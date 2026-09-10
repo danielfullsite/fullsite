@@ -1,5 +1,6 @@
 'use client'
 
+import { prepararTransferenciaItem } from '@/lib/transferencia-item'
 import { Component, useState, useCallback, useEffect, useRef, Suspense, type ErrorInfo, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
@@ -3044,9 +3045,13 @@ function POSContent() {
 
     const itemName = transferringItem.nombre
     const itemId = transferringItem.id
-    const opId = generateId() // idempotency key
+    let confirmada: (() => void) | undefined
+    let opId: string
 
     try {
+      const pending = prepararTransferenciaItem(_cid(), loadedOrderId, itemId, targetMesa)
+      opId = pending.operationId
+      confirmada = pending.confirmada
       const res = await fetch('/api/pos/transfer-item', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getPOSAuthHeaders() },
@@ -3060,11 +3065,13 @@ function POSContent() {
           approved_by: auth.name,
           approved_role: auth.role,
           operation_id: opId,
+          approval_token: auth.approvalToken,
         }),
       })
       const result = await res.json()
 
       if (result.ok) {
+        confirmada()
         // Success: remove item from local state
         setOrderItems(prev => prev.filter(i => i.id !== itemId))
         setSentItemIds(prev => { const next = new Set(prev); next.delete(itemId); return next })
@@ -3073,18 +3080,14 @@ function POSContent() {
         // nube; bajo Electron nadie mas se enteraba. Origen: la cuenta sin el
         // renglon. Destino: la ruta devuelve `target_order_id` (existente o recien
         // creada) y los renglones que quedaron ahi. Ver lib/aviso-lan.ts.
-        const quedan = orderItems.filter(i => i.id !== itemId)
-        void avisarCuentaActualizada({
-          opId: `${opId}-origen`, orderId: loadedOrderId, clientId: _cid(), mesa, turnoId: turnoId || null,
-          ...cuentaEnviadaParaLan(quedan, sentItemIds, new Set([...cancelledItems, ...voidedItems]), discount),
-        })
-        if (typeof result.target_order_id === 'string' && Array.isArray(result.target_items)) {
-          const subDestino = (result.target_items as OrderItem[]).filter(i => !i.cancelled).reduce((s, i) => s + (Number(i.subtotal) || 0), 0)
+        // Publish the committed receipts, never totals or snapshots rebuilt from
+        // this terminal's potentially stale account (which may include drafts).
+        for (const [suffix, account] of [['origen', result.source_order], ['destino', result.target_order]] as const) {
+          if (!account || typeof account.id !== 'string' || !Array.isArray(account.items)) continue
           void avisarCuentaActualizada({
-            opId: `${opId}-destino`, orderId: result.target_order_id, clientId: _cid(), mesa: targetMesa,
-            turnoId: turnoId || null, status: 'enviada', items: result.target_items, mesero,
-            subtotal: subDestino, iva: subDestino * getIvaRate(),
-            total: Math.round((subDestino + subDestino * getIvaRate()) * 100) / 100,
+            opId: `${opId}-${suffix}`, orderId: account.id, clientId: _cid(), mesa: account.mesa,
+            turnoId: account.turno_id, status: account.status, items: account.items, mesero: account.mesero,
+            subtotal: Number(account.subtotal), iva: Number(account.iva), total: Number(account.total),
           })
         }
       } else if (result.error === 'SOURCE_CONFLICT' || result.error === 'TARGET_CONFLICT') {
@@ -3095,11 +3098,11 @@ function POSContent() {
         showToast(result.message || 'El item ya fue movido por otra terminal')
         setOrderItems(prev => prev.filter(i => i.id !== itemId))
       } else {
-        showToast(`Error: ${result.error || 'desconocido'}`)
+        showToast(result.message || `Error: ${result.error || 'desconocido'}`)
       }
     } catch (err) {
       console.error('[transfer] Network error:', err)
-      showToast('Error de red al transferir — intenta de nuevo')
+      showToast('No se confirmó la transferencia. Reintenta el mismo destino para recuperar el resultado.')
     }
 
     operationLock.current = false

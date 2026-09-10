@@ -1,4 +1,5 @@
 'use strict'
+const { turnReport } = require('./turn-report')
 // Pure preparation of Caja-owned orders. The handler serializes this with money
 // commands and commits the result before projecting or acknowledging it.
 const COMMANDS = new Set(['ORDER_SAVE', 'ORDER_SEND', 'ORDER_MOVE', 'ORDER_VOID', 'TURN_OPEN', 'TURN_CLOSE', 'KITCHEN_SET'])
@@ -114,11 +115,9 @@ class OperationalDomain {
       if (snapshot.salon_orders.length || state.getFinancialOrders().some(o => o.turno_id === turnoId && (o.balance_cents > 0 || o.reserved_cents > 0))) fail('UNSETTLED_FINANCIAL_ACCOUNTS', 'Quedan cuentas abiertas o intentos de pago por resolver')
       if (snapshot.kds_orders.length) fail('PENDING_KITCHEN_WORK', 'Quedan comandas sin entregar en cocina')
       const counted = int(payload.counted_cash_cents, 'counted_cash_cents')
-      const accepted = state.getFinancialOrders().filter(o => o.turno_id === turnoId).flatMap(o => o.payments.filter(p => p.status === 'accepted'))
-      const sum = rows => rows.reduce((total, payment) => int(total + payment.amount_cents, 'cobros del turno'), 0)
-      const cashSales = sum(accepted.filter(p => p.method === 'cash')), totalPaid = sum(accepted)
-      const opening = int(turno.opening_cash_cents ?? 0, 'opening_cash_cents')
-      const expected = int(opening + cashSales, 'expected_cash_cents')
+      const report = turnReport(turno, state.getFinancialOrders(), snapshot.salon_orders)
+      const { opening_cash_cents: opening, cash_sales_cents: cashSales,
+        total_paid_cents: totalPaid, expected_cash_cents: expected } = report
       return { turno: null, closed_turno: { ...turno, closed_by: actor.id, closed_at: now,
         opening_cash_cents: opening, cash_sales_cents: cashSales, total_paid_cents: totalPaid,
         expected_cash_cents: expected, counted_cash_cents: counted, difference_cents: counted - expected,

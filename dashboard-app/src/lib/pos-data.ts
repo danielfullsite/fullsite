@@ -2331,7 +2331,7 @@ export async function verifyManagerPinWithRole(pin: string): Promise<{ name: str
  *   verifyPinWithMinRole(pin, 'gerente')  → accepts gerente, admin
  *   verifyPinWithMinRole(pin, 'admin')    → accepts admin only
  */
-export async function verifyPinWithMinRole(pin: string, minRole: string): Promise<{ name: string; role: string } | null> {
+export async function verifyPinWithMinRole(pin: string, minRole: string): Promise<{ name: string; role: string; approvalToken?: string } | null> {
   if (!pin) return null
   try {
     const { apiUrl } = await import('./api-base')
@@ -2341,7 +2341,7 @@ export async function verifyPinWithMinRole(pin: string, minRole: string): Promis
       body: JSON.stringify({ pin, client_id: _getClientId(), min_role: minRole }),
     })
     if (res.ok) {
-      const { staff } = await res.json()
+      const { staff, shiftToken } = await res.json()
       if (staff?.name) {
         const role = staff.role || minRole
         try {
@@ -2349,7 +2349,7 @@ export async function verifyPinWithMinRole(pin: string, minRole: string): Promis
           cached[await _pinCacheKey(pin)] = { name: staff.name, role, cached_at: Date.now() }
           localStorage.setItem('pos_manager_pin_cache', JSON.stringify(cached))
         } catch { /* ignore */ }
-        return { name: staff.name, role }
+        return { name: staff.name, role, approvalToken: shiftToken }
       }
       return null
     }

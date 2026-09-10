@@ -140,8 +140,9 @@ describe('cada mutación del POS avisa a Pedro', () => {
 
   it('REGRESION: transferir un platillo avisa origen y destino', () => {
     const transferir = bloque(pos, 'const handleTransferItem = useCallback', 'const handleVoidOrder')
-    expect(transferir.split('avisarCuentaActualizada(').length - 1).toBe(2)
-    expect(transferir).toMatch(/result\.target_order_id/)
+    expect(transferir).toContain("[['origen', result.source_order], ['destino', result.target_order]]")
+    expect(transferir).toContain('avisarCuentaActualizada(')
+    expect(transferir).toMatch(/result\.target_order/)
   })
 
   it('REGRESION: transferir la mesa avisa la mesa nueva', () => {
@@ -164,16 +165,7 @@ describe('cada mutación del POS avisa a Pedro', () => {
     expect(fusion).toMatch(/avisarCuentaActualizada\(\{[\s\S]*items: mergedItems/)
   })
 
-  it('REGRESION: la ruta de transferencia devuelve a qué orden fue a dar el renglón', () => {
-    const ruta = leer('src/app/api/pos/transfer-item/route.ts')
-    expect(ruta).toMatch(/target_order_id: targetOrderId/)
-    // La orden NUEVA en la mesa destino se crea pidiendo la representación: sin
-    // eso PostgREST no devuelve el id y el POS no tiene a quién avisar.
-    const crear = bloque(ruta, 'const createRes = await fetch', 'targetSuccess = createRes.ok')
-    expect(crear).toMatch(/return=representation/)
-    expect(crear).not.toMatch(/return=minimal/)
-    expect(crear).toMatch(/turno_id/)
-  })
+
 })
 
 

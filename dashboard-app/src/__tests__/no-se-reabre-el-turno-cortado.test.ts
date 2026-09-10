@@ -93,7 +93,7 @@ describe('los dos proxies heredan la regla sin tocarlos', () => {
 
   for (const ruta of ['app/api/pos/db/route.ts', 'app/api/pos/db/[...path]/route.ts']) {
     it(`${ruta} llama a camposProhibidos`, () => {
-      expect(lee(ruta)).toMatch(/camposProhibidos\(/)
+      expect(lee(ruta)).toMatch(/prepararCuerpoProxy\(/)
     })
   }
 })

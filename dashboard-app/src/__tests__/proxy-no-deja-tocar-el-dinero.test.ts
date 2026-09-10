@@ -126,7 +126,7 @@ describe('las dos puertas están cerradas, no una', () => {
   // exactamente como este hueco sobrevivió a la auditoría anterior.
   for (const ruta of ['app/api/pos/db/route.ts', 'app/api/pos/db/[...path]/route.ts']) {
     it(`${ruta} comprueba las columnas`, () => {
-      expect(sinComentarios(ruta)).toMatch(/camposProhibidos\(/)
+      expect(sinComentarios(ruta)).toMatch(/prepararCuerpoProxy\(/)
     })
 
     it(`${ruta} exige gerente para borrar una orden`, () => {

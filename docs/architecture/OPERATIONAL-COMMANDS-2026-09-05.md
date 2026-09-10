@@ -47,3 +47,14 @@ El actualizador requiere que la publicación declare `fullsite.supportedStoreFor
 `operational-runtime.test.js`: 17 escenarios con precios/opciones, concurrencia, disco lleno, reinicio, pago/preparación independientes, permisos, cierre contado y transporte. Incluye dos tickets sobre TCP loopback, reintento/reinicio sin duplicar, falta de configuración antes del commit y fallo de cola después del commit. No contacta impresoras físicas ni producción.
 
 El laboratorio `FULLSITE_LAB_OPERATIONAL=1` añade botones reales para guardar, enviar, mover/anular con PIN, dividir, recibir efectivo, reiniciar Caja, preparar/entregar y cerrar turno. `FULLSITE_LAB_UI_BUNDLE` permite repetirlo con el paquete instalado y sin servidor Next. Sus resultados deben consultarse sobre la revisión concreta de UI, sin convertir un contador histórico en certificación de campo.
+
+
+## Corte X antes de la visita (10 de septiembre)
+
+`GET /reports/turn?turno_id=...` exige credencial LAN, actor verificado por Caja y
+permiso `corte_x`. Una terminal secundaria reenvía también el actor. Sin Caja no
+sustituye el reporte por su estado parcial. Comparte `core/turn-report.js` con
+`TURN_CLOSE`: suma aceptados (incluidos parciales), separa reservas y saldo, e
+incluye consumo aún no preparado para pago. La preparación de cocina no filtra
+los cobros. La página `/pos/corte` consulta esta ruta cuando Caja es la autoridad.
+Los movimientos de efectivo y propinas siguen sujetos al cierre H03/H06.

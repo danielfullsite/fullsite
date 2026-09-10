@@ -15,7 +15,7 @@
  * directo con su JWT. Solo las terminales POS (shiftToken) se rutean aquí.
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { ALLOW, MANAGER_ONLY_WRITE, puedeEscribirEn, MANAGER_ONLY_DELETE, NO_CID, camposProhibidos, isManager, redactResponse, tableOf } from '@/lib/pos-db-policy'
+import { ALLOW, puedeEscribirEn, MANAGER_ONLY_DELETE, NO_CID, prepararCuerpoProxy, isManager, redactResponse, tableOf } from '@/lib/pos-db-policy'
 import { withPOSAuth } from '@/lib/api-auth'
 
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -71,25 +71,11 @@ async function handle(request: NextRequest, method: string) {
   let body: string | undefined
   if (isWrite) {
     const raw = await request.text()
-    if (raw) {
-      // Inyecta client_id del token en el body (objeto o array) para writes.
-      try {
-        const parsed = JSON.parse(raw)
-        const stamp = (o: Record<string, unknown>) => (!NO_CID.has(table) ? { ...o, client_id: auth.clientId } : o)
-        body = JSON.stringify(Array.isArray(parsed) ? parsed.map(stamp) : stamp(parsed))
-      } catch {
-        body = raw
-      }
-      headers['Content-Type'] = 'application/json'
-    }
+    const prepared = prepararCuerpoProxy(table, auth.role, method, raw, auth.clientId)
+    if (prepared.error !== undefined) return NextResponse.json({ error: prepared.error }, { status: prepared.status })
+    body = prepared.body
+    if (body) headers['Content-Type'] = 'application/json'
 
-    // Las cifras del dinero no se escriben desde el navegador. Se comprueba aquí, con el
-    // cuerpo ya leído, y en LOS DOS proxies: gatear uno solo deja la puerta abierta por el
-    // otro, que es exactamente como este hueco sobrevivió a la auditoría anterior.
-    const prohibidas = camposProhibidos(table, auth.role, body)
-    if (prohibidas.length) {
-      return NextResponse.json({ error: `estas columnas requieren rol de gerente: ${prohibidas.join(', ')}` }, { status: 403 })
-    }
   }
 
   const res = await fetch(`${SB_URL}/rest/v1/${target}`, { method, headers, body, cache: 'no-store' })

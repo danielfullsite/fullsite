@@ -75,6 +75,13 @@ export const MANAGER_ONLY_WRITE = new Set<string>([
   // Los precios sólo se editan desde /admin/menu, que es pantalla de gerente. Sin esto,
   // un shift token de mesero podía bajarle el precio a un platillo y cobrarlo barato.
   'pos_menu_items',
+  'pos_menu_categories', 'pos_modifiers', 'pos_modifier_groups',
+  'pos_item_modifier_groups', 'pos_category_modifiers', 'pos_sizes',
+  'pos_price_types', 'pos_combos', 'pos_promotions', 'pos_payment_methods',
+  'pos_inventory', 'pos_inventory_movements', 'pos_ingredients',
+  'pos_recipes', 'pos_recipe_lines', 'pos_sub_recipes',
+  'pos_sub_recipe_ingredients', 'pos_suppliers', 'pos_purchase_orders',
+  'pos_purchase_order_items',
 ])
 
 // ── LA CAJA LA OPERA UN CAJERO, Y NO PODÍA CERRARLA ─────────────────────────
@@ -268,4 +275,34 @@ export function redactResponse(table: string, text: string, contentType: string 
 
   const cleaned = Array.isArray(data) ? data.map(strip) : strip(data)
   return JSON.stringify(cleaned)
+}
+
+/** Validate caller fields before adding server-owned scope. PATCH identity is
+ * immutable for every role. POST retains new IDs but stamps the authenticated
+ * tenant. Both proxy entrypoints must use this contract before any write. */
+export function prepararCuerpoProxy(table: string, role: string | null | undefined,
+  method: string, raw: string, clientId: string):
+  { body?: string; error?: undefined } | { error: string; status: 400 | 403 } {
+  if (!raw) return { body: undefined }
+  let data: unknown
+  try { data = JSON.parse(raw) } catch { return { error: 'cuerpo JSON inválido', status: 400 } }
+  const object = (value: unknown): value is Record<string, unknown> =>
+    !!value && typeof value === 'object' && !Array.isArray(value)
+  const rows = Array.isArray(data) ? data : [data]
+  if (!rows.length || !rows.every(object) || (method !== 'POST' && !object(data))) {
+    return { error: 'se requiere un objeto; sólo POST admite lotes de objetos', status: 400 }
+  }
+  if (method === 'PATCH' && rows.some(row => 'id' in row || 'client_id' in row)) {
+    return { error: 'id y client_id son inmutables', status: 403 }
+  }
+  // POST scope supplied by a caller is replaced, never used as authorization.
+  const callerRows = rows.map(row => {
+    const copy = { ...row }
+    if (method === 'POST') delete copy.client_id
+    return copy
+  })
+  const forbidden = camposProhibidos(table, role, JSON.stringify(callerRows))
+  if (forbidden.length) return { error: `estas columnas requieren rol de gerente: ${forbidden.join(', ')}`, status: 403 }
+  const stamped = callerRows.map(row => method === 'POST' && !NO_CID.has(table) ? { ...row, client_id: clientId } : row)
+  return { body: JSON.stringify(Array.isArray(data) ? stamped : stamped[0]) }
 }

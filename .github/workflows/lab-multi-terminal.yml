@@ -110,6 +110,10 @@ jobs:
 
 
   ui-multi-terminal:
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [legacy, caja]
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -137,10 +141,27 @@ jobs:
         run: xvfb-run --auto-servernum node electron-app/lab/laboratorio-ui-multiterminal.cjs
         env:
           CI: 'true'
+          FULLSITE_LAB_OPERATIONAL: ${{ matrix.mode == 'caja' && '1' || '0' }}
       - name: Conservar resultados y capturas
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: lab-ui-multi-terminal-evidence
-          path: output/closure/ui/
+          name: lab-ui-multi-terminal-${{ matrix.mode }}-evidence
+          path: output/closure/ui*/
           retention-days: 14
+
+  transfer-postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Probar transferencia en PostgreSQL temporal
+        run: node electron-app/lab/run-transfer-item-local.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: transfer-postgres-evidence
+          path: output/closure/transfer-item

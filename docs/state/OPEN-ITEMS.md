@@ -15,6 +15,16 @@
 
 Regla: cuando cierres un item, márcalo aquí. Cuando aparezca uno nuevo, entra aquí — no en un doc suelto.
 
+## Cierre de software antes de la visita — 10 de septiembre
+
+Instrucción vigente de Daniel: completar aquí el sistema; no usar la ausencia de
+hardware en AMALAY como motivo para dejar software pendiente. Ejecución y evidencia:
+[CIERRE-SOFTWARE-2026-09-10](../audit/CIERRE-SOFTWARE-2026-09-10.md).
+En implementación: H09 proxy real, H04 transferencia legacy transaccional con
+recibo, H01 reporte X/Z de Caja. Los H completos conservan su estado hasta cerrar
+sus demás condiciones; la tabla inferior es la base de trabajo, no un dictamen
+que sustituya revisar los cambios posteriores.
+
 ## Recuperación del candidato — 10 de septiembre
 
 Rama `cert/instalador-2026-09-10`, base #391. [Evidencia y límites](../audit/CANDIDATO-POS-KDS-2026-09-10.md).

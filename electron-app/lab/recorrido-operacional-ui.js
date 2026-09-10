@@ -106,6 +106,16 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     await expect(pos3.page.locator('body')).toContainText(/Saldo confirmado en Caja:.*87[.,]00/)
     await pos2.page.screenshot({ path: path.join(output, 'cobro-parcial-desde-botones.png'), fullPage: true })
   })
+  await check('Corte X sin WAN incluye el pago parcial antes de entregar cocina', async () => {
+    await pos3.page.goto(`${uiOrigin}/pos/corte`, { waitUntil: 'domcontentloaded' })
+    await expect(pos3.page.getByRole('heading', { name: 'Corte de Caja' })).toBeVisible()
+    await expect(pos3.page.locator('dl').locator('div').filter({ hasText: 'Cobrado confirmado' })).toContainText(/29[.,]00/)
+    await expect(pos3.page.locator('dl').locator('div').filter({ hasText: 'Efectivo esperado' })).toContainText(/529[.,]00/)
+    await expect(pos3.page.locator('dl').locator('div').filter({ hasText: 'Saldo por cobrar' })).toContainText(/87[.,]00/)
+    assert.equal((await snapshot()).kds_orders.length,1)
+    await pos3.page.screenshot({ path: path.join(output, 'corte-x-parcial-sin-wan.png'), fullPage: true })
+    await pos3.page.goto(`${uiOrigin}/pos?mesa=1`, { waitUntil: 'domcontentloaded' })
+  })
   await check('Reiniciar Caja recupera el cobro y se continúa desde otra terminal', async () => {
     const previous = caja
     previous.process.kill('SIGKILL')
@@ -121,6 +131,13 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     assert.equal(state.financial_orders[0].paid_cents, 11600)
     assert.equal(state.salon_orders.length, 0)
     assert.equal(state.kds_orders.length, 1)
+  })
+  await check('Corte X conserva el total liquidado mientras cocina sigue preparando', async () => {
+    await pos2.page.goto(`${uiOrigin}/pos/corte`, { waitUntil: 'domcontentloaded' })
+    await expect(pos2.page.locator('dl').locator('div').filter({ hasText: 'Cobrado confirmado' })).toContainText(/116[.,]00/)
+    await expect(pos2.page.locator('dl').locator('div').filter({ hasText: 'Efectivo esperado' })).toContainText(/616[.,]00/)
+    assert.equal((await snapshot()).kds_orders.length,1)
+    assert.ok((await snapshot()).turno, 'Consultar X no cierra el turno')
   })
   await check('Sin Caja se bloquea la confirmación de cobros y se conserva la última cuenta', async () => {
     caja.process.kill('SIGKILL')

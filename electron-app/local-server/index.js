@@ -27,6 +27,7 @@ const networkAdapter = require('./adapters/network')
 const { NdjsonEventStore }  = require('./adapters/storage/ndjson')
 const { CoreEventStore }    = require('./core/event-store')
 const { identidadDeBuild } = require('./core/identidad-de-build')
+const { turnReport } = require('./core/turn-report')
 const { RestaurantState }   = require('./core/state')
 const { WsHub }             = require('./core/ws-hub')
 const { CommandHandler }    = require('./core/command-handler')
@@ -317,7 +318,7 @@ function forwardGet(targetUrl, credenciales = {}) {
 }
 
 /** Lecturas que una terminal secundaria puede hacerle a la caja. */
-const LECTURAS_REENVIADAS = ['/state', '/events', '/print/uncertain', '/auth/status', '/catalog', '/catalog/status', '/sync/status']
+const LECTURAS_REENVIADAS = ['/reports/turn', '/state', '/events', '/print/uncertain', '/auth/status', '/catalog', '/catalog/status', '/sync/status']
 
 // Keep identity and routing configuration explicit so every cloned terminal can
 // discover the caja without relying on process-global or customer-specific state.
@@ -432,7 +433,9 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority 
     if (posServerIp && req.method === 'GET' && LECTURAS_REENVIADAS.includes(url)) {
       try {
         // `rutaCompleta`, NO `url`: sin la query se pierde `?since=N`.
-        const up = await forwardGet(`http://${posServerIp}:${cajaPort}${rutaCompleta}`, credencialesHaciaLaCaja)
+        const readHeaders = { ...credencialesHaciaLaCaja }
+        if (url === '/reports/turn' && req.headers['x-fullsite-actor']) readHeaders['x-fullsite-actor'] = req.headers['x-fullsite-actor']
+        const up = await forwardGet(`http://${posServerIp}:${cajaPort}${rutaCompleta}`, readHeaders)
         res.writeHead(up.status || 502, {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*',
@@ -530,6 +533,25 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority 
         // cuatro terminales quedaron iguales.
         build:            identidadDeBuild(version),
       })
+      return
+    }
+
+    // X is an authorized read. Never substitute a secondary's partial state or
+    // cloud cache when Caja is unreachable; the forwarding block returns 503.
+    if (url === '/reports/turn' && req.method === 'GET') {
+      try {
+        if (!actorAuthority || state.toSnapshot().write_authority !== 'caja') {
+          json(res, 503, { error: 'Reporte de Caja no disponible' }); return
+        }
+        const actor = actorAuthority.verify(req.headers['x-fullsite-actor'], credencial.terminalId)
+        if (!actor.permissions.includes('corte_x')) { json(res, 403, { error: 'Sin permiso para corte X' }); return }
+        const requested = new URL(rutaCompleta, 'http://localhost').searchParams.get('turno_id')
+        const snapshot = state.toSnapshot()
+        const turno = requested ? [snapshot.turno, ...snapshot.turn_summaries].find(t => t?.id === requested) : (snapshot.turno || snapshot.turn_summaries.at(-1))
+        if (!turno) { json(res, 404, { error: 'Turno no encontrado' }); return }
+        json(res, 200, { authoritative: true, report: turnReport(turno, state.getFinancialOrders(), snapshot.salon_orders),
+          closed: !!turno.closed_at, close: turno.closed_at ? turno : null, sequence: await eventStore.getLastSequence() })
+      } catch (error) { json(res, 403, { error: error.message || 'Reporte no autorizado' }) }
       return
     }
 
