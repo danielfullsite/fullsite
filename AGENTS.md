@@ -103,6 +103,8 @@ Documentos e impresión incierta: [`docs/architecture/CANONICAL-PRINT-2026-09-10
 
 Cajón autorizado: [`docs/architecture/CANONICAL-DRAWER-2026-09-10.md`](docs/architecture/CANONICAL-DRAWER-2026-09-10.md). Apertura explícita, destino configurado y un solo pulso. Pago y episodio se reservan antes del efecto; una incertidumbre requiere decisión del encargado.
 
+Si falta el recibo de cola de un comando comprometido, recuperar como incierto, nunca como envío pendiente. El corte durable de recuperación impide que decisiones históricas vuelvan a autorizar papel o cajón; una nueva decisión corresponde al episodio reconstruido.
+
 Operaciones autorizadas, rutas de cocina, impresión y cierre contado: [`docs/architecture/OPERATIONAL-COMMANDS-2026-09-05.md`](docs/architecture/OPERATIONAL-COMMANDS-2026-09-05.md). Interacción y límites de botones: [`docs/architecture/OPERATIONAL-UI-CAJA-2026-09-05.md`](docs/architecture/OPERATIONAL-UI-CAJA-2026-09-05.md). La autoridad es opt-in; no reenviar colas cloud legacy ni activar módulos sin comandos locales.
 
 Código de interfaz instalado y recuperación: [`docs/architecture/OFFLINE-UI-PACKAGE-2026-09-05.md`](docs/architecture/OFFLINE-UI-PACKAGE-2026-09-05.md). Recibos de negocio, barrera cloud y transición por sucursal: [`docs/architecture/CAJA-CLOUD-MATERIALIZATION-2026-09-05.md`](docs/architecture/CAJA-CLOUD-MATERIALIZATION-2026-09-05.md). Instalar un binario no activa una sucursal; el downgrade del log exige migración validada.

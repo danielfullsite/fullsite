@@ -252,3 +252,24 @@ sin bloqueantes adicionales. Evidencia SQL:
 No cierra H11: falta la recuperación segura de credenciales de servicio cuya
 respuesta se perdió y la aceptación de enrolamiento/primera venta. La cuenta
 existente conserva su contraseña; el alta nunca la rota implícitamente.
+
+El checkpoint de alta **d4eee979** pasó todos los checks de PR; laboratorio
+multi-terminal **34466866989**, incluido PostgreSQL de provisión. El build Windows
+**34466889797** compiló la UI pero se detuvo en la prueba SIGKILL del cajón, antes
+de empaquetar. Su receptor sólo registraba bytes al recibir FIN; ahora registra
+DATA y el proceso se corta después de observar el pulso exacto, antes de guardar
+el recibo. El nuevo checkpoint necesita pasar nuevamente Windows.
+
+## H15: pérdida de recibos de impresión
+
+Al recuperar un comando cuyo trabajo ya no existe en la cola, Caja conserva
+destino/bytes pero crea un episodio incierto. Las decisiones anteriores al corte
+durable de recuperación no reenvían papel ni pulsos. Una nueva decisión para ese
+episodio sí se recupera después de otro reinicio, sin repetirla.
+
+Servidor **592/592** y selección en Electron real **25/25**. Tres regresiones
+nuevas cubren pérdida de cola después de papel/pulso enviados, replay de una
+decisión antigua, resolución nueva y reintento del comando original. Usan log
+durable, archivo de cola y receptor TCP. Revisión adversarial sin nuevos hallazgos.
+No cierra restauración completa: falta coherencia entre archivos, cola antigua
+todavía presente y ensayo de respaldo/recuperación en equipo de reemplazo.

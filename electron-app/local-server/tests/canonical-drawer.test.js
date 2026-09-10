@@ -17,7 +17,17 @@ function fixture(){
  return {state,actor,order,fin,operations,resolutions,printer}
 }
 const payload={command_id:'operation',command_type:'PAYMENT_DRAWER_OPEN',order_id:'order',payment_id:'cash'}
-async function receiver(){const received=[];const server=net.createServer(socket=>{const chunks=[];socket.on('data',b=>chunks.push(b));socket.on('end',()=>{received.push(Buffer.concat(chunks));socket.end()});socket.on('error',()=>{})});server.listen(0,'127.0.0.1');await once(server,'listening');return {server,received,port:server.address().port}}
+async function receiver(){
+ const received=[]
+ const server=net.createServer(socket=>{
+  let index=-1
+  // Observe bytes when received. SIGKILL can close Windows sockets with RST,
+  // without an 'end' event; TCP FIN is not proof that the pulse arrived.
+  socket.on('data',bytes=>{if(index<0){index=received.length;received.push(Buffer.alloc(0))}received[index]=Buffer.concat([received[index],bytes])})
+  socket.on('end',()=>socket.end());socket.on('error',()=>{})
+ })
+ server.listen(0,'127.0.0.1');await once(server,'listening');return {server,received,port:server.address().port}
+}
 async function waitFor(predicate){for(let i=0;i<400;i++){if(predicate())return;await new Promise(r=>setTimeout(r,10))}assert.fail('Timed out waiting for drawer transport')}
 test('explicit configuration selects one drawer despite replicated receipt printers and copies',()=>{
  const f=fixture(),before=JSON.stringify(f.fin),prepared=domain.prepare(payload,f)
@@ -65,17 +75,22 @@ test('real TCP sends exactly one pulse and replay/config changes never duplicate
 })
 test('SIGKILL after real pulse stays uncertain; explicit retry uses original destination once without COPIA bytes', {timeout:10000},async()=>{
  const target=await receiver(),other=await receiver(),file=path.join(dir,'crash-queue.json')
+ let child
  try{
-  const script=`const p=require(${JSON.stringify(require.resolve('../adapters/printer'))});const q=require(${JSON.stringify(require.resolve('../adapters/print-queue'))});p.init({printersConfig:${JSON.stringify(config(target.port))},queueFilePath:process.argv[1]});q.markCopyPrinted=()=>process.kill(process.pid,'SIGKILL');p.enqueuePreparedJobs(p.prepareDrawerJobs({commandId:'crashed'}));`
-  const child=spawn(process.execPath,['-e',script,file],{stdio:['ignore','pipe','pipe']});const [code,signal]=await once(child,'exit');assert(code!==0||signal)
-  await waitFor(()=>target.received.length===1)
+  const script=`const p=require(${JSON.stringify(require.resolve('../adapters/printer'))});const q=require(${JSON.stringify(require.resolve('../adapters/print-queue'))});p.init({printersConfig:${JSON.stringify(config(target.port))},queueFilePath:process.argv[1]});q.markCopyPrinted=()=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0);p.enqueuePreparedJobs(p.prepareDrawerJobs({commandId:'crashed'}));`
+  child=spawn(process.execPath,['-e',script,file],{stdio:['ignore','pipe','pipe']})
+  // The child holds before persisting its copy receipt. Kill only after the TCP
+  // receiver observed the exact pulse, not merely after the OS accepted write().
+  const exit=once(child,'exit')
+  await waitFor(()=>target.received.length===1&&target.received[0].equals(PULSE))
+  child.kill('SIGKILL');const [code,signal]=await exit;assert(code!==0||signal)
   printer.init({printersConfig:config(other.port),queueFilePath:file});const job=queue.getAllJobs()[0];assert.equal(job.status,'uncertain')
   await new Promise(r=>setTimeout(r,30));assert.equal(target.received.length,1)
   const effect={job_id:job.job_id,command_id:'resolve-crash',uncertain_episode_id:job.uncertain_episode_id,resolution:'retry_pulse',reason:'Inspección física',recorded_by:'manager'}
   printer.applyPreparedDrawerResolution(effect);await waitFor(()=>target.received.length===2&&queue.getJob(job.job_id).status==='printed')
   assert(target.received.every(bytes=>bytes.equals(PULSE)));assert.equal(other.received.length,0)
   queue.init({filePath:file});printer.applyPreparedDrawerResolution(effect);await new Promise(r=>setTimeout(r,30));assert.equal(target.received.length,2)
- }finally{await Promise.all([new Promise(r=>target.server.close(r)),new Promise(r=>other.server.close(r))])}
+ }finally{if(child&&child.exitCode===null&&child.signalCode===null)child.kill('SIGKILL');await Promise.all([new Promise(r=>target.server.close(r)),new Promise(r=>other.server.close(r))])}
 })
 test('all-copy receipt crash still allows one explicit pulse; opened verification emits none and replay ignores later episode',async()=>{
  const target=await receiver()

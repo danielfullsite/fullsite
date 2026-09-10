@@ -159,7 +159,7 @@ class CommandHandler {
     // Projection belongs to the commit, even if a later queue write fails. A
     // retry must not leave a committed send invisible or advance it twice.
     if (!duplicate) this._state.apply(event)
-    await this._recoverEffect(event)
+    await this._recoverEffect(event, duplicate ? await this._store.getLastSequence() : undefined)
     const receipt = { command_id: event.payload.command_id, event_id: event.id, sequence: event.sequence }
     if (duplicate) return { duplicate: true, receipt, ...(event.result ? { result: event.result } : {}) }
 
@@ -255,18 +255,18 @@ class CommandHandler {
 
   }
 
-  async _recoverEffect(event) {
+  async _recoverEffect(event, recoveryThroughSequence) {
     if (event?.effects?.print_jobs?.length) {
       if (!this._printer?.enqueuePreparedJobs) throw new Error('Durable printer adapter unavailable')
-      await this._printer.enqueuePreparedJobs(event.effects.print_jobs)
+      await this._printer.enqueuePreparedJobs(event.effects.print_jobs, { recoveryThroughSequence })
     }
     for (const resolution of event?.effects?.print_resolutions || []) {
       if (!this._printer?.applyPreparedResolution) throw new Error('Durable print reconciliation unavailable')
-      await this._printer.applyPreparedResolution(resolution)
+      await this._printer.applyPreparedResolution(resolution, { eventSequence: event.sequence })
     }
     for (const resolution of event?.effects?.drawer_resolutions || []) {
       if (!this._printer?.applyPreparedDrawerResolution) throw new Error('Durable drawer reconciliation unavailable')
-      await this._printer.applyPreparedDrawerResolution(resolution)
+      await this._printer.applyPreparedDrawerResolution(resolution, { eventSequence: event.sequence })
     }
   }
 
@@ -275,9 +275,10 @@ class CommandHandler {
   // have printed and cannot be deduplicated safely.
   async recoverPendingEffects() {
     let recovered = 0
+    const recoveryThroughSequence = await this._store.getLastSequence()
     for (const event of await this._store.readAfter(0)) {
       if (!event.effects?.print_jobs && !event.effects?.print_resolutions && !event.effects?.drawer_resolutions) continue
-      await this._recoverEffect(event)
+      await this._recoverEffect(event, recoveryThroughSequence)
       recovered++
     }
     return { recovered }

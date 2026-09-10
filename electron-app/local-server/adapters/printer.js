@@ -128,8 +128,8 @@ function prepareJobs(stationId, data, documentType, opts = {}) {
 
 // Returns only after all jobs/receipts are durable. Actual printing is asynchronous
 // for commands; ACK means accepted for printing, never proof of physical paper.
-function enqueuePreparedJobs(jobs) {
-  const ids = printQueue.enqueueMany(jobs)
+function enqueuePreparedJobs(jobs, options) {
+  const ids = printQueue.enqueueMany(jobs, options)
   _scheduleDrain(ids).catch(e => console.error('[printer] Queue drain failed:', e.message))
   return ids
 }
@@ -264,15 +264,15 @@ function resolveUncertain(jobId, outcome) {
   return resolved
 }
 
-function applyPreparedResolution(effect) {
-  const receipt = printQueue.applyPreparedResolution(effect)
+function applyPreparedResolution(effect, options) {
+  const receipt = printQueue.applyPreparedResolution(effect, options)
   // The durable transition may predate a crash. Drain pending work on retries too.
   if (effect.resolution === 'reprint') _scheduleDrain([effect.job_id]).catch(e => console.error('[printer] Resolution drain failed:', e.message))
   return receipt
 }
 
-function applyPreparedDrawerResolution(effect) {
-  const receipt = printQueue.applyPreparedDrawerResolution(effect)
+function applyPreparedDrawerResolution(effect, options) {
+  const receipt = printQueue.applyPreparedDrawerResolution(effect, options)
   if (effect.resolution === 'retry_pulse') _scheduleDrain([effect.job_id]).catch(e => console.error('[printer] Drawer recovery failed:', e.message))
   return receipt
 }

@@ -24,7 +24,8 @@ function init({ filePath }) {
   if (recovered.some((j, i) => j !== loaded[i])) _commit(recovered)
   _gcOld()
 }
-function enqueueMany(options) {
+function enqueueMany(options, { recoveryThroughSequence } = {}) {
+  if (recoveryThroughSequence !== undefined && (!Number.isSafeInteger(recoveryThroughSequence) || recoveryThroughSequence < 1)) throw new Error('INVALID_PRINT_RECOVERY_SEQUENCE')
   const jobs = clone(_jobs)
   const ids = []
   for (const opts of options) {
@@ -47,6 +48,13 @@ function enqueueMany(options) {
       document_type: opts.document_type || 'receipt', data_b64: opts.data_b64,
       copies: opts.copies || 1, copies_printed: 0, reprint: opts.reprint || false,
       status: 'pending', created_at: now, updated_at: now, attempts: 0, last_error: null,
+      // A committed intent without its receipt may already have reached paper
+      // or the drawer. Never infer that a missing queue means an unsent job.
+      ...(recoveryThroughSequence === undefined ? {} : {
+        status: 'uncertain', uncertain_episode_id: randomUUID(),
+        recovered_before_sequence: recoveryThroughSequence,
+        last_error: 'Falta el recibo de este trabajo. Verifica el papel o cajón antes de autorizar otro envío.',
+      }),
     })
     ids.push(jobId)
   }
@@ -74,14 +82,20 @@ function resolveUncertain(id, outcome) {
 }
 // One queue write records both the decision receipt and its state transition.
 // Replaying an old decision must never resolve a later uncertain episode.
-function applyPreparedResolution(effect) { return _applyPreparedResolution(effect, false) }
-function applyPreparedDrawerResolution(effect) { return _applyPreparedResolution(effect, true) }
-function _applyPreparedResolution(effect, drawer) {
+function applyPreparedResolution(effect, options) { return _applyPreparedResolution(effect, false, options) }
+function applyPreparedDrawerResolution(effect, options) { return _applyPreparedResolution(effect, true, options) }
+function _applyPreparedResolution(effect, drawer, { eventSequence } = {}) {
   _assertHealthy()
   const {job_id, command_id, uncertain_episode_id, resolution, reason, recorded_by} = effect || {}
   if (![job_id,command_id,uncertain_episode_id,reason,recorded_by].every(v => typeof v === 'string' && v.trim() && v.length <= 1000) || !(drawer ? ['opened','retry_pulse'] : ['printed','reprint']).includes(resolution)) throw new Error('INVALID_PRINT_RESOLUTION')
   const target = getJob(job_id)
   if (!target || (target.document_type === 'drawer_pulse') !== drawer) throw new Error('PRINT_RESOLUTION_TYPE_CONFLICT')
+  // Historical decisions also lost their delivery receipts. Their original
+  // authority does not authorize repeating a physical effect after restoration.
+  // Persist the cutoff so further restarts cannot revive any old decision.
+  if (target.recovered_before_sequence !== undefined && Number.isSafeInteger(eventSequence) && eventSequence <= target.recovered_before_sequence) {
+    return { duplicate: true, job_id, reconciliation_required: true }
+  }
   const receipt = {job_id,command_id,uncertain_episode_id,resolution,reason,recorded_by}
   const prior = _jobs.flatMap(j => j.resolution_receipts || []).find(r => r.command_id === command_id)
   if (prior) {

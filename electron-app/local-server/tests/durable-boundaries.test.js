@@ -177,7 +177,7 @@ test('event commit before queue failure: restart restores original prepared job 
   let fail = true
   const printer = {
     prepareJobs: () => [printJob()],
-    enqueuePreparedJobs: jobs => { if (fail) throw new Error('queue ENOSPC'); return queue.enqueueMany(jobs) },
+    enqueuePreparedJobs: (jobs, options) => { if (fail) throw new Error('queue ENOSPC'); return queue.enqueueMany(jobs, options) },
   }
   let core = new CoreEventStore(storage()); await core.load()
   const makeHandler = () => new CommandHandler({ eventStore: core, state: { apply() {} }, wsHub: { async broadcast() {} }, printer, restaurantId: 'test' })
@@ -193,6 +193,8 @@ test('event commit before queue failure: restart restores original prepared job 
   assert.equal(retry.duplicate, true)
   assert.equal(queue.getAllJobs().length, 1)
   assert.equal(queue.getJob('job').connection.host, '127.0.0.1')
+  assert.equal(queue.getJob('job').status, 'uncertain')
+  assert.equal(queue.getPendingJobs().length, 0)
 })
 
 test('real TCP adapter sends configured copies once despite retry and config change', { timeout: 10000 }, async () => {
