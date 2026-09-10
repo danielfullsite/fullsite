@@ -32,6 +32,8 @@ const { ActorAuthority } = require('../local-server/core/actor-authority')
 const { CatalogStore } = require('../local-server/core/catalog-store')
 const WebSocket = require(path.join(ELECTRON_APP, 'node_modules/ws'))
 
+// Cold compilation is test setup, separate from UI interaction deadlines.
+const compileTimeout = process.env.CI ? 300000 : 90000
 const tenant = 'closure-lab'
 const operationalMode = process.env.FULLSITE_LAB_OPERATIONAL === '1'
 const packagedBundle = process.env.FULLSITE_LAB_UI_BUNDLE ? path.resolve(process.env.FULLSITE_LAB_UI_BUNDLE) : null
@@ -423,10 +425,10 @@ async function main() {
   nextProcess.stdout.on('data', recordNext)
   nextProcess.stderr.on('data', recordNext)
   await until(async () => (await fetch(`${uiOrigin}/pos/mesas`, { signal: AbortSignal.timeout(5000) })).ok,
-    'Next sirve la pantalla real', 150000)
+    'Next sirve la pantalla real', Math.max(150000, compileTimeout))
   for (const route of ['/pos', '/pos/cocina', '/pos/barra', '/pos/plano']) {
     await until(async () => (await fetch(`${uiOrigin}${route}`, { signal: AbortSignal.timeout(15000) })).ok,
-      `Preparar compilación ${route}`, 90000)
+      `Preparar compilación ${route}`, compileTimeout)
   }
   }
   // Prepare real signed sessions in the synthetic Caja profile before it boots.

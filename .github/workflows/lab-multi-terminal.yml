@@ -28,19 +28,17 @@ name: Laboratorio multi-terminal (Caja + POS 2 + POS 3 + KDS)
 # fisica para la columna Cert, y sigue en 0 de 21. Esto mueve la columna Test, que es
 # lo que un servidor de integracion puede mover.
 #
-# Los otros laboratorios NO se cablean aqui a proposito:
-#   · `laboratorio-arranque-frio` necesita el paquete de UI offline prearmado (~5 min
-#     de build de Next). Va como paso aparte cuando alguien lo pida.
-#   · `laboratorio-ui-multiterminal` levanta `next dev` y compila /pos, /pos/cocina,
-#     /pos/barra y /pos/plano: el primer compilado se pasa de los 90 s que el propio
-#     laboratorio se da, y en frio truena. Es de correr a mano antes de una visita.
+# El laboratorio de UI se ejecuta en un job separado: compilar Next en frío
+# necesita más presupuesto que verificar el protocolo entre procesos.
 
 on:
   pull_request:
     paths:
       - 'electron-app/local-server/**'
       - 'electron-app/main.js'
-      - 'electron-app/lab/laboratorio-multi-terminal.cjs'
+      - 'electron-app/lab/**'
+      - 'dashboard-app/src/app/pos/**'
+      - 'dashboard-app/src/lib/aviso-lan.ts'
       - '.github/workflows/lab-multi-terminal.yml'
   push:
     branches: [main]
@@ -109,3 +107,40 @@ jobs:
           path: /tmp/lab-multi-*
           if-no-files-found: ignore
           retention-days: 7
+
+
+  ui-multi-terminal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: |
+            electron-app/package-lock.json
+            dashboard-app/package-lock.json
+      - run: npm ci
+        working-directory: electron-app
+      - run: npm ci
+        working-directory: dashboard-app
+      - name: Instalar dependencias del navegador
+        run: npx playwright install-deps chromium
+        working-directory: dashboard-app
+      - name: Preparar display y sandbox
+        run: |
+          sudo apt-get update && sudo apt-get install -y xvfb
+          sudo chown root:root electron-app/node_modules/electron/dist/chrome-sandbox
+          sudo chmod 4755 electron-app/node_modules/electron/dist/chrome-sandbox
+      - name: Recorrer POS y KDS desde las pantallas reales
+        run: xvfb-run --auto-servernum node electron-app/lab/laboratorio-ui-multiterminal.cjs
+        env:
+          CI: 'true'
+      - name: Conservar resultados y capturas
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lab-ui-multi-terminal-evidence
+          path: output/closure/ui/
+          retention-days: 14
