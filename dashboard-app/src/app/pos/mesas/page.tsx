@@ -296,7 +296,7 @@ export default function MesasPage() {
       if (debeUsarPedro(salon)) {
         const deLaCaja = aOrdenesDelSalon(salon.ordenes)
         setActiveOrders(deLaCaja.map(o => ({
-          id: o.id, mesa: o.mesa ?? 0, customer_name: o.customer_name, order_number: null,
+          id: o.id, mesa: o.mesa ?? 0, customer_name: o.customer_name, order_number: o.order_number,
           mesero: o.mesero ?? '', personas: o.personas, total: o.total,
           status: o.status ?? 'enviada',
           created_at: o.created_at ?? new Date().toISOString(),

@@ -97,7 +97,8 @@ async function main() {
     assert.equal(worker.status().last_sequence, 0)
     const result = await worker.flush()
     assert.equal(result.confirmed, 7)
-    const order = scalar(`select row_to_json(o) from (select id,total,saldo,payment_status,preparation_status,items,financial_revision,caja_financial_snapshot from public.pos_orders where id=${quote(orderId)}) o;`)
+    const order = scalar(`select row_to_json(o) from (select id,order_number,total,saldo,payment_status,preparation_status,items,financial_revision,caja_financial_snapshot from public.pos_orders where id=${quote(orderId)}) o;`)
+    assert.equal(order.order_number, 1)
     assert.equal(order.total, 116); assert.equal(order.saldo, 87)
     assert.equal(order.payment_status, 'pendiente'); assert.equal(order.preparation_status, 'enviada')
     assert.equal(order.items[0].cantidad, 2); assert.equal(order.financial_revision, 4)
@@ -182,6 +183,9 @@ async function main() {
       [e=>e.result.financial_order.accounts[0].total_cents++,/DUAL_ACCOUNT_CHANGED/],
       [e=>e.payload.account_id='missing',/DUAL_ACCOUNT_REQUIRED/],
       [e=>e.type='ORDER_SEND',/DUAL_TOTAL_DECREASE/],
+      [e=>e.result.operational_order.order_number=2,/ORDER_NUMBER_CHANGED/],
+      [e=>delete e.result.operational_order.order_number,/ORDER_NUMBER_CHANGED/],
+      [e=>e.result.operational_order.order_number=0,/INVALID_ORDER_NUMBER/],
       [e=>e.result.financial_order.balance_cents++,/FINANCIAL_SUM_MISMATCH/],
       [e=>e.result.financial_allocation.amount_cents++,/DUAL_ALLOCATION_MISMATCH/],
       [e=>e.result.financial_order.turno_id=randomUUID(),/DUAL_ORDER_SCOPE/],
@@ -201,7 +205,7 @@ async function main() {
     const invoke=(e,previous)=>`select apply_pos_caja_event(${quote(streamId)}::uuid,${quote(credential)},${quote(previous)},${quote(historyHash(previous,e))},${json(e)});`
     const otherOrder=randomUUID(), createOther=structuredClone(event)
     createOther.id=randomUUID();createOther.payload={};createOther.result={operational_order:structuredClone(op)}
-    createOther.result.operational_order.order_id=otherOrder;createOther.result.operational_order.order_revision=1;createOther.result.operational_order.mesa=3
+    createOther.result.operational_order.order_number=2;createOther.result.operational_order.order_id=otherOrder;createOther.result.operational_order.order_revision=1;createOther.result.operational_order.mesa=3
     const cross=structuredClone(event);cross.id=randomUUID();cross.sequence++;cross.result.financial_order.order_id=otherOrder
     const crossed=sql('begin;'+invoke(createOther,stream.last_history_hash)+invoke(cross,historyHash(stream.last_history_hash,createOther))+'rollback;', {allowError:true})
     assert.match(crossed,/DUAL_ORDER_SCOPE/)
@@ -348,6 +352,45 @@ async function main() {
     assert.equal(closed.fondo_final, 601); assert.equal(closed.efectivo_sistema, 601); assert.equal(closed.diferencia, 0)
     assert(closed.closed_at)
     assert.equal(sql(`select preparation_status from public.pos_orders where id=${quote(orderId)};`), 'entregada')
+  })
+  await check('Z resets the canonical ordinal in the same business day with the real daily trigger and index', async () => {
+    const nextTurn = randomUUID(), nextOrder = randomUUID()
+    assert.ok((await command('TURN_OPEN', { turno_id: nextTurn, opening_cash_cents: 0 })).result)
+    assert.ok((await command('ORDER_SAVE', { turno_id: nextTurn, order_id: nextOrder, expected_revision: 0,
+      catalog_revision: catalog.read().revision, mesa: 1, items: [{ line_id: 'next-coffee', product_id: 'coffee', quantity: 1 }] })).result)
+    assert.equal((await worker.flush()).confirmed, 2)
+    const rows = scalar(`select json_agg(o order by id) from (select id,order_number,dia_venta from pos_orders where id in (${quote(orderId)},${quote(nextOrder)})) o`)
+    assert.equal(rows.length, 2)
+    assert(rows.every(o => o.order_number === 1))
+    assert.equal(rows[0].dia_venta, rows[1].dia_venta)
+  })
+  await check('Old Caja receipts with absent or previously inferred ordinals do not block canonical numbering or exact retries', async () => {
+    const current = scalar(`select row_to_json(s) from (select last_sequence,last_history_hash from pos_caja_streams where stream_id=${quote(streamId)}) s`)
+    const template = committedEnvelope((await storage.readAfter(current.last_sequence - 1))[0])
+    const fn = file => {
+      const source = fs.readFileSync(path.join(ROOT, 'supabase/migrations', file), 'utf8')
+      const start = source.indexOf('create or replace function public.set_pos_order_number()')
+      return source.slice(start, source.indexOf('$$;', start) + 3)
+    }
+    const oldFn = fn('20260901180000_folio_por_dia_de_venta.sql')
+    const newFn = fn('PENDIENTE_20260910080000_caja_folio_por_turno.sql')
+    const invoke = (event, previous) => `select apply_pos_caja_event(${quote(streamId)}::uuid,${quote(credential)},${quote(previous)},${quote(historyHash(previous,event))},${json(event)});`
+    for (const previouslyMaterialized of [false, true]) {
+      const old = structuredClone(template), next = structuredClone(template)
+      old.id=randomUUID();old.sequence=current.last_sequence+1;old.payload.command_id=randomUUID()
+      old.result.operational_order.id=old.result.operational_order.order_id=randomUUID()
+      old.result.operational_order.mesa=2
+      delete old.result.operational_order.order_number
+      next.id=randomUUID();next.sequence=old.sequence+1;next.payload.command_id=randomUUID()
+      next.result.operational_order.id=next.result.operational_order.order_id=randomUUID()
+      next.result.operational_order.mesa=3;next.result.operational_order.order_number=2
+      const oldHash=historyHash(current.last_history_hash,old)
+      const result=sql('begin;'+(previouslyMaterialized?oldFn:'')+invoke(old,current.last_history_hash)+newFn+invoke(next,oldHash)+invoke(old,current.last_history_hash)+
+        `select json_build_object('old',(select order_number from pos_orders where id=${quote(old.result.operational_order.order_id)}),'new',(select order_number from pos_orders where id=${quote(next.result.operational_order.order_id)}));rollback;`).split('\n')
+      const row=result.map(line=>{try{return JSON.parse(line)}catch{return null}}).find(value=>value&&Object.hasOwn(value,'old'))
+      assert.equal(row.new,2)
+      assert.equal(row.old,previouslyMaterialized?2:null)
+    }
   })
   await check('Revoking a stream blocks later synchronization and preserves pending local events', async () => {
     const previousSequence = worker.status().last_sequence

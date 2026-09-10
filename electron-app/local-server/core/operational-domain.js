@@ -181,6 +181,10 @@ class OperationalDomain {
     let next = existing ? clone(existing) : { id: orderId, order_id: orderId, authority: 'caja', turno_id: turnoId,
       created_by: actor.id, mesero: actor.name || actor.id, created_at: now, status: 'abierta', payment_status: 'pendiente', preparation_status: null,
       comanda_batches: '{}', kitchen_items: [], kitchen_revision: 0, kds_item_status: '{}', descuento: 0, propina: 0, pagos: [], _kds_sent: false }
+    if (!existing) {
+      next.order_number = state.getNextOrderNumber(turnoId)
+      if (next.order_number > 2147483647) fail('ORDER_NUMBER_EXHAUSTED', 'Abre un nuevo turno para continuar la numeración')
+    }
     next.order_revision = int(expected + 1, 'order_revision'); next.updated_at = now
     if (type === 'ORDER_SAVE') {
       if (!catalogEnvelope?.ready || !catalogEnvelope.catalog) fail('CATALOG_NOT_READY', 'Prepara el catálogo de Caja antes de operar')

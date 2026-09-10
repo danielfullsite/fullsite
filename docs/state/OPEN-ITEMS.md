@@ -39,6 +39,8 @@ de ambas cuentas y recibo: 9 grupos PostgreSQL prueban concurrencia y rollback.
 La migración sigue PENDIENTE, y H04 nuevo modo Caja conserva sus demás huecos.
 Los H01–H16 inferiores siguen abiertos salvo evidencia posterior explícita.
 
+Feedback reciente, defectos nuevos y aceptación por síntoma: [Eduardo 9 de septiembre](../audit/EDUARDO-2026-09-09.md). Numeración Caja por turno, identidad nueva tras cierre y descarte de lecturas KDS tardías probados; recorrido Caja 23/23. No implican cierre global.
+
 ## Candidato de cierre: pendientes actualizados el 10 de septiembre
 
 Fuente y aceptación de cada H: [Huecos actuales y condiciones de cierre](../audit/FULLSITE-HUECOS-ACTUALES-2026-09-08.md). No instalado en AMALAY. Estos estados distinguen código pendiente de falta de prueba; no vuelven a declarar abiertos los defectos ya corregidos en el candidato. El backlog heredado inferior no es una auditoría nueva de producción.

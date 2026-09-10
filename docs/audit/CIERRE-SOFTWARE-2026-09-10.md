@@ -290,3 +290,13 @@ visible sin mutación y el rechazo de estado conserva el pendiente. Web
 porque se retiraron la constante sin uso y pruebas que repetían la regla antigua
 de autoarchivo; la nueva evidencia verifica el comportamiento de las pantallas.
 Las demás brechas de H12 continúan abiertas.
+
+
+## Feedback Eduardo 9 de septiembre: folio compartido y lecturas KDS tardías
+
+La nueva [matriz por síntoma](EDUARDO-2026-09-09.md) distingue pruebas de laboratorio de los videos reportados. Se reprodujo ausencia de ordinal en Caja; el contador por turno se proyecta desde commits, sobrevive replay/snapshot y no reutiliza números al cancelar. Salón, editor y papel conservan el mismo número. La migración candidata separa el índice diario legacy del índice canónico por turno, conserva fecha comercial e historia y evita que la nube invente números de recibos antiguos. PostgreSQL carga ahora el trigger diario real: 17 escenarios pasan, incluyendo dos turnos en un día y recibos antiguos ya materializados.
+
+Un segundo defecto se reprodujo en el HTML real de KDS: una respuesta vieja puede repintar una comanda después de recibir un snapshot vacío. El control de lecturas descarta respuestas anteriores a la aplicada y a un ACK de cocina. La regresión de respuestas invertidas falló antes y pasó después; se agregó el caso de lectura pendiente durante el ACK. Cinco pruebas del HTML pasan. El recorrido ampliado detectó un tercer defecto: liberar referencias de la cuenta cerrada no reiniciaba su identidad/revisión en React. La nueva cuenta intentaba usar una identidad cerrada. Se reinician UUID, revisión, ordinal y destino financiero conservando el recibo independiente y el borrador propio. El recorrido Caja completo pasa **23/23**, incluyendo primer pedido posterior a Z, vacío de las tres terminales y conservación del cierre. Web **3,707/3,707**, DOM **289/289**. El instalador anterior todavía no contiene este diff.
+
+
+Validación final de este checkpoint: servidor **594/594**, web **3,707/3,707**, DOM **289/289**, TypeScript aprobado, PostgreSQL **17/17**, UI Caja **23/23** y legacy/Eduardo **21/21**. La suite legacy incluye transferencia, anulación offline, pérdida y reintento del aviso de cierre, mapas idénticos y ausencia de segundo cobro. Revisión adversarial sin nuevo bloqueo tras las correcciones.

@@ -135,7 +135,7 @@ export function cuentaConfirmada(lectura: LecturaDeCuenta): boolean {
 export interface OrdenDelSalon {
   id: string; mesa: number | null; customer_name: string | null; mesero: string | null
   personas: number; status: string | null; total: number; saldo: number | null
-  order_revision: number | null; created_at: string | null
+  order_revision: number | null; order_number: number | null; created_at: string | null
 }
 export function aOrdenesDelSalon(crudas: Record<string, unknown>[]): OrdenDelSalon[] {
   return crudas.filter(o => o && (o.id || o.order_id)).map(o => ({
@@ -147,6 +147,7 @@ export function aOrdenesDelSalon(crudas: Record<string, unknown>[]): OrdenDelSal
     status: typeof o.status === 'string' ? o.status : null,
     total: Number.isFinite(Number(o.total)) ? Number(o.total) : 0,
     saldo: o.saldo != null && Number.isFinite(Number(o.saldo)) ? Number(o.saldo) : null,
+    order_number: typeof o.order_number === 'number' && Number.isSafeInteger(o.order_number) && o.order_number > 0 ? o.order_number : null,
     order_revision: Number.isInteger(o.order_revision) ? Number(o.order_revision) : null,
     created_at: typeof o.created_at === 'string' ? o.created_at
       : typeof o.ts === 'number' ? new Date(o.ts).toISOString() : null,

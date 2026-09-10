@@ -24,7 +24,7 @@ function authorize(payload,{state,actor,printer}) {
 }
 function encodeDocument(doc) {
   const c=doc.content, lines=[c.restaurant_name,doc.original_document_id?'COPIA — '+doc.kind:doc.kind==='precheck'?'PRECUENTA — NO ACREDITA PAGO':'RECIBO DE PAGO',
-    `Orden ${doc.order_id}`,c.mesa==null?`Cuenta ${c.customer_name||''}`:`Mesa ${c.mesa}`,`Documento ${doc.document_id}`,doc.created_at,'-'.repeat(40)]
+    ...(c.order_number ? [`Orden #${c.order_number}`] : []), `Orden ${doc.order_id}`,c.mesa==null?`Cuenta ${c.customer_name||''}`:`Mesa ${c.mesa}`,`Documento ${doc.document_id}`,doc.created_at,'-'.repeat(40)]
   if (doc.original_document_id) lines.push(`Original ${doc.original_document_id}`,`Motivo ${doc.reason}`)
   for(const item of c.items||[]) {
     lines.push(`${item.quantity} x ${item.name}  ${money(item.total_cents)}`)
@@ -75,7 +75,7 @@ function prepare(payload,context) {
       (kind==='payment_receipt'?d.payment_id===payment.payment_id:d.order_revision===order.order_revision&&d.financial_revision===(fin?.revision||0)))) fail('PRINT_COPY_REQUIRED','Ya existe documento; solicita una copia explícita')
     const items=typeof order.items==='string'?JSON.parse(order.items):order.items
     doc={kind,order_id:order.order_id,payment_id:payment?.payment_id,order_revision:order.order_revision,financial_revision:fin?.revision||0,original_document_id:null,
-      content:{restaurant_name:text(catalogEnvelope?.catalog?.config?.display_name||'Fullsite'),mesa:order.mesa,customer_name:text(order.customer_name),
+      content:{order_number:order.order_number??null,restaurant_name:text(catalogEnvelope?.catalog?.config?.display_name||'Fullsite'),mesa:order.mesa,customer_name:text(order.customer_name),
         items:(items||[]).map(i=>({name:text(i.nombre),quantity:i.cantidad,total_cents:i.total_cents,modifiers:(i.modificadores||[]).map(text),notes:text(i.notas)})),
         subtotal_cents:order.subtotal_cents,iva_cents:order.iva_cents,total_cents:order.total_cents,discount_cents:order.subtotal_cents+order.iva_cents-order.total_cents,
         paid_cents:fin?.paid_cents||0,reserved_cents:fin?.reserved_cents||0,balance_cents:fin?.balance_cents??order.total_cents,

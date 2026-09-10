@@ -355,6 +355,12 @@ begin
       if not found or public.pos_caja_cents(op->'kitchen_revision') <> existing.kitchen_revision + 1 or
         public.pos_caja_cents(op->'order_revision') <> existing.order_revision then raise exception 'KITCHEN_PROJECTION_GAP'; end if;
     elsif public.pos_caja_cents(op->'order_revision') <> coalesce(existing.order_revision, 0) + 1 then raise exception 'ORDER_PROJECTION_GAP'; end if;
+    -- Old committed receipts without an ordinal remain replayable. Once Caja
+    -- supplies one, all later receipts must preserve that exact identity.
+    if op ? 'order_number' and (jsonb_typeof(op->'order_number') is distinct from 'number'
+      or public.pos_caja_cents(op->'order_number') not between 1 and 2147483647) then raise exception 'INVALID_ORDER_NUMBER'; end if;
+    if existing.caja_operational_snapshot ? 'order_number' and
+      op->'order_number' is distinct from existing.caja_operational_snapshot->'order_number' then raise exception 'ORDER_NUMBER_CHANGED'; end if;
     total := public.pos_caja_cents(op->'total_cents');
     if total <> public.pos_caja_cents(op->'subtotal_cents') + public.pos_caja_cents(op->'iva_cents') then raise exception 'ORDER_TOTAL_MISMATCH'; end if;
     dual := event_type in ('ORDER_SAVE', 'ORDER_SEND') and existing.financial_revision > 0;
@@ -387,17 +393,17 @@ begin
       end loop;
     elsif event_type in ('ORDER_SAVE','ORDER_SEND') and result ? 'financial_order' then raise exception 'UNEXPECTED_FINANCIAL_RESULT';
     elsif existing.financial_revision > 0 and total::numeric <> existing.total * 100 then raise exception 'FINANCIAL_ORDER_MISMATCH'; end if;
-    insert into public.pos_orders(id, client_id, location_id, turno_id, mesa, mesero, personas, customer_name, notas, status,
+    insert into public.pos_orders(id, client_id, location_id, turno_id, order_number, mesa, mesero, personas, customer_name, notas, status,
       subtotal, iva, total, items, created_at, updated_at, order_revision, preparation_status, payment_status, saldo,
       comanda_batches, kitchen_items, kitchen_revision, caja_stream_id, caja_operational_snapshot)
-    values(op->>'order_id', stream.client_id, stream.location_id, op->>'turno_id', (op->>'mesa')::integer, op->>'mesero',
+    values(op->>'order_id', stream.client_id, stream.location_id, op->>'turno_id', (op->>'order_number')::integer, (op->>'mesa')::integer, op->>'mesero',
       (op->>'personas')::integer, op->>'customer_name', op->>'notas', op->>'status',
       public.pos_caja_cents(op->'subtotal_cents')::numeric / 100, public.pos_caja_cents(op->'iva_cents')::numeric / 100,
       total::numeric / 100, public.pos_caja_json(op->'items'), (op->>'created_at')::timestamptz, (op->>'updated_at')::timestamptz,
       public.pos_caja_cents(op->'order_revision'), op->>'preparation_status', coalesce(existing.payment_status, 'pendiente'),
       case when existing.financial_revision > 0 then existing.saldo else total::numeric / 100 end, public.pos_caja_json(op->'comanda_batches'), op->'kitchen_items',
       public.pos_caja_cents(op->'kitchen_revision'), p_stream_id, op)
-    on conflict (id) do update set mesa = excluded.mesa, mesero = excluded.mesero, personas = excluded.personas,
+    on conflict (id) do update set order_number = coalesce((excluded.caja_operational_snapshot->>'order_number')::integer, pos_orders.order_number), mesa = excluded.mesa, mesero = excluded.mesero, personas = excluded.personas,
       customer_name = excluded.customer_name, notas = excluded.notas, status = excluded.status, subtotal = excluded.subtotal,
       iva = excluded.iva, total = excluded.total, saldo = excluded.saldo, items = excluded.items, updated_at = excluded.updated_at,
       order_revision = excluded.order_revision, preparation_status = excluded.preparation_status,

@@ -58,11 +58,11 @@ Antes de activar una instalación se necesita:
 
 ## Verificación reproducible
 
-`node electron-app/lab/run-materializador-local.cjs` crea su propio clúster PostgreSQL en loopback con puerto libre, usa las definiciones `pos_orders`, `pos_turnos` y `pos_cash_movements` del baseline, aplica ambas migraciones pendientes y lo elimina al terminar. Requiere PostgreSQL disponible mediante `pg_config`, o `FULLSITE_TEST_PG_BIN` con su carpeta de binarios. No acepta una URL remota ni modifica servidores existentes.
+`node electron-app/lab/run-materializador-local.cjs` crea su propio clúster PostgreSQL en loopback con puerto libre, usa las definiciones `pos_orders`, `pos_turnos` y `pos_cash_movements` del baseline, carga el trigger e índice de día de venta y aplica las migraciones pendientes de cuentas, materialización y folio Caja por turno y lo elimina al terminar. Requiere PostgreSQL disponible mediante `pg_config`, o `FULLSITE_TEST_PG_BIN` con su carpeta de binarios. No acepta una URL remota ni modifica servidores existentes.
 
 El laboratorio genera eventos mediante **CommandHandler y NDJSON reales**. Ejecuta la función SQL real bajo rol service_role, igual que la ruta fija del servidor; simula pérdida de la respuesta después de un commit PostgreSQL confirmado. Verifica orden de eventos, credencial, retry, historial alterado, restauración, fence, sucursales, rollback transaccional, reserva desconocida, pago total sin retirar cocina y cierre contado después de entrega. Las pruebas de worker ejercitan HTTP loopback, rechazo de recibo falso, coalescencia y diagnóstico autenticado.
 
-Evidencia local actualizada: 12 recorridos PostgreSQL (incluye retiro, depósito, replay y Z neto) y 15 pruebas de worker más outbox shadow. Resultados y logs en `output/closure/materializer`. Esto no certifica el transporte PostgREST desplegado, migración en AMALAY ni aceptación del hardware.
+Evidencia local actualizada: 17 recorridos PostgreSQL (incluye retiro, depósito, replay, Z neto, reinicio de folio en el mismo día y recibos antiguos sin ordinal canónico) y 15 pruebas de worker más outbox shadow. Resultados y logs en `output/closure/materializer`. Esto no certifica el transporte PostgREST desplegado, migración en AMALAY ni aceptación del hardware.
 
 ## Lo que este recibo no cierra
 

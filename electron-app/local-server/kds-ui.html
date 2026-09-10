@@ -519,6 +519,7 @@
       });
   }
   var kitchenPending={};
+  var stateReadIssued=0, stateReadApplied=0, stateReadMinimum=0;
   function commandUuid(){if(crypto.randomUUID)return crypto.randomUUID();var bytes=new Uint32Array(4);crypto.getRandomValues(bytes);return 'kds-'+Array.prototype.map.call(bytes,function(n){return n.toString(16).padStart(8,'0');}).join('');}
   function postKitchen(order,ids,status){
     if(!actorSession()){openActor();return;}
@@ -529,7 +530,7 @@
       .then(function(r){if(!r.ok)throw new Error('Sin conexión con Caja');return r.json();})
       .then(function(data){var result=Array.isArray(data.results)&&data.results.length===1?data.results[0]:null;
         if(!result||result.error||!result.receipt||result.receipt.command_id!==cmd.command_id){if(result&&result.code==='ACTOR_REQUIRED'){lockActor();openActor();}throw new Error(result&&result.error||'Caja no confirmó el cambio');}
-        fetchState();
+        stateReadMinimum=stateReadIssued+1; fetchState();
       }).catch(function(error){toast(error.message||'Cambio sin confirmar en Caja');fetchState();})
       .finally(function(){kitchenPending[order.id]=false;});
   }
@@ -615,11 +616,12 @@
 
   function fetchState(){
     if(location.protocol==="file:"){ setConn(true); connTxt.textContent="modo demo local"; render(false); return; }
+    var read=++stateReadIssued;
     var ctrl=new AbortController(); var to=setTimeout(function(){ ctrl.abort(); },4000);
     fetch(STATE_BASE+"/state",{cache:"no-store",signal:ctrl.signal,headers:authHeaders()})
       .then(function(r){ return r.ok?r.json():Promise.reject(); })
-      .then(function(data){ clearTimeout(to); cajaWrites=data.write_authority==='caja'; lastGood=adaptOrders(data); setConn(data.authoritative!==false); paintActor(); render(true); })
-      .catch(function(){ clearTimeout(to); setConn(false); render(false); });
+      .then(function(data){ clearTimeout(to); if(read<stateReadApplied||read<stateReadMinimum)return; stateReadApplied=read; cajaWrites=data.write_authority==='caja'; lastGood=adaptOrders(data); setConn(data.authoritative!==false); paintActor(); render(true); })
+      .catch(function(){ clearTimeout(to); if(read!==stateReadIssued||read<stateReadMinimum)return; setConn(false); render(false); });
   }
 
   function tick(){ var d=new Date(); document.getElementById("clock").textContent=("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2); }

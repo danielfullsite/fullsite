@@ -75,3 +75,10 @@ sustituye el reporte por su estado parcial. Comparte `core/turn-report.js` con
 incluye consumo aún no preparado para pago. La preparación de cocina no filtra
 los cobros. La página `/pos/corte` consulta esta ruta cuando Caja es la autoridad.
 Retiros y depósitos se incluyen en X/Z desde `CASH_MOVEMENT`. Propinas siguen sujetas a H03; arqueo e impresión requieren su propia evidencia de H05/H06.
+
+
+## Número visible por turno — feedback 9 de septiembre
+
+Caja asigna `order_number` al primer `ORDER_SAVE` confirmado de una identidad. La proyección conserva máximos por turno en `order_numbers`, también al hidratar snapshots sin cuentas visibles. Ediciones, reintentos, pagos y anulaciones conservan el número; el siguiente turno comienza en 1. UUID de orden/documento identifica historia aun con ordinales repetidos entre turnos. Los logs anteriores sin número siguen legibles y no se renumeran.
+
+La UI de salón/editor y el papel canónico consumen el ordinal confirmado. El materializador conserva su inmutabilidad y requiere la candidata `PENDIENTE_20260910080000_caja_folio_por_turno.sql` para convivir con los triggers e índices diarios anteriores. No modifica la regla diaria de escritores legacy ni activa Caja.

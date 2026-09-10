@@ -22,9 +22,9 @@ describe('same operational account from every POS', () => {
     expect(localNetworkFetch).toHaveBeenCalledWith('http://127.0.0.1:8721/state', expect.objectContaining({ cache: 'no-store' }))
   })
   it('named accounts retain name, guests, revision and remaining balance in the salon', () => {
-    const named = { ...order, mesa: 0, customer_name: 'SR RAUL' }
+    const named = { ...order, mesa: 0, customer_name: 'SR RAUL', order_number: 8 }
     expect(seleccionarCuenta(snapshot([named]), { mesa: 0, customerName: 'SR RAUL' }).orden?.id).toBe('A')
-    expect(aOrdenesDelSalon([named])[0]).toMatchObject({ customer_name: 'SR RAUL', personas: 3, saldo: 100, order_revision: 4 })
+    expect(aOrdenesDelSalon([named])[0]).toMatchObject({ customer_name: 'SR RAUL', personas: 3, saldo: 100, order_revision: 4, order_number: 8 })
   })
   it('ID pins the account even if another order takes the same mesa', () => {
     const newer = { ...order, id: 'B' }

@@ -51,6 +51,7 @@ class RestaurantState {
     this._locks  = new Map()  // mesa → { client_id, expires_ms }
     this._turno  = null       // { id, opened_by, opened_at } | null
     this._turnIdentities = new Set()
+    this._orderNumbers = new Map() // turno_id → last committed ordinal (including settled/void orders)
     this._turnSummaries = new Map()
     this._cashMovements = new Map()
     this._itemTransfers = new Set()
@@ -108,6 +109,7 @@ class RestaurantState {
       }
       order._from_cloud = false
       this._orders.set(order.order_id, order)
+      this._rememberOrderNumber(order)
       if (order.mesa != null && !cancelled(order) && !settled(order)) this._mesas.set(String(order.mesa), { status: 'ocupada', order_id: order.order_id, locked_by: null })
       this._kds = this._kds.filter(k => k.order_id !== order.order_id)
       if (order._kds_sent && !cancelled(order) && order.preparation_status !== 'entregada') {
@@ -636,6 +638,7 @@ class RestaurantState {
     this._mesas = new Map(Object.entries(snap.mesas || {}))
     this._locks = new Map(Object.entries(snap.locks || {}))
     this._kds   = Array.isArray(snap.kds_queue) ? [...snap.kds_queue] : []
+    this._orderNumbers = new Map(Object.entries(snap.order_numbers || {}).filter(([, n]) => Number.isSafeInteger(n) && n >= 0 && n <= 2147483647))
     this._turno = snap.turno ?? null
     this._turnIdentities = new Set(Array.isArray(snap.turn_identities) ? snap.turn_identities : [])
     this._turnSummaries = new Map((Array.isArray(snap.turn_summaries) ? snap.turn_summaries : []).filter(t => t?.id).map(t => [t.id, JSON.parse(JSON.stringify(t))]))
@@ -670,6 +673,7 @@ class RestaurantState {
       const id = o?.order_id ?? o?.id
       if (id && cancelled(o)) this._orders.set(id, { ...o, id, order_id: id, _from_cloud: false, _kds_sent: false })
     }
+    for (const order of this._orders.values()) this._rememberOrderNumber(order)
     this._orderSnapshotComplete = snap.order_snapshot_complete === true
     return true
   }
@@ -709,11 +713,19 @@ class RestaurantState {
       cash_movements: this.getCashMovements(),
       turno:              this._turno,
       turn_identities: [...this._turnIdentities],
+      order_numbers: Object.fromEntries(this._orderNumbers),
       turn_summaries: [...this._turnSummaries.values()].map(t => JSON.parse(JSON.stringify(t))),
       locks:              Object.fromEntries(this._locks),
       last_supabase_sync: this._lastSupabaseSync,
     }
   }
+
+  _rememberOrderNumber(order) {
+    if (order.authority !== 'caja' || !order.turno_id) return
+    const last = this._orderNumbers.get(order.turno_id) || 0
+    if (Number.isSafeInteger(order.order_number) && order.order_number > last) this._orderNumbers.set(order.turno_id, order.order_number)
+  }
+  getNextOrderNumber(turnoId) { return (this._orderNumbers.get(turnoId) || 0) + 1 }
 
   getMesa(mesa)    { return this._mesas.get(String(mesa)) || { status: 'libre', order_id: null } }
   getOrder(id) { const order = this._orders.get(id); return order ? JSON.parse(JSON.stringify(order)) : null }

@@ -2389,6 +2389,10 @@ function POSContent() {
     idCuentaCaja.current = null
     baseCuentaCaja.current = null
     cuentaRemotaCaja.current = null
+    // Closing releases the table, never the old order identity. A subsequent
+    // draft must not submit ORDER_SAVE against a paid/void order or old revision.
+    setOrderId(generateId()); setLoadedOrderId(null); setOrderRevision(0)
+    setOrderNumber(null); setFinanzasConsumoCaja(null); setDestinoConsumoCaja(null)
     return queda
   }, [claveCuentaCaja])
 
@@ -2568,6 +2572,7 @@ function POSContent() {
     cuentaRemotaCaja.current = order; idCuentaCaja.current = order.id; baseCuentaCaja.current = editable
     if (!conservarBorrador) aplicarCuentaCaja(editable)
     setOrderId(order.id); setLoadedOrderId(order.id); setOrderRevision(order.order_revision)
+    setOrderNumber(typeof order.order_number === 'number' && Number.isSafeInteger(order.order_number) && order.order_number > 0 ? order.order_number : null)
     const sent = order.items.filter(i => (i.sent_quantity ?? 0) > 0)
     setSentItemIds(new Set(sent.map(i => i.id)))
     setSentItemSnapshots(Object.fromEntries(sent.map(i => [i.id, { cantidad: i.sent_quantity!, modificadores: i.modificadores, notas: i.notas, silla: i.silla }])))
