@@ -18,6 +18,7 @@ Todos los comandos financieros exigen la transición explícita y una orden cuya
 | `ORDER_MOVE` | Cuenta/revisión y destino libre. Conserva la identidad del consumo y libera la mesa anterior. |
 | `ORDER_VOID` | Cuenta/revisión y motivo. Exige permiso de anulación; conserva el registro y retira las proyecciones activas. |
 | `KITCHEN_SET` | IDs de renglones enviados, revisión de cocina y estado progresivo. Cocina puede avanzar después del pago; nunca modifica saldos. |
+| `CASH_MOVEMENT` | Retiro o depósito con identidad estable, importe positivo en centavos y motivo. Exige turno abierto, actor con `retiros_programados`; rechazo por efectivo insuficiente. Snapshot, replay y nube conservan una sola operación. |
 | `TURN_CLOSE` | Turno, efectivo contado y notas. Rechaza deuda, reservas y preparación pendiente; conserva un cierre calculado y consultable después de reiniciar. |
 
 La revisión de cocina es independiente de la del consumo y de la financiera. `items` representa consumo completo; `kitchen_items` representa rondas enviadas. Salón presenta deuda y cocina presenta preparación. Abrir cuentas financieras bloquea cambios incompatibles de consumo; todavía no existe ajuste posterior al pago parcial.
@@ -57,4 +58,4 @@ sustituye el reporte por su estado parcial. Comparte `core/turn-report.js` con
 `TURN_CLOSE`: suma aceptados (incluidos parciales), separa reservas y saldo, e
 incluye consumo aún no preparado para pago. La preparación de cocina no filtra
 los cobros. La página `/pos/corte` consulta esta ruta cuando Caja es la autoridad.
-Los movimientos de efectivo y propinas siguen sujetos al cierre H03/H06.
+Retiros y depósitos se incluyen en X/Z desde `CASH_MOVEMENT`. Propinas siguen sujetas a H03; arqueo e impresión requieren su propia evidencia de H05/H06.

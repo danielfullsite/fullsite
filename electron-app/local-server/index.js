@@ -549,7 +549,7 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority 
         const snapshot = state.toSnapshot()
         const turno = requested ? [snapshot.turno, ...snapshot.turn_summaries].find(t => t?.id === requested) : (snapshot.turno || snapshot.turn_summaries.at(-1))
         if (!turno) { json(res, 404, { error: 'Turno no encontrado' }); return }
-        json(res, 200, { authoritative: true, report: turnReport(turno, state.getFinancialOrders(), snapshot.salon_orders),
+        json(res, 200, { authoritative: true, report: turnReport(turno, state.getFinancialOrders(), snapshot.salon_orders, state.getCashMovements()),
           closed: !!turno.closed_at, close: turno.closed_at ? turno : null, sequence: await eventStore.getLastSequence() })
       } catch (error) { json(res, 403, { error: error.message || 'Reporte no autorizado' }) }
       return
@@ -990,7 +990,7 @@ async function startLocalServer({ dataDir, port = 7717, config = {}, businessSyn
   // reconciled stream. A secondary and a legacy installation never start it.
   if (businessSync && config.localAuthorityEnabled === true && config.terminalRole === 'server_pos' && !config.posServerIp) {
     try {
-      _businessOutbox = new BusinessOutbox({ eventStore, directory: dataDir, supabaseUrl, anonKey: supabaseKey,
+      _businessOutbox = new BusinessOutbox({ eventStore, directory: dataDir, materializeUrl: businessSync.materialize_url,
         restaurantId, locationId: config.branchId || config.locationId,
         streamId: businessSync.stream_id, credential: businessSync.credential,
         baselineSequence: businessSync.baseline_sequence, baselineHistoryHash: businessSync.baseline_history_hash })

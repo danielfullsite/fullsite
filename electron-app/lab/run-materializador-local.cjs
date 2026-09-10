@@ -34,6 +34,7 @@ async function main() {
     if (end < 0) throw new Error('Baseline table definition incomplete: ' + table)
     schema += baseline.slice(start, end + 3) + `\nalter table public.${table} add primary key(id);\n`
   }
+  schema += "create sequence public.pos_cash_movements_id_seq; alter table public.pos_cash_movements alter column id set default nextval('public.pos_cash_movements_id_seq');\n"
   schema += fs.readFileSync(path.join(ROOT, 'supabase/migrations/PENDIENTE_20260904000000_cuentas_divididas_modelo_durable.sql'), 'utf8')
   schema += fs.readFileSync(path.join(ROOT, 'supabase/migrations/PENDIENTE_20260905010000_caja_business_materializer.sql'), 'utf8')
   fs.writeFileSync(path.join(output, 'schema-run.log'), run(path.join(bin, 'psql'), ['-X', '-h', '127.0.0.1', '-p', port, '-U', 'postgres', '-d', 'postgres', '-v', 'ON_ERROR_STOP=1'], { input: schema }))

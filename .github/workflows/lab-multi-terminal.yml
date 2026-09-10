@@ -160,8 +160,15 @@ jobs:
           node-version: '20'
       - name: Probar transferencia en PostgreSQL temporal
         run: node electron-app/lab/run-transfer-item-local.cjs
+      - name: Instalar runtime del materializador
+        run: npm ci
+        working-directory: electron-app
+      - name: Probar recibos de negocio en PostgreSQL temporal
+        run: node electron-app/lab/run-materializador-local.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: transfer-postgres-evidence
-          path: output/closure/transfer-item
+          path: |
+            output/closure/transfer-item
+            output/closure/materializer

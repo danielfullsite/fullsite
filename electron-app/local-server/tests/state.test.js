@@ -11,6 +11,66 @@ function makeEvent(type, payload, seq = 1) {
   return { id: `ev-${seq}`, sequence: seq, type, ts: Date.now(), client_id: 'c1', restaurant_id: 'r1', payload }
 }
 
+describe('Delayed account snapshots across terminals', () => {
+  test('cancelled identities survive repeated snapshot hydration and reject late sends and upserts', () => {
+    const caja = new RestaurantState()
+    caja.apply(makeEvent(EVENT.ORDER_SENT, { order_id: 'old', mesa: 1, items: [{ id: 'a' }], total: 58 }))
+    caja.apply(makeEvent(EVENT.ORDER_CANCELLED, { order_id: 'old', mesa: 1 }))
+    caja.apply(makeEvent(EVENT.ORDER_SENT, { order_id: 'new', mesa: 1, items: [{ id: 'b' }], total: 116 }))
+    const secondary = new RestaurantState()
+    secondary.hidratarDesdeSnapshot(caja.toSnapshot())
+    const reconnected = new RestaurantState()
+    reconnected.hidratarDesdeSnapshot(secondary.toSnapshot())
+    for (const state of [caja, secondary, reconnected]) {
+      for (const type of [EVENT.ORDER_UPSERTED, EVENT.ORDER_SENT]) {
+        state.apply(makeEvent(type, { order_id: 'old', mesa: 1, items: [{ id: 'a' }], total: 58 }))
+      }
+      assert.equal(state.getOrder('old').status, 'cancelada')
+      assert.equal(state.getMesa(1).order_id, 'new')
+      assert.deepEqual(state.toSnapshot().salon_orders.map(o => o.id), ['new'])
+      assert.deepEqual(state.toSnapshot().kds_orders.map(o => o.id), ['new'])
+    }
+  })
+
+  test('older full upserts and sends cannot overwrite a newer round after reconnect', () => {
+    const caja = new RestaurantState()
+    caja.apply(makeEvent(EVENT.ORDER_SENT, { order_id: 'o', mesa: 2, items: [{ id: 'a' }, { id: 'b' }], total: 116, order_revision: 3 }))
+    const secondary = new RestaurantState()
+    secondary.hidratarDesdeSnapshot(caja.toSnapshot())
+    for (const state of [caja, secondary]) {
+      for (const type of [EVENT.ORDER_UPSERTED, EVENT.ORDER_SENT]) {
+        state.apply(makeEvent(type, { order_id: 'o', mesa: 1, items: [{ id: 'a' }], total: 58, order_revision: 2 }))
+      }
+      assert.equal(state.getOrder('o').total, 116)
+      assert.equal(state.getOrder('o').order_revision, 3)
+      assert.equal(JSON.parse(state.getOrder('o').items).length, 2)
+      assert.equal(state.getMesa(2).order_id, 'o')
+      assert.equal(state.getMesa(1).order_id, null)
+      assert.equal(state.getKdsQueue()[0].items_sent.length, 2)
+      // Kitchen progress is independent of the account revision.
+      state.apply(makeEvent(EVENT.ORDER_UPSERTED, { order_id: 'o', status: 'lista' }))
+      assert.equal(state.getOrder('o').preparation_status, 'lista')
+      assert.equal(state.getOrder('o').order_revision, 3)
+    }
+  })
+
+  test('equal and newer account revisions still apply, as do unversioned legacy offline events', () => {
+    const state = new RestaurantState()
+    const send = (revision, id) => state.apply(makeEvent(EVENT.ORDER_SENT, {
+      order_id: 'o', mesa: 1, items: [{ id }], total: 58, ...(revision === undefined ? {} : { order_revision: revision }),
+    }))
+    send(3, 'initial')
+    send(3, 'equal')
+    assert.equal(JSON.parse(state.getOrder('o').items)[0].id, 'equal')
+    send(4, 'newer')
+    assert.equal(state.getOrder('o').order_revision, 4)
+    send(undefined, 'legacy')
+    assert.equal(JSON.parse(state.getOrder('o').items)[0].id, 'legacy')
+    send(0, 'offline')
+    assert.equal(JSON.parse(state.getOrder('o').items)[0].id, 'offline')
+  })
+})
+
 describe('Mesa lifecycle', () => {
   test('ORDER_UPSERTED marks mesa as ocupada', () => {
     const state = new RestaurantState()

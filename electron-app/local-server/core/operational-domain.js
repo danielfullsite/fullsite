@@ -2,7 +2,7 @@
 const { turnReport } = require('./turn-report')
 // Pure preparation of Caja-owned orders. The handler serializes this with money
 // commands and commits the result before projecting or acknowledging it.
-const COMMANDS = new Set(['ORDER_SAVE', 'ORDER_SEND', 'ORDER_MOVE', 'ORDER_VOID', 'TURN_OPEN', 'TURN_CLOSE', 'KITCHEN_SET'])
+const COMMANDS = new Set(['ORDER_SAVE', 'ORDER_SEND', 'ORDER_MOVE', 'ORDER_VOID', 'TURN_OPEN', 'TURN_CLOSE', 'CASH_MOVEMENT', 'KITCHEN_SET'])
 const clone = value => JSON.parse(JSON.stringify(value))
 class OperationalError extends Error { constructor(code, message) { super(message); this.code = code } }
 const fail = (code, message) => { throw new OperationalError(code, message) }
@@ -99,7 +99,7 @@ function lineFromCatalog(input, catalog, catalogRevision) {
 class OperationalDomain {
   prepare(payload, { state, catalogEnvelope, actor, now = new Date().toISOString() }) {
     const type = payload.command_type
-    const permission = { ORDER_SAVE: 'pos.orders.write', ORDER_SEND: 'pos.orders.send', ORDER_MOVE: 'pos.orders.move', ORDER_VOID: 'pos.orders.cancel', TURN_OPEN: 'pos.turns.open', TURN_CLOSE: 'pos.turns.close', KITCHEN_SET: 'actualizar_estatus_orden' }[type]
+    const permission = { ORDER_SAVE: 'pos.orders.write', ORDER_SEND: 'pos.orders.send', ORDER_MOVE: 'pos.orders.move', ORDER_VOID: 'pos.orders.cancel', TURN_OPEN: 'pos.turns.open', TURN_CLOSE: 'pos.turns.close', CASH_MOVEMENT: 'retiros_programados', KITCHEN_SET: 'actualizar_estatus_orden' }[type]
     if (!permission) fail('UNKNOWN_OPERATIONAL_COMMAND', 'Comando operativo desconocido')
     authorize(actor, permission)
     const turno = state.getTurno()
@@ -110,16 +110,33 @@ class OperationalDomain {
       return { turno: { id: turnoId, opened_by: actor.id, opened_at: now, opening_cash_cents: int(payload.opening_cash_cents ?? 0, 'opening_cash_cents'), authority: 'caja' } }
     }
     if (!turno || turno.id !== turnoId) fail('TURNO_MISMATCH', 'La operación debe pertenecer al turno actual de Caja')
+    if (type === 'CASH_MOVEMENT') {
+      const movementId = id(payload.movement_id, 'movement_id')
+      if (!['retiro', 'deposito'].includes(payload.type)) fail('INVALID_CASH_MOVEMENT', 'Elige retiro o depósito')
+      const amount = int(payload.amount_cents, 'amount_cents', 1)
+      const reason = note(payload.reason, 'reason', 1000).trim()
+      if (!reason) fail('REASON_REQUIRED', 'Escribe el motivo del movimiento')
+      const previous = state.getCashMovements().find(m => m.id === movementId)
+      if (previous) {
+        if (previous.turno_id !== turnoId || previous.type !== payload.type || previous.amount_cents !== amount || previous.reason !== reason) fail('MOVEMENT_ID_REUSED', 'La identidad pertenece a otro movimiento')
+        return { cash_movement: previous }
+      }
+      const report = turnReport(turno, state.getFinancialOrders(), state.toSnapshot().salon_orders, state.getCashMovements())
+      if (payload.type === 'retiro' && amount > report.expected_cash_cents) fail('INSUFFICIENT_CASH', 'El retiro supera el efectivo esperado en Caja')
+      return { cash_movement: { id: movementId, turno_id: turnoId, type: payload.type,
+        amount_cents: amount, reason, actor: actor.id, approved_by: actor.id, created_at: now } }
+    }
     if (type === 'TURN_CLOSE') {
       const snapshot = state.toSnapshot()
       if (snapshot.salon_orders.length || state.getFinancialOrders().some(o => o.turno_id === turnoId && (o.balance_cents > 0 || o.reserved_cents > 0))) fail('UNSETTLED_FINANCIAL_ACCOUNTS', 'Quedan cuentas abiertas o intentos de pago por resolver')
       if (snapshot.kds_orders.length) fail('PENDING_KITCHEN_WORK', 'Quedan comandas sin entregar en cocina')
       const counted = int(payload.counted_cash_cents, 'counted_cash_cents')
-      const report = turnReport(turno, state.getFinancialOrders(), snapshot.salon_orders)
+      const report = turnReport(turno, state.getFinancialOrders(), snapshot.salon_orders, state.getCashMovements())
       const { opening_cash_cents: opening, cash_sales_cents: cashSales,
         total_paid_cents: totalPaid, expected_cash_cents: expected } = report
       return { turno: null, closed_turno: { ...turno, closed_by: actor.id, closed_at: now,
         opening_cash_cents: opening, cash_sales_cents: cashSales, total_paid_cents: totalPaid,
+        deposits_cents: report.deposits_cents, withdrawals_cents: report.withdrawals_cents,
         expected_cash_cents: expected, counted_cash_cents: counted, difference_cents: counted - expected,
         notes: note(payload.notes, 'notes', 1000) } }
     }

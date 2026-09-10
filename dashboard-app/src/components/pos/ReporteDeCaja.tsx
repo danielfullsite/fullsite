@@ -42,6 +42,7 @@ export default function ReporteDeCaja() {
       <dl className="grid grid-cols-2 gap-4">
         {[
           ['Cobrado confirmado', report.total_paid_cents], ['Cobrado en efectivo', report.cash_sales_cents],
+          ['Depósitos', report.deposits_cents], ['Retiros', report.withdrawals_cents],
           ['Fondo inicial', report.opening_cash_cents], ['Efectivo esperado', report.expected_cash_cents],
           ['Saldo por cobrar', report.balance_cents], ['Cobros pendientes de resolver', report.reserved_cents],
         ].map(([label, value]) => <div key={String(label)} className="rounded-xl border border-[var(--line)] p-4"><dt className="text-sm text-[var(--text-3)]">{label}</dt><dd className="text-2xl font-semibold">{pesosDeCentavos(Number(value))}</dd></div>)}

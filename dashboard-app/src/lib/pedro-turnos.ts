@@ -18,3 +18,17 @@ export async function cerrarTurnoCaja(turnoId: string, counted: number, notes: s
   if (!close || close.id !== turnoId || !close.closed_at || !Number.isSafeInteger(close.expected_cash_cents) || !Number.isSafeInteger(close.difference_cents)) throw new Error('Caja no confirmó el resumen del cierre.')
   return close
 }
+
+export interface MovimientoDeCaja {
+  id: string; turno_id: string; type: 'retiro' | 'deposito'; amount_cents: number
+  reason: string; actor: string; approved_by: string; created_at: string
+}
+export async function registrarMovimientoCaja(turnoId: string, type: MovimientoDeCaja['type'], amount: number,
+  reason: string, actor: import('./pedro-actor').SesionDeCaja): Promise<{ movement: MovimientoDeCaja; recovered: boolean }> {
+  const receipt = await ejecutarComandoCaja(`cash:movement:${turnoId}`, 'CASH_MOVEMENT', {
+    turno_id: turnoId, movement_id: crypto.randomUUID(), type, amount_cents: amount, reason,
+  }, { actor })
+  const movement = receipt.result.cash_movement as MovimientoDeCaja | undefined
+  if (!movement || movement.turno_id !== turnoId || !Number.isSafeInteger(movement.amount_cents)) throw new Error('Caja no confirmó el movimiento.')
+  return { movement, recovered: receipt.recovered }
+}

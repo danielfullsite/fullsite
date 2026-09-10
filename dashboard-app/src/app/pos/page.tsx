@@ -3087,6 +3087,7 @@ function POSContent() {
           void avisarCuentaActualizada({
             opId: `${opId}-${suffix}`, orderId: account.id, clientId: _cid(), mesa: account.mesa,
             turnoId: account.turno_id, status: account.status, items: account.items, mesero: account.mesero,
+            orderRevision: account.order_revision,
             subtotal: Number(account.subtotal), iva: Number(account.iva), total: Number(account.total),
           })
         }

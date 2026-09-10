@@ -84,7 +84,7 @@ class CommandHandler {
     if (OPERATIONAL_COMMANDS.has(commandType)) {
       if (!this._localAuthorityEnabled) throw new OperationalError('LOCAL_AUTHORITY_DISABLED', 'La autoridad de escritura de Caja no está activada en esta instalación')
       // Recheck authorization even for a duplicate; a receipt is not permission.
-      authorizeOperational(context.actor, { ORDER_SAVE: 'pos.orders.write', ORDER_SEND: 'pos.orders.send', ORDER_MOVE: 'pos.orders.move', ORDER_VOID: 'pos.orders.cancel', TURN_OPEN: 'pos.turns.open', TURN_CLOSE: 'pos.turns.close', KITCHEN_SET: 'actualizar_estatus_orden' }[commandType])
+      authorizeOperational(context.actor, { ORDER_SAVE: 'pos.orders.write', ORDER_SEND: 'pos.orders.send', ORDER_MOVE: 'pos.orders.move', ORDER_VOID: 'pos.orders.cancel', TURN_OPEN: 'pos.turns.open', TURN_CLOSE: 'pos.turns.close', CASH_MOVEMENT: 'retiros_programados', KITCHEN_SET: 'actualizar_estatus_orden' }[commandType])
     }
     if (this._localAuthorityEnabled && ['ORDER_UPSERTED', 'KDS_ITEM_STATUS'].includes(commandType)) authorizeOperational(context.actor, 'actualizar_estatus_orden')
 

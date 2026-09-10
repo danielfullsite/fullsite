@@ -37,7 +37,7 @@ function seedStream(id, location, active = true) {
       ${quote(INITIAL_HASH)},0,${quote(INITIAL_HASH)},now(),'local-test-reconciled');`)
 }
 function rpc(args, allowError = false) {
-  return sql(`set role anon; select public.apply_pos_caja_event(${quote(args.p_stream_id)}::uuid,${quote(args.p_credential)},
+  return sql(`set role service_role; select public.apply_pos_caja_event(${quote(args.p_stream_id)}::uuid,${quote(args.p_credential)},
     ${quote(args.p_previous_history_hash)},${quote(args.p_history_hash)},${json(args.p_event)});`, { allowError })
 }
 async function main() {
@@ -81,8 +81,11 @@ async function main() {
     assert.equal(Number(sql(`select count(*) from public.pos_caja_business_receipts where stream_id=${quote(streamId)};`)), 0)
   })
   let calls = 0, loseFirstResponse = true
-  const options = { eventStore: storage, directory: temporary, supabaseUrl: 'https://local-test.invalid', anonKey: 'synthetic-anon',
-    restaurantId: tenant, locationId: branch, streamId, credential, fetchImpl: async (_url, init) => {
+  const options = { eventStore: storage, directory: temporary, materializeUrl: 'https://local-test.invalid/api/pos/caja/materialize',
+    restaurantId: tenant, locationId: branch, streamId, credential, fetchImpl: async (url, init) => {
+      assert.equal(url, 'https://local-test.invalid/api/pos/caja/materialize')
+      assert.equal(init.headers.apikey, undefined)
+      assert.equal(init.headers.Authorization, undefined)
       calls++
       const data = JSON.parse(rpc(JSON.parse(init.body)))
       if (loseFirstResponse) { loseFirstResponse = false; throw new TypeError('Response lost after actual PostgreSQL COMMIT') }
@@ -176,14 +179,22 @@ async function main() {
     assert.equal(row.kitchen_items.length, 1)
     assert.equal(Number(sql(`select sum(monto) from public.pos_payment_attempts where order_id=${quote(orderId)} and estado='aceptado';`)), 116)
   })
+  await check('Cash movements materialize exactly once and reconcile the same Z close', async () => {
+    await command('CASH_MOVEMENT', { movement_id:'withdrawal',type:'retiro',amount_cents:2000,reason:'Safe deposit' })
+    await command('CASH_MOVEMENT', { movement_id:'deposit',type:'deposito',amount_cents:500,reason:'Change supplied' })
+    assert.equal((await worker.flush()).confirmed,2)
+    assert.equal((await worker.flush()).confirmed,0)
+    assert.equal(Number(sql(`select count(*) from public.pos_cash_movements where turno_id=${quote(turnoId)};`)),2)
+    assert.equal(Number(sql(`select sum(case when type='deposito' then amount else -amount end) from public.pos_cash_movements where turno_id=${quote(turnoId)};`)),-15)
+  })
   await check('Kitchen delivery and counted cash closure persist independently of settlement', async () => {
     const operational = state.getOrder(orderId)
     await command('KITCHEN_SET', { expected_kitchen_revision: operational.kitchen_revision,
       item_ids: operational.kitchen_items.map(item => item.id), status: 'entregada' })
-    await command('TURN_CLOSE', { counted_cash_cents: 61600, notes: 'Synthetic closure' })
+    await command('TURN_CLOSE', { counted_cash_cents: 60100, notes: 'Synthetic closure' })
     assert.equal((await worker.flush()).confirmed, 2)
     const closed = scalar(`select row_to_json(t) from (select fondo_final,efectivo_sistema,diferencia,closed_at from public.pos_turnos where id=${quote(turnoId)}) t;`)
-    assert.equal(closed.fondo_final, 616); assert.equal(closed.efectivo_sistema, 616); assert.equal(closed.diferencia, 0)
+    assert.equal(closed.fondo_final, 601); assert.equal(closed.efectivo_sistema, 601); assert.equal(closed.diferencia, 0)
     assert(closed.closed_at)
     assert.equal(sql(`select preparation_status from public.pos_orders where id=${quote(orderId)};`), 'entregada')
   })

@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import MovimientoDeCaja from './MovimientoDeCaja'
 import { leerTurnosCaja, cerrarTurnoCaja, type TurnoDeCaja as Turno, type CierreDeCaja } from '@/lib/pedro-turnos'
 import { centavosDeTexto, pesosDeCentavos } from '@/lib/pedro-finanzas'
 import { openTurno, logAudit } from '@/lib/pos-data'
@@ -127,6 +128,7 @@ export default function TurnoDeCaja() {
           {busy ? 'Confirmando con Caja…' : turno ? 'Confirmar cierre de turno' : 'Abrir turno'}
         </button>
       </div>
+      {turno && connected && <MovimientoDeCaja turnoId={turno.id} />}
       {latest && <section aria-label="Último cierre confirmado" className="rounded-2xl border border-emerald-600 p-5">
         <h2 className="text-xl font-bold">Último cierre confirmado</h2>
         <p className="my-2 text-sm">{new Date(latest.closed_at).toLocaleString('es-MX')}</p>

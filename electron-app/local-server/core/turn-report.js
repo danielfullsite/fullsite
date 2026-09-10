@@ -7,10 +7,10 @@ function cents(value) {
   return value
 }
 function sum(a,b) { return cents(a+cents(b)) }
-function turnReport(turno, financialOrders, salonOrders = []) {
+function turnReport(turno, financialOrders, salonOrders = [], movements = []) {
   if (!turno?.id || !Array.isArray(financialOrders)) throw new Error('TURN_REPORT_UNAVAILABLE')
   const result = { turno_id: turno.id, opening_cash_cents: cents(turno.opening_cash_cents),
-    cash_sales_cents: 0, total_paid_cents: 0, reserved_cents: 0, balance_cents: 0,
+    cash_sales_cents: 0, total_paid_cents: 0, deposits_cents: 0, withdrawals_cents: 0, reserved_cents: 0, balance_cents: 0,
     settled_orders: 0, open_orders: 0, unprepared_orders: 0, payments_by_method: {} }
   const ids = new Set()
   for (const order of financialOrders.filter(o => o.turno_id === turno.id)) {
@@ -41,7 +41,14 @@ function turnReport(turno, financialOrders, salonOrders = []) {
     result.balance_cents = sum(result.balance_cents,order.total_cents)
     result.open_orders++; result.unprepared_orders++
   }
-  result.expected_cash_cents = sum(result.opening_cash_cents,result.cash_sales_cents)
+  const movementIds = new Set()
+  for (const movement of movements.filter(m => m.turno_id === turno.id)) {
+    if (!movement.id || movementIds.has(movement.id) || !['retiro','deposito'].includes(movement.type)) throw new Error('INVALID_REPORT_MOVEMENT')
+    movementIds.add(movement.id)
+    const key = movement.type === 'retiro' ? 'withdrawals_cents' : 'deposits_cents'
+    result[key] = sum(result[key],movement.amount_cents)
+  }
+  result.expected_cash_cents = cents(sum(sum(result.opening_cash_cents,result.cash_sales_cents),result.deposits_cents)-result.withdrawals_cents)
   return result
 }
 module.exports = { turnReport }

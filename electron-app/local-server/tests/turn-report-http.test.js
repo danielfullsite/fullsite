@@ -8,7 +8,7 @@ const headers = cred.cabecerasDeCredencial({ secreto:secret, restaurantId:'lab',
 function setup(role='admin') {
   const turno={id:'t',opening_cash_cents:100}
   return buildHttpRouter({ restaurantId:'lab', config:{lanSecret:secret},
-    state:{toSnapshot:()=>({write_authority:'caja',turno,turn_summaries:[],salon_orders:[]}),getFinancialOrders:()=>[]},
+    state:{toSnapshot:()=>({write_authority:'caja',turno,turn_summaries:[],salon_orders:[]}),getFinancialOrders:()=>[],getCashMovements:()=>[]},
     eventStore:{getLastSequence:async()=>3},
     actorAuthority:{verify(token,device){assert.equal(device,'pos2'); if(token!=='signed-lab') throw new Error('Invalid actor'); return {permissions:role==='admin'?['corte_x']:[]} }},
   })

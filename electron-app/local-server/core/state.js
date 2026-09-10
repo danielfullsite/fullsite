@@ -13,6 +13,13 @@ const PREPARATION_STATUS = new Set(['enviada', 'preparando', 'lista', 'entregada
 const FINANCIAL_CLOSED = new Set(['cerrada', 'pagada', 'closed', 'paid'])
 const cancelled = o => o.status === 'cancelada' || o.status === 'void'
 const settled = o => o.payment_status === 'pagada' || FINANCIAL_CLOSED.has(o.status)
+// Cloud account revisions order full snapshots, not independent kitchen status
+// events. Zero/absent revisions are legacy offline writes, not cloud versions.
+function staleAccountSnapshot(existing, payload) {
+  return existing && (payload.items != null || payload.items_sent != null) &&
+    Number.isSafeInteger(payload.order_revision) && payload.order_revision > 0 &&
+    Number.isSafeInteger(existing.order_revision) && payload.order_revision < existing.order_revision
+}
 // Preserve only business fields. Command credentials/transport metadata must never
 // enter a snapshot sent to another terminal.
 function orderFields(payload) {
@@ -45,6 +52,7 @@ class RestaurantState {
     this._turno  = null       // { id, opened_by, opened_at } | null
     this._turnIdentities = new Set()
     this._turnSummaries = new Map()
+    this._cashMovements = new Map()
     this._lastSupabaseSync = null
     this._orderSnapshotComplete = false
     this._financialOrders = new Map()
@@ -70,6 +78,11 @@ class RestaurantState {
       }
       this._orderSnapshotComplete = true
       return { changed: ['orders', 'mesas', 'kds'] }
+    }
+    if (type === 'CASH_MOVEMENT' && event.result?.cash_movement) {
+      const movement = JSON.parse(JSON.stringify(event.result.cash_movement))
+      this._cashMovements.set(movement.id, movement)
+      return { changed: ['cash_movements'] }
     }
     if (['TURN_OPEN', 'TURN_CLOSE'].includes(type) && event.result && 'turno' in event.result) {
       this._turno = event.result.turno ? JSON.parse(JSON.stringify(event.result.turno)) : null
@@ -152,6 +165,7 @@ class RestaurantState {
     const existing = this._orders.get(order_id)
     // A replayed LAN update is not authorization to reopen a cancelled account.
     if (existing && cancelled(existing)) return { changed: [] }
+    if (staleAccountSnapshot(existing, payload)) return { changed: [] }
     if (existing) {
       // Status update from KDS (preparando / lista / entregada) or POS merge
       this._orders.set(order_id, {
@@ -202,6 +216,7 @@ class RestaurantState {
       : null
     const existing = this._orders.get(order_id)
     if (existing && cancelled(existing)) return { changed: [] }
+    if (staleAccountSnapshot(existing, payload)) return { changed: [] }
 
     if (existing && existing._kds_sent) {
       // Additional round — replace items, preserve kds_item_status and immutable fields
@@ -510,6 +525,7 @@ class RestaurantState {
     if (!snap || typeof snap !== 'object') return false
     this._writeAuthority = snap.write_authority === 'caja' ? 'caja' : 'legacy'
 
+    this._cashMovements = new Map((Array.isArray(snap.cash_movements) ? snap.cash_movements : []).map(m => [m.id, JSON.parse(JSON.stringify(m))]))
     this._mesas = new Map(Object.entries(snap.mesas || {}))
     this._locks = new Map(Object.entries(snap.locks || {}))
     this._kds   = Array.isArray(snap.kds_queue) ? [...snap.kds_queue] : []
@@ -530,6 +546,12 @@ class RestaurantState {
       const id = o?.order_id ?? o?.id
       if (!id) continue
       this._orders.set(id, { ...o, id, order_id: id, _kds_sent: kitchenIds.has(id) || !!o.preparation_status })
+    }
+    // Cancelled identities are absent from both visible projections, but must
+    // survive reconnect so a delayed broadcast cannot recreate their debt.
+    for (const o of Array.isArray(snap.cancelled_orders) ? snap.cancelled_orders : []) {
+      const id = o?.order_id ?? o?.id
+      if (id && cancelled(o)) this._orders.set(id, { ...o, id, order_id: id, _from_cloud: false, _kds_sent: false })
     }
     this._orderSnapshotComplete = snap.order_snapshot_complete === true
     return true
@@ -556,8 +578,12 @@ class RestaurantState {
       kds_queue:          [...this._kds],
       kds_orders,
       salon_orders,
+      cancelled_orders: [...this._orders.values()].filter(cancelled).map(o => ({
+        id: o.order_id ?? o.id, order_id: o.order_id ?? o.id, mesa: o.mesa, status: 'cancelada',
+      })),
       order_snapshot_complete,
       financial_orders: this.getFinancialOrders(),
+      cash_movements: this.getCashMovements(),
       turno:              this._turno,
       turn_identities: [...this._turnIdentities],
       turn_summaries: [...this._turnSummaries.values()].map(t => JSON.parse(JSON.stringify(t))),
@@ -569,6 +595,7 @@ class RestaurantState {
   getMesa(mesa)    { return this._mesas.get(String(mesa)) || { status: 'libre', order_id: null } }
   getOrder(id) { const order = this._orders.get(id); return order ? JSON.parse(JSON.stringify(order)) : null }
   getFinancialOrder(id) { const order = this._financialOrders.get(id); return order ? JSON.parse(JSON.stringify(order)) : null }
+  getCashMovements() { return [...this._cashMovements.values()].map(m => JSON.parse(JSON.stringify(m))) }
   getFinancialOrders() { return [...this._financialOrders.values()].map(order => JSON.parse(JSON.stringify(order))) }
   getKdsQueue()    { return [...this._kds] }
   getTurno()       { return this._turno }

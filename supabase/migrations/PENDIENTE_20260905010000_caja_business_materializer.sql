@@ -30,7 +30,10 @@ alter table public.pos_order_closures
   add column if not exists caja_stream_id uuid;
 alter table public.pos_cash_movements
   add column if not exists location_id text,
-  add column if not exists caja_stream_id uuid;
+  add column if not exists caja_stream_id uuid,
+  add column if not exists caja_movement_id text;
+create unique index if not exists pos_cash_movement_identity
+  on public.pos_cash_movements(client_id, location_id, caja_movement_id);
 alter table public.pos_payment_attempts drop constraint if exists pos_payment_attempts_estado_valido;
 alter table public.pos_payment_attempts add constraint pos_payment_attempts_estado_valido
   check (estado in ('pendiente', 'aceptado', 'rechazado', 'desconocido'));
@@ -145,7 +148,7 @@ declare
   stream public.pos_caja_streams%rowtype; receipt public.pos_caja_business_receipts%rowtype;
   event_seq bigint; event_type text; event_id text; result jsonb; op jsonb; fin jsonb; turno jsonb;
   existing public.pos_orders%rowtype; existing_turno public.pos_turnos%rowtype;
-  account jsonb; payment jsonb; account_number integer := 0; affected integer;
+  account jsonb; payment jsonb; movement jsonb; account_number integer := 0; affected integer;
   paid bigint := 0; reserved bigint := 0; total bigint; account_total bigint := 0;
   account_paid bigint; account_reserved bigint; materialized boolean := false;
 begin
@@ -169,7 +172,7 @@ begin
       'history_hash', receipt.history_hash, 'materialized', receipt.materialized, 'duplicate', true);
   end if;
   if event_seq <> stream.last_sequence + 1 or p_previous_history_hash <> stream.last_history_hash then raise exception 'STREAM_SEQUENCE_GAP'; end if;
-  materialized := event_type in ('TURN_OPEN', 'TURN_CLOSE', 'ORDER_SAVE', 'ORDER_SEND', 'ORDER_MOVE', 'ORDER_VOID', 'KITCHEN_SET',
+  materialized := event_type in ('TURN_OPEN', 'TURN_CLOSE', 'CASH_MOVEMENT', 'ORDER_SAVE', 'ORDER_SEND', 'ORDER_MOVE', 'ORDER_VOID', 'KITCHEN_SET',
     'FINANCIAL_OPEN', 'FINANCIAL_SPLIT', 'FINANCIAL_PAYMENT_START', 'FINANCIAL_PAYMENT_RESULT');
   if not materialized and event_type not in ('STATE_SYNC', 'MESA_LOCK', 'MESA_UNLOCK', 'PRINT_COMMAND') then
     raise exception 'UNSUPPORTED_BUSINESS_EVENT: %', event_type;
@@ -202,6 +205,25 @@ begin
         diferencia = case when turno ? 'difference_cents' then (turno->>'difference_cents')::numeric / 100 else null end,
         notas = turno->>'notes' where id = turno->>'id';
     end if;
+  elsif event_type = 'CASH_MOVEMENT' then
+    movement := result->'cash_movement';
+    if nullif(movement->>'id','') is null or movement->>'type' not in ('retiro','deposito') or
+      nullif(movement->>'reason','') is null or nullif(movement->>'actor','') is null or
+      nullif(movement->>'approved_by','') is null or public.pos_caja_cents(movement->'amount_cents') <= 0
+      then raise exception 'INVALID_CASH_MOVEMENT'; end if;
+    if not exists(select 1 from public.pos_turnos where id=movement->>'turno_id' and client_id=stream.client_id
+      and location_id=stream.location_id and caja_stream_id=p_stream_id and closed_at is null)
+      then raise exception 'CASH_MOVEMENT_TURN_MISMATCH'; end if;
+    insert into public.pos_cash_movements(client_id,location_id,caja_stream_id,caja_movement_id,turno_id,type,amount,reason,actor,approved_by,created_at)
+      values(stream.client_id,stream.location_id,p_stream_id,movement->>'id',movement->>'turno_id',movement->>'type',
+        public.pos_caja_cents(movement->'amount_cents')::numeric/100,movement->>'reason',movement->>'actor',movement->>'approved_by',
+        (movement->>'created_at')::timestamptz)
+      on conflict(client_id,location_id,caja_movement_id) do nothing;
+    if not exists(select 1 from public.pos_cash_movements where client_id=stream.client_id and location_id=stream.location_id
+      and caja_movement_id=movement->>'id' and turno_id=movement->>'turno_id' and type=movement->>'type'
+      and amount=public.pos_caja_cents(movement->'amount_cents')::numeric/100 and reason=movement->>'reason'
+      and actor=movement->>'actor' and approved_by=movement->>'approved_by' and caja_stream_id=p_stream_id)
+      then raise exception 'CASH_MOVEMENT_ID_CONFLICT'; end if;
   elsif event_type in ('ORDER_SAVE', 'ORDER_SEND', 'ORDER_MOVE', 'ORDER_VOID', 'KITCHEN_SET') then
     op := result->'operational_order';
     if op->>'authority' is distinct from 'caja' or op->>'order_id' is null or op->>'turno_id' is null then raise exception 'INVALID_ORDER_RESULT'; end if;
