@@ -402,7 +402,37 @@ class RestaurantState {
         const existing = this._orders.get(id)
         // Cloud bootstrap must not replace accepted local commands. Their
         // materialization is reconciled through command receipts, not polling.
-        if (existing && !existing._from_cloud) continue
+        //
+        // UNA FILA CERRADA EN NUBE SI ES UN RECIBO. Lo de arriba protege a las ordenes
+        // locales de la AUSENCIA en nube: un poll parcial no puede cancelar nada. Esto
+        // es lo contrario: la fila EXISTE y dice `cerrada`/`pagada`. En modo legacy la
+        // nube es la autoridad de cobro (el POS le guarda el cobro ANTES de avisar a la
+        // LAN), asi que ese estado ya materializo el dinero.
+        //
+        // Sin esto, si el ORDER_CLOSED de la LAN se perdia —la caja acababa de cambiar
+        // de IP, el WiFi parpadeo justo al cobrar— esta orden quedaba `enviada` aqui
+        // para siempre: la mesa ocupada en las tres pantallas y cobrable otra vez. Es
+        // el video de Eduardo del 2026-08-24 («si vuelves a ingresar, hay un platillo,
+        // y se puede volver a cobrar»), reproducido en el laboratorio el 2026-09-10.
+        // El POS ya reintenta ese aviso (lib/aviso-lan.ts); esta es la segunda
+        // cerradura, por si la terminal que cobro nunca vuelve a encender.
+        //
+        // Solo se toca el DINERO (payment_status, saldo, closed_at) y la mesa: los
+        // platillos y la preparacion se conservan, igual que en _applyOrderClosed (D2).
+        // Y solo se libera la mesa si sigue apuntando a ESTA orden.
+        if (existing && !existing._from_cloud) {
+          if (FINANCIAL_CLOSED.has(row.status) && !settled(existing) && !cancelled(existing)) {
+            this._orders.set(id, { ...existing, payment_status: 'pagada', saldo: 0,
+              closed_at: row.closed_at || existing.closed_at || new Date().toISOString(),
+              updated_at: new Date().toISOString() })
+            const mesa = existing.mesa != null ? String(existing.mesa) : null
+            if (mesa && this._mesas.get(mesa)?.order_id === id) {
+              this._mesas.set(mesa, { status: 'libre', order_id: null, locked_by: null })
+              this._locks.delete(mesa)
+            }
+          }
+          continue
+        }
         this._orders.set(id, { ...row, id, order_id: id, _from_cloud: true,
           _kds_sent: row.status !== 'abierta',
           preparation_status: row.preparation_status ?? (PREPARATION_STATUS.has(row.status) ? row.status : null),

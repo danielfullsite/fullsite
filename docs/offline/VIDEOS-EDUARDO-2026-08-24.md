@@ -118,11 +118,17 @@ vista) hasta que alguien saliera al salón. Ahora la rama «cerrada» pinta exac
 la caché conserva (`pos/page.tsx`, `setOrderItems(propios)`), y el aviso distingue «vuelve al
 salón» de «conservamos lo que tecleaste».
 
-**Lo que NO se cambió, a propósito:** Pedro. Que `_applyStateSync` acepte una fila `cerrada`
-en nube como recibo de una orden local sería la segunda cerradura (una fila presente que
-dice `cerrada` no es «ausencia»), pero es cambio de instalador y de contrato
-([`CONTRATO-LECTURA-CUENTAS.md`](CONTRATO-LECTURA-CUENTAS.md)); va en su propio PR con el
-lote de `local-server` que ya exige instalador (T-09).
+**La segunda cerradura, en Pedro (PR aparte, requiere instalador):** `_applyStateSync` en
+modo legacy ahora acepta una fila `cerrada`/`pagada` **presente** en nube como recibo de
+liquidación de una orden local — libera la mesa (si aún apunta a esa orden), marca
+`pagada` y `saldo 0`, conserva platillos y preparación (D2). Una fila presente que dice
+`cerrada` no es «ausencia»: la ausencia sigue sin cerrar nada, una fila abierta sigue sin
+tocar la orden local, y en modo `caja` el poll sigue siendo observacional. Contrato
+actualizado en [`CONTRATO-LECTURA-CUENTAS.md`](CONTRATO-LECTURA-CUENTAS.md); pruebas en
+`state.test.js` («una fila cerrada en nube liquida la orden local», 8 casos, A/B: 2 en rojo
+contra el código anterior). Con las dos cerraduras, un aviso perdido lo recupera la
+terminal que cobró (reintento) o la caja sola en el siguiente poll con internet — y sin
+internet, el reintento por LAN.
 
 ## 4. Cómo se probó
 
@@ -191,12 +197,14 @@ siguen verdes: la regla «un aviso jamás frena un cobro» no se tocó.
 | La mesa cobrada se libera en todas las pantallas (2) | **probado localmente** | Igual |
 | Doble cobro por caché (3a) y por split (3b) | **probado localmente** (pruebas unitarias + lab) | Igual; el split offline sigue siendo limitación documentada (`pos/page.tsx:3900`) |
 | Doble cobro por aviso perdido (3c) | **implementado + probado localmente** (17 unitarias + lab adversarial) | Deploy a Vercel; en AMALAY, cobrar con la caja desconectada 10 s y ver que la mesa se libera sola al reconectar |
-| Segunda cerradura en Pedro (nube `cerrada` → orden local) | **no implementado** | PR propio en `local-server`, con instalador |
+| Segunda cerradura en Pedro (nube `cerrada` → orden local) | **implementado + probado localmente** (8 casos en `state.test.js`; suite de Pedro 532/532) | Instalador nuevo en las TRES máquinas de AMALAY; validar en campo: cobrar con la LAN cortada, reconectar sólo el internet, y ver que la caja libera la mesa sola |
 | Certificación física (matriz) | **0 de 26** | Un turno en AMALAY con huella, impresora y router |
 
 ## 6. Lo que sigue abierto y no se toca aquí
 
-- **Pedro ignora una fila `cerrada` en nube para órdenes locales** (§3c, segunda cerradura).
+- **La segunda cerradura vive en Pedro** (§3c): no viaja por Vercel. Hasta que el instalador
+  nuevo esté en las tres máquinas, la única cerradura activa en AMALAY es el reintento del
+  POS — que basta mientras la terminal que cobró siga encendida.
 - **Split sin internet**: la salida `OFFLINE_QUEUED` resetea la división completa
   (`pos/page.tsx:3900-3906`, «LIMITACIÓN CONOCIDA»). No es el video de Eduardo, pero es la
   misma familia y sigue documentado como muro 2.

@@ -21,6 +21,15 @@ financiero. `STATE_SYNC` admite `orders` con registros completos y
 la ausencia de una orden local en nube, incluso tras 45 segundos, no constituye
 un recibo de cierre. Los comandos aceptados no se borran por ese poll.
 
+**Una fila presente en nube con estado `cerrada`/`pagada` sí es recibo de liquidación
+de una orden local (2026-09-10, sólo en modo legacy).** En ese modo la nube es la
+autoridad de cobro: el POS le guarda el cobro antes de avisar `ORDER_CLOSED` a la LAN.
+Si ese aviso se pierde, el poll liquida la orden —`payment_status: pagada`, `saldo 0`,
+`closed_at` de la nube— y libera la mesa sólo si todavía apunta a esa orden. Platillos
+y preparación se conservan (D2). Una fila abierta sigue sin tocar la orden local; la
+ausencia sigue sin cerrar nada; en modo `caja` el poll sigue siendo observacional.
+Pruebas: `state.test.js`, «una fila cerrada en nube liquida la orden local».
+
 ## Consumidores
 
 En una terminal local, mapa y editor leen Caja antes de consultar nube. Se
