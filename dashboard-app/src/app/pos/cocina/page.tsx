@@ -170,23 +170,9 @@ export default function CocinaPage() {
     }
     if (!kitchenScopeIsCurrent(scope)) { setOrders([]); return }
 
-    // Auto-archive orders with NO activity in 4h (genuinely abandoned). Uses
-    // updated_at (last touch), NOT created_at: a table opened hours ago but still
-    // being worked — e.g. an item just added — must stay on screen and never be
-    // auto-archived. Falls back to created_at when updated_at is absent.
-    const now = Date.now()
-    const fourHoursMs = 4 * 60 * 60 * 1000
-    const activityAge = (o: KitchenOrderFromDB) =>
-      now - new Date(o.updated_at || o.created_at).getTime()
-    for (const order of data) {
-      if (activityAge(order) > fourHoursMs && (order.status === 'enviada' || order.status === 'preparando')) {
-        try {
-          await updateOrderStatus(order.id, 'entregada')
-        } catch { /* non-blocking */ }
-      }
-    }
-    // Re-filter after auto-archive — keep orders active within the last 4h.
-    const fresh = data.filter(o => activityAge(o) <= fourHoursMs || o.status === 'lista')
+    // El tiempo transcurrido es una alerta, nunca prueba de entrega.
+    // getKitchenOrders ya limita la lectura al turno/sucursal activos.
+    const fresh = [...data]
 
     // Also fetch delivery orders (nueva/preparando)
     try {

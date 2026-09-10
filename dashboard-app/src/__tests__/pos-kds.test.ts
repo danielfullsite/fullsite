@@ -4,13 +4,12 @@
  * Coverage:
  *  - resolveItemStation (KDS-GAP-01)
  *  - forward-only guard logic
- *  - auto-archive threshold (KDS-GAP-03)
  *  - optimistic update semantics (KDS-GAP-02)
  *  - station filter correctness
  */
 
 import { describe, it, expect } from 'vitest'
-import { resolveItemStation, getStationByName, KITCHEN_ARCHIVE_HOURS } from '../lib/pos-constants'
+import { resolveItemStation, getStationByName } from '../lib/pos-constants'
 
 // ─── resolveItemStation ───────────────────────────────────────────────────────
 
@@ -99,52 +98,6 @@ describe('forward-only guard', () => {
   it('blocks same-status transition', () => {
     expect(canAdvance('enviada', 'enviada')).toBe(false)
     expect(canAdvance('preparando', 'preparando')).toBe(false)
-  })
-})
-
-// ─── Auto-archive threshold ───────────────────────────────────────────────────
-
-describe('auto-archive threshold', () => {
-  const ARCHIVE_MS = KITCHEN_ARCHIVE_HOURS * 60 * 60 * 1000
-
-  function shouldAutoArchive(ageMs: number, status: string): boolean {
-    return ageMs > ARCHIVE_MS && (status === 'enviada' || status === 'preparando')
-  }
-
-  function shouldBeVisible(ageMs: number, status: string): boolean {
-    return ageMs <= ARCHIVE_MS || status === 'lista'
-  }
-
-  it('KITCHEN_ARCHIVE_HOURS is 4', () => {
-    expect(KITCHEN_ARCHIVE_HOURS).toBe(4)
-  })
-
-  it('archives old enviada/preparando orders', () => {
-    const fiveHoursMs = 5 * 60 * 60 * 1000
-    expect(shouldAutoArchive(fiveHoursMs, 'enviada')).toBe(true)
-    expect(shouldAutoArchive(fiveHoursMs, 'preparando')).toBe(true)
-  })
-
-  it('does not archive recent orders', () => {
-    const oneHourMs = 60 * 60 * 1000
-    expect(shouldAutoArchive(oneHourMs, 'enviada')).toBe(false)
-    expect(shouldAutoArchive(oneHourMs, 'preparando')).toBe(false)
-  })
-
-  it('does not archive lista orders regardless of age', () => {
-    const tenHoursMs = 10 * 60 * 60 * 1000
-    expect(shouldAutoArchive(tenHoursMs, 'lista')).toBe(false)
-  })
-
-  it('keeps lista orders visible even past archive threshold', () => {
-    const fiveHoursMs = 5 * 60 * 60 * 1000
-    expect(shouldBeVisible(fiveHoursMs, 'lista')).toBe(true)
-  })
-
-  it('hides old non-lista orders from view', () => {
-    const fiveHoursMs = 5 * 60 * 60 * 1000
-    expect(shouldBeVisible(fiveHoursMs, 'enviada')).toBe(false)
-    expect(shouldBeVisible(fiveHoursMs, 'preparando')).toBe(false)
   })
 })
 

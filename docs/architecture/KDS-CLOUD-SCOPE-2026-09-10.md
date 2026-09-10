@@ -23,6 +23,12 @@ ella y descarta resultados si cambia durante la consulta. El contrato común
 La procedencia del bridge se obtiene de la conexión descubierta y autenticada;
 no se infiere del payload ni se agrega después de cambiar de instalación.
 
+Refrescar cocina o barra no cambia estados por antigüedad. Las comandas pendientes
+del turno siguen visibles aunque hayan pasado cuatro horas; el reloj indica
+demora, no entrega. El cambio de estado requiere una acción del personal. Barra
+también respeta el rechazo explícito de `updateOrderStatus` y no registra éxito
+en auditoría cuando la escritura devuelve `false`.
+
 H12 permanece abierto: esta tanda no certifica sesiones exclusivas, huella,
 proveedores ni todos los caminos de escritura cloud. El caché offline aún usa
 ventana temporal y requiere reconciliación de turno al recuperar conectividad;

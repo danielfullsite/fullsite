@@ -6,7 +6,7 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Clock, Check, Flame, RefreshCw, Wine, Printer } from 'lucide-react'
 import { getKitchenOrders, updateOrderStatus, logAudit, type KitchenOrderFromDB, type OrderItem } from '@/lib/pos-data'
-import { isBebida as isBeverage, POLL_INTERVAL_KITCHEN, KITCHEN_ARCHIVE_HOURS, resolveItemStation, type StationName } from '@/lib/pos-constants'
+import { isBebida as isBeverage, POLL_INTERVAL_KITCHEN, resolveItemStation, type StationName } from '@/lib/pos-constants'
 import { useVisibleInterval } from '@/lib/use-visible-interval'
 import { reprintByStation, type ReprintOrderContext } from '@/lib/printer'
 import { getActiveClientSlug as _cid } from '@/lib/data'
@@ -52,19 +52,8 @@ export default function BarraPage() {
       const allOrders = navigator.onLine ? await getKitchenOrders() : await readScopedKitchenCache(scope) as unknown as KitchenOrderFromDB[]
       if (!kitchenScopeIsCurrent(scope)) { setOrders([]); return }
 
-      // Auto-archive orders older than 4 hours (matches Cocina behavior — KDS-GAP-03)
-      const now = Date.now()
-      const fourHoursMs = KITCHEN_ARCHIVE_HOURS * 60 * 60 * 1000
-      for (const order of allOrders) {
-        const age = now - new Date(order.created_at).getTime()
-        if (age > fourHoursMs && (order.status === 'enviada' || order.status === 'preparando')) {
-          try { await updateOrderStatus(order.id, 'entregada') } catch { /* non-blocking */ }
-        }
-      }
-      const visibleOrders = allOrders.filter(o => {
-        const age = now - new Date(o.created_at).getTime()
-        return age <= fourHoursMs || o.status === 'lista'
-      })
+      // Una comanda pendiente no se entrega ni desaparece por antigüedad.
+      const visibleOrders = [...allOrders]
 
       // G-02: parity with Cocina — show delivery_orders on Barra too
       try {
@@ -173,7 +162,12 @@ export default function BarraPage() {
     setOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus } : o))
 
     try {
-      await updateOrderStatus(id, newStatus)
+      const confirmed = await updateOrderStatus(id, newStatus)
+      if (!confirmed) {
+        setOrders(prev => prev.map(o => o.id === id ? { ...o, status: currentStatus } : o))
+        showToast('Error al cambiar estado. Intenta de nuevo.')
+        return
+      }
       logAudit({
         order_id: id, action: 'status_changed', actor: 'Barra', mesa,
         details: { from: currentStatus, to: newStatus, mesero },

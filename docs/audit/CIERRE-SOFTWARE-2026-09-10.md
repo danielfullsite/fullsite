@@ -273,3 +273,20 @@ decisión antigua, resolución nueva y reintento del comando original. Usan log
 durable, archivo de cola y receptor TCP. Revisión adversarial sin nuevos hallazgos.
 No cierra restauración completa: falta coherencia entre archivos, cola antigua
 todavía presente y ensayo de respaldo/recuperación en equipo de reemplazo.
+
+El checkpoint de recibos **97aeac6a** pasó todos los checks de PR, incluido el
+laboratorio multi-terminal **34467422852**. Windows se vuelve a construir en
+**34467477379**; su resultado debe verificarse antes de identificar un instalador.
+
+## H12: una demora no equivale a entrega
+
+Cocina y barra ya no escriben `entregada` ni ocultan comandas pendientes sólo
+por tener más de cuatro horas. Barra comprueba el rechazo explícito de escritura
+y no registra una auditoría de éxito ante `false`.
+
+Tres pruebas DOM importan ambas pantallas: una comanda de veinte horas sigue
+visible sin mutación y el rechazo de estado conserva el pendiente. Web
+**3,707/3,707**, DOM **287/287**, TypeScript aprobado. El conteo web baja en siete
+porque se retiraron la constante sin uso y pruebas que repetían la regla antigua
+de autoarchivo; la nueva evidencia verifica el comportamiento de las pantallas.
+Las demás brechas de H12 continúan abiertas.

@@ -9,8 +9,6 @@ let _dynamicIvaRate: number | null = null
 export function setIvaRate(rate: number) { _dynamicIvaRate = rate }
 export function getIvaRate(): number { return _dynamicIvaRate ?? IVA_RATE }
 
-export const KITCHEN_ARCHIVE_HOURS = 4
-
 // 10s: en LAN la cocina recibe órdenes en tiempo real por el bridge (Pedro); este
 // poll a /api/pos/kitchen es el fallback CLOUD. A 2s cada pantalla generaba ~20k
 // requests/día (driver #1 del gasto Vercel+Supabase). 10s + pausa-si-oculto lo baja
