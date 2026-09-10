@@ -45,7 +45,7 @@ import { calcSplitParejo, calcSplitItems } from '@/lib/pos-calculations'
 import { publishEvent, getDeviceId } from '@/lib/events'
 import { apiUrl } from '@/lib/api-base'
 import { sendOrderToKitchen, kitchenFailureMessage } from '@/lib/kitchen-bridge'
-import { avisarCierreDeOrden } from '@/lib/aviso-lan'
+import { avisarCierreDeOrden, avisarCuentaActualizada, cuentaEnviadaParaLan } from '@/lib/aviso-lan'
 import { cacheTrasElCierre } from '@/lib/cache-de-cuenta'
 import { leerCuenta, requiereCaja, cuentaConfirmada, type LecturaDeCuenta } from '@/lib/pedro-cliente'
 import { leerCatalogoCaja } from '@/lib/pedro-catalogo'
@@ -3016,8 +3016,18 @@ function POSContent() {
           console.error('[cancel] Failed to queue offline — cancellation is local only until next send')
         }
       }
+      // Y QUE PEDRO LO SEPA. Hasta aqui la cancelacion iba solo a la nube; bajo
+      // Electron el mapa y el editor leen de Pedro, asi que el platillo cancelado
+      // seguia sumando en el mapa y saliendo en cocina. Se manda la cuenta completa
+      // con el renglon marcado `cancelled` (igual que la fila de nube) y los totales
+      // recalculados; durable, con el mismo opId del cancel. Ver lib/aviso-lan.ts.
+      void avisarCuentaActualizada({
+        opId: cancelOpId, orderId: effectiveOrderId, clientId: _cid(), mesa, turnoId: turnoId || null,
+        ...cuentaEnviadaParaLan(orderItems, sentItemIds,
+          new Set([...cancelledItems, ...voidedItems, cancellingItem.id]), discount),
+      })
     }
-  }, [cancellingItem, orderId, mesero, mesa, loadedOrderId, validarCuentaCaja, bloqueaLegacyCaja])
+  }, [cancellingItem, orderId, mesero, mesa, loadedOrderId, validarCuentaCaja, bloqueaLegacyCaja, orderItems, cancelledItems, voidedItems, discount, turnoId, sentItemIds])
 
   // Void entire order
   // Eduardo Jul 21 (Batch 8): Transfer individual platillo to another mesa
@@ -3059,6 +3069,24 @@ function POSContent() {
         setOrderItems(prev => prev.filter(i => i.id !== itemId))
         setSentItemIds(prev => { const next = new Set(prev); next.delete(itemId); return next })
         showToast(`${itemName} transferido a mesa ${targetMesa} — aprobó ${auth.name}`)
+        // Y QUE PEDRO LO SEPA, en las DOS mesas. La ruta ya movio el renglon en la
+        // nube; bajo Electron nadie mas se enteraba. Origen: la cuenta sin el
+        // renglon. Destino: la ruta devuelve `target_order_id` (existente o recien
+        // creada) y los renglones que quedaron ahi. Ver lib/aviso-lan.ts.
+        const quedan = orderItems.filter(i => i.id !== itemId)
+        void avisarCuentaActualizada({
+          opId: `${opId}-origen`, orderId: loadedOrderId, clientId: _cid(), mesa, turnoId: turnoId || null,
+          ...cuentaEnviadaParaLan(quedan, sentItemIds, new Set([...cancelledItems, ...voidedItems]), discount),
+        })
+        if (typeof result.target_order_id === 'string' && Array.isArray(result.target_items)) {
+          const subDestino = (result.target_items as OrderItem[]).filter(i => !i.cancelled).reduce((s, i) => s + (Number(i.subtotal) || 0), 0)
+          void avisarCuentaActualizada({
+            opId: `${opId}-destino`, orderId: result.target_order_id, clientId: _cid(), mesa: targetMesa,
+            turnoId: turnoId || null, status: 'enviada', items: result.target_items, mesero,
+            subtotal: subDestino, iva: subDestino * getIvaRate(),
+            total: Math.round((subDestino + subDestino * getIvaRate()) * 100) / 100,
+          })
+        }
       } else if (result.error === 'SOURCE_CONFLICT' || result.error === 'TARGET_CONFLICT') {
         showToast(result.message || 'Conflicto — recarga y reintenta')
         // Reload order from DB to get fresh state
@@ -3076,7 +3104,7 @@ function POSContent() {
 
     operationLock.current = false
     setTransferringItem(null)
-  }, [transferringItem, loadedOrderId, mesero, mesa, validarCuentaCaja, bloqueaLegacyCaja])
+  }, [transferringItem, loadedOrderId, mesero, mesa, validarCuentaCaja, bloqueaLegacyCaja, orderItems, cancelledItems, voidedItems, discount, turnoId, sentItemIds])
 
   const handleVoidOrder = useCallback(async (reason: string, managerName: string) => {
     if (accionPendienteEnCaja('La autorización anterior de anulación')) return
@@ -3142,6 +3170,17 @@ function POSContent() {
         } catch { /* si falla el encolado, la limpieza local igual procede */ }
         showToast('Anulada offline — se sincroniza al reconectar')
       }
+      // Y QUE PEDRO LO SEPA. Hasta aqui la anulacion iba solo a la nube; bajo
+      // Electron el mapa y el editor leen de Pedro, asi que la mesa anulada seguia
+      // OCUPADA en las tres pantallas y al reabrirla volvian sus platillos: «estas
+      // cuentas ya no deberian estar» (Eduardo, 2026-08-24), por la puerta de la
+      // anulacion. ORDER_CANCELLED libera la mesa y saca la orden de cocina
+      // (state.js, _applyOrderCancelled); durable, con el opId de la anulacion.
+      void avisarCierreDeOrden({ opId: voidOpId, orderId: loadedOrderId, clientId: _cid(), mesa, turnoId: turnoId || null, cancelada: true })
+      // Y esta pantalla suelta la identidad de la cuenta anulada YA, como al
+      // cobrar: si el lector de un segundo la readopta antes de que Pedro la borre,
+      // los platillos anulados vuelven a pintarse un instante.
+      olvidarCuentaCerrada('cobrada-aqui')
     }
     // R0.5 RESOLVED: Reverse deductions for items that were sent to kitchen.
     // Void = entire order cancelled before payment, stock should come back.
@@ -3160,7 +3199,7 @@ function POSContent() {
     setShowVoidOrder(false)
     showToast(`Orden anulada — aprobado por ${managerName}`)
     setSaving(false); operationLock.current = false
-  }, [orderId, mesero, mesa, orderItems, loadedOrderId, saving, sentItemIds, validarCuentaCaja, bloqueaLegacyCaja])
+  }, [orderId, mesero, mesa, orderItems, loadedOrderId, saving, sentItemIds, validarCuentaCaja, bloqueaLegacyCaja, turnoId, olvidarCuentaCerrada])
 
   // Cash movement confirmed (already saved to Supabase in modal)
   const handleCashMovement = useCallback((type: 'retiro' | 'deposito', amount: number, reason: string, managerName: string) => {
@@ -4396,6 +4435,19 @@ function POSContent() {
               onWheel={e => e.currentTarget.blur()}
               onChange={(e) => {
                 const newMesa = Number(e.target.value) || 1
+                // BAJO ELECTRON ESTE CAMBIO NO MUEVE NADA: la cuenta vive en Pedro, y
+                // cambiar el numero aqui solo cambia QUE mesa lee el editor. Lo que habia
+                // en pantalla —los renglones sin enviar de la mesa origen— se anexaba a la
+                // cuenta de la mesa destino en la primera lectura (el merge de la cuenta
+                // nueva conserva «lo local no enviado») y se persistia como suyo, sin PIN y
+                // sin aviso. Diagnosticado en CIERRE-DEFECTOS-2026-09-06 y sin arreglar
+                // hasta hoy. Para mover una cuenta esta «Transferir mesa» (con PIN); para
+                // capturar otra mesa esta el salon.
+                if (requiereCaja() && orderItems.length > 0 && newMesa !== mesa) {
+                  showToast('Para mover esta cuenta usa «Transferir mesa». Para otra mesa, vuelve al salón.')
+                  e.target.value = String(mesa)
+                  return
+                }
                 if (!bloqueaLegacyCaja && orderItems.length > 0 && newMesa !== mesa) {
                   logAudit({ order_id: orderId, action: 'status_changed', actor: mesero, mesa, details: { type: 'mesa_moved', from: mesa, to: newMesa } })
                   showToast(`Mesa ${mesa} → Mesa ${newMesa}`)
@@ -5002,7 +5054,20 @@ function POSContent() {
                       setMesa(newMesa)
                       // Persist to Supabase — keep current status (or 'enviada' if unknown)
                       if (orderId && loadedOrderId) {
-                        await updateOrderStatus(orderId, 'enviada', { mesa: newMesa })
+                        const moved = await updateOrderStatus(orderId, 'enviada', { mesa: newMesa })
+                        if (!moved) {
+                          setMesa(Number(oldMesa))
+                          showToast('No se pudo transferir la mesa. Reintenta.')
+                          return
+                        }
+                        // Y QUE PEDRO LO SEPA. Bajo Electron el mapa lee de Pedro: sin esto
+                        // la cuenta seguia pintada en la mesa vieja y la nueva se veia libre.
+                        // ORDER_UPSERTED con la mesa nueva: Pedro libera la vieja si apuntaba a
+                        // esta orden y ocupa la nueva (state.js, _applyOrderUpserted). Durable.
+                        void avisarCuentaActualizada({
+                          opId: `mueve:${orderId}:${oldMesa}:${newMesa}:${Date.now()}`, orderId, clientId: _cid(),
+                          mesa: newMesa, turnoId: turnoId || null, status: 'enviada',
+                        })
                       } else {
                         // New unsaved order — block transfer, must send to kitchen first
                         setMesa(Number(oldMesa))

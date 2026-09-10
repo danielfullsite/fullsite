@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
 
     // ── Step 1: Read source order with version ──
     const sourceRes = await fetch(
-      `${sbUrl}/rest/v1/pos_orders?id=eq.${source_order_id}&client_id=eq.${clientId}&select=id,items,updated_at,mesa,order_revision`,
+      `${sbUrl}/rest/v1/pos_orders?id=eq.${source_order_id}&client_id=eq.${clientId}&select=id,items,updated_at,mesa,order_revision,turno_id`,
       { headers, cache: 'no-store' }
     )
     if (!sourceRes.ok) return Response.json({ ok: false, error: 'SOURCE_READ_FAILED' }, { status: 502 })
@@ -130,6 +130,10 @@ export async function POST(request: NextRequest) {
 
     // ── Step 5: PATCH target (add item) or POST new order ──
     let targetSuccess = false
+    // Quien llama necesita saber a QUE orden fue a dar el renglon: bajo Electron el
+    // POS le avisa a Pedro la cuenta destino completa (lib/aviso-lan.ts), y sin el
+    // id de una orden recien creada no hay a quien avisar.
+    let targetOrderId: string | null = target?.id ?? null
     if (target) {
       const targetPatchRes = await fetch(
         `${sbUrl}/rest/v1/pos_orders?id=eq.${target.id}&updated_at=eq.${encodeURIComponent(targetUpdatedAt)}`,
@@ -147,10 +151,11 @@ export async function POST(request: NextRequest) {
         targetSuccess = Array.isArray(targetPatchRows) && targetPatchRows.length > 0
       }
     } else {
-      // Create new order on target mesa
+      // Create new order on target mesa. `return=representation` para conocer su id;
+      // hereda el turno de la orden origen para que no nazca fuera del corte.
       const createRes = await fetch(`${sbUrl}/rest/v1/pos_orders`, {
         method: 'POST',
-        headers: { ...headers, Prefer: 'return=minimal' },
+        headers: { ...headers, Prefer: 'return=representation' },
         body: JSON.stringify({
           client_id: clientId,
           mesa: target_mesa,
@@ -158,10 +163,18 @@ export async function POST(request: NextRequest) {
           personas: 1,
           status: 'enviada',
           items: JSON.stringify([transferItem]),
+          ...(source.turno_id ? { turno_id: source.turno_id } : {}),
           updated_at: new Date().toISOString(),
         }),
       })
       targetSuccess = createRes.ok
+      if (createRes.ok) {
+        try {
+          const created = await createRes.json()
+          const row = Array.isArray(created) ? created[0] : created
+          if (row?.id) targetOrderId = String(row.id)
+        } catch { /* sin id: el POS no podra avisar a Pedro la cuenta nueva, pero la transferencia ya ocurrio */ }
+      }
     }
 
     if (!targetSuccess) {
@@ -208,7 +221,11 @@ export async function POST(request: NextRequest) {
       })
     } catch { /* audit is best-effort */ }
 
-    return Response.json({ ok: true, item_name: transferItem.nombre || transferItem.name })
+    return Response.json({
+      ok: true, item_name: transferItem.nombre || transferItem.name,
+      // Para que el POS pueda avisarle a Pedro la cuenta destino completa.
+      target_order_id: targetOrderId, target_items: targetItems,
+    })
 
   } catch (err) {
     console.error('[transfer-item] Unhandled error:', err)

@@ -340,3 +340,40 @@ describe('Clobber / STATE_SYNC merge (GAP-002)', () => {
     assert.equal(state.getTurno().conflict_count, 2)
   })
 })
+
+
+describe('Late LAN notifications cannot resurrect cancelled orders', () => {
+  test('a delayed cancellation cannot free a table occupied by another order', () => {
+    const state = new RestaurantState()
+    state.apply(makeEvent(EVENT.ORDER_SENT, { order_id: 'old', mesa: 5, items: [] }, 1))
+    state.apply(makeEvent(EVENT.ORDER_SENT, { order_id: 'new', mesa: 5, items: [] }, 2))
+    state.apply(makeEvent(EVENT.ORDER_CANCELLED, { order_id: 'old', mesa: 5 }, 3))
+    assert.equal(state.getMesa('5').order_id, 'new')
+    assert.equal(state.getMesa('5').status, 'ocupada')
+  })
+
+  test('a delayed update after cancellation cannot reopen the account', () => {
+    const state = new RestaurantState()
+    state.apply(makeEvent(EVENT.ORDER_SENT, { order_id: 'old', mesa: 5, items: [] }, 1))
+    state.apply(makeEvent(EVENT.ORDER_CANCELLED, { order_id: 'old', mesa: 5 }, 2))
+    state.apply(makeEvent(EVENT.ORDER_UPSERTED, { order_id: 'old', mesa: 5, status: 'enviada', total: 58 }, 3))
+    assert.equal(state.toSnapshot().salon_orders.length, 0)
+    assert.equal(state.getMesa('5').status, 'libre')
+  })
+})
+
+
+test('cancelled identity survives replay, a delayed send and stale cloud rows', () => {
+  const history = [
+    makeEvent(EVENT.ORDER_SENT, { order_id: 'old', mesa: 5, items: [{ id: 'coffee' }] }, 1),
+    makeEvent(EVENT.ORDER_CANCELLED, { order_id: 'old', mesa: 5 }, 2),
+  ]
+  const restarted = new RestaurantState()
+  for (const event of history) restarted.apply(event)
+  restarted.apply(makeEvent(EVENT.ORDER_SENT, { order_id: 'old', mesa: 5, items: [{ id: 'coffee' }] }, 3))
+  restarted.apply(makeEvent(EVENT.STATE_SYNC, { orders: [{ id: 'old', mesa: 5, status: 'enviada', items: '[]' }], mesas: [{ mesa: 5, order_id: 'old', status: 'ocupada' }], kds_queue: [{ order_id: 'old', mesa: 5 }] }, 4))
+  assert.equal(restarted.toSnapshot().salon_orders.length, 0)
+  assert.equal(restarted.toSnapshot().kds_orders.length, 0)
+  assert.equal(restarted.toSnapshot().kds_queue.length, 0)
+  assert.equal(restarted.getMesa('5').status, 'libre')
+})

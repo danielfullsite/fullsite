@@ -15,6 +15,13 @@
 
 Regla: cuando cierres un item, márcalo aquí. Cuando aparezca uno nuevo, entra aquí — no en un doc suelto.
 
+## Recuperación del candidato — 10 de septiembre
+
+Rama `cert/instalador-2026-09-10`, base #391. [Evidencia y límites](../audit/CANDIDATO-POS-KDS-2026-09-10.md).
+Avisos de mutaciones recuperados y protección de anulaciones/reintentos probada localmente.
+Laboratorio UI y candidato Windows pendientes de aprobación; no instalado ni certificado.
+Los H01–H16 inferiores siguen abiertos salvo evidencia posterior explícita.
+
 ## Candidato de cierre: revisión del 8 de septiembre
 
 Fuente y aceptación de cada H: [Huecos actuales y condiciones de cierre](../audit/FULLSITE-HUECOS-ACTUALES-2026-09-08.md). No instalado en AMALAY. Estos estados distinguen código pendiente de falta de prueba; no vuelven a declarar abiertos los defectos ya corregidos en el candidato. El backlog heredado inferior no es una auditoría nueva de producción.

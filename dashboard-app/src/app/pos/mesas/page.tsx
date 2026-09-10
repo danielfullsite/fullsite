@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft, Users, Calendar, RefreshCw, Merge, X, Clock, AlertTriangle, LayoutGrid, Map, UserPlus, Lock as LockIcon, Power, PencilRuler } from 'lucide-react'
 import { getMesasConfig, formatMXN, logAudit, verifyManagerPin, fetchPosMesas, fetchWithTimeout, getPOSAuthHeaders } from '@/lib/pos-data'
 import type { Mesa } from '@/lib/pos-data'
+import { avisarCierreDeOrden, avisarCuentaActualizada } from '@/lib/aviso-lan'
 import { getActiveClientSlug as _cid } from '@/lib/data'
 import { getPosConfigSync } from '@/lib/pos-config'
 import { shouldUsePersistedFloorCoordinates } from '@/lib/floorplan-coordinates'
@@ -592,6 +593,17 @@ export default function MesasPage() {
         order_id: tgtOrder.id, action: 'status_changed', actor: 'Sistema',
         details: { type: 'mesa_merge', from_mesa: mergeSource, to_mesa: mergeTarget, items_moved: srcItems.length },
       })
+
+      // Y QUE PEDRO LO SEPA, en las DOS mesas. La RPC ya cancelo la origen y
+      // creció la destino en la nube; bajo Electron este mapa lee de Pedro, asi
+      // que sin esto la mesa origen seguia ocupada y la destino con su total viejo.
+      // Ambos avisos son durables (lib/aviso-lan.ts) y comparten el id del merge.
+      const idDelMerge = `merge:${srcOrder.id}:${tgtOrder.id}`
+      void avisarCierreDeOrden({ opId: idDelMerge, orderId: String(srcOrder.id), clientId: _cid(),
+        mesa: mergeSource, turnoId: srcOrder.turno_id ?? null, cancelada: true })
+      void avisarCuentaActualizada({ opId: idDelMerge, orderId: String(tgtOrder.id), clientId: _cid(),
+        mesa: mergeTarget, turnoId: tgtOrder.turno_id ?? null, status: tgtOrder.status ?? 'enviada',
+        items: mergedItems, subtotal: newSubtotal, iva: newIva, total: newTotal, personas: newPersonas })
 
       showToast(`Mesa ${mergeSource} fusionada con mesa ${mergeTarget}`)
       setMergeMode(false); setMergeSource(null); setMergeTarget(null)

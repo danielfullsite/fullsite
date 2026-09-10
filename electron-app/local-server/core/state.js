@@ -150,6 +150,8 @@ class RestaurantState {
   _applyOrderUpserted(payload) {
     const { order_id, mesa, items, status } = payload
     const existing = this._orders.get(order_id)
+    // A replayed LAN update is not authorization to reopen a cancelled account.
+    if (existing && cancelled(existing)) return { changed: [] }
     if (existing) {
       // Status update from KDS (preparando / lista / entregada) or POS merge
       this._orders.set(order_id, {
@@ -199,6 +201,7 @@ class RestaurantState {
       ? (typeof comanda_batches === 'string' ? comanda_batches : JSON.stringify(comanda_batches))
       : null
     const existing = this._orders.get(order_id)
+    if (existing && cancelled(existing)) return { changed: [] }
 
     if (existing && existing._kds_sent) {
       // Additional round — replace items, preserve kds_item_status and immutable fields
@@ -266,9 +269,18 @@ class RestaurantState {
   }
 
   _applyOrderCancelled({ order_id, mesa }) {
-    this._orders.delete(order_id)
+    // Retain the cancellation through event replay so late updates cannot revive
+    // this identity. The table may already belong to a newer account.
+    const order = this._orders.get(order_id)
+    this._orders.set(order_id, { ...order, id: order_id, order_id,
+      mesa: order?.mesa ?? mesa, status: 'cancelada', _from_cloud: false, _kds_sent: false })
     this._kds = this._kds.filter(k => k.order_id !== order_id)
-    if (mesa) this._mesas.set(String(mesa), { status: 'libre', order_id: null, locked_by: null })
+    for (const table of new Set([mesa, order?.mesa])) {
+      if (table != null && this._mesas.get(String(table))?.order_id === order_id) {
+        this._mesas.set(String(table), { status: 'libre', order_id: null, locked_by: null })
+        this._locks.delete(String(table))
+      }
+    }
     return { changed: ['mesas', 'orders', 'kds'] }
   }
 
@@ -374,9 +386,10 @@ class RestaurantState {
       for (const m of mesas) {
         const key = String(m.mesa)
         if (protectedMesas.has(key)) continue  // no pisar mesa con orden local fresca
+        const locallyCancelled = m.order_id && cancelled(this._orders.get(m.order_id) || {})
         this._mesas.set(key, {
-          status:    m.status || (m.order_id ? 'ocupada' : 'libre'),
-          order_id:  m.order_id || null,
+          status:    locallyCancelled ? 'libre' : m.status || (m.order_id ? 'ocupada' : 'libre'),
+          order_id:  locallyCancelled ? null : m.order_id || null,
           locked_by: null,
         })
       }
@@ -384,7 +397,7 @@ class RestaurantState {
     }
     if (kds_queue) {
       const protectedKds = this._kds.filter((k) => protectedOrderIds.has(k.order_id))
-      const fromPoll     = kds_queue.filter((k) => !protectedOrderIds.has(k.order_id))
+      const fromPoll     = kds_queue.filter((k) => !protectedOrderIds.has(k.order_id) && !cancelled(this._orders.get(k.order_id) || {}))
       this._kds = [...fromPoll, ...protectedKds]
     }
     if (turno !== undefined) {

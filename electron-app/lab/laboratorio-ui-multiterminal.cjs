@@ -92,11 +92,16 @@ async function until(fn, label, timeout = 30000) {
 // escondite y concluía que la terminal se había bloqueado. Tras cada `goto` se
 // espera a que algún botón tenga su onClick colgado —eso es hidratación, no un
 // sleep— antes de mirar cualquier cosa.
-const esperarHidratacion = page => until(() => page.evaluate(() =>
+const esperarHidratacion = async page => {
+  // Exercise the active terminal as a user would; Chromium throttles background
+  // windows while four Electron processes are open on the same desktop.
+  await page.bringToFront()
+  return until(() => page.evaluate(() =>
   [...document.querySelectorAll('button')].some(b => {
     const clave = Object.keys(b).find(k => k.startsWith('__reactProps'))
     return !!clave && typeof b[clave]?.onClick === 'function'
   })).catch(() => false), 'hidratación de la pantalla', 90000)
+}
 function request(terminal, route, init = {}) {
   return fetch(`http://127.0.0.1:${terminal.port}${route}`, {
     ...init, headers: { ...headers,
@@ -187,13 +192,13 @@ const staff = { id: '00000000-0000-4000-8000-000000000071', name: 'Operador de l
 const turno = { id: '00000000-0000-4000-8000-000000000072', client_id: tenant,
   fondo_inicial: 500, opened_by: staff.name, opened_at: new Date().toISOString(), closed_at: null }
 const fixture = {
-  clients: [{ id: tenant, display_name: 'Restaurante de laboratorio', mesas: 3, meseros: [staff.name],
+  clients: [{ id: tenant, display_name: 'Restaurante de laboratorio', mesas: 7, meseros: [staff.name],
     timezone: 'America/Monterrey', iva_rate: 0.16, features: { pos: true, posRestaurant: true } }],
   pos_menu_categories: [{ id: 'lab-bebidas', name: 'Bebidas laboratorio', active: true, sort_order: 1, color: '#327867' }],
   pos_menu_items: [{ id: 'lab-cafe', category_id: 'lab-bebidas', name: 'Café de laboratorio', price: 50,
     active: true, sort_order: 1, station: 'barra' }],
   pos_payment_methods: [{ id: 'lab-cash', name: 'Efectivo', type: 'efectivo', commission_pct: 0 }],
-  pos_mesas: [1, 2, 3].map(number => ({ id: `mesa-${number}`, client_id: tenant, number,
+  pos_mesas: [1, 2, 3, 4, 5, 6, 7].map(number => ({ id: `mesa-${number}`, client_id: tenant, number,
     capacity: 4, active: true, x_pct: 15 + number * 20, y_pct: 40, shape: 'square', zone: 'Salón' })),
   pos_turnos: [turno], pos_staff: [staff], pos_orders: [],
 }
@@ -374,6 +379,10 @@ require(${JSON.stringify(path.join(ELECTRON_APP, 'main.js'))});\n`)
   }, { tenant, staff, turno, terminalId, port, secret, actorSession, operationalMode, uiOrigin, sinSesion: !!opts.sinSesion })
   const page = await app.firstWindow()
   terminal.page = page
+  page.on('requestfailed', request => {
+    const url = new URL(request.url())
+    if (url.pathname.startsWith('/_next/')) terminal.log.push(`[asset-failed] ${url.pathname} ${request.failure()?.errorText}\n`)
+  })
   page.on('pageerror', error => terminal.errors.push(error.stack || error.message))
   page.on('console', message => {
     if (['error', 'warning'].includes(message.type())) terminal.log.push(`[renderer] ${message.text()}\n`)
@@ -686,6 +695,11 @@ async function main() {
   // por eso viaja como función y no como valor.
   await require('./videos-de-eduardo-ui.cjs')({ caja: () => caja, pos2, pos3, kds, check, expect, assert, until, request,
     esperarHidratacion, tenant, output, uiOrigin, orderId, path })
+  // Las mutaciones que iban solo a la nube (anular, transferir mesa) tienen que
+  // llegar a Pedro. `setWan` porque anular pide validar el PIN del gerente en la
+  // nube antes de poder hacerlo sin ella (el caché de 30 min).
+  await require('./mutaciones-llegan-a-pedro-ui.cjs')({ caja: () => caja, pos2, pos3, check, expect, assert, until, request,
+    command, esperarHidratacion, tenant, output, uiOrigin, turno, staff, path, randomUUID, setWan: v => { wan = v } })
   await check('Al apagarse Caja, POS 2 muestra que la cuenta no está confirmada', async () => {
     caja.process.kill('SIGKILL')
     await until(async () => {
@@ -721,6 +735,7 @@ async function main() {
 
 main().catch(error => {
   console.error(error.stack)
+  if (!results.some(r => !r.passed)) results.push({ name: 'Preparación del laboratorio', passed: false, error: error.message })
   process.exitCode = 1
 }).finally(async () => {
   for (const server of reservedPorts.values()) await new Promise(resolve => server.close(resolve))
