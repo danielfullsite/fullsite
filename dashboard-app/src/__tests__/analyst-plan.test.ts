@@ -285,6 +285,27 @@ describe('extraer el JSON que devuelve un modelo', () => {
   it('devuelve null si no hay JSON', () => {
     expect(extraerJSON('no puedo')).toBeNull()
   })
+
+  it('un JSON truncado a media palabra devuelve null, no un objeto a medias', () => {
+    // El caso real: con maxTokens bajo, el modelo cortaba en `"pct_efe` y el plan salía
+    // vacío aunque hubiera elegido bien las vistas.
+    const truncado = '{"consultas":[{"vista":"ops_personal","columnas":["pct_efe'
+    expect(extraerJSON(truncado)).toBeNull()
+  })
+})
+
+describe('el descarte dice POR QUÉ se quedó sin plan', () => {
+  it('sin JSON que leer lo dice, en vez de culpar al arreglo', () => {
+    // Confundir "no hubo JSON" con "el JSON no traía consultas" manda a buscar el error
+    // en el prompt cuando está en el presupuesto de tokens. Costó una corrida entenderlo.
+    const p = validarPlan(null, HOY)
+    expect(p.descartes.join(' ')).toContain('truncó')
+  })
+
+  it('un JSON válido sin consultas culpa al arreglo, no al parseo', () => {
+    const p = validarPlan({ formula: 'x' }, HOY)
+    expect(p.descartes.join(' ')).toContain('arreglo')
+  })
 })
 
 describe('el recorte de filas conserva lo que pesa', () => {

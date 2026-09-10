@@ -73,7 +73,11 @@ export async function POST(request: NextRequest) {
         { role: 'system', content: promptDePlaneacion(hoy, zona) },
         { role: 'user', content: pregunta },
       ],
-      maxTokens: 800,
+      // 800 no alcanzaba. Con dos consultas y columnas explícitas el JSON se cortaba a
+      // media palabra ("pct_efe…"), `extraerJSON` devolvía null y el plan salía vacío —
+      // con el modelo habiendo elegido bien las vistas. Lo encontró la prueba en vivo;
+      // ninguna de las 36 unitarias podía verlo, porque todas parten de un JSON completo.
+      maxTokens: 2000,
       temperature: 0,   // planear no es creativo
     })
     const plan = validarPlan(extraerJSON(crudo), hoy)
