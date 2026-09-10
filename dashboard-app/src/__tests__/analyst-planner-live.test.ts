@@ -24,7 +24,7 @@ async function planear(pregunta: string) {
       { role: 'system', content: promptDePlaneacion(HOY, 'America/Monterrey') },
       { role: 'user', content: pregunta },
     ],
-    maxTokens: 800,
+    maxTokens: 2000,   // el MISMO presupuesto que la ruta; con 800 el JSON se truncaba
     temperature: 0,
   })
   const plan = validarPlan(extraerJSON(crudo), HOY)
@@ -35,7 +35,11 @@ describe.skipIf(!HAY_LLAVE)('el planificador con un modelo real', () => {
   it('una pregunta SIN palabras clave llega a los datos correctos', async () => {
     // Ésta es la prueba que justifica todo el trabajo: en /api/chat, "dinero" no está en
     // ninguna lista de keywords, así que el modelo nunca vería costos ni consumo.
-    const { plan } = await planear('¿por qué se me está yendo el dinero?')
+    const { plan, crudo } = await planear('¿por qué se me está yendo el dinero?')
+    // Cuando falla hay que poder ver QUÉ razonó, no sólo que dio cero.
+    // eslint-disable-next-line no-console
+    console.log('[plan]', JSON.stringify({ formula: plan.formula, descartes: plan.descartes,
+      vistas: plan.consultas.map((c) => c.vista), crudo: crudo.slice(0, 600) }, null, 2))
     expect(plan.consultas.length).toBeGreaterThan(0)
     const vistas = plan.consultas.map((c) => c.vista)
     // No se exige una vista concreta —hay varias formas razonables de atacar esto— pero sí

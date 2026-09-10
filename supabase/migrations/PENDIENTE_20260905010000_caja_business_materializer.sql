@@ -306,4 +306,8 @@ begin
     'history_hash', p_history_hash, 'materialized', materialized, 'duplicate', false);
 end $$;
 revoke all on function public.apply_pos_caja_event(uuid, text, text, text, jsonb) from public;
-grant execute on function public.apply_pos_caja_event(uuid, text, text, text, jsonb) to anon, authenticated, service_role;
+-- `anon` es el rol de la LLAVE PUBLICA. Este mismo archivo revoca arriba (L75) todo
+-- acceso de `anon` a las tablas de caja; otorgarle EXECUTE sobre el materializador
+-- que las escribe lo contradice. No hay un solo llamador de esta funcion en el
+-- cliente: el POS llega por /api/pos/db con service_role. Se queda fuera.
+grant execute on function public.apply_pos_caja_event(uuid, text, text, text, jsonb) to authenticated, service_role;

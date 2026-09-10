@@ -73,7 +73,11 @@ export function validarPlan(crudo: unknown, hoy: string): PlanValidado {
   const raiz = (crudo ?? {}) as Record<string, unknown>
   const lista = Array.isArray(raiz.consultas) ? raiz.consultas : []
 
-  if (!Array.isArray(raiz.consultas)) {
+  if (crudo === null || crudo === undefined) {
+    // Distinto de "vino un plan sin consultas": aquí no hubo JSON que leer. Confundirlos
+    // manda a buscar el error en el prompt cuando está en el presupuesto de tokens.
+    descartes.push('no se pudo leer un JSON de la respuesta del modelo (¿se truncó?)')
+  } else if (!Array.isArray(raiz.consultas)) {
     descartes.push('el plan no traía un arreglo `consultas`')
   }
 
@@ -196,12 +200,15 @@ DEVUELVE EXACTAMENTE ESTE JSON, sin texto alrededor y sin bloque de código:
     { "vista": "<una de las de arriba>",
       "desde": "YYYY-MM-DD",
       "hasta": "YYYY-MM-DD",
-      "columnas": ["..."],
       "filtros": {},
       "porque": "una frase de por qué esto ayuda a responder" }
   ],
   "formula": "cómo se obtiene la respuesta a partir de esos datos, en una línea"
 }
+
+Puedes añadir "columnas": ["..."] a una consulta, pero NO hace falta: si la omites se
+traen todas las de esa vista. Omítela salvo que quieras acotar de verdad — enumerarlas
+alarga el JSON sin ganar nada.
 
 REGLAS
 1. Máximo ${MAX_CONSULTAS} consultas. Pide lo que necesitas, no todo lo que existe.
