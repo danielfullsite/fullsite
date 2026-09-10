@@ -68,7 +68,14 @@ module.exports = async function mutacionesLleganAPedro({ caja, pos2, pos3, check
       await expect(pos2.page.locator('body')).toContainText('Transferir a mesa #:')
       await pos2.page.locator('input[type="number"][placeholder="#"]').fill('7')
       await pos2.page.getByRole('button', { name: 'Confirmar', exact: true }).click()
+      const notices = new Set()
       await until(async () => {
+        const body = await pos2.page.locator('body').innerText()
+        const messages = body.match(/(?:La cuenta|La configuración|No se pudo|Caja debe|Envia la orden|Catálogo sin)[^\n]*/g) || []
+        for (const message of messages) if (!notices.has(message)) {
+          notices.add(message)
+          console.log(`[transferir-mesa] ${message}`)
+        }
         const s = await salon()
         return s.mesas?.['4']?.status === 'libre' && s.mesas?.['7']?.order_id === idMesa4 && ordenesDeMesa(s, 7).length === 1
       }, 'Caja movió la cuenta de la mesa 4 a la 7 al recibir el ORDER_UPSERTED')
