@@ -82,6 +82,9 @@ jobs:
       # SIEMPRE --x64. En Mac con Apple Silicon los defaults salen arm64 y NO corren
       # en Windows (OFFLINE-LAN-FIELD-PROVEN §5.2). Aqui corre en windows-latest,
       # pero se declara explicito para que no dependa del runner.
+      - name: Sellar el commit antes de empaquetar
+        run: npm run sellar
+
       - name: Construir instalador del POS
         run: npx electron-builder --win --x64 --config electron-builder-pos.json --publish ${{ (github.event_name == 'push' && 'always') || 'never' }}
         env:

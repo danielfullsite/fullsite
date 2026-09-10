@@ -105,8 +105,25 @@ jobs:
         shell: bash
         run: node --test local-server/tests/*.test.js
 
+      - name: Sellar el commit del candidato
+        run: npm run sellar
+
       - name: Build Windows installer
         run: npx electron-builder --win --x64 --publish never
+
+      - name: Verificar identidad dentro del ejecutable
+        shell: bash
+        run: |
+          node - <<'JS'
+          const assert = require('node:assert/strict')
+          const asar = require('@electron/asar')
+          const archive = 'dist/win-unpacked/resources/app.asar'
+          const info = JSON.parse(asar.extractFile(archive, 'build-info.json'))
+          assert.equal(info.sha, process.env.GITHUB_SHA)
+          assert.equal(info.limpio, true)
+          assert.equal(info.version, require('./package.json').version)
+          console.log(`Paquete identificado: ${info.version} · ${info.sha}`)
+          JS
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
