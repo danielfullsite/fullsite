@@ -149,6 +149,7 @@ declare
   event_seq bigint; event_type text; event_id text; result jsonb; op jsonb; fin jsonb; turno jsonb;
   existing public.pos_orders%rowtype; existing_turno public.pos_turnos%rowtype;
   old_fin jsonb; old_account jsonb; chosen_account text; dual boolean := false; delta bigint;
+  drawer jsonb;
   document jsonb; original_document jsonb; content jsonb; resolution jsonb;
   account jsonb; payment jsonb; movement jsonb; account_number integer := 0; affected integer;
   paid bigint := 0; reserved bigint := 0; total bigint; account_total bigint := 0;
@@ -176,7 +177,7 @@ begin
   if event_seq <> stream.last_sequence + 1 or p_previous_history_hash <> stream.last_history_hash then raise exception 'STREAM_SEQUENCE_GAP'; end if;
   materialized := event_type in ('TURN_OPEN', 'TURN_CLOSE', 'CASH_MOVEMENT', 'ORDER_SAVE', 'ORDER_SEND', 'ORDER_MOVE', 'ORDER_VOID', 'KITCHEN_SET',
     'FINANCIAL_OPEN', 'FINANCIAL_SPLIT', 'FINANCIAL_PAYMENT_START', 'FINANCIAL_PAYMENT_RESULT');
-  if not materialized and event_type not in ('STATE_SYNC', 'MESA_LOCK', 'MESA_UNLOCK', 'PRINT_COMMAND', 'ORDER_PRECHECK_PRINT', 'PAYMENT_RECEIPT_PRINT', 'PRINT_UNCERTAIN_RESOLVE') then
+  if not materialized and event_type not in ('STATE_SYNC', 'MESA_LOCK', 'MESA_UNLOCK', 'PRINT_COMMAND', 'ORDER_PRECHECK_PRINT', 'PAYMENT_RECEIPT_PRINT', 'PRINT_UNCERTAIN_RESOLVE', 'PAYMENT_DRAWER_OPEN', 'DRAWER_OPEN', 'DRAWER_UNCERTAIN_RESOLVE') then
     raise exception 'UNSUPPORTED_BUSINESS_EVENT: %', event_type;
   end if;
   insert into public.pos_caja_business_receipts(stream_id, sequence, event_id, client_id, location_id, event,
@@ -257,6 +258,51 @@ begin
         coalesce(r.event->'result'->'print_document'->'job_ids','[]'::jsonb) ? (resolution->>'job_id') or
         exists(select 1 from jsonb_array_elements(coalesce(r.event->'result'->'preparation_delivery','[]'::jsonb)) d
           where coalesce(d->'job_ids','[]'::jsonb) ? (resolution->>'job_id')))) then raise exception 'PRINT_JOB_SCOPE'; end if;
+  end if;
+
+  if event_type in ('PAYMENT_DRAWER_OPEN','DRAWER_OPEN') then
+    drawer := result->'drawer_operation';
+    if jsonb_typeof(drawer) is distinct from 'object' or nullif(drawer->>'operation_id','') is null or
+      drawer->>'operation_id' is distinct from p_event->'payload'->>'command_id' or
+      drawer->>'kind' is distinct from (case when event_type='PAYMENT_DRAWER_OPEN' then 'payment' else 'manual' end) or
+      nullif(drawer->>'job_id','') is null or nullif(drawer->>'printer_id','') is null or nullif(drawer->>'recorded_by','') is null or
+      nullif(drawer->>'created_at','') is null or nullif(drawer->>'reason','') is null then raise exception 'INVALID_DRAWER_OPERATION'; end if;
+    if not exists(select 1 from public.pos_turnos t where t.id=drawer->>'turno_id' and t.client_id=stream.client_id
+      and t.location_id=stream.location_id and t.caja_stream_id=p_stream_id and t.closed_at is null) or
+      (p_event->'payload' ? 'turno_id' and p_event->'payload'->>'turno_id' is distinct from drawer->>'turno_id') then raise exception 'DRAWER_TURN_SCOPE'; end if;
+    if exists(select 1 from public.pos_caja_business_receipts r where r.stream_id=p_stream_id and r.sequence<event_seq and
+      (r.event->'result'->'drawer_operation'->>'operation_id'=drawer->>'operation_id' or
+       r.event->'result'->'drawer_operation'->>'job_id'=drawer->>'job_id')) then raise exception 'DRAWER_ID_REUSED'; end if;
+    if event_type='PAYMENT_DRAWER_OPEN' then
+      select * into existing from public.pos_orders o where o.id=drawer->>'order_id';
+      if not found or existing.client_id is distinct from stream.client_id or existing.location_id is distinct from stream.location_id or
+        existing.caja_stream_id is distinct from p_stream_id or existing.turno_id is distinct from drawer->>'turno_id' or
+        drawer->>'order_id' is distinct from p_event->'payload'->>'order_id' or
+        drawer->>'payment_id' is distinct from p_event->'payload'->>'payment_id' then raise exception 'DRAWER_ORDER_SCOPE'; end if;
+      select p.snapshot into payment from public.pos_payment_attempts p where p.payment_id=drawer->>'payment_id' and p.order_id=existing.id
+        and p.client_id=stream.client_id and p.location_id=stream.location_id and p.caja_stream_id=p_stream_id and p.estado='aceptado' and p.metodo='cash';
+      if not found or public.pos_caja_cents(drawer->'amount_cents')<>public.pos_caja_cents(payment->'amount_cents') then raise exception 'DRAWER_CASH_PAYMENT_REQUIRED'; end if;
+      if exists(select 1 from public.pos_caja_business_receipts r where r.stream_id=p_stream_id and r.sequence<event_seq
+        and r.event->'result'->'drawer_operation'->>'kind'='payment' and r.event->'result'->'drawer_operation'->>'order_id'=existing.id
+        and r.event->'result'->'drawer_operation'->>'payment_id'=drawer->>'payment_id') then raise exception 'DRAWER_PAYMENT_ALREADY_OPENED'; end if;
+    elsif drawer->>'reason' is distinct from p_event->'payload'->>'reason' or
+      nullif(p_event->'payload'->>'turno_id','') is null or drawer ? 'payment_id' or drawer ? 'order_id' or drawer ? 'amount_cents'
+      then raise exception 'INVALID_MANUAL_DRAWER_OPERATION'; end if;
+  elsif event_type='DRAWER_UNCERTAIN_RESOLVE' then
+    resolution := result->'drawer_resolution';
+    if nullif(resolution->>'job_id','') is null or nullif(resolution->>'uncertain_episode_id','') is null or
+      nullif(resolution->>'recorded_by','') is null or nullif(resolution->>'reason','') is null or
+      coalesce(resolution->>'resolution','') not in ('opened','retry_pulse') or
+      resolution->>'job_id' is distinct from p_event->'payload'->>'job_id' or
+      resolution->>'uncertain_episode_id' is distinct from p_event->'payload'->>'uncertain_episode_id' or
+      resolution->>'resolution' is distinct from p_event->'payload'->>'resolution' or
+      resolution->>'reason' is distinct from p_event->'payload'->>'reason' then raise exception 'INVALID_DRAWER_RESOLUTION'; end if;
+    if not exists(select 1 from public.pos_caja_business_receipts r where r.stream_id=p_stream_id and r.sequence<event_seq
+      and r.client_id=stream.client_id and r.location_id=stream.location_id and
+      r.event->'result'->'drawer_operation'->>'job_id'=resolution->>'job_id') then raise exception 'DRAWER_JOB_SCOPE'; end if;
+    if exists(select 1 from public.pos_caja_business_receipts r where r.stream_id=p_stream_id and r.sequence<event_seq
+      and r.event->'result'->'drawer_resolution'->>'job_id'=resolution->>'job_id' and
+      r.event->'result'->'drawer_resolution'->>'uncertain_episode_id'=resolution->>'uncertain_episode_id') then raise exception 'DRAWER_EPISODE_ALREADY_RESOLVED'; end if;
   end if;
 
   if event_type in ('TURN_OPEN', 'TURN_CLOSE') then

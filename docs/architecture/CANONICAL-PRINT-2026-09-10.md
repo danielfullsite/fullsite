@@ -64,5 +64,6 @@ contra el historial del mismo escritor. Los bytes de impresión no se envían.
 
 La UI conserva el intento inmutable hasta validar el recibo y ofrece recuperación
 aunque la cuenta ya se haya liquidado o el trabajo deje de aparecer como incierto.
-La apertura del cajón y las pruebas físicas de papel, Windows y energía siguen
-pendientes de H05/H15; estos comandos no abren el cajón.
+La apertura del cajón sigue su [contrato separado](CANONICAL-DRAWER-2026-09-10.md).
+Las pruebas físicas de papel, Windows y energía siguen pendientes de H05/H15;
+los comandos de documentos no abren el cajón.

@@ -43,6 +43,7 @@ const VALID_CONNECTION_TYPES = ['tcp', 'usb', 'windows']
 const VALID_DOCUMENT_TYPES = [
   'kitchen_ticket',   // comanda para cocina
   'bar_ticket',       // comanda para barra
+  'drawer_pulse',     // fixed single-output cash drawer command
   'receipt',          // recibo de caja / ticket de cobro
   'pre_ticket',       // pre-cuenta antes de cobro
   'invoice',          // factura CFDI
@@ -187,6 +188,15 @@ function validate(config) {
     // encoding
     if (p.encoding !== undefined && !VALID_ENCODINGS.includes(p.encoding)) {
       errors.push(`printers[${i}].encoding must be one of: ${VALID_ENCODINGS.join(', ')}`)
+    }
+  }
+
+  // Drawer routing is explicit; receipt replication never selects a drawer.
+  if (config.drawer_printer_id !== undefined) {
+    const drawer = config.printers.filter(p => p?.printer_id === config.drawer_printer_id)
+    if (typeof config.drawer_printer_id !== 'string' || !config.drawer_printer_id.trim() || drawer.length !== 1 ||
+      drawer[0].enabled !== true || !drawer[0].station_ids?.includes('caja')) {
+      errors.push('drawer_printer_id must reference one enabled caja printer')
     }
   }
 

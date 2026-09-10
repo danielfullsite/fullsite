@@ -49,7 +49,7 @@ Los tickets de `ORDER_SEND` se preparan a partir del resultado canónico y queda
 
 Si la cola de impresión falla después del commit, la ronda continúa visible y el reintento recupera su intención original, aunque haya cambiado la configuración de impresoras. El recibo significa trabajo guardado; la confirmación TCP no prueba que salió papel. Los envíos inciertos requieren comprobación del operador según el contrato de durabilidad.
 
-En modo Caja se rechazan las rutas legacy de impresión cruda, cajón, prueba, configuración y resolución manual, así como `PRINT_COMMAND`. Una credencial de transporte no equivale a autorización de empleado. La impresión canónica de `ORDER_SEND` continúa disponible. Precuenta, recibo y resolución autorizada de papel incierto siguen el [contrato de documentos](CANONICAL-PRINT-2026-09-10.md); el cajón aún requiere integración.
+En modo Caja se rechazan las rutas legacy de impresión cruda, cajón, prueba, configuración y resolución manual, así como `PRINT_COMMAND`. Una credencial de transporte no equivale a autorización de empleado. La impresión canónica de `ORDER_SEND` continúa disponible. Precuenta, recibo y resolución autorizada de papel incierto siguen el [contrato de documentos](CANONICAL-PRINT-2026-09-10.md); el cajón usa su [contrato autorizado de pulso único](CANONICAL-DRAWER-2026-09-10.md).
 
 ## Cierre de turno y límites
 

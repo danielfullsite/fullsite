@@ -1,5 +1,6 @@
 'use client'
 
+import CajonDeCaja from './CajonDeCaja'
 import DocumentoImpresoDeCaja from './DocumentoImpresoDeCaja'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { abrirFinanzasCaja, leerEstadoCobroCaja, dividirParejoCaja, reservarEfectivoCaja,
@@ -192,7 +193,7 @@ export default function CobroDeCaja({ order, onClose, onChanged }: Props) {
           <h3 className="font-bold">Pagos confirmados</h3>
           {finance.payments.filter(p => p.status === 'accepted').map(p => <div key={p.payment_id} className="mt-2 space-y-2 text-sm"><p>
             {pesosDeCentavos(p.amount_cents)} · {p.method === 'cash' ? 'Efectivo' : (p.provider || 'Terminal')}{p.change_cents ? ` · Cambio ${pesosDeCentavos(p.change_cents)}` : ''}
-          </p><DocumentoImpresoDeCaja order={{ id: finance.order_id, order_revision: finance.order_revision, financial_order: finance }} paymentId={p.payment_id} /></div>)}
+          </p><DocumentoImpresoDeCaja order={{ id: finance.order_id, order_revision: finance.order_revision, financial_order: finance }} paymentId={p.payment_id} />{p.method === 'cash' && <CajonDeCaja turnoId={finance.turno_id} orderId={finance.order_id} paymentId={p.payment_id} />}</div>)}
         </div>}
       </>}
     </div>

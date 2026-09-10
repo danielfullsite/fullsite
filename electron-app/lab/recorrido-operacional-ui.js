@@ -89,7 +89,9 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
   if (printLab) await check('Precuenta y copia salen por TCP local desde documentos canónicos sin cambiar deuda', async () => {
     await ensureUnlocked(pos3)
     const before = await snapshot()
-    await pos3.page.getByRole('button', { name: 'Cuenta', exact: true }).click()
+    // Next dev's issue badge overlaps the center of this footer button.
+    // Click its lower edge, which remains a real, unobscured product control.
+    await pos3.page.getByRole('button', { name: 'Cuenta', exact: true }).click({ position: { x: 10, y: 40 } })
     const document = pos3.page.getByRole('region', { name: 'Impresión de precuenta', exact: true })
     await document.getByRole('button', { name: 'Imprimir precuenta', exact: true }).click()
     await until(() => printLab.packets.length === 1, 'Precuenta recibida en TCP sintético')
@@ -125,6 +127,22 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     assert.equal((await snapshot()).kds_orders.length, 1)
     await pos2.page.goto(`${uiOrigin}/pos?mesa=1`, { waitUntil: 'domcontentloaded' })
     await ensureUnlocked(pos2)
+  })
+  if (printLab?.drawer) await check('La apertura manual requiere PIN y motivo y envía un único pulso al cajón configurado', async () => {
+    const before = await snapshot()
+    const count = printLab.hex.length
+    await ensureUnlocked(pos3)
+    await pos3.page.getByTitle('Abrir cajón', { exact: true }).click()
+    const panel = pos3.page.getByRole('region', { name: 'Apertura manual del cajón', exact: true })
+    await panel.getByLabel('Motivo de apertura', { exact: true }).fill('Cambio laboratorio')
+    await panel.getByLabel('PIN para abrir el cajón', { exact: true }).fill(labPin)
+    await panel.getByRole('button', { name: 'Solicitar apertura manual', exact: true }).click()
+    await until(() => printLab.hex.length === count + 1, 'Pulso manual recibido en TCP sintético')
+    assert.equal(printLab.hex.at(-1), '1b700019fa')
+    const after = await snapshot()
+    assert.deepEqual(after.financial_orders, before.financial_orders)
+    assert.equal(after.drawer_operations.filter(operation => operation.kind === 'manual').length, 1)
+    await pos3.page.getByRole('button', { name: 'Cerrar apertura manual', exact: true }).click()
   })
   await check('Anular otra cuenta con PIN libera su mesa sin alterar el consumo anterior', async () => {
     await pos3.page.goto(`${uiOrigin}/pos?mesa=3`, { waitUntil: 'domcontentloaded' })
@@ -166,6 +184,21 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     assert.match(printLab.packets.at(-1), /Importe recibido 29\.00/)
     assert.match(printLab.packets.at(-1), /Saldo 87\.00/)
     assert.deepEqual((await snapshot()).financial_orders[0], before)
+  })
+  if (printLab?.drawer) await check('El efectivo confirmado sólo abre el cajón por acción explícita y una vez por abono', async () => {
+    const before = (await snapshot()).financial_orders[0]
+    assert.equal(printLab.hex.filter(bytes => bytes === '1b700019fa').length, 1, 'Confirmar dinero no emite pulso automático')
+    const count = printLab.hex.length
+    const button = modal(pos2).getByRole('button', { name: 'Solicitar apertura para este abono', exact: true })
+    await button.click()
+    await until(() => printLab.hex.length === count + 1, 'Pulso por abono recibido en TCP sintético')
+    assert.equal(printLab.hex.at(-1), '1b700019fa')
+    await expect(button).toBeDisabled()
+    assert.deepEqual((await snapshot()).financial_orders[0], before)
+    await modal(pos2).getByRole('button', { name: 'Cerrar', exact: true }).click()
+    await openPayment(pos2)
+    await expect(modal(pos2).getByRole('button', { name: 'Solicitar apertura para este abono', exact: true })).toBeDisabled()
+    assert.equal(printLab.hex.length, count + 1)
   })
   await check('Después del abono se agrega consumo a la segunda cuenta sin cambiar pagos ni imprimir al guardar', async () => {
     const before = await snapshot()

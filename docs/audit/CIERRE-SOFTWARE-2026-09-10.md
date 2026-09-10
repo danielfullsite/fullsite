@@ -170,3 +170,27 @@ Web 3,679/3,679; DOM 265/265; servidor 579/579; materializador PostgreSQL
 14 grupos; selección de impresión dentro de Electron 15/15. El nuevo modo
 `FULLSITE_LAB_PRINT=1` queda incluido en el job de Caja de CI. Cajón y aceptación
 de impresoras reales continúan pendientes.
+
+
+## H05: cajón autorizado integrado
+
+[Contrato de cajón](../architecture/CANONICAL-DRAWER-2026-09-10.md): apertura
+manual con PIN/motivo y acción explícita para efectivo aceptado. Un destino
+configurado y un pulso por acción, con reserva durable por pago/episodio,
+recuperación del mismo comando y decisión del encargado ante incertidumbre.
+Los documentos de papel no producen pulsos y las aperturas no modifican dinero.
+
+Recorrido UI **22/22**, servidor **589/589**, DOM **273/273**, TypeScript aprobado,
+materializador PostgreSQL **15 grupos**. Evidencia local:
+`output/closure/ui-operacion/results.json` y `synthetic-printed-documents.json`.
+Receptor TCP sintético: dos pulsos exactos, manual y por abono. Revisión
+adversarial sin otro defecto concreto. No se acredita hardware ni producción.
+
+El CI 34461636234 del checkpoint anterior 70272c3c falló por el indicador de
+Next desarrollo que interceptaba el botón Cuenta. El laboratorio ahora pulsa
+un punto visible del mismo botón, sin force ni ocultar errores; el recorrido
+22/22 pasó con esa corrección. El nuevo checkpoint necesita su propio CI.
+
+Web **3,679/3,679** y selección de cajón dentro de Electron **10/10** aprobadas
+en esta misma tanda. El asistente de configuración tiene dos pruebas DOM
+incluidas en las 273; confirma selección explícita y eliminación persistida.

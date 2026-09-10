@@ -28,6 +28,7 @@ function enqueueMany(options) {
   const jobs = clone(_jobs)
   const ids = []
   for (const opts of options) {
+    if (opts.document_type === 'drawer_pulse' && (opts.copies !== 1 || opts.data_b64 !== Buffer.from([0x1b,0x70,0,0x19,0xfa]).toString('base64'))) throw new Error('INVALID_DRAWER_JOB')
     const jobId = opts.job_id || randomUUID()
     const existing = jobs.find(j => j.job_id === jobId)
     if (existing) {
@@ -63,6 +64,7 @@ function markRecoverable(id, error) { return _transition(id, 'recoverable', j =>
 function markUncertain(id, error) { return _transition(id, 'uncertain', j => { j.uncertain_episode_id = randomUUID(); j.last_error = error || 'Print outcome unknown; verify paper before reprinting' }) }
 function markCancelled(id) { return _transition(id, 'cancelled') }
 function resolveUncertain(id, outcome) {
+  if (getJob(id)?.document_type === 'drawer_pulse') throw new Error('CONTROLLED_DRAWER_REQUIRED')
   if (getJob(id)?.status !== 'uncertain') return false
   if (outcome === 'printed') return markPrinted(id)
   if (outcome === 'reprint') return _transition(id, 'pending', j => {
@@ -72,10 +74,14 @@ function resolveUncertain(id, outcome) {
 }
 // One queue write records both the decision receipt and its state transition.
 // Replaying an old decision must never resolve a later uncertain episode.
-function applyPreparedResolution(effect) {
+function applyPreparedResolution(effect) { return _applyPreparedResolution(effect, false) }
+function applyPreparedDrawerResolution(effect) { return _applyPreparedResolution(effect, true) }
+function _applyPreparedResolution(effect, drawer) {
   _assertHealthy()
   const {job_id, command_id, uncertain_episode_id, resolution, reason, recorded_by} = effect || {}
-  if (![job_id,command_id,uncertain_episode_id,reason,recorded_by].every(v => typeof v === 'string' && v.trim() && v.length <= 1000) || !['printed','reprint'].includes(resolution)) throw new Error('INVALID_PRINT_RESOLUTION')
+  if (![job_id,command_id,uncertain_episode_id,reason,recorded_by].every(v => typeof v === 'string' && v.trim() && v.length <= 1000) || !(drawer ? ['opened','retry_pulse'] : ['printed','reprint']).includes(resolution)) throw new Error('INVALID_PRINT_RESOLUTION')
+  const target = getJob(job_id)
+  if (!target || (target.document_type === 'drawer_pulse') !== drawer) throw new Error('PRINT_RESOLUTION_TYPE_CONFLICT')
   const receipt = {job_id,command_id,uncertain_episode_id,resolution,reason,recorded_by}
   const prior = _jobs.flatMap(j => j.resolution_receipts || []).find(r => r.command_id === command_id)
   if (prior) {
@@ -86,9 +92,13 @@ function applyPreparedResolution(effect) {
   if (!job || job.status !== 'uncertain' || job.uncertain_episode_id !== uncertain_episode_id) throw new Error('PRINT_UNCERTAIN_EPISODE_CONFLICT')
   const jobs = clone(_jobs), next = jobs.find(j => j.job_id === job_id)
   next.resolution_receipts = [...(next.resolution_receipts || []), {...receipt, copies_printed_before:job.copies_printed || 0, copies_configured:job.copies}]
-  next.status = resolution === 'printed' ? 'printed' : 'pending'
+  next.status = ['printed','opened'].includes(resolution) ? 'printed' : 'pending'
   next.updated_at = new Date().toISOString()
-  next.last_error = resolution === 'printed' ? null : 'Reimpresión autorizada tras verificar papel: ' + reason
+  next.last_error = ['printed','opened'].includes(resolution) ? null : (drawer ? 'Pulso adicional autorizado: ' : 'Reimpresión autorizada tras verificar papel: ') + reason
+  if (resolution === 'retry_pulse') {
+    next.copies = 1; next.copies_printed = 0; next.attempts = 0
+    delete next.reprint_data_b64
+  }
   if (resolution === 'reprint') {
     next.reprint = true; next.attempts = 0
     // Transport confirmation may have reached every copy before a crash in
@@ -163,7 +173,7 @@ function _gcOld() {
 }
 module.exports = {
   init, enqueue, enqueueMany, markPrinting, markCopyPrinted, markPrinted, markFailed,
-  applyPreparedResolution, getUncertainJobSummaries, markRetrying, markCancelled, markRecoverable, markUncertain, resolveUncertain,
+  applyPreparedResolution, applyPreparedDrawerResolution, getUncertainJobSummaries, markRetrying, markCancelled, markRecoverable, markUncertain, resolveUncertain,
   retryRecoverableJobs, getRecoverableJobs, getUncertainJobs, getJob, getAllJobs,
   getPendingJobs, getJobsByStatus, canRetry, MAX_ATTEMPTS, VALID_STATUSES,
   _forTesting: { _load, _persist, _gcOld, _getPending },

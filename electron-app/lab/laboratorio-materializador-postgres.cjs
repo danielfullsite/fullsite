@@ -262,6 +262,50 @@ async function main() {
     assert.deepEqual(scalar(business),before)
     assert.equal(Number(sql(`select last_sequence from pos_caja_streams where stream_id=${quote(streamId)}`)),current.last_sequence)
   })
+  await check('Drawer payment/manual/episode receipts enforce provenance and never mutate money', async () => {
+    const drawer=require('../local-server/core/canonical-drawer'),printer=require('../local-server/adapters/printer'),queue=require('../local-server/adapters/print-queue')
+    const operations=[],resolutions=[],op=state.getOrder(orderId),fin=state.getFinancialOrder(orderId)
+    printer.init({printersConfig:{schema_version:2,drawer_printer_id:'drawer',printers:[{printer_id:'drawer',name:'Drawer',enabled:true,station_ids:['caja'],copies:3,connection:{type:'tcp',host:'127.0.0.1',port:1}}]}})
+    queue.init({filePath:path.join(temporary,'drawer-fixture.json')})
+    const drawerState={getTurno:()=>state.getTurno(),getOrder:()=>op,getFinancialOrder:()=>fin,getDrawerOperations:()=>operations,
+      getDrawerOperation:id=>operations.find(o=>o.operation_id===id),getDrawerResolution:()=>null}
+    const context={state:drawerState,actor,printer}
+    const current=scalar(`select row_to_json(s) from (select last_sequence,last_history_hash from pos_caja_streams where stream_id=${quote(streamId)}) s`)
+    const envelope=(type,payload,result,sequence,previous)=>{const event={id:randomUUID(),sequence,type,restaurant_id:tenant,payload,result};return {p_stream_id:streamId,p_credential:credential,p_previous_history_hash:previous,p_history_hash:historyHash(previous,event),p_event:event}}
+    const build=(type,fields,sequence,previous)=>{const payload={command_type:type,command_id:randomUUID(),...fields};const prepared=drawer.prepare(payload,context);if(prepared.result.drawer_operation){operations.push(prepared.result.drawer_operation);queue.enqueueMany(prepared.effects.print_jobs)}return envelope(type,payload,prepared.result,sequence,previous)}
+    const manual=build('DRAWER_OPEN',{turno_id:turnoId,reason:'Supply change'},current.last_sequence+1,current.last_history_hash)
+    const paid=build('PAYMENT_DRAWER_OPEN',{order_id:orderId,payment_id:paymentId,turno_id:turnoId},manual.p_event.sequence+1,manual.p_history_hash)
+    const job=paid.p_event.result.drawer_operation.job_id;queue.markUncertain(job,'Synthetic outcome')
+    const resolution=build('DRAWER_UNCERTAIN_RESOLVE',{job_id:job,uncertain_episode_id:queue.getJob(job).uncertain_episode_id,resolution:'retry_pulse',reason:'Drawer checked closed'},paid.p_event.sequence+1,paid.p_history_hash)
+    const statement=a=>`select apply_pos_caja_event(${quote(a.p_stream_id)}::uuid,${quote(a.p_credential)},${quote(a.p_previous_history_hash)},${quote(a.p_history_hash)},${json(a.p_event)});`
+    const business=`select jsonb_build_object('orders',(select jsonb_agg(to_jsonb(o) order by id) from pos_orders o),'accounts',(select jsonb_agg(to_jsonb(a) order by account_id) from pos_order_accounts a),'payments',(select jsonb_agg(to_jsonb(p) order by payment_id) from pos_payment_attempts p))`
+    const before=scalar(business)
+    const rows=sql('begin;'+[manual,paid,resolution,paid].map(statement).join('')+business+';rollback;').split('\n').map(JSON.parse)
+    assert(rows.slice(0,3).every(r=>r.materialized===false));assert.equal(rows[3].duplicate,true);assert.deepEqual(rows[4],before)
+    const repeated=structuredClone(paid);repeated.p_event.sequence++;repeated.p_previous_history_hash=paid.p_history_hash;repeated.p_event.id=randomUUID();repeated.p_event.payload.command_id=randomUUID();repeated.p_event.result.drawer_operation.operation_id=repeated.p_event.payload.command_id;repeated.p_event.result.drawer_operation.job_id=randomUUID()
+    assert.match(sql('begin;'+[manual,paid,repeated].map(statement).join('')+'rollback;',{allowError:true}),/DRAWER_PAYMENT_ALREADY_OPENED/)
+    const repeatDecision=structuredClone(resolution);repeatDecision.p_event.sequence++;repeatDecision.p_previous_history_hash=resolution.p_history_hash;repeatDecision.p_event.id=randomUUID();repeatDecision.p_event.payload.command_id=randomUUID()
+    assert.match(sql('begin;'+[manual,paid,resolution,repeatDecision].map(statement).join('')+'rollback;',{allowError:true}),/DRAWER_EPISODE_ALREADY_RESOLVED/)
+    const paper=structuredClone(resolution);paper.p_event.type='PRINT_UNCERTAIN_RESOLVE';paper.p_event.payload.command_type=paper.p_event.type;paper.p_event.payload.resolution='reprint';paper.p_event.result={print_resolution:{...resolution.p_event.result.drawer_resolution,resolution:'reprint'}}
+    assert.match(sql('begin;'+[manual,paid,paper].map(statement).join('')+'rollback;',{allowError:true}),/PRINT_JOB_SCOPE/)
+    const foreign=randomUUID();seedStream(foreign,'drawer-other-branch')
+    const wrong=structuredClone(manual);wrong.p_stream_id=foreign;wrong.p_event.sequence=1;wrong.p_previous_history_hash=INITIAL_HASH;assert.match(rpc(wrong,true),/DRAWER_TURN_SCOPE/)
+    const wrongDecision=structuredClone(resolution);wrongDecision.p_stream_id=foreign;wrongDecision.p_event.sequence=1;wrongDecision.p_previous_history_hash=INITIAL_HASH
+    assert.match(sql('begin;'+[manual,paid,wrongDecision].map(statement).join('')+'rollback;',{allowError:true}),/DRAWER_JOB_SCOPE/)
+    const noReason=structuredClone(manual);noReason.p_event.result.drawer_operation.reason='';assert.match(rpc(noReason,true),/INVALID_DRAWER_OPERATION/)
+    // Materialize a genuine accepted external attempt in this disposable transaction.
+    const {FinancialDomain}=require('../local-server/core/financial-domain'),financial=new FinancialDomain();financial.hydrate([fin]);const card=randomUUID()
+    const startPayload={command_id:randomUUID(),command_type:'FINANCIAL_PAYMENT_START',order_id:orderId,expected_revision:fin.revision,payment_id:card,account_id:accounts[1],amount_cents:100,method:'external',provider:'terminal'}
+    const startResult=financial.prepare(startPayload,{order:op,turno:state.getTurno(),actor});financial.hydrate([startResult.financial_order])
+    const acceptedPayload={command_id:randomUUID(),command_type:'FINANCIAL_PAYMENT_RESULT',order_id:orderId,expected_revision:startResult.financial_order.revision,payment_id:card,status:'accepted',evidence:{kind:'provider_result',provider:'terminal',status:'accepted',reference:'isolated-card',currency:'MXN',amount_cents:100}}
+    const acceptedResult=financial.prepare(acceptedPayload,{order:op,turno:state.getTurno(),actor})
+    const start=envelope(startPayload.command_type,startPayload,startResult,current.last_sequence+1,current.last_history_hash)
+    const accepted=envelope(acceptedPayload.command_type,acceptedPayload,acceptedResult,start.p_event.sequence+1,start.p_history_hash)
+    const cardDrawer=structuredClone(paid);cardDrawer.p_event.sequence=accepted.p_event.sequence+1;cardDrawer.p_previous_history_hash=accepted.p_history_hash;cardDrawer.p_event.payload.payment_id=card;cardDrawer.p_event.result.drawer_operation.payment_id=card;cardDrawer.p_event.result.drawer_operation.amount_cents=100
+    assert.match(sql('begin;'+[start,accepted,cardDrawer].map(statement).join('')+'rollback;',{allowError:true}),/DRAWER_CASH_PAYMENT_REQUIRED/)
+    assert.deepEqual(scalar(business),before)
+    assert.equal(Number(sql(`select last_sequence from pos_caja_streams where stream_id=${quote(streamId)}`)),current.last_sequence)
+  })
   await check('Full settlement materializes once and preserves pending kitchen work', async () => {
     const reservedPayment = eighth.result.financial_order.payments.at(-1)
     await command('FINANCIAL_PAYMENT_RESULT', { expected_revision: state.getFinancialOrder(orderId).revision,

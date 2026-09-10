@@ -110,6 +110,7 @@ function setStations(newConfig) {
 // Pure preparation: routing and bytes are captured inside the durable command
 // transaction before any job is sent to a printer.
 function prepareJobs(stationId, data, documentType, opts = {}) {
+  if (documentType === 'drawer_pulse') throw Object.assign(new Error('CONTROLLED_DRAWER_REQUIRED'), {code:'CONTROLLED_DRAWER_REQUIRED'})
   if (!_config || !Array.isArray(_config.printers) || !_config.printers.length) {
     throw Object.assign(new Error('PRINTER_NOT_CONFIGURED'), { code: 'PRINTER_NOT_CONFIGURED', station: stationId })
   }
@@ -175,6 +176,16 @@ async function _processJobs(ids) {
 
 // ESC/POS: kick cash drawer on pin 2 (standard RJ-11 port)
 const DRAWER_KICK = Buffer.from([0x1b, 0x70, 0x00, 0x19, 0xfa])
+
+function prepareDrawerJobs({commandId} = {}) {
+  if (!commandId || !_config?.drawer_printer_id || !printerSchema.validate(_config).valid) {
+    throw Object.assign(new Error('DRAWER_NOT_CONFIGURED: selecciona una impresora de Caja para el cajón'), {code:'DRAWER_NOT_CONFIGURED'})
+  }
+  const target = _config.printers.find(p => p.printer_id === _config.drawer_printer_id)
+  return [{job_id:createHash('sha256').update(`${commandId}:drawer:${target.printer_id}`).digest('hex'),command_id:commandId,
+    station_id:'caja',printer_id:target.printer_id,printer_name:target.name,connection:JSON.parse(JSON.stringify(target.connection)),
+    document_type:'drawer_pulse',data_b64:DRAWER_KICK.toString('base64'),copies:1,reprint:false}]
+}
 
 async function kickDrawer() {
   await printToStation('caja', DRAWER_KICK, 'receipt')
@@ -260,6 +271,12 @@ function applyPreparedResolution(effect) {
   return receipt
 }
 
+function applyPreparedDrawerResolution(effect) {
+  const receipt = printQueue.applyPreparedDrawerResolution(effect)
+  if (effect.resolution === 'retry_pulse') _scheduleDrain([effect.job_id]).catch(e => console.error('[printer] Drawer recovery failed:', e.message))
+  return receipt
+}
+
 // ── Exports ───────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -269,6 +286,8 @@ module.exports = {
   setStations,
   printToStation,
   prepareJobs,
+  prepareDrawerJobs,
+  applyPreparedDrawerResolution,
   enqueuePreparedJobs,
   resolveUncertain,
   applyPreparedResolution,

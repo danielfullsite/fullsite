@@ -6,6 +6,7 @@ import { registerServiceWorker, requestNotificationPermission } from '@/lib/serv
 import { apiUrl } from '@/lib/api-base'
 import { checkActiveSession, registerSession, startHeartbeat, removeSession, getTerminalId } from '@/lib/pos-sessions'
 import TurnoGate from '@/components/pos/TurnoGate'
+import AperturasPendientesDeCaja from '@/components/pos/AperturasPendientesDeCaja'
 import ImpresionesPendientesDeCaja from '@/components/pos/ImpresionesPendientesDeCaja'
 import PendingOrderInventory from '@/components/pos/PendingOrderInventory'
 import { getActiveClientSlug as _cid } from '@/lib/data'
@@ -819,6 +820,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
           </div>
         )}
         <ImpresionesPendientesDeCaja />
+        <AperturasPendientesDeCaja />
         <TurnoGate staff={staff!}>
           {children}
           <PendingOrderInventory clientId={_cid()} />

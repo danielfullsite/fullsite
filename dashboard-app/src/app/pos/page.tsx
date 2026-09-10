@@ -55,6 +55,7 @@ import { leerCatalogoCaja } from '@/lib/pedro-catalogo'
 import { guardarCuentaEnCaja, enviarCuentaEnCaja, moverCuentaEnCaja, anularCuentaEnCaja, GuardadoAnteriorRecuperado, firmaBorradorParaCaja, type OrdenConfirmada } from '@/lib/pedro-operaciones'
 import { type FinanzasDeCaja, pesosDeCentavos } from '@/lib/pedro-finanzas'
 import { crearSesionEditorCaja } from '@/lib/pos-editor-session'
+import CajonDeCaja from '@/components/pos/CajonDeCaja'
 import DocumentoImpresoDeCaja from '@/components/pos/DocumentoImpresoDeCaja'
 import ConsumoPendienteDeCaja from '@/components/pos/ConsumoPendienteDeCaja'
 import CobroDeCaja from '@/components/pos/CobroDeCaja'
@@ -2350,6 +2351,7 @@ function POSContent() {
   const [lecturaCuentaCaja, setLecturaCuentaCaja] = useState<LecturaDeCuenta | null>(null)
   const [destinoConsumoCaja, setDestinoConsumoCaja] = useState<{ orderId: string; accountId: string } | null>(null)
   const [finanzasConsumoCaja, setFinanzasConsumoCaja] = useState<FinanzasDeCaja | null>(null)
+  const [showCajonCaja, setShowCajonCaja] = useState(false)
   const [precuentaCaja, setPrecuentaCaja] = useState<OrdenConfirmada | null>(null)
   const [cobroDeCaja, setCobroDeCaja] = useState<OrdenConfirmada | null>(null)
   const [avisoCuentaCaja, setAvisoCuentaCaja] = useState<string | null>(null)
@@ -4625,6 +4627,10 @@ function POSContent() {
       )}
 
       {requiereCaja() && <ConsumoPendienteDeCaja disabled={saving} onRecovered={() => { void refrescarCuentaCaja.current() }} />}
+      {showCajonCaja && <section aria-label="Solicitud manual del cajón" className="border-b p-4">
+        <button className="mb-2 rounded border px-3 py-2" onClick={() => setShowCajonCaja(false)}>Cerrar apertura manual</button>
+        <CajonDeCaja turnoId={turnoId || ''} />
+      </section>}
       {precuentaCaja && <section aria-label="Precuenta de Caja" className="border-b border-[var(--line)] bg-[var(--surface)] px-4 py-3">
         <button className="mb-2 rounded border px-3 py-2" onClick={() => setPrecuentaCaja(null)}>Cerrar precuenta</button>
         <DocumentoImpresoDeCaja order={precuentaCaja} />
@@ -4983,7 +4989,7 @@ function POSContent() {
                 />
               </div>
               <button
-                onClick={() => { if (accionPendienteEnCaja('La apertura manual del cajón')) return; if (!isMobileRestricted) { openCashDrawer(); showToast('Cajón abierto') } }}
+                onClick={() => { if (escribeEnCaja) { setShowCajonCaja(true); return }; if (bloqueaLegacyCaja) { showToast('Caja debe confirmar la conexión antes de solicitar la apertura.'); return }; if (!isMobileRestricted) { openCashDrawer(); showToast('Cajón abierto') } }}
                 disabled={isMobileRestricted}
                 className="w-12 min-h-[48px] flex items-center justify-center rounded-lg bg-[var(--surface-2)] hover:bg-[var(--raised)] disabled:opacity-30 text-[var(--text-3)] transition-colors"
                 title={isMobileRestricted ? 'Solo disponible en terminal de caja' : 'Abrir cajón'}

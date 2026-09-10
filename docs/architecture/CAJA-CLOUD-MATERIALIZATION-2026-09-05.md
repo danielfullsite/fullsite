@@ -84,3 +84,13 @@ reintento exacto sigue devolviendo el recibo original.
 Los bytes y destinos quedan en los efectos durables locales. La nube conserva
 el documento y la decisión declarada del operador; no certifica salida física
 de papel ni consulta la cola local para verificar el episodio incierto.
+
+`PAYMENT_DRAWER_OPEN`, `DRAWER_OPEN` y `DRAWER_UNCERTAIN_RESOLVE` también se
+registran como auditoría con `materialized:false`. La apertura exige turno
+vigente en la misma sucursal; la vinculada a pago exige efectivo aceptado y una
+sola apertura original por pago. La apertura manual conserva motivo y actor.
+Las resoluciones sólo admiten trabajos procedentes de una apertura de cajón del
+mismo flujo y una decisión por episodio. Una resolución de impresión no puede
+resolver un pulso de cajón. Ninguno de estos eventos modifica dinero ni prueba
+la posición física del cajón; los pulsos se ejecutan exclusivamente en la cola
+local durable, sobre su destino explícito capturado.

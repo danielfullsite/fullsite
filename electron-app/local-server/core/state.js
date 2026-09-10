@@ -60,6 +60,8 @@ class RestaurantState {
     this._printDocuments = new Map()
     this._printResolutions = new Map()
     this._canonicalPrintJobs = new Map()
+    this._drawerOperations = new Map()
+    this._drawerResolutions = new Map()
   }
 
   // ─── Projection ─────────────────────────────────────────────────────────
@@ -67,6 +69,16 @@ class RestaurantState {
   /** Apply one event to the state. Returns the fields that changed. */
   apply(event) {
     const { type, payload } = event
+    if (['PAYMENT_DRAWER_OPEN', 'DRAWER_OPEN'].includes(type) && event.result?.drawer_operation) {
+      const operation = JSON.parse(JSON.stringify(event.result.drawer_operation))
+      this._drawerOperations.set(operation.operation_id, operation)
+      return { changed: ['drawer_operations'] }
+    }
+    if (type === 'DRAWER_UNCERTAIN_RESOLVE' && event.result?.drawer_resolution) {
+      const resolution = JSON.parse(JSON.stringify(event.result.drawer_resolution))
+      this._drawerResolutions.set(JSON.stringify([resolution.job_id, resolution.uncertain_episode_id]), { ...resolution, command_id: payload.command_id })
+      return { changed: ['drawer_resolutions'] }
+    }
     if (['ORDER_SEND', 'ORDER_PRECHECK_PRINT', 'PAYMENT_RECEIPT_PRINT'].includes(type)) {
       for (const job of event.effects?.print_jobs || []) this._canonicalPrintJobs.set(job.job_id, {
         job_id: job.job_id, command_id: payload.command_id, document_type: job.document_type,
@@ -636,6 +648,10 @@ class RestaurantState {
       .filter(r => r?.job_id && r?.uncertain_episode_id).map(r => [JSON.stringify([r.job_id, r.uncertain_episode_id]), JSON.parse(JSON.stringify(r))]))
     this._canonicalPrintJobs = new Map((Array.isArray(snap.canonical_print_jobs) ? snap.canonical_print_jobs : [])
       .filter(j => j?.job_id && j?.command_id).map(j => [j.job_id, { ...j }]))
+    this._drawerOperations = new Map((Array.isArray(snap.drawer_operations) ? snap.drawer_operations : [])
+      .filter(o => o?.operation_id).map(o => [o.operation_id, JSON.parse(JSON.stringify(o))]))
+    this._drawerResolutions = new Map((Array.isArray(snap.drawer_resolutions) ? snap.drawer_resolutions : [])
+      .filter(r => r?.job_id && r?.uncertain_episode_id).map(r => [JSON.stringify([r.job_id, r.uncertain_episode_id]), JSON.parse(JSON.stringify(r))]))
 
     // `toSnapshot` quita el flag interno `_kds_sent` antes de mandar. Se repone:
     // sin el, `toSnapshot` de ESTA terminal filtraria las ordenes y el KDS local
@@ -688,6 +704,8 @@ class RestaurantState {
       print_documents: this.getPrintDocuments(),
       print_resolutions: [...this._printResolutions.values()].map(resolution => JSON.parse(JSON.stringify(resolution))),
       canonical_print_jobs: [...this._canonicalPrintJobs.values()].map(job => ({ ...job })),
+      drawer_operations: this.getDrawerOperations(),
+      drawer_resolutions: [...this._drawerResolutions.values()].map(resolution => JSON.parse(JSON.stringify(resolution))),
       cash_movements: this.getCashMovements(),
       turno:              this._turno,
       turn_identities: [...this._turnIdentities],
@@ -706,6 +724,9 @@ class RestaurantState {
   getPrintDocument(id) { const document = this._printDocuments.get(id); return document ? JSON.parse(JSON.stringify(document)) : null }
   getPrintResolution(jobId, episodeId) { const resolution = this._printResolutions.get(JSON.stringify([jobId, episodeId])); return resolution ? JSON.parse(JSON.stringify(resolution)) : null }
   getCanonicalPrintJob(jobId) { const job = this._canonicalPrintJobs.get(jobId); return job ? { ...job } : null }
+  getDrawerOperations() { return [...this._drawerOperations.values()].map(operation => JSON.parse(JSON.stringify(operation))) }
+  getDrawerOperation(id) { const operation = this._drawerOperations.get(id); return operation ? JSON.parse(JSON.stringify(operation)) : null }
+  getDrawerResolution(jobId, episodeId) { const resolution = this._drawerResolutions.get(JSON.stringify([jobId, episodeId])); return resolution ? JSON.parse(JSON.stringify(resolution)) : null }
   getKdsQueue()    { return [...this._kds] }
   getTurno()       { return this._turno }
   getLock(mesa)    { return this._locks.get(String(mesa)) || null }
