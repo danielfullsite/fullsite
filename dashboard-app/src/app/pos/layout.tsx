@@ -138,6 +138,12 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
       import('@/lib/pos-offline-db').then(m => m.registerAutoSync()).catch(() => {})
       // Start print retry loop — processes any queued print jobs from previous sessions
       import('@/lib/print-queue').then(m => m.startRetryLoop()).catch(() => {})
+      // Avisos de cierre a la LAN que no llegaron a Pedro (la LAN parpadeó justo al
+      // cobrar): se reintentan desde aquí porque el cobro navega al mapa con una
+      // navegación completa y el módulo que falló muere con la página. Sin esto, la
+      // caja se queda creyendo que la mesa debe dinero y se puede volver a cobrar
+      // (video de Eduardo, 2026-08-24). Ver lib/aviso-lan.ts.
+      import('@/lib/aviso-lan').then(m => m.asegurarReintentos()).catch(() => {})
       // Load client config for receipts, IVA, branding (cached singleton)
       import('@/lib/pos-config').then(m => m.getPosClientConfig()).then(async cfg => {
         if (cfg?.logoUrl) setLogoSrc(cfg.logoUrl)
