@@ -1,3 +1,4 @@
+import { kitchenOrderInScope, readKitchenScope } from './kitchen-read-scope'
 // POS Menu Data — AMALAY real menu (el POS legado)
 //
 // SQL for Supabase (run in SQL Editor):
@@ -1827,7 +1828,17 @@ export interface KitchenOrderFromDB {
   personas?: number
 }
 
+const loadKitchenCache = () => import('@/lib/pos-offline-db')
+
 export async function getKitchenOrders(): Promise<KitchenOrderFromDB[]> {
+  let cacheModule: ReturnType<typeof loadKitchenCache> | undefined
+  const cache = () => cacheModule ??= loadKitchenCache()
+  const clientId = _getClientId()
+  const scope = readKitchenScope(clientId)
+  const { locationId } = scope
+  const sameScope = (row: Record<string, unknown>) => kitchenOrderInScope(row, scope)
+  const scopeUnchanged = () => _getClientId() === clientId &&
+    (typeof window === 'undefined' ? '' : localStorage.getItem('FULLSITE_LOCATION_ID') || '') === locationId
   // Only fetch today's orders (not ancient ones stuck in "enviada")
   const today = new Date()
   today.setHours(today.getHours() - 12) // Last 12 hours
@@ -1840,12 +1851,12 @@ export async function getKitchenOrders(): Promise<KitchenOrderFromDB[]> {
     // pos_orders directly — the anon key hits RLS and sees 0 rows — and a KDS on a
     // separate machine cannot hold the LAN ws:// bridge from an https page (mixed
     // content). This endpoint is the reliable online path; offline still falls back
-    // to the IndexedDB cache in the catch block below. `cutoff` is applied server-side.
+    // to the scoped IndexedDB cache below. The server resolves one exact open shift.
     // Token de cocina por-tenant (provisionado a la terminal; el Electron KDS lo
     // inyecta desde su config). Si no está presente, el endpoint opera abierto.
     const _kt = typeof window !== 'undefined' ? localStorage.getItem('pos_kitchen_token') : null
     const res = await fetchWithTimeout(
-      `/api/pos/kitchen?client_id=${encodeURIComponent(_getClientId())}`,
+      `/api/pos/kitchen?client_id=${encodeURIComponent(clientId)}${locationId ? `&location_id=${encodeURIComponent(locationId)}` : ''}`,
       { cache: 'no-store', headers: _kt ? { 'x-kitchen-token': _kt } : undefined }
     )
     // Un error del servidor NO puede devolver lista vacía.
@@ -1860,10 +1871,13 @@ export async function getKitchenOrders(): Promise<KitchenOrderFromDB[]> {
     // cacheadas en el dispositivo. Para una pantalla de cocina, ver las últimas
     // comandas conocidas siempre es mejor que ver la nada.
     if (!res.ok) throw new Error(`kitchen_http_${res.status}`)
-    orders = await res.json()
+    const rows: unknown = await res.json()
+    if (!Array.isArray(rows)) throw new Error('kitchen_invalid_response')
+    if (!scopeUnchanged()) return []
+    orders = rows.filter(sameScope)
     // Cache para offline — fire and forget, no bloquea
     if (typeof window !== 'undefined') {
-      import('@/lib/pos-offline-db').then(({ cacheOrder }) =>
+      cache().then(({ cacheOrder }) =>
         Promise.all(orders.map(o => cacheOrder(o as unknown as Record<string, unknown>)))
       ).catch(() => {})
     }
@@ -1882,12 +1896,12 @@ export async function getKitchenOrders(): Promise<KitchenOrderFromDB[]> {
     const bridgeMergeCutoff = new Date(Date.now() - 5 * 60 * 1000).toISOString()
     if (typeof window !== 'undefined') {
       try {
-        const { getCachedOrders } = await import('@/lib/pos-offline-db')
+        const { getCachedOrders } = await cache()
         const existing = new Set(orders.map(o => String(o.id)))
         const cached = await getCachedOrders()
         for (const c of cached) {
           if (
-            c._bridge_unsynced === true && !existing.has(String(c.id)) &&
+            sameScope(c) && c._bridge_unsynced === true && !existing.has(String(c.id)) &&
             ['enviada', 'preparando', 'lista'].includes(String(c.status)) &&
             String(c.created_at || c.updated_at || '') >= bridgeMergeCutoff
           ) {
@@ -1905,11 +1919,11 @@ export async function getKitchenOrders(): Promise<KitchenOrderFromDB[]> {
     // Offline — mostrar las órdenes cacheadas en este dispositivo (IndexedDB)
     if (typeof window === 'undefined') return []
     try {
-      const { getCachedOrders } = await import('@/lib/pos-offline-db')
+      const { getCachedOrders } = await cache()
       const cached = await getCachedOrders()
       orders = cached
         .filter(o =>
-          ['enviada', 'preparando', 'lista'].includes(String(o.status)) &&
+          sameScope(o) && ['enviada', 'preparando', 'lista'].includes(String(o.status)) &&
           String(o.created_at || o.updated_at || '') >= cutoff
         )
         .map(o => ({
@@ -1925,6 +1939,7 @@ export async function getKitchenOrders(): Promise<KitchenOrderFromDB[]> {
   // QW3: deduplicar por id. Antes la key era mesa+mesero+items -> dos ordenes
   // distintas identicas colapsaban (se perdia un platillo del KDS) y diferencias
   // de serializacion online/offline duplicaban cards.
+  if (!scopeUnchanged()) return []
   const seen = new Set<string>()
   return orders.filter(o => {
     const key = String(o.id)

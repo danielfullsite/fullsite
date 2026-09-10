@@ -12,6 +12,7 @@
 //   via GET /identity before opening the WebSocket. The discovered endpoint is
 //   persisted in the ServerRegistry for faster subsequent connections.
 
+import { currentKitchenScope, type KitchenReadScope } from './kitchen-read-scope'
 import { useEffect, useRef, useState } from 'react'
 import { credencialDeLaRedLocal } from './local-network-fetch'
 import { getBridgeUrl as getHttpBridgeUrl } from './bridge-url'
@@ -85,6 +86,7 @@ export class BridgeClient {
     lastSequence = 0,
     /** If set, overrides the URL derived from localStorage. Provided by discovery. */
     private readonly _wsUrl?: string,
+    private readonly credentials = credencialDeLaRedLocal(),
   ) {
     this._lastSequence = lastSequence
   }
@@ -104,10 +106,10 @@ export class BridgeClient {
         this._reconnectDelay = RECONNECT_INITIAL_MS  // reset backoff on successful connection
         this._send({
           type: 'SUBSCRIBE',
-          lan_secret: credencialDeLaRedLocal()['x-fullsite-lan'],
-          location_id: credencialDeLaRedLocal()['x-fullsite-sucursal'],
+          lan_secret: this.credentials['x-fullsite-lan'],
+          location_id: this.credentials['x-fullsite-sucursal'],
           client_id: this.clientId,
-          terminal_id: credencialDeLaRedLocal()['x-fullsite-terminal'],
+          terminal_id: this.credentials['x-fullsite-terminal'],
           client_type: this.clientType,
           restaurant_id: this.restaurantId,
           last_sequence: this._lastSequence,
@@ -117,6 +119,7 @@ export class BridgeClient {
 
       this.ws.onmessage = (ev) => {
         try {
+          if (this.dead || JSON.stringify(this.credentials) !== JSON.stringify(credencialDeLaRedLocal())) return
           const msg = JSON.parse(ev.data as string) as ServerMsg
           if (msg.type === 'SNAPSHOT') this._connected = true
           // Track the highest sequence seen for catch-up on reconnect
@@ -164,6 +167,7 @@ export class BridgeClient {
    * No-op (returns null) if the WS is not open.
    */
   sendCommand(commandType: string, payload: Record<string, unknown>): string | null {
+    if (JSON.stringify(this.credentials) !== JSON.stringify(credencialDeLaRedLocal())) return null
     if (!this._connected || this.ws?.readyState !== WebSocket.OPEN) return null
     const commandId = typeof payload.command_id === 'string' ? payload.command_id : crypto.randomUUID()
     this._send({
@@ -205,12 +209,20 @@ export type DiscoveryState = 'idle' | 'discovering' | 'found' | 'not_found' | 'i
  * @returns { connected, discoveryState, discoveryDiagnostic }
  */
 export function useBridgeClient(
-  onDelta?: (event: BridgeEvent) => void,
+  onDelta?: (event: BridgeEvent, scope?: KitchenReadScope) => void,
   clientType: 'pos' | 'kds' | 'barra' | 'admin' = 'pos',
 ): { connected: boolean; discoveryState: DiscoveryState; discoveryDiagnostic: DiscoveryDiagnostic | undefined } {
   const [connected, setConnected] = useState(false)
   const [discoveryState, setDiscoveryState] = useState<DiscoveryState>('idle')
   const [discoveryDiagnostic, setDiscoveryDiagnostic] = useState<DiscoveryDiagnostic | undefined>()
+  const [identityKey, setIdentityKey] = useState('')
+  useEffect(() => {
+    const refresh = () => setIdentityKey(JSON.stringify([currentKitchenScope(), credencialDeLaRedLocal()]))
+    refresh()
+    const timer = setInterval(refresh, 500)
+    window.addEventListener('storage', refresh)
+    return () => { clearInterval(timer); window.removeEventListener('storage', refresh) }
+  }, [])
   const onDeltaRef = useRef(onDelta)
   onDeltaRef.current = onDelta
 
@@ -220,6 +232,10 @@ export function useBridgeClient(
     const hasBridgeHost = !!(localStorage.getItem('FULLSITE_BRIDGE_URL') || localStorage.getItem('pos_bridge_host'))
     if (!isElectron && !hasBridgeHost) return
 
+    setConnected(false)
+    const credentials = credencialDeLaRedLocal()
+    const capturedScope = currentKitchenScope()
+    const stillCurrent = () => JSON.stringify(credentials) === JSON.stringify(credencialDeLaRedLocal()) && JSON.stringify(capturedScope) === JSON.stringify(currentKitchenScope())
     const restaurantId = localStorage.getItem('fullsite_client_id') || undefined
     if (!restaurantId) return
 
@@ -239,7 +255,7 @@ export function useBridgeClient(
       const discovery = new ServerDiscovery(buildDiscoveryConfig(restaurantId!))
       const result = await discovery.discover()
 
-      if (cancelled) return
+      if (cancelled || !stillCurrent()) return
 
       if (result.state !== 'found') {
         setDiscoveryState(result.state as DiscoveryState)
@@ -247,6 +263,9 @@ export function useBridgeClient(
         return
       }
 
+      const identity = result.identity
+      const deliveryScope = credentials['x-fullsite-lan'] && identity?.restaurant_id === capturedScope.clientId &&
+        (identity.branch_id || '') === capturedScope.locationId ? capturedScope : undefined
       setDiscoveryState('found')
       setDiscoveryDiagnostic(undefined)
 
@@ -255,15 +274,16 @@ export function useBridgeClient(
 
       // Restore last known sequence so the server only sends events we haven't seen.
       // Without this, every page load replays the full event history (KDS-03 fix).
-      const seqKey = `pos_bridge_last_seq_${clientType}`
+      const seqKey = `pos_bridge_last_seq_${clientType}_${encodeURIComponent(restaurantId!)}_${encodeURIComponent(capturedScope.locationId)}`
       const savedSeq = parseInt(localStorage.getItem(seqKey) || '0', 10) || 0
 
-      client = new BridgeClient(clientId, clientType, restaurantId, savedSeq, wsUrl)
+      client = new BridgeClient(clientId, clientType, restaurantId, savedSeq, wsUrl, credentials)
 
       unsub = client.on((msg) => {
+        if (cancelled || !stillCurrent()) return
         if (msg.type === 'SNAPSHOT' || msg.type === 'PONG') setConnected(true)
         if (msg.type === 'DELTA' && onDeltaRef.current) {
-          onDeltaRef.current((msg as Extract<ServerMsg, { type: 'DELTA' }>).payload.event)
+          onDeltaRef.current((msg as Extract<ServerMsg, { type: 'DELTA' }>).payload.event, deliveryScope)
         }
         // Persist lastSequence so next page load resumes from here, not from 0.
         const seq = (msg as { sequence?: number }).sequence
@@ -273,6 +293,7 @@ export function useBridgeClient(
       })
 
       client.connect()
+      if (statusInterval) clearInterval(statusInterval)
       statusInterval = setInterval(() => {
         setConnected(client?.connected ?? false)
         // Re-run full discovery when the server IP may have changed (DHCP renew, server restart).
@@ -300,7 +321,7 @@ export function useBridgeClient(
       if (statusInterval) clearInterval(statusInterval)
       client?.disconnect()
     }
-  }, [clientType])
+  }, [clientType, identityKey])
 
   return { connected, discoveryState, discoveryDiagnostic }
 }

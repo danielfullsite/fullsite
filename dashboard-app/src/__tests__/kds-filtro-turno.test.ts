@@ -6,7 +6,7 @@ import { mismoDiaDeVenta } from '@/lib/dia-de-venta'
 // PR-2 KDS — regresión del "empalme": órdenes de días anteriores mezcladas con
 // las del turno nuevo en el tablero (junta 2026-09-01; campo AMALAY 2026-08-27).
 
-const req = () => new NextRequest('http://localhost/api/pos/kitchen?client_id=testtenant')
+const req = () => new NextRequest('http://localhost/api/pos/kitchen?client_id=testtenant&location_id=branch-a')
 
 function mockFetchSequence(responses: Array<{ ok: boolean; status?: number; json?: unknown }>) {
   const calls: string[] = []
@@ -48,15 +48,14 @@ describe('GET /api/pos/kitchen — qué ve el tablero', () => {
     expect(calls.length).toBe(1) // ni siquiera consulta órdenes
   })
 
-  it('turno IRRESOLUBLE (falla la consulta) → modo degradado con ventana de 12h, cocina no se queda ciega', async () => {
+  it('turno irresoluble no amplía la consulta a órdenes de otros turnos', async () => {
     const calls = mockFetchSequence([
       { ok: false, status: 503 },
       { ok: true, json: [{ id: 'o1' }] },
     ])
     const res = await GET(req())
-    expect(res.status).toBe(200)
-    expect(calls[1]).toContain('updated_at=gte')
-    expect(calls[1]).not.toContain('turno_id=eq')
+    expect(res.status).toBe(502)
+    expect(calls).toHaveLength(1)
   })
 })
 
@@ -70,7 +69,35 @@ describe('filtro cliente por día de venta (fuga de "lista" eterna)', () => {
     for (const p of ['app/pos/kds/page.tsx', 'app/kds/page.tsx']) {
       const src = readFileSync(join(__dirname, '..', p), 'utf8')
       expect(src, p).toContain('mismoDiaDeVenta(o.created_at, now, inicio)')
-      expect(src, p).toContain('mismoDiaDeVenta(o.created_at, Date.now(), inicioIdb)')
+      expect(src, p).not.toContain("getCachedOrders('lista')")
     }
+  })
+})
+
+
+describe('KDS con sucursales simultáneas', () => {
+  it('filtra turnos y comandas por la misma sucursal aunque otra abrió después', async () => {
+    const seen: string[] = []
+    vi.stubGlobal('fetch', vi.fn(async (input: string) => {
+      const url = new URL(input.replace(/^.*?\/rest\/v1/, 'http://localhost/rest/v1')); seen.push(input)
+      const branch = url.searchParams.get('location_id')
+      if (url.pathname.endsWith('pos_turnos')) return Response.json(branch === 'eq.branch-a' ? [{ id: 'turn-a' }] : [{ id: 'turn-b-newer' }])
+      return Response.json([{ id: 'order-a', mesa: 1 }])
+    }))
+    expect((await GET(req())).status).toBe(200)
+    expect(seen).toHaveLength(2)
+    for (const url of seen) expect(url).toContain('location_id=eq.branch-a')
+    expect(seen[1]).toContain('turno_id=eq.turn-a')
+  })
+  it('dos turnos no se reducen silenciosamente al último', async () => {
+    const calls = mockFetchSequence([{ ok: true, json: [{ id: 'a' }, { id: 'b' }] }])
+    const res = await GET(new NextRequest('http://localhost/api/pos/kitchen?client_id=testtenant'))
+    expect(res.status).toBe(409)
+    expect(calls).toHaveLength(1)
+  })
+  it.each([{}, null, [{ id: '' }]])('respuesta inválida no equivale a turno cerrado: %j', async body => {
+    const calls = mockFetchSequence([{ ok: true, json: body === null ? { invalid: true } : body }])
+    expect((await GET(req())).status).toBe(502)
+    expect(calls).toHaveLength(1)
   })
 })

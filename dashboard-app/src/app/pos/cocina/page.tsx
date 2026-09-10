@@ -1,5 +1,7 @@
 'use client'
 
+import { cacheKitchenBridgeOrder } from '@/lib/kitchen-bridge-cache'
+import { currentKitchenScope, kitchenScopeIsCurrent, readScopedKitchenCache } from '@/lib/kitchen-read-scope'
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Clock, ChefHat, Check, Flame, RefreshCw, Ban, ShieldAlert, X, Settings, Printer } from 'lucide-react'
@@ -159,26 +161,14 @@ export default function CocinaPage() {
   }
 
   const fetchOrdersInner = async () => {
+    const scope = currentKitchenScope()
     let data: KitchenOrderFromDB[]
     try {
-      if (!navigator.onLine) throw new Error('offline')
-      data = await getKitchenOrders()
+      data = navigator.onLine ? await getKitchenOrders() : await readScopedKitchenCache(scope) as unknown as KitchenOrderFromDB[]
     } catch {
-      // Offline — merge newly-queued orders from IndexedDB into current state
-      try {
-        const { getCachedOrders } = await import('@/lib/pos-offline-db')
-        const [env, prep] = await Promise.all([getCachedOrders('enviada'), getCachedOrders('preparando')])
-        const cached = [...env, ...prep] as unknown as KitchenOrderFromDB[]
-        if (cached.length > 0) {
-          setOrders(prev => {
-            const existing = new Set(prev.map(o => o.id))
-            const fresh = cached.filter(o => !existing.has(o.id))
-            return fresh.length > 0 ? [...prev, ...fresh] : prev
-          })
-        }
-      } catch {}
-      throw new Error('offline')
+      data = await readScopedKitchenCache(scope).catch(() => []) as unknown as KitchenOrderFromDB[]
     }
+    if (!kitchenScopeIsCurrent(scope)) { setOrders([]); return }
 
     // Auto-archive orders with NO activity in 4h (genuinely abandoned). Uses
     // updated_at (last touch), NOT created_at: a table opened hours ago but still
@@ -237,6 +227,7 @@ export default function CocinaPage() {
       if (hasNew) playNotificationSound()
     }
     prevEnviadaIdsRef.current = enviadaIds
+    if (!kitchenScopeIsCurrent(scope)) { setOrders([]); return }
     setOrders(fresh)
   }
 
@@ -263,35 +254,15 @@ export default function CocinaPage() {
   }, [])
 
   // Push DELTA events from the POS local server — works cross-device over LAN
-  useBridgeClient((event) => {
+  useBridgeClient((event, scope) => {
     const ORDER_EVENTS = ['ORDER_UPSERTED', 'ORDER_SENT', 'ORDER_ITEMS_TRANSFERRED', 'ORDER_CLOSED', 'KDS_ITEM_STATUS']
     if (!ORDER_EVENTS.includes(event.type)) return
     const p = event.payload as Record<string, unknown> | undefined
-    if ((event.type === 'ORDER_SENT' || event.type === 'ORDER_UPSERTED') && p && p.order_id) {
+    if ((event.type === 'ORDER_SENT' || event.type === 'ORDER_UPSERTED') && p && p.order_id && scope) {
       // Cachear en IndexedDB ANTES de re-consultar: offline, fetchOrders lee de
       // IndexedDB, así que si consultamos antes de cachear la comanda no aparece
       // hasta el siguiente poll. Con await, cae al instante también sin internet.
-      import('@/lib/pos-offline-db').then(async ({ cacheOrder }) => {
-        await cacheOrder({
-          id: p.order_id as string,
-          mesa: p.mesa,
-          mesero: p.mesero,
-          status: 'enviada',
-          items: typeof p.items === 'string' ? p.items : JSON.stringify(p.items || []),
-          personas: p.personas || 1,
-          total: p.total || 0,
-          turno_id: p.turno_id || null,
-          notas: p.notas || null,
-          comanda_batches: p.comanda_batches ? JSON.stringify(p.comanda_batches) : null,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          // Llegó por el bridge (offline): aún no está en Supabase. La marca hace que
-          // getKitchenOrders la conserve en la vista aunque el poll online no la traiga,
-          // hasta que sincronice (ahí se re-cachea sin la marca). Mata el "clobber".
-          _bridge_unsynced: true,
-        })
-        fetchOrders()
-      }).catch(() => { fetchOrders() })
+      cacheKitchenBridgeOrder(p, scope).then(saved => { if (saved) fetchOrders() }).catch(() => { fetchOrders() })
     } else {
       fetchOrders()
     }

@@ -4,6 +4,8 @@ const path = require('node:path')
 /** Only screen gestures mutate the service. HTTP reads independently verify the
  * durable result; no helper command creates an order or records a payment. */
 module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert, until, request, output, uiOrigin, labPin, restartCaja, printLab }) {
+  // Development route/chunk loading uses the same budget as cold prewarming.
+  const navigationTimeout = process.env.CI ? 300000 : 90000
   const snapshot = async () => (await request(caja, '/state')).json()
   let orderId
   const ensureUnlocked = async terminal => {
@@ -13,7 +15,7 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     await until(async () => terminal.page.evaluate(() => {
       const enter = document.querySelector('button[aria-label="Entrar"]')
       if (!enter) return [...document.querySelectorAll('button')].some(b => /Bebidas laboratorio|Cobrar|Confirmar cierre|Abrir turno|Confirmar movimiento/.test(b.textContent)) || /Corte de Caja|Último cierre confirmado/.test(document.body.innerText)
-      const digit = [...document.querySelectorAll('button')].find(b => b.textContent.trim() === '1')
+      const digit = [...enter.parentElement.querySelectorAll('button')].find(b => b.textContent.trim() === '1')
       const props = digit && Object.keys(digit).find(k => k.startsWith('__reactProps'))
       return !!props && typeof digit[props]?.onClick === 'function'
     }), 'POS o teclado hidratado', 30000)
@@ -55,7 +57,7 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     await caja.page.getByPlaceholder('0.00', { exact: true }).fill('500')
     await caja.page.getByRole('button', { name: /Abrir turno/i }).click()
     await until(async () => (await snapshot()).turno?.opening_cash_cents === 50000, 'Turno durable desde UI')
-    for (const t of [pos2, pos3]) await t.page.goto(`${uiOrigin}/pos?mesa=1`, { waitUntil: 'domcontentloaded' })
+    for (const t of [pos2, pos3]) await t.page.goto(`${uiOrigin}/pos?mesa=1`, { waitUntil: 'domcontentloaded', timeout: navigationTimeout })
     await expect(pos2.page.getByRole('button', { name: /Bebidas laboratorio/ })).toBeVisible({ timeout: 30000 })
   })
   await check('POS 2 captura y guarda; POS 3 ve la misma cuenta antes de enviarla a cocina', async () => {
@@ -119,13 +121,13 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
         order: localStorage.getItem(`pos_order_${mesa}`), draft: localStorage.getItem(`pos_draft_${mesa}`),
       }), source), { account: null, order: null, draft: null }, 'Mover no recrea caché vacía al desmontar el editor')
       await until(async () => (await snapshot()).salon_orders.some(o => o.id === orderId && o.mesa === destination), 'Mesa transferida por UI')
-      await pos3.page.goto(`${uiOrigin}/pos?mesa=${destination}`, { waitUntil: 'domcontentloaded' })
+      await pos3.page.goto(`${uiOrigin}/pos?mesa=${destination}`, { waitUntil: 'domcontentloaded', timeout: navigationTimeout })
       await ensureUnlocked(pos3)
       await expect(pos3.page.locator('body')).toContainText(/Saldo confirmado en Caja:.*116[.,]00/)
     }
     await move(2); await move(1)
     assert.equal((await snapshot()).kds_orders.length, 1)
-    await pos2.page.goto(`${uiOrigin}/pos?mesa=1`, { waitUntil: 'domcontentloaded' })
+    await pos2.page.goto(`${uiOrigin}/pos?mesa=1`, { waitUntil: 'domcontentloaded', timeout: navigationTimeout })
     await ensureUnlocked(pos2)
   })
   if (printLab?.drawer) await check('La apertura manual requiere PIN y motivo y envía un único pulso al cajón configurado', async () => {
@@ -145,7 +147,7 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     await pos3.page.getByRole('button', { name: 'Cerrar apertura manual', exact: true }).click()
   })
   await check('Anular otra cuenta con PIN libera su mesa sin alterar el consumo anterior', async () => {
-    await pos3.page.goto(`${uiOrigin}/pos?mesa=3`, { waitUntil: 'domcontentloaded' })
+    await pos3.page.goto(`${uiOrigin}/pos?mesa=3`, { waitUntil: 'domcontentloaded', timeout: navigationTimeout })
     await ensureUnlocked(pos3)
     await addCoffee(pos3)
     await pos3.page.getByRole('button', { name: 'Guardar', exact: true }).click()
@@ -159,7 +161,7 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     assert.equal(state.salon_orders.length, 1)
     assert.equal(state.salon_orders[0].id, orderId)
     assert.equal(state.salon_orders[0].total_cents, 11600)
-    await pos3.page.goto(`${uiOrigin}/pos?mesa=1`, { waitUntil: 'domcontentloaded' })
+    await pos3.page.goto(`${uiOrigin}/pos?mesa=1`, { waitUntil: 'domcontentloaded', timeout: navigationTimeout })
     await ensureUnlocked(pos3)
   })
   await check('Dividir desde la pantalla persiste dos cuentas de 58 pesos', async () => {
@@ -240,7 +242,7 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     await pos3.page.screenshot({ path: path.join(output, 'consumo-aditivo-tras-abono.png'), fullPage: true })
   })
   await check('Corte X sin WAN incluye el pago parcial antes de entregar cocina', async () => {
-    await pos3.page.goto(`${uiOrigin}/pos/corte`, { waitUntil: 'domcontentloaded' })
+    await pos3.page.goto(`${uiOrigin}/pos/corte`, { waitUntil: 'domcontentloaded', timeout: navigationTimeout })
     await ensureUnlocked(pos3)
     await expect(pos3.page.getByRole('heading', { name: 'Corte de Caja' })).toBeVisible()
     await expect(pos3.page.locator('dl').locator('div').filter({ hasText: 'Cobrado confirmado' })).toContainText(/29[.,]00/)
@@ -248,7 +250,7 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     await expect(pos3.page.locator('dl').locator('div').filter({ hasText: 'Saldo por cobrar' })).toContainText(/145[.,]00/)
     assert.equal((await snapshot()).kds_orders.length,1)
     await pos3.page.screenshot({ path: path.join(output, 'corte-x-parcial-sin-wan.png'), fullPage: true })
-    await pos3.page.goto(`${uiOrigin}/pos?mesa=1`, { waitUntil: 'domcontentloaded' })
+    await pos3.page.goto(`${uiOrigin}/pos?mesa=1`, { waitUntil: 'domcontentloaded', timeout: navigationTimeout })
     await ensureUnlocked(pos3)
   })
   await check('Reiniciar Caja recupera el cobro y se continúa desde otra terminal', async () => {
@@ -277,7 +279,7 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     assert.deepEqual((await snapshot()).financial_orders[0], before)
   })
   await check('Corte X conserva el total liquidado mientras cocina sigue preparando', async () => {
-    await pos2.page.goto(`${uiOrigin}/pos/corte`, { waitUntil: 'domcontentloaded' })
+    await pos2.page.goto(`${uiOrigin}/pos/corte`, { waitUntil: 'domcontentloaded', timeout: navigationTimeout })
     await ensureUnlocked(pos2)
     await expect(pos2.page.locator('dl').locator('div').filter({ hasText: 'Cobrado confirmado' })).toContainText(/174[.,]00/)
     await expect(pos2.page.locator('dl').locator('div').filter({ hasText: 'Efectivo esperado' })).toContainText(/674[.,]00/)
@@ -301,7 +303,7 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     assert.equal((await snapshot()).financial_orders[0].paid_cents, 17400)
   })
   await check('Retiros y depósitos autorizados desde POS 2 se incluyen en el cierre compartido', async () => {
-    await pos2.page.goto(`${uiOrigin}/pos/turno`, { waitUntil: 'domcontentloaded' })
+    await pos2.page.goto(`${uiOrigin}/pos/turno`, { waitUntil: 'domcontentloaded', timeout: navigationTimeout })
     await ensureUnlocked(pos2)
     const movement = pos2.page.getByRole('region', { name: 'Movimientos de efectivo' })
     await expect(movement).toBeVisible()
@@ -316,12 +318,12 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     await movement.getByLabel('PIN de autorización', { exact: true }).fill(labPin)
     await movement.getByRole('button', { name: 'Confirmar movimiento' }).click()
     await until(async () => (await snapshot()).cash_movements.length === 2, 'Dos movimientos durables')
-    await pos2.page.goto(`${uiOrigin}/pos/corte`, { waitUntil: 'domcontentloaded' })
+    await pos2.page.goto(`${uiOrigin}/pos/corte`, { waitUntil: 'domcontentloaded', timeout: navigationTimeout })
     await ensureUnlocked(pos2)
     await expect(pos2.page.locator('dl').locator('div').filter({ hasText: 'Efectivo esperado' })).toContainText(/659[.,]00/)
   })
   await check('El cierre de turno concilia fondo, ventas, retiros y depósitos', async () => {
-    await caja.page.goto(`${uiOrigin}/pos/turno`, { waitUntil: 'domcontentloaded' })
+    await caja.page.goto(`${uiOrigin}/pos/turno`, { waitUntil: 'domcontentloaded', timeout: navigationTimeout })
     await ensureUnlocked(caja)
     await caja.page.getByLabel('Efectivo contado al cierre', { exact: true }).fill('659')
     await caja.page.getByRole('button', { name: 'Confirmar cierre de turno', exact: true }).click()
@@ -332,7 +334,7 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     assert.equal(state.turn_summaries[0].expected_cash_cents, 65900)
     assert.equal(state.turn_summaries[0].difference_cents, 0)
     await caja.page.screenshot({ path: path.join(output, 'cierre-turno-desde-pantalla.png'), fullPage: true })
-    await caja.page.reload({ waitUntil: 'domcontentloaded' })
+    await caja.page.reload({ waitUntil: 'domcontentloaded', timeout: navigationTimeout })
     await ensureUnlocked(caja)
     await expect(caja.page.getByRole('region', { name: 'Último cierre confirmado' })).toContainText(/659[.,]00/)
   })

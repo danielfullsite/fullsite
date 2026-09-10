@@ -1,5 +1,7 @@
 'use client'
 
+import { currentKitchenScope, kitchenScopeIsCurrent, readScopedKitchenCache } from '@/lib/kitchen-read-scope'
+import { cacheKitchenBridgeOrder } from '@/lib/kitchen-bridge-cache'
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Clock, Check, Flame, RefreshCw, Wine, Printer } from 'lucide-react'
@@ -45,9 +47,10 @@ export default function BarraPage() {
   }
 
   const fetchOrders = async () => {
+    const scope = currentKitchenScope()
     try {
-      if (!navigator.onLine) throw new Error('offline')
-      const allOrders = await getKitchenOrders()
+      const allOrders = navigator.onLine ? await getKitchenOrders() : await readScopedKitchenCache(scope) as unknown as KitchenOrderFromDB[]
+      if (!kitchenScopeIsCurrent(scope)) { setOrders([]); return }
 
       // Auto-archive orders older than 4 hours (matches Cocina behavior — KDS-GAP-03)
       const now = Date.now()
@@ -94,22 +97,11 @@ export default function BarraPage() {
       const newEnviadas = visibleOrders.filter(o => o.status === 'enviada').length
       if (prevCountRef.current > 0 && newEnviadas > prevCountRef.current) playSound()
       prevCountRef.current = newEnviadas
+      if (!kitchenScopeIsCurrent(scope)) { setOrders([]); return }
       setOrders(visibleOrders)
     } catch {
-      // Offline — merge cached orders from IndexedDB into current state
-      // (same pattern as cocina/page.tsx so barra survives reload without internet)
-      try {
-        const { getCachedOrders } = await import('@/lib/pos-offline-db')
-        const [env, prep] = await Promise.all([getCachedOrders('enviada'), getCachedOrders('preparando')])
-        const cached = [...env, ...prep] as unknown as KitchenOrderFromDB[]
-        if (cached.length > 0) {
-          setOrders(prev => {
-            const existing = new Set(prev.map(o => o.id))
-            const fresh = cached.filter(o => !existing.has(o.id))
-            return fresh.length > 0 ? [...prev, ...fresh] : prev
-          })
-        }
-      } catch { /* IndexedDB not available */ }
+      const cached = await readScopedKitchenCache(scope).catch(() => [])
+      setOrders(kitchenScopeIsCurrent(scope) ? cached as unknown as KitchenOrderFromDB[] : [])
     } finally {
       setLoading(false)
       setOffline(typeof navigator !== 'undefined' && !navigator.onLine)
@@ -128,28 +120,14 @@ export default function BarraPage() {
   }, [])
 
   // G-06: push DELTA events from the POS local server — LAN-first resilience
-  useBridgeClient((event) => {
+  useBridgeClient((event, scope) => {
     const ORDER_EVENTS = ['ORDER_UPSERTED', 'ORDER_SENT', 'ORDER_ITEMS_TRANSFERRED', 'ORDER_CLOSED', 'KDS_ITEM_STATUS']
     if (ORDER_EVENTS.includes(event.type)) {
       if ((event.type === 'ORDER_SENT' || event.type === 'ORDER_UPSERTED') && event.payload) {
         const p = event.payload as Record<string, unknown>
-        if (p.order_id) {
-          import('@/lib/pos-offline-db').then(({ cacheOrder }) => {
-            cacheOrder({
-              id: p.order_id as string,
-              mesa: p.mesa,
-              mesero: p.mesero,
-              status: 'enviada',
-              items: typeof p.items === 'string' ? p.items : JSON.stringify(p.items || []),
-              personas: p.personas || 1,
-              total: p.total || 0,
-              turno_id: p.turno_id || null,
-              notas: p.notas || null,
-              comanda_batches: p.comanda_batches ? JSON.stringify(p.comanda_batches) : null,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            })
-          }).catch(() => {})
+        if (p.order_id && scope) {
+          cacheKitchenBridgeOrder(p, scope).then(saved => { if (saved) fetchOrders() }).catch(() => {})
+          return
         }
       }
       fetchOrders()

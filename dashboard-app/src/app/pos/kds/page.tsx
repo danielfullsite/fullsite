@@ -1,5 +1,6 @@
 'use client'
 
+import { currentKitchenScope, kitchenScopeIsCurrent, readScopedKitchenCache } from '@/lib/kitchen-read-scope'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Printer } from 'lucide-react'
 import {
@@ -167,27 +168,14 @@ export default function KDSPage() {
   // ── Supabase fallback poll ─────────────────────────────────────────────
   // Only runs when KDS is not in LAN_PRIMARY mode.
   const fetchOrdersForFallback = useCallback(async () => {
+    const scope = currentKitchenScope()
     let data: KitchenOrderFromDB[]
     try {
-      data = await getKitchenOrders()
+      data = navigator.onLine ? await getKitchenOrders() : await readScopedKitchenCache(scope) as unknown as KitchenOrderFromDB[]
     } catch {
-      // Offline — merge IDB-cached orders into fallback state
-      try {
-        const { getCachedOrders } = await import('@/lib/pos-offline-db')
-        const [env, prep, lst] = await Promise.all([
-          getCachedOrders('enviada'),
-          getCachedOrders('preparando'),
-          getCachedOrders('lista'),
-        ])
-        // El cache IDB no distingue días: sin este corte, tras varios días de
-        // operación el fallback offline pintaba órdenes 'lista' de fechas viejas.
-        const inicioIdb = inicioDiaConfigurado()
-        const cached = ([...env, ...prep, ...lst] as unknown as KitchenOrderFromDB[])
-          .filter(o => mismoDiaDeVenta(o.created_at, Date.now(), inicioIdb))
-        if (cached.length > 0) kdsClient.setFallbackOrders(cached)
-      } catch { /* IndexedDB not available */ }
-      return
+      data = await readScopedKitchenCache(scope).catch(() => []) as unknown as KitchenOrderFromDB[]
     }
+    if (!kitchenScopeIsCurrent(scope)) { kdsClient.setFallbackOrders([]); return }
     const now = Date.now()
     const fourHours = 4 * 60 * 60 * 1000
     const inicio = inicioDiaConfigurado()

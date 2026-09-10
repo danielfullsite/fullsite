@@ -108,3 +108,5 @@ Operaciones autorizadas, rutas de cocina, impresión y cierre contado: [`docs/ar
 Código de interfaz instalado y recuperación: [`docs/architecture/OFFLINE-UI-PACKAGE-2026-09-05.md`](docs/architecture/OFFLINE-UI-PACKAGE-2026-09-05.md). Recibos de negocio, barrera cloud y transición por sucursal: [`docs/architecture/CAJA-CLOUD-MATERIALIZATION-2026-09-05.md`](docs/architecture/CAJA-CLOUD-MATERIALIZATION-2026-09-05.md). Instalar un binario no activa una sucursal; el downgrade del log exige migración validada.
 
 Inventario del candidato: [`docs/architecture/INVENTORY-CONFIRMED-2026-09-10.md`](docs/architecture/INVENTORY-CONFIRMED-2026-09-10.md). Movimiento manual usa recibo/stock/costo en una transacción. Venta y cancelación se concilian desde la orden confirmada; no devolver existencias por un borrador o una cancelación preparada.
+
+Lectura cloud de KDS: [`docs/architecture/KDS-CLOUD-SCOPE-2026-09-10.md`](docs/architecture/KDS-CLOUD-SCOPE-2026-09-10.md). Turno único por sucursal, sin ampliar consultas cuando falla su resolución. Caché exige procedencia de restaurante/sucursal.

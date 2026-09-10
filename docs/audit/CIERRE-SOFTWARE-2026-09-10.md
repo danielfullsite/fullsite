@@ -194,3 +194,32 @@ un punto visible del mismo botón, sin force ni ocultar errores; el recorrido
 Web **3,679/3,679** y selección de cajón dentro de Electron **10/10** aprobadas
 en esta misma tanda. El asistente de configuración tiene dos pruebas DOM
 incluidas en las 273; confirma selección explícita y eliminación persistida.
+
+El checkpoint de cajón **7e843fe1** pasó CI **34462858845** multi-terminal,
+además de Dashboard, servidor y Offline E2E del mismo commit.
+
+
+## H12: lectura KDS y procedencia de caché
+
+[Contrato de lectura por sucursal](../architecture/KDS-CLOUD-SCOPE-2026-09-10.md).
+El endpoint resuelve un turno único por sucursal, no el último del restaurante.
+Un error de turno no amplía la consulta a doce horas. La caché de cocina, barra
+y las dos pantallas KDS pasa por el mismo filtro de restaurante/sucursal.
+
+El bridge captura la identidad descubierta y las credenciales de su conexión;
+los productores de caché conservan esa procedencia y no adoptan la identidad de
+una navegación posterior. Se verificó también DELTA antes de SNAPSHOT: es una
+secuencia válida del servidor después de autenticar al cliente y debe conservarse.
+
+Web **3,684/3,684**, DOM **282/282**, TypeScript aprobado. El recorrido integrado
+se registra por separado. No cierra H12: delivery cloud aún requiere sucursal,
+el caché temporal requiere conciliación exacta de turno y falta la aceptación
+de presencia/huella y del resto de escrituras cloud.
+
+
+El recorrido posterior de H12 terminó **22/22**, incluido reinicio, pérdida de
+Caja, preparación/entrega KDS, retiro/depósito y cierre con $659 esperados y
+contados. Los intentos previos agotaron navegación/carga de Next; el laboratorio
+acota el teclado PIN a su contenedor y alinea navegación con el presupuesto de
+compilación (CI 300 s/local 90 s), manteniendo aserciones de interacción de 30 s.
+Evidencia: `output/closure/ui-operacion/results.json`; receptor TCP sintético.
