@@ -210,6 +210,101 @@ describe('Clobber / STATE_SYNC merge (GAP-002)', () => {
     assert.equal(state.getMesa('9').status, 'ocupada', 'la ausencia cloud no es un recibo de cierre')
   })
 
+  // ── Una fila CERRADA en nube sí es recibo (2026-09-10) ─────────────────────
+  //
+  // D1 dice que la AUSENCIA no cierra nada. Esto es lo contrario: la fila existe y
+  // dice `cerrada`. En modo legacy la nube es la autoridad de cobro; si el
+  // ORDER_CLOSED de la LAN se perdió, esta orden quedaba `enviada` aquí para
+  // siempre y la mesa se podía volver a cobrar (video de Eduardo, 2026-08-24).
+  describe('una fila cerrada en nube liquida la orden local', () => {
+    const filaCerrada = (id, mesa, extra = {}) => ({
+      id, mesa, status: 'cerrada', items: '[]', closed_at: '2026-09-10T20:00:00.000Z', ...extra,
+    })
+    const poll = (orders, seq) => makeEvent(EVENT.STATE_SYNC, {
+      mesas: [], kds_queue: [], orders, synced_at: new Date().toISOString(),
+    }, seq)
+
+    test('REGRESION: libera la mesa, marca pagada y saldo 0, y la saca del salón', () => {
+      const state = new RestaurantState()
+      state.apply(makeEvent(EVENT.ORDER_SENT, { order_id: 'loc-1', mesa: '5', total: 58, items: [{ n: 'café' }] }, 1))
+      assert.equal(state.getMesa('5').status, 'ocupada', 'premisa')
+
+      state.apply(poll([filaCerrada('loc-1', 5)], 2))
+
+      assert.equal(state.getMesa('5').status, 'libre')
+      assert.equal(state.getMesa('5').order_id, null)
+      const o = state._orders.get('loc-1')
+      assert.equal(o.payment_status, 'pagada')
+      assert.equal(o.saldo, 0)
+      assert.equal(o.closed_at, '2026-09-10T20:00:00.000Z', 'conserva la hora de cierre de la nube')
+      assert.ok(!state.toSnapshot().salon_orders.some(s => s.order_id === 'loc-1'), 'ya no debe dinero')
+    })
+
+    test('conserva los platillos y la preparación pendiente (D2): pagada antes de cocinar sigue en cocina', () => {
+      const state = new RestaurantState()
+      state.apply(makeEvent(EVENT.ORDER_SENT, { order_id: 'loc-2', mesa: '6', items: [{ n: 'sopa' }] }, 1))
+      state.apply(poll([filaCerrada('loc-2', 6)], 2))
+      const o = state._orders.get('loc-2')
+      assert.deepEqual(JSON.parse(o.items), [{ n: 'sopa' }], 'la fila de nube (items vacíos) NO pisa los platillos locales')
+      assert.ok(state.toSnapshot().kds_orders.some(k => k.order_id === 'loc-2'), 'la comanda sigue en cocina')
+    })
+
+    test('pagada, closed y paid cuentan igual que cerrada', () => {
+      for (const status of ['pagada', 'closed', 'paid']) {
+        const state = new RestaurantState()
+        state.apply(makeEvent(EVENT.ORDER_SENT, { order_id: 'loc-3', mesa: '3', items: [] }, 1))
+        state.apply(poll([filaCerrada('loc-3', 3, { status })], 2))
+        assert.equal(state.getMesa('3').status, 'libre', status)
+      }
+    })
+
+    test('una fila ABIERTA en nube no toca la orden local (el continue de siempre)', () => {
+      const state = new RestaurantState()
+      state.apply(makeEvent(EVENT.ORDER_SENT, { order_id: 'loc-4', mesa: '4', items: [{ n: 'taco' }] }, 1))
+      state.apply(poll([filaCerrada('loc-4', 4, { status: 'enviada', items: '[{"n":"otra cosa"}]' })], 2))
+      assert.equal(state.getMesa('4').status, 'ocupada')
+      assert.deepEqual(JSON.parse(state._orders.get('loc-4').items), [{ n: 'taco' }])
+      assert.notEqual(state._orders.get('loc-4').payment_status, 'pagada')
+    })
+
+    test('una fila cerrada de OTRA orden en la misma mesa no libera la mesa', () => {
+      const state = new RestaurantState()
+      state.apply(makeEvent(EVENT.ORDER_SENT, { order_id: 'vieja', mesa: '8', items: [] }, 1))
+      state.apply(makeEvent(EVENT.ORDER_CLOSED, { order_id: 'vieja', mesa: '8' }, 2))
+      state.apply(makeEvent(EVENT.ORDER_SENT, { order_id: 'nueva', mesa: '8', items: [] }, 3))
+      assert.equal(state.getMesa('8').order_id, 'nueva', 'premisa')
+      // la nube todavía trae la vieja como cerrada (turno abierto): no es recibo de la nueva
+      state.apply(poll([filaCerrada('vieja', 8)], 4))
+      assert.equal(state.getMesa('8').status, 'ocupada')
+      assert.equal(state.getMesa('8').order_id, 'nueva')
+    })
+
+    test('idempotente: el mismo poll dos veces deja el mismo estado', () => {
+      const state = new RestaurantState()
+      state.apply(makeEvent(EVENT.ORDER_SENT, { order_id: 'loc-5', mesa: '2', items: [] }, 1))
+      state.apply(poll([filaCerrada('loc-5', 2)], 2))
+      const antes = JSON.stringify(state.toSnapshot())
+      state.apply(poll([filaCerrada('loc-5', 2)], 3))
+      const despues = JSON.stringify(state.toSnapshot())
+      assert.equal(despues, antes)
+    })
+
+    test('en modo caja el poll sigue siendo observacional: no liquida nada', () => {
+      const state = new RestaurantState({ localAuthorityEnabled: true })
+      state.apply(makeEvent(EVENT.ORDER_SENT, { order_id: 'loc-6', mesa: '7', items: [] }, 1))
+      state.apply(poll([filaCerrada('loc-6', 7)], 2))
+      assert.equal(state.getMesa('7').status, 'ocupada')
+      assert.notEqual(state._orders.get('loc-6').payment_status, 'pagada')
+    })
+
+    test('la ausencia sigue sin ser recibo (D1 no cambia): sin fila, la mesa sigue ocupada', () => {
+      const state = new RestaurantState()
+      state.apply(makeEvent(EVENT.ORDER_SENT, { order_id: 'loc-7', mesa: '1', items: [] }, 1))
+      state.apply(poll([], 2))
+      assert.equal(state.getMesa('1').status, 'ocupada')
+    })
+  })
+
   test('la orden protegida sigue en el KDS tras el poll', () => {
     const state = new RestaurantState()
     state.apply(makeEvent(EVENT.ORDER_SENT, { order_id: 'k-1', mesa: '2', items: [{ n: 'sopa' }] }, 1))
