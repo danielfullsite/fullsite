@@ -1695,7 +1695,10 @@ export async function saveOrder(order: Order, saveOperationId?: string): Promise
       })
     } catch {
       const queue = JSON.parse(localStorage.getItem('fullsite_offline_queue') || '[]')
-      queue.push({ table: 'pos_orders', data: payload, endpoint: '/api/pos/save-order', transport: 'APP_API', timestamp: Date.now(), synced: false })
+      // `method` viaja: sin el, drainLocalStorageToIdb lo re-encolaba como PATCH y
+      // /api/pos/save-order (solo POST) respondia 405 para siempre (barrido
+      // 2026-09-10, offline-queue LENTE-4).
+      queue.push({ table: 'pos_orders', method: 'POST', data: payload, endpoint: '/api/pos/save-order', transport: 'APP_API', timestamp: Date.now(), synced: false })
       localStorage.setItem('fullsite_offline_queue', JSON.stringify(queue))
     }
     console.log('[offline] Order saved to queue — will sync when online')
@@ -2281,7 +2284,12 @@ export async function verifyManagerPin(pin: string): Promise<string | null> {
   try {
     const cached = JSON.parse(localStorage.getItem('pos_manager_pin_cache') || '{}')
     const entry = cached[await _pinCacheKey(pin)]
-    if (entry?.name && Date.now() - (entry.cached_at || 0) < 30 * 60 * 1000) {
+    // La cache guarda TODO PIN validado online, incluido el de un capitan que
+    // autorizo una transferencia (min_role capitan). Sin revisar el rol, ese
+    // capitan autorizaba anulaciones y descuentos de gerente durante 30 min sin
+    // red (barrido 2026-09-10, offline-queue LENTE-6). Online el servidor lo
+    // rechaza; offline se aplica la misma regla.
+    if (entry?.name && Date.now() - (entry.cached_at || 0) < 30 * 60 * 1000 && (_ROLE_LVL[entry.role] || 0) >= 4) {
       return entry.name as string
     }
   } catch { /* ignore */ }
@@ -2320,7 +2328,8 @@ export async function verifyManagerPinWithRole(pin: string): Promise<{ name: str
   try {
     const cached = JSON.parse(localStorage.getItem('pos_manager_pin_cache') || '{}')
     const entry = cached[await _pinCacheKey(pin)]
-    if (entry?.name && Date.now() - (entry.cached_at || 0) < 30 * 60 * 1000) {
+    // Mismo candado que en verifyManagerPin: solo gerente+ desde la cache.
+    if (entry?.name && Date.now() - (entry.cached_at || 0) < 30 * 60 * 1000 && (_ROLE_LVL[entry.role] || 0) >= 4) {
       return { name: entry.name, role: entry.role || 'gerente' }
     }
   } catch { /* ignore */ }
@@ -2366,7 +2375,9 @@ export async function verifyPinWithMinRole(pin: string, minRole: string): Promis
   try {
     const cached = JSON.parse(localStorage.getItem('pos_manager_pin_cache') || '{}')
     const entry = cached[await _pinCacheKey(pin)]
-    if (entry?.name && Date.now() - (entry.cached_at || 0) < 30 * 60 * 1000) {
+    // El rol cacheado tiene que cumplir el minimo pedido; un PIN de capitan
+    // validado para transferir no vale para un permiso de gerente.
+    if (entry?.name && Date.now() - (entry.cached_at || 0) < 30 * 60 * 1000 && (_ROLE_LVL[entry.role] || 0) >= (_ROLE_LVL[minRole] || 99)) {
       return { name: entry.name, role: entry.role || minRole }
     }
   } catch { /* ignore */ }

@@ -1132,7 +1132,7 @@ async function _syncAllInner(): Promise<SyncResult> {
   if (typeof window !== 'undefined') {
     try { shiftToken = localStorage.getItem('pos_shift_token') } catch {}
   }
-  const appApiToken = accessToken || shiftToken
+  let appApiToken = accessToken || shiftToken
   if (queue.length > 0 && !appApiToken) {
     console.warn('[offline-sync] sin sesión ni shift token — replay pospuesto (fail closed), cola preservada')
     emitAuthRequired()
@@ -1181,6 +1181,18 @@ async function _syncAllInner(): Promise<SyncResult> {
           await new Promise<void>(r => setTimeout(r, 400))
         }
         let result = await replayViaAppApi(item, appApiToken!)
+        // La sesion de Supabase de la maquina (alguien entro al dashboard) gana
+        // sobre el shift token (BUG-019: tras dias offline el shift token pudo
+        // vencer). Pero si ESA sesion no tiene membresia en el tenant de la
+        // terminal, el servidor responde 401 en cada drenado y la caja se
+        // deslogueaba en bucle aunque el shift token —el mismo con el que se
+        // guarda online— fuera valido (barrido 2026-09-10, offline-queue LENTE-5).
+        // Un 401 con la sesion se reintenta UNA vez con el shift token; si pasa,
+        // el resto del pase sigue con el.
+        if (!result.ok && result.errorClass === 'AUTH_EXPIRED' && shiftToken && appApiToken !== shiftToken) {
+          const conShift = await replayViaAppApi(item, shiftToken)
+          if (conShift.errorClass !== 'AUTH_EXPIRED') { result = conShift; appApiToken = shiftToken }
+        }
         // ORDER_NOT_FOUND con la creación de esa orden todavía en la cola (el
         // buffer de localStorage la re-encola al FINAL) no es terminal: es
         // orden de llegada. Se reintenta cuando la creación haya subido.
@@ -1720,7 +1732,10 @@ export async function drainLocalStorageToIdb(): Promise<void> {
     let allOk = true
     for (const item of unsynced) {
       try {
-        const method = (item.method as string | undefined) || 'PATCH'
+        // Un item del buffer sin `method`: por endpoint. /api/pos/save-order solo
+        // exporta POST; el viejo default PATCH lo dejaba en 405 eterno.
+        const endpointDelItem = item.endpoint as string | undefined
+        const method = (item.method as string | undefined) || (endpointDelItem?.startsWith('/api/') ? 'POST' : 'PATCH')
         await queueOperation(
           (item.table as string) || 'pos_orders',
           method as 'POST' | 'PATCH' | 'DELETE',
