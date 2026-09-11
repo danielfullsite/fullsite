@@ -501,7 +501,12 @@
     else if(anyTouched) postStatus(order,"preparando");
   }
   function postStatus(order,status){
-    var key=order.id+":"+status; if(postedStatus[key]) return; postedStatus[key]=1;
+    // La llave lleva el numero de rondas: Pedro regresa la orden a 'enviada' con
+    // cada ronda nueva y, con la llave de antes (id:status), la segunda ronda
+    // jamas llegaba a 'lista' ni a 'preparando' en la caja (barrido 2026-09-10,
+    // kds LENTE-1).
+    var rounds=0; try{ var b=typeof order.comanda_batches==='string'?JSON.parse(order.comanda_batches):order.comanda_batches; rounds=Array.isArray(b)?b.length:0; }catch(e){ rounds=0; }
+    var key=order.id+":"+status+":"+rounds; if(postedStatus[key]) return; postedStatus[key]=1;
     var cmd={ command_id:(order.id+"-"+status+"-"+Math.floor(Date.now()/1000)), command_type:"ORDER_UPSERTED", order_id:order.id, mesa:order.mesa, status:status, client_id:(CFG.client_id||"") };
     fetch(STATE_BASE+"/events",{method:"POST",signal:AbortSignal.timeout(4000),headers:authHeaders({"Content-Type":"application/json"}),body:JSON.stringify(cmd)})
       .then(function(r){ if(!r.ok) throw new Error("Sin conexión con Caja"); return r.json(); })

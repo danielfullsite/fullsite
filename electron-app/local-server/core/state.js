@@ -501,6 +501,9 @@ class RestaurantState {
     for (const [orderId, order] of this._orders) {
       if (!order._kds_sent) continue
       const belongsToAnotherTurno = activeTurnoId && order.turno_id && order.turno_id !== activeTurnoId
+      // Una orden local YA COBRADA de un turno que la nube ya cerro es el empalme
+      // de ayer: no debe dinero ni trabajo. Se retira aunque sea local.
+      if (!order._from_cloud && belongsToAnotherTurno && settled(order)) { this._orders.delete(orderId); continue }
       const absentAndPastGrace = !pollOrderIds.has(orderId) && !protectedOrderIds.has(orderId)
       if (!protectedOrderIds.has(orderId) && (belongsToAnotherTurno || absentAndPastGrace)) this._orders.delete(orderId)
     }
@@ -560,11 +563,31 @@ class RestaurantState {
         // platillos y la preparacion se conservan, igual que en _applyOrderClosed (D2).
         // Y solo se libera la mesa si sigue apuntando a ESTA orden.
         if (existing && !existing._from_cloud) {
-          if (FINANCIAL_CLOSED.has(row.status) && !settled(existing) && !cancelled(existing)) {
-            this._orders.set(id, { ...existing, payment_status: 'pagada', saldo: 0,
-              closed_at: row.closed_at || existing.closed_at || new Date().toISOString(),
+          // UNA FILA CANCELADA EN NUBE TAMBIEN ES UN RECIBO (misma familia que el
+          // cierre de abajo): el POS cancela contra la nube antes de avisar a la
+          // LAN, y si el aviso se pierde la cocina seguia preparando y la mesa
+          // quedaba ocupada hasta el corte (barrido 2026-09-10, pedro-core LENTE-2).
+          if (cancelled(row) && !cancelled(existing) && !settled(existing)) {
+            this._applyOrderCancelled({ order_id: id, mesa: existing.mesa })
+            continue
+          }
+          // Mesa movida en la nube: se libera la vieja si aun apunta aqui y se
+          // ocupa la nueva si nadie mas la tiene.
+          if (row.mesa != null && existing.mesa != null && String(row.mesa) !== String(existing.mesa) &&
+              !settled(existing) && !cancelled(existing)) {
+            const vieja = String(existing.mesa), nueva = String(row.mesa)
+            if (this._mesas.get(vieja)?.order_id === id) { this._mesas.set(vieja, { status: 'libre', order_id: null, locked_by: null }); this._locks.delete(vieja) }
+            const ocupante = this._mesas.get(nueva)?.order_id
+            if (!ocupante || ocupante === id) this._mesas.set(nueva, { status: 'ocupada', order_id: id, locked_by: null })
+            this._orders.set(id, { ...existing, mesa: row.mesa, updated_at: new Date().toISOString() })
+            this._kds = this._kds.map(k => k.order_id === id ? { ...k, mesa: row.mesa } : k)
+          }
+          const actual = this._orders.get(id)
+          if (FINANCIAL_CLOSED.has(row.status) && !settled(actual) && !cancelled(actual)) {
+            this._orders.set(id, { ...actual, payment_status: 'pagada', saldo: 0,
+              closed_at: row.closed_at || actual.closed_at || new Date().toISOString(),
               updated_at: new Date().toISOString() })
-            const mesa = existing.mesa != null ? String(existing.mesa) : null
+            const mesa = actual.mesa != null ? String(actual.mesa) : null
             if (mesa && this._mesas.get(mesa)?.order_id === id) {
               this._mesas.set(mesa, { status: 'libre', order_id: null, locked_by: null })
               this._locks.delete(mesa)
@@ -577,6 +600,17 @@ class RestaurantState {
           preparation_status: row.preparation_status ?? (PREPARATION_STATUS.has(row.status) ? row.status : null),
           payment_status: row.payment_status ?? (FINANCIAL_CLOSED.has(row.status) ? 'pagada' : 'pendiente'),
         })
+        // La fila dice cancelada/cerrada pero la mesa pudo quedar "protegida" por
+        // la ventana de gracia (orden fresca ausente de mesas/kds_queue): la
+        // proteccion es contra la AUSENCIA, no contra una fila que si llego.
+        if (cancelled(row) || FINANCIAL_CLOSED.has(row.status)) {
+          const mesa = row.mesa ?? existing?.mesa
+          if (mesa != null && this._mesas.get(String(mesa))?.order_id === id) {
+            this._mesas.set(String(mesa), { status: 'libre', order_id: null, locked_by: null })
+            this._locks.delete(String(mesa))
+          }
+          if (cancelled(row)) this._kds = this._kds.filter(k => k.order_id !== id)
+        }
       }
       this._orderSnapshotComplete = order_snapshot_complete === true && orders.every(row => {
         if (!(row?.id ?? row?.order_id)) return false
@@ -668,7 +702,7 @@ class RestaurantState {
     for (const o of [...kitchen, ...(Array.isArray(snap.salon_orders) ? snap.salon_orders : [])]) {
       const id = o?.order_id ?? o?.id
       if (!id) continue
-      this._orders.set(id, { ...o, id, order_id: id, _kds_sent: kitchenIds.has(id) || !!o.preparation_status })
+      this._orders.set(id, { ...o, id, order_id: id, _from_cloud: o.from_cloud === true, _kds_sent: kitchenIds.has(id) || !!o.preparation_status })
     }
     // Cancelled identities are absent from both visible projections, but must
     // survive reconnect so a delayed broadcast cannot recreate their debt.
@@ -684,10 +718,20 @@ class RestaurantState {
   toSnapshot() {
     // D2: kitchen is preparation work; salon is unsettled debt. Both carry the
     // full order and the financial result so a secondary can reopen the account.
-    const clean = ({ _kds_sent, _from_cloud, ...rest }) => ({ ...rest, saldo: balanceOf(rest),
+    // `from_cloud` viaja en la foto: sin el, una secundaria hidratada trataba TODA
+    // orden como local y ninguna foto de la nube podia quitarle, cancelar ni
+    // mover una orden que en la caja venia de la nube (tableros divergentes hasta
+    // la siguiente reconexion; barrido 2026-09-10, pedro-core LENTE-3).
+    const clean = ({ _kds_sent, _from_cloud, ...rest }) => ({ ...rest, from_cloud: _from_cloud === true, saldo: balanceOf(rest),
       financial_order: this._financialOrders.get(rest.order_id ?? rest.id) ?? null })
+    // Legacy: la cocina no tiene accion "entregar" (existe solo bajo Caja). Una
+    // comanda COBRADA cuya preparacion ya esta lista sale del tablero; si se
+    // cobro antes de cocinarse, se queda (D2: el cobro no borra trabajo).
+    // Antes cada ticket cobrado quedaba como tarjeta verde hasta el corte
+    // (barrido 2026-09-10, kds LENTE-2).
+    const cobradaYServida = o => this._writeAuthority !== 'caja' && settled(o) && (o.preparation_status ?? o.status) === 'lista'
     const kds_orders = [...this._orders.values()]
-      .filter(o => o._kds_sent && !cancelled(o) &&
+      .filter(o => o._kds_sent && !cancelled(o) && !cobradaYServida(o) &&
         (o.preparation_status ?? o.status) !== 'entregada' &&
         // Legacy financial-only status without preparation cannot invent work.
         (!FINANCIAL_CLOSED.has(o.status) || !!o.preparation_status))
