@@ -384,3 +384,15 @@ DOM **289/289**, TypeScript aprobado, PostgreSQL de conciliación **13/13** y de
 movimientos **8/8**, UI legacy **21/21**. CI y UI Caja en curso al escribir
 esto; el resultado final y el hash del instalador se anotan en la sección
 siguiente. Nada validado en campo.
+
+**Resultado final del checkpoint `6b49470a`.** CI verde en todos los checks
+obligatorios (test ×2, offline, local-server, transfer-postgres,
+multi-terminal, ui-multi-terminal caja y legacy). Localmente UI Caja
+**18/18** (una corrida previa falló por bloqueo de sesión en POS 3 y no se
+reprodujo). Instalador construido localmente con la pareja de producción:
+`Fullsite POS Setup 1.4.0.exe`, SHA-256
+`93400ee047080dbe8ff71bd9166f227e11f2b06d07050c87c63ae477a60d295a`, sello
+`6b49470a` limpio, copiado a `~/fullsite-candidates/2026-09-11-6b49470a/`.
+No se declara Fullsite cerrado: falta aceptación física (impresoras, cajón,
+huella, corte eléctrico, Windows real), la variable de CI y las migraciones
+PENDIENTE coordinadas.
