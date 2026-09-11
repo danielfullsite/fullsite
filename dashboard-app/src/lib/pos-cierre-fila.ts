@@ -13,7 +13,8 @@
  * nueva sin migración rompe esa prueba antes de romper un corte.
  */
 
-import { diaDeVenta, inicioDiaConfigurado } from './dia-de-venta'
+import { horaInicioDia, inicioDiaConfigurado } from './dia-de-venta'
+import { getActiveTimezone } from './date-mx'
 
 export interface DatosDelCierre {
   id: string
@@ -45,8 +46,18 @@ export interface DatosDelCierre {
  * al día siguiente, y ése es el `fecha` que se le muestra al cajero al confrontar
  * el fondo («el corte Z#3 del 2026-09-03» por un corte del 2).
  */
-export function fechaDelCierre(ahora: Date): string {
-  return diaDeVenta(ahora, inicioDiaConfigurado())
+export function fechaDelCierre(ahora: Date, tz: string = getActiveTimezone()): string {
+  // Con la ZONA DEL TENANT, no con la del proceso: `diaDeVenta` usa getHours() y
+  // en un runner en UTC (CI, un servidor) daba el dia de UTC. Medido en CI el
+  // 2026-09-11: 02:00 de Monterrey salia como el dia siguiente.
+  const partes: Record<string, string> = {}
+  for (const p of new Intl.DateTimeFormat('en-CA', {
+    timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(ahora)) partes[p.type] = p.value
+  const hora = (Number(partes.hour) % 24) + Number(partes.minute) / 60
+  const pared = Date.UTC(Number(partes.year), Number(partes.month) - 1, Number(partes.day))
+  const dia = new Date(hora < horaInicioDia(inicioDiaConfigurado()) ? pared - 86_400_000 : pared)
+  return dia.toISOString().slice(0, 10)
 }
 
 export function armarFilaDeCierre(d: DatosDelCierre) {
