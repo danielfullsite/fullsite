@@ -59,6 +59,15 @@ jobs:
         working-directory: dashboard-app
         run: npm ci
 
+      # Lo que se publica aqui se instala en restaurantes: la URL y la llave anon
+      # tienen que ser del MISMO proyecto y la llave tiene que ser `anon`. Ver
+      # electron-build.yml y scripts/configuracion-publica.cjs (2026-09-10).
+      - name: La URL y la llave anon deben ser del mismo proyecto
+        run: node scripts/configuracion-publica.cjs
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+
       - name: Construir paquete offline completo
         run: npm run build:ui
         env:
