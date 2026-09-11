@@ -34,7 +34,11 @@ export function prepararCancelacionItem(order: Record<string, any>, itemId: stri
   if ([nextSubtotal, nextDiscount, nextTax, nextTotal].some(n => !Number.isSafeInteger(n) || n < 0)) throw new Error('INVALID_AMOUNTS')
   return { alreadyApplied: false, item, patch: {
     items: JSON.stringify(items.map(i => i.id === itemId ? { ...i, cancelled: true,
-      inventory_disposition: options.prepared === true ? 'retain_consumption' : options.prepared === false ? 'return_stock' : 'pending',
+      // Sin respuesta explícita se conserva el consumo: cancel-item es para
+      // renglones ya enviados, y 'pending' bloqueaba la conciliación de TODA la
+      // orden (barrido 2026-09-10, inventario LENTE-2). Nunca se fabrica una
+      // devolución; la merma queda registrada y un gerente la corrige a mano.
+      inventory_disposition: options.prepared === true ? 'retain_consumption' : options.prepared === false ? 'return_stock' : 'retain_consumption',
       voided: options.voided === true, cancellation_reason: options.reason ?? null } : i)),
     subtotal: nextSubtotal / 100, descuento: nextDiscount / 100, iva: nextTax / 100,
     total: nextTotal / 100, saldo: nextTotal / 100,

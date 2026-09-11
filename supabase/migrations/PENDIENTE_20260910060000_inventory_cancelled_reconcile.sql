@@ -86,7 +86,7 @@ BEGIN
 
   -- ═══ STEP 5: Discover removed/cancelled items → desired=0 ═══
   FOR v_orphan IN
-    SELECT rr.order_item_id, rr.menu_item_id, rr.cancellation_disposition
+    SELECT rr.order_item_id, rr.menu_item_id, rr.cancellation_disposition, rr.applied_consumption
     FROM pos_reconciliation_results rr
     WHERE rr.client_id = p_client_id
       AND rr.order_id = p_order_id
@@ -96,7 +96,13 @@ BEGIN
   LOOP
     -- An empty cancelled order is not evidence that consumed goods came back.
     -- Fail the entire transaction rather than infer a physical disposition.
-    IF v_is_cancelled AND v_orphan.cancellation_disposition IS DISTINCT FROM 'return_stock' THEN
+    --
+    -- Barrido 2026-09-10 (inventario LENTE-2): tampoco lo es una orden CERRADA
+    -- cuyo renglón con consumo aplicado ya no está en `items` (el cobro mandaba
+    -- sólo lo cobrado). Un huérfano con consumo y sin disposición falla cerrado
+    -- sin importar el estado de la orden: nunca se fabrica una devolución.
+    IF v_orphan.cancellation_disposition IS DISTINCT FROM 'return_stock'
+       AND (v_is_cancelled OR coalesce(v_orphan.applied_consumption, 0) > 0) THEN
       RAISE EXCEPTION 'CANCELLATION_DISPOSITION_REQUIRED';
     END IF;
     RETURN QUERY SELECT * FROM r1_reconcile_item(

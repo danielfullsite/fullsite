@@ -9,7 +9,8 @@ const order = () => ({ id: 'order', order_revision: 4, updated_at: '2026-09-10T0
 afterEach(() => vi.unstubAllGlobals())
 describe('cancelación con importes canónicos', () => {
   it('persiste la disposición explícita sin devolver ingredientes preparados', () => {
-    for (const [prepared, disposition] of [[true, 'retain_consumption'], [false, 'return_stock'], [undefined, 'pending']] as const) {
+    // undefined → retain_consumption (antes 'pending', que bloqueaba la orden entera).
+    for (const [prepared, disposition] of [[true, 'retain_consumption'], [false, 'return_stock'], [undefined, 'retain_consumption']] as const) {
       const result = prepararCancelacionItem(order(), 'cancel', { prepared, voided: false, reason: 'Motivo confirmado' })
       expect(JSON.parse(result.patch!.items)[0]).toMatchObject({ cancelled: true, inventory_disposition: disposition, voided: false, cancellation_reason: 'Motivo confirmado' })
     }

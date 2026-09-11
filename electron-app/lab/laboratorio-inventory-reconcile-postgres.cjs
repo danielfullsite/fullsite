@@ -92,6 +92,39 @@ async function main(){
  assert(returns.every(r=>r.code===0),JSON.stringify(returns)); assert.equal(stock(),9)
  console.log('PASS whole-order void never invents a return; explicit disposition survives removal and concurrent retries')
 
+ // ── Barrido 2026-09-10, inventario LENTE-1: fusionar mesas NO descuenta dos veces ──
+ sql(`insert into pos_orders(id,client_id,turno_id,mesa,items,subtotal,total,order_revision) values('merge-src','a','test-turn',1,${quote(JSON.stringify([item]))}::jsonb,20,20,1);`)
+ sql(call('merge-src')); assert.equal(stock(),8.5)
+ sql(`insert into pos_orders(id,client_id,turno_id,mesa,items,subtotal,total,order_revision) values('merge-dst','a','test-turn',2,'[]'::jsonb,0,0,1);`)
+ const merged=JSON.parse(sql(`select r1_merge_orders('a','merge-dst',1,'merge-src',1,${quote(JSON.stringify([item]))}::jsonb,20,20,0,2,null);`))
+ assert.equal(merged.ok,true); assert.equal(merged.reparented_intents,1)
+ assert.equal(sql("select order_id from pos_reconciliation_results where order_item_id='line-1' and order_id in ('merge-src','merge-dst')"),'merge-dst')
+ assert.equal(sql("select items::text from pos_orders where id='merge-src'"),'[]')
+ sql(call('merge-dst')); sql(call('merge-src')); assert.equal(stock(),8.5)
+ sql(call('merge-dst')); sql(call('merge-src')); assert.equal(stock(),8.5)
+ sql(`update pos_orders set items=${quote(JSON.stringify([{...item,cancelled:true,inventory_disposition:'return_stock'}]))}::jsonb,order_revision=order_revision+1 where id='merge-dst';`)
+ sql(call('merge-dst')); assert.equal(stock(),9)
+ console.log('PASS merge re-parents consumption: destination does not deduct again, source cancels clean, destination cancellation returns once')
+
+ // ── Barrido 2026-09-10, inventario LENTE-2: el cobro conserva los renglones cancelados ──
+ sql(`insert into pos_orders(id,client_id,turno_id,items,subtotal,total,order_revision) values('paid-cancel','a','test-turn',${quote(JSON.stringify([item]))}::jsonb,20,20,1);`)
+ sql(call('paid-cancel')); assert.equal(stock(),8.5)
+ sql(`update pos_orders set items=${quote(JSON.stringify([{...item,cancelled:true,inventory_disposition:'retain_consumption'}]))}::jsonb,subtotal=0,total=0,order_revision=2 where id='paid-cancel';`)
+ sql(call('paid-cancel')); assert.equal(stock(),8.5)
+ // handlePayment manda items=payingItems, que EXCLUYE el cancelado.
+ const paid=JSON.parse(sql("select r1_save_order('a','paid-cancel',2,null,null,null,null,'cerrada',null,null,null,null,null,null,null,null,null,'[]'::jsonb,null);"))
+ assert.equal(paid.ok,true)
+ assert.equal(sql("select count(*) from pos_orders o, jsonb_array_elements(o.items) i where o.id='paid-cancel' and (i->>'cancelled')::boolean"),'1')
+ sql(call('paid-cancel')); assert.equal(stock(),8.5)
+ console.log('PASS payment with payingItems keeps the cancelled line: no fabricated return of a prepared dish')
+
+ // ── y si la evidencia se perdió por otro camino, se falla cerrado aunque la orden esté cerrada ──
+ sql(`insert into pos_orders(id,client_id,turno_id,items,order_revision) values('orphan','a','test-turn',${quote(JSON.stringify([item]))}::jsonb,1);`)
+ sql(call('orphan')); assert.equal(stock(),8)
+ sql("update pos_orders set items='[]'::jsonb,status='cerrada',order_revision=2 where id='orphan';")
+ assert.throws(()=>sql(call('orphan')),/CANCELLATION_DISPOSITION_REQUIRED/); assert.equal(stock(),8)
+ console.log('PASS an orphan with applied consumption and no disposition fails closed even on a closed order')
+
 
 }
 main().catch(error=>{console.error(error);process.exitCode=1})

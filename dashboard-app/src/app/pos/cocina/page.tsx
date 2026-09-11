@@ -93,6 +93,9 @@ export default function CocinaPage() {
   // Cancel modal state
   const [cancelTarget, setCancelTarget] = useState<{ orderId: string; itemIndex: number; itemName: string; mesa: number; mesero: string } | null>(null)
   const [cancelReason, setCancelReason] = useState('')
+  // La cocina es quien SABE si el platillo ya se preparó; antes no se le
+  // preguntaba y la cancelación viajaba sin disposición de inventario.
+  const [cancelPreparado, setCancelPreparado] = useState<boolean | null>(null)
   const [cancelPin, setCancelPin] = useState('')
   const [cancelError, setCancelError] = useState('')
   const [toast, setToast] = useState<string | null>(null)
@@ -265,6 +268,7 @@ export default function CocinaPage() {
   const handleCancelItem = async () => {
     if (!cancelTarget) return
     if (!cancelReason) { setCancelError('Selecciona un motivo'); return }
+    if (cancelPreparado === null) { setCancelError('Indica si el platillo ya se preparó'); return }
     if (!cancelPin) { setCancelError('Ingresa PIN de gerente'); return }
     const manager = await verifyManagerPin(cancelPin)
     if (!manager) { setCancelError('PIN invalido'); return }
@@ -318,6 +322,9 @@ export default function CocinaPage() {
         item_id: itemDelCancel.id,
         operation_id: cocinaOpId,
         reason: cancelReason,
+        // Disposición de inventario: preparado → merma (se conserva el consumo);
+        // no preparado → los ingredientes regresan.
+        prepared: cancelPreparado,
         manager,
         approval_token: tokenDelGerente || undefined,
         // Sin token firmado (PIN validado contra el cache offline) se declara
@@ -382,7 +389,10 @@ export default function CocinaPage() {
     setCancelReason('')
     setCancelPin('')
     setCancelError('')
-    showToast(`${cancelTarget.itemName} cancelado — ingredientes devueltos al inventario`)
+    showToast(cancelPreparado
+      ? `${cancelTarget.itemName} cancelado — se registra como merma`
+      : `${cancelTarget.itemName} cancelado — los ingredientes regresan al inventario`)
+    setCancelPreparado(null)
     fetchOrders()
   }
 
@@ -1075,6 +1085,25 @@ export default function CocinaPage() {
                       }`}
                     >
                       {r}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-semibold text-[var(--text-3)] uppercase tracking-wide mb-2 block">¿Ya se preparó?</label>
+                <div className="grid grid-cols-2 gap-2" data-testid="cancel-preparado">
+                  {([[true, 'Sí, ya se preparó (merma)'], [false, 'No, no se preparó']] as const).map(([valor, texto]) => (
+                    <button
+                      key={String(valor)}
+                      onClick={() => { setCancelPreparado(valor); setCancelError('') }}
+                      className={`px-3 py-2.5 rounded-lg text-sm transition-colors ${
+                        cancelPreparado === valor
+                          ? 'bg-red-900/40 border border-red-600 text-white'
+                          : 'bg-[var(--line)]/50 border border-slate-600/50 text-[var(--text-4)] hover:bg-[var(--line)]'
+                      }`}
+                    >
+                      {texto}
                     </button>
                   ))}
                 </div>

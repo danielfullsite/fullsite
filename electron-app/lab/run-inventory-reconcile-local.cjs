@@ -31,7 +31,9 @@ try {
   for (const table of ['pos_inventory','pos_inventory_movements','pos_item_inventory_policy','pos_recipe_versions','pos_recipe_lines','pos_reconciliation_results','pos_market_stock','pos_market_movements']) schema += `create sequence ${table}_id_seq; alter table ${table} alter column id set default nextval('${table}_id_seq');\n`
   schema += 'alter table pos_inventory add unique(client_id,ingredient_id);\n'
   schema += 'alter table pos_reconciliation_results add unique(client_id,order_id,order_item_id);\n'
-  for (const name of ['convert_recipe_to_stock','r1_reconcile_item']) {
+  // r1_save_order exige private.can_write_client; en el laboratorio todo tenant escribe.
+  schema += 'create schema if not exists private; create or replace function private.can_write_client(p_client_id text) returns boolean language sql as $$ select true $$;\n'
+  for (const name of ['convert_recipe_to_stock','r1_reconcile_item','r1_merge_orders']) {
     const start = baseline.indexOf(`CREATE OR REPLACE FUNCTION "public"."${name}"`)
     const end = baseline.indexOf('\n\nALTER FUNCTION', start)
     if (start < 0 || end < 0) throw new Error('Missing function: ' + name)
@@ -39,6 +41,8 @@ try {
   }
   schema += fs.readFileSync(path.join(ROOT, 'supabase/migrations/PENDIENTE_20260910010000_transfer_item_atomico.sql'), 'utf8')
   schema += fs.readFileSync(path.join(ROOT, 'supabase/migrations/PENDIENTE_20260910060000_inventory_cancelled_reconcile.sql'), 'utf8')
+  schema += fs.readFileSync(path.join(ROOT, 'supabase/migrations/20260826_r1_save_order_ambigua.sql'), 'utf8')
+  schema += fs.readFileSync(path.join(ROOT, 'supabase/migrations/PENDIENTE_20260910070000_merge_y_cobro_conservan_consumo.sql'), 'utf8')
   fs.writeFileSync(path.join(output, 'schema-run.log'), run(path.join(bin, 'psql'), ['-X', '-h', base, '-U', 'postgres', '-p', '5432', '-d', 'postgres', '-v', 'ON_ERROR_STOP=1'], { input: schema }))
   const result = spawnSync(process.execPath, [path.join(__dirname, 'laboratorio-inventory-reconcile-postgres.cjs'), base], {
     cwd: ROOT, encoding: 'utf8', env: { ...process.env, FULLSITE_TEST_PSQL: path.join(bin, 'psql') },
