@@ -1480,7 +1480,7 @@ export async function cacheCashMovement(movement: Record<string, unknown>): Prom
   })
 }
 
-export async function getCachedCashMovsByTurno(turnoId: string): Promise<{ type: string; amount: number }[]> {
+export async function getCachedCashMovsByTurno(turnoId: string): Promise<{ id?: string; type: string; amount: number }[]> {
   const db = await openDB()
   // Read from cash_movements store (write-through cache: online success + offline)
   const synced: { id: string; type: string; amount: number }[] = await new Promise((resolve) => {
@@ -1502,7 +1502,9 @@ export async function getCachedCashMovsByTurno(turnoId: string): Promise<{ type:
       amount: Number((item.data as Record<string, unknown>).amount) || 0,
     }))
     .filter(m => !m.id || !seen.has(m.id))
-  return [...synced, ...queued].map(({ type, amount }) => ({ type, amount }))
+  // El `id` viaja: el wizard de cierre fusiona esta lista con la de la nube por
+  // id, para contar UNA vez lo que ya subió y sumar lo que sigue en la cola.
+  return [...synced, ...queued].map(({ id, type, amount }) => (id ? { id, type, amount } : { type, amount }))
 }
 
 // ─── Print Jobs (IDB v4) — durable backup for print-queue.ts localStorage ───
