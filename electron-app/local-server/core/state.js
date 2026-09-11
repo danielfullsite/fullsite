@@ -155,7 +155,9 @@ class RestaurantState {
         return this._applyOrderUpserted(payload)
 
       case EVENT.ORDER_SENT:
-        return this._applyOrderSent(payload)
+        // El ts del evento, no el reloj del replay: tras reiniciar Pedro las
+        // comandas conservan su antiguedad en cocina (barrido 2026-09-10, LENTE-5).
+        return this._applyOrderSent(payload, event.ts)
 
       case EVENT.ORDER_CLOSED:
         return this._applyOrderClosed(payload)
@@ -184,6 +186,11 @@ class RestaurantState {
         // el KDS en modo LAN amanecia con las comandas de ayer — el "empalme"
         // reportado en campo. Con _turno=null ademas _applyStateSync no filtraba
         // nada (belongsToAnotherTurno siempre false), asi que nada lo corregia.
+        //
+        // El aviso ahora es DURABLE (lib/aviso-lan.ts reintenta): un TURNO_CLOSED
+        // que llega horas tarde, ya con OTRO turno abierto, no puede barrer el piso
+        // del turno nuevo. Solo limpia si es el turno vigente (o no hay ninguno).
+        if (payload?.turno_id && this._turno?.id && payload.turno_id !== this._turno.id) return { changed: [] }
         this._turno = null
         this._orders.clear()
         this._kds = []
@@ -317,8 +324,9 @@ class RestaurantState {
   // On first send: store complete order object so KDS can display without Supabase.
   // On subsequent sends: replace items (preserving kds_item_status — new indices
   //   are absent from the map which the KDS treats as not-done).
-  _applyOrderSent(payload) {
+  _applyOrderSent(payload, ts = null) {
     const { order_id, mesa, mesero, status, notas, comanda_batches, personas, total, turno_id } = payload
+    const momento = Number.isFinite(ts) && ts > 0 ? ts : Date.now()
     // Accept both 'items' (POS broadcast) and 'items_sent' (legacy test fixture / old protocol)
     const items = payload.items ?? payload.items_sent ?? []
     const itemsStr = typeof items === 'string' ? items : JSON.stringify(items)
@@ -339,11 +347,11 @@ class RestaurantState {
         comanda_batches:  combatStr ?? existing.comanda_batches,
         status:           'enviada',   // new round resets to enviada
         preparation_status: 'enviada',
-        updated_at:       new Date().toISOString(),
+        updated_at:       new Date(momento).toISOString(),
         // kds_item_status NOT touched — new item indices are simply absent (→ not-done)
       })
     } else {
-      const now = new Date().toISOString()
+      const now = new Date(momento).toISOString()
       this._orders.set(order_id, {
         id:               order_id,
         order_id,
@@ -371,7 +379,7 @@ class RestaurantState {
     // kds_queue: minimal entry for Supabase-poll STATE_SYNC compatibility
     const inKds = this._kds.find(k => k.order_id === order_id)
     if (!inKds) {
-      this._kds.push({ order_id, mesa, items_sent: items || [], sent_at: Date.now() })
+      this._kds.push({ order_id, mesa, items_sent: items || [], sent_at: momento })
     } else {
       inKds.items_sent = items || []
     }
@@ -722,7 +730,7 @@ class RestaurantState {
     // orden como local y ninguna foto de la nube podia quitarle, cancelar ni
     // mover una orden que en la caja venia de la nube (tableros divergentes hasta
     // la siguiente reconexion; barrido 2026-09-10, pedro-core LENTE-3).
-    const clean = ({ _kds_sent, _from_cloud, ...rest }) => ({ ...rest, from_cloud: _from_cloud === true, saldo: balanceOf(rest),
+    const clean = ({ _kds_sent, _from_cloud, ...rest }) => ({ ...rest, ...(_from_cloud === true ? { from_cloud: true } : {}), saldo: balanceOf(rest),
       financial_order: this._financialOrders.get(rest.order_id ?? rest.id) ?? null })
     // Legacy: la cocina no tiene accion "entregar" (existe solo bajo Caja). Una
     // comanda COBRADA cuya preparacion ya esta lista sale del tablero; si se

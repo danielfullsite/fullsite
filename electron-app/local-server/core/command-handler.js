@@ -35,6 +35,7 @@ class CommandHandler {
    * @param {{ eventStore: import('./event-store').CoreEventStore, state: import('./state').RestaurantState, wsHub: import('./ws-hub').WsHub, printer: import('../adapters/printer'), restaurantId: string }} opts
    */
   constructor({ eventStore, state, wsHub, printer, restaurantId, catalogStore = null, localAuthorityEnabled = false }) {
+    this._sinTransmitir = new Set()
     this._store         = eventStore
     this._state         = state
     this._hub           = wsHub
@@ -159,9 +160,22 @@ class CommandHandler {
     // Projection belongs to the commit, even if a later queue write fails. A
     // retry must not leave a committed send invisible or advance it twice.
     if (!duplicate) this._state.apply(event)
-    await this._recoverEffect(event, duplicate ? await this._store.getLastSequence() : undefined)
+    // Si encolar los efectos falla DESPUES del commit, el evento ya esta
+    // proyectado pero nunca se transmitio: el reintento del POS llega como
+    // duplicado y antes se devolvia sin broadcast, asi que los tableros por WS
+    // no lo veian (barrido 2026-09-10, pedro-core LENTE-6). Se anota el id y el
+    // duplicado que por fin recupera los efectos lo transmite.
+    try {
+      await this._recoverEffect(event, duplicate ? await this._store.getLastSequence() : undefined)
+    } catch (e) {
+      if (!duplicate) this._sinTransmitir.add(event.id)
+      throw e
+    }
     const receipt = { command_id: event.payload.command_id, event_id: event.id, sequence: event.sequence }
-    if (duplicate) return { duplicate: true, receipt, ...(event.result ? { result: event.result } : {}) }
+    if (duplicate) {
+      if (this._sinTransmitir.has(event.id)) { this._sinTransmitir.delete(event.id); await this._hub.broadcast(event) }
+      return { duplicate: true, receipt, ...(event.result ? { result: event.result } : {}) }
+    }
 
     // Broadcast the new event to all connected clients
     await this._hub.broadcast(event)

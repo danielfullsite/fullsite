@@ -174,6 +174,25 @@ async function startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, branc
       const orders = await readOperationalOrders({ supabaseUrl, restaurantId, branchId,
         turnoId: activeTurno?.id,
         headers: { apikey: supabaseKey, Authorization: `Bearer ${bearer}` }, signal: controller.signal })
+      // EL EMPALME DE AYER, POR LA NUBE. Una orden LOCAL de un turno que la nube ya
+      // cerro (el TURNO_CLOSED de la LAN se perdio) no aparece en la consulta del
+      // turno activo, asi que su fila 'cerrada'/'cancelada' nunca llegaba y la
+      // orden amanecia en el KDS. Se piden sus filas por id para que
+      // _applyStateSync la corrija (barrido 2026-09-10, kds LENTE-4).
+      const filasHuerfanas = []
+      try {
+        const vivas = state.toSnapshot()
+        const huerfanas = [...vivas.salon_orders, ...vivas.kds_orders]
+          .filter(o => o && !o.from_cloud && o.turno_id && o.turno_id !== activeTurno?.id)
+          .map(o => String(o.order_id ?? o.id))
+        const ids = [...new Set(huerfanas)].filter(id => id && !orders.some(r => r.id === id)).slice(0, 200)
+        if (ids.length > 0) {
+          const r = await fetch(
+            `${supabaseUrl}/rest/v1/pos_orders?client_id=eq.${encodeURIComponent(restaurantId)}&id=in.(${ids.map(encodeURIComponent).join(',')})&select=*`,
+            { headers: { apikey: supabaseKey, Authorization: `Bearer ${bearer}` }, signal: controller.signal })
+          if (r.ok) { const filas = await r.json(); if (Array.isArray(filas)) filasHuerfanas.push(...filas) }
+        }
+      } catch { /* sin estas filas la foto sigue valiendo; se reintenta en 5 s */ }
       // A restaurant can have historical/open-order residue from an older shift.
       // Only the newest active shift belongs on today's operational surfaces. A
       // duplicate active shift is reported in the turno snapshot for remediation,
@@ -222,7 +241,9 @@ async function startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, branc
       // core/foto-de-nube.js: memoria + red cuando cambia + UN archivo reemplazable
       // para arrancar sin internet con la ultima foto.
       const foto = {
-        orders:     operationalOrders,
+        // Las huerfanas van en la foto SOLO como filas (no en mesas ni kds_queue):
+        // _applyStateSync las usa para corregir la orden local, nada mas.
+        orders:     [...operationalOrders, ...filasHuerfanas],
         order_snapshot_complete: true,
         mesas:      Object.entries(mesaMap).map(([mesa, v]) => ({ mesa, ...v })),
         kds_queue:  operationalOrders.filter(o => o.status === 'enviada' || o.status === 'preparando' || o.status === 'lista').map(o => ({
@@ -330,7 +351,7 @@ const LECTURAS_REENVIADAS = ['/reports/turn', '/state', '/events', '/print/uncer
 
 // Keep identity and routing configuration explicit so every cloned terminal can
 // discover the caja without relying on process-global or customer-specific state.
-function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority = null, catalogStore = null, authorityReason = null, catalogReason = null, getBusinessSyncStatus = () => ({ configured: false }), getEnlaceStatus = () => null, printer, version, serverId, restaurantId, config = {}, instanceName = '', branchId = config.branchId || config.locationId || null, posServerIp = config.posServerIp || null, port = 7717, posServerPort = config.posServerPort || null }) {
+function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority = null, catalogStore = null, authorityReason = null, catalogReason = null, getBusinessSyncStatus = () => ({ configured: false }), getEnlaceStatus = () => null, printer, version, serverId, restaurantId, config = {}, instanceName = '', branchId = config.branchId || config.locationId || null, posServerIp: posServerIpFijo = config.posServerIp || null, cajaActual = null, port = 7717, posServerPort = config.posServerPort || null }) {
   // Puerto de la CAJA al reenviar. Antes se usaba `port` — el puerto PROPIO del
   // secundario — lo que acopla ambos al 7717: dos Pedros en una misma maquina
   // (pruebas, demos) o una terminal en puerto distinto rompian el forward.
@@ -341,6 +362,10 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority 
     secreto: config.lanSecret || null, restaurantId, terminalId: config.terminalId, branchId,
   })
   return async function router(req, res) {
+    // T-09 completo: cuando la caja cambia de IP, el enlace WS la sigue (T-09) y
+    // ahora TAMBIEN los reenvios HTTP de la secundaria y la pagina del KDS. Se lee
+    // por peticion desde `cajaActual`, que actualiza el enlace al reubicarla.
+    const posServerIp = cajaActual ? cajaActual.ip : posServerIpFijo
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
     // Sin listar la cabecera de credencial, el preflight la rechaza y el POS
@@ -852,6 +877,10 @@ async function startLocalServer({ dataDir, port = 7717, config = {}, businessSyn
 
   // ── State machine: rebuild from event log ────────────────────────────────
   const state  = new RestaurantState({ localAuthorityEnabled: config.localAuthorityEnabled === true && !config.posServerIp })
+  // Direccion VIVA de la caja: arranca con el config (o la nota de T-09, abajo) y
+  // la actualiza el enlace cuando la caja se muda. Router, reenvio por WS y la
+  // pagina del KDS la leen de aqui, no del config congelado.
+  const cajaActual = { ip: config.posServerIp || null }
   const events = await eventStore.readAfter(0)
   if (!config.posServerIp && config.localAuthorityEnabled !== true && events.some(event =>
     event.result?.operational_order?.authority === 'caja' || event.result?.turno?.authority === 'caja')) {
@@ -933,7 +962,7 @@ async function startLocalServer({ dataDir, port = 7717, config = {}, businessSyn
       const credentials = credLan.cabecerasDeCredencial({ secreto: config.lanSecret, restaurantId,
         terminalId: transport.terminalId, branchId: config.branchId || config.locationId || null })
       if (transport.actorToken) credentials['x-fullsite-actor'] = transport.actorToken
-      const up = await forwardPost(`http://${config.posServerIp}:${config.posServerPort || port}/events`,
+      const up = await forwardPost(`http://${cajaActual.ip || config.posServerIp}:${config.posServerPort || port}/events`,
         JSON.stringify(msg.payload), credentials)
       const body = JSON.parse(up.body || '{}')
       if (up.status !== 200 || !Array.isArray(body.results) || body.results.length !== 1) {
@@ -964,6 +993,7 @@ async function startLocalServer({ dataDir, port = 7717, config = {}, businessSyn
     instanceName,
     branchId: config.branchId || config.locationId || null,
     posServerIp: config.posServerIp || null,
+    cajaActual,
     port,
   })
   const httpServer = http.createServer(router)
@@ -1101,6 +1131,7 @@ async function startLocalServer({ dataDir, port = 7717, config = {}, businessSyn
       } catch { return null }
     })()
     const ipDeLaCaja = cajaAnotada || config.posServerIp
+    cajaActual.ip = ipDeLaCaja
     if (cajaAnotada && cajaAnotada !== config.posServerIp) {
       console.warn(`[server] usando la caja anotada ${cajaAnotada} en vez de ${config.posServerIp} (config.json)`)
     }
@@ -1174,6 +1205,9 @@ async function startLocalServer({ dataDir, port = 7717, config = {}, businessSyn
       alCambiarDeCaja: (nuevaUrl) => {
         const m = /\/\/([^:/]+)/.exec(nuevaUrl)
         if (!m) return
+        // Primero la memoria (reenvios y KDS la usan YA); el disco es para el
+        // proximo arranque.
+        cajaActual.ip = m[1]
         try {
           const fsCfg = require('fs')
           const rutaCfg = pathCursor.join(dataDir, 'caja-conocida.json')
