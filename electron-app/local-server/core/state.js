@@ -732,14 +732,13 @@ class RestaurantState {
     // la siguiente reconexion; barrido 2026-09-10, pedro-core LENTE-3).
     const clean = ({ _kds_sent, _from_cloud, ...rest }) => ({ ...rest, ...(_from_cloud === true ? { from_cloud: true } : {}), saldo: balanceOf(rest),
       financial_order: this._financialOrders.get(rest.order_id ?? rest.id) ?? null })
-    // Legacy: la cocina no tiene accion "entregar" (existe solo bajo Caja). Una
-    // comanda COBRADA cuya preparacion ya esta lista sale del tablero; si se
-    // cobro antes de cocinarse, se queda (D2: el cobro no borra trabajo).
-    // Antes cada ticket cobrado quedaba como tarjeta verde hasta el corte
-    // (barrido 2026-09-10, kds LENTE-2).
-    const cobradaYServida = o => this._writeAuthority !== 'caja' && settled(o) && (o.preparation_status ?? o.status) === 'lista'
+    // D2 (ADR-005): el cobro no borra trabajo de cocina; una comanda cobrada se
+    // queda hasta que la cocina la ENTREGA. En legacy no habia boton de entrega
+    // (solo bajo Caja) y cada ticket cobrado quedaba verde hasta el corte (barrido
+    // 2026-09-10, kds LENTE-2): kds-ui.html ahora ofrece «Entregar ronda» tambien
+    // en legacy (ORDER_UPSERTED 'entregada', comando de solo preparacion).
     const kds_orders = [...this._orders.values()]
-      .filter(o => o._kds_sent && !cancelled(o) && !cobradaYServida(o) &&
+      .filter(o => o._kds_sent && !cancelled(o) &&
         (o.preparation_status ?? o.status) !== 'entregada' &&
         // Legacy financial-only status without preparation cannot invent work.
         (!FINANCIAL_CLOSED.has(o.status) || !!o.preparation_status))

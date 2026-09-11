@@ -477,7 +477,7 @@
             '<span class="time '+timeCls+'">'+elapsed(c.createdAt)+'</span>'+badge+'</div></div>'+
           oNote+
           '<div class="items">'+body+'</div>'+
-          (st!=="lista"?'<div class="card-f"><button class="fbtn ready" data-ready="'+esc(c.order.id)+'" data-batch="'+esc(c.batchId)+'">✓ Todo listo</button></div>':c.order.authority==='caja'?'<div class="card-f"><button class="fbtn ready" data-deliver="'+esc(c.order.id)+'" data-batch="'+esc(c.batchId)+'">Entregar ronda</button></div>':'')+
+          (st!=="lista"?'<div class="card-f"><button class="fbtn ready" data-ready="'+esc(c.order.id)+'" data-batch="'+esc(c.batchId)+'">✓ Todo listo</button></div>':c.order.authority==='caja'?'<div class="card-f"><button class="fbtn ready" data-deliver="'+esc(c.order.id)+'" data-batch="'+esc(c.batchId)+'">Entregar ronda</button></div>':'<div class="card-f"><button class="fbtn ready" data-entregar="'+esc(c.order.id)+'">Entregada</button></div>')+
         '</div>';
        }catch(cardErr){ try{ console.error('[kds] tarjeta con error, se omite:', (c&&c.order&&c.order.id), cardErr); }catch(_){} }
       });
@@ -542,6 +542,10 @@
 
   // ── interactions ──
   document.addEventListener("click",function(e){
+    // Legacy (sin Caja): «Entregada» saca del tablero una comanda lista; sin esto
+    // la cobrada quedaba verde hasta el corte (barrido 2026-09-10, kds LENTE-2).
+    var entregar=e.target.closest('[data-entregar]');
+    if(entregar){ var oEnt=lastGood.find(function(o){return o.id===entregar.getAttribute('data-entregar');}); if(oEnt) postStatus(oEnt,'entregada'); return; }
     var deliver=e.target.closest('[data-deliver]');
     if(deliver){ var deliveredOrder=lastGood.find(function(o){return o.id===deliver.getAttribute('data-deliver');});if(!deliveredOrder)return;
       var deliveredIds=parseItems(deliveredOrder.items).filter(function(i){return i.comanda_batch_id===deliver.getAttribute('data-batch')&&i.preparation_status!=='entregada'&&(STATION==='todas'||resolveStation(i)===STATION);}).map(function(i){return i.id;});

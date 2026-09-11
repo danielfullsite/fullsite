@@ -77,13 +77,19 @@ describe('la secundaria conserva el origen de cada orden', () => {
   })
 })
 
-describe('legacy: la comanda cobrada y lista sale del tablero', () => {
-  test('REGRESION: cobrada antes de cocinar se queda; cobrada y lista se va', () => {
+describe('legacy: la comanda cobrada se queda hasta que la cocina la entrega (D2)', () => {
+  test('cobrada y lista sigue en el tablero; «Entregada» (ORDER_UPSERTED entregada) la saca', () => {
     const s = conOrdenLocal()
     s.apply(ev(EVENT.ORDER_CLOSED, { order_id: 'X', mesa: 5 }))
-    assert.equal(s.toSnapshot().kds_orders.length, 1, 'cobrada antes de cocinar: la cocina la sigue viendo')
     s.apply(ev(EVENT.ORDER_UPSERTED, { order_id: 'X', status: 'lista' }))
-    assert.equal(s.toSnapshot().kds_orders.length, 0, 'lista y cobrada: fuera del tablero')
+    assert.equal(s.toSnapshot().kds_orders.length, 1, 'D2: el cobro no borra trabajo de cocina')
+    s.apply(ev(EVENT.ORDER_UPSERTED, { order_id: 'X', status: 'entregada' }))
+    assert.equal(s.toSnapshot().kds_orders.length, 0)
+  })
+  test('REGRESION (fuente): kds-ui ofrece «Entregada» en legacy, no solo bajo Caja', () => {
+    const html = fs.readFileSync(path.join(__dirname, '../kds-ui.html'), 'utf8')
+    assert.match(html, /data-entregar=/)
+    assert.match(html, /postStatus\(oEnt,'entregada'\)/)
   })
 })
 
