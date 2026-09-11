@@ -237,6 +237,12 @@ function conectarConLaCaja({ cajaUrl, serverId, restaurantId, lanSecret, branchI
    * reproduzca lo ya visto.
    */
   const aplicar = (ev, seqDelSobre) => {
+    // Una foto de la nube (core/foto-de-nube.js) no esta en el log de la caja: no
+    // tiene secuencia propia y el sobre trae la ultima secuencia GUARDADA, que
+    // puede ser <= cursor. Deduplicarla por ese numero la descartaria siempre que
+    // no hubiera eventos nuevos, que es justo cuando mas llega. Se aplica sin
+    // tocar el cursor: la siguiente foto la reemplaza entera.
+    if (ev?.transient === true) { entregar(ev); return }
     const seq = typeof ev?.sequence === 'number' ? ev.sequence
       : (typeof seqDelSobre === 'number' ? seqDelSobre : null)
 

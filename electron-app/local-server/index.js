@@ -117,11 +117,14 @@ function buildDeliveryTicket(command, station) {
   )
 }
 
-async function startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, branchId, serviceEmail, servicePassword, state, eventStore, wsHub, cmdHandler }) {
+async function startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, branchId, serviceEmail, servicePassword, state, eventStore, wsHub, cmdHandler, dataDir = null }) {
   if (!supabaseUrl || !supabaseKey) return
   const POLL_INTERVAL = 5000
   const { readOperationalOrders } = require('./core/operational-order-poll')
+  const { aplicarFotoDeNube } = require('./core/foto-de-nube')
   let polling = false
+  // Huella de la ultima foto guardada en disco: solo se reescribe si cambia.
+  let ultimaHuella = null
 
   // Auth SCOPED al tenant. Si hay una service-account (usuario Supabase miembro
   // SOLO de este client_id), se usa su JWT (role authenticated) → la RLS deja leer
@@ -212,7 +215,13 @@ async function startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, branc
         mesaMap[String(o.mesa)] = { status: o.status === 'pagando' ? 'pagando' : 'ocupada', order_id: o.id }
       }
 
-      const event = await eventStore.appendInternal(EVENT.STATE_SYNC, {
+      // LA FOTO DE LA NUBE NO VA AL LOG. Antes esto era `eventStore.appendInternal(
+      // STATE_SYNC, ...)` cada 5 s con TODAS las filas del turno, con fsync, aunque
+      // nada cambiara: ~220 MB por hora, y el log entero se carga en memoria al
+      // arrancar. Tras un dia de servicio Pedro no volvia a levantar. Ver
+      // core/foto-de-nube.js: memoria + red cuando cambia + UN archivo reemplazable
+      // para arrancar sin internet con la ultima foto.
+      const foto = {
         orders:     operationalOrders,
         order_snapshot_complete: true,
         mesas:      Object.entries(mesaMap).map(([mesa, v]) => ({ mesa, ...v })),
@@ -226,15 +235,13 @@ async function startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, branc
           conflict_count: activeTurnos.length,
         } : null,
         synced_at:  new Date().toISOString(),
-      }, { restaurantId })
-
-      const prevSnap = JSON.stringify(state.toSnapshot())
-      state.apply(event)
-      const newSnap = JSON.stringify(state.toSnapshot())
-
-      if (prevSnap !== newSnap) {
-        await wsHub.broadcast(event)
       }
+      // `synced_at` cambia en cada poll: se excluye de la huella para que dos fotos
+      // iguales no se guarden dos veces.
+      const { synced_at: _sa, ...paraHuella } = foto
+      const resultado = await aplicarFotoDeNube({ state, wsHub, dataDir, restaurantId, payload: foto,
+        huellaAnterior: ultimaHuella, huellaDe: JSON.stringify(paraHuella) })
+      ultimaHuella = resultado.huella
 
       heartbeat.recordSync()
     } catch (err) {
@@ -852,6 +859,19 @@ async function startLocalServer({ dataDir, port = 7717, config = {}, businessSyn
   }
   console.log(`[server] Replaying ${events.length} events to rebuild state...`)
   for (const ev of events) state.apply(ev)
+  // La ultima foto de la nube no esta en el log (core/foto-de-nube.js): se aplica
+  // desde su archivo para que un reinicio SIN internet arranque con el salon que
+  // la nube ya habia confirmado y no con las mesas de la nube vacias hasta el
+  // siguiente poll. Solo la caja legacy hace poll; las secundarias se hidratan
+  // de la caja y el modo Caja es la autoridad.
+  if (!config.posServerIp && config.localAuthorityEnabled !== true) {
+    const { leerFotoDeNube, eventoTransitorio } = require('./core/foto-de-nube')
+    const foto = leerFotoDeNube(dataDir, restaurantId)
+    if (foto.payload) {
+      try { state.apply(eventoTransitorio(restaurantId, foto.payload)); console.log(`[server] Foto de nube aplicada (guardada ${foto.saved_at})`) }
+      catch (e) { console.warn('[server] Foto de nube ignorada:', e.message) }
+    } else if (foto.motivo !== 'sin foto') console.warn(`[server] Foto de nube ignorada: ${foto.motivo}`)
+  }
   console.log('[server] State ready.')
 
   // La autoridad lanza si su archivo quedó a medias por un apagón, o si alguien
@@ -995,7 +1015,7 @@ async function startLocalServer({ dataDir, port = 7717, config = {}, businessSyn
 
   // ── Supabase poll (Phase 1 bridge) ────────────────────────────────────────
   if (supabaseUrl && supabaseKey && !config.posServerIp && config.localAuthorityEnabled !== true) {
-    startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, branchId: config.branchId || config.locationId || null, serviceEmail, servicePassword, state, eventStore, wsHub, cmdHandler })
+    startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, branchId: config.branchId || config.locationId || null, serviceEmail, servicePassword, state, eventStore, wsHub, cmdHandler, dataDir })
       .catch(e => console.warn('[server] Supabase poll start error:', e.message))
   }
 
