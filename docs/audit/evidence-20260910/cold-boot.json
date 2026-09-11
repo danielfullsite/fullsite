@@ -1,0 +1,27 @@
+{
+  "revision": "ebe610593e6df478cc772fb2b680240e2b85a191d9160bbcb6b7f73eae0eb578",
+  "results": [
+    {
+      "name": "Cold boot loads packaged POS with empty Chromium profile and no Next server or WAN",
+      "passed": true
+    },
+    {
+      "name": "Typed PIN is verified by prepared Caja and real static RSC navigation mounts the turno gate",
+      "passed": true
+    },
+    {
+      "name": "Secondary cold boot reads Caja catalog over LAN and verifies PIN without private browser cache",
+      "passed": true
+    },
+    {
+      "name": "Killing real Electron then restarting offline retains package and demands a fresh typed PIN",
+      "passed": true
+    },
+    {
+      "name": "All tested screens keep running without unhandled renderer errors",
+      "passed": true
+    }
+  ],
+  "package_source_commit": "9ae4320f",
+  "runtime": "macOS Electron"
+}

@@ -4,7 +4,7 @@
 > coincidían: `BUGS.md`, los 27 hallazgos PRR, los P0 de la Biblia Wansoft, la auditoría
 > `audit/AUDITORIA-FULL-2026-08-19.md` y la `audit/AUDITORIA-FULL-FULLSITE-2026-08-19.md`.
 > Organizado por las **olas** de `../PLAN-AHORA.md`. Estado: ✅ hecho · 🔶 grace/parcial · ⬜ abierto.
-> Última actualización: 2026-09-08 (noche) para el candidato `lab/pin-real-desde-pantalla`; las olas de agosto conservan su estado histórico salvo actualización explícita.
+> Última actualización: 2026-09-10 para el candidato `cert/instalador-2026-09-10`; las olas de agosto conservan su estado histórico salvo actualización explícita.
 >
 > **Ojo con la frescura de este documento.** Al revisarlo el 2026-09-08 con Daniel en el
 > restaurante, DOS de sus 🔴 P0 estaban desactualizados a favor nuestro: OP-10 ya tenía
@@ -15,28 +15,65 @@
 
 Regla: cuando cierres un item, márcalo aquí. Cuando aparezca uno nuevo, entra aquí — no en un doc suelto.
 
-## Candidato de cierre: revisión del 8 de septiembre
+## Cierre de software antes de la visita — 10 de septiembre
+
+Instrucción vigente de Daniel: completar aquí el sistema; no usar la ausencia de
+hardware en AMALAY como motivo para dejar software pendiente. Ejecución y evidencia:
+[CIERRE-SOFTWARE-2026-09-10](../audit/CIERRE-SOFTWARE-2026-09-10.md).
+Implementado y probado en el candidato: proxy de datos y campos; transferencia
+legacy atómica; retiros/depósitos y X/Z de Caja; consumo adicional tras abonos;
+papel/cajón canónicos y resolución de incertidumbre; inventario manual atómico y
+conciliación legacy; lectura KDS por sucursal; alta reanudable y activación atómica;
+barrera de actualización y retención incierta al perder recibos de impresión.
+El progreso está guardado en el PR borrador #392. Sus migraciones siguen pendientes.
+Ningún H completo se considera cerrado sólo por esta enumeración.
+
+## Recuperación del candidato — 10 de septiembre
+
+Rama `cert/instalador-2026-09-10`, base #391. [Evidencia y límites](../audit/CANDIDATO-POS-KDS-2026-09-10.md).
+Avisos de mutaciones recuperados y protección de anulaciones/reintentos probada localmente.
+Windows empaquetado y sellado; arranque frío macOS 5/5; laboratorio UI tres POS y
+KDS **21/21** (run 34449964970). No instalado ni certificado en campo.
+El bloqueo H04 de compensación incondicional se reemplazó por una transacción
+de ambas cuentas y recibo: 9 grupos PostgreSQL prueban concurrencia y rollback.
+La migración sigue PENDIENTE, y H04 nuevo modo Caja conserva sus demás huecos.
+Los H01–H16 inferiores siguen abiertos salvo evidencia posterior explícita.
+
+Feedback reciente, defectos nuevos y aceptación por síntoma: [Eduardo 9 de septiembre](../audit/EDUARDO-2026-09-09.md). Numeración Caja por turno, identidad nueva tras cierre y descarte de lecturas KDS tardías probados; recorrido Caja 23/23. No implican cierre global. Segunda tanda probada en UI Caja 23/23 y legacy 21/21: prioridad de borradores, compatibilidad de transporte memorizada y rechazo de anulación sin almacenamiento durable.
+
+## Barrido de defectos — 10 y 11 de septiembre
+
+Doce lentes con refutación adversarial sobre `c2cafac9`; 39 hallazgos confirmados,
+todos corregidos con prueba A/B salvo tres P2 que quedan registrados (corte por
+día vs día de venta, toma física por delta, recepción de OC con stock absoluto).
+Matriz completa por módulo: [BARRIDO-2026-09-10](../audit/BARRIDO-2026-09-10.md).
+Bloqueos al 11 de septiembre: la variable de CI ya está corregida (instalador de CI
+`4e81b93e` sellado, hash en CIERRE-SOFTWARE); las cuatro migraciones de inventario
+ya están en staging (producción no); los binarios de huella siguen fuera del repo.
+Nada validado en campo.
+
+## Candidato de cierre: pendientes actualizados el 10 de septiembre
 
 Fuente y aceptación de cada H: [Huecos actuales y condiciones de cierre](../audit/FULLSITE-HUECOS-ACTUALES-2026-09-08.md). No instalado en AMALAY. Estos estados distinguen código pendiente de falta de prueba; no vuelven a declarar abiertos los defectos ya corregidos en el candidato. El backlog heredado inferior no es una auditoría nueva de producción.
 
 | ID | Pendiente vigente del candidato | Estado |
 |---|---|---|
-| H01 | Corte y reportes omiten el nuevo modelo de pago separado | ⬜ defecto estático |
-| H02 | Ajustes de consumo después de preparar cuenta financiera | ⬜ función pendiente |
-| H03 | Tarjeta, pago mixto y propinas por Caja | ⬜ función pendiente |
-| H04 | Transferir consumo, unir cuentas, cancelación individual y otras acciones de salón | ⬜ funciones pendientes |
-| H05 | Recibo, precuenta, cajón y resolución autorizada de impresión incierta | ⬜ funciones y hardware |
-| H06 | Retiros, depósitos y X/Z completo | ⬜ función pendiente |
+| H01 | X/Z local integrado; Z con preflight (no cierra turno sin cierre), fecha por día de venta, guardia desde Pedro sin WAN; falta conciliación completa de abonos en reportes cloud | 🔶 parcial probado |
+| H02 | Consumo adicional integrado; faltan reducciones, ajustes y devoluciones con dinero abierto | 🔶 parcial probado |
+| H03 | Tarjeta/proveedores, pago mixto y propinas por Caja | ⬜ función pendiente |
+| H04 | Transferencia legacy atómica; faltan transferir/unir/cancelar consumo individual en Caja | 🔶 parcial probado |
+| H05 | Papel/cajón y resolución autorizada implementados; falta aceptación de dispositivos físicos | 🔶 software probado; hardware pendiente |
+| H06 | Retiros, depósitos y X/Z integrados; apertura confrontada con motivo durable en Caja. Falta cierre con todos los medios/propinas | 🔶 parcial probado |
 | H07 | Entrada de delivery y otros canales al escritor Caja | ⬜ integración pendiente |
-| H08 | Inventario transaccional, recetas y depleción de ventas nuevas | ⬜ defecto e integración |
-| H09 | Permisos y campos inmutables en APIs cloud/proxies | ⬜ validación y enforcement |
+| H08 | Movimiento manual atómico y conciliación legacy probados; disposición por renglón en anulación completa y en KDS; fusión y cobro conservan consumo; stock negativo admite entradas; market en cobro offline. Faltan consumo del outbox Caja, toma física absoluta y casos de recetas | 🔶 parcial probado (PostgreSQL local 13/13) |
+| H09 | Proxy y relaciones acotados; falta matriz completa de APIs/empleados y enforcement restante | 🔶 parcial probado |
 | H10 | Aislamiento y recuperación de MP/Clip/CFDI/delivery | ⬜ implementación y sandbox |
-| H11 | Alta reanudable, activación completa y credenciales iniciales | ⬜ defectos estáticos |
-| H12 | Sucursales, presencia de empleado y huella LAN | ⬜ integración y aceptación |
-| H13 | Conciliación, periodo completo y procedencia de datos de dashboard/IA | ⬜ integración y aceptación |
+| H11 | Alta reanudable y activación atómica probadas; falta recuperación de credencial perdida y enrolamiento/primera venta | 🔶 parcial probado |
+| H12 | Lectura KDS/caché por sucursal probadas; foto de nube sin engordar el log, nube corrige órdenes locales, secundaria conserva origen, T-09 completo; falta delivery cloud, turno exacto offline, presencia y huella | 🔶 parcial probado |
+| H13 | Periodo/paginación/indisponibilidad mejorados; falta conciliación completa dashboard/IA | 🔶 parcial probado |
 | H14 | Migraciones reales y transición coordinada de AMALAY | 🔶 PostgreSQL local probado; destino pendiente |
-| H15 | Publicación real, Windows/hardware y restauración | 🔶 empaquetado sintético probado; campo pendiente |
-| H16 | Carga, diagnóstico accionable y actualización con pendientes | ⬜ aceptación y funciones de soporte |
+| H15 | Build Windows actualizado en validación; guard de pareja Supabase en el bundle; recibos ausentes quedan inciertos; falta restauración coherente, variable de CI corregida y hardware | 🔶 parcial probado |
+| H16 | Barrera de actualización incluye pendientes durables; falta carga, diagnóstico y soporte con ejecución confirmada | 🔶 parcial probado |
 
 ---
 

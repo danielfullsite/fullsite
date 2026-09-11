@@ -75,6 +75,13 @@ export const MANAGER_ONLY_WRITE = new Set<string>([
   // Los precios sólo se editan desde /admin/menu, que es pantalla de gerente. Sin esto,
   // un shift token de mesero podía bajarle el precio a un platillo y cobrarlo barato.
   'pos_menu_items',
+  'pos_menu_categories', 'pos_modifiers', 'pos_modifier_groups',
+  'pos_item_modifier_groups', 'pos_category_modifiers', 'pos_sizes',
+  'pos_price_types', 'pos_combos', 'pos_promotions', 'pos_payment_methods',
+  'pos_inventory', 'pos_inventory_movements', 'pos_ingredients',
+  'pos_recipes', 'pos_recipe_lines', 'pos_sub_recipes',
+  'pos_sub_recipe_ingredients', 'pos_suppliers', 'pos_purchase_orders',
+  'pos_purchase_order_items',
 ])
 
 // ── LA CAJA LA OPERA UN CAJERO, Y NO PODÍA CERRARLA ─────────────────────────
@@ -136,10 +143,9 @@ export function puedeEscribirEn(table: string, role: string | null | undefined):
  * total desde los renglones — sólo que ese detector vive en la ruta de guardado, y este
  * camino la rodea por completo.
  *
- * Se prohíben por COLUMNA y no por tabla a propósito: una lista de lo prohibido deja pasar
- * cualquier columna legítima que aún no conozcamos, mientras que una lista de lo permitido
- * rompería el POS en cuanto alguien agregue un campo. En un restaurante, un 403 a media
- * comanda cuesta más que el hueco.
+ * El proxy no es una API de guardado: para roles operativos sólo admite
+ * kds_item_status y mesero. Nuevas columnas de consumo o finanzas deben usar
+ * el contrato de guardado, no heredar autorización por estar ausentes de una lista.
  *
  * Verificado el 2026-09-08: las ÚNICAS escrituras del cliente a `pos_orders` que pasan por
  * aquí son `kds_item_status` (cocina marcando, kds/page.tsx:332) y `mesero`
@@ -213,7 +219,7 @@ export function camposProhibidos(table: string, role: string | null | undefined,
     if (intentaReabrir(table, obj)) encontradas.add(`${REABRIR_SOLO_GERENTE[table]} (reabrir)`)
     if (!vetadas) continue
     for (const col of Object.keys(obj)) {
-      if (vetadas.includes(col)) encontradas.add(col)
+      if (vetadas.includes(col) || (table === 'pos_orders' && !['kds_item_status', 'mesero'].includes(col))) encontradas.add(col)
     }
   }
   return [...encontradas]
@@ -222,9 +228,9 @@ export function camposProhibidos(table: string, role: string | null | undefined,
 /**
  * Columnas que NUNCA salen por el proxy, pase lo que pase en el `select`.
  *
- * Se filtran del CUERPO de la respuesta, no del query: un `select=*`, un
- * `select=pin`, un embed o un RPC que devuelva la fila entera quedan cubiertos
- * por igual. Filtrar el query string se puede evadir; filtrar la salida no.
+ * Las consultas genéricas sólo admiten selección plana; alias, embeddings y
+ * filtros sobre secretos se rechazan. La salida se redacta además para cubrir
+ * select=* y los recibos de escritura de las rutas fijas.
  */
 export const REDACTED_COLUMNS: Record<string, readonly string[]> = {
   pos_staff: ['pin'],
@@ -237,7 +243,8 @@ export function isManager(role: string | undefined | null): boolean {
 
 /** Nombre de tabla a partir de `pos_orders?select=*` o `rest/v1/pos_orders?...`. */
 export function tableOf(path: string): string {
-  return (path.split('?')[0] || '').replace(/^rest\/v1\//, '').split('/')[0] || ''
+  const resource = (path.split('?')[0] || '').replace(/^rest\/v1\//, '')
+  return /^[a-z][a-z0-9_]*$/.test(resource) && !path.includes('#') ? resource : ''
 }
 
 /**
@@ -268,4 +275,46 @@ export function redactResponse(table: string, text: string, contentType: string 
 
   const cleaned = Array.isArray(data) ? data.map(strip) : strip(data)
   return JSON.stringify(cleaned)
+}
+
+/** Validate caller fields before adding server-owned scope. PATCH identity is
+ * immutable for every role. POST retains new IDs but stamps the authenticated
+ * tenant. Both proxy entrypoints must use this contract before any write. */
+export function prepararCuerpoProxy(table: string, role: string | null | undefined,
+  method: string, raw: string, clientId: string):
+  { body?: string; error?: undefined } | { error: string; status: 400 | 403 } {
+  if (!raw) return { body: undefined }
+  let data: unknown
+  try { data = JSON.parse(raw) } catch { return { error: 'cuerpo JSON inválido', status: 400 } }
+  const object = (value: unknown): value is Record<string, unknown> =>
+    !!value && typeof value === 'object' && !Array.isArray(value)
+  const rows = Array.isArray(data) ? data : [data]
+  if (!rows.length || !rows.every(object) || (method !== 'POST' && !object(data))) {
+    return { error: 'se requiere un objeto; sólo POST admite lotes de objetos', status: 400 }
+  }
+  if (method === 'PATCH' && rows.some(row => 'id' in row || 'client_id' in row)) {
+    return { error: 'id y client_id son inmutables', status: 403 }
+  }
+  // POST scope supplied by a caller is replaced, never used as authorization.
+  const callerRows = rows.map(row => {
+    const copy = { ...row }
+    if (method === 'POST') delete copy.client_id
+    return copy
+  })
+  const forbidden = camposProhibidos(table, role, JSON.stringify(callerRows))
+  if (forbidden.length) return { error: `estas columnas requieren rol de gerente: ${forbidden.join(', ')}`, status: 403 }
+  const stamped = callerRows.map(row => method === 'POST' && !NO_CID.has(table) ? { ...row, client_id: clientId } : row)
+  return { body: JSON.stringify(Array.isArray(data) ? stamped : stamped[0]) }
+}
+
+/** The generic POS proxy supports flat columns only. Aliases/embeds must use a
+ * domain endpoint with its own field and relationship authorization. Existing
+ * POS callers use flat selections; identity secrets cannot be renamed around
+ * response redaction or tested through filters/counts. */
+export function consultaProxyValida(table: string, params: URLSearchParams): boolean {
+  if (params.getAll('select').length > 1) return false
+  const select = params.get('select')
+  if (select !== null && !/^(?:\*|[a-z_][a-z0-9_]*)(?:,(?:\*|[a-z_][a-z0-9_]*))*$/i.test(select)) return false
+  const secrets = REDACTED_COLUMNS[table] || []
+  return !secrets.some(column => new RegExp(`\\b${column}\\b`, 'i').test(Array.from(params.entries()).flat().join(' ')))
 }

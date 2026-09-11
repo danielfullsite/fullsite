@@ -1,4 +1,6 @@
 'use client'
+import { TenantOnboardingCredentials } from '@/components/platform/TenantOnboardingCredentials'
+
 
 import { useEffect, useState } from 'react'
 import { Store, Plus, Activity, AlertTriangle, ArrowUpRight, Bot, RefreshCw, X, Sparkles, Circle, Power, KeyRound } from 'lucide-react'
@@ -317,6 +319,8 @@ function NewTenantModal({ onClose, onDone, toast, tenantCount }: {
   const [creds, setCreds] = useState<{
     staffPins: Array<{ role: string; pin: string }>
     localServer: { email: string; password: string } | null
+    ownerCredentialCreated: boolean; staffSetupRequired: boolean; existingServiceCredential: boolean
+    tenantId: string; email: string; initialPassword: string
   } | null>(null)
   const [mesasTouched, setMesasTouched] = useState(false)
   const [locationsText, setLocationsText] = useState('Principal')
@@ -324,7 +328,7 @@ function NewTenantModal({ onClose, onDone, toast, tenantCount }: {
   const [busy, setBusy] = useState(false)
 
   const autoSlug = (v: string) => v.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
-  const valid = name && slug && email && password.length >= 6
+  const valid = name && slug && email && password.length >= 8
   const locations = locationsText.split('\n').map(line => line.trim()).filter(Boolean).map(line => {
     const [locationName, ...addressParts] = line.split('|')
     return { name: locationName.trim(), address: addressParts.join('|').trim() }
@@ -352,10 +356,13 @@ function NewTenantModal({ onClose, onDone, toast, tenantCount }: {
         // el operador las guarde (gap Minute-0 #2/#3).
         const j = await res.json().catch(() => ({})) as {
           staff_pins?: Array<{ role: string; pin: string }>
+          staff_setup_required?: boolean; owner_credentials?: string; local_server_credentials?: string
+          ok?: boolean; clientId?: string; activation?: { active?: boolean }
           local_server?: { email: string; password: string } | null
         }
+        if (j.ok !== true || j.clientId !== slug || j.activation?.active !== true) throw new Error('Alta sin confirmar')
         toast('success', `Tenant "${slug}" dado de alta`)
-        setCreds({ staffPins: j.staff_pins || [], localServer: j.local_server || null })
+        setCreds({ tenantId: slug, email, initialPassword: password, staffPins: j.staff_pins || [], localServer: j.local_server || null, ownerCredentialCreated: j.owner_credentials === 'created', staffSetupRequired: j.staff_setup_required !== false, existingServiceCredential: j.local_server_credentials === 'existing_not_returned' })
         onDone()
       }
       else if (res.status === 429) toast('error', 'Límite de escrituras excedido.')
@@ -377,58 +384,15 @@ function NewTenantModal({ onClose, onDone, toast, tenantCount }: {
           <Sparkles size={18} className="text-[var(--accent-bright)]" />
           <div>
             <div className="font-bold text-[var(--text-1)]">Nuevo cliente</div>
-            <div className="text-[11px] text-[var(--text-3)]">Alta completa · onboarding cero-código</div>
+            <div className="text-[11px] text-[var(--text-3)]">Restaurante y acceso del dueño</div>
           </div>
           <button onClick={onClose} className="ml-auto text-[var(--text-3)] hover:text-[var(--text-1)]"><X size={18} /></button>
         </div>
         {creds ? (
-          // Pantalla de credenciales — se muestran UNA vez; el server no las
-          // vuelve a mandar. El operador debe guardarlas antes de cerrar.
-          <div className="p-5 space-y-4">
-            <p className="text-sm font-semibold text-[var(--text-1)]">Guarda estas credenciales — no se volverán a mostrar</p>
-            <div className="rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3 text-sm">
-              <p className="text-xs text-[var(--text-3)] mb-1">URL del KDS (ábrela una vez en la tablet de cocina; queda configurada)</p>
-              <p className="font-mono break-all text-[var(--text-1)]">app.fullsite.mx/kds?client={slug}</p>
-            </div>
-            <div className="rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3 text-sm">
-              <p className="text-xs text-[var(--text-3)] mb-1">Login del dueño</p>
-              <p className="font-mono text-[var(--text-1)]">{email} · {password}</p>
-            </div>
-            {creds.staffPins.length > 0 && (
-              <div className="rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3 text-sm">
-                <p className="text-xs text-[var(--text-3)] mb-2">PINs de plantilla del POS (rotarlos en Personal &amp; PINs)</p>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                  {creds.staffPins.map(sp => (
-                    <p key={sp.role} className="flex justify-between gap-2"><span className="capitalize text-[var(--text-2)]">{sp.role}</span><span className="font-mono tabular-nums text-[var(--text-1)]">{sp.pin}</span></p>
-                  ))}
-                </div>
-              </div>
-            )}
-            {creds.localServer && (
-              <div className="rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3 text-sm">
-                <p className="text-xs text-[var(--text-3)] mb-1">Service account del Local Server (Pedro)</p>
-                <p className="font-mono break-all text-[var(--text-1)]">{creds.localServer.email}</p>
-                <p className="font-mono text-[var(--text-1)]">{creds.localServer.password}</p>
-              </div>
-            )}
-            <button
-              onClick={() => {
-                const lines = [
-                  `Tenant: ${slug}`,
-                  `Dueño: ${email} / ${password}`,
-                  ...creds.staffPins.map(sp => `PIN ${sp.role}: ${sp.pin}`),
-                  ...(creds.localServer ? [`Local Server: ${creds.localServer.email} / ${creds.localServer.password}`] : []),
-                ]
-                navigator.clipboard?.writeText(lines.join('\n')).then(() => toast('success', 'Credenciales copiadas'))
-              }}
-              className="w-full py-2.5 rounded-xl border border-[var(--line)] text-sm font-semibold text-[var(--text-1)] hover:border-[var(--accent-line)]">
-              Copiar todo
-            </button>
-            <button onClick={onClose}
-              className="w-full py-3 rounded-xl bg-[var(--accent)] text-[#04120c] font-bold">
-              Listo, ya las guardé
-            </button>
-          </div>
+          <TenantOnboardingCredentials tenantId={creds.tenantId} email={creds.email} initialPassword={creds.initialPassword}
+            ownerCredentialCreated={creds.ownerCredentialCreated} staffSetupRequired={creds.staffSetupRequired}
+            staffPins={creds.staffPins} localServer={creds.localServer} existingServiceCredential={creds.existingServiceCredential}
+            onDone={onClose} onNotice={toast} />
         ) : (
         <div className="p-5 space-y-4">
           <label className="block">
@@ -466,7 +430,7 @@ function NewTenantModal({ onClose, onDone, toast, tenantCount }: {
             </label>
             <label className="block">
               <span className="text-xs text-[var(--text-3)]">Password inicial</span>
-              <input value={password} onChange={e => setPassword(e.target.value)} type="text" placeholder="mín. 6 caracteres"
+              <input value={password} onChange={e => setPassword(e.target.value)} type="text" placeholder="mín. 8 caracteres"
                 className="mt-1 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2.5 text-[var(--text-1)] outline-none focus:border-[var(--accent-line)] text-sm" />
             </label>
           </div>

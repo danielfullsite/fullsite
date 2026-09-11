@@ -15,6 +15,15 @@ for (const key of ['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY'])
   if (!process.env[key]) throw new Error(`Missing public build configuration: ${key}`)
 }
 if (new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).protocol !== 'https:') throw new Error('Public Supabase URL must use HTTPS')
+// URL y llave del MISMO proyecto, y la llave `anon`. El 2026-09-10 CI compilo cuatro
+// paquetes con la llave de staging y la URL de produccion sin que nada lo detectara.
+// Un paquete de laboratorio con valores sinteticos tiene que declararlo: nunca podra
+// confundirse con un candidato, y el manifiesto lo lleva escrito.
+const sintetico = process.env.FULLSITE_UI_BUNDLE_SINTETICO === '1'
+if (sintetico) console.warn('[build-offline-ui] PAQUETE SINTETICO: no se verifica la pareja URL/llave. Solo laboratorio; no instalar.')
+else require('./configuracion-publica.cjs').verificarParejaSupabase({
+  url: process.env.NEXT_PUBLIC_SUPABASE_URL, anonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+})
 
 const repository = path.resolve(__dirname, '../..')
 const source = path.join(repository, 'dashboard-app')

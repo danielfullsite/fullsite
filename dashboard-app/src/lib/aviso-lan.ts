@@ -76,6 +76,8 @@
 
 import { getBridgeUrl } from './bridge-url'
 import { localNetworkFetch } from './local-network-fetch'
+import { requiereCaja } from './pedro-cliente'
+import { calcOrderTotals, round2 } from './pos-calculations'
 
 /**
  * Presupuesto corto a proposito. Este aviso ocurre mientras el cajero espera para
@@ -86,7 +88,7 @@ const TIMEOUT_MS = 1_200
 
 const LOG = '[aviso-lan]'
 
-export type TipoDeAviso = 'ORDER_CLOSED' | 'ORDER_CANCELLED' | 'ORDER_UPSERTED'
+export type TipoDeAviso = 'ORDER_CLOSED' | 'ORDER_CANCELLED' | 'ORDER_UPSERTED' | 'ORDER_ITEMS_TRANSFERRED' | 'TURNO_CLOSED'
 
 export interface Aviso {
   /**
@@ -100,6 +102,31 @@ export interface Aviso {
   mesa?: number | null
   turno_id?: string | null
   status?: string | null
+  /**
+   * Campos de negocio de un ORDER_UPSERTED. Pedro copia exactamente estos
+   * (state.js, `orderFields`) y reemplaza `items` si viene; lo que no viene se
+   * conserva. Nunca credenciales ni transporte.
+   */
+  items?: unknown[]
+  subtotal?: number
+  iva?: number
+  total?: number
+  descuento?: number
+  personas?: number
+  mesero?: string
+  order_revision?: number
+  notas?: string | null
+  item_id?: string
+  source_order?: CuentaTransferida
+  target_order?: CuentaTransferida
+}
+
+export interface CuentaTransferida {
+  id: string; items: unknown[]; order_revision: number; [key: string]: unknown
+}
+function cuentasDelAviso(aviso: Aviso): string[] {
+  return [aviso.order_id, aviso.target_order?.id].filter((id): id is string => !!id)
+    .map(id => JSON.stringify([aviso.client_id, id]))
 }
 
 // ── Avisos pendientes: lo que no llego, se guarda ────────────────────────────
@@ -134,7 +161,9 @@ function escribirPendientes(lista: Aviso[]): void {
 }
 
 function recordarPendiente(aviso: Aviso): void {
-  escribirPendientes([...leerAvisosPendientes().filter(a => a.command_id !== aviso.command_id), aviso])
+  const pendientes = leerAvisosPendientes()
+  // A duplicate caller must retain its original position and payload.
+  if (!pendientes.some(a => a.command_id === aviso.command_id)) escribirPendientes([...pendientes, aviso])
 }
 
 function olvidarPendiente(commandId: string): void {
@@ -187,9 +216,21 @@ export async function avisarALaLan(aviso: Aviso): Promise<boolean> {
     return false
   }
 
+  // Sin una caja a la que avisar —el POS web de un tenant sin Electron ni
+  // puente configurado— el aviso es de un solo intento, como siempre fue. Guardarlo
+  // y reintentarlo cada 3 s en un navegador que nunca va a tener Pedro seria un
+  // temporizador eterno golpeando 127.0.0.1 por nada.
+  if (!requiereCaja()) return enviar(aviso)
+
   // ANTES de mandar, no despues de fallar: si la pestaña muere a media llamada
   // (el cobro navega al mapa con `location.replace`), el aviso sobrevive igual.
+  const cuentas = cuentasDelAviso(aviso)
+  const anteriorPendiente = leerAvisosPendientes().some(a =>
+    a.command_id !== aviso.command_id && cuentasDelAviso(a).some(id => cuentas.includes(id)))
   recordarPendiente(aviso)
+  // Do not overtake an older snapshot of the same account. Otherwise its retry
+  // would restore the previous items/total after this update was acknowledged.
+  if (anteriorPendiente) { asegurarReintentos(); return false }
   const llego = await enviar(aviso)
   if (llego) olvidarPendiente(aviso.command_id)
   else asegurarReintentos()
@@ -207,8 +248,12 @@ export function reintentarAvisosPendientes(): Promise<{ pendientes: number; entr
   if (reintentoEnCurso) return reintentoEnCurso
   reintentoEnCurso = (async () => {
     let entregados = 0
+    const bloqueadas = new Set<string>()
     for (const aviso of leerAvisosPendientes()) {
+      const cuentas = cuentasDelAviso(aviso)
+      if (cuentas.some(id => bloqueadas.has(id))) { cuentas.forEach(id => bloqueadas.add(id)); continue }
       if (await enviar(aviso)) { olvidarPendiente(aviso.command_id); entregados++ }
+      else cuentas.forEach(id => bloqueadas.add(id))
     }
     const pendientes = leerAvisosPendientes().length
     if (pendientes === 0) detenerReintentos()
@@ -244,6 +289,26 @@ export function hayReintentosProgramados(): boolean { return temporizador !== nu
  * `opId` es el mismo identificador de la operacion de cobro, para que el aviso
  * herede su idempotencia — dos taps del boton de cobrar producen un solo aviso.
  */
+/**
+ * El turno cerro: que Pedro limpie el piso, y que lo sepa aunque la LAN
+ * parpadee justo al cerrar. Antes era un intento de 2.5 s sin cola: si no
+ * llegaba, las comandas de anoche amanecian en el KDS (barrido 2026-09-10,
+ * pedro-core LENTE-3 / kds LENTE-4). Pedro ignora un TURNO_CLOSED tardio si ya
+ * hay otro turno abierto (state.js), asi que reintentarlo es seguro.
+ *
+ * `order_id` lleva el id del turno solo porque la cola de avisos ordena por
+ * cuenta; Pedro lee `turno_id`.
+ */
+export function avisarCierreDeTurno(args: { turnoId: string; clientId: string }): Promise<boolean> {
+  return avisarALaLan({
+    command_id: `turno-closed:${args.turnoId}`,
+    command_type: 'TURNO_CLOSED',
+    order_id: `turno:${args.turnoId}`,
+    client_id: args.clientId,
+    turno_id: args.turnoId,
+  })
+}
+
 export function avisarCierreDeOrden(args: {
   opId: string
   orderId: string
@@ -261,4 +326,110 @@ export function avisarCierreDeOrden(args: {
     turno_id: args.turnoId ?? null,
     status: args.cancelada ? 'cancelada' : 'cerrada',
   })
+}
+
+/**
+ * La cuenta cambio sin pasar por «Enviar» ni por «Cobrar»: que Pedro lo sepa.
+ *
+ * ── POR QUE EXISTE (barrido del 2026-09-10, antes del instalador) ────────────
+ *
+ * Bajo Electron el mapa y el editor leen del MISMO Pedro (H3, 365eaf22). Pero en
+ * modo legacy —que es como se instala AMALAY— cinco mutaciones de la cuenta iban
+ * SOLO a la nube y Pedro nunca se enteraba:
+ *
+ *   anular la orden           pos/page.tsx  handleVoidOrder      → status 'cancelada'
+ *   cancelar un platillo      pos/page.tsx  handleCancelItem     → /api/pos/cancel-item
+ *   transferir un platillo    pos/page.tsx  handleTransferItem   → /api/pos/transfer-item
+ *   transferir la mesa        pos/page.tsx  boton «Transferir»   → updateOrderStatus(mesa)
+ *   fusionar dos mesas        pos/mesas     handleMerge          → /api/pos/merge-orders
+ *
+ * Y Pedro protege toda orden local del poll de nube (state.js, _applyStateSync),
+ * asi que esa nube nunca lo corregia. Resultado: la mesa anulada seguia ocupada
+ * en las tres pantallas, el platillo cancelado seguia sumando en el mapa, la mesa
+ * transferida se veia en la vieja. Es la familia entera de «por fuera no dice lo
+ * mismo que por dentro» de los videos de Eduardo, por otra puerta.
+ *
+ * Solo «Enviar» (ORDER_SENT, kitchen-bridge.ts) y «Cobrar» (ORDER_CLOSED, arriba)
+ * hablaban con Pedro. Esto es la boca que faltaba para todo lo demas: un
+ * ORDER_UPSERTED con la verdad completa de la cuenta, durable como el cierre.
+ * Pedro reemplaza items y status, mueve la mesa si cambio, y conserva lo que no
+ * viene (state.js, _applyOrderUpserted).
+ */
+export function avisarCuentaActualizada(args: {
+  opId: string
+  orderId: string
+  clientId: string
+  mesa?: number | null
+  turnoId?: string | null
+  status?: string | null
+  items?: unknown[]
+  subtotal?: number
+  iva?: number
+  total?: number
+  descuento?: number
+  personas?: number
+  mesero?: string
+  orderRevision?: number
+  notas?: string | null
+}): Promise<boolean> {
+  const sinIndefinidos = <T extends object>(o: T): T =>
+    Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as T
+  return avisarALaLan(sinIndefinidos({
+    command_id: `cuenta:${args.opId}`,
+    command_type: 'ORDER_UPSERTED' as const,
+    order_id: args.orderId,
+    client_id: args.clientId,
+    mesa: args.mesa,
+    turno_id: args.turnoId,
+    status: args.status,
+    items: args.items,
+    subtotal: args.subtotal,
+    iva: args.iva,
+    total: args.total,
+    descuento: args.descuento,
+    personas: args.personas,
+    mesero: args.mesero,
+    order_revision: args.orderRevision,
+    notas: args.notas,
+  }))
+}
+
+/** Publish only a committed row and its own revision. Failed, conflicted or
+ * response-lost mutations never authorize replacement from a terminal draft. */
+export function avisarCuentaConfirmada(args: {
+  opId: string; clientId: string; result: { ok?: boolean; order?: Record<string, unknown> }
+}): Promise<boolean> {
+  const order = args.result.order
+  if (args.result.ok !== true || !order || typeof order.id !== 'string' ||
+    !Number.isSafeInteger(order.order_revision) || Number(order.order_revision) < 1) return Promise.resolve(false)
+  let items = order.items
+  if (typeof items === 'string') { try { items = JSON.parse(items) } catch { return Promise.resolve(false) } }
+  if (!Array.isArray(items)) return Promise.resolve(false)
+  return avisarCuentaActualizada({ opId: args.opId, clientId: args.clientId, orderId: order.id,
+    items, orderRevision: Number(order.order_revision), mesa: order.mesa as number | undefined,
+    turnoId: order.turno_id as string | undefined, status: order.status as string | undefined,
+    subtotal: order.subtotal as number, iva: order.iva as number, total: order.total as number,
+    descuento: order.descuento as number | undefined, personas: order.personas as number | undefined,
+    notas: order.notas as string | undefined })
+}
+
+/** Both committed accounts travel in one durable event; no second send/print. */
+export function avisarTransferenciaItem(args: {
+  opId: string; clientId: string; itemId: string; source: CuentaTransferida; target: CuentaTransferida
+}): Promise<boolean> {
+  return avisarALaLan({ command_id: `transferencia:${args.opId}`, command_type: 'ORDER_ITEMS_TRANSFERRED',
+    order_id: args.source.id, client_id: args.clientId, item_id: args.itemId,
+    source_order: args.source, target_order: args.target })
+}
+
+
+/** Only sent lines belong to the shared kitchen/account snapshot. Local drafts
+ * stay on their terminal until the operator explicitly sends them. */
+export function cuentaEnviadaParaLan<T extends { id: string; subtotal: number; cancelled?: boolean }>(
+  items: T[], sentIds: ReadonlySet<string>, excludedIds: ReadonlySet<string>, discount = 0,
+) {
+  const sent = items.filter(item => sentIds.has(item.id)).map(item =>
+    excludedIds.has(item.id) ? { ...item, cancelled: true } : item)
+  const { subtotal, iva, total } = calcOrderTotals(sent.filter(item => !item.cancelled), discount)
+  return { items: sent, subtotal, iva, total: round2(total), descuento: discount }
 }

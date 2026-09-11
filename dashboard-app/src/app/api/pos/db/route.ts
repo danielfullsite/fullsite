@@ -15,15 +15,16 @@
  * directo con su JWT. Solo las terminales POS (shiftToken) se rutean aquí.
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { ALLOW, MANAGER_ONLY_WRITE, puedeEscribirEn, MANAGER_ONLY_DELETE, NO_CID, camposProhibidos, isManager, redactResponse, tableOf } from '@/lib/pos-db-policy'
+import { ALLOW, puedeEscribirEn, MANAGER_ONLY_DELETE, NO_CID, prepararCuerpoProxy, isManager, redactResponse, tableOf, consultaProxyValida } from '@/lib/pos-db-policy'
 import { withPOSAuth } from '@/lib/api-auth'
+import { scopedProxyRequest } from '@/lib/pos-db-scoped'
 
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SB_SERVICE = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 // Tablas que el POS puede LEER/ESCRIBIR vía proxy. Todo lo demás se rechaza.
 
-// Tablas SIN columna client_id → no se inyecta scope (globales/child de bajo riesgo).
+// Las tablas hijas se autorizan mediante pos_scoped_child dentro de PostgreSQL.
 
 // Escrituras sensibles: requieren gerente/admin.
 
@@ -54,11 +55,10 @@ async function handle(request: NextRequest, method: string) {
   }
 
   // Tenant scope: fuerza client_id del token en el query (reads y writes).
-  let target = path
-  if (!NO_CID.has(table)) {
-    const sep = target.includes('?') ? '&' : '?'
-    target = `${target}${sep}client_id=eq.${encodeURIComponent(auth.clientId)}`
-  }
+  const params = new URLSearchParams(path.includes('?') ? path.slice(path.indexOf('?') + 1) : '')
+  if (!consultaProxyValida(table, params)) return NextResponse.json({ error: 'consulta no permitida' }, { status: 403 })
+  if (!NO_CID.has(table)) params.set('client_id', `eq.${auth.clientId}`)
+  const target = `${table}?${params.toString()}`
 
   const headers: Record<string, string> = {
     apikey: SB_SERVICE,
@@ -71,28 +71,15 @@ async function handle(request: NextRequest, method: string) {
   let body: string | undefined
   if (isWrite) {
     const raw = await request.text()
-    if (raw) {
-      // Inyecta client_id del token en el body (objeto o array) para writes.
-      try {
-        const parsed = JSON.parse(raw)
-        const stamp = (o: Record<string, unknown>) => (!NO_CID.has(table) ? { ...o, client_id: auth.clientId } : o)
-        body = JSON.stringify(Array.isArray(parsed) ? parsed.map(stamp) : stamp(parsed))
-      } catch {
-        body = raw
-      }
-      headers['Content-Type'] = 'application/json'
-    }
+    const prepared = prepararCuerpoProxy(table, auth.role, method, raw, auth.clientId)
+    if (prepared.error !== undefined) return NextResponse.json({ error: prepared.error }, { status: prepared.status })
+    body = prepared.body
+    if (body) headers['Content-Type'] = 'application/json'
 
-    // Las cifras del dinero no se escriben desde el navegador. Se comprueba aquí, con el
-    // cuerpo ya leído, y en LOS DOS proxies: gatear uno solo deja la puerta abierta por el
-    // otro, que es exactamente como este hueco sobrevivió a la auditoría anterior.
-    const prohibidas = camposProhibidos(table, auth.role, body)
-    if (prohibidas.length) {
-      return NextResponse.json({ error: `estas columnas requieren rol de gerente: ${prohibidas.join(', ')}` }, { status: 403 })
-    }
   }
 
-  const res = await fetch(`${SB_URL}/rest/v1/${target}`, { method, headers, body, cache: 'no-store' })
+  const scoped = await scopedProxyRequest({ table, method, params, body, prefer, range, clientId: auth.clientId, url: SB_URL, key: SB_SERVICE })
+  const res = scoped || await fetch(`${SB_URL}/rest/v1/${target}`, { method, headers, body, cache: 'no-store', redirect: 'error' })
   const rawOut = await res.text()
   const ct = res.headers.get('content-type')
   // El PIN nunca sale por el proxy, pida lo que pida el `select`.

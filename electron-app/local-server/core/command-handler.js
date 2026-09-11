@@ -8,10 +8,13 @@ const { EVENT } = require('../protocol')
 const { FinancialDomain, FinancialError, FINANCIAL_COMMANDS } = require('./financial-domain')
 const { OperationalDomain, OperationalError, OPERATIONAL_COMMANDS, authorizeOperational } = require('./operational-domain')
 const { prepareOrderPrintEffects } = require('./operational-print')
+const canonicalPrint = require('./canonical-print')
+const canonicalDrawer = require('./canonical-drawer')
 
 // Map from command_type (from client) → eventType (stored in log)
 const COMMAND_TO_EVENT = {
   ORDER_UPSERTED:  EVENT.ORDER_UPSERTED,
+  ORDER_ITEMS_TRANSFERRED: EVENT.ORDER_ITEMS_TRANSFERRED,
   ORDER_SENT:      EVENT.ORDER_SENT,
   ORDER_CLOSED:    EVENT.ORDER_CLOSED,
   ORDER_CANCELLED: EVENT.ORDER_CANCELLED,
@@ -23,6 +26,8 @@ const COMMAND_TO_EVENT = {
   PRINT_COMMAND:   EVENT.PRINT_COMMAND,
   ...Object.fromEntries([...FINANCIAL_COMMANDS].map(type => [type, EVENT[type]])),
   ...Object.fromEntries([...OPERATIONAL_COMMANDS].map(type => [type, EVENT[type]])),
+  ...Object.fromEntries([...canonicalPrint.PRINT_COMMANDS].map(type => [type, EVENT[type]])),
+  ...Object.fromEntries([...canonicalDrawer.DRAWER_COMMANDS].map(type => [type, EVENT[type]])),
 }
 
 class CommandHandler {
@@ -30,6 +35,7 @@ class CommandHandler {
    * @param {{ eventStore: import('./event-store').CoreEventStore, state: import('./state').RestaurantState, wsHub: import('./ws-hub').WsHub, printer: import('../adapters/printer'), restaurantId: string }} opts
    */
   constructor({ eventStore, state, wsHub, printer, restaurantId, catalogStore = null, localAuthorityEnabled = false }) {
+    this._sinTransmitir = new Set()
     this._store         = eventStore
     this._state         = state
     this._hub           = wsHub
@@ -81,10 +87,18 @@ class CommandHandler {
     if (this._localAuthorityEnabled && commandType === 'PRINT_COMMAND') {
       throw new OperationalError('CONTROLLED_PRINT_REQUIRED', 'La impresión en Caja debe provenir de una operación autorizada; no se aceptan bytes del navegador')
     }
+    if (canonicalPrint.PRINT_COMMANDS.has(commandType)) {
+      if (!this._localAuthorityEnabled) throw new OperationalError('LOCAL_AUTHORITY_DISABLED', 'La impresión canónica requiere autoridad de Caja')
+      canonicalPrint.authorize(cmdPayload, { state: this._state, actor: context.actor, printer: this._printer })
+    }
+    if (canonicalDrawer.DRAWER_COMMANDS.has(commandType)) {
+      if (!this._localAuthorityEnabled) throw new OperationalError('LOCAL_AUTHORITY_DISABLED', 'La apertura autorizada requiere Caja')
+      canonicalDrawer.authorize(cmdPayload, { state: this._state, actor: context.actor, printer: this._printer })
+    }
     if (OPERATIONAL_COMMANDS.has(commandType)) {
       if (!this._localAuthorityEnabled) throw new OperationalError('LOCAL_AUTHORITY_DISABLED', 'La autoridad de escritura de Caja no está activada en esta instalación')
       // Recheck authorization even for a duplicate; a receipt is not permission.
-      authorizeOperational(context.actor, { ORDER_SAVE: 'pos.orders.write', ORDER_SEND: 'pos.orders.send', ORDER_MOVE: 'pos.orders.move', ORDER_VOID: 'pos.orders.cancel', TURN_OPEN: 'pos.turns.open', TURN_CLOSE: 'pos.turns.close', KITCHEN_SET: 'actualizar_estatus_orden' }[commandType])
+      authorizeOperational(context.actor, { ORDER_SAVE: 'pos.orders.write', ORDER_SEND: 'pos.orders.send', ORDER_MOVE: 'pos.orders.move', ORDER_VOID: 'pos.orders.cancel', TURN_OPEN: 'pos.turns.open', TURN_CLOSE: 'pos.turns.close', CASH_MOVEMENT: 'retiros_programados', KITCHEN_SET: 'actualizar_estatus_orden' }[commandType])
     }
     if (this._localAuthorityEnabled && ['ORDER_UPSERTED', 'KDS_ITEM_STATUS'].includes(commandType)) authorizeOperational(context.actor, 'actualizar_estatus_orden')
 
@@ -92,12 +106,24 @@ class CommandHandler {
       return { error: 'PRINT_COMMAND requires station and data_b64' }
     }
 
-    let operationalResult, operationalCatalog
+    let operationalResult, operationalCatalog, printPrepared, drawerPrepared
+    const prepareDrawer = () => drawerPrepared ?? (drawerPrepared = canonicalDrawer.prepare(cmdPayload, {
+      state: this._state, actor: context.actor, printer: this._printer,
+    }))
+    const preparePrint = () => printPrepared ?? (printPrepared = canonicalPrint.prepare(cmdPayload, {
+      state: this._state, actor: context.actor, printer: this._printer, catalogEnvelope: this._catalog?.read(),
+    }))
     const prepareOperational = () => {
       if (!operationalResult) {
         this._validateCommandState(commandType, cmdPayload, fromClientId)
         operationalCatalog = ['ORDER_SAVE', 'ORDER_MOVE', 'ORDER_SEND'].includes(commandType) ? this._catalog?.read() : null
         operationalResult = new OperationalDomain().prepare(cmdPayload, { state: this._state, actor: context.actor, catalogEnvelope: operationalCatalog })
+        if (['ORDER_SAVE', 'ORDER_SEND'].includes(commandType) && this._state.getFinancialOrder?.(cmdPayload.order_id)) {
+          const financial = new FinancialDomain()
+          financial.hydrate(this._state.getFinancialOrders())
+          Object.assign(operationalResult, financial.prepareOperationalChange(cmdPayload, this._state.getOrder(cmdPayload.order_id), operationalResult.operational_order, context.actor))
+          operationalResult.operational_order.saldo = operationalResult.financial_order.balance_cents / 100
+        }
       }
       return operationalResult
     }
@@ -107,6 +133,8 @@ class CommandHandler {
         eventType: COMMAND_TO_EVENT[commandType],
         buildResult: () => {
           this._validateCommandState(commandType, cmdPayload, fromClientId)
+          if (canonicalPrint.PRINT_COMMANDS.has(commandType)) return preparePrint().result
+          if (canonicalDrawer.DRAWER_COMMANDS.has(commandType)) return prepareDrawer().result
           if (OPERATIONAL_COMMANDS.has(commandType)) return prepareOperational()
           if (!FINANCIAL_COMMANDS.has(commandType)) return undefined
           if (!this._state.getFinancialOrders || !this._state.getOrder) throw new FinancialError('FINANCIAL_PROJECTION_UNAVAILABLE', 'Financial projection is not ready')
@@ -120,7 +148,9 @@ class CommandHandler {
             cmdPayload.station, Buffer.from(cmdPayload.data_b64, 'base64'), cmdPayload.document_type,
             { commandId, reprint: cmdPayload.reprint === true }
           ) }
-        } : commandType === 'ORDER_SEND' ? () => prepareOrderPrintEffects(prepareOperational(), commandId, operationalCatalog, this._printer) : undefined,
+        } : commandType === 'ORDER_SEND' ? () => prepareOrderPrintEffects(prepareOperational(), commandId, operationalCatalog, this._printer)
+          : canonicalPrint.PRINT_COMMANDS.has(commandType) ? () => preparePrint().effects
+            : canonicalDrawer.DRAWER_COMMANDS.has(commandType) ? () => prepareDrawer().effects : undefined,
       }
     )
 
@@ -130,9 +160,22 @@ class CommandHandler {
     // Projection belongs to the commit, even if a later queue write fails. A
     // retry must not leave a committed send invisible or advance it twice.
     if (!duplicate) this._state.apply(event)
-    await this._recoverEffect(event)
+    // Si encolar los efectos falla DESPUES del commit, el evento ya esta
+    // proyectado pero nunca se transmitio: el reintento del POS llega como
+    // duplicado y antes se devolvia sin broadcast, asi que los tableros por WS
+    // no lo veian (barrido 2026-09-10, pedro-core LENTE-6). Se anota el id y el
+    // duplicado que por fin recupera los efectos lo transmite.
+    try {
+      await this._recoverEffect(event, duplicate ? await this._store.getLastSequence() : undefined)
+    } catch (e) {
+      if (!duplicate) this._sinTransmitir.add(event.id)
+      throw e
+    }
     const receipt = { command_id: event.payload.command_id, event_id: event.id, sequence: event.sequence }
-    if (duplicate) return { duplicate: true, receipt, ...(event.result ? { result: event.result } : {}) }
+    if (duplicate) {
+      if (this._sinTransmitir.has(event.id)) { this._sinTransmitir.delete(event.id); await this._hub.broadcast(event) }
+      return { duplicate: true, receipt, ...(event.result ? { result: event.result } : {}) }
+    }
 
     // Broadcast the new event to all connected clients
     await this._hub.broadcast(event)
@@ -140,7 +183,7 @@ class CommandHandler {
     return { event, receipt, ...(event.result ? { result: event.result } : {}) }
   }
   requiresActor(commandType) {
-    return FINANCIAL_COMMANDS.has(commandType) || OPERATIONAL_COMMANDS.has(commandType) ||
+    return FINANCIAL_COMMANDS.has(commandType) || OPERATIONAL_COMMANDS.has(commandType) || canonicalPrint.PRINT_COMMANDS.has(commandType) || canonicalDrawer.DRAWER_COMMANDS.has(commandType) ||
       this._localAuthorityEnabled && ['ORDER_UPSERTED', 'KDS_ITEM_STATUS'].includes(commandType)
   }
   _authorizeFinancial(type, payload, actor) {
@@ -171,6 +214,21 @@ class CommandHandler {
   }
 
   _validateCommandState(commandType, cmdPayload, fromClientId) {
+    if (commandType === 'ORDER_ITEMS_TRANSFERRED') {
+      const accounts = [cmdPayload.source_order, cmdPayload.target_order]
+      if (this._localAuthorityEnabled || accounts.some(o => this._state.getOrder?.(o?.id)?.authority === 'caja')) {
+        throw new OperationalError('AUTHORITATIVE_COMMAND_REQUIRED', 'Las transferencias legacy no pueden modificar cuentas de Caja')
+      }
+      if (accounts.some(o => this._state.getFinancialOrder?.(o?.id))) {
+        throw new FinancialError('FINANCIAL_ORDER_LOCKED', 'Las cuentas con pagos no aceptan transferencias legacy')
+      }
+      if (!cmdPayload.item_id || accounts.some(o => !o?.id || !Array.isArray(o.items) ||
+        !Number.isSafeInteger(o.order_revision) || o.order_revision < 1) ||
+        accounts[0].id === accounts[1].id || accounts[0].items.some(i => i.id === cmdPayload.item_id) ||
+        accounts[1].items.filter(i => i.id === cmdPayload.item_id).length !== 1) {
+        throw new OperationalError('INVALID_TRANSFER_RECEIPT', 'La transferencia requiere los dos recibos confirmados')
+      }
+    }
     const operationalOrder = this._state.getOrder?.(cmdPayload.order_id)
     if (operationalOrder?.authority === 'caja' && ['ORDER_UPSERTED', 'KDS_ITEM_STATUS'].includes(commandType)) {
       throw new OperationalError('KITCHEN_COMMAND_REQUIRED', 'Confirma los productos enviados mediante el comando de cocina autorizado')
@@ -211,10 +269,19 @@ class CommandHandler {
 
   }
 
-  async _recoverEffect(event) {
-    if (!event?.effects?.print_jobs?.length) return
-    if (!this._printer?.enqueuePreparedJobs) throw new Error('Durable printer adapter unavailable')
-    await this._printer.enqueuePreparedJobs(event.effects.print_jobs)
+  async _recoverEffect(event, recoveryThroughSequence) {
+    if (event?.effects?.print_jobs?.length) {
+      if (!this._printer?.enqueuePreparedJobs) throw new Error('Durable printer adapter unavailable')
+      await this._printer.enqueuePreparedJobs(event.effects.print_jobs, { recoveryThroughSequence })
+    }
+    for (const resolution of event?.effects?.print_resolutions || []) {
+      if (!this._printer?.applyPreparedResolution) throw new Error('Durable print reconciliation unavailable')
+      await this._printer.applyPreparedResolution(resolution, { eventSequence: event.sequence })
+    }
+    for (const resolution of event?.effects?.drawer_resolutions || []) {
+      if (!this._printer?.applyPreparedDrawerResolution) throw new Error('Durable drawer reconciliation unavailable')
+      await this._printer.applyPreparedDrawerResolution(resolution, { eventSequence: event.sequence })
+    }
   }
 
   // Call at startup after event-store replay, before accepting new commands.
@@ -222,9 +289,10 @@ class CommandHandler {
   // have printed and cannot be deduplicated safely.
   async recoverPendingEffects() {
     let recovered = 0
+    const recoveryThroughSequence = await this._store.getLastSequence()
     for (const event of await this._store.readAfter(0)) {
-      if (!event.effects?.print_jobs) continue
-      await this._recoverEffect(event)
+      if (!event.effects?.print_jobs && !event.effects?.print_resolutions && !event.effects?.drawer_resolutions) continue
+      await this._recoverEffect(event, recoveryThroughSequence)
       recovered++
     }
     return { recovered }

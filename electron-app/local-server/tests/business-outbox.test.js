@@ -21,7 +21,9 @@ test('HTTP success without the exact business receipt never advances or exposes 
     const chunks = []; for await (const chunk of req) chunks.push(chunk)
     const body = JSON.parse(Buffer.concat(chunks))
     calls++
-    assert.equal(req.url, '/rest/v1/rpc/apply_pos_caja_event')
+    assert.equal(req.url, '/api/pos/caja/materialize')
+    assert.equal(req.headers.apikey, undefined)
+    assert.equal(req.headers.authorization, undefined)
     assert.equal(body.p_event.result.turno.opening_cash_cents, 50000, 'committed result is transported')
     res.setHeader('Content-Type', 'application/json')
     res.end(JSON.stringify(valid ? { stream_id: body.p_stream_id, sequence: body.p_event.sequence,

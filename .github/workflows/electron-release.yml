@@ -59,6 +59,15 @@ jobs:
         working-directory: dashboard-app
         run: npm ci
 
+      # Lo que se publica aqui se instala en restaurantes: la URL y la llave anon
+      # tienen que ser del MISMO proyecto y la llave tiene que ser `anon`. Ver
+      # electron-build.yml y scripts/configuracion-publica.cjs (2026-09-10).
+      - name: La URL y la llave anon deben ser del mismo proyecto
+        run: node scripts/configuracion-publica.cjs
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+
       - name: Construir paquete offline completo
         run: npm run build:ui
         env:
@@ -82,6 +91,9 @@ jobs:
       # SIEMPRE --x64. En Mac con Apple Silicon los defaults salen arm64 y NO corren
       # en Windows (OFFLINE-LAN-FIELD-PROVEN §5.2). Aqui corre en windows-latest,
       # pero se declara explicito para que no dependa del runner.
+      - name: Sellar el commit antes de empaquetar
+        run: npm run sellar
+
       - name: Construir instalador del POS
         run: npx electron-builder --win --x64 --config electron-builder-pos.json --publish ${{ (github.event_name == 'push' && 'always') || 'never' }}
         env:

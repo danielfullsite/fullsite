@@ -1,10 +1,12 @@
 'use client'
 
+import CajonDeCaja from './CajonDeCaja'
+import DocumentoImpresoDeCaja from './DocumentoImpresoDeCaja'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { abrirFinanzasCaja, leerFinanzasCaja, dividirParejoCaja, reservarEfectivoCaja,
+import { abrirFinanzasCaja, leerEstadoCobroCaja, dividirParejoCaja, reservarEfectivoCaja,
   confirmarEfectivoCaja, liberarEfectivoNoRecibido, avisoAntesDeCobrarCaja, centavosDeTexto, pesosDeCentavos,
   reservarCobroExterno, confirmarCobroExterno, rechazarCobroExterno, marcarCobroExternoIncierto,
-  type FinanzasDeCaja, type PagoDeCaja } from '@/lib/pedro-finanzas'
+  type FinanzasDeCaja, type PagoDeCaja, type OrdenParaCobroCaja } from '@/lib/pedro-finanzas'
 
 /** Nombre por omisión de la terminal bancaria. En AMALAY la tarjeta se pasa en el aparato
  *  del banco y se registra aquí: son dos actos manuales, no una integración. */
@@ -20,6 +22,7 @@ interface Props {
  * another terminal. Receiving cash is an explicit action after reserving money.
  * An uncertain response keeps the attempt recoverable; it never clears a table. */
 export default function CobroDeCaja({ order, onClose, onChanged }: Props) {
+  const [savedOrder, setSavedOrder] = useState<OrdenParaCobroCaja>(order)
   const [finance, setFinance] = useState<FinanzasDeCaja | null>(null)
   const [error, setError] = useState('')
   const [connectionError, setConnectionError] = useState('')
@@ -44,8 +47,9 @@ export default function CobroDeCaja({ order, onClose, onChanged }: Props) {
       if (pending || working.current) return
       pending = true
       try {
-        const next = await leerFinanzasCaja(order.id)
-        if (alive) { if (next) apply(next); else setConnected(true); setConnectionError('') }
+        const snapshot = await leerEstadoCobroCaja(order.id)
+        const next = snapshot.financial
+        if (alive) { setSavedOrder(current => snapshot.order && snapshot.order.order_revision >= current.order_revision ? snapshot.order : current); if (next) apply(next); else setConnected(true); setConnectionError('') }
       } catch (e) {
         if (alive) { setConnected(false); setConnectionError(e instanceof Error ? e.message : 'No se pudo consultar Caja.') }
       } finally { pending = false }
@@ -84,7 +88,7 @@ export default function CobroDeCaja({ order, onClose, onChanged }: Props) {
     return run(acciones.fn, acciones.ok)
   }
 
-  const sendWarning = avisoAntesDeCobrarCaja(order)
+  const sendWarning = avisoAntesDeCobrarCaja(savedOrder)
   const disabled = busy || !connected
   const button = 'min-h-[48px] rounded-xl px-4 py-3 font-semibold disabled:opacity-40 disabled:cursor-not-allowed'
   const field = 'w-full rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-3 text-[var(--text)]'
@@ -107,13 +111,13 @@ export default function CobroDeCaja({ order, onClose, onChanged }: Props) {
       {(connectionError || error) && <p role="alert" className="mt-4 rounded-xl bg-red-500/10 p-3 text-red-600">{connectionError || error}</p>}
       {notice && <p role="status" className="mt-4 rounded-xl bg-emerald-500/10 p-3 text-emerald-700">{notice}</p>}
       {!finance ? <div className="mt-6">
-        <p className="text-3xl font-bold">{pesosDeCentavos(order.total_cents)}</p>
+        <p className="text-3xl font-bold">{pesosDeCentavos(savedOrder.total_cents)}</p>
         <p className="my-4">{sendWarning || 'Confirma el total para preparar las cuentas de cobro. Los productos pendientes seguirán en cocina.'}</p>
         <button className={`${button} bg-blue-600 text-white`} disabled={disabled || !!sendWarning}
-          onClick={() => run(() => abrirFinanzasCaja(order), 'Cuenta preparada para cobrar.')}>Preparar cuenta para cobrar</button>
+          onClick={() => run(() => abrirFinanzasCaja(savedOrder), 'Cuenta preparada para cobrar.')}>Preparar cuenta para cobrar</button>
       </div> : <>
-        <dl className="my-6 grid grid-cols-3 gap-3">
-          {[['Total', finance.total_cents], ['Pagado', finance.paid_cents], ['Pendiente', finance.balance_cents]].map(([label, value]) =>
+        <dl className="my-6 grid grid-cols-2 gap-3">
+          {[['Total', finance.total_cents], ['Pagado', finance.paid_cents], ['Reservado', finance.reserved_cents], ['Pendiente', finance.balance_cents]].map(([label, value]) =>
             <div key={label}><dt className="text-sm text-[var(--text-2)]">{label}</dt><dd className="text-xl font-bold">{pesosDeCentavos(Number(value))}</dd></div>)}
         </dl>
         <div className="space-y-2" aria-label="Cuentas compartidas">
@@ -130,9 +134,10 @@ export default function CobroDeCaja({ order, onClose, onChanged }: Props) {
             onClick={() => run(() => dividirParejoCaja(finance, Number(split)), 'División guardada y visible en todas las terminales.')}>Dividir cuenta</button>
         </div>}
         {finance.status === 'settled' ? <p className="my-5 text-lg font-bold text-emerald-700">Cuenta liquidada. Cocina conserva la preparación pendiente.</p> : <>
+          {sendWarning && <p role="status" className="my-3 text-amber-700">{sendWarning} Los cobros en proceso todavía pueden confirmarse o aclararse.</p>}
           {account && <div className="my-5 space-y-3 border-t border-[var(--line)] pt-4">
             <label className="block">Importe a cobrar en efectivo<input aria-label="Importe a cobrar" className={field} inputMode="decimal" value={amount} placeholder={((account.balance_cents - account.reserved_cents) / 100).toFixed(2)} onChange={e => setAmount(e.target.value)} /></label>
-            <button className={`${button} w-full bg-blue-600 text-white`} disabled={disabled}
+            <button className={`${button} w-full bg-blue-600 text-white`} disabled={disabled || !!sendWarning}
               onClick={() => run(() => reservarEfectivoCaja(finance, account.account_id,
                 centavosDeTexto(amount || ((account.balance_cents - account.reserved_cents) / 100).toFixed(2))), 'Cobro preparado. Confirma cuando hayas recibido el efectivo.')}>Preparar cobro en efectivo</button>
 
@@ -144,7 +149,7 @@ export default function CobroDeCaja({ order, onClose, onChanged }: Props) {
               <label className="block text-sm">Terminal donde se pasa la tarjeta
                 <input aria-label="Terminal bancaria" className={field} value={terminal}
                   onChange={e => setTerminal(e.target.value)} /></label>
-              <button className={`${button} mt-3 w-full border border-blue-600 text-blue-600`} disabled={disabled || !terminal.trim()}
+              <button className={`${button} mt-3 w-full border border-blue-600 text-blue-600`} disabled={disabled || !!sendWarning || !terminal.trim()}
                 onClick={() => run(() => reservarCobroExterno(finance, account.account_id,
                   centavosDeTexto(amount || ((account.balance_cents - account.reserved_cents) / 100).toFixed(2)), terminal),
                   'Importe apartado. Pasa la tarjeta en la terminal y registra aquí el resultado.')}>
@@ -186,9 +191,9 @@ export default function CobroDeCaja({ order, onClose, onChanged }: Props) {
         </>}
         {finance.payments.some(p => p.status === 'accepted') && <div className="mt-5 border-t border-[var(--line)] pt-4">
           <h3 className="font-bold">Pagos confirmados</h3>
-          {finance.payments.filter(p => p.status === 'accepted').map(p => <p key={p.payment_id} className="mt-2 text-sm">
+          {finance.payments.filter(p => p.status === 'accepted').map(p => <div key={p.payment_id} className="mt-2 space-y-2 text-sm"><p>
             {pesosDeCentavos(p.amount_cents)} · {p.method === 'cash' ? 'Efectivo' : (p.provider || 'Terminal')}{p.change_cents ? ` · Cambio ${pesosDeCentavos(p.change_cents)}` : ''}
-          </p>)}
+          </p><DocumentoImpresoDeCaja order={{ id: finance.order_id, order_revision: finance.order_revision, financial_order: finance }} paymentId={p.payment_id} />{p.method === 'cash' && <CajonDeCaja turnoId={finance.turno_id} orderId={finance.order_id} paymentId={p.payment_id} />}</div>)}
         </div>}
       </>}
     </div>

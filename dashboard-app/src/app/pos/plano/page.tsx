@@ -213,7 +213,7 @@ export default function PlanoPage() {
 
   // Push DELTA events from the local server → mesa state updates without waiting 30s
   useBridgeClient((event) => {
-    const MESA_EVENTS = ['ORDER_UPSERTED', 'ORDER_SENT', 'ORDER_CLOSED', 'MESA_LOCK', 'MESA_UNLOCK']
+    const MESA_EVENTS = ['ORDER_UPSERTED', 'ORDER_SENT', 'ORDER_ITEMS_TRANSFERRED', 'ORDER_CLOSED', 'MESA_LOCK', 'MESA_UNLOCK']
     if (MESA_EVENTS.includes(event.type)) fetchData()
   }, 'pos')
 

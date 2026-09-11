@@ -32,14 +32,14 @@ const enServicio = { turno: { id: 't1' }, mesas: [['1', { status: 'ocupada' }]],
 beforeEach(() => inst._reset())
 
 describe('Contrato con el servidor local', () => {
-  test('REGRESION: startLocalServer DEBE exportar `state`', () => {
+  test('REGRESION: startLocalServer DEBE exportar el proveedor de colas durables', () => {
     // Sin esto el instalador recibe undefined y no instala NUNCA, en silencio.
     const fs = require('fs')
     const path = require('path')
     const fuente = fs.readFileSync(path.join(__dirname, '..', 'index.js'), 'utf8')
       .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
-    assert.match(fuente, /return \{[^}]*\bstate\b[^}]*\}/,
-      'local-server/index.js debe devolver `state` en su objeto de retorno')
+    assert.match(fuente, /return \{[^}]*\bgetInstallSnapshot\b[^}]*\}/,
+      'local-server/index.js debe devolver el proveedor vivo de estado y colas')
   })
 })
 

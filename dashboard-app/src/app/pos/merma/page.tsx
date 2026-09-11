@@ -1,5 +1,7 @@
 'use client'
 
+import PendingMovementRecovery from '@/components/inventory/PendingMovementRecovery'
+
 import { useState, useEffect } from 'react'
 import { Trash2, Search, Plus, Check, ArrowLeft } from 'lucide-react'
 import { getIngredients, logAudit } from '@/lib/pos-data'
@@ -96,7 +98,7 @@ export default function MermaPage() {
       // descuenta stock + previene underflow (piso 0) + idempotencia, ATÓMICO. Antes esta
       // página hacía insert al ledger + PATCH directo a pos_inventory por separado — prohibido
       // (corrompe stock/costo, doble-click duplicaba, sin idempotencia). Ahora usa el contrato.
-      const { recordMovement } = await import('@/lib/inventory')
+      const { recordMovement, confirmarMovimientoInventario } = await import('@/lib/inventory')
       // LA CLAVE SE ARMABA CON EL CONTENIDO, Y EL CONTENIDO SE REPITE.
       //
       // Antes era `merma-<fecha>-` + los pares ingrediente:cantidad, cortados a 140
@@ -146,6 +148,7 @@ export default function MermaPage() {
       })
 
       // Guardado confirmado: lo siguiente que se capture es OTRA merma, con otra clave.
+      await confirmarMovimientoInventario(_cid(), idempotency_key)
       confirmarOperacion()
       setSaved(true)
       setEntries([])
@@ -164,6 +167,7 @@ export default function MermaPage() {
 
   return (
     <div className="h-dvh overflow-y-auto pos-fat-scroll max-w-2xl mx-auto">
+      <PendingMovementRecovery />
       <div className="flex items-center gap-3 mb-6">
         <Link href="/pos" className="p-2 rounded-lg hover:bg-[var(--surface-2)] text-[var(--text-3)]">
           <ArrowLeft size={16} />

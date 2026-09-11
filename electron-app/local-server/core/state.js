@@ -13,6 +13,13 @@ const PREPARATION_STATUS = new Set(['enviada', 'preparando', 'lista', 'entregada
 const FINANCIAL_CLOSED = new Set(['cerrada', 'pagada', 'closed', 'paid'])
 const cancelled = o => o.status === 'cancelada' || o.status === 'void'
 const settled = o => o.payment_status === 'pagada' || FINANCIAL_CLOSED.has(o.status)
+// Cloud account revisions order full snapshots, not independent kitchen status
+// events. Zero/absent revisions are legacy offline writes, not cloud versions.
+function staleAccountSnapshot(existing, payload) {
+  return existing && (payload.items != null || payload.items_sent != null) &&
+    Number.isSafeInteger(payload.order_revision) && payload.order_revision > 0 &&
+    Number.isSafeInteger(existing.order_revision) && payload.order_revision < existing.order_revision
+}
 // Preserve only business fields. Command credentials/transport metadata must never
 // enter a snapshot sent to another terminal.
 function orderFields(payload) {
@@ -44,10 +51,18 @@ class RestaurantState {
     this._locks  = new Map()  // mesa → { client_id, expires_ms }
     this._turno  = null       // { id, opened_by, opened_at } | null
     this._turnIdentities = new Set()
+    this._orderNumbers = new Map() // turno_id → last committed ordinal (including settled/void orders)
     this._turnSummaries = new Map()
+    this._cashMovements = new Map()
+    this._itemTransfers = new Set()
     this._lastSupabaseSync = null
     this._orderSnapshotComplete = false
     this._financialOrders = new Map()
+    this._printDocuments = new Map()
+    this._printResolutions = new Map()
+    this._canonicalPrintJobs = new Map()
+    this._drawerOperations = new Map()
+    this._drawerResolutions = new Map()
   }
 
   // ─── Projection ─────────────────────────────────────────────────────────
@@ -55,21 +70,58 @@ class RestaurantState {
   /** Apply one event to the state. Returns the fields that changed. */
   apply(event) {
     const { type, payload } = event
+    if (['PAYMENT_DRAWER_OPEN', 'DRAWER_OPEN'].includes(type) && event.result?.drawer_operation) {
+      const operation = JSON.parse(JSON.stringify(event.result.drawer_operation))
+      this._drawerOperations.set(operation.operation_id, operation)
+      return { changed: ['drawer_operations'] }
+    }
+    if (type === 'DRAWER_UNCERTAIN_RESOLVE' && event.result?.drawer_resolution) {
+      const resolution = JSON.parse(JSON.stringify(event.result.drawer_resolution))
+      this._drawerResolutions.set(JSON.stringify([resolution.job_id, resolution.uncertain_episode_id]), { ...resolution, command_id: payload.command_id })
+      return { changed: ['drawer_resolutions'] }
+    }
+    if (['ORDER_SEND', 'ORDER_PRECHECK_PRINT', 'PAYMENT_RECEIPT_PRINT'].includes(type)) {
+      for (const job of event.effects?.print_jobs || []) this._canonicalPrintJobs.set(job.job_id, {
+        job_id: job.job_id, command_id: payload.command_id, document_type: job.document_type,
+      })
+    }
+    if (type === 'PRINT_UNCERTAIN_RESOLVE' && event.result?.print_resolution) {
+      const resolution = JSON.parse(JSON.stringify(event.result.print_resolution))
+      this._printResolutions.set(JSON.stringify([resolution.job_id, resolution.uncertain_episode_id]), { ...resolution, command_id: payload.command_id })
+      return { changed: ['print_resolutions'] }
+    }
+    if (['ORDER_PRECHECK_PRINT', 'PAYMENT_RECEIPT_PRINT'].includes(type) && event.result?.print_document) {
+      const document = JSON.parse(JSON.stringify(event.result.print_document))
+      this._printDocuments.set(document.document_id, document)
+      return { changed: ['print_documents'] }
+    }
     if (['ORDER_SAVE', 'ORDER_SEND', 'ORDER_MOVE', 'ORDER_VOID', 'KITCHEN_SET'].includes(type) && event.result?.operational_order) {
       const order = JSON.parse(JSON.stringify(event.result.operational_order))
+      const financial = event.result.financial_order
+      if (financial) {
+        this._financialOrders.set(financial.order_id, JSON.parse(JSON.stringify(financial)))
+        order.saldo = financial.balance_cents / 100
+        order.payment_status = financial.status === 'settled' ? 'pagada' : 'pendiente'
+      }
       const previous = this._orders.get(order.order_id)
       if (previous?.mesa != null && this._mesas.get(String(previous.mesa))?.order_id === order.order_id) {
         this._mesas.set(String(previous.mesa), { status: 'libre', order_id: null, locked_by: null })
       }
       order._from_cloud = false
       this._orders.set(order.order_id, order)
+      this._rememberOrderNumber(order)
       if (order.mesa != null && !cancelled(order) && !settled(order)) this._mesas.set(String(order.mesa), { status: 'ocupada', order_id: order.order_id, locked_by: null })
       this._kds = this._kds.filter(k => k.order_id !== order.order_id)
       if (order._kds_sent && !cancelled(order) && order.preparation_status !== 'entregada') {
         this._kds.push({ order_id: order.order_id, mesa: order.mesa, items_sent: order.kitchen_items, sent_at: Date.parse(order.updated_at) })
       }
       this._orderSnapshotComplete = true
-      return { changed: ['orders', 'mesas', 'kds'] }
+      return { changed: ['orders', 'mesas', 'kds', ...(financial ? ['financial_orders'] : [])] }
+    }
+    if (type === 'CASH_MOVEMENT' && event.result?.cash_movement) {
+      const movement = JSON.parse(JSON.stringify(event.result.cash_movement))
+      this._cashMovements.set(movement.id, movement)
+      return { changed: ['cash_movements'] }
     }
     if (['TURN_OPEN', 'TURN_CLOSE'].includes(type) && event.result && 'turno' in event.result) {
       this._turno = event.result.turno ? JSON.parse(JSON.stringify(event.result.turno)) : null
@@ -97,11 +149,15 @@ class RestaurantState {
     }
 
     switch (type) {
+      case EVENT.ORDER_ITEMS_TRANSFERRED:
+        return this._applyItemsTransferred(payload)
       case EVENT.ORDER_UPSERTED:
         return this._applyOrderUpserted(payload)
 
       case EVENT.ORDER_SENT:
-        return this._applyOrderSent(payload)
+        // El ts del evento, no el reloj del replay: tras reiniciar Pedro las
+        // comandas conservan su antiguedad en cocina (barrido 2026-09-10, LENTE-5).
+        return this._applyOrderSent(payload, event.ts)
 
       case EVENT.ORDER_CLOSED:
         return this._applyOrderClosed(payload)
@@ -130,6 +186,11 @@ class RestaurantState {
         // el KDS en modo LAN amanecia con las comandas de ayer — el "empalme"
         // reportado en campo. Con _turno=null ademas _applyStateSync no filtraba
         // nada (belongsToAnotherTurno siempre false), asi que nada lo corregia.
+        //
+        // El aviso ahora es DURABLE (lib/aviso-lan.ts reintenta): un TURNO_CLOSED
+        // que llega horas tarde, ya con OTRO turno abierto, no puede barrer el piso
+        // del turno nuevo. Solo limpia si es el turno vigente (o no hay ninguno).
+        if (payload?.turno_id && this._turno?.id && payload.turno_id !== this._turno.id) return { changed: [] }
         this._turno = null
         this._orders.clear()
         this._kds = []
@@ -138,6 +199,9 @@ class RestaurantState {
         return { changed: ['turno', 'orders', 'kds', 'mesas'] }
 
       case EVENT.STATE_SYNC:
+        // Una foto heredada compactada al cargar el log (adapters/storage/ndjson.js)
+        // no trae salon: se salta. La siguiente foto viva la reemplaza entera.
+        if (payload?.compacted === true) return { changed: [] }
         return this._applyStateSync(payload)
 
       default:
@@ -150,6 +214,9 @@ class RestaurantState {
   _applyOrderUpserted(payload) {
     const { order_id, mesa, items, status } = payload
     const existing = this._orders.get(order_id)
+    // A replayed LAN update is not authorization to reopen a cancelled account.
+    if (existing && cancelled(existing)) return { changed: [] }
+    if (staleAccountSnapshot(existing, payload)) return { changed: [] }
     if (existing) {
       // Status update from KDS (preparando / lista / entregada) or POS merge
       this._orders.set(order_id, {
@@ -185,13 +252,81 @@ class RestaurantState {
     return { changed: ['mesas', 'orders'] }
   }
 
+  // A transfer is one projection transaction for both identities. It relocates
+  // existing preparation; unlike ORDER_SENT it never creates a print effect.
+  _applyItemsTransferred(payload) {
+    const { source_order: source, target_order: target, item_id, command_id } = payload
+    if (!source?.id || !target?.id || !Array.isArray(source.items) || !Array.isArray(target.items) ||
+      source.id === target.id || !item_id || this._itemTransfers.has(command_id)) return { changed: [] }
+    const parse = (value, fallback) => {
+      if (typeof value !== 'string') return value ?? fallback
+      try { return JSON.parse(value) } catch { return fallback }
+    }
+    const previousSource = this._orders.get(source.id)
+    const previousTarget = this._orders.get(target.id)
+    const previousItems = parse(previousSource?.items, [])
+    const movedIndex = previousItems.findIndex(i => i.id === item_id)
+    const moved = previousItems[movedIndex] || target.items.find(i => i.id === item_id)
+    const preparation = moved?.preparation_status || previousSource?.preparation_status || source.preparation_status || source.status
+    const wasSent = !!previousSource?._kds_sent || PREPARATION_STATUS.has(preparation)
+    const sourceDone = parse(previousSource?.kds_item_status, {})
+    const movedDone = sourceDone[movedIndex] ?? (preparation === 'lista' || preparation === 'entregada')
+    // Remap positional legacy completion flags by immutable item ID when a row
+    // leaves an account. Removing index 0 must not mark the next item done.
+    for (const [receipt, previous] of [[source, previousSource], [target, previousTarget]]) {
+      if (previous && (cancelled(previous) || staleAccountSnapshot(previous, receipt))) continue
+      this._applyOrderUpserted({ ...receipt, order_id: receipt.id })
+      const current = this._orders.get(receipt.id)
+      if (cancelled(current)) current._kds_sent = false
+      if (previous?.preparation_status) current.preparation_status = previous.preparation_status
+      const oldItems = parse(previous?.items, [])
+      const done = parse(previous?.kds_item_status, {})
+      const flags = {}
+      receipt.items.forEach((item, index) => {
+        const oldIndex = oldItems.findIndex(old => old.id === item.id)
+        if (oldIndex >= 0 && done[oldIndex] !== undefined) flags[index] = done[oldIndex]
+        else if (receipt.id === target.id && item.id === item_id && movedDone) flags[index] = true
+      })
+      current.kds_item_status = JSON.stringify(flags)
+    }
+    const destination = this._orders.get(target.id)
+    if (destination && !cancelled(destination) && wasSent) {
+      const items = parse(destination.items, [])
+      const index = items.findIndex(i => i.id === item_id)
+      if (index >= 0) {
+        // Preserve a newer destination's item metadata. Only carry preparation
+        // when this identity has not already advanced it independently.
+        if (!items[index].preparation_status && PREPARATION_STATUS.has(preparation)) {
+          items[index] = { ...items[index], preparation_status: movedDone && preparation !== 'entregada' ? 'lista' : preparation }
+        }
+        destination.items = JSON.stringify(items)
+        destination._kds_sent = true
+        if ((!previousTarget?._kds_sent || ['lista', 'entregada'].includes(previousTarget.preparation_status) && !movedDone) &&
+          !staleAccountSnapshot(previousTarget, target) && preparation !== 'entregada') destination.preparation_status = 'enviada'
+      }
+    }
+    // Rebuild both minimal queues from the resulting accounts, including when
+    // a newer snapshot made one side of the receipt stale.
+    for (const id of [source.id, target.id]) {
+      this._kds = this._kds.filter(k => k.order_id !== id)
+      const order = this._orders.get(id)
+      const items = parse(order?.items, []).filter(i => !i.cancelled && i.preparation_status !== 'entregada')
+      if (order?._kds_sent && !cancelled(order) && order.preparation_status !== 'entregada' && items.length) {
+        this._kds.push({ order_id: id, mesa: order.mesa, items_sent: items, sent_at: Date.parse(order.created_at) })
+      }
+    }
+    if (command_id) this._itemTransfers.add(command_id)
+    return { changed: ['orders', 'mesas', 'kds'] }
+  }
+
   // ORDER_SENT: first round OR additional round from same order.
   // POS always sends the FULL updated items list on each round.
   // On first send: store complete order object so KDS can display without Supabase.
   // On subsequent sends: replace items (preserving kds_item_status — new indices
   //   are absent from the map which the KDS treats as not-done).
-  _applyOrderSent(payload) {
+  _applyOrderSent(payload, ts = null) {
     const { order_id, mesa, mesero, status, notas, comanda_batches, personas, total, turno_id } = payload
+    const momento = Number.isFinite(ts) && ts > 0 ? ts : Date.now()
     // Accept both 'items' (POS broadcast) and 'items_sent' (legacy test fixture / old protocol)
     const items = payload.items ?? payload.items_sent ?? []
     const itemsStr = typeof items === 'string' ? items : JSON.stringify(items)
@@ -199,6 +334,8 @@ class RestaurantState {
       ? (typeof comanda_batches === 'string' ? comanda_batches : JSON.stringify(comanda_batches))
       : null
     const existing = this._orders.get(order_id)
+    if (existing && cancelled(existing)) return { changed: [] }
+    if (staleAccountSnapshot(existing, payload)) return { changed: [] }
 
     if (existing && existing._kds_sent) {
       // Additional round — replace items, preserve kds_item_status and immutable fields
@@ -210,11 +347,11 @@ class RestaurantState {
         comanda_batches:  combatStr ?? existing.comanda_batches,
         status:           'enviada',   // new round resets to enviada
         preparation_status: 'enviada',
-        updated_at:       new Date().toISOString(),
+        updated_at:       new Date(momento).toISOString(),
         // kds_item_status NOT touched — new item indices are simply absent (→ not-done)
       })
     } else {
-      const now = new Date().toISOString()
+      const now = new Date(momento).toISOString()
       this._orders.set(order_id, {
         id:               order_id,
         order_id,
@@ -242,7 +379,7 @@ class RestaurantState {
     // kds_queue: minimal entry for Supabase-poll STATE_SYNC compatibility
     const inKds = this._kds.find(k => k.order_id === order_id)
     if (!inKds) {
-      this._kds.push({ order_id, mesa, items_sent: items || [], sent_at: Date.now() })
+      this._kds.push({ order_id, mesa, items_sent: items || [], sent_at: momento })
     } else {
       inKds.items_sent = items || []
     }
@@ -266,9 +403,18 @@ class RestaurantState {
   }
 
   _applyOrderCancelled({ order_id, mesa }) {
-    this._orders.delete(order_id)
+    // Retain the cancellation through event replay so late updates cannot revive
+    // this identity. The table may already belong to a newer account.
+    const order = this._orders.get(order_id)
+    this._orders.set(order_id, { ...order, id: order_id, order_id,
+      mesa: order?.mesa ?? mesa, status: 'cancelada', _from_cloud: false, _kds_sent: false })
     this._kds = this._kds.filter(k => k.order_id !== order_id)
-    if (mesa) this._mesas.set(String(mesa), { status: 'libre', order_id: null, locked_by: null })
+    for (const table of new Set([mesa, order?.mesa])) {
+      if (table != null && this._mesas.get(String(table))?.order_id === order_id) {
+        this._mesas.set(String(table), { status: 'libre', order_id: null, locked_by: null })
+        this._locks.delete(String(table))
+      }
+    }
     return { changed: ['mesas', 'orders', 'kds'] }
   }
 
@@ -363,6 +509,9 @@ class RestaurantState {
     for (const [orderId, order] of this._orders) {
       if (!order._kds_sent) continue
       const belongsToAnotherTurno = activeTurnoId && order.turno_id && order.turno_id !== activeTurnoId
+      // Una orden local YA COBRADA de un turno que la nube ya cerro es el empalme
+      // de ayer: no debe dinero ni trabajo. Se retira aunque sea local.
+      if (!order._from_cloud && belongsToAnotherTurno && settled(order)) { this._orders.delete(orderId); continue }
       const absentAndPastGrace = !pollOrderIds.has(orderId) && !protectedOrderIds.has(orderId)
       if (!protectedOrderIds.has(orderId) && (belongsToAnotherTurno || absentAndPastGrace)) this._orders.delete(orderId)
     }
@@ -374,9 +523,10 @@ class RestaurantState {
       for (const m of mesas) {
         const key = String(m.mesa)
         if (protectedMesas.has(key)) continue  // no pisar mesa con orden local fresca
+        const locallyCancelled = m.order_id && cancelled(this._orders.get(m.order_id) || {})
         this._mesas.set(key, {
-          status:    m.status || (m.order_id ? 'ocupada' : 'libre'),
-          order_id:  m.order_id || null,
+          status:    locallyCancelled ? 'libre' : m.status || (m.order_id ? 'ocupada' : 'libre'),
+          order_id:  locallyCancelled ? null : m.order_id || null,
           locked_by: null,
         })
       }
@@ -384,7 +534,7 @@ class RestaurantState {
     }
     if (kds_queue) {
       const protectedKds = this._kds.filter((k) => protectedOrderIds.has(k.order_id))
-      const fromPoll     = kds_queue.filter((k) => !protectedOrderIds.has(k.order_id))
+      const fromPoll     = kds_queue.filter((k) => !protectedOrderIds.has(k.order_id) && !cancelled(this._orders.get(k.order_id) || {}))
       this._kds = [...fromPoll, ...protectedKds]
     }
     if (turno !== undefined) {
@@ -421,11 +571,31 @@ class RestaurantState {
         // platillos y la preparacion se conservan, igual que en _applyOrderClosed (D2).
         // Y solo se libera la mesa si sigue apuntando a ESTA orden.
         if (existing && !existing._from_cloud) {
-          if (FINANCIAL_CLOSED.has(row.status) && !settled(existing) && !cancelled(existing)) {
-            this._orders.set(id, { ...existing, payment_status: 'pagada', saldo: 0,
-              closed_at: row.closed_at || existing.closed_at || new Date().toISOString(),
+          // UNA FILA CANCELADA EN NUBE TAMBIEN ES UN RECIBO (misma familia que el
+          // cierre de abajo): el POS cancela contra la nube antes de avisar a la
+          // LAN, y si el aviso se pierde la cocina seguia preparando y la mesa
+          // quedaba ocupada hasta el corte (barrido 2026-09-10, pedro-core LENTE-2).
+          if (cancelled(row) && !cancelled(existing) && !settled(existing)) {
+            this._applyOrderCancelled({ order_id: id, mesa: existing.mesa })
+            continue
+          }
+          // Mesa movida en la nube: se libera la vieja si aun apunta aqui y se
+          // ocupa la nueva si nadie mas la tiene.
+          if (row.mesa != null && existing.mesa != null && String(row.mesa) !== String(existing.mesa) &&
+              !settled(existing) && !cancelled(existing)) {
+            const vieja = String(existing.mesa), nueva = String(row.mesa)
+            if (this._mesas.get(vieja)?.order_id === id) { this._mesas.set(vieja, { status: 'libre', order_id: null, locked_by: null }); this._locks.delete(vieja) }
+            const ocupante = this._mesas.get(nueva)?.order_id
+            if (!ocupante || ocupante === id) this._mesas.set(nueva, { status: 'ocupada', order_id: id, locked_by: null })
+            this._orders.set(id, { ...existing, mesa: row.mesa, updated_at: new Date().toISOString() })
+            this._kds = this._kds.map(k => k.order_id === id ? { ...k, mesa: row.mesa } : k)
+          }
+          const actual = this._orders.get(id)
+          if (FINANCIAL_CLOSED.has(row.status) && !settled(actual) && !cancelled(actual)) {
+            this._orders.set(id, { ...actual, payment_status: 'pagada', saldo: 0,
+              closed_at: row.closed_at || actual.closed_at || new Date().toISOString(),
               updated_at: new Date().toISOString() })
-            const mesa = existing.mesa != null ? String(existing.mesa) : null
+            const mesa = actual.mesa != null ? String(actual.mesa) : null
             if (mesa && this._mesas.get(mesa)?.order_id === id) {
               this._mesas.set(mesa, { status: 'libre', order_id: null, locked_by: null })
               this._locks.delete(mesa)
@@ -438,6 +608,17 @@ class RestaurantState {
           preparation_status: row.preparation_status ?? (PREPARATION_STATUS.has(row.status) ? row.status : null),
           payment_status: row.payment_status ?? (FINANCIAL_CLOSED.has(row.status) ? 'pagada' : 'pendiente'),
         })
+        // La fila dice cancelada/cerrada pero la mesa pudo quedar "protegida" por
+        // la ventana de gracia (orden fresca ausente de mesas/kds_queue): la
+        // proteccion es contra la AUSENCIA, no contra una fila que si llego.
+        if (cancelled(row) || FINANCIAL_CLOSED.has(row.status)) {
+          const mesa = row.mesa ?? existing?.mesa
+          if (mesa != null && this._mesas.get(String(mesa))?.order_id === id) {
+            this._mesas.set(String(mesa), { status: 'libre', order_id: null, locked_by: null })
+            this._locks.delete(String(mesa))
+          }
+          if (cancelled(row)) this._kds = this._kds.filter(k => k.order_id !== id)
+        }
       }
       this._orderSnapshotComplete = order_snapshot_complete === true && orders.every(row => {
         if (!(row?.id ?? row?.order_id)) return false
@@ -496,16 +677,29 @@ class RestaurantState {
   hidratarDesdeSnapshot(snap) {
     if (!snap || typeof snap !== 'object') return false
     this._writeAuthority = snap.write_authority === 'caja' ? 'caja' : 'legacy'
+    this._itemTransfers = new Set(Array.isArray(snap.item_transfers) ? snap.item_transfers : [])
 
+    this._cashMovements = new Map((Array.isArray(snap.cash_movements) ? snap.cash_movements : []).map(m => [m.id, JSON.parse(JSON.stringify(m))]))
     this._mesas = new Map(Object.entries(snap.mesas || {}))
     this._locks = new Map(Object.entries(snap.locks || {}))
     this._kds   = Array.isArray(snap.kds_queue) ? [...snap.kds_queue] : []
+    this._orderNumbers = new Map(Object.entries(snap.order_numbers || {}).filter(([, n]) => Number.isSafeInteger(n) && n >= 0 && n <= 2147483647))
     this._turno = snap.turno ?? null
     this._turnIdentities = new Set(Array.isArray(snap.turn_identities) ? snap.turn_identities : [])
     this._turnSummaries = new Map((Array.isArray(snap.turn_summaries) ? snap.turn_summaries : []).filter(t => t?.id).map(t => [t.id, JSON.parse(JSON.stringify(t))]))
     this._lastSupabaseSync = snap.last_supabase_sync ?? null
     this._financialOrders = new Map((Array.isArray(snap.financial_orders) ? snap.financial_orders : [])
       .filter(o => o?.order_id).map(o => [o.order_id, JSON.parse(JSON.stringify(o))]))
+    this._printDocuments = new Map((Array.isArray(snap.print_documents) ? snap.print_documents : [])
+      .filter(d => d?.document_id).map(d => [d.document_id, JSON.parse(JSON.stringify(d))]))
+    this._printResolutions = new Map((Array.isArray(snap.print_resolutions) ? snap.print_resolutions : [])
+      .filter(r => r?.job_id && r?.uncertain_episode_id).map(r => [JSON.stringify([r.job_id, r.uncertain_episode_id]), JSON.parse(JSON.stringify(r))]))
+    this._canonicalPrintJobs = new Map((Array.isArray(snap.canonical_print_jobs) ? snap.canonical_print_jobs : [])
+      .filter(j => j?.job_id && j?.command_id).map(j => [j.job_id, { ...j }]))
+    this._drawerOperations = new Map((Array.isArray(snap.drawer_operations) ? snap.drawer_operations : [])
+      .filter(o => o?.operation_id).map(o => [o.operation_id, JSON.parse(JSON.stringify(o))]))
+    this._drawerResolutions = new Map((Array.isArray(snap.drawer_resolutions) ? snap.drawer_resolutions : [])
+      .filter(r => r?.job_id && r?.uncertain_episode_id).map(r => [JSON.stringify([r.job_id, r.uncertain_episode_id]), JSON.parse(JSON.stringify(r))]))
 
     // `toSnapshot` quita el flag interno `_kds_sent` antes de mandar. Se repone:
     // sin el, `toSnapshot` de ESTA terminal filtraria las ordenes y el KDS local
@@ -516,8 +710,15 @@ class RestaurantState {
     for (const o of [...kitchen, ...(Array.isArray(snap.salon_orders) ? snap.salon_orders : [])]) {
       const id = o?.order_id ?? o?.id
       if (!id) continue
-      this._orders.set(id, { ...o, id, order_id: id, _kds_sent: kitchenIds.has(id) || !!o.preparation_status })
+      this._orders.set(id, { ...o, id, order_id: id, _from_cloud: o.from_cloud === true, _kds_sent: kitchenIds.has(id) || !!o.preparation_status })
     }
+    // Cancelled identities are absent from both visible projections, but must
+    // survive reconnect so a delayed broadcast cannot recreate their debt.
+    for (const o of Array.isArray(snap.cancelled_orders) ? snap.cancelled_orders : []) {
+      const id = o?.order_id ?? o?.id
+      if (id && cancelled(o)) this._orders.set(id, { ...o, id, order_id: id, _from_cloud: false, _kds_sent: false })
+    }
+    for (const order of this._orders.values()) this._rememberOrderNumber(order)
     this._orderSnapshotComplete = snap.order_snapshot_complete === true
     return true
   }
@@ -525,8 +726,17 @@ class RestaurantState {
   toSnapshot() {
     // D2: kitchen is preparation work; salon is unsettled debt. Both carry the
     // full order and the financial result so a secondary can reopen the account.
-    const clean = ({ _kds_sent, _from_cloud, ...rest }) => ({ ...rest, saldo: balanceOf(rest),
+    // `from_cloud` viaja en la foto: sin el, una secundaria hidratada trataba TODA
+    // orden como local y ninguna foto de la nube podia quitarle, cancelar ni
+    // mover una orden que en la caja venia de la nube (tableros divergentes hasta
+    // la siguiente reconexion; barrido 2026-09-10, pedro-core LENTE-3).
+    const clean = ({ _kds_sent, _from_cloud, ...rest }) => ({ ...rest, ...(_from_cloud === true ? { from_cloud: true } : {}), saldo: balanceOf(rest),
       financial_order: this._financialOrders.get(rest.order_id ?? rest.id) ?? null })
+    // D2 (ADR-005): el cobro no borra trabajo de cocina; una comanda cobrada se
+    // queda hasta que la cocina la ENTREGA. En legacy no habia boton de entrega
+    // (solo bajo Caja) y cada ticket cobrado quedaba verde hasta el corte (barrido
+    // 2026-09-10, kds LENTE-2): kds-ui.html ahora ofrece «Entregar ronda» tambien
+    // en legacy (ORDER_UPSERTED 'entregada', comando de solo preparacion).
     const kds_orders = [...this._orders.values()]
       .filter(o => o._kds_sent && !cancelled(o) &&
         (o.preparation_status ?? o.status) !== 'entregada' &&
@@ -539,24 +749,50 @@ class RestaurantState {
 
     return {
       write_authority: this._writeAuthority,
+      item_transfers: [...this._itemTransfers],
       mesas:              Object.fromEntries(this._mesas),
       kds_queue:          [...this._kds],
       kds_orders,
       salon_orders,
+      cancelled_orders: [...this._orders.values()].filter(cancelled).map(o => ({
+        id: o.order_id ?? o.id, order_id: o.order_id ?? o.id, mesa: o.mesa, status: 'cancelada',
+      })),
       order_snapshot_complete,
       financial_orders: this.getFinancialOrders(),
+      print_documents: this.getPrintDocuments(),
+      print_resolutions: [...this._printResolutions.values()].map(resolution => JSON.parse(JSON.stringify(resolution))),
+      canonical_print_jobs: [...this._canonicalPrintJobs.values()].map(job => ({ ...job })),
+      drawer_operations: this.getDrawerOperations(),
+      drawer_resolutions: [...this._drawerResolutions.values()].map(resolution => JSON.parse(JSON.stringify(resolution))),
+      cash_movements: this.getCashMovements(),
       turno:              this._turno,
       turn_identities: [...this._turnIdentities],
+      order_numbers: Object.fromEntries(this._orderNumbers),
       turn_summaries: [...this._turnSummaries.values()].map(t => JSON.parse(JSON.stringify(t))),
       locks:              Object.fromEntries(this._locks),
       last_supabase_sync: this._lastSupabaseSync,
     }
   }
 
+  _rememberOrderNumber(order) {
+    if (order.authority !== 'caja' || !order.turno_id) return
+    const last = this._orderNumbers.get(order.turno_id) || 0
+    if (Number.isSafeInteger(order.order_number) && order.order_number > last) this._orderNumbers.set(order.turno_id, order.order_number)
+  }
+  getNextOrderNumber(turnoId) { return (this._orderNumbers.get(turnoId) || 0) + 1 }
+
   getMesa(mesa)    { return this._mesas.get(String(mesa)) || { status: 'libre', order_id: null } }
   getOrder(id) { const order = this._orders.get(id); return order ? JSON.parse(JSON.stringify(order)) : null }
   getFinancialOrder(id) { const order = this._financialOrders.get(id); return order ? JSON.parse(JSON.stringify(order)) : null }
+  getCashMovements() { return [...this._cashMovements.values()].map(m => JSON.parse(JSON.stringify(m))) }
   getFinancialOrders() { return [...this._financialOrders.values()].map(order => JSON.parse(JSON.stringify(order))) }
+  getPrintDocuments() { return [...this._printDocuments.values()].map(document => JSON.parse(JSON.stringify(document))) }
+  getPrintDocument(id) { const document = this._printDocuments.get(id); return document ? JSON.parse(JSON.stringify(document)) : null }
+  getPrintResolution(jobId, episodeId) { const resolution = this._printResolutions.get(JSON.stringify([jobId, episodeId])); return resolution ? JSON.parse(JSON.stringify(resolution)) : null }
+  getCanonicalPrintJob(jobId) { const job = this._canonicalPrintJobs.get(jobId); return job ? { ...job } : null }
+  getDrawerOperations() { return [...this._drawerOperations.values()].map(operation => JSON.parse(JSON.stringify(operation))) }
+  getDrawerOperation(id) { const operation = this._drawerOperations.get(id); return operation ? JSON.parse(JSON.stringify(operation)) : null }
+  getDrawerResolution(jobId, episodeId) { const resolution = this._drawerResolutions.get(JSON.stringify([jobId, episodeId])); return resolution ? JSON.parse(JSON.stringify(resolution)) : null }
   getKdsQueue()    { return [...this._kds] }
   getTurno()       { return this._turno }
   getLock(mesa)    { return this._locks.get(String(mesa)) || null }

@@ -162,7 +162,10 @@ describe('el camino del cobro conserva su red de seguridad', () => {
       .map((i, n) => db.slice(i, bucles[n + 1] ?? db.length))
       .find(b => b.includes('markSynced('))
     expect(drenado, 'no encontré el bucle de drenado').toBeTruthy()
-    expect(drenado!, 'el drenado debe envolver cada item en try').toMatch(/^for \(const item of queue\) \{[\s\S]{0,400}try \{/)
+    // 700 y no 400: desde 2026-09-10 antes del try hay guardas de `continue` (orden
+    // detenida, item terminal, reintentos agotados) que no lanzan; el try sigue
+    // envolviendo todo lo que si puede fallar.
+    expect(drenado!, 'el drenado debe envolver cada item en try').toMatch(/^for \(const item of queue\) \{[\s\S]{0,700}try \{/)
     expect(drenado!).toMatch(/catch \(error\) \{[\s\S]{0,200}incrementRetry/)
   })
 })

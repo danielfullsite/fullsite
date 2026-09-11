@@ -103,6 +103,37 @@ function puedeInstalarAhora(snapshot) {
     return { permitido: false, motivo: 'no se pudo leer el estado del restaurante' }
   }
 
+  if (!Object.prototype.hasOwnProperty.call(snapshot, 'turno') ||
+    !Array.isArray(snapshot.kds_orders) || !snapshot.mesas || typeof snapshot.mesas !== 'object' ||
+    snapshot.order_snapshot_complete === false) {
+    return { permitido: false, motivo: 'el estado del restaurante está incompleto' }
+  }
+  const readiness = snapshot.install_readiness
+  if (readiness) {
+    if (readiness.primary !== true) return { permitido: false, motivo: 'la terminal secundaria no confirma el reposo de Caja' }
+    if (readiness.commands_in_flight !== 0) return { permitido: false, motivo: 'hay comandos locales en curso' }
+    if (!readiness.storage_available) return { permitido: false, motivo: 'no se confirmó el almacenamiento durable' }
+    if (readiness.authority_required && snapshot.write_authority !== 'caja') return { permitido: false, motivo: 'no se confirmó la autoridad de Caja' }
+    if (!Array.isArray(readiness.print_jobs)) return { permitido: false, motivo: 'no se pudo verificar la cola de impresión' }
+    if (readiness.print_jobs.some(job => !['printed', 'cancelled'].includes(job.status))) return { permitido: false, motivo: 'hay impresión pendiente o sin resolver' }
+    if (readiness.business_required) {
+      const sync = readiness.business_sync
+      if (!sync?.configured || sync.error || sync.pending_events !== 0 ||
+        !Number.isSafeInteger(readiness.last_sequence) || readiness.last_sequence < 0 ||
+        sync.last_sequence !== readiness.last_sequence) return { permitido: false, motivo: 'hay comandos de negocio pendientes de confirmar en la nube' }
+    }
+    if (snapshot.write_authority === 'caja' && (!Array.isArray(snapshot.financial_orders) || !Array.isArray(snapshot.salon_orders))) return { permitido: false, motivo: 'faltan las cuentas de Caja' }
+  } else if (snapshot.write_authority === 'caja') {
+    return { permitido: false, motivo: 'faltan las colas durables de Caja' }
+  }
+  if (Array.isArray(snapshot.salon_orders) && snapshot.salon_orders.length) return { permitido: false, motivo: 'hay cuentas abiertas en el salón' }
+  if (Array.isArray(snapshot.financial_orders) && snapshot.financial_orders.some(order =>
+    !Number.isSafeInteger(order.balance_cents) || order.balance_cents !== 0 ||
+    !Number.isSafeInteger(order.reserved_cents) || order.reserved_cents !== 0 ||
+    !Array.isArray(order.payments) || order.payments.some(payment => ['pending', 'unknown'].includes(payment.status)))) {
+    return { permitido: false, motivo: 'hay saldos o reservas de pago por resolver' }
+  }
+
   if (snapshot.turno) {
     return { permitido: false, motivo: 'hay un turno abierto' }
   }
@@ -112,8 +143,8 @@ function puedeInstalarAhora(snapshot) {
     return { permitido: false, motivo: `hay ${kds.length} comanda(s) en la cocina` }
   }
 
-  // `mesas` llega como pares [numero, {status}] desde toSnapshot().
-  const mesas = Array.isArray(snapshot.mesas) ? snapshot.mesas : []
+  // El snapshot actual usa un objeto; se aceptan también los pares legacy.
+  const mesas = Array.isArray(snapshot.mesas) ? snapshot.mesas : Object.values(snapshot.mesas)
   const ocupadas = mesas.filter(m => {
     const v = Array.isArray(m) ? m[1] : m
     return v && v.status && v.status !== 'libre'

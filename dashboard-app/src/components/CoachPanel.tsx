@@ -1,5 +1,7 @@
 'use client'
 
+import ReportUnavailable from '@/components/ReportUnavailable'
+
 import { useEffect, useState, useMemo } from 'react'
 import {
   Sparkles, TrendingUp, TrendingDown, AlertTriangle, Calendar,
@@ -170,14 +172,17 @@ function generateInsights(data: WansoftDaily[]): { insights: Insight[]; summary:
 
 export default function CoachPanel() {
   const [data, setData] = useState<WansoftDaily[]>([])
+  const [reportError, setReportError] = useState(false)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
 
   async function loadData() {
+    setReportError(false); setLoading(true)
     try {
       const days = await getRecentDays(30)
       setData(days)
     } catch (err) {
+      setReportError(true)
       console.error('Coach: error loading data', err)
     } finally {
       setLoading(false)
@@ -200,6 +205,8 @@ export default function CoachPanel() {
   const latestDate = data.length > 0
     ? [...data].sort((a, b) => b.fecha.localeCompare(a.fecha))[0].fecha
     : null
+
+  if (reportError) return <ReportUnavailable onRetry={loadData} />
 
   if (loading) {
     return (

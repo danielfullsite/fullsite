@@ -102,6 +102,10 @@ export async function POST(request: NextRequest) {
 
     return Response.json({
       ...mergeResult,
+      // These are the exact values accepted by the revision-checked RPC, not a
+      // later read that could pair newer items with the merge's old revision.
+      target_order: { id: target_order_id, items: merged_items, order_revision: mergeResult.target_revision,
+        total: sTotal, subtotal, iva, personas, notas },
       reconciliation: reconResults,
     })
   } catch (err) {

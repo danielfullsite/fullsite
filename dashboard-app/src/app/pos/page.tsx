@@ -1,5 +1,8 @@
 'use client'
 
+import { prepararTransferenciaItem } from '@/lib/transferencia-item'
+import { confirmarCancelacionItem } from '@/lib/cancelacion-cliente'
+import { setOrderInventoryPending } from '@/lib/order-inventory-pending'
 import { Component, useState, useCallback, useEffect, useRef, Suspense, type ErrorInfo, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
@@ -18,7 +21,6 @@ import {
   addOrderItems,
   logAudit,
   deductIngredientsForOrder,
-  reverseIngredientDeduction,
   deductMarketStockForOrder,
   getRecipes,
   getIngredients,
@@ -45,11 +47,18 @@ import { calcSplitParejo, calcSplitItems } from '@/lib/pos-calculations'
 import { publishEvent, getDeviceId } from '@/lib/events'
 import { apiUrl } from '@/lib/api-base'
 import { sendOrderToKitchen, kitchenFailureMessage } from '@/lib/kitchen-bridge'
-import { avisarCierreDeOrden } from '@/lib/aviso-lan'
-import { cacheTrasElCierre } from '@/lib/cache-de-cuenta'
+import { avisarCierreDeOrden, avisarCuentaActualizada, avisarTransferenciaItem, avisarCuentaConfirmada } from '@/lib/aviso-lan'
+import { disposicionPropuesta, renglonesAnulados, renglonesVivos, resumenDeDisposicion, type Disposicion } from '@/lib/anulacion-completa'
+import { recordarOrdenEncolada } from '@/lib/pos-mesa-cache'
+import { cacheTrasElCierre, cachePreferidaAlAbrir } from '@/lib/cache-de-cuenta'
 import { leerCuenta, requiereCaja, cuentaConfirmada, type LecturaDeCuenta } from '@/lib/pedro-cliente'
 import { leerCatalogoCaja } from '@/lib/pedro-catalogo'
 import { guardarCuentaEnCaja, enviarCuentaEnCaja, moverCuentaEnCaja, anularCuentaEnCaja, GuardadoAnteriorRecuperado, firmaBorradorParaCaja, type OrdenConfirmada } from '@/lib/pedro-operaciones'
+import { type FinanzasDeCaja, pesosDeCentavos } from '@/lib/pedro-finanzas'
+import { crearSesionEditorCaja } from '@/lib/pos-editor-session'
+import CajonDeCaja from '@/components/pos/CajonDeCaja'
+import DocumentoImpresoDeCaja from '@/components/pos/DocumentoImpresoDeCaja'
+import ConsumoPendienteDeCaja from '@/components/pos/ConsumoPendienteDeCaja'
 import CobroDeCaja from '@/components/pos/CobroDeCaja'
 import { reconciliarCuenta, cuentaEditableDe, mismaConfirmacionDeCuenta, type CuentaEditable } from '@/lib/pos-order-reconciliation'
 import { evaluarLiquidacion, cuentasDe, intentoDePago } from '@/lib/liquidacion-de-orden'
@@ -1059,7 +1068,7 @@ function DiscountModal({ subtotal, personas, items, onApply, onCancel }: Discoun
 
 interface CancelModalProps {
   itemName: string
-  onConfirm: (reason: string, managerName: string, options: { prepared: boolean; voided: boolean }) => void
+  onConfirm: (reason: string, managerName: string, options: { prepared: boolean; voided: boolean }) => Promise<void>
   onCancel: () => void
 }
 
@@ -1071,6 +1080,16 @@ function CancelModal({ itemName, onConfirm, onCancel }: CancelModalProps) {
   const [managerName, setManagerName] = useState('')
   const [biometricAvailable, setBiometricAvailable] = useState(false)
   const [biometricChecking, setBiometricChecking] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+  const confirmingRef = useRef(false)
+  const confirm = async (options: { prepared: boolean; voided: boolean }) => {
+    if (confirmingRef.current) return
+    confirmingRef.current = true
+    setConfirming(true); setError('')
+    try { await onConfirm(reason, managerName, options) }
+    catch (failure) { setError(failure instanceof Error ? failure.message : 'Cancelación sin confirmar') }
+    finally { confirmingRef.current = false; setConfirming(false) }
+  }
 
   useEffect(() => {
     // Check if there are manager/admin biometric credentials stored
@@ -1142,7 +1161,7 @@ function CancelModal({ itemName, onConfirm, onCancel }: CancelModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/60" onClick={onCancel} />
+      <div className="absolute inset-0 bg-black/60" onClick={confirming ? undefined : onCancel} />
       <div className="relative bg-[var(--surface-2)] border border-red-700/40 rounded-2xl w-full max-w-md shadow-2xl mx-4 p-5">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-full bg-[var(--crit-soft)] flex items-center justify-center">
@@ -1226,31 +1245,36 @@ function CancelModal({ itemName, onConfirm, onCancel }: CancelModalProps) {
 
         {step === 'prepared' && (
           <>
+            {error && <p role="alert" className="mb-3 text-[var(--crit-ink)]">{error}</p>}
+            {confirming && <p role="status">Confirmando cancelación…</p>}
             <p className="text-[var(--text-4)] text-sm mb-4">Si se preparo, queda registrado como merma. Si fue un error operativo, puedes anular (no afecta metricas).</p>
             <div className="space-y-2 mb-5">
               <button
-                onClick={() => onConfirm(reason, managerName, { prepared: false, voided: false })}
+                disabled={confirming}
+                onClick={() => void confirm({ prepared: false, voided: false })}
                 className="w-full py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold transition-colors min-h-[48px] flex items-center justify-center gap-2"
               >
                 <Ban size={18} />
                 Cancelar — No se preparo
               </button>
               <button
-                onClick={() => onConfirm(reason, managerName, { prepared: true, voided: false })}
+                disabled={confirming}
+                onClick={() => void confirm({ prepared: true, voided: false })}
                 className="w-full py-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-semibold transition-colors min-h-[48px] flex items-center justify-center gap-2"
               >
                 <ShieldAlert size={18} />
                 Cancelar — Si, se preparo (merma)
               </button>
               <button
-                onClick={() => onConfirm(reason, managerName, { prepared: false, voided: true })}
+                disabled={confirming}
+                onClick={() => void confirm({ prepared: false, voided: true })}
                 className="w-full py-3 rounded-xl bg-[var(--surface-2)] hover:bg-[var(--text-4)] text-[var(--text-1)] font-semibold transition-colors min-h-[48px] flex items-center justify-center gap-2"
               >
                 <X size={18} />
                 Anular — Error operativo
               </button>
             </div>
-            <button onClick={() => setStep('reason')} className="w-full py-2.5 rounded-xl bg-[var(--line)] hover:bg-[var(--line)] text-[var(--text-4)] font-semibold transition-colors min-h-[44px]">
+            <button disabled={confirming} onClick={() => setStep('reason')} className="w-full py-2.5 rounded-xl bg-[var(--line)] hover:bg-[var(--line)] text-[var(--text-4)] font-semibold transition-colors min-h-[44px]">
               Volver
             </button>
           </>
@@ -1265,14 +1289,22 @@ function CancelModal({ itemName, onConfirm, onCancel }: CancelModalProps) {
 interface VoidOrderModalProps {
   mesa: number
   total: number
-  onConfirm: (reason: string, managerName: string) => void
-  onConfirmCaja?: (reason: string, pin: string) => Promise<void>
+  /** Renglones vivos de la cuenta: cada uno recibe una disposición de inventario. */
+  items: OrderItem[]
+  /** Los que ya se enviaron a cocina: se proponen como merma, nunca como devolución. */
+  enviados: Set<string>
+  onConfirm: (reason: string, managerName: string, disposiciones: Record<string, Disposicion>) => void
+  onConfirmCaja?: (reason: string, pin: string, disposiciones: Record<string, Disposicion>) => Promise<void>
   onCancel: () => void
 }
 
-function VoidOrderModal({ mesa, total, onConfirm, onConfirmCaja, onCancel }: VoidOrderModalProps) {
+function VoidOrderModal({ mesa, total, items, enviados, onConfirm, onConfirmCaja, onCancel }: VoidOrderModalProps) {
   const [reason, setReason] = useState('')
   const [pin, setPin] = useState('')
+  // H08: qué pasa con la mercancía de cada renglón. La propuesta es conservadora
+  // (lo enviado = merma); el gerente cambia lo que haga falta ANTES de teclear su PIN.
+  const [disposiciones, setDisposiciones] = useState<Record<string, Disposicion>>(() => disposicionPropuesta(items, enviados))
+  const resumen = resumenDeDisposicion(items, disposiciones)
   const [error, setError] = useState('')
   const [biometricAvail, setBiometricAvail] = useState(false)
   const [bioChecking, setBioChecking] = useState(false)
@@ -1315,7 +1347,7 @@ function VoidOrderModal({ mesa, total, onConfirm, onConfirmCaja, onCancel }: Voi
       if (assertion) {
         const credId = btoa(String.fromCharCode(...new Uint8Array((assertion as PublicKeyCredential).rawId)))
         const member = stored[credId] as { name?: string }
-        if (member?.name) onConfirm(reason, member.name)
+        if (member?.name) onConfirm(reason, member.name, disposiciones)
       }
     } catch { setError('Huella no reconocida') }
     setBioChecking(false)
@@ -1327,13 +1359,13 @@ function VoidOrderModal({ mesa, total, onConfirm, onConfirmCaja, onCancel }: Voi
     if (onConfirmCaja) {
       if (confirming) return
       setConfirming(true)
-      try { await onConfirmCaja(reason, pin) } catch (e) { setError(e instanceof Error ? e.message : 'Caja no confirmó la anulación') }
+      try { await onConfirmCaja(reason, pin, disposiciones) } catch (e) { setError(e instanceof Error ? e.message : 'Caja no confirmó la anulación') }
       finally { setConfirming(false); setPin('') }
       return
     }
     const manager = await verifyManagerPin(pin)
     if (!manager) { setError('PIN invalido'); return }
-    onConfirm(reason, manager)
+    onConfirm(reason, manager, disposiciones)
   }
 
   return (
@@ -1360,6 +1392,38 @@ function VoidOrderModal({ mesa, total, onConfirm, onConfirmCaja, onCancel }: Voi
               rows={3}
               className="w-full bg-[var(--line)] border border-[var(--line)] rounded-lg px-4 py-3 text-[var(--text-1)] placeholder-[var(--text-4)] text-sm focus:outline-none focus:border-red-500 resize-none"
             />
+          </div>
+
+          {/* H08 — qué pasa con la mercancía de cada renglón. Sin esto la anulación
+              quedaba con inventario pendiente para siempre. */}
+          <div>
+            <label className="text-sm font-semibold text-[var(--text-3)] uppercase tracking-wide mb-2 block">
+              Inventario por renglón
+            </label>
+            <div className="max-h-44 overflow-y-auto space-y-1.5 pr-1" data-testid="disposicion-por-renglon">
+              {renglonesVivos(items).map(r => (
+                <div key={r.id} className="flex items-center gap-2 text-sm">
+                  <span className="flex-1 truncate text-[var(--text-1)]">{r.cantidad}× {r.nombre}</span>
+                  <button
+                    type="button"
+                    onClick={() => setDisposiciones(prev => ({ ...prev, [r.id]: 'retain_consumption' }))}
+                    aria-pressed={disposiciones[r.id] === 'retain_consumption'}
+                    className={`px-2 py-1.5 rounded-lg text-xs font-semibold min-h-[36px] ${disposiciones[r.id] === 'retain_consumption' ? 'bg-amber-600 text-white' : 'bg-[var(--line)] text-[var(--text-3)]'}`}
+                    title="Se preparó: es merma, el stock no regresa"
+                  >Se preparó</button>
+                  <button
+                    type="button"
+                    onClick={() => setDisposiciones(prev => ({ ...prev, [r.id]: 'return_stock' }))}
+                    aria-pressed={disposiciones[r.id] === 'return_stock'}
+                    className={`px-2 py-1.5 rounded-lg text-xs font-semibold min-h-[36px] ${disposiciones[r.id] === 'return_stock' ? 'bg-emerald-600 text-white' : 'bg-[var(--line)] text-[var(--text-3)]'}`}
+                    title="No se preparó: la mercancía regresa al inventario"
+                  >No se preparó</button>
+                </div>
+              ))}
+            </div>
+            <p className="text-[11px] text-[var(--text-3)] mt-1.5">
+              Merma {formatMXN(resumen.merma)} · Regresa {formatMXN(resumen.regresa)}. Lo enviado a cocina se propone como merma.
+            </p>
           </div>
 
           <div>
@@ -1678,13 +1742,14 @@ function POSContent() {
   // que carga. Evita que el persist escriba items de la mesa vieja en la caché de la
   // nueva durante una transición de mesa (fuga cross-mesa).
   const orderItemsMesaRef = useRef<number>(initialMesa)
+  const sesionEditorCaja = useRef(crearSesionEditorCaja())
 
   // Persist order items to localStorage on every change (8h TTL, survives offline navigation).
   // Merge into any existing cache entry to preserve fields (id, revision, mesero) written
   // by the success path, so the lazy-init still finds the order id on fast remounts.
   useEffect(() => {
     // Solo persistir si los items pertenecen a la mesa actual (no en plena transición).
-    if (mesa > 0 && orderItemsMesaRef.current === mesa) {
+    if (mesa > 0 && orderItemsMesaRef.current === mesa && (!requiereCaja() || sesionEditorCaja.current.puedePersistir())) {
       try {
         const existing = localStorage.getItem(`pos_order_${mesa}`)
         const prev = existing ? JSON.parse(existing) : {}
@@ -2325,6 +2390,10 @@ function POSContent() {
   })
 
   const [lecturaCuentaCaja, setLecturaCuentaCaja] = useState<LecturaDeCuenta | null>(null)
+  const [destinoConsumoCaja, setDestinoConsumoCaja] = useState<{ orderId: string; accountId: string } | null>(null)
+  const [finanzasConsumoCaja, setFinanzasConsumoCaja] = useState<FinanzasDeCaja | null>(null)
+  const [showCajonCaja, setShowCajonCaja] = useState(false)
+  const [precuentaCaja, setPrecuentaCaja] = useState<OrdenConfirmada | null>(null)
   const [cobroDeCaja, setCobroDeCaja] = useState<OrdenConfirmada | null>(null)
   const [avisoCuentaCaja, setAvisoCuentaCaja] = useState<string | null>(null)
   const [ultimaLecturaCaja, setUltimaLecturaCaja] = useState<number | null>(null)
@@ -2361,12 +2430,17 @@ function POSContent() {
     idCuentaCaja.current = null
     baseCuentaCaja.current = null
     cuentaRemotaCaja.current = null
+    // Closing releases the table, never the old order identity. A subsequent
+    // draft must not submit ORDER_SAVE against a paid/void order or old revision.
+    setOrderId(generateId()); setLoadedOrderId(null); setOrderRevision(0)
+    setOrderNumber(null); setFinanzasConsumoCaja(null); setDestinoConsumoCaja(null)
     return queda
   }, [claveCuentaCaja])
 
   useEffect(() => {
     if (!requiereCaja()) return
     let disposed = false
+    const generation = sesionEditorCaja.current.iniciar()
     let pending: Promise<LecturaDeCuenta | null> | null = null
     let target: string | null = new URLSearchParams(window.location.search).get('order')
     try {
@@ -2388,12 +2462,15 @@ function POSContent() {
       let saved = JSON.parse(localStorage.getItem(claveCuentaCaja) || 'null')
       // Migration of the existing per-table cache. It is only a merge baseline,
       // never authority; its age and identity remain intact.
-      if (!saved?.confirmed && !clienteNombre) {
-        const legacy = JSON.parse(localStorage.getItem(`pos_order_${mesa}`) || 'null')
-        if (legacy?.id && Array.isArray(legacy.items)) saved = { confirmed: {
-          ...legacy, descuento: legacy.discount, order_revision: legacy.revision,
-        }, confirmedAt: legacy.ts }
-      }
+      saved = cachePreferidaAlAbrir(saved, () => {
+        if (!clienteNombre) {
+          const legacy = JSON.parse(localStorage.getItem(`pos_order_${mesa}`) || 'null')
+          if (legacy?.id && Array.isArray(legacy.items)) return { confirmed: {
+            ...legacy, descuento: legacy.discount, order_revision: legacy.revision,
+          }, confirmedAt: legacy.ts }
+        }
+        return saved
+      })
       if (saved?.confirmed?.id && (!target || saved.confirmed.id === target)) {
         idCuentaCaja.current = saved.confirmed.id
         baseCuentaCaja.current = saved.base || cuentaEditableDe(saved.confirmed)
@@ -2407,7 +2484,7 @@ function POSContent() {
     } catch {}
     async function read(): Promise<LecturaDeCuenta | null> {
       const result = await leerCuenta({ orderId: idCuentaCaja.current, mesa, customerName: clienteNombre })
-      if (disposed) return null
+      if (disposed || !sesionEditorCaja.current.vigente(generation)) return null
       cuentaCacheLista.current = true
       setLecturaCuentaCaja(result); setLoadingMesa(false)
       if (result.estado === 'incierta') { setAvisoCuentaCaja(result.motivo || 'Cuenta sin confirmar — sólo borradores'); return result }
@@ -2444,6 +2521,7 @@ function POSContent() {
           !current.sentItemIds.has(i.id) && !remote.items.some(r => r.id === i.id))] }, conflictos: [],
       }
       cuentaRemotaCaja.current = order
+      setFinanzasConsumoCaja((order.financial_order as FinanzasDeCaja | null) ?? null)
       idCuentaCaja.current = String(order.id)
       aplicarCuentaCaja(merged.cuenta)
       setCancelledItems(new Set(merged.cuenta.items.filter(i => i.cancelled).map(i => i.id)))
@@ -2481,7 +2559,7 @@ function POSContent() {
   }, [mesa, clienteNombre])
 
   useEffect(() => {
-    if (!requiereCaja() || !cuentaCacheLista.current || orderItemsMesaRef.current !== mesa) return
+    if (!requiereCaja() || !cuentaCacheLista.current || !sesionEditorCaja.current.puedePersistir() || orderItemsMesaRef.current !== mesa) return
     try {
       const saved = JSON.parse(localStorage.getItem(claveCuentaCaja) || '{}')
       localStorage.setItem(claveCuentaCaja, JSON.stringify({ ...saved, draftOrderId: orderId, draft: {
@@ -2534,9 +2612,11 @@ function POSContent() {
       return false
     }
     const editable = cuentaEditableDe(order)
+    setFinanzasConsumoCaja(order.financial_order ?? null)
     cuentaRemotaCaja.current = order; idCuentaCaja.current = order.id; baseCuentaCaja.current = editable
     if (!conservarBorrador) aplicarCuentaCaja(editable)
     setOrderId(order.id); setLoadedOrderId(order.id); setOrderRevision(order.order_revision)
+    setOrderNumber(typeof order.order_number === 'number' && Number.isSafeInteger(order.order_number) && order.order_number > 0 ? order.order_number : null)
     const sent = order.items.filter(i => (i.sent_quantity ?? 0) > 0)
     setSentItemIds(new Set(sent.map(i => i.id)))
     setSentItemSnapshots(Object.fromEntries(sent.map(i => [i.id, { cantidad: i.sent_quantity!, modificadores: i.modificadores, notas: i.notas, silla: i.silla }])))
@@ -2553,7 +2633,10 @@ function POSContent() {
       if (!turnoId) throw new Error('Un encargado debe abrir el turno en Caja.')
       const draftBefore = firmaBorradorParaCaja(cuentaActual.current)
       const saved = await guardarCuentaEnCaja({ id: orderId, turnoId, revision: loadedOrderId ? orderRevision : 0,
-        mesa, clienteNombre: clienteNombre || undefined, personas, notas: orderNotes, items: activeItems, discount })
+        mesa, clienteNombre: clienteNombre || undefined, personas, notas: orderNotes, items: activeItems, discount,
+        financial: (cuentaRemotaCaja.current?.financial_order as FinanzasDeCaja | null) ?? null,
+        confirmedDiscount: Number(cuentaRemotaCaja.current?.descuento ?? 0),
+        accountId: destinoConsumoCaja && destinoConsumoCaja.orderId === orderId ? destinoConsumoCaja.accountId : undefined })
       const editedWhileWaiting = draftBefore !== firmaBorradorParaCaja(cuentaActual.current)
       if (!adoptarConfirmacionCaja(saved, editedWhileWaiting)) return
       if (editedWhileWaiting) { setAvisoCuentaCaja('Caja confirmó el guardado. Conservamos los cambios que hiciste mientras esperabas; guárdalos antes de enviar.'); return }
@@ -2587,6 +2670,8 @@ function POSContent() {
     operationLock.current = true; setSaving(true)
     try {
       await moverCuentaEnCaja(cuentaGuardadaParaOperacion(), mesaDestinoCaja, pin)
+      sesionEditorCaja.current.salir()
+      cuentaCacheLista.current = false
       setOrderItems([])
       try { localStorage.removeItem(claveCuentaCaja); localStorage.removeItem(`pos_draft_${mesa}`); localStorage.removeItem(`pos_order_${mesa}`) } catch {}
       setMesaDestinoCaja(null); setPinPrompt(null); setPinInput('')
@@ -2598,6 +2683,8 @@ function POSContent() {
     operationLock.current = true; setSaving(true)
     try {
       await anularCuentaEnCaja(cuentaGuardadaParaOperacion(), reason, pin)
+      sesionEditorCaja.current.salir()
+      cuentaCacheLista.current = false
       setOrderItems([])
       try { localStorage.removeItem(claveCuentaCaja); localStorage.removeItem(`pos_draft_${mesa}`); localStorage.removeItem(`pos_order_${mesa}`) } catch {}
       setShowVoidOrder(false)
@@ -2607,6 +2694,7 @@ function POSContent() {
 
   // Auto-save draft items to localStorage on every change (prevents loss on refresh)
   useEffect(() => {
+    if (requiereCaja() && !sesionEditorCaja.current.puedePersistir()) return
     if (mesa > 0 && orderItems.length > 0) {
       try { localStorage.setItem(`pos_draft_${mesa}`, JSON.stringify({ items: orderItems, orderId, mesero, personas, ts: Date.now() })) } catch {}
     } else if (mesa > 0) {
@@ -2913,111 +3001,42 @@ function POSContent() {
     setEditingOrderItem(null)
   }, [])
 
-  // Cancel item (requires reason + manager PIN — NEVER delete)
+  // A cancelled flag is a confirmed outcome, never an optimistic money edit.
   const handleCancelItem = useCallback(async (reason: string, managerName: string, options: { prepared: boolean; voided: boolean }) => {
-    if (!cancellingItem) return
-    if (accionPendienteEnCaja('La cancelación individual')) return
-    if (!await validarCuentaCaja()) return
-    const { prepared, voided } = options
-    const action = voided ? 'item_voided' as const : 'item_cancelled' as const
-    logAudit({
-      order_id: orderId, action, actor: mesero, mesa,
-      details: { item: cancellingItem.nombre, cantidad: cancellingItem.cantidad, precio: cancellingItem.subtotal, prepared, voided },
-      reason,
-      approved_by: managerName,
-    })
-    // Shadow mode: evento SENSIBLE — la BD lo rechaza sin audit.approvedBy
-    publishEvent(voided ? 'orders.item.voided.v1' : 'orders.item.cancelled.v1', 1, { userId: mesero, deviceId: getDeviceId() }, {
-      ticketId: orderId, itemId: cancellingItem.id, productId: cancellingItem.nombre,
-      qty: cancellingItem.cantidad, inventoryImpact: !voided, mesa, clientId: getClientId(),
-    }, {
-      requestedBy: mesero, approvedBy: managerName, reason,
-      before: { qty: cancellingItem.cantidad, subtotal: cancellingItem.subtotal, prepared, voided },
-      after: { qty: 0, cancelled: !voided, voided },
-    })
-    // R0.5 RESOLVED: Forward deduction is now active, so reversal is safe.
-    // Only reverse if item was prepared (sent to kitchen = stock was deducted).
-    // Voided items that were never sent don't need reversal.
-    if (!voided && prepared) {
-      reverseIngredientDeduction(cancellingItem, loadedOrderId || '', managerName, reason)
-        .catch(err => console.error('[inventory] Reversal error (non-blocking):', err))
-    }
-    if (voided) {
-      setVoidedItems(prev => new Set(prev).add(cancellingItem.id))
-    } else {
-      setCancelledItems(prev => new Set(prev).add(cancellingItem.id))
-    }
-    // H-4 FIX: persist cancelled flag ON the item in orderItems state
-    // so draft auto-save (pos_draft_${mesa}) includes it, and mesa switch preserves it
-    setOrderItems(prev => prev.map(i =>
-      i.id === cancellingItem.id ? { ...i, cancelled: true } : i
-    ))
-    setCancellingItem(null)
-    if (voided) {
-      showToast(`${cancellingItem.nombre} ANULADO — aprobado por ${managerName}`)
-    } else if (prepared) {
-      showToast(`${cancellingItem.nombre} cancelado — registrado como merma`)
-    } else {
-      showToast(`${cancellingItem.nombre} cancelado — aprobado por ${managerName}`)
-    }
-    // Persist to DB via OCC-safe endpoint so KDS reflects cancellation.
-    // APP_API transport required — SUPABASE_REST MUST NOT mutate pos_orders.
-    const effectiveOrderId = loadedOrderId || orderId
-    if (effectiveOrderId) {
-      const cancelOpId = genOpId()
-      // Aprobación server-verificable: si el PIN de gerente se validó online,
-      // consumeManagerApproval devuelve su token firmado (la ruta valida el rol =
-      // infalsificable). Offline no hay token → offline_approved (device-trust, "como
-      // Wansoft": el cancel se encoló tras verificar el PIN en el dispositivo).
-      const _approvalToken = consumeManagerApproval(managerName)
-      const cancelBody = {
-        client_id: _cid(),
-        order_id: effectiveOrderId,
-        item_id: cancellingItem.id,
-        voided,
-        operation_id: cancelOpId,
-        mesero,
-        reason,
-        manager: managerName,
-        approval_token: _approvalToken || undefined,
-        offline_approved: _approvalToken ? undefined : true,
+    if (!cancellingItem || accionPendienteEnCaja('La cancelación individual')) return
+    if (!await validarCuentaCaja() || operationLock.current) return
+    operationLock.current = true
+    const item = cancellingItem
+    try {
+      // Unsent local draft lines have no shared cancellation or stock effect.
+      if (!sentItemIds.has(item.id) && !(Number(item.sent_quantity) > 0)) {
+        setOrderItems(previous => previous.filter(row => row.id !== item.id))
+        setCancellingItem(null)
+        showToast('Artículo retirado del borrador. Guarda para compartir los cambios.')
+        return
       }
-      try {
-        const res = await fetch('/api/pos/cancel-item', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...getPOSAuthHeaders() },
-          body: JSON.stringify(cancelBody),
-          signal: AbortSignal.timeout(5000),
-        })
-        const result = res.ok ? await res.json() : { ok: false }
-        if (result.conflict) {
-          // Local state already updated — the item is cancelled in UI.
-          // OCC conflict means DB has a newer revision; the cancel will replay on next send.
-          showToast('Conflicto de versión — cancelación local aplicada, se sincronizará al próximo envío')
-        } else if (result.ok && typeof result.revision === 'number') {
-          // La cancelacion AVANZA la revision en el servidor (si no, el siguiente
-          // guardado de una terminal con copia vieja pisa el arreglo de items y
-          // devuelve el platillo cancelado a la cuenta). Adoptar la revision que
-          // devuelve la ruta evita que ese avance nos choque a nosotros mismos en el
-          // proximo guardado.
-          setOrderRevision(result.revision)
-        }
-        if (!result.ok && !result.conflict && !result.already_applied) {
-          throw new Error(`cancel-item API error: ${result.error || res.status}`)
-        }
-      } catch (err) {
-        // Offline or API error: queue for replay with APP_API transport
-        console.warn('[cancel] Queuing offline:', err)
-        try {
-          const { queueOperation } = await import('@/lib/pos-offline-db')
-          await queueOperation('pos_orders', 'POST', cancelBody as unknown as Record<string, unknown>, '/api/pos/cancel-item', '0', 'APP_API')
-        } catch {
-          // IDB unavailable — local state is the truth until next send overwrites DB
-          console.error('[cancel] Failed to queue offline — cancellation is local only until next send')
-        }
-      }
-    }
-  }, [cancellingItem, orderId, mesero, mesa, loadedOrderId, validarCuentaCaja, bloqueaLegacyCaja])
+      const receipt = await confirmarCancelacionItem({ client_id: _cid(), order_id: loadedOrderId || orderId,
+        item_id: item.id, mesero, reason, manager: managerName, ...options },
+        getPOSAuthHeaders(), consumeManagerApproval(managerName))
+      // The saved intent wins on recovery, even if the operator changed the
+      // options while the previous acknowledgment was unavailable.
+      const { intent, result } = receipt
+      setOrderRevision(result.revision)
+      if (result.order.descuento != null && Number.isFinite(Number(result.order.descuento))) setDiscount(Number(result.order.descuento))
+      if (intent.voided) setVoidedItems(previous => new Set(previous).add(intent.item_id))
+      else setCancelledItems(previous => new Set(previous).add(intent.item_id))
+      setOrderItems(previous => previous.map(row => row.id === intent.item_id ? { ...row, ...receipt.item } : row))
+      void avisarCuentaConfirmada({ opId: intent.operation_id!, clientId: _cid(), result })
+      receipt.confirmada()
+      setCancellingItem(null)
+      const inventoryPending = result.inventory_pending !== false
+      setOrderInventoryPending(_cid(), intent.order_id, inventoryPending, result.order.mesa ?? mesa)
+      showToast(`${receipt.recovered ? 'Cancelación recuperada' : 'Cancelación confirmada'}: ${item.nombre}${inventoryPending ? ' — inventario pendiente de conciliar' : ''}`)
+      // Inventory reconciliation belongs to the server's canonical receipt. The
+      // old fuzzy stock PATCH here could reverse before rejection or twice after
+      // a lost response; neither local stock nor a shadow cancellation is emitted.
+    } finally { operationLock.current = false }
+  }, [cancellingItem, orderId, mesero, mesa, loadedOrderId, validarCuentaCaja, bloqueaLegacyCaja, sentItemIds])
 
   // Void entire order
   // Eduardo Jul 21 (Batch 8): Transfer individual platillo to another mesa
@@ -3034,9 +3053,13 @@ function POSContent() {
 
     const itemName = transferringItem.nombre
     const itemId = transferringItem.id
-    const opId = generateId() // idempotency key
+    let confirmada: (() => void) | undefined
+    let opId: string
 
     try {
+      const pending = prepararTransferenciaItem(_cid(), loadedOrderId, itemId, targetMesa)
+      opId = pending.operationId
+      confirmada = pending.confirmada
       const res = await fetch('/api/pos/transfer-item', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getPOSAuthHeaders() },
@@ -3050,15 +3073,25 @@ function POSContent() {
           approved_by: auth.name,
           approved_role: auth.role,
           operation_id: opId,
+          approval_token: auth.approvalToken,
         }),
       })
       const result = await res.json()
 
       if (result.ok) {
+        confirmada()
         // Success: remove item from local state
         setOrderItems(prev => prev.filter(i => i.id !== itemId))
         setSentItemIds(prev => { const next = new Set(prev); next.delete(itemId); return next })
         showToast(`${itemName} transferido a mesa ${targetMesa} — aprobó ${auth.name}`)
+        // Y QUE PEDRO LO SEPA, en las DOS mesas. La ruta ya movio el renglon en la
+        // nube; bajo Electron nadie mas se enteraba. Origen: la cuenta sin el
+        // renglon. Destino: la ruta devuelve `target_order_id` (existente o recien
+        // creada) y los renglones que quedaron ahi. Ver lib/aviso-lan.ts.
+        // Publish the committed receipts, never totals or snapshots rebuilt from
+        // this terminal's potentially stale account (which may include drafts).
+        void avisarTransferenciaItem({ opId, clientId: _cid(), itemId,
+          source: result.source_order, target: result.target_order })
       } else if (result.error === 'SOURCE_CONFLICT' || result.error === 'TARGET_CONFLICT') {
         showToast(result.message || 'Conflicto — recarga y reintenta')
         // Reload order from DB to get fresh state
@@ -3067,49 +3100,44 @@ function POSContent() {
         showToast(result.message || 'El item ya fue movido por otra terminal')
         setOrderItems(prev => prev.filter(i => i.id !== itemId))
       } else {
-        showToast(`Error: ${result.error || 'desconocido'}`)
+        showToast(result.message || `Error: ${result.error || 'desconocido'}`)
       }
     } catch (err) {
       console.error('[transfer] Network error:', err)
-      showToast('Error de red al transferir — intenta de nuevo')
+      showToast('No se confirmó la transferencia. Reintenta el mismo destino para recuperar el resultado.')
     }
 
     operationLock.current = false
     setTransferringItem(null)
-  }, [transferringItem, loadedOrderId, mesero, mesa, validarCuentaCaja, bloqueaLegacyCaja])
+  }, [transferringItem, loadedOrderId, mesero, mesa, validarCuentaCaja, bloqueaLegacyCaja, orderItems, cancelledItems, voidedItems, discount, turnoId, sentItemIds])
 
-  const handleVoidOrder = useCallback(async (reason: string, managerName: string) => {
+  const handleVoidOrder = useCallback(async (reason: string, managerName: string, disposiciones: Record<string, Disposicion>) => {
     if (accionPendienteEnCaja('La autorización anterior de anulación')) return
     if (!await validarCuentaCaja()) return
     if (operationLock.current) return
+    // H08: la anulacion completa viaja con la disposicion de inventario de CADA
+    // renglon (retain_consumption = merma; return_stock = regresa). Sin eso
+    // `r1_reconcile_order` rechaza conciliar y el inventario quedaba pendiente
+    // para siempre. Si falta una decision, no se manda nada: se le pide al gerente.
+    let renglones: ReturnType<typeof renglonesAnulados<OrderItem>>
+    try { renglones = renglonesAnulados(orderItems, disposiciones, reason) }
+    catch (e) { showToast(e instanceof Error && e.message.includes('CANCELLATION_DISPOSITION_REQUIRED')
+      ? 'Falta decidir qué pasa con la mercancía de un renglón' : 'No se pudo preparar la anulación'); return }
     operationLock.current = true
     setSaving(true)
-    const voidTotal = orderItems.reduce((sum, i) => sum + i.subtotal, 0)
-    logAudit({
-      order_id: orderId, action: 'order_cancelled', actor: mesero, mesa,
-      details: { items: orderItems.map(i => ({ nombre: i.nombre, cantidad: i.cantidad, subtotal: i.subtotal })), total: voidTotal },
-      reason,
-      approved_by: managerName,
-    })
-    // Shadow mode: anulación = un evento sensible por cada línea de la orden
-    for (const i of orderItems) {
-      publishEvent('orders.item.cancelled.v1', 1, { userId: mesero, deviceId: getDeviceId() }, {
-        ticketId: orderId, itemId: i.id, productId: i.nombre,
-        qty: i.cantidad, inventoryImpact: true, mesa, clientId: getClientId(), voidOrder: true,
-      }, {
-        requestedBy: mesero, approvedBy: managerName, reason: `ANULACIÓN ORDEN: ${reason}`,
-        before: { qty: i.cantidad, subtotal: i.subtotal },
-        after: { qty: 0, cancelled: true },
-      })
-    }
     // Mark order as cancelled via revision-aware boundary (reconciliation-relevant status)
+    let inventoryPending = false
     if (loadedOrderId) {
+      inventoryPending = true
       const voidOpId = genOpId()
       const voidPayload = {
         order_id: loadedOrderId,
         expected_revision: orderRevision,
         save_operation_id: voidOpId,
         status: 'cancelada',
+        // Los renglones cancelados con su disposicion: es lo que concilia inventario
+        // (r1_save_order hace `items = coalesce(p_items, items)`).
+        items: renglones,
         notas: `ANULADA: ${reason} (por ${managerName})`,
       }
       try {
@@ -3130,6 +3158,7 @@ function POSContent() {
           return
         }
         if (voidResult.revision != null) setOrderRevision(voidResult.revision)
+        inventoryPending = voidResult.inventory_status !== 'COMPLETE'
       } catch (err) {
         // Offline: un fetch desnudo dejaba operationLock=true para siempre (terminal
         // congelada) y perdia la anulacion. Encola el cancel para replay idempotente
@@ -3139,28 +3168,58 @@ function POSContent() {
           const { queueOperation } = await import('@/lib/pos-offline-db')
           await queueOperation('pos_orders', 'POST', voidPayload, '/api/pos/save-order',
             String(orderRevision ?? 0), 'APP_API')
-        } catch { /* si falla el encolado, la limpieza local igual procede */ }
+        } catch {
+          showToast('No se pudo guardar la anulación. La cuenta se conserva; libera almacenamiento y reintenta.')
+          setSaving(false); operationLock.current = false
+          return
+        }
         showToast('Anulada offline — se sincroniza al reconectar')
       }
+      // Y QUE PEDRO LO SEPA. Hasta aqui la anulacion iba solo a la nube; bajo
+      // Electron el mapa y el editor leen de Pedro, asi que la mesa anulada seguia
+      // OCUPADA en las tres pantallas y al reabrirla volvian sus platillos: «estas
+      // cuentas ya no deberian estar» (Eduardo, 2026-08-24), por la puerta de la
+      // anulacion. ORDER_CANCELLED libera la mesa y saca la orden de cocina
+      // (state.js, _applyOrderCancelled); durable, con el opId de la anulacion.
+      void avisarCierreDeOrden({ opId: voidOpId, orderId: loadedOrderId, clientId: _cid(), mesa, turnoId: turnoId || null, cancelada: true })
+      // Y esta pantalla suelta la identidad de la cuenta anulada YA, como al
+      // cobrar: si el lector de un segundo la readopta antes de que Pedro la borre,
+      // los platillos anulados vuelven a pintarse un instante.
+      olvidarCuentaCerrada('cobrada-aqui')
     }
-    // R0.5 RESOLVED: Reverse deductions for items that were sent to kitchen.
-    // Void = entire order cancelled before payment, stock should come back.
-    const sentItems = orderItems.filter(i => sentItemIds.has(i.id) && !cancelledItems.has(i.id) && !voidedItems.has(i.id))
-    if (sentItems.length > 0) {
-      for (const item of sentItems) {
-        reverseIngredientDeduction(item, loadedOrderId || '', managerName, reason)
-          .catch(err => console.error('[inventory] Order void reversal error (non-blocking):', err))
-      }
+    // Publish cancellation only after confirmation or durable offline enqueue.
+    const voidTotal = orderItems.reduce((sum, i) => sum + i.subtotal, 0)
+    logAudit({
+      order_id: orderId, action: 'order_cancelled', actor: mesero, mesa,
+      details: {
+        items: orderItems.map(i => ({ nombre: i.nombre, cantidad: i.cantidad, subtotal: i.subtotal, inventory_disposition: disposiciones[i.id] ?? null })),
+        total: voidTotal, disposicion: resumenDeDisposicion(orderItems, disposiciones),
+      },
+      reason,
+      approved_by: managerName,
+    })
+    // Shadow mode: anulación = un evento sensible por cada línea de la orden
+    for (const i of orderItems) {
+      publishEvent('orders.item.cancelled.v1', 1, { userId: mesero, deviceId: getDeviceId() }, {
+        ticketId: orderId, itemId: i.id, productId: i.nombre,
+        qty: i.cantidad, inventoryImpact: true, mesa, clientId: getClientId(), voidOrder: true,
+      }, {
+        requestedBy: mesero, approvedBy: managerName, reason: `ANULACIÓN ORDEN: ${reason}`,
+        before: { qty: i.cantidad, subtotal: i.subtotal },
+        after: { qty: 0, cancelled: true },
+      })
     }
+    // save-order reconciles committed inventory. A paid/prepared dish is not
+    // physical stock returned; missing disposition remains explicitly pending.
     setOrderItems([])
     setCancelledItems(new Set())
     setVoidedItems(new Set())
     setDiscount(0)
     setOrderNotes('')
     setShowVoidOrder(false)
-    showToast(`Orden anulada — aprobado por ${managerName}`)
+    showToast(`Orden anulada — aprobado por ${managerName}${inventoryPending ? '. Inventario pendiente de conciliación.' : ''}`)
     setSaving(false); operationLock.current = false
-  }, [orderId, mesero, mesa, orderItems, loadedOrderId, saving, sentItemIds, validarCuentaCaja, bloqueaLegacyCaja])
+  }, [orderId, mesero, mesa, orderItems, loadedOrderId, saving, sentItemIds, validarCuentaCaja, bloqueaLegacyCaja, turnoId, olvidarCuentaCerrada])
 
   // Cash movement confirmed (already saved to Supabase in modal)
   const handleCashMovement = useCallback((type: 'retiro' | 'deposito', amount: number, reason: string, managerName: string) => {
@@ -3464,6 +3523,11 @@ function POSContent() {
             })
             const conflictPrint = await printByStation({ ...order, items: conflictNewItems })
             if (conflictPrint.failed.length > 0) showToast(`⚠ Impresora sin conexión: ${conflictPrint.failed.join(', ')}`)
+            setOrderInventoryPending(_cid(), order.id, true, order.mesa)
+            try {
+              const inventory = await deductIngredientsForOrder(conflictNewItems, order.id, mesero || 'POS', batchId)
+              setOrderInventoryPending(_cid(), order.id, !inventory.success, order.mesa)
+            } catch { /* the confirmed append remains; the persistent banner offers retry */ }
             showToast(`${conflictNewItems.length} item${conflictNewItems.length !== 1 ? 's' : ''} enviados`)
             try {
               const freshRes = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${order.id}&select=updated_at`, {
@@ -3516,6 +3580,13 @@ function POSContent() {
         // expected_revision must be 1 higher than this send's queued revision.
         // If internet returns before payment, saveResult.revision (line ~3161) overrides this.
         setOrderRevision(prev => prev + 1)
+        // El cache de la mesa tiene que saber QUE orden se encoló y con QUE
+        // revisión, o al reabrir la mesa sin red se inventa otra orden y el
+        // cobro sale con expected_revision viejo. Ver lib/pos-mesa-cache.ts.
+        recordarOrdenEncolada(order.mesa, {
+          id: order.id, items: activeItems, mesero, personas, discount, notas: orderNotes,
+          revision: orderRevision + 1,
+        })
         // Immediate count refresh: interval only fires every 30s, but IDB is local.
         getPendingQueue().then(q => setPendingSync(q.length)).catch(() => {})
         // Broadcast to local server so KDS on other LAN devices receives the order offline
@@ -3561,6 +3632,7 @@ function POSContent() {
           client_id: _cid(),
         })
         const finish = () => {
+          setOrderInventoryPending(_cid(), order.id, true, order.mesa)
           sessionStorage.removeItem('pos_staff')
           sessionStorage.removeItem('pos_last_activity')
           navigateToMesaMap()
@@ -3586,6 +3658,7 @@ function POSContent() {
     }
     if (saveResult.revision != null) setOrderRevision(saveResult.revision)
     if (saveResult.inventory_status === 'BLOCKED') {
+      setOrderInventoryPending(_cid(), order.id, true, order.mesa)
       showToast('Inventario: algunos ingredientes no se pudieron descontar')
     }
     const ok = true
@@ -3699,8 +3772,11 @@ function POSContent() {
 
       // Deduct ingredients at kitchen send time (only new items in this batch)
       if (newItems.length > 0) {
+        setOrderInventoryPending(_cid(), orderId, true, mesa)
         try {
-          await deductIngredientsForOrder(newItems, orderId, mesero || 'POS', batchId)
+          const inventory = await deductIngredientsForOrder(newItems, orderId, mesero || 'POS', batchId)
+          setOrderInventoryPending(_cid(), orderId, !inventory.success, mesa)
+          if (!inventory.success) showToast('Comanda confirmada — inventario pendiente de conciliar')
         } catch (err) {
           console.error('[inventory] Deduction error (non-blocking):', err)
         }
@@ -3752,7 +3828,13 @@ function POSContent() {
 
   // Pre-ticket (precuenta — antes de cobrar)
   const handlePreTicket = async () => {
-    if (accionPendienteEnCaja('La impresión de precuenta')) return
+    if (escribeEnCaja) {
+      if (!await validarCuentaCaja()) return
+      try { setPrecuentaCaja(cuentaGuardadaParaOperacion()) }
+      catch (error) { showToast(error instanceof Error ? error.message : 'Guarda la cuenta antes de imprimir.') }
+      return
+    }
+    if (bloqueaLegacyCaja) { showToast('Caja debe confirmar la cuenta antes de imprimir.'); return }
     if (activeItems.length === 0) return
     const order: Order = {
       id: orderId,
@@ -3920,6 +4002,19 @@ function POSContent() {
       // es consistente con ese comportamiento previo. Arreglar el split offline
       // exige estado durable compartido — es el muro 2, no esto.
       void avisarCierreDeOrden({ opId, orderId, clientId: _cid(), mesa: order.mesa, turnoId: order.turnoId ?? null })
+      // Market: sin red el descuento de stock (retail 1:1, items mkt-*) nunca se
+      // hacia porque `deductMarketStockForOrder` vive mas abajo, en la salida
+      // feliz. Se encola tras el cobro de la MISMA orden (la cola lo sube en
+      // orden y r1_legacy_sale_deduction es idempotente por orden). Misma regla
+      // de split que la salida feliz. Barrido 2026-09-10, inventario LENTE-3.
+      if (splitPayingCuenta === 0 || splitMode !== 'parejo' || splitPayingCuenta === 1) {
+        const mkt = payingItems.filter(i => i.menuItemId).map(i => ({ menu_item_id: i.menuItemId, cantidad: i.cantidad }))
+        if (mkt.length > 0) {
+          import('@/lib/pos-offline-db').then(({ queueOperation }) =>
+            queueOperation('pos_orders', 'POST', { order_id: payId, actor: mesero, items: mkt }, '/api/pos/deduct-market', undefined, 'APP_API')
+          ).catch(() => { /* sin IDB: el descuento de market queda sin registrar, como antes */ })
+        }
+      }
       if (pagos.some(p => p.metodo.toLowerCase().includes('efectivo'))) openCashDrawer()
       handlePrintTicket(order)
       showToast('Sin conexión — cobro guardado localmente, se sincronizará al reconectar')
@@ -4396,6 +4491,19 @@ function POSContent() {
               onWheel={e => e.currentTarget.blur()}
               onChange={(e) => {
                 const newMesa = Number(e.target.value) || 1
+                // BAJO ELECTRON ESTE CAMBIO NO MUEVE NADA: la cuenta vive en Pedro, y
+                // cambiar el numero aqui solo cambia QUE mesa lee el editor. Lo que habia
+                // en pantalla —los renglones sin enviar de la mesa origen— se anexaba a la
+                // cuenta de la mesa destino en la primera lectura (el merge de la cuenta
+                // nueva conserva «lo local no enviado») y se persistia como suyo, sin PIN y
+                // sin aviso. Diagnosticado en CIERRE-DEFECTOS-2026-09-06 y sin arreglar
+                // hasta hoy. Para mover una cuenta esta «Transferir mesa» (con PIN); para
+                // capturar otra mesa esta el salon.
+                if (requiereCaja() && orderItems.length > 0 && newMesa !== mesa) {
+                  showToast('Para mover esta cuenta usa «Transferir mesa». Para otra mesa, vuelve al salón.')
+                  e.target.value = String(mesa)
+                  return
+                }
                 if (!bloqueaLegacyCaja && orderItems.length > 0 && newMesa !== mesa) {
                   logAudit({ order_id: orderId, action: 'status_changed', actor: mesero, mesa, details: { type: 'mesa_moved', from: mesa, to: newMesa } })
                   showToast(`Mesa ${mesa} → Mesa ${newMesa}`)
@@ -4602,8 +4710,29 @@ function POSContent() {
         </div>
       )}
 
+      {requiereCaja() && <ConsumoPendienteDeCaja disabled={saving} onRecovered={() => { void refrescarCuentaCaja.current() }} />}
+      {showCajonCaja && <section aria-label="Solicitud manual del cajón" className="border-b p-4">
+        <button className="mb-2 rounded border px-3 py-2" onClick={() => setShowCajonCaja(false)}>Cerrar apertura manual</button>
+        <CajonDeCaja turnoId={turnoId || ''} />
+      </section>}
+      {precuentaCaja && <section aria-label="Precuenta de Caja" className="border-b border-[var(--line)] bg-[var(--surface)] px-4 py-3">
+        <button className="mb-2 rounded border px-3 py-2" onClick={() => setPrecuentaCaja(null)}>Cerrar precuenta</button>
+        <DocumentoImpresoDeCaja order={precuentaCaja} />
+      </section>}
       {cobroDeCaja && <CobroDeCaja order={cobroDeCaja} onClose={() => { setCobroDeCaja(null); void refrescarCuentaCaja.current() }}
         onChanged={() => { void refrescarCuentaCaja.current() }} />}
+      {escribeEnCaja && finanzasConsumoCaja && finanzasConsumoCaja.order_id === orderId && <div className="px-4 py-3 border-b border-[var(--line)] text-sm" aria-label="Saldo del consumo en Caja">
+        <p>Abonado {pesosDeCentavos(finanzasConsumoCaja.paid_cents)} · Reservado {pesosDeCentavos(finanzasConsumoCaja.reserved_cents)} · Saldo {pesosDeCentavos(finanzasConsumoCaja.balance_cents)}</p>
+        {finanzasConsumoCaja.accounts.length > 1 && <label className="block mt-2">Cuenta para el consumo nuevo
+          <select aria-label="Cuenta para el consumo nuevo" className="ml-2 rounded border p-2 bg-[var(--surface)]" disabled={saving}
+            value={destinoConsumoCaja && destinoConsumoCaja.orderId === orderId ? destinoConsumoCaja.accountId : ''}
+            onChange={event => setDestinoConsumoCaja({ orderId, accountId: event.target.value })}>
+            <option value="">Selecciona una cuenta</option>
+            {finanzasConsumoCaja.accounts.map((account, index) => <option key={account.account_id} value={account.account_id}>{account.label || `Cuenta ${index + 1}`} · Saldo {pesosDeCentavos(account.balance_cents)}</option>)}
+          </select>
+        </label>}
+        <p className="mt-1 text-[var(--text-2)]">El consumo nuevo aumenta la cuenta elegida. Los abonos y cobros en proceso se conservan.</p>
+      </div>}
       {requiereCaja() && avisoCuentaCaja && (
         <div role="status" className="px-4 py-3 bg-amber-950 text-amber-100 text-sm flex flex-wrap items-center gap-3">
           <span>{avisoCuentaCaja}{ultimaLecturaCaja ? ` Última confirmación: ${new Date(ultimaLecturaCaja).toLocaleTimeString('es-MX')}.` : ''}</span>
@@ -4944,7 +5073,7 @@ function POSContent() {
                 />
               </div>
               <button
-                onClick={() => { if (accionPendienteEnCaja('La apertura manual del cajón')) return; if (!isMobileRestricted) { openCashDrawer(); showToast('Cajón abierto') } }}
+                onClick={() => { if (escribeEnCaja) { setShowCajonCaja(true); return }; if (bloqueaLegacyCaja) { showToast('Caja debe confirmar la conexión antes de solicitar la apertura.'); return }; if (!isMobileRestricted) { openCashDrawer(); showToast('Cajón abierto') } }}
                 disabled={isMobileRestricted}
                 className="w-12 min-h-[48px] flex items-center justify-center rounded-lg bg-[var(--surface-2)] hover:bg-[var(--raised)] disabled:opacity-30 text-[var(--text-3)] transition-colors"
                 title={isMobileRestricted ? 'Solo disponible en terminal de caja' : 'Abrir cajón'}
@@ -5002,7 +5131,20 @@ function POSContent() {
                       setMesa(newMesa)
                       // Persist to Supabase — keep current status (or 'enviada' if unknown)
                       if (orderId && loadedOrderId) {
-                        await updateOrderStatus(orderId, 'enviada', { mesa: newMesa })
+                        const moved = await updateOrderStatus(orderId, 'enviada', { mesa: newMesa })
+                        if (!moved) {
+                          setMesa(Number(oldMesa))
+                          showToast('No se pudo transferir la mesa. Reintenta.')
+                          return
+                        }
+                        // Y QUE PEDRO LO SEPA. Bajo Electron el mapa lee de Pedro: sin esto
+                        // la cuenta seguia pintada en la mesa vieja y la nueva se veia libre.
+                        // ORDER_UPSERTED con la mesa nueva: Pedro libera la vieja si apuntaba a
+                        // esta orden y ocupa la nueva (state.js, _applyOrderUpserted). Durable.
+                        void avisarCuentaActualizada({
+                          opId: `mueve:${orderId}:${oldMesa}:${newMesa}:${Date.now()}`, orderId, clientId: _cid(),
+                          mesa: newMesa, turnoId: turnoId || null, status: 'enviada',
+                        })
                       } else {
                         // New unsaved order — block transfer, must send to kitchen first
                         setMesa(Number(oldMesa))
@@ -5638,6 +5780,8 @@ function POSContent() {
         <VoidOrderModal
           mesa={mesa}
           total={total}
+          items={activeItems}
+          enviados={sentItemIds}
           onConfirm={handleVoidOrder}
           onConfirmCaja={bloqueaLegacyCaja ? anularOrdenCaja : undefined}
           onCancel={() => setShowVoidOrder(false)}

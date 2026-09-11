@@ -30,7 +30,7 @@ function moneyFromOrder(order) {
   return rounded
 }
 function requireSentConsumption(order) {
-  let items = order.items
+  let items = order?.items
   if (typeof items === 'string') {
     try { items = JSON.parse(items) } catch { items = null }
   }
@@ -93,6 +93,34 @@ class FinancialDomain {
   constructor() { this._orders = new Map() }
   getOrder(orderId) { const order = this._orders.get(orderId); return order ? clone(order) : null }
   getOrders() { return [...this._orders.values()].map(clone) }
+  /** Atomic companion to an additive operational save/send. Prior payments and
+   * account allocations never come from the terminal or get redistributed. */
+  prepareOperationalChange(payload, previousOrder, operationalOrder, actor) {
+    const existing = this.getOrder(payload.order_id)
+    if (!existing) fail('FINANCIAL_ORDER_NOT_FOUND', 'No hay cuentas de cobro')
+    if (!['ORDER_SAVE', 'ORDER_SEND'].includes(payload.command_type) || existing.status === 'settled') fail('FINANCIAL_ORDER_LOCKED', 'Sólo se admite agregar consumo a cuentas abiertas')
+    if (revision(payload.expected_financial_revision) !== existing.revision) fail('FINANCIAL_REVISION_CONFLICT', 'Los pagos cambiaron; actualiza la cuenta')
+    if (existing.order_revision !== previousOrder.order_revision || existing.turno_id !== operationalOrder.turno_id ||
+      operationalOrder.order_revision !== previousOrder.order_revision + 1 || moneyFromOrder(previousOrder) !== existing.total_cents) fail('FINANCIAL_ORDER_CONFLICT', 'La orden y sus cuentas no coinciden')
+    const next = clone(existing)
+    const delta = cents(moneyFromOrder(operationalOrder) - existing.total_cents, 'additional consumption')
+    let allocation
+    if (payload.command_type === 'ORDER_SAVE') {
+      const accountId = id(payload.account_id, 'account_id')
+      const account = next.accounts.find(a => a.account_id === accountId)
+      if (!account) fail('ACCOUNT_NOT_FOUND', 'Selecciona una cuenta de esta orden para el consumo adicional')
+      account.total_cents = add(account.total_cents, delta)
+      next.total_cents = add(next.total_cents, delta)
+      const oldItems = typeof previousOrder.items === 'string' ? JSON.parse(previousOrder.items) : previousOrder.items
+      const newItems = typeof operationalOrder.items === 'string' ? JSON.parse(operationalOrder.items) : operationalOrder.items
+      allocation = { account_id: accountId, amount_cents: delta, ...(actor ? { recorded_by: actor.id } : {}),
+        lines: newItems.map(line => ({ line_id: line.id, quantity: line.cantidad - (oldItems.find(old => old.id === line.id)?.cantidad || 0) })).filter(line => line.quantity > 0) }
+    } else if (delta !== 0) fail('FINANCIAL_ORDER_CONFLICT', 'Enviar una comanda no cambia su importe')
+    next.order_revision = operationalOrder.order_revision
+    next.revision = add(next.revision, 1)
+    summarize(next)
+    return { financial_order: next, ...(allocation ? { financial_allocation: allocation } : {}) }
+  }
   apply(order) {
     // Applied values originate from prepare() and the checksummed committed log.
     // Validate the aggregate again so a malformed remote snapshot cannot liquidate.
@@ -187,6 +215,7 @@ class FinancialDomain {
       }
       // payment_id is unique across mother orders, not merely inside one account.
       if (this.getOrders().some(o => o.payments.some(p => p.payment_id === payload.payment_id))) fail('PAYMENT_ID_REUSED', 'Payment belongs to another order')
+      requireSentConsumption(operationalOrder)
     }
     if (type === 'FINANCIAL_PAYMENT_RESULT') {
       id(payload.payment_id, 'payment_id')

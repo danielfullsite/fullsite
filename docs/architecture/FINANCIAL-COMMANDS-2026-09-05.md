@@ -34,6 +34,16 @@ El evento y ese resultado se confirman juntos. Un reintento por `command_id` obt
 
 El candidato exige que cada renglón guardado tenga `sent_quantity === cantidad`, con ambas cantidades enteras válidas, antes de `FINANCIAL_OPEN`. El detalle ausente, ilegible o parcialmente enviado produce `ORDER_SEND_REQUIRED` sin crear cuentas ni bloquear consumos. La pantalla muestra el motivo y deshabilita Preparar cuenta para cobrar. Basta con enviar: se permite cobrar mientras cocina aún prepara o entrega, conservando separados ambos estados.
 
+Desde el candidato del 10 de septiembre, una orden financiera abierta admite
+consumo aditivo mediante `ORDER_SAVE`/`ORDER_SEND`, con ambas revisiones y cuenta
+destino explícita al guardar. La transición financiera pura conserva pagos y
+reservas; sólo aumenta el total de esa cuenta y su saldo. El evento y la
+materialización contienen ambas proyecciones, evitando confirmar consumo sin
+su deuda. Las líneas anteriores no pueden eliminarse o reducirse por ese camino.
+Cada nuevo `FINANCIAL_PAYMENT_START` vuelve a exigir consumo enviado, después de
+reconocer reintentos del mismo pago. `FINANCIAL_PAYMENT_RESULT` conserva la
+posibilidad de resolver reservas previas sin exigir nuevo envío.
+
 El runtime comprueba la sesión y el permiso de cada comando. Además, el dominio financiero aplica la misma pertenencia que órdenes: un actor distinto de `created_by` requiere `ver_todas_cuentas`. Esto también cubre dividir, reservar y resolver pagos, incluidos intentos repetidos bajo un comando nuevo. Los perfiles autorizados de Caja conservan acceso transversal; un mesero no puede preparar ni alterar cuentas ajenas.
 
 Verificación específica: `financial-open-policy.test.js` (7 escenarios) y `financial-open-policy.dom.test.ts` (4 escenarios, incluido el modal real). No abre cuentas financieras antes del envío ni amplía los ajustes posteriores a cobros.

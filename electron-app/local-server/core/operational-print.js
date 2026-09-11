@@ -21,7 +21,7 @@ function wrap(value, width = 40) {
 function ticket(order, station, items, batchId, restaurantName) {
   const batch = JSON.parse(order.comanda_batches)[batchId]
   const lines = [text(restaurantName), station.toUpperCase(), order.mesa === null ? `Cuenta: ${text(order.customer_name)}` : `Mesa ${order.mesa}`,
-    `Ronda ${batch.seq + 1}`, `Orden ${text(order.order_id, 80)}`, `Mesero: ${text(order.mesero)}`, text(batch.created_at), '-'.repeat(40)]
+    `Ronda ${batch.seq + 1}`, ...(order.order_number ? [`Orden #${order.order_number}`] : []), `Orden ${text(order.order_id, 80)}`, `Mesero: ${text(order.mesero)}`, text(batch.created_at), '-'.repeat(40)]
   if (order.notas) lines.push(wrap(`NOTA: ${order.notas}`), '-'.repeat(40))
   for (const item of items) {
     lines.push(wrap(`${item.cantidad} x ${item.nombre}`))

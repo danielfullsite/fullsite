@@ -97,6 +97,20 @@ Antes de modificar almacenamiento o impresión de Pedro, leer [`docs/architectur
 
 Dinero usa [`docs/architecture/FINANCIAL-COMMANDS-2026-09-05.md`](docs/architecture/FINANCIAL-COMMANDS-2026-09-05.md): centavos, reservas y resultados durables con actor verificado. Liquidación no significa entrega. UI de efectivo/split y materializador integrados en laboratorio; el candidato no está habilitado para producción.
 
+Consumo adicional con cuentas financieras abiertas exige revisión operacional y financiera, cuenta destino y un único commit con ambas proyecciones. Pagos y reservas se conservan. Una ronda pendiente bloquea nuevos cobros, pero permite resolver intentos previos. Reducir consumo o devolver dinero requiere su propio ajuste autorizado; no borrar las cuentas financieras para desbloquear la orden.
+
+Documentos e impresión incierta: [`docs/architecture/CANONICAL-PRINT-2026-09-10.md`](docs/architecture/CANONICAL-PRINT-2026-09-10.md). Precuenta y recibo usan datos canónicos; copias son explícitas. Resolver papel reserva el episodio en el log antes del efecto de cola y conserva un recibo idempotente. No autorizar impresión con bytes del navegador ni abrir cajón desde estos comandos.
+
+Cajón autorizado: [`docs/architecture/CANONICAL-DRAWER-2026-09-10.md`](docs/architecture/CANONICAL-DRAWER-2026-09-10.md). Apertura explícita, destino configurado y un solo pulso. Pago y episodio se reservan antes del efecto; una incertidumbre requiere decisión del encargado.
+
+Si falta el recibo de cola de un comando comprometido, recuperar como incierto, nunca como envío pendiente. El corte durable de recuperación impide que decisiones históricas vuelvan a autorizar papel o cajón; una nueva decisión corresponde al episodio reconstruido.
+
 Operaciones autorizadas, rutas de cocina, impresión y cierre contado: [`docs/architecture/OPERATIONAL-COMMANDS-2026-09-05.md`](docs/architecture/OPERATIONAL-COMMANDS-2026-09-05.md). Interacción y límites de botones: [`docs/architecture/OPERATIONAL-UI-CAJA-2026-09-05.md`](docs/architecture/OPERATIONAL-UI-CAJA-2026-09-05.md). La autoridad es opt-in; no reenviar colas cloud legacy ni activar módulos sin comandos locales.
 
 Código de interfaz instalado y recuperación: [`docs/architecture/OFFLINE-UI-PACKAGE-2026-09-05.md`](docs/architecture/OFFLINE-UI-PACKAGE-2026-09-05.md). Recibos de negocio, barrera cloud y transición por sucursal: [`docs/architecture/CAJA-CLOUD-MATERIALIZATION-2026-09-05.md`](docs/architecture/CAJA-CLOUD-MATERIALIZATION-2026-09-05.md). Instalar un binario no activa una sucursal; el downgrade del log exige migración validada.
+
+Inventario del candidato: [`docs/architecture/INVENTORY-CONFIRMED-2026-09-10.md`](docs/architecture/INVENTORY-CONFIRMED-2026-09-10.md). Movimiento manual usa recibo/stock/costo en una transacción. Venta y cancelación se concilian desde la orden confirmada; no devolver existencias por un borrador o una cancelación preparada.
+
+Lectura cloud de KDS: [`docs/architecture/KDS-CLOUD-SCOPE-2026-09-10.md`](docs/architecture/KDS-CLOUD-SCOPE-2026-09-10.md). Turno único por sucursal, sin ampliar consultas cuando falla su resolución. Caché exige procedencia de restaurante/sucursal.
+
+Alta reanudable: [`docs/architecture/TENANT-PROVISIONING-2026-09-10.md`](docs/architecture/TENANT-PROVISIONING-2026-09-10.md). Siembra sólo ausentes con plan inicial persistido; membresías y activación atómicas. Nunca reactivar suspendidos ni usar PINs calculables de plantilla.

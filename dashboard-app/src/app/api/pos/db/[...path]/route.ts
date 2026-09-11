@@ -49,7 +49,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { withPOSAuth, unauthorized } from '@/lib/api-auth'
-import { ALLOW, MANAGER_ONLY_WRITE, puedeEscribirEn, MANAGER_ONLY_DELETE, camposProhibidos, isManager, redactResponse, tableOf } from '@/lib/pos-db-policy'
+import { scopedProxyRequest } from '@/lib/pos-db-scoped'
+import { ALLOW, NO_CID, puedeEscribirEn, MANAGER_ONLY_DELETE, prepararCuerpoProxy, isManager, redactResponse, tableOf, consultaProxyValida } from '@/lib/pos-db-policy'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -109,40 +110,21 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ path: string[] 
 
   // Query params del request original + forzar client_id salvo en inserts.
   const params = new URLSearchParams(req.nextUrl.search)
-  if (req.method !== 'POST') {
+  if (!consultaProxyValida(table, params)) return forbidden('consulta no permitida')
+  if (req.method !== 'POST' && !NO_CID.has(table)) {
     params.set('client_id', `eq.${clientId}`)
   }
   const qs = params.toString()
-  const target = `${SUPABASE_URL}/rest/v1/${resource}${qs ? `?${qs}` : ''}`
+  const target = `${SUPABASE_URL}/rest/v1/${table}${qs ? `?${qs}` : ''}`
 
   // Body: en POST a tablas pos_, forzar client_id del token en cada fila.
   let body: string | undefined
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     const raw = await req.text().catch(() => '')
-    if (raw && req.method === 'POST') {
-      try {
-        const parsed = JSON.parse(raw)
-        const withCid = Array.isArray(parsed)
-          ? parsed.map((r) => ({ ...r, client_id: clientId }))
-          : { ...parsed, client_id: clientId }
-        body = JSON.stringify(withCid)
-      } catch {
-        body = raw
-      }
-    } else {
-      body = raw || undefined
-    }
+    const prepared = prepararCuerpoProxy(table, auth.role, req.method, raw, clientId)
+    if (prepared.error !== undefined) return NextResponse.json({ error: prepared.error }, { status: prepared.status })
+    body = prepared.body
 
-    // LAS CIFRAS DEL DINERO NO SE ESCRIBEN DESDE EL NAVEGADOR.
-    //
-    // Se comprueba DESPUÉS de leer el cuerpo, porque hasta aquí no se sabe qué columnas
-    // trae. Lo verificado el 2026-09-08: por este camino el cliente sólo escribe
-    // `kds_item_status` y `mesero`; los totales van por /api/pos/save-order, que los
-    // recalcula. Así que un `total` que llegue aquí no viene del POS.
-    const prohibidas = camposProhibidos(table, auth.role, body)
-    if (prohibidas.length) {
-      return forbidden(`estas columnas requieren rol de gerente: ${prohibidas.join(', ')}`)
-    }
   }
 
   // Headers que respeta PostgREST del request original (Prefer, Range, Content-Type).
@@ -155,7 +137,8 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ path: string[] 
   const range = req.headers.get('range'); if (range) fwd['Range'] = range
 
   try {
-    const r = await fetch(target, { method: req.method, headers: fwd, body })
+    const scoped = await scopedProxyRequest({ table, method: req.method, params, body, prefer, range, clientId, url: SUPABASE_URL, key: SERVICE_KEY })
+    const r = scoped || await fetch(target, { method: req.method, headers: fwd, body, redirect: 'error' })
     const raw2 = await r.text()
     const ct = r.headers.get('content-type')
     // El PIN nunca sale por aquí, sin importar qué pidió el `select`.

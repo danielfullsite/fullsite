@@ -1,5 +1,7 @@
 'use client'
 
+import ReportUnavailable from '@/components/ReportUnavailable'
+
 import { useEffect, useState, useMemo } from 'react'
 import {
   ResponsiveContainer,
@@ -46,13 +48,14 @@ function extractEcommerce(day: WansoftDaily) {
 
 export default function EcommercePage() {
   const [data, setData] = useState<WansoftDaily[]>([])
+  const [reportError, setReportError] = useState(false)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     getRecentDays(90).then(d => {
       setData(d)
       setLoading(false)
-    })
+    }).catch(() => { setReportError(true); setLoading(false) })
   }, [])
 
   const ecommerceData = useMemo(() => {
@@ -105,6 +108,8 @@ export default function EcommercePage() {
 
   const channelColors: Record<string, string> = { Rappi: '#ff5a00', Ubereats: '#06c167', Otro: '#8b5cf6' }
   const channelMax = ecommerceData.channels[0]?.total || 1
+
+  if (reportError) return <ReportUnavailable />
 
   return (
     <>

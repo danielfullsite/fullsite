@@ -17,6 +17,10 @@ import path from 'node:path'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
 vi.mock('@/lib/bridge-url', () => ({ getBridgeUrl: () => 'http://127.0.0.1:7717' }))
+// Hay una caja a la que avisar (Electron, o puente configurado). Sin eso el aviso
+// es de un solo intento y nada de lo de abajo aplica — ver la prueba al final.
+let hayCaja = true
+vi.mock('@/lib/pedro-cliente', () => ({ requiereCaja: () => hayCaja }))
 
 const CLAVE = 'pos_avisos_lan_pendientes'
 const store: Record<string, string> = {}
@@ -47,6 +51,7 @@ beforeEach(() => {
   enviados.length = 0
   localStorage.clear()
   plan = [{ ok: true }]
+  hayCaja = true
   vi.resetModules()
 })
 afterEach(async () => {
@@ -181,6 +186,18 @@ describe('El temporizador de reintentos se enciende solo y se apaga solo', () =>
   it('sin pendientes no arranca nada', async () => {
     const { asegurarReintentos, hayReintentosProgramados } = await cargar()
     expect(asegurarReintentos()).toBe(false)
+    expect(hayReintentosProgramados()).toBe(false)
+  })
+
+  it('sin una caja a la que avisar (POS web sin Electron ni puente) es de un solo intento: nada se guarda ni se reintenta', async () => {
+    // Un tenant que usa el POS desde el navegador no tiene Pedro. Guardar el aviso
+    // y reintentarlo cada 3 s ahí sería un temporizador eterno contra 127.0.0.1.
+    hayCaja = false
+    programar(new Error('Failed to fetch'))
+    const { avisarCierreDeOrden, hayReintentosProgramados } = await cargar()
+    expect(await avisarCierreDeOrden(cierre('op-web'))).toBe(false)
+    expect(enviados).toHaveLength(1)
+    expect(store[CLAVE]).toBeUndefined()
     expect(hayReintentosProgramados()).toBe(false)
   })
 

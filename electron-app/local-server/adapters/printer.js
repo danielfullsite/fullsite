@@ -110,6 +110,7 @@ function setStations(newConfig) {
 // Pure preparation: routing and bytes are captured inside the durable command
 // transaction before any job is sent to a printer.
 function prepareJobs(stationId, data, documentType, opts = {}) {
+  if (documentType === 'drawer_pulse') throw Object.assign(new Error('CONTROLLED_DRAWER_REQUIRED'), {code:'CONTROLLED_DRAWER_REQUIRED'})
   if (!_config || !Array.isArray(_config.printers) || !_config.printers.length) {
     throw Object.assign(new Error('PRINTER_NOT_CONFIGURED'), { code: 'PRINTER_NOT_CONFIGURED', station: stationId })
   }
@@ -127,8 +128,8 @@ function prepareJobs(stationId, data, documentType, opts = {}) {
 
 // Returns only after all jobs/receipts are durable. Actual printing is asynchronous
 // for commands; ACK means accepted for printing, never proof of physical paper.
-function enqueuePreparedJobs(jobs) {
-  const ids = printQueue.enqueueMany(jobs)
+function enqueuePreparedJobs(jobs, options) {
+  const ids = printQueue.enqueueMany(jobs, options)
   _scheduleDrain(ids).catch(e => console.error('[printer] Queue drain failed:', e.message))
   return ids
 }
@@ -156,7 +157,7 @@ async function _processJobs(ids) {
     printQueue.markPrinting(id) // durable BEFORE bytes can leave this process
     try {
       for (let copy = job.copies_printed || 0; copy < job.copies; copy++) {
-        await _physicalPrint(job.connection, Buffer.from(job.data_b64, 'base64'))
+        await _physicalPrint(job.connection, Buffer.from(job.reprint_data_b64 || job.data_b64, 'base64'))
         // Failure after a physical send remains uncertain, including disk errors.
         printQueue.markCopyPrinted(id)
       }
@@ -175,6 +176,16 @@ async function _processJobs(ids) {
 
 // ESC/POS: kick cash drawer on pin 2 (standard RJ-11 port)
 const DRAWER_KICK = Buffer.from([0x1b, 0x70, 0x00, 0x19, 0xfa])
+
+function prepareDrawerJobs({commandId} = {}) {
+  if (!commandId || !_config?.drawer_printer_id || !printerSchema.validate(_config).valid) {
+    throw Object.assign(new Error('DRAWER_NOT_CONFIGURED: selecciona una impresora de Caja para el cajón'), {code:'DRAWER_NOT_CONFIGURED'})
+  }
+  const target = _config.printers.find(p => p.printer_id === _config.drawer_printer_id)
+  return [{job_id:createHash('sha256').update(`${commandId}:drawer:${target.printer_id}`).digest('hex'),command_id:commandId,
+    station_id:'caja',printer_id:target.printer_id,printer_name:target.name,connection:JSON.parse(JSON.stringify(target.connection)),
+    document_type:'drawer_pulse',data_b64:DRAWER_KICK.toString('base64'),copies:1,reprint:false}]
+}
 
 async function kickDrawer() {
   await printToStation('caja', DRAWER_KICK, 'receipt')
@@ -253,6 +264,19 @@ function resolveUncertain(jobId, outcome) {
   return resolved
 }
 
+function applyPreparedResolution(effect, options) {
+  const receipt = printQueue.applyPreparedResolution(effect, options)
+  // The durable transition may predate a crash. Drain pending work on retries too.
+  if (effect.resolution === 'reprint') _scheduleDrain([effect.job_id]).catch(e => console.error('[printer] Resolution drain failed:', e.message))
+  return receipt
+}
+
+function applyPreparedDrawerResolution(effect, options) {
+  const receipt = printQueue.applyPreparedDrawerResolution(effect, options)
+  if (effect.resolution === 'retry_pulse') _scheduleDrain([effect.job_id]).catch(e => console.error('[printer] Drawer recovery failed:', e.message))
+  return receipt
+}
+
 // ── Exports ───────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -262,8 +286,13 @@ module.exports = {
   setStations,
   printToStation,
   prepareJobs,
+  prepareDrawerJobs,
+  applyPreparedDrawerResolution,
   enqueuePreparedJobs,
   resolveUncertain,
+  applyPreparedResolution,
+  getJob: printQueue.getJob,
+  getUncertainJobSummaries: printQueue.getUncertainJobSummaries,
   kickDrawer,
   buildTestTicket,
   // Exposed for /print-queue HTTP endpoint

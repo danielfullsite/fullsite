@@ -147,12 +147,15 @@ test('sent items cannot be deleted or changed; another waiter needs permission; 
   assert.equal((await s.send('ORDER_SAVE', saveFields(s, { expected_revision: 2, catalog_revision: before }))).code, 'CATALOG_REVISION_CONFLICT')
   assert.equal((await s.send('ORDER_SAVE', saveFields(s, { expected_revision: 2, items: items(2) }))).code, 'SENT_PRICE_CHANGED')
 })
-test('opening accounts locks consumption and preserves preparation independently from payment', async t => {
+test('opening accounts requires financial revision for additions and preserves preparation independently from payment', async t => {
   const s = await setup(t)
   await s.send('ORDER_SAVE', saveFields(s)); await s.send('ORDER_SEND', orderFields(1))
   assert.ok((await s.send('FINANCIAL_OPEN', { order_id: 'mother', turno_id: 't1', expected_revision: 0, expected_order_revision: 2, total_cents: 7540, currency: 'MXN' })).event)
-  for (const type of ['ORDER_SAVE', 'ORDER_SEND', 'ORDER_MOVE', 'ORDER_VOID']) {
+  for (const type of ['ORDER_MOVE', 'ORDER_VOID']) {
     assert.equal((await s.send(type, saveFields(s, { expected_revision: 2 }))).code, 'FINANCIAL_ORDER_LOCKED')
+  }
+  for (const type of ['ORDER_SAVE', 'ORDER_SEND']) {
+    assert.equal((await s.send(type, saveFields(s, { expected_revision: 2 }))).code, 'FINANCIAL_REVISION_CONFLICT')
   }
   assert.equal((await s.send('TURN_CLOSE', { turno_id: 't1' })).code, 'UNSETTLED_FINANCIAL_ACCOUNTS')
   assert.equal((await s.send('ORDER_UPSERTED', { order_id: 'mother', status: 'entregada' })).code, 'KITCHEN_COMMAND_REQUIRED')
@@ -364,4 +367,96 @@ test('two stations on one TCP printer send distinct durable tickets once across 
   await new Promise(resolve => setImmediate(resolve))
   assert.equal(queue.getAllJobs().length, 2)
   assert.equal(received.length, 2)
+})
+
+test('cash movements are authorized, durable and included once in X and Z after restart', async t => {
+  const { turnReport } = require('../core/turn-report')
+  let s = await setup(t)
+  const fields = { turno_id:'t1', movement_id:'withdrawal-1', type:'retiro', amount_cents:2000, reason:'Fondo a resguardo' }
+  const denied = await s.send('CASH_MOVEMENT',fields,{actor:{...actor,permissions:permissionsFor('mesero')}})
+  assert.equal(denied.code,'PERMISSION_DENIED')
+  assert.equal(s.state.getCashMovements().length,0)
+  assert.equal((await s.send('CASH_MOVEMENT',fields)).result.cash_movement.amount_cents,2000)
+  await s.send('CASH_MOVEMENT',fields)
+  assert.equal(s.state.getCashMovements().length,1)
+  const conflict=await s.send('CASH_MOVEMENT',{...fields,amount_cents:1000})
+  assert.equal(conflict.code,'MOVEMENT_ID_REUSED')
+  s = await s.restart()
+  await s.send('CASH_MOVEMENT',{...fields,movement_id:'deposit-1',type:'deposito',amount_cents:500})
+  const report=turnReport(s.state.getTurno(),s.state.getFinancialOrders(),[],s.state.getCashMovements())
+  assert.equal(report.expected_cash_cents,8500)
+  assert.equal((await s.send('CASH_MOVEMENT',{...fields,movement_id:'too-much',amount_cents:8501})).code,'INSUFFICIENT_CASH')
+  const closed=await s.send('TURN_CLOSE',{turno_id:'t1',counted_cash_cents:8500,notes:'Comprobado'})
+  assert.equal(closed.result.closed_turno.expected_cash_cents,8500)
+  assert.equal(closed.result.closed_turno.difference_cents,0)
+  assert.equal(closed.result.closed_turno.withdrawals_cents,2000)
+  assert.equal(closed.result.closed_turno.deposits_cents,500)
+  assert.equal((await s.send('CASH_MOVEMENT',{...fields,movement_id:'after-close'})).code,'TURNO_MISMATCH')
+})
+
+test('Eduardo: shared order numbers survive retries/restart and restart at one after Z without erasing history', async t => {
+  let s = await setup(t)
+  const first = await s.send('ORDER_SAVE', saveFields(s, { command_id: 'first-number' }))
+  assert.equal(first.result.operational_order.order_number, 1)
+  const second = await s.send('ORDER_SAVE', saveFields(s, { order_id: 'second', mesa: 8 }))
+  assert.equal(second.result.operational_order.order_number, 2)
+  const retry = await s.send('ORDER_SAVE', saveFields(s, { command_id: 'first-number' }))
+  assert.equal(retry.result.operational_order.order_number, 1)
+  s = await s.restart()
+  const edited = await s.send('ORDER_SAVE', saveFields(s, { expected_revision: 1, items: items(2) }))
+  assert.equal(edited.result.operational_order.order_number, 1)
+  await s.send('ORDER_VOID', orderFields(2, { reason: 'Cancelar prueba' }))
+  await s.send('ORDER_VOID', { order_id: 'second', turno_id: 't1', expected_revision: 1, reason: 'Cancelar prueba' })
+  await s.send('TURN_CLOSE', { turno_id: 't1', counted_cash_cents: 10000 })
+  await s.send('TURN_OPEN', { turno_id: 't2', opening_cash_cents: 0, opening_reason: 'Resguardo después del corte' })
+  const next = await s.send('ORDER_SAVE', saveFields(s, { order_id: 'new-turn', turno_id: 't2' }))
+  assert.equal(next.result.operational_order.order_number, 1)
+  assert.equal(s.state.getOrder('mother').order_number, 1)
+  assert.equal(s.state.getOrder('mother').status, 'cancelada')
+  assert.equal(s.state.toSnapshot().salon_orders.length, 1)
+  s = await s.restart()
+  assert.equal(s.state.getOrder('new-turn').order_number, 1)
+  const fourth = await s.send('ORDER_SAVE', saveFields(s, { order_id: 'fourth', turno_id: 't2', mesa: 8 }))
+  assert.equal(fourth.result.operational_order.order_number, 2)
+})
+
+
+test('Opening cash differences require a durable explanation against the last committed close', async t => {
+  let s = await setup(t)
+  await s.send('TURN_CLOSE', { turno_id: 't1', counted_cash_cents: 10000 })
+  s = await s.restart()
+  const fields = { turno_id: 'explained-turn', opening_cash_cents: 0 }
+  assert.equal((await s.send('TURN_OPEN', fields)).code, 'OPENING_REASON_REQUIRED')
+  assert.equal(s.state.getTurno(), null)
+  assert.equal((await s.send('TURN_OPEN', { ...fields, opening_reason: '   banco ' })).code, 'OPENING_REASON_REQUIRED')
+  const opened = await s.send('TURN_OPEN', { ...fields, command_id: 'explained-opening', opening_reason: '  Resguardo del efectivo en caja fuerte  ', previous_counted_cash_cents: 0 })
+  assert.ok(opened.result?.turno)
+  assert.deepEqual(opened.result.turno.opening_reconciliation, {
+    previous_turno_id: 't1', previous_counted_cash_cents: 10000, difference_cents: -10000,
+    reason: 'Resguardo del efectivo en caja fuerte',
+  })
+  s = await s.restart()
+  assert.deepEqual(s.state.getTurno(), opened.result.turno)
+  const retry = await s.send('TURN_OPEN', { ...fields, command_id: 'explained-opening', opening_reason: '  Resguardo del efectivo en caja fuerte  ', previous_counted_cash_cents: 0 })
+  assert.deepEqual(retry.result.turno, opened.result.turno)
+  const closed = await s.send('TURN_CLOSE', { turno_id: fields.turno_id, counted_cash_cents: 0 })
+  assert.deepEqual(closed.result.closed_turno.opening_reconciliation, opened.result.turno.opening_reconciliation)
+  assert.ok((await s.send('TURN_OPEN', { turno_id: 'small-difference', opening_cash_cents: 5000 })).result?.turno)
+})
+
+test('Order numbers serialize competing terminals, reject without consuming, and survive an empty salon snapshot', async t => {
+  const s = await setup(t)
+  const invalid = await s.send('ORDER_SAVE', saveFields(s, { items: [] }))
+  assert.equal(invalid.code, 'INVALID_ITEMS')
+  const results = await Promise.all([1, 2, 3].map(n => s.send('ORDER_SAVE', saveFields(s, { order_id: `parallel-${n}`, mesa: n }), { client: `POS-${n}` })))
+  assert.deepEqual(results.map(r => r.result.operational_order.order_number).sort(), [1, 2, 3])
+  for (let n = 1; n <= 3; n++) assert.ok((await s.send('ORDER_VOID', { order_id: `parallel-${n}`, turno_id: 't1', expected_revision: 1, reason: 'Cancelación laboratorio' })).result)
+  const snap = s.state.toSnapshot()
+  assert.equal(snap.salon_orders.length, 0)
+  assert.equal(snap.kds_orders.length, 0)
+  const secondary = new RestaurantState({ localAuthorityEnabled: true })
+  assert.equal(secondary.hidratarDesdeSnapshot(snap), true)
+  assert.equal(secondary.getNextOrderNumber('t1'), 4)
+  assert.equal(secondary.getNextOrderNumber('other-turn'), 1)
+  assert.equal((await s.restart()).state.getNextOrderNumber('t1'), 4)
 })

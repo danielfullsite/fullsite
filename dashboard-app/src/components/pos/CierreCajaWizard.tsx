@@ -12,7 +12,7 @@ import {
   getCachedCashMovsByTurno,
 } from '@/lib/pos-offline-db'
 import { getPosConfigSync } from '@/lib/pos-config'
-import { sendOrderToKitchen } from '@/lib/kitchen-bridge'
+import { avisarCierreDeTurno } from '@/lib/aviso-lan'
 import { getPOSAuthHeaders, fetchWithTimeout, getPaymentMethodsFromDB } from '@/lib/pos-data'
 import { computeOrderSummary, summaryToArqueoInput, calcEfectivoEsperado } from '@/lib/pos-arqueo'
 import {
@@ -25,6 +25,8 @@ import {
   UMBRAL_EXPLICACION_MXN,
   type OpenOrder,
 } from '@/lib/pos-cierre-guard'
+import { armarFilaDeCierre, rechazoDefinitivo } from '@/lib/pos-cierre-fila'
+import { requiereCaja, leerSalon } from '@/lib/pedro-cliente'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -47,6 +49,46 @@ const MONEDAS = [
   { value: 1, label: '$1' },
   { value: 0.5, label: '$0.50' },
 ]
+
+/** Nube + local, una vez cada movimiento: gana la fila de nube si el id está en las dos. */
+export function fusionarMovimientos(
+  nube: { id?: string; type: string; amount: number }[],
+  locales: { id?: string; type: string; amount: number }[],
+): { type: string; amount: number }[] {
+  const vistos = new Set(nube.map(m => m.id).filter(Boolean))
+  const extras = locales.filter(m => !m.id || !vistos.has(m.id))
+  return [...nube, ...extras].map(({ type, amount }) => ({ type, amount }))
+}
+
+/**
+ * Cuentas abiertas del turno para la guardia de cierre. Bajo Caja se le pregunta
+ * a Pedro (tiene el salón sin internet); si no contesta o no estamos bajo Caja,
+ * la nube. Si NINGUNA contesta, devuelve la lista vacía — y eso es lo que había
+ * antes también, pero ahora sólo pasa sin Pedro Y sin nube.
+ */
+async function leerCuentasAbiertas(turnoId: string): Promise<OpenOrder[]> {
+  if (requiereCaja()) {
+    const salon = await leerSalon()
+    if (salon.procedencia !== 'sin-pedro') {
+      const delTurno = salon.ordenes.filter(o => !o.turno_id || String(o.turno_id) === turnoId)
+      return filterOpenOrders(delTurno.map(o => ({
+        id: String(o.id ?? o.order_id ?? ''),
+        mesa: Number(o.mesa) || 0,
+        mesero: String(o.mesero ?? ''),
+        status: String(o.status ?? ''),
+        total: Number(o.total) || 0,
+      })))
+    }
+  }
+  try {
+    const openRes = await fetchWithTimeout(
+      `${SUPABASE_URL}/rest/v1/pos_orders?select=id,mesa,mesero,status,total&client_id=eq.${_cid()}&turno_id=eq.${turnoId}&status=in.(enviada,preparando,lista)`,
+      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } },
+    )
+    if (openRes.ok) return filterOpenOrders(await openRes.json())
+  } catch { /* sin nube: abajo */ }
+  return []
+}
 
 interface CierreData {
   billetes: Record<number, number>
@@ -169,8 +211,15 @@ export default function CierreCajaWizard({
         } catch { /* IDB unavailable */ }
       }
 
-      // Cash movements — Supabase first, IDB fallback
+      // Cash movements — nube + IDB, FUSIONADOS por id.
+      //
+      // Antes la nube ganaba entera y la caché sólo entraba si la nube devolvía
+      // CERO filas. Con un depósito subido y un retiro todavía en la cola (WAN
+      // degradado a media tarde), el retiro no contaba y el efectivo esperado
+      // salía alto: el cajero cerraba con FALTANTE que no existía. La cola local
+      // es tan real como la nube; lo que está en las dos se cuenta una vez.
       let cashMovements: { type: string; amount: number }[] = []
+      const nube: { id?: string; type: string; amount: number }[] = []
       try {
         // `client_id` NO estaba en este filtro y sí en el de órdenes, tres líneas
         // arriba. La RLS tapa al extraño, pero no al usuario con varias membresías:
@@ -178,17 +227,14 @@ export default function CierreCajaWizard({
         // depósitos y retiros entran directo al efectivo esperado. Mismo patrón que
         // se cerró en seis lecturas el 2026-08-30; ésta se quedó fuera.
         const movRes = await fetch(
-          `${SUPABASE_URL}/rest/v1/pos_cash_movements?client_id=eq.${_cid()}&turno_id=eq.${turnoId}&select=type,amount`,
+          `${SUPABASE_URL}/rest/v1/pos_cash_movements?client_id=eq.${_cid()}&turno_id=eq.${turnoId}&select=id,type,amount`,
           { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, signal: AbortSignal.timeout(4000) }
         )
-        if (movRes.ok) cashMovements = await movRes.json()
+        if (movRes.ok) nube.push(...(await movRes.json()))
       } catch { /* fall through */ }
-
-      if (cashMovements.length === 0) {
-        try {
-          cashMovements = await getCachedCashMovsByTurno(turnoId)
-        } catch { /* IDB unavailable */ }
-      }
+      let locales: { id?: string; type: string; amount: number }[] = []
+      try { locales = await getCachedCashMovsByTurno(turnoId) } catch { /* IDB unavailable */ }
+      cashMovements = fusionarMovimientos(nube, locales)
 
       // EL CATÁLOGO SABE QUÉ ES CADA FORMA DE PAGO; ANTES NO SE LE PREGUNTABA.
       //
@@ -235,17 +281,13 @@ export default function CierreCajaWizard({
       })
       setDataLoaded(true)
 
-      // GUARD-08: fetch open orders for this turno (best-effort — offline skips guard)
-      try {
-        const openRes = await fetch(
-          `${SUPABASE_URL}/rest/v1/pos_orders?select=id,mesa,mesero,status,total&client_id=eq.${_cid()}&turno_id=eq.${turnoId}&status=in.(enviada,preparando,lista)`,
-          { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, signal: AbortSignal.timeout(4000) }
-        )
-        if (openRes.ok) {
-          const raw = await openRes.json()
-          setOpenOrders(filterOpenOrders(raw))
-        }
-      } catch { /* offline — allow close without guard */ }
+      // GUARD-08: cuentas abiertas de este turno.
+      //
+      // La lectura era sólo de nube y, si fallaba, el corte seguía SIN guardia:
+      // sin WAN se cerraba el turno con mesas vivas y el TURNO_CLOSED las
+      // borraba del KDS. Bajo Caja, Pedro tiene el salón (`/state`) aunque no
+      // haya internet; se le pregunta primero ahí y la nube es el respaldo.
+      setOpenOrders(await leerCuentasAbiertas(turnoId))
       setOpenOrdersLoaded(true)
 
       setLoading(false)
@@ -309,36 +351,20 @@ export default function CierreCajaWizard({
 
     // Stable UUID — generated once at wizard mount, same across all retries
     const cierreId = cierreIdRef.current
-    const now = new Date().toISOString()
+    const ahora = new Date()
+    const now = ahora.toISOString()
+    // La fila vive en `pos-cierre-fila.ts` para que una prueba la confronte con
+    // el esquema real (`pos-cierre-fila-cabe-en-la-tabla.test.ts`). La `fecha`
+    // sale del día de venta, no del reloj UTC.
     const cierreData = withEscalationPayload(
-      {
-        id: cierreId,
-        client_id: _cid(),
-        turno_id: turnoId,
-        fecha: now.split('T')[0],
-        fondo_inicial: fondoInicial,
-        billetes: JSON.stringify({}),
-        monedas: JSON.stringify({}),
-        total_contado: totalContado,
-        efectivo_sistema: efectivoEsperado,
-        tarjeta_sistema: systemData.tarjeta,
-        transferencias_sistema: systemData.transferencias,
-        // Plataformas y cortesias, fuera de `tarjeta_sistema`: ese numero se
-        // concilia a mano contra la terminal bancaria y con basura adentro no cuadra.
-        otros_sistema: systemData.otros,
-        diferencia,
-        total_ventas: systemData.totalVentas,
-        tickets_count: systemData.ticketsCount,
-        cancelaciones: systemData.cancelaciones,
-        descuentos: systemData.descuentos,
-        propinas: systemData.propinas,
-        // Queda EN el cierre: manana explica una diferencia en vez de adivinarla.
-        cola_pendiente_al_cerrar: colaPendiente,
-        notas: notas || null,
-        closed_by: manager,
-        approved_by: manager,
-        created_at: now,
-      },
+      armarFilaDeCierre({
+        id: cierreId, clientId: _cid(), turnoId, ahora,
+        fondoInicial, totalContado, efectivoEsperado,
+        tarjeta: systemData.tarjeta, transferencias: systemData.transferencias, otros: systemData.otros,
+        diferencia, totalVentas: systemData.totalVentas, ticketsCount: systemData.ticketsCount,
+        cancelaciones: systemData.cancelaciones, descuentos: systemData.descuentos, propinas: systemData.propinas,
+        colaPendiente, notas: notas || null, closedBy: manager,
+      }),
       openOrders,
       escalationAuthorizedBy,
       escalationNota.trim() || null,
@@ -352,6 +378,33 @@ export default function CierreCajaWizard({
       closed_at: now,
       notas: notas || null,
     }
+
+    // 0. PREFLIGHT: si la nube contesta con un rechazo definitivo, el cierre NO
+    // procede. Un 400 aquí (columna inexistente, tipo inválido, RLS de negocio)
+    // no se arregla reintentando: la cola lo marcaría terminal, el PATCH del
+    // turno sí entraría, y el turno quedaría cerrado SIN cierre — sin folio Z,
+    // sin historial, con el fondo de mañana confrontado contra nada. Así se
+    // perdieron cierres en todo entorno que no tuviera la columna
+    // `cola_pendiente_al_cerrar`. Sin red, 5xx o sesión caída: se sigue por la
+    // cola, como siempre; el operador conserva su conteo en pantalla si se aborta.
+    let cierreAceptadoPorLaNube = false
+    try {
+      const pre = await fetch(`${SUPABASE_URL}/rest/v1/pos_cierres`, {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify(cierreData),
+        signal: AbortSignal.timeout(6000),
+      })
+      if (pre.ok) cierreAceptadoPorLaNube = true
+      else if (rechazoDefinitivo(pre.status)) {
+        let detalle = ''
+        try { const j = await pre.json(); detalle = String(j?.message ?? j?.hint ?? '') } catch { /* sin cuerpo */ }
+        setPinError(`La nube rechazó el cierre (HTTP ${pre.status})${detalle ? `: ${detalle}` : ''}. No se cerró el turno; avisa a soporte.`)
+        setSaving(false)
+        closingRef.current = false
+        return
+      }
+    } catch { /* sin red o timeout: el cierre sigue por la cola durable */ }
 
     // 1. Close turno in IDB immediately — survives any network failure
     try {
@@ -376,10 +429,12 @@ export default function CierreCajaWizard({
       olvidarTurnoPendiente()
     } catch { /* sync queue unavailable — proceed */ }
 
-    // 3. Best-effort Supabase — we don't block onComplete on network
+    // 3. Best-effort Supabase — we don't block onComplete on network. El POST del
+    // cierre ya se intentó en el preflight; si lo aceptó, no se repite (el id es
+    // estable y la cola lo deduplica de todos modos, pero un 409 no es evidencia).
     try {
-      const [cierreRes, turnoRes] = await Promise.all([
-        fetch(`${SUPABASE_URL}/rest/v1/pos_cierres`, {
+      await Promise.all([
+        cierreAceptadoPorLaNube ? Promise.resolve() : fetch(`${SUPABASE_URL}/rest/v1/pos_cierres`, {
           method: 'POST',
           headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
           body: JSON.stringify(cierreData),
@@ -392,8 +447,7 @@ export default function CierreCajaWizard({
           signal: AbortSignal.timeout(6000),
         }),
       ])
-      // If both succeeded, the sync queue items will be deduplicated on next sync
-      if (!cierreRes.ok || !turnoRes.ok) { /* queued — will sync later */ }
+      // Lo que no entró queda en la cola y se sincroniza después.
     } catch { /* offline — queued */ }
 
     // 4. Audit log (best-effort)
@@ -447,16 +501,10 @@ export default function CierreCajaWizard({
     } catch { /* */ }
 
     // 7. Avisar al local-server (modo LAN): TURNO_CLOSED purga ordenes/KDS/mesas
-    // en Pedro para que el tablero amanezca limpio. Best-effort con presupuesto
-    // corto — el cierre NUNCA se bloquea por la LAN (regla dura #3).
-    try {
-      await sendOrderToKitchen({
-        command_id: `turno-closed:${turnoId}`,
-        command_type: 'TURNO_CLOSED',
-        turno_id: turnoId,
-        client_id: _cid(),
-      }, { deadlineMs: 2500 })
-    } catch { /* sin bridge — el KDS online ya filtra por turno */ }
+    // en Pedro para que el tablero amanezca limpio. DURABLE: si la LAN no contesta
+    // ahora, queda pendiente y se reintenta (lib/aviso-lan.ts). El cierre NUNCA se
+    // bloquea por la LAN (regla dura #3): no se espera.
+    void avisarCierreDeTurno({ turnoId, clientId: _cid() })
 
     // 8. Always complete — the restaurant must be able to close the shift offline
     onComplete()
@@ -500,14 +548,8 @@ export default function CierreCajaWizard({
           details: { type: 'cancelada_en_lote_cierre', mesa: o.mesa, total: o.total, motivo: escalationNota.trim() } })
       } catch { fallidas.push(`mesa ${o.mesa}`) }
     }
-    // Releer del server — nunca declarar exito a medias.
-    try {
-      const openRes = await fetchWithTimeout(
-        `${SUPABASE_URL}/rest/v1/pos_orders?select=id,mesa,mesero,status,total&client_id=eq.${_cid()}&turno_id=eq.${turnoId}&status=in.(enviada,preparando,lista)`,
-        { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } },
-      )
-      if (openRes.ok) setOpenOrders(filterOpenOrders(await openRes.json()))
-    } catch { /* se queda la lista anterior */ }
+    // Releer — nunca declarar exito a medias.
+    try { setOpenOrders(await leerCuentasAbiertas(turnoId)) } catch { /* se queda la lista anterior */ }
     setBatchSaving(false)
     if (fallidas.length) setEscalationError(`No se pudieron cancelar: ${fallidas.join(', ')}. Reintenta o ciérralas desde la caja.`)
   }

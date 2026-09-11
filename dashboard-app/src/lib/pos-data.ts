@@ -1,3 +1,4 @@
+import { kitchenOrderInScope, readKitchenScope } from './kitchen-read-scope'
 // POS Menu Data — AMALAY real menu (el POS legado)
 //
 // SQL for Supabase (run in SQL Editor):
@@ -272,7 +273,6 @@ export function getModifierTypeFromCategoryName(catName: string): 'none' | 'coff
 import { _categoryNameCache } from '@/lib/pos-constants'
 import { getActiveClientSlug } from '@/lib/data'
 import { requiereCaja } from './pedro-cliente'
-import { inventoryPolicyService, logPolicyGateFailure } from '@/lib/inventory-policy'
 import { mismoDiaDeVenta, inicioDiaConfigurado } from '@/lib/dia-de-venta'
 import { esFalloDeRed, esFalloDeAutenticacion, ErrorDeSesion, ErrorDeContrato } from '@/lib/clasificar-fallo'
 
@@ -628,7 +628,7 @@ export function olvidarTurnoPendiente(): void {
  * está encolado. La UI debe decirlo — "abrió" y "quedó registrado en el server"
  * no son lo mismo, y confundirlos produjo el "abrí turno y luego no había turno".
  */
-export async function openTurno(fondoInicial: number, openedBy: string): Promise<{ id: string; fondo_inicial: number; opened_by: string; opened_at: string; sincronizado?: boolean } | null> {
+export async function openTurno(fondoInicial: number, openedBy: string, openingReason = ''): Promise<{ id: string; fondo_inicial: number; opened_by: string; opened_at: string; sincronizado?: boolean } | null> {
   if (requiereCaja()) {
     const { leerSalon } = await import('./pedro-cliente')
     const local = await leerSalon()
@@ -638,7 +638,7 @@ export async function openTurno(fondoInicial: number, openedBy: string): Promise
       if (local.turno) return (await getActiveTurnos())[0] ?? null
       const opening = Math.round(fondoInicial * 100)
       if (!Number.isSafeInteger(opening) || opening < 0 || Math.abs(fondoInicial * 100 - opening) > 1e-7) throw new Error('El fondo debe ser un importe válido con hasta dos decimales.')
-      const receipt = await ejecutarComandoCaja('turn:open', 'TURN_OPEN', { turno_id: idParaAbrirTurno(), opening_cash_cents: opening })
+      const receipt = await ejecutarComandoCaja('turn:open', 'TURN_OPEN', { turno_id: idParaAbrirTurno(), opening_cash_cents: opening, opening_reason: openingReason })
       const t = receipt.result.turno as Record<string, unknown> | undefined
       if (!t?.id || !t.opened_at || !Number.isSafeInteger(t.opening_cash_cents)) throw new Error('Caja no confirmó la apertura de turno.')
       const confirmed = { id: String(t.id), fondo_inicial: Number(t.opening_cash_cents) / 100, opened_by: String(t.opened_by), opened_at: String(t.opened_at), sincronizado: false }
@@ -1029,12 +1029,6 @@ export const RECIPE_ALIASES: Record<string, string[]> = {
   'te chai': ['te chai'],
   'te verde': ['te verde'],
 }
-
-// Phase-gate: when set to 'disabled', the fuzzy fallback (RECIPE_ALIASES + name matching)
-// is skipped and only the DB recipe_ref is used. Flip via Vercel env var — no deploy needed.
-// Retirement criteria: 0 fuzzy logs for AMALAY during 7 consecutive days.
-const RECIPE_FALLBACK_ENABLED =
-  (typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_RECIPE_FALLBACK : undefined) !== 'disabled'
 
 /** Un pago dentro de una cuenta (pago mixto multi-forma, estilo el POS legado) */
 export interface PagoForma {
@@ -1701,7 +1695,10 @@ export async function saveOrder(order: Order, saveOperationId?: string): Promise
       })
     } catch {
       const queue = JSON.parse(localStorage.getItem('fullsite_offline_queue') || '[]')
-      queue.push({ table: 'pos_orders', data: payload, endpoint: '/api/pos/save-order', transport: 'APP_API', timestamp: Date.now(), synced: false })
+      // `method` viaja: sin el, drainLocalStorageToIdb lo re-encolaba como PATCH y
+      // /api/pos/save-order (solo POST) respondia 405 para siempre (barrido
+      // 2026-09-10, offline-queue LENTE-4).
+      queue.push({ table: 'pos_orders', method: 'POST', data: payload, endpoint: '/api/pos/save-order', transport: 'APP_API', timestamp: Date.now(), synced: false })
       localStorage.setItem('fullsite_offline_queue', JSON.stringify(queue))
     }
     console.log('[offline] Order saved to queue — will sync when online')
@@ -1834,7 +1831,17 @@ export interface KitchenOrderFromDB {
   personas?: number
 }
 
+const loadKitchenCache = () => import('@/lib/pos-offline-db')
+
 export async function getKitchenOrders(): Promise<KitchenOrderFromDB[]> {
+  let cacheModule: ReturnType<typeof loadKitchenCache> | undefined
+  const cache = () => cacheModule ??= loadKitchenCache()
+  const clientId = _getClientId()
+  const scope = readKitchenScope(clientId)
+  const { locationId } = scope
+  const sameScope = (row: Record<string, unknown>) => kitchenOrderInScope(row, scope)
+  const scopeUnchanged = () => _getClientId() === clientId &&
+    (typeof window === 'undefined' ? '' : localStorage.getItem('FULLSITE_LOCATION_ID') || '') === locationId
   // Only fetch today's orders (not ancient ones stuck in "enviada")
   const today = new Date()
   today.setHours(today.getHours() - 12) // Last 12 hours
@@ -1847,12 +1854,12 @@ export async function getKitchenOrders(): Promise<KitchenOrderFromDB[]> {
     // pos_orders directly — the anon key hits RLS and sees 0 rows — and a KDS on a
     // separate machine cannot hold the LAN ws:// bridge from an https page (mixed
     // content). This endpoint is the reliable online path; offline still falls back
-    // to the IndexedDB cache in the catch block below. `cutoff` is applied server-side.
+    // to the scoped IndexedDB cache below. The server resolves one exact open shift.
     // Token de cocina por-tenant (provisionado a la terminal; el Electron KDS lo
     // inyecta desde su config). Si no está presente, el endpoint opera abierto.
     const _kt = typeof window !== 'undefined' ? localStorage.getItem('pos_kitchen_token') : null
     const res = await fetchWithTimeout(
-      `/api/pos/kitchen?client_id=${encodeURIComponent(_getClientId())}`,
+      `/api/pos/kitchen?client_id=${encodeURIComponent(clientId)}${locationId ? `&location_id=${encodeURIComponent(locationId)}` : ''}`,
       { cache: 'no-store', headers: _kt ? { 'x-kitchen-token': _kt } : undefined }
     )
     // Un error del servidor NO puede devolver lista vacía.
@@ -1867,10 +1874,13 @@ export async function getKitchenOrders(): Promise<KitchenOrderFromDB[]> {
     // cacheadas en el dispositivo. Para una pantalla de cocina, ver las últimas
     // comandas conocidas siempre es mejor que ver la nada.
     if (!res.ok) throw new Error(`kitchen_http_${res.status}`)
-    orders = await res.json()
+    const rows: unknown = await res.json()
+    if (!Array.isArray(rows)) throw new Error('kitchen_invalid_response')
+    if (!scopeUnchanged()) return []
+    orders = rows.filter(sameScope)
     // Cache para offline — fire and forget, no bloquea
     if (typeof window !== 'undefined') {
-      import('@/lib/pos-offline-db').then(({ cacheOrder }) =>
+      cache().then(({ cacheOrder }) =>
         Promise.all(orders.map(o => cacheOrder(o as unknown as Record<string, unknown>)))
       ).catch(() => {})
     }
@@ -1889,12 +1899,12 @@ export async function getKitchenOrders(): Promise<KitchenOrderFromDB[]> {
     const bridgeMergeCutoff = new Date(Date.now() - 5 * 60 * 1000).toISOString()
     if (typeof window !== 'undefined') {
       try {
-        const { getCachedOrders } = await import('@/lib/pos-offline-db')
+        const { getCachedOrders } = await cache()
         const existing = new Set(orders.map(o => String(o.id)))
         const cached = await getCachedOrders()
         for (const c of cached) {
           if (
-            c._bridge_unsynced === true && !existing.has(String(c.id)) &&
+            sameScope(c) && c._bridge_unsynced === true && !existing.has(String(c.id)) &&
             ['enviada', 'preparando', 'lista'].includes(String(c.status)) &&
             String(c.created_at || c.updated_at || '') >= bridgeMergeCutoff
           ) {
@@ -1912,11 +1922,11 @@ export async function getKitchenOrders(): Promise<KitchenOrderFromDB[]> {
     // Offline — mostrar las órdenes cacheadas en este dispositivo (IndexedDB)
     if (typeof window === 'undefined') return []
     try {
-      const { getCachedOrders } = await import('@/lib/pos-offline-db')
+      const { getCachedOrders } = await cache()
       const cached = await getCachedOrders()
       orders = cached
         .filter(o =>
-          ['enviada', 'preparando', 'lista'].includes(String(o.status)) &&
+          sameScope(o) && ['enviada', 'preparando', 'lista'].includes(String(o.status)) &&
           String(o.created_at || o.updated_at || '') >= cutoff
         )
         .map(o => ({
@@ -1932,6 +1942,7 @@ export async function getKitchenOrders(): Promise<KitchenOrderFromDB[]> {
   // QW3: deduplicar por id. Antes la key era mesa+mesero+items -> dos ordenes
   // distintas identicas colapsaban (se perdia un platillo del KDS) y diferencias
   // de serializacion online/offline duplicaban cards.
+  if (!scopeUnchanged()) return []
   const seen = new Set<string>()
   return orders.filter(o => {
     const key = String(o.id)
@@ -2273,7 +2284,12 @@ export async function verifyManagerPin(pin: string): Promise<string | null> {
   try {
     const cached = JSON.parse(localStorage.getItem('pos_manager_pin_cache') || '{}')
     const entry = cached[await _pinCacheKey(pin)]
-    if (entry?.name && Date.now() - (entry.cached_at || 0) < 30 * 60 * 1000) {
+    // La cache guarda TODO PIN validado online, incluido el de un capitan que
+    // autorizo una transferencia (min_role capitan). Sin revisar el rol, ese
+    // capitan autorizaba anulaciones y descuentos de gerente durante 30 min sin
+    // red (barrido 2026-09-10, offline-queue LENTE-6). Online el servidor lo
+    // rechaza; offline se aplica la misma regla.
+    if (entry?.name && Date.now() - (entry.cached_at || 0) < 30 * 60 * 1000 && (_ROLE_LVL[entry.role] || 0) >= 4) {
       return entry.name as string
     }
   } catch { /* ignore */ }
@@ -2312,7 +2328,8 @@ export async function verifyManagerPinWithRole(pin: string): Promise<{ name: str
   try {
     const cached = JSON.parse(localStorage.getItem('pos_manager_pin_cache') || '{}')
     const entry = cached[await _pinCacheKey(pin)]
-    if (entry?.name && Date.now() - (entry.cached_at || 0) < 30 * 60 * 1000) {
+    // Mismo candado que en verifyManagerPin: solo gerente+ desde la cache.
+    if (entry?.name && Date.now() - (entry.cached_at || 0) < 30 * 60 * 1000 && (_ROLE_LVL[entry.role] || 0) >= 4) {
       return { name: entry.name, role: entry.role || 'gerente' }
     }
   } catch { /* ignore */ }
@@ -2331,7 +2348,7 @@ export async function verifyManagerPinWithRole(pin: string): Promise<{ name: str
  *   verifyPinWithMinRole(pin, 'gerente')  → accepts gerente, admin
  *   verifyPinWithMinRole(pin, 'admin')    → accepts admin only
  */
-export async function verifyPinWithMinRole(pin: string, minRole: string): Promise<{ name: string; role: string } | null> {
+export async function verifyPinWithMinRole(pin: string, minRole: string): Promise<{ name: string; role: string; approvalToken?: string } | null> {
   if (!pin) return null
   try {
     const { apiUrl } = await import('./api-base')
@@ -2341,7 +2358,7 @@ export async function verifyPinWithMinRole(pin: string, minRole: string): Promis
       body: JSON.stringify({ pin, client_id: _getClientId(), min_role: minRole }),
     })
     if (res.ok) {
-      const { staff } = await res.json()
+      const { staff, shiftToken } = await res.json()
       if (staff?.name) {
         const role = staff.role || minRole
         try {
@@ -2349,7 +2366,7 @@ export async function verifyPinWithMinRole(pin: string, minRole: string): Promis
           cached[await _pinCacheKey(pin)] = { name: staff.name, role, cached_at: Date.now() }
           localStorage.setItem('pos_manager_pin_cache', JSON.stringify(cached))
         } catch { /* ignore */ }
-        return { name: staff.name, role }
+        return { name: staff.name, role, approvalToken: shiftToken }
       }
       return null
     }
@@ -2358,7 +2375,9 @@ export async function verifyPinWithMinRole(pin: string, minRole: string): Promis
   try {
     const cached = JSON.parse(localStorage.getItem('pos_manager_pin_cache') || '{}')
     const entry = cached[await _pinCacheKey(pin)]
-    if (entry?.name && Date.now() - (entry.cached_at || 0) < 30 * 60 * 1000) {
+    // El rol cacheado tiene que cumplir el minimo pedido; un PIN de capitan
+    // validado para transferir no vale para un permiso de gerente.
+    if (entry?.name && Date.now() - (entry.cached_at || 0) < 30 * 60 * 1000 && (_ROLE_LVL[entry.role] || 0) >= (_ROLE_LVL[minRole] || 99)) {
       return { name: entry.name, role: entry.role || minRole }
     }
   } catch { /* ignore */ }
@@ -2464,36 +2483,8 @@ export async function getRecipeForItem(menuItemId: string): Promise<RecipeRow[]>
 }
 
 /**
- * Batch-fetch recipe_ref for a set of menu item IDs.
- * Returns a Map<menuItemId, recipe_ref> containing only items that have a non-null recipe_ref.
- * One DB call for the entire order — does not touch pos_recipes_old.
- */
-async function fetchRecipeRefs(
-  clientId: string,
-  menuItemIds: string[],
-): Promise<Map<string, string>> {
-  if (menuItemIds.length === 0) return new Map()
-  const ids = menuItemIds.map(id => encodeURIComponent(id)).join(',')
-  try {
-    const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/pos_menu_items?client_id=eq.${clientId}&id=in.(${ids})&select=id,recipe_ref`,
-      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
-    )
-    if (!res.ok) return new Map()
-    const rows: { id: string; recipe_ref: string | null }[] = await res.json()
-    return new Map(
-      rows
-        .filter(r => r.recipe_ref != null)
-        .map(r => [r.id, r.recipe_ref!])
-    )
-  } catch {
-    return new Map()
-  }
-}
-
-/**
  * Returns recipe_ref coverage stats for a client.
- * Used to decide when to retire the fuzzy fallback.
+ * Read-only catalog coverage; does not authorize stock mutations.
  */
 export async function fetchRecipeRefCoverage(clientId: string): Promise<{
   totalItems: number
@@ -2672,318 +2663,52 @@ export async function logInventoryMovement(movement: {
   }
 }
 
-// ─── Auto-deduction: deduct recipe ingredients when order sent to kitchen ───
+// ─── Sale inventory: reconcile the committed order through R1 ───────────────
 
-// Tracks orderIds that have already emitted policy_gate_failure to prevent duplicate events
-// when deductIngredientsForOrder is retried for the same order within a session.
-const _gateFailureOrderIds = new Set<string>()
-
-// Tracks orderIds for which ingredient deduction has already fired in this process.
-// Prevents double-deduction caused by fire-and-forget timing (handlePayment releases
-// operationLock before the deduction Promise resolves) or rapid double-tap on "Cobrar".
-//
-// GROWTH: one 36-byte UUID per paid order. At 200 orders/day ≈ 7 KB/day, ≈ 2.6 MB/year
-// without restart. Lifecycle is bounded by the page/process session. Negligible at
-// current scale. If the process runs weeks without reload, LRU eviction could be added.
-//
-// ERROR BEHAVIOR: if deductIngredientsForOrder() fails after adding orderId here,
-// the catch block removes orderId from this Set so a subsequent retry can proceed.
-// An orderId is only kept permanently after a confirmed successful deduction.
-//
-// SCOPE LIMITS — this Set does NOT protect against:
-//   - Process/tab restart: Set is cleared on page reload.
-//   - Multiple browser tabs or POS terminals on the same order (no shared state).
-//   - Multiple Local Server instances.
-// Distributed idempotency (DB-level check on pos_inventory_movements) is tracked
-// separately as a follow-up after this P0 containment is stable.
-const _deductedOrderIds = new Set<string>()
-
-function _recordGateFailure(orderId: string, items: OrderItem[], actor: string): void {
-  if (_gateFailureOrderIds.has(orderId)) return
-  _gateFailureOrderIds.add(orderId)
-  const policyState = inventoryPolicyService.stats().state
-  console.error('[policy:gate] policy_gate_failure', { orderId, itemCount: items.length, policyState })
-  console.info('[policy:event] policy_gate_failure', {
-    orderId, itemCount: items.length, items: items.map(i => i.nombre), policyState,
-  })
-  logPolicyGateFailure(_getClientId(), orderId, policyState, actor)
-}
-
+/** Legacy call signature retained for POS callers. Only the canonical order ID
+ * crosses this boundary: supplied lines, actor text and batch IDs cannot choose
+ * ingredient targets, quantities, ownership or idempotency. The authenticated
+ * server delegates those decisions to R1. Repeated calls (including after a lost
+ * response or another terminal's call) must reach that durable reconciliation.
+ * Empty deductions/resolution arrays do not claim ingredient-level evidence. */
 export async function deductIngredientsForOrder(
-  items: OrderItem[],
+  _items: OrderItem[],
   orderId: string,
-  actor: string,
-  batchId?: string,
-): Promise<{ success: boolean; deductions: { ingredient: string; amount: number; unit: string; newStock: number }[]; alerts: string[]; resolution: { DB_MAPPING: string[]; FUZZY_FALLBACK: string[]; R1_OWNED: string[]; GATE_FAILED: string[]; UNRESOLVED: string[] } }> {
+  _actor: string,
+  _batchId?: string,
+): Promise<{ success: boolean; inventory_status: 'COMPLETE' | 'BLOCKED' | 'PENDING'; deductions: { ingredient: string; amount: number; unit: string; newStock: number }[]; alerts: string[]; resolution: { DB_MAPPING: string[]; FUZZY_FALLBACK: string[]; R1_OWNED: string[]; GATE_FAILED: string[]; UNRESOLVED: string[] } }> {
+  const resolution = { DB_MAPPING: [], FUZZY_FALLBACK: [], R1_OWNED: [], GATE_FAILED: [], UNRESOLVED: [] }
+  const pending = { success: false, inventory_status: 'PENDING' as const, deductions: [],
+    alerts: ['No se confirmó el consumo de inventario. Reintenta la conciliación de la orden.'], resolution }
+  if (typeof orderId !== 'string' || !orderId.trim() || orderId.length > 200) return pending
   try {
-  // Policy must be READY before Sistema A runs.
-  // If policy is UNINITIALIZED/LOADING/FAILED we cannot distinguish recipe items from
-  // unclassified. Skip Sistema A entirely — R1 already fired at Kitchen Send.
-  if (!inventoryPolicyService.isReady()) {
-    _recordGateFailure(orderId, items, actor)
-    console.info(
-      `[deduct:summary] order=${orderId} items=${items.length} gate=FAILED_NO_POLICY ` +
-      `policyState=${inventoryPolicyService.stats().state}`
-    )
-    return {
-      success: true,
-      deductions: [],
-      alerts: [],
-      resolution: { DB_MAPPING: [], FUZZY_FALLBACK: [], R1_OWNED: [], GATE_FAILED: items.map(i => i.nombre), UNRESOLVED: [] },
+    const { apiUrl } = await import('./api-base')
+    const response = await fetchWithTimeout(apiUrl('/api/pos/inventory/reconcile'), {
+      method: 'POST', headers: { 'Content-Type': 'application/json', ...getPOSAuthHeaders() },
+      body: JSON.stringify({ order_id: orderId }), redirect: 'error', cache: 'no-store',
+    }, 18_000)
+    if (!response.ok) return pending
+    const result = await response.json()
+    if (result?.inventory_status === 'COMPLETE' && result.inventory_pending === false) {
+      return { success: true, inventory_status: 'COMPLETE', deductions: [], alerts: [], resolution }
     }
-  }
-
-  // Idempotency guard — key is orderId:batchId when batchId is provided (kitchen send)
-  // so that additional items sent in a second batch are not skipped.
-  const deductKey = batchId ? `${orderId}:${batchId}` : orderId
-  if (_deductedOrderIds.has(deductKey)) {
-    console.info(`[deduct:idempotent] key=${deductKey} already deducted this session — skip`)
-    return {
-      success: true,
-      deductions: [],
-      alerts: [],
-      resolution: { DB_MAPPING: [], FUZZY_FALLBACK: [], R1_OWNED: [], GATE_FAILED: [], UNRESOLVED: [] },
+    if (result?.inventory_status === 'BLOCKED' && result.inventory_pending === true) {
+      return { ...pending, inventory_status: 'BLOCKED', alerts: ['El consumo de inventario está bloqueado y requiere revisión. No se confirmó la conciliación.'] }
     }
-  }
-  _deductedOrderIds.add(deductKey)
-
-  // 1. Get all recipes and inventory
-  const recipes = await getRecipes()
-  const inventory = await getInventory()
-  const invMap = new Map(inventory.map(i => [i.ingredient_id, i]))
-
-  const deductions: { ingredient: string; amount: number; unit: string; newStock: number }[] = []
-  const alerts: string[] = []
-  const resolution = { DB_MAPPING: [] as string[], FUZZY_FALLBACK: [] as string[], R1_OWNED: [] as string[], GATE_FAILED: [] as string[], UNRESOLVED: [] as string[] }
-
-  // 2. Fetch recipe_ref from pos_menu_items for all items in this order (1 DB call)
-  const menuItemIds = [...new Set(items.map(i => i.menuItemId))]
-  const recipeRefMap = await fetchRecipeRefs(_getClientId(), menuItemIds)
-
-  // Observability counters — flushed to console at end of loop
-  const obs = {
-    total: 0, r1Skipped: 0, viaDb: 0, viaFuzzy: 0, miss: 0,
-    fuzzyItems: [] as string[], missItems: [] as string[],
-  }
-
-  // 3. For each order item, find matching recipe and deduct
-  // Normalize: strip prefixes, size suffixes, temperature variants
-  const normalizeRecipeName = (n: string) => n.toLowerCase()
-    .replace(/^sprw\s*-\s*/i, '')
-    .replace(/\s*\(.*?\)\s*/g, ' ')
-    .replace(/\s*(14oz|16oz|12oz|360\s*ml|240\s*ml|180\s*ml|450\s*ml)\s*/gi, ' ')
-    .replace(/\s*(caliente|frio|fría|helado|servido)\s*/gi, ' ')
-    .replace(/\s*(media porción|para compartir|1\/2)\s*/gi, ' ')
-    .replace(/\s+/g, ' ').trim()
-
-  const recipesByName = new Map<string, typeof recipes>()
-  const recipesByNorm = new Map<string, typeof recipes>()
-  for (const r of recipes) {
-    const key = r.menu_item_name.toLowerCase()
-    if (!recipesByName.has(key)) recipesByName.set(key, [])
-    recipesByName.get(key)!.push(r)
-    const norm = normalizeRecipeName(r.menu_item_name)
-    if (!recipesByNorm.has(norm)) recipesByNorm.set(norm, [])
-    recipesByNorm.get(norm)!.push(r)
-  }
-
-  for (const item of items) {
-    // R1 gate: skip items owned by R1 — deduction handled by r1_reconcile_item.
-    // Defaults to Alternativa A from §8: only 'recipe' items are gated; 'unclassified'
-    // continue through Sistema A unchanged until §8 decision is made.
-    const mode = inventoryPolicyService.getMode(item.menuItemId)
-    if (mode === 'recipe') {
-      obs.r1Skipped++
-      resolution.R1_OWNED.push(item.nombre)
-      continue
-    }
-
-    obs.total++
-    const itemName = item.nombre.toLowerCase()
-    const itemNorm = normalizeRecipeName(item.nombre)
-    let recipeRows: typeof recipes = []
-    let resolvedVia: 'db' | 'fuzzy' | 'miss' = 'miss'
-
-    // Path 1: DB recipe_ref — direct lookup, no text matching
-    const recipeRef = recipeRefMap.get(item.menuItemId)
-    if (recipeRef) {
-      const rows = recipesByName.get(recipeRef)
-      if (rows && rows.length > 0) {
-        recipeRows = rows
-        resolvedVia = 'db'
-      }
-    }
-
-    // Path 2: Fuzzy fallback (RECIPE_ALIASES + name matching)
-    // Active while NEXT_PUBLIC_RECIPE_FALLBACK !== 'disabled'
-    if (recipeRows.length === 0 && RECIPE_FALLBACK_ENABLED) {
-      // Priority 1: alias map
-      const aliases = RECIPE_ALIASES[itemName]
-      if (aliases) {
-        for (const alias of aliases) {
-          const rows = recipesByName.get(alias.toLowerCase())
-          if (rows && rows.length > 0) { recipeRows = rows; break }
-        }
-      }
-      // Priority 2: exact match on recipe name
-      if (recipeRows.length === 0) recipeRows = recipesByName.get(itemName) ?? []
-      // Priority 3: normalized match (strips prefixes, sizes, temperature)
-      if (recipeRows.length === 0) recipeRows = recipesByNorm.get(itemNorm) ?? []
-      // Priority 4: best partial match (normalized)
-      if (recipeRows.length === 0) {
-        let bestMatch: { name: string; rows: typeof recipes } | null = null
-        let bestScore = 0
-        for (const [name, rows] of recipesByNorm) {
-          if (name.length < 3 || itemNorm.length < 3) continue
-          if (name.includes(itemNorm) || itemNorm.includes(name)) {
-            const score = Math.min(name.length, itemNorm.length) / Math.max(name.length, itemNorm.length)
-            if (score > bestScore && score > 0.5) { bestScore = score; bestMatch = { name, rows } }
-          }
-        }
-        if (bestMatch) recipeRows = bestMatch.rows
-      }
-      if (recipeRows.length > 0) resolvedVia = 'fuzzy'
-    }
-
-    // Record resolution path — never skip silently
-    if (resolvedVia === 'db') {
-      obs.viaDb++
-      resolution.DB_MAPPING.push(item.nombre)
-    } else if (resolvedVia === 'fuzzy') {
-      obs.viaFuzzy++
-      obs.fuzzyItems.push(item.nombre)
-      resolution.FUZZY_FALLBACK.push(item.nombre)
-      console.warn(`[deduct:fuzzy] "${item.nombre}" — sin recipe_ref en DB, usando fallback`)
-    } else {
-      obs.miss++
-      obs.missItems.push(item.nombre)
-      resolution.UNRESOLVED.push(item.nombre)
-      console.warn(`[deduct:miss] "${item.nombre}" (id=${item.menuItemId}) — sin receta en DB ni fuzzy`)
-      continue
-    }
-
-    for (const row of recipeRows) {
-      const deductAmount = row.quantity * item.cantidad
-      const inv = invMap.get(row.ingredient_id)
-      if (!inv) continue
-
-      // Skip sub-recipes — they don't carry physical stock
-      if (row.ingredient_id.startsWith('sub_') || inv.ingredient_category === 'subreceta' || inv.ingredient_category === 'SUBRECETA') continue
-
-      const actualDeduction = Math.min(deductAmount, inv.stock) // never deduct more than available
-      const newStock = Math.max(0, inv.stock - deductAmount)
-
-      // Update stock
-      await updateInventoryStock(row.ingredient_id, newStock)
-
-      // Log movement (log actual amount deducted, not requested)
-      await logInventoryMovement({
-        ingredient_id: row.ingredient_id,
-        movement_type: 'deduction',
-        quantity: -actualDeduction,
-        order_id: orderId,
-        actor,
-        notes: `${item.cantidad}x ${item.nombre}${actualDeduction < deductAmount ? ' (stock insuficiente)' : ''}`,
-      })
-
-      deductions.push({
-        ingredient: inv.ingredient_name ?? row.ingredient_id,
-        amount: actualDeduction,
-        unit: row.unit || inv.ingredient_unit || '',
-        newStock,
-      })
-
-      // Check reorder point
-      if (newStock <= inv.reorder_point) {
-        alerts.push(`${inv.ingredient_name}: ${newStock.toFixed(2)} ${inv.ingredient_unit} (punto de reorden: ${inv.reorder_point})`)
-      }
-
-      // Update local map
-      inv.stock = newStock
-    }
-  }
-
-  // Observability summary — one line per order in server logs
-  if (obs.total > 0) {
-    const pDb    = Math.round(obs.viaDb    / obs.total * 100)
-    const pFuzzy = Math.round(obs.viaFuzzy / obs.total * 100)
-    const pMiss  = Math.round(obs.miss     / obs.total * 100)
-    console.info(
-      `[deduct:summary] order=${orderId} items=${obs.total + obs.r1Skipped} gate=ACTIVE r1=${obs.r1Skipped} ` +
-      `db=${obs.viaDb}(${pDb}%) fuzzy=${obs.viaFuzzy}(${pFuzzy}%) miss=${obs.miss}(${pMiss}%)`
-    )
-    if (obs.fuzzyItems.length > 0) console.warn(`[deduct:fuzzy-items] ${obs.fuzzyItems.join(', ')}`)
-    if (obs.missItems.length  > 0) console.warn(`[deduct:miss-items]  ${obs.missItems.join(', ')}`)
-  }
-
-  return { success: true, deductions, alerts, resolution }
-  } catch (err) {
-    // Remove orderId so a subsequent retry is not silently blocked by the idempotency guard.
-    // The guard is meant to prevent double-deduction on success, not to block retries after failure.
-    _deductedOrderIds.delete(orderId)
-    console.warn('[deductIngredientsForOrder] Failed:', err)
-    return { success: false, deductions: [], alerts: ['Error al descontar inventario'], resolution: { DB_MAPPING: [], FUZZY_FALLBACK: [], R1_OWNED: [], GATE_FAILED: [], UNRESOLVED: [] } }
-  }
+    return pending
+  } catch { return pending }
 }
 
-/** Reverse ingredient deduction for a cancelled item (return stock) */
+/** Compatibility entry point: only committed disposition and historical R1
+ * consumption may decide a return. Never rebuild stock from today's recipes. */
 export async function reverseIngredientDeduction(
-  item: OrderItem,
+  _item: OrderItem,
   orderId: string,
-  actor: string,
-  reason: string,
+  _actor: string,
+  _reason: string,
 ): Promise<void> {
-  try {
-    const recipes = await getRecipes()
-    const inventory = await getInventory()
-    const invMap = new Map(inventory.map(i => [i.ingredient_id, i]))
-
-    const normalizeRecipeName = (n: string) => n.toLowerCase()
-      .replace(/^sprw\s*-\s*/i, '').replace(/\s*\(.*?\)\s*/g, ' ')
-      .replace(/\s*(14oz|16oz|12oz|360\s*ml|240\s*ml|180\s*ml|450\s*ml)\s*/gi, ' ')
-      .replace(/\s*(caliente|frio|fría|helado|servido)\s*/gi, ' ')
-      .replace(/\s+/g, ' ').trim()
-
-    const recipesByName = new Map<string, typeof recipes>()
-    for (const r of recipes) {
-      const key = r.menu_item_name.toLowerCase()
-      if (!recipesByName.has(key)) recipesByName.set(key, [])
-      recipesByName.get(key)!.push(r)
-      const norm = normalizeRecipeName(r.menu_item_name)
-      if (!recipesByName.has(norm)) recipesByName.set(norm, [])
-      recipesByName.get(norm)!.push(r)
-    }
-
-    const itemName = item.nombre.toLowerCase()
-    const aliases = RECIPE_ALIASES[itemName]
-    let recipeRows: typeof recipes = []
-    if (aliases) {
-      for (const alias of aliases) {
-        const rows = recipesByName.get(alias.toLowerCase())
-        if (rows && rows.length > 0) { recipeRows = rows; break }
-      }
-    }
-    if (recipeRows.length === 0) recipeRows = recipesByName.get(itemName) ?? []
-    if (recipeRows.length === 0) recipeRows = recipesByName.get(normalizeRecipeName(item.nombre)) ?? []
-
-    for (const row of recipeRows) {
-      const qty = row.quantity * (item.cantidad || 1)
-      const inv = invMap.get(row.ingredient_id)
-      if (inv) {
-        await updateInventoryStock(row.ingredient_id, inv.stock + qty)
-        await logInventoryMovement({
-          ingredient_id: row.ingredient_id,
-          movement_type: 'adjustment',
-          quantity: qty,
-          order_id: orderId,
-          actor,
-          notes: `Cancelacion: ${item.nombre} — ${reason}`,
-        })
-      }
-    }
-  } catch (err) {
-    console.warn('[reverseIngredientDeduction] Failed:', err)
-  }
+  const result = await deductIngredientsForOrder([], orderId, '')
+  if (!result.success) throw new Error('Inventario pendiente de conciliación; no se confirmó devolución de existencias.')
 }
 
 export async function getInventoryMovements(limit = 50): Promise<InventoryMovement[]> {

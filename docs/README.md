@@ -31,9 +31,15 @@ El modelo: plataforma SaaS multi-tenant, un solo Supabase, particionamiento por 
 | Entender cómo está construido | [`architecture/SYSTEM-ARCHITECTURE.md`](architecture/SYSTEM-ARCHITECTURE.md) |
 | **Qué está abierto (índice único)** | [`state/OPEN-ITEMS.md`](state/OPEN-ITEMS.md) |
 | **Huecos actuales del candidato y condiciones de cierre** | [`audit/FULLSITE-HUECOS-ACTUALES-2026-09-08.md`](audit/FULLSITE-HUECOS-ACTUALES-2026-09-08.md) |
+| **Feedback de Eduardo: síntomas y evidencia** | [`audit/EDUARDO-2026-09-09.md`](audit/EDUARDO-2026-09-09.md) |
+| **Correcciones y evidencia posterior por commit** | [`audit/CIERRE-SOFTWARE-2026-09-10.md`](audit/CIERRE-SOFTWARE-2026-09-10.md) |
+| **Barrido de defectos 10-11 sep: matriz por módulo** | [`audit/BARRIDO-2026-09-10.md`](audit/BARRIDO-2026-09-10.md) |
+| **Instalación, migración, recuperación y rollback del candidato** | [`pos/INSTALACION-CANDIDATO-2026-09-11.md`](pos/INSTALACION-CANDIDATO-2026-09-11.md) |
 | **Plan de cierre operativo (septiembre)** | [`PLAN-CIERRE-FULLSITE-2026-09-04.md`](PLAN-CIERRE-FULLSITE-2026-09-04.md) |
 | **Qué instalar y comprobar en AMALAY (candidato, no desplegado)** | [`offline/AMALAY-INSTALACION-CANDIDATO-2026-09-05.md`](offline/AMALAY-INSTALACION-CANDIDATO-2026-09-05.md) |
 | **Operación, dinero y cocina desde Caja** | [`architecture/OPERATIONAL-COMMANDS-2026-09-05.md`](architecture/OPERATIONAL-COMMANDS-2026-09-05.md) |
+| **Lectura cloud KDS y sucursal** | [`architecture/KDS-CLOUD-SCOPE-2026-09-10.md`](architecture/KDS-CLOUD-SCOPE-2026-09-10.md) |
+| **Alta reanudable de restaurantes** | [`architecture/TENANT-PROVISIONING-2026-09-10.md`](architecture/TENANT-PROVISIONING-2026-09-10.md) |
 | **Interfaz instalada y materialización cloud** | [`architecture/OFFLINE-UI-PACKAGE-2026-09-05.md`](architecture/OFFLINE-UI-PACKAGE-2026-09-05.md) · [`architecture/CAJA-CLOUD-MATERIALIZATION-2026-09-05.md`](architecture/CAJA-CLOUD-MATERIALIZATION-2026-09-05.md) |
 | Plan general anterior (agosto) | [`PLAN-AHORA.md`](PLAN-AHORA.md) |
 | **Auditoría de cierre punta a punta (septiembre)** | [`audit/FULLSITE-CIERRE-PUNTA-A-PUNTA-2026-09-04.md`](audit/FULLSITE-CIERRE-PUNTA-A-PUNTA-2026-09-04.md) |

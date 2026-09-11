@@ -7,7 +7,9 @@ const html = readFileSync(resolve(process.cwd(), '../electron-app/local-server/k
 const windows: any[] = []
 afterEach(() => { windows.splice(0).forEach(w => w.close()) })
 
-function screen({ reject = false, session = false } = {}) {
+function screen({ reject = false, session = false, delayedReads = false } = {}) {
+  const reads: ((value: Response) => void)[] = []
+  const polls: (() => void)[] = []
   const calls: { url: string; init: RequestInit; body: any }[] = []
   const errors: unknown[] = []
   const order = { id: 'mother', order_id: 'mother', authority: 'caja', turno_id: 'shift', kitchen_revision: 1, mesa: 2,
@@ -16,6 +18,8 @@ function screen({ reject = false, session = false } = {}) {
     comanda_batches: { round: { status: 'enviada', seq: 0, created_at: '2026-01-01T01:00:00Z' } } }
   const actor = { staff: { id: 'cook', name: 'Cocina', role: 'admin' }, actor_token: 'signed-session', expires_at: Date.now() + 3600000, offline: true }
   const dom = new JSDOM(html, { url: 'http://localhost:7717/kds', runScripts: 'dangerously', beforeParse(w: any) {
+    const setInterval = w.setInterval.bind(w)
+    w.setInterval = (callback: () => void, ms: number) => { if (ms === 2000) polls.push(callback); return setInterval(callback, ms) }
     w.__KDS_CFG__ = { headers: { 'x-fullsite-terminal': 'KDS-1', 'x-fullsite-lan': 'synthetic' } }
     if (session) w.sessionStorage.setItem('pos_actor_session', JSON.stringify(actor))
     w.localStorage.setItem('kds_settings_v1', JSON.stringify({ sound: false, station: 'todas' }))
@@ -31,11 +35,12 @@ function screen({ reject = false, session = false } = {}) {
         order.status = body.status; order.comanda_batches.round.status = body.status
         return Response.json({ results: [{ receipt: { command_id: body.command_id }, result: { operational_order: order } }] })
       }
+      if (delayedReads && calls.filter(c => c.url.endsWith('/state')).length > 1) return new Promise<Response>(resolve => reads.push(resolve))
       return Response.json({ authoritative: true, write_authority: 'caja', kds_orders: order.status === 'entregada' ? [] : [order], kds_queue: [] })
     }
   } })
   windows.push(dom.window)
-  return { win: dom.window as any, calls, errors, order }
+  return { win: dom.window as any, calls, errors, order, reads, polls }
 }
 it('real kitchen HTML asks PIN before changes, clears PIN and sends the authenticated command with a receipt', async () => {
   const s = screen()
@@ -82,4 +87,31 @@ it('separate prepare and deliver buttons advance the current kitchen revision', 
     ['preparando', 1], ['lista', 2], ['entregada', 3],
   ])
   expect(s.errors).toEqual([])
+})
+
+it('a delayed older kitchen read cannot resurrect work after a newer empty snapshot', async () => {
+  const s = screen({ session: true, delayedReads: true })
+  await vi.waitFor(() => expect(s.win.document.querySelector('.card')).not.toBeNull())
+  s.polls[0](); s.polls[0]()
+  await vi.waitFor(() => expect(s.reads).toHaveLength(2))
+  s.reads[1](Response.json({ authoritative: true, write_authority: 'caja', sequence: 12, kds_orders: [], kds_queue: [] }))
+  await vi.waitFor(() => expect(s.win.document.querySelector('.card')).toBeNull())
+  s.reads[0](Response.json({ authoritative: true, write_authority: 'caja', sequence: 11, kds_orders: [s.order], kds_queue: [] }))
+  await new Promise(resolve => setTimeout(resolve, 25))
+  expect(s.win.document.querySelector('.card') === null).toBe(true)
+})
+
+it('kitchen acknowledgement invalidates outstanding reads before the new snapshot resolves', async () => {
+  const s = screen({ session: true, delayedReads: true })
+  await vi.waitFor(() => expect(s.win.document.querySelector('[data-ready]')).not.toBeNull())
+  s.polls[0]()
+  const old = JSON.parse(JSON.stringify(s.order))
+  old.mesa = 999
+  s.win.document.querySelector('[data-ready]').click()
+  await vi.waitFor(() => expect(s.reads).toHaveLength(2))
+  s.reads[0](Response.json({ authoritative: true, write_authority: 'caja', kds_orders: [old], kds_queue: [] }))
+  await new Promise(resolve => setTimeout(resolve, 25))
+  expect(s.win.document.body.textContent).not.toContain('Mesa 999')
+  s.reads[1](Response.json({ authoritative: true, write_authority: 'caja', kds_orders: [s.order], kds_queue: [] }))
+  await vi.waitFor(() => expect(s.win.document.querySelector('[data-deliver]')).not.toBeNull())
 })

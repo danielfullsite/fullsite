@@ -11,6 +11,23 @@ const digest = value => crypto.createHash('sha256').update(JSON.stringify(value)
 const frame = events => JSON.stringify({ transaction_version: 1, events, checksum: digest(events) }) + '\n'
 const copy = value => JSON.parse(JSON.stringify(value))
 const { sameCommand } = require('../../core/command-identity')
+
+// ─── Fotos de nube heredadas en el log ───────────────────────────────────────
+//
+// Hasta el 2026-09-10 el poll legacy escribia un STATE_SYNC con TODAS las filas
+// del turno cada 5 s (core/foto-de-nube.js cuenta la historia: ~220 MB/hora).
+// Una instalacion que se actualiza trae ese log. No se pueden BORRAR esos
+// eventos: la cadena de secuencias es contigua por contrato y las secundarias
+// deduplican por secuencia. Lo que se hace es vaciarles el payload y dejar la
+// marca `compacted`: misma identidad, misma secuencia, cien bytes en vez de
+// trescientos mil. El estado ignora un STATE_SYNC compactado (core/state.js).
+// Se conserva integro el ULTIMO, para que el primer arranque tras actualizar
+// sin internet siga teniendo el salon hasta que exista cloud-snapshot.json.
+const STATE_SYNC = 'STATE_SYNC'
+const compactable = e => e && e.type === STATE_SYNC && e.payload && typeof e.payload === 'object' && e.payload.compacted !== true
+function compactar(event) {
+  return { ...event, payload: { compacted: true, synced_at: event.payload.synced_at ?? null } }
+}
 class NdjsonEventStore extends EventStore {
   constructor({ eventLogPath }) {
     super()
@@ -25,6 +42,7 @@ class NdjsonEventStore extends EventStore {
   async load() {
     if (this._loaded) return
     const events = []
+    let heredadas = 0
     if (fs.existsSync(this._logPath)) {
       const bytes = fs.readFileSync(this._logPath)
       const boundary = bytes.lastIndexOf(10) + 1
@@ -36,25 +54,56 @@ class NdjsonEventStore extends EventStore {
         try { fs.ftruncateSync(fd, boundary); fs.fsyncSync(fd) } finally { fs.closeSync(fd) }
       }
       const ids = new Set()
-      for (const [lineNumber, line] of bytes.subarray(0, boundary).toString('utf8').split('\n').entries()) {
+      // Linea por linea desde el buffer, sin convertir el archivo entero a UNA
+      // cadena: `toString` sobre un log de mas de 512 MB lanza ERR_STRING_TOO_LONG
+      // y Pedro no arranca. Con las fotos heredadas ese tamano se alcanzaba en dos
+      // turnos.
+      let inicio = 0
+      let lineNumber = 0
+      while (inicio < boundary) {
+        const fin = bytes.indexOf(10, inicio)
+        const line = bytes.toString('utf8', inicio, fin)
+        inicio = fin + 1
+        lineNumber++
         if (!line) continue
         let record
-        try { record = JSON.parse(line) } catch { throw new Error(`EVENT_LOG_CORRUPT: invalid JSON at line ${lineNumber + 1}`) }
+        try { record = JSON.parse(line) } catch { throw new Error(`EVENT_LOG_CORRUPT: invalid JSON at line ${lineNumber}`) }
         const batch = record.transaction_version === 1 ? record.events : [record]
         if (!Array.isArray(batch) || !batch.length || (record.transaction_version === 1 && digest(batch) !== record.checksum)) {
-          throw new Error(`EVENT_LOG_CORRUPT: invalid transaction at line ${lineNumber + 1}`)
+          throw new Error(`EVENT_LOG_CORRUPT: invalid transaction at line ${lineNumber}`)
         }
         for (const event of batch) {
           if (!event || typeof event.id !== 'string' || !event.id || event.sequence !== events.length + 1 || ids.has(event.id)) {
-            throw new Error(`EVENT_LOG_CORRUPT: invalid sequence or identity at line ${lineNumber + 1}`)
+            throw new Error(`EVENT_LOG_CORRUPT: invalid sequence or identity at line ${lineNumber}`)
           }
           ids.add(event.id)
+          if (compactable(event)) heredadas++
           events.push(event)
         }
       }
     }
+    // Compactar todas las fotos heredadas salvo la ultima (ver arriba).
+    if (heredadas > 1) {
+      let restantes = heredadas
+      for (let i = 0; i < events.length; i++) {
+        if (!compactable(events[i])) continue
+        if (restantes > 1) events[i] = compactar(events[i])
+        restantes--
+      }
+      try { this._rewrite(events) } catch (error) { this._fault = error; throw error }
+      this._compactadas = heredadas - 1
+    }
     this._adopt(events)
     this._loaded = true
+  }
+  // Reescritura completa por archivo temporal + rename, frame por frame: nunca
+  // se arma el archivo entero en una sola cadena.
+  _rewrite(events) {
+    const tmp = this._logPath + '.tmp'
+    const fd = fs.openSync(tmp, 'w', 0o600)
+    try { for (const e of events) writeAll(fd, frame([e])); fs.fsyncSync(fd) } finally { fs.closeSync(fd) }
+    fs.renameSync(tmp, this._logPath)
+    syncDirectory(this._logPath)
   }
   _adopt(events) {
     this._events = events
@@ -153,16 +202,18 @@ class NdjsonEventStore extends EventStore {
     if (!this._loaded) await this.load()
     this._assertHealthy()
     const selected = new Set(sequences)
+    // Si nada cambia, no se toca el disco. El poll de delivery volvia a marcar
+    // cada 5 s eventos ya sincronizados, y cada marca reescribia el log entero.
+    if (!this._events.some(e => selected.has(e.sequence) && !e.synced)) return
     const updated = this._events.map(e => selected.has(e.sequence) ? { ...e, synced: true } : e)
-    if (!updated.length) return
-    try { replaceFile(this._logPath, updated.map(e => frame([e])).join('')) } catch (error) {
+    try { this._rewrite(updated) } catch (error) {
       this._fault = error // rename may already have committed; do not use stale memory.
       throw error
     }
     this._adopt(updated)
   }
   getStats() {
-    return { lastSequence: this._sequence, unsyncedCount: this._unsyncedCount, processedCommands: this._processedCommands.size, storageUnavailable: !!this._fault }
+    return { lastSequence: this._sequence, unsyncedCount: this._unsyncedCount, processedCommands: this._processedCommands.size, storageUnavailable: !!this._fault, compactedSnapshots: this._compactadas || 0 }
   }
 }
 module.exports = { NdjsonEventStore }

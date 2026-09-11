@@ -194,8 +194,8 @@ function deriveRoutingTable(printers) {
 
 // ── Config assembly ───────────────────────────────────────────────────────────
 
-function buildV2Config(printers) {
-  return { schema_version: 2, printers, routing: {} }
+function buildV2Config(printers, drawerPrinterId) {
+  return { schema_version: 2, printers, routing: {}, ...(drawerPrinterId ? { drawer_printer_id: drawerPrinterId } : {}) }
 }
 
 // ── Exports ───────────────────────────────────────────────────────────────────

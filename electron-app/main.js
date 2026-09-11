@@ -1108,10 +1108,9 @@ app.whenReady().then(async () => {
       requiredStoreFormat: 'fullsite-command-transactions-v1',
       // Estado VIVO del restaurante. Si el servidor local no arranco, devuelve null
       // y la politica falla CERRADO — no instala.
-      // `state` lo expone local-server/index.js a proposito para esto. Si algun dia
-      // dejara de exportarlo, esto devuelve null y la politica falla CERRADO — no
-      // instala, en vez de instalar a ciegas. Hay prueba del contrato.
-      getSnapshot: () => (localServer && localServer.state ? localServer.state.toSnapshot() : null),
+      // El proveedor incluye las colas durables y el cursor confirmado de negocio;
+      // una copia del salón no prueba que sea seguro reiniciar.
+      getSnapshot: () => localServer?.getInstallSnapshot?.() || null,
       // Freno de emergencia. Falla CERRADO a proposito: si no se puede consultar,
       // no se instala. Una cosa es dejar OPERAR sin Supabase, otra instalar a ciegas.
       estaBloqueada: async (version) => {

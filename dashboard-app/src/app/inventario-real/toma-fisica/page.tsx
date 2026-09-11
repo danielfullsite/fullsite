@@ -1,12 +1,14 @@
 'use client'
 
+import PendingMovementRecovery from '@/components/inventory/PendingMovementRecovery'
+
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { Search, Save, CheckCircle, AlertTriangle, Package } from 'lucide-react'
 import { getActiveClientSlug } from '@/lib/data'
 import { formatCurrency, formatNumber } from '@/lib/format'
 import PageHeader from '@/components/PageHeader'
 import { sbPost } from '@/lib/supabase-helpers'
-import { recordMovement, loadInventoryWithStock, makeIdempotencyKey } from '@/lib/inventory'
+import { confirmarMovimientoInventario, recordMovement, loadInventoryWithStock, makeIdempotencyKey } from '@/lib/inventory'
 import type { MovementResult } from '@/lib/inventory'
 import { useClaveDeOperacion } from '@/lib/clave-de-operacion'
 
@@ -201,7 +203,13 @@ export default function TomaFisicaPage() {
           })),
         })
 
+        if (movResult.success) {
+          const balances = new Map(movResult.details.map(detail => [detail.ingredient_id, detail.stock_after]))
+          setItems(previous => previous.map(item => ({ ...item, stock: balances.get(item.ingredient_id) ?? item.stock })))
+        }
+
         if (movResult.was_duplicate) {
+          await confirmarMovimientoInventario(clientId, idempotencyKey)
           confirmarOperacion()   // terminal: quedo registrado antes
           setSaveMessage({ type: 'duplicate', text: 'Este conteo ya fue registrado anteriormente.' })
           setCounts({})
@@ -250,6 +258,7 @@ export default function TomaFisicaPage() {
         ? ` ${adjustments.length} ajustes aplicados al stock.`
         : ' Sin discrepancias.'
 
+      await confirmarMovimientoInventario(clientId, idempotencyKey)
       confirmarOperacion()   // guardado confirmado: el proximo conteo es otra operacion
       setSaveMessage({
         type: 'success',
@@ -290,6 +299,7 @@ export default function TomaFisicaPage() {
 
   return (
     <div className="space-y-6">
+      <PendingMovementRecovery />
       <PageHeader
         title="Toma Fisica de Inventario"
         subtitle={`Conteo real vs sistema — ${items.length} productos`}

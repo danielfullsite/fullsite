@@ -23,6 +23,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
  * Estas pruebas miran la URL que se construye, que es donde vive el bug.
  */
 
+vi.mock('../lib/supabase', () => ({ supabase: { auth: { getSession: async () => ({ data: { session: { access_token: 'synthetic-report-session' } } }) } } }))
+
 const URLS: string[] = []
 
 function respuestaVacia() {

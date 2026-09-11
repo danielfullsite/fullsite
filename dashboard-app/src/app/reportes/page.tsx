@@ -1,5 +1,7 @@
 'use client'
 
+import ReportUnavailable from '@/components/ReportUnavailable'
+
 import { useState, useMemo, useCallback } from 'react'
 import { FileBarChart, Download, DollarSign, Users, UtensilsCrossed, TrendingUp } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
@@ -32,17 +34,21 @@ export default function ReportesPage() {
   })
   const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10))
   const [data, setData] = useState<WansoftDaily[]>([])
+  const [reportError, setReportError] = useState(false)
   const [loading, setLoading] = useState(false)
   const [generated, setGenerated] = useState(false)
 
   const generate = useCallback(async () => {
+    setReportError(false)
     setLoading(true)
     setGenerated(false)
     try {
       const result = await getDateRange(from, to)
       setData(result)
+      setReportError(false)
       setGenerated(true)
     } catch (err) {
+      setReportError(true)
       console.error('Error generating report:', err)
     } finally {
       setLoading(false)
@@ -116,6 +122,8 @@ export default function ReportesPage() {
       dias: data.length,
     }
   }, [data, generated])
+
+  if (reportError) return <ReportUnavailable onRetry={generate} />
 
   return (
     <>

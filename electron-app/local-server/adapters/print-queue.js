@@ -16,18 +16,20 @@ function init({ filePath }) {
   _filePath = filePath
   _fault = null
   const loaded = _load()
-  const recovered = loaded.map(j => j.status === 'printing' ? {
-    ...j, status: 'uncertain', updated_at: new Date().toISOString(),
+  const recovered = loaded.map(j => j.status === 'uncertain' && !j.uncertain_episode_id ? { ...j, uncertain_episode_id: randomUUID() } : j.status === 'printing' ? {
+    ...j, status: 'uncertain', uncertain_episode_id: randomUUID(), updated_at: new Date().toISOString(),
     last_error: 'El proceso se interrumpió durante la impresión. Verifica el papel antes de reimprimir.',
   } : j)
   _jobs = loaded
   if (recovered.some((j, i) => j !== loaded[i])) _commit(recovered)
   _gcOld()
 }
-function enqueueMany(options) {
+function enqueueMany(options, { recoveryThroughSequence } = {}) {
+  if (recoveryThroughSequence !== undefined && (!Number.isSafeInteger(recoveryThroughSequence) || recoveryThroughSequence < 1)) throw new Error('INVALID_PRINT_RECOVERY_SEQUENCE')
   const jobs = clone(_jobs)
   const ids = []
   for (const opts of options) {
+    if (opts.document_type === 'drawer_pulse' && (opts.copies !== 1 || opts.data_b64 !== Buffer.from([0x1b,0x70,0,0x19,0xfa]).toString('base64'))) throw new Error('INVALID_DRAWER_JOB')
     const jobId = opts.job_id || randomUUID()
     const existing = jobs.find(j => j.job_id === jobId)
     if (existing) {
@@ -46,6 +48,13 @@ function enqueueMany(options) {
       document_type: opts.document_type || 'receipt', data_b64: opts.data_b64,
       copies: opts.copies || 1, copies_printed: 0, reprint: opts.reprint || false,
       status: 'pending', created_at: now, updated_at: now, attempts: 0, last_error: null,
+      // A committed intent without its receipt may already have reached paper
+      // or the drawer. Never infer that a missing queue means an unsent job.
+      ...(recoveryThroughSequence === undefined ? {} : {
+        status: 'uncertain', uncertain_episode_id: randomUUID(),
+        recovered_before_sequence: recoveryThroughSequence,
+        last_error: 'Falta el recibo de este trabajo. Verifica el papel o cajón antes de autorizar otro envío.',
+      }),
     })
     ids.push(jobId)
   }
@@ -60,15 +69,64 @@ function markPrinted(id) { return _transition(id, 'printed', j => { j.last_error
 function markFailed(id, error) { return _transition(id, 'failed', j => { j.last_error = error || 'Unknown error' }) }
 function markRetrying(id, error) { return _transition(id, 'retrying', j => { j.last_error = error || null }) }
 function markRecoverable(id, error) { return _transition(id, 'recoverable', j => { j.last_error = error || 'Printer unavailable' }) }
-function markUncertain(id, error) { return _transition(id, 'uncertain', j => { j.last_error = error || 'Print outcome unknown; verify paper before reprinting' }) }
+function markUncertain(id, error) { return _transition(id, 'uncertain', j => { j.uncertain_episode_id = randomUUID(); j.last_error = error || 'Print outcome unknown; verify paper before reprinting' }) }
 function markCancelled(id) { return _transition(id, 'cancelled') }
 function resolveUncertain(id, outcome) {
+  if (getJob(id)?.document_type === 'drawer_pulse') throw new Error('CONTROLLED_DRAWER_REQUIRED')
   if (getJob(id)?.status !== 'uncertain') return false
   if (outcome === 'printed') return markPrinted(id)
   if (outcome === 'reprint') return _transition(id, 'pending', j => {
     j.reprint = true; j.attempts = 0; j.last_error = 'Reimpresión solicitada tras verificar el resultado incierto'
   })
   throw new Error('Expected printed or reprint reconciliation')
+}
+// One queue write records both the decision receipt and its state transition.
+// Replaying an old decision must never resolve a later uncertain episode.
+function applyPreparedResolution(effect, options) { return _applyPreparedResolution(effect, false, options) }
+function applyPreparedDrawerResolution(effect, options) { return _applyPreparedResolution(effect, true, options) }
+function _applyPreparedResolution(effect, drawer, { eventSequence } = {}) {
+  _assertHealthy()
+  const {job_id, command_id, uncertain_episode_id, resolution, reason, recorded_by} = effect || {}
+  if (![job_id,command_id,uncertain_episode_id,reason,recorded_by].every(v => typeof v === 'string' && v.trim() && v.length <= 1000) || !(drawer ? ['opened','retry_pulse'] : ['printed','reprint']).includes(resolution)) throw new Error('INVALID_PRINT_RESOLUTION')
+  const target = getJob(job_id)
+  if (!target || (target.document_type === 'drawer_pulse') !== drawer) throw new Error('PRINT_RESOLUTION_TYPE_CONFLICT')
+  // Historical decisions also lost their delivery receipts. Their original
+  // authority does not authorize repeating a physical effect after restoration.
+  // Persist the cutoff so further restarts cannot revive any old decision.
+  if (target.recovered_before_sequence !== undefined && Number.isSafeInteger(eventSequence) && eventSequence <= target.recovered_before_sequence) {
+    return { duplicate: true, job_id, reconciliation_required: true }
+  }
+  const receipt = {job_id,command_id,uncertain_episode_id,resolution,reason,recorded_by}
+  const prior = _jobs.flatMap(j => j.resolution_receipts || []).find(r => r.command_id === command_id)
+  if (prior) {
+    if (Object.keys(receipt).some(key => prior[key] !== receipt[key])) throw new Error('PRINT_RESOLUTION_ID_REUSED')
+    return {duplicate:true, job_id}
+  }
+  const job = getJob(job_id)
+  if (!job || job.status !== 'uncertain' || job.uncertain_episode_id !== uncertain_episode_id) throw new Error('PRINT_UNCERTAIN_EPISODE_CONFLICT')
+  const jobs = clone(_jobs), next = jobs.find(j => j.job_id === job_id)
+  next.resolution_receipts = [...(next.resolution_receipts || []), {...receipt, copies_printed_before:job.copies_printed || 0, copies_configured:job.copies}]
+  next.status = ['printed','opened'].includes(resolution) ? 'printed' : 'pending'
+  next.updated_at = new Date().toISOString()
+  next.last_error = ['printed','opened'].includes(resolution) ? null : (drawer ? 'Pulso adicional autorizado: ' : 'Reimpresión autorizada tras verificar papel: ') + reason
+  if (resolution === 'retry_pulse') {
+    next.copies = 1; next.copies_printed = 0; next.attempts = 0
+    delete next.reprint_data_b64
+  }
+  if (resolution === 'reprint') {
+    next.reprint = true; next.attempts = 0
+    // Transport confirmation may have reached every copy before a crash in
+    // markPrinted. Explicit operator authorization must still produce paper.
+    if ((next.copies_printed || 0) >= next.copies) next.copies_printed = 0
+    next.reprint_data_b64 = Buffer.concat([Buffer.from('\x1b\x40COPIA - REIMPRESION AUTORIZADA\n','ascii'), Buffer.from(next.data_b64,'base64')]).toString('base64')
+  }
+  _commit(jobs)
+  return {duplicate:false, job_id}
+}
+function getUncertainJobSummaries() {
+  return getUncertainJobs().map(j => ({job_id:j.job_id,command_id:j.command_id,uncertain_episode_id:j.uncertain_episode_id,
+    station_id:j.station_id,printer_name:j.printer_name,document_type:j.document_type,copies:j.copies,
+    copies_printed:j.copies_printed,status:j.status,created_at:j.created_at,updated_at:j.updated_at,last_error:j.last_error}))
 }
 function retryRecoverableJobs() {
   const ids = _jobs.filter(j => j.status === 'recoverable').map(j => j.job_id)
@@ -129,7 +187,7 @@ function _gcOld() {
 }
 module.exports = {
   init, enqueue, enqueueMany, markPrinting, markCopyPrinted, markPrinted, markFailed,
-  markRetrying, markCancelled, markRecoverable, markUncertain, resolveUncertain,
+  applyPreparedResolution, applyPreparedDrawerResolution, getUncertainJobSummaries, markRetrying, markCancelled, markRecoverable, markUncertain, resolveUncertain,
   retryRecoverableJobs, getRecoverableJobs, getUncertainJobs, getJob, getAllJobs,
   getPendingJobs, getJobsByStatus, canRetry, MAX_ATTEMPTS, VALID_STATUSES,
   _forTesting: { _load, _persist, _gcOld, _getPending },

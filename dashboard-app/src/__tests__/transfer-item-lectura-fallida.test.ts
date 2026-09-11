@@ -1,122 +1,56 @@
-// Mover un item con la mesa destino ilegible partia la cuenta en dos.
-//
-// HALLADO el 2026-09-01 barriendo la familia de fallos del 2026-08-31: una respuesta
-// fallida convertida en dato vacio.
-//
-//   const targetRows = targetRes.ok ? await targetRes.json() : []
-//   const target = hasTarget ? targetRows[0] : null
-//
-// Ante un 401 o un 500 al leer la mesa DESTINO, `target` quedaba null — que es
-// indistinguible de "esa mesa no tiene cuenta abierta". El paso 5 se iba entonces al
-// `else`: CREAR UNA ORDEN NUEVA.
-//
-// Con la mesa destino ya ocupada, el efecto real era: el item se quitaba de la orden
-// origen (paso 4, que si corria) y aparecia una SEGUNDA cuenta en esa mesa. Cuenta
-// partida en dos, y el mesero sin saber cual cobrar.
-//
-// LA REGLA: si no se puede leer el destino, no se mueve nada. Se aborta ANTES del
-// PATCH del origen, asi que no queda nada a medias que deshacer.
-
-import { describe, it, expect, beforeEach, vi } from 'vitest'
-
-vi.mock('@/lib/api-auth', () => ({
-  withPOSAuth: vi.fn(async () => ({ clientId: 'amalay', role: 'gerente', staffName: 'Ana' })),
-  unauthorized: () => Response.json({ error: 'no' }, { status: 401 }),
-}))
-
-const ORDEN_ORIGEN = {
-  id: 'src-1',
-  items: JSON.stringify([{ id: 'i1', nombre: 'Taco', precio: 50 }]),
-  updated_at: '2026-09-01T10:00:00Z',
-  order_revision: 1,
-}
-
-let llamadas: { url: string; method: string }[] = []
-
-/** `destinoOk` decide si la lectura de la mesa destino responde bien. */
-function stubFetch(destinoOk: boolean) {
-  llamadas = []
-  vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
-    const u = String(url)
-    const method = init?.method || 'GET'
-    llamadas.push({ url: u, method })
-
-    // Lectura de la orden ORIGEN (por id) — siempre bien.
-    if (method === 'GET' && u.includes('id=eq.src-1')) {
-      return { ok: true, json: async () => [ORDEN_ORIGEN] } as unknown as Response
-    }
-    // Lectura de la mesa DESTINO (por mesa) — la que se rompe en la prueba.
-    if (method === 'GET' && u.includes('mesa=eq.')) {
-      return destinoOk
-        ? ({ ok: true, json: async () => [] } as unknown as Response)
-        : ({ ok: false, status: 500, json: async () => ({}) } as unknown as Response)
-    }
-    return { ok: true, json: async () => [{ id: 'x', updated_at: '2026-09-01T10:00:01Z' }] } as unknown as Response
-  })
-}
-
-const req = (body: Record<string, unknown>) => ({
-  headers: { get: () => null },
-  json: async () => body,
-}) as unknown as import('next/server').NextRequest
-
-const cuerpo = { source_order_id: 'src-1', item_id: 'i1', target_mesa: 7, mesero: 'Ana' }
-
-// Nota: la lectura del ORIGEN si estaba bien manejada en esta misma ruta
-// (`SOURCE_READ_FAILED`, 502). Solo la del DESTINO caia al `: []`. Eso es lo que
-// delata que fue un descuido y no una decision de diseno.
-
+// The old GET + PATCH + rollback route is replaced by a single transaction.
+// SQL failure must never fall back to removing the item through direct PATCH.
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { NextRequest } from 'next/server'
+const auth = vi.hoisted(() => ({ clientId: 'tenant-lab', role: 'mesero' }))
+const approval = vi.hoisted(() => ({ cid: 'tenant-lab', rol: 'gerente', nam: 'Ana', sub: 'supervisor' }))
+vi.mock('@/lib/api-auth', () => ({ withPOSAuth: async () => auth, unauthorized: () => new Response(null, { status: 401 }) }))
+vi.mock('@/lib/shift-token', () => ({ verifyShiftToken: async (token: string) => token === 'signed-lab' ? approval : null }))
+import { POST } from '@/app/api/pos/transfer-item/route'
+const request = (extra = {}) => new NextRequest('http://localhost/api/pos/transfer-item', { method: 'POST',
+  body: JSON.stringify({ source_order_id: 'src', item_id: 'i1', target_mesa: 7, operation_id: 'stable-op', approval_token: 'signed-lab', ...extra }) })
 beforeEach(() => {
-  vi.unstubAllGlobals()
-  process.env.NEXT_PUBLIC_SUPABASE_URL ||= 'https://x.supabase.co'
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||= 'k'
+  approval.cid = 'tenant-lab'; approval.rol = 'gerente'
+  process.env.SUPABASE_SERVICE_KEY = 'synthetic-test-key'
+  process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://127.0.0.1:9999'
 })
-
-const mutaciones = () => llamadas.filter(l => l.method === 'PATCH' || l.method === 'POST')
-
-describe('Si no se puede leer la mesa destino, no se mueve nada', () => {
-  it('REGRESION: un 500 al leer el destino aborta con TARGET_READ_FAILED', async () => {
-    stubFetch(false)
-    const { POST } = await import('@/app/api/pos/transfer-item/route')
-
-    const res = await POST(req(cuerpo))
-    const body = await res.json()
-
-    expect(res.status).toBe(502)
-    expect(body.error).toBe('TARGET_READ_FAILED')
+afterEach(() => vi.unstubAllGlobals())
+describe('transferencia atómica autorizada', () => {
+  it('si falla la transacción no hay PATCH de origen ni compensación', async () => {
+    const fetcher = vi.fn(async (_url: string, _init: RequestInit) => Response.json({ message: 'target unavailable' }, { status: 500 }))
+    vi.stubGlobal('fetch', fetcher)
+    expect((await POST(request())).status).toBe(503)
+    expect(fetcher).toHaveBeenCalledTimes(1)
+    expect(fetcher.mock.calls[0][0]).toContain('/rpc/r1_transfer_item_atomic')
   })
-
-  it('REGRESION: y NO toca la orden origen — nada a medias', async () => {
-    // Esto es lo que de verdad importa. Antes el item ya se habia quitado del origen
-    // cuando se descubria el problema.
-    stubFetch(false)
-    const { POST } = await import('@/app/api/pos/transfer-item/route')
-
-    await POST(req(cuerpo))
-
-    expect(mutaciones(), `no debe haber escrituras: ${JSON.stringify(mutaciones())}`).toHaveLength(0)
+  it('el recibo perdido exige reintentar la misma identidad', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('lost response') }))
+    const response = await POST(request())
+    expect(response.status).toBe(503)
+    expect((await response.json()).error).toBe('TRANSFER_UNCONFIRMED')
   })
-
-  it('REGRESION: y NO crea una orden nueva en la mesa destino', async () => {
-    // El efecto visible del bug: una segunda cuenta en una mesa que ya tenia una.
-    stubFetch(false)
-    const { POST } = await import('@/app/api/pos/transfer-item/route')
-
-    await POST(req(cuerpo))
-
-    expect(llamadas.filter(l => l.method === 'POST')).toHaveLength(0)
+  it('la identidad del tenant y aprobador salen de tokens, no del cuerpo', async () => {
+    const fetcher = vi.fn(async (_url: string, _init: RequestInit) => Response.json({ ok: true, source_order: { id: 'src' }, target_order: { id: 'dst' } }))
+    vi.stubGlobal('fetch', fetcher)
+    expect((await POST(request({ client_id: 'otro', approved_by: 'forjado' }))).status).toBe(200)
+    const input = JSON.parse(fetcher.mock.calls[0][1].body as string)
+    expect(input).toMatchObject({ p_client_id: 'tenant-lab', p_actor: 'Ana', p_operation_id: 'stable-op' })
   })
-})
-
-describe('El camino bueno no se rompio', () => {
-  it('con el destino legible y VACIO, si procede a mover', async () => {
-    // Destino legible y sin cuenta = crear orden nueva es lo CORRECTO aqui.
-    stubFetch(true)
-    const { POST } = await import('@/app/api/pos/transfer-item/route')
-
-    const res = await POST(req(cuerpo))
-
-    expect(res.status).not.toBe(502)
-    expect(mutaciones().length, 'debe haber escrituras cuando todo se leyo bien').toBeGreaterThan(0)
+  it.each(['forjado', ''])('no acepta aprobación %s declarada por cliente', async token => {
+    const fetcher = vi.fn(); vi.stubGlobal('fetch', fetcher)
+    expect((await POST(request({ approval_token: token, approved_role: 'admin' }))).status).toBe(403)
+    expect(fetcher).not.toHaveBeenCalled()
+  })
+  it('rechaza supervisor de otro restaurante antes de escribir', async () => {
+    approval.cid = 'otro'
+    const fetcher = vi.fn(); vi.stubGlobal('fetch', fetcher)
+    expect((await POST(request())).status).toBe(403)
+    expect(fetcher).not.toHaveBeenCalled()
+  })
+  it('rechaza un token firmado de mesero como aprobación', async () => {
+    approval.rol = 'mesero'
+    const fetcher = vi.fn(); vi.stubGlobal('fetch', fetcher)
+    expect((await POST(request())).status).toBe(403)
+    expect(fetcher).not.toHaveBeenCalled()
   })
 })

@@ -1,5 +1,7 @@
 'use client'
 
+import { cacheKitchenBridgeOrder } from '@/lib/kitchen-bridge-cache'
+import { currentKitchenScope, kitchenScopeIsCurrent, readScopedKitchenCache } from '@/lib/kitchen-read-scope'
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Clock, ChefHat, Check, Flame, RefreshCw, Ban, ShieldAlert, X, Settings, Printer } from 'lucide-react'
@@ -91,6 +93,9 @@ export default function CocinaPage() {
   // Cancel modal state
   const [cancelTarget, setCancelTarget] = useState<{ orderId: string; itemIndex: number; itemName: string; mesa: number; mesero: string } | null>(null)
   const [cancelReason, setCancelReason] = useState('')
+  // La cocina es quien SABE si el platillo ya se preparó; antes no se le
+  // preguntaba y la cancelación viajaba sin disposición de inventario.
+  const [cancelPreparado, setCancelPreparado] = useState<boolean | null>(null)
   const [cancelPin, setCancelPin] = useState('')
   const [cancelError, setCancelError] = useState('')
   const [toast, setToast] = useState<string | null>(null)
@@ -159,44 +164,18 @@ export default function CocinaPage() {
   }
 
   const fetchOrdersInner = async () => {
+    const scope = currentKitchenScope()
     let data: KitchenOrderFromDB[]
     try {
-      if (!navigator.onLine) throw new Error('offline')
-      data = await getKitchenOrders()
+      data = navigator.onLine ? await getKitchenOrders() : await readScopedKitchenCache(scope) as unknown as KitchenOrderFromDB[]
     } catch {
-      // Offline — merge newly-queued orders from IndexedDB into current state
-      try {
-        const { getCachedOrders } = await import('@/lib/pos-offline-db')
-        const [env, prep] = await Promise.all([getCachedOrders('enviada'), getCachedOrders('preparando')])
-        const cached = [...env, ...prep] as unknown as KitchenOrderFromDB[]
-        if (cached.length > 0) {
-          setOrders(prev => {
-            const existing = new Set(prev.map(o => o.id))
-            const fresh = cached.filter(o => !existing.has(o.id))
-            return fresh.length > 0 ? [...prev, ...fresh] : prev
-          })
-        }
-      } catch {}
-      throw new Error('offline')
+      data = await readScopedKitchenCache(scope).catch(() => []) as unknown as KitchenOrderFromDB[]
     }
+    if (!kitchenScopeIsCurrent(scope)) { setOrders([]); return }
 
-    // Auto-archive orders with NO activity in 4h (genuinely abandoned). Uses
-    // updated_at (last touch), NOT created_at: a table opened hours ago but still
-    // being worked — e.g. an item just added — must stay on screen and never be
-    // auto-archived. Falls back to created_at when updated_at is absent.
-    const now = Date.now()
-    const fourHoursMs = 4 * 60 * 60 * 1000
-    const activityAge = (o: KitchenOrderFromDB) =>
-      now - new Date(o.updated_at || o.created_at).getTime()
-    for (const order of data) {
-      if (activityAge(order) > fourHoursMs && (order.status === 'enviada' || order.status === 'preparando')) {
-        try {
-          await updateOrderStatus(order.id, 'entregada')
-        } catch { /* non-blocking */ }
-      }
-    }
-    // Re-filter after auto-archive — keep orders active within the last 4h.
-    const fresh = data.filter(o => activityAge(o) <= fourHoursMs || o.status === 'lista')
+    // El tiempo transcurrido es una alerta, nunca prueba de entrega.
+    // getKitchenOrders ya limita la lectura al turno/sucursal activos.
+    const fresh = [...data]
 
     // Also fetch delivery orders (nueva/preparando)
     try {
@@ -237,6 +216,7 @@ export default function CocinaPage() {
       if (hasNew) playNotificationSound()
     }
     prevEnviadaIdsRef.current = enviadaIds
+    if (!kitchenScopeIsCurrent(scope)) { setOrders([]); return }
     setOrders(fresh)
   }
 
@@ -263,35 +243,15 @@ export default function CocinaPage() {
   }, [])
 
   // Push DELTA events from the POS local server — works cross-device over LAN
-  useBridgeClient((event) => {
-    const ORDER_EVENTS = ['ORDER_UPSERTED', 'ORDER_SENT', 'ORDER_CLOSED', 'KDS_ITEM_STATUS']
+  useBridgeClient((event, scope) => {
+    const ORDER_EVENTS = ['ORDER_UPSERTED', 'ORDER_SENT', 'ORDER_ITEMS_TRANSFERRED', 'ORDER_CLOSED', 'KDS_ITEM_STATUS']
     if (!ORDER_EVENTS.includes(event.type)) return
     const p = event.payload as Record<string, unknown> | undefined
-    if ((event.type === 'ORDER_SENT' || event.type === 'ORDER_UPSERTED') && p && p.order_id) {
+    if ((event.type === 'ORDER_SENT' || event.type === 'ORDER_UPSERTED') && p && p.order_id && scope) {
       // Cachear en IndexedDB ANTES de re-consultar: offline, fetchOrders lee de
       // IndexedDB, así que si consultamos antes de cachear la comanda no aparece
       // hasta el siguiente poll. Con await, cae al instante también sin internet.
-      import('@/lib/pos-offline-db').then(async ({ cacheOrder }) => {
-        await cacheOrder({
-          id: p.order_id as string,
-          mesa: p.mesa,
-          mesero: p.mesero,
-          status: 'enviada',
-          items: typeof p.items === 'string' ? p.items : JSON.stringify(p.items || []),
-          personas: p.personas || 1,
-          total: p.total || 0,
-          turno_id: p.turno_id || null,
-          notas: p.notas || null,
-          comanda_batches: p.comanda_batches ? JSON.stringify(p.comanda_batches) : null,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          // Llegó por el bridge (offline): aún no está en Supabase. La marca hace que
-          // getKitchenOrders la conserve en la vista aunque el poll online no la traiga,
-          // hasta que sincronice (ahí se re-cachea sin la marca). Mata el "clobber".
-          _bridge_unsynced: true,
-        })
-        fetchOrders()
-      }).catch(() => { fetchOrders() })
+      cacheKitchenBridgeOrder(p, scope).then(saved => { if (saved) fetchOrders() }).catch(() => { fetchOrders() })
     } else {
       fetchOrders()
     }
@@ -308,6 +268,7 @@ export default function CocinaPage() {
   const handleCancelItem = async () => {
     if (!cancelTarget) return
     if (!cancelReason) { setCancelError('Selecciona un motivo'); return }
+    if (cancelPreparado === null) { setCancelError('Indica si el platillo ya se preparó'); return }
     if (!cancelPin) { setCancelError('Ingresa PIN de gerente'); return }
     const manager = await verifyManagerPin(cancelPin)
     if (!manager) { setCancelError('PIN invalido'); return }
@@ -361,6 +322,9 @@ export default function CocinaPage() {
         item_id: itemDelCancel.id,
         operation_id: cocinaOpId,
         reason: cancelReason,
+        // Disposición de inventario: preparado → merma (se conserva el consumo);
+        // no preparado → los ingredientes regresan.
+        prepared: cancelPreparado,
         manager,
         approval_token: tokenDelGerente || undefined,
         // Sin token firmado (PIN validado contra el cache offline) se declara
@@ -377,6 +341,8 @@ export default function CocinaPage() {
       setCancelError('Error al guardar cancelación')
       return
     }
+    // Lo que el servidor de verdad concilio; el aviso de abajo no promete mas.
+    const inventarioConciliado = saveResult.inventory_status === 'COMPLETE'
 
     // 3. Re-add ingredients to inventory
     const itemName = cancelTarget.itemName.toLowerCase()
@@ -425,7 +391,12 @@ export default function CocinaPage() {
     setCancelReason('')
     setCancelPin('')
     setCancelError('')
-    showToast(`${cancelTarget.itemName} cancelado — ingredientes devueltos al inventario`)
+    showToast(!inventarioConciliado
+      ? `${cancelTarget.itemName} cancelado — inventario pendiente de conciliar`
+      : cancelPreparado
+        ? `${cancelTarget.itemName} cancelado — se registra como merma`
+        : `${cancelTarget.itemName} cancelado — los ingredientes regresan al inventario`)
+    setCancelPreparado(null)
     fetchOrders()
   }
 
@@ -1118,6 +1089,25 @@ export default function CocinaPage() {
                       }`}
                     >
                       {r}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-semibold text-[var(--text-3)] uppercase tracking-wide mb-2 block">¿Ya se preparó?</label>
+                <div className="grid grid-cols-2 gap-2" data-testid="cancel-preparado">
+                  {([[true, 'Sí, ya se preparó (merma)'], [false, 'No, no se preparó']] as const).map(([valor, texto]) => (
+                    <button
+                      key={String(valor)}
+                      onClick={() => { setCancelPreparado(valor); setCancelError('') }}
+                      className={`px-3 py-2.5 rounded-lg text-sm transition-colors ${
+                        cancelPreparado === valor
+                          ? 'bg-red-900/40 border border-red-600 text-white'
+                          : 'bg-[var(--line)]/50 border border-slate-600/50 text-[var(--text-4)] hover:bg-[var(--line)]'
+                      }`}
+                    >
+                      {texto}
                     </button>
                   ))}
                 </div>

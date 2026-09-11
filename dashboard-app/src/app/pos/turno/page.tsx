@@ -8,6 +8,7 @@ import dynamic from 'next/dynamic'
 import { getActiveClientSlug as _cid } from '@/lib/data'
 import { cacheTurno, getCachedActiveTurno, getCachedOrdersByTurno } from '@/lib/pos-offline-db'
 import { leerSalon, requiereCaja } from '@/lib/pedro-cliente'
+import ImpresionesInciertasDeCaja from '@/components/pos/ImpresionesInciertasDeCaja'
 import TurnoDeCaja from '@/components/pos/TurnoDeCaja'
 import {
   evaluarAvisoDeHuerfanas, OPEN_ORDER_STATUSES, evaluarFondoDeApertura, leerContado,
@@ -315,7 +316,7 @@ export default function TurnoPage() {
     }).catch(() => { if (alive) setMode('error') })
     return () => { alive = false }
   }, [attempt])
-  if (mode === 'caja') return <TurnoDeCaja />
+  if (mode === 'caja') return <><TurnoDeCaja /><ImpresionesInciertasDeCaja /><ImpresionesInciertasDeCaja kind="drawer" /></>
   if (mode === 'legacy') return <TurnoPageLegacy />
   return <main className="p-8 text-[var(--text-1)]"><p>{mode === 'error' ? 'No se pudo confirmar el turno con Caja.' : 'Consultando turno…'}</p>
     {mode === 'error' && <button className="mt-4 rounded-xl border p-3" onClick={() => { setMode('loading'); setAttempt(n => n + 1) }}>Volver a consultar</button>}</main>

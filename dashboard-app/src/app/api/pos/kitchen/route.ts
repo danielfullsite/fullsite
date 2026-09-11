@@ -28,7 +28,7 @@ const CLIENT_RE = /^[a-z0-9_-]{1,40}$/i
 
 // Kitchen-only projection — no total/subtotal/iva/propina/metodo_pago/pagos.
 const KITCHEN_SELECT =
-  'id,mesa,mesero,status,items,kds_item_status,comanda_batches,created_at,updated_at,notas,order_revision,order_number'
+  'id,client_id,location_id,turno_id,mesa,mesero,status,items,kds_item_status,comanda_batches,created_at,updated_at,notas,order_revision,order_number'
 
 export async function GET(request: NextRequest) {
   const clientId = request.nextUrl.searchParams.get('client_id') || ''
@@ -41,50 +41,38 @@ export async function GET(request: NextRequest) {
     return Response.json({ error: 'no autorizado' }, { status: 401 })
   }
 
-  // Qué muestra el KDS — regla de la junta 2026-09-01: las comandas del TURNO
-  // ABIERTO, y nada más. Tres casos:
-  //
-  //   1. Turno abierto  → filtro exacto `turno_id = <turno abierto>`. La versión
-  //      anterior filtraba `updated_at >= opened_at`, y una orden de AYER que
-  //      cocina tocaba (toggle de item escribe kds_item_status) actualizaba su
-  //      updated_at y SE RECALIFICABA como de hoy — ese era el mecanismo del
-  //      "empalme" de órdenes de días distintos en el tablero.
-  //   2. Sin turno abierto (tras el Corte Z, o antes de abrir) → tablero VACÍO.
-  //      El POS no puede mandar comandas sin turno (TurnoGate + save-order las
-  //      rechaza), así que aquí no hay nada legítimo que mostrar; la ventana de
-  //      12 h que había de respaldo era la que resucitaba órdenes viejas.
-  //   3. Turno IRRESOLUBLE (falló la consulta) → modo degradado: ventana de
-  //      12 h por updated_at, como antes, para que un blip de red no deje a
-  //      cocina ciega en plena operación.
-  let turnoFilter: string | null = null
-  let degradado = false
+  const locationId = request.nextUrl.searchParams.get('location_id') || ''
+  if (locationId && !/^[a-z0-9_-]{1,100}$/i.test(locationId)) {
+    return Response.json({ error: 'location_id inválido' }, { status: 400 })
+  }
+  // Una terminal provisionada consulta exclusivamente su sucursal. Legacy sin
+  // sucursal sólo puede resolver un turno inequívoco; nunca elegir "el último".
+  const locationFilter = locationId ? `&location_id=eq.${encodeURIComponent(locationId)}` : ''
+  let turnoId: string
   try {
     const tRes = await fetch(
       `${SB_URL}/rest/v1/pos_turnos?client_id=eq.${encodeURIComponent(clientId)}` +
-      `&closed_at=is.null&select=id&order=opened_at.desc&limit=1`,
+      locationFilter + `&closed_at=is.null&select=id&limit=2`,
       { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }, cache: 'no-store' }
     )
-    if (tRes.ok) {
-      const tRows = await tRes.json().catch(() => []) as Array<{ id?: string }>
-      const turnoId = Array.isArray(tRows) ? tRows[0]?.id : undefined
-      if (turnoId) {
-        turnoFilter = `&turno_id=eq.${encodeURIComponent(turnoId)}`
-      } else {
-        // Caso 2: el server CONFIRMÓ que no hay turno → tablero limpio.
-        return Response.json([], { headers: { 'Cache-Control': 'no-store' } })
-      }
-    } else {
-      degradado = true
+    if (!tRes.ok) throw new Error('turno_unavailable')
+    const rows: unknown = await tRes.json()
+    if (!Array.isArray(rows) || rows.some(row => !row || typeof row.id !== 'string' || !row.id)) {
+      throw new Error('turno_invalid')
     }
-  } catch { degradado = true }
-  const cutoff12h = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString()
+    if (rows.length === 0) return Response.json([], { headers: { 'Cache-Control': 'no-store' } })
+    if (rows.length !== 1) return Response.json({ error: 'Turno ambiguo; configura la sucursal o revisa los turnos abiertos' }, { status: 409 })
+    turnoId = rows[0].id
+  } catch {
+    // No ampliar a una ventana temporal: mezclaría turnos o sucursales. La UI
+    // conserva sólo su caché identificada mientras vuelve a consultar.
+    return Response.json({ error: 'No se pudo resolver el turno de cocina' }, { status: 502 })
+  }
   const url =
-    `${SB_URL}/rest/v1/pos_orders` +
-    `?status=in.(enviada,preparando,lista)` +
-    `&client_id=eq.${encodeURIComponent(clientId)}` +
-    (degradado ? `&updated_at=gte.${encodeURIComponent(cutoff12h)}` : turnoFilter!) +
-    `&select=${KITCHEN_SELECT}` +
-    `&order=created_at.desc`
+    `${SB_URL}/rest/v1/pos_orders?status=in.(enviada,preparando,lista)` +
+    `&client_id=eq.${encodeURIComponent(clientId)}` + (locationFilter || '&location_id=is.null') +
+    `&turno_id=eq.${encodeURIComponent(turnoId)}` +
+    `&select=${KITCHEN_SELECT}&order=created_at.desc`
 
   try {
     const res = await fetch(url, {
@@ -96,7 +84,8 @@ export async function GET(request: NextRequest) {
       return Response.json({ error: 'No se pudieron leer las órdenes' }, { status: 502 })
     }
     const rows = await res.json()
-    return Response.json(Array.isArray(rows) ? rows : [], {
+    if (!Array.isArray(rows)) throw new Error('kitchen_invalid_response')
+    return Response.json(rows, {
       headers: { 'Cache-Control': 'no-store' },
     })
   } catch (e) {

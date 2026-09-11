@@ -37,6 +37,9 @@ export const GUARDIANES_DE_SESION = [
  * necesita resolver el tenant por otro lado (ej. el mapping tienda→tenant del webhook).
  */
 export const GUARDIANES_DE_SECRETO = [
+  // Fixed RPC validates the dedicated stream credential and resolves restaurant/
+  // branch from pos_caja_streams before any effect; never trusts payload tenant.
+  'apply_pos_caja_event',
   'checkAdminAuth', // @/lib/integrations/admin-auth — INTEGRATION_ADMIN_SECRET, tiempo constante
   'INTEGRATION_ADMIN_SECRET',
   'ONBOARDING_SECRET',

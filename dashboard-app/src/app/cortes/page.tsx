@@ -1,5 +1,7 @@
 'use client'
 
+import ReportUnavailable from '@/components/ReportUnavailable'
+
 import { useEffect, useState, useMemo } from 'react'
 import { DollarSign, Ticket, Users, Receipt, Banknote, CreditCard, Vault, ArrowDownCircle, Building2 } from 'lucide-react'
 import KPICard from '@/components/KPICard'
@@ -47,6 +49,7 @@ export default function CortesPage() {
   const [withdrawals, setWithdrawals] = useState<{ nombre: string; total: number }[]>([])
   const [deposits, setDeposits] = useState<{ nombre: string; total: number }[]>([])
   const [cashClosingFecha, setCashClosingFecha] = useState<string>('')
+  const [reportError, setReportError] = useState(false)
   const [loading, setLoading] = useState(true)
   const [period, setPeriod] = useState<30 | 60 | 90>(30)
   const [range, setRange] = useState<DateRange | null>(null)
@@ -81,6 +84,7 @@ export default function CortesPage() {
           setDeposits(items)
         }
       } catch (err) {
+        setReportError(true)
         console.error('Error loading cortes data:', err)
       } finally {
         setLoading(false)
@@ -195,6 +199,8 @@ export default function CortesPage() {
       render: ({ row }) => formatCurrency(extractPayment(row).tarjeta),
       footer: <span className="py-3.5 px-4 text-sm tabular-nums font-bold text-[var(--text-1)]">{formatCurrency(totalTarjeta)}</span> },
   ]
+
+  if (reportError) return <ReportUnavailable />
 
   if (loading) {
 

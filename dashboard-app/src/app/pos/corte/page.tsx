@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
+import { leerSalon, requiereCaja } from '@/lib/pedro-cliente'
+import ReporteDeCaja from '@/components/pos/ReporteDeCaja'
 import { Fingerprint, ArrowLeft, Receipt, RefreshCw, Clock, DollarSign, Users, CreditCard, Banknote, Ban, Percent, ChefHat, RotateCcw, ShieldAlert, AlertTriangle, X, Download, Printer } from 'lucide-react'
 import { formatMXN, getAuditLogRange, reopenOrder, logAudit, getClientId, verifyManagerPin, verifyManagerHuella, hayHuellasDadasDeAlta, consumeManagerApproval, getActiveTurnoTolerante, getPaymentMethodsFromDB, type AuditLogEntry, type PagoForma, type PaymentMethodDB } from '@/lib/pos-data'
 import { isTiempoItem } from '@/lib/pos-constants'
@@ -151,6 +153,23 @@ const ACCIONES_DE_CANCELACION = ['item_cancelled', 'item_voided', 'order_cancell
 const TOPE_DE_ORDENES = 1000
 
 export default function CortePage() {
+  const [mode, setMode] = useState<'loading' | 'caja' | 'legacy' | 'error'>('loading')
+  const [attempt, setAttempt] = useState(0)
+  useEffect(() => {
+    let alive = true
+    if (!requiereCaja()) { setMode('legacy'); return }
+    void leerSalon().then(state => {
+      if (alive) setMode(!state.autoritativa ? 'error' : state.writeAuthority === 'caja' ? 'caja' : 'legacy')
+    }).catch(() => { if (alive) setMode('error') })
+    return () => { alive = false }
+  }, [attempt])
+  if (mode === 'caja') return <ReporteDeCaja />
+  if (mode === 'legacy') return <CortePageLegacy />
+  return <main className="p-8 text-[var(--text-1)]"><p>{mode === 'error' ? 'No se pudo confirmar el corte con Caja.' : 'Consultando Caja…'}</p>
+    {mode === 'error' && <button className="mt-4 rounded-xl border p-3" onClick={() => { setMode('loading'); setAttempt(n => n + 1) }}>Volver a consultar</button>}</main>
+}
+
+function CortePageLegacy() {
   const [orders, setOrders] = useState<OrderFromDB[]>([])
   const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([])
   const [loading, setLoading] = useState(true)

@@ -30,7 +30,10 @@ alter table public.pos_order_closures
   add column if not exists caja_stream_id uuid;
 alter table public.pos_cash_movements
   add column if not exists location_id text,
-  add column if not exists caja_stream_id uuid;
+  add column if not exists caja_stream_id uuid,
+  add column if not exists caja_movement_id text;
+create unique index if not exists pos_cash_movement_identity
+  on public.pos_cash_movements(client_id, location_id, caja_movement_id);
 alter table public.pos_payment_attempts drop constraint if exists pos_payment_attempts_estado_valido;
 alter table public.pos_payment_attempts add constraint pos_payment_attempts_estado_valido
   check (estado in ('pendiente', 'aceptado', 'rechazado', 'desconocido'));
@@ -145,7 +148,10 @@ declare
   stream public.pos_caja_streams%rowtype; receipt public.pos_caja_business_receipts%rowtype;
   event_seq bigint; event_type text; event_id text; result jsonb; op jsonb; fin jsonb; turno jsonb;
   existing public.pos_orders%rowtype; existing_turno public.pos_turnos%rowtype;
-  account jsonb; payment jsonb; account_number integer := 0; affected integer;
+  old_fin jsonb; old_account jsonb; chosen_account text; dual boolean := false; delta bigint;
+  drawer jsonb;
+  document jsonb; original_document jsonb; content jsonb; resolution jsonb;
+  account jsonb; payment jsonb; movement jsonb; account_number integer := 0; affected integer;
   paid bigint := 0; reserved bigint := 0; total bigint; account_total bigint := 0;
   account_paid bigint; account_reserved bigint; materialized boolean := false;
 begin
@@ -169,9 +175,9 @@ begin
       'history_hash', receipt.history_hash, 'materialized', receipt.materialized, 'duplicate', true);
   end if;
   if event_seq <> stream.last_sequence + 1 or p_previous_history_hash <> stream.last_history_hash then raise exception 'STREAM_SEQUENCE_GAP'; end if;
-  materialized := event_type in ('TURN_OPEN', 'TURN_CLOSE', 'ORDER_SAVE', 'ORDER_SEND', 'ORDER_MOVE', 'ORDER_VOID', 'KITCHEN_SET',
+  materialized := event_type in ('TURN_OPEN', 'TURN_CLOSE', 'CASH_MOVEMENT', 'ORDER_SAVE', 'ORDER_SEND', 'ORDER_MOVE', 'ORDER_VOID', 'KITCHEN_SET',
     'FINANCIAL_OPEN', 'FINANCIAL_SPLIT', 'FINANCIAL_PAYMENT_START', 'FINANCIAL_PAYMENT_RESULT');
-  if not materialized and event_type not in ('STATE_SYNC', 'MESA_LOCK', 'MESA_UNLOCK', 'PRINT_COMMAND') then
+  if not materialized and event_type not in ('STATE_SYNC', 'MESA_LOCK', 'MESA_UNLOCK', 'PRINT_COMMAND', 'ORDER_PRECHECK_PRINT', 'PAYMENT_RECEIPT_PRINT', 'PRINT_UNCERTAIN_RESOLVE', 'PAYMENT_DRAWER_OPEN', 'DRAWER_OPEN', 'DRAWER_UNCERTAIN_RESOLVE') then
     raise exception 'UNSUPPORTED_BUSINESS_EVENT: %', event_type;
   end if;
   insert into public.pos_caja_business_receipts(stream_id, sequence, event_id, client_id, location_id, event,
@@ -180,6 +186,124 @@ begin
       p_previous_history_hash, p_history_hash, txid_current(), materialized);
   perform set_config('fullsite.caja_stream', p_stream_id::text, true);
   perform set_config('fullsite.caja_sequence', event_seq::text, true);
+
+  -- Paper events advance only the audited stream receipt. They never replay
+  -- business snapshots into orders, accounts, payments, or closures.
+  if event_type in ('ORDER_PRECHECK_PRINT','PAYMENT_RECEIPT_PRINT') then
+    document := result->'print_document'; content := document->'content';
+    if jsonb_typeof(document) is distinct from 'object' or nullif(document->>'document_id','') is null or
+      document->>'document_id' is distinct from p_event->'payload'->>'command_id' or
+      document->>'order_id' is distinct from p_event->'payload'->>'order_id' or
+      nullif(document->>'original_document_id','') is distinct from nullif(p_event->'payload'->>'original_document_id','') or
+      nullif(document->>'recorded_by','') is null or nullif(document->>'created_at','') is null or
+      document->>'kind' is distinct from (case when event_type='ORDER_PRECHECK_PRINT' then 'precheck' else 'payment_receipt' end) or
+      jsonb_typeof(document->'job_ids') is distinct from 'array' or jsonb_array_length(document->'job_ids')=0 then raise exception 'INVALID_PRINT_DOCUMENT'; end if;
+    if exists(select 1 from jsonb_array_elements(document->'job_ids') j where jsonb_typeof(j) <> 'string' or length(j #>> '{}')=0) then raise exception 'INVALID_PRINT_DOCUMENT'; end if;
+    if exists(select 1 from public.pos_caja_business_receipts r where r.stream_id=p_stream_id and r.sequence<event_seq
+      and r.event->'result'->'print_document'->>'document_id'=document->>'document_id') then raise exception 'PRINT_DOCUMENT_ID_REUSED'; end if;
+    select * into existing from public.pos_orders where id=document->>'order_id';
+    if not found or existing.client_id is distinct from stream.client_id or existing.location_id is distinct from stream.location_id or
+      existing.caja_stream_id is distinct from p_stream_id then raise exception 'PRINT_ORDER_SCOPE'; end if;
+    if nullif(document->>'original_document_id','') is not null then
+      select r.event->'result'->'print_document' into original_document from public.pos_caja_business_receipts r
+        where r.stream_id=p_stream_id and r.sequence<event_seq and r.client_id=stream.client_id and r.location_id=stream.location_id
+          and r.event->'result'->'print_document'->>'document_id'=document->>'original_document_id';
+      if not found or nullif(original_document->>'original_document_id','') is not null or
+        nullif(document->>'reason','') is null or document->>'reason' is distinct from p_event->'payload'->>'reason' or
+        (document - 'document_id' - 'created_at' - 'recorded_by' - 'job_ids' - 'original_document_id' - 'reason') is distinct from
+        (original_document - 'document_id' - 'created_at' - 'recorded_by' - 'job_ids' - 'original_document_id' - 'reason')
+        then raise exception 'PRINT_ORIGINAL_SCOPE'; end if;
+    else
+      if public.pos_caja_cents(document->'order_revision') <> existing.order_revision or
+        public.pos_caja_cents(document->'financial_revision') <> existing.financial_revision then raise exception 'PRINT_REVISION_CONFLICT'; end if;
+      if event_type='ORDER_PRECHECK_PRINT' and existing.status='cancelada' then raise exception 'PRINT_ORDER_CANCELLED'; end if;
+      if public.pos_caja_cents(content->'subtotal_cents')::numeric <> existing.subtotal*100 or
+        public.pos_caja_cents(content->'iva_cents')::numeric <> existing.iva*100 or
+        public.pos_caja_cents(content->'total_cents')::numeric <> existing.total*100 or
+        public.pos_caja_cents(content->'discount_cents')::numeric <> (existing.subtotal+existing.iva-existing.total)*100 or
+        public.pos_caja_cents(content->'paid_cents') <> (case when existing.financial_revision>0 then public.pos_caja_cents(existing.caja_financial_snapshot->'paid_cents') else 0 end) or
+        public.pos_caja_cents(content->'reserved_cents') <> (case when existing.financial_revision>0 then public.pos_caja_cents(existing.caja_financial_snapshot->'reserved_cents') else 0 end) or
+        public.pos_caja_cents(content->'balance_cents')::numeric <> existing.saldo*100 then raise exception 'PRINT_AMOUNT_MISMATCH'; end if;
+      if jsonb_typeof(content->'items') is distinct from 'array' or
+        jsonb_array_length(content->'items') <> jsonb_array_length(existing.items) or exists(
+        select 1 from jsonb_array_elements(content->'items') with ordinality c(item,n)
+        join jsonb_array_elements(existing.items) with ordinality o(item,n) using(n)
+        where c.item->'quantity' is distinct from o.item->'cantidad' or c.item->'total_cents' is distinct from o.item->'total_cents')
+        then raise exception 'PRINT_ITEMS_MISMATCH'; end if;
+      if event_type='PAYMENT_RECEIPT_PRINT' then
+        select p.snapshot into payment from public.pos_payment_attempts p where p.payment_id=document->>'payment_id' and p.order_id=existing.id
+          and p.client_id=stream.client_id and p.location_id=stream.location_id and p.caja_stream_id=p_stream_id and p.estado='aceptado';
+        if not found or document->>'payment_id' is distinct from p_event->'payload'->>'payment_id' or
+          content->'payment'->>'payment_id' is distinct from payment->>'payment_id' or
+          content->'payment'->>'method' is distinct from payment->>'method' or
+          public.pos_caja_cents(content->'payment'->'amount_cents') <> public.pos_caja_cents(payment->'amount_cents') then raise exception 'PRINT_PAYMENT_SCOPE'; end if;
+        if payment->>'method'='cash' and (content->'payment'->'received_cents' is distinct from payment->'evidence'->'received_cents' or
+          content->'payment'->'change_cents' is distinct from payment->'change_cents') then raise exception 'PRINT_PAYMENT_SCOPE'; end if;
+      end if;
+    end if;
+  elsif event_type='PRINT_UNCERTAIN_RESOLVE' then
+    resolution := result->'print_resolution';
+    if nullif(resolution->>'job_id','') is null or nullif(resolution->>'uncertain_episode_id','') is null or
+      nullif(resolution->>'recorded_by','') is null or nullif(resolution->>'reason','') is null or
+      coalesce(resolution->>'resolution','') not in ('printed','reprint') or
+      resolution->>'job_id' is distinct from p_event->'payload'->>'job_id' or
+      resolution->>'uncertain_episode_id' is distinct from p_event->'payload'->>'uncertain_episode_id' or
+      resolution->>'resolution' is distinct from p_event->'payload'->>'resolution' or
+      resolution->>'reason' is distinct from p_event->'payload'->>'reason' then raise exception 'INVALID_PRINT_RESOLUTION'; end if;
+    if exists(select 1 from public.pos_caja_business_receipts r where r.stream_id=p_stream_id and r.sequence<event_seq
+      and r.event->'result'->'print_resolution'->>'job_id'=resolution->>'job_id'
+      and r.event->'result'->'print_resolution'->>'uncertain_episode_id'=resolution->>'uncertain_episode_id') then raise exception 'PRINT_EPISODE_ALREADY_RESOLVED'; end if;
+    if not exists(select 1 from public.pos_caja_business_receipts r where r.stream_id=p_stream_id and r.sequence<event_seq
+      and r.client_id=stream.client_id and r.location_id=stream.location_id and (
+        coalesce(r.event->'result'->'print_document'->'job_ids','[]'::jsonb) ? (resolution->>'job_id') or
+        exists(select 1 from jsonb_array_elements(coalesce(r.event->'result'->'preparation_delivery','[]'::jsonb)) d
+          where coalesce(d->'job_ids','[]'::jsonb) ? (resolution->>'job_id')))) then raise exception 'PRINT_JOB_SCOPE'; end if;
+  end if;
+
+  if event_type in ('PAYMENT_DRAWER_OPEN','DRAWER_OPEN') then
+    drawer := result->'drawer_operation';
+    if jsonb_typeof(drawer) is distinct from 'object' or nullif(drawer->>'operation_id','') is null or
+      drawer->>'operation_id' is distinct from p_event->'payload'->>'command_id' or
+      drawer->>'kind' is distinct from (case when event_type='PAYMENT_DRAWER_OPEN' then 'payment' else 'manual' end) or
+      nullif(drawer->>'job_id','') is null or nullif(drawer->>'printer_id','') is null or nullif(drawer->>'recorded_by','') is null or
+      nullif(drawer->>'created_at','') is null or nullif(drawer->>'reason','') is null then raise exception 'INVALID_DRAWER_OPERATION'; end if;
+    if not exists(select 1 from public.pos_turnos t where t.id=drawer->>'turno_id' and t.client_id=stream.client_id
+      and t.location_id=stream.location_id and t.caja_stream_id=p_stream_id and t.closed_at is null) or
+      (p_event->'payload' ? 'turno_id' and p_event->'payload'->>'turno_id' is distinct from drawer->>'turno_id') then raise exception 'DRAWER_TURN_SCOPE'; end if;
+    if exists(select 1 from public.pos_caja_business_receipts r where r.stream_id=p_stream_id and r.sequence<event_seq and
+      (r.event->'result'->'drawer_operation'->>'operation_id'=drawer->>'operation_id' or
+       r.event->'result'->'drawer_operation'->>'job_id'=drawer->>'job_id')) then raise exception 'DRAWER_ID_REUSED'; end if;
+    if event_type='PAYMENT_DRAWER_OPEN' then
+      select * into existing from public.pos_orders o where o.id=drawer->>'order_id';
+      if not found or existing.client_id is distinct from stream.client_id or existing.location_id is distinct from stream.location_id or
+        existing.caja_stream_id is distinct from p_stream_id or existing.turno_id is distinct from drawer->>'turno_id' or
+        drawer->>'order_id' is distinct from p_event->'payload'->>'order_id' or
+        drawer->>'payment_id' is distinct from p_event->'payload'->>'payment_id' then raise exception 'DRAWER_ORDER_SCOPE'; end if;
+      select p.snapshot into payment from public.pos_payment_attempts p where p.payment_id=drawer->>'payment_id' and p.order_id=existing.id
+        and p.client_id=stream.client_id and p.location_id=stream.location_id and p.caja_stream_id=p_stream_id and p.estado='aceptado' and p.metodo='cash';
+      if not found or public.pos_caja_cents(drawer->'amount_cents')<>public.pos_caja_cents(payment->'amount_cents') then raise exception 'DRAWER_CASH_PAYMENT_REQUIRED'; end if;
+      if exists(select 1 from public.pos_caja_business_receipts r where r.stream_id=p_stream_id and r.sequence<event_seq
+        and r.event->'result'->'drawer_operation'->>'kind'='payment' and r.event->'result'->'drawer_operation'->>'order_id'=existing.id
+        and r.event->'result'->'drawer_operation'->>'payment_id'=drawer->>'payment_id') then raise exception 'DRAWER_PAYMENT_ALREADY_OPENED'; end if;
+    elsif drawer->>'reason' is distinct from p_event->'payload'->>'reason' or
+      nullif(p_event->'payload'->>'turno_id','') is null or drawer ? 'payment_id' or drawer ? 'order_id' or drawer ? 'amount_cents'
+      then raise exception 'INVALID_MANUAL_DRAWER_OPERATION'; end if;
+  elsif event_type='DRAWER_UNCERTAIN_RESOLVE' then
+    resolution := result->'drawer_resolution';
+    if nullif(resolution->>'job_id','') is null or nullif(resolution->>'uncertain_episode_id','') is null or
+      nullif(resolution->>'recorded_by','') is null or nullif(resolution->>'reason','') is null or
+      coalesce(resolution->>'resolution','') not in ('opened','retry_pulse') or
+      resolution->>'job_id' is distinct from p_event->'payload'->>'job_id' or
+      resolution->>'uncertain_episode_id' is distinct from p_event->'payload'->>'uncertain_episode_id' or
+      resolution->>'resolution' is distinct from p_event->'payload'->>'resolution' or
+      resolution->>'reason' is distinct from p_event->'payload'->>'reason' then raise exception 'INVALID_DRAWER_RESOLUTION'; end if;
+    if not exists(select 1 from public.pos_caja_business_receipts r where r.stream_id=p_stream_id and r.sequence<event_seq
+      and r.client_id=stream.client_id and r.location_id=stream.location_id and
+      r.event->'result'->'drawer_operation'->>'job_id'=resolution->>'job_id') then raise exception 'DRAWER_JOB_SCOPE'; end if;
+    if exists(select 1 from public.pos_caja_business_receipts r where r.stream_id=p_stream_id and r.sequence<event_seq
+      and r.event->'result'->'drawer_resolution'->>'job_id'=resolution->>'job_id' and
+      r.event->'result'->'drawer_resolution'->>'uncertain_episode_id'=resolution->>'uncertain_episode_id') then raise exception 'DRAWER_EPISODE_ALREADY_RESOLVED'; end if;
+  end if;
 
   if event_type in ('TURN_OPEN', 'TURN_CLOSE') then
     turno := case when event_type = 'TURN_OPEN' then result->'turno' else result->'closed_turno' end;
@@ -202,6 +326,25 @@ begin
         diferencia = case when turno ? 'difference_cents' then (turno->>'difference_cents')::numeric / 100 else null end,
         notas = turno->>'notes' where id = turno->>'id';
     end if;
+  elsif event_type = 'CASH_MOVEMENT' then
+    movement := result->'cash_movement';
+    if nullif(movement->>'id','') is null or movement->>'type' not in ('retiro','deposito') or
+      nullif(movement->>'reason','') is null or nullif(movement->>'actor','') is null or
+      nullif(movement->>'approved_by','') is null or public.pos_caja_cents(movement->'amount_cents') <= 0
+      then raise exception 'INVALID_CASH_MOVEMENT'; end if;
+    if not exists(select 1 from public.pos_turnos where id=movement->>'turno_id' and client_id=stream.client_id
+      and location_id=stream.location_id and caja_stream_id=p_stream_id and closed_at is null)
+      then raise exception 'CASH_MOVEMENT_TURN_MISMATCH'; end if;
+    insert into public.pos_cash_movements(client_id,location_id,caja_stream_id,caja_movement_id,turno_id,type,amount,reason,actor,approved_by,created_at)
+      values(stream.client_id,stream.location_id,p_stream_id,movement->>'id',movement->>'turno_id',movement->>'type',
+        public.pos_caja_cents(movement->'amount_cents')::numeric/100,movement->>'reason',movement->>'actor',movement->>'approved_by',
+        (movement->>'created_at')::timestamptz)
+      on conflict(client_id,location_id,caja_movement_id) do nothing;
+    if not exists(select 1 from public.pos_cash_movements where client_id=stream.client_id and location_id=stream.location_id
+      and caja_movement_id=movement->>'id' and turno_id=movement->>'turno_id' and type=movement->>'type'
+      and amount=public.pos_caja_cents(movement->'amount_cents')::numeric/100 and reason=movement->>'reason'
+      and actor=movement->>'actor' and approved_by=movement->>'approved_by' and caja_stream_id=p_stream_id)
+      then raise exception 'CASH_MOVEMENT_ID_CONFLICT'; end if;
   elsif event_type in ('ORDER_SAVE', 'ORDER_SEND', 'ORDER_MOVE', 'ORDER_VOID', 'KITCHEN_SET') then
     op := result->'operational_order';
     if op->>'authority' is distinct from 'caja' or op->>'order_id' is null or op->>'turno_id' is null then raise exception 'INVALID_ORDER_RESULT'; end if;
@@ -212,25 +355,62 @@ begin
       if not found or public.pos_caja_cents(op->'kitchen_revision') <> existing.kitchen_revision + 1 or
         public.pos_caja_cents(op->'order_revision') <> existing.order_revision then raise exception 'KITCHEN_PROJECTION_GAP'; end if;
     elsif public.pos_caja_cents(op->'order_revision') <> coalesce(existing.order_revision, 0) + 1 then raise exception 'ORDER_PROJECTION_GAP'; end if;
+    -- Old committed receipts without an ordinal remain replayable. Once Caja
+    -- supplies one, all later receipts must preserve that exact identity.
+    if op ? 'order_number' and (jsonb_typeof(op->'order_number') is distinct from 'number'
+      or public.pos_caja_cents(op->'order_number') not between 1 and 2147483647) then raise exception 'INVALID_ORDER_NUMBER'; end if;
+    if existing.caja_operational_snapshot ? 'order_number' and
+      op->'order_number' is distinct from existing.caja_operational_snapshot->'order_number' then raise exception 'ORDER_NUMBER_CHANGED'; end if;
     total := public.pos_caja_cents(op->'total_cents');
     if total <> public.pos_caja_cents(op->'subtotal_cents') + public.pos_caja_cents(op->'iva_cents') then raise exception 'ORDER_TOTAL_MISMATCH'; end if;
-    insert into public.pos_orders(id, client_id, location_id, turno_id, mesa, mesero, personas, customer_name, notas, status,
+    dual := event_type in ('ORDER_SAVE', 'ORDER_SEND') and existing.financial_revision > 0;
+    if dual then
+      fin := result->'financial_order'; old_fin := existing.caja_financial_snapshot;
+      if jsonb_typeof(fin) is distinct from 'object' or old_fin->>'status' is distinct from 'open' or
+        existing.payment_status = 'pagada' or fin->>'status' is distinct from 'open' then raise exception 'DUAL_FINANCIAL_REQUIRED'; end if;
+      if fin->>'order_id' is distinct from op->>'order_id' or fin->>'order_id' is distinct from existing.id or
+        fin->>'turno_id' is distinct from old_fin->>'turno_id' or fin->>'turno_id' is distinct from op->>'turno_id' then raise exception 'DUAL_ORDER_SCOPE'; end if;
+      if (fin - 'revision' - 'order_revision' - 'total_cents' - 'balance_cents' - 'accounts' - 'payments') is distinct from
+        (old_fin - 'revision' - 'order_revision' - 'total_cents' - 'balance_cents' - 'accounts' - 'payments') then raise exception 'DUAL_METADATA_CHANGED'; end if;
+      if public.pos_caja_cents(p_event->'payload'->'expected_financial_revision') <> existing.financial_revision or
+        public.pos_caja_cents(fin->'revision') <> existing.financial_revision + 1 or
+        public.pos_caja_cents(fin->'order_revision') <> public.pos_caja_cents(op->'order_revision') then raise exception 'DUAL_REVISION_CONFLICT'; end if;
+      if fin->'payments' is distinct from old_fin->'payments' then raise exception 'DUAL_PAYMENT_CHANGED'; end if;
+      delta := total - public.pos_caja_cents(old_fin->'total_cents');
+      if delta < 0 or (event_type = 'ORDER_SEND' and delta <> 0) then raise exception 'DUAL_TOTAL_DECREASE'; end if;
+      chosen_account := p_event->'payload'->>'account_id';
+      if event_type = 'ORDER_SAVE' and (nullif(chosen_account,'') is null or not exists(
+        select 1 from jsonb_array_elements(old_fin->'accounts') x where x->>'account_id'=chosen_account)) then raise exception 'DUAL_ACCOUNT_REQUIRED'; end if;
+      if event_type = 'ORDER_SAVE' and (result->'financial_allocation'->>'account_id' is distinct from chosen_account or
+        public.pos_caja_cents(result->'financial_allocation'->'amount_cents') <> delta) then raise exception 'DUAL_ALLOCATION_MISMATCH'; end if;
+      if jsonb_typeof(fin->'accounts') is distinct from 'array' or jsonb_array_length(fin->'accounts') <> jsonb_array_length(old_fin->'accounts') then raise exception 'DUAL_ACCOUNT_CHANGED'; end if;
+      for old_account in select x from jsonb_array_elements(old_fin->'accounts') x loop
+        select x into account from jsonb_array_elements(fin->'accounts') x where x->>'account_id'=old_account->>'account_id';
+        if not found or (account - 'total_cents' - 'balance_cents') is distinct from (old_account - 'total_cents' - 'balance_cents') or
+          public.pos_caja_cents(account->'total_cents') <> public.pos_caja_cents(old_account->'total_cents') + (case when old_account->>'account_id'=chosen_account then delta else 0 end) or
+          public.pos_caja_cents(account->'balance_cents') <> public.pos_caja_cents(old_account->'balance_cents') + (case when old_account->>'account_id'=chosen_account then delta else 0 end)
+          then raise exception 'DUAL_ACCOUNT_CHANGED'; end if;
+      end loop;
+    elsif event_type in ('ORDER_SAVE','ORDER_SEND') and result ? 'financial_order' then raise exception 'UNEXPECTED_FINANCIAL_RESULT';
+    elsif existing.financial_revision > 0 and total::numeric <> existing.total * 100 then raise exception 'FINANCIAL_ORDER_MISMATCH'; end if;
+    insert into public.pos_orders(id, client_id, location_id, turno_id, order_number, mesa, mesero, personas, customer_name, notas, status,
       subtotal, iva, total, items, created_at, updated_at, order_revision, preparation_status, payment_status, saldo,
       comanda_batches, kitchen_items, kitchen_revision, caja_stream_id, caja_operational_snapshot)
-    values(op->>'order_id', stream.client_id, stream.location_id, op->>'turno_id', (op->>'mesa')::integer, op->>'mesero',
+    values(op->>'order_id', stream.client_id, stream.location_id, op->>'turno_id', (op->>'order_number')::integer, (op->>'mesa')::integer, op->>'mesero',
       (op->>'personas')::integer, op->>'customer_name', op->>'notas', op->>'status',
       public.pos_caja_cents(op->'subtotal_cents')::numeric / 100, public.pos_caja_cents(op->'iva_cents')::numeric / 100,
       total::numeric / 100, public.pos_caja_json(op->'items'), (op->>'created_at')::timestamptz, (op->>'updated_at')::timestamptz,
       public.pos_caja_cents(op->'order_revision'), op->>'preparation_status', coalesce(existing.payment_status, 'pendiente'),
       case when existing.financial_revision > 0 then existing.saldo else total::numeric / 100 end, public.pos_caja_json(op->'comanda_batches'), op->'kitchen_items',
       public.pos_caja_cents(op->'kitchen_revision'), p_stream_id, op)
-    on conflict (id) do update set mesa = excluded.mesa, mesero = excluded.mesero, personas = excluded.personas,
+    on conflict (id) do update set order_number = coalesce((excluded.caja_operational_snapshot->>'order_number')::integer, pos_orders.order_number), mesa = excluded.mesa, mesero = excluded.mesero, personas = excluded.personas,
       customer_name = excluded.customer_name, notas = excluded.notas, status = excluded.status, subtotal = excluded.subtotal,
       iva = excluded.iva, total = excluded.total, saldo = excluded.saldo, items = excluded.items, updated_at = excluded.updated_at,
       order_revision = excluded.order_revision, preparation_status = excluded.preparation_status,
       comanda_batches = excluded.comanda_batches, kitchen_items = excluded.kitchen_items,
       kitchen_revision = excluded.kitchen_revision, caja_operational_snapshot = excluded.caja_operational_snapshot;
-  elsif event_type like 'FINANCIAL_%' then
+  end if;
+  if event_type like 'FINANCIAL_%' or dual then
     fin := result->'financial_order';
     if fin->>'order_id' is null or fin->>'currency' is distinct from 'MXN' or jsonb_typeof(fin->'accounts') is distinct from 'array'
       or jsonb_array_length(fin->'accounts') = 0 or jsonb_typeof(fin->'payments') is distinct from 'array' then raise exception 'INVALID_FINANCIAL_RESULT'; end if;
@@ -276,11 +456,12 @@ begin
       insert into public.pos_order_accounts(account_id, order_id, client_id, location_id, numero, total, snapshot, caja_stream_id)
         values(account->>'account_id', fin->>'order_id', stream.client_id, stream.location_id, account_number,
           public.pos_caja_cents(account->'total_cents')::numeric / 100, account, p_stream_id)
-      on conflict(account_id) do update set snapshot = excluded.snapshot
+      on conflict(account_id) do update set snapshot = excluded.snapshot, total = excluded.total
         where pos_order_accounts.client_id = excluded.client_id and pos_order_accounts.location_id = excluded.location_id and
-          pos_order_accounts.order_id = excluded.order_id and pos_order_accounts.caja_stream_id = excluded.caja_stream_id and pos_order_accounts.total = excluded.total;
+          pos_order_accounts.order_id = excluded.order_id and pos_order_accounts.caja_stream_id = excluded.caja_stream_id and (pos_order_accounts.total = excluded.total or dual);
       get diagnostics affected = row_count; if affected <> 1 then raise exception 'ACCOUNT_ID_CONFLICT'; end if;
     end loop;
+    if not dual then
     for payment in select x from jsonb_array_elements(fin->'payments') x loop
       if payment->>'payment_id' is null or not exists(select 1 from jsonb_array_elements(fin->'accounts') x where x->>'account_id' = payment->>'account_id') then raise exception 'PAYMENT_ACCOUNT_MISSING'; end if;
       insert into public.pos_payment_attempts(payment_id, account_id, order_id, client_id, location_id, terminal_id, monto, metodo, estado, snapshot, caja_stream_id)
@@ -294,6 +475,7 @@ begin
           (pos_payment_attempts.estado in ('pendiente', 'desconocido') or pos_payment_attempts.snapshot = excluded.snapshot);
       get diagnostics affected = row_count; if affected <> 1 then raise exception 'PAYMENT_ID_CONFLICT'; end if;
     end loop;
+    end if;
     update public.pos_orders set financial_revision = public.pos_caja_cents(fin->'revision'), caja_financial_snapshot = fin,
       saldo = public.pos_caja_cents(fin->'balance_cents')::numeric / 100, payment_status = case when fin->>'status' = 'settled' then 'pagada' else 'pendiente' end,
       pagos = coalesce((select jsonb_agg(jsonb_build_object('payment_id', x->>'payment_id', 'account_id', x->>'account_id',

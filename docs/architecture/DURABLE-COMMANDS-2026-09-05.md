@@ -18,11 +18,24 @@ Estado: implementado y probado localmente sobre el candidato de cierre; no certi
 
 La cola guarda todos los trabajos preparados de un comando antes de enviarlos, con IDs estables. Una escritura fallida se propaga; la memoria no presenta como persistido un trabajo perdido. Los recibos de comandos se conservan aunque sean antiguos, pues mientras el evento pueda reproducirse debe existir su deduplicación.
 
+Si un reintento o el arranque encuentra un comando comprometido sin su recibo de
+cola, reconstruye el trabajo como `uncertain`, con episodio nuevo. El log acredita
+la intención, no demuestra que nunca salió papel o pulso. Esto también afecta un
+fallo entre commit y primera escritura de cola: se conserva el trabajo, pero se
+requiere verificación explícita antes de enviarlo.
+
+El recibo reconstruido guarda `recovered_before_sequence`, el último evento al
+iniciar esa recuperación. Las resoluciones anteriores o iguales a ese corte no
+reautorizan un efecto físico, aunque se vuelva a arrancar. Una decisión nueva,
+posterior al corte y para el episodio actual, sí puede resolverse de forma durable.
+El mismo mecanismo cubre papel y cajón. No certifica una cola antigua todavía
+presente, un respaldo incoherente entre archivos ni restauración en otro equipo.
+
 - `pending` / `retrying`: envío pendiente; puede intentarse sin conocimiento de un envío anterior incierto.
 - `printing`: el estado quedó durable antes de enviar bytes. Se registra cada copia terminada.
 - `printed`: el transporte/spooler informó éxito; no constituye evidencia física de papel.
 - `recoverable`: no hubo envío al dispositivo y se puede reintentar cuando vuelva.
-- `uncertain`: hubo interrupción durante el envío, error después de enviar bytes o reinicio con `printing`. Debe verificarse el papel; nunca se reimprime automáticamente.
+- `uncertain`: hubo interrupción durante el envío, error después de enviar bytes, reinicio con `printing` o falta el recibo de un trabajo comprometido. Debe verificarse el papel/cajón; nunca se reenvía automáticamente.
 
 `getUncertainJobs()` permite mostrar los trabajos a revisar. `resolveUncertain(id, 'printed')` registra la verificación del operador; `'reprint'` deja constancia de una reimpresión explícita y vuelve a encolar las copias restantes. El endpoint que lo exponga necesita autorización local. No hay garantía de exactamente una hoja física.
 

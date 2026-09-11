@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
   IVA_RATE,
-  KITCHEN_ARCHIVE_HOURS,
   POLL_INTERVAL_KITCHEN,
   POLL_INTERVAL_KDS,
   BEBIDA_KEYWORDS,
@@ -20,10 +19,6 @@ import {
 describe('POS Constants', () => {
   it('IVA_RATE is 0 (precios incluyen IVA — Mexico IVA-inclusive pricing)', () => {
     expect(IVA_RATE).toBe(0)
-  })
-
-  it('KITCHEN_ARCHIVE_HOURS is 4', () => {
-    expect(KITCHEN_ARCHIVE_HOURS).toBe(4)
   })
 
   it('POLL_INTERVAL_KITCHEN is 10000ms (fallback cloud; LAN es realtime vía bridge)', () => {

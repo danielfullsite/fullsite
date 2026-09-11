@@ -32,8 +32,17 @@ const { ActorAuthority } = require('../local-server/core/actor-authority')
 const { CatalogStore } = require('../local-server/core/catalog-store')
 const WebSocket = require(path.join(ELECTRON_APP, 'node_modules/ws'))
 
+// Cold compilation is test setup, separate from UI interaction deadlines.
+const compileTimeout = process.env.CI ? 300000 : 90000
 const tenant = 'closure-lab'
 const operationalMode = process.env.FULLSITE_LAB_OPERATIONAL === '1'
+const printMode = process.env.FULLSITE_LAB_PRINT === '1'
+const drawerMode = process.env.FULLSITE_LAB_DRAWER === '1'
+if (drawerMode && !printMode) throw new Error('Drawer lab requires synthetic print mode')
+if (printMode && !operationalMode) throw new Error('Print UI lab requires operational mode')
+let syntheticPrinter = null
+const printedPackets = []
+const printedHex = []
 const packagedBundle = process.env.FULLSITE_LAB_UI_BUNDLE ? path.resolve(process.env.FULLSITE_LAB_UI_BUNDLE) : null
 const packagedManifest = packagedBundle ? require('../offline-ui/package-store').verifyPackage(packagedBundle).manifest : null
 if (packagedBundle && !operationalMode) throw new Error('Packaged service lab requires operational mode')
@@ -92,11 +101,16 @@ async function until(fn, label, timeout = 30000) {
 // escondite y concluía que la terminal se había bloqueado. Tras cada `goto` se
 // espera a que algún botón tenga su onClick colgado —eso es hidratación, no un
 // sleep— antes de mirar cualquier cosa.
-const esperarHidratacion = page => until(() => page.evaluate(() =>
+const esperarHidratacion = async page => {
+  // Exercise the active terminal as a user would; Chromium throttles background
+  // windows while four Electron processes are open on the same desktop.
+  await page.bringToFront()
+  return until(() => page.evaluate(() =>
   [...document.querySelectorAll('button')].some(b => {
     const clave = Object.keys(b).find(k => k.startsWith('__reactProps'))
     return !!clave && typeof b[clave]?.onClick === 'function'
   })).catch(() => false), 'hidratación de la pantalla', 90000)
+}
 function request(terminal, route, init = {}) {
   return fetch(`http://127.0.0.1:${terminal.port}${route}`, {
     ...init, headers: { ...headers,
@@ -187,13 +201,13 @@ const staff = { id: '00000000-0000-4000-8000-000000000071', name: 'Operador de l
 const turno = { id: '00000000-0000-4000-8000-000000000072', client_id: tenant,
   fondo_inicial: 500, opened_by: staff.name, opened_at: new Date().toISOString(), closed_at: null }
 const fixture = {
-  clients: [{ id: tenant, display_name: 'Restaurante de laboratorio', mesas: 3, meseros: [staff.name],
+  clients: [{ id: tenant, display_name: 'Restaurante de laboratorio', mesas: 7, meseros: [staff.name],
     timezone: 'America/Monterrey', iva_rate: 0.16, features: { pos: true, posRestaurant: true } }],
   pos_menu_categories: [{ id: 'lab-bebidas', name: 'Bebidas laboratorio', active: true, sort_order: 1, color: '#327867' }],
   pos_menu_items: [{ id: 'lab-cafe', category_id: 'lab-bebidas', name: 'Café de laboratorio', price: 50,
     active: true, sort_order: 1, station: 'barra' }],
   pos_payment_methods: [{ id: 'lab-cash', name: 'Efectivo', type: 'efectivo', commission_pct: 0 }],
-  pos_mesas: [1, 2, 3].map(number => ({ id: `mesa-${number}`, client_id: tenant, number,
+  pos_mesas: [1, 2, 3, 4, 5, 6, 7].map(number => ({ id: `mesa-${number}`, client_id: tenant, number,
     capacity: 4, active: true, x_pct: 15 + number * 20, y_pct: 40, shape: 'square', zone: 'Salón' })),
   pos_turnos: [turno], pos_staff: [staff], pos_orders: [],
 }
@@ -222,7 +236,32 @@ async function startNube() {
     let body = ''
     req.on('data', chunk => { body += chunk })
     req.on('end', () => {
-      const responder = (status, json) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(json)) }
+      const responder = (status, json) => { res.writeHead(status, {
+        'Content-Type': 'application/json', 'Access-Control-Allow-Origin': req.headers.origin || '*',
+        'Access-Control-Allow-Credentials': 'true',
+        'Access-Control-Allow-Headers': req.headers['access-control-request-headers'] || '*', 'Access-Control-Allow-Methods': 'GET,POST,PATCH,DELETE,OPTIONS',
+      }); res.end(JSON.stringify(json)) }
+      // A real HTTP response avoids the status=0 observed when Electron receives
+      // Playwright's fulfilled PATCH response. Only synthetic renderer fixtures
+      // use this prefix; the real Caja PIN/catalog paths below stay separate.
+      if (url.pathname.startsWith('/renderer/')) {
+        if (req.method === 'OPTIONS') return responder(200, {})
+        const pathname = url.pathname.slice('/renderer'.length)
+        nubeRequests.push({ ruta: pathname, method: req.method, fixture: 'renderer', wan: true, ts: Date.now() })
+        const rest = pathname.startsWith('/rest/v1/') ? pathname.slice('/rest/v1/'.length)
+          : pathname === '/api/pos/db' ? url.searchParams.get('path') || '' : null
+        if (rest !== null) return responder(200, fixture[rest.split('?')[0]] || [])
+        if (pathname === '/api/pos/pin') {
+          let input = {}
+          try { input = JSON.parse(body || '{}') } catch {}
+          const reply = respuestaDePin(input.pin)
+          return responder(reply.status, reply.json)
+        }
+        if (/save-order|add-items|payment|merge-orders|transfer|split|liquidar/.test(pathname)) {
+          return responder(503, { error: 'El laboratorio exige escritura por Caja' })
+        }
+        return responder(200, {})
+      }
       if (req.method === 'POST' && url.pathname === '/api/pos/pin') {
         let cuerpo = {}
         try { cuerpo = JSON.parse(body || '{}') } catch {}
@@ -261,29 +300,14 @@ async function fixtureRoute(route, uiOrigin, pedroPorts) {
   // Nunca enviar tráfico de este laboratorio a un restaurante o proveedor real.
   if (!local && !['data:', 'blob:', 'about:'].includes(url.protocol)) return route.abort('blockedbyclient')
   if (pedroPorts.includes(Number(url.port))) return route.continue()
-  const rest = url.pathname.startsWith('/rest/v1/') ? url.pathname.slice('/rest/v1/'.length)
-    : url.pathname === '/api/pos/db' ? url.searchParams.get('path') || '' : null
-  if (rest !== null) {
+  // Chromium may issue a preflight at the redirected local origin.
+  if (nube && url.origin === nube.origin && url.pathname.startsWith('/renderer/')) return route.continue()
+  if (url.pathname.startsWith('/rest/v1/') || url.pathname.startsWith('/api/') || url.pathname.startsWith('/auth/')) {
     if (!wan) return route.abort('internetdisconnected')
-    const table = rest.split('?')[0]
-    const rows = fixture[table] || []
-    return route.fulfill({ status: 200, json: rows, headers: { 'access-control-allow-origin': '*' } })
-  }
-  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/auth/')) {
-    if (!wan) return route.abort('internetdisconnected')
-    if (url.pathname === '/api/pos/pin') {
-      // Bajo Electron este camino no se usa (el PIN va a Caja); se mantiene
-      // coherente con la nube del laboratorio por si el renderer lo llamara.
-      let pinRecibido = null
-      try { pinRecibido = JSON.parse(request.postData() || '{}').pin ?? null } catch {}
-      const r = respuestaDePin(pinRecibido)
-      return route.fulfill({ status: r.status, json: r.json })
-    }
-    // Unexpected order mutations must not silently succeed in the fixture.
-    if (/save-order|add-items|payment|merge-orders|transfer|split|liquidar/.test(url.pathname)) {
-      return route.fulfill({ status: 503, json: { error: 'El laboratorio exige escritura por Caja' } })
-    }
-    return route.fulfill({ json: {} })
+    // The original full-page referrer violates Chromium's cross-origin policy
+    // after this test-only redirect. Strip it; keep browser security enabled.
+    return route.continue({ url: `${nube.origin}/renderer${url.pathname}${url.search}`,
+      headers: { ...request.headers(), referer: undefined } })
   }
   if (url.origin === uiOrigin) return route.continue()
   return route.abort('blockedbyclient')
@@ -292,6 +316,11 @@ async function fixtureRoute(route, uiOrigin, pedroPorts) {
 async function startTerminal(name, role, port, cajaPort, uiOrigin, ports, opts = {}) {
   const userData = path.join(base, name)
   fs.mkdirSync(userData, { recursive: true })
+  if (syntheticPrinter && role === 'server_pos') fs.writeFileSync(path.join(userData, 'printers.json'), JSON.stringify({
+    schema_version: 2, ...(drawerMode ? { drawer_printer_id: 'lab-tcp-caja' } : {}), routing: { default_station: 'caja' }, printers: [{ printer_id: 'lab-tcp-caja', name: 'Caja laboratorio TCP', enabled: true,
+      connection: { type: 'tcp', host: '127.0.0.1', port: syntheticPrinter.address().port }, station_ids: ['caja'],
+      document_types: ['pre_ticket', 'receipt'], copies: 1, encoding: 'cp850' }],
+  }))
   const { terminalId, actorSession } = prepared.get(name)
   fs.writeFileSync(path.join(userData, 'config.json'), JSON.stringify({
     config_version: CURRENT_CONFIG_VERSION, restaurant_id: tenant, terminal_id: terminalId,
@@ -374,6 +403,10 @@ require(${JSON.stringify(path.join(ELECTRON_APP, 'main.js'))});\n`)
   }, { tenant, staff, turno, terminalId, port, secret, actorSession, operationalMode, uiOrigin, sinSesion: !!opts.sinSesion })
   const page = await app.firstWindow()
   terminal.page = page
+  page.on('requestfailed', request => {
+    const url = new URL(request.url())
+    if (url.pathname.startsWith('/_next/') || url.pathname.startsWith('/renderer/')) terminal.log.push(`[asset-failed] ${url.pathname} ${request.failure()?.errorText}\n`)
+  })
   page.on('pageerror', error => terminal.errors.push(error.stack || error.message))
   page.on('console', message => {
     if (['error', 'warning'].includes(message.type())) terminal.log.push(`[renderer] ${message.text()}\n`)
@@ -399,6 +432,14 @@ async function check(name, run) {
 }
 
 async function main() {
+  if (printMode) {
+    syntheticPrinter = net.createServer(socket => {
+      const chunks = []
+      socket.on('data', chunk => chunks.push(chunk))
+      socket.on('end', () => { const bytes = Buffer.concat(chunks); printedPackets.push(bytes.toString('ascii')); printedHex.push(bytes.toString('hex')) })
+    })
+    await new Promise(resolve => syntheticPrinter.listen(0, '127.0.0.1', resolve))
+  }
   const uiPort = await freePort()
   const ports = []
   for (let i = 0; i < 4; i++) ports.push(await freePort(true))
@@ -414,10 +455,10 @@ async function main() {
   nextProcess.stdout.on('data', recordNext)
   nextProcess.stderr.on('data', recordNext)
   await until(async () => (await fetch(`${uiOrigin}/pos/mesas`, { signal: AbortSignal.timeout(5000) })).ok,
-    'Next sirve la pantalla real', 150000)
-  for (const route of ['/pos', '/pos/cocina', '/pos/barra', '/pos/plano']) {
+    'Next sirve la pantalla real', Math.max(150000, compileTimeout))
+  for (const route of ['/pos', '/pos/cocina', '/pos/barra', '/pos/plano', ...(operationalMode ? ['/pos/corte', '/pos/turno'] : [])]) {
     await until(async () => (await fetch(`${uiOrigin}${route}`, { signal: AbortSignal.timeout(15000) })).ok,
-      `Preparar compilación ${route}`, 90000)
+      `Preparar compilación ${route}`, compileTimeout)
   }
   }
   // Prepare real signed sessions in the synthetic Caja profile before it boots.
@@ -443,7 +484,7 @@ async function main() {
   if (operationalMode) {
     wan = false
     await require('./recorrido-operacional-ui')({ caja, pos2, pos3, kds, check, expect, assert, until, request,
-      tenant, output, uiOrigin, labPin, restartCaja: () => startTerminal('Caja', 'server_pos', ports[0], ports[0], uiOrigin, ports) })
+      tenant, output, uiOrigin, labPin, printLab: printMode ? { packets: printedPackets, hex: printedHex, drawer: drawerMode } : null, restartCaja: () => startTerminal('Caja', 'server_pos', ports[0], ports[0], uiOrigin, ports) })
     return
   }
   if (pinDesdePantalla) {
@@ -686,6 +727,11 @@ async function main() {
   // por eso viaja como función y no como valor.
   await require('./videos-de-eduardo-ui.cjs')({ caja: () => caja, pos2, pos3, kds, check, expect, assert, until, request,
     esperarHidratacion, tenant, output, uiOrigin, orderId, path })
+  // Las mutaciones que iban solo a la nube (anular, transferir mesa) tienen que
+  // llegar a Pedro. `setWan` porque anular pide validar el PIN del gerente en la
+  // nube antes de poder hacerlo sin ella (el caché de 30 min).
+  await require('./mutaciones-llegan-a-pedro-ui.cjs')({ caja: () => caja, pos2, pos3, check, expect, assert, until, request,
+    command, esperarHidratacion, tenant, output, uiOrigin, turno, staff, path, randomUUID, setWan: v => { wan = v } })
   await check('Al apagarse Caja, POS 2 muestra que la cuenta no está confirmada', async () => {
     caja.process.kill('SIGKILL')
     await until(async () => {
@@ -721,6 +767,7 @@ async function main() {
 
 main().catch(error => {
   console.error(error.stack)
+  if (!results.some(r => !r.passed)) results.push({ name: 'Preparación del laboratorio', passed: false, error: error.message })
   process.exitCode = 1
 }).finally(async () => {
   for (const server of reservedPorts.values()) await new Promise(resolve => server.close(resolve))
@@ -732,9 +779,14 @@ main().catch(error => {
       }
     } catch { /* también se captura el fallo cuando el proceso ya murió */ }
     fs.writeFileSync(path.join(output, `${terminal.name}.log`), terminal.log.join(''))
+  }
+  // Capture every screen before stopping Caja; otherwise secondary evidence
+  // depicts a disconnection caused by cleanup rather than the failing step.
+  for (const terminal of terminals) {
     try { await Promise.race([terminal.app.close(), new Promise(resolve => setTimeout(resolve, 2500))]) } catch {}
     if (terminal.process.exitCode === null && terminal.process.signalCode === null) terminal.process.kill('SIGKILL')
   }
+  if (syntheticPrinter) { syntheticPrinter.close(); fs.writeFileSync(path.join(output, 'synthetic-printed-documents.json'), JSON.stringify({ documents: printedPackets, hex: printedHex }, null, 2)) }
   if (nextProcess && nextProcess.exitCode === null) nextProcess.kill('SIGTERM')
   if (nube) { nube.server.closeAllConnections(); nube.server.close() }
   fs.writeFileSync(path.join(output, 'next.log'), nextLog)

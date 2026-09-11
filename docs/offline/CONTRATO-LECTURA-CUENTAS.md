@@ -68,3 +68,10 @@ en los paquetes siguientes; los guards pueden bloquear una orden legacy sin
 revisión. Tampoco certifica hardware, impresión ni producción.
 
 Decisiones: [ADR-005](../adr/ADR-005-AUTORIDAD-OFFLINE-Y-ESTADOS.md).
+
+
+## Recuperación de borrador después de cierre — 10 de septiembre
+
+Al cerrar una cuenta se liberan tanto las referencias como la identidad/revisión del editor. Un borrador posterior recibe UUID nuevo. La copia actual recuperable —confirmada o con borrador, incluso vacío— tiene prioridad sobre la caché del formato anterior. La migración no puede recuperar una identidad pagada por encima de productos propios pendientes.
+
+El transporte LAN recuerda los valores de enum no soportados por el motor; no confunde esa incompatibilidad con desconexión o denegación de acceso. Las credenciales, señales y cuerpos conservan el mismo contenido en el único fallback de compatibilidad.

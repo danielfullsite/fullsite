@@ -1,6 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import ReportUnavailable from '@/components/ReportUnavailable'
+
+import { useCallback, useEffect, useState } from 'react'
 import { Banknote, CreditCard, ArrowDownRight, ArrowUpRight } from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
@@ -11,11 +13,16 @@ import type { WansoftDaily } from '@/lib/types'
 
 export default function CajaPage() {
   const [data, setData] = useState<WansoftDaily[]>([])
+  const [reportError, setReportError] = useState(false)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    getRecentDays(30).then(d => { setData(d) }).catch(() => {}).finally(() => setLoading(false))
+  const loadReport = useCallback(async () => {
+    setReportError(false); setLoading(true)
+    try { setData(await getRecentDays(30)) }
+    catch { setReportError(true) }
+    finally { setLoading(false) }
   }, [])
+  useEffect(() => { void loadReport() }, [loadReport])
 
   // efectivo/tarjeta in wansoft_daily are MXN amounts
   const totalEfectivo = data.reduce((s, d) => {
@@ -40,6 +47,8 @@ export default function CajaPage() {
       tarjeta: Math.round(ta),
     }
   })
+
+  if (reportError) return <ReportUnavailable onRetry={loadReport} />
 
   return (
     <>

@@ -1,5 +1,7 @@
 'use client'
 
+import ReportUnavailable from '@/components/ReportUnavailable'
+
 import { useEffect, useState, useMemo } from 'react'
 import {
   ResponsiveContainer,
@@ -21,6 +23,7 @@ const PAYMENT_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4', '
 
 export default function IngresosPage() {
   const [data, setData] = useState<WansoftDaily[]>([])
+  const [reportError, setReportError] = useState(false)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -29,7 +32,7 @@ export default function IngresosPage() {
         d = await getDashboardFromPosOrders(30)
       }
       setData(d)
-    }).catch(() => {}).finally(() => setLoading(false))
+    }).catch(() => setReportError(true)).finally(() => setLoading(false))
   }, [])
 
   // efectivo/tarjeta in wansoft_daily are MXN amounts
@@ -72,6 +75,8 @@ export default function IngresosPage() {
       }
     })
   }, [data])
+
+  if (reportError) return <ReportUnavailable />
 
   return (
     <>

@@ -337,6 +337,12 @@
   function getIState(oid, key){
     var order=lastGood.find(function(o){return o.id===oid;});
     if(order&&order.authority==='caja') { var it=parseItems(order.items).find(function(i){return i.id===key;}); var status=it&&it.preparation_status; return status==='lista'||status==='entregada'?'listo':status==='preparando'?'preparando':'nueva'; }
+    if(order) {
+      var transferred=parseItems(order.items).find(function(i){return i.id===key;});
+      var confirmed=transferred&&transferred.preparation_status;
+      if(confirmed==='lista'||confirmed==='entregada') return 'listo';
+      if(confirmed==='preparando'&&!(local[oid]&&local[oid][key])) return 'preparando';
+    }
     return (local[oid] && local[oid][key]) || "nueva";
   }
   function setIState(oid, key, st){ (local[oid]=local[oid]||{})[key]=st; saveLocal(local); }
@@ -471,7 +477,7 @@
             '<span class="time '+timeCls+'">'+elapsed(c.createdAt)+'</span>'+badge+'</div></div>'+
           oNote+
           '<div class="items">'+body+'</div>'+
-          (st!=="lista"?'<div class="card-f"><button class="fbtn ready" data-ready="'+esc(c.order.id)+'" data-batch="'+esc(c.batchId)+'">✓ Todo listo</button></div>':c.order.authority==='caja'?'<div class="card-f"><button class="fbtn ready" data-deliver="'+esc(c.order.id)+'" data-batch="'+esc(c.batchId)+'">Entregar ronda</button></div>':'')+
+          (st!=="lista"?'<div class="card-f"><button class="fbtn ready" data-ready="'+esc(c.order.id)+'" data-batch="'+esc(c.batchId)+'">✓ Todo listo</button></div>':c.order.authority==='caja'?'<div class="card-f"><button class="fbtn ready" data-deliver="'+esc(c.order.id)+'" data-batch="'+esc(c.batchId)+'">Entregar ronda</button></div>':'<div class="card-f"><button class="fbtn ready" data-entregar="'+esc(c.order.id)+'">Entregada</button></div>')+
         '</div>';
        }catch(cardErr){ try{ console.error('[kds] tarjeta con error, se omite:', (c&&c.order&&c.order.id), cardErr); }catch(_){} }
       });
@@ -495,7 +501,12 @@
     else if(anyTouched) postStatus(order,"preparando");
   }
   function postStatus(order,status){
-    var key=order.id+":"+status; if(postedStatus[key]) return; postedStatus[key]=1;
+    // La llave lleva el numero de rondas: Pedro regresa la orden a 'enviada' con
+    // cada ronda nueva y, con la llave de antes (id:status), la segunda ronda
+    // jamas llegaba a 'lista' ni a 'preparando' en la caja (barrido 2026-09-10,
+    // kds LENTE-1).
+    var rounds=0; try{ var b=typeof order.comanda_batches==='string'?JSON.parse(order.comanda_batches):order.comanda_batches; rounds=Array.isArray(b)?b.length:0; }catch(e){ rounds=0; }
+    var key=order.id+":"+status+":"+rounds; if(postedStatus[key]) return; postedStatus[key]=1;
     var cmd={ command_id:(order.id+"-"+status+"-"+Math.floor(Date.now()/1000)), command_type:"ORDER_UPSERTED", order_id:order.id, mesa:order.mesa, status:status, client_id:(CFG.client_id||"") };
     fetch(STATE_BASE+"/events",{method:"POST",signal:AbortSignal.timeout(4000),headers:authHeaders({"Content-Type":"application/json"}),body:JSON.stringify(cmd)})
       .then(function(r){ if(!r.ok) throw new Error("Sin conexión con Caja"); return r.json(); })
@@ -513,6 +524,7 @@
       });
   }
   var kitchenPending={};
+  var stateReadIssued=0, stateReadApplied=0, stateReadMinimum=0;
   function commandUuid(){if(crypto.randomUUID)return crypto.randomUUID();var bytes=new Uint32Array(4);crypto.getRandomValues(bytes);return 'kds-'+Array.prototype.map.call(bytes,function(n){return n.toString(16).padStart(8,'0');}).join('');}
   function postKitchen(order,ids,status){
     if(!actorSession()){openActor();return;}
@@ -523,13 +535,17 @@
       .then(function(r){if(!r.ok)throw new Error('Sin conexión con Caja');return r.json();})
       .then(function(data){var result=Array.isArray(data.results)&&data.results.length===1?data.results[0]:null;
         if(!result||result.error||!result.receipt||result.receipt.command_id!==cmd.command_id){if(result&&result.code==='ACTOR_REQUIRED'){lockActor();openActor();}throw new Error(result&&result.error||'Caja no confirmó el cambio');}
-        fetchState();
+        stateReadMinimum=stateReadIssued+1; fetchState();
       }).catch(function(error){toast(error.message||'Cambio sin confirmar en Caja');fetchState();})
       .finally(function(){kitchenPending[order.id]=false;});
   }
 
   // ── interactions ──
   document.addEventListener("click",function(e){
+    // Legacy (sin Caja): «Entregada» saca del tablero una comanda lista; sin esto
+    // la cobrada quedaba verde hasta el corte (barrido 2026-09-10, kds LENTE-2).
+    var entregar=e.target.closest('[data-entregar]');
+    if(entregar){ var oEnt=lastGood.find(function(o){return o.id===entregar.getAttribute('data-entregar');}); if(oEnt) postStatus(oEnt,'entregada'); return; }
     var deliver=e.target.closest('[data-deliver]');
     if(deliver){ var deliveredOrder=lastGood.find(function(o){return o.id===deliver.getAttribute('data-deliver');});if(!deliveredOrder)return;
       var deliveredIds=parseItems(deliveredOrder.items).filter(function(i){return i.comanda_batch_id===deliver.getAttribute('data-batch')&&i.preparation_status!=='entregada'&&(STATION==='todas'||resolveStation(i)===STATION);}).map(function(i){return i.id;});
@@ -609,11 +625,12 @@
 
   function fetchState(){
     if(location.protocol==="file:"){ setConn(true); connTxt.textContent="modo demo local"; render(false); return; }
+    var read=++stateReadIssued;
     var ctrl=new AbortController(); var to=setTimeout(function(){ ctrl.abort(); },4000);
     fetch(STATE_BASE+"/state",{cache:"no-store",signal:ctrl.signal,headers:authHeaders()})
       .then(function(r){ return r.ok?r.json():Promise.reject(); })
-      .then(function(data){ clearTimeout(to); cajaWrites=data.write_authority==='caja'; lastGood=adaptOrders(data); setConn(data.authoritative!==false); paintActor(); render(true); })
-      .catch(function(){ clearTimeout(to); setConn(false); render(false); });
+      .then(function(data){ clearTimeout(to); if(read<stateReadApplied||read<stateReadMinimum)return; stateReadApplied=read; cajaWrites=data.write_authority==='caja'; lastGood=adaptOrders(data); setConn(data.authoritative!==false); paintActor(); render(true); })
+      .catch(function(){ clearTimeout(to); if(read!==stateReadIssued||read<stateReadMinimum)return; setConn(false); render(false); });
   }
 
   function tick(){ var d=new Date(); document.getElementById("clock").textContent=("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2); }

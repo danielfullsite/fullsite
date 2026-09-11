@@ -1,5 +1,8 @@
 'use client'
 
+import PendingMovementRecovery from '@/components/inventory/PendingMovementRecovery'
+import { useClaveDeOperacion } from '@/lib/clave-de-operacion'
+
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Upload, FileText, CheckCircle, AlertTriangle, XCircle, Package, ArrowRight, Zap } from 'lucide-react'
@@ -25,6 +28,7 @@ interface MatchedLine {
 }
 
 export default function RecepcionFacturaPage() {
+  const { clave: claveDeOperacion, confirmar: confirmarOperacion } = useClaveDeOperacion()
   const [cfdi, setCfdi] = useState<CfdiParsed | null>(null)
   const [ingredients, setIngredients] = useState<Ingredient[]>([])
   const [matched, setMatched] = useState<MatchedLine[]>([])
@@ -129,7 +133,7 @@ export default function RecepcionFacturaPage() {
       await fetch(`${SUPABASE_URL}/rest/v1/pos_facturas`, {
         method: 'POST', headers,
         body: JSON.stringify({
-          id: `FACT-${cfdi.uuid || Date.now()}`,
+          id: `FACT-${cfdi.uuid || claveDeOperacion}`,
           client_id: _cid(),
           supplier: cfdi.emisorNombre,
           folio: `${cfdi.serie}${cfdi.folio}`,
@@ -146,7 +150,7 @@ export default function RecepcionFacturaPage() {
       // 2. Entrada al inventario por el CONTRATO (invoice_entry): costo promedio ponderado
       // (unit_cost = valor unitario del CFDI) + stock atómico + ledger inmutable + idempotencia
       // por UUID del CFDI. Antes: PATCH directo a cost_per_unit + PATCH/insert manual — prohibido (AGENTS.md).
-      const { recordMovement } = await import('@/lib/inventory')
+      const { recordMovement, confirmarMovimientoInventario } = await import('@/lib/inventory')
       const invLines = matched
         .filter(l => l.ingredient && l.includeInRestock)
         .map(l => ({
@@ -160,7 +164,7 @@ export default function RecepcionFacturaPage() {
           client_id: _cid(),
           movement_type: 'invoice_entry',
           actor: 'XML Factura',
-          idempotency_key: `cfdi-${cfdi.uuid || `${cfdi.serie}${cfdi.folio}`}`,
+          idempotency_key: cfdi.uuid ? `cfdi:${cfdi.uuid.trim().toLowerCase()}` : `invoice-manual-${claveDeOperacion}`,
           lines: invLines,
           metadata: { supplier: cfdi.emisorNombre, folio: `${cfdi.serie}${cfdi.folio}`, cfdi_uuid: cfdi.uuid, source: 'pos/recepcion-factura' },
         })
@@ -171,6 +175,8 @@ export default function RecepcionFacturaPage() {
         }
       }
 
+      await confirmarMovimientoInventario(_cid(), cfdi.uuid ? `cfdi:${cfdi.uuid.trim().toLowerCase()}` : `invoice-manual-${claveDeOperacion}`)
+      confirmarOperacion()
       setSaved(true)
       setTimeout(() => setSaved(false), 5000)
     } catch (e) {
@@ -185,6 +191,7 @@ export default function RecepcionFacturaPage() {
 
   return (
     <div className="h-dvh overflow-y-auto pos-fat-scroll max-w-5xl mx-auto p-6">
+      <PendingMovementRecovery />
       <div className="flex items-center gap-3 mb-6">
         <Link href="/pos" className="p-2 rounded-lg hover:bg-[var(--surface-2)] text-[var(--text-3)]"><ArrowLeft size={16} /></Link>
         <Zap size={24} className="text-amber-400" />

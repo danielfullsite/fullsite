@@ -1,22 +1,12 @@
-// Tenant provisioning — Control Plane domain module (Fase 3).
-//
-// Contract: `provisionTenant()` is the single reusable entry point for "dar de alta"
-// a new tenant. Given a clientId + brand, it clones a FULL tenant skeleton
-// (clients row, default location, menu, payment methods, role placeholders) from the
-// global onboarding template. It is:
-//   - IDEMPOTENT: every write is an UPSERT keyed on a deterministic id
-//     (Prefer: resolution=merge-duplicates). Re-running yields the same tenant.
-//   - MULTI-TENANT SAFE: every seeded row carries client_id = clientId. Nothing
-//     global is mutated.
-//   - SERVICE-ROLE ONLY: uses SUPABASE_SERVICE_KEY via PostgREST fetch. NEVER the
-//     Supabase SDK (hangs in App Router), NEVER the anon key.
-//
-// Table/column shapes mirror seeds/_lib/seed-restaurant.ts exactly. This module is
-// the domain owner — routes MUST call it rather than inline provisioning logic.
-
+// Provisioning contract: create a pending tenant, seed missing rows only, then
+// activate with owner/service memberships in one database transaction. Existing
+// configuration, prices, policies, disabled rows and legacy activation survive
+// retries. Template staff are inactive and their random PINs do not grant access.
+// PostgREST + service role only; no SDK and no anon fallback.
+import { randomInt, randomUUID } from 'node:crypto'
 import { DEFAULT_ONBOARDING_TEMPLATE, type OnboardingTemplate } from './onboarding-template'
 import type { ClientFeatures } from './client-config'
-import { resolveVerticalPreset, type VerticalId } from './vertical-presets'
+import { resolveVerticalPreset, type VerticalId, type SeedCombo } from './vertical-presets'
 
 // Kept in sync with DEFAULT_FEATURES in src/lib/client-config.ts (which is not
 // exported). New tenants get the standard feature set.
@@ -63,9 +53,39 @@ export interface ProvisionResult {
 
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 
-function slugifyLocation(value: string): string {
-  return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+interface ProvisionPlan {
+  version: 1
+  mesas: number
+  template: OnboardingTemplate
+  locations: Array<{id:string;name:string;address:string}>
+  combos: SeedCombo[]
+}
+interface ProvisionedClient { id:string; active:boolean; provisioning_state:'pending'|'complete'|null; provisioning_plan:ProvisionPlan|null }
+async function readTenant(clientId:string): Promise<ProvisionedClient|null> {
+  const response=await checked(await fetch(`${SB_URL}/rest/v1/clients?id=eq.${encodeURIComponent(clientId)}&select=id,active,provisioning_state,provisioning_plan&limit=1`,{headers:headers(),cache:'no-store'}),'read tenant')
+  const rows=await response.json()
+  if(!Array.isArray(rows)||rows.length>1||(rows.length&&rows[0].id!==clientId)) throw new Error('[provision] invalid tenant lookup')
+  return rows[0]||null
+}
+function requirePlan(value:ProvisionPlan|null):ProvisionPlan {
+  if(value?.version!==1||!Number.isSafeInteger(value.mesas)||value.mesas<0||!Array.isArray(value.locations)||!value.locations.length||
+    !Array.isArray(value.template?.menu)||!Array.isArray(value.template?.paymentMethods)||!Array.isArray(value.template?.roles)||!Array.isArray(value.combos)) throw new Error('[provision] PROVISION_PLAN_REQUIRED: concilia el plan pendiente')
+  return value
+}
+function capturePlan(input:ProvisionInput):ProvisionPlan {
+  const preset=input.vertical?resolveVerticalPreset(input.vertical):null,tpl=input.template||preset?.template||DEFAULT_ONBOARDING_TEMPLATE
+  // Explicit projection only: credentials and unknown input properties never enter the plan.
+  return {version:1,mesas:input.mesas??preset?.defaultMesas??10,locations:(input.locations?.length?input.locations:[{name:'Principal'}]).map(l=>({id:l.id||randomUUID(),name:l.name.trim(),address:l.address?.trim()||''})),
+    template:{menu:tpl.menu.map(c=>({idSuffix:c.idSuffix,name:c.name,color:c.color,sort_order:c.sort_order,items:c.items.map(i=>({idSuffix:i.idSuffix,name:i.name,price:i.price,sort_order:i.sort_order}))})),
+      paymentMethods:tpl.paymentMethods.map(m=>({name:m.name,type:m.type,commission_pct:m.commission_pct,fiscal_code:m.fiscal_code})),roles:[...tpl.roles]},
+    combos:JSON.parse(JSON.stringify(preset?.combos||[]))}
+}
+async function prevalidateLocations(plan:ProvisionPlan,clientId:string):Promise<void> {
+  if(new Set(plan.locations.map(l=>l.id)).size!==plan.locations.length)throw new Error('[provision] duplicate location identity')
+  const ids=`in.(${plan.locations.map(l=>JSON.stringify(l.id)).join(',')})`
+  const response=await checked(await fetch(`${SB_URL}/rest/v1/client_locations?id=${encodeURIComponent(ids)}&select=id,client_id`,{headers:headers(),cache:'no-store'}),'scope locations')
+  const rows=await response.json()
+  if(!Array.isArray(rows)||rows.some(row=>row.client_id!==clientId))throw new Error('[provision] SCOPE_CONFLICT client_locations')
 }
 
 function serviceKey(): string {
@@ -73,23 +93,8 @@ function serviceKey(): string {
   return process.env.SUPABASE_SERVICE_KEY || ''
 }
 
-/**
- * PIN determinístico de 10 dígitos a partir de una semilla (tenant:rol).
- * FNV-1a doble pasada → 10 dígitos, primer dígito nunca 0. No es secreto
- * criptográfico: es el PIN inicial de plantilla que el dueño debe rotar; su
- * único requisito es longitud 10 y estabilidad entre corridas del provision.
- */
-export function deterministicPin10(seed: string): string {
-  let h1 = 0x811c9dc5, h2 = 0x01000193
-  for (let i = 0; i < seed.length; i++) {
-    h1 = Math.imul(h1 ^ seed.charCodeAt(i), 0x01000193) >>> 0
-    h2 = Math.imul(h2 ^ seed.charCodeAt(seed.length - 1 - i), 0x01000193) >>> 0
-  }
-  // 9 dígitos mezclando ambos hashes sin productos de 64 bits (precisión JS).
-  const nine = String(h1 % 100000).padStart(5, '0') + String(h2 % 10000).padStart(4, '0')
-  const first = String((h1 % 9) + 1) // 1-9: nunca empieza en 0
-  return first + nine
-}
+/** Independent random credential; operation/row identity never depends on it. */
+export function randomPin10(): string { return String(randomInt(1_000_000_000, 10_000_000_000)) }
 
 function headers() {
   const key = serviceKey()
@@ -98,137 +103,93 @@ function headers() {
     Authorization: `Bearer ${key}`,
     'Content-Type': 'application/json',
     // Idempotent upsert on the table's primary key.
-    Prefer: 'resolution=merge-duplicates,return=minimal',
+    Prefer: 'resolution=ignore-duplicates,return=representation',
   }
 }
 
-/** ¿Cuántas filas tiene `table` para este client? (para siembras idempotentes por conteo). */
+async function checked(response: Response, operation: string): Promise<Response> {
+  if (!response.ok) throw new Error(`[provision] ${operation} failed (${response.status})`)
+  return response
+}
 async function countFor(table: string, clientId: string): Promise<number> {
-  const res = await fetch(
-    `${SB_URL}/rest/v1/${table}?client_id=eq.${encodeURIComponent(clientId)}&select=id`,
-    { headers: { ...headers(), Prefer: 'count=exact', Range: '0-0' }, cache: 'no-store' }
-  )
-  const range = res.headers.get('content-range')
-  if (range) { const total = range.split('/')[1]; return total === '*' ? 0 : parseInt(total, 10) }
-  return 0
+  const res = await checked(await fetch(`${SB_URL}/rest/v1/${table}?client_id=eq.${encodeURIComponent(clientId)}&select=id`,
+    { headers: { ...headers(), Prefer: 'count=exact', Range: '0-0' }, cache: 'no-store' }), `count ${table}`)
+  const total = res.headers.get('content-range')?.split('/')[1]
+  if (!total || !/^\d+$/.test(total) || !Number.isSafeInteger(Number(total))) throw new Error(`[provision] invalid count ${table}`)
+  return Number(total)
 }
-
-async function insertRows(table: string, rows: Record<string, unknown>[]): Promise<number> {
-  if (rows.length === 0) return 0
-  const res = await fetch(`${SB_URL}/rest/v1/${table}`, {
-    method: 'POST',
-    headers: { ...headers(), Prefer: 'return=minimal' },
-    body: JSON.stringify(rows),
-    cache: 'no-store',
-  })
-  if (!res.ok) {
-    const detail = await res.text().catch(() => '')
-    throw new Error(`[provision] insert ${table} failed (${res.status}): ${detail}`)
+async function insertMissing(table: string, rows: Record<string, unknown>[], conflictCols?: string): Promise<Record<string, unknown>[]> {
+  if (!rows.length) return []
+  const suffix = conflictCols ? `?on_conflict=${encodeURIComponent(conflictCols)}` : ''
+  const res = await checked(await fetch(`${SB_URL}/rest/v1/${table}${suffix}`, {method:'POST',headers:headers(),body:JSON.stringify(rows),cache:'no-store'}), `insert ${table}`)
+  const inserted = await res.json()
+  if (!Array.isArray(inserted)) throw new Error(`[provision] invalid insert receipt ${table}`)
+  // Ignore-duplicates cannot overwrite foreign rows. Confirm that every requested
+  // globally keyed identity belongs to this tenant before continuing the skeleton.
+  if (rows.every(row => typeof row.id === 'string' && typeof row.client_id === 'string')) {
+    const ids = `in.(${rows.map(row => JSON.stringify(row.id)).join(',')})`
+    const check = await checked(await fetch(`${SB_URL}/rest/v1/${table}?id=${encodeURIComponent(ids)}&select=id,client_id`, {headers:headers(),cache:'no-store'}), `scope ${table}`)
+    const existing = await check.json()
+    if (!Array.isArray(existing) || rows.some(row => !existing.some(item => item.id === row.id && item.client_id === row.client_id))) throw new Error(`[provision] SCOPE_CONFLICT ${table}`)
   }
-  return rows.length
+  return inserted
 }
-
-async function upsert(table: string, rows: Record<string, unknown>[]): Promise<number> {
-  if (rows.length === 0) return 0
-  const res = await fetch(`${SB_URL}/rest/v1/${table}`, {
-    method: 'POST',
-    headers: headers(),
-    body: JSON.stringify(rows),
-    cache: 'no-store',
-  })
-  if (!res.ok) {
-    const detail = await res.text().catch(() => '')
-    throw new Error(`[provision] upsert ${table} failed (${res.status}): ${detail}`)
-  }
-  return rows.length
+async function upsert(table: string, rows: Record<string, unknown>[]): Promise<number> { return (await insertMissing(table,rows)).length }
+async function upsertOnConflict(table: string, rows: Record<string, unknown>[], conflictCols: string): Promise<number> { return (await insertMissing(table,rows,conflictCols)).length }
+async function insertRows(table: string, rows: Record<string, unknown>[]): Promise<number> { return (await insertMissing(table,rows,'client_id,number')).length }
+function validateInput(input: ProvisionInput) {
+  if (!/^[a-z0-9_-]{1,40}$/i.test(input.clientId || '')) throw new Error('[provision] invalid clientId')
+  if (!SB_URL || !serviceKey()) throw new Error('[provision] service configuration required')
+  if (input.mesas !== undefined && (!Number.isSafeInteger(input.mesas) || input.mesas < 0 || input.mesas > 500)) throw new Error('[provision] invalid mesas')
+  if (input.locations && (!Array.isArray(input.locations) || input.locations.length > 100 || input.locations.some(l => typeof l.name !== 'string' || !l.name.trim() || (l.id !== undefined && (typeof l.id !== 'string' || !l.id.trim() || l.id.length > 200))))) throw new Error('[provision] invalid locations')
 }
-
-/**
- * Upsert resolving on a NON-primary-key unique constraint. Needed for tables
- * whose PK is a serial id but whose logical identity is (client_id, ...): the
- * default merge-duplicates resolves on the serial PK (never conflicts → dup on
- * re-run). `on_conflict` tells PostgREST which unique index to merge on.
- */
-async function upsertOnConflict(table: string, rows: Record<string, unknown>[], conflictCols: string): Promise<number> {
-  if (rows.length === 0) return 0
-  const res = await fetch(`${SB_URL}/rest/v1/${table}?on_conflict=${encodeURIComponent(conflictCols)}`, {
-    method: 'POST',
-    headers: headers(),
-    body: JSON.stringify(rows),
-    cache: 'no-store',
-  })
-  if (!res.ok) {
-    const detail = await res.text().catch(() => '')
-    throw new Error(`[provision] upsert ${table} (on_conflict=${conflictCols}) failed (${res.status}): ${detail}`)
-  }
-  return rows.length
+/** Safe to call before/resume provisioning. Never activates or edits an existing tenant. */
+export async function provisionTenantBegin(input: ProvisionInput): Promise<{clientId:string;created:number;tenant:ProvisionedClient}> {
+  validateInput(input)
+  const existing=await readTenant(input.clientId)
+  if(existing)return {clientId:input.clientId,created:0,tenant:existing}
+  const plan=capturePlan(input),preset=input.vertical?resolveVerticalPreset(input.vertical):null
+  // Reject an incorrect explicit location before making it part of durable intent.
+  await prevalidateLocations(plan,input.clientId)
+  const created = await upsert('clients',[{id:input.clientId,display_name:input.display_name||input.clientId,
+    accent_color:input.accent_color||'emerald',default_theme:input.default_theme||'light',logo_url:input.logo_url||null,
+    iva_rate:0.16,timezone:'America/Mexico_City',active:false,provisioning_state:'pending',provisioning_plan:plan,
+    features:JSON.stringify({...DEFAULT_FEATURES,...preset?.features}),mesas:plan.mesas,
+    ...(input.vertical?{type:input.vertical}:{}),
+    ...(preset?{pos_settings:{'agents.thresholds':{...preset.thresholds,source:`vertical:${preset.id}`,seeded_at:new Date().toISOString()}}}:{}),
+    data_source:'fullsite',business_day_start_local:'05:00:00'}])
+  // A concurrent first request may have won. Only its committed plan is authoritative.
+  const tenant=await readTenant(input.clientId)
+  if(!tenant)throw new Error('[provision] tenant insert unconfirmed')
+  return {clientId:input.clientId,created,tenant}
+}
+async function rpc(name: string, args: Record<string, unknown>): Promise<unknown> {
+  if (!SB_URL || !serviceKey()) throw new Error('[provision] service configuration required')
+  const response = await checked(await fetch(`${SB_URL}/rest/v1/rpc/${name}`,{method:'POST',headers:headers(),body:JSON.stringify(args),cache:'no-store'}),name)
+  return response.json()
+}
+export interface ProvisionActivation { activated:boolean; provisioning_state:'pending'|'complete'|null; active:boolean; staff_setup_required:boolean }
+/** Memberships and activation commit together. A suspended/legacy tenant is never reactivated. */
+export async function activateProvisionedTenant(clientId:string,ownerUserId:string,options:{serviceUserId?:string}={}): Promise<ProvisionActivation> {
+  const result = await rpc('pos_activate_provisioned_tenant',{p_client_id:clientId,p_owner_user_id:ownerUserId,p_service_user_id:options.serviceUserId||null}) as ProvisionActivation
+  if (!result || typeof result.activated !== 'boolean' || typeof result.active !== 'boolean' || typeof result.staff_setup_required !== 'boolean' || ![null,'pending','complete'].includes(result.provisioning_state)) throw new Error('[provision] invalid activation receipt')
+  return result
 }
 
 /**
  * Provision a full tenant skeleton. Fail-closed: throws if no service key.
  */
 export async function provisionTenant(input: ProvisionInput): Promise<ProvisionResult> {
+  validateInput(input)
   const { clientId } = input
-  if (!clientId) throw new Error('[provision] clientId required')
-  if (!SB_URL) throw new Error('[provision] NEXT_PUBLIC_SUPABASE_URL not configured')
-  if (!serviceKey()) throw new Error('[provision] SUPABASE_SERVICE_KEY not configured')
-
-  const preset = input.vertical ? resolveVerticalPreset(input.vertical) : null
-
-  // ¿El tenant ya existe? Los umbrales día-0 (Lazo 1) solo se siembran en el
-  // alta ORIGINAL: un re-provision no debe pisar pos_settings que el tenant o
-  // el tuner (Lazo 2) ya ajustaron.
-  let clientExists = false
-  try {
-    const chk = await fetch(`${SB_URL}/rest/v1/clients?id=eq.${encodeURIComponent(clientId)}&select=id&limit=1`,
-      { headers: headers(), cache: 'no-store' })
-    const rows = chk.ok ? await chk.json().catch(() => []) : []
-    clientExists = Array.isArray(rows) && rows.length > 0
-  } catch { /* si no se pudo verificar, tratar como existente = no pisar settings */ clientExists = true }
-
-  const tpl = input.template || preset?.template || DEFAULT_ONBOARDING_TEMPLATE
-  const displayName = input.display_name || clientId
-  const mesas = input.mesas ?? preset?.defaultMesas ?? 10
-  const features: ClientFeatures = preset
-    ? { ...DEFAULT_FEATURES, ...preset.features }
-    : DEFAULT_FEATURES
-
-  // ── 1. clients row ─────────────────────────────────────────────────────────
-  const clientsCount = await upsert('clients', [{
-    id: clientId,
-    display_name: displayName,
-    accent_color: input.accent_color || 'emerald',
-    default_theme: input.default_theme || 'light',
-    logo_url: input.logo_url || null,
-    iva_rate: 0.16,
-    timezone: 'America/Mexico_City',
-    active: true,
-    features: JSON.stringify(features),
-    mesas,
-    // Tipo de restaurante (vertical preset). Columna `type` ya existe en `clients`.
-    ...(input.vertical ? { type: input.vertical } : {}),
-    // Lazo 1 (docs/ai/APRENDIZAJE-AGENTES-DESIGN.md): umbrales de industria del
-    // vertical como prior de los agentes — SOLO en el alta original, para no
-    // pisar ajustes del tenant/tuner en un re-provision.
-    ...(!clientExists && preset ? { pos_settings: { 'agents.thresholds': { ...preset.thresholds, source: `vertical:${preset.id}`, seeded_at: new Date().toISOString() } } } : {}),
-    data_source: 'fullsite',
-    // Requerido por el cálculo de día de negocio (ops_aggregate.get_business_day_config).
-    // Sin esto, los agentes de IA crashean para el clon. Default 05:00 (día empieza a las 5am).
-    business_day_start_local: '05:00:00',
-    // 'plan' NO es columna real de `clients` (validado contra el esquema en staging) → no se escribe.
-  }])
-
-  // ── 2. default location ────────────────────────────────────────────────────
-  const locationInputs = input.locations?.length
-    ? input.locations
-    : [{ id: `${clientId}-principal`, name: 'Principal', address: '' }]
-  const locationRows = locationInputs.map((location, index) => ({
-    id: location.id || `${clientId}-${slugifyLocation(location.name) || `sucursal-${index + 1}`}`,
-    client_id: clientId,
-    name: location.name.trim(),
-    address: location.address?.trim() || '',
-    active: true,
-  }))
+  const begun=await provisionTenantBegin(input)
+  if(begun.tenant.provisioning_state!=='pending') {
+    const readiness=await rpc('pos_mark_tenant_provisioned',{p_client_id:clientId}) as {ready?:boolean}
+    if(readiness?.ready!==true)throw new Error('[provision] readiness unconfirmed')
+    return {clientId,staffPins:[],created:{clients:0,client_locations:0,pos_menu_categories:0,pos_menu_items:0,pos_payment_methods:0,pos_staff:0,pos_mesas:0,pos_combos:0,pos_mutation_authority:0,pos_item_inventory_policy:0}}
+  }
+  const plan=requirePlan(begun.tenant.provisioning_plan),tpl=plan.template,mesas=plan.mesas,clientsCount=begun.created
+  const locationRows=plan.locations.map(location=>({...location,client_id:clientId,active:true}))
   const locationsCount = await upsert('client_locations', locationRows)
 
   // ── 3. menu categories + items ─────────────────────────────────────────────
@@ -270,29 +231,33 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
   // ── 5. role placeholders (pos_staff) ───────────────────────────────────────
   // One placeholder staff row per role so the new tenant has a starting role set.
   // PINs de 10 dígitos (regla 2026-08-29: la huella es el método primario; el
-  // PIN es respaldo y debe ser largo, no un 4 dígitos observable). Deterministas
-  // por tenant+rol para que re-correr el provision dé el mismo resultado, y
+  // PIN es respaldo y debe ser largo, no un 4 dígitos observable). Aleatorios
+  // e INACTIVOS: el alta real de empleados/enrolamiento habilita acceso, y
   // sembrados SOLO si el tenant no tiene staff (idempotente por conteo — así un
   // re-provision de un tenant viejo con PINs de 4 dígitos no duplica filas).
   let staffCount = 0
   const staffPins: Array<{ role: string; pin: string }> = []
   if ((await countFor('pos_staff', clientId)) === 0) {
     const staffRows = tpl.roles.map((role) => {
-      const pin = deterministicPin10(`${clientId}:${role}`)
+      const pin = randomPin10()
       staffPins.push({ role, pin })
       return {
-        id: `${clientId}-${pin}`,
+        id: `${clientId}-staff-${role}`,
         client_id: clientId,
         name: `${role} (plantilla)`,
         pin,
         role,
         role_display: role,
-        active: true,
+        active: false,
         hourly_rate: 0,
         weekly_salary: 0,
       }
     })
-    staffCount = await upsert('pos_staff', staffRows)
+    const inserted = await insertMissing('pos_staff', staffRows)
+    staffCount = inserted.length
+    // Only inserted inactive placeholders return their credential; a racing
+    // retry must not present a freshly generated PIN that was never stored.
+    staffPins.splice(0, staffPins.length, ...inserted.map(row => ({role:String(row.role),pin:String(row.pin)})))
   }
 
   // ── 5b. combos semilla (pos_combos) ────────────────────────────────────────
@@ -301,8 +266,8 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
   // 2026-08-29; este bloque hace lo mismo para todo tenant nuevo). Idempotente
   // por conteo: un re-provision no duplica ni pisa combos editados.
   let combosCount = 0
-  if (preset?.combos?.length && (await countFor('pos_combos', clientId)) === 0) {
-    const comboRows = preset.combos.map(c => ({
+  if (plan.combos.length && (await countFor('pos_combos', clientId)) === 0) {
+    const comboRows = plan.combos.map(c => ({
       id: `${clientId}-${c.idSuffix}`,
       client_id: clientId,
       name: c.name,
@@ -375,6 +340,9 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
   const policyCount = await upsertOnConflict(
     'pos_item_inventory_policy', policyRows, 'client_id,menu_item_id'
   )
+
+  const readiness = await rpc('pos_mark_tenant_provisioned', {p_client_id:clientId}) as {ready?:boolean}
+  if (readiness?.ready !== true) throw new Error('[provision] readiness unconfirmed')
 
   return {
     clientId,

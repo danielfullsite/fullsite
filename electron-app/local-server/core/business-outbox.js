@@ -21,14 +21,14 @@ function committedEnvelope(event) {
 const historyHash = (previous, event) => crypto.createHash('sha256').update(previous + '\n' + JSON.stringify(committedEnvelope(event))).digest('hex')
 
 class BusinessOutbox {
-  constructor({ eventStore, directory, supabaseUrl, anonKey, restaurantId, locationId, streamId, credential,
+  constructor({ eventStore, directory, materializeUrl = 'https://app.fullsite.mx/api/pos/caja/materialize', restaurantId, locationId, streamId, credential,
     baselineSequence = 0, baselineHistoryHash = INITIAL_HASH, fetchImpl = fetch, intervalMs = 5000, batchSize = 100, timeoutMs = 8000 }) {
     if (!eventStore || !directory || !restaurantId || !locationId || !/^[a-f0-9-]{36}$/i.test(streamId || '') ||
-      typeof credential !== 'string' || credential.length < 32 || !anonKey ||
+      typeof credential !== 'string' || credential.length < 32 ||
       !Number.isSafeInteger(baselineSequence) || baselineSequence < 0 || !validHash(baselineHistoryHash)) throw new Error('Business sync configuration incomplete')
-    const origin = new URL(supabaseUrl)
+    const origin = new URL(materializeUrl)
     if (origin.protocol !== 'https:') throw new Error('Business sync requires HTTPS')
-    this.store = eventStore; this.url = origin.origin; this.anonKey = anonKey
+    this.store = eventStore; this.url = origin.href
     this.scope = { stream_id: streamId, restaurant_id: restaurantId, location_id: locationId }
     this.credential = credential; this.fetch = fetchImpl; this.batchSize = batchSize; this.timeoutMs = timeoutMs; this.intervalMs = intervalMs
     this.baseline = { sequence: baselineSequence, history_hash: baselineHistoryHash }
@@ -76,8 +76,8 @@ class BusinessOutbox {
     this.pending = pending.length
     let confirmed = 0, materialized = 0
     for (const { event, previousHash, hash } of pending.slice(0, this.batchSize)) {
-      const response = await this.fetch(this.url + '/rest/v1/rpc/apply_pos_caja_event', {
-        method: 'POST', headers: { apikey: this.anonKey, Authorization: `Bearer ${this.anonKey}`, 'Content-Type': 'application/json' },
+      const response = await this.fetch(this.url, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ p_stream_id: this.scope.stream_id, p_credential: this.credential,
           p_previous_history_hash: previousHash, p_history_hash: hash, p_event: committedEnvelope(event) }),
         redirect: 'error', signal: AbortSignal.timeout(this.timeoutMs),

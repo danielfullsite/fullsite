@@ -106,12 +106,15 @@ describe('devoluciones: una sola clave para la base y para el historial', () => 
   })
 })
 
-describe('lo que NO se toco, y por que', () => {
+describe('identidad de comprobantes y movimientos', () => {
   it('entradas-factura ya usaba el UUID del comprobante', () => {
     // Es el ejemplo bien hecho: la misma factura no puede importarse dos veces porque la
     // clave es el UUID del CFDI, no el reloj.
     const src = sinComentarios('app/inventario-real/entradas-factura/page.tsx')
-    expect(src).toMatch(/const idempotencyKey = `cfdi_\$\{cfdiUuid\}`/)
+    expect(src).toMatch(/const idempotencyKey = cfdiUuid \? `cfdi:\$\{cfdiUuid\}`/ )
+    expect(src).toContain('.trim().toLowerCase()')
+    const pos = sinComentarios('app/pos/recepcion-factura/page.tsx')
+    expect(pos).toContain('`cfdi:${cfdi.uuid.trim().toLowerCase()}`')
   })
 
   it('pos/merma YA NO tiene el defecto opuesto — se cerro despues', () => {

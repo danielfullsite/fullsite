@@ -1,5 +1,7 @@
 'use client'
 
+import ReportUnavailable from '@/components/ReportUnavailable'
+
 import { useEffect, useState, useMemo } from 'react'
 import { HandCoins, Users, TrendingUp, CreditCard } from 'lucide-react'
 import KPICard from '@/components/KPICard'
@@ -13,6 +15,7 @@ const PROPINA_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4', '
 
 export default function PropinasPage() {
   const [data, setData] = useState<WansoftDaily[]>([])
+  const [reportError, setReportError] = useState(false)
   const [loading, setLoading] = useState(true)
   const [realTips, setRealTips] = useState<{ mesero: string; ventas: number; tickets: number; propinas: number; propina_promedio: number }[] | null>(null)
 
@@ -34,7 +37,7 @@ export default function PropinasPage() {
       } else if (tips && Array.isArray(tips.data) && tips.data.length > 0) {
         setRealTips(tips.data as typeof realTips)
       }
-    }).catch(() => {}).finally(() => setLoading(false))
+    }).catch(() => setReportError(true)).finally(() => setLoading(false))
   }, [])
 
   const totalPropinas = useMemo(() => data.reduce((s, d) => s + (d.propinas_total || 0), 0), [data])
@@ -97,6 +100,8 @@ export default function PropinasPage() {
 
   const tarjetaTotal = tarjetaPayments.reduce((s, p) => s + p.total, 0)
   const tarjetaMax = tarjetaPayments[0]?.total || 1
+
+  if (reportError) return <ReportUnavailable />
 
   return (
     <>

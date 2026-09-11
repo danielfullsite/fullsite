@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { cacheTrasElCierre } from '@/lib/cache-de-cuenta'
+import { cacheTrasElCierre, cachePreferidaAlAbrir } from '@/lib/cache-de-cuenta'
 
 // La caché `pos_cuenta_<tenant>_mesa:N` no se limpiaba al cobrar. La mesa se veía
 // libre en el mapa, pero al abrirla el editor readoptaba `confirmed.id` de la
@@ -62,4 +62,24 @@ describe('la caché de una mesa cuya cuenta ya se cerró', () => {
     expect(cacheTrasElCierre(soloBorrador, 'cerrada-en-caja')?.draft)
       .toEqual({ items: [{ id: 'a' }, { id: 'b' }] })
   })
+})
+
+
+it('reopening after a remote payment keeps new unsent products instead of reimporting the paid account', () => {
+  const saved = cacheTrasElCierre({ ...cuentaCobrada,
+    draft: { items: [...cuentaCobrada.draft.items, { id: 'new-beer', nombre: 'Lager' }] },
+  }, 'cerrada-en-caja')
+  const reopened = cachePreferidaAlAbrir(saved, () => cuentaCobrada)
+  expect(reopened?.confirmed).toBeUndefined()
+  expect(reopened?.draft?.items).toEqual([{ id: 'new-beer', nombre: 'Lager' }])
+})
+it('a deliberately empty current draft does not bring back products from legacy storage', () => {
+  const reopened = cachePreferidaAlAbrir({ draft: { items: [] }, draftOrderId: 'fresh-order' }, () => cuentaCobrada)
+  expect(reopened?.draft?.items).toEqual([])
+  expect(reopened?.draftOrderId).toBe('fresh-order')
+})
+
+it('old storage still migrates when there is no recoverable current account', () => {
+  expect(cachePreferidaAlAbrir(null, () => cuentaCobrada)).toEqual(cuentaCobrada)
+  expect(cachePreferidaAlAbrir({ draft: { items: 'corrupt' } }, () => cuentaCobrada)).toEqual(cuentaCobrada)
 })

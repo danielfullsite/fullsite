@@ -63,7 +63,8 @@ describe('lo que NO se toco, a proposito', () => {
   it('los renglones cancelados siguen SIN persistirse en items', () => {
     // Persistirlos rompe el corte, platillos_top y la reconciliacion de inventario.
     // Si alguien lo cambia, esta prueba se pone roja y el comentario explica por que.
-    expect(codigo).toMatch(/\{ \.\.\.i, cancelled: true \}/)
+    expect(codigo).toContain('prepararCancelacionItem(order, item_id, { prepared, voided, reason })')
+    expect(readFileSync(join(__dirname, '..', 'lib', 'cancelacion-item.ts'), 'utf8')).toMatch(/\{ \.\.\.i, cancelled: true,/)
     expect(codigo).not.toMatch(/payingItems/)
   })
 

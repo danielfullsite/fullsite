@@ -1,12 +1,15 @@
 'use client'
 
+import PendingMovementRecovery from '@/components/inventory/PendingMovementRecovery'
+import { useClaveDeOperacion } from '@/lib/clave-de-operacion'
+
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { Upload, FileText, CheckCircle, AlertTriangle, Search, Save, Loader2, Link2, PackageCheck, Trash2, ArrowRight, X } from 'lucide-react'
 import { getActiveClientSlug } from '@/lib/data'
 import { formatCurrency } from '@/lib/format'
 import PageHeader from '@/components/PageHeader'
 import { sbPost, sbGet } from '@/lib/supabase-helpers'
-import { recordMovement, loadInventoryWithStock, makeIdempotencyKey } from '@/lib/inventory'
+import { confirmarMovimientoInventario, recordMovement, loadInventoryWithStock, makeIdempotencyKey } from '@/lib/inventory'
 import type { MovementResult } from '@/lib/inventory'
 
 // ── Types ───────────────────────────────────────────────────────────
@@ -138,6 +141,7 @@ function parseCFDI(xml: string): CFDIData | null {
 // ── Component ───────────────────────────────────────────────────────
 
 export default function EntradasFacturaPage() {
+  const { clave: claveDeOperacion, confirmar: confirmarOperacion } = useClaveDeOperacion()
   // Catalogs (canonical sources)
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [products, setProducts] = useState<InventoryProduct[]>([])
@@ -314,8 +318,8 @@ export default function EntradasFacturaPage() {
     const fecha = cfdi.fecha.slice(0, 10) || todayStr()
     const timestamp = nowKey()
     // For invoices, idempotency is by UUID — same invoice can never be imported twice
-    const cfdiUuid = (cfdi.uuid || 'noid').replace(/[^a-zA-Z0-9-]/g, '')
-    const idempotencyKey = `cfdi_${cfdiUuid}`
+    const cfdiUuid = (cfdi.uuid || '').trim().toLowerCase()
+    const idempotencyKey = cfdiUuid ? `cfdi:${cfdiUuid}` : `invoice-manual-${claveDeOperacion}`
 
     const mapped = mappings.filter(m => m.matchedProduct)
 
@@ -343,6 +347,8 @@ export default function EntradasFacturaPage() {
       })
 
       if (movResult.was_duplicate) {
+        await confirmarMovimientoInventario(clientId, idempotencyKey)
+        confirmarOperacion()
         setSaveResult('ok')
         setCfdi(null)
         setMappings([])
@@ -406,6 +412,8 @@ export default function EntradasFacturaPage() {
         data: payload,
       })
 
+      await confirmarMovimientoInventario(clientId, idempotencyKey)
+      confirmarOperacion()
       setSaveResult('ok')
       setCfdi(null)
       setMappings([])
@@ -440,6 +448,7 @@ export default function EntradasFacturaPage() {
 
   return (
     <div className="space-y-6 pb-24">
+      <PendingMovementRecovery />
       <PageHeader
         title="Entrada con Factura"
         subtitle="Vincular factura XML a entrada de inventario"

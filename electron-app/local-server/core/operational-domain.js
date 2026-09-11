@@ -1,7 +1,8 @@
 'use strict'
+const { turnReport } = require('./turn-report')
 // Pure preparation of Caja-owned orders. The handler serializes this with money
 // commands and commits the result before projecting or acknowledging it.
-const COMMANDS = new Set(['ORDER_SAVE', 'ORDER_SEND', 'ORDER_MOVE', 'ORDER_VOID', 'TURN_OPEN', 'TURN_CLOSE', 'KITCHEN_SET'])
+const COMMANDS = new Set(['ORDER_SAVE', 'ORDER_SEND', 'ORDER_MOVE', 'ORDER_VOID', 'TURN_OPEN', 'TURN_CLOSE', 'CASH_MOVEMENT', 'KITCHEN_SET'])
 const clone = value => JSON.parse(JSON.stringify(value))
 class OperationalError extends Error { constructor(code, message) { super(message); this.code = code } }
 const fail = (code, message) => { throw new OperationalError(code, message) }
@@ -98,7 +99,7 @@ function lineFromCatalog(input, catalog, catalogRevision) {
 class OperationalDomain {
   prepare(payload, { state, catalogEnvelope, actor, now = new Date().toISOString() }) {
     const type = payload.command_type
-    const permission = { ORDER_SAVE: 'pos.orders.write', ORDER_SEND: 'pos.orders.send', ORDER_MOVE: 'pos.orders.move', ORDER_VOID: 'pos.orders.cancel', TURN_OPEN: 'pos.turns.open', TURN_CLOSE: 'pos.turns.close', KITCHEN_SET: 'actualizar_estatus_orden' }[type]
+    const permission = { ORDER_SAVE: 'pos.orders.write', ORDER_SEND: 'pos.orders.send', ORDER_MOVE: 'pos.orders.move', ORDER_VOID: 'pos.orders.cancel', TURN_OPEN: 'pos.turns.open', TURN_CLOSE: 'pos.turns.close', CASH_MOVEMENT: 'retiros_programados', KITCHEN_SET: 'actualizar_estatus_orden' }[type]
     if (!permission) fail('UNKNOWN_OPERATIONAL_COMMAND', 'Comando operativo desconocido')
     authorize(actor, permission)
     const turno = state.getTurno()
@@ -106,21 +107,45 @@ class OperationalDomain {
     if (type === 'TURN_OPEN') {
       if (turno) fail('TURN_ALREADY_OPEN', 'Ya existe un turno; abre el turno actual')
       if (state.hasTurnIdentity?.(turnoId)) fail('TURN_ID_REUSED', 'El turno nuevo requiere una identidad nueva')
-      return { turno: { id: turnoId, opened_by: actor.id, opened_at: now, opening_cash_cents: int(payload.opening_cash_cents ?? 0, 'opening_cash_cents'), authority: 'caja' } }
+      const opening = int(payload.opening_cash_cents ?? 0, 'opening_cash_cents')
+      const reason = note(payload.opening_reason, 'opening_reason').trim()
+      // Compare with committed history, never a browser-provided balance. This
+      // evidence travels with the opening receipt, its replicas and its outbox.
+      const previous = state.toSnapshot().turn_summaries.at(-1)
+      const counted = previous ? int(previous.counted_cash_cents, 'previous_counted_cash_cents') : null
+      const difference = counted === null ? null : opening - counted
+      if (difference !== null && Math.abs(difference) > 5000 && reason.length < 10) fail('OPENING_REASON_REQUIRED', 'Explica con al menos 10 caracteres la diferencia de más de $50 contra el último corte.')
+      return { turno: { id: turnoId, opened_by: actor.id, opened_at: now, opening_cash_cents: opening, authority: 'caja',
+        opening_reconciliation: { previous_turno_id: previous?.id ?? null, previous_counted_cash_cents: counted, difference_cents: difference, reason } } }
     }
     if (!turno || turno.id !== turnoId) fail('TURNO_MISMATCH', 'La operación debe pertenecer al turno actual de Caja')
+    if (type === 'CASH_MOVEMENT') {
+      const movementId = id(payload.movement_id, 'movement_id')
+      if (!['retiro', 'deposito'].includes(payload.type)) fail('INVALID_CASH_MOVEMENT', 'Elige retiro o depósito')
+      const amount = int(payload.amount_cents, 'amount_cents', 1)
+      const reason = note(payload.reason, 'reason', 1000).trim()
+      if (!reason) fail('REASON_REQUIRED', 'Escribe el motivo del movimiento')
+      const previous = state.getCashMovements().find(m => m.id === movementId)
+      if (previous) {
+        if (previous.turno_id !== turnoId || previous.type !== payload.type || previous.amount_cents !== amount || previous.reason !== reason) fail('MOVEMENT_ID_REUSED', 'La identidad pertenece a otro movimiento')
+        return { cash_movement: previous }
+      }
+      const report = turnReport(turno, state.getFinancialOrders(), state.toSnapshot().salon_orders, state.getCashMovements())
+      if (payload.type === 'retiro' && amount > report.expected_cash_cents) fail('INSUFFICIENT_CASH', 'El retiro supera el efectivo esperado en Caja')
+      return { cash_movement: { id: movementId, turno_id: turnoId, type: payload.type,
+        amount_cents: amount, reason, actor: actor.id, approved_by: actor.id, created_at: now } }
+    }
     if (type === 'TURN_CLOSE') {
       const snapshot = state.toSnapshot()
       if (snapshot.salon_orders.length || state.getFinancialOrders().some(o => o.turno_id === turnoId && (o.balance_cents > 0 || o.reserved_cents > 0))) fail('UNSETTLED_FINANCIAL_ACCOUNTS', 'Quedan cuentas abiertas o intentos de pago por resolver')
       if (snapshot.kds_orders.length) fail('PENDING_KITCHEN_WORK', 'Quedan comandas sin entregar en cocina')
       const counted = int(payload.counted_cash_cents, 'counted_cash_cents')
-      const accepted = state.getFinancialOrders().filter(o => o.turno_id === turnoId).flatMap(o => o.payments.filter(p => p.status === 'accepted'))
-      const sum = rows => rows.reduce((total, payment) => int(total + payment.amount_cents, 'cobros del turno'), 0)
-      const cashSales = sum(accepted.filter(p => p.method === 'cash')), totalPaid = sum(accepted)
-      const opening = int(turno.opening_cash_cents ?? 0, 'opening_cash_cents')
-      const expected = int(opening + cashSales, 'expected_cash_cents')
+      const report = turnReport(turno, state.getFinancialOrders(), snapshot.salon_orders, state.getCashMovements())
+      const { opening_cash_cents: opening, cash_sales_cents: cashSales,
+        total_paid_cents: totalPaid, expected_cash_cents: expected } = report
       return { turno: null, closed_turno: { ...turno, closed_by: actor.id, closed_at: now,
         opening_cash_cents: opening, cash_sales_cents: cashSales, total_paid_cents: totalPaid,
+        deposits_cents: report.deposits_cents, withdrawals_cents: report.withdrawals_cents,
         expected_cash_cents: expected, counted_cash_cents: counted, difference_cents: counted - expected,
         notes: note(payload.notes, 'notes', 1000) } }
     }
@@ -154,17 +179,26 @@ class OperationalDomain {
     if (existing && existing.authority !== 'caja') fail('LEGACY_ORDER_REQUIRES_CUTOVER', 'Esta orden requiere migración de autoridad antes de editarla por LAN')
     if (existing && (existing.turno_id !== turnoId || ['cancelada', 'pagada', 'cerrada', 'dividida'].includes(existing.status) || existing.payment_status === 'pagada')) fail('ORDER_NOT_OPEN', 'La cuenta ya no está abierta en este turno')
     if (expected !== (existing?.order_revision ?? 0)) fail('ORDER_REVISION_CONFLICT', 'La cuenta cambió en otra terminal; recárgala antes de confirmar')
-    if (state.getFinancialOrder(orderId)) fail('FINANCIAL_ORDER_LOCKED', 'Ya hay cuentas de cobro; termina o concilia antes de modificar consumos')
+    const financial = state.getFinancialOrder(orderId)
+    if (financial) {
+      if (!['ORDER_SAVE', 'ORDER_SEND'].includes(type)) fail('FINANCIAL_ORDER_LOCKED', 'Esta operación requiere un ajuste de las cuentas de cobro')
+      if (financial.status === 'settled') fail('ORDER_NOT_OPEN', 'La cuenta ya está liquidada')
+      if (!Number.isSafeInteger(payload.expected_financial_revision) || payload.expected_financial_revision !== financial.revision) fail('FINANCIAL_REVISION_CONFLICT', 'Confirma la revisión actual de pagos conservando el borrador')
+    }
     if (existing && existing.created_by !== actor.id && !actor.permissions.includes('ver_todas_cuentas')) fail('PERMISSION_DENIED', 'No tienes permiso para modificar la cuenta de otro empleado')
     if (type !== 'ORDER_SAVE' && !existing) fail('ORDER_NOT_FOUND', 'Guarda la cuenta en Caja antes de continuar')
     let next = existing ? clone(existing) : { id: orderId, order_id: orderId, authority: 'caja', turno_id: turnoId,
       created_by: actor.id, mesero: actor.name || actor.id, created_at: now, status: 'abierta', payment_status: 'pendiente', preparation_status: null,
       comanda_batches: '{}', kitchen_items: [], kitchen_revision: 0, kds_item_status: '{}', descuento: 0, propina: 0, pagos: [], _kds_sent: false }
+    if (!existing) {
+      next.order_number = state.getNextOrderNumber(turnoId)
+      if (next.order_number > 2147483647) fail('ORDER_NUMBER_EXHAUSTED', 'Abre un nuevo turno para continuar la numeración')
+    }
     next.order_revision = int(expected + 1, 'order_revision'); next.updated_at = now
     if (type === 'ORDER_SAVE') {
       if (!catalogEnvelope?.ready || !catalogEnvelope.catalog) fail('CATALOG_NOT_READY', 'Prepara el catálogo de Caja antes de operar')
       if (payload.catalog_revision !== catalogEnvelope.revision) fail('CATALOG_REVISION_CONFLICT', 'El catálogo cambió; revisa productos y precios')
-      if (Object.keys(payload).some(k => !['command_id', 'command_type', 'order_id', 'turno_id', 'expected_revision', 'catalog_revision', 'mesa', 'customer_name', 'personas', 'notas', 'items', 'restaurant_id', 'location_id', 'client_id'].includes(k))) fail('UNTRUSTED_ORDER_FIELDS', 'Caja calcula importes y atribución; ajustes requieren su comando autorizado')
+      if (Object.keys(payload).some(k => !['command_id', 'command_type', 'order_id', 'turno_id', 'expected_revision', 'expected_financial_revision', 'account_id', 'catalog_revision', 'mesa', 'customer_name', 'personas', 'notas', 'items', 'restaurant_id', 'location_id', 'client_id'].includes(k))) fail('UNTRUSTED_ORDER_FIELDS', 'Caja calcula importes y atribución; ajustes requieren su comando autorizado')
       if (!Array.isArray(payload.items) || !payload.items.length || payload.items.length > 1000) fail('INVALID_ITEMS', 'La cuenta requiere de 1 a 1000 renglones')
       const catalog = catalogEnvelope.catalog
       const mesa = table(payload.mesa, catalog)
@@ -178,7 +212,8 @@ class OperationalDomain {
         if (seen.has(line.id)) fail('DUPLICATE_LINE_ID', 'Cada renglón requiere identidad única')
         seen.add(line.id)
         const old = oldItems.find(i => i.id === line.id)
-        if (old?.sent_quantity > 0) {
+        if (old && (old.sent_quantity > 0 || financial)) {
+          if (financial && line.cantidad < old.cantidad) fail('FINANCIAL_ADDITION_ONLY', 'Las cuentas preparadas admiten consumo adicional; reducir requiere ajuste autorizado')
           if (line.cantidad < old.sent_quantity || line.menuItemId !== old.menuItemId ||
             line.notas !== old.notas || line.silla !== old.silla || JSON.stringify(line.modifier_ids) !== JSON.stringify(old.modifier_ids)) fail('SENT_ITEM_LOCKED', 'No se pueden quitar ni cambiar productos ya enviados; requiere cancelación autorizada')
           // A sent line retains its accepted price. Further units at changed
@@ -189,11 +224,16 @@ class OperationalDomain {
         }
         return line
       })
-      if (oldItems.some(i => i.sent_quantity > 0 && !seen.has(i.id))) fail('SENT_ITEM_LOCKED', 'No se pueden retirar productos enviados de la cuenta')
+      if (oldItems.some(i => (i.sent_quantity > 0 || financial) && !seen.has(i.id))) fail('SENT_ITEM_LOCKED', 'No se pueden retirar productos enviados o asignados a una cuenta de cobro')
       const subtotal = items.reduce((sum, line) => int(sum + line.total_cents, 'subtotal'), 0)
       const ivaRate = existing?.iva_rate ?? catalog.config.iva_rate
-      const iva = int(Math.round(subtotal * ivaRate), 'iva')
-      const total = int(subtotal + iva, 'total')
+      // Preserve the accepted tax/discount on prior consumption. Only the new
+      // round is priced now, using the order's pinned tax rate. Take the rounded
+      // cumulative difference so repeated small rounds cannot lose tax cents.
+      const addedSubtotal = financial ? int(subtotal - int(existing.subtotal_cents, 'subtotal anterior'), 'consumo adicional') : subtotal
+      const addedTax = financial ? Math.round(subtotal * ivaRate) - Math.round(existing.subtotal_cents * ivaRate) : Math.round(subtotal * ivaRate)
+      const iva = financial ? int(existing.iva_cents + addedTax, 'iva') : int(addedTax, 'iva')
+      const total = financial ? int(existing.total_cents + addedSubtotal + iva - existing.iva_cents, 'total') : int(subtotal + iva, 'total')
       Object.assign(next, { mesa, customer_name: note(payload.customer_name, 'customer_name', 200), personas: int(payload.personas ?? 1, 'personas', 1, 1000),
         notas: note(payload.notas, 'notas'), items: JSON.stringify(items), catalog_revision: catalogEnvelope.revision, iva_rate: ivaRate,
         subtotal_cents: subtotal, iva_cents: iva, total_cents: total, subtotal: subtotal / 100, iva: iva / 100, total: total / 100, saldo: total / 100 })

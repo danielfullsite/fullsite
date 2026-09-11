@@ -1,5 +1,7 @@
 'use client'
 
+import ReportUnavailable from '@/components/ReportUnavailable'
+
 import { useEffect, useState, useMemo } from 'react'
 import { AlertTriangle, TrendingDown, Ban, Shield } from 'lucide-react'
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts'
@@ -11,10 +13,11 @@ import type { WansoftDaily } from '@/lib/types'
 
 export default function CancelacionesPage() {
   const [data, setData] = useState<WansoftDaily[]>([])
+  const [reportError, setReportError] = useState(false)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    getRecentDays(90).then(d => { setData(d); setLoading(false) }).catch(() => setLoading(false))
+    getRecentDays(90).then(d => { setData(d); setLoading(false) }).catch(() => { setReportError(true); setLoading(false) })
   }, [])
 
   const last30 = data.slice(-30)
@@ -51,6 +54,8 @@ export default function CancelacionesPage() {
 
   // Top days with highest discounts
   const topDays = [...last30].sort((a, b) => (b.descuentos || 0) - (a.descuentos || 0)).slice(0, 5)
+
+  if (reportError) return <ReportUnavailable />
 
   return (
     <>

@@ -17,6 +17,7 @@ La RPC `apply_pos_caja_event` escribe una proyección y su recibo dentro de **un
 | `pos_turnos` | Turno abierto y cierre contado, sucursal explícita y snapshot completo. Los importes de cierre provienen de `closed_turno`. |
 | `pos_orders` | Consumo completo, importes en centavos convertidos a pesos, revisión operativa y cocina por producto/ronda. Snapshots operacional y financiero conservados separados. |
 | `pos_order_accounts` | Todas las cuentas del split desde que se define, con identidad explícita y snapshot. |
+| `pos_cash_movements` | Retiros y depósitos durables de Caja, identidad de movimiento y autorización de empleado verificadas; replay no duplica el ledger. |
 | `pos_payment_attempts` | Intentos pendientes, desconocidos, aceptados y rechazados; evidencia y cambio en el snapshot. Sólo aceptados suman al pago. |
 | `pos_caja_streams` | Sucursal, stream, Caja, credencial hasheada, punto inicial y progreso de la secuencia. |
 | `pos_caja_business_receipts` | Evento inmutable, hashes de historial, transacción y recibo de proyección. |
@@ -27,7 +28,7 @@ La migración nueva depende de `PENDIENTE_20260904000000_cuentas_divididas_model
 
 ## Una sola autoridad de escritura
 
-El fence de base de datos protege órdenes, turnos, cuentas, intentos, cierres y movimientos de caja. Rechaza escrituras legacy, incluso a través de APIs con service role. Sólo permite las escrituras de una RPC que ya registró su recibo **en la transacción actual**, con la misma sucursal y stream. Un marcador de sesión inventado o un recibo de una transacción anterior no basta. Cambiar o vaciar `location_id` tampoco permite escapar de la protección. Retiros y depósitos siguen bloqueados en modo Caja hasta que tengan comando de dominio y proyección; no se habilitan por haber agregado el fence.
+El fence de base de datos protege órdenes, turnos, cuentas, intentos, cierres y movimientos de caja. Rechaza escrituras legacy, incluso a través de APIs con service role. Sólo permite las escrituras de una RPC que ya registró su recibo **en la transacción actual**, con la misma sucursal y stream. Un marcador de sesión inventado o un recibo de una transacción anterior no basta. Cambiar o vaciar `location_id` tampoco permite escapar de la protección. Retiros y depósitos usan `CASH_MOVEMENT`, con permiso `retiros_programados`, importe positivo en centavos, motivo, turno abierto e identidad durable. El efectivo esperado incluye depósitos menos retiros; no se permite retirar más del efectivo esperado.
 
 `writer_authority` mantiene el fence; `active` controla la credencial de sincronización. Son independientes: **revocar sincronización no vuelve a habilitar un escritor legacy**. Sólo hay un stream con autoridad por restaurante y sucursal. Las tablas de control no tienen lectura o escritura pública, y la RPC valida una credencial dedicada de Caja de al menos 32 caracteres aleatorios. No acepta PIN, shiftToken de empleado ni secreto LAN como credencial de nube.
 
@@ -53,18 +54,43 @@ Antes de activar una instalación se necesita:
 4. Activar fence y credencial en una transacción controlada, instalar config `localAuthorityEnabled:true` y `business_sync` en Caja, y reiniciar todas las terminales con el mismo candidato. No hay adopción automática de órdenes legacy: requieren una migración explícita antes de continuar.
 5. Verificar una operación completa en las tablas y su recibo, cortar WAN, operar, reconectar y comparar Caja/nube. Para rollback, detener escritores, drenar o conciliar todo lo pendiente y cambiar la autoridad mediante otro corte coordinado. Cambiar sólo un flag no es un rollback seguro.
 
-`business_sync` contiene `stream_id`, `credential`, `baseline_sequence` y `baseline_history_hash`. La sucursal y el restaurante se toman de la instalación; la URL Supabase y anon key públicas se reutilizan de su configuración existente. Ninguna de estas filas se crea automáticamente al iniciar el POS.
+`business_sync` contiene `stream_id`, `credential`, `baseline_sequence` y `baseline_history_hash`. La sucursal y el restaurante se toman de la instalación. El worker usa HTTPS a `/api/pos/caja/materialize` de app.fullsite.mx (override administrativo `materialize_url`). Esa ruta invoca únicamente `apply_pos_caja_event` con la service key del servidor; la RPC valida la credencial exclusiva del stream antes de cualquier efecto. La terminal no recibe service key y no invoca la RPC con anon. El límite HTTP permite el presupuesto SQL de 4 MiB más el sobre de transporte. Ninguna de estas filas se crea automáticamente al iniciar el POS.
 
 ## Verificación reproducible
 
-`node electron-app/lab/run-materializador-local.cjs` crea su propio clúster PostgreSQL en loopback con puerto libre, usa las definiciones `pos_orders`, `pos_turnos` y `pos_cash_movements` del baseline, aplica ambas migraciones pendientes y lo elimina al terminar. Requiere PostgreSQL disponible mediante `pg_config`, o `FULLSITE_TEST_PG_BIN` con su carpeta de binarios. No acepta una URL remota ni modifica servidores existentes.
+`node electron-app/lab/run-materializador-local.cjs` crea su propio clúster PostgreSQL en loopback con puerto libre, usa las definiciones `pos_orders`, `pos_turnos` y `pos_cash_movements` del baseline, carga el trigger e índice de día de venta y aplica las migraciones pendientes de cuentas, materialización y folio Caja por turno y lo elimina al terminar. Requiere PostgreSQL disponible mediante `pg_config`, o `FULLSITE_TEST_PG_BIN` con su carpeta de binarios. No acepta una URL remota ni modifica servidores existentes.
 
-El laboratorio genera eventos mediante **CommandHandler y NDJSON reales**. Ejecuta la función SQL real bajo rol anon; simula pérdida de la respuesta después de un commit PostgreSQL confirmado. Verifica orden de eventos, credencial, retry, historial alterado, restauración, fence, sucursales, rollback transaccional, reserva desconocida, pago total sin retirar cocina y cierre contado después de entrega. Las pruebas de worker ejercitan HTTP loopback, rechazo de recibo falso, coalescencia y diagnóstico autenticado.
+El laboratorio genera eventos mediante **CommandHandler y NDJSON reales**. Ejecuta la función SQL real bajo rol service_role, igual que la ruta fija del servidor; simula pérdida de la respuesta después de un commit PostgreSQL confirmado. Verifica orden de eventos, credencial, retry, historial alterado, restauración, fence, sucursales, rollback transaccional, reserva desconocida, pago total sin retirar cocina y cierre contado después de entrega. Las pruebas de worker ejercitan HTTP loopback, rechazo de recibo falso, coalescencia y diagnóstico autenticado.
 
-Evidencia local: 11 recorridos PostgreSQL y 15 pruebas de worker más outbox shadow. Resultados y logs en `output/closure/materializer`. Esto no certifica el transporte PostgREST desplegado, migración en AMALAY ni aceptación del hardware.
+Evidencia local actualizada: 17 recorridos PostgreSQL (incluye retiro, depósito, replay, Z neto, reinicio de folio en el mismo día y recibos antiguos sin ordinal canónico) y 15 pruebas de worker más outbox shadow. Resultados y logs en `output/closure/materializer`. Esto no certifica el transporte PostgREST desplegado, migración en AMALAY ni aceptación del hardware.
 
 ## Lo que este recibo no cierra
 
-El materializador cubre órdenes, cuentas, intentos y turnos. **No confirma consumo de inventario**, receta ni food cost. Los contadores de conciliación de inventario no se adelantan. Hace falta conectar el módulo canónico de inventario mediante su propia evidencia sin permitir que vuelva a escribir órdenes por una ruta legacy fuera del fence.
+El materializador cubre órdenes, cuentas, intentos, turnos y movimientos de efectivo. **No confirma consumo de inventario**, receta ni food cost. Los contadores de conciliación de inventario no se adelantan. Hace falta conectar el módulo canónico de inventario mediante su propia evidencia sin permitir que vuelva a escribir órdenes por una ruta legacy fuera del fence.
 
 Los reportes que filtran únicamente `status=cerrada` deben adaptarse a `payment_status=pagada` y al modelo de cuentas: cambiar preparación para satisfacer ese filtro rompería la decisión de producto. Propinas, descuentos, reembolsos, promociones y resultados de terminal bancaria requieren sus resultados de dominio completos; no se inventan desde totales legacy. Tampoco se publica una página ni se activa ninguna instalación al aplicar este cambio de código.
+
+### Auditoría de papel (candidato H05, 10 de septiembre)
+
+`ORDER_PRECHECK_PRINT`, `PAYMENT_RECEIPT_PRINT` y `PRINT_UNCERTAIN_RESOLVE`
+avanzan el recibo del flujo con `materialized:false`: no actualizan órdenes,
+cuentas, pagos ni cierres. El materializador valida sucursal, orden, revisiones,
+importes y cantidades canónicas; un recibo de pago exige un intento aceptado.
+Las copias referencian el documento original del mismo flujo y conservan su
+contenido histórico. Una resolución referencia un trabajo publicado por un
+documento o por `ORDER_SEND`, y cada episodio admite una sola decisión; el
+reintento exacto sigue devolviendo el recibo original.
+
+Los bytes y destinos quedan en los efectos durables locales. La nube conserva
+el documento y la decisión declarada del operador; no certifica salida física
+de papel ni consulta la cola local para verificar el episodio incierto.
+
+`PAYMENT_DRAWER_OPEN`, `DRAWER_OPEN` y `DRAWER_UNCERTAIN_RESOLVE` también se
+registran como auditoría con `materialized:false`. La apertura exige turno
+vigente en la misma sucursal; la vinculada a pago exige efectivo aceptado y una
+sola apertura original por pago. La apertura manual conserva motivo y actor.
+Las resoluciones sólo admiten trabajos procedentes de una apertura de cajón del
+mismo flujo y una decisión por episodio. Una resolución de impresión no puede
+resolver un pulso de cajón. Ninguno de estos eventos modifica dinero ni prueba
+la posición física del cajón; los pulsos se ejecutan exclusivamente en la cola
+local durable, sobre su destino explícito capturado.

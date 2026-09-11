@@ -1,0 +1,55 @@
+{
+  "date": "2026-09-10",
+  "pr": "https://github.com/danielfullsite/fullsite/pull/392",
+  "candidate_commit": "c275ce1738c5b1f7c1455bae9c3a59bb25d9938c",
+  "build_run": "https://github.com/danielfullsite/fullsite/actions/runs/34448151518",
+  "installer_sha256": "eb81b06f44c7bbf0bd951787fe3cbfecc6b7902fb319ba4009241a3ceb5fd3b0",
+  "automated": {
+    "web": {
+      "passed": 3569,
+      "failed": 0,
+      "excluded": [
+        "analyst-planner-live.test.ts"
+      ]
+    },
+    "dom": {
+      "passed": 230,
+      "failed": 0
+    },
+    "pedro_macos": {
+      "passed": 535,
+      "failed": 0
+    },
+    "pedro_windows": {
+      "passed": 535,
+      "failed": 0
+    },
+    "typescript_errors": 0,
+    "new_eslint_diagnostics_vs_base": 0,
+    "packaged_commit_verified": true,
+    "cold_boot_macos": {
+      "passed": 5,
+      "failed": 0,
+      "package_source_commit": "9ae4320f",
+      "runtime": "macOS Electron; ui-bundle extracted from Windows portable"
+    }
+  },
+  "ui": {
+    "state": "passed",
+    "run": "https://github.com/danielfullsite/fullsite/actions/runs/34449964970",
+    "passed": 21,
+    "failed": 0,
+    "validated_commit": "fe444cb5dab158c5f7aeb2bb66e221bbcc934f99",
+    "cloud": "synthetic isolated HTTP; online transfer requires HTTP 200"
+  },
+  "field_certified": false,
+  "installed_in_amalay": false,
+  "automatic_release_published": false,
+  "limitations": [
+    "Hardware verification absent",
+    "Proprietary fingerprint kit absent from package",
+    "Cloud fixtures synthetic; no production database exercised",
+    "Individual item transfer, cancellation and merge lack full UI concurrency acceptance",
+    "This report does not close all H01-H16 platform functions"
+  ]
+}

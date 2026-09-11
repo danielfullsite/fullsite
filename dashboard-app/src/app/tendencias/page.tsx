@@ -1,5 +1,7 @@
 'use client'
 
+import ReportUnavailable from '@/components/ReportUnavailable'
+
 import { useEffect, useState, useMemo } from 'react'
 import {
   ResponsiveContainer,
@@ -30,6 +32,7 @@ type TPPeriod = 'dia' | 'semana' | 'mes'
 
 export default function TendenciasPage() {
   const [allData, setAllData] = useState<WansoftDaily[]>([])
+  const [reportError, setReportError] = useState(false)
   const [loading, setLoading] = useState(true)
   const [tpPeriod, setTpPeriod] = useState<TPPeriod>('mes')
   const [dowSelected, setDowSelected] = useState(5) // viernes por default (pedido de Mónica)
@@ -44,6 +47,7 @@ export default function TendenciasPage() {
         }
         setAllData(data)
       } catch (err) {
+        setReportError(true)
         console.error('Error loading trends data:', err)
       } finally {
         setLoading(false)
@@ -337,6 +341,8 @@ export default function TendenciasPage() {
 
     return { chartData, tableData, currentYear, prevYear }
   }, [monthlyAgg])
+
+  if (reportError) return <ReportUnavailable />
 
   if (loading) {
     return (

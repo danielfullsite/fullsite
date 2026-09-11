@@ -69,6 +69,17 @@ jobs:
           fi
           echo "Configuracion publica presente."
 
+      # PRESENTE NO ES CORRECTA. El 2026-09-10 las dos variables existian y cuatro builds
+      # salieron en verde con la llave anon de STAGING y la URL de PRODUCCION: un paquete
+      # que responde 401 a toda consulta directa. La llave es un JWT publico con el `ref`
+      # del proyecto; se compara con el host de la URL y se exige `role: anon`.
+      # `scripts/configuracion-publica.cjs` (probado en local-server/tests).
+      - name: La URL y la llave anon deben ser del mismo proyecto
+        run: node scripts/configuracion-publica.cjs
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+
       # Browser configuration only. No service role, PIN, LAN or branch config
       # belongs in this build. Missing values fail the build before packaging.
       - name: Build complete offline POS UI
@@ -105,8 +116,25 @@ jobs:
         shell: bash
         run: node --test local-server/tests/*.test.js
 
+      - name: Sellar el commit del candidato
+        run: npm run sellar
+
       - name: Build Windows installer
         run: npx electron-builder --win --x64 --publish never
+
+      - name: Verificar identidad dentro del ejecutable
+        shell: bash
+        run: |
+          node - <<'JS'
+          const assert = require('node:assert/strict')
+          const asar = require('@electron/asar')
+          const archive = 'dist/win-unpacked/resources/app.asar'
+          const info = JSON.parse(asar.extractFile(archive, 'build-info.json'))
+          assert.equal(info.sha, process.env.GITHUB_SHA)
+          assert.equal(info.limpio, true)
+          assert.equal(info.version, require('./package.json').version)
+          console.log(`Paquete identificado: ${info.version} · ${info.sha}`)
+          JS
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4

@@ -18,7 +18,7 @@ export function centavosDeTexto(text: string): number {
   if (!Number.isSafeInteger(value) || value < 0) throw new Error('Importe fuera de rango.')
   return value
 }
-function finanzas(value: unknown, orderId: string): FinanzasDeCaja {
+export function validarFinanzasCaja(value: unknown, orderId: string): FinanzasDeCaja {
   const f = value as FinanzasDeCaja | undefined
   if (!f || f.order_id !== orderId || f.currency !== 'MXN' || !Number.isSafeInteger(f.revision) ||
       !Number.isSafeInteger(f.balance_cents) || f.balance_cents < 0 || !Array.isArray(f.accounts) || !Array.isArray(f.payments)) {
@@ -26,18 +26,24 @@ function finanzas(value: unknown, orderId: string): FinanzasDeCaja {
   }
   return f
 }
-export async function leerFinanzasCaja(orderId: string): Promise<FinanzasDeCaja | null> {
+export interface OrdenParaCobroCaja { id: string; turno_id: string; order_revision: number; total_cents: number; items?: unknown }
+export async function leerEstadoCobroCaja(orderId: string): Promise<{ financial: FinanzasDeCaja | null; order: OrdenParaCobroCaja | null }> {
   const response = await localNetworkFetch(`${getBridgeUrl()}/state`, { cache: 'no-store', signal: AbortSignal.timeout(2000) })
   const state = await response.json()
   if (!response.ok || state.authoritative !== true || state.write_authority !== 'caja' || !Array.isArray(state.financial_orders)) {
     throw new ErrorDeCaja('Sin conexión confirmada con Caja. Los cobros están bloqueados.', 'CAJA_UNAVAILABLE')
   }
   const current = state.financial_orders.find((o: FinanzasDeCaja) => o.order_id === orderId)
-  return current ? finanzas(current, orderId) : null
+  const order = Array.isArray(state.salon_orders) ? state.salon_orders.find((row: { id?: string; order_id?: string }) => (row.order_id ?? row.id) === orderId) : null
+  const confirmed = order && typeof order.turno_id === 'string' && Number.isSafeInteger(order.order_revision) && Number.isSafeInteger(order.total_cents)
+  return { financial: current ? validarFinanzasCaja(current, orderId) : null, order: confirmed ? { ...order, id: orderId } : null }
+}
+export async function leerFinanzasCaja(orderId: string): Promise<FinanzasDeCaja | null> {
+  return (await leerEstadoCobroCaja(orderId)).financial
 }
 async function change(key: string, type: string, fields: Record<string, unknown> & { order_id: string }): Promise<FinanzasDeCaja> {
   const receipt = await ejecutarComandoCaja(key, type, fields)
-  return finanzas(receipt.result.financial_order, fields.order_id)
+  return validarFinanzasCaja(receipt.result.financial_order, fields.order_id)
 }
 /** UX preflight only; Caja checks the same prerequisite with its saved order
  * inside the durable transaction. Sending and preparing remain separate. */

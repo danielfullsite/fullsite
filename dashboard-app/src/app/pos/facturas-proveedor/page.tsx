@@ -1,6 +1,9 @@
 'use client'
 
+import PendingMovementRecovery from '@/components/inventory/PendingMovementRecovery'
+
 import { useState, useEffect } from 'react'
+import { useClaveDeOperacion } from '@/lib/clave-de-operacion'
 import { FileText, Upload, Check, ArrowLeft, AlertTriangle, DollarSign } from 'lucide-react'
 import { getIngredients } from '@/lib/pos-data'
 import { formatCurrency } from '@/lib/format'
@@ -33,6 +36,7 @@ const VARIANCE_THRESHOLD = 10 // Alert if price varies >10%
 
 
 export default function FacturasProveedorPage() {
+  const { clave: claveDeOperacion, confirmar: confirmarOperacion } = useClaveDeOperacion()
   const [ingredients, setIngredients] = useState<Ingredient[]>([])
   const [items, setItems] = useState<FacturaItem[]>([])
   const [proveedor, setProveedor] = useState('')
@@ -96,7 +100,7 @@ export default function FacturasProveedorPage() {
         method: 'POST',
         headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
         body: JSON.stringify({
-          id: `FACT-${Date.now()}`,
+          id: `FACT-${claveDeOperacion}`,
           client_id: _cid(),
           supplier: proveedor,
           folio: numFactura || null,
@@ -113,12 +117,12 @@ export default function FacturasProveedorPage() {
       // 'invoice_entry' recalcula el COSTO PROMEDIO PONDERADO (con unit_cost = precio de la
       // factura), fija el stock atómico e inserta el ledger inmutable + idempotencia. Antes:
       // PATCH directo a cost_per_unit (pisaba con el último precio) + insert/PATCH manual — prohibido.
-      const { recordMovement } = await import('@/lib/inventory')
+      const { recordMovement, confirmarMovimientoInventario } = await import('@/lib/inventory')
       const invResult = await recordMovement({
         client_id: _cid(),
         movement_type: 'invoice_entry',
         actor: 'almacén',
-        idempotency_key: `factura-${numFactura || today}-${proveedor}`,
+        idempotency_key: `factura-manual-${claveDeOperacion}`,
         lines: items.map(item => ({
           ingredient_id: item.ingredient_id,
           quantity: Math.abs(item.quantity),   // entra stock
@@ -133,6 +137,8 @@ export default function FacturasProveedorPage() {
         return
       }
 
+      await confirmarMovimientoInventario(_cid(), `factura-manual-${claveDeOperacion}`)
+      confirmarOperacion()
       setSaved(true)
       setItems([])
       setNumFactura('')
@@ -148,6 +154,7 @@ export default function FacturasProveedorPage() {
 
   return (
     <div className="h-dvh overflow-y-auto pos-fat-scroll max-w-4xl mx-auto">
+      <PendingMovementRecovery />
       <div className="flex items-center gap-3 mb-6">
         <Link href="/pos" className="p-2 rounded-lg hover:bg-[var(--surface-2)] text-[var(--text-3)]"><ArrowLeft size={16} /></Link>
         <div>

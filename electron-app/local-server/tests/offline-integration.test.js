@@ -77,6 +77,28 @@ describe('Integración offline — flujo completo de servicio', () => {
   beforeEach(() => { dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fs-offline-')) })
   afterEach(() => { try { fs.rmSync(dir, { recursive: true, force: true }) } catch {} })
 
+  test('transfer receipt commits once without printing and cannot enter Caja authority or locked financial accounts', async () => {
+    const s = await buildStack(dir)
+    await send(s.cmd, { command_type: 'ORDER_SENT', command_id: 'initial', order_id: 'src', mesa: 1,
+      items: [{ id: 'coffee' }], total: 58, order_revision: 1 })
+    const transfer = { command_type: 'ORDER_ITEMS_TRANSFERRED', command_id: 'transfer', order_id: 'src', item_id: 'coffee',
+      source_order: { id: 'src', mesa: 1, items: [], total: 0, status: 'enviada', order_revision: 2 },
+      target_order: { id: 'dst', mesa: 2, items: [{ id: 'coffee' }], total: 58, status: 'enviada', order_revision: 1 } }
+    await send(s.cmd, transfer)
+    assert.equal((await send(s.cmd, transfer)).duplicate, true)
+    assert.equal(s.broadcasts.filter(e => e.type === 'ORDER_ITEMS_TRANSFERRED').length, 1)
+    assert.equal(s.prints.length, 0)
+    const restarted = await buildStack(dir)
+    assert.deepEqual(restarted.state.getKdsQueue().map(q => q.order_id), ['dst'])
+    const caja = new CommandHandler({ eventStore: s.eventStore, state: s.state, wsHub: { broadcast: async () => {} },
+      restaurantId: R, localAuthorityEnabled: true })
+    assert.equal((await send(caja, { ...transfer, command_id: 'blocked' })).code, 'AUTHORITATIVE_COMMAND_REQUIRED')
+    s.state._financialOrders.set('dst', { order_id: 'dst' })
+    assert.equal((await send(s.cmd, { ...transfer, command_id: 'locked' })).code, 'FINANCIAL_ORDER_LOCKED')
+    s.state._financialOrders.clear()
+    assert.equal((await send(s.cmd, { ...transfer, command_id: 'malformed', target_order: { ...transfer.target_order, items: [] } })).code, 'INVALID_TRANSFER_RECEIPT')
+  })
+
   test('boot → turno → orden → KDS → cobro → cierre (todo offline, persistido)', async () => {
     const s = await buildStack(dir)
 

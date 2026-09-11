@@ -312,6 +312,11 @@
         <div class="empty-sub">La terminal operará, pero los tickets no se imprimirán.</div>
       </div>
       <div id="pfList" class="printer-list"></div>
+      <div style="margin-top:14px">
+        <label for="pfDrawerPrinter">Impresora conectada al cajón</label>
+        <select id="pfDrawerPrinter" onchange="state.drawerPrinterId = this.value"></select>
+        <p style="font-size:12px;margin-top:6px">Selecciona una sola impresora de Caja. La apertura envía un pulso, independientemente de las copias de los tickets. Guardar esta selección no abre el cajón.</p>
+      </div>
 
       <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn-sm" onclick="pfStartAdd()">+ Agregar impresora</button>
@@ -476,6 +481,7 @@ const state = {
   serverInfo:     null,
   // CFG-01: printer config
   printers:       [],
+  drawerPrinterId: '',
   printersLoaded: false,
 }
 
@@ -729,6 +735,7 @@ async function setupStep5() {
         const result = await window.setupBridge.loadPrinters()
         if (result.state === 'configured' && Array.isArray(result.config?.printers)) {
           state.printers = result.config.printers
+          state.drawerPrinterId = result.config.drawer_printer_id || ''
           if (result.migrated) {
             showAlert('printerMigrateAlert', 'migrate',
               'Se encontró configuración de impresoras anterior y fue migrada al nuevo formato v2. Revisa la lista y guarda.')
@@ -768,6 +775,13 @@ function pfRenderList() {
   const list   = document.getElementById('pfList')
   const empty  = document.getElementById('pfEmpty')
   const ps     = state.printers
+  const drawerOptions = ps.filter(p => p.enabled && p.station_ids?.includes('caja'))
+  const drawer = document.getElementById('pfDrawerPrinter')
+  drawer.innerHTML = '<option value="">Sin cajón configurado</option>' +
+    drawerOptions.map(p => `<option value="${esc(p.printer_id)}">${esc(p.name)}</option>`).join('') +
+    (state.drawerPrinterId && !drawerOptions.some(p => p.printer_id === state.drawerPrinterId)
+      ? `<option value="${esc(state.drawerPrinterId)}">Revisa la impresora asignada: ${esc(state.drawerPrinterId)}</option>` : '')
+  drawer.value = state.drawerPrinterId
 
   if (ps.length === 0) {
     empty.style.display = ''
@@ -1083,6 +1097,7 @@ async function pfImport() {
       return
     }
     state.printers = result.config.printers || []
+    state.drawerPrinterId = result.config.drawer_printer_id || ''
     if (result.migrated) {
       showAlert('printerMigrateAlert', 'migrate', 'Respaldo importado y migrado de v1 a v2. Revisa las impresoras antes de continuar.')
     } else {
@@ -1099,12 +1114,6 @@ async function pfImport() {
 async function pfProceed() {
   clearAlert('pfProceedAlert')
 
-  if (state.printers.length === 0) {
-    // PRINTER_NOT_CONFIGURED is valid — proceed with a warning in the final summary
-    goTo(6)
-    return
-  }
-
   const nav = document.getElementById('pfStepNav')
   const btn = nav.querySelector('.btn-primary')
   btn.disabled = true; btn.textContent = 'Guardando...'
@@ -1115,7 +1124,8 @@ async function pfProceed() {
       goTo(6)
       return
     }
-    const config = { schema_version: 2, printers: state.printers, routing: {} }
+    const config = { schema_version: 2, printers: state.printers, routing: {},
+      ...(state.drawerPrinterId ? { drawer_printer_id: state.drawerPrinterId } : {}) }
     const result = await window.setupBridge.savePrinters(config)
     if (result.ok) {
       goTo(6)

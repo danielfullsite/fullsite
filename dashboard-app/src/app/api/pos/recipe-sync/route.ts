@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server'
+import { agregarPorIngrediente } from '@/lib/recipe-sync-unidades'
 import { withPOSAuth, unauthorized, checkPosRole, POS_ROLE_LVL } from '@/lib/api-auth'
 
 /**
@@ -118,13 +119,20 @@ export async function POST(request: NextRequest) {
     }
 
     // ── 3. Agregar por ingrediente (respeta UNIQUE(recipe_version_id,ingredient_id)) ─
-    const agg = new Map<string, { quantity: number; unit: string | null }>()
-    for (const r of oldRows) {
-      const q = Number(r.quantity) || 0
-      const prev = agg.get(r.ingredient_id)
-      if (prev) prev.quantity += q
-      else agg.set(r.ingredient_id, { quantity: q, unit: r.unit })
+    // Dos filas del mismo insumo con UNIDADES distintas (100 g + 1 kg) se sumaban
+    // como 101 g (barrido 2026-09-10, inventario LENTE-6). Se convierten a la
+    // unidad de la primera fila con la tabla del tenant + las metricas de cajon;
+    // si no hay conversion, se rechaza en vez de proyectar una receta falsa.
+    let convRows: { from_unit: string; to_unit: string; factor: number }[] = []
+    try {
+      const convRes = await fetch(`${sbUrl}/rest/v1/pos_unit_conversions?client_id=eq.${cid}&select=from_unit,to_unit,factor`, { headers: H, cache: 'no-store' })
+      if (convRes.ok) convRows = await convRes.json()
+    } catch { /* sin tabla del tenant: solo las metricas de cajon */ }
+    const agregado = agregarPorIngrediente(oldRows.map(r => ({ ingredient_id: r.ingredient_id, quantity: Number(r.quantity) || 0, unit: r.unit })), convRows)
+    if (!agregado.ok) {
+      return Response.json({ ok: false, error: `MIXED_UNITS: ${agregado.detalle}` } satisfies SyncResult, { status: 409 })
     }
+    const agg = agregado.porIngrediente
 
     // ── 4. Versiones existentes + gate legacy ──────────────────────────────────
     const verRes = await fetch(
