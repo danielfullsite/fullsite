@@ -39,10 +39,10 @@ try {
     if (start < 0 || end < 0) throw new Error('Missing function: ' + name)
     schema += baseline.slice(start,end) + '\n'
   }
-  schema += fs.readFileSync(path.join(ROOT, 'supabase/migrations/PENDIENTE_20260910010000_transfer_item_atomico.sql'), 'utf8')
-  schema += fs.readFileSync(path.join(ROOT, 'supabase/migrations/PENDIENTE_20260910060000_inventory_cancelled_reconcile.sql'), 'utf8')
+  schema += fs.readFileSync(path.join(ROOT, 'supabase/migrations/20260910010000_transfer_item_atomico.sql'), 'utf8')
+  schema += fs.readFileSync(path.join(ROOT, 'supabase/migrations/20260910060000_inventory_cancelled_reconcile.sql'), 'utf8')
   schema += fs.readFileSync(path.join(ROOT, 'supabase/migrations/20260826_r1_save_order_ambigua.sql'), 'utf8')
-  schema += fs.readFileSync(path.join(ROOT, 'supabase/migrations/PENDIENTE_20260910070000_merge_y_cobro_conservan_consumo.sql'), 'utf8')
+  schema += fs.readFileSync(path.join(ROOT, 'supabase/migrations/20260910070000_merge_y_cobro_conservan_consumo.sql'), 'utf8')
   fs.writeFileSync(path.join(output, 'schema-run.log'), run(path.join(bin, 'psql'), ['-X', '-h', base, '-U', 'postgres', '-p', '5432', '-d', 'postgres', '-v', 'ON_ERROR_STOP=1'], { input: schema }))
   const result = spawnSync(process.execPath, [path.join(__dirname, 'laboratorio-inventory-reconcile-postgres.cjs'), base], {
     cwd: ROOT, encoding: 'utf8', env: { ...process.env, FULLSITE_TEST_PSQL: path.join(bin, 'psql') },

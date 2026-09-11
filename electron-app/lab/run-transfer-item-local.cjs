@@ -35,7 +35,7 @@ async function main() {
     schema += baseline.slice(start, end + 3) + `\nalter table public.${table} add primary key(id);\n`
   }
   schema += 'alter table pos_reconciliation_results add unique(client_id,order_id,order_item_id);\n'
-  schema += fs.readFileSync(path.join(ROOT, 'supabase/migrations/PENDIENTE_20260910010000_transfer_item_atomico.sql'), 'utf8')
+  schema += fs.readFileSync(path.join(ROOT, 'supabase/migrations/20260910010000_transfer_item_atomico.sql'), 'utf8')
   schema += fs.readFileSync(path.join(ROOT, 'supabase/migrations/PENDIENTE_20260910040000_una_cuenta_activa_por_mesa.sql'), 'utf8')
   fs.writeFileSync(path.join(output, 'schema-run.log'), run(path.join(bin, 'psql'), ['-X', '-h', '127.0.0.1', '-p', port, '-U', 'postgres', '-d', 'postgres', '-v', 'ON_ERROR_STOP=1'], { input: schema }))
   const result = spawnSync(process.execPath, [path.join(__dirname, 'laboratorio-transfer-item-postgres.cjs'), port], {
