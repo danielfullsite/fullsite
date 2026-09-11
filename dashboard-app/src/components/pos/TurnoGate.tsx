@@ -78,8 +78,9 @@ export default function TurnoGate({ staff, children }: TurnoGateProps) {
       if (requiereCaja()) {
         const local = await leerSalon()
         if (local.writeAuthority === 'caja') {
-          setVeredicto(evaluarAperturaDeTurno({ determinado: true, cuentas: local.ordenes as unknown as Extract<LecturaDeCuentas, { determinado: true }>['cuentas'] }))
-          return
+          const v = evaluarAperturaDeTurno({ determinado: true, cuentas: local.ordenes as unknown as Extract<LecturaDeCuentas, { determinado: true }>['cuentas'] })
+          setVeredicto(v)
+          return v
         }
       }
       const res = await fetchWithTimeout(
@@ -93,7 +94,9 @@ export default function TurnoGate({ staff, children }: TurnoGateProps) {
     } catch {
       lectura = { determinado: false, motivo: 'sin conexion' }
     }
-    setVeredicto(evaluarAperturaDeTurno(lectura))
+    const v = evaluarAperturaDeTurno(lectura)
+    setVeredicto(v)
+    return v
   }, [])
 
   /** "Hay que matarlas todas" — cancelacion auditada, NUNCA un DELETE. */
@@ -414,6 +417,15 @@ export default function TurnoGate({ staff, children }: TurnoGateProps) {
       const fondo = parseFloat(fondoInicial)
       if (isNaN(fondo) || fondo < 0) {
         setError('Ingresa el fondo de caja')
+        return
+      }
+      // La regla de Eduardo se revisa TAMBIEN al confirmar, no solo al pintar la
+      // pantalla: si la consulta de cuentas huerfanas aun no habia contestado (o se
+      // hizo antes de que otra terminal dejara una cuenta abierta), el formulario
+      // dejaba abrir el turno por encima de ellas (barrido 2026-09-10, caja LENTE-6).
+      const vigente = await revisarCuentasHuerfanas()
+      if (vigente && !vigente.permitido) {
+        setError(`Hay ${vigente.bloqueantes.length} cuenta(s) abierta(s) del turno anterior. Ciérralas antes de abrir el turno.`)
         return
       }
       setOpening(true)
