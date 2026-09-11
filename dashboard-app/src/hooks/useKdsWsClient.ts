@@ -58,14 +58,19 @@ function saveCachedOrders(orders: KitchenOrderFromDB[]) {
 // Converts a raw server payload (from SNAPSHOT kds_orders or DELTA payload)
 // into the KitchenOrderFromDB shape expected by the KDS page.
 
-function normalizeOrder(raw: Record<string, unknown>, existing?: KitchenOrderFromDB): KitchenOrderFromDB {
+export function normalizeOrder(raw: Record<string, unknown>, existing?: KitchenOrderFromDB): KitchenOrderFromDB {
   const id = ((raw.id || raw.order_id) as string) ?? ''
   return {
     id,
     mesa:            (raw.mesa as number)  ?? existing?.mesa ?? 0,
     mesero:          (raw.mesero as string) ?? existing?.mesero ?? '',
     status:          (raw.status as string) ?? existing?.status ?? 'enviada',
-    items:           typeof raw.items === 'string'   ? raw.items   : (existing?.items ?? '[]'),
+    // El DELTA ORDER_SENT del POS trae `items` como ARREGLO (el SNAPSHOT como
+    // string). Solo se aceptaba el string: la primera comanda de una orden nueva
+    // llegaba con items '[]' y el filtro del KDS no la pintaba ni sonaba hasta
+    // reconectar (barrido 2026-09-10, kds LENTE-3).
+    items:           raw.items == null ? (existing?.items ?? '[]')
+                       : (typeof raw.items === 'string' ? raw.items : JSON.stringify(raw.items)),
     kds_item_status: raw.kds_item_status !== undefined
                        ? (typeof raw.kds_item_status === 'string' ? raw.kds_item_status : JSON.stringify(raw.kds_item_status))
                        : (existing?.kds_item_status ?? null),
