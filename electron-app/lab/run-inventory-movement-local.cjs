@@ -30,7 +30,7 @@ try {
   }
   for (const table of ['pos_inventory','pos_inventory_movements']) schema += `create sequence ${table}_id_seq; alter table ${table} alter column id set default nextval('${table}_id_seq');\n`
   schema += 'alter table pos_inventory add unique(client_id,ingredient_id);\n'
-  schema += fs.readFileSync(path.join(ROOT, 'supabase/migrations/PENDIENTE_20260910050000_inventory_movement_atomic.sql'), 'utf8')
+  schema += fs.readFileSync(path.join(ROOT, 'supabase/migrations/20260910050000_inventory_movement_atomic.sql'), 'utf8')
   fs.writeFileSync(path.join(output, 'schema-run.log'), run(path.join(bin, 'psql'), ['-X', '-h', base, '-U', 'postgres', '-p', '5432', '-d', 'postgres', '-v', 'ON_ERROR_STOP=1'], { input: schema }))
   const result = spawnSync(process.execPath, [path.join(__dirname, 'laboratorio-inventory-movement-postgres.cjs'), base], {
     cwd: ROOT, encoding: 'utf8', env: { ...process.env, FULLSITE_TEST_PSQL: path.join(bin, 'psql') },

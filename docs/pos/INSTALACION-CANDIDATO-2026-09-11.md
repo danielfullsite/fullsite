@@ -57,10 +57,11 @@ Daniel presente** y sobre el mismo commit del instalador.
 
 ## 4. Migraciones PENDIENTE (inventario) — despliegue coordinado
 
-Archivos: `PENDIENTE_20260910010000`, `050000`, `060000`, `070000`. Se aplican
-**juntas y en ese orden**, en staging primero, con el laboratorio PostgreSQL
-como referencia (13/13 y 8/8). Sin ellas, la UI de esta rama devuelve 503 en
-movimientos de inventario y transferencias (documentado en BARRIDO §Inventario).
+**Aplicadas el 2026-09-11** en staging y en producción (autorizado por Daniel),
+en orden 010000 → 050000 → 060000 → 070000 (esta última en tres partes), con
+humo sintético OK en ambos entornos (tenant `smoke-inv`, sin residuos). Por eso
+ya no llevan el prefijo `PENDIENTE_`. Las otras siete `PENDIENTE_` siguen sin
+aplicar.
 Rollback de migraciones: son `create or replace` de funciones más columnas
 aditivas; revertir = reaplicar las definiciones del baseline (`git show
 origin/main:supabase/migrations/00000000000000_baseline_esquema.sql`).

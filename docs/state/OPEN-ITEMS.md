@@ -49,7 +49,7 @@ día vs día de venta, toma física por delta, recepción de OC con stock absolu
 Matriz completa por módulo: [BARRIDO-2026-09-10](../audit/BARRIDO-2026-09-10.md).
 Bloqueos al 11 de septiembre: la variable de CI ya está corregida (instalador de CI
 `4e81b93e` sellado, hash en CIERRE-SOFTWARE); las cuatro migraciones de inventario
-ya están en staging (producción no); los binarios de huella siguen fuera del repo.
+ya están en staging Y en producción (11-09, humo OK en ambos); los binarios de huella siguen fuera del repo.
 Nada validado en campo.
 
 ## Candidato de cierre: pendientes actualizados el 10 de septiembre

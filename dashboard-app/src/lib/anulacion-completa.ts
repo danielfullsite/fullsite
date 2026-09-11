@@ -3,7 +3,7 @@
  *
  * ── CONTRATO ─────────────────────────────────────────────────────────────────
  *
- * `r1_reconcile_order` (PENDIENTE_20260910060000) exige, para una orden
+ * `r1_reconcile_order` (20260910060000) exige, para una orden
  * `cancelada`, una disposición explícita por renglón:
  *
  *   retain_consumption  se preparó: la mercancía se consumió, es merma; el stock

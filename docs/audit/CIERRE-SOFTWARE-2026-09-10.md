@@ -420,3 +420,9 @@ PENDIENTE coordinadas.
   o compilar con el SDK de DigitalPersona.
 - **Aceptación física:** guion en INSTALACION-CANDIDATO-2026-09-11 §3, pendiente
   de ejecutarse en AMALAY.
+
+**Producción al día — 11 de septiembre.** Con autorización de Daniel se aplicaron a
+producción (proyecto compartido: AMALAY y todos los tenants) las cuatro
+migraciones de inventario en el mismo orden que en staging; las siete funciones
+verificadas y el humo sintético OK sin residuos. La capa web ya estaba en Vercel
+desde el merge de #392. Falta sólo Pedro/Electron, que requiere instalación física.
