@@ -91,8 +91,8 @@ origin/main:supabase/migrations/00000000000000_baseline_esquema.sql`).
 
 ## 7. Bloqueos externos vigentes
 
-- Variable de CI `NEXT_PUBLIC_SUPABASE_ANON_KEY` = staging: el build de CI
-  ahora falla con el comando exacto; el instalador del candidato se construye
-  localmente con la pareja de producción.
+- ~~Variable de CI~~ corregida el 11-09: el instalador de CI `4e81b93e` es el
+  candidato (hashes en CIERRE-SOFTWARE). Las cuatro migraciones de inventario ya
+  están en staging; en producción siguen pendientes (sección 4).
 - Binarios de huella fuera del repo.
 - Aceptación física completa (impresoras, cajón, corte eléctrico, Windows real).

@@ -47,9 +47,10 @@ Doce lentes con refutación adversarial sobre `c2cafac9`; 39 hallazgos confirmad
 todos corregidos con prueba A/B salvo tres P2 que quedan registrados (corte por
 día vs día de venta, toma física por delta, recepción de OC con stock absoluto).
 Matriz completa por módulo: [BARRIDO-2026-09-10](../audit/BARRIDO-2026-09-10.md).
-Dos bloqueos externos: la variable de CI `NEXT_PUBLIC_SUPABASE_ANON_KEY` es de
-staging (el build ahora falla en vez de salir inservible) y los binarios de huella
-no están en el repo. Nada validado en campo.
+Bloqueos al 11 de septiembre: la variable de CI ya está corregida (instalador de CI
+`4e81b93e` sellado, hash en CIERRE-SOFTWARE); las cuatro migraciones de inventario
+ya están en staging (producción no); los binarios de huella siguen fuera del repo.
+Nada validado en campo.
 
 ## Candidato de cierre: pendientes actualizados el 10 de septiembre
 

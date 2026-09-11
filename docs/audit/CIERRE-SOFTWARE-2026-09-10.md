@@ -396,3 +396,27 @@ reprodujo). Instalador construido localmente con la pareja de producción:
 No se declara Fullsite cerrado: falta aceptación física (impresoras, cajón,
 huella, corte eléctrico, Windows real), la variable de CI y las migraciones
 PENDIENTE coordinadas.
+
+## Bloqueos quitados — 11 de septiembre
+
+- **Variable de CI corregida.** `NEXT_PUBLIC_SUPABASE_ANON_KEY` ya es la llave
+  anon de producción. El workflow `electron-build` sobre `4e81b93e` pasó el guard
+  y produjo instalador y portable sellados (`limpio: true`):
+  instalador SHA-256 `e923aad4887a87941e8a5ce77a1300b5e6f4229c0cee837fc5696655964ee31d`,
+  portable `168d2e94c0b93833e12ee91e83c388c8ad8cbbf9ba3dad04b78a3da1fcde66d3`
+  ([run 34624236121](https://github.com/danielfullsite/fullsite/actions/runs/34624236121)),
+  copiados a `~/fullsite-candidates/2026-09-11-4e81b93e-ci/`. Este es el
+  candidato a instalar (mismo código que el local `6b49470a` más los docs).
+- **Staging al día con las cuatro migraciones de inventario** (autorizado por
+  Daniel): `pos_cierres.cola_pendiente_al_cerrar`, `transfer_item_atomico`,
+  `inventory_movement_atomic`, `inventory_cancelled_reconcile` y
+  `merge_y_cobro_conservan_consumo` (en tres partes). Verificadas las siete
+  funciones en `pg_proc`. Las otras siete `PENDIENTE_` (cuentas divididas,
+  materializador de Caja, proxy, folio) siguen sin aplicar y requieren su propia
+  decisión. Producción no se tocó.
+- **Huella: sigue bloqueado.** En la Mac sólo existe el fuente
+  `fingerprint-service.cs`; `DPUruNet.dll` y `fingerprint-service.exe` viven en
+  `C:\fullsite\` de las terminales de AMALAY. Se necesita copiarlos desde SERVER1
+  o compilar con el SDK de DigitalPersona.
+- **Aceptación física:** guion en INSTALACION-CANDIDATO-2026-09-11 §3, pendiente
+  de ejecutarse en AMALAY.
