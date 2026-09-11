@@ -48,6 +48,7 @@ import { publishEvent, getDeviceId } from '@/lib/events'
 import { apiUrl } from '@/lib/api-base'
 import { sendOrderToKitchen, kitchenFailureMessage } from '@/lib/kitchen-bridge'
 import { avisarCierreDeOrden, avisarCuentaActualizada, avisarTransferenciaItem, avisarCuentaConfirmada } from '@/lib/aviso-lan'
+import { disposicionPropuesta, renglonesAnulados, renglonesVivos, resumenDeDisposicion, type Disposicion } from '@/lib/anulacion-completa'
 import { cacheTrasElCierre, cachePreferidaAlAbrir } from '@/lib/cache-de-cuenta'
 import { leerCuenta, requiereCaja, cuentaConfirmada, type LecturaDeCuenta } from '@/lib/pedro-cliente'
 import { leerCatalogoCaja } from '@/lib/pedro-catalogo'
@@ -1287,14 +1288,22 @@ function CancelModal({ itemName, onConfirm, onCancel }: CancelModalProps) {
 interface VoidOrderModalProps {
   mesa: number
   total: number
-  onConfirm: (reason: string, managerName: string) => void
-  onConfirmCaja?: (reason: string, pin: string) => Promise<void>
+  /** Renglones vivos de la cuenta: cada uno recibe una disposición de inventario. */
+  items: OrderItem[]
+  /** Los que ya se enviaron a cocina: se proponen como merma, nunca como devolución. */
+  enviados: Set<string>
+  onConfirm: (reason: string, managerName: string, disposiciones: Record<string, Disposicion>) => void
+  onConfirmCaja?: (reason: string, pin: string, disposiciones: Record<string, Disposicion>) => Promise<void>
   onCancel: () => void
 }
 
-function VoidOrderModal({ mesa, total, onConfirm, onConfirmCaja, onCancel }: VoidOrderModalProps) {
+function VoidOrderModal({ mesa, total, items, enviados, onConfirm, onConfirmCaja, onCancel }: VoidOrderModalProps) {
   const [reason, setReason] = useState('')
   const [pin, setPin] = useState('')
+  // H08: qué pasa con la mercancía de cada renglón. La propuesta es conservadora
+  // (lo enviado = merma); el gerente cambia lo que haga falta ANTES de teclear su PIN.
+  const [disposiciones, setDisposiciones] = useState<Record<string, Disposicion>>(() => disposicionPropuesta(items, enviados))
+  const resumen = resumenDeDisposicion(items, disposiciones)
   const [error, setError] = useState('')
   const [biometricAvail, setBiometricAvail] = useState(false)
   const [bioChecking, setBioChecking] = useState(false)
@@ -1337,7 +1346,7 @@ function VoidOrderModal({ mesa, total, onConfirm, onConfirmCaja, onCancel }: Voi
       if (assertion) {
         const credId = btoa(String.fromCharCode(...new Uint8Array((assertion as PublicKeyCredential).rawId)))
         const member = stored[credId] as { name?: string }
-        if (member?.name) onConfirm(reason, member.name)
+        if (member?.name) onConfirm(reason, member.name, disposiciones)
       }
     } catch { setError('Huella no reconocida') }
     setBioChecking(false)
@@ -1349,13 +1358,13 @@ function VoidOrderModal({ mesa, total, onConfirm, onConfirmCaja, onCancel }: Voi
     if (onConfirmCaja) {
       if (confirming) return
       setConfirming(true)
-      try { await onConfirmCaja(reason, pin) } catch (e) { setError(e instanceof Error ? e.message : 'Caja no confirmó la anulación') }
+      try { await onConfirmCaja(reason, pin, disposiciones) } catch (e) { setError(e instanceof Error ? e.message : 'Caja no confirmó la anulación') }
       finally { setConfirming(false); setPin('') }
       return
     }
     const manager = await verifyManagerPin(pin)
     if (!manager) { setError('PIN invalido'); return }
-    onConfirm(reason, manager)
+    onConfirm(reason, manager, disposiciones)
   }
 
   return (
@@ -1382,6 +1391,38 @@ function VoidOrderModal({ mesa, total, onConfirm, onConfirmCaja, onCancel }: Voi
               rows={3}
               className="w-full bg-[var(--line)] border border-[var(--line)] rounded-lg px-4 py-3 text-[var(--text-1)] placeholder-[var(--text-4)] text-sm focus:outline-none focus:border-red-500 resize-none"
             />
+          </div>
+
+          {/* H08 — qué pasa con la mercancía de cada renglón. Sin esto la anulación
+              quedaba con inventario pendiente para siempre. */}
+          <div>
+            <label className="text-sm font-semibold text-[var(--text-3)] uppercase tracking-wide mb-2 block">
+              Inventario por renglón
+            </label>
+            <div className="max-h-44 overflow-y-auto space-y-1.5 pr-1" data-testid="disposicion-por-renglon">
+              {renglonesVivos(items).map(r => (
+                <div key={r.id} className="flex items-center gap-2 text-sm">
+                  <span className="flex-1 truncate text-[var(--text-1)]">{r.cantidad}× {r.nombre}</span>
+                  <button
+                    type="button"
+                    onClick={() => setDisposiciones(prev => ({ ...prev, [r.id]: 'retain_consumption' }))}
+                    aria-pressed={disposiciones[r.id] === 'retain_consumption'}
+                    className={`px-2 py-1.5 rounded-lg text-xs font-semibold min-h-[36px] ${disposiciones[r.id] === 'retain_consumption' ? 'bg-amber-600 text-white' : 'bg-[var(--line)] text-[var(--text-3)]'}`}
+                    title="Se preparó: es merma, el stock no regresa"
+                  >Se preparó</button>
+                  <button
+                    type="button"
+                    onClick={() => setDisposiciones(prev => ({ ...prev, [r.id]: 'return_stock' }))}
+                    aria-pressed={disposiciones[r.id] === 'return_stock'}
+                    className={`px-2 py-1.5 rounded-lg text-xs font-semibold min-h-[36px] ${disposiciones[r.id] === 'return_stock' ? 'bg-emerald-600 text-white' : 'bg-[var(--line)] text-[var(--text-3)]'}`}
+                    title="No se preparó: la mercancía regresa al inventario"
+                  >No se preparó</button>
+                </div>
+              ))}
+            </div>
+            <p className="text-[11px] text-[var(--text-3)] mt-1.5">
+              Merma {formatMXN(resumen.merma)} · Regresa {formatMXN(resumen.regresa)}. Lo enviado a cocina se propone como merma.
+            </p>
           </div>
 
           <div>
@@ -3069,10 +3110,18 @@ function POSContent() {
     setTransferringItem(null)
   }, [transferringItem, loadedOrderId, mesero, mesa, validarCuentaCaja, bloqueaLegacyCaja, orderItems, cancelledItems, voidedItems, discount, turnoId, sentItemIds])
 
-  const handleVoidOrder = useCallback(async (reason: string, managerName: string) => {
+  const handleVoidOrder = useCallback(async (reason: string, managerName: string, disposiciones: Record<string, Disposicion>) => {
     if (accionPendienteEnCaja('La autorización anterior de anulación')) return
     if (!await validarCuentaCaja()) return
     if (operationLock.current) return
+    // H08: la anulacion completa viaja con la disposicion de inventario de CADA
+    // renglon (retain_consumption = merma; return_stock = regresa). Sin eso
+    // `r1_reconcile_order` rechaza conciliar y el inventario quedaba pendiente
+    // para siempre. Si falta una decision, no se manda nada: se le pide al gerente.
+    let renglones: ReturnType<typeof renglonesAnulados<OrderItem>>
+    try { renglones = renglonesAnulados(orderItems, disposiciones, reason) }
+    catch (e) { showToast(e instanceof Error && e.message.includes('CANCELLATION_DISPOSITION_REQUIRED')
+      ? 'Falta decidir qué pasa con la mercancía de un renglón' : 'No se pudo preparar la anulación'); return }
     operationLock.current = true
     setSaving(true)
     // Mark order as cancelled via revision-aware boundary (reconciliation-relevant status)
@@ -3085,6 +3134,9 @@ function POSContent() {
         expected_revision: orderRevision,
         save_operation_id: voidOpId,
         status: 'cancelada',
+        // Los renglones cancelados con su disposicion: es lo que concilia inventario
+        // (r1_save_order hace `items = coalesce(p_items, items)`).
+        items: renglones,
         notas: `ANULADA: ${reason} (por ${managerName})`,
       }
       try {
@@ -3138,7 +3190,10 @@ function POSContent() {
     const voidTotal = orderItems.reduce((sum, i) => sum + i.subtotal, 0)
     logAudit({
       order_id: orderId, action: 'order_cancelled', actor: mesero, mesa,
-      details: { items: orderItems.map(i => ({ nombre: i.nombre, cantidad: i.cantidad, subtotal: i.subtotal })), total: voidTotal },
+      details: {
+        items: orderItems.map(i => ({ nombre: i.nombre, cantidad: i.cantidad, subtotal: i.subtotal, inventory_disposition: disposiciones[i.id] ?? null })),
+        total: voidTotal, disposicion: resumenDeDisposicion(orderItems, disposiciones),
+      },
       reason,
       approved_by: managerName,
     })
@@ -5704,6 +5759,8 @@ function POSContent() {
         <VoidOrderModal
           mesa={mesa}
           total={total}
+          items={activeItems}
+          enviados={sentItemIds}
           onConfirm={handleVoidOrder}
           onConfirmCaja={bloqueaLegacyCaja ? anularOrdenCaja : undefined}
           onCancel={() => setShowVoidOrder(false)}
