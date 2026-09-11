@@ -341,6 +341,8 @@ export default function CocinaPage() {
       setCancelError('Error al guardar cancelación')
       return
     }
+    // Lo que el servidor de verdad concilio; el aviso de abajo no promete mas.
+    const inventarioConciliado = saveResult.inventory_status === 'COMPLETE'
 
     // 3. Re-add ingredients to inventory
     const itemName = cancelTarget.itemName.toLowerCase()
@@ -389,9 +391,11 @@ export default function CocinaPage() {
     setCancelReason('')
     setCancelPin('')
     setCancelError('')
-    showToast(cancelPreparado
-      ? `${cancelTarget.itemName} cancelado — se registra como merma`
-      : `${cancelTarget.itemName} cancelado — los ingredientes regresan al inventario`)
+    showToast(!inventarioConciliado
+      ? `${cancelTarget.itemName} cancelado — inventario pendiente de conciliar`
+      : cancelPreparado
+        ? `${cancelTarget.itemName} cancelado — se registra como merma`
+        : `${cancelTarget.itemName} cancelado — los ingredientes regresan al inventario`)
     setCancelPreparado(null)
     fetchOrders()
   }

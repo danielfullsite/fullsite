@@ -40,3 +40,12 @@ describe('recordarOrdenEncolada', () => {
     expect(rama).toMatch(/recordarOrdenEncolada\(order\.mesa, \{[\s\S]*id: order\.id[\s\S]*revision: orderRevision \+ 1/)
   })
 })
+
+describe('cobro offline: el descuento de market viaja en la cola', () => {
+  it('REGRESION (fuente): la rama OFFLINE_QUEUED del cobro encola POST /api/pos/deduct-market para la misma orden', () => {
+    const src = readFileSync(join(process.cwd(), 'src/app/pos/page.tsx'), 'utf8')
+    const i = src.indexOf("if (!saveResult.ok && saveResult.error === 'OFFLINE_QUEUED') {")
+    const rama = src.slice(i, i + 3000)
+    expect(rama).toMatch(/queueOperation\('pos_orders', 'POST', \{ order_id: payId, actor: mesero, items: mkt \}, '\/api\/pos\/deduct-market', undefined, 'APP_API'\)/)
+  })
+})

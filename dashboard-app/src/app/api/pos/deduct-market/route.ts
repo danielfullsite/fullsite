@@ -41,7 +41,14 @@ export async function POST(request: NextRequest) {
       return Response.json({ ok: false, error: 'RPC_FAILED' }, { status: 502 })
     }
 
-    return Response.json(await res.json())
+    const result = await res.json()
+    // Tenant con autoridad r1: aqui no hay nada que descontar. Es un no-op, no un
+    // rechazo: el cobro offline encola esta llamada y un ok:false la marcaria
+    // conflicto terminal en cada terminal (barrido 2026-09-10).
+    if (result && result.ok === false && result.error === 'AUTHORITY_NOT_LEGACY') {
+      return Response.json({ ok: true, skipped: 'AUTHORITY_NOT_LEGACY', deductions: [] })
+    }
+    return Response.json(result)
   } catch (err) {
     console.error('[deduct-market] Error:', err)
     return Response.json({ ok: false, error: 'INTERNAL_ERROR' }, { status: 500 })

@@ -239,4 +239,349 @@ begin
 end;
 $function$;
 
+
+-- ── (3) r1_reconcile_item: un insumo sin fila de inventario bloquea, no aborta ──
+-- Copia integra de la funcion del baseline con UN cambio: el RAISE del conteo de
+-- candados se vuelve resultado BLOCKED_TARGET_MISSING (ver comentario adentro).
+CREATE OR REPLACE FUNCTION "public"."r1_reconcile_item"("p_client_id" "text", "p_order_id" "text", "p_item_id" "text", "p_menu_item_id" "text", "p_desired" numeric, "p_sale_authority" "text") RETURNS TABLE("r_item_id" "text", "r_result" "text", "r_applied" numeric, "r_delta" numeric)
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+DECLARE
+  v_intent pos_reconciliation_results%ROWTYPE;
+  v_mode text;
+  v_recipe_version_id bigint;
+  v_market_stock_id bigint;
+  v_delta numeric;
+  v_next_rev int;
+  v_converted numeric;
+  v_ing_delta numeric;
+  v_plan_line RECORD;
+  v_locked_count int;
+  v_updated int;
+BEGIN
+  -- ═══ STEP 1: Idempotent intent creation + lock ═══
+  INSERT INTO pos_reconciliation_results
+    (client_id, order_id, order_item_id, menu_item_id, cantidad)
+  VALUES (p_client_id, p_order_id, p_item_id, p_menu_item_id, p_desired)
+  ON CONFLICT (client_id, order_id, order_item_id) DO NOTHING;
+
+  SELECT * INTO v_intent FROM pos_reconciliation_results
+  WHERE client_id = p_client_id AND order_id = p_order_id AND order_item_id = p_item_id
+  FOR UPDATE;
+
+  -- ═══ STEP 2: Identity corruption check ═══
+  IF v_intent.menu_item_id != p_menu_item_id THEN
+    RAISE EXCEPTION 'Identity corruption: intent menu_item_id=% but observed=%',
+      v_intent.menu_item_id, p_menu_item_id;
+  END IF;
+
+  -- ═══ STEP 3: Resolve treatment ═══
+  IF v_intent.pinned_mode IS NOT NULL THEN
+    -- Use pinned (historical immutability)
+    v_mode := v_intent.pinned_mode;
+    v_recipe_version_id := v_intent.pinned_recipe_version_id;
+    v_market_stock_id := v_intent.pinned_market_stock_id;
+  ELSE
+    -- First terminal decision: resolve from current policy
+    SELECT inventory_mode, market_stock_id
+    INTO v_mode, v_market_stock_id
+    FROM pos_item_inventory_policy
+    WHERE client_id = p_client_id AND menu_item_id = p_menu_item_id;
+
+    IF v_mode IS NULL OR v_mode = 'unclassified' THEN
+      UPDATE pos_reconciliation_results SET
+        cantidad = p_desired, result = 'BLOCKED_UNCLASSIFIED', updated_at = now()
+      WHERE id = v_intent.id;
+      RETURN QUERY SELECT p_item_id, 'BLOCKED_UNCLASSIFIED'::text, v_intent.applied_consumption, 0::numeric;
+      RETURN;
+    END IF;
+
+    IF v_mode = 'recipe' THEN
+      SELECT id INTO v_recipe_version_id FROM pos_recipe_versions
+      WHERE client_id = p_client_id AND menu_item_id = p_menu_item_id AND active = true;
+      IF v_recipe_version_id IS NULL THEN
+        UPDATE pos_reconciliation_results SET
+          cantidad = p_desired, result = 'BLOCKED_RECIPE_MISSING', updated_at = now()
+        WHERE id = v_intent.id;
+        RETURN QUERY SELECT p_item_id, 'BLOCKED_RECIPE_MISSING'::text, v_intent.applied_consumption, 0::numeric;
+        RETURN;
+      END IF;
+    END IF;
+
+    IF v_mode = 'direct_stock' THEN
+      IF v_market_stock_id IS NULL THEN
+        UPDATE pos_reconciliation_results SET
+          cantidad = p_desired, result = 'BLOCKED_TARGET_MISSING', updated_at = now()
+        WHERE id = v_intent.id;
+        RETURN QUERY SELECT p_item_id, 'BLOCKED_TARGET_MISSING'::text, v_intent.applied_consumption, 0::numeric;
+        RETURN;
+      END IF;
+      -- Verify target exists
+      IF NOT EXISTS (SELECT 1 FROM pos_market_stock WHERE client_id = p_client_id AND id = v_market_stock_id) THEN
+        UPDATE pos_reconciliation_results SET
+          cantidad = p_desired, result = 'BLOCKED_TARGET_MISSING', updated_at = now()
+        WHERE id = v_intent.id;
+        RETURN QUERY SELECT p_item_id, 'BLOCKED_TARGET_MISSING'::text, v_intent.applied_consumption, 0::numeric;
+        RETURN;
+      END IF;
+    END IF;
+  END IF;
+
+  -- ═══ STEP 4: NON_INVENTORY — before delta computation ═══
+  IF v_mode = 'non_inventory' THEN
+    UPDATE pos_reconciliation_results SET
+      pinned_mode = COALESCE(v_intent.pinned_mode, 'non_inventory'),
+      cantidad = p_desired,
+      result = 'NO_MUTATION_APPROVED',
+      updated_at = now()
+    WHERE id = v_intent.id;
+    RETURN QUERY SELECT p_item_id, 'NO_MUTATION_APPROVED'::text, 0::numeric, 0::numeric;
+    RETURN;
+  END IF;
+
+  -- ═══ STEP 5: Consumption delta ═══
+  v_delta := p_desired - v_intent.applied_consumption;
+
+  IF v_delta = 0 THEN
+    UPDATE pos_reconciliation_results SET
+      cantidad = p_desired, result = 'RECONCILED', updated_at = now()
+    WHERE id = v_intent.id;
+    RETURN QUERY SELECT p_item_id, 'RECONCILED'::text, v_intent.applied_consumption, 0::numeric;
+    RETURN;
+  END IF;
+
+  -- ═══ STEP 6: Authority check — MUST be r1 for sale mutation ═══
+  IF p_sale_authority != 'r1' THEN
+    UPDATE pos_reconciliation_results SET
+      cantidad = p_desired, result = 'BLOCKED_OWNER_MISSING', updated_at = now()
+    WHERE id = v_intent.id;
+    RETURN QUERY SELECT p_item_id, 'BLOCKED_OWNER_MISSING'::text, v_intent.applied_consumption, 0::numeric;
+    RETURN;
+  END IF;
+
+  v_next_rev := v_intent.last_mutation_revision + 1;
+
+  -- ═══ STEP 7: RECIPE MODE ═══
+  IF v_mode = 'recipe' THEN
+
+    -- PHASE A: Complete prevalidation — zero mutation
+    FOR v_plan_line IN
+      SELECT l.ingredient_id, l.quantity AS recipe_qty, l.recipe_unit,
+             inv.stock_unit, inv.ingredient_id AS inv_target
+      FROM pos_recipe_lines l
+      JOIN pos_inventory inv ON inv.client_id = l.client_id AND inv.ingredient_id = l.ingredient_id
+      WHERE l.client_id = p_client_id AND l.recipe_version_id = v_recipe_version_id
+      ORDER BY l.ingredient_id
+    LOOP
+      v_converted := convert_recipe_to_stock(v_plan_line.recipe_qty, v_plan_line.recipe_unit, v_plan_line.stock_unit);
+      IF v_converted IS NULL THEN
+        UPDATE pos_reconciliation_results SET
+          cantidad = p_desired, result = 'BLOCKED_UNIT_MISSING', updated_at = now()
+        WHERE id = v_intent.id;
+        RETURN QUERY SELECT p_item_id, 'BLOCKED_UNIT_MISSING'::text, v_intent.applied_consumption, 0::numeric;
+        RETURN;
+      END IF;
+      IF v_converted <= 0 THEN
+        UPDATE pos_reconciliation_results SET
+          cantidad = p_desired, result = 'BLOCKED_UNIT_MISSING', updated_at = now()
+        WHERE id = v_intent.id;
+        RETURN QUERY SELECT p_item_id, 'BLOCKED_UNIT_MISSING'::text, v_intent.applied_consumption, 0::numeric;
+        RETURN;
+      END IF;
+    END LOOP;
+
+    -- PHASE A.2: Acquire ALL ingredient target locks in deterministic order
+    SELECT count(*) INTO v_locked_count
+    FROM (
+      SELECT ingredient_id FROM pos_inventory
+      WHERE client_id = p_client_id
+        AND ingredient_id IN (
+          SELECT ingredient_id FROM pos_recipe_lines
+          WHERE client_id = p_client_id AND recipe_version_id = v_recipe_version_id
+        )
+      ORDER BY ingredient_id
+      FOR UPDATE
+    ) locked;
+
+    -- Verify all targets locked. Un insumo de la receta SIN fila en pos_inventory
+    -- (o con mas de una) no es corrupcion: es una receta a medio dar de alta. Antes
+    -- se lanzaba RAISE y abortaba la conciliacion de TODA la orden (barrido
+    -- 2026-09-10, inventario LENTE-6). Ahora es un resultado BLOCKED explicito,
+    -- como los demas: la orden queda pendiente, visible, y sin tocar stock.
+    IF v_locked_count != (SELECT count(DISTINCT ingredient_id) FROM pos_recipe_lines
+                          WHERE client_id = p_client_id AND recipe_version_id = v_recipe_version_id) THEN
+      UPDATE pos_reconciliation_results SET
+        cantidad = p_desired, result = 'BLOCKED_TARGET_MISSING', updated_at = now()
+      WHERE id = v_intent.id;
+      RETURN QUERY SELECT p_item_id, 'BLOCKED_TARGET_MISSING'::text, v_intent.applied_consumption, 0::numeric;
+      RETURN;
+    END IF;
+
+    -- PHASE B: Mutation (all-or-nothing — any failure = RAISE = tx abort)
+    FOR v_plan_line IN
+      SELECT l.ingredient_id, l.quantity AS recipe_qty, l.recipe_unit,
+             inv.stock_unit
+      FROM pos_recipe_lines l
+      JOIN pos_inventory inv ON inv.client_id = l.client_id AND inv.ingredient_id = l.ingredient_id
+      WHERE l.client_id = p_client_id AND l.recipe_version_id = v_recipe_version_id
+      ORDER BY l.ingredient_id
+    LOOP
+      v_converted := convert_recipe_to_stock(v_plan_line.recipe_qty, v_plan_line.recipe_unit, v_plan_line.stock_unit);
+      v_ing_delta := v_converted * v_delta;
+
+      -- Atomic stock update — no clamping, allows negative
+      UPDATE pos_inventory
+      SET stock = stock - v_ing_delta, updated_at = now()
+      WHERE client_id = p_client_id AND ingredient_id = v_plan_line.ingredient_id;
+      GET DIAGNOSTICS v_updated = ROW_COUNT;
+      IF v_updated != 1 THEN
+        RAISE EXCEPTION 'Ingredient % update failed: rows=%', v_plan_line.ingredient_id, v_updated;
+      END IF;
+
+      -- Movement provenance (order_id left NULL — uuid type mismatch; use reconciliation_result_id)
+      INSERT INTO pos_inventory_movements
+        (client_id, ingredient_id, movement_type, quantity, actor, notes,
+         reconciliation_result_id, mutation_revision)
+      VALUES
+        (p_client_id, v_plan_line.ingredient_id,
+         CASE WHEN v_ing_delta > 0 THEN 'recipe_deduction' ELSE 'recipe_reversal' END,
+         -v_ing_delta,
+         'r1_reconciler',
+         'rv=' || v_recipe_version_id || ' rev=' || v_next_rev || ' oi=' || p_item_id,
+         v_intent.id, v_next_rev);
+    END LOOP;
+
+    -- Commit pin + applied state
+    UPDATE pos_reconciliation_results SET
+      pinned_mode = COALESCE(v_intent.pinned_mode, 'recipe'),
+      pinned_recipe_version_id = COALESCE(v_intent.pinned_recipe_version_id, v_recipe_version_id),
+      cantidad = p_desired,
+      applied_consumption = p_desired,
+      last_mutation_revision = v_next_rev,
+      result = 'RECONCILED',
+      updated_at = now()
+    WHERE id = v_intent.id;
+
+    RETURN QUERY SELECT p_item_id, 'RECONCILED'::text, p_desired, v_delta;
+    RETURN;
+
+  -- ═══ STEP 8: DIRECT_STOCK MODE ═══
+  ELSIF v_mode = 'direct_stock' THEN
+
+    -- Atomic market stock update — no clamping
+    UPDATE pos_market_stock
+    SET stock = stock - v_delta, updated_at = now()
+    WHERE client_id = p_client_id AND id = v_market_stock_id;
+    GET DIAGNOSTICS v_updated = ROW_COUNT;
+    IF v_updated != 1 THEN
+      RAISE EXCEPTION 'Market stock % update failed: rows=%', v_market_stock_id, v_updated;
+    END IF;
+
+    -- Movement provenance
+    INSERT INTO pos_market_movements
+      (client_id, menu_item_id, movement_type, quantity, order_id, actor, notes,
+       reconciliation_result_id, mutation_revision)
+    VALUES
+      (p_client_id, p_menu_item_id,
+       CASE WHEN v_delta > 0 THEN 'venta' ELSE 'devolucion' END,
+       -v_delta, p_order_id,
+       'r1_reconciler',
+       'mkt=' || v_market_stock_id || ' rev=' || v_next_rev || ' oi=' || p_item_id,
+       v_intent.id, v_next_rev);
+
+    -- Commit pin + applied state
+    UPDATE pos_reconciliation_results SET
+      pinned_mode = COALESCE(v_intent.pinned_mode, 'direct_stock'),
+      pinned_market_stock_id = COALESCE(v_intent.pinned_market_stock_id, v_market_stock_id),
+      cantidad = p_desired,
+      applied_consumption = p_desired,
+      last_mutation_revision = v_next_rev,
+      result = 'RECONCILED',
+      updated_at = now()
+    WHERE id = v_intent.id;
+
+    RETURN QUERY SELECT p_item_id, 'RECONCILED'::text, p_desired, v_delta;
+    RETURN;
+
+  END IF;
+
+  -- Should not reach here
+  RAISE EXCEPTION 'Unhandled mode: %', v_mode;
+END;
+$$;
+
+-- ── (4) r1_legacy_sale_deduction: idempotente por orden (replay offline) ─────
+CREATE OR REPLACE FUNCTION "public"."r1_legacy_sale_deduction"("p_client_id" "text", "p_order_id" "text", "p_actor" "text", "p_items" "jsonb") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+DECLARE
+  v_authority text;
+  v_item jsonb;
+  v_mid text;
+  v_qty numeric;
+  v_current_stock numeric;
+  v_new_stock numeric;
+  v_deductions jsonb := '[]'::jsonb;
+  v_updated int;
+BEGIN
+  -- 1. Acquire authority FOR SHARE (participates in serialized transition protocol)
+  SELECT sale_authority INTO v_authority
+  FROM pos_mutation_authority
+  WHERE client_id = p_client_id
+  FOR SHARE;
+
+  IF v_authority IS NULL OR v_authority != 'legacy' THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'AUTHORITY_NOT_LEGACY',
+      'current_authority', COALESCE(v_authority, 'none'));
+  END IF;
+
+  -- 2. IDEMPOTENTE POR ORDEN. El cobro offline encola esta llamada y la cola
+  -- reintenta ante una respuesta perdida: sin esto cada reintento descontaba otra
+  -- vez (barrido 2026-09-10, inventario LENTE-3). Si la orden ya tiene movimientos
+  -- de venta, se devuelven los que hubo y no se toca nada.
+  IF EXISTS (SELECT 1 FROM pos_market_movements
+             WHERE client_id = p_client_id AND order_id = p_order_id AND movement_type = 'venta') THEN
+    SELECT coalesce(jsonb_agg(jsonb_build_object('menu_item_id', m.menu_item_id, 'cantidad', -m.quantity,
+             'new_stock', (SELECT s.stock FROM pos_market_stock s WHERE s.client_id = p_client_id AND s.menu_item_id = m.menu_item_id))), '[]'::jsonb)
+    INTO v_deductions
+    FROM pos_market_movements m
+    WHERE m.client_id = p_client_id AND m.order_id = p_order_id AND m.movement_type = 'venta';
+    RETURN jsonb_build_object('ok', true, 'already_applied', true, 'deductions', v_deductions);
+  END IF;
+
+  -- 3. Process each item
+  FOR v_item IN SELECT * FROM jsonb_array_elements(p_items) LOOP
+    v_mid := v_item->>'menu_item_id';
+    v_qty := (v_item->>'cantidad')::numeric;
+
+    IF v_mid IS NULL OR v_qty IS NULL OR v_qty <= 0 THEN CONTINUE; END IF;
+
+    -- Atomic stock decrement (no clamp — allows negative)
+    UPDATE pos_market_stock
+    SET stock = stock - v_qty, updated_at = now()
+    WHERE client_id = p_client_id AND menu_item_id = v_mid
+    RETURNING stock INTO v_new_stock;
+
+    GET DIAGNOSTICS v_updated = ROW_COUNT;
+
+    IF v_updated = 1 THEN
+      -- Movement provenance
+      INSERT INTO pos_market_movements
+        (client_id, menu_item_id, movement_type, quantity, order_id, actor, notes)
+      VALUES
+        (p_client_id, v_mid, 'venta', -v_qty, p_order_id, p_actor,
+         'legacy_sale_rpc');
+
+      v_deductions := v_deductions || jsonb_build_object(
+        'menu_item_id', v_mid, 'cantidad', v_qty, 'new_stock', v_new_stock);
+    END IF;
+    -- If item not in pos_market_stock, skip silently (matches legacy behavior)
+  END LOOP;
+
+  RETURN jsonb_build_object('ok', true, 'deductions', v_deductions);
+END;
+$$;
+
 COMMIT;

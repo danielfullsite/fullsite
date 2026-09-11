@@ -125,6 +125,29 @@ async function main(){
  assert.throws(()=>sql(call('orphan')),/CANCELLATION_DISPOSITION_REQUIRED/); assert.equal(stock(),8)
  console.log('PASS an orphan with applied consumption and no disposition fails closed even on a closed order')
 
+ // ── Barrido 2026-09-10, inventario LENTE-6 (primer pase): un insumo sin fila de inventario bloquea, no aborta ──
+ sql(`insert into pos_ingredients(id,client_id,name,unit) values('sinfila','a','Sin fila','kg');
+  insert into pos_item_inventory_policy(client_id,menu_item_id,inventory_mode,approved_at,approved_by) values('a','cake','recipe',now(),'manager');
+  insert into pos_recipe_versions(id,client_id,menu_item_id,active,source,created_by,activated_at,activated_by) values(2,'a','cake',true,'manual','manager',now(),'manager');
+  insert into pos_recipe_lines(client_id,recipe_version_id,ingredient_id,quantity,recipe_unit) values('a',2,'flour',0.25,'kg'),('a',2,'sinfila',1,'kg');
+  insert into pos_orders(id,client_id,turno_id,items,order_revision) values('half-recipe','a','test-turn',${quote(JSON.stringify([{id:'line-c',menuItemId:'cake',cantidad:1,subtotal:30}]))}::jsonb,1);`)
+ const antesHalf=stock()
+ const half=sql(call('half-recipe'))
+ assert(half.includes('BLOCKED_TARGET_MISSING'),half)
+ assert.equal(stock(),antesHalf,'ni la harina se toca: todo o nada, pero sin abortar')
+ console.log('PASS a recipe ingredient without inventory row yields BLOCKED_TARGET_MISSING instead of aborting the order')
+
+ // ── Barrido 2026-09-10, inventario LENTE-3 (primer pase): la venta de market es idempotente por orden ──
+ sql(`insert into pos_market_stock(client_id,menu_item_id,stock) values('a','mkt-agua',10);
+  update pos_mutation_authority set sale_authority='legacy' where client_id='a';`)
+ const venta=JSON.parse(sql(`select r1_legacy_sale_deduction('a','mkt-order','cajero','[{"menu_item_id":"mkt-agua","cantidad":2}]'::jsonb);`))
+ assert.equal(venta.ok,true); assert.equal(Number(sql("select stock from pos_market_stock where menu_item_id='mkt-agua'")),8)
+ const repetida=JSON.parse(sql(`select r1_legacy_sale_deduction('a','mkt-order','cajero','[{"menu_item_id":"mkt-agua","cantidad":2}]'::jsonb);`))
+ assert.equal(repetida.already_applied,true); assert.equal(Number(sql("select stock from pos_market_stock where menu_item_id='mkt-agua'")),8)
+ assert.equal(repetida.deductions[0].cantidad,2)
+ sql("update pos_mutation_authority set sale_authority='r1' where client_id='a';")
+ console.log('PASS legacy market sale deduction is idempotent per order: a replayed cobro never deducts twice')
+
 
 }
 main().catch(error=>{console.error(error);process.exitCode=1})

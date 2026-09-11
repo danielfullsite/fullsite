@@ -4002,6 +4002,19 @@ function POSContent() {
       // es consistente con ese comportamiento previo. Arreglar el split offline
       // exige estado durable compartido — es el muro 2, no esto.
       void avisarCierreDeOrden({ opId, orderId, clientId: _cid(), mesa: order.mesa, turnoId: order.turnoId ?? null })
+      // Market: sin red el descuento de stock (retail 1:1, items mkt-*) nunca se
+      // hacia porque `deductMarketStockForOrder` vive mas abajo, en la salida
+      // feliz. Se encola tras el cobro de la MISMA orden (la cola lo sube en
+      // orden y r1_legacy_sale_deduction es idempotente por orden). Misma regla
+      // de split que la salida feliz. Barrido 2026-09-10, inventario LENTE-3.
+      if (splitPayingCuenta === 0 || splitMode !== 'parejo' || splitPayingCuenta === 1) {
+        const mkt = payingItems.filter(i => i.menuItemId).map(i => ({ menu_item_id: i.menuItemId, cantidad: i.cantidad }))
+        if (mkt.length > 0) {
+          import('@/lib/pos-offline-db').then(({ queueOperation }) =>
+            queueOperation('pos_orders', 'POST', { order_id: payId, actor: mesero, items: mkt }, '/api/pos/deduct-market', undefined, 'APP_API')
+          ).catch(() => { /* sin IDB: el descuento de market queda sin registrar, como antes */ })
+        }
+      }
       if (pagos.some(p => p.metodo.toLowerCase().includes('efectivo'))) openCashDrawer()
       handlePrintTicket(order)
       showToast('Sin conexión — cobro guardado localmente, se sincronizará al reconectar')
