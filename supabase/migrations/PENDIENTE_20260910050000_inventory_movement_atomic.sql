@@ -79,14 +79,24 @@ begin
     if p_movement_type='deduction' and (ingredient.product_type in ('subreceta','sub_recipe') or left(ingredient.id,4)='sub_') then raise exception 'SUBRECIPE_HAS_NO_STOCK'; end if;
     qty := (line->>'quantity')::numeric; purchase_cost := coalesce((line->>'unit_cost')::numeric,0);
     before_cost := ingredient.cost_per_unit;
-    if inventory.stock<0 or before_cost is null or before_cost<0 or before_cost>9007199254740991 or
-      inventory.stock>9007199254740991 then raise exception 'INVALID_CURRENT_STOCK_OR_COST'; end if;
+    -- La venta deja stock NEGATIVO por diseno (r1_reconcile_item no lo tope; AMALAY
+    -- hoy: 38 de 1268 insumos). Un negativo no es un dato invalido: es la razon de
+    -- que el almacen quiera capturar una entrada o un conteo. Rechazarlo dejaba el
+    -- lote completo sin guardar y sin salida en la UI (barrido 2026-09-10,
+    -- inventario LENTE-3). Se valida el costo y la magnitud; el signo, no.
+    if before_cost is null or before_cost<0 or before_cost>9007199254740991 or
+      abs(inventory.stock)>9007199254740991 then raise exception 'INVALID_CURRENT_STOCK_OR_COST'; end if;
     after_stock := inventory.stock+qty;
-    if after_stock<0 then raise exception 'INSUFFICIENT_STOCK'; end if;
-    if after_stock>9007199254740991 then raise exception 'INVALID_QUANTITY_OR_COST'; end if;
+    -- Sacar de un negativo lo deja mas negativo: sigue siendo insuficiente. Una
+    -- entrada o un conteo pueden dejar el saldo por debajo de cero si el hoyo era
+    -- mas grande que lo capturado; eso es la verdad del almacen, no un error.
+    if after_stock<0 and (qty<0 or p_movement_type='deduction') then raise exception 'INSUFFICIENT_STOCK'; end if;
+    if abs(after_stock)>9007199254740991 then raise exception 'INVALID_QUANTITY_OR_COST'; end if;
     after_cost := before_cost;
     if entry and purchase_cost>0 then
-      after_cost := case when inventory.stock=0 then purchase_cost
+      -- Con saldo negativo o cero el promedio ponderado no tiene sentido: el
+      -- costo vigente es el de la compra que repone.
+      after_cost := case when inventory.stock<=0 or after_stock<=0 then purchase_cost
         else (inventory.stock*before_cost+qty*purchase_cost)/after_stock end;
     end if;
     insert into public.pos_inventory_movements(client_id,ingredient_id,movement_type,quantity,actor,notes,movement_operation_key,movement_operation_line)

@@ -73,5 +73,18 @@ async function main(){
   assert(reverse.every(r=>r.code===0),JSON.stringify(reverse))
   assert.equal(sql("select stock=10+(select sum(quantity) from pos_inventory_movements where ingredient_id='a1') from pos_inventory where ingredient_id='a1'"),'t')
   console.log('PASS concurrent deltas, same-key races, reversed batch lock ordering and ledger-stock conservation')
+
+  // ── Barrido 2026-09-10, inventario LENTE-3: un saldo negativo no bloquea entradas ni conteos ──
+  sql("insert into pos_ingredients(id,client_id,name,unit,cost_per_unit) values('neg','a','Cebolla','KG',3); insert into pos_inventory(client_id,ingredient_id,stock) values('a','neg',-2);")
+  const repone=JSON.parse(sql(call('neg-entry',[line('neg',10,4)])))
+  assert.equal(repone.success,true);assert.equal(balance('neg'),8);assert.equal(repone.details[0].cost_after,4)
+  const conteo=JSON.parse(sql(call('neg-count',[line('neg',-3)],'adjustment')))
+  assert.equal(conteo.success,true);assert.equal(balance('neg'),5)
+  sql("update pos_inventory set stock=-6 where ingredient_id='neg';")
+  const parcial=JSON.parse(sql(call('neg-partial-entry',[line('neg',4,4)])))
+  assert.equal(parcial.success,true);assert.equal(balance('neg'),-2,'una entrada menor que el hoyo deja el saldo negativo pero mejor')
+  assert.throws(()=>sql(call('neg-waste',[line('neg',-1)],'waste')),/INSUFFICIENT_STOCK/)
+  assert.equal(balance('neg'),-2)
+  console.log('PASS negative balances accept entries and physical counts; deductions from a negative balance stay rejected')
 }
 main().catch(error=>{console.error(error);process.exitCode=1})

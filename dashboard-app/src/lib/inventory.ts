@@ -111,9 +111,14 @@ export async function recordMovement(req: MovementRequest): Promise<MovementResu
     if (!response.ok) {
       // These SQL errors prove this exact request rolled back. Authentication,
       // conflicting keys and network errors never authorize forgetting intent.
+      // MOVEMENT_KEY_REUSED y LEGACY_MOVEMENT_REQUIRES_RECONCILIATION tambien
+      // prueban que ESTA request nunca aplicara: sin ellos el intento quedaba
+      // congelado y bloqueaba todo movimiento del dispositivo (barrido 2026-09-10,
+      // inventario LENTE-4).
       const rejected = ['INVALID_MOVEMENT_IDENTITY','INVALID_MOVEMENT_TYPE','INVALID_LINES','INVALID_LINE',
         'INVALID_QUANTITY_OR_COST','INGREDIENT_SCOPE_CONFLICT','INVENTORY_ROW_REQUIRED',
-        'AMBIGUOUS_INVENTORY','SUBRECIPE_HAS_NO_STOCK','INVALID_CURRENT_STOCK_OR_COST','INSUFFICIENT_STOCK']
+        'AMBIGUOUS_INVENTORY','SUBRECIPE_HAS_NO_STOCK','INVALID_CURRENT_STOCK_OR_COST','INSUFFICIENT_STOCK',
+        'MOVEMENT_KEY_REUSED','LEGACY_MOVEMENT_REQUIRES_RECONCILIATION','DUPLICATE_INGREDIENT']
       if (durable && response.status === 409 && rejected.includes(result.error)) await resolvePendingMovement(req)
       return failed(typeof result.error === 'string' ? result.error : 'INVENTORY_UNCONFIRMED')
     }
