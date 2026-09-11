@@ -12,7 +12,7 @@ import {
   getCachedCashMovsByTurno,
 } from '@/lib/pos-offline-db'
 import { getPosConfigSync } from '@/lib/pos-config'
-import { sendOrderToKitchen } from '@/lib/kitchen-bridge'
+import { avisarCierreDeTurno } from '@/lib/aviso-lan'
 import { getPOSAuthHeaders, fetchWithTimeout, getPaymentMethodsFromDB } from '@/lib/pos-data'
 import { computeOrderSummary, summaryToArqueoInput, calcEfectivoEsperado } from '@/lib/pos-arqueo'
 import {
@@ -501,16 +501,10 @@ export default function CierreCajaWizard({
     } catch { /* */ }
 
     // 7. Avisar al local-server (modo LAN): TURNO_CLOSED purga ordenes/KDS/mesas
-    // en Pedro para que el tablero amanezca limpio. Best-effort con presupuesto
-    // corto — el cierre NUNCA se bloquea por la LAN (regla dura #3).
-    try {
-      await sendOrderToKitchen({
-        command_id: `turno-closed:${turnoId}`,
-        command_type: 'TURNO_CLOSED',
-        turno_id: turnoId,
-        client_id: _cid(),
-      }, { deadlineMs: 2500 })
-    } catch { /* sin bridge — el KDS online ya filtra por turno */ }
+    // en Pedro para que el tablero amanezca limpio. DURABLE: si la LAN no contesta
+    // ahora, queda pendiente y se reintenta (lib/aviso-lan.ts). El cierre NUNCA se
+    // bloquea por la LAN (regla dura #3): no se espera.
+    void avisarCierreDeTurno({ turnoId, clientId: _cid() })
 
     // 8. Always complete — the restaurant must be able to close the shift offline
     onComplete()

@@ -128,6 +128,9 @@ describe('el cierre no cuadra sobre una cola a medio subir', () => {
   })
 
   it('y el numero queda EN el cierre, para explicar la diferencia mañana', () => {
-    expect(wizard).toMatch(/cola_pendiente_al_cerrar: colaPendiente/)
+    // La fila vive en lib/pos-cierre-fila.ts (2026-09-10); el wizard le pasa `colaPendiente`.
+    const fila = readFileSync(join(process.cwd(), 'src/lib/pos-cierre-fila.ts'), 'utf8')
+    expect(fila).toMatch(/cola_pendiente_al_cerrar: d\.colaPendiente/)
+    expect(wizard).toMatch(/colaPendiente, notas: notas \|\| null, closedBy: manager/)
   })
 })

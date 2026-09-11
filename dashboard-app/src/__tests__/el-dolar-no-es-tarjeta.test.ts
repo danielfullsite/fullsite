@@ -191,7 +191,10 @@ describe('el wizard le pregunta al catalogo antes de cerrar', () => {
   })
 
   it('guarda el desglose de otros en el cierre', () => {
-    expect(wizard).toMatch(/otros_sistema: systemData\.otros/)
+    // La fila vive en lib/pos-cierre-fila.ts (2026-09-10); el wizard le pasa `otros`.
+    const fila = readFileSync(join(process.cwd(), 'src/lib/pos-cierre-fila.ts'), 'utf8')
+    expect(fila).toMatch(/otros_sistema: d\.otros/)
+    expect(wizard).toMatch(/otros: systemData\.otros/)
   })
 })
 

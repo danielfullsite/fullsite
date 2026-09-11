@@ -18,9 +18,12 @@ describe('CierreCajaWizard — el cierre Z limpia el día', () => {
     }
   })
 
-  it('avisa TURNO_CLOSED al local-server para purgar el KDS en modo LAN', () => {
-    expect(wizard).toContain("command_type: 'TURNO_CLOSED'")
-    expect(wizard).toContain('sendOrderToKitchen')
+  it('avisa TURNO_CLOSED al local-server para purgar el KDS en modo LAN — y ahora es DURABLE', () => {
+    // 2026-09-10: ya no es un intento de 2.5 s; va por la cola de avisos de la LAN.
+    expect(wizard).toMatch(/void avisarCierreDeTurno\(\{ turnoId, clientId: _cid\(\) \}\)/)
+    const aviso = readFileSync(join(__dirname, '..', 'lib', 'aviso-lan.ts'), 'utf8')
+    expect(aviso).toContain("command_type: 'TURNO_CLOSED'")
+    expect(aviso).toMatch(/command_id: `turno-closed:\$\{args\.turnoId\}`/)
   })
 
   it('la cancelación en lote PATCHea por id con filtro (lección de los once turnos)', () => {

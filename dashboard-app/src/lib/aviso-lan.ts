@@ -88,7 +88,7 @@ const TIMEOUT_MS = 1_200
 
 const LOG = '[aviso-lan]'
 
-export type TipoDeAviso = 'ORDER_CLOSED' | 'ORDER_CANCELLED' | 'ORDER_UPSERTED' | 'ORDER_ITEMS_TRANSFERRED'
+export type TipoDeAviso = 'ORDER_CLOSED' | 'ORDER_CANCELLED' | 'ORDER_UPSERTED' | 'ORDER_ITEMS_TRANSFERRED' | 'TURNO_CLOSED'
 
 export interface Aviso {
   /**
@@ -289,6 +289,26 @@ export function hayReintentosProgramados(): boolean { return temporizador !== nu
  * `opId` es el mismo identificador de la operacion de cobro, para que el aviso
  * herede su idempotencia — dos taps del boton de cobrar producen un solo aviso.
  */
+/**
+ * El turno cerro: que Pedro limpie el piso, y que lo sepa aunque la LAN
+ * parpadee justo al cerrar. Antes era un intento de 2.5 s sin cola: si no
+ * llegaba, las comandas de anoche amanecian en el KDS (barrido 2026-09-10,
+ * pedro-core LENTE-3 / kds LENTE-4). Pedro ignora un TURNO_CLOSED tardio si ya
+ * hay otro turno abierto (state.js), asi que reintentarlo es seguro.
+ *
+ * `order_id` lleva el id del turno solo porque la cola de avisos ordena por
+ * cuenta; Pedro lee `turno_id`.
+ */
+export function avisarCierreDeTurno(args: { turnoId: string; clientId: string }): Promise<boolean> {
+  return avisarALaLan({
+    command_id: `turno-closed:${args.turnoId}`,
+    command_type: 'TURNO_CLOSED',
+    order_id: `turno:${args.turnoId}`,
+    client_id: args.clientId,
+    turno_id: args.turnoId,
+  })
+}
+
 export function avisarCierreDeOrden(args: {
   opId: string
   orderId: string
