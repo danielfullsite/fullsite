@@ -345,3 +345,42 @@ adversarial detectó la entrada alternativa de apertura y no encontró otro
 bloqueo tras corregirla. El checkpoint anterior **28a866f0** también pasó CI,
 incluido multi-terminal **34472704800**. El instalador anterior no contiene esta
 tanda: requiere reconstrucción antes de presentarlo como el código actual.
+
+## Barrido de defectos con refutación adversarial — 10 y 11 de septiembre
+
+Sobre `c2cafac9` se corrieron doce lentes de búsqueda (Pedro, cola offline, SW,
+caja, KDS, inventario, permisos, integraciones, instalador, multi-tenant,
+migraciones, pruebas vacías) con refutadores independientes. Sobrevivieron 39
+hallazgos: 8 P0, 20 P1, 11 P2. La matriz completa por módulo, con prueba y
+estado de cada uno, está en [BARRIDO-2026-09-10](BARRIDO-2026-09-10.md). Todos
+los P0 y P1 quedaron corregidos con prueba A/B (la prueba nueva falla con el
+código anterior); tres P2 quedan registrados sin cambio (ventana del corte por
+día, toma física por delta, recepción de OC con stock absoluto).
+
+Los tres P0 que más pesaban para AMALAY: el poll de nube engordaba
+`events.ndjson` ~220 MB/h y Pedro no volvía a arrancar tras un día (ahora la
+foto es transitoria y las instalaciones existentes se compactan al cargar); el
+Service Worker servía `/api/pos/db?path=pos_orders…` desde caché sin marca
+(una orden cobrada reaparecía abierta); y el Corte Z cerraba el turno aunque la
+nube rechazara el cierre por una columna sin migración (ahora hay preflight y la
+migración `20260910090000` entra al repositorio). Inventario cierra los dos
+dobles: la fusión ya no descuenta dos veces y el cobro conserva los renglones
+cancelados con su disposición; el KDS pregunta si el platillo se preparó.
+
+El laboratorio legacy de CI detectó que un filtro nuevo contradecía D2 (la
+comanda cobrada debe quedarse hasta entregarse): se retiró el filtro y en su
+lugar el KDS legacy ofrece «Entregada». El runner en UTC detectó que
+`fechaDelCierre` dependía de la zona del proceso: ahora usa la del tenant.
+
+Bloqueos externos explícitos: la variable de CI `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+es de staging (el build ahora falla con el comando exacto; el instalador del
+candidato se construye localmente con la pareja de producción); los binarios de
+huella no están en el repositorio; las migraciones `PENDIENTE_` de inventario
+requieren despliegue coordinado. Procedimiento de instalación, migración,
+recuperación y rollback: [INSTALACION-CANDIDATO-2026-09-11](../pos/INSTALACION-CANDIDATO-2026-09-11.md).
+
+Validación local sobre `0ba0c5e3`: servidor **636/636**, web **3,765/3,765**,
+DOM **289/289**, TypeScript aprobado, PostgreSQL de conciliación **13/13** y de
+movimientos **8/8**, UI legacy **21/21**. CI y UI Caja en curso al escribir
+esto; el resultado final y el hash del instalador se anotan en la sección
+siguiente. Nada validado en campo.

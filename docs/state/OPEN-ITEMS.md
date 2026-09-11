@@ -41,27 +41,37 @@ Los H01–H16 inferiores siguen abiertos salvo evidencia posterior explícita.
 
 Feedback reciente, defectos nuevos y aceptación por síntoma: [Eduardo 9 de septiembre](../audit/EDUARDO-2026-09-09.md). Numeración Caja por turno, identidad nueva tras cierre y descarte de lecturas KDS tardías probados; recorrido Caja 23/23. No implican cierre global. Segunda tanda probada en UI Caja 23/23 y legacy 21/21: prioridad de borradores, compatibilidad de transporte memorizada y rechazo de anulación sin almacenamiento durable.
 
+## Barrido de defectos — 10 y 11 de septiembre
+
+Doce lentes con refutación adversarial sobre `c2cafac9`; 39 hallazgos confirmados,
+todos corregidos con prueba A/B salvo tres P2 que quedan registrados (corte por
+día vs día de venta, toma física por delta, recepción de OC con stock absoluto).
+Matriz completa por módulo: [BARRIDO-2026-09-10](../audit/BARRIDO-2026-09-10.md).
+Dos bloqueos externos: la variable de CI `NEXT_PUBLIC_SUPABASE_ANON_KEY` es de
+staging (el build ahora falla en vez de salir inservible) y los binarios de huella
+no están en el repo. Nada validado en campo.
+
 ## Candidato de cierre: pendientes actualizados el 10 de septiembre
 
 Fuente y aceptación de cada H: [Huecos actuales y condiciones de cierre](../audit/FULLSITE-HUECOS-ACTUALES-2026-09-08.md). No instalado en AMALAY. Estos estados distinguen código pendiente de falta de prueba; no vuelven a declarar abiertos los defectos ya corregidos en el candidato. El backlog heredado inferior no es una auditoría nueva de producción.
 
 | ID | Pendiente vigente del candidato | Estado |
 |---|---|---|
-| H01 | X/Z local integrado; falta conciliación completa de abonos en reportes cloud | 🔶 parcial probado |
+| H01 | X/Z local integrado; Z con preflight (no cierra turno sin cierre), fecha por día de venta, guardia desde Pedro sin WAN; falta conciliación completa de abonos en reportes cloud | 🔶 parcial probado |
 | H02 | Consumo adicional integrado; faltan reducciones, ajustes y devoluciones con dinero abierto | 🔶 parcial probado |
 | H03 | Tarjeta/proveedores, pago mixto y propinas por Caja | ⬜ función pendiente |
 | H04 | Transferencia legacy atómica; faltan transferir/unir/cancelar consumo individual en Caja | 🔶 parcial probado |
 | H05 | Papel/cajón y resolución autorizada implementados; falta aceptación de dispositivos físicos | 🔶 software probado; hardware pendiente |
 | H06 | Retiros, depósitos y X/Z integrados; apertura confrontada con motivo durable en Caja. Falta cierre con todos los medios/propinas | 🔶 parcial probado |
 | H07 | Entrada de delivery y otros canales al escritor Caja | ⬜ integración pendiente |
-| H08 | Movimiento manual atómico y conciliación legacy probados; anulación completa sin disposición conserva stock y queda pendiente. Faltan captura/autorización de disposición, consumo del outbox Caja y casos de recetas | 🔶 parcial probado |
+| H08 | Movimiento manual atómico y conciliación legacy probados; disposición por renglón en anulación completa y en KDS; fusión y cobro conservan consumo; stock negativo admite entradas; market en cobro offline. Faltan consumo del outbox Caja, toma física absoluta y casos de recetas | 🔶 parcial probado (PostgreSQL local 13/13) |
 | H09 | Proxy y relaciones acotados; falta matriz completa de APIs/empleados y enforcement restante | 🔶 parcial probado |
 | H10 | Aislamiento y recuperación de MP/Clip/CFDI/delivery | ⬜ implementación y sandbox |
 | H11 | Alta reanudable y activación atómica probadas; falta recuperación de credencial perdida y enrolamiento/primera venta | 🔶 parcial probado |
-| H12 | Lectura KDS/caché por sucursal probadas; falta delivery cloud, turno exacto offline, presencia y huella | 🔶 parcial probado |
+| H12 | Lectura KDS/caché por sucursal probadas; foto de nube sin engordar el log, nube corrige órdenes locales, secundaria conserva origen, T-09 completo; falta delivery cloud, turno exacto offline, presencia y huella | 🔶 parcial probado |
 | H13 | Periodo/paginación/indisponibilidad mejorados; falta conciliación completa dashboard/IA | 🔶 parcial probado |
 | H14 | Migraciones reales y transición coordinada de AMALAY | 🔶 PostgreSQL local probado; destino pendiente |
-| H15 | Build Windows actualizado en validación; recibos ausentes quedan inciertos; falta restauración coherente y hardware | 🔶 parcial probado |
+| H15 | Build Windows actualizado en validación; guard de pareja Supabase en el bundle; recibos ausentes quedan inciertos; falta restauración coherente, variable de CI corregida y hardware | 🔶 parcial probado |
 | H16 | Barrera de actualización incluye pendientes durables; falta carga, diagnóstico y soporte con ejecución confirmada | 🔶 parcial probado |
 
 ---
