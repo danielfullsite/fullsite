@@ -49,6 +49,7 @@ import { apiUrl } from '@/lib/api-base'
 import { sendOrderToKitchen, kitchenFailureMessage } from '@/lib/kitchen-bridge'
 import { avisarCierreDeOrden, avisarCuentaActualizada, avisarTransferenciaItem, avisarCuentaConfirmada } from '@/lib/aviso-lan'
 import { disposicionPropuesta, renglonesAnulados, renglonesVivos, resumenDeDisposicion, type Disposicion } from '@/lib/anulacion-completa'
+import { recordarOrdenEncolada } from '@/lib/pos-mesa-cache'
 import { cacheTrasElCierre, cachePreferidaAlAbrir } from '@/lib/cache-de-cuenta'
 import { leerCuenta, requiereCaja, cuentaConfirmada, type LecturaDeCuenta } from '@/lib/pedro-cliente'
 import { leerCatalogoCaja } from '@/lib/pedro-catalogo'
@@ -3579,6 +3580,13 @@ function POSContent() {
         // expected_revision must be 1 higher than this send's queued revision.
         // If internet returns before payment, saveResult.revision (line ~3161) overrides this.
         setOrderRevision(prev => prev + 1)
+        // El cache de la mesa tiene que saber QUE orden se encoló y con QUE
+        // revisión, o al reabrir la mesa sin red se inventa otra orden y el
+        // cobro sale con expected_revision viejo. Ver lib/pos-mesa-cache.ts.
+        recordarOrdenEncolada(order.mesa, {
+          id: order.id, items: activeItems, mesero, personas, discount, notas: orderNotes,
+          revision: orderRevision + 1,
+        })
         // Immediate count refresh: interval only fires every 30s, but IDB is local.
         getPendingQueue().then(q => setPendingSync(q.length)).catch(() => {})
         // Broadcast to local server so KDS on other LAN devices receives the order offline

@@ -469,6 +469,8 @@ export async function getCachedInventory(): Promise<Record<string, unknown>[]> {
 
 // ─── Sync Queue ─────────────────────────────────────────────────────────────
 
+let ultimoTsDeCola = 0
+
 export async function queueOperation(
   table: string,
   method: 'POST' | 'PATCH' | 'DELETE',
@@ -478,7 +480,14 @@ export async function queueOperation(
   transport?: ReplayTransport
 ): Promise<string> {
   const db = await openDB()
-  const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  // El id ordena la cola (getAll sobre el keyPath). Dos operaciones en el MISMO
+  // milisegundo —un envío y su cobro en la misma ráfaga, o el drenado del buffer
+  // de localStorage, que re-encola en bucle— quedaban ordenadas por el sufijo
+  // aleatorio: el cobro podía reproducirse antes que la creación de su orden.
+  // Marca de tiempo estrictamente creciente dentro de la sesión.
+  const ts = Math.max(Date.now(), ultimoTsDeCola + 1)
+  ultimoTsDeCola = ts
+  const id = `${ts}-${Math.random().toString(36).slice(2, 8)}`
   const item: SyncQueueItem = {
     id,
     table,
@@ -1089,6 +1098,19 @@ export async function syncAll(options: { retryExhausted?: boolean } = {}): Promi
   }
 }
 
+/** order_id de un item de la cola (APP_API save-order o REST de pos_orders). */
+export function ordenDelItem(item: Pick<SyncQueueItem, 'data' | 'table'>): string | null {
+  const d = item.data as Record<string, unknown> | undefined
+  const id = d?.order_id ?? (item.table === 'pos_orders' ? d?.id : undefined)
+  return typeof id === 'string' && id ? id : null
+}
+
+/** ¿Hay OTRO item sin subir de la misma orden con expected_revision 0 (la creación)? */
+export function creacionPendienteEnCola(ordenId: string, queue: Pick<SyncQueueItem, 'id' | 'data' | 'table' | 'synced'>[], exceptoId: string): boolean {
+  return queue.some(it => it.id !== exceptoId && !it.synced && ordenDelItem(it) === ordenId &&
+    Number((it.data as Record<string, unknown>)?.expected_revision ?? -1) === 0)
+}
+
 async function _syncAllInner(): Promise<SyncResult> {
   const queue = await getPendingQueue()
   let synced = 0
@@ -1117,16 +1139,37 @@ async function _syncAllInner(): Promise<SyncResult> {
     return { synced: 0, failed: queue.length }
   }
 
+  // UNA ORDEN SE SUBE EN ORDEN, O NO SE SUBE.
+  //
+  // P0 del barrido 2026-09-10 (offline-queue LENTE-3): la cola traía [POST A
+  // rev 0 (envío), POST A rev 1 cerrada (cobro)]. El envío recibía un 502 real
+  // (Vercel, RPC_FAILED, TURN_NOT_FOUND porque el turno aún no subía) y el bucle
+  // SEGUÍA: 400 ms después el cobro llegaba a un backend ya sano, la orden A no
+  // existía → ORDER_NOT_FOUND → TERMINAL, y se saltaba para siempre. Al siguiente
+  // tick el envío creaba A (enviada). Resultado: cobro en cajón, orden abierta
+  // en la nube, corte de la nube sin ese dinero; el modal de conflicto sólo
+  // ofrecía borrar el cobro.
+  //
+  // Regla: si un item de una orden no sube en este pase (fallo, conflicto,
+  // reintentos agotados), los items POSTERIORES de la MISMA orden se saltan sin
+  // consumir reintentos ni clasificarse. Se reintentan en el próximo pase, ya
+  // con su antecesor arriba.
+  const ordenesDetenidas = new Set<string>()
+  const ordenDe = (it: SyncQueueItem) => ordenDelItem(it)
+
   for (const item of queue) {
     // Recheck between entries: a long replay must stop if the installation
     // changes authority or loses Caja. The database fence covers in-flight IO.
     const blocked = await replayAuthorityBlock()
     if (blocked) return { synced, failed, blocked }
+    const ordenId = ordenDe(item)
+    if (ordenId && ordenesDetenidas.has(ordenId)) continue
     // Skip items in terminal error state — they require operator intervention
     if (item.error_class === 'STALE_WRITE_CONFLICT' || item.error_class === 'TERMINAL_NON_RETRYABLE') {
+      if (ordenId) ordenesDetenidas.add(ordenId)
       continue
     }
-    if (item.retries >= 5) continue
+    if (item.retries >= 5) { if (ordenId) ordenesDetenidas.add(ordenId); continue }
 
     const transport = resolveTransport(item)
 
@@ -1137,7 +1180,17 @@ async function _syncAllInner(): Promise<SyncResult> {
         if (synced > 0 || failed > 0) {
           await new Promise<void>(r => setTimeout(r, 400))
         }
-        const result = await replayViaAppApi(item, appApiToken!)
+        let result = await replayViaAppApi(item, appApiToken!)
+        // ORDER_NOT_FOUND con la creación de esa orden todavía en la cola (el
+        // buffer de localStorage la re-encola al FINAL) no es terminal: es
+        // orden de llegada. Se reintenta cuando la creación haya subido.
+        let creacionDetras = false
+        if (!result.ok && result.detail === 'ORDER_NOT_FOUND' && ordenId && creacionPendienteEnCola(ordenId, queue, item.id)) {
+          result = { ok: false, errorClass: 'TRANSIENT_RETRYABLE', detail: 'ORDER_NOT_FOUND (creación aún en cola)' }
+          // La creación viene DETRÁS: no se detiene la orden, o nunca subiría.
+          creacionDetras = true
+        }
+        if (!result.ok && ordenId && !creacionDetras) ordenesDetenidas.add(ordenId)
 
         if (result.ok) {
           await markSynced(item.id)
