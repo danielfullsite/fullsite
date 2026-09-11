@@ -195,7 +195,7 @@ async function startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, branc
           const command = deliveryOrderCommand(row, restaurantId)
           const ingestResult = await cmdHandler.handle({ protocol_version: PROTOCOL_VERSION, type: 'COMMAND', restaurant_id: restaurantId, payload: command }, 'delivery-poll')
           // This event originated in Supabase; do not echo it back through the outbox.
-          if (ingestResult.event?.sequence) await eventStore.markSynced([ingestResult.event.sequence])
+          if (!ingestResult.duplicate && ingestResult.event?.sequence) await eventStore.markSynced([ingestResult.event.sequence])
           for (const station of ['cocina', 'barra', 'caja']) {
             const ticket = buildDeliveryTicket(command, station)
             if (!ticket) continue
@@ -203,7 +203,7 @@ async function startSupabasePoll({ supabaseUrl, supabaseKey, restaurantId, branc
               protocol_version: PROTOCOL_VERSION, type: 'COMMAND', restaurant_id: restaurantId,
               payload: { command_id: `delivery-print:${row.platform}:${row.platform_order_id}:${station}`, command_type: 'PRINT_COMMAND', station, data_b64: ticket.toString('base64') },
             }, 'delivery-poll')
-            if (printResult.event?.sequence) await eventStore.markSynced([printResult.event.sequence])
+            if (!printResult.duplicate && printResult.event?.sequence) await eventStore.markSynced([printResult.event.sequence])
           }
         }
       }

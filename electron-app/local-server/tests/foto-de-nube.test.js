@@ -128,3 +128,93 @@ describe('las secundarias aplican la foto sin mover el cursor', () => {
     assert.match(aplicar, /if \(seq <= cursor\) return/)
   })
 })
+
+describe('instalaciones existentes: las fotos heredadas en el log se compactan al cargar', () => {
+  const grande = (n) => Array.from({ length: n }, (_, i) => fila(`o${i}`, i + 1))
+  async function logHeredado(dir, fotos) {
+    const store = new CoreEventStore(new NdjsonEventStore({ eventLogPath: path.join(dir, 'events.ndjson') }))
+    await store.load()
+    await store.appendInternal(EVENT.ORDER_SENT, { order_id: 'local-1', mesa: 9, items: [] }, { restaurantId: 'r1' })
+    for (let i = 0; i < fotos; i++) await store.appendInternal(EVENT.STATE_SYNC, payloadCon(grande(150)), { restaurantId: 'r1' })
+    await store.appendInternal(EVENT.ORDER_SENT, { order_id: 'local-2', mesa: 8, items: [] }, { restaurantId: 'r1' })
+    return store
+  }
+
+  test('REGRESION: 30 fotos de 150 filas -> el archivo encoge, las secuencias no cambian y la ultima foto sigue integra', async () => {
+    const dir = dirTemporal()
+    const viejo = await logHeredado(dir, 30)
+    const ultimaSeq = await viejo.getLastSequence()
+    const ruta = path.join(dir, 'events.ndjson')
+    const antes = fs.statSync(ruta).size
+
+    const adaptador = new NdjsonEventStore({ eventLogPath: ruta })
+    const nuevo = new CoreEventStore(adaptador)
+    await nuevo.load()
+    const despues = fs.statSync(ruta).size
+    assert.ok(despues < antes / 20, `el log debe encoger mucho: ${antes} -> ${despues}`)
+    assert.equal(await nuevo.getLastSequence(), ultimaSeq, 'la cadena de secuencias es la misma')
+    assert.equal(adaptador.getStats().compactedSnapshots, 29)
+
+    const eventos = await nuevo.readAfter(0)
+    const fotos = eventos.filter(e => e.type === EVENT.STATE_SYNC)
+    assert.equal(fotos.length, 30)
+    assert.equal(fotos.filter(e => e.payload.compacted === true).length, 29)
+    assert.equal(fotos[29].payload.compacted, undefined, 'la ultima conserva el salon')
+    assert.equal(fotos[29].payload.orders.length, 150)
+
+    // La reproduccion sigue dando el mismo salon: 150 de nube + 2 locales.
+    const state = new RestaurantState()
+    for (const e of eventos) state.apply(e)
+    assert.equal(state.toSnapshot().salon_orders.length, 152)
+
+    // Un segundo arranque no vuelve a reescribir: ya no hay nada que compactar.
+    const mtime = fs.statSync(ruta).mtimeMs
+    const tercero = new NdjsonEventStore({ eventLogPath: ruta })
+    await tercero.load()
+    assert.equal(fs.statSync(ruta).mtimeMs, mtime)
+    assert.equal(tercero.getStats().compactedSnapshots, 0)
+  })
+
+  test('una sola foto heredada se deja como esta', async () => {
+    const dir = dirTemporal()
+    await logHeredado(dir, 1)
+    const ruta = path.join(dir, 'events.ndjson')
+    const antes = fs.statSync(ruta).size
+    const store = new NdjsonEventStore({ eventLogPath: ruta })
+    await store.load()
+    assert.equal(fs.statSync(ruta).size, antes)
+  })
+
+  test('un STATE_SYNC compactado no mueve el estado', () => {
+    const state = new RestaurantState()
+    state.apply(foto.eventoTransitorio('r1', payloadCon([fila('o1', 1)])))
+    const antes = JSON.stringify(state.toSnapshot())
+    state.apply({ id: 'x', type: EVENT.STATE_SYNC, ts: 1, client_id: 'server', restaurant_id: 'r1', payload: { compacted: true, synced_at: 'z' } })
+    assert.equal(JSON.stringify(state.toSnapshot()), antes)
+  })
+})
+
+describe('markSynced no toca el disco si nada cambia', () => {
+  test('REGRESION: marcar de nuevo secuencias ya sincronizadas no reescribe el log', async () => {
+    const dir = dirTemporal()
+    const ruta = path.join(dir, 'events.ndjson')
+    const store = new CoreEventStore(new NdjsonEventStore({ eventLogPath: ruta }))
+    await store.load()
+    const ev = await store.appendInternal(EVENT.ORDER_SENT, { order_id: 'd-1', mesa: 1, items: [] }, { restaurantId: 'r1' })
+    await store.markSynced([ev.sequence])
+    assert.equal(await store.unsyncedCount(), 0)
+    const antes = fs.statSync(ruta).mtimeMs
+    const ino = fs.statSync(ruta).ino
+    await new Promise(r => setTimeout(r, 20))
+    await store.markSynced([ev.sequence])
+    await store.markSynced([9999])
+    assert.equal(fs.statSync(ruta).mtimeMs, antes, 'sin cambios, sin reescritura')
+    assert.equal(fs.statSync(ruta).ino, ino)
+  })
+
+  test('REGRESION (fuente): el poll de delivery no marca sincronizado un duplicado', () => {
+    const src = fs.readFileSync(path.join(__dirname, '../index.js'), 'utf8')
+    assert.match(src, /if \(!ingestResult\.duplicate && ingestResult\.event\?\.sequence\) await eventStore\.markSynced/)
+    assert.match(src, /if \(!printResult\.duplicate && printResult\.event\?\.sequence\) await eventStore\.markSynced/)
+  })
+})

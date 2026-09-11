@@ -192,6 +192,9 @@ class RestaurantState {
         return { changed: ['turno', 'orders', 'kds', 'mesas'] }
 
       case EVENT.STATE_SYNC:
+        // Una foto heredada compactada al cargar el log (adapters/storage/ndjson.js)
+        // no trae salon: se salta. La siguiente foto viva la reemplaza entera.
+        if (payload?.compacted === true) return { changed: [] }
         return this._applyStateSync(payload)
 
       default:
