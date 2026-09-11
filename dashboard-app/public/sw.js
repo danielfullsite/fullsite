@@ -1,7 +1,7 @@
 // Service Worker — Fullsite POS offline-first
 // Caches app shell, static assets, and API responses for true offline operation
 
-const CACHE_VERSION = 'v47'
+const CACHE_VERSION = 'v48'
 const STATIC_CACHE = `fullsite-static-${CACHE_VERSION}`
 const DYNAMIC_CACHE = `fullsite-dynamic-${CACHE_VERSION}`
 const API_CACHE = `fullsite-api-${CACHE_VERSION}`
@@ -58,6 +58,28 @@ const NEVER_CACHE_PATTERNS = [
   /\/rest\/v1\/pos_orders/,
   /\/rest\/v1\/pos_mesas/,
 ]
+
+// ─── /api/pos/db: el proxy de la terminal ES una consulta REST ───────────────
+//
+// La terminal con PIN (sin sesion de Supabase) no pega a /rest/v1:
+// supabase-fetch-patch.ts reescribe cada GET a `/api/pos/db?path=<consulta
+// PostgREST url-encoded>`. Para el SW el pathname es `/api/pos/db`, asi que
+// NEVER_CACHE (pos_orders, pos_mesas) no lo veia y la consulta entraba por la
+// rama generica de /api/: cada 200 al cache dinamico y, sin red, el respaldo con
+// ignoreSearch devolvia CUALQUIER `/api/pos/db?...` —otra mesa, pos_staff, lo que
+// hubiera— como 200 sin marca. Una orden ya cobrada volvia abierta en la mesa;
+// un turno cerrado en Caja resucitaba en pos_turno_cache y las ordenes salian
+// con turno_id cerrado (409 terminal en el replay). El comentario de arriba
+// declaraba cerrado ese bug; lo estaba solo para el camino con JWT de dashboard.
+//
+// Aqui se traduce el proxy a la ruta REST que representa y se le aplica la MISMA
+// politica: lo que nunca se cachea directo, tampoco se cachea por proxy; lo
+// demas entra por la rama de API (match exacto, respuesta guardada MARCADA).
+function consultaProxeada(url) {
+  if (url.pathname !== '/api/pos/db') return null
+  const path = url.searchParams.get('path') || ''
+  return '/rest/v1/' + path.split('?')[0]
+}
 
 self.addEventListener('install', (event) => {
   console.log('[SW] Installing...')
@@ -163,6 +185,14 @@ self.addEventListener('fetch', (event) => {
 
   // Never cache auth or payment endpoints
   if (NEVER_CACHE_PATTERNS.some((p) => p.test(url.pathname))) return
+
+  // El proxy de la terminal se juzga por la consulta que lleva adentro.
+  const proxeada = consultaProxeada(url)
+  if (proxeada) {
+    if (NEVER_CACHE_PATTERNS.some((p) => p.test(proxeada))) return
+    event.respondWith(networkFirstWithCache(request, API_CACHE, true))
+    return
+  }
 
   // API requests: network-first with cache fallback
   if (url.hostname.includes('supabase.co') && API_CACHE_PATTERNS.some((p) => p.test(url.pathname))) {
