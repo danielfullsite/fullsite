@@ -214,9 +214,9 @@ class EventosViejos(unittest.TestCase):
 
 class LoQueSeGuarda(unittest.TestCase):
     def test_guarda_la_venta_real_y_el_error_para_poder_auditarlo(self):
-        import json
         (_, _, _), parches = correr([evento(10000, AYER, 10)], {AYER: 12000})
-        ev = json.loads(parches[0][1]["evidence"])
+        ev = parches[0][1]["evidence"]
+        self.assertIsInstance(ev, dict, "jsonb debe recibir un objeto, no JSON serializado")
         self.assertEqual(ev["venta_real"], 12000)
         self.assertAlmostEqual(ev["error_pct"], 16.67, places=1)
         self.assertIn("calificado_el", ev)
