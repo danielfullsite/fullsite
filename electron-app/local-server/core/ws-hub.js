@@ -131,11 +131,29 @@ class WsHub {
         if (anterior && anterior.ws !== ws) anterior.ws.close(1008, 'conexion reemplazada')
         autenticado = true
         clearTimeout(authTimeout)
-        this._clients.set(clientId, {
+        // NINGÚN DELTA ANTES DEL SNAPSHOT.
+        //
+        // El cliente entraba a `_clients` aquí y el SNAPSHOT se armaba después,
+        // con dos `await` de por medio (última secuencia y catch-up). Si otra
+        // terminal mandaba una comanda en esa ventana, el `broadcast` la sacaba
+        // ANTES del SNAPSHOT: el sobre del DELTA traía una secuencia MAYOR que la
+        // del SNAPSHOT que venía detrás. La secundaria lee eso como «la Caja
+        // reinició su historia» (enlace-con-caja.js), pone el cursor en -1 y
+        // vuelve a aplicar todo el catch-up: cada comanda se proyecta dos veces y
+        // se repinta dos veces en cocina, barra y plano. Reproducido con WsHub y
+        // cliente ws reales el 2026-09-12 (barrido 3, multi-terminal).
+        //
+        // Se registra igual —para no PERDER lo que salga en la ventana— pero
+        // marcado `listo: false`: lo que llegue se guarda y se entrega en orden
+        // justo después del SNAPSHOT.
+        const entrada = {
           ws,
           meta:     { client_id: clientId, client_type: msg.client_type, remote_ip: remoteIp, connected_at: Date.now(), restaurant_id: remoteRestaurantId || null },
           lastPong: Date.now(),
-        })
+          listo:    false,
+          enEspera: [],
+        }
+        this._clients.set(clientId, entrada)
 
         console.log(`[ws-hub] Client subscribed: ${clientId} (${msg.client_type}) from ${remoteIp}`)
 
@@ -148,6 +166,13 @@ class WsHub {
           state:   this._getState(),
           deltas,
         }, serverSeq))
+        // Desde aquí ya puede recibir: primero lo que se acumuló, en orden.
+        entrada.listo = true
+        const enEspera = entrada.enEspera
+        entrada.enEspera = []
+        for (const pendiente of enEspera) {
+          if (ws.readyState === ws.OPEN) { try { ws.send(pendiente) } catch {} }
+        }
 
         return
       }
@@ -215,15 +240,26 @@ class WsHub {
 
   // ─── Broadcast ───────────────────────────────────────────────────────────
 
+  /** Un cliente que aún no recibió su SNAPSHOT guarda lo que llegue; ver SUBSCRIBE. */
+  static MAX_EN_ESPERA = 500
+
   async broadcast(event) {
     if (this._clients.size === 0) return
     const seq = await this._getLastSeq()
     const msg = this._envelope(S2C.DELTA, { event }, seq)
     let sent = 0
-    for (const { ws } of this._clients.values()) {
-      if (ws.readyState === ws.OPEN) {
-        try { ws.send(msg); sent++ } catch {}
+    for (const cliente of this._clients.values()) {
+      const { ws } = cliente
+      if (ws.readyState !== ws.OPEN) continue
+      if (cliente.listo === false) {
+        // Si la espera se desborda, es mejor que reconecte y pida un SNAPSHOT
+        // nuevo que entregarle una historia con agujeros.
+        if (cliente.enEspera.length >= WsHub.MAX_EN_ESPERA) { try { ws.close(1013, 'catch-up desbordado') } catch {} ; continue }
+        cliente.enEspera.push(msg)
+        sent++
+        continue
       }
+      try { ws.send(msg); sent++ } catch {}
     }
     return sent
   }

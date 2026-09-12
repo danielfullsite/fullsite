@@ -50,26 +50,56 @@ async function resolveClientId(providerStoreId: string): Promise<string | null> 
   return res.rows[0]?.client_id ?? null
 }
 
-async function quarantineUnmappedStore(rawOrder: unknown, providerStoreId: string, source: ProcessSource, correlationId: string) {
-  await sbJson('integration_webhook_dlq', {
-    method: 'POST',
-    headers: { Prefer: 'return=minimal' },
-    body: JSON.stringify({
+/**
+ * UNA ORDEN QUE NO SE PUDO INGERIR TIENE QUE QUEDAR ESCRITA EN ALGÚN LADO.
+ *
+ * Sólo `UNMAPPED_STORE` iba a la cola de rezagados. Los otros dos caminos de
+ * descarte —`RAPPI_ORDER_ID_MISSING` y `RAPPI_STORE_ID_MISSING`— devolvían la
+ * palabra `dlq` y nada más, así que un payload con forma inesperada (el webhook
+ * desenvuelve `order`/`data` por adivinanza) se tragaba una orden real de un
+ * cliente sin dejar rastro. Rappi ya recibió su 200 y no reintenta.
+ * (Barrido 3, 2026-09-12, integraciones P0.)
+ *
+ * `cuarentena` es el único camino: escribe la fila, deja la auditoría, y NUNCA
+ * lanza — si hasta la cuarentena falla, se registra en consola con el payload
+ * para que exista al menos en el log de la función.
+ */
+export async function cuarentenarOrdenDeRappi(rawOrder: unknown, motivo: string, source: ProcessSource, correlationId = crypto.randomUUID()) {
+  return cuarentena(rawOrder, motivo, source, correlationId)
+}
+
+async function cuarentena(rawOrder: unknown, motivo: string, source: ProcessSource, correlationId: string, extra: Record<string, unknown> = {}) {
+  try {
+    await sbJson('integration_webhook_dlq', {
+      method: 'POST',
+      headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({
+        provider: 'rappi',
+        event_type: `order.${source}`,
+        client_id: null,
+        payload: rawOrder,
+        failure_reason: motivo,
+      }),
+    })
+  } catch (e) {
+    console.error('[rappi-ingest] no se pudo encolar en la DLQ', { motivo, error: e instanceof Error ? e.message : String(e), payload: rawOrder })
+  }
+  try {
+    await auditLog({
       provider: 'rappi',
-      event_type: `order.${source}`,
-      client_id: null,
-      payload: rawOrder,
-      failure_reason: `unmapped_store: provider_store_id="${providerStoreId}" has no integration_store_mappings row`,
-    }),
-  }).catch(() => ({ ok: false, status: 0, rows: [] }))
-  await auditLog({
-    provider: 'rappi',
-    correlation_id: correlationId,
-    action: 'order.dlq',
-    request: { provider_store_id: providerStoreId, source },
-    response: { reason: 'unmapped_store' },
-    status_code: 422,
-  })
+      correlation_id: correlationId,
+      action: 'order.dlq',
+      request: { source, ...extra },
+      response: { reason: motivo },
+      status_code: 422,
+    })
+  } catch { /* la auditoría nunca frena la cuarentena */ }
+}
+
+async function quarantineUnmappedStore(rawOrder: unknown, providerStoreId: string, source: ProcessSource, correlationId: string) {
+  await cuarentena(rawOrder,
+    `unmapped_store: provider_store_id="${providerStoreId}" has no integration_store_mappings row`,
+    source, correlationId, { provider_store_id: providerStoreId })
 }
 
 function deliveryOrderId(platformOrderId: string): string {
@@ -78,7 +108,10 @@ function deliveryOrderId(platformOrderId: string): string {
 
 export async function processRappiOrder(rawOrder: unknown, source: ProcessSource, correlationId = crypto.randomUUID()): Promise<ProcessResult> {
   const platformOrderId = rappiProviderOrderId(rawOrder)
-  if (!platformOrderId) return { action: 'dlq', reason: 'RAPPI_ORDER_ID_MISSING' }
+  if (!platformOrderId) {
+    await cuarentena(rawOrder, 'RAPPI_ORDER_ID_MISSING', source, correlationId)
+    return { action: 'dlq', reason: 'RAPPI_ORDER_ID_MISSING' }
+  }
 
   const existingId = await findExisting(platformOrderId)
   if (existingId) {
@@ -94,7 +127,10 @@ export async function processRappiOrder(rawOrder: unknown, source: ProcessSource
   }
 
   const providerStoreId = rappiProviderStoreId(rawOrder, rappiStoreId())
-  if (!providerStoreId) return { action: 'dlq', platformOrderId, reason: 'RAPPI_STORE_ID_MISSING' }
+  if (!providerStoreId) {
+    await cuarentena(rawOrder, 'RAPPI_STORE_ID_MISSING', source, correlationId, { platform_order_id: platformOrderId })
+    return { action: 'dlq', platformOrderId, reason: 'RAPPI_STORE_ID_MISSING' }
+  }
 
   const clientId = await resolveClientId(providerStoreId)
   if (!clientId) {

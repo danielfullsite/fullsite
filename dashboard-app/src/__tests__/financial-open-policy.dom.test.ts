@@ -61,10 +61,16 @@ it('an existing financial account uses fresh send progress, blocks new money, an
     return Response.json({ authoritative: true, write_authority: 'caja', financial_orders: [reserved], salon_orders: [saved] })
   })
   render(createElement(CobroDeCaja, { order: { ...saved, items: [{ cantidad: 2, sent_quantity: 2 }] }, onClose: () => {}, onChanged: () => {} }))
+  // El modal abre solo en «Por confirmar» cuando hay dinero apartado sin resolver
+  // (2026-09-12: se repartió en pestañas para que no haya scroll en la caja).
   await screen.findByText('Cobro por confirmar · $10.00')
-  expect((screen.getByRole('button', { name: 'Preparar cobro en efectivo' }) as HTMLButtonElement).disabled).toBe(true)
-  expect((screen.getByRole('button', { name: 'Cobrar con terminal bancaria' }) as HTMLButtonElement).disabled).toBe(true)
   expect(screen.getByText('Reservado')).toBeTruthy()
+  // El contrato no cambia: con productos sin enviar, NINGÚN camino abre dinero nuevo.
+  fireEvent.click(screen.getByRole('tab', { name: /Efectivo/ }))
+  expect((screen.getByRole('button', { name: 'Preparar cobro en efectivo' }) as HTMLButtonElement).disabled).toBe(true)
+  fireEvent.click(screen.getByRole('tab', { name: /Tarjeta/ }))
+  expect((screen.getByRole('button', { name: 'Cobrar con terminal bancaria' }) as HTMLButtonElement).disabled).toBe(true)
+  fireEvent.click(screen.getByRole('tab', { name: /Por confirmar/ }))
   fireEvent.change(screen.getByLabelText('Efectivo recibido pending-cash'), { target: { value: '10' } })
   fireEvent.click(screen.getByRole('button', { name: /Confirmar efectivo recibido/ }))
   await vi.waitFor(() => expect(network.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(true))
