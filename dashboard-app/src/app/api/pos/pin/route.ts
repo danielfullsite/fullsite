@@ -14,14 +14,16 @@ import { pinGate, pinRecord } from '@/lib/pin-throttle'
 
 async function respond(staff: { id: string; name: string; role: string }, clientId: string, key: string) {
   await pinRecord(key, true) // success clears the throttle for this source
-  let shiftToken: string | undefined
   try {
-    shiftToken = await issueShiftToken(staff.id, clientId, staff.role, staff.name)
+    const shiftToken = await issueShiftToken(staff.id, clientId, staff.role, staff.name)
+    return Response.json({ staff, shiftToken })
   } catch (e) {
-    // SHIFT_TOKEN_SECRET not configured — log and continue without token (degrades to legacy flow)
+    // Nunca desbloquear con identidad nueva y sin token: el navegador podría
+    // conservar el token anterior de un gerente y mostrar a un mesero mientras
+    // las peticiones siguen saliendo con privilegios viejos.
     console.error('[pin] issueShiftToken failed (SHIFT_TOKEN_SECRET missing?):', e)
+    return Response.json({ error: 'No se pudo crear la sesión segura', code: 'shift_token_unavailable' }, { status: 503 })
   }
-  return Response.json({ staff, shiftToken })
 }
 
 /**
@@ -109,6 +111,18 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'No se pudo verificar el acceso', code: 'authority_unavailable' }, { status: 503 })
     }
 
+    // Un identificador de huella NO es prueba biométrica. Hasta almacenar la
+    // llave pública y validar challenge + authenticatorData + signature en el
+    // servidor, aceptar `fingerprint_id` permite pedir el token de cualquier
+    // empleado cuyo UUID conozca el navegador. La huella queda como
+    // identificación local y el PIN como autorización.
+    if (fingerprint_id !== undefined) {
+      return Response.json(
+        { error: 'La huella debe confirmarse con PIN', code: 'biometric_proof_required' },
+        { status: 403 },
+      )
+    }
+
     // Role hierarchy filter
     const ROLE_HIERARCHY: Record<string, number> = { mesero: 1, cajero: 2, capitan: 3, gerente: 4, admin: 5 }
     const effectiveMinRole = min_role || (manager === true ? 'gerente' : null)
@@ -119,40 +133,6 @@ export async function POST(request: NextRequest) {
         .filter(([, level]) => level >= minLevel)
         .map(([role]) => role)
       roleFilter = `&role=in.(${allowedRoles.join(',')})`
-    }
-
-    /**
-     * La huella IGNORABA el rol pedido — escalada de privilegio.
-     *
-     * Esta rama resolvia y devolvia ANTES de que se calculara `roleFilter`, asi que
-     * `manager: true` y `min_role` no se aplicaban. Y como el endpoint no verifica
-     * ninguna firma WebAuthn —confia en el id que le mandan— bastaba con conocer el
-     * UUID de un gerente para pedir un shiftToken de gerente SIN huella y SIN PIN.
-     * Esos UUID viven en `pos_staff_cache`, en el localStorage de cualquier terminal.
-     *
-     * Encontrado el 2026-08-31 al ir a extender la huella al corte de caja. Montar
-     * esa funcion encima habria llevado el bypass justo a la autorizacion del dinero.
-     *
-     * LO QUE ESTE ARREGLO NO HACE: sigue sin verificarse la firma WebAuthn del lado
-     * del servidor; el id sigue siendo una afirmacion del cliente. Lo que se cierra
-     * es la ESCALADA: una huella solo puede obtener el rol que su propio empleado ya
-     * tiene. La verificacion real exige guardar las llaves publicas en el servidor y
-     * validar la assertion — va aparte, y sigue haciendo falta.
-     */
-    // Fingerprint (WebAuthn) login — look up by staff ID, validate active status + tenant
-    if (fingerprint_id && typeof fingerprint_id === 'string') {
-      const fpRes = await fetch(
-        `${sbUrl}/rest/v1/pos_staff?id=eq.${encodeURIComponent(fingerprint_id)}&active=eq.true&client_id=eq.${encodeURIComponent(clientId)}${roleFilter}&select=id,name,role&limit=1`,
-        { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
-      )
-      if (fpRes.ok) {
-        const rows = await fpRes.json()
-        if (Array.isArray(rows) && rows.length > 0) {
-          return respond({ id: rows[0].id, name: rows[0].name, role: rows[0].role }, clientId, throttleKey)
-        }
-      }
-      await pinRecord(throttleKey, false)
-      return Response.json({ error: 'Empleado no encontrado o desactivado' }, { status: 401 })
     }
 
     // Transitional compatibility: existing staff may still have 4–8 digit

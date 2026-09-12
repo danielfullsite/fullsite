@@ -41,6 +41,7 @@ import {
   type PagoForma,
   updateOrderStatus,
   getPOSAuthHeaders,
+  MANAGER_BIOMETRIC_APPROVAL_ENABLED,
 } from '@/lib/pos-data'
 import { getIvaRate, TIEMPO_ITEM_ID, isTiempoItem, getStationForItem, setCategoryNameCache, _categoryNameCache, isNoPrintStation, getCancellationReasons, getDiscountCatalog, hasKdsStation } from '@/lib/pos-constants'
 import { calcSplitParejo, calcSplitItems } from '@/lib/pos-calculations'
@@ -756,6 +757,7 @@ function DiscountModal({ subtotal, personas, items, onApply, onCancel }: Discoun
   const [discBioChecking, setDiscBioChecking] = useState(false)
 
   useEffect(() => {
+    if (!MANAGER_BIOMETRIC_APPROVAL_ENABLED) return
     try {
       const stored = JSON.parse(localStorage.getItem('pos_biometric_credentials') || '{}')
       const has = Object.values(stored).some((m: unknown) => {
@@ -1092,6 +1094,7 @@ function CancelModal({ itemName, onConfirm, onCancel }: CancelModalProps) {
   }
 
   useEffect(() => {
+    if (!MANAGER_BIOMETRIC_APPROVAL_ENABLED) return
     // Check if there are manager/admin biometric credentials stored
     try {
       const stored = JSON.parse(localStorage.getItem('pos_biometric_credentials') || '{}')
@@ -1311,6 +1314,7 @@ function VoidOrderModal({ mesa, total, items, enviados, onConfirm, onConfirmCaja
   const [confirming, setConfirming] = useState(false)
 
   useEffect(() => {
+    if (!MANAGER_BIOMETRIC_APPROVAL_ENABLED) return
     if (onConfirmCaja) return
     try {
       const stored = JSON.parse(localStorage.getItem('pos_biometric_credentials') || '{}')
@@ -1494,6 +1498,7 @@ function CashMovementModal({ turnoId, actor, onConfirm, onCancel }: CashMovement
   const [bioChecking, setBioChecking] = useState(false)
 
   useEffect(() => {
+    if (!MANAGER_BIOMETRIC_APPROVAL_ENABLED) return
     try {
       const stored = JSON.parse(localStorage.getItem('pos_biometric_credentials') || '{}')
       const has = Object.values(stored).some((m: unknown) => {

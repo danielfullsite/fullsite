@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { prepararCancelacionItem } from '@/lib/cancelacion-item'
-vi.mock('@/lib/api-auth', () => ({ withPOSAuth: async () => ({ clientId: 'lab', staffId: 'cashier' }), unauthorized: vi.fn() }))
+vi.mock('@/lib/api-auth', () => ({ withPOSAuth: async () => ({ clientId: 'lab', staffId: 'manager', staffName: 'Manager', role: 'gerente' }), unauthorized: vi.fn() }))
 vi.mock('@/lib/shift-token', () => ({ verifyShiftToken: vi.fn() }))
 import { POST } from '@/app/api/pos/cancel-item/route'
 const order = () => ({ id: 'order', order_revision: 4, updated_at: '2026-09-10T00:00:00Z',
@@ -47,7 +47,7 @@ it('persiste todos los importes con OCC y devuelve exactamente la fila confirmad
     if (init?.method === 'POST') return Response.json({})
     return Response.json([current])
   }))
-  const request = () => new Request('http://test/api/pos/cancel-item', { method: 'POST', body: JSON.stringify({ order_id: 'order', item_id: 'cancel', offline_approved: true }) }) as any
+  const request = () => new Request('http://test/api/pos/cancel-item', { method: 'POST', body: JSON.stringify({ order_id: 'order', item_id: 'cancel' }) }) as any
   const result = await (await POST(request())).json()
   expect(result.order).toEqual(current)
   expect(result.revision).toBe(5)
@@ -57,7 +57,7 @@ it('persiste todos los importes con OCC y devuelve exactamente la fila confirmad
 })
 it('el conflicto de OCC no devuelve una fila ni una revisión inventadas', async () => {
   vi.stubGlobal('fetch', vi.fn(async (_url: string, init?: RequestInit) => Response.json(init?.method === 'PATCH' ? [] : [order()])))
-  const result = await (await POST(new Request('http://test/api/pos/cancel-item', { method: 'POST', body: JSON.stringify({ order_id: 'order', item_id: 'cancel', offline_approved: true }) }) as any)).json()
+  const result = await (await POST(new Request('http://test/api/pos/cancel-item', { method: 'POST', body: JSON.stringify({ order_id: 'order', item_id: 'cancel' }) }) as any)).json()
   expect(result.conflict).toBe(true)
   expect(result.order).toBeUndefined()
   expect(result.revision).toBeUndefined()

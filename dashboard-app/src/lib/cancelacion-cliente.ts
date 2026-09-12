@@ -23,12 +23,14 @@ export async function confirmarCancelacionItem(input: IntentoCancelacion, header
   } catch { throw new Error('No se pudo conservar el intento. La cuenta no se modificó.') }
   if (approvalToken) approvals.set(intent.operation_id!, approvalToken)
   const authorization = approvalToken || approvals.get(intent.operation_id!)
-  if (intent.authorization_mode === 'online' && !authorization) throw new Error('Autoriza nuevamente con PIN para recuperar esta cancelación.')
+  if (!authorization) {
+    throw new Error('Autoriza con PIN de gerente en línea o desde Caja. La cuenta no se modificó.')
+  }
   let response: Response
   let result: Record<string, any>
   try {
     response = await fetch('/api/pos/cancel-item', { method: 'POST', headers: { 'Content-Type': 'application/json', ...headers },
-      body: JSON.stringify({ ...intent, approval_token: authorization || undefined, offline_approved: authorization ? undefined : true }),
+      body: JSON.stringify({ ...intent, approval_token: authorization }),
       signal: AbortSignal.timeout(5000) })
     result = await response.json()
   } catch { throw new Error('Cancelación sin confirmar. Reintenta para recuperar el mismo intento; la cuenta y el inventario no se modificaron aquí.') }

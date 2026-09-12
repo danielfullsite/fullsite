@@ -117,6 +117,11 @@ const NIVEL: Record<string, number> = { mesero: 1, cajero: 2, capitan: 3, gerent
 
 /** Nivel mínimo para ESCRIBIR, cuando no basta con la lista de gerente. */
 export const NIVEL_MINIMO_DE_ESCRITURA: Record<string, number> = {
+  // Abrir, cerrar o corregir un turno cambia la frontera del Corte Z. El mesero
+  // sólo necesita leer el turno para guardar comandas; Caja/cajero es quien lo
+  // opera. Antes se protegían algunas cifras, pero `closed_at` y `opened_by`
+  // seguían permitiendo cerrar el turno actual o inventar uno nuevo.
+  pos_turnos: NIVEL.cajero,
   pos_cash_movements: NIVEL.cajero,
   pos_cierres: NIVEL.cajero,
 }

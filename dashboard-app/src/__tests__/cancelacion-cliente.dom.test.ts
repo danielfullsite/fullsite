@@ -32,19 +32,15 @@ it('a lost acknowledgment retains the immutable operation and original options a
   retry.confirmada()
   expect(localStorage.length).toBe(0)
 })
-it('keeps the existing offline approval mode while refusing to fabricate a confirmed row', async () => {
-  let body: any
-  vi.stubGlobal('fetch', vi.fn(async (_url: string, init: RequestInit) => {
-    body = JSON.parse(String(init.body))
-    return Response.json({ ok: true, revision: 5 })
-  }))
-  await expect(confirmarCancelacionItem(intent, {})).rejects.toThrow('recibo válido')
-  expect(body.offline_approved).toBe(true)
-  expect(body.approval_token).toBeUndefined()
+it('sin prueba firmada conserva el intento pero ni siquiera llama al servidor', async () => {
+  const request = vi.fn()
+  vi.stubGlobal('fetch', request)
+  await expect(confirmarCancelacionItem(intent, {})).rejects.toThrow('Autoriza con PIN')
+  expect(request).not.toHaveBeenCalled()
   expect(localStorage.length).toBe(1)
 })
 it('does not reinterpret a missing or transferred item as another cancellation', async () => {
   vi.stubGlobal('fetch', vi.fn(async () => Response.json({ ...receipt, order: { ...receipt.order, items: [{ id: 'other' }] } })))
-  await expect(confirmarCancelacionItem(intent, {})).rejects.toThrow('ya no pertenece')
+  await expect(confirmarCancelacionItem(intent, {}, 'manager-token')).rejects.toThrow('ya no pertenece')
   expect(localStorage.length).toBe(0)
 })

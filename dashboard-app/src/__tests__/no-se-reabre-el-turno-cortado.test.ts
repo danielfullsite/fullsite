@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { camposProhibidos, MANAGER_ONLY_WRITE, REABRIR_SOLO_GERENTE } from '@/lib/pos-db-policy'
+import { camposProhibidos, MANAGER_ONLY_WRITE, puedeEscribirEn, REABRIR_SOLO_GERENTE } from '@/lib/pos-db-policy'
 
 // REABRIR EL TURNO YA CORTADO.
 //
@@ -27,6 +27,11 @@ const MESERO = 'mesero'
 const GERENTE = 'gerente'
 
 describe('el vector', () => {
+  it('un mesero no puede escribir ni crear turnos', () => {
+    expect(puedeEscribirEn('pos_turnos', MESERO)).toBe(false)
+    expect(puedeEscribirEn('pos_turnos', 'cajero')).toBe(true)
+  })
+
   it('un mesero ya no puede reabrir un turno', () => {
     const v = camposProhibidos('pos_turnos', MESERO, JSON.stringify({ closed_at: null }))
     expect(v.length).toBeGreaterThan(0)
@@ -62,6 +67,7 @@ describe('lo que NO se puede romper: el corte tiene que poder subir', () => {
 
   it('y pos_turnos NO está en MANAGER_ONLY_WRITE, a propósito', () => {
     expect(MANAGER_ONLY_WRITE.has('pos_turnos')).toBe(false)
+    expect(puedeEscribirEn('pos_turnos', 'cajero')).toBe(true)
   })
 
   it('abrir un turno tampoco se bloquea', () => {

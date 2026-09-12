@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     const clientId = auth.clientId
 
     const body = await request.json()
-    const { order_id, item_id, prepared, voided, operation_id, mesero, reason, manager, approval_token, offline_approved } = body
+    const { order_id, item_id, prepared, voided, operation_id, mesero, reason, manager, approval_token } = body
 
     if (!order_id || !item_id) {
       return Response.json({ ok: false, error: 'MISSING_PARAMS' }, { status: 400 })
@@ -45,35 +45,20 @@ export async function POST(request: NextRequest) {
     // directo. Ahora:
     //   • Online: exige el token FIRMADO del gerente (rol gerente+, mismo tenant) que emite
     //     /api/pos/pin → infalsificable desde el cliente.
-    //   • Offline (offline_approved): el cancel se encoló tras verificar el PIN del gerente
-    //     EN EL DISPOSITIVO (PBKDF2, 8h). Decisión Opción A ("como Wansoft"): se acepta y se
-    //     audita como device-trust, para no romper la operación offline en país 40% efectivo.
+    //   • Sin token separado: sólo una sesión firmada que ya sea gerente+.
     let approvalMode = ''
     if (typeof approval_token === 'string' && approval_token) {
       const p = await verifyShiftToken(approval_token)
       if (p && p.cid === clientId && (ROLE_LVL[p.rol] || 0) >= 4) approvalMode = 'online:' + p.rol
     }
     if (!approvalMode) {
-      if (offline_approved === true) {
-        // El rol viene del shift token FIRMADO, no del cuerpo. Sin esto,
-        // `offline_device_trust` de un mesero que se autoaprobó y de un gerente
-        // aprobando en la terminal del mesero se veían IDÉNTICOS en la bitácora.
-        // No se bloquea: bloquear aquí rompería la cancelación sin WAN, y un 403 en
-        // el replay de la cola es terminal (pos-offline-db.ts:821) — la cancelación
-        // se perdería para siempre. Ver manager-approval.ts para el cierre real.
-        approvalMode = `offline_device_trust:${auth.role || 'desconocido'}`
-      } else {
-        // Sin ninguna aprobación. ROLLOUT EN 2 FASES para no romper clientes viejos (SW
-        // cacheado que aún no manda la aprobación):
-        //   • Fase 1 (default): GRACE — permite pero audita como 'legacy_no_approval'.
-        //     Cero riesgo al desplegar; empieza a detectar el vector.
-        //   • Fase 2: setear CANCEL_APPROVAL_STRICT=true en el env → 403 (bloquea el POST
-        //     forjado). Se activa cuando el log deje de mostrar 'legacy_no_approval'.
-        if (process.env.CANCEL_APPROVAL_STRICT === 'true') {
-          return Response.json({ ok: false, error: 'MANAGER_APPROVAL_REQUIRED' }, { status: 403 })
-        }
-        approvalMode = 'legacy_no_approval'
-      }
+      const requesterLevel = ROLE_LVL[auth.role] || 0
+      // `offline_approved` era un booleano controlado por el navegador. Sólo una
+      // sesión firmada de gerente puede autorizar sin un segundo token. En AMALAY,
+      // las operaciones sin WAN pasan por Caja y su actor_token local; el camino
+      // cloud no inventa una aprobación que no puede verificar.
+      if (requesterLevel >= 4) approvalMode = `session_role:${auth.role}`
+      else return Response.json({ ok: false, error: 'MANAGER_APPROVAL_REQUIRED' }, { status: 403 })
     }
 
     // ── Step 1: Read order with current updated_at ──
@@ -193,8 +178,7 @@ export async function POST(request: NextRequest) {
             // autorizó, así que se conserva — pero como afirmación, no como hecho.
             manager_declarado: typeof manager === 'string' ? manager : null,
             mesero_declarado: typeof mesero === 'string' ? mesero : null,
-            revisar: approvalMode.startsWith('offline_device_trust')
-              && (ROLE_LVL[String(auth.role)] || 0) < 4,
+            revisar: false,
             voided: !!voided,
             prepared: typeof prepared === 'boolean' ? prepared : null,
             operation_id,

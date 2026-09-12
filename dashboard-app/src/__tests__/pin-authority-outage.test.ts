@@ -33,4 +33,16 @@ describe('PIN authority distinguishes outages from employee rejection', () => {
     expect(response.status).toBe(403)
     expect(await response.json()).toMatchObject({ code: 'terminal_not_enrolled' })
   })
+  it('a valid PIN cannot unlock when the signed token cannot be issued', async () => {
+    vi.mocked(issueShiftToken).mockRejectedValueOnce(new Error('missing secret'))
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => String(url).includes('/clients?')
+      ? Response.json([{ pos_settings: {} }])
+      : Response.json([{ id: 'staff-1', name: 'Ana', role: 'mesero' }])))
+
+    const response = await POST(request())
+
+    expect(response.status).toBe(503)
+    expect(await response.json()).toMatchObject({ code: 'shift_token_unavailable' })
+  })
 })

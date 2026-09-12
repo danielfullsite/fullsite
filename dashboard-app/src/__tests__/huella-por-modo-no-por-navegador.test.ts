@@ -12,22 +12,10 @@ import {
 // diario. En la versión que corre hoy en producción ese guard no existe.
 
 describe('con qué se decide si la huella basta', () => {
-  it('en el modo con el que se instala, la huella entra', () => {
-    // localAuthorityEnabled apagado, o sea autoridad de escritura legacy: es
-    // exactamente lo que hace la versión que hoy corre en el restaurante.
-    expect(decidirHuella('legacy')).toBe('entrar')
-  })
-
-  it('con autoridad de Caja, la huella identifica y el PIN autoriza', () => {
-    // El permiso lo firma Caja a partir de un PIN, y el lector no da PIN.
-    expect(decidirHuella('caja')).toBe('identificar-y-pedir-pin')
-  })
-
-  it('mientras no se sabe el modo, no se deja al mesero en la puerta', () => {
-    // Desbloquear la pantalla no es autoridad: con autoridad de Caja toda
-    // escritura sigue exigiendo el permiso firmado más adelante. Negar la
-    // entrada por un dato que aún no llegó cuesta más de lo que protege.
-    expect(decidirHuella('desconocido')).toBe('entrar')
+  it('en cualquier modo la huella identifica y el PIN firma la sesión', () => {
+    for (const modo of ['legacy', 'caja', 'desconocido'] as const) {
+      expect(decidirHuella(modo)).toBe('identificar-y-pedir-pin')
+    }
   })
 })
 
@@ -101,9 +89,9 @@ describe('sin almacenamiento del navegador', () => {
     expect(modoDeAutoridadRecordado()).toBe('caja')  // la memoria del proceso alcanza
   })
 
-  it('sin nada recordado, sigue siendo desconocido y la huella entra', () => {
+  it('sin nada recordado, sigue siendo desconocido y pide PIN', () => {
     expect(modoDeAutoridadRecordado()).toBe('desconocido')
-    expect(decidirHuella(modoDeAutoridadRecordado())).toBe('entrar')
+    expect(decidirHuella(modoDeAutoridadRecordado())).toBe('identificar-y-pedir-pin')
   })
 })
 

@@ -35,6 +35,10 @@ describe('el vector: la caja puede cerrar su turno', () => {
     expect(puedeEscribirEn('pos_cash_movements', 'cajero')).toBe(true)
   })
 
+  it('tambien puede abrir y cerrar su turno', () => {
+    expect(puedeEscribirEn('pos_turnos', 'cajero')).toBe(true)
+  })
+
   it('gerente, admin y dueño tambien, claro', () => {
     for (const rol of ['gerente', 'admin', 'dueño']) {
       expect(puedeEscribirEn('pos_cierres', rol), rol).toBe(true)
@@ -52,6 +56,7 @@ describe('lo que NO se abrio', () => {
     // Era el vector que el candado original queria cerrar, y sigue cerrado.
     expect(puedeEscribirEn('pos_cierres', 'mesero')).toBe(false)
     expect(puedeEscribirEn('pos_cash_movements', 'mesero')).toBe(false)
+    expect(puedeEscribirEn('pos_turnos', 'mesero')).toBe(false)
   })
 
   it('ni un rol desconocido, ni uno vacio', () => {
@@ -99,6 +104,7 @@ describe('las dos listas no se pisan', () => {
   it('y tienen su nivel minimo declarado', () => {
     expect(NIVEL_MINIMO_DE_ESCRITURA.pos_cierres).toBe(2)
     expect(NIVEL_MINIMO_DE_ESCRITURA.pos_cash_movements).toBe(2)
+    expect(NIVEL_MINIMO_DE_ESCRITURA.pos_turnos).toBe(2)
   })
 })
 
