@@ -272,11 +272,13 @@ describe('Turno', () => {
       command_id: 'c1', order_id: 'o1', mesa: 5, mesero: 'm',
       items: [{ nombre: 'Bowl', station: 'cocina' }], status: 'enviada',
     }, 2))
-    const result = state.apply(makeEvent(EVENT.TURNO_CLOSED, { turno_id: 't1' }, 3))
+    state.apply(makeEvent(EVENT.MESA_LOCK, { mesa: 5, client_id: 'terminal-vieja' }, 3))
+    const result = state.apply(makeEvent(EVENT.TURNO_CLOSED, { turno_id: 't1' }, 4))
     assert.equal(state.hasActiveTurno(), false)
     const snap = state.toSnapshot()
     assert.equal(snap.kds_orders.length, 0)
-    assert.deepEqual(result.changed.sort(), ['kds', 'mesas', 'orders', 'turno'])
+    assert.deepEqual(snap.locks, {})
+    assert.deepEqual(result.changed.sort(), ['kds', 'locks', 'mesas', 'orders', 'turno'])
   })
 })
 

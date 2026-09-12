@@ -236,7 +236,20 @@ class CommandHandler {
   }
 
   _validateCommandState(commandType, cmdPayload, fromClientId) {
-    if (MESA_COORDINATED_COMMANDS.has(commandType)) {
+    const operationalOrder = this._state.getOrder?.(cmdPayload.order_id)
+    const preparationRank = { enviada: 0, preparando: 1, lista: 2, entregada: 3 }
+    const targetPreparationRank = preparationRank[cmdPayload.status]
+    const currentPreparationRank = preparationRank[operationalOrder?.preparation_status ?? operationalOrder?.status]
+    // El KDS legacy sólo cambia el avance culinario de una cuenta ya existente.
+    // No modifica productos, importes, identidad ni mesa, por lo que no compite
+    // con el editor del mesero y debe poder avanzar mientras éste conserva el lock.
+    const preparationOnly = !!operationalOrder && operationalOrder._kds_sent === true &&
+      Object.keys(cmdPayload).every(key =>
+      ['command_id', 'command_type', 'restaurant_id', 'location_id', 'client_id', 'order_id', 'mesa', 'status'].includes(key)) &&
+      (cmdPayload.mesa === undefined || String(cmdPayload.mesa) === String(operationalOrder.mesa)) &&
+      Number.isInteger(targetPreparationRank) && Number.isInteger(currentPreparationRank) &&
+      targetPreparationRank >= currentPreparationRank
+    if (MESA_COORDINATED_COMMANDS.has(commandType) && !(commandType === 'ORDER_UPSERTED' && preparationOnly)) {
       const mesas = new Set([
         cmdPayload.mesa,
         this._state.getOrder?.(cmdPayload.order_id)?.mesa,
@@ -265,7 +278,6 @@ class CommandHandler {
         throw new OperationalError('INVALID_TRANSFER_RECEIPT', 'La transferencia requiere los dos recibos confirmados')
       }
     }
-    const operationalOrder = this._state.getOrder?.(cmdPayload.order_id)
     if (operationalOrder?.authority === 'caja' && ['ORDER_UPSERTED', 'KDS_ITEM_STATUS'].includes(commandType)) {
       throw new OperationalError('KITCHEN_COMMAND_REQUIRED', 'Confirma los productos enviados mediante el comando de cocina autorizado')
     }
@@ -276,10 +288,6 @@ class CommandHandler {
     }
     // Once accounts exist, a legacy full-order patch must not change any
     // financial inputs or identity. Kitchen can still advance preparation.
-    const preparationOnly = Object.keys(cmdPayload).every(key =>
-      ['command_id', 'command_type', 'restaurant_id', 'location_id', 'client_id', 'order_id', 'mesa', 'status'].includes(key)) &&
-      (cmdPayload.mesa === undefined || cmdPayload.mesa === this._state.getOrder?.(cmdPayload.order_id)?.mesa) &&
-      ['enviada', 'preparando', 'lista', 'entregada'].includes(cmdPayload.status)
     if ((this._localAuthorityEnabled || operationalOrder?.authority === 'caja') &&
       (['ORDER_SENT', 'ORDER_CANCELLED', 'ORDER_CLOSED', 'TURNO_OPENED', 'TURNO_CLOSED'].includes(commandType) ||
         commandType === 'ORDER_UPSERTED' && !preparationOnly)) {

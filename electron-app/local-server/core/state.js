@@ -128,6 +128,15 @@ class RestaurantState {
       if (this._turno?.id) this._turnIdentities.add(this._turno.id)
       if (event.result.closed_turno?.id) this._turnSummaries.set(event.result.closed_turno.id, JSON.parse(JSON.stringify(event.result.closed_turno)))
       this._orderSnapshotComplete = true
+      if (type === 'TURN_CLOSE') {
+        // Un lease pertenece al editor del turno que acaba de cerrar. Conservarlo
+        // bloquea la misma mesa al iniciar el día siguiente aunque ya no exista una
+        // cuenta abierta. El cierre legacy ya vacía el piso; la ruta autoritativa
+        // debe soltar también toda exclusión del turno anterior.
+        this._locks.clear()
+        for (const [mesa, value] of this._mesas) this._mesas.set(mesa, { ...value, locked_by: null })
+        return { changed: ['turno', 'locks', 'mesas'] }
+      }
       return { changed: ['turno'] }
     }
     // FinancialDomain validates commands before durable commit. The projector
@@ -195,8 +204,9 @@ class RestaurantState {
         this._orders.clear()
         this._kds = []
         this._mesas.clear()
+        this._locks.clear()
         this._orderSnapshotComplete = true
-        return { changed: ['turno', 'orders', 'kds', 'mesas'] }
+        return { changed: ['turno', 'orders', 'kds', 'mesas', 'locks'] }
 
       case EVENT.STATE_SYNC:
         // Una foto heredada compactada al cargar el log (adapters/storage/ndjson.js)
