@@ -4,6 +4,12 @@ import { GET, PATCH } from '@/app/api/pos/kitchen/route'
 import { mismoDiaDeVenta } from '@/lib/dia-de-venta'
 import { mergeKdsItemStatus } from '@/hooks/useKdsWsClient'
 
+const kitchenAuth = vi.hoisted(() => ({ enabled: true, valid: true }))
+vi.mock('@/lib/kitchen-token', () => ({
+  kitchenTokenEnabled: () => kitchenAuth.enabled,
+  verifyKitchenToken: () => kitchenAuth.valid,
+}))
+
 // PR-2 KDS — regresión del "empalme": órdenes de días anteriores mezcladas con
 // las del turno nuevo en el tablero (junta 2026-09-01; campo AMALAY 2026-08-27).
 
@@ -32,6 +38,8 @@ function mockFetchSequence(responses: Array<{ ok: boolean; status?: number; json
 beforeEach(() => {
   vi.restoreAllMocks()
   vi.stubEnv('SUPABASE_SERVICE_KEY', 'test-service-key')
+  kitchenAuth.enabled = true
+  kitchenAuth.valid = true
 })
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -158,6 +166,22 @@ describe('PATCH /api/pos/kitchen — progreso concurrente por producto', () => {
     const fetchMock = vi.fn()
     vi.stubGlobal('fetch', fetchMock)
     expect((await PATCH(patchReq({ order_id: 'o', item_index: 0, done: true }))).status).toBe(503)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('falla cerrado si no hay secreto de cocina aunque exista service key', async () => {
+    kitchenAuth.enabled = false
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    expect((await PATCH(patchReq({ order_id: 'o', item_index: 0, done: true }))).status).toBe(503)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('rechaza un token que no pertenece al tenant', async () => {
+    kitchenAuth.valid = false
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    expect((await PATCH(patchReq({ order_id: 'o', item_index: 0, done: true }))).status).toBe(401)
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
