@@ -7,6 +7,7 @@ import { Component, useState, useCallback, useEffect, useRef, Suspense, type Err
 import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { resolveMesa, clearMesaTarget, peekMesaTarget } from '@/lib/pos-navigation'
+import { PIN_LENGTH } from '@/lib/staff-pin'
 import { nextMostradorCuenta, getServiceModel } from '@/lib/pos-service-model'
 import {
   MESEROS,
@@ -5593,7 +5594,8 @@ function POSContent() {
               type="password"
               inputMode="numeric"
               value={syncConflictPin}
-              onChange={e => { setSyncConflictPin(e.target.value.replace(/\D/g, '').slice(0, 8)); setSyncConflictError('') }}
+              maxLength={PIN_LENGTH}
+              onChange={e => { setSyncConflictPin(e.target.value.replace(/\D/g, '').slice(0, PIN_LENGTH)); setSyncConflictError('') }}
               className="mt-2 w-full rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3 text-center text-2xl tracking-[0.5em] text-[var(--text-1)]"
               placeholder="••••"
             />
@@ -5602,7 +5604,7 @@ function POSContent() {
                 <button
                   key={digit}
                   type="button"
-                  onClick={() => { setSyncConflictPin(p => `${p}${digit}`.slice(0, 8)); setSyncConflictError('') }}
+                  onClick={() => { setSyncConflictPin(p => `${p}${digit}`.slice(0, PIN_LENGTH)); setSyncConflictError('') }}
                   className="min-h-[54px] rounded-xl bg-[var(--surface-2)] text-xl font-black text-[var(--text-1)] active:bg-[var(--accent-soft)]"
                 >
                   {digit}
@@ -5617,7 +5619,7 @@ function POSContent() {
               </button>
               <button
                 type="button"
-                onClick={() => { setSyncConflictPin(p => `${p}0`.slice(0, 8)); setSyncConflictError('') }}
+                onClick={() => { setSyncConflictPin(p => `${p}0`.slice(0, PIN_LENGTH)); setSyncConflictError('') }}
                 className="min-h-[54px] rounded-xl bg-[var(--surface-2)] text-xl font-black text-[var(--text-1)] active:bg-[var(--accent-soft)]"
               >
                 0

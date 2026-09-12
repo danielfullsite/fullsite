@@ -8,6 +8,7 @@ import { Fingerprint, ArrowLeft, Receipt, RefreshCw, Clock, DollarSign, Users, C
 import { formatMXN, getAuditLogRange, reopenOrder, logAudit, getClientId, verifyManagerPin, verifyManagerHuella, hayHuellasDadasDeAlta, consumeManagerApproval, getActiveTurnoTolerante, getPaymentMethodsFromDB, type AuditLogEntry, type PagoForma, type PaymentMethodDB } from '@/lib/pos-data'
 import { isTiempoItem } from '@/lib/pos-constants'
 import { getActiveTimezone, todayMX, zonedStartOfDayISO } from '@/lib/date-mx'
+import { PIN_LENGTH } from '@/lib/staff-pin'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -1069,7 +1070,7 @@ function CortePageLegacy() {
               <input
                 type="password"
                 inputMode="numeric"
-                maxLength={4}
+                maxLength={PIN_LENGTH}
                 value={reopenPin}
                 onChange={e => { setReopenPin(e.target.value.replace(/\D/g, '')); setReopenError('') }}
                 placeholder="****"
