@@ -3,11 +3,11 @@
 // y manda el PDF/XML por email al cliente (best-effort).
 
 import { stampCfdi, emailCfdi, isFacturamaConfigured, type CfdiRequestRow } from '@/lib/facturama'
-import { withPOSAuth, unauthorized } from '@/lib/api-auth'
+import { checkPosRole, POS_ROLE_LVL, withPOSAuth, unauthorized } from '@/lib/api-auth'
 import { NextRequest } from 'next/server'
 
 function sbHeaders() {
-  const sbKey = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  const sbKey = process.env.SUPABASE_SERVICE_KEY!
   return {
     apikey: sbKey,
     Authorization: `Bearer ${sbKey}`,
@@ -15,13 +15,33 @@ function sbHeaders() {
   }
 }
 
-async function patchRequest(id: string, patch: Record<string, unknown>) {
+async function patchRequest(clientId: string, id: string, patch: Record<string, unknown>) {
   const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  return fetch(`${sbUrl}/rest/v1/pos_cfdi_requests?id=eq.${encodeURIComponent(id)}`, {
+  return fetch(`${sbUrl}/rest/v1/pos_cfdi_requests?id=eq.${encodeURIComponent(id)}&client_id=eq.${encodeURIComponent(clientId)}`, {
     method: 'PATCH',
     headers: { ...sbHeaders(), Prefer: 'return=minimal' },
     body: JSON.stringify({ ...patch, updated_at: new Date().toISOString() }),
   })
+}
+
+async function claimRequest(clientId: string, id: string) {
+  const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const res = await fetch(
+    `${sbUrl}/rest/v1/pos_cfdi_requests?id=eq.${encodeURIComponent(id)}` +
+    `&client_id=eq.${encodeURIComponent(clientId)}&status=in.(pendiente,error)`,
+    {
+      method: 'PATCH',
+      headers: { ...sbHeaders(), Prefer: 'return=representation' },
+      body: JSON.stringify({
+        status: 'procesando',
+        error_msg: 'Timbrado en curso. No reintentar hasta conocer el resultado del PAC.',
+        updated_at: new Date().toISOString(),
+      }),
+    },
+  )
+  if (!res.ok) throw new Error(`CFDI_CLAIM_FAILED_${res.status}`)
+  const rows = await res.json().catch(() => [])
+  return (Array.isArray(rows) ? rows[0] : null) as (CfdiRequestRow & { status: string }) | null
 }
 
 export async function POST(req: NextRequest) {
@@ -32,9 +52,16 @@ export async function POST(req: NextRequest) {
   // ya es fail-closed multi-membresía y honra el header x-fullsite-tenant validado.
   const auth = await withPOSAuth(req)
   if (!auth) return unauthorized()
+  if (!checkPosRole(auth, POS_ROLE_LVL.cajero, 'POS_STRICT_ROLES').ok) {
+    return Response.json({ ok: false, error: 'El rol no autoriza emitir CFDI' }, { status: 403 })
+  }
   const clientId = auth.clientId
+  let claimedId: string | null = null
 
   try {
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
+      return Response.json({ ok: false, error: 'Base de datos fiscal no configurada' }, { status: 503 })
+    }
     if (!isFacturamaConfigured()) {
       return Response.json(
         { ok: false, error: 'Facturama no configurado — faltan FACTURAMA_USER/PASSWORD/EXPEDITION_PLACE' },
@@ -49,25 +76,17 @@ export async function POST(req: NextRequest) {
       ? String(body.payment_form)
       : undefined
 
-    // Cargar la solicitud — filtrar por client_id para aislamiento de tenant
-    const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const res = await fetch(
-      `${sbUrl}/rest/v1/pos_cfdi_requests?id=eq.${encodeURIComponent(id)}&client_id=eq.${encodeURIComponent(clientId)}&limit=1`,
-      { headers: sbHeaders(), cache: 'no-store' }
-    )
-    if (!res.ok) return Response.json({ ok: false, error: 'No se pudo cargar la solicitud' }, { status: 500 })
-    const rows = await res.json()
-    const row: (CfdiRequestRow & { status: string }) | undefined = rows[0]
-    if (!row) return Response.json({ ok: false, error: 'Solicitud no encontrada' }, { status: 404 })
-    if (!['pendiente', 'error'].includes(row.status)) {
-      return Response.json({ ok: false, error: `La solicitud está "${row.status}" — solo se timbran pendientes` }, { status: 409 })
+    // Compare-and-swap en Postgres: dos taps concurrentes no pueden reclamar la
+    // misma solicitud. Leer y después hacer PATCH permitía dos timbrados SAT.
+    const row = await claimRequest(clientId, id)
+    if (!row) {
+      return Response.json({ ok: false, error: 'La solicitud ya está siendo procesada o fue emitida' }, { status: 409 })
     }
-
-    await patchRequest(id, { status: 'procesando', error_msg: null })
+    claimedId = id
 
     const result = await stampCfdi(row, paymentForm)
     if (!result.ok || !result.facturamaId) {
-      await patchRequest(id, { status: 'error', error_msg: result.error ?? 'Error desconocido' })
+      await patchRequest(clientId, id, { status: 'error', error_msg: result.error ?? 'Error desconocido' })
       return Response.json({ ok: false, error: result.error ?? 'Error al timbrar' }, { status: 502 })
     }
 
@@ -76,14 +95,31 @@ export async function POST(req: NextRequest) {
     const pdfUrl = `/api/factura/descarga?fid=${encodeURIComponent(result.facturamaId)}&tipo=pdf`
     const xmlUrl = `/api/factura/descarga?fid=${encodeURIComponent(result.facturamaId)}&tipo=xml`
 
-    await patchRequest(id, {
+    const persisted = await patchRequest(clientId, id, {
       status: 'emitida',
       folio_fiscal: result.uuid || null,
       pdf_url: pdfUrl,
       xml_url: xmlUrl,
     })
+    if (!persisted.ok) {
+      console.error('[factura/timbrar] PAC confirmó pero no se pudo persistir el folio', { id, status: persisted.status })
+      await patchRequest(clientId, id, {
+        status: 'incierto',
+        error_msg: 'El PAC confirmó el timbrado, pero no se guardó el folio. Concilia en Facturama; no reintentes.',
+      }).catch(() => null)
+      return Response.json({
+        ok: false,
+        uncertain: true,
+        error: 'Facturama confirmó el timbrado, pero no se pudo guardar el folio. No reintentes; concilia en Facturama.',
+      }, { status: 502 })
+    }
+    claimedId = null
 
-    const emailed = row.email ? await emailCfdi(result.facturamaId, row.email) : false
+    let emailed = false
+    if (row.email) {
+      try { emailed = await emailCfdi(result.facturamaId, row.email) }
+      catch (error) { console.error('[factura/timbrar] timbrada, pero el correo falló', { id, error: String(error) }) }
+    }
 
     return Response.json({
       ok: true,
@@ -94,6 +130,17 @@ export async function POST(req: NextRequest) {
     })
   } catch (e) {
     console.error('[factura/timbrar] error:', e)
+    if (claimedId) {
+      await patchRequest(clientId, claimedId, {
+        status: 'incierto',
+        error_msg: 'Se perdió la respuesta del PAC. Verifica Facturama antes de cualquier reintento.',
+      }).catch(() => null)
+      return Response.json({
+        ok: false,
+        uncertain: true,
+        error: 'Resultado incierto: verifica Facturama antes de reintentar para evitar un CFDI duplicado.',
+      }, { status: 502 })
+    }
     return Response.json({ ok: false, error: 'Error inesperado' }, { status: 500 })
   }
 }

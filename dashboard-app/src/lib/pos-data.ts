@@ -3300,7 +3300,7 @@ export interface CFDIRequest {
   subtotal: number
   iva: number
   total: number
-  status: 'pendiente' | 'procesando' | 'emitida' | 'cancelada' | 'error'
+  status: 'pendiente' | 'procesando' | 'incierto' | 'emitida' | 'cancelada' | 'error'
   folio_fiscal?: string
   pdf_url?: string
   xml_url?: string
