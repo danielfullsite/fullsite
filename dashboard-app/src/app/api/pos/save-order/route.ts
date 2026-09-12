@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { esCuentaDeCobroDeSplit } from '@/lib/liquidacion-de-orden'
 import { withPOSAuth, unauthorized } from '@/lib/api-auth'
 import { verifyManagerApproval } from '@/lib/manager-approval'
+import { hasPermission } from '@/lib/pos-permissions'
 
 /**
  * R2D1 + R2 Final + R2D — Revision-aware order save + R1 reconciliation boundary
@@ -31,6 +32,13 @@ interface SaveResult {
   inventory_results?: Array<{ r_item_id: string; r_result: string; r_applied: number; r_delta: number }>
   first_execution?: boolean
   idempotent_replay?: boolean
+}
+
+interface ExistingOrderAuthority {
+  mesero?: unknown
+  descuento?: unknown
+  items?: unknown
+  status?: unknown
 }
 
 type TurnoResolution =
@@ -157,6 +165,89 @@ async function ivaRateFor(
     return rate
   } catch {
     return null
+  }
+}
+
+function sameStaffName(left: unknown, right: unknown): boolean {
+  const normalize = (value: unknown) => String(value ?? '').normalize('NFKC').trim().toLocaleLowerCase('es-MX')
+  return normalize(left) !== '' && normalize(left) === normalize(right)
+}
+
+function orderItems(value: unknown): Array<Record<string, unknown>> | null {
+  if (Array.isArray(value)) return value as Array<Record<string, unknown>>
+  if (typeof value !== 'string') return null
+  try {
+    const parsed = JSON.parse(value)
+    return Array.isArray(parsed) ? parsed as Array<Record<string, unknown>> : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Rebuild aggregate money fields for a waiter from the line snapshot that is about
+ * to be saved. This prevents an unprivileged caller from sending the real items but
+ * independently declaring a $1 subtotal/total.
+ *
+ * SECURITY LIMIT (intentional and tracked): line-level `precio`, `precioExtra` and
+ * `subtotal` are still a client snapshot. Repricing them from today's catalog would
+ * corrupt legitimate offline orders after a menu-price change, and even-split child
+ * accounts deliberately carry all parent lines with only a fraction of the total.
+ * Closing that remaining gap requires versioned price/promotion evidence, not a
+ * best-effort lookup of the current catalog. The existing post-save price audit stays
+ * active until that authority exists.
+ */
+async function waiterFinancialAuthority(opts: {
+  body: Record<string, unknown>
+  existing: ExistingOrderAuthority | null
+  signedStaffName: string
+  clientId: string
+  sbUrl: string
+  headers: Record<string, string>
+}): Promise<
+  | { ok: true; mesero: string; descuento: number; subtotal: number; iva: number; total: number }
+  | { ok: false; status: number; error: string }
+> {
+  const signedName = opts.signedStaffName.trim()
+  if (!signedName) return { ok: false, status: 403, error: 'SIGNED_STAFF_REQUIRED' }
+
+  const currentWaiter = String(opts.existing?.mesero ?? '').trim()
+  if (currentWaiter && !sameStaffName(currentWaiter, signedName)) {
+    return { ok: false, status: 403, error: 'ORDER_NOT_OWNED' }
+  }
+
+  const items = orderItems(opts.body.items) ?? orderItems(opts.existing?.items)
+  if (!items) return { ok: false, status: 400, error: 'INVALID_ITEMS' }
+
+  let subtotalCents = 0
+  for (const item of items) {
+    if (item?.cancelled) continue
+    const line = Number(item?.subtotal)
+    if (!Number.isFinite(line) || line < 0) {
+      return { ok: false, status: 400, error: 'INVALID_ITEM_SUBTOTAL' }
+    }
+    subtotalCents += Math.round(line * 100)
+  }
+
+  // A waiter cannot create or alter an order discount. If a manager/cashier already
+  // saved one, subsequent waiter updates preserve that server value exactly.
+  const currentDiscount = Number(opts.existing?.descuento ?? 0)
+  const discountCents = Number.isFinite(currentDiscount)
+    ? Math.min(subtotalCents, Math.max(0, Math.round(currentDiscount * 100)))
+    : 0
+
+  const ivaRate = await ivaRateFor(opts.clientId, opts.sbUrl, opts.headers)
+  if (ivaRate === null) return { ok: false, status: 503, error: 'IVA_RATE_UNAVAILABLE' }
+  const taxableCents = Math.max(0, subtotalCents - discountCents)
+  const ivaCents = Math.round(taxableCents * ivaRate)
+
+  return {
+    ok: true,
+    mesero: currentWaiter || signedName,
+    descuento: discountCents / 100,
+    subtotal: subtotalCents / 100,
+    iva: ivaCents / 100,
+    total: (taxableCents + ivaCents) / 100,
   }
 }
 
@@ -388,6 +479,59 @@ export async function POST(request: NextRequest) {
       return Response.json({ ok: false, error: 'INVALID_REVISION' } satisfies SaveResult, { status: 400 })
     }
 
+    if ((body.status === 'cerrada' || body.status === 'dividida') && !hasPermission(auth.role, 'cerrar_cuentas')) {
+      return Response.json({ ok: false, error: 'CLOSE_ORDER_FORBIDDEN' } satisfies SaveResult, { status: 403 })
+    }
+
+    const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const sbKey = process.env.SUPABASE_SERVICE_KEY
+    if (!sbKey) {
+      return Response.json({ ok: false, error: 'SERVER_CONFIG_ERROR' } satisfies SaveResult, { status: 500 })
+    }
+
+    const headers = {
+      'apikey': sbKey,
+      'Authorization': `Bearer ${sbKey}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation',
+    }
+
+    let authoritativeMesero = body.mesero ?? null
+    let authoritativeDiscount = body.descuento ?? null
+    let authoritativeSubtotal = body.subtotal ?? null
+    let authoritativeIva = body.iva ?? null
+    let authoritativeTotal = body.total ?? null
+
+    // The waiter-scoped profile is intentionally narrow: it may create/update its
+    // own operational order, but cannot choose the owner, discounts or aggregate
+    // money. Use capabilities rather than a literal role so the canonical `staff`
+    // alias (and any unknown fail-safe role) cannot bypass this boundary.
+    const waiterScoped = hasPermission(auth.role, 'ver_cuentas_propias')
+      && !hasPermission(auth.role, 'ver_todas_cuentas')
+    if (waiterScoped) {
+      const existingRes = await fetch(
+        `${sbUrl}/rest/v1/pos_orders?id=eq.${encodeURIComponent(order_id)}` +
+          `&client_id=eq.${encodeURIComponent(clientId)}&select=mesero,descuento,items,status&limit=1`,
+        { headers, cache: 'no-store' },
+      )
+      if (!existingRes.ok) {
+        return Response.json({ ok: false, error: 'ORDER_AUTHORITY_UNAVAILABLE' } satisfies SaveResult, { status: 503 })
+      }
+      const existingRows = await existingRes.json() as ExistingOrderAuthority[]
+      const existing = Array.isArray(existingRows) ? existingRows[0] ?? null : null
+      const authority = await waiterFinancialAuthority({
+        body, existing, signedStaffName: auth.staffName, clientId, sbUrl, headers,
+      })
+      if (!authority.ok) {
+        return Response.json({ ok: false, error: authority.error } satisfies SaveResult, { status: authority.status })
+      }
+      authoritativeMesero = authority.mesero
+      authoritativeDiscount = authority.descuento
+      authoritativeSubtotal = authority.subtotal
+      authoritativeIva = authority.iva
+      authoritativeTotal = authority.total
+    }
+
     if (body.conflict_resolution === true) {
       const approval = await verifyManagerApproval({
         approvalToken: body.approval_token,
@@ -414,19 +558,6 @@ export async function POST(request: NextRequest) {
       if (pagosSum !== expected) {
         return Response.json({ ok: false, error: 'PAYMENT_MISMATCH' } satisfies SaveResult, { status: 400 })
       }
-    }
-
-    const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const sbKey = process.env.SUPABASE_SERVICE_KEY
-    if (!sbKey) {
-      return Response.json({ ok: false, error: 'SERVER_CONFIG_ERROR' } satisfies SaveResult, { status: 500 })
-    }
-
-    const headers = {
-      'apikey': sbKey,
-      'Authorization': `Bearer ${sbKey}`,
-      'Content-Type': 'application/json',
-      'Prefer': 'return=representation',
     }
 
     // ── Detección de skimming (Fase 1 · log-only · CERO riesgo) ──
@@ -500,13 +631,13 @@ export async function POST(request: NextRequest) {
       p_expected_revision: expected_revision,
       p_mesa: body.mesa ?? null,
       p_customer_name: body.customer_name ?? null,
-      p_mesero: body.mesero ?? null,
+      p_mesero: authoritativeMesero,
       p_personas: body.personas ?? null,
       p_status: body.status ?? null,
-      p_subtotal: body.subtotal ?? null,
-      p_iva: body.iva ?? null,
-      p_total: body.total ?? null,
-      p_descuento: body.descuento ?? null,
+      p_subtotal: authoritativeSubtotal,
+      p_iva: authoritativeIva,
+      p_total: authoritativeTotal,
+      p_descuento: authoritativeDiscount,
       p_propina: body.propina ?? null,
       p_metodo_pago: body.metodo_pago ?? null,
       p_pagos: body.pagos ?? null,
