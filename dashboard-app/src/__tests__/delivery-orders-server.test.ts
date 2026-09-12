@@ -103,4 +103,17 @@ describe('/api/pos/delivery-orders', () => {
     expect(response.status).toBe(400)
     expect(fetch).not.toHaveBeenCalled()
   })
+
+  it('PATCH no permite fabricar estados finales reservados para la plataforma', async () => {
+    const fetchMock = vi.fn(async () => Response.json([{ id: 'd1' }]))
+    vi.stubGlobal('fetch', fetchMock)
+    const { PATCH } = await import('@/app/api/pos/delivery-orders/route')
+
+    const response = await PATCH(new NextRequest('https://app.test/api/pos/delivery-orders', {
+      method: 'PATCH', body: JSON.stringify({ id: 'd1', patch: { status: 'entregada' } }),
+    }))
+
+    expect(response.status).toBe(400)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
 })
