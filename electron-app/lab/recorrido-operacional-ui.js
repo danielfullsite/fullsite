@@ -55,6 +55,12 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     await pestanaDelCobro(terminal, 'Efectivo')
     await dialog.getByLabel('Importe a cobrar', { exact: true }).fill(amount)
     await dialog.getByRole('button', { name: 'Preparar cobro en efectivo', exact: true }).click()
+    // El modal abre solo la pestaña del dinero apartado, PERO sólo mientras nadie
+    // haya elegido pestaña a mano: una vez que el cajero toca una, no se la
+    // movemos debajo de los dedos (CobroDeCaja, `pestanaTocada`). Este recorrido
+    // acaba de tocar «Efectivo», así que le toca navegar como navegaría la
+    // persona: el importe se apartó, ahora se va a confirmarlo.
+    await pestanaDelCobro(terminal, 'Por confirmar')
     await dialog.getByRole('textbox', { name: /^Efectivo recibido / }).fill(amount)
     await dialog.getByRole('button', { name: 'Confirmar efectivo recibido', exact: true }).click()
     await expect(dialog.getByText('Efectivo registrado en Caja y compartido con las terminales.')).toBeVisible()
@@ -235,6 +241,7 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     const savedEvent = events.filter(event => event.type === 'ORDER_SAVE').at(-1)
     assert.equal(savedEvent.effects?.print_jobs?.length || 0, 0, 'Guardar no genera impresión')
     await openPayment(pos3)
+    await pestanaDelCobro(pos3, 'Efectivo')
     await expect(modal(pos3).getByRole('button', { name: 'Preparar cobro en efectivo', exact: true })).toBeDisabled()
     await expect(modal(pos3).getByText(/Envía todos los productos guardados/)).toBeVisible()
     await modal(pos3).getByRole('button', { name: 'Cerrar', exact: true }).click()
@@ -284,6 +291,7 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
   if (printLab) await check('La cuenta liquidada conserva acceso al recibo del último abono', async () => {
     const before = (await snapshot()).financial_orders[0]
     const count = printLab.packets.length
+    await pestanaDelCobro(pos3, 'Cobrados')
     await modal(pos3).getByRole('button', { name: 'Imprimir recibo del abono', exact: true }).last().click()
     await until(() => printLab.packets.length === count + 1, 'Recibo liquidado en TCP sintético')
     assert.match(printLab.packets.at(-1), /Importe recibido 116\.00/)

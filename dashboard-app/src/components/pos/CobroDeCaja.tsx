@@ -86,8 +86,12 @@ export default function CobroDeCaja({ order, onClose, onChanged }: Props) {
   useEffect(() => {
     // Un cobro apartado sin resolver manda sobre cualquier otra cosa; si el
     // cajero ya eligió pestaña a mano, no se la movemos debajo de los dedos.
-    if (!pestanaTocada && pendingPayments.length > 0) setPestana('porConfirmar')
-  }, [pendingPayments.length, pestanaTocada])
+    if (pestanaTocada) return
+    if (pendingPayments.length > 0) { setPestana('porConfirmar'); return }
+    // Y en una cuenta ya liquidada no hay nada que cobrar: lo único que queda es
+    // el recibo y el cajón del abono, que viven en «Cobrados».
+    if (finance?.status === 'settled' && cobrados.length > 0) setPestana('cobrados')
+  }, [pendingPayments.length, pestanaTocada, finance?.status, cobrados.length])
   const irA = (destino: typeof pestana) => { setPestanaTocada(true); setPestana(destino) }
   const confirm = (payment: PagoDeCaja) => run(async () => {
     const next = await confirmarEfectivoCaja(finance!, payment, centavosDeTexto(received[payment.payment_id] || ''))
