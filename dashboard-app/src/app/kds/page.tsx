@@ -98,6 +98,7 @@ export default function KDSStandalone() {
   const [statusMsg, setStatusMsg] = useState<{ success: boolean; text: string } | null>(null)
   const [showExitConfirm, setShowExitConfirm] = useState(false)
   const advancingRef = useRef<Set<string>>(new Set())
+  const savingItemsRef = useRef<Set<string>>(new Set())
   const prevEnviadaRef = useRef(0)
 
   const kdsClient = useKdsWsClient()
@@ -278,25 +279,59 @@ export default function KDSStandalone() {
     }
   }
 
-  const toggleItemDone = (orderId: string, itemIndex: number, order: KitchenOrderFromDB) => {
+  const toggleItemDone = async (orderId: string, itemIndex: number, order: KitchenOrderFromDB) => {
     const key = `${orderId}-${itemIndex}`
+    if (savingItemsRef.current.has(key)) return
+    savingItemsRef.current.add(key)
+
+    const wasDone = doneItems.has(key)
     const next = new Set(doneItems)
-    const done = !next.has(key)
+    const done = !wasDone
+    let shouldAutoAdvance = false
     if (done) {
       next.add(key)
       const items: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
       const allDone = items.every((item, idx) => item.cancelled || next.has(`${orderId}-${idx}`))
-      if (allDone && order.status === 'preparando') {
-        void advance(orderId, order.status, order.mesa, order.mesero)
-      }
+      shouldAutoAdvance = allDone && order.status === 'preparando'
     } else {
       next.delete(key)
     }
     setDoneItems(next)
-    kdsClient.sendCommand('KDS_ITEM_STATUS', { order_id: orderId, kds_item_delta: { item_index: itemIndex, done } })
-    void updateKitchenItemStatus(orderId, itemIndex, done).then(ok => {
-      if (!ok) console.error(`[KDS] No se pudo persistir el avance atómico de ${orderId}/${itemIndex}`)
-    })
+    const delta = {
+      order_id: orderId,
+      kds_item_delta: { item_index: itemIndex, done },
+    }
+
+    try {
+      const writes: Promise<boolean>[] = [updateKitchenItemStatus(orderId, itemIndex, done)]
+      if (kdsClient.mode === 'LAN_PRIMARY') {
+        writes.push(kdsClient.sendCommandConfirmed('KDS_ITEM_STATUS', delta))
+      }
+      // Keep operating as soon as either durable authority confirms. Promise.any
+      // still observes the slower rejection, avoiding an unhandled promise.
+      const persisted = await Promise.any(writes.map(async write => {
+        if (await write) return true
+        throw new Error('kds_write_rejected')
+      })).catch(() => false)
+      if (!persisted) {
+        // Revert only this item. Other concurrent product deltas must survive.
+        setDoneItems(current => {
+          const rolledBack = new Set(current)
+          if (wasDone) rolledBack.add(key)
+          else rolledBack.delete(key)
+          return rolledBack
+        })
+        setStatusMsg({ success: false, text: 'No se guardó el avance · toca para reintentar' })
+        setTimeout(() => setStatusMsg(null), 5000)
+        return
+      }
+
+      // Never advance the whole ticket until the last product delta has one
+      // durable authority: Caja on the LAN or the atomic cloud RPC.
+      if (shouldAutoAdvance) await advance(orderId, order.status, order.mesa, order.mesero)
+    } finally {
+      savingItemsRef.current.delete(key)
+    }
   }
 
   const filteredOrders = orders
