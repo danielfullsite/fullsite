@@ -9,6 +9,7 @@ import TurnoGate from '@/components/pos/TurnoGate'
 import AperturasPendientesDeCaja from '@/components/pos/AperturasPendientesDeCaja'
 import ImpresionesPendientesDeCaja from '@/components/pos/ImpresionesPendientesDeCaja'
 import PendingOrderInventory from '@/components/pos/PendingOrderInventory'
+import MesaLockGuard from '@/components/pos/MesaLockGuard'
 import { getActiveClientSlug as _cid } from '@/lib/data'
 import { getEffectiveSetting } from '@/lib/settings'
 import { initStationRouting, initNoPrintStations, initCancellationReasons, initDiscountCatalog, initKdsStations } from '@/lib/pos-constants'
@@ -783,7 +784,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
         <ImpresionesPendientesDeCaja />
         <AperturasPendientesDeCaja />
         <TurnoGate staff={staff!}>
-          {children}
+          <MesaLockGuard enabled={unlocked}>{children}</MesaLockGuard>
           <PendingOrderInventory clientId={_cid()} />
         </TurnoGate>
       </div>

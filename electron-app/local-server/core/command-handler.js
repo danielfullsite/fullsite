@@ -11,6 +11,12 @@ const { prepareOrderPrintEffects } = require('./operational-print')
 const canonicalPrint = require('./canonical-print')
 const canonicalDrawer = require('./canonical-drawer')
 
+const MESA_COORDINATED_COMMANDS = new Set([
+  'ORDER_UPSERTED', 'ORDER_ITEMS_TRANSFERRED', 'ORDER_SENT', 'ORDER_CLOSED', 'ORDER_CANCELLED',
+  'ORDER_SAVE', 'ORDER_SEND', 'ORDER_MOVE', 'ORDER_VOID',
+  ...FINANCIAL_COMMANDS,
+])
+
 // Map from command_type (from client) → eventType (stored in log)
 const COMMAND_TO_EVENT = {
   ORDER_UPSERTED:  EVENT.ORDER_UPSERTED,
@@ -64,7 +70,10 @@ class CommandHandler {
   }
 
   async _handle(msg, fromClientId, context) {
-    const cmdPayload = msg.payload || {}
+    // Never project caller-owned identity for coordination locks. On HTTP the
+    // terminal comes from the authenticated transport header; on WS it comes
+    // from the authenticated SUBSCRIBE. The body is data, not identity.
+    const cmdPayload = { ...(msg.payload || {}) }
     const commandType = cmdPayload.command_type
 
     if (!commandType || !COMMAND_TO_EVENT[commandType]) {
@@ -73,6 +82,20 @@ class CommandHandler {
 
     const commandId = cmdPayload.command_id
     if (!commandId) return { error: 'Missing command_id' }
+
+    if (commandType === 'MESA_LOCK' || commandType === 'MESA_UNLOCK') {
+      if (!fromClientId || fromClientId === 'rest-api') {
+        throw new FinancialError('TERMINAL_ID_REQUIRED', 'La terminal debe estar emparejada para bloquear una mesa')
+      }
+      const mesa = Number(cmdPayload.mesa)
+      if (!Number.isSafeInteger(mesa) || mesa <= 0) throw new FinancialError('INVALID_MESA', 'Mesa inválida')
+      cmdPayload.mesa = String(mesa)
+      cmdPayload.client_id = fromClientId
+      if (commandType === 'MESA_LOCK' && (!Number.isSafeInteger(cmdPayload.expires_ms) ||
+        cmdPayload.expires_ms <= Date.now() || cmdPayload.expires_ms > Date.now() + 60_000)) {
+        throw new FinancialError('INVALID_MESA_LOCK_EXPIRY', 'La vigencia del bloqueo de mesa es inválida')
+      }
+    }
 
     // Validate restaurant_id
     if (msg.restaurant_id && msg.restaurant_id !== this._restaurantId) {
@@ -214,6 +237,20 @@ class CommandHandler {
   }
 
   _validateCommandState(commandType, cmdPayload, fromClientId) {
+    if (MESA_COORDINATED_COMMANDS.has(commandType)) {
+      const mesas = new Set([
+        cmdPayload.mesa,
+        this._state.getOrder?.(cmdPayload.order_id)?.mesa,
+        cmdPayload.source_order?.mesa,
+        cmdPayload.target_order?.mesa,
+      ].filter(mesa => mesa !== undefined && mesa !== null).map(String))
+      for (const mesa of mesas) {
+        const lock = this._state.getLock(mesa)
+        if (lock && lock.client_id !== fromClientId && lock.expires_ms > Date.now()) {
+          throw new FinancialError('MESA_LOCK_CONFLICT', `Otra terminal está editando la mesa ${mesa}`)
+        }
+      }
+    }
     if (commandType === 'ORDER_ITEMS_TRANSFERRED') {
       const accounts = [cmdPayload.source_order, cmdPayload.target_order]
       if (this._localAuthorityEnabled || accounts.some(o => this._state.getOrder?.(o?.id)?.authority === 'caja')) {
