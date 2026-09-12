@@ -5,7 +5,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Printer } from 'lucide-react'
 import {
   getKitchenOrders, updateKitchenItemStatus, updateOrderStatus, logAudit,
-  type KitchenOrderFromDB, type OrderItem,
+  type KitchenOrderFromDB, type KitchenCloudReadStatus, type OrderItem,
 } from '@/lib/pos-data'
 import { reprintByStation, type ReprintOrderContext } from '@/lib/printer'
 import { type StationName, getStationByName, POLL_INTERVAL_KITCHEN } from '@/lib/pos-constants'
@@ -96,6 +96,7 @@ export default function KDSStandalone() {
   const [doneItems, setDoneItems] = useState<Set<string>>(new Set())
   const [reprintMsg, setReprintMsg] = useState<{ success: boolean; text: string } | null>(null)
   const [statusMsg, setStatusMsg] = useState<{ success: boolean; text: string } | null>(null)
+  const [cloudReadStatus, setCloudReadStatus] = useState<KitchenCloudReadStatus>('ready')
   const [showExitConfirm, setShowExitConfirm] = useState(false)
   const advancingRef = useRef<Set<string>>(new Set())
   const savingItemsRef = useRef<Set<string>>(new Set())
@@ -167,7 +168,7 @@ export default function KDSStandalone() {
     const scope = currentKitchenScope()
     let data: KitchenOrderFromDB[]
     try {
-      data = navigator.onLine ? await getKitchenOrders() : await readScopedKitchenCache(scope) as unknown as KitchenOrderFromDB[]
+      data = navigator.onLine ? await getKitchenOrders(setCloudReadStatus) : await readScopedKitchenCache(scope) as unknown as KitchenOrderFromDB[]
     } catch {
       data = await readScopedKitchenCache(scope).catch(() => []) as unknown as KitchenOrderFromDB[]
     }
@@ -425,6 +426,17 @@ export default function KDSStandalone() {
           )}
         </div>
       </div>
+
+      {kdsClient.mode !== 'LAN_PRIMARY' && cloudReadStatus === 'configuration-required' && (
+        <div role="alert" className="px-4 py-2 bg-red-950 border-b border-red-700 text-red-200 text-sm font-bold flex-shrink-0">
+          Respaldo cloud bloqueado: falta KITCHEN_TOKEN_SECRET en el servidor. La red local y el caché siguen operando.
+        </div>
+      )}
+      {kdsClient.mode !== 'LAN_PRIMARY' && cloudReadStatus === 'token-required' && (
+        <div role="alert" className="px-4 py-2 bg-red-950 border-b border-red-700 text-red-200 text-sm font-bold flex-shrink-0">
+          Respaldo cloud bloqueado: esta terminal no tiene un token KDS válido. Importa su config generado; el caché sigue visible.
+        </div>
+      )}
 
       {/* Orders grid */}
       <div className="flex-1 overflow-y-auto p-3">

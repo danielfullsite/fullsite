@@ -37,6 +37,7 @@ function mockFetchSequence(responses: Array<{ ok: boolean; status?: number; json
 
 beforeEach(() => {
   vi.restoreAllMocks()
+  vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'http://supabase.test')
   vi.stubEnv('SUPABASE_SERVICE_KEY', 'test-service-key')
   kitchenAuth.enabled = true
   kitchenAuth.valid = true
@@ -47,6 +48,40 @@ afterEach(() => {
 })
 
 describe('GET /api/pos/kitchen — qué ve el tablero', () => {
+  it('falla cerrado sin secreto server y no consulta Supabase con service_role', async () => {
+    kitchenAuth.enabled = false
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    const res = await GET(req())
+
+    expect(res.status).toBe(503)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('rechaza lectura sin token válido antes de consultar Supabase', async () => {
+    kitchenAuth.valid = false
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    const res = await GET(req())
+
+    expect(res.status).toBe(401)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('no degrada la lectura privilegiada a la anon key si falta service_role', async () => {
+    vi.stubEnv('SUPABASE_SERVICE_KEY', '')
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'anon-no-es-autoridad-kds')
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    const res = await GET(req())
+
+    expect(res.status).toBe(503)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('con turno abierto filtra por turno_id EXACTO (no updated_at, que recalificaba órdenes viejas al tocarlas)', async () => {
     const calls = mockFetchSequence([
       { ok: true, json: [{ id: 'turno-abierto-1' }] },

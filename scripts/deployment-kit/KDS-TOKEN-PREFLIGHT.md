@@ -1,7 +1,8 @@
 # Preflight de token para KDS
 
-La escritura del avance de cocina usa `service_role` sólo detrás de un token HMAC
-por tenant. Sin este preflight, el endpoint de escritura falla cerrado con `503`.
+La lectura cloud y la escritura del avance de cocina usan `service_role` sólo detrás
+de un token HMAC por tenant. Sin este preflight, ambos endpoints fallan cerrado con
+`503`; el KDS conserva las comandas recibidas por LAN y su caché local.
 
 1. Genera y guarda `KITCHEN_TOKEN_SECRET` en el gestor de secretos. Debe tener al
    menos 16 caracteres; no lo pongas en el manifest ni en Git.
@@ -14,8 +15,13 @@ por tenant. Sin este preflight, el endpoint de escritura falla cerrado con `503`
    verificar que el archivo importado es el generado.
 5. Importa el `config.json` correspondiente en cada terminal. Electron inyecta
    `pos_kitchen_token` únicamente en el origen propio de Fullsite.
-6. Antes de operar, comprueba: GET de cocina responde, marcar un producto persiste,
-   un request sin token recibe `401`, y con el secreto server ausente recibe `503`.
+6. Antes de desplegar el código que exige el token, provisiona el secreto server y
+   reconstruye/importa los kits. Así no existe una ventana donde el respaldo cloud
+   quede bloqueado por falta de configuración.
+7. Antes de operar, comprueba: GET de cocina responde, marcar un producto persiste,
+   un request sin token recibe `401`, y con el secreto server ausente GET y PATCH
+   reciben `503` sin consultar Supabase. Confirma también que, con WAN caída, una
+   comanda nueva sigue llegando por LAN y que al reiniciar aparece desde caché.
 
 No despliegues el PATCH atómico ni la migración KDS pendiente hasta completar los
-seis pasos en staging y reconstruir el instalador desde el commit final.
+siete pasos en staging y reconstruir el instalador desde el commit final.
