@@ -3252,7 +3252,7 @@ export async function getClosedOrders(date: string): Promise<{ id: string; mesa:
   return res.json()
 }
 
-export async function reopenOrder(orderId: string, manager?: string, approvalToken?: string | null): Promise<boolean> {
+export async function reopenOrder(orderId: string, manager?: string, approvalToken?: string | null, operationId?: string): Promise<boolean> {
   // Reabrir una cuenta PAGADA es sensible (fraude: reabrir → modificar → re-cerrar menor).
   // Ya NO es un PATCH directo con anon-key: va por /api/pos/reopen-order, que VERIFICA la
   // aprobación de gerente server-side mediante token firmado.
@@ -3261,6 +3261,7 @@ export async function reopenOrder(orderId: string, manager?: string, approvalTok
     headers: { 'Content-Type': 'application/json', ...getPOSAuthHeaders() },
     body: JSON.stringify({
       order_id: orderId,
+      operation_id: operationId || `reopen:${orderId}`,
       manager: manager || undefined,
       approval_token: approvalToken || undefined,
     }),

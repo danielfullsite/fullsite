@@ -295,7 +295,8 @@ function CortePageLegacy() {
 
     // Aprobación server-verificable: token firmado del gerente (online) que la ruta valida.
     const approvalToken = consumeManagerApproval(manager)
-    const ok = await reopenOrder(reopenTarget.id, manager, approvalToken)
+    const operationId = `reopen:${reopenTarget.id}:${reopenTarget.closed_at || 'closed'}`
+    const ok = await reopenOrder(reopenTarget.id, manager, approvalToken, operationId)
     if (ok) {
       logAudit({
         order_id: reopenTarget.id, action: 'status_changed', actor: manager,
