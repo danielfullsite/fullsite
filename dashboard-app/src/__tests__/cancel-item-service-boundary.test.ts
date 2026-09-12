@@ -28,16 +28,20 @@ afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs() })
 
 describe('frontera de cancelación', () => {
   it('un dueño autenticado usa service role y repite tenant en lectura y escritura OCC', async () => {
-    const fetcher = vi.fn(async (_url: string, init?: RequestInit) => {
-      if (init?.method === 'PATCH') return Response.json([{ ...order, ...JSON.parse(String(init.body)) }])
-      if (init?.method === 'POST') return Response.json({})
+    const fetcher = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.includes('pos_cancel_item_operations')) return Response.json([])
+      if (url.includes('/rpc/r1_cancel_item_atomic')) {
+        const input = JSON.parse(String(init?.body))
+        const updated = { ...order, ...input.p_patch }
+        return Response.json({ ok: true, revision: updated.order_revision, order: updated })
+      }
       return Response.json([order])
     })
     vi.stubGlobal('fetch', fetcher)
     const response = await POST(request())
     expect(response.status).toBe(200)
-    const write = fetcher.mock.calls.find(([, init]) => init?.method === 'PATCH')!
-    expect(write[0]).toContain('client_id=eq.tenant-a')
+    const write = fetcher.mock.calls.find(([url]) => url.includes('/rpc/r1_cancel_item_atomic'))!
+    expect(JSON.parse(String(write[1]?.body))).toMatchObject({ p_client_id: 'tenant-a', p_order_id: 'order-1' })
     expect((write[1]?.headers as Record<string, string>).Authorization).toBe('Bearer service-test')
   })
 

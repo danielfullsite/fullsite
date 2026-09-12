@@ -72,7 +72,7 @@ describe('la bitácora no la dicta el cliente', () => {
     expect(reopen).toMatch(/appr\.approverId \|\| auth\.staffId/)
     expect(reopen).not.toContain('manager_declarado')
     const cancel = lee('cancel-item')
-    expect(cancel).toMatch(/actor: auth\.staffName/)
+    expect(cancel).toMatch(/approvedBy = auth\.staffName \|\| auth\.staffId/)
     expect(cancel).toMatch(/solicitante_rol: auth\.role/)
   })
 
