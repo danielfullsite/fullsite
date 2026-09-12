@@ -29,8 +29,14 @@ Asegurar la continuidad de los servicios de Fullsite y la recuperacion rapida de
 
 ### 3.2 Base de datos (Supabase)
 - PostgreSQL con replicacion automatica
-- Backups automaticos diarios con retencion de 30 dias
-- Point-in-Time Recovery (PITR) disponible
+- Backups automaticos diarios gestionados por Supabase
+- **PENDIENTE — Point-in-Time Recovery.** PITR es un complemento de pago del plan; no se ha
+  confirmado que este contratado en este proyecto. Hasta confirmarlo, no debe presentarse como
+  disponible ante un cliente ni ante un auditor.
+- **PENDIENTE — retencion.** La ventana real de retencion depende del plan contratado. La cifra
+  de 30 dias venia escrita aqui sin haber sido verificada contra la consola de Supabase.
+- **PENDIENTE — prueba de restauracion.** Nunca se ha ejecutado una restauracion completa. Un
+  respaldo que no se ha restaurado es una suposicion, no un control.
 - Region primaria con failover gestionado por Supabase
 
 ### 3.3 DNS/CDN (Cloudflare)
@@ -80,7 +86,7 @@ Asegurar la continuidad de los servicios de Fullsite y la recuperacion rapida de
 
 | Que | Frecuencia | Retencion | Donde | Responsable |
 |---|---|---|---|---|
-| Base de datos completa | Diario (automatico) | 30 dias | Supabase (region primaria) | Automatico |
+| Base de datos completa | Diario (automatico) | Segun plan contratado — **sin verificar** | Supabase (region primaria) | Automatico |
 | Codigo fuente | Cada commit | Indefinida | GitHub (repositorio privado) | Automatico |
 | Secrets y configuracion | Al cambiar | Version actual | GitHub Secrets + Vercel Env | CEO |
 | Datos de clientes (export) | Bajo demanda | N/A | Entregado al cliente | Soporte |
