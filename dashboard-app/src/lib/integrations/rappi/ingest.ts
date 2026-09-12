@@ -4,6 +4,7 @@ import { rappiStoreId } from '@/lib/integrations/rappi/auth'
 
 type ProcessSource = 'webhook' | 'poller' | 'manual'
 type ProcessResult = { action: 'new' | 'dedup' | 'dlq'; orderId?: string; platformOrderId?: string; reason?: string }
+type ProcessOptions = { quarantine?: boolean }
 
 const SB_URL = () => process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const SB_SERVICE_KEY = () => process.env.SUPABASE_SERVICE_KEY || ''
@@ -42,7 +43,7 @@ async function findExisting(platformOrderId: string) {
   return res.rows[0]?.id ?? null
 }
 
-async function resolveClientId(providerStoreId: string): Promise<string | null> {
+export async function resolveClientId(providerStoreId: string): Promise<string | null> {
   const encoded = encodeURIComponent(providerStoreId)
   const res = await sbJson<{ client_id: string }>(
     `integration_store_mappings?provider=eq.rappi&provider_store_id=eq.${encoded}&select=client_id&limit=1`
@@ -106,10 +107,16 @@ function deliveryOrderId(platformOrderId: string): string {
   return `rappi-${platformOrderId}`.replace(/[^a-zA-Z0-9_-]+/g, '-').slice(0, 120)
 }
 
-export async function processRappiOrder(rawOrder: unknown, source: ProcessSource, correlationId = crypto.randomUUID()): Promise<ProcessResult> {
+export async function processRappiOrder(
+  rawOrder: unknown,
+  source: ProcessSource,
+  correlationId = crypto.randomUUID(),
+  options: ProcessOptions = {},
+): Promise<ProcessResult> {
+  const shouldQuarantine = options.quarantine !== false
   const platformOrderId = rappiProviderOrderId(rawOrder)
   if (!platformOrderId) {
-    await cuarentena(rawOrder, 'RAPPI_ORDER_ID_MISSING', source, correlationId)
+    if (shouldQuarantine) await cuarentena(rawOrder, 'RAPPI_ORDER_ID_MISSING', source, correlationId)
     return { action: 'dlq', reason: 'RAPPI_ORDER_ID_MISSING' }
   }
 
@@ -128,13 +135,13 @@ export async function processRappiOrder(rawOrder: unknown, source: ProcessSource
 
   const providerStoreId = rappiProviderStoreId(rawOrder, rappiStoreId())
   if (!providerStoreId) {
-    await cuarentena(rawOrder, 'RAPPI_STORE_ID_MISSING', source, correlationId, { platform_order_id: platformOrderId })
+    if (shouldQuarantine) await cuarentena(rawOrder, 'RAPPI_STORE_ID_MISSING', source, correlationId, { platform_order_id: platformOrderId })
     return { action: 'dlq', platformOrderId, reason: 'RAPPI_STORE_ID_MISSING' }
   }
 
   const clientId = await resolveClientId(providerStoreId)
   if (!clientId) {
-    await quarantineUnmappedStore(rawOrder, providerStoreId, source, correlationId)
+    if (shouldQuarantine) await quarantineUnmappedStore(rawOrder, providerStoreId, source, correlationId)
     return { action: 'dlq', platformOrderId, reason: 'UNMAPPED_STORE' }
   }
 

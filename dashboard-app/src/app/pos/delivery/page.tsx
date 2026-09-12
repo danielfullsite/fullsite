@@ -11,17 +11,15 @@ import {
   ArrowLeft, RefreshCw, Clock, ChefHat, PackageCheck,
   Truck, CheckCircle2, ShoppingBag, DollarSign, XCircle, Ban,
 } from 'lucide-react'
-import { formatMXN, logAudit, getClientId } from '@/lib/pos-data'
+import { formatMXN, logAudit, getPOSAuthHeaders } from '@/lib/pos-data'
 import { CANCEL_REASON_LABELS, UBER_CANCEL_REASONS } from '@/lib/integrations/uber-eats/reasons'
 import type { UberCancelReason } from '@/lib/integrations/uber-eats/reasons'
+import {
+  cancellationMessage, detectExternalCancellations, soundCancellationAlert,
+  type ExternalCancellation,
+} from '@/lib/integrations/delivery-cancel-alert'
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-const SB_HEADERS = {
-  apikey: SUPABASE_KEY,
-  Authorization: `Bearer ${SUPABASE_KEY}`,
-  'Content-Type': 'application/json',
-}
+const CANCEL_ALERTS_KEY = 'delivery_cancel_alerts'
 
 type PlatformFilter = 'todas' | 'ubereats' | 'rappi'
 
@@ -86,13 +84,32 @@ export default function DeliveryPage() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<PlatformFilter>('todas')
   const [actorName, setActorName] = useState('Caja')
+  const [cancelAlerts, setCancelAlerts] = useState<ExternalCancellation[]>([])
+  const [patchError, setPatchError] = useState<string | null>(null)
+  const previousOrdersRef = useRef<DeliveryOrder[]>([])
+  const cancelledLocallyRef = useRef<Set<string>>(new Set())
+  const alertedRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
     try {
       const saved = sessionStorage.getItem('pos_staff')
       if (saved) setActorName(JSON.parse(saved).name || 'Caja')
     } catch { /* */ }
+    try {
+      const saved = JSON.parse(localStorage.getItem(CANCEL_ALERTS_KEY) || '[]') as ExternalCancellation[]
+      if (Array.isArray(saved)) {
+        setCancelAlerts(saved)
+        saved.forEach(alert => alertedRef.current.add(alert.id))
+      }
+    } catch { /* invalid stale cache */ }
   }, [])
+
+  useEffect(() => {
+    try {
+      if (cancelAlerts.length) localStorage.setItem(CANCEL_ALERTS_KEY, JSON.stringify(cancelAlerts))
+      else localStorage.removeItem(CANCEL_ALERTS_KEY)
+    } catch { /* localStorage unavailable; the visual alert still works */ }
+  }, [cancelAlerts])
 
   const fetchingRef = useRef(false)
   const fetchOrders = useCallback(async () => {
@@ -101,13 +118,27 @@ export default function DeliveryPage() {
     try {
       const today = new Date().toISOString().slice(0, 10)
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/delivery_orders?client_id=eq.${getClientId()}&platform=in.(ubereats,rappi)&created_at=gte.${today}T00:00:00&order=created_at.desc`,
-        { headers: SB_HEADERS, cache: 'no-store' }
+        `/api/pos/delivery-orders?platform=ubereats,rappi&since=${today}T00:00:00`,
+        { headers: getPOSAuthHeaders(), cache: 'no-store' }
       )
       if (res.ok) {
         const data: DeliveryOrder[] = await res.json()
         // Filter out test/invalid orders
-        setOrders(data.filter(o => o.customer_name && !o.customer_name.startsWith('TEST') && o.total > 0))
+        const visible = data.filter(o => o.customer_name && !o.customer_name.startsWith('TEST') && o.total > 0)
+        try {
+          const newAlerts = detectExternalCancellations(
+            previousOrdersRef.current, visible, cancelledLocallyRef.current, alertedRef.current,
+          )
+          if (newAlerts.length) {
+            newAlerts.forEach(alert => alertedRef.current.add(alert.id))
+            setCancelAlerts(previous => [...previous, ...newAlerts])
+            if (newAlerts.some(alert => alert.kitchenInProgress)) soundCancellationAlert()
+          }
+        } catch (error) {
+          console.warn('[delivery] cancellation alert failed:', error)
+        }
+        previousOrdersRef.current = visible
+        setOrders(visible)
       }
     } catch { /* sin red */ } finally {
       fetchingRef.current = false
@@ -151,15 +182,29 @@ export default function DeliveryPage() {
     }
   }, [orders])
 
-  const patchOrder = async (id: string, body: Record<string, unknown>) => {
-    await fetch(`${SUPABASE_URL}/rest/v1/delivery_orders?id=eq.${id}`, {
-      method: 'PATCH', headers: SB_HEADERS, body: JSON.stringify(body),
-    })
-    fetchOrders()
+  const patchOrder = async (id: string, body: Record<string, unknown>): Promise<boolean> => {
+    let ok = false
+    try {
+      const response = await fetch('/api/pos/delivery-orders', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...getPOSAuthHeaders() },
+        body: JSON.stringify({ id, patch: body }),
+      })
+      ok = response.ok
+      if (!ok) console.warn('[delivery] PATCH failed:', response.status)
+    } catch (error) {
+      console.warn('[delivery] PATCH without network:', error)
+    }
+    return ok
   }
 
   const handleStatusChange = async (order: DeliveryOrder, newStatus: 'preparando' | 'lista') => {
-    await patchOrder(order.id, { status: newStatus, updated_at: new Date().toISOString() })
+    const applied = await patchOrder(order.id, { status: newStatus, updated_at: new Date().toISOString() })
+    if (!applied) {
+      setPatchError(`No se pudo cambiar la orden de ${order.customer_name}. Intenta de nuevo.`)
+      return
+    }
+    void fetchOrders()
     // When marking lista → notify Uber that order is ready for pickup
     if (newStatus === 'lista' && order.platform === 'ubereats' && order.platform_order_id) {
       fetch('/api/integrations/uber-eats/order', {
@@ -176,7 +221,13 @@ export default function DeliveryPage() {
   }
 
   const handleCancel = async (order: DeliveryOrder, reason: UberCancelReason) => {
-    await patchOrder(order.id, { status: 'cancelada', updated_at: new Date().toISOString() })
+    const applied = await patchOrder(order.id, { status: 'cancelada', updated_at: new Date().toISOString() })
+    if (!applied) {
+      setPatchError(`No se pudo cancelar la orden de ${order.customer_name}. Sigue activa — intenta de nuevo.`)
+      return
+    }
+    cancelledLocallyRef.current.add(order.id)
+    void fetchOrders()
     if (order.platform === 'ubereats' && order.platform_order_id) {
       fetch('/api/integrations/uber-eats/order', {
         method: 'POST',
@@ -189,6 +240,35 @@ export default function DeliveryPage() {
 
   return (
     <div className="h-dvh flex flex-col overflow-hidden" style={{ background: '#0a0a0f' }}>
+      {patchError && (
+        <div className="shrink-0 bg-amber-500 text-black px-4 py-3 flex items-center gap-3" role="alert">
+          <XCircle size={20} className="shrink-0" />
+          <p className="flex-1 font-bold text-sm">{patchError}</p>
+          <button onClick={() => setPatchError(null)} className="shrink-0 px-4 py-2 rounded-lg bg-black/80 text-white font-bold text-sm min-h-[44px]">Cerrar</button>
+        </div>
+      )}
+      {cancelAlerts.length > 0 && (
+        <div className="shrink-0 bg-red-600 text-white" role="alert" aria-live="assertive">
+          {cancelAlerts.map(alert => (
+            <div key={alert.id} className="flex items-center gap-3 px-4 py-3 border-b border-red-500/40 last:border-0">
+              <Ban size={22} className="shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="font-black text-sm leading-tight">{cancellationMessage(alert)}</p>
+                <p className="text-white/80 text-xs mt-0.5">{formatMXN(alert.total)}{alert.platform_order_id && ` · ${alert.platform_order_id}`}{` · estaba en «${alert.previousStatus}»`}</p>
+              </div>
+              <button
+                onClick={() => {
+                  logAudit({ action: 'delivery_cancel_alert_ack', actor: actorName, details: { delivery_id: alert.id, platform: alert.platform, previous_status: alert.previousStatus } })
+                  setCancelAlerts(previous => previous.filter(item => item.id !== alert.id))
+                }}
+                className="shrink-0 px-4 py-2 rounded-lg bg-white text-red-700 font-black text-sm min-h-[44px]"
+              >
+                Enterado
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
       {/* Header */}
       <div className="flex-shrink-0 z-20 bg-[#12121a] border-b border-white/10 px-4 py-3 flex items-center gap-3">
         <Link href="/pos" className="w-11 h-11 rounded-lg bg-white/10 flex items-center justify-center text-white">

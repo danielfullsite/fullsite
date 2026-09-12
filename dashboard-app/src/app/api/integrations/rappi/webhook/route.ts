@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse, after } from 'next/server'
 import { verifyRappiSignature } from '@/lib/integrations/rappi/signature'
-import { processRappiOrder, cuarentenarOrdenDeRappi } from '@/lib/integrations/rappi/ingest'
+import { processRappiOrder, cuarentenarOrdenDeRappi, resolveClientId } from '@/lib/integrations/rappi/ingest'
+import { esPing, extraerStoreId, responderPing } from '@/lib/integrations/rappi/ping'
 
 // Webhook de Rappi (push-first). Verifica firma HMAC sobre el body CRUDO, ACK 200
 // INMEDIATO (RAPPI-002: antes de cualquier I/O), y procesa la orden en background
@@ -9,7 +10,8 @@ import { processRappiOrder, cuarentenarOrdenDeRappi } from '@/lib/integrations/r
 
 export const dynamic = 'force-dynamic'
 
-const isDev = () => (process.env.RAPPI_ENV || 'dev').toLowerCase() !== 'prod'
+// Missing configuration must not enable signature-format discovery in production.
+const isDev = () => (process.env.RAPPI_ENV || 'prod').toLowerCase() !== 'prod'
 
 // Rappi puede envolver la orden en { order } o { data }; processRappiOrder tolera la forma.
 function extractOrder(payload: unknown): unknown {
@@ -41,7 +43,7 @@ export async function POST(request: NextRequest) {
     if (dev) {
       console.log(
         `[rappi-webhook] verify-fail reason=${sig.reason} hasHeader=${Boolean(header)} ` +
-        `bodyLen=${rawBody.length} header="${(header || '').slice(0, 96)}"`,
+        `bodyLen=${rawBody.length}`,
       )
     }
     const status = sig.reason === 'NO_SECRET_CONFIGURED' ? 503 : 401
@@ -60,9 +62,9 @@ export async function POST(request: NextRequest) {
     ? (payload as Record<string, unknown>).event ?? (payload as Record<string, unknown>).type
     : null) as string | null
 
-  // PING u otros eventos sin orden: ACK sin ingerir.
-  if (eventType && /ping/i.test(eventType)) {
-    return NextResponse.json({ ok: true, event: eventType })
+  // El PING de Rappi es por tienda y exige el campo `status`.
+  if (esPing(payload, eventType)) {
+    return NextResponse.json(await responderPing(extraerStoreId(payload), resolveClientId))
   }
 
   // RAPPI-002: ACK 200 primero; la ingesta corre en background (no bloquea a Rappi).

@@ -1975,6 +1975,7 @@ export type AuditAction =
   | 'delivery_created'
   | 'delivery_assigned'
   | 'delivery_status_changed'
+  | 'delivery_cancel_alert_ack'
   | 'delivery_closed'
   | 'comandas_print_off'
   | 'comandas_print_on'
