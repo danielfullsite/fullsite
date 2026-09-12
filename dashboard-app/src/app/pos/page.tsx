@@ -6574,16 +6574,30 @@ function POSContent() {
                           } catch { /* keep polling */ }
                         }, 3000)
                       } else {
-                        // MP failed, fall back to manual
+                        // UNA RESPUESTA QUE NO LLEGÓ NO ES UN COBRO.
+                        //
+                        // Aquí se cerraba la venta como «Tarjeta de crédito» sin
+                        // preguntar nada. Pero Mercado Pago pudo haber recibido el
+                        // intent y tener la terminal pidiendo la tarjeta: si el
+                        // cliente la pasa, se cobró y la orden ya está cerrada sin
+                        // referencia; si el cajero vuelve a mandar el cobro, son dos
+                        // cargos. (Barrido 3, 2026-09-12, integraciones P0.)
+                        //
+                        // El cobro manual sigue disponible —es la pantalla del monto
+                        // grande para teclearlo en la terminal del banco— pero lo
+                        // abre una PERSONA que fue a ver el aparato, no un catch.
                         setSaving(false); operationLock.current = false
-                        handlePayment('Tarjeta de crédito')
+                        showToast('La terminal no confirmó. Revísala ANTES de volver a cobrar: puede haber cobrado ya.')
+                        setShowCardConfirm(true)
                       }
                     } catch {
                       setSaving(false); operationLock.current = false
                       if (!navigator.onLine) {
                         showToast('Sin conexión — pago con terminal no disponible offline')
                       } else {
-                        handlePayment('Tarjeta de crédito')
+                        // Mismo criterio que arriba: sin respuesta no se afirma cobro.
+                        showToast('No se pudo hablar con la terminal. Revísala ANTES de volver a cobrar: puede haber cobrado ya.')
+                        setShowCardConfirm(true)
                       }
                     }
                   } else {
