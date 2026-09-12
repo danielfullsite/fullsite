@@ -68,7 +68,11 @@ const PATCHABLE = new Set([
   'status', 'updated_at', 'ready_at', 'picked_up_at', 'cancelled_at',
   'en_route_at', 'delivered_at', 'closed_at', 'notes', 'driver_name', 'driver_phone',
 ])
-const DELIVERY_STATUSES = new Set(['nueva', 'recibida', 'aceptada', 'preparando', 'lista', 'en_ruta', 'entregada', 'cancelada'])
+// This browser-facing route only owns kitchen progress and an explicitly
+// authorized cancellation. Final provider states arrive through signed
+// webhooks/reconciliation; accepting them here would let any shift token hide
+// a live order by fabricating `entregada` or `en_ruta`.
+const DELIVERY_STATUSES = new Set(['preparando', 'lista', 'cancelada'])
 const DATE_FIELDS = new Set(['updated_at', 'ready_at', 'picked_up_at', 'cancelled_at', 'en_route_at', 'delivered_at', 'closed_at'])
 const SHORT_TEXT_LIMITS: Record<string, number> = { notes: 2000, driver_name: 200, driver_phone: 80 }
 
