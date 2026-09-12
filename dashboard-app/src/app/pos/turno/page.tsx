@@ -713,8 +713,9 @@ function TurnoPageLegacy() {
                   </div>
                   <div className="space-y-4">
                     <div>
-                      <label className="text-sm text-[var(--text-3)] block mb-1">Quien abre</label>
+                      <label htmlFor="turno-opened-by" className="text-sm text-[var(--text-3)] block mb-1">Quien abre</label>
                       <input
+                        id="turno-opened-by"
                         type="text"
                         value={openedBy}
                         onChange={e => setOpenedBy(e.target.value)}
@@ -723,8 +724,9 @@ function TurnoPageLegacy() {
                       />
                     </div>
                     <div>
-                      <label className="text-sm text-[var(--text-3)] block mb-1">Fondo de caja (efectivo contado)</label>
+                      <label htmlFor="turno-fondo-inicial" className="text-sm text-[var(--text-3)] block mb-1">Fondo de caja (efectivo contado)</label>
                       <input
+                        id="turno-fondo-inicial"
                         type="number"
                         inputMode="decimal"
                         value={fondoInicial}

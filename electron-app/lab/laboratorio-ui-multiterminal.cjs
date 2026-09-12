@@ -16,7 +16,6 @@ const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
-const { pathToFileURL } = require('node:url')
 const net = require('node:net')
 const http = require('node:http')
 const { spawn } = require('node:child_process')
@@ -317,8 +316,7 @@ async function fixtureRoute(route, uiOrigin, pedroPorts) {
 async function startTerminal(name, role, port, cajaPort, uiOrigin, ports, opts = {}) {
   const userData = path.join(base, name)
   fs.mkdirSync(userData, { recursive: true })
-  const idlePage = path.join(userData, 'lab-idle.html')
-  fs.writeFileSync(idlePage, '<!doctype html><meta charset="utf-8"><title>Fullsite Lab</title>')
+  const idleTarget = `${uiOrigin}/icon-192v2.png`
   if (syntheticPrinter && role === 'server_pos') fs.writeFileSync(path.join(userData, 'printers.json'), JSON.stringify({
     schema_version: 2, ...(drawerMode ? { drawer_printer_id: 'lab-tcp-caja' } : {}), routing: { default_station: 'caja' }, printers: [{ printer_id: 'lab-tcp-caja', name: 'Caja laboratorio TCP', enabled: true,
       connection: { type: 'tcp', host: '127.0.0.1', port: syntheticPrinter.address().port }, station_ids: ['caja'],
@@ -371,9 +369,9 @@ require(${JSON.stringify(path.join(ELECTRON_APP, 'main.js'))});\n`)
     env: cleanEnv({ FULLSITE_DEV: '1', FULLSITE_USER_DATA_DIR: userData, FULLSITE_LOCAL_SERVER_PORT: String(port),
       FULLSITE_LAB_NUBE: nube.origin,
       ...(packagedBundle ? { FULLSITE_UI_BUNDLE_DIR: packagedBundle } : {}),
-      // Arranque inerte en file://: instala interceptores antes del JS de producto
-      // y setupOfflineRetry no compite con el page.goto controlado por el lab.
-      FULLSITE_POS_URL: pathToFileURL(idlePage).href, FULLSITE_KDS_URL: pathToFileURL(idlePage).href }), timeout: 60000,
+      // Arranque inerte del mismo origen: instalar interceptores antes del JS de
+      // producto impide que la precarga del SW escape al aislamiento de pruebas.
+      FULLSITE_POS_URL: idleTarget, FULLSITE_KDS_URL: idleTarget }), timeout: 60000,
   })
   const terminal = { name, role, port, app, process: app.process(), userData, terminalId, actorSession, log: [], errors: [] }
   terminals.push(terminal)
@@ -416,35 +414,24 @@ require(${JSON.stringify(path.join(ELECTRON_APP, 'main.js'))});\n`)
   })
   await until(async () => (await request(terminal, '/health')).ok, `${name}: arranque de Pedro`)
   const target = role === 'kds' ? `http://127.0.0.1:${port}/kds` : `${uiOrigin}/pos/mesas`
-  await page.waitForLoadState('domcontentloaded', { timeout: 90000 })
   if (role === 'kds') {
     // main.js ya navega el KDS al HTML privado con sus credenciales LAN. Volver a
     // llamar loadURL aquí crea dos navegaciones al mismo destino: Electron 44
     // cancela una con ERR_FAILED aunque la pantalla haya cargado correctamente.
-    // Se espera la navegación real y se aplica el estado que el init script dejó
-    // preparado para las navegaciones posteriores del laboratorio.
+    // Se espera la navegación real y sólo entonces se hace una recarga controlada:
+    // el init script debe correr antes del JS del KDS y la petición conserva las
+    // cabeceras privadas que exige Pedro.
     await until(() => page.evaluate(target => location.href === target && document.readyState !== 'loading', target),
       `${name}: KDS local visible`, 90000)
-    await page.evaluate(({ tenant, staff, turno, terminalId, port, secret, actorSession, operationalMode, uiOrigin, sinSesion }) => {
-      localStorage.setItem('fullsite_client_id', tenant)
-      localStorage.setItem('pos_terminal_id', terminalId)
-      localStorage.setItem('FULLSITE_BRIDGE_URL', `http://127.0.0.1:${port}`)
-      localStorage.setItem('FULLSITE_LAN_SECRET', secret)
-      localStorage.setItem('FULLSITE_TERMINAL_ID', terminalId)
-      localStorage.setItem('FULLSITE_OFFLINE_DISABLED', '1')
-      localStorage.setItem('kds_settings_v1', JSON.stringify({ station: 'todas' }))
-      localStorage.setItem('pos_shift_token', 'synthetic-lab-session')
-      if (!operationalMode) {
-        localStorage.setItem('pos_turno_id', turno.id)
-        localStorage.setItem('pos_turno_cache', JSON.stringify({ turno, turnos: [turno], ts: Date.now() }))
-      }
-      if (!sinSesion) {
-        sessionStorage.setItem('pos_staff', JSON.stringify(staff))
-        sessionStorage.setItem('pos_actor_session', JSON.stringify(actorSession))
-        sessionStorage.setItem('pos_last_activity', String(Date.now()))
-      }
-    }, { tenant, staff, turno, terminalId, port, secret, actorSession, operationalMode, uiOrigin, sinSesion: !!opts.sinSesion })
-  } else await page.goto(target, { waitUntil: 'domcontentloaded', timeout: 90000 })
+    await context.setExtraHTTPHeaders(headers)
+    await page.reload({ waitUntil: 'domcontentloaded', timeout: 90000 })
+  } else {
+    // _electron.launch devuelve la ventana antes de que el primer loadURL termine.
+    // Navegar inmediatamente puede ser cancelado después por ese load tardío.
+    await until(() => page.evaluate(idle => location.href === idle && document.readyState !== 'loading', idleTarget),
+      `${name}: arranque inerte visible`, 90000)
+    await page.goto(target, { waitUntil: 'domcontentloaded', timeout: 90000 })
+  }
   return terminal
 }
 

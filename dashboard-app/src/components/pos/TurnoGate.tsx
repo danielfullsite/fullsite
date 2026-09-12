@@ -224,15 +224,12 @@ export default function TurnoGate({ staff, children }: TurnoGateProps) {
   // Poll every 5s when waiting for turno
   useEffect(() => {
     if (status !== 'none' && status !== 'stale' && status !== 'conflict') return
-    const interval = setInterval(async () => {
-      const result = await getActiveTurnoWithStaleCheck()
-      if (result.turno && !result.isStale && result.activeCount === 1) {
-        setTurno(result.turno)
-        setStatus('active')
-      }
-    }, 5000)
+    // checkTurno contiene la clasificación de sesión, caché offline y fallas de
+    // Caja. El callback anterior repetía sólo el happy path y dejaba rechazos sin
+    // catch cada cinco segundos cuando Pedro todavía no era autoritativo.
+    const interval = setInterval(() => { void checkTurno() }, 5000)
     return () => clearInterval(interval)
-  }, [status])
+  }, [status, checkTurno])
 
   // Revalidate turno immediately when internet comes back
   useEffect(() => {
@@ -451,10 +448,11 @@ export default function TurnoGate({ staff, children }: TurnoGateProps) {
           <p className="text-slate-400 text-sm mb-8">Cuenta el efectivo en caja y abre el turno para comenzar operaciones.</p>
 
           <div className="mb-4">
-            <label className="text-slate-400 text-xs font-medium block mb-2 text-left">Fondo de caja (efectivo contado)</label>
+            <label htmlFor="turno-gate-fondo" className="text-slate-400 text-xs font-medium block mb-2 text-left">Fondo de caja (efectivo contado)</label>
             <div className="relative">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xl font-bold">$</span>
               <input
+                id="turno-gate-fondo"
                 type="number"
                 inputMode="decimal"
                 value={fondoInicial}
