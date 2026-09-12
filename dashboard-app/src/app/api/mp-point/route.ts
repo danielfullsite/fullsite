@@ -1,23 +1,32 @@
 import { NextRequest } from 'next/server'
-import { withPOSAuth, unauthorized } from '@/lib/api-auth'
+import { POS_ROLE_LVL, withPOSAuth, unauthorized } from '@/lib/api-auth'
 
 // MP Point Smart API proxy.
 // Auth: requires valid POS shift token or Supabase session (withPOSAuth).
-// accessToken: reads MP_ACCESS_TOKEN env first; client-supplied fallback for
-//   orgs that haven't migrated to server-side key storage yet (P0-H Phase 2).
-// TODO P0-H Phase 2: read accessToken from credentials_vault keyed by clientId;
-//   drop client-supplied accessToken entirely.
+// El token sólo vive en servidor. MP_CLIENT_ID ata esa cuenta de Mercado Pago
+// a un único tenant hasta que exista credentials_vault por restaurante.
 
 export async function POST(request: NextRequest) {
   try {
     const auth = await withPOSAuth(request)
     if (!auth) return unauthorized()
 
-    const { action, accessToken: clientToken, deviceId, amount, orderId, paymentIntentId, paymentId, installments, installments_cost, tip_enabled, print_on_terminal, mode } = await request.json()
+    const { action, deviceId, amount, orderId, paymentIntentId, paymentId, installments, installments_cost, tip_enabled, print_on_terminal, mode } = await request.json()
 
-    const accessToken = process.env.MP_ACCESS_TOKEN || clientToken
-    if (!accessToken) {
-      return Response.json({ error: 'MP access token no configurado' }, { status: 503 })
+    const accessToken = process.env.MP_ACCESS_TOKEN?.trim()
+    const configuredClientId = process.env.MP_CLIENT_ID?.trim()
+    if (!accessToken || !configuredClientId) {
+      return Response.json({ error: 'Mercado Pago no configurado en servidor' }, { status: 503 })
+    }
+    if (configuredClientId !== auth.clientId) {
+      return Response.json({ error: 'Mercado Pago no pertenece a este restaurante' }, { status: 403 })
+    }
+
+    const roleLevel = POS_ROLE_LVL[auth.role] ?? 0
+    const managerActions = new Set(['devices', 'refund', 'device-status', 'change-mode'])
+    const minLevel = managerActions.has(String(action)) ? POS_ROLE_LVL.gerente : POS_ROLE_LVL.cajero
+    if (roleLevel < minLevel) {
+      return Response.json({ error: 'El rol no autoriza esta operación de pago' }, { status: 403 })
     }
 
     const headers = {
@@ -29,20 +38,21 @@ export async function POST(request: NextRequest) {
     if (action === 'devices') {
       const res = await fetch('https://api.mercadopago.com/point/integration-api/devices', { headers })
       const data = await res.json()
-      return Response.json(data)
+      return Response.json(data, { status: res.status })
     }
 
     // Send payment intent (supports Point Smart options)
     if (action === 'payment') {
-      if (!deviceId || !amount) {
-        return Response.json({ error: 'deviceId y amount requeridos' }, { status: 400 })
+      const numericAmount = Number(amount)
+      if (!deviceId || !orderId || !Number.isFinite(numericAmount) || numericAmount <= 0) {
+        return Response.json({ error: 'deviceId, orderId y amount positivo requeridos' }, { status: 400 })
       }
 
       // Build payment body — Smart supports installments, tip, etc.
       const paymentBody: Record<string, unknown> = {
-        amount: Math.round(amount * 100),
+        amount: Math.round(numericAmount * 100),
         additional_info: {
-          external_reference: orderId || 'fullsite-pos',
+          external_reference: String(orderId).slice(0, 64),
           print_on_terminal: print_on_terminal ?? true,
         },
       }
@@ -61,7 +71,7 @@ export async function POST(request: NextRequest) {
       }
 
       const res = await fetch(
-        `https://api.mercadopago.com/point/integration-api/devices/${deviceId}/payment-intents`,
+        `https://api.mercadopago.com/point/integration-api/devices/${encodeURIComponent(String(deviceId))}/payment-intents`,
         {
           method: 'POST',
           headers,
@@ -84,12 +94,12 @@ export async function POST(request: NextRequest) {
       }
 
       const res = await fetch(
-        `https://api.mercadopago.com/point/integration-api/payment-intents/${paymentIntentId}`,
+        `https://api.mercadopago.com/point/integration-api/payment-intents/${encodeURIComponent(String(paymentIntentId))}`,
         { headers }
       )
 
       const data = await res.json()
-      return Response.json(data)
+      return Response.json(data, { status: res.status })
     }
 
     // Cancel payment intent
@@ -99,7 +109,7 @@ export async function POST(request: NextRequest) {
       }
 
       const res = await fetch(
-        `https://api.mercadopago.com/point/integration-api/devices/${deviceId}/payment-intents`,
+        `https://api.mercadopago.com/point/integration-api/devices/${encodeURIComponent(String(deviceId))}/payment-intents`,
         { method: 'DELETE', headers }
       )
 
@@ -107,7 +117,7 @@ export async function POST(request: NextRequest) {
         return Response.json({ success: true })
       }
       const data = await res.json().catch(() => ({}))
-      return Response.json({ success: false, error: data.message || 'Error al cancelar' })
+      return Response.json({ success: false, error: data.message || 'Error al cancelar' }, { status: res.status })
     }
 
     // Get last payment status for device
@@ -122,7 +132,7 @@ export async function POST(request: NextRequest) {
       )
 
       const data = await res.json()
-      return Response.json(data)
+      return Response.json(data, { status: res.status })
     }
 
     // Refund a payment (Point Smart only)
@@ -130,12 +140,15 @@ export async function POST(request: NextRequest) {
       if (!paymentId) {
         return Response.json({ error: 'paymentId requerido' }, { status: 400 })
       }
+      if (amount !== undefined && (!Number.isFinite(Number(amount)) || Number(amount) <= 0)) {
+        return Response.json({ error: 'amount debe ser positivo' }, { status: 400 })
+      }
 
       const refundBody: Record<string, unknown> = {}
-      if (amount) refundBody.amount = Math.round(amount * 100)
+      if (amount !== undefined) refundBody.amount = Math.round(Number(amount) * 100)
 
       const res = await fetch(
-        `https://api.mercadopago.com/v1/payments/${paymentId}/refunds`,
+        `https://api.mercadopago.com/v1/payments/${encodeURIComponent(String(paymentId))}/refunds`,
         {
           method: 'POST',
           headers,
@@ -157,22 +170,22 @@ export async function POST(request: NextRequest) {
       }
 
       const res = await fetch(
-        `https://api.mercadopago.com/point/integration-api/devices/${deviceId}`,
+        `https://api.mercadopago.com/point/integration-api/devices/${encodeURIComponent(String(deviceId))}`,
         { headers }
       )
 
       const data = await res.json()
-      return Response.json(data)
+      return Response.json(data, { status: res.status })
     }
 
     // Change operating mode (Point Smart: PDV or STANDALONE)
     if (action === 'change-mode') {
-      if (!deviceId || !mode) {
+      if (!deviceId || !['PDV', 'STANDALONE'].includes(String(mode))) {
         return Response.json({ error: 'deviceId y mode requeridos' }, { status: 400 })
       }
 
       const res = await fetch(
-        `https://api.mercadopago.com/point/integration-api/devices/${deviceId}`,
+        `https://api.mercadopago.com/point/integration-api/devices/${encodeURIComponent(String(deviceId))}`,
         {
           method: 'PATCH',
           headers,
@@ -184,7 +197,7 @@ export async function POST(request: NextRequest) {
         return Response.json({ success: true })
       }
       const data = await res.json().catch(() => ({}))
-      return Response.json({ success: false, error: data.message || 'Error al cambiar modo' })
+      return Response.json({ success: false, error: data.message || 'Error al cambiar modo' }, { status: res.status })
     }
 
     return Response.json({ error: 'Accion no valida' }, { status: 400 })
