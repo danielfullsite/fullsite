@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest'
-vi.mock('@/lib/api-auth', () => ({ withPOSAuth: async () => ({ clientId: 'lab' }), unauthorized: vi.fn() }))
+vi.mock('@/lib/api-auth', () => ({ withPOSAuth: async () => ({ clientId: 'lab', role: 'capitan' }), unauthorized: vi.fn() }))
 import { POST } from '@/app/api/pos/merge-orders/route'
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs() })
 it('devuelve los campos aceptados por la RPC con su revisión, incluido el total validado en servidor', async () => {

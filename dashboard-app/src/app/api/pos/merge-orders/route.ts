@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { withPOSAuth, unauthorized } from '@/lib/api-auth'
+import { hasPermission } from '@/lib/pos-permissions'
 
 /**
  * Atomic mesa merge + reconciliation of every affected order.
@@ -9,6 +10,9 @@ export async function POST(request: NextRequest) {
   try {
     const auth = await withPOSAuth(request)
     if (!auth) return unauthorized()
+    if (!hasPermission(auth.role, 'juntar_mesas')) {
+      return Response.json({ ok: false, error: 'MERGE_PERMISSION_REQUIRED' }, { status: 403 })
+    }
     const clientId = auth.clientId
     const body = await request.json()
     const { target_order_id, target_expected_revision, source_order_id, source_expected_revision,
