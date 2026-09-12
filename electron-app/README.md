@@ -13,6 +13,10 @@ Wraps `https://app.fullsite.mx/pos` as a native Windows application in kiosk mod
 
 ## Setup
 
+Build tooling requires Node.js 22.12 or newer (CI uses Node 24). Electron 44
+targets Windows 10/11 x64; the optional macOS test build requires macOS 13 or
+newer. The field installers remain Windows x64.
+
 ```bash
 npm install
 ```
