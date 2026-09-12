@@ -4,9 +4,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { adquirirMesa, liberarMesa, MESA_LOCK_RENEW_MS, MesaLockError } from '@/lib/mesa-lock'
 import { requiereCaja } from '@/lib/pedro-cliente'
-import { resolveMesa } from '@/lib/pos-navigation'
+import { POS_MESA_EXIT_EVENT, resolveMesa, type PosMesaExitDetail } from '@/lib/pos-navigation'
 
-type Estado = 'inactivo' | 'confirmando' | 'adquirido' | 'conflicto' | 'sin-caja'
+type Estado = 'inactivo' | 'confirmando' | 'adquirido' | 'saliendo' | 'conflicto' | 'sin-caja'
 
 export default function MesaLockGuard({ enabled, children }: Readonly<{ enabled: boolean; children?: React.ReactNode }>) {
   const pathname = usePathname()
@@ -28,44 +28,77 @@ export default function MesaLockGuard({ enabled, children }: Readonly<{ enabled:
     let vivo = true
     let adquirido = false
     let renovando = false
+    let saliendo = false
+    let adquisicion: Promise<void> | null = null
     setEstado('confirmando')
 
-    const adquirir = async () => {
-      if (renovando) return
+    const adquirir = () => {
+      if (renovando || saliendo) return adquisicion ?? Promise.resolve()
       renovando = true
-      try {
-        await adquirirMesa(mesa)
-        if (!vivo) {
-          // La navegación ganó la carrera contra el ACK: no dejar un lock
-          // huérfano esperando a que venza.
-          void liberarMesa(mesa).catch(() => {})
-          return
-        }
-        adquirido = true
-        setEstado('adquirido')
-      } catch (error) {
-        if (!vivo) return
-        setEstado(error instanceof MesaLockError && error.code === 'MESA_LOCK_CONFLICT' ? 'conflicto' : 'sin-caja')
-      } finally { renovando = false }
+      adquisicion = (async () => {
+        try {
+          await adquirirMesa(mesa)
+          if (!vivo || saliendo) {
+            // La salida ganó la carrera contra un acquire/renew ya en vuelo.
+            // Esperar este unlock dentro de la misma promesa evita que la
+            // navegación lo aborte y que un renew tardío reviva el lease.
+            await liberarMesa(mesa).catch(() => {})
+            adquirido = false
+            return
+          }
+          adquirido = true
+          setEstado('adquirido')
+        } catch (error) {
+          if (!vivo || saliendo) return
+          setEstado(error instanceof MesaLockError && error.code === 'MESA_LOCK_CONFLICT' ? 'conflicto' : 'sin-caja')
+        } finally { renovando = false }
+      })()
+      return adquisicion
     }
 
-    void adquirir()
     const timer = window.setInterval(() => { void adquirir() }, MESA_LOCK_RENEW_MS)
+    const salir = (raw: Event) => {
+      const event = raw as CustomEvent<PosMesaExitDetail>
+      if (event.detail?.mesa !== mesa) return
+      event.preventDefault()
+      if (saliendo) return
+      saliendo = true
+      window.clearInterval(timer)
+      setEstado('saliendo')
+      void (async () => {
+        try { await adquisicion } catch { /* adquirir ya traduce el error */ }
+        if (adquirido) {
+          adquirido = false
+          await liberarMesa(mesa).catch(() => {})
+        }
+        event.detail.navigate()
+      })()
+    }
+
+    window.addEventListener(POS_MESA_EXIT_EVENT, salir)
+    void adquirir()
     return () => {
       vivo = false
       window.clearInterval(timer)
-      if (adquirido) void liberarMesa(mesa).catch(() => {})
+      window.removeEventListener(POS_MESA_EXIT_EVENT, salir)
+      if (adquirido && !saliendo) {
+        adquirido = false
+        void liberarMesa(mesa).catch(() => {})
+      }
     }
   }, [debeBloquear, mesa, retry])
 
-  if (!debeBloquear || estado === 'inactivo' || estado === 'adquirido') return children
+  // Fail closed desde el primer render. `inactivo` es el estado inicial antes
+  // de que corra el effect; montar los hijos aquí abriría una ventana breve en
+  // la que el editor ejecuta efectos sin que Caja haya confirmado el lease.
+  if (!debeBloquear || estado === 'adquirido') return children
 
-  if (estado === 'confirmando') return (
+  if (estado === 'inactivo' || estado === 'confirmando' || estado === 'saliendo') return (
     <div className="h-dvh flex items-center justify-center bg-[#0a0a0f] text-white" role="status" aria-live="polite">
       <div className="text-center">
         <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
-        <p className="text-lg font-bold">Confirmando mesa {mesa} con Caja…</p>
-        <p className="mt-2 text-sm text-white/55">Un momento; todavía no se puede editar la comanda.</p>
+        <p className="text-lg font-bold">{estado === 'saliendo' ? `Liberando mesa ${mesa}…` : `Confirmando mesa ${mesa} con Caja…`}</p>
+        <p className="mt-2 text-sm text-white/55">{estado === 'saliendo' ? 'Un momento; estamos confirmando la salida con Caja.' : 'Un momento; todavía no se puede editar la comanda.'}</p>
       </div>
     </div>
   )

@@ -1,9 +1,11 @@
 import { createElement } from 'react'
+import { renderToString } from 'react-dom/server'
 import { act, cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import MesaLockGuard from '@/components/pos/MesaLockGuard'
 import { adquirirMesa, liberarMesa } from '@/lib/mesa-lock'
 import { localNetworkFetch } from '@/lib/local-network-fetch'
+import { POS_MESA_EXIT_EVENT, type PosMesaExitDetail } from '@/lib/pos-navigation'
 
 const navigation = vi.hoisted(() => ({ replace: vi.fn(), pathname: '/pos', query: 'mesa=7' }))
 vi.mock('next/navigation', () => ({
@@ -51,6 +53,12 @@ describe('protocolo de lock de mesa', () => {
 })
 
 describe('guardia del editor POS', () => {
+  it('falla cerrado también en el render inicial anterior a los effects', () => {
+    const html = renderToString(createElement(MesaLockGuard, { enabled: true }, createElement('button', null, 'Editar comanda')))
+    expect(html).not.toContain('Editar comanda')
+    expect(html).toContain('Confirmando mesa 7 con Caja')
+  })
+
   it('no deja tocar la orden hasta adquirir, renueva y libera al salir', async () => {
     vi.useFakeTimers()
     const view = render(createElement(MesaLockGuard, { enabled: true }, createElement('button', null, 'Editar comanda')))
@@ -80,5 +88,70 @@ describe('guardia del editor POS', () => {
     render(createElement(MesaLockGuard, { enabled: true }, createElement('button', null, 'Editar comanda')))
     expect(await screen.findByText('Caja no confirmó la mesa')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Editar comanda' })).toBeNull()
+  })
+
+  it('vuelve inerte el editor y navega sólo después del ACK de unlock', async () => {
+    let confirmarUnlock!: () => void
+    network
+      .mockImplementationOnce(async (_url, init) => ok(JSON.parse(String(init?.body)).command_id))
+      .mockImplementationOnce(async (_url, init) => new Promise<Response>(resolve => {
+        const id = JSON.parse(String(init?.body)).command_id
+        confirmarUnlock = () => resolve(ok(id))
+      }))
+    const view = render(createElement(MesaLockGuard, { enabled: true }, createElement('button', null, 'Editar comanda')))
+    await act(async () => {})
+    const navigate = vi.fn()
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent<PosMesaExitDetail>(POS_MESA_EXIT_EVENT, {
+        cancelable: true, detail: { mesa: 7, navigate },
+      }))
+      await Promise.resolve()
+    })
+
+    expect(screen.queryByRole('button', { name: 'Editar comanda' })).toBeNull()
+    expect(screen.getByText('Liberando mesa 7…')).toBeTruthy()
+    expect(navigate).not.toHaveBeenCalled()
+    expect(network).toHaveBeenCalledTimes(2)
+    const repeatedNavigate = vi.fn()
+    expect(window.dispatchEvent(new CustomEvent<PosMesaExitDetail>(POS_MESA_EXIT_EVENT, {
+      cancelable: true, detail: { mesa: 7, navigate: repeatedNavigate },
+    }))).toBe(false)
+    await act(async () => { confirmarUnlock() })
+    await vi.waitFor(() => expect(navigate).toHaveBeenCalledOnce())
+    expect(repeatedNavigate).not.toHaveBeenCalled()
+    view.unmount()
+    await act(async () => {})
+    expect(network).toHaveBeenCalledTimes(2)
+  })
+
+  it('espera un renew en vuelo, lo deshace y no deja un segundo unlock tardío', async () => {
+    vi.useFakeTimers()
+    let confirmarRenew!: () => void
+    network
+      .mockImplementationOnce(async (_url, init) => ok(JSON.parse(String(init?.body)).command_id))
+      .mockImplementationOnce(async (_url, init) => new Promise<Response>(resolve => {
+        const id = JSON.parse(String(init?.body)).command_id
+        confirmarRenew = () => resolve(ok(id))
+      }))
+      .mockImplementationOnce(async (_url, init) => ok(JSON.parse(String(init?.body)).command_id))
+    const view = render(createElement(MesaLockGuard, { enabled: true }, createElement('button', null, 'Editar comanda')))
+    await act(async () => {})
+    await act(async () => { await vi.advanceTimersByTimeAsync(10_000) })
+    const navigate = vi.fn()
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent<PosMesaExitDetail>(POS_MESA_EXIT_EVENT, {
+        cancelable: true, detail: { mesa: 7, navigate },
+      }))
+    })
+    expect(screen.getByText('Liberando mesa 7…')).toBeTruthy()
+    expect(network).toHaveBeenCalledTimes(2)
+    await act(async () => { confirmarRenew(); await Promise.resolve() })
+    await vi.waitFor(() => expect(navigate).toHaveBeenCalledOnce())
+    expect(JSON.parse(String(network.mock.calls[2][1]?.body)).command_type).toBe('MESA_UNLOCK')
+    view.unmount()
+    await act(async () => {})
+    expect(network).toHaveBeenCalledTimes(3)
   })
 })

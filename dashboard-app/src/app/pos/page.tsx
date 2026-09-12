@@ -2681,7 +2681,7 @@ function POSContent() {
       setOrderItems([])
       try { localStorage.removeItem(claveCuentaCaja); localStorage.removeItem(`pos_draft_${mesa}`); localStorage.removeItem(`pos_order_${mesa}`) } catch {}
       setMesaDestinoCaja(null); setPinPrompt(null); setPinInput('')
-      navigateToMesaMap()
+      navigateToMesaMap(window.location, mesa)
     } finally { operationLock.current = false; setSaving(false) }
   }
   const anularOrdenCaja = async (reason: string, pin: string) => {
@@ -2694,7 +2694,7 @@ function POSContent() {
       setOrderItems([])
       try { localStorage.removeItem(claveCuentaCaja); localStorage.removeItem(`pos_draft_${mesa}`); localStorage.removeItem(`pos_order_${mesa}`) } catch {}
       setShowVoidOrder(false)
-      navigateToMesaMap()
+      navigateToMesaMap(window.location, mesa)
     } finally { operationLock.current = false; setSaving(false) }
   }
 
@@ -3448,7 +3448,7 @@ function POSContent() {
                 showToast(`${raceNewItems.length} item${raceNewItems.length !== 1 ? 's' : ''} enviados`)
                 sessionStorage.removeItem('pos_staff')
                 sessionStorage.removeItem('pos_last_activity')
-                navigateToMesaMap(); lock()
+                navigateToMesaMap(window.location, mesa); lock()
                 return
               } else {
                 showToast('Error al agregar items — intenta de nuevo')
@@ -3547,7 +3547,7 @@ function POSContent() {
             } catch {}
             sessionStorage.removeItem('pos_staff')
             sessionStorage.removeItem('pos_last_activity')
-            navigateToMesaMap(); lock()
+            navigateToMesaMap(window.location, mesa); lock()
             return
           } else {
             if (saveResult.current_revision != null) setOrderRevision(saveResult.current_revision)
@@ -3645,7 +3645,7 @@ function POSContent() {
           setOrderInventoryPending(_cid(), order.id, true, order.mesa)
           sessionStorage.removeItem('pos_staff')
           sessionStorage.removeItem('pos_last_activity')
-          navigateToMesaMap()
+          navigateToMesaMap(window.location, mesa)
           lock()
         }
         if (!kitchen.ok) {
@@ -3822,7 +3822,7 @@ function POSContent() {
       const finishOnline = () => {
         sessionStorage.removeItem('pos_staff')
         sessionStorage.removeItem('pos_last_activity')
-        navigateToMesaMap()
+        navigateToMesaMap(window.location, mesa)
         lock()
       }
       if (!kitchen.ok) {
@@ -4229,7 +4229,7 @@ function POSContent() {
       // enviar. Evita quedar en la mesa (o caer a mesa 1) tras cerrar la cuenta.
       sessionStorage.removeItem('pos_staff')
       sessionStorage.removeItem('pos_last_activity')
-      navigateToMesaMap()
+      navigateToMesaMap(window.location, mesa)
       lock()
     } else {
       showToast('Error al cerrar cuenta')
@@ -4486,7 +4486,7 @@ function POSContent() {
           {/* Back to mesa map — always visible in kiosk mode (no browser back button) */}
           <button
             type="button"
-            onClick={() => navigateToMesaMap()}
+            onClick={() => navigateToMesaMap(window.location, mesa)}
             className="flex items-center justify-center w-11 h-11 rounded-lg bg-[var(--line)] border border-[var(--line)] text-[var(--text-3)] hover:text-[var(--text-1)] flex-shrink-0 transition-colors"
             title="Volver al mapa de mesas"
           >
@@ -5236,7 +5236,7 @@ function POSContent() {
           <div className={`px-3 py-1 border-t border-[var(--line)] gap-2 flex-shrink-0 ${escribeEnCaja ? 'grid grid-cols-3' : 'flex'}`}>
             {orderItems.length === 0 ? (
               <button
-                onClick={() => navigateToMesaMap()}
+                onClick={() => navigateToMesaMap(window.location, mesa)}
                 className="flex-1 flex items-center justify-center gap-2 bg-[var(--surface-2)] hover:bg-[var(--text-4)] active:bg-[var(--raised)] active:scale-[0.97] text-[var(--text-1)] font-bold py-2.5 rounded-xl text-base transition-all min-h-[52px]"
               >
                 <ArrowLeft size={18} />

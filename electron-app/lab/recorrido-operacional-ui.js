@@ -142,6 +142,9 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     }
     await move(2); await move(1)
     assert.equal((await snapshot()).kds_orders.length, 1)
+    await pos3.page.getByTitle('Volver al mapa de mesas', { exact: true }).click()
+    await expect(pos3.page).toHaveURL(`${uiOrigin}/pos/mesas`, { timeout: 10000 })
+    await until(async () => !(await snapshot()).locks?.['1'], 'POS 3 libera mesa 1 después de transferirla', 10000)
     await pos2.page.goto(`${uiOrigin}/pos?mesa=1`, { waitUntil: 'domcontentloaded', timeout: navigationTimeout })
     await ensureUnlocked(pos2)
   })
@@ -178,7 +181,8 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     assert.equal(state.salon_orders[0].total_cents, 11600)
     await pos3.page.goto(`${uiOrigin}/pos?mesa=1`, { waitUntil: 'domcontentloaded', timeout: navigationTimeout })
     await ensureUnlocked(pos3)
-    await pos3.page.goto(`${uiOrigin}/pos/mesas`, { waitUntil: 'domcontentloaded', timeout: navigationTimeout })
+    await pos3.page.getByTitle('Volver al mapa de mesas', { exact: true }).click()
+    await expect(pos3.page).toHaveURL(`${uiOrigin}/pos/mesas`, { timeout: 10000 })
     await until(async () => !(await snapshot()).locks?.['1'], 'POS 3 libera mesa 1 después de verificarla', 10000)
   })
   await check('Dividir desde la pantalla persiste dos cuentas de 58 pesos', async () => {
@@ -226,7 +230,8 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
   })
   await check('Después del abono se agrega consumo a la segunda cuenta sin cambiar pagos ni imprimir al guardar', async () => {
     if (await modal(pos2).isVisible()) await modal(pos2).getByRole('button', { name: 'Cerrar', exact: true }).click()
-    await pos2.page.goto(`${uiOrigin}/pos/mesas`, { waitUntil: 'domcontentloaded', timeout: navigationTimeout })
+    await pos2.page.getByTitle('Volver al mapa de mesas', { exact: true }).click()
+    await expect(pos2.page).toHaveURL(`${uiOrigin}/pos/mesas`, { timeout: 10000 })
     await until(async () => !(await snapshot()).locks?.['1'], 'POS 2 libera mesa 1 antes del relevo', 10000)
     await pos3.page.goto(`${uiOrigin}/pos?mesa=1`, { waitUntil: 'domcontentloaded', timeout: navigationTimeout })
     await ensureUnlocked(pos3)
