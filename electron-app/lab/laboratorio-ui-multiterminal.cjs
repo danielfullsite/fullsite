@@ -211,6 +211,27 @@ const fixture = {
     capacity: 4, active: true, x_pct: 15 + number * 20, y_pct: 40, shape: 'square', zone: 'Salón' })),
   pos_turnos: [turno], pos_staff: [staff], pos_orders: [],
 }
+// Un catálogo de una categoría y un producto sirve para afirmar cosas, pero no
+// para ver si una carta cabe en la pantalla de una caja. Con
+// `FULLSITE_LAB_CATALOGO_DEMO=1` el laboratorio siembra un restaurante de
+// tamaño creíble —12 categorías, 240 platillos, 40 mesas— que es lo que hace
+// falta para retratar densidad. Sin la variable no cambia absolutamente nada,
+// así que CI sigue viendo el mismo fixture mínimo de siempre.
+if (process.env.FULLSITE_LAB_CATALOGO_DEMO === '1') {
+  const familias = ['Entradas', 'Sopas', 'Ensaladas', 'Tacos', 'Cortes', 'Pescados', 'Pastas', 'Hamburguesas',
+    'Postres', 'Cervezas', 'Vinos', 'Cocteles']
+  familias.forEach((nombre, i) => {
+    const id = `demo-cat-${i + 1}`
+    fixture.pos_menu_categories.push({ id, name: nombre, active: true, sort_order: i + 2, color: '#327867' })
+    for (let n = 1; n <= 20; n++) {
+      fixture.pos_menu_items.push({ id: `${id}-${n}`, category_id: id, name: `${nombre} de la casa ${n}`,
+        price: 60 + n * 7, active: true, sort_order: n, station: 'cocina' })
+    }
+  })
+  fixture.pos_mesas = Array.from({ length: 40 }, (_, i) => ({ id: `mesa-${i + 1}`, client_id: tenant, number: i + 1,
+    capacity: 4, active: true, x_pct: 8 + (i % 8) * 11, y_pct: 12 + Math.floor(i / 8) * 17, shape: 'square', zone: 'Salón' }))
+  fixture.clients[0].mesas = 40
+}
 // Un solo catálogo completo: lo consume la preparación de Caja antes de arrancar
 // y lo sirve la nube del laboratorio cuando Caja lo refresca tras un PIN online.
 const catalogoDeLab = () => ({ schema_version: 1, complete: true, catalog_scope: 'restaurant', restaurant_id: tenant,
@@ -218,7 +239,10 @@ const catalogoDeLab = () => ({ schema_version: 1, complete: true, catalog_scope:
     'pos.station_routing': { barra: ['lab-bebidas'] },
     'pos.no_print_stations': ['cocina', 'barra', 'caja'],
   },
-  categories: [{ ...fixture.pos_menu_categories[0], items: fixture.pos_menu_items }], payment_methods: fixture.pos_payment_methods,
+  // Cada categoría con SUS platillos. Con el fixture mínimo esto da exactamente
+  // lo mismo que antes (una categoría, un café); con el catálogo demo da las doce.
+  categories: fixture.pos_menu_categories.map(cat => ({ ...cat,
+    items: fixture.pos_menu_items.filter(item => item.category_id === cat.id) })), payment_methods: fixture.pos_payment_methods,
   modifiers: { groups: [{ id: 'lab-temperature', name: 'Preparación de laboratorio', level: 1, min_selections: 1, max_selections: 1, required: true }],
     mods: [{ id: 'lab-hot', group_id: 'lab-temperature', name: 'Caliente de laboratorio', price: 0 }],
     item_links: [{ item_id: 'lab-cafe', group_id: 'lab-temperature' }], category_links: [] },
@@ -483,7 +507,10 @@ async function main() {
   const kds = await startTerminal('Cocina', 'kds', ports[3], ports[0], uiOrigin, ports)
   if (operationalMode) {
     wan = false
-    await require('./recorrido-operacional-ui')({ caja, pos2, pos3, kds, check, expect, assert, until, request,
+    // El recorrido operacional es el de siempre; `FULLSITE_LAB_RECORRIDO` deja
+    // enchufar otro sobre el mismo arnés (hoy: `./recorrido-capturas-ui`, que
+    // retrata las pantallas a los cuatro tamaños de caja en vez de afirmar nada).
+    await require(process.env.FULLSITE_LAB_RECORRIDO || './recorrido-operacional-ui')({ caja, pos2, pos3, kds, check, expect, assert, until, request,
       tenant, output, uiOrigin, labPin, printLab: printMode ? { packets: printedPackets, hex: printedHex, drawer: drawerMode } : null, restartCaja: () => startTerminal('Caja', 'server_pos', ports[0], ports[0], uiOrigin, ports) })
     return
   }
