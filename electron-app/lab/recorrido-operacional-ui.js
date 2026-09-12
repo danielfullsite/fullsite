@@ -178,8 +178,11 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     assert.equal(state.salon_orders[0].total_cents, 11600)
     await pos3.page.goto(`${uiOrigin}/pos?mesa=1`, { waitUntil: 'domcontentloaded', timeout: navigationTimeout })
     await ensureUnlocked(pos3)
+    await pos3.page.goto(`${uiOrigin}/pos/mesas`, { waitUntil: 'domcontentloaded', timeout: navigationTimeout })
+    await until(async () => !(await snapshot()).locks?.['1'], 'POS 3 libera mesa 1 después de verificarla', 10000)
   })
   await check('Dividir desde la pantalla persiste dos cuentas de 58 pesos', async () => {
+    await pos2.page.goto(`${uiOrigin}/pos?mesa=1`, { waitUntil: 'domcontentloaded', timeout: navigationTimeout })
     await openPayment(pos2)
     await modal(pos2).getByRole('button', { name: 'Preparar cuenta para cobrar' }).click()
     await modal(pos2).getByRole('button', { name: 'Dividir cuenta', exact: true }).click()
@@ -189,8 +192,9 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
   await check('Cobrar 29 pesos desde el botón actualiza el saldo de POS 3', async () => {
     await collectCash(pos2, '29')
     await until(async () => (await snapshot()).financial_orders[0].paid_cents === 2900, 'Pago UI comprometido')
-    await ensureUnlocked(pos3)
-    await expect(pos3.page.locator('body')).toContainText(/Saldo confirmado en Caja:.*87[.,]00/)
+    // POS 2 conserva el lock mientras cobra. POS 3 comprueba el saldo compartido
+    // desde el mapa, sin saltarse la exclusión mutua del editor.
+    await expect(pos3.page.locator('body')).toContainText(/\$87[.,]00/, { timeout: 15000 })
     await pos2.page.screenshot({ path: path.join(output, 'cobro-parcial-desde-botones.png'), fullPage: true })
   })
   if (printLab) await check('El recibo del abono se imprime sin registrar otro pago', async () => {
@@ -221,6 +225,11 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     assert.equal(printLab.hex.length, count + 1)
   })
   await check('Después del abono se agrega consumo a la segunda cuenta sin cambiar pagos ni imprimir al guardar', async () => {
+    if (await modal(pos2).isVisible()) await modal(pos2).getByRole('button', { name: 'Cerrar', exact: true }).click()
+    await pos2.page.goto(`${uiOrigin}/pos/mesas`, { waitUntil: 'domcontentloaded', timeout: navigationTimeout })
+    await until(async () => !(await snapshot()).locks?.['1'], 'POS 2 libera mesa 1 antes del relevo', 10000)
+    await pos3.page.goto(`${uiOrigin}/pos?mesa=1`, { waitUntil: 'domcontentloaded', timeout: navigationTimeout })
+    await ensureUnlocked(pos3)
     const before = await snapshot()
     const previousKitchen = before.kds_orders
     const previousPayments = before.financial_orders[0].payments

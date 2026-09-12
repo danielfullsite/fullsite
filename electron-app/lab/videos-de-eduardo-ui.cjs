@@ -200,6 +200,11 @@ module.exports = async function videosDeEduardo({ caja, pos2, pos3, kds, check, 
         JSON.parse(localStorage.getItem(`pos_cuenta_${tenant}_mesa:1`) || 'null'), tenant)
       assert(!cache?.confirmed?.id, `${terminal.name}: la identidad de la cuenta liquidada no sobrevive en caché (18eff681): ${JSON.stringify(cache)}`)
       await foto(terminal, 'mesa1-reabierta')
+      // El lock nuevo impide correctamente que la siguiente terminal abra la
+      // misma mesa mientras ésta siga en el editor. Volver al mapa representa
+      // que el mesero terminó de revisar y permite verificar también el UNLOCK.
+      await irAlMapa(terminal)
+      await until(async () => !(await salon()).locks?.['1'], `${terminal.name} libera la mesa 1 al salir`, 10000)
     }
   })
   await check('Video de Eduardo 3 — la cola de POS 3 tiene UN solo cierre de esa orden: no hay segundo cobro', async () => {
