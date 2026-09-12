@@ -137,3 +137,12 @@ describe('el wizard usa la política, no su propia versión', () => {
     expect(wizard).not.toMatch(/Notas del cierre \(opcional\)</)
   })
 })
+
+describe('la guarda del arqueo vive en el handler, no solo en el boton', () => {
+  it('REGRESION (fuente): handleSave vuelve a evaluar arqueo.puedeCerrar antes de tomar el candado', () => {
+    const wizard = readFileSync(join(process.cwd(), 'src/components/pos/CierreCajaWizard.tsx'), 'utf8')
+    const i = wizard.indexOf('const handleSave = async')
+    const cabeza = wizard.slice(i, wizard.indexOf('closingRef.current = true', i))
+    expect(cabeza).toMatch(/if \(!arqueo\.puedeCerrar\) \{ setPinError\(/)
+  })
+})

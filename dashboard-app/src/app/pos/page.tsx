@@ -4888,16 +4888,24 @@ function POSContent() {
                       </div>
 
                       {/* Item name + modifiers + KDS status */}
-                      <div className="flex-1 min-w-0">
-                        <p className={`font-medium text-sm leading-tight ${isVoided ? 'line-through text-[var(--text-4)]' : isCancelled ? 'line-through text-[var(--crit-ink)]' : ''}`}>
+                      {/* Barrido visual 2026-09-11: a 1600px el nombre se partía letra por
+                          letra y las etiquetas inline se encimaban con el asiento. El nombre
+                          tiene ancho mínimo, máximo dos líneas, y las etiquetas van en su
+                          propia fila. */}
+                      <div className="flex-1 min-w-[140px]">
+                        <p className={`font-medium text-sm leading-tight break-words line-clamp-2 ${isVoided ? 'line-through text-[var(--text-4)]' : isCancelled ? 'line-through text-[var(--crit-ink)]' : ''}`} title={item.nombre}>
                           {item.nombre}
-                          {!isCancelled && !isVoided && (item as OrderItem & { kds_done?: boolean }).kds_done && (
-                            <span className="ml-2 inline-flex items-center bg-[var(--accent-soft)] text-[var(--accent-ink)] border border-[var(--accent-line)] text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none">LISTO</span>
-                          )}
-                          {!isCancelled && !isVoided && item.station && isNoPrintStation(item.station) && (
-                            <span className="ml-2 inline-flex items-center bg-[var(--surface-2)] text-[var(--text-3)] border border-[var(--line)] text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none" title="Producto de Market — no genera comanda">SIN COMANDA</span>
-                          )}
                         </p>
+                        {!isCancelled && !isVoided && ((item as OrderItem & { kds_done?: boolean }).kds_done || (item.station && isNoPrintStation(item.station))) && (
+                          <div className="flex flex-wrap gap-1 mt-0.5">
+                            {(item as OrderItem & { kds_done?: boolean }).kds_done && (
+                              <span className="inline-flex items-center bg-[var(--accent-soft)] text-[var(--accent-ink)] border border-[var(--accent-line)] text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none">LISTO</span>
+                            )}
+                            {item.station && isNoPrintStation(item.station) && (
+                              <span className="inline-flex items-center bg-[var(--surface-2)] text-[var(--text-3)] border border-[var(--line)] text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none" title="Producto de Market — no genera comanda">SIN COMANDA</span>
+                            )}
+                          </div>
+                        )}
                         {isVoided && (
                           <span className="inline-flex items-center bg-[var(--surface-2)] text-[var(--text-2)] border border-[var(--line)] text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none mt-0.5">ANULADO</span>
                         )}

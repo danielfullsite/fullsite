@@ -329,6 +329,11 @@ export default function CierreCajaWizard({
   const handleSave = async (identidad?: { name: string; role: string }) => {
     // Prevent double-tap / concurrent close attempts
     if (closingRef.current || saving) return
+    // La regla del arqueo se vuelve a evaluar AQUÍ, no sólo en el `disabled` del
+    // botón: un handler disparado por teclado, por huella o por un botón que
+    // alguien habilitó no puede cerrar con el conteo vacío (auditoría de
+    // pruebas 2026-09-11: la guarda vivía únicamente en el atributo).
+    if (!arqueo.puedeCerrar) { setPinError(arqueo.motivo || 'Captura el efectivo contado antes de cerrar'); return }
     closingRef.current = true
     setSaving(true)
     setPinError('')
