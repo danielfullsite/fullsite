@@ -146,8 +146,7 @@ import {
   ClipboardCheck,
   Power,
   Utensils,
-  Coffee, EggFried, Sandwich, Salad, CupSoda, Citrus, Croissant, CakeSlice, IceCream, Leaf, Pizza, Fish, Cookie,
-} from 'lucide-react'
+  Coffee, EggFried, Sandwich, Salad, CupSoda, Citrus, Croissant, CakeSlice, IceCream, Leaf, Pizza, Fish, Cookie, Wrench} from 'lucide-react'
 import {
   getMPConfig,
   saveMPConfig,
@@ -2148,6 +2147,7 @@ function POSContent() {
   // Split de cuenta
   const [showSplit, setShowSplit] = useState(false)
   const [showVerify, setShowVerify] = useState(false)
+  const [showFunciones, setShowFunciones] = useState(false)
   const [sentItemIds, setSentItemIds] = useState<Set<string>>(new Set())
   const [sentItemSnapshots, setSentItemSnapshots] = useState<Record<string, { cantidad: number; modificadores: string[]; notas: string; silla?: number }>>({})
   const [splitAssignments, setSplitAssignments] = useState<Record<string, number>>({}) // itemId → cuenta (1-6)
@@ -4568,6 +4568,25 @@ function POSContent() {
               <span className="truncate">{mesero || 'Sin mesero'}</span>
             </button>
           )}
+          {/* EL DINERO DE LA CUENTA, UNA SOLA VEZ.
+              La comanda tenía su propia cabecera repitiendo «Mesa N · Np · mesero»
+              —lo mismo que esta barra— y encima con un SEGUNDO campo de mesa que no
+              llevaba la guarda antifraude del de aquí: escribir un número ahí movía
+              los renglones sin enviar a otra mesa en silencio, que es el defecto de
+              CIERRE-DEFECTOS-2026-09-06 corregido en un campo y no en su copia.
+              Al fundir las dos cabeceras se recuperan ~59px de los 632 útiles y
+              desaparece el campo sin guarda. */}
+          <div className="ml-auto flex-shrink-0 text-right leading-tight">
+            <span className="block text-[var(--accent-ink)] font-extrabold text-xl font-mono tabular-nums tracking-tight">{formatMXN(total)}</span>
+            {requiereCaja() && lecturaCuentaCaja?.orden?.saldo != null && (
+              <span className="block text-[11px] text-[var(--text-3)]">
+                {/* «confirmado» no es relleno: separa el saldo que la Caja ya dio
+                    por bueno del total que esta pantalla calcula sola. El
+                    laboratorio lo verifica por ese texto. */}
+                Saldo confirmado en Caja: <span className="font-mono tabular-nums">{formatMXN(Number(lecturaCuentaCaja.orden.saldo))}</span>
+              </span>
+            )}
+          </div>
         </div>
         {/* Row 3: Mobile tab toggle (only visible on mobile) */}
         <div className="flex md:hidden border-t border-[var(--line)]/50">
@@ -4760,32 +4779,6 @@ function POSContent() {
       <div className="flex flex-1 overflow-hidden">
         {/* Left Panel -- Current Order (50% on tablet, full on mobile when active) */}
         <div className={`md:w-[50%] lg:w-[45%] md:flex flex-col border-r border-[var(--line)] bg-[var(--surface)] ${mobileView === 'order' ? 'flex w-full' : 'hidden'}`}>
-          {/* Order header — compact */}
-          <div className="px-3 py-1 border-b border-[var(--line)] bg-[var(--surface-2)]/50 flex-shrink-0">
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-bold flex items-center gap-1">
-                Mesa
-                <input
-                  type="number"
-                  value={mesa}
-                  onWheel={e => e.currentTarget.blur()}
-                  onChange={e => { const v = Number(e.target.value) || 1; setMesa(v); router.replace(`/pos?mesa=${v}`) }}
-                  min={1}
-                  max={999}
-                  className="w-14 text-center bg-transparent border border-[var(--line)] rounded-lg text-[var(--text-1)] font-bold text-base mx-1 py-0.5 focus:border-[var(--accent)] focus:outline-none"
-                />
-                <span className="text-[var(--text-3)] font-normal text-xs">{personas}p · {(mesero || '').split(' ')[0] || 'Sin mesero'}</span>
-              </h2>
-              <span className="text-[var(--accent-ink)] font-extrabold text-xl font-mono tabular-nums tracking-tight">{formatMXN(total)}</span>
-            </div>
-          </div>
-
-          {requiereCaja() && lecturaCuentaCaja?.orden?.saldo != null && (
-            <div className="px-3 py-1 text-sm text-[var(--text-3)]">
-              Saldo confirmado en Caja: {formatMXN(Number(lecturaCuentaCaja.orden.saldo))}
-            </div>
-          )}
-
           {/* Order items list — MAIN AREA, takes all available space */}
           <div className="flex-1 overflow-y-auto px-3 py-1 min-h-0 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
             {orderItems.length === 0 ? (
@@ -5023,52 +5016,13 @@ function POSContent() {
 
           {/* Discount + Order notes + Totals — fixed at bottom, compact */}
           <div className="border-t border-[var(--line)] px-3 py-1 bg-[var(--surface-2)]/50 flex-shrink-0">
-            {/* Tiempos row */}
-            <div className="flex items-center gap-1 mb-1">
-              <button
-                onClick={addTiempoSeparator}
-                disabled={activeItems.filter(i => !isTiempoItem(i)).length === 0}
-                className="flex items-center gap-1.5 px-4 min-h-[48px] rounded-lg bg-[var(--warn-soft)] border border-[color-mix(in_srgb,var(--warn)_40%,transparent)] hover:bg-[var(--warn-soft)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--warn-ink)] text-sm font-semibold transition-colors"
-                title="Insertar separador de tiempo"
-              >
-                <Clock size={18} />
-                Tiempo
-              </button>
-              {orderItems.some(isTiempoItem) && (
-                <button
-                  onClick={() => { if (!accionPendienteEnCaja('La impresión por tiempos')) setShowFirebutton(true) }}
-                  className="flex items-center gap-1.5 px-4 min-h-[48px] rounded-lg bg-orange-600 hover:bg-orange-500 text-white text-sm font-bold transition-colors"
-                  title="Impresión por tiempos — disparar siguiente tiempo a cocina"
-                >
-                  <Flame size={18} />
-                  Disparar
-                </button>
-              )}
-              <div className="flex-1" />
-            </div>
-            {/* Inline tools row: discount, notes, void */}
-            <div className="flex items-center gap-1 mb-1">
-              <button
-                onClick={() => { if (!accionPendienteEnCaja('Los descuentos y cortesías')) setShowDiscount(true) }}
-                disabled={orderItems.length === 0 || !can('descuentos_ordenes_pct')}
-                className="flex items-center gap-1.5 px-4 min-h-[48px] rounded-lg bg-[var(--line)] hover:bg-[var(--line)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--text-4)] text-sm font-semibold transition-colors"
-                title={!can('descuentos_ordenes_pct') ? 'Sin permiso para descuentos' : 'Aplicar descuento'}
-              >
-                <Percent size={16} />
-                {discount > 0 ? `-${formatMXN(discount)}` : 'Desc'}
-              </button>
-              {discount > 0 && (
-                <button
-                  onClick={() => {
-                    logAudit({ order_id: orderId, action: 'discount_removed', actor: mesero, mesa, details: { amount: discount } })
-                    setDiscount(0)
-                    setAppliedPromo(null)
-                  }}
-                  className="w-12 min-h-[48px] flex items-center justify-center rounded-lg bg-[var(--crit-soft)] border border-[color-mix(in_srgb,var(--crit)_40%,transparent)] hover:bg-[var(--crit-soft)] text-[var(--crit-ink)] transition-colors"
-                >
-                  <X size={18} />
-                </button>
-              )}
+            {/* La tira de herramientas eran DOS filas de botones de 48px —104px de los
+                632 útiles de una caja de 1024×768— y cinco de ellos sólo decían qué
+                hacían en un `title`, o sea en hover. En una caja táctil no hay hover:
+                el mesero veía ⇄ y ⛨ sin saber que eran «Transferir mesa» y «Anular
+                orden». Ahora viven en una hoja con su nombre a la vista, a un toque,
+                y la comanda recupera la altura. Ninguna función se quitó. */}
+            <div className="flex items-center gap-2 mb-1">
               {/* Order notes — inline input */}
               <div className="flex-1 flex items-center gap-1 min-w-0">
                 <StickyNote size={12} className="text-[var(--text-3)] flex-shrink-0" />
@@ -5081,20 +5035,87 @@ function POSContent() {
                 />
               </div>
               <button
+                type="button"
+                onClick={() => setShowFunciones(true)}
+                className="min-h-[56px] px-4 flex items-center justify-center gap-2 rounded-xl bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-2)] text-sm font-bold active:scale-95 transition-transform flex-shrink-0"
+              >
+                <Wrench size={18} />
+                Funciones
+              </button>
+            </div>
+            {showFunciones && (
+              <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 p-3" onClick={() => setShowFunciones(false)}>
+                <div className="w-full max-w-3xl rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] p-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+                  <div className="mb-3 flex items-center justify-between">
+                    <h3 className="text-lg font-bold text-[var(--text-1)]">Funciones de la cuenta</h3>
+                    <button type="button" onClick={() => setShowFunciones(false)}
+                      className="min-h-[56px] px-5 rounded-xl bg-[var(--line)] text-[var(--text-2)] font-bold active:scale-95 transition-transform">
+                      Cerrar
+                    </button>
+                  </div>
+                  {/* Elegir una función cierra la hoja: nadie quiere volver a buscar
+                      el botón «Cerrar» después de pedir el cajón. El manejador de
+                      cada botón corre primero y esto sube por burbujeo. */}
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" onClick={() => setShowFunciones(false)}>
+              <button
+                onClick={addTiempoSeparator}
+                disabled={activeItems.filter(i => !isTiempoItem(i)).length === 0}
+                className="flex items-center gap-1.5 min-h-[64px] px-4 rounded-xl bg-[var(--warn-soft)] border border-[color-mix(in_srgb,var(--warn)_40%,transparent)] hover:bg-[var(--warn-soft)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--warn-ink)] text-sm font-semibold transition-colors"
+                title="Insertar separador de tiempo"
+              >
+                <Clock size={18} />
+                Tiempo
+              </button>
+              {orderItems.some(isTiempoItem) && (
+                <button
+                  onClick={() => { if (!accionPendienteEnCaja('La impresión por tiempos')) setShowFirebutton(true) }}
+                  className="flex items-center gap-1.5 min-h-[64px] px-4 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-sm font-bold transition-colors"
+                  title="Impresión por tiempos — disparar siguiente tiempo a cocina"
+                >
+                  <Flame size={18} />
+                  Disparar
+                </button>
+              )}
+              <div className="flex-1" />
+              <button
+                onClick={() => { if (!accionPendienteEnCaja('Los descuentos y cortesías')) setShowDiscount(true) }}
+                disabled={orderItems.length === 0 || !can('descuentos_ordenes_pct')}
+                className="flex items-center gap-1.5 min-h-[64px] px-4 rounded-xl bg-[var(--line)] hover:bg-[var(--line)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--text-4)] text-sm font-semibold transition-colors"
+                title={!can('descuentos_ordenes_pct') ? 'Sin permiso para descuentos' : 'Aplicar descuento'}
+              >
+                <Percent size={16} />
+                {discount > 0 ? `-${formatMXN(discount)}` : 'Desc'}
+              </button>
+              {discount > 0 && (
+                <button
+                  onClick={() => {
+                    logAudit({ order_id: orderId, action: 'discount_removed', actor: mesero, mesa, details: { amount: discount } })
+                    setDiscount(0)
+                    setAppliedPromo(null)
+                  }}
+                  className="min-h-[64px] px-4 flex items-center justify-center gap-2 text-sm font-bold rounded-lg bg-[var(--crit-soft)] border border-[color-mix(in_srgb,var(--crit)_40%,transparent)] hover:bg-[var(--crit-soft)] text-[var(--crit-ink)] transition-colors"
+                >
+                  <X size={18} />
+                <span>Quitar descuento</span>
+                </button>
+              )}
+              <button
                 onClick={() => { if (escribeEnCaja) { setShowCajonCaja(true); return }; if (bloqueaLegacyCaja) { showToast('Caja debe confirmar la conexión antes de solicitar la apertura.'); return }; if (!isMobileRestricted) { openCashDrawer(); showToast('Cajón abierto') } }}
                 disabled={isMobileRestricted}
-                className="w-12 min-h-[48px] flex items-center justify-center rounded-lg bg-[var(--surface-2)] hover:bg-[var(--raised)] disabled:opacity-30 text-[var(--text-3)] transition-colors"
+                className="min-h-[64px] px-4 flex items-center justify-center gap-2 text-sm font-bold rounded-lg bg-[var(--surface-2)] hover:bg-[var(--raised)] disabled:opacity-30 text-[var(--text-3)] transition-colors"
                 title={isMobileRestricted ? 'Solo disponible en terminal de caja' : 'Abrir cajón'}
               >
                 <Banknote size={18} />
+                <span>Abrir cajón</span>
               </button>
               <button
                 onClick={() => { if (!accionPendienteEnCaja('Los retiros y depósitos') && !isMobileRestricted) setShowCashMovement(true) }}
                 disabled={isMobileRestricted}
-                className="w-12 min-h-[48px] flex items-center justify-center rounded-lg bg-[var(--surface-2)] hover:bg-[var(--raised)] disabled:opacity-30 text-[var(--text-3)] transition-colors"
+                className="min-h-[64px] px-4 flex items-center justify-center gap-2 text-sm font-bold rounded-lg bg-[var(--surface-2)] hover:bg-[var(--raised)] disabled:opacity-30 text-[var(--text-3)] transition-colors"
                 title={isMobileRestricted ? 'Solo disponible en terminal de caja' : 'Retiro / Deposito'}
               >
                 <DollarSign size={18} />
+                <span>Retiro / Depósito</span>
               </button>
               <button
                 onClick={() => {
@@ -5115,10 +5136,11 @@ function POSContent() {
                   showToast('Reimpresión de ticket')
                 }}
                 disabled={orderItems.length === 0}
-                className="w-12 min-h-[48px] flex items-center justify-center rounded-lg bg-[var(--surface-2)] hover:bg-[var(--raised)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--text-3)] transition-colors"
+                className="min-h-[64px] px-4 flex items-center justify-center gap-2 text-sm font-bold rounded-lg bg-[var(--surface-2)] hover:bg-[var(--raised)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--text-3)] transition-colors"
                 title="Reimprimir ticket"
               >
                 <Printer size={18} />
+                <span>Reimprimir ticket</span>
               </button>
               <button
                 onClick={() => {
@@ -5167,21 +5189,25 @@ function POSContent() {
                   })
                 }}
                 disabled={orderItems.length === 0}
-                className="w-12 min-h-[48px] flex items-center justify-center rounded-lg bg-[var(--info-soft)] hover:bg-[var(--info-soft)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--info-ink)] transition-colors"
+                className="min-h-[64px] px-4 flex items-center justify-center gap-2 text-sm font-bold rounded-lg bg-[var(--info-soft)] hover:bg-[var(--info-soft)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--info-ink)] transition-colors"
                 title="Transferir mesa"
               >
                 <ArrowRightLeft size={18} />
+                <span>Transferir mesa</span>
               </button>
               <button
                 onClick={() => setShowVoidOrder(true)}
                 disabled={orderItems.length === 0}
-                className="w-12 min-h-[48px] flex items-center justify-center rounded-lg bg-[var(--crit-soft)] hover:bg-[var(--crit-soft)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--crit-ink)] transition-colors"
+                className="min-h-[64px] px-4 flex items-center justify-center gap-2 text-sm font-bold rounded-lg bg-[var(--crit-soft)] hover:bg-[var(--crit-soft)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--crit-ink)] transition-colors"
                 title="Anular orden"
               >
                 <ShieldAlert size={18} />
+                <span>Anular orden</span>
               </button>
-            </div>
-
+                  </div>
+                </div>
+              </div>
+            )}
             {/* Promos available */}
             {availablePromos.length > 0 && discount === 0 && (
               <div className="flex items-center gap-1.5 mb-1.5 overflow-x-auto">
@@ -5222,61 +5248,68 @@ function POSContent() {
             </div>
           </div>
 
-          {/* Action buttons — compact for tablets */}
-          <div className={`px-3 py-1 border-t border-[var(--line)] gap-2 flex-shrink-0 ${escribeEnCaja ? 'grid grid-cols-3' : 'flex'}`}>
+          {/* Seis botones del mismo peso no dicen cuál sigue. Las cuatro secundarias
+              —Guardar, Verificar, Cuenta, Split— van arriba a 52px; abajo, solas y
+              a 64px, las dos que mueven la operación: Enviar la comida y Cobrar el
+              dinero. Ninguna se quitó ni cambió de comportamiento. */}
+          <div className="px-3 py-2 border-t border-[var(--line)] flex flex-col gap-2 flex-shrink-0">
             {orderItems.length === 0 ? (
-              <button
+<button
                 onClick={() => navigateToMesaMap()}
-                className="flex-1 flex items-center justify-center gap-2 bg-[var(--surface-2)] hover:bg-[var(--text-4)] active:bg-[var(--raised)] active:scale-[0.97] text-[var(--text-1)] font-bold py-2.5 rounded-xl text-base transition-all min-h-[52px]"
+                className="flex-1 flex items-center justify-center gap-2 bg-[var(--surface-2)] hover:bg-[var(--text-4)] active:bg-[var(--raised)] active:scale-[0.97] text-[var(--text-1)] font-bold py-2 rounded-xl text-lg transition-all min-h-[64px]"
               >
                 <ArrowLeft size={18} />
                 Salir
               </button>
             ) : (<>
-            {escribeEnCaja && <button onClick={() => guardarOperacionCaja(false)}
+              <div className={`grid gap-2 ${escribeEnCaja ? 'grid-cols-4' : 'grid-cols-3'}`}>
+                {escribeEnCaja && <button onClick={() => guardarOperacionCaja(false)}
               disabled={activeItems.length === 0 || saving || cuentaCajaBloqueada}
-              className="flex-1 min-h-[52px] rounded-xl bg-slate-700 px-3 py-2.5 font-bold text-white disabled:opacity-40">Guardar</button>}
-            <button
+              className="min-h-[52px] rounded-xl bg-slate-700 px-3 py-2.5 font-bold text-white disabled:opacity-40">Guardar</button>}
+<button
               onClick={() => setShowVerify(true)}
               disabled={activeItems.length === 0}
-              className="flex-[0.5] flex items-center justify-center gap-1 bg-cyan-600 hover:bg-cyan-500 active:bg-cyan-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-2.5 rounded-xl text-sm transition-all min-h-[52px]"
+              className="flex items-center justify-center gap-1 bg-cyan-600 hover:bg-cyan-500 active:bg-cyan-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-2 rounded-xl text-sm transition-all min-h-[52px]"
             >
               <ClipboardCheck size={16} />
               Verificar
             </button>
-            <button
-              onClick={handleSendToKitchen}
-              disabled={activeItems.length === 0 || saving || loadingMesa || cuentaCajaBloqueada}
-              className="flex-1 flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-2.5 rounded-xl text-base transition-all min-h-[52px]"
-            >
-              {saving ? <div className="w-[18px] h-[18px] border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Send size={18} />}
-              {saving ? 'Enviando' : sentToKitchen ? 'Enviado' : 'Enviar'}
-            </button>
-            <button
+<button
               onClick={handlePreTicket}
               disabled={activeItems.length === 0 || saving || loadingMesa || cuentaCajaBloqueada}
-              className="flex-[0.6] flex items-center justify-center gap-1 bg-amber-600 hover:bg-amber-500 active:bg-amber-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-2.5 rounded-xl text-base transition-all min-h-[52px]"
+              className="flex items-center justify-center gap-1 bg-amber-600 hover:bg-amber-500 active:bg-amber-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-2 rounded-xl text-sm transition-all min-h-[52px]"
             >
               <Receipt size={16} />
               Cuenta
             </button>
-            <button
+<button
               onClick={async () => { if (escribeEnCaja) { await handleCloseOrder(); return }; if (accionPendienteEnCaja('La división anterior de cuenta')) return; if (!await validarCuentaCaja()) return; if (activeItems.length >= 2) { setSplitMode(null); setSplitCount(0); setSplitParejoN(0); setSplitAssignments({}); setShowSplit(true) } else handleCloseOrder() }}
               disabled={activeItems.length === 0 || saving || cuentaCajaBloqueada || !can('cerrar_cuentas')}
-              className="flex-[0.4] flex items-center justify-center bg-purple-600 hover:bg-purple-500 active:bg-purple-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-2.5 rounded-xl text-base transition-all min-h-[52px]"
+              className="flex items-center justify-center bg-purple-600 hover:bg-purple-500 active:bg-purple-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-2 rounded-xl text-sm transition-all min-h-[52px]"
               title={!can('cerrar_cuentas') ? 'Sin permiso para cobrar' : ''}
             >
               Split
             </button>
-            <button
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+<button
+              onClick={handleSendToKitchen}
+              disabled={activeItems.length === 0 || saving || loadingMesa || cuentaCajaBloqueada}
+              className="flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-2 rounded-xl text-lg transition-all min-h-[64px]"
+            >
+              {saving ? <div className="w-[18px] h-[18px] border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Send size={18} />}
+              {saving ? 'Enviando' : sentToKitchen ? 'Enviado' : 'Enviar'}
+            </button>
+<button
               onClick={handleCloseOrder}
               disabled={activeItems.length === 0 || saving || cuentaCajaBloqueada || !can('cerrar_cuentas')}
-              className="flex-1 flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-2.5 rounded-xl text-base transition-all min-h-[52px]"
+              className="flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-2 rounded-xl text-lg transition-all min-h-[64px]"
               title={!can('cerrar_cuentas') ? 'Sin permiso para cobrar' : ''}
             >
               <CreditCard size={18} />
               {!can('cerrar_cuentas') ? 'Sin permiso' : 'Cobrar'}
             </button>
+              </div>
             </>)}
           </div>
         </div>

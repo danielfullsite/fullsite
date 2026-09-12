@@ -107,7 +107,45 @@ Verificada A/B: con un `-1` en el corte de página, 3 de sus 5 casos fallan.
 Capturas: `despues-1024x768-mesas.png` y `despues-1366x768-mesas.png`. El «antes»
 comparable es el de 1366×768 (ver §6).
 
-2. Editor de cuenta/comanda
+### 2. Editor de cuenta/comanda — **hecho**
+
+El peor número del sistema: la lista de renglones mostraba **297px de 724** en
+1024×768 — tres renglones y medio de diez. La recuperación no estaba en achicar
+los renglones sino en el cromo, que pesaba más que el contenido.
+
+| Qué | Recupera |
+|---|---|
+| La comanda tenía **su propia cabecera** repitiendo «Mesa N · Np · mesero», lo mismo que la barra de arriba. Se funden: el dinero sube a la barra de mesa | ~59px |
+| El saldo de Caja tenía renglón propio; va pegado al total, que es contra lo que se compara | ~28px |
+| Las dos filas de herramientas (8 botones de 48px) pasan a la hoja **«Funciones»** | ~48px |
+| Barra de acciones: cuatro secundarias a 52px arriba; **Enviar y Cobrar solas a 64px** abajo | jerarquía |
+
+**Resultado medido** (`despues-comanda2/medidas.json`), de 724px de cuenta:
+
+| | antes | después |
+|---|---|---|
+| 1600×900 | 408px (56%) | **535px (74%)** |
+| 1366×768 | 311px (43%) | **440px (61%)** |
+| 1280×800 | 343px (47%) | **472px (65%)** |
+| 1024×768 | 297px (41%) | **426px (59%)** |
+
+**Lo que apareció al mover la tira.** Cinco de esos ocho botones eran iconos
+cuyo significado sólo vivía en un `title` — o sea, en hover. En una caja táctil
+no hay hover: el mesero veía ⇄ y ⛨ sin manera de saber que eran «Transferir
+mesa» y «Anular orden». Ahora se llaman por su nombre, a 64px.
+
+**Y un defecto real, no visual.** La cabecera duplicada traía un **segundo campo
+de mesa sin la guarda antifraude** del de la barra: hacía `setMesa(v)` pelado.
+Es el defecto de `CIERRE-DEFECTOS-2026-09-06` —escribir otro número reparenta en
+silencio los renglones sin enviar— corregido en un campo y no en su copia. Al
+fundir las cabeceras desaparece. Guardián: `un-solo-campo-de-mesa.test.ts`,
+verificado A/B contra el árbol anterior (2 campos, 1 con guarda → 1 con guarda).
+
+**Lo que NO se logró.** Una cuenta de diez renglones **sigue sin caber** en
+1024×768: 426px de 724. Llegar a cero exigiría paginar la lista, y paginar una
+lista que crece mientras el mesero captura tiene su propio costo (agregas un
+platillo y se va a otra página). Queda planteado, no hecho.
+
 3. Catálogo y categorías
 4. Cobro de Caja (ya hecho en PR #395; queda revisarlo contra estas reglas)
 5. Turno y Corte Z

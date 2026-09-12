@@ -87,7 +87,9 @@ module.exports = async function ({ caja, pos2, kds, expect, until, request, outp
     await caja.page.locator('label').getByText('Caliente de laboratorio', { exact: true }).click()
     await caja.page.getByRole('button', { name: /Agregar.*50/ }).click()
   }
-  await caja.page.getByRole('button', { name: 'Enviar', exact: true }).click()
+  // Ver el comentario de `enviarACocina` en recorrido-operacional-ui.js: en
+  // desarrollo el distintivo de Next se para sobre el centro de este botón.
+  await caja.page.getByRole('button', { name: 'Enviar', exact: true }).click({ position: { x: 140, y: 20 } })
   await until(async () => (await snapshot()).kds_orders.length === 1, 'Ronda en cocina para el KDS')
 
   // ── Recorrido de capturas ──────────────────────────────────────────────────

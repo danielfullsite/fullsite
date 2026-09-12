@@ -84,6 +84,7 @@ module.exports = async function mutacionesLleganAPedro({ caja, pos2, pos3, check
     await check('Mutaciones — «Transferir mesa» 4 → 7 desde POS 2 llega a Pedro: la 4 se libera y la 7 se ocupa en las tres pantallas', async () => {
       await abrirMesa(pos2, 4)
       await expect(pos2.page.locator('body')).toContainText('Café de laboratorio', { timeout: 20000 })
+      await pos2.page.getByRole('button', { name: 'Funciones', exact: true }).click()
       await pos2.page.getByTitle('Transferir mesa').click()
       await expect(pos2.page.locator('body')).toContainText('Transferir a mesa #:')
       await pos2.page.locator('input[type="number"][placeholder="#"]').fill('7')
@@ -120,6 +121,7 @@ module.exports = async function mutacionesLleganAPedro({ caja, pos2, pos3, check
     await check('Mutaciones — «Anular orden» de la mesa 5 desde POS 3, sin internet, llega a Pedro: la mesa se libera en las tres pantallas', async () => {
       await abrirMesa(pos3, 5)
       await expect(pos3.page.locator('body')).toContainText(/116[.,]00/, { timeout: 20000 })
+      await pos3.page.getByRole('button', { name: 'Funciones', exact: true }).click()
       await pos3.page.getByTitle('Anular orden').click()
       const modal = pos3.page.locator('div.fixed.inset-0').filter({ hasText: 'Anular orden completa' })
       await expect(modal).toBeVisible()

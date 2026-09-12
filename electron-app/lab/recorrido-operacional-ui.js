@@ -38,6 +38,22 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     await terminal.page.locator('label').getByText('Caliente de laboratorio', { exact: true }).click()
     await terminal.page.getByRole('button', { name: /Agregar.*50/ }).click()
   }
+  // Las herramientas de la cuenta (cajón, retiro, reimprimir, transferir, anular)
+  // eran ocho iconos de 48px cuyo significado sólo vivía en un `title` — o sea,
+  // en hover, que en una caja táctil no existe. Desde el 2026-09-12 viven en la
+  // hoja «Funciones», con su nombre a la vista. Nada se quitó: se abre y se toca.
+  // «Enviar» quedó abajo a la izquierda al darle a la comanda una barra con
+  // jerarquía (2026-09-12), y ahí es justo donde Next en desarrollo planta su
+  // distintivo de errores: el clic al centro del botón lo intercepta un
+  // `<nextjs-portal>`. No es del producto —en el paquete no existe— así que se
+  // toca la mitad derecha del botón, que es superficie real.
+  const enviarACocina = async terminal => {
+    await terminal.page.getByRole('button', { name: 'Enviar', exact: true })
+      .click({ position: { x: 140, y: 20 } })
+  }
+  const funcionesDeLaCuenta = async terminal => {
+    await terminal.page.getByRole('button', { name: 'Funciones', exact: true }).click()
+  }
   const modal = terminal => terminal.page.getByRole('dialog', { name: 'Cobro de la cuenta' })
   const openPayment = async terminal => {
     await ensureUnlocked(terminal)
@@ -93,7 +109,7 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
   })
   await check('POS 3 agrega otra ronda y Enviar confirma los dos cafés a cocina', async () => {
     await addCoffee(pos3)
-    await pos3.page.getByRole('button', { name: 'Enviar', exact: true }).click()
+    await enviarACocina(pos3)
     await until(async () => (await snapshot()).kds_orders.length === 1, 'Ronda desde botón Enviar')
     const state = await snapshot()
     assert.equal(state.salon_orders[0].id, orderId)
@@ -125,6 +141,7 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
   await check('Transferir mesa con PIN conserva la cuenta y la ronda en todos los puntos', async () => {
     const move = async destination => {
       const source = (await snapshot()).salon_orders.find(order => order.id === orderId).mesa
+      await funcionesDeLaCuenta(pos3)
       await pos3.page.getByTitle('Transferir mesa', { exact: true }).click()
       await pos3.page.getByPlaceholder('#', { exact: true }).fill(String(destination))
       await pos3.page.getByRole('button', { name: 'Confirmar', exact: true }).click()
@@ -149,7 +166,8 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     const before = await snapshot()
     const count = printLab.hex.length
     await ensureUnlocked(pos3)
-    await pos3.page.getByTitle('Abrir cajón', { exact: true }).click()
+    await funcionesDeLaCuenta(pos3)
+      await pos3.page.getByTitle('Abrir cajón', { exact: true }).click()
     const panel = pos3.page.getByRole('region', { name: 'Apertura manual del cajón', exact: true })
     await panel.getByLabel('Motivo de apertura', { exact: true }).fill('Cambio laboratorio')
     await panel.getByLabel('PIN para abrir el cajón', { exact: true }).fill(labPin)
@@ -167,7 +185,8 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     await addCoffee(pos3)
     await pos3.page.getByRole('button', { name: 'Guardar', exact: true }).click()
     await until(async () => (await snapshot()).salon_orders.some(o => o.mesa === 3), 'Cuenta de anulación guardada')
-    await pos3.page.getByTitle('Anular orden', { exact: true }).click()
+    await funcionesDeLaCuenta(pos3)
+      await pos3.page.getByTitle('Anular orden', { exact: true }).click()
     await pos3.page.getByPlaceholder('Describe el motivo...').fill('Cliente de prueba se retira')
     await pos3.page.getByPlaceholder('****', { exact: true }).fill(labPin)
     await pos3.page.locator('button').filter({ hasText: /^\s*Anular orden\s*$/ }).click()
@@ -245,7 +264,7 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     await expect(modal(pos3).getByRole('button', { name: 'Preparar cobro en efectivo', exact: true })).toBeDisabled()
     await expect(modal(pos3).getByText(/Envía todos los productos guardados/)).toBeVisible()
     await modal(pos3).getByRole('button', { name: 'Cerrar', exact: true }).click()
-    await pos3.page.getByRole('button', { name: 'Enviar', exact: true }).click()
+    await enviarACocina(pos3)
     await until(async () => {
       const current = (await snapshot()).salon_orders[0]
       const items = typeof current.items === 'string' ? JSON.parse(current.items) : current.items

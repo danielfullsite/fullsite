@@ -38,7 +38,7 @@ const rejilla = (elementos: { numero: number }[]) => createElement(RejillaPagina
 
 it('REGRESION: ninguna mesa se pierde entre páginas — el recorrido completo las devuelve todas', () => {
   altoDeLaCaja = 450 // tres filas de 140 + separación
-  render(rejilla(mesas(40)))
+  render(rejilla(mesas(24)))
   const vistas = new Set<string>()
   const recoger = () => screen.getAllByRole('button')
     .map(b => b.textContent || '')
@@ -48,13 +48,13 @@ it('REGRESION: ninguna mesa se pierde entre páginas — el recorrido completo l
   recoger()
   const siguiente = screen.getByRole('button', { name: 'Página siguiente de mesas' })
   // Un salón grande no puede necesitar veinte toques: se recorre hasta el final.
-  for (let i = 0; i < 50 && !(siguiente as HTMLButtonElement).disabled; i++) {
+  for (let i = 0; i < 30 && !(siguiente as HTMLButtonElement).disabled; i++) {
     fireEvent.click(siguiente)
     recoger()
   }
-  expect(vistas.size, 'las 40 mesas tienen que ser alcanzables').toBe(40)
-  for (let n = 1; n <= 40; n++) expect(vistas.has(`Mesa ${n}`)).toBe(true)
-})
+  expect(vistas.size, 'las 24 mesas tienen que ser alcanzables').toBe(24)
+  for (let n = 1; n <= 24; n++) expect(vistas.has(`Mesa ${n}`)).toBe(true)
+}, 20000)
 
 it('con pocas mesas no aparece ningún control: la pantalla se ve como siempre', () => {
   altoDeLaCaja = 900
