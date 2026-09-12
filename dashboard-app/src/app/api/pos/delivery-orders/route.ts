@@ -102,6 +102,14 @@ export async function PATCH(request: NextRequest) {
   const safe = validatePatch(body.patch as Record<string, unknown>)
   if (!safe) return Response.json({ error: 'INVALID_PATCH' }, { status: 400 })
 
+  // Leer la bandeja de delivery requiere `registro_comanda`, pero modificarla
+  // es otra capacidad. El contrato granular reserva el progreso de cocina para
+  // admin/gerente/capitán; un shift de cajero o mesero conserva vista de sólo
+  // lectura aunque llame la ruta directamente.
+  if (!hasPermission(auth.role, 'actualizar_estatus_orden')) {
+    return Response.json({ error: 'STATUS_PERMISSION_REQUIRED' }, { status: 403 })
+  }
+
   // `closed_at` también saca la orden de la lista activa, aunque status no diga
   // cancelada. Ambos caminos requieren el permiso crítico de cancelación.
   const cancelsOrder = safe.status === 'cancelada' || safe.cancelled_at != null || safe.closed_at != null

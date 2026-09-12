@@ -12,6 +12,7 @@ import {
   Truck, CheckCircle2, ShoppingBag, DollarSign, XCircle, Ban,
 } from 'lucide-react'
 import { formatMXN, logAudit, getPOSAuthHeaders } from '@/lib/pos-data'
+import { hasPermission } from '@/lib/pos-permissions'
 import { CANCEL_REASON_LABELS, UBER_CANCEL_REASONS } from '@/lib/integrations/uber-eats/reasons'
 import type { UberCancelReason } from '@/lib/integrations/uber-eats/reasons'
 import {
@@ -84,6 +85,7 @@ export default function DeliveryPage() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<PlatformFilter>('todas')
   const [actorName, setActorName] = useState('Caja')
+  const [actorRole, setActorRole] = useState('mesero')
   const [cancelAlerts, setCancelAlerts] = useState<ExternalCancellation[]>([])
   const [patchError, setPatchError] = useState<string | null>(null)
   const previousOrdersRef = useRef<DeliveryOrder[]>([])
@@ -93,7 +95,11 @@ export default function DeliveryPage() {
   useEffect(() => {
     try {
       const saved = sessionStorage.getItem('pos_staff')
-      if (saved) setActorName(JSON.parse(saved).name || 'Caja')
+      if (saved) {
+        const actor = JSON.parse(saved)
+        setActorName(actor.name || 'Caja')
+        setActorRole(actor.role || 'mesero')
+      }
     } catch { /* */ }
     try {
       const saved = JSON.parse(localStorage.getItem(CANCEL_ALERTS_KEY) || '[]') as ExternalCancellation[]
@@ -166,6 +172,9 @@ export default function DeliveryPage() {
     () => filteredOrders.filter(o => ['entregada', 'cancelada'].includes(o.status) || o.closed_at),
     [filteredOrders]
   )
+
+  const canUpdateStatus = hasPermission(actorRole, 'actualizar_estatus_orden')
+  const canCancel = canUpdateStatus && hasPermission(actorRole, 'cancelar_ordenes')
 
   // Stats
   const stats = useMemo(() => {
@@ -358,6 +367,8 @@ export default function DeliveryPage() {
                       order={o}
                       onStatusChange={handleStatusChange}
                       onCancel={handleCancel}
+                      canUpdateStatus={canUpdateStatus}
+                      canCancel={canCancel}
                     />
                   ))}
                 </div>
@@ -372,7 +383,14 @@ export default function DeliveryPage() {
                 </h2>
                 <div className="space-y-3">
                   {completedOrders.map(o => (
-                    <OrderCard key={o.id} order={o} onStatusChange={handleStatusChange} onCancel={handleCancel} />
+                    <OrderCard
+                      key={o.id}
+                      order={o}
+                      onStatusChange={handleStatusChange}
+                      onCancel={handleCancel}
+                      canUpdateStatus={canUpdateStatus}
+                      canCancel={canCancel}
+                    />
                   ))}
                 </div>
               </section>
@@ -417,10 +435,14 @@ function OrderCard({
   order,
   onStatusChange,
   onCancel,
+  canUpdateStatus,
+  canCancel,
 }: {
   order: DeliveryOrder
   onStatusChange: (order: DeliveryOrder, status: 'preparando' | 'lista') => void
   onCancel: (order: DeliveryOrder, reason: UberCancelReason) => void
+  canUpdateStatus: boolean
+  canCancel: boolean
 }) {
   const [showCancelMenu, setShowCancelMenu] = useState(false)
   const platform = PLATFORM_STYLE[order.platform] || PLATFORM_STYLE.ubereats
@@ -492,7 +514,7 @@ function OrderCard({
       {!isCompleted && (
         <div className="space-y-2 pt-1">
           <div className="flex gap-2">
-            {order.status === 'nueva' && (
+            {canUpdateStatus && order.status === 'nueva' && (
               <button
                 onClick={() => onStatusChange(order, 'preparando')}
                 className="flex-1 py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-bold text-sm min-h-[48px] flex items-center justify-center gap-2 transition-colors"
@@ -501,7 +523,7 @@ function OrderCard({
                 Preparando
               </button>
             )}
-            {order.status === 'preparando' && (
+            {canUpdateStatus && order.status === 'preparando' && (
               <button
                 onClick={() => onStatusChange(order, 'lista')}
                 className="flex-1 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-sm min-h-[48px] flex items-center justify-center gap-2 transition-colors"
@@ -516,8 +538,13 @@ function OrderCard({
                 Esperando repartidor de {platform.label}
               </div>
             )}
+            {!canUpdateStatus && ['nueva', 'preparando'].includes(order.status) && (
+              <div className="flex-1 min-h-[48px] rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-white/50 text-xs font-semibold flex items-center justify-center text-center">
+                Solo lectura · un capitán, gerente o dueño actualiza cocina
+              </div>
+            )}
             {/* Cancel button — available for nueva and preparando */}
-            {['nueva', 'preparando'].includes(order.status) && (
+            {canCancel && ['nueva', 'preparando'].includes(order.status) && (
               <button
                 onClick={() => setShowCancelMenu(v => !v)}
                 className="w-12 h-12 rounded-xl bg-red-600/20 border border-red-500/30 text-red-400 flex items-center justify-center shrink-0 active:bg-red-600/30"

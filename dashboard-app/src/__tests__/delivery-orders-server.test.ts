@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 
-let auth: { clientId: string } | null = { clientId: 'tenant-server' }
+let auth: { clientId: string; role: string } | null = { clientId: 'tenant-server', role: 'admin' }
 let kitchenEnabled = true
 let kitchenValid = true
 
@@ -19,7 +19,7 @@ describe('/api/pos/delivery-orders', () => {
     vi.restoreAllMocks()
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://staging.example.invalid'
     process.env.SUPABASE_SERVICE_KEY = 'service-key-test'
-    auth = { clientId: 'tenant-server' }
+    auth = { clientId: 'tenant-server', role: 'admin' }
     kitchenEnabled = true
     kitchenValid = true
   })
@@ -116,4 +116,39 @@ describe('/api/pos/delivery-orders', () => {
     expect(response.status).toBe(400)
     expect(fetchMock).not.toHaveBeenCalled()
   })
+
+  it.each(['admin', 'gerente', 'capitan'])(
+    'PATCH permite a %s avanzar la preparación con el permiso canónico',
+    async role => {
+      auth = { clientId: 'tenant-server', role }
+      const fetchMock = vi.fn(async () => Response.json([{ id: 'd1' }]))
+      vi.stubGlobal('fetch', fetchMock)
+      const { PATCH } = await import('@/app/api/pos/delivery-orders/route')
+
+      const response = await PATCH(new NextRequest('https://app.test/api/pos/delivery-orders', {
+        method: 'PATCH', body: JSON.stringify({ id: 'd1', patch: { status: 'preparando' } }),
+      }))
+
+      expect(response.status).toBe(200)
+      expect(fetchMock).toHaveBeenCalledOnce()
+    },
+  )
+
+  it.each(['cajero', 'mesero'])(
+    'PATCH deja a %s consultar delivery pero no cambiar su preparación',
+    async role => {
+      auth = { clientId: 'tenant-server', role }
+      const fetchMock = vi.fn(async () => Response.json([{ id: 'd1' }]))
+      vi.stubGlobal('fetch', fetchMock)
+      const { PATCH } = await import('@/app/api/pos/delivery-orders/route')
+
+      const response = await PATCH(new NextRequest('https://app.test/api/pos/delivery-orders', {
+        method: 'PATCH', body: JSON.stringify({ id: 'd1', patch: { status: 'lista' } }),
+      }))
+
+      expect(response.status).toBe(403)
+      expect(await response.json()).toEqual({ error: 'STATUS_PERMISSION_REQUIRED' })
+      expect(fetchMock).not.toHaveBeenCalled()
+    },
+  )
 })
