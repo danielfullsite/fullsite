@@ -61,19 +61,9 @@ const CATEGORIES = [
 
 export default function VaultPage() {
   const { role } = useAuth()
-  const [credentials, setCredentials] = useState<Credential[]>([])
-  const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
-  const [showAdd, setShowAdd] = useState(false)
-  const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set())
-  const [copiedId, setCopiedId] = useState<string | null>(null)
-  const [expandedCat, setExpandedCat] = useState<string | null>(null)
-  const [availableClients, setAvailableClients] = useState<{id: string, display_name: string}[]>([])
 
-  // Form state
-  const [form, setForm] = useState({ client_id: getActiveClientSlug(), category: 'delivery', name: '', username: '', password: '', url: '', notes: '' })
-
-  // Only dueño/admin can access
+  // La autorización vive en un componente sin más hooks. Así, mientras AuthContext
+  // resuelve o cambia de sesión, nunca cambia el orden de hooks de VaultContent.
   if (role !== 'dueño') {
     return (
       <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center">
@@ -85,6 +75,22 @@ export default function VaultPage() {
       </div>
     )
   }
+
+  return <VaultContent />
+}
+
+function VaultContent() {
+  const [credentials, setCredentials] = useState<Credential[]>([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [showAdd, setShowAdd] = useState(false)
+  const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set())
+  const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [expandedCat, setExpandedCat] = useState<string | null>(null)
+  const [availableClients, setAvailableClients] = useState<{id: string, display_name: string}[]>([])
+
+  // Form state
+  const [form, setForm] = useState({ client_id: getActiveClientSlug(), category: 'delivery', name: '', username: '', password: '', url: '', notes: '' })
 
   const fetchCredentials = async () => {
     setLoading(true)
