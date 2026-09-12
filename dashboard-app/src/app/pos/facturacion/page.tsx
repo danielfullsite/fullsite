@@ -16,6 +16,7 @@ import { IVA_RATE } from '@/lib/pos-constants'
 const STATUS_STYLES: Record<string, { color: string; bg: string; label: string; icon: typeof Clock }> = {
   pendiente: { color: 'text-amber-400', bg: 'bg-amber-900/40', label: 'Pendiente', icon: Clock },
   procesando: { color: 'text-blue-400', bg: 'bg-blue-900/40', label: 'Procesando', icon: RefreshCw },
+  incierto: { color: 'text-orange-300', bg: 'bg-orange-900/40', label: 'Verificar en Facturama', icon: AlertCircle },
   emitida: { color: 'text-emerald-400', bg: 'bg-emerald-900/40', label: 'Emitida', icon: Check },
   cancelada: { color: 'text-red-400', bg: 'bg-red-900/40', label: 'Cancelada', icon: X },
   error: { color: 'text-red-400', bg: 'bg-red-900/40', label: 'Error', icon: AlertCircle },
@@ -371,6 +372,11 @@ export default function FacturacionPage() {
                       )}
                       {req.status === 'error' && req.error_msg && (
                         <p className="text-xs text-red-400 mt-2">{req.error_msg}</p>
+                      )}
+                      {(req.status === 'procesando' || req.status === 'incierto') && (
+                        <p className="text-xs text-orange-300 mt-2">
+                          {req.error_msg || 'No reintentes. Verifica el resultado directamente en Facturama para evitar un CFDI duplicado.'}
+                        </p>
                       )}
                       {req.folio_fiscal && (
                         <p className="text-xs text-[var(--text-2)] mt-2 font-mono">Folio fiscal: {req.folio_fiscal}</p>
