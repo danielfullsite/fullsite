@@ -91,10 +91,9 @@ class CommandHandler {
       if (!Number.isSafeInteger(mesa) || mesa <= 0) throw new FinancialError('INVALID_MESA', 'Mesa inválida')
       cmdPayload.mesa = String(mesa)
       cmdPayload.client_id = fromClientId
-      if (commandType === 'MESA_LOCK' && (!Number.isSafeInteger(cmdPayload.expires_ms) ||
-        cmdPayload.expires_ms <= Date.now() || cmdPayload.expires_ms > Date.now() + 60_000)) {
-        throw new FinancialError('INVALID_MESA_LOCK_EXPIRY', 'La vigencia del bloqueo de mesa es inválida')
-      }
+      // A tablet clock can be minutes off and the caller is not allowed to pin a
+      // table indefinitely. Caja owns the absolute lease deadline.
+      if (commandType === 'MESA_LOCK') cmdPayload.expires_ms = Date.now() + 30_000
     }
 
     // Validate restaurant_id

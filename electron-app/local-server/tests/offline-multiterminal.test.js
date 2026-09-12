@@ -127,6 +127,18 @@ describe('Multi-terminal simulado — estado compartido en LAN', () => {
     assert.equal(srv.serverState.getLock('7'), null)
   })
 
+  test('Caja fija la vigencia: un reloj incorrecto en la tablet no vence ni alarga el lock', async () => {
+    const srv = await buildServer(dir)
+    const before = Date.now()
+    const result = await send(srv.cmd, 'term-A', {
+      command_type: 'MESA_LOCK', command_id: 'skewed-clock', mesa: '7', expires_ms: 1,
+    })
+    assert.ok(!result.error)
+    const lock = srv.serverState.getLock('7')
+    assert.ok(lock.expires_ms >= before + 29_000)
+    assert.ok(lock.expires_ms <= Date.now() + 30_000)
+  })
+
   test('el cierre en A libera la mesa en B', async () => {
     const srv = await buildServer(dir)
     const B = srv.connect('term-B')
