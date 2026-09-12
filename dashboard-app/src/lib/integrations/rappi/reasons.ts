@@ -23,11 +23,19 @@ const UBER_TO_RAPPI_CANCEL: Record<string, RappiCancelType> = {
   RESTAURANT_CLOSED: 'STORE_CLOSED',
   POS_OFFLINE: 'POS_OFFLINE',
   RESTAURANT_TOO_BUSY: 'POS_INTERNAL_ERROR',
+  CUSTOMER_CALLED_TO_CANCEL: 'INTEGRATOR_ERROR',
+  CANNOT_COMPLETE_CUSTOMER_NOTE: 'INTEGRATOR_ERROR',
+  DUPLICATE_ORDER: 'INTEGRATOR_ERROR',
+  ORDER_NOT_DELIVERED: 'INTEGRATOR_ERROR',
   OTHER: 'INTEGRATOR_ERROR',
 }
 
 export function isRappiCancelType(value: string): value is RappiCancelType {
   return value in RAPPI_CANCEL_TYPES
+}
+
+export function isRappiCompatibleCancelReason(value: string): boolean {
+  return isRappiCancelType(value) || value in UBER_TO_RAPPI_CANCEL
 }
 
 export function toRappiCancelType(value?: string | null): RappiCancelType {

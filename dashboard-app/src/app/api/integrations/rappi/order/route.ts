@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { withPOSAuth, unauthorized } from '@/lib/api-auth'
 import { syncRappiOrderAction } from '@/lib/integrations/rappi/order-sync'
-import { isRappiCancelType } from '@/lib/integrations/rappi/reasons'
+import { isRappiCompatibleCancelReason } from '@/lib/integrations/rappi/reasons'
 import { hasPermission } from '@/lib/pos-permissions'
 
 export async function POST(request: NextRequest) {
@@ -13,6 +13,7 @@ export async function POST(request: NextRequest) {
     action?: 'accept' | 'ready' | 'reject' | 'cancel'
     reason?: string
     minutes_to_ready?: number
+    update_local_status?: boolean
   }
 
   if (!body.order_id || !body.action || !['accept', 'ready', 'reject', 'cancel'].includes(body.action)) {
@@ -23,7 +24,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: 'CANCEL_PERMISSION_REQUIRED' }, { status: 403 })
   }
 
-  if ((body.action === 'reject' || body.action === 'cancel') && body.reason && !isRappiCancelType(body.reason)) {
+  if ((body.action === 'reject' || body.action === 'cancel') && body.reason && !isRappiCompatibleCancelReason(body.reason)) {
     return NextResponse.json({ ok: false, error: 'INVALID_RAPPI_CANCEL_TYPE' }, { status: 400 })
   }
 
@@ -33,7 +34,9 @@ export async function POST(request: NextRequest) {
     action: body.action,
     reason: body.reason,
     minutesToReady: body.minutes_to_ready,
-    updateLocalStatus: true,
+    // Defaults to the historical server-owned write. The delivery UI opts out
+    // so it can verify the provider response before advancing its local truth.
+    updateLocalStatus: body.update_local_status !== false,
   })
 
   return NextResponse.json(result, { status: result.ok ? 200 : 422 })

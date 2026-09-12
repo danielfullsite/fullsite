@@ -13,6 +13,11 @@ import {
 } from 'lucide-react'
 import { formatMXN, logAudit, getPOSAuthHeaders } from '@/lib/pos-data'
 import { hasPermission } from '@/lib/pos-permissions'
+import {
+  applyDeliveryAction,
+  type DeliveryProvider,
+  type DeliveryProviderAction,
+} from '@/lib/delivery-action-client'
 import { CANCEL_REASON_LABELS, UBER_CANCEL_REASONS } from '@/lib/integrations/uber-eats/reasons'
 import type { UberCancelReason } from '@/lib/integrations/uber-eats/reasons'
 import {
@@ -49,6 +54,13 @@ interface DeliveryOrder {
   en_route_at: string | null
   delivered_at: string | null
   closed_at: string | null
+}
+
+interface PendingDeliveryAction {
+  order: DeliveryOrder
+  action: DeliveryProviderAction
+  reason?: UberCancelReason
+  providerAlreadyConfirmed: boolean
 }
 
 function elapsedStr(dateStr: string): string {
@@ -88,9 +100,11 @@ export default function DeliveryPage() {
   const [actorRole, setActorRole] = useState('mesero')
   const [cancelAlerts, setCancelAlerts] = useState<ExternalCancellation[]>([])
   const [patchError, setPatchError] = useState<string | null>(null)
+  const [pendingAction, setPendingAction] = useState<PendingDeliveryAction | null>(null)
   const previousOrdersRef = useRef<DeliveryOrder[]>([])
   const cancelledLocallyRef = useRef<Set<string>>(new Set())
   const alertedRef = useRef<Set<string>>(new Set())
+  const actionInFlightRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
     try {
@@ -207,21 +221,74 @@ export default function DeliveryPage() {
     return ok
   }
 
+  const runProviderAction = async ({
+    order, action, reason, providerAlreadyConfirmed,
+  }: PendingDeliveryAction) => {
+    if (actionInFlightRef.current.has(order.id)) return
+    if (!order.platform_order_id || !['ubereats', 'rappi'].includes(order.platform)) {
+      setPatchError(`La orden de ${order.customer_name} no tiene una referencia válida del proveedor. No se cambió en Fullsite.`)
+      return
+    }
+
+    actionInFlightRef.current.add(order.id)
+    setPatchError(null)
+    try {
+      const updatedAt = new Date().toISOString()
+      const result = await applyDeliveryAction({
+        localOrderId: order.id,
+        platformOrderId: order.platform_order_id,
+        platform: order.platform as DeliveryProvider,
+        action,
+        reason,
+        localPatch: action === 'ready'
+          ? { status: 'lista', ready_at: updatedAt, updated_at: updatedAt }
+          : { status: 'cancelada', cancelled_at: updatedAt, updated_at: updatedAt },
+        authHeaders: getPOSAuthHeaders(),
+        providerAlreadyConfirmed,
+      })
+
+      if (!result.ok) {
+        setPendingAction({
+          order, action, reason,
+          providerAlreadyConfirmed: result.retry === 'local_only',
+        })
+        const providerName = order.platform === 'rappi' ? 'Rappi' : 'Uber Eats'
+        if (result.stage === 'local') {
+          setPatchError(`${providerName} sí confirmó, pero Fullsite no pudo guardar el cambio. Reintenta para completar sólo el registro local.`)
+        } else if (result.uncertain) {
+          setPatchError(`No sabemos si ${providerName} alcanzó a recibir la acción. Fullsite mantiene el estado anterior; reintenta para reconciliar.`)
+        } else {
+          setPatchError(`${providerName} rechazó la acción. Fullsite mantiene el estado anterior; revisa y reintenta.`)
+        }
+        return
+      }
+
+      setPendingAction(null)
+      if (action === 'cancel') cancelledLocallyRef.current.add(order.id)
+      await fetchOrders()
+      logAudit({
+        action: action === 'cancel' ? 'order_cancelled' : 'delivery_status_changed',
+        actor: actorName,
+        details: action === 'cancel'
+          ? { delivery_id: order.id, platform: order.platform, reason, cliente: order.customer_name }
+          : { delivery_id: order.id, platform: order.platform, from: order.status, to: 'lista', cliente: order.customer_name },
+      })
+    } finally {
+      actionInFlightRef.current.delete(order.id)
+    }
+  }
+
   const handleStatusChange = async (order: DeliveryOrder, newStatus: 'preparando' | 'lista') => {
+    if (newStatus === 'lista') {
+      await runProviderAction({ order, action: 'ready', providerAlreadyConfirmed: false })
+      return
+    }
     const applied = await patchOrder(order.id, { status: newStatus, updated_at: new Date().toISOString() })
     if (!applied) {
       setPatchError(`No se pudo cambiar la orden de ${order.customer_name}. Intenta de nuevo.`)
       return
     }
     void fetchOrders()
-    // When marking lista → notify Uber that order is ready for pickup
-    if (newStatus === 'lista' && order.platform === 'ubereats' && order.platform_order_id) {
-      fetch('/api/integrations/uber-eats/order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getPOSAuthHeaders() },
-        body: JSON.stringify({ order_id: order.platform_order_id, action: 'ready' }),
-      }).catch(e => console.warn('[delivery] mark-ready failed:', e))
-    }
     logAudit({
       action: 'delivery_status_changed',
       actor: actorName,
@@ -230,21 +297,7 @@ export default function DeliveryPage() {
   }
 
   const handleCancel = async (order: DeliveryOrder, reason: UberCancelReason) => {
-    const applied = await patchOrder(order.id, { status: 'cancelada', updated_at: new Date().toISOString() })
-    if (!applied) {
-      setPatchError(`No se pudo cancelar la orden de ${order.customer_name}. Sigue activa — intenta de nuevo.`)
-      return
-    }
-    cancelledLocallyRef.current.add(order.id)
-    void fetchOrders()
-    if (order.platform === 'ubereats' && order.platform_order_id) {
-      fetch('/api/integrations/uber-eats/order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getPOSAuthHeaders() },
-        body: JSON.stringify({ order_id: order.platform_order_id, action: 'cancel', reason }),
-      }).catch(e => console.warn('[delivery] cancel failed:', e))
-    }
-    logAudit({ action: 'order_cancelled', actor: actorName, details: { delivery_id: order.id, platform: order.platform, reason, cliente: order.customer_name } })
+    await runProviderAction({ order, action: 'cancel', reason, providerAlreadyConfirmed: false })
   }
 
   return (
@@ -253,7 +306,15 @@ export default function DeliveryPage() {
         <div className="shrink-0 bg-amber-500 text-black px-4 py-3 flex items-center gap-3" role="alert">
           <XCircle size={20} className="shrink-0" />
           <p className="flex-1 font-bold text-sm">{patchError}</p>
-          <button onClick={() => setPatchError(null)} className="shrink-0 px-4 py-2 rounded-lg bg-black/80 text-white font-bold text-sm min-h-[44px]">Cerrar</button>
+          {pendingAction && (
+            <button
+              onClick={() => void runProviderAction(pendingAction)}
+              className="shrink-0 px-4 py-2 rounded-lg bg-black text-white font-black text-sm min-h-[44px]"
+            >
+              Reintentar
+            </button>
+          )}
+          <button onClick={() => { setPatchError(null); setPendingAction(null) }} className="shrink-0 px-4 py-2 rounded-lg bg-black/80 text-white font-bold text-sm min-h-[44px]">Cerrar</button>
         </div>
       )}
       {cancelAlerts.length > 0 && (

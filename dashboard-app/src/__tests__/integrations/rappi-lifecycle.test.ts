@@ -11,7 +11,8 @@ import {
 } from '@/lib/integrations/rappi/auth'
 import { acceptRappiOrder, markRappiOrderReady, rejectRappiOrder } from '@/lib/integrations/rappi/adapter'
 import { normalizeRappiOrder, rappiProviderOrderId, rappiProviderStoreId } from '@/lib/integrations/rappi/normalizer'
-import { isRappiCancelType, toRappiCancelType } from '@/lib/integrations/rappi/reasons'
+import { isRappiCancelType, isRappiCompatibleCancelReason, toRappiCancelType } from '@/lib/integrations/rappi/reasons'
+import { UBER_CANCEL_REASONS } from '@/lib/integrations/uber-eats/reasons'
 
 const originalFetch = global.fetch
 
@@ -189,5 +190,6 @@ describe('Rappi cancellation contract', () => {
     expect(toRappiCancelType('OUT_OF_ITEM')).toBe('ITEM_STOCKOUT')
     expect(toRappiCancelType('OTHER')).toBe('INTEGRATOR_ERROR')
     expect(toRappiCancelType(undefined)).toBe('INTEGRATOR_ERROR')
+    expect(Object.keys(UBER_CANCEL_REASONS).every(isRappiCompatibleCancelReason)).toBe(true)
   })
 })
