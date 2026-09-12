@@ -2883,13 +2883,14 @@ export async function getMarketMovements(limit = 50): Promise<MarketMovement[]> 
 
 /** Entrada / merma / ajuste manual via constrained server-side RPC.
  *  Conservation: no GREATEST(0,...) clamp. Negative stock visible.
- *  Actor is REPORTED_ACTOR (browser-supplied, not server-verified). */
+ *  El actor del argumento es sólo compatibilidad UI; el servidor usa la sesión. */
 export async function registerMarketMovement(
   menuItemId: string,
   type: 'entrada' | 'merma' | 'ajuste',
   quantity: number,
-  actor: string,
+  _actor: string,
   notes?: string,
+  operationId?: string,
 ): Promise<{ ok: boolean; newStock: number }> {
   try {
     const adjustType = type === 'ajuste' ? 'ajuste_absoluto' : type
@@ -2900,7 +2901,7 @@ export async function registerMarketMovement(
         menu_item_id: menuItemId,
         adjustment_type: adjustType,
         quantity: Math.abs(quantity),
-        actor,
+        operation_id: operationId || crypto.randomUUID(),
         notes,
       }),
     })
