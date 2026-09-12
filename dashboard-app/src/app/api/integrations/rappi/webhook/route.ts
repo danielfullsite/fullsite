@@ -1,4 +1,6 @@
 import { type NextRequest, NextResponse, after } from 'next/server'
+import { esPing, extraerStoreId, responderPing } from '@/lib/integrations/rappi/ping'
+import { resolveClientId } from '@/lib/integrations/rappi/ingest'
 import { verifyRappiSignature } from '@/lib/integrations/rappi/signature'
 import { processRappiOrder } from '@/lib/integrations/rappi/ingest'
 
@@ -60,9 +62,14 @@ export async function POST(request: NextRequest) {
     ? (payload as Record<string, unknown>).event ?? (payload as Record<string, unknown>).type
     : null) as string | null
 
-  // PING u otros eventos sin orden: ACK sin ingerir.
-  if (eventType && /ping/i.test(eventType)) {
-    return NextResponse.json({ ok: true, event: eventType })
+  // PING de disponibilidad. Contrato: responder { status:"OK", description:"Store on" }.
+  // `status` es obligatorio — antes se respondia { ok:true, event }, que para Rappi
+  // significa "tienda NO disponible". Y se responde POR TIENDA, no OK a ciegas.
+  // Ver lib/integrations/rappi/ping.ts.
+  if (esPing(payload, eventType)) {
+    const storeId = extraerStoreId(payload)
+    const respuesta = await responderPing(storeId, resolveClientId)
+    return NextResponse.json(respuesta)
   }
 
   // RAPPI-002: ACK 200 primero; la ingesta corre en background (no bloquea a Rappi).
