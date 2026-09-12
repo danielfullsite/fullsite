@@ -12,13 +12,19 @@ export async function POST(request: NextRequest) {
     if (!auth) return unauthorized()
     const clientId = auth.clientId
     const body = await request.json()
-    const { menu_item_id, adjustment_type, quantity, actor, notes } = body
+    const { menu_item_id, adjustment_type, quantity, operation_id, notes } = body
 
-    if (!menu_item_id || !adjustment_type || quantity == null) {
+    if (typeof menu_item_id !== 'string' || !menu_item_id || menu_item_id.length > 200 ||
+        typeof operation_id !== 'string' || !operation_id || operation_id.length > 200 ||
+        (notes != null && (typeof notes !== 'string' || notes.length > 1000))) {
       return Response.json({ ok: false, error: 'INVALID_PAYLOAD' }, { status: 400 })
     }
     if (!['entrada', 'merma', 'ajuste_absoluto'].includes(adjustment_type)) {
       return Response.json({ ok: false, error: 'INVALID_TYPE' }, { status: 400 })
+    }
+    if (typeof quantity !== 'number' || !Number.isFinite(quantity) || quantity < 0 ||
+        (adjustment_type !== 'ajuste_absoluto' && quantity === 0)) {
+      return Response.json({ ok: false, error: 'INVALID_QUANTITY' }, { status: 400 })
     }
 
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -32,24 +38,10 @@ export async function POST(request: NextRequest) {
       return Response.json({ ok: false, error: 'ROLE_REQUIRED' }, { status: 403 })
     }
     // Actor server-verificado (no confiar en el auto-reportado del body).
-    const verifiedActor = auth.staffName || auth.staffId || actor || 'almacen'
-    if (gate.mode.startsWith('below_role:')) {
-      void fetch(`${sbUrl}/rest/v1/pos_audit_log`, {
-        method: 'POST',
-        headers: {
-          'apikey': sbKey, 'Authorization': `Bearer ${sbKey}`,
-          'Content-Type': 'application/json', 'Prefer': 'return=minimal',
-        },
-        body: JSON.stringify({
-          client_id: clientId,
-          action: 'market_adjust_below_role',
-          actor: verifiedActor,
-          details: { role_mode: gate.mode, adjustment_type, menu_item_id, quantity },
-        }),
-      }).catch(() => {})
-    }
+    const verifiedActor = auth.staffId
+    if (!verifiedActor) return Response.json({ ok: false, error: 'ACTOR_REQUIRED' }, { status: 403 })
 
-    const res = await fetch(`${sbUrl}/rest/v1/rpc/r1_adjust_market_stock`, {
+    const res = await fetch(`${sbUrl}/rest/v1/rpc/r1_adjust_market_stock_atomic`, {
       method: 'POST',
       headers: {
         'apikey': sbKey, 'Authorization': `Bearer ${sbKey}`,
@@ -60,20 +52,22 @@ export async function POST(request: NextRequest) {
         p_menu_item_id: menu_item_id,
         p_adjustment_type: adjustment_type,
         p_quantity: quantity,
-        p_actor: verifiedActor,  // OP-39: server-verified, ya no REPORTED_ACTOR
+        p_actor: verifiedActor,
         p_notes: notes || null,
+        p_operation_id: operation_id,
       }),
     })
 
     if (!res.ok) {
-      const errText = await res.text()
-      console.error('[adjust-market] RPC error:', res.status, errText)
-      return Response.json({ ok: false, error: 'RPC_FAILED' }, { status: 502 })
+      const result = await res.json().catch(() => ({}))
+      const known = ['MARKET_ITEM_NOT_FOUND', 'OPERATION_ID_REUSED', 'INVALID_MARKET_ADJUSTMENT']
+      const error = known.includes(result.message) ? result.message : 'MARKET_UNCONFIRMED'
+      return Response.json({ ok: false, error }, { status: error === 'MARKET_UNCONFIRMED' ? 503 : 409 })
     }
 
     return Response.json(await res.json())
   } catch (err) {
     console.error('[adjust-market] Error:', err)
-    return Response.json({ ok: false, error: 'INTERNAL_ERROR' }, { status: 500 })
+    return Response.json({ ok: false, error: 'MARKET_UNCONFIRMED' }, { status: 503 })
   }
 }
