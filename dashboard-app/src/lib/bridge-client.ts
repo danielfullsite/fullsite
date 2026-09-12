@@ -224,7 +224,7 @@ export function useBridgeClient(
     return () => { clearInterval(timer); window.removeEventListener('storage', refresh) }
   }, [])
   const onDeltaRef = useRef(onDelta)
-  onDeltaRef.current = onDelta
+  useEffect(() => { onDeltaRef.current = onDelta }, [onDelta])
 
   useEffect(() => {
     if (typeof window === 'undefined') return

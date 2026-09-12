@@ -30,7 +30,7 @@
 // una entrada real. Por eso la clave se renueva en cuanto una operación se confirma:
 // vive exactamente lo que dura un intento y sus reintentos, ni más ni menos.
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useState } from 'react'
 
 /** Un identificador de operación. Aleatorio, no derivado del reloj. */
 function nuevaClave(): string {
@@ -56,11 +56,9 @@ export interface ClaveDeOperacion {
  */
 export function useClaveDeOperacion(): ClaveDeOperacion {
   const [clave, setClave] = useState(nuevaClave)
-  // `useRef` para que `confirmar` no cambie de identidad entre renders y pueda ir en las
-  // dependencias de un `useCallback` sin rehacerlo en cada vuelta.
-  const setter = useRef(setClave)
-  setter.current = setClave
-  const confirmar = useCallback(() => { setter.current(nuevaClave()) }, [])
+  // El setter de useState ya tiene identidad estable; el ref intermedio sólo
+  // introducía una escritura durante render sin aportar estabilidad adicional.
+  const confirmar = useCallback(() => { setClave(nuevaClave()) }, [])
   return { clave, confirmar }
 }
 
