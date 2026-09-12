@@ -12,6 +12,7 @@
 import { uberFetch } from './oauth'
 import { withRetry } from '../retry'
 import { auditLog } from '../audit-logger'
+import { normalizeStoreOpen, rawStoreStatus } from './store-status'
 
 export async function listDeliveryStores(
   correlationId: string,
@@ -76,9 +77,10 @@ export async function getDeliveryStoreStatus(
       return { ok: false, error: err }
     }
     const data = (await r.json()) as { is_open?: boolean; status?: string; store_status?: string }
-    const isOpen = data.is_open !== undefined ? data.is_open : (data.store_status ?? data.status) === 'ACTIVE'
-    const statusStr = data.store_status ?? data.status
+    const isOpen = normalizeStoreOpen(data)
+    const statusStr = rawStoreStatus(data)
     await auditLog({ provider: 'ubereats', correlation_id: correlationId, action: 'delivery.store.get_status', request: { store_id: storeId }, response: { is_open: isOpen, status: statusStr }, status_code: r.status, duration_ms: Date.now() - t0 })
+    if (isOpen === null) return { ok: false, status: statusStr, error: 'UNKNOWN_STORE_STATUS' }
     return { ok: true, is_open: isOpen, status: statusStr }
   } catch (e) {
     return { ok: false, error: String(e) }

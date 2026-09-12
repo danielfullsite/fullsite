@@ -19,6 +19,7 @@ import { getPosData } from '@/lib/integrations/uber-eats/provisioning'
 import { getOrderAdapterForPayload, getOrderAdapter } from '@/lib/integrations/uber-eats/adapter-factory'
 import { uploadMenu, type UberMenuUpload } from '@/lib/integrations/uber-eats/menu'
 import { auditLog } from '@/lib/integrations/audit-logger'
+import { normalizeStoreOpen, rawStoreStatus } from '@/lib/integrations/uber-eats/store-status'
 
 const SB_URL = () => process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SB_KEY = () => process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -149,6 +150,7 @@ interface WebhookEventRow {
   id: string
   status: string
   correlation_id: string
+  attempts?: number
 }
 
 async function upsertWebhookEvent(
@@ -187,14 +189,29 @@ async function upsertWebhookEvent(
 
   // Row already exists — fetch it to return correlation_id
   const existing = await fetch(
-    `${SB_URL()}/rest/v1/integration_webhook_events?provider=eq.ubereats&provider_event_id=eq.${encodeURIComponent(providerEventId)}&select=id,status,correlation_id&limit=1`,
+    `${SB_URL()}/rest/v1/integration_webhook_events?provider=eq.ubereats&provider_event_id=eq.${encodeURIComponent(providerEventId)}&select=id,status,correlation_id,attempts&limit=1`,
     { headers: sbHeaders() }
   )
   const existingRows = existing.ok ? (await existing.json()) as WebhookEventRow[] : []
-  return {
-    row: existingRows[0] ?? { id: '', status: 'processed', correlation_id: correlationId },
-    isDuplicate: true,
+  const row = existingRows[0]
+  if (!row || row.status === 'processed' || row.status === 'processing') {
+    return { row: row ?? { id: '', status: 'processed', correlation_id: correlationId }, isDuplicate: true }
   }
+
+  // `failed`/`received` no son resultados. El reintento reclama la fila con CAS;
+  // sólo uno continúa y los demás reciben duplicate/busy.
+  const claimed = await fetch(
+    `${SB_URL()}/rest/v1/integration_webhook_events?id=eq.${encodeURIComponent(row.id)}&status=eq.${encodeURIComponent(row.status)}`,
+    {
+      method: 'PATCH',
+      headers: { ...sbHeaders(), Prefer: 'return=representation' },
+      body: JSON.stringify({ status: 'processing', attempts: Number(row.attempts || 0) + 1, last_error: null }),
+    },
+  )
+  const claimedRows = claimed.ok ? await claimed.json().catch(() => []) as WebhookEventRow[] : []
+  return claimedRows[0]
+    ? { row: claimedRows[0], isDuplicate: false }
+    : { row, isDuplicate: true }
 }
 
 async function markEventProcessed(eventId: string, error?: string): Promise<void> {
@@ -314,6 +331,18 @@ export async function POST(request: NextRequest) {
     return new NextResponse(null, { status: 400 })
   }
 
+  await processVerifiedUberPayload(body)
+  return new NextResponse(null, { status: 200 })
+}
+
+/**
+ * Procesa un payload que ya cruzó una frontera confiable: firma Uber verificada
+ * o fila de DLQ reclamada por el endpoint administrativo. No acepta requests.
+ */
+export async function processVerifiedUberPayload(
+  body: Record<string, unknown>,
+  options: { skipDlqOnError?: boolean } = {},
+): Promise<{ ok: boolean; error?: string }> {
   const meta = (body.meta ?? {}) as Record<string, unknown>
   const resource = (meta.resource ?? {}) as Record<string, unknown>
   const store = (resource.store ?? {}) as Record<string, unknown>
@@ -332,8 +361,10 @@ export async function POST(request: NextRequest) {
   const clientId = await resolveClientId(storeId)
   if (!clientId) {
     const quarantineCorrelationId = crypto.randomUUID()
-    await quarantineUnmappedStore(storeId, providerEventId, eventType, body, quarantineCorrelationId)
-    return new NextResponse(null, { status: 200 })
+    if (!options.skipDlqOnError) {
+      await quarantineUnmappedStore(storeId, providerEventId, eventType, body, quarantineCorrelationId)
+    }
+    return { ok: false, error: 'UNMAPPED_STORE' }
   }
 
   // Step 4 — Dedup
@@ -343,7 +374,9 @@ export async function POST(request: NextRequest) {
 
   if (isDuplicate) {
     console.log(`[uber-webhook-v2] Duplicate event ${providerEventId} — ack without processing`)
-    return new NextResponse(null, { status: 200 })
+    return eventRow.status === 'processed'
+      ? { ok: true }
+      : { ok: false, error: 'EVENT_BUSY' }
   }
 
   const correlationId = eventRow.correlation_id
@@ -400,11 +433,12 @@ export async function POST(request: NextRequest) {
     const errMsg = String(e)
     console.error(`[uber-webhook-v2] Processing error correlation=${correlationId}:`, e)
     await markEventProcessed(eventRow.id, errMsg)
-    await sendToDLQ(eventRow.id, eventType, clientId, body, errMsg)
+    if (!options.skipDlqOnError) await sendToDLQ(eventRow.id, eventType, clientId, body, errMsg)
     await auditLog({ provider: 'ubereats', client_id: clientId, correlation_id: correlationId, action: 'webhook.processing_error', response: { error: errMsg } })
+    return { ok: false, error: errMsg }
   }
 
-  return new NextResponse(null, { status: 200 })
+  return { ok: true }
 }
 
 // ─── Event handlers ───────────────────────────────────────────────────────────
@@ -701,9 +735,9 @@ async function handleStoreStatus(
   eventId: string,
   correlationId: string
 ): Promise<void> {
-  const p = payload as { store_status?: string; is_open?: boolean }
-  const isOpen = p.store_status === 'ACTIVE' || p.is_open === true
-  if (storeId) {
+  const p = payload as { store_status?: string; status?: string; is_open?: boolean }
+  const isOpen = normalizeStoreOpen(p)
+  if (storeId && isOpen !== null) {
     await fetch(
       `${SB_URL()}/rest/v1/integration_store_mappings?provider=eq.ubereats&provider_store_id=eq.${encodeURIComponent(storeId)}`,
       {
@@ -713,7 +747,11 @@ async function handleStoreStatus(
       }
     ).catch(() => {})
   }
-  await auditLog({ provider: 'ubereats', correlation_id: correlationId, action: 'store.status_update', request: { store_id: storeId, is_open: isOpen } })
+  await auditLog({
+    provider: 'ubereats', correlation_id: correlationId, action: 'store.status_update',
+    request: { store_id: storeId, is_open: isOpen, raw_status: rawStoreStatus(p) },
+    response: isOpen === null ? { ignored: true, reason: 'UNKNOWN_STORE_STATUS' } : { updated: Boolean(storeId) },
+  })
   await markEventProcessed(eventId)
 }
 

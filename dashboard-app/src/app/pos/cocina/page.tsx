@@ -15,9 +15,9 @@ import {
 import { isBebida, POLL_INTERVAL_KITCHEN, getStationByName, type StationName } from '@/lib/pos-constants'
 import { useVisibleInterval } from '@/lib/use-visible-interval'
 import { reprintByStation, type ReprintOrderContext } from '@/lib/printer'
-import { getActiveClientSlug as _cid } from '@/lib/data'
 import { useBridgeClient, setPosServerHost } from '@/lib/bridge-client'
 import { PIN_LENGTH } from '@/lib/staff-pin'
+import { getActiveClientSlug as _cid } from '@/lib/data'
 
 
 function getElapsedMinutes(dateStr: string): number {
@@ -180,11 +180,10 @@ export default function CocinaPage() {
 
     // Also fetch delivery orders (nueva/preparando)
     try {
-      const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-      const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      const kitchenToken = localStorage.getItem('pos_kitchen_token')
       const delRes = await fetch(
-        `${sbUrl}/rest/v1/delivery_orders?select=*&status=in.(nueva,aceptada,preparando)&client_id=eq.${_cid()}&order=created_at.desc`,
-        { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` } }
+        `/api/pos/delivery-orders?client_id=${encodeURIComponent(_cid())}&status=nueva,aceptada,preparando`,
+        { headers: { ...getPOSAuthHeaders(), ...(kitchenToken ? { 'x-kitchen-token': kitchenToken } : {}) }, cache: 'no-store' }
       )
       if (delRes.ok) {
         const deliveryOrders = await delRes.json()
