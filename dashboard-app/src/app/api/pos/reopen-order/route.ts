@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { withPOSAuth, unauthorized } from '@/lib/api-auth'
-import { verifyManagerApproval, apruebaSospechosa } from '@/lib/manager-approval'
+import { verifyManagerApproval } from '@/lib/manager-approval'
 
 /**
  * Reabrir una cuenta PAGADA/cerrada (status → enviada, closed_at → null).
@@ -17,9 +17,9 @@ export async function POST(request: NextRequest) {
   const clientId = auth.clientId
 
   const body = await request.json().catch(() => ({}))
-  const { order_id, manager, approval_token } = body
-  if (!order_id || typeof order_id !== 'string') {
-    return Response.json({ ok: false, error: 'MISSING_ORDER_ID' }, { status: 400 })
+  const { order_id, operation_id, approval_token } = body
+  if (typeof order_id !== 'string' || !order_id || order_id.length > 200) {
+    return Response.json({ ok: false, error: 'INVALID_REQUEST' }, { status: 400 })
   }
 
   const appr = await verifyManagerApproval({
@@ -29,39 +29,32 @@ export async function POST(request: NextRequest) {
     solicitanteRol: auth.role,
   })
   if (!appr.ok) return Response.json({ ok: false, error: 'MANAGER_APPROVAL_REQUIRED' }, { status: 403 })
+  if (typeof operation_id !== 'string' || !operation_id || operation_id.length > 200) {
+    return Response.json({ ok: false, error: 'INVALID_REQUEST' }, { status: 400 })
+  }
 
   const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
   const sbKey = process.env.SUPABASE_SERVICE_KEY
   if (!sbKey) return Response.json({ ok: false, error: 'SERVER_CONFIG_ERROR' }, { status: 500 })
-  const H = { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json' }
-
-  const res = await fetch(
-    `${sbUrl}/rest/v1/pos_orders?id=eq.${encodeURIComponent(order_id)}&client_id=eq.${encodeURIComponent(clientId)}`,
-    { method: 'PATCH', headers: { ...H, Prefer: 'return=minimal' },
-      body: JSON.stringify({ status: 'enviada', closed_at: null, metodo_pago: null }) }
-  )
-  if (!res.ok) return Response.json({ ok: false, error: `REOPEN_FAILED_${res.status}` }, { status: 502 })
-
-  // Auditoría (best-effort, registra el modo de aprobación para el agente anti-fraude)
-  fetch(`${sbUrl}/rest/v1/pos_audit_log`, {
-    method: 'POST', headers: { ...H, Prefer: 'return=minimal' },
-    body: JSON.stringify({
-      client_id: clientId, order_id, action: 'order_reopened',
-      // EL ACTOR SALE DEL TOKEN, NO DEL CUERPO. Antes era
-      // `(typeof manager === 'string' && manager) || auth.staffName`, o sea que quien
-      // reabría la cuenta escribía el nombre que quisiera: el robo quedaba firmado con
-      // el nombre del gerente y la bitácora acusaba a un inocente.
-      actor: auth.staffName || auth.staffId || 'POS',
-      details: {
-        approval_mode: appr.mode,
-        solicitante_rol: auth.role,
-        // Lo que el cliente AFIRMÓ. Se conserva porque en el camino offline es el único
-        // dato de quién autorizó — pero se guarda como afirmación, no como hecho.
-        manager_declarado: typeof manager === 'string' ? manager : null,
-        revisar: apruebaSospechosa(appr),
-      },
-    }),
-  }).catch(() => {})
-
-  return Response.json({ ok: true })
+  const approver = appr.approverId || auth.staffId
+  if (!approver) return Response.json({ ok: false, error: 'APPROVER_ID_REQUIRED' }, { status: 403 })
+  try {
+    const res = await fetch(`${sbUrl}/rest/v1/rpc/r1_reopen_order_atomic`, {
+      method: 'POST',
+      headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_client_id: clientId, p_order_id: order_id,
+        p_operation_id: operation_id, p_actor: approver, p_approval_mode: appr.mode }),
+      redirect: 'error', signal: AbortSignal.timeout(15000),
+    })
+    const result = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      const known = ['ORDER_NOT_FOUND', 'ORDER_NOT_CLOSED', 'ACTIVE_TABLE_CONFLICT', 'OPERATION_ID_REUSED']
+      const error = known.includes(result.message) ? result.message : 'REOPEN_UNCONFIRMED'
+      return Response.json({ ok: false, error }, { status: error === 'REOPEN_UNCONFIRMED' ? 503 : 409 })
+    }
+    if (result?.ok !== true || !Number.isSafeInteger(result.revision)) throw new Error('INVALID_RECEIPT')
+    return Response.json(result, { headers: { 'Cache-Control': 'no-store' } })
+  } catch {
+    return Response.json({ ok: false, error: 'REOPEN_UNCONFIRMED' }, { status: 503 })
+  }
 }

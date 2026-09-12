@@ -4,7 +4,7 @@ import { join } from 'node:path'
 
 vi.mock('@/lib/shift-token', () => ({
   verifyShiftToken: vi.fn(async (token: string) => token === 'GERENTE_OK'
-    ? { cid: 'amalay', rol: 'gerente' }
+    ? { cid: 'amalay', rol: 'gerente', sub: 'gerente-id', nam: 'Gerente Real' }
     : token === 'OTRO_TENANT' ? { cid: 'otro', rol: 'gerente' }
       : token === 'MESERO' ? { cid: 'amalay', rol: 'mesero' } : null),
 }))
@@ -39,6 +39,7 @@ describe('offline_approved no es una autorización', () => {
       solicitanteRol: 'mesero',
     })
     expect(result).toMatchObject({ ok: true, mode: 'online:gerente' })
+    expect(result).toMatchObject({ approverId: 'gerente-id', approverName: 'Gerente Real' })
     expect(apruebaSospechosa(result)).toBe(false)
   })
 
@@ -66,13 +67,13 @@ describe('la bitácora no la dicta el cliente', () => {
     readFileSync(join(__dirname, '..', 'app', 'api', 'pos', route, 'route.ts'), 'utf8')
       .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
 
-  it('reopen-order y cancel-item toman actor y rol del token de sesión', () => {
-    for (const route of ['reopen-order', 'cancel-item']) {
-      const source = lee(route)
-      expect(source, route).toMatch(/actor: auth\.staffName/)
-      expect(source, route).toMatch(/solicitante_rol: auth\.role/)
-      expect(source, route).toMatch(/manager_declarado/)
-    }
+  it('reopen-order usa el aprobador firmado y cancel-item al solicitante firmado', () => {
+    const reopen = lee('reopen-order')
+    expect(reopen).toMatch(/appr\.approverId \|\| auth\.staffId/)
+    expect(reopen).not.toContain('manager_declarado')
+    const cancel = lee('cancel-item')
+    expect(cancel).toMatch(/actor: auth\.staffName/)
+    expect(cancel).toMatch(/solicitante_rol: auth\.role/)
   })
 
   it('ninguna ruta usa offline_approved para conceder acceso', () => {
