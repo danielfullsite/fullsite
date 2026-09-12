@@ -1,10 +1,15 @@
 // Mercado Pago Point — full integration via /api/mp-point proxy
 // Supports Point Smart (full API) and Point Mini (basic only)
 
+function posAuthHeaders(): Record<string, string> {
+  if (typeof window === 'undefined') return {}
+  const token = localStorage.getItem('pos_shift_token')
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
 export type DeviceModel = 'SMART' | 'MINI' | 'UNKNOWN'
 
 export interface MPConfig {
-  accessToken: string
   deviceId: string
   deviceModel: DeviceModel
 }
@@ -46,14 +51,23 @@ export function getMPConfig(): MPConfig | null {
   if (typeof window === 'undefined') return null
   const config = localStorage.getItem('mp_point_config')
   if (!config) return null
-  const parsed = JSON.parse(config)
+  const parsed = JSON.parse(config) as Record<string, unknown>
+  // Migración de seguridad: versiones anteriores persistían el bearer de la
+  // cuenta completa en una tablet compartida. Nunca se vuelve a exponer.
+  delete parsed.accessToken
+  localStorage.removeItem('mp_access_token')
   // Migration: add deviceModel if missing
   if (!parsed.deviceModel) parsed.deviceModel = 'UNKNOWN'
-  return parsed
+  const safe = { deviceId: String(parsed.deviceId || ''), deviceModel: parsed.deviceModel as DeviceModel }
+  if (!safe.deviceId) return null
+  localStorage.setItem('mp_point_config', JSON.stringify(safe))
+  return safe
 }
 
 export function saveMPConfig(config: MPConfig) {
-  localStorage.setItem('mp_point_config', JSON.stringify(config))
+  localStorage.removeItem('mp_access_token')
+  localStorage.removeItem('mp_device_id')
+  localStorage.setItem('mp_point_config', JSON.stringify({ deviceId: config.deviceId, deviceModel: config.deviceModel }))
 }
 
 export function clearMPConfig() {
@@ -74,12 +88,12 @@ export function detectDeviceModel(device: MPDevice): DeviceModel {
   return 'UNKNOWN'
 }
 
-export async function fetchMPDevices(accessToken: string): Promise<{ success: boolean; devices?: MPDevice[]; error?: string }> {
+export async function fetchMPDevices(): Promise<{ success: boolean; devices?: MPDevice[]; error?: string }> {
   try {
     const res = await fetch('/api/mp-point', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'devices', accessToken }),
+      headers: { 'Content-Type': 'application/json', ...posAuthHeaders() },
+      body: JSON.stringify({ action: 'devices' }),
     })
     if (res.ok) {
       const data = await res.json()
@@ -103,10 +117,9 @@ export async function sendPaymentToPoint(
   try {
     const res = await fetch('/api/mp-point', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...posAuthHeaders() },
       body: JSON.stringify({
         action: 'payment',
-        accessToken: config.accessToken,
         deviceId: config.deviceId,
         amount,
         orderId,
@@ -144,10 +157,9 @@ export async function refundPayment(
   try {
     const res = await fetch('/api/mp-point', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...posAuthHeaders() },
       body: JSON.stringify({
         action: 'refund',
-        accessToken: config.accessToken,
         paymentId,
         amount,
       }),
@@ -171,10 +183,9 @@ export async function getDeviceStatus(): Promise<DeviceStatus | null> {
   try {
     const res = await fetch('/api/mp-point', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...posAuthHeaders() },
       body: JSON.stringify({
         action: 'device-status',
-        accessToken: config.accessToken,
         deviceId: config.deviceId,
       }),
     })
@@ -196,10 +207,9 @@ export async function changeOperatingMode(
   try {
     const res = await fetch('/api/mp-point', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...posAuthHeaders() },
       body: JSON.stringify({
         action: 'change-mode',
-        accessToken: config.accessToken,
         deviceId: config.deviceId,
         mode,
       }),
@@ -221,10 +231,9 @@ export async function checkPaymentStatus(
   try {
     const res = await fetch('/api/mp-point', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...posAuthHeaders() },
       body: JSON.stringify({
         action: 'status',
-        accessToken: config.accessToken,
         paymentIntentId,
       }),
     })
@@ -259,10 +268,9 @@ export async function cancelPaymentIntent(): Promise<{ success: boolean; error?:
   try {
     const res = await fetch('/api/mp-point', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...posAuthHeaders() },
       body: JSON.stringify({
         action: 'cancel',
-        accessToken: config.accessToken,
         deviceId: config.deviceId,
       }),
     })

@@ -2121,7 +2121,6 @@ function POSContent() {
   // Mercado Pago Point
   const [mpConfig, setMpConfig] = useState<MPConfig | null>(null)
   const [showMPConfig, setShowMPConfig] = useState(false)
-  const [mpAccessToken, setMpAccessToken] = useState('')
   const [mpDeviceId, setMpDeviceId] = useState('')
   const [mpDevices, setMpDevices] = useState<MPDevice[]>([])
   const [mpLoadingDevices, setMpLoadingDevices] = useState(false)
@@ -4438,7 +4437,7 @@ function POSContent() {
             <button
               onClick={() => {
                 const cfg = getMPConfig()
-                if (cfg) { setMpAccessToken(cfg.accessToken); setMpDeviceId(cfg.deviceId) }
+                if (cfg) setMpDeviceId(cfg.deviceId)
                 setShowMPConfig(true)
               }}
               className={`hidden sm:flex flex-shrink-0 items-center gap-1 px-2 lg:px-3 py-1 rounded-full text-sm font-bold min-h-[44px] ${
@@ -6241,16 +6240,9 @@ function POSContent() {
             </div>
 
             <div className="space-y-4">
-              <div>
-                <label className="text-[var(--text-3)] text-xs mb-1 block">Access Token</label>
-                <input
-                  type="password"
-                  value={mpAccessToken}
-                  onChange={e => setMpAccessToken(e.target.value)}
-                  placeholder="APP_USR-..."
-                  className="w-full border border-[var(--line)] rounded-lg px-4 py-3 text-[var(--text-1)] text-sm focus:outline-none focus:border-cyan-500" style={{background:'var(--surface-2)'}}
-                />
-              </div>
+              <p className="rounded-lg bg-cyan-950/40 px-3 py-2 text-xs text-cyan-200">
+                La credencial de Mercado Pago se configura en el servidor; esta terminal sólo conserva su Device ID.
+              </p>
 
               <div>
                 <label className="text-[var(--text-3)] text-xs mb-1 block">Device ID</label>
@@ -6264,9 +6256,8 @@ function POSContent() {
                   />
                   <button
                     onClick={async () => {
-                      if (!mpAccessToken) { showToast('Ingresa el Access Token primero'); return }
                       setMpLoadingDevices(true)
-                      const result = await fetchMPDevices(mpAccessToken)
+                      const result = await fetchMPDevices()
                       if (result.success && result.devices) {
                         setMpDevices(result.devices)
                         if (result.devices.length === 0) showToast('No se encontraron dispositivos')
@@ -6275,7 +6266,7 @@ function POSContent() {
                       }
                       setMpLoadingDevices(false)
                     }}
-                    disabled={mpLoadingDevices || !mpAccessToken}
+                    disabled={mpLoadingDevices}
                     className="px-3 py-3 rounded-lg bg-cyan-600 hover:bg-cyan-500 disabled:bg-[var(--line)] text-white text-xs font-medium transition-colors whitespace-nowrap"
                   >
                     {mpLoadingDevices ? <Loader2 size={16} className="animate-spin" /> : 'Buscar'}
@@ -6309,7 +6300,6 @@ function POSContent() {
                     onClick={() => {
                       clearMPConfig()
                       setMpConfig(null)
-                      setMpAccessToken('')
                       setMpDeviceId('')
                       setShowMPConfig(false)
                       showToast('Point desconfigurado')
@@ -6321,14 +6311,14 @@ function POSContent() {
                 )}
                 <button
                   onClick={() => {
-                    if (!mpAccessToken || !mpDeviceId) { showToast('Completa ambos campos'); return }
-                    const cfg: MPConfig = { accessToken: mpAccessToken, deviceId: mpDeviceId, deviceModel: 'MINI' }
+                    if (!mpDeviceId) { showToast('Ingresa el Device ID'); return }
+                    const cfg: MPConfig = { deviceId: mpDeviceId, deviceModel: 'MINI' }
                     saveMPConfig(cfg)
                     setMpConfig(cfg)
                     setShowMPConfig(false)
                     showToast('Point configurado')
                   }}
-                  disabled={!mpAccessToken || !mpDeviceId}
+                  disabled={!mpDeviceId}
                   className="flex-[2] py-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 disabled:bg-[var(--line)] disabled:text-[var(--text-3)] text-white font-semibold text-sm transition-colors"
                 >
                   Guardar
@@ -6504,19 +6494,17 @@ function POSContent() {
               <button
                 onClick={async () => {
                   // Try MP Point Smart first
-                  const mpToken = localStorage.getItem('mp_access_token')
-                  const mpDevice = localStorage.getItem('mp_device_id')
-                  if (mpToken && mpDevice) {
+                  const point = getMPConfig()
+                  if (point?.deviceId) {
                     showToast('Enviando cobro a terminal...')
                     setSaving(true)
                     try {
                       const res = await fetch(apiUrl('/api/mp-point'), {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 'Content-Type': 'application/json', ...getPOSAuthHeaders() },
                         body: JSON.stringify({
                           action: 'payment',
-                          accessToken: mpToken,
-                          deviceId: mpDevice,
+                          deviceId: point.deviceId,
                           amount: payTotal + propina,
                           orderId: orderId,
                         }),
@@ -6531,8 +6519,8 @@ function POSContent() {
                           try {
                             const statusRes = await fetch(apiUrl('/api/mp-point'), {
                               method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ action: 'status', accessToken: mpToken, paymentIntentId: intentId }),
+                              headers: { 'Content-Type': 'application/json', ...getPOSAuthHeaders() },
+                              body: JSON.stringify({ action: 'status', paymentIntentId: intentId }),
                             })
                             const statusData = await statusRes.json()
                             if (statusData.state === 'FINISHED') {
