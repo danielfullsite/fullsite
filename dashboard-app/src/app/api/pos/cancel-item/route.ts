@@ -4,8 +4,7 @@ import { verifyShiftToken } from '@/lib/shift-token'
 import { prepararCancelacionItem } from '@/lib/cancelacion-item'
 import { reconciliarInventarioConfirmado } from '@/lib/inventory-reconcile-server'
 
-// Nivel de rol por nombre (gerente/admin = manager+). Debe coincidir con pin/route.ts.
-const ROLE_LVL: Record<string, number> = { mesero: 1, cajero: 2, capitan: 3, gerente: 4, admin: 5 }
+const ROLE_LVL: Record<string, number> = { mesero: 1, cajero: 2, capitan: 3, gerente: 4, admin: 5, 'dueño': 6 }
 
 /**
  * Atomic item cancel within an order.
@@ -20,14 +19,6 @@ const ROLE_LVL: Record<string, number> = { mesero: 1, cajero: 2, capitan: 3, ger
  */
 
 export async function POST(request: NextRequest) {
-  const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const sbKey = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  const headers = {
-    apikey: sbKey,
-    Authorization: `Bearer ${sbKey}`,
-    'Content-Type': 'application/json',
-  }
-
   try {
     const auth = await withPOSAuth(request)
     if (!auth) return unauthorized()
@@ -60,10 +51,14 @@ export async function POST(request: NextRequest) {
       if (requesterLevel >= 4) approvalMode = `session_role:${auth.role}`
       else return Response.json({ ok: false, error: 'MANAGER_APPROVAL_REQUIRED' }, { status: 403 })
     }
+    const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const sbKey = process.env.SUPABASE_SERVICE_KEY
+    if (!sbKey) return Response.json({ ok: false, error: 'CANCEL_UNAVAILABLE' }, { status: 503 })
+    const headers = { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json' }
 
     // ── Step 1: Read order with current updated_at ──
     const readRes = await fetch(
-      `${sbUrl}/rest/v1/pos_orders?id=eq.${order_id}&client_id=eq.${clientId}&select=*&limit=1`,
+      `${sbUrl}/rest/v1/pos_orders?id=eq.${encodeURIComponent(order_id)}&client_id=eq.${encodeURIComponent(clientId)}&select=*&limit=1`,
       { headers, cache: 'no-store' }
     )
     if (!readRes.ok) return Response.json({ ok: false, error: 'READ_FAILED' }, { status: 502 })
@@ -85,7 +80,7 @@ export async function POST(request: NextRequest) {
 
     // ── Step 3: PATCH with OCC guard ──
     const patchRes = await fetch(
-      `${sbUrl}/rest/v1/pos_orders?id=eq.${order_id}&updated_at=eq.${encodeURIComponent(updatedAt)}`,
+      `${sbUrl}/rest/v1/pos_orders?id=eq.${encodeURIComponent(order_id)}&client_id=eq.${encodeURIComponent(clientId)}&updated_at=eq.${encodeURIComponent(updatedAt)}`,
       {
         method: 'PATCH',
         headers: { ...headers, Prefer: 'return=representation' },

@@ -104,7 +104,7 @@ describe('una cancelacion es una revision de la orden', () => {
   })
 
   it('el PATCH sigue protegido por updated_at', () => {
-    expect(rutaLimpia).toMatch(/pos_orders\?id=eq\.\$\{order_id\}&updated_at=eq\./)
+    expect(rutaLimpia).toMatch(/pos_orders\?id=eq\.\$\{encodeURIComponent\(order_id\)\}&client_id=eq\.\$\{encodeURIComponent\(clientId\)\}&updated_at=eq\./)
   })
 
   it('cero filas sigue siendo conflicto, no exito', () => {
