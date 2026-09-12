@@ -31,7 +31,7 @@
     "mercadopago": "^3.1.0",
     "next": "16.3.5",
     "playwright": "^1.60.0",
-    "posthog-js": "^1.375.0",
+    "posthog-js": "^1.379.1",
     "qrcode": "^1.5.4",
     "react": "19.2.4",
     "react-dom": "19.2.4",
