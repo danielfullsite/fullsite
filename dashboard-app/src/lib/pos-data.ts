@@ -2035,7 +2035,9 @@ export async function logAudit(event: AuditEvent): Promise<boolean> {
     action: event.action,
     actor: typeof event.actor === 'string' && event.actor.trim() ? event.actor.trim() : 'POS Offline',
     mesa: event.mesa ?? null,
-    details: event.details ? JSON.stringify(event.details) : null,
+    // `details` es jsonb y el cuerpo se serializa completo más abajo. Mandar aquí
+    // otra cadena JSON crea un escalar string que `details->>'campo'` no consulta.
+    details: event.details ?? null,
     reason: event.reason || null,
     approved_by: event.approved_by || null,
   }
@@ -2074,10 +2076,32 @@ export interface AuditLogEntry {
   action: string
   actor: string
   mesa: number | null
-  details: string | null
+  // Las filas nuevas son objetos; se conserva string para el historial anterior.
+  details: string | Record<string, unknown> | null
   reason: string | null
   approved_by: string | null
   created_at: string
+}
+
+export function parseAuditDetails(
+  details: AuditLogEntry['details'],
+): Record<string, unknown> | null {
+  if (!details) return null
+  if (typeof details !== 'string') return details
+  try {
+    const parsed: unknown = JSON.parse(details)
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : null
+  } catch {
+    return null
+  }
+}
+
+export function auditDetailsText(details: AuditLogEntry['details']): string {
+  if (!details) return ''
+  if (typeof details === 'string') return details
+  try { return JSON.stringify(details) } catch { return '' }
 }
 
 export async function getAuditLog(limit = 100, offset = 0): Promise<AuditLogEntry[]> {
