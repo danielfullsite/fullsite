@@ -3,7 +3,7 @@ import { NextRequest } from 'next/server'
 
 const processRappiOrder = vi.fn()
 vi.mock('@/lib/integrations/rappi/ingest', () => ({ processRappiOrder }))
-vi.mock('@/lib/integrations/uber-eats/webhook/route', () => ({ processVerifiedUberPayload: vi.fn() }))
+vi.mock('@/lib/integrations/uber-eats/webhook-handler', () => ({ processVerifiedUberPayload: vi.fn() }))
 
 const row = {
   id: '11111111-1111-4111-8111-111111111111', provider: 'rappi', event_type: 'order.webhook',
