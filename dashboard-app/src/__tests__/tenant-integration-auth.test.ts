@@ -17,7 +17,7 @@ const state = vi.hoisted(() => ({
     cancelOrder: vi.fn(async () => ({ ok: true })),
     markOrderReady: vi.fn(async () => ({ ok: true })),
   },
-  rappiAction: vi.fn(async () => ({ ok: true })),
+  rappiAction: vi.fn(async (..._args: unknown[]) => ({ ok: true })),
 }))
 
 vi.mock('@/lib/api-auth', () => ({
@@ -117,7 +117,7 @@ describe('autorización de integraciones por tenant y rol', () => {
 
   it('reconcile siempre consulta y audita el tenant autenticado aunque el body lo omita', async () => {
     auth('admin', 'tenant-a')
-    const fetchMock = vi.fn(async () => Response.json([]))
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => Response.json([]))
     vi.stubGlobal('fetch', fetchMock)
     const { POST } = await import('@/app/api/integrations/uber-eats/reconcile/route')
 
