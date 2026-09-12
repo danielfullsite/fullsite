@@ -243,12 +243,15 @@ class CommandHandler {
     // El KDS legacy sólo cambia el avance culinario de una cuenta ya existente.
     // No modifica productos, importes, identidad ni mesa, por lo que no compite
     // con el editor del mesero y debe poder avanzar mientras éste conserva el lock.
-    const preparationOnly = !!operationalOrder && operationalOrder._kds_sent === true &&
+    const preparationShape = !!operationalOrder && operationalOrder._kds_sent === true &&
       Object.keys(cmdPayload).every(key =>
       ['command_id', 'command_type', 'restaurant_id', 'location_id', 'client_id', 'order_id', 'mesa', 'status'].includes(key)) &&
       (cmdPayload.mesa === undefined || String(cmdPayload.mesa) === String(operationalOrder.mesa)) &&
-      Number.isInteger(targetPreparationRank) && Number.isInteger(currentPreparationRank) &&
-      targetPreparationRank >= currentPreparationRank
+      Number.isInteger(targetPreparationRank) && Number.isInteger(currentPreparationRank)
+    if (commandType === 'ORDER_UPSERTED' && preparationShape && targetPreparationRank < currentPreparationRank) {
+      throw new OperationalError('PREPARATION_REGRESSION', 'El estado de cocina no puede retroceder')
+    }
+    const preparationOnly = preparationShape && targetPreparationRank >= currentPreparationRank
     if (MESA_COORDINATED_COMMANDS.has(commandType) && !(commandType === 'ORDER_UPSERTED' && preparationOnly)) {
       const mesas = new Set([
         cmdPayload.mesa,

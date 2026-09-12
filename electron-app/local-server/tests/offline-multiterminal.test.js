@@ -118,15 +118,23 @@ describe('Multi-terminal simulado — estado compartido en LAN', () => {
     assert.equal(srv.serverState.getOrder('o7').total, original.total)
     assert.equal(srv.serverState.getOrder('o7').mesa, original.mesa)
 
-    for (const [command_id, mesa, status] of [
-      ['kds-regression', '7', 'enviada'],
-      ['kds-wrong-table', '8', 'entregada'],
-    ]) {
-      const rejected = await send(srv.cmd, 'term-kds', {
-        command_type: 'ORDER_UPSERTED', command_id, order_id: 'o7', mesa, status,
-      })
-      assert.equal(rejected.code, 'MESA_LOCK_CONFLICT')
-    }
+    const delivered = await send(srv.cmd, 'term-kds', {
+      command_type: 'ORDER_UPSERTED', command_id: 'kds-delivered', order_id: 'o7', mesa: '7', status: 'entregada',
+    })
+    assert.ok(!delivered.error)
+    await send(srv.cmd, 'term-A', { command_type: 'MESA_UNLOCK', command_id: 'unlock-7', mesa: '7' })
+    const regression = await send(srv.cmd, 'term-kds', {
+      command_type: 'ORDER_UPSERTED', command_id: 'kds-regression', order_id: 'o7', mesa: '7', status: 'lista',
+    })
+    assert.equal(regression.code, 'PREPARATION_REGRESSION')
+    assert.equal(srv.serverState.getOrder('o7').status, 'entregada')
+    assert.equal(srv.serverState.toSnapshot().kds_orders.length, 0, 'una regresión no revive la comanda')
+
+    await send(srv.cmd, 'term-A', { command_type: 'MESA_LOCK', command_id: 'relock-7', mesa: '7' })
+    const wrongTable = await send(srv.cmd, 'term-kds', {
+      command_type: 'ORDER_UPSERTED', command_id: 'kds-wrong-table', order_id: 'o7', mesa: '8', status: 'entregada',
+    })
+    assert.equal(wrongTable.code, 'MESA_LOCK_CONFLICT')
 
     const edit = await send(srv.cmd, 'term-B', {
       command_type: 'ORDER_UPSERTED', command_id: 'edit-7', order_id: 'o7', mesa: '7',
