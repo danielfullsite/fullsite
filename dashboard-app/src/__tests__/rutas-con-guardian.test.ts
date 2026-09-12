@@ -18,11 +18,13 @@
 // vive dentro de `handle`. Marcar esa ruta como abierta habría sido ruido, y el ruido
 // es cómo mueren estas pruebas.
 import { describe, it, expect } from 'vitest'
-import { readdirSync, readFileSync } from 'node:fs'
-import { join, relative } from 'node:path'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { dirname, join, relative, resolve } from 'node:path'
 import { GUARDIANES, RUTAS_PUBLICAS } from '@/lib/seguridad/guardianes-api'
 
 const RAIZ_API = join(process.cwd(), 'src', 'app', 'api')
+const RAIZ_SRC = join(process.cwd(), 'src')
+const METODO_HTTP = /^(GET|POST|PUT|PATCH|DELETE)$/
 
 /** Un handler HTTP exportado y el texto de su cuerpo. */
 interface Handler {
@@ -30,6 +32,7 @@ interface Handler {
   metodo: string // 'GET'
   llave: string  // 'GET /agents/events'
   cuerpo: string
+  archivo: string // implementación real; puede vivir fuera de route.ts por re-export
 }
 
 function archivosDeRuta(dir: string): string[] {
@@ -42,8 +45,82 @@ function archivosDeRuta(dir: string): string[] {
   return salida.sort()
 }
 
-const RE_HANDLER = /export\s+(?:async\s+)?(?:function\s+|const\s+)(GET|POST|PUT|PATCH|DELETE)\b/g
+const RE_HANDLER = /(?:^|\n)\s*export\s+(?:async\s+)?(?:function\s+|const\s+)(\w+)\b/g
+const RE_REEXPORT = /(?:^|\n)\s*export\s*\{([^}]+)\}\s*from\s*['"]([^'"]+)['"]/g
 const RE_AYUDANTE = /(?:^|\n)\s*(?:export\s+)?(?:async\s+)?(?:function\s+(\w+)|const\s+(\w+)\s*=\s*(?:async\s*)?\()/g
+
+interface DeclaracionExportada {
+  nombre: string
+  cuerpo: string
+}
+
+interface Reexport {
+  importado: string
+  exportado: string
+  modulo: string
+}
+
+function declaracionesExportadas(fuente: string): DeclaracionExportada[] {
+  const marcas = [...fuente.matchAll(RE_HANDLER)]
+  return marcas.map((marca, indice) => {
+    const inicio = marca.index ?? 0
+    const fin = indice + 1 < marcas.length ? marcas[indice + 1].index : fuente.length
+    return { nombre: marca[1], cuerpo: fuente.slice(inicio, fin) }
+  })
+}
+
+function reexports(fuente: string): Reexport[] {
+  const salida: Reexport[] = []
+  for (const marca of fuente.matchAll(RE_REEXPORT)) {
+    for (const entrada of marca[1].split(',')) {
+      const limpia = entrada.trim()
+      if (!limpia || limpia.startsWith('type ')) continue
+      const partes = limpia.split(/\s+as\s+/)
+      salida.push({
+        importado: partes[0],
+        exportado: partes[1] ?? partes[0],
+        modulo: marca[2],
+      })
+    }
+  }
+  return salida
+}
+
+function resolverModulo(desde: string, modulo: string): string {
+  const base = modulo.startsWith('@/')
+    ? join(RAIZ_SRC, modulo.slice(2))
+    : resolve(dirname(desde), modulo)
+  const candidatos = [`${base}.ts`, `${base}.tsx`, base, join(base, 'index.ts'), join(base, 'index.tsx')]
+  const encontrado = candidatos.find(candidato => existsSync(candidato) && statSync(candidato).isFile())
+  if (!encontrado) throw new Error(`No se pudo resolver el re-export ${modulo} desde ${desde}`)
+  return encontrado
+}
+
+/**
+ * Sigue un export HTTP hasta la declaración que realmente lo implementa. Fallar al
+ * resolver es intencional: ignorar un re-export dejaría una ruta fuera del barrido.
+ */
+function resolverHandlerExportado(
+  archivo: string,
+  nombre: string,
+  visitados = new Set<string>(),
+): { archivo: string; cuerpo: string } {
+  const llave = `${archivo}#${nombre}`
+  if (visitados.has(llave)) throw new Error(`Ciclo de re-exports al resolver ${llave}`)
+  visitados.add(llave)
+
+  const fuente = readFileSync(archivo, 'utf8')
+  const declaracion = declaracionesExportadas(fuente).find(item => item.nombre === nombre)
+  if (declaracion) return { archivo, cuerpo: declaracion.cuerpo }
+
+  const reexport = reexports(fuente).find(item => item.exportado === nombre)
+  if (!reexport) throw new Error(`El handler ${nombre} exportado por ${archivo} no tiene implementación resoluble`)
+  return resolverHandlerExportado(
+    resolverModulo(archivo, reexport.modulo),
+    reexport.importado,
+    visitados,
+  )
+}
 
 /**
  * Guardianes efectivos de un archivo: los registrados, más los ayudantes locales que
@@ -78,34 +155,51 @@ function recolectarHandlers(): Handler[] {
   for (const archivo of archivosDeRuta(RAIZ_API)) {
     const fuente = readFileSync(archivo, 'utf8')
     const ruta = '/' + relative(RAIZ_API, archivo).replace(/\/route\.ts$/, '').replace(/\\/g, '/')
-    const marcas = [...fuente.matchAll(RE_HANDLER)]
+    const metodos = new Set([
+      ...declaracionesExportadas(fuente).map(item => item.nombre),
+      ...reexports(fuente).map(item => item.exportado),
+    ].filter(nombre => METODO_HTTP.test(nombre)))
 
-    for (let i = 0; i < marcas.length; i++) {
-      const inicio = marcas[i].index ?? 0
-      const fin = i + 1 < marcas.length ? marcas[i + 1].index : fuente.length
-      const metodo = marcas[i][1]
-      handlers.push({ ruta, metodo, llave: `${metodo} ${ruta}`, cuerpo: fuente.slice(inicio, fin) })
+    for (const metodo of metodos) {
+      const implementacion = resolverHandlerExportado(archivo, metodo)
+      handlers.push({
+        ruta,
+        metodo,
+        llave: `${metodo} ${ruta}`,
+        cuerpo: implementacion.cuerpo,
+        archivo: implementacion.archivo,
+      })
     }
   }
   return handlers
 }
 
-/** Guardianes efectivos por archivo, cacheados por ruta. */
-const efectivosPorRuta = new Map<string, string[]>()
-function guardianesDe(ruta: string): string[] {
-  if (!efectivosPorRuta.has(ruta)) {
-    const archivo = join(RAIZ_API, ruta.slice(1), 'route.ts')
-    efectivosPorRuta.set(ruta, guardianesEfectivos(readFileSync(archivo, 'utf8')))
+/** Guardianes efectivos, cacheados por el archivo donde vive la implementación. */
+const efectivosPorArchivo = new Map<string, string[]>()
+function guardianesDe(archivo: string): string[] {
+  if (!efectivosPorArchivo.has(archivo)) {
+    efectivosPorArchivo.set(archivo, guardianesEfectivos(readFileSync(archivo, 'utf8')))
   }
-  return efectivosPorRuta.get(ruta)!
+  return efectivosPorArchivo.get(archivo)!
 }
 
 const HANDLERS = recolectarHandlers()
-const tieneGuardian = (h: Handler) => guardianesDe(h.ruta).some(g => h.cuerpo.includes(g))
+const tieneGuardian = (h: Handler) => guardianesDe(h.archivo).some(g => h.cuerpo.includes(g))
 
 describe('toda ruta de API tiene guardián o está declarada pública', () => {
   it('el barrido encuentra las rutas (si esto falla, la ruta base cambió)', () => {
     expect(HANDLERS.length).toBeGreaterThan(80)
+  })
+
+  it('sigue re-exports HTTP hasta la implementación sin perder sus guardianes', () => {
+    const ruta = '/integrations/uber-eats/webhook'
+    const get = HANDLERS.find(h => h.llave === `GET ${ruta}`)
+    const post = HANDLERS.find(h => h.llave === `POST ${ruta}`)
+
+    expect(get?.archivo).toMatch(/\/lib\/integrations\/uber-eats\/webhook-handler\.ts$/)
+    expect(post?.archivo).toBe(get?.archivo)
+    expect(tieneGuardian(post!)).toBe(true)
+    expect(tieneGuardian(get!)).toBe(false)
   })
 
   it('ningún handler queda abierto sin declararlo', () => {
@@ -154,7 +248,7 @@ describe('toda ruta de API tiene guardián o está declarada pública', () => {
       // métodos son `export const GET = handle` y el `withPOSAuth` vive dentro de
       // `handle`. Mirar sólo el trozo da el falso positivo que la cabecera de este
       // archivo ya documenta para el barrido de guardianes.
-      const fuente = readFileSync(join(RAIZ_API, h.ruta.slice(1), 'route.ts'), 'utf8')
+      const fuente = readFileSync(h.archivo, 'utf8')
       return !['requireTenant', 'withPOSAuth'].some(g => fuente.includes(g))
     })
     expect(sinSesion).toEqual([])
