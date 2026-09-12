@@ -87,16 +87,16 @@ jobs:
       #
       # Lo obvio seria `--no-sandbox`. No: en las terminales del restaurante el sandbox
       # esta ENCENDIDO, y una prueba que lo apaga deja de probar lo que corre en campo.
-      # Es el arreglo que documenta Electron.
+      # Electron 44 puede diferir la descarga del binario hasta el primer `require`;
+      # por eso se materializa antes de buscar y configurar el helper. Es el arreglo
+      # que documenta Electron, sin desactivar ninguna protección.
       - name: Habilitar el sandbox de Electron
         run: |
-          sandbox_path="$(find node_modules/electron -type f -name chrome-sandbox -print -quit)"
-          if [ -n "$sandbox_path" ]; then
-            sudo chown root:root "$sandbox_path"
-            sudo chmod 4755 "$sandbox_path"
-          else
-            echo "Esta distribución de Electron no incluye helper SUID; se conserva el sandbox de namespaces."
-          fi
+          node node_modules/electron/install.js
+          sandbox_path="node_modules/electron/dist/chrome-sandbox"
+          test -f "$sandbox_path"
+          sudo chown root:root "$sandbox_path"
+          sudo chmod 4755 "$sandbox_path"
 
       - name: Pruebas del servidor local
         run: node --test local-server/tests/*.test.js
@@ -140,13 +140,11 @@ jobs:
       - name: Preparar display y sandbox
         run: |
           sudo apt-get update && sudo apt-get install -y xvfb
-          sandbox_path="$(find electron-app/node_modules/electron -type f -name chrome-sandbox -print -quit)"
-          if [ -n "$sandbox_path" ]; then
-            sudo chown root:root "$sandbox_path"
-            sudo chmod 4755 "$sandbox_path"
-          else
-            echo "Esta distribución de Electron no incluye helper SUID; se conserva el sandbox de namespaces."
-          fi
+          node electron-app/node_modules/electron/install.js
+          sandbox_path="electron-app/node_modules/electron/dist/chrome-sandbox"
+          test -f "$sandbox_path"
+          sudo chown root:root "$sandbox_path"
+          sudo chmod 4755 "$sandbox_path"
       - name: Recorrer POS y KDS desde las pantallas reales
         run: xvfb-run --auto-servernum node electron-app/lab/laboratorio-ui-multiterminal.cjs
         env:
