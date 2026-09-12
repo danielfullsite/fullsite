@@ -209,7 +209,7 @@ export default function DeliveryPage() {
     if (newStatus === 'lista' && order.platform === 'ubereats' && order.platform_order_id) {
       fetch('/api/integrations/uber-eats/order', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getPOSAuthHeaders() },
         body: JSON.stringify({ order_id: order.platform_order_id, action: 'ready' }),
       }).catch(e => console.warn('[delivery] mark-ready failed:', e))
     }
@@ -231,7 +231,7 @@ export default function DeliveryPage() {
     if (order.platform === 'ubereats' && order.platform_order_id) {
       fetch('/api/integrations/uber-eats/order', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getPOSAuthHeaders() },
         body: JSON.stringify({ order_id: order.platform_order_id, action: 'cancel', reason }),
       }).catch(e => console.warn('[delivery] cancel failed:', e))
     }

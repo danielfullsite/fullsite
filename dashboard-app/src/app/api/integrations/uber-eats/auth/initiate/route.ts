@@ -9,6 +9,10 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { buildUberAuthUrl } from '@/lib/integrations/uber-eats/oauth'
 import { auditLog } from '@/lib/integrations/audit-logger'
+import { requireTenant } from '@/lib/api-auth'
+import { isManager } from '@/lib/pos-db-policy'
+
+const STORE_ID_RE = /^[a-z0-9_-]{1,128}$/i
 
 function redirectUri(req: NextRequest): string {
   const override = process.env.UBER_REDIRECT_URI
@@ -23,13 +27,22 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url)
   const storeId = searchParams.get('store_id') || ''
-  const clientId = searchParams.get('client_id') || process.env.NEXT_PUBLIC_DEFAULT_CLIENT_ID
+  const requestedClientId = searchParams.get('client_id')
 
-  if (!storeId) {
-    return NextResponse.json({ error: 'store_id is required' }, { status: 400 })
+  // Este flujo termina guardando tokens de Uber con service_role. El navegador
+  // que lo inicia debe probar membresía del tenant; una cookie CSRF sólo enlaza
+  // ida y vuelta, no autoriza a escoger un restaurante.
+  const auth = await requireTenant(request, requestedClientId)
+  if (auth instanceof Response) return auth
+  if (!isManager(auth.role)) {
+    return NextResponse.json({ error: 'Se requiere rol de gerente' }, { status: 403 })
   }
-  if (!clientId) {
-    return NextResponse.json({ error: 'client_id is required' }, { status: 400 })
+  const clientId = auth.clientId
+
+  // `state` usa `|` como separador. Sin una lista de caracteres explícita, un
+  // store_id como `tienda|victima` desplazaba el client_id que lee el callback.
+  if (!STORE_ID_RE.test(storeId)) {
+    return NextResponse.json({ error: 'store_id is required' }, { status: 400 })
   }
 
   // Generate CSRF state: uuid + encoded store context

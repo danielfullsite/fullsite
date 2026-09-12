@@ -1,6 +1,7 @@
 import { type NextRequest } from 'next/server'
 import { withPOSAuth, unauthorized } from '@/lib/api-auth'
 import { kitchenTokenEnabled, verifyKitchenToken } from '@/lib/kitchen-token'
+import { hasPermission } from '@/lib/pos-permissions'
 
 const SB_URL = () => process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const SB_KEY = () => process.env.SUPABASE_SERVICE_KEY || ''
@@ -96,6 +97,13 @@ export async function PATCH(request: NextRequest) {
   }
   const safe = validatePatch(body.patch as Record<string, unknown>)
   if (!safe) return Response.json({ error: 'INVALID_PATCH' }, { status: 400 })
+
+  // `closed_at` también saca la orden de la lista activa, aunque status no diga
+  // cancelada. Ambos caminos requieren el permiso crítico de cancelación.
+  const cancelsOrder = safe.status === 'cancelada' || safe.cancelled_at != null || safe.closed_at != null
+  if (cancelsOrder && !hasPermission(auth.role, 'cancelar_ordenes')) {
+    return Response.json({ error: 'CANCEL_PERMISSION_REQUIRED' }, { status: 403 })
+  }
 
   const result = await fetch(
     `${SB_URL()}/rest/v1/delivery_orders?id=eq.${encodeURIComponent(body.id)}&client_id=eq.${encodeURIComponent(auth.clientId)}&select=id`,

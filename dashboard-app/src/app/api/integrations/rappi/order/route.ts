@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { withPOSAuth, unauthorized } from '@/lib/api-auth'
 import { syncRappiOrderAction } from '@/lib/integrations/rappi/order-sync'
 import { isRappiCancelType } from '@/lib/integrations/rappi/reasons'
+import { hasPermission } from '@/lib/pos-permissions'
 
 export async function POST(request: NextRequest) {
   const auth = await withPOSAuth(request)
@@ -16,6 +17,10 @@ export async function POST(request: NextRequest) {
 
   if (!body.order_id || !body.action || !['accept', 'ready', 'reject', 'cancel'].includes(body.action)) {
     return NextResponse.json({ ok: false, error: 'INVALID_RAPPI_ACTION' }, { status: 400 })
+  }
+
+  if ((body.action === 'reject' || body.action === 'cancel') && !hasPermission(auth.role, 'cancelar_ordenes')) {
+    return NextResponse.json({ ok: false, error: 'CANCEL_PERMISSION_REQUIRED' }, { status: 403 })
   }
 
   if ((body.action === 'reject' || body.action === 'cancel') && body.reason && !isRappiCancelType(body.reason)) {

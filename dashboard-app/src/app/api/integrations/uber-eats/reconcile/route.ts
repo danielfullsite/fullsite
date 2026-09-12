@@ -27,14 +27,16 @@ export async function POST(request: NextRequest) {
   // Reconciliar mueve datos de pedidos: exige sesión del propio restaurante.
   const auth = await requireTenant(request, client_id)
   if (auth instanceof Response) return auth
+  const clientId = auth.clientId
 
   const effectiveThreshold = (process.env.UBER_ENV === 'sandbox' && threshold_minutes != null)
     ? threshold_minutes
     : STUCK_THRESHOLD_MINUTES
   const thresholdTime = new Date(Date.now() - effectiveThreshold * 60_000).toISOString()
-  const filter = client_id
-    ? `client_id=eq.${client_id}&platform=eq.ubereats&status=eq.nueva&created_at=lt.${thresholdTime}`
-    : `platform=eq.ubereats&status=eq.nueva&created_at=lt.${thresholdTime}`
+  // requireTenant ya resolvió la autoridad. El filtro nunca puede depender de
+  // que el cliente haya repetido client_id en el body: al omitirlo, la versión
+  // anterior consultaba los pedidos de todos los restaurantes con service_role.
+  const filter = `client_id=eq.${encodeURIComponent(clientId)}&platform=eq.ubereats&status=eq.nueva&created_at=lt.${encodeURIComponent(thresholdTime)}`
 
   const r = await fetch(
     `${SB_URL()}/rest/v1/delivery_orders?${filter}&select=id,platform_order_id,client_id,created_at&limit=50`,
@@ -55,13 +57,13 @@ export async function POST(request: NextRequest) {
 
     if (uberStatus === 'CANCELLED' || uberStatus === 'cancelled') {
       await fetch(
-        `${SB_URL()}/rest/v1/delivery_orders?id=eq.${order.id}`,
+        `${SB_URL()}/rest/v1/delivery_orders?id=eq.${encodeURIComponent(order.id)}&client_id=eq.${encodeURIComponent(clientId)}`,
         { method: 'PATCH', headers: { ...sbHeaders(), Prefer: 'return=minimal' }, body: JSON.stringify({ status: 'cancelada', updated_at: new Date().toISOString() }) }
       )
       results.push({ order_id: order.platform_order_id, uber_status: uberStatus, action: 'cancelled' })
     } else if (uberStatus === 'DELIVERED' || uberStatus === 'delivered') {
       await fetch(
-        `${SB_URL()}/rest/v1/delivery_orders?id=eq.${order.id}`,
+        `${SB_URL()}/rest/v1/delivery_orders?id=eq.${encodeURIComponent(order.id)}&client_id=eq.${encodeURIComponent(clientId)}`,
         { method: 'PATCH', headers: { ...sbHeaders(), Prefer: 'return=minimal' }, body: JSON.stringify({ status: 'entregada', updated_at: new Date().toISOString() }) }
       )
       results.push({ order_id: order.platform_order_id, uber_status: uberStatus, action: 'delivered' })
@@ -72,7 +74,7 @@ export async function POST(request: NextRequest) {
 
   await auditLog({
     provider: 'ubereats',
-    client_id: client_id ?? null,
+    client_id: clientId,
     correlation_id: correlationId,
     action: 'reconciliation.run',
     request: { stuck_threshold_minutes: effectiveThreshold },

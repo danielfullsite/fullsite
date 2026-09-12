@@ -74,8 +74,6 @@ export const RUTAS_PUBLICAS: Record<string, string> = {
     'autenticación (no hay sesión previa). Falla cerrado: código inexistente/vencido/usado → 400.',
 
   // El navegador de un tercero llega aquí sin sesión nuestra.
-  'GET /integrations/uber-eats/auth/initiate':
-    'Uber redirige el navegador. Protegida con CSRF contra cookie httpOnly `uber_oauth_state`.',
   'GET /integrations/uber-eats/auth/callback':
     'Retorno del OAuth de Uber. Misma protección CSRF por cookie.',
   'POST /factura':
