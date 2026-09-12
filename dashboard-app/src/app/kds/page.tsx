@@ -4,7 +4,7 @@ import { currentKitchenScope, kitchenScopeIsCurrent, readScopedKitchenCache } fr
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Printer } from 'lucide-react'
 import {
-  getKitchenOrders, updateOrderStatus, logAudit,
+  getKitchenOrders, updateKitchenItemStatus, updateOrderStatus, logAudit,
   type KitchenOrderFromDB, type OrderItem,
 } from '@/lib/pos-data'
 import { reprintByStation, type ReprintOrderContext } from '@/lib/printer'
@@ -280,55 +280,22 @@ export default function KDSStandalone() {
 
   const toggleItemDone = (orderId: string, itemIndex: number, order: KitchenOrderFromDB) => {
     const key = `${orderId}-${itemIndex}`
-    setDoneItems(prev => {
-      const next = new Set(prev)
-      if (next.has(key)) {
-        next.delete(key)
-      } else {
-        next.add(key)
-        const items: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
-        const allDone = items.every((item, idx) => {
-          if (item.cancelled) return true
-          const k = `${orderId}-${idx}`
-          return k === key || prev.has(k)
-        })
-        if (allDone && order.status === 'preparando') {
-          advance(orderId, order.status, order.mesa, order.mesero)
-        }
-      }
-
+    const next = new Set(doneItems)
+    const done = !next.has(key)
+    if (done) {
+      next.add(key)
       const items: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
-      const kdsStatus: Record<string, boolean> = {}
-      items.forEach((item, idx) => {
-        if (item.cancelled) return
-        const k = `${orderId}-${idx}`
-        kdsStatus[`${idx}`] = k === key ? !prev.has(key) : next.has(k)
-      })
-
-      kdsClient.sendCommand('KDS_ITEM_STATUS', { order_id: orderId, kds_item_status: JSON.stringify(kdsStatus) })
-
-      fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${orderId}`, {
-        method: 'PATCH',
-        headers: {
-          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-          Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}`,
-          'Content-Type': 'application/json',
-          Prefer: 'return=minimal',
-        },
-        body: JSON.stringify({ kds_item_status: JSON.stringify(kdsStatus) }),
-      }).catch(() => {
-        import('@/lib/pos-offline-db').then(({ queueOperation }) =>
-          queueOperation('pos_orders', 'PATCH', { kds_item_status: JSON.stringify(kdsStatus) }, `pos_orders?id=eq.${orderId}`)
-        ).catch(() => {
-          try {
-            const q = JSON.parse(localStorage.getItem('fullsite_offline_queue') || '[]')
-            q.push({ table: 'pos_orders', method: 'PATCH', endpoint: `pos_orders?id=eq.${orderId}`, data: { kds_item_status: JSON.stringify(kdsStatus) }, timestamp: Date.now(), synced: false })
-            localStorage.setItem('fullsite_offline_queue', JSON.stringify(q))
-          } catch { /* noop */ }
-        })
-      })
-
-      return next
+      const allDone = items.every((item, idx) => item.cancelled || next.has(`${orderId}-${idx}`))
+      if (allDone && order.status === 'preparando') {
+        void advance(orderId, order.status, order.mesa, order.mesero)
+      }
+    } else {
+      next.delete(key)
+    }
+    setDoneItems(next)
+    kdsClient.sendCommand('KDS_ITEM_STATUS', { order_id: orderId, kds_item_delta: { item_index: itemIndex, done } })
+    void updateKitchenItemStatus(orderId, itemIndex, done).then(ok => {
+      if (!ok) console.error(`[KDS] No se pudo persistir el avance atómico de ${orderId}/${itemIndex}`)
     })
   }
 

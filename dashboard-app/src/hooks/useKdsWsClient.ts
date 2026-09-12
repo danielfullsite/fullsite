@@ -54,6 +54,22 @@ function saveCachedOrders(orders: KitchenOrderFromDB[]) {
   try { localStorage.setItem(LS_CACHE_KEY, JSON.stringify(orders)) } catch {}
 }
 
+export function mergeKdsItemStatus(
+  currentStatus: string | null,
+  delta: { item_index?: unknown; done?: unknown } | undefined,
+): string | null {
+  if (!delta || !Number.isInteger(delta.item_index) || Number(delta.item_index) < 0 || typeof delta.done !== 'boolean') {
+    return currentStatus
+  }
+  let current: Record<string, boolean> = {}
+  try {
+    const parsed = typeof currentStatus === 'string' ? JSON.parse(currentStatus) : currentStatus
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) current = { ...parsed }
+  } catch { /* a corrupt legacy map must not block the current kitchen action */ }
+  current[String(delta.item_index)] = delta.done
+  return JSON.stringify(current)
+}
+
 // ── Order normalizer ──────────────────────────────────────────────────────────
 // Converts a raw server payload (from SNAPSHOT kds_orders or DELTA payload)
 // into the KitchenOrderFromDB shape expected by the KDS page.
@@ -188,7 +204,11 @@ export function useKdsWsClient(restaurantId?: string): UseKdsWsClientResult {
       case 'KDS_ITEM_STATUS': {
         if (!orderId) break
         const existing = ordersMap.current.get(orderId)
-        if (existing && p.kds_item_status !== undefined) {
+        const delta = p.kds_item_delta as { item_index?: unknown; done?: unknown } | undefined
+        const validDelta = delta && Number.isInteger(delta.item_index) && Number(delta.item_index) >= 0 && typeof delta.done === 'boolean'
+        if (existing && validDelta) {
+          ordersMap.current.set(orderId, { ...existing, kds_item_status: mergeKdsItemStatus(existing.kds_item_status, delta) })
+        } else if (existing && p.kds_item_status !== undefined) {
           ordersMap.current.set(orderId, {
             ...existing,
             kds_item_status: typeof p.kds_item_status === 'string'
