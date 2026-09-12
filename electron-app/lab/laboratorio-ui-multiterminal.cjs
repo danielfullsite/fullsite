@@ -415,13 +415,32 @@ require(${JSON.stringify(path.join(ELECTRON_APP, 'main.js'))});\n`)
   const target = role === 'kds' ? `http://127.0.0.1:${port}/kds` : `${uiOrigin}/pos/mesas`
   await page.waitForLoadState('domcontentloaded', { timeout: 90000 })
   if (role === 'kds') {
-    // La navegación al HTML privado usa el mismo extraHeaders que main.js;
-    // los fetch posteriores se autentican desde el código real del KDS.
-    await app.evaluate(({ BrowserWindow }, { target, headers }) => {
-      return BrowserWindow.getAllWindows()[0].loadURL(target, {
-        extraHeaders: Object.entries(headers).map(([key, value]) => `${key}: ${value}`).join('\r\n'),
-      })
-    }, { target, headers })
+    // main.js ya navega el KDS al HTML privado con sus credenciales LAN. Volver a
+    // llamar loadURL aquí crea dos navegaciones al mismo destino: Electron 44
+    // cancela una con ERR_FAILED aunque la pantalla haya cargado correctamente.
+    // Se espera la navegación real y se aplica el estado que el init script dejó
+    // preparado para las navegaciones posteriores del laboratorio.
+    await until(() => page.evaluate(target => location.href === target && document.readyState !== 'loading', target),
+      `${name}: KDS local visible`, 90000)
+    await page.evaluate(({ tenant, staff, turno, terminalId, port, secret, actorSession, operationalMode, uiOrigin, sinSesion }) => {
+      localStorage.setItem('fullsite_client_id', tenant)
+      localStorage.setItem('pos_terminal_id', terminalId)
+      localStorage.setItem('FULLSITE_BRIDGE_URL', `http://127.0.0.1:${port}`)
+      localStorage.setItem('FULLSITE_LAN_SECRET', secret)
+      localStorage.setItem('FULLSITE_TERMINAL_ID', terminalId)
+      localStorage.setItem('FULLSITE_OFFLINE_DISABLED', '1')
+      localStorage.setItem('kds_settings_v1', JSON.stringify({ station: 'todas' }))
+      localStorage.setItem('pos_shift_token', 'synthetic-lab-session')
+      if (!operationalMode) {
+        localStorage.setItem('pos_turno_id', turno.id)
+        localStorage.setItem('pos_turno_cache', JSON.stringify({ turno, turnos: [turno], ts: Date.now() }))
+      }
+      if (!sinSesion) {
+        sessionStorage.setItem('pos_staff', JSON.stringify(staff))
+        sessionStorage.setItem('pos_actor_session', JSON.stringify(actorSession))
+        sessionStorage.setItem('pos_last_activity', String(Date.now()))
+      }
+    }, { tenant, staff, turno, terminalId, port, secret, actorSession, operationalMode, uiOrigin, sinSesion: !!opts.sinSesion })
   } else await page.goto(target, { waitUntil: 'domcontentloaded', timeout: 90000 })
   return terminal
 }
