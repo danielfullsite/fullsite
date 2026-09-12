@@ -8,7 +8,7 @@ import { resolveMesa } from '@/lib/pos-navigation'
 
 type Estado = 'inactivo' | 'confirmando' | 'adquirido' | 'conflicto' | 'sin-caja'
 
-export default function MesaLockGuard({ enabled, children }: Readonly<{ enabled: boolean; children: React.ReactNode }>) {
+export default function MesaLockGuard({ enabled, children }: Readonly<{ enabled: boolean; children?: React.ReactNode }>) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const router = useRouter()

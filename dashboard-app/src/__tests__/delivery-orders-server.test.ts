@@ -26,7 +26,7 @@ describe('/api/pos/delivery-orders', () => {
 
   it('GET permite un KDS sin shift sólo con tenant y HMAC válido', async () => {
     auth = null
-    const fetchMock = vi.fn(async () => Response.json([{ id: 'delivery-kds' }]))
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => Response.json([{ id: 'delivery-kds' }]))
     vi.stubGlobal('fetch', fetchMock)
     const { GET } = await import('@/app/api/pos/delivery-orders/route')
     const response = await GET(new NextRequest('https://app.test/api/pos/delivery-orders?client_id=kds-tenant&status=nueva', {
