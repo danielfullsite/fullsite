@@ -17,6 +17,12 @@ test('Electron runtime is pinned and the lockfile agrees', () => {
   assert.equal(pkg.engines.node, '>=22.12.0')
 })
 
+test('installer builder is pinned past the audited vulnerable range', () => {
+  assert.equal(pkg.devDependencies['electron-builder'], '26.15.3')
+  assert.equal(lock.packages['node_modules/electron-builder'].version, '26.15.3')
+  assert.equal(lock.packages['node_modules/builder-util-runtime'].version, '9.7.0')
+})
+
 test('Electron workflows use a Node version supported by Electron 44', () => {
   for (const name of ['electron-build.yml', 'electron-release.yml', 'lab-multi-terminal.yml', 'offline-e2e.yml']) {
     const workflow = fs.readFileSync(path.join(repository, '.github', 'workflows', name), 'utf8')

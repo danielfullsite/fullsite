@@ -29,3 +29,9 @@ test('dedicated KDS build stays available only through its explicit config', () 
   assert.equal(kds.productName, 'Fullsite KDS')
   assert.equal(kds.appId, 'mx.fullsite.kds')
 })
+
+test('macOS packages use the source icon format supported by builder v26', () => {
+  const pos = JSON.parse(fs.readFileSync(path.join(appDir, 'electron-builder-pos.json'), 'utf8'))
+  const kds = JSON.parse(fs.readFileSync(path.join(appDir, 'electron-builder-kds.json'), 'utf8'))
+  for (const config of [pkg.build, pos, kds]) assert.equal(config.mac.icon, 'icon.png')
+})
