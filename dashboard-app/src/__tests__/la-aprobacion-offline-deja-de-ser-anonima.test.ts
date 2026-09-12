@@ -67,12 +67,14 @@ describe('la bitácora no la dicta el cliente', () => {
     readFileSync(join(__dirname, '..', 'app', 'api', 'pos', route, 'route.ts'), 'utf8')
       .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
 
-  it('reopen-order usa el aprobador firmado y cancel-item al solicitante firmado', () => {
+  it('reopen-order y cancel-item atribuyen la bitácora al aprobador firmado', () => {
     const reopen = lee('reopen-order')
     expect(reopen).toMatch(/appr\.approverId \|\| auth\.staffId/)
     expect(reopen).not.toContain('manager_declarado')
     const cancel = lee('cancel-item')
-    expect(cancel).toMatch(/actor: auth\.staffName/)
+    expect(cancel).toMatch(/let approvedBy = auth\.staffName \|\| auth\.staffId/)
+    expect(cancel).toMatch(/approvedBy = p\.nam \|\| p\.sub/)
+    expect(cancel).toMatch(/p_actor: approvedBy/)
     expect(cancel).toMatch(/solicitante_rol: auth\.role/)
   })
 

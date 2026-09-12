@@ -34,6 +34,10 @@ const ruta = readFileSync(
   join(__dirname, '..', 'app', 'api', 'pos', 'cancel-item', 'route.ts'), 'utf8',
 )
 const codigo = ruta.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+const migracion = readFileSync(
+  join(__dirname, '..', '..', '..', 'supabase', 'migrations', 'PENDIENTE_20260912170000_cancel_item_atomico.sql'),
+  'utf8',
+)
 
 describe('la bitacora registra cuanto dinero se cancelo', () => {
   it('guarda el monto del renglon', () => {
@@ -54,8 +58,10 @@ describe('la bitacora registra cuanto dinero se cancelo', () => {
     // Si se intentara leer despues del cobro ya no existiria: el cobro sobreescribe
     // `items` sin los cancelados. Esto ancla que la escritura del log viva en esta
     // ruta y no en save-order.
-    expect(codigo).toMatch(/pos_audit_log/)
     expect(codigo).toMatch(/targetItem/)
+    expect(codigo).toMatch(/r1_cancel_item_atomic/)
+    expect(codigo).toMatch(/p_details: details/)
+    expect(migracion).toMatch(/insert into public\.pos_audit_log/)
   })
 })
 
@@ -69,7 +75,11 @@ describe('lo que NO se toco, a proposito', () => {
   })
 
   it('la guarda de concurrencia sigue en su lugar', () => {
-    expect(codigo).toMatch(/updated_at=eq\./)
+    expect(codigo).toMatch(/p_expected_updated_at: updatedAt/)
+    expect(codigo).toMatch(/p_expected_revision: Number\(revisionActual\) \|\| 0/)
+    expect(migracion).toMatch(/where id=p_order_id and client_id=p_client_id for update/)
+    expect(migracion).toMatch(/current_order\.updated_at is distinct from p_expected_updated_at/)
+    expect(migracion).toMatch(/current_order\.order_revision,0\) is distinct from p_expected_revision/)
   })
 
   it('y la idempotencia por operation_id tambien', () => {

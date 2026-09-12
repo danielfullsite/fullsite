@@ -90,8 +90,13 @@ jobs:
       # Es el arreglo que documenta Electron.
       - name: Habilitar el sandbox de Electron
         run: |
-          sudo chown root:root node_modules/electron/dist/chrome-sandbox
-          sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
+          sandbox_path="$(find node_modules/electron -type f -name chrome-sandbox -print -quit)"
+          if [ -n "$sandbox_path" ]; then
+            sudo chown root:root "$sandbox_path"
+            sudo chmod 4755 "$sandbox_path"
+          else
+            echo "Esta distribución de Electron no incluye helper SUID; se conserva el sandbox de namespaces."
+          fi
 
       - name: Pruebas del servidor local
         run: node --test local-server/tests/*.test.js
@@ -135,8 +140,13 @@ jobs:
       - name: Preparar display y sandbox
         run: |
           sudo apt-get update && sudo apt-get install -y xvfb
-          sudo chown root:root electron-app/node_modules/electron/dist/chrome-sandbox
-          sudo chmod 4755 electron-app/node_modules/electron/dist/chrome-sandbox
+          sandbox_path="$(find electron-app/node_modules/electron -type f -name chrome-sandbox -print -quit)"
+          if [ -n "$sandbox_path" ]; then
+            sudo chown root:root "$sandbox_path"
+            sudo chmod 4755 "$sandbox_path"
+          else
+            echo "Esta distribución de Electron no incluye helper SUID; se conserva el sandbox de namespaces."
+          fi
       - name: Recorrer POS y KDS desde las pantallas reales
         run: xvfb-run --auto-servernum node electron-app/lab/laboratorio-ui-multiterminal.cjs
         env:
