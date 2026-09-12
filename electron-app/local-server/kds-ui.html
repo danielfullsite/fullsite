@@ -35,17 +35,17 @@
   .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;background:var(--text-4)}
   .hright{display:flex;align-items:center;gap:18px}
   .view-switch{display:flex;align-items:center;padding:3px;background:var(--surface);border:1px solid var(--line);border-radius:10px}
-  .view-switch button{min-height:32px;padding:0 10px;border:0;border-radius:7px;background:transparent;color:var(--text-3);font-size:11px;font-weight:800;cursor:pointer}
+  .view-switch button{min-height:44px;padding:0 10px;border:0;border-radius:7px;background:transparent;color:var(--text-3);font-size:11px;font-weight:800;cursor:pointer}
   .view-switch button.on{background:var(--text-1);color:var(--bg)}
   .view-switch button:focus-visible{outline:2px solid var(--prep);outline-offset:2px}
   .counts{display:flex;align-items:center;gap:16px;font-size:13px;color:var(--text-3)}
   .counts b{color:var(--text-1);font-variant-numeric:tabular-nums;font-size:15px}
   .counts .c-new{color:#93c5fd} .counts .c-prep{color:#fcd34d} .counts .c-lista{color:#6ee7b7}
   #clock{font-variant-numeric:tabular-nums;font-size:13px;color:var(--text-3)}
-  .gear{width:38px;height:38px;border-radius:9px;border:1px solid var(--line-2);background:var(--surface-3);color:var(--text-3);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .gear{width:44px;height:44px;border-radius:9px;border:1px solid var(--line-2);background:var(--surface-3);color:var(--text-3);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
   .gear:active{background:var(--line)}
   .gear:focus-visible{outline:2px solid var(--prep);outline-offset:2px}
-  #actor-button{min-height:38px;padding:6px 10px;background:var(--surface-3);color:var(--text-2);border:1px solid var(--line-2);border-radius:9px;cursor:pointer}
+  #actor-button{min-height:44px;padding:6px 10px;background:var(--surface-3);color:var(--text-2);border:1px solid var(--line-2);border-radius:9px;cursor:pointer}
   #actor-pin{width:100%;padding:12px;background:var(--surface);color:var(--text-1);border:1px solid var(--line-2);border-radius:8px;font-size:22px}
   #actor-error{color:var(--danger);font-size:14px;min-height:20px}
 
@@ -123,11 +123,11 @@
   .modal{width:100%;max-width:420px;background:var(--surface-2);border:1px solid var(--line-2);border-radius:16px;overflow:hidden}
   .modal-h{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--line)}
   .modal-h h2{font-size:17px;font-weight:800}
-  .modal-x{width:34px;height:34px;border-radius:8px;border:1px solid var(--line-2);background:var(--surface-3);color:var(--text-2);font-size:18px;cursor:pointer}
+  .modal-x{width:44px;height:44px;border-radius:8px;border:1px solid var(--line-2);background:var(--surface-3);color:var(--text-2);font-size:18px;cursor:pointer}
   .modal-b{padding:20px;display:flex;flex-direction:column;gap:20px}
   .fld label{display:block;font-size:12px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--text-4);margin-bottom:9px}
   .seg{display:flex;gap:8px}
-  .seg button{flex:1;padding:11px;border:1px solid var(--line-2);background:var(--surface);color:var(--text-2);border-radius:9px;font-size:14px;font-weight:700;cursor:pointer;text-transform:capitalize}
+  .seg button{flex:1;min-height:44px;padding:11px;border:1px solid var(--line-2);background:var(--surface);color:var(--text-2);border-radius:9px;font-size:14px;font-weight:700;cursor:pointer;text-transform:capitalize}
   .seg button.on{background:var(--prep);border-color:var(--prep);color:#1a1204}
   .step{display:flex;align-items:center;gap:14px}
   .step button{width:44px;height:44px;border-radius:10px;border:1px solid var(--line-2);background:var(--surface);color:var(--text-1);font-size:22px;font-weight:800;cursor:pointer}
@@ -174,7 +174,7 @@
   @media(max-width:900px){.counts{display:none}.hright{gap:7px}.view-switch button{padding:0 8px}}
   @media(max-width:640px){
     header{padding:8px}.brand .chef,.brand .stn,.conn{display:none}.brand h1{font-size:16px}
-    aside{display:none}.view-switch button{font-size:10px;padding:0 6px}.gear{width:34px;height:34px}
+    aside{display:none}.view-switch button{font-size:10px;padding:0 6px}.gear{width:44px;height:44px}
     body.v-compact main,body.v-operation main,body.v-expo main{display:flex;height:auto;overflow-y:auto;overflow-x:hidden;padding:8px;column-width:auto}
     body.v-compact .card,body.v-operation .card,body.v-expo .card{display:flex;width:100%;max-width:none;flex:1 1 100%}
   }
