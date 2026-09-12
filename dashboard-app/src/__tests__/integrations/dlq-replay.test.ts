@@ -105,7 +105,7 @@ describe('DLQ de integraciones', () => {
   })
 
   it('la migración añade lease y dueño CAS sin modificar payloads', () => {
-    const migration = readFileSync(resolve(process.cwd(), '../supabase/migrations/PENDIENTE_20260912160000_integration_dlq_replay_lease.sql'), 'utf8')
+    const migration = readFileSync(resolve(process.cwd(), '../supabase/migrations/PENDIENTE_20260912180000_integration_dlq_replay_lease.sql'), 'utf8')
     expect(migration).toContain('ADD COLUMN IF NOT EXISTS claimed_at timestamptz')
     expect(migration).toContain('ADD COLUMN IF NOT EXISTS claim_token uuid')
     expect(migration).not.toMatch(/DROP\s|DELETE\s|TRUNCATE\s/i)
