@@ -17,6 +17,7 @@ import { useVisibleInterval } from '@/lib/use-visible-interval'
 import { reprintByStation, type ReprintOrderContext } from '@/lib/printer'
 import { getActiveClientSlug as _cid } from '@/lib/data'
 import { useBridgeClient, setPosServerHost } from '@/lib/bridge-client'
+import { PIN_LENGTH } from '@/lib/staff-pin'
 
 
 function getElapsedMinutes(dateStr: string): number {
@@ -1121,7 +1122,7 @@ export default function CocinaPage() {
                 <input
                   type="password"
                   inputMode="numeric"
-                  maxLength={4}
+                  maxLength={PIN_LENGTH}
                   value={cancelPin}
                   onChange={(e) => { setCancelPin(e.target.value.replace(/\D/g, '')); setCancelError('') }}
                   placeholder="****"
