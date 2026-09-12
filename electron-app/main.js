@@ -291,7 +291,6 @@ function registerProvisioningIpc() {
         system_printers = (await setupWindow.webContents.getPrintersAsync()).map(printer => ({
           name: printer.name,
           displayName: printer.displayName || printer.name,
-          isDefault: !!printer.isDefault,
         }));
       }
     } catch (error) {
@@ -891,7 +890,7 @@ function createKdsWindow(x, y, width, height, urlOverride) {
     kdsWindow.webContents.executeJavaScript(`JSON.stringify({cid: localStorage.getItem('fullsite_client_id'), bh: localStorage.getItem('pos_bridge_host'), tid: localStorage.getItem('pos_terminal_id'), electron: navigator.userAgent.includes('Electron'), url: location.href})`).then(v => console.log('[kds-diag]', v)).catch(e => console.log('[kds-diag ERR]', e.message));
   });
   // TEMP DIAG: pipe renderer console to main stdout
-  kdsWindow.webContents.on('console-message', (_e, _level, message) => {
+  kdsWindow.webContents.on('console-message', ({ message }) => {
     if (/bridge|discover|ws|socket|identity|client|7717|\bSW\b|CACHE_VERSION|v2\d|activat/i.test(message)) console.log('[kds-console]', message);
   });
 
@@ -954,7 +953,7 @@ function createSetupWindow() {
 app.commandLine.appendSwitch('enable-features', 'WebAuthenticationWin10');
 app.commandLine.appendSwitch('enable-web-authentication');
 // Allow the trusted https POS/KDS shell to reach its own Local Server.
-// Electron 33 embeds Chromium 130: webSecurity:false and
+// Electron 44 embeds Chromium 152: webSecurity:false and
 // BlockInsecurePrivateNetworkRequests alone are insufficient there. Chromium
 // still sends/enforces a PNA retry and fails localhost before the request
 // reaches Pedro. Disable only the three legacy PNA gates; do not use the global
