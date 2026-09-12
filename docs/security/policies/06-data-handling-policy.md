@@ -22,7 +22,7 @@ Definir como Fullsite recolecta, almacena, procesa, transmite y elimina datos, a
 | **Datos fiscales** | RFC, CSD, CFDI emitidos, XMLs | Critico | 5 anos (obligacion fiscal SAT) |
 | **Datos de contacto** | Nombre, telefono, email de reservaciones | Confidencial | Mientras el cliente tenga contrato |
 | **Logs y telemetria** | Acciones en POS, audit trail, logs de agentes | Interno | 90 dias (logs), indefinido (audit trail) |
-| **Datos de IA** | Prompts enviados a Anthropic, respuestas | Interno | No retenidos (zero-retention en Anthropic API) |
+| **Datos de IA** | Prompts enviados a Anthropic, respuestas | Interno | Fuera de nuestro control: rige el contrato con el proveedor |
 
 ## 3. Principios de manejo
 
@@ -71,7 +71,14 @@ El POS solo recibe un token de confirmacion. Los datos reales de la tarjeta nunc
 ## 7. Datos de IA
 
 - Los datos operativos se envian a Anthropic Claude API unicamente durante la sesion de consulta
-- Anthropic opera con zero-retention policy en su API comercial: no almacena prompts ni respuestas
+- **Lo que si podemos demostrar** es que datos salen de aqui, no que hace el proveedor con
+  ellos. Ningun dato de tarjeta puede viajar en un prompt porque no existe: la base no tiene
+  una sola columna de numero de tarjeta, CVV ni fecha de expiracion (comprobable con una
+  consulta a `information_schema.columns`).
+- **Lo que NO afirmamos** es la politica de retencion de Anthropic. Depende del producto, la
+  modalidad de contratacion y la version vigente de sus terminos, y cambia sin que nosotros nos
+  enteremos. Para una evaluacion contractual, la fuente es
+  https://www.anthropic.com/legal/commercial-terms — no este documento.
 - No se envian datos de autenticacion ni datos fiscales a la API de IA
 - No se usan datos de clientes para entrenar modelos
 
