@@ -28,7 +28,7 @@ describe('checador atómico e idempotente', () => {
     expect(response.status).toBe(200)
     expect(fetcher).toHaveBeenCalledTimes(1)
     expect(fetcher.mock.calls[0][0]).toBe('https://db.example/rest/v1/rpc/r1_time_clock_atomic')
-    expect(JSON.parse(fetcher.mock.calls[0][1].body as string)).toEqual({
+    expect(JSON.parse(fetcher.mock.calls[0]![1]!.body as string)).toEqual({
       p_client_id: 'tenant-a', p_pin: '1234567890', p_operation_id: 'clock-op-1',
     })
   })
