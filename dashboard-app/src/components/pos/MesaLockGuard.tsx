@@ -8,6 +8,14 @@ import { POS_MESA_EXIT_EVENT, resolveMesa, type PosMesaExitDetail } from '@/lib/
 
 type Estado = 'inactivo' | 'confirmando' | 'adquirido' | 'saliendo' | 'conflicto' | 'sin-caja'
 
+// React StrictMode monta, limpia y vuelve a montar cada effect en desarrollo.
+// Las dos instancias comparten la identidad física de la terminal: si la limpieza
+// vieja manda MESA_UNLOCK después de que la nueva renovó el lease, Caja no puede
+// distinguirlas y borra el lock vigente. Este registro entrega el lease a la
+// instancia más nueva de la misma página/mesa; una limpieza genuina (sin relevo)
+// sí lo libera.
+const efectoActivoPorMesa = new Map<number, symbol>()
+
 export default function MesaLockGuard({ enabled, children }: Readonly<{ enabled: boolean; children?: React.ReactNode }>) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -25,6 +33,8 @@ export default function MesaLockGuard({ enabled, children }: Readonly<{ enabled:
 
   useEffect(() => {
     if (!debeBloquear) { setEstado('inactivo'); return }
+    const efecto = Symbol(`mesa-${mesa}`)
+    efectoActivoPorMesa.set(mesa, efecto)
     let vivo = true
     let adquirido = false
     let renovando = false
@@ -39,6 +49,11 @@ export default function MesaLockGuard({ enabled, children }: Readonly<{ enabled:
         try {
           await adquirirMesa(mesa)
           if (!vivo || saliendo) {
+            // Un remount inmediato de la misma página ya comparte este lease con
+            // la misma identidad de terminal. Su acquire/renew es el dueño actual;
+            // un unlock de esta instancia vieja lo dejaría editando sin exclusión.
+            const relevo = efectoActivoPorMesa.get(mesa)
+            if (!saliendo && relevo && relevo !== efecto) return
             // La salida ganó la carrera contra un acquire/renew ya en vuelo.
             // Esperar este unlock dentro de la misma promesa evita que la
             // navegación lo aborte y que un renew tardío reviva el lease.
@@ -81,10 +96,16 @@ export default function MesaLockGuard({ enabled, children }: Readonly<{ enabled:
       vivo = false
       window.clearInterval(timer)
       window.removeEventListener(POS_MESA_EXIT_EVENT, salir)
-      if (adquirido && !saliendo) {
-        adquirido = false
-        void liberarMesa(mesa).catch(() => {})
-      }
+      // Darle un microtask al remount de StrictMode permite transferir la
+      // titularidad antes de decidir si éste fue un desmontaje real.
+      queueMicrotask(() => {
+        if (efectoActivoPorMesa.get(mesa) !== efecto) return
+        efectoActivoPorMesa.delete(mesa)
+        if (adquirido && !saliendo) {
+          adquirido = false
+          void liberarMesa(mesa).catch(() => {})
+        }
+      })
     }
   }, [debeBloquear, mesa, retry])
 

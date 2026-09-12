@@ -1,4 +1,4 @@
-import { createElement } from 'react'
+import { createElement, StrictMode } from 'react'
 import { renderToString } from 'react-dom/server'
 import { act, cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -73,6 +73,25 @@ describe('guardia del editor POS', () => {
     await act(async () => {})
     expect(network).toHaveBeenCalledTimes(3)
     expect(JSON.parse(String(network.mock.calls[2][1]?.body)).command_type).toBe('MESA_UNLOCK')
+  })
+
+  it('no deja que la limpieza vieja de StrictMode borre el lease del remount', async () => {
+    const commands: string[] = []
+    network.mockImplementation(async (_url, init) => {
+      const command = JSON.parse(String(init?.body))
+      commands.push(command.command_type)
+      return ok(command.command_id)
+    })
+    const view = render(createElement(StrictMode, null,
+      createElement(MesaLockGuard, { enabled: true }, createElement('button', null, 'Editar comanda'))))
+
+    await act(async () => {})
+    expect(screen.getByRole('button', { name: 'Editar comanda' })).toBeTruthy()
+    expect(commands).toEqual(['MESA_LOCK', 'MESA_LOCK'])
+
+    view.unmount()
+    await act(async () => {})
+    expect(commands).toEqual(['MESA_LOCK', 'MESA_LOCK', 'MESA_UNLOCK'])
   })
 
   it('muestra el conflicto al mesero y mantiene bloqueado el editor', async () => {

@@ -1079,6 +1079,8 @@ export interface Mesa {
   mesero?: string
   personas?: number
   total?: number
+  /** Deuda vigente confirmada por Caja; puede ser menor al consumo tras abonos. */
+  saldo?: number | null
 }
 
 export const MENU_CATEGORIES: MenuCategory[] = [
