@@ -98,6 +98,11 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
+  // Unlike the read-only rollout-compatible GET, a service-role write can never
+  // fall back to client_id-only authorization.
+  if (!kitchenTokenEnabled()) {
+    return Response.json({ error: 'Token de cocina no configurado' }, { status: 503 })
+  }
   const scope = requestScope(request)
   if (scope instanceof Response) return scope
   const serviceKey = process.env.SUPABASE_SERVICE_KEY
