@@ -1833,6 +1833,30 @@ export interface KitchenOrderFromDB {
 
 const loadKitchenCache = () => import('@/lib/pos-offline-db')
 
+/** Persist one KDS checkbox without replacing another kitchen screen's map. */
+export async function updateKitchenItemStatus(orderId: string, itemIndex: number, done: boolean): Promise<boolean> {
+  if (!orderId || !Number.isSafeInteger(itemIndex) || itemIndex < 0 || typeof done !== 'boolean') return false
+  const clientId = _getClientId()
+  const { locationId } = readKitchenScope(clientId)
+  const kitchenToken = typeof window !== 'undefined' ? localStorage.getItem('pos_kitchen_token') : null
+  try {
+    const res = await fetchWithTimeout(
+      `/api/pos/kitchen?client_id=${encodeURIComponent(clientId)}${locationId ? `&location_id=${encodeURIComponent(locationId)}` : ''}`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(kitchenToken ? { 'x-kitchen-token': kitchenToken } : {}),
+        },
+        body: JSON.stringify({ order_id: orderId, item_index: itemIndex, done }),
+      },
+    )
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
 export async function getKitchenOrders(): Promise<KitchenOrderFromDB[]> {
   let cacheModule: ReturnType<typeof loadKitchenCache> | undefined
   const cache = () => cacheModule ??= loadKitchenCache()
