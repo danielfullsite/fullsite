@@ -1,7 +1,7 @@
 'use client'
 
 import { Suspense, useState, useEffect, useCallback, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { registerServiceWorker, requestNotificationPermission } from '@/lib/service-worker'
 import { apiUrl } from '@/lib/api-base'
 import { checkActiveSession, registerSession, startHeartbeat, removeSession, getTerminalId } from '@/lib/pos-sessions'
@@ -78,11 +78,11 @@ interface StaffMember {
 const KDS_PATHS = ['/pos/cocina', '/pos/barra', '/pos/panaderia', '/pos/kds']
 
 export default function POSLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const router = useRouter()
+  const pathname = usePathname()
 
-  // KDS screens bypass auth entirely — no PIN, no turno gate
-  const isKDS = typeof window !== 'undefined' && KDS_PATHS.some(p => window.location.pathname.startsWith(p))
-  if (isKDS) {
+  // Mantener KDS y POS en componentes distintos evita que una navegación cliente
+  // cambie el número de hooks ejecutados por este layout compartido.
+  if (KDS_PATHS.some(p => pathname.startsWith(p))) {
     return (
       <div className="pos-kiosk" style={{
         background:'#0a0a0f', color:'#fff', minHeight:'100dvh', overflow:'auto',
@@ -98,6 +98,12 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
       </div>
     )
   }
+
+  return <AuthenticatedPOSLayout>{children}</AuthenticatedPOSLayout>
+}
+
+function AuthenticatedPOSLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const router = useRouter()
 
   const [unlocked, setUnlocked] = useState(false)
   const [staff, setStaff] = useState<StaffMember | null>(null)
@@ -338,7 +344,10 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
     }
   }, [unlocked, resetIdleTimer])
 
-  const isLocked = lockedUntil > Date.now()
+  // `lockedUntil` vuelve a cero con el temporizador que arma el intento fallido.
+  // No leer el reloj durante render: además de ser impuro, no provocaría por sí
+  // solo un nuevo render cuando vence el bloqueo.
+  const isLocked = lockedUntil > 0
   const [biometricAvailable, setBiometricAvailable] = useState(() => {
     if (typeof window === 'undefined') return false
     try { return localStorage.getItem(FP_AVAILABLE_KEY) === '1' } catch { return false }
