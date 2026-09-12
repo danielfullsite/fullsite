@@ -1,8 +1,6 @@
 import { getBridgeUrl } from './bridge-url'
 import { localNetworkFetch } from './local-network-fetch'
 
-const LEASE_MS = 30_000
-
 export class MesaLockError extends Error {
   constructor(message: string, readonly code: string, readonly incierto = false) {
     super(message)
@@ -24,7 +22,6 @@ async function enviar(commandType: 'MESA_LOCK' | 'MESA_UNLOCK', mesa: number): P
     command_id: commandId,
     command_type: commandType,
     mesa,
-    ...(commandType === 'MESA_LOCK' ? { expires_ms: Date.now() + LEASE_MS } : {}),
   }
 
   let response: Response

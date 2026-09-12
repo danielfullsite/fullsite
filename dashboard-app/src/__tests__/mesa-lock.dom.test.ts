@@ -38,7 +38,7 @@ describe('protocolo de lock de mesa', () => {
     const acquire = JSON.parse(String(network.mock.calls[0][1]?.body))
     const release = JSON.parse(String(network.mock.calls[1][1]?.body))
     expect(acquire).toMatchObject({ command_type: 'MESA_LOCK', mesa: 7 })
-    expect(acquire.expires_ms).toBeGreaterThan(Date.now())
+    expect(acquire).not.toHaveProperty('expires_ms')
     expect(acquire).not.toHaveProperty('client_id')
     expect(release).toMatchObject({ command_type: 'MESA_UNLOCK', mesa: 7 })
     expect(release).not.toHaveProperty('client_id')
