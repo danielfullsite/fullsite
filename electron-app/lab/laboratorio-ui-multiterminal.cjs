@@ -16,6 +16,7 @@ const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
+const { pathToFileURL } = require('node:url')
 const net = require('node:net')
 const http = require('node:http')
 const { spawn } = require('node:child_process')
@@ -316,6 +317,8 @@ async function fixtureRoute(route, uiOrigin, pedroPorts) {
 async function startTerminal(name, role, port, cajaPort, uiOrigin, ports, opts = {}) {
   const userData = path.join(base, name)
   fs.mkdirSync(userData, { recursive: true })
+  const idlePage = path.join(userData, 'lab-idle.html')
+  fs.writeFileSync(idlePage, '<!doctype html><meta charset="utf-8"><title>Fullsite Lab</title>')
   if (syntheticPrinter && role === 'server_pos') fs.writeFileSync(path.join(userData, 'printers.json'), JSON.stringify({
     schema_version: 2, ...(drawerMode ? { drawer_printer_id: 'lab-tcp-caja' } : {}), routing: { default_station: 'caja' }, printers: [{ printer_id: 'lab-tcp-caja', name: 'Caja laboratorio TCP', enabled: true,
       connection: { type: 'tcp', host: '127.0.0.1', port: syntheticPrinter.address().port }, station_ids: ['caja'],
@@ -368,9 +371,9 @@ require(${JSON.stringify(path.join(ELECTRON_APP, 'main.js'))});\n`)
     env: cleanEnv({ FULLSITE_DEV: '1', FULLSITE_USER_DATA_DIR: userData, FULLSITE_LOCAL_SERVER_PORT: String(port),
       FULLSITE_LAB_NUBE: nube.origin,
       ...(packagedBundle ? { FULLSITE_UI_BUNDLE_DIR: packagedBundle } : {}),
-      // Arranque inerte del mismo origen: instalar interceptores antes del JS de
-      // producto impide que la precarga del SW escape al aislamiento de pruebas.
-      FULLSITE_POS_URL: `${uiOrigin}/icon-192v2.png`, FULLSITE_KDS_URL: `${uiOrigin}/icon-192v2.png` }), timeout: 60000,
+      // Arranque inerte en file://: instala interceptores antes del JS de producto
+      // y setupOfflineRetry no compite con el page.goto controlado por el lab.
+      FULLSITE_POS_URL: pathToFileURL(idlePage).href, FULLSITE_KDS_URL: pathToFileURL(idlePage).href }), timeout: 60000,
   })
   const terminal = { name, role, port, app, process: app.process(), userData, terminalId, actorSession, log: [], errors: [] }
   terminals.push(terminal)
