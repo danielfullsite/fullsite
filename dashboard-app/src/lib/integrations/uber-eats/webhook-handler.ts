@@ -290,9 +290,9 @@ async function persistOrder(
     return { ok: false, was_duplicate: err.includes('duplicate') || err.includes('conflict') }
   }
 
-  // 201 = created, 200 with empty body = duplicate ignored
-  const responseText = await r.text()
-  const wasDuplicate = responseText === '' || r.status === 200
+  // `return=minimal` leaves both successful responses without a body; PostgREST
+  // distinguishes them by status: 201 inserted, 200 conflict ignored.
+  const wasDuplicate = r.status === 200
   return { ok: true, was_duplicate: wasDuplicate }
 }
 
