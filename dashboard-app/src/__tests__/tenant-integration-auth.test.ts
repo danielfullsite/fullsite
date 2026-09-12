@@ -164,6 +164,20 @@ describe('autorización de integraciones por tenant y rol', () => {
     expect(state.rappiAction).not.toHaveBeenCalled()
   })
 
+  it('Rappi acepta el motivo canónico de la UI y permite que ésta difiera el PATCH local', async () => {
+    auth('admin', 'tenant-a')
+    const rappi = await import('@/app/api/integrations/rappi/order/route')
+
+    const response = await rappi.POST(request('https://app.test/api/integrations/rappi/order', {
+      order_id: 'order-2', action: 'cancel', reason: 'ITEM_UNAVAILABLE', update_local_status: false,
+    }))
+
+    expect(response.status).toBe(200)
+    expect(state.rappiAction).toHaveBeenCalledWith(expect.objectContaining({
+      clientId: 'tenant-a', action: 'cancel', reason: 'ITEM_UNAVAILABLE', updateLocalStatus: false,
+    }))
+  })
+
   it('un mesero no puede disfrazar una cancelación con status o closed_at', async () => {
     auth('mesero', 'tenant-a')
     const fetchMock = vi.fn(async () => Response.json([{ id: 'order-1' }]))
