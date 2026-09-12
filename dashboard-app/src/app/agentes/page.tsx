@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState, useCallback, useRef } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import {
   Activity, Package, Shield, Users, TrendingUp, RefreshCw,
   ChevronRight, CheckCircle, AlertTriangle, AlertCircle, Info,
@@ -268,15 +268,15 @@ export default function AgentesPage() {
   const [filterAgent, setFilterAgent] = useState<AgentId | null>(null)
   const [filterSev, setFilterSev] = useState<Severity | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const clientId = useRef(getClientId())
+  const [clientId] = useState(getClientId)
 
   const fetchEvents = useCallback(async () => {
-    if (!clientId.current) return
+    if (!clientId) return
     setLoading(true)
     setError(null)
     try {
       const url = new URL('/api/agents/events', window.location.origin)
-      url.searchParams.set('client_id', clientId.current)
+      url.searchParams.set('client_id', clientId)
       url.searchParams.set('limit', '60')
       const res = await fetch(url.toString())
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -289,7 +289,7 @@ export default function AgentesPage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [clientId])
 
   useEffect(() => { fetchEvents() }, [fetchEvents])
 
@@ -304,14 +304,14 @@ export default function AgentesPage() {
   }, [fetchEvents])
 
   async function runAllAgents() {
-    if (!clientId.current || running) return
+    if (!clientId || running) return
     setRunning(true)
     setError(null)
     try {
       await fetch('/api/agents/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ client_id: clientId.current }),
+        body: JSON.stringify({ client_id: clientId }),
       })
       await fetchEvents()
     } catch (e) {
@@ -368,7 +368,7 @@ export default function AgentesPage() {
       />
 
       {/* Métricas 30 días */}
-      <MetricsWidget clientId={clientId.current} />
+      <MetricsWidget clientId={clientId} />
 
       {/* Summary chips */}
       <div className="flex items-center gap-2 mb-5 flex-wrap">
