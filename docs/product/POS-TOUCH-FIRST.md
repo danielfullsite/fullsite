@@ -83,7 +83,30 @@ foco visible, `aria-current` en la página activa.
 
 ## 4. Orden de trabajo
 
-1. Mapa de mesas y navegación operativa
+### 1. Mapa de mesas y navegación operativa — **hecho**
+
+| Qué | Por qué |
+|---|---|
+| Fuera las dos tarjetas KPI; el `% de aforo` sube al encabezado | repetían «ocupadas» y «personas» que el encabezado ya decía, y costaban ~62px de los 632 útiles |
+| Los nueve controles del encabezado pasan de 30-44px a **56px**, con `active:` | se tocan con el dedo |
+| Rejilla, cuentas por nombre y reservaciones dejan de estar apiladas: **pestañas con su cuenta** | era el único scroll de la pantalla; las dos de abajo no existían para quien no arrastra el dedo |
+| `RejillaPaginada` mide el hueco, calcula las filas que caben y pagina | y si todo cabe **no pinta ningún control**: una pantalla de doce mesas se ve como siempre |
+| Las filas crecen hasta llenar el alto (`minmax(alto, 1fr)`) | con celdas de alto fijo, en 1600×900 quedaba casi media pantalla en negro |
+| Número de mesa a `text-4xl`, total a `text-lg`, minutos a `text-sm` | son los tres datos que se leen a dos metros |
+| Las quince insignias «Disponible» idénticas salen de la vista, **el estado entra en el `aria-label`** | el color del riel ya lo decía; el dato no se perdió |
+
+Una trampa que costó encontrar: `GridView` estaba declarado **dentro** del
+render, así que React le daba un tipo nuevo en cada repintado y lo remontaba. Con
+una rejilla sin estado eso sólo costaba trabajo; con una paginada habría
+reiniciado a la página 1 cada vez que el salón refresca.
+
+Prueba: `rejilla-paginada.dom.test.ts` — no protege el aspecto, recorre **todas**
+las páginas y exige que el conjunto pintado sea exactamente el de entrada.
+Verificada A/B: con un `-1` en el corte de página, 3 de sus 5 casos fallan.
+
+Capturas: `despues-1024x768-mesas.png` y `despues-1366x768-mesas.png`. El «antes»
+comparable es el de 1366×768 (ver §6).
+
 2. Editor de cuenta/comanda
 3. Catálogo y categorías
 4. Cobro de Caja (ya hecho en PR #395; queda revisarlo contra estas reglas)

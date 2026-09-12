@@ -13,6 +13,7 @@ import { shouldUsePersistedFloorCoordinates } from '@/lib/floorplan-coordinates'
 import { setMesaTarget } from '@/lib/pos-navigation'
 import { counterHomePath, getServiceModel, isCounterModel } from '@/lib/pos-service-model'
 import { evaluarRespuestaDeMesas } from '@/lib/plano-mesas'
+import RejillaPaginada from '@/components/pos/RejillaPaginada'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -162,6 +163,7 @@ export default function MesasPage() {
   const [planoNoVerificado, setPlanoNoVerificado] = useState<string | null>(null)
   const [currentMesero, setCurrentMesero] = useState<string>('')
   const [viewMode, setViewMode] = useState<'planograma' | 'grid'>('grid')
+  const [seccion, setSeccion] = useState<'mesas' | 'cuentas' | 'reservas'>('mesas')
   const [staffName, setStaffName] = useState<string>('')
   const [clientMesas, setClientMesas] = useState<Mesa[]>(() => getMesasConfig(_cid(), 16))
   const [floorTables, setFloorTables] = useState<FloorTable[]>(FLOOR_TABLES)
@@ -660,7 +662,21 @@ export default function MesasPage() {
     return (
       <button
         onClick={() => handleMesaClick(mesa.number)}
-        className={`relative overflow-hidden border p-3 pl-4 transition-all active:scale-95 flex flex-col justify-between w-full h-full shadow-[var(--shadow-soft)] ${shapeClass} ${
+        // La insignia de estado dejó de pintarse en las mesas libres —quince
+        // etiquetas «Disponible» idénticas que el color del borde ya decía— pero
+        // el estado NO se perdió: vive aquí, que es de donde lo lee un lector de
+        // pantalla y de donde lo lee el laboratorio.
+        aria-label={[`Mesa ${mesa.number}`, statusLabel[mesa.status],
+          mesa.status === 'disponible' ? `${mesa.capacity} lugares` : null,
+          mesa.mesero || null,
+          order ? formatDur(mins) : null,
+          mesa.total != null ? formatMXN(mesa.total) : null].filter(Boolean).join(' · ')}
+        className={`relative overflow-hidden border p-3 pl-4 transition-all active:scale-95 flex flex-col w-full h-full shadow-[var(--shadow-soft)] ${
+          // Una mesa libre sólo tiene dos datos. Repartidos arriba y abajo dejaban
+          // un hueco en medio que crecía con la tarjeta; juntos y al centro, el
+          // número se lee desde la puerta.
+          mesa.status === 'disponible' && !compact ? 'justify-center gap-1' : 'justify-between'
+        } ${shapeClass} ${
           mergeSource === mesa.number ? 'ring-4 ring-[var(--warn)] border-[var(--warn)] bg-[var(--warn-soft)]' :
           mergeTarget === mesa.number ? 'ring-4 ring-[var(--accent)] border-[var(--accent)] bg-[var(--accent-soft)]' :
           getMesaColor(mesa)
@@ -669,10 +685,9 @@ export default function MesasPage() {
       >
         <span aria-hidden className="absolute left-0 top-0 bottom-0 w-1" style={{ background: mesa.status === 'disponible' ? 'var(--accent)' : mesa.status === 'cuenta' ? 'var(--warn)' : 'var(--info)' }} />
         <div className="flex items-start justify-between">
-          <span className={`${compact ? 'text-xl' : 'text-2xl'} font-extrabold tabular-nums tracking-tight`}>{mesa.number}</span>
-          {!compact && (
-            <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border leading-none ${
-              mesa.status === 'disponible' ? 'bg-[var(--accent-soft)] text-[var(--accent-ink)] border-[var(--accent-line)]' :
+          <span className={`${compact ? 'text-xl' : 'text-4xl leading-none'} font-extrabold tabular-nums tracking-tight`}>{mesa.number}</span>
+          {!compact && mesa.status !== 'disponible' && (
+            <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-full border leading-none ${
               mesa.status === 'ocupada' ? 'bg-[var(--info-soft)] text-[var(--info-ink)] border-[color-mix(in_srgb,var(--info)_40%,transparent)]' :
               'bg-[var(--warn-soft)] text-[var(--warn-ink)] border-[color-mix(in_srgb,var(--warn)_40%,transparent)]'
             }`}>
@@ -685,10 +700,10 @@ export default function MesasPage() {
             {order && (
               <div className={`flex items-center gap-1 mb-0.5 ${isAlert ? 'text-[var(--crit-ink)]' : isWarning ? 'text-[var(--warn-ink)]' : 'text-[var(--text-3)]'}`}>
                 <Clock size={10} />
-                <span className={`text-[10px] font-mono font-bold ${isAlert ? 'animate-pulse' : ''}`}>
+                <span className={`text-sm font-mono font-bold ${isAlert ? 'animate-pulse' : ''}`}>
                   {formatDur(mins)}
                 </span>
-                {isAlert && <AlertTriangle size={9} className="text-[var(--crit-ink)]" />}
+                {isAlert && <AlertTriangle size={12} className="text-[var(--crit-ink)]" />}
               </div>
             )}
             {!compact && <p className="text-[var(--text-4)] text-xs truncate">{mesa.mesero}</p>}
@@ -704,12 +719,12 @@ export default function MesasPage() {
                 <span className="font-semibold text-[var(--text-1)] tabular-nums">{mesa.personas}</span>
               </div>
               {mesa.total != null && (
-                <span className="text-[var(--text-1)] font-bold text-xs font-mono tabular-nums">{formatMXN(mesa.total)}</span>
+                <span className="text-[var(--text-1)] font-bold text-lg font-mono tabular-nums leading-none">{formatMXN(mesa.total)}</span>
               )}
             </div>
           </div>
         ) : (
-          <p className={`text-[var(--text-3)] ${compact ? 'text-[10px]' : 'text-xs'} mt-1`}>
+          <p className={`text-[var(--text-3)] ${compact ? 'text-[10px]' : 'text-sm font-semibold'} mt-1`}>
             {mesa.capacity} lug.
           </p>
         )}
@@ -886,18 +901,20 @@ export default function MesasPage() {
   }
 
   // ─── Grid View (classic) ──────────────────────────────────────────────────
-  const GridView = () => (
-    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-2.5">
-      {mesas.filter(mesa => {
-        if (!soloMisMesas || !currentMesero) return true
-        return mesa.status === 'disponible' || mesa.mesero === currentMesero
-      }).map(mesa => (
-        <div key={mesa.number} className="min-h-[140px]">
-          <MesaCard mesa={mesa} />
-        </div>
-      ))}
-    </div>
-  )
+  // `GridView` era un componente declarado dentro del render: React le daba un
+  // tipo nuevo en cada repintado y lo remontaba. Con una rejilla sin estado eso
+  // sólo costaba trabajo; con una rejilla paginada habría reiniciado la página a
+  // la 1 cada vez que el salón refresca. Por eso ahora es sólo la lista.
+  const mesasVisibles = mesas.filter(mesa => {
+    if (!soloMisMesas || !currentMesero) return true
+    return mesa.status === 'disponible' || mesa.mesero === currentMesero
+  })
+  // La última cuenta por nombre se cobra, o la última reservación pasa: la
+  // pestaña donde estaba el cajero deja de existir. Se cae a «Mesas» en el
+  // mismo cálculo, sin un efecto que pueda llegar tarde y pintar un hueco.
+  const seccionActiva =
+    (seccion === 'cuentas' && namedOrders.length === 0) ||
+    (seccion === 'reservas' && reservas.length === 0) ? 'mesas' : seccion
 
   return (
     <div className="h-screen flex flex-col text-[var(--text-1)]" style={{ background:"var(--bg)" }}>
@@ -931,7 +948,7 @@ export default function MesasPage() {
       )}
       <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 lg:px-6 py-3 lg:py-4 bg-[var(--surface-2)] border-b border-[var(--line)] flex-shrink-0">
         <div className="flex flex-wrap items-center gap-3 min-w-0">
-          <Link href="/pos" className="w-10 h-10 rounded-lg bg-[var(--line)] hover:bg-[var(--surface-2)] flex items-center justify-center transition-colors flex-shrink-0">
+          <Link href="/pos" className="w-14 h-14 rounded-xl bg-[var(--line)] hover:bg-[var(--surface-2)] active:scale-95 flex items-center justify-center transition-all flex-shrink-0">
             <ArrowLeft size={20} />
           </Link>
           <div className="min-w-0">
@@ -940,11 +957,17 @@ export default function MesasPage() {
               {(staffName || currentMesero) && <span className="text-[var(--accent-ink)]">{staffName || currentMesero}</span>}
               {turnoNum != null && <span> · Turno {turnoNum}</span>}
               {(staffName || currentMesero || turnoNum != null) && ' · '}
-              MESA(S): {counts.ocupada + counts.cuenta}{namedOrders.length > 0 && ` · CUENTAS: ${namedOrders.length}`} · {totalPersonas} personas
+              {/* `aforo` bajaba de las tarjetas KPI que ocupaban una fila entera
+                  de la rejilla. Aquí dice lo mismo y no cuesta alto. */}
+              <span className="font-semibold text-[var(--text-2)] tabular-nums">
+                {counts.ocupada + counts.cuenta}/{mesas.length || 0}
+              </span> mesas
+              {mesas.length > 0 && <span> · {Math.round(((counts.ocupada + counts.cuenta) / mesas.length) * 100)}% de aforo</span>}
+              {namedOrders.length > 0 && ` · CUENTAS: ${namedOrders.length}`} · {totalPersonas} personas
               <span className="hidden lg:inline"> · {new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })} {new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</span>
             </p>
           </div>
-          <button onClick={fetchData} className="w-11 h-11 rounded-lg bg-[var(--line)] hover:bg-[var(--surface-2)] flex items-center justify-center">
+          <button onClick={fetchData} className="w-14 h-14 rounded-xl bg-[var(--line)] hover:bg-[var(--surface-2)] active:scale-95 flex items-center justify-center transition-transform">
             <RefreshCw size={14} />
           </button>
 
@@ -954,7 +977,7 @@ export default function MesasPage() {
             {(_cid() === 'amalay' || hasFloorplan) && (
               <button
                 onClick={() => setViewMode('planograma')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                className={`flex items-center gap-1.5 min-h-[52px] px-4 rounded-lg text-xs font-bold transition-colors ${
                   viewMode === 'planograma' ? 'bg-[var(--surface-2)] text-[var(--text-1)]' : 'text-[var(--text-3)] hover:text-[var(--text-1)]'
                 }`}
               >
@@ -963,7 +986,7 @@ export default function MesasPage() {
             )}
             <button
               onClick={() => setViewMode('grid')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              className={`flex items-center gap-1.5 min-h-[52px] px-4 rounded-lg text-xs font-bold transition-colors ${
                 viewMode === 'grid' ? 'bg-[var(--surface-2)] text-[var(--text-1)]' : 'text-[var(--text-3)] hover:text-[var(--text-1)]'
               }`}
             >
@@ -976,7 +999,7 @@ export default function MesasPage() {
           {(staffRole === 'admin' || staffRole === 'gerente') && (
             <Link
               href="/pos/plano-editor"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[var(--line)] text-[var(--text-2)] hover:text-[var(--text-1)] hover:bg-[var(--surface-2)] transition-colors ml-2"
+              className="flex items-center gap-1.5 min-h-[56px] px-4 rounded-xl text-xs font-bold active:scale-95 bg-[var(--line)] text-[var(--text-2)] hover:text-[var(--text-1)] hover:bg-[var(--surface-2)] transition-colors ml-2"
               title="Editar el mapa de mesas"
             >
               <PencilRuler size={13} /> Editar mapa
@@ -986,7 +1009,7 @@ export default function MesasPage() {
           {currentMesero && (
             <button
               onClick={() => setSoloMisMesas(!soloMisMesas)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              className={`flex items-center gap-1.5 min-h-[56px] px-4 rounded-xl text-sm font-bold active:scale-95 transition-colors ${
                 soloMisMesas ? 'bg-emerald-500 text-black' : 'bg-[var(--line)] hover:bg-[var(--surface-2)] text-[var(--text-3)]'
               }`}
             >
@@ -996,7 +1019,7 @@ export default function MesasPage() {
           )}
           <button
             onClick={() => { setMergeMode(!mergeMode); setMergeSource(null); setMergeTarget(null) }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+            className={`flex items-center gap-1.5 min-h-[56px] px-4 rounded-xl text-sm font-bold active:scale-95 transition-colors ${
               mergeMode ? 'bg-amber-500 text-black' : 'bg-[var(--line)] hover:bg-[var(--surface-2)] text-[var(--text-3)]'
             }`}
           >
@@ -1005,7 +1028,7 @@ export default function MesasPage() {
           </button>
           <button
             onClick={() => { setNewCuentaName(''); setShowNewCuenta(true) }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-teal-600/30 hover:bg-teal-600/50 text-[var(--accent-ink)] border border-teal-600/40 transition-colors"
+            className="flex items-center gap-1.5 min-h-[56px] px-4 rounded-xl text-sm font-bold active:scale-95 bg-teal-600/30 hover:bg-teal-600/50 text-[var(--accent-ink)] border border-teal-600/40 transition-colors"
           >
             <UserPlus size={14} /> Cuenta
           </button>
@@ -1027,7 +1050,7 @@ export default function MesasPage() {
               window.location.reload()
             }}
             title="Bloquear pantalla"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-[var(--line)] hover:bg-red-900/40 text-[var(--text-3)] transition-colors"
+            className="flex items-center gap-1.5 min-h-[56px] px-4 rounded-xl text-sm font-bold active:scale-95 bg-[var(--line)] hover:bg-red-900/40 text-[var(--text-3)] transition-colors"
           >
             <LockIcon size={14} /> Bloquear
           </button>
@@ -1099,7 +1122,7 @@ export default function MesasPage() {
                 })
               }}
               title="Cerrar app"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-red-900/30 hover:bg-red-900/50 text-[var(--crit-ink)] border border-red-800/40 transition-colors"
+              className="flex items-center gap-1.5 min-h-[56px] px-4 rounded-xl text-sm font-bold active:scale-95 bg-red-900/30 hover:bg-red-900/50 text-[var(--crit-ink)] border border-red-800/40 transition-colors"
             >
               <Power size={14} /> Cerrar
             </button>
@@ -1121,104 +1144,111 @@ export default function MesasPage() {
           El aviso sigue POR MESA: cada tarjeta se pinta en rojo si lleva demasiado
           tiempo abierta — control anti robo-hormiga sin ocupar espacio arriba. */}
 
-      {!loading && (() => {
-        const ocupadas = counts.ocupada + counts.cuenta
-        const totalMesas = mesas.length || 0
-        const aforo = totalMesas > 0 ? Math.round((ocupadas / totalMesas) * 100) : 0
-        return (
-          <div className="grid grid-cols-2 gap-2 px-4 lg:px-6 pt-2.5 flex-shrink-0">
-            {[
-              { l: 'Mesas ocupadas', v: `${ocupadas}`, sub: `/${totalMesas}`, d: `${aforo}% de aforo`, ink: 'var(--accent-ink)' },
-              { l: 'Personas', v: `${totalPersonas}`, sub: '', d: 'en piso ahora', ink: 'var(--text-3)' },
-            ].map((k) => (
-              <div key={k.l} className="rounded-xl border border-[var(--line)] px-3.5 py-2 shadow-[var(--shadow-soft)] bg-[var(--surface)]">
-                <div className="font-mono text-[9px] uppercase tracking-[0.13em] text-[var(--text-3)]">{k.l}</div>
-                <div className="text-lg font-extrabold mt-0.5 tabular-nums tracking-tight text-[var(--text-1)] leading-none">
-                  {k.v}<span className="text-[var(--text-4)] text-sm font-bold">{k.sub}</span>
-                </div>
-                <div className="text-[11px] font-semibold mt-0.5" style={{ color: k.ink }}>{k.d}</div>
-              </div>
-            ))}
-          </div>
-        )
-      })()}
+      {/* Las dos tarjetas de KPI que vivían aquí decían lo mismo que el encabezado
+          —ocupadas y personas— y costaban ~62px de los 632 útiles de una caja de
+          1024×768. El único dato que sólo estaba en ellas, el aforo, se mudó
+          arriba: no se perdió nada y la rejilla ganó una fila. */}
 
-      <div className={`flex-1 ${viewMode === 'planograma' ? 'p-2 overflow-hidden' : 'px-4 py-3 overflow-y-auto'}`}>
+      {/* Tres cosas vivían apiladas en una sola columna con scroll: la rejilla de
+          mesas, las cuentas por nombre y las reservaciones del día. En una caja
+          sin ratón, las dos de abajo no existen — hay que arrastrar el dedo por
+          una barra de pocos píxeles para descubrirlas. Ahora son pestañas, cada
+          una dice cuántas trae, y ninguna perdió nada de lo que mostraba.
+          La barra sólo aparece cuando hay algo más que mesas. */}
+      {!loading && (namedOrders.length > 0 || reservas.length > 0) && (
+        <div className="flex gap-2 px-4 lg:px-6 pt-2 flex-shrink-0" role="tablist" aria-label="Secciones del salón">
+          {([
+            ['mesas', 'Mesas', mesasVisibles.length, LayoutGrid],
+            ['cuentas', 'Cuentas por nombre', namedOrders.length, UserPlus],
+            ['reservas', 'Reservaciones hoy', reservas.length, Calendar],
+          ] as const).map(([id, texto, n, Icono]) => (
+            <button key={id} type="button" role="tab" aria-selected={seccionActiva === id} onClick={() => setSeccion(id)}
+              className={`min-h-[56px] flex-1 rounded-xl border px-3 text-sm font-bold transition-colors active:scale-[0.98] flex items-center justify-center gap-2 ${
+                seccionActiva === id
+                  ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--text-1)]'
+                  : 'border-[var(--line)] text-[var(--text-3)] hover:text-[var(--text-1)] active:bg-[var(--surface-2)]'
+              }`}>
+              <Icono size={18} />
+              {texto}{n > 0 ? ` (${n})` : ''}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* `overflow-hidden` en vez de `overflow-y-auto`: lo que no cabe se pagina,
+          no se esconde debajo del borde. */}
+      <div className={`flex-1 min-h-0 flex flex-col overflow-hidden ${viewMode === 'planograma' ? 'p-2' : 'px-4 py-3'}`}>
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <div className="w-8 h-8 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
           </div>
+        ) : seccionActiva === 'cuentas' ? (
+          <RejillaPaginada
+            elementos={namedOrders}
+            claveDe={o => o.id}
+            altoDeCelda={112}
+            nombreDeElementos="cuentas"
+            clasesDeRejilla="grid grid-cols-2 md:grid-cols-4 gap-3 content-start"
+            pintar={o => {
+              const mins = getMinutes(o.created_at)
+              const isAlert = mins >= ALERT_THRESHOLD
+              return (
+                <button
+                  onClick={() => {
+                    sessionStorage.setItem('pos_cuenta_target', JSON.stringify({ mesa: 0, customerName: o.customer_name, orderId: o.id }))
+                    router.push(`/pos?cuenta=${encodeURIComponent(o.customer_name || '')}&order=${encodeURIComponent(o.id)}`)
+                  }}
+                  className="bg-teal-900/40 border-2 border-teal-600/60 hover:bg-teal-800/50 rounded-2xl p-3 text-left transition-all active:scale-95 w-full h-full flex flex-col justify-between"
+                >
+                  <div className="flex items-start justify-between">
+                    <span className="font-bold text-[var(--accent-ink)] uppercase truncate">#{o.customer_name}</span>
+                    {o.order_number != null && <span className="text-[10px] font-mono text-[var(--accent-ink)]">#{o.order_number}</span>}
+                  </div>
+                  <div className={`flex items-center gap-1 ${isAlert ? 'text-[var(--crit-ink)]' : 'text-[var(--accent-ink)]'}`}>
+                    <Clock size={12} />
+                    <span className={`text-xs font-mono font-bold ${isAlert ? 'animate-pulse' : ''}`}>{formatDur(mins)}</span>
+                    {isAlert && <AlertTriangle size={11} className="text-[var(--crit-ink)]" />}
+                  </div>
+                  <div className="flex items-end justify-between">
+                    <span className="text-[var(--text-3)] text-xs truncate">{o.mesero}</span>
+                    <span className="text-[var(--text-1)] font-bold text-lg font-mono tabular-nums">{formatMXN(o.total || 0)}</span>
+                  </div>
+                </button>
+              )
+            }}
+          />
+        ) : seccionActiva === 'reservas' ? (
+          <RejillaPaginada
+            elementos={reservas}
+            claveDe={r => r.codigo_reserva}
+            altoDeCelda={112}
+            nombreDeElementos="reservaciones"
+            clasesDeRejilla="grid grid-cols-2 md:grid-cols-3 gap-3 content-start"
+            pintar={r => (
+              <div className="bg-amber-900/20 border border-amber-700/30 rounded-xl px-4 py-3 h-full flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <span className="text-[var(--warn-ink)] font-bold text-lg tabular-nums">{r.horario_inicio?.slice(0, 5)}</span>
+                  <span className="text-[var(--warn-ink)] text-xs font-mono">{r.codigo_reserva}</span>
+                </div>
+                <p className="text-[var(--text-1)] font-medium truncate">{r.nombre}</p>
+                <div className="flex items-center justify-between">
+                  <span className="text-[var(--text-3)] text-sm flex items-center gap-1"><Users size={12} /> {r.guests} personas</span>
+                  <span className="text-[var(--text-2)] text-xs truncate">{r.espacio}</span>
+                </div>
+              </div>
+            )}
+          />
+        ) : viewMode === 'planograma' ? (
+          <PlanogramaView />
         ) : (
-          <>
-            {viewMode === 'planograma' ? <PlanogramaView /> : <GridView />}
-
-            {/* Cuentas por nombre (sin mesa) */}
-            {namedOrders.length > 0 && (
-              <div className="max-w-5xl mx-auto mt-6">
-                <h3 className="text-[var(--text-1)] font-bold text-lg mb-3 flex items-center gap-2">
-                  <UserPlus size={18} className="text-[var(--accent-ink)]" />
-                  Cuentas por nombre ({namedOrders.length})
-                </h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {namedOrders.map(o => {
-                    const mins = getMinutes(o.created_at)
-                    const isAlert = mins >= ALERT_THRESHOLD
-                    return (
-                      <button
-                        key={o.id}
-                        onClick={() => {
-                          sessionStorage.setItem('pos_cuenta_target', JSON.stringify({ mesa: 0, customerName: o.customer_name, orderId: o.id }))
-                          router.push(`/pos?cuenta=${encodeURIComponent(o.customer_name || '')}&order=${encodeURIComponent(o.id)}`)
-                        }}
-                        className="bg-teal-900/40 border-2 border-teal-600/60 hover:bg-teal-800/50 rounded-2xl p-3 text-left transition-all active:scale-95"
-                      >
-                        <div className="flex items-start justify-between">
-                          <span className="font-bold text-[var(--accent-ink)] uppercase truncate">#{o.customer_name}</span>
-                          {o.order_number != null && <span className="text-[10px] font-mono text-[var(--accent-ink)]">#{o.order_number}</span>}
-                        </div>
-                        <div className={`flex items-center gap-1 mt-1 ${isAlert ? 'text-[var(--crit-ink)]' : 'text-[var(--accent-ink)]'}`}>
-                          <Clock size={10} />
-                          <span className={`text-[10px] font-mono font-bold ${isAlert ? 'animate-pulse' : ''}`}>
-                            {formatDur(mins)}
-                          </span>
-                          {isAlert && <AlertTriangle size={9} className="text-[var(--crit-ink)]" />}
-                        </div>
-                        <div className="flex items-center justify-between mt-1">
-                          <span className="text-[var(--text-3)] text-xs truncate">{o.mesero}</span>
-                          <span className="text-[var(--text-1)] font-semibold text-xs">{formatMXN(o.total || 0)}</span>
-                        </div>
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Reservaciones */}
-            {reservas.length > 0 && (
-              <div className="max-w-5xl mx-auto mt-6">
-                <h3 className="text-[var(--text-1)] font-bold text-lg mb-3 flex items-center gap-2">
-                  <Calendar size={18} className="text-[var(--warn-ink)]" />
-                  Reservaciones hoy ({reservas.length})
-                </h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {reservas.map(r => (
-                    <div key={r.codigo_reserva} className="bg-amber-900/20 border border-amber-700/30 rounded-xl px-4 py-3">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-[var(--warn-ink)] font-bold text-sm">{r.horario_inicio?.slice(0, 5)}</span>
-                        <span className="text-[var(--warn-ink)] text-xs">{r.codigo_reserva}</span>
-                      </div>
-                      <p className="text-[var(--text-1)] font-medium">{r.nombre}</p>
-                      <div className="flex items-center justify-between mt-1">
-                        <span className="text-[var(--text-3)] text-sm flex items-center gap-1"><Users size={12} /> {r.guests} personas</span>
-                        <span className="text-[var(--text-2)] text-xs">{r.espacio}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </>
+          <RejillaPaginada
+            elementos={mesasVisibles}
+            claveDe={mesa => String(mesa.number)}
+            altoDeCelda={140}
+            nombreDeElementos="mesas"
+            clasesDeRejilla="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-2.5"
+            pintar={mesa => <MesaCard mesa={mesa} />}
+          />
         )}
       </div>
 

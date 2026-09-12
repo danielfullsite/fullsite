@@ -21,7 +21,10 @@ module.exports = async function ({ caja, pos2, kds, expect, until, request, outp
   const etiqueta = process.env.FULLSITE_LAB_ETIQUETA || 'captura'
   const destino = path.join(output, 'capturas', etiqueta)
   fs.mkdirSync(destino, { recursive: true })
-  const navigationTimeout = 120000
+  // Next en desarrollo compila la ruta la primera vez que alguien la pide: en
+  // este mismo worktree /pos/corte tardó 159s en frío. El presupuesto de
+  // navegación tiene que cubrir eso o el retrato muere antes de empezar.
+  const navigationTimeout = 300000
   const snapshot = async () => (await request(caja, '/state')).json()
   const fallos = []
 
