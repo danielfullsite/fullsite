@@ -82,16 +82,16 @@ describe('BUG-019 — PIN lookup usa service role, no anon', () => {
     expect(JSON.stringify(json)).not.toContain(SERVICE)
   })
 
-  it('el path de fingerprint también usa la service key para el lookup de pos_staff', async () => {
+  it('el path de fingerprint se rechaza antes del lookup privilegiado', async () => {
     stubFetch([{ id: 's2', name: 'Hector', role: 'cajero' }])
     const { POST } = await import('@/app/api/pos/pin/route')
 
-    await POST(makeReq({ fingerprint_id: 'fp-abc', client_id: 'tenantB' }))
+    const res = await POST(makeReq({ fingerprint_id: 'fp-abc', client_id: 'tenantB' }))
 
     const staffCall = outbound.find(c => c.url.includes('pos_staff'))
-    expect(staffCall, 'no hubo consulta a pos_staff en el path de huella').toBeDefined()
-    expect(staffCall!.authorization).toBe(`Bearer ${SERVICE}`)
-    expect(staffCall!.url).toContain('client_id=eq.tenantB')
+    expect(res.status).toBe(403)
+    expect(await res.json()).toMatchObject({ code: 'biometric_proof_required' })
+    expect(staffCall).toBeUndefined()
     expect(outbound.every(c => c.apikey !== ANON)).toBe(true)
   })
 })

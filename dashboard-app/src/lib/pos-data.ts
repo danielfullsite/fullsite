@@ -2161,8 +2161,7 @@ async function _managerFromStaffCache(pin: string, minLevel = 4): Promise<{ name
 // Aprobación de gerente SERVER-VERIFICABLE: cuando el PIN se valida online, /api/pos/pin
 // emite un shiftToken firmado del gerente. Lo guardamos aquí un instante para que la ruta
 // de cancelar/descuento valide el ROL server-side (infalsificable), en vez de confiar en
-// el string `manager`. De un solo uso, vida 2 min. Offline no hay token → device-trust
-// (ver cancel-item/route.ts, decisión "como Wansoft").
+// el string `manager`. De un solo uso, vida 2 min. Sin token no se fabrica aprobación.
 let _lastManagerApproval: { token: string; name: string; at: number } | null = null
 export function consumeManagerApproval(name: string): string | null {
   const a = _lastManagerApproval
@@ -2172,83 +2171,24 @@ export function consumeManagerApproval(name: string): string | null {
 }
 
 /**
- * Autorizacion de gerente POR HUELLA — misma exigencia de rol que el PIN.
- *
- * Pedido por Daniel el 2026-08-31: "para ingresar pin en corte de caja tmb deberia
- * de ser con huella" y "tambien para cierre de caja".
- *
- * Reutiliza el mismo endpoint y el mismo `manager: true` que `verifyManagerPin`, asi
- * que el servidor aplica la jerarquia de roles y emite el mismo shiftToken. Antes eso
- * NO pasaba: la rama de huella de /api/pos/pin devolvia antes de calcular el filtro
- * de rol, y cualquier empleado obtenia token de gerente. Se tapo primero, aparte,
- * porque montar esta funcion encima habria llevado el bypass a la caja.
- *
- * FACTOR DE SEGURIDAD, con honestidad: el servidor sigue SIN verificar la firma
- * WebAuthn — el id es una afirmacion del cliente. En la practica esto no es peor que
- * el PIN de 4 digitos que hoy se teclea a la vista de todos (el de AMALAY es 1234, y
- * un PIN observable se copia; una huella exige presencia fisica). Pero tampoco es una
- * garantia criptografica, y hasta que se verifique la assertion en el servidor la
- * huella NO debe ser el unico factor para mover dinero.
- *
- * Devuelve null si no hay huellas dadas de alta, si el usuario cancela, o si el
- * empleado no alcanza el rol. Nunca lanza: la pantalla debe poder ofrecer el PIN.
+ * La aprobación biométrica de dinero está deshabilitada hasta verificar WebAuthn en
+ * servidor. Las pantallas conservan el PIN como camino seguro.
  */
 export async function verifyManagerHuella(minRole = 'gerente'): Promise<{ name: string; role: string } | null> {
-  if (typeof window === 'undefined' || !window.PublicKeyCredential) return null
-  try {
-    const stored = JSON.parse(localStorage.getItem('pos_biometric_credentials') || '{}')
-    const credIds = Object.keys(stored)
-    if (credIds.length === 0) return null
-
-    const challenge = new Uint8Array(32)
-    crypto.getRandomValues(challenge)
-    const assertion = await navigator.credentials.get({
-      publicKey: {
-        challenge,
-        rpId: window.location.hostname,
-        allowCredentials: credIds.map(id => ({
-          id: Uint8Array.from(atob(id), c => c.charCodeAt(0)),
-          type: 'public-key' as const,
-        })),
-        userVerification: 'required',
-        timeout: 30_000,
-      },
-    })
-    if (!assertion) return null
-
-    const credId = btoa(String.fromCharCode(...new Uint8Array((assertion as PublicKeyCredential).rawId)))
-    const staffId = (stored[credId] as { id?: string } | undefined)?.id
-    if (!staffId) return null
-
-    const { apiUrl } = await import('./api-base')
-    const res = await fetch(apiUrl('/api/pos/pin'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      // `min_role` es lo que el servidor ignoraba en la rama de huella hasta hoy.
-      body: JSON.stringify({ fingerprint_id: staffId, client_id: _getClientId(), min_role: minRole }),
-    })
-    if (!res.ok) return null
-    const { staff, shiftToken } = await res.json()
-    if (!staff?.name) return null
-    if (shiftToken) _lastManagerApproval = { token: shiftToken as string, name: staff.name as string, at: Date.now() }
-    return { name: staff.name as string, role: (staff.role as string) || minRole }
-  } catch {
-    // Huella cancelada, no reconocida, o sin red. La pantalla ofrece el PIN.
-    return null
-  }
+  void minRole
+  // Fail closed hasta que el servidor emita un challenge, guarde la llave
+  // pública y verifique la assertion WebAuthn. Un UUID resuelto en el cliente no
+  // es aprobación de gerente.
+  return null
 }
 
 /** ¿Vale la pena ofrecer el boton de huella en esta terminal? */
 export async function hayHuellasDadasDeAlta(): Promise<boolean> {
-  if (typeof window === 'undefined' || !window.PublicKeyCredential) return false
-  try {
-    const stored = JSON.parse(localStorage.getItem('pos_biometric_credentials') || '{}')
-    if (Object.keys(stored).length === 0) return false
-    return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
-  } catch {
-    return false
-  }
+  return false
 }
+
+/** Se habilita sólo cuando la assertion biométrica sea verificable en servidor. */
+export const MANAGER_BIOMETRIC_APPROVAL_ENABLED = false
 
 // Validación server-side de PIN de gerente (cancelaciones, descuentos, cortes).
 // Antes venía de NEXT_PUBLIC_MANAGER_PINS (expuesto en el bundle) — ahora valida
@@ -3266,7 +3206,7 @@ export async function getClosedOrders(date: string): Promise<{ id: string; mesa:
 export async function reopenOrder(orderId: string, manager?: string, approvalToken?: string | null): Promise<boolean> {
   // Reabrir una cuenta PAGADA es sensible (fraude: reabrir → modificar → re-cerrar menor).
   // Ya NO es un PATCH directo con anon-key: va por /api/pos/reopen-order, que VERIFICA la
-  // aprobación de gerente server-side (token firmado online, o offline_approved device-trust).
+  // aprobación de gerente server-side mediante token firmado.
   const res = await fetch('/api/pos/reopen-order', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getPOSAuthHeaders() },
@@ -3274,7 +3214,6 @@ export async function reopenOrder(orderId: string, manager?: string, approvalTok
       order_id: orderId,
       manager: manager || undefined,
       approval_token: approvalToken || undefined,
-      offline_approved: approvalToken ? undefined : true,
     }),
   })
   return res.ok

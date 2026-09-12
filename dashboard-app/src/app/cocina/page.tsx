@@ -259,19 +259,22 @@ export default function CocinaPage() {
     // token ya estaba en la mano y no se usaba: aqui se consume.
     const cocinaOpId = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`
     const tokenDelGerente = consumeManagerApproval(manager)
+    if (!tokenDelGerente) {
+      setCancelError('Se necesita validar el PIN de gerente en línea para cancelar. Reintenta cuando esta terminal tenga conexión.')
+      return
+    }
     const saveRes = await fetch('/api/pos/cancel-item', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...getPOSAuthHeaders() },
+      // KDS no tiene login propio. El token del gerente autentica tanto a la
+      // terminal como a la aprobación y queda limitado al mismo tenant.
+      headers: { 'Content-Type': 'application/json', ...getPOSAuthHeaders(), Authorization: `Bearer ${tokenDelGerente}` },
       body: JSON.stringify({
         order_id: cancelTarget.orderId,
         item_id: itemDelCancel.id,
         operation_id: cocinaOpId,
         reason: cancelReason,
         manager,
-        approval_token: tokenDelGerente || undefined,
-        // Sin token firmado (PIN validado contra el cache offline) se declara
-        // device-trust, igual que el POS. La ruta lo audita como tal.
-        offline_approved: tokenDelGerente ? undefined : true,
+        approval_token: tokenDelGerente,
       }),
     })
     const saveResult = saveRes.ok ? await saveRes.json() : { ok: false }

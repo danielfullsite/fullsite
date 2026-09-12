@@ -57,15 +57,17 @@ describe.each(KDS)('el KDS %s cancela por la puerta auditada', (_nombre, archivo
     // `verifyManagerPin` pide `/api/pos/pin` con `manager: true` (filtra rol
     // gerente+ EN EL SERVIDOR) y devuelve un shiftToken. Ya estaba en la mano.
     expect(handler).toMatch(/consumeManagerApproval\(manager\)/)
-    expect(handler).toMatch(/approval_token: tokenDelGerente \|\| undefined/)
+    expect(handler).toMatch(/approval_token: tokenDelGerente/)
   })
 
-  it('sin token declara device-trust, como el POS — no se queda mudo', () => {
-    expect(handler).toMatch(/offline_approved: tokenDelGerente \? undefined : true/)
+  it('sin token firmado se detiene y pide conexión', () => {
+    expect(handler).toMatch(/if \(!tokenDelGerente\)/)
+    expect(handler).not.toContain('offline_approved')
   })
 
   it('viaja con la credencial de la terminal', () => {
     expect(handler).toMatch(/\.\.\.getPOSAuthHeaders\(\)/)
+    expect(handler).toMatch(/Authorization: `Bearer \$\{tokenDelGerente\}`/)
   })
 
   it('un item sin id NO se cancela por el camino viejo: se rechaza', () => {
@@ -150,7 +152,9 @@ describe('lo que la puerta auditada exige y la otra no exigia', () => {
     expect(rutaLimpia).toMatch(/ya_enviado_a_cocina: Number\(targetItem\.sent_quantity\) > 0/)
   })
 
-  it('marca para revisar cuando un rol bajo se autoaprobo sin red', () => {
-    expect(rutaLimpia).toMatch(/revisar: approvalMode\.startsWith\('offline_device_trust'\)/)
+  it('un rol bajo sin token queda bloqueado antes de tocar la orden', () => {
+    expect(rutaLimpia).toMatch(/requesterLevel >= 4/)
+    expect(rutaLimpia).toMatch(/MANAGER_APPROVAL_REQUIRED/)
+    expect(rutaLimpia).not.toContain('offline_device_trust')
   })
 })

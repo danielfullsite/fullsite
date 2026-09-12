@@ -8,8 +8,8 @@ import { verifyManagerApproval, apruebaSospechosa } from '@/lib/manager-approval
  * Anti-fraude (PERM-07 / BUG-4): antes reopenOrder hacía un PATCH directo con anon-key
  * (JWT del usuario) → cualquier mesero podía reabrir una cuenta pagada por POST directo,
  * modificarla y re-cerrarla por menos = skimming. Ahora se exige aprobación de gerente
- * VERIFICADA server-side (token firmado online, o device-trust offline). El PATCH corre
- * con service_role, scopeado al tenant del token. Rollout grace → strict (POS_APPROVAL_STRICT).
+ * VERIFICADA server-side (token firmado de gerente o sesión gerente+). El PATCH corre
+ * con service_role y queda limitado al tenant del token.
  */
 export async function POST(request: NextRequest) {
   const auth = await withPOSAuth(request)
@@ -17,13 +17,13 @@ export async function POST(request: NextRequest) {
   const clientId = auth.clientId
 
   const body = await request.json().catch(() => ({}))
-  const { order_id, manager, approval_token, offline_approved } = body
+  const { order_id, manager, approval_token } = body
   if (!order_id || typeof order_id !== 'string') {
     return Response.json({ ok: false, error: 'MISSING_ORDER_ID' }, { status: 400 })
   }
 
   const appr = await verifyManagerApproval({
-    approvalToken: approval_token, offlineApproved: offline_approved, clientId, minLevel: 4,
+    approvalToken: approval_token, clientId, minLevel: 4,
     // El rol sale del shift token FIRMADO, no del cuerpo. Con esto la bitácora
     // distingue a un gerente aprobando en su terminal de un mesero que se autoaprobó.
     solicitanteRol: auth.role,

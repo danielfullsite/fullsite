@@ -15,7 +15,7 @@ import { initStationRouting, initNoPrintStations, initCancellationReasons, initD
 import { inventoryPolicyService } from '@/lib/inventory-policy'
 import { getFingerprintUrl } from '@/lib/fingerprint-url'
 import { localNetworkFetch } from '@/lib/local-network-fetch'
-import { decidirHuella, modoDeAutoridadRecordado } from '@/lib/modo-autoridad'
+import { mensajeDeIdentificado } from '@/lib/modo-autoridad'
 import { provisionManagerCredential, verifyPinOffline, estadoCredencialesOffline } from '@/lib/pos-manager-auth'
 import { POSLockContext } from './pos-lock-context'
 import { requiereCaja } from '@/lib/pedro-cliente'
@@ -27,6 +27,10 @@ async function hashPin(pin: string, staffId: string): Promise<string> {
     const buf = await crypto.subtle.digest('SHA-256', data)
     return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
   } catch { return '' }
+}
+
+function clearStoredShiftToken(): void {
+  try { localStorage.removeItem('pos_shift_token') } catch {}
 }
 
 
@@ -214,7 +218,9 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
   useEffect(() => {
     const onAuthRequired = () => {
       if (!unlockedRef.current) return // ya está en la pantalla de PIN
-      try { sessionStorage.removeItem('pos_staff'); cerrarActorDeCaja() } catch {}
+      try { sessionStorage.removeItem('pos_staff') } catch {}
+      clearStoredShiftToken()
+      cerrarActorDeCaja()
       setSessionError('Tu sesión expiró — vuelve a ingresar tu PIN. Tus comandas están guardadas y se enviarán al reingresar.')
       setUnlocked(false)
     }
@@ -252,8 +258,11 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
       const lastActivity = sessionStorage.getItem('pos_last_activity')
       if (saved && lastActivity) {
         const elapsed = Date.now() - parseInt(lastActivity)
-        const localActor = requiereCaja() ? actorDeCaja() : null
-        if (elapsed < IDLE_TIMEOUT_MS && (!requiereCaja() || localActor)) {
+        const usaCaja = requiereCaja()
+        const localActor = usaCaja ? actorDeCaja() : null
+        let tieneTokenCloud = false
+        try { tieneTokenCloud = Boolean(localStorage.getItem('pos_shift_token')) } catch {}
+        if (elapsed < IDLE_TIMEOUT_MS && (usaCaja ? Boolean(localActor) : tieneTokenCloud)) {
           try {
             const parsed = localActor?.staff || JSON.parse(saved)
             setStaff(parsed)
@@ -265,10 +274,16 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
         } else {
           // Session expired — clean up server session too
           sessionStorage.removeItem('pos_staff')
+          clearStoredShiftToken()
           cerrarActorDeCaja()
           sessionStorage.removeItem('pos_last_activity')
           removeSession().catch(() => {})
         }
+      } else {
+        // No hay identidad visible que corresponda al token: se borra para que
+        // una pestaña nueva no herede silenciosamente los privilegios anteriores.
+        clearStoredShiftToken()
+        cerrarActorDeCaja()
       }
       // PIN validation is now server-side only via /api/pos/pin
       // No PINs cached in localStorage (security: prevents PIN theft via DevTools)
@@ -309,6 +324,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
           setStaff(null)
           setPin('')
           sessionStorage.removeItem('pos_staff')
+          clearStoredShiftToken()
           cerrarActorDeCaja()
           sessionStorage.removeItem('pos_last_activity')
         }
@@ -377,95 +393,27 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
     return false
   }
 
-  // Authenticate with fingerprint via DigitalPersona service (port 7718)
+  // DigitalPersona identifica a la persona; el PIN crea la sesión firmada.
+  // El identificador devuelto por el lector es información del cliente, no una
+  // prueba que el servidor pueda validar, así que nunca desbloquea por sí solo.
   const handleBiometricLogin = async () => {
-    // Antes se preguntaba `requiereCaja()`, que responde por el userAgent: bajo
-    // Electron es SIEMPRE verdadero, así que la huella quedaba rechazada en las
-    // tres terminales de un restaurante que la usa a diario. La pregunta correcta
-    // no es «¿soy una aplicación de escritorio?» sino «¿esta instalación exige un
-    // permiso firmado por Caja?». Ese dato lo publica Pedro en su estado.
-    // Con autoridad de Caja la huella sigue sirviendo para saber quién eres, pero
-    // el permiso lo firma Caja a partir de un PIN y el lector no trae PIN.
-    if (decidirHuella(modoDeAutoridadRecordado()) === 'identificar-y-pedir-pin') {
-      setSessionError('Esta caja pide tu PIN para firmar el turno. La huella sirve para identificarte, no para autorizar cobros.')
-      return
-    }
     setBiometricChecking(true)
     try {
       const res = await localNetworkFetch(`${FINGERPRINT_URL}/identify`, { method: 'GET', signal: AbortSignal.timeout(20000) })
       const data = await res.json()
 
       if (data.ok && data.staffId) {
-        // Look up staff member by ID from pos_staff via API.
-        // Offline: ni lo intentamos — son 4s de espera garantizada. Mismo guard
-        // que ya usa la ruta de PIN mas abajo.
-        let staffRes: Response | null = null
-        if (navigator.onLine) {
-          try {
-            staffRes = await fetch(apiUrl('/api/pos/pin'), {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ pin: '___fingerprint___', client_id: _cid(), fingerprint_id: data.staffId, device_id: getTerminalId() }),
-              signal: AbortSignal.timeout(4000),
-            })
-          } catch { staffRes = null }
-        }
-
-        // Try API first (validates active status), fall back to local cache
         let member: StaffMember | null = null
-        if (staffRes?.ok) {
-          try {
-            const staffData = await staffRes.json()
-            if (staffData.staff) {
-              member = staffData.staff
-              // Refresh offline cache so it survives a future storage-cleared offline session
-              try {
-                const fpMap = JSON.parse(localStorage.getItem('pos_fingerprint_staff') || '{}')
-                fpMap[data.staffId] = member
-                localStorage.setItem('pos_fingerprint_staff', JSON.stringify(fpMap))
-              } catch {}
-            }
-          } catch {}
-        }
-        if (!member) {
-          try {
-            const fpMap = JSON.parse(localStorage.getItem('pos_fingerprint_staff') || '{}')
-            if (fpMap[data.staffId]) member = fpMap[data.staffId]
-          } catch {}
-        }
+        try {
+          const fpMap = JSON.parse(localStorage.getItem('pos_fingerprint_staff') || '{}')
+          if (fpMap[data.staffId]) member = fpMap[data.staffId]
+        } catch {}
 
         if (!member) {
-          setSessionError(
-            navigator.onLine
-              ? 'Huella reconocida pero usuario no vinculado. Entra con PIN primero.'
-              : 'Huella reconocida, pero sin internet esta terminal aun no la conoce. Entra con PIN una vez y la huella queda lista para offline.'
-          )
-          setBiometricChecking(false)
-          return
-        }
-
-        // Session locking
-        setSessionError('')
-        const conflict = await checkActiveSession(member.id)
-        if (conflict) {
-          setSessionError('Usuario activo en otra terminal.')
-          setBiometricChecking(false)
-          return
-        }
-        await registerSession(member.id, member.name)
-        startHeartbeat(member.id)
-        ensureAttendanceEntry(member.id, member.name, 'huella')
-
-        setStaff(member)
-        setUnlocked(true)
-        setAttempts(0)
-        sessionStorage.setItem('pos_staff', JSON.stringify(member))
-        sessionStorage.setItem('pos_last_activity', Date.now().toString())
-        // Fullscreen handled by Electron kiosk mode
-        requestNotificationPermission().catch(() => {})
-        // Go to mesas after fingerprint login
-        if (window.location.pathname === '/pos' && !window.location.search) {
-          router.push('/pos/mesas')
+          setSessionError('Reconocí la huella, pero esta terminal aún no sabe quién eres. Entra con tu PIN una vez para vincularla.')
+        } else {
+          setPin('')
+          setSessionError(mensajeDeIdentificado(member.name))
         }
       } else {
         setSessionError(data.error || 'Huella no reconocida')
@@ -479,6 +427,9 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
 
   const handleSubmit = async () => {
     if (pin.length < 4 || isLocked) return
+    // Si el intento falla o el servidor no puede firmar una sesión nueva, jamás
+    // se reutiliza silenciosamente el token privilegiado de la persona anterior.
+    clearStoredShiftToken()
     setChecking(true)
     setError(false)
 
@@ -760,7 +711,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
           </svg>
           <h2 className="text-xl font-bold mb-2">{staff.name}</h2>
           <p className="text-slate-400 text-sm mb-2">
-            Registra tu huella para entrar sin PIN.
+            Registra tu huella para identificarte rápidamente. Tu PIN confirma la sesión.
           </p>
           <div className="text-slate-500 text-xs mb-6 space-y-1">
             <p>1. Toca el boton y pon tu dedo firme y plano en el lector</p>
@@ -798,7 +749,17 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
   }
 
   if (unlocked) return (
-    <POSLockContext.Provider value={{ lock: () => { cerrarActorDeCaja(); setUnlocked(false); setPin('') } }}>
+    <POSLockContext.Provider value={{ lock: () => {
+      try {
+        sessionStorage.removeItem('pos_staff')
+        sessionStorage.removeItem('pos_last_activity')
+      } catch {}
+      clearStoredShiftToken()
+      cerrarActorDeCaja()
+      setStaff(null)
+      setUnlocked(false)
+      setPin('')
+    } }}>
       <div className="pos-kiosk" style={{
         background:'#0a0a0f', color:'#fff', minHeight:'100dvh', overflow:'auto',
         colorScheme:'dark',
