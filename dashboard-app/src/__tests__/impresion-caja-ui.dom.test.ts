@@ -52,6 +52,8 @@ it('accepted payments retain a receipt button after full settlement and do not s
   })
   render(createElement(CobroDeCaja, { order, onClose: () => {}, onChanged: () => {} }))
   await screen.findByText('Cuenta liquidada. Cocina conserva la preparación pendiente.')
+  // Los cobros ya confirmados viven en su pestaña (2026-09-12, POS sin scroll).
+  fireEvent.click(await screen.findByRole('tab', { name: /Cobrados/ }))
   const button = await screen.findByRole('button', { name: 'Imprimir recibo del abono' })
   await vi.waitFor(() => expect((button as HTMLButtonElement).disabled).toBe(false))
   fireEvent.click(button)

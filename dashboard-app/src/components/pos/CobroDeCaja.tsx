@@ -36,6 +36,18 @@ export default function CobroDeCaja({ order, onClose, onChanged }: Props) {
   const [terminal, setTerminal] = useState(TERMINAL_POR_OMISION)
   const [split, setSplit] = useState('2')
   const [notice, setNotice] = useState('')
+  // ── SIN SCROLL EN PANTALLA TÁCTIL (2026-09-12) ──────────────────────────────
+  // Este modal era una columna larga: totales, cuentas, división, efectivo,
+  // terminal bancaria, cobros por confirmar y cobros confirmados, uno debajo del
+  // otro con `overflow-auto`. En la caja no hay ratón y la barra de scroll es de
+  // pocos píxeles: el cajero tenía que arrastrar para encontrar el botón, y el
+  // encabezado se perdía (captura de campo del 2026-09-11).
+  //
+  // Ahora es UNA pantalla con pestañas grandes. No se quitó ni un dato ni un
+  // botón: sólo se repartieron. La pestaña con cobros por confirmar se abre
+  // sola, porque ésa es la que trae dinero apartado esperando una decisión.
+  const [pestana, setPestana] = useState<'efectivo' | 'tarjeta' | 'porConfirmar' | 'cobrados'>('efectivo')
+  const [pestanaTocada, setPestanaTocada] = useState(false)
   const apply = useCallback((next: FinanzasDeCaja) => {
     setFinance(current => current && current.revision > next.revision ? current : next)
     setConnected(true)
@@ -70,6 +82,13 @@ export default function CobroDeCaja({ order, onClose, onChanged }: Props) {
   }
   const account = finance?.accounts.find(a => a.account_id === accountId && a.balance_cents > a.reserved_cents) ?? finance?.accounts.find(a => a.balance_cents > a.reserved_cents)
   const pendingPayments = finance?.payments.filter(p => p.status === 'pending' || p.status === 'unknown') ?? []
+  const cobrados = finance?.payments.filter(p => p.status === 'accepted') ?? []
+  useEffect(() => {
+    // Un cobro apartado sin resolver manda sobre cualquier otra cosa; si el
+    // cajero ya eligió pestaña a mano, no se la movemos debajo de los dedos.
+    if (!pestanaTocada && pendingPayments.length > 0) setPestana('porConfirmar')
+  }, [pendingPayments.length, pestanaTocada])
+  const irA = (destino: typeof pestana) => { setPestanaTocada(true); setPestana(destino) }
   const confirm = (payment: PagoDeCaja) => run(async () => {
     const next = await confirmarEfectivoCaja(finance!, payment, centavosDeTexto(received[payment.payment_id] || ''))
     const paid = next.payments.find(p => p.payment_id === payment.payment_id)
@@ -102,7 +121,7 @@ export default function CobroDeCaja({ order, onClose, onChanged }: Props) {
       if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus() }
       if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus() }
     }}>
-    <div className="w-full max-w-2xl max-h-[92vh] overflow-auto rounded-2xl bg-[var(--surface)] text-[var(--text)] p-6 shadow-xl">
+    <div className="flex w-full max-w-2xl max-h-[94vh] flex-col gap-3 rounded-2xl bg-[var(--surface)] text-[var(--text)] p-5 shadow-xl">
       <div className="flex items-start justify-between gap-4">
         <div><h2 id="cobro-caja-title" className="text-2xl font-bold">Cobro de la cuenta</h2>
           <p className="mt-1 text-sm text-[var(--text-2)]">{connected ? 'Conectado con Caja' : 'Sin confirmar conexión con Caja'}</p></div>
@@ -116,48 +135,73 @@ export default function CobroDeCaja({ order, onClose, onChanged }: Props) {
         <button className={`${button} bg-blue-600 text-white`} disabled={disabled || !!sendWarning}
           onClick={() => run(() => abrirFinanzasCaja(savedOrder), 'Cuenta preparada para cobrar.')}>Preparar cuenta para cobrar</button>
       </div> : <>
-        <dl className="my-6 grid grid-cols-2 gap-3">
+        {/* Resumen en UNA fila: los cuatro importes caben sin empujar el resto. */}
+        <dl className="grid grid-cols-4 gap-2">
           {[['Total', finance.total_cents], ['Pagado', finance.paid_cents], ['Reservado', finance.reserved_cents], ['Pendiente', finance.balance_cents]].map(([label, value]) =>
-            <div key={label}><dt className="text-sm text-[var(--text-2)]">{label}</dt><dd className="text-xl font-bold">{pesosDeCentavos(Number(value))}</dd></div>)}
+            <div key={label}><dt className="text-xs text-[var(--text-2)]">{label}</dt><dd className="text-lg font-bold tabular-nums">{pesosDeCentavos(Number(value))}</dd></div>)}
         </dl>
-        <div className="space-y-2" aria-label="Cuentas compartidas">
+        {/* Cuentas compartidas en fila: se deslizan de lado, que en táctil es
+            natural, en vez de crecer hacia abajo. Con una sola cuenta no se
+            pinta la lista: ya está elegida y ocupar alto no aporta. */}
+        {finance.accounts.length > 1 && <div className="flex gap-2 overflow-x-auto pb-1" aria-label="Cuentas compartidas">
           {finance.accounts.map((a, i) => <button key={a.account_id} disabled={disabled || a.balance_cents <= a.reserved_cents}
-            className={`flex w-full items-center justify-between gap-3 rounded-xl border p-3 text-left ${account?.account_id === a.account_id ? 'border-blue-500 bg-blue-500/10' : 'border-[var(--line)]'}`}
+            className={`min-h-[56px] shrink-0 rounded-xl border px-3 py-2 text-left ${account?.account_id === a.account_id ? 'border-blue-500 bg-blue-500/10' : 'border-[var(--line)]'}`}
             onClick={() => { setAccountId(a.account_id); setAmount(((a.balance_cents - a.reserved_cents) / 100).toFixed(2)) }}>
-            <span>{a.label || `Cuenta ${i + 1}`}<small className="block text-[var(--text-2)]">Pagado {pesosDeCentavos(a.paid_cents)}{a.reserved_cents > 0 ? ` · En proceso ${pesosDeCentavos(a.reserved_cents)}` : ''}</small></span>
-            <strong>{pesosDeCentavos(a.balance_cents)}</strong>
+            <span className="block font-semibold">{a.label || `Cuenta ${i + 1}`} · {pesosDeCentavos(a.balance_cents)}</span>
+            <small className="block text-[var(--text-2)]">Pagado {pesosDeCentavos(a.paid_cents)}{a.reserved_cents > 0 ? ` · En proceso ${pesosDeCentavos(a.reserved_cents)}` : ''}</small>
           </button>)}
-        </div>
-        {finance.payments.length === 0 && <div className="my-5 flex items-end gap-3">
-          <label className="flex-1">Dividir en partes iguales<input aria-label="Número de cuentas" className={field} type="number" min="2" max="50" value={split} onChange={e => setSplit(e.target.value)} /></label>
+        </div>}
+        {finance.payments.length === 0 && <div className="flex items-end gap-2">
+          <label className="flex-1 text-sm">Dividir en partes iguales<input aria-label="Número de cuentas" className={field} type="number" min="2" max="50" value={split} onChange={e => setSplit(e.target.value)} /></label>
           <button className={`${button} border border-[var(--line)]`} disabled={disabled}
             onClick={() => run(() => dividirParejoCaja(finance, Number(split)), 'División guardada y visible en todas las terminales.')}>Dividir cuenta</button>
         </div>}
+        {/* Pestañas: una pantalla por decisión, sin scroll. El número en la
+            pestaña dice lo que hay dentro para que nada quede escondido. */}
+        <div className="flex gap-2" role="tablist" aria-label="Formas de cobro">
+          {([
+            ['efectivo', 'Efectivo', 0],
+            ['tarjeta', 'Tarjeta', 0],
+            ['porConfirmar', 'Por confirmar', pendingPayments.length],
+            ['cobrados', 'Cobrados', cobrados.length],
+          ] as const).map(([id, texto, n]) => (
+            <button key={id} role="tab" aria-selected={pestana === id} onClick={() => irA(id)}
+              className={`min-h-[56px] flex-1 rounded-xl border px-2 text-sm font-bold ${pestana === id ? 'border-blue-500 bg-blue-500/10 text-[var(--text)]' : 'border-[var(--line)] text-[var(--text-2)]'} ${n > 0 && pestana !== id ? 'border-amber-500 text-amber-600' : ''}`}>
+              {texto}{n > 0 ? ` (${n})` : ''}
+            </button>
+          ))}
+        </div>
         {finance.status === 'settled' ? <p className="my-5 text-lg font-bold text-emerald-700">Cuenta liquidada. Cocina conserva la preparación pendiente.</p> : <>
           {sendWarning && <p role="status" className="my-3 text-amber-700">{sendWarning} Los cobros en proceso todavía pueden confirmarse o aclararse.</p>}
-          {account && <div className="my-5 space-y-3 border-t border-[var(--line)] pt-4">
+          {account && pestana === 'efectivo' && <div className="space-y-3">
             <label className="block">Importe a cobrar en efectivo<input aria-label="Importe a cobrar" className={field} inputMode="decimal" value={amount} placeholder={((account.balance_cents - account.reserved_cents) / 100).toFixed(2)} onChange={e => setAmount(e.target.value)} /></label>
             <button className={`${button} w-full bg-blue-600 text-white`} disabled={disabled || !!sendWarning}
               onClick={() => run(() => reservarEfectivoCaja(finance, account.account_id,
                 centavosDeTexto(amount || ((account.balance_cents - account.reserved_cents) / 100).toFixed(2))), 'Cobro preparado. Confirma cuando hayas recibido el efectivo.')}>Preparar cobro en efectivo</button>
-
-            {/* COBRO CON TERMINAL BANCARIA.
-                Se aparta el importe ANTES de pasar la tarjeta para que otra terminal no lo
-                cobre otra vez mientras el cajero está en el aparato. El resultado se
-                registra después, con la referencia del voucher. */}
-            <div className="rounded-xl border border-[var(--line)] p-3">
-              <label className="block text-sm">Terminal donde se pasa la tarjeta
-                <input aria-label="Terminal bancaria" className={field} value={terminal}
-                  onChange={e => setTerminal(e.target.value)} /></label>
-              <button className={`${button} mt-3 w-full border border-blue-600 text-blue-600`} disabled={disabled || !!sendWarning || !terminal.trim()}
-                onClick={() => run(() => reservarCobroExterno(finance, account.account_id,
-                  centavosDeTexto(amount || ((account.balance_cents - account.reserved_cents) / 100).toFixed(2)), terminal),
-                  'Importe apartado. Pasa la tarjeta en la terminal y registra aquí el resultado.')}>
-                Cobrar con terminal bancaria</button>
-              <p className="mt-2 text-xs text-[var(--text-2)]">El importe queda apartado mientras pasas la tarjeta. Ninguna otra terminal lo puede cobrar.</p>
-            </div>
           </div>}
-          {pendingPayments.map(payment => <section key={payment.payment_id} className="my-4 rounded-xl border border-amber-500 p-4">
+
+          {/* COBRO CON TERMINAL BANCARIA.
+              Se aparta el importe ANTES de pasar la tarjeta para que otra terminal no lo
+              cobre otra vez mientras el cajero está en el aparato. El resultado se
+              registra después, con la referencia del voucher. */}
+          {account && pestana === 'tarjeta' && <div className="space-y-3">
+            <label className="block">Importe a cobrar con tarjeta<input aria-label="Importe a cobrar con tarjeta" className={field} inputMode="decimal" value={amount} placeholder={((account.balance_cents - account.reserved_cents) / 100).toFixed(2)} onChange={e => setAmount(e.target.value)} /></label>
+            <label className="block text-sm">Terminal donde se pasa la tarjeta
+              <input aria-label="Terminal bancaria" className={field} value={terminal}
+                onChange={e => setTerminal(e.target.value)} /></label>
+            <button className={`${button} w-full border border-blue-600 text-blue-600`} disabled={disabled || !!sendWarning || !terminal.trim()}
+              onClick={() => run(() => reservarCobroExterno(finance, account.account_id,
+                centavosDeTexto(amount || ((account.balance_cents - account.reserved_cents) / 100).toFixed(2)), terminal),
+                'Importe apartado. Pasa la tarjeta en la terminal y registra aquí el resultado.')}>
+              Cobrar con terminal bancaria</button>
+            <p className="text-xs text-[var(--text-2)]">El importe queda apartado mientras pasas la tarjeta. Ninguna otra terminal lo puede cobrar.</p>
+          </div>}
+          {(pestana === 'efectivo' || pestana === 'tarjeta') && pendingPayments.length > 0 &&
+            <p className="text-sm text-amber-600">Hay {pendingPayments.length} cobro(s) apartado(s) sin resolver. Están en la pestaña «Por confirmar».</p>}
+          {pestana === 'porConfirmar' && pendingPayments.length === 0 &&
+            <p className="text-sm text-[var(--text-2)]">No hay cobros apartados esperando decisión.</p>}
+          {pestana === 'porConfirmar' && <div className="min-h-0 flex-1 overflow-y-auto">
+          {pendingPayments.map(payment => <section key={payment.payment_id} className="mb-3 rounded-xl border border-amber-500 p-4">
             <h3 className="font-bold">Cobro por confirmar · {pesosDeCentavos(payment.amount_cents)}</h3>
             <p className="my-2 text-sm">Este importe ya está reservado. Verifica si se recibió el dinero antes de confirmar o liberarlo.</p>
             {payment.method === 'cash' && <>
@@ -188,10 +232,12 @@ export default function CobroDeCaja({ order, onClose, onChanged }: Props) {
               <p className="mt-2 text-xs text-[var(--text-2)]">Si no sabes si pasó, no adivines: déjalo pendiente. El importe sigue apartado y se resuelve después con el voucher.</p>
             </>}
           </section>)}
+          </div>}
         </>}
-        {finance.payments.some(p => p.status === 'accepted') && <div className="mt-5 border-t border-[var(--line)] pt-4">
+        {pestana === 'cobrados' && cobrados.length === 0 && <p className="text-sm text-[var(--text-2)]">Todavía no hay cobros confirmados en esta cuenta.</p>}
+        {pestana === 'cobrados' && cobrados.length > 0 && <div className="min-h-0 flex-1 overflow-y-auto">
           <h3 className="font-bold">Pagos confirmados</h3>
-          {finance.payments.filter(p => p.status === 'accepted').map(p => <div key={p.payment_id} className="mt-2 space-y-2 text-sm"><p>
+          {cobrados.map(p => <div key={p.payment_id} className="mt-2 space-y-2 text-sm"><p>
             {pesosDeCentavos(p.amount_cents)} · {p.method === 'cash' ? 'Efectivo' : (p.provider || 'Terminal')}{p.change_cents ? ` · Cambio ${pesosDeCentavos(p.change_cents)}` : ''}
           </p><DocumentoImpresoDeCaja order={{ id: finance.order_id, order_revision: finance.order_revision, financial_order: finance }} paymentId={p.payment_id} />{p.method === 'cash' && <CajonDeCaja turnoId={finance.turno_id} orderId={finance.order_id} paymentId={p.payment_id} />}</div>)}
         </div>}
