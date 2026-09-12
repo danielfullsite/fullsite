@@ -742,7 +742,7 @@ CREATE TABLE IF NOT EXISTS pos_inventory_movements (
   product_id BIGINT,
   movement_type TEXT NOT NULL,
   quantity NUMERIC NOT NULL,
-  order_id UUID,
+  order_id TEXT,
   actor TEXT,
   notes TEXT,
   created_at TIMESTAMPTZ DEFAULT now(),

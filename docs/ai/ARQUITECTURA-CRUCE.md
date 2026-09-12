@@ -162,6 +162,22 @@ Movimientos de salida = Σ(receta del platillo × cantidad vendida)  ±  merma d
 Lo que sobra de esa resta es merma no declarada: producto que salió sin venderse. Es el
 cruce más valioso del sistema y el que justifica todo el trabajo del laboratorio.
 
+> **La procedencia del lado real** (2026-09-09). El lado izquierdo de la resta lo da
+> `ops_consumo`. El derecho es `pos_inventory_movements`, y hasta esta fecha sus descuentos
+> por receta no guardaban de qué orden venían: la columna `order_id` era `uuid` y
+> `pos_orders.id` es `text`, así que `r1_reconcile_item` la dejaba en NULL —1,948
+> movimientos en amalay, ninguno con orden—. La procedencia no se había perdido (vivía en
+> `reconciliation_result_id` → `pos_reconciliation_results.order_id`, que sí es text), pero
+> exigía dos saltos y no servía para los tenants sin UUID, que son la mayoría: `scyf-demo`
+> tiene 3 UUID en 110,790 órdenes.
+>
+> La migración pendiente `PENDIENTE_20260912120000_order_id_del_ledger_es_text.sql` pasa la columna a `text`,
+> rellenó los 2,349 movimientos por esa vía y puso a `r1_reconcile_item` a escribirla. Con
+> eso el detector puede decir *de qué órdenes*, y distinguir un descuento duplicado de uno
+> faltante y de una reversa sin par — las tres cosas que separan un hallazgo de una
+> acusación por un artefacto. La regresión vive en
+> `supabase/tests/order_id_del_ledger_test.sql`.
+
 **Nivel 4 — el día contra sus partes.** `ops_daily_history.ventas_dia` debe ser la suma
 de sus órdenes. Suena obvio, y es justo el tipo de cosa que se rompe cuando alguien
 cambia una vista — como pasó hoy con `ops_daily`, congelada 13 días sin que nadie lo
