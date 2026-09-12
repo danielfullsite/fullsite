@@ -73,11 +73,29 @@ En una cocina eso no es un error de log: es que dejan de salir los platillos.
    Con el secreto aún apagado el token se ignora, así que se puede provisionar sin prisa y sin
    riesgo.
 
-4. **Recién entonces**, poner `KITCHEN_TOKEN_SECRET` en Vercel y redesplegar.
+4. **Encender en modo `grace` primero** (recomendado). Poner en Vercel:
+   ```
+   KITCHEN_TOKEN_SECRET = <el secreto>
+   KITCHEN_TOKEN_MODE   = grace
+   ```
+   En `grace` el endpoint **verifica pero sigue sirviendo**, y deja en los registros de
+   Vercel una línea por cada pantalla que no trae token válido:
+   ```
+   [kitchen-token] sin token válido, servido en modo grace { client_id, trae_token, ua }
+   ```
+   Así se ve **qué pantallas faltan por provisionar sin que la cocina se quede a ciegas**.
+   Es el mismo patrón grace → strict del enforcement antifraude
+   ([`FRAUD-ENFORCEMENT-FLAGS.md`](FRAUD-ENFORCEMENT-FLAGS.md)).
 
-5. **Verificar las dos direcciones:**
+   > Un turno completo de servicio en `grace` es suficiente: si no aparece ninguna línea,
+   > todas las pantallas están provisionadas.
+
+5. **Pasar a `strict`** quitando `KITCHEN_TOKEN_MODE` (sin la variable, con secreto, el
+   default ya es `strict`) y redesplegar.
+
+6. **Verificar las dos direcciones:**
    - Una pantalla provisionada sigue recibiendo comandas.
-   - `curl` sin token a `?client_id=<otro tenant>` devuelve **401**.
+   - Una petición sin token a `?client_id=<otro tenant>` devuelve **401**.
 
 ## Pendiente aparte: que falle CERRADO
 
@@ -87,5 +105,25 @@ despliega un entorno sin él, el endpoint vuelve a servir abierto **sin avisar**
 Es el mismo antipatrón que tenía `POS_FALLBACK_PIN` antes del 2026-08-26. Una vez provisionadas
 las pantallas, conviene invertirlo: sin secreto, **denegar** en vez de autorizar.
 
-No se cambia hoy porque hacerlo antes de provisionar tiene exactamente el efecto que este
-documento trata de evitar.
+**Sigue sin cambiarse, y a propósito.** Invertir el default hoy —con el secreto ausente en
+producción— dejaría a la cocina de AMALAY sin comandas en el siguiente despliegue, que es
+exactamente lo que este documento trata de evitar. El modo `grace` existe para poder llegar a
+ese punto sin ese riesgo: primero se comprueba que todas las pantallas traen token, después se
+invierte el default.
+
+> El orden importa y no es negociable: **provisionar → `grace` → `strict` → fallar cerrado.**
+> Saltarse un paso se paga en el pase de cocina, en hora pico.
+
+## Estado del código
+
+| | |
+|---|---|
+| Firma y verificación del token | ✅ `lib/kitchen-token.ts` |
+| Rollout `off` → `grace` → `strict` | ✅ `evaluarTokenCocina()` |
+| Reporte de pantallas sin provisionar | ✅ registro en `grace` |
+| Pruebas | ✅ 13, incluidas token ajeno y modo basura |
+| `KITCHEN_TOKEN_SECRET` en producción | 🔴 **no está** — por eso el endpoint sirve abierto |
+| Pantallas provisionadas | 🔴 ninguna |
+
+Sin el secreto, todo lo anterior está inerte y el comportamiento es idéntico al de siempre.
+**El código no es lo que falta: falta el turno con las pantallas enfrente.**
