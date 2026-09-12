@@ -1,10 +1,14 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const appRoot = join(import.meta.dirname, '..', '..')
 
 describe('public security trust center', () => {
+  it('no publica certificados de cumplimiento autoemitidos', () => {
+    expect(existsSync(join(appRoot, 'src/app/certificados/page.tsx'))).toBe(false)
+  })
+
   it('links public evidence and does not claim unearned certifications', () => {
     const page = readFileSync(join(appRoot, 'src/app/seguridad/page.tsx'), 'utf8')
 
