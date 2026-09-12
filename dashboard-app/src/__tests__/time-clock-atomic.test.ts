@@ -22,7 +22,7 @@ afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs() })
 describe('checador atómico e idempotente', () => {
   it('resuelve empleado, alternancia e inserción en una sola transacción', async () => {
     const receipt = { ok: true, staff_name: 'Ana', type: 'entrada', ts: '2026-09-12T12:00:00Z', recientes: [] }
-    const fetcher = vi.fn(async () => Response.json(receipt))
+    const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => Response.json(receipt))
     vi.stubGlobal('fetch', fetcher)
     const response = await POST(request({ pin: '1234567890', operation_id: 'clock-op-1', method: 'huella' }))
     expect(response.status).toBe(200)

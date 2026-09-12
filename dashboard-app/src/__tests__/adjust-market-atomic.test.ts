@@ -24,7 +24,7 @@ afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs() })
 
 describe('ajuste market atómico', () => {
   it('envía identidad estable, tenant y actor verificados a una sola transacción', async () => {
-    const fetcher = vi.fn(async () => Response.json({ ok: true, new_stock: 10, delta: 5, was_duplicate: false }))
+    const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => Response.json({ ok: true, new_stock: 10, delta: 5, was_duplicate: false }))
     vi.stubGlobal('fetch', fetcher)
     const response = await POST(request({ client_id: 'otro' }))
     expect(response.status).toBe(200)

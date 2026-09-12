@@ -33,7 +33,7 @@ afterEach(() => {
 
 describe('reapertura atómica de orden', () => {
   it('manda tenant, identidad estable y aprobador verificados a una sola transacción', async () => {
-    const fetcher = vi.fn(async () => Response.json({ ok: true, revision: 8, already_applied: false }))
+    const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => Response.json({ ok: true, revision: 8, already_applied: false }))
     vi.stubGlobal('fetch', fetcher)
 
     const response = await POST(request({ client_id: 'otro', manager: 'forjado' }))
