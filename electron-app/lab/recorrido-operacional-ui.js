@@ -44,8 +44,15 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     await terminal.page.getByRole('button', { name: 'Cobrar', exact: true }).click()
     await expect(modal(terminal)).toBeVisible()
   }
+  // El modal de cobro se repartió en pestañas el 2026-09-12 (POS sin scroll: en la
+  // caja no hay ratón). Nada se quitó — lo que antes estaba en la misma columna
+  // ahora vive en Efectivo / Tarjeta / Por confirmar / Cobrados.
+  const pestanaDelCobro = async (terminal, nombre) => {
+    await modal(terminal).getByRole('tab', { name: new RegExp(nombre) }).click()
+  }
   const collectCash = async (terminal, amount) => {
     const dialog = modal(terminal)
+    await pestanaDelCobro(terminal, 'Efectivo')
     await dialog.getByLabel('Importe a cobrar', { exact: true }).fill(amount)
     await dialog.getByRole('button', { name: 'Preparar cobro en efectivo', exact: true }).click()
     await dialog.getByRole('textbox', { name: /^Efectivo recibido / }).fill(amount)
@@ -183,6 +190,7 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
   if (printLab) await check('El recibo del abono se imprime sin registrar otro pago', async () => {
     const before = (await snapshot()).financial_orders[0]
     const count = printLab.packets.length
+    await pestanaDelCobro(pos2, 'Cobrados')
     await modal(pos2).getByRole('button', { name: 'Imprimir recibo del abono', exact: true }).click()
     await until(() => printLab.packets.length === count + 1, 'Recibo parcial en TCP sintético')
     assert.match(printLab.packets.at(-1), /Importe recibido 29\.00/)
@@ -193,6 +201,7 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     const before = (await snapshot()).financial_orders[0]
     assert.equal(printLab.hex.filter(bytes => bytes === '1b700019fa').length, 1, 'Confirmar dinero no emite pulso automático')
     const count = printLab.hex.length
+    await pestanaDelCobro(pos2, 'Cobrados')
     const button = modal(pos2).getByRole('button', { name: 'Solicitar apertura para este abono', exact: true })
     await button.click()
     await until(() => printLab.hex.length === count + 1, 'Pulso por abono recibido en TCP sintético')
@@ -201,6 +210,7 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     assert.deepEqual((await snapshot()).financial_orders[0], before)
     await modal(pos2).getByRole('button', { name: 'Cerrar', exact: true }).click()
     await openPayment(pos2)
+    await pestanaDelCobro(pos2, 'Cobrados')
     await expect(modal(pos2).getByRole('button', { name: 'Solicitar apertura para este abono', exact: true })).toBeDisabled()
     assert.equal(printLab.hex.length, count + 1)
   })
