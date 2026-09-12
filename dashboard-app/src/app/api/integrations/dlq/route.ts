@@ -4,6 +4,7 @@ import { processRappiOrder } from '@/lib/integrations/rappi/ingest'
 import { processVerifiedUberPayload } from '@/lib/integrations/uber-eats/webhook-handler'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const DLQ_LEASE_MS = 5 * 60 * 1000
 
 function dbConfig() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest) {
 
   const res = await fetch(
     `${db.url}/rest/v1/integration_webhook_dlq?status=neq.resolved` +
-    '&select=id,provider,event_type,client_id,failure_reason,status,attempts,last_error,created_at,updated_at' +
+    '&select=id,provider,event_type,client_id,failure_reason,status,attempts,last_error,claimed_at,created_at,updated_at' +
     '&order=created_at.asc&limit=200',
     { headers: headers(db.key), cache: 'no-store' },
   )
@@ -53,14 +54,31 @@ export async function POST(request: NextRequest) {
   const candidate = Array.isArray(rows) ? rows[0] as Record<string, unknown> | undefined : undefined
   if (!candidate) return NextResponse.json({ ok: false, error: 'DLQ_ENTRY_NOT_FOUND' }, { status: 404 })
 
-  // Compare-and-swap: dos operadores no reprocesan la misma orden a la vez.
+  // Compare-and-swap con lease: dos operadores no reprocesan la misma orden a
+  // la vez, pero un worker muerto tampoco la congela para siempre.
+  const now = new Date()
+  const leaseCutoff = new Date(now.getTime() - DLQ_LEASE_MS)
+  const status = String(candidate.status || '')
+  const claimedAtMs = typeof candidate.claimed_at === 'string' ? Date.parse(candidate.claimed_at) : Number.NaN
+  const expiredProcessing = status === 'processing' && (!Number.isFinite(claimedAtMs) || claimedAtMs < leaseCutoff.getTime())
+  if (!['pending', 'failed'].includes(status) && !expiredProcessing) {
+    return NextResponse.json({ ok: false, error: 'DLQ_ENTRY_BUSY' }, { status: 409 })
+  }
+
   const attempts = Number(candidate.attempts || 0) + 1
+  const claimToken = crypto.randomUUID()
+  const claimFilter = expiredProcessing
+    ? `status=eq.processing&or=(claimed_at.is.null,claimed_at.lt.${encodeURIComponent(leaseCutoff.toISOString())})`
+    : 'status=in.(pending,failed)'
   const claim = await fetch(
-    `${db.url}/rest/v1/integration_webhook_dlq?id=eq.${encodeURIComponent(id)}&status=in.(pending,failed)`,
+    `${db.url}/rest/v1/integration_webhook_dlq?id=eq.${encodeURIComponent(id)}&${claimFilter}`,
     {
       method: 'PATCH',
       headers: headers(db.key, 'return=representation'),
-      body: JSON.stringify({ status: 'processing', attempts, last_error: null, updated_at: new Date().toISOString() }),
+      body: JSON.stringify({
+        status: 'processing', attempts, last_error: null,
+        claimed_at: now.toISOString(), claim_token: claimToken, updated_at: now.toISOString(),
+      }),
     },
   )
   const claimedRows = claim.ok ? await claim.json().catch(() => []) : []
@@ -86,19 +104,31 @@ export async function POST(request: NextRequest) {
     }
 
     const resolvedAt = new Date().toISOString()
-    const persisted = await fetch(`${db.url}/rest/v1/integration_webhook_dlq?id=eq.${encodeURIComponent(id)}&status=eq.processing`, {
+    const persisted = await fetch(
+      `${db.url}/rest/v1/integration_webhook_dlq?id=eq.${encodeURIComponent(id)}` +
+      `&status=eq.processing&claim_token=eq.${encodeURIComponent(claimToken)}`,
+      {
       method: 'PATCH',
       headers: headers(db.key, 'return=minimal'),
-      body: JSON.stringify({ status: 'resolved', resolved_at: resolvedAt, last_error: null, updated_at: resolvedAt }),
+      body: JSON.stringify({
+        status: 'resolved', resolved_at: resolvedAt, last_error: null,
+        claimed_at: null, claim_token: null, updated_at: resolvedAt,
+      }),
     })
     if (!persisted.ok) throw new Error(`DLQ_RESOLUTION_PERSIST_FAILED_${persisted.status}`)
     return NextResponse.json({ ok: true, id, provider: entry.provider, action, order_id: orderId })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    await fetch(`${db.url}/rest/v1/integration_webhook_dlq?id=eq.${encodeURIComponent(id)}&status=eq.processing`, {
+    await fetch(
+      `${db.url}/rest/v1/integration_webhook_dlq?id=eq.${encodeURIComponent(id)}` +
+      `&status=eq.processing&claim_token=eq.${encodeURIComponent(claimToken)}`,
+      {
       method: 'PATCH',
       headers: headers(db.key, 'return=minimal'),
-      body: JSON.stringify({ status: 'failed', last_error: message.slice(0, 1000), updated_at: new Date().toISOString() }),
+      body: JSON.stringify({
+        status: 'failed', last_error: message.slice(0, 1000),
+        claimed_at: null, claim_token: null, updated_at: new Date().toISOString(),
+      }),
     }).catch(() => null)
     return NextResponse.json({ ok: false, error: 'DLQ_REPLAY_FAILED', detail: message }, { status: 422 })
   }
