@@ -29,8 +29,8 @@ describe('ajuste market atómico', () => {
     const response = await POST(request({ client_id: 'otro' }))
     expect(response.status).toBe(200)
     expect(fetcher).toHaveBeenCalledTimes(1)
-    expect(fetcher.mock.calls[0][0]).toBe('https://db.example/rest/v1/rpc/r1_adjust_market_stock_atomic')
-    expect(JSON.parse(fetcher.mock.calls[0][1].body as string)).toEqual({
+    expect(fetcher.mock.calls[0]![0]).toBe('https://db.example/rest/v1/rpc/r1_adjust_market_stock_atomic')
+    expect(JSON.parse(fetcher.mock.calls[0]![1]!.body as string)).toEqual({
       p_client_id: 'tenant-a', p_menu_item_id: 'item-a', p_adjustment_type: 'entrada',
       p_quantity: 5, p_actor: 'manager-1', p_notes: 'Recepción', p_operation_id: 'market-op-1',
     })

@@ -40,8 +40,8 @@ describe('reapertura atómica de orden', () => {
 
     expect(response.status).toBe(200)
     expect(fetcher).toHaveBeenCalledTimes(1)
-    expect(fetcher.mock.calls[0][0]).toBe('https://db.example/rest/v1/rpc/r1_reopen_order_atomic')
-    expect(JSON.parse(fetcher.mock.calls[0][1].body as string)).toEqual({
+    expect(fetcher.mock.calls[0]![0]).toBe('https://db.example/rest/v1/rpc/r1_reopen_order_atomic')
+    expect(JSON.parse(fetcher.mock.calls[0]![1]!.body as string)).toEqual({
       p_client_id: 'tenant-a',
       p_order_id: 'order-1',
       p_operation_id: 'reopen:order-1:closed-at',
