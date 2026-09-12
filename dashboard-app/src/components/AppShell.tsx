@@ -65,7 +65,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return <>{children}</>
   }
 
-  if (!showContent && loading) {
+  // Private children must never mount in the render between auth resolving to
+  // `user=null` and the redirect effect running. That one render was enough for
+  // dashboard effects to issue protected queries and briefly paint the staff
+  // shell before /login replaced it.
+  if (loading || !user || !showContent) {
     return (
       <div className="flex items-center justify-center h-screen bg-[var(--bg)]">
         <div className="text-center">
