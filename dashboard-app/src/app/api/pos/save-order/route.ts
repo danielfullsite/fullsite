@@ -483,6 +483,21 @@ export async function POST(request: NextRequest) {
       return Response.json({ ok: false, error: 'CLOSE_ORDER_FORBIDDEN' } satisfies SaveResult, { status: 403 })
     }
 
+    if (body.status === 'cancelada' && !hasPermission(auth.role, 'cancelar_ordenes')) {
+      const approval = await verifyManagerApproval({
+        approvalToken: body.approval_token,
+        clientId,
+        minLevel: 4,
+        solicitanteRol: auth.role,
+      })
+      // The separate signed approver token is part of the idempotent payload, so a
+      // cancellation approved online but queued after a network failure can replay.
+      // A browser-only/offline_approved assertion never grants this authority.
+      if (!approval.ok || !approval.mode.startsWith('online:')) {
+        return Response.json({ ok: false, error: 'CANCEL_ORDER_FORBIDDEN' } satisfies SaveResult, { status: 403 })
+      }
+    }
+
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
     const sbKey = process.env.SUPABASE_SERVICE_KEY
     if (!sbKey) {

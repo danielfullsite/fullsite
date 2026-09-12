@@ -19,12 +19,23 @@ const state = vi.hoisted(() => ({
   } as Auth,
   existing: null as null | Record<string, unknown>,
   calls: [] as Call[],
+  managerApproval: false,
+  approvalCalls: [] as Array<Record<string, unknown>>,
 }))
 
 vi.mock('@/lib/api-auth', async (original) => {
   const real = await original<typeof import('@/lib/api-auth')>()
   return { ...real, withPOSAuth: vi.fn(async () => state.auth) }
 })
+
+vi.mock('@/lib/manager-approval', () => ({
+  verifyManagerApproval: vi.fn(async (options: Record<string, unknown>) => {
+    state.approvalCalls.push(options)
+    return state.managerApproval
+      ? { ok: true, mode: 'online:gerente', solicitanteNivel: 2 }
+      : { ok: false, mode: 'blocked', solicitanteNivel: 1 }
+  }),
+}))
 
 function response(body: unknown, status = 200): Response {
   return {
@@ -89,6 +100,8 @@ beforeEach(() => {
   }
   state.existing = null
   state.calls = []
+  state.managerApproval = false
+  state.approvalCalls = []
   process.env.NEXT_PUBLIC_SUPABASE_URL = URLBASE
   process.env.SUPABASE_SERVICE_KEY = SERVICE
   installFetch()
@@ -101,6 +114,47 @@ describe('save-order usa la autoridad firmada, no los campos financieros del nav
     expect(result.status).toBe(403)
     expect(await result.json()).toMatchObject({ ok: false, error: 'CLOSE_ORDER_FORBIDDEN' })
     expect(rpcBody()).toBeUndefined()
+  })
+
+  it('un mesero no puede anular su cuenta por POST directo', async () => {
+    state.existing = { mesero: 'Ana', descuento: 0, items: [item()], status: 'enviada' }
+
+    const result = await save(payload({ expected_revision: 2, status: 'cancelada' }))
+
+    expect(result.status).toBe(403)
+    expect(await result.json()).toMatchObject({ ok: false, error: 'CANCEL_ORDER_FORBIDDEN' })
+    expect(rpcBody()).toBeUndefined()
+  })
+
+  it('un admin con permiso propio sí puede anular', async () => {
+    state.auth = {
+      clientId: 'amalay', staffId: 'staff-admin', staffName: 'Admin', role: 'admin', authType: 'shift_token',
+    }
+
+    const result = await save(payload({ expected_revision: 2, status: 'cancelada' }))
+
+    expect(result.status).toBe(200)
+    expect(rpcBody()).toMatchObject({ p_status: 'cancelada' })
+  })
+
+  it('un cajero con aprobación firmada puede anular y reintentar la misma operación offline', async () => {
+    state.auth = {
+      clientId: 'amalay', staffId: 'staff-cajero', staffName: 'Caja', role: 'cajero', authType: 'shift_token',
+    }
+    state.managerApproval = true
+
+    const result = await save(payload({
+      expected_revision: 2, status: 'cancelada', approval_token: 'signed-manager-token',
+      save_operation_id: 'offline-cancel-1',
+    }))
+
+    expect(result.status).toBe(200)
+    expect(rpcBody()).toMatchObject({
+      p_status: 'cancelada', p_save_operation_id: 'offline-cancel-1',
+    })
+    expect(state.approvalCalls).toContainEqual(expect.objectContaining({
+      approvalToken: 'signed-manager-token', clientId: 'amalay', solicitanteRol: 'cajero',
+    }))
   })
 
   it('una orden nueva queda a nombre del mesero firmado y sin descuento inventado', async () => {

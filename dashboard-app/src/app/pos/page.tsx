@@ -3136,10 +3136,14 @@ function POSContent() {
     if (loadedOrderId) {
       inventoryPending = true
       const voidOpId = genOpId()
+      // Signed by /api/pos/pin and copied into the queued payload. If connectivity
+      // drops after the manager approves, replay can still prove the authorization.
+      const cancellationApprovalToken = consumeManagerApproval(managerName)
       const voidPayload = {
         order_id: loadedOrderId,
         expected_revision: orderRevision,
         save_operation_id: voidOpId,
+        approval_token: cancellationApprovalToken,
         status: 'cancelada',
         // Los renglones cancelados con su disposicion: es lo que concilia inventario
         // (r1_save_order hace `items = coalesce(p_items, items)`).
