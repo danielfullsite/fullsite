@@ -34,6 +34,7 @@ El modelo: plataforma SaaS multi-tenant, un solo Supabase, particionamiento por 
 | **Feedback de Eduardo: síntomas y evidencia** | [`audit/EDUARDO-2026-09-09.md`](audit/EDUARDO-2026-09-09.md) |
 | **Correcciones y evidencia posterior por commit** | [`audit/CIERRE-SOFTWARE-2026-09-10.md`](audit/CIERRE-SOFTWARE-2026-09-10.md) |
 | **Barrido de defectos 10-11 sep: matriz por módulo** | [`audit/BARRIDO-2026-09-10.md`](audit/BARRIDO-2026-09-10.md) |
+| **Tercer barrido 11 sep: datos reales, visual, auditoría de pruebas** | [`audit/BARRIDO3-2026-09-11.md`](audit/BARRIDO3-2026-09-11.md) |
 | **Instalación, migración, recuperación y rollback del candidato** | [`pos/INSTALACION-CANDIDATO-2026-09-11.md`](pos/INSTALACION-CANDIDATO-2026-09-11.md) |
 | **Plan de cierre operativo (septiembre)** | [`PLAN-CIERRE-FULLSITE-2026-09-04.md`](PLAN-CIERRE-FULLSITE-2026-09-04.md) |
 | **Qué instalar y comprobar en AMALAY (candidato, no desplegado)** | [`offline/AMALAY-INSTALACION-CANDIDATO-2026-09-05.md`](offline/AMALAY-INSTALACION-CANDIDATO-2026-09-05.md) |
