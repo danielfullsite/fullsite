@@ -94,6 +94,37 @@ describe('Multi-terminal simulado — estado compartido en LAN', () => {
 
     const rB = await send(srv.cmd, 'term-B', { command_type: 'MESA_LOCK', command_id: 'l2', mesa: '7', client_id: 'term-B', expires_ms: Date.now() + 30000 })
     assert.ok(rB.error && /locked/i.test(rB.error), 'B NO debe poder bloquear la mesa que A tiene')
+
+    const editB = await send(srv.cmd, 'term-B', { command_type: 'ORDER_UPSERTED', command_id: 'edit-b', order_id: 'o7', mesa: '7', items: [] })
+    assert.equal(editB.code, 'MESA_LOCK_CONFLICT', 'un cliente viejo tampoco debe saltarse el lock y escribir')
+    assert.equal(srv.serverState.getMesa('7').order_id, null)
+  })
+
+  test('la identidad autenticada manda: el payload no puede robar ni liberar el lock de otra terminal', async () => {
+    const srv = await buildServer(dir)
+
+    const lock = await send(srv.cmd, 'term-A', {
+      command_type: 'MESA_LOCK', command_id: 'lock-spoof', mesa: '7',
+      client_id: 'term-victima', expires_ms: Date.now() + 30_000,
+    })
+    assert.ok(!lock.error)
+    assert.equal(srv.serverState.getLock('7').client_id, 'term-A')
+
+    const unlock = await send(srv.cmd, 'term-B', {
+      command_type: 'MESA_UNLOCK', command_id: 'unlock-spoof', mesa: '7', client_id: 'term-A',
+    })
+    assert.ok(!unlock.error)
+    assert.equal(srv.serverState.getLock('7').client_id, 'term-A', 'B no debe poder liberar el lock de A')
+  })
+
+  test('un lock sin identidad de terminal verificable falla cerrado', async () => {
+    const srv = await buildServer(dir)
+    const result = await send(srv.cmd, 'rest-api', {
+      command_type: 'MESA_LOCK', command_id: 'anonymous-lock', mesa: '7',
+      client_id: 'term-inventada', expires_ms: Date.now() + 30_000,
+    })
+    assert.equal(result.code, 'TERMINAL_ID_REQUIRED')
+    assert.equal(srv.serverState.getLock('7'), null)
   })
 
   test('el cierre en A libera la mesa en B', async () => {

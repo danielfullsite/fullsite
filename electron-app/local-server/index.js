@@ -681,7 +681,10 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority 
             payload:          ev,
           }
           const result = await handleAuthenticatedCommand({ cmdHandler, actorAuthority, msg: fakeMsg,
-            clientId: req.headers['x-fullsite-terminal'] || ev.client_id || 'rest-api',
+            // The LAN secret authenticates the installation; only the transport
+            // header identifies its terminal. Never promote a body field into
+            // authenticated identity (MESA_LOCK uses this to decide ownership).
+            clientId: req.headers['x-fullsite-terminal'] || 'rest-api',
             terminalId: req.headers['x-fullsite-terminal'], actorToken: req.headers['x-fullsite-actor'] })
           results.push(result)
         }
