@@ -3,6 +3,8 @@ import { prepararCancelacionItem } from '@/lib/cancelacion-item'
 vi.mock('@/lib/api-auth', () => ({ withPOSAuth: async () => ({ clientId: 'lab', staffId: 'manager', staffName: 'Manager', role: 'gerente' }), unauthorized: vi.fn() }))
 vi.mock('@/lib/shift-token', () => ({ verifyShiftToken: vi.fn() }))
 import { POST } from '@/app/api/pos/cancel-item/route'
+process.env.SUPABASE_SERVICE_KEY = 'service-test'
+process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://db.example'
 const order = () => ({ id: 'order', order_revision: 4, updated_at: '2026-09-10T00:00:00Z',
   status: 'enviada', items: [{ id: 'cancel', subtotal: 50 }, { id: 'keep', subtotal: 100 }],
   subtotal: 150, descuento: 15, iva: 10.8, total: 145.8, saldo: 145.8, pagos: [] })
