@@ -90,7 +90,7 @@ const INVENTARIO: Record<string, number> = {
   'src/app/pos/food-cost/page.tsx': 1,
   'src/app/pos/mesas/page.tsx': 3,
   'src/app/api/pos/recipe-sync/route.ts': 3,
-  'src/app/api/pos/time-clock/route.ts': 4,
+  'src/app/api/pos/time-clock/route.ts': 1,
   'src/components/pos/InventoryAlerts.tsx': 3,
 }
 

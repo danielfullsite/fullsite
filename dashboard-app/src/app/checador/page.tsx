@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Fingerprint, Delete, LogIn, LogOut, Check, Clock, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 
@@ -18,18 +18,30 @@ export default function ChecadorPage() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [result, setResult] = useState<Result | null>(null)
+  const pendingClock = useRef<{ pin: string; operationId: string } | null>(null)
 
   useEffect(() => { setNow(new Date()); const i = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(i) }, [])
 
-  const submit = useCallback(async (value: string, method: 'pin' | 'huella' = 'pin') => {
+  const submit = useCallback(async (value: string) => {
     setBusy(true); setError('')
+    const pending = pendingClock.current?.pin === value
+      ? pendingClock.current
+      : { pin: value, operationId: crypto.randomUUID() }
+    pendingClock.current = pending
     try {
       const res = await fetch('/api/pos/time-clock', {
         method: 'POST', credentials: 'include',
-        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin: value, method }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: value, operation_id: pending.operationId }),
       })
       const j = await res.json().catch(() => ({}))
-      if (!res.ok) { setError(j.error || 'No se pudo registrar'); setPin(''); return }
+      if (!res.ok) {
+        if (res.status < 500) pendingClock.current = null
+        setError(j.error || 'No se pudo registrar')
+        if (res.status < 500) setPin('')
+        return
+      }
+      pendingClock.current = null
       setResult(j); setPin('')
       setTimeout(() => setResult(null), 6000)
     } catch { setError('Error de red') } finally { setBusy(false) }
