@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { resolveMesa, clearMesaTarget, peekMesaTarget } from '@/lib/pos-navigation'
 import { PIN_LENGTH } from '@/lib/staff-pin'
+import { guardarBorradorPOS } from '@/lib/pos-draft'
 import { nextMostradorCuenta, getServiceModel } from '@/lib/pos-service-model'
 import {
   MESEROS,
@@ -2701,7 +2702,7 @@ function POSContent() {
   useEffect(() => {
     if (requiereCaja() && !sesionEditorCaja.current.puedePersistir()) return
     if (mesa > 0 && orderItems.length > 0) {
-      try { localStorage.setItem(`pos_draft_${mesa}`, JSON.stringify({ items: orderItems, orderId, mesero, personas, ts: Date.now() })) } catch {}
+      try { guardarBorradorPOS(mesa, { items: orderItems, orderId, mesero, personas }) } catch {}
     } else if (mesa > 0) {
       try { localStorage.removeItem(`pos_draft_${mesa}`) } catch {}
     }
