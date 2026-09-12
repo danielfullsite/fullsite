@@ -41,6 +41,17 @@ Los H01–H16 inferiores siguen abiertos salvo evidencia posterior explícita.
 
 Feedback reciente, defectos nuevos y aceptación por síntoma: [Eduardo 9 de septiembre](../audit/EDUARDO-2026-09-09.md). Numeración Caja por turno, identidad nueva tras cierre y descarte de lecturas KDS tardías probados; recorrido Caja 23/23. No implican cierre global. Segunda tanda probada en UI Caja 23/23 y legacy 21/21: prioridad de borradores, compatibilidad de transporte memorizada y rechazo de anulación sin almacenamiento durable.
 
+## Barrido 3, segunda vuelta — 12 de septiembre
+
+Las cinco lentes que el límite de sesión mató el 11 corrieron completas: **31
+hallazgos**. Seis P0 corregidos con prueba A/B (DELTA antes del SNAPSHOT, borrado
+de la bitácora, dinero del turno, sello del instalador publicado, MP Point que
+afirmaba cobro, Rappi que perdía órdenes). Lo que sigue abierto, por riesgo:
+la DLQ sin nadie que la drene, el token de Mercado Pago expuesto (rotar),
+`offline_approved` que `POS_APPROVAL_STRICT` no cierra, doble timbrado de CFDI,
+`kds_item_status` sin revisión entre dos cocinas, y el lock de mesa que ningún
+cliente emite. Detalle: [BARRIDO3-LENTES](../audit/BARRIDO3-LENTES-2026-09-12.md).
+
 ## Barrido de defectos — 10 y 11 de septiembre
 
 Doce lentes con refutación adversarial sobre `c2cafac9`; 39 hallazgos confirmados,
