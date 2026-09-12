@@ -1833,6 +1833,8 @@ export interface KitchenOrderFromDB {
 
 const loadKitchenCache = () => import('@/lib/pos-offline-db')
 
+export type KitchenCloudReadStatus = 'ready' | 'configuration-required' | 'token-required' | 'unavailable'
+
 /** Persist one KDS checkbox without replacing another kitchen screen's map. */
 export async function updateKitchenItemStatus(orderId: string, itemIndex: number, done: boolean): Promise<boolean> {
   if (!orderId || !Number.isSafeInteger(itemIndex) || itemIndex < 0 || typeof done !== 'boolean') return false
@@ -1857,7 +1859,9 @@ export async function updateKitchenItemStatus(orderId: string, itemIndex: number
   }
 }
 
-export async function getKitchenOrders(): Promise<KitchenOrderFromDB[]> {
+export async function getKitchenOrders(
+  onCloudStatus?: (status: KitchenCloudReadStatus) => void,
+): Promise<KitchenOrderFromDB[]> {
   let cacheModule: ReturnType<typeof loadKitchenCache> | undefined
   const cache = () => cacheModule ??= loadKitchenCache()
   const clientId = _getClientId()
@@ -1872,6 +1876,11 @@ export async function getKitchenOrders(): Promise<KitchenOrderFromDB[]> {
   const cutoff = today.toISOString()
 
   let orders: KitchenOrderFromDB[]
+  let cloudStatusReported = false
+  const reportCloudStatus = (status: KitchenCloudReadStatus) => {
+    cloudStatusReported = true
+    onCloudStatus?.(status)
+  }
   try {
     // KDS displays read via the same-origin /api/pos/kitchen endpoint (server-side
     // service key, tenant-scoped, kitchen-only fields). A login-less KDS cannot read
@@ -1879,8 +1888,10 @@ export async function getKitchenOrders(): Promise<KitchenOrderFromDB[]> {
     // separate machine cannot hold the LAN ws:// bridge from an https page (mixed
     // content). This endpoint is the reliable online path; offline still falls back
     // to the scoped IndexedDB cache below. The server resolves one exact open shift.
-    // Token de cocina por-tenant (provisionado a la terminal; el Electron KDS lo
-    // inyecta desde su config). Si no está presente, el endpoint opera abierto.
+    // Token por-tenant provisionado a la terminal; Electron lo inyecta desde su
+    // config. El endpoint cloud falla cerrado si falta el secreto server (503) o
+    // si esta terminal no presenta un token válido (401). En ambos casos el catch
+    // conserva las comandas de IndexedDB/LAN y la UI explica qué debe configurarse.
     const _kt = typeof window !== 'undefined' ? localStorage.getItem('pos_kitchen_token') : null
     const res = await fetchWithTimeout(
       `/api/pos/kitchen?client_id=${encodeURIComponent(clientId)}${locationId ? `&location_id=${encodeURIComponent(locationId)}` : ''}`,
@@ -1897,11 +1908,18 @@ export async function getKitchenOrders(): Promise<KitchenOrderFromDB[]> {
     // Lanzando, el catch hace lo que ya sabe hacer: mostrar las comandas
     // cacheadas en el dispositivo. Para una pantalla de cocina, ver las últimas
     // comandas conocidas siempre es mejor que ver la nada.
-    if (!res.ok) throw new Error(`kitchen_http_${res.status}`)
+    if (!res.ok) {
+      reportCloudStatus(
+        res.status === 503 ? 'configuration-required' :
+          res.status === 401 ? 'token-required' : 'unavailable'
+      )
+      throw new Error(`kitchen_http_${res.status}`)
+    }
     const rows: unknown = await res.json()
     if (!Array.isArray(rows)) throw new Error('kitchen_invalid_response')
     if (!scopeUnchanged()) return []
     orders = rows.filter(sameScope)
+    reportCloudStatus('ready')
     // Cache para offline — fire and forget, no bloquea
     if (typeof window !== 'undefined') {
       cache().then(({ cacheOrder }) =>
@@ -1943,6 +1961,7 @@ export async function getKitchenOrders(): Promise<KitchenOrderFromDB[]> {
       } catch { /* IndexedDB unavailable — online result stands */ }
     }
   } catch {
+    if (!cloudStatusReported) reportCloudStatus('unavailable')
     // Offline — mostrar las órdenes cacheadas en este dispositivo (IndexedDB)
     if (typeof window === 'undefined') return []
     try {

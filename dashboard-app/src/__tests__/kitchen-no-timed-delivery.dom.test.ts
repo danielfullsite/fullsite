@@ -41,3 +41,21 @@ it('barra: a rejected status update restores the pending state and writes no suc
   expect(mocks.write).toHaveBeenCalledWith('old-pending', 'preparando')
   expect(mocks.audit).not.toHaveBeenCalled()
 })
+
+it('cocina conserva órdenes LAN/cache y avisa cuando el respaldo cloud requiere configuración', async () => {
+  mocks.read.mockImplementation(async (onCloudStatus?: (status: string) => void) => {
+    onCloudStatus?.('configuration-required')
+    return [{
+      id: 'cached-order', client_id: 'test', location_id: 'north', turno_id: 'turn',
+      mesa: 9, mesero: 'Mesero cache', status: 'enviada',
+      items: [{ id: 'item-cache', nombre: 'Orden desde caché', cantidad: 1, station: 'cocina' }],
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    }]
+  })
+
+  render(React.createElement(CocinaPage))
+
+  expect((await screen.findAllByText('Orden desde caché')).length).toBeGreaterThan(0)
+  expect(screen.getByRole('alert').textContent).toContain('KDS sin configurar en el servidor')
+  expect(screen.getByRole('alert').textContent).toContain('red local y las comandas guardadas siguen disponibles')
+})

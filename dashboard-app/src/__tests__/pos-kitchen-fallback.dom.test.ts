@@ -66,6 +66,29 @@ describe('getKitchenOrders — un error del servidor no puede vaciar la cocina',
     expect(await getKitchenOrders()).toHaveLength(1)
   })
 
+  it.each([
+    [503, 'configuration-required'],
+    [401, 'token-required'],
+  ] as const)('con %s conserva caché y reporta por qué el cloud está bloqueado', async (status, expected) => {
+    responde(status)
+    getCachedOrders.mockResolvedValue([COMANDA])
+    const onCloudStatus = vi.fn()
+
+    const { getKitchenOrders } = await import('@/lib/pos-data')
+    expect(await getKitchenOrders(onCloudStatus)).toHaveLength(1)
+    expect(onCloudStatus).toHaveBeenCalledWith(expected)
+  })
+
+  it('una respuesta 200 inválida no se anuncia como cloud listo', async () => {
+    responde(200, { unexpected: true })
+    getCachedOrders.mockResolvedValue([COMANDA])
+    const onCloudStatus = vi.fn()
+
+    const { getKitchenOrders } = await import('@/lib/pos-data')
+    expect(await getKitchenOrders(onCloudStatus)).toHaveLength(1)
+    expect(onCloudStatus).toHaveBeenLastCalledWith('unavailable')
+  })
+
   it('si tampoco hay caché devuelve vacío, sin reventar', async () => {
     responde(400)
     getCachedOrders.mockResolvedValue([])
@@ -79,8 +102,10 @@ describe('getKitchenOrders — un error del servidor no puede vaciar la cocina',
     getCachedOrders.mockResolvedValue([])
 
     const { getKitchenOrders } = await import('@/lib/pos-data')
-    const r = await getKitchenOrders()
+    const onCloudStatus = vi.fn()
+    const r = await getKitchenOrders(onCloudStatus)
     expect(r).toHaveLength(1)
+    expect(onCloudStatus).toHaveBeenCalledWith('ready')
   })
 })
 
