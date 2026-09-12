@@ -9,6 +9,7 @@ const { generateKit, validateManifest } = require('./generate-kit.cjs')
 const { validate: validateTerminal } = require('../../electron-app/local-server/config-schema')
 
 const fixture = JSON.parse(fs.readFileSync(path.join(__dirname, 'example.monclova.json'), 'utf8'))
+const KITCHEN_SECRET = 'test-kitchen-secret-32-characters'
 
 describe('Golden Deployment Kit v1', () => {
   test('example manifest is valid', () => {
@@ -26,7 +27,7 @@ describe('Golden Deployment Kit v1', () => {
   test('generates isolated configs, printers, checksums, guide and smoke test', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'fullsite-kit-'))
     const out = path.join(root, 'package')
-    const result = generateKit(fixture, out, { now: '2026-08-24T08:00:00.000Z' })
+    const result = generateKit(fixture, out, { now: '2026-08-24T08:00:00.000Z', kitchenTokenSecret: KITCHEN_SECRET })
     assert.equal(result.terminals.length, 3)
     assert.equal(new Set(result.terminals.map(t => t.terminal_id)).size, 3)
     assert.ok(fs.existsSync(path.join(out, 'INSTALL.md')))
@@ -43,6 +44,9 @@ describe('Golden Deployment Kit v1', () => {
       const config = JSON.parse(fs.readFileSync(path.join(out, terminal.folder, 'config.json')))
       assert.equal(validateTerminal(config).valid, true)
       assert.equal(config.restaurant_id, fixture.restaurant_id)
+      assert.equal(config.kitchen_token, require('crypto').createHmac('sha256', KITCHEN_SECRET)
+        .update(`kitchen:${fixture.restaurant_id}`).digest('base64url'))
+      assert.equal(JSON.stringify(config).includes(KITCHEN_SECRET), false)
       if (terminal.role === 'server_pos') {
         assert.equal(config.local_server_host, '127.0.0.1')
         assert.ok(fs.existsSync(path.join(out, terminal.folder, 'printers.json')))
@@ -56,7 +60,15 @@ describe('Golden Deployment Kit v1', () => {
 
   test('refuses to overwrite an existing package', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'fullsite-kit-existing-'))
-    assert.throws(() => generateKit(fixture, root), /already exists/)
+    assert.throws(() => generateKit(fixture, root, { kitchenTokenSecret: KITCHEN_SECRET }), /already exists/)
+    fs.rmSync(root, { recursive: true })
+  })
+
+  test('fails closed before generating a kit without a strong kitchen secret', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'fullsite-kit-no-secret-'))
+    const out = path.join(root, 'package')
+    assert.throws(() => generateKit(fixture, out, { kitchenTokenSecret: 'short' }), /at least 16/)
+    assert.equal(fs.existsSync(out), false)
     fs.rmSync(root, { recursive: true })
   })
 })

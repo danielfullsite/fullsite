@@ -128,6 +128,15 @@ class RestaurantState {
       if (this._turno?.id) this._turnIdentities.add(this._turno.id)
       if (event.result.closed_turno?.id) this._turnSummaries.set(event.result.closed_turno.id, JSON.parse(JSON.stringify(event.result.closed_turno)))
       this._orderSnapshotComplete = true
+      if (type === 'TURN_CLOSE') {
+        // Un lease pertenece al editor del turno que acaba de cerrar. Conservarlo
+        // bloquea la misma mesa al iniciar el día siguiente aunque ya no exista una
+        // cuenta abierta. El cierre legacy ya vacía el piso; la ruta autoritativa
+        // debe soltar también toda exclusión del turno anterior.
+        this._locks.clear()
+        for (const [mesa, value] of this._mesas) this._mesas.set(mesa, { ...value, locked_by: null })
+        return { changed: ['turno', 'locks', 'mesas'] }
+      }
       return { changed: ['turno'] }
     }
     // FinancialDomain validates commands before durable commit. The projector
@@ -195,8 +204,9 @@ class RestaurantState {
         this._orders.clear()
         this._kds = []
         this._mesas.clear()
+        this._locks.clear()
         this._orderSnapshotComplete = true
-        return { changed: ['turno', 'orders', 'kds', 'mesas'] }
+        return { changed: ['turno', 'orders', 'kds', 'mesas', 'locks'] }
 
       case EVENT.STATE_SYNC:
         // Una foto heredada compactada al cargar el log (adapters/storage/ndjson.js)
@@ -418,14 +428,29 @@ class RestaurantState {
     return { changed: ['mesas', 'orders', 'kds'] }
   }
 
-  // KDS_ITEM_STATUS: two protocols supported.
-  // New: kds_item_status = JSON string of the full {idx: bool} map (sent by toggleItemDone).
+  // KDS_ITEM_STATUS: three protocols supported.
+  // Current: kds_item_delta changes one index and merges it into the persisted map.
+  // Previous: kds_item_status replaces the full {idx: bool} map.
   // Legacy: item_id + status='entregada' removes a single item from kds_queue.
-  _applyKdsItemStatus({ order_id, item_id, status, kds_item_status }) {
+  _applyKdsItemStatus({ order_id, item_id, status, kds_item_status, kds_item_delta }) {
     // Update full order object if present
     const order = this._orders.get(order_id)
     if (order) {
-      if (kds_item_status !== undefined) {
+      const validDelta = kds_item_delta && Number.isInteger(kds_item_delta.item_index) &&
+        kds_item_delta.item_index >= 0 && typeof kds_item_delta.done === 'boolean'
+      if (validDelta) {
+        let current = order.kds_item_status
+        if (typeof current === 'string') {
+          try { current = JSON.parse(current) } catch { current = {} }
+        }
+        const merged = current && typeof current === 'object' && !Array.isArray(current) ? { ...current } : {}
+        merged[String(kds_item_delta.item_index)] = kds_item_delta.done
+        this._orders.set(order_id, {
+          ...order,
+          kds_item_status: JSON.stringify(merged),
+          updated_at: new Date().toISOString(),
+        })
+      } else if (kds_item_status !== undefined) {
         this._orders.set(order_id, {
           ...order,
           kds_item_status: typeof kds_item_status === 'string' ? kds_item_status : JSON.stringify(kds_item_status),

@@ -61,20 +61,67 @@ test.describe.serial('POS offline — service worker + boot sin pantalla negra',
   })
 
   test('rutas del POS cargan offline (kds/mesas/cocina) — chunks por ruta cacheados', async ({ page, context }) => {
-    await page.goto('/pos', { waitUntil: 'networkidle' }).catch(() => {})
-    const swReady = await page.evaluate(async () => {
-      if (!('serviceWorker' in navigator)) return false
-      try { await navigator.serviceWorker.ready; return true } catch { return false }
+    const pageErrors: string[] = []
+    const failedChunks: string[] = []
+    page.on('pageerror', error => pageErrors.push(error.message))
+    page.on('requestfailed', request => {
+      if (new URL(request.url()).pathname.startsWith('/_next/static/')) failedChunks.push(request.url())
     })
-    test.skip(!swReady, 'Service worker no activo — corre contra build de producción')
+    await page.goto('/pos', { waitUntil: 'networkidle' }).catch(() => {})
+    const swControls = await page.evaluate(async () => {
+      if (!('serviceWorker' in navigator)) return false
+      try { await navigator.serviceWorker.ready } catch { return false }
+      for (let i = 0; i < 30; i++) {
+        if (navigator.serviceWorker.controller) return true
+        await new Promise((resolve) => setTimeout(resolve, 500))
+      }
+      return false
+    })
+    if (process.env.CI) expect(swControls, 'el build productivo de CI debe quedar controlado por su service worker').toBe(true)
+    else test.skip(!swControls, 'Service worker no controla la página — corre contra build de producción')
     await page.waitForTimeout(3500)   // deja precachear todas las rutas
     await context.setOffline(true)
 
-    for (const route of ['/pos/mesas', '/pos/kds', '/pos/cocina']) {
-      await page.goto(route, { waitUntil: 'domcontentloaded' }).catch(() => {})
-      const nodes = await page.locator('body *').count().catch(() => 0)
-      expect(nodes, `${route} no debe quedar en pantalla negra offline`).toBeGreaterThan(10)
+    const routes = [
+      { path: '/pos/mesas', signal: /Ingresa tu PIN para abrir|Mesas/, action: 'pin' },
+      { path: '/pos/kds', signal: /COCINA/, action: 'close-kds' },
+      { path: '/pos/cocina', signal: /Nuevas.*Preparando.*Listas/, action: 'settings' },
+    ]
+    for (const route of routes) {
+      const response = await page.goto(route.path, { waitUntil: 'domcontentloaded' })
+      expect(response, `${route.path} debe tener respuesta offline`).not.toBeNull()
+      expect(response?.ok(), `${route.path} debe responder 2xx offline`).toBe(true)
+      expect(response?.fromServiceWorker(), `${route.path} debe venir del service worker`).toBe(true)
+      // DOMContentLoaded todavía puede ser sólo el shell HTML de Next. Esperar
+      // la hidratación evita confundir esos pocos nodos transitorios con una
+      // pantalla negra, sin esconder un chunk ausente: offline nunca hidrataría.
+      await expect.poll(
+        () => page.locator('body *').count().catch(() => 0),
+        { message: `${route.path} no debe quedar en pantalla negra offline`, timeout: 15_000 },
+      ).toBeGreaterThan(10)
+      await expect(page.locator('body')).toContainText(route.signal, { timeout: 15_000 })
+      await expect(page.locator('body')).not.toContainText('Reintentar conexion')
+      const action = route.action === 'pin'
+        ? page.getByRole('button', { name: '1', exact: true })
+        : route.action === 'close-kds'
+          ? page.getByTitle('Cerrar KDS', { exact: true })
+          : page.getByTitle('Configuración', { exact: true })
+      await expect.poll(() => action.evaluate(element => {
+        const key = Object.keys(element).find(name => name.startsWith('__reactProps'))
+        return !!key && typeof (element as unknown as Record<string, { onClick?: unknown }>)[key]?.onClick === 'function'
+      }).catch(() => false), { message: `${route.path} debe hidratar su interacción React` }).toBe(true)
+      await action.click()
+      if (route.action === 'settings') {
+        await expect(page.getByText('Settings KDS', { exact: true })).toBeVisible()
+      } else {
+        await expect(page).toHaveURL(new RegExp(`${route.path.replaceAll('/', '\\/')}$`))
+      }
+      const html = await page.content()
+      expect(html).not.toContain('ERR_INTERNET_DISCONNECTED')
+      expect(html).not.toContain('This site can’t be reached')
     }
+    expect(pageErrors, 'las rutas offline no deben lanzar errores JS').toEqual([])
+    expect(failedChunks, 'ningún chunk de Next debe fallar offline').toEqual([])
   })
 
   test('IndexedDB del POS está disponible offline (no depende de red)', async ({ page, context }) => {

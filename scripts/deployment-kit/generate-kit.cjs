@@ -10,6 +10,13 @@ const VALID_ROLES = new Set(['server_pos', 'pos', 'kds', 'admin'])
 const REMOTE_ROLES = new Set(['pos', 'kds'])
 const CLIENT_RE = /^[a-z0-9][a-z0-9_-]{1,39}$/i
 
+function kitchenToken(secret, restaurantId) {
+  if (typeof secret !== 'string' || secret.length < 16) {
+    throw new Error('KITCHEN_TOKEN_SECRET is required and must be at least 16 characters')
+  }
+  return crypto.createHmac('sha256', secret).update(`kitchen:${restaurantId}`).digest('base64url')
+}
+
 function isIPv4(value) {
   if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(value || '')) return false
   return value.split('.').every(part => Number(part) >= 0 && Number(part) <= 255)
@@ -50,7 +57,7 @@ function validateManifest(manifest) {
   return { valid: errors.length === 0, errors }
 }
 
-function terminalConfig(manifest, terminal, now) {
+function terminalConfig(manifest, terminal, now, provisionedKitchenToken) {
   const id = terminal.terminal_id || crypto.randomUUID()
   const role = terminal.role
   const config = {
@@ -66,6 +73,7 @@ function terminalConfig(manifest, terminal, now) {
     client_id: manifest.restaurant_id,
     channel: manifest.channel || 'stable',
     instance_name: `${manifest.display_name} · ${terminal.name.trim()}`,
+    kitchen_token: provisionedKitchenToken,
   }
   if (REMOTE_ROLES.has(role)) config.pos_server_ip = manifest.server_ip
   if (role === 'kds') config.kds_only = true
@@ -116,13 +124,14 @@ function installGuide(manifest, terminalEntries) {
 function generateKit(manifest, outputDir, options = {}) {
   const checked = validateManifest(manifest)
   if (!checked.valid) throw new Error(`Invalid deployment manifest:\n- ${checked.errors.join('\n- ')}`)
+  const provisionedKitchenToken = kitchenToken(options.kitchenTokenSecret ?? process.env.KITCHEN_TOKEN_SECRET, manifest.restaurant_id)
   if (fs.existsSync(outputDir)) throw new Error(`Output already exists: ${outputDir}`)
   fs.mkdirSync(outputDir, { recursive: true, mode: 0o700 })
   const now = options.now || new Date().toISOString()
   const files = []; const terminalEntries = []
 
   for (const terminal of manifest.terminals) {
-    const config = terminalConfig(manifest, terminal, now)
+    const config = terminalConfig(manifest, terminal, now, provisionedKitchenToken)
     const folder = `${String(manifest.terminals.indexOf(terminal) + 1).padStart(2, '0')}-${slug(terminal.name)}`
     const dir = path.join(outputDir, folder); fs.mkdirSync(dir, { mode: 0o700 })
     const saved = writeJson(path.join(dir, 'config.json'), config)
@@ -166,11 +175,15 @@ if (require.main === module) {
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
     const result = validateManifest(manifest)
     if (!result.valid) throw new Error(`Invalid deployment manifest:\n- ${result.errors.join('\n- ')}`)
-    if (args.validateOnly) { console.log(`VALID — ${manifest.restaurant_id}`); process.exit(0) }
+    if (args.validateOnly) {
+      kitchenToken(process.env.KITCHEN_TOKEN_SECRET, manifest.restaurant_id)
+      console.log(`VALID — ${manifest.restaurant_id} — kitchen token listo`)
+      process.exit(0)
+    }
     const out = path.resolve(args.out || path.join(process.cwd(), 'deployment-packages', `${manifest.restaurant_id}-${Date.now()}`))
     const generated = generateKit(manifest, out)
     console.log(`GENERATED — ${generated.terminals.length} terminal(s) — ${out}`)
   } catch (error) { console.error(`ERROR — ${error.message}`); process.exit(1) }
 }
 
-module.exports = { generateKit, validateManifest, terminalConfig, isIPv4, slug }
+module.exports = { generateKit, validateManifest, terminalConfig, kitchenToken, isIPv4, slug }

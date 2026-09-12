@@ -7,6 +7,8 @@ import { Component, useState, useCallback, useEffect, useRef, Suspense, type Err
 import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { resolveMesa, clearMesaTarget, peekMesaTarget } from '@/lib/pos-navigation'
+import { PIN_LENGTH } from '@/lib/staff-pin'
+import { guardarBorradorPOS } from '@/lib/pos-draft'
 import { nextMostradorCuenta, getServiceModel } from '@/lib/pos-service-model'
 import {
   MESEROS,
@@ -2121,7 +2123,6 @@ function POSContent() {
   // Mercado Pago Point
   const [mpConfig, setMpConfig] = useState<MPConfig | null>(null)
   const [showMPConfig, setShowMPConfig] = useState(false)
-  const [mpAccessToken, setMpAccessToken] = useState('')
   const [mpDeviceId, setMpDeviceId] = useState('')
   const [mpDevices, setMpDevices] = useState<MPDevice[]>([])
   const [mpLoadingDevices, setMpLoadingDevices] = useState(false)
@@ -2680,7 +2681,7 @@ function POSContent() {
       setOrderItems([])
       try { localStorage.removeItem(claveCuentaCaja); localStorage.removeItem(`pos_draft_${mesa}`); localStorage.removeItem(`pos_order_${mesa}`) } catch {}
       setMesaDestinoCaja(null); setPinPrompt(null); setPinInput('')
-      navigateToMesaMap()
+      navigateToMesaMap(window.location, mesa)
     } finally { operationLock.current = false; setSaving(false) }
   }
   const anularOrdenCaja = async (reason: string, pin: string) => {
@@ -2693,7 +2694,7 @@ function POSContent() {
       setOrderItems([])
       try { localStorage.removeItem(claveCuentaCaja); localStorage.removeItem(`pos_draft_${mesa}`); localStorage.removeItem(`pos_order_${mesa}`) } catch {}
       setShowVoidOrder(false)
-      navigateToMesaMap()
+      navigateToMesaMap(window.location, mesa)
     } finally { operationLock.current = false; setSaving(false) }
   }
 
@@ -2701,7 +2702,7 @@ function POSContent() {
   useEffect(() => {
     if (requiereCaja() && !sesionEditorCaja.current.puedePersistir()) return
     if (mesa > 0 && orderItems.length > 0) {
-      try { localStorage.setItem(`pos_draft_${mesa}`, JSON.stringify({ items: orderItems, orderId, mesero, personas, ts: Date.now() })) } catch {}
+      try { guardarBorradorPOS(mesa, { items: orderItems, orderId, mesero, personas }) } catch {}
     } else if (mesa > 0) {
       try { localStorage.removeItem(`pos_draft_${mesa}`) } catch {}
     }
@@ -3135,10 +3136,14 @@ function POSContent() {
     if (loadedOrderId) {
       inventoryPending = true
       const voidOpId = genOpId()
+      // Signed by /api/pos/pin and copied into the queued payload. If connectivity
+      // drops after the manager approves, replay can still prove the authorization.
+      const cancellationApprovalToken = consumeManagerApproval(managerName)
       const voidPayload = {
         order_id: loadedOrderId,
         expected_revision: orderRevision,
         save_operation_id: voidOpId,
+        approval_token: cancellationApprovalToken,
         status: 'cancelada',
         // Los renglones cancelados con su disposicion: es lo que concilia inventario
         // (r1_save_order hace `items = coalesce(p_items, items)`).
@@ -3443,7 +3448,7 @@ function POSContent() {
                 showToast(`${raceNewItems.length} item${raceNewItems.length !== 1 ? 's' : ''} enviados`)
                 sessionStorage.removeItem('pos_staff')
                 sessionStorage.removeItem('pos_last_activity')
-                navigateToMesaMap(); lock()
+                navigateToMesaMap(window.location, mesa); lock()
                 return
               } else {
                 showToast('Error al agregar items — intenta de nuevo')
@@ -3542,7 +3547,7 @@ function POSContent() {
             } catch {}
             sessionStorage.removeItem('pos_staff')
             sessionStorage.removeItem('pos_last_activity')
-            navigateToMesaMap(); lock()
+            navigateToMesaMap(window.location, mesa); lock()
             return
           } else {
             if (saveResult.current_revision != null) setOrderRevision(saveResult.current_revision)
@@ -3640,7 +3645,7 @@ function POSContent() {
           setOrderInventoryPending(_cid(), order.id, true, order.mesa)
           sessionStorage.removeItem('pos_staff')
           sessionStorage.removeItem('pos_last_activity')
-          navigateToMesaMap()
+          navigateToMesaMap(window.location, mesa)
           lock()
         }
         if (!kitchen.ok) {
@@ -3817,7 +3822,7 @@ function POSContent() {
       const finishOnline = () => {
         sessionStorage.removeItem('pos_staff')
         sessionStorage.removeItem('pos_last_activity')
-        navigateToMesaMap()
+        navigateToMesaMap(window.location, mesa)
         lock()
       }
       if (!kitchen.ok) {
@@ -4224,7 +4229,7 @@ function POSContent() {
       // enviar. Evita quedar en la mesa (o caer a mesa 1) tras cerrar la cuenta.
       sessionStorage.removeItem('pos_staff')
       sessionStorage.removeItem('pos_last_activity')
-      navigateToMesaMap()
+      navigateToMesaMap(window.location, mesa)
       lock()
     } else {
       showToast('Error al cerrar cuenta')
@@ -4438,7 +4443,7 @@ function POSContent() {
             <button
               onClick={() => {
                 const cfg = getMPConfig()
-                if (cfg) { setMpAccessToken(cfg.accessToken); setMpDeviceId(cfg.deviceId) }
+                if (cfg) setMpDeviceId(cfg.deviceId)
                 setShowMPConfig(true)
               }}
               className={`hidden sm:flex flex-shrink-0 items-center gap-1 px-2 lg:px-3 py-1 rounded-full text-sm font-bold min-h-[44px] ${
@@ -4481,7 +4486,7 @@ function POSContent() {
           {/* Back to mesa map — always visible in kiosk mode (no browser back button) */}
           <button
             type="button"
-            onClick={() => navigateToMesaMap()}
+            onClick={() => navigateToMesaMap(window.location, mesa)}
             className="flex items-center justify-center w-11 h-11 rounded-lg bg-[var(--line)] border border-[var(--line)] text-[var(--text-3)] hover:text-[var(--text-1)] flex-shrink-0 transition-colors"
             title="Volver al mapa de mesas"
           >
@@ -5231,7 +5236,7 @@ function POSContent() {
           <div className={`px-3 py-1 border-t border-[var(--line)] gap-2 flex-shrink-0 ${escribeEnCaja ? 'grid grid-cols-3' : 'flex'}`}>
             {orderItems.length === 0 ? (
               <button
-                onClick={() => navigateToMesaMap()}
+                onClick={() => navigateToMesaMap(window.location, mesa)}
                 className="flex-1 flex items-center justify-center gap-2 bg-[var(--surface-2)] hover:bg-[var(--text-4)] active:bg-[var(--raised)] active:scale-[0.97] text-[var(--text-1)] font-bold py-2.5 rounded-xl text-base transition-all min-h-[52px]"
               >
                 <ArrowLeft size={18} />
@@ -5594,7 +5599,8 @@ function POSContent() {
               type="password"
               inputMode="numeric"
               value={syncConflictPin}
-              onChange={e => { setSyncConflictPin(e.target.value.replace(/\D/g, '').slice(0, 8)); setSyncConflictError('') }}
+              maxLength={PIN_LENGTH}
+              onChange={e => { setSyncConflictPin(e.target.value.replace(/\D/g, '').slice(0, PIN_LENGTH)); setSyncConflictError('') }}
               className="mt-2 w-full rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3 text-center text-2xl tracking-[0.5em] text-[var(--text-1)]"
               placeholder="••••"
             />
@@ -5603,7 +5609,7 @@ function POSContent() {
                 <button
                   key={digit}
                   type="button"
-                  onClick={() => { setSyncConflictPin(p => `${p}${digit}`.slice(0, 8)); setSyncConflictError('') }}
+                  onClick={() => { setSyncConflictPin(p => `${p}${digit}`.slice(0, PIN_LENGTH)); setSyncConflictError('') }}
                   className="min-h-[54px] rounded-xl bg-[var(--surface-2)] text-xl font-black text-[var(--text-1)] active:bg-[var(--accent-soft)]"
                 >
                   {digit}
@@ -5618,7 +5624,7 @@ function POSContent() {
               </button>
               <button
                 type="button"
-                onClick={() => { setSyncConflictPin(p => `${p}0`.slice(0, 8)); setSyncConflictError('') }}
+                onClick={() => { setSyncConflictPin(p => `${p}0`.slice(0, PIN_LENGTH)); setSyncConflictError('') }}
                 className="min-h-[54px] rounded-xl bg-[var(--surface-2)] text-xl font-black text-[var(--text-1)] active:bg-[var(--accent-soft)]"
               >
                 0
@@ -6241,16 +6247,9 @@ function POSContent() {
             </div>
 
             <div className="space-y-4">
-              <div>
-                <label className="text-[var(--text-3)] text-xs mb-1 block">Access Token</label>
-                <input
-                  type="password"
-                  value={mpAccessToken}
-                  onChange={e => setMpAccessToken(e.target.value)}
-                  placeholder="APP_USR-..."
-                  className="w-full border border-[var(--line)] rounded-lg px-4 py-3 text-[var(--text-1)] text-sm focus:outline-none focus:border-cyan-500" style={{background:'var(--surface-2)'}}
-                />
-              </div>
+              <p className="rounded-lg bg-cyan-950/40 px-3 py-2 text-xs text-cyan-200">
+                La credencial de Mercado Pago se configura en el servidor; esta terminal sólo conserva su Device ID.
+              </p>
 
               <div>
                 <label className="text-[var(--text-3)] text-xs mb-1 block">Device ID</label>
@@ -6264,9 +6263,8 @@ function POSContent() {
                   />
                   <button
                     onClick={async () => {
-                      if (!mpAccessToken) { showToast('Ingresa el Access Token primero'); return }
                       setMpLoadingDevices(true)
-                      const result = await fetchMPDevices(mpAccessToken)
+                      const result = await fetchMPDevices()
                       if (result.success && result.devices) {
                         setMpDevices(result.devices)
                         if (result.devices.length === 0) showToast('No se encontraron dispositivos')
@@ -6275,7 +6273,7 @@ function POSContent() {
                       }
                       setMpLoadingDevices(false)
                     }}
-                    disabled={mpLoadingDevices || !mpAccessToken}
+                    disabled={mpLoadingDevices}
                     className="px-3 py-3 rounded-lg bg-cyan-600 hover:bg-cyan-500 disabled:bg-[var(--line)] text-white text-xs font-medium transition-colors whitespace-nowrap"
                   >
                     {mpLoadingDevices ? <Loader2 size={16} className="animate-spin" /> : 'Buscar'}
@@ -6309,7 +6307,6 @@ function POSContent() {
                     onClick={() => {
                       clearMPConfig()
                       setMpConfig(null)
-                      setMpAccessToken('')
                       setMpDeviceId('')
                       setShowMPConfig(false)
                       showToast('Point desconfigurado')
@@ -6321,14 +6318,14 @@ function POSContent() {
                 )}
                 <button
                   onClick={() => {
-                    if (!mpAccessToken || !mpDeviceId) { showToast('Completa ambos campos'); return }
-                    const cfg: MPConfig = { accessToken: mpAccessToken, deviceId: mpDeviceId, deviceModel: 'MINI' }
+                    if (!mpDeviceId) { showToast('Ingresa el Device ID'); return }
+                    const cfg: MPConfig = { deviceId: mpDeviceId, deviceModel: 'MINI' }
                     saveMPConfig(cfg)
                     setMpConfig(cfg)
                     setShowMPConfig(false)
                     showToast('Point configurado')
                   }}
-                  disabled={!mpAccessToken || !mpDeviceId}
+                  disabled={!mpDeviceId}
                   className="flex-[2] py-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 disabled:bg-[var(--line)] disabled:text-[var(--text-3)] text-white font-semibold text-sm transition-colors"
                 >
                   Guardar
@@ -6504,19 +6501,17 @@ function POSContent() {
               <button
                 onClick={async () => {
                   // Try MP Point Smart first
-                  const mpToken = localStorage.getItem('mp_access_token')
-                  const mpDevice = localStorage.getItem('mp_device_id')
-                  if (mpToken && mpDevice) {
+                  const point = getMPConfig()
+                  if (point?.deviceId) {
                     showToast('Enviando cobro a terminal...')
                     setSaving(true)
                     try {
                       const res = await fetch(apiUrl('/api/mp-point'), {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 'Content-Type': 'application/json', ...getPOSAuthHeaders() },
                         body: JSON.stringify({
                           action: 'payment',
-                          accessToken: mpToken,
-                          deviceId: mpDevice,
+                          deviceId: point.deviceId,
                           amount: payTotal + propina,
                           orderId: orderId,
                         }),
@@ -6531,8 +6526,8 @@ function POSContent() {
                           try {
                             const statusRes = await fetch(apiUrl('/api/mp-point'), {
                               method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ action: 'status', accessToken: mpToken, paymentIntentId: intentId }),
+                              headers: { 'Content-Type': 'application/json', ...getPOSAuthHeaders() },
+                              body: JSON.stringify({ action: 'status', paymentIntentId: intentId }),
                             })
                             const statusData = await statusRes.json()
                             if (statusData.state === 'FINISHED') {

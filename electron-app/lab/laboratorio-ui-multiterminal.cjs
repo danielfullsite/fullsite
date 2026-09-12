@@ -316,6 +316,7 @@ async function fixtureRoute(route, uiOrigin, pedroPorts) {
 async function startTerminal(name, role, port, cajaPort, uiOrigin, ports, opts = {}) {
   const userData = path.join(base, name)
   fs.mkdirSync(userData, { recursive: true })
+  const idleTarget = `${uiOrigin}/icon-192v2.png`
   if (syntheticPrinter && role === 'server_pos') fs.writeFileSync(path.join(userData, 'printers.json'), JSON.stringify({
     schema_version: 2, ...(drawerMode ? { drawer_printer_id: 'lab-tcp-caja' } : {}), routing: { default_station: 'caja' }, printers: [{ printer_id: 'lab-tcp-caja', name: 'Caja laboratorio TCP', enabled: true,
       connection: { type: 'tcp', host: '127.0.0.1', port: syntheticPrinter.address().port }, station_ids: ['caja'],
@@ -370,7 +371,7 @@ require(${JSON.stringify(path.join(ELECTRON_APP, 'main.js'))});\n`)
       ...(packagedBundle ? { FULLSITE_UI_BUNDLE_DIR: packagedBundle } : {}),
       // Arranque inerte del mismo origen: instalar interceptores antes del JS de
       // producto impide que la precarga del SW escape al aislamiento de pruebas.
-      FULLSITE_POS_URL: `${uiOrigin}/icon-192v2.png`, FULLSITE_KDS_URL: `${uiOrigin}/icon-192v2.png` }), timeout: 60000,
+      FULLSITE_POS_URL: idleTarget, FULLSITE_KDS_URL: idleTarget }), timeout: 60000,
   })
   const terminal = { name, role, port, app, process: app.process(), userData, terminalId, actorSession, log: [], errors: [] }
   terminals.push(terminal)
@@ -413,16 +414,24 @@ require(${JSON.stringify(path.join(ELECTRON_APP, 'main.js'))});\n`)
   })
   await until(async () => (await request(terminal, '/health')).ok, `${name}: arranque de Pedro`)
   const target = role === 'kds' ? `http://127.0.0.1:${port}/kds` : `${uiOrigin}/pos/mesas`
-  await page.waitForLoadState('domcontentloaded', { timeout: 90000 })
   if (role === 'kds') {
-    // La navegación al HTML privado usa el mismo extraHeaders que main.js;
-    // los fetch posteriores se autentican desde el código real del KDS.
-    await app.evaluate(({ BrowserWindow }, { target, headers }) => {
-      return BrowserWindow.getAllWindows()[0].loadURL(target, {
-        extraHeaders: Object.entries(headers).map(([key, value]) => `${key}: ${value}`).join('\r\n'),
-      })
-    }, { target, headers })
-  } else await page.goto(target, { waitUntil: 'domcontentloaded', timeout: 90000 })
+    // main.js ya navega el KDS al HTML privado con sus credenciales LAN. Volver a
+    // llamar loadURL aquí crea dos navegaciones al mismo destino: Electron 44
+    // cancela una con ERR_FAILED aunque la pantalla haya cargado correctamente.
+    // Se espera la navegación real y sólo entonces se hace una recarga controlada:
+    // el init script debe correr antes del JS del KDS y la petición conserva las
+    // cabeceras privadas que exige Pedro.
+    await until(() => page.evaluate(target => location.href === target && document.readyState !== 'loading', target),
+      `${name}: KDS local visible`, 90000)
+    await context.setExtraHTTPHeaders(headers)
+    await page.reload({ waitUntil: 'domcontentloaded', timeout: 90000 })
+  } else {
+    // _electron.launch devuelve la ventana antes de que el primer loadURL termine.
+    // Navegar inmediatamente puede ser cancelado después por ese load tardío.
+    await until(() => page.evaluate(idle => location.href === idle && document.readyState !== 'loading', idleTarget),
+      `${name}: arranque inerte visible`, 90000)
+    await page.goto(target, { waitUntil: 'domcontentloaded', timeout: 90000 })
+  }
   return terminal
 }
 

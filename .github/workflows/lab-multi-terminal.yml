@@ -60,7 +60,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: electron-app/package-lock.json
 
@@ -87,11 +87,16 @@ jobs:
       #
       # Lo obvio seria `--no-sandbox`. No: en las terminales del restaurante el sandbox
       # esta ENCENDIDO, y una prueba que lo apaga deja de probar lo que corre en campo.
-      # Es el arreglo que documenta Electron.
+      # Electron 44 puede diferir la descarga del binario hasta el primer `require`;
+      # por eso se materializa antes de buscar y configurar el helper. Es el arreglo
+      # que documenta Electron, sin desactivar ninguna protección.
       - name: Habilitar el sandbox de Electron
         run: |
-          sudo chown root:root node_modules/electron/dist/chrome-sandbox
-          sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
+          node node_modules/electron/install.js
+          sandbox_path="node_modules/electron/dist/chrome-sandbox"
+          test -f "$sandbox_path"
+          sudo chown root:root "$sandbox_path"
+          sudo chmod 4755 "$sandbox_path"
 
       - name: Pruebas del servidor local
         run: node --test local-server/tests/*.test.js
@@ -120,7 +125,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: npm
           cache-dependency-path: |
             electron-app/package-lock.json
@@ -135,8 +140,11 @@ jobs:
       - name: Preparar display y sandbox
         run: |
           sudo apt-get update && sudo apt-get install -y xvfb
-          sudo chown root:root electron-app/node_modules/electron/dist/chrome-sandbox
-          sudo chmod 4755 electron-app/node_modules/electron/dist/chrome-sandbox
+          node electron-app/node_modules/electron/install.js
+          sandbox_path="electron-app/node_modules/electron/dist/chrome-sandbox"
+          test -f "$sandbox_path"
+          sudo chown root:root "$sandbox_path"
+          sudo chmod 4755 "$sandbox_path"
       - name: Recorrer POS y KDS desde las pantallas reales
         run: xvfb-run --auto-servernum node electron-app/lab/laboratorio-ui-multiterminal.cjs
         env:
@@ -159,7 +167,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
       - name: Probar transferencia en PostgreSQL temporal
         run: node electron-app/lab/run-transfer-item-local.cjs
       - name: Probar aislamiento de proxy y tablas hijas en PostgreSQL temporal

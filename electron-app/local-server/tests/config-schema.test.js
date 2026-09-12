@@ -131,6 +131,13 @@ describe('validate()', () => {
     assert.equal(valid, false)
   })
 
+  test('validates an optional provisioned kitchen token', () => {
+    assert.equal(validate({ ...VALID_CONFIG, kitchen_token: 'a'.repeat(43) }).valid, true)
+    const result = validate({ ...VALID_CONFIG, kitchen_token: 'short' })
+    assert.equal(result.valid, false)
+    assert.ok(result.errors.some(e => e.includes('kitchen_token')))
+  })
+
   // ── Operational safety ──────────────────────────────────────────────────────
 
   test('restaurant_id "unknown" is never valid (operational safety)', () => {

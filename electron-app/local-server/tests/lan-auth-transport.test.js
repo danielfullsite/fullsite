@@ -181,7 +181,7 @@ test('Caja transport credential alone cannot open drawer, inject print bytes or 
 
 test('preloads disponen identidad antes del primer fetch, nunca desde URL o navegación ajena', async t => {
   const f = await fixture(t)
-  const config = { restaurant_id: R, terminal_id: 'pos-2', location_id: BRANCH, lan_secret: SECRET }
+  const config = { restaurant_id: R, terminal_id: 'pos-2', location_id: BRANCH, lan_secret: SECRET, kitchen_token: 'kitchen-token' }
   const posUrl = 'http://127.0.0.1:3999/pos'
   assert.equal(rendererIdentity({ url: posUrl, config, posUrl, dev: false }), null)
   assert.equal(rendererIdentity({ url: 'https://evil.invalid/?client=auth-test', config, posUrl, dev: true }), null)
@@ -197,6 +197,7 @@ test('preloads disponen identidad antes del primer fetch, nunca desde URL o nave
       const headers = values.has('FULLSITE_LAN_SECRET') ? { 'x-fullsite-lan': values.get('FULLSITE_LAN_SECRET') } : {}
       assert.equal((await fetch(f.base + '/state', { headers })).status, identity ? 200 : 401, name + url)
       if (!identity) assert.equal(values.size, 0)
+      else assert.equal(values.get('pos_kitchen_token'), 'kitchen-token')
     }
   }
 })

@@ -83,7 +83,9 @@ vi.mock('@/lib/api-auth', async (orig) => {
   return {
     ...real,
     withPOSAuth: async () => ({
-      clientId: tenant, staffId: 's1', staffName: 'Mesero', role: 'mesero', authType: 'session',
+      // La suite ejercita el detector posterior a un cierre ya autorizado. Un mesero
+      // ya no puede alcanzar ese punto: save-order lo detiene antes del RPC.
+      clientId: tenant, staffId: 's1', staffName: 'Mesero', role: 'admin', authType: 'session',
     }),
   }
 })

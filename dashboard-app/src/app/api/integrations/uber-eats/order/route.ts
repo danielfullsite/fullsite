@@ -14,18 +14,21 @@ import { getOrderAdapter, type UberChannel } from '@/lib/integrations/uber-eats/
 import type { UberDenyReason, UberCancelReason } from '@/lib/integrations/uber-eats/reasons'
 import { UBER_DENY_REASONS, UBER_CANCEL_REASONS } from '@/lib/integrations/uber-eats/reasons'
 import { checkAdminAuth } from '@/lib/integrations/admin-auth'
-import { withPOSAuth, unauthorized } from '@/lib/api-auth'
+import { type POSAuthContext, withPOSAuth, unauthorized } from '@/lib/api-auth'
+import { hasPermission } from '@/lib/pos-permissions'
 
 const SB_URL = () => process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SB_KEY = () => process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-async function resolveOrderContext(platformOrderId: string): Promise<{ storeId?: string; channel: UberChannel }> {
+async function resolveOrderContext(platformOrderId: string, clientId?: string): Promise<{ storeId?: string; channel: UberChannel } | null> {
+  const tenantFilter = clientId ? `&client_id=eq.${encodeURIComponent(clientId)}` : ''
   const r = await fetch(
-    `${SB_URL()}/rest/v1/delivery_orders?platform=eq.ubereats&platform_order_id=eq.${encodeURIComponent(platformOrderId)}&select=raw_payload&limit=1`,
+    `${SB_URL()}/rest/v1/delivery_orders?platform=eq.ubereats&platform_order_id=eq.${encodeURIComponent(platformOrderId)}${tenantFilter}&select=raw_payload&limit=1`,
     { headers: { apikey: SB_KEY(), Authorization: `Bearer ${SB_KEY()}` } }
   ).catch(() => null)
-  if (!r?.ok) return { channel: 'eats' }
+  if (!r?.ok) return clientId ? null : { channel: 'eats' }
   const rows = (await r.json()) as Array<{ raw_payload?: Record<string, unknown> }>
+  if (!rows.length) return clientId ? null : { channel: 'eats' }
   const raw = rows[0]?.raw_payload
   if (!raw) return { channel: 'eats' }
   const storeId = (raw.store as { store_id?: string } | undefined)?.store_id
@@ -40,9 +43,11 @@ export async function POST(request: NextRequest) {
   //   - los workflows de certificacion desde CI      -> INTEGRATION_ADMIN_SECRET
   // Poner solo el secreto admin romperia la pantalla del cajero, y el navegador
   // no puede sostener ese secreto. Falla cerrado si no hay ninguno de los dos.
-  if (!checkAdminAuth(request).ok) {
-    const ctx = await withPOSAuth(request)
-    if (!ctx) return unauthorized('Se requiere sesion')
+  const adminAuthorized = checkAdminAuth(request).ok
+  let posAuth: POSAuthContext | null = null
+  if (!adminAuthorized) {
+    posAuth = await withPOSAuth(request)
+    if (!posAuth) return unauthorized('Se requiere sesion')
   }
   const correlationId = crypto.randomUUID()
   try {
@@ -56,7 +61,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'order_id and action required' }, { status: 400 })
     }
 
-    const { storeId, channel } = await resolveOrderContext(order_id)
+    // Cancelar o rechazar una venta es la misma capacidad crítica sin importar
+    // si nació en el POS o en una plataforma. El secreto M2M conserva acceso para
+    // automatizaciones; una sesión POS debe tener el permiso canónico.
+    if (posAuth && (action === 'deny' || action === 'cancel') && !hasPermission(posAuth.role, 'cancelar_ordenes')) {
+      return NextResponse.json({ error: 'CANCEL_PERMISSION_REQUIRED' }, { status: 403 })
+    }
+
+    const context = await resolveOrderContext(order_id, posAuth?.clientId)
+    if (!context) return NextResponse.json({ error: 'ORDER_NOT_FOUND' }, { status: 404 })
+    const { storeId, channel } = context
     const adapter = getOrderAdapter(channel)
 
     switch (action) {

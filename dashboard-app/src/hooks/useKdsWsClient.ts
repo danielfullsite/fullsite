@@ -54,6 +54,22 @@ function saveCachedOrders(orders: KitchenOrderFromDB[]) {
   try { localStorage.setItem(LS_CACHE_KEY, JSON.stringify(orders)) } catch {}
 }
 
+export function mergeKdsItemStatus(
+  currentStatus: string | null,
+  delta: { item_index?: unknown; done?: unknown } | undefined,
+): string | null {
+  if (!delta || !Number.isInteger(delta.item_index) || Number(delta.item_index) < 0 || typeof delta.done !== 'boolean') {
+    return currentStatus
+  }
+  let current: Record<string, boolean> = {}
+  try {
+    const parsed = typeof currentStatus === 'string' ? JSON.parse(currentStatus) : currentStatus
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) current = { ...parsed }
+  } catch { /* a corrupt legacy map must not block the current kitchen action */ }
+  current[String(delta.item_index)] = delta.done
+  return JSON.stringify(current)
+}
+
 // ── Order normalizer ──────────────────────────────────────────────────────────
 // Converts a raw server payload (from SNAPSHOT kds_orders or DELTA payload)
 // into the KitchenOrderFromDB shape expected by the KDS page.
@@ -102,6 +118,12 @@ export interface UseKdsWsClientResult {
    */
   sendCommand: (commandType: string, payload: Record<string, unknown>) => string | null
   /**
+   * Send a LAN command and resolve only after Caja ACKs or rejects it.
+   * A lost acknowledgement resolves false after the timeout, so callers never
+   * mistake a socket write for a durable kitchen change.
+   */
+  sendCommandConfirmed: (commandType: string, payload: Record<string, unknown>, timeoutMs?: number) => Promise<boolean>
+  /**
    * Replace the orders directly (e.g., when the Supabase fallback poll returns).
    * Ignored when mode is LAN_PRIMARY (Local Server is authoritative in that mode).
    */
@@ -123,6 +145,7 @@ export function useKdsWsClient(restaurantId?: string): UseKdsWsClientResult {
   const seenIds   = useRef<Set<string>>(new Set())
   const clientRef = useRef<BridgeClient | null>(null)
   const modeRef   = useRef<KdsMode>('OFFLINE')
+  const pendingCommandsRef = useRef<Map<string, (accepted: boolean) => void>>(new Map())
 
   // Derived state flush: publish ordersMap → React state + cache
   const flush = useCallback(() => {
@@ -188,7 +211,11 @@ export function useKdsWsClient(restaurantId?: string): UseKdsWsClientResult {
       case 'KDS_ITEM_STATUS': {
         if (!orderId) break
         const existing = ordersMap.current.get(orderId)
-        if (existing && p.kds_item_status !== undefined) {
+        const delta = p.kds_item_delta as { item_index?: unknown; done?: unknown } | undefined
+        const validDelta = delta && Number.isInteger(delta.item_index) && Number(delta.item_index) >= 0 && typeof delta.done === 'boolean'
+        if (existing && validDelta) {
+          ordersMap.current.set(orderId, { ...existing, kds_item_status: mergeKdsItemStatus(existing.kds_item_status, delta) })
+        } else if (existing && p.kds_item_status !== undefined) {
           ordersMap.current.set(orderId, {
             ...existing,
             kds_item_status: typeof p.kds_item_status === 'string'
@@ -215,6 +242,26 @@ export function useKdsWsClient(restaurantId?: string): UseKdsWsClientResult {
       clientRef.current?.sendCommand(commandType, payload) ?? null,
     [],
   )
+
+  const sendCommandConfirmed = useCallback((
+    commandType: string,
+    payload: Record<string, unknown>,
+    timeoutMs = 3_000,
+  ): Promise<boolean> => new Promise(resolve => {
+    const commandId = crypto.randomUUID()
+    let settled = false
+    const settle = (accepted: boolean) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      pendingCommandsRef.current.delete(commandId)
+      resolve(accepted)
+    }
+    const timer = setTimeout(() => settle(false), timeoutMs)
+    pendingCommandsRef.current.set(commandId, settle)
+    const sent = clientRef.current?.sendCommand(commandType, { ...payload, command_id: commandId })
+    if (!sent) settle(false)
+  }), [])
 
   const setFallbackOrders = useCallback((fallback: KitchenOrderFromDB[]) => {
     if (modeRef.current === 'LAN_PRIMARY') return  // Local Server is authoritative
@@ -319,7 +366,11 @@ export function useKdsWsClient(restaurantId?: string): UseKdsWsClientResult {
       } else if (msg.type === 'PONG') {
         setConnected(true)
 
+      } else if (msg.type === 'ACK') {
+        pendingCommandsRef.current.get(msg.payload.command_id)?.(true)
+
       } else if (msg.type === 'REJECT') {
+        if (msg.payload.command_id) pendingCommandsRef.current.get(msg.payload.command_id)?.(false)
         console.warn('[KDS-WS] Command rejected:', msg.payload)
       }
     })
@@ -347,8 +398,10 @@ export function useKdsWsClient(restaurantId?: string): UseKdsWsClientResult {
       clearInterval(statusInterval)
       client.disconnect()
       clientRef.current = null
+      for (const settle of pendingCommandsRef.current.values()) settle(false)
+      pendingCommandsRef.current.clear()
     }
   }, [restaurantId, applyEvent, flush])
 
-  return { orders, mode, lastSequence, connected, sendCommand, setFallbackOrders }
+  return { orders, mode, lastSequence, connected, sendCommand, sendCommandConfirmed, setFallbackOrders }
 }

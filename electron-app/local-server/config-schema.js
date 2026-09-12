@@ -28,6 +28,7 @@ const PROTOCOL_VERSION = '1.0'
  * @property {string}  [pos_server_ip]     — LAN IP of the server_pos (pos/kds/admin machines)
  * @property {string}  [supabaseUrl]       — override Supabase URL
  * @property {string}  [supabaseAnonKey]   — override Supabase anon key
+ * @property {string}  [kitchen_token]     — HMAC provisioned by the deployment kit
  */
 
 /**
@@ -94,6 +95,10 @@ function validate(config) {
   if (config.provisioned_at && isNaN(Date.parse(config.provisioned_at))) {
     errors.push('provisioned_at must be a valid ISO 8601 timestamp')
   }
+  if (config.kitchen_token !== undefined && config.kitchen_token !== null &&
+      (typeof config.kitchen_token !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(config.kitchen_token))) {
+    errors.push('kitchen_token must be a 43-character base64url HMAC')
+  }
 
   return { valid: errors.length === 0, errors }
 }
@@ -139,6 +144,7 @@ function fromLegacy(legacy) {
     supabaseUrl:    legacy.supabaseUrl || null,
     supabaseAnonKey: legacy.supabaseAnonKey || null,
     localAuthorityEnabled: legacy.localAuthorityEnabled === true,
+    kitchen_token: legacy.kitchen_token || legacy.kitchenToken || null,
   }
 
   const { valid, errors } = validate(migrated)

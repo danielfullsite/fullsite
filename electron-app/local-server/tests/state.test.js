@@ -167,6 +167,28 @@ describe('KDS queue', () => {
     assert.equal(kds[0].items_sent[0].id, 'i2')
   })
 
+  test('concurrent kitchen deltas merge instead of erasing another screen', () => {
+    const state = new RestaurantState()
+    state.apply(makeEvent(EVENT.ORDER_SENT, {
+      order_id: 'shared-kitchen', mesa: 4, status: 'preparando',
+      items: [{ id: 'food' }, { id: 'drink' }],
+    }, 1))
+
+    // Cocina and barra act from the same stale snapshot. A full-map replacement
+    // makes the second command erase the first; item deltas must commute.
+    state.apply(makeEvent(EVENT.KDS_ITEM_STATUS, {
+      order_id: 'shared-kitchen', kds_item_delta: { item_index: 0, done: true },
+    }, 2))
+    state.apply(makeEvent(EVENT.KDS_ITEM_STATUS, {
+      order_id: 'shared-kitchen', kds_item_delta: { item_index: 1, done: true },
+    }, 3))
+
+    assert.deepEqual(JSON.parse(state.getOrder('shared-kitchen').kds_item_status), {
+      0: true,
+      1: true,
+    })
+  })
+
   test('D2 ORDER_CLOSED conserva trabajo pendiente en KDS', () => {
     const state = new RestaurantState()
     state.apply(makeEvent(EVENT.ORDER_SENT,   { order_id: 'o1', mesa: '2', items_sent: [{ id: 'i1' }] }, 1))
@@ -250,11 +272,13 @@ describe('Turno', () => {
       command_id: 'c1', order_id: 'o1', mesa: 5, mesero: 'm',
       items: [{ nombre: 'Bowl', station: 'cocina' }], status: 'enviada',
     }, 2))
-    const result = state.apply(makeEvent(EVENT.TURNO_CLOSED, { turno_id: 't1' }, 3))
+    state.apply(makeEvent(EVENT.MESA_LOCK, { mesa: 5, client_id: 'terminal-vieja' }, 3))
+    const result = state.apply(makeEvent(EVENT.TURNO_CLOSED, { turno_id: 't1' }, 4))
     assert.equal(state.hasActiveTurno(), false)
     const snap = state.toSnapshot()
     assert.equal(snap.kds_orders.length, 0)
-    assert.deepEqual(result.changed.sort(), ['kds', 'mesas', 'orders', 'turno'])
+    assert.deepEqual(snap.locks, {})
+    assert.deepEqual(result.changed.sort(), ['kds', 'locks', 'mesas', 'orders', 'turno'])
   })
 })
 

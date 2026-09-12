@@ -15,7 +15,7 @@ export default function DocumentoImpresoDeCaja({ order, paymentId }: Props) {
   const working = useRef(false)
   const scope = `${order.id}:${order.order_revision}:${order.financial_order?.revision ?? 0}:${paymentId ?? ''}`
   const currentScope = useRef(scope)
-  currentScope.current = scope
+  useEffect(() => { currentScope.current = scope }, [scope])
   const refresh = async () => {
     const documents = await leerDocumentosCaja(order.id)
     if (currentScope.current !== scope) return

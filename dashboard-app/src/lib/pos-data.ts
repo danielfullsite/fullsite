@@ -1079,6 +1079,8 @@ export interface Mesa {
   mesero?: string
   personas?: number
   total?: number
+  /** Deuda vigente confirmada por Caja; puede ser menor al consumo tras abonos. */
+  saldo?: number | null
 }
 
 export const MENU_CATEGORIES: MenuCategory[] = [
@@ -1833,7 +1835,35 @@ export interface KitchenOrderFromDB {
 
 const loadKitchenCache = () => import('@/lib/pos-offline-db')
 
-export async function getKitchenOrders(): Promise<KitchenOrderFromDB[]> {
+export type KitchenCloudReadStatus = 'ready' | 'configuration-required' | 'token-required' | 'unavailable'
+
+/** Persist one KDS checkbox without replacing another kitchen screen's map. */
+export async function updateKitchenItemStatus(orderId: string, itemIndex: number, done: boolean): Promise<boolean> {
+  if (!orderId || !Number.isSafeInteger(itemIndex) || itemIndex < 0 || typeof done !== 'boolean') return false
+  const clientId = _getClientId()
+  const { locationId } = readKitchenScope(clientId)
+  const kitchenToken = typeof window !== 'undefined' ? localStorage.getItem('pos_kitchen_token') : null
+  try {
+    const res = await fetchWithTimeout(
+      `/api/pos/kitchen?client_id=${encodeURIComponent(clientId)}${locationId ? `&location_id=${encodeURIComponent(locationId)}` : ''}`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(kitchenToken ? { 'x-kitchen-token': kitchenToken } : {}),
+        },
+        body: JSON.stringify({ order_id: orderId, item_index: itemIndex, done }),
+      },
+    )
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
+export async function getKitchenOrders(
+  onCloudStatus?: (status: KitchenCloudReadStatus) => void,
+): Promise<KitchenOrderFromDB[]> {
   let cacheModule: ReturnType<typeof loadKitchenCache> | undefined
   const cache = () => cacheModule ??= loadKitchenCache()
   const clientId = _getClientId()
@@ -1848,6 +1878,11 @@ export async function getKitchenOrders(): Promise<KitchenOrderFromDB[]> {
   const cutoff = today.toISOString()
 
   let orders: KitchenOrderFromDB[]
+  let cloudStatusReported = false
+  const reportCloudStatus = (status: KitchenCloudReadStatus) => {
+    cloudStatusReported = true
+    onCloudStatus?.(status)
+  }
   try {
     // KDS displays read via the same-origin /api/pos/kitchen endpoint (server-side
     // service key, tenant-scoped, kitchen-only fields). A login-less KDS cannot read
@@ -1855,8 +1890,10 @@ export async function getKitchenOrders(): Promise<KitchenOrderFromDB[]> {
     // separate machine cannot hold the LAN ws:// bridge from an https page (mixed
     // content). This endpoint is the reliable online path; offline still falls back
     // to the scoped IndexedDB cache below. The server resolves one exact open shift.
-    // Token de cocina por-tenant (provisionado a la terminal; el Electron KDS lo
-    // inyecta desde su config). Si no está presente, el endpoint opera abierto.
+    // Token por-tenant provisionado a la terminal; Electron lo inyecta desde su
+    // config. El endpoint cloud falla cerrado si falta el secreto server (503) o
+    // si esta terminal no presenta un token válido (401). En ambos casos el catch
+    // conserva las comandas de IndexedDB/LAN y la UI explica qué debe configurarse.
     const _kt = typeof window !== 'undefined' ? localStorage.getItem('pos_kitchen_token') : null
     const res = await fetchWithTimeout(
       `/api/pos/kitchen?client_id=${encodeURIComponent(clientId)}${locationId ? `&location_id=${encodeURIComponent(locationId)}` : ''}`,
@@ -1873,11 +1910,18 @@ export async function getKitchenOrders(): Promise<KitchenOrderFromDB[]> {
     // Lanzando, el catch hace lo que ya sabe hacer: mostrar las comandas
     // cacheadas en el dispositivo. Para una pantalla de cocina, ver las últimas
     // comandas conocidas siempre es mejor que ver la nada.
-    if (!res.ok) throw new Error(`kitchen_http_${res.status}`)
+    if (!res.ok) {
+      reportCloudStatus(
+        res.status === 503 ? 'configuration-required' :
+          res.status === 401 ? 'token-required' : 'unavailable'
+      )
+      throw new Error(`kitchen_http_${res.status}`)
+    }
     const rows: unknown = await res.json()
     if (!Array.isArray(rows)) throw new Error('kitchen_invalid_response')
     if (!scopeUnchanged()) return []
     orders = rows.filter(sameScope)
+    reportCloudStatus('ready')
     // Cache para offline — fire and forget, no bloquea
     if (typeof window !== 'undefined') {
       cache().then(({ cacheOrder }) =>
@@ -1919,6 +1963,7 @@ export async function getKitchenOrders(): Promise<KitchenOrderFromDB[]> {
       } catch { /* IndexedDB unavailable — online result stands */ }
     }
   } catch {
+    if (!cloudStatusReported) reportCloudStatus('unavailable')
     // Offline — mostrar las órdenes cacheadas en este dispositivo (IndexedDB)
     if (typeof window === 'undefined') return []
     try {
@@ -1976,6 +2021,7 @@ export type AuditAction =
   | 'delivery_assigned'
   | 'delivery_status_changed'
   | 'delivery_closed'
+  | 'delivery_cancel_alert_ack'
   | 'comandas_print_off'
   | 'comandas_print_on'
   | 'mesa_transferred'
@@ -2010,7 +2056,9 @@ export async function logAudit(event: AuditEvent): Promise<boolean> {
     action: event.action,
     actor: typeof event.actor === 'string' && event.actor.trim() ? event.actor.trim() : 'POS Offline',
     mesa: event.mesa ?? null,
-    details: event.details ? JSON.stringify(event.details) : null,
+    // `details` es jsonb y el cuerpo se serializa completo más abajo. Mandar aquí
+    // otra cadena JSON crea un escalar string que `details->>'campo'` no consulta.
+    details: event.details ?? null,
     reason: event.reason || null,
     approved_by: event.approved_by || null,
   }
@@ -2049,10 +2097,32 @@ export interface AuditLogEntry {
   action: string
   actor: string
   mesa: number | null
-  details: string | null
+  // Las filas nuevas son objetos; se conserva string para el historial anterior.
+  details: string | Record<string, unknown> | null
   reason: string | null
   approved_by: string | null
   created_at: string
+}
+
+export function parseAuditDetails(
+  details: AuditLogEntry['details'],
+): Record<string, unknown> | null {
+  if (!details) return null
+  if (typeof details !== 'string') return details
+  try {
+    const parsed: unknown = JSON.parse(details)
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : null
+  } catch {
+    return null
+  }
+}
+
+export function auditDetailsText(details: AuditLogEntry['details']): string {
+  if (!details) return ''
+  if (typeof details === 'string') return details
+  try { return JSON.stringify(details) } catch { return '' }
 }
 
 export async function getAuditLog(limit = 100, offset = 0): Promise<AuditLogEntry[]> {
@@ -2834,13 +2904,14 @@ export async function getMarketMovements(limit = 50): Promise<MarketMovement[]> 
 
 /** Entrada / merma / ajuste manual via constrained server-side RPC.
  *  Conservation: no GREATEST(0,...) clamp. Negative stock visible.
- *  Actor is REPORTED_ACTOR (browser-supplied, not server-verified). */
+ *  El actor del argumento es sólo compatibilidad UI; el servidor usa la sesión. */
 export async function registerMarketMovement(
   menuItemId: string,
   type: 'entrada' | 'merma' | 'ajuste',
   quantity: number,
-  actor: string,
+  _actor: string,
   notes?: string,
+  operationId?: string,
 ): Promise<{ ok: boolean; newStock: number }> {
   try {
     const adjustType = type === 'ajuste' ? 'ajuste_absoluto' : type
@@ -2851,7 +2922,7 @@ export async function registerMarketMovement(
         menu_item_id: menuItemId,
         adjustment_type: adjustType,
         quantity: Math.abs(quantity),
-        actor,
+        operation_id: operationId || crypto.randomUUID(),
         notes,
       }),
     })
@@ -3203,7 +3274,7 @@ export async function getClosedOrders(date: string): Promise<{ id: string; mesa:
   return res.json()
 }
 
-export async function reopenOrder(orderId: string, manager?: string, approvalToken?: string | null): Promise<boolean> {
+export async function reopenOrder(orderId: string, manager?: string, approvalToken?: string | null, operationId?: string): Promise<boolean> {
   // Reabrir una cuenta PAGADA es sensible (fraude: reabrir → modificar → re-cerrar menor).
   // Ya NO es un PATCH directo con anon-key: va por /api/pos/reopen-order, que VERIFICA la
   // aprobación de gerente server-side mediante token firmado.
@@ -3212,6 +3283,7 @@ export async function reopenOrder(orderId: string, manager?: string, approvalTok
     headers: { 'Content-Type': 'application/json', ...getPOSAuthHeaders() },
     body: JSON.stringify({
       order_id: orderId,
+      operation_id: operationId || `reopen:${orderId}`,
       manager: manager || undefined,
       approval_token: approvalToken || undefined,
     }),
@@ -3276,7 +3348,7 @@ export interface CFDIRequest {
   subtotal: number
   iva: number
   total: number
-  status: 'pendiente' | 'procesando' | 'emitida' | 'cancelada' | 'error'
+  status: 'pendiente' | 'procesando' | 'incierto' | 'emitida' | 'cancelada' | 'error'
   folio_fiscal?: string
   pdf_url?: string
   xml_url?: string

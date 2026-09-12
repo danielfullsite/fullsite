@@ -10,13 +10,14 @@ import {
   updateInventoryStock, logInventoryMovement, getInventory, getRecipes,
   getRecipeDetail,
   verifyManagerPin, consumeManagerApproval, RECIPE_ALIASES, formatMXN, getPOSAuthHeaders,
-  type KitchenOrderFromDB, type RecipeDetail, type OrderItem,
+  type KitchenOrderFromDB, type KitchenCloudReadStatus, type RecipeDetail, type OrderItem,
 } from '@/lib/pos-data'
 import { isBebida, POLL_INTERVAL_KITCHEN, getStationByName, type StationName } from '@/lib/pos-constants'
 import { useVisibleInterval } from '@/lib/use-visible-interval'
 import { reprintByStation, type ReprintOrderContext } from '@/lib/printer'
-import { getActiveClientSlug as _cid } from '@/lib/data'
 import { useBridgeClient, setPosServerHost } from '@/lib/bridge-client'
+import { PIN_LENGTH } from '@/lib/staff-pin'
+import { getActiveClientSlug as _cid } from '@/lib/data'
 
 
 function getElapsedMinutes(dateStr: string): number {
@@ -69,6 +70,7 @@ export default function CocinaPage() {
   const [mounted, setMounted] = useState(false)
   const [loading, setLoading] = useState(true)
   const [offline, setOffline] = useState(false)
+  const [cloudReadStatus, setCloudReadStatus] = useState<KitchenCloudReadStatus>('ready')
 
 
   // Recipe detail modal
@@ -167,7 +169,7 @@ export default function CocinaPage() {
     const scope = currentKitchenScope()
     let data: KitchenOrderFromDB[]
     try {
-      data = navigator.onLine ? await getKitchenOrders() : await readScopedKitchenCache(scope) as unknown as KitchenOrderFromDB[]
+      data = navigator.onLine ? await getKitchenOrders(setCloudReadStatus) : await readScopedKitchenCache(scope) as unknown as KitchenOrderFromDB[]
     } catch {
       data = await readScopedKitchenCache(scope).catch(() => []) as unknown as KitchenOrderFromDB[]
     }
@@ -179,11 +181,10 @@ export default function CocinaPage() {
 
     // Also fetch delivery orders (nueva/preparando)
     try {
-      const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-      const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      const kitchenToken = localStorage.getItem('pos_kitchen_token')
       const delRes = await fetch(
-        `${sbUrl}/rest/v1/delivery_orders?select=*&status=in.(nueva,aceptada,preparando)&client_id=eq.${_cid()}&order=created_at.desc`,
-        { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` } }
+        `/api/pos/delivery-orders?client_id=${encodeURIComponent(_cid())}&status=nueva,aceptada,preparando`,
+        { headers: { ...getPOSAuthHeaders(), ...(kitchenToken ? { 'x-kitchen-token': kitchenToken } : {}) }, cache: 'no-store' }
       )
       if (delRes.ok) {
         const deliveryOrders = await delRes.json()
@@ -222,7 +223,8 @@ export default function CocinaPage() {
 
   // Register ?bridge=IP and ?client=slug on first visit.
   // ?client= is essential for KDS terminals that never do a Supabase login
-  // (the KDS route is public): getKitchenOrders() filters by getActiveClientSlug(),
+  // (the KDS route does not require a user login, but does require the terminal
+  // token): getKitchenOrders() filters by getActiveClientSlug(),
   // which reads localStorage 'fullsite_client_id' — only set by AuthContext on login.
   // Without it the KDS queries an empty client_id and shows 0 orders even though
   // the order exists in pos_orders. The Electron injects ?client= like ?bridge=.
@@ -727,6 +729,17 @@ export default function CocinaPage() {
         </div>
       )}
 
+      {cloudReadStatus === 'configuration-required' && (
+        <div role="alert" className="px-6 py-2 bg-red-950/70 border-b border-red-600/50 text-red-200 text-sm font-semibold flex-shrink-0">
+          KDS sin configurar en el servidor. La red local y las comandas guardadas siguen disponibles; configura KITCHEN_TOKEN_SECRET antes de usar respaldo cloud.
+        </div>
+      )}
+      {cloudReadStatus === 'token-required' && (
+        <div role="alert" className="px-6 py-2 bg-red-950/70 border-b border-red-600/50 text-red-200 text-sm font-semibold flex-shrink-0">
+          Esta terminal KDS no está autorizada. Importa el config generado para conservar el respaldo cloud; la red local y el caché siguen disponibles.
+        </div>
+      )}
+
       {/* Station filter — hidden, always show all */}
       <div className="hidden">
         {([
@@ -1121,7 +1134,7 @@ export default function CocinaPage() {
                 <input
                   type="password"
                   inputMode="numeric"
-                  maxLength={4}
+                  maxLength={PIN_LENGTH}
                   value={cancelPin}
                   onChange={(e) => { setCancelPin(e.target.value.replace(/\D/g, '')); setCancelError('') }}
                   placeholder="****"

@@ -3,6 +3,8 @@ import { prepararCancelacionItem } from '@/lib/cancelacion-item'
 vi.mock('@/lib/api-auth', () => ({ withPOSAuth: async () => ({ clientId: 'lab', staffId: 'manager', staffName: 'Manager', role: 'gerente' }), unauthorized: vi.fn() }))
 vi.mock('@/lib/shift-token', () => ({ verifyShiftToken: vi.fn() }))
 import { POST } from '@/app/api/pos/cancel-item/route'
+process.env.SUPABASE_SERVICE_KEY = 'service-test'
+process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://db.example'
 const order = () => ({ id: 'order', order_revision: 4, updated_at: '2026-09-10T00:00:00Z',
   status: 'enviada', items: [{ id: 'cancel', subtotal: 50 }, { id: 'keep', subtotal: 100 }],
   subtotal: 150, descuento: 15, iva: 10.8, total: 145.8, saldo: 145.8, pagos: [] })
@@ -37,17 +39,15 @@ it('persiste todos los importes con OCC y devuelve exactamente la fila confirmad
   let current = order()
   const writes: any[] = []
   vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
-    if (init?.method === 'PATCH') {
-      expect(url).toContain('updated_at=eq.')
-      expect(init.headers).toMatchObject({ Prefer: 'return=representation' })
-      const patch = JSON.parse(String(init.body)); writes.push(patch)
-      current = { ...current, ...patch }
-      return Response.json([current])
+    if (url.includes('pos_cancel_item_operations')) return Response.json([])
+    if (url.includes('/rpc/r1_cancel_item_atomic')) {
+      const input = JSON.parse(String(init?.body)); writes.push(input.p_patch)
+      current = { ...current, ...input.p_patch, updated_at: '2026-09-10T00:00:01Z' }
+      return Response.json({ ok: true, item_name: 'cancel', revision: current.order_revision, order: current })
     }
-    if (init?.method === 'POST') return Response.json({})
     return Response.json([current])
   }))
-  const request = () => new Request('http://test/api/pos/cancel-item', { method: 'POST', body: JSON.stringify({ order_id: 'order', item_id: 'cancel' }) }) as any
+  const request = () => new Request('http://test/api/pos/cancel-item', { method: 'POST', body: JSON.stringify({ order_id: 'order', item_id: 'cancel', operation_id: 'cancel-op' }) }) as any
   const result = await (await POST(request())).json()
   expect(result.order).toEqual(current)
   expect(result.revision).toBe(5)
@@ -56,8 +56,12 @@ it('persiste todos los importes con OCC y devuelve exactamente la fila confirmad
   expect(writes).toHaveLength(1)
 })
 it('el conflicto de OCC no devuelve una fila ni una revisión inventadas', async () => {
-  vi.stubGlobal('fetch', vi.fn(async (_url: string, init?: RequestInit) => Response.json(init?.method === 'PATCH' ? [] : [order()])))
-  const result = await (await POST(new Request('http://test/api/pos/cancel-item', { method: 'POST', body: JSON.stringify({ order_id: 'order', item_id: 'cancel' }) }) as any)).json()
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+    if (url.includes('pos_cancel_item_operations')) return Response.json([])
+    if (url.includes('/rpc/r1_cancel_item_atomic')) return Response.json({ message: 'ORDER_CONFLICT' }, { status: 400 })
+    return Response.json([order()])
+  }))
+  const result = await (await POST(new Request('http://test/api/pos/cancel-item', { method: 'POST', body: JSON.stringify({ order_id: 'order', item_id: 'cancel', operation_id: 'cancel-op' }) }) as any)).json()
   expect(result.conflict).toBe(true)
   expect(result.order).toBeUndefined()
   expect(result.revision).toBeUndefined()

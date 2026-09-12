@@ -33,24 +33,27 @@ describe('MPConfig', () => {
   })
 
   it('saves and retrieves config', () => {
-    const config: MPConfig = { accessToken: 'tok_123', deviceId: 'dev_abc', deviceModel: 'SMART' }
+    const config: MPConfig = { deviceId: 'dev_abc', deviceModel: 'SMART' }
     saveMPConfig(config)
     const result = getMPConfig()
     expect(result).toEqual(config)
   })
 
   it('clears config', () => {
-    saveMPConfig({ accessToken: 'tok', deviceId: 'dev', deviceModel: 'MINI' })
+    saveMPConfig({ deviceId: 'dev', deviceModel: 'MINI' })
     clearMPConfig()
     expect(getMPConfig()).toBeNull()
   })
 
   it('migrates old config without deviceModel', () => {
     // Simulate old config without deviceModel
+    localStorageMock.setItem('mp_access_token', 'token-legacy')
     localStorageMock.setItem('mp_point_config', JSON.stringify({ accessToken: 'tok', deviceId: 'dev' }))
     const config = getMPConfig()
     expect(config).not.toBeNull()
     expect(config!.deviceModel).toBe('UNKNOWN')
+    expect(localStorageMock.getItem('mp_access_token')).toBeNull()
+    expect(localStorageMock.getItem('mp_point_config')).not.toContain('accessToken')
   })
 })
 
@@ -58,12 +61,12 @@ describe('MPConfig', () => {
 
 describe('isPointSmart', () => {
   it('returns true for SMART model', () => {
-    saveMPConfig({ accessToken: 'tok', deviceId: 'dev', deviceModel: 'SMART' })
+    saveMPConfig({ deviceId: 'dev', deviceModel: 'SMART' })
     expect(isPointSmart()).toBe(true)
   })
 
   it('returns false for MINI model', () => {
-    saveMPConfig({ accessToken: 'tok', deviceId: 'dev', deviceModel: 'MINI' })
+    saveMPConfig({ deviceId: 'dev', deviceModel: 'MINI' })
     expect(isPointSmart()).toBe(false)
   })
 

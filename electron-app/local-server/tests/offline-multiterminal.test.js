@@ -94,6 +94,102 @@ describe('Multi-terminal simulado — estado compartido en LAN', () => {
 
     const rB = await send(srv.cmd, 'term-B', { command_type: 'MESA_LOCK', command_id: 'l2', mesa: '7', client_id: 'term-B', expires_ms: Date.now() + 30000 })
     assert.ok(rB.error && /locked/i.test(rB.error), 'B NO debe poder bloquear la mesa que A tiene')
+
+    const editB = await send(srv.cmd, 'term-B', { command_type: 'ORDER_UPSERTED', command_id: 'edit-b', order_id: 'o7', mesa: '7', items: [] })
+    assert.equal(editB.code, 'MESA_LOCK_CONFLICT', 'un cliente viejo tampoco debe saltarse el lock y escribir')
+    assert.equal(srv.serverState.getMesa('7').order_id, null)
+  })
+
+  test('el lock del mesero no bloquea el avance de cocina pero sí otra edición', async () => {
+    const srv = await buildServer(dir)
+    await send(srv.cmd, 'term-A', {
+      command_type: 'ORDER_SENT', command_id: 'create-7', order_id: 'o7', mesa: '7',
+      status: 'enviada', items: [{ id: 'i7', nombre: 'Sopa' }],
+    })
+    const original = JSON.parse(JSON.stringify(srv.serverState.getOrder('o7')))
+    await send(srv.cmd, 'term-A', { command_type: 'MESA_LOCK', command_id: 'lock-7', mesa: '7' })
+
+    const kitchen = await send(srv.cmd, 'term-kds', {
+      command_type: 'ORDER_UPSERTED', command_id: 'kds-ready', order_id: 'o7', mesa: '7', status: 'lista',
+    })
+    assert.ok(!kitchen.error, `cocina debe avanzar aunque el mesero edite: ${kitchen.error || ''}`)
+    assert.equal(srv.serverState.getOrder('o7').status, 'lista')
+    assert.equal(srv.serverState.getOrder('o7').items, original.items)
+    assert.equal(srv.serverState.getOrder('o7').total, original.total)
+    assert.equal(srv.serverState.getOrder('o7').mesa, original.mesa)
+
+    const delivered = await send(srv.cmd, 'term-kds', {
+      command_type: 'ORDER_UPSERTED', command_id: 'kds-delivered', order_id: 'o7', mesa: '7', status: 'entregada',
+    })
+    assert.ok(!delivered.error)
+    await send(srv.cmd, 'term-A', { command_type: 'MESA_UNLOCK', command_id: 'unlock-7', mesa: '7' })
+    const regression = await send(srv.cmd, 'term-kds', {
+      command_type: 'ORDER_UPSERTED', command_id: 'kds-regression', order_id: 'o7', mesa: '7', status: 'lista',
+    })
+    assert.equal(regression.code, 'PREPARATION_REGRESSION')
+    assert.equal(srv.serverState.getOrder('o7').status, 'entregada')
+    assert.equal(srv.serverState.toSnapshot().kds_orders.length, 0, 'una regresión no revive la comanda')
+
+    await send(srv.cmd, 'term-A', { command_type: 'MESA_LOCK', command_id: 'relock-7', mesa: '7' })
+    const wrongTable = await send(srv.cmd, 'term-kds', {
+      command_type: 'ORDER_UPSERTED', command_id: 'kds-wrong-table', order_id: 'o7', mesa: '8', status: 'entregada',
+    })
+    assert.equal(wrongTable.code, 'MESA_LOCK_CONFLICT')
+
+    const edit = await send(srv.cmd, 'term-B', {
+      command_type: 'ORDER_UPSERTED', command_id: 'edit-7', order_id: 'o7', mesa: '7',
+      status: 'lista', items: [{ id: 'i7', nombre: 'Sopa' }, { id: 'i8', nombre: 'Postre' }],
+    })
+    assert.equal(edit.code, 'MESA_LOCK_CONFLICT')
+
+    await send(srv.cmd, 'term-A', {
+      command_type: 'ORDER_UPSERTED', command_id: 'unsent-8', order_id: 'o8', mesa: '8',
+      status: 'abierta', items: [{ id: 'i9', nombre: 'Cuenta sin enviar' }],
+    })
+    await send(srv.cmd, 'term-A', { command_type: 'MESA_LOCK', command_id: 'lock-8', mesa: '8' })
+    const unsent = await send(srv.cmd, 'term-kds', {
+      command_type: 'ORDER_UPSERTED', command_id: 'kds-unsent', order_id: 'o8', mesa: '8', status: 'lista',
+    })
+    assert.equal(unsent.code, 'MESA_LOCK_CONFLICT')
+  })
+
+  test('la identidad autenticada manda: el payload no puede robar ni liberar el lock de otra terminal', async () => {
+    const srv = await buildServer(dir)
+
+    const lock = await send(srv.cmd, 'term-A', {
+      command_type: 'MESA_LOCK', command_id: 'lock-spoof', mesa: '7',
+      client_id: 'term-victima', expires_ms: Date.now() + 30_000,
+    })
+    assert.ok(!lock.error)
+    assert.equal(srv.serverState.getLock('7').client_id, 'term-A')
+
+    const unlock = await send(srv.cmd, 'term-B', {
+      command_type: 'MESA_UNLOCK', command_id: 'unlock-spoof', mesa: '7', client_id: 'term-A',
+    })
+    assert.ok(!unlock.error)
+    assert.equal(srv.serverState.getLock('7').client_id, 'term-A', 'B no debe poder liberar el lock de A')
+  })
+
+  test('un lock sin identidad de terminal verificable falla cerrado', async () => {
+    const srv = await buildServer(dir)
+    const result = await send(srv.cmd, 'rest-api', {
+      command_type: 'MESA_LOCK', command_id: 'anonymous-lock', mesa: '7',
+      client_id: 'term-inventada', expires_ms: Date.now() + 30_000,
+    })
+    assert.equal(result.code, 'TERMINAL_ID_REQUIRED')
+    assert.equal(srv.serverState.getLock('7'), null)
+  })
+
+  test('Caja fija la vigencia: un reloj incorrecto en la tablet no vence ni alarga el lock', async () => {
+    const srv = await buildServer(dir)
+    const before = Date.now()
+    const result = await send(srv.cmd, 'term-A', {
+      command_type: 'MESA_LOCK', command_id: 'skewed-clock', mesa: '7', expires_ms: 1,
+    })
+    assert.ok(!result.error)
+    const lock = srv.serverState.getLock('7')
+    assert.ok(lock.expires_ms >= before + 29_000)
+    assert.ok(lock.expires_ms <= Date.now() + 30_000)
   })
 
   test('el cierre en A libera la mesa en B', async () => {

@@ -84,6 +84,7 @@ const LEGACY_CONFIG_PATH  = path.join('C:\\fullsite', 'config.json');
 // blocking the Local Server, POS, and KDS from starting.
 let autoInstaller = null;   // handle del auto-update; null si no arranco
 const configSchema        = require('./local-server/config-schema');
+const { loadTerminalConfig } = require('./local-server/config-loader');
 const printerConfigSchema = require('./local-server/adapters/printer-config-schema');
 
 /**
@@ -106,67 +107,14 @@ function getPrimaryConfigPath() {
  *   4. If nothing works → NOT_PROVISIONED
  */
 function loadAndValidateConfig() {
-  const primaryPath = getPrimaryConfigPath();
-
-  // 1. Try primary (new schema)
-  try {
-    if (fs.existsSync(primaryPath)) {
-      const data = JSON.parse(fs.readFileSync(primaryPath, 'utf8'));
-      const { valid, errors } = configSchema.validate(data);
-      if (valid) {
-        console.log('[config] Valid config loaded from', primaryPath);
-        configSchema.touchValidatedAt(data);
-        return { valid: true, config: data, migrated: false, errors: [], sourcePath: primaryPath };
-      }
-      console.warn('[config] Primary config invalid:', errors);
-    }
-  } catch (e) {
-    console.warn('[config] Error reading primary config:', e.message);
-  }
-
-  // 2. Try legacy path
-  let legacy = null;
-  try {
-    if (fs.existsSync(LEGACY_CONFIG_PATH)) {
-      legacy = JSON.parse(fs.readFileSync(LEGACY_CONFIG_PATH, 'utf8'));
-      console.log('[config] Legacy config found at', LEGACY_CONFIG_PATH);
-
-      // 2a. If legacy is already new schema (migrated manually), validate it
-      const { valid, errors } = configSchema.validate(legacy);
-      if (valid) {
-        console.log('[config] Legacy config is already valid new schema');
-        return { valid: true, config: legacy, migrated: false, errors: [], sourcePath: LEGACY_CONFIG_PATH };
-      }
-
-      // 2b. Auto-migrate legacy to new schema
-      const migrated = configSchema.fromLegacy(legacy);
-      if (migrated) {
-        console.log('[config] Auto-migrated legacy config:', JSON.stringify({ restaurant_id: migrated.restaurant_id, terminal_id: migrated.terminal_id }));
-        // Save migrated config to primary path so future boots use it
-        try {
-          fs.mkdirSync(path.dirname(primaryPath), { recursive: true });
-          fs.writeFileSync(primaryPath, JSON.stringify(migrated, null, 2), 'utf8');
-          console.log('[config] Migrated config saved to', primaryPath);
-        } catch (e2) {
-          console.warn('[config] Could not save migrated config:', e2.message);
-        }
-        return { valid: true, config: migrated, migrated: true, errors: [], sourcePath: primaryPath };
-      }
-      console.warn('[config] Legacy config could not be migrated (missing restaurantId)');
-    }
-  } catch (e) {
-    console.warn('[config] Error reading legacy config:', e.message);
-  }
-
-  // 3. NOT_PROVISIONED
-  return {
-    valid: false,
-    config: null,
-    migrated: false,
-    errors: legacy ? ['Legacy config found but lacks a valid restaurant_id'] : ['No config.json found'],
-    sourcePath: primaryPath,
-    legacy,
-  };
+  return loadTerminalConfig({
+    fs,
+    path,
+    schema: configSchema,
+    primaryPath: getPrimaryConfigPath(),
+    legacyPath: LEGACY_CONFIG_PATH,
+    logger: console,
+  });
 }
 
 /**
@@ -343,7 +291,6 @@ function registerProvisioningIpc() {
         system_printers = (await setupWindow.webContents.getPrintersAsync()).map(printer => ({
           name: printer.name,
           displayName: printer.displayName || printer.name,
-          isDefault: !!printer.isDefault,
         }));
       }
     } catch (error) {
@@ -943,7 +890,7 @@ function createKdsWindow(x, y, width, height, urlOverride) {
     kdsWindow.webContents.executeJavaScript(`JSON.stringify({cid: localStorage.getItem('fullsite_client_id'), bh: localStorage.getItem('pos_bridge_host'), tid: localStorage.getItem('pos_terminal_id'), electron: navigator.userAgent.includes('Electron'), url: location.href})`).then(v => console.log('[kds-diag]', v)).catch(e => console.log('[kds-diag ERR]', e.message));
   });
   // TEMP DIAG: pipe renderer console to main stdout
-  kdsWindow.webContents.on('console-message', (_e, _level, message) => {
+  kdsWindow.webContents.on('console-message', ({ message }) => {
     if (/bridge|discover|ws|socket|identity|client|7717|\bSW\b|CACHE_VERSION|v2\d|activat/i.test(message)) console.log('[kds-console]', message);
   });
 
@@ -1006,7 +953,7 @@ function createSetupWindow() {
 app.commandLine.appendSwitch('enable-features', 'WebAuthenticationWin10');
 app.commandLine.appendSwitch('enable-web-authentication');
 // Allow the trusted https POS/KDS shell to reach its own Local Server.
-// Electron 33 embeds Chromium 130: webSecurity:false and
+// Electron 44 embeds Chromium 152: webSecurity:false and
 // BlockInsecurePrivateNetworkRequests alone are insufficient there. Chromium
 // still sends/enforces a PNA retry and fails localhost before the request
 // reaches Pedro. Disable only the three legacy PNA gates; do not use the global

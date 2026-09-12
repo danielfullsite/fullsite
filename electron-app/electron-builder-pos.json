@@ -41,7 +41,7 @@
   },
   "mac": {
     "target": "dmg",
-    "icon": "icon.ico"
+    "icon": "icon.png"
   },
   "nsis": {
     "oneClick": true,

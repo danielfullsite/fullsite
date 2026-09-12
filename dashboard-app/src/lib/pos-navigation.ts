@@ -1,6 +1,12 @@
 import { counterHomePath, isCounterModel, peekServiceModel } from './pos-service-model'
 
 export const POS_MESA_MAP_PATH = '/pos/mesas'
+export const POS_MESA_EXIT_EVENT = 'fullsite:pos-mesa-exit'
+
+export type PosMesaExitDetail = {
+  mesa: number
+  navigate: () => void
+}
 
 /**
  * Leave an order through a full document navigation.
@@ -12,17 +18,35 @@ export const POS_MESA_MAP_PATH = '/pos/mesas'
  */
 export function navigateToMesaMap(
   location: Pick<Location, 'replace'> = window.location,
+  mesaActual?: number,
 ): void {
   // Tenants de mostrador (fast food / dark kitchen) no tienen mapa de mesas:
   // al salir de una orden se abre la siguiente orden de mostrador. peek es
   // síncrono y sin red (ver pos-service-model.ts); su default 'tables' deja
   // este flujo exactamente como siempre para todos los demás tenants.
   const model = peekServiceModel()
-  if (isCounterModel(model)) {
-    location.replace(counterHomePath(model))
-    return
+  const destino = isCounterModel(model) ? counterHomePath(model) : POS_MESA_MAP_PATH
+  let navego = false
+  const navegar = () => {
+    if (navego) return
+    navego = true
+    location.replace(destino)
   }
-  location.replace(POS_MESA_MAP_PATH)
+
+  // El mapa usa un hard replace a propósito para sobrevivir al App Router
+  // cacheado cuando no hay internet. La guardia que posee el lease intercepta
+  // este evento: vuelve la UI inerte, cancela su renovación, libera y después
+  // llama `navigate`. Sin guardia (mostrador/cuenta/cloud), la salida es inmediata.
+  if (Number.isInteger(mesaActual) && Number(mesaActual) > 0 &&
+      typeof window !== 'undefined' && typeof window.dispatchEvent === 'function' && typeof CustomEvent === 'function') {
+    const event = new CustomEvent<PosMesaExitDetail>(POS_MESA_EXIT_EVENT, {
+      cancelable: true,
+      detail: { mesa: Number(mesaActual), navigate: navegar },
+    })
+    window.dispatchEvent(event)
+    if (event.defaultPrevented) return
+  }
+  navegar()
 }
 
 /**

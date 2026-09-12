@@ -460,14 +460,18 @@ BEGIN
         RAISE EXCEPTION 'Ingredient % update failed: rows=%', v_plan_line.ingredient_id, v_updated;
       END IF;
 
-      -- Movement provenance (order_id left NULL — uuid type mismatch; use reconciliation_result_id)
+      -- Movement provenance. `order_id` es text desde la migración 20260912120000.
+      -- Mientras fue uuid, esta rama lo dejaba NULL y la de direct_stock sí lo escribía,
+      -- porque pos_market_movements.order_id siempre fue text. El id ya estaba en alcance
+      -- (p_order_id); lo único que faltaba era una columna que lo admitiera.
       INSERT INTO pos_inventory_movements
-        (client_id, ingredient_id, movement_type, quantity, actor, notes,
+        (client_id, ingredient_id, movement_type, quantity, order_id, actor, notes,
          reconciliation_result_id, mutation_revision)
       VALUES
         (p_client_id, v_plan_line.ingredient_id,
          CASE WHEN v_ing_delta > 0 THEN 'recipe_deduction' ELSE 'recipe_reversal' END,
          -v_ing_delta,
+         p_order_id,
          'r1_reconciler',
          'rv=' || v_recipe_version_id || ' rev=' || v_next_rev || ' oi=' || p_item_id,
          v_intent.id, v_next_rev);
@@ -891,7 +895,7 @@ BEGIN
       UNION ALL
       SELECT DISTINCT m2.ingredient_id as ing_id, 0::numeric as exp_qty
       FROM pos_inventory_movements m2
-      WHERE m2.order_id = p_order_id::uuid AND m2.movement_type IN ('deduction','reversal')
+      WHERE m2.order_id = p_order_id AND m2.movement_type IN ('deduction','reversal')
         AND m2.ingredient_id NOT IN (
           SELECT r2.ingredient_id FROM jsonb_array_elements(v_items) e2
           JOIN pos_recipes_old r2 ON r2.client_id = v_client_id AND lower(r2.menu_item_name) = lower(e2->>'nombre'))
@@ -903,7 +907,7 @@ BEGIN
 
     SELECT ROUND(COALESCE(SUM(m3.quantity), 0), 6) INTO v_current_net
     FROM pos_inventory_movements m3
-    WHERE m3.order_id = p_order_id::uuid AND m3.ingredient_id = v_rec.ing_id AND m3.movement_type IN ('deduction','reversal');
+    WHERE m3.order_id = p_order_id AND m3.ingredient_id = v_rec.ing_id AND m3.movement_type IN ('deduction','reversal');
 
     v_adjustment := ROUND(-v_rec.expected_qty, 6) - v_current_net;
 
@@ -914,7 +918,7 @@ BEGIN
 
     INSERT INTO pos_inventory_movements (client_id, ingredient_id, movement_type, quantity, order_id, actor, notes)
     VALUES (v_client_id, v_rec.ing_id, CASE WHEN v_adjustment < 0 THEN 'deduction' ELSE 'reversal' END,
-            v_adjustment, p_order_id::uuid, 'system-reconcile', 'Reconciliation ' || ROUND(v_adjustment, 6));
+            v_adjustment, p_order_id, 'system-reconcile', 'Reconciliation ' || ROUND(v_adjustment, 6));
 
     UPDATE pos_inventory AS inv SET stock = inv.stock + v_adjustment, updated_at = NOW()
     WHERE inv.client_id = v_client_id AND inv.ingredient_id = v_rec.ing_id;

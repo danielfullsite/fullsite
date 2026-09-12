@@ -9,7 +9,7 @@ import { verifyShiftToken } from '@/lib/shift-token'
 //   • Offline: la sesión solicitante ya debe ser gerente+. Un booleano enviado por
 //     el navegador nunca demuestra que otra persona capturó su PIN.
 
-const ROLE_LVL: Record<string, number> = { mesero: 1, cajero: 2, capitan: 3, gerente: 4, admin: 5 }
+const ROLE_LVL: Record<string, number> = { mesero: 1, cajero: 2, capitan: 3, gerente: 4, admin: 5, 'dueño': 6 }
 
 // `offline_approved: true` era una afirmación controlada por el navegador y permitía
 // que un mesero reabriera una cuenta pagada. Ya no concede nada. Sin token separado,
@@ -23,17 +23,23 @@ export async function verifyManagerApproval(opts: {
   minLevel?: number
   /** Rol de la sesión que pide, del shift token FIRMADO. No lo dicta el cliente. */
   solicitanteRol?: string
-}): Promise<{ ok: boolean; mode: string; solicitanteNivel: number }> {
+}): Promise<{ ok: boolean; mode: string; solicitanteNivel: number; approverId?: string; approverName?: string }> {
   const minLevel = opts.minLevel ?? 4 // gerente+
   const solicitanteNivel = ROLE_LVL[String(opts.solicitanteRol)] || 0
   let mode = ''
+  let approverId: string | undefined
+  let approverName: string | undefined
   if (typeof opts.approvalToken === 'string' && opts.approvalToken) {
     const p = await verifyShiftToken(opts.approvalToken)
-    if (p && p.cid === opts.clientId && (ROLE_LVL[p.rol] || 0) >= minLevel) mode = 'online:' + p.rol
+    if (p && p.cid === opts.clientId && (ROLE_LVL[p.rol] || 0) >= minLevel) {
+      mode = 'online:' + p.rol
+      approverId = p.sub
+      approverName = p.nam
+    }
   }
   if (!mode && solicitanteNivel >= minLevel) mode = `session_role:${opts.solicitanteRol}`
   if (!mode) return { ok: false, mode: 'blocked', solicitanteNivel }
-  return { ok: true, mode, solicitanteNivel }
+  return { ok: true, mode, solicitanteNivel, approverId, approverName }
 }
 
 /**

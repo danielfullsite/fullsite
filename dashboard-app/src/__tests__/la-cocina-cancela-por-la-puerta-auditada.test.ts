@@ -91,25 +91,24 @@ describe('una cancelacion es una revision de la orden', () => {
     expect(rutaLimpia).toMatch(/order_revision: revisionActual/)
   })
 
-  it('y la avanza en el MISMO PATCH que escribe los items', () => {
-    // En el mismo PATCH para que el filtro de `updated_at` proteja las dos cosas:
-    // si otra escritura gano la carrera, no afecta filas y sale 409, como antes.
+  it('y la avanza en la MISMA RPC que escribe los items', () => {
     const i = rutaLimpia.indexOf('...cancellation.patch')
     expect(i).toBeGreaterThan(-1)
     expect(rutaLimpia.slice(i, i + 400)).toMatch(/order_revision: \(Number\(revisionActual\) \|\| 0\) \+ 1/)
   })
 
   it('devuelve la revision nueva a quien cancelo', () => {
-    expect(rutaLimpia).toContain('revision: patchRows[0].order_revision')
+    expect(rutaLimpia).toContain('...committed')
   })
 
-  it('el PATCH sigue protegido por updated_at', () => {
-    expect(rutaLimpia).toMatch(/pos_orders\?id=eq\.\$\{order_id\}&updated_at=eq\./)
+  it('la RPC conserva las dos precondiciones OCC', () => {
+    expect(rutaLimpia).toContain('p_expected_updated_at: updatedAt')
+    expect(rutaLimpia).toContain('p_expected_revision: Number(revisionActual)')
   })
 
-  it('cero filas sigue siendo conflicto, no exito', () => {
-    expect(rutaLimpia).toMatch(/patchRows\.length === 0/)
-    expect(rutaLimpia).toMatch(/conflict: true/)
+  it('el rechazo OCC sigue siendo conflicto, no exito', () => {
+    expect(rutaLimpia).toContain("'ORDER_CONFLICT'")
+    expect(rutaLimpia).toContain("conflict: error === 'ORDER_CONFLICT'")
   })
 })
 
@@ -140,7 +139,8 @@ describe('lo que la puerta auditada exige y la otra no exigia', () => {
   })
 
   it('el actor sale del token, no del cuerpo', () => {
-    expect(rutaLimpia).toMatch(/actor: auth\.staffName \|\| auth\.staffId/)
+    expect(rutaLimpia).toMatch(/approvedBy = auth\.staffName \|\| auth\.staffId/)
+    expect(rutaLimpia).not.toMatch(/\{[^}]*actor[^}]*\} = body/)
   })
 
   it('guarda el monto del platillo cancelado', () => {

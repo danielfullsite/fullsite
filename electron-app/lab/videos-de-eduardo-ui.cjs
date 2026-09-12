@@ -200,6 +200,11 @@ module.exports = async function videosDeEduardo({ caja, pos2, pos3, kds, check, 
         JSON.parse(localStorage.getItem(`pos_cuenta_${tenant}_mesa:1`) || 'null'), tenant)
       assert(!cache?.confirmed?.id, `${terminal.name}: la identidad de la cuenta liquidada no sobrevive en caché (18eff681): ${JSON.stringify(cache)}`)
       await foto(terminal, 'mesa1-reabierta')
+      // Salir con el botón real prueba el camino que usa el mesero: confirma el
+      // UNLOCK con Caja antes del hard replace offline-safe hacia el mapa.
+      await terminal.page.getByTitle('Volver al mapa de mesas', { exact: true }).click()
+      await expect(terminal.page).toHaveURL(`${uiOrigin}/pos/mesas`, { timeout: 10000 })
+      await until(async () => !(await salon()).locks?.['1'], `${terminal.name} libera la mesa 1 al salir`, 10000)
     }
   })
   await check('Video de Eduardo 3 — la cola de POS 3 tiene UN solo cierre de esa orden: no hay segundo cobro', async () => {

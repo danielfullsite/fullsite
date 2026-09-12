@@ -129,6 +129,7 @@ interface ActiveOrder {
   mesero: string
   personas: number
   total: number
+  saldo?: number | null
   status: string
   created_at: string
 }
@@ -297,7 +298,7 @@ export default function MesasPage() {
         const deLaCaja = aOrdenesDelSalon(salon.ordenes)
         setActiveOrders(deLaCaja.map(o => ({
           id: o.id, mesa: o.mesa ?? 0, customer_name: o.customer_name, order_number: o.order_number,
-          mesero: o.mesero ?? '', personas: o.personas, total: o.total,
+          mesero: o.mesero ?? '', personas: o.personas, total: o.total, saldo: o.saldo,
           status: o.status ?? 'enviada',
           created_at: o.created_at ?? new Date().toISOString(),
         })) as unknown as ActiveOrder[])
@@ -403,6 +404,7 @@ export default function MesasPage() {
             mesero: (d.mesero as string) ?? '',
             personas: (d.personas as number) ?? 0,
             total: (d.total as number) ?? 0,
+            saldo: null,
             status: String(d.status),
             created_at: (d.created_at as string) ?? new Date().toISOString(),
           }))
@@ -473,6 +475,7 @@ export default function MesasPage() {
       mesero: order.mesero,
       personas: order.personas,
       total: order.total,
+      saldo: order.saldo,
     } : m)
   }
 
@@ -704,7 +707,9 @@ export default function MesasPage() {
                 <span className="font-semibold text-[var(--text-1)] tabular-nums">{mesa.personas}</span>
               </div>
               {mesa.total != null && (
-                <span className="text-[var(--text-1)] font-bold text-xs font-mono tabular-nums">{formatMXN(mesa.total)}</span>
+                <span className="text-[var(--text-1)] font-bold text-xs font-mono tabular-nums">
+                  {mesa.saldo != null && mesa.saldo !== mesa.total ? `Saldo ${formatMXN(mesa.saldo)}` : formatMXN(mesa.total)}
+                </span>
               )}
             </div>
           </div>
@@ -1185,7 +1190,9 @@ export default function MesasPage() {
                         </div>
                         <div className="flex items-center justify-between mt-1">
                           <span className="text-[var(--text-3)] text-xs truncate">{o.mesero}</span>
-                          <span className="text-[var(--text-1)] font-semibold text-xs">{formatMXN(o.total || 0)}</span>
+                          <span className="text-[var(--text-1)] font-semibold text-xs">
+                            {o.saldo != null && o.saldo !== o.total ? `Saldo ${formatMXN(o.saldo)}` : formatMXN(o.total || 0)}
+                          </span>
                         </div>
                       </button>
                     )

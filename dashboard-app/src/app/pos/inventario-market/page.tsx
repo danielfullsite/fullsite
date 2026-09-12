@@ -55,6 +55,7 @@ export default function InventarioMarketPage() {
 
   // Modal state
   const [modal, setModal] = useState<{ type: ModalType; item: Row } | null>(null)
+  const [movementOperationId, setMovementOperationId] = useState('')
   const [qty, setQty] = useState('')
   const [motivo, setMotivo] = useState(MOTIVOS_MERMA[0])
   const [reorderPoint, setReorderPoint] = useState('')
@@ -103,6 +104,7 @@ export default function InventarioMarketPage() {
 
   const openModal = (type: ModalType, item: Row) => {
     setModal({ type, item })
+    setMovementOperationId(crypto.randomUUID())
     setQty(type === 'ajuste' ? String(item.stock) : '')
     setMotivo(MOTIVOS_MERMA[0])
     setReorderPoint(String(item.reorder_point))
@@ -117,7 +119,7 @@ export default function InventarioMarketPage() {
       const notes = modal.type === 'merma' ? motivo
         : modal.type === 'ajuste' ? 'Ajuste manual de stock'
         : 'Entrada de mercancía'
-      const { ok, newStock } = await registerMarketMovement(modal.item.id, modal.type, n, 'almacén', notes)
+      const { ok, newStock } = await registerMarketMovement(modal.item.id, modal.type, n, 'almacén', notes, movementOperationId)
 
       // Punto de reorden (si cambió)
       const rp = Number(reorderPoint)

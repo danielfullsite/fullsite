@@ -4,8 +4,8 @@ import { currentKitchenScope, kitchenScopeIsCurrent, readScopedKitchenCache } fr
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Printer } from 'lucide-react'
 import {
-  getKitchenOrders, updateOrderStatus, logAudit,
-  type KitchenOrderFromDB, type OrderItem,
+  getKitchenOrders, updateKitchenItemStatus, updateOrderStatus, logAudit,
+  type KitchenOrderFromDB, type KitchenCloudReadStatus, type OrderItem,
 } from '@/lib/pos-data'
 import { reprintByStation, type ReprintOrderContext } from '@/lib/printer'
 import { type StationName, getStationByName, POLL_INTERVAL_KITCHEN } from '@/lib/pos-constants'
@@ -96,8 +96,10 @@ export default function KDSStandalone() {
   const [doneItems, setDoneItems] = useState<Set<string>>(new Set())
   const [reprintMsg, setReprintMsg] = useState<{ success: boolean; text: string } | null>(null)
   const [statusMsg, setStatusMsg] = useState<{ success: boolean; text: string } | null>(null)
+  const [cloudReadStatus, setCloudReadStatus] = useState<KitchenCloudReadStatus>('ready')
   const [showExitConfirm, setShowExitConfirm] = useState(false)
   const advancingRef = useRef<Set<string>>(new Set())
+  const savingItemsRef = useRef<Set<string>>(new Set())
   const prevEnviadaRef = useRef(0)
 
   const kdsClient = useKdsWsClient()
@@ -166,7 +168,7 @@ export default function KDSStandalone() {
     const scope = currentKitchenScope()
     let data: KitchenOrderFromDB[]
     try {
-      data = navigator.onLine ? await getKitchenOrders() : await readScopedKitchenCache(scope) as unknown as KitchenOrderFromDB[]
+      data = navigator.onLine ? await getKitchenOrders(setCloudReadStatus) : await readScopedKitchenCache(scope) as unknown as KitchenOrderFromDB[]
     } catch {
       data = await readScopedKitchenCache(scope).catch(() => []) as unknown as KitchenOrderFromDB[]
     }
@@ -278,58 +280,59 @@ export default function KDSStandalone() {
     }
   }
 
-  const toggleItemDone = (orderId: string, itemIndex: number, order: KitchenOrderFromDB) => {
+  const toggleItemDone = async (orderId: string, itemIndex: number, order: KitchenOrderFromDB) => {
     const key = `${orderId}-${itemIndex}`
-    setDoneItems(prev => {
-      const next = new Set(prev)
-      if (next.has(key)) {
-        next.delete(key)
-      } else {
-        next.add(key)
-        const items: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
-        const allDone = items.every((item, idx) => {
-          if (item.cancelled) return true
-          const k = `${orderId}-${idx}`
-          return k === key || prev.has(k)
+    if (savingItemsRef.current.has(key)) return
+    savingItemsRef.current.add(key)
+
+    const wasDone = doneItems.has(key)
+    const next = new Set(doneItems)
+    const done = !wasDone
+    let shouldAutoAdvance = false
+    if (done) {
+      next.add(key)
+      const items: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
+      const allDone = items.every((item, idx) => item.cancelled || next.has(`${orderId}-${idx}`))
+      shouldAutoAdvance = allDone && order.status === 'preparando'
+    } else {
+      next.delete(key)
+    }
+    setDoneItems(next)
+    const delta = {
+      order_id: orderId,
+      kds_item_delta: { item_index: itemIndex, done },
+    }
+
+    try {
+      const writes: Promise<boolean>[] = [updateKitchenItemStatus(orderId, itemIndex, done)]
+      if (kdsClient.mode === 'LAN_PRIMARY') {
+        writes.push(kdsClient.sendCommandConfirmed('KDS_ITEM_STATUS', delta))
+      }
+      // Keep operating as soon as either durable authority confirms. Promise.any
+      // still observes the slower rejection, avoiding an unhandled promise.
+      const persisted = await Promise.any(writes.map(async write => {
+        if (await write) return true
+        throw new Error('kds_write_rejected')
+      })).catch(() => false)
+      if (!persisted) {
+        // Revert only this item. Other concurrent product deltas must survive.
+        setDoneItems(current => {
+          const rolledBack = new Set(current)
+          if (wasDone) rolledBack.add(key)
+          else rolledBack.delete(key)
+          return rolledBack
         })
-        if (allDone && order.status === 'preparando') {
-          advance(orderId, order.status, order.mesa, order.mesero)
-        }
+        setStatusMsg({ success: false, text: 'No se guardó el avance · toca para reintentar' })
+        setTimeout(() => setStatusMsg(null), 5000)
+        return
       }
 
-      const items: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
-      const kdsStatus: Record<string, boolean> = {}
-      items.forEach((item, idx) => {
-        if (item.cancelled) return
-        const k = `${orderId}-${idx}`
-        kdsStatus[`${idx}`] = k === key ? !prev.has(key) : next.has(k)
-      })
-
-      kdsClient.sendCommand('KDS_ITEM_STATUS', { order_id: orderId, kds_item_status: JSON.stringify(kdsStatus) })
-
-      fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${orderId}`, {
-        method: 'PATCH',
-        headers: {
-          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-          Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}`,
-          'Content-Type': 'application/json',
-          Prefer: 'return=minimal',
-        },
-        body: JSON.stringify({ kds_item_status: JSON.stringify(kdsStatus) }),
-      }).catch(() => {
-        import('@/lib/pos-offline-db').then(({ queueOperation }) =>
-          queueOperation('pos_orders', 'PATCH', { kds_item_status: JSON.stringify(kdsStatus) }, `pos_orders?id=eq.${orderId}`)
-        ).catch(() => {
-          try {
-            const q = JSON.parse(localStorage.getItem('fullsite_offline_queue') || '[]')
-            q.push({ table: 'pos_orders', method: 'PATCH', endpoint: `pos_orders?id=eq.${orderId}`, data: { kds_item_status: JSON.stringify(kdsStatus) }, timestamp: Date.now(), synced: false })
-            localStorage.setItem('fullsite_offline_queue', JSON.stringify(q))
-          } catch { /* noop */ }
-        })
-      })
-
-      return next
-    })
+      // Never advance the whole ticket until the last product delta has one
+      // durable authority: Caja on the LAN or the atomic cloud RPC.
+      if (shouldAutoAdvance) await advance(orderId, order.status, order.mesa, order.mesero)
+    } finally {
+      savingItemsRef.current.delete(key)
+    }
   }
 
   const filteredOrders = orders
@@ -423,6 +426,17 @@ export default function KDSStandalone() {
           )}
         </div>
       </div>
+
+      {kdsClient.mode !== 'LAN_PRIMARY' && cloudReadStatus === 'configuration-required' && (
+        <div role="alert" className="px-4 py-2 bg-red-950 border-b border-red-700 text-red-200 text-sm font-bold flex-shrink-0">
+          Respaldo cloud bloqueado: falta KITCHEN_TOKEN_SECRET en el servidor. La red local y el caché siguen operando.
+        </div>
+      )}
+      {kdsClient.mode !== 'LAN_PRIMARY' && cloudReadStatus === 'token-required' && (
+        <div role="alert" className="px-4 py-2 bg-red-950 border-b border-red-700 text-red-200 text-sm font-bold flex-shrink-0">
+          Respaldo cloud bloqueado: esta terminal no tiene un token KDS válido. Importa su config generado; el caché sigue visible.
+        </div>
+      )}
 
       {/* Orders grid */}
       <div className="flex-1 overflow-y-auto p-3">

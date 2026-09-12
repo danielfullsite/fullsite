@@ -52,6 +52,12 @@ describe('verdad única de apertura', () => {
     expect(gate).not.toContain('.toDateString()')
   })
 
+  it('el sondeo reutiliza la ruta protegida y no deja rechazos sin manejar', () => {
+    const gate = src('components/pos/TurnoGate.tsx')
+    expect(gate).toMatch(/setInterval\(\(\) => \{ void checkTurno\(\) \}, 5000\)/)
+    expect(gate).not.toMatch(/setInterval\(async \(\) => \{\s*const result = await getActiveTurnoWithStaleCheck/)
+  })
+
   it('el replay de pos_turnos va con merge-duplicates y los turnos drenan primero', () => {
     const sync = src('lib/offline-sync.ts')
     expect(sync).toContain('resolution=merge-duplicates')
