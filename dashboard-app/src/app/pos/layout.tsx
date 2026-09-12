@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { Suspense, useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { registerServiceWorker, requestNotificationPermission } from '@/lib/service-worker'
 import { apiUrl } from '@/lib/api-base'
@@ -784,7 +784,9 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
         <ImpresionesPendientesDeCaja />
         <AperturasPendientesDeCaja />
         <TurnoGate staff={staff!}>
-          <MesaLockGuard enabled={unlocked}>{children}</MesaLockGuard>
+          <Suspense fallback={<div className="h-dvh flex items-center justify-center bg-[#0a0a0f] text-white">Confirmando acceso a mesa con Caja…</div>}>
+            <MesaLockGuard enabled={unlocked}>{children}</MesaLockGuard>
+          </Suspense>
           <PendingOrderInventory clientId={_cid()} />
         </TurnoGate>
       </div>
