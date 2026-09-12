@@ -151,4 +151,22 @@ describe('add-items respeta dueño de cuenta y precios del tenant', () => {
     expect(result.status).toBe(409)
     expect(await result.json()).toMatchObject({ ok: false, error: 'INVALID_COMBO_PRICE' })
   })
+
+  it('rechaza repetir una opción de un slot y omitir otro slot del combo', async () => {
+    state.menu = [{ id: 'menu-1', name: 'Uno', price: 80 }, { id: 'menu-2', name: 'Dos', price: 70 }]
+    state.combos = [{
+      id: 'combo-1', price: 100,
+      items: [{ menu_item_id: 'menu-1', substitutions: [] }, { menu_item_id: 'menu-2', substitutions: [] }],
+    }]
+    const comboEvidence = { _comboId: 'combo-1', _comboGroupId: 'group-1' }
+
+    const result = await add([
+      line({ id: 'c1', menuItemId: 'menu-1', precio: 50, subtotal: 50, ...comboEvidence }),
+      line({ id: 'c2', menuItemId: 'menu-1', precio: 50, subtotal: 50, ...comboEvidence }),
+    ])
+
+    expect(result.status).toBe(409)
+    expect(await result.json()).toMatchObject({ ok: false, error: 'INVALID_COMBO_ITEM' })
+    expect(rpc()).toBeUndefined()
+  })
 })

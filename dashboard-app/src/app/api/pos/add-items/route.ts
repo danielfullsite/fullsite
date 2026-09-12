@@ -39,6 +39,31 @@ function jsonArray(value: unknown): Array<Record<string, unknown>> | null {
   } catch { return null }
 }
 
+function matchesComboSlots(definition: Array<Record<string, unknown>>, group: AppendItem[]): boolean {
+  if (definition.length !== group.length) return false
+  const allowedBySlot = definition.map(slot => {
+    const allowed = new Set<string>()
+    if (typeof slot.menu_item_id === 'string') allowed.add(slot.menu_item_id)
+    for (const substitution of jsonArray(slot.substitutions) ?? []) {
+      if (typeof substitution.id === 'string') allowed.add(substitution.id)
+    }
+    return allowed
+  })
+  const itemToSlot = Array<number>(group.length).fill(-1)
+  const assignSlot = (slotIndex: number, seenItems: Set<number>): boolean => {
+    for (let itemIndex = 0; itemIndex < group.length; itemIndex++) {
+      if (seenItems.has(itemIndex) || !allowedBySlot[slotIndex].has(String(group[itemIndex].menuItemId))) continue
+      seenItems.add(itemIndex)
+      if (itemToSlot[itemIndex] === -1 || assignSlot(itemToSlot[itemIndex], seenItems)) {
+        itemToSlot[itemIndex] = slotIndex
+        return true
+      }
+    }
+    return false
+  }
+  return definition.every((_, slotIndex) => assignSlot(slotIndex, new Set()))
+}
+
 function validateShape(items: AppendItem[]): string | null {
   const ids = new Set<string>()
   for (const item of items) {
@@ -160,15 +185,7 @@ export async function POST(request: NextRequest) {
           group.reduce((sum, item) => sum + (cents(item.subtotal) ?? 0), 0) !== comboPrice) {
           return Response.json({ ok: false, error: 'INVALID_COMBO_PRICE' }, { status: 409 })
         }
-        const allowedIds = new Set<string>()
-        for (const slot of definition) {
-          if (typeof slot.menu_item_id === 'string') allowedIds.add(slot.menu_item_id)
-          const substitutions = jsonArray(slot.substitutions)
-          for (const substitution of substitutions ?? []) {
-            if (typeof substitution.id === 'string') allowedIds.add(substitution.id)
-          }
-        }
-        if (group.some(item => !allowedIds.has(String(item.menuItemId)))) {
+        if (!matchesComboSlots(definition, group)) {
           return Response.json({ ok: false, error: 'INVALID_COMBO_ITEM' }, { status: 409 })
         }
       }
