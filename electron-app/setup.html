@@ -583,6 +583,7 @@ function doMigrate() {
     pos_server_ip:     state.legacy.pos_server_ip || null,
     supabaseUrl:       state.legacy.supabaseUrl    || null,
     supabaseAnonKey:   state.legacy.supabaseAnonKey || null,
+    kitchen_token:     state.legacy.kitchen_token || state.legacy.kitchenToken || null,
   }
   syncStateFromConfig(migrated)
   goTo(6)  // skip to validation — migration pre-fills everything
@@ -1272,6 +1273,7 @@ async function saveAndRestart() {
     pos_server_ip:     state.terminalRole !== 'server_pos' ? state.serverHost : null,
     supabaseUrl:       state.legacy?.supabaseUrl || null,
     supabaseAnonKey:   state.legacy?.supabaseAnonKey || null,
+    kitchen_token:     state.legacy?.kitchen_token || state.legacy?.kitchenToken || null,
   }
 
   try {

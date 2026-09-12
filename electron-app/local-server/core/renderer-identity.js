@@ -21,6 +21,7 @@ function rendererIdentity({ url, config, port = 7717, dev = false, posUrl }) {
     pos_terminal_id: config.terminal_id || config.terminalId || '',
     FULLSITE_TERMINAL_ID: config.terminal_id || config.terminalId || '',
     FULLSITE_LOCATION_ID: config.location_id || config.branch_id || config.branchId || '',
+    pos_kitchen_token: config.kitchen_token || config.kitchenToken || '',
     FULLSITE_LAN_SECRET: config.lan_secret || config.lanSecret || '',
     FULLSITE_BRIDGE_URL: `http://127.0.0.1:${port}`,
     pos_bridge_host: '',
