@@ -1,6 +1,6 @@
 'use client'
 
-import ReportUnavailable from '@/components/ReportUnavailable'
+import { useReportUnavailable } from '@/lib/report-status'
 
 import { useEffect, useState, useMemo } from 'react'
 import { AlertTriangle, TrendingDown, Ban, Shield } from 'lucide-react'
@@ -55,7 +55,10 @@ export default function CancelacionesPage() {
   // Top days with highest discounts
   const topDays = [...last30].sort((a, b) => (b.descuentos || 0) - (a.descuentos || 0)).slice(0, 5)
 
-  if (reportError) return <ReportUnavailable />
+  // La lectura falló, pero la pantalla se sigue dibujando: el aviso sale arriba
+  // (AppShell) y las cifras se reservan. Antes aquí se devolvía la tarjeta de
+  // error y se perdía toda la página, formularios incluidos.
+  useReportUnavailable(reportError)
 
   return (
     <>

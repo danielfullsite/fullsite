@@ -1,6 +1,6 @@
 'use client'
 
-import ReportUnavailable from '@/components/ReportUnavailable'
+import { useReportUnavailable } from '@/lib/report-status'
 
 import React, { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
@@ -211,7 +211,10 @@ export default function DashboardPage() {
     }
   }, [])
 
-  if (reportError) return <ReportUnavailable />
+  // La lectura falló, pero la pantalla se sigue dibujando: el aviso sale arriba
+  // (AppShell) y las cifras se reservan. Antes aquí se devolvía la tarjeta de
+  // error y se perdía toda la página, formularios incluidos.
+  useReportUnavailable(reportError)
 
   if (loading) {
     return (

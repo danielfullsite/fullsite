@@ -1,6 +1,6 @@
 'use client'
 
-import ReportUnavailable from '@/components/ReportUnavailable'
+import { useReportUnavailable } from '@/lib/report-status'
 
 import { useEffect, useState, useMemo } from 'react'
 import {
@@ -109,7 +109,10 @@ export default function EcommercePage() {
   const channelColors: Record<string, string> = { Rappi: '#ff5a00', Ubereats: '#06c167', Otro: '#8b5cf6' }
   const channelMax = ecommerceData.channels[0]?.total || 1
 
-  if (reportError) return <ReportUnavailable />
+  // La lectura falló, pero la pantalla se sigue dibujando: el aviso sale arriba
+  // (AppShell) y las cifras se reservan. Antes aquí se devolvía la tarjeta de
+  // error y se perdía toda la página, formularios incluidos.
+  useReportUnavailable(reportError)
 
   return (
     <>

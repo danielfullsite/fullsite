@@ -1,6 +1,6 @@
 'use client'
 
-import ReportUnavailable from '@/components/ReportUnavailable'
+import { useReportUnavailable } from '@/lib/report-status'
 
 import { useEffect, useState, useMemo } from 'react'
 import {
@@ -206,7 +206,10 @@ export default function CoachPanel() {
     ? [...data].sort((a, b) => b.fecha.localeCompare(a.fecha))[0].fecha
     : null
 
-  if (reportError) return <ReportUnavailable onRetry={loadData} />
+  // La lectura falló, pero la pantalla se sigue dibujando: el aviso sale arriba
+  // (AppShell) y las cifras se reservan. Antes aquí se devolvía la tarjeta de
+  // error y se perdía toda la página, formularios incluidos.
+  useReportUnavailable(reportError, loadData)
 
   if (loading) {
     return (

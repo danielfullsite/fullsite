@@ -1,6 +1,6 @@
 'use client'
 
-import ReportUnavailable from '@/components/ReportUnavailable'
+import { useReportUnavailable } from '@/lib/report-status'
 
 import { useCallback, useEffect, useState } from 'react'
 import { Banknote, CreditCard, ArrowDownRight, ArrowUpRight } from 'lucide-react'
@@ -48,7 +48,10 @@ export default function CajaPage() {
     }
   })
 
-  if (reportError) return <ReportUnavailable onRetry={loadReport} />
+  // La lectura falló, pero la pantalla se sigue dibujando: el aviso sale arriba
+  // (AppShell) y las cifras se reservan. Antes aquí se devolvía la tarjeta de
+  // error y se perdía toda la página, formularios incluidos.
+  useReportUnavailable(reportError, loadReport)
 
   return (
     <>
