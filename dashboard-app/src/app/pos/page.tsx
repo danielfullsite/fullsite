@@ -53,7 +53,8 @@ import { recordarOrdenEncolada } from '@/lib/pos-mesa-cache'
 import { cacheTrasElCierre, cachePreferidaAlAbrir } from '@/lib/cache-de-cuenta'
 import { leerCuenta, requiereCaja, cuentaConfirmada, type LecturaDeCuenta } from '@/lib/pedro-cliente'
 import { leerCatalogoCaja } from '@/lib/pedro-catalogo'
-import { guardarCuentaEnCaja, enviarCuentaEnCaja, moverCuentaEnCaja, anularCuentaEnCaja, GuardadoAnteriorRecuperado, firmaBorradorParaCaja, type OrdenConfirmada } from '@/lib/pedro-operaciones'
+import { guardarCuentaEnCaja, enviarCuentaEnCaja, moverCuentaEnCaja, anularCuentaEnCaja, AnulacionAnteriorRecuperada, GuardadoAnteriorRecuperado, TransferenciaAnteriorRecuperada, firmaBorradorParaCaja, type OrdenConfirmada } from '@/lib/pedro-operaciones'
+import { autorizarOperacionConHuellaEnCaja, autorizarOperacionConPinEnCaja, type SesionDeCaja } from '@/lib/pedro-actor'
 import { type FinanzasDeCaja, pesosDeCentavos } from '@/lib/pedro-finanzas'
 import { crearSesionEditorCaja } from '@/lib/pos-editor-session'
 import CajonDeCaja from '@/components/pos/CajonDeCaja'
@@ -61,6 +62,8 @@ import DocumentoImpresoDeCaja from '@/components/pos/DocumentoImpresoDeCaja'
 import ConsumoPendienteDeCaja from '@/components/pos/ConsumoPendienteDeCaja'
 import CobroDeCaja from '@/components/pos/CobroDeCaja'
 import RejillaPaginada from '@/components/pos/RejillaPaginada'
+import AutorizacionPinOHuella from '@/components/pos/AutorizacionPinOHuella'
+import { useEstadoHuellaCaja } from '@/components/pos/useEstadoHuellaCaja'
 import { reconciliarCuenta, cuentaEditableDe, mismaConfirmacionDeCuenta, type CuentaEditable } from '@/lib/pos-order-reconciliation'
 import { evaluarLiquidacion, cuentasDe, intentoDePago } from '@/lib/liquidacion-de-orden'
 import type { OrderItem, MenuItem, Order } from '@/lib/pos-data'
@@ -1299,7 +1302,7 @@ interface VoidOrderModalProps {
   /** Los que ya se enviaron a cocina: se proponen como merma, nunca como devolución. */
   enviados: Set<string>
   onConfirm: (reason: string, managerName: string, disposiciones: Record<string, Disposicion>) => void
-  onConfirmCaja?: (reason: string, pin: string, disposiciones: Record<string, Disposicion>) => Promise<void>
+  onConfirmCaja?: (reason: string, actor: SesionDeCaja, disposiciones: Record<string, Disposicion>) => Promise<void>
   onCancel: () => void
 }
 
@@ -1314,6 +1317,7 @@ function VoidOrderModal({ mesa, total, items, enviados, onConfirm, onConfirmCaja
   const [biometricAvail, setBiometricAvail] = useState(false)
   const [bioChecking, setBioChecking] = useState(false)
   const [confirming, setConfirming] = useState(false)
+  const huellaCaja = useEstadoHuellaCaja()
 
   useEffect(() => {
     if (onConfirmCaja) return
@@ -1361,13 +1365,7 @@ function VoidOrderModal({ mesa, total, items, enviados, onConfirm, onConfirmCaja
   const handleConfirm = async () => {
     if (!reason.trim()) { setError('Escribe el motivo'); return }
     if (!pin) { setError('Ingresa el PIN de quien autoriza'); return }
-    if (onConfirmCaja) {
-      if (confirming) return
-      setConfirming(true)
-      try { await onConfirmCaja(reason, pin, disposiciones) } catch (e) { setError(e instanceof Error ? e.message : 'Caja no confirmó la anulación') }
-      finally { setConfirming(false); setPin('') }
-      return
-    }
+    if (onConfirmCaja) return
     const manager = await verifyManagerPin(pin)
     if (!manager) { setError('PIN invalido'); return }
     onConfirm(reason, manager, disposiciones)
@@ -1376,7 +1374,7 @@ function VoidOrderModal({ mesa, total, items, enviados, onConfirm, onConfirmCaja
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/60" onClick={onCancel} />
-      <div className="relative bg-[var(--surface-2)] border border-red-700/40 rounded-2xl w-full max-w-md shadow-2xl mx-4 p-5">
+      <div className="relative max-h-[calc(100vh-24px)] overflow-y-auto bg-[var(--surface-2)] border border-red-700/40 rounded-2xl w-full max-w-md shadow-2xl mx-4 p-5">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-full bg-[var(--crit-soft)] flex items-center justify-center">
             <ShieldAlert size={20} className="text-[var(--crit-ink)]" />
@@ -1413,14 +1411,14 @@ function VoidOrderModal({ mesa, total, items, enviados, onConfirm, onConfirmCaja
                     type="button"
                     onClick={() => setDisposiciones(prev => ({ ...prev, [r.id]: 'retain_consumption' }))}
                     aria-pressed={disposiciones[r.id] === 'retain_consumption'}
-                    className={`px-2 py-1.5 rounded-lg text-xs font-semibold min-h-[36px] ${disposiciones[r.id] === 'retain_consumption' ? 'bg-amber-600 text-white' : 'bg-[var(--line)] text-[var(--text-3)]'}`}
+                    className={`px-3 py-2 rounded-lg text-xs font-semibold min-h-[56px] ${disposiciones[r.id] === 'retain_consumption' ? 'bg-amber-600 text-white' : 'bg-[var(--line)] text-[var(--text-3)]'}`}
                     title="Se preparó: es merma, el stock no regresa"
                   >Se preparó</button>
                   <button
                     type="button"
                     onClick={() => setDisposiciones(prev => ({ ...prev, [r.id]: 'return_stock' }))}
                     aria-pressed={disposiciones[r.id] === 'return_stock'}
-                    className={`px-2 py-1.5 rounded-lg text-xs font-semibold min-h-[36px] ${disposiciones[r.id] === 'return_stock' ? 'bg-emerald-600 text-white' : 'bg-[var(--line)] text-[var(--text-3)]'}`}
+                    className={`px-3 py-2 rounded-lg text-xs font-semibold min-h-[56px] ${disposiciones[r.id] === 'return_stock' ? 'bg-emerald-600 text-white' : 'bg-[var(--line)] text-[var(--text-3)]'}`}
                     title="No se preparó: la mercancía regresa al inventario"
                   >No se preparó</button>
                 </div>
@@ -1431,9 +1429,25 @@ function VoidOrderModal({ mesa, total, items, enviados, onConfirm, onConfirmCaja
             </p>
           </div>
 
-          <div>
+          {onConfirmCaja ? <AutorizacionPinOHuella
+            label="Autoriza la anulación completa"
+            pin={pin}
+            onPinChange={value => { setPin(value); setError('') }}
+            onPin={autorizarOperacionConPinEnCaja}
+            onHuella={autorizarOperacionConHuellaEnCaja}
+            onAuthorized={async actor => {
+              setConfirming(true)
+              try { await onConfirmCaja(reason, actor, disposiciones); setPin('') }
+              finally { setConfirming(false) }
+            }}
+            huellaDisponible={huellaCaja.disponible}
+            motivoHuellaNoDisponible={huellaCaja.motivo}
+            disabled={!reason.trim() || confirming}
+            pinButtonLabel="Anular con PIN"
+            huellaButtonLabel="Anular con huella"
+          /> : <div>
             <label className="text-sm font-semibold text-[var(--text-3)] uppercase tracking-wide mb-2 block">
-              {onConfirmCaja ? 'PIN de quien autoriza en Caja' : biometricAvail ? 'Huella digital o PIN de gerente' : 'PIN de gerente'}
+              {biometricAvail ? 'Huella digital o PIN de gerente' : 'PIN de gerente'}
             </label>
             <div className="flex gap-2">
               <input
@@ -1456,23 +1470,23 @@ function VoidOrderModal({ mesa, total, items, enviados, onConfirm, onConfirmCaja
                 </button>
               )}
             </div>
-          </div>
+          </div>}
 
           {error && <p className="text-[var(--crit-ink)] text-sm text-center">{error}</p>}
         </div>
 
         <div className="flex gap-3 mt-5">
-          <button onClick={onCancel} className="flex-1 py-3 rounded-xl bg-[var(--line)] hover:bg-[var(--line)] text-[var(--text-4)] font-semibold transition-colors min-h-[48px]">
+          <button onClick={onCancel} className="flex-1 py-3 rounded-xl bg-[var(--line)] hover:bg-[var(--line)] text-[var(--text-4)] font-semibold transition-colors min-h-[56px]">
             Volver
           </button>
-          <button
+          {!onConfirmCaja && <button
             onClick={handleConfirm}
             disabled={confirming}
-            className="flex-[2] py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold transition-colors min-h-[48px] flex items-center justify-center gap-2"
+            className="flex-[2] py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold transition-colors min-h-[56px] flex items-center justify-center gap-2"
           >
             <Ban size={18} />
             Anular orden
-          </button>
+          </button>}
         </div>
       </div>
     </div>
@@ -1702,6 +1716,7 @@ function POSContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const { lock } = usePOSLock()
+  const huellaCaja = useEstadoHuellaCaja()
   // Mostrador (tenants counter/channels): abre una cuenta nueva sin mesa con
   // nombre único — reutiliza intacto el flujo "cuenta por nombre" de abajo.
   // El nombre se genera UNA vez (inicializador de estado): regenerarlo en cada
@@ -2685,11 +2700,15 @@ function POSContent() {
   // A committed move/void can disappear from the old salon before its ACK
   // arrives. Use the last saved identity and let Caja validate/deduplicate;
   // requiring an open-account preflight here would make its receipt unreachable.
-  const moverMesaCaja = async (pin: string) => {
+  const moverMesaCaja = async (actor: SesionDeCaja) => {
     if (operationLock.current || mesaDestinoCaja === null) return
     operationLock.current = true; setSaving(true)
     try {
-      await moverCuentaEnCaja(cuentaGuardadaParaOperacion(), mesaDestinoCaja, pin)
+      try { await moverCuentaEnCaja(cuentaGuardadaParaOperacion(), mesaDestinoCaja, actor) }
+      catch (error) {
+        if (!(error instanceof TransferenciaAnteriorRecuperada)) throw error
+        showToast(error.message)
+      }
       sesionEditorCaja.current.salir()
       cuentaCacheLista.current = false
       setOrderItems([])
@@ -2698,11 +2717,15 @@ function POSContent() {
       navigateToMesaMap()
     } finally { operationLock.current = false; setSaving(false) }
   }
-  const anularOrdenCaja = async (reason: string, pin: string) => {
+  const anularOrdenCaja = async (reason: string, actor: SesionDeCaja, disposiciones: Record<string, Disposicion>) => {
     if (operationLock.current) return
     operationLock.current = true; setSaving(true)
     try {
-      await anularCuentaEnCaja(cuentaGuardadaParaOperacion(), reason, pin)
+      try { await anularCuentaEnCaja(cuentaGuardadaParaOperacion(), reason, disposiciones, actor) }
+      catch (error) {
+        if (!(error instanceof AnulacionAnteriorRecuperada)) throw error
+        showToast(error.message)
+      }
       sesionEditorCaja.current.salir()
       cuentaCacheLista.current = false
       setOrderItems([])
@@ -5849,20 +5872,18 @@ function POSContent() {
 
       {mesaDestinoCaja !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <form className="bg-[var(--surface)] rounded-2xl border border-[var(--line)] p-6 w-full max-w-sm mx-4" onSubmit={async e => {
-            e.preventDefault()
-            try { await moverMesaCaja(pinInput) } catch (error) { showToast(error instanceof Error ? error.message : 'Caja no confirmó la transferencia.') }
-            finally { setPinInput('') }
-          }}>
+          <div className="bg-[var(--surface)] rounded-2xl border border-[var(--line)] p-6 w-full max-w-lg mx-4">
             <h3 className="text-lg font-bold mb-3">Transferir a mesa {mesaDestinoCaja}</h3>
-            <label htmlFor="move-caja-pin" className="block text-sm mb-2">PIN de quien autoriza en Caja</label>
-            <input id="move-caja-pin" type="password" autoFocus autoComplete="off" inputMode="numeric" maxLength={10} value={pinInput}
-              onChange={e => setPinInput(e.target.value.replace(/\D/g, ''))} className="w-full p-3 rounded-lg bg-[var(--surface-2)] border border-[var(--line)]" />
-            <div className="flex gap-3 mt-4">
-              <button type="button" disabled={saving} onClick={() => { setMesaDestinoCaja(null); setPinInput('') }} className="flex-1 p-3 rounded-lg bg-[var(--surface-2)]">Volver</button>
-              <button type="submit" disabled={saving || pinInput.length < 4} className="flex-1 p-3 rounded-lg bg-amber-600 text-white disabled:opacity-40">Confirmar transferencia</button>
-            </div>
-          </form>
+            <AutorizacionPinOHuella label={`Autoriza la transferencia a mesa ${mesaDestinoCaja}`}
+              pin={pinInput} onPinChange={setPinInput}
+              onPin={autorizarOperacionConPinEnCaja} onHuella={autorizarOperacionConHuellaEnCaja}
+              onAuthorized={async actor => { try { await moverMesaCaja(actor); setPinInput('') }
+                catch (error) { throw error instanceof Error ? error : new Error('Caja no confirmó la transferencia.') } }}
+              huellaDisponible={huellaCaja.disponible} motivoHuellaNoDisponible={huellaCaja.motivo}
+              disabled={saving} pinButtonLabel="Transferir con PIN" huellaButtonLabel="Transferir con huella" />
+            <button type="button" disabled={saving} onClick={() => { setMesaDestinoCaja(null); setPinInput('') }}
+              className="mt-3 min-h-[56px] w-full rounded-lg bg-[var(--surface-2)] px-4">Volver</button>
+          </div>
         </div>
       )}
 
