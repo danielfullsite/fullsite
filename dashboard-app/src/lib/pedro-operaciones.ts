@@ -37,6 +37,13 @@ function validarReciboConsumo(result: Record<string, unknown>, command: Readonly
   if (command.expected_financial_revision !== undefined && !result.financial_order) throw new Error('Missing financial receipt')
   readOrder(result.operational_order, orderId, result.financial_order)
 }
+function validarReciboMutacion(confirmed: OrdenConfirmada, command: Readonly<Record<string, unknown>>) {
+  if (confirmed.turno_id !== command.turno_id) throw new Error('Caja confirmó la operación en otro turno')
+  const expected = command.expected_revision
+  if (!Number.isSafeInteger(expected) || confirmed.order_revision !== Number(expected) + 1) {
+    throw new Error('Caja no confirmó la revisión exacta de la operación')
+  }
+}
 /** Send product identities and intent. Caja owns prices, tax, mandatory options,
  * revisions and delivery batches. No Supabase write follows this receipt. */
 export class GuardadoAnteriorRecuperado extends Error {
@@ -97,7 +104,7 @@ export async function enviarCuentaEnCaja(order: OrdenConfirmada): Promise<OrdenC
   return confirmed
 }
 
-/** Move and void use a fresh one-command approval; the returned actor token is
+/** Move and void use a fresh approval in the UI; the returned actor token is
  * passed in a header, never as order data, and never changes the logged-in user. */
 export async function moverCuentaEnCaja(order: OrdenConfirmada, mesa: number, actor: SesionDeCaja): Promise<OrdenConfirmada> {
   if (!Number.isSafeInteger(mesa) || mesa < 1) throw new Error('Ingresa un número de mesa válido.')
@@ -105,6 +112,7 @@ export async function moverCuentaEnCaja(order: OrdenConfirmada, mesa: number, ac
     order_id: order.id, turno_id: order.turno_id, expected_revision: order.order_revision, mesa,
   }, { actor, validateResult: (result, command) => {
     const confirmed = readOrder(result.operational_order, order.id, result.financial_order)
+    validarReciboMutacion(confirmed, command)
     if (confirmed.mesa !== command.mesa) throw new Error('Caja confirmó otro destino')
   } })
   const result = readOrder(receipt.result.operational_order, order.id, receipt.result.financial_order)
@@ -122,6 +130,7 @@ export async function anularCuentaEnCaja(order: OrdenConfirmada, reason: string,
   const receipt = await ejecutarComandoCaja(`void:${order.id}`, 'ORDER_VOID', request, { actor,
     validateResult: (raw, command) => {
       const confirmed = readOrder(raw.operational_order, order.id, raw.financial_order)
+      validarReciboMutacion(confirmed, command)
       if (confirmed.status !== 'cancelada') throw new Error('Caja no confirmó la anulación')
       const rows = new Map(confirmed.items.map(item => [item.id, item]))
       const expected = command.inventory_dispositions

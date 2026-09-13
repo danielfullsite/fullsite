@@ -277,9 +277,15 @@ class OperationalDomain {
     } else if (type === 'ORDER_MOVE') {
       if (!catalogEnvelope?.ready) fail('CATALOG_NOT_READY', 'No se pudo verificar el salón de Caja')
       const mesa = table(payload.mesa, catalogEnvelope.catalog)
+      const movedFrom = next.mesa ?? null
       checkTable(mesa, state, orderId); next.mesa = mesa
       if (mesa === null) next.customer_name = note(payload.customer_name, 'customer_name', 200)
       checkCustomer(next, state)
+      const movement = { from: movedFrom, to: mesa, actor_id: actor.id, moved_at: now }
+      const history = parse(next.move_history || [])
+      if (!Array.isArray(history)) fail('INVALID_OPERATIONAL_VALUE', 'Historial de transferencia inválido')
+      next.moved_from = movedFrom; next.moved_to = mesa; next.moved_by = actor.id; next.moved_at = now
+      next.move_history = [...history, movement]
     } else if (type === 'ORDER_VOID') {
       next.cancellation_reason = note(payload.reason, 'reason', 500).trim()
       if (!next.cancellation_reason) fail('CANCELLATION_REASON_REQUIRED', 'Indica el motivo de cancelación')

@@ -213,7 +213,12 @@ test('two kitchen devices cannot overwrite progress, forge sent identities or by
 test('authorized move releases old table; cancellation is durable and cannot be resurrected by cloud polling', async t => {
   let s = await setup(t)
   await s.send('ORDER_SAVE', saveFields(s)); await s.send('ORDER_SEND', orderFields(1))
-  assert.ok((await s.send('ORDER_MOVE', orderFields(2, { mesa: 8 }))).event)
+  const move = await s.send('ORDER_MOVE', orderFields(2, { mesa: 8 }))
+  assert.ok(move.event)
+  assert.deepEqual(move.result.operational_order.move_history, [{ from: 7, to: 8, actor_id: actor.id, moved_at: move.result.operational_order.moved_at }])
+  assert.equal(move.result.operational_order.moved_from, 7)
+  assert.equal(move.result.operational_order.moved_to, 8)
+  assert.equal(move.result.operational_order.moved_by, actor.id)
   assert.equal(s.state.getMesa(7).status, 'libre')
   assert.equal(s.state.getMesa(8).order_id, 'mother')
   const inventory_dispositions = [{ line_id: 'line-coffee', disposition: 'retain_consumption' }]

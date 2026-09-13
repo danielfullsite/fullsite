@@ -131,6 +131,29 @@ it('a recovered move never passes as a newly selected destination', async () => 
   expect((recovered as TransferenciaAnteriorRecuperada).orden.mesa).toBe(8)
 })
 
+it('an authorization error while recovering keeps the original command id for the next approver', async () => {
+  let original: Record<string, unknown> = {}
+  request.mockImplementationOnce(async (_url, init) => { original = JSON.parse(String(init?.body)); throw new Error('ACK lost') })
+  await expect(moverCuentaEnCaja(order, 8, authorizer)).rejects.toMatchObject({ incierto: true })
+  request.mockResolvedValueOnce(Response.json({ results: [{ error: 'Permiso requerido', code: 'PERMISSION_DENIED' }] }))
+  await expect(moverCuentaEnCaja(order, 8, employee)).rejects.toMatchObject({ code: 'PERMISSION_DENIED' })
+  expect(Object.keys(localStorage).some(key => key.startsWith('pos_comando_pendiente:'))).toBe(true)
+  request.mockImplementationOnce(async (_url, init) => {
+    expect(JSON.parse(String(init?.body))).toEqual(original)
+    return success(original, { ...order, order_revision: 2, mesa: 8 }, true)
+  })
+  await expect(moverCuentaEnCaja(order, 8, authorizer)).resolves.toMatchObject({ mesa: 8, order_revision: 2 })
+  expect(Object.keys(localStorage)).toHaveLength(0)
+})
+
+it('move and void receipts must belong to the same turn and exact next revision', async () => {
+  request.mockImplementationOnce(async (_url, init) => success(JSON.parse(String(init?.body)), { ...order, turno_id: 'other-turn', order_revision: 2, mesa: 8 }))
+  await expect(moverCuentaEnCaja(order, 8, authorizer)).rejects.toMatchObject({ incierto: true })
+  localStorage.clear()
+  request.mockImplementationOnce(async (_url, init) => success(JSON.parse(String(init?.body)), { ...voidedOrder, order_revision: 4 }))
+  await expect(anularCuentaEnCaja(order, 'Cliente se retira', dispositions, authorizer)).rejects.toMatchObject({ incierto: true })
+})
+
 it('a move receipt for another destination remains pending and cannot clear the editor', async () => {
   request.mockImplementationOnce(async (_url, init) => success(JSON.parse(String(init?.body)), { ...order, order_revision: 2, mesa: 7 }))
   await expect(moverCuentaEnCaja(order, 8, authorizer)).rejects.toMatchObject({ incierto: true })

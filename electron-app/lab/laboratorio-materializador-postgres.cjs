@@ -51,6 +51,15 @@ async function main() {
       settings: { 'pos.station_routing': { barra: ['drinks'] }, 'pos.no_print_stations': ['barra', 'cocina', 'caja'] },
       modifiers: { groups: [], mods: [], item_links: [], category_links: [] }, payment_methods: [{ id: 'cash', name: 'Cash', type: 'cash' }] }) })
   await catalog.refresh('synthetic')
+  sql(`insert into public.pos_ingredients(id,client_id,name,unit) values('coffee-bean',${quote(tenant)},'Coffee bean','kg');
+    insert into public.pos_inventory(client_id,ingredient_id,stock,stock_unit) values(${quote(tenant)},'coffee-bean',10,'kg');
+    insert into public.pos_mutation_authority(client_id,sale_authority) values(${quote(tenant)},'r1');
+    insert into public.pos_item_inventory_policy(client_id,menu_item_id,inventory_mode,approved_at,approved_by)
+      values(${quote(tenant)},'coffee','recipe',now(),'manager');
+    insert into public.pos_recipe_versions(id,client_id,menu_item_id,active,source,created_by,activated_at,activated_by)
+      values(1,${quote(tenant)},'coffee',true,'manual','manager',now(),'manager');
+    insert into public.pos_recipe_lines(client_id,recipe_version_id,ingredient_id,quantity,recipe_unit)
+      values(${quote(tenant)},1,'coffee-bean',0.25,'kg');`)
   const actor = { id: 'operator', name: 'Operador', permissions: permissionsFor('admin'), expires_at: Date.now() + 3600000 }
   const handler = new CommandHandler({ eventStore: storage, state, wsHub: { broadcast: async () => {} }, restaurantId: tenant, catalogStore: catalog, localAuthorityEnabled: true })
   const turnoId = randomUUID(), orderId = randomUUID()
@@ -102,6 +111,7 @@ async function main() {
     assert.equal(order.total, 116); assert.equal(order.saldo, 87)
     assert.equal(order.payment_status, 'pendiente'); assert.equal(order.preparation_status, 'enviada')
     assert.equal(order.items[0].cantidad, 2); assert.equal(order.financial_revision, 4)
+    assert.equal(Number(sql(`select stock from public.pos_inventory where client_id=${quote(tenant)} and ingredient_id='coffee-bean';`)), 9.5)
     assert.equal(order.caja_financial_snapshot.payments[0].change_cents, 100)
     assert.equal(Number(sql(`select count(*) from public.pos_order_accounts where order_id=${quote(orderId)};`)), 2)
     assert.equal(Number(sql(`select count(*) from public.pos_payment_attempts where order_id=${quote(orderId)};`)), 1)
@@ -164,6 +174,21 @@ async function main() {
     assert.equal(row.estado, 'desconocido'); assert.equal(row.monto, 29)
     assert.equal(Number(sql(`select saldo from public.pos_orders where id=${quote(orderId)};`)), 87)
   })
+  await check('Caja materializes an explicit full void and returns its pinned inventory exactly once', async () => {
+    const voidOrderId = randomUUID()
+    await command('ORDER_SAVE', { order_id: voidOrderId, expected_revision: 0, catalog_revision: catalog.read().revision,
+      mesa: 2, items: [{ line_id: 'line-void-coffee', product_id: 'coffee', quantity: 1 }] })
+    assert.equal((await worker.flush()).confirmed, 1)
+    assert.equal(Number(sql(`select stock from public.pos_inventory where client_id=${quote(tenant)} and ingredient_id='coffee-bean';`)), 9.25)
+    await command('ORDER_VOID', { order_id: voidOrderId, expected_revision: 1, reason: 'Cliente canceló antes de preparar',
+      inventory_dispositions: [{ line_id: 'line-void-coffee', disposition: 'return_stock' }] })
+    assert.equal((await worker.flush()).confirmed, 1)
+    assert.equal(Number(sql(`select stock from public.pos_inventory where client_id=${quote(tenant)} and ingredient_id='coffee-bean';`)), 9.5)
+    assert.equal(sql(`select cancellation_disposition from public.pos_reconciliation_results where client_id=${quote(tenant)} and order_id=${quote(voidOrderId)};`), 'return_stock')
+    assert.equal((await worker.flush()).confirmed, 0)
+    assert.equal(Number(sql(`select count(*) from public.pos_inventory_movements m join public.pos_reconciliation_results r
+      on r.id=m.reconciliation_result_id where r.client_id=${quote(tenant)} and r.order_id=${quote(voidOrderId)};`)), 2)
+  })
   await check('Dual save/send commit both revisions, preserve accepted/unknown attempts, and reject divergent projections atomically', async () => {
     const row = scalar(`select row_to_json(o) from (select caja_operational_snapshot as op,caja_financial_snapshot as fin from pos_orders where id=${quote(orderId)}) o`)
     const stream = scalar(`select row_to_json(s) from (select last_sequence,last_history_hash from pos_caja_streams where stream_id=${quote(streamId)}) s`)
@@ -205,7 +230,7 @@ async function main() {
     const invoke=(e,previous)=>`select apply_pos_caja_event(${quote(streamId)}::uuid,${quote(credential)},${quote(previous)},${quote(historyHash(previous,e))},${json(e)});`
     const otherOrder=randomUUID(), createOther=structuredClone(event)
     createOther.id=randomUUID();createOther.payload={};createOther.result={operational_order:structuredClone(op)}
-    createOther.result.operational_order.order_number=2;createOther.result.operational_order.order_id=otherOrder;createOther.result.operational_order.order_revision=1;createOther.result.operational_order.mesa=3
+    createOther.result.operational_order.order_number=Number(sql(`select max(order_number)+1 from pos_orders where turno_id=${quote(turnoId)}`));createOther.result.operational_order.order_id=otherOrder;createOther.result.operational_order.order_revision=1;createOther.result.operational_order.mesa=3
     const cross=structuredClone(event);cross.id=randomUUID();cross.sequence++;cross.result.financial_order.order_id=otherOrder
     const crossed=sql('begin;'+invoke(createOther,stream.last_history_hash)+invoke(cross,historyHash(stream.last_history_hash,createOther))+'rollback;', {allowError:true})
     assert.match(crossed,/DUAL_ORDER_SCOPE/)
@@ -376,6 +401,7 @@ async function main() {
     }
     const oldFn = fn('20260901180000_folio_por_dia_de_venta.sql')
     const newFn = fn('PENDIENTE_20260910080000_caja_folio_por_turno.sql')
+    const legacyNextOrdinal = Number(sql(`select max(order_number)+1 from pos_orders where client_id=${quote(tenant)} and location_id=${quote(branch)}`))
     const invoke = (event, previous) => `select apply_pos_caja_event(${quote(streamId)}::uuid,${quote(credential)},${quote(previous)},${quote(historyHash(previous,event))},${json(event)});`
     for (const previouslyMaterialized of [false, true]) {
       const old = structuredClone(template), next = structuredClone(template)
@@ -391,7 +417,7 @@ async function main() {
         `select json_build_object('old',(select order_number from pos_orders where id=${quote(old.result.operational_order.order_id)}),'new',(select order_number from pos_orders where id=${quote(next.result.operational_order.order_id)}));rollback;`).split('\n')
       const row=result.map(line=>{try{return JSON.parse(line)}catch{return null}}).find(value=>value&&Object.hasOwn(value,'old'))
       assert.equal(row.new,2)
-      assert.equal(row.old,previouslyMaterialized?2:null)
+      assert.equal(row.old,previouslyMaterialized?legacyNextOrdinal:null)
     }
   })
   await check('Revoking a stream blocks later synchronization and preserves pending local events', async () => {

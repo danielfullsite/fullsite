@@ -27,14 +27,38 @@ async function main() {
   started = true
   const baseline = fs.readFileSync(path.join(ROOT, 'supabase/migrations/00000000000000_baseline_esquema.sql'), 'utf8')
   let schema = 'create role anon; create role authenticated; create role service_role;\n'
-  for (const table of ['pos_orders', 'pos_turnos', 'pos_cash_movements']) {
+  for (const table of [
+    'pos_orders', 'pos_turnos', 'pos_cash_movements',
+    'pos_inventory', 'pos_inventory_movements', 'pos_ingredients',
+    'pos_item_inventory_policy', 'pos_recipe_versions', 'pos_recipe_lines',
+    'pos_reconciliation_results', 'pos_market_stock', 'pos_market_movements',
+    'pos_mutation_authority',
+  ]) {
     const start = baseline.indexOf(`CREATE TABLE IF NOT EXISTS "public"."${table}"`)
     if (start < 0) throw new Error('Baseline table missing: ' + table)
     const end = baseline.indexOf('\n);', start)
     if (end < 0) throw new Error('Baseline table definition incomplete: ' + table)
-    schema += baseline.slice(start, end + 3) + `\nalter table public.${table} add primary key(id);\n`
+    const primaryKey = table === 'pos_mutation_authority' ? 'client_id' : 'id'
+    schema += baseline.slice(start, end + 3) + `\nalter table public.${table} add primary key(${primaryKey});\n`
   }
   schema += "create table public.clients(id text primary key, timezone text, business_day_start_local time);\n"
+  for (const table of [
+    'pos_inventory', 'pos_inventory_movements', 'pos_item_inventory_policy',
+    'pos_recipe_versions', 'pos_recipe_lines', 'pos_reconciliation_results',
+    'pos_market_stock', 'pos_market_movements',
+  ]) {
+    schema += `create sequence public.${table}_id_seq; alter table public.${table} alter column id set default nextval('public.${table}_id_seq');\n`
+  }
+  schema += 'alter table public.pos_inventory add unique(client_id,ingredient_id);\n'
+  schema += 'alter table public.pos_reconciliation_results add unique(client_id,order_id,order_item_id);\n'
+  schema += 'create schema if not exists private; create or replace function private.can_write_client(p_client_id text) returns boolean language sql as $$ select true $$;\n'
+  for (const name of ['convert_recipe_to_stock', 'r1_reconcile_item']) {
+    const start = baseline.indexOf(`CREATE OR REPLACE FUNCTION "public"."${name}"`)
+    const end = baseline.indexOf('\n\nALTER FUNCTION', start)
+    if (start < 0 || end < 0) throw new Error('Baseline function missing: ' + name)
+    schema += baseline.slice(start, end) + '\n'
+  }
+  schema += fs.readFileSync(path.join(ROOT, 'supabase/migrations/20260910060000_inventory_cancelled_reconcile.sql'), 'utf8')
   schema += fs.readFileSync(path.join(ROOT, 'supabase/migrations/20260901180000_folio_por_dia_de_venta.sql'), 'utf8')
   schema += 'create trigger trg_pos_order_number before insert on public.pos_orders for each row execute function public.set_pos_order_number();\n'
   schema += "create sequence public.pos_cash_movements_id_seq; alter table public.pos_cash_movements alter column id set default nextval('public.pos_cash_movements_id_seq');\n"

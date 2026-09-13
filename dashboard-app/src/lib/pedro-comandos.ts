@@ -81,8 +81,14 @@ export async function ejecutarComandoCaja(operation: string, type: string, field
   }
   const receipt = body.results?.length === 1 ? body.results[0] : undefined
   if (receipt?.error && typeof receipt.code === 'string') {
-    localStorage.removeItem(key)
-    actualizarIntentosCaja()
+    // A recovered command may already be committed and merely be retried with
+    // a different/expired approver. Keep its immutable journal until Caja can
+    // return the durable receipt; deleting it here would make the next click a
+    // second business intent with a new command_id.
+    if (!recovered) {
+      localStorage.removeItem(key)
+      actualizarIntentosCaja()
+    }
     throw new ErrorDeCaja(String(receipt.error), receipt.code)
   }
   const event = receipt?.event as { command_id?: string; payload?: { command_id?: string }; result?: Record<string, unknown> } | undefined
