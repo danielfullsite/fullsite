@@ -12,11 +12,21 @@ interface Sesion {
   inputModeInicial: string
 }
 
-const FILAS_TEXTO = [
+const FILAS_LETRAS = [
   ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'],
   ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
   ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', 'Ñ'],
-  ['Z', 'X', 'C', 'V', 'B', 'N', 'M', '-', '/', '.'],
+  ['Z', 'X', 'C', 'V', 'B', 'N', 'M', '@', '.', '-'],
+]
+
+// Una segunda capa conserva el mismo alto que las letras. Incluye los signos
+// necesarios para correos, contraseñas, tokens y referencias sin depender de
+// copiar/pegar ni de un teclado físico.
+const FILAS_SIMBOLOS = [
+  ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'],
+  ['@', '.', '_', '-', '+', '=', '/', '\\', ':', ';'],
+  ['!', '?', '#', '$', '%', '&', '*', '(', ')', "'"],
+  ['"', ',', '{', '}', '[', ']', '<', '>', '°', '|'],
 ]
 
 const TIPOS_SIN_TECLADO = new Set(['button', 'checkbox', 'color', 'date', 'datetime-local', 'file', 'hidden', 'month', 'radio', 'range', 'reset', 'submit', 'time', 'week'])
@@ -64,6 +74,8 @@ export default function TecladoTactilGlobal() {
   const [campo, setCampo] = useState<Campo | null>(null)
   const [modo, setModo] = useState<Modo>('texto')
   const [nombre, setNombre] = useState('Campo de texto')
+  const [mayusculas, setMayusculas] = useState(true)
+  const [simbolos, setSimbolos] = useState(false)
 
   const restaurar = (actual: Sesion | null, desenfocar: boolean) => {
     if (!actual) return
@@ -102,6 +114,11 @@ export default function TecladoTactilGlobal() {
       setCampo(objetivo)
       setModo(nuevoModo)
       setNombre(nombreDelCampo(objetivo))
+      // Conserva el teclado textual en mayúsculas como antes, pero correos y
+      // secretos empiezan en minúsculas, que es la captura habitual y evita un
+      // toque extra en los dos campos donde el caso importa más.
+      setMayusculas(!(objetivo instanceof HTMLInputElement && ['email', 'password', 'url'].includes(objetivo.type)))
+      setSimbolos(false)
       requestAnimationFrame(() => objetivo.scrollIntoView?.({ block: 'center', behavior: 'smooth' }))
     }
     document.addEventListener('pointerdown', abrir, true)
@@ -137,6 +154,8 @@ export default function TecladoTactilGlobal() {
 
   if (!campo) return null
   const tecla = 'min-h-[56px] rounded-xl border border-[var(--line)] bg-[var(--raised)] px-2 text-lg font-bold text-[var(--text-1)] active:scale-95'
+  const filasTexto = simbolos ? FILAS_SIMBOLOS : FILAS_LETRAS.map(fila => fila.map(caracter =>
+    /^[A-ZÑ]$/.test(caracter) && !mayusculas ? caracter.toLocaleLowerCase('es-MX') : caracter))
 
   return <section data-teclado-tactil-panel role="dialog" aria-label={`Teclado en pantalla para ${nombre}`}
     className="fixed inset-x-0 bottom-0 z-[240] border-t border-[var(--line)] bg-[var(--surface)] p-3 shadow-[0_-18px_45px_rgba(0,0,0,.65)]">
@@ -150,14 +169,19 @@ export default function TecladoTactilGlobal() {
       </div>
 
       {modo === 'texto' ? <div className="space-y-2">
-        {FILAS_TEXTO.map((fila, index) => <div key={index} className="grid grid-cols-10 gap-2">
+        {filasTexto.map((fila, index) => <div key={index} className="grid grid-cols-10 gap-2">
           {fila.map(caracter => <button type="button" key={caracter} aria-label={`Escribir ${caracter}`} className={tecla}
             onPointerDown={e => e.preventDefault()} onClick={() => escribir(caracter)}>{caracter}</button>)}
         </div>)}
-        <div className="grid grid-cols-[1fr_3fr_1fr_1fr] gap-2">
+        <div className="grid grid-cols-[1fr_1fr_2fr_1fr_1fr] gap-2">
           <button type="button" className={tecla} onPointerDown={e => e.preventDefault()} onClick={() => fijarValor(campo, '')}>Limpiar</button>
+          <button type="button" aria-pressed={mayusculas} disabled={simbolos} className={`${tecla} disabled:opacity-40`}
+            onPointerDown={e => e.preventDefault()} onClick={() => setMayusculas(valor => !valor)}>
+            {mayusculas ? 'Minúsculas' : 'Mayúsculas'}
+          </button>
           <button type="button" className={tecla} onPointerDown={e => e.preventDefault()} onClick={() => escribir(' ')}>Espacio</button>
-          <button type="button" className={tecla} onPointerDown={e => e.preventDefault()} onClick={() => escribir(',')}>Coma</button>
+          <button type="button" aria-pressed={simbolos} className={tecla} onPointerDown={e => e.preventDefault()}
+            onClick={() => setSimbolos(valor => !valor)}>{simbolos ? 'Letras' : 'Símbolos'}</button>
           <button type="button" className={tecla} onPointerDown={e => e.preventDefault()} onClick={borrar}>Borrar</button>
         </div>
       </div> : <div className="mx-auto grid max-w-xl grid-cols-3 gap-2">
