@@ -34,6 +34,18 @@ module.exports = async function ({ caja, pos2, kds, expect, until, request, outp
   const navigationTimeout = 300000
   const snapshot = async () => (await request(caja, '/state')).json()
   const fallos = []
+  const escribirConTecladoTactil = async (terminal, locator, valor) => {
+    const handle = await locator.elementHandle()
+    if (!handle) throw new Error(`No se encontró el campo táctil para «${valor}»`)
+    await locator.dispatchEvent('pointerdown', { pointerType: 'touch', button: 0 })
+    const teclado = terminal.page.getByRole('dialog', { name: /Teclado en pantalla para/ })
+    await expect(teclado).toBeVisible()
+    await teclado.getByRole('button', { name: 'Limpiar', exact: true }).click()
+    for (const caracter of valor) await teclado.getByRole('button', { name: `Escribir ${caracter}`, exact: true }).click()
+    await teclado.getByRole('button', { name: 'Listo', exact: true }).click()
+    const escrito = await handle.inputValue()
+    if (escrito !== valor) throw new Error(`El teclado escribió «${escrito}» en vez de «${valor}»`)
+  }
 
   const medir = async (terminal, [w, h]) => {
     // Next puede terminar una navegación justo cuando Playwright entra al proceso
@@ -103,7 +115,7 @@ module.exports = async function ({ caja, pos2, kds, expect, until, request, outp
           .map(el => ({ clase: (el.className || '').toString().slice(0, 60), alto: el.scrollHeight, visible: el.clientHeight }))
           .slice(0, 8),
         dialogo: (() => {
-          const dialog = document.querySelector('[role="dialog"]')
+          const dialog = document.querySelector('[data-teclado-tactil-panel]') || document.querySelector('[role="dialog"]')
           if (!dialog) return null
           const panel = dialog.firstElementChild
           const controlesMenores56 = [...dialog.querySelectorAll('button,input,select')]
@@ -127,7 +139,7 @@ module.exports = async function ({ caja, pos2, kds, expect, until, request, outp
   // ── Estado operativo: turno abierto y una cuenta con consumo enviado ────────
   await expect(caja.page.getByText('No hay turno abierto', { exact: true })).toBeVisible({ timeout: 60000 })
   await caja.page.getByRole('link', { name: 'Ir a abrir turno', exact: true }).click()
-  await caja.page.getByLabel('Fondo inicial en efectivo', { exact: true }).fill('500')
+  await escribirConTecladoTactil(caja, caja.page.getByLabel('Fondo inicial en efectivo', { exact: true }), '500')
   await caja.page.getByRole('button', { name: /Abrir turno/i }).click()
   await until(async () => (await snapshot()).turno?.opening_cash_cents === 50000, 'Turno durable desde UI')
   for (const t of [caja, pos2]) await t.page.goto(`${uiOrigin}/pos?mesa=1`, { waitUntil: 'domcontentloaded', timeout: navigationTimeout })
@@ -164,6 +176,15 @@ module.exports = async function ({ caja, pos2, kds, expect, until, request, outp
     medidas.push(await retratar(caja, 'categorias', vp))
 
     try {
+      const buscador = caja.page.getByPlaceholder('Buscar platillo...', { exact: true })
+      await buscador.dispatchEvent('pointerdown', { pointerType: 'touch', button: 0 })
+      const teclado = caja.page.getByRole('dialog', { name: /Teclado en pantalla para/ })
+      await expect(teclado).toBeVisible()
+      medidas.push(await retratar(caja, 'teclado-texto', vp))
+      await teclado.getByRole('button', { name: 'Cancelar', exact: true }).click()
+    } catch (error) { fallos.push(`teclado texto ${vp.join('x')}: ${error.message}`) }
+
+    try {
       // El fixture de laboratorio tiene un solo café; el demo añade categorías
       // de veinte platillos. Retratar una de éstas comprueba densidad y paginación
       // reales en vez de validar sólo el estado vacío.
@@ -195,6 +216,13 @@ module.exports = async function ({ caja, pos2, kds, expect, until, request, outp
         await caja.page.waitForTimeout(200)
         medidas.push(await retratar(caja, nombre, vp))
       }
+      await caja.page.getByRole('tab', { name: /^Efectivo/ }).click()
+      const importe = caja.page.getByLabel('Importe a cobrar', { exact: true })
+      await importe.dispatchEvent('pointerdown', { pointerType: 'touch', button: 0 })
+      const teclado = caja.page.getByRole('dialog', { name: /Teclado en pantalla para/ })
+      await expect(teclado).toBeVisible()
+      medidas.push(await retratar(caja, 'teclado-decimal', vp))
+      await teclado.getByRole('button', { name: 'Cancelar', exact: true }).click()
       await caja.page.getByRole('button', { name: 'Cerrar', exact: true }).click()
       await caja.page.waitForTimeout(400)
     } catch (error) { fallos.push(`cobro ${vp.join('x')}: ${error.message}`) }

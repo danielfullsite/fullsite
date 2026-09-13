@@ -8,6 +8,26 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
   const navigationTimeout = process.env.CI ? 300000 : 90000
   const snapshot = async () => (await request(caja, '/state')).json()
   let orderId
+  const escribirConTecladoTactil = async (terminal, locator, valor) => {
+    const handle = await locator.elementHandle()
+    if (!handle) throw new Error(`No se encontró el campo táctil para «${valor}»`)
+    await locator.dispatchEvent('pointerdown', { pointerType: 'touch', button: 0 })
+    const teclado = terminal.page.getByRole('dialog', { name: /Teclado en pantalla para/ })
+    await expect(teclado).toBeVisible()
+    await teclado.getByRole('button', { name: 'Limpiar', exact: true }).click()
+    for (const caracter of valor.toUpperCase()) {
+      if (caracter === ' ') await teclado.getByRole('button', { name: 'Espacio', exact: true }).click()
+      else if (caracter === '.') {
+        const decimal = teclado.getByRole('button', { name: 'Escribir punto decimal', exact: true })
+        if (await decimal.isVisible().catch(() => false)) await decimal.click()
+        else await teclado.getByRole('button', { name: 'Escribir .', exact: true }).click()
+      } else await teclado.getByRole('button', { name: `Escribir ${caracter}`, exact: true }).click()
+    }
+    await teclado.getByRole('button', { name: 'Listo', exact: true }).click()
+    await expect(teclado).not.toBeVisible()
+    const escrito = await handle.inputValue()
+    if (escrito !== valor.toUpperCase()) throw new Error(`El teclado escribió «${escrito}» en vez de «${valor.toUpperCase()}»`)
+  }
   const ensureUnlocked = async terminal => {
     const enter = terminal.page.getByRole('button', { name: 'Entrar', exact: true })
     // A navigation can briefly render the PIN shell before React restores the
@@ -78,7 +98,7 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
   const collectCash = async (terminal, amount) => {
     const dialog = modal(terminal)
     await pestanaDelCobro(terminal, 'Efectivo')
-    await dialog.getByLabel('Importe a cobrar', { exact: true }).fill(amount)
+    await escribirConTecladoTactil(terminal, dialog.getByLabel('Importe a cobrar', { exact: true }), amount)
     await dialog.getByRole('button', { name: 'Preparar cobro en efectivo', exact: true }).click()
     // El modal abre solo la pestaña del dinero apartado, PERO sólo mientras nadie
     // haya elegido pestaña a mano: una vez que el cajero toca una, no se la
@@ -86,14 +106,14 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     // acaba de tocar «Efectivo», así que le toca navegar como navegaría la
     // persona: el importe se apartó, ahora se va a confirmarlo.
     await pestanaDelCobro(terminal, 'Por confirmar')
-    await dialog.getByRole('textbox', { name: /^Efectivo recibido / }).fill(amount)
+    await escribirConTecladoTactil(terminal, dialog.getByRole('textbox', { name: /^Efectivo recibido / }), amount)
     await dialog.getByRole('button', { name: 'Confirmar efectivo recibido', exact: true }).click()
     await expect(dialog.getByText('Efectivo registrado en Caja y compartido con las terminales.')).toBeVisible()
   }
   await check('Sin WAN se abre turno desde el botón de Caja y lo comparten tres terminales', async () => {
     await expect(caja.page.getByText('No hay turno abierto', { exact: true })).toBeVisible({ timeout: 30000 })
     await caja.page.getByRole('link', { name: 'Ir a abrir turno', exact: true }).click()
-    await caja.page.getByLabel('Fondo inicial en efectivo', { exact: true }).fill('500')
+    await escribirConTecladoTactil(caja, caja.page.getByLabel('Fondo inicial en efectivo', { exact: true }), '500')
     await caja.page.getByRole('button', { name: /Abrir turno/i }).click()
     await until(async () => (await snapshot()).turno?.opening_cash_cents === 50000, 'Turno durable desde UI')
     for (const t of [caja, pos2, pos3]) await t.page.goto(`${uiOrigin}/pos?mesa=1`, { waitUntil: 'domcontentloaded', timeout: navigationTimeout })
@@ -148,11 +168,11 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     assert.match(printLab.packets[0], /PRECUENTA/)
     assert.match(printLab.packets[0], /Orden #1/)
     assert.match(printLab.packets[0], /Total 116\.00/)
-    await document.getByLabel('Motivo de la copia', { exact: true }).fill('Cliente pide copia laboratorio')
+    await escribirConTecladoTactil(pos3, document.getByLabel('Motivo de la copia', { exact: true }), 'CLIENTE PIDE COPIA LABORATORIO')
     await document.getByRole('button', { name: 'Imprimir copia de precuenta', exact: true }).click()
     await until(() => printLab.packets.length === 2, 'Copia recibida en TCP sintético')
     assert.match(printLab.packets[1], /COPIA/)
-    assert.match(printLab.packets[1], /Cliente pide copia laboratorio/)
+    assert.match(printLab.packets[1], /CLIENTE PIDE COPIA LABORATORIO/)
     assert.deepEqual((await snapshot()).financial_orders, before.financial_orders)
     await pos3.page.getByRole('button', { name: 'Cerrar precuenta', exact: true }).click()
   })
@@ -161,9 +181,9 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
       const source = (await snapshot()).salon_orders.find(order => order.id === orderId).mesa
       await funcionesDeLaCuenta(pos3)
       await pos3.page.getByTitle('Transferir mesa', { exact: true }).click()
-      await pos3.page.getByPlaceholder('#', { exact: true }).fill(String(destination))
+      await escribirConTecladoTactil(pos3, pos3.page.getByPlaceholder('#', { exact: true }), String(destination))
       await pos3.page.getByRole('button', { name: 'Confirmar', exact: true }).click()
-      await pos3.page.locator('#move-caja-pin').fill(labPin)
+      await escribirConTecladoTactil(pos3, pos3.page.locator('#move-caja-pin'), labPin)
       await pos3.page.getByRole('button', { name: 'Confirmar transferencia', exact: true }).click()
       await expect(pos3.page).toHaveURL(`${uiOrigin}/pos/mesas`, { timeout: 30000 })
       assert.deepEqual(await pos3.page.evaluate(mesa => ({
@@ -187,8 +207,8 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     await funcionesDeLaCuenta(pos3)
       await pos3.page.getByTitle('Abrir cajón', { exact: true }).click()
     const panel = pos3.page.getByRole('region', { name: 'Apertura manual del cajón', exact: true })
-    await panel.getByLabel('Motivo de apertura', { exact: true }).fill('Cambio laboratorio')
-    await panel.getByLabel('PIN para abrir el cajón', { exact: true }).fill(labPin)
+    await escribirConTecladoTactil(pos3, panel.getByLabel('Motivo de apertura', { exact: true }), 'CAMBIO LABORATORIO')
+    await escribirConTecladoTactil(pos3, panel.getByLabel('PIN para abrir el cajón', { exact: true }), labPin)
     await panel.getByRole('button', { name: 'Solicitar apertura manual', exact: true }).click()
     await until(() => printLab.hex.length === count + 1, 'Pulso manual recibido en TCP sintético')
     assert.equal(printLab.hex.at(-1), '1b700019fa')
@@ -205,8 +225,8 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     await until(async () => (await snapshot()).salon_orders.some(o => o.mesa === 3), 'Cuenta de anulación guardada')
     await funcionesDeLaCuenta(pos3)
       await pos3.page.getByTitle('Anular orden', { exact: true }).click()
-    await pos3.page.getByPlaceholder('Describe el motivo...').fill('Cliente de prueba se retira')
-    await pos3.page.getByPlaceholder('****', { exact: true }).fill(labPin)
+    await escribirConTecladoTactil(pos3, pos3.page.getByPlaceholder('Describe el motivo...'), 'CLIENTE DE PRUEBA SE RETIRA')
+    await escribirConTecladoTactil(pos3, pos3.page.getByPlaceholder('****', { exact: true }), labPin)
     await pos3.page.locator('button').filter({ hasText: /^\s*Anular orden\s*$/ }).click()
     await expect(pos3.page).toHaveURL(`${uiOrigin}/pos/mesas`, { timeout: 30000 })
     const state = await snapshot()
@@ -370,15 +390,15 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     await ensureUnlocked(pos2)
     const movement = pos2.page.getByRole('region', { name: 'Movimientos de efectivo' })
     await expect(movement).toBeVisible()
-    await movement.getByLabel('Importe del movimiento', { exact: true }).fill('20')
-    await movement.getByLabel('Motivo del movimiento', { exact: true }).fill('Resguardo laboratorio')
-    await movement.getByLabel('PIN de autorización', { exact: true }).fill(labPin)
+    await escribirConTecladoTactil(pos2, movement.getByLabel('Importe del movimiento', { exact: true }), '20')
+    await escribirConTecladoTactil(pos2, movement.getByLabel('Motivo del movimiento', { exact: true }), 'RESGUARDO LABORATORIO')
+    await escribirConTecladoTactil(pos2, movement.getByLabel('PIN de autorización', { exact: true }), labPin)
     await movement.getByRole('button', { name: 'Confirmar movimiento' }).click()
     await expect(movement.getByRole('status')).toContainText('Movimiento confirmado')
     await movement.getByLabel('Tipo de movimiento', { exact: true }).selectOption('deposito')
-    await movement.getByLabel('Importe del movimiento', { exact: true }).fill('5')
-    await movement.getByLabel('Motivo del movimiento', { exact: true }).fill('Cambio laboratorio')
-    await movement.getByLabel('PIN de autorización', { exact: true }).fill(labPin)
+    await escribirConTecladoTactil(pos2, movement.getByLabel('Importe del movimiento', { exact: true }), '5')
+    await escribirConTecladoTactil(pos2, movement.getByLabel('Motivo del movimiento', { exact: true }), 'CAMBIO LABORATORIO')
+    await escribirConTecladoTactil(pos2, movement.getByLabel('PIN de autorización', { exact: true }), labPin)
     await movement.getByRole('button', { name: 'Confirmar movimiento' }).click()
     await until(async () => (await snapshot()).cash_movements.length === 2, 'Dos movimientos durables')
     await pos2.page.goto(`${uiOrigin}/pos/corte`, { waitUntil: 'domcontentloaded', timeout: navigationTimeout })
@@ -388,7 +408,7 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
   await check('El cierre de turno concilia fondo, ventas, retiros y depósitos', async () => {
     await caja.page.goto(`${uiOrigin}/pos/turno`, { waitUntil: 'domcontentloaded', timeout: navigationTimeout })
     await ensureUnlocked(caja)
-    await caja.page.getByLabel('Efectivo contado al cierre', { exact: true }).fill('659')
+    await escribirConTecladoTactil(caja, caja.page.getByLabel('Efectivo contado al cierre', { exact: true }), '659')
     await caja.page.getByRole('button', { name: 'Confirmar cierre de turno', exact: true }).click()
     await expect(caja.page.getByRole('region', { name: 'Último cierre confirmado' })).toBeVisible()
     const state = await snapshot()
@@ -413,14 +433,14 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     await caja.page.goto(`${uiOrigin}/pos/mesas`, { waitUntil: 'domcontentloaded', timeout: navigationTimeout })
     await ensureUnlocked(caja)
     await caja.page.getByRole('link', { name: 'Ir a abrir turno', exact: true }).click()
-    await caja.page.getByLabel('Fondo inicial en efectivo', { exact: true }).fill('0')
-    await caja.page.getByLabel('¿A dónde se fue (o de dónde salió) la diferencia?', { exact: true }).fill('Resguardo del efectivo después del corte de laboratorio')
+    await escribirConTecladoTactil(caja, caja.page.getByLabel('Fondo inicial en efectivo', { exact: true }), '0')
+    await escribirConTecladoTactil(caja, caja.page.getByLabel('¿A dónde se fue (o de dónde salió) la diferencia?', { exact: true }), 'RESGUARDO DEL EFECTIVO DESPUES DEL CORTE DE LABORATORIO')
     await caja.page.getByRole('button', { name: /Abrir turno/i }).click()
     await until(async () => (await snapshot()).turno !== null, 'Nuevo turno confirmado')
     const opening = (await snapshot()).turno.opening_reconciliation
     assert.equal(opening.previous_counted_cash_cents, 65900)
     assert.equal(opening.difference_cents, -65900)
-    assert.equal(opening.reason, 'Resguardo del efectivo después del corte de laboratorio')
+    assert.equal(opening.reason, 'RESGUARDO DEL EFECTIVO DESPUES DEL CORTE DE LABORATORIO')
     await expect(caja.page.getByText(`Motivo del fondo: ${opening.reason}`, { exact: true })).toBeVisible()
     await pos2.page.goto(`${uiOrigin}/pos?mesa=1`, { waitUntil: 'domcontentloaded', timeout: navigationTimeout })
     await addCoffee(pos2)

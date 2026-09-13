@@ -215,6 +215,32 @@ idempotencia. Verificación final: web **3,783/3,783**, DOM **300/300**,
 TypeScript limpio, laboratorio Caja/papel/cajón **25/25** y recorrido legacy con
 PIN táctil **26/26**.
 
+### Teclado en pantalla para todo el POS — **hecho en el shell POS**
+
+`inputMode` era sólo una sugerencia al sistema operativo. En Electron no había
+garantía de que apareciera teclado y el laboratorio escribía con `.fill()`, así
+que tampoco probaba la promesa táctil. `TecladoTactilGlobal` se monta una vez en
+el layout y escucha el toque real sobre cualquier `input` o `textarea` del POS:
+
+- importes, cantidades y PIN abren pad numérico/decimal;
+- búsqueda, notas, motivos y referencias abren teclado de texto;
+- `Cancelar` restaura el valor anterior; `Listo`, `Limpiar`, espacio y borrar
+  siempre están visibles;
+- todos los blancos miden al menos 56px y el PIN nunca se refleja en el panel;
+- sólo se abre por `pointerdown`: enfoque programático, lectores y pruebas no
+  quedan bloqueados;
+- el campo se vuelve `readOnly` antes del foco para no apilar el teclado de
+  Windows/iPadOS debajo del teclado de Fullsite.
+
+En 1024×768, tanto letras como decimales ocupan **376px**, no aumentan el alto
+del documento y no contienen controles menores de 56px. El recorrido Caja
+introduce ahora fondo, cobros, motivos, PINs, transferencia, anulación, cajón,
+retiros y cierre pulsando esas teclas: **25/25**.
+
+El KDS instalado no comparte este layout; su pad y sus blancos táctiles forman
+parte del bloque 6 y siguen pendientes. No se considera cerrado el requisito
+global hasta probar también cocina.
+
 5. Turno y Corte Z
 6. KDS
 

@@ -9,6 +9,7 @@ import TurnoGate from '@/components/pos/TurnoGate'
 import AperturasPendientesDeCaja from '@/components/pos/AperturasPendientesDeCaja'
 import ImpresionesPendientesDeCaja from '@/components/pos/ImpresionesPendientesDeCaja'
 import PendingOrderInventory from '@/components/pos/PendingOrderInventory'
+import TecladoTactilGlobal from '@/components/pos/TecladoTactilGlobal'
 import { getActiveClientSlug as _cid } from '@/lib/data'
 import { getEffectiveSetting } from '@/lib/settings'
 import { initStationRouting, initNoPrintStations, initCancellationReasons, initDiscountCatalog, initKdsStations } from '@/lib/pos-constants'
@@ -825,6 +826,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
           {children}
           <PendingOrderInventory clientId={_cid()} />
         </TurnoGate>
+        <TecladoTactilGlobal />
       </div>
     </POSLockContext.Provider>
   )
