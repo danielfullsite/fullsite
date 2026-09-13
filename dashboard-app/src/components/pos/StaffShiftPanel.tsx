@@ -2,8 +2,11 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { Clock, LogIn, LogOut, Coffee, Users, TrendingUp, DollarSign, Timer } from 'lucide-react'
-import { formatMXN, verifyManagerPin, logAudit } from '@/lib/pos-data'
+import { formatMXN, verifyStaffPin, logAudit } from '@/lib/pos-data'
 import { getActiveClientSlug as _cid } from '@/lib/data'
+import { ingresarConHuellaEnCaja } from '@/lib/pedro-actor'
+import AutorizacionPinOHuella from './AutorizacionPinOHuella'
+import { useEstadoHuellaCaja } from './useEstadoHuellaCaja'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -31,10 +34,9 @@ export default function StaffShiftPanel({ onShiftChange }: StaffShiftPanelProps)
   const [allShiftsToday, setAllShiftsToday] = useState<StaffShift[]>([])
   const [loading, setLoading] = useState(true)
   const [pin, setPin] = useState('')
-  const [pinError, setPinError] = useState('')
   const [actionMode, setActionMode] = useState<'clock_in' | 'clock_out' | 'break_start' | 'break_end' | null>(null)
-  const [selectedStaff, setSelectedStaff] = useState<string | null>(null)
   const [tab, setTab] = useState<'active' | 'report'>('active')
+  const huella = useEstadoHuellaCaja()
 
   const fetchShifts = useCallback(async () => {
     try {
@@ -58,19 +60,10 @@ export default function StaffShiftPanel({ onShiftChange }: StaffShiftPanelProps)
     return () => clearInterval(interval)
   }, [fetchShifts])
 
-  const handleClockIn = async () => {
-    const staffName = await verifyManagerPin(pin)
-    if (!staffName) {
-      setPinError('PIN no reconocido')
-      return
-    }
-
+  const handleClockIn = async (member: { id: string; name: string; role: string }) => {
     // Check if already clocked in
-    const existing = activeShifts.find(s => s.staff_name === staffName)
-    if (existing) {
-      setPinError(`${staffName} ya tiene turno activo`)
-      return
-    }
+    const existing = activeShifts.find(s => s.staff_id === member.id)
+    if (existing) throw new Error(`${member.name} ya tiene turno activo`)
 
     const id = `shift-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
     try {
@@ -80,28 +73,31 @@ export default function StaffShiftPanel({ onShiftChange }: StaffShiftPanelProps)
         body: JSON.stringify({
           id,
           client_id: _cid(),
-          staff_id: pin,
-          staff_name: staffName,
+          staff_id: member.id,
+          staff_name: member.name,
           clock_in: new Date().toISOString(),
           breaks: JSON.stringify([]),
         }),
       })
-      if (res.ok) {
-        logAudit({ action: 'status_changed', actor: staffName, details: { type: 'clock_in', shift_id: id } })
-        setPin('')
-        setPinError('')
-        setActionMode(null)
-        fetchShifts()
-        onShiftChange?.()
-      }
-    } catch {
-      setPinError('Error de conexión')
-    }
+      if (!res.ok) throw new Error('No se pudo registrar la entrada')
+      logAudit({ action: 'status_changed', actor: member.name, details: { type: 'clock_in', shift_id: id, staff_id: member.id } })
+      setPin('')
+      setActionMode(null)
+      fetchShifts()
+      onShiftChange?.()
+    } catch (error) { throw error instanceof Error ? error : new Error('Error de conexión') }
   }
 
-  const handleClockOut = async () => {
-    if (!selectedStaff) return
-    const shift = activeShifts.find(s => s.id === selectedStaff)
+  const identificarConPin = async (valor: string) => {
+    const member = await verifyStaffPin(valor)
+    if (!member) throw new Error('PIN no reconocido')
+    return member
+  }
+
+  const identificarConHuella = async () => (await ingresarConHuellaEnCaja()).staff
+
+  const handleClockOut = async (shiftId: string) => {
+    const shift = activeShifts.find(s => s.id === shiftId)
     if (!shift) return
 
     const clockOut = new Date()
@@ -122,16 +118,14 @@ export default function StaffShiftPanel({ onShiftChange }: StaffShiftPanelProps)
         }),
       })
       logAudit({ action: 'status_changed', actor: shift.staff_name, details: { type: 'clock_out', hours: hoursWorked.toFixed(2) } })
-      setSelectedStaff(null)
       setActionMode(null)
       fetchShifts()
       onShiftChange?.()
     } catch { /* */ }
   }
 
-  const handleBreakStart = async () => {
-    if (!selectedStaff) return
-    const shift = activeShifts.find(s => s.id === selectedStaff)
+  const handleBreakStart = async (shiftId: string) => {
+    const shift = activeShifts.find(s => s.id === shiftId)
     if (!shift) return
 
     const breaks = [...(shift.breaks || []), { start: new Date().toISOString() }]
@@ -141,15 +135,13 @@ export default function StaffShiftPanel({ onShiftChange }: StaffShiftPanelProps)
         headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
         body: JSON.stringify({ breaks: JSON.stringify(breaks) }),
       })
-      setSelectedStaff(null)
       setActionMode(null)
       fetchShifts()
     } catch { /* */ }
   }
 
-  const handleBreakEnd = async () => {
-    if (!selectedStaff) return
-    const shift = activeShifts.find(s => s.id === selectedStaff)
+  const handleBreakEnd = async (shiftId: string) => {
+    const shift = activeShifts.find(s => s.id === shiftId)
     if (!shift) return
 
     const breaks = [...(shift.breaks || [])]
@@ -163,7 +155,6 @@ export default function StaffShiftPanel({ onShiftChange }: StaffShiftPanelProps)
         headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
         body: JSON.stringify({ breaks: JSON.stringify(breaks) }),
       })
-      setSelectedStaff(null)
       setActionMode(null)
       fetchShifts()
     } catch { /* */ }
@@ -220,7 +211,7 @@ export default function StaffShiftPanel({ onShiftChange }: StaffShiftPanelProps)
         <>
           {/* Clock In button */}
           <button
-            onClick={() => { setActionMode('clock_in'); setPin(''); setPinError('') }}
+            onClick={() => { setActionMode('clock_in'); setPin('') }}
             className="w-full flex items-center justify-center gap-2 py-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold hover:bg-emerald-500/20 transition-colors"
           >
             <LogIn size={20} />
@@ -230,33 +221,14 @@ export default function StaffShiftPanel({ onShiftChange }: StaffShiftPanelProps)
           {/* PIN modal for clock in */}
           {actionMode === 'clock_in' && (
             <div className="bg-[var(--line)] rounded-xl p-4 space-y-3">
-              <p className="text-sm text-[var(--text-2)] font-medium">Ingresa tu PIN de empleado</p>
-              <input
-                type="password"
-                inputMode="numeric"
-                maxLength={10}
-                value={pin}
-                onChange={(e) => { setPin(e.target.value); setPinError('') }}
-                placeholder="••••"
-                autoFocus
-                className="w-full bg-[var(--surface)] border border-[var(--line)] rounded-lg px-4 py-3 text-center text-2xl tracking-[0.5em] text-[var(--text-1)] focus:outline-none focus:border-emerald-500"
-              />
-              {pinError && <p className="text-red-400 text-xs">{pinError}</p>}
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setActionMode(null)}
-                  className="flex-1 py-2 rounded-lg border border-[var(--line)] text-[var(--text-3)] text-sm"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleClockIn}
-                  disabled={pin.length < 4}
-                  className="flex-1 py-2 rounded-lg bg-emerald-500 text-white text-sm font-bold disabled:opacity-50"
-                >
-                  Confirmar
-                </button>
-              </div>
+              <AutorizacionPinOHuella label="Identificar empleado para registrar entrada"
+                pin={pin} onPinChange={setPin} onPin={identificarConPin} onHuella={identificarConHuella}
+                onAuthorized={handleClockIn} huellaDisponible={huella.disponible}
+                motivoHuellaNoDisponible={huella.motivo} />
+              <button onClick={() => setActionMode(null)}
+                className="min-h-[56px] w-full rounded-lg border border-[var(--line)] px-4 text-sm text-[var(--text-3)]">
+                Cancelar
+              </button>
             </div>
           )}
 
@@ -294,21 +266,21 @@ export default function StaffShiftPanel({ onShiftChange }: StaffShiftPanelProps)
                   <div className="flex gap-2">
                     {isOnBreak(shift) ? (
                       <button
-                        onClick={() => { setSelectedStaff(shift.id); handleBreakEnd() }}
+                        onClick={() => void handleBreakEnd(shift.id)}
                         className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg bg-amber-500/10 text-amber-400 text-xs font-medium hover:bg-amber-500/20"
                       >
                         <Coffee size={14} /> Fin descanso
                       </button>
                     ) : (
                       <button
-                        onClick={() => { setSelectedStaff(shift.id); handleBreakStart() }}
+                        onClick={() => void handleBreakStart(shift.id)}
                         className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg bg-[var(--surface)] text-[var(--text-3)] text-xs font-medium hover:text-amber-400"
                       >
                         <Coffee size={14} /> Descanso
                       </button>
                     )}
                     <button
-                      onClick={() => { setSelectedStaff(shift.id); handleClockOut() }}
+                      onClick={() => void handleClockOut(shift.id)}
                       className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg bg-red-500/10 text-red-400 text-xs font-medium hover:bg-red-500/20"
                     >
                       <LogOut size={14} /> Salida

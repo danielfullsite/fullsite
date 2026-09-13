@@ -136,6 +136,76 @@ class ActorAuthority {
     this._queue = result.catch(() => {})
     return result
   }
+  loginBiometric(input) {
+    // `staffId` is accepted only from Pedro's authenticated loopback call to the
+    // DigitalPersona service. The HTTP route must never copy it from a renderer.
+    const result = this._queue.then(() => this._loginBiometric(input))
+    this._queue = result.catch(() => {})
+    return result
+  }
+  async _loginBiometric({ staffId, deviceId, restaurantId, minRole }) {
+    const now = this._time()
+    if (restaurantId !== this.restaurantId || !/^[\w-]{1,64}$/.test(deviceId || '')) throw fail('Scope de acceso inválido', 403, 'ACTOR_SCOPE_INVALID')
+    if (minRole && !LEVEL[normalizedRole(minRole)]) throw fail('Permiso solicitado inválido', 400, 'INVALID_ROLE')
+    if (this.data.denied_devices[deviceId]) throw fail('Terminal revocada; requiere autorización con internet', 403, 'terminal_not_enrolled')
+    let credential = Object.values(this.data.credentials).find(candidate =>
+      candidate.staff.id === staffId && candidate.expires_at > now && candidate.devices?.[deviceId] > now)
+    if (!credential) throw fail('Huella o terminal sin preparar, o credencial vencida; entra con PIN una vez', 401, 'BIOMETRIC_USER_NOT_PREPARED')
+    if (minRole && LEVEL[normalizedRole(credential.staff.role)] < LEVEL[normalizedRole(minRole)]) throw fail('Este usuario no tiene el permiso solicitado', 403, 'PERMISSION_DENIED')
+
+    // La huella prueba presencia local, no que la cuenta siga activa hoy. Cuando
+    // hay WAN, la autoridad cloud vuelve a confirmar empleado, rol y terminal;
+    // sólo una falla de transporte/5xx/429 usa la credencial preparada offline.
+    // Así una baja o revocación online no conserva autoridad durante todo el TTL.
+    let offline = false, shiftToken
+    try {
+      const response = await this.fetch(this.cloudOrigin + '/api/pos/pin', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, redirect: 'error',
+        body: JSON.stringify({ fingerprint_id: staffId, client_id: this.restaurantId,
+          device_id: deviceId, ...(minRole ? { min_role: minRole } : {}) }),
+        signal: AbortSignal.timeout(this.cloudTimeoutMs),
+      })
+      if ([400, 401, 403].includes(response.status)) {
+        const rejection = await response.json().catch(() => ({}))
+        if (rejection.code === 'terminal_not_enrolled') this.data.denied_devices[deviceId] = true
+        else if (response.status === 401) {
+          for (const [index, candidate] of Object.entries(this.data.credentials)) {
+            if (candidate.staff.id === staffId) delete this.data.credentials[index]
+          }
+        }
+        throw fail(rejection.code === 'terminal_not_enrolled' ? 'Terminal no autorizada' : 'Huella rechazada por la autoridad', response.status, rejection.code || 'BIOMETRIC_REJECTED')
+      }
+      if (!response.ok) throw new Error('Autoridad no disponible')
+      const data = await response.json()
+      const staff = data.staff
+      if (typeof staff?.id !== 'string' || staff.id !== staffId || typeof staff.name !== 'string' || !LEVEL[normalizedRole(staff.role)]) {
+        throw fail('Respuesta de autoridad biométrica inválida', 502, 'AUTHORITY_RESPONSE_INVALID')
+      }
+      shiftToken = typeof data.shiftToken === 'string' ? data.shiftToken : undefined
+      const roleChanged = credential.staff.role !== staff.role
+      credential.staff = { id: staff.id, name: staff.name, role: staff.role }
+      credential.expires_at = now + this.ttl
+      credential.devices = { ...credential.devices, [deviceId]: now + this.ttl }
+      if (roleChanged) credential.revision = crypto.randomUUID()
+      delete this.data.denied_devices[deviceId]
+    } catch (error) {
+      if (error.status) { this._persist(); throw error }
+      offline = true
+      if (this.data.denied_devices[deviceId]) throw fail('Terminal revocada; requiere autorización con internet', 403, 'terminal_not_enrolled')
+      if (!credential || credential.expires_at <= now || !(credential.devices?.[deviceId] > now)) {
+        throw fail('Huella o terminal sin preparar, o credencial vencida; entra con PIN una vez', 401, 'BIOMETRIC_USER_NOT_PREPARED')
+      }
+    }
+
+    // Persist the monotonic clock before signing. A full disk must never turn a
+    // cached biometric match into fresh authority that Caja cannot later audit.
+    this._persist()
+    const expiresAt = Math.min(now + 8 * 3600000, credential.expires_at)
+    const payload = Buffer.from(JSON.stringify({ restaurant_id: this.restaurantId, location_id: this.branchId,
+      device_id: deviceId, actor_id: credential.staff.id, revision: credential.revision, expires_at: expiresAt })).toString('base64url')
+    return { staff: credential.staff, actor_token: payload + '.' + this._sign(payload), expires_at: expiresAt,
+      offline, auth_method: 'fingerprint', ...(shiftToken ? { shiftToken } : {}) }
+  }
   async _login({ pin, deviceId, restaurantId, minRole }) {
     const now = this._time()
     if (restaurantId !== this.restaurantId || !/^[\w-]{1,64}$/.test(deviceId || '')) throw fail('Scope de acceso inválido', 403, 'ACTOR_SCOPE_INVALID')

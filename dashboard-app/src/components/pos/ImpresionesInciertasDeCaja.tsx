@@ -1,8 +1,10 @@
 'use client'
 import { resolverCajonCaja } from '@/lib/pedro-cajon'
 import { useRef, useState } from 'react'
-import { autorizarOperacionConPinEnCaja } from '@/lib/pedro-actor'
+import { autorizarOperacionConHuellaEnCaja, autorizarOperacionConPinEnCaja, type SesionDeCaja } from '@/lib/pedro-actor'
 import { leerImpresionesInciertasCaja, resolverImpresionCaja, type ImpresionInciertaCaja } from '@/lib/pedro-impresion'
+import AutorizacionPinOHuella from './AutorizacionPinOHuella'
+import { useEstadoHuellaCaja } from './useEstadoHuellaCaja'
 
 export default function ImpresionesInciertasDeCaja({ kind = 'paper' }: { kind?: 'paper' | 'drawer' }) {
   const drawer = kind === 'drawer'
@@ -15,6 +17,7 @@ export default function ImpresionesInciertasDeCaja({ kind = 'paper' }: { kind?: 
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
   const working = useRef(false)
+  const huella = useEstadoHuellaCaja()
   const refresh = async () => {
     if (working.current) return
     working.current = true; setBusy(true); setMessage('')
@@ -22,11 +25,10 @@ export default function ImpresionesInciertasDeCaja({ kind = 'paper' }: { kind?: 
     catch (error) { setMessage(error instanceof Error ? error.message : 'Cola sin confirmar') }
     finally { working.current = false; setBusy(false) }
   }
-  const resolve = async () => {
+  const resolve = async (actor: SesionDeCaja) => {
     if (!selected || working.current) return
     working.current = true; setBusy(true); setMessage('')
     try {
-      const actor = await autorizarOperacionConPinEnCaja(pin)
       setPin('')
       const confirmed = drawer
         ? { resolution: (await resolverCajonCaja(selected, resolution as 'opened' | 'retry_pulse', reason, actor)).result.drawer_resolution as Record<string, unknown> }
@@ -54,9 +56,10 @@ export default function ImpresionesInciertasDeCaja({ kind = 'paper' }: { kind?: 
         <option value={drawer ? "opened" : "printed"}>{drawer ? "Verifiqué la apertura" : "El documento salió completo"}</option><option value={drawer ? "retry_pulse" : "reprint"}>{drawer ? "Solicitar otro pulso" : "Necesito una copia"}</option>
       </select></label>
       <label className="block font-medium">Detalle de la verificación<input disabled={busy} value={reason} onChange={event => setReason(event.target.value)} className={field} /></label>
-      <label className="block font-medium">PIN del encargado<input disabled={busy} type="password" inputMode="numeric" autoComplete="off" value={pin} onChange={event => setPin(event.target.value)} className={field} /></label>
-      <div className="grid grid-cols-2 gap-2"><button disabled={busy} onClick={() => { setSelected(null); setPin('') }} className={button}>Cerrar</button>
-        <button disabled={busy || !reason.trim() || !pin} onClick={() => void resolve()} className={`${button} border-emerald-600 bg-emerald-600 text-white`}>Confirmar verificación en Caja</button></div>
+      <AutorizacionPinOHuella label="Autorizar verificación en Caja" pin={pin} onPinChange={setPin}
+        onPin={autorizarOperacionConPinEnCaja} onHuella={autorizarOperacionConHuellaEnCaja} onAuthorized={resolve}
+        huellaDisponible={huella.disponible} motivoHuellaNoDisponible={huella.motivo} disabled={busy || !reason.trim()} />
+      <button disabled={busy} onClick={() => { setSelected(null); setPin('') }} className={`${button} w-full`}>Cerrar</button>
     </div>}
     {message && <p role="status" className="mt-3">{message}</p>}
   </section>

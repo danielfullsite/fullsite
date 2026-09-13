@@ -37,6 +37,7 @@ export default function TurnoDeCaja() {
   const [busy, setBusy] = useState(false)
   const [pestana, setPestana] = useState<PestanaTurno>('turno')
   const working = useRef(false)
+  const turnoCerrado = useRef<string | null>(null)
   useEffect(() => {
     let alive = true, pending = false
     const read = async () => {
@@ -44,7 +45,18 @@ export default function TurnoDeCaja() {
       pending = true
       try {
         const state = await leerTurnosCaja()
-        if (alive) { setTurno(state.turno); setCierres(state.cierres); setConnected(true) }
+        if (alive) {
+          // Un poll iniciado antes del ACK de cierre puede regresar todavía el
+          // turno anterior. No lo resucitamos en pantalla ni reactivamos sus
+          // operaciones; la supresión termina cuando Caja ya reporta cerrado
+          // o aparece un turno realmente distinto.
+          if (state.turno?.id === turnoCerrado.current) setTurno(null)
+          else {
+            if (!state.turno || state.turno.id !== turnoCerrado.current) turnoCerrado.current = null
+            setTurno(state.turno)
+          }
+          setCierres(state.cierres); setConnected(true)
+        }
       } catch { if (alive) setConnected(false) }
       finally { pending = false }
     }
@@ -58,6 +70,7 @@ export default function TurnoDeCaja() {
       const cents = centavosDeTexto(amount)
       if (turno) {
         const close = await cerrarTurnoCaja(turno.id, cents, notes)
+        turnoCerrado.current = turno.id
         setCierres(previous => [...previous.filter(c => c.id !== close.id), close]); setTurno(null); setPestana('ultimo')
       } else {
         if (!veredictoDelFondo.puedeAbrir) {

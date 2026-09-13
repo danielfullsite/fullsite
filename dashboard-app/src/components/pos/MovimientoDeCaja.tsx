@@ -1,8 +1,10 @@
 'use client'
 import { useRef, useState } from 'react'
 import { registrarMovimientoCaja } from '@/lib/pedro-turnos'
-import { autorizarOperacionConPinEnCaja } from '@/lib/pedro-actor'
+import { autorizarOperacionConHuellaEnCaja, autorizarOperacionConPinEnCaja, type SesionDeCaja } from '@/lib/pedro-actor'
 import { centavosDeTexto, pesosDeCentavos } from '@/lib/pedro-finanzas'
+import AutorizacionPinOHuella from './AutorizacionPinOHuella'
+import { useEstadoHuellaCaja } from './useEstadoHuellaCaja'
 
 export default function MovimientoDeCaja({ turnoId }: { turnoId: string }) {
   const [type, setType] = useState<'retiro' | 'deposito'>('retiro')
@@ -12,13 +14,13 @@ export default function MovimientoDeCaja({ turnoId }: { turnoId: string }) {
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
   const running = useRef(false)
-  const submit = async () => {
+  const huella = useEstadoHuellaCaja()
+  const submit = async (actor: SesionDeCaja) => {
     if (running.current) return
     running.current = true; setBusy(true); setMessage('')
     try {
       const cents = centavosDeTexto(amount)
       if (!cents || !reason.trim()) throw new Error('Indica un importe positivo y el motivo.')
-      const actor = await autorizarOperacionConPinEnCaja(pin)
       const { movement, recovered } = await registrarMovimientoCaja(turnoId, type, cents, reason.trim(), actor)
       setPin('')
       setMessage(`${recovered ? 'Se recuperó el movimiento anterior' : 'Movimiento confirmado'}: ${movement.type} de ${pesosDeCentavos(movement.amount_cents)}. ${movement.reason}`)
@@ -35,10 +37,11 @@ export default function MovimientoDeCaja({ turnoId }: { turnoId: string }) {
     <div className="mt-4 grid gap-3 md:grid-cols-2">
       <label className="block font-medium">Tipo de movimiento<select aria-label="Tipo de movimiento" disabled={busy} value={type} onChange={e => setType(e.target.value as typeof type)} className={field}><option value="retiro">Retiro</option><option value="deposito">Depósito</option></select></label>
       <label className="block font-medium">Importe del movimiento<input disabled={busy} inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)} className={field} /></label>
-      <label className="block font-medium">Motivo del movimiento<input disabled={busy} value={reason} onChange={e => setReason(e.target.value)} className={field} /></label>
-      <label className="block font-medium">PIN de autorización<input disabled={busy} type="password" inputMode="numeric" autoComplete="off" value={pin} onChange={e => setPin(e.target.value)} className={field} /></label>
+      <label className="block font-medium md:col-span-2">Motivo del movimiento<input disabled={busy} value={reason} onChange={e => setReason(e.target.value)} className={field} /></label>
     </div>
     {message && <p role="status" className="mt-3 rounded-xl bg-[var(--line)]/40 p-3 text-sm">{message}</p>}
-    <button disabled={busy || !amount || !reason.trim() || !pin} onClick={() => void submit()} className="mt-auto min-h-[64px] rounded-xl bg-blue-600 px-4 py-3 text-lg font-bold text-white active:scale-[0.99] disabled:opacity-40">{busy ? 'Confirmando…' : 'Confirmar movimiento'}</button>
+    <div className="mt-auto pt-3"><AutorizacionPinOHuella label="Autorizar y confirmar movimiento" pin={pin} onPinChange={setPin}
+      onPin={autorizarOperacionConPinEnCaja} onHuella={autorizarOperacionConHuellaEnCaja} onAuthorized={submit}
+      huellaDisponible={huella.disponible} motivoHuellaNoDisponible={huella.motivo} disabled={busy || !amount || !reason.trim()} /></div>
   </section>
 }

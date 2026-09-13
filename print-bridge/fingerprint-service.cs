@@ -9,10 +9,14 @@
 //   GET  /identify              → 1-sample 1:N match, returns staffId
 //   GET  /list                  → enrolled staff IDs
 //   GET  /delete?id=STAFF_ID   → delete locally + from Supabase
+// Every endpoint uses mutual HMAC authentication. The shared secret never
+// crosses the HTTP socket; request and response are bound to one fresh nonce.
 
 using System;
 using System.IO;
 using System.Net;
+using System.Globalization;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -35,6 +39,25 @@ class FingerprintService
     // Sync de templates vía el SERVIDOR (el service_role NO vive en la caja).
     static string apiBaseUrl  = "https://app.fullsite.mx";
     static string syncSecret  = "";
+    const string IpcSecretEnvironment = "FULLSITE_FINGERPRINT_IPC_SECRET";
+    const string IpcTimestampHeader = "X-Fullsite-Fingerprint-Timestamp";
+    const string IpcNonceHeader = "X-Fullsite-Fingerprint-Nonce";
+    const string IpcSignatureHeader = "X-Fullsite-Fingerprint-Signature";
+    const string IpcResponseSignatureHeader = "X-Fullsite-Fingerprint-Response-Signature";
+    const string IpcAuthVersion = "fullsite-fingerprint-hmac-v1";
+    const long IpcMaxClockSkewMs = 30000;
+    const int MaxRequestBodyBytes = 1024 * 1024;
+    static string ipcSecret = "";
+    static readonly object nonceLock = new object();
+    static readonly Dictionary<string, long> seenNonces = new Dictionary<string, long>(StringComparer.Ordinal);
+
+    sealed class IpcRequestAuth
+    {
+        public string Timestamp;
+        public string Nonce;
+        public string Method;
+        public string Path;
+    }
 
     static void Main(string[] args)
     {
@@ -43,11 +66,9 @@ class FingerprintService
         Console.WriteLine("Fullsite Fingerprint Service");
         Console.WriteLine("============================");
 
-        if (!LoadConfig())
+        if (!LoadConfig() || !LoadIpcSecret())
         {
-            Console.WriteLine("FATAL: No se pudo leer C:\\fullsite\\config.json");
-            Console.WriteLine("Asegurate de que el archivo exista y contenga: restaurant_id, supabaseUrl, supabaseAnonKey");
-            Console.ReadLine();
+            Console.WriteLine("FATAL: configuración o secreto IPC de huella inválido");
             return;
         }
         Console.WriteLine("Config: client_id=" + clientId);
@@ -150,6 +171,161 @@ class FingerprintService
         }
     }
 
+    static bool LoadIpcSecret()
+    {
+        try
+        {
+            string value = Environment.GetEnvironmentVariable(IpcSecretEnvironment) ?? "";
+            if (string.IsNullOrEmpty(value))
+            {
+                string file = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    @"Fullsite POS\fingerprint\fingerprint-ipc-secret"
+                );
+                if (File.Exists(file)) value = File.ReadAllText(file, Encoding.ASCII).Trim();
+            }
+            if (!Regex.IsMatch(value, "^[a-f0-9]{64}$"))
+            {
+                Console.WriteLine("FATAL: falta el fingerprint-ipc-secret privado; actualiza/repara la instalación");
+                return false;
+            }
+            ipcSecret = value;
+            return true;
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine("FATAL: no se pudo leer el secreto IPC: " + e.Message);
+            return false;
+        }
+    }
+
+    static bool ConstantTimeEquals(string presented, string expected)
+    {
+        byte[] a = Encoding.UTF8.GetBytes(presented ?? "");
+        byte[] b = Encoding.UTF8.GetBytes(expected ?? "");
+        int different = a.Length ^ b.Length;
+        int length = Math.Max(a.Length, b.Length);
+        for (int i = 0; i < length; i++)
+        {
+            byte av = i < a.Length ? a[i] : (byte)0;
+            byte bv = i < b.Length ? b[i] : (byte)0;
+            different |= av ^ bv;
+        }
+        return different == 0;
+    }
+
+    static byte[] HexBytes(string hex)
+    {
+        byte[] bytes = new byte[hex.Length / 2];
+        for (int i = 0; i < bytes.Length; i++) bytes[i] = Convert.ToByte(hex.Substring(i * 2, 2), 16);
+        return bytes;
+    }
+
+    static string Sha256Hex(byte[] bytes)
+    {
+        using (var sha = SHA256.Create()) return BytesToHex(sha.ComputeHash(bytes ?? new byte[0]));
+    }
+
+    static string BytesToHex(byte[] bytes)
+    {
+        var result = new StringBuilder(bytes.Length * 2);
+        foreach (byte value in bytes) result.Append(value.ToString("x2", CultureInfo.InvariantCulture));
+        return result.ToString();
+    }
+
+    static string HmacHex(string canonical)
+    {
+        using (var hmac = new HMACSHA256(HexBytes(ipcSecret)))
+            return BytesToHex(hmac.ComputeHash(Encoding.UTF8.GetBytes(canonical)));
+    }
+
+    static long UnixTimeMilliseconds()
+    {
+        return (long)(DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalMilliseconds;
+    }
+
+    static byte[] ReadRequestBody(HttpListenerRequest req)
+    {
+        if (req.ContentLength64 > MaxRequestBodyBytes) throw new InvalidOperationException("Cuerpo IPC demasiado grande");
+        using (var output = new MemoryStream())
+        {
+            byte[] buffer = new byte[8192];
+            int read;
+            while ((read = req.InputStream.Read(buffer, 0, buffer.Length)) > 0)
+            {
+                if (output.Length + read > MaxRequestBodyBytes) throw new InvalidOperationException("Cuerpo IPC demasiado grande");
+                output.Write(buffer, 0, read);
+            }
+            return output.ToArray();
+        }
+    }
+
+    static string RequestCanonical(IpcRequestAuth auth, byte[] body)
+    {
+        return string.Join("\n", new string[] {
+            IpcAuthVersion, auth.Timestamp, auth.Nonce, auth.Method, auth.Path, Sha256Hex(body)
+        });
+    }
+
+    static string ResponseCanonical(IpcRequestAuth auth, int statusCode, string body)
+    {
+        return string.Join("\n", new string[] {
+            IpcAuthVersion + "-response", auth.Timestamp, auth.Nonce, auth.Method, auth.Path,
+            statusCode.ToString(CultureInfo.InvariantCulture), Sha256Hex(Encoding.UTF8.GetBytes(body ?? ""))
+        });
+    }
+
+    static bool RequireIpcAuth(HttpListenerRequest req, byte[] body, HttpListenerResponse res, out string json, out IpcRequestAuth auth)
+    {
+        json = "";
+        auth = null;
+        string timestamp = req.Headers[IpcTimestampHeader] ?? "";
+        string nonce = req.Headers[IpcNonceHeader] ?? "";
+        string presented = req.Headers[IpcSignatureHeader] ?? "";
+        long timestampValue;
+        long now = UnixTimeMilliseconds();
+        if (!long.TryParse(timestamp, NumberStyles.None, CultureInfo.InvariantCulture, out timestampValue) ||
+            timestampValue < now - IpcMaxClockSkewMs || timestampValue > now + IpcMaxClockSkewMs ||
+            !Regex.IsMatch(nonce, "^[a-f0-9]{64}$") || !Regex.IsMatch(presented, "^[a-f0-9]{64}$"))
+        {
+            res.StatusCode = 401;
+            json = "{\"ok\":false,\"error\":\"Autorización local requerida\",\"code\":\"FINGERPRINT_IPC_AUTH_INVALID\"}";
+            return false;
+        }
+
+        var candidate = new IpcRequestAuth {
+            Timestamp = timestamp,
+            Nonce = nonce,
+            Method = (req.HttpMethod ?? "").ToUpperInvariant(),
+            Path = req.RawUrl ?? req.Url.PathAndQuery
+        };
+        string expected = HmacHex(RequestCanonical(candidate, body));
+        if (!ConstantTimeEquals(presented, expected))
+        {
+            res.StatusCode = 401;
+            json = "{\"ok\":false,\"error\":\"Autorización local requerida\",\"code\":\"FINGERPRINT_IPC_AUTH_INVALID\"}";
+            return false;
+        }
+
+        // A valid signature proves Pedro knows the secret. Only after that do we
+        // consume the nonce, so unauthenticated noise cannot exhaust the cache.
+        auth = candidate;
+        lock (nonceLock)
+        {
+            var expired = new List<string>();
+            foreach (var item in seenNonces) if (item.Value < now - IpcMaxClockSkewMs) expired.Add(item.Key);
+            foreach (string oldNonce in expired) seenNonces.Remove(oldNonce);
+            if (seenNonces.ContainsKey(nonce))
+            {
+                res.StatusCode = 409;
+                json = "{\"ok\":false,\"error\":\"Solicitud biométrica repetida\",\"code\":\"FINGERPRINT_IPC_REPLAY\"}";
+                return false;
+            }
+            seenNonces[nonce] = timestampValue;
+        }
+        return true;
+    }
+
     // Extract a JSON string value by key, handling escape sequences.
     static string ExtractJsonString(string json, string key)
     {
@@ -211,41 +387,45 @@ class FingerprintService
     {
         var req = ctx.Request;
         var res = ctx.Response;
-        res.Headers.Add("Access-Control-Allow-Origin", "*");
-        res.Headers.Add("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-        res.Headers.Add("Access-Control-Allow-Headers", "Content-Type");
-
-        if (req.HttpMethod == "OPTIONS") { res.StatusCode = 204; res.Close(); return; }
-
         string path    = req.Url.AbsolutePath;
         string staffId = req.QueryString["id"] ?? "";
         string json    = "";
+        IpcRequestAuth auth = null;
 
         try
         {
-            switch (path)
+            byte[] requestBody = ReadRequestBody(req);
+            if (RequireIpcAuth(req, requestBody, res, out json, out auth))
             {
-                case "/health":
-                    int cnt; lock (templatesLock) { cnt = templates.Count; }
-                    json = "{\"ok\":true,\"reader\":\"" + EscapeJson(reader.Description.Name) + "\",\"enrolled\":" + cnt + ",\"client_id\":\"" + EscapeJson(clientId) + "\"}";
-                    break;
-                case "/enroll":
-                    if (string.IsNullOrEmpty(staffId)) { json = "{\"error\":\"Falta parametro id\"}"; res.StatusCode = 400; }
-                    else json = DoEnroll(staffId);
-                    break;
-                case "/identify":
-                    json = DoIdentify();
-                    break;
-                case "/list":
-                    json = DoList();
-                    break;
-                case "/delete":
-                    if (string.IsNullOrEmpty(staffId)) { json = "{\"error\":\"Falta parametro id\"}"; res.StatusCode = 400; }
-                    else json = DoDelete(staffId);
-                    break;
-                default:
-                    json = "{\"error\":\"Ruta no encontrada\"}"; res.StatusCode = 404;
-                    break;
+                if (!string.Equals(req.HttpMethod, "GET", StringComparison.OrdinalIgnoreCase))
+                {
+                    res.StatusCode = 405;
+                    json = "{\"ok\":false,\"error\":\"Método no permitido\"}";
+                }
+                else switch (path)
+                {
+                    case "/health":
+                        int cnt; lock (templatesLock) { cnt = templates.Count; }
+                        json = "{\"ok\":true,\"ipc_auth_required\":true,\"ipc_auth_scheme\":\"hmac-sha256-v1\",\"reader\":\"" + EscapeJson(reader.Description.Name) + "\",\"enrolled\":" + cnt + ",\"client_id\":\"" + EscapeJson(clientId) + "\"}";
+                        break;
+                    case "/enroll":
+                        if (string.IsNullOrEmpty(staffId)) { json = "{\"error\":\"Falta parametro id\"}"; res.StatusCode = 400; }
+                        else json = DoEnroll(staffId);
+                        break;
+                    case "/identify":
+                        json = DoIdentify();
+                        break;
+                    case "/list":
+                        json = DoList();
+                        break;
+                    case "/delete":
+                        if (string.IsNullOrEmpty(staffId)) { json = "{\"error\":\"Falta parametro id\"}"; res.StatusCode = 400; }
+                        else json = DoDelete(staffId);
+                        break;
+                    default:
+                        json = "{\"error\":\"Ruta no encontrada\"}"; res.StatusCode = 404;
+                        break;
+                }
             }
         }
         catch (Exception e)
@@ -256,6 +436,7 @@ class FingerprintService
         }
 
         byte[] buf = Encoding.UTF8.GetBytes(json);
+        if (auth != null) res.Headers.Add(IpcResponseSignatureHeader, HmacHex(ResponseCanonical(auth, res.StatusCode, json)));
         res.ContentType = "application/json; charset=utf-8";
         res.ContentLength64 = buf.Length;
         res.OutputStream.Write(buf, 0, buf.Length);

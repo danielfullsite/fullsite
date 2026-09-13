@@ -9,10 +9,12 @@ la tableta y la verificación física, pero el producto no debe asumir mouse ni
 teclado en ninguna instalación. Tocar un campo abre un teclado o pad en pantalla;
 aceptar, cancelar, borrar y cerrar siempre tienen controles visibles.
 
-**No es un rediseño.** La identidad se queda: los tokens de `globals.css`
+**No es un cambio de marca.** La identidad se queda: los tokens de `globals.css`
 (`--surface #0c1012`, `--panel #131a1d`, `--accent #10b981`, `--ok/--warn/--crit/--info`)
 y la tipografía canónica del proyecto. Lo que cambia es **dónde cae cada cosa en
-una pantalla de caja sin ratón**. Ningún contrato de negocio se toca.
+una pantalla de caja sin ratón**. Las operaciones de negocio conservan sus
+contratos; las rutas de autenticación sí se endurecen para que la huella pueda
+emitir la misma autoridad verificable que el PIN.
 
 ## 1. El «antes», medido
 
@@ -244,6 +246,33 @@ cancelar, cobrar, abrir cajón ni afectar saldos. La credencial LAN sigue siendo
 lo que una futura inscripción individual de terminales permitirá revocarlas por
 separado; no se presenta la cabecera de una pantalla como identidad segura.
 
+### Huella como alternativa al PIN — **base segura hecha; barrido en curso**
+
+La opción «Autorizar con huella» permanece visible junto al PIN. Si la terminal
+no tiene lector, no es Caja o todavía conserva el servicio anterior, el botón se
+desactiva y explica el motivo; no desaparece ni aparenta haber autorizado. KDS
+queda fuera por diseño: cocina no pide PIN ni identifica a una persona.
+
+En Caja, el navegador ya no entrega `staffId`, rol ni `fingerprint_id`. Pedro
+activa el DigitalPersona por loopback, toma de ahí la identidad y emite el mismo
+`actor_token` firmado que usa el PIN. El canal local usa un secreto de 32 bytes
+protegido por ACL y autenticación mutua HMAC con nonce, tiempo, método, ruta y
+cuerpo; Pedro rechaza tanto respuestas alteradas como un proceso impostor que
+ocupe el puerto 7718. Con WAN, la cuenta y el rol se revalidan antes de firmar;
+sin WAN sólo entra una persona y terminal preparadas, dentro de su vigencia.
+
+Ya usan el selector común: entrada del POS, movimiento y reporte de Caja,
+apertura manual, verificación de papel/cajón y recuperación durable de esas dos
+colas. Siguen pendientes las superficies legacy y dos modales grandes del editor
+(transferencia y anulación) para poder afirmar literalmente «todo PIN tiene
+huella».
+
+El rollout es intencionalmente fail-closed. El `fingerprint-service.exe` nuevo
+debe compilarse en Windows con `DPUruNet.dll`, detener el proceso anterior,
+reemplazarlo y reiniciarlo. Un servicio viejo o sin autenticación mutua deja la
+huella deshabilitada y conserva el PIN como salida; nunca cae al protocolo
+inseguro.
+
 ### 5. Turno y Corte Z — **hecho y medido**
 
 Turno ahora es una sola pantalla de 768px con cuatro pestañas de 56px: Turno,
@@ -266,8 +295,8 @@ sólo cambios de estado de preparación autenticados por la instalación.
 
 Recorrido operacional Electron: **20/20**. Capturas a 1024×768: **16 pantallas,
 cero scroll de página y cero fallos de navegación**; el capturador registra
-dimensiones para revisión y todavía no actúa como gate. Suites locales: web **3,783/3,783**, DOM
-**309/309**, Electron **653/653** y TypeScript limpio. La única prueba web fuera
+dimensiones para revisión y todavía no actúa como gate. Suites locales: web **3,784/3,784**, DOM
+**315/315**, Electron **665/665** y TypeScript limpio. La única prueba web fuera
 de esa corrida es el archivo live del analista, dependiente de un proveedor
 externo que respondió con límite de cuota.
 

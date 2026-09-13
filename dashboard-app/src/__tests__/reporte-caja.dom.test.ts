@@ -4,7 +4,11 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 const read = vi.hoisted(() => vi.fn())
 const authorize = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/pedro-reportes', () => ({ leerReporteCaja: read }))
-vi.mock('@/lib/pedro-actor', () => ({ autorizarOperacionConPinEnCaja: authorize }))
+vi.mock('@/lib/pedro-actor', () => ({
+  autorizarOperacionConPinEnCaja: authorize,
+  autorizarOperacionConHuellaEnCaja: vi.fn(),
+  estadoHuellaEnCaja: vi.fn(async () => ({ disponible: false, motivo: 'Sin lector' })),
+}))
 import ReporteDeCaja from '@/components/pos/ReporteDeCaja'
 import { prepararTransferenciaItem } from '@/lib/transferencia-item'
 afterEach(() => { cleanup(); vi.clearAllMocks(); localStorage.clear() })
@@ -50,8 +54,8 @@ describe('corte confirmado en pantalla', () => {
     render(React.createElement(ReporteDeCaja))
     await screen.findByRole('alert')
 
-    const pin = screen.getByLabelText('PIN autorizado')
-    const submit = screen.getByRole('button', { name: 'Consultar con PIN' })
+    const pin = screen.getByLabelText('PIN de autorización')
+    const submit = screen.getByRole('button', { name: 'Autorizar con PIN' })
     expect(pin.className).toContain('min-h-[56px]')
     expect(submit.className).toContain('min-h-[56px]')
     expect(screen.queryByText('$0.00')).toBeNull()

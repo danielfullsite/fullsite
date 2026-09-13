@@ -3,6 +3,9 @@ import { beforeEach, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 vi.mock('@/lib/bridge-url', () => ({ getBridgeUrl: () => 'http://127.0.0.1:7718' }))
 vi.mock('@/lib/local-network-fetch', () => ({ localNetworkFetch: vi.fn() }))
+vi.mock('@/components/pos/useEstadoHuellaCaja', () => ({
+  useEstadoHuellaCaja: () => ({ disponible: false, motivo: 'Sin lector en prueba' }),
+}))
 import { localNetworkFetch } from '@/lib/local-network-fetch'
 import { abrirCajonPorPagoCaja, abrirCajonManualCaja } from '@/lib/pedro-cajon'
 import CajonDeCaja from '@/components/pos/CajonDeCaja'
@@ -12,7 +15,7 @@ const network = vi.mocked(localNetworkFetch)
 const actor = { staff: { id: 'cashier', name: 'Caja', role: 'admin' }, actor_token: 'synthetic', expires_at: Date.now() + 600000, offline: true }
 const operation = (command: Record<string, unknown>) => ({ operation_id: command.command_id, kind: command.command_type === 'PAYMENT_DRAWER_OPEN' ? 'payment' : 'manual', turno_id: command.turno_id, order_id: command.order_id, payment_id: command.payment_id, reason: command.reason || 'Pago confirmado', job_id: 'job', printer_id: 'printer' })
 const reply = (command: Record<string, unknown>) => Response.json({ results: [{ event: { payload: command }, result: { drawer_operation: operation(command) } }] })
-beforeEach(() => { cleanup(); vi.clearAllMocks(); localStorage.clear(); sessionStorage.clear(); sessionStorage.setItem('pos_actor_session', JSON.stringify(actor)) })
+beforeEach(() => { cleanup(); vi.clearAllMocks(); network.mockReset(); localStorage.clear(); sessionStorage.clear(); sessionStorage.setItem('pos_actor_session', JSON.stringify(actor)) })
 it('confirmed cash does not automatically pulse; the explicit action sends only payment identity and is then disabled', async () => {
   const posts: Record<string, unknown>[] = []
   network.mockImplementation(async (_url, init) => {
@@ -40,10 +43,10 @@ it('a previously requested payment opening cannot issue another original pulse a
 it('manual opening requires reason and fresh PIN; rejection does not announce an open drawer', async () => {
   network.mockResolvedValueOnce(Response.json(actor)).mockResolvedValueOnce(Response.json({ results: [{ code: 'DRAWER_NOT_CONFIGURED', error: 'Cajón no configurado' }] }))
   render(createElement(CajonDeCaja, { turnoId: 'turn' }))
-  const button = screen.getByRole('button', { name: 'Solicitar apertura manual' })
+  const button = screen.getByRole('button', { name: 'Autorizar con PIN' })
   expect((button as HTMLButtonElement).disabled).toBe(true)
   fireEvent.change(screen.getByLabelText('Motivo de apertura'), { target: { value: 'Cambio para caja' } })
-  fireEvent.change(screen.getByLabelText('PIN para abrir el cajón'), { target: { value: '1234' } })
+  fireEvent.change(screen.getByLabelText('PIN de autorización'), { target: { value: '1234' } })
   fireEvent.click(button)
   await screen.findByText('Cajón no configurado')
   expect(screen.queryByText(/Apertura solicitada/)).toBeNull()
@@ -82,7 +85,7 @@ it('drawer uncertainty is separate from paper and sends a manager-approved retry
   expect(screen.queryByRole('button', { name: /Papel · receipt/ })).toBeNull()
   fireEvent.change(screen.getByLabelText('Resultado verificado'), { target: { value: 'retry_pulse' } })
   fireEvent.change(screen.getByLabelText('Detalle de la verificación'), { target: { value: 'No abrió' } })
-  fireEvent.change(screen.getByLabelText('PIN del encargado'), { target: { value: '1234' } })
-  fireEvent.click(screen.getByRole('button', { name: 'Confirmar verificación en Caja' }))
+  fireEvent.change(screen.getByLabelText('PIN de autorización'), { target: { value: '1234' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Autorizar con PIN' }))
   await screen.findByText(/Apertura solicitada/)
 })

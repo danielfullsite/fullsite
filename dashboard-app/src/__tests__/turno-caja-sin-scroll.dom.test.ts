@@ -15,7 +15,11 @@ vi.mock('@/lib/pedro-turnos', () => ({
   registrarMovimientoCaja: doubles.move,
 }))
 vi.mock('@/lib/pos-data', () => ({ openTurno: doubles.open, logAudit: doubles.audit }))
-vi.mock('@/lib/pedro-actor', () => ({ autorizarOperacionConPinEnCaja: doubles.authorize }))
+vi.mock('@/lib/pedro-actor', () => ({
+  autorizarOperacionConPinEnCaja: doubles.authorize,
+  autorizarOperacionConHuellaEnCaja: vi.fn(),
+  estadoHuellaEnCaja: vi.fn(async () => ({ disponible: false, motivo: 'Sin lector' })),
+}))
 vi.mock('@/lib/pedro-impresion', () => ({
   leerImpresionesInciertasCaja: doubles.readUncertain,
   resolverImpresionCaja: vi.fn(),

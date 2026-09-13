@@ -2143,7 +2143,7 @@ async function _pinCacheKey(pin: string): Promise<string> {
 // terminal" durante un corte de internet, sin depender de una verificacion online
 // reciente (la cache de 30min quedaba vacia -> "PIN invalido" offline).
 const _ROLE_LVL: Record<string, number> = { mesero: 1, cajero: 2, capitan: 3, gerente: 4, admin: 5 }
-async function _managerFromStaffCache(pin: string, minLevel = 4): Promise<{ name: string; role: string } | null> {
+async function _managerFromStaffCache(pin: string, minLevel = 4): Promise<{ id: string; name: string; role: string } | null> {
   try {
     if (typeof localStorage === 'undefined') return null
     const raw = localStorage.getItem('pos_staff_cache')
@@ -2154,8 +2154,33 @@ async function _managerFromStaffCache(pin: string, minLevel = 4): Promise<{ name
     const data = new TextEncoder().encode(`${pin}:${s.id}`)
     const buf = await crypto.subtle.digest('SHA-256', data)
     const h = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
-    return h === s.pin_hash ? { name: s.name as string, role: s.role as string } : null
+    return h === s.pin_hash ? { id: s.id as string, name: s.name as string, role: s.role as string } : null
   } catch { return null }
+}
+
+/**
+ * Identifica a cualquier empleado por PIN sin convertir el secreto en identidad.
+ * La asistencia necesita el UUID canónico de `pos_staff`; guardar el PIN como
+ * `staff_id` expone la credencial y mezcla personas cuando se rota.
+ */
+export async function verifyStaffPin(pin: string): Promise<{ id: string; name: string; role: string } | null> {
+  if (!/^\d{4,10}$/.test(pin)) return null
+  try {
+    const { apiUrl } = await import('./api-base')
+    const res = await fetch(apiUrl('/api/pos/pin'), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin, client_id: _getClientId() }),
+    })
+    if (res.ok) {
+      const { staff } = await res.json()
+      if (typeof staff?.id === 'string' && staff.id && typeof staff.name === 'string' && typeof staff.role === 'string') {
+        return { id: staff.id, name: staff.name, role: staff.role }
+      }
+      return null
+    }
+    if (res.status === 400 || res.status === 401 || res.status === 403) return null
+  } catch { /* sin red: sólo vale el usuario local preparado */ }
+  return _managerFromStaffCache(pin, 1)
 }
 
 // Aprobación de gerente SERVER-VERIFICABLE: cuando el PIN se valida online, /api/pos/pin

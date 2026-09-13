@@ -263,6 +263,15 @@ async function startLocalServer() {
 
   const { startLocalServer: start } = require('./local-server');
   const dataDir = app.getPath('userData');
+  let fingerprintIpcSecretForServer = null;
+  try {
+    fingerprintIpcSecretForServer = prepareFingerprintIpcSecret({
+      directory: resolveFingerprintIpcDirectory({ userDataDirectory: dataDir }),
+    });
+    fingerprintIpcSecret = fingerprintIpcSecretForServer;
+  } catch (e) {
+    console.error('[fingerprint] No se pudo preparar el secreto IPC; las rutas de huella fallarán cerradas:', e.message);
+  }
   const printersResult = loadPrinters();
   const printerConfigPath = getPrinterConfigPath();
   const queueFilePath = path.join(dataDir, 'print-queue.json');
@@ -300,6 +309,9 @@ async function startLocalServer() {
     localAuthorityEnabled: appConfig.localAuthorityEnabled === true,
     branchId:           appConfig.location_id || appConfig.branch_id || appConfig.branchId || null,
     lanSecret:          appConfig.lan_secret     || appConfig.lanSecret || null,
+    // Sólo vive en memoria de main/Pedro. rendererIdentity usa una allowlist y no
+    // expone este secreto al preload, a la página ni a localStorage.
+    fingerprintIpcSecret: fingerprintIpcSecretForServer,
   };
 
   try {
@@ -654,12 +666,27 @@ function registerProvisioningIpc() {
 // must be in C:\fullsite\ on each terminal.
 
 const { spawn } = require('child_process');
+const {
+  prepareFingerprintIpcSecret,
+  resolveFingerprintIpcDirectory,
+  createFingerprintIpcRequestAuth,
+  verifyFingerprintIpcResponse,
+} = require('./local-server/core/fingerprint-ipc-secret');
 let fingerprintProcess = null;
 let fingerprintRestartCount = 0;
+let fingerprintIpcSecret = null;
 
 function startFingerprintService() {
   const fpExe = 'C:\\fullsite\\fingerprint-service.exe';
   const fpDll = 'C:\\fullsite\\DPUruNet.dll';
+  try {
+    if (!fingerprintIpcSecret) fingerprintIpcSecret = prepareFingerprintIpcSecret({
+      directory: resolveFingerprintIpcDirectory({ userDataDirectory: app.getPath('userData') }),
+    });
+  } catch (e) {
+    console.error('[fingerprint] Secreto IPC inválido; huella deshabilitada hasta reparar:', e.message);
+    return;
+  }
 
   // AUTO-INSTALAR EL SERVICIO DESDE EL PAQUETE. Es lo que hace clonable la huella.
   //
@@ -696,10 +723,35 @@ function startFingerprintService() {
   }
 
   // Check if already running on port 7718
-  const testReq = http.get('http://127.0.0.1:7718/health', (res) => {
-    if (res.statusCode === 200) {
-      console.log('[fingerprint] Service already running on port 7718');
-    }
+  const healthAuth = createFingerprintIpcRequestAuth({
+    secret: fingerprintIpcSecret,
+    method: 'GET',
+    path: '/health',
+  });
+  const testReq = http.get({ hostname: '127.0.0.1', port: 7718, path: '/health', headers: healthAuth.headers }, (res) => {
+    let body = '';
+    res.on('data', chunk => { body += chunk; });
+    res.on('end', () => {
+      let health = null;
+      try { health = JSON.parse(body); } catch {}
+      let authenticated = false;
+      try {
+        authenticated = verifyFingerprintIpcResponse({
+          secret: fingerprintIpcSecret,
+          context: healthAuth.context,
+          statusCode: res.statusCode || 502,
+          body,
+          headers: res.headers,
+        });
+      } catch (error) {
+        console.error('[fingerprint] El proceso en 7718 no demostró conocer el secreto IPC:', error.message);
+      }
+      if (authenticated && res.statusCode === 200 && health?.ipc_auth_required === true && health?.ipc_auth_scheme === 'hmac-sha256-v1') {
+        console.log('[fingerprint] Servicio seguro ya está activo en 7718');
+      } else {
+        console.error('[fingerprint] Servicio viejo, impostor o inseguro en 7718: deténlo y actualiza fingerprint-service.exe antes de usar huella');
+      }
+    });
   });
   testReq.on('error', () => {
     // Not running, start it
@@ -708,6 +760,7 @@ function startFingerprintService() {
       cwd: 'C:\\fullsite',
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
+      env: { ...process.env, FULLSITE_FINGERPRINT_IPC_SECRET: fingerprintIpcSecret },
     });
 
     fingerprintProcess.stdout.on('data', (data) => {

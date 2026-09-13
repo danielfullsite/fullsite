@@ -3,7 +3,9 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { leerReporteCaja } from '@/lib/pedro-reportes'
 import { pesosDeCentavos } from '@/lib/pedro-finanzas'
-import { autorizarOperacionConPinEnCaja } from '@/lib/pedro-actor'
+import { autorizarOperacionConHuellaEnCaja, autorizarOperacionConPinEnCaja, type SesionDeCaja } from '@/lib/pedro-actor'
+import AutorizacionPinOHuella from './AutorizacionPinOHuella'
+import { useEstadoHuellaCaja } from './useEstadoHuellaCaja'
 
 export default function ReporteDeCaja() {
   const [result, setResult] = useState<Awaited<ReturnType<typeof leerReporteCaja>> | null>(null)
@@ -11,6 +13,7 @@ export default function ReporteDeCaja() {
   const [busy, setBusy] = useState(true)
   const [pin, setPin] = useState('')
   const [token, setToken] = useState<string>()
+  const huella = useEstadoHuellaCaja()
   const load = async (approval?: string) => {
     setBusy(true); setError(''); setResult(null)
     try { setResult(await leerReporteCaja(undefined, approval)) }
@@ -18,10 +21,9 @@ export default function ReporteDeCaja() {
     finally { setBusy(false) }
   }
   useEffect(() => { void load() }, [])
-  const authorize = async () => {
+  const authorize = async (session: SesionDeCaja) => {
     setBusy(true); setError('')
     try {
-      const session = await autorizarOperacionConPinEnCaja(pin)
       setToken(session.actor_token); setPin(''); await load(session.actor_token)
     } catch (e) { setError(e instanceof Error ? e.message : 'No se confirmó el permiso'); setBusy(false) }
   }
@@ -33,10 +35,9 @@ export default function ReporteDeCaja() {
     <p className="text-sm text-[var(--text-2)]">Importes confirmados por Caja. Consultar el corte X no cierra el turno.</p>
     {busy && <p role="status">Consultando Caja…</p>}
     {error && <div role="alert" className="rounded-xl border border-amber-500 p-3"><p>{error}</p>
-      <form onSubmit={event => { event.preventDefault(); void authorize() }} className="mt-2 flex items-end gap-3">
-        <label className="flex-1">PIN autorizado<input type="password" inputMode="numeric" autoComplete="off" value={pin} onChange={e => setPin(e.target.value)} className="mt-1 min-h-[56px] w-full rounded border bg-transparent p-2" /></label>
-        <button disabled={busy || !pin} className="min-h-[56px] rounded border px-3">Consultar con PIN</button>
-      </form></div>}
+      <div className="mt-2"><AutorizacionPinOHuella label="Autorizar consulta de Corte X" pin={pin} onPinChange={setPin}
+        onPin={autorizarOperacionConPinEnCaja} onHuella={autorizarOperacionConHuellaEnCaja} onAuthorized={authorize}
+        huellaDisponible={huella.disponible} motivoHuellaNoDisponible={huella.motivo} disabled={busy} /></div></div>}
     {report && <>
       <p>Turno {report.turno_id} · {result.closed ? 'Cerrado · Z' : 'Abierto · X'}</p>
       <dl className="grid grid-cols-2 gap-3">

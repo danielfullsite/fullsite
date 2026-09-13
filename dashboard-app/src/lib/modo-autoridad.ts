@@ -19,7 +19,7 @@
  */
 
 export type ModoDeAutoridad = 'caja' | 'legacy' | 'desconocido'
-export type DecisionDeHuella = 'entrar' | 'identificar-y-pedir-pin'
+export type DecisionDeHuella = 'entrar' | 'entrar-con-caja'
 export type CausaDeFalloDeHuella =
   | 'servicio-apagado'
   | 'sin-lectura'
@@ -34,10 +34,9 @@ export function normalizarAutoridad(valor: unknown): 'caja' | 'legacy' | null {
 }
 
 /**
- * Con autoridad de Caja, el permiso lo firma Caja a partir de un PIN, y el
- * lector no da PIN: la huella sirve para saber quién eres, y el PIN para
- * autorizar. En cualquier otro caso la huella entra, igual que en la versión
- * que hoy corre en el restaurante.
+ * Con autoridad de Caja, el lector se consume únicamente por el puente local
+ * autenticado y Caja firma el mismo actor_token que para el PIN. En legacy la
+ * huella sólo desbloquea la pantalla como en la versión de campo.
  *
  * `desconocido` entra a propósito. Desbloquear la pantalla no es autoridad: con
  * autoridad de Caja toda escritura sigue exigiendo el permiso firmado más
@@ -46,7 +45,7 @@ export function normalizarAutoridad(valor: unknown): 'caja' | 'legacy' | null {
  * deja al mesero parado en la puerta por un dato que aún no llegó.
  */
 export function decidirHuella(modo: ModoDeAutoridad): DecisionDeHuella {
-  return modo === 'caja' ? 'identificar-y-pedir-pin' : 'entrar'
+  return modo === 'caja' ? 'entrar-con-caja' : 'entrar'
 }
 
 /**

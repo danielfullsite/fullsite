@@ -3,6 +3,9 @@ import { beforeEach, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 vi.mock('@/lib/bridge-url', () => ({ getBridgeUrl: () => 'http://127.0.0.1:7718' }))
 vi.mock('@/lib/local-network-fetch', () => ({ localNetworkFetch: vi.fn() }))
+vi.mock('@/components/pos/useEstadoHuellaCaja', () => ({
+  useEstadoHuellaCaja: () => ({ disponible: false, motivo: 'Sin lector en prueba' }),
+}))
 import { localNetworkFetch } from '@/lib/local-network-fetch'
 import DocumentoImpresoDeCaja from '@/components/pos/DocumentoImpresoDeCaja'
 import ImpresionesPendientesDeCaja from '@/components/pos/ImpresionesPendientesDeCaja'
@@ -18,7 +21,7 @@ const finance: FinanzasDeCaja = { order_id: 'order', turno_id: 'turn', currency:
   payments: [{ payment_id: 'paid', account_id: 'full', amount_cents: 5800, method: 'cash', status: 'accepted' }] }
 const order = { id: 'order', order_revision: 3, turno_id: 'turn', total_cents: 999999, financial_order: finance }
 const job = { job_id: 'job', uncertain_episode_id: 'episode', printer_name: 'Caja', document_type: 'receipt', created_at: '', copies: 1, copies_printed: 0 }
-beforeEach(() => { cleanup(); vi.clearAllMocks(); localStorage.clear(); sessionStorage.clear(); sessionStorage.setItem('pos_actor_session', JSON.stringify(actor)) })
+beforeEach(() => { cleanup(); vi.clearAllMocks(); network.mockReset(); localStorage.clear(); sessionStorage.clear(); sessionStorage.setItem('pos_actor_session', JSON.stringify(actor)) })
 const eventReply = (command: Record<string, unknown>, result: Record<string, unknown>) => Response.json({ results: [{ event: { payload: command }, result }] })
 it('precheck sends only canonical identity, then an explicit reasoned copy references the original', async () => {
   const documents: Record<string, unknown>[] = []
@@ -107,11 +110,11 @@ it('uncertain paper requires a selected episode, reason, and fresh approval for 
   render(createElement(ImpresionesInciertasDeCaja))
   fireEvent.click(screen.getByRole('button', { name: 'Consultar impresiones por verificar' }))
   fireEvent.click(await screen.findByRole('button', { name: 'Caja · receipt · job' }))
-  const confirm = screen.getByRole('button', { name: 'Confirmar verificación en Caja' })
+  const confirm = screen.getByRole('button', { name: 'Autorizar con PIN' })
   expect((confirm as HTMLButtonElement).disabled).toBe(true)
   fireEvent.change(screen.getByLabelText('Resultado verificado'), { target: { value: 'reprint' } })
   fireEvent.change(screen.getByLabelText('Detalle de la verificación'), { target: { value: 'Se atascó el papel' } })
-  fireEvent.change(screen.getByLabelText('PIN del encargado'), { target: { value: '1234' } })
+  fireEvent.change(screen.getByLabelText('PIN de autorización'), { target: { value: '1234' } })
   fireEvent.click(confirm)
   await screen.findByText('Caja guardó la solicitud de copia. Verifica su salida en la impresora.')
 })

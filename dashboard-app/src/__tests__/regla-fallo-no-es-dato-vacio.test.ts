@@ -81,7 +81,6 @@ const FORMA_PELIGROSA = /(\w+)\.ok\s*\?[^\n]{0,160}?:\s*(\[\s*\]|null|\{\s*\}|\b
  * PARA SUBIRLO: no. Si necesitas subirlo, estás escribiendo el bug otra vez.
  */
 const INVENTARIO: Record<string, number> = {
-  'src/app/pos/layout.tsx': 1,
   'src/app/pos/monitor/page.tsx': 1,
   'src/app/pos/staff-analytics/page.tsx': 1,
   'src/app/pos/plano/page.tsx': 1,
