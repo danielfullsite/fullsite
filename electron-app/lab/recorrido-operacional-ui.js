@@ -191,8 +191,9 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
       await pos3.page.getByTitle('Transferir mesa', { exact: true }).click()
       await escribirConTecladoTactil(pos3, pos3.page.getByPlaceholder('#', { exact: true }), String(destination))
       await pos3.page.getByRole('button', { name: 'Confirmar', exact: true }).click()
-      await escribirConTecladoTactil(pos3, pos3.page.locator('#move-caja-pin'), labPin)
-      await pos3.page.getByRole('button', { name: 'Confirmar transferencia', exact: true }).click()
+      const autorizacion = pos3.page.getByRole('group', { name: `Autoriza la transferencia a mesa ${destination}`, exact: true })
+      await escribirConTecladoTactil(pos3, autorizacion.getByLabel('PIN de autorización', { exact: true }), labPin)
+      await autorizacion.getByRole('button', { name: 'Transferir con PIN', exact: true }).click()
       await expect(pos3.page).toHaveURL(`${uiOrigin}/pos/mesas`, { timeout: 30000 })
       assert.deepEqual(await pos3.page.evaluate(mesa => ({
         account: localStorage.getItem(`pos_cuenta_closure-lab_mesa:${mesa}`),
@@ -234,8 +235,9 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     await funcionesDeLaCuenta(pos3)
       await pos3.page.getByTitle('Anular orden', { exact: true }).click()
     await escribirConTecladoTactil(pos3, pos3.page.getByPlaceholder('Describe el motivo...'), 'CLIENTE DE PRUEBA SE RETIRA')
-    await escribirConTecladoTactil(pos3, pos3.page.getByPlaceholder('****', { exact: true }), labPin)
-    await pos3.page.locator('button').filter({ hasText: /^\s*Anular orden\s*$/ }).click()
+    const autorizacion = pos3.page.getByRole('group', { name: 'Autoriza la anulación completa', exact: true })
+    await escribirConTecladoTactil(pos3, autorizacion.getByLabel('PIN de autorización', { exact: true }), labPin)
+    await autorizacion.getByRole('button', { name: 'Anular con PIN', exact: true }).click()
     await expect(pos3.page).toHaveURL(`${uiOrigin}/pos/mesas`, { timeout: 30000 })
     const state = await snapshot()
     assert.equal(state.salon_orders.length, 1)
