@@ -22,7 +22,10 @@ test('the fingerprint IPC secret is random, durable and never repaired open', t 
   assert.equal(resolveFingerprintIpcDirectory({ platform: 'win32', userDataDirectory: 'C:\\Users\\caja\\AppData\\Roaming\\Fullsite POS' }), path.join('C:\\Users\\caja\\AppData\\Roaming\\Fullsite POS', 'fingerprint'))
   assert.equal(resolveFingerprintIpcDirectory({ platform: 'darwin', userDataDirectory: '/private/app' }), path.join('/private/app', 'fingerprint'))
   assert.equal(fs.readFileSync(path.join(directory, FILE_NAME), 'utf8').trim(), first)
-  assert.equal(fs.statSync(path.join(directory, FILE_NAME)).mode & 0o777, 0o600)
+  // Windows reports synthetic POSIX mode bits (typically 0666) even after its
+  // real DACL is private. The Windows guarantee is the icacls assertion below;
+  // chmod mode is meaningful only on POSIX hosts.
+  if (process.platform !== 'win32') assert.equal(fs.statSync(path.join(directory, FILE_NAME)).mode & 0o777, 0o600)
 
   const windowsDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'fullsite-fingerprint-ipc-win-'))
   t.after(() => fs.rmSync(windowsDirectory, { recursive: true, force: true }))
