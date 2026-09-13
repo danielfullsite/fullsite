@@ -6,6 +6,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 
 vi.mock('@/lib/shift-token', () => ({
   issueShiftToken: vi.fn(async () => 'SHIFT_TOKEN_XYZ'),
+  issueBiometricRevalidationToken: vi.fn(async () => 'BIO_PROOF'),
+  verifyBiometricRevalidationToken: vi.fn(async () => ({ sub: 'fp-abc', cid: 'tenantB', did: 'POS-B', iat: 1, exp: Date.now() + 1000 })),
 }))
 
 const SERVICE = 'SERVICE_ROLE_SENTINEL'
@@ -37,9 +39,9 @@ function stubFetch(rows: unknown) {
   })
 }
 
-function makeReq(body: Record<string, unknown>) {
+function makeReq(body: Record<string, unknown>, authorization?: string) {
   return {
-    headers: { get: (_k: string) => null },
+    headers: { get: (k: string) => k.toLowerCase() === 'authorization' ? authorization || null : null },
     json: async () => body,
   } as unknown as import('next/server').NextRequest
 }
@@ -86,7 +88,7 @@ describe('BUG-019 — PIN lookup usa service role, no anon', () => {
     stubFetch([{ id: 's2', name: 'Hector', role: 'cajero' }])
     const { POST } = await import('@/app/api/pos/pin/route')
 
-    await POST(makeReq({ fingerprint_id: 'fp-abc', client_id: 'tenantB' }))
+    await POST(makeReq({ fingerprint_id: 'fp-abc', client_id: 'tenantB', device_id: 'POS-B' }, 'Bearer BIO_PROOF'))
 
     const staffCall = outbound.find(c => c.url.includes('pos_staff'))
     expect(staffCall, 'no hubo consulta a pos_staff en el path de huella').toBeDefined()

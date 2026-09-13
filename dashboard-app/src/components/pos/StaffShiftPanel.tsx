@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Clock, LogIn, LogOut, Coffee, Users, TrendingUp, DollarSign, Timer } from 'lucide-react'
 import { formatMXN, verifyStaffPin, logAudit } from '@/lib/pos-data'
 import { getActiveClientSlug as _cid } from '@/lib/data'
-import { ingresarConHuellaEnCaja } from '@/lib/pedro-actor'
+import { autorizarOperacionConHuellaEnCaja } from '@/lib/pedro-actor'
 import AutorizacionPinOHuella from './AutorizacionPinOHuella'
 import { useEstadoHuellaCaja } from './useEstadoHuellaCaja'
 
@@ -94,7 +94,9 @@ export default function StaffShiftPanel({ onShiftChange }: StaffShiftPanelProps)
     return member
   }
 
-  const identificarConHuella = async () => (await ingresarConHuellaEnCaja()).staff
+  // Fichar identifica a la persona del gesto, pero nunca reemplaza la sesión
+  // del mesero que está operando esta terminal.
+  const identificarConHuella = async () => (await autorizarOperacionConHuellaEnCaja()).staff
 
   const handleClockOut = async (shiftId: string) => {
     const shift = activeShifts.find(s => s.id === shiftId)
@@ -267,21 +269,21 @@ export default function StaffShiftPanel({ onShiftChange }: StaffShiftPanelProps)
                     {isOnBreak(shift) ? (
                       <button
                         onClick={() => void handleBreakEnd(shift.id)}
-                        className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg bg-amber-500/10 text-amber-400 text-xs font-medium hover:bg-amber-500/20"
+                        className="flex-1 min-h-[56px] flex items-center justify-center gap-1 px-3 py-2 rounded-lg bg-amber-500/10 text-amber-400 text-xs font-medium hover:bg-amber-500/20"
                       >
                         <Coffee size={14} /> Fin descanso
                       </button>
                     ) : (
                       <button
                         onClick={() => void handleBreakStart(shift.id)}
-                        className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg bg-[var(--surface)] text-[var(--text-3)] text-xs font-medium hover:text-amber-400"
+                        className="flex-1 min-h-[56px] flex items-center justify-center gap-1 px-3 py-2 rounded-lg bg-[var(--surface)] text-[var(--text-3)] text-xs font-medium hover:text-amber-400"
                       >
                         <Coffee size={14} /> Descanso
                       </button>
                     )}
                     <button
                       onClick={() => void handleClockOut(shift.id)}
-                      className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg bg-red-500/10 text-red-400 text-xs font-medium hover:bg-red-500/20"
+                      className="flex-1 min-h-[56px] flex items-center justify-center gap-1 px-3 py-2 rounded-lg bg-red-500/10 text-red-400 text-xs font-medium hover:bg-red-500/20"
                     >
                       <LogOut size={14} /> Salida
                     </button>

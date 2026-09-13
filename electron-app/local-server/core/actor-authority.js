@@ -154,18 +154,22 @@ class ActorAuthority {
     if (minRole && LEVEL[normalizedRole(credential.staff.role)] < LEVEL[normalizedRole(minRole)]) throw fail('Este usuario no tiene el permiso solicitado', 403, 'PERMISSION_DENIED')
 
     // La huella prueba presencia local, no que la cuenta siga activa hoy. Cuando
-    // hay WAN, la autoridad cloud vuelve a confirmar empleado, rol y terminal;
-    // sólo una falla de transporte/5xx/429 usa la credencial preparada offline.
+    // hay WAN, la autoridad cloud vuelve a confirmar empleado, rol y terminal.
+    // La capability nació de un PIN previo y está ligada al mismo actor/scope;
+    // fingerprint_id por sí solo nunca autentica ante la nube.
     // Así una baja o revocación online no conserva autoridad durante todo el TTL.
-    let offline = false, shiftToken
+    if (typeof credential.biometric_proof !== 'string' || !credential.biometric_proof) {
+      throw fail('Huella preparada con una versión anterior; entra con PIN una vez', 401, 'BIOMETRIC_PROOF_REQUIRED')
+    }
+    let offline = false
     try {
       const response = await this.fetch(this.cloudOrigin + '/api/pos/pin', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, redirect: 'error',
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${credential.biometric_proof}` }, redirect: 'error',
         body: JSON.stringify({ fingerprint_id: staffId, client_id: this.restaurantId,
           device_id: deviceId, ...(minRole ? { min_role: minRole } : {}) }),
         signal: AbortSignal.timeout(this.cloudTimeoutMs),
       })
-      if ([400, 401, 403].includes(response.status)) {
+      if ([400, 401, 403, 429].includes(response.status)) {
         const rejection = await response.json().catch(() => ({}))
         if (rejection.code === 'terminal_not_enrolled') this.data.denied_devices[deviceId] = true
         else if (response.status === 401) {
@@ -181,7 +185,6 @@ class ActorAuthority {
       if (typeof staff?.id !== 'string' || staff.id !== staffId || typeof staff.name !== 'string' || !LEVEL[normalizedRole(staff.role)]) {
         throw fail('Respuesta de autoridad biométrica inválida', 502, 'AUTHORITY_RESPONSE_INVALID')
       }
-      shiftToken = typeof data.shiftToken === 'string' ? data.shiftToken : undefined
       const roleChanged = credential.staff.role !== staff.role
       credential.staff = { id: staff.id, name: staff.name, role: staff.role }
       credential.expires_at = now + this.ttl
@@ -204,7 +207,7 @@ class ActorAuthority {
     const payload = Buffer.from(JSON.stringify({ restaurant_id: this.restaurantId, location_id: this.branchId,
       device_id: deviceId, actor_id: credential.staff.id, revision: credential.revision, expires_at: expiresAt })).toString('base64url')
     return { staff: credential.staff, actor_token: payload + '.' + this._sign(payload), expires_at: expiresAt,
-      offline, auth_method: 'fingerprint', ...(shiftToken ? { shiftToken } : {}) }
+      offline, auth_method: 'fingerprint' }
   }
   async _login({ pin, deviceId, restaurantId, minRole }) {
     const now = this._time()
@@ -245,12 +248,14 @@ class ActorAuthority {
       const staff = data.staff
       if (typeof staff?.id !== 'string' || !staff.id || typeof staff.name !== 'string' || !LEVEL[normalizedRole(staff.role)]) throw fail('Respuesta de autoridad inválida', 502, 'AUTHORITY_RESPONSE_INVALID')
       shiftToken = typeof data.shiftToken === 'string' ? data.shiftToken : undefined
+      const biometricProof = typeof data.biometricProof === 'string' ? data.biometricProof : undefined
       const unchanged = credential && credential.staff.id === staff.id && credential.staff.role === staff.role
       const salt = unchanged ? credential.salt : crypto.randomBytes(16).toString('hex')
       credential = { staff: { id: staff.id, name: staff.name, role: staff.role }, salt,
         hash: crypto.scryptSync(pin, salt, 32).toString('hex'), expires_at: now + this.ttl,
         revision: unchanged ? credential.revision : crypto.randomUUID(),
-        devices: { ...(unchanged ? credential.devices : {}), [deviceId]: now + this.ttl } }
+        devices: { ...(unchanged ? credential.devices : {}), [deviceId]: now + this.ttl },
+        ...(biometricProof ? { biometric_proof: biometricProof } : {}) }
       for (const [oldIndex, old] of Object.entries(this.data.credentials)) if (old.staff.id === staff.id) delete this.data.credentials[oldIndex]
       this.data.credentials[index] = credential
       delete this.data.denied_devices[deviceId]

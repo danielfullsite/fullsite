@@ -14,6 +14,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
 vi.mock('@/lib/shift-token', () => ({
   issueShiftToken: vi.fn(async () => 'SHIFT_TOKEN_XYZ'),
+  issueBiometricRevalidationToken: vi.fn(async () => 'BIO_PROOF'),
+  verifyBiometricRevalidationToken: vi.fn(async () => null),
 }))
 
 const PIN_MAESTRO = '999999'

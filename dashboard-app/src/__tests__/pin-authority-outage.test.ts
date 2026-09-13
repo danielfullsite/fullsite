@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { POST } from '@/app/api/pos/pin/route'
 import { issueShiftToken } from '@/lib/shift-token'
-vi.mock('@/lib/shift-token', () => ({ issueShiftToken: vi.fn(async () => 'synthetic-token') }))
+vi.mock('@/lib/shift-token', () => ({
+  issueShiftToken: vi.fn(async () => 'synthetic-token'),
+  issueBiometricRevalidationToken: vi.fn(async () => 'synthetic-biometric-proof'),
+  verifyBiometricRevalidationToken: vi.fn(async () => null),
+}))
 vi.mock('@/lib/pin-throttle', () => ({ pinGate: vi.fn(async () => ({ allowed: true })), pinRecord: vi.fn(async () => {}) }))
 const request = () => ({ headers: new Headers(), json: async () => ({ pin: '1234567890', client_id: 'lab', device_id: 'POS-A' }) }) as unknown as import('next/server').NextRequest
 beforeEach(() => { vi.clearAllMocks(); process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://synthetic.invalid'; process.env.SUPABASE_SERVICE_KEY = 'synthetic-key' })

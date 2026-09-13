@@ -18,7 +18,8 @@ function authority(options = {}) {
       if (mode === 'revoked') return Response.json({ error: 'PIN incorrecto' }, { status: 401 })
       if (mode === 'device-revoked') return Response.json({ code: 'terminal_not_enrolled' }, { status: 403 })
       if (mode === 'throttled') return Response.json({}, { status: 429 })
-      return Response.json({ staff: { ...employee, ...(mode === 'mesero' ? { role: 'mesero' } : {}) }, shiftToken: 'synthetic-online-shift-token' })
+      return Response.json({ staff: { ...employee, ...(mode === 'mesero' ? { role: 'mesero' } : {}) },
+        shiftToken: 'synthetic-online-shift-token', biometricProof: 'synthetic-biometric-proof' })
     }, ...options })
 }
 
@@ -62,10 +63,11 @@ test('trusted DigitalPersona identification issues authority only for a prepared
   assert.deepEqual(JSON.parse(calls.at(-1).init.body), {
     fingerprint_id: employee.id, client_id: 'lab', device_id: 'POS-A',
   })
+  assert.equal(calls.at(-1).init.headers.Authorization, 'Bearer synthetic-biometric-proof')
   assert.equal(biometric.staff.id, employee.id)
   assert.equal(biometric.auth_method, 'fingerprint')
   assert.equal(biometric.offline, false)
-  assert.equal(biometric.shiftToken, 'synthetic-online-shift-token')
+  assert.equal(biometric.shiftToken, undefined, 'biometric revalidation never mints or returns a cloud session')
   assert.equal(a.verify(biometric.actor_token, 'POS-A').id, employee.id)
 
   await assert.rejects(a.loginBiometric({ staffId: 'forged', deviceId: 'POS-A', restaurantId: 'lab' }), { code: 'BIOMETRIC_USER_NOT_PREPARED' })
@@ -92,6 +94,16 @@ test('biometric login uses a prepared verifier only when the cloud is unavailabl
   assert.equal(biometric.offline, true)
   assert.equal(biometric.shiftToken, undefined)
   assert.equal(a.verify(biometric.actor_token, 'POS-A').id, employee.id)
+})
+
+test('biometric HTTP 429 fails closed instead of renewing stale cached authority', async () => {
+  const a = authority()
+  await a.login(login)
+  mode = 'throttled'
+  await assert.rejects(
+    a.loginBiometric({ staffId: employee.id, deviceId: 'POS-A', restaurantId: 'lab' }),
+    { status: 429, code: 'BIOMETRIC_REJECTED' },
+  )
 })
 
 test('biometric authority fails closed after device revocation, expiry, rollback or storage failure', async t => {

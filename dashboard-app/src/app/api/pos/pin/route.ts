@@ -1,5 +1,9 @@
 import { NextRequest } from 'next/server'
-import { issueShiftToken } from '@/lib/shift-token'
+import {
+  issueBiometricRevalidationToken,
+  issueShiftToken,
+  verifyBiometricRevalidationToken,
+} from '@/lib/shift-token'
 import { pinGate, pinRecord } from '@/lib/pin-throttle'
 
 // PIN validation + shift token issuance.
@@ -12,16 +16,25 @@ import { pinGate, pinRecord } from '@/lib/pin-throttle'
 // ip:pin), so trying many different PINs from one source shares one budget and
 // trips a lockout — 10k-PIN enumeration becomes infeasible.
 
-async function respond(staff: { id: string; name: string; role: string }, clientId: string, key: string) {
+async function respond(
+  staff: { id: string; name: string; role: string },
+  clientId: string,
+  key: string,
+  deviceId?: string,
+) {
   await pinRecord(key, true) // success clears the throttle for this source
   let shiftToken: string | undefined
+  let biometricProof: string | undefined
   try {
     shiftToken = await issueShiftToken(staff.id, clientId, staff.role, staff.name)
+    if (deviceId && /^[\w-]{1,64}$/.test(deviceId)) {
+      biometricProof = await issueBiometricRevalidationToken(staff.id, clientId, deviceId)
+    }
   } catch (e) {
     // SHIFT_TOKEN_SECRET not configured — log and continue without token (degrades to legacy flow)
     console.error('[pin] issueShiftToken failed (SHIFT_TOKEN_SECRET missing?):', e)
   }
-  return Response.json({ staff, shiftToken })
+  return Response.json({ staff, shiftToken, biometricProof })
 }
 
 /**
@@ -51,15 +64,32 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'client_id requerido' }, { status: 400 })
     }
     const clientId = client_id
-    // Brute-force gate — one budget per (tenant, source), NOT per PIN, so
-    // enumerating many PINs from one source trips the lockout.
+    const biometricRequest = fingerprint_id !== undefined
+    let biometricProof: Awaited<ReturnType<typeof verifyBiometricRevalidationToken>> = null
+    if (biometricRequest) {
+      if (typeof fingerprint_id !== 'string' || !fingerprint_id) {
+        return Response.json({ error: 'Solicitud biométrica inválida', code: 'BIOMETRIC_REQUEST_INVALID' }, { status: 400 })
+      }
+      const bearer = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') || ''
+      biometricProof = await verifyBiometricRevalidationToken(bearer)
+      if (!biometricProof || biometricProof.sub !== fingerprint_id || biometricProof.cid !== clientId ||
+        biometricProof.did !== device_id) {
+        return Response.json({ error: 'Revalidación biométrica no autorizada', code: 'BIOMETRIC_PROOF_REQUIRED' }, { status: 401 })
+      }
+    }
+
+    // Brute-force gate — one budget per (tenant, source), NOT per PIN. A
+    // revalidación biométrica trae una capability firmada obtenida con un PIN
+    // previo: no comparte el presupuesto público de adivinación.
     const throttleKey = `${clientId}:${ip}`
-    const gate = await pinGate(throttleKey)
-    if (!gate.allowed) {
-      return Response.json(
-        { error: 'Terminal bloqueada por intentos fallidos. Espera unos minutos.' },
-        { status: 429, headers: gate.retryAfter ? { 'Retry-After': String(gate.retryAfter) } : undefined }
-      )
+    if (!biometricRequest) {
+      const gate = await pinGate(throttleKey)
+      if (!gate.allowed) {
+        return Response.json(
+          { error: 'Terminal bloqueada por intentos fallidos. Espera unos minutos.' },
+          { status: 429, headers: gate.retryAfter ? { 'Retry-After': String(gate.retryAfter) } : undefined }
+        )
+      }
     }
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
     // BUG-019: pos_staff is now tenant-scoped RLS with NO anon access, so the PIN
@@ -121,26 +151,10 @@ export async function POST(request: NextRequest) {
       roleFilter = `&role=in.(${allowedRoles.join(',')})`
     }
 
-    /**
-     * La huella IGNORABA el rol pedido — escalada de privilegio.
-     *
-     * Esta rama resolvia y devolvia ANTES de que se calculara `roleFilter`, asi que
-     * `manager: true` y `min_role` no se aplicaban. Y como el endpoint no verifica
-     * ninguna firma WebAuthn —confia en el id que le mandan— bastaba con conocer el
-     * UUID de un gerente para pedir un shiftToken de gerente SIN huella y SIN PIN.
-     * Esos UUID viven en `pos_staff_cache`, en el localStorage de cualquier terminal.
-     *
-     * Encontrado el 2026-08-31 al ir a extender la huella al corte de caja. Montar
-     * esa funcion encima habria llevado el bypass justo a la autorizacion del dinero.
-     *
-     * LO QUE ESTE ARREGLO NO HACE: sigue sin verificarse la firma WebAuthn del lado
-     * del servidor; el id sigue siendo una afirmacion del cliente. Lo que se cierra
-     * es la ESCALADA: una huella solo puede obtener el rol que su propio empleado ya
-     * tiene. La verificacion real exige guardar las llaves publicas en el servidor y
-     * validar la assertion — va aparte, y sigue haciendo falta.
-     */
-    // Fingerprint (WebAuthn) login — look up by staff ID, validate active status + tenant
-    if (fingerprint_id && typeof fingerprint_id === 'string') {
+    // Revalidación interna de Pedro. fingerprint_id nunca es una credencial: debe
+    // estar ligado por firma al mismo empleado, tenant y terminal preparados por
+    // un PIN anterior. Esta rama sólo devuelve estado canónico; jamás emite token.
+    if (biometricRequest && biometricProof) {
       const fpRes = await fetch(
         `${sbUrl}/rest/v1/pos_staff?id=eq.${encodeURIComponent(fingerprint_id)}&active=eq.true&client_id=eq.${encodeURIComponent(clientId)}${roleFilter}&select=id,name,role&limit=1`,
         { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
@@ -148,10 +162,9 @@ export async function POST(request: NextRequest) {
       if (fpRes.ok) {
         const rows = await fpRes.json()
         if (Array.isArray(rows) && rows.length > 0) {
-          return respond({ id: rows[0].id, name: rows[0].name, role: rows[0].role }, clientId, throttleKey)
+          return Response.json({ staff: { id: rows[0].id, name: rows[0].name, role: rows[0].role } })
         }
       }
-      await pinRecord(throttleKey, false)
       return Response.json({ error: 'Empleado no encontrado o desactivado' }, { status: 401 })
     }
 
@@ -168,7 +181,7 @@ export async function POST(request: NextRequest) {
     if (res.ok) {
       const rows = await res.json()
       if (Array.isArray(rows) && rows.length > 0) {
-        return respond({ id: rows[0].id, name: rows[0].name, role: rows[0].role }, clientId, throttleKey)
+        return respond({ id: rows[0].id, name: rows[0].name, role: rows[0].role }, clientId, throttleKey, device_id)
       }
     }
 
@@ -186,7 +199,7 @@ export async function POST(request: NextRequest) {
     if (fallbackAllowedFor(clientId)) {
       const fallback = (process.env.POS_FALLBACK_PIN ?? '').trim()
       if (fallback && pin === fallback) {
-        return respond({ id: 'admin', name: 'Admin', role: 'admin' }, clientId, throttleKey)
+        return respond({ id: 'admin', name: 'Admin', role: 'admin' }, clientId, throttleKey, device_id)
       }
     }
 
@@ -196,7 +209,7 @@ export async function POST(request: NextRequest) {
       for (const entry of raw.split(',')) {
         const [p, name] = entry.split(':')
         if (p && name && p.trim() === pin) {
-          return respond({ id: 'manager', name: name.trim(), role: 'gerente' }, clientId, throttleKey)
+          return respond({ id: 'manager', name: name.trim(), role: 'gerente' }, clientId, throttleKey, device_id)
         }
       }
     }
