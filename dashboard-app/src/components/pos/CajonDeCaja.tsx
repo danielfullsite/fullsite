@@ -36,11 +36,11 @@ export default function CajonDeCaja({ turnoId, orderId, paymentId }: { turnoId: 
   }
   return <section aria-label={paymentId ? 'Cajón para el abono' : 'Apertura manual del cajón'} className="space-y-2 rounded border p-3 text-sm">
     {paymentId ? <p>{requested ? 'La apertura para este abono ya fue solicitada. Revisa el cajón antes de cualquier otro pulso.' : 'El abono está confirmado. Abrir el cajón es una acción separada.'}</p>
-      : <><label className="block">Motivo de apertura<input className="ml-2 rounded border bg-transparent p-2" disabled={busy} value={reason} onChange={event => setReason(event.target.value)} /></label>
-        <label className="block">PIN para abrir el cajón<input className="ml-2 rounded border bg-transparent p-2" type="password" inputMode="numeric" autoComplete="off" disabled={busy} value={pin} onChange={event => setPin(event.target.value)} /></label></>}
-    <button className="rounded border px-3 py-2 disabled:opacity-50" disabled={busy || !ready || requested || !turnoId || (!paymentId && (!reason.trim() || !pin))} onClick={() => void request()}>
+      : <><label className="block">Motivo de apertura<input className="ml-2 min-h-[56px] rounded border bg-transparent p-2" disabled={busy} value={reason} onChange={event => setReason(event.target.value)} /></label>
+        <label className="block">PIN para abrir el cajón<input className="ml-2 min-h-[56px] rounded border bg-transparent p-2" type="password" inputMode="numeric" autoComplete="off" disabled={busy} value={pin} onChange={event => setPin(event.target.value)} /></label></>}
+    <button className="min-h-[56px] rounded border px-3 py-2 disabled:opacity-50" disabled={busy || !ready || requested || !turnoId || (!paymentId && (!reason.trim() || !pin))} onClick={() => void request()}>
       {busy ? 'Solicitando apertura…' : paymentId ? 'Solicitar apertura para este abono' : 'Solicitar apertura manual'}</button>
-    {!ready && <button className="ml-2 underline" disabled={busy} onClick={() => void leerAperturasCaja().then(operations => {
+    {!ready && <button className="ml-2 min-h-[56px] underline" disabled={busy} onClick={() => void leerAperturasCaja().then(operations => {
       setRequested(operations.some(operation => operation.kind === 'payment' && operation.order_id === orderId && operation.payment_id === paymentId)); setReady(true)
     }).catch(error => setMessage(error.message))}>Consultar solicitud en Caja</button>}
     {message && <p role="status">{message}</p>}

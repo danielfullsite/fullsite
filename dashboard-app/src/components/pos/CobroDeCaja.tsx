@@ -113,8 +113,8 @@ export default function CobroDeCaja({ order, onClose, onChanged }: Props) {
 
   const sendWarning = avisoAntesDeCobrarCaja(savedOrder)
   const disabled = busy || !connected
-  const button = 'min-h-[48px] rounded-xl px-4 py-3 font-semibold disabled:opacity-40 disabled:cursor-not-allowed'
-  const field = 'w-full rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-3 text-[var(--text)]'
+  const button = 'min-h-[56px] rounded-xl px-4 py-3 font-semibold disabled:opacity-40 disabled:cursor-not-allowed'
+  const field = 'min-h-[56px] w-full rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-3 text-[var(--text)]'
 
   return <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="cobro-caja-title"
     onKeyDown={e => {

@@ -83,3 +83,15 @@ it('el contenedor del modal ya no es una columna con scroll', async () => {
   expect(panel.className).not.toContain('overflow-auto')
   expect(panel.className).toContain('flex-col')
 })
+
+it('todos los controles visibles del cobro respetan el blanco táctil de 56px', async () => {
+  const { container } = render(createElement(CobroDeCaja, { order, onClose: () => {}, onChanged: () => {} }))
+  await screen.findByRole('tab', { name: /Efectivo/ })
+
+  for (const pestana of [/Efectivo/, /Tarjeta/, /Por confirmar/, /Cobrados/]) {
+    fireEvent.click(screen.getByRole('tab', { name: pestana }))
+    const controls = [...container.querySelectorAll<HTMLButtonElement | HTMLInputElement>('button, input')]
+      .filter(control => !control.closest('[hidden]'))
+    for (const control of controls) expect(control.className).toContain('min-h-[56px]')
+  }
+})

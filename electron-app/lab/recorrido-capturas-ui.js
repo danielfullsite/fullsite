@@ -102,6 +102,23 @@ module.exports = async function ({ caja, pos2, kds, expect, until, request, outp
           .filter(el => el.scrollHeight > el.clientHeight + 8 && getComputedStyle(el).overflowY.match(/auto|scroll/))
           .map(el => ({ clase: (el.className || '').toString().slice(0, 60), alto: el.scrollHeight, visible: el.clientHeight }))
           .slice(0, 8),
+        dialogo: (() => {
+          const dialog = document.querySelector('[role="dialog"]')
+          if (!dialog) return null
+          const panel = dialog.firstElementChild
+          const controlesMenores56 = [...dialog.querySelectorAll('button,input,select')]
+            .filter(el => {
+              const rect = el.getBoundingClientRect()
+              return rect.width > 0 && rect.height > 0 && rect.height < 55.5
+            })
+            .map(el => ({ nombre: el.getAttribute('aria-label') || el.textContent?.trim().slice(0, 60) || el.tagName, alto: el.getBoundingClientRect().height }))
+          return {
+            alto: panel?.getBoundingClientRect().height ?? 0,
+            visible: window.innerHeight,
+            scroll: panel ? panel.scrollHeight > panel.clientHeight + 1 : false,
+            controlesMenores56,
+          }
+        })(),
       }))
       return { nombre, w, h, ...caja_, scrollVertical: caja_.alto > caja_.ventana + 1 }
     } catch (error) { fallos.push(`${nombre} ${w}x${h}: ${error.message}`); return null }
@@ -168,6 +185,16 @@ module.exports = async function ({ caja, pos2, kds, expect, until, request, outp
       await caja.page.getByRole('button', { name: 'Cobrar', exact: true }).click()
       await expect(caja.page.getByRole('dialog', { name: 'Cobro de la cuenta' })).toBeVisible({ timeout: 20000 })
       medidas.push(await retratar(caja, 'cobro', vp))
+      const preparar = caja.page.getByRole('button', { name: 'Preparar cuenta para cobrar', exact: true })
+      if (await preparar.isVisible().catch(() => false)) {
+        await preparar.click()
+        await expect(caja.page.getByRole('tab', { name: /Efectivo/ })).toBeVisible({ timeout: 20000 })
+      }
+      for (const [pestana, nombre] of [['Efectivo', 'cobro-efectivo'], ['Tarjeta', 'cobro-tarjeta'], ['Por confirmar', 'cobro-por-confirmar'], ['Cobrados', 'cobro-cobrados']]) {
+        await caja.page.getByRole('tab', { name: new RegExp(`^${pestana}`) }).click()
+        await caja.page.waitForTimeout(200)
+        medidas.push(await retratar(caja, nombre, vp))
+      }
       await caja.page.getByRole('button', { name: 'Cerrar', exact: true }).click()
       await caja.page.waitForTimeout(400)
     } catch (error) { fallos.push(`cobro ${vp.join('x')}: ${error.message}`) }

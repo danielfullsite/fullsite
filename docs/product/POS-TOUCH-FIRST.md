@@ -4,6 +4,11 @@
 > PR #395 (`16ec3697`). Continúa lo que empezó `POS-SIN-SCROLL.md`, que resolvió
 > el modal de cobro. Esto es el resto de las pantallas.
 
+**Alcance: todos los POS Fullsite, no una variante de AMALAY.** AMALAY aporta
+la tableta y la verificación física, pero el producto no debe asumir mouse ni
+teclado en ninguna instalación. Tocar un campo abre un teclado o pad en pantalla;
+aceptar, cancelar, borrar y cerrar siempre tienen controles visibles.
+
 **No es un rediseño.** La identidad se queda: los tokens de `globals.css`
 (`--surface #0c1012`, `--panel #131a1d`, `--accent #10b981`, `--ok/--warn/--crit/--info`)
 y la tipografía canónica del proyecto. Lo que cambia es **dónde cae cada cosa en
@@ -78,8 +83,10 @@ el peor problema del sistema, por encima del scroll de Turno.
 
 **«Rejilla paginada + barra fija».** Una rejilla que sabe cuántas filas caben,
 un par de controles grandes a los costados y un indicador `3 / 7` en mono. Es el
-mismo gesto en mesas, catálogo y KDS. Teclado: `PageUp`/`PageDown` y flechas,
-foco visible, `aria-current` en la página activa.
+mismo gesto en mesas, catálogo y KDS. `PageUp`/`PageDown` y flechas quedan como
+apoyo de accesibilidad, con foco visible y `aria-current` en la página activa.
+**La operación no depende de teclado ni mouse:** esos atajos nunca sustituyen
+los botones táctiles visibles.
 
 ## 4. Orden de trabajo
 
@@ -180,7 +187,34 @@ siguen siendo Turno y, en dos resoluciones, Corte.
 Capturas de la medida crítica: [`despues-1024x768-categorias.png`](capturas/pos-touch-first/despues-1024x768-categorias.png)
 y [`despues-1024x768-catalogo.png`](capturas/pos-touch-first/despues-1024x768-catalogo.png).
 
-4. Cobro de Caja (ya hecho en PR #395; queda revisarlo contra estas reglas)
+### 4. Cobro de Caja — **hecho y medido**
+
+El PR #395 ya había convertido la columna larga en cuatro pestañas. La revisión
+de este bloque recorrió también los estados internos, no sólo la portada:
+Efectivo, Tarjeta, Por confirmar y Cobrados.
+
+| Estado a 1024×768 | Alto del panel | Scroll del panel | Controles menores de 56px |
+|---|---:|---:|---:|
+| Portada | 304px | no | 0 |
+| Efectivo | 544px | no | 0 |
+| Tarjeta | 660px | no | 0 |
+| Por confirmar | 428px | no | 0 |
+| Cobrados vacío | 416px | no | 0 |
+
+**Defecto visual global encontrado.** Las clases `min-h-[56px]` no medían 56px
+en el navegador: la regla no estratificada `.pos-kiosk button` ganaba sobre las
+utilidades de Tailwind y las dejaba en 48–50px. El piso general del POS ahora
+vive en la capa `base` con `:where(.pos-kiosk)`, así que los controles ordinarios
+conservan 48px y los marcados como táctiles sí suben a 56px. El laboratorio lo
+comprueba con cajas delimitadoras reales en las cuatro pestañas; la prueba DOM
+además protege que cada control del componente conserve su clase táctil.
+
+Imprimir recibo, pedir apertura de cajón y los campos auxiliares recibieron el
+mismo mínimo. No se cambió ninguna operación financiera, autoridad ni regla de
+idempotencia. Verificación final: web **3,783/3,783**, DOM **300/300**,
+TypeScript limpio, laboratorio Caja/papel/cajón **25/25** y recorrido legacy con
+PIN táctil **26/26**.
+
 5. Turno y Corte Z
 6. KDS
 

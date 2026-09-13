@@ -26,7 +26,7 @@ import { isTopDialog, popDialog, pushDialog } from './dialogStack'
  * necesita, y los defaults reproducen el comportamiento actual.
  *
  * ⚠️ `container` es la decisión delicada. En `/pos/*` el CSS de kiosko
- * (`globals.css:44-78`) usa selectores DESCENDIENTES: `.pos-kiosk button { min-height:48px }`,
+ * (`globals.css:44-78`) usa selectores DESCENDIENTES: `:where(.pos-kiosk) button { min-height:48px }`,
  * `touch-action`, `user-select`. Portalear un modal del POS a `document.body` lo saca
  * de `.pos-kiosk` y los botones vuelven a su altura por defecto — sin error, sin
  * warning, sólo dedos que fallan. Por eso el default es `'inline'`.

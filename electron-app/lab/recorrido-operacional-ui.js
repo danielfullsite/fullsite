@@ -66,6 +66,15 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
   const pestanaDelCobro = async (terminal, nombre) => {
     await modal(terminal).getByRole('tab', { name: new RegExp(nombre) }).click()
   }
+  const controlesTactilesPequenos = terminal => modal(terminal).locator('button,input,select').evaluateAll(controls => controls
+    .filter(control => {
+      const rect = control.getBoundingClientRect()
+      return rect.width > 0 && rect.height > 0 && rect.height < 55.5
+    })
+    .map(control => ({
+      nombre: control.getAttribute('aria-label') || control.textContent.trim().slice(0, 60) || control.tagName,
+      alto: control.getBoundingClientRect().height,
+    })))
   const collectCash = async (terminal, amount) => {
     const dialog = modal(terminal)
     await pestanaDelCobro(terminal, 'Efectivo')
@@ -220,6 +229,12 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     await ensureUnlocked(pos3)
     await expect(pos3.page.locator('body')).toContainText(/Saldo confirmado en Caja:.*87[.,]00/)
     await pos2.page.screenshot({ path: path.join(output, 'cobro-parcial-desde-botones.png'), fullPage: true })
+  })
+  await check('Las cuatro pantallas de cobro conservan controles táctiles de al menos 56 px', async () => {
+    for (const pestana of ['Efectivo', 'Tarjeta', 'Por confirmar', 'Cobrados']) {
+      await pestanaDelCobro(pos2, pestana)
+      assert.deepEqual(await controlesTactilesPequenos(pos2), [], `${pestana} tiene controles menores de 56 px`)
+    }
   })
   if (printLab) await check('El recibo del abono se imprime sin registrar otro pago', async () => {
     const before = (await snapshot()).financial_orders[0]

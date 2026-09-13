@@ -53,19 +53,26 @@ details[name="posnav"][open] > summary .nav-caret { transform: rotate(180deg); }
   user-select: text;
 }
 /* ============ POS touch-friendly ============
- * Piso mínimo de touch target en TODO el POS: ningún control < 44px.
- * Los controles primarios se suben a 56-60px vía clases Tailwind puntuales. */
-.pos-kiosk button {
-  min-height: 48px;
-  -webkit-tap-highlight-color: transparent;
-}
-.pos-kiosk input:not([type="checkbox"]):not([type="radio"]),
-.pos-kiosk select {
-  min-height: 48px;
-}
-.pos-kiosk input[type="checkbox"], .pos-kiosk input[type="radio"] {
-  width: 22px;
-  height: 22px;
+ * Piso mínimo de touch target en TODO el POS: ningún control < 48px.
+ * `:where()` y la capa base mantienen baja la prioridad para que
+ * `min-h-[56px]` sí pueda subir los controles primarios. Sin capa, una regla
+ * global no estratificada vence a las utilidades de Tailwind aunque tenga menor
+ * especificidad; con `.pos-kiosk button` además ganaba por especificidad. El
+ * resultado eran botones de 48px aunque su clase dijera 56px (medido en el
+ * laboratorio táctil a 1024×768). */
+@layer base {
+  :where(.pos-kiosk) button {
+    min-height: 48px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  :where(.pos-kiosk) input:not([type="checkbox"]):not([type="radio"]),
+  :where(.pos-kiosk) select {
+    min-height: 48px;
+  }
+  :where(.pos-kiosk) input[type="checkbox"], :where(.pos-kiosk) input[type="radio"] {
+    width: 22px;
+    height: 22px;
+  }
 }
 /* Sin overflow:hidden — subpáginas /pos/* (turno, ordenes) sí scrollean */
 body:has(.pos-kiosk) {
