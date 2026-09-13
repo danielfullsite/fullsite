@@ -146,7 +146,40 @@ verificado A/B contra el árbol anterior (2 campos, 1 con guarda → 1 con guard
 lista que crece mientras el mesero captura tiene su propio costo (agregas un
 platillo y se va a otra página). Queda planteado, no hecho.
 
-3. Catálogo y categorías
+### 3. Catálogo y categorías — **hecho**
+
+El catálogo confundía «ocupar la pantalla» con «ser fácil de tocar». Con 13
+categorías, `gridAutoRows: 1fr` repartía los 632px disponibles entre sólo tres
+filas: cada botón crecía hasta ~180px y «Vinos» quedaba sola en una franja. El
+modal repetía el defecto: una categoría de un platillo convertía una tarjeta en
+un bloque de más de 250px; una grande exigía scroll.
+
+| Qué | Resultado |
+|---|---|
+| Categorías en filas fijas de **88px**, alineadas arriba | las 13 ocupan tres filas densas en 1024×768; ninguna depende del scroll |
+| Platillos en filas fijas de **96px** dentro de `RejillaPaginada` | 20 platillos se ven completos a la vez en 1024×768; un catálogo mayor obtiene Anterior / Siguiente |
+| Búsqueda global paginada en renglones de 68px | una búsqueda larga ya no crece fuera de la pantalla |
+| Botón visible «Cerrar» de 56px + tecla `Escape` | el modal ya no exige acertarle a una «×» de 40px ni tocar el telón |
+| `PageUp` / `PageDown` y flechas en la rejilla | teclado y accesibilidad usan la misma paginación que el dedo |
+
+`RejillaPaginada` conserva su comportamiento anterior por defecto: las mesas
+sí expanden sus filas para llenar el salón. Catálogo pide explícitamente filas
+compactas, de modo que este bloque no cambia proporciones del mapa.
+
+**Defecto funcional encontrado.** El buscador interno se limpiaba al tocar el
+telón o la «×», pero no al elegir un platillo. Al abrir después otra categoría,
+el filtro invisible anterior podía ocultar todos sus productos. Todas las salidas
+del modal pasan ahora por una sola operación que limpia categoría y búsqueda.
+
+Evidencia: `rejilla-paginada.dom.test.ts` (7 casos), laboratorio Caja **24/24**
+(incluye cierre real con Escape), laboratorio legacy **21/21** y 32 capturas del
+catálogo demo (13 categorías, 240 platillos) en cuatro resoluciones. Catálogo y
+categorías no aparecen entre los contenedores con scroll; los pendientes medidos
+siguen siendo Turno y, en dos resoluciones, Corte.
+
+Capturas de la medida crítica: [`despues-1024x768-categorias.png`](capturas/pos-touch-first/despues-1024x768-categorias.png)
+y [`despues-1024x768-catalogo.png`](capturas/pos-touch-first/despues-1024x768-catalogo.png).
+
 4. Cobro de Caja (ya hecho en PR #395; queda revisarlo contra estas reglas)
 5. Turno y Corte Z
 6. KDS

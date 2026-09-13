@@ -90,6 +90,15 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     for (const t of [caja, pos2, pos3]) await t.page.goto(`${uiOrigin}/pos?mesa=1`, { waitUntil: 'domcontentloaded', timeout: navigationTimeout })
     await expect(pos2.page.getByRole('button', { name: /Bebidas laboratorio/ })).toBeVisible({ timeout: 30000 })
   })
+  await check('El catálogo se cierra con Escape y devuelve el foco operativo a las categorías', async () => {
+    const categoria = pos2.page.getByRole('button', { name: /Bebidas laboratorio/ })
+    await categoria.click()
+    await expect(pos2.page.getByRole('dialog', { name: /Bebidas laboratorio/ })).toBeVisible()
+    await pos2.page.keyboard.press('Escape')
+    await expect(pos2.page.getByRole('dialog', { name: /Bebidas laboratorio/ })).not.toBeVisible()
+    await expect(categoria).toBeVisible()
+    await expect(categoria).toBeFocused()
+  })
   await check('POS 2 captura y guarda; POS 3 ve la misma cuenta antes de enviarla a cocina', async () => {
     await addCoffee(pos2)
     await pos2.page.getByRole('button', { name: 'Guardar', exact: true }).click()

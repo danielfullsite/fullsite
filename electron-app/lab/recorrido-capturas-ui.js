@@ -15,7 +15,14 @@
 const path = require('node:path')
 const fs = require('node:fs')
 
-const VIEWPORTS = [[1600, 900], [1366, 768], [1280, 800], [1024, 768]]
+const VIEWPORTS = (() => {
+  if (!process.env.FULLSITE_LAB_VIEWPORT) return [[1600, 900], [1366, 768], [1280, 800], [1024, 768]]
+  const size = process.env.FULLSITE_LAB_VIEWPORT.split('x').map(Number)
+  if (size.length !== 2 || size.some(value => !Number.isSafeInteger(value) || value <= 0)) {
+    throw new Error('FULLSITE_LAB_VIEWPORT debe usar el formato 1024x768')
+  }
+  return [size]
+})()
 
 module.exports = async function ({ caja, pos2, kds, expect, until, request, output, uiOrigin, labPin }) {
   const etiqueta = process.env.FULLSITE_LAB_ETIQUETA || 'captura'
@@ -29,9 +36,20 @@ module.exports = async function ({ caja, pos2, kds, expect, until, request, outp
   const fallos = []
 
   const medir = async (terminal, [w, h]) => {
-    await terminal.app.evaluate(({ BrowserWindow }, size) => {
-      BrowserWindow.getAllWindows()[0].setContentSize(size.w, size.h)
-    }, { w, h })
+    // Next puede terminar una navegación justo cuando Playwright entra al proceso
+    // principal. Ese cambio destruye el contexto, no la ventana: se reintenta sólo
+    // ese caso transitorio y cualquier otro error sigue abortando el retrato.
+    for (let intento = 0; intento < 3; intento++) {
+      try {
+        await terminal.app.evaluate(({ BrowserWindow }, size) => {
+          BrowserWindow.getAllWindows()[0].setContentSize(size.w, size.h)
+        }, { w, h })
+        break
+      } catch (error) {
+        if (!/Execution context was destroyed/.test(error.message) || intento === 2) throw error
+        await terminal.page.waitForTimeout(750)
+      }
+    }
     await terminal.page.waitForTimeout(500)
   }
   // El POS se bloquea solo por inactividad, y este recorrido pasa minutos sin
@@ -45,11 +63,29 @@ module.exports = async function ({ caja, pos2, kds, expect, until, request, outp
     const entrar = terminal.page.getByRole('button', { name: 'Entrar', exact: true })
     try {
       if (!await entrar.isVisible()) return
-      for (const digito of labPin) await terminal.page.getByRole('button', { name: digito, exact: true }).click()
+      // Al navegar, el shell bloqueado aparece un instante antes de restaurar la
+      // sesión. Esperar evita teclear medio PIN sobre un componente que React está
+      // desmontando y reportar un falso fallo con el botón Entrar deshabilitado.
+      await terminal.page.waitForTimeout(1000)
+      if (!await entrar.isVisible()) return
+      const borrar = terminal.page.getByRole('button', { name: 'Borrar', exact: true })
+      while (await borrar.isVisible() && await borrar.isEnabled()) await borrar.click()
+      for (const digito of labPin) {
+        if (!await entrar.isVisible()) return
+        await terminal.page.getByRole('button', { name: digito, exact: true }).click()
+      }
+      if (!await entrar.isVisible()) return
+      await expect(entrar).toBeEnabled({ timeout: 5000 })
       await entrar.click()
       await expect(entrar).not.toBeVisible({ timeout: 15000 })
       await terminal.page.waitForTimeout(1500)
-    } catch (error) { fallos.push(`desbloqueo: ${error.message}`) }
+    } catch (error) {
+      // Si el teclado ya no existe, la restauración ganó la carrera y logró
+      // exactamente el estado buscado: POS desbloqueado. El texto concreto del
+      // error de Playwright cambia según en qué dígito ocurrió el desmontaje.
+      const sesionRestaurada = !await entrar.isVisible().catch(() => false)
+      if (!sesionRestaurada) fallos.push(`desbloqueo: ${error.message}`)
+    }
   }
   const retratar = async (terminal, nombre, [w, h]) => {
     try {
@@ -108,14 +144,23 @@ module.exports = async function ({ caja, pos2, kds, expect, until, request, outp
     await despertar(caja)
     await expect(caja.page.getByRole('button', { name: /Bebidas laboratorio/ })).toBeVisible({ timeout: 120000 })
     medidas.push(await retratar(caja, 'comanda', vp))
+    medidas.push(await retratar(caja, 'categorias', vp))
 
     try {
-      await caja.page.getByRole('button', { name: /Bebidas laboratorio/ }).click()
+      // El fixture de laboratorio tiene un solo café; el demo añade categorías
+      // de veinte platillos. Retratar una de éstas comprueba densidad y paginación
+      // reales en vez de validar sólo el estado vacío.
+      const categoriaConVolumen = caja.page.getByRole('button', { name: /Cervezas/ })
+      const categoria = await categoriaConVolumen.isVisible()
+        ? categoriaConVolumen
+        : caja.page.getByRole('button', { name: /Bebidas laboratorio/ })
+      await categoria.click()
       await caja.page.waitForTimeout(700)
       medidas.push(await retratar(caja, 'catalogo', vp))
-      // Este modal NO cierra con Escape (pos/page.tsx: sólo el telón y la «×» de
-      // 40px). Se cierra como lo cierra un dedo: tocando el telón.
-      await caja.page.locator('div.fixed.inset-0.z-50').first().click({ position: { x: 6, y: 6 } })
+      // Escape es una salida real además del botón Cerrar de 56px. Si no funciona,
+      // el siguiente retrato deja evidencia del modal atorado sobre la operación.
+      await caja.page.keyboard.press('Escape')
+      await expect(caja.page.getByRole('dialog')).not.toBeVisible({ timeout: 5000 })
       await caja.page.waitForTimeout(600)
     } catch (error) { fallos.push(`catalogo ${vp.join('x')}: ${error.message}`) }
 

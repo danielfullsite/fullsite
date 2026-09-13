@@ -14,7 +14,7 @@
 //
 // No decide nada del negocio. Recibe elementos ya construidos y sólo elige
 // cuáles se pintan.
-import { useCallback, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 interface Props<T> {
@@ -30,6 +30,9 @@ interface Props<T> {
   clasesDeRejilla: string
   /** Separación vertical entre filas, en px, para que el cálculo cuadre con el gap. */
   separacion?: number
+  /** Mesas aprovechan todo el alto disponible; catálogo conserva filas compactas
+   *  para que una categoría o un platillo no se conviertan en una tarjeta gigante. */
+  expandirFilas?: boolean
   /** Qué se nombra en el control de página: «mesas», «platillos», «comandas». */
   nombreDeElementos?: string
   vacio?: ReactNode
@@ -37,7 +40,7 @@ interface Props<T> {
 
 export default function RejillaPaginada<T>({
   elementos, claveDe, pintar, altoDeCelda, clasesDeRejilla,
-  separacion = 10, nombreDeElementos = 'elementos', vacio,
+  separacion = 10, expandirFilas = true, nombreDeElementos = 'elementos', vacio,
 }: Props<T>) {
   const caja = useRef<HTMLDivElement>(null)
   const [porPagina, setPorPagina] = useState(0)
@@ -74,12 +77,28 @@ export default function RejillaPaginada<T>({
   // vacío, y la medición siguiente lo recorta.
   const visibles = porPagina > 0 ? elementos.slice(actual * porPagina, (actual + 1) * porPagina) : elementos
   const hayPaginas = paginas > 1
+  const irA = (destino: number) => setPagina(Math.max(0, Math.min(paginas - 1, destino)))
+  const navegarConTeclado = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'PageUp' || event.key === 'ArrowLeft') {
+      if (actual === 0) return
+      event.preventDefault()
+      irA(actual - 1)
+    }
+    if (event.key === 'PageDown' || event.key === 'ArrowRight') {
+      if (actual === paginas - 1) return
+      event.preventDefault()
+      irA(actual + 1)
+    }
+  }
 
   const boton = 'flex h-14 min-w-14 items-center justify-center rounded-xl border border-[var(--line)] bg-[var(--surface-2)] text-[var(--text-1)] disabled:opacity-35 active:scale-95 transition-transform'
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2">
-      <div ref={caja} className={`min-h-0 flex-1 ${clasesDeRejilla}`} style={{ gridAutoRows: `minmax(${altoDeCelda}px, 1fr)` }}>
+    <div className="flex min-h-0 flex-1 flex-col gap-2" role="region"
+      aria-label={`Rejilla de ${nombreDeElementos}`} tabIndex={hayPaginas ? 0 : undefined}
+      onKeyDown={navegarConTeclado}>
+      <div ref={caja} className={`min-h-0 flex-1 ${clasesDeRejilla}`}
+        style={{ gridAutoRows: expandirFilas ? `minmax(${altoDeCelda}px, 1fr)` : `${altoDeCelda}px` }}>
         {visibles.map((elemento, i) => (
           <div key={claveDe(elemento, actual * porPagina + i)}>{pintar(elemento, actual * porPagina + i)}</div>
         ))}
@@ -87,15 +106,15 @@ export default function RejillaPaginada<T>({
       {elementos.length === 0 && vacio}
       {hayPaginas && (
         <div className="flex flex-shrink-0 items-center justify-center gap-3" role="group" aria-label={`Páginas de ${nombreDeElementos}`}>
-          <button type="button" className={boton} onClick={() => setPagina(p => Math.max(0, p - 1))}
+          <button type="button" className={boton} onClick={() => irA(actual - 1)}
             disabled={actual === 0} aria-label={`Página anterior de ${nombreDeElementos}`}>
             <ChevronLeft size={24} />
           </button>
-          <span className="font-mono text-base font-bold tabular-nums text-[var(--text-2)]" aria-live="polite">
+          <span className="font-mono text-base font-bold tabular-nums text-[var(--text-2)]" aria-live="polite" aria-current="page">
             {actual + 1} / {paginas}
             <span className="ml-2 text-sm font-normal text-[var(--text-3)]">{elementos.length} {nombreDeElementos}</span>
           </span>
-          <button type="button" className={boton} onClick={() => setPagina(p => Math.min(paginas - 1, p + 1))}
+          <button type="button" className={boton} onClick={() => irA(actual + 1)}
             disabled={actual === paginas - 1} aria-label={`Página siguiente de ${nombreDeElementos}`}>
             <ChevronRight size={24} />
           </button>

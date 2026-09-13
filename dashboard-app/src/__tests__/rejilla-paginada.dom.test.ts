@@ -91,3 +91,25 @@ it('si la lista se encoge por debajo de la página actual, se retrocede en vez d
   expect(screen.queryByRole('group', { name: /Páginas/ })).toBeNull()
   expect(screen.getAllByRole('button').map(b => b.textContent)).toEqual(['Mesa 1', 'Mesa 2'])
 })
+
+it('el catálogo puede conservar filas compactas aunque sobre altura', () => {
+  altoDeLaCaja = 450
+  render(createElement(RejillaPaginada<{ numero: number }>, {
+    elementos: mesas(2), claveDe: m => String(m.numero),
+    pintar: m => createElement('button', null, `Categoría ${m.numero}`),
+    altoDeCelda: 88, expandirFilas: false,
+    nombreDeElementos: 'categorías', clasesDeRejilla: 'grid',
+  }))
+  const grid = screen.getByRole('button', { name: 'Categoría 1' }).parentElement?.parentElement
+  expect(grid?.style.gridAutoRows).toBe('88px')
+})
+
+it('PageDown y flecha izquierda navegan sin depender del ratón', () => {
+  altoDeLaCaja = 300
+  render(rejilla(mesas(7)))
+  const region = screen.getByRole('region', { name: 'Rejilla de mesas' })
+  fireEvent.keyDown(region, { key: 'PageDown' })
+  expect(screen.getByText(/2 \/ 4/)).toBeTruthy()
+  fireEvent.keyDown(region, { key: 'ArrowLeft' })
+  expect(screen.getByText(/1 \/ 4/)).toBeTruthy()
+})

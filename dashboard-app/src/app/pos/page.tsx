@@ -3,7 +3,7 @@
 import { prepararTransferenciaItem } from '@/lib/transferencia-item'
 import { confirmarCancelacionItem } from '@/lib/cancelacion-cliente'
 import { setOrderInventoryPending } from '@/lib/order-inventory-pending'
-import { Component, useState, useCallback, useEffect, useRef, Suspense, type ErrorInfo, type ReactNode } from 'react'
+import { Component, useState, useCallback, useEffect, useMemo, useRef, Suspense, type ErrorInfo, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { resolveMesa, clearMesaTarget, peekMesaTarget } from '@/lib/pos-navigation'
@@ -60,6 +60,7 @@ import CajonDeCaja from '@/components/pos/CajonDeCaja'
 import DocumentoImpresoDeCaja from '@/components/pos/DocumentoImpresoDeCaja'
 import ConsumoPendienteDeCaja from '@/components/pos/ConsumoPendienteDeCaja'
 import CobroDeCaja from '@/components/pos/CobroDeCaja'
+import RejillaPaginada from '@/components/pos/RejillaPaginada'
 import { reconciliarCuenta, cuentaEditableDe, mismaConfirmacionDeCuenta, type CuentaEditable } from '@/lib/pos-order-reconciliation'
 import { evaluarLiquidacion, cuentasDe, intentoDePago } from '@/lib/liquidacion-de-orden'
 import type { OrderItem, MenuItem, Order } from '@/lib/pos-data'
@@ -192,6 +193,11 @@ function catIconFor(name: string, size = 20) {
   if (has('vino', 'wine')) return <Wine size={size} />
   return <Utensils size={size} />
 }
+type CatalogTile =
+  | { kind: 'combos'; id: string }
+  | { kind: 'speed-combo'; id: string; combo: Combo }
+  | { kind: 'category'; id: string; category: MenuCategory }
+
 const POSCopilot = dynamic(() => import('@/components/POSCopilot'), { ssr: false })
 const OfflineIndicator = dynamic(() => import('@/components/pos/OfflineIndicator'), { ssr: false })
 const InventoryAlerts = dynamic(() => import('@/components/pos/InventoryAlerts'), { ssr: false })
@@ -1720,6 +1726,20 @@ function POSContent() {
   }, [])
   const [selectedCategory, setSelectedCategory] = useState<string>('')
   const [categorySearch, setCategorySearch] = useState('')
+  const categoryTriggerRef = useRef<HTMLButtonElement | null>(null)
+  const cerrarCategoria = useCallback(() => {
+    setSelectedCategory('')
+    setCategorySearch('')
+    queueMicrotask(() => categoryTriggerRef.current?.focus())
+  }, [])
+  useEffect(() => {
+    if (!selectedCategory) return
+    const cerrarConEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') cerrarCategoria()
+    }
+    document.addEventListener('keydown', cerrarConEscape)
+    return () => document.removeEventListener('keydown', cerrarConEscape)
+  }, [selectedCategory, cerrarCategoria])
   const [orderItems, setOrderItems] = useState<OrderItem[]>(() => {
     // Pre-populate from cache to prevent blank flash on mount
     if (typeof window === 'undefined') return []
@@ -2879,6 +2899,23 @@ function POSContent() {
 
   const activeCategory =
     menuCategories.find((c) => c.id === selectedCategory) || menuCategories[0] || { id: '', name: '', items: [] }
+  const categoriesWithItems = useMemo(() => menuCategories
+    .filter(cat => cat.items.some(item => item.price > 0))
+    .sort((a, b) => a.name.localeCompare(b.name, 'es')), [menuCategories])
+  const catalogTiles: CatalogTile[] = useMemo(() => [
+    ...(allCombos.length > 0 ? [{ kind: 'combos' as const, id: 'combos' }] : []),
+    ...(speedMode ? allCombos.map(combo => ({ kind: 'speed-combo' as const, id: `speed-${combo.id}`, combo })) : []),
+    ...categoriesWithItems.map(category => ({ kind: 'category' as const, id: category.id, category })),
+  ], [allCombos, speedMode, categoriesWithItems])
+  const categoryItems = useMemo(() => activeCategory.items.filter(item => item.price > 0), [activeCategory])
+  const filteredCategoryItems = useMemo(() => categoryItems.filter(item =>
+    !categorySearch || item.name.toLowerCase().includes(categorySearch.toLowerCase())), [categoryItems, categorySearch])
+  const normalizedMenuSearch = menuSearch.trim().toLowerCase()
+  const menuSearchResults: { item: MenuItem; category: string; catId: string; catColor: string }[] = useMemo(() => normalizedMenuSearch
+    ? menuCategories.flatMap(category => category.items
+      .filter(item => item.price > 0 && item.name.toLowerCase().includes(normalizedMenuSearch))
+      .map(item => ({ item, category: category.name, catId: category.id, catColor: category.color || 'bg-emerald-600' })))
+    : [], [menuCategories, normalizedMenuSearch])
 
   // Open modifier modal for a new item
   const handleMenuItemTap = useCallback((item: MenuItem, catId?: string) => {
@@ -5378,75 +5415,51 @@ function POSContent() {
 
           {menuSearch.trim() ? (
             /* Search results across all categories */
-            <div className="flex-1 overflow-y-auto p-3 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
-              {(() => {
-                const term = menuSearch.toLowerCase()
-                const results: { item: MenuItem; category: string; catId: string }[] = []
-                for (const cat of menuCategories) {
-                  for (const item of cat.items) {
-                    if (item.price > 0 && item.name.toLowerCase().includes(term)) {
-                      results.push({ item, category: cat.name, catId: cat.id })
-                    }
-                  }
-                }
-                if (results.length === 0) {
-                  return <p className="text-[var(--text-2)] text-center py-8">Sin resultados para &ldquo;{menuSearch}&rdquo;</p>
-                }
-                return (
-                  <div className="space-y-2">
-                    {results.map(({ item, category, catId }) => {
-                      const catColor = menuCategories.find(c => c.id === catId)?.color || 'bg-emerald-600'
-                      return (
-                        <button
-                          key={item.id}
-                          onClick={() => { handleMenuItemTap(item, catId); setMobileView('order') }}
-                          className="w-full bg-[var(--surface-2)] hover:bg-[var(--line)] active:bg-[var(--accent-soft)] border border-[var(--line)] rounded-xl text-left transition-colors flex items-center min-h-[64px] overflow-hidden"
-                        >
-                          <div className={`w-1.5 self-stretch flex-shrink-0 rounded-l-lg ${catColor}`} />
-                          <div className="flex items-center justify-between flex-1 px-3 py-3">
-                            <div>
-                              <span className="font-semibold text-base text-[var(--text-1)]">{item.name}</span>
-                              <span className="text-[var(--text-2)] text-xs ml-2">{category}</span>
-                            </div>
-                            <span className="text-[var(--accent-ink)] font-bold text-lg font-mono tabular-nums">{formatMXN(item.price)}</span>
-                          </div>
-                        </button>
-                      )
-                    })}
-                  </div>
-                )
-              })()}
+            <div className="flex flex-1 min-h-0 flex-col overflow-hidden p-3">
+              <RejillaPaginada
+                key={normalizedMenuSearch}
+                elementos={menuSearchResults}
+                claveDe={({ item }) => item.id}
+                altoDeCelda={68}
+                expandirFilas={false}
+                separacion={8}
+                nombreDeElementos="resultados"
+                clasesDeRejilla="grid grid-cols-1 gap-2 content-start"
+                vacio={<p className="text-[var(--text-2)] text-center py-8">Sin resultados para &ldquo;{menuSearch}&rdquo;</p>}
+                pintar={({ item, category, catId, catColor }) => (
+                    <button
+                      onClick={() => { handleMenuItemTap(item, catId); setMobileView('order') }}
+                      className="h-full w-full bg-[var(--surface-2)] hover:bg-[var(--line)] active:bg-[var(--accent-soft)] active:scale-[0.98] border border-[var(--line)] rounded-xl text-left transition-all flex items-center overflow-hidden"
+                    >
+                      <div className={`w-1.5 self-stretch flex-shrink-0 rounded-l-lg ${catColor}`} />
+                      <div className="flex items-center justify-between flex-1 px-3 py-2">
+                        <div className="min-w-0">
+                          <span className="block truncate font-semibold text-base text-[var(--text-1)]">{item.name}</span>
+                          <span className="block truncate text-[var(--text-2)] text-xs">{category}</span>
+                        </div>
+                        <span className="ml-3 flex-shrink-0 text-[var(--accent-ink)] font-bold text-lg font-mono tabular-nums">{formatMXN(item.price)}</span>
+                      </div>
+                    </button>
+                )}
+              />
             </div>
           ) : (
             <>
-              {/* Category grid — full area, alphabetical left→right, large touch targets */}
-              <div className="flex-1 bg-[var(--surface-2)]/50 p-1 overflow-hidden">
+              {/* En catálogo el espacio sobrante no debe inflar trece botones hasta
+                  convertirlos en tres franjas gigantes. Las filas se quedan densas
+                  y arriba; si un restaurante tiene más categorías, aparecen páginas. */}
+              <div className="flex flex-1 min-h-0 flex-col bg-[var(--surface-2)]/50 p-2 overflow-hidden">
                 {catalogoError && <p role="alert" className="p-3 text-[var(--warn-ink)]">{catalogoError}</p>}
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-1 h-full" style={{ gridAutoRows: '1fr' }}>
-                  {allCombos.length > 0 && (
-                    <button
-                      onClick={() => setShowComboModal(true)}
-                      className="px-3 py-3 rounded-xl text-sm font-bold text-center transition-all min-h-[72px] leading-tight flex flex-col items-center justify-center gap-0.5 bg-gradient-to-br from-amber-600 to-orange-600 text-white hover:opacity-100 active:scale-95 ring-2 ring-amber-400/30"
-                    >
-                      <Layers size={18} />
-                      <span>Combos</span>
-                      <span className="text-[10px] font-normal opacity-70">{allCombos.length}</span>
-                    </button>
-                  )}
-                  {/* Speed screen (mostrador): cada combo es un botón de UN toque al
-                      frente del grid — la venta de un fast food vive aquí. */}
-                  {speedMode && allCombos.map(combo => (
-                    <button
-                      key={`speed-${combo.id}`}
-                      onClick={() => addComboToOrder(combo)}
-                      className="px-3 py-3 rounded-xl text-sm font-bold text-center transition-all min-h-[72px] leading-tight flex flex-col items-center justify-center gap-0.5 bg-gradient-to-br from-amber-500/90 to-orange-500/90 text-white hover:opacity-100 active:scale-95"
-                    >
-                      <span className="leading-tight">{combo.name}</span>
-                      <span className="text-xs font-mono tabular-nums opacity-90">${Math.round(combo.price)}</span>
-                    </button>
-                  ))}
-                  {menuCategories.length === 0 && (
-                    <div className="col-span-full flex flex-col items-center justify-center py-16 text-center">
+                <RejillaPaginada
+                  elementos={catalogTiles}
+                  claveDe={tile => tile.id}
+                  altoDeCelda={88}
+                  expandirFilas={false}
+                  separacion={8}
+                  nombreDeElementos="categorías"
+                  clasesDeRejilla="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 content-start"
+                  vacio={(
+                    <div className="flex flex-1 flex-col items-center justify-center py-16 text-center">
                       <Package size={48} className="text-[var(--text-3)] mb-4 opacity-40" />
                       <p className="text-lg font-semibold text-[var(--text-1)] mb-2">{catalogoError ? 'Menú no disponible' : 'Sin menú configurado'}</p>
                       <p className="text-sm text-[var(--text-3)] max-w-md">
@@ -5454,72 +5467,109 @@ function POSContent() {
                       </p>
                     </div>
                   )}
-                  {menuCategories.filter(cat => cat.items.some(i => i.price > 0))
-                    .sort((a, b) => a.name.localeCompare(b.name, 'es'))
-                    .map((cat) => {
-                      const catColor = (cat as { color?: string }).color || 'bg-[var(--surface-2)]'
-                      const itemCount = cat.items.filter(i => i.price > 0).length
-                      return (
-                        <button
-                          key={cat.id}
-                          onClick={() => setSelectedCategory(cat.id)}
-                          className={`px-3 py-3 rounded-xl text-sm font-bold text-center transition-all min-h-[72px] leading-tight flex flex-col items-center justify-center gap-0.5 ${catColor} opacity-85 text-[var(--text-1)] hover:opacity-100 active:scale-95`}
-                        >
-                          <span className="opacity-90">{catIconFor(cat.name, 22)}</span>
-                          <span>{cat.name}</span>
-                          <span className="text-[10px] font-normal opacity-70">{itemCount}</span>
-                        </button>
-                      )
-                    })}
-                </div>
+                  pintar={tile => {
+                    if (tile.kind === 'combos') return (
+                    <button
+                      onClick={() => setShowComboModal(true)}
+                      className="h-full w-full px-2 py-2 rounded-xl text-sm font-bold text-center transition-all leading-tight flex flex-col items-center justify-center gap-0.5 bg-gradient-to-br from-amber-600 to-orange-600 text-white hover:opacity-100 active:scale-95 ring-2 ring-amber-400/30"
+                    >
+                      <Layers size={18} />
+                      <span>Combos</span>
+                      <span className="text-[10px] font-normal opacity-70">{allCombos.length}</span>
+                    </button>
+                    )
+                    if (tile.kind === 'speed-combo') return (
+                    <button
+                      onClick={() => addComboToOrder(tile.combo)}
+                      className="h-full w-full px-2 py-2 rounded-xl text-sm font-bold text-center transition-all leading-tight flex flex-col items-center justify-center gap-0.5 bg-gradient-to-br from-amber-500/90 to-orange-500/90 text-white hover:opacity-100 active:scale-95"
+                    >
+                      <span className="leading-tight line-clamp-2">{tile.combo.name}</span>
+                      <span className="text-xs font-mono tabular-nums opacity-90">${Math.round(tile.combo.price)}</span>
+                    </button>
+                    )
+                    const cat = tile.category
+                    const catColor = (cat as { color?: string }).color || 'bg-[var(--surface-2)]'
+                    const itemCount = cat.items.filter(item => item.price > 0).length
+                    return (
+                      <button
+                        onClick={event => {
+                          categoryTriggerRef.current = event.currentTarget
+                          setSelectedCategory(cat.id)
+                        }}
+                        className={`h-full w-full px-2 py-2 rounded-xl text-sm font-bold text-center transition-all leading-tight flex flex-col items-center justify-center gap-0.5 ${catColor} opacity-85 text-[var(--text-1)] hover:opacity-100 active:scale-95`}
+                      >
+                        <span className="opacity-90">{catIconFor(cat.name, 22)}</span>
+                        <span className="line-clamp-2">{cat.name}</span>
+                        <span className="text-[10px] font-normal opacity-70">{itemCount}</span>
+                      </button>
+                    )
+                  }}
+                />
               </div>
 
               {/* Menu items — centered modal overlay on category tap */}
               {selectedCategory && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => { setSelectedCategory(''); setCategorySearch('') }}>
-                  <div className={`bg-[var(--panel)] rounded-2xl border border-[var(--line)] shadow-2xl w-[96vw] max-w-[1200px] overflow-hidden flex flex-col ${activeCategory.items.filter(i => i.price > 0).length > 15 ? 'h-[90vh]' : 'max-h-[90vh]'}`} onClick={e => e.stopPropagation()}>
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={cerrarCategoria}>
+                  <div role="dialog" aria-modal="true" aria-labelledby="titulo-categoria-pos"
+                    className="bg-[var(--panel)] rounded-2xl border border-[var(--line)] shadow-2xl w-[96vw] max-w-[1200px] h-[90dvh] overflow-hidden flex flex-col"
+                    onClick={e => e.stopPropagation()}>
                     <div className={`flex items-center justify-between px-4 py-2 border-b border-[rgba(255,255,255,0.08)] ${(activeCategory as { color?: string }).color || 'bg-emerald-600'}`}>
-                      <h3 className="text-[var(--text-1)] font-bold text-lg">{activeCategory.name} <span className="text-[var(--text-1)]/60 text-sm font-normal ml-2">{activeCategory.items.filter(i => i.price > 0).length} platillos</span></h3>
-                      <button onClick={() => { setSelectedCategory(''); setCategorySearch('') }} className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center text-white text-2xl font-bold hover:bg-white/30 active:scale-95">&times;</button>
+                      <h3 id="titulo-categoria-pos" className="text-[var(--text-1)] font-bold text-lg">{activeCategory.name} <span className="text-[var(--text-1)]/60 text-sm font-normal ml-2">{categoryItems.length} platillos</span></h3>
+                      <button onClick={cerrarCategoria} className="min-h-14 px-4 rounded-xl bg-white/20 flex items-center justify-center gap-2 text-white text-sm font-bold hover:bg-white/30 active:scale-95">
+                        <X size={20} /> Cerrar
+                      </button>
                     </div>
-                    {activeCategory.items.filter(i => i.price > 0).length > 30 && (
+                    {categoryItems.length > 30 && (
                       <div className="px-3 pt-2">
                         <input
                           type="text"
                           value={categorySearch}
                           onChange={e => setCategorySearch(e.target.value)}
                           placeholder="Buscar en esta categoría..."
-                          className="w-full bg-[var(--surface-2)] border border-[var(--line)] rounded-lg px-3 py-2 text-[var(--text-1)] text-sm placeholder:text-[var(--text-4)] focus:outline-none focus:border-[var(--accent)]"
+                          className="w-full min-h-14 bg-[var(--surface-2)] border border-[var(--line)] rounded-xl px-4 py-2 text-[var(--text-1)] text-base placeholder:text-[var(--text-4)] focus:outline-none focus:border-[var(--accent)]"
                           autoFocus
                         />
                       </div>
                     )}
-                    <div className="flex-1 overflow-y-auto p-2 overscroll-contain pos-fat-scroll flex flex-col" style={{ WebkitOverflowScrolling: 'touch' }}>
-                      <div className="grid grid-cols-3 md:grid-cols-5 gap-2 flex-1" style={{ gridAutoRows: 'minmax(80px, 150px)', minHeight: 0 }}>
-                {activeCategory.items.filter(item => item.price > 0 && (!categorySearch || item.name.toLowerCase().includes(categorySearch.toLowerCase()))).map((item) => {
-                    const isOOS = outOfStockItems.has(item.id)
-                    return (
-                    <button
-                      key={item.id}
-                      onClick={() => { if (isOOS) { showToast(`${item.name} — AGOTADO`); return } handleMenuItemTap(item, activeCategory.id); setSelectedCategory(''); setMobileView('order') }}
-                      className={`bg-[var(--surface-2)] hover:bg-[var(--raised)] active:scale-[0.97] border rounded-xl text-left transition-all flex overflow-hidden relative shadow-sm ${
-                        isOOS
-                          ? 'border-[color-mix(in_srgb,var(--crit)_40%,transparent)] opacity-50 cursor-not-allowed'
-                          : (item as MenuItem & { promo?: boolean }).promo
-                          ? 'border-[var(--accent-line)] ring-1 ring-[var(--accent-soft)]'
-                          : 'border-[var(--line-soft)] hover:border-[var(--accent-line)]'
-                      }`}
-                    >
-                      <div className={`w-1.5 flex-shrink-0 rounded-l-2xl ${isOOS ? 'bg-[var(--crit)]' : (activeCategory as { color?: string }).color || 'bg-emerald-600'}`} />
-                      {isOOS && <span className="absolute top-2 right-2 bg-[var(--crit)] text-white text-[10px] font-black px-1.5 py-0.5 rounded-md uppercase tracking-wide">Agotado</span>}
-                      <div className="flex flex-col justify-between px-3 py-2.5 flex-1">
-                        <span className={`font-semibold text-sm leading-snug ${isOOS ? 'text-[var(--text-4)] line-through' : 'text-[var(--text-1)]'}`}>{item.name}</span>
-                        <span className={`font-bold text-base mt-1 font-mono tabular-nums ${isOOS ? 'text-[var(--crit-ink)]' : 'text-[var(--accent-ink)]'}`}>${Math.round(item.price)}</span>
-                      </div>
-                    </button>
-                    )
-                  })}
-                      </div>
+                    <div className="flex flex-1 min-h-0 flex-col overflow-hidden p-2">
+                      <RejillaPaginada
+                        key={`${activeCategory.id}:${categorySearch}`}
+                        elementos={filteredCategoryItems}
+                        claveDe={item => item.id}
+                        altoDeCelda={96}
+                        expandirFilas={false}
+                        separacion={8}
+                        nombreDeElementos="platillos"
+                        clasesDeRejilla="grid grid-cols-3 md:grid-cols-5 gap-2 content-start"
+                        vacio={<p className="text-[var(--text-2)] text-center py-8">Sin platillos que coincidan con la búsqueda.</p>}
+                        pintar={item => {
+                          const isOOS = outOfStockItems.has(item.id)
+                          return (
+                            <button
+                              onClick={() => {
+                                if (isOOS) { showToast(`${item.name} — AGOTADO`); return }
+                                handleMenuItemTap(item, activeCategory.id)
+                                cerrarCategoria()
+                                setMobileView('order')
+                              }}
+                              className={`h-full w-full bg-[var(--surface-2)] hover:bg-[var(--raised)] active:scale-[0.97] border rounded-xl text-left transition-all flex overflow-hidden relative shadow-sm ${
+                                isOOS
+                                  ? 'border-[color-mix(in_srgb,var(--crit)_40%,transparent)] opacity-50 cursor-not-allowed'
+                                  : (item as MenuItem & { promo?: boolean }).promo
+                                  ? 'border-[var(--accent-line)] ring-1 ring-[var(--accent-soft)]'
+                                  : 'border-[var(--line-soft)] hover:border-[var(--accent-line)]'
+                              }`}
+                            >
+                              <div className={`w-1.5 flex-shrink-0 rounded-l-2xl ${isOOS ? 'bg-[var(--crit)]' : (activeCategory as { color?: string }).color || 'bg-emerald-600'}`} />
+                              {isOOS && <span className="absolute top-2 right-2 bg-[var(--crit)] text-white text-[10px] font-black px-1.5 py-0.5 rounded-md uppercase tracking-wide">Agotado</span>}
+                              <div className="flex flex-col justify-between px-3 py-2.5 flex-1 min-w-0">
+                                <span className={`font-semibold text-sm leading-snug line-clamp-2 ${isOOS ? 'text-[var(--text-4)] line-through' : 'text-[var(--text-1)]'}`}>{item.name}</span>
+                                <span className={`font-bold text-base mt-1 font-mono tabular-nums ${isOOS ? 'text-[var(--crit-ink)]' : 'text-[var(--accent-ink)]'}`}>${Math.round(item.price)}</span>
+                              </div>
+                            </button>
+                          )
+                        }}
+                      />
                     </div>
                   </div>
                 </div>
