@@ -42,36 +42,27 @@ function screen({ reject = false, session = false, delayedReads = false } = {}) 
   windows.push(dom.window)
   return { win: dom.window as any, calls, errors, order, reads, polls }
 }
-it('real kitchen HTML asks PIN before changes, clears PIN and sends the authenticated command with a receipt', async () => {
+it('real kitchen HTML changes preparation without PIN using only its installation credential', async () => {
   const s = screen()
   await vi.waitFor(() => expect(s.win.document.querySelector('[data-ready]')).not.toBeNull())
-  // Old accepted kitchen work is never hidden by an age cutoff in Caja mode.
-  s.win.document.querySelector('[data-ready]').click()
-  expect(s.win.document.getElementById('actor-modal').classList.contains('show')).toBe(true)
-  expect(s.calls.filter(c => c.url.endsWith('/events'))).toHaveLength(0)
-  s.win.document.getElementById('actor-pin').value = '1234'
-  s.win.document.getElementById('actor-form').dispatchEvent(new s.win.Event('submit', { bubbles: true, cancelable: true }))
-  await vi.waitFor(() => expect(s.win.document.getElementById('actor-modal').classList.contains('show')).toBe(false))
-  expect(s.win.document.getElementById('actor-pin').value).toBe('')
-  expect(s.calls.find(c => c.url.endsWith('/auth/pin'))?.body).toEqual({ pin: '1234' })
-  expect(s.win.localStorage.getItem('pos_actor_session')).toBeNull()
+  expect(s.win.document.getElementById('actor-modal')).toBeNull()
+  expect(s.win.document.body.textContent).not.toContain('Entrar con PIN')
   s.win.document.querySelector('[data-ready]').click()
   await vi.waitFor(() => expect(s.win.document.querySelector('[data-deliver]')).not.toBeNull())
+  expect(s.calls.filter(c => c.url.endsWith('/auth/pin'))).toHaveLength(0)
   const change = s.calls.find(c => c.url.endsWith('/events'))!
-  expect(change.init.headers).toMatchObject({ 'x-fullsite-actor': 'signed-session', 'x-fullsite-terminal': 'KDS-1' })
+  expect(change.init.headers).toMatchObject({ 'x-fullsite-terminal': 'KDS-1', 'x-fullsite-lan': 'synthetic' })
+  expect(change.init.headers).not.toHaveProperty('x-fullsite-actor')
   expect(change.body).toMatchObject({ command_type: 'KITCHEN_SET', order_id: 'mother', turno_id: 'shift', expected_kitchen_revision: 1, item_ids: ['round:coffee'], status: 'lista' })
-  expect(JSON.stringify(change.body)).not.toContain('signed-session')
   expect(s.errors).toEqual([])
 })
-it('rejected preparation never creates private ready state; blocking removes the actor session', async () => {
+it('rejected preparation never creates private ready state', async () => {
   const s = screen({ session: true, reject: true })
   await vi.waitFor(() => expect(s.win.document.querySelector('[data-ready]')).not.toBeNull())
   s.win.document.querySelector('[data-ready]').click()
   await vi.waitFor(() => expect(s.win.document.getElementById('toast').textContent).toContain('Permiso rechazado'))
   expect(s.win.document.querySelector('[data-deliver]')).toBeNull()
   expect(s.win.localStorage.getItem('kds_local_v3')).toBeNull()
-  s.win.document.getElementById('actor-button').click()
-  expect(s.win.sessionStorage.getItem('pos_actor_session')).toBeNull()
   expect(s.errors).toEqual([])
 })
 it('separate prepare and deliver buttons advance the current kitchen revision', async () => {

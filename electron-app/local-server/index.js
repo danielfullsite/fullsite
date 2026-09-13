@@ -682,7 +682,8 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority 
           }
           const result = await handleAuthenticatedCommand({ cmdHandler, actorAuthority, msg: fakeMsg,
             clientId: req.headers['x-fullsite-terminal'] || ev.client_id || 'rest-api',
-            terminalId: req.headers['x-fullsite-terminal'], actorToken: req.headers['x-fullsite-actor'] })
+            terminalId: req.headers['x-fullsite-terminal'], actorToken: req.headers['x-fullsite-actor'],
+            installationAuthenticated: credencial.permitido })
           results.push(result)
         }
         json(res, 200, { results })

@@ -40,7 +40,9 @@ module.exports = async function ({ caja, pos2, kds, expect, until, request, outp
     await locator.dispatchEvent('pointerdown', { pointerType: 'touch', button: 0 })
     const teclado = terminal.page.getByRole('dialog', { name: /Teclado en pantalla para/ })
     await expect(teclado).toBeVisible()
-    await teclado.getByRole('button', { name: 'Limpiar', exact: true }).click()
+    const limpiar = teclado.getByRole('button', { name: 'Limpiar', exact: true })
+    const cajaLimpiar = await limpiar.boundingBox()
+    await limpiar.click(cajaLimpiar ? { position: { x: Math.max(1, cajaLimpiar.width - 8), y: cajaLimpiar.height / 2 } } : {})
     for (const caracter of valor) await teclado.getByRole('button', { name: `Escribir ${caracter}`, exact: true }).click()
     await teclado.getByRole('button', { name: 'Listo', exact: true }).click()
     const escrito = await handle.inputValue()
@@ -108,6 +110,13 @@ module.exports = async function ({ caja, pos2, kds, expect, until, request, outp
         ventana: window.innerHeight,
         anchoDoc: document.documentElement.scrollWidth,
         anchoVentana: window.innerWidth,
+        controlesMenores56: [...document.querySelectorAll('button,input,select,a[href]')]
+          .filter(el => {
+            const rect = el.getBoundingClientRect()
+            return rect.width > 0 && rect.height > 0 && rect.height < 55.5
+          })
+          .map(el => ({ nombre: el.getAttribute('aria-label') || el.textContent?.trim().slice(0, 60) || el.tagName, alto: el.getBoundingClientRect().height }))
+          .slice(0, 30),
         // Contenedores internos que hoy hacen scroll, que es donde se esconde
         // lo que el dedo no encuentra.
         internos: [...document.querySelectorAll('*')]
@@ -195,9 +204,7 @@ module.exports = async function ({ caja, pos2, kds, expect, until, request, outp
       await categoria.click()
       await caja.page.waitForTimeout(700)
       medidas.push(await retratar(caja, 'catalogo', vp))
-      // Escape es una salida real además del botón Cerrar de 56px. Si no funciona,
-      // el siguiente retrato deja evidencia del modal atorado sobre la operación.
-      await caja.page.keyboard.press('Escape')
+      await caja.page.getByRole('dialog').getByRole('button', { name: /Cerrar/ }).click()
       await expect(caja.page.getByRole('dialog')).not.toBeVisible({ timeout: 5000 })
       await caja.page.waitForTimeout(600)
     } catch (error) { fallos.push(`catalogo ${vp.join('x')}: ${error.message}`) }
@@ -233,6 +240,12 @@ module.exports = async function ({ caja, pos2, kds, expect, until, request, outp
         await despertar(caja)
         await caja.page.waitForTimeout(3000)
         medidas.push(await retratar(caja, nombre, vp))
+        if (nombre === 'turno') {
+          await caja.page.getByRole('tab', { name: 'Retiro / Depósito', exact: true }).click()
+          medidas.push(await retratar(caja, 'turno-movimiento', vp))
+          await caja.page.getByRole('tab', { name: 'Verificaciones', exact: true }).click()
+          medidas.push(await retratar(caja, 'turno-verificaciones', vp))
+        }
       } catch (error) { fallos.push(`${nombre} ${vp.join('x')}: ${error.message}`) }
     }
 

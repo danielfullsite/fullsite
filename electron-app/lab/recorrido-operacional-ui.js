@@ -14,7 +14,12 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     await locator.dispatchEvent('pointerdown', { pointerType: 'touch', button: 0 })
     const teclado = terminal.page.getByRole('dialog', { name: /Teclado en pantalla para/ })
     await expect(teclado).toBeVisible()
-    await teclado.getByRole('button', { name: 'Limpiar', exact: true }).click()
+    // El distintivo de Next sólo existe en desarrollo y ocupa la esquina inferior
+    // izquierda. Tocamos el extremo derecho de Limpiar, que sigue siendo superficie
+    // real del botón y coincide con el paquete donde ese portal no existe.
+    const limpiar = teclado.getByRole('button', { name: 'Limpiar', exact: true })
+    const cajaLimpiar = await limpiar.boundingBox()
+    await limpiar.click(cajaLimpiar ? { position: { x: Math.max(1, cajaLimpiar.width - 8), y: cajaLimpiar.height / 2 } } : {})
     for (const caracter of valor.toUpperCase()) {
       if (caracter === ' ') await teclado.getByRole('button', { name: 'Espacio', exact: true }).click()
       else if (caracter === '.') {
@@ -119,11 +124,12 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     for (const t of [caja, pos2, pos3]) await t.page.goto(`${uiOrigin}/pos?mesa=1`, { waitUntil: 'domcontentloaded', timeout: navigationTimeout })
     await expect(pos2.page.getByRole('button', { name: /Bebidas laboratorio/ })).toBeVisible({ timeout: 30000 })
   })
-  await check('El catálogo se cierra con Escape y devuelve el foco operativo a las categorías', async () => {
+  await check('El catálogo se cierra tocando su botón visible y devuelve el foco operativo a las categorías', async () => {
     const categoria = pos2.page.getByRole('button', { name: /Bebidas laboratorio/ })
     await categoria.click()
-    await expect(pos2.page.getByRole('dialog', { name: /Bebidas laboratorio/ })).toBeVisible()
-    await pos2.page.keyboard.press('Escape')
+    const catalogo = pos2.page.getByRole('dialog', { name: /Bebidas laboratorio/ })
+    await expect(catalogo).toBeVisible()
+    await catalogo.getByRole('button', { name: /Cerrar/ }).click()
     await expect(pos2.page.getByRole('dialog', { name: /Bebidas laboratorio/ })).not.toBeVisible()
     await expect(categoria).toBeVisible()
     await expect(categoria).toBeFocused()
@@ -136,6 +142,7 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     orderId = order.id
     assert.equal(order.total_cents, 5800)
     assert.equal(state.kds_orders.length, 0, 'Guardar no envía comida')
+    await ensureUnlocked(pos3)
     await expect(pos3.page.locator('body')).toContainText(/Saldo confirmado en Caja:.*58[.,]00/)
   })
   await check('Cobrar una cuenta aún sin enviar no bloquea sus productos pendientes', async () => {
@@ -153,6 +160,7 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     assert.equal(state.salon_orders[0].id, orderId)
     assert.equal(state.salon_orders[0].total_cents, 11600)
     await expect(kds.page.locator('body')).toContainText('Café de laboratorio', { timeout: 15000 })
+    await ensureUnlocked(pos2)
     await expect(pos2.page.locator('body')).toContainText(/Saldo confirmado en Caja:.*116[.,]00/)
     await pos3.page.screenshot({ path: path.join(output, 'orden-creada-compartida.png'), fullPage: true })
   })
@@ -388,6 +396,7 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
   await check('Retiros y depósitos autorizados desde POS 2 se incluyen en el cierre compartido', async () => {
     await pos2.page.goto(`${uiOrigin}/pos/turno`, { waitUntil: 'domcontentloaded', timeout: navigationTimeout })
     await ensureUnlocked(pos2)
+    await pos2.page.getByRole('tab', { name: 'Retiro / Depósito', exact: true }).click()
     const movement = pos2.page.getByRole('region', { name: 'Movimientos de efectivo' })
     await expect(movement).toBeVisible()
     await escribirConTecladoTactil(pos2, movement.getByLabel('Importe del movimiento', { exact: true }), '20')
@@ -419,6 +428,7 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     await caja.page.screenshot({ path: path.join(output, 'cierre-turno-desde-pantalla.png'), fullPage: true })
     await caja.page.reload({ waitUntil: 'domcontentloaded', timeout: navigationTimeout })
     await ensureUnlocked(caja)
+    await caja.page.getByRole('tab', { name: 'Último cierre', exact: true }).click()
     await expect(caja.page.getByRole('region', { name: 'Último cierre confirmado' })).toContainText(/659[.,]00/)
   })
   await check('Eduardo: corte Z vacía los tres POS y el nuevo turno comienza en orden 1 conservando el cierre', async () => {

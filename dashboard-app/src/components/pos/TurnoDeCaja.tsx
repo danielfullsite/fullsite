@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import ImpresionesInciertasDeCaja from './ImpresionesInciertasDeCaja'
 import MovimientoDeCaja from './MovimientoDeCaja'
 import { leerTurnosCaja, cerrarTurnoCaja, type TurnoDeCaja as Turno, type CierreDeCaja } from '@/lib/pedro-turnos'
 import { centavosDeTexto, pesosDeCentavos } from '@/lib/pedro-finanzas'
@@ -24,6 +25,8 @@ function pesosDelCampo(texto: string): number | null {
   try { return centavosDeTexto(texto) / 100 } catch { return null }
 }
 
+type PestanaTurno = 'turno' | 'movimiento' | 'ultimo' | 'verificaciones'
+
 export default function TurnoDeCaja() {
   const [turno, setTurno] = useState<Turno | null>(null)
   const [cierres, setCierres] = useState<CierreDeCaja[]>([])
@@ -32,6 +35,7 @@ export default function TurnoDeCaja() {
   const [amount, setAmount] = useState('')
   const [notes, setNotes] = useState('')
   const [busy, setBusy] = useState(false)
+  const [pestana, setPestana] = useState<PestanaTurno>('turno')
   const working = useRef(false)
   useEffect(() => {
     let alive = true, pending = false
@@ -54,7 +58,7 @@ export default function TurnoDeCaja() {
       const cents = centavosDeTexto(amount)
       if (turno) {
         const close = await cerrarTurnoCaja(turno.id, cents, notes)
-        setCierres(previous => [...previous.filter(c => c.id !== close.id), close]); setTurno(null)
+        setCierres(previous => [...previous.filter(c => c.id !== close.id), close]); setTurno(null); setPestana('ultimo')
       } else {
         if (!veredictoDelFondo.puedeAbrir) {
           setError(veredictoDelFondo.motivo || 'Revisa el fondo de caja.')
@@ -96,47 +100,84 @@ export default function TurnoDeCaja() {
         } : null,
       }
   const veredictoDelFondo = evaluarFondoDeApertura(pesosDelCampo(amount), lecturaDelCierre, notes)
-  return <main className="min-h-screen bg-[var(--surface)] text-[var(--text-1)] p-5 md:p-8">
-    <div className="mx-auto max-w-2xl">
-      <Link href="/pos/mesas" className="inline-block rounded-lg border border-[var(--line)] px-4 py-3">Volver al salón</Link>
-      <h1 className="mt-6 text-3xl font-bold">Turno de Caja</h1>
-      <p className="mt-2">{connected ? turno ? 'Turno abierto y compartido con las terminales.' : 'No hay turno abierto.' : 'Sin conexión confirmada con Caja. La apertura y el cierre están bloqueados.'}</p>
-      {error && <p role="alert" className="my-4 rounded-xl bg-red-500/10 p-3 text-red-600">{error}</p>}
-      {turno && <p className="my-5">Fondo inicial: <strong>{pesosDeCentavos(turno.opening_cash_cents)}</strong></p>}
-      {turno?.opening_reconciliation?.reason && <p className="my-3">Motivo del fondo: {turno.opening_reconciliation.reason}</p>}
-      <div className="my-6 rounded-2xl border border-[var(--line)] p-5 space-y-4">
-        <label className="block">{turno ? 'Efectivo contado al cierre' : 'Fondo inicial en efectivo'}
-          <input aria-label={turno ? 'Efectivo contado al cierre' : 'Fondo inicial en efectivo'} inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)}
-            className="mt-2 w-full rounded-xl border border-[var(--line)] bg-[var(--surface)] p-3 text-xl" /></label>
-        {/* Lo que dejo contado el corte anterior, enfrente del numero que se teclea.
-            Que NO coincidan es normal: el gerente se lleva la venta al banco. Lo que
-            estaba mal era que no coincidieran en silencio. */}
-        {!turno && veredictoDelFondo.aviso && (
-          <p className={`rounded-xl p-3 text-sm ${veredictoDelFondo.exigeExplicacion
-            ? 'bg-amber-500/10 text-amber-500' : 'bg-[var(--line)]/40 text-[var(--text-3)]'}`}>
-            {veredictoDelFondo.aviso}
-          </p>
-        )}
-        {(turno || veredictoDelFondo.exigeExplicacion) && <label className="block">
-          {turno ? 'Notas del cierre' : '¿A dónde se fue (o de dónde salió) la diferencia?'}
-          <textarea value={notes} onChange={e => setNotes(e.target.value)} className="mt-2 w-full rounded-xl border border-[var(--line)] bg-[var(--surface)] p-3" /></label>}
-        {!turno && veredictoDelFondo.motivo && amount.trim() !== '' && (
-          <p className="text-xs text-amber-500">{veredictoDelFondo.motivo}</p>
-        )}
-        <button disabled={busy || !connected || !amount || (!turno && !veredictoDelFondo.puedeAbrir)} onClick={act} className="min-h-[48px] w-full rounded-xl bg-blue-600 px-4 py-3 font-bold text-white disabled:opacity-40">
-          {busy ? 'Confirmando con Caja…' : turno ? 'Confirmar cierre de turno' : 'Abrir turno'}
-        </button>
+  const pestanaVisible = pestana === 'movimiento' && (!turno || !connected) || pestana === 'ultimo' && !latest
+    ? 'turno' : pestana
+  const pestanas: Array<{ id: PestanaTurno; label: string; disabled?: boolean }> = [
+    { id: 'turno', label: 'Turno' },
+    { id: 'movimiento', label: 'Retiro / Depósito', disabled: !turno || !connected },
+    { id: 'ultimo', label: 'Último cierre', disabled: !latest },
+    { id: 'verificaciones', label: 'Verificaciones' },
+  ]
+
+  return <main className="flex h-dvh flex-col overflow-hidden bg-[var(--surface)] text-[var(--text-1)]">
+    <header className="flex flex-shrink-0 items-center gap-4 border-b border-[var(--line)] bg-[var(--surface-2)] px-4 py-2">
+      <Link href="/pos/mesas" className="flex min-h-[56px] items-center rounded-xl border border-[var(--line)] px-4 font-bold active:scale-95">Volver al salón</Link>
+      <div className="min-w-0 flex-1">
+        <h1 className="text-2xl font-bold">Turno de Caja</h1>
+        <p className="truncate text-sm text-[var(--text-3)]">{connected ? turno ? 'Turno abierto y compartido con las terminales.' : 'No hay turno abierto.' : 'Sin conexión confirmada con Caja. La apertura y el cierre están bloqueados.'}</p>
       </div>
-      {turno && connected && <MovimientoDeCaja turnoId={turno.id} />}
-      {latest && <section aria-label="Último cierre confirmado" className="rounded-2xl border border-emerald-600 p-5">
-        <h2 className="text-xl font-bold">Último cierre confirmado</h2>
-        <p className="my-2 text-sm">{new Date(latest.closed_at).toLocaleString('es-MX')}</p>
-        <dl className="space-y-2">{[
-          ['Fondo inicial', latest.opening_cash_cents], ['Ventas en efectivo', latest.cash_sales_cents],
-          ['Total cobrado', latest.total_paid_cents], ['Efectivo esperado', latest.expected_cash_cents],
-          ['Efectivo contado', latest.counted_cash_cents], ['Diferencia', latest.difference_cents],
-        ].map(([label, value]) => <div key={label} className="flex justify-between gap-4"><dt>{label}</dt><dd className="font-semibold">{pesosDeCentavos(Number(value))}</dd></div>)}</dl>
-      </section>}
+      {turno && <p className="hidden text-right text-sm sm:block">Fondo inicial<br /><strong className="text-lg">{pesosDeCentavos(turno.opening_cash_cents)}</strong></p>}
+    </header>
+
+    <div className="grid flex-shrink-0 grid-cols-4 gap-2 border-b border-[var(--line)] px-3 py-2" role="tablist" aria-label="Operaciones del turno">
+      {pestanas.map(opcion => <button key={opcion.id} id={`tab-turno-${opcion.id}`} type="button" role="tab"
+        aria-selected={pestanaVisible === opcion.id} aria-controls={`panel-turno-${opcion.id}`} disabled={opcion.disabled}
+        onClick={() => setPestana(opcion.id)}
+        className={`min-h-[56px] rounded-xl border px-2 text-sm font-bold active:scale-[0.98] disabled:opacity-35 ${pestanaVisible === opcion.id ? 'border-emerald-500 bg-[var(--accent-soft)] text-[var(--accent-ink)]' : 'border-[var(--line)] text-[var(--text-3)]'}`}>
+        {opcion.label}
+      </button>)}
+    </div>
+
+    <div className="min-h-0 flex-1 overflow-hidden p-3">
+      <section id="panel-turno-turno" role="tabpanel" aria-labelledby="tab-turno-turno" hidden={pestanaVisible !== 'turno'} className="mx-auto h-full max-w-4xl">
+        <div className="flex h-full flex-col rounded-2xl border border-[var(--line)] p-4">
+          <div className="mb-3 flex items-start justify-between gap-4">
+            <div><h2 className="text-xl font-bold">{turno ? 'Cerrar turno' : 'Abrir turno'}</h2>
+              <p className="text-sm text-[var(--text-3)]">{turno ? 'Cuenta el efectivo y confirma el cierre con Caja.' : 'Registra el efectivo inicial antes de operar.'}</p></div>
+            {turno && <p className="text-sm sm:hidden">Fondo: <strong>{pesosDeCentavos(turno.opening_cash_cents)}</strong></p>}
+          </div>
+          {error && <p role="alert" className="mb-3 rounded-xl bg-red-500/10 p-3 text-[var(--crit-ink)]">{error}</p>}
+          {turno?.opening_reconciliation?.reason && <p className="mb-3 rounded-xl bg-[var(--line)]/40 p-3 text-sm">Motivo del fondo: {turno.opening_reconciliation.reason}</p>}
+          <div className="grid gap-3 md:grid-cols-2">
+            <label className="block font-medium">{turno ? 'Efectivo contado al cierre' : 'Fondo inicial en efectivo'}
+              <input aria-label={turno ? 'Efectivo contado al cierre' : 'Fondo inicial en efectivo'} inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)}
+                className="mt-2 min-h-[56px] w-full rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-xl" /></label>
+            {(turno || veredictoDelFondo.exigeExplicacion) && <label className="block font-medium">
+              {turno ? 'Notas del cierre' : '¿A dónde se fue (o de dónde salió) la diferencia?'}
+              <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} className="mt-2 min-h-[72px] w-full resize-none rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 py-3" /></label>}
+          </div>
+          {!turno && veredictoDelFondo.aviso && <p className={`mt-3 rounded-xl p-3 text-sm ${veredictoDelFondo.exigeExplicacion
+            ? 'bg-amber-500/10 text-amber-500' : 'bg-[var(--line)]/40 text-[var(--text-3)]'}`}>{veredictoDelFondo.aviso}</p>}
+          {!turno && veredictoDelFondo.motivo && amount.trim() !== '' && <p className="mt-2 text-xs text-amber-500">{veredictoDelFondo.motivo}</p>}
+          <button disabled={busy || !connected || !amount || (!turno && !veredictoDelFondo.puedeAbrir)} onClick={act}
+            className="mt-auto min-h-[64px] w-full rounded-xl bg-blue-600 px-4 py-3 text-lg font-bold text-white active:scale-[0.99] disabled:opacity-40">
+            {busy ? 'Confirmando con Caja…' : turno ? 'Confirmar cierre de turno' : 'Abrir turno'}
+          </button>
+        </div>
+      </section>
+
+      <div id="panel-turno-movimiento" role="tabpanel" aria-labelledby="tab-turno-movimiento" hidden={pestanaVisible !== 'movimiento'} className="mx-auto h-full max-w-4xl">
+        {turno && <MovimientoDeCaja turnoId={turno.id} />}
+      </div>
+
+      <div id="panel-turno-ultimo" role="tabpanel" aria-labelledby="tab-turno-ultimo" hidden={pestanaVisible !== 'ultimo'} className="mx-auto h-full max-w-4xl">
+        {latest && <section aria-label="Último cierre confirmado" className="flex h-full flex-col rounded-2xl border border-emerald-600 p-5">
+          <h2 className="text-xl font-bold">Último cierre confirmado</h2>
+          <p className="mt-1 text-sm text-[var(--text-3)]">{new Date(latest.closed_at).toLocaleString('es-MX')}</p>
+          <dl className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3">{[
+            ['Fondo inicial', latest.opening_cash_cents], ['Ventas en efectivo', latest.cash_sales_cents],
+            ['Total cobrado', latest.total_paid_cents], ['Efectivo esperado', latest.expected_cash_cents],
+            ['Efectivo contado', latest.counted_cash_cents], ['Diferencia', latest.difference_cents],
+          ].map(([label, value]) => <div key={label} className="rounded-xl bg-[var(--surface-2)] p-4"><dt className="text-sm text-[var(--text-3)]">{label}</dt><dd className="mt-1 text-xl font-bold">{pesosDeCentavos(Number(value))}</dd></div>)}</dl>
+        </section>}
+      </div>
+
+      <div id="panel-turno-verificaciones" role="tabpanel" aria-labelledby="tab-turno-verificaciones" hidden={pestanaVisible !== 'verificaciones'} className="mx-auto h-full max-w-5xl">
+        <div className="grid h-full min-h-0 gap-3 md:grid-cols-2">
+          <ImpresionesInciertasDeCaja />
+          <ImpresionesInciertasDeCaja kind="drawer" />
+        </div>
+      </div>
     </div>
   </main>
 }

@@ -39,22 +39,25 @@ export default function ImpresionesInciertasDeCaja({ kind = 'paper' }: { kind?: 
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Verificación sin confirmar') }
     finally { working.current = false; setBusy(false) }
   }
-  return <section aria-label={drawer ? "Revisar cajón incierto" : "Revisar papel incierto"} className="space-y-3 rounded-xl border border-[var(--line)] p-4 text-sm">
-    <button disabled={busy} onClick={() => void refresh()} className="rounded border px-3 py-2 disabled:opacity-50">{drawer ? "Consultar aperturas por verificar" : "Consultar impresiones por verificar"}</button>
+  const field = 'mt-2 min-h-[56px] w-full rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 py-3'
+  const button = 'min-h-[56px] rounded-xl border border-[var(--line)] px-3 py-2 font-semibold disabled:opacity-50'
+  return <section aria-label={drawer ? "Revisar cajón incierto" : "Revisar papel incierto"} className="min-h-0 overflow-y-auto rounded-xl border border-[var(--line)] p-4 text-sm">
+    <h2 className="text-lg font-bold">{drawer ? 'Cajón por verificar' : 'Papel por verificar'}</h2>
+    <button disabled={busy} onClick={() => void refresh()} className={`${button} mt-3`}>{drawer ? "Consultar aperturas por verificar" : "Consultar impresiones por verificar"}</button>
     {jobs?.length === 0 && <p>{drawer ? "Caja no reporta aperturas inciertas en esta consulta." : "Caja no reporta impresiones inciertas en esta consulta."}</p>}
     {jobs?.map(job => <button key={`${job.job_id}:${job.uncertain_episode_id}`} disabled={busy}
       onClick={() => { setSelected(job); setResolution(drawer ? 'opened' : 'printed'); setReason(''); setPin(''); setMessage('') }}
-      className="block rounded border px-3 py-2">{job.printer_name} · {job.document_type} · {job.job_id.slice(0, 12)}</button>)}
-    {selected && <div className="space-y-2" role="group" aria-label={drawer ? "Verificar resultado del cajón" : "Verificar resultado de impresión"}>
+      className={`${button} mt-2 block w-full text-left`}>{job.printer_name} · {job.document_type} · {job.job_id.slice(0, 12)}</button>)}
+    {selected && <div className="mt-3 space-y-3" role="group" aria-label={drawer ? "Verificar resultado del cajón" : "Verificar resultado de impresión"}>
       <p>{drawer ? "Revisa el cajón antes de decidir. Otro pulso puede volver a abrirlo." : "Revisa la impresora y el documento antes de decidir. Una conexión confirmada no prueba que haya salido papel."}</p>
-      <label className="block">Resultado verificado<select disabled={busy} value={resolution} onChange={event => setResolution(event.target.value as typeof resolution)} className="ml-2 rounded border bg-[var(--surface)] p-2">
+      <label className="block font-medium">Resultado verificado<select disabled={busy} value={resolution} onChange={event => setResolution(event.target.value as typeof resolution)} className={field}>
         <option value={drawer ? "opened" : "printed"}>{drawer ? "Verifiqué la apertura" : "El documento salió completo"}</option><option value={drawer ? "retry_pulse" : "reprint"}>{drawer ? "Solicitar otro pulso" : "Necesito una copia"}</option>
       </select></label>
-      <label className="block">Detalle de la verificación<input disabled={busy} value={reason} onChange={event => setReason(event.target.value)} className="ml-2 rounded border bg-transparent p-2" /></label>
-      <label className="block">PIN del encargado<input disabled={busy} type="password" inputMode="numeric" autoComplete="off" value={pin} onChange={event => setPin(event.target.value)} className="ml-2 rounded border bg-transparent p-2" /></label>
-      <button disabled={busy || !reason.trim() || !pin} onClick={() => void resolve()} className="rounded border px-3 py-2 disabled:opacity-50">Confirmar verificación en Caja</button>
-      <button disabled={busy} onClick={() => { setSelected(null); setPin('') }} className="ml-2 underline">Cerrar</button>
+      <label className="block font-medium">Detalle de la verificación<input disabled={busy} value={reason} onChange={event => setReason(event.target.value)} className={field} /></label>
+      <label className="block font-medium">PIN del encargado<input disabled={busy} type="password" inputMode="numeric" autoComplete="off" value={pin} onChange={event => setPin(event.target.value)} className={field} /></label>
+      <div className="grid grid-cols-2 gap-2"><button disabled={busy} onClick={() => { setSelected(null); setPin('') }} className={button}>Cerrar</button>
+        <button disabled={busy || !reason.trim() || !pin} onClick={() => void resolve()} className={`${button} border-emerald-600 bg-emerald-600 text-white`}>Confirmar verificación en Caja</button></div>
     </div>}
-    {message && <p role="status">{message}</p>}
+    {message && <p role="status" className="mt-3">{message}</p>}
   </section>
 }

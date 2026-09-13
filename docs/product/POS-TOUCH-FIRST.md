@@ -237,18 +237,47 @@ del documento y no contienen controles menores de 56px. El recorrido Caja
 introduce ahora fondo, cobros, motivos, PINs, transferencia, anulación, cajón,
 retiros y cierre pulsando esas teclas: **25/25**.
 
-El KDS instalado no comparte este layout; su pad y sus blancos táctiles forman
-parte del bloque 6 y siguen pendientes. No se considera cerrado el requisito
-global hasta probar también cocina.
+El KDS instalado no comparte este layout. Su superficie se verificó por separado
+en Electron: preparación y entrega se hacen por toque y sin PIN; el KDS sólo
+recibe autoridad para `KITCHEN_SET`. No puede cambiar el contenido o mesa,
+cancelar, cobrar, abrir cajón ni afectar saldos. La credencial LAN sigue siendo compartida por instalación, por
+lo que una futura inscripción individual de terminales permitirá revocarlas por
+separado; no se presenta la cabecera de una pantalla como identidad segura.
 
-5. Turno y Corte Z
-6. KDS
+### 5. Turno y Corte Z — **hecho y medido**
+
+Turno ahora es una sola pantalla de 768px con cuatro pestañas de 56px: Turno,
+Retiro / Depósito, Último cierre y Verificaciones. Los paneles permanecen
+montados al cambiar de pestaña para no perder borradores. Un cierre confirmado
+abre Último cierre y Corte conserva sus guardas fail-closed.
+
+A 1024×768, el turno abierto, movimientos, verificaciones vacías y Corte X
+tienen **cero scroll de página** y **cero controles visibles menores de 56px**.
+La conservación y navegación de Último cierre están cubiertas por DOM y por el
+recorrido operacional; todavía falta su captura dimensional con un cierre real.
+
+### 6. KDS — **hecho y medido**
+
+Vista, ajustes, renglones y acciones miden al menos 56px. Una comanda extensa
+desplaza únicamente su lista interna para mantener siempre visible la acción
+principal; la página no hace scroll. Los interruptores de ajustes son controles
+semánticos. Cocina no requiere identidad de empleado ni teclado: la Caja acepta
+sólo cambios de estado de preparación autenticados por la instalación.
+
+Recorrido operacional Electron: **20/20**. Capturas a 1024×768: **16 pantallas,
+cero scroll de página y cero fallos de navegación**; el capturador registra
+dimensiones para revisión y todavía no actúa como gate. Suites locales: web **3,783/3,783**, DOM
+**309/309**, Electron **653/653** y TypeScript limpio. La única prueba web fuera
+de esa corrida es el archivo live del analista, dependiente de un proveedor
+externo que respondió con límite de cuota.
 
 ## 5. Lo que NO se hace
 
 - Convertirlo en dashboard SaaS.
 - Cambiar tipografía, acento o iconografía.
-- Tocar lógica de negocio, `saveOrder` ni su caída a `OFFLINE_QUEUED`.
+- Tocar `saveOrder` ni su caída a `OFFLINE_QUEUED`. La única excepción de
+  autoridad es explícita: el KDS autenticado por la instalación puede ejecutar
+  sólo `KITCHEN_SET`, porque cocina no usa PIN de empleado.
 - Tocar los archivos que lleva Codex: `api/pos/pin/**`, `api/pos/staff-cache/**`,
   `shift-token.ts`, `api-auth.ts`, `pos-db-policy.ts`, `manager-approval.ts`,
   `adjust-market`, `recipe-sync`, `cancel-item`, migraciones y
