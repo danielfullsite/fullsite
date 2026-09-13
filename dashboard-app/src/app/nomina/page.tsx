@@ -1,6 +1,6 @@
 'use client'
 
-import ReportUnavailable from '@/components/ReportUnavailable'
+import { useReportUnavailable } from '@/lib/report-status'
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { Users, Clock, DollarSign, TrendingUp, Calendar, AlertTriangle, ChevronDown, Download, Wallet, Receipt, UserCheck, Timer } from 'lucide-react'
@@ -329,7 +329,10 @@ export default function NominaPage() {
 
   // ── Render ────────────────────────────────────────────────────────
 
-  if (reportError) return <ReportUnavailable onRetry={() => loadData(period)} />
+  // La lectura falló, pero la pantalla se sigue dibujando: el aviso sale arriba
+  // (AppShell) y las cifras se reservan. Antes aquí se devolvía la tarjeta de
+  // error y se perdía toda la página, formularios incluidos.
+  useReportUnavailable(reportError, () => loadData(period))
 
   if (loading) {
     return (

@@ -2,6 +2,7 @@
 
 import { TrendingUp, TrendingDown, Minus, LucideIcon } from 'lucide-react'
 import { motion } from 'framer-motion'
+import { useReportStatus } from '@/lib/report-status'
 
 interface KPICardProps {
   label: string
@@ -92,6 +93,16 @@ export default function KPICard({
   const defaults = { bg: 'bg-[var(--surface-2)]', icon: 'text-[var(--text-3)]', borderColor: 'border-[var(--accent-line)]', spark: undefined as string | undefined }
   const style = accentClass ? iconStyles[accentClass] || defaults : defaults
 
+  // Una lectura caída no vale cero. Mientras el aviso de "Datos no disponibles"
+  // esté arriba, la tarjeta enseña una raya en vez de un $0.00 que se lee como
+  // un hecho — y esconde delta, cambio semanal y sparkline, que salen del mismo
+  // cálculo. La pantalla sigue completa; sólo la cifra se reserva.
+  const { failed: unconfirmed } = useReportStatus()
+  const shownValue = unconfirmed ? '—' : value
+  const showDelta = !unconfirmed && Boolean(delta)
+  const showWeekChange = !unconfirmed && weekChange !== undefined && weekChange !== null
+  const showSparkline = !unconfirmed && sparklineData && sparklineData.length >= 2
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -110,11 +121,11 @@ export default function KPICard({
           )}
           <div className="flex-1 min-w-0">
             <p className="text-[9px] uppercase tracking-[0.12em] font-mono text-[var(--text-3)] mb-0.5">{label}</p>
-            <p data-testid="kpi-valor" className="text-[23px] font-extrabold tracking-[-0.02em] text-[var(--text-1)] leading-tight tnum"><Cifra value={value} /></p>
+            <p data-testid="kpi-valor" title={unconfirmed ? 'Sin confirmar' : undefined} className="text-[23px] font-extrabold tracking-[-0.02em] text-[var(--text-1)] leading-tight tnum"><Cifra value={shownValue} /></p>
           </div>
         </div>
         {/* Single compact delta */}
-        {weekChange !== undefined && weekChange !== null && (
+        {showWeekChange && (
           <div className={`mt-2 flex items-center gap-1 text-[11px] font-bold ${
             weekChange > 0 ? 'text-[var(--ok-ink)]' : weekChange < 0 ? 'text-[var(--crit-ink)]' : 'text-[var(--text-4)]'
           }`}>
@@ -140,7 +151,7 @@ export default function KPICard({
             )}
             <span className="text-[10px] uppercase tracking-[0.13em] font-mono text-[var(--text-3)] leading-tight">{label}</span>
           </div>
-          {sparklineData && sparklineData.length >= 2 && (
+          {showSparkline && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -156,11 +167,12 @@ export default function KPICard({
           animate={{ opacity: 1 }}
           transition={{ duration: 0.3, delay: index * 0.06 + 0.15 }}
           data-testid="kpi-valor"
+          title={unconfirmed ? 'Sin confirmar' : undefined}
           className="text-[31px] font-extrabold tracking-[-0.025em] text-[var(--text-1)] tnum mt-[10px] leading-none"
         >
-          <Cifra value={value} />
+          <Cifra value={shownValue} />
         </motion.p>
-        {delta && (
+        {showDelta && (
           <motion.div
             initial={{ opacity: 0, x: -8 }}
             animate={{ opacity: 1, x: 0 }}
@@ -178,7 +190,7 @@ export default function KPICard({
             {subtitle && <span className="text-[var(--text-4)] text-xs">{subtitle}</span>}
           </motion.div>
         )}
-        {weekChange !== undefined && weekChange !== null && (
+        {showWeekChange && (
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

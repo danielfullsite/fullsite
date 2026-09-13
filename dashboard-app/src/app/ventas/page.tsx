@@ -1,6 +1,6 @@
 'use client'
 
-import ReportUnavailable from '@/components/ReportUnavailable'
+import { useReportUnavailable } from '@/lib/report-status'
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import {
@@ -215,7 +215,10 @@ export default function VentasPage() {
     { key: 'custom', label: 'Personalizado' },
   ]
 
-  if (reportError) return <ReportUnavailable onRetry={loadData} />
+  // La lectura falló, pero la pantalla se sigue dibujando: el aviso sale arriba
+  // (AppShell) y las cifras se reservan. Antes aquí se devolvía la tarjeta de
+  // error y se perdía toda la página, formularios incluidos.
+  useReportUnavailable(reportError, loadData)
 
   return (
     <>

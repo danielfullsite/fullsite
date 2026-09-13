@@ -1,6 +1,6 @@
 'use client'
 
-import ReportUnavailable from '@/components/ReportUnavailable'
+import { useReportUnavailable } from '@/lib/report-status'
 
 import { useEffect, useState, useMemo } from 'react'
 import { DollarSign, Ticket, Users, Receipt, Banknote, CreditCard, Vault, ArrowDownCircle, Building2 } from 'lucide-react'
@@ -200,7 +200,10 @@ export default function CortesPage() {
       footer: <span className="py-3.5 px-4 text-sm tabular-nums font-bold text-[var(--text-1)]">{formatCurrency(totalTarjeta)}</span> },
   ]
 
-  if (reportError) return <ReportUnavailable />
+  // La lectura falló, pero la pantalla se sigue dibujando: el aviso sale arriba
+  // (AppShell) y las cifras se reservan. Antes aquí se devolvía la tarjeta de
+  // error y se perdía toda la página, formularios incluidos.
+  useReportUnavailable(reportError)
 
   if (loading) {
 

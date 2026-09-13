@@ -1,6 +1,6 @@
 'use client'
 
-import ReportUnavailable from '@/components/ReportUnavailable'
+import { useReportUnavailable } from '@/lib/report-status'
 
 import { useEffect, useState, useMemo } from 'react'
 import { HandCoins, Users, TrendingUp, CreditCard } from 'lucide-react'
@@ -101,7 +101,10 @@ export default function PropinasPage() {
   const tarjetaTotal = tarjetaPayments.reduce((s, p) => s + p.total, 0)
   const tarjetaMax = tarjetaPayments[0]?.total || 1
 
-  if (reportError) return <ReportUnavailable />
+  // La lectura falló, pero la pantalla se sigue dibujando: el aviso sale arriba
+  // (AppShell) y las cifras se reservan. Antes aquí se devolvía la tarjeta de
+  // error y se perdía toda la página, formularios incluidos.
+  useReportUnavailable(reportError)
 
   return (
     <>

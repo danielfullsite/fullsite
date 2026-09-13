@@ -1,6 +1,6 @@
 'use client'
 
-import ReportUnavailable from '@/components/ReportUnavailable'
+import { useReportUnavailable } from '@/lib/report-status'
 
 import { useState, useMemo, useCallback } from 'react'
 import { FileBarChart, Download, DollarSign, Users, UtensilsCrossed, TrendingUp } from 'lucide-react'
@@ -123,7 +123,10 @@ export default function ReportesPage() {
     }
   }, [data, generated])
 
-  if (reportError) return <ReportUnavailable onRetry={generate} />
+  // La lectura falló, pero la pantalla se sigue dibujando: el aviso sale arriba
+  // (AppShell) y las cifras se reservan. Antes aquí se devolvía la tarjeta de
+  // error y se perdía toda la página, formularios incluidos.
+  useReportUnavailable(reportError, generate)
 
   return (
     <>

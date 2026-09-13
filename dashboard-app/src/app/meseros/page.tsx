@@ -1,6 +1,6 @@
 'use client'
 
-import ReportUnavailable from '@/components/ReportUnavailable'
+import { useReportUnavailable } from '@/lib/report-status'
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import {
@@ -294,7 +294,10 @@ export default function MeserosPage() {
     return waiterKpis.find(w => w.nombre === selectedMesero) || null
   }, [selectedMesero, waiterKpis])
 
-  if (reportError) return <ReportUnavailable />
+  // La lectura falló, pero la pantalla se sigue dibujando: el aviso sale arriba
+  // (AppShell) y las cifras se reservan. Antes aquí se devolvía la tarjeta de
+  // error y se perdía toda la página, formularios incluidos.
+  useReportUnavailable(reportError)
 
   if (loading) {
     return (

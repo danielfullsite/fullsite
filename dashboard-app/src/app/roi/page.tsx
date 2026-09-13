@@ -1,6 +1,6 @@
 'use client'
 
-import ReportUnavailable from '@/components/ReportUnavailable'
+import { useReportUnavailable } from '@/lib/report-status'
 
 import { useEffect, useState } from 'react'
 import { TrendingUp, Shield, AlertTriangle, DollarSign, Bot, RefreshCw, Zap, Eye } from 'lucide-react'
@@ -198,7 +198,10 @@ export default function ROIPage() {
 
   useEffect(() => { load() }, [])
 
-  if (reportError) return <ReportUnavailable onRetry={load} />
+  // La lectura falló, pero la pantalla se sigue dibujando: el aviso sale arriba
+  // (AppShell) y las cifras se reservan. Antes aquí se devolvía la tarjeta de
+  // error y se perdía toda la página, formularios incluidos.
+  useReportUnavailable(reportError, load)
 
   if (loading) {
     return <div className="flex items-center justify-center h-96"><div className="w-10 h-10 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>

@@ -6,6 +6,7 @@ import Sidebar from '@/components/Sidebar'
 import ChatWidget from '@/components/ChatWidget'
 import NotificationBell from '@/components/NotificationBell'
 import ActAsBanner from '@/components/ActAsBanner'
+import { ReportUnavailableHost } from '@/components/ReportUnavailable'
 import { PageTransition } from '@/components/motion'
 import { useEffect, useState } from 'react'
 
@@ -90,6 +91,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <NotificationBell />
         </div>
         <div className="p-4 sm:p-6 lg:p-8 max-w-[1400px] mx-auto min-w-0">
+          {/* Lecturas que no se pudieron confirmar. Vive aquí —y no dentro de
+              cada página— para que el aviso salga sin que ninguna pantalla deje
+              de dibujarse. */}
+          <ReportUnavailableHost />
           <PageTransition key={pathname}>
             {children}
           </PageTransition>

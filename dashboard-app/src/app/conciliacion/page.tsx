@@ -1,6 +1,6 @@
 'use client'
 
-import ReportUnavailable from '@/components/ReportUnavailable'
+import { useReportUnavailable } from '@/lib/report-status'
 
 import { useState, useCallback, useEffect, useMemo } from 'react'
 import { Upload, CheckCircle, AlertTriangle, DollarSign, CreditCard, Banknote, ArrowUpDown, FileSpreadsheet, TrendingUp } from 'lucide-react'
@@ -169,7 +169,10 @@ export default function ConciliacionPage() {
   const pendientes = conciliacion.filter(r => r.status === 'pendiente').length
   const conciliados = conciliacion.filter(r => r.status === 'ok').length
 
-  if (reportError) return <ReportUnavailable />
+  // La lectura falló, pero la pantalla se sigue dibujando: el aviso sale arriba
+  // (AppShell) y las cifras se reservan. Antes aquí se devolvía la tarjeta de
+  // error y se perdía toda la página, formularios incluidos.
+  useReportUnavailable(reportError)
 
   if (loading) {
     return <div className="flex items-center justify-center h-96"><div className="w-10 h-10 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>
