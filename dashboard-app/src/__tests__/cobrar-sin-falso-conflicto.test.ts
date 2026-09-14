@@ -46,10 +46,21 @@ describe('la marca de concurrencia nunca se fabrica en el cliente', () => {
     expect(cuerpo).not.toMatch(/new Date\(\)/)
   })
 
-  it('y con marca nula el chequeo deja pasar el cobro en vez de bloquearlo', () => {
+  it('y sin orden cargada el chequeo deja pasar el cobro en vez de bloquearlo', () => {
     const i = fuente.indexOf('const checkOrderConflict = async')
     const cuerpo = fuente.slice(i, i + 600)
-    // `!loadedUpdatedAt` → `return false` = «no hay conflicto detectable».
-    expect(cuerpo).toMatch(/if \(!loadedOrderId \|\| !loadedUpdatedAt\) return false/)
+    // Sin orden en el servidor no hay conflicto que detectar.
+    expect(cuerpo).toMatch(/if \(!loadedOrderId\) return false/)
+  })
+
+  it('REGRESION: el chequeo pregunta por revisión, no por el reloj de la fila', () => {
+    // Segunda mitad del mismo incidente de campo. Aunque la marca ya no se
+    // fabrique en el cliente, comparar `updated_at` sigue bloqueando el cobro:
+    // el trigger la mueve en cualquier escritura, y el KDS escribe cada vez que
+    // cocina palomea un platillo. La pregunta correcta es por `order_revision`.
+    const i = fuente.indexOf('const checkOrderConflict = async')
+    const cuerpo = fuente.slice(i, i + 2000)
+    expect(cuerpo).toMatch(/select=order_revision,status/)
+    expect(cuerpo).not.toMatch(/updated_at/)
   })
 })

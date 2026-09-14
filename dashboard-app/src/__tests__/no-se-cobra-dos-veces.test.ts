@@ -53,7 +53,20 @@ describe('capa 1 y 2 — el POS no deja cobrar dos veces desde la pantalla', () 
     const check = cuerpoDe('app/pos/page.tsx', 'const checkOrderConflict = async', 2000)
     expect(check).toMatch(/'cerrada'/)
     expect(check).toMatch(/'cancelada'/)
-    expect(check).toMatch(/updated_at/)
+  })
+
+  it('REGRESION: pregunta por `order_revision`, NUNCA por `updated_at`', () => {
+    // El trigger `set_updated_at` mueve `updated_at` en CUALQUIER escritura sobre
+    // `pos_orders` (baseline_esquema.sql: `NEW.updated_at = NOW()`, incondicional),
+    // y el KDS escribe cada vez que cocina palomea un platillo. Comparar esa marca
+    // bloqueaba el cobro de una mesa porque alguien marcó un plato como listo
+    // (AMALAY, 2026-09-13). `order_revision` sólo lo mueven `r1_save_order` y
+    // `r1_add_items` — dinero y renglones — que es exactamente lo que esta guarda
+    // quiere detectar, y es la misma revisión que usa el OCC del servidor.
+    const check = cuerpoDe('app/pos/page.tsx', 'const checkOrderConflict = async', 2000)
+    expect(check).toMatch(/order_revision/)
+    expect(check, 'comparar updated_at bloquea el cobro cuando cocina marca un platillo')
+      .not.toMatch(/updated_at/)
   })
 
   it('y si falla la red NO bloquea el cobro — se apoya en las capas del servidor', () => {

@@ -3415,12 +3415,30 @@ function POSContent() {
     } catch { return { updatedAt: null } }
   }
 
-  // Concurrency check: verify order hasn't been modified by another terminal
+  // ¿OTRA TERMINAL TOCÓ ESTA CUENTA? SE PREGUNTA POR REVISIÓN, NO POR RELOJ.
+  //
+  // Esto comparaba `updated_at`. El trigger `set_updated_at` lo mueve en CUALQUIER
+  // escritura sobre `pos_orders` (baseline_esquema.sql:1465, `NEW.updated_at =
+  // NOW()`, incondicional) — y cocina escribe: cada vez que el KDS palomea un
+  // platillo hace un PATCH de `kds_item_status`. En AMALAY cocina SÍ marca, así
+  // que la secuencia diaria era: el cajero abre la mesa, cocina palomea la
+  // entrada, el cajero toca Cobrar y recibe «esta orden fue modificada por otro
+  // usuario» — sin que nadie tocara dinero ni productos. Y no cedía al reintentar,
+  // porque la marca no se vuelve a leer mientras la mesa siga abierta en pantalla.
+  //
+  // `order_revision` sí distingue quién escribió qué: lo incrementan `r1_save_order`
+  // y `r1_add_items` —las escrituras que cambian dinero o renglones— y NO lo toca
+  // el KDS. Es además la misma revisión que usa el OCC de `saveOrder`, así que la
+  // guarda de pantalla y la del servidor pasan a hablar el mismo idioma.
+  //
+  // El mismo síntoma ya se había visto en el camino de Enviar: ahí la guarda se
+  // quitó entera con la nota «caused false positives from stale updatedAt». Aquí
+  // no se quita —cobrar sí necesita protección— se le cambia la pregunta.
   const checkOrderConflict = async (context: string): Promise<boolean> => {
-    if (!loadedOrderId || !loadedUpdatedAt) return false // no conflict possible
+    if (!loadedOrderId) return false // no conflict possible
     try {
       const checkRes = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${loadedOrderId}&select=updated_at,created_at,status&limit=1`,
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${loadedOrderId}&select=order_revision,status&limit=1`,
         { headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` }, cache: 'no-store', signal: AbortSignal.timeout(4000) }
       )
       if (checkRes.ok) {
@@ -3431,8 +3449,8 @@ function POSContent() {
             showToast(`Esta orden ya fue ${rows[0].status} por otro usuario`)
             return true
           }
-          const currentUpdatedAt = rows[0].updated_at || rows[0].created_at
-          if (currentUpdatedAt && currentUpdatedAt !== loadedUpdatedAt) {
+          const revisionEnServidor = rows[0].order_revision
+          if (Number.isInteger(revisionEnServidor) && revisionEnServidor !== orderRevision) {
             showToast('Esta orden fue modificada por otro usuario. Recarga la mesa.')
             return true
           }
@@ -4295,6 +4313,11 @@ function POSContent() {
       sessionStorage.removeItem('pos_last_activity')
       navigateToMesaMap()
       lock()
+      // ÚNICO PUNTO EN QUE ESTE COBRO QUEDÓ REGISTRADO. Lo devuelve para que el
+      // camino de MP Point sepa distinguir «se cobró» de «no se cobró»: todas
+      // las demás salidas de esta función son `return` sin valor (undefined), y
+      // ninguna lanza. Ver el comentario del `clearMpRecovery` más abajo.
+      return true
     } else {
       showToast('Error al cerrar cuenta')
       setSaving(false); operationLock.current = false
@@ -6717,8 +6740,29 @@ function POSContent() {
                               }
                               updateMpRecovery(mpRec)
                               try {
-                                await handlePayment('Tarjeta de crédito', recoveryOpId)
-                                clearMpRecovery()
+                                // EL RASTRO SÓLO SE BORRA SI EL COBRO QUEDÓ REGISTRADO.
+                                //
+                                // Esto llamaba `clearMpRecovery()` sin condición. Pero
+                                // `handlePayment` no lanza en sus fallas reales —su cuerpo es
+                                // try/finally, sin catch— y cada falla sale por `return`:
+                                // conflicto de revisión, `saveResult.conflict`,
+                                // PAYMENT_MISMATCH, API_ERROR, SESSION_EXPIRED. O sea: la
+                                // terminal bancaria ya capturó el dinero del cliente, el
+                                // registro en Fullsite falló, y se borraba el único rastro
+                                // que existía. El banner rojo de recuperación nunca aparecía,
+                                // la mesa quedaba abierta con el total completo, y el
+                                // siguiente que la tocara la cobraba otra vez.
+                                //
+                                // `handlePayment` devuelve `true` sólo en su punto de éxito;
+                                // cualquier otra salida es `undefined` y conserva el rastro.
+                                if (await handlePayment('Tarjeta de crédito', recoveryOpId) === true) {
+                                  clearMpRecovery()
+                                } else {
+                                  updateMpRecovery({ ...mpRec, state: 'RECONCILIATION_REQUIRED' as MpPaymentState,
+                                    error: 'La terminal aprobó el cobro pero no se pudo registrar en Fullsite.' })
+                                  setSaving(false)
+                                  operationLock.current = false
+                                }
                               } catch (err) {
                                 const failed: MpPaymentRecovery = {
                                   ...mpRec,
