@@ -1003,14 +1003,14 @@ export default function MesasPage() {
           </button>
         </div>
       )}
-      <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 lg:px-6 py-3 lg:py-4 bg-[var(--surface-2)] border-b border-[var(--line)] flex-shrink-0">
+      <header className={`flex flex-wrap items-center justify-between border-b border-[var(--line)] flex-shrink-0 bg-[var(--surface-2)] ${posV2 ? 'gap-x-2 gap-y-1 px-3 py-1.5' : 'gap-x-4 gap-y-2 px-4 lg:px-6 py-3 lg:py-4'}`}>
         <div className="flex flex-wrap items-center gap-3 min-w-0">
           <Link href="/pos" className="w-10 h-10 rounded-lg bg-[var(--line)] hover:bg-[var(--surface-2)] flex items-center justify-center transition-colors flex-shrink-0">
             <ArrowLeft size={20} />
           </Link>
           <div className="min-w-0">
-            <h1 className="text-xl font-bold leading-tight">Mesas</h1>
-            <p className="text-[var(--text-3)] text-xs lg:text-sm whitespace-nowrap">
+            <h1 className={posV2 ? 'text-[17px] font-black tracking-[-0.03em] leading-none' : 'text-xl font-bold leading-tight'}>Mesas</h1>
+            <p className={`text-[var(--text-3)] whitespace-nowrap ${posV2 ? 'hidden' : 'text-xs lg:text-sm'}`}>
               {(staffName || currentMesero) && <span className="text-[var(--accent-ink)]">{staffName || currentMesero}</span>}
               {turnoNum != null && <span> · Turno {turnoNum}</span>}
               {(staffName || currentMesero || turnoNum != null) && ' · '}
@@ -1179,7 +1179,7 @@ export default function MesasPage() {
             </button>
           )}
         </div>
-        <div className="hidden md:flex items-center gap-6">
+        <div className={`items-center gap-6 ${posV2 ? 'hidden' : 'hidden md:flex'}`}>
           {Object.entries(counts).map(([status, count]) => (
             <div key={status} className="flex items-center gap-2">
               <div className={`w-3 h-3 rounded-full ${statusDot[status]}`} />

@@ -220,3 +220,18 @@
     transition-duration: .01ms !important;
   }
 }
+
+/* ── El encabezado de las subpantallas, a la altura del diseño ───────────
+   El demo le da 52 px a la barra y deja el resto a la operación. Aquí los
+   botones de acción venían con etiqueta —«Editar mapa», «Fusionar»,
+   «Bloquear»— y entre los siete se comían dos renglones. Se compactan sin
+   quitarles nada: el icono se queda, la etiqueta sólo aparece cuando hay
+   ancho de sobra. */
+.pos-v2 header button { padding-top: 6px; padding-bottom: 6px; }
+.pos-v2 header button[class*="text-sm"] { font-size: 12.5px; }
+@media (max-width: 1500px) {
+  .pos-v2 header button > span:not([class]) { display: none; }
+}
+
+/* Las pastillas de cifras: monoespaciada y versalitas, como el diseño. */
+.pos-v2 header + div [class*="rounded-full"] { letter-spacing: 0.04em; }
