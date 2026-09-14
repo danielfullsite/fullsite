@@ -91,6 +91,12 @@ export type PosProductTileProps = {
   price: number
   /** Clase de Tailwind de la categoría, tal como viene del catálogo. */
   colorClass: string
+  /** Color del diseño (hex). Cuando viene, MANDA sobre `colorClass`.
+   *  Las clases del catálogo son morados y turquesas al azar; la paleta del
+   *  diseño son nueve tonos apagados, uno por familia. */
+  colorHex?: string
+  /** Cuántos de este producto lleva ya la cuenta. */
+  cuantos?: number
   /** Agotado: se ve, pero sigue siendo tocable para avisar por qué no se puede. */
   isOOS: boolean
   promo?: boolean
@@ -98,7 +104,7 @@ export type PosProductTileProps = {
   onClick: () => void
 }
 
-export function PosProductTile({ name, price, colorClass, isOOS, promo, v2, onClick }: PosProductTileProps) {
+export function PosProductTile({ name, price, colorClass, colorHex, cuantos, isOOS, promo, v2, onClick }: PosProductTileProps) {
   // ── Antes del rediseño ─────────────────────────────────────────────────────
   if (!v2) {
     return (
@@ -127,31 +133,44 @@ export function PosProductTile({ name, price, colorClass, isOOS, promo, v2, onCl
   // metro de distancia el color es lo único que se alcanza a distinguir.
   // Encima va un velo oscuro fijo para que el texto blanco aguante también
   // sobre los amarillos y cianes del catálogo, que sin él no contrastan.
+  // El mosaico del diseño: un degradado de UN solo tono a 150 grados, el color
+  // de su familia. Sin el velo que le había puesto encima — el diseño no lo
+  // lleva, y era lo que apagaba los colores y los volvía lodo.
+  const fondo = colorHex ? `linear-gradient(150deg, ${colorHex}, ${colorHex}cc)` : undefined
+
   return (
     <button
       onClick={onClick}
       aria-disabled={isOOS || undefined}
       className={[
-        'relative overflow-hidden rounded-2xl px-2 py-2.5 shadow-[0_2px_10px_rgba(0,0,0,.28)]',
-        'flex flex-col items-center justify-center gap-1 text-center text-white',
-        'transition-[transform,filter] duration-150 active:scale-[0.94] active:brightness-[1.12]',
-        colorClass,
+        'relative overflow-hidden rounded-[var(--r2,12px)] px-2 py-2.5',
+        'flex flex-col items-center justify-center gap-[5px] text-center text-white',
+        'shadow-[var(--shadow-1,0_1px_2px_rgba(0,0,0,.4))]',
+        'transition-[transform,filter] duration-[130ms] active:scale-[0.94] active:brightness-[1.15]',
+        colorHex ? '' : colorClass,
         isOOS ? 'grayscale opacity-45 cursor-not-allowed' : '',
-        promo && !isOOS ? 'ring-2 ring-[var(--accent-ink)] ring-offset-2 ring-offset-[var(--surface)]' : '',
+        promo && !isOOS ? 'ring-2 ring-[var(--accent-bright)] ring-offset-2 ring-offset-[var(--bg)]' : '',
       ].filter(Boolean).join(' ')}
+      style={fondo ? { background: fondo } : undefined}
     >
-      <span aria-hidden className="absolute inset-0 bg-gradient-to-br from-white/[0.14] via-transparent to-black/30" />
+      {/* Cuántos llevas ya de este producto. El demo lo trae y evita que el
+          mesero cuente renglones en la cuenta para saber si ya lo pidió. */}
+      {!!cuantos && cuantos > 0 && (
+        <span className="absolute top-[5px] right-[5px] min-w-[19px] h-[19px] px-[5px] rounded-full grid place-items-center font-mono text-[10.5px] font-black bg-black/40">
+          {cuantos}
+        </span>
+      )}
       {isOOS && (
-        <span className="absolute top-1.5 right-1.5 z-10 bg-[var(--crit)] text-white text-[9px] font-black px-1.5 py-0.5 rounded-md uppercase tracking-wide">
+        <span className="absolute top-[5px] left-[6px] text-[8.5px] font-black uppercase tracking-[0.06em] opacity-80">
           Agotado
         </span>
       )}
       <span
-        className={`relative text-[12px] font-extrabold leading-[1.14] tracking-[-0.015em] line-clamp-3 drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)] ${isOOS ? 'line-through' : ''}`}
+        className={`text-[12px] font-extrabold leading-[1.14] tracking-[-0.015em] line-clamp-3 ${isOOS ? 'line-through' : ''}`}
       >
         {name}
       </span>
-      <span className="relative font-mono tabular-nums text-[11.5px] font-bold tracking-[-0.02em] opacity-[0.92] drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]">
+      <span className="font-mono tabular-nums text-[11.5px] font-bold tracking-[-0.02em] opacity-[0.92]">
         ${Math.round(price)}
       </span>
     </button>

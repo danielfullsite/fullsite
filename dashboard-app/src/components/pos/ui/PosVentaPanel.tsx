@@ -85,7 +85,7 @@ export function contarTap(id: string) {
 }
 
 export function PosVentaPanel({
-  categorias, outOfStock, busqueda, onBusqueda, onEscanear, onTocarProducto, v2, fallback,
+  categorias, outOfStock, busqueda, onBusqueda, onEscanear, onTocarProducto, conteos, v2, fallback,
 }: {
   categorias: Cat[]
   outOfStock: Set<string>
@@ -93,6 +93,8 @@ export function PosVentaPanel({
   onBusqueda: (v: string) => void
   onEscanear: () => void
   onTocarProducto: (item: Item, catId: string) => void
+  /** Cuántas unidades de cada producto lleva ya la cuenta, por id. */
+  conteos?: Record<string, number>
   v2: boolean
   fallback: React.ReactNode
 }) {
@@ -247,6 +249,8 @@ export function PosVentaPanel({
                   name={i.name}
                   price={i.price}
                   colorClass={c.color || 'bg-emerald-600'}
+                  colorHex={(FAMILIAS.find(f => f.k === familiaDe(c.name)) || FAMILIAS[4]).c}
+                  cuantos={conteos?.[i.id]}
                   isOOS={isOOS}
                   onClick={() => {
                     if (isOOS) { onTocarProducto(i, c.id); return }

@@ -170,6 +170,7 @@ import { PosActionBand } from '@/components/pos/ui/PosActionBand'
 import { PosAdaptiveGrid } from '@/components/pos/ui/PosAdaptiveGrid'
 import { PosVentaPanel } from '@/components/pos/ui/PosVentaPanel'
 import { PosNumPad, PosMonto } from '@/components/pos/ui/PosNumPad'
+import { PosOrderSheet } from '@/components/pos/ui/PosOrderSheet'
 
 // El reintento del bridge y la validacion de la respuesta viven ahora en
 // lib/kitchen-bridge.ts (sendOrderToKitchen), que SI reporta el resultado.
@@ -1881,6 +1882,9 @@ function POSContent() {
 
   // Out-of-stock tracking
   const [outOfStockItems, setOutOfStockItems] = useState<Set<string>>(new Set())
+  // Renglón cuya hoja de acciones está abierta. En el diseño el renglón no
+  // trae botones: se toca y las acciones salen aquí.
+  const [accionesDe, setAccionesDe] = useState<string | null>(null)
   const posV2 = usePosV2()
 
   useEffect(() => {
@@ -2900,6 +2904,25 @@ function POSContent() {
     setToast(msg)
     toastTimerRef.current = setTimeout(() => setToast(null), 2500)
   }
+  // Cancelar un renglón. Vive aquí una sola vez porque lo llaman DOS lugares
+  // —el renglón y su hoja de acciones— y tener dos copias de una regla de
+  // negocio es cómo se separan con el tiempo.
+  // Transferir un renglón. Igual que cancelar: lo llaman el renglón y su hoja,
+  // y una regla de negocio con dos copias termina teniendo dos comportamientos.
+  const transferirRenglon = useCallback((item: OrderItem) => {
+    if (!accionPendienteEnCaja('La transferencia de un platillo')) setTransferringItem(item)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const cancelarRenglon = useCallback((item: OrderItem) => {
+    if (bloqueaLegacyCaja && (item.sent_quantity ?? 0) === 0 && !sentItemIds.has(item.id)) {
+      setOrderItems(prev => prev.filter(row => row.id !== item.id))
+      showToast('Producto retirado del borrador. Guarda para compartir el cambio.')
+      return
+    }
+    if (!accionPendienteEnCaja('La cancelación individual de productos enviados')) setCancellingItem(item)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bloqueaLegacyCaja, sentItemIds])
 
   useEffect(() => {
     const update = () => {
@@ -4942,15 +4965,9 @@ function POSContent() {
                       onInc={() => updateQuantity(item.id, 1)}
                       onCycleSilla={() => cycleSilla(item.id)}
                       onEdit={() => handleEditOrderItem(item)}
-                      onTransfer={() => { if (!accionPendienteEnCaja('La transferencia de un platillo')) setTransferringItem(item) }}
-                      onCancel={() => {
-                        if (bloqueaLegacyCaja && (item.sent_quantity ?? 0) === 0 && !sentItemIds.has(item.id)) {
-                          setOrderItems(prev => prev.filter(row => row.id !== item.id))
-                          showToast('Producto retirado del borrador. Guarda para compartir el cambio.')
-                          return
-                        }
-                        if (!accionPendienteEnCaja('La cancelación individual de productos enviados')) setCancellingItem(item)
-                      }}
+                      onTransfer={() => transferirRenglon(item)}
+                      onAbrirAcciones={() => setAccionesDe(item.id)}
+                      onCancel={() => cancelarRenglon(item)}
                     />
                   )
                 })}
@@ -5272,6 +5289,7 @@ function POSContent() {
               busqueda={menuSearch}
               onBusqueda={setMenuSearch}
               onEscanear={() => setShowBarcodeScanner(true)}
+              conteos={Object.fromEntries(orderItems.map(i => [i.id, i.cantidad]))}
               onTocarProducto={(item, catId) => {
                 if (outOfStockItems.has(item.id)) { showToast(`${item.name} — AGOTADO`); return }
                 handleMenuItemTap(item as unknown as MenuItem, catId)
@@ -6353,6 +6371,33 @@ function POSContent() {
       })()}
 
       {/* Payment Modal */}
+      {/* Acciones del renglón. Las MISMAS funciones que antes vivían como seis
+          botones en línea; sólo cambió dónde viven. */}
+      {posV2 && accionesDe && (() => {
+        const item = orderItems.find(i => i.id === accionesDe)
+        if (!item) return null
+        const isSent = sentItemIds.has(item.id)
+        return (
+          <PosOrderSheet
+            nombre={item.nombre}
+            cantidad={item.cantidad}
+            subtotalFmt={formatMXN(item.subtotal)}
+            silla={item.silla || 1}
+            modificadores={item.modificadores || []}
+            notas={item.notas}
+            isSent={isSent}
+            puedeCancelar={can('cancelar_ordenes')}
+            onDec={() => updateQuantity(item.id, -1)}
+            onInc={() => updateQuantity(item.id, 1)}
+            onCycleSilla={() => cycleSilla(item.id)}
+            onEdit={() => handleEditOrderItem(item)}
+            onTransfer={() => transferirRenglon(item)}
+            onCancel={() => cancelarRenglon(item)}
+            onCerrar={() => setAccionesDe(null)}
+          />
+        )
+      })()}
+
       {showPayment && !bloqueaLegacyCaja && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-2">
           <div className="bg-[var(--surface-2)] rounded-2xl p-5 w-full max-w-3xl border border-[var(--line)] max-h-[96vh] min-h-[420px] overflow-y-auto">

@@ -38,6 +38,8 @@ export type PosOrderRowProps = {
   onEdit: () => void
   onTransfer: () => void
   onCancel: () => void
+  /** Abre la hoja de acciones. Sustituye a los seis botones en línea. */
+  onAbrirAcciones: () => void
   v2: boolean
 }
 
@@ -64,7 +66,8 @@ function Modificadores({ mods }: { mods: string[] }) {
 export function PosOrderRow(p: PosOrderRowProps) {
   const { nombre, cantidad, subtotalFmt, silla, modificadores, notas,
           isCancelled, isVoided, isSent, isFlashing, kdsDone, sinComanda,
-          puedeCancelar, onDec, onInc, onCycleSilla, onEdit, onTransfer, onCancel, v2 } = p
+          puedeCancelar, onDec, onInc, onCycleSilla, onEdit, onTransfer, onCancel,
+          onAbrirAcciones, v2 } = p
   const mods = modificadores || []
 
   // ── Antes del rediseño ─────────────────────────────────────────────────────
@@ -183,134 +186,82 @@ export function PosOrderRow(p: PosOrderRowProps) {
     )
   }
 
-  // ── Rediseño ───────────────────────────────────────────────────────────────
-  // Tres cambios, y cada uno responde a algo que se ve en la caja:
+  // ── El renglón del diseño ──────────────────────────────────────────────────
+  // Tres columnas y ningún botón: cantidad, nombre (con sus modificadores
+  // debajo) y precio. Se toca el renglón y las acciones salen en una hoja.
   //
-  // 1. La cantidad deja de ser un par de botones de 44 px y se vuelve un
-  //    control sólido de 56 — es lo que más se toca y lo que más se falla.
-  // 2. El estado del renglón se lee por una franja de color a la izquierda,
-  //    no por el fondo: el fondo teñido de rojo hacía ilegible el nombre.
-  // 3. Los botones destructivos dejan de competir con los normales. Cancelar
-  //    no puede verse igual de disponible que editar.
-  const franja = isVoided ? 'var(--text-4)'
-    : isCancelled ? 'var(--crit)'
-    : isSent ? 'var(--info)'
-    : 'var(--accent)'
+  // La versión anterior metía seis controles en línea. Se comían el ancho de la
+  // columna, así que el nombre del platillo caía en dos letras por renglón y
+  // los modificadores no cabían. Y tener «cancelar» a 8 px de «sumar», en una
+  // pantalla que se toca con prisa, es un error esperando a ocurrir.
   const apagado = isVoided || isCancelled
 
   return (
-    <div
-      className={`relative flex items-center gap-2 py-2 pl-3.5 pr-2.5 rounded-[14px] border transition-all overflow-hidden ${
-        isFlashing
-          ? 'ring-2 ring-[var(--accent)] bg-[var(--accent-soft)] border-[var(--accent-line)]'
-          : apagado
-          ? 'bg-[var(--surface-2)] border-[var(--line)]'
-          : 'bg-[var(--surface-2)] border-[var(--line)] hover:bg-[var(--raised)] hover:border-[var(--accent-line)]'
-      }`}
+    <button
+      onClick={onAbrirAcciones}
+      className={`w-full grid items-center gap-2.5 px-2 py-[7px] rounded-[var(--r2,12px)] text-left transition-colors ${isSent && !apagado ? 'opacity-[0.55]' : ''} ${isFlashing ? 'ring-2 ring-[var(--accent)]' : ''}`}
+      style={{
+        gridTemplateColumns: 'auto 1fr auto',
+        background: isFlashing ? 'var(--accent-soft)' : 'transparent',
+      }}
     >
-      <span aria-hidden className="absolute left-0 top-0 bottom-0 w-1.5" style={{ background: franja, opacity: apagado ? 0.5 : 1 }} />
-
-      <div className="flex items-center rounded-xl border border-[var(--line)] bg-[var(--surface)] overflow-hidden flex-shrink-0">
-        <button
-          onClick={(e) => { e.stopPropagation(); onDec() }}
-          disabled={isCancelled || isVoided || isSent}
-          aria-label="Uno menos"
-          className="w-12 h-14 flex items-center justify-center text-[var(--text-1)] transition-transform active:scale-90 disabled:opacity-25 disabled:cursor-not-allowed"
-        >
-          <Minus size={20} />
-        </button>
-        <span className={`w-9 text-center font-black text-xl font-mono tabular-nums ${isSent ? 'text-[var(--text-3)]' : 'text-[var(--text-1)]'}`}>
-          {cantidad}
-        </span>
-        <button
-          onClick={(e) => { e.stopPropagation(); onInc() }}
-          disabled={isCancelled || isVoided || isSent}
-          aria-label="Uno más"
-          className="w-12 h-14 flex items-center justify-center text-[var(--text-1)] transition-transform active:scale-90 disabled:opacity-25 disabled:cursor-not-allowed"
-        >
-          <Plus size={20} />
-        </button>
-      </div>
-
-      <div className="flex-1 min-w-[90px]">
-        <p className={`font-semibold text-[15px] leading-tight break-words line-clamp-2 ${apagado ? 'line-through text-[var(--text-4)]' : 'text-[var(--text-1)]'}`} title={nombre}>
-          {nombre}
-        </p>
-        {(kdsDone || sinComanda || isVoided || (isCancelled && !isVoided)) && (
-          <div className="flex flex-wrap gap-1 mt-1">
-            {!apagado && kdsDone && (
-              <span className="inline-flex items-center bg-[var(--accent-soft)] text-[var(--accent-ink)] border border-[var(--accent-line)] text-[9px] font-black px-1.5 py-0.5 rounded-full leading-none tracking-wide">LISTO</span>
-            )}
-            {!apagado && sinComanda && (
-              <span className="inline-flex items-center bg-[var(--surface-2)] text-[var(--text-3)] border border-[var(--line)] text-[9px] font-black px-1.5 py-0.5 rounded-full leading-none tracking-wide" title="Producto de Market — no genera comanda">SIN COMANDA</span>
-            )}
-            {isVoided && (
-              <span className="inline-flex items-center bg-[var(--surface-2)] text-[var(--text-2)] border border-[var(--line)] text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none tracking-wide">ANULADO</span>
-            )}
-            {isCancelled && !isVoided && (
-              <span className="inline-flex items-center bg-[var(--crit-soft)] text-[var(--crit-ink)] border border-[color-mix(in_srgb,var(--crit)_40%,transparent)] text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none tracking-wide">CANCELADO</span>
-            )}
-          </div>
-        )}
-        {mods.length > 0 && (
-          <p className="text-[var(--text-3)] text-[11.5px] truncate leading-relaxed mt-0.5">
-            <Modificadores mods={mods} />
-          </p>
-        )}
-        {notas && (
-          <p className="text-[var(--text-2)] text-[11.5px] italic truncate">
-            {notas}
-          </p>
-        )}
-      </div>
-
-      {!apagado && (
-        <button
-          onClick={(e) => { e.stopPropagation(); if (!isSent) onCycleSilla() }}
-          disabled={isSent}
-          className={`flex-shrink-0 min-w-[48px] h-14 px-2 rounded-xl text-sm font-black flex items-center justify-center transition-transform active:scale-95 ${isSent ? 'bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-4)] cursor-not-allowed' : 'bg-[var(--info-soft)] border border-[color-mix(in_srgb,var(--info)_40%,transparent)] text-[var(--info-ink)]'}`}
-          title={isSent ? 'Enviado — no se puede cambiar silla' : 'Silla — toca para cambiar'}
-        >
-          {isSent && <Lock size={12} className="mr-1" />}
-          S{silla || 1}
-        </button>
-      )}
-
-      <span className={`font-black text-base w-20 text-right flex-shrink-0 font-mono tabular-nums ${apagado ? 'line-through text-[var(--text-4)]' : 'text-[var(--text-1)]'}`}>
-        {subtotalFmt}
+      <span
+        className="min-w-[30px] h-[30px] px-[7px] rounded-[7px] grid place-items-center font-mono font-extrabold text-[13px]"
+        style={apagado
+          ? { background: 'var(--surface-2)', color: 'var(--text-4)' }
+          : isSent
+          ? { background: 'var(--surface-2)', color: 'var(--text-4)' }
+          : { background: 'var(--info-soft)', color: 'var(--info)' }}
+      >
+        {cantidad}
       </span>
 
-      {!apagado && (
-        <div className="flex items-center gap-1 flex-shrink-0">
-          {!isSent && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onEdit() }}
-            aria-label="Editar"
-            className="w-12 h-14 rounded-xl bg-[var(--surface)] border border-[var(--line)] text-[var(--text-3)] flex items-center justify-center transition-transform active:scale-90"
-          >
-            <Pencil size={18} />
-          </button>
-          )}
-          {isSent && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onTransfer() }}
-            className="w-12 h-14 rounded-xl bg-[var(--warn-soft)] border border-[color-mix(in_srgb,var(--warn)_40%,transparent)] text-[var(--warn-ink)] flex items-center justify-center transition-transform active:scale-90"
-            title="Transferir platillo a otra mesa (requiere supervisor)"
-          >
-            <ArrowRightLeft size={17} />
-          </button>
-          )}
-          {puedeCancelar && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onCancel() }}
-            className="w-12 h-14 rounded-xl bg-transparent border border-[color-mix(in_srgb,var(--crit)_30%,transparent)] text-[color-mix(in_srgb,var(--crit-ink)_75%,transparent)] flex items-center justify-center transition-[transform,background,color] active:scale-90 hover:bg-[var(--crit-soft)] hover:text-[var(--crit-ink)]"
-            title="Cancelar item (requiere gerente)"
-          >
-            <Ban size={18} />
-          </button>
-          )}
-        </div>
-      )}
-    </div>
+      <span className="min-w-0">
+        <span
+          className={`block font-semibold text-[14px] leading-[1.25] line-clamp-2 ${apagado ? 'line-through' : ''}`}
+          style={{ color: apagado ? 'var(--text-4)' : 'var(--text-1)' }}
+          title={nombre}
+        >
+          {nombre}
+        </span>
+        {mods.length > 0 && (
+          <span className="block text-[11px] leading-[1.2] mt-0.5 truncate" style={{ color: 'var(--text-3)' }}>
+            <Modificadores mods={mods} />
+          </span>
+        )}
+        {notas && (
+          <span className="block text-[11px] italic leading-[1.2] truncate" style={{ color: 'var(--text-2)' }}>
+            {notas}
+          </span>
+        )}
+        {(kdsDone || sinComanda || isVoided || (isCancelled && !isVoided)) && (
+          <span className="flex flex-wrap gap-1 mt-1">
+            {!apagado && kdsDone && (
+              <span className="inline-flex items-center text-[9px] font-black px-1.5 py-0.5 rounded-full leading-none tracking-wide"
+                style={{ background: 'var(--accent-soft)', color: 'var(--accent-bright)' }}>LISTO</span>
+            )}
+            {!apagado && sinComanda && (
+              <span className="inline-flex items-center text-[9px] font-black px-1.5 py-0.5 rounded-full leading-none tracking-wide"
+                style={{ background: 'var(--surface-2)', color: 'var(--text-3)' }} title="Producto de Market — no genera comanda">SIN COMANDA</span>
+            )}
+            {isVoided && (
+              <span className="inline-flex items-center text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none tracking-wide"
+                style={{ background: 'var(--surface-2)', color: 'var(--text-2)' }}>ANULADO</span>
+            )}
+            {isCancelled && !isVoided && (
+              <span className="inline-flex items-center text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none tracking-wide"
+                style={{ background: 'var(--crit-soft)', color: 'var(--crit-ink)' }}>CANCELADO</span>
+            )}
+          </span>
+        )}
+      </span>
+
+      <span
+        className={`font-mono font-bold text-[14px] tabular-nums ${apagado ? 'line-through' : ''}`}
+        style={{ color: apagado ? 'var(--text-4)' : 'var(--text-1)' }}
+      >
+        {subtotalFmt}
+      </span>
+    </button>
   )
 }
