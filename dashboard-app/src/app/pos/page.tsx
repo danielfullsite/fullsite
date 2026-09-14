@@ -268,6 +268,7 @@ class ModifierModalErrorBoundary extends Component<
 }
 
 function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onConfirm, onCancel }: ModifierModalProps) {
+  const posV2 = usePosV2()
   const { quitarOptions: defaultQuitar, agregarOptions: legacyAgregar } = getModifiersForCategory(categoryId)
 
   // ── Grupos multinivel (el POS legado: "NIVEL 1: PROTEINA, opcional, máx 2") ──
@@ -524,10 +525,41 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
                     </span>
                   )}
                 </h4>
-                <div className="grid grid-cols-3 gap-1.5">
+                <div className={posV2
+                  ? "grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(128px,1fr))]"
+                  : "grid grid-cols-3 gap-1.5"}>
                   {group.options.map(opt => {
                     const checked = sel.has(opt.id ?? opt.name)
                     const blocked = !checked && group.maxSelections !== null && group.maxSelections > 1 && sel.size >= group.maxSelections
+                    if (posV2) {
+                      // Sin casilla: el mosaico ENTERO es el blanco táctil y el
+                      // color dice si está elegida. Cazar un cuadrito de 24 px
+                      // con el dedo es de donde salen los modificadores que
+                      // nadie quiso marcar. La casilla real sigue ahí, oculta,
+                      // para el lector de pantalla y para el mismo onChange.
+                      return (
+                        <label
+                          key={opt.name}
+                          aria-selected={checked}
+                          className={`min-h-[56px] rounded-[var(--r2,12px)] border flex flex-col items-center justify-center gap-0.5 px-2 text-center transition-transform active:scale-95 ${blocked ? 'opacity-35 cursor-not-allowed' : 'cursor-pointer'}`}
+                          style={checked
+                            ? { background: 'var(--accent-soft)', borderColor: 'var(--accent-line)', color: 'var(--accent-bright)' }
+                            : { background: 'var(--surface-2)', borderColor: 'var(--line)', color: 'var(--text-2)' }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            disabled={blocked}
+                            onChange={() => toggleGroupOption(group, opt.id ?? opt.name)}
+                            className="sr-only"
+                          />
+                          <span className="text-[13.5px] font-extrabold leading-tight line-clamp-2">{opt.name}</span>
+                          <small className="text-[10px] font-mono font-semibold opacity-70">
+                            {opt.price > 0 ? `+${formatMXN(opt.price)}` : 'Gratis'}
+                          </small>
+                        </label>
+                      )
+                    }
                     return (
                       <label
                         key={opt.name}
