@@ -166,6 +166,7 @@ import { computeOutOfStockItems } from '@/lib/stock-availability'
 import { usePOSLock } from './pos-lock-context'
 import { layerZ } from '@/components/ui/layers'
 import { PosProductTile, usePosV2 } from '@/components/pos/ui/PosProductTile'
+import { PosOrderRow } from '@/components/pos/ui/PosOrderRow'
 
 // El reintento del bridge y la validacion de la respuesta viven ahora en
 // lib/kitchen-bridge.ts (sendOrderToKitchen), que SI reporta el resultado.
@@ -4878,148 +4879,36 @@ function POSContent() {
                   const isVoided = voidedItems.has(item.id)
                   const isSent = sentItemIds.has(item.id)
                   return (
-                    <div
+                    <PosOrderRow
                       key={item.id}
-                      className={`flex items-center gap-2 py-1.5 px-2.5 rounded-[12px] transition-all ${
-                        isVoided
-                          ? 'bg-[var(--surface-2)] border border-[var(--line)] opacity-40'
-                          : isCancelled
-                          ? 'bg-[var(--crit-soft)] border border-[color-mix(in_srgb,var(--crit)_40%,transparent)] opacity-60'
-                          : flashItemId === item.id
-                          ? 'ring-2 ring-[var(--accent)] bg-[var(--accent-soft)] border border-[var(--accent-line)]'
-                          : 'bg-[var(--surface-2)] border border-[var(--line)] hover:bg-[var(--raised)] hover:border-[var(--accent-line)]'
-                      }`}
-                    >
-                      {/* Quantity controls */}
-                      <div className="flex items-center gap-0.5">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, -1) }}
-                          disabled={isCancelled || isVoided || isSent}
-                          className="w-11 h-11 rounded-lg bg-[var(--surface)] border border-[var(--line)] hover:bg-[var(--line)] disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors text-[var(--text-1)]"
-                        >
-                          <Minus size={18} />
-                        </button>
-                        <span className={`w-7 text-center font-bold text-lg font-mono tabular-nums ${isSent ? 'text-[var(--text-3)]' : ''}`}>
-                          {item.cantidad}
-                        </span>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, 1) }}
-                          disabled={isCancelled || isVoided || isSent}
-                          className="w-11 h-11 rounded-lg bg-[var(--surface)] border border-[var(--line)] hover:bg-[var(--line)] disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors text-[var(--text-1)]"
-                        >
-                          <Plus size={18} />
-                        </button>
-                      </div>
-
-                      {/* Item name + modifiers + KDS status */}
-                      {/* Barrido visual 2026-09-11: a 1600px el nombre se partía letra por
-                          letra y las etiquetas inline se encimaban con el asiento. El nombre
-                          tiene ancho mínimo, máximo dos líneas, y las etiquetas van en su
-                          propia fila. */}
-                      <div className="flex-1 min-w-[90px]">
-                        <p className={`font-medium text-sm leading-tight break-words line-clamp-2 ${isVoided ? 'line-through text-[var(--text-4)]' : isCancelled ? 'line-through text-[var(--crit-ink)]' : ''}`} title={item.nombre}>
-                          {item.nombre}
-                        </p>
-                        {!isCancelled && !isVoided && ((item as OrderItem & { kds_done?: boolean }).kds_done || (item.station && isNoPrintStation(item.station))) && (
-                          <div className="flex flex-wrap gap-1 mt-0.5">
-                            {(item as OrderItem & { kds_done?: boolean }).kds_done && (
-                              <span className="inline-flex items-center bg-[var(--accent-soft)] text-[var(--accent-ink)] border border-[var(--accent-line)] text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none">LISTO</span>
-                            )}
-                            {item.station && isNoPrintStation(item.station) && (
-                              <span className="inline-flex items-center bg-[var(--surface-2)] text-[var(--text-3)] border border-[var(--line)] text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none" title="Producto de Market — no genera comanda">SIN COMANDA</span>
-                            )}
-                          </div>
-                        )}
-                        {isVoided && (
-                          <span className="inline-flex items-center bg-[var(--surface-2)] text-[var(--text-2)] border border-[var(--line)] text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none mt-0.5">ANULADO</span>
-                        )}
-                        {isCancelled && !isVoided && (
-                          <span className="inline-flex items-center bg-[var(--crit-soft)] text-[var(--crit-ink)] border border-[color-mix(in_srgb,var(--crit)_40%,transparent)] text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none mt-0.5">CANCELADO</span>
-                        )}
-                        {(item.modificadores || []).length > 0 && (
-                          <p className="text-[var(--text-3)] text-[11px] truncate leading-relaxed">
-                            {(item.modificadores || []).map((mod, mi, arr) => {
-                              const parts = String(mod).split(/(\+\$[\d,.]+)/g)
-                              return (
-                                <span key={mi}>
-                                  {parts.map((p, pi) => /^\+\$/.test(p)
-                                    ? <span key={pi} className="text-[var(--accent-ink)] font-semibold font-mono tabular-nums">{p}</span>
-                                    : <span key={pi}>{p}</span>)}
-                                  {mi < arr.length - 1 ? ' · ' : ''}
-                                </span>
-                              )
-                            })}
-                          </p>
-                        )}
-                        {item.notas && (
-                          <p className="text-[var(--text-2)] text-[11px] italic truncate">
-                            {item.notas}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Silla badge (tap para ciclar 1..personas) — locked if sent */}
-                      {!isCancelled && !isVoided && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); if (!isSent) cycleSilla(item.id) }}
-                          disabled={isSent}
-                          className={`flex-shrink-0 min-w-[44px] h-11 px-2 rounded-lg text-sm font-bold flex items-center justify-center transition-colors ${isSent ? 'bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-4)] cursor-not-allowed' : 'bg-[var(--info-soft)] border border-[color-mix(in_srgb,var(--info)_40%,transparent)] text-[var(--info-ink)] hover:bg-[var(--info-soft)]'}`}
-                          title={isSent ? 'Enviado — no se puede cambiar silla' : 'Silla — toca para cambiar'}
-                        >
-                          {isSent && <Lock size={12} className="mr-1" />}
-                          S{item.silla || 1}
-                        </button>
-                      )}
-
-                      {/* Line total */}
-                      <span className={`font-semibold text-sm w-20 text-right flex-shrink-0 font-mono tabular-nums ${isVoided ? 'line-through text-[var(--text-4)]' : isCancelled ? 'line-through text-[var(--crit-ink)]' : ''}`}>
-                        {formatMXN(item.subtotal)}
-                      </span>
-
-                      {!isCancelled && !isVoided && (
-                        <>
-                          {/* Edit — disabled if sent to kitchen (Eduardo Jul 21) */}
-                          {!isSent && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleEditOrderItem(item) }}
-                            className="w-11 h-11 rounded-lg bg-[var(--surface)] border border-[var(--line)] hover:bg-[var(--line)] text-[var(--text-3)] flex items-center justify-center transition-colors"
-                          >
-                            <Pencil size={18} />
-                          </button>
-                          )}
-
-                          {/* Transfer platillo (Eduardo Jul 21 — requires supervisor PIN) */}
-                          {isSent && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); if (!accionPendienteEnCaja('La transferencia de un platillo')) setTransferringItem(item) }}
-                            className="w-11 h-11 rounded-lg bg-[var(--warn-soft)] border border-[color-mix(in_srgb,var(--warn)_40%,transparent)] hover:bg-[var(--warn-soft)] text-[var(--warn-ink)] flex items-center justify-center transition-colors"
-                            title="Transferir platillo a otra mesa (requiere supervisor)"
-                          >
-                            <ArrowRightLeft size={16} />
-                          </button>
-                          )}
-
-                          {/* Cancel (NOT delete — requires reason + manager PIN) */}
-                          {can('cancelar_ordenes') && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              if (bloqueaLegacyCaja && (item.sent_quantity ?? 0) === 0 && !sentItemIds.has(item.id)) {
-                                setOrderItems(prev => prev.filter(row => row.id !== item.id))
-                                showToast('Producto retirado del borrador. Guarda para compartir el cambio.')
-                                return
-                              }
-                              if (!accionPendienteEnCaja('La cancelación individual de productos enviados')) setCancellingItem(item)
-                            }}
-                            className="w-11 h-11 rounded-lg bg-[var(--crit-soft)] border border-[color-mix(in_srgb,var(--crit)_40%,transparent)] hover:bg-[var(--crit-soft)] text-[var(--crit-ink)] flex items-center justify-center transition-colors"
-                            title="Cancelar item (requiere gerente)"
-                          >
-                            <Ban size={18} />
-                          </button>
-                          )}
-                        </>
-                      )}
-                    </div>
+                      v2={posV2}
+                      nombre={item.nombre}
+                      cantidad={item.cantidad}
+                      subtotalFmt={formatMXN(item.subtotal)}
+                      silla={item.silla || 1}
+                      modificadores={item.modificadores || []}
+                      notas={item.notas}
+                      isCancelled={isCancelled}
+                      isVoided={isVoided}
+                      isSent={isSent}
+                      isFlashing={flashItemId === item.id}
+                      kdsDone={!!(item as OrderItem & { kds_done?: boolean }).kds_done}
+                      sinComanda={!!(item.station && isNoPrintStation(item.station))}
+                      puedeCancelar={can('cancelar_ordenes')}
+                      onDec={() => updateQuantity(item.id, -1)}
+                      onInc={() => updateQuantity(item.id, 1)}
+                      onCycleSilla={() => cycleSilla(item.id)}
+                      onEdit={() => handleEditOrderItem(item)}
+                      onTransfer={() => { if (!accionPendienteEnCaja('La transferencia de un platillo')) setTransferringItem(item) }}
+                      onCancel={() => {
+                        if (bloqueaLegacyCaja && (item.sent_quantity ?? 0) === 0 && !sentItemIds.has(item.id)) {
+                          setOrderItems(prev => prev.filter(row => row.id !== item.id))
+                          showToast('Producto retirado del borrador. Guarda para compartir el cambio.')
+                          return
+                        }
+                        if (!accionPendienteEnCaja('La cancelación individual de productos enviados')) setCancellingItem(item)
+                      }}
+                    />
                   )
                 })}
                           </div>
