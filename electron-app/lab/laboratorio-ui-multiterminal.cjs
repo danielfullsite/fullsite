@@ -529,9 +529,82 @@ require(${JSON.stringify(path.join(ELECTRON_APP, 'main.js'))});\n`)
   return terminal
 }
 
+// ── Qué había realmente en la pantalla ───────────────────────────────────────
+//
+// Un laboratorio que sólo dice PASS puede estar mintiendo con toda la razón.
+// El 2026-09-13, en AMALAY, 3,803 pruebas estaban en verde mientras cuatro cosas
+// estaban rotas en el restaurante. Y estas cinco corridas fallaron cinco veces
+// con el mismo renglón —«esperaba un botón y no apareció»— sin decir NUNCA qué
+// sí había en pantalla. Eso no es una prueba, es una adivinanza cronometrada.
+//
+// `inspeccionar` levanta acta de lo que se ve: qué botones hay, si la página
+// pide scroll, qué contenedores se desbordan a lo ancho, y qué controles quedan
+// por debajo de los 56 px que exige un dedo. Se anota SIEMPRE, pase o falle,
+// porque «pasó» tampoco dice si se veía bien.
+async function inspeccionar(page) {
+  try {
+    return await page.evaluate(() => {
+      const visible = el => {
+        const r = el.getBoundingClientRect(), s = getComputedStyle(el)
+        return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none'
+      }
+      const nombre = el => (el.getAttribute('aria-label') || el.innerText || el.value || el.placeholder || '')
+        .replace(/\s+/g, ' ').trim().slice(0, 70)
+      return {
+        ruta: location.pathname + location.search,
+        ventana: `${innerWidth}x${innerHeight}`,
+        documento_alto: document.documentElement.scrollHeight,
+        pide_scroll_vertical: document.documentElement.scrollHeight > innerHeight + 1,
+        desbordes_horizontales: [...document.querySelectorAll('*')]
+          .filter(el => el.scrollWidth > el.clientWidth + 2 && /auto|scroll/.test(getComputedStyle(el).overflowX))
+          .slice(0, 8).map(el => ({ clase: String(el.className || '').slice(0, 60), ancho: el.scrollWidth, visible: el.clientWidth })),
+        controles_menores_56: [...document.querySelectorAll('button,input,select')].filter(visible)
+          .map(el => ({ control: nombre(el), alto: Math.round(el.getBoundingClientRect().height) }))
+          .filter(c => c.alto > 0 && c.alto < 56).slice(0, 12),
+        dialogo_abierto: document.querySelector('[role="dialog"]') ? nombre(document.querySelector('[role="dialog"]')) : null,
+        avisos: [...document.querySelectorAll('[class*=toast],[class*=Toast],[role=alert]')].filter(visible).map(nombre).filter(Boolean).slice(0, 4),
+        botones_visibles: [...document.querySelectorAll('button')].filter(visible).map(nombre).filter(Boolean).slice(0, 45),
+      }
+    })
+  } catch (e) { return { error: e.message.split('\n')[0] } }
+}
+
+const actas = []
+async function levantarActa(motivo, etiqueta) {
+  const acta = { motivo, etiqueta, ts: new Date().toISOString(), terminales: {} }
+  for (const t of terminals) {
+    if (!t?.page) continue
+    acta.terminales[t.name] = await inspeccionar(t.page)
+    await captura(t.page, `acta-${etiqueta}-${t.name.replace(/\s+/g, '-').toLowerCase()}.png`)
+  }
+  actas.push(acta)
+  return acta
+}
+
 async function check(name, run) {
-  try { await run(); results.push({ name, passed: true }); console.log(`PASS ${name}`) }
-  catch (error) { results.push({ name, passed: false, error: error.message }); throw error }
+  const etiqueta = String(results.length + 1).padStart(2, '0')
+  try {
+    await run()
+    results.push({ name, passed: true })
+    console.log(`PASS ${name}`)
+    await levantarActa('caso aprobado', etiqueta)
+  } catch (error) {
+    const primera = error.message.split('\n')[0]
+    results.push({ name, passed: false, error: primera })
+    console.log(`FALLA ${name}`)
+    console.log(`      ${primera}`)
+    const acta = await levantarActa('caso fallido', etiqueta)
+    // Lo que de verdad hacía falta las cinco veces: qué SÍ había en pantalla.
+    for (const [terminal, info] of Object.entries(acta.terminales)) {
+      if (!info.botones_visibles) continue
+      console.log(`      ${terminal} en ${info.ruta} (${info.ventana}) — ${info.botones_visibles.length} botones visibles`)
+      console.log(`        ${info.botones_visibles.slice(0, 14).join(' | ')}`)
+      if (info.avisos?.length) console.log(`        avisos en pantalla: ${info.avisos.join(' | ')}`)
+      if (info.dialogo_abierto) console.log(`        diálogo abierto: ${info.dialogo_abierto}`)
+    }
+    // NO se aborta: una falla no puede esconder a las siguientes. El acta dice
+    // si las de abajo cayeron por arrastre.
+  }
 }
 
 async function main() {
@@ -925,5 +998,41 @@ main().catch(error => {
       'La nube está simulada; órdenes y réplicas usan Pedro real'],
     errors: terminals.flatMap(t => t.errors.map(error => ({ terminal: t.name, error }))),
   }, null, 2))
+  // ── El acta, en un archivo que una persona pueda leer en dos minutos ───────
+  const lineas = ['# Acta del recorrido', '', `Corrida: ${new Date().toISOString()}`,
+    `Catálogo: ${real ? 'REAL — ' + fixture.pos_menu_categories.length + ' categorías, ' + fixture.pos_menu_items.length + ' productos' : 'fixture mínimo'}`,
+    real ? `Escenario: «${escenario.categoria.name}» → «${escenario.producto.name}» · estación ${escenario.estacion}` +
+      (escenario.grupo ? ` · grupo obligatorio «${escenario.grupo.name}»` : ' · sin grupo obligatorio') : '', '',
+    '## Veredicto', '']
+  for (const r of results) lineas.push(`- ${r.passed ? 'PASA ' : 'FALLA'} ${r.name}${r.passed ? '' : `\n      ${r.error}`}`)
+  lineas.push('', '## Lo visual, caso por caso', '')
+  for (const acta of actas) {
+    lineas.push(`### ${acta.etiqueta} — ${acta.motivo}`)
+    for (const [terminal, i] of Object.entries(acta.terminales)) {
+      if (i.error) { lineas.push(`- **${terminal}**: no se pudo inspeccionar (${i.error})`); continue }
+      const notas = []
+      if (i.pide_scroll_vertical) notas.push(`**pide scroll vertical** (documento ${i.documento_alto}px en ventana de ${i.ventana})`)
+      if (i.desbordes_horizontales?.length) notas.push(`**${i.desbordes_horizontales.length} contenedor(es) desbordados a lo ancho**: ` +
+        i.desbordes_horizontales.map(d => `${d.clase || '(sin clase)'} ${d.ancho}px en ${d.visible}px`).join(' · '))
+      if (i.controles_menores_56?.length) notas.push(`**${i.controles_menores_56.length} control(es) por debajo de 56px**: ` +
+        i.controles_menores_56.map(c => `${c.control || '(sin nombre)'} ${c.alto}px`).join(' · '))
+      if (i.avisos?.length) notas.push(`avisos: ${i.avisos.join(' | ')}`)
+      if (i.dialogo_abierto) notas.push(`diálogo: ${i.dialogo_abierto}`)
+      lineas.push(`- **${terminal}** · ${i.ruta} · ${i.ventana}` + (notas.length ? '\n  - ' + notas.join('\n  - ') : ' — sin observaciones'))
+    }
+    lineas.push('')
+  }
+  const actaPath = path.join(output, 'acta-del-recorrido.md')
+  fs.writeFileSync(actaPath, lineas.join('\n'))
+  fs.writeFileSync(path.join(output, 'acta-del-recorrido.json'), JSON.stringify({ results, actas }, null, 2))
+
+  const conScroll = actas.flatMap(a => Object.entries(a.terminales))
+    .filter(([, i]) => i.pide_scroll_vertical).length
+  const conDesborde = actas.flatMap(a => Object.entries(a.terminales))
+    .filter(([, i]) => i.desbordes_horizontales?.length).length
+  const chicos = actas.flatMap(a => Object.entries(a.terminales))
+    .filter(([, i]) => i.controles_menores_56?.length).length
   console.log(`${results.filter(r => r.passed).length}/${results.length} casos UI. Evidencia: ${output}`)
+  console.log(`ACTA VISUAL: ${conScroll} pantalla(s) piden scroll · ${conDesborde} con desborde horizontal · ${chicos} con controles menores a 56px`)
+  console.log(`ACTA: ${actaPath}`)
 })
