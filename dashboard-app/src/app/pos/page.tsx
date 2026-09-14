@@ -4638,7 +4638,10 @@ function POSContent() {
       {/* Nav overlay */}
       {showNav && (
         <div className="fixed inset-0 z-40 flex" onClick={() => setShowNav(false)}>
-          <div className="w-[min(20rem,88vw)] bg-[var(--surface-2)] border-r border-[var(--line)] p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl overflow-y-auto max-h-[100dvh] pos-fat-scroll" onClick={e => e.stopPropagation()}>
+          <div className={posV2
+            ? "w-full bg-[var(--bg)] p-5 pt-[max(1.25rem,env(safe-area-inset-top))] pb-[max(1.25rem,env(safe-area-inset-bottom))] overflow-hidden max-h-[100dvh] [column-width:230px] [column-gap:20px]"
+            : "w-[min(20rem,88vw)] bg-[var(--surface-2)] border-r border-[var(--line)] p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl overflow-y-auto max-h-[100dvh] pos-fat-scroll"}
+            onClick={e => e.stopPropagation()}>
             <p className="text-[var(--text-2)] text-xs font-semibold uppercase mb-2">Navegación</p>
             {/* Acordeón: un grupo abierto a la vez (details[name="posnav"]) → sin scroll.
              * Solo lo que un operador toca en servicio. El back-office (recetas, food-cost,
@@ -4673,11 +4676,16 @@ function POSContent() {
                 const items = group.items.filter(item => canSee(item.section))
                 if (items.length === 0) return null
                 return (
-                  <details key={group.title} name="posnav" open={group.defaultOpen} className="group/nav">
+                  <details
+                    key={group.title}
+                    name={posV2 ? undefined : "posnav"}
+                    open={posV2 ? true : group.defaultOpen}
+                    className={posV2 ? "group/nav break-inside-avoid mb-3" : "group/nav"}
+                  >
                     <summary className="flex items-center gap-3 px-4 rounded-xl cursor-pointer select-none text-[var(--text-2)] hover:bg-[var(--line)] hover:text-white transition-colors min-h-[60px]">
                       <group.icon size={24} />
                       <span className="text-lg font-bold flex-1">{group.title}</span>
-                      <ChevronDown size={20} className="nav-caret opacity-60" />
+                      {!posV2 && <ChevronDown size={20} className="nav-caret opacity-60" />}
                     </summary>
                     <div className="mt-1 mb-2 ml-3 pl-3 border-l border-[var(--line)] space-y-1">
                       {items.map(item => (

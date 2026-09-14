@@ -12,50 +12,93 @@
    (el tile, el renglón, la banda, la retícula) siguen portándose aparte.
    ───────────────────────────────────────────────────────────────────────────── */
 
+/* ── Los tokens del diseño, copiados EXACTOS ─────────────────────────────
+   La primera versión de este archivo los inventó «parecidos» y por eso el POS
+   no se veía como el demo: los 16 valores que probé estaban mal, ninguno
+   coincidía. Estos vienen literalmente del skeleton publicado, sin redondear.
+   Si el diseño cambia, se vuelven a copiar de ahí — no se ajustan a ojo. */
 .pos-v2 {
-  /* ── Superficies ────────────────────────────────────────────────────────
-     Más contraste entre niveles. El tema anterior los tenía a 4 puntos de
-     luminosidad de distancia y a un metro todo se veía del mismo color. */
-  --v2-bg:        #080b0e;
-  --v2-surface:   #0f1419;
-  --v2-surface-2: #161d24;
-  --v2-raised:    #1e2730;
-  --v2-line:      #253039;
-  --v2-line-soft: #1a232b;
-
-  --v2-ink-1: #f2f6f8;
-  --v2-ink-2: #aebac4;
-  --v2-ink-3: #7d8b96;
-  --v2-ink-4: #59666f;
-
-  --v2-r1: 12px;
-  --v2-r2: 16px;
-  --v2-r3: 20px;
-
-  --v2-sombra-1: 0 1px 2px rgba(0,0,0,.4);
-  --v2-sombra-2: 0 6px 18px rgba(0,0,0,.45);
-  --v2-sombra-3: 0 18px 48px rgba(0,0,0,.6);
-
-  --v2-ease: cubic-bezier(.2,.8,.3,1);
-
-  /* El mínimo táctil del sistema. No se negocia. */
-  --v2-tap: 56px;
+  --bg: #080b0c;
+  --surface: #0c1012;
+  --surface-2: #11171a;
+  --panel: #131a1d;
+  --raised: #1a2226;
+  --line: #232b2c;
+  --line-soft: #191f20;
+  --text-1: #eef2f0;
+  --text-2: #a8b5b1;
+  --text-3: #6f7d79;
+  --text-4: #4a5553;
+  --accent: #10b981;
+  --accent-bright: #34d399;
+  --accent-deep: #059669;
+  --accent-soft: rgba(16,185,129,.12);
+  --accent-line: rgba(16,185,129,.28);
+  --info: #38bdf8;
+  --info-soft: rgba(56,189,248,.12);
+  --info-line: rgba(56,189,248,.3);
+  --warn: #f5a524;
+  --warn-soft: rgba(245,165,36,.12);
+  --warn-line: rgba(245,165,36,.3);
+  --crit: #f5455c;
+  --crit-soft: rgba(245,69,92,.12);
+  --crit-ink: #fda4af;
+  --crit-line: rgba(245,69,92,.32);
+  --r1: 8px;
+  --r2: 12px;
+  --r3: 16px;
+  --r4: 22px;
+  --tap: 56px;
+  --shadow-1: 0 1px 2px rgba(0,0,0,.4);
+  --shadow-2: 0 8px 24px rgba(0,0,0,.45);
+  --shadow-3: 0 24px 64px rgba(0,0,0,.6);
+  --ease: cubic-bezier(.2,.9,.3,1);
 }
 
-/* ── Se reescriben los tokens que ya usa el marcado, así el revestimiento
-      llega a cada pantalla sin tocar una sola línea de JSX. ───────────────── */
+/* El mismo diseño en claro, para la barra con sol directo. */
+.pos-v2[data-theme="light"], [data-theme="light"] .pos-v2 {
+  --bg: #eef1ec;
+  --surface: #fff;
+  --surface-2: #f4f7f1;
+  --panel: #fff;
+  --raised: #fff;
+  --line: #dde3dc;
+  --line-soft: #eef1ec;
+  --text-1: #0e1613;
+  --text-2: #3d4a46;
+  --text-3: #6b7873;
+  --text-4: #9aa5a1;
+  --accent: #0ea371;
+  --accent-bright: #10b981;
+  --accent-soft: rgba(16,185,129,.1);
+  --accent-line: rgba(5,120,90,.24);
+  --shadow-1: 0 1px 2px rgba(11,60,40,.1);
+  --shadow-2: 0 8px 24px rgba(11,60,40,.12);
+  --shadow-3: 0 24px 64px rgba(11,60,40,.18);
+}
+
+/* Los nombres que el marcado ya usa apuntan a los mismos valores, así el
+   revestimiento llega a cada pantalla sin tocar una línea de JSX. */
 .pos-v2 {
-  --bg:         var(--v2-bg);
-  --surface:    var(--v2-surface);
-  --surface-2:  var(--v2-surface-2);
-  --panel:      var(--v2-surface);
-  --raised:     var(--v2-raised);
-  --line:       var(--v2-line);
-  --line-soft:  var(--v2-line-soft);
-  --text-1:     var(--v2-ink-1);
-  --text-2:     var(--v2-ink-2);
-  --text-3:     var(--v2-ink-3);
-  --text-4:     var(--v2-ink-4);
+  --v2-tap: var(--tap);
+  --v2-ease: var(--ease);
+  --v2-r1: var(--r1);
+  --v2-r2: var(--r2);
+  --v2-r3: var(--r3);
+  --v2-r4: var(--r4);
+  --v2-bg: var(--bg);
+  --v2-surface: var(--surface);
+  --v2-surface-2: var(--surface-2);
+  --v2-raised: var(--raised);
+  --v2-line: var(--line);
+  --v2-line-soft: var(--line-soft);
+  --v2-ink-1: var(--text-1);
+  --v2-ink-2: var(--text-2);
+  --v2-ink-3: var(--text-3);
+  --v2-ink-4: var(--text-4);
+  --v2-sombra-1: var(--shadow-1);
+  --v2-sombra-2: var(--shadow-2);
+  --v2-sombra-3: var(--shadow-3);
 }
 
 .pos-v2,
