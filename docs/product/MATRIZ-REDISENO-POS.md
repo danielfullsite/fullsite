@@ -105,6 +105,66 @@ Por riesgo operativo, no por lo que se ve más:
 
 ---
 
+## La evidencia de campo pesa más que la Biblia
+
+La Biblia es ingeniería inversa del sistema anterior: dice cómo **debería** funcionar un
+POS. [`OBSERVACIONES-CAMPO-2026-08-09-10.md`](../pos/OBSERVACIONES-CAMPO-2026-08-09-10.md)
+dice qué **falló de verdad** con usuarios reales. Cuando se contradigan, gana el campo.
+
+### Lo que más se repitió, y no es un bug: es un requisito
+
+Cinco observaciones distintas, el mismo día, dicen lo mismo:
+
+> *«el refresh de la mesa tiene que ser inmediato porque trataba de meter platillos sin que
+> se refresheara bien y **se trababa todo**»*
+>
+> *«todo debe estar corriendo a la milésima»*
+
+**Estado verificable hoy** (`mesas/page.tsx:442-454`): hay sondeo cada 3 s, más refresco al
+volver el foco y al hacerse visible la pestaña. O sea que el mecanismo existe y la queja de
+agosto tiene respuesta.
+
+**Lo que NO se puede afirmar:** que cumpla el requisito. *«A la milésima»* no es tres
+segundos, y nadie lo ha vuelto a ver en campo desde entonces.
+
+**Consecuencia para este rediseño:** la retícula de mesas ya no hace scroll, pero eso no
+toca el refresco. Hacer que una pantalla se vea mejor no la hace sentirse viva.
+
+### Lo que el campo dice sobre lo que estoy rediseñando
+
+| Observación de campo | Toca | Estado |
+|---|---|---|
+| *«no sale el logo de AMALAY, éste no es el bueno»* | Marca en pantalla y ticket | Sin resolver; se cruza con el hueco #20 |
+| *«agregar producto no se ve bien»* | Altas de catálogo | Sin tocar |
+| *«no jala el lápiz para editar y no deja cambiarlo de mesa»* | Editar orden (#6) | Sin verificar tras el rediseño del renglón |
+| *«la última modificación no se puso en fullscreen»* | Caparazón de la terminal | Sin tocar |
+| *«se congeló toda la pantalla»* al desconectar internet | Arranque en frío sin WAN | Fuera del rediseño; sigue abierto |
+
+### Dónde está AMALAY de verdad
+
+Medido el 2026-09-14 contra su base, no leído de un documento:
+
+| Tabla | Filas para `amalay` | Última |
+|---|---|---|
+| `pos_orders` | 39 | hoy |
+| `pos_print_jobs` | 371 | 2026-09-03 |
+| **`pos_cash_movements`** | **0** | — |
+
+Para dimensionar: los 10 tenants juntos llevan **128,546** órdenes. AMALAY tiene 39, y las
+de hoy son pruebas de Daniel.
+
+**Lo que eso significa para el riesgo.** AMALAY todavía no opera sobre Fullsite —
+`pos_cash_movements` en cero dice que nunca se ha registrado un movimiento de caja ahí. El
+rediseño no puede romperles un turno que no está ocurriendo.
+
+El riesgo real es el otro: **que esto llegue sin operar al día del cutover.** Por eso las
+filas «operado» de la matriz importan más que cualquier otra columna.
+
+> Dos órdenes de prueba de hoy quedaron abiertas en las mesas 1 y 2 de AMALAY
+> ($197.20 y $232.00). Conviene cerrarlas antes de que alguien las vea como reales.
+
+---
+
 ## Reglas que esta matriz impone
 
 1. **Ninguna fila se marca «operado» sin haber ejecutado el flujo completo** en
