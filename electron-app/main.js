@@ -277,8 +277,11 @@ async function startLocalServer() {
     restaurantId,
     channel:            appConfig.channel        || process.env.FULLSITE_CHANNEL    || 'stable',
     instanceName:       appConfig.instance_name  || appConfig.instanceName          || `Fullsite POS — ${os.hostname()}`,
-    supabaseUrl:        appConfig.supabaseUrl    || process.env.SUPABASE_URL        || '',
-    supabaseKey:        appConfig.supabaseAnonKey || process.env.SUPABASE_ANON_KEY  || '',
+    // La cadena de resolución vive en config-schema.js y NADA MÁS ahí. Estaba
+    // escrita tres veces (aquí, abajo en el updater, y en el esquema) y por eso
+    // se desincronizaban: local-server/index.js leía `supabaseKey` cuando el
+    // esquema declara `supabaseAnonKey`. Ver tests/heartbeat-credenciales.test.js.
+    ...configSchema.readSupabaseCreds(appConfig),
     printersConfig:     printersResult.config,    // null when not_configured — adapter handles safely
     printerConfigPath,
     queueFilePath,
@@ -1100,8 +1103,10 @@ app.whenReady().then(async () => {
   // el POS arranque.
   try {
     const { iniciar } = require('./update/auto-installer');
-    const supabaseUrl = appConfig.supabaseUrl || process.env.SUPABASE_URL || '';
-    const supabaseKey = appConfig.supabaseAnonKey || process.env.SUPABASE_ANON_KEY || '';
+    // Misma fuente única que arriba. Sin credencial, `estaBloqueada` lanza y el
+    // auto-instalador falla CERRADO — correcto, pero significa que la terminal
+    // no se actualiza NUNCA. Ésa era la situación de toda la flota hasta hoy.
+    const { supabaseUrl, supabaseKey } = configSchema.readSupabaseCreds(appConfig);
 
     autoInstaller = iniciar({
       canal: appConfig.channel || process.env.FULLSITE_CHANNEL || 'stable',
