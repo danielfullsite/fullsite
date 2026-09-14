@@ -784,7 +784,17 @@ async function main() {
     await captura(pos3.page, 'cuenta-compartida-sin-internet.png')
   })
   await check('POS 3 sin caché obtiene menú y opciones obligatorias de Caja sin internet', async () => {
-    await pos3.page.getByRole('button', { name: new RegExp(escapar(escenario.categoria.name)) }).click()
+    // Con un catálogo real la carta PAGINA: 38 categorías no caben en una pantalla
+    // (en AMALAY se ven «1 / 2 · 36 categorías»), así que la categoría elegida
+    // puede estar en la segunda página y el clic directo nunca la encuentra.
+    // Medido el 2026-09-14: el recorrido murió 30 s esperando «Signature».
+    // Un cajero con 464 productos tampoco pagina: escribe en el buscador.
+    const buscador = pos3.page.getByPlaceholder(/Buscar platillo/i)
+    if (await buscador.count()) {
+      await buscador.fill(escenario.producto.name.trim().split(/\s+/).slice(0, 2).join(' '))
+    } else {
+      await pos3.page.getByRole('button', { name: new RegExp(escapar(escenario.categoria.name)) }).click()
+    }
     await pos3.page.getByRole('button', { name: new RegExp(escapar(escenario.producto.name)) }).first().click()
     if (escenario.grupo && escenario.opcion) {
       // El botón de agregar nace deshabilitado hasta elegir la opción obligatoria:
