@@ -153,8 +153,11 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
         if (cfg?.logoUrl) setLogoSrc(cfg.logoUrl)
         if (cfg?.name) setClientName(cfg.name)
         if (cfg?.ivaRate !== undefined) {
-          const { setIvaRate } = await import('@/lib/pos-constants')
+          // La tasa y el MODO viajan juntos: con la tasa sola, un restaurante de
+          // precios inclusivos cobraría 16% de más en cada ticket.
+          const { setIvaRate, setPreciosIncluyenIva } = await import('@/lib/pos-constants')
           setIvaRate(cfg.ivaRate)
+          setPreciosIncluyenIva(cfg.preciosIncluyenIva === true)
         }
       }).catch(() => {})
       // Load operational settings — idle timeout + station routing override
