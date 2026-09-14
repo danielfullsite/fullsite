@@ -578,19 +578,25 @@
 
   function setConn(ok){ online=ok; connDot.style.background=ok?"var(--lista)":"var(--danger)"; connTxt.textContent=ok?"conectado":"sin conexión — reintentando"; }
 
-  // Adaptador robusto: el KDS pinta órdenes con forma {id, mesa, items,...}. Prefiere la
-  // fuente offline-nativa (kds_orders) si viene poblada; si no, normaliza kds_queue —el
-  // campo que SÍ llena la caja (incl. 1.3.3)— a esa misma forma. Así jala online y offline
-  // sin tocar la caja ni romper el flujo probado caja→KDS por LAN.
+  // Adaptador robusto: el KDS pinta órdenes con forma {id, mesa, items,...}. Une la
+  // proyección offline-nativa (kds_orders) con kds_queue —el campo que SÍ llena la
+  // caja legacy— y deja ganar a la versión nativa cuando ambas contienen la misma
+  // orden. Antes, el primer cambio de cocina creaba un único kds_order y ocultaba de
+  // golpe todas las demás comandas que aún vivían sólo en kds_queue.
   function adaptOrders(data){
     if(!data) return [];
-    if(Array.isArray(data.kds_orders) && data.kds_orders.length) return data.kds_orders;
+    var nativeOrders=Array.isArray(data.kds_orders)?data.kds_orders:[];
+    var merged=nativeOrders.slice();
+    var seen={};
+    nativeOrders.forEach(function(o){ var key=o&&(o.id||o.order_id); if(key) seen[key]=true; });
     if(Array.isArray(data.kds_queue) && data.kds_queue.length){
-      return data.kds_queue.map(function(q){
-        return { id:q.order_id, mesa:q.mesa, items:q.items_sent||[], created_at:q.sent_at, updated_at:q.sent_at, status:"enviada" };
+      data.kds_queue.forEach(function(q){
+        if(!q||!q.order_id||seen[q.order_id]) return;
+        seen[q.order_id]=true;
+        merged.push({ id:q.order_id, order_id:q.order_id, mesa:q.mesa, turno_id:q.turno_id, items:q.items_sent||[], created_at:q.sent_at, updated_at:q.sent_at, status:"enviada" });
       });
     }
-    return [];
+    return merged;
   }
 
   function fetchState(){
