@@ -656,6 +656,55 @@ export default function MesasPage() {
     const isAlert = mins >= ALERT_THRESHOLD
     const isWarning = mins >= WARNING_THRESHOLD && mins < ALERT_THRESHOLD
 
+    // ── La tarjeta del demo ────────────────────────────────────────────────
+    // Tres datos y ya: número, estado, monto. La anterior mostraba siete
+    // —insignia, reloj, duración, mesero, hora de apertura, folio, comensales,
+    // monto— y a tres metros ninguno se leía porque todos competían.
+    // Sólo aplica a la vista de retícula; el planograma pasa `shape` y se
+    // queda con su tarjeta, que depende de la forma real de la mesa.
+    if (posV2 && !shape) {
+      const esFusion = mergeSource === mesa.number || mergeTarget === mesa.number
+      const tinte =
+        mesa.status === 'ocupada' ? { bg: 'var(--info-soft)', bd: 'var(--info-line)', tx: 'var(--info)' }
+        : mesa.status === 'cuenta' ? { bg: 'var(--warn-soft)', bd: 'var(--warn-line)', tx: 'var(--warn)' }
+        : { bg: 'var(--surface-2)', bd: 'var(--line)', tx: 'var(--text-2)' }
+
+      // El renglón de abajo dice lo más útil que haya: cuánto debe, si no
+      // cuánto lleva, y si está libre para cuántos es.
+      const abajo = order
+        ? formatMXN(order.total ?? 0)
+        : mins > 0 ? formatDur(mins)
+        : `${mesa.capacity ?? 4}p`
+
+      return (
+        <button
+          onClick={() => handleMesaClick(mesa.number)}
+          aria-current={esFusion || undefined}
+          className="w-full h-full rounded-[var(--r2,12px)] border-2 flex flex-col items-center justify-center gap-0.5 transition-transform active:scale-[0.94] overflow-hidden px-1"
+          style={{
+            background: mergeSource === mesa.number ? 'var(--warn-soft)'
+              : mergeTarget === mesa.number ? 'var(--accent-soft)' : tinte.bg,
+            borderColor: mergeSource === mesa.number ? 'var(--warn)'
+              : mergeTarget === mesa.number ? 'var(--accent)' : tinte.bd,
+            color: tinte.tx,
+          }}
+        >
+          <span className="text-[23px] font-black tabular-nums tracking-[-0.04em] leading-none">
+            {mesa.number}
+          </span>
+          <span className="text-[9px] font-black uppercase tracking-[0.06em] leading-none" style={{ color: 'var(--text-3)' }}>
+            {statusLabel[mesa.status]}
+          </span>
+          <span
+            className="text-[10.5px] font-mono font-bold tabular-nums leading-none mt-0.5"
+            style={{ opacity: order ? 1 : 0.55, color: isAlert ? 'var(--crit-ink)' : isWarning ? 'var(--warn-ink)' : undefined }}
+          >
+            {abajo}
+          </span>
+        </button>
+      )
+    }
+
     const shapeClass = shape === 'round' ? 'rounded-full' :
                        shape === 'rect-h' ? 'rounded-2xl' :
                        shape === 'rect-v' ? 'rounded-2xl' : 'rounded-2xl'
