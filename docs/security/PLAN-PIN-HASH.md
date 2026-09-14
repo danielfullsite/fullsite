@@ -245,6 +245,45 @@ revoke select (pin, pin_hash) on public.pos_staff from anon;
 **Impacto offline: ninguno.** Ningún código lee la columna todavía.
 **Reversible:** `drop column` (nadie escribió nada).
 
+> **Estado 2026-09-14 — migración ESCRITA y EJECUTADA, pendiente de aplicar en prod.**
+>
+> Archivo: `supabase/migrations/PENDIENTE_20260914120000_pos_staff_pin_hash.sql`.
+> Guarda: `dashboard-app/src/__tests__/pos-staff-pin-hash-migration.test.ts` (18 pruebas).
+> **No se aplicó por el MCP** — el de AMALAY y el de staging son read-only, verificado
+> (`cannot execute ALTER TABLE in a read-only transaction`).
+>
+> Se ejecutó de verdad contra un **Postgres 16.14 local** con el DDL de producción replicado
+> y tres filas de dos tenants. Eso corrigió **cuatro cosas del plan de arriba**:
+>
+> **1. El CHECK del plan tenía un hueco, y sólo se vio corriéndolo.** Un `CHECK` de Postgres
+> rechaza la fila sólo cuando la expresión da `FALSE`; si da `NULL`, **pasa**. La forma
+> natural —`... and pin_hash_v >= 1`— dejaba entrar una fila de (hash válido, versión `NULL`):
+> `true and (NULL >= 1)` = `NULL`, y `false or NULL` = `NULL` → pasa. Justo la fila a medio
+> escribir que el constraint existe para impedir. Se arregla poniendo los `is not null`
+> **delante**, para que la rama dé `false and …` = `FALSE`. Leer la expresión no bastaba.
+>
+> **2. Un índice, no dos.** El plan pedía `(client_id, pin_hash)` **y** `(pin_hash)`. El
+> `explain` con `enable_seqscan=off` muestra que las dos consultas de F4 —la de
+> `/api/pos/pin` y la de `pinTaken`— resuelven con el compuesto usando **ambas** columnas
+> como `Index Cond`. El segundo era redundante y costaba en cada escritura.
+>
+> **3. El CHECK se adelantó de F6 a F1.** Sale gratis (las 84 filas tienen `pin_hash` NULL) y
+> cambia dónde se descubre un backfill roto: al escribirlo en F3, no en F4 con 40 personas
+> sin poder entrar.
+>
+> **4. El `revoke` de `anon` NO se hizo.** El bloque de arriba está equivocado: en Postgres un
+> privilegio a **nivel tabla** no se recorta revocando columnas sueltas. `anon` tiene
+> `GRANT SELECT` sobre toda la tabla, así que `revoke select (pin, pin_hash)` se vería como
+> que cierra algo y no cerraría nada. Cerrarlo de verdad exige revocar el `SELECT` completo y
+> volver a otorgarlo columna por columna — eso cambia la superficie de acceso de `anon` y
+> merece su propio PR con su propio barrido. Hoy es inocuo: `anon` no tiene política RLS ni
+> `rolbypassrls`, así que lee **cero filas**.
+>
+> **Y una divergencia de esquema que hay que saber antes de F5:** producción tiene tres
+> constraints en `pos_staff` (`pkey`, `unique_pin_per_client`, `pos_staff_pin_len_chk`);
+> **staging sólo tiene las dos primeras**. F5 planea `drop constraint pos_staff_pin_len_chk`
+> y en staging eso revienta — ahí tendrá que ser `drop constraint if exists`.
+
 ### F2 — Doble escritura
 
 E1, E2 y E3 calculan y escriben `pin_hash` + `pin_hash_v = 1` junto al `pin` de siempre.
