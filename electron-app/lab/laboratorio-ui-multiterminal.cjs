@@ -111,6 +111,19 @@ const esperarHidratacion = async page => {
     return !!clave && typeof b[clave]?.onClick === 'function'
   })).catch(() => false), 'hidratación de la pantalla', 90000)
 }
+// Una foto es EVIDENCIA, no una aserción: nunca debe tumbar un caso.
+//
+// Con la red cortada (`wan = false`) Playwright espera a que carguen las
+// tipografías antes de capturar, y como nunca resuelven, se cuelga 30 s y mata
+// el caso. Medido el 2026-09-14: el recorrido con catálogo real moría en la foto
+// del menú sin internet, con todas las aserciones ya pasadas.
+async function captura(page, archivo) {
+  try {
+    await page.screenshot({ path: path.join(output, archivo), fullPage: true, timeout: 12000 })
+  } catch (e) {
+    console.log(`[evidencia] no se pudo capturar ${archivo}: ${e.message.split('\n')[0]}`)
+  }
+}
 function request(terminal, route, init = {}) {
   return fetch(`http://127.0.0.1:${terminal.port}${route}`, {
     ...init, headers: { ...headers,
@@ -699,7 +712,7 @@ async function main() {
       assert(preparada, 'Caja debe conservar la credencial preparada')
       assert(preparada.devices?.[pos3.terminalId] > Date.now(), 'preparada para la terminal que tecleó')
       assert(typeof preparada.hash === 'string' && !Object.values(preparada).includes(pinDelLab), 'el PIN no se guarda en claro')
-      await pos3.page.screenshot({ path: path.join(output, 'pin-online-entra.png'), fullPage: true })
+      await captura(pos3.page, 'pin-online-entra.png')
     })
     await check('Sin internet, Caja rechaza el PIN sin preparar y acepta el preparado sin consultar la nube', async () => {
       // Cierre de turno: se vacía la sesión y se recarga, como al reabrir la
@@ -724,7 +737,7 @@ async function main() {
       const sinNube = pinsEnLaNube().slice(vistosAntes)
       assert.equal(sinNube.length, 2, `Caja intentó la nube en ambos PIN: ${JSON.stringify(sinNube)}`)
       assert(sinNube.every(r => r.wan === false), 'ninguna llegó a responderse: la nube estaba caída')
-      await pos3.page.screenshot({ path: path.join(output, 'pin-offline-entra.png'), fullPage: true })
+      await captura(pos3.page, 'pin-offline-entra.png')
       wan = true
       // El resto del recorrido usa la sesión firmada preparada (comandos
       // financieros por HTTP con actor_token). El PIN ya probó la ENTRADA; se
@@ -768,7 +781,7 @@ async function main() {
     const visible = await pos3.page.evaluate(tenant => JSON.parse(localStorage.getItem(`pos_cuenta_${tenant}_mesa:1`) || 'null')?.confirmed, tenant)
     assert.equal(visible?.id, orderId, 'El editor conservó el ID de la cuenta de Caja')
     assert.equal(visible?.items?.[0]?.cantidad, 2)
-    await pos3.page.screenshot({ path: path.join(output, 'cuenta-compartida-sin-internet.png'), fullPage: true })
+    await captura(pos3.page, 'cuenta-compartida-sin-internet.png')
   })
   await check('POS 3 sin caché obtiene menú y opciones obligatorias de Caja sin internet', async () => {
     await pos3.page.getByRole('button', { name: new RegExp(escapar(escenario.categoria.name)) }).click()
@@ -783,7 +796,7 @@ async function main() {
       console.log('[escenario] el catálogo no trae grupos obligatorios: sólo se comprueba que el menú llegó')
       await expect(pos3.page.getByRole('button', { name: /Agregar/ })).toBeEnabled()
     }
-    await pos3.page.screenshot({ path: path.join(output, 'catalogo-compartido-sin-internet.png'), fullPage: true })
+    await captura(pos3.page, 'catalogo-compartido-sin-internet.png')
     await pos3.page.getByRole('button', { name: 'Cancelar', exact: true }).click()
   })
   await check('Una instalación sin transición rechaza crear otra autoridad monetaria', async () => {
