@@ -12,6 +12,8 @@ import { esFalloDeAutenticacion } from '@/lib/clasificar-fallo'
 import { mismoDiaDeVenta, inicioDiaConfigurado } from '@/lib/dia-de-venta'
 import { fetchWithTimeout, getPOSAuthHeaders, getClientId, formatMXN, logAudit as _logAudit } from '@/lib/pos-data'
 import { leerSalon, requiereCaja } from '@/lib/pedro-cliente'
+import { PosNumPad, PosMonto } from '@/components/pos/ui/PosNumPad'
+import { usePosV2 } from '@/components/pos/ui/PosProductTile'
 
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 
@@ -43,6 +45,7 @@ export default function TurnoGate({ staff, children }: TurnoGateProps) {
   const [status, setStatus] = useState<TurnoStatus>('loading')
   const [turno, setTurno] = useState<ActiveTurno | null>(null)
   const [activeCount, setActiveCount] = useState(0)
+  const posV2 = usePosV2()
   const [fondoInicial, setFondoInicial] = useState('')
   const [opening, setOpening] = useState(false)
   const [error, setError] = useState('')
@@ -441,6 +444,46 @@ export default function TurnoGate({ staff, children }: TurnoGateProps) {
       }
       } catch (e) { setError(e instanceof Error ? e.message : 'Caja no confirmó la apertura de turno.') }
       finally { setOpening(false) }
+    }
+
+    if (posV2) {
+      // Pantalla de dinero: el monto manda y el teclado ocupa lo que merece.
+      // Antes era un `<input type=number>` con su flechita de 12 px — contar
+      // el fondo de un turno tocando eso es pedir que se equivoquen.
+      return (
+        <div className="h-dvh flex items-center justify-center select-none px-4" style={{ background: 'var(--bg)' }}>
+          <div className="w-full max-w-[360px] flex flex-col gap-5">
+            <div className="text-center">
+              <DoorOpen size={44} className="mx-auto mb-3" strokeWidth={1.5} style={{ color: 'var(--info)' }} />
+              <h2 className="text-xl font-bold" style={{ color: 'var(--text-1)' }}>No hay turno abierto</h2>
+              <p className="text-[13px] mt-1" style={{ color: 'var(--text-3)' }}>
+                Cuenta el efectivo y ábrelo para empezar.
+              </p>
+            </div>
+
+            <PosMonto valor={fondoInicial} etiqueta="Fondo de caja" />
+
+            <PosNumPad
+              valor={fondoInicial}
+              onValor={setFondoInicial}
+              onConfirmar={() => { if (!opening && fondoInicial) handleOpen() }}
+              rapidos={[500, 1000, 2000]}
+            />
+
+            <button
+              onClick={handleOpen}
+              disabled={opening || !fondoInicial}
+              className="w-full min-h-[64px] rounded-2xl font-bold text-[17px] transition-transform active:scale-[0.97] disabled:opacity-35 disabled:pointer-events-none"
+              style={{ background: 'linear-gradient(180deg,var(--accent-bright,#34d399),var(--accent))', color: '#04231a', border: '1px solid transparent' }}
+            >
+              {opening ? 'Abriendo turno…' : 'Abrir turno'}
+            </button>
+
+            <p className="text-center text-xs" style={{ color: 'var(--text-4)' }}>{staff.name} · {staff.role}</p>
+            {error && <p className="text-center text-sm" style={{ color: 'var(--crit-ink)' }}>{error}</p>}
+          </div>
+        </div>
+      )
     }
 
     return (
