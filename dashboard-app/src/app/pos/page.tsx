@@ -165,6 +165,7 @@ import { getActiveClientSlug as _cid } from '@/lib/data'
 import { computeOutOfStockItems } from '@/lib/stock-availability'
 import { usePOSLock } from './pos-lock-context'
 import { layerZ } from '@/components/ui/layers'
+import { PosProductTile, usePosV2 } from '@/components/pos/ui/PosProductTile'
 
 // El reintento del bridge y la validacion de la respuesta viven ahora en
 // lib/kitchen-bridge.ts (sendOrderToKitchen), que SI reporta el resultado.
@@ -1844,6 +1845,7 @@ function POSContent() {
 
   // Out-of-stock tracking
   const [outOfStockItems, setOutOfStockItems] = useState<Set<string>>(new Set())
+  const posV2 = usePosV2()
 
   useEffect(() => {
     (async () => {
@@ -5488,24 +5490,16 @@ function POSContent() {
                 {activeCategory.items.filter(item => item.price > 0 && (!categorySearch || item.name.toLowerCase().includes(categorySearch.toLowerCase()))).map((item) => {
                     const isOOS = outOfStockItems.has(item.id)
                     return (
-                    <button
+                    <PosProductTile
                       key={item.id}
+                      v2={posV2}
+                      name={item.name}
+                      price={item.price}
+                      colorClass={(activeCategory as { color?: string }).color || 'bg-emerald-600'}
+                      isOOS={isOOS}
+                      promo={(item as MenuItem & { promo?: boolean }).promo}
                       onClick={() => { if (isOOS) { showToast(`${item.name} — AGOTADO`); return } handleMenuItemTap(item, activeCategory.id); setSelectedCategory(''); setMobileView('order') }}
-                      className={`bg-[var(--surface-2)] hover:bg-[var(--raised)] active:scale-[0.97] border rounded-xl text-left transition-all flex overflow-hidden relative shadow-sm ${
-                        isOOS
-                          ? 'border-[color-mix(in_srgb,var(--crit)_40%,transparent)] opacity-50 cursor-not-allowed'
-                          : (item as MenuItem & { promo?: boolean }).promo
-                          ? 'border-[var(--accent-line)] ring-1 ring-[var(--accent-soft)]'
-                          : 'border-[var(--line-soft)] hover:border-[var(--accent-line)]'
-                      }`}
-                    >
-                      <div className={`w-1.5 flex-shrink-0 rounded-l-2xl ${isOOS ? 'bg-[var(--crit)]' : (activeCategory as { color?: string }).color || 'bg-emerald-600'}`} />
-                      {isOOS && <span className="absolute top-2 right-2 bg-[var(--crit)] text-white text-[10px] font-black px-1.5 py-0.5 rounded-md uppercase tracking-wide">Agotado</span>}
-                      <div className="flex flex-col justify-between px-3 py-2.5 flex-1">
-                        <span className={`font-semibold text-sm leading-snug ${isOOS ? 'text-[var(--text-4)] line-through' : 'text-[var(--text-1)]'}`}>{item.name}</span>
-                        <span className={`font-bold text-base mt-1 font-mono tabular-nums ${isOOS ? 'text-[var(--crit-ink)]' : 'text-[var(--accent-ink)]'}`}>${Math.round(item.price)}</span>
-                      </div>
-                    </button>
+                    />
                     )
                   })}
                       </div>
