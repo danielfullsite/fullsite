@@ -338,6 +338,48 @@ completa.** Ninguno habría sobrevivido a citar el archivo.
 **Al escribir una memoria**, ponerle la fecha en que se verificó. Una nota sin fecha se lee
 como un hecho permanente. Medido ese día: 22 de 148 memorias traían marca de verificación.
 
+### La regla de la lectura
+
+> Establecida el 2026-09-14, después de una noche entera en AMALAY con ~30 búsquedas y **un**
+> documento leído completo: el que Daniel señaló al final, cuando dijo *«siento que no lees los
+> documentos que ya tenemos»*. Tenía razón.
+
+Las reglas de arriba dicen que un hecho necesita fuente y que un negativo hereda su búsqueda.
+Ésta dice **cómo se mira**:
+
+> **`grep` sirve para ubicar, nunca para concluir.** Una búsqueda contesta la pregunta que ya
+> traes; leer contesta las que no sabías que tenías. Encontrada la línea, se lee el archivo
+> alrededor. Un hallazgo que nació de una coincidencia y murió ahí no es un hallazgo.
+
+**Antes de preguntarle a Daniel algo sobre el SISTEMA, se busca primero — y si aun así se
+pregunta, se dice qué se buscó.** El corolario de §2 («la fuente más rápida suele no ser un
+archivo») está escrito para lo que sólo vive en su cabeza: qué pasó en una junta, qué decidió,
+qué tiene en la mano. **No** para lo que está escrito en su propio repositorio. Usarlo así no es
+consultarlo: es delegarle la tarea.
+
+Las tres preguntas de esa noche, con su respuesta ya escrita:
+
+| Se le preguntó | Dónde estaba contestado |
+|---|---|
+| «¿Qué es PDV2?» | `project_amalay_deployment_state.md:24`, `DECISION-BRAIN.md:97` |
+| «¿El ticket de caja sale en la panadería?» | `DEBRIEF-JUL12.md:269` — panadería no tiene impresora |
+| «¿Los productos de Market deben imprimir?» | `DEBRIEF-JUL12.md:269` — Market/Caja: ticket USB, NO KDS |
+
+**Y la causa raíz no es el olvido, es que nada obliga.** Hay 429 documentos y un índice
+(`docs/DECISION-BRAIN.md`) que no se abrió en toda la noche. Un aviso que salta en cada búsqueda
+deja de avisar. Por eso:
+
+> **Todo trabajo de campo arranca con `node scripts/arranque-campo.mjs`.** Imprime la topología
+> real de las terminales, la lista corta de documentos que zanjan preguntas frecuentes, y
+> certifica las máquinas vivas. Es una llamada, produce lo que de todas formas hace falta, y por
+> eso se corre — a diferencia de un documento, que hay que acordarse de leer.
+
+El principio general, que aplica al código y a quien lo escribe por igual:
+
+> **Lo que no se puede olvidar es lo que se ejecuta solo.** Un documento protege sólo si alguien
+> se acuerda de leerlo; una comprobación protege aunque nadie se acuerde. Cada cosa aprendida que
+> sea comprobable se convierte en una comprobación, no en un párrafo.
+
 ## 18. Trabajo con otros agentes
 
 Antes de comenzar: revisar ramas y worktrees, identificar archivos que otros agentes
