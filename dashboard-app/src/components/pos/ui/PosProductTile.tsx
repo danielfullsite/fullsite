@@ -27,8 +27,35 @@ function suscribir(fn: () => void) {
   window.addEventListener('storage', fn)
   return () => { suscriptores.delete(fn); window.removeEventListener('storage', fn) }
 }
+/**
+ * Restaurantes donde el rediseno viene prendido de fabrica, por variable de
+ * entorno y no cableado: `NEXT_PUBLIC_POS_V2_TENANTS=amalay,otro`.
+ *
+ * Existe porque AMALAY todavia NO opera sobre Fullsite —cero movimientos de
+ * caja en toda su historia—, asi que ahi el rediseno se ve operandolo, no
+ * escribiendo un hash. Un restaurante en operacion real no entra a esta lista
+ * hasta que su matriz este en verde.
+ */
+function porOmisionAqui(): boolean {
+  const lista = (process.env.NEXT_PUBLIC_POS_V2_TENANTS || '')
+    .split(',').map(x => x.trim().toLowerCase()).filter(Boolean)
+  if (lista.length === 0) return false
+  try {
+    const actual = (localStorage.getItem('fullsite_client_id')
+      || process.env.NEXT_PUBLIC_DEFAULT_CLIENT_ID || '').toLowerCase().trim()
+    return !!actual && lista.includes(actual)
+  } catch { return false }
+}
+
 function leerCliente(): boolean {
-  try { return localStorage.getItem(FLAG_KEY) === '1' } catch { return false }
+  try {
+    const guardado = localStorage.getItem(FLAG_KEY)
+    // Lo que la persona eligio manda SIEMPRE sobre el valor de fabrica: quien
+    // escribio `#v2=0` en una caja de la lista espera que se quede apagado.
+    if (guardado === '1') return true
+    if (guardado === '0') return false
+    return porOmisionAqui()
+  } catch { return false }
 }
 const leerServidor = () => false
 
