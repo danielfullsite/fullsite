@@ -74,24 +74,27 @@ cliente se da de alta sin tocar el sistema.
 
 ---
 
-## Cómo se verifica — y por qué en otro restaurante
+## Cómo se verifica — corregido
 
-La bandera ya aísla a AMALAY: está apagada por omisión y vive en el
-`localStorage` de cada equipo. El riesgo de que la vean por accidente es cero.
+> **Corrección del 2026-09-14.** La primera versión de esta sección proponía operar en
+> `boruca` para no ensuciar a AMALAY. Daniel lo aclaró en un renglón: *«nadie está usando
+> AMALAY todavía, es apenas demo, no se usa en operación»*. Los números lo confirman —
+> `pos_cash_movements` en cero desde siempre.
+>
+> O sea que la precaución sobraba, y peor: **habría validado el caso fácil.** Boruca tiene
+> 32 platillos; el problema que este rediseño resuelve —que nada quepa en la pantalla—
+> sólo aparece con las 58 categorías de AMALAY.
 
-Lo que un tenant de pruebas da y la bandera no es **poder operar**. Un POS no se
-evalúa mirándolo: hay que abrir turno, mandar a cocina, dividir y cobrar. Hacer
-eso en AMALAY les mete ventas falsas al corte, al food cost y al inventario.
+**Se opera directo sobre `amalay`.** Es el caso difícil y no hay operación que proteger.
 
 | Tenant | Platillos | Personal | Mesas | Para qué |
 |---|---|---|---|---|
-| `boruca` — Boruca Restaurant & Bar | 32 | 7 | 14 | **Operar.** El único demo con las tres cosas |
-| `amalay` | cientos | 40 | 33 | **Sólo mirar, en lectura.** El caso difícil |
+| `amalay` | cientos, 58 categorías | 40 | 33 | **Operar y mirar.** El caso que hay que resolver |
+| `boruca` | 32 | 7 | 14 | Sólo si hace falta un segundo tenant para probar clonabilidad |
 
-**Por qué los dos.** Boruca tiene 32 platillos; AMALAY tiene 58 categorías con
-cientos. El problema que este rediseño resuelve —que nada quepa en la pantalla—
-**sólo se reproduce con el catálogo de AMALAY**. Validar las familias y la
-retícula con 32 platillos es validar el caso fácil.
+**Lo que sigue siendo cierto del riesgo.** El objetivo declarado es llevar AMALAY a
+operación real. Que hoy no lo esté no relaja la matriz — la hace más urgente: cada fila que
+llegue sin operar al día del cutover se convierte en un problema con clientes sentados.
 
 ### Orden propuesto
 
