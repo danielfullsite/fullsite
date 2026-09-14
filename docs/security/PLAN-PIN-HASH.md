@@ -1,8 +1,22 @@
 # Plan — hashear los PIN de `pos_staff`
 
-> **Estado: PROPUESTO. No implementado, no aplicado.** Nada de este documento tocó la base.
-> Todo lo que se consultó fue `SELECT` por el MCP read-only, y el MCP se queda read-only.
-> Levantado el 2026-09-14. Requiere aprobación de Daniel antes de la Fase 0.
+> **Estado al 2026-09-14 — EN CURSO. La base sigue sin tocarse.**
+>
+> | Fase | Estado |
+> |---|---|
+> | F-1 · rama de falla del login (`429`/`5xx`) | **mergeada** ([#410](https://github.com/danielfullsite/fullsite/pull/410)) |
+> | F0 · la regla de hasheo (`pos-pin-hash.ts`) | **mergeada** ([#411](https://github.com/danielfullsite/fullsite/pull/411)) |
+> | F1 · columnas `pin_hash` / `pin_hash_v` | **mergeada** ([#412](https://github.com/danielfullsite/fullsite/pull/412)) — el archivo está en el repo, **sin aplicar a ninguna base** |
+> | C1 · borrar `/api/pos/staff-cache` | **hecho**, adelantado fuera de F4 (§7) |
+> | F2 en adelante | **bloqueadas**: falta publicar `POS_PIN_PEPPER` y aplicar la migración |
+>
+> **Los 84 PIN siguen en texto plano.** Nada de lo anterior los protegió todavía: F0 es una
+> regla que nadie importa, F1 son columnas vacías sin aplicar, y C1 cerró una fuga distinta.
+> La protección empieza en F3.
+>
+> Nada de este documento tocó la base. Todo lo que se consultó fue `SELECT` por el MCP
+> read-only, y el MCP **se queda read-only** — verificado al intentar un `ALTER TABLE` en
+> staging (`cannot execute ALTER TABLE in a read-only transaction`).
 
 Documento hermano: [`MIGRACION-PINS.md`](MIGRACION-PINS.md) — ése mide la migración de
 **longitud** (4 → 10 dígitos). Éste cambia el **almacenamiento**. Son ejes distintos y
@@ -154,7 +168,7 @@ Ese predicado cambia en F5.
 |---|---|---|
 | X1 | `api/owner/staff/route.ts:82` → `select=...,pin,...` → `equipo/page.tsx:195` lo revela con un ojito | F5 |
 | X2 | `api/platform/staff/route.ts:23` → `platform/staff/page.tsx:107` lo pinta en un input editable | F5 |
-| X3 | `api/pos/staff-cache/route.ts:11-16,37` — hash con sal estática, sin consumidor. Ver §7, C1 | **F4, borrar** |
+| X3 | ~~`api/pos/staff-cache/route.ts`~~ — hash con sal estática, sin consumidor. Ver §7, C1 | **BORRADA 2026-09-14** |
 
 ### Ya resuelto — los tres verificadores offline
 
@@ -323,7 +337,7 @@ personas no puedan entrar.
 ### F4 — Corte de lectura. **La fase de riesgo.**
 
 - V1, V2 y V3 buscan por `pin_hash=eq.<hash>` en vez de `pin=eq.<pin>`.
-- X3 (`api/pos/staff-cache/route.ts`) **se borra**. Ver §7, C1.
+- ~~X3 (`api/pos/staff-cache/route.ts`) **se borra**.~~ Hecho el 2026-09-14, adelantado fuera de F4 porque no dependía de nada del plan. Ver §7, C1.
 - V4 (mobile-app) necesita decisión propia, §7, C3.
 - **Sin fallback a `pin`.** Un fallback reabre el camino de texto plano y esconde un backfill
   fallido. El rollback es de código —`git revert` + redeploy—; la columna `pin` sigue ahí y
@@ -397,7 +411,7 @@ Cambia la pantalla de bloqueo y reabre T-24 en serio. No entra en esta migració
 | `api/owner/staff/route.ts` | `:124`, `:168` escriben hash | `:55` `pinTaken` por hash | `:82` sin `pin` |
 | `api/platform/staff/route.ts` | `:43` escribe hash | — | `:23` sin `pin` |
 | `lib/provision-tenant.ts` | `:248` escribe hash | — | deja de escribir `pin` |
-| `api/pos/staff-cache/route.ts` | — | **borrar** | — |
+| ~~`api/pos/staff-cache/route.ts`~~ | — | ~~borrar~~ hecho 09-14 | — |
 | `mobile-app/src/screens/LoginScreen.tsx` | — | decisión §7 C3 | — |
 | `equipo/page.tsx` | — | — | `:195` ojito → resetear |
 | `platform/staff/page.tsx` | — | — | `:107` input write-only |
@@ -515,6 +529,16 @@ T-24 vuelve a necesitar campo sobre el commit de F4, no sobre el de PR #133.
 `route.ts:11-16` hashea con `SHA-256(pin + '_fullsite_salt')`: sal estática, sin iteraciones,
 espacio de 10^4. Se revienta completo en menos de un segundo. Y `:37` se lo entrega a
 **cualquiera con shift token** —o sea, a cualquier mesero— para **toda la plantilla activa**.
+**BORRADA el 2026-09-14.** Guarda: `dashboard-app/src/__tests__/staff-cache-no-vuelve.test.ts`.
+
+La historia completa, que es la lección: `9d1776ea` creó la ruta **junto con su consumidor**
+en `pos/layout.tsx`. `dbd84c1a` ("POS: P0 production hardening") quitó el consumidor —el mismo
+"P0-E fix" que menciona `api/pos/pin/route.ts:8`— y **dejó la ruta sirviendo**. Un endurecimiento
+a medias: se cerró el uso y se dejó abierta la fuente.
+
+Es la forma inversa del hallazgo de T-24. Allá un módulo perfecto y desconectado se veía igual
+que uno que no existe; aquí una ruta desconectada se veía igual que una borrada — y no lo estaba.
+
 `rg 'staff-cache|pinHash'` sobre `dashboard-app/src`, `electron-app` y `mobile-app` no
 encuentra un solo consumidor. Es exposición viva de código muerto; conviene borrarlo antes
 que el resto del plan.
