@@ -12,6 +12,32 @@ const LEVEL = { mesero: 1, cajero: 2, capitan: 3, gerente: 4, admin: 5 }
 const normalizedRole = role => permissionContract.aliases[role] || role
 const fail = (message, status = 401, code = 'ACTOR_REQUIRED') => Object.assign(new Error(message), { status, code })
 const equal = (a, b) => { const x = Buffer.from(a || ''), y = Buffer.from(b || ''); return x.length === y.length && crypto.timingSafeEqual(x, y) }
+const BIOMETRIC_ASSERTION_VERSION = 'fullsite-biometric-device-v1'
+const BIOMETRIC_ASSERTION_MAX_AGE_MS = 30_000
+function biometricAssertionCanonical(assertion = {}) {
+  return [
+    BIOMETRIC_ASSERTION_VERSION,
+    assertion.timestamp,
+    assertion.nonce,
+    assertion.restaurant_id,
+    assertion.location_id || '',
+    assertion.terminal_id,
+    assertion.staff_id,
+    assertion.min_role || '',
+  ].join('\n')
+}
+
+function normalizeBiometricPublicKey(publicKey) {
+  if (publicKey == null || publicKey === '') return null
+  if (typeof publicKey !== 'string' || publicKey.length > 2048) throw fail('Clave biométrica de terminal inválida', 400, 'BIOMETRIC_DEVICE_KEY_INVALID')
+  try {
+    const key = crypto.createPublicKey(publicKey)
+    if (key.asymmetricKeyType !== 'ed25519') throw new Error('tipo inválido')
+    return key.export({ type: 'spki', format: 'pem' }).toString()
+  } catch {
+    throw fail('Clave biométrica de terminal inválida', 400, 'BIOMETRIC_DEVICE_KEY_INVALID')
+  }
+}
 // El presupuesto de intentos es POR TERMINAL. Cuando era uno solo para toda la
 // instalación, diez errores en la Entrada dejaban sin poder entrar a la Caja y al
 // Escondite: las tres terminales autorizan contra esta misma clase. Un empleado
@@ -73,16 +99,21 @@ class ActorAuthority {
     this.key = fs.readFileSync(keyPath, 'utf8').trim()
     if (!/^[a-f0-9]{64}$/.test(this.key)) throw new Error('Clave de autoridad inválida')
     this.file = path.join(directory, 'actor-credentials.json')
-    this.data = { credentials: {}, failures: {}, denied_devices: {}, last_seen: 0 }
+    this.data = { credentials: {}, failures: {}, denied_devices: {}, device_keys: {}, biometric_nonces: {}, last_seen: 0 }
     if (fs.existsSync(this.file)) {
       this.data = JSON.parse(fs.readFileSync(this.file, 'utf8'))
       // Formato anterior: una lista plana sin terminal. No se puede repartir
       // entre terminales, así que se descarta. Son marcas de diez minutos como
       // mucho, y sólo ocurre una vez, al actualizar.
       if (Array.isArray(this.data.failures)) this.data.failures = {}
+      // Campos agregados después del despliegue inicial: una ausencia limpia se
+      // migra a vacío; un tipo incorrecto sigue significando archivo dañado.
+      if (this.data.device_keys === undefined) this.data.device_keys = {}
+      if (this.data.biometric_nonces === undefined) this.data.biometric_nonces = {}
       if (this.data.restaurant_id !== restaurantId || this.data.location_id !== this.branchId ||
         !this.data.credentials || !this.data.failures || typeof this.data.failures !== 'object' ||
-        !this.data.denied_devices || !Number.isFinite(this.data.last_seen)) {
+        !this.data.denied_devices || !this.data.device_keys || typeof this.data.device_keys !== 'object' ||
+        !this.data.biometric_nonces || typeof this.data.biometric_nonces !== 'object' || !Number.isFinite(this.data.last_seen)) {
         throw new Error('Credenciales dañadas o pertenecientes a otra instalación')
       }
     }
@@ -143,10 +174,35 @@ class ActorAuthority {
     this._queue = result.catch(() => {})
     return result
   }
-  async _loginBiometric({ staffId, deviceId, restaurantId, minRole }) {
+  async _loginBiometric({ staffId, deviceId, restaurantId, minRole, deviceProof }) {
     const now = this._time()
     if (restaurantId !== this.restaurantId || !/^[\w-]{1,64}$/.test(deviceId || '')) throw fail('Scope de acceso inválido', 403, 'ACTOR_SCOPE_INVALID')
     if (minRole && !LEVEL[normalizedRole(minRole)]) throw fail('Permiso solicitado inválido', 400, 'INVALID_ROLE')
+    const assertion = deviceProof?.assertion
+    const signature = deviceProof?.signature
+    if (!assertion || assertion.version !== BIOMETRIC_ASSERTION_VERSION || assertion.restaurant_id !== this.restaurantId || assertion.location_id !== this.branchId ||
+      assertion.terminal_id !== deviceId || assertion.staff_id !== staffId || (assertion.min_role || undefined) !== (minRole || undefined) ||
+      !Number.isSafeInteger(assertion.timestamp) || Math.abs(now - assertion.timestamp) > BIOMETRIC_ASSERTION_MAX_AGE_MS ||
+      !/^[a-f0-9]{64}$/.test(assertion.nonce || '') || typeof signature !== 'string' || !/^[A-Za-z0-9_-]{80,128}$/.test(signature)) {
+      throw fail('Prueba biométrica de terminal inválida o vencida', 401, 'BIOMETRIC_DEVICE_PROOF_INVALID')
+    }
+    const publicKey = this.data.device_keys[deviceId]
+    if (!publicKey) throw fail('Esta terminal debe entrar con PIN una vez antes de usar huella', 401, 'BIOMETRIC_DEVICE_NOT_PREPARED')
+    let proofValid = false
+    try {
+      proofValid = crypto.verify(null, Buffer.from(biometricAssertionCanonical(assertion), 'utf8'),
+        crypto.createPublicKey(publicKey), Buffer.from(signature, 'base64url'))
+    } catch {}
+    if (!proofValid) throw fail('La terminal no demostró la lectura biométrica', 401, 'BIOMETRIC_DEVICE_PROOF_INVALID')
+    for (const [nonce, seenAt] of Object.entries(this.data.biometric_nonces)) {
+      if (!Number.isFinite(seenAt) || seenAt < now - BIOMETRIC_ASSERTION_MAX_AGE_MS) delete this.data.biometric_nonces[nonce]
+    }
+    const replayKey = `${deviceId}:${assertion.nonce}`
+    if (this.data.biometric_nonces[replayKey]) throw fail('La prueba biométrica ya fue utilizada', 409, 'BIOMETRIC_DEVICE_PROOF_REPLAY')
+    this.data.biometric_nonces[replayKey] = now
+    // Consumir el nonce antes de consultar la nube: un timeout o una respuesta
+    // rechazada tampoco debe convertir una captura vieja en un segundo intento.
+    this._persist()
     if (this.data.denied_devices[deviceId]) throw fail('Terminal revocada; requiere autorización con internet', 403, 'terminal_not_enrolled')
     let credential = Object.values(this.data.credentials).find(candidate =>
       candidate.staff.id === staffId && candidate.expires_at > now && candidate.devices?.[deviceId] > now)
@@ -209,7 +265,7 @@ class ActorAuthority {
     return { staff: credential.staff, actor_token: payload + '.' + this._sign(payload), expires_at: expiresAt,
       offline, auth_method: 'fingerprint' }
   }
-  async _login({ pin, deviceId, restaurantId, minRole }) {
+  async _login({ pin, deviceId, restaurantId, minRole, biometricDevicePublicKey }) {
     const now = this._time()
     if (restaurantId !== this.restaurantId || !/^[\w-]{1,64}$/.test(deviceId || '')) throw fail('Scope de acceso inválido', 403, 'ACTOR_SCOPE_INVALID')
     if (!/^\d{4,10}$/.test(pin || '')) throw fail('PIN inválido', 400, 'INVALID_PIN')
@@ -221,6 +277,7 @@ class ActorAuthority {
     if (vivosEnLaInstalacion >= INTENTOS_POR_INSTALACION) {
       throw fail('Demasiados intentos en el restaurante; espera diez minutos', 429, 'PIN_RATE_LIMITED')
     }
+    const normalizedDeviceKey = normalizeBiometricPublicKey(biometricDevicePublicKey)
     const index = this._index(pin)
     let credential = this.data.credentials[index], offline = false, shiftToken
     try {
@@ -247,6 +304,13 @@ class ActorAuthority {
       const data = await response.json()
       const staff = data.staff
       if (typeof staff?.id !== 'string' || !staff.id || typeof staff.name !== 'string' || !LEVEL[normalizedRole(staff.role)]) throw fail('Respuesta de autoridad inválida', 502, 'AUTHORITY_RESPONSE_INVALID')
+      const enrolledDeviceKey = this.data.device_keys[deviceId]
+      if (normalizedDeviceKey && enrolledDeviceKey && enrolledDeviceKey !== normalizedDeviceKey) {
+        // Ni siquiera un PIN correcto rota silenciosamente la identidad del equipo:
+        // recuperar/reemplazar un POS requiere una revocación explícita. Esto
+        // evita que otro poseedor del secreto LAN suplante una terminal enrolada.
+        throw fail('La identidad biométrica de esta terminal no coincide; requiere recuperación administrada', 409, 'BIOMETRIC_DEVICE_KEY_MISMATCH')
+      }
       shiftToken = typeof data.shiftToken === 'string' ? data.shiftToken : undefined
       const biometricProof = typeof data.biometricProof === 'string' ? data.biometricProof : undefined
       const unchanged = credential && credential.staff.id === staff.id && credential.staff.role === staff.role
@@ -258,6 +322,9 @@ class ActorAuthority {
         ...(biometricProof ? { biometric_proof: biometricProof } : {}) }
       for (const [oldIndex, old] of Object.entries(this.data.credentials)) if (old.staff.id === staff.id) delete this.data.credentials[oldIndex]
       this.data.credentials[index] = credential
+      // Una clave nueva sólo se enrola después de que la nube aceptó el PIN y
+      // el device_id. El camino offline jamás puede cambiar la identidad del POS.
+      if (normalizedDeviceKey) this.data.device_keys[deviceId] = normalizedDeviceKey
       delete this.data.denied_devices[deviceId]
     } catch (error) {
       if (error.status) { this._anotarFallo(deviceId, now); this._persist(); throw error }
@@ -291,4 +358,4 @@ class ActorAuthority {
     return { ...credential.staff, permissions: permissionsFor(credential.staff.role), device_id: deviceId, expires_at: claims.expires_at }
   }
 }
-module.exports = { ActorAuthority, permissionsFor }
+module.exports = { ActorAuthority, permissionsFor, biometricAssertionCanonical, BIOMETRIC_ASSERTION_VERSION }

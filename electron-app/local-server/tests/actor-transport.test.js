@@ -43,7 +43,7 @@ test('PIN and payments forwarded through a secondary retain verified employee/de
     return { port: app.address().port, state, eventStore, cmdHandler, catalog }
   }
   const caja = await server('Caja', {}, actorAuthority)
-  const secondary = await server('Secondary', { posServerIp: '127.0.0.1', posServerPort: caja.port })
+  const secondary = await server('Secondary', { terminalId: 'POS-2', posServerIp: '127.0.0.1', posServerPort: caja.port })
   const headers = cred.cabecerasDeCredencial({ secreto: secret, restaurantId, branchId, terminalId: 'POS-2' })
   const request = (route, payload, extra = {}) => fetch(`http://127.0.0.1:${secondary.port}${route}`, {
     method: payload ? 'POST' : 'GET', headers: { ...headers, 'Content-Type': 'application/json', ...extra },
