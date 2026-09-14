@@ -40,6 +40,7 @@ const credLan = require('./core/credencial-lan')
 const { OutboxWorker }      = require('./core/outbox')
 const { BusinessOutbox } = require('./core/business-outbox')
 const mdns      = require('./discovery/mdns')
+const { readSupabaseCreds } = require('./config-schema')
 const heartbeat = require('./telemetry/heartbeat')
 const updater   = require('./update/manager')
 const { buildInstallSnapshot } = require('./update/snapshot')
@@ -844,11 +845,23 @@ async function startLocalServer({ dataDir, port = 7717, config = {}, businessSyn
   console.log(`[server] Credencial LAN: ${credLan.paraLog(config.lanSecret)}`)
   if (!config.lanSecret) console.warn('[server] Terminal sin emparejar: operacion bloqueada, diagnostico disponible')
 
+  const _creds = readSupabaseCreds(config)
+
   const {
     channel            = config.channel || 'stable',
     instanceName       = config.instanceName || `Fullsite POS — ${os.hostname()}`,
-    supabaseUrl        = process.env.SUPABASE_URL || '',
-    supabaseKey        = process.env.SUPABASE_ANON_KEY || '',
+    // Las credenciales NO se leen aquí a mano: el nombre del campo lo declara el
+    // esquema (`supabaseAnonKey`), y aquí se leía `supabaseKey` — un nombre que
+    // ningún config.json del esquema tiene.
+    //
+    // En la ruta de producción el hueco estaba tapado por accidente: main.js
+    // construye su `cfg` traduciendo `appConfig.supabaseAnonKey → supabaseKey`
+    // antes de llamar aquí. Pero cualquier llamador que pase un config del
+    // esquema tal cual (los runners de prueba, el laboratorio multi-terminal,
+    // un arranque directo) se quedaba sin llave y sin saber por qué.
+    // Ver configSchema.readSupabaseCreds y tests/heartbeat-credenciales.test.js.
+    supabaseUrl        = _creds.supabaseUrl,
+    supabaseKey        = _creds.supabaseKey,
     // Service-account por-tenant (miembro SOLO de este client_id) para que el poll
     // lea con JWT authenticated en vez de la anon key. Opcional (fallback a anon).
     serviceEmail       = config.serviceEmail || process.env.SUPABASE_SERVICE_EMAIL || '',

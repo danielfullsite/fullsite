@@ -1,0 +1,53 @@
+name: Fleet Heartbeat Watchdog
+
+# Alerta por AUSENCIA de telemetria de terminales.
+#
+# Corre DURANTE el servicio, no de madrugada: una terminal apagada a las 4am es
+# normal y alertar ahi entrena a ignorar la alerta. 2pm y 8pm MX son horas en
+# que las cajas deben estar prendidas y cobrando.
+
+on:
+  schedule:
+    - cron: '0 20 * * *'   # 2pm MX (UTC-6) — comida
+    - cron: '0 2 * * *'    # 8pm MX (UTC-6) — cena
+  workflow_dispatch:
+    inputs:
+      client_id:
+        description: "Client ID"
+        required: false
+        default: "amalay"
+      stale_min:
+        description: "Minutos sin reportar para considerar una terminal callada"
+        required: false
+        default: "25"
+
+jobs:
+  heartbeat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - run: pip install requests
+
+      # Las pruebas corren ANTES del vigilante, en el mismo job: es el único
+      # lugar que garantiza que la lógica se ejecute antes de confiar en ella.
+      # Un vigilante roto no avisa que está roto — ése es justo el bug que
+      # este workflow existe para cazar.
+      - name: Pruebas del vigilante
+        run: python .github/scripts/test_fleet_heartbeat.py
+
+      - name: Run fleet-heartbeat watchdog
+        env:
+          SUPABASE_URL:         ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          TELEGRAM_BOT_TOKEN:   ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CLIENT_ID:            ${{ github.event.inputs.client_id || 'amalay' }}
+          HEARTBEAT_STALE_MIN:  ${{ github.event.inputs.stale_min || '25' }}
+          TRIGGER_TYPE:         ${{ github.event_name }}
+        run: python .github/scripts/fleet_heartbeat.py

@@ -35,7 +35,19 @@ let _lastSyncAt     = null
 function start(opts) {
   const { supabaseUrl, supabaseKey } = opts
   if (!supabaseUrl || !supabaseKey) {
-    console.log('[heartbeat] No Supabase credentials — fleet telemetry disabled')
+    // Apagarse en silencio es lo que hizo que esto llevara meses muerto sin que
+    // nadie lo notara: una flota que no reporta se ve idéntica a una flota sana.
+    // Decir EXACTAMENTE qué falta y qué se pierde, en warn, no en log.
+    const faltan = [
+      !supabaseUrl ? 'supabaseUrl' : null,
+      !supabaseKey ? 'supabaseAnonKey' : null,
+    ].filter(Boolean).join(' y ')
+    console.warn(
+      `[heartbeat] TELEMETRIA DE FLOTA APAGADA — falta ${faltan} en config.json ` +
+      `(o SUPABASE_URL / SUPABASE_ANON_KEY en el entorno). Esta terminal NO va a ` +
+      `reportar cola de sync, fallas de impresion, version ni disco. Diagnostico ` +
+      `remoto imposible: hay que venir fisicamente.`
+    )
     return
   }
 

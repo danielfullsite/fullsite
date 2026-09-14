@@ -66,6 +66,7 @@ TRIGGERS (GitHub Actions cron / Telegram webhook)
 | Agents Weekly | `agents-weekly.yml` | cron (Lun-Vie) | ops | Staffing + Menu Engineering + Suppliers + Waste + Anti-Fraud + Tips |
 | Intraday Sales | `intraday-sales.yml` | cron | reportes | Reporte de ventas intraday |
 | Wansoft Scraper | `wansoft-daily-mesero.yml` | cron (3pm avance, 8:30/11pm cierre) | ops | Scraper Playwright → parser → Telegram |
+| Fleet Heartbeat | `fleet-heartbeat.yml` | cron (2pm/8pm MX) | ops | Alerta si una terminal deja de reportar telemetría, o si la flota nunca reportó (silent si OK) |
 
 ### Secrets requeridos en GitHub (Settings → Secrets → Actions)
 
@@ -94,6 +95,7 @@ TRIGGERS (GitHub Actions cron / Telegram webhook)
 | `menu_engineering.py` | Clasifica platillos: estrellas, vacas, perros (lunes) |
 | `antifraud_agent.py` | Detecta patrones de fraude en cancelaciones/descuentos (viernes) |
 | `tips_analyzer.py` | Analisis de propinas por mesero (viernes) |
+| `fleet_heartbeat.py` | Vigila `local_server_heartbeats`: alerta por AUSENCIA de telemetría de terminales. Lógica pura en `evaluar_flota()`, probada sin red por `test_fleet_heartbeat.py` |
 
 Todos siguen el patron: `client_config.get_client()` → fetch data → Groq/Claude → Telegram → log `agent_runs`.
 

@@ -157,10 +157,39 @@ function touchValidatedAt(config) {
   config.last_validated_at = new Date().toISOString()
 }
 
+/**
+ * Resolver las credenciales de Supabase desde un config de terminal.
+ *
+ * Vive aquí, y no en el consumidor, porque el nombre del campo es parte DEL
+ * ESQUEMA: este módulo declara `supabaseAnonKey` (no `supabaseKey`) y quien lo
+ * lea tiene que preguntárselo a él, en vez de adivinarlo.
+ *
+ * `local-server/index.js` lo adivinaba y le atinaba sólo porque `main.js`
+ * traduce el nombre antes de llamarlo. Cualquier otro llamador —runners de
+ * prueba, laboratorio multi-terminal, arranque directo— se quedaba sin llave
+ * y con la telemetría apagada sin explicación. Ver
+ * `tests/heartbeat-credenciales.test.js`.
+ *
+ * Orden de precedencia: config del esquema → alias escrito a mano → entorno.
+ * El entorno va al final a propósito: en una terminal instalada por .exe no
+ * existe, así que nunca puede ser la fuente principal.
+ *
+ * @param {object} config configuración de la terminal
+ * @param {object} [env]  process.env por defecto
+ * @returns {{ supabaseUrl: string, supabaseKey: string }} cadenas vacías si falta
+ */
+function readSupabaseCreds(config = {}, env = process.env) {
+  return {
+    supabaseUrl: config.supabaseUrl || env.SUPABASE_URL || '',
+    supabaseKey: config.supabaseAnonKey || config.supabaseKey || env.SUPABASE_ANON_KEY || '',
+  }
+}
+
 module.exports = {
   validate,
   fromLegacy,
   touchValidatedAt,
+  readSupabaseCreds,
   VALID_ROLES,
   CURRENT_CONFIG_VERSION,
   PROTOCOL_VERSION,
