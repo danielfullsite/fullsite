@@ -481,6 +481,13 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
     if (pin.length < 4 || isLocked) return
     setChecking(true)
     setError(false)
+    // El teclado se deshabilita con `checking`. Abajo hay 15 await y ocho
+    // `setChecking(false)` sueltos: si cualquiera de esos await rechaza,
+    // `checking` se queda en true y la caja se queda MUERTA hasta recargar
+    // —no se puede ni teclear un dígito. El finally de abajo es el seguro.
+    // El cuerpo no se reindenta a propósito: así el diff son dos líneas y no
+    // doscientas, y se puede revisar de un vistazo.
+    try {
 
     const unlock = async (member: StaffMember, localSession = false) => {
       // ── Session locking: prevent concurrent login on multiple terminals ──
@@ -716,6 +723,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
     }
     setTimeout(() => setError(false), 1500)
     setChecking(false)
+    } finally { setChecking(false) }
   }
 
   // Fullscreen is handled by Electron kiosk mode — no browser fullscreen needed
@@ -925,8 +933,8 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
           {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => (
             <button
               key={d}
-              onClick={() => { if (!isLocked && !checking) setPin((p) => (p + d).slice(0, 10)) }}
-              disabled={isLocked || checking}
+              onClick={() => { if (!isLocked) setPin((p) => (p + d).slice(0, 10)) }}
+              disabled={isLocked}
               className="min-h-[64px] rounded-2xl bg-slate-800/70 hover:bg-slate-700 active:scale-95 border border-slate-700 text-white text-2xl font-bold transition-all disabled:opacity-40"
             >
               {d}
@@ -934,8 +942,8 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
           ))}
           {/* Borrar */}
           <button
-            onClick={() => { if (!isLocked && !checking) setPin((p) => p.slice(0, -1)) }}
-            disabled={isLocked || checking || pin.length === 0}
+            onClick={() => { if (!isLocked) setPin((p) => p.slice(0, -1)) }}
+            disabled={isLocked || pin.length === 0}
             aria-label="Borrar"
             className="min-h-[64px] rounded-2xl bg-slate-800/40 hover:bg-slate-700 active:scale-95 border border-slate-700 text-slate-300 flex items-center justify-center transition-all disabled:opacity-30"
           >
@@ -943,8 +951,8 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
           </button>
           {/* 0 */}
           <button
-            onClick={() => { if (!isLocked && !checking) setPin((p) => (p + '0').slice(0, 10)) }}
-            disabled={isLocked || checking}
+            onClick={() => { if (!isLocked) setPin((p) => (p + '0').slice(0, 10)) }}
+            disabled={isLocked}
             className="min-h-[64px] rounded-2xl bg-slate-800/70 hover:bg-slate-700 active:scale-95 border border-slate-700 text-white text-2xl font-bold transition-all disabled:opacity-40"
           >
             0
