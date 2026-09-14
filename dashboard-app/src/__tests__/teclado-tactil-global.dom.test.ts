@@ -18,6 +18,18 @@ function tocar(texto: string) {
   for (const caracter of texto) fireEvent.click(screen.getByRole('button', { name: `Escribir ${caracter}` }))
 }
 
+function FondoDeCajaSinFor() {
+  const [value, setValue] = useState('')
+  return createElement('div', null,
+    createElement('label', null, 'Fondo de caja (efectivo contado)'),
+    createElement('input', {
+      type: 'number', inputMode: 'decimal', placeholder: '$0.00', value,
+      onChange: (event: ChangeEvent<HTMLInputElement>) => setValue(event.target.value),
+    }),
+    createElement(TecladoTactilGlobal),
+  )
+}
+
 it('un toque abre el pad, escribe en el input controlado y Listo restaura el campo', () => {
   render(createElement(Campo))
   const input = screen.getByLabelText('Importe de prueba') as HTMLInputElement
@@ -92,6 +104,19 @@ it('mantiene visible el avance del PIN sin revelar los dígitos bajo el teclado'
   expect(preview.textContent).toBe('••••')
   expect(screen.queryByText('1234')).toBeNull()
   expect(input.value).toBe('1234')
+})
+
+it('nombra el Fondo de caja aunque el formulario antiguo no enlace label e input', () => {
+  render(createElement(FondoDeCajaSinFor))
+  const input = screen.getByPlaceholderText('$0.00')
+
+  fireEvent.pointerDown(input)
+
+  const teclado = screen.getByRole('dialog', {
+    name: 'Teclado en pantalla para Fondo de caja (efectivo contado)',
+  })
+  expect(teclado.textContent).toContain('Fondo de caja (efectivo contado)')
+  expect(screen.getByText('Sin capturar')).toBeTruthy()
 })
 
 it('alterna entre minúsculas y mayúsculas sin agregar otra fila al teclado', () => {

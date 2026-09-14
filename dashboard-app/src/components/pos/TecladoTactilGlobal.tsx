@@ -53,6 +53,18 @@ function nombreDelCampo(campo: Campo): string {
   }
   const parentLabel = campo.closest('label')
   if (parentLabel?.textContent?.trim()) return parentLabel.textContent.trim()
+
+  // Muchos formularios antiguos pintan `<label>` y `<input>` como hermanos,
+  // sin `htmlFor`. Visualmente se entiende, pero el teclado no podia saber que
+  // "$0.00" era el Fondo de caja. Recorremos solamente dos contenedores y solo
+  // aceptamos una etiqueta inequivoca; si hay varias, no adivinamos.
+  let contenedor: HTMLElement | null = campo.parentElement
+  for (let profundidad = 0; contenedor && profundidad < 2; profundidad += 1) {
+    const etiquetas = [...contenedor.children].filter((child): child is HTMLLabelElement =>
+      child instanceof HTMLLabelElement && !child.contains(campo))
+    if (etiquetas.length === 1 && etiquetas[0].textContent?.trim()) return etiquetas[0].textContent.trim()
+    contenedor = contenedor.parentElement
+  }
   return campo.placeholder || 'Campo de texto'
 }
 
