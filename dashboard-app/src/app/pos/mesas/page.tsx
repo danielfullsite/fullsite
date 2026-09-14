@@ -1200,6 +1200,26 @@ export default function MesasPage() {
         const totalMesas = mesas.length || 0
         const aforo = totalMesas > 0 ? Math.round((ocupadas / totalMesas) * 100) : 0
         return (
+          posV2 ? (
+            // El demo lleva estos números como pastillas en la barra, no como
+            // una banda de tarjetas. Aquí valía ~90 px de alto —tres renglones
+            // de mesas— para decir dos cifras.
+            <div className="flex items-center gap-2 px-4 lg:px-6 pt-2 pb-0.5 flex-shrink-0 flex-wrap">
+              {[
+                { l: 'Ocupadas', v: `${ocupadas}/${totalMesas}`, ink: 'var(--accent-ink)' },
+                { l: 'Aforo', v: `${aforo}%`, ink: 'var(--text-2)' },
+                { l: 'En piso', v: `${totalPersonas}`, ink: 'var(--info)' },
+              ].map(k => (
+                <span
+                  key={k.l}
+                  className="inline-flex items-center gap-2 h-7 px-2.5 rounded-full border text-[11px] font-mono font-semibold tracking-[0.04em] uppercase whitespace-nowrap"
+                  style={{ background: 'var(--surface)', borderColor: 'var(--line)', color: 'var(--text-3)' }}
+                >
+                  {k.l}<b style={{ color: k.ink, fontWeight: 800 }}>{k.v}</b>
+                </span>
+              ))}
+            </div>
+          ) : (
           <div className="grid grid-cols-2 gap-2 px-4 lg:px-6 pt-2.5 flex-shrink-0">
             {[
               { l: 'Mesas ocupadas', v: `${ocupadas}`, sub: `/${totalMesas}`, d: `${aforo}% de aforo`, ink: 'var(--accent-ink)' },
@@ -1214,6 +1234,7 @@ export default function MesasPage() {
               </div>
             ))}
           </div>
+          )
         )
       })()}
 
