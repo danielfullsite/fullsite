@@ -607,6 +607,118 @@ async function check(name, run) {
   }
 }
 
+// ── Recorrido de TODAS las pantallas, en los dos estados de red ──────────────
+//
+// Daniel, 2026-09-14: «quiero llegar al cien por ciento de las pantallas y
+// validar cada una online, offline, saber que está offline, saber que está
+// online, validar que los botones funcionen, que las órdenes llegan».
+//
+// Hasta esta noche el laboratorio visitaba 3 de 33 pantallas: el 9%.
+//
+// QUÉ COMPRUEBA ESTO, Y QUÉ NO
+//
+//   SÍ: que la pantalla cargue, que no quede en blanco, que no reviente, que no
+//       pida scroll, que nada se desborde a lo ancho, que ningún control quede
+//       por debajo de 56 px, y el inventario de botones con su estado.
+//   NO: que cada botón haga lo correcto. Picarle a todos a ciegas no es
+//       validación: hay botones que cobran, cancelan y borran. Eso se escribe
+//       pantalla por pantalla, y vive en los casos de arriba.
+//
+// EL ESTADO DE RED SE DEMUESTRA, NO SE SUPONE. El documento probado en campo lo
+// dice: «nunca equiparar navigator.onLine con conectividad real». Aquí se prueba
+// desde DENTRO de la página, que es quien lo sufre: se pide algo a la nube y algo
+// a Pedro. Online = la nube contesta. Offline = la nube NO contesta y Pedro SÍ,
+// que es la definición de «sin internet pero con LAN».
+const PANTALLAS = ['', 'mesas', 'plano', 'turno', 'corte', 'cocina', 'barra', 'panaderia',
+  'historial', 'monitor', 'auditoria', 'staff', 'staff-analytics', 'asistencia', 'cliente',
+  'configuracion', 'huella', 'qr', 'delivery', 'facturacion', 'facturas-proveedor',
+  'recepcion-factura', 'compras', 'orden-compra', 'recetas', 'food-cost', 'merma',
+  'inventario', 'inventario-fisico', 'inventario-market', 'plano-editor', 'ui-kit', 'kds']
+
+// GUARDIÁN: si alguien agrega una pantalla al POS y no la agrega aquí, esta
+// corrida se detiene. Es la forma de que «el 9% de las pantallas» no vuelva a
+// pasar sin que nadie se entere.
+{
+  const dirPantallas = path.join(APP, 'src/app/pos')
+  const enDisco = fs.readdirSync(dirPantallas, { withFileTypes: true })
+    .filter(d => d.isDirectory() && fs.existsSync(path.join(dirPantallas, d.name, 'page.tsx')))
+    .map(d => d.name)
+  const sinRecorrer = enDisco.filter(n => !PANTALLAS.includes(n))
+  if (sinRecorrer.length) {
+    throw new Error(`Pantallas del POS sin recorrer: ${sinRecorrer.join(', ')}. Agrégalas a PANTALLAS en este archivo.`)
+  }
+}
+
+async function estadoDeRedReal(page, puertoPedro) {
+  return page.evaluate(async puerto => {
+    const alcanza = async url => {
+      try {
+        const c = new AbortController()
+        const t = setTimeout(() => c.abort(), 4000)
+        const r = await fetch(url, { cache: 'no-store', signal: c.signal })
+        clearTimeout(t)
+        return r.status > 0
+      } catch { return false }
+    }
+    return {
+      nube: await alcanza('https://app.fullsite.mx/api/pos/menu'),
+      pedro: await alcanza(`http://127.0.0.1:${puerto}/health`),
+      navigator_onLine: navigator.onLine,
+    }
+  }, puertoPedro)
+}
+
+async function recorrerPantallas(terminal, etiquetaRed) {
+  const hallazgos = []
+  const red = await estadoDeRedReal(terminal.page, terminal.port)
+  const coherente = etiquetaRed === 'online' ? red.nube === true : (red.nube === false && red.pedro === true)
+  console.log(`\n── PANTALLAS · ${terminal.name} · red declarada ${etiquetaRed} ──`)
+  console.log(`   comprobado: nube=${red.nube} pedro=${red.pedro} navigator.onLine=${red.navigator_onLine}` +
+    (coherente ? '  ✓ coherente' : '  ✗ NO COINCIDE con lo declarado'))
+  if (red.navigator_onLine !== red.nube) {
+    console.log(`   ⚠ navigator.onLine dice ${red.navigator_onLine} y la nube ${red.nube ? 'sí' : 'no'} contesta: por eso no se le cree`)
+  }
+  hallazgos.push({ pantalla: '(estado de red)', red, declarado: etiquetaRed, coherente })
+
+  for (const ruta of PANTALLAS) {
+    const url = ruta === 'kds' ? `http://127.0.0.1:${terminal.port}/kds` : `${uiOrigin}/pos${ruta ? '/' + ruta : ''}`
+    const h = { pantalla: ruta || '(raíz /pos)', red: etiquetaRed }
+    try {
+      await terminal.page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 })
+      await esperarHidratacion(terminal.page).catch(() => {})
+      const info = await inspeccionar(terminal.page)
+      const cuerpo = await terminal.page.evaluate(() => ({
+        texto: (document.body.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 400),
+        largo: (document.body.innerText || '').trim().length,
+      }))
+      h.ruta = info.ruta
+      h.botones = info.botones_visibles?.length ?? 0
+      h.vacia = cuerpo.largo < 40
+      h.reventada = /Application error|Unhandled Runtime|No se pudieron|Algo salió mal/i.test(cuerpo.texto)
+      h.pide_scroll = info.pide_scroll_vertical
+      h.desbordes = info.desbordes_horizontales?.length ?? 0
+      h.controles_chicos = info.controles_menores_56?.length ?? 0
+      h.redirigida = !info.ruta.includes(ruta) && ruta !== '' && ruta !== 'kds'
+      h.muestra = cuerpo.texto.slice(0, 120)
+      await captura(terminal.page, `pantalla-${etiquetaRed}-${ruta || 'raiz'}.png`)
+    } catch (e) {
+      h.error = e.message.split('\n')[0]
+    }
+    const mal = h.error || h.vacia || h.reventada
+    console.log(`   ${mal ? 'MAL ' : h.pide_scroll || h.desbordes ? 'OJO ' : 'ok  '} /pos/${ruta.padEnd(20)}` +
+      (h.error ? ` ${h.error}` :
+       h.vacia ? ' EN BLANCO' :
+       h.reventada ? ' REVENTADA' :
+       `${String(h.botones).padStart(3)} botones` +
+       (h.redirigida ? `  → redirigió a ${h.ruta}` : '') +
+       (h.pide_scroll ? '  pide scroll' : '') +
+       (h.desbordes ? `  ${h.desbordes} desborde(s)` : '') +
+       (h.controles_chicos ? `  ${h.controles_chicos} control(es) <56px` : '')))
+    hallazgos.push(h)
+  }
+  return hallazgos
+}
+
 async function main() {
   if (printMode) {
     syntheticPrinter = net.createServer(socket => {
@@ -998,6 +1110,25 @@ main().catch(error => {
       'La nube está simulada; órdenes y réplicas usan Pedro real'],
     errors: terminals.flatMap(t => t.errors.map(error => ({ terminal: t.name, error }))),
   }, null, 2))
+// ── El cien por ciento de las pantallas, en los dos estados de red ─────────
+  if (process.env.FULLSITE_LAB_PANTALLAS === '1') {
+    const pantallas = []
+    wan = true
+    await new Promise(r => setTimeout(r, 1500))
+    pantallas.push(...await recorrerPantallas(caja, 'online'))
+    wan = false
+    await new Promise(r => setTimeout(r, 1500))
+    pantallas.push(...await recorrerPantallas(caja, 'offline'))
+    fs.writeFileSync(path.join(output, 'recorrido-de-pantallas.json'), JSON.stringify(pantallas, null, 2))
+    const visitas = pantallas.filter(p => p.pantalla !== '(estado de red)')
+    const rotas = visitas.filter(p => p.error || p.vacia || p.reventada)
+    const conScroll = visitas.filter(p => p.pide_scroll)
+    const conDesborde = visitas.filter(p => p.desbordes)
+    console.log(`\nPANTALLAS: ${visitas.length} visitas · ${rotas.length} rotas · ` +
+      `${conScroll.length} piden scroll · ${conDesborde.length} con desborde`)
+    if (rotas.length) console.log(`   rotas: ${rotas.map(p => `${p.pantalla}[${p.red}]`).join(', ')}`)
+  }
+
   // ── El acta, en un archivo que una persona pueda leer en dos minutos ───────
   const lineas = ['# Acta del recorrido', '', `Corrida: ${new Date().toISOString()}`,
     `Catálogo: ${real ? 'REAL — ' + fixture.pos_menu_categories.length + ' categorías, ' + fixture.pos_menu_items.length + ' productos' : 'fixture mínimo'}`,
