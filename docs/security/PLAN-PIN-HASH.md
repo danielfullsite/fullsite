@@ -192,6 +192,32 @@ lo que convierte una pimienta mal puesta en "el restaurante no abre" (§6.2, R1)
 
 **Impacto offline: ninguno.** **Reversible:** borrar el archivo.
 
+> **Estado 2026-09-14 — código LISTO, pimienta PENDIENTE.**
+>
+> Implementado en `dashboard-app/src/lib/pos-pin-hash.ts` con 22 pruebas
+> (`src/__tests__/pos-pin-hash.test.ts`). Se verificó con dos mutaciones que las pruebas
+> fallan cuando deben: quitar el `client_id` del mensaje tumba las 2 de separación entre
+> tenants, y aflojar el fallo cerrado tumba 4. El módulo **no lo importa ninguna ruta** —
+> eso es F2.
+>
+> **Falta un paso que no me corresponde ejecutar: publicar la pimienta.** Es un secreto de
+> producción, y el protocolo (CLAUDE.md §13) dice que no amplíe el alcance a rotación de
+> secretos sin autorización. El runbook, para que el valor no pase nunca por un chat ni por
+> un log:
+>
+> ```
+> openssl rand -hex 32
+> ```
+>
+> Guardarlo primero en el gestor de contraseñas — **se va a necesitar otra vez** para correr
+> el backfill de F3 desde la máquina de Daniel — y después publicarlo con el mismo valor en
+> `Production` y en `Preview`. Si preview y prod difieren, F3 escribe hashes que F4 no
+> encuentra y nadie entra.
+>
+> Una vez publicada, `POS_PIN_PEPPER` queda anotada en
+> [`PROTECCIONES-CONSTRUIDAS-VS-ACTIVADAS.md`](PROTECCIONES-CONSTRUIDAS-VS-ACTIVADAS.md),
+> donde está explicado por qué su 🔴 hoy **no** se lee igual que el de las demás filas.
+
 ### F1 — DDL aditiva
 
 ```sql
