@@ -109,7 +109,11 @@ jobs:
       - name: Guardar los instaladores como artefacto
         uses: actions/upload-artifact@v4
         with:
-          name: instaladores-${{ github.ref_name }}
+          # `ref_name` contiene `/` en ramas como `claude/pos-touch-first`, y
+          # upload-artifact rechaza esos nombres aunque ambos instaladores ya
+          # hayan compilado. El run id es estable, único y válido tanto para
+          # pruebas manuales como para releases disparados por etiqueta.
+          name: instaladores-${{ github.run_id }}
           path: |
             electron-app/dist-pos/*.exe
             electron-app/dist-kds/*.exe
