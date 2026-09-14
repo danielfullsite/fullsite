@@ -18,6 +18,7 @@ import { localNetworkFetch } from '@/lib/local-network-fetch'
 import { decidirHuella, modoDeAutoridadRecordado } from '@/lib/modo-autoridad'
 import { provisionManagerCredential, verifyPinOffline, estadoCredencialesOffline } from '@/lib/pos-manager-auth'
 import { usePosOffline } from '@/hooks/usePosOffline'
+import { clasificarRespuestaDePin } from '@/lib/veredicto-de-la-autoridad'
 import { POSLockContext } from './pos-lock-context'
 import { requiereCaja } from '@/lib/pedro-cliente'
 import { actorDeCaja, cerrarActorDeCaja, ingresarConPinEnCaja } from '@/lib/pedro-actor'
@@ -500,6 +501,10 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
     if (pin.length < 4 || isLocked) return
     setChecking(true)
     setError(false)
+    // Un intento nuevo borra el aviso del anterior. Sin esto, el mensaje de "el servidor no
+    // pudo confirmar tu PIN" se queda pegado junto al "PIN incorrecto" del siguiente intento
+    // y el operador ve dos diagnósticos contradictorios a la vez.
+    setSessionError('')
 
     const unlock = async (member: StaffMember, localSession = false) => {
       // ── Session locking: prevent concurrent login on multiple terminals ──
@@ -578,6 +583,10 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
       return
     }
 
+    // Por qué caímos al respaldo local: sin red, o con red pero sin veredicto de la nube.
+    // Los dos casos terminan en el mismo `catch` y necesitan mensajes distintos.
+    let autoridadNoDisponible = false
+
     try {
       // Skip network entirely when offline — go straight to local cache
       if (!navigator.onLine) throw new Error('offline')
@@ -589,22 +598,35 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
         body: JSON.stringify({ pin, client_id: _cid(), device_id: getTerminalId() }),
         signal: AbortSignal.timeout(4000),
       })
-      if (res.status === 403) {
-        try {
-          const j = await res.json()
-          if (j?.code === 'terminal_not_enrolled') { setNotEnrolled(j.device_id || getTerminalId()); return }
-        } catch {}
+      // Quién juzga qué: sólo un 401 habla del PIN. Todo lo demás habla del servidor,
+      // de la terminal o de la red. La regla vive en veredicto-de-la-autoridad.ts con su
+      // historia; aquí sólo se actúa sobre ella.
+      const cuerpo = res.ok ? null : await res.json().catch(() => null)
+      const veredicto = clasificarRespuestaDePin(res.status, cuerpo?.code)
+
+      if (veredicto === 'terminal-no-enrolada') {
+        setNotEnrolled(cuerpo?.device_id || getTerminalId())
+        return
       }
-      // 400 = el servidor rechazó el client_id (vacío o mal formado). Es un
-      // problema de provisionamiento de la terminal, no del PIN de quien lo
-      // teclea. Se dice, y no se cuenta como intento fallido.
-      if (res.status === 400) {
+      // El servidor rechazó el client_id (vacío o mal formado). Es un problema de
+      // provisionamiento de la terminal, no del PIN de quien lo teclea. Se dice, y no se
+      // cuenta como intento fallido.
+      if (veredicto === 'sin-tenant') {
         setSinTenant(true)
         setPin('')
         setChecking(false)
         return
       }
-      if (res.ok) {
+      // 429 o 5xx: la nube contestó, pero no juzgó este PIN. LANZAR es lo que despierta
+      // el respaldo local de abajo — un `return` o caer de largo lo saltaría, que es
+      // exactamente el defecto que este arreglo cierra. Quien ya tenga credencial
+      // aprovisionada entra igual que con la nube caída; quien no, recibe un mensaje que
+      // no lo manda a revisar el módem.
+      if (veredicto === 'autoridad-no-disponible') {
+        autoridadNoDisponible = true
+        throw new Error('autoridad-no-disponible')
+      }
+      if (veredicto === 'aceptado') {
         const { staff: member, shiftToken } = await res.json()
         if (member?.id) {
           try {
@@ -713,7 +735,18 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
       // bloquearía al gerente tecleando bien, justo el día que abre sin internet.
       const estado = estadoCredencialesOffline()
       if (estado !== 'utilizable') {
-        if (estado === 'todas-vencidas') setSesionVencida(true)
+        // El orden importa: si llegamos aquí porque la NUBE contestó mal, ésa es la causa
+        // real y gana sobre las otras dos. Decir "conéctate una vez" a quien ya está
+        // conectado, o "sin conexión" a quien tiene internet, manda a buscar el problema
+        // al lugar equivocado — y en un restaurante eso son treinta minutos mirando el módem.
+        //
+        // Va por `sessionError` y no por un cuarto booleano a propósito: este componente
+        // arrastra un `rules-of-hooks` de nacimiento (hay un return temprano antes de TODOS
+        // sus hooks), así que cada useState nuevo suma un error de lint al archivo. El
+        // mensaje se ve igual — mismo recuadro ámbar — sin empeorar el baseline.
+        if (autoridadNoDisponible) {
+          setSessionError('El servidor no pudo confirmar tu PIN ahora mismo. No es tu PIN ni tu internet — espera un momento e intenta de nuevo.')
+        } else if (estado === 'todas-vencidas') setSesionVencida(true)
         else setNetworkError(true)
         setPin('')
         setTimeout(() => { setNetworkError(false); setSesionVencida(false) }, 4000)

@@ -36,6 +36,7 @@ razón de este documento.
 | `ONBOARDING_SECRET` | 🔴 | **cerrada** | `503`. Correcto |
 | `INTERNAL_ADMIN_PASSWORD` | 🔴 | **cerrada** | `500`. Correcto |
 | `MANAGER_PINS_CLIENT_ID` | 🔴 | cerrada | Irrelevante: `MANAGER_PINS` tampoco está |
+| `POS_PIN_PEPPER` | 🔴 | **cerrada** | **Aún no conectada.** Ver abajo |
 
 **5 activadas · 1 apagada fallando abierta · 2 en modo observación · 1 apagada a propósito ·
 4 apagadas fallando cerradas.**
@@ -43,6 +44,21 @@ razón de este documento.
 > Al cierre del 2026-08-26 queda **una** fallando abierta: `KITCHEN_TOKEN_SECRET`.
 > `CRON_SECRET` se corrigió el mismo día —no encendiéndola, sino invirtiendo el default— y
 > está **verificada en producción**.
+
+### `POS_PIN_PEPPER` — todavía no es una protección apagada (2026-09-14)
+
+Cuidado con leer su 🔴 como las demás. Las otras filas son mecanismos **conectados** a los que
+les falta la variable. Ésta todavía no la lee nadie: `dashboard-app/src/lib/pos-pin-hash.ts`
+existe, está probado, y **no lo importa ninguna ruta**. Es la Fase 0 de
+[`PLAN-PIN-HASH.md`](PLAN-PIN-HASH.md); la doble escritura es F2 y el corte de lectura F4.
+
+O sea que hoy no protege nada, y **encenderla sola tampoco protegería nada**: los PIN siguen en
+texto plano en `pos_staff.pin` hasta que corran las fases. Lo que sí está garantizado es hacia
+dónde falla cuando se conecte — `hashPinParaBD()` lanza sin pimienta y nunca vuelve a comparar
+texto plano; hay pruebas que se ven fallar si alguien le agrega ese camino de regreso.
+
+Un módulo perfecto y desconectado se ve, en producción, igual que un módulo que no existe. Esta
+fila está aquí para que dentro de dos meses nadie confunda las dos cosas.
 
 ---
 
