@@ -5,6 +5,11 @@
 > 10-digit emergency PIN."* Este documento sirve para saber cuánto falta de esa migración.
 >
 > Levantado el 2026-08-26 al verificar el fix de `POS_FALLBACK_PIN`.
+>
+> **Eje distinto, no confundir:** este documento mide la **longitud** del PIN. Cómo se
+> *guarda* —hoy en texto plano en `pos_staff.pin`— es [`PLAN-PIN-HASH.md`](PLAN-PIN-HASH.md).
+> Ninguno reemplaza al otro: un PIN de 10 dígitos en claro sigue en claro, y uno de 4
+> hasheado sigue siendo adivinable en línea.
 
 ## Por qué importa
 
@@ -54,6 +59,9 @@ WHERE client_id = 'amalay' AND active = true;
 ## Línea base — 2026-08-26
 
 **0 de 40 migrados.** Todos con 4 dígitos.
+
+> **Re-medido el 2026-09-14: sigue en 0 de 40.** 19 días sin avance. En los 11 tenants,
+> 81 de 84 personas traen PIN de 4 dígitos; los únicos 3 de 10 dígitos son de `tekila-rg`.
 
 | Rol | Personas | Prioridad |
 |---|---|---|
