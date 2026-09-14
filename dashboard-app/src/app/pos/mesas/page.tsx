@@ -136,6 +136,8 @@ interface ActiveOrder {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 import { leerSalon, debeUsarPedro, aOrdenesDelSalon, avisoDeProcedencia, requiereCaja, type LecturaDelSalon } from '@/lib/pedro-cliente'
+import { PosAdaptiveGrid } from '@/components/pos/ui/PosAdaptiveGrid'
+import { usePosV2 } from '@/components/pos/ui/PosProductTile'
 
 export default function MesasPage() {
   const router = useRouter()
@@ -162,6 +164,7 @@ export default function MesasPage() {
   const [planoNoVerificado, setPlanoNoVerificado] = useState<string | null>(null)
   const [currentMesero, setCurrentMesero] = useState<string>('')
   const [viewMode, setViewMode] = useState<'planograma' | 'grid'>('grid')
+  const posV2 = usePosV2()
   const [staffName, setStaffName] = useState<string>('')
   const [clientMesas, setClientMesas] = useState<Mesa[]>(() => getMesasConfig(_cid(), 16))
   const [floorTables, setFloorTables] = useState<FloorTable[]>(FLOOR_TABLES)
@@ -886,7 +889,22 @@ export default function MesasPage() {
   }
 
   // ─── Grid View (classic) ──────────────────────────────────────────────────
+  // Las mesas visibles, ya filtradas y ordenadas por número. Se calcula una
+  // sola vez para que las dos ramas pinten exactamente lo mismo.
+  const mesasVisibles = mesas
+    .filter(mesa => (!soloMisMesas || !currentMesero) ? true : (mesa.status === 'disponible' || mesa.mesero === currentMesero))
+    .slice()
+    .sort((a, b) => a.number - b.number)
+
   const GridView = () => (
+    <PosAdaptiveGrid
+      v2={posV2}
+      items={mesasVisibles}
+      keyOf={(mesa) => String(mesa.number)}
+      minCelda={{ ancho: 150, alto: 132 }}
+      hueco={10}
+      render={(mesa) => <MesaCard mesa={mesa} />}
+      fallback={
     <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-2.5">
       {/* Por NÚMERO. Esta pantalla nunca ordenó: pintaba lo que llegara de
           `pos_mesas`, que se lee con `order=sort_order.asc`. Cuando ese campo no
@@ -902,6 +920,8 @@ export default function MesasPage() {
         </div>
       ))}
     </div>
+      }
+    />
   )
 
   return (
@@ -1148,7 +1168,7 @@ export default function MesasPage() {
         )
       })()}
 
-      <div className={`flex-1 ${viewMode === 'planograma' ? 'p-2 overflow-hidden' : 'px-4 py-3 overflow-y-auto'}`}>
+      <div className={`flex-1 min-h-0 flex flex-col ${viewMode === 'planograma' ? 'p-2 overflow-hidden' : (posV2 ? 'px-4 py-3 overflow-hidden' : 'px-4 py-3 overflow-y-auto')}`}>
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <div className="w-8 h-8 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
