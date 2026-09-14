@@ -888,10 +888,15 @@ export default function MesasPage() {
   // ─── Grid View (classic) ──────────────────────────────────────────────────
   const GridView = () => (
     <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-2.5">
+      {/* Por NÚMERO. Esta pantalla nunca ordenó: pintaba lo que llegara de
+          `pos_mesas`, que se lee con `order=sort_order.asc`. Cuando ese campo no
+          corresponde a la numeración —AMALAY, 2026-09-13— el salón sale
+          «45, 2, 3, 4, 5 · 6, 7, 1, 44, 43…» y el mesero no encuentra su mesa.
+          El orden físico sigue en el planograma, que coloca por coordenadas. */}
       {mesas.filter(mesa => {
         if (!soloMisMesas || !currentMesero) return true
         return mesa.status === 'disponible' || mesa.mesero === currentMesero
-      }).map(mesa => (
+      }).slice().sort((a, b) => a.number - b.number).map(mesa => (
         <div key={mesa.number} className="min-h-[140px]">
           <MesaCard mesa={mesa} />
         </div>
