@@ -211,9 +211,42 @@ const fixture = {
     capacity: 4, active: true, x_pct: 15 + number * 20, y_pct: 40, shape: 'square', zone: 'Salón' })),
   pos_turnos: [turno], pos_staff: [staff], pos_orders: [],
 }
+// ── Catálogo de un restaurante de verdad ─────────────────────────────────────
+//
+// Con `FULLSITE_LAB_CATALOGO=<ruta>` el laboratorio deja de usar su categoría de
+// juguete y siembra el catálogo real que la Caja sirve en `GET /catalog`. Los
+// bugs de DATOS —ruteos con huecos, modificadores obligatorios, densidad de
+// carta— no existen con una categoría y un café; y son la mitad de los que
+// muerden en campo. Sin la variable no cambia nada, así que CI sigue viendo el
+// fixture mínimo de siempre.
+//
+// El archivo vive FUERA del repositorio: éste es público y un catálogo real trae
+// precios y datos fiscales del cliente. Ver electron-app/lab/catalogo-real.cjs.
+const real = process.env.FULLSITE_LAB_CATALOGO
+  ? require('./catalogo-real').cargar({ catalogo: process.env.FULLSITE_LAB_CATALOGO,
+      mesas: process.env.FULLSITE_LAB_MESAS, tenant, staff })
+  : null
+if (real) {
+  fixture.pos_menu_categories = real.categorias
+  fixture.pos_menu_items = real.items
+  if (real.metodos.length) fixture.pos_payment_methods = real.metodos
+  if (real.mesas) fixture.pos_mesas = real.mesas
+  fixture.clients[0].mesas = fixture.pos_mesas.length
+  const r = real.resumen()
+  console.log(`[catálogo real] ${r.categorias} categorías · ${r.productos} productos · ` +
+    `${r.grupos_modificadores} grupos de modificadores · ${r.modificadores} modificadores · ` +
+    `${r.metodos_pago} métodos de pago · ${r.mesas} mesas`)
+  console.log(`[catálogo real] estaciones ruteadas: ${r.estaciones.join(', ') || '(ninguna)'}`)
+  if (r.categorias_sin_estacion.length) {
+    const total = r.categorias_sin_estacion.reduce((s, c) => s + c.productos, 0)
+    console.log(`[catálogo real] ⚠ ${r.categorias_sin_estacion.length} categorías SIN estación (${total} productos):`)
+    for (const c of r.categorias_sin_estacion) console.log(`[catálogo real]    ${c.id} — ${c.nombre} (${c.productos})`)
+  }
+}
+
 // Un solo catálogo completo: lo consume la preparación de Caja antes de arrancar
 // y lo sirve la nube del laboratorio cuando Caja lo refresca tras un PIN online.
-const catalogoDeLab = () => ({ schema_version: 1, complete: true, catalog_scope: 'restaurant', restaurant_id: tenant,
+const catalogoDeLab = () => real ? real.catalogo() : ({ schema_version: 1, complete: true, catalog_scope: 'restaurant', restaurant_id: tenant,
   refreshed_at: new Date().toISOString(), config: fixture.clients[0], settings: {
     'pos.station_routing': { barra: ['lab-bebidas'] },
     'pos.no_print_stations': ['cocina', 'barra', 'caja'],
