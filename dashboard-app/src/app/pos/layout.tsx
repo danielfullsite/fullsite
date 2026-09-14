@@ -18,6 +18,8 @@ import { localNetworkFetch } from '@/lib/local-network-fetch'
 import { decidirHuella, modoDeAutoridadRecordado } from '@/lib/modo-autoridad'
 import { provisionManagerCredential, verifyPinOffline, estadoCredencialesOffline } from '@/lib/pos-manager-auth'
 import { POSLockContext } from './pos-lock-context'
+import './pos-v2.css'
+import { usePosV2 } from '@/components/pos/ui/PosProductTile'
 import { requiereCaja } from '@/lib/pedro-cliente'
 import { actorDeCaja, cerrarActorDeCaja, ingresarConPinEnCaja } from '@/lib/pedro-actor'
 
@@ -74,6 +76,9 @@ const KDS_PATHS = ['/pos/cocina', '/pos/barra', '/pos/panaderia', '/pos/kds']
 
 export default function POSLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const router = useRouter()
+  // La bandera del rediseño. Va aquí arriba porque es un hook: no puede
+  // colgar de una rama, y abajo hay un retorno temprano para el KDS.
+  const posV2 = usePosV2()
 
   // KDS screens bypass auth entirely — no PIN, no turno gate
   const isKDS = typeof window !== 'undefined' && KDS_PATHS.some(p => window.location.pathname.startsWith(p))
@@ -113,6 +118,8 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
   // operador necesita saber que la salida es conectarse una vez, no seguir tecleando.
   const [sesionVencida, setSesionVencida] = useState(false)
   const [checking, setChecking] = useState(false)
+  // La bandera del rediseño. Con ella puesta, `pos-v2.css` reviste TODAS las
+  // pantallas del POS; sin ella ese archivo no pinta nada.
   const [attempts, setAttempts] = useState(0)
   const [lockedUntil, setLockedUntil] = useState(0)
   const [showFingerprintRegister, setShowFingerprintRegister] = useState(false)
@@ -758,7 +765,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
       }
     }
     return (
-      <div className="pos-kiosk h-dvh flex items-center justify-center bg-slate-900 text-white select-none" style={{background: 'linear-gradient(180deg, #0a0a14 0%, #111827 100%)'}}>
+      <div className={`pos-kiosk ${posV2 ? 'pos-v2' : ''} h-dvh flex items-center justify-center bg-slate-900 text-white select-none`} style={{background: 'linear-gradient(180deg, #0a0a14 0%, #111827 100%)'}}>
         <div className="text-center w-full max-w-xs mx-4">
           <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-6">
             <path d="M12 10v4M7.5 7.5C9 6 10.5 5.5 12 5.5c3.5 0 6.5 3 6.5 6.5 0 1.5-.5 3-1.5 4" />
@@ -807,7 +814,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
 
   if (unlocked) return (
     <POSLockContext.Provider value={{ lock: () => { cerrarActorDeCaja(); setUnlocked(false); setPin('') } }}>
-      <div className="pos-kiosk" style={{
+      <div className={`pos-kiosk ${posV2 ? 'pos-v2' : ''}`} style={{
         background:'#0a0a0f', color:'#fff', minHeight:'100dvh', overflow:'auto',
         colorScheme:'dark',
         // Force all CSS variables to dark values for POS
@@ -840,7 +847,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
   const remainingAttempts = MAX_ATTEMPTS - attempts
 
   return (
-    <div className="pos-kiosk h-dvh flex items-center justify-center bg-slate-900 text-white select-none" style={{background: 'linear-gradient(180deg, #0a0a14 0%, #111827 100%)'}}
+    <div className={`pos-kiosk ${posV2 ? 'pos-v2' : ''} h-dvh flex items-center justify-center bg-slate-900 text-white select-none`} style={{background: 'linear-gradient(180deg, #0a0a14 0%, #111827 100%)'}}
       onClick={() => { /* Fullscreen handled by Electron kiosk mode */ }}
     >
       <div className="text-center w-full max-w-xs mx-4">

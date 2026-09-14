@@ -1,0 +1,179 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   Capa de tema del rediseño del punto de venta.
+
+   TODO cuelga de `.pos-v2`. Sin esa clase en la raíz, este archivo no pinta
+   absolutamente nada — apagar la bandera es el rollback completo, y por eso
+   vive aparte en vez de dentro de globals.css, que lo comparte el dashboard.
+
+   Por qué una capa y no sólo componentes: portar componente por componente es
+   seguro pero deja el sistema a medias durante semanas. Esto reviste TODAS las
+   pantallas del POS de una vez —PIN, mesas, turno, corte, inventario— sin
+   tocar su marcado. Las piezas que además necesitan cambio de estructura
+   (el tile, el renglón, la banda, la retícula) siguen portándose aparte.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.pos-v2 {
+  /* ── Superficies ────────────────────────────────────────────────────────
+     Más contraste entre niveles. El tema anterior los tenía a 4 puntos de
+     luminosidad de distancia y a un metro todo se veía del mismo color. */
+  --v2-bg:        #080b0e;
+  --v2-surface:   #0f1419;
+  --v2-surface-2: #161d24;
+  --v2-raised:    #1e2730;
+  --v2-line:      #253039;
+  --v2-line-soft: #1a232b;
+
+  --v2-ink-1: #f2f6f8;
+  --v2-ink-2: #aebac4;
+  --v2-ink-3: #7d8b96;
+  --v2-ink-4: #59666f;
+
+  --v2-r1: 12px;
+  --v2-r2: 16px;
+  --v2-r3: 20px;
+
+  --v2-sombra-1: 0 1px 2px rgba(0,0,0,.4);
+  --v2-sombra-2: 0 6px 18px rgba(0,0,0,.45);
+  --v2-sombra-3: 0 18px 48px rgba(0,0,0,.6);
+
+  --v2-ease: cubic-bezier(.2,.8,.3,1);
+
+  /* El mínimo táctil del sistema. No se negocia. */
+  --v2-tap: 56px;
+}
+
+/* ── Se reescriben los tokens que ya usa el marcado, así el revestimiento
+      llega a cada pantalla sin tocar una sola línea de JSX. ───────────────── */
+.pos-v2 {
+  --bg:         var(--v2-bg);
+  --surface:    var(--v2-surface);
+  --surface-2:  var(--v2-surface-2);
+  --panel:      var(--v2-surface);
+  --raised:     var(--v2-raised);
+  --line:       var(--v2-line);
+  --line-soft:  var(--v2-line-soft);
+  --text-1:     var(--v2-ink-1);
+  --text-2:     var(--v2-ink-2);
+  --text-3:     var(--v2-ink-3);
+  --text-4:     var(--v2-ink-4);
+}
+
+.pos-v2,
+.pos-v2 [style*="linear-gradient(180deg, #0a0a14"] {
+  background: var(--v2-bg) !important;
+  color: var(--v2-ink-1);
+}
+
+/* ── Tipografía ──────────────────────────────────────────────────────────── */
+.pos-v2 { letter-spacing: -0.01em; }
+.pos-v2 h1, .pos-v2 h2, .pos-v2 h3 { letter-spacing: -0.02em; }
+
+/* El dinero y las cantidades SIEMPRE en monoespaciada de ancho fijo: una
+   columna de precios que baila se lee mal y se suma peor. */
+.pos-v2 .font-mono, .pos-v2 .tabular-nums { font-variant-numeric: tabular-nums; }
+
+/* ── Botones ─────────────────────────────────────────────────────────────── */
+.pos-v2 button {
+  transition: transform .13s var(--v2-ease), background-color .13s var(--v2-ease),
+              border-color .13s var(--v2-ease), opacity .13s var(--v2-ease);
+}
+.pos-v2 button:active:not(:disabled) { transform: scale(.97); }
+
+/* El piso táctil, de verdad.
+   globals.css:58 fija `.pos-kiosk button { min-height: 48px }`. Esa regla
+   tiene especificidad (0,1,1) y le gana a TODA clase `min-h-[Npx]` de
+   Tailwind (0,1,0) — así que el comentario de ese archivo, que dice que los
+   controles primarios «se suben a 56-60px vía clases Tailwind puntuales»,
+   describe algo que no ocurre: una tecla que declara 64 px mide 48.
+   Aquí se sube el piso a 56 con (0,2,1), que sí gana, y se devuelven sus
+   alturas a los controles que pidieron más. */
+.pos-kiosk.pos-v2 button { min-height: var(--v2-tap); }
+.pos-kiosk.pos-v2 input:not([type="checkbox"]):not([type="radio"]),
+.pos-kiosk.pos-v2 select { min-height: var(--v2-tap); }
+.pos-kiosk.pos-v2 button[class*="min-h-[60px]"] { min-height: 60px; }
+.pos-kiosk.pos-v2 button[class*="min-h-[64px]"] { min-height: 64px; }
+.pos-kiosk.pos-v2 button[class*="min-h-[72px]"] { min-height: 72px; }
+.pos-v2 button[class*="rounded-xl"]  { border-radius: var(--v2-r2); }
+.pos-v2 button[class*="rounded-2xl"] { border-radius: var(--v2-r3); }
+.pos-v2 button[class*="rounded-lg"]  { border-radius: var(--v2-r1); }
+
+/* ── El teclado del PIN ──────────────────────────────────────────────────── */
+.pos-v2 button[class*="bg-slate-800"] {
+  background: var(--v2-surface-2) !important;
+  border-color: var(--v2-line) !important;
+  border-radius: var(--v2-r3) !important;
+  box-shadow: var(--v2-sombra-1);
+  font-weight: 700;
+}
+.pos-v2 button[class*="bg-slate-800"]:active:not(:disabled) {
+  background: var(--v2-raised) !important;
+  transform: scale(.94);
+}
+/* El botón de confirmar. `:not(:disabled)` importa: sin eso se pintaba de
+   verde incluso sin PIN capturado, que es prometer una acción que no existe. */
+.pos-v2 button[class*="bg-emerald-600"]:not(:disabled) {
+  background: linear-gradient(180deg, var(--accent-bright, #34d399), var(--accent)) !important;
+  border-color: transparent !important;
+  color: #04231a !important;
+  box-shadow: 0 6px 18px rgba(16,185,129,.24);
+}
+.pos-v2 button[class*="bg-emerald-600"]:disabled {
+  background: var(--v2-surface-2) !important;
+  border-color: var(--v2-line) !important;
+  color: var(--v2-ink-4) !important;
+  box-shadow: none;
+}
+
+/* ── Tarjetas, paneles y hojas ───────────────────────────────────────────── */
+.pos-v2 [class*="rounded-2xl"][class*="border"],
+.pos-v2 [class*="rounded-xl"][class*="border"] {
+  border-color: var(--v2-line);
+}
+.pos-v2 [class*="shadow-2xl"] { box-shadow: var(--v2-sombra-3) !important; }
+.pos-v2 [class*="shadow-lg"]  { box-shadow: var(--v2-sombra-2) !important; }
+.pos-v2 [class*="shadow-sm"]  { box-shadow: var(--v2-sombra-1) !important; }
+
+/* La hoja que flota se despega del fondo con un velo, no con un borde. */
+.pos-v2 [class*="bg-black/60"] {
+  background: rgba(4,7,9,.72) !important;
+  backdrop-filter: blur(10px) saturate(120%);
+}
+
+/* ── Campos ──────────────────────────────────────────────────────────────── */
+.pos-v2 input:not([type="checkbox"]):not([type="radio"]),
+.pos-v2 select,
+.pos-v2 textarea {
+  background: var(--v2-surface-2);
+  border-color: var(--v2-line);
+  border-radius: var(--v2-r1);
+  color: var(--v2-ink-1);
+  transition: border-color .14s var(--v2-ease), box-shadow .14s var(--v2-ease);
+}
+.pos-v2 input:focus, .pos-v2 select:focus, .pos-v2 textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft, rgba(16,185,129,.16));
+}
+
+/* ── El renglón de la cuenta y las listas ────────────────────────────────── */
+.pos-v2 [class*="divide-y"] > * + * { border-color: var(--v2-line-soft); }
+
+/* ── Barras de desplazamiento gordas, para dedo ──────────────────────────── */
+.pos-v2 ::-webkit-scrollbar { width: 14px; height: 14px; }
+.pos-v2 ::-webkit-scrollbar-thumb {
+  background: var(--v2-raised);
+  border-radius: 99px;
+  border: 4px solid transparent;
+  background-clip: padding-box;
+}
+.pos-v2 ::-webkit-scrollbar-track { background: transparent; }
+
+/* ── Movimiento ──────────────────────────────────────────────────────────
+   El movimiento confirma que el sistema te oyó. Nada más: no decora y no
+   hace esperar. Quien no quiere animaciones, no las recibe. */
+@media (prefers-reduced-motion: reduce) {
+  .pos-v2 *, .pos-v2 *::before, .pos-v2 *::after {
+    animation-duration: .01ms !important;
+    transition-duration: .01ms !important;
+  }
+}
