@@ -905,10 +905,17 @@ export default function MesasPage() {
   // tipo nuevo en cada repintado y lo remontaba. Con una rejilla sin estado eso
   // sólo costaba trabajo; con una rejilla paginada habría reiniciado la página a
   // la 1 cada vez que el salón refresca. Por eso ahora es sólo la lista.
+  // EN LA REJILLA, LAS MESAS VAN POR NÚMERO.
+  //
+  // Esta pantalla nunca ordenó: pintaba el orden en que llegaran de `pos_mesas`,
+  // que se lee con `order=sort_order.asc`. Cuando `sort_order` no corresponde a
+  // la numeración —AMALAY, 2026-09-13— el salón sale «45, 2, 3, 4, 5 · 6, 7, 1,
+  // 44, 43…» y el mesero no encuentra su mesa. El orden físico sigue viviendo en
+  // el planograma, que coloca por coordenadas; la rejilla es la vista numérica.
   const mesasVisibles = mesas.filter(mesa => {
     if (!soloMisMesas || !currentMesero) return true
     return mesa.status === 'disponible' || mesa.mesero === currentMesero
-  })
+  }).slice().sort((a, b) => a.number - b.number)
   // La última cuenta por nombre se cobra, o la última reservación pasa: la
   // pestaña donde estaba el cajero deja de existir. Se cae a «Mesas» en el
   // mismo cálculo, sin un efecto que pueda llegar tarde y pintar un hueco.

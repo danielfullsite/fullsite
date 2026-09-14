@@ -3389,6 +3389,31 @@ function POSContent() {
   const iva = Math.round(subtotalAfterDiscount * getIvaRate() * 100) / 100
   const total = Math.round((subtotalAfterDiscount + iva) * 100) / 100
 
+  // LA MARCA DE CONCURRENCIA SALE DEL SERVIDOR O NO EXISTE.
+  //
+  // `checkOrderConflict` compara el `updated_at` del servidor contra la copia
+  // que guardó esta pantalla. Cuando la relectura fallaba, el código anterior
+  // rellenaba esa copia con `new Date().toISOString()` —el reloj de la
+  // terminal—, y dos relojes distintos no coinciden jamás. En AMALAY, el
+  // 2026-09-13: el mesero enviaba la comanda, tocaba Cobrar, y le salía «esta
+  // orden fue modificada por otro usuario» sin que nadie la hubiera tocado.
+  //
+  // Devolver `null` no afloja la protección contra doble cobro: con marca nula
+  // `checkOrderConflict` contesta «no hay conflicto detectable», y la defensa
+  // real sigue siendo la de `saveOrder` —`expected_revision` (OCC) y
+  // `save_operation_id` (idempotencia)—, que es justo lo que ya decía el
+  // comentario del `catch` de aquí abajo.
+  const marcaDelServidor = async (id: string): Promise<{ updatedAt: string | null; orderNumber?: number }> => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${id}&select=updated_at,order_number`, {
+        headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` },
+      })
+      if (!res.ok) return { updatedAt: null }
+      const rows = await res.json()
+      return { updatedAt: rows[0]?.updated_at ?? null, orderNumber: rows[0]?.order_number }
+    } catch { return { updatedAt: null } }
+  }
+
   // Concurrency check: verify order hasn't been modified by another terminal
   const checkOrderConflict = async (context: string): Promise<boolean> => {
     if (!loadedOrderId || !loadedUpdatedAt) return false // no conflict possible
@@ -3589,12 +3614,10 @@ function POSContent() {
               setOrderInventoryPending(_cid(), order.id, !inventory.success, order.mesa)
             } catch { /* the confirmed append remains; the persistent banner offers retry */ }
             showToast(`${conflictNewItems.length} item${conflictNewItems.length !== 1 ? 's' : ''} enviados`)
-            try {
-              const freshRes = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${order.id}&select=updated_at`, {
-                headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` },
-              })
-              if (freshRes.ok) { const rows = await freshRes.json(); if (rows[0]?.updated_at) setLoadedUpdatedAt(rows[0].updated_at) }
-            } catch {}
+            // Misma regla: si no se puede leer la del servidor, la marca queda en
+            // null. Conservar la vieja después de que NOSOTROS escribimos produce
+            // exactamente el mismo falso conflicto al cobrar.
+            setLoadedUpdatedAt((await marcaDelServidor(order.id)).updatedAt)
             sessionStorage.removeItem('pos_staff')
             sessionStorage.removeItem('pos_last_activity')
             navigateToMesaMap(); lock()
@@ -3607,12 +3630,10 @@ function POSContent() {
           // Only metadata (personas, notas, mesero) conflicted — refresh revision and let user retry
           if (saveResult.current_revision != null) {
             setOrderRevision(saveResult.current_revision)
-            try {
-              const freshRes = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${order.id}&select=updated_at`, {
-                headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` },
-              })
-              if (freshRes.ok) { const rows = await freshRes.json(); if (rows[0]?.updated_at) setLoadedUpdatedAt(rows[0].updated_at) }
-            } catch {}
+            // Misma regla: si no se puede leer la del servidor, la marca queda en
+            // null. Conservar la vieja después de que NOSOTROS escribimos produce
+            // exactamente el mismo falso conflicto al cobrar.
+            setLoadedUpdatedAt((await marcaDelServidor(order.id)).updatedAt)
           }
           showToast('Toca Enviar de nuevo')
         }
@@ -3844,22 +3865,14 @@ function POSContent() {
 
       setLoadedOrderId(orderId)
       // Read server's actual updated_at + order_number (triggers set these)
-      try {
-        const freshRes = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${orderId}&select=updated_at,order_number`, {
-          headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` },
-        })
-        if (freshRes.ok) {
-          const rows = await freshRes.json()
-          if (rows[0]?.updated_at) setLoadedUpdatedAt(rows[0].updated_at)
-          else setLoadedUpdatedAt(new Date().toISOString())
-          if (rows[0]?.order_number) setOrderNumber(rows[0].order_number)
-        } else setLoadedUpdatedAt(new Date().toISOString())
-      } catch { setLoadedUpdatedAt(new Date().toISOString()) }
+      const marcaTrasEnviar = await marcaDelServidor(orderId)
+      setLoadedUpdatedAt(marcaTrasEnviar.updatedAt)
+      if (marcaTrasEnviar.orderNumber) setOrderNumber(marcaTrasEnviar.orderNumber)
       // NO liberar el lock aquí: se mantiene hasta navegar → evita doble-envío/doble-lock
       // si el mesero toca Enviar dos veces.
       // Cache order locally so it loads instantly when returning to this mesa
       try {
-        localStorage.setItem(`pos_order_${mesa}`, JSON.stringify({ id: orderId, items: activeItems, mesero, personas, discount, notas: orderNotes, revision: saveResult.revision ?? orderRevision, updatedAt: new Date().toISOString(), ts: Date.now() }))
+        localStorage.setItem(`pos_order_${mesa}`, JSON.stringify({ id: orderId, items: activeItems, mesero, personas, discount, notas: orderNotes, revision: saveResult.revision ?? orderRevision, ...(marcaTrasEnviar.updatedAt ? { updatedAt: marcaTrasEnviar.updatedAt } : {}), ts: Date.now() }))
         localStorage.removeItem(`pos_draft_${mesa}`) // clear draft after successful save
       } catch {}
       // Tras enviar: al mapa de mesas AL INSTANTE + bloqueo (re-identificación por
@@ -4945,7 +4958,14 @@ function POSContent() {
                           letra y las etiquetas inline se encimaban con el asiento. El nombre
                           tiene ancho mínimo, máximo dos líneas, y las etiquetas van en su
                           propia fila. */}
-                      <div className="flex-1 min-w-[140px]">
+                      {/* El piso de 140px arreglaba 1600px y rompía 1024px: la fila
+                          mide contador(116) + silla(60) + importe(80) + dos botones(88)
+                          + huecos ≈ 324px de los ~436 útiles, así que al nombre le
+                          quedan ~112. Con 140 de mínimo la fila se pasaba ~28px y lo
+                          que se salía por la derecha eran justo «Transferir platillo» y
+                          «Cancelar item» (AMALAY, 2026-09-13). Con 90 cabe en 1024 y
+                          sigue sin partirse letra por letra en 1600. */}
+                      <div className="flex-1 min-w-[90px]">
                         <p className={`font-medium text-sm leading-tight break-words line-clamp-2 ${isVoided ? 'line-through text-[var(--text-4)]' : isCancelled ? 'line-through text-[var(--crit-ink)]' : ''}`} title={item.nombre}>
                           {item.nombre}
                         </p>
