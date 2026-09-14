@@ -104,13 +104,35 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # El instalador NSIS reemplaza la versión instalada. Para un piloto físico
+      # primero necesitamos poder abrir exactamente el mismo build desde una
+      # carpeta aislada y conservar intacto el rollback anterior.
+      - name: Empaquetar portables y manifiesto SHA-256
+        shell: powershell
+        run: |
+          $version = node -p "require('./package.json').version"
+          Compress-Archive -Path 'dist-pos\win-unpacked\*' -DestinationPath "dist-pos\Fullsite-POS-$version-x64-portable.zip" -Force
+          Compress-Archive -Path 'dist-kds\win-unpacked\*' -DestinationPath "dist-kds\Fullsite-KDS-$version-x64-portable.zip" -Force
+          $artifacts = Get-ChildItem dist-pos,dist-kds -Recurse -File | Where-Object { $_.Extension -in @('.exe','.zip') }
+          $manifest = $artifacts | Get-FileHash -Algorithm SHA256 | ForEach-Object {
+            "{0}  {1}" -f $_.Hash.ToLowerInvariant(), (Resolve-Path -Relative $_.Path)
+          }
+          $manifest | Set-Content -Path 'SHA256SUMS.txt' -Encoding Ascii
+
       # Se conservan aunque se haya publicado: si el release se borra o se rehace,
       # el binario exacto que se probo sigue disponible.
       - name: Guardar los instaladores como artefacto
         uses: actions/upload-artifact@v4
         with:
-          name: instaladores-${{ github.ref_name }}
+          # `ref_name` contiene `/` en ramas como `claude/pos-touch-first`, y
+          # upload-artifact rechaza esos nombres aunque ambos instaladores ya
+          # hayan compilado. El run id es estable, único y válido tanto para
+          # pruebas manuales como para releases disparados por etiqueta.
+          name: instaladores-${{ github.run_id }}
           path: |
             electron-app/dist-pos/*.exe
+            electron-app/dist-pos/*.zip
             electron-app/dist-kds/*.exe
+            electron-app/dist-kds/*.zip
+            electron-app/SHA256SUMS.txt
           retention-days: 90

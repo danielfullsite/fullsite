@@ -155,17 +155,28 @@ test('KDS autenticado conserva HTTP local y añade credenciales a lectura y env�
   assert.equal(cfg.headers['x-fullsite-lan'], SECRET)
   // Ejecutar los dos calls reales del archivo, sin reemplazar su construcción de headers.
   const calls = []
-  const context = { CFG: cfg, Object, Date, JSON, ACTOR_KEY: 'pos_actor_session', sessionStorage: { getItem: () => null } }
-  vm.runInNewContext(html.match(/function actorSession\(\)\{[^\n]*\}/)[0], context)
+  const context = { CFG: cfg, Object }
   vm.runInNewContext(html.match(/function authHeaders\(extra\)\{[^\n]*\}/)[0], context)
   for (const extra of [undefined, { 'Content-Type': 'application/json' }]) {
     calls.push(await fetch(f.base + '/state', { headers: context.authHeaders(extra) }))
   }
   assert.ok(calls.every(r => r.status === 200))
-  context.sessionStorage.getItem = () => JSON.stringify({ staff: { id: 'synthetic-employee' }, actor_token: 'synthetic-signed-session', expires_at: Date.now() + 60000 })
-  assert.equal(context.authHeaders()['x-fullsite-actor'], 'synthetic-signed-session')
+  assert.equal(context.authHeaders()['x-fullsite-actor'], undefined)
   assert.match(html, /fetch\(STATE_BASE\+"\/state",\{[^\n]*headers:authHeaders\(\)/)
   assert.match(html, /fetch\(STATE_BASE\+"\/events",\{[^\n]*headers:authHeaders\(/)
+})
+
+test('la credencial de instalación autoriza sólo cambios de cocina y nunca operaciones de empleado', async t => {
+  const f = await fixture(t)
+  const headers = { ...auth, 'x-fullsite-terminal': 'KDS-1', 'Content-Type': 'application/json' }
+  const send = async command_type => (await (await fetch(f.base + '/events', { method: 'POST', headers,
+    body: JSON.stringify({ command_id: command_type, command_type }) })).json()).results[0]
+  assert.equal((await send('KITCHEN_SET')).event.id, 'accepted')
+  const denied = await send('ORDER_VOID')
+  assert.equal(denied.code, 'ACTOR_REQUIRED')
+  assert.equal(f.commands(), 1)
+  assert.equal((await fetch(f.base + '/events', { method: 'POST', headers: { ...headers, 'x-fullsite-lan': 'wrong' },
+    body: JSON.stringify({ command_id: 'forged', command_type: 'KITCHEN_SET' }) })).status, 401)
 })
 
 test('Caja transport credential alone cannot open drawer, inject print bytes or alter printing configuration', async t => {

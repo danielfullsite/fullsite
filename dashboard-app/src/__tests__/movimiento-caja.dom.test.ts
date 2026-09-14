@@ -3,7 +3,11 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 const { send, approve } = vi.hoisted(() => ({ send: vi.fn(), approve: vi.fn() }))
 vi.mock('@/lib/pedro-turnos', () => ({ registrarMovimientoCaja: send }))
-vi.mock('@/lib/pedro-actor', () => ({ autorizarOperacionConPinEnCaja: approve }))
+vi.mock('@/lib/pedro-actor', () => ({
+  autorizarOperacionConPinEnCaja: approve,
+  autorizarOperacionConHuellaEnCaja: vi.fn(),
+  estadoHuellaEnCaja: vi.fn(async () => ({ disponible: false, motivo: 'Sin lector' })),
+}))
 import MovimientoDeCaja from '@/components/pos/MovimientoDeCaja'
 beforeEach(() => { approve.mockResolvedValue({ actor_token: 'synthetic' }) })
 afterEach(() => { cleanup(); vi.resetAllMocks() })
@@ -18,17 +22,17 @@ it('recuperar un recibo anterior preserva el nuevo borrador y exige otra confirm
     .mockResolvedValueOnce({ recovered: false, movement: { type: 'deposito', amount_cents: 500, reason: 'Cambio' } })
   render(React.createElement(MovimientoDeCaja, { turnoId: 'turno' }))
   enter('20', 'Proveedor')
-  fireEvent.click(screen.getByText('Confirmar movimiento'))
+  fireEvent.click(screen.getByRole('button', { name: 'Autorizar con PIN' }))
   await screen.findByText('Sin confirmación de Caja')
   fireEvent.change(screen.getByLabelText('Tipo de movimiento'), { target: { value: 'deposito' } })
   enter('5', 'Cambio')
-  fireEvent.click(screen.getByText('Confirmar movimiento'))
+  fireEvent.click(screen.getByRole('button', { name: 'Autorizar con PIN' }))
   await screen.findByText(/Se recuperó el movimiento anterior: retiro de \$20.00. Proveedor/)
   expect((screen.getByLabelText('Importe del movimiento') as HTMLInputElement).value).toBe('5')
   expect((screen.getByLabelText('Motivo del movimiento') as HTMLInputElement).value).toBe('Cambio')
   expect(send).toHaveBeenCalledTimes(2)
   enter('5', 'Cambio')
-  fireEvent.click(screen.getByText('Confirmar movimiento'))
+  fireEvent.click(screen.getByRole('button', { name: 'Autorizar con PIN' }))
   await screen.findByText(/Movimiento confirmado: deposito de \$5.00. Cambio/)
   expect((screen.getByLabelText('Importe del movimiento') as HTMLInputElement).value).toBe('')
 })
@@ -36,7 +40,7 @@ it('PIN rechazado no registra movimiento y conserva los datos para corregir', as
   approve.mockRejectedValueOnce(new Error('PIN no autorizado'))
   render(React.createElement(MovimientoDeCaja, { turnoId: 'turno' }))
   enter('20', 'Proveedor')
-  fireEvent.click(screen.getByText('Confirmar movimiento'))
+  fireEvent.click(screen.getByRole('button', { name: 'Autorizar con PIN' }))
   await screen.findByText('PIN no autorizado')
   expect(send).not.toHaveBeenCalled()
   expect((screen.getByLabelText('Importe del movimiento') as HTMLInputElement).value).toBe('20')

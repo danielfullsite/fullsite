@@ -31,12 +31,16 @@ const { turnReport } = require('./core/turn-report')
 const { RestaurantState }   = require('./core/state')
 const { WsHub }             = require('./core/ws-hub')
 const { CommandHandler }    = require('./core/command-handler')
-const { ActorAuthority } = require('./core/actor-authority')
+const { ActorAuthority, biometricAssertionCanonical, BIOMETRIC_ASSERTION_VERSION } = require('./core/actor-authority')
 const { CatalogStore } = require('./core/catalog-store')
 const { handleAuthenticatedCommand } = require('./core/command-authority')
 const { conectarConLaCaja } = require('./core/enlace-con-caja')
 const { buscarLaCaja } = require('./core/buscar-la-caja')
 const credLan = require('./core/credencial-lan')
+const {
+  createFingerprintIpcRequestAuth,
+  verifyFingerprintIpcResponse,
+} = require('./core/fingerprint-ipc-secret')
 const { OutboxWorker }      = require('./core/outbox')
 const { BusinessOutbox } = require('./core/business-outbox')
 const mdns      = require('./discovery/mdns')
@@ -346,12 +350,110 @@ function forwardGet(targetUrl, credenciales = {}) {
   })
 }
 
+function configuredFingerprintIpcSecret(config = {}) {
+  const value = config.fingerprintIpcSecret || config.fingerprint_ipc_secret
+  return typeof value === 'string' && /^[a-f0-9]{64}$/.test(value) ? value : null
+}
+
+function prepareBiometricDeviceIdentity({ dataDir, platform = process.platform, username = process.env.USERNAME || os.userInfo().username,
+  runAcl = (command, args) => require('node:child_process').execFileSync(command, args, { stdio: 'ignore', windowsHide: true }) }) {
+  const fs = require('node:fs')
+  const path = require('node:path')
+  const file = path.join(dataDir, 'biometric-device-key.pem')
+  fs.mkdirSync(dataDir, { recursive: true })
+  if (!fs.existsSync(file)) {
+    const generated = crypto.generateKeyPairSync('ed25519', {
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+    })
+    fs.writeFileSync(file, generated.privateKey, { flag: 'wx', mode: 0o600 })
+  }
+  fs.chmodSync(file, 0o600)
+  if (platform === 'win32') {
+    if (typeof username !== 'string' || !username.trim()) throw new Error('Usuario Windows inválido para proteger la clave biométrica')
+    runAcl('icacls.exe', [file, '/inheritance:r', '/grant:r', `${username}:(F)`, 'SYSTEM:(F)'])
+  }
+  const privateKey = crypto.createPrivateKey(fs.readFileSync(file, 'utf8'))
+  if (privateKey.asymmetricKeyType !== 'ed25519') throw new Error('Clave biométrica de terminal inválida')
+  const publicKey = crypto.createPublicKey(privateKey).export({ type: 'spki', format: 'pem' }).toString()
+  return {
+    publicKey,
+    createProof(fields) {
+      const assertion = {
+        version: BIOMETRIC_ASSERTION_VERSION,
+        timestamp: fields.timestamp === undefined ? Date.now() : fields.timestamp,
+        nonce: crypto.randomBytes(32).toString('hex'),
+        restaurant_id: fields.restaurantId,
+        location_id: fields.branchId || null,
+        terminal_id: fields.terminalId,
+        staff_id: fields.staffId,
+        ...(fields.minRole ? { min_role: fields.minRole } : {}),
+      }
+      return {
+        assertion,
+        signature: crypto.sign(null, Buffer.from(biometricAssertionCanonical(assertion), 'utf8'), privateKey).toString('base64url'),
+      }
+    },
+  }
+}
+
+function isLoopbackAddress(address) {
+  return address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1'
+}
+
+function requestFingerprintService({ method, path, ipcSecret, body = '', hostname = '127.0.0.1', port = 7718 }) {
+  return new Promise((resolve, reject) => {
+    let auth
+    try { auth = createFingerprintIpcRequestAuth({ secret: ipcSecret, method, path, body }) }
+    catch (error) { reject(error); return }
+    const request = http.request({
+      hostname, port, method, path, timeout: 90000,
+      headers: auth.headers,
+    }, response => {
+      const chunks = []
+      let bytes = 0
+      response.on('data', chunk => {
+        bytes += chunk.length
+        if (bytes > 1024 * 1024) {
+          request.destroy(Object.assign(new Error('Respuesta de huella demasiado grande'), { code: 'FINGERPRINT_RESPONSE_TOO_LARGE' }))
+          return
+        }
+        chunks.push(chunk)
+      })
+      response.on('end', () => {
+        const statusCode = response.statusCode || 502
+        const responseBody = Buffer.concat(chunks).toString('utf8')
+        try {
+          verifyFingerprintIpcResponse({
+            secret: ipcSecret,
+            context: auth.context,
+            statusCode,
+            body: responseBody,
+            headers: response.headers,
+          })
+        } catch (error) {
+          reject(error)
+          return
+        }
+        resolve({
+          statusCode,
+          contentType: response.headers['content-type'] || 'application/json',
+          body: responseBody,
+        })
+      })
+    })
+    request.on('error', reject)
+    request.setTimeout(90000, () => request.destroy(Object.assign(new Error('Fingerprint timeout'), { code: 'FINGERPRINT_TIMEOUT' })))
+    request.end(body)
+  })
+}
+
 /** Lecturas que una terminal secundaria puede hacerle a la caja. */
 const LECTURAS_REENVIADAS = ['/reports/turn', '/state', '/events', '/print/uncertain', '/auth/status', '/catalog', '/catalog/status', '/sync/status']
 
 // Keep identity and routing configuration explicit so every cloned terminal can
 // discover the caja without relying on process-global or customer-specific state.
-function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority = null, catalogStore = null, authorityReason = null, catalogReason = null, getBusinessSyncStatus = () => ({ configured: false }), getEnlaceStatus = () => null, printer, version, serverId, restaurantId, config = {}, instanceName = '', branchId = config.branchId || config.locationId || null, posServerIp: posServerIpFijo = config.posServerIp || null, cajaActual = null, port = 7717, posServerPort = config.posServerPort || null }) {
+function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority = null, catalogStore = null, authorityReason = null, catalogReason = null, getBusinessSyncStatus = () => ({ configured: false }), getEnlaceStatus = () => null, printer, version, serverId, restaurantId, config = {}, instanceName = '', branchId = config.branchId || config.locationId || null, posServerIp: posServerIpFijo = config.posServerIp || null, cajaActual = null, port = 7717, posServerPort = config.posServerPort || null, fingerprintRequest = requestFingerprintService }) {
   // Puerto de la CAJA al reenviar. Antes se usaba `port` — el puerto PROPIO del
   // secundario — lo que acopla ambos al 7717: dos Pedros en una misma maquina
   // (pruebas, demos) o una terminal en puerto distinto rompian el forward.
@@ -434,12 +536,22 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority 
     // of truth. Its POS page is https and CANNOT POST to the caja's http LAN IP
     // (mixed content). So it POSTs to THIS local server (127.0.0.1, exempt from the
     // wall) and we forward /print, /events and /drawer to the caja over Node http.
-    if (posServerIp && req.method === 'POST' && (url === '/print' || url === '/events' || url === '/drawer' || url === '/print/resolve' || url === '/auth/pin')) {
+    const secondaryPin = url === '/auth/pin' && config.terminalRole !== 'kds'
+    if (posServerIp && req.method === 'POST' && (url === '/print' || url === '/events' || url === '/drawer' || url === '/print/resolve' || secondaryPin)) {
       try {
         const body = await parseBody(req)
-        const up = await forwardPost(`http://${posServerIp}:${cajaPort}${url}`, JSON.stringify(body), {
+        // El navegador nunca elige la clave biométrica que Caja enrola. Pedro
+        // sobreescribe cualquier campo recibido con la clave pública cuya parte
+        // privada vive en userData y no se expone por rendererIdentity.
+        const forwardedBody = secondaryPin && config.biometricDeviceIdentity
+          ? { ...body, biometric_device_public_key: config.biometricDeviceIdentity.publicKey }
+          : body
+        const up = await forwardPost(`http://${posServerIp}:${cajaPort}${url}`, JSON.stringify(forwardedBody), {
           ...credencialesHaciaLaCaja,
-          ...(req.headers['x-fullsite-terminal'] ? { 'x-fullsite-terminal': req.headers['x-fullsite-terminal'] } : {}),
+          // En autenticación manda la identidad aprovisionada del proceso, no la
+          // cabecera que el renderer puede escribir. Para las rutas legacy se
+          // conserva su comportamiento hasta migrarlas una por una.
+          ...(!secondaryPin && req.headers['x-fullsite-terminal'] ? { 'x-fullsite-terminal': req.headers['x-fullsite-terminal'] } : {}),
           ...(req.headers['x-fullsite-actor'] ? { 'x-fullsite-actor': req.headers['x-fullsite-actor'] } : {}),
         })
         res.writeHead(up.status || 502, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
@@ -649,14 +761,129 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority 
       try {
         const body = await parseBody(req)
         if (credLan.verificarScope(body, { restaurantId, branchId })) { json(res, 403, { error: 'Scope de otra instalación' }); return }
+        const deviceId = req.headers['x-fullsite-terminal']
+        const configuredDeviceId = config.terminalId || config.terminal_id
+        // En el POS local, el renderer no puede sustituir su clave pública. En
+        // Caja sólo se acepta la clave transportada cuando corresponde a otra
+        // terminal; ActorAuthority impedirá rotar una identidad ya enrolada.
+        const biometricDevicePublicKey = deviceId === configuredDeviceId
+          ? config.biometricDeviceIdentity?.publicKey
+          : body.biometric_device_public_key
         const result = await actorAuthority.login({ pin: body.pin, restaurantId,
-          deviceId: req.headers['x-fullsite-terminal'], minRole: body.min_role })
+          deviceId, minRole: body.min_role, biometricDevicePublicKey })
         // Server-issued token only, held for acquisition, never persisted.
         if (!result.offline && result.shiftToken && catalogStore) {
           void catalogStore.refresh(result.shiftToken).catch(() => {})
         }
         json(res, 200, result)
       } catch (error) { json(res, error.status || 500, { error: error.message, code: error.code }) }
+      return
+    }
+
+    if (url === '/auth/fingerprint/status' && req.method === 'GET') {
+      if (!['pos', 'server_pos'].includes(config.terminalRole) || !isLoopbackAddress(req.socket?.remoteAddress)) {
+        json(res, 200, { available: false, reason: 'La huella no está disponible en KDS ni en terminales sin rol POS' })
+        return
+      }
+      if ((!posServerIp && !actorAuthority) || !configuredFingerprintIpcSecret(config) || !config.biometricDeviceIdentity) {
+        json(res, 200, { available: false, reason: 'La autoridad, identidad de terminal o canal biométrico no están preparados' })
+        return
+      }
+      try {
+        const upstream = await fingerprintRequest({ method: 'GET', path: '/health', ipcSecret: configuredFingerprintIpcSecret(config) })
+        const health = JSON.parse(upstream.body || '{}')
+        const available = upstream.statusCode === 200 && health.ok === true && health.ipc_auth_required === true && health.ipc_auth_scheme === 'hmac-sha256-v1'
+        json(res, 200, { available, reason: available ? undefined : 'Lector DigitalPersona seguro no detectado' })
+      } catch {
+        json(res, 200, { available: false, reason: 'Lector DigitalPersona no disponible' })
+      }
+      return
+    }
+
+    // Sólo Caja consume afirmaciones firmadas por un POS enrolado. El secreto LAN
+    // por sí solo no basta: está disponible al renderer para el transporte local.
+    // La identidad de empleado queda ligada a clave Ed25519, terminal, tenant,
+    // sucursal, rol mínimo, tiempo y nonce de un solo uso.
+    if (url === '/auth/fingerprint/assertion' && req.method === 'POST') {
+      if (posServerIp || config.terminalRole !== 'server_pos' || !actorAuthority || typeof actorAuthority.loginBiometric !== 'function') {
+        json(res, 404, { error: 'Not found' })
+        return
+      }
+      try {
+        const body = await parseBody(req)
+        const assertion = body?.assertion
+        const deviceId = req.headers['x-fullsite-terminal']
+        if (!assertion || assertion.terminal_id !== deviceId) {
+          json(res, 403, { error: 'La afirmación no pertenece a la terminal autenticada', code: 'BIOMETRIC_DEVICE_SCOPE_INVALID' })
+          return
+        }
+        const result = await actorAuthority.loginBiometric({
+          staffId: assertion.staff_id, deviceId, restaurantId, minRole: assertion.min_role,
+          deviceProof: { assertion, signature: body.signature },
+        })
+        json(res, 200, result)
+      } catch (error) {
+        json(res, error.status || 503, { error: error.message || 'No se pudo verificar la huella', code: error.code })
+      }
+      return
+    }
+
+    if (url === '/auth/fingerprint' && req.method === 'POST') {
+      if (!['pos', 'server_pos'].includes(config.terminalRole)) {
+        json(res, 409, { error: 'KDS no autentica operadores', code: 'BIOMETRIC_KDS_DISABLED' })
+        return
+      }
+      if (!isLoopbackAddress(req.socket?.remoteAddress)) {
+        json(res, 403, { error: 'La captura biométrica sólo puede iniciarse en el POS local', code: 'BIOMETRIC_LOCAL_ONLY' })
+        return
+      }
+      if ((!posServerIp && (!actorAuthority || typeof actorAuthority.loginBiometric !== 'function')) || !config.biometricDeviceIdentity) {
+        json(res, 503, { error: 'Autorización biométrica o identidad del POS no preparada', code: 'ACTOR_AUTHORITY_UNAVAILABLE' })
+        return
+      }
+      const ipcSecret = configuredFingerprintIpcSecret(config)
+      if (!ipcSecret) {
+        json(res, 503, { error: 'Canal biométrico interno no configurado', code: 'FINGERPRINT_IPC_NOT_CONFIGURED' })
+        return
+      }
+      try {
+        const body = await parseBody(req)
+        const forbidden = ['staffId', 'staff_id', 'fingerprint_id', 'actor_id']
+        if (!body || typeof body !== 'object' || Array.isArray(body) || forbidden.some(key => body[key] !== undefined)) {
+          json(res, 400, { error: 'La identidad debe venir del lector de Caja', code: 'BIOMETRIC_IDENTITY_FORBIDDEN' })
+          return
+        }
+        if (Object.keys(body).some(key => key !== 'min_role')) {
+          json(res, 400, { error: 'Solicitud biométrica inválida', code: 'BIOMETRIC_REQUEST_INVALID' })
+          return
+        }
+        const upstream = await fingerprintRequest({ method: 'GET', path: '/identify', ipcSecret })
+        let identified
+        try { identified = JSON.parse(upstream.body || '{}') }
+        catch { throw Object.assign(new Error('Respuesta inválida del lector'), { status: 502, code: 'FINGERPRINT_RESPONSE_INVALID' }) }
+        if (upstream.statusCode !== 200 || identified.ok !== true || typeof identified.staffId !== 'string' ||
+          !/^[\w-]{1,128}$/.test(identified.staffId)) {
+          throw Object.assign(new Error(identified.error || 'Huella no reconocida'), {
+            status: upstream.statusCode >= 400 && upstream.statusCode < 500 ? upstream.statusCode : 401,
+            code: identified.code || 'FINGERPRINT_NOT_RECOGNIZED',
+          })
+        }
+        const deviceId = config.terminalId || config.terminal_id
+        const deviceProof = config.biometricDeviceIdentity.createProof({
+          restaurantId, branchId, terminalId: deviceId, staffId: identified.staffId, minRole: body.min_role,
+        })
+        if (posServerIp) {
+          const up = await forwardPost(`http://${posServerIp}:${cajaPort}/auth/fingerprint/assertion`, JSON.stringify(deviceProof), credencialesHaciaLaCaja)
+          res.writeHead(up.status || 502, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
+          res.end(up.body || '{}')
+        } else {
+          const result = await actorAuthority.loginBiometric({ staffId: identified.staffId,
+            deviceId, restaurantId, minRole: body.min_role, deviceProof })
+          json(res, 200, result)
+        }
+      } catch (error) {
+        json(res, error.status || 503, { error: error.message || 'No se pudo verificar la huella', code: error.code })
+      }
       return
     }
 
@@ -682,7 +909,8 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority 
           }
           const result = await handleAuthenticatedCommand({ cmdHandler, actorAuthority, msg: fakeMsg,
             clientId: req.headers['x-fullsite-terminal'] || ev.client_id || 'rest-api',
-            terminalId: req.headers['x-fullsite-terminal'], actorToken: req.headers['x-fullsite-actor'] })
+            terminalId: req.headers['x-fullsite-terminal'], actorToken: req.headers['x-fullsite-actor'],
+            installationAuthenticated: credencial.permitido })
           results.push(result)
         }
         json(res, 200, { results })
@@ -789,26 +1017,92 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority 
       return
     }
 
-    // ── /fp/* proxy → fingerprint service on port 7718 ───────────────────────
-    // The web app calls /fp/health, /fp/enroll, /fp/auth, /fp/list via this
-    // proxy so it only needs to know about one local port (7717).
+    // ── Renderer-safe /fp proxy → native service on loopback ─────────────────
+    // Keep this an explicit allowlist. In particular, /identify is reserved for
+    // Caja's internal /auth/fingerprint flow: accepting a staff id from the
+    // renderer would turn the installation-wide LAN credential into identity.
     if (url?.startsWith('/fp')) {
-      const fpPath = url.slice(3) || '/'
-      const fpQuery = req.url?.includes('?') ? req.url.slice(req.url.indexOf('?')) : ''
-      const fpUrl = `http://127.0.0.1:7718${fpPath}${fpQuery}`
+      const route = url.slice(3) || '/'
+      const parsed = new URL(req.url || url, 'http://127.0.0.1')
+      const queryKeys = [...parsed.searchParams.keys()]
+      if (route === '/identify') {
+        json(res, 403, { error: 'La identificación biométrica es interna de Caja', code: 'BIOMETRIC_INTERNAL_ONLY' })
+        return
+      }
+      const isHealth = route === '/health'
+      const isProtected = ['/list', '/enroll', '/delete'].includes(route)
+      if (!isHealth && !isProtected) {
+        json(res, 404, { error: 'Ruta biométrica no permitida', code: 'FINGERPRINT_ROUTE_NOT_ALLOWED' })
+        return
+      }
+      if (req.method !== 'GET') {
+        res.setHeader('Allow', 'GET')
+        json(res, 405, { error: 'Método biométrico no permitido', code: 'FINGERPRINT_METHOD_NOT_ALLOWED' })
+        return
+      }
+      if (isHealth && queryKeys.length > 0) {
+        json(res, 400, { error: 'Health no acepta parámetros', code: 'FINGERPRINT_QUERY_INVALID' })
+        return
+      }
+
+      let nativePath = route
+      const ipcSecret = configuredFingerprintIpcSecret(config)
+      if (!ipcSecret) {
+        json(res, 503, { error: 'Canal biométrico interno no configurado', code: 'FINGERPRINT_IPC_NOT_CONFIGURED' })
+        return
+      }
+      if (isProtected) {
+        if (!actorAuthority || typeof actorAuthority.verify !== 'function') {
+          json(res, 503, { error: 'Autorización no preparada en Caja', code: 'ACTOR_AUTHORITY_UNAVAILABLE' })
+          return
+        }
+        let actor
+        try { actor = actorAuthority.verify(req.headers['x-fullsite-actor'], credencial.terminalId) }
+        catch (error) {
+          json(res, error.status || 401, { error: error.message || 'Sesión de usuario inválida', code: error.code || 'ACTOR_REQUIRED' })
+          return
+        }
+        if (!Array.isArray(actor.permissions) || !actor.permissions.includes('configurar_huella_digital')) {
+          json(res, 403, { error: 'Sin permiso para configurar huellas', code: 'PERMISSION_DENIED' })
+          return
+        }
+
+        const declaredScope = {
+          restaurant_id: parsed.searchParams.get('restaurant_id') ?? parsed.searchParams.get('client_id') ?? undefined,
+          location_id: parsed.searchParams.get('location_id') ?? undefined,
+        }
+        if (credLan.verificarScope(declaredScope, { restaurantId, branchId })) {
+          json(res, 403, { error: 'Scope de otra instalación', code: 'ACTOR_SCOPE_INVALID' })
+          return
+        }
+        const allowedQuery = route === '/list'
+          ? new Set(['client_id', 'restaurant_id', 'location_id'])
+          : new Set(['id', 'client_id', 'restaurant_id', 'location_id'])
+        if (queryKeys.some(key => !allowedQuery.has(key))) {
+          json(res, 400, { error: 'Parámetro biométrico no permitido', code: 'FINGERPRINT_QUERY_INVALID' })
+          return
+        }
+        if (route !== '/list') {
+          const ids = parsed.searchParams.getAll('id')
+          if (ids.length !== 1 || !/^[\w-]{1,128}$/.test(ids[0])) {
+            json(res, 400, { error: 'Empleado objetivo inválido', code: 'FINGERPRINT_TARGET_INVALID' })
+            return
+          }
+          nativePath += `?id=${encodeURIComponent(ids[0])}`
+        }
+      }
+
       try {
-        const fpReq = require('http').request(fpUrl, { method: req.method, timeout: 90000 }, fpRes => {
-          res.writeHead(fpRes.statusCode, {
-            'Content-Type': fpRes.headers['content-type'] || 'application/json',
-            'Access-Control-Allow-Origin': '*',
-          })
-          fpRes.pipe(res)
+        const upstream = await fingerprintRequest({ method: 'GET', path: nativePath, ipcSecret })
+        res.writeHead(upstream.statusCode || 502, { 'Content-Type': upstream.contentType || 'application/json' })
+        res.end(upstream.body || '{}')
+      } catch (error) {
+        const timeout = error?.code === 'FINGERPRINT_TIMEOUT'
+        json(res, timeout ? 504 : 503, {
+          ok: false,
+          error: timeout ? 'Fingerprint timeout' : 'Fingerprint service not running',
+          code: error?.code,
         })
-        fpReq.on('error', () => json(res, 503, { ok: false, error: 'Fingerprint service not running' }))
-        fpReq.setTimeout(90000, () => { fpReq.destroy(); json(res, 504, { ok: false, error: 'Fingerprint timeout' }) })
-        req.pipe(fpReq)
-      } catch (e) {
-        json(res, 503, { ok: false, error: e.message })
       }
       return
     }
@@ -843,6 +1137,17 @@ async function startLocalServer({ dataDir, port = 7717, config = {}, businessSyn
   credLan.prepararCredencial({ dataDir, config })
   console.log(`[server] Credencial LAN: ${credLan.paraLog(config.lanSecret)}`)
   if (!config.lanSecret) console.warn('[server] Terminal sin emparejar: operacion bloqueada, diagnostico disponible')
+  if (['pos', 'server_pos'].includes(config.terminalRole)) {
+    try { config.biometricDeviceIdentity = prepareBiometricDeviceIdentity({ dataDir }) }
+    catch (error) {
+      // La huella falla cerrada; PIN y operación normal siguen disponibles.
+      config.biometricDeviceIdentity = null
+      console.error('[server] Identidad biométrica del POS no disponible:', error.message)
+    }
+  } else {
+    // Un KDS nunca genera ni conserva una credencial de operador.
+    config.biometricDeviceIdentity = null
+  }
 
   const {
     channel            = config.channel || 'stable',
@@ -1251,4 +1556,5 @@ async function startLocalServer({ dataDir, port = 7717, config = {}, businessSyn
 
 // buildHttpRouter se exporta para poder probar las rutas sin levantar el servidor
 // completo (mDNS + heartbeat + polling quedarían corriendo y colgarían el test).
-module.exports = { startLocalServer, buildHttpRouter, deliveryStation, deliveryOrderCommand, buildDeliveryTicket }
+module.exports = { startLocalServer, buildHttpRouter, deliveryStation, deliveryOrderCommand, buildDeliveryTicket,
+  isLoopbackAddress, requestFingerprintService, prepareBiometricDeviceIdentity }

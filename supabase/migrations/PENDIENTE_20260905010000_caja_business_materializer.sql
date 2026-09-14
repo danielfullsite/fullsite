@@ -1,5 +1,6 @@
 -- Candidato, NO aplicado. Ejecutar sólo después de la migración pendiente de
--- cuentas de 20260904 y de revisar el cutover de cada sucursal. No activa ninguna.
+-- cuentas de 20260904, de 20260910060000_inventory_cancelled_reconcile y de
+-- revisar el cutover de cada sucursal. No activa ninguna.
 -- Una copia shadow no es un recibo de negocio. Esta función confirma ambos
 -- (proyección + recibo) en una transacción y rechaza cualquier otro escritor.
 
@@ -409,6 +410,14 @@ begin
       order_revision = excluded.order_revision, preparation_status = excluded.preparation_status,
       comanda_batches = excluded.comanda_batches, kitchen_items = excluded.kitchen_items,
       kitchen_revision = excluded.kitchen_revision, caja_operational_snapshot = excluded.caja_operational_snapshot;
+    -- El recibo y los marcadores del write fence ya existen en ESTA transacción.
+    -- Conciliar después por otra RPC sería rechazado por CAJA_WRITE_FENCE y, peor,
+    -- permitiría confirmar una anulación sin devolver el stock seleccionado.
+    -- KITCHEN_SET no cambia order_revision ni consumo; los demás eventos sí deben
+    -- cerrar su linaje de inventario antes de avanzar el stream.
+    if event_type <> 'KITCHEN_SET' then
+      perform 1 from public.r1_reconcile_order(stream.client_id, op->>'order_id');
+    end if;
   end if;
   if event_type like 'FINANCIAL_%' or dual then
     fin := result->'financial_order';

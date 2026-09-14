@@ -8,6 +8,9 @@
 
 const ALGORITHM = { name: 'HMAC', hash: 'SHA-256' }
 const TTL_MS = 8 * 60 * 60 * 1000
+const BIOMETRIC_REVALIDATION_TTL_MS = 7 * 24 * 60 * 60 * 1000
+const BIOMETRIC_PREFIX = 'bio1'
+const BIOMETRIC_DOMAIN = 'fullsite-biometric-revalidation-v1\n'
 
 export interface ShiftTokenPayload {
   sub: string   // staffId
@@ -16,6 +19,14 @@ export interface ShiftTokenPayload {
   nam: string   // staffName
   iat: number   // issued at (unix ms)
   exp: number   // expires at (unix ms)
+}
+
+export interface BiometricRevalidationPayload {
+  sub: string
+  cid: string
+  did: string
+  iat: number
+  exp: number
 }
 
 async function getKey(): Promise<CryptoKey> {
@@ -71,6 +82,54 @@ export async function verifyShiftToken(token: string): Promise<ShiftTokenPayload
     if (!payload.sub || !payload.cid || !payload.rol || !payload.exp) return null
     if (Date.now() > payload.exp) return null
 
+    return payload
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Capability issued only after a successful PIN login. It lets Pedro ask the
+ * cloud whether that same employee/tenant/device is still active; it is not a
+ * POS session and cannot authorize any business API guarded by verifyShiftToken.
+ */
+export async function issueBiometricRevalidationToken(
+  staffId: string,
+  clientId: string,
+  deviceId: string,
+): Promise<string> {
+  if (!/^[\w-]{1,64}$/.test(deviceId)) throw new Error('device_id inválido')
+  const key = await getKey()
+  const now = Date.now()
+  const payload: BiometricRevalidationPayload = {
+    sub: staffId,
+    cid: clientId,
+    did: deviceId,
+    iat: now,
+    exp: now + BIOMETRIC_REVALIDATION_TTL_MS,
+  }
+  const data = Buffer.from(JSON.stringify(payload)).toString('base64url')
+  const signed = new TextEncoder().encode(BIOMETRIC_DOMAIN + data)
+  const sig = await crypto.subtle.sign(ALGORITHM.name, key, signed)
+  return `${BIOMETRIC_PREFIX}.${data}.${Buffer.from(sig).toString('base64url')}`
+}
+
+export async function verifyBiometricRevalidationToken(token: string): Promise<BiometricRevalidationPayload | null> {
+  try {
+    const [prefix, dataB64, sigB64, extra] = token.split('.')
+    if (prefix !== BIOMETRIC_PREFIX || !dataB64 || !sigB64 || extra !== undefined) return null
+    const dataBytes = Buffer.from(dataB64, 'base64url')
+    const signatureBytes = Buffer.from(sigB64, 'base64url')
+    // Base64url permits equivalent spellings through unused trailing bits.
+    // Accept only the canonical spelling so the capability has one identity.
+    if (dataBytes.toString('base64url') !== dataB64 || signatureBytes.toString('base64url') !== sigB64) return null
+    const key = await getKey()
+    const signed = new TextEncoder().encode(BIOMETRIC_DOMAIN + dataB64)
+    const valid = await crypto.subtle.verify(ALGORITHM.name, key, signatureBytes, signed)
+    if (!valid) return null
+    const payload = JSON.parse(dataBytes.toString('utf8')) as BiometricRevalidationPayload
+    if (!payload.sub || !payload.cid || !/^[\w-]{1,64}$/.test(payload.did || '') || !payload.exp) return null
+    if (Date.now() > payload.exp) return null
     return payload
   } catch {
     return null

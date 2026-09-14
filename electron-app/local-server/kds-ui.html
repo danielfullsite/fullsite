@@ -35,19 +35,16 @@
   .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;background:var(--text-4)}
   .hright{display:flex;align-items:center;gap:18px}
   .view-switch{display:flex;align-items:center;padding:3px;background:var(--surface);border:1px solid var(--line);border-radius:10px}
-  .view-switch button{min-height:32px;padding:0 10px;border:0;border-radius:7px;background:transparent;color:var(--text-3);font-size:11px;font-weight:800;cursor:pointer}
+  .view-switch button{min-height:56px;padding:0 14px;border:0;border-radius:7px;background:transparent;color:var(--text-3);font-size:12px;font-weight:800;cursor:pointer}
   .view-switch button.on{background:var(--text-1);color:var(--bg)}
   .view-switch button:focus-visible{outline:2px solid var(--prep);outline-offset:2px}
   .counts{display:flex;align-items:center;gap:16px;font-size:13px;color:var(--text-3)}
   .counts b{color:var(--text-1);font-variant-numeric:tabular-nums;font-size:15px}
   .counts .c-new{color:#93c5fd} .counts .c-prep{color:#fcd34d} .counts .c-lista{color:#6ee7b7}
   #clock{font-variant-numeric:tabular-nums;font-size:13px;color:var(--text-3)}
-  .gear{width:38px;height:38px;border-radius:9px;border:1px solid var(--line-2);background:var(--surface-3);color:var(--text-3);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .gear{width:56px;height:56px;border-radius:12px;border:1px solid var(--line-2);background:var(--surface-3);color:var(--text-3);font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
   .gear:active{background:var(--line)}
   .gear:focus-visible{outline:2px solid var(--prep);outline-offset:2px}
-  #actor-button{min-height:38px;padding:6px 10px;background:var(--surface-3);color:var(--text-2);border:1px solid var(--line-2);border-radius:9px;cursor:pointer}
-  #actor-pin{width:100%;padding:12px;background:var(--surface);color:var(--text-1);border:1px solid var(--line-2);border-radius:8px;font-size:22px}
-  #actor-error{color:var(--danger);font-size:14px;min-height:20px}
 
   /* body: rail + board */
   .body{flex:1;display:flex;min-height:0}
@@ -94,7 +91,7 @@
   .onote .ic{flex-shrink:0}
 
   .items{padding:5px 10px 7px;display:flex;flex-direction:column}
-  .item{display:flex;gap:12px;padding:11px 7px;align-items:flex-start;border-radius:10px;cursor:pointer;border-top:1px solid transparent}
+  .item{display:flex;gap:12px;min-height:56px;padding:11px 7px;align-items:flex-start;border-radius:10px;cursor:pointer;border-top:1px solid transparent}
   .item+.item{border-top-color:var(--line)}
   .item:active{background:var(--surface-3)}
   .item.i-preparando{background:var(--prep-bg)}
@@ -110,7 +107,7 @@
   .note{font-size:14px;color:var(--text-3);font-style:italic;margin-top:2px;line-height:1.3}
 
   .card-f{display:flex;border-top:1px solid var(--line)}
-  .fbtn{flex:1;padding:13px;border:none;background:transparent;color:var(--text-2);font-size:15px;font-weight:800;cursor:pointer;letter-spacing:.3px}
+  .fbtn{flex:1;min-height:56px;padding:13px;border:none;background:transparent;color:var(--text-2);font-size:15px;font-weight:800;cursor:pointer;letter-spacing:.3px}
   .fbtn:active{background:var(--line)}
   .fbtn.ready{color:#6ee7b7}
 
@@ -123,23 +120,24 @@
   .modal{width:100%;max-width:420px;background:var(--surface-2);border:1px solid var(--line-2);border-radius:16px;overflow:hidden}
   .modal-h{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--line)}
   .modal-h h2{font-size:17px;font-weight:800}
-  .modal-x{width:34px;height:34px;border-radius:8px;border:1px solid var(--line-2);background:var(--surface-3);color:var(--text-2);font-size:18px;cursor:pointer}
+  .modal-x{width:56px;height:56px;border-radius:10px;border:1px solid var(--line-2);background:var(--surface-3);color:var(--text-2);font-size:20px;cursor:pointer}
   .modal-b{padding:20px;display:flex;flex-direction:column;gap:20px}
   .fld label{display:block;font-size:12px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--text-4);margin-bottom:9px}
   .seg{display:flex;gap:8px}
-  .seg button{flex:1;padding:11px;border:1px solid var(--line-2);background:var(--surface);color:var(--text-2);border-radius:9px;font-size:14px;font-weight:700;cursor:pointer;text-transform:capitalize}
+  .seg button{flex:1;min-height:56px;padding:11px;border:1px solid var(--line-2);background:var(--surface);color:var(--text-2);border-radius:9px;font-size:14px;font-weight:700;cursor:pointer;text-transform:capitalize}
   .seg button.on{background:var(--prep);border-color:var(--prep);color:#1a1204}
   .step{display:flex;align-items:center;gap:14px}
-  .step button{width:44px;height:44px;border-radius:10px;border:1px solid var(--line-2);background:var(--surface);color:var(--text-1);font-size:22px;font-weight:800;cursor:pointer}
+  .step button{width:56px;height:56px;border-radius:10px;border:1px solid var(--line-2);background:var(--surface);color:var(--text-1);font-size:22px;font-weight:800;cursor:pointer}
   .step .val{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;min-width:70px;text-align:center}
   .step .val small{display:block;font-size:11px;font-weight:600;color:var(--text-4);text-transform:uppercase;letter-spacing:.5px}
   .tgl{display:flex;align-items:center;justify-content:space-between}
-  .tgl .sw{width:52px;height:30px;border-radius:999px;background:var(--line-2);position:relative;cursor:pointer;transition:background .15s;flex-shrink:0}
-  .tgl .sw.on{background:var(--lista)}
-  .tgl .sw::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:left .15s}
-  .tgl .sw.on::after{left:25px}
+  .tgl .sw{width:64px;height:56px;border:0;border-radius:999px;background:transparent;position:relative;cursor:pointer;flex-shrink:0}
+  .tgl .sw::before{content:"";position:absolute;left:6px;right:6px;top:13px;height:30px;border-radius:999px;background:var(--line-2);transition:background .15s}
+  .tgl .sw.on::before{background:var(--lista)}
+  .tgl .sw::after{content:"";position:absolute;top:16px;left:9px;width:24px;height:24px;border-radius:50%;background:#fff;transition:left .15s}
+  .tgl .sw.on::after{left:31px}
   .modal-f{padding:16px 20px;border-top:1px solid var(--line);display:flex;gap:10px}
-  .modal-f button{flex:1;padding:13px;border-radius:10px;font-size:15px;font-weight:800;cursor:pointer;border:1px solid var(--line-2);background:var(--surface);color:var(--text-2)}
+  .modal-f button{flex:1;min-height:56px;padding:13px;border-radius:10px;font-size:15px;font-weight:800;cursor:pointer;border:1px solid var(--line-2);background:var(--surface);color:var(--text-2)}
   .modal-f .save{background:var(--lista);border-color:var(--lista);color:#04140d}
 
   /* Vista compacta: lectura de cocina de arriba hacia abajo y después a la derecha.
@@ -159,7 +157,7 @@
      los platillos de abajo quedaban invisibles E INALCANZABLES para cocina
      (encontrado en stress visual 2026-09-02: 50 items, se veian ~17).
      Tope a la tarjeta + scroll interno en su lista de items. */
-  body.v-compact .card{max-height:calc(100vh - 76px)}
+  body.v-compact .card{max-height:calc(100vh - 92px)}
   body.v-compact .card .items{overflow-y:auto;min-height:0}
   body.v-compact .item{gap:6px;padding:5px 3px;border-radius:6px}
   body.v-compact .tick{width:22px;height:22px;border-radius:5px;font-size:12px}
@@ -174,7 +172,7 @@
   @media(max-width:900px){.counts{display:none}.hright{gap:7px}.view-switch button{padding:0 8px}}
   @media(max-width:640px){
     header{padding:8px}.brand .chef,.brand .stn,.conn{display:none}.brand h1{font-size:16px}
-    aside{display:none}.view-switch button{font-size:10px;padding:0 6px}.gear{width:34px;height:34px}
+    aside{display:none}.view-switch button{font-size:10px;padding:0 6px}
     body.v-compact main,body.v-operation main,body.v-expo main{display:flex;height:auto;overflow-y:auto;overflow-x:hidden;padding:8px;column-width:auto}
     body.v-compact .card,body.v-operation .card,body.v-expo .card{display:flex;width:100%;max-width:none;flex:1 1 100%}
   }
@@ -190,9 +188,8 @@
       <span class="conn"><span class="dot" id="conn-dot"></span><span id="conn-txt">conectando…</span></span>
     </div>
     <div class="hright">
-      <button id="actor-button" type="button">Entrar con PIN</button>
       <div class="view-switch" aria-label="Vista del tablero">
-        <button data-view="compact">Compacta</button><button data-view="operation">Operación</button><button data-view="expo">Expo</button>
+        <button data-view="compact" aria-pressed="false">Compacta</button><button data-view="operation" aria-pressed="false">Operación</button><button data-view="expo" aria-pressed="false">Expo</button>
       </div>
       <div class="counts">
         <span class="c-new">Nuevas <b id="n-new">0</b></span>
@@ -215,14 +212,6 @@
   </div>
 </div>
 <div class="toast" id="toast"></div>
-<div class="modal-bg" id="actor-modal" role="dialog" aria-modal="true" aria-labelledby="actor-title">
-  <form class="modal" id="actor-form">
-    <div class="modal-h"><h2 id="actor-title">Acceso de cocina</h2><button class="modal-x" id="actor-close" type="button" aria-label="Cerrar acceso">×</button></div>
-    <div class="modal-b"><p>Ingresa tu PIN para confirmar la preparación en Caja.</p><label for="actor-pin">PIN del empleado</label><input id="actor-pin" type="password" inputmode="numeric" autocomplete="off" minlength="4" maxlength="8" required /><p id="actor-error" role="alert"></p></div>
-    <div class="modal-f"><button id="actor-lock" type="button">Bloquear sesión</button><button class="save" id="actor-submit" type="submit">Entrar</button></div>
-  </form>
-</div>
-
 <!-- settings -->
 <div class="modal-bg" id="modal">
   <div class="modal" role="dialog" aria-modal="true" aria-label="Ajustes">
@@ -245,8 +234,8 @@
           <button id="alert-up" aria-label="Más">+</button>
         </div>
       </div>
-      <div class="fld"><div class="tgl"><label style="margin:0">Sonido de nueva orden</label><div class="sw" id="sound-sw"></div></div></div>
-      <div class="fld"><div class="tgl"><label style="margin:0">Modo claro</label><div class="sw" id="theme-sw"></div></div></div>
+      <div class="fld"><div class="tgl"><label style="margin:0" for="sound-sw">Sonido de nueva orden</label><button class="sw" id="sound-sw" type="button" role="switch" aria-checked="false" aria-label="Sonido de nueva orden"></button></div></div>
+      <div class="fld"><div class="tgl"><label style="margin:0" for="theme-sw">Modo claro</label><button class="sw" id="theme-sw" type="button" role="switch" aria-checked="false" aria-label="Modo claro"></button></div></div>
     </div>
     <div class="modal-f"><button id="m-cancel">Cancelar</button><button class="save" id="m-save">Guardar</button></div>
   </div>
@@ -258,26 +247,7 @@
   var CFG = window.__KDS_CFG__ || {};
   var STATE_BASE = (CFG.bridge_base || "").replace(/\/$/,"");
   var POLL_MS = 2000;
-  var ACTOR_KEY = 'pos_actor_session';
-  var cajaWrites = false;
-  function actorSession(){ try { var s=JSON.parse(sessionStorage.getItem(ACTOR_KEY)||'null'); return s&&s.staff&&s.staff.id&&typeof s.actor_token==='string'&&s.expires_at>Date.now()?s:null; }catch(e){ return null; } }
-  function authHeaders(extra){ var s=actorSession(); return Object.assign({}, CFG.headers || {}, s?{'x-fullsite-actor':s.actor_token}:{}, extra || {}); }
-  function paintActor(){ var s=actorSession(); document.getElementById('actor-button').textContent=s?s.staff.name+' · Bloquear':'Entrar con PIN'; }
-  function openActor(){ document.getElementById('actor-error').textContent=''; document.getElementById('actor-modal').classList.add('show'); document.getElementById('actor-pin').focus(); }
-  function lockActor(){ sessionStorage.removeItem(ACTOR_KEY); paintActor(); }
-  document.getElementById('actor-button').addEventListener('click',function(){ if(actorSession()) lockActor(); openActor(); });
-  document.getElementById('actor-close').addEventListener('click',function(){ document.getElementById('actor-modal').classList.remove('show'); document.getElementById('actor-pin').value=''; });
-  document.getElementById('actor-lock').addEventListener('click',function(){ lockActor(); document.getElementById('actor-pin').value=''; });
-  document.getElementById('actor-form').addEventListener('submit',function(e){
-    e.preventDefault(); var input=document.getElementById('actor-pin'), button=document.getElementById('actor-submit');
-    var pin=input.value; input.value=''; button.disabled=true;
-    fetch(STATE_BASE+'/auth/pin',{method:'POST',headers:authHeaders({'Content-Type':'application/json'}),signal:AbortSignal.timeout(6500),body:JSON.stringify({pin:pin})})
-      .then(function(r){ return r.json().then(function(data){ if(!r.ok||!data.staff||!data.staff.id||typeof data.actor_token!=='string'||!(data.expires_at>Date.now())) throw new Error(data.error||'Caja no confirmó la sesión'); return data; }); })
-      .then(function(data){ sessionStorage.setItem(ACTOR_KEY,JSON.stringify({staff:data.staff,actor_token:data.actor_token,expires_at:data.expires_at,offline:data.offline})); paintActor(); document.getElementById('actor-modal').classList.remove('show'); })
-      .catch(function(error){ document.getElementById('actor-error').textContent=error.message||'Sin conexión con Caja'; })
-      .finally(function(){ button.disabled=false; });
-  });
-  paintActor();
+  function authHeaders(extra){ return Object.assign({}, CFG.headers || {}, extra || {}); }
   var LKEY = "kds_local_v3";           // per-item touch state
   var SKEY = "kds_settings_v1";         // station / alert_min / sound
 
@@ -295,7 +265,7 @@
   function applyTheme(){ try{ document.body.classList.toggle("light", THEME==="light"); }catch(e){} }
   function applyView(){
     document.body.classList.remove("v-compact","v-operation","v-expo"); document.body.classList.add("v-"+VIEW);
-    Array.prototype.forEach.call(document.querySelectorAll("[data-view]"),function(b){ b.classList.toggle("on",b.getAttribute("data-view")===VIEW); });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-view]"),function(b){ var selected=b.getAttribute("data-view")===VIEW; b.classList.toggle("on",selected); b.setAttribute("aria-pressed",String(selected)); });
   }
 
   var boardEl = document.getElementById("board");
@@ -456,7 +426,7 @@
           var ist=getIState(c.order.id,itemKey(c.order.id,it,i));
           var mods=Array.isArray(it.modificadores)?it.modificadores.filter(Boolean):(it.modificadores?[String(it.modificadores)]:[]);
           var check = ist==="listo"?"✓":(ist==="preparando"?"•":"");
-          body+='<div class="item i-'+ist+'" data-o="'+esc(c.order.id)+'" data-k="'+esc(itemKey(c.order.id,it,i))+'">'+
+          body+='<div class="item i-'+ist+'" role="button" tabindex="0" data-o="'+esc(c.order.id)+'" data-k="'+esc(itemKey(c.order.id,it,i))+'">'+
             '<div class="tick">'+check+'</div>'+
             '<div class="qty">'+esc(it.cantidad||it.quantity||1)+'</div>'+
             '<div class="it-body"><div class="it-name">'+esc(it.nombre||it.name||"—")+'</div>'+
@@ -513,7 +483,7 @@
       .then(function(data){
         var result=Array.isArray(data.results)&&data.results.length===1?data.results[0]:null;
         var id=result&&((result.event&&result.event.id)||(result.duplicate&&result.receipt&&result.receipt.event_id));
-        if(!result||result.error||id!==cmd.command_id) { if(result&&result.code==='ACTOR_REQUIRED'){lockActor();openActor();} throw new Error(result&&result.error||"Caja no confirmó el cambio"); }
+        if(!result||result.error||id!==cmd.command_id) throw new Error(result&&result.error||"Caja no confirmó el cambio");
         fetchState();
       }).catch(function(){
         postedStatus[key]=0;
@@ -527,14 +497,13 @@
   var stateReadIssued=0, stateReadApplied=0, stateReadMinimum=0;
   function commandUuid(){if(crypto.randomUUID)return crypto.randomUUID();var bytes=new Uint32Array(4);crypto.getRandomValues(bytes);return 'kds-'+Array.prototype.map.call(bytes,function(n){return n.toString(16).padStart(8,'0');}).join('');}
   function postKitchen(order,ids,status){
-    if(!actorSession()){openActor();return;}
     if(kitchenPending[order.id]) return;
     kitchenPending[order.id]=true;
     var cmd={command_type:'KITCHEN_SET',command_id:commandUuid(),order_id:order.id,turno_id:order.turno_id,expected_kitchen_revision:order.kitchen_revision||0,item_ids:ids,status:status};
     fetch(STATE_BASE+'/events',{method:'POST',headers:authHeaders({'Content-Type':'application/json'}),signal:AbortSignal.timeout(4000),body:JSON.stringify(cmd)})
       .then(function(r){if(!r.ok)throw new Error('Sin conexión con Caja');return r.json();})
       .then(function(data){var result=Array.isArray(data.results)&&data.results.length===1?data.results[0]:null;
-        if(!result||result.error||!result.receipt||result.receipt.command_id!==cmd.command_id){if(result&&result.code==='ACTOR_REQUIRED'){lockActor();openActor();}throw new Error(result&&result.error||'Caja no confirmó el cambio');}
+        if(!result||result.error||!result.receipt||result.receipt.command_id!==cmd.command_id)throw new Error(result&&result.error||'Caja no confirmó el cambio');
         stateReadMinimum=stateReadIssued+1; fetchState();
       }).catch(function(error){toast(error.message||'Cambio sin confirmar en Caja');fetchState();})
       .finally(function(){kitchenPending[order.id]=false;});
@@ -555,7 +524,6 @@
       var oid=ready.getAttribute("data-ready"); var order=lastGood.find(function(x){ return x.id===oid; }); if(!order) return;
       var batch=ready.getAttribute("data-batch");
       if(order.authority==='caja') { postKitchen(order,parseItems(order.items).filter(function(i){return i.comanda_batch_id===batch&&i.preparation_status!=='entregada'&&(STATION==='todas'||resolveStation(i)===STATION);}).map(function(i){return i.id;}),'lista');return; }
-      if(cajaWrites&&!actorSession()){openActor();return;}
       parseItems(order.items).filter(function(it){ return !isSkippable(it) && (STATION==="todas"||resolveStation(it)===STATION); }).forEach(function(it,i){
         var bid=it.comanda_batch_id||("seq"+(it.comanda_batch_seq==null?0:it.comanda_batch_seq));
         if(bid===batch) setIState(oid,itemKey(oid,it,i),"listo");
@@ -568,12 +536,12 @@
       var cur=getIState(oid2,k);
       var currentOrder=lastGood.find(function(o){return o.id===oid2;});
       if(currentOrder&&currentOrder.authority==='caja'){if(cur==='listo')return;postKitchen(currentOrder,[k],cur==='nueva'?'preparando':'lista');return;}
-      if(cajaWrites&&!actorSession()){openActor();return;}
       var next = cur==="nueva"?"preparando":cur==="preparando"?"listo":"nueva";
       setIState(oid2,k,next); render(false);
       var order2=lastGood.find(function(x){ return x.id===oid2; }); if(order2) syncOrder(order2);
     }
   });
+  document.addEventListener("keydown",function(e){ var item=e.target.closest&&e.target.closest('.item[role="button"]'); if(item&&(e.key==='Enter'||e.key===' ')){e.preventDefault();item.click();} });
 
   // ── settings modal ──
   var modal=document.getElementById("modal");
@@ -584,6 +552,8 @@
     document.getElementById("alert-val").textContent=draft.alert_min;
     document.getElementById("sound-sw").classList.toggle("on", draft.sound);
     document.getElementById("theme-sw").classList.toggle("on", draft.theme==="light");
+    document.getElementById("sound-sw").setAttribute("aria-checked",String(draft.sound));
+    document.getElementById("theme-sw").setAttribute("aria-checked",String(draft.theme==="light"));
   }
   function openModal(){ draft={ station:STATION, alert_min:ALERT_MIN, sound:SOUND, scale:SCALE, theme:THEME }; paintModal(); modal.classList.add("show"); }
   function closeModal(){ modal.classList.remove("show"); }
@@ -608,19 +578,25 @@
 
   function setConn(ok){ online=ok; connDot.style.background=ok?"var(--lista)":"var(--danger)"; connTxt.textContent=ok?"conectado":"sin conexión — reintentando"; }
 
-  // Adaptador robusto: el KDS pinta órdenes con forma {id, mesa, items,...}. Prefiere la
-  // fuente offline-nativa (kds_orders) si viene poblada; si no, normaliza kds_queue —el
-  // campo que SÍ llena la caja (incl. 1.3.3)— a esa misma forma. Así jala online y offline
-  // sin tocar la caja ni romper el flujo probado caja→KDS por LAN.
+  // Adaptador robusto: el KDS pinta órdenes con forma {id, mesa, items,...}. Une la
+  // proyección offline-nativa (kds_orders) con kds_queue —el campo que SÍ llena la
+  // caja legacy— y deja ganar a la versión nativa cuando ambas contienen la misma
+  // orden. Antes, el primer cambio de cocina creaba un único kds_order y ocultaba de
+  // golpe todas las demás comandas que aún vivían sólo en kds_queue.
   function adaptOrders(data){
     if(!data) return [];
-    if(Array.isArray(data.kds_orders) && data.kds_orders.length) return data.kds_orders;
+    var nativeOrders=Array.isArray(data.kds_orders)?data.kds_orders:[];
+    var merged=nativeOrders.slice();
+    var seen={};
+    nativeOrders.forEach(function(o){ var key=o&&(o.id||o.order_id); if(key) seen[key]=true; });
     if(Array.isArray(data.kds_queue) && data.kds_queue.length){
-      return data.kds_queue.map(function(q){
-        return { id:q.order_id, mesa:q.mesa, items:q.items_sent||[], created_at:q.sent_at, updated_at:q.sent_at, status:"enviada" };
+      data.kds_queue.forEach(function(q){
+        if(!q||!q.order_id||seen[q.order_id]) return;
+        seen[q.order_id]=true;
+        merged.push({ id:q.order_id, order_id:q.order_id, mesa:q.mesa, turno_id:q.turno_id, items:q.items_sent||[], created_at:q.sent_at, updated_at:q.sent_at, status:"enviada" });
       });
     }
-    return [];
+    return merged;
   }
 
   function fetchState(){
@@ -629,7 +605,7 @@
     var ctrl=new AbortController(); var to=setTimeout(function(){ ctrl.abort(); },4000);
     fetch(STATE_BASE+"/state",{cache:"no-store",signal:ctrl.signal,headers:authHeaders()})
       .then(function(r){ return r.ok?r.json():Promise.reject(); })
-      .then(function(data){ clearTimeout(to); if(read<stateReadApplied||read<stateReadMinimum)return; stateReadApplied=read; cajaWrites=data.write_authority==='caja'; lastGood=adaptOrders(data); setConn(data.authoritative!==false); paintActor(); render(true); })
+      .then(function(data){ clearTimeout(to); if(read<stateReadApplied||read<stateReadMinimum)return; stateReadApplied=read; lastGood=adaptOrders(data); setConn(data.authoritative!==false); render(true); })
       .catch(function(){ clearTimeout(to); if(read!==stateReadIssued||read<stateReadMinimum)return; setConn(false); render(false); });
   }
 

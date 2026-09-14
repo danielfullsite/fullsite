@@ -5,12 +5,17 @@ import Link from 'next/link'
 import { ArrowLeft, Fingerprint, CheckCircle, XCircle, Trash2, User, Search } from 'lucide-react'
 import { getFingerprintUrl } from '@/lib/fingerprint-url'
 import { localNetworkFetch } from '@/lib/local-network-fetch'
+import { actorDeCaja } from '@/lib/pedro-actor'
 
 interface StaffMember { id: string; name: string; role: string }
 
 function apiHeaders(): Record<string, string> {
   const token = typeof window !== 'undefined' ? localStorage.getItem('pos_shift_token') : null
   return { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }
+}
+function fingerprintAdminHeaders(): Record<string, string> {
+  const actor = typeof window !== 'undefined' ? actorDeCaja() : null
+  return actor ? { 'x-fullsite-actor': actor.actor_token } : {}
 }
 
 export default function HuellaPage() {
@@ -26,7 +31,7 @@ export default function HuellaPage() {
     // DigitalPersona is exposed through Pedro's CSP-safe local proxy.
     Promise.all([
       localNetworkFetch(`${fingerprintUrl}/health`, { signal: AbortSignal.timeout(3000) }).then(r => r.ok ? r.json() : null),
-      localNetworkFetch(`${fingerprintUrl}/list`, { signal: AbortSignal.timeout(3000) }).then(r => r.ok ? r.json() : null),
+      localNetworkFetch(`${fingerprintUrl}/list`, { headers: fingerprintAdminHeaders(), signal: AbortSignal.timeout(3000) }).then(r => r.ok ? r.json() : null),
     ]).then(([health, list]) => {
       setBiometricAvailable(health?.ok === true)
       const enrolled = Array.isArray(list?.enrolled) ? list.enrolled : []
@@ -46,6 +51,7 @@ export default function HuellaPage() {
     setError('')
     try {
       const res = await localNetworkFetch(`${getFingerprintUrl()}/enroll?id=${encodeURIComponent(member.id)}`, {
+        headers: fingerprintAdminHeaders(),
         signal: AbortSignal.timeout(90000),
       })
       const data = await res.json()
@@ -67,6 +73,7 @@ export default function HuellaPage() {
     setError('')
     try {
       const res = await localNetworkFetch(`${getFingerprintUrl()}/delete?id=${encodeURIComponent(memberId)}`, {
+        headers: fingerprintAdminHeaders(),
         signal: AbortSignal.timeout(5000),
       })
       const data = await res.json()

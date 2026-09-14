@@ -5,11 +5,20 @@ const fs = require('node:fs')
 const path = require('node:path')
 const os = require('node:os')
 const { ActorAuthority, permissionsFor } = require('../core/actor-authority')
-let directory, now, mode, calls
-beforeEach(() => { directory = fs.mkdtempSync(path.join(os.tmpdir(), 'fullsite-actor-')); now = Date.now(); mode = 'online'; calls = [] })
+const { prepareBiometricDeviceIdentity } = require('../index')
+let directory, now, mode, calls, identity, login
+beforeEach(() => {
+  directory = fs.mkdtempSync(path.join(os.tmpdir(), 'fullsite-actor-')); now = Date.now(); mode = 'online'; calls = []
+  identity = prepareBiometricDeviceIdentity({ dataDir: path.join(directory, 'device-key') })
+  login = { pin: '5678901234', deviceId: 'POS-A', restaurantId: 'lab', biometricDevicePublicKey: identity.publicKey }
+})
 afterEach(() => fs.rmSync(directory, { recursive: true, force: true }))
 const employee = { id: 'employee', name: 'Cajero de prueba', role: 'cajero' }
-const login = { pin: '5678901234', deviceId: 'POS-A', restaurantId: 'lab' }
+function biometricInput(overrides = {}) {
+  const input = { staffId: employee.id, deviceId: 'POS-A', restaurantId: 'lab', ...overrides }
+  return { ...input, deviceProof: identity.createProof({ restaurantId: input.restaurantId, branchId: 'branch-A',
+    terminalId: input.deviceId, staffId: input.staffId, minRole: input.minRole, timestamp: now }) }
+}
 function authority(options = {}) {
   return new ActorAuthority({ directory, restaurantId: 'lab', branchId: 'branch-A', now: () => now,
     fetchImpl: async (url, init) => {
@@ -18,7 +27,8 @@ function authority(options = {}) {
       if (mode === 'revoked') return Response.json({ error: 'PIN incorrecto' }, { status: 401 })
       if (mode === 'device-revoked') return Response.json({ code: 'terminal_not_enrolled' }, { status: 403 })
       if (mode === 'throttled') return Response.json({}, { status: 429 })
-      return Response.json({ staff: { ...employee, ...(mode === 'mesero' ? { role: 'mesero' } : {}) }, shiftToken: 'synthetic-online-shift-token' })
+      return Response.json({ staff: { ...employee, ...(mode === 'mesero' ? { role: 'mesero' } : {}) },
+        shiftToken: 'synthetic-online-shift-token', biometricProof: 'synthetic-biometric-proof' })
     }, ...options })
 }
 
@@ -50,6 +60,84 @@ test('new user/device cannot self-provision offline or borrow a token from anoth
   await assert.rejects(a.login({ ...login, pin: '1234567890' }), { code: 'OFFLINE_USER_NOT_PREPARED' })
   await assert.rejects(a.login({ ...login, deviceId: 'POS-B' }), { code: 'OFFLINE_USER_NOT_PREPARED' })
   await assert.rejects(a.login({ ...login, restaurantId: 'other' }), { code: 'ACTOR_SCOPE_INVALID' })
+})
+
+test('trusted DigitalPersona identification issues authority only for a prepared employee and device', async () => {
+  const a = authority()
+  await a.login(login)
+  const cloudCalls = calls.length
+
+  const biometric = await a.loginBiometric(biometricInput())
+  assert.equal(calls.length, cloudCalls + 1)
+  assert.deepEqual(JSON.parse(calls.at(-1).init.body), {
+    fingerprint_id: employee.id, client_id: 'lab', device_id: 'POS-A',
+  })
+  assert.equal(calls.at(-1).init.headers.Authorization, 'Bearer synthetic-biometric-proof')
+  assert.equal(biometric.staff.id, employee.id)
+  assert.equal(biometric.auth_method, 'fingerprint')
+  assert.equal(biometric.offline, false)
+  assert.equal(biometric.shiftToken, undefined, 'biometric revalidation never mints or returns a cloud session')
+  assert.equal(a.verify(biometric.actor_token, 'POS-A').id, employee.id)
+
+  await assert.rejects(a.loginBiometric(biometricInput({ staffId: 'forged' })), { code: 'BIOMETRIC_USER_NOT_PREPARED' })
+  await assert.rejects(a.loginBiometric(biometricInput({ deviceId: 'POS-B' })), { code: 'BIOMETRIC_DEVICE_NOT_PREPARED' })
+  await assert.rejects(a.loginBiometric(biometricInput({ restaurantId: 'other' })), { code: 'ACTOR_SCOPE_INVALID' })
+  await assert.rejects(a.loginBiometric(biometricInput({ minRole: 'gerente' })), { code: 'PERMISSION_DENIED' })
+})
+
+test('online employee revocation invalidates biometric authority and its prepared verifier', async () => {
+  const a = authority()
+  const prepared = await a.login(login)
+  mode = 'revoked'
+  await assert.rejects(a.loginBiometric(biometricInput()), { code: 'BIOMETRIC_REJECTED' })
+  assert.throws(() => a.verify(prepared.actor_token, 'POS-A'), { status: 401 })
+  mode = 'offline'
+  await assert.rejects(a.loginBiometric(biometricInput()), { code: 'BIOMETRIC_USER_NOT_PREPARED' })
+})
+
+test('biometric login uses a prepared verifier only when the cloud is unavailable', async () => {
+  const a = authority()
+  await a.login(login)
+  mode = 'offline'
+  const biometric = await a.loginBiometric(biometricInput())
+  assert.equal(biometric.offline, true)
+  assert.equal(biometric.shiftToken, undefined)
+  assert.equal(a.verify(biometric.actor_token, 'POS-A').id, employee.id)
+})
+
+test('biometric HTTP 429 fails closed instead of renewing stale cached authority', async () => {
+  const a = authority()
+  await a.login(login)
+  mode = 'throttled'
+  await assert.rejects(
+    a.loginBiometric(biometricInput()),
+    { status: 429, code: 'BIOMETRIC_REJECTED' },
+  )
+})
+
+test('biometric authority fails closed after device revocation, expiry, rollback or storage failure', async t => {
+  const a = authority({ credentialTtlMs: 10000 })
+  await a.login(login)
+  const first = await a.loginBiometric(biometricInput())
+  assert.equal(authority({ credentialTtlMs: 10000 }).verify(first.actor_token, 'POS-A').id, employee.id)
+
+  mode = 'device-revoked'
+  await assert.rejects(a.login(login), { code: 'terminal_not_enrolled' })
+  await assert.rejects(a.loginBiometric(biometricInput()), { code: 'terminal_not_enrolled' })
+
+  mode = 'online'
+  await a.login(login)
+  now += 10001
+  await assert.rejects(a.loginBiometric(biometricInput()), { code: 'BIOMETRIC_USER_NOT_PREPARED' })
+
+  now -= 120000
+  await assert.rejects(authority({ credentialTtlMs: 10000 }).loginBiometric(biometricInput()), { code: 'ACTOR_CLOCK_INVALID' })
+
+  now += 120000
+  await a.login(login)
+  const mock = t.mock.method(fs, 'writeSync', () => { throw new Error('ENOSPC') })
+  await assert.rejects(a.loginBiometric(biometricInput()), { code: 'ACTOR_STORAGE_UNAVAILABLE' })
+  mock.mock.restore()
 })
 
 test('a routine second online login does not invalidate a still valid issued session', async () => {

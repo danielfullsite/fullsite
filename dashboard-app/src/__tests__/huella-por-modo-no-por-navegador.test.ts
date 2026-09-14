@@ -20,7 +20,7 @@ describe('con qué se decide si la huella basta', () => {
 
   it('con autoridad de Caja, la huella identifica y el PIN autoriza', () => {
     // El permiso lo firma Caja a partir de un PIN, y el lector no da PIN.
-    expect(decidirHuella('caja')).toBe('identificar-y-pedir-pin')
+    expect(decidirHuella('caja')).toBe('entrar-con-caja')
   })
 
   it('mientras no se sabe el modo, no se deja al mesero en la puerta', () => {
@@ -80,7 +80,7 @@ describe('memoria del modo', () => {
     recordarAutoridad(null)
     recordarAutoridad('')
     expect(modoDeAutoridadRecordado()).toBe('caja')
-    expect(decidirHuella(modoDeAutoridadRecordado())).toBe('identificar-y-pedir-pin')
+    expect(decidirHuella(modoDeAutoridadRecordado())).toBe('entrar-con-caja')
   })
 
   it('sobrevive a un refresco de la pantalla', () => {

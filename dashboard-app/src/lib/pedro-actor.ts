@@ -32,8 +32,38 @@ async function solicitarSesionCaja(pin: string, minRole?: string): Promise<Sesio
   }
   return data
 }
+async function solicitarSesionCajaConHuella(minRole?: string): Promise<SesionDeCaja> {
+  const res = await localNetworkFetch(`${getBridgeUrl()}/auth/fingerprint`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    // La identidad nunca viaja desde el navegador. Pedro activa el lector local
+    // y Caja resuelve al empleado contra su credencial preparada.
+    body: JSON.stringify(minRole ? { min_role: minRole } : {}),
+    signal: AbortSignal.timeout(25000),
+  })
+  const data = await res.json()
+  if (!res.ok || !data.staff?.id || typeof data.actor_token !== 'string' || !(data.expires_at > Date.now())) {
+    throw Object.assign(new Error(data.error || 'Caja no confirmó la huella'), { code: data.code, status: res.status })
+  }
+  return data
+}
+export async function estadoHuellaEnCaja(): Promise<{ disponible: boolean; motivo?: string }> {
+  try {
+    const res = await localNetworkFetch(`${getBridgeUrl()}/auth/fingerprint/status`, {
+      cache: 'no-store', signal: AbortSignal.timeout(2500),
+    })
+    const data = await res.json()
+    return { disponible: res.ok && data.available === true, motivo: data.reason }
+  } catch {
+    return { disponible: false, motivo: 'Caja o lector DigitalPersona no disponible' }
+  }
+}
 export async function ingresarConPinEnCaja(pin: string, minRole?: string): Promise<SesionDeCaja> {
   const session = await solicitarSesionCaja(pin, minRole)
+  if (!minRole) sessionStorage.setItem(KEY, JSON.stringify(session))
+  return session
+}
+export async function ingresarConHuellaEnCaja(minRole?: string): Promise<SesionDeCaja> {
+  const session = await solicitarSesionCajaConHuella(minRole)
   if (!minRole) sessionStorage.setItem(KEY, JSON.stringify(session))
   return session
 }
@@ -42,4 +72,7 @@ export async function ingresarConPinEnCaja(pin: string, minRole?: string): Promi
  * Caja checks the signer's canonical permission on the command itself. */
 export async function autorizarOperacionConPinEnCaja(pin: string): Promise<SesionDeCaja> {
   return solicitarSesionCaja(pin)
+}
+export async function autorizarOperacionConHuellaEnCaja(minRole?: string): Promise<SesionDeCaja> {
+  return solicitarSesionCajaConHuella(minRole)
 }

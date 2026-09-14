@@ -3,7 +3,8 @@ const path = require('path');
 const http = require('http');
 const os   = require('os');
 const fs   = require('fs');
-const { execSync } = require('child_process');
+const crypto = require('crypto');
+const { execSync, execFileSync } = require('child_process');
 
 // ─── Puntos de anclaje del laboratorio multi-terminal ────────────────────────
 //
@@ -34,6 +35,14 @@ const KDS_URL = process.env.FULLSITE_KDS_URL || 'https://app.fullsite.mx/pos/coc
 // kiosco/fullscreen) para poder probar en una Mac/PC sin quedar atrapado. En
 // producción (sin el flag) sigue en kiosco, como debe ser en una terminal real.
 const DEV = process.env.FULLSITE_DEV === '1';
+
+// Registrar el autoarranque sólo en una instalación real. Un laboratorio usa
+// FULLSITE_DEV y/o un userData separado; tocar los login items desde ese proceso
+// alteraría el arranque de la terminal anfitriona aunque el ejecutable sea
+// portátil y se esté validando lado-a-lado.
+const LOGIN_ITEM_ENABLED = process.platform === 'win32'
+  && !DEV
+  && !process.env.FULLSITE_USER_DATA_DIR;
 
 // userData separado por terminal. Se aplica AQUÍ, en la carga del módulo, porque
 // `app.setPath` sólo surte efecto antes de que algo llame a `getPath('userData')`
@@ -85,6 +94,7 @@ const LEGACY_CONFIG_PATH  = path.join('C:\\fullsite', 'config.json');
 let autoInstaller = null;   // handle del auto-update; null si no arranco
 const configSchema        = require('./local-server/config-schema');
 const printerConfigSchema = require('./local-server/adapters/printer-config-schema');
+const { readJsonFile }     = require('./local-server/core/json-file');
 
 /**
  * Return the primary config path: userData first (writable by Electron),
@@ -111,7 +121,7 @@ function loadAndValidateConfig() {
   // 1. Try primary (new schema)
   try {
     if (fs.existsSync(primaryPath)) {
-      const data = JSON.parse(fs.readFileSync(primaryPath, 'utf8'));
+      const data = readJsonFile(fs, primaryPath);
       const { valid, errors } = configSchema.validate(data);
       if (valid) {
         console.log('[config] Valid config loaded from', primaryPath);
@@ -128,7 +138,7 @@ function loadAndValidateConfig() {
   let legacy = null;
   try {
     if (fs.existsSync(LEGACY_CONFIG_PATH)) {
-      legacy = JSON.parse(fs.readFileSync(LEGACY_CONFIG_PATH, 'utf8'));
+      legacy = readJsonFile(fs, LEGACY_CONFIG_PATH);
       console.log('[config] Legacy config found at', LEGACY_CONFIG_PATH);
 
       // 2a. If legacy is already new schema (migrated manually), validate it
@@ -197,7 +207,7 @@ function loadPrinters() {
   if (primaryPath) {
     try {
       if (fs.existsSync(primaryPath)) {
-        const raw = JSON.parse(fs.readFileSync(primaryPath, 'utf8'));
+        const raw = readJsonFile(fs, primaryPath);
         const result = printerConfigSchema.loadAndValidate(raw);
         if (result.valid) {
           if (result.migrated) {
@@ -219,7 +229,7 @@ function loadPrinters() {
   // 2. Try legacy path (AMALAY v1 migration source)
   try {
     if (fs.existsSync(LEGACY_PRINTERS_PATH)) {
-      const raw = JSON.parse(fs.readFileSync(LEGACY_PRINTERS_PATH, 'utf8'));
+      const raw = readJsonFile(fs, LEGACY_PRINTERS_PATH);
       const result = printerConfigSchema.loadAndValidate(raw);
       if (result.valid) {
         // Save migrated config to primary path so future boots skip legacy
@@ -263,6 +273,15 @@ async function startLocalServer() {
 
   const { startLocalServer: start } = require('./local-server');
   const dataDir = app.getPath('userData');
+  let fingerprintIpcSecretForServer = null;
+  try {
+    fingerprintIpcSecretForServer = prepareFingerprintIpcSecret({
+      directory: resolveFingerprintIpcDirectory({ userDataDirectory: dataDir }),
+    });
+    fingerprintIpcSecret = fingerprintIpcSecretForServer;
+  } catch (e) {
+    console.error('[fingerprint] No se pudo preparar el secreto IPC; las rutas de huella fallarán cerradas:', e.message);
+  }
   const printersResult = loadPrinters();
   const printerConfigPath = getPrinterConfigPath();
   const queueFilePath = path.join(dataDir, 'print-queue.json');
@@ -300,6 +319,9 @@ async function startLocalServer() {
     localAuthorityEnabled: appConfig.localAuthorityEnabled === true,
     branchId:           appConfig.location_id || appConfig.branch_id || appConfig.branchId || null,
     lanSecret:          appConfig.lan_secret     || appConfig.lanSecret || null,
+    // Sólo vive en memoria de main/Pedro. rendererIdentity usa una allowlist y no
+    // expone este secreto al preload, a la página ni a localStorage.
+    fingerprintIpcSecret: fingerprintIpcSecretForServer,
   };
 
   try {
@@ -327,7 +349,7 @@ function registerProvisioningIpc() {
   ipcMain.handle('provision:get-info', async () => {
     let legacy = null;
     try {
-      if (fs.existsSync(LEGACY_CONFIG_PATH)) legacy = JSON.parse(fs.readFileSync(LEGACY_CONFIG_PATH, 'utf8'));
+      if (fs.existsSync(LEGACY_CONFIG_PATH)) legacy = readJsonFile(fs, LEGACY_CONFIG_PATH);
     } catch {}
     const network_interfaces = [];
     for (const [name, addresses] of Object.entries(os.networkInterfaces())) {
@@ -475,7 +497,7 @@ function registerProvisioningIpc() {
     })
     if (result.canceled || !result.filePaths.length) return { ok: false, error: 'canceled' }
     try {
-      const data = JSON.parse(fs.readFileSync(result.filePaths[0], 'utf8'))
+      const data = readJsonFile(fs, result.filePaths[0])
       const { valid, errors } = configSchema.validate(data)
       if (!valid) return { ok: false, error: errors.join('; '), data }
       return { ok: true, config: data }
@@ -493,7 +515,7 @@ function registerProvisioningIpc() {
     let legacyV1 = null
     try {
       if (fs.existsSync(LEGACY_PRINTERS_PATH)) {
-        const raw = JSON.parse(fs.readFileSync(LEGACY_PRINTERS_PATH, 'utf8'))
+        const raw = readJsonFile(fs, LEGACY_PRINTERS_PATH)
         if (!raw.schema_version || raw.schema_version < 2) legacyV1 = raw
       }
     } catch {}
@@ -527,7 +549,7 @@ function registerProvisioningIpc() {
       // Step 3 — validate tmp from disk before rename (protective)
       let preRead
       try {
-        preRead = JSON.parse(fs.readFileSync(tmpPath, 'utf8'))
+        preRead = readJsonFile(fs, tmpPath)
       } catch (e) {
         try { fs.unlinkSync(tmpPath) } catch {}
         return { ok: false, error: 'Pre-rename read-back failed: ' + e.message }
@@ -543,7 +565,7 @@ function registerProvisioningIpc() {
 
       // Step 5 — post-rename observability only; no rollback
       try {
-        const canonical = JSON.parse(fs.readFileSync(configPath, 'utf8'))
+        const canonical = readJsonFile(fs, configPath)
         if (canonical.schema_version !== 2) {
           console.error('[provision] CRITICAL: post-rename schema_version mismatch — filesystem anomaly suspected at', configPath)
         } else {
@@ -615,7 +637,7 @@ function registerProvisioningIpc() {
     })
     if (result.canceled || !result.filePaths.length) return { ok: false, error: 'canceled' }
     try {
-      const raw       = JSON.parse(fs.readFileSync(result.filePaths[0], 'utf8'))
+      const raw       = readJsonFile(fs, result.filePaths[0])
       const validated = printerConfigSchema.loadAndValidate(raw)
       if (!validated.valid) return { ok: false, error: validated.errors.join('; ') }
       return { ok: true, config: validated.config, migrated: validated.migrated }
@@ -654,12 +676,94 @@ function registerProvisioningIpc() {
 // must be in C:\fullsite\ on each terminal.
 
 const { spawn } = require('child_process');
+const {
+  prepareFingerprintIpcSecret,
+  resolveFingerprintIpcDirectory,
+  createFingerprintIpcRequestAuth,
+  verifyFingerprintIpcResponse,
+} = require('./local-server/core/fingerprint-ipc-secret');
 let fingerprintProcess = null;
 let fingerprintRestartCount = 0;
+let fingerprintIpcSecret = null;
+
+function fingerprintFileHash(file) {
+  return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+}
+
+function stopExactFingerprintProcesses(executablePath) {
+  if (process.platform !== 'win32') return [];
+  const query = '$target=[IO.Path]::GetFullPath($args[0]); ' +
+    "$exact=@(Get-CimInstance Win32_Process -Filter \"Name = 'fingerprint-service.exe'\" | " +
+    'Where-Object { $_.ExecutablePath -and ([IO.Path]::GetFullPath($_.ExecutablePath) -ieq $target) }); ' +
+    '$exact | ForEach-Object { Write-Output $_.ProcessId; Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop; ' +
+    'Wait-Process -Id $_.ProcessId -Timeout 5 -ErrorAction SilentlyContinue }';
+  const stdout = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', query, executablePath], {
+    encoding: 'utf8', windowsHide: true, timeout: 5000,
+  });
+  return stdout.split(/\r?\n/).map(value => Number(value.trim())).filter(Number.isSafeInteger);
+}
+
+function updateBundledFingerprintService({ bundledExe, bundledDll, installedExe, installedDll }) {
+  if (!fs.existsSync(bundledExe) || !fs.existsSync(bundledDll)) return false;
+  const expectedExe = fingerprintFileHash(bundledExe);
+  const expectedDll = fingerprintFileHash(bundledDll);
+  if (fs.existsSync(installedExe) && fs.existsSync(installedDll) &&
+      fingerprintFileHash(installedExe) === expectedExe && fingerprintFileHash(installedDll) === expectedDll) return false;
+
+  const targetDirectory = path.dirname(installedExe);
+  fs.mkdirSync(targetDirectory, { recursive: true });
+  const stageDirectory = path.join(targetDirectory, `.fingerprint-stage-${crypto.randomUUID()}`);
+  const backupDirectory = path.join(targetDirectory, `fingerprint-backup-${Date.now()}`);
+  fs.mkdirSync(stageDirectory, { recursive: true });
+  fs.mkdirSync(backupDirectory, { recursive: true });
+  const stagedExe = path.join(stageDirectory, path.basename(installedExe));
+  const stagedDll = path.join(stageDirectory, path.basename(installedDll));
+  try {
+    fs.copyFileSync(bundledExe, stagedExe);
+    fs.copyFileSync(bundledDll, stagedDll);
+    if (fingerprintFileHash(stagedExe) !== expectedExe || fingerprintFileHash(stagedDll) !== expectedDll) {
+      throw new Error('la copia temporal no coincide por SHA-256');
+    }
+    for (const processId of stopExactFingerprintProcesses(installedExe)) {
+      console.warn(`[fingerprint] Deteniendo sólo el servicio exacto anterior (PID ${processId}) para actualizarlo`);
+    }
+    if (fs.existsSync(installedExe)) fs.renameSync(installedExe, path.join(backupDirectory, path.basename(installedExe)));
+    if (fs.existsSync(installedDll)) fs.renameSync(installedDll, path.join(backupDirectory, path.basename(installedDll)));
+    fs.renameSync(stagedExe, installedExe);
+    fs.renameSync(stagedDll, installedDll);
+    if (fingerprintFileHash(installedExe) !== expectedExe || fingerprintFileHash(installedDll) !== expectedDll) {
+      throw new Error('la instalación no coincide por SHA-256');
+    }
+    console.log(`[fingerprint] Servicio actualizado y verificado; respaldo recuperable en ${backupDirectory}`);
+    return true;
+  } catch (error) {
+    try {
+      if (fs.existsSync(installedExe)) fs.rmSync(installedExe, { force: true });
+      if (fs.existsSync(installedDll)) fs.rmSync(installedDll, { force: true });
+      const oldExe = path.join(backupDirectory, path.basename(installedExe));
+      const oldDll = path.join(backupDirectory, path.basename(installedDll));
+      if (fs.existsSync(oldExe)) fs.renameSync(oldExe, installedExe);
+      if (fs.existsSync(oldDll)) fs.renameSync(oldDll, installedDll);
+    } catch (rollbackError) {
+      console.error('[fingerprint] La restauración automática falló; conserva el respaldo:', rollbackError.message);
+    }
+    throw error;
+  } finally {
+    fs.rmSync(stageDirectory, { recursive: true, force: true });
+  }
+}
 
 function startFingerprintService() {
   const fpExe = 'C:\\fullsite\\fingerprint-service.exe';
   const fpDll = 'C:\\fullsite\\DPUruNet.dll';
+  try {
+    if (!fingerprintIpcSecret) fingerprintIpcSecret = prepareFingerprintIpcSecret({
+      directory: resolveFingerprintIpcDirectory({ userDataDirectory: app.getPath('userData') }),
+    });
+  } catch (e) {
+    console.error('[fingerprint] Secreto IPC inválido; huella deshabilitada hasta reparar:', e.message);
+    return;
+  }
 
   // AUTO-INSTALAR EL SERVICIO DESDE EL PAQUETE. Es lo que hace clonable la huella.
   //
@@ -672,20 +776,19 @@ function startFingerprintService() {
   // Los binarios NO se commitean (DLL propietario del SDK DigitalPersona U.are.U). El
   // instalador solo los empaqueta si estan presentes al correr electron-builder; si no,
   // este bloque no encuentra nada, no rompe, y el arranque sigue como antes.
-  if (!fs.existsSync(fpExe) || !fs.existsSync(fpDll)) {
-    try {
-      const bundledDir = path.join(process.resourcesPath || __dirname, 'fingerprint');
-      const bExe = path.join(bundledDir, 'fingerprint-service.exe');
-      const bDll = path.join(bundledDir, 'DPUruNet.dll');
-      if (fs.existsSync(bExe) && fs.existsSync(bDll)) {
-        fs.mkdirSync('C:\\fullsite', { recursive: true });
-        if (!fs.existsSync(fpExe)) fs.copyFileSync(bExe, fpExe);
-        if (!fs.existsSync(fpDll)) fs.copyFileSync(bDll, fpDll);
-        console.log('[fingerprint] Servicio instalado desde el paquete a C:\\fullsite\\');
-      }
-    } catch (e) {
-      console.warn('[fingerprint] No se pudo auto-instalar desde el paquete:', e.message);
-    }
+  try {
+    const bundledDir = path.join(process.resourcesPath || __dirname, 'fingerprint');
+    const changed = updateBundledFingerprintService({
+      bundledExe: path.join(bundledDir, 'fingerprint-service.exe'),
+      bundledDll: path.join(bundledDir, 'DPUruNet.dll'),
+      installedExe: fpExe,
+      installedDll: fpDll,
+    });
+    if (changed) console.log('[fingerprint] Servicio instalado/actualizado desde el paquete a C:\\fullsite\\');
+  } catch (e) {
+    // Si no se pudo verificar o respaldar, no se arranca una mezcla incierta.
+    console.error('[fingerprint] Actualización segura abortada; huella deshabilitada:', e.message);
+    return;
   }
 
   // Check if files exist
@@ -696,10 +799,35 @@ function startFingerprintService() {
   }
 
   // Check if already running on port 7718
-  const testReq = http.get('http://127.0.0.1:7718/health', (res) => {
-    if (res.statusCode === 200) {
-      console.log('[fingerprint] Service already running on port 7718');
-    }
+  const healthAuth = createFingerprintIpcRequestAuth({
+    secret: fingerprintIpcSecret,
+    method: 'GET',
+    path: '/health',
+  });
+  const testReq = http.get({ hostname: '127.0.0.1', port: 7718, path: '/health', headers: healthAuth.headers }, (res) => {
+    let body = '';
+    res.on('data', chunk => { body += chunk; });
+    res.on('end', () => {
+      let health = null;
+      try { health = JSON.parse(body); } catch {}
+      let authenticated = false;
+      try {
+        authenticated = verifyFingerprintIpcResponse({
+          secret: fingerprintIpcSecret,
+          context: healthAuth.context,
+          statusCode: res.statusCode || 502,
+          body,
+          headers: res.headers,
+        });
+      } catch (error) {
+        console.error('[fingerprint] El proceso en 7718 no demostró conocer el secreto IPC:', error.message);
+      }
+      if (authenticated && res.statusCode === 200 && health?.ipc_auth_required === true && health?.ipc_auth_scheme === 'hmac-sha256-v1') {
+        console.log('[fingerprint] Servicio seguro ya está activo en 7718');
+      } else {
+        console.error('[fingerprint] Servicio viejo, impostor o inseguro en 7718: deténlo y actualiza fingerprint-service.exe antes de usar huella');
+      }
+    });
   });
   testReq.on('error', () => {
     // Not running, start it
@@ -708,6 +836,11 @@ function startFingerprintService() {
       cwd: 'C:\\fullsite',
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
+      env: {
+        ...process.env,
+        FULLSITE_FINGERPRINT_IPC_SECRET: fingerprintIpcSecret,
+        FULLSITE_USER_DATA_DIR: app.getPath('userData'),
+      },
     });
 
     fingerprintProcess.stdout.on('data', (data) => {
@@ -1024,7 +1157,7 @@ app.whenReady().then(async () => {
   });
 
   // Auto-start on Windows login (creates startup shortcut)
-  if (process.platform === 'win32') {
+  if (LOGIN_ITEM_ENABLED) {
     app.setLoginItemSettings({ openAtLogin: true, path: process.execPath });
   }
 

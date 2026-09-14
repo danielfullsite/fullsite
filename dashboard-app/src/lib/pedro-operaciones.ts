@@ -2,7 +2,8 @@ import { validarFinanzasCaja, type FinanzasDeCaja } from './pedro-finanzas'
 import type { OrderItem } from './pos-data'
 import { leerCatalogoCaja } from './pedro-catalogo'
 import { ejecutarComandoCaja, comandoPendienteCaja } from './pedro-comandos'
-import { autorizarOperacionConPinEnCaja } from './pedro-actor'
+import type { SesionDeCaja } from './pedro-actor'
+import { renglonesAnulados, type Disposicion } from './anulacion-completa'
 
 export interface CuentaParaGuardar {
   id: string; turnoId: string; revision: number; mesa: number; clienteNombre?: string
@@ -36,11 +37,28 @@ function validarReciboConsumo(result: Record<string, unknown>, command: Readonly
   if (command.expected_financial_revision !== undefined && !result.financial_order) throw new Error('Missing financial receipt')
   readOrder(result.operational_order, orderId, result.financial_order)
 }
+function validarReciboMutacion(confirmed: OrdenConfirmada, command: Readonly<Record<string, unknown>>) {
+  if (confirmed.turno_id !== command.turno_id) throw new Error('Caja confirmó la operación en otro turno')
+  const expected = command.expected_revision
+  if (!Number.isSafeInteger(expected) || confirmed.order_revision !== Number(expected) + 1) {
+    throw new Error('Caja no confirmó la revisión exacta de la operación')
+  }
+}
 /** Send product identities and intent. Caja owns prices, tax, mandatory options,
  * revisions and delivery batches. No Supabase write follows this receipt. */
 export class GuardadoAnteriorRecuperado extends Error {
   constructor(readonly orden: OrdenConfirmada) {
     super('Recuperamos el guardado anterior. Tu borrador más reciente sigue pendiente; revísalo y vuelve a guardar antes de enviar.')
+  }
+}
+export class TransferenciaAnteriorRecuperada extends Error {
+  constructor(readonly orden: OrdenConfirmada) {
+    super(`Caja recuperó la transferencia anterior a la mesa ${orden.mesa}.`)
+  }
+}
+export class AnulacionAnteriorRecuperada extends Error {
+  constructor(readonly orden: OrdenConfirmada) {
+    super('Caja recuperó la anulación anterior con su motivo y decisiones de inventario originales.')
   }
 }
 export async function guardarCuentaEnCaja(order: CuentaParaGuardar): Promise<OrdenConfirmada> {
@@ -86,24 +104,53 @@ export async function enviarCuentaEnCaja(order: OrdenConfirmada): Promise<OrdenC
   return confirmed
 }
 
-/** Move and void use a fresh one-command approval; the returned actor token is
+/** Move and void use a fresh approval in the UI; the returned actor token is
  * passed in a header, never as order data, and never changes the logged-in user. */
-export async function moverCuentaEnCaja(order: OrdenConfirmada, mesa: number, pin: string): Promise<OrdenConfirmada> {
+export async function moverCuentaEnCaja(order: OrdenConfirmada, mesa: number, actor: SesionDeCaja): Promise<OrdenConfirmada> {
   if (!Number.isSafeInteger(mesa) || mesa < 1) throw new Error('Ingresa un número de mesa válido.')
-  const actor = await autorizarOperacionConPinEnCaja(pin)
   const receipt = await ejecutarComandoCaja(`move:${order.id}`, 'ORDER_MOVE', {
     order_id: order.id, turno_id: order.turno_id, expected_revision: order.order_revision, mesa,
-  }, { actor })
-  return readOrder(receipt.result.operational_order, order.id, receipt.result.financial_order)
+  }, { actor, validateResult: (result, command) => {
+    const confirmed = readOrder(result.operational_order, order.id, result.financial_order)
+    validarReciboMutacion(confirmed, command)
+    if (confirmed.mesa !== command.mesa) throw new Error('Caja confirmó otro destino')
+  } })
+  const result = readOrder(receipt.result.operational_order, order.id, receipt.result.financial_order)
+  if (receipt.recovered && receipt.command.mesa !== mesa) throw new TransferenciaAnteriorRecuperada(result)
+  if (result.mesa !== mesa) throw new Error('Caja no confirmó la mesa solicitada.')
+  return result
 }
-export async function anularCuentaEnCaja(order: OrdenConfirmada, reason: string, pin: string): Promise<OrdenConfirmada> {
+export async function anularCuentaEnCaja(order: OrdenConfirmada, reason: string, disposiciones: Readonly<Record<string, Disposicion>>, actor: SesionDeCaja): Promise<OrdenConfirmada> {
   if (!reason.trim()) throw new Error('Escribe el motivo de anulación.')
-  const actor = await autorizarOperacionConPinEnCaja(pin)
-  const receipt = await ejecutarComandoCaja(`void:${order.id}`, 'ORDER_VOID', {
-    order_id: order.id, turno_id: order.turno_id, expected_revision: order.order_revision, reason: reason.trim(),
-  }, { actor })
+  const reasonTrimmed = reason.trim()
+  const inventoryDispositions = renglonesAnulados(order.items, disposiciones, reasonTrimmed)
+    .map(item => ({ line_id: item.id, disposition: item.inventory_disposition }))
+  const request = { order_id: order.id, turno_id: order.turno_id, expected_revision: order.order_revision,
+    reason: reasonTrimmed, inventory_dispositions: inventoryDispositions }
+  const receipt = await ejecutarComandoCaja(`void:${order.id}`, 'ORDER_VOID', request, { actor,
+    validateResult: (raw, command) => {
+      const confirmed = readOrder(raw.operational_order, order.id, raw.financial_order)
+      validarReciboMutacion(confirmed, command)
+      if (confirmed.status !== 'cancelada') throw new Error('Caja no confirmó la anulación')
+      const rows = new Map(confirmed.items.map(item => [item.id, item]))
+      const expected = command.inventory_dispositions
+      if (!Array.isArray(expected) || expected.length !== confirmed.items.length) throw new Error('Caja no confirmó todas las disposiciones')
+      for (const value of expected) {
+        const disposition = value as { line_id?: unknown; disposition?: unknown }
+        const row = (typeof disposition.line_id === 'string' ? rows.get(disposition.line_id) : undefined) as
+          (OrderItem & { inventory_disposition?: string; cancellation_reason?: string }) | undefined
+        if (!row || row.cancelled !== true || row.inventory_disposition !== disposition.disposition || row.cancellation_reason !== command.reason) {
+          throw new Error('Caja no confirmó las disposiciones de inventario')
+        }
+      }
+    },
+  })
   const result = readOrder(receipt.result.operational_order, order.id, receipt.result.financial_order)
   if (result.status !== 'cancelada') throw new Error('Caja no confirmó la anulación. Conservamos la cuenta.')
+  if (receipt.recovered && JSON.stringify({ reason: receipt.command.reason, inventory_dispositions: receipt.command.inventory_dispositions }) !==
+      JSON.stringify({ reason: request.reason, inventory_dispositions: request.inventory_dispositions })) {
+    throw new AnulacionAnteriorRecuperada(result)
+  }
   return result
 }
 

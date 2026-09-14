@@ -3,7 +3,7 @@
 import { prepararTransferenciaItem } from '@/lib/transferencia-item'
 import { confirmarCancelacionItem } from '@/lib/cancelacion-cliente'
 import { setOrderInventoryPending } from '@/lib/order-inventory-pending'
-import { Component, useState, useCallback, useEffect, useRef, Suspense, type ErrorInfo, type ReactNode } from 'react'
+import { Component, useState, useCallback, useEffect, useMemo, useRef, Suspense, type ErrorInfo, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { resolveMesa, clearMesaTarget, peekMesaTarget } from '@/lib/pos-navigation'
@@ -53,13 +53,17 @@ import { recordarOrdenEncolada } from '@/lib/pos-mesa-cache'
 import { cacheTrasElCierre, cachePreferidaAlAbrir } from '@/lib/cache-de-cuenta'
 import { leerCuenta, requiereCaja, cuentaConfirmada, type LecturaDeCuenta } from '@/lib/pedro-cliente'
 import { leerCatalogoCaja } from '@/lib/pedro-catalogo'
-import { guardarCuentaEnCaja, enviarCuentaEnCaja, moverCuentaEnCaja, anularCuentaEnCaja, GuardadoAnteriorRecuperado, firmaBorradorParaCaja, type OrdenConfirmada } from '@/lib/pedro-operaciones'
+import { guardarCuentaEnCaja, enviarCuentaEnCaja, moverCuentaEnCaja, anularCuentaEnCaja, AnulacionAnteriorRecuperada, GuardadoAnteriorRecuperado, TransferenciaAnteriorRecuperada, firmaBorradorParaCaja, type OrdenConfirmada } from '@/lib/pedro-operaciones'
+import { autorizarOperacionConHuellaEnCaja, autorizarOperacionConPinEnCaja, type SesionDeCaja } from '@/lib/pedro-actor'
 import { type FinanzasDeCaja, pesosDeCentavos } from '@/lib/pedro-finanzas'
 import { crearSesionEditorCaja } from '@/lib/pos-editor-session'
 import CajonDeCaja from '@/components/pos/CajonDeCaja'
 import DocumentoImpresoDeCaja from '@/components/pos/DocumentoImpresoDeCaja'
 import ConsumoPendienteDeCaja from '@/components/pos/ConsumoPendienteDeCaja'
 import CobroDeCaja from '@/components/pos/CobroDeCaja'
+import RejillaPaginada from '@/components/pos/RejillaPaginada'
+import AutorizacionPinOHuella from '@/components/pos/AutorizacionPinOHuella'
+import { useEstadoHuellaCaja } from '@/components/pos/useEstadoHuellaCaja'
 import { reconciliarCuenta, cuentaEditableDe, mismaConfirmacionDeCuenta, type CuentaEditable } from '@/lib/pos-order-reconciliation'
 import { evaluarLiquidacion, cuentasDe, intentoDePago } from '@/lib/liquidacion-de-orden'
 import type { OrderItem, MenuItem, Order } from '@/lib/pos-data'
@@ -146,8 +150,7 @@ import {
   ClipboardCheck,
   Power,
   Utensils,
-  Coffee, EggFried, Sandwich, Salad, CupSoda, Citrus, Croissant, CakeSlice, IceCream, Leaf, Pizza, Fish, Cookie,
-} from 'lucide-react'
+  Coffee, EggFried, Sandwich, Salad, CupSoda, Citrus, Croissant, CakeSlice, IceCream, Leaf, Pizza, Fish, Cookie, Wrench} from 'lucide-react'
 import {
   getMPConfig,
   saveMPConfig,
@@ -193,6 +196,11 @@ function catIconFor(name: string, size = 20) {
   if (has('vino', 'wine')) return <Wine size={size} />
   return <Utensils size={size} />
 }
+type CatalogTile =
+  | { kind: 'combos'; id: string }
+  | { kind: 'speed-combo'; id: string; combo: Combo }
+  | { kind: 'category'; id: string; category: MenuCategory }
+
 const POSCopilot = dynamic(() => import('@/components/POSCopilot'), { ssr: false })
 const OfflineIndicator = dynamic(() => import('@/components/pos/OfflineIndicator'), { ssr: false })
 const InventoryAlerts = dynamic(() => import('@/components/pos/InventoryAlerts'), { ssr: false })
@@ -1294,7 +1302,7 @@ interface VoidOrderModalProps {
   /** Los que ya se enviaron a cocina: se proponen como merma, nunca como devolución. */
   enviados: Set<string>
   onConfirm: (reason: string, managerName: string, disposiciones: Record<string, Disposicion>) => void
-  onConfirmCaja?: (reason: string, pin: string, disposiciones: Record<string, Disposicion>) => Promise<void>
+  onConfirmCaja?: (reason: string, actor: SesionDeCaja, disposiciones: Record<string, Disposicion>) => Promise<void>
   onCancel: () => void
 }
 
@@ -1309,6 +1317,7 @@ function VoidOrderModal({ mesa, total, items, enviados, onConfirm, onConfirmCaja
   const [biometricAvail, setBiometricAvail] = useState(false)
   const [bioChecking, setBioChecking] = useState(false)
   const [confirming, setConfirming] = useState(false)
+  const huellaCaja = useEstadoHuellaCaja()
 
   useEffect(() => {
     if (onConfirmCaja) return
@@ -1356,13 +1365,7 @@ function VoidOrderModal({ mesa, total, items, enviados, onConfirm, onConfirmCaja
   const handleConfirm = async () => {
     if (!reason.trim()) { setError('Escribe el motivo'); return }
     if (!pin) { setError('Ingresa el PIN de quien autoriza'); return }
-    if (onConfirmCaja) {
-      if (confirming) return
-      setConfirming(true)
-      try { await onConfirmCaja(reason, pin, disposiciones) } catch (e) { setError(e instanceof Error ? e.message : 'Caja no confirmó la anulación') }
-      finally { setConfirming(false); setPin('') }
-      return
-    }
+    if (onConfirmCaja) return
     const manager = await verifyManagerPin(pin)
     if (!manager) { setError('PIN invalido'); return }
     onConfirm(reason, manager, disposiciones)
@@ -1371,7 +1374,7 @@ function VoidOrderModal({ mesa, total, items, enviados, onConfirm, onConfirmCaja
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/60" onClick={onCancel} />
-      <div className="relative bg-[var(--surface-2)] border border-red-700/40 rounded-2xl w-full max-w-md shadow-2xl mx-4 p-5">
+      <div className="relative max-h-[calc(100vh-24px)] overflow-y-auto bg-[var(--surface-2)] border border-red-700/40 rounded-2xl w-full max-w-md shadow-2xl mx-4 p-5">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-full bg-[var(--crit-soft)] flex items-center justify-center">
             <ShieldAlert size={20} className="text-[var(--crit-ink)]" />
@@ -1408,14 +1411,14 @@ function VoidOrderModal({ mesa, total, items, enviados, onConfirm, onConfirmCaja
                     type="button"
                     onClick={() => setDisposiciones(prev => ({ ...prev, [r.id]: 'retain_consumption' }))}
                     aria-pressed={disposiciones[r.id] === 'retain_consumption'}
-                    className={`px-2 py-1.5 rounded-lg text-xs font-semibold min-h-[36px] ${disposiciones[r.id] === 'retain_consumption' ? 'bg-amber-600 text-white' : 'bg-[var(--line)] text-[var(--text-3)]'}`}
+                    className={`px-3 py-2 rounded-lg text-xs font-semibold min-h-[56px] ${disposiciones[r.id] === 'retain_consumption' ? 'bg-amber-600 text-white' : 'bg-[var(--line)] text-[var(--text-3)]'}`}
                     title="Se preparó: es merma, el stock no regresa"
                   >Se preparó</button>
                   <button
                     type="button"
                     onClick={() => setDisposiciones(prev => ({ ...prev, [r.id]: 'return_stock' }))}
                     aria-pressed={disposiciones[r.id] === 'return_stock'}
-                    className={`px-2 py-1.5 rounded-lg text-xs font-semibold min-h-[36px] ${disposiciones[r.id] === 'return_stock' ? 'bg-emerald-600 text-white' : 'bg-[var(--line)] text-[var(--text-3)]'}`}
+                    className={`px-3 py-2 rounded-lg text-xs font-semibold min-h-[56px] ${disposiciones[r.id] === 'return_stock' ? 'bg-emerald-600 text-white' : 'bg-[var(--line)] text-[var(--text-3)]'}`}
                     title="No se preparó: la mercancía regresa al inventario"
                   >No se preparó</button>
                 </div>
@@ -1426,9 +1429,25 @@ function VoidOrderModal({ mesa, total, items, enviados, onConfirm, onConfirmCaja
             </p>
           </div>
 
-          <div>
+          {onConfirmCaja ? <AutorizacionPinOHuella
+            label="Autoriza la anulación completa"
+            pin={pin}
+            onPinChange={value => { setPin(value); setError('') }}
+            onPin={autorizarOperacionConPinEnCaja}
+            onHuella={autorizarOperacionConHuellaEnCaja}
+            onAuthorized={async actor => {
+              setConfirming(true)
+              try { await onConfirmCaja(reason, actor, disposiciones); setPin('') }
+              finally { setConfirming(false) }
+            }}
+            huellaDisponible={huellaCaja.disponible}
+            motivoHuellaNoDisponible={huellaCaja.motivo}
+            disabled={!reason.trim() || confirming}
+            pinButtonLabel="Anular con PIN"
+            huellaButtonLabel="Anular con huella"
+          /> : <div>
             <label className="text-sm font-semibold text-[var(--text-3)] uppercase tracking-wide mb-2 block">
-              {onConfirmCaja ? 'PIN de quien autoriza en Caja' : biometricAvail ? 'Huella digital o PIN de gerente' : 'PIN de gerente'}
+              {biometricAvail ? 'Huella digital o PIN de gerente' : 'PIN de gerente'}
             </label>
             <div className="flex gap-2">
               <input
@@ -1451,23 +1470,23 @@ function VoidOrderModal({ mesa, total, items, enviados, onConfirm, onConfirmCaja
                 </button>
               )}
             </div>
-          </div>
+          </div>}
 
           {error && <p className="text-[var(--crit-ink)] text-sm text-center">{error}</p>}
         </div>
 
         <div className="flex gap-3 mt-5">
-          <button onClick={onCancel} className="flex-1 py-3 rounded-xl bg-[var(--line)] hover:bg-[var(--line)] text-[var(--text-4)] font-semibold transition-colors min-h-[48px]">
+          <button onClick={onCancel} className="flex-1 py-3 rounded-xl bg-[var(--line)] hover:bg-[var(--line)] text-[var(--text-4)] font-semibold transition-colors min-h-[56px]">
             Volver
           </button>
-          <button
+          {!onConfirmCaja && <button
             onClick={handleConfirm}
             disabled={confirming}
-            className="flex-[2] py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold transition-colors min-h-[48px] flex items-center justify-center gap-2"
+            className="flex-[2] py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold transition-colors min-h-[56px] flex items-center justify-center gap-2"
           >
             <Ban size={18} />
             Anular orden
-          </button>
+          </button>}
         </div>
       </div>
     </div>
@@ -1697,6 +1716,7 @@ function POSContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const { lock } = usePOSLock()
+  const huellaCaja = useEstadoHuellaCaja()
   // Mostrador (tenants counter/channels): abre una cuenta nueva sin mesa con
   // nombre único — reutiliza intacto el flujo "cuenta por nombre" de abajo.
   // El nombre se genera UNA vez (inicializador de estado): regenerarlo en cada
@@ -1721,6 +1741,20 @@ function POSContent() {
   }, [])
   const [selectedCategory, setSelectedCategory] = useState<string>('')
   const [categorySearch, setCategorySearch] = useState('')
+  const categoryTriggerRef = useRef<HTMLButtonElement | null>(null)
+  const cerrarCategoria = useCallback(() => {
+    setSelectedCategory('')
+    setCategorySearch('')
+    queueMicrotask(() => categoryTriggerRef.current?.focus())
+  }, [])
+  useEffect(() => {
+    if (!selectedCategory) return
+    const cerrarConEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') cerrarCategoria()
+    }
+    document.addEventListener('keydown', cerrarConEscape)
+    return () => document.removeEventListener('keydown', cerrarConEscape)
+  }, [selectedCategory, cerrarCategoria])
   const [orderItems, setOrderItems] = useState<OrderItem[]>(() => {
     // Pre-populate from cache to prevent blank flash on mount
     if (typeof window === 'undefined') return []
@@ -2148,6 +2182,8 @@ function POSContent() {
   // Split de cuenta
   const [showSplit, setShowSplit] = useState(false)
   const [showVerify, setShowVerify] = useState(false)
+  const [showFunciones, setShowFunciones] = useState(false)
+  const [showPersonas, setShowPersonas] = useState(false)
   const [sentItemIds, setSentItemIds] = useState<Set<string>>(new Set())
   const [sentItemSnapshots, setSentItemSnapshots] = useState<Record<string, { cantidad: number; modificadores: string[]; notas: string; silla?: number }>>({})
   const [splitAssignments, setSplitAssignments] = useState<Record<string, number>>({}) // itemId → cuenta (1-6)
@@ -2665,11 +2701,15 @@ function POSContent() {
   // A committed move/void can disappear from the old salon before its ACK
   // arrives. Use the last saved identity and let Caja validate/deduplicate;
   // requiring an open-account preflight here would make its receipt unreachable.
-  const moverMesaCaja = async (pin: string) => {
+  const moverMesaCaja = async (actor: SesionDeCaja) => {
     if (operationLock.current || mesaDestinoCaja === null) return
     operationLock.current = true; setSaving(true)
     try {
-      await moverCuentaEnCaja(cuentaGuardadaParaOperacion(), mesaDestinoCaja, pin)
+      try { await moverCuentaEnCaja(cuentaGuardadaParaOperacion(), mesaDestinoCaja, actor) }
+      catch (error) {
+        if (!(error instanceof TransferenciaAnteriorRecuperada)) throw error
+        showToast(error.message)
+      }
       sesionEditorCaja.current.salir()
       cuentaCacheLista.current = false
       setOrderItems([])
@@ -2678,11 +2718,15 @@ function POSContent() {
       navigateToMesaMap()
     } finally { operationLock.current = false; setSaving(false) }
   }
-  const anularOrdenCaja = async (reason: string, pin: string) => {
+  const anularOrdenCaja = async (reason: string, actor: SesionDeCaja, disposiciones: Record<string, Disposicion>) => {
     if (operationLock.current) return
     operationLock.current = true; setSaving(true)
     try {
-      await anularCuentaEnCaja(cuentaGuardadaParaOperacion(), reason, pin)
+      try { await anularCuentaEnCaja(cuentaGuardadaParaOperacion(), reason, disposiciones, actor) }
+      catch (error) {
+        if (!(error instanceof AnulacionAnteriorRecuperada)) throw error
+        showToast(error.message)
+      }
       sesionEditorCaja.current.salir()
       cuentaCacheLista.current = false
       setOrderItems([])
@@ -2879,6 +2923,23 @@ function POSContent() {
 
   const activeCategory =
     menuCategories.find((c) => c.id === selectedCategory) || menuCategories[0] || { id: '', name: '', items: [] }
+  const categoriesWithItems = useMemo(() => menuCategories
+    .filter(cat => cat.items.some(item => item.price > 0))
+    .sort((a, b) => a.name.localeCompare(b.name, 'es')), [menuCategories])
+  const catalogTiles: CatalogTile[] = useMemo(() => [
+    ...(allCombos.length > 0 ? [{ kind: 'combos' as const, id: 'combos' }] : []),
+    ...(speedMode ? allCombos.map(combo => ({ kind: 'speed-combo' as const, id: `speed-${combo.id}`, combo })) : []),
+    ...categoriesWithItems.map(category => ({ kind: 'category' as const, id: category.id, category })),
+  ], [allCombos, speedMode, categoriesWithItems])
+  const categoryItems = useMemo(() => activeCategory.items.filter(item => item.price > 0), [activeCategory])
+  const filteredCategoryItems = useMemo(() => categoryItems.filter(item =>
+    !categorySearch || item.name.toLowerCase().includes(categorySearch.toLowerCase())), [categoryItems, categorySearch])
+  const normalizedMenuSearch = menuSearch.trim().toLowerCase()
+  const menuSearchResults: { item: MenuItem; category: string; catId: string; catColor: string }[] = useMemo(() => normalizedMenuSearch
+    ? menuCategories.flatMap(category => category.items
+      .filter(item => item.price > 0 && item.name.toLowerCase().includes(normalizedMenuSearch))
+      .map(item => ({ item, category: category.name, catId: category.id, catColor: category.color || 'bg-emerald-600' })))
+    : [], [menuCategories, normalizedMenuSearch])
 
   // Open modifier modal for a new item
   const handleMenuItemTap = useCallback((item: MenuItem, catId?: string) => {
@@ -3329,12 +3390,55 @@ function POSContent() {
   const iva = Math.round(subtotalAfterDiscount * getIvaRate() * 100) / 100
   const total = Math.round((subtotalAfterDiscount + iva) * 100) / 100
 
-  // Concurrency check: verify order hasn't been modified by another terminal
+  // LA MARCA DE CONCURRENCIA SALE DEL SERVIDOR O NO EXISTE.
+  //
+  // `checkOrderConflict` compara el `updated_at` del servidor contra la copia
+  // que guardó esta pantalla. Cuando la relectura fallaba, el código anterior
+  // rellenaba esa copia con `new Date().toISOString()` —el reloj de la
+  // terminal—, y dos relojes distintos no coinciden jamás. En AMALAY, el
+  // 2026-09-13: el mesero enviaba la comanda, tocaba Cobrar, y le salía «esta
+  // orden fue modificada por otro usuario» sin que nadie la hubiera tocado.
+  //
+  // Devolver `null` no afloja la protección contra doble cobro: con marca nula
+  // `checkOrderConflict` contesta «no hay conflicto detectable», y la defensa
+  // real sigue siendo la de `saveOrder` —`expected_revision` (OCC) y
+  // `save_operation_id` (idempotencia)—, que es justo lo que ya decía el
+  // comentario del `catch` de aquí abajo.
+  const marcaDelServidor = async (id: string): Promise<{ updatedAt: string | null; orderNumber?: number }> => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${id}&select=updated_at,order_number`, {
+        headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` },
+      })
+      if (!res.ok) return { updatedAt: null }
+      const rows = await res.json()
+      return { updatedAt: rows[0]?.updated_at ?? null, orderNumber: rows[0]?.order_number }
+    } catch { return { updatedAt: null } }
+  }
+
+  // ¿OTRA TERMINAL TOCÓ ESTA CUENTA? SE PREGUNTA POR REVISIÓN, NO POR RELOJ.
+  //
+  // Esto comparaba `updated_at`. El trigger `set_updated_at` lo mueve en CUALQUIER
+  // escritura sobre `pos_orders` (baseline_esquema.sql:1465, `NEW.updated_at =
+  // NOW()`, incondicional) — y cocina escribe: cada vez que el KDS palomea un
+  // platillo hace un PATCH de `kds_item_status`. En AMALAY cocina SÍ marca, así
+  // que la secuencia diaria era: el cajero abre la mesa, cocina palomea la
+  // entrada, el cajero toca Cobrar y recibe «esta orden fue modificada por otro
+  // usuario» — sin que nadie tocara dinero ni productos. Y no cedía al reintentar,
+  // porque la marca no se vuelve a leer mientras la mesa siga abierta en pantalla.
+  //
+  // `order_revision` sí distingue quién escribió qué: lo incrementan `r1_save_order`
+  // y `r1_add_items` —las escrituras que cambian dinero o renglones— y NO lo toca
+  // el KDS. Es además la misma revisión que usa el OCC de `saveOrder`, así que la
+  // guarda de pantalla y la del servidor pasan a hablar el mismo idioma.
+  //
+  // El mismo síntoma ya se había visto en el camino de Enviar: ahí la guarda se
+  // quitó entera con la nota «caused false positives from stale updatedAt». Aquí
+  // no se quita —cobrar sí necesita protección— se le cambia la pregunta.
   const checkOrderConflict = async (context: string): Promise<boolean> => {
-    if (!loadedOrderId || !loadedUpdatedAt) return false // no conflict possible
+    if (!loadedOrderId) return false // no conflict possible
     try {
       const checkRes = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${loadedOrderId}&select=updated_at,created_at,status&limit=1`,
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${loadedOrderId}&select=order_revision,status&limit=1`,
         { headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` }, cache: 'no-store', signal: AbortSignal.timeout(4000) }
       )
       if (checkRes.ok) {
@@ -3345,8 +3449,8 @@ function POSContent() {
             showToast(`Esta orden ya fue ${rows[0].status} por otro usuario`)
             return true
           }
-          const currentUpdatedAt = rows[0].updated_at || rows[0].created_at
-          if (currentUpdatedAt && currentUpdatedAt !== loadedUpdatedAt) {
+          const revisionEnServidor = rows[0].order_revision
+          if (Number.isInteger(revisionEnServidor) && revisionEnServidor !== orderRevision) {
             showToast('Esta orden fue modificada por otro usuario. Recarga la mesa.')
             return true
           }
@@ -3529,12 +3633,10 @@ function POSContent() {
               setOrderInventoryPending(_cid(), order.id, !inventory.success, order.mesa)
             } catch { /* the confirmed append remains; the persistent banner offers retry */ }
             showToast(`${conflictNewItems.length} item${conflictNewItems.length !== 1 ? 's' : ''} enviados`)
-            try {
-              const freshRes = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${order.id}&select=updated_at`, {
-                headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` },
-              })
-              if (freshRes.ok) { const rows = await freshRes.json(); if (rows[0]?.updated_at) setLoadedUpdatedAt(rows[0].updated_at) }
-            } catch {}
+            // Misma regla: si no se puede leer la del servidor, la marca queda en
+            // null. Conservar la vieja después de que NOSOTROS escribimos produce
+            // exactamente el mismo falso conflicto al cobrar.
+            setLoadedUpdatedAt((await marcaDelServidor(order.id)).updatedAt)
             sessionStorage.removeItem('pos_staff')
             sessionStorage.removeItem('pos_last_activity')
             navigateToMesaMap(); lock()
@@ -3547,12 +3649,10 @@ function POSContent() {
           // Only metadata (personas, notas, mesero) conflicted — refresh revision and let user retry
           if (saveResult.current_revision != null) {
             setOrderRevision(saveResult.current_revision)
-            try {
-              const freshRes = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${order.id}&select=updated_at`, {
-                headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` },
-              })
-              if (freshRes.ok) { const rows = await freshRes.json(); if (rows[0]?.updated_at) setLoadedUpdatedAt(rows[0].updated_at) }
-            } catch {}
+            // Misma regla: si no se puede leer la del servidor, la marca queda en
+            // null. Conservar la vieja después de que NOSOTROS escribimos produce
+            // exactamente el mismo falso conflicto al cobrar.
+            setLoadedUpdatedAt((await marcaDelServidor(order.id)).updatedAt)
           }
           showToast('Toca Enviar de nuevo')
         }
@@ -3784,22 +3884,14 @@ function POSContent() {
 
       setLoadedOrderId(orderId)
       // Read server's actual updated_at + order_number (triggers set these)
-      try {
-        const freshRes = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${orderId}&select=updated_at,order_number`, {
-          headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` },
-        })
-        if (freshRes.ok) {
-          const rows = await freshRes.json()
-          if (rows[0]?.updated_at) setLoadedUpdatedAt(rows[0].updated_at)
-          else setLoadedUpdatedAt(new Date().toISOString())
-          if (rows[0]?.order_number) setOrderNumber(rows[0].order_number)
-        } else setLoadedUpdatedAt(new Date().toISOString())
-      } catch { setLoadedUpdatedAt(new Date().toISOString()) }
+      const marcaTrasEnviar = await marcaDelServidor(orderId)
+      setLoadedUpdatedAt(marcaTrasEnviar.updatedAt)
+      if (marcaTrasEnviar.orderNumber) setOrderNumber(marcaTrasEnviar.orderNumber)
       // NO liberar el lock aquí: se mantiene hasta navegar → evita doble-envío/doble-lock
       // si el mesero toca Enviar dos veces.
       // Cache order locally so it loads instantly when returning to this mesa
       try {
-        localStorage.setItem(`pos_order_${mesa}`, JSON.stringify({ id: orderId, items: activeItems, mesero, personas, discount, notas: orderNotes, revision: saveResult.revision ?? orderRevision, updatedAt: new Date().toISOString(), ts: Date.now() }))
+        localStorage.setItem(`pos_order_${mesa}`, JSON.stringify({ id: orderId, items: activeItems, mesero, personas, discount, notas: orderNotes, revision: saveResult.revision ?? orderRevision, ...(marcaTrasEnviar.updatedAt ? { updatedAt: marcaTrasEnviar.updatedAt } : {}), ts: Date.now() }))
         localStorage.removeItem(`pos_draft_${mesa}`) // clear draft after successful save
       } catch {}
       // Tras enviar: al mapa de mesas AL INSTANTE + bloqueo (re-identificación por
@@ -4221,6 +4313,11 @@ function POSContent() {
       sessionStorage.removeItem('pos_last_activity')
       navigateToMesaMap()
       lock()
+      // ÚNICO PUNTO EN QUE ESTE COBRO QUEDÓ REGISTRADO. Lo devuelve para que el
+      // camino de MP Point sepa distinguir «se cobró» de «no se cobró»: todas
+      // las demás salidas de esta función son `return` sin valor (undefined), y
+      // ninguna lanza. Ver el comentario del `clearMpRecovery` más abajo.
+      return true
     } else {
       showToast('Error al cerrar cuenta')
       setSaving(false); operationLock.current = false
@@ -4515,9 +4612,52 @@ function POSContent() {
               className="w-11 sm:w-14 bg-transparent text-[var(--text-1)] text-base font-bold text-center border-none outline-none"
             />
           </div>
-          <select value={personas} onChange={(e) => setPersonas(Number(e.target.value))} className="flex-shrink-0 bg-[var(--line)] text-[var(--text-1)] rounded-lg px-2 sm:px-4 py-2 text-base sm:text-lg font-bold border border-[var(--line)] min-h-[48px]">
-            {Array.from({ length: 20 }, (_, i) => (<option key={i + 1} value={i + 1}>{i + 1}p</option>))}
-          </select>
+          {/* CUÁNTAS PERSONAS SE SIENTAN, DE UN TOQUE.
+              Esto era un <select> nativo con veinte opciones. En una caja táctil
+              eso despliega una lista que hay que arrastrar con el dedo, y las
+              opciones que no caben no existen (campo, AMALAY 2026-09-13: «tengo
+              que scrollear para ver cuántas personas escoger»). Ahora es un
+              botón que abre una cuadrícula: veinte números a la vista, de 64px,
+              sin una sola barra de desplazamiento. */}
+          <button
+            type="button"
+            onClick={() => setShowPersonas(true)}
+            aria-label={`Personas en la mesa: ${personas}`}
+            className="flex-shrink-0 flex items-center gap-1 bg-[var(--line)] text-[var(--text-1)] rounded-lg px-3 sm:px-4 text-base sm:text-lg font-bold border border-[var(--line)] min-h-[48px] active:scale-95 transition-transform"
+          >
+            {personas}p
+            <ChevronDown size={16} className="text-[var(--text-3)]" />
+          </button>
+          {showPersonas && (
+            <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4" onClick={() => setShowPersonas(false)}>
+              <div className="w-full max-w-2xl rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] p-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="text-lg font-bold text-[var(--text-1)]">¿Cuántas personas?</h3>
+                  <button type="button" onClick={() => setShowPersonas(false)}
+                    className="min-h-[56px] px-5 rounded-xl bg-[var(--line)] text-[var(--text-2)] font-bold active:scale-95 transition-transform">
+                    Cerrar
+                  </button>
+                </div>
+                <div className="grid grid-cols-5 gap-2">
+                  {Array.from({ length: 20 }, (_, i) => i + 1).map(n => (
+                    <button
+                      key={n}
+                      type="button"
+                      aria-current={n === personas}
+                      onClick={() => { setPersonas(n); setShowPersonas(false) }}
+                      className={`min-h-[64px] rounded-xl border text-xl font-extrabold tabular-nums active:scale-95 transition-transform ${
+                        n === personas
+                          ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--text-1)]'
+                          : 'border-[var(--line)] bg-[var(--surface)] text-[var(--text-2)]'
+                      }`}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
           {/* Mesero — BLOQUEADO a la identidad logueada (anti-fraude). Reasignar
               requiere PIN de gerente y queda en bitácora. */}
           {reassignMgr ? (
@@ -4568,6 +4708,25 @@ function POSContent() {
               <span className="truncate">{mesero || 'Sin mesero'}</span>
             </button>
           )}
+          {/* EL DINERO DE LA CUENTA, UNA SOLA VEZ.
+              La comanda tenía su propia cabecera repitiendo «Mesa N · Np · mesero»
+              —lo mismo que esta barra— y encima con un SEGUNDO campo de mesa que no
+              llevaba la guarda antifraude del de aquí: escribir un número ahí movía
+              los renglones sin enviar a otra mesa en silencio, que es el defecto de
+              CIERRE-DEFECTOS-2026-09-06 corregido en un campo y no en su copia.
+              Al fundir las dos cabeceras se recuperan ~59px de los 632 útiles y
+              desaparece el campo sin guarda. */}
+          <div className="ml-auto flex-shrink-0 text-right leading-tight">
+            <span className="block text-[var(--accent-ink)] font-extrabold text-xl font-mono tabular-nums tracking-tight">{formatMXN(total)}</span>
+            {requiereCaja() && lecturaCuentaCaja?.orden?.saldo != null && (
+              <span className="block text-[11px] text-[var(--text-3)]">
+                {/* «confirmado» no es relleno: separa el saldo que la Caja ya dio
+                    por bueno del total que esta pantalla calcula sola. El
+                    laboratorio lo verifica por ese texto. */}
+                Saldo confirmado en Caja: <span className="font-mono tabular-nums">{formatMXN(Number(lecturaCuentaCaja.orden.saldo))}</span>
+              </span>
+            )}
+          </div>
         </div>
         {/* Row 3: Mobile tab toggle (only visible on mobile) */}
         <div className="flex md:hidden border-t border-[var(--line)]/50">
@@ -4760,32 +4919,6 @@ function POSContent() {
       <div className="flex flex-1 overflow-hidden">
         {/* Left Panel -- Current Order (50% on tablet, full on mobile when active) */}
         <div className={`md:w-[50%] lg:w-[45%] md:flex flex-col border-r border-[var(--line)] bg-[var(--surface)] ${mobileView === 'order' ? 'flex w-full' : 'hidden'}`}>
-          {/* Order header — compact */}
-          <div className="px-3 py-1 border-b border-[var(--line)] bg-[var(--surface-2)]/50 flex-shrink-0">
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-bold flex items-center gap-1">
-                Mesa
-                <input
-                  type="number"
-                  value={mesa}
-                  onWheel={e => e.currentTarget.blur()}
-                  onChange={e => { const v = Number(e.target.value) || 1; setMesa(v); router.replace(`/pos?mesa=${v}`) }}
-                  min={1}
-                  max={999}
-                  className="w-14 text-center bg-transparent border border-[var(--line)] rounded-lg text-[var(--text-1)] font-bold text-base mx-1 py-0.5 focus:border-[var(--accent)] focus:outline-none"
-                />
-                <span className="text-[var(--text-3)] font-normal text-xs">{personas}p · {(mesero || '').split(' ')[0] || 'Sin mesero'}</span>
-              </h2>
-              <span className="text-[var(--accent-ink)] font-extrabold text-xl font-mono tabular-nums tracking-tight">{formatMXN(total)}</span>
-            </div>
-          </div>
-
-          {requiereCaja() && lecturaCuentaCaja?.orden?.saldo != null && (
-            <div className="px-3 py-1 text-sm text-[var(--text-3)]">
-              Saldo confirmado en Caja: {formatMXN(Number(lecturaCuentaCaja.orden.saldo))}
-            </div>
-          )}
-
           {/* Order items list — MAIN AREA, takes all available space */}
           <div className="flex-1 overflow-y-auto px-3 py-1 min-h-0 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
             {orderItems.length === 0 ? (
@@ -4892,7 +5025,14 @@ function POSContent() {
                           letra y las etiquetas inline se encimaban con el asiento. El nombre
                           tiene ancho mínimo, máximo dos líneas, y las etiquetas van en su
                           propia fila. */}
-                      <div className="flex-1 min-w-[140px]">
+                      {/* El piso de 140px arreglaba 1600px y rompía 1024px: la fila
+                          mide contador(116) + silla(60) + importe(80) + dos botones(88)
+                          + huecos ≈ 324px de los ~436 útiles, así que al nombre le
+                          quedan ~112. Con 140 de mínimo la fila se pasaba ~28px y lo
+                          que se salía por la derecha eran justo «Transferir platillo» y
+                          «Cancelar item» (AMALAY, 2026-09-13). Con 90 cabe en 1024 y
+                          sigue sin partirse letra por letra en 1600. */}
+                      <div className="flex-1 min-w-[90px]">
                         <p className={`font-medium text-sm leading-tight break-words line-clamp-2 ${isVoided ? 'line-through text-[var(--text-4)]' : isCancelled ? 'line-through text-[var(--crit-ink)]' : ''}`} title={item.nombre}>
                           {item.nombre}
                         </p>
@@ -5023,52 +5163,13 @@ function POSContent() {
 
           {/* Discount + Order notes + Totals — fixed at bottom, compact */}
           <div className="border-t border-[var(--line)] px-3 py-1 bg-[var(--surface-2)]/50 flex-shrink-0">
-            {/* Tiempos row */}
-            <div className="flex items-center gap-1 mb-1">
-              <button
-                onClick={addTiempoSeparator}
-                disabled={activeItems.filter(i => !isTiempoItem(i)).length === 0}
-                className="flex items-center gap-1.5 px-4 min-h-[48px] rounded-lg bg-[var(--warn-soft)] border border-[color-mix(in_srgb,var(--warn)_40%,transparent)] hover:bg-[var(--warn-soft)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--warn-ink)] text-sm font-semibold transition-colors"
-                title="Insertar separador de tiempo"
-              >
-                <Clock size={18} />
-                Tiempo
-              </button>
-              {orderItems.some(isTiempoItem) && (
-                <button
-                  onClick={() => { if (!accionPendienteEnCaja('La impresión por tiempos')) setShowFirebutton(true) }}
-                  className="flex items-center gap-1.5 px-4 min-h-[48px] rounded-lg bg-orange-600 hover:bg-orange-500 text-white text-sm font-bold transition-colors"
-                  title="Impresión por tiempos — disparar siguiente tiempo a cocina"
-                >
-                  <Flame size={18} />
-                  Disparar
-                </button>
-              )}
-              <div className="flex-1" />
-            </div>
-            {/* Inline tools row: discount, notes, void */}
-            <div className="flex items-center gap-1 mb-1">
-              <button
-                onClick={() => { if (!accionPendienteEnCaja('Los descuentos y cortesías')) setShowDiscount(true) }}
-                disabled={orderItems.length === 0 || !can('descuentos_ordenes_pct')}
-                className="flex items-center gap-1.5 px-4 min-h-[48px] rounded-lg bg-[var(--line)] hover:bg-[var(--line)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--text-4)] text-sm font-semibold transition-colors"
-                title={!can('descuentos_ordenes_pct') ? 'Sin permiso para descuentos' : 'Aplicar descuento'}
-              >
-                <Percent size={16} />
-                {discount > 0 ? `-${formatMXN(discount)}` : 'Desc'}
-              </button>
-              {discount > 0 && (
-                <button
-                  onClick={() => {
-                    logAudit({ order_id: orderId, action: 'discount_removed', actor: mesero, mesa, details: { amount: discount } })
-                    setDiscount(0)
-                    setAppliedPromo(null)
-                  }}
-                  className="w-12 min-h-[48px] flex items-center justify-center rounded-lg bg-[var(--crit-soft)] border border-[color-mix(in_srgb,var(--crit)_40%,transparent)] hover:bg-[var(--crit-soft)] text-[var(--crit-ink)] transition-colors"
-                >
-                  <X size={18} />
-                </button>
-              )}
+            {/* La tira de herramientas eran DOS filas de botones de 48px —104px de los
+                632 útiles de una caja de 1024×768— y cinco de ellos sólo decían qué
+                hacían en un `title`, o sea en hover. En una caja táctil no hay hover:
+                el mesero veía ⇄ y ⛨ sin saber que eran «Transferir mesa» y «Anular
+                orden». Ahora viven en una hoja con su nombre a la vista, a un toque,
+                y la comanda recupera la altura. Ninguna función se quitó. */}
+            <div className="flex items-center gap-2 mb-1">
               {/* Order notes — inline input */}
               <div className="flex-1 flex items-center gap-1 min-w-0">
                 <StickyNote size={12} className="text-[var(--text-3)] flex-shrink-0" />
@@ -5081,20 +5182,87 @@ function POSContent() {
                 />
               </div>
               <button
+                type="button"
+                onClick={() => setShowFunciones(true)}
+                className="min-h-[56px] px-4 flex items-center justify-center gap-2 rounded-xl bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-2)] text-sm font-bold active:scale-95 transition-transform flex-shrink-0"
+              >
+                <Wrench size={18} />
+                Funciones
+              </button>
+            </div>
+            {showFunciones && (
+              <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 p-3" onClick={() => setShowFunciones(false)}>
+                <div className="w-full max-w-3xl rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] p-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+                  <div className="mb-3 flex items-center justify-between">
+                    <h3 className="text-lg font-bold text-[var(--text-1)]">Funciones de la cuenta</h3>
+                    <button type="button" onClick={() => setShowFunciones(false)}
+                      className="min-h-[56px] px-5 rounded-xl bg-[var(--line)] text-[var(--text-2)] font-bold active:scale-95 transition-transform">
+                      Cerrar
+                    </button>
+                  </div>
+                  {/* Elegir una función cierra la hoja: nadie quiere volver a buscar
+                      el botón «Cerrar» después de pedir el cajón. El manejador de
+                      cada botón corre primero y esto sube por burbujeo. */}
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" onClick={() => setShowFunciones(false)}>
+              <button
+                onClick={addTiempoSeparator}
+                disabled={activeItems.filter(i => !isTiempoItem(i)).length === 0}
+                className="flex items-center gap-1.5 min-h-[64px] px-4 rounded-xl bg-[var(--warn-soft)] border border-[color-mix(in_srgb,var(--warn)_40%,transparent)] hover:bg-[var(--warn-soft)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--warn-ink)] text-sm font-semibold transition-colors"
+                title="Insertar separador de tiempo"
+              >
+                <Clock size={18} />
+                Tiempo
+              </button>
+              {orderItems.some(isTiempoItem) && (
+                <button
+                  onClick={() => { if (!accionPendienteEnCaja('La impresión por tiempos')) setShowFirebutton(true) }}
+                  className="flex items-center gap-1.5 min-h-[64px] px-4 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-sm font-bold transition-colors"
+                  title="Impresión por tiempos — disparar siguiente tiempo a cocina"
+                >
+                  <Flame size={18} />
+                  Disparar
+                </button>
+              )}
+              <div className="flex-1" />
+              <button
+                onClick={() => { if (!accionPendienteEnCaja('Los descuentos y cortesías')) setShowDiscount(true) }}
+                disabled={orderItems.length === 0 || !can('descuentos_ordenes_pct')}
+                className="flex items-center gap-1.5 min-h-[64px] px-4 rounded-xl bg-[var(--line)] hover:bg-[var(--line)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--text-4)] text-sm font-semibold transition-colors"
+                title={!can('descuentos_ordenes_pct') ? 'Sin permiso para descuentos' : 'Aplicar descuento'}
+              >
+                <Percent size={16} />
+                {discount > 0 ? `-${formatMXN(discount)}` : 'Desc'}
+              </button>
+              {discount > 0 && (
+                <button
+                  onClick={() => {
+                    logAudit({ order_id: orderId, action: 'discount_removed', actor: mesero, mesa, details: { amount: discount } })
+                    setDiscount(0)
+                    setAppliedPromo(null)
+                  }}
+                  className="min-h-[64px] px-4 flex items-center justify-center gap-2 text-sm font-bold rounded-lg bg-[var(--crit-soft)] border border-[color-mix(in_srgb,var(--crit)_40%,transparent)] hover:bg-[var(--crit-soft)] text-[var(--crit-ink)] transition-colors"
+                >
+                  <X size={18} />
+                <span>Quitar descuento</span>
+                </button>
+              )}
+              <button
                 onClick={() => { if (escribeEnCaja) { setShowCajonCaja(true); return }; if (bloqueaLegacyCaja) { showToast('Caja debe confirmar la conexión antes de solicitar la apertura.'); return }; if (!isMobileRestricted) { openCashDrawer(); showToast('Cajón abierto') } }}
                 disabled={isMobileRestricted}
-                className="w-12 min-h-[48px] flex items-center justify-center rounded-lg bg-[var(--surface-2)] hover:bg-[var(--raised)] disabled:opacity-30 text-[var(--text-3)] transition-colors"
+                className="min-h-[64px] px-4 flex items-center justify-center gap-2 text-sm font-bold rounded-lg bg-[var(--surface-2)] hover:bg-[var(--raised)] disabled:opacity-30 text-[var(--text-3)] transition-colors"
                 title={isMobileRestricted ? 'Solo disponible en terminal de caja' : 'Abrir cajón'}
               >
                 <Banknote size={18} />
+                <span>Abrir cajón</span>
               </button>
               <button
                 onClick={() => { if (!accionPendienteEnCaja('Los retiros y depósitos') && !isMobileRestricted) setShowCashMovement(true) }}
                 disabled={isMobileRestricted}
-                className="w-12 min-h-[48px] flex items-center justify-center rounded-lg bg-[var(--surface-2)] hover:bg-[var(--raised)] disabled:opacity-30 text-[var(--text-3)] transition-colors"
+                className="min-h-[64px] px-4 flex items-center justify-center gap-2 text-sm font-bold rounded-lg bg-[var(--surface-2)] hover:bg-[var(--raised)] disabled:opacity-30 text-[var(--text-3)] transition-colors"
                 title={isMobileRestricted ? 'Solo disponible en terminal de caja' : 'Retiro / Deposito'}
               >
                 <DollarSign size={18} />
+                <span>Retiro / Depósito</span>
               </button>
               <button
                 onClick={() => {
@@ -5115,10 +5283,11 @@ function POSContent() {
                   showToast('Reimpresión de ticket')
                 }}
                 disabled={orderItems.length === 0}
-                className="w-12 min-h-[48px] flex items-center justify-center rounded-lg bg-[var(--surface-2)] hover:bg-[var(--raised)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--text-3)] transition-colors"
+                className="min-h-[64px] px-4 flex items-center justify-center gap-2 text-sm font-bold rounded-lg bg-[var(--surface-2)] hover:bg-[var(--raised)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--text-3)] transition-colors"
                 title="Reimprimir ticket"
               >
                 <Printer size={18} />
+                <span>Reimprimir ticket</span>
               </button>
               <button
                 onClick={() => {
@@ -5167,21 +5336,25 @@ function POSContent() {
                   })
                 }}
                 disabled={orderItems.length === 0}
-                className="w-12 min-h-[48px] flex items-center justify-center rounded-lg bg-[var(--info-soft)] hover:bg-[var(--info-soft)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--info-ink)] transition-colors"
+                className="min-h-[64px] px-4 flex items-center justify-center gap-2 text-sm font-bold rounded-lg bg-[var(--info-soft)] hover:bg-[var(--info-soft)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--info-ink)] transition-colors"
                 title="Transferir mesa"
               >
                 <ArrowRightLeft size={18} />
+                <span>Transferir mesa</span>
               </button>
               <button
                 onClick={() => setShowVoidOrder(true)}
                 disabled={orderItems.length === 0}
-                className="w-12 min-h-[48px] flex items-center justify-center rounded-lg bg-[var(--crit-soft)] hover:bg-[var(--crit-soft)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--crit-ink)] transition-colors"
+                className="min-h-[64px] px-4 flex items-center justify-center gap-2 text-sm font-bold rounded-lg bg-[var(--crit-soft)] hover:bg-[var(--crit-soft)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--crit-ink)] transition-colors"
                 title="Anular orden"
               >
                 <ShieldAlert size={18} />
+                <span>Anular orden</span>
               </button>
-            </div>
-
+                  </div>
+                </div>
+              </div>
+            )}
             {/* Promos available */}
             {availablePromos.length > 0 && discount === 0 && (
               <div className="flex items-center gap-1.5 mb-1.5 overflow-x-auto">
@@ -5222,61 +5395,68 @@ function POSContent() {
             </div>
           </div>
 
-          {/* Action buttons — compact for tablets */}
-          <div className={`px-3 py-1 border-t border-[var(--line)] gap-2 flex-shrink-0 ${escribeEnCaja ? 'grid grid-cols-3' : 'flex'}`}>
+          {/* Seis botones del mismo peso no dicen cuál sigue. Las cuatro secundarias
+              —Guardar, Verificar, Cuenta, Split— van arriba a 52px; abajo, solas y
+              a 64px, las dos que mueven la operación: Enviar la comida y Cobrar el
+              dinero. Ninguna se quitó ni cambió de comportamiento. */}
+          <div className="px-3 py-2 border-t border-[var(--line)] flex flex-col gap-2 flex-shrink-0">
             {orderItems.length === 0 ? (
-              <button
+<button
                 onClick={() => navigateToMesaMap()}
-                className="flex-1 flex items-center justify-center gap-2 bg-[var(--surface-2)] hover:bg-[var(--text-4)] active:bg-[var(--raised)] active:scale-[0.97] text-[var(--text-1)] font-bold py-2.5 rounded-xl text-base transition-all min-h-[52px]"
+                className="flex-1 flex items-center justify-center gap-2 bg-[var(--surface-2)] hover:bg-[var(--text-4)] active:bg-[var(--raised)] active:scale-[0.97] text-[var(--text-1)] font-bold py-2 rounded-xl text-lg transition-all min-h-[64px]"
               >
                 <ArrowLeft size={18} />
                 Salir
               </button>
             ) : (<>
-            {escribeEnCaja && <button onClick={() => guardarOperacionCaja(false)}
+              <div className={`grid gap-2 ${escribeEnCaja ? 'grid-cols-4' : 'grid-cols-3'}`}>
+                {escribeEnCaja && <button onClick={() => guardarOperacionCaja(false)}
               disabled={activeItems.length === 0 || saving || cuentaCajaBloqueada}
-              className="flex-1 min-h-[52px] rounded-xl bg-slate-700 px-3 py-2.5 font-bold text-white disabled:opacity-40">Guardar</button>}
-            <button
+              className="min-h-[52px] rounded-xl bg-slate-700 px-3 py-2.5 font-bold text-white disabled:opacity-40">Guardar</button>}
+<button
               onClick={() => setShowVerify(true)}
               disabled={activeItems.length === 0}
-              className="flex-[0.5] flex items-center justify-center gap-1 bg-cyan-600 hover:bg-cyan-500 active:bg-cyan-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-2.5 rounded-xl text-sm transition-all min-h-[52px]"
+              className="flex items-center justify-center gap-1 bg-cyan-600 hover:bg-cyan-500 active:bg-cyan-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-2 rounded-xl text-sm transition-all min-h-[52px]"
             >
               <ClipboardCheck size={16} />
               Verificar
             </button>
-            <button
-              onClick={handleSendToKitchen}
-              disabled={activeItems.length === 0 || saving || loadingMesa || cuentaCajaBloqueada}
-              className="flex-1 flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-2.5 rounded-xl text-base transition-all min-h-[52px]"
-            >
-              {saving ? <div className="w-[18px] h-[18px] border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Send size={18} />}
-              {saving ? 'Enviando' : sentToKitchen ? 'Enviado' : 'Enviar'}
-            </button>
-            <button
+<button
               onClick={handlePreTicket}
               disabled={activeItems.length === 0 || saving || loadingMesa || cuentaCajaBloqueada}
-              className="flex-[0.6] flex items-center justify-center gap-1 bg-amber-600 hover:bg-amber-500 active:bg-amber-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-2.5 rounded-xl text-base transition-all min-h-[52px]"
+              className="flex items-center justify-center gap-1 bg-amber-600 hover:bg-amber-500 active:bg-amber-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-2 rounded-xl text-sm transition-all min-h-[52px]"
             >
               <Receipt size={16} />
               Cuenta
             </button>
-            <button
+<button
               onClick={async () => { if (escribeEnCaja) { await handleCloseOrder(); return }; if (accionPendienteEnCaja('La división anterior de cuenta')) return; if (!await validarCuentaCaja()) return; if (activeItems.length >= 2) { setSplitMode(null); setSplitCount(0); setSplitParejoN(0); setSplitAssignments({}); setShowSplit(true) } else handleCloseOrder() }}
               disabled={activeItems.length === 0 || saving || cuentaCajaBloqueada || !can('cerrar_cuentas')}
-              className="flex-[0.4] flex items-center justify-center bg-purple-600 hover:bg-purple-500 active:bg-purple-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-2.5 rounded-xl text-base transition-all min-h-[52px]"
+              className="flex items-center justify-center bg-purple-600 hover:bg-purple-500 active:bg-purple-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-2 rounded-xl text-sm transition-all min-h-[52px]"
               title={!can('cerrar_cuentas') ? 'Sin permiso para cobrar' : ''}
             >
               Split
             </button>
-            <button
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+<button
+              onClick={handleSendToKitchen}
+              disabled={activeItems.length === 0 || saving || loadingMesa || cuentaCajaBloqueada}
+              className="flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-2 rounded-xl text-lg transition-all min-h-[64px]"
+            >
+              {saving ? <div className="w-[18px] h-[18px] border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Send size={18} />}
+              {saving ? 'Enviando' : sentToKitchen ? 'Enviado' : 'Enviar'}
+            </button>
+<button
               onClick={handleCloseOrder}
               disabled={activeItems.length === 0 || saving || cuentaCajaBloqueada || !can('cerrar_cuentas')}
-              className="flex-1 flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-2.5 rounded-xl text-base transition-all min-h-[52px]"
+              className="flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-2 rounded-xl text-lg transition-all min-h-[64px]"
               title={!can('cerrar_cuentas') ? 'Sin permiso para cobrar' : ''}
             >
               <CreditCard size={18} />
               {!can('cerrar_cuentas') ? 'Sin permiso' : 'Cobrar'}
             </button>
+              </div>
             </>)}
           </div>
         </div>
@@ -5345,75 +5525,51 @@ function POSContent() {
 
           {menuSearch.trim() ? (
             /* Search results across all categories */
-            <div className="flex-1 overflow-y-auto p-3 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
-              {(() => {
-                const term = menuSearch.toLowerCase()
-                const results: { item: MenuItem; category: string; catId: string }[] = []
-                for (const cat of menuCategories) {
-                  for (const item of cat.items) {
-                    if (item.price > 0 && item.name.toLowerCase().includes(term)) {
-                      results.push({ item, category: cat.name, catId: cat.id })
-                    }
-                  }
-                }
-                if (results.length === 0) {
-                  return <p className="text-[var(--text-2)] text-center py-8">Sin resultados para &ldquo;{menuSearch}&rdquo;</p>
-                }
-                return (
-                  <div className="space-y-2">
-                    {results.map(({ item, category, catId }) => {
-                      const catColor = menuCategories.find(c => c.id === catId)?.color || 'bg-emerald-600'
-                      return (
-                        <button
-                          key={item.id}
-                          onClick={() => { handleMenuItemTap(item, catId); setMobileView('order') }}
-                          className="w-full bg-[var(--surface-2)] hover:bg-[var(--line)] active:bg-[var(--accent-soft)] border border-[var(--line)] rounded-xl text-left transition-colors flex items-center min-h-[64px] overflow-hidden"
-                        >
-                          <div className={`w-1.5 self-stretch flex-shrink-0 rounded-l-lg ${catColor}`} />
-                          <div className="flex items-center justify-between flex-1 px-3 py-3">
-                            <div>
-                              <span className="font-semibold text-base text-[var(--text-1)]">{item.name}</span>
-                              <span className="text-[var(--text-2)] text-xs ml-2">{category}</span>
-                            </div>
-                            <span className="text-[var(--accent-ink)] font-bold text-lg font-mono tabular-nums">{formatMXN(item.price)}</span>
-                          </div>
-                        </button>
-                      )
-                    })}
-                  </div>
-                )
-              })()}
+            <div className="flex flex-1 min-h-0 flex-col overflow-hidden p-3">
+              <RejillaPaginada
+                key={normalizedMenuSearch}
+                elementos={menuSearchResults}
+                claveDe={({ item }) => item.id}
+                altoDeCelda={68}
+                expandirFilas={false}
+                separacion={8}
+                nombreDeElementos="resultados"
+                clasesDeRejilla="grid grid-cols-1 gap-2 content-start"
+                vacio={<p className="text-[var(--text-2)] text-center py-8">Sin resultados para &ldquo;{menuSearch}&rdquo;</p>}
+                pintar={({ item, category, catId, catColor }) => (
+                    <button
+                      onClick={() => { handleMenuItemTap(item, catId); setMobileView('order') }}
+                      className="h-full w-full bg-[var(--surface-2)] hover:bg-[var(--line)] active:bg-[var(--accent-soft)] active:scale-[0.98] border border-[var(--line)] rounded-xl text-left transition-all flex items-center overflow-hidden"
+                    >
+                      <div className={`w-1.5 self-stretch flex-shrink-0 rounded-l-lg ${catColor}`} />
+                      <div className="flex items-center justify-between flex-1 px-3 py-2">
+                        <div className="min-w-0">
+                          <span className="block truncate font-semibold text-base text-[var(--text-1)]">{item.name}</span>
+                          <span className="block truncate text-[var(--text-2)] text-xs">{category}</span>
+                        </div>
+                        <span className="ml-3 flex-shrink-0 text-[var(--accent-ink)] font-bold text-lg font-mono tabular-nums">{formatMXN(item.price)}</span>
+                      </div>
+                    </button>
+                )}
+              />
             </div>
           ) : (
             <>
-              {/* Category grid — full area, alphabetical left→right, large touch targets */}
-              <div className="flex-1 bg-[var(--surface-2)]/50 p-1 overflow-hidden">
+              {/* En catálogo el espacio sobrante no debe inflar trece botones hasta
+                  convertirlos en tres franjas gigantes. Las filas se quedan densas
+                  y arriba; si un restaurante tiene más categorías, aparecen páginas. */}
+              <div className="flex flex-1 min-h-0 flex-col bg-[var(--surface-2)]/50 p-2 overflow-hidden">
                 {catalogoError && <p role="alert" className="p-3 text-[var(--warn-ink)]">{catalogoError}</p>}
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-1 h-full" style={{ gridAutoRows: '1fr' }}>
-                  {allCombos.length > 0 && (
-                    <button
-                      onClick={() => setShowComboModal(true)}
-                      className="px-3 py-3 rounded-xl text-sm font-bold text-center transition-all min-h-[72px] leading-tight flex flex-col items-center justify-center gap-0.5 bg-gradient-to-br from-amber-600 to-orange-600 text-white hover:opacity-100 active:scale-95 ring-2 ring-amber-400/30"
-                    >
-                      <Layers size={18} />
-                      <span>Combos</span>
-                      <span className="text-[10px] font-normal opacity-70">{allCombos.length}</span>
-                    </button>
-                  )}
-                  {/* Speed screen (mostrador): cada combo es un botón de UN toque al
-                      frente del grid — la venta de un fast food vive aquí. */}
-                  {speedMode && allCombos.map(combo => (
-                    <button
-                      key={`speed-${combo.id}`}
-                      onClick={() => addComboToOrder(combo)}
-                      className="px-3 py-3 rounded-xl text-sm font-bold text-center transition-all min-h-[72px] leading-tight flex flex-col items-center justify-center gap-0.5 bg-gradient-to-br from-amber-500/90 to-orange-500/90 text-white hover:opacity-100 active:scale-95"
-                    >
-                      <span className="leading-tight">{combo.name}</span>
-                      <span className="text-xs font-mono tabular-nums opacity-90">${Math.round(combo.price)}</span>
-                    </button>
-                  ))}
-                  {menuCategories.length === 0 && (
-                    <div className="col-span-full flex flex-col items-center justify-center py-16 text-center">
+                <RejillaPaginada
+                  elementos={catalogTiles}
+                  claveDe={tile => tile.id}
+                  altoDeCelda={88}
+                  expandirFilas={false}
+                  separacion={8}
+                  nombreDeElementos="categorías"
+                  clasesDeRejilla="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 content-start"
+                  vacio={(
+                    <div className="flex flex-1 flex-col items-center justify-center py-16 text-center">
                       <Package size={48} className="text-[var(--text-3)] mb-4 opacity-40" />
                       <p className="text-lg font-semibold text-[var(--text-1)] mb-2">{catalogoError ? 'Menú no disponible' : 'Sin menú configurado'}</p>
                       <p className="text-sm text-[var(--text-3)] max-w-md">
@@ -5421,72 +5577,109 @@ function POSContent() {
                       </p>
                     </div>
                   )}
-                  {menuCategories.filter(cat => cat.items.some(i => i.price > 0))
-                    .sort((a, b) => a.name.localeCompare(b.name, 'es'))
-                    .map((cat) => {
-                      const catColor = (cat as { color?: string }).color || 'bg-[var(--surface-2)]'
-                      const itemCount = cat.items.filter(i => i.price > 0).length
-                      return (
-                        <button
-                          key={cat.id}
-                          onClick={() => setSelectedCategory(cat.id)}
-                          className={`px-3 py-3 rounded-xl text-sm font-bold text-center transition-all min-h-[72px] leading-tight flex flex-col items-center justify-center gap-0.5 ${catColor} opacity-85 text-[var(--text-1)] hover:opacity-100 active:scale-95`}
-                        >
-                          <span className="opacity-90">{catIconFor(cat.name, 22)}</span>
-                          <span>{cat.name}</span>
-                          <span className="text-[10px] font-normal opacity-70">{itemCount}</span>
-                        </button>
-                      )
-                    })}
-                </div>
+                  pintar={tile => {
+                    if (tile.kind === 'combos') return (
+                    <button
+                      onClick={() => setShowComboModal(true)}
+                      className="h-full w-full px-2 py-2 rounded-xl text-sm font-bold text-center transition-all leading-tight flex flex-col items-center justify-center gap-0.5 bg-gradient-to-br from-amber-600 to-orange-600 text-white hover:opacity-100 active:scale-95 ring-2 ring-amber-400/30"
+                    >
+                      <Layers size={18} />
+                      <span>Combos</span>
+                      <span className="text-[10px] font-normal opacity-70">{allCombos.length}</span>
+                    </button>
+                    )
+                    if (tile.kind === 'speed-combo') return (
+                    <button
+                      onClick={() => addComboToOrder(tile.combo)}
+                      className="h-full w-full px-2 py-2 rounded-xl text-sm font-bold text-center transition-all leading-tight flex flex-col items-center justify-center gap-0.5 bg-gradient-to-br from-amber-500/90 to-orange-500/90 text-white hover:opacity-100 active:scale-95"
+                    >
+                      <span className="leading-tight line-clamp-2">{tile.combo.name}</span>
+                      <span className="text-xs font-mono tabular-nums opacity-90">${Math.round(tile.combo.price)}</span>
+                    </button>
+                    )
+                    const cat = tile.category
+                    const catColor = (cat as { color?: string }).color || 'bg-[var(--surface-2)]'
+                    const itemCount = cat.items.filter(item => item.price > 0).length
+                    return (
+                      <button
+                        onClick={event => {
+                          categoryTriggerRef.current = event.currentTarget
+                          setSelectedCategory(cat.id)
+                        }}
+                        className={`h-full w-full px-2 py-2 rounded-xl text-sm font-bold text-center transition-all leading-tight flex flex-col items-center justify-center gap-0.5 ${catColor} opacity-85 text-[var(--text-1)] hover:opacity-100 active:scale-95`}
+                      >
+                        <span className="opacity-90">{catIconFor(cat.name, 22)}</span>
+                        <span className="line-clamp-2">{cat.name}</span>
+                        <span className="text-[10px] font-normal opacity-70">{itemCount}</span>
+                      </button>
+                    )
+                  }}
+                />
               </div>
 
               {/* Menu items — centered modal overlay on category tap */}
               {selectedCategory && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => { setSelectedCategory(''); setCategorySearch('') }}>
-                  <div className={`bg-[var(--panel)] rounded-2xl border border-[var(--line)] shadow-2xl w-[96vw] max-w-[1200px] overflow-hidden flex flex-col ${activeCategory.items.filter(i => i.price > 0).length > 15 ? 'h-[90vh]' : 'max-h-[90vh]'}`} onClick={e => e.stopPropagation()}>
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={cerrarCategoria}>
+                  <div role="dialog" aria-modal="true" aria-labelledby="titulo-categoria-pos"
+                    className="bg-[var(--panel)] rounded-2xl border border-[var(--line)] shadow-2xl w-[96vw] max-w-[1200px] h-[90dvh] overflow-hidden flex flex-col"
+                    onClick={e => e.stopPropagation()}>
                     <div className={`flex items-center justify-between px-4 py-2 border-b border-[rgba(255,255,255,0.08)] ${(activeCategory as { color?: string }).color || 'bg-emerald-600'}`}>
-                      <h3 className="text-[var(--text-1)] font-bold text-lg">{activeCategory.name} <span className="text-[var(--text-1)]/60 text-sm font-normal ml-2">{activeCategory.items.filter(i => i.price > 0).length} platillos</span></h3>
-                      <button onClick={() => { setSelectedCategory(''); setCategorySearch('') }} className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center text-white text-2xl font-bold hover:bg-white/30 active:scale-95">&times;</button>
+                      <h3 id="titulo-categoria-pos" className="text-[var(--text-1)] font-bold text-lg">{activeCategory.name} <span className="text-[var(--text-1)]/60 text-sm font-normal ml-2">{categoryItems.length} platillos</span></h3>
+                      <button onClick={cerrarCategoria} className="min-h-14 px-4 rounded-xl bg-white/20 flex items-center justify-center gap-2 text-white text-sm font-bold hover:bg-white/30 active:scale-95">
+                        <X size={20} /> Cerrar
+                      </button>
                     </div>
-                    {activeCategory.items.filter(i => i.price > 0).length > 30 && (
+                    {categoryItems.length > 30 && (
                       <div className="px-3 pt-2">
                         <input
                           type="text"
                           value={categorySearch}
                           onChange={e => setCategorySearch(e.target.value)}
                           placeholder="Buscar en esta categoría..."
-                          className="w-full bg-[var(--surface-2)] border border-[var(--line)] rounded-lg px-3 py-2 text-[var(--text-1)] text-sm placeholder:text-[var(--text-4)] focus:outline-none focus:border-[var(--accent)]"
+                          className="w-full min-h-14 bg-[var(--surface-2)] border border-[var(--line)] rounded-xl px-4 py-2 text-[var(--text-1)] text-base placeholder:text-[var(--text-4)] focus:outline-none focus:border-[var(--accent)]"
                           autoFocus
                         />
                       </div>
                     )}
-                    <div className="flex-1 overflow-y-auto p-2 overscroll-contain pos-fat-scroll flex flex-col" style={{ WebkitOverflowScrolling: 'touch' }}>
-                      <div className="grid grid-cols-3 md:grid-cols-5 gap-2 flex-1" style={{ gridAutoRows: 'minmax(80px, 150px)', minHeight: 0 }}>
-                {activeCategory.items.filter(item => item.price > 0 && (!categorySearch || item.name.toLowerCase().includes(categorySearch.toLowerCase()))).map((item) => {
-                    const isOOS = outOfStockItems.has(item.id)
-                    return (
-                    <button
-                      key={item.id}
-                      onClick={() => { if (isOOS) { showToast(`${item.name} — AGOTADO`); return } handleMenuItemTap(item, activeCategory.id); setSelectedCategory(''); setMobileView('order') }}
-                      className={`bg-[var(--surface-2)] hover:bg-[var(--raised)] active:scale-[0.97] border rounded-xl text-left transition-all flex overflow-hidden relative shadow-sm ${
-                        isOOS
-                          ? 'border-[color-mix(in_srgb,var(--crit)_40%,transparent)] opacity-50 cursor-not-allowed'
-                          : (item as MenuItem & { promo?: boolean }).promo
-                          ? 'border-[var(--accent-line)] ring-1 ring-[var(--accent-soft)]'
-                          : 'border-[var(--line-soft)] hover:border-[var(--accent-line)]'
-                      }`}
-                    >
-                      <div className={`w-1.5 flex-shrink-0 rounded-l-2xl ${isOOS ? 'bg-[var(--crit)]' : (activeCategory as { color?: string }).color || 'bg-emerald-600'}`} />
-                      {isOOS && <span className="absolute top-2 right-2 bg-[var(--crit)] text-white text-[10px] font-black px-1.5 py-0.5 rounded-md uppercase tracking-wide">Agotado</span>}
-                      <div className="flex flex-col justify-between px-3 py-2.5 flex-1">
-                        <span className={`font-semibold text-sm leading-snug ${isOOS ? 'text-[var(--text-4)] line-through' : 'text-[var(--text-1)]'}`}>{item.name}</span>
-                        <span className={`font-bold text-base mt-1 font-mono tabular-nums ${isOOS ? 'text-[var(--crit-ink)]' : 'text-[var(--accent-ink)]'}`}>${Math.round(item.price)}</span>
-                      </div>
-                    </button>
-                    )
-                  })}
-                      </div>
+                    <div className="flex flex-1 min-h-0 flex-col overflow-hidden p-2">
+                      <RejillaPaginada
+                        key={`${activeCategory.id}:${categorySearch}`}
+                        elementos={filteredCategoryItems}
+                        claveDe={item => item.id}
+                        altoDeCelda={96}
+                        expandirFilas={false}
+                        separacion={8}
+                        nombreDeElementos="platillos"
+                        clasesDeRejilla="grid grid-cols-3 md:grid-cols-5 gap-2 content-start"
+                        vacio={<p className="text-[var(--text-2)] text-center py-8">Sin platillos que coincidan con la búsqueda.</p>}
+                        pintar={item => {
+                          const isOOS = outOfStockItems.has(item.id)
+                          return (
+                            <button
+                              onClick={() => {
+                                if (isOOS) { showToast(`${item.name} — AGOTADO`); return }
+                                handleMenuItemTap(item, activeCategory.id)
+                                cerrarCategoria()
+                                setMobileView('order')
+                              }}
+                              className={`h-full w-full bg-[var(--surface-2)] hover:bg-[var(--raised)] active:scale-[0.97] border rounded-xl text-left transition-all flex overflow-hidden relative shadow-sm ${
+                                isOOS
+                                  ? 'border-[color-mix(in_srgb,var(--crit)_40%,transparent)] opacity-50 cursor-not-allowed'
+                                  : (item as MenuItem & { promo?: boolean }).promo
+                                  ? 'border-[var(--accent-line)] ring-1 ring-[var(--accent-soft)]'
+                                  : 'border-[var(--line-soft)] hover:border-[var(--accent-line)]'
+                              }`}
+                            >
+                              <div className={`w-1.5 flex-shrink-0 rounded-l-2xl ${isOOS ? 'bg-[var(--crit)]' : (activeCategory as { color?: string }).color || 'bg-emerald-600'}`} />
+                              {isOOS && <span className="absolute top-2 right-2 bg-[var(--crit)] text-white text-[10px] font-black px-1.5 py-0.5 rounded-md uppercase tracking-wide">Agotado</span>}
+                              <div className="flex flex-col justify-between px-3 py-2.5 flex-1 min-w-0">
+                                <span className={`font-semibold text-sm leading-snug line-clamp-2 ${isOOS ? 'text-[var(--text-4)] line-through' : 'text-[var(--text-1)]'}`}>{item.name}</span>
+                                <span className={`font-bold text-base mt-1 font-mono tabular-nums ${isOOS ? 'text-[var(--crit-ink)]' : 'text-[var(--accent-ink)]'}`}>${Math.round(item.price)}</span>
+                              </div>
+                            </button>
+                          )
+                        }}
+                      />
                     </div>
                   </div>
                 </div>
@@ -5766,20 +5959,18 @@ function POSContent() {
 
       {mesaDestinoCaja !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <form className="bg-[var(--surface)] rounded-2xl border border-[var(--line)] p-6 w-full max-w-sm mx-4" onSubmit={async e => {
-            e.preventDefault()
-            try { await moverMesaCaja(pinInput) } catch (error) { showToast(error instanceof Error ? error.message : 'Caja no confirmó la transferencia.') }
-            finally { setPinInput('') }
-          }}>
+          <div className="bg-[var(--surface)] rounded-2xl border border-[var(--line)] p-6 w-full max-w-lg mx-4">
             <h3 className="text-lg font-bold mb-3">Transferir a mesa {mesaDestinoCaja}</h3>
-            <label htmlFor="move-caja-pin" className="block text-sm mb-2">PIN de quien autoriza en Caja</label>
-            <input id="move-caja-pin" type="password" autoFocus autoComplete="off" inputMode="numeric" maxLength={10} value={pinInput}
-              onChange={e => setPinInput(e.target.value.replace(/\D/g, ''))} className="w-full p-3 rounded-lg bg-[var(--surface-2)] border border-[var(--line)]" />
-            <div className="flex gap-3 mt-4">
-              <button type="button" disabled={saving} onClick={() => { setMesaDestinoCaja(null); setPinInput('') }} className="flex-1 p-3 rounded-lg bg-[var(--surface-2)]">Volver</button>
-              <button type="submit" disabled={saving || pinInput.length < 4} className="flex-1 p-3 rounded-lg bg-amber-600 text-white disabled:opacity-40">Confirmar transferencia</button>
-            </div>
-          </form>
+            <AutorizacionPinOHuella label={`Autoriza la transferencia a mesa ${mesaDestinoCaja}`}
+              pin={pinInput} onPinChange={setPinInput}
+              onPin={autorizarOperacionConPinEnCaja} onHuella={autorizarOperacionConHuellaEnCaja}
+              onAuthorized={async actor => { try { await moverMesaCaja(actor); setPinInput('') }
+                catch (error) { throw error instanceof Error ? error : new Error('Caja no confirmó la transferencia.') } }}
+              huellaDisponible={huellaCaja.disponible} motivoHuellaNoDisponible={huellaCaja.motivo}
+              disabled={saving} pinButtonLabel="Transferir con PIN" huellaButtonLabel="Transferir con huella" />
+            <button type="button" disabled={saving} onClick={() => { setMesaDestinoCaja(null); setPinInput('') }}
+              className="mt-3 min-h-[56px] w-full rounded-lg bg-[var(--surface-2)] px-4">Volver</button>
+          </div>
         </div>
       )}
 
@@ -6549,8 +6740,29 @@ function POSContent() {
                               }
                               updateMpRecovery(mpRec)
                               try {
-                                await handlePayment('Tarjeta de crédito', recoveryOpId)
-                                clearMpRecovery()
+                                // EL RASTRO SÓLO SE BORRA SI EL COBRO QUEDÓ REGISTRADO.
+                                //
+                                // Esto llamaba `clearMpRecovery()` sin condición. Pero
+                                // `handlePayment` no lanza en sus fallas reales —su cuerpo es
+                                // try/finally, sin catch— y cada falla sale por `return`:
+                                // conflicto de revisión, `saveResult.conflict`,
+                                // PAYMENT_MISMATCH, API_ERROR, SESSION_EXPIRED. O sea: la
+                                // terminal bancaria ya capturó el dinero del cliente, el
+                                // registro en Fullsite falló, y se borraba el único rastro
+                                // que existía. El banner rojo de recuperación nunca aparecía,
+                                // la mesa quedaba abierta con el total completo, y el
+                                // siguiente que la tocara la cobraba otra vez.
+                                //
+                                // `handlePayment` devuelve `true` sólo en su punto de éxito;
+                                // cualquier otra salida es `undefined` y conserva el rastro.
+                                if (await handlePayment('Tarjeta de crédito', recoveryOpId) === true) {
+                                  clearMpRecovery()
+                                } else {
+                                  updateMpRecovery({ ...mpRec, state: 'RECONCILIATION_REQUIRED' as MpPaymentState,
+                                    error: 'La terminal aprobó el cobro pero no se pudo registrar en Fullsite.' })
+                                  setSaving(false)
+                                  operationLock.current = false
+                                }
                               } catch (err) {
                                 const failed: MpPaymentRecovery = {
                                   ...mpRec,
@@ -6574,16 +6786,30 @@ function POSContent() {
                           } catch { /* keep polling */ }
                         }, 3000)
                       } else {
-                        // MP failed, fall back to manual
+                        // UNA RESPUESTA QUE NO LLEGÓ NO ES UN COBRO.
+                        //
+                        // Aquí se cerraba la venta como «Tarjeta de crédito» sin
+                        // preguntar nada. Pero Mercado Pago pudo haber recibido el
+                        // intent y tener la terminal pidiendo la tarjeta: si el
+                        // cliente la pasa, se cobró y la orden ya está cerrada sin
+                        // referencia; si el cajero vuelve a mandar el cobro, son dos
+                        // cargos. (Barrido 3, 2026-09-12, integraciones P0.)
+                        //
+                        // El cobro manual sigue disponible —es la pantalla del monto
+                        // grande para teclearlo en la terminal del banco— pero lo
+                        // abre una PERSONA que fue a ver el aparato, no un catch.
                         setSaving(false); operationLock.current = false
-                        handlePayment('Tarjeta de crédito')
+                        showToast('La terminal no confirmó. Revísala ANTES de volver a cobrar: puede haber cobrado ya.')
+                        setShowCardConfirm(true)
                       }
                     } catch {
                       setSaving(false); operationLock.current = false
                       if (!navigator.onLine) {
                         showToast('Sin conexión — pago con terminal no disponible offline')
                       } else {
-                        handlePayment('Tarjeta de crédito')
+                        // Mismo criterio que arriba: sin respuesta no se afirma cobro.
+                        showToast('No se pudo hablar con la terminal. Revísala ANTES de volver a cobrar: puede haber cobrado ya.')
+                        setShowCardConfirm(true)
                       }
                     }
                   } else {

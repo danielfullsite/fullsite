@@ -121,16 +121,20 @@ describe('El arranque instala el servicio desde el paquete', () => {
     assert.match(cuerpo, /DPUruNet\.dll/)
   })
 
-  test('los copia a C:\\fullsite la primera vez', () => {
-    assert.match(cuerpo, /copyFileSync/, 'encuentra los binarios pero no los instala')
-    assert.match(cuerpo, /mkdirSync/, 'no crea C:\\fullsite si no existe')
+  test('instala o actualiza el par completo en C:\\fullsite', () => {
+    assert.match(cuerpo, /updateBundledFingerprintService/, 'encuentra los binarios pero no los instala')
+    assert.match(main, /copyFileSync/, 'no prepara una copia verificable')
+    assert.match(main, /mkdirSync/, 'no crea C:\\fullsite si no existe')
   })
 
-  test('copia sólo lo que falta, sin pisar lo que ya está en la caja', () => {
-    // En AMALAY ya hay binarios en C:\fullsite\ de la instalación anterior. Pisarlos con
-    // los del paquete podría bajar una versión que ahí sí funciona.
-    assert.match(cuerpo, /if \(!fs\.existsSync\(fpExe\)\) fs\.copyFileSync/)
-    assert.match(cuerpo, /if \(!fs\.existsSync\(fpDll\)\) fs\.copyFileSync/)
+  test('reemplaza una versión distinta sólo después de SHA-256 y deja respaldo recuperable', () => {
+    // El servicio anterior de AMALAY no habla HMAC. Conservarlo sólo porque existe
+    // deja la huella apagada para siempre; la actualización debe ser transaccional.
+    assert.match(main, /fingerprintFileHash/)
+    assert.match(main, /fingerprint-backup-/)
+    assert.match(main, /stopExactFingerprintProcesses/)
+    assert.match(main, /fs\.renameSync/)
+    assert.match(main, /La restauración automática falló/)
   })
 
   test('si el paquete no trae los binarios, no revienta el arranque', () => {

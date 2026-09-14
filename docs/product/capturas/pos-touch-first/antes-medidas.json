@@ -1,0 +1,386 @@
+{
+  "etiqueta": "antes",
+  "medidas": [
+    {
+      "nombre": "mesas",
+      "w": 1600,
+      "h": 900,
+      "alto": 865,
+      "ventana": 865,
+      "anchoDoc": 1600,
+      "anchoVentana": 1600,
+      "internos": [],
+      "scrollVertical": false
+    },
+    {
+      "nombre": "comanda",
+      "w": 1600,
+      "h": 900,
+      "alto": 865,
+      "ventana": 865,
+      "anchoDoc": 1600,
+      "anchoVentana": 1600,
+      "internos": [
+        {
+          "clase": "flex-1 overflow-y-auto px-3 py-1 min-h-0 overscroll-contain",
+          "alto": 724,
+          "visible": 408
+        }
+      ],
+      "scrollVertical": false
+    },
+    {
+      "nombre": "catalogo",
+      "w": 1600,
+      "h": 900,
+      "alto": 865,
+      "ventana": 865,
+      "anchoDoc": 1600,
+      "anchoVentana": 1600,
+      "internos": [
+        {
+          "clase": "flex-1 overflow-y-auto px-3 py-1 min-h-0 overscroll-contain",
+          "alto": 724,
+          "visible": 408
+        }
+      ],
+      "scrollVertical": false
+    },
+    {
+      "nombre": "cobro",
+      "w": 1600,
+      "h": 900,
+      "alto": 865,
+      "ventana": 865,
+      "anchoDoc": 1600,
+      "anchoVentana": 1600,
+      "internos": [
+        {
+          "clase": "flex-1 overflow-y-auto px-3 py-1 min-h-0 overscroll-contain",
+          "alto": 724,
+          "visible": 408
+        }
+      ],
+      "scrollVertical": false
+    },
+    {
+      "nombre": "turno",
+      "w": 1600,
+      "h": 900,
+      "alto": 1184,
+      "ventana": 865,
+      "anchoDoc": 1588,
+      "anchoVentana": 1600,
+      "internos": [],
+      "scrollVertical": true
+    },
+    {
+      "nombre": "corte",
+      "w": 1600,
+      "h": 900,
+      "alto": 865,
+      "ventana": 865,
+      "anchoDoc": 1600,
+      "anchoVentana": 1600,
+      "internos": [],
+      "scrollVertical": false
+    },
+    {
+      "nombre": "kds",
+      "w": 1600,
+      "h": 900,
+      "alto": 865,
+      "ventana": 865,
+      "anchoDoc": 1600,
+      "anchoVentana": 1600,
+      "internos": [],
+      "scrollVertical": false
+    },
+    {
+      "nombre": "mesas",
+      "w": 1366,
+      "h": 768,
+      "alto": 768,
+      "ventana": 768,
+      "anchoDoc": 1366,
+      "anchoVentana": 1366,
+      "internos": [],
+      "scrollVertical": false
+    },
+    {
+      "nombre": "comanda",
+      "w": 1366,
+      "h": 768,
+      "alto": 768,
+      "ventana": 768,
+      "anchoDoc": 1366,
+      "anchoVentana": 1366,
+      "internos": [
+        {
+          "clase": "flex-1 overflow-y-auto px-3 py-1 min-h-0 overscroll-contain",
+          "alto": 724,
+          "visible": 311
+        }
+      ],
+      "scrollVertical": false
+    },
+    {
+      "nombre": "catalogo",
+      "w": 1366,
+      "h": 768,
+      "alto": 768,
+      "ventana": 768,
+      "anchoDoc": 1366,
+      "anchoVentana": 1366,
+      "internos": [
+        {
+          "clase": "flex-1 overflow-y-auto px-3 py-1 min-h-0 overscroll-contain",
+          "alto": 724,
+          "visible": 311
+        }
+      ],
+      "scrollVertical": false
+    },
+    {
+      "nombre": "cobro",
+      "w": 1366,
+      "h": 768,
+      "alto": 768,
+      "ventana": 768,
+      "anchoDoc": 1366,
+      "anchoVentana": 1366,
+      "internos": [
+        {
+          "clase": "flex-1 overflow-y-auto px-3 py-1 min-h-0 overscroll-contain",
+          "alto": 724,
+          "visible": 311
+        }
+      ],
+      "scrollVertical": false
+    },
+    {
+      "nombre": "turno",
+      "w": 1366,
+      "h": 768,
+      "alto": 1184,
+      "ventana": 768,
+      "anchoDoc": 1354,
+      "anchoVentana": 1366,
+      "internos": [],
+      "scrollVertical": true
+    },
+    {
+      "nombre": "corte",
+      "w": 1366,
+      "h": 768,
+      "alto": 774,
+      "ventana": 768,
+      "anchoDoc": 1354,
+      "anchoVentana": 1366,
+      "internos": [],
+      "scrollVertical": true
+    },
+    {
+      "nombre": "kds",
+      "w": 1366,
+      "h": 768,
+      "alto": 768,
+      "ventana": 768,
+      "anchoDoc": 1366,
+      "anchoVentana": 1366,
+      "internos": [],
+      "scrollVertical": false
+    },
+    {
+      "nombre": "mesas",
+      "w": 1280,
+      "h": 800,
+      "alto": 800,
+      "ventana": 800,
+      "anchoDoc": 1280,
+      "anchoVentana": 1280,
+      "internos": [],
+      "scrollVertical": false
+    },
+    {
+      "nombre": "comanda",
+      "w": 1280,
+      "h": 800,
+      "alto": 800,
+      "ventana": 800,
+      "anchoDoc": 1280,
+      "anchoVentana": 1280,
+      "internos": [
+        {
+          "clase": "flex-1 overflow-y-auto px-3 py-1 min-h-0 overscroll-contain",
+          "alto": 724,
+          "visible": 343
+        }
+      ],
+      "scrollVertical": false
+    },
+    {
+      "nombre": "catalogo",
+      "w": 1280,
+      "h": 800,
+      "alto": 800,
+      "ventana": 800,
+      "anchoDoc": 1280,
+      "anchoVentana": 1280,
+      "internos": [
+        {
+          "clase": "flex-1 overflow-y-auto px-3 py-1 min-h-0 overscroll-contain",
+          "alto": 724,
+          "visible": 343
+        }
+      ],
+      "scrollVertical": false
+    },
+    {
+      "nombre": "cobro",
+      "w": 1280,
+      "h": 800,
+      "alto": 800,
+      "ventana": 800,
+      "anchoDoc": 1280,
+      "anchoVentana": 1280,
+      "internos": [
+        {
+          "clase": "flex-1 overflow-y-auto px-3 py-1 min-h-0 overscroll-contain",
+          "alto": 724,
+          "visible": 343
+        }
+      ],
+      "scrollVertical": false
+    },
+    {
+      "nombre": "turno",
+      "w": 1280,
+      "h": 800,
+      "alto": 1184,
+      "ventana": 800,
+      "anchoDoc": 1268,
+      "anchoVentana": 1280,
+      "internos": [],
+      "scrollVertical": true
+    },
+    {
+      "nombre": "corte",
+      "w": 1280,
+      "h": 800,
+      "alto": 800,
+      "ventana": 800,
+      "anchoDoc": 1280,
+      "anchoVentana": 1280,
+      "internos": [],
+      "scrollVertical": false
+    },
+    {
+      "nombre": "kds",
+      "w": 1280,
+      "h": 800,
+      "alto": 800,
+      "ventana": 800,
+      "anchoDoc": 1280,
+      "anchoVentana": 1280,
+      "internos": [],
+      "scrollVertical": false
+    },
+    {
+      "nombre": "mesas",
+      "w": 1024,
+      "h": 768,
+      "alto": 768,
+      "ventana": 768,
+      "anchoDoc": 1024,
+      "anchoVentana": 1024,
+      "internos": [],
+      "scrollVertical": false
+    },
+    {
+      "nombre": "comanda",
+      "w": 1024,
+      "h": 768,
+      "alto": 768,
+      "ventana": 768,
+      "anchoDoc": 1024,
+      "anchoVentana": 1024,
+      "internos": [
+        {
+          "clase": "flex-1 overflow-y-auto px-3 py-1 min-h-0 overscroll-contain",
+          "alto": 724,
+          "visible": 297
+        }
+      ],
+      "scrollVertical": false
+    },
+    {
+      "nombre": "catalogo",
+      "w": 1024,
+      "h": 768,
+      "alto": 768,
+      "ventana": 768,
+      "anchoDoc": 1024,
+      "anchoVentana": 1024,
+      "internos": [
+        {
+          "clase": "flex-1 overflow-y-auto px-3 py-1 min-h-0 overscroll-contain",
+          "alto": 724,
+          "visible": 297
+        }
+      ],
+      "scrollVertical": false
+    },
+    {
+      "nombre": "cobro",
+      "w": 1024,
+      "h": 768,
+      "alto": 768,
+      "ventana": 768,
+      "anchoDoc": 1024,
+      "anchoVentana": 1024,
+      "internos": [
+        {
+          "clase": "flex-1 overflow-y-auto px-3 py-1 min-h-0 overscroll-contain",
+          "alto": 724,
+          "visible": 297
+        }
+      ],
+      "scrollVertical": false
+    },
+    {
+      "nombre": "turno",
+      "w": 1024,
+      "h": 768,
+      "alto": 1184,
+      "ventana": 768,
+      "anchoDoc": 1012,
+      "anchoVentana": 1024,
+      "internos": [],
+      "scrollVertical": true
+    },
+    {
+      "nombre": "corte",
+      "w": 1024,
+      "h": 768,
+      "alto": 774,
+      "ventana": 768,
+      "anchoDoc": 1012,
+      "anchoVentana": 1024,
+      "internos": [],
+      "scrollVertical": true
+    },
+    {
+      "nombre": "kds",
+      "w": 1024,
+      "h": 768,
+      "alto": 768,
+      "ventana": 768,
+      "anchoDoc": 1024,
+      "anchoVentana": 1024,
+      "internos": [],
+      "scrollVertical": false
+    }
+  ],
+  "fallos": []
+}

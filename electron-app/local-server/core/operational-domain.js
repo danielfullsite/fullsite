@@ -45,6 +45,27 @@ function checkCustomer(order, state) {
   const key = value => String(value || '').normalize('NFKC').toLocaleLowerCase('es-MX').trim()
   if (state.toSnapshot().salon_orders.some(o => o.mesa === null && o.order_id !== order.order_id && key(o.customer_name) === key(order.customer_name))) fail('CUSTOMER_ACCOUNT_EXISTS', 'Ya existe una cuenta abierta con ese nombre; abre la cuenta actual')
 }
+function cancelledItems(itemsValue, dispositionsValue, reason) {
+  const items = parse(itemsValue)
+  if (!Array.isArray(items) || !Array.isArray(dispositionsValue) || dispositionsValue.length !== items.length) {
+    fail('CANCELLATION_DISPOSITION_REQUIRED', 'Decide qué pasa con el inventario de cada renglón')
+  }
+  const byId = new Map()
+  for (const value of dispositionsValue) {
+    if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some(key => !['line_id', 'disposition'].includes(key))) {
+      fail('INVALID_CANCELLATION_DISPOSITION', 'Disposición de inventario inválida')
+    }
+    const lineId = id(value.line_id, 'line_id')
+    if (byId.has(lineId) || !['retain_consumption', 'return_stock'].includes(value.disposition)) {
+      fail('INVALID_CANCELLATION_DISPOSITION', 'Disposición de inventario inválida o repetida')
+    }
+    byId.set(lineId, value.disposition)
+  }
+  if (items.some(item => !byId.has(item.id)) || [...byId.keys()].some(lineId => !items.some(item => item.id === lineId))) {
+    fail('CANCELLATION_DISPOSITION_REQUIRED', 'Falta la disposición de un renglón de la cuenta')
+  }
+  return items.map(item => ({ ...item, cancelled: true, inventory_disposition: byId.get(item.id), cancellation_reason: reason }))
+}
 function resolveStation(category, catalog) {
   const routing = catalog.settings['pos.station_routing']
   if (!routing || typeof routing !== 'object' || Array.isArray(routing)) fail('CATALOG_ROUTING_REQUIRED', 'Prepara las estaciones de cada categoría en Caja')
@@ -256,12 +277,19 @@ class OperationalDomain {
     } else if (type === 'ORDER_MOVE') {
       if (!catalogEnvelope?.ready) fail('CATALOG_NOT_READY', 'No se pudo verificar el salón de Caja')
       const mesa = table(payload.mesa, catalogEnvelope.catalog)
+      const movedFrom = next.mesa ?? null
       checkTable(mesa, state, orderId); next.mesa = mesa
       if (mesa === null) next.customer_name = note(payload.customer_name, 'customer_name', 200)
       checkCustomer(next, state)
+      const movement = { from: movedFrom, to: mesa, actor_id: actor.id, moved_at: now }
+      const history = parse(next.move_history || [])
+      if (!Array.isArray(history)) fail('INVALID_OPERATIONAL_VALUE', 'Historial de transferencia inválido')
+      next.moved_from = movedFrom; next.moved_to = mesa; next.moved_by = actor.id; next.moved_at = now
+      next.move_history = [...history, movement]
     } else if (type === 'ORDER_VOID') {
       next.cancellation_reason = note(payload.reason, 'reason', 500).trim()
       if (!next.cancellation_reason) fail('CANCELLATION_REASON_REQUIRED', 'Indica el motivo de cancelación')
+      next.items = JSON.stringify(cancelledItems(next.items, payload.inventory_dispositions, next.cancellation_reason))
       next.status = 'cancelada'; next.cancelled_by = actor.id; next.cancelled_at = now
     }
     return { operational_order: next }

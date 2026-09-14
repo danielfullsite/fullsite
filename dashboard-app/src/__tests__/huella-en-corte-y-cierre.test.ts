@@ -24,17 +24,20 @@ const cierre = sinComentarios(readFileSync(join(process.cwd(), 'src/components/p
 const posData = sinComentarios(readFileSync(join(process.cwd(), 'src/lib/pos-data.ts'), 'utf8'))
 
 describe('La huella pide el rol al servidor, no se lo concede sola', () => {
-  it('verifyManagerHuella manda min_role y fingerprint_id a /api/pos/pin', () => {
+  it('verifyManagerHuella pide el rol a Pedro sin proponer identidad desde el navegador', () => {
     const fn = posData.slice(posData.indexOf('export async function verifyManagerHuella'))
     const cuerpo = fn.slice(0, fn.indexOf('\n}\n'))
-    expect(cuerpo).toContain('min_role')
-    expect(cuerpo).toContain('fingerprint_id')
-    expect(cuerpo, 'debe pegarle al endpoint que valida rol').toContain('/api/pos/pin')
+    expect(cuerpo).toContain('autorizarOperacionConHuellaEnCaja(minRole)')
+    expect(cuerpo).toContain('minRole')
+    expect(cuerpo).not.toContain('fingerprint_id')
+    expect(cuerpo).not.toContain('/api/pos/pin')
   })
 
-  it('exige userVerification — la huella no puede saltarse con solo tener el aparato', () => {
+  it('no usa WebAuthn ni el mapa de IDs controlado por el navegador', () => {
     const fn = posData.slice(posData.indexOf('export async function verifyManagerHuella'))
-    expect(fn.slice(0, fn.indexOf('\n}\n'))).toContain("userVerification: 'required'")
+    const cuerpo = fn.slice(0, fn.indexOf('\n}\n'))
+    expect(cuerpo).not.toContain('navigator.credentials')
+    expect(cuerpo).not.toContain('pos_biometric_credentials')
   })
 
   it('nunca lanza: devuelve null para que la pantalla pueda ofrecer el PIN', () => {

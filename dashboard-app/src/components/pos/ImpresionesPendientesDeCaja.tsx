@@ -2,7 +2,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { operacionesPendientesCaja } from '@/lib/pedro-comandos'
 import { recuperarImpresionCaja } from '@/lib/pedro-impresion'
-import { autorizarOperacionConPinEnCaja } from '@/lib/pedro-actor'
+import { autorizarOperacionConHuellaEnCaja, autorizarOperacionConPinEnCaja, type SesionDeCaja } from '@/lib/pedro-actor'
+import AutorizacionPinOHuella from './AutorizacionPinOHuella'
+import { useEstadoHuellaCaja } from './useEstadoHuellaCaja'
 
 const pendientes = () => operacionesPendientesCaja().filter(({ command }) =>
   ['ORDER_PRECHECK_PRINT', 'PAYMENT_RECEIPT_PRINT', 'PRINT_UNCERTAIN_RESOLVE'].includes(command.command_type))
@@ -15,6 +17,7 @@ export default function ImpresionesPendientesDeCaja() {
   const [busy, setBusy] = useState(false)
   const working = useRef(false)
   const [message, setMessage] = useState('')
+  const huella = useEstadoHuellaCaja()
   useEffect(() => {
     const refresh = () => setPending(pendientes())
     refresh()
@@ -22,11 +25,10 @@ export default function ImpresionesPendientesDeCaja() {
     window.addEventListener('pos:comandos-pendientes', refresh)
     return () => { window.removeEventListener('storage', refresh); window.removeEventListener('pos:comandos-pendientes', refresh) }
   }, [])
-  const recover = async (operation: string, approval: boolean) => {
+  const recover = async (operation: string, actor?: SesionDeCaja) => {
     if (working.current) return
     working.current = true; setBusy(true); setMessage('')
     try {
-      const actor = approval ? await autorizarOperacionConPinEnCaja(pin) : undefined
       setPin('')
       await recuperarImpresionCaja(operation, actor)
       setSelected(null)
@@ -37,14 +39,18 @@ export default function ImpresionesPendientesDeCaja() {
   if (!pending.length && !message) return null
   return <section aria-label="Solicitudes de impresión pendientes" className="border-b border-amber-700 bg-amber-950 p-4 text-sm text-amber-100">
     {pending.length > 0 && <p>Hay solicitudes de impresión sin confirmar. Recupera su resultado original aunque el trabajo o la cuenta ya no aparezcan.</p>}
-    {pending.map(({ operation, command }) => <button key={operation} disabled={busy} className="mr-2 mt-2 rounded border px-3 py-2 disabled:opacity-50"
-      onClick={() => command.command_type === 'PRINT_UNCERTAIN_RESOLVE' ? (setSelected(operation), setPin(''), setMessage('')) : void recover(operation, false)}>
+    {pending.map(({ operation, command }) => <button key={operation} disabled={busy} className="mr-2 mt-2 min-h-[56px] rounded border px-3 py-2 disabled:opacity-50"
+      onClick={() => command.command_type === 'PRINT_UNCERTAIN_RESOLVE' ? (setSelected(operation), setPin(''), setMessage('')) : void recover(operation)}>
       Recuperar {command.command_type === 'PRINT_UNCERTAIN_RESOLVE' ? 'verificación' : command.command_type === 'ORDER_PRECHECK_PRINT' ? 'precuenta' : 'recibo'} · {String(command.order_id ?? command.job_id).slice(0, 16)}
     </button>)}
-    {selected && <div className="mt-3">
-      <label>PIN del encargado para recuperar<input type="password" inputMode="numeric" autoComplete="off" disabled={busy} value={pin} onChange={event => setPin(event.target.value)} className="ml-2 rounded border bg-transparent p-2" /></label>
-      <button disabled={busy || !pin} className="ml-2 rounded border p-2 disabled:opacity-50" onClick={() => void recover(selected, true)}>Recuperar verificación original</button>
-      <button disabled={busy} className="ml-2 underline" onClick={() => { setSelected(null); setPin('') }}>Cerrar</button>
+    {selected && <div className="mt-3 space-y-3">
+      <AutorizacionPinOHuella label="Autorizar recuperación de impresión" pin={pin} onPinChange={setPin}
+        pinLabel="PIN del encargado para recuperar" pinButtonLabel="Recuperar verificación original"
+        huellaButtonLabel="Recuperar verificación con huella"
+        onPin={autorizarOperacionConPinEnCaja} onHuella={autorizarOperacionConHuellaEnCaja}
+        onAuthorized={actor => recover(selected, actor)} huellaDisponible={huella.disponible}
+        motivoHuellaNoDisponible={huella.motivo} disabled={busy} />
+      <button disabled={busy} className="min-h-[56px] w-full rounded border px-3 py-2 font-semibold disabled:opacity-50" onClick={() => { setSelected(null); setPin('') }}>Cerrar</button>
     </div>}
     {message && <p role="status" className="mt-2">{message}</p>}
   </section>

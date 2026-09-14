@@ -431,7 +431,7 @@ async function _getPaymentMethodsFromCache(): Promise<PaymentMethodDB[]> {
   return []
 }
 
-type ActiveTurnoRecord = { id: string; fondo_inicial: number; opened_by: string; opened_at: string }
+type ActiveTurnoRecord = { id: string; fondo_inicial: number; opened_by: string; opened_at: string; sincronizado?: boolean }
 
 /** Turnos activos (pos_turnos sin closed_at), del más reciente al más antiguo. */
 export async function getActiveTurnos(): Promise<ActiveTurnoRecord[]> {
@@ -476,6 +476,63 @@ export async function getActiveTurnos(): Promise<ActiveTurnoRecord[]> {
     }
   }
 
+  /**
+   * Un GET 200 con `[]` no siempre significa "no hay turno".
+   *
+   * Cuando la apertura se hizo localmente, el POST queda en la cola
+   * `fullsite_offline_queue`. La terminal puede recuperar internet suficiente
+   * para que el GET conteste, pero no para que ese POST ya haya drenado. Antes
+   * tomábamos el `[]` como autoridad, reemplazábamos `pos_turno_cache` por null y
+   * TurnoGate mostraba "No hay turno abierto" segundos después de confirmar la
+   * apertura.
+   *
+   * La cola pendiente es la prueba durable de que el turno local todavía debe
+   * considerarse activo. No basta con confiar en cualquier cache: un turno ya
+   * cerrado desde otra terminal también puede quedar cacheado y no debe
+   * resucitarse.
+   */
+  const pendingLocalFromCache = async (): Promise<ActiveTurnoRecord[]> => {
+    if (typeof localStorage === 'undefined') return []
+    let pendingIds = new Set<string>()
+    try {
+      const queue = JSON.parse(localStorage.getItem('fullsite_offline_queue') || '[]')
+      if (Array.isArray(queue)) pendingIds = new Set(
+        queue
+          .filter(item => item?.synced !== true && item?.table === 'pos_turnos' && item?.data?.id)
+          .map(item => String(item.data.id))
+      )
+    } catch {}
+
+    // Primero intenta la copia rápida. Una versión anterior podía reemplazarla
+    // con null al recibir GET 200 + [], por eso no termina aquí si está vacía.
+    const cached = fromCache()
+      .filter(turno => pendingIds.has(turno.id))
+      .map(turno => ({ ...turno, sincronizado: false }))
+    if (cached.length > 0) return cached
+
+    // La página de Turnos guarda además una copia durable en IndexedDB. En Caja
+    // observamos exactamente este orden: apertura local -> navegación a Mesas ->
+    // la respuesta remota vacía borró localStorage, pero el turno seguía en IDB.
+    // Sólo recuperamos un turno activo, del día de venta actual y con evidencia
+    // de que aún no sincronizó (sin synced_at o con POST pendiente). Un turno
+    // cerrado o ya sincronizado no puede resucitar por esta vía.
+    if (typeof indexedDB === 'undefined') return []
+    try {
+      const { getCachedActiveTurno } = await import('@/lib/pos-offline-db')
+      const turno = await getCachedActiveTurno(_getClientId())
+      if (!turno || turno.closed_at || !turno.opened_at) return []
+      const pendiente = pendingIds.has(String(turno.id)) || !turno.synced_at
+      if (!pendiente || !mismoDiaDeVenta(turno.opened_at, Date.now(), inicioDiaConfigurado())) return []
+      return [{
+        id: String(turno.id),
+        fondo_inicial: Number(turno.fondo_inicial) || 0,
+        opened_by: String(turno.opened_by || ''),
+        opened_at: String(turno.opened_at),
+        sincronizado: false,
+      }]
+    } catch { return [] }
+  }
+
   let res: Response
   try {
     res = await fetchWithTimeout(
@@ -484,7 +541,8 @@ export async function getActiveTurnos(): Promise<ActiveTurnoRecord[]> {
     )
   } catch {
     // No hubo respuesta: red caida o timeout. Aqui SI vale el cache.
-    return fromCache()
+    const cached = fromCache()
+    return cached.length > 0 ? cached : pendingLocalFromCache()
   }
 
   if (!res.ok) {
@@ -499,13 +557,21 @@ export async function getActiveTurnos(): Promise<ActiveTurnoRecord[]> {
      * Un fallo de contrato tiene que SUBIR. Servir cache ante un 401 no es
      * tolerancia a fallos: es operar con datos viejos sin decirselo a nadie.
      */
-    if (esFalloDeRed(res.status)) return fromCache()
+    if (esFalloDeRed(res.status)) {
+      const cached = fromCache()
+      return cached.length > 0 ? cached : pendingLocalFromCache()
+    }
     const detalle = await res.text().catch(() => '')
     if (esFalloDeAutenticacion(res.status)) throw new ErrorDeSesion(res.status, detalle.slice(0, 200))
     throw new ErrorDeContrato(res.status, detalle.slice(0, 200))
   }
 
-  const rows = await res.json()
+  const payload = await res.json()
+  const rows: ActiveTurnoRecord[] = Array.isArray(payload) ? payload : []
+  if (rows.length === 0) {
+    const pending = await pendingLocalFromCache()
+    if (pending.length > 0) return pending
+  }
   if (typeof window !== 'undefined') {
     try { localStorage.setItem('pos_turno_cache', JSON.stringify({ turno: rows[0] || null, turnos: rows, ts: Date.now() })) } catch {}
   }
@@ -641,7 +707,21 @@ export async function openTurno(fondoInicial: number, openedBy: string, openingR
       const receipt = await ejecutarComandoCaja('turn:open', 'TURN_OPEN', { turno_id: idParaAbrirTurno(), opening_cash_cents: opening, opening_reason: openingReason })
       const t = receipt.result.turno as Record<string, unknown> | undefined
       if (!t?.id || !t.opened_at || !Number.isSafeInteger(t.opening_cash_cents)) throw new Error('Caja no confirmó la apertura de turno.')
-      const confirmed = { id: String(t.id), fondo_inicial: Number(t.opening_cash_cents) / 100, opened_by: String(t.opened_by), opened_at: String(t.opened_at), sincronizado: false }
+      // UN TURNO QUE LA CAJA CONFIRMÓ NO ES UN TURNO «SOLO LOCAL».
+      //
+      // Tres líneas arriba se exige el recibo de `TURN_OPEN` y se lanza si la
+      // Caja no confirmó. O sea: para llegar aquí, la autoridad que gobierna
+      // este turno ya lo escribió en su bitácora durable. Marcarlo
+      // `sincronizado: false` contradice la definición de arriba —«quedó SOLO
+      // local … y está encolado»— y produjo tres daños en campo (AMALAY,
+      // 2026-09-13): el aviso «Turno abierto LOCAL (sin conexión)» sobre un
+      // turno que sí se abrió; un registro de auditoría que dice `sincronizado:
+      // false` de algo confirmado; y una copia durable sin `synced_at`, que es
+      // la que después puede resucitar un turno ya cerrado.
+      //
+      // En modo Caja la autoridad es la Caja, no la nube. La subida a la nube va
+      // por su propio camino y tiene su propia cola; no se representa aquí.
+      const confirmed = { id: String(t.id), fondo_inicial: Number(t.opening_cash_cents) / 100, opened_by: String(t.opened_by), opened_at: String(t.opened_at), sincronizado: true }
       // Cache is a display convenience; every operational read still asks Caja.
       localStorage.setItem('pos_turno_cache', JSON.stringify({ turno: confirmed, turnos: [confirmed], ts: Date.now() }))
       olvidarTurnoPendiente()
@@ -658,9 +738,10 @@ export async function openTurno(fondoInicial: number, openedBy: string, openingR
   const body = { id, client_id: _getClientId(), opened_by: openedBy, fondo_inicial: fondoInicial, opened_at: openedAt }
 
   // Cachear el turno local para que getActiveTurno lo devuelva offline (mismo key/shape).
-  const cacheLocal = () => {
+  const cacheTurno = (sincronizado: boolean) => {
     if (typeof window !== 'undefined') {
-      try { localStorage.setItem('pos_turno_cache', JSON.stringify({ turno: localTurno, ts: Date.now() })) } catch {}
+      const turno = { ...localTurno, sincronizado }
+      try { localStorage.setItem('pos_turno_cache', JSON.stringify({ turno, turnos: [turno], ts: Date.now() })) } catch {}
     }
   }
   // Encolar el POST para sincronizar al reconectar. id client-side = idempotente:
@@ -673,7 +754,7 @@ export async function openTurno(fondoInicial: number, openedBy: string, openingR
   // Offline: abrir turno LOCAL + encolar (el día arranca sin internet).
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
     await queueForSync()
-    cacheLocal()
+    cacheTurno(false)
     return { ...localTurno, sincronizado: false }
   }
 
@@ -709,7 +790,7 @@ export async function openTurno(fondoInicial: number, openedBy: string, openingR
 
     if (!res.ok) throw new Error('post failed')
     const rows = await res.json()
-    cacheLocal()
+    cacheTurno(true)
     return { ...(rows[0] || localTurno), sincronizado: true }
   } catch (e) {
     // Un conflicto ya se resolvió arriba; lo que llega aquí es red. Si el mensaje viene
@@ -718,7 +799,7 @@ export async function openTurno(fondoInicial: number, openedBy: string, openingR
     // "Online" pero el POST falló (LAN degradada / timeout) — abrir local + encolar
     // en vez de bloquear el día con "Error al abrir turno".
     await queueForSync()
-    cacheLocal()
+    cacheTurno(false)
     return { ...localTurno, sincronizado: false }
   }
 }
@@ -2143,7 +2224,7 @@ async function _pinCacheKey(pin: string): Promise<string> {
 // terminal" durante un corte de internet, sin depender de una verificacion online
 // reciente (la cache de 30min quedaba vacia -> "PIN invalido" offline).
 const _ROLE_LVL: Record<string, number> = { mesero: 1, cajero: 2, capitan: 3, gerente: 4, admin: 5 }
-async function _managerFromStaffCache(pin: string, minLevel = 4): Promise<{ name: string; role: string } | null> {
+async function _managerFromStaffCache(pin: string, minLevel = 4): Promise<{ id: string; name: string; role: string } | null> {
   try {
     if (typeof localStorage === 'undefined') return null
     const raw = localStorage.getItem('pos_staff_cache')
@@ -2154,8 +2235,33 @@ async function _managerFromStaffCache(pin: string, minLevel = 4): Promise<{ name
     const data = new TextEncoder().encode(`${pin}:${s.id}`)
     const buf = await crypto.subtle.digest('SHA-256', data)
     const h = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
-    return h === s.pin_hash ? { name: s.name as string, role: s.role as string } : null
+    return h === s.pin_hash ? { id: s.id as string, name: s.name as string, role: s.role as string } : null
   } catch { return null }
+}
+
+/**
+ * Identifica a cualquier empleado por PIN sin convertir el secreto en identidad.
+ * La asistencia necesita el UUID canónico de `pos_staff`; guardar el PIN como
+ * `staff_id` expone la credencial y mezcla personas cuando se rota.
+ */
+export async function verifyStaffPin(pin: string): Promise<{ id: string; name: string; role: string } | null> {
+  if (!/^\d{4,10}$/.test(pin)) return null
+  try {
+    const { apiUrl } = await import('./api-base')
+    const res = await fetch(apiUrl('/api/pos/pin'), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin, client_id: _getClientId() }),
+    })
+    if (res.ok) {
+      const { staff } = await res.json()
+      if (typeof staff?.id === 'string' && staff.id && typeof staff.name === 'string' && typeof staff.role === 'string') {
+        return { id: staff.id, name: staff.name, role: staff.role }
+      }
+      return null
+    }
+    if (res.status === 400 || res.status === 401 || res.status === 403) return null
+  } catch { /* sin red: sólo vale el usuario local preparado */ }
+  return _managerFromStaffCache(pin, 1)
 }
 
 // Aprobación de gerente SERVER-VERIFICABLE: cuando el PIN se valida online, /api/pos/pin
@@ -2171,80 +2277,25 @@ export function consumeManagerApproval(name: string): string | null {
   return null
 }
 
-/**
- * Autorizacion de gerente POR HUELLA — misma exigencia de rol que el PIN.
- *
- * Pedido por Daniel el 2026-08-31: "para ingresar pin en corte de caja tmb deberia
- * de ser con huella" y "tambien para cierre de caja".
- *
- * Reutiliza el mismo endpoint y el mismo `manager: true` que `verifyManagerPin`, asi
- * que el servidor aplica la jerarquia de roles y emite el mismo shiftToken. Antes eso
- * NO pasaba: la rama de huella de /api/pos/pin devolvia antes de calcular el filtro
- * de rol, y cualquier empleado obtenia token de gerente. Se tapo primero, aparte,
- * porque montar esta funcion encima habria llevado el bypass a la caja.
- *
- * FACTOR DE SEGURIDAD, con honestidad: el servidor sigue SIN verificar la firma
- * WebAuthn — el id es una afirmacion del cliente. En la practica esto no es peor que
- * el PIN de 4 digitos que hoy se teclea a la vista de todos (el de AMALAY es 1234, y
- * un PIN observable se copia; una huella exige presencia fisica). Pero tampoco es una
- * garantia criptografica, y hasta que se verifique la assertion en el servidor la
- * huella NO debe ser el unico factor para mover dinero.
- *
- * Devuelve null si no hay huellas dadas de alta, si el usuario cancela, o si el
- * empleado no alcanza el rol. Nunca lanza: la pantalla debe poder ofrecer el PIN.
- */
+/** Autorización de gerente por el lector local autenticado de Caja. Pedro obtiene
+ * la identidad del DigitalPersona; el navegador nunca propone un staff_id. */
 export async function verifyManagerHuella(minRole = 'gerente'): Promise<{ name: string; role: string } | null> {
-  if (typeof window === 'undefined' || !window.PublicKeyCredential) return null
   try {
-    const stored = JSON.parse(localStorage.getItem('pos_biometric_credentials') || '{}')
-    const credIds = Object.keys(stored)
-    if (credIds.length === 0) return null
-
-    const challenge = new Uint8Array(32)
-    crypto.getRandomValues(challenge)
-    const assertion = await navigator.credentials.get({
-      publicKey: {
-        challenge,
-        rpId: window.location.hostname,
-        allowCredentials: credIds.map(id => ({
-          id: Uint8Array.from(atob(id), c => c.charCodeAt(0)),
-          type: 'public-key' as const,
-        })),
-        userVerification: 'required',
-        timeout: 30_000,
-      },
-    })
-    if (!assertion) return null
-
-    const credId = btoa(String.fromCharCode(...new Uint8Array((assertion as PublicKeyCredential).rawId)))
-    const staffId = (stored[credId] as { id?: string } | undefined)?.id
-    if (!staffId) return null
-
-    const { apiUrl } = await import('./api-base')
-    const res = await fetch(apiUrl('/api/pos/pin'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      // `min_role` es lo que el servidor ignoraba en la rama de huella hasta hoy.
-      body: JSON.stringify({ fingerprint_id: staffId, client_id: _getClientId(), min_role: minRole }),
-    })
-    if (!res.ok) return null
-    const { staff, shiftToken } = await res.json()
-    if (!staff?.name) return null
-    if (shiftToken) _lastManagerApproval = { token: shiftToken as string, name: staff.name as string, at: Date.now() }
-    return { name: staff.name as string, role: (staff.role as string) || minRole }
+    const { autorizarOperacionConHuellaEnCaja } = await import('./pedro-actor')
+    const { staff } = await autorizarOperacionConHuellaEnCaja(minRole)
+    if (!staff?.name || !staff.role) return null
+    return { name: staff.name, role: staff.role }
   } catch {
-    // Huella cancelada, no reconocida, o sin red. La pantalla ofrece el PIN.
+    // Huella cancelada, no reconocida o sin permiso. La pantalla ofrece el PIN.
     return null
   }
 }
 
 /** ¿Vale la pena ofrecer el boton de huella en esta terminal? */
 export async function hayHuellasDadasDeAlta(): Promise<boolean> {
-  if (typeof window === 'undefined' || !window.PublicKeyCredential) return false
   try {
-    const stored = JSON.parse(localStorage.getItem('pos_biometric_credentials') || '{}')
-    if (Object.keys(stored).length === 0) return false
-    return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
+    const { estadoHuellaEnCaja } = await import('./pedro-actor')
+    return (await estadoHuellaEnCaja()).disponible
   } catch {
     return false
   }

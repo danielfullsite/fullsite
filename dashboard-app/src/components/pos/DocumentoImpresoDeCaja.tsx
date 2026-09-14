@@ -58,10 +58,10 @@ export default function DocumentoImpresoDeCaja({ order, paymentId }: Props) {
   }
   const title = paymentId ? 'recibo del abono' : 'precuenta'
   return <section aria-label={`Impresión de ${title}`} className="space-y-2 text-sm">
-    {original && <label className="block">Motivo de la copia<input disabled={busy} value={reason} onChange={event => setReason(event.target.value)} className="ml-2 rounded border bg-transparent p-2" /></label>}
+    {original && <label className="block">Motivo de la copia<input disabled={busy} value={reason} onChange={event => setReason(event.target.value)} className="ml-2 min-h-[56px] rounded border bg-transparent p-2" /></label>}
     <button disabled={!ready || busy || !!original && !reason.trim() || !!paymentId && !order.financial_order}
-      onClick={() => void print()} className="rounded border px-3 py-2 disabled:opacity-50">{busy ? 'Confirmando impresión…' : `Imprimir ${original ? 'copia de ' : ''}${title}`}</button>
-    {!ready && <button disabled={busy} onClick={() => void refresh().catch(error => setMessage(error.message))} className="ml-2 underline">Verificar documentos en Caja</button>}
+      onClick={() => void print()} className="min-h-[56px] rounded border px-3 py-2 disabled:opacity-50">{busy ? 'Confirmando impresión…' : `Imprimir ${original ? 'copia de ' : ''}${title}`}</button>
+    {!ready && <button disabled={busy} onClick={() => void refresh().catch(error => setMessage(error.message))} className="ml-2 min-h-[56px] underline">Verificar documentos en Caja</button>}
     {!paymentId && <p>La precuenta muestra consumo confirmado; no acredita pago.</p>}
     {message && <p role="status">{message}</p>}
   </section>

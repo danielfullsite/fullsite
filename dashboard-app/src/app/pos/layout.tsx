@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { registerServiceWorker, requestNotificationPermission } from '@/lib/service-worker'
 import { apiUrl } from '@/lib/api-base'
 import { checkActiveSession, registerSession, startHeartbeat, removeSession, getTerminalId } from '@/lib/pos-sessions'
@@ -9,17 +9,17 @@ import TurnoGate from '@/components/pos/TurnoGate'
 import AperturasPendientesDeCaja from '@/components/pos/AperturasPendientesDeCaja'
 import ImpresionesPendientesDeCaja from '@/components/pos/ImpresionesPendientesDeCaja'
 import PendingOrderInventory from '@/components/pos/PendingOrderInventory'
+import TecladoTactilGlobal from '@/components/pos/TecladoTactilGlobal'
 import { getActiveClientSlug as _cid } from '@/lib/data'
 import { getEffectiveSetting } from '@/lib/settings'
 import { initStationRouting, initNoPrintStations, initCancellationReasons, initDiscountCatalog, initKdsStations } from '@/lib/pos-constants'
 import { inventoryPolicyService } from '@/lib/inventory-policy'
 import { getFingerprintUrl } from '@/lib/fingerprint-url'
 import { localNetworkFetch } from '@/lib/local-network-fetch'
-import { decidirHuella, modoDeAutoridadRecordado } from '@/lib/modo-autoridad'
 import { provisionManagerCredential, verifyPinOffline, estadoCredencialesOffline } from '@/lib/pos-manager-auth'
 import { POSLockContext } from './pos-lock-context'
 import { requiereCaja } from '@/lib/pedro-cliente'
-import { actorDeCaja, cerrarActorDeCaja, ingresarConPinEnCaja } from '@/lib/pedro-actor'
+import { actorDeCaja, cerrarActorDeCaja, estadoHuellaEnCaja, ingresarConHuellaEnCaja, ingresarConPinEnCaja } from '@/lib/pedro-actor'
 
 async function hashPin(pin: string, staffId: string): Promise<string> {
   try {
@@ -73,10 +73,9 @@ interface StaffMember {
 const KDS_PATHS = ['/pos/cocina', '/pos/barra', '/pos/panaderia', '/pos/kds']
 
 export default function POSLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const router = useRouter()
-
   // KDS screens bypass auth entirely — no PIN, no turno gate
-  const isKDS = typeof window !== 'undefined' && KDS_PATHS.some(p => window.location.pathname.startsWith(p))
+  const pathname = usePathname()
+  const isKDS = KDS_PATHS.some(p => pathname.startsWith(p))
   if (isKDS) {
     return (
       <div className="pos-kiosk" style={{
@@ -93,6 +92,12 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
       </div>
     )
   }
+
+  return <POSAuthenticatedLayout>{children}</POSAuthenticatedLayout>
+}
+
+function POSAuthenticatedLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const router = useRouter()
 
   const [unlocked, setUnlocked] = useState(false)
   const [staff, setStaff] = useState<StaffMember | null>(null)
@@ -321,11 +326,15 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
     }
   }, [unlocked, resetIdleTimer])
 
-  const isLocked = lockedUntil > Date.now()
+  // El temporizador que impone el bloqueo también limpia este valor. Así el
+  // render no depende de consultar el reloj (y no puede cambiar de resultado
+  // sólo por volver a renderizar otra parte de la pantalla).
+  const isLocked = lockedUntil !== 0
   const [biometricAvailable, setBiometricAvailable] = useState(() => {
     if (typeof window === 'undefined') return false
     try { return localStorage.getItem(FP_AVAILABLE_KEY) === '1' } catch { return false }
   })
+  const [biometricUnavailableReason, setBiometricUnavailableReason] = useState('Lector DigitalPersona no detectado en esta terminal.')
   const [biometricChecking, setBiometricChecking] = useState(false)
 
   const FINGERPRINT_URL = getFingerprintUrl()
@@ -336,13 +345,14 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
       // first race and used to hide the button until a manual Ctrl+R.
       for (let attempt = 0; attempt < 6 && !cancelled; attempt++) {
         try {
-          const r = await localNetworkFetch(`${FINGERPRINT_URL}/health`, { signal: AbortSignal.timeout(1000) })
-          const data = r.ok ? await r.json() : null
-          if (data?.ok) {
+          const status = await estadoHuellaEnCaja()
+          if (status.disponible) {
             try { localStorage.setItem(FP_AVAILABLE_KEY, '1') } catch {}
             if (!cancelled) setBiometricAvailable(true)
             return
           }
+          if (!cancelled && status.motivo) setBiometricUnavailableReason(status.motivo)
+          throw new Error(status.motivo || 'Huella no disponible')
         } catch { /* service may still be starting */ }
         if (attempt < 5) await new Promise(resolve => setTimeout(resolve, 500))
       }
@@ -356,9 +366,11 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
   // Register fingerprint via DigitalPersona service (port 7718)
   const handleBiometricRegister = async (staffMember: StaffMember) => {
     try {
+      const actor = actorDeCaja()
       // Call fingerprint service to enroll (captures 4 samples)
       const res = await localNetworkFetch(`${FINGERPRINT_URL}/enroll?id=${encodeURIComponent(staffMember.id)}`, {
         method: 'GET',
+        headers: actor ? { 'x-fullsite-actor': actor.actor_token } : {},
         signal: AbortSignal.timeout(90000), // 90 sec for 4 captures
       })
       const data = await res.json()
@@ -379,102 +391,32 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
 
   // Authenticate with fingerprint via DigitalPersona service (port 7718)
   const handleBiometricLogin = async () => {
-    // Antes se preguntaba `requiereCaja()`, que responde por el userAgent: bajo
-    // Electron es SIEMPRE verdadero, así que la huella quedaba rechazada en las
-    // tres terminales de un restaurante que la usa a diario. La pregunta correcta
-    // no es «¿soy una aplicación de escritorio?» sino «¿esta instalación exige un
-    // permiso firmado por Caja?». Ese dato lo publica Pedro en su estado.
-    // Con autoridad de Caja la huella sigue sirviendo para saber quién eres, pero
-    // el permiso lo firma Caja a partir de un PIN y el lector no trae PIN.
-    if (decidirHuella(modoDeAutoridadRecordado()) === 'identificar-y-pedir-pin') {
-      setSessionError('Esta caja pide tu PIN para firmar el turno. La huella sirve para identificarte, no para autorizar cobros.')
-      return
-    }
+    // El renderer sólo dispara el gesto. Pedro habla con el lector por su canal
+    // autenticado, recibe la identidad y firma la misma sesión que para el PIN.
+    // Nunca se acepta staffId, rol ni mapa biométrico desde el navegador.
     setBiometricChecking(true)
+    setSessionError('')
     try {
-      const res = await localNetworkFetch(`${FINGERPRINT_URL}/identify`, { method: 'GET', signal: AbortSignal.timeout(20000) })
-      const data = await res.json()
-
-      if (data.ok && data.staffId) {
-        // Look up staff member by ID from pos_staff via API.
-        // Offline: ni lo intentamos — son 4s de espera garantizada. Mismo guard
-        // que ya usa la ruta de PIN mas abajo.
-        let staffRes: Response | null = null
-        if (navigator.onLine) {
-          try {
-            staffRes = await fetch(apiUrl('/api/pos/pin'), {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ pin: '___fingerprint___', client_id: _cid(), fingerprint_id: data.staffId, device_id: getTerminalId() }),
-              signal: AbortSignal.timeout(4000),
-            })
-          } catch { staffRes = null }
-        }
-
-        // Try API first (validates active status), fall back to local cache
-        let member: StaffMember | null = null
-        if (staffRes?.ok) {
-          try {
-            const staffData = await staffRes.json()
-            if (staffData.staff) {
-              member = staffData.staff
-              // Refresh offline cache so it survives a future storage-cleared offline session
-              try {
-                const fpMap = JSON.parse(localStorage.getItem('pos_fingerprint_staff') || '{}')
-                fpMap[data.staffId] = member
-                localStorage.setItem('pos_fingerprint_staff', JSON.stringify(fpMap))
-              } catch {}
-            }
-          } catch {}
-        }
-        if (!member) {
-          try {
-            const fpMap = JSON.parse(localStorage.getItem('pos_fingerprint_staff') || '{}')
-            if (fpMap[data.staffId]) member = fpMap[data.staffId]
-          } catch {}
-        }
-
-        if (!member) {
-          setSessionError(
-            navigator.onLine
-              ? 'Huella reconocida pero usuario no vinculado. Entra con PIN primero.'
-              : 'Huella reconocida, pero sin internet esta terminal aun no la conoce. Entra con PIN una vez y la huella queda lista para offline.'
-          )
-          setBiometricChecking(false)
-          return
-        }
-
-        // Session locking
-        setSessionError('')
-        const conflict = await checkActiveSession(member.id)
-        if (conflict) {
-          setSessionError('Usuario activo en otra terminal.')
-          setBiometricChecking(false)
-          return
-        }
+      const session = await ingresarConHuellaEnCaja()
+      if (session.shiftToken) localStorage.setItem('pos_shift_token', session.shiftToken)
+      const member = session.staff
+      const conflict = session.offline ? null : await checkActiveSession(member.id)
+      if (conflict) throw new Error('Usuario activo en otra terminal. Cierra esa sesión primero.')
+      if (!session.offline) {
         await registerSession(member.id, member.name)
         startHeartbeat(member.id)
-        ensureAttendanceEntry(member.id, member.name, 'huella')
-
-        setStaff(member)
-        setUnlocked(true)
-        setAttempts(0)
-        sessionStorage.setItem('pos_staff', JSON.stringify(member))
-        sessionStorage.setItem('pos_last_activity', Date.now().toString())
-        // Fullscreen handled by Electron kiosk mode
-        requestNotificationPermission().catch(() => {})
-        // Go to mesas after fingerprint login
-        if (window.location.pathname === '/pos' && !window.location.search) {
-          router.push('/pos/mesas')
-        }
-      } else {
-        setSessionError(data.error || 'Huella no reconocida')
       }
-    } catch (e) {
-      console.warn('[fingerprint] Login failed:', e)
-      setSessionError('Error al leer huella. Intenta de nuevo.')
-    }
-    setBiometricChecking(false)
+      ensureAttendanceEntry(member.id, member.name, 'huella')
+      setStaff(member)
+      setUnlocked(true)
+      setAttempts(0)
+      sessionStorage.setItem('pos_staff', JSON.stringify(member))
+      sessionStorage.setItem('pos_last_activity', Date.now().toString())
+      requestNotificationPermission().catch(() => {})
+      if (window.location.pathname === '/pos' && !window.location.search) router.push('/pos/mesas')
+    } catch (error) {
+      setSessionError(error instanceof Error ? error.message : 'Caja no confirmó la huella')
+    } finally { setBiometricChecking(false) }
   }
 
   const handleSubmit = async () => {
@@ -513,7 +455,10 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
       if (biometricAvailable) {
         let serviceHasTemplates = true
         try {
-          const listRes = await localNetworkFetch(`${getFingerprintUrl()}/list`, { signal: AbortSignal.timeout(2000) })
+          const actor = actorDeCaja()
+          const listRes = await localNetworkFetch(`${getFingerprintUrl()}/list`, {
+            headers: actor ? { 'x-fullsite-actor': actor.actor_token } : {}, signal: AbortSignal.timeout(2000),
+          })
           const listData = await listRes.json()
           serviceHasTemplates = listData.count > 0 && listData.enrolled?.includes(member.id)
         } catch { serviceHasTemplates = false }
@@ -825,6 +770,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
           {children}
           <PendingOrderInventory clientId={_cid()} />
         </TurnoGate>
+        <TecladoTactilGlobal />
       </div>
     </POSLockContext.Provider>
   )
@@ -870,9 +816,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
             <span className="text-white font-black tracking-[-0.04em]" style={{ fontSize: 34 }}>fullsite</span>
             <span className="inline-block bg-emerald-500" style={{ width: 11, height: 11, marginLeft: 3, borderRadius: 2 }} />
           </div>
-          <p className="text-slate-400 text-sm mt-2">
-            {biometricAvailable ? 'Huella digital o PIN para abrir' : 'Ingresa tu PIN para abrir'}
-          </p>
+          <p className="text-slate-400 text-sm mt-2">Huella digital o PIN para abrir</p>
           <button
             onClick={() => {
               const fApp = (window as unknown as { fullsiteApp?: { quit: () => void } }).fullsiteApp
@@ -888,10 +832,10 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
         </div>
 
         {/* Biometric login button */}
-        {biometricAvailable && (
-          <button
+        <button
             onClick={handleBiometricLogin}
-            disabled={biometricChecking || isLocked}
+            disabled={!biometricAvailable || biometricChecking || isLocked}
+            aria-describedby={!biometricAvailable ? "fingerprint-unavailable" : undefined}
             className="w-full py-5 rounded-xl bg-blue-600 hover:bg-blue-500 active:scale-[0.97] disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold text-lg transition-all min-h-[64px] mb-4 flex items-center justify-center gap-3"
           >
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -901,8 +845,8 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
               <path d="M12 14.5c1.5 0 2.5-1 2.5-2.5S13.5 9.5 12 9.5 9.5 10.5 9.5 12" />
             </svg>
             {biometricChecking ? 'Verificando huella...' : 'Entrar con huella'}
-          </button>
-        )}
+        </button>
+        {!biometricAvailable && <p id="fingerprint-unavailable" className="-mt-2 mb-4 text-xs text-slate-400">Huella no disponible: {biometricUnavailableReason}</p>}
 
         {/* Puntitos del PIN (progreso) */}
         <div className="flex items-center justify-center gap-3 mb-6" aria-hidden>
