@@ -258,6 +258,56 @@ const catalogoDeLab = () => real ? real.catalogo() : ({ schema_version: 1, compl
     item_links: [{ item_id: 'lab-cafe', group_id: 'lab-temperature' }], category_links: [] },
 })
 
+// ── Qué producto recorre la prueba ───────────────────────────────────────────
+//
+// El recorrido NO puede nombrar a mano su categoría ni su platillo. Con el
+// fixture mínimo funcionaba; con un catálogo real esa categoría no existe y el
+// caso muere buscando un botón que nadie va a pintar (medido el 2026-09-14:
+// 3/4 casos, el cuarto esperando «Bebidas laboratorio» 30 s).
+//
+// Se elige solo, y con criterio, no con el primero que aparezca:
+//   · categoría RUTEADA a una estación — el recorrido manda a cocina y mira el KDS;
+//   · de preferencia un producto CON grupo obligatorio, porque el caso que lo usa
+//     comprueba justamente que las opciones obligatorias llegan desde Caja sin
+//     internet. Si el catálogo no tiene ninguno, ese tramo se omite y se dice.
+function elegirEscenario(cat) {
+  const ruteo = (cat.settings || {})['pos.station_routing'] || {}
+  const estacionDe = new Map()
+  for (const [estacion, categorias] of Object.entries(ruteo)) {
+    for (const c of categorias || []) estacionDe.set(String(c).toLowerCase(), estacion)
+  }
+  const mods = cat.modifiers || {}
+  const obligatorios = new Map((mods.groups || []).filter(g => g.required).map(g => [g.id, g]))
+  const vinculos = new Map()
+  for (const l of mods.item_links || []) {
+    if (obligatorios.has(l.group_id)) vinculos.set(l.item_id, obligatorios.get(l.group_id))
+  }
+  const candidatas = (cat.categories || []).filter(c =>
+    (c.items || []).length && (estacionDe.has(String(c.id).toLowerCase()) || estacionDe.has(String(c.name || '').toLowerCase())))
+  const lista = candidatas.length ? candidatas : (cat.categories || []).filter(c => (c.items || []).length)
+  let categoria = null, producto = null, grupo = null
+  for (const c of lista) {
+    const conGrupo = (c.items || []).find(i => vinculos.has(i.id))
+    if (conGrupo) { categoria = c; producto = conGrupo; grupo = vinculos.get(conGrupo.id); break }
+  }
+  if (!producto && lista.length) { categoria = lista[0]; producto = categoria.items[0] }
+  if (!producto) throw new Error('El catálogo del laboratorio no tiene un solo producto')
+  const opcion = grupo ? (mods.mods || []).find(m => m.group_id === grupo.id) : null
+  const estacion = estacionDe.get(String(categoria.id).toLowerCase())
+    || estacionDe.get(String(categoria.name || '').toLowerCase()) || 'cocina'
+  return { categoria, producto, grupo: opcion ? grupo : null, opcion, estacion }
+}
+const escenario = elegirEscenario(catalogoDeLab())
+const precioUnitario = Number(escenario.producto.price) || 0
+const cantidadDePrueba = 2
+const subtotalDePrueba = Math.round(precioUnitario * cantidadDePrueba * 100) / 100
+const ivaDePrueba = Math.round(subtotalDePrueba * 0.16 * 100) / 100
+const totalDePrueba = Math.round((subtotalDePrueba + ivaDePrueba) * 100) / 100
+const escapar = t => String(t).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+console.log(`[escenario] categoría «${escenario.categoria.name}» · producto «${escenario.producto.name}» ` +
+  `· estación ${escenario.estacion} · ${cantidadDePrueba} × ${precioUnitario} = ${totalDePrueba} con IVA` +
+  (escenario.grupo ? ` · grupo obligatorio «${escenario.grupo.name}»` : ' · SIN grupo obligatorio: ese tramo se omite'))
+
 // ── Nube del laboratorio ──────────────────────────────────────────────────────
 // Sirve lo que Caja pide a `app.fullsite.mx` desde su proceso Node: validación de
 // PIN y catálogo. Con `wan = false` corta la conexión (ECONNRESET), que es lo que
@@ -691,13 +741,14 @@ async function main() {
   const orderId = randomUUID()
   await command(caja, 'TURNO_OPENED', { ...turno, turno_id: turno.id, ts: turno.opened_at })
   await command(pos2, 'ORDER_SENT', { order_id: orderId, mesa: 1, mesero: staff.name,
-    customer_name: 'Familia laboratorio', personas: 3, status: 'enviada', total: 116,
-    subtotal: 100, iva: 16, saldo: 116, turno_id: turno.id, order_revision: 4,
-    items: [{ id: 'lab-line-1', nombre: 'Café de laboratorio', cantidad: 2, precio: 50,
-      subtotal: 100, precioExtra: 0, modificadores: [], notas: '', station: 'barra', menuItemId: 'lab-cafe' }],
+    customer_name: 'Familia laboratorio', personas: 3, status: 'enviada', total: totalDePrueba,
+    subtotal: subtotalDePrueba, iva: ivaDePrueba, saldo: totalDePrueba, turno_id: turno.id, order_revision: 4,
+    items: [{ id: 'lab-line-1', nombre: escenario.producto.name, cantidad: cantidadDePrueba, precio: precioUnitario,
+      subtotal: subtotalDePrueba, precioExtra: 0, modificadores: [], notas: '', station: escenario.estacion,
+      menuItemId: escenario.producto.id }],
   })
   await check('La comanda llega a la pantalla de cocina por LAN', async () => {
-    await expect(kds.page.locator('body')).toContainText('Café de laboratorio', { timeout: 20000 })
+    await expect(kds.page.locator('body')).toContainText(escenario.producto.name, { timeout: 20000 })
   })
   await check('Un comando WebSocket del POS secundario se confirma en Caja', async () => {
     const id = randomUUID()
@@ -711,26 +762,34 @@ async function main() {
   await check('Sin internet, POS 3 abre los productos y el total de la misma cuenta', async () => {
     await pos3.page.goto(`${uiOrigin}/pos?mesa=1`, { waitUntil: 'domcontentloaded', timeout: 60000 })
     await esperarHidratacion(pos3.page)
-    await expect(pos3.page.locator('body')).toContainText('Café de laboratorio', { timeout: 20000 })
-    await expect(pos3.page.locator('body')).toContainText(/116[.,]00/, { timeout: 10000 })
+    await expect(pos3.page.locator('body')).toContainText(escenario.producto.name, { timeout: 20000 })
+    await expect(pos3.page.locator('body')).toContainText(
+      new RegExp(escapar(totalDePrueba.toFixed(2)).replace('\\.', '[.,]')), { timeout: 10000 })
     const visible = await pos3.page.evaluate(tenant => JSON.parse(localStorage.getItem(`pos_cuenta_${tenant}_mesa:1`) || 'null')?.confirmed, tenant)
     assert.equal(visible?.id, orderId, 'El editor conservó el ID de la cuenta de Caja')
     assert.equal(visible?.items?.[0]?.cantidad, 2)
     await pos3.page.screenshot({ path: path.join(output, 'cuenta-compartida-sin-internet.png'), fullPage: true })
   })
   await check('POS 3 sin caché obtiene menú y opciones obligatorias de Caja sin internet', async () => {
-    await pos3.page.getByRole('button', { name: /Bebidas laboratorio/ }).click()
-    await pos3.page.getByRole('button', { name: /Café de laboratorio.*50/ }).click()
-    await expect(pos3.page.getByRole('button', { name: 'Elige Preparación de laboratorio' })).toBeDisabled()
-    await pos3.page.getByText('Caliente de laboratorio', { exact: true }).click()
-    await expect(pos3.page.getByRole('button', { name: /Agregar.*50/ })).toBeEnabled()
+    await pos3.page.getByRole('button', { name: new RegExp(escapar(escenario.categoria.name)) }).click()
+    await pos3.page.getByRole('button', { name: new RegExp(escapar(escenario.producto.name)) }).first().click()
+    if (escenario.grupo && escenario.opcion) {
+      // El botón de agregar nace deshabilitado hasta elegir la opción obligatoria:
+      // eso es lo que demuestra que el grupo viajó desde Caja sin internet.
+      await expect(pos3.page.getByRole('button', { name: `Elige ${escenario.grupo.name}` })).toBeDisabled()
+      await pos3.page.getByText(escenario.opcion.name, { exact: true }).click()
+      await expect(pos3.page.getByRole('button', { name: /Agregar/ })).toBeEnabled()
+    } else {
+      console.log('[escenario] el catálogo no trae grupos obligatorios: sólo se comprueba que el menú llegó')
+      await expect(pos3.page.getByRole('button', { name: /Agregar/ })).toBeEnabled()
+    }
     await pos3.page.screenshot({ path: path.join(output, 'catalogo-compartido-sin-internet.png'), fullPage: true })
     await pos3.page.getByRole('button', { name: 'Cancelar', exact: true }).click()
   })
   await check('Una instalación sin transición rechaza crear otra autoridad monetaria', async () => {
     const response = await request(pos2, '/events', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ command_type: 'FINANCIAL_OPEN', command_id: randomUUID(), order_id: orderId,
-        turno_id: turno.id, expected_revision: 0, expected_order_revision: 4, total_cents: 11600, currency: 'MXN' }) })
+        turno_id: turno.id, expected_revision: 0, expected_order_revision: 4, total_cents: Math.round(totalDePrueba * 100), currency: 'MXN' }) })
     assert.equal((await response.json()).results[0].code, 'LOCAL_AUTHORITY_DISABLED')
     assert.equal((await (await request(caja, '/state')).json()).financial_orders.length, 0)
   })
@@ -741,12 +800,12 @@ async function main() {
     caja = await startTerminal('Caja', 'server_pos', ports[0], ports[0], uiOrigin, ports)
     const snapshot = await (await request(caja, '/state')).json()
     const recovered = snapshot.salon_orders.find(o => o.id === orderId || o.order_id === orderId)
-    assert.equal(recovered.total, 116)
+    assert.equal(recovered.total, totalDePrueba)
     assert(snapshot.kds_orders.some(o => o.id === orderId || o.order_id === orderId))
-    await expect(pos3.page.locator('body')).toContainText(/Saldo confirmado en Caja:.*116[.,]00/)
+    await expect(pos3.page.locator('body')).toContainText(new RegExp('Saldo confirmado en Caja:.*' + escapar(totalDePrueba.toFixed(2)).replace('\\.', '[.,]')))
   })
   await check('Cocina legacy confirma preparación sin inventar liquidación', async () => {
-    await kds.page.locator('.card').filter({ hasText: 'Café de laboratorio' }).getByRole('button', { name: /Todo listo/ }).click()
+    await kds.page.locator('.card').filter({ hasText: escenario.producto.name }).getByRole('button', { name: /Todo listo/ }).click()
     await until(async () => {
       const snapshot = await (await request(caja, '/state')).json()
       return snapshot.kds_orders.find(o => o.id === orderId || o.order_id === orderId)?.status === 'lista'
