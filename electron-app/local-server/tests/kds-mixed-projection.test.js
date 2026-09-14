@@ -7,7 +7,10 @@ const path = require('path')
 const vm = require('node:vm')
 
 function loadAdapter() {
-  const html = fs.readFileSync(path.join(__dirname, '../kds-ui.html'), 'utf8')
+  // Git for Windows checks the fixture out with CRLF. Normalize before applying
+  // the structural matcher so this regression test exercises adaptOrders on the
+  // same source in macOS, Linux and the Windows packaging runner.
+  const html = fs.readFileSync(path.join(__dirname, '../kds-ui.html'), 'utf8').replace(/\r\n/g, '\n')
   const source = html.match(/  function adaptOrders\(data\)\{[\s\S]*?\n  \}\n\n  function fetchState/)
   assert.ok(source, 'adaptOrders must remain extractable for the projection regression test')
   const fn = source[0].replace(/\n\n  function fetchState$/, '\nreturn adaptOrders')
