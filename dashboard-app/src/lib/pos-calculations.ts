@@ -4,7 +4,7 @@
  * Extracted from pos/page.tsx so they can be tested independently.
  */
 
-import { getIvaRate } from './pos-constants'
+import { getIvaRate, preciosIncluyenIva } from './pos-constants'
 import type { OrderItem } from './pos-data'
 
 // ─── Item subtotal ─────────────────────────────────────────────────────────
@@ -23,13 +23,40 @@ export interface OrderTotals {
   total: number
 }
 
-/** Calculate full order totals from active items, applying discount before IVA. */
+/**
+ * Totales de la orden. El descuento se aplica antes del impuesto.
+ *
+ * DOS MODOS, y el restaurante declara cuál (ver `preciosIncluyenIva`):
+ *
+ *   EXCLUSIVO (por omisión)  el precio de carta NO trae impuesto
+ *       base  = precio − descuento
+ *       iva   = base × tasa
+ *       total = base + iva                 $92.00 -> $106.72
+ *
+ *   INCLUSIVO                el precio de carta YA trae impuesto
+ *       total = precio − descuento         el cliente paga lo que dice la carta
+ *       base  = total / (1 + tasa)
+ *       iva   = total − base               $92.00 -> $92.00 (base 79.31, iva 12.69)
+ *
+ * En los DOS, `subtotalAfterDiscount + iva = total`: es la ley L-02 del catálogo
+ * (docs/pos/LEYES-DEL-SISTEMA.md) y de ella depende que el corte de caja cuadre.
+ *
+ * `subtotalAfterDiscount` es la BASE GRAVABLE, que es lo que el ticket debe
+ * imprimir como «Sub» — en modo inclusivo eso NO es la suma de los precios de
+ * carta, sino lo que queda al sacarle el impuesto.
+ */
 export function calcOrderTotals(items: Pick<OrderItem, 'subtotal'>[], discount = 0): OrderTotals {
   const subtotal = items.reduce((sum, item) => sum + item.subtotal, 0)
-  const subtotalAfterDiscount = Math.max(0, subtotal - discount)
-  const iva = subtotalAfterDiscount * getIvaRate()
-  const total = subtotalAfterDiscount + iva
-  return { subtotal, subtotalAfterDiscount, iva, total }
+  const trasDescuento = Math.max(0, subtotal - discount)
+  const tasa = getIvaRate()
+
+  if (preciosIncluyenIva() && tasa > 0) {
+    const base = trasDescuento / (1 + tasa)
+    return { subtotal, subtotalAfterDiscount: base, iva: trasDescuento - base, total: trasDescuento }
+  }
+
+  const iva = trasDescuento * tasa
+  return { subtotal, subtotalAfterDiscount: trasDescuento, iva, total: trasDescuento + iva }
 }
 
 // ─── Split de cuenta ───────────────────────────────────────────────────────
@@ -116,7 +143,12 @@ export function calcSplitParejo(
 ): SplitPaymentTotals {
   const fullSubtotal = items.reduce((s, i) => s + i.subtotal, 0)
   const fullAfterDisc = Math.max(0, fullSubtotal - discount)
-  const fullTotal = fullAfterDisc + fullAfterDisc * getIvaRate()
+  // Mismo criterio que calcOrderTotals: con precio inclusivo el total YA es el
+  // precio de carta; sumarle la tasa aquí partiría la cuenta con un total que no
+  // coincide con el de la orden completa.
+  const fullTotal = preciosIncluyenIva() && getIvaRate() > 0
+    ? fullAfterDisc
+    : fullAfterDisc + fullAfterDisc * getIvaRate()
   const isLast = cuenta === n
   const each = (full: number) => isLast
     ? round2(full - round2(full / n) * (n - 1))
