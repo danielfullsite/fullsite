@@ -35,6 +35,14 @@ const KDS_URL = process.env.FULLSITE_KDS_URL || 'https://app.fullsite.mx/pos/coc
 // producción (sin el flag) sigue en kiosco, como debe ser en una terminal real.
 const DEV = process.env.FULLSITE_DEV === '1';
 
+// Registrar el autoarranque sólo en una instalación real. Un laboratorio usa
+// FULLSITE_DEV y/o un userData separado; tocar los login items desde ese proceso
+// alteraría el arranque de la terminal anfitriona aunque el ejecutable sea
+// portátil y se esté validando lado-a-lado.
+const LOGIN_ITEM_ENABLED = process.platform === 'win32'
+  && !DEV
+  && !process.env.FULLSITE_USER_DATA_DIR;
+
 // userData separado por terminal. Se aplica AQUÍ, en la carga del módulo, porque
 // `app.setPath` sólo surte efecto antes de que algo llame a `getPath('userData')`
 // — y config.json, printers.json y el event store salen todos de ahí.
@@ -1077,7 +1085,7 @@ app.whenReady().then(async () => {
   });
 
   // Auto-start on Windows login (creates startup shortcut)
-  if (process.platform === 'win32') {
+  if (LOGIN_ITEM_ENABLED) {
     app.setLoginItemSettings({ openAtLogin: true, path: process.execPath });
   }
 

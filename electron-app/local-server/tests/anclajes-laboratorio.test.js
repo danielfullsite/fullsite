@@ -26,6 +26,7 @@ const { execFileSync } = require('node:child_process')
 const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
+const vm = require('node:vm')
 
 const MAIN = path.join(__dirname, '..', '..', 'main.js')
 
@@ -56,6 +57,17 @@ function resolver(env) {
     encoding: 'utf8',
   })
   return JSON.parse(out)
+}
+
+function resuelveAutoarranque(env, platform = 'win32') {
+  const fuente = fs.readFileSync(MAIN, 'utf8')
+  const lineDev = /const DEV = ([^\n;]+);/.exec(fuente)
+  const lineLogin = /const LOGIN_ITEM_ENABLED = ([\s\S]*?);/.exec(fuente)
+  assert.ok(lineDev && lineLogin, 'no se halló la política de autoarranque en main.js')
+
+  const processAislado = { platform, env }
+  const DEV = vm.runInNewContext(lineDev[1], { process: processAislado })
+  return vm.runInNewContext(lineLogin[1], { process: processAislado, DEV })
 }
 
 describe('Los defaults de PRODUCCIÓN no cambian', () => {
@@ -143,5 +155,23 @@ describe('userData separado por terminal', () => {
     } finally {
       fs.rmSync(base, { recursive: true, force: true })
     }
+  })
+})
+
+describe('El laboratorio no modifica el autoarranque del anfitrión', () => {
+  test('producción Windows conserva el autoarranque', () => {
+    assert.equal(resuelveAutoarranque({}), true)
+  })
+
+  test('FULLSITE_DEV desactiva el registro de login items', () => {
+    assert.equal(resuelveAutoarranque({ FULLSITE_DEV: '1' }), false)
+  })
+
+  test('un userData aislado desactiva el registro aun sin FULLSITE_DEV', () => {
+    assert.equal(resuelveAutoarranque({ FULLSITE_USER_DATA_DIR: 'C:\\lab\\kds' }), false)
+  })
+
+  test('fuera de Windows nunca registra login items', () => {
+    assert.equal(resuelveAutoarranque({}, 'darwin'), false)
   })
 })
