@@ -33,17 +33,24 @@ function leerCliente(): boolean {
 const leerServidor = () => false
 
 /**
- * Bandera del rediseno. Se prende con `?v2=1` y se apaga con `?v2=0`; queda
- * guardada en el equipo. Apagarla es el rollback: el tile vuelve a su marcado
+ * Bandera del rediseno. Se prende con `#v2=1` y se apaga con `#v2=0`; queda
+ * guardada en el equipo. Apagarla es el rollback: todo vuelve a su marcado
  * anterior sin tocar una linea de codigo.
+ *
+ * Va en el HASH y no en la query a proposito. `pos/layout.tsx` decide a donde
+ * aterrizar despues del PIN con `if (pathname === '/pos' && !location.search)
+ * router.push('/pos/mesas')`, y hay 12 lugares mas en app/pos que leen
+ * `location.search`. Una bandera de diseno que cambie la navegacion no es una
+ * bandera de diseno. El hash no lo lee nadie en el POS.
  */
 export function usePosV2(): boolean {
   if (typeof window !== 'undefined') {
-    // El parametro manda sobre lo guardado, y se aplica antes de leer para que
-    // el primer render ya traiga el valor correcto.
+    // El hash manda sobre lo guardado, y se aplica antes de leer para que el
+    // primer render ya traiga el valor correcto.
     try {
-      const q = new URLSearchParams(window.location.search).get('v2')
-      if ((q === '1' || q === '0') && localStorage.getItem(FLAG_KEY) !== q) {
+      const m = /(?:^|[#&])v2=([01])(?:&|$)/.exec(window.location.hash)
+      const q = m ? m[1] : null
+      if (q && localStorage.getItem(FLAG_KEY) !== q) {
         localStorage.setItem(FLAG_KEY, q)
         suscriptores.forEach(fn => fn())
       }
