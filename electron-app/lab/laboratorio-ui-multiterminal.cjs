@@ -223,7 +223,8 @@ const fixture = {
 // El archivo vive FUERA del repositorio: éste es público y un catálogo real trae
 // precios y datos fiscales del cliente. Ver electron-app/lab/catalogo-real.cjs.
 const real = process.env.FULLSITE_LAB_CATALOGO
-  ? require('./catalogo-real').cargar({ catalogo: process.env.FULLSITE_LAB_CATALOGO,
+  // La extensión va explícita: `require` sólo autocompleta .js/.json/.node, nunca .cjs.
+  ? require('./catalogo-real.cjs').cargar({ catalogo: process.env.FULLSITE_LAB_CATALOGO,
       mesas: process.env.FULLSITE_LAB_MESAS, tenant, staff })
   : null
 if (real) {
