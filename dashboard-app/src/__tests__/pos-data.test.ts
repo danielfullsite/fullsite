@@ -44,6 +44,36 @@ describe('getActiveTurno cold offline', () => {
 
     vi.stubGlobal('fetch', originalFetch)
   })
+
+  it('con GET 200 vacío conserva un turno local mientras su POST siga pendiente', async () => {
+    // Compatibilidad con el candidato ya instalado en Caja: su cache todavía no
+    // guardaba `sincronizado`, pero la cola sí prueba que el POST sigue pendiente.
+    const turno = { id: 'turno-local-pendiente', fondo_inicial: 0, opened_by: 'Daniel', opened_at: new Date().toISOString() }
+    localStorage.setItem('pos_turno_cache', JSON.stringify({ turno, turnos: [turno], ts: Date.now() }))
+    localStorage.setItem('fullsite_offline_queue', JSON.stringify([
+      { id: 'queue-1', table: 'pos_turnos', data: { id: turno.id }, timestamp: Date.now(), synced: false },
+    ]))
+    const originalFetch = globalThis.fetch
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => [] }))
+
+    await expect(getActiveTurno()).resolves.toEqual({ ...turno, sincronizado: false })
+
+    vi.stubGlobal('fetch', originalFetch)
+  })
+
+  it('un GET 200 vacío no resucita un turno cacheado sin POST pendiente', async () => {
+    const turno = { id: 'turno-ya-cerrado', fondo_inicial: 0, opened_by: 'Daniel', opened_at: new Date().toISOString() }
+    localStorage.setItem('pos_turno_cache', JSON.stringify({ turno, turnos: [turno], ts: Date.now() }))
+    localStorage.setItem('fullsite_offline_queue', JSON.stringify([
+      { id: 'queue-ya-sincronizada', table: 'pos_turnos', data: { id: turno.id }, timestamp: Date.now(), synced: true },
+    ]))
+    const originalFetch = globalThis.fetch
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => [] }))
+
+    await expect(getActiveTurno()).resolves.toBeNull()
+
+    vi.stubGlobal('fetch', originalFetch)
+  })
 })
 
 // ─── formatMXN ────────────────────────────────────────────────────────────
