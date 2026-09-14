@@ -20,6 +20,8 @@ import {
   validateEscalationNota,
   withEscalationPayload,
   openOrderStatusLabel,
+  pedroPuedeAfirmarElSalon,
+  type LecturaDeCuentas,
   evaluarArqueo,
   leerContado,
   UMBRAL_EXPLICACION_MXN,
@@ -61,33 +63,46 @@ export function fusionarMovimientos(
 }
 
 /**
- * Cuentas abiertas del turno para la guardia de cierre. Bajo Caja se le pregunta
- * a Pedro (tiene el salón sin internet); si no contesta o no estamos bajo Caja,
- * la nube. Si NINGUNA contesta, devuelve la lista vacía — y eso es lo que había
- * antes también, pero ahora sólo pasa sin Pedro Y sin nube.
+ * Cuentas abiertas del turno para la guardia de cierre.
+ *
+ * Devuelve `determinado` porque las dos respuestas posibles NO son «hay» y «no
+ * hay»: la tercera es «nadie me lo pudo decir», y confundirla con la segunda es
+ * lo que cerró un turno con $429.20 vivos en AMALAY el 2026-09-14. Ver
+ * `pedroPuedeAfirmarElSalon`.
+ *
+ * Orden: Pedro primero cuando corremos bajo Caja —tiene el salón sin internet—
+ * pero SÓLO si su foto está completa. Si contesta a medias, la nube decide. Si
+ * ninguna de las dos puede, se dice que no se pudo; el cierre NO se bloquea (la
+ * noche siempre se tiene que poder cerrar) pero queda avisado y escrito.
  */
-async function leerCuentasAbiertas(turnoId: string): Promise<OpenOrder[]> {
+async function leerCuentasAbiertas(turnoId: string): Promise<LecturaDeCuentas> {
+  let motivoLocal: string | null = null
   if (requiereCaja()) {
     const salon = await leerSalon()
-    if (salon.procedencia !== 'sin-pedro') {
+    if (pedroPuedeAfirmarElSalon(salon)) {
       const delTurno = salon.ordenes.filter(o => !o.turno_id || String(o.turno_id) === turnoId)
-      return filterOpenOrders(delTurno.map(o => ({
+      return { determinado: true, cuentas: filterOpenOrders(delTurno.map(o => ({
         id: String(o.id ?? o.order_id ?? ''),
         mesa: Number(o.mesa) || 0,
         mesero: String(o.mesero ?? ''),
         status: String(o.status ?? ''),
         total: Number(o.total) || 0,
-      })))
+      }))) }
     }
+    motivoLocal = salon.motivo || (salon.completa === false
+      ? 'la caja no ha terminado de confirmar las cuentas'
+      : 'sin conexión con la caja')
   }
   try {
     const openRes = await fetchWithTimeout(
       `${SUPABASE_URL}/rest/v1/pos_orders?select=id,mesa,mesero,status,total&client_id=eq.${_cid()}&turno_id=eq.${turnoId}&status=in.(enviada,preparando,lista)`,
       { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } },
     )
-    if (openRes.ok) return filterOpenOrders(await openRes.json())
-  } catch { /* sin nube: abajo */ }
-  return []
+    if (openRes.ok) return { determinado: true, cuentas: filterOpenOrders(await openRes.json()) }
+    return { determinado: false, motivo: motivoLocal || `la nube respondió HTTP ${openRes.status}` }
+  } catch {
+    return { determinado: false, motivo: motivoLocal || 'sin conexión con la nube' }
+  }
 }
 
 interface CierreData {
@@ -136,6 +151,9 @@ export default function CierreCajaWizard({
   // GUARD-08: open orders check
   const [openOrders, setOpenOrders] = useState<OpenOrder[]>([])
   const [openOrdersLoaded, setOpenOrdersLoaded] = useState(false)
+  /** `false` = nadie pudo confirmar si hay cuentas abiertas. NO es «no hay». */
+  const [cuentasVerificadas, setCuentasVerificadas] = useState(true)
+  const [motivoSinVerificar, setMotivoSinVerificar] = useState<string | null>(null)
   // GUARD-08: manager escalation
   const [escalationActive, setEscalationActive] = useState(false)
   const [escalationPin, setEscalationPin] = useState('')
@@ -287,7 +305,10 @@ export default function CierreCajaWizard({
       // sin WAN se cerraba el turno con mesas vivas y el TURNO_CLOSED las
       // borraba del KDS. Bajo Caja, Pedro tiene el salón (`/state`) aunque no
       // haya internet; se le pregunta primero ahí y la nube es el respaldo.
-      setOpenOrders(await leerCuentasAbiertas(turnoId))
+      const lectura = await leerCuentasAbiertas(turnoId)
+      setOpenOrders(lectura.determinado ? lectura.cuentas : [])
+      setCuentasVerificadas(lectura.determinado)
+      setMotivoSinVerificar(lectura.determinado ? null : lectura.motivo)
       setOpenOrdersLoaded(true)
 
       setLoading(false)
@@ -306,6 +327,17 @@ export default function CierreCajaWizard({
     totalContado,
   )
   const arqueo = evaluarArqueo(contadoCapturado, diferencia, notas)
+
+  // Un corte cerrado a ciegas se marca en el propio corte. Va dentro de `notas`
+  // y no en una columna nueva a propósito: mañana, quien explique una diferencia
+  // lo lee donde ya busca, y no hace falta migrar la tabla para que sirva hoy.
+  // La misma nota viaja a la nube, a la copia local y al ticket impreso: si sólo
+  // quedara en una de las tres, la que se consulte podría ser la otra.
+  const notasDelCierre = [
+    notas.trim() || null,
+    cuentasVerificadas ? null
+      : `[cuentas abiertas NO verificadas al cerrar${motivoSinVerificar ? `: ${motivoSinVerificar}` : ''}]`,
+  ].filter(Boolean).join(' ') || null
 
   // Huella para cerrar turno. Pedido por Daniel el 2026-08-31 ("tambien para cierre
   // de caja"). La identidad entra por el MISMO embudo que el PIN: se sigue exigiendo
@@ -368,7 +400,7 @@ export default function CierreCajaWizard({
         tarjeta: systemData.tarjeta, transferencias: systemData.transferencias, otros: systemData.otros,
         diferencia, totalVentas: systemData.totalVentas, ticketsCount: systemData.ticketsCount,
         cancelaciones: systemData.cancelaciones, descuentos: systemData.descuentos, propinas: systemData.propinas,
-        colaPendiente, notas: notas || null, closedBy: manager,
+        colaPendiente, notas: notasDelCierre, closedBy: manager,
       }),
       openOrders,
       escalationAuthorizedBy,
@@ -381,7 +413,7 @@ export default function CierreCajaWizard({
       efectivo_sistema: efectivoEsperado,
       diferencia,
       closed_at: now,
-      notas: notas || null,
+      notas: notasDelCierre,
     }
 
     // 0. PREFLIGHT: si la nube contesta con un rechazo definitivo, el cierre NO
@@ -413,7 +445,7 @@ export default function CierreCajaWizard({
 
     // 1. Close turno in IDB immediately — survives any network failure
     try {
-      await closeCachedTurno(turnoId, totalContado, notas || undefined)
+      await closeCachedTurno(turnoId, totalContado, notasDelCierre || undefined)
     } catch { /* IDB unavailable — continue */ }
 
     // 2. Enqueue both writes to the durable sync queue
@@ -554,7 +586,13 @@ export default function CierreCajaWizard({
       } catch { fallidas.push(`mesa ${o.mesa}`) }
     }
     // Releer — nunca declarar exito a medias.
-    try { setOpenOrders(await leerCuentasAbiertas(turnoId)) } catch { /* se queda la lista anterior */ }
+    try {
+      const lectura = await leerCuentasAbiertas(turnoId)
+      // Si la relectura no se pudo determinar, NO se vacía la lista: declarar
+      // éxito por falta de respuesta es justo el error que arregla este archivo.
+      if (lectura.determinado) setOpenOrders(lectura.cuentas)
+      else { setCuentasVerificadas(false); setMotivoSinVerificar(lectura.motivo) }
+    } catch { /* se queda la lista anterior */ }
     setBatchSaving(false)
     if (fallidas.length) setEscalationError(`No se pudieron cancelar: ${fallidas.join(', ')}. Reintenta o ciérralas desde la caja.`)
   }
@@ -629,7 +667,7 @@ export default function CierreCajaWizard({
       <div class="row"><span>Cancelaciones:</span><span>${systemData.cancelaciones}</span></div>
       <div class="row"><span>Descuentos:</span><span>${formatMXN(systemData.descuentos)}</span></div>
       <div class="row"><span>Propinas:</span><span>${formatMXN(systemData.propinas)}</span></div>
-      ${notas ? `<div class="line"></div><p>Notas: ${notas}</p>` : ''}
+      ${notasDelCierre ? `<div class="line"></div><p>Notas: ${notasDelCierre}</p>` : ''}
       <div class="line"></div>
       <p style="text-align:center;font-size:10px">Cerrado por: ${managerName || '---'}</p>
       </body></html>
@@ -787,6 +825,21 @@ export default function CierreCajaWizard({
           </div>
         ) : (
           <>
+        {/* No se pudo comprobar el salón: se avisa, NO se bloquea. La noche
+            siempre se tiene que poder cerrar (regla dura #3 del offline), pero
+            el cajero tiene que saber que está cerrando a ciegas. */}
+        {openOrdersLoaded && !cuentasVerificadas && (
+          <div className="mx-5 mt-4 flex items-start gap-2 px-4 py-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-200 text-sm">
+            <AlertTriangle size={16} className="flex-shrink-0 mt-0.5" />
+            <span>
+              <strong>No se pudieron revisar las cuentas abiertas</strong>
+              {motivoSinVerificar ? ` (${motivoSinVerificar})` : ''}. Puedes cerrar, pero
+              comprueba en el salón que no quede ninguna mesa sin cobrar — este corte
+              quedará marcado como no verificado.
+            </span>
+          </div>
+        )}
+
         {/* Progress bar */}
         <div className="h-1 bg-[var(--line)]">
           <div
