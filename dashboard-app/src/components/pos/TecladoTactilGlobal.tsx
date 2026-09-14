@@ -172,30 +172,34 @@ export default function TecladoTactilGlobal() {
   if (!campo) return null
   const esSecreto = campo instanceof HTMLInputElement && campo.type === 'password'
   const vistaPrevia = esSecreto ? '•'.repeat(valorVisible.length) : valorVisible
-  const tecla = 'min-h-[56px] rounded-xl border border-[var(--line)] bg-[var(--raised)] px-2 text-lg font-bold text-[var(--text-1)] active:scale-95'
+  const tecla = 'min-h-[52px] rounded-xl border border-[var(--line)] bg-[var(--raised)] px-2 text-lg font-bold text-[var(--text-1)] active:scale-95'
   const filasTexto = simbolos ? FILAS_SIMBOLOS : FILAS_LETRAS.map(fila => fila.map(caracter =>
     /^[A-ZÑ]$/.test(caracter) && !mayusculas ? caracter.toLocaleLowerCase('es-MX') : caracter))
 
-  return <section data-teclado-tactil-panel role="dialog" aria-label={`Teclado en pantalla para ${nombre}`}
-    className="fixed inset-x-0 bottom-0 z-[240] border-t border-[var(--line)] bg-[var(--surface)] p-3 shadow-[0_-18px_45px_rgba(0,0,0,.65)]">
-    <div className="mx-auto max-w-5xl">
-      <div className="mb-2 flex min-h-[64px] items-center justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-bold text-[var(--text-3)]">{nombre}</p>
-          <output
-            aria-label={esSecreto ? `${nombre}: ${valorVisible.length} digitos capturados` : `${nombre}: valor capturado`}
-            className="mt-1 block min-h-8 truncate text-2xl font-bold tracking-[0.35em] text-[var(--text-1)]"
-          >
-            {vistaPrevia || <span className="text-base font-medium tracking-normal text-[var(--text-4)]">Sin capturar</span>}
-          </output>
-        </div>
-        <div className="flex gap-2">
-          <button type="button" className={`${tecla} px-4 text-sm`} onPointerDown={e => e.preventDefault()} onClick={() => cerrar(false)}>Cancelar</button>
-          <button type="button" className={`${tecla} border-emerald-600 bg-emerald-600 px-6 text-sm text-white`} onPointerDown={e => e.preventDefault()} onClick={() => cerrar(true)}>Listo</button>
-        </div>
-      </div>
+  const contexto = <div className="min-w-0 rounded-2xl border-2 border-emerald-500/70 bg-emerald-500/10 px-4 py-3 shadow-[0_0_24px_rgba(16,185,129,.12)]">
+    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-400">Escribiendo en</p>
+    <p className="mt-1 truncate text-lg font-black text-[var(--text-1)]">{nombre}</p>
+    <output
+      aria-live="polite"
+      aria-label={esSecreto ? `${nombre}: ${valorVisible.length} digitos capturados` : `${nombre}: valor capturado`}
+      className="mt-2 block min-h-9 truncate rounded-xl bg-black/20 px-3 py-1 text-2xl font-black tracking-[0.35em] text-white"
+    >
+      {vistaPrevia || <span className="text-base font-semibold tracking-normal text-[var(--text-3)]">Sin capturar</span>}
+    </output>
+  </div>
 
-      {modo === 'texto' ? <div className="space-y-2">
+  return <section data-teclado-tactil-panel role="dialog" aria-label={`Teclado en pantalla para ${nombre}`}
+    className="fixed inset-x-0 bottom-0 z-[240] border-t border-[var(--line)] bg-[var(--surface)] p-2 shadow-[0_-18px_45px_rgba(0,0,0,.65)]">
+    <div className="mx-auto max-w-6xl">
+      {modo === 'texto' ? <>
+        <div className="mb-2 flex items-center gap-3">
+          <div className="min-w-0 flex-1">{contexto}</div>
+          <div className="flex gap-2">
+            <button type="button" className={`${tecla} px-4 text-sm`} onPointerDown={e => e.preventDefault()} onClick={() => cerrar(false)}>Cancelar</button>
+            <button type="button" className={`${tecla} border-emerald-600 bg-emerald-600 px-6 text-sm text-white`} onPointerDown={e => e.preventDefault()} onClick={() => cerrar(true)}>Listo</button>
+          </div>
+        </div>
+        <div className="space-y-2">
         {filasTexto.map((fila, index) => <div key={index} className="grid grid-cols-10 gap-2">
           {fila.map(caracter => <button type="button" key={caracter} aria-label={`Escribir ${caracter}`} className={tecla}
             onPointerDown={e => e.preventDefault()} onClick={() => escribir(caracter)}>{caracter}</button>)}
@@ -211,14 +215,27 @@ export default function TecladoTactilGlobal() {
             onClick={() => setSimbolos(valor => !valor)}>{simbolos ? 'Letras' : 'Símbolos'}</button>
           <button type="button" className={tecla} onPointerDown={e => e.preventDefault()} onClick={borrar}>Borrar</button>
         </div>
-      </div> : <div className="mx-auto grid max-w-xl grid-cols-3 gap-2">
-        {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(numero => <button type="button" key={numero} aria-label={`Escribir ${numero}`} className={tecla}
-          onPointerDown={e => e.preventDefault()} onClick={() => escribir(numero)}>{numero}</button>)}
-        <button type="button" className={tecla} onPointerDown={e => e.preventDefault()} onClick={() => { fijarValor(campo, ''); setValorVisible('') }}>Limpiar</button>
-        <button type="button" aria-label="Escribir 0" className={tecla} onPointerDown={e => e.preventDefault()} onClick={() => escribir('0')}>0</button>
-        <button type="button" className={tecla} onPointerDown={e => e.preventDefault()} onClick={borrar}>Borrar</button>
-        {modo === 'decimal' && <button type="button" aria-label="Escribir punto decimal" className={`${tecla} col-span-3`} onPointerDown={e => e.preventDefault()}
-          onClick={() => { if (!campo.value.includes('.')) escribir('.') }}>Punto decimal</button>}
+        </div>
+      </> : <div className="grid gap-2 md:grid-cols-[minmax(280px,0.85fr)_minmax(440px,1.15fr)] md:items-stretch">
+        <div className="flex flex-col justify-between gap-2">
+          {contexto}
+          {modo === 'decimal' && <button type="button" aria-label="Escribir punto decimal" className={tecla} onPointerDown={e => e.preventDefault()}
+            onClick={() => { if (!campo.value.includes('.')) escribir('.') }}>Punto decimal</button>}
+          <div className="grid grid-cols-2 gap-2">
+            <button type="button" className={`${tecla} text-sm`} onPointerDown={e => e.preventDefault()} onClick={() => cerrar(false)}>Cancelar</button>
+            <button type="button" className={`${tecla} border-emerald-600 bg-emerald-600 text-sm text-white`} onPointerDown={e => e.preventDefault()} onClick={() => cerrar(true)}>Listo</button>
+          </div>
+        </div>
+        <div className="grid grid-cols-4 gap-2">
+          {['1', '2', '3'].map(numero => <button type="button" key={numero} aria-label={`Escribir ${numero}`} className={tecla}
+            onPointerDown={e => e.preventDefault()} onClick={() => escribir(numero)}>{numero}</button>)}
+          <button type="button" className={tecla} onPointerDown={e => e.preventDefault()} onClick={borrar}>Borrar</button>
+          {['4', '5', '6'].map(numero => <button type="button" key={numero} aria-label={`Escribir ${numero}`} className={tecla}
+            onPointerDown={e => e.preventDefault()} onClick={() => escribir(numero)}>{numero}</button>)}
+          <button type="button" className={tecla} onPointerDown={e => e.preventDefault()} onClick={() => { fijarValor(campo, ''); setValorVisible('') }}>Limpiar</button>
+          {['7', '8', '9', '0'].map(numero => <button type="button" key={numero} aria-label={`Escribir ${numero}`} className={tecla}
+            onPointerDown={e => e.preventDefault()} onClick={() => escribir(numero)}>{numero}</button>)}
+        </div>
       </div>}
     </div>
   </section>

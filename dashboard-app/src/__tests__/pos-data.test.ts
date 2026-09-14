@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import 'fake-indexeddb/auto'
+import { IDBFactory } from 'fake-indexeddb'
 
 // ─── localStorage mock ────────────────────────────────────────────────────
 
@@ -11,11 +13,16 @@ const localStorageMock = {
 }
 vi.stubGlobal('localStorage', localStorageMock)
 
-beforeEach(() => localStorageMock.clear())
+beforeEach(() => {
+  localStorageMock.clear()
+  globalThis.indexedDB = new IDBFactory()
+  process.env.NEXT_PUBLIC_DEFAULT_CLIENT_ID = 'amalay'
+})
 
 // ─── Import after mocking ─────────────────────────────────────────────────
 
 import { IVA_RATE } from '@/lib/pos-constants'
+import { cacheTurno, getCachedActiveTurno } from '@/lib/pos-offline-db'
 import {
   formatMXN,
   generateId,
@@ -67,6 +74,37 @@ describe('getActiveTurno cold offline', () => {
     localStorage.setItem('fullsite_offline_queue', JSON.stringify([
       { id: 'queue-ya-sincronizada', table: 'pos_turnos', data: { id: turno.id }, timestamp: Date.now(), synced: true },
     ]))
+    const originalFetch = globalThis.fetch
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => [] }))
+
+    await expect(getActiveTurno()).resolves.toBeNull()
+
+    vi.stubGlobal('fetch', originalFetch)
+  })
+
+  it('recupera desde IndexedDB el turno local si una versión anterior ya borró localStorage', async () => {
+    const turno = { id: 'turno-durable-pendiente', client_id: 'amalay', fondo_inicial: 0, opened_by: 'Daniel', opened_at: new Date().toISOString() }
+    await cacheTurno(turno)
+    await expect(getCachedActiveTurno('amalay')).resolves.toMatchObject({ id: turno.id })
+    localStorage.setItem('fullsite_offline_queue', JSON.stringify([
+      { id: 'queue-durable', table: 'pos_turnos', data: { id: turno.id }, timestamp: Date.now(), synced: false },
+    ]))
+    const originalFetch = globalThis.fetch
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => [] }))
+
+    await expect(getActiveTurno()).resolves.toEqual({
+      id: turno.id, fondo_inicial: 0, opened_by: 'Daniel', opened_at: turno.opened_at, sincronizado: false,
+    })
+
+    vi.stubGlobal('fetch', originalFetch)
+  })
+
+  it('no recupera desde IndexedDB un turno que ya estaba sincronizado', async () => {
+    const turno = {
+      id: 'turno-durable-sincronizado', client_id: 'amalay', fondo_inicial: 0,
+      opened_by: 'Daniel', opened_at: new Date().toISOString(), synced_at: new Date().toISOString(),
+    }
+    await cacheTurno(turno)
     const originalFetch = globalThis.fetch
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => [] }))
 

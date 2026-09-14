@@ -133,3 +133,14 @@ it('alterna entre minúsculas y mayúsculas sin agregar otra fila al teclado', (
   expect(screen.getByRole('dialog').className).toContain('fixed')
   expect(screen.getByRole('dialog').className).toContain('bottom-0')
 })
+
+it('el pad numérico usa tres filas compactas y destaca el campo que se está editando', () => {
+  render(createElement(Campo))
+  fireEvent.pointerDown(screen.getByLabelText('Importe de prueba'))
+
+  const teclado = screen.getByRole('dialog')
+  expect(teclado.textContent).toContain('Escribiendo en')
+  expect(teclado.textContent).toContain('Importe de prueba')
+  expect(teclado.firstElementChild?.firstElementChild?.className).toContain('md:grid-cols-')
+  expect(screen.getAllByRole('button', { name: /^Escribir [0-9]$/ })).toHaveLength(10)
+})

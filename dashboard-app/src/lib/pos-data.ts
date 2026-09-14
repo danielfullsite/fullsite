@@ -491,24 +491,46 @@ export async function getActiveTurnos(): Promise<ActiveTurnoRecord[]> {
    * cerrado desde otra terminal también puede quedar cacheado y no debe
    * resucitarse.
    */
-  const pendingLocalFromCache = (): ActiveTurnoRecord[] => {
+  const pendingLocalFromCache = async (): Promise<ActiveTurnoRecord[]> => {
     if (typeof localStorage === 'undefined') return []
-    const cached = fromCache()
-    if (cached.length === 0) return []
+    let pendingIds = new Set<string>()
     try {
       const queue = JSON.parse(localStorage.getItem('fullsite_offline_queue') || '[]')
-      if (!Array.isArray(queue)) return []
-      const pendingIds = new Set(
+      if (Array.isArray(queue)) pendingIds = new Set(
         queue
           .filter(item => item?.synced !== true && item?.table === 'pos_turnos' && item?.data?.id)
           .map(item => String(item.data.id))
       )
-      return cached
-        .filter(turno => pendingIds.has(turno.id))
-        .map(turno => ({ ...turno, sincronizado: false }))
-    } catch {
-      return []
-    }
+    } catch {}
+
+    // Primero intenta la copia rápida. Una versión anterior podía reemplazarla
+    // con null al recibir GET 200 + [], por eso no termina aquí si está vacía.
+    const cached = fromCache()
+      .filter(turno => pendingIds.has(turno.id))
+      .map(turno => ({ ...turno, sincronizado: false }))
+    if (cached.length > 0) return cached
+
+    // La página de Turnos guarda además una copia durable en IndexedDB. En Caja
+    // observamos exactamente este orden: apertura local -> navegación a Mesas ->
+    // la respuesta remota vacía borró localStorage, pero el turno seguía en IDB.
+    // Sólo recuperamos un turno activo, del día de venta actual y con evidencia
+    // de que aún no sincronizó (sin synced_at o con POST pendiente). Un turno
+    // cerrado o ya sincronizado no puede resucitar por esta vía.
+    if (typeof indexedDB === 'undefined') return []
+    try {
+      const { getCachedActiveTurno } = await import('@/lib/pos-offline-db')
+      const turno = await getCachedActiveTurno(_getClientId())
+      if (!turno || turno.closed_at || !turno.opened_at) return []
+      const pendiente = pendingIds.has(String(turno.id)) || !turno.synced_at
+      if (!pendiente || !mismoDiaDeVenta(turno.opened_at, Date.now(), inicioDiaConfigurado())) return []
+      return [{
+        id: String(turno.id),
+        fondo_inicial: Number(turno.fondo_inicial) || 0,
+        opened_by: String(turno.opened_by || ''),
+        opened_at: String(turno.opened_at),
+        sincronizado: false,
+      }]
+    } catch { return [] }
   }
 
   let res: Response
@@ -519,7 +541,8 @@ export async function getActiveTurnos(): Promise<ActiveTurnoRecord[]> {
     )
   } catch {
     // No hubo respuesta: red caida o timeout. Aqui SI vale el cache.
-    return fromCache()
+    const cached = fromCache()
+    return cached.length > 0 ? cached : pendingLocalFromCache()
   }
 
   if (!res.ok) {
@@ -534,7 +557,10 @@ export async function getActiveTurnos(): Promise<ActiveTurnoRecord[]> {
      * Un fallo de contrato tiene que SUBIR. Servir cache ante un 401 no es
      * tolerancia a fallos: es operar con datos viejos sin decirselo a nadie.
      */
-    if (esFalloDeRed(res.status)) return fromCache()
+    if (esFalloDeRed(res.status)) {
+      const cached = fromCache()
+      return cached.length > 0 ? cached : pendingLocalFromCache()
+    }
     const detalle = await res.text().catch(() => '')
     if (esFalloDeAutenticacion(res.status)) throw new ErrorDeSesion(res.status, detalle.slice(0, 200))
     throw new ErrorDeContrato(res.status, detalle.slice(0, 200))
@@ -543,7 +569,7 @@ export async function getActiveTurnos(): Promise<ActiveTurnoRecord[]> {
   const payload = await res.json()
   const rows: ActiveTurnoRecord[] = Array.isArray(payload) ? payload : []
   if (rows.length === 0) {
-    const pending = pendingLocalFromCache()
+    const pending = await pendingLocalFromCache()
     if (pending.length > 0) return pending
   }
   if (typeof window !== 'undefined') {
