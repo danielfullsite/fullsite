@@ -933,8 +933,8 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
           {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => (
             <button
               key={d}
-              onClick={() => { if (!isLocked && !checking) setPin((p) => (p + d).slice(0, 10)) }}
-              disabled={isLocked || checking}
+              onClick={() => { if (!isLocked) setPin((p) => (p + d).slice(0, 10)) }}
+              disabled={isLocked}
               className="min-h-[64px] rounded-2xl bg-slate-800/70 hover:bg-slate-700 active:scale-95 border border-slate-700 text-white text-2xl font-bold transition-all disabled:opacity-40"
             >
               {d}
@@ -942,8 +942,8 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
           ))}
           {/* Borrar */}
           <button
-            onClick={() => { if (!isLocked && !checking) setPin((p) => p.slice(0, -1)) }}
-            disabled={isLocked || checking || pin.length === 0}
+            onClick={() => { if (!isLocked) setPin((p) => p.slice(0, -1)) }}
+            disabled={isLocked || pin.length === 0}
             aria-label="Borrar"
             className="min-h-[64px] rounded-2xl bg-slate-800/40 hover:bg-slate-700 active:scale-95 border border-slate-700 text-slate-300 flex items-center justify-center transition-all disabled:opacity-30"
           >
@@ -951,8 +951,8 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
           </button>
           {/* 0 */}
           <button
-            onClick={() => { if (!isLocked && !checking) setPin((p) => (p + '0').slice(0, 10)) }}
-            disabled={isLocked || checking}
+            onClick={() => { if (!isLocked) setPin((p) => (p + '0').slice(0, 10)) }}
+            disabled={isLocked}
             className="min-h-[64px] rounded-2xl bg-slate-800/70 hover:bg-slate-700 active:scale-95 border border-slate-700 text-white text-2xl font-bold transition-all disabled:opacity-40"
           >
             0
