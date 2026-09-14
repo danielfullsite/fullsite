@@ -74,6 +74,7 @@ export default function TecladoTactilGlobal() {
   const [campo, setCampo] = useState<Campo | null>(null)
   const [modo, setModo] = useState<Modo>('texto')
   const [nombre, setNombre] = useState('Campo de texto')
+  const [valorVisible, setValorVisible] = useState('')
   const [mayusculas, setMayusculas] = useState(true)
   const [simbolos, setSimbolos] = useState(false)
 
@@ -114,6 +115,7 @@ export default function TecladoTactilGlobal() {
       setCampo(objetivo)
       setModo(nuevoModo)
       setNombre(nombreDelCampo(objetivo))
+      setValorVisible(objetivo.value)
       // Conserva el teclado textual en mayúsculas como antes, pero correos y
       // secretos empiezan en minúsculas, que es la captura habitual y evita un
       // toque extra en los dos campos donde el caso importa más.
@@ -136,6 +138,7 @@ export default function TecladoTactilGlobal() {
     let siguiente = actual.value.slice(0, inicio) + texto + actual.value.slice(fin)
     if (actual.maxLength >= 0) siguiente = siguiente.slice(0, actual.maxLength)
     fijarValor(actual, siguiente)
+    setValorVisible(siguiente)
     requestAnimationFrame(() => {
       const posicion = Math.min(inicio + texto.length, siguiente.length)
       try { actual.setSelectionRange(posicion, posicion) } catch { /* type=number */ }
@@ -148,11 +151,15 @@ export default function TecladoTactilGlobal() {
     const inicio = actual.selectionStart ?? actual.value.length
     const fin = actual.selectionEnd ?? inicio
     const desde = inicio === fin ? Math.max(0, inicio - 1) : inicio
-    fijarValor(actual, actual.value.slice(0, desde) + actual.value.slice(fin))
+    const siguiente = actual.value.slice(0, desde) + actual.value.slice(fin)
+    fijarValor(actual, siguiente)
+    setValorVisible(siguiente)
     requestAnimationFrame(() => { try { actual.setSelectionRange(desde, desde) } catch { /* type=number */ } })
   }
 
   if (!campo) return null
+  const esSecreto = campo instanceof HTMLInputElement && campo.type === 'password'
+  const vistaPrevia = esSecreto ? '•'.repeat(valorVisible.length) : valorVisible
   const tecla = 'min-h-[56px] rounded-xl border border-[var(--line)] bg-[var(--raised)] px-2 text-lg font-bold text-[var(--text-1)] active:scale-95'
   const filasTexto = simbolos ? FILAS_SIMBOLOS : FILAS_LETRAS.map(fila => fila.map(caracter =>
     /^[A-ZÑ]$/.test(caracter) && !mayusculas ? caracter.toLocaleLowerCase('es-MX') : caracter))
@@ -160,8 +167,16 @@ export default function TecladoTactilGlobal() {
   return <section data-teclado-tactil-panel role="dialog" aria-label={`Teclado en pantalla para ${nombre}`}
     className="fixed inset-x-0 bottom-0 z-[240] border-t border-[var(--line)] bg-[var(--surface)] p-3 shadow-[0_-18px_45px_rgba(0,0,0,.65)]">
     <div className="mx-auto max-w-5xl">
-      <div className="mb-2 flex min-h-[56px] items-center justify-between gap-3">
-        <p className="truncate font-bold">{nombre}</p>
+      <div className="mb-2 flex min-h-[64px] items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-bold text-[var(--text-3)]">{nombre}</p>
+          <output
+            aria-label={esSecreto ? `${nombre}: ${valorVisible.length} digitos capturados` : `${nombre}: valor capturado`}
+            className="mt-1 block min-h-8 truncate text-2xl font-bold tracking-[0.35em] text-[var(--text-1)]"
+          >
+            {vistaPrevia || <span className="text-base font-medium tracking-normal text-[var(--text-4)]">Sin capturar</span>}
+          </output>
+        </div>
         <div className="flex gap-2">
           <button type="button" className={`${tecla} px-4 text-sm`} onPointerDown={e => e.preventDefault()} onClick={() => cerrar(false)}>Cancelar</button>
           <button type="button" className={`${tecla} border-emerald-600 bg-emerald-600 px-6 text-sm text-white`} onPointerDown={e => e.preventDefault()} onClick={() => cerrar(true)}>Listo</button>
@@ -174,7 +189,7 @@ export default function TecladoTactilGlobal() {
             onPointerDown={e => e.preventDefault()} onClick={() => escribir(caracter)}>{caracter}</button>)}
         </div>)}
         <div className="grid grid-cols-[1fr_1fr_2fr_1fr_1fr] gap-2">
-          <button type="button" className={tecla} onPointerDown={e => e.preventDefault()} onClick={() => fijarValor(campo, '')}>Limpiar</button>
+          <button type="button" className={tecla} onPointerDown={e => e.preventDefault()} onClick={() => { fijarValor(campo, ''); setValorVisible('') }}>Limpiar</button>
           <button type="button" aria-pressed={mayusculas} disabled={simbolos} className={`${tecla} disabled:opacity-40`}
             onPointerDown={e => e.preventDefault()} onClick={() => setMayusculas(valor => !valor)}>
             {mayusculas ? 'Minúsculas' : 'Mayúsculas'}
@@ -187,7 +202,7 @@ export default function TecladoTactilGlobal() {
       </div> : <div className="mx-auto grid max-w-xl grid-cols-3 gap-2">
         {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(numero => <button type="button" key={numero} aria-label={`Escribir ${numero}`} className={tecla}
           onPointerDown={e => e.preventDefault()} onClick={() => escribir(numero)}>{numero}</button>)}
-        <button type="button" className={tecla} onPointerDown={e => e.preventDefault()} onClick={() => fijarValor(campo, '')}>Limpiar</button>
+        <button type="button" className={tecla} onPointerDown={e => e.preventDefault()} onClick={() => { fijarValor(campo, ''); setValorVisible('') }}>Limpiar</button>
         <button type="button" aria-label="Escribir 0" className={tecla} onPointerDown={e => e.preventDefault()} onClick={() => escribir('0')}>0</button>
         <button type="button" className={tecla} onPointerDown={e => e.preventDefault()} onClick={borrar}>Borrar</button>
         {modo === 'decimal' && <button type="button" aria-label="Escribir punto decimal" className={`${tecla} col-span-3`} onPointerDown={e => e.preventDefault()}

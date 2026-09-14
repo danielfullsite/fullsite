@@ -648,7 +648,7 @@ export default function CierreCajaWizard({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-2">
-      <div className="bg-[var(--surface-2)] border border-[var(--line)] rounded-2xl w-full max-w-3xl max-h-[96vh] overflow-y-auto">
+      <div className={`bg-[var(--surface-2)] border border-[var(--line)] rounded-2xl w-full ${step === 2 ? 'max-w-5xl' : 'max-w-3xl'} max-h-[96vh] overflow-hidden flex flex-col`}>
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--line)]">
           <div className="flex items-center gap-3">
@@ -669,7 +669,7 @@ export default function CierreCajaWizard({
 
         {/* GUARD-08: show open-orders screen before letting the wizard proceed */}
         {openOrdersLoaded && openOrders.length > 0 && !escalationAuthorizedBy ? (
-          <div className="p-5 space-y-4">
+          <div className="p-5 space-y-4 overflow-y-auto">
             <div className="flex items-center gap-3 text-amber-400">
               <ShieldAlert size={22} className="flex-shrink-0" />
               <div>
@@ -795,7 +795,7 @@ export default function CierreCajaWizard({
           />
         </div>
 
-        <div className="p-5">
+        <div className={`p-5 overflow-y-auto ${step === 2 ? 'grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)] lg:items-start' : ''}`}>
           {/* Step 1: How much cash? */}
           {step === 1 && (
             <div>
@@ -951,8 +951,8 @@ export default function CierreCajaWizard({
 
           {/* Approve section (part of step 2) */}
           {step === 2 && (
-            <>
-              <div className="mt-6 mb-4">
+            <div className="lg:sticky lg:top-0">
+              <div className="mb-4">
                 <label className="text-sm text-[var(--text-3)] block mb-2">
                   {huellaDisponible ? 'Huella o PIN de gerente para aprobar' : 'PIN de gerente para aprobar'}
                 </label>
@@ -1006,7 +1006,7 @@ export default function CierreCajaWizard({
                   )}
                 </button>
               </div>
-            </>
+            </div>
           )}
         </div>
 

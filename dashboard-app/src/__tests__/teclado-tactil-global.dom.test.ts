@@ -80,6 +80,20 @@ it('escribe una credencial opaca con minúsculas, guión bajo y guión usando so
   expect(input.value).toBe('clave_-privada')
 }, 10_000)
 
+it('mantiene visible el avance del PIN sin revelar los dígitos bajo el teclado', () => {
+  render(createElement(Campo, { modo: 'decimal', tipo: 'password' }))
+  const input = screen.getByLabelText('Importe de prueba') as HTMLInputElement
+
+  fireEvent.pointerDown(input)
+  expect(screen.getByText('Sin capturar')).toBeTruthy()
+  tocar('1234')
+
+  const preview = screen.getByLabelText('Importe de prueba: 4 digitos capturados')
+  expect(preview.textContent).toBe('••••')
+  expect(screen.queryByText('1234')).toBeNull()
+  expect(input.value).toBe('1234')
+})
+
 it('alterna entre minúsculas y mayúsculas sin agregar otra fila al teclado', () => {
   render(createElement(Campo, { modo: 'text' }))
   const input = screen.getByLabelText('Importe de prueba') as HTMLInputElement
