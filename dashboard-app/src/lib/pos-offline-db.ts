@@ -1732,10 +1732,35 @@ export async function drainLocalStorageToIdb(): Promise<void> {
     let allOk = true
     for (const item of unsynced) {
       try {
-        // Un item del buffer sin `method`: por endpoint. /api/pos/save-order solo
-        // exporta POST; el viejo default PATCH lo dejaba en 405 eterno.
+        // UN RENGLÓN SIN MÉTODO ES UN INSERT, NO UN PARCHE.
+        //
+        // Este default ya había mordido una vez: para los endpoints `/api/` se
+        // corrigió porque «el viejo default PATCH lo dejaba en 405 eterno». Las
+        // TABLAS se quedaron con PATCH, y eso produjo algo peor que un 405:
+        // `PATCH pos_turnos` sin filtro, rechazado por la guarda de mutaciones
+        // sin filtro (la que existe por el incidente del 2026-08-31, cuando un
+        // PATCH sin filtro cerró once turnos) y marcado TERMINAL_NON_RETRYABLE,
+        // o sea invisible para siempre. Medido en AMALAY el 2026-09-14.
+        //
+        // La regla completa tiene TRES casos, no dos:
+        //
+        //   · endpoint /api/…            -> POST   (la ruta sólo exporta POST)
+        //   · endpoint CON filtro (?…)   -> PATCH  (actualiza una fila concreta)
+        //   · SIN endpoint, sólo tabla   -> POST   (es un INSERT)
+        //
+        // El tercero es el que faltaba. Un renglón sin endpoint viene de
+        // `addToQueue(tabla, datos)`, que nunca tuvo forma de expresar otra cosa
+        // que insertar. Tratarlo como PATCH producía `PATCH pos_turnos` pelón.
+        //
+        // El segundo NO se toca: `buffer-de-emergencia-lleva-method.test.ts` lo
+        // protege con un caso real —`pos_turnos?id=eq.t1`— y convertirlo en POST
+        // volvería un UPDATE en un INSERT. Un arreglo que rompe el caso de al
+        // lado no es un arreglo.
         const endpointDelItem = item.endpoint as string | undefined
-        const method = (item.method as string | undefined) || (endpointDelItem?.startsWith('/api/') ? 'POST' : 'PATCH')
+        const method = (item.method as string | undefined)
+          || (endpointDelItem?.startsWith('/api/') ? 'POST'
+            : endpointDelItem?.includes('?') ? 'PATCH'
+            : 'POST')
         await queueOperation(
           (item.table as string) || 'pos_orders',
           method as 'POST' | 'PATCH' | 'DELETE',
