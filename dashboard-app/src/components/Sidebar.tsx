@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import NavPantallaCompleta from './NavPantallaCompleta'
 import {
   LayoutDashboard,
   Users,
@@ -244,6 +245,19 @@ export default function Sidebar() {
   const isPlatform = pathname.startsWith('/platform')
   const sections = isPlatform ? platformNavSections : navSections
 
+  // Las mismas dos comprobaciones que el aside, extraídas para poder
+  // alimentar también el menú de pantalla completa sin duplicar el criterio.
+  const seccionesVisibles = sections
+    .map(sec => ({
+      label: sec.label,
+      items: isPlatform
+        ? sec.items
+        : sec.items.filter(item =>
+            canAccessPage(role, item.href, permissions) && canPlanAccessPage(clientConfig?.plan, item.href)
+          ),
+    }))
+    .filter(sec => sec.items.length > 0)
+
   // Collapsible sections — auto-expand section containing current page
   const activeSection = sections.findIndex(s => s.items.some(i => pathname === i.href || (i.href !== '/' && pathname.startsWith(i.href + '/'))))
   const [expandedSections, setExpandedSections] = useState<Set<number>>(() => new Set(activeSection >= 0 ? [activeSection, 0] : [0]))
@@ -416,27 +430,26 @@ export default function Sidebar() {
         </button>
       )}
 
-      {/* Mobile overlay */}
-      {mobileOpen && (
-        <div
-          className="fixed inset-0 bg-black/30 z-30 lg:hidden"
-          onClick={() => setMobileOpen(false)}
-        />
-      )}
-
       {/* Desktop sidebar — static in flex layout */}
       <div className="hidden lg:flex flex-shrink-0">
         {sidebarContent}
       </div>
 
-      {/* Mobile sidebar — slide in */}
-      <div
-        className={`lg:hidden fixed top-0 left-0 h-full z-40 transition-all duration-200 ${
-          mobileOpen ? 'translate-x-0 opacity-100 visible' : '-translate-x-full opacity-0 invisible'
-        }`}
-      >
-        {sidebarContent}
-      </div>
+      {/* Móvil: menú de pantalla completa. Antes era un cajón angosto con los
+          79 enlaces en una sola columna — llegar a «Corte» costaba medio menú
+          de recorrido. Ahora caben a la vista y hay filtro. */}
+      {mobileOpen && (
+        <div className="lg:hidden">
+          <NavPantallaCompleta
+            secciones={seccionesVisibles}
+            pathname={pathname}
+            onClose={() => setMobileOpen(false)}
+            onSignOut={signOut}
+            titulo={isPlatform ? 'Fullsite' : (clientConfig?.display_name || 'Fullsite')}
+            subtitulo={userLabel}
+          />
+        </div>
+      )}
     </>
   )
 }
