@@ -94,6 +94,7 @@ const LEGACY_CONFIG_PATH  = path.join('C:\\fullsite', 'config.json');
 let autoInstaller = null;   // handle del auto-update; null si no arranco
 const configSchema        = require('./local-server/config-schema');
 const printerConfigSchema = require('./local-server/adapters/printer-config-schema');
+const { readJsonFile }     = require('./local-server/core/json-file');
 
 /**
  * Return the primary config path: userData first (writable by Electron),
@@ -120,7 +121,7 @@ function loadAndValidateConfig() {
   // 1. Try primary (new schema)
   try {
     if (fs.existsSync(primaryPath)) {
-      const data = JSON.parse(fs.readFileSync(primaryPath, 'utf8'));
+      const data = readJsonFile(fs, primaryPath);
       const { valid, errors } = configSchema.validate(data);
       if (valid) {
         console.log('[config] Valid config loaded from', primaryPath);
@@ -137,7 +138,7 @@ function loadAndValidateConfig() {
   let legacy = null;
   try {
     if (fs.existsSync(LEGACY_CONFIG_PATH)) {
-      legacy = JSON.parse(fs.readFileSync(LEGACY_CONFIG_PATH, 'utf8'));
+      legacy = readJsonFile(fs, LEGACY_CONFIG_PATH);
       console.log('[config] Legacy config found at', LEGACY_CONFIG_PATH);
 
       // 2a. If legacy is already new schema (migrated manually), validate it
@@ -206,7 +207,7 @@ function loadPrinters() {
   if (primaryPath) {
     try {
       if (fs.existsSync(primaryPath)) {
-        const raw = JSON.parse(fs.readFileSync(primaryPath, 'utf8'));
+        const raw = readJsonFile(fs, primaryPath);
         const result = printerConfigSchema.loadAndValidate(raw);
         if (result.valid) {
           if (result.migrated) {
@@ -228,7 +229,7 @@ function loadPrinters() {
   // 2. Try legacy path (AMALAY v1 migration source)
   try {
     if (fs.existsSync(LEGACY_PRINTERS_PATH)) {
-      const raw = JSON.parse(fs.readFileSync(LEGACY_PRINTERS_PATH, 'utf8'));
+      const raw = readJsonFile(fs, LEGACY_PRINTERS_PATH);
       const result = printerConfigSchema.loadAndValidate(raw);
       if (result.valid) {
         // Save migrated config to primary path so future boots skip legacy
@@ -348,7 +349,7 @@ function registerProvisioningIpc() {
   ipcMain.handle('provision:get-info', async () => {
     let legacy = null;
     try {
-      if (fs.existsSync(LEGACY_CONFIG_PATH)) legacy = JSON.parse(fs.readFileSync(LEGACY_CONFIG_PATH, 'utf8'));
+      if (fs.existsSync(LEGACY_CONFIG_PATH)) legacy = readJsonFile(fs, LEGACY_CONFIG_PATH);
     } catch {}
     const network_interfaces = [];
     for (const [name, addresses] of Object.entries(os.networkInterfaces())) {
@@ -496,7 +497,7 @@ function registerProvisioningIpc() {
     })
     if (result.canceled || !result.filePaths.length) return { ok: false, error: 'canceled' }
     try {
-      const data = JSON.parse(fs.readFileSync(result.filePaths[0], 'utf8'))
+      const data = readJsonFile(fs, result.filePaths[0])
       const { valid, errors } = configSchema.validate(data)
       if (!valid) return { ok: false, error: errors.join('; '), data }
       return { ok: true, config: data }
@@ -514,7 +515,7 @@ function registerProvisioningIpc() {
     let legacyV1 = null
     try {
       if (fs.existsSync(LEGACY_PRINTERS_PATH)) {
-        const raw = JSON.parse(fs.readFileSync(LEGACY_PRINTERS_PATH, 'utf8'))
+        const raw = readJsonFile(fs, LEGACY_PRINTERS_PATH)
         if (!raw.schema_version || raw.schema_version < 2) legacyV1 = raw
       }
     } catch {}
@@ -548,7 +549,7 @@ function registerProvisioningIpc() {
       // Step 3 — validate tmp from disk before rename (protective)
       let preRead
       try {
-        preRead = JSON.parse(fs.readFileSync(tmpPath, 'utf8'))
+        preRead = readJsonFile(fs, tmpPath)
       } catch (e) {
         try { fs.unlinkSync(tmpPath) } catch {}
         return { ok: false, error: 'Pre-rename read-back failed: ' + e.message }
@@ -564,7 +565,7 @@ function registerProvisioningIpc() {
 
       // Step 5 — post-rename observability only; no rollback
       try {
-        const canonical = JSON.parse(fs.readFileSync(configPath, 'utf8'))
+        const canonical = readJsonFile(fs, configPath)
         if (canonical.schema_version !== 2) {
           console.error('[provision] CRITICAL: post-rename schema_version mismatch — filesystem anomaly suspected at', configPath)
         } else {
@@ -636,7 +637,7 @@ function registerProvisioningIpc() {
     })
     if (result.canceled || !result.filePaths.length) return { ok: false, error: 'canceled' }
     try {
-      const raw       = JSON.parse(fs.readFileSync(result.filePaths[0], 'utf8'))
+      const raw       = readJsonFile(fs, result.filePaths[0])
       const validated = printerConfigSchema.loadAndValidate(raw)
       if (!validated.valid) return { ok: false, error: validated.errors.join('; ') }
       return { ok: true, config: validated.config, migrated: validated.migrated }
