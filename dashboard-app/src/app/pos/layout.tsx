@@ -481,6 +481,13 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
     if (pin.length < 4 || isLocked) return
     setChecking(true)
     setError(false)
+    // El teclado se deshabilita con `checking`. Abajo hay 15 await y ocho
+    // `setChecking(false)` sueltos: si cualquiera de esos await rechaza,
+    // `checking` se queda en true y la caja se queda MUERTA hasta recargar
+    // —no se puede ni teclear un dígito. El finally de abajo es el seguro.
+    // El cuerpo no se reindenta a propósito: así el diff son dos líneas y no
+    // doscientas, y se puede revisar de un vistazo.
+    try {
 
     const unlock = async (member: StaffMember, localSession = false) => {
       // ── Session locking: prevent concurrent login on multiple terminals ──
@@ -716,6 +723,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
     }
     setTimeout(() => setError(false), 1500)
     setChecking(false)
+    } finally { setChecking(false) }
   }
 
   // Fullscreen is handled by Electron kiosk mode — no browser fullscreen needed
