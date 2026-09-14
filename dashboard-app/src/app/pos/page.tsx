@@ -167,6 +167,7 @@ import { layerZ } from '@/components/ui/layers'
 import { PosProductTile, usePosV2 } from '@/components/pos/ui/PosProductTile'
 import { PosOrderRow } from '@/components/pos/ui/PosOrderRow'
 import { PosActionBand } from '@/components/pos/ui/PosActionBand'
+import { PosAdaptiveGrid } from '@/components/pos/ui/PosAdaptiveGrid'
 
 // El reintento del bridge y la validacion de la respuesta viven ahora en
 // lib/kitchen-bridge.ts (sendOrderToKitchen), que SI reporta el resultado.
@@ -5337,7 +5338,29 @@ function POSContent() {
                         />
                       </div>
                     )}
-                    <div className="flex-1 overflow-y-auto p-2 overscroll-contain pos-fat-scroll flex flex-col" style={{ WebkitOverflowScrolling: 'touch' }}>
+                    <div className={`flex-1 p-2 overscroll-contain flex flex-col ${posV2 ? 'overflow-hidden min-h-0' : 'overflow-y-auto pos-fat-scroll'}`} style={{ WebkitOverflowScrolling: 'touch' }}>
+                      <PosAdaptiveGrid
+                        v2={posV2}
+                        items={activeCategory.items.filter(item => item.price > 0 && (!categorySearch || item.name.toLowerCase().includes(categorySearch.toLowerCase())))}
+                        keyOf={(item) => item.id}
+                        minCelda={{ ancho: 140, alto: 88 }}
+                        hueco={8}
+                        render={(item) => {
+                          const isOOS = outOfStockItems.has(item.id)
+                          return (
+                            <PosProductTile
+                              v2={posV2}
+                              name={item.name}
+                              price={item.price}
+                              colorClass={(activeCategory as { color?: string }).color || 'bg-emerald-600'}
+                              isOOS={isOOS}
+                              promo={(item as MenuItem & { promo?: boolean }).promo}
+                              onClick={() => { if (isOOS) { showToast(`${item.name} — AGOTADO`); return } handleMenuItemTap(item, activeCategory.id); setSelectedCategory(''); setMobileView('order') }}
+                            />
+                          )
+                        }}
+                        fallback={
+                          <>
                       <div className="grid grid-cols-3 md:grid-cols-5 gap-2 flex-1" style={{ gridAutoRows: 'minmax(80px, 150px)', minHeight: 0 }}>
                 {activeCategory.items.filter(item => item.price > 0 && (!categorySearch || item.name.toLowerCase().includes(categorySearch.toLowerCase()))).map((item) => {
                     const isOOS = outOfStockItems.has(item.id)
@@ -5355,6 +5378,9 @@ function POSContent() {
                     )
                   })}
                       </div>
+                          </>
+                        }
+                      />
                     </div>
                   </div>
                 </div>
