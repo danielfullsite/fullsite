@@ -3329,12 +3329,26 @@ function POSContent() {
   const iva = Math.round(subtotalAfterDiscount * getIvaRate() * 100) / 100
   const total = Math.round((subtotalAfterDiscount + iva) * 100) / 100
 
-  // Concurrency check: verify order hasn't been modified by another terminal
+  // ¿OTRA TERMINAL TOCÓ ESTA CUENTA? SE PREGUNTA POR REVISIÓN, NO POR RELOJ.
+  //
+  // Esto comparaba `updated_at`. El trigger `set_updated_at` lo mueve en CUALQUIER
+  // escritura sobre `pos_orders` (`baseline_esquema.sql`: `NEW.updated_at = NOW()`,
+  // incondicional) — y cocina escribe: cada vez que el KDS palomea un platillo
+  // hace un PATCH de `kds_item_status`. En AMALAY cocina SÍ marca, así que la
+  // secuencia diaria era: el cajero abre la mesa, cocina palomea la entrada, el
+  // cajero toca Cobrar y recibe «esta orden fue modificada por otro usuario» sin
+  // que nadie tocara dinero ni productos. Reproducido en campo el 2026-09-13 con
+  // la mesa 2 de AMALAY, $232.00.
+  //
+  // `order_revision` sí distingue quién escribió qué: lo mueven `r1_save_order` y
+  // `r1_add_items` —dinero y renglones— y NO lo toca el KDS. Es además la misma
+  // revisión del OCC de `saveOrder`, así que la guarda de pantalla y la del
+  // servidor pasan a hablar el mismo idioma.
   const checkOrderConflict = async (context: string): Promise<boolean> => {
-    if (!loadedOrderId || !loadedUpdatedAt) return false // no conflict possible
+    if (!loadedOrderId) return false // no conflict possible
     try {
       const checkRes = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${loadedOrderId}&select=updated_at,created_at,status&limit=1`,
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${loadedOrderId}&select=order_revision,status&limit=1`,
         { headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` }, cache: 'no-store', signal: AbortSignal.timeout(4000) }
       )
       if (checkRes.ok) {
@@ -3345,8 +3359,8 @@ function POSContent() {
             showToast(`Esta orden ya fue ${rows[0].status} por otro usuario`)
             return true
           }
-          const currentUpdatedAt = rows[0].updated_at || rows[0].created_at
-          if (currentUpdatedAt && currentUpdatedAt !== loadedUpdatedAt) {
+          const revisionEnServidor = rows[0].order_revision
+          if (Number.isInteger(revisionEnServidor) && revisionEnServidor !== orderRevision) {
             showToast('Esta orden fue modificada por otro usuario. Recarga la mesa.')
             return true
           }
@@ -3783,23 +3797,27 @@ function POSContent() {
       }
 
       setLoadedOrderId(orderId)
-      // Read server's actual updated_at + order_number (triggers set these)
+      // Read server's actual updated_at + order_number (triggers set these).
+      // La marca sale del servidor o no existe: rellenarla con el reloj de la
+      // terminal —como se hacía aquí— garantizaba un falso conflicto después,
+      // porque dos relojes distintos no coinciden jamás.
+      let marcaDelServidor: string | null = null
       try {
         const freshRes = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${orderId}&select=updated_at,order_number`, {
           headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` },
         })
         if (freshRes.ok) {
           const rows = await freshRes.json()
-          if (rows[0]?.updated_at) setLoadedUpdatedAt(rows[0].updated_at)
-          else setLoadedUpdatedAt(new Date().toISOString())
+          if (rows[0]?.updated_at) marcaDelServidor = rows[0].updated_at
           if (rows[0]?.order_number) setOrderNumber(rows[0].order_number)
-        } else setLoadedUpdatedAt(new Date().toISOString())
-      } catch { setLoadedUpdatedAt(new Date().toISOString()) }
+        }
+      } catch { /* sin marca del servidor: se queda en null */ }
+      setLoadedUpdatedAt(marcaDelServidor)
       // NO liberar el lock aquí: se mantiene hasta navegar → evita doble-envío/doble-lock
       // si el mesero toca Enviar dos veces.
       // Cache order locally so it loads instantly when returning to this mesa
       try {
-        localStorage.setItem(`pos_order_${mesa}`, JSON.stringify({ id: orderId, items: activeItems, mesero, personas, discount, notas: orderNotes, revision: saveResult.revision ?? orderRevision, updatedAt: new Date().toISOString(), ts: Date.now() }))
+        localStorage.setItem(`pos_order_${mesa}`, JSON.stringify({ id: orderId, items: activeItems, mesero, personas, discount, notas: orderNotes, revision: saveResult.revision ?? orderRevision, ...(marcaDelServidor ? { updatedAt: marcaDelServidor } : {}), ts: Date.now() }))
         localStorage.removeItem(`pos_draft_${mesa}`) // clear draft after successful save
       } catch {}
       // Tras enviar: al mapa de mesas AL INSTANTE + bloqueo (re-identificación por
@@ -4221,6 +4239,10 @@ function POSContent() {
       sessionStorage.removeItem('pos_last_activity')
       navigateToMesaMap()
       lock()
+      // ÚNICO PUNTO EN QUE ESTE COBRO QUEDÓ REGISTRADO. Lo devuelve para que el
+      // camino de MP Point distinga «se cobró» de «no se cobró»: todas las demás
+      // salidas de esta función son `return` sin valor, y ninguna lanza.
+      return true
     } else {
       showToast('Error al cerrar cuenta')
       setSaving(false); operationLock.current = false
@@ -4892,7 +4914,7 @@ function POSContent() {
                           letra y las etiquetas inline se encimaban con el asiento. El nombre
                           tiene ancho mínimo, máximo dos líneas, y las etiquetas van en su
                           propia fila. */}
-                      <div className="flex-1 min-w-[140px]">
+                      <div className="flex-1 min-w-[90px]">
                         <p className={`font-medium text-sm leading-tight break-words line-clamp-2 ${isVoided ? 'line-through text-[var(--text-4)]' : isCancelled ? 'line-through text-[var(--crit-ink)]' : ''}`} title={item.nombre}>
                           {item.nombre}
                         </p>
@@ -6549,8 +6571,23 @@ function POSContent() {
                               }
                               updateMpRecovery(mpRec)
                               try {
-                                await handlePayment('Tarjeta de crédito', recoveryOpId)
-                                clearMpRecovery()
+                                // EL RASTRO SÓLO SE BORRA SI EL COBRO QUEDÓ REGISTRADO.
+                                // `handlePayment` NO lanza en sus fallas reales —su cuerpo es
+                                // try/finally, sin catch— y cada falla sale por `return`:
+                                // conflicto de revisión, saveResult.conflict, PAYMENT_MISMATCH,
+                                // API_ERROR, SESSION_EXPIRED. Borrar sin condición dejaba a la
+                                // terminal bancaria habiendo capturado el dinero del cliente, el
+                                // registro fallido, y CERO rastro: el banner de recuperación no
+                                // aparecía, la mesa quedaba abierta con el total completo, y el
+                                // siguiente que la tocara la cobraba otra vez.
+                                if (await handlePayment('Tarjeta de crédito', recoveryOpId) === true) {
+                                  clearMpRecovery()
+                                } else {
+                                  updateMpRecovery({ ...mpRec, state: 'RECONCILIATION_REQUIRED' as MpPaymentState,
+                                    error: 'La terminal aprobó el cobro pero no se pudo registrar en Fullsite.' })
+                                  setSaving(false)
+                                  operationLock.current = false
+                                }
                               } catch (err) {
                                 const failed: MpPaymentRecovery = {
                                   ...mpRec,
