@@ -641,7 +641,21 @@ export async function openTurno(fondoInicial: number, openedBy: string, openingR
       const receipt = await ejecutarComandoCaja('turn:open', 'TURN_OPEN', { turno_id: idParaAbrirTurno(), opening_cash_cents: opening, opening_reason: openingReason })
       const t = receipt.result.turno as Record<string, unknown> | undefined
       if (!t?.id || !t.opened_at || !Number.isSafeInteger(t.opening_cash_cents)) throw new Error('Caja no confirmó la apertura de turno.')
-      const confirmed = { id: String(t.id), fondo_inicial: Number(t.opening_cash_cents) / 100, opened_by: String(t.opened_by), opened_at: String(t.opened_at), sincronizado: false }
+      // UN TURNO QUE LA CAJA CONFIRMÓ NO ES UN TURNO «SOLO LOCAL».
+      //
+      // Tres líneas arriba se exige el recibo de `TURN_OPEN` y se lanza si la
+      // Caja no confirmó. O sea: para llegar aquí, la autoridad que gobierna
+      // este turno ya lo escribió en su bitácora durable. Marcarlo
+      // `sincronizado: false` contradice la definición de arriba —«quedó SOLO
+      // local … y está encolado»— y produjo tres daños en campo (AMALAY,
+      // 2026-09-13): el aviso «Turno abierto LOCAL (sin conexión)» sobre un
+      // turno que sí se abrió; un registro de auditoría que dice `sincronizado:
+      // false` de algo confirmado; y una copia durable sin `synced_at`, que es
+      // la que después puede resucitar un turno ya cerrado.
+      //
+      // En modo Caja la autoridad es la Caja, no la nube. La subida a la nube va
+      // por su propio camino y tiene su propia cola; no se representa aquí.
+      const confirmed = { id: String(t.id), fondo_inicial: Number(t.opening_cash_cents) / 100, opened_by: String(t.opened_by), opened_at: String(t.opened_at), sincronizado: true }
       // Cache is a display convenience; every operational read still asks Caja.
       localStorage.setItem('pos_turno_cache', JSON.stringify({ turno: confirmed, turnos: [confirmed], ts: Date.now() }))
       olvidarTurnoPendiente()
