@@ -1,7 +1,7 @@
 // Fullsite Fingerprint Service — multi-tenant
 // Compile: C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe /r:DPUruNet.dll /out:fingerprint-service.exe fingerprint-service.cs
 // Prerequisites: DPUruNet.dll in the same directory as the exe.
-// Config: reads C:\fullsite\config.json for restaurant_id, supabaseUrl, supabaseAnonKey.
+// Config: reads Electron userData first, then legacy C:\fullsite\config.json.
 //
 // Endpoints:
 //   GET  /health                → reader status + enrolled count
@@ -32,7 +32,7 @@ class FingerprintService
     const int DPFJ_PROBABILITY_ONE = 0x7FFFFFFF;
     const int FALSE_POSITIVE_RATE = DPFJ_PROBABILITY_ONE / 100000;
 
-    // Loaded from C:\fullsite\config.json — never hardcoded
+    // Loaded from a validated config.json — never hardcoded
     static string supabaseUrl = "";
     static string supabaseKey = "";
     static string clientId    = "";
@@ -134,41 +134,64 @@ class FingerprintService
     // Reads restaurant_id / supabaseUrl / supabaseAnonKey from config.json.
     // Accepts both new schema (snake_case) and legacy camelCase keys.
 
+    static string[] UserDataCandidates()
+    {
+        string explicitDirectory = Environment.GetEnvironmentVariable("FULLSITE_USER_DATA_DIR") ?? "";
+        string roaming = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        return new string[] {
+            explicitDirectory,
+            Path.Combine(roaming, "fullsite-pos"),
+            Path.Combine(roaming, "Fullsite POS"),
+        };
+    }
+
     static bool LoadConfig()
     {
-        string configPath = @"C:\fullsite\config.json";
-        try
+        // Electron es la autoridad sobre userData. Cuando él arranca este hijo pasa
+        // FULLSITE_USER_DATA_DIR; los dos nombres de Roaming conservan compatibilidad
+        // con instalaciones existentes. C:\fullsite queda al final como migración.
+        // Nunca se imprime el JSON ni una llave: sólo la ruta elegida y faltantes.
+        List<string> candidates = new List<string>();
+        foreach (string directory in UserDataCandidates())
         {
-            if (!File.Exists(configPath))
+            if (!string.IsNullOrEmpty(directory)) candidates.Add(Path.Combine(directory, "config.json"));
+        }
+        candidates.Add(@"C:\fullsite\config.json");
+
+        HashSet<string> visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (string configPath in candidates)
+        {
+            if (!visited.Add(configPath)) continue;
+            try
             {
-                Console.WriteLine("config.json no encontrado en " + configPath);
-                return false;
+                if (!File.Exists(configPath)) continue;
+                string json = File.ReadAllText(configPath, Encoding.UTF8);
+                string rid = ExtractJsonString(json, "restaurant_id") ?? ExtractJsonString(json, "restaurantId") ??
+                    ExtractJsonString(json, "client_id") ?? ExtractJsonString(json, "clientId");
+                string url = ExtractJsonString(json, "supabaseUrl");
+                string key = ExtractJsonString(json, "supabaseAnonKey");
+                if (string.IsNullOrEmpty(rid) || string.IsNullOrEmpty(url) || string.IsNullOrEmpty(key))
+                {
+                    Console.WriteLine("config.json ignorado (incompleto): " + configPath);
+                    continue;
+                }
+
+                clientId = rid.ToLowerInvariant().Trim();
+                supabaseUrl = url.TrimEnd('/');
+                supabaseKey = key;
+                string api = ExtractJsonString(json, "apiBaseUrl") ?? ExtractJsonString(json, "api_base_url");
+                if (!string.IsNullOrEmpty(api)) apiBaseUrl = api.TrimEnd('/');
+                syncSecret = ExtractJsonString(json, "fingerprintSyncSecret") ?? ExtractJsonString(json, "fingerprint_sync_secret") ?? "";
+                Console.WriteLine("Configuración de huella cargada desde " + configPath);
+                return true;
             }
-            string json = File.ReadAllText(configPath, Encoding.UTF8);
-
-            string rid = ExtractJsonString(json, "restaurant_id") ?? ExtractJsonString(json, "restaurantId");
-            string url = ExtractJsonString(json, "supabaseUrl");
-            string key = ExtractJsonString(json, "supabaseAnonKey");
-
-            if (string.IsNullOrEmpty(rid)) { Console.WriteLine("config.json: falta 'restaurant_id'"); return false; }
-            if (string.IsNullOrEmpty(url)) { Console.WriteLine("config.json: falta 'supabaseUrl'");   return false; }
-            if (string.IsNullOrEmpty(key)) { Console.WriteLine("config.json: falta 'supabaseAnonKey'"); return false; }
-
-            clientId    = rid.ToLowerInvariant().Trim();
-            supabaseUrl = url.TrimEnd('/');
-            supabaseKey = key;
-
-            // Opcionales: endpoint de sync + secreto acotado (recomendado para multi-terminal).
-            string api = ExtractJsonString(json, "apiBaseUrl") ?? ExtractJsonString(json, "api_base_url");
-            if (!string.IsNullOrEmpty(api)) apiBaseUrl = api.TrimEnd('/');
-            syncSecret = ExtractJsonString(json, "fingerprintSyncSecret") ?? ExtractJsonString(json, "fingerprint_sync_secret") ?? "";
-            return true;
+            catch (Exception e)
+            {
+                Console.WriteLine("config.json ignorado (no se pudo leer): " + configPath + " (" + e.GetType().Name + ")");
+            }
         }
-        catch (Exception e)
-        {
-            Console.WriteLine("Error leyendo config.json: " + e.Message);
-            return false;
-        }
+        Console.WriteLine("FATAL: no se encontró un config.json válido en userData ni en C:\\fullsite");
+        return false;
     }
 
     static bool LoadIpcSecret()
@@ -178,11 +201,14 @@ class FingerprintService
             string value = Environment.GetEnvironmentVariable(IpcSecretEnvironment) ?? "";
             if (string.IsNullOrEmpty(value))
             {
-                string file = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                    @"Fullsite POS\fingerprint\fingerprint-ipc-secret"
-                );
-                if (File.Exists(file)) value = File.ReadAllText(file, Encoding.ASCII).Trim();
+                foreach (string directory in UserDataCandidates())
+                {
+                    if (string.IsNullOrEmpty(directory)) continue;
+                    string file = Path.Combine(directory, @"fingerprint\fingerprint-ipc-secret");
+                    if (!File.Exists(file)) continue;
+                    value = File.ReadAllText(file, Encoding.ASCII).Trim();
+                    if (!string.IsNullOrEmpty(value)) break;
+                }
             }
             if (!Regex.IsMatch(value, "^[a-f0-9]{64}$"))
             {

@@ -3,7 +3,8 @@ const path = require('path');
 const http = require('http');
 const os   = require('os');
 const fs   = require('fs');
-const { execSync } = require('child_process');
+const crypto = require('crypto');
+const { execSync, execFileSync } = require('child_process');
 
 // ─── Puntos de anclaje del laboratorio multi-terminal ────────────────────────
 //
@@ -684,6 +685,73 @@ let fingerprintProcess = null;
 let fingerprintRestartCount = 0;
 let fingerprintIpcSecret = null;
 
+function fingerprintFileHash(file) {
+  return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+}
+
+function stopExactFingerprintProcesses(executablePath) {
+  if (process.platform !== 'win32') return [];
+  const query = '$target=[IO.Path]::GetFullPath($args[0]); ' +
+    "$exact=@(Get-CimInstance Win32_Process -Filter \"Name = 'fingerprint-service.exe'\" | " +
+    'Where-Object { $_.ExecutablePath -and ([IO.Path]::GetFullPath($_.ExecutablePath) -ieq $target) }); ' +
+    '$exact | ForEach-Object { Write-Output $_.ProcessId; Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop; ' +
+    'Wait-Process -Id $_.ProcessId -Timeout 5 -ErrorAction SilentlyContinue }';
+  const stdout = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', query, executablePath], {
+    encoding: 'utf8', windowsHide: true, timeout: 5000,
+  });
+  return stdout.split(/\r?\n/).map(value => Number(value.trim())).filter(Number.isSafeInteger);
+}
+
+function updateBundledFingerprintService({ bundledExe, bundledDll, installedExe, installedDll }) {
+  if (!fs.existsSync(bundledExe) || !fs.existsSync(bundledDll)) return false;
+  const expectedExe = fingerprintFileHash(bundledExe);
+  const expectedDll = fingerprintFileHash(bundledDll);
+  if (fs.existsSync(installedExe) && fs.existsSync(installedDll) &&
+      fingerprintFileHash(installedExe) === expectedExe && fingerprintFileHash(installedDll) === expectedDll) return false;
+
+  const targetDirectory = path.dirname(installedExe);
+  fs.mkdirSync(targetDirectory, { recursive: true });
+  const stageDirectory = path.join(targetDirectory, `.fingerprint-stage-${crypto.randomUUID()}`);
+  const backupDirectory = path.join(targetDirectory, `fingerprint-backup-${Date.now()}`);
+  fs.mkdirSync(stageDirectory, { recursive: true });
+  fs.mkdirSync(backupDirectory, { recursive: true });
+  const stagedExe = path.join(stageDirectory, path.basename(installedExe));
+  const stagedDll = path.join(stageDirectory, path.basename(installedDll));
+  try {
+    fs.copyFileSync(bundledExe, stagedExe);
+    fs.copyFileSync(bundledDll, stagedDll);
+    if (fingerprintFileHash(stagedExe) !== expectedExe || fingerprintFileHash(stagedDll) !== expectedDll) {
+      throw new Error('la copia temporal no coincide por SHA-256');
+    }
+    for (const processId of stopExactFingerprintProcesses(installedExe)) {
+      console.warn(`[fingerprint] Deteniendo sólo el servicio exacto anterior (PID ${processId}) para actualizarlo`);
+    }
+    if (fs.existsSync(installedExe)) fs.renameSync(installedExe, path.join(backupDirectory, path.basename(installedExe)));
+    if (fs.existsSync(installedDll)) fs.renameSync(installedDll, path.join(backupDirectory, path.basename(installedDll)));
+    fs.renameSync(stagedExe, installedExe);
+    fs.renameSync(stagedDll, installedDll);
+    if (fingerprintFileHash(installedExe) !== expectedExe || fingerprintFileHash(installedDll) !== expectedDll) {
+      throw new Error('la instalación no coincide por SHA-256');
+    }
+    console.log(`[fingerprint] Servicio actualizado y verificado; respaldo recuperable en ${backupDirectory}`);
+    return true;
+  } catch (error) {
+    try {
+      if (fs.existsSync(installedExe)) fs.rmSync(installedExe, { force: true });
+      if (fs.existsSync(installedDll)) fs.rmSync(installedDll, { force: true });
+      const oldExe = path.join(backupDirectory, path.basename(installedExe));
+      const oldDll = path.join(backupDirectory, path.basename(installedDll));
+      if (fs.existsSync(oldExe)) fs.renameSync(oldExe, installedExe);
+      if (fs.existsSync(oldDll)) fs.renameSync(oldDll, installedDll);
+    } catch (rollbackError) {
+      console.error('[fingerprint] La restauración automática falló; conserva el respaldo:', rollbackError.message);
+    }
+    throw error;
+  } finally {
+    fs.rmSync(stageDirectory, { recursive: true, force: true });
+  }
+}
+
 function startFingerprintService() {
   const fpExe = 'C:\\fullsite\\fingerprint-service.exe';
   const fpDll = 'C:\\fullsite\\DPUruNet.dll';
@@ -707,20 +775,19 @@ function startFingerprintService() {
   // Los binarios NO se commitean (DLL propietario del SDK DigitalPersona U.are.U). El
   // instalador solo los empaqueta si estan presentes al correr electron-builder; si no,
   // este bloque no encuentra nada, no rompe, y el arranque sigue como antes.
-  if (!fs.existsSync(fpExe) || !fs.existsSync(fpDll)) {
-    try {
-      const bundledDir = path.join(process.resourcesPath || __dirname, 'fingerprint');
-      const bExe = path.join(bundledDir, 'fingerprint-service.exe');
-      const bDll = path.join(bundledDir, 'DPUruNet.dll');
-      if (fs.existsSync(bExe) && fs.existsSync(bDll)) {
-        fs.mkdirSync('C:\\fullsite', { recursive: true });
-        if (!fs.existsSync(fpExe)) fs.copyFileSync(bExe, fpExe);
-        if (!fs.existsSync(fpDll)) fs.copyFileSync(bDll, fpDll);
-        console.log('[fingerprint] Servicio instalado desde el paquete a C:\\fullsite\\');
-      }
-    } catch (e) {
-      console.warn('[fingerprint] No se pudo auto-instalar desde el paquete:', e.message);
-    }
+  try {
+    const bundledDir = path.join(process.resourcesPath || __dirname, 'fingerprint');
+    const changed = updateBundledFingerprintService({
+      bundledExe: path.join(bundledDir, 'fingerprint-service.exe'),
+      bundledDll: path.join(bundledDir, 'DPUruNet.dll'),
+      installedExe: fpExe,
+      installedDll: fpDll,
+    });
+    if (changed) console.log('[fingerprint] Servicio instalado/actualizado desde el paquete a C:\\fullsite\\');
+  } catch (e) {
+    // Si no se pudo verificar o respaldar, no se arranca una mezcla incierta.
+    console.error('[fingerprint] Actualización segura abortada; huella deshabilitada:', e.message);
+    return;
   }
 
   // Check if files exist
@@ -768,7 +835,11 @@ function startFingerprintService() {
       cwd: 'C:\\fullsite',
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
-      env: { ...process.env, FULLSITE_FINGERPRINT_IPC_SECRET: fingerprintIpcSecret },
+      env: {
+        ...process.env,
+        FULLSITE_FINGERPRINT_IPC_SECRET: fingerprintIpcSecret,
+        FULLSITE_USER_DATA_DIR: app.getPath('userData'),
+      },
     });
 
     fingerprintProcess.stdout.on('data', (data) => {
