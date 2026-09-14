@@ -168,6 +168,7 @@ import { PosProductTile, usePosV2 } from '@/components/pos/ui/PosProductTile'
 import { PosOrderRow } from '@/components/pos/ui/PosOrderRow'
 import { PosActionBand } from '@/components/pos/ui/PosActionBand'
 import { PosAdaptiveGrid } from '@/components/pos/ui/PosAdaptiveGrid'
+import { PosVentaPanel } from '@/components/pos/ui/PosVentaPanel'
 
 // El reintento del bridge y la validacion de la respuesta viven ahora en
 // lib/kitchen-bridge.ts (sendOrderToKitchen), que SI reporta el resultado.
@@ -5160,6 +5161,7 @@ function POSContent() {
 
         {/* Right Panel -- Menu (50% on tablet, full on mobile when active) */}
         <div className={`md:w-[50%] lg:w-[55%] md:flex flex-col ${mobileView === 'menu' ? 'flex w-full' : 'hidden'}`} style={{background:'var(--surface)'}}>
+          {!posV2 && (<>
           {/* Search bar — touch target + barcode scanner */}
           <div className="px-2 pt-1 pb-0.5 flex-shrink-0 flex gap-2">
             <input
@@ -5178,6 +5180,7 @@ function POSContent() {
             </button>
           </div>
 
+          </>)}
           {/* Seat tabs — PoloTab style */}
           {personas > 1 && (
             <div className="px-2 pb-0.5 flex-shrink-0 flex items-center gap-1 overflow-x-auto">
@@ -5220,6 +5223,22 @@ function POSContent() {
             </div>
           )}
 
+          {posV2 ? (
+            <PosVentaPanel
+              v2
+              categorias={menuCategories as unknown as { id: string; name: string; color?: string; items: { id: string; name: string; price: number }[] }[]}
+              outOfStock={outOfStockItems}
+              busqueda={menuSearch}
+              onBusqueda={setMenuSearch}
+              onEscanear={() => setShowBarcodeScanner(true)}
+              onTocarProducto={(item, catId) => {
+                if (outOfStockItems.has(item.id)) { showToast(`${item.name} — AGOTADO`); return }
+                handleMenuItemTap(item as unknown as MenuItem, catId)
+                setMobileView('order')
+              }}
+              fallback={null}
+            />
+          ) : (<>
           {menuSearch.trim() ? (
             /* Search results across all categories */
             <div className="flex-1 overflow-y-auto p-3 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
@@ -5385,6 +5404,7 @@ function POSContent() {
                   </div>
                 </div>
               )}
+          </>)}
               {/* Combo selection modal */}
               {showComboModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowComboModal(false)}>
