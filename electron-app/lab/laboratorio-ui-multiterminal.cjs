@@ -317,6 +317,12 @@ const subtotalDePrueba = Math.round(precioUnitario * cantidadDePrueba * 100) / 1
 const ivaDePrueba = Math.round(subtotalDePrueba * 0.16 * 100) / 100
 const totalDePrueba = Math.round((subtotalDePrueba + ivaDePrueba) * 100) / 100
 const escapar = t => String(t).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+// El HTML COLAPSA los espacios seguidos. Un catálogo real trae nombres como
+// «HALF  HALF COMBO» —dos espacios— que en pantalla se pintan con uno solo, y
+// una expresión con los dos no coincide jamás. Medido el 2026-09-14: la cuarta
+// corrida murió 30 s esperando ese botón. Los fixtures de juguete no tienen
+// espacios dobles, ni acentos raros, ni nombres con salto de línea.
+const porNombre = t => new RegExp(escapar(String(t).trim()).replace(/\s+/g, '\\s+'))
 console.log(`[escenario] categoría «${escenario.categoria.name}» · producto «${escenario.producto.name}» ` +
   `· estación ${escenario.estacion} · ${cantidadDePrueba} × ${precioUnitario} = ${totalDePrueba} con IVA` +
   (escenario.grupo ? ` · grupo obligatorio «${escenario.grupo.name}»` : ' · SIN grupo obligatorio: ese tramo se omite'))
@@ -793,9 +799,9 @@ async function main() {
     if (await buscador.count()) {
       await buscador.fill(escenario.producto.name.trim().split(/\s+/).slice(0, 2).join(' '))
     } else {
-      await pos3.page.getByRole('button', { name: new RegExp(escapar(escenario.categoria.name)) }).click()
+      await pos3.page.getByRole('button', { name: porNombre(escenario.categoria.name) }).click()
     }
-    await pos3.page.getByRole('button', { name: new RegExp(escapar(escenario.producto.name)) }).first().click()
+    await pos3.page.getByRole('button', { name: porNombre(escenario.producto.name) }).first().click()
     if (escenario.grupo && escenario.opcion) {
       // El botón de agregar nace deshabilitado hasta elegir la opción obligatoria:
       // eso es lo que demuestra que el grupo viajó desde Caja sin internet.
