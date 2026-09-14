@@ -17,7 +17,7 @@ copiarlos a mano** en cada caja — es el camino clonable a N clientes.
 ## Autorización local obligatoria
 
 El arranque genera un `fingerprint-ipc-secret` de 32 bytes aleatorios. En Windows
-vive bajo `%APPDATA%\Fullsite POS\fingerprint`, con ACL sólo para el usuario de la
+vive bajo el `userData` real de Electron (primero `%APPDATA%\fullsite-pos\fingerprint`), con ACL sólo para el usuario de la
 caja y `SYSTEM`; el instalador manual y Electron leen exactamente el mismo archivo.
 Pedro y el servicio lo conservan sólo en memoria. El secreto **nunca cruza HTTP**.
 Cada llamada, incluida `health`, lleva timestamp, un nonce aleatorio y un HMAC que

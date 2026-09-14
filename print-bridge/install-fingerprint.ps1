@@ -30,12 +30,12 @@ function Find-FullsiteUserData {
       if (-not $restaurant) { $restaurant = $config.restaurantId }
       if (-not $restaurant) { $restaurant = $config.client_id }
       if (-not $restaurant) { $restaurant = $config.clientId }
-      if ($restaurant -and $config.supabaseUrl -and $config.supabaseAnonKey) { return $candidate }
+      if ($restaurant -and ([string]$restaurant -match '^[a-zA-Z0-9_-]{1,40}$')) { return $candidate }
     } catch {
       # No se imprime el JSON ni el error completo: el archivo puede traer secretos.
     }
   }
-  throw 'No se encontró el userData válido de Electron (config.json completo). Abre Fullsite POS una vez y vuelve a intentar.'
+  throw 'No se encontró el userData válido de Electron (config.json con restaurant_id). Abre Fullsite POS una vez y vuelve a intentar.'
 }
 
 $userDataDirectory = Find-FullsiteUserData
@@ -167,7 +167,8 @@ if (-not (Test-Path $ipcSecretFile)) {
   $secret = -join ($bytes | ForEach-Object { $_.ToString('x2') })
   [System.IO.File]::WriteAllText($ipcSecretFile, $secret, [System.Text.Encoding]::ASCII)
 }
-& icacls.exe $ipcSecretFile /inheritance:r /grant:r "$($env:USERNAME):(F)" "SYSTEM:(F)" | Out-Null
+$windowsIdentity = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+& icacls.exe $ipcSecretFile /inheritance:r /grant:r "$windowsIdentity`:(F)" "SYSTEM:(F)" | Out-Null
 if ($LASTEXITCODE -ne 0) {
   Write-Host '[ERROR] No se pudo restringir el secreto IPC al usuario de la caja y SYSTEM.' -ForegroundColor Red
   exit 1
