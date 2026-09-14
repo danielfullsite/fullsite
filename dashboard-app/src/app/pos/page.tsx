@@ -169,6 +169,7 @@ import { PosOrderRow } from '@/components/pos/ui/PosOrderRow'
 import { PosActionBand } from '@/components/pos/ui/PosActionBand'
 import { PosAdaptiveGrid } from '@/components/pos/ui/PosAdaptiveGrid'
 import { PosVentaPanel } from '@/components/pos/ui/PosVentaPanel'
+import { PosNumPad, PosMonto } from '@/components/pos/ui/PosNumPad'
 
 // El reintento del bridge y la validacion de la respuesta viven ahora en
 // lib/kitchen-bridge.ts (sendOrderToKitchen), que SI reporta el resultado.
@@ -6404,7 +6405,7 @@ function POSContent() {
                   value={propina || ''}
                   onChange={e => setPropina(Number(e.target.value) || 0)}
                   placeholder="$"
-                  className="w-28 min-h-[56px] bg-[var(--line)] border border-[var(--line)] rounded-xl px-3 text-[var(--text-1)] text-lg text-center focus:outline-none focus:border-[var(--accent)]"
+                  className={`w-28 bg-[var(--line)] border border-[var(--line)] rounded-xl px-3 text-[var(--text-1)] text-lg text-center focus:outline-none focus:border-[var(--accent)] ${posV2 ? 'min-h-[60px] font-mono font-bold' : 'min-h-[56px]'}`}
                 />
               </div>
             </div>
@@ -6562,12 +6563,27 @@ function POSContent() {
                         </div>
                       )
                     })()}
+                    {posV2 ? (
+                      <>
+                        {/* Lo recibido, grande y en monoespaciada. Antes era un
+                            `<input type=number>`: en una caja no hay teclado
+                            físico, así que ese campo era donde se equivocaba
+                            el cajero. */}
+                        <PosMonto valor={cashAmount} etiqueta="Recibido" />
+                        <PosNumPad
+                          valor={cashAmount}
+                          onValor={setCashAmount}
+                          onConfirmar={() => { if (cashReceived >= totalConPropina && !saving) handlePayment('Efectivo') }}
+                        />
+                      </>
+                    ) : (
                     <input
                       type="number" inputMode="decimal" value={cashAmount}
                       onChange={e => setCashAmount(e.target.value)}
                       placeholder="Otro monto" autoFocus
                       className="w-full bg-[var(--bg)] border-2 border-[var(--line)] rounded-xl px-4 py-3 text-[var(--text-1)] text-2xl text-center font-black focus:outline-none focus:border-[var(--accent)]"
                     />
+                    )}
                     {cashReceived > 0 && (
                       cambio >= 0 ? (
                         <div className="text-center py-4 rounded-xl bg-[var(--info-soft)] border" style={{ borderColor: 'color-mix(in srgb, var(--info) 35%, transparent)' }}>

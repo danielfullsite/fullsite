@@ -27,6 +27,8 @@ import {
 } from '@/lib/pos-cierre-guard'
 import { armarFilaDeCierre, rechazoDefinitivo } from '@/lib/pos-cierre-fila'
 import { requiereCaja, leerSalon } from '@/lib/pedro-cliente'
+import { PosNumPad, PosMonto } from '@/components/pos/ui/PosNumPad'
+import { usePosV2 } from '@/components/pos/ui/PosProductTile'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -122,6 +124,7 @@ export default function CierreCajaWizard({
   onComplete,
 }: CierreCajaWizardProps) {
   const [step, setStep] = useState(1)
+  const posV2 = usePosV2()
   const [cashInput, setCashInput] = useState('')
   const [pin, setPin] = useState('')
   const [pinError, setPinError] = useState('')
@@ -801,6 +804,16 @@ export default function CierreCajaWizard({
             <div>
               <h3 className="font-bold text-[var(--text-1)] mb-2">¿Cuánto efectivo hay en caja?</h3>
               <p className="text-sm text-[var(--text-3)] mb-6">Cuenta todo el efectivo (billetes + monedas) y escribe el total.</p>
+              {posV2 ? (
+                // El arqueo es el momento en que se cuenta dinero de verdad, y
+                // se capturaba en un `<input type=number>` con su flechita. Un
+                // dedo grasoso sobre una flecha de doce pixeles es como se
+                // producen las diferencias que despues nadie explica.
+                <div className="flex flex-col gap-4">
+                  <PosMonto valor={cashInput} etiqueta="Efectivo contado" />
+                  <PosNumPad valor={cashInput} onValor={setCashInput} />
+                </div>
+              ) : (
               <div className="relative">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl text-[var(--text-3)]">$</span>
                 <input
@@ -813,6 +826,7 @@ export default function CierreCajaWizard({
                   className="w-full bg-[var(--line)] border border-[var(--line)] rounded-xl pl-10 pr-4 py-5 text-3xl font-bold text-center text-[var(--text-1)] focus:outline-none focus:border-emerald-500"
                 />
               </div>
+              )}
               <div className="mt-4 text-center text-sm text-[var(--text-3)]">
                 Efectivo esperado por el sistema: <span className="text-emerald-400 font-bold">{formatMXN(efectivoEsperado)}</span>
               </div>
