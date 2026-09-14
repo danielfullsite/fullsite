@@ -2183,6 +2183,7 @@ function POSContent() {
   const [showSplit, setShowSplit] = useState(false)
   const [showVerify, setShowVerify] = useState(false)
   const [showFunciones, setShowFunciones] = useState(false)
+  const [showPersonas, setShowPersonas] = useState(false)
   const [sentItemIds, setSentItemIds] = useState<Set<string>>(new Set())
   const [sentItemSnapshots, setSentItemSnapshots] = useState<Record<string, { cantidad: number; modificadores: string[]; notas: string; silla?: number }>>({})
   const [splitAssignments, setSplitAssignments] = useState<Record<string, number>>({}) // itemId → cuenta (1-6)
@@ -4588,9 +4589,52 @@ function POSContent() {
               className="w-11 sm:w-14 bg-transparent text-[var(--text-1)] text-base font-bold text-center border-none outline-none"
             />
           </div>
-          <select value={personas} onChange={(e) => setPersonas(Number(e.target.value))} className="flex-shrink-0 bg-[var(--line)] text-[var(--text-1)] rounded-lg px-2 sm:px-4 py-2 text-base sm:text-lg font-bold border border-[var(--line)] min-h-[48px]">
-            {Array.from({ length: 20 }, (_, i) => (<option key={i + 1} value={i + 1}>{i + 1}p</option>))}
-          </select>
+          {/* CUÁNTAS PERSONAS SE SIENTAN, DE UN TOQUE.
+              Esto era un <select> nativo con veinte opciones. En una caja táctil
+              eso despliega una lista que hay que arrastrar con el dedo, y las
+              opciones que no caben no existen (campo, AMALAY 2026-09-13: «tengo
+              que scrollear para ver cuántas personas escoger»). Ahora es un
+              botón que abre una cuadrícula: veinte números a la vista, de 64px,
+              sin una sola barra de desplazamiento. */}
+          <button
+            type="button"
+            onClick={() => setShowPersonas(true)}
+            aria-label={`Personas en la mesa: ${personas}`}
+            className="flex-shrink-0 flex items-center gap-1 bg-[var(--line)] text-[var(--text-1)] rounded-lg px-3 sm:px-4 text-base sm:text-lg font-bold border border-[var(--line)] min-h-[48px] active:scale-95 transition-transform"
+          >
+            {personas}p
+            <ChevronDown size={16} className="text-[var(--text-3)]" />
+          </button>
+          {showPersonas && (
+            <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4" onClick={() => setShowPersonas(false)}>
+              <div className="w-full max-w-2xl rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] p-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="text-lg font-bold text-[var(--text-1)]">¿Cuántas personas?</h3>
+                  <button type="button" onClick={() => setShowPersonas(false)}
+                    className="min-h-[56px] px-5 rounded-xl bg-[var(--line)] text-[var(--text-2)] font-bold active:scale-95 transition-transform">
+                    Cerrar
+                  </button>
+                </div>
+                <div className="grid grid-cols-5 gap-2">
+                  {Array.from({ length: 20 }, (_, i) => i + 1).map(n => (
+                    <button
+                      key={n}
+                      type="button"
+                      aria-current={n === personas}
+                      onClick={() => { setPersonas(n); setShowPersonas(false) }}
+                      className={`min-h-[64px] rounded-xl border text-xl font-extrabold tabular-nums active:scale-95 transition-transform ${
+                        n === personas
+                          ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--text-1)]'
+                          : 'border-[var(--line)] bg-[var(--surface)] text-[var(--text-2)]'
+                      }`}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
           {/* Mesero — BLOQUEADO a la identidad logueada (anti-fraude). Reasignar
               requiere PIN de gerente y queda en bitácora. */}
           {reassignMgr ? (
