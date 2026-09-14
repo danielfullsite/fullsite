@@ -53,7 +53,20 @@ for (let i = 2; i < process.argv.length; i += 2) {
 }
 const HOST = args.host || '127.0.0.1'
 const PUERTO = Number(args.puerto || 7717)
-const ROL = (args.rol || 'caja').toLowerCase()
+
+// El rol se declara y NO se adivina.
+//
+// Pedro no expone `terminal_role` en `/health`, así que este programa no puede
+// corroborarlo. El 2026-09-14 se certificó PDV2 —que es el KDS de cocina
+// (deployment-state, DECISION-BRAIN:97, DEBRIEF-JUL12:269)— como si fuera un POS
+// secundario, y eso inventó dos fallas: un KDS no tiene impresoras ni login.
+// Hasta que `/health` reporte el rol, equivocarse aquí es equivocarse en todo.
+const ROLES = ['caja', 'secundaria', 'kds']
+const ROL = (args.rol || '').toLowerCase()
+if (!ROLES.includes(ROL)) {
+  console.error(`Indica --rol (${ROLES.join(' | ')}). No se adivina: el rol cambia qué es correcto.`)
+  process.exit(2)
+}
 const SHA = args.sha || null
 const PERSONAL = args.personal ? Number(args.personal) : null
 const CAJA = args.caja || null
@@ -181,9 +194,15 @@ async function certificar() {
     pendiente('C9-C14', 'Comprobaciones de estado', 'sin --secreto no se pueden consultar', 'credencial-lan.js:56')
   } else {
     // C9 — personal preparado para operar sin internet
+    //
+    // No aplica al KDS: es una pantalla sin login (DEBRIEF-JUL12 §KDS). Pedirle
+    // usuarios preparados produce una falla inventada — pasó el 2026-09-14 por
+    // certificar PDV2 con el rol equivocado.
     const auth = await pedir(HOST, '/auth/status', { conCredencial: true })
     const preparados = auth.json?.prepared_users ?? 0
-    if (PERSONAL == null) {
+    if (ROL === 'kds') {
+      pasa('C9', 'Personal preparado para offline', 'no aplica: el KDS no tiene login', 'DEBRIEF-JUL12')
+    } else if (PERSONAL == null) {
       pendiente('C9', 'Personal preparado para offline', `${preparados} preparados; no se indicó --personal`, 'HALLAZGOS §4')
     } else if (preparados >= PERSONAL) {
       pasa('C9', 'Personal preparado para offline', `${preparados}/${PERSONAL}`, 'HALLAZGOS §4')

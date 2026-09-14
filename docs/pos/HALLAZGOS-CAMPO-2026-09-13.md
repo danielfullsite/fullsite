@@ -175,16 +175,44 @@ Superficie de ataque sin beneficio. Debe borrarse, o documentarse por qué exist
 
 ---
 
-## 6. ABIERTO — PDV2 no tiene ninguna estación de impresión
+## 6. RETIRADO — «PDV2 no tiene estaciones de impresión»
 
-```
-CAJA: stations = [barra, caja, cocina, tickets]
-PDV2: stations = []
-```
+**Esto era un error mío, no un defecto del sistema.** PDV2 es el **KDS de cocina**
+(`kds_only: true`), y un KDS no tiene impresoras por diseño: `stations: []` es lo
+correcto. La falla la produjo certificarlo con el rol equivocado.
 
-Falta confirmar si eso es correcto —una secundaria puede reenviar la impresión a la
-Caja— o si significa que PDV2 no puede mandar a cocina cuando la Caja está apagada.
-Sin verificar.
+Estaba documentado en tres lugares y no se leyeron:
+
+- `MEMORY/project_amalay_deployment_state.md:24` — «PDV2 · KDS dedicado (`kds_only: true`)»
+- `docs/DECISION-BRAIN.md:97` — «el build dedicado (PDV2) carga `kds-ui.html` local»
+- `docs/customers/amalay/DEBRIEF-JUL12.md:269` — «Cocina: KDS PDV2 + impresoras TCP
+  (fría .21, caliente .40). Barra: comanda impresa (.30), NO KDS. Market/Caja: ticket
+  USB, NO KDS. **Panadería: comunicación VERBAL, NO KDS, NO impresora dedicada**»
+
+Ese último renglón también resuelve la duda sobre la impresora llamada `PANADERIA`: la
+panadería **no tiene impresora**; el nombre del dispositivo es histórico. No había nada
+que investigar.
+
+**Entrada es PDV3**, no PDV2, y no está en la tailnet.
+
+### Lo que sí queda, degradado a hipótesis sin verificar
+
+La compuerta del navegador (`print-queue.ts:264`) decide si puede imprimir leyendo las
+estaciones de **su propio** Pedro. En una terminal secundaria cuyo Pedro reenvía a la
+Caja (field-proven §5.5 🔒), esa lectura es la pregunta equivocada: si la secundaria no
+tiene un `printers.json` propio, detiene todas las comandas en silencio aunque la Caja
+pudiera imprimirlas.
+
+El field-proven dice que la impresión de secundarias se verificó con Entrada y funcionó,
+así que ahí la compuerta pasa —presumiblemente porque Entrada sí tiene configuración de
+impresoras—. **No hay ninguna terminal secundaria en la tailnet para comprobarlo.**
+Queda como riesgo de configuración, no como defecto confirmado.
+
+### Y una carencia real que este error dejó a la vista
+
+`/health` **no reporta `terminal_role`**. Sin ese dato, ninguna herramienta —ni una
+persona— puede saber qué es correcto para una terminal sin preguntarle a alguien. Toda
+la equivocación de arriba se evita si Pedro dice qué es.
 
 ---
 
