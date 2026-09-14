@@ -15,7 +15,7 @@
  * directo con su JWT. Solo las terminales POS (shiftToken) se rutean aquí.
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { ALLOW, puedeEscribirEn, MANAGER_ONLY_DELETE, NO_CID, prepararCuerpoProxy, isManager, redactResponse, tableOf, consultaProxyValida } from '@/lib/pos-db-policy'
+import { ALLOW, puedeEscribirEn, MANAGER_ONLY_DELETE, NO_CID, SCOPED_BY_OWN_ID, SOLO_LECTURA, prepararCuerpoProxy, isManager, redactResponse, tableOf, consultaProxyValida } from '@/lib/pos-db-policy'
 import { withPOSAuth } from '@/lib/api-auth'
 import { scopedProxyRequest } from '@/lib/pos-db-scoped'
 
@@ -43,6 +43,11 @@ async function handle(request: NextRequest, method: string) {
   if (!ALLOW.has(table)) return NextResponse.json({ error: `table not allowed: ${table}` }, { status: 403 })
 
   const isWrite = method !== 'GET'
+  // Sólo lectura: la configuración del restaurante se edita desde el dashboard
+  // con sesión de usuario, nunca con un shift token de terminal.
+  if (isWrite && SOLO_LECTURA.has(table)) {
+    return NextResponse.json({ error: `${table} es de solo lectura para el POS` }, { status: 403 })
+  }
   // `puedeEscribirEn` cubre las dos listas: las tablas de identidad siguen pidiendo
   // gerente, y las de caja piden cajero+ — antes pedían gerente y el Corte Z de una
   // caja logueada como cajero moría en 403 sin reintento. Ver pos-db-policy.ts.
@@ -57,7 +62,12 @@ async function handle(request: NextRequest, method: string) {
   // Tenant scope: fuerza client_id del token en el query (reads y writes).
   const params = new URLSearchParams(path.includes('?') ? path.slice(path.indexOf('?') + 1) : '')
   if (!consultaProxyValida(table, params)) return NextResponse.json({ error: 'consulta no permitida' }, { status: 403 })
-  if (!NO_CID.has(table)) params.set('client_id', `eq.${auth.clientId}`)
+  // El acotamiento por tenant NO es opcional: sin él, el proxy corre con
+  // service_role y se salta RLS. `clients` no tiene columna client_id — su llave
+  // ES el restaurante — así que se acota por `id`. Si alguna vez se cae en el
+  // `else`, la consulta sale sin filtro y eso es una fuga entre restaurantes.
+  if (SCOPED_BY_OWN_ID.has(table)) params.set('id', `eq.${auth.clientId}`)
+  else if (!NO_CID.has(table)) params.set('client_id', `eq.${auth.clientId}`)
   const target = `${table}?${params.toString()}`
 
   const headers: Record<string, string> = {
