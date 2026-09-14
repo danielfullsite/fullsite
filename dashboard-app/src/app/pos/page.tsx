@@ -143,7 +143,6 @@ import {
   DollarSign,
   ArrowDownUp,
   Layers,
-  ClipboardCheck,
   Power,
   Utensils,
   Coffee, EggFried, Sandwich, Salad, CupSoda, Citrus, Croissant, CakeSlice, IceCream, Leaf, Pizza, Fish, Cookie,
@@ -167,6 +166,7 @@ import { usePOSLock } from './pos-lock-context'
 import { layerZ } from '@/components/ui/layers'
 import { PosProductTile, usePosV2 } from '@/components/pos/ui/PosProductTile'
 import { PosOrderRow } from '@/components/pos/ui/PosOrderRow'
+import { PosActionBand } from '@/components/pos/ui/PosActionBand'
 
 // El reintento del bridge y la validacion de la respuesta viven ahora en
 // lib/kitchen-bridge.ts (sendOrderToKitchen), que SI reporta el resultado.
@@ -5135,63 +5135,26 @@ function POSContent() {
             </div>
           </div>
 
-          {/* Action buttons — compact for tablets */}
-          <div className={`px-3 py-1 border-t border-[var(--line)] gap-2 flex-shrink-0 ${escribeEnCaja ? 'grid grid-cols-3' : 'flex'}`}>
-            {orderItems.length === 0 ? (
-              <button
-                onClick={() => navigateToMesaMap()}
-                className="flex-1 flex items-center justify-center gap-2 bg-[var(--surface-2)] hover:bg-[var(--text-4)] active:bg-[var(--raised)] active:scale-[0.97] text-[var(--text-1)] font-bold py-2.5 rounded-xl text-base transition-all min-h-[52px]"
-              >
-                <ArrowLeft size={18} />
-                Salir
-              </button>
-            ) : (<>
-            {escribeEnCaja && <button onClick={() => guardarOperacionCaja(false)}
-              disabled={activeItems.length === 0 || saving || cuentaCajaBloqueada}
-              className="flex-1 min-h-[52px] rounded-xl bg-slate-700 px-3 py-2.5 font-bold text-white disabled:opacity-40">Guardar</button>}
-            <button
-              onClick={() => setShowVerify(true)}
-              disabled={activeItems.length === 0}
-              className="flex-[0.5] flex items-center justify-center gap-1 bg-cyan-600 hover:bg-cyan-500 active:bg-cyan-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-2.5 rounded-xl text-sm transition-all min-h-[52px]"
-            >
-              <ClipboardCheck size={16} />
-              Verificar
-            </button>
-            <button
-              onClick={handleSendToKitchen}
-              disabled={activeItems.length === 0 || saving || loadingMesa || cuentaCajaBloqueada}
-              className="flex-1 flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-2.5 rounded-xl text-base transition-all min-h-[52px]"
-            >
-              {saving ? <div className="w-[18px] h-[18px] border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Send size={18} />}
-              {saving ? 'Enviando' : sentToKitchen ? 'Enviado' : 'Enviar'}
-            </button>
-            <button
-              onClick={handlePreTicket}
-              disabled={activeItems.length === 0 || saving || loadingMesa || cuentaCajaBloqueada}
-              className="flex-[0.6] flex items-center justify-center gap-1 bg-amber-600 hover:bg-amber-500 active:bg-amber-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-2.5 rounded-xl text-base transition-all min-h-[52px]"
-            >
-              <Receipt size={16} />
-              Cuenta
-            </button>
-            <button
-              onClick={async () => { if (escribeEnCaja) { await handleCloseOrder(); return }; if (accionPendienteEnCaja('La división anterior de cuenta')) return; if (!await validarCuentaCaja()) return; if (activeItems.length >= 2) { setSplitMode(null); setSplitCount(0); setSplitParejoN(0); setSplitAssignments({}); setShowSplit(true) } else handleCloseOrder() }}
-              disabled={activeItems.length === 0 || saving || cuentaCajaBloqueada || !can('cerrar_cuentas')}
-              className="flex-[0.4] flex items-center justify-center bg-purple-600 hover:bg-purple-500 active:bg-purple-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-2.5 rounded-xl text-base transition-all min-h-[52px]"
-              title={!can('cerrar_cuentas') ? 'Sin permiso para cobrar' : ''}
-            >
-              Split
-            </button>
-            <button
-              onClick={handleCloseOrder}
-              disabled={activeItems.length === 0 || saving || cuentaCajaBloqueada || !can('cerrar_cuentas')}
-              className="flex-1 flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-2.5 rounded-xl text-base transition-all min-h-[52px]"
-              title={!can('cerrar_cuentas') ? 'Sin permiso para cobrar' : ''}
-            >
-              <CreditCard size={18} />
-              {!can('cerrar_cuentas') ? 'Sin permiso' : 'Cobrar'}
-            </button>
-            </>)}
-          </div>
+          {/* Banda de acción — ver components/pos/ui/PosActionBand.tsx */}
+          <PosActionBand
+            v2={posV2}
+            vacia={orderItems.length === 0}
+            escribeEnCaja={escribeEnCaja}
+            saving={saving}
+            sentToKitchen={sentToKitchen}
+            sinItems={activeItems.length === 0}
+            bloqueadoGuardar={activeItems.length === 0 || saving || cuentaCajaBloqueada}
+            bloqueadoEnviar={activeItems.length === 0 || saving || loadingMesa || cuentaCajaBloqueada}
+            bloqueadoCobrar={activeItems.length === 0 || saving || cuentaCajaBloqueada || !can('cerrar_cuentas')}
+            puedeCobrar={can('cerrar_cuentas')}
+            onSalir={() => navigateToMesaMap()}
+            onGuardar={() => guardarOperacionCaja(false)}
+            onVerificar={() => setShowVerify(true)}
+            onEnviar={handleSendToKitchen}
+            onCuenta={handlePreTicket}
+            onSplit={async () => { if (escribeEnCaja) { await handleCloseOrder(); return }; if (accionPendienteEnCaja('La división anterior de cuenta')) return; if (!await validarCuentaCaja()) return; if (activeItems.length >= 2) { setSplitMode(null); setSplitCount(0); setSplitParejoN(0); setSplitAssignments({}); setShowSplit(true) } else handleCloseOrder() }}
+            onCobrar={handleCloseOrder}
+          />
         </div>
 
         {/* Right Panel -- Menu (50% on tablet, full on mobile when active) */}
