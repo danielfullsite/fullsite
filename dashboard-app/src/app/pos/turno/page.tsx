@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, DoorOpen, DoorClosed, DollarSign, Clock, Users, FileText, Printer, X, ChevronDown, ChevronRight, AlertTriangle } from 'lucide-react'
-import { formatMXN, logAudit, openTurno } from '@/lib/pos-data'
+import { formatMXN, getActiveTurnos, logAudit, openTurno } from '@/lib/pos-data'
 import dynamic from 'next/dynamic'
 import { getActiveClientSlug as _cid } from '@/lib/data'
 import { cacheTurno, getCachedActiveTurno, getCachedOrdersByTurno } from '@/lib/pos-offline-db'
@@ -357,63 +357,85 @@ function TurnoPageLegacy() {
   const fetchTurno = async () => {
     setLoading(true)
     try {
-      const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/pos_turnos?closed_at=is.null&client_id=eq.${_cid()}&order=opened_at.desc&limit=10`,
-        { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
-      )
-      if (res.ok) {
-        const rows = await res.json()
-        const turno = rows[0] || null
-        setActiveTurno(turno)
-        // Verdad de campo AMALAY 2026-08-27 (Eduardo): quedaron DOS turnos
-        // abiertos y el Corte Z entraba en conflicto. El más reciente es el
-        // operativo; los demás son huérfanos de días/pruebas anteriores y se
-        // ofrecen para cierre administrativo aquí mismo.
-        setStaleTurnos(Array.isArray(rows) && rows.length > 1 ? rows.slice(1) : [])
-        // Keep IDB in sync so we have a fallback when offline
-        if (turno) {
-          await cacheTurno({ ...turno, client_id: _cid(), synced_at: new Date().toISOString() })
-        }
-        // GUARD-08: aviso de ordenes huerfanas de un cierre anterior.
-        //
-        // Esta consulta pide el ultimo cierre que TUVO ordenes abiertas, que es un
-        // hecho historico y nunca deja de ser cierto. Antes se enseñaba tal cual, y
-        // en AMALAY el aviso del Z#2 (1-sep) llevaba SIETE DIAS en pantalla con dos
-        // cierres Z encima, pidiendo buscar 13 mesas de las que ya no quedaba
-        // ninguna abierta. Ahora se comprueba cuales siguen abiertas HOY.
-        try {
-          const cierreRes = await fetch(
-            `${SUPABASE_URL}/rest/v1/pos_cierres?client_id=eq.${_cid()}&cierre_con_ordenes_abiertas=eq.true&order=created_at.desc&limit=1&select=ordenes_pendientes,cierre_nota`,
-            { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, signal: AbortSignal.timeout(3000) }
-          )
-          if (cierreRes.ok) {
-            const [lastCierre] = await cierreRes.json()
-            const declaradas: string[] = lastCierre?.ordenes_pendientes || []
-            if (declaradas.length > 0) {
-              // Que siguen abiertas de aquellas. Si no se puede saber, NO se calla:
-              // convertir un fallo de red en "ya no hay" es el error que costo caro
-              // el 2026-08-31.
-              let lectura: Parameters<typeof evaluarAvisoDeHuerfanas>[1]
-              try {
-                const ids = declaradas.map(id => `"${id}"`).join(',')
-                const abiertasRes = await fetch(
-                  `${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${_cid()}&id=in.(${ids})&status=in.(${OPEN_ORDER_STATUSES.join(',')})&select=id`,
-                  { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, signal: AbortSignal.timeout(3000) }
-                )
-                if (!abiertasRes.ok) throw new Error(`HTTP ${abiertasRes.status}`)
-                const filas: Array<{ id: string }> = await abiertasRes.json()
-                lectura = { determinado: true, abiertas: filas.map(f => f.id) }
-              } catch (e) {
-                lectura = { determinado: false, motivo: e instanceof Error ? e.message : 'sin conexion' }
-              }
-              const aviso = evaluarAvisoDeHuerfanas(declaradas, lectura, lastCierre?.cierre_nota || null)
-              setOrphanCierre(aviso.mostrar ? aviso : null)
-            }
-          }
-        } catch { /* columns not yet migrated or offline — skip banner */ }
-        setLoading(false)
-        return
+      // Misma lectura que usa TurnoGate. Es importante porque un GET remoto puede
+      // contestar `[]` mientras la apertura local sigue pendiente en la cola.
+      // Mantener una consulta paralela aquí volvería a producir dos verdades:
+      // Turnos activo / Mesas bloqueadas (o al revés).
+      const rows = await getActiveTurnos()
+      const active = rows[0] || null
+      const turno: Turno | null = active ? {
+        ...active,
+        closed_by: null,
+        fondo_final: null,
+        efectivo_sistema: null,
+        diferencia: null,
+        closed_at: null,
+        notas: null,
+      } : null
+      setActiveTurno(turno)
+      // Verdad de campo AMALAY 2026-08-27 (Eduardo): quedaron DOS turnos
+      // abiertos y el Corte Z entraba en conflicto. El más reciente es el
+      // operativo; los demás son huérfanos de días/pruebas anteriores y se
+      // ofrecen para cierre administrativo aquí mismo.
+      setStaleTurnos(rows.length > 1 ? rows.slice(1).map(t => ({
+        ...t,
+        closed_by: null,
+        fondo_final: null,
+        efectivo_sistema: null,
+        diferencia: null,
+        closed_at: null,
+        notas: null,
+      })) : [])
+      // Keep IDB in sync so we have a fallback when offline
+      if (turno) {
+        await cacheTurno({
+          id: turno.id,
+          client_id: _cid(),
+          opened_by: turno.opened_by,
+          fondo_inicial: turno.fondo_inicial,
+          opened_at: turno.opened_at,
+          synced_at: active?.sincronizado === false ? undefined : new Date().toISOString(),
+        })
       }
+      // GUARD-08: aviso de ordenes huerfanas de un cierre anterior.
+      //
+      // Esta consulta pide el ultimo cierre que TUVO ordenes abiertas, que es un
+      // hecho historico y nunca deja de ser cierto. Antes se enseñaba tal cual, y
+      // en AMALAY el aviso del Z#2 (1-sep) llevaba SIETE DIAS en pantalla con dos
+      // cierres Z encima, pidiendo buscar 13 mesas de las que ya no quedaba
+      // ninguna abierta. Ahora se comprueba cuales siguen abiertas HOY.
+      try {
+        const cierreRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/pos_cierres?client_id=eq.${_cid()}&cierre_con_ordenes_abiertas=eq.true&order=created_at.desc&limit=1&select=ordenes_pendientes,cierre_nota`,
+          { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, signal: AbortSignal.timeout(3000) }
+        )
+        if (cierreRes.ok) {
+          const [lastCierre] = await cierreRes.json()
+          const declaradas: string[] = lastCierre?.ordenes_pendientes || []
+          if (declaradas.length > 0) {
+            // Que siguen abiertas de aquellas. Si no se puede saber, NO se calla:
+            // convertir un fallo de red en "ya no hay" es el error que costo caro
+            // el 2026-08-31.
+            let lectura: Parameters<typeof evaluarAvisoDeHuerfanas>[1]
+            try {
+              const ids = declaradas.map(id => `"${id}"`).join(',')
+              const abiertasRes = await fetch(
+                `${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${_cid()}&id=in.(${ids})&status=in.(${OPEN_ORDER_STATUSES.join(',')})&select=id`,
+                { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, signal: AbortSignal.timeout(3000) }
+              )
+              if (!abiertasRes.ok) throw new Error(`HTTP ${abiertasRes.status}`)
+              const filas: Array<{ id: string }> = await abiertasRes.json()
+              lectura = { determinado: true, abiertas: filas.map(f => f.id) }
+            } catch (e) {
+              lectura = { determinado: false, motivo: e instanceof Error ? e.message : 'sin conexion' }
+            }
+            const aviso = evaluarAvisoDeHuerfanas(declaradas, lectura, lastCierre?.cierre_nota || null)
+            setOrphanCierre(aviso.mostrar ? aviso : null)
+          }
+        }
+      } catch { /* columns not yet migrated or offline — skip banner */ }
+      setLoading(false)
+      return
     } catch { /* offline — fall through to IDB */ }
     // Offline fallback: read from IndexedDB
     const cached = await getCachedActiveTurno(_cid())

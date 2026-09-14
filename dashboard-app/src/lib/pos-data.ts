@@ -431,7 +431,7 @@ async function _getPaymentMethodsFromCache(): Promise<PaymentMethodDB[]> {
   return []
 }
 
-type ActiveTurnoRecord = { id: string; fondo_inicial: number; opened_by: string; opened_at: string }
+type ActiveTurnoRecord = { id: string; fondo_inicial: number; opened_by: string; opened_at: string; sincronizado?: boolean }
 
 /** Turnos activos (pos_turnos sin closed_at), del más reciente al más antiguo. */
 export async function getActiveTurnos(): Promise<ActiveTurnoRecord[]> {
@@ -476,6 +476,41 @@ export async function getActiveTurnos(): Promise<ActiveTurnoRecord[]> {
     }
   }
 
+  /**
+   * Un GET 200 con `[]` no siempre significa "no hay turno".
+   *
+   * Cuando la apertura se hizo localmente, el POST queda en la cola
+   * `fullsite_offline_queue`. La terminal puede recuperar internet suficiente
+   * para que el GET conteste, pero no para que ese POST ya haya drenado. Antes
+   * tomábamos el `[]` como autoridad, reemplazábamos `pos_turno_cache` por null y
+   * TurnoGate mostraba "No hay turno abierto" segundos después de confirmar la
+   * apertura.
+   *
+   * La cola pendiente es la prueba durable de que el turno local todavía debe
+   * considerarse activo. No basta con confiar en cualquier cache: un turno ya
+   * cerrado desde otra terminal también puede quedar cacheado y no debe
+   * resucitarse.
+   */
+  const pendingLocalFromCache = (): ActiveTurnoRecord[] => {
+    if (typeof localStorage === 'undefined') return []
+    const cached = fromCache()
+    if (cached.length === 0) return []
+    try {
+      const queue = JSON.parse(localStorage.getItem('fullsite_offline_queue') || '[]')
+      if (!Array.isArray(queue)) return []
+      const pendingIds = new Set(
+        queue
+          .filter(item => item?.synced !== true && item?.table === 'pos_turnos' && item?.data?.id)
+          .map(item => String(item.data.id))
+      )
+      return cached
+        .filter(turno => pendingIds.has(turno.id))
+        .map(turno => ({ ...turno, sincronizado: false }))
+    } catch {
+      return []
+    }
+  }
+
   let res: Response
   try {
     res = await fetchWithTimeout(
@@ -505,7 +540,12 @@ export async function getActiveTurnos(): Promise<ActiveTurnoRecord[]> {
     throw new ErrorDeContrato(res.status, detalle.slice(0, 200))
   }
 
-  const rows = await res.json()
+  const payload = await res.json()
+  const rows: ActiveTurnoRecord[] = Array.isArray(payload) ? payload : []
+  if (rows.length === 0) {
+    const pending = pendingLocalFromCache()
+    if (pending.length > 0) return pending
+  }
   if (typeof window !== 'undefined') {
     try { localStorage.setItem('pos_turno_cache', JSON.stringify({ turno: rows[0] || null, turnos: rows, ts: Date.now() })) } catch {}
   }
@@ -672,9 +712,10 @@ export async function openTurno(fondoInicial: number, openedBy: string, openingR
   const body = { id, client_id: _getClientId(), opened_by: openedBy, fondo_inicial: fondoInicial, opened_at: openedAt }
 
   // Cachear el turno local para que getActiveTurno lo devuelva offline (mismo key/shape).
-  const cacheLocal = () => {
+  const cacheTurno = (sincronizado: boolean) => {
     if (typeof window !== 'undefined') {
-      try { localStorage.setItem('pos_turno_cache', JSON.stringify({ turno: localTurno, ts: Date.now() })) } catch {}
+      const turno = { ...localTurno, sincronizado }
+      try { localStorage.setItem('pos_turno_cache', JSON.stringify({ turno, turnos: [turno], ts: Date.now() })) } catch {}
     }
   }
   // Encolar el POST para sincronizar al reconectar. id client-side = idempotente:
@@ -692,7 +733,7 @@ export async function openTurno(fondoInicial: number, openedBy: string, openingR
   // Offline: abrir turno LOCAL + encolar (el día arranca sin internet).
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
     await queueForSync()
-    cacheLocal()
+    cacheTurno(false)
     return { ...localTurno, sincronizado: false }
   }
 
@@ -728,7 +769,7 @@ export async function openTurno(fondoInicial: number, openedBy: string, openingR
 
     if (!res.ok) throw new Error('post failed')
     const rows = await res.json()
-    cacheLocal()
+    cacheTurno(true)
     return { ...(rows[0] || localTurno), sincronizado: true }
   } catch (e) {
     // Un conflicto ya se resolvió arriba; lo que llega aquí es red. Si el mensaje viene
@@ -737,7 +778,7 @@ export async function openTurno(fondoInicial: number, openedBy: string, openingR
     // "Online" pero el POST falló (LAN degradada / timeout) — abrir local + encolar
     // en vez de bloquear el día con "Error al abrir turno".
     await queueForSync()
-    cacheLocal()
+    cacheTurno(false)
     return { ...localTurno, sincronizado: false }
   }
 }
