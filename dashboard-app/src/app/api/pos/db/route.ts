@@ -15,7 +15,7 @@
  * directo con su JWT. Solo las terminales POS (shiftToken) se rutean aquí.
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { ALLOW, puedeEscribirEn, MANAGER_ONLY_DELETE, NO_CID, prepararCuerpoProxy, isManager, redactResponse, tableOf, consultaProxyValida } from '@/lib/pos-db-policy'
+import { ALLOW, puedeEscribirEn, MANAGER_ONLY_DELETE, puedeBorrarEn, SOLO_SE_INSERTA, NO_CID, prepararCuerpoProxy, isManager, redactResponse, tableOf, consultaProxyValida } from '@/lib/pos-db-policy'
 import { withPOSAuth } from '@/lib/api-auth'
 import { scopedProxyRequest } from '@/lib/pos-db-scoped'
 
@@ -43,6 +43,11 @@ async function handle(request: NextRequest, method: string) {
   if (!ALLOW.has(table)) return NextResponse.json({ error: `table not allowed: ${table}` }, { status: 403 })
 
   const isWrite = method !== 'GET'
+  // La bitácora se escribe, no se corrige: un PATCH ahí sólo sirve para cambiar
+  // el actor de la fila que uno mismo dejó.
+  if ((method === 'PATCH' || method === 'DELETE') && SOLO_SE_INSERTA.has(table) && !isManager(auth.role)) {
+    return NextResponse.json({ error: 'esta tabla sólo admite registrar, no modificar' }, { status: 403 })
+  }
   // `puedeEscribirEn` cubre las dos listas: las tablas de identidad siguen pidiendo
   // gerente, y las de caja piden cajero+ — antes pedían gerente y el Corte Z de una
   // caja logueada como cajero moría en 403 sin reintento. Ver pos-db-policy.ts.
@@ -50,7 +55,8 @@ async function handle(request: NextRequest, method: string) {
     return NextResponse.json({ error: 'manager required' }, { status: 403 })
   }
   // Una orden no se borra, se cancela: el borrado deja el arqueo sin rastro.
-  if (method === 'DELETE' && MANAGER_ONLY_DELETE.has(table) && !isManager(auth.role)) {
+  // Borrar es la excepción: sólo donde alguien lo autorizó a propósito (pos-db-policy).
+  if (method === 'DELETE' && !puedeBorrarEn(table, auth.role)) {
     return NextResponse.json({ error: 'borrar requiere rol de gerente; cancela la orden en su lugar' }, { status: 403 })
   }
 

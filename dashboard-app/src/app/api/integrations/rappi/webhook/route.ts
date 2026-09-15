@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse, after } from 'next/server'
 import { verifyRappiSignature } from '@/lib/integrations/rappi/signature'
-import { processRappiOrder } from '@/lib/integrations/rappi/ingest'
+import { processRappiOrder, cuarentenarOrdenDeRappi } from '@/lib/integrations/rappi/ingest'
 
 // Webhook de Rappi (push-first). Verifica firma HMAC sobre el body CRUDO, ACK 200
 // INMEDIATO (RAPPI-002: antes de cualquier I/O), y procesa la orden en background
@@ -72,7 +72,14 @@ export async function POST(request: NextRequest) {
       const result = await processRappiOrder(order, 'webhook')
       if (dev) console.log(`[rappi-webhook] ingest action=${result.action} order=${result.orderId ?? ''} reason=${result.reason ?? ''}`)
     } catch (e) {
-      if (dev) console.log(`[rappi-webhook] ingest-error ${e instanceof Error ? e.message : 'unknown'}`)
+      // EN PRODUCCIÓN TAMBIÉN. Este catch sólo escribía en consola `if (dev)`, así
+      // que cualquier excepción de la ingesta —falta de service key, PostgREST
+      // caído, inserción rechazada— desaparecía: Rappi ya tiene su 200 y no
+      // reintenta. Ahora queda en el log de la función Y en la cola de rezagados.
+      // (Barrido 3, 2026-09-12.)
+      console.error('[rappi-webhook] ingest-error', e instanceof Error ? e.message : 'unknown')
+      try { await cuarentenarOrdenDeRappi(order, `INGEST_THREW: ${e instanceof Error ? e.message : 'unknown'}`, 'webhook') }
+      catch (dlqError) { console.error('[rappi-webhook] tampoco se pudo encolar', dlqError instanceof Error ? dlqError.message : dlqError, { order }) }
     }
   })
 

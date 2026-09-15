@@ -50,7 +50,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withPOSAuth, unauthorized } from '@/lib/api-auth'
 import { scopedProxyRequest } from '@/lib/pos-db-scoped'
-import { ALLOW, NO_CID, puedeEscribirEn, MANAGER_ONLY_DELETE, prepararCuerpoProxy, isManager, redactResponse, tableOf, consultaProxyValida } from '@/lib/pos-db-policy'
+import { ALLOW, NO_CID, puedeEscribirEn, MANAGER_ONLY_DELETE, puedeBorrarEn, SOLO_SE_INSERTA, prepararCuerpoProxy, isManager, redactResponse, tableOf, consultaProxyValida } from '@/lib/pos-db-policy'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -104,8 +104,14 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ path: string[] 
     return forbidden('se requiere rol de gerente')
   }
   // Una orden no se borra, se cancela: el borrado deja el arqueo sin rastro.
-  if (req.method === 'DELETE' && MANAGER_ONLY_DELETE.has(table) && !isManager(auth.role)) {
+  // Borrar es la excepción: sólo donde alguien lo autorizó a propósito (pos-db-policy).
+  if (req.method === 'DELETE' && !puedeBorrarEn(table, auth.role)) {
     return forbidden('borrar requiere rol de gerente; cancela la orden en su lugar')
+  }
+  // La bitácora se escribe, no se corrige: un PATCH ahí sólo sirve para cambiar
+  // el actor de la fila que uno mismo dejó.
+  if ((req.method === 'PATCH' || req.method === 'DELETE') && SOLO_SE_INSERTA.has(table) && !isManager(auth.role)) {
+    return forbidden('esta tabla sólo admite registrar, no modificar')
   }
 
   // Query params del request original + forzar client_id salvo en inserts.

@@ -198,7 +198,14 @@ function conectarConLaCaja({ cajaUrl, serverId, restaurantId, lanSecret, branchI
         // viene en este mismo SNAPSHOT es la nueva línea base.
         const cajaDelSobre = typeof msg.server_id === 'string' && msg.server_id ? msg.server_id : null
         const cambioDeCaja = cajaId !== null && cajaDelSobre !== null && cajaDelSobre !== cajaId
-        const secuenciaRetrocedio = typeof msg.sequence === 'number' && msg.sequence < cursor
+        // UNA SECUENCIA MENOR NO PRUEBA QUE LA CAJA SE REINSTALÓ. Si es la MISMA
+        // caja (mismo server_id), un número más bajo sólo significa que algo se
+        // adelantó por la red — pasaba con un DELTA emitido mientras el hub
+        // armaba este SNAPSHOT (ws-hub.js). Interpretarlo como «historia nueva»
+        // ponía el cursor en -1 y re-aplicaba todo el catch-up: cada comanda dos
+        // veces. La identidad manda; el número sólo cuenta si no la tenemos.
+        const mismaCaja = cajaId !== null && cajaDelSobre !== null && cajaDelSobre === cajaId
+        const secuenciaRetrocedio = !mismaCaja && typeof msg.sequence === 'number' && msg.sequence < cursor
         if (cambioDeCaja || secuenciaRetrocedio) {
           console.warn(`${LOG} la caja reinició su historia (${cambioDeCaja ? 'otra instalación' : `secuencia ${msg.sequence} < cursor ${cursor}`}); se reinicia el cursor`)
           cursor = -1

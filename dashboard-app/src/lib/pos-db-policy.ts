@@ -160,8 +160,80 @@ export const CAMPOS_SOLO_DE_GERENTE: Record<string, readonly string[]> = {
   ],
 }
 
+/**
+ * EL DINERO DEL TURNO TAMBIÉN ES DINERO, Y NO ESTABA PROTEGIDO.
+ *
+ * `CAMPOS_SOLO_DE_GERENTE` sólo cubría `pos_orders`. Sobre `pos_turnos` lo único
+ * prohibido a un rol bajo era poner `closed_at` en null (reabrir). Todo lo demás
+ * pasaba entero, así que con un shift token de mesero:
+ *
+ *     PATCH pos_turnos?id=eq.<turno>   { "efectivo_sistema": 4200, "diferencia": 0 }
+ *
+ * y el arqueo del turno cuadra después de sacar efectivo del cajón. (Barrido de
+ * permisos, 2026-09-12.)
+ *
+ * NO se puede exigir gerente: el Corte Z lo cierra la caja, que opera como
+ * `cajero`, y su PATCH lleva justo esas columnas. Un candado de gerente mataría
+ * el corte en 403 y —por la clasificación terminal del replay— el turno no
+ * subiría nunca. Por eso el candado es por NIVEL: cajero sí, mesero no.
+ */
+export const CAMPOS_POR_NIVEL_MINIMO: Record<string, { columnas: readonly string[]; nivel: number }> = {
+  pos_turnos: {
+    columnas: ['efectivo_sistema', 'diferencia', 'fondo_final', 'fondo_inicial', 'total_ventas', 'closed_by', 'client_id'],
+    nivel: 2, // cajero
+  },
+  pos_cierres: {
+    columnas: ['total_contado', 'efectivo_sistema', 'diferencia', 'total_ventas', 'propinas', 'client_id'],
+    nivel: 2, // cajero
+  },
+  pos_cash_movements: {
+    columnas: ['amount', 'type', 'client_id'],
+    nivel: 2, // cajero
+  },
+}
+
 /** Tablas donde BORRAR exige gerente, aunque escribir no. Una orden no se borra: se cancela. */
 export const MANAGER_ONLY_DELETE = new Set<string>(['pos_orders'])
+
+/**
+ * BORRAR ES LA EXCEPCIÓN, NO LA REGLA.
+ *
+ * `MANAGER_ONLY_DELETE` es una lista de prohibiciones, y por eso cada tabla que
+ * entra a `ALLOW` nace BORRABLE por un shift token de mesero. Medido el
+ * 2026-09-12 sobre las 37 tablas de la lista: sólo `pos_orders` estaba cubierta,
+ * así que un mesero podía mandar
+ *
+ *     DELETE pos_audit_log?client_id=eq.<tenant>
+ *
+ * y llevarse la bitácora donde caen `order_reopened`, `skimming_suspect` y
+ * `legacy_no_approval` — justo la evidencia que los flags en modo grace están
+ * recolectando para poder endurecerlos. El cuerpo de un DELETE va vacío, así que
+ * el candado por columnas ni siquiera llega a evaluarse.
+ *
+ * Se invierte el default: un rol operativo sólo borra donde alguien lo escribió
+ * aquí a propósito. Hoy la lista está vacía porque ninguna pantalla de servicio
+ * borra por el proxy (las de catálogo son de gerente y van por MANAGER_ONLY_WRITE).
+ * Si mañana una pantalla necesita borrar, se agrega con su razón, y eso deja
+ * constancia de la decisión en vez de heredarla por omisión.
+ */
+export const BORRADO_PERMITIDO_A_ROL_OPERATIVO = new Set<string>([])
+
+/** ¿Este rol alcanza para BORRAR en esta tabla? */
+export function puedeBorrarEn(table: string, role: string | null | undefined): boolean {
+  if (isManager(role)) return true
+  return BORRADO_PERMITIDO_A_ROL_OPERATIVO.has(table) && puedeEscribirEn(table, role)
+}
+
+/**
+ * LA BITÁCORA SE ESCRIBE, NO SE CORRIGE.
+ *
+ * `pos_audit_log` tiene que aceptar INSERT de cualquier terminal: ahí caen las
+ * cancelaciones, las reaperturas y los avisos de sospecha, y si un mesero no
+ * pudiera insertar, la evidencia se perdería justo cuando importa. Pero un
+ * PATCH sobre una fila ya escrita sirve para UNA sola cosa: cambiarle el `actor`
+ * a la cancelación que uno hizo. Nadie lo necesita.
+ */
+export const SOLO_SE_INSERTA = new Set<string>(['pos_audit_log', 'pos_save_operations'])
 
 /**
  * Qué columnas prohibidas trae este cuerpo. Vacío = puede pasar.
@@ -202,8 +274,11 @@ function intentaReabrir(table: string, fila: Record<string, unknown>): boolean {
 
 export function camposProhibidos(table: string, role: string | null | undefined, cuerpo: string | undefined): string[] {
   const vetadas = CAMPOS_SOLO_DE_GERENTE[table]
+  const porNivel = CAMPOS_POR_NIVEL_MINIMO[table]
+  // Un rol que ya alcanza el nivel de esas columnas no tiene nada que vetar ahí.
+  const vetadasPorNivel = porNivel && (NIVEL[String(role)] || 0) < porNivel.nivel ? porNivel.columnas : null
   const puedeReabrir = !(table in REABRIR_SOLO_GERENTE)
-  if ((!vetadas && puedeReabrir) || isManager(role)) return []
+  if ((!vetadas && !vetadasPorNivel && puedeReabrir) || isManager(role)) return []
   if (!cuerpo) return []
   let dato: unknown
   try {
@@ -217,6 +292,7 @@ export function camposProhibidos(table: string, role: string | null | undefined,
     if (!fila || typeof fila !== 'object') continue
     const obj = fila as Record<string, unknown>
     if (intentaReabrir(table, obj)) encontradas.add(`${REABRIR_SOLO_GERENTE[table]} (reabrir)`)
+    if (vetadasPorNivel) for (const col of Object.keys(obj)) if (vetadasPorNivel.includes(col)) encontradas.add(col)
     if (!vetadas) continue
     for (const col of Object.keys(obj)) {
       if (vetadas.includes(col) || (table === 'pos_orders' && !['kds_item_status', 'mesero'].includes(col))) encontradas.add(col)
