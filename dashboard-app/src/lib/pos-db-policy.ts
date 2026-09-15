@@ -20,6 +20,7 @@
 
 /** Tablas que los proxies pueden tocar. Lo que no está aquí, no existe. */
 export const ALLOW = new Set<string>([
+  'clients',   // sólo lectura y acotada por `id` — ver SCOPED_BY_OWN_ID y SOLO_LECTURA
   'pos_orders',
   'pos_menu_items',
   'pos_menu_categories',
@@ -44,6 +45,10 @@ export const ALLOW = new Set<string>([
   'pos_terminals',
   'pos_inventory',
   'pos_inventory_movements',
+  // Sin ella `inventory-policy.ts` queda en FAILED_NO_POLICY y el gate de
+  // descuento corre fail-open para siempre. Medido en AMALAY el 2026-09-14:
+  // 12 respuestas 403 en cinco pantallas, con el POS online.
+  'pos_item_inventory_policy',
   'pos_recipes',
   'pos_recipe_lines',
   'pos_ingredients',
@@ -62,6 +67,34 @@ export const ALLOW = new Set<string>([
 export const NO_CID = new Set<string>(['pos_purchase_order_items', 'pos_sub_recipe_ingredients'])
 
 /**
+ * Tablas que NO tienen columna `client_id` y se acotan por su propio `id`.
+ *
+ * `clients` es el caso: su llave ES el identificador del restaurante. Meterla en
+ * `NO_CID` la dejaría sin acotar y cualquier terminal leería la configuración de
+ * TODOS los restaurantes — un cambio de una línea que abre una fuga entre
+ * tenants. Por eso tiene su propia categoría en vez de reusar la existente.
+ *
+ * Por qué hacía falta (AMALAY, 2026-09-14): el POS pide `/rest/v1/clients`, el
+ * parche de fetch lo manda al proxy, el proxy contesta 403, `client-config.ts`
+ * cae a `getClientConfigFallback()` y la terminal opera con valores inventados —
+ * timezone America/Mexico_City en vez de America/Monterrey y `plan:
+ * 'fullsite_completo'` sin importar el plan contratado. El IVA y las mesas de
+ * AMALAY coinciden con el fallback por casualidad, así que el defecto es
+ * invisible aquí y equivocado en cada restaurante que se clone.
+ */
+export const SCOPED_BY_OWN_ID = new Set<string>(['clients'])
+
+/**
+ * El POS las LEE y nunca las escribe.
+ *
+ * `puedeEscribirEn` permite escribir toda tabla sin nivel declarado, así que
+ * «no la escribe nadie» hay que decirlo, no darlo por hecho. La configuración
+ * del restaurante se edita desde el dashboard con sesión de usuario, jamás con
+ * un shift token.
+ */
+export const SOLO_LECTURA = new Set<string>(['clients'])
+
+/**
  * Escribir en estas exige rol de gerente.
  *
  * `pos_staff` es la incorporación de hoy y la que cierra la escalada: sin ella,
@@ -70,6 +103,10 @@ export const NO_CID = new Set<string>(['pos_purchase_order_items', 'pos_sub_reci
  */
 export const MANAGER_ONLY_WRITE = new Set<string>([
   'pos_staff',
+  // «changes are admin-level migrations (not operational)» — inventory-policy.ts.
+  // Hace falta decirlo aquí porque `puedeEscribirEn` deja escribir por omisión:
+  // sin esta línea un shift token de mesero apaga el descuento de inventario.
+  'pos_item_inventory_policy',
   'pos_terminals',
   'pos_fingerprint_templates',
   // Los precios sólo se editan desde /admin/menu, que es pantalla de gerente. Sin esto,
