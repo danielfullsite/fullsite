@@ -309,7 +309,7 @@ export async function conducirV1(guion, opciones = {}) {
     const vis = el => { const b = el.getBoundingClientRect(); return b.width > 0 && b.height > 0 }
     const bs = [...document.querySelectorAll('button')].filter(vis)
     const elige = bs.find(b => /^Elige\s+/i.test((b.innerText || '').trim()))
-    const agregar = bs.find(b => /^Agregar\s+\$/i.test((b.innerText || '').trim()))
+    const agregar = bs.find(b => /^Agregar\b[^$]*\$/i.test((b.innerText || '').trim()))
     return {
       exigido: !!elige,
       rotulo: (elige || agregar)?.innerText?.trim() || null,
@@ -447,10 +447,13 @@ export async function conducirV1(guion, opciones = {}) {
           if (opcion.ok === false) {
             r = opcion
           } else {
-            const confirmar = await pulsar('^Agregar \\$', 'confirmar producto')
+            const confirmar = await pulsar('^Agregar\\b[^$]*\\$', 'confirmar producto')
             await page.waitForTimeout(2000)
             // La ley: al completar el grupo, el botón deja de decir «Elige …» y
-            // pasa a «Agregar $…». Si sigue diciendo «Elige», no se completó.
+            // pasa a «Agregar ✓ $…». Si sigue diciendo «Elige», no se completó.
+            // El patrón NO asume qué hay entre la palabra y el importe: el POS
+            // mete una palomita ahí, y `^Agregar \\$` la perdía — tercer fallo
+            // seguido por lo mismo, un rótulo real que no era el que supuse.
             r = confirmar.ok === false
               ? { ...confirmar, motivo: `${confirmar.motivo} — el botón siguió exigiendo el grupo` }
               : confirmar

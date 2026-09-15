@@ -115,9 +115,40 @@ console.log('\n5 · si de verdad no está, lo dice')
   T('y lista lo que sí había', Array.isArray(r.enPantalla) && r.enPantalla.includes('Cancelar'))
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   6 · EL BOTÓN DE CONFIRMAR LLEVA UNA PALOMITA EN MEDIO
+   ───────────────────────────────────────────────────────────────────────────
+   Al completar el grupo, el botón pasa de «Elige CERT-G01-OPCION» a
+   «Agregar ✓ $100.00». El patrón era `^Agregar\s+\$`, que exige el importe
+   pegado a la palabra, y la palomita lo rompía: en
+   cert-g01-20260915T205357Z el modificador SÍ quedó marcado —palomita verde,
+   «Obligatorio» en verde, botón habilitado— y el conductor informó que el
+   botón «siguió exigiendo el grupo».
+
+   Tercer fallo seguido por lo mismo: un rótulo real que no era el supuesto.
+   El patrón no debe asumir QUÉ hay entre la palabra y el importe.
+   ═══════════════════════════════════════════════════════════════════════════ */
+console.log('\n6 · «Agregar ✓ $100.00» — el rótulo real al completar el grupo')
+{
+  const VIEJO = /^Agregar\s+\$/i
+  const NUEVO = /^Agregar\b[^$]*\$/i
+
+  const reales = ['Agregar ✓ $100.00', 'Agregar $100.00', 'Agregar  ✓  $1,234.50']
+  for (const t of reales) {
+    T(`el patrón nuevo reconoce «${t}»`, NUEVO.test(t))
+  }
+  T('el patrón VIEJO perdía «Agregar ✓ $100.00» (la regresión)',
+    !VIEJO.test('Agregar ✓ $100.00'))
+
+  // Y no debe confundirse con el botón bloqueado ni con otros «Agregar».
+  for (const t of ['Elige CERT-G01-OPCION', '+ Agregar impresora', 'Agregar propina']) {
+    T(`no confunde «${t}» con el confirmar`, !NUEVO.test(t))
+  }
+}
+
 console.log(`\n${'═'.repeat(68)}`)
 if (fallos) {
   console.log(`*** ${fallos} comprobaciones fallaron: el conductor volvería a perder la opción.`)
   process.exit(1)
 }
-console.log('>>> las opciones se pulsan aunque no sean botones.')
+console.log('>>> las opciones se pulsan aunque no sean botones, y el confirmar se reconoce con palomita.')
