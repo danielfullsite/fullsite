@@ -47,11 +47,19 @@ export async function conducirV1(guion, opciones = {}) {
     cdp        = ENTORNO.cdp,
     evidencia  = null,          // directorio para screenshots y traza; null = sin evidencia
     corridaId  = 'run',
+    // ── EL MODO DE LA SONDA ────────────────────────────────────────────────
+    // CAPTURE_ONLY por defecto, siempre. Escribir de verdad tiene que pedirse
+    // explícitamente y acreditar a qué tenant: el default nunca arriesga.
+    modo            = 'CAPTURE_ONLY',
+    tenantPermitido = null,     // en SANDBOX, el único tenant al que se deja escribir
+    bridgeTenant    = null,     // tenant que el puente local acreditó (verificado en L0)
   } = opciones
 
   const nav = await chromium.connectOverCDP(cdp)
   const ctx = nav.contexts()[0]
-  await ctx.addInitScript(SONDA)
+  // La configuración viaja como ARGUMENTO, no capturada del ámbito: `addInitScript`
+  // serializa la función y un `const` de aquí afuera llegaría como `undefined`.
+  await ctx.addInitScript(SONDA, { modo, tenantPermitido, bridgeTenant })
 
   // ── EVIDENCIA SIEMPRE, NO SÓLO AL FALLAR ────────────────────────────────
   // Los configs de Playwright del repo usan `trace: 'on-first-retry'` y
@@ -341,7 +349,18 @@ export async function conducirV1(guion, opciones = {}) {
   manifiesto.order_state.push({ origen: 'pantalla', ...pantalla })
 
   await nav.close()
-  return { manifiesto, bitacora, pasos, corrio, pasosOk, pasosTotal: guion.pasos.length, traza }
+  // El modo que la sonda REALMENTE aplicó, leído de la página. Pedirlo no es lo
+  // mismo que obtenerlo: la sonda degrada a CAPTURE_ONLY cuando el tenant no
+  // acredita, y quien lea el acta tiene que ver cuál de los dos ocurrió.
+  const modoEfectivo = await page.evaluate(() => window.__sondaModo ?? null).catch(() => null)
+
+  // Las capturas que existen, contadas sobre el disco y no sobre la intención:
+  // un `screenshot()` que falló en silencio dejaría el contador en alto y el
+  // directorio vacío, que es exactamente la evidencia que no se puede auditar.
+  const capturas = pasos.map(p => p.evidencia).filter(Boolean)
+
+  return { manifiesto, bitacora, pasos, corrio, pasosOk, pasosTotal: guion.pasos.length,
+           traza, capturas, modoEfectivo }
 }
 
 /** Reexportado para que el guion viva en un solo lugar: `cert/objetivo-g01.mjs`. */

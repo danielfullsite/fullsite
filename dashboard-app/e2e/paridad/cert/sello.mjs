@@ -16,6 +16,10 @@
 import { execFileSync } from 'node:child_process'
 import { statfsSync } from 'node:fs'
 import { ENTORNO } from './objetivo-g01.mjs'
+import { detectarCDP } from './cdp.mjs'
+
+/** El único tenant al que SANDBOX puede escribir. No es configurable a propósito. */
+export const TENANT_LABORATORIO = 'fullsite-cert-lab-v2'
 
 const MIN_DISCO_MB = Number(process.env.CERT_MIN_DISCO_MB || 2048)
 const TIMEOUT_MS   = Number(process.env.CERT_HTTP_TIMEOUT_MS || 4000)
@@ -88,11 +92,18 @@ export async function preflight({ shaEsperado = process.env.CERTIFICATION_TARGET
   })
 
   // ── G-3 · El navegador de certificación está accesible por CDP ────────────
-  const cdp = await traer(`${ENTORNO.cdp}/json/version`)
-  G('G-3', 'navegador accesible por CDP', cdp.ok, {
-    esperado: `200 en ${ENTORNO.cdp}`, observado: cdp.ok ? 'accesible' : (cdp.error || `HTTP ${cdp.status}`),
+  //
+  // El puerto ya no se da por sabido: se busca. Un `FULLSITE_CDP` explícito se
+  // respeta tal cual —si quien corre la certificación nombró una terminal, no
+  // se sustituye por otra en silencio—; sin él, se detecta entre los puertos
+  // habituales y se reporta cuál se encontró.
+  const cdp = await detectarCDP()
+  G('G-3', 'navegador accesible por CDP', !cdp.error, {
+    esperado: process.env.FULLSITE_CDP ? `200 en ${process.env.FULLSITE_CDP}` : 'un navegador con CDP abierto',
+    observado: cdp.error || `${cdp.url} · ${cdp.navegador ?? 'navegador'} (${cdp.origen})`,
     causa: 'entorno',
   })
+  const cdpUrl = cdp.error ? null : cdp.url
 
   // ── G-4 · Pedro vivo, y su identidad ──────────────────────────────────────
   const ident = await traer(`${ENTORNO.bridge}/identity`)
@@ -168,10 +179,42 @@ export async function preflight({ shaEsperado = process.env.CERTIFICATION_TARGET
     esperado: 'FULLSITE_PIN definido', observado: ENTORNO.pin ? 'provisto (no se imprime)' : 'ausente',
   })
 
+  /* ── G-9 · LA LLAVE DE SANDBOX ───────────────────────────────────────────
+     Escribir de verdad es lo que hace posibles los oráculos, y también lo
+     único de este arnés que puede dañar datos de alguien. La llave se entrega
+     aquí y en un solo caso: el tenant declarado es EXACTAMENTE el laboratorio.
+
+     No hay «casi»: un tenant vacío, uno distinto, o uno que se parezca, deja la
+     corrida en CAPTURE_ONLY. La consecuencia de negar la llave es un
+     NOT_OBSERVED en los oráculos —feo pero honesto—; la de darla de más es
+     escribir en el restaurante de alguien. */
+  const tenantDeclarado = (ENTORNO.tenant || '').toLowerCase()
+  const esLaboratorio = tenantDeclarado === TENANT_LABORATORIO
+  G('G-9a', `tenant declarado === «${TENANT_LABORATORIO}»`, esLaboratorio, {
+    esperado: TENANT_LABORATORIO, observado: tenantDeclarado || 'no declarado (CERT_CLIENT_ID vacío)',
+  })
+  // G-9b · El puente local tiene su propio dueño, y puede no ser el mismo.
+  //        Medido el 15-sep: Pedro vivo reportaba `restaurant_id: "demo"`.
+  const puenteDe = String(sello.restaurant_id ?? '').toLowerCase()
+  const puenteEsDelLab = puenteDe === TENANT_LABORATORIO
+  G('G-9b', 'el puente local pertenece al tenant de laboratorio', puenteEsDelLab, {
+    esperado: TENANT_LABORATORIO,
+    observado: puenteDe || 'no declarado',
+    causa: 'precondicion',
+  })
+
   return {
     gates,
     sello,
     seqInicial,
+    cdpUrl,
+    // La llave de escritura, resuelta una sola vez y en un solo lugar.
+    sandbox: {
+      permitido: esLaboratorio,
+      tenant: esLaboratorio ? TENANT_LABORATORIO : null,
+      bridgeTenant: puenteEsDelLab ? TENANT_LABORATORIO : null,
+      motivo: esLaboratorio ? null : `el tenant declarado es «${tenantDeclarado || 'ninguno'}»`,
+    },
     satisfechas: gates.every(g => g.ok),
   }
 }
