@@ -38,8 +38,13 @@ const { versionDeInterfaz } = require('./version-de-interfaz')
 function identidadDeTerminal({
   version, config = null, serverId = null, protocolo = null,
   paqueteUi = null, catalogo = null, origenUi = 'paquete',
+  // Dónde buscar el sello. En producción es el valor por omisión —junto al
+  // ejecutable—; se puede fijar para que una prueba no dependa de si alguien
+  // corrió `npm run sellar` en su copia de trabajo. Esa dependencia hacía que
+  // la prueba del caso «sin sellar» pasara o fallara según el estado del disco.
+  raizDelSello = undefined,
 } = {}) {
-  const build = identidadDeBuild(version)
+  const build = raizDelSello === undefined ? identidadDeBuild(version) : identidadDeBuild(version, raizDelSello)
 
   // La edad del catálogo importa más que su existencia: `catalog.ready` ya dice
   // que HAY catálogo, no de cuándo es. Una caja con el menú de hace tres

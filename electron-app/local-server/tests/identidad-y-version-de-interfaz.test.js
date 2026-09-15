@@ -19,6 +19,14 @@ const assert = require('node:assert/strict')
 
 const { identidadDeTerminal, lineaDeIdentidad } = require('../core/identidad-de-terminal')
 const vdi = require('../core/version-de-interfaz')
+const fs = require('node:fs')
+const os = require('node:os')
+const path = require('node:path')
+
+/** Un directorio SIN build-info.json. Sin esto la prueba del caso «sin sellar»
+ *  pasaba o fallaba segun si alguien habia compilado en su copia de trabajo —
+ *  una prueba que depende del estado del disco no protege de nada. */
+const SIN_SELLO = fs.mkdtempSync(path.join(os.tmpdir(), 'fullsite-sin-sello-'))
 
 test.beforeEach(() => vdi._olvidar())
 
@@ -84,14 +92,14 @@ test('versionDeInterfaz() antes de resolver contesta v1 y no resuelve sola', () 
 // ── La identidad ────────────────────────────────────────────────────────────
 
 test('sin sello, la identidad dice "sin sellar" en vez de inventar un commit', () => {
-  const id = identidadDeTerminal({ version: '1.4.0', config: null })
+  const id = identidadDeTerminal({ version: '1.4.0', config: null, raizDelSello: SIN_SELLO })
   assert.equal(id.app.git_sha, null)
   assert.equal(id.app.clean, false)
   assert.match(id.app.etiqueta, /sin sellar/)
 })
 
 test('los cinco bloques existen siempre, aunque vengan vacíos', () => {
-  const id = identidadDeTerminal({ version: '1.4.0' })
+  const id = identidadDeTerminal({ version: '1.4.0', raizDelSello: SIN_SELLO })
   for (const bloque of ['app', 'ui', 'pedro', 'config', 'terminal']) {
     assert.ok(id[bloque], `falta el bloque ${bloque}`)
   }
@@ -127,7 +135,7 @@ test('una fecha de catálogo ilegible da edad null, no un número inventado', ()
 })
 
 test('la línea del pie cabe en la pantalla de bloqueo y se lee por teléfono', () => {
-  const id = identidadDeTerminal({ version: '1.4.0', config: { terminal_id: 'caja-01' } })
+  const id = identidadDeTerminal({ version: '1.4.0', config: { terminal_id: 'caja-01' }, raizDelSello: SIN_SELLO })
   const linea = lineaDeIdentidad(id)
   assert.match(linea, /^1\.4\.0 · /)
   assert.match(linea, /UI v1/)
@@ -163,7 +171,7 @@ test('coherente = null cuando falta el sello de la interfaz — indemostrable, n
 test('el commit de la interfaz NUNCA se hereda del de la cáscara', () => {
   // Éste es el defecto que el documento de reconciliación identificó como causa
   // raíz: dar por bueno que «salen del mismo repo».
-  const id = identidadDeTerminal({ version: '1.4.0' })
+  const id = identidadDeTerminal({ version: '1.4.0', raizDelSello: SIN_SELLO })
   assert.equal(id.ui.git_sha, null)
   assert.equal(id.coherente, null)
 })
@@ -177,7 +185,7 @@ test('un ui_sha con forma inválida se descarta en vez de propagarse', () => {
 test('un ejecutable con cambios sin guardar SE VE — no se esconde', () => {
   // Es el caso que más confunde en campo: un .dmg armado a mano desde un
   // checkout sucio reporta el mismo número que el oficial.
-  const id = identidadDeTerminal({ version: '1.4.0' })
+  const id = identidadDeTerminal({ version: '1.4.0', raizDelSello: SIN_SELLO })
   id.app.git_sha = '97e2b30b'
   id.app.clean = false
   assert.match(lineaDeIdentidad(id), /\+cambios/)
