@@ -150,39 +150,53 @@ export function comparar(a, b) {
 export const MUTACIONES = [
   {
     id: 'M1',
-    nombre: 'la comanda manda 2 donde V1 mandaba 1',
+    nombre: 'el envío manda 2 donde V1 mandaba 1',
     porQue: 'una reimplementación que reenvía la partida completa en vez de la diferencia',
-    esperada: ['kds_events'],
+    // Vigila el PAYLOAD REAL de /api/pos/save-order, que es el que persiste y
+    // acaba alimentando al KDS. Antes miraba `kds_events`, que en la topología
+    // de G01 está vacío: el POS escribe a la nube y Pedro sincroniza, no hay
+    // POST directo al puente. La mutación quedaba «no aplicable» sobre un
+    // journey que sí produce el dato.
+    esperada: ['api_writes'],
     aplicar(m) {
       const c = structuredClone(m)
-      const ev = c.kds_events.find(e => Array.isArray(e.items) && e.items.length)
-      if (!ev) return null
-      ev.items[0].q = (Number(ev.items[0].q) || 1) + 1
+      const w = (c.api_writes || []).find(e => Array.isArray(e.items) && e.items.length)
+      if (!w) return null
+      w.items[0].q = (Number(w.items[0].q) || 1) + 1
       return c
     },
   },
   {
     id: 'M2',
-    nombre: 'se omite el evento de auditoría del envío',
-    porQue: 'la auditoría es lo primero que se cae al reescribir una pantalla',
-    esperada: ['audit_events'],
+    nombre: 'se pierde el modificador obligatorio al enviar',
+    porQue: 'es el control que G01 existe para ejercitar: un rediseño que arma el '
+          + 'payload sin los modificadores manda a cocina un platillo sin su opción, '
+          + 'y nadie lo nota hasta que sale mal el plato',
+    esperada: ['api_writes'],
     aplicar(m) {
       const c = structuredClone(m)
-      if (!c.audit_events.length) return null
-      c.audit_events.shift()
+      const w = (c.api_writes || []).find(e => Array.isArray(e.items)
+        && e.items.some(it => Array.isArray(it.mods) && it.mods.length))
+      if (!w) return null
+      const it = w.items.find(x => Array.isArray(x.mods) && x.mods.length)
+      it.mods = []
       return c
     },
   },
   {
     id: 'M3',
-    nombre: 'la comanda va a la estación equivocada',
+    nombre: 'el renglón se rutea a la estación equivocada',
     porQue: 'el ruteo por estación se recalcula mal y la comida sale en barra',
-    esperada: ['kds_events'],
+    // `items[].station` viaja en el payload que persiste y es el campo que el
+    // KDS lee para decidir tablero: corromperlo ahí es corromper el ruteo real.
+    esperada: ['api_writes'],
     aplicar(m) {
       const c = structuredClone(m)
-      const ev = c.kds_events[0]
-      if (!ev) return null
-      ev.estacion = ev.estacion === 'barra' ? 'cocina' : 'barra'
+      const w = (c.api_writes || []).find(e => Array.isArray(e.items)
+        && e.items.some(it => it.station))
+      if (!w) return null
+      const it = w.items.find(x => x.station)
+      it.station = it.station === 'barra' ? 'cocina' : 'barra'
       return c
     },
   },

@@ -36,6 +36,11 @@ const corrida = (semilla) => ({
     method: 'POST', endpoint: '/api/pos/save-order',
     save_operation_id: `op_${semilla}k3j4h5g6`,
     body: { mesa: 7, status: 'enviada', total: 197.2 },
+    // Los renglones del payload REAL: cantidad, estación y modificadores. Es lo
+    // que M1, M2 y M3 corrompen desde que se reapuntaron al camino que G01 usa
+    // de verdad —POS → save-order → nube → Pedro → KDS—, en vez de a un POST
+    // directo al puente que en esta topología no existe.
+    items: [{ n: 'CERT-G01-PLATO', q: 1, station: 'cocina', mods: ['CERT-G01-ESTANDAR'] }],
   }],
   local_db_writes: [{ store: 'pos_orders', key: `${semilla}bcd1234efgh`, op: 'put' }],
   sync_queue: [{

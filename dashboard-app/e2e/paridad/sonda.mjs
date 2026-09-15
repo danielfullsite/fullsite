@@ -160,6 +160,26 @@ export const SONDA = (cfg) => {
         } else {
           anotar('api_writes', { metodo, tabla, endpoint: `/rest/v1/${tabla}`, cuerpo: resumir(cuerpo) })
         }
+      } else if (/\/api\/pos\/save-order/.test(ruta)) {
+        /* EL PAYLOAD DE save-order ES EL EFECTO, no un detalle.
+           `resumir()` conserva sólo campos escalares y tira `items`, así que las
+           mutaciones que vigilan cantidad, estación y modificadores no tenían
+           dónde morder: M1, M2 y M3 salían «no aplicable» sobre un journey que
+           sí produce esos datos. Aquí se guarda de cada renglón lo que el
+           contrato promete —nombre, cantidad, estación, modificadores— y nada
+           más: ni precios completos ni payload entero en el acta. */
+        const items = Array.isArray(cuerpo?.items) ? cuerpo.items : []
+        anotar('api_writes', {
+          metodo, url: ruta, cuerpo: resumir(cuerpo),
+          items: items.map(it => ({
+            n: it?.nombre ?? it?.name ?? null,
+            q: it?.cantidad ?? it?.qty ?? it?.q ?? 1,
+            station: it?.station ?? it?.estacion ?? null,
+            mods: (Array.isArray(it?.modificadores) ? it.modificadores
+                 : Array.isArray(it?.mods) ? it.mods : [])
+                 .map(m => (m && typeof m === 'object') ? (m.nombre ?? m.name ?? null) : m),
+          })),
+        })
       } else {
         anotar('api_writes', { metodo, url: ruta, cuerpo: resumir(cuerpo) })
       }
