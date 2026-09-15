@@ -6,9 +6,11 @@
   "scripts": {
     "start": "electron .",
     "build:ui": "node scripts/build-offline-ui.cjs",
-    "build:win": "npm run build:ui && npm run sellar && electron-builder --win --x64 --publish never",
-    "build:mac": "npm run build:ui && npm run sellar && electron-builder --mac --publish never",
-    "sellar": "node scripts/sellar-version.cjs"
+    "build:win": "npm run build:ui && npm run sellar && npm run sellar:credenciales && electron-builder --win --x64 --publish never",
+    "build:mac": "npm run build:ui && npm run sellar && npm run sellar:credenciales && electron-builder --mac --publish never",
+    "sellar": "node scripts/sellar-version.cjs",
+    "sellar:credenciales": "node scripts/sellar-credenciales.cjs",
+    "build:mac:dev": "npm run build:ui && npm run sellar && node scripts/sellar-credenciales.cjs --permitir-sin-sellar && electron-builder --mac --publish never"
   },
   "author": "Fullsite",
   "license": "UNLICENSED",

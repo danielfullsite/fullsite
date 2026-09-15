@@ -5,3 +5,4 @@
 # Credenciales selladas en el build. NUNCA se commitean: la llave viaja en el
 # instalador (igual que ya viajaba dentro del ui-bundle), no en el repositorio.
 credenciales-selladas.json
+ui-bundle.sello.json
