@@ -1,0 +1,65 @@
+-- ─────────────────────────────────────────────────────────────────────────────
+-- P0 · ocm_daily vuelve a correr con los privilegios de quien pregunta
+--
+-- ESTADO CAPTURADO ANTES DE APLICAR  (read-only contra prod, 2026-09-15 04:19:05 UTC)
+--   objeto      public.ocm_daily (relkind = 'v')
+--   owner       postgres            ← rolbypassrls = true
+--   reloptions  NULL                ← el candado NO está puesto
+--   viewdef     md5 f922a2bb1ae533888b9a45b273f3bee1 · 2,886 bytes
+--   grants      authenticated  SELECT (+ DELETE/INSERT/UPDATE/TRIGGER/TRUNCATE/REFERENCES/MAINTAIN)
+--               anon           SIN SELECT
+--               service_role   SELECT · fullsite_agent SELECT · fullsite_readonly SELECT
+--   tablas base pos_orders  RLS on, force off, policy authenticated:
+--                             private.user_has_client_access(client_id)
+--               ops_daily   RLS on, force off, misma policy
+--
+-- QUÉ PASÓ, CON FECHAS DE `supabase_migrations.schema_migrations`
+--   2026-08-26 07:01:15 UTC · cerrar_vistas_ocm_fuga_cross_tenant
+--       ALTER VIEW public.ocm_daily SET (security_invoker = on);
+--       REVOKE SELECT ON public.ocm_daily FROM anon;
+--     Cerró la fuga. Las otras 9 vistas de ese mismo lote siguen cerradas hoy.
+--
+--   2026-09-09 03:53:05 UTC · ocm_daily_no_materializar
+--       CREATE OR REPLACE VIEW public.ocm_daily AS WITH live AS NOT MATERIALIZED (...)
+--     Venía a cambiar el plan de ejecución, no los permisos. Pero
+--     `CREATE OR REPLACE VIEW` REEMPLAZA los reloptions: lo que no se vuelve a
+--     declarar en el WITH se pierde sin aviso. El REVOKE a `anon` sí sobrevivió
+--     —es ACL, no reloption— y por eso el hueco quedó abierto SÓLO para
+--     `authenticated`, que es el caso que nadie mira.
+--
+-- POR QUÉ ESO EXPONE TODO
+--   Sin `security_invoker`, la vista corre como su dueño `postgres`, que tiene
+--   `rolbypassrls = true`. El RLS de `pos_orders` y `ops_daily` no se evalúa —
+--   está intacto, y no sirve de nada. La vista deja de mostrar un restaurante y
+--   muestra los 9.
+--
+-- POR QUÉ NO SE AGREGA UN WHERE POR INQUILINO
+--   Porque la autoridad correcta ya existe y es más rica que un filtro: un usuario
+--   puede pertenecer a VARIOS restaurantes (hoy hay uno que pertenece a 6).
+--   `client_users` es quien lo sabe. Reimplementar eso dentro de la vista podría
+--   divergir. Con `security_invoker = on` manda el RLS de las tablas base, que es
+--   exactamente cómo están las otras tres vistas OCM.
+--
+-- QUÉ NO ROMPE
+--   · `authenticated` ya tiene SELECT sobre `pos_orders` y `ops_daily` — que es lo
+--     que `security_invoker` le va a exigir (verificado con has_table_privilege).
+--   · Único consumidor en el repo: `.github/scripts/agent_daily_source.py`, que usa
+--     SUPABASE_SERVICE_KEY (línea 23). `service_role` tiene `rolbypassrls = true`,
+--     así que sigue viendo todo; además ya filtra `client_id=eq.{client_id}`.
+--   · Las expresiones de una policy RLS se evalúan con los privilegios del dueño de
+--     la tabla, así que `private.user_has_client_access` funciona aunque
+--     `authenticated` no tenga USAGE sobre el esquema `private`. Es el mismo camino
+--     que el POS usa hoy en producción.
+--
+-- ROLLBACK
+--   alter view public.ocm_daily reset (security_invoker);
+--   -- Reabre la fuga. Sólo como maniobra de emergencia, con el incidente abierto.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+alter view public.ocm_daily set (security_invoker = on);
+
+-- Idempotente y deliberado: hoy `anon` ya no tiene SELECT (lo quitó el lote de
+-- 08-26 y el CREATE OR REPLACE no se lo devolvió, porque los ACL no viajan en los
+-- reloptions). Se repite para que este archivo, por sí solo, deje la vista en el
+-- estado correcto aunque se aplique sobre una base que no traiga aquel lote.
+revoke select on public.ocm_daily from anon;
