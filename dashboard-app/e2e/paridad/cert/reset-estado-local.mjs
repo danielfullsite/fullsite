@@ -5,9 +5,20 @@
 // corridas que no parten del mismo estado no miden determinismo — miden
 // acumulación, y su «diferencia» no dice nada del sistema.
 //
-// Navegar hacia atrás NO alcanza: el borrador vive en la IndexedDB `fullsite_pos`
-// (store `orders`, pos-offline-db.ts:57) y sobrevive a la navegación, que es
-// justamente lo que el POS promete para no perder órdenes sin internet.
+// ── DÓNDE VIVE DE VERDAD EL ESTADO DE LA MESA ───────────────────────────────
+// Trazado desde lo que se renderiza, no supuesto:
+//   subtotal (page.tsx:5240) ← activeItems (:3301) ← orderItems (React state)
+// y `orderItems` se puebla en cascada DESDE localStorage:
+//   1. `pos_order_<mesa>`  — caché de la orden, TTL 8 h  (page.tsx:2326)
+//   2. la DB remota por API
+//   3. `pos_draft_<mesa>`  — borrador sin guardar, TTL 4 h (page.tsx:2265)
+//   4. vacío
+//
+// La primera versión de este reset limpiaba la IndexedDB `fullsite_pos`, que NO
+// participa en esa cadena: el contador daba 0, el reset se declaraba verificado
+// y la mesa seguía acumulando un plato por corrida ($500 en A, $600 en B).
+// Limpiar el sitio equivocado y verificarlo con una prueba que no prueba lo que
+// dice es peor que no limpiar: da permiso de avanzar.
 //
 // ── LA GUARDA ───────────────────────────────────────────────────────────────
 // Esto BORRA datos locales. Por eso falla cerrado: si no puede DEMOSTRAR que la
@@ -50,6 +61,20 @@ export async function resetEstadoLocal(page, { baseUrl, mesa }) {
   }
 
   // ── 2 · Vaciar SÓLO lo que una corrida ensucia ────────────────────────────
+  //    Primero localStorage, que es la fuente real de lo que se ve.
+  const claves = await page.evaluate(() => {
+    const borradas = []
+    try {
+      for (const k of Object.keys(localStorage)) {
+        // `pos_order_*` y `pos_draft_*` son el estado por mesa. `pos_turno_id` y
+        // `pos_mesero` NO se tocan: el turno es fixture y la sesión es
+        // precondición, no suciedad de la corrida.
+        if (/^pos_(order|draft)_/.test(k)) { localStorage.removeItem(k); borradas.push(k) }
+      }
+    } catch { /* almacenamiento bloqueado */ }
+    return borradas
+  }).catch(() => [])
+
   const borrados = await page.evaluate(() => new Promise((resolve) => {
     const req = indexedDB.open('fullsite_pos')
     req.onerror = () => resolve({ error: 'no se pudo abrir fullsite_pos' })
@@ -98,14 +123,46 @@ export async function resetEstadoLocal(page, { baseUrl, mesa }) {
     }
   })).catch(() => ({ ordenesLocales: null }))
 
+  // Que las claves ya no estén es condición necesaria, NO suficiente: el
+  // invariante que importa —ticket vacío, 0 items, subtotal $0.00— sólo se puede
+  // observar con la mesa abierta, y de eso se encarga el conductor en S2.
+  const quedan = await page.evaluate(() => {
+    try { return Object.keys(localStorage).filter(k => /^pos_(order|draft)_/.test(k)) } catch { return null }
+  }).catch(() => null)
+
+  const limpio = Array.isArray(quedan) && quedan.length === 0 && verificacion.ordenesLocales === 0
   return {
-    ok: verificacion.ordenesLocales === 0,
+    ok: limpio,
     tenant: scope.tenant,
     borrados,
+    claves_borradas: claves,
+    claves_restantes: quedan,
     verificacion,
-    motivo: verificacion.ordenesLocales === 0 ? null
-      : `tras limpiar quedan ${verificacion.ordenesLocales} órdenes locales`,
+    motivo: limpio ? null
+      : (quedan === null ? 'no se pudo releer localStorage'
+        : quedan.length ? `quedaron claves de mesa: ${quedan.join(', ')}`
+        : `tras limpiar quedan ${verificacion.ordenesLocales} órdenes locales`),
   }
+}
+
+/**
+ * El ticket TAL COMO SE VE con la mesa abierta. Es el único sitio donde el
+ * invariante del reset se puede observar de verdad: `Sub $0.00` y cero items.
+ */
+export async function ticketVisible(page) {
+  return page.evaluate(() => {
+    const t = (document.body.innerText || '').replace(/\s+/g, ' ')
+    const sub = (t.match(/Sub\s*\$([\d,]+\.\d{2})/) || [])[1] ?? null
+    // Cada renglón del ticket trae el control de cantidad; contarlos es contar
+    // items sin depender de cómo se llame la clase CSS de esta versión.
+    const items = document.querySelectorAll('[data-testid^="item-"]').length
+    return {
+      subtotal: sub === null ? null : Number(sub.replace(/,/g, '')),
+      itemsPorTestid: items,
+      // Los importes que se ven, para poder demostrar $100 y no $200.
+      importes: (t.match(/\$[\d,]+\.\d{2}/g) || []).slice(0, 8),
+    }
+  }).catch(() => ({ subtotal: null, itemsPorTestid: null, importes: [] }))
 }
 
 /**

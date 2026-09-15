@@ -170,6 +170,38 @@ console.log('\n5 · V-15/V-16/V-17 · reset, alcance declarado y 6/6 en SANDBOX'
   T('V-17 acepta 6/6', !reglas(seis).includes('V-17'))
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   6 · UN ORÁCULO NO ACUSA DE ALGO QUE NUNCA SE INTENTÓ
+   ───────────────────────────────────────────────────────────────────────────
+   En cert-g01-20260915T210702Z el DB oracle dijo «el journey envió a cocina
+   pero no quedó ninguna orden». El journey NO envió: S6 falló. El oráculo dio
+   por hecho el paso productor y le cobró al producto su ausencia. Los tres
+   tienen que quedar en NOT_OBSERVED cuando S6 no se ejecutó.
+   ═══════════════════════════════════════════════════════════════════════════ */
+console.log('\n6 · sin S6 ejecutado, los tres oráculos son NOT_OBSERVED')
+{
+  // El criterio del orquestador: la clase la decide S6, no lo que se encuentre.
+  const claseDeOraculo = (s6Ejecutado, hallazgo) =>
+    s6Ejecutado !== true ? 'NOT_OBSERVED' : hallazgo
+
+  for (const [caso, hallazgo] of [
+    ['S6=false + no hay orden en la base', 'PRODUCT_DEFECT'],
+    ['S6=false + la secuencia de Pedro no cambió', 'PRODUCT_DEFECT'],
+    ['S6=false + no hay item en el KDS', 'PRODUCT_DEFECT'],
+  ]) {
+    T(`${caso} → NOT_OBSERVED`, claseDeOraculo(false, hallazgo) === 'NOT_OBSERVED')
+  }
+  T('con S6 ejecutado, el hallazgo SÍ puede acusar',
+    claseDeOraculo(true, 'PRODUCT_DEFECT') === 'PRODUCT_DEFECT')
+  T('y con S6 ejecutado y efecto presente, es conforme',
+    claseDeOraculo(true, 'EXPECTED_BEHAVIOR') === 'EXPECTED_BEHAVIOR')
+
+  // Y el contrato sigue negando el PASS: NOT_OBSERVED nunca es aprobado.
+  const ciego = sobreImpecable()
+  ciego.oracles.db = { classification: 'NOT_OBSERVED', motivo: 'S6 no se ejecutó', detalle: null }
+  T('V-12 sigue rechazando el PASS con el oráculo ciego', reglas(ciego).includes('V-12'))
+}
+
 console.log(`\n${'═'.repeat(68)}`)
 if (fallos) {
   console.log(`*** ${fallos} comprobaciones fallaron: el contrato no está vigilando lo que dice.`)

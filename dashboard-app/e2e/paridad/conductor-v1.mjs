@@ -29,7 +29,7 @@ import { join } from 'node:path'
 import { vacio } from './manifiesto-de-efectos.mjs'
 import { SONDA } from './sonda.mjs'
 import { OBJETIVO, ENTORNO, G01 as GUION_G01 } from './cert/objetivo-g01.mjs'
-import { resetEstadoLocal, estadoDeMesa } from './cert/reset-estado-local.mjs'
+import { resetEstadoLocal, estadoDeMesa, ticketVisible } from './cert/reset-estado-local.mjs'
 
 // El PIN no tiene default. Un PIN adivinado produce un fallo de autenticación
 // que se lee como defecto del producto — el error que ya costó dos corridas.
@@ -416,6 +416,7 @@ export async function conducirV1(guion, opciones = {}) {
   // paso porque dos corridas que no parten del mismo estado no miden
   // determinismo: A terminó en $100 y B arrancó de ahí hasta $200.
   let reset = null
+  let ticketTrasAbrir = null
   if (resetAntes) {
     reset = await resetEstadoLocal(page, { baseUrl, mesa })
     if (!reset.ok) {
@@ -451,6 +452,11 @@ export async function conducirV1(guion, opciones = {}) {
         const t = await page.evaluate(() => (document.body.innerText || '').replace(/\s+/g, ' ')).catch(() => '')
         manifiesto.table_state.push({ mesa: n, abierta: r.ok === true, estado: r.estadoMesa ?? null,
           importes: (t.match(/\$[\d,]+\.\d{2}/g) || []).slice(0, 4) })
+        // EL INVARIANTE DEL RESET SE OBSERVA AQUÍ, y sólo aquí: con la mesa
+        // abierta y antes de agregar nada, el ticket tiene que decir Sub $0.00.
+        // Medirlo al final de S5 era imposible — el modal del modificador tapa
+        // el ticket— y devolvía «no medido», que se podía leer como cero.
+        ticketTrasAbrir = await ticketVisible(page)
         break
       }
 
@@ -560,7 +566,7 @@ export async function conducirV1(guion, opciones = {}) {
 
   return { manifiesto, bitacora, pasos, corrio, pasosOk,
            pasosTotal: hastaPaso ?? guion.pasos.length,
-           traza, capturas, modoEfectivo, reset, estadoInicial, estadoFinal }
+           traza, capturas, modoEfectivo, reset, estadoInicial, estadoFinal, ticketTrasAbrir }
 }
 
 /** Reexportado para que el guion viva en un solo lugar: `cert/objetivo-g01.mjs`. */

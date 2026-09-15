@@ -88,27 +88,35 @@ const resetOk = A.reset?.ok === true && B.reset?.ok === true
 // verifica tras limpiar, no el subtotal de pantalla: al terminar S5 el modal del
 // modificador tapa el ticket y «Sub $…» no es legible. Medir por ahí habría dado
 // «no medido» y, peor, se habría podido leer como «cero».
-const bPartioDeCero = B.reset?.verificacion?.ordenesLocales === 0
+// El invariante se OBSERVA en el ticket con la mesa abierta: Sub $0.00 y cero
+// items. Que las claves de localStorage ya no estén es necesario, no suficiente.
+const ticketA = A.ticketTrasAbrir ?? null
+const ticketB = B.ticketTrasAbrir ?? null
+const arrancoLimpio = (t) => t !== null && t.subtotal === 0
+const bPartioDeCero = arrancoLimpio(ticketA) && arrancoLimpio(ticketB)
 sobre.capture = {
   a_steps: `${A.pasosOk}/${PASOS_CAPTURA}`,
   b_steps: `${B.pasosOk}/${PASOS_CAPTURA}`,
   reset_verified: resetOk && bPartioDeCero,
-  a_ordenes_locales_tras_reset: A.reset?.verificacion?.ordenesLocales ?? null,
-  b_ordenes_locales_tras_reset: B.reset?.verificacion?.ordenesLocales ?? null,
+  a_ticket_al_abrir: ticketA, b_ticket_al_abrir: ticketB,
+  a_claves_borradas: A.reset?.claves_borradas ?? null,
+  b_claves_borradas: B.reset?.claves_borradas ?? null,
   // La no-acumulación se demuestra comparando lo que cada corrida dejó en la
   // pantalla: si B hubiera heredado a A, sus importes serían el doble.
   a_importes: A.manifiesto?.order_state?.[0]?.importes ?? null,
   b_importes: B.manifiesto?.order_state?.[0]?.importes ?? null,
   reset_a: A.reset ?? null, reset_b: B.reset ?? null,
 }
-console.log(`\nRESET · órdenes locales tras limpiar: A=${A.reset?.verificacion?.ordenesLocales ?? '?'}`
-  + ` B=${B.reset?.verificacion?.ordenesLocales ?? '?'}`)
+console.log(`\nRESET · subtotal al abrir la mesa: A=${ticketA?.subtotal ?? '?'} B=${ticketB?.subtotal ?? '?'}`
+  + `  (exigido: 0 en las dos)`)
+console.log(`      claves de mesa borradas: A=${(A.reset?.claves_borradas ?? []).length}`
+  + ` B=${(B.reset?.claves_borradas ?? []).length}`)
 console.log(`      importes en pantalla: A=${JSON.stringify(sobre.capture.a_importes)}`
   + ` B=${JSON.stringify(sobre.capture.b_importes)}`)
 emitir({
   id: 'reset-entre-corridas', fase: 'reset', descripcion: 'B parte del mismo estado inicial que A',
-  esperado: '0 órdenes locales antes de B',
-  observado: `${B.reset?.verificacion?.ordenesLocales ?? 'no medido'} órdenes locales`,
+  esperado: 'ticket en Sub $0.00 al abrir la mesa, en A y en B',
+  observado: `A=${ticketA?.subtotal ?? 'no medido'} B=${ticketB?.subtotal ?? 'no medido'}`,
   clase: sobre.capture.reset_verified ? 'EXPECTED_BEHAVIOR' : 'HARNESS_ERROR',
 })
 
@@ -169,6 +177,8 @@ emitir({
    el «cero diferencias» de esa categoría es trivialmente cierto. Eso no es un
    aprobado — es el hueco exacto que el arnés existe para no tener.
    ═══════════════════════════════════════════════════════════════════════════ */
+// La paridad corre S1-S5; las mutaciones de envío no tienen dónde morder ahí.
+const MUTACIONES_APLICABLES = false
 console.log(`\nLAS CINCO MUTACIONES, sobre el manifiesto REAL:`)
 const detalleMut = []
 const noAplicables = []
@@ -206,6 +216,14 @@ for (const m of MUTACIONES) {
 
 sobre.mutation = { total: MUTACIONES.length, detected: detectadas,
                    no_aplicables: noAplicables, detalle: detalleMut }
+/* Las categorías que M1-M4 vigilan —kds_events, audit_events, sync_queue— sólo
+   se llenan al ENVIAR. La fase de paridad llega a S5, así que evaluarlas aquí
+   reporta «1/5» como si el arnés hubiera fallado en detectar, cuando lo que
+   falta es el paso productor. Se marca NOT_RUN y se decide en SANDBOX. */
+if (!MUTACIONES_APLICABLES) {
+  sobre.mutation = { ...sobre.mutation, estado: 'NOT_RUN',
+    motivo: 'las mutaciones se evalúan sobre efectos de envío; la fase de paridad llega a S5' }
+}
 console.log(`\nDETECTADAS ${detectadas}/${MUTACIONES.length}`)
 if (noAplicables.length) {
   console.log(`*** ${noAplicables.join(', ')} NO APLICABLES. Una mutación no aplicable no es verde.`)
@@ -293,11 +311,34 @@ if (!l0.sandbox.permitido) {
   const ses = await abrirSesion({ baseUrl: ENTORNO.baseUrl, tenant: l0.sandbox.tenant, pin: ENTORNO.pin })
   if (ses.error) console.log(`   ✗ sin sesión para los oráculos: ${ses.error}`)
 
-  const db = await dbOracle({ baseUrl: ENTORNO.baseUrl, token: ses.token, objetivo: OBJETIVO,
-                              desde, turnoId: sobre.correlation.turno_id })
-  const pedro = await pedroOracle({ bridge: ENTORNO.bridge, seqInicial: l0.seqInicial,
-                                    tenantEsperado: l0.sandbox.tenant })
-  const kds = await kdsOracle({ orden: db.orden ?? null, objetivo: OBJETIVO })
+  /* ── UN ORÁCULO NO ACUSA DE ALGO QUE NUNCA SE INTENTÓ ────────────────────
+     En cert-g01-20260915T210702Z el DB oracle dijo «el journey envió a cocina
+     pero no quedó ninguna orden». El journey NO envió: S6 falló. El oráculo dio
+     por hecho el paso productor y le cobró al producto su ausencia.
+
+     Sin S6 ejecutado, la respuesta honesta es NOT_OBSERVED: no hay efecto que
+     buscar, y no haberlo encontrado no dice nada del sistema. */
+  const s6 = S.pasos.find(p => p.n === 6)
+  const S6_EJECUTADO = s6?.ok === true
+
+  const ciegoPorS6 = (cual) => ({
+    clase: 'NOT_OBSERVED', ok: false,
+    motivo: `S6 no se ejecutó (${s6?.motivo ?? 'no llegó a intentarse'}): no hay efecto que ${cual} pueda observar`,
+    detalle: { s6_executed: false, s6_motivo: s6?.motivo ?? null },
+  })
+
+  const db = S6_EJECUTADO
+    ? await dbOracle({ baseUrl: ENTORNO.baseUrl, token: ses.token, objetivo: OBJETIVO,
+                       desde, turnoId: sobre.correlation.turno_id })
+    : ciegoPorS6('la base')
+  const pedro = S6_EJECUTADO
+    ? await pedroOracle({ bridge: ENTORNO.bridge, seqInicial: l0.seqInicial,
+                          tenantEsperado: l0.sandbox.tenant })
+    : ciegoPorS6('el puente')
+  const kds = S6_EJECUTADO
+    ? await kdsOracle({ orden: db.orden ?? null, objetivo: OBJETIVO })
+    : ciegoPorS6('el KDS')
+  sobre.s6_executed = S6_EJECUTADO
 
   // La correlación se completa con lo que el oráculo encontró: los ids hijos
   // nacen al guardar, no antes.
