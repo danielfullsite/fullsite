@@ -127,6 +127,87 @@ export async function conducirV1(guion, opciones = {}) {
     return r
   }
 
+  /**
+   * Pulsa la tarjeta de una mesa POR SU IDENTIDAD, nunca por su estado.
+   *
+   * El patrón anterior era `^<n>\s+(Disponible|Ocupada)`, y eso metía el estado
+   * dentro de la identidad del control. La mesa 1 existía, estaba visible y era
+   * pulsable, pero decía «Sin confirmar» —un tercer estado que el producto lista
+   * en su propia leyenda— y el conductor informó «no está en pantalla». Enumerar
+   * estados sólo mueve el problema al siguiente estado que alguien agregue.
+   *
+   * Una mesa se identifica por su NÚMERO. El estado se observa aparte y viaja a
+   * la evidencia (`estadoMesa`), que es donde sirve.
+   *
+   * Orden de búsqueda, del identificador más estable al más frágil:
+   *   1. `data-testid` semántico (`mesa-3`, `table-3`) — hoy el POS no lo pone,
+   *      pero cuando lo ponga esto lo usa sin tocar nada más.
+   *   2. `aria-label` que nombre la mesa.
+   *   3. control cuyo texto EMPIECE por el número, ignorando lo que siga.
+   *
+   * Y distingue tres desenlaces que no son lo mismo: no hay ninguna mesa
+   * (precondición: el tenant no las sembró), la mesa está pero deshabilitada
+   * (dato del producto), o la mesa está y se pudo pulsar.
+   */
+  const pulsarMesa = async (n) => {
+    const r = await page.evaluate((num) => {
+      const vis = (el) => {
+        const b = el.getBoundingClientRect()
+        return b.width > 0 && b.height > 0 && getComputedStyle(el).display !== 'none'
+      }
+      const controles = [...document.querySelectorAll('button,[role=button]')].filter(vis)
+      const texto = (el) => (el.innerText || '').replace(/\s+/g, ' ').trim()
+
+      // 1 · identificador semántico
+      let b = controles.find(el => {
+        const id = el.getAttribute('data-testid') || el.dataset?.mesa || el.dataset?.table || ''
+        return new RegExp(`^(mesa|table)[-_]?${num}$`, 'i').test(String(id))
+      })
+      let via = b ? 'data-testid' : null
+
+      // 2 · nombre accesible
+      if (!b) {
+        b = controles.find(el => new RegExp(`\\bmesa\\s*${num}\\b`, 'i').test(el.getAttribute('aria-label') || ''))
+        if (b) via = 'aria-label'
+      }
+
+      // 3 · el número al principio del rótulo, pase lo que pase después.
+      //     Se exige algo MÁS que el número para no confundir la tarjeta con la
+      //     tecla «1» del teclado numérico del PIN, cuyo texto es sólo el dígito.
+      if (!b) {
+        b = controles.find(el => {
+          const t = texto(el)
+          return new RegExp(`^${num}\\b`).test(t) && t.length > String(num).length
+        })
+        if (b) via = 'texto que empieza por el número'
+      }
+
+      const inventario = () => controles.map(x => texto(x) || x.getAttribute('aria-label') || '(sin nombre)').slice(0, 30)
+
+      if (!b) {
+        // ¿Hay ALGUNA tarjeta de mesa? Distingue «el tenant no sembró mesas»
+        // de «hay mesas y no reconocí ésta».
+        const hayMesas = controles.some(el => /^\d+\b/.test(texto(el)) && texto(el).length > 1)
+        return { ok: false, motivo: hayMesas ? `la mesa ${num} no está entre las mesas visibles`
+                                             : 'no hay ninguna mesa en pantalla',
+                 hayMesas, enPantalla: inventario() }
+      }
+
+      const rotulo = texto(b)
+      // El estado es lo que queda del rótulo al quitarle número y aforo.
+      const estadoMesa = (rotulo.replace(new RegExp(`^${num}\\s*`), '')
+        .replace(/\d+\s*lug\.?/i, '').trim()) || null
+
+      if (b.disabled || b.getAttribute('aria-disabled') === 'true') {
+        return { ok: false, motivo: 'está deshabilitado', rotulo, estadoMesa, enPantalla: inventario() }
+      }
+      b.click()
+      return { ok: true, rotulo, estadoMesa, via }
+    }, n)
+    bitacora.push({ etiqueta: `abrir mesa ${n}`, ...r })
+    return r
+  }
+
   /** ¿Está puesta la pantalla de bloqueo? */
   const estaBloqueado = async () => {
     const t = await page.evaluate(() => (document.body.innerText || '').replace(/\s+/g, ' ')).catch(() => '')
@@ -218,13 +299,34 @@ export async function conducirV1(guion, opciones = {}) {
          enviar). Que el arnés no lo encuentre es problema del arnés, y jamás
          se promueve a defecto: un paso que no se ejecutó no observó nada.
      ═════════════════════════════════════════════════════════════════════════ */
+  /**
+   * ¿A quién se le imputa que un paso no se ejecutara?
+   *
+   * La causa por defecto la fija el guion (`causaSiFalta`): un dato que el
+   * tenant debía sembrar es precondición. Pero esa regla se equivoca en un caso
+   * concreto y ya se equivocó: la mesa 1 ESTABA en pantalla, visible y
+   * pulsable, y el conductor la reportó ausente porque su patrón exigía un
+   * estado que no era el de esa mesa. Eso se clasificó como precondición del
+   * tenant cuando era del instrumento.
+   *
+   * La regla: si el DOM demuestra que el control existía, la culpa es del
+   * arnés — da igual qué diga el guion. Un instrumento que no reconoce lo que
+   * tiene enfrente no puede cobrárselo al sistema que mide.
+   */
+  const imputar = (paso, r) => {
+    if (r.controlPresente === true) return 'arnes'
+    if (r.hayMesas === true) return 'arnes'          // había mesas; no supo cuál
+    if (r.motivo === 'está deshabilitado') return 'producto'  // existe y el producto lo bloquea
+    return paso.causaSiFalta ?? 'arnes'
+  }
+
   const registrar = async (paso, r, extra = {}) => {
     const png = await retratar(paso.n, paso.accion)
     pasos.push({
       n: paso.n, accion: paso.accion, etiqueta: paso.etiqueta,
       ok: r.ok !== false,
       motivo: r.ok === false ? (r.motivo ?? 'no se ejecutó') : null,
-      causa: r.ok === false ? (paso.causaSiFalta ?? 'arnes') : null,
+      causa: r.ok === false ? imputar(paso, r) : null,
       rotulo: r.rotulo ?? null,
       enPantalla: r.ok === false ? (r.enPantalla ?? []).slice(0, 12) : undefined,
       evidencia: png,
@@ -253,13 +355,14 @@ export async function conducirV1(guion, opciones = {}) {
       // ── 2 · Abrir la mesa ────────────────────────────────────────────────
       case 'abrirMesa': {
         const n = paso.mesa ?? mesa
-        const r = await pulsar(`^${n}\\s+(Disponible|Ocupada)`, `abrir mesa ${n}`)
+        const r = await pulsarMesa(n)
         await page.waitForTimeout(3500); await ingresarConPin(); await page.waitForTimeout(2000)
         await registrar(paso, r)
         // El estado de la mesa es una de las diez categorías del manifiesto y
         // estaba muerta: se lee de la pantalla, que es lo que ve el mesero.
+        // Va aquí, en la EVIDENCIA, y no en el selector: ver §pulsarMesa.
         const t = await page.evaluate(() => (document.body.innerText || '').replace(/\s+/g, ' ')).catch(() => '')
-        manifiesto.table_state.push({ mesa: n, abierta: r.ok === true,
+        manifiesto.table_state.push({ mesa: n, abierta: r.ok === true, estado: r.estadoMesa ?? null,
           importes: (t.match(/\$[\d,]+\.\d{2}/g) || []).slice(0, 4) })
         break
       }

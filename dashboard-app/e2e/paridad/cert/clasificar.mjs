@@ -59,6 +59,10 @@ export function clasificar(h) {
   if (!ejecuto) {
     if (h.causa === 'entorno')      return 'ENVIRONMENT_ERROR'
     if (h.causa === 'precondicion') return 'PRECONDITION_FAILURE'
+    // Un control que EXISTE y que el producto deja deshabilitado no es un fallo
+    // del instrumento: es el producto diciendo que no se puede. Se distingue de
+    // «no lo encontré», que sí es del arnés.
+    if (h.causa === 'producto')     return 'PRODUCT_DEFECT'
     return 'HARNESS_ERROR'
   }
 
