@@ -170,18 +170,55 @@ function touchValidatedAt(config) {
  * y con la telemetría apagada sin explicación. Ver
  * `tests/heartbeat-credenciales.test.js`.
  *
- * Orden de precedencia: config del esquema → alias escrito a mano → entorno.
- * El entorno va al final a propósito: en una terminal instalada por .exe no
- * existe, así que nunca puede ser la fuente principal.
+ * Orden: config del esquema → alias escrito a mano → entorno → SELLADO EN EL
+ * BUILD. El sellado va hasta el final para que cualquier config o entorno lo
+ * pueda sobrescribir, pero existe porque en una terminal instalada por .exe no
+ * hay entorno y la receta de clonado no escribe la llave en el config.
  *
  * @param {object} config configuración de la terminal
  * @param {object} [env]  process.env por defecto
  * @returns {{ supabaseUrl: string, supabaseKey: string }} cadenas vacías si falta
  */
+let _selladas = undefined   // undefined = sin leer; null = no hay archivo
+
+/**
+ * Credenciales SELLADAS EN EL BUILD, última fuente de la cadena.
+ *
+ * Es la que faltaba, y su ausencia costó dos cosas a la vez (medido 2026-09-14):
+ *
+ *   1. `local_server_heartbeats` con CERO filas desde que existe — la flota no
+ *      reporta y nadie puede diagnosticar sin ir físicamente.
+ *   2. Ninguna terminal se auto-actualiza. `main.js` consulta el freno de
+ *      versiones antes de instalar y ese `estaBloqueada` hace
+ *      `if (!supabaseUrl || !supabaseKey) throw`. El auto-instalador falla
+ *      CERRADO a propósito ('no se pudo consultar el freno de versiones'), que
+ *      es lo correcto — pero sin credencial nunca se puede consultar, así que
+ *      no instala NUNCA. Por eso cada arreglo exige visitar la caja.
+ *
+ * El archivo lo escribe `scripts/sellar-credenciales.cjs` al empaquetar, desde
+ * el entorno de build, y está en .gitignore: la llave no vive en el repo.
+ *
+ * No agrega exposición: es la MISMA anon key que ya viaja dentro del instalador
+ * dentro del `ui-bundle` (la web la publica como NEXT_PUBLIC_SUPABASE_ANON_KEY).
+ * Lo que cambia es que ahora el proceso principal también la puede leer.
+ */
+function _leerSelladas() {
+  if (_selladas !== undefined) return _selladas
+  try {
+    // require() y no readFileSync: empaquetado en asar sigue resolviendo.
+    _selladas = require('../credenciales-selladas.json')
+  } catch {
+    _selladas = null   // no sellado (desarrollo, o build sin secretos): no es un error
+  }
+  return _selladas
+}
+
 function readSupabaseCreds(config = {}, env = process.env) {
+  const sellado = _leerSelladas() || {}
   return {
-    supabaseUrl: config.supabaseUrl || env.SUPABASE_URL || '',
-    supabaseKey: config.supabaseAnonKey || config.supabaseKey || env.SUPABASE_ANON_KEY || '',
+    supabaseUrl: config.supabaseUrl || env.SUPABASE_URL || sellado.supabaseUrl || '',
+    supabaseKey: config.supabaseAnonKey || config.supabaseKey || env.SUPABASE_ANON_KEY
+      || sellado.supabaseAnonKey || '',
   }
 }
 
