@@ -75,6 +75,26 @@ if (!l0.satisfechas) {
    ═══════════════════════════════════════════════════════════════════════════ */
 const PASOS_CAPTURA = 5   // S1-S5. Ver `hastaPaso` en el conductor.
 
+/* ── EL RESET DEL TENANT, NO SÓLO DE LA TERMINAL ──────────────────────────────
+   `resetEstadoLocal` limpia lo que la terminal guarda. No alcanza desde que S6
+   escribe de verdad: la orden queda VIVA en la base y en Pedro, la mesa sigue
+   ocupada, y la corrida siguiente abre con $100 ya cargados. Esto la cancela por
+   el contrato del producto — sin DELETE, sin SQL, sin tocar el audit trail. */
+const { labReset } = await import('./lab-reset.mjs')
+const resetTenant = async (etiqueta) => {
+  const r = await labReset({ pin: ENTORNO.pin, mesa: OBJETIVO.mesa })
+  console.log(`\n── lab:reset:g01 (${etiqueta}) ── activas ${r.active_cert_orders_antes ?? '?'} → ${r.active_cert_orders ?? '?'}`
+    + ` · mesa ocupada: ${r.open_order_for_mesa} · ${r.ok ? 'OK' : `*** ${r.motivo}`}`)
+  emitir({
+    id: `lab-reset-${etiqueta}`, fase: 'reset', descripcion: `lab:reset:g01 (${etiqueta})`,
+    esperado: '0 órdenes CERT activas y mesa libre',
+    observado: `${r.active_cert_orders ?? 'no medido'} activas · mesa ocupada ${r.open_order_for_mesa}`,
+    clase: r.ok ? 'EXPECTED_BEHAVIOR' : 'HARNESS_ERROR',
+  })
+  return r
+}
+const resetAntesDeParidad = await resetTenant('antes de paridad')
+
 console.log(`\n── corrida A (CAPTURE_ONLY · S1-S5, con reset previo) ──`)
 const A = await correr('A', { hastaPaso: PASOS_CAPTURA, resetAntes: true })
 console.log(`\n── corrida B (CAPTURE_ONLY · S1-S5, con reset previo) ──`)
@@ -260,8 +280,10 @@ if (!l0.sandbox.permitido) {
   // El ancla temporal se toma ANTES de la corrida: sin ella, el DB oracle no
   // puede distinguir la orden de este journey de una que ya estaba.
   const desde = new Date(Date.now() - 5000).toISOString()
-  // Estado limpio también aquí: la fase de efectos no debe heredar el borrador
-  // que dejó la paridad, o el DB oracle no sabría de qué corrida es la orden.
+  // Estado limpio también aquí, en las dos capas: la nube (órdenes vivas) y la
+  // terminal (borrador). Si no, el DB oracle no sabría de qué corrida es la orden.
+  const resetAntesDeSandbox = await resetTenant('antes de SANDBOX')
+  sobre.lab_reset = { antes_de_paridad: resetAntesDeParidad, antes_de_sandbox: resetAntesDeSandbox }
   const S = await correr('SANDBOX', {
     modo: 'SANDBOX',
     tenantPermitido: l0.sandbox.tenant,
