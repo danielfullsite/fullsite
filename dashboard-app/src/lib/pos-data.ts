@@ -681,7 +681,12 @@ export async function openTurno(fondoInicial: number, openedBy: string, openingR
   // al subir crea la MISMA fila, sin duplicar. turno_id en órdenes es TEXT (sin FK),
   // así que las comandas offline sincronizan aunque el turno suba después.
   const queueForSync = async () => {
-    try { const { addToQueue } = await import('@/lib/offline-sync'); addToQueue('pos_turnos', body) } catch {}
+    // 'POST' explícito: abrir turno INSERTA una fila. Dejarlo al valor por
+    // omisión hizo que el renglón viajara sin método, que la migración a
+    // IndexedDB lo convirtiera en PATCH, y que un `PATCH pos_turnos` sin filtro
+    // fuera rechazado para siempre por la guarda. Medido dos veces en AMALAY el
+    // 2026-09-14: la pantalla decía «Turno activo» y la nube no tenía ninguno.
+    try { const { addToQueue } = await import('@/lib/offline-sync'); addToQueue('pos_turnos', body, 'POST') } catch {}
   }
 
   // Offline: abrir turno LOCAL + encolar (el día arranca sin internet).
