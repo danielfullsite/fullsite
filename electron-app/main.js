@@ -84,6 +84,7 @@ const LEGACY_CONFIG_PATH  = path.join('C:\\fullsite', 'config.json');
 // blocking the Local Server, POS, and KDS from starting.
 let autoInstaller = null;   // handle del auto-update; null si no arranco
 const configSchema        = require('./local-server/config-schema');
+const { resolverVersionDeInterfaz } = require('./local-server/core/version-de-interfaz');
 const printerConfigSchema = require('./local-server/adapters/printer-config-schema');
 
 /**
@@ -273,8 +274,21 @@ async function startLocalServer() {
     console.warn('[main] Printer config invalid:', printersResult.errors);
   }
 
+  // ── Qué interfaz sirve esta terminal — SE DECIDE AQUÍ Y NO SE VUELVE A LEER ──
+  //
+  // El congelado es el punto, no la lectura. Si la versión se resolviera en cada
+  // navegación, una orden podría empezar en V1 y terminar en V2 —dos modelos de
+  // estado distintos a media captura—. Cambiar de interfaz exige reiniciar, que
+  // es un gesto deliberado y visible.
+  //
+  // `FULLSITE_UI_VERSION` sólo se mira en DEV: en una caja de restaurante manda
+  // `config.json`, y nada más.
+  const ui = resolverVersionDeInterfaz({ config: appConfig, dev: DEV });
+  console.log(`[main] Interfaz: ${ui.version} (${ui.procedencia})`);
+
   const cfg = {
     restaurantId,
+    uiVersion:          ui.version,
     channel:            appConfig.channel        || process.env.FULLSITE_CHANNEL    || 'stable',
     instanceName:       appConfig.instance_name  || appConfig.instanceName          || `Fullsite POS — ${os.hostname()}`,
     // La cadena de resolución vive en config-schema.js y NADA MÁS ahí. Estaba

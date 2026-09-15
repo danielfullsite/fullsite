@@ -48,6 +48,19 @@ function validate(config) {
     errors.push('localAuthorityEnabled must be an explicit boolean')
   }
 
+  // ui_version — qué interfaz sirve esta terminal ('v1' | 'v2').
+  //
+  // OPCIONAL A PROPÓSITO, y ausente significa 'v1'. Todas las terminales ya
+  // instaladas carecen del campo, y ninguna debe dejar de arrancar por eso.
+  //
+  // Un valor PRESENTE pero inválido sí se rechaza: escribir "V3" o "verdadero"
+  // es un error de operación que hay que ver al provisionar, no descubrir en
+  // plena comida. La resolución en caliente (core/version-de-interfaz.js) cae a
+  // 'v1' de todos modos, así que una caja nunca queda sin interfaz.
+  if (config.ui_version !== undefined && !['v1', 'v2'].includes(config.ui_version)) {
+    errors.push(`ui_version must be 'v1' or 'v2' when present (got ${JSON.stringify(config.ui_version)})`)
+  }
+
   const required = [
     'config_version', 'restaurant_id', 'terminal_id', 'terminal_role',
     'terminal_name', 'local_server_host', 'local_server_port',

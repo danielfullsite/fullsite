@@ -22,11 +22,28 @@ function normalizar(crudo) {
   const sha = typeof crudo.sha === 'string' ? crudo.sha.trim().toLowerCase() : ''
   if (!SHA_VALIDO.test(sha)) return null
   const sellado = typeof crudo.sellado_en === 'string' ? crudo.sellado_en : null
+  // La revisión del paquete de interfaz es un sha256 del CONTENIDO servido. Un
+  // valor con otra forma se descarta en vez de propagarse: un identificador a
+  // medias en un reporte de campo es peor que su ausencia, porque parece dato.
+  const uiRev = typeof crudo.ui_revision === 'string' && /^[0-9a-f]{64}$/.test(crudo.ui_revision)
+    ? crudo.ui_revision : null
+  // El commit de la interfaz se LEE del sello; jamás se deduce del de la
+  // cáscara ni del hash de contenido. Si no viene, es `null` — y `coherente`
+  // será `null` también, que es la verdad: no se puede demostrar.
+  const uiSha = typeof crudo.ui_sha === 'string' && SHA_VALIDO.test(crudo.ui_sha.trim().toLowerCase())
+    ? crudo.ui_sha.trim().toLowerCase() : null
   return {
     sha: sha.slice(0, 12),
     rama: typeof crudo.rama === 'string' && crudo.rama ? crudo.rama : null,
     sellado_en: sellado && !Number.isNaN(Date.parse(sellado)) ? sellado : null,
     limpio: crudo.limpio === true,
+    ui_version: crudo.ui_version === 'v2' ? 'v2' : 'v1',
+    ui_revision: uiRev,
+    ui_sha: uiSha ? uiSha.slice(0, 12) : null,
+    // Tres estados, no dos. Se recalcula sobre los sellos normalizados en vez
+    // de confiar en el booleano del archivo: un `coherente:true` escrito a mano
+    // en el JSON no debe poder mentirle a `/health`.
+    coherente: (uiSha && sha) ? (uiSha === sha) : null,
   }
 }
 
@@ -46,6 +63,7 @@ function identidadDeBuild(version, raiz = path.join(__dirname, '..', '..')) {
   const sello = leerSello(raiz)
   if (!sello) {
     return { version, sha: null, rama: null, sellado_en: null, limpio: false,
+      ui_version: 'v1', ui_revision: null, ui_sha: null, coherente: null,
       etiqueta: `${version} (sin sellar)` }
   }
   // El sufijo del sello importa: un ejecutable armado con cambios sin guardar no

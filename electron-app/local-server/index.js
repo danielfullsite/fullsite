@@ -27,6 +27,7 @@ const networkAdapter = require('./adapters/network')
 const { NdjsonEventStore }  = require('./adapters/storage/ndjson')
 const { CoreEventStore }    = require('./core/event-store')
 const { identidadDeBuild } = require('./core/identidad-de-build')
+const { identidadDeTerminal } = require('./core/identidad-de-terminal')
 const { turnReport } = require('./core/turn-report')
 const { RestaurantState }   = require('./core/state')
 const { WsHub }             = require('./core/ws-hub')
@@ -513,6 +514,26 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority 
     // Fast identity check for discovery. Returns only the fields needed to
     // validate that a terminal found the right server before opening a WS.
     // No auth required — the information is already in mDNS TXT records.
+    // Quién es ESTA terminal, completo y en un solo lugar. Lo usan /health y
+    // /identity: dos rutas que contestaban cosas distintas sobre lo mismo.
+    const identidadCompleta = () => identidadDeTerminal({
+      version,
+      config: {
+        terminal_id: config.terminalId ?? null,
+        terminal_role: config.terminalRole ?? config.role ?? null,
+        terminal_name: instanceName || config.terminalName || null,
+        restaurant_id: restaurantId ?? null,
+        config_version: config.configVersion ?? config.config_version ?? null,
+      },
+      serverId,
+      protocolo: PROTOCOL_VERSION,
+      paqueteUi: null,
+      catalogo: catalogStore
+        ? { revision: catalogStore.status()?.revision ?? null,
+            actualizado_en: catalogStore.status()?.refreshed_at ?? null }
+        : null,
+    })
+
     if (url === '/identity' && req.method === 'GET') {
       json(res, 200, {
         ok:               true,
@@ -523,6 +544,7 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority 
         version,
         protocol_version: PROTOCOL_VERSION,
         capabilities:     ['orders', 'kds', 'printing', 'mesa-lock', 'sync-queue'],
+        identidad:        identidadCompleta(),
         lan_ips:          networkAdapter.getAllLanIps(),
         ts:               Date.now(),
       })
@@ -572,6 +594,10 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority 
         // puede atar una queja de campo a una versión, ni comprobar que las
         // cuatro terminales quedaron iguales.
         build:            identidadDeBuild(version),
+        // El bloque completo: app + interfaz + Pedro + catálogo + terminal.
+        // `build` se conserva porque ya hay consumidores; `identidad` es el
+        // que contesta "qué está instalado en esta caja" de una sola vez.
+        identidad:        identidadCompleta(),
       })
       return
     }
