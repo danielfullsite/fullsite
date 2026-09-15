@@ -41,7 +41,7 @@ function git(args) {
  * Cada compuerta trae su propia `causa` para que la clasificación sepa a quién
  * imputarle el fallo: `entorno` no es lo mismo que `precondicion`.
  */
-export async function preflight({ shaEsperado = process.env.CERTIFICATION_RUN_SHA || null } = {}) {
+export async function preflight({ shaEsperado = process.env.CERTIFICATION_TARGET_SHA || null } = {}) {
   const gates = []
   const G = (id, nombre, ok, { esperado = null, observado = null, causa = 'precondicion' } = {}) =>
     gates.push({ id, nombre, ok, esperado, observado, causa })
@@ -55,10 +55,10 @@ export async function preflight({ shaEsperado = process.env.CERTIFICATION_RUN_SH
   })
   // G-1c · El checkout desciende del SHA certificado.
   //
-  // NO se exige `HEAD === CERTIFICATION_RUN_SHA`. El arnés vive por necesidad
+  // NO se exige `HEAD === CERTIFICATION_TARGET_SHA`. El arnés vive por necesidad
   // ENCIMA de la base de producto: en cuanto el rig se comitea, HEAD deja de
   // ser el SHA del build y la igualdad es imposible de cumplir. Es la misma
-  // distinción que separa PRODUCT_BASE_SHA de CERTIFICATION_RUN_SHA.
+  // distinción que separa PRODUCT_BEHAVIOR_BASE_SHA de CERTIFICATION_TARGET_SHA.
   //
   // El invariante que sí importa es la descendencia: el arnés tiene que estar
   // construido sobre el código que se está certificando, no sobre una rama
@@ -69,7 +69,7 @@ export async function preflight({ shaEsperado = process.env.CERTIFICATION_RUN_SH
       headLargo === shaEsperado ||
       (() => { try { execFileSync('git', ['merge-base', '--is-ancestor', shaEsperado, 'HEAD']); return true } catch { return false } })()
     )
-    G('G-1c', 'el checkout desciende de CERTIFICATION_RUN_SHA', desciende, {
+    G('G-1c', 'el checkout desciende de CERTIFICATION_TARGET_SHA', desciende, {
       esperado: `descendiente de ${shaEsperado.slice(0, 12)}`,
       observado: headLargo ? `HEAD ${headLargo.slice(0, 12)}${desciende ? ' (desciende)' : ' (rama lateral)'}` : null,
     })
@@ -136,10 +136,10 @@ export async function preflight({ shaEsperado = process.env.CERTIFICATION_RUN_SH
     })
     if (shaEsperado) {
       const corto = (s) => (s || '').slice(0, 12)
-      G('G-5e', 'app.git_sha === CERTIFICATION_RUN_SHA', corto(sello.app_git_sha) === corto(shaEsperado), {
+      G('G-5e', 'app.git_sha === CERTIFICATION_TARGET_SHA', corto(sello.app_git_sha) === corto(shaEsperado), {
         esperado: corto(shaEsperado), observado: corto(sello.app_git_sha) || null,
       })
-      G('G-5f', 'ui.git_sha === CERTIFICATION_RUN_SHA', corto(sello.ui_git_sha) === corto(shaEsperado), {
+      G('G-5f', 'ui.git_sha === CERTIFICATION_TARGET_SHA', corto(sello.ui_git_sha) === corto(shaEsperado), {
         esperado: corto(shaEsperado), observado: corto(sello.ui_git_sha) || null,
       })
     }

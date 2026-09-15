@@ -94,8 +94,8 @@ No se reimplementa aquí. Pedro la calcula en
 `/identity`. Las compuertas exigen:
 
 ```
-app.git_sha == CERTIFICATION_RUN_SHA
-ui.git_sha  == CERTIFICATION_RUN_SHA
+app.git_sha == CERTIFICATION_TARGET_SHA
+ui.git_sha  == CERTIFICATION_TARGET_SHA
 app.clean   == true
 coherente   == true
 ```
@@ -108,7 +108,7 @@ npm run lab:reset:g01       # siembra el laboratorio (PR2)
 npm run certify:g01         # el veredicto
 ```
 
-Variables: `CERTIFICATION_RUN_SHA`, `FULLSITE_PIN`, `FULLSITE_CDP`,
+Variables: `CERTIFICATION_TARGET_SHA`, `FULLSITE_PIN`, `FULLSITE_CDP`,
 `CERT_BASE_URL`, `CERT_BRIDGE`, `CERT_CLIENT_ID`, `CERT_OUT`, y el objetivo
 (`CERT_CATEGORY`, `CERT_PRODUCT`, `CERT_REQUIRED_MOD_GROUP`,
 `CERT_MODIFIER_OPTION`, `CERT_MESA`).
