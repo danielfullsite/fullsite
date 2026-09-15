@@ -73,9 +73,17 @@ console.log('   >>> ZERO DELTA — el normalizador absorbe ids y relojes sin bor
 // ── 2 · Las cinco mutaciones deliberadas ────────────────────────────────────
 console.log(`\n2. LAS CINCO MUTACIONES DELIBERADAS`)
 let detectadas = 0
+let noAplicables = 0
 for (const m of MUTACIONES) {
   const mutado = m.aplicar(corrida('2'))
-  if (!mutado) { console.log(`   ?? ${m.id} no se pudo aplicar sobre este manifiesto`); continue }
+  // Una mutación no aplicable NO es un pase. Antes esto imprimía «??» y seguía
+  // como si nada: una categoría de efectos vacía significa que nadie la está
+  // mirando, y el «cero diferencias» de esa categoría es trivialmente cierto.
+  if (!mutado) {
+    noAplicables++
+    console.log(`   ✗ ${m.id} NO APLICABLE sobre este manifiesto — categoría vacía: ${m.esperada.join('/')}`)
+    continue
+  }
   const diffs = comparar(A, normalizar(mutado))
   const categorias = diffs.map(d => d.categoria)
   const acerto = diffs.length > 0 && m.esperada.some(c => categorias.includes(c))
@@ -87,10 +95,11 @@ for (const m of MUTACIONES) {
 }
 
 console.log('\n' + '═'.repeat(66))
-console.log(`DETECTADAS ${detectadas}/${MUTACIONES.length}`)
-if (detectadas === MUTACIONES.length) {
+console.log(`DETECTADAS ${detectadas}/${MUTACIONES.length}${noAplicables ? ` · NO APLICABLES ${noAplicables}` : ''}`)
+if (detectadas === MUTACIONES.length && noAplicables === 0) {
   console.log('>>> El comparador delata las cinco. Queda por probar la CAPTURA contra el sistema vivo.')
 } else {
-  console.log('*** EL ARNÉS NO ES CONFIABLE. No continuar hasta que detecte 5/5.')
+  if (noAplicables) console.log(`*** ${noAplicables} mutación(es) no aplicable(s): hay categorías del manifiesto que nadie observa.`)
+  console.log('*** EL ARNÉS NO ES CONFIABLE. No continuar hasta que detecte 5/5 sin no-aplicables.')
   process.exit(1)
 }
