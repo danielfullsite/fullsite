@@ -10,10 +10,12 @@
 // el resto: NOT_OBSERVED jamás convive con PASS.
 //
 // ── DE DÓNDE SALE CADA EXPECTATIVA ──────────────────────────────────────────
-// El contrato de la orden no se inventó aquí: es el payload que arma
-// `pos-data.ts:1365` — `order_id, mesa, mesero, status, turno_id, items[],
-// save_operation_id, comanda_batches`. El ruteo a estación es `items[].station`,
-// que el POS calcula con `getStationForItem` (pos-constants.ts:158).
+// QUÉ se espera sale del payload que arma `pos-data.ts:1365` (mesa, status,
+// turno, items con sus modificadores). CÓMO se llama cada cosa en la base sale
+// de la BASE, no de ese payload: los dos vocabularios NO coinciden, y darlo por
+// hecho dejó al oráculo ciego una vez —`order_id` y `save_operation_id` no son
+// columnas de `pos_orders`—. El ruteo a estación es `items[].station`, el mismo
+// campo que el KDS lee, calculado por `getStationForItem` (pos-constants.ts:158).
 //
 // SEGURIDAD: el PIN se lee del entorno y no se imprime; el shift token vive en
 // memoria de este proceso y de él sólo se reporta el tenant y el rol.
@@ -78,8 +80,22 @@ async function leer(baseUrl, token, ruta) {
 export async function dbOracle({ baseUrl, token, objetivo, desde, turnoId = null }) {
   if (!token) return ciego('sin sesión: no se pudo consultar la base')
 
+  /* ── LOS NOMBRES DE LA TABLA NO SON LOS DEL PAYLOAD ──────────────────────
+     Este select pedía `order_id` y `save_operation_id` porque así se llaman en
+     el payload que arma `pos-data.ts:1365`. En la TABLA no existen, y PostgREST
+     rechaza el select entero con 400: el oráculo quedaba ciego y G01 fallaba
+     por su propio instrumento.
+
+     El mapeo real está en `save-order/route.ts:129`, que hace
+     `pos_orders?id=eq.${order_id}`: el `order_id` que manda el POS se guarda en
+     la columna `id`. `save_operation_id` viaja como parámetro RPC
+     (`p_save_operation_id`, línea 103) hacia `r1_save_order_idempotent`, y no es
+     columna de esta tabla.
+
+     La lección, que ya costó una vez con una columna `saldo` inventada: el
+     esquema se le pregunta a la tabla, no se deduce de quien le escribe. */
   const filtro = [
-    'pos_orders?select=id,order_id,mesa,status,turno_id,items,save_operation_id,created_at',
+    'pos_orders?select=id,mesa,status,turno_id,items,comanda_batches,created_at',
     `created_at=gte.${encodeURIComponent(desde)}`,
     turnoId ? `turno_id=eq.${turnoId}` : null,
     'order=created_at.desc', 'limit=20',
@@ -103,7 +119,7 @@ export async function dbOracle({ baseUrl, token, objetivo, desde, turnoId = null
   if (!orden) {
     return { clase: 'PRODUCT_DEFECT', ok: false,
       motivo: `hay ${filas.length} orden(es) nuevas pero ninguna contiene «${objetivo.producto}»`,
-      detalle: { candidatas: filas.map(o => ({ order_id: o.order_id, mesa: o.mesa,
+      detalle: { candidatas: filas.map(o => ({ id: o.id, mesa: o.mesa,
         items: (o.items || []).map(i => i?.nombre ?? i?.name).slice(0, 5) })) } }
   }
 
@@ -115,7 +131,7 @@ export async function dbOracle({ baseUrl, token, objetivo, desde, turnoId = null
 
   const comprobaciones = [
     { id: 'orden-existe',   ok: true,
-      esperado: 'una orden con el producto objetivo', observado: `order_id ${orden.order_id}` },
+      esperado: 'una orden con el producto objetivo', observado: `pos_orders.id ${orden.id}` },
     { id: 'mesa-correcta',  ok: String(orden.mesa) === String(objetivo.mesa),
       esperado: `mesa ${objetivo.mesa}`, observado: `mesa ${orden.mesa}` },
     { id: 'producto',       ok: true,
@@ -131,9 +147,15 @@ export async function dbOracle({ baseUrl, token, objetivo, desde, turnoId = null
   return {
     clase: todo ? 'EXPECTED_BEHAVIOR' : 'PRODUCT_DEFECT', ok: todo,
     motivo: todo ? null : comprobaciones.filter(c => !c.ok).map(c => `${c.id}: esperaba «${c.esperado}», vio «${c.observado}»`).join('; '),
-    detalle: { comprobaciones, order_id: orden.order_id, save_operation_id: orden.save_operation_id,
-               turno_id: orden.turno_id, mesa: orden.mesa },
-    correlacion: { order_id: orden.order_id, save_operation_id: orden.save_operation_id, turno_id: orden.turno_id },
+    detalle: {
+      comprobaciones, order_id: orden.id, turno_id: orden.turno_id, mesa: orden.mesa,
+      // Se DECLARA la ausencia en vez de callarla. `save_operation_id` no es
+      // columna de pos_orders; correlacionarlo exigiría otra fuente, y hoy
+      // `pos_save_operations` devuelve 400 por el proxy (investigación aparte,
+      // POS_SAVE_OPERATIONS_PROXY_400). Ni se infiere ni se fabrica.
+      save_operation_id_observation: 'NOT_EXPOSED_BY_CURRENT_ORACLE',
+    },
+    correlacion: { order_id: orden.id, save_operation_id: null, turno_id: orden.turno_id },
     orden,
   }
 }
@@ -193,13 +215,13 @@ export async function kdsOracle({ orden, objetivo, estacionEsperada = 'cocina' }
 
   const items = Array.isArray(orden.items) ? orden.items : []
   const item = items.find(it => String(it?.nombre ?? it?.name ?? '').toUpperCase().includes(objetivo.producto.toUpperCase()))
-  if (!item) return ciego(`la orden ${orden.order_id} no contiene «${objetivo.producto}»`)
+  if (!item) return ciego(`la orden ${orden.id} no contiene «${objetivo.producto}»`)
 
   const estacion = item.station ?? item.estacion ?? null
   if (estacion === null) {
     return { clase: 'PRODUCT_DEFECT', ok: false,
       motivo: 'el item no trae estación: el KDS no puede rutearlo a ningún tablero',
-      detalle: { order_id: orden.order_id, item: item.nombre ?? item.name } }
+      detalle: { order_id: orden.id, item: item.nombre ?? item.name } }
   }
 
   // ¿Quedó constancia de que se ENVIÓ, no sólo de que se agregó? `comanda_batches`
@@ -216,6 +238,6 @@ export async function kdsOracle({ orden, objetivo, estacionEsperada = 'cocina' }
   return {
     clase: todo ? 'EXPECTED_BEHAVIOR' : 'PRODUCT_DEFECT', ok: todo,
     motivo: todo ? null : comprobaciones.filter(c => !c.ok).map(c => `${c.id}: esperaba «${c.esperado}», vio «${c.observado}»`).join('; '),
-    detalle: { comprobaciones, order_id: orden.order_id, estacion, lotes: lotes.length },
+    detalle: { comprobaciones, order_id: orden.id, estacion, lotes: lotes.length },
   }
 }
