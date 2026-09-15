@@ -1,0 +1,79 @@
+{
+  "_porque_existe": [
+    "El 2026-09-14 se certificó el KDS de cocina como si fuera un POS secundario y eso",
+    "inventó dos fallas que no existían. El dato estaba escrito en tres lugares y no se leyó.",
+    "Aquí la topología deja de ser algo que hay que recordar: es un dato del repositorio.",
+    "Pedro NO reporta `terminal_role` en /health — mientras no lo haga, este archivo es la",
+    "única fuente que permite saber qué es correcto para cada máquina."
+  ],
+  "restaurantes": {
+    "amalay": {
+      "nombre": "AMALAY Coffee & Market",
+      "ciudad": "San Pedro Garza García, NL",
+      "zona_horaria": "America/Monterrey",
+      "personal_activo": 40,
+      "personal_por_rol": { "mesero": 14, "cocina": 14, "gerente": 5, "cajero": 4, "barra": 2, "admin": 1 },
+      "mesas": 33,
+      "zonas": ["Entrada", "Interior", "Barra", "Terraza", "Pasillo", "Toldo", "Privado"],
+      "lan": "192.168.1.0/24",
+      "terminales": [
+        {
+          "nombre": "SERVER1",
+          "alias": "caja",
+          "rol": "caja",
+          "terminal_role": "server_pos",
+          "lan": "192.168.1.71",
+          "tailscale": "100.108.165.48",
+          "tiene_impresoras": true,
+          "tiene_huella": true,
+          "notas": "Autoridad. Corre Pedro con el event store y las 4 estaciones. El servicio de huella (7718) es proceso hijo del POS."
+        },
+        {
+          "nombre": "PDV2",
+          "alias": "cocina",
+          "rol": "kds",
+          "terminal_role": "kds",
+          "kds_only": true,
+          "lan": "192.168.1.4",
+          "tailscale": "100.91.142.45",
+          "tiene_impresoras": false,
+          "tiene_huella": false,
+          "tiene_login": false,
+          "notas": "KDS dedicado. Carga http://127.0.0.1:7717/kds de su PROPIO Pedro. stations=[] y prepared_users=1 son CORRECTOS aquí: no imprime ni tiene login."
+        },
+        {
+          "nombre": "PDV3",
+          "alias": "entrada",
+          "rol": "secundaria",
+          "terminal_role": "pos",
+          "lan": null,
+          "tailscale": null,
+          "tiene_impresoras": false,
+          "tiene_huella": true,
+          "notas": "POS secundario con lector de huella. Imprime reenviando a la Caja (field-proven §5.5). FALTA Tailscale."
+        },
+        {
+          "nombre": "PDV1",
+          "alias": "escondite",
+          "rol": "secundaria",
+          "terminal_role": "pos",
+          "lan": null,
+          "tailscale": null,
+          "tiene_impresoras": false,
+          "tiene_huella": false,
+          "notas": "POS secundario. FALTA Tailscale."
+        }
+      ],
+      "impresoras": [
+        { "estacion": "cocina", "nombre": "Cocina 1", "conexion": "tcp", "host": "192.168.1.21", "etiqueta_fisica": "COCINA FRIA" },
+        { "estacion": "cocina", "nombre": "Cocina 2", "conexion": "tcp", "host": "192.168.1.40", "etiqueta_fisica": "COCINA CALIENTE" },
+        { "estacion": "barra",  "nombre": "Barra",    "conexion": "tcp", "host": "192.168.1.30", "nota": "Barra imprime comanda pero NO tiene KDS" },
+        { "estacion": "caja",   "nombre": "Caja",     "conexion": "usb", "nombres_windows": ["PANADERIA"], "nota": "El nombre del dispositivo es histórico. La panadería NO tiene impresora: se comunican de voz (DEBRIEF-JUL12:269)." },
+        { "estacion": "tickets","nombre": "Tickets",  "conexion": "usb", "nombres_windows": ["EC01", "EC TICKET"] }
+      ],
+      "sin_kds": ["barra", "caja", "market", "panaderia"],
+      "modo": "legacy",
+      "modo_nota": "write_authority=legacy: la nube es la autoridad del dinero. En modo Caja, operational-domain.js exige estación por categoría."
+    }
+  }
+}
