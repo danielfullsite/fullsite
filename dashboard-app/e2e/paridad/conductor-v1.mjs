@@ -525,7 +525,11 @@ export async function conducirV1(guion, opciones = {}) {
   // corridas vacías da cero trivialmente. Un arnés que dice «idénticos» cuando
   // no pasó nada es peor que no tener arnés: da permiso de avanzar.
   const pasosOk = pasos.filter(p => p.ok).length
-  const corrio = pasos.length === guion.pasos.length && pasosOk === guion.pasos.length
+  // El alcance manda, no el guion entero: con `hastaPaso: 5` la corrida está
+  // COMPLETA con cinco pasos. Comparar contra `guion.pasos.length` declaraba
+  // «no se ejecutó» una fase de paridad que había hecho exactamente lo pedido.
+  const alcance = hastaPaso ?? guion.pasos.length
+  const corrio = pasos.length === alcance && pasosOk === alcance
   if (!corrio) {
     const ultimo = pasos.find(p => !p.ok)
     manifiesto.__no_corrio = {

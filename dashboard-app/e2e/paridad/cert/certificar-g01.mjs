@@ -84,21 +84,31 @@ const B = await correr('B', { hastaPaso: PASOS_CAPTURA, resetAntes: true })
 // No basta con llamarlo: hay que DEMOSTRAR que B partió de cero. Si B empezó
 // donde A terminó, «zero delta» no mide determinismo sino acumulación.
 const resetOk = A.reset?.ok === true && B.reset?.ok === true
-const bPartioDeCero = (B.estadoInicial?.subtotal ?? null) === 0 || (B.estadoInicial?.subtotal ?? null) === null
+// La prueba del reset es el CONTEO DE ÓRDENES LOCALES que `resetEstadoLocal`
+// verifica tras limpiar, no el subtotal de pantalla: al terminar S5 el modal del
+// modificador tapa el ticket y «Sub $…» no es legible. Medir por ahí habría dado
+// «no medido» y, peor, se habría podido leer como «cero».
+const bPartioDeCero = B.reset?.verificacion?.ordenesLocales === 0
 sobre.capture = {
   a_steps: `${A.pasosOk}/${PASOS_CAPTURA}`,
   b_steps: `${B.pasosOk}/${PASOS_CAPTURA}`,
   reset_verified: resetOk && bPartioDeCero,
-  a_subtotal_final: A.estadoFinal?.subtotal ?? null,
-  b_subtotal_inicial: B.estadoInicial?.subtotal ?? null,
-  b_subtotal_final: B.estadoFinal?.subtotal ?? null,
+  a_ordenes_locales_tras_reset: A.reset?.verificacion?.ordenesLocales ?? null,
+  b_ordenes_locales_tras_reset: B.reset?.verificacion?.ordenesLocales ?? null,
+  // La no-acumulación se demuestra comparando lo que cada corrida dejó en la
+  // pantalla: si B hubiera heredado a A, sus importes serían el doble.
+  a_importes: A.manifiesto?.order_state?.[0]?.importes ?? null,
+  b_importes: B.manifiesto?.order_state?.[0]?.importes ?? null,
   reset_a: A.reset ?? null, reset_b: B.reset ?? null,
 }
-console.log(`\nRESET · A terminó en ${A.estadoFinal?.subtotal ?? '?'} · B empezó en ${B.estadoInicial?.subtotal ?? '?'}`
-  + ` · B terminó en ${B.estadoFinal?.subtotal ?? '?'}`)
+console.log(`\nRESET · órdenes locales tras limpiar: A=${A.reset?.verificacion?.ordenesLocales ?? '?'}`
+  + ` B=${B.reset?.verificacion?.ordenesLocales ?? '?'}`)
+console.log(`      importes en pantalla: A=${JSON.stringify(sobre.capture.a_importes)}`
+  + ` B=${JSON.stringify(sobre.capture.b_importes)}`)
 emitir({
   id: 'reset-entre-corridas', fase: 'reset', descripcion: 'B parte del mismo estado inicial que A',
-  esperado: 'B empieza en 0', observado: `B empezó en ${B.estadoInicial?.subtotal ?? 'no medido'}`,
+  esperado: '0 órdenes locales antes de B',
+  observado: `${B.reset?.verificacion?.ordenesLocales ?? 'no medido'} órdenes locales`,
   clase: sobre.capture.reset_verified ? 'EXPECTED_BEHAVIOR' : 'HARNESS_ERROR',
 })
 
