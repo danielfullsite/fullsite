@@ -94,7 +94,23 @@ Un escenario es **CERTIFIED** solo cuando las 3 columnas están marcadas: Impl �
 
 | Impl | Test | Cert | Pendiente |
 |---|---|---|---|
-| ✓ | ✗ | ✗ | Test requiere seed de 30 órdenes en IDB; ejecutar manualmente primero |
+| ✓ (desde 2026-09-14) | parcial | ✗ | Test requiere seed de 30 órdenes en IDB; ejecutar manualmente primero |
+
+> **Este «Impl ✓» estuvo mal marcado hasta el 2026-09-14.** El código del contrato
+> —`usePosOffline`, que escucha `online` y revisa cada 30 s— existía y estaba bien
+> escrito, pero **no lo importaba ni un archivo**: era código muerto. Lo único que
+> drenaba la cola era teclear el PIN (`app/pos/layout.tsx`).
+>
+> Medido en campo ese día: se abrió turno con internet, la pantalla dijo «Turno
+> activo», la subida quedó en la cola con `reintentos: 0` y `error: ''` —nunca
+> intentada— y el turno se perdió; `/pos/mesas` decía «No hay turno abierto»
+> mientras `/pos/turno` lo daba por activo.
+>
+> La marca se puso porque el código EXISTÍA. Nadie comprobó que estuviera
+> CONECTADO, y una matriz de pruebas no distingue esas dos cosas. Por eso el
+> arreglo trae un guardián que falla si el hook vuelve a quedarse sin montar:
+> `la-cola-se-drena-sola.test.ts`. La columna Test queda en **parcial** — el
+> guardián comprueba el cableado, no la subida real de 30 órdenes.
 
 ---
 

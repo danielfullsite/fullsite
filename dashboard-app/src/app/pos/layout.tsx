@@ -18,6 +18,7 @@ import { localNetworkFetch } from '@/lib/local-network-fetch'
 import { decidirHuella, modoDeAutoridadRecordado } from '@/lib/modo-autoridad'
 import { provisionManagerCredential, verifyPinOffline, estadoCredencialesOffline } from '@/lib/pos-manager-auth'
 import { clasificarRespuestaDePin } from '@/lib/veredicto-de-la-autoridad'
+import { usePosOffline } from '@/hooks/usePosOffline'
 import { POSLockContext } from './pos-lock-context'
 import { requiereCaja } from '@/lib/pedro-cliente'
 import { actorDeCaja, cerrarActorDeCaja, ingresarConPinEnCaja } from '@/lib/pedro-actor'
@@ -122,6 +123,24 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
   const [clientName, setClientName] = useState('')
   const [fingerprintMsg, setFingerprintMsg] = useState('')
   const [sessionError, setSessionError] = useState('')
+
+  // EL DRENADO DE LA COLA VIVE AQUÍ PORQUE AQUÍ NADIE LO APAGA.
+  //
+  // `usePosOffline` ya escuchaba `online`, ya revisaba cada 30 s y ya sólo salía
+  // a la red cuando había algo encolado. Estaba bien escrito y no lo montaba
+  // NADIE — cero importaciones en todo el repo. Lo único que drenaba de verdad
+  // era el login con PIN, unas líneas más abajo.
+  //
+  // Medido en AMALAY el 2026-09-14: se abrió turno con internet, la pantalla dijo
+  // «Turno activo», la subida quedó encolada con `reintentos: 0` y `error: ''`
+  // —nunca intentada— y el turno se perdió. `TEST-MATRIX.md` §T-03 ya escribía el
+  // contrato («al reconectar: window.online → syncAll()») y lo daba por
+  // implementado: el código existía, sólo que desconectado.
+  //
+  // Va en el layout y no en una pantalla porque el layout está montado mientras
+  // el POS esté abierto. En una pantalla suelta dejaría de drenar en cuanto el
+  // cajero navegue a otra, que es justo cuando hay cosas encoladas.
+  usePosOffline()
 
   // Register service worker + start background queues on mount
   const swRegistered = useRef(false)
