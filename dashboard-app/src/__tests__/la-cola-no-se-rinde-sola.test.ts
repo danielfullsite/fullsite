@@ -131,6 +131,10 @@ describe('el cierre no cuadra sobre una cola a medio subir', () => {
     // La fila vive en lib/pos-cierre-fila.ts (2026-09-10); el wizard le pasa `colaPendiente`.
     const fila = readFileSync(join(process.cwd(), 'src/lib/pos-cierre-fila.ts'), 'utf8')
     expect(fila).toMatch(/cola_pendiente_al_cerrar: d\.colaPendiente/)
-    expect(wizard).toMatch(/colaPendiente, notas: notas \|\| null, closedBy: manager/)
+    // Lo que esta prueba protege es que `colaPendiente` LLEGUE a la fila. Antes
+    // se anclaba además al texto vecino (`notas: notas || null`), que no es parte
+    // del contrato: el 2026-09-14 las notas pasaron a llevar también la marca de
+    // «cuentas no verificadas» y esto se puso rojo sin que nada se hubiera roto.
+    expect(wizard).toMatch(/colaPendiente, notas: \w+, closedBy: manager/)
   })
 })
