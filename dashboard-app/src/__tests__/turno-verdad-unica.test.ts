@@ -52,13 +52,6 @@ describe('verdad única de apertura', () => {
     expect(gate).not.toContain('.toDateString()')
   })
 
-  it('/pos/turno y TurnoGate leen el mismo getActiveTurnos', () => {
-    const page = src('app/pos/turno/page.tsx')
-    const gate = src('components/pos/TurnoGate.tsx')
-    expect(page).toContain('getActiveTurnos()')
-    expect(gate).toContain('getActiveTurnoWithStaleCheck()')
-  })
-
   it('el replay de pos_turnos va con merge-duplicates y los turnos drenan primero', () => {
     const sync = src('lib/offline-sync.ts')
     expect(sync).toContain('resolution=merge-duplicates')

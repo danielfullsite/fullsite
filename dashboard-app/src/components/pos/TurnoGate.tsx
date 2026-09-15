@@ -33,7 +33,6 @@ interface ActiveTurno {
   fondo_inicial: number
   opened_by: string
   opened_at: string
-  sincronizado?: boolean
 }
 
 // Paths that should NOT be blocked by turno gate
@@ -141,14 +140,13 @@ export default function TurnoGate({ staff, children }: TurnoGateProps) {
       const result = await getActiveTurnoWithStaleCheck()
       setActiveCount(result.activeCount)
       if (result.turno) {
-        const pendienteLocal = result.turno.sincronizado === false
         // Online + turno found → cache it for offline use
         try {
           localStorage.setItem('pos_cached_turno', JSON.stringify(result.turno))
-          if (!pendienteLocal) localStorage.setItem('pos_last_turno_sync', new Date().toISOString())
+          localStorage.setItem('pos_last_turno_sync', new Date().toISOString())
         } catch {}
-        setIsOfflineMode(pendienteLocal)
-        setOfflineSince(pendienteLocal ? prev => prev || new Date().toISOString() : null)
+        setIsOfflineMode(false)
+        setOfflineSince(null)
         if (result.activeCount > 1) {
           setTurno(result.turno)
           setStatus('conflict')
