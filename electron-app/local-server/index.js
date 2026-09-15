@@ -551,6 +551,12 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority 
         // hasta que alguien intenta entrar con su PIN en plena comida.
         authority:        { ready: !!actorAuthority, reason: authorityReason },
         catalog:          { ready: !!catalogStore, reason: catalogReason },
+        // TELEMETRIA: se publica el estado para que el apagón se pueda VER.
+        // `local_server_heartbeats` llevaba 0 filas desde que existe y nadie lo
+        // supo, porque una flota que no reporta se ve igual que una flota sana.
+        // El motivo ya se decía en un console.warn dentro de Electron, o sea en
+        // ningún lado. Aquí lo leen el certificador y el panel de flota.
+        telemetria:       heartbeat.estado(),
         staged_update:    updater.getStagedUpdate(),
         update_channel:   updater.getChannel(),
         stations:         Object.keys(printer.getStations()),
