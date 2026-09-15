@@ -10,7 +10,7 @@
 //
 //   node cert/certificar-g01.mjs
 
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, readdirSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { normalizar, comparar, MUTACIONES, CATEGORIAS } from '../manifiesto-de-efectos.mjs'
 import { G01, OBJETIVO, ENTORNO, TOTAL_PASOS } from './objetivo-g01.mjs'
@@ -35,7 +35,7 @@ console.log(`${G01.id} · ${G01.nombre}`)
 console.log(linea('═'))
 console.log(`run_id   ${runId}`)
 console.log(`objetivo ${OBJETIVO.categoria} / ${OBJETIVO.producto} / ${OBJETIVO.grupo} → ${OBJETIVO.opcion}`)
-console.log(`blanco   ${ENTORNO.baseUrl}  ·  bridge ${ENTORNO.bridge}  ·  cdp ${ENTORNO.cdp}`)
+console.log(`blanco   ${ENTORNO.baseUrl}  ·  bridge ${ENTORNO.bridge}`)
 
 /* ═══════════════════════════════════════════════════════════════════════════
    L0 · SELLO Y PRECONDICIONES
@@ -45,6 +45,15 @@ const l0 = await preflight()
 sobre.identity = l0.sello
 sobre.preconditions_satisfied = l0.satisfechas
 sobre.correlation.pedro_seq_inicial = l0.seqInicial
+
+/* ── EL CDP QUE SE USÓ, NO EL QUE ESTABA ESCRITO ─────────────────────────────
+   El encabezado imprimía `ENTORNO.cdp` —el default 9222— antes de que L0
+   detectara nada. En la corrida cert-g01-20260915T203020Z el acta decía 9222 y
+   la corrida habló con 50815. Un dato falso en un acta de certificación vale
+   menos que ninguno: quien la lea después no puede saber qué terminal se midió.
+   Se imprime y se guarda lo que L0 resolvió, y sólo después de resolverlo. */
+sobre.cdp = { url: l0.cdpUrl ?? null, origen: l0.cdpUrl ? 'detectado en L0' : 'no disponible' }
+console.log(`cdp      ${l0.cdpUrl ?? '(ningún navegador accesible)'}`)
 
 for (const g of l0.gates) {
   const clase = clasificar({ fase: 'preflight', ok: g.ok, causa: g.causa })
@@ -248,22 +257,6 @@ if (!l0.sandbox.permitido) {
   }
 }
 
-/* ── La evidencia visual, contada sobre lo que existe en el disco ──────────── */
-{
-  const { existsSync, readdirSync } = await import('node:fs')
-  const archivos = existsSync(dir) ? readdirSync(dir) : []
-  const capturas = archivos.filter(f => f.endsWith('.png'))
-  const trazas = archivos.filter(f => f.endsWith('.zip'))
-  sobre.visual_evidence = { capturas: capturas.length, trazas: trazas.length,
-                            archivos: [...capturas, ...trazas].slice(0, 40) }
-  console.log(`\nevidencia visual: ${capturas.length} capturas · ${trazas.length} trazas`)
-  emitir({
-    id: 'evidencia-visual', fase: 'evidencia', descripcion: 'capturas suficientes para auditar',
-    esperado: '≥ 2 capturas', observado: `${capturas.length} capturas`,
-    clase: capturas.length >= 2 ? 'EXPECTED_BEHAVIOR' : 'HARNESS_ERROR',
-  })
-}
-
 await cerrar()
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -305,6 +298,24 @@ async function correr(etiqueta, extra = {}) {
   }
 }
 
+/**
+ * Cuenta la evidencia visual que quedó en el directorio de la corrida.
+ * Exportada aparte para que su regresión se pueda probar sin navegador.
+ */
+function contarEvidencia() {
+  const archivos = existsSync(dir) ? readdirSync(dir) : []
+  const capturas = archivos.filter(f => f.toLowerCase().endsWith('.png'))
+  const trazas = archivos.filter(f => f.toLowerCase().endsWith('.zip'))
+  sobre.visual_evidence = { capturas: capturas.length, trazas: trazas.length,
+                            archivos: [...capturas, ...trazas].sort().slice(0, 40) }
+  console.log(`\nevidencia visual: ${capturas.length} capturas · ${trazas.length} trazas`)
+  emitir({
+    id: 'evidencia-visual', fase: 'evidencia', descripcion: 'capturas suficientes para auditar',
+    esperado: '≥ 2 capturas', observado: `${capturas.length} capturas`,
+    clase: capturas.length >= 2 ? 'EXPECTED_BEHAVIOR' : 'HARNESS_ERROR',
+  })
+}
+
 /** Enlaza los ids hijos al `run_id`. Aparecen tarde; se buscan donde caen. */
 function enlazarCorrelacion(manifiesto) {
   const buscar = (campo) => {
@@ -322,6 +333,20 @@ function enlazarCorrelacion(manifiesto) {
 }
 
 async function cerrar() {
+  /* ── LA EVIDENCIA SE CUENTA SIEMPRE, PASE LO QUE PASE ────────────────────
+     Estaba al final del guion feliz, después de la compuerta que corta cuando
+     el driver no ejecuta. Resultado medido en la corrida
+     cert-g01-20260915T203020Z: 12 capturas y 2 trazas EN DISCO, y el sobre
+     diciendo `capturas: 0`.
+
+     Una corrida que falla temprano es justo cuando la evidencia hace más falta
+     —es lo que se mira para saber por qué—, así que el conteo vive aquí
+     dentro, en el único camino por el que salen todas las corridas. Y se cuenta
+     sobre los archivos que EXISTEN, no sobre cuántos se intentó escribir: un
+     `screenshot()` que falló en silencio dejaría el contador alto y el
+     directorio vacío. */
+  contarEvidencia()
+
   sobre.finished_at = new Date().toISOString()
   sobre.summary = resumirClases(clases)
 
