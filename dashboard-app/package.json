@@ -13,7 +13,10 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "seed": "npx tsx seeds/run.ts"
+    "seed": "npx tsx seeds/run.ts",
+    "certify:g01": "node e2e/paridad/cert/certificar-g01.mjs",
+    "certify:selftest": "node e2e/paridad/cert/probar-captura-cero.mjs && node e2e/paridad/probar-el-comparador.mjs && node e2e/paridad/cert/probar-clasificacion.mjs",
+    "lab:reset:g01": "node e2e/paridad/cert/lab-reset.mjs"
   },
   "dependencies": {
     "@capacitor/cli": "^8.4.0",
