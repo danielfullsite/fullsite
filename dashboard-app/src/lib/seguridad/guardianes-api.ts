@@ -26,6 +26,7 @@ export const GUARDIANES_DE_SESION = [
   'getSessionUserId',
   'verifyShiftToken',
   'verifyKitchenToken',
+  'evaluarTokenCocina', // envuelve a verifyKitchenToken con el rollout off → grace → strict
   'isPlatformAdmin',
   'requirePlatformAdmin',
   'isAuthorized', // /api/backup — Bearer contra Supabase Auth + allowlist de correos
