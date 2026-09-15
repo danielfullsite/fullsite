@@ -22,21 +22,28 @@ const T = (nombre, ok, detalle = '') => {
  * Una `page` de mentira. Cuenta cuántas veces se evaluó algo que toca
  * IndexedDB: si la guarda funciona, con un tenant ajeno ese contador es 0.
  */
-function paginaFalsa({ tenant, ordenesTras = 0, clavesMesa = ['pos_draft_1'], quedanTras = [] }) {
+function paginaFalsa({ tenant, ordenesTras = 0, clavesMesa = ['pos_draft_1', 'pos_cuenta_fullsite-cert-lab-v2_mesa:1'], quedanTras = [] }) {
   const registro = { evaluaciones: 0, tocoIndexedDB: 0, navego: 0, tocoLocalStorage: 0 }
   return {
     registro,
     async evaluate(fn) {
       registro.evaluaciones++
       const fuente = String(fn)
-      if (fuente.includes('fullsite_client_id')) {
+      // Se distingue por lo que la función HACE, no por palabras que puedan
+      // aparecer en sus comentarios: `String(fn)` los incluye, y anclar el
+      // matcher a un nombre mencionado de paso ya rompió esta prueba una vez.
+      if (fuente.includes('getItem(')) {
         return { tenant: tenant === null ? null : String(tenant).toLowerCase().trim(), origen: 'https://app.fullsite.mx' }
       }
       // El reset limpia localStorage ANTES que IndexedDB: es la fuente real de
       // lo que se ve (pos_order_<mesa> / pos_draft_<mesa>).
-      if (fuente.includes('pos_(order|draft)')) {
+      if (fuente.includes('removeItem')) {          // el borrado
         registro.tocoLocalStorage++
-        return registro.tocoLocalStorage === 1 ? clavesMesa : quedanTras
+        return clavesMesa
+      }
+      if (fuente.includes('Object.keys(localStorage)')) {   // la relectura
+        registro.tocoLocalStorage++
+        return quedanTras
       }
       if (fuente.includes('indexedDB')) {
         registro.tocoIndexedDB++
@@ -90,6 +97,8 @@ console.log('\n2 · en el laboratorio sí limpia, y lo verifica')
   T('tocó la base dos veces: limpiar y VERIFICAR', p.registro.tocoIndexedDB === 2, String(p.registro.tocoIndexedDB))
   T('limpió localStorage y volvió a leerlo', p.registro.tocoLocalStorage === 2, String(p.registro.tocoLocalStorage))
   T('reporta qué claves de mesa borró', r.claves_borradas?.includes('pos_draft_1'), JSON.stringify(r.claves_borradas))
+  T('incluye la cuenta de caja, que era el acumulador real',
+    r.claves_borradas?.some(k => k.startsWith('pos_cuenta_')), JSON.stringify(r.claves_borradas))
   T('recargó la página para releer el estado', p.registro.navego === 1)
   T('reporta qué stores limpió', r.borrados?.stores?.includes('orders'), JSON.stringify(r.borrados))
   T('el tenant queda en la evidencia', r.tenant === TENANT_LABORATORIO)

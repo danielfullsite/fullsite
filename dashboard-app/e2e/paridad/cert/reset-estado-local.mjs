@@ -66,12 +66,25 @@ export async function resetEstadoLocal(page, { baseUrl, mesa }) {
     const borradas = []
     try {
       for (const k of Object.keys(localStorage)) {
-        // `pos_order_*` y `pos_draft_*` son el estado por mesa. `pos_turno_id` y
-        // `pos_mesero` NO se tocan: el turno es fixture y la sesión es
-        // precondición, no suciedad de la corrida.
-        if (/^pos_(order|draft)_/.test(k)) { localStorage.removeItem(k); borradas.push(k) }
+        // Las TRES familias que una corrida ensucia:
+        //   pos_order_<mesa>          caché de la orden        (page.tsx:2326)
+        //   pos_draft_<mesa>          borrador sin guardar     (page.tsx:2265)
+        //   pos_cuenta_<tenant>_mesa: cuenta de caja por mesa  (page.tsx:2413)
+        //   fullsite_event_queue      cola de eventos          (lib/events.ts:17)
+        //
+        // La tercera es la que faltaba. Con las dos primeras borradas, la mesa
+        // seguía abriendo en $700 y $800: el acumulador real era la cuenta de
+        // caja, y su nombre no empieza por `pos_order_` ni `pos_draft_`.
+        //
+        // NO se tocan: pos_turno_id, pos_shift_token, pos_mesero,
+        // fullsite_client_id, pos_plano_*, pos_meseros_cache — turno, sesión,
+        // identidad y catálogo son fixture o precondición, no suciedad.
+        if (/^pos_(order|draft|cuenta)_/.test(k) || k === 'fullsite_event_queue') {
+          localStorage.removeItem(k); borradas.push(k)
+        }
       }
     } catch { /* almacenamiento bloqueado */ }
+    try { sessionStorage.removeItem('pos_cuenta_target') } catch { /* bloqueado */ }
     return borradas
   }).catch(() => [])
 
@@ -127,7 +140,10 @@ export async function resetEstadoLocal(page, { baseUrl, mesa }) {
   // invariante que importa —ticket vacío, 0 items, subtotal $0.00— sólo se puede
   // observar con la mesa abierta, y de eso se encarga el conductor en S2.
   const quedan = await page.evaluate(() => {
-    try { return Object.keys(localStorage).filter(k => /^pos_(order|draft)_/.test(k)) } catch { return null }
+    try {
+      return Object.keys(localStorage)
+        .filter(k => /^pos_(order|draft|cuenta)_/.test(k) || k === 'fullsite_event_queue')
+    } catch { return null }
   }).catch(() => null)
 
   const limpio = Array.isArray(quedan) && quedan.length === 0 && verificacion.ordenesLocales === 0
