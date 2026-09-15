@@ -48,7 +48,9 @@ export function nuevoSobre({ runId, journeyId = 'G01', nombre = '' }) {
     correlation: { run_id: runId, save_operation_id: null, order_id: null, turno_id: null,
                    pedro_seq_inicial: null, pedro_seq_final: null },
     steps: [],
-    oracles: {},
+    oracles: {},                // db / pedro / kds — los llena la fase SANDBOX
+    visual_evidence: { capturas: 0, trazas: 0, archivos: [] },
+    sandbox: { modo: null, tenant: null, writes: 0, violations: 0, detalle_violaciones: [] },
     parity: null,
     mutation: null,
     manifest_effects: null,
@@ -148,6 +150,41 @@ export function validar(sobre) {
   // V-11 · PASS exige los 6 pasos.
   if (sobre.verdict === 'PASS' && sobre.driver?.steps_ok !== sobre.driver?.steps_total) {
     F('V-11', `PASS exige todos los pasos; llegó ${sobre.driver?.steps_ok}/${sobre.driver?.steps_total}`)
+  }
+
+  /* ── V-12 · LOS TRES ORÁCULOS ────────────────────────────────────────────
+     El manifiesto dice qué INTENTÓ el POS; un oráculo dice qué QUEDÓ. Sin los
+     tres, un PASS sólo afirma que el journey emitió las peticiones correctas —
+     que es precisamente lo que el arnés viejo ya sabía hacer y no alcanzaba.
+
+     `null`, `NOT_OBSERVED` y «no aplicable» valen igual: no se miró. */
+  const ORACULOS = ['db', 'pedro', 'kds']
+  if (sobre.verdict === 'PASS') {
+    for (const o of ORACULOS) {
+      const r = sobre.oracles?.[o]
+      if (!r) { F('V-12', `PASS sin el oráculo «${o}»`); continue }
+      if (r.classification !== 'EXPECTED_BEHAVIOR') {
+        F('V-12', `el oráculo «${o}» no confirmó: ${r.classification}${r.motivo ? ` — ${r.motivo}` : ''}`)
+      }
+    }
+  }
+
+  /* ── V-13 · EVIDENCIA VISUAL ─────────────────────────────────────────────
+     Un PASS que nadie puede volver a mirar no se puede auditar después. El
+     mínimo es antes y después del journey; el arnés captura por paso. Cero
+     capturas nunca es un aprobado. */
+  if (sobre.verdict === 'PASS') {
+    const n = sobre.visual_evidence?.capturas ?? 0
+    if (n < 2) F('V-13', `PASS exige al menos 2 capturas (antes/después); llegó ${n}`)
+  }
+
+  /* ── V-14 · NI UNA ESCRITURA FUERA DEL LABORATORIO ───────────────────────
+     El guardia de SANDBOX anota cada intento que bloqueó. Que haya bloqueado
+     bien no vuelve inocuo el intento: significa que el journey trató de tocar
+     un tenant que no le toca, y eso se investiga antes de certificar nada. */
+  const violaciones = sobre.sandbox?.violations ?? 0
+  if (sobre.verdict === 'PASS' && violaciones > 0) {
+    F('V-14', `el guardia bloqueó ${violaciones} escritura(s) fuera del laboratorio`)
   }
   return faltas
 }

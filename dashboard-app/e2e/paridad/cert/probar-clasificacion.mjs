@@ -71,6 +71,18 @@ const sobreBueno = () => {
   s.identity = { app_git_sha: 'abc123', app_clean: true, coherente: true }
   s.driver = { executed: true, steps_total: 6, steps_ok: 6 }
   s.mutation = { total: 5, detected: 5, no_aplicables: [], detalle: [] }
+  // Desde PR2 un PASS también exige los tres oráculos (V-12), evidencia visual
+  // (V-13) y cero bloqueos del guardia (V-14). Un sobre «bien formado» que no
+  // los traiga dejó de serlo: el contrato creció a propósito, y este fixture
+  // lo sigue. Las pruebas de esas tres reglas viven en
+  // `probar-oraculos-y-evidencia.mjs`.
+  s.oracles = {
+    db:    { classification: 'EXPECTED_BEHAVIOR', motivo: null, detalle: {} },
+    pedro: { classification: 'EXPECTED_BEHAVIOR', motivo: null, detalle: {} },
+    kds:   { classification: 'EXPECTED_BEHAVIOR', motivo: null, detalle: {} },
+  }
+  s.visual_evidence = { capturas: 6, trazas: 1, archivos: [] }
+  s.sandbox = { modo: 'SANDBOX', tenant: 'fullsite-cert-lab-v2', writes: 3, violations: 0, detalle_violaciones: [] }
   s.summary = resumir(['EXPECTED_BEHAVIOR'])
   observar(s, { id: 'x', fase: 'driver', descripcion: 'algo', esperado: 1, observado: 1, clase: 'EXPECTED_BEHAVIOR' })
   return s

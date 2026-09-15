@@ -165,6 +165,105 @@ if (noAplicables.length) {
   console.log(`*** ${noAplicables.join(', ')} NO APLICABLES. Una mutación no aplicable no es verde.`)
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   FASE 3 · SANDBOX — la corrida que SÍ deja rastro, y los tres oráculos
+   ───────────────────────────────────────────────────────────────────────────
+   Va al final a propósito. La paridad y las mutaciones se miden en
+   CAPTURE_ONLY, donde el arnés puede correr mil veces sin mover nada; sólo
+   cuando esas dos compuertas ya hablaron se deja salir una escritura real.
+
+   Y es UNA corrida, no dos: dos corridas reales dejarían dos órdenes con ids
+   distintos, y la comparación de paridad se volvería ruido. Paridad mide
+   intenciones; los oráculos miden efectos. Mezclarlas rompe las dos.
+   ═══════════════════════════════════════════════════════════════════════════ */
+console.log(`\n── corrida SANDBOX (escribe de verdad, sólo en el laboratorio) ──`)
+
+if (!l0.sandbox.permitido) {
+  // Sin llave no hay corrida real. Los tres oráculos quedan ciegos, y eso se
+  // dice — no se rellena con el manifiesto de CAPTURE_ONLY, que es la
+  // tentación exacta que convierte un arnés en un sello de goma.
+  console.log(`   ✗ SANDBOX no autorizado: ${l0.sandbox.motivo}`)
+  sobre.sandbox = { modo: 'CAPTURE_ONLY', tenant: null, writes: 0, violations: 0,
+                    detalle_violaciones: [], motivo: l0.sandbox.motivo }
+  for (const o of ['db', 'pedro', 'kds']) {
+    sobre.oracles[o] = { classification: 'NOT_OBSERVED',
+      motivo: `sin corrida SANDBOX: ${l0.sandbox.motivo}`, detalle: null }
+    emitir({ id: `oraculo-${o}`, fase: 'oraculo', descripcion: `oráculo ${o}`,
+      esperado: 'efecto real observado', observado: 'no hubo corrida que observar',
+      clase: 'NOT_OBSERVED' })
+  }
+} else {
+  // El ancla temporal se toma ANTES de la corrida: sin ella, el DB oracle no
+  // puede distinguir la orden de este journey de una que ya estaba.
+  const desde = new Date(Date.now() - 5000).toISOString()
+  const S = await correr('SANDBOX', {
+    modo: 'SANDBOX',
+    tenantPermitido: l0.sandbox.tenant,
+    bridgeTenant: l0.sandbox.bridgeTenant,
+  })
+
+  const violaciones = S.manifiesto?.sandbox_violations ?? []
+  const escrituras = S.manifiesto?.sandbox_writes ?? []
+  sobre.sandbox = {
+    modo: S.modoEfectivo?.efectivo ?? 'desconocido',
+    tenant: l0.sandbox.tenant,
+    writes: escrituras.length,
+    violations: violaciones.length,
+    detalle_violaciones: violaciones.slice(0, 10),
+  }
+  console.log(`   modo efectivo: ${sobre.sandbox.modo} · escrituras reales: ${escrituras.length}`
+    + ` · bloqueadas por el guardia: ${violaciones.length}`)
+  for (const v of violaciones.slice(0, 5)) console.log(`   ✗ BLOQUEADA ${v.metodo} ${v.url} → ${v.motivo}`)
+
+  emitir({
+    id: 'guardia-sandbox', fase: 'sandbox', descripcion: 'ninguna escritura fuera del laboratorio',
+    esperado: '0 bloqueos', observado: `${violaciones.length} bloqueos`,
+    clase: violaciones.length === 0 ? 'EXPECTED_BEHAVIOR' : 'HARNESS_ERROR',
+  })
+
+  // ── Los tres oráculos ────────────────────────────────────────────────────
+  const { abrirSesion, dbOracle, pedroOracle, kdsOracle } = await import('./oraculos.mjs')
+  const ses = await abrirSesion({ baseUrl: ENTORNO.baseUrl, tenant: l0.sandbox.tenant, pin: ENTORNO.pin })
+  if (ses.error) console.log(`   ✗ sin sesión para los oráculos: ${ses.error}`)
+
+  const db = await dbOracle({ baseUrl: ENTORNO.baseUrl, token: ses.token, objetivo: OBJETIVO,
+                              desde, turnoId: sobre.correlation.turno_id })
+  const pedro = await pedroOracle({ bridge: ENTORNO.bridge, seqInicial: l0.seqInicial,
+                                    tenantEsperado: l0.sandbox.tenant })
+  const kds = await kdsOracle({ orden: db.orden ?? null, objetivo: OBJETIVO })
+
+  // La correlación se completa con lo que el oráculo encontró: los ids hijos
+  // nacen al guardar, no antes.
+  if (db.correlacion) Object.assign(sobre.correlation, db.correlacion)
+  if (pedro.correlacion) Object.assign(sobre.correlation, pedro.correlacion)
+
+  for (const [nombre, r] of [['db', db], ['pedro', pedro], ['kds', kds]]) {
+    sobre.oracles[nombre] = { classification: r.clase, motivo: r.motivo, detalle: r.detalle }
+    console.log(`   ${r.ok ? '·' : '✗'} oráculo ${nombre.padEnd(5)} ${r.clase}${r.motivo ? ` → ${String(r.motivo).slice(0, 120)}` : ''}`)
+    emitir({
+      id: `oraculo-${nombre}`, fase: 'oraculo', descripcion: `oráculo ${nombre}`,
+      esperado: 'el efecto quedó y es el del journey',
+      observado: r.motivo ?? 'confirmado', clase: r.clase,
+    })
+  }
+}
+
+/* ── La evidencia visual, contada sobre lo que existe en el disco ──────────── */
+{
+  const { existsSync, readdirSync } = await import('node:fs')
+  const archivos = existsSync(dir) ? readdirSync(dir) : []
+  const capturas = archivos.filter(f => f.endsWith('.png'))
+  const trazas = archivos.filter(f => f.endsWith('.zip'))
+  sobre.visual_evidence = { capturas: capturas.length, trazas: trazas.length,
+                            archivos: [...capturas, ...trazas].slice(0, 40) }
+  console.log(`\nevidencia visual: ${capturas.length} capturas · ${trazas.length} trazas`)
+  emitir({
+    id: 'evidencia-visual', fase: 'evidencia', descripcion: 'capturas suficientes para auditar',
+    esperado: '≥ 2 capturas', observado: `${capturas.length} capturas`,
+    clase: capturas.length >= 2 ? 'EXPECTED_BEHAVIOR' : 'HARNESS_ERROR',
+  })
+}
+
 await cerrar()
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -181,10 +280,14 @@ await cerrar()
  * no producir. Cargado aquí, una dependencia ausente es una observación
  * ENVIRONMENT_ERROR con su sobre y su reporte, como cualquier otro fallo.
  */
-async function correr(etiqueta) {
+async function correr(etiqueta, extra = {}) {
   try {
     const { conducirV1 } = await import('../conductor-v1.mjs')
-    const r = await conducirV1(G01, { evidencia: dir, corridaId: etiqueta, objetivo: OBJETIVO })
+    const r = await conducirV1(G01, {
+      evidencia: dir, corridaId: etiqueta, objetivo: OBJETIVO,
+      ...(l0.cdpUrl ? { cdp: l0.cdpUrl } : {}),
+      ...extra,
+    })
     for (const p of r.pasos) {
       console.log(`   ${p.ok ? '·' : '✗'} ${p.n} ${p.etiqueta}${p.ok ? (p.rotulo ? `: «${String(p.rotulo).slice(0, 40)}»` : '') : `  → ${p.motivo}`}`)
     }
