@@ -1,0 +1,31 @@
+name: Guardia — vistas que se saltan el RLS
+
+# POR QUE UN WORKFLOW APARTE Y NO UN PASO EN "Agentes — Pruebas"
+# Ese workflow es deliberadamente SIN RED: corre en cada push y su costo son
+# segundos. Este necesita hablar con produccion, asi que no cabe ahi sin volverlo
+# lento y dependiente de secretos en cada PR de cualquiera.
+#
+# POR QUE CON HORARIO Y NO SOLO A MANO
+# La fuga que motiva esto (`ocm_daily`, 2026-09-09) no entro por un PR: entro por una
+# migracion aplicada directo a la base, que nunca existio como archivo. Un guardian
+# que solo corre cuando alguien se acuerda no habria visto nada — igual que no lo vio
+# el guardian de archivos, que si existia y si funcionaba.
+#
+# Corre cada 6 horas: la ventana real de exposicion fue de ~6 dias.
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+jobs:
+  vistas:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with: { python-version: '3.11' }
+      - run: pip install requests
+      - run: python .github/scripts/guardia_vistas_expuestas.py
