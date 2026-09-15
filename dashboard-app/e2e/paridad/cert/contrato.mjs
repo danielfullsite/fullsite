@@ -186,6 +186,31 @@ export function validar(sobre) {
   if (sobre.verdict === 'PASS' && violaciones > 0) {
     F('V-14', `el guardia bloqueó ${violaciones} escritura(s) fuera del laboratorio`)
   }
+
+  /* ── V-15 · EL RESET ENTRE CORRIDAS ──────────────────────────────────────
+     Dos corridas que no parten del mismo estado no miden determinismo. Medido
+     en cert-g01-20260915T205601Z: A terminó en $100 y B llegó a $200 porque
+     arrancó donde A la dejó. Un «zero delta» sobre eso no dice nada. */
+  if (sobre.verdict === 'PASS' && sobre.capture?.reset_verified !== true) {
+    F('V-15', `PASS exige reset verificado entre corridas; llegó ${sobre.capture?.reset_verified}`)
+  }
+
+  /* ── V-16 · EL ALCANCE DE LA PARIDAD SE DECLARA ──────────────────────────
+     La paridad cubre S1-S5 en CAPTURE_ONLY y NADA MÁS. S6 se certifica en la
+     fase SANDBOX contra oráculos reales. Un acta que no diga su alcance invita
+     a leer «zero delta» como si cubriera el journey entero. */
+  if (sobre.verdict === 'PASS' && sobre.parity?.scope !== 'S1-S5_CAPTURE_ONLY') {
+    F('V-16', `PASS exige parity.scope = «S1-S5_CAPTURE_ONLY»; llegó «${sobre.parity?.scope}»`)
+  }
+
+  /* ── V-17 · LOS SEIS PASOS SE EXIGEN EN SANDBOX ──────────────────────────
+     Es donde S6 puede ejecutarse: las escrituras llegan a la Caja y la cuenta
+     se confirma. En CAPTURE_ONLY exigir 6/6 sería pedirle al arnés que se
+     contradiga a sí mismo. */
+  if (sobre.verdict === 'PASS') {
+    const [ok, total] = String(sobre.sandbox_steps ?? '0/0').split('/').map(Number)
+    if (!total || ok !== total) F('V-17', `PASS exige los 6 pasos en SANDBOX; llegó ${sobre.sandbox_steps}`)
+  }
   return faltas
 }
 

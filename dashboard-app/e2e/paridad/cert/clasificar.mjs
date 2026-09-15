@@ -59,10 +59,10 @@ export function clasificar(h) {
   if (!ejecuto) {
     if (h.causa === 'entorno')      return 'ENVIRONMENT_ERROR'
     if (h.causa === 'precondicion') return 'PRECONDITION_FAILURE'
-    // Un control que EXISTE y que el producto deja deshabilitado no es un fallo
-    // del instrumento: es el producto diciendo que no se puede. Se distingue de
-    // «no lo encontré», que sí es del arnés.
-    if (h.causa === 'producto')     return 'PRODUCT_DEFECT'
+    // NO hay rama 'producto' aquí, y es deliberado. Llegó a haberla —«control
+    // presente y deshabilitado ⇒ PRODUCT_DEFECT»— y era falsa: un control
+    // deshabilitado puede ser una guarda legítima funcionando. Un paso que no se
+    // ejecutó nunca acusa al producto por sí solo.
     return 'HARNESS_ERROR'
   }
 

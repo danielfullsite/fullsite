@@ -83,6 +83,9 @@ const sobreBueno = () => {
   }
   s.visual_evidence = { capturas: 6, trazas: 1, archivos: [] }
   s.sandbox = { modo: 'SANDBOX', tenant: 'fullsite-cert-lab-v2', writes: 3, violations: 0, detalle_violaciones: [] }
+  s.capture = { a_steps: '5/5', b_steps: '5/5', reset_verified: true }
+  s.parity = { scope: 'S1-S5_CAPTURE_ONLY', diferencias: 0, detalle: [] }
+  s.sandbox_steps = '6/6'
   s.summary = resumir(['EXPECTED_BEHAVIOR'])
   observar(s, { id: 'x', fase: 'driver', descripcion: 'algo', esperado: 1, observado: 1, clase: 'EXPECTED_BEHAVIOR' })
   return s

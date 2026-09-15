@@ -73,12 +73,36 @@ if (!l0.satisfechas) {
 /* ═══════════════════════════════════════════════════════════════════════════
    FASE 2 · PARIDAD — dos corridas CAPTURE_ONLY
    ═══════════════════════════════════════════════════════════════════════════ */
-console.log(`\n── corrida A (CAPTURE_ONLY) ──`)
-const A = await correr('A')
-console.log(`\n── corrida B (CAPTURE_ONLY) ──`)
-const B = await correr('B')
+const PASOS_CAPTURA = 5   // S1-S5. Ver `hastaPaso` en el conductor.
 
-sobre.driver = { executed: A.corrio && B.corrio, steps_total: TOTAL_PASOS, steps_ok: A.pasosOk }
+console.log(`\n── corrida A (CAPTURE_ONLY · S1-S5, con reset previo) ──`)
+const A = await correr('A', { hastaPaso: PASOS_CAPTURA, resetAntes: true })
+console.log(`\n── corrida B (CAPTURE_ONLY · S1-S5, con reset previo) ──`)
+const B = await correr('B', { hastaPaso: PASOS_CAPTURA, resetAntes: true })
+
+// ── LA PRUEBA DEL RESET ────────────────────────────────────────────────────
+// No basta con llamarlo: hay que DEMOSTRAR que B partió de cero. Si B empezó
+// donde A terminó, «zero delta» no mide determinismo sino acumulación.
+const resetOk = A.reset?.ok === true && B.reset?.ok === true
+const bPartioDeCero = (B.estadoInicial?.subtotal ?? null) === 0 || (B.estadoInicial?.subtotal ?? null) === null
+sobre.capture = {
+  a_steps: `${A.pasosOk}/${PASOS_CAPTURA}`,
+  b_steps: `${B.pasosOk}/${PASOS_CAPTURA}`,
+  reset_verified: resetOk && bPartioDeCero,
+  a_subtotal_final: A.estadoFinal?.subtotal ?? null,
+  b_subtotal_inicial: B.estadoInicial?.subtotal ?? null,
+  b_subtotal_final: B.estadoFinal?.subtotal ?? null,
+  reset_a: A.reset ?? null, reset_b: B.reset ?? null,
+}
+console.log(`\nRESET · A terminó en ${A.estadoFinal?.subtotal ?? '?'} · B empezó en ${B.estadoInicial?.subtotal ?? '?'}`
+  + ` · B terminó en ${B.estadoFinal?.subtotal ?? '?'}`)
+emitir({
+  id: 'reset-entre-corridas', fase: 'reset', descripcion: 'B parte del mismo estado inicial que A',
+  esperado: 'B empieza en 0', observado: `B empezó en ${B.estadoInicial?.subtotal ?? 'no medido'}`,
+  clase: sobre.capture.reset_verified ? 'EXPECTED_BEHAVIOR' : 'HARNESS_ERROR',
+})
+
+sobre.driver = { executed: A.corrio && B.corrio, steps_total: PASOS_CAPTURA, steps_ok: A.pasosOk }
 sobre.steps = A.pasos
 sobre.manifest_effects = Object.fromEntries(CATEGORIAS.map(c => [c, (A.manifiesto[c] ?? []).length]))
 enlazarCorrelacion(A.manifiesto)
@@ -114,7 +138,10 @@ if (!sobre.driver.executed) {
 const nA = normalizar(A.manifiesto)
 const nB = normalizar(B.manifiesto)
 const dif = comparar(nA, nB)
-sobre.parity = { diferencias: dif.length, detalle: dif.map(d => ({ categoria: d.categoria, motivo: d.motivo })) }
+// El ALCANCE se declara en el acta. S6 NO está cubierto por la paridad: se
+// certifica en la fase SANDBOX, contra oráculos reales.
+sobre.parity = { scope: 'S1-S5_CAPTURE_ONLY', diferencias: dif.length,
+                 detalle: dif.map(d => ({ categoria: d.categoria, motivo: d.motivo })) }
 console.log(`\n${linea()}\nV1 vs V1 → ${dif.length} diferencias`)
 for (const d of dif) console.log(`   ✗ ${d.categoria}: ${d.motivo}`)
 
@@ -205,11 +232,32 @@ if (!l0.sandbox.permitido) {
   // El ancla temporal se toma ANTES de la corrida: sin ella, el DB oracle no
   // puede distinguir la orden de este journey de una que ya estaba.
   const desde = new Date(Date.now() - 5000).toISOString()
+  // Estado limpio también aquí: la fase de efectos no debe heredar el borrador
+  // que dejó la paridad, o el DB oracle no sabría de qué corrida es la orden.
   const S = await correr('SANDBOX', {
     modo: 'SANDBOX',
     tenantPermitido: l0.sandbox.tenant,
     bridgeTenant: l0.sandbox.bridgeTenant,
+    resetAntes: true,
   })
+
+  /* ── AQUÍ SÍ SE EXIGEN LOS SEIS PASOS ──────────────────────────────────────
+     S6 sólo puede ejecutarse donde las escrituras llegan a la Caja, así que el
+     contador de pasos que vale para el veredicto es el de ESTA corrida, no el
+     de la paridad. El driver del sobre pasa a reflejarlo. */
+  sobre.sandbox_steps = `${S.pasosOk}/${TOTAL_PASOS}`
+  sobre.driver = { executed: S.corrio, steps_total: TOTAL_PASOS, steps_ok: S.pasosOk }
+  sobre.steps = S.pasos
+  for (const p of S.pasos) {
+    emitir({
+      id: `sandbox-paso-${p.n}`, fase: 'sandbox', descripcion: p.etiqueta,
+      esperado: 'el paso se ejecuta', observado: p.ok ? (p.rotulo ?? 'ok') : p.motivo,
+      clase: clasificar({ fase: 'driver', ok: p.ok, l0: l0.satisfechas, ejecuto: p.ok, causa: p.causa ?? undefined }),
+      evidencia: p.evidencia,
+    })
+    console.log(`   ${p.ok ? '·' : '✗'} S${p.n} ${p.etiqueta}${p.ok ? '' : `  → ${p.motivo}`}`)
+  }
+  if (S.reset && !S.reset.ok) console.log(`   ✗ reset previo a SANDBOX: ${S.reset.motivo}`)
 
   const violaciones = S.manifiesto?.sandbox_violations ?? []
   const escrituras = S.manifiesto?.sandbox_writes ?? []

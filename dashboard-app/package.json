@@ -15,7 +15,7 @@
     "test:e2e:ui": "playwright test --ui",
     "seed": "npx tsx seeds/run.ts",
     "certify:g01": "node e2e/paridad/cert/certificar-g01.mjs",
-    "certify:selftest": "node e2e/paridad/cert/probar-captura-cero.mjs && node e2e/paridad/probar-el-comparador.mjs && node e2e/paridad/cert/probar-clasificacion.mjs && node e2e/paridad/cert/probar-guardia-sandbox.mjs && node e2e/paridad/cert/probar-oraculos-y-evidencia.mjs && node e2e/paridad/cert/probar-acta-fiel.mjs && node e2e/paridad/cert/probar-selector-de-mesa.mjs && node e2e/paridad/cert/probar-selector-de-opcion.mjs",
+    "certify:selftest": "node e2e/paridad/cert/probar-captura-cero.mjs && node e2e/paridad/probar-el-comparador.mjs && node e2e/paridad/cert/probar-clasificacion.mjs && node e2e/paridad/cert/probar-guardia-sandbox.mjs && node e2e/paridad/cert/probar-oraculos-y-evidencia.mjs && node e2e/paridad/cert/probar-acta-fiel.mjs && node e2e/paridad/cert/probar-selector-de-mesa.mjs && node e2e/paridad/cert/probar-selector-de-opcion.mjs && node e2e/paridad/cert/probar-reset.mjs",
     "lab:reset:g01": "node e2e/paridad/cert/lab-reset.mjs"
   },
   "dependencies": {

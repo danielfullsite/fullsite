@@ -38,6 +38,9 @@ function sobreImpecable() {
   }
   s.visual_evidence = { capturas: 6, trazas: 1, archivos: [] }
   s.sandbox = { modo: 'SANDBOX', tenant: 'fullsite-cert-lab-v2', writes: 4, violations: 0, detalle_violaciones: [] }
+  s.capture = { a_steps: '5/5', b_steps: '5/5', reset_verified: true }
+  s.parity = { scope: 'S1-S5_CAPTURE_ONLY', diferencias: 0, detalle: [] }
+  s.sandbox_steps = '6/6'
   s.summary = { EXPECTED_BEHAVIOR: 1 }
   return s
 }
@@ -130,6 +133,41 @@ console.log('\n4 · no hay regresión en V-7, V-8, V-10 y V-11')
   const obs = sobreImpecable()
   obs.observations = [{ id: 'y', classification: 'NOT_OBSERVED' }]
   T('V-7 sigue rechazando PASS con una observación no conforme', reglas(obs).includes('V-7'))
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   5 · V-15/V-16/V-17 · LAS DOS FASES
+   ───────────────────────────────────────────────────────────────────────────
+   G01 se certifica en dos fases porque S6 no puede ejecutarse en CAPTURE_ONLY:
+   el POS en modo caja exige que la Caja confirme la cuenta, y la sonda impide
+   que la Caja se entere. Estas tres reglas impiden que esa separación se
+   convierta en un hueco.
+   ═══════════════════════════════════════════════════════════════════════════ */
+console.log('\n5 · V-15/V-16/V-17 · reset, alcance declarado y 6/6 en SANDBOX')
+{
+  const sinReset = sobreImpecable()
+  sinReset.capture = { a_steps: '5/5', b_steps: '5/5', reset_verified: false }
+  T('V-15 rechaza PASS sin reset verificado', reglas(sinReset).includes('V-15'))
+
+  const sinCapture = sobreImpecable(); delete sinCapture.capture
+  T('V-15 rechaza PASS sin la sección capture', reglas(sinCapture).includes('V-15'))
+
+  const scopeMalo = sobreImpecable()
+  scopeMalo.parity = { scope: 'S1-S6', diferencias: 0, detalle: [] }
+  T('V-16 rechaza un alcance que diga cubrir S6', reglas(scopeMalo).includes('V-16'))
+
+  const sinScope = sobreImpecable()
+  sinScope.parity = { diferencias: 0, detalle: [] }
+  T('V-16 rechaza una paridad sin alcance declarado', reglas(sinScope).includes('V-16'))
+
+  const cinco = sobreImpecable(); cinco.sandbox_steps = '5/6'
+  T('V-17 rechaza PASS con 5/6 en SANDBOX', reglas(cinco).includes('V-17'))
+
+  const ninguno = sobreImpecable(); delete ninguno.sandbox_steps
+  T('V-17 rechaza PASS sin pasos de SANDBOX', reglas(ninguno).includes('V-17'))
+
+  const seis = sobreImpecable(); seis.sandbox_steps = '6/6'
+  T('V-17 acepta 6/6', !reglas(seis).includes('V-17'))
 }
 
 console.log(`\n${'═'.repeat(68)}`)

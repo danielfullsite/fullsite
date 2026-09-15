@@ -29,6 +29,7 @@ import { join } from 'node:path'
 import { vacio } from './manifiesto-de-efectos.mjs'
 import { SONDA } from './sonda.mjs'
 import { OBJETIVO, ENTORNO, G01 as GUION_G01 } from './cert/objetivo-g01.mjs'
+import { resetEstadoLocal, estadoDeMesa } from './cert/reset-estado-local.mjs'
 
 // El PIN no tiene default. Un PIN adivinado produce un fallo de autenticación
 // que se lee como defecto del producto — el error que ya costó dos corridas.
@@ -53,6 +54,13 @@ export async function conducirV1(guion, opciones = {}) {
     modo            = 'CAPTURE_ONLY',
     tenantPermitido = null,     // en SANDBOX, el único tenant al que se deja escribir
     bridgeTenant    = null,     // tenant que el puente local acreditó (verificado en L0)
+    // ── EL ALCANCE DE LA CORRIDA ───────────────────────────────────────────
+    // La fase de paridad corre S1-S5: S6 no puede ejecutarse en CAPTURE_ONLY
+    // porque el POS en modo caja exige que la Caja confirme la cuenta, y la
+    // sonda impide que la Caja se entere. Exigir 6/6 ahí era pedirle al arnés
+    // que se contradijera a sí mismo.
+    hastaPaso       = null,     // null = todos
+    resetAntes      = false,    // deja la terminal en el estado inicial
   } = opciones
 
   const nav = await chromium.connectOverCDP(cdp)
@@ -365,7 +373,21 @@ export async function conducirV1(guion, opciones = {}) {
   const imputar = (paso, r) => {
     if (r.controlPresente === true) return 'arnes'
     if (r.hayMesas === true) return 'arnes'          // había mesas; no supo cuál
-    if (r.motivo === 'está deshabilitado') return 'producto'  // existe y el producto lo bloquea
+    /* ── UN CONTROL DESHABILITADO NO ES UN DEFECTO ──────────────────────────
+       Esta función llegó a devolver 'producto' ante cualquier control
+       deshabilitado. Es falso, y se vio en cert-g01-20260915T205601Z: «Enviar»
+       estaba gris por `cuentaCajaBloqueada` (pos/page.tsx:2596), la guarda que
+       impide operar sobre una cuenta que la Caja no confirmó. El producto
+       estaba protegiéndose exactamente como debe — y el acta lo acusó de
+       PRODUCT_DEFECT.
+
+       Y la cuenta estaba sin confirmar por culpa del arnés: en CAPTURE_ONLY las
+       escrituras a Pedro se anotan y no salen, así que la Caja nunca se entera.
+
+       Para acusar al producto hace falta evidencia de que la acción DEBÍA estar
+       permitida en ese estado y el producto contradijo el contrato. Un
+       deshabilitado, por sí solo, no es esa evidencia: se imputa al arnés, que
+       es quien no dejó al sistema en condiciones de ejecutar el paso. */
     return paso.causaSiFalta ?? 'arnes'
   }
 
@@ -389,7 +411,23 @@ export async function conducirV1(guion, opciones = {}) {
       ? 'precondicion' : 'arnes'
   )
 
+  // ── EL RESET, DENTRO DE LA MISMA CONEXIÓN ───────────────────────────────
+  // Va aquí y no fuera porque necesita la `page` viva; y va ANTES del primer
+  // paso porque dos corridas que no parten del mismo estado no miden
+  // determinismo: A terminó en $100 y B arrancó de ahí hasta $200.
+  let reset = null
+  if (resetAntes) {
+    reset = await resetEstadoLocal(page, { baseUrl, mesa })
+    if (!reset.ok) {
+      await nav.close().catch(() => {})
+      return { manifiesto, bitacora, pasos: [], corrio: false, pasosOk: 0,
+               pasosTotal: guion.pasos.length, traza: null, capturas: [], reset }
+    }
+  }
+  const estadoInicial = await estadoDeMesa(page, mesa)
+
   for (const paso of guion.pasos) {
+    if (hastaPaso !== null && paso.n > hastaPaso) break
     paso.causaSiFalta = paso.causaSiFalta ?? causaDe(paso.accion)
     switch (paso.accion) {
       // ── 1 · PIN / login — es un PASO, no un preámbulo ────────────────────
@@ -514,8 +552,11 @@ export async function conducirV1(guion, opciones = {}) {
   // directorio vacío, que es exactamente la evidencia que no se puede auditar.
   const capturas = pasos.map(p => p.evidencia).filter(Boolean)
 
-  return { manifiesto, bitacora, pasos, corrio, pasosOk, pasosTotal: guion.pasos.length,
-           traza, capturas, modoEfectivo }
+  const estadoFinal = await estadoDeMesa(page, mesa)
+
+  return { manifiesto, bitacora, pasos, corrio, pasosOk,
+           pasosTotal: hastaPaso ?? guion.pasos.length,
+           traza, capturas, modoEfectivo, reset, estadoInicial, estadoFinal }
 }
 
 /** Reexportado para que el guion viva en un solo lugar: `cert/objetivo-g01.mjs`. */
