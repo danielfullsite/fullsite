@@ -387,6 +387,11 @@ if (!l0.sandbox.permitido) {
      Aquí la base es la corrida SANDBOX contra sí misma: se muta su manifiesto y
      se exige que el comparador delate el cambio. Es la pregunta correcta
      —¿este comparador ve una diferencia real?— hecha sobre datos que existen. */
+  /* El manifiesto de SANDBOX va al acta. Sin él, un «no aplicable» de una
+     mutación no se puede diagnosticar después: hay que volver a correr el
+     journey entero sólo para ver qué se capturó. */
+  sobre.sandbox_manifest = Object.fromEntries(
+    CATEGORIAS.map(c => [c, (S.manifiesto?.[c] ?? []).slice(0, 10)]))
   const nS = normalizar(S.manifiesto)
   const detalleS = []
   const noAplicablesS = []
