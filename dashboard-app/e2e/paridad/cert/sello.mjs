@@ -21,7 +21,18 @@ import { detectarCDP } from './cdp.mjs'
 /** El único tenant al que SANDBOX puede escribir. No es configurable a propósito. */
 export const TENANT_LABORATORIO = 'fullsite-cert-lab-v2'
 
-const MIN_DISCO_MB = Number(process.env.CERT_MIN_DISCO_MB || 2048)
+/* ── EL GATE DE DISCO ────────────────────────────────────────────────────────
+   El default era 2 GiB, y eso aprobaba corridas que la regla del proyecto
+   reprueba: el gate oficial son 20 GiB, con 25 como objetivo operacional.
+   Un arnés con un umbral más flojo que la regla que dice vigilar no vigila —
+   da luz verde justo en el rango donde la corrida se vuelve poco fiable.
+
+   Configurable por entorno, pero el default es el gate oficial: quien quiera
+   correr con menos tiene que escribirlo, y entonces queda dicho en el acta. */
+const MIN_DISCO_GB = Number(process.env.CERT_MIN_DISCO_GB || 20)
+const MIN_DISCO_MB = Math.round(MIN_DISCO_GB * 1024)
+/** Objetivo operacional: no bloquea, pero se reporta cuando no se alcanza. */
+const OBJETIVO_DISCO_GB = Number(process.env.CERT_OBJETIVO_DISCO_GB || 25)
 const TIMEOUT_MS   = Number(process.env.CERT_HTTP_TIMEOUT_MS || 4000)
 
 async function traer(url) {
@@ -86,8 +97,11 @@ export async function preflight({ shaEsperado = process.env.CERTIFICATION_TARGET
     const s = statfsSync('/')
     discoMb = Math.round((s.bsize * s.bavail) / 1048576)
   } catch { /* se reporta como no medido */ }
-  G('G-2', `disco libre ≥ ${MIN_DISCO_MB} MB`, discoMb !== null && discoMb >= MIN_DISCO_MB, {
-    esperado: `≥ ${MIN_DISCO_MB} MB`, observado: discoMb === null ? 'no medido' : `${discoMb} MB`,
+  const discoGb = discoMb === null ? null : Math.round(discoMb / 1024)
+  G('G-2', `disco libre ≥ ${MIN_DISCO_GB} GiB`, discoMb !== null && discoMb >= MIN_DISCO_MB, {
+    esperado: `≥ ${MIN_DISCO_GB} GiB`,
+    observado: discoGb === null ? 'no medido'
+      : `${discoGb} GiB${discoGb < OBJETIVO_DISCO_GB ? ` (bajo el objetivo operacional de ${OBJETIVO_DISCO_GB} GiB)` : ''}`,
     causa: 'entorno',
   })
 
