@@ -52,7 +52,22 @@ const SONDA = () => {
     // Pedro vive en la LAN; sus avisos son efectos aparte.
     const esPedro = /127\.0\.0\.1:7717|:7717\//.test(url)
 
-    if (esEscritura && (url.includes('/api/') || esPedro)) {
+    // ── LA AUTENTICACIÓN NO SE INTERCEPTA ───────────────────────────────────
+    //
+    // Entrar al sistema es una PRECONDICIÓN del guion, no uno de los efectos que
+    // el guion mide. Interceptarla rompe el guion entero y —lo peor— el fallo se
+    // disfraza de defecto del producto.
+    //
+    // Es exactamente lo que pasó: la sonda se tragaba el POST del PIN y devolvía
+    // `{ok:true, capturado:true}`, un cuerpo sin `staff.id` ni `actor_token`. El
+    // POS hacía lo correcto —rechazarlo— y mostraba «Caja no confirmó la
+    // sesión». Se leyó como «el POS no deja entrar» durante dos corridas.
+    //
+    // Las rutas de identidad pasan ÍNTEGRAS al Pedro real. No mueven dinero, no
+    // mueven mesas, no escriben órdenes: no son lo que este arnés compara.
+    const esAutenticacion = /\/auth\/|\/fp\/|\/identity|\/api\/pos\/pin/.test(url)
+
+    if (esEscritura && !esAutenticacion && (url.includes('/api/') || esPedro)) {
       let cuerpo = null
       try { cuerpo = opciones.body ? JSON.parse(opciones.body) : null } catch { cuerpo = '(no es JSON)' }
       anotar(esPedro ? 'pedro_events' : 'api_writes', { metodo, url: url.replace(/^https?:\/\/[^/]+/, ''), cuerpo })
