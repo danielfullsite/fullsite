@@ -184,7 +184,7 @@ const detalleMut = []
 const noAplicables = []
 let detectadas = 0
 
-for (const m of MUTACIONES) {
+for (const m of (MUTACIONES_APLICABLES ? MUTACIONES : [])) {
   const mutado = m.aplicar(B.manifiesto)
   if (!mutado) {
     noAplicables.push(m.id)
@@ -354,6 +354,47 @@ if (!l0.sandbox.permitido) {
       observado: r.motivo ?? 'confirmado', clase: r.clase,
     })
   }
+
+  /* ── LAS CINCO MUTACIONES, SOBRE EL MANIFIESTO QUE SÍ LAS ADMITE ──────────
+     M1 y M3 muerden en `kds_events`, M2 en `audit_events`, M4 en la cola: tres
+     categorías que sólo se llenan al ENVIAR. Evaluarlas sobre la fase de
+     paridad —que llega a S5— daba 1/5 con cuatro «no aplicable», como si el
+     comparador hubiera fallado en detectar, cuando lo que faltaba era el paso
+     productor.
+
+     Aquí la base es la corrida SANDBOX contra sí misma: se muta su manifiesto y
+     se exige que el comparador delate el cambio. Es la pregunta correcta
+     —¿este comparador ve una diferencia real?— hecha sobre datos que existen. */
+  const nS = normalizar(S.manifiesto)
+  const detalleS = []
+  const noAplicablesS = []
+  let detectadasS = 0
+  console.log('\nLAS CINCO MUTACIONES, sobre el manifiesto de SANDBOX:')
+  for (const m of MUTACIONES) {
+    const mutado = m.aplicar(S.manifiesto)
+    if (!mutado) {
+      noAplicablesS.push(m.id)
+      detalleS.push({ id: m.id, nombre: m.nombre, aplicable: false, detectada: false, esperada: m.esperada })
+      console.log(`   ✗ ${m.id} · ${m.nombre} → NO APLICABLE (categoría vacía: ${m.esperada.join('/')})`)
+      emitir({ id: `mut-${m.id}`, fase: 'mutacion', descripcion: `${m.id} ${m.nombre}`,
+        esperado: `diferencia en ${m.esperada.join(' o ')}`,
+        observado: 'no aplicable — la categoría de efectos está vacía', clase: 'NOT_OBSERVED' })
+      continue
+    }
+    const diffs = comparar(nS, normalizar(mutado))
+    const cats = diffs.map(x => x.categoria)
+    const ok = diffs.length > 0 && m.esperada.some(c => cats.includes(c))
+    if (ok) detectadasS++
+    detalleS.push({ id: m.id, nombre: m.nombre, aplicable: true, detectada: ok, categorias: cats, esperada: m.esperada })
+    console.log(`   ${ok ? '✓' : '✗'} ${m.id} · ${m.nombre} → ${cats.join(', ') || '(nada)'}`)
+    emitir({ id: `mut-${m.id}`, fase: 'mutacion', descripcion: `${m.id} ${m.nombre}`,
+      esperado: `diferencia en ${m.esperada.join(' o ')}`,
+      observado: cats.length ? cats.join(', ') : 'ninguna diferencia',
+      clase: clasificar({ fase: 'mutacion', ok, l0: l0.satisfechas, ejecuto: true, causa: 'arnes' }) })
+  }
+  sobre.mutation = { total: MUTACIONES.length, detected: detectadasS,
+                     no_aplicables: noAplicablesS, detalle: detalleS, base: 'SANDBOX' }
+  console.log(`\nDETECTADAS ${detectadasS}/${MUTACIONES.length}`)
 }
 
 await cerrar()
