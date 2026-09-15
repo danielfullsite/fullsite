@@ -18,7 +18,12 @@
 //
 //   node conductor-v1.mjs [--mesa 7]
 
-import { chromium } from '/private/tmp/claude-501/-Users-danielrg-fullsite/5da718bd-f5a0-4f70-b4bf-871021defe7a/scratchpad/wt-touch/dashboard-app/node_modules/playwright/index.mjs'
+// `playwright` es dependencia de dashboard-app, así que el nombre simple
+// resuelve desde cualquier punto del paquete. La versión anterior traía una RUTA
+// ABSOLUTA a un worktree hermano: funcionaba en la máquina donde se escribió y
+// moría en cualquier otra —incluida ésta, en cuanto ese worktree se limpió—.
+// Un arnés de certificación que sólo corre en un disco concreto no certifica.
+import { chromium } from 'playwright'
 import { vacio } from './manifiesto-de-efectos.mjs'
 
 const PIN = process.env.FULLSITE_PIN || '1234'
