@@ -208,6 +208,55 @@ export async function conducirV1(guion, opciones = {}) {
     return r
   }
 
+  /**
+   * Pulsa una OPCIÓN de modificador. No todo lo que se toca es un `<button>`.
+   *
+   * `pulsar()` busca en `button,[role=button]`, y con eso llega a categorías,
+   * productos y botones de acción. Las opciones de un grupo NO son botones:
+   * `pos/page.tsx:527` las dibuja como `<label>` con un `<input type=checkbox>`
+   * en `sr-only` — accesible y correcto, pero invisible para aquel selector.
+   *
+   * Resultado medido en cert-g01-20260915T205037Z: el modal estaba abierto, con
+   * «Obligatorio», «Max 1» y el botón bloqueado en «Elige CERT-G01-OPCION» —el
+   * producto haciendo exactamente lo que debe— y el conductor informó que
+   * CERT-G01-ESTANDAR «no está en pantalla».
+   *
+   * Se pulsa el `<label>`, no el input oculto: es lo que toca un mesero, y es
+   * lo que dispara el `onChange` del producto.
+   */
+  const pulsarOpcion = async (texto, etiqueta = texto) => {
+    const r = await page.evaluate((t) => {
+      const vis = (el) => {
+        const b = el.getBoundingClientRect()
+        return b.width > 0 && b.height > 0 && getComputedStyle(el).display !== 'none'
+      }
+      const re = new RegExp(t, 'i')
+      const candidatos = [...document.querySelectorAll(
+        'label,[role=option],[role=radio],[role=checkbox],[role=menuitemradio],button,[role=button]')].filter(vis)
+      const nombre = (el) => (el.getAttribute('aria-label') || el.innerText || '').replace(/\s+/g, ' ').trim()
+
+      const el = candidatos.find(x => re.test(nombre(x)))
+      if (!el) {
+        return { ok: false, motivo: 'no está en pantalla',
+                 enPantalla: candidatos.map(nombre).filter(Boolean).slice(0, 25) }
+      }
+      const rotulo = nombre(el)
+      const dentro = el.querySelector('input,[role=radio],[role=checkbox]')
+      const bloqueado = el.getAttribute('aria-disabled') === 'true' || el.disabled === true ||
+                        (dentro && dentro.disabled === true)
+      if (bloqueado) {
+        // El control EXISTE y el producto lo bloquea: eso es dato del producto,
+        // no ceguera del instrumento.
+        return { ok: false, motivo: 'está deshabilitado', rotulo, controlPresente: true }
+      }
+      el.click()
+      const marcado = dentro ? (dentro.checked === true || dentro.getAttribute('aria-checked') === 'true') : null
+      return { ok: true, rotulo, marcado, etiquetaHTML: el.tagName.toLowerCase() }
+    }, texto)
+    bitacora.push({ etiqueta, ...r })
+    return r
+  }
+
   /** ¿Está puesta la pantalla de bloqueo? */
   const estaBloqueado = async () => {
     const t = await page.evaluate(() => (document.body.innerText || '').replace(/\s+/g, ' ')).catch(() => '')
@@ -393,7 +442,7 @@ export async function conducirV1(guion, opciones = {}) {
         if (!est.exigido) {
           r = { ok: false, motivo: `el grupo «${objetivo.grupo}» no exigió elección`, enPantalla: est.enPantalla }
         } else {
-          const opcion = await pulsar(escapar(objetivo.opcion), `opción ${objetivo.opcion}`)
+          const opcion = await pulsarOpcion(escapar(objetivo.opcion), `opción ${objetivo.opcion}`)
           await page.waitForTimeout(900)
           if (opcion.ok === false) {
             r = opcion
