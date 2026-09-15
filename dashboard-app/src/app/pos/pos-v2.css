@@ -235,3 +235,13 @@
 
 /* Las pastillas de cifras: monoespaciada y versalitas, como el diseño. */
 .pos-v2 header + div [class*="rounded-full"] { letter-spacing: 0.04em; }
+
+/* ── Las alturas, dentro del caparazón ───────────────────────────────────
+   33 pantallas del POS se declaran `h-screen` o `h-dvh` —«toda la ventana»—
+   porque hasta ahora cada una ERA la ventana. Dentro de un caparazón con una
+   barra de 52 px eso desborda por esos 52 px exactos.
+   Se bajan a «todo el espacio que me dieron». Sólo aplica con la bandera
+   puesta; sin ella ninguna pantalla cambia. */
+.pos-v2 [class*="h-screen"],
+.pos-v2 [class*="h-dvh"] { height: 100% !important; }
+.pos-v2 [class*="min-h-screen"] { min-height: 100% !important; }

@@ -4407,7 +4407,11 @@ function POSContent() {
       )}
 
       {/* Top Bar */}
-      <header className="pos-safe-top flex flex-col bg-[var(--surface-2)] border-b border-[var(--line)] flex-shrink-0">
+      {/* La primera franja —marca, hamburguesa, estado, usuario y reloj— la da
+          ahora el caparazón, y es la MISMA en las 42 pantallas del POS. Aquí se
+          esconde para no tener dos barras, en vez de borrarla: apagar la
+          bandera la devuelve. */}
+      <header className={`pos-safe-top flex flex-col bg-[var(--surface-2)] border-b border-[var(--line)] flex-shrink-0 ${posV2 ? '[&>div:first-child]:hidden' : ''}`}>
         {/* Row 1: Logo + Hamburger + Ready badge + Staff + Clock */}
         <div className="flex min-w-0 items-center justify-between gap-2 px-2 py-0.5 sm:px-3">
           <div className="flex flex-shrink-0 items-center gap-2">

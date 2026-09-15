@@ -20,6 +20,8 @@ import { provisionManagerCredential, verifyPinOffline, estadoCredencialesOffline
 import { POSLockContext } from './pos-lock-context'
 import './pos-v2.css'
 import { usePosV2 } from '@/components/pos/ui/PosProductTile'
+import { PosShell } from '@/components/pos/ui/PosShell'
+import { navVisible } from '@/lib/pos-nav'
 import { requiereCaja } from '@/lib/pedro-cliente'
 import { actorDeCaja, cerrarActorDeCaja, ingresarConPinEnCaja } from '@/lib/pedro-actor'
 
@@ -837,7 +839,22 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
         <ImpresionesPendientesDeCaja />
         <AperturasPendientesDeCaja />
         <TurnoGate staff={staff!}>
-          {children}
+          {posV2 ? (
+            <PosShell
+              secciones={navVisible(
+                // El POS ya gatea por PIN y por perfil dentro de cada pantalla;
+                // aquí sólo se decide qué aparece en el menú. Sin datos de
+                // permiso a este nivel se muestra todo y la pantalla destino
+                // sigue aplicando su propia regla.
+                () => true,
+                () => true,
+              )}
+              usuario={staff?.name}
+              onSignOut={undefined}
+            >
+              {children}
+            </PosShell>
+          ) : children}
           <PendingOrderInventory clientId={_cid()} />
         </TurnoGate>
       </div>
