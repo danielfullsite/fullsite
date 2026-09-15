@@ -6,7 +6,7 @@ import { getActiveTurnoWithStaleCheck, openTurno, logAudit } from '@/lib/pos-dat
 import { getPermissions } from '@/lib/pos-permissions'
 import { Clock, DoorOpen, AlertTriangle } from 'lucide-react'
 import { ErrorDeSesion } from '@/lib/clasificar-fallo'
-import { evaluarAperturaDeTurno, totalDeCuentas, openOrderStatusLabel,
+import { evaluarAperturaDeTurno, totalDeCuentas, openOrderStatusLabel, pedroPuedeAfirmarElSalon,
   type VeredictoApertura, type LecturaDeCuentas } from '@/lib/pos-cierre-guard'
 import { esFalloDeAutenticacion } from '@/lib/clasificar-fallo'
 import { mismoDiaDeVenta, inicioDiaConfigurado } from '@/lib/dia-de-venta'
@@ -77,7 +77,11 @@ export default function TurnoGate({ staff, children }: TurnoGateProps) {
     try {
       if (requiereCaja()) {
         const local = await leerSalon()
-        if (local.writeAuthority === 'caja') {
+        // `writeAuthority` dice quién puede ESCRIBIR; no dice si esta lectura
+        // sirve para AFIRMAR que no hay cuentas. Con la foto a medio reconstruir
+        // la lista viene corta y el turno abriría sobre cuentas vivas. Si Pedro
+        // no alcanza, se cae a la nube, que es lo que hace el resto del método.
+        if (local.writeAuthority === 'caja' && pedroPuedeAfirmarElSalon(local)) {
           const v = evaluarAperturaDeTurno({ determinado: true, cuentas: local.ordenes as unknown as Extract<LecturaDeCuentas, { determinado: true }>['cuentas'] })
           setVeredicto(v)
           return v

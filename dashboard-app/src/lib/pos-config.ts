@@ -10,7 +10,8 @@ export interface PosClientConfig {
   address: string      // "San Pedro Garza Garcia, NL"
   phone: string        // "8115324371"
   rfc: string          // "AFO200806JI0"
-  ivaRate: number      // 0 (AMALAY: precios incluyen IVA)
+  ivaRate: number          // tasa del restaurante, de clients.iva_rate
+  preciosIncluyenIva: boolean  // ¿el precio de la carta ya la trae?
   receiptFooter: string // "Gracias por tu visita!"
   logoUrl: string      // URL to logo image for tickets
   socialMedia: string  // "@amalay.mx" or similar
@@ -39,6 +40,7 @@ export async function getPosClientConfig(): Promise<PosClientConfig> {
     phone: config.phone || '',
     rfc: config.rfc || '',
     ivaRate: config.iva_rate,
+    preciosIncluyenIva: config.precios_incluyen_iva,
     receiptFooter: config.receipt_footer || 'Gracias por tu visita!',
     logoUrl: config.logo_url || '',
     socialMedia: config.social_media || '',
@@ -57,6 +59,7 @@ export function getPosConfigSync(): PosClientConfig {
     phone: '',
     rfc: '',
     ivaRate: 0,
+    preciosIncluyenIva: false,
     receiptFooter: 'Gracias por tu visita!',
     logoUrl: '',
     socialMedia: '',
