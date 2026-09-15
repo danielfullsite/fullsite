@@ -111,6 +111,49 @@ export async function conducirV1(guion, { mesa = 7 } = {}) {
   const manifiesto = vacio()
   const bitacora = []
 
+  /**
+   * Pulsa por SIGNIFICADO. Nunca se traga un fallo.
+   *
+   * EL NOMBRE DE UN CONTROL NO ES SU TEXTO. El botón de confirmar el PIN se
+   * dibuja como un icono: `innerText` vacío y `aria-label="Entrar"`. Un buscador
+   * que sólo mire el texto no lo ve y reporta «no está» sobre un botón que
+   * cualquiera tiene enfrente. Eso tumbó la primera corrida completa de G01 —
+   * y peor: el fallo se parecía a un defecto del producto.
+   *
+   * Orden de búsqueda, del identificador más estable al más frágil:
+   *   1. data-testid — puesto a propósito para esto
+   *   2. aria-label  — el nombre accesible
+   *   3. title       — la alternativa de varios controles
+   *   4. innerText   — el último, porque el rediseño lo cambia
+   *
+   * Y se distingue DESHABILITADO de AUSENTE: no son lo mismo, y confundirlos
+   * manda a buscar por el lado equivocado.
+   */
+  const pulsar = async (patron, etiqueta = patron) => {
+    const r = await page.evaluate(p => {
+      const vis = el => { const b = el.getBoundingClientRect(); return b.width > 0 && b.height > 0 }
+      const re = new RegExp(p, 'i')
+      const nombres = el => [
+        el.getAttribute('data-testid'),
+        el.getAttribute('aria-label'),
+        el.getAttribute('title'),
+        (el.innerText || '').replace(/\s+/g, ' ').trim(),
+      ].filter(Boolean)
+      const controles = [...document.querySelectorAll('button,[role=button]')].filter(vis)
+      const inventario = () => controles.map(x => nombres(x)[0] || '(sin nombre)').slice(0, 30)
+      const b = controles.find(x => nombres(x).some(n => re.test(n)))
+      if (!b) return { ok: false, motivo: 'no está en pantalla', enPantalla: inventario() }
+      const rotulo = nombres(b)[0]
+      if (b.disabled || b.getAttribute('aria-disabled') === 'true') {
+        return { ok: false, motivo: 'está deshabilitado', rotulo, enPantalla: inventario() }
+      }
+      b.click()
+      return { ok: true, rotulo }
+    }, patron)
+    bitacora.push({ etiqueta, ...r })
+    return r
+  }
+
   const desbloquear = async () => {
     const t = await page.evaluate(() => (document.body.innerText || '').replace(/\s+/g, ' ')).catch(() => '')
     if (!/PIN para abrir|Huella digital o PIN|Ingresa tu PIN/i.test(t)) return
@@ -118,26 +161,10 @@ export async function conducirV1(guion, { mesa = 7 } = {}) {
       await page.getByRole('button', { name: new RegExp(`^${d}$`) }).first().click().catch(() => {})
       await page.waitForTimeout(130)
     }
-    const entrar = page.getByRole('button', { name: 'Entrar', exact: true })
-    if (await entrar.count().catch(() => 0)) await entrar.click().catch(() => {})
-    else await page.keyboard.press('Enter').catch(() => {})
+    // El confirmar es un icono sin texto: se busca por nombre accesible, y sólo
+    // está habilitado con el PIN completo.
+    await pulsar('^Entrar$', 'confirmar PIN')
     await page.waitForTimeout(3500)
-  }
-
-  /** Pulsa por SIGNIFICADO y reporta el rótulo exacto. Nunca se traga un fallo. */
-  const pulsar = async (patron, etiqueta = patron) => {
-    const r = await page.evaluate(p => {
-      const vis = el => { const b = el.getBoundingClientRect(); return b.width > 0 && b.height > 0 }
-      const b = [...document.querySelectorAll('button')].filter(vis)
-        .find(x => new RegExp(p, 'i').test((x.innerText || '').replace(/\s+/g, ' ').trim()))
-      if (!b) return { ok: false, enPantalla: [...document.querySelectorAll('button')].filter(vis)
-        .map(x => (x.innerText || '').replace(/\s+/g, ' ').trim()).filter(Boolean).slice(0, 30) }
-      const rotulo = (b.innerText || '').replace(/\s+/g, ' ').trim()
-      b.click()
-      return { ok: true, rotulo }
-    }, patron)
-    bitacora.push({ etiqueta, ...r })
-    return r
   }
 
   const recoger = async () => {
