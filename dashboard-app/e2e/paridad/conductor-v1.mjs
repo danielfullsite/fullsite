@@ -30,6 +30,7 @@ import { vacio } from './manifiesto-de-efectos.mjs'
 import { SONDA } from './sonda.mjs'
 import { OBJETIVO, ENTORNO, G01 as GUION_G01 } from './cert/objetivo-g01.mjs'
 import { resetEstadoLocal, estadoDeMesa, ticketVisible } from './cert/reset-estado-local.mjs'
+import { abrirObservadorMain, normalizarSaveOrder, fusionarApiWrites } from './cert/observador-main.mjs'
 
 // El PIN no tiene default. Un PIN adivinado produce un fallo de autenticación
 // que se lee como defecto del producto — el error que ya costó dos corridas.
@@ -61,7 +62,18 @@ export async function conducirV1(guion, opciones = {}) {
     // que se contradijera a sí mismo.
     hastaPaso       = null,     // null = todos
     resetAntes      = false,    // deja la terminal en el estado inicial
+    // ── LA FRONTERA AUTORITATIVA ───────────────────────────────────────────
+    // `window.fetch` no ve `POST /api/pos/save-order`, que es donde viven
+    // cantidad, modificadores y estación. El observador del MAIN sí. Si no está
+    // disponible, el manifiesto se queda sin ese write y las mutaciones que lo
+    // necesitan salen NOT_OBSERVED — que es el resultado correcto, no un hueco.
+    inspectorMain   = process.env.CERT_MAIN_INSPECTOR || 'http://127.0.0.1:9331',
+    observarMain    = true,
   } = opciones
+
+  const observador = observarMain
+    ? await abrirObservadorMain({ inspectorUrl: inspectorMain, runId: `${corridaId}-${Date.now()}` })
+    : { disponible: false, motivo: 'observación del MAIN desactivada por opción', leer: async () => [], cerrar: async () => {} }
 
   const nav = await chromium.connectOverCDP(cdp)
   const ctx = nav.contexts()[0]
@@ -438,6 +450,9 @@ export async function conducirV1(guion, opciones = {}) {
   if (resetAntes) {
     reset = await resetEstadoLocal(page, { baseUrl, mesa })
     if (!reset.ok) {
+      // El observador se retira también por esta salida: un listener que
+      // sobrevive a una corrida abortada contamina la siguiente.
+      await observador.cerrar().catch(() => {})
       await nav.close().catch(() => {})
       return { manifiesto, bitacora, pasos: [], corrio: false, pasosOk: 0,
                pasosTotal: guion.pasos.length, traza: null, capturas: [], reset }
@@ -582,9 +597,38 @@ export async function conducirV1(guion, opciones = {}) {
 
   const estadoFinal = await estadoDeMesa(page, mesa)
 
+  /* ── LO QUE VIO LA FRONTERA AUTORITATIVA ───────────────────────────────────
+     Se lee DESPUÉS del journey y se funde en `api_writes`. La sonda puede haber
+     anotado el mismo write; ante la misma identidad —método, ruta,
+     save_operation_id, order_id— gana el MAIN. La de la sonda queda como
+     diagnóstico, nunca como autoridad. */
+  let observacionMain = { disponible: observador.disponible, motivo: observador.motivo,
+                          save_orders: 0, lan_events: 0 }
+  try {
+    const crudos = await observador.leer()
+    const normalizados = crudos
+      .filter(w => w.clase === 'save_order')
+      .map(w => normalizarSaveOrder(w))
+      .filter(Boolean)
+    observacionMain = {
+      disponible: observador.disponible, motivo: observador.motivo,
+      save_orders: normalizados.length,
+      lan_events: crudos.filter(w => w.clase === 'lan_event').length,
+    }
+    if (normalizados.length) {
+      manifiesto.api_writes = fusionarApiWrites(manifiesto.api_writes ?? [], normalizados)
+    }
+  } catch (e) {
+    observacionMain = { disponible: false, motivo: `no se pudo leer el observador: ${e?.message ?? e}`,
+                        save_orders: 0, lan_events: 0 }
+  }
+  manifiesto.observador_main = observacionMain
+  await observador.cerrar()
+
   return { manifiesto, bitacora, pasos, corrio, pasosOk,
            pasosTotal: hastaPaso ?? guion.pasos.length,
-           traza, capturas, modoEfectivo, reset, estadoInicial, estadoFinal, ticketTrasAbrir }
+           traza, capturas, modoEfectivo, reset, estadoInicial, estadoFinal, ticketTrasAbrir,
+           observadorMain: observacionMain }
 }
 
 /** Reexportado para que el guion viva en un solo lugar: `cert/objetivo-g01.mjs`. */
