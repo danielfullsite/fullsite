@@ -7,67 +7,65 @@
 -- no tiene con qué reconocer «esto ya lo vi». Medido contra el schema el
 -- 2026-09-17:
 --
---   pos_cash_movements       id bigint / nextval  · sin unique de negocio
---   pos_audit_log            id bigint / nextval  · sin unique de negocio
---   pos_market_movements     id bigint / nextval  · sin unique de negocio
---   pos_inventory_movements  id bigint / nextval  · PERO ya tiene
+--   pos_cash_movements       id bigint / nextval  · sin unique de negocio · 0 filas
+--   pos_audit_log            id bigint / nextval  · sin unique de negocio · 1,674 filas
+--   pos_market_movements     id bigint / nextval  · sin unique de negocio · 238 filas
+--   pos_inventory_movements  ya tiene
 --       UNIQUE (client_id, movement_operation_key, movement_operation_line)
 --       WHERE movement_operation_key IS NOT NULL
---     y ningún código de cliente llena esas columnas (cero referencias en src/).
---     Por eso esta migración NO le agrega nada: la identidad ya existe en la
---     base y lo que falta es usarla.
+--     y ningún código de cliente llenaba esas columnas (cero referencias en
+--     src/ al 2026-09-17). Por eso esta migración NO LE TOCA NADA: la identidad
+--     ya existe en la base y lo que faltaba era usarla, que es cambio de código.
 --
--- QUÉ HACE ESTA MIGRACIÓN
+-- QUÉ HACE
 --
--- Agrega `client_op_id text NULL` a las tres tablas que no tienen identidad, y
--- un índice único PARCIAL por tenant. Parcial a propósito: las filas históricas
--- (1,674 de auditoría, 238 de market, 0 de caja al 2026-09-17) quedan fuera del
--- índice y no hay que tocar ni una.
+--   3 columnas nuevas, text, NULL, SIN DEFAULT
+--   3 índices únicos PARCIALES por tenant
 --
--- NO hace backfill. NO altera filas existentes. NO cambia tipos ni defaults.
--- NO toca pos_inventory_movements.
+-- Parciales a propósito: las 1,912 filas históricas quedan fuera del índice y no
+-- hay que tocar ni una. Sin backfill, sin UPDATE, sin INSERT, sin DELETE.
+-- Sin RLS, sin grants, sin triggers, sin funciones.
 --
--- IDENTIDAD: QUÉ VA EN client_op_id
+-- POR QUÉ DDL ESTRICTO (sin IF NOT EXISTS)
 --
---   pos_cash_movements   UUID aleatorio generado UNA vez, al confirmar el
---                        movimiento. Dos retiros de $500 en el mismo minuto son
---                        dos eventos legítimos: un determinista los colapsaría y
---                        borraría dinero declarado.
---   pos_audit_log        UUID aleatorio por evento. La bitácora registra
---                        observaciones, no estado; dos actores que observan lo
---                        mismo son dos hechos. La operación auditada viaja en
---                        `details` como METADATO, nunca como identidad.
---   pos_market_movements columna preparada, productor pendiente: hoy
---                        `logMarketMovement` no tiene ningún llamador y la venta
---                        de Market se descuenta server-side por
---                        r1_legacy_sale_deduction. Ver el reporte de P0A.
+-- `IF NOT EXISTS` convierte un desajuste en silencio: si la columna ya existiera
+-- —por una corrida previa a medias, o por alguien que la creó a mano con otro
+-- tipo— la migración pasaría en verde sobre un estado que nadie verificó. Se
+-- prefiere que falle y que el drift se vea.
+--
+-- POR QUÉ LOS TIMEOUTS
+--
+-- `ADD COLUMN` nullable sin default es sólo catálogo desde PG11: no reescribe la
+-- tabla. `CREATE UNIQUE INDEX` (no CONCURRENTLY, que además no puede ir dentro
+-- de una transacción) toma SHARE y bloquea escrituras mientras construye — con
+-- 0, 1,674 y 238 filas eso son milisegundos. Los timeouts existen para el caso
+-- que no controlo: si algo tuviera la tabla tomada, esto ABORTA a los 3 s en vez
+-- de encolarse detrás y frenar una caja en servicio.
 --
 -- ORDEN DE DESPLIEGUE: primero esta migración, después el código. Al revés,
 -- PostgREST responde PGRST204 «column not found» y las escrituras se caen.
+--
+-- Rollback simétrico: PENDIENTE_20260917200000_append_idempotency_ROLLBACK.sql
 
-ALTER TABLE public.pos_cash_movements   ADD COLUMN IF NOT EXISTS client_op_id text;
-ALTER TABLE public.pos_audit_log        ADD COLUMN IF NOT EXISTS client_op_id text;
-ALTER TABLE public.pos_market_movements ADD COLUMN IF NOT EXISTS client_op_id text;
+BEGIN;
 
-CREATE UNIQUE INDEX IF NOT EXISTS pos_cash_movements_client_op_id
+SET LOCAL lock_timeout = '3s';
+SET LOCAL statement_timeout = '30s';
+
+ALTER TABLE public.pos_cash_movements   ADD COLUMN client_op_id text;
+ALTER TABLE public.pos_audit_log        ADD COLUMN client_op_id text;
+ALTER TABLE public.pos_market_movements ADD COLUMN client_op_id text;
+
+CREATE UNIQUE INDEX pos_cash_movements_client_op_id
   ON public.pos_cash_movements (client_id, client_op_id)
   WHERE client_op_id IS NOT NULL;
 
-CREATE UNIQUE INDEX IF NOT EXISTS pos_audit_log_client_op_id
+CREATE UNIQUE INDEX pos_audit_log_client_op_id
   ON public.pos_audit_log (client_id, client_op_id)
   WHERE client_op_id IS NOT NULL;
 
-CREATE UNIQUE INDEX IF NOT EXISTS pos_market_movements_client_op_id
+CREATE UNIQUE INDEX pos_market_movements_client_op_id
   ON public.pos_market_movements (client_id, client_op_id)
   WHERE client_op_id IS NOT NULL;
 
-COMMENT ON COLUMN public.pos_cash_movements.client_op_id IS
-  'Identidad de la operación generada por el cliente al confirmar el movimiento. '
-  'Misma en la escritura online y en el replay de la cola. Aleatoria: dos retiros '
-  'iguales son dos eventos.';
-COMMENT ON COLUMN public.pos_audit_log.client_op_id IS
-  'Identidad del EVENTO de auditoría. Aleatoria por observación. La operación '
-  'auditada va en details como metadato, no como identidad.';
-COMMENT ON COLUMN public.pos_market_movements.client_op_id IS
-  'Identidad de la operación. Columna preparada: al 2026-09-17 logMarketMovement '
-  'no tiene llamadores y la venta se descuenta server-side.';
+COMMIT;
