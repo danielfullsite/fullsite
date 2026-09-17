@@ -1,4 +1,5 @@
 import { kitchenOrderInScope, readKitchenScope } from './kitchen-read-scope'
+import { nuevaIdentidadDeAccion, identidadDeRecepcionDeCompra } from './operation-identity'
 // POS Menu Data — AMALAY real menu (el POS legado)
 //
 // SQL for Supabase (run in SQL Editor):
@@ -2023,8 +2024,21 @@ export interface AuditEvent {
 }
 
 export async function logAudit(event: AuditEvent): Promise<boolean> {
+  // IDENTIDAD PROPIA DEL EVENTO, no de la operación que audita.
+  //
+  // `pos_audit_log.id` es bigint por secuencia y la tabla no tiene clave de
+  // negocio: si la petición llega y la respuesta se pierde, el replay inserta
+  // una fila nueva. `client_op_id` cierra eso, con índice único parcial por
+  // tenant (migración PENDIENTE_20260917200000).
+  //
+  // ALEATORIA a propósito. La bitácora registra OBSERVACIONES, no estado: dos
+  // actores que ven el mismo hecho son dos filas legítimas, y heredar la
+  // identidad de la operación auditada las colapsaría en una. Cuando el evento
+  // pertenece a otra operación, ésa viaja como METADATO —`order_id`, y lo que
+  // el llamador ponga en `details`— nunca como identidad.
   const payload = {
     client_id: event.client_id || _getClientId(),
+    client_op_id: nuevaIdentidadDeAccion(),
     order_id: event.order_id || null,
     action: event.action,
     actor: typeof event.actor === 'string' && event.actor.trim() ? event.actor.trim() : 'POS Offline',
@@ -2654,9 +2668,25 @@ export async function updateInventoryStock(ingredientId: string, newStock: numbe
 // but all POS code still operates on the legacy pos_ingredients model.
 // When the full inventory migration is complete, replace ingredient_id with product_id.
 // See docs/INVENTORY-MIGRATION.md for the migration plan.
+/**
+ * IDENTIDAD DETERMINISTA, no aleatoria.
+ *
+ * Este movimiento NO es un evento propio: pertenece a la operación que lo causa
+ * —hoy, la recepción de una orden de compra—. Si dos terminales procesan la misma
+ * recepción, deben producir la MISMA identidad, o el inventario se descuenta dos
+ * veces. Un UUID aleatorio pasaría el caso «reintento del mismo item» y fallaría
+ * justo ése.
+ *
+ * La base ya tenía la infraestructura y nadie la usaba:
+ *   UNIQUE (client_id, movement_operation_key, movement_operation_line)
+ *     WHERE movement_operation_key IS NOT NULL
+ * Cero referencias a esas columnas en todo `src/` al 2026-09-17. Por eso esta
+ * migración no agrega columna aquí: la identidad ya existe, faltaba llenarla.
+ */
 export async function logInventoryMovement(movement: {
   ingredient_id: string; movement_type: string; quantity: number;
   order_id?: string; actor?: string; notes?: string;
+  movement_operation_key?: string; movement_operation_line?: string;
 }): Promise<boolean> {
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/pos_inventory_movements`, {
@@ -2874,6 +2904,22 @@ export async function upsertMarketStock(
   }
 }
 
+/**
+ * SIN IDENTIDAD TODAVÍA, Y A PROPÓSITO.
+ *
+ * P0A auditó esta función el 2026-09-17 y encontró que **no tiene ningún
+ * llamador** en todo `src/`. La venta de Market no pasa por aquí: se descuenta
+ * server-side con `r1_legacy_sale_deduction`, vía `/api/pos/deduct-market`, que
+ * ya es idempotente por `order_id`.
+ *
+ * Por eso no se le inventa una identidad de línea: no hay evento de venta que
+ * derivar, y un `order_id + menu_item_id + índice de arreglo` sería una clave
+ * posicional frágil para un camino que nadie ejecuta. La columna `client_op_id`
+ * queda creada en la migración; el día que esta función tenga un llamador, la
+ * identidad se decide con el evento real a la vista:
+ *   · si nace de una venta → determinista, derivada de esa venta y su renglón
+ *   · si es ajuste manual  → aleatoria, generada al confirmar la acción
+ */
 export async function logMarketMovement(movement: {
   menu_item_id: string; movement_type: string; quantity: number;
   order_id?: string; actor?: string; notes?: string;
@@ -3191,6 +3237,11 @@ export async function restockFromPurchaseOrder(
     if (inv) {
       const newStock = inv.stock + qty
       await updateInventoryStock(item.ingredient_id, newStock)
+      // La identidad sale de la orden de compra y de su renglón, los dos
+      // asignados por el servidor ANTES de la recepción. No se usa el índice del
+      // arreglo: el orden de una lista depende de cómo se cargó, y dos terminales
+      // podrían recorrerla distinto.
+      const identidad = identidadDeRecepcionDeCompra(orderId, item.id)
       await logInventoryMovement({
         ingredient_id: item.ingredient_id,
         movement_type: 'restock',
@@ -3198,6 +3249,7 @@ export async function restockFromPurchaseOrder(
         order_id: orderId,
         actor,
         notes: `OC ${orderId} - ${item.ingredient_name}`,
+        ...identidad,
       })
     }
   }

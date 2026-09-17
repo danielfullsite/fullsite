@@ -63,6 +63,7 @@ import CobroDeCaja from '@/components/pos/CobroDeCaja'
 import { reconciliarCuenta, cuentaEditableDe, mismaConfirmacionDeCuenta, type CuentaEditable } from '@/lib/pos-order-reconciliation'
 import { evaluarLiquidacion, cuentasDe, intentoDePago } from '@/lib/liquidacion-de-orden'
 import type { OrderItem, MenuItem, Order } from '@/lib/pos-data'
+import { nuevaIdentidadDeAccion, type ResultadoDeEscritura } from '@/lib/operation-identity'
 import {
   printByStation,
   comandasMuted,
@@ -1479,7 +1480,10 @@ function VoidOrderModal({ mesa, total, items, enviados, onConfirm, onConfirmCaja
 interface CashMovementModalProps {
   turnoId: string | null
   actor: string
-  onConfirm: (type: 'retiro' | 'deposito', amount: number, reason: string, managerName: string) => void
+  // `resultado` y `clientOpId` viajan para que la auditoría registre lo que de
+  // verdad pasó con la escritura, no lo que se supone que pasó.
+  onConfirm: (type: 'retiro' | 'deposito', amount: number, reason: string, managerName: string,
+              resultado: ResultadoDeEscritura, clientOpId: string) => void
   onCancel: () => void
 }
 
@@ -1510,9 +1514,22 @@ function CashMovementModal({ turnoId, actor, onConfirm, onCancel }: CashMovement
   const doCashSave = async (manager: string) => {
     const num = parseFloat(amount)
     setSaving(true)
-    // Stable id — ensures idempotency whether we save online or queue offline
-    const id = crypto.randomUUID()
-    const payload = { id, client_id: _cid(), turno_id: turnoId, type, amount: num, reason: reason.trim(), actor, approved_by: manager }
+    // EL `id` NO SE MANDA. `pos_cash_movements.id` es bigint con
+    // nextval(pos_cash_movements_id_seq) y lo asigna el servidor. Aquí se mandaba
+    // `crypto.randomUUID()` con el comentario «Stable id — ensures idempotency»:
+    // un UUID de texto contra una columna bigint lo rechaza Postgres con 22P02, o
+    // sea que la fila NUNCA se escribía. La tabla tenía CERO filas en toda la
+    // base, de todos los tenants, al 2026-09-17 — con un intento auditado
+    // (chickin-demo, E2E del 2026-09-03) que no dejó fila.
+    //
+    // La identidad va ahora en `client_op_id`, que sí es text y tiene índice
+    // único parcial por tenant. Se genera UNA vez, aquí, al confirmar: el MISMO
+    // valor viaja online y en la cola, que es lo que vuelve seguro el reintento.
+    // Aleatoria a propósito: dos retiros iguales son dos eventos (ver
+    // operation-identity.ts).
+    const clientOpId = nuevaIdentidadDeAccion()
+    const idLocal = clientOpId   // la caché de IDB necesita una llave propia
+    const payload = { client_op_id: clientOpId, client_id: _cid(), turno_id: turnoId, type, amount: num, reason: reason.trim(), actor, approved_by: manager }
     try {
       const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
       const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -1525,18 +1542,28 @@ function CashMovementModal({ turnoId, actor, onConfirm, onCancel }: CashMovement
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       // Write-through cache — mirror to IDB even though Supabase succeeded.
       // Guarantees the wizard sees this movement if connectivity drops before cierre.
-      cacheCashMovement({ id, client_id: payload.client_id, turno_id: turnoId ?? '', type, amount: num, reason: reason.trim(), actor, approved_by: manager })
+      cacheCashMovement({ id: idLocal, client_id: payload.client_id, turno_id: turnoId ?? '', type, amount: num, reason: reason.trim(), actor, approved_by: manager })
         .catch(() => { /* IDB unavailable — sync_queue is the fallback */ })
-      onConfirm(type, num, reason.trim(), manager)
+      onConfirm(type, num, reason.trim(), manager, 'saved', clientOpId)
     } catch {
       // Offline or server error — queue for sync AND write-through al cache IDB.
       // Sin el cache, tras sincronizar (markSynced + clearSyncedItems) el movimiento
       // sale de la cola y desaparece del arqueo si se vuelve offline en el mismo turno.
       // getCachedCashMovsByTurno dedup por id, asi que cache + cola no cuenta doble. (P0 dinero)
-      cacheCashMovement({ id, client_id: payload.client_id, turno_id: turnoId ?? '', type, amount: num, reason: reason.trim(), actor, approved_by: manager })
+      cacheCashMovement({ id: idLocal, client_id: payload.client_id, turno_id: turnoId ?? '', type, amount: num, reason: reason.trim(), actor, approved_by: manager })
         .catch(() => { /* IDB no disponible — la cola es el fallback */ })
-      await queueOperation('pos_cash_movements', 'POST', payload as Record<string, unknown>, undefined, undefined, 'SUPABASE_REST')
-      onConfirm(type, num, reason.trim(), manager)
+      // EL RESULTADO VIAJA. Antes las dos ramas llamaban igual a `onConfirm`, y
+      // el audit escribía «cash_deposito» con el comentario «already saved to
+      // Supabase» — afirmando un éxito que nadie comprobó. Ese comentario es la
+      // razón por la que el defecto del `id` vivió meses sin que nadie lo viera:
+      // el rastro decía que hubo depósito cuando no había fila.
+      let resultado: ResultadoDeEscritura = 'queued'
+      try {
+        await queueOperation('pos_cash_movements', 'POST', payload as Record<string, unknown>, undefined, undefined, 'SUPABASE_REST')
+      } catch {
+        resultado = 'failed'
+      }
+      onConfirm(type, num, reason.trim(), manager, resultado, clientOpId)
     }
   }
 
@@ -3221,17 +3248,27 @@ function POSContent() {
     setSaving(false); operationLock.current = false
   }, [orderId, mesero, mesa, orderItems, loadedOrderId, saving, sentItemIds, validarCuentaCaja, bloqueaLegacyCaja, turnoId, olvidarCuentaCerrada])
 
-  // Cash movement confirmed (already saved to Supabase in modal)
-  const handleCashMovement = useCallback((type: 'retiro' | 'deposito', amount: number, reason: string, managerName: string) => {
+  // Movimiento de caja confirmado por el operador. El modal ya intentó escribirlo
+  // y nos dice CÓMO terminó: guardado, encolado o fallido. Antes esta función
+  // decía «already saved to Supabase in modal» y auditaba un éxito que nadie
+  // comprobó — con el defecto del `id` bigint, el rastro afirmaba depósitos que
+  // no existían en ninguna parte.
+  const handleCashMovement = useCallback((type: 'retiro' | 'deposito', amount: number, reason: string,
+                                          managerName: string, resultado: ResultadoDeEscritura, clientOpId: string) => {
     const action = type === 'retiro' ? 'cash_retiro' as const : 'cash_deposito' as const
     logAudit({
       order_id: undefined, action, actor: mesero, mesa,
-      details: { type, amount, reason, turno_id: turnoId },
+      // `resultado` y `client_op_id` van como METADATO del evento auditado: la
+      // identidad del audit es la suya propia (ver logAudit), no la del movimiento.
+      details: { type, amount, reason, turno_id: turnoId, resultado, movimiento_client_op_id: clientOpId },
       reason,
       approved_by: managerName,
     })
     setShowCashMovement(false)
-    showToast(`${type === 'retiro' ? 'Retiro' : 'Deposito'} de ${formatMXN(amount)} registrado`)
+    const rotulo = type === 'retiro' ? 'Retiro' : 'Deposito'
+    if (resultado === 'saved') showToast(`${rotulo} de ${formatMXN(amount)} registrado`)
+    else if (resultado === 'queued') showToast(`${rotulo} de ${formatMXN(amount)} guardado localmente — se sincroniza al reconectar`)
+    else showToast(`${rotulo} de ${formatMXN(amount)} NO se pudo guardar. Anótalo y avisa a soporte.`)
   }, [mesero, mesa, turnoId])
 
   const updateQuantity = useCallback((id: string, delta: number) => {
