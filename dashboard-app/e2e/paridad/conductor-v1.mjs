@@ -293,8 +293,26 @@ export async function conducirV1(guion, opciones = {}) {
     // El confirmar es un icono sin texto: se busca por nombre accesible, y sólo
     // está habilitado con el PIN completo.
     const r = await pulsar('^Entrar$', 'confirmar PIN')
-    await page.waitForTimeout(3500)
     if (r.ok === false) return r
+
+    // ESPERAR EL EFECTO, NO UN RELOJ.
+    //
+    // Aquí había `waitForTimeout(3500)`. Medido el 2026-09-17 contra el
+    // laboratorio: `/api/pos/pin` responde normalmente en ~750 ms, pero un
+    // intento de cada tres tardó 21.3 s —lambda fría más los dos 404 de
+    // `pos_pin_throttle`, que no existe en la base—. Con la espera fija, la
+    // corrida A de cert-g01-20260917T180223Z declaró «el PIN se envió y la
+    // pantalla de bloqueo siguió puesta» sobre un PIN que sí entró: los cinco
+    // pasos cayeron detrás, y la paridad quedó sin medir por un sleep.
+    //
+    // El presupuesto se agota igual si el PIN de verdad no entra, así que la
+    // aserción no se debilita: sólo deja de medir la latencia del servidor.
+    const LIMITE_MS = 45000
+    const hasta = Date.now() + LIMITE_MS
+    while (Date.now() < hasta) {
+      if (!await estaBloqueado()) break
+      await page.waitForTimeout(1000)
+    }
 
     // Se comprueba el EFECTO, no el clic. Un «Entrar» que se pulsa y deja la
     // pantalla de bloqueo puesta no entró — y ahí nace «Caja no confirmó la
