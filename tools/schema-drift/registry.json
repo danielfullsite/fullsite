@@ -1,0 +1,53 @@
+{
+  "registry_version": "1.0",
+  "comment": [
+    "Objetos verificables y el archivo de migración que los declara.",
+    "Se mantiene A MANO a propósito: el mapeo archivo→objeto no se puede inferir de",
+    "forma confiable parseando SQL, y un mapeo inventado produciría veredictos falsos.",
+    "Cada entrada se agrega sólo después de LEER el archivo que la declara.",
+    "ledger_hint es una HEURÍSTICA: los nombres del ledger no corresponden a los",
+    "nombres de archivo (ésa es justamente la deriva estructural). Un hint que no",
+    "empata NO prueba que la migración no se aplicó — sólo que el ledger no la nombra así."
+  ],
+  "objects": [
+    { "id": "col.pos_cash_movements.client_op_id", "kind": "column", "rel": "pos_cash_movements", "name": "client_op_id", "file": "supabase/migrations/PENDIENTE_20260917200000_append_idempotency.sql", "file_ref": "21d66e4", "ledger_hint": "append_idempotency", "note": "P0A" },
+    { "id": "col.pos_audit_log.client_op_id", "kind": "column", "rel": "pos_audit_log", "name": "client_op_id", "file": "supabase/migrations/PENDIENTE_20260917200000_append_idempotency.sql", "file_ref": "21d66e4", "ledger_hint": "append_idempotency", "note": "P0A" },
+    { "id": "col.pos_market_movements.client_op_id", "kind": "column", "rel": "pos_market_movements", "name": "client_op_id", "file": "supabase/migrations/PENDIENTE_20260917200000_append_idempotency.sql", "file_ref": "21d66e4", "ledger_hint": "append_idempotency", "note": "P0A" },
+    { "id": "idx.pos_cash_movements_client_op_id", "kind": "index", "rel": "pos_cash_movements", "name": "pos_cash_movements_client_op_id", "file": "supabase/migrations/PENDIENTE_20260917200000_append_idempotency.sql", "file_ref": "21d66e4", "ledger_hint": "append_idempotency", "note": "único parcial" },
+    { "id": "idx.pos_audit_log_client_op_id", "kind": "index", "rel": "pos_audit_log", "name": "pos_audit_log_client_op_id", "file": "supabase/migrations/PENDIENTE_20260917200000_append_idempotency.sql", "file_ref": "21d66e4", "ledger_hint": "append_idempotency", "note": "único parcial" },
+    { "id": "idx.pos_market_movements_client_op_id", "kind": "index", "rel": "pos_market_movements", "name": "pos_market_movements_client_op_id", "file": "supabase/migrations/PENDIENTE_20260917200000_append_idempotency.sql", "file_ref": "21d66e4", "ledger_hint": "append_idempotency", "note": "único parcial" },
+
+    { "id": "fn.pos_scoped_child", "kind": "function", "rel": null, "name": "pos_scoped_child", "file": "supabase/migrations/PENDIENTE_20260910030000_proxy_child_scope.sql", "file_ref": "origin/main", "ledger_hint": "proxy_child_scope", "note": "" },
+    { "id": "fn.pos_scoped_upsert", "kind": "function", "rel": null, "name": "pos_scoped_upsert", "file": "supabase/migrations/PENDIENTE_20260910020000_scoped_proxy_upsert.sql", "file_ref": "origin/main", "ledger_hint": "scoped_proxy_upsert", "note": "hermana de pos_scoped_child" },
+
+    { "id": "tbl.pos_tenant_provisioning_ready", "kind": "table", "rel": null, "name": "pos_tenant_provisioning_ready", "file": "supabase/migrations/PENDIENTE_20260910070000_tenant_provisioning_atomic.sql", "file_ref": "origin/main", "ledger_hint": "tenant_provisioning_atomic", "note": "" },
+    { "id": "fn.pos_activate_provisioned_tenant", "kind": "function", "rel": null, "name": "pos_activate_provisioned_tenant", "file": "supabase/migrations/PENDIENTE_20260910070000_tenant_provisioning_atomic.sql", "file_ref": "origin/main", "ledger_hint": "tenant_provisioning_atomic", "note": "" },
+
+    { "id": "col.client_locations.timezone", "kind": "column", "rel": "client_locations", "name": "timezone", "file": "supabase/migrations/20260902120000_client_locations_timezone.sql", "file_ref": "origin/main", "ledger_hint": "client_locations_timezone", "note": "el código la lee" },
+
+    { "id": "col.pos_turnos.location_id", "kind": "column", "rel": "pos_turnos", "name": "location_id", "file": "supabase/migrations/20260827150000_pos_turnos_por_sucursal.sql", "file_ref": "origin/main", "ledger_hint": "turnos_por_sucursal", "note": "" },
+    { "id": "col.pos_turnos.status", "kind": "column", "rel": "pos_turnos", "name": "status", "file": "supabase/migrations/20260827150000_pos_turnos_por_sucursal.sql", "file_ref": "origin/main", "ledger_hint": "turnos_por_sucursal", "note": "" },
+    { "id": "idx.uq_pos_turnos_activo_por_sucursal", "kind": "index", "rel": "pos_turnos", "name": "uq_pos_turnos_activo_por_sucursal", "file": "supabase/migrations/20260827150000_pos_turnos_por_sucursal.sql", "file_ref": "origin/main", "ledger_hint": "turnos_por_sucursal", "note": "" },
+    { "id": "idx.pos_turnos_uno_abierto_por_restaurante", "kind": "index", "rel": "pos_turnos", "name": "pos_turnos_uno_abierto_por_restaurante", "file": "supabase/migrations/20260909030000_un_turno_abierto_por_restaurante.sql", "file_ref": "origin/main", "ledger_hint": "un_turno_abierto", "note": "invariante de turno abierto" },
+
+    { "id": "fn.pos_record_inventory_movement", "kind": "function", "rel": null, "name": "pos_record_inventory_movement", "file": "supabase/migrations/20260910050000_inventory_movement_atomic.sql", "file_ref": "origin/main", "ledger_hint": "inventory_movement_atomic", "note": "" },
+    { "id": "tbl.pos_inventory_movement_operations", "kind": "table", "rel": null, "name": "pos_inventory_movement_operations", "file": "supabase/migrations/20260910050000_inventory_movement_atomic.sql", "file_ref": "origin/main", "ledger_hint": "inventory_movement_atomic", "note": "" },
+    { "id": "idx.pos_inventory_movement_operation_line", "kind": "index", "rel": "pos_inventory_movements", "name": "pos_inventory_movement_operation_line", "file": "supabase/migrations/20260910050000_inventory_movement_atomic.sql", "file_ref": "origin/main", "ledger_hint": "inventory_movement_atomic", "note": "único parcial" },
+
+    { "id": "fn.r1_transfer_item_atomic", "kind": "function", "rel": null, "name": "r1_transfer_item_atomic", "file": "supabase/migrations/20260910010000_transfer_item_atomico.sql", "file_ref": "origin/main", "ledger_hint": "transfer_item_atomico", "note": "" },
+    { "id": "tbl.pos_transfer_operations", "kind": "table", "rel": null, "name": "pos_transfer_operations", "file": "supabase/migrations/20260910010000_transfer_item_atomico.sql", "file_ref": "origin/main", "ledger_hint": "transfer_item_atomico", "note": "" },
+
+    { "id": "tbl.pos_terminals", "kind": "table", "rel": null, "name": "pos_terminals", "file": "supabase/migrations/20260827120000_pos_terminals_por_sucursal.sql", "file_ref": "origin/main", "ledger_hint": "pos_terminals", "note": "está en el ALLOW del proxy" },
+    { "id": "tbl.pos_terminal_enrollments", "kind": "table", "rel": null, "name": "pos_terminal_enrollments", "file": "supabase/migrations/20260827130000_pos_terminal_enrollments.sql", "file_ref": "origin/main", "ledger_hint": "pos_terminal_enrollments", "note": "" },
+
+    { "id": "col.pos_staff.pin_hash", "kind": "column", "rel": "pos_staff", "name": "pin_hash", "file": "supabase/migrations/PENDIENTE_20260914120000_pos_staff_pin_hash.sql", "file_ref": "origin/main", "ledger_hint": "pos_staff_pin_hash", "note": "" },
+
+    { "id": "tbl.pos_caja_streams", "kind": "table", "rel": null, "name": "pos_caja_streams", "file": "supabase/migrations/PENDIENTE_20260905010000_caja_business_materializer.sql", "file_ref": "origin/main", "ledger_hint": "caja_business_materializer", "note": "" },
+    { "id": "tbl.pos_caja_business_receipts", "kind": "table", "rel": null, "name": "pos_caja_business_receipts", "file": "supabase/migrations/PENDIENTE_20260905010000_caja_business_materializer.sql", "file_ref": "origin/main", "ledger_hint": "caja_business_materializer", "note": "" },
+    { "id": "fn.apply_pos_caja_event", "kind": "function", "rel": null, "name": "apply_pos_caja_event", "file": "supabase/migrations/PENDIENTE_20260905010000_caja_business_materializer.sql", "file_ref": "origin/main", "ledger_hint": "caja_business_materializer", "note": "" },
+    { "id": "col.pos_orders.caja_stream_id", "kind": "column", "rel": "pos_orders", "name": "caja_stream_id", "file": "supabase/migrations/PENDIENTE_20260905010000_caja_business_materializer.sql", "file_ref": "origin/main", "ledger_hint": "caja_business_materializer", "note": "" },
+
+    { "id": "tbl.pos_save_operations", "kind": "table", "rel": null, "name": "pos_save_operations", "file": "supabase/migrations/00000000000000_baseline_esquema.sql", "file_ref": "origin/main", "ledger_hint": null, "note": "nace en el baseline; no tiene fila de ledger propia" },
+    { "id": "fn.r1_save_order_idempotent", "kind": "function", "rel": null, "name": "r1_save_order_idempotent", "file": "supabase/migrations/00000000000000_baseline_esquema.sql", "file_ref": "origin/main", "ledger_hint": null, "note": "idem" }
+  ]
+}

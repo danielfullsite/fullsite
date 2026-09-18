@@ -1,0 +1,583 @@
+{
+  "artifact_version": "1.0",
+  "tool": "schema-drift-guard",
+  "mode": "DRY_RUN",
+  "checked_at": "2026-09-18T21:05:56Z",
+  "repo_sha": "21d66e413663b4e78d244d5c6fcc7c8a521897c5",
+  "database_identity": "supabase:qjiomlvudfmzuvqvhwpk/postgres · PostgreSQL 17.6",
+  "inputs": {
+    "migration_files": 45,
+    "ledger_rows": 54,
+    "registry_objects": 29,
+    "registry_version": "1.0"
+  },
+  "objects": [
+    {
+      "id": "col.pos_cash_movements.client_op_id",
+      "kind": "column",
+      "relation": "pos_cash_movements",
+      "name": "client_op_id",
+      "declared_in": "supabase/migrations/PENDIENTE_20260917200000_append_idempotency.sql",
+      "declared_at_ref": "21d66e4",
+      "sources": {
+        "file": true,
+        "ledger": false,
+        "effect": true
+      },
+      "state": "FILE_AND_EFFECT_NO_LEDGER",
+      "severity": "WARN",
+      "note": "P0A"
+    },
+    {
+      "id": "col.pos_audit_log.client_op_id",
+      "kind": "column",
+      "relation": "pos_audit_log",
+      "name": "client_op_id",
+      "declared_in": "supabase/migrations/PENDIENTE_20260917200000_append_idempotency.sql",
+      "declared_at_ref": "21d66e4",
+      "sources": {
+        "file": true,
+        "ledger": false,
+        "effect": true
+      },
+      "state": "FILE_AND_EFFECT_NO_LEDGER",
+      "severity": "WARN",
+      "note": "P0A"
+    },
+    {
+      "id": "col.pos_market_movements.client_op_id",
+      "kind": "column",
+      "relation": "pos_market_movements",
+      "name": "client_op_id",
+      "declared_in": "supabase/migrations/PENDIENTE_20260917200000_append_idempotency.sql",
+      "declared_at_ref": "21d66e4",
+      "sources": {
+        "file": true,
+        "ledger": false,
+        "effect": true
+      },
+      "state": "FILE_AND_EFFECT_NO_LEDGER",
+      "severity": "WARN",
+      "note": "P0A"
+    },
+    {
+      "id": "idx.pos_cash_movements_client_op_id",
+      "kind": "index",
+      "relation": "pos_cash_movements",
+      "name": "pos_cash_movements_client_op_id",
+      "declared_in": "supabase/migrations/PENDIENTE_20260917200000_append_idempotency.sql",
+      "declared_at_ref": "21d66e4",
+      "sources": {
+        "file": true,
+        "ledger": false,
+        "effect": true
+      },
+      "state": "FILE_AND_EFFECT_NO_LEDGER",
+      "severity": "WARN",
+      "note": "único parcial"
+    },
+    {
+      "id": "idx.pos_audit_log_client_op_id",
+      "kind": "index",
+      "relation": "pos_audit_log",
+      "name": "pos_audit_log_client_op_id",
+      "declared_in": "supabase/migrations/PENDIENTE_20260917200000_append_idempotency.sql",
+      "declared_at_ref": "21d66e4",
+      "sources": {
+        "file": true,
+        "ledger": false,
+        "effect": true
+      },
+      "state": "FILE_AND_EFFECT_NO_LEDGER",
+      "severity": "WARN",
+      "note": "único parcial"
+    },
+    {
+      "id": "idx.pos_market_movements_client_op_id",
+      "kind": "index",
+      "relation": "pos_market_movements",
+      "name": "pos_market_movements_client_op_id",
+      "declared_in": "supabase/migrations/PENDIENTE_20260917200000_append_idempotency.sql",
+      "declared_at_ref": "21d66e4",
+      "sources": {
+        "file": true,
+        "ledger": false,
+        "effect": true
+      },
+      "state": "FILE_AND_EFFECT_NO_LEDGER",
+      "severity": "WARN",
+      "note": "único parcial"
+    },
+    {
+      "id": "fn.pos_scoped_child",
+      "kind": "function",
+      "relation": null,
+      "name": "pos_scoped_child",
+      "declared_in": "supabase/migrations/PENDIENTE_20260910030000_proxy_child_scope.sql",
+      "declared_at_ref": "origin/main",
+      "sources": {
+        "file": true,
+        "ledger": false,
+        "effect": true
+      },
+      "state": "FILE_AND_EFFECT_NO_LEDGER",
+      "severity": "WARN",
+      "note": null
+    },
+    {
+      "id": "fn.pos_scoped_upsert",
+      "kind": "function",
+      "relation": null,
+      "name": "pos_scoped_upsert",
+      "declared_in": "supabase/migrations/PENDIENTE_20260910020000_scoped_proxy_upsert.sql",
+      "declared_at_ref": "origin/main",
+      "sources": {
+        "file": true,
+        "ledger": false,
+        "effect": false
+      },
+      "state": "FILE_ONLY",
+      "severity": "OK",
+      "note": "hermana de pos_scoped_child"
+    },
+    {
+      "id": "tbl.pos_tenant_provisioning_ready",
+      "kind": "table",
+      "relation": null,
+      "name": "pos_tenant_provisioning_ready",
+      "declared_in": "supabase/migrations/PENDIENTE_20260910070000_tenant_provisioning_atomic.sql",
+      "declared_at_ref": "origin/main",
+      "sources": {
+        "file": true,
+        "ledger": true,
+        "effect": true
+      },
+      "state": "MATCH",
+      "severity": "OK",
+      "note": null
+    },
+    {
+      "id": "fn.pos_activate_provisioned_tenant",
+      "kind": "function",
+      "relation": null,
+      "name": "pos_activate_provisioned_tenant",
+      "declared_in": "supabase/migrations/PENDIENTE_20260910070000_tenant_provisioning_atomic.sql",
+      "declared_at_ref": "origin/main",
+      "sources": {
+        "file": true,
+        "ledger": true,
+        "effect": true
+      },
+      "state": "MATCH",
+      "severity": "OK",
+      "note": null
+    },
+    {
+      "id": "col.client_locations.timezone",
+      "kind": "column",
+      "relation": "client_locations",
+      "name": "timezone",
+      "declared_in": "supabase/migrations/20260902120000_client_locations_timezone.sql",
+      "declared_at_ref": "origin/main",
+      "sources": {
+        "file": true,
+        "ledger": false,
+        "effect": false
+      },
+      "state": "FILE_ONLY",
+      "severity": "WARN",
+      "note": "el código la lee"
+    },
+    {
+      "id": "col.pos_turnos.location_id",
+      "kind": "column",
+      "relation": "pos_turnos",
+      "name": "location_id",
+      "declared_in": "supabase/migrations/20260827150000_pos_turnos_por_sucursal.sql",
+      "declared_at_ref": "origin/main",
+      "sources": {
+        "file": true,
+        "ledger": false,
+        "effect": false
+      },
+      "state": "FILE_ONLY",
+      "severity": "WARN",
+      "note": null
+    },
+    {
+      "id": "col.pos_turnos.status",
+      "kind": "column",
+      "relation": "pos_turnos",
+      "name": "status",
+      "declared_in": "supabase/migrations/20260827150000_pos_turnos_por_sucursal.sql",
+      "declared_at_ref": "origin/main",
+      "sources": {
+        "file": true,
+        "ledger": false,
+        "effect": false
+      },
+      "state": "FILE_ONLY",
+      "severity": "WARN",
+      "note": null
+    },
+    {
+      "id": "idx.uq_pos_turnos_activo_por_sucursal",
+      "kind": "index",
+      "relation": "pos_turnos",
+      "name": "uq_pos_turnos_activo_por_sucursal",
+      "declared_in": "supabase/migrations/20260827150000_pos_turnos_por_sucursal.sql",
+      "declared_at_ref": "origin/main",
+      "sources": {
+        "file": true,
+        "ledger": false,
+        "effect": false
+      },
+      "state": "FILE_ONLY",
+      "severity": "WARN",
+      "note": null
+    },
+    {
+      "id": "idx.pos_turnos_uno_abierto_por_restaurante",
+      "kind": "index",
+      "relation": "pos_turnos",
+      "name": "pos_turnos_uno_abierto_por_restaurante",
+      "declared_in": "supabase/migrations/20260909030000_un_turno_abierto_por_restaurante.sql",
+      "declared_at_ref": "origin/main",
+      "sources": {
+        "file": true,
+        "ledger": false,
+        "effect": false
+      },
+      "state": "FILE_ONLY",
+      "severity": "WARN",
+      "note": "invariante de turno abierto"
+    },
+    {
+      "id": "fn.pos_record_inventory_movement",
+      "kind": "function",
+      "relation": null,
+      "name": "pos_record_inventory_movement",
+      "declared_in": "supabase/migrations/20260910050000_inventory_movement_atomic.sql",
+      "declared_at_ref": "origin/main",
+      "sources": {
+        "file": true,
+        "ledger": true,
+        "effect": true
+      },
+      "state": "MATCH",
+      "severity": "OK",
+      "note": null
+    },
+    {
+      "id": "tbl.pos_inventory_movement_operations",
+      "kind": "table",
+      "relation": null,
+      "name": "pos_inventory_movement_operations",
+      "declared_in": "supabase/migrations/20260910050000_inventory_movement_atomic.sql",
+      "declared_at_ref": "origin/main",
+      "sources": {
+        "file": true,
+        "ledger": true,
+        "effect": true
+      },
+      "state": "MATCH",
+      "severity": "OK",
+      "note": null
+    },
+    {
+      "id": "idx.pos_inventory_movement_operation_line",
+      "kind": "index",
+      "relation": "pos_inventory_movements",
+      "name": "pos_inventory_movement_operation_line",
+      "declared_in": "supabase/migrations/20260910050000_inventory_movement_atomic.sql",
+      "declared_at_ref": "origin/main",
+      "sources": {
+        "file": true,
+        "ledger": true,
+        "effect": true
+      },
+      "state": "MATCH",
+      "severity": "OK",
+      "note": "único parcial"
+    },
+    {
+      "id": "fn.r1_transfer_item_atomic",
+      "kind": "function",
+      "relation": null,
+      "name": "r1_transfer_item_atomic",
+      "declared_in": "supabase/migrations/20260910010000_transfer_item_atomico.sql",
+      "declared_at_ref": "origin/main",
+      "sources": {
+        "file": true,
+        "ledger": true,
+        "effect": true
+      },
+      "state": "MATCH",
+      "severity": "OK",
+      "note": null
+    },
+    {
+      "id": "tbl.pos_transfer_operations",
+      "kind": "table",
+      "relation": null,
+      "name": "pos_transfer_operations",
+      "declared_in": "supabase/migrations/20260910010000_transfer_item_atomico.sql",
+      "declared_at_ref": "origin/main",
+      "sources": {
+        "file": true,
+        "ledger": true,
+        "effect": true
+      },
+      "state": "MATCH",
+      "severity": "OK",
+      "note": null
+    },
+    {
+      "id": "tbl.pos_terminals",
+      "kind": "table",
+      "relation": null,
+      "name": "pos_terminals",
+      "declared_in": "supabase/migrations/20260827120000_pos_terminals_por_sucursal.sql",
+      "declared_at_ref": "origin/main",
+      "sources": {
+        "file": true,
+        "ledger": false,
+        "effect": false
+      },
+      "state": "FILE_ONLY",
+      "severity": "WARN",
+      "note": "está en el ALLOW del proxy"
+    },
+    {
+      "id": "tbl.pos_terminal_enrollments",
+      "kind": "table",
+      "relation": null,
+      "name": "pos_terminal_enrollments",
+      "declared_in": "supabase/migrations/20260827130000_pos_terminal_enrollments.sql",
+      "declared_at_ref": "origin/main",
+      "sources": {
+        "file": true,
+        "ledger": false,
+        "effect": false
+      },
+      "state": "FILE_ONLY",
+      "severity": "WARN",
+      "note": null
+    },
+    {
+      "id": "col.pos_staff.pin_hash",
+      "kind": "column",
+      "relation": "pos_staff",
+      "name": "pin_hash",
+      "declared_in": "supabase/migrations/PENDIENTE_20260914120000_pos_staff_pin_hash.sql",
+      "declared_at_ref": "origin/main",
+      "sources": {
+        "file": true,
+        "ledger": false,
+        "effect": false
+      },
+      "state": "FILE_ONLY",
+      "severity": "OK",
+      "note": null
+    },
+    {
+      "id": "tbl.pos_caja_streams",
+      "kind": "table",
+      "relation": null,
+      "name": "pos_caja_streams",
+      "declared_in": "supabase/migrations/PENDIENTE_20260905010000_caja_business_materializer.sql",
+      "declared_at_ref": "origin/main",
+      "sources": {
+        "file": true,
+        "ledger": false,
+        "effect": false
+      },
+      "state": "FILE_ONLY",
+      "severity": "OK",
+      "note": null
+    },
+    {
+      "id": "tbl.pos_caja_business_receipts",
+      "kind": "table",
+      "relation": null,
+      "name": "pos_caja_business_receipts",
+      "declared_in": "supabase/migrations/PENDIENTE_20260905010000_caja_business_materializer.sql",
+      "declared_at_ref": "origin/main",
+      "sources": {
+        "file": true,
+        "ledger": false,
+        "effect": false
+      },
+      "state": "FILE_ONLY",
+      "severity": "OK",
+      "note": null
+    },
+    {
+      "id": "fn.apply_pos_caja_event",
+      "kind": "function",
+      "relation": null,
+      "name": "apply_pos_caja_event",
+      "declared_in": "supabase/migrations/PENDIENTE_20260905010000_caja_business_materializer.sql",
+      "declared_at_ref": "origin/main",
+      "sources": {
+        "file": true,
+        "ledger": false,
+        "effect": false
+      },
+      "state": "FILE_ONLY",
+      "severity": "OK",
+      "note": null
+    },
+    {
+      "id": "col.pos_orders.caja_stream_id",
+      "kind": "column",
+      "relation": "pos_orders",
+      "name": "caja_stream_id",
+      "declared_in": "supabase/migrations/PENDIENTE_20260905010000_caja_business_materializer.sql",
+      "declared_at_ref": "origin/main",
+      "sources": {
+        "file": true,
+        "ledger": false,
+        "effect": false
+      },
+      "state": "FILE_ONLY",
+      "severity": "OK",
+      "note": null
+    },
+    {
+      "id": "tbl.pos_save_operations",
+      "kind": "table",
+      "relation": null,
+      "name": "pos_save_operations",
+      "declared_in": "supabase/migrations/00000000000000_baseline_esquema.sql",
+      "declared_at_ref": "origin/main",
+      "sources": {
+        "file": true,
+        "ledger": null,
+        "effect": true
+      },
+      "state": "MATCH",
+      "severity": "OK",
+      "note": "nace en el baseline; no tiene fila de ledger propia"
+    },
+    {
+      "id": "fn.r1_save_order_idempotent",
+      "kind": "function",
+      "relation": null,
+      "name": "r1_save_order_idempotent",
+      "declared_in": "supabase/migrations/00000000000000_baseline_esquema.sql",
+      "declared_at_ref": "origin/main",
+      "sources": {
+        "file": true,
+        "ledger": null,
+        "effect": true
+      },
+      "state": "MATCH",
+      "severity": "OK",
+      "note": "idem"
+    }
+  ],
+  "drifts": [
+    {
+      "id": "col.pos_cash_movements.client_op_id",
+      "state": "FILE_AND_EFFECT_NO_LEDGER",
+      "severity": "WARN",
+      "note": "P0A"
+    },
+    {
+      "id": "col.pos_audit_log.client_op_id",
+      "state": "FILE_AND_EFFECT_NO_LEDGER",
+      "severity": "WARN",
+      "note": "P0A"
+    },
+    {
+      "id": "col.pos_market_movements.client_op_id",
+      "state": "FILE_AND_EFFECT_NO_LEDGER",
+      "severity": "WARN",
+      "note": "P0A"
+    },
+    {
+      "id": "idx.pos_cash_movements_client_op_id",
+      "state": "FILE_AND_EFFECT_NO_LEDGER",
+      "severity": "WARN",
+      "note": "único parcial"
+    },
+    {
+      "id": "idx.pos_audit_log_client_op_id",
+      "state": "FILE_AND_EFFECT_NO_LEDGER",
+      "severity": "WARN",
+      "note": "único parcial"
+    },
+    {
+      "id": "idx.pos_market_movements_client_op_id",
+      "state": "FILE_AND_EFFECT_NO_LEDGER",
+      "severity": "WARN",
+      "note": "único parcial"
+    },
+    {
+      "id": "fn.pos_scoped_child",
+      "state": "FILE_AND_EFFECT_NO_LEDGER",
+      "severity": "WARN",
+      "note": null
+    },
+    {
+      "id": "col.client_locations.timezone",
+      "state": "FILE_ONLY",
+      "severity": "WARN",
+      "note": "el código la lee"
+    },
+    {
+      "id": "col.pos_turnos.location_id",
+      "state": "FILE_ONLY",
+      "severity": "WARN",
+      "note": null
+    },
+    {
+      "id": "col.pos_turnos.status",
+      "state": "FILE_ONLY",
+      "severity": "WARN",
+      "note": null
+    },
+    {
+      "id": "idx.uq_pos_turnos_activo_por_sucursal",
+      "state": "FILE_ONLY",
+      "severity": "WARN",
+      "note": null
+    },
+    {
+      "id": "idx.pos_turnos_uno_abierto_por_restaurante",
+      "state": "FILE_ONLY",
+      "severity": "WARN",
+      "note": "invariante de turno abierto"
+    },
+    {
+      "id": "tbl.pos_terminals",
+      "state": "FILE_ONLY",
+      "severity": "WARN",
+      "note": "está en el ALLOW del proxy"
+    },
+    {
+      "id": "tbl.pos_terminal_enrollments",
+      "state": "FILE_ONLY",
+      "severity": "WARN",
+      "note": null
+    }
+  ],
+  "summary": {
+    "by_state": {
+      "FILE_AND_EFFECT_NO_LEDGER": 7,
+      "FILE_ONLY": 13,
+      "MATCH": 9
+    },
+    "blocking": 0,
+    "warning": 14,
+    "ok": 15
+  },
+  "guarantees": {
+    "read_only": true,
+    "ddl_executed": 0,
+    "ledger_writes": 0,
+    "contains_secrets": false,
+    "contains_customer_data": false
+  }
+}

@@ -1,0 +1,216 @@
+#!/usr/bin/env node
+/**
+ * SCHEMA DRIFT GUARD — dry-run, sólo lectura, sin credenciales.
+ *
+ * ── QUÉ HACE ────────────────────────────────────────────────────────────────
+ * Compara TRES fuentes y clasifica cada objeto verificable en exactamente un
+ * estado. Nunca dos. Nunca «probablemente».
+ *
+ *   A  archivos de migración        (del repo, por `git ls-tree`)
+ *   B  ledger schema_migrations     (filas registradas)
+ *   C  efecto real en PostgreSQL    (introspección)
+ *
+ * ── POR QUÉ TRES Y NO DOS ───────────────────────────────────────────────────
+ * Porque el 2026-09-18 se encontraron los tres desacuerdos posibles el mismo
+ * día: un archivo PENDIENTE cuyo efecto está vivo y sin registrar, una función
+ * viva cuya hermana no lo está, y archivos registrados en el repo cuyo efecto
+ * no existe. `FILE != LEDGER != EFFECT`.
+ *
+ * ── LA REGLA QUE LO HACE ÚTIL ───────────────────────────────────────────────
+ * El guardián NO concluye que algo está aplicado porque el archivo exista o
+ * porque el ledger tenga una fila. Sólo C decide si hay efecto.
+ *
+ * ── LO QUE NO HACE, Y NO VA A HACER ─────────────────────────────────────────
+ * No escribe. Ni al esquema, ni al ledger, ni a los archivos. No ejecuta DDL.
+ * No hace `supabase db push`. No renombra migraciones. No corrige nada.
+ * No toca la red: recibe la introspección ya hecha, por archivo.
+ *
+ * ── SIN CREDENCIALES, A PROPÓSITO ───────────────────────────────────────────
+ * El guardián no se conecta a la base. Quien la consulta le pasa el resultado
+ * en `--effects`. Así el binario no maneja secretos y puede correr en CI con
+ * una credencial de sólo lectura que vive fuera de él.
+ *
+ * ── USO ─────────────────────────────────────────────────────────────────────
+ *   node drift-guard.mjs \
+ *     --registry registry.json \
+ *     --files    files.json     \  # A: [{path}]
+ *     --ledger   ledger.json    \  # B: [{version,name}]
+ *     --effects  effects.json   \  # C: {"<object id>": 0|1}
+ *     --repo-sha <sha> --db-identity <texto> [--out artifact.json]
+ *
+ * Código de salida:  0 sin deriva bloqueante · 1 con deriva bloqueante
+ *                    2 error de uso o de entrada
+ */
+
+import { readFileSync, writeFileSync } from 'node:fs'
+
+// ─── Estados. Exactamente uno por objeto. ───────────────────────────────────
+const S = {
+  MATCH: 'MATCH',
+  FILE_ONLY: 'FILE_ONLY',
+  LEDGER_ONLY: 'LEDGER_ONLY',
+  EFFECT_ONLY: 'EFFECT_ONLY',
+  FILE_AND_EFFECT_NO_LEDGER: 'FILE_AND_EFFECT_NO_LEDGER',
+  LEDGER_AND_EFFECT_NO_FILE: 'LEDGER_AND_EFFECT_NO_FILE',
+  MISMATCH: 'MISMATCH',
+  UNKNOWN: 'UNKNOWN',
+}
+
+/**
+ * Severidad por estado.
+ *   BLOCK  corrupción: el build falla
+ *   WARN   puede ser legítimo (una corrida de certificación) pero hay que verlo
+ *   OK     estado correcto, no es deriva
+ */
+const SEVERITY = {
+  [S.MATCH]: 'OK',
+  [S.FILE_ONLY]: 'OK',          // se ajusta abajo: depende de si el archivo es PENDIENTE_
+  [S.LEDGER_ONLY]: 'BLOCK',
+  [S.MISMATCH]: 'BLOCK',
+  [S.EFFECT_ONLY]: 'WARN',
+  [S.FILE_AND_EFFECT_NO_LEDGER]: 'WARN',
+  [S.LEDGER_AND_EFFECT_NO_FILE]: 'WARN',
+  [S.UNKNOWN]: 'WARN',
+}
+
+/**
+ * `FILE_ONLY` significa dos cosas opuestas, y la primera corrida lo demostró.
+ *
+ *   PENDIENTE_20260914120000_pos_staff_pin_hash.sql sin aplicar  → correcto
+ *   20260902120000_client_locations_timezone.sql sin aplicar     → deuda
+ *
+ * Los dos caen en `FILE_ONLY`. Tratarlos igual esconde el segundo caso, que es
+ * justo el que duele: el código lee `client_locations.timezone` y la columna no
+ * existe. La distinción no es un estado nuevo —los ocho estados son el contrato—
+ * sino la severidad: el prefijo `PENDIENTE_` es una declaración de intención, y
+ * su ausencia significa que alguien esperaba que esa migración ya estuviera.
+ */
+const esPendientePorDiseno = (ruta) => /(^|\/)PENDIENTE_/.test(String(ruta || ''))
+function severidad(state, file) {
+  if (state === S.FILE_ONLY) return esPendientePorDiseno(file) ? 'OK' : 'WARN'
+  return SEVERITY[state]
+}
+
+// ─── Entrada ────────────────────────────────────────────────────────────────
+function args(argv) {
+  const o = {}
+  for (let i = 2; i < argv.length; i += 2) {
+    if (!argv[i].startsWith('--')) fail(`argumento inesperado: ${argv[i]}`)
+    o[argv[i].slice(2)] = argv[i + 1]
+  }
+  return o
+}
+function fail(msg) { console.error(`drift-guard: ${msg}`); process.exit(2) }
+function readJson(p, etiqueta) {
+  try { return JSON.parse(readFileSync(p, 'utf8')) }
+  catch (e) { fail(`no se pudo leer ${etiqueta} (${p}): ${e.message}`) }
+}
+
+/**
+ * ¿El ledger nombra esta migración?
+ *
+ * Es una HEURÍSTICA por substring, y tiene que decirse: los nombres del ledger
+ * NO corresponden a los nombres de archivo. `20260910050000_inventory_movement_atomic.sql`
+ * está registrado como `20260911220951 inventory_movement_atomic`: otro sello,
+ * otro prefijo. Por eso el empate se busca por `ledger_hint` explícito del
+ * registro, puesto a mano tras leer el archivo — nunca derivado del nombre.
+ *
+ * Un hint sin empate NO prueba que no se aplicó. Sólo dice que el ledger no la
+ * nombra así. La prueba de aplicación es C, siempre.
+ */
+function ledgerTiene(ledger, hint) {
+  if (hint === null || hint === undefined) return null   // el objeto no espera fila propia
+  return ledger.some(r => String(r.name || '').includes(hint))
+}
+
+function clasificar({ enArchivo, enLedger, enEfecto }) {
+  // El objeto no declara nada verificable: no se inventa un veredicto.
+  if (enEfecto === null || enEfecto === undefined) return S.UNKNOWN
+
+  // El objeto nace en el baseline y no espera fila de ledger propia.
+  if (enLedger === null) return enEfecto ? S.MATCH : (enArchivo ? S.FILE_ONLY : S.UNKNOWN)
+
+  if (enArchivo && enLedger && enEfecto) return S.MATCH
+  if (enArchivo && !enLedger && !enEfecto) return S.FILE_ONLY
+  if (!enArchivo && enLedger && !enEfecto) return S.LEDGER_ONLY
+  if (!enArchivo && !enLedger && enEfecto) return S.EFFECT_ONLY
+  if (enArchivo && !enLedger && enEfecto) return S.FILE_AND_EFFECT_NO_LEDGER
+  if (!enArchivo && enLedger && enEfecto) return S.LEDGER_AND_EFFECT_NO_FILE
+  // archivo + ledger + sin efecto: se registró y no dejó rastro.
+  if (enArchivo && enLedger && !enEfecto) return S.MISMATCH
+  return S.UNKNOWN
+}
+
+// ─── Principal ──────────────────────────────────────────────────────────────
+const a = args(process.argv)
+for (const req of ['registry', 'files', 'ledger', 'effects']) {
+  if (!a[req]) fail(`falta --${req}`)
+}
+
+const registry = readJson(a.registry, 'registry')
+const files = readJson(a.files, 'files')       // A
+const ledger = readJson(a.ledger, 'ledger')    // B
+const effects = readJson(a.effects, 'effects') // C
+
+if (!Array.isArray(registry?.objects)) fail('registry.objects debe ser un arreglo')
+const rutas = new Set((Array.isArray(files) ? files : files.paths || []).map(f => f.path ?? f))
+
+const objects = registry.objects.map(o => {
+  const enArchivo = rutas.has(o.file)
+  const enLedger = ledgerTiene(ledger, o.ledger_hint)
+  const crudo = effects[o.id]
+  const enEfecto = crudo === undefined ? null : Number(crudo) > 0
+  const state = clasificar({ enArchivo, enLedger, enEfecto })
+  return {
+    id: o.id, kind: o.kind, relation: o.rel ?? null, name: o.name,
+    declared_in: o.file, declared_at_ref: o.file_ref ?? null,
+    sources: { file: enArchivo, ledger: enLedger, effect: enEfecto },
+    state, severity: severidad(state, o.file),
+    note: o.note || null,
+  }
+})
+
+const drifts = objects.filter(o => o.severity !== 'OK')
+const summary = {}
+for (const o of objects) summary[o.state] = (summary[o.state] || 0) + 1
+
+const artifact = {
+  artifact_version: '1.0',
+  tool: 'schema-drift-guard',
+  mode: 'DRY_RUN',
+  checked_at: a['checked-at'] || new Date().toISOString(),
+  repo_sha: a['repo-sha'] || null,
+  database_identity: a['db-identity'] || null,
+  inputs: {
+    migration_files: rutas.size,
+    ledger_rows: ledger.length,
+    registry_objects: registry.objects.length,
+    registry_version: registry.registry_version ?? null,
+  },
+  objects,
+  drifts: drifts.map(d => ({ id: d.id, state: d.state, severity: d.severity, note: d.note })),
+  summary: {
+    by_state: summary,
+    blocking: drifts.filter(d => d.severity === 'BLOCK').length,
+    warning: drifts.filter(d => d.severity === 'WARN').length,
+    ok: objects.length - drifts.length,
+  },
+  // Invariantes del propio artefacto. Si alguna es falsa, el artefacto no vale.
+  guarantees: {
+    read_only: true,
+    ddl_executed: 0,
+    ledger_writes: 0,
+    contains_secrets: false,
+    contains_customer_data: false,
+  },
+}
+
+const salida = JSON.stringify(artifact, null, 2)
+if (a.out) { writeFileSync(a.out, salida + '\n'); console.error(`artefacto → ${a.out}`) }
+else console.log(salida)
+
+// Resumen legible a stderr, para que stdout quede limpio para el artefacto.
+console.error(`\nestados: ${Object.entries(summary).map(([k, v]) => `${k}=${v}`).join(' · ')}`)
+console.error(`bloqueantes=${artifact.summary.blocking}  avisos=${artifact.summary.warning}  ok=${artifact.summary.ok}`)
+
+process.exit(artifact.summary.blocking > 0 ? 1 : 0)

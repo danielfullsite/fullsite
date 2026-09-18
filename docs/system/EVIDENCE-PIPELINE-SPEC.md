@@ -1,11 +1,12 @@
 # EVIDENCE PIPELINE — spec de diseño
 
-> **INTERNO.** Diseño, no implementación. Nada de esto se construyó.
+> **INTERNO.** §1, §2 y §5 son diseño sin implementar. **§3 sí se construyó y corrió en seco**:
+> `tools/schema-drift/`, con autoprueba 11/11 y artefacto real contra la base.
 > **Fecha:** 2026-09-18 · `origin/main` = `10017cf9` · arnés leído en `cert/rig-v1-pr2` (`9e6fe715`).
 >
-> Cubre tres piezas que hoy no existen y que tienen que existir antes de que el tablero de release
-> signifique algo: el **artefacto de resultado**, el **tablero derivado**, y el **guardián de deriva
-> de migraciones**.
+> Cubre cuatro piezas que tienen que existir antes de que el tablero de release signifique algo: el
+> **artefacto de resultado**, el **tablero derivado**, el **oráculo de check** y el **guardián de
+> deriva de migraciones** — este último ya corrió en seco (§3).
 
 ---
 
@@ -132,9 +133,14 @@ run.json (1.1)           ← qué pasó                (artefacto, no editable)
 
 ### 2.3 Qué pasa con el tablero de hoy
 
-`RELEASE-BOARD.md` @ `4fb39140` queda como está, marcado **`SIN ARTEFACTO`**. **No se edita a mano
-para perseguir el estado de Fork** — hacerlo sería repetir exactamente el error que este spec
-existe para eliminar. Se reemplaza cuando haya artefacto, no antes.
+`RELEASE-BOARD.md` lleva `RELEASE_BOARD_AUTHORITY = MANUAL_SNAPSHOT / SIN_ARTEFACTO_COMPLETO` en la
+cabecera y una hora de corte, no sólo una fecha. Se actualizó a mano una segunda vez el mismo día
+—SHAs nuevos y resultados reportados por Fork— y **eso es exactamente la razón por la que no puede
+ser autoridad**. Se reemplaza por una proyección generada cuando exista el artefacto, no antes.
+
+Regla provisional mientras tanto: **el tablero registra lo que Fork reporta, marcado como
+reportado, nunca como verificado.** Un `PASS` sin `run.json` publicado y sin definición de compuerta
+es una afirmación, no una certificación.
 
 ---
 
@@ -235,3 +241,71 @@ inteligencia comercial y de precios.
 Un repositorio privado nuevo resuelve la exposición y **no** resuelve el respaldo por sí solo: hay
 que empujar a él. Los tres documentos de `docs/system/` llevan hoy horas existiendo sólo en un
 disco sin Time Machine. **La preservación es urgente; la publicación no lo es.**
+
+---
+
+## 5 · ORÁCULO DE CHECK — el `echo` que mintió
+
+### 5.1 El error real
+
+```bash
+npx tsc --noEmit
+echo "TSC ok"
+```
+
+En una shell, `echo` corre **pase lo que pase** con el comando anterior. `tsc` puede salir con
+código 2 y la línea siguiente imprime `TSC ok`. Quien lee la salida —una persona o un agente— ve la
+palabra «ok» y la toma como resultado.
+
+> **La regla: un mensaje producido por el arnés nunca es evidencia de que el comando anterior pasó.**
+> La evidencia del comando la produce el comando: su código de salida.
+
+Es la misma familia que las tres reglas duras del arnés de certificación: `NOT_OBSERVED` no es
+`PASS`, y un 200 vacío no es un recibo. Aquí la variante es peor, porque el arnés **fabrica** la
+apariencia de conformidad en vez de sólo no medirla.
+
+### 5.2 Qué se guarda de cada check
+
+Nunca la conclusión. Siempre la medición:
+
+```jsonc
+{
+  "id": "typescript",
+  "command": ["npx", "tsc", "--noEmit"],   // argv, no una cadena de shell
+  "exit_code": 2,
+  "stdout_sha256": "<64 hex>",
+  "stderr_sha256": "<64 hex>",
+  "started_at": "2026-09-18T21:40:00.000Z",
+  "finished_at": "2026-09-18T21:40:37.412Z",
+  "duration_ms": 37412,
+  "oracle": "exit_code === 0",
+  "state": "FAIL"
+}
+```
+
+- **`command` es un arreglo**, no una cadena. Sin shell no hay `&&`, `;` ni `echo` que se cuelen.
+- **Se guarda el hash de la salida, no la salida.** El hash prueba que no cambió y no arrastra rutas
+  locales ni nombres de archivo a un artefacto que puede acabar publicado. La salida completa vive en
+  `artifacts_dir`, junto a la traza.
+- **`oracle` es explícito y se guarda.** Quien lea el artefacto dentro de un año sabe qué se
+  consideró aprobar.
+- **`state` lo deriva el pipeline del oráculo**, nunca del texto de la salida.
+
+### 5.3 El oráculo por tipo de check
+
+| Check | Oráculo | Lo que NO cuenta |
+|---|---|---|
+| TypeScript | `exit_code === 0` | que la salida no diga «error»; que un `echo` posterior diga «ok» |
+| ESLint | `exit_code === 0` **contra la línea base acordada** | conteo de advertencias |
+| Pruebas | `exit_code === 0` **y** aprobadas ≥ total esperado | «no arrojó error» |
+| Build | `exit_code === 0` **y** el artefacto existe en disco | que el log termine sin excepción |
+| Guardián de esquema | `summary.blocking === 0` | que el comando no truene |
+| Certificación | `verdict === 'PASS'` en `run.json` | el `REPORT.md`, que es proyección |
+
+### 5.4 La regla general, que aplica más allá de `tsc`
+
+> **Un check sin `exit_code` guardado es `NOT_OBSERVED`, no `PASS`.**
+
+Y su corolario, que es lo que hace falta para que esto no se repita: **ningún paso del pipeline se
+compone con `&&` o `;` en una cadena de shell.** Cada comando se ejecuta por separado, con su argv,
+y su resultado se registra antes de decidir si hay siguiente paso.
