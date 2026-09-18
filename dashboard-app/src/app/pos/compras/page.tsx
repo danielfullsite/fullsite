@@ -66,7 +66,9 @@ export default function ComprasPage() {
 
   const toggleExpand = async (id: string) => {
     if (expanded === id) { setExpanded(null); return }
-    const items = await getPurchaseOrderItems(id)
+    let items: PurchaseOrderItem[]
+    try { items = await getPurchaseOrderItems(id) }
+    catch { showToast('No se pudieron leer los productos de esta OC'); return }
     setExpandedItems(items)
     setExpanded(id)
   }
@@ -108,9 +110,22 @@ export default function ComprasPage() {
   const [receptionBy, setReceptionBy] = useState('')
   const [receptionNotes, setReceptionNotes] = useState('')
   const [savingReception, setSavingReception] = useState(false)
+  // Un fallo de recepción ya no puede quedarse mudo: vive aquí y se muestra
+  // dentro del modal, que permanece abierto para reintentar.
+  const [receptionError, setReceptionError] = useState<string | null>(null)
 
   const openReception = async (po: PurchaseOrder) => {
-    const items = await getPurchaseOrderItems(po.id)
+    // No se abre un modal listo para confirmar sobre una lista que no se pudo
+    // leer. Antes, un error de lectura entraba como `[]` y la recepción se
+    // confirmaba con cero items, dejando la OC «recibida» por $0.00.
+    let items: PurchaseOrderItem[]
+    try {
+      items = await getPurchaseOrderItems(po.id)
+    } catch (error) {
+      showToast(`No se pudieron leer los productos de la OC ${po.id.slice(0, 8)} — reintenta`)
+      console.error('[compras] recepción no abierta:', error instanceof Error ? error.message : error)
+      return
+    }
     setReceptionItems(items.map(item => ({
       ...item,
       qty_received: item.quantity_ordered, // pre-fill with ordered qty
@@ -119,6 +134,7 @@ export default function ComprasPage() {
     setReceptionPO(po)
     setReceptionBy('')
     setReceptionNotes('')
+    setReceptionError(null)
   }
 
   const updateReceivedQty = (itemId: number, qty: number) => {
@@ -133,9 +149,34 @@ export default function ComprasPage() {
     ))
   }
 
+  /**
+   * CONFIRMAR UNA RECEPCIÓN ES DECLARAR QUE TRES COSAS QUEDARON.
+   *
+   * Antes no se revisaba ninguna: se disparaban los pasos, se mostraba el toast
+   * de éxito y se cerraba el modal pasara lo que pasara. Una orden podía quedar
+   * «recibida» por $0.00 sin inventario y sin un error visible.
+   *
+   * Ahora cada paso se confirma antes del siguiente, y el éxito se declara sólo
+   * al final. Si algo falla, el modal se queda abierto con el error y se puede
+   * reintentar — que es seguro porque las tres escrituras lo toleran:
+   *   · `quantity_received` es absoluto, no incremental
+   *   · el inventario es idempotente por `po:<orderId>` (P0A)
+   *   · el estado de la cabecera es un PATCH idempotente
+   *
+   * Lo que NO se hace es revertir el inventario si la cabecera falla después de
+   * que el movimiento ya se aplicó. Revertir automáticamente un asiento
+   * confirmado inventa una salida de almacén que nadie hizo; el reintento
+   * encuentra el mismo `po:<orderId>` y no vuelve a sumar.
+   */
   const handleConfirmReception = async () => {
     if (!receptionPO || !receptionBy.trim()) return
+    if (!receptionItems.length) {
+      setReceptionError('Esta orden no tiene productos que dar de alta. Revísala antes de recibirla.')
+      return
+    }
     setSavingReception(true)
+    setReceptionError(null)
+    try {
 
     // 1. Update quantity_received for each item
     await receiveOrderItems(
@@ -155,13 +196,15 @@ export default function ComprasPage() {
     const actualIva = actualSubtotal * IVA_RATE
     const actualTotal = actualSubtotal + actualIva
 
-    // 4. Update OC status
-    await updatePurchaseOrderStatus(receptionPO.id, 'recibida', {
+    // 4. Update OC status — revisado. Si falla DESPUÉS del inventario, el
+    // movimiento ya quedó aplicado y el reintento no lo duplica.
+    const cabecera = await updatePurchaseOrderStatus(receptionPO.id, 'recibida', {
       received_by: receptionBy,
       subtotal: actualSubtotal,
       iva: actualIva,
       total: actualTotal,
     })
+    if (!cabecera) throw new Error('ESTADO_NO_CONFIRMADO: la orden no pudo marcarse como recibida')
 
     // 5. Log discrepancies in audit
     const discrepancies = receptionItems.filter(item => item.qty_received !== item.quantity_ordered)
@@ -187,12 +230,24 @@ export default function ComprasPage() {
       reason: discrepancies.length > 0 ? `${discrepancies.length} discrepancia(s) en recepcion` : undefined,
     })
 
-    const itemCount = receptionItems.reduce((s, i) => s + (i.qty_received > 0 ? 1 : 0), 0)
+      const itemCount = receptionItems.reduce((s, i) => s + (i.qty_received > 0 ? 1 : 0), 0)
 
-    setSavingReception(false)
-    setReceptionPO(null)
-    showToast(`Recepcion completa — ${itemCount} items dados de alta en inventario${discrepancies.length > 0 ? `, ${discrepancies.length} discrepancias` : ''}`)
-    fetchData()
+      // Sólo aquí, con los tres pasos confirmados, la recepción es un hecho.
+      setReceptionPO(null)
+      showToast(`Recepcion completa — ${itemCount} items dados de alta en inventario${discrepancies.length > 0 ? `, ${discrepancies.length} discrepancias` : ''}`)
+      fetchData()
+    } catch (error) {
+      const detalle = error instanceof Error ? error.message : String(error)
+      console.error('[compras] recepción no confirmada:', detalle)
+      setReceptionError(
+        detalle.startsWith('CANTIDAD_NO_CONFIRMADA') ? 'No se pudieron guardar las cantidades recibidas. Reintenta.'
+        : detalle.startsWith('INVENTARIO_NO_CONFIRMADO') ? 'El inventario no confirmó el alta. Reintenta la misma recepción: no se duplica.'
+        : detalle.startsWith('ESTADO_NO_CONFIRMADO') ? 'El inventario SÍ quedó aplicado, pero la orden no pudo marcarse como recibida. Reintenta.'
+        : `La recepción no se completó: ${detalle}`
+      )
+    } finally {
+      setSavingReception(false)
+    }
   }
 
   // ─── Create Factura for OC ──────────────────────────────────────────────
@@ -764,6 +819,18 @@ export default function ComprasPage() {
                 )
               })()}
 
+              {receptionItems.length === 0 && (
+                <div className="mt-4 bg-amber-500/10 border border-amber-500/40 rounded-lg px-4 py-3 text-sm text-amber-300">
+                  Esta orden no tiene productos registrados. No se puede recibir: revísala o vuelve a capturarla.
+                </div>
+              )}
+
+              {receptionError && (
+                <div className="mt-4 bg-red-500/10 border border-red-500/50 rounded-lg px-4 py-3 text-sm text-red-300">
+                  {receptionError}
+                </div>
+              )}
+
               {/* Who received */}
               <div className="mt-4">
                 <label className="text-sm text-[var(--text-3)] block mb-1">Recibido por</label>
@@ -795,7 +862,7 @@ export default function ComprasPage() {
               </button>
               <button
                 onClick={handleConfirmReception}
-                disabled={!receptionBy.trim() || savingReception}
+                disabled={!receptionBy.trim() || savingReception || receptionItems.length === 0}
                 className="flex-[2] py-3 rounded-xl bg-amber-600 hover:bg-amber-500 disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-semibold flex items-center justify-center gap-2"
               >
                 <PackageCheck size={18} />

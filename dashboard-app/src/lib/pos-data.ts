@@ -3181,13 +3181,33 @@ export async function getPurchaseOrders(): Promise<PurchaseOrder[]> {
   return res.json()
 }
 
+/**
+ * UN ERROR NO ES UNA LISTA VACÍA.
+ *
+ * Esto devolvía `[]` ante cualquier fallo, y quien llamaba no podía distinguir
+ * «esta orden no tiene renglones» de «no pude leerlos». La recepción tomaba ese
+ * `[]` como un hecho: marcaba la OC recibida, recalculaba el total a $0.00 y no
+ * tocaba inventario, sin un solo error en pantalla.
+ *
+ * Visto en el laboratorio el 2026-09-18: con el RPC `pos_scoped_child` ausente,
+ * el GET contestaba 503 y la orden quedaba «recibida» por cero pesos.
+ *
+ * Una lista vacía verdadera se conserva como vacía. Un fallo LANZA.
+ */
 export async function getPurchaseOrderItems(orderId: string): Promise<PurchaseOrderItem[]> {
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/pos_purchase_order_items?order_id=eq.${orderId}`,
-    { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
-  )
-  if (!res.ok) return []
-  return res.json()
+  let res: Response
+  try {
+    res = await fetch(
+      `${SUPABASE_URL}/rest/v1/pos_purchase_order_items?order_id=eq.${orderId}`,
+      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
+    )
+  } catch {
+    throw new Error('RENGLONES_ILEGIBLES: sin conexión con el servidor')
+  }
+  if (!res.ok) throw new Error(`RENGLONES_ILEGIBLES: HTTP ${res.status}`)
+  const cuerpo = await res.json().catch(() => null)
+  if (!Array.isArray(cuerpo)) throw new Error('RENGLONES_ILEGIBLES: respuesta inesperada')
+  return cuerpo as PurchaseOrderItem[]
 }
 
 export async function updatePurchaseOrderStatus(
@@ -3209,18 +3229,37 @@ export async function updatePurchaseOrderStatus(
 }
 
 // Receive items at almacén (update quantity_received)
+/**
+ * UNA ESCRITURA QUE NO SE REVISÓ NO ESTÁ CONFIRMADA.
+ *
+ * Antes se disparaban los PATCH sin mirar ni una respuesta y se devolvía `true`
+ * siempre. Con el proxy contestando 503 —caso real del 2026-09-18— ninguna
+ * cantidad se guardaba y la recepción seguía de largo como si todas hubieran
+ * quedado.
+ *
+ * Lanzar a la primera falla deja renglones anteriores ya aplicados, y está bien:
+ * `quantity_received` es un valor ABSOLUTO, no un incremento, así que reintentar
+ * la misma recepción los vuelve a escribir con el mismo valor. Lo que no puede
+ * pasar —y es lo que esto corta— es avanzar al inventario sin tenerlos todos.
+ */
 export async function receiveOrderItems(
   orderId: string, received: { item_id: number; quantity_received: number }[]
 ): Promise<boolean> {
   for (const r of received) {
-    await fetch(
-      `${SUPABASE_URL}/rest/v1/pos_purchase_order_items?id=eq.${r.item_id}`,
-      {
-        method: 'PATCH',
-        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify({ quantity_received: r.quantity_received }),
-      }
-    )
+    let res: Response
+    try {
+      res = await fetch(
+        `${SUPABASE_URL}/rest/v1/pos_purchase_order_items?id=eq.${r.item_id}`,
+        {
+          method: 'PATCH',
+          headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+          body: JSON.stringify({ quantity_received: r.quantity_received }),
+        }
+      )
+    } catch {
+      throw new Error(`CANTIDAD_NO_CONFIRMADA: renglón ${r.item_id}, sin conexión`)
+    }
+    if (!res.ok) throw new Error(`CANTIDAD_NO_CONFIRMADA: renglón ${r.item_id}, HTTP ${res.status}`)
   }
   return true
 }
