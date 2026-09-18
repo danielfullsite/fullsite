@@ -3,7 +3,7 @@
 > **INTERNO — no publicar.** Contiene bloqueadores de release y estado de fallo vivo.
 > Ver [`SOURCE-OF-TRUTH.md`](SOURCE-OF-TRUTH.md) §4.
 >
-> **Corte:** 2026-09-18, **21:30** (segunda foto del día). Este tablero es una **foto**, no un
+> **Corte:** 2026-09-18, **23:10** (tercera foto del día). Este tablero es una **foto**, no un
 > documento vivo: cada línea lleva el SHA con el que se tomó. Si no coincide con `git rev-parse`, el
 > tablero está viejo y gana el SHA.
 >
@@ -29,6 +29,31 @@
 | **`P0A_FINAL_SHA`** | **`8d8c20d832a9be1f4bb78edaf917d2dfc3861d85`** (`p0a/recepcion-transaccional`) | **el SHA certificado de P0A.** Publicado por Fork |
 | **`CURRENT_INTEGRATION_HEAD`** | **`21d66e413663b4e78d244d5c6fcc7c8a521897c5`** (`p0a/recepcion-sin-fail-open`) | hijo **directo** de `8d8c20d8`, verificado con `git rev-parse ^`. Cierra el fail-open de recepción. **NO es todavía `FINAL_RELEASE_CANDIDATE`** |
 | `p0a/append-idempotency` | `bb0464268fc3721a4b3463d18324f9bda12b220b` | ancestro de los dos anteriores · publicado para preservación, sin PR |
+
+### 1.1 · El HEAD de Fork se movió otra vez — y los artefactos NO se reescriben
+
+| | |
+|---|---|
+| `CURRENT_FORK_HEAD` | **`7ae2745b8461763cedfc547fde16d7230c1f6fd8`** · rama `p0a/po-create-tax-actor`, publicada |
+| asunto | *fix(compras): el impuesto sale de la configuración y la firma de la sesión* |
+| cadena desde `8d8c20d8` | `21d66e41` → `9772f164` → `0ca78971` → `7ae2745b` |
+| `P0A_FINAL_SHA` | **`8d8c20d8` sigue intacto y sigue siendo ancestro** (`git merge-base --is-ancestor`) |
+
+**Cuarta vez que el HEAD se mueve en un día.** Los artefactos ya emitidos quedan **congelados con el
+SHA con el que se midieron** — reescribirlos para perseguir el HEAD sería convertir evidencia en
+opinión:
+
+| Artefacto | Fijado a | Regla |
+|---|---|---|
+| `drift-report.json` | `21d66e41` | no se reescribe |
+| `release-triage.json` | `21d66e41` | no se reescribe |
+| `deploy-pack-turno-abierto.json` | `9772f164` (donde se verificó la compuerta de código) | no se reescribe; si hay que revalidar sobre otro SHA, se emite un pack nuevo |
+
+**Consecuencia operativa, registrada:** antes del paso 5 hay que **revalidar `CONFLICT_HANDLER_READY`
+sobre el SHA que quede sirviendo**, no sobre `9772f164`. Está escrito en la compuerta de entrada de
+ese paso.
+
+**Compras es de Fork.** Los cuatro commits de la cadena son suyos; no se leyeron ni se evaluaron.
 
 **Linaje verificado con `git`:**
 

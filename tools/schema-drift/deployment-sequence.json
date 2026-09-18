@@ -1,0 +1,142 @@
+{
+  "board_version": "1.0",
+  "prepared_at": "2026-09-18",
+  "status": "PREPARADO · NO EJECUTADO · ningún paso autorizado",
+  "authority_note": "Este tablero es un PLAN, no un resultado. Ningún paso pasa a DONE editando este archivo: pasa cuando existe su evidencia. Mientras no haya artefacto, el estado de cada paso es NOT_STARTED y así se queda.",
+
+  "fixed_reference_points": {
+    "P0A_FINAL_SHA": "8d8c20d832a9be1f4bb78edaf917d2dfc3861d85",
+    "P0A_FINAL_SHA_note": "El SHA certificado de P0A NO se mueve. Sigue siendo ancestro de toda la línea (verificado con git merge-base --is-ancestor).",
+    "CURRENT_FORK_HEAD": "7ae2745b8461763cedfc547fde16d7230c1f6fd8",
+    "CURRENT_FORK_HEAD_branch": "p0a/po-create-tax-actor (publicada)",
+    "CURRENT_FORK_HEAD_subject": "fix(compras): el impuesto sale de la configuración y la firma de la sesión",
+    "chain_since_p0a": ["21d66e41", "9772f164", "0ca78971", "7ae2745b"],
+    "historical_artifacts_frozen": [
+      { "artifact": "drift-report.json", "pinned_to": "21d66e413663b4e78d244d5c6fcc7c8a521897c5", "rule": "NO se reescribe. Su veredicto vale para el SHA con el que se midió." },
+      { "artifact": "release-triage.json", "pinned_to": "21d66e413663b4e78d244d5c6fcc7c8a521897c5", "rule": "NO se reescribe." },
+      { "artifact": "deploy-pack-turno-abierto.json", "pinned_to": "9772f164 (compuerta de código verificada ahí)", "rule": "NO se reescribe. Si hay que revalidar sobre otro SHA, se emite un pack nuevo." }
+    ]
+  },
+
+  "steps": [
+    {
+      "n": 1,
+      "id": "FORK_FINAL_GREEN",
+      "owner": "FORK",
+      "state": "NOT_STARTED",
+      "what": "Fork cierra su track de compras y declara verde sobre un SHA final.",
+      "entry_gate": "ninguna — es el primero",
+      "exit_evidence": "SHA final declarado por Fork + su corrida verde",
+      "blocks": "todo lo demás",
+      "backlog_role": "ninguno. No investigar, no reproducir, no opinar sobre compras."
+    },
+    {
+      "n": 2,
+      "id": "DEPLOY_PO_MIGRATION",
+      "owner": "FORK",
+      "state": "NOT_STARTED",
+      "what": "Desplegar la migración de órdenes de compra que acompañe al SHA final.",
+      "entry_gate": "STEP 1 verde",
+      "exit_evidence": "fingerprint post-deploy de los objetos que cree, leído por introspección",
+      "backlog_role": "ninguno hasta el paso 7."
+    },
+    {
+      "n": 3,
+      "id": "DEPLOY_VERCEL",
+      "owner": "FORK",
+      "state": "NOT_STARTED",
+      "what": "Desplegar el código a Vercel.",
+      "entry_gate": "STEP 2 con su fingerprint verificado",
+      "exit_evidence": "deployment id + el SHA que quedó sirviendo",
+      "hard_rule": "CÓDIGO ANTES QUE ÍNDICE. El paso 5 no puede adelantarse a éste: sin el manejo del 409 desplegado, el índice convierte un segundo turno en un turno fantasma que nunca sincroniza."
+    },
+    {
+      "n": 4,
+      "id": "RUNTIME_CERT_COMPRAS",
+      "owner": "FORK",
+      "state": "NOT_STARTED",
+      "what": "Certificación de runtime del frente de compras, en tenant CERT.",
+      "entry_gate": "STEP 3 desplegado",
+      "exit_evidence": "run.json con veredicto",
+      "backlog_role": "ninguno."
+    },
+    {
+      "n": 5,
+      "id": "DEPLOY_OPEN_SHIFT_INDEX",
+      "owner": "BACKLOG",
+      "state": "READY_NOT_AUTHORIZED",
+      "what": "Crear idx.pos_turnos_uno_abierto_por_restaurante en la base compartida.",
+      "entry_gate": [
+        "STEP 4 cerrado y el entorno quieto",
+        "instrucción explícita de Daniel",
+        "REPETIR el preflight pegado a la operación — el resultado del 2026-09-18 caduca",
+        "compuerta: tenants_with_multiple_open_shifts = 0 AND open_shifts_without_tenant = 0",
+        "revalidar CONFLICT_HANDLER_READY sobre el SHA que quedó sirviendo en el paso 3, no sobre 9772f164"
+      ],
+      "pack": "deploy-pack-turno-abierto.json",
+      "ddl": "CREATE UNIQUE INDEX IF NOT EXISTS pos_turnos_uno_abierto_por_restaurante ON public.pos_turnos (client_id) WHERE closed_at IS NULL;",
+      "rollback": "DROP INDEX public.pos_turnos_uno_abierto_por_restaurante;",
+      "exit_evidence": "consulta de fingerprint post-deploy: def idéntico al esperado, indisunique=true, indisvalid=true",
+      "single_objective": "Este paso crea un índice y NADA más. No repara ledger, no renombra migraciones, no toca otras derivas.",
+      "abort_rule": "Si el preflight encuentra un tenant con dos turnos abiertos: ABORTAR. No autocerrar. Cerrar duplicados con un UPDATE masivo fue lo que produjo los closed_at anteriores al opened_at que la propia migración documenta."
+    },
+    {
+      "n": 6,
+      "id": "RUNTIME_CERT_R1_R8",
+      "owner": "BACKLOG",
+      "state": "PLAN_READY_NOT_RUN",
+      "what": "Certificación de runtime del invariante de turno abierto, R1–R8, en tenant CERT.",
+      "entry_gate": "STEP 5 con fingerprint verificado",
+      "plan": "deploy-pack-turno-abierto.json → runtime_cert_plan_AFTER_DEPLOY",
+      "tenant": "fullsite-cert-lab-v2. Nunca amalay.",
+      "exit_evidence": "run.json con los ocho pasos observados y veredicto por la regla del arnés: PASS sólo si todas las observaciones son EXPECTED_BEHAVIOR",
+      "not_covered": "El camino de Pedro (write_authority='caja') tiene su propio guard y exige instalación con autoridad local encendida."
+    },
+    {
+      "n": 7,
+      "id": "RERUN_DRIFT_GUARDIAN",
+      "owner": "BACKLOG",
+      "state": "NOT_STARTED",
+      "what": "Volver a correr el guardián de deriva contra el estado posterior a los pasos 2 y 5.",
+      "entry_gate": "STEP 6 cerrado",
+      "expected_changes": [
+        "idx.pos_turnos_uno_abierto_por_restaurante: FILE_ONLY → FILE_AND_EFFECT_NO_LEDGER, con PRESENT_AND_MATCHING",
+        "los objetos que cree la migración del paso 2 entran al registro con su fingerprint esperado leído de su archivo",
+        "el resto NO debe moverse. Si algo más cambió de estado, alguien hizo algo que no estaba en esta secuencia."
+      ],
+      "artifact": "drift-report.json nuevo, pinned al SHA del paso 3. El anterior NO se sobrescribe.",
+      "note": "El guardián queda CONGELADO en v1.1. Sólo se le tocan bugs reales."
+    },
+    {
+      "n": 8,
+      "id": "RECORD_RELEASE_ARTIFACT",
+      "owner": "BACKLOG",
+      "state": "TEMPLATE_READY",
+      "what": "Emitir el artefacto de release que registra qué se liberó, con qué evidencia.",
+      "entry_gate": "STEP 7 sin cambios inesperados",
+      "template": "release-artifact.template.json",
+      "rule": "El artefacto se EMITE, no se redacta. Cada campo cita su evidencia o queda en UNKNOWN. Un tablero derivado de él puede generarse después; el tablero manual actual se retira ese día."
+    }
+  ],
+
+  "explicitly_not_in_this_sequence": [
+    { "item": "Reconciliar el ledger de migraciones", "why": "Los 7 FILE_AND_EFFECT_NO_LEDGER siguen abiertos a propósito. Es una operación aparte, con su propia autorización, y su único paso de escritura va a supabase_migrations, no al esquema." },
+    { "item": "Cerrar el contrato P0A", "why": "Las siete definiciones de compuerta siguen MISSING. RESULT_REPORTED != GATE_DEFINED. El borrador no se commitea." },
+    { "item": "Las 3 derivas multi-sucursal", "why": "col.pos_turnos.location_id, idx.uq_pos_turnos_activo_por_sucursal y col.client_locations.timezone no bloquean este release." },
+    { "item": "Arreglar la trampa de pos_terminals", "why": "Registrada como guardrail, no como trabajo. Ver hazards." }
+  ],
+
+  "hazards_registered_not_fixed": [
+    {
+      "id": "LATENT_CONFIG_HAZARD",
+      "subject": "pos.require_enrolled_terminal",
+      "state": "ARMADO",
+      "rule": "NO activar mientras la tabla pos_terminals no exista.",
+      "effect_if_violated": "api/pos/pin/route.ts consulta pos_terminals; sin la tabla PostgREST da 400, la ruta responde 503 authority_unavailable y el restaurante se queda sin login de nube. Es una escritura de configuración, sin deploy.",
+      "state_today": "13 tenants sin la llave; amalay con la llave presente en false",
+      "applies_during": "TODA la secuencia. Ningún paso de abajo debe tocar esa configuración."
+    }
+  ],
+
+  "guarantees": { "steps_executed": 0, "shared_db_writes": 0, "amalay_writes": 0, "product_files_modified": 0, "config_changed": 0 }
+}
