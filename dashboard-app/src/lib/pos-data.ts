@@ -1,6 +1,7 @@
 import { kitchenOrderInScope, readKitchenScope } from './kitchen-read-scope'
 import { nuevaIdentidadDeAccion } from './operation-identity'
 import { recordMovement, confirmarMovimientoInventario } from './inventory'
+import { apiUrl } from './api-base'
 // POS Menu Data — AMALAY real menu (el POS legado)
 //
 // SQL for Supabase (run in SQL Editor):
@@ -3194,6 +3195,107 @@ export async function getPurchaseOrders(): Promise<PurchaseOrder[]> {
  *
  * Una lista vacía verdadera se conserva como vacía. Un fallo LANZA.
  */
+/**
+ * Cabeceras para las rutas POS autenticadas.
+ *
+ * No hay un helper compartido en el repo: cada sitio lo arma en línea. Se
+ * replica el patrón canónico de `inventory.ts:100-108` —shift token del POS, o
+ * el JWT del dashboard— en vez de inventar otro contrato o refactorizar los
+ * nueve sitios existentes dentro de este track.
+ */
+function encabezadosPOS(): Record<string, string> {
+  const h: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (typeof window === 'undefined') return h
+  let token: string | null = null
+  try { token = localStorage.getItem('pos_shift_token') } catch { /* ssr/privado */ }
+  if (!token) {
+    try {
+      const host = new URL(SUPABASE_URL).hostname.split('.')[0]
+      const guardado = localStorage.getItem(`sb-${host}-auth-token`)
+      if (guardado) token = JSON.parse(guardado)?.access_token || null
+    } catch { /* sin sesión */ }
+  }
+  if (token && token !== SUPABASE_KEY) h.Authorization = `Bearer ${token}`
+  const cid = _getClientId()
+  if (cid) h['x-fullsite-tenant'] = cid
+  return h
+}
+
+/**
+ * CATÁLOGO ESTRICTO PARA COMPRAS.
+ *
+ * `getIngredients()` devuelve `[]` ante error y tiene nueve llamadores; cambiarla
+ * globalmente arriesga pantallas ajenas a este flujo. Pero comprar contra un
+ * catálogo que no se pudo leer es exactamente cómo nacieron los ingredientes
+ * inventados: si la lista llega vacía por un 503, el formulario invita a teclear
+ * un nombre nuevo y a fabricar su id.
+ *
+ * Aquí un fallo LANZA y un catálogo legítimamente vacío se conserva vacío. Quien
+ * compra usa sólo esta frontera.
+ */
+export async function getIngredientCatalogStrict(signal?: AbortSignal): Promise<Ingredient[]> {
+  let res: Response
+  try {
+    res = await fetch(
+      `${SUPABASE_URL}/rest/v1/pos_ingredients?client_id=eq.${_getClientId()}&active=eq.true&order=name.asc&limit=2000`,
+      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store', signal }
+    )
+  } catch { throw new Error('CATALOGO_ILEGIBLE: sin conexión con el servidor') }
+  if (!res.ok) throw new Error(`CATALOGO_ILEGIBLE: HTTP ${res.status}`)
+  const cuerpo = await res.json().catch(() => null)
+  if (!Array.isArray(cuerpo)) throw new Error('CATALOGO_ILEGIBLE: respuesta inesperada')
+  return cuerpo as Ingredient[]
+}
+
+/**
+ * ALTA DE INGREDIENTE. La identidad la asigna el SERVIDOR.
+ *
+ * Nunca se manda un id: el nombre es un nombre, no una llave primaria. Devuelve
+ * el ingrediente confirmado, y ESE `id` es el que puede entrar a una orden.
+ */
+export async function createIngredient(datos: {
+  name: string; unit: string; cost_per_unit?: number; category?: string; supplier?: string
+}): Promise<Ingredient> {
+  const res = await fetch(apiUrl('/api/pos/ingredientes'), {
+    method: 'POST',
+    headers: encabezadosPOS(),
+    body: JSON.stringify(datos),
+  }).catch(() => null)
+  if (!res) throw new Error('INGREDIENTE_NO_CONFIRMADO: sin conexión')
+  const cuerpo = await res.json().catch(() => null)
+  if (!res.ok || !cuerpo?.id) {
+    throw new Error(typeof cuerpo?.error === 'string' ? cuerpo.error : 'INGREDIENTE_NO_CONFIRMADO')
+  }
+  return cuerpo as Ingredient
+}
+
+/**
+ * CREAR UNA ORDEN DE COMPRA, entera o nada.
+ *
+ * Sustituye a `createPurchaseOrder`, que hacía dos POST independientes y dejaba
+ * la cabecera huérfana si el segundo fallaba. El servidor valida todas las
+ * líneas antes de escribir y commitea las dos inserciones juntas.
+ *
+ * No lleva `client_id`: el tenant sale de la sesión autenticada.
+ */
+export async function createPurchaseOrderAtomic(orden: {
+  supplier: string; created_by: string; notes?: string; ai_suggested?: boolean
+  lines: { ingredient_id: string; ingredient_name?: string; quantity_ordered: number; unit: string; unit_cost: number }[]
+}): Promise<{ order_id: string; total: number }> {
+  const { lines, ...header } = orden
+  const res = await fetch(apiUrl('/api/pos/purchase-orders'), {
+    method: 'POST',
+    headers: encabezadosPOS(),
+    body: JSON.stringify({ header, lines }),
+  }).catch(() => null)
+  if (!res) throw new Error('ORDEN_NO_CONFIRMADA: sin conexión')
+  const cuerpo = await res.json().catch(() => null)
+  if (!res.ok || !cuerpo?.order_id) {
+    throw new Error(typeof cuerpo?.error === 'string' ? cuerpo.error : 'ORDEN_NO_CONFIRMADA')
+  }
+  return cuerpo as { order_id: string; total: number }
+}
+
 export async function getPurchaseOrderItems(orderId: string): Promise<PurchaseOrderItem[]> {
   let res: Response
   try {
