@@ -1,0 +1,126 @@
+{
+  "triage_version": "1.0",
+  "triaged_at": "2026-09-18",
+  "candidate_sha": "21d66e413663b4e78d244d5c6fcc7c8a521897c5",
+  "inputs": ["drift-report.json (artifact_version 1.1)", "release-policy.json (policy_version 1.0)"],
+  "method": "Lectura del código del candidato con `git show <sha>:<ruta>` más introspección de sólo lectura de la base. Cero ejecución en runtime.",
+  "comment": [
+    "release-policy.json NO se modificó. Este triage lo toma como entrada y lo confronta",
+    "contra el alcance REAL del producto en el candidato. Donde el triage contradice a la",
+    "política, gana el código leído — y la contradicción queda escrita, no corregida en silencio."
+  ],
+
+  "current_release_capabilities": {
+    "apertura_de_turno": { "included": true, "evidence": "components/pos/TurnoGate.tsx (572 líneas), modificado en el candidato" },
+    "cierre_corte": { "included": true, "evidence": "components/pos/CierreCajaWizard.tsx (1091), app/pos/corte/page.tsx (1121), ambos modificados en el candidato" },
+    "caja": { "included": true, "evidence": "pos_cash_movements con client_op_id escrito por operation-identity.ts; 12 filas en prod" },
+    "una_sola_sucursal": { "included": true, "evidence": "TurnoGate, CierreCajaWizard y corte tienen CERO menciones de location_id/locationId/sucursal" },
+    "multi_sucursal": { "included": false, "evidence": "pos_turnos no tiene location_id y el código lo retiró a propósito (save-order/route.ts:49-56). 3 tenants ya tienen >1 sucursal activa en datos, pero el flujo de turno es por tenant, no por sucursal" },
+    "timezone_configurable": { "included": true, "scope": "por TENANT, no por sucursal", "evidence": "client-config.ts:112 lee `clients?id=eq.<id>` y toma `row.timezone || 'America/Mexico_City'`. clients.timezone EXISTE en prod y está poblada en los 14 tenants (America/Chicago, Mexico_City, Monterrey)" },
+    "terminal_enrollment": { "included": "OPT_IN_APAGADO", "evidence": "api/pos/pin/route.ts:75-104 lo exige sólo si `pos.require_enrolled_terminal === true`. Hoy: 13 tenants sin la llave, amalay con la llave en false" },
+    "fleet_management": { "included": false, "evidence": "local_server_heartbeats = 0 filas. PR #406 abierto desde 2026-09-14" }
+  },
+
+  "blockers": [
+    {
+      "object_id": "idx.pos_turnos_uno_abierto_por_restaurante",
+      "policy_said": "BLOCKER",
+      "triage": "MUST_FIX_BEFORE_CURRENT_RELEASE",
+      "current_release_blocker": true,
+      "why": "El release SÍ abre y cierra turnos, y no existe nada que impida dos turnos abiertos en el mismo restaurante. El daño no es teórico: un corte sobre el turno equivocado mueve dinero al día equivocado.",
+      "migration": "supabase/migrations/20260909030000_un_turno_abierto_por_restaurante.sql",
+      "exact_definition": "CREATE UNIQUE INDEX IF NOT EXISTS pos_turnos_uno_abierto_por_restaurante — más un COMMENT ON INDEX",
+      "dependencies": "ninguna. Sólo necesita las columnas client_id y closed_at, que existen.",
+      "data_conflicts_today": "NINGUNO. 10 turnos abiertos en total, exactamente 1 por tenant (amalay, boruca, carls-jr, chickin-demo, demo, diezmex-demo, fullsite-cert-lab-v2, scyf-demo, tekila-rg, test_noreste_grill). Cero tenants con más de uno.",
+      "safe_to_fix_in_isolation": true,
+      "note": "Es la única de las cuatro que puede aplicarse hoy sin tocar nada más y sin conflicto de datos. NO SE APLICÓ."
+    },
+    {
+      "object_id": "col.pos_turnos.location_id",
+      "policy_said": "BLOCKER",
+      "triage": "CAN_WAIT_FOR_MULTI_LOCATION",
+      "current_release_blocker": false,
+      "why": "CORRECCIÓN A LA POLÍTICA. El código actual NO depende de esta columna: se retiró del select a propósito tras el incidente del 2026-08-31, con la razón escrita en save-order/route.ts:49-56 y 112-113. Además existe un guardián —pos-turnos-columnas.test.ts— que lee el CÓDIGO REAL, extrae toda columna pedida a pos_turnos y la contrasta contra el esquema, así que la regresión no se puede volver a escribir.",
+      "evidence_that_policy_was_wrong": "La política usaba el incidente histórico como prueba del estado actual. El incidente es real; el estado actual no es el mismo. Verificar el código lo cambia.",
+      "safe_to_fix_in_isolation": false,
+      "note": "Agregar la columna sin adaptar el flujo de turno no aporta nada, y reintroducirla al select sin su prueba es exactamente lo que causó el incidente."
+    },
+    {
+      "object_id": "idx.uq_pos_turnos_activo_por_sucursal",
+      "policy_said": "BLOCKER",
+      "triage": "CAN_WAIT_FOR_MULTI_LOCATION",
+      "current_release_blocker": false,
+      "why": "MULTI_LOCATION_ONLY. Depende de pos_turnos.location_id, que no existe. Es una invariante que no se puede crear hasta que exista su columna, y su columna no se necesita hasta que el turno sea por sucursal.",
+      "safe_to_fix_in_isolation": false
+    },
+    {
+      "object_id": "col.client_locations.timezone",
+      "policy_said": "BLOCKER",
+      "triage": "CAN_WAIT_FOR_MULTI_LOCATION",
+      "current_release_blocker": false,
+      "classification": "MULTI_LOCATION_BLOCKER",
+      "why": "CORRECCIÓN A LA POLÍTICA. La zona horaria del release actual sale de clients.timezone, que EXISTE y está poblada en los 14 tenants. client_locations.timezone es el refinamiento POR SUCURSAL, y ningún camino vivo lo lee: api/chat y api/platform/locations piden `select=id,name,active`, y api/platform/terminal-config llama a generateTerminalConfig SIN pasar timezone.",
+      "clone_blocker": false,
+      "clone_reasoning": "Un clon en otra zona funciona hoy: se llena clients.timezone del tenant nuevo. Sólo se rompe si ese cliente tiene sucursales en zonas distintas entre sí.",
+      "what_breaks_without_it": "Un tenant con dos sucursales en husos distintos: las dos calculan día de venta y corte con la zona del tenant, no la suya. Con 3 tenants que ya tienen >1 sucursal activa, esto deja de ser hipotético en cuanto una cruce de huso.",
+      "safe_to_fix_in_isolation": true,
+      "note": "Agregar la columna es aditivo y nullable; lo que no es aislado es hacer que el código la prefiera sobre clients.timezone."
+    }
+  ],
+
+  "source_of_truth_only": {
+    "count": 7,
+    "product_behavior_ok": true,
+    "deployment_history_broken": true,
+    "objects": [
+      "col.pos_cash_movements.client_op_id", "col.pos_audit_log.client_op_id", "col.pos_market_movements.client_op_id",
+      "idx.pos_cash_movements_client_op_id", "idx.pos_audit_log_client_op_id", "idx.pos_market_movements_client_op_id",
+      "fn.pos_scoped_child"
+    ],
+    "why_not_product_defects": "Los siete dan PRESENT_AND_MATCHING contra el fingerprint del archivo: la definición viva es la correcta. El producto se comporta bien. Lo roto es la HISTORIA: existen en la base sin fila en el ledger, así que un clon nuevo del esquema no los tendría y nadie puede reconstruir cuándo ni por qué entraron.",
+    "reconciliation_procedure_PROPOSED_NOT_EXECUTED": [
+      "1. verificar fingerprint vivo — ya hecho: 12/12 PRESENT_AND_MATCHING",
+      "2. verificar el cuerpo exacto de la migración contra lo que el objeto declara",
+      "3. reparar el ledger/historia — insertar la fila que falta, con su sello real",
+      "4. volver a correr el guardián y exigir que los siete pasen a MATCH"
+    ],
+    "warning": "El paso 3 es la ÚNICA escritura de todo el procedimiento y es a supabase_migrations, no al esquema. No se ejecutó. Requiere autorización explícita y debe hacerse con Fork fuera de una corrida."
+  },
+
+  "unassessed_relevant_to_current_release": [
+    {
+      "object": "tbl.pos_terminals",
+      "current_path_depends_on_it": "SÍ, condicionalmente — api/pos/pin/route.ts:88-95",
+      "evidence": "La ruta del PIN consulta pos_terminals sólo si `pos.require_enrolled_terminal === true`. La tabla NO EXISTE, así que PostgREST devolvería 400, `!tRes.ok` y la ruta responde 503 `authority_unavailable`. Hoy el flag está apagado: 13 tenants sin la llave y amalay con la llave presente en `false`.",
+      "release_impact_recommendation": "BLOCKER LATENTE / TRAMPA ARMADA. No bloquea hoy, pero encender ese flag —una sola escritura de configuración, sin deploy— deja sin login de nube a todo el restaurante. El fail-closed es el comportamiento correcto; el problema es que el flag existe y su tabla no.",
+      "smallest_safe_action": "Que el flag sea inoperable mientras la tabla no exista, o aplicar la migración. Ninguna de las dos se hizo."
+    },
+    {
+      "object": "fn.pos_scoped_upsert",
+      "current_path_depends_on_it": "PARCIALMENTE — lib/pos-db-scoped.ts:14",
+      "evidence": "`const rpc = child ? 'pos_scoped_child' : 'pos_scoped_upsert'`. La rama `child` (tablas de NO_CID) resuelve a pos_scoped_child, que SÍ existe. La rama `upsert` se toma en POST con `resolution=merge-duplicates`, y ese RPC NO existe. El módulo declara explícitamente que no cae a REST sin restricción cuando su migración falta.",
+      "release_impact_recommendation": "UNASSESSED — y se queda así a propósito. Determinar qué tablas hacen merge-duplicates por el proxy exige recorrer callers de compras, que es territorio de Fork. Se registra la mitad conocida: media pareja aplicada.",
+      "boundary": "NO investigado: las tablas hijas de NO_CID son pos_purchase_order_items y pos_sub_recipe_ingredients. Compras es de Fork."
+    },
+    {
+      "object": "col.pos_staff.pin_hash",
+      "current_path_depends_on_it": "NO",
+      "evidence": "El `pin_hash` que aparece en pos/layout.tsx:657-691 es el hash del caché OFFLINE del navegador, no la columna de la tabla. Ninguna ruta viva lee pos_staff.pin_hash.",
+      "release_impact_recommendation": "DEGRADED, no bloqueante. Los PIN siguen en claro en pos_staff. Es deuda de seguridad conocida (PLAN-PIN-HASH.md), no un bloqueador del alcance actual."
+    },
+    {
+      "object": "col.pos_turnos.status",
+      "current_path_depends_on_it": "NO",
+      "evidence": "Cero referencias en pos-data.ts al `status` de turno. El guardián pos-turnos-columnas.test.ts enumera las columnas reales y `status` no está entre ellas ni entre las pedidas.",
+      "release_impact_recommendation": "COSMETIC para el alcance actual. Viaja con la misma migración multi-sucursal."
+    },
+    {
+      "object": "tbl.pos_save_operations + fn.r1_save_order_idempotent",
+      "current_path_depends_on_it": "SÍ — es el camino de guardado de orden",
+      "evidence": "Ambos PRESENT_AND_MATCHING contra su fingerprint del baseline; 984 filas vivas hasta hoy.",
+      "release_impact_recommendation": "SIN IMPACTO de esquema. El riesgo conocido de esta pareja no es deriva: es que pos_save_operations está en el ALLOW del proxy y es escribible por cualquier rol (U1, sin reproducir en runtime)."
+    }
+  ],
+
+  "guarantees": { "db_writes": 0, "product_files_modified": 0, "amalay_writes": 0, "migrations_applied": 0, "policy_modified": false }
+}
