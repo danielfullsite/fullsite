@@ -29,11 +29,13 @@ export async function POST(request: NextRequest) {
   const unit = texto(body.unit, 24)
   const cost = body.cost_per_unit === undefined || body.cost_per_unit === null ? 0 : Number(body.cost_per_unit)
   if (!name || !unit || !Number.isFinite(cost) || cost < 0) return Response.json({ error: 'INVALID_REQUEST' }, { status: 400 })
-  // El tenant sale de la sesión. Si el cuerpo trae otro, es una discrepancia y
-  // se rechaza en vez de resolverse en silencio a favor de uno de los dos.
-  if (body.client_id !== undefined && body.client_id !== auth.clientId) {
-    return Response.json({ error: 'TENANT_MISMATCH' }, { status: 403 })
-  }
+  // EL TENANT NUNCA ES ENTRADA DEL CLIENTE.
+  //
+  // Antes esto sólo rechazaba un client_id DISTINTO al de la sesión, y aceptaba
+  // el que coincidía. Aceptarlo cuando coincide enseña que el campo se manda, y
+  // el día que alguien lo lea en vez de compararlo, el tenant vuelve a venir del
+  // cuerpo. Hay una sola fuente —`withPOSAuth`— y el campo no se admite jamás.
+  if ('client_id' in body) return Response.json({ error: 'CLIENT_ID_NOT_ACCEPTED' }, { status: 400 })
 
   const key = process.env.SUPABASE_SERVICE_KEY
   if (!key) return Response.json({ error: 'INGREDIENT_UNAVAILABLE' }, { status: 503 })

@@ -28,11 +28,17 @@ BEGIN
   IF coalesce(p_header->>'created_by','') = '' THEN RAISE EXCEPTION 'CREATED_BY_REQUIRED'; END IF;
   -- El tenant NO se lee del cuerpo: lo pone quien llama, ya autenticado.
   IF p_header ? 'client_id' THEN RAISE EXCEPTION 'CLIENT_ID_NOT_ACCEPTED'; END IF;
+  -- Una OC nueva NACE en borrador. Ignorar el campo no basta: aceptarlo en
+  -- silencio deja la puerta abierta a que un cambio futuro lo vuelva a leer, y
+  -- quien lo mandó se queda creyendo que eligió el estado. Se rechaza de frente.
+  IF p_header ? 'status' THEN RAISE EXCEPTION 'STATUS_NOT_ACCEPTED'; END IF;
   IF EXISTS (SELECT 1 FROM public.pos_purchase_orders WHERE id = v_id) THEN RAISE EXCEPTION 'ORDER_ID_TAKEN'; END IF;
 
   -- ── VALIDAR TODO ANTES DE ESCRIBIR NADA ───────────────────────────────────
   FOR v_linea IN SELECT value FROM jsonb_array_elements(p_lines) LOOP
     IF jsonb_typeof(v_linea) <> 'object' THEN RAISE EXCEPTION 'INVALID_LINE'; END IF;
+    -- Ni en las líneas. El tenant tiene UNA fuente y no es el cuerpo.
+    IF v_linea ? 'client_id' THEN RAISE EXCEPTION 'CLIENT_ID_NOT_ACCEPTED'; END IF;
     v_ing := v_linea->>'ingredient_id';
     IF coalesce(v_ing,'') = '' THEN RAISE EXCEPTION 'INGREDIENT_REQUIRED'; END IF;
     -- El ingrediente tiene que ser de ESTE restaurante. Aquí es donde moría el
@@ -49,7 +55,7 @@ BEGIN
   -- ── ESCRIBIR ──────────────────────────────────────────────────────────────
   INSERT INTO public.pos_purchase_orders (id, client_id, supplier, status, created_by, notes,
                                           subtotal, iva, total, ai_suggested)
-  VALUES (v_id, p_client_id, p_header->>'supplier', coalesce(nullif(p_header->>'status',''), 'borrador'),
+  VALUES (v_id, p_client_id, p_header->>'supplier', 'borrador',
           p_header->>'created_by', nullif(p_header->>'notes',''),
           v_total, round(v_total * 0.16, 2), round(v_total * 1.16, 2),
           coalesce((p_header->>'ai_suggested')::boolean, false));
@@ -86,6 +92,22 @@ BEGIN
   IF coalesce(p_cost, -1) < 0 THEN RAISE EXCEPTION 'INVALID_COST'; END IF;
   -- Dos ingredientes con el mismo nombre en un restaurante son un error de
   -- captura, y el de abajo terminaría comprando contra el equivocado.
+  --
+  -- `EXISTS` y luego `INSERT` tiene una ventana: dos altas simultáneas del mismo
+  -- nombre pasan las dos la comprobación y crean dos filas. No hay índice único
+  -- que lo impida —y no se puede crear a ciegas: el catálogo histórico tiene
+  -- 1,475 filas sin auditar y podría ya contener duplicados—, así que la
+  -- exclusión se toma explícitamente.
+  --
+  -- El lock es de TRANSACCIÓN y por (tenant, nombre normalizado): dos altas del
+  -- mismo nombre en el mismo restaurante se serializan; en restaurantes
+  -- distintos, o con nombres distintos, no se estorban. Se libera solo al
+  -- terminar, sin necesidad de soltarlo a mano en cada camino de error.
+  -- Una sola llave de 64 bits: `pg_advisory_xact_lock` no tiene forma
+  -- (bigint, bigint), y partir el hash en dos int32 desperdicia entropía.
+  PERFORM pg_advisory_xact_lock(hashtextextended(p_client_id || '|' || lower(btrim(p_name)), 0));
+  -- Recomprobar DESPUÉS del lock: quien esperó tiene que ver lo que el otro
+  -- acaba de escribir, no lo que había cuando llegó.
   IF EXISTS (SELECT 1 FROM public.pos_ingredients
              WHERE client_id = p_client_id AND lower(btrim(name)) = lower(btrim(p_name))) THEN
     RAISE EXCEPTION 'INGREDIENT_NAME_TAKEN';

@@ -32,7 +32,15 @@ export async function POST(request: NextRequest) {
       !Array.isArray(lines) || lines.length < 1 || lines.length > 200) {
     return Response.json({ error: 'INVALID_REQUEST' }, { status: 400 })
   }
+  // EL TENANT NUNCA ES ENTRADA DEL CLIENTE — en ningún nivel del cuerpo, ni
+  // aunque coincida con la sesión. Una sola fuente: `withPOSAuth`.
+  if ('client_id' in body) return Response.json({ error: 'CLIENT_ID_NOT_ACCEPTED' }, { status: 400 })
   if ('client_id' in header) return Response.json({ error: 'CLIENT_ID_NOT_ACCEPTED' }, { status: 400 })
+  if (lines.some(l => l && typeof l === 'object' && 'client_id' in (l as Record<string, unknown>))) {
+    return Response.json({ error: 'CLIENT_ID_NOT_ACCEPTED' }, { status: 400 })
+  }
+  // El estado tampoco: una OC nueva nace en borrador y punto.
+  if ('status' in header) return Response.json({ error: 'STATUS_NOT_ACCEPTED' }, { status: 400 })
 
   const key = process.env.SUPABASE_SERVICE_KEY
   if (!key) return Response.json({ error: 'PURCHASE_ORDER_UNAVAILABLE' }, { status: 503 })
@@ -48,7 +56,8 @@ export async function POST(request: NextRequest) {
       // ocurrió en PostgreSQL, así que reintentar es seguro y no deja restos.
       const conocidos = ['SCOPE_REQUIRED', 'INVALID_HEADER', 'INVALID_LINES', 'INVALID_LINE',
         'SUPPLIER_REQUIRED', 'CREATED_BY_REQUIRED', 'CLIENT_ID_NOT_ACCEPTED', 'ORDER_ID_TAKEN',
-        'INGREDIENT_REQUIRED', 'INGREDIENT_SCOPE_CONFLICT', 'INVALID_QUANTITY', 'INVALID_UNIT_COST', 'UNIT_REQUIRED']
+        'INGREDIENT_REQUIRED', 'INGREDIENT_SCOPE_CONFLICT', 'INVALID_QUANTITY', 'INVALID_UNIT_COST',
+        'UNIT_REQUIRED', 'STATUS_NOT_ACCEPTED']
       const error = conocidos.includes(result?.message) ? result.message : 'PURCHASE_ORDER_UNCONFIRMED'
       return Response.json({ error }, { status: error === 'PURCHASE_ORDER_UNCONFIRMED' ? 503 : 409 })
     }
