@@ -8,12 +8,18 @@ import { Fingerprint, ArrowLeft, Receipt, RefreshCw, Clock, DollarSign, Users, C
 import { formatMXN, getAuditLogRange, reopenOrder, logAudit, getClientId, verifyManagerPin, verifyManagerHuella, hayHuellasDadasDeAlta, consumeManagerApproval, getActiveTurnoTolerante, getPaymentMethodsFromDB, type AuditLogEntry, type PagoForma, type PaymentMethodDB } from '@/lib/pos-data'
 import { isTiempoItem } from '@/lib/pos-constants'
 import { getActiveTimezone, todayMX, zonedStartOfDayISO } from '@/lib/date-mx'
+import { claveLogicaDeCaja } from '@/lib/operation-identity'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 interface CashMovement {
+  // `id` es el bigint del servidor: no existe hasta que la fila se escribe, así
+  // que no sirve como identidad de un movimiento que todavía está en la cola.
   id: string
+  // La identidad que SÍ sobrevive a caché → cola → nube. Opcional porque los
+  // registros anteriores a P0A no la tienen.
+  client_op_id?: string
   type: 'retiro' | 'deposito'
   amount: number
   reason: string
@@ -242,11 +248,28 @@ function CortePageLegacy() {
         try {
           const { getPendingQueue } = await import('@/lib/pos-offline-db')
           const pending = await getPendingQueue()
-          const seenIds = new Set((cm as CashMovement[]).map(m => m.id))
+          // DEDUP POR IDENTIDAD LÓGICA.
+          //
+          // Antes: `seenIds` se armaba con el `id` de la nube —un bigint— y se
+          // comparaba contra `d.id` del payload encolado. Desde P0A ese payload
+          // ya no lleva `id`, así que `d.id` es undefined y el filtro DESCARTABA
+          // el movimiento: un retiro offline desaparecía del arqueo. Y aunque
+          // existiera, comparar el bigint del servidor contra un id de cliente
+          // nunca podría empatar.
+          //
+          // `client_op_id` es lo único que vive en los tres estados. Los
+          // registros legacy caen a su `id`, así que siguen viéndose igual.
+          const seenIds = new Set((cm as CashMovement[]).map(m => claveLogicaDeCaja(m)).filter(Boolean))
           const queuedCm = pending
             .filter(p => p.table === 'pos_cash_movements')
             .map(p => p.data as unknown as (CashMovement & { turno_id?: string }))
-            .filter(d => d && d.turno_id === turnoActivo.id && d.id && !seenIds.has(d.id))
+            .filter(d => {
+              if (!d || d.turno_id !== turnoActivo.id) return false
+              const k = claveLogicaDeCaja(d)
+              // Sin identidad no se puede deduplicar; esconderlo sería perder
+              // dinero del arqueo, así que se muestra.
+              return !k || !seenIds.has(k)
+            })
           if (queuedCm.length) cmMerged = [...(cm as CashMovement[]), ...queuedCm]
         } catch { /* cola no disponible → solo lo de Supabase */ }
       }

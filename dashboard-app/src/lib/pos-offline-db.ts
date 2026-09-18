@@ -2,6 +2,7 @@
 // Stores menu, orders, inventory, and sync queue for offline-first operation
 import { leerSalon, requiereCaja } from './pedro-cliente'
 import { CAMPOS_SOLO_DE_GERENTE } from './pos-db-policy'
+import { claveLogicaDeCaja } from './operation-identity'
 
 const DB_NAME = 'fullsite_pos'
 const DB_VERSION = 4
@@ -1545,31 +1546,52 @@ export async function cacheCashMovement(movement: Record<string, unknown>): Prom
   })
 }
 
-export async function getCachedCashMovsByTurno(turnoId: string): Promise<{ id?: string; type: string; amount: number }[]> {
+export async function getCachedCashMovsByTurno(turnoId: string): Promise<{ id?: string; client_op_id?: string; type: string; amount: number }[]> {
   const db = await openDB()
   // Read from cash_movements store (write-through cache: online success + offline)
-  const synced: { id: string; type: string; amount: number }[] = await new Promise((resolve) => {
+  const synced: { id: string; client_op_id: string; type: string; amount: number }[] = await new Promise((resolve) => {
     const tx = db.transaction('cash_movements', 'readonly')
     const req = tx.objectStore('cash_movements').index('turno_id').getAll(IDBKeyRange.only(turnoId))
-    req.onsuccess = () => resolve((req.result || []).map((m: Record<string, unknown>) => ({ id: String(m.id ?? ''), type: m.type as string, amount: Number(m.amount) || 0 })))
+    req.onsuccess = () => resolve((req.result || []).map((m: Record<string, unknown>) => ({
+      id: String(m.id ?? ''), client_op_id: typeof m.client_op_id === 'string' ? m.client_op_id : '',
+      type: m.type as string, amount: Number(m.amount) || 0,
+    })))
     req.onerror = () => resolve([])
   })
   // Also check sync_queue for unsynced cash movements, DEDUP por id: un movimiento
   // offline ahora vive en el cache write-through Y en la cola hasta sincronizar;
   // sin dedup se contaria doble en el arqueo. (P0 dinero)
-  const seen = new Set(synced.map(m => m.id).filter(Boolean))
+  // DEDUP POR IDENTIDAD LÓGICA, NO POR `id`.
+  //
+  // Desde P0A el payload de la cola ya NO lleva `id` —ese campo es bigint y lo
+  // asigna el servidor—, así que comparar por `item.data.id` dejaba `''` y el
+  // `!m.id` de abajo daba por bueno TODO lo encolado: un movimiento que vive a la
+  // vez en la caché y en la cola se contaba DOS VECES en el arqueo. Es dinero.
+  //
+  // `claveLogicaDeCaja` usa `client_op_id` y cae a `id` sólo para registros
+  // legacy, que es como siguen funcionando los que ya estaban guardados.
+  const seen = new Set(synced.map(m => claveLogicaDeCaja(m)).filter(Boolean))
   const pending = await getPendingQueue()
   const queued = pending
     .filter(item => item.table === 'pos_cash_movements' && (item.data as Record<string, unknown>).turno_id === turnoId)
-    .map(item => ({
-      id: String((item.data as Record<string, unknown>).id ?? ''),
-      type: (item.data as Record<string, unknown>).type as string,
-      amount: Number((item.data as Record<string, unknown>).amount) || 0,
-    }))
-    .filter(m => !m.id || !seen.has(m.id))
-  // El `id` viaja: el wizard de cierre fusiona esta lista con la de la nube por
-  // id, para contar UNA vez lo que ya subió y sumar lo que sigue en la cola.
-  return [...synced, ...queued].map(({ id, type, amount }) => (id ? { id, type, amount } : { type, amount }))
+    .map(item => {
+      const d = item.data as Record<string, unknown>
+      return {
+        id: String(d.id ?? ''),
+        client_op_id: typeof d.client_op_id === 'string' ? d.client_op_id : '',
+        type: d.type as string,
+        amount: Number(d.amount) || 0,
+      }
+    })
+    // Sin identidad no se puede deduplicar, y descartarlo sería esconder dinero:
+    // pasa, y el llamador lo ve. Con identidad, pasa sólo si no estaba ya.
+    .filter(m => { const k = claveLogicaDeCaja(m); return !k || !seen.has(k) })
+  // La identidad viaja: el wizard de cierre fusiona esta lista con la de la nube
+  // —que desde P0A también trae `client_op_id`— para contar UNA vez lo que ya
+  // subió y sumar lo que sigue en la cola.
+  return [...synced, ...queued].map(({ id, client_op_id, type, amount }) => ({
+    ...(id ? { id } : {}), ...(client_op_id ? { client_op_id } : {}), type, amount,
+  }))
 }
 
 // ─── Print Jobs (IDB v4) — durable backup for print-queue.ts localStorage ───

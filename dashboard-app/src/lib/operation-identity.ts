@@ -67,3 +67,28 @@ export function identidadDeRecepcionDeCompra(poId: string, poItemId: number | st
 
 /** Cómo terminó una escritura que puede caer a la cola. El audit registra ESTO. */
 export type ResultadoDeEscritura = 'saved' | 'queued' | 'failed'
+
+/**
+ * LA IDENTIDAD LÓGICA DE UN MOVIMIENTO DE CAJA, venga de donde venga.
+ *
+ * Un mismo retiro aparece hasta en tres formas mientras vive:
+ *   · caché local  — la clave técnica del store IDB
+ *   · cola durable — el payload que se reproducirá
+ *   · nube         — la fila, con su `id` bigint del servidor
+ *
+ * El arqueo los fusiona, y si los compara por la llave equivocada cuenta dos
+ * veces un movimiento o esconde uno. Ninguna de las dos es aceptable: es dinero.
+ *
+ * `client_op_id` es la única identidad que sobrevive a los tres estados. El `id`
+ * del servidor NO sirve —no existe hasta que la fila se escribe— y el `id` local
+ * sólo existe en registros viejos, de antes de que hubiera identidad. De ahí el
+ * respaldo: los registros legacy se siguen leyendo por su `id`.
+ */
+export function claveLogicaDeCaja(m: { client_op_id?: unknown; id?: unknown } | null | undefined): string {
+  if (!m) return ''
+  const op = typeof m.client_op_id === 'string' ? m.client_op_id.trim() : ''
+  if (op) return op
+  // Legacy: registros anteriores a P0A, que sólo tienen `id` de cliente.
+  const id = m.id === null || m.id === undefined ? '' : String(m.id).trim()
+  return id
+}

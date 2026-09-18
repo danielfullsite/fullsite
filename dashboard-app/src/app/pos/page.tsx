@@ -1528,7 +1528,12 @@ function CashMovementModal({ turnoId, actor, onConfirm, onCancel }: CashMovement
     // Aleatoria a propósito: dos retiros iguales son dos eventos (ver
     // operation-identity.ts).
     const clientOpId = nuevaIdentidadDeAccion()
-    const idLocal = clientOpId   // la caché de IDB necesita una llave propia
+    // El store `cash_movements` tiene keyPath 'id', así que la caché necesita esa
+    // llave. Se le da el MISMO client_op_id: es llave TÉCNICA local, no la
+    // identidad del servidor — ésa la asigna Postgres. Y el registro lleva además
+    // `client_op_id` explícito, porque el arqueo deduplica por identidad lógica
+    // (claveLogicaDeCaja) y no por la llave del store.
+    const idLocal = clientOpId
     const payload = { client_op_id: clientOpId, client_id: _cid(), turno_id: turnoId, type, amount: num, reason: reason.trim(), actor, approved_by: manager }
     try {
       const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -1542,7 +1547,7 @@ function CashMovementModal({ turnoId, actor, onConfirm, onCancel }: CashMovement
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       // Write-through cache — mirror to IDB even though Supabase succeeded.
       // Guarantees the wizard sees this movement if connectivity drops before cierre.
-      cacheCashMovement({ id: idLocal, client_id: payload.client_id, turno_id: turnoId ?? '', type, amount: num, reason: reason.trim(), actor, approved_by: manager })
+      cacheCashMovement({ id: idLocal, client_op_id: clientOpId, client_id: payload.client_id, turno_id: turnoId ?? '', type, amount: num, reason: reason.trim(), actor, approved_by: manager })
         .catch(() => { /* IDB unavailable — sync_queue is the fallback */ })
       onConfirm(type, num, reason.trim(), manager, 'saved', clientOpId)
     } catch {
@@ -1550,7 +1555,7 @@ function CashMovementModal({ turnoId, actor, onConfirm, onCancel }: CashMovement
       // Sin el cache, tras sincronizar (markSynced + clearSyncedItems) el movimiento
       // sale de la cola y desaparece del arqueo si se vuelve offline en el mismo turno.
       // getCachedCashMovsByTurno dedup por id, asi que cache + cola no cuenta doble. (P0 dinero)
-      cacheCashMovement({ id: idLocal, client_id: payload.client_id, turno_id: turnoId ?? '', type, amount: num, reason: reason.trim(), actor, approved_by: manager })
+      cacheCashMovement({ id: idLocal, client_op_id: clientOpId, client_id: payload.client_id, turno_id: turnoId ?? '', type, amount: num, reason: reason.trim(), actor, approved_by: manager })
         .catch(() => { /* IDB no disponible — la cola es el fallback */ })
       // EL RESULTADO VIAJA. Antes las dos ramas llamaban igual a `onConfirm`, y
       // el audit escribía «cash_deposito» con el comentario «already saved to
