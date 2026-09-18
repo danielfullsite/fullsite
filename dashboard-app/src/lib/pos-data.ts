@@ -1,5 +1,6 @@
 import { kitchenOrderInScope, readKitchenScope } from './kitchen-read-scope'
-import { nuevaIdentidadDeAccion, identidadDeRecepcionDeCompra } from './operation-identity'
+import { nuevaIdentidadDeAccion } from './operation-identity'
+import { recordMovement, confirmarMovimientoInventario } from './inventory'
 // POS Menu Data — AMALAY real menu (el POS legado)
 //
 // SQL for Supabase (run in SQL Editor):
@@ -3225,34 +3226,91 @@ export async function receiveOrderItems(
 }
 
 // Restock inventory when OC is received
+/**
+ * RECEPCIÓN DE ORDEN DE COMPRA — un solo hecho, una sola transacción.
+ *
+ * ── POR QUÉ CAMBIÓ ──────────────────────────────────────────────────────────
+ * La versión anterior hacía, por renglón:
+ *
+ *     leer stock  →  newStock = stock + qty  →  PATCH absoluto  →  POST movimiento
+ *
+ * El movimiento llevaba identidad determinista y un índice único lo protegía,
+ * así que un reintento NO duplicaba el asiento. Pero el PATCH iba ANTES, sin
+ * guarda, y con un valor calculado desde una lectura que el intento anterior ya
+ * había modificado. Medido en el laboratorio de certificación el 2026-09-18 con
+ * S0=100 y Q=5: primera ejecución dejó 105; el reintento de la MISMA recepción
+ * dejó **110**, con **un solo** movimiento en la bitácora.
+ *
+ * O sea: el libro cuadraba y el inventario no. Deduplicar el asiento no
+ * deduplica el efecto — protegía la escritura que no mueve el negocio, y llegaba
+ * después de la que sí.
+ *
+ * ── POR QUÉ ASÍ ─────────────────────────────────────────────────────────────
+ * El contrato transaccional ya existía y nadie lo usaba desde aquí:
+ * `recordMovement()` va por `/api/pos/inventory/movement` a
+ * `pos_record_inventory_movement()`, que aplica recibo, bitácora y stock en UNA
+ * transacción gobernada por la misma `idempotency_key`. Reproducir ese contrato
+ * a mano sería tener dos verdades; se reusa el que ya está probado.
+ *
+ * ── LA IDENTIDAD ES LA RECEPCIÓN, NO EL RENGLÓN ────────────────────────────
+ * Recibir una OC es UN hecho, no N hechos independientes: si llega el camión y
+ * se captura dos veces, no entraron dos camiones. Por eso la llave es de la
+ * orden —`po:<id>`— y todos los renglones viajan como líneas de la misma
+ * operación.
+ *
+ * Y por eso el orden de las líneas se canoniza por `item.id` (que asigna el
+ * servidor al crear el renglón) y no por la posición del arreglo: dos terminales
+ * que carguen la misma OC pueden recorrerla distinto, y dos intents con las
+ * mismas líneas en distinto orden tienen que ser el mismo intent.
+ *
+ * `metadata` sólo lleva datos deterministas. Un timestamp, un id de terminal o
+ * un request_id harían que el mismo hecho se viera distinto en cada intento —
+ * procedencia no es identidad.
+ */
 export async function restockFromPurchaseOrder(
   orderId: string, items: PurchaseOrderItem[], actor: string
 ): Promise<void> {
-  const inventory = await getInventory()
-  const invMap = new Map(inventory.map(i => [i.ingredient_id, i]))
+  const lineas = [...items]
+    // Identidad estable del renglón, asignada por el servidor. Nunca la posición.
+    .sort((a, b) => (Number(a.id) - Number(b.id)) || String(a.id).localeCompare(String(b.id)))
+    .map(item => ({
+      ingredient_id: item.ingredient_id,
+      quantity: item.quantity_received ?? item.quantity_ordered,
+      notes: `OC ${orderId} - ${item.ingredient_name}`,
+    }))
+    // Un renglón recibido en cero no mueve inventario. El contrato rechaza
+    // cantidad 0, y colarlo tumbaría la recepción entera por una línea que no
+    // tenía nada que aplicar.
+    .filter(linea => Number.isFinite(linea.quantity) && linea.quantity !== 0)
 
-  for (const item of items) {
-    const qty = item.quantity_received ?? item.quantity_ordered
-    const inv = invMap.get(item.ingredient_id)
-    if (inv) {
-      const newStock = inv.stock + qty
-      await updateInventoryStock(item.ingredient_id, newStock)
-      // La identidad sale de la orden de compra y de su renglón, los dos
-      // asignados por el servidor ANTES de la recepción. No se usa el índice del
-      // arreglo: el orden de una lista depende de cómo se cargó, y dos terminales
-      // podrían recorrerla distinto.
-      const identidad = identidadDeRecepcionDeCompra(orderId, item.id)
-      await logInventoryMovement({
-        ingredient_id: item.ingredient_id,
-        movement_type: 'restock',
-        quantity: qty,
-        order_id: orderId,
-        actor,
-        notes: `OC ${orderId} - ${item.ingredient_name}`,
-        ...identidad,
-      })
-    }
+  if (!lineas.length) return
+
+  const resultado = await recordMovement({
+    client_id: _getClientId(),
+    movement_type: 'restock',
+    actor,
+    idempotency_key: `po:${orderId}`,
+    lines: lineas,
+    metadata: { source: 'purchase_order_reception', purchase_order_id: orderId },
+  })
+
+  // Sin confirmación del movimiento transaccional, la recepción NO sigue. Antes
+  // continuaba igual y la orden terminaba marcada «recibida» con el inventario
+  // sin tocar: el error se volvía un hecho silencioso.
+  if (!resultado.success) {
+    throw new Error(`INVENTARIO_NO_CONFIRMADO: ${resultado.errors.join(', ') || 'sin detalle'}`)
   }
+
+  // CERRAR EL INTENT DURABLE. `recordMovement` congela la intención antes de
+  // salir a la red para que un recargue a media operación no la pierda, y sólo
+  // el llamador sabe cuándo terminó. Al no cerrarlo, la SIGUIENTE recepción
+  // —legítima, de otra orden— chocaba contra el pendiente y moría con
+  // INVENTORY_PENDING sin llegar a la red.
+  //
+  // Visto en el laboratorio el 2026-09-18: recibida la OC A, la OC B dejó de
+  // aplicar inventario. Lo correcto no era dejar de congelar: era cerrarlo
+  // cuando el recibo ya está confirmado, que es justo aquí.
+  await confirmarMovimientoInventario(_getClientId(), `po:${orderId}`)
 }
 
 // CRUD for Facturas
