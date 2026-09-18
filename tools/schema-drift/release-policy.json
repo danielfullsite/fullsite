@@ -1,0 +1,119 @@
+{
+  "policy_version": "1.0",
+  "comment": [
+    "DRIFT_SEVERITY y RELEASE_IMPACT son dos cosas distintas y no se derivan una de la otra.",
+    "",
+    "DRIFT_SEVERITY responde: ¿el esquema corresponde a la fuente?  Lo calcula el guardián.",
+    "RELEASE_IMPACT responde: ¿esto puede liberarse?  Lo decide una persona, y vive aquí.",
+    "",
+    "El guardián reportó 14 avisos y 0 bloqueantes. Eso NO significa que los 14 sean inocuos:",
+    "significa que ninguno es corrupción del ledger. Un WARN puede ser un bloqueador de release",
+    "—una columna de zona horaria que el código lee y no existe rompe el día de venta en cualquier",
+    "sucursal fuera del centro— y un BLOCK puede no serlo si el objeto no participa del alcance",
+    "que se libera.",
+    "",
+    "NADA DE ESTO DECIDE UN RELEASE AUTOMÁTICAMENTE. Es la separación de conceptos, escrita,",
+    "para que la decisión la tome alguien con el dato enfrente."
+  ],
+  "levels": {
+    "BLOCKER": "no se libera el alcance afectado mientras la deriva exista",
+    "DEGRADED": "se puede liberar, con el defecto conocido y declarado en las notas",
+    "COSMETIC": "no afecta comportamiento observable",
+    "UNASSESSED": "nadie lo evaluó todavía. NO es lo mismo que COSMETIC"
+  },
+  "objects": [
+    {
+      "object_id": "col.client_locations.timezone",
+      "drift_severity": "WARN",
+      "release_impact": "BLOCKER",
+      "release_critical_when": "el alcance incluye más de una sucursal, o cualquier sucursal fuera de America/Monterrey",
+      "rationale": "terminal-config.ts emite `timezone` desde client_locations y el POS la consume para día de venta, cortes y reportes. La columna no existe, así que toda terminal cae a la zona de su máquina. Con una sola sucursal en la zona del centro el defecto es invisible; con dos, los cortes cierran en días distintos."
+    },
+    {
+      "object_id": "col.pos_turnos.location_id",
+      "drift_severity": "WARN",
+      "release_impact": "BLOCKER",
+      "release_critical_when": "el alcance incluye turnos por sucursal",
+      "rationale": "Es la causa raíz documentada del incidente del 2026-08-31: save-order pedía location_id a pos_turnos, que no la tiene, PostgREST devolvía 400 y el código lo leyó como «no hay turno». El POS no envió una sola comanda en toda la noche."
+    },
+    {
+      "object_id": "idx.pos_turnos_uno_abierto_por_restaurante",
+      "drift_severity": "WARN",
+      "release_impact": "BLOCKER",
+      "release_critical_when": "el alcance incluye apertura o cierre de turno",
+      "rationale": "Sin el índice único no hay nada que impida dos turnos abiertos a la vez. Los 11 turnos basura de AMALAY siguen siendo posibles, y un corte sobre el turno equivocado mueve dinero al día equivocado."
+    },
+    {
+      "object_id": "idx.uq_pos_turnos_activo_por_sucursal",
+      "drift_severity": "WARN",
+      "release_impact": "BLOCKER",
+      "release_critical_when": "multi-sucursal con turnos simultáneos",
+      "rationale": "Misma familia que el anterior, por sucursal. Depende de pos_turnos.location_id, que tampoco existe: es una invariante que no se puede crear hasta que exista su columna."
+    },
+    {
+      "object_id": "col.pos_turnos.status",
+      "drift_severity": "WARN",
+      "release_impact": "UNASSESSED",
+      "release_critical_when": null,
+      "rationale": "Declarada en la misma migración que location_id. No se determinó qué código la lee; no se asume inocua por no haberla investigado."
+    },
+    {
+      "object_id": "tbl.pos_terminals",
+      "drift_severity": "WARN",
+      "release_impact": "DEGRADED",
+      "release_critical_when": "el alcance promete registro de terminales o diagnóstico remoto de flota",
+      "rationale": "La tabla no existe y sin embargo está en el ALLOW del proxy. No rompe nada hoy —nadie escribe ahí— pero significa que no hay registro de terminal en la nube: el «desde dónde» del principio #4 de la constitución queda sin contestar."
+    },
+    {
+      "object_id": "tbl.pos_terminal_enrollments",
+      "drift_severity": "WARN",
+      "release_impact": "DEGRADED",
+      "release_critical_when": "el alcance incluye enrolamiento de terminal",
+      "rationale": "Misma migración huérfana que pos_terminals."
+    },
+    {
+      "object_id": "col.pos_cash_movements.client_op_id",
+      "drift_severity": "WARN",
+      "release_impact": "DEGRADED",
+      "release_critical_when": "se libera sin registrar la migración en el ledger",
+      "rationale": "El efecto es correcto y el fingerprint coincide con el archivo. Lo que está mal es la procedencia: existe en la base sin fila en el ledger, así que un clon nuevo del esquema no lo tendría. El defecto no es la columna, es que el repositorio no gobierna el esquema."
+    },
+    {
+      "object_id": "col.pos_audit_log.client_op_id",
+      "drift_severity": "WARN", "release_impact": "DEGRADED",
+      "release_critical_when": "se libera sin registrar la migración en el ledger",
+      "rationale": "Igual que el anterior: fingerprint correcto, procedencia sin registrar."
+    },
+    {
+      "object_id": "col.pos_market_movements.client_op_id",
+      "drift_severity": "WARN", "release_impact": "DEGRADED",
+      "release_critical_when": "se libera sin registrar la migración en el ledger",
+      "rationale": "Igual que los anteriores. Además es la única de las tres sin ninguna fila poblada."
+    },
+    {
+      "object_id": "idx.pos_cash_movements_client_op_id",
+      "drift_severity": "WARN", "release_impact": "DEGRADED",
+      "release_critical_when": "se libera sin registrar la migración en el ledger",
+      "rationale": "El índice único parcial es lo que de verdad hace la idempotencia. Está bien construido y sin registrar."
+    },
+    {
+      "object_id": "idx.pos_audit_log_client_op_id",
+      "drift_severity": "WARN", "release_impact": "DEGRADED",
+      "release_critical_when": "se libera sin registrar la migración en el ledger",
+      "rationale": "Igual que el anterior."
+    },
+    {
+      "object_id": "idx.pos_market_movements_client_op_id",
+      "drift_severity": "WARN", "release_impact": "DEGRADED",
+      "release_critical_when": "se libera sin registrar la migración en el ledger",
+      "rationale": "Igual que el anterior."
+    },
+    {
+      "object_id": "fn.pos_scoped_child",
+      "drift_severity": "WARN",
+      "release_impact": "UNASSESSED",
+      "release_critical_when": null,
+      "rationale": "Función viva, con firma, SECURITY DEFINER y search_path que coinciden con el archivo, pero sin registrar. Su hermana pos_scoped_upsert no está aplicada: se aplicó media pareja, y no se determinó si el proxy depende de que las dos existan."
+    }
+  ]
+}

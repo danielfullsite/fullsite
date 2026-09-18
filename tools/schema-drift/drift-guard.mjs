@@ -91,6 +91,68 @@ function severidad(state, file) {
   return SEVERITY[state]
 }
 
+
+// ─── v1.1 · FINGERPRINTS ────────────────────────────────────────────────────
+/**
+ * `exists` demuestra PRESENCIA. No demuestra EQUIVALENCIA.
+ *
+ *   OBJECT_EXISTS != OBJECT_MATCHES_EXPECTED_DEFINITION
+ *
+ * Una columna puede existir con otro tipo, un índice con otro predicado, una
+ * función con otro `search_path` o sin `SECURITY DEFINER`. El guardián v1
+ * los habría dado por buenos. Éste los compara.
+ */
+const DETALLE = {
+  PRESENT_AND_MATCHING: 'PRESENT_AND_MATCHING',
+  PRESENT_BUT_DIFFERENT: 'PRESENT_BUT_DIFFERENT',
+  ABSENT: 'ABSENT',
+  NOT_CHECKED: 'NOT_CHECKED',
+}
+
+/** Espacios colapsados, minúsculas, sin `public.`, sin `if not exists`, sin `;` final. */
+const norm = (v) => String(v ?? '')
+  .toLowerCase().replace(/\bif not exists\b/g, '').replace(/\bpublic\./g, '')
+  .replace(/\s+/g, ' ').replace(/\s*;\s*$/, '').trim()
+/** `search_path=a, b` y `a,b` son el mismo valor. El prefijo y los espacios no son semántica. */
+const normPath = (v) => String(v ?? '').toLowerCase().replace(/^search_path\s*=\s*/, '').replace(/\s+/g, '').trim()
+
+/** Campos comparados por tipo de objeto. Lo que no está aquí no se compara. */
+const CAMPOS = {
+  column:   [['data_type', norm], ['udt_name', norm], ['is_nullable', norm], ['column_default', norm]],
+  index:    [['unique', v => String(v)], ['indexdef', norm]],
+  function: [['args', norm], ['returns', norm], ['security_definer', v => String(v)],
+             ['search_path', normPath], ['body_md5', norm]],
+  constraint: [['definition', norm]],
+}
+
+/**
+ * Compara esperado contra observado. Devuelve el detalle y las diferencias.
+ * Sólo compara los campos que el registro DECLARA esperar: un campo ausente en
+ * `expected` no se inventa, y no cuenta como diferencia.
+ */
+function comparar(expected, observed) {
+  if (!expected) return { detalle: DETALLE.NOT_CHECKED, diffs: [], razon: 'el registro no declara fingerprint esperado' }
+  if (!observed) return { detalle: DETALLE.NOT_CHECKED, diffs: [], razon: 'la introspección no trajo fingerprint' }
+  const campos = CAMPOS[expected.kind || observed.kind]
+  if (!campos) return { detalle: DETALLE.NOT_CHECKED, diffs: [], razon: `tipo sin reglas de comparación: ${expected.kind}` }
+  const diffs = []
+  for (const [campo, f] of campos) {
+    if (!(campo in expected)) continue           // no se exige lo que no se declaró
+    const e = f(expected[campo]), o = f(observed[campo])
+    if (e !== o) diffs.push({ field: campo, expected: e, observed: o })
+  }
+  return diffs.length
+    ? { detalle: DETALLE.PRESENT_BUT_DIFFERENT, diffs, razon: null }
+    : { detalle: DETALLE.PRESENT_AND_MATCHING, diffs: [], razon: null }
+}
+
+/** Normaliza la entrada C: acepta el formato v1 (0|1) y el v1.1 ({exists, observed}). */
+function leerEfecto(crudo) {
+  if (crudo === undefined || crudo === null) return { exists: null, observed: null }
+  if (typeof crudo === 'number' || typeof crudo === 'boolean') return { exists: Number(crudo) > 0, observed: null }
+  return { exists: crudo.exists === true, observed: crudo.observed ?? null }
+}
+
 // ─── Entrada ────────────────────────────────────────────────────────────────
 function args(argv) {
   const o = {}
@@ -123,7 +185,11 @@ function ledgerTiene(ledger, hint) {
   return ledger.some(r => String(r.name || '').includes(hint))
 }
 
-function clasificar({ enArchivo, enLedger, enEfecto }) {
+function clasificar({ enArchivo, enLedger, enEfecto, detalle }) {
+  // v1.1: existir con otra definición NO es estar aplicado. Manda sobre todo lo
+  // demás, incluso con archivo + ledger + objeto presentes.
+  if (detalle === DETALLE.PRESENT_BUT_DIFFERENT) return S.MISMATCH
+
   // El objeto no declara nada verificable: no se inventa un veredicto.
   if (enEfecto === null || enEfecto === undefined) return S.UNKNOWN
 
@@ -151,6 +217,12 @@ const registry = readJson(a.registry, 'registry')
 const files = readJson(a.files, 'files')       // A
 const ledger = readJson(a.ledger, 'ledger')    // B
 const effects = readJson(a.effects, 'effects') // C
+// Política de release: OPCIONAL y SEPARADA de la severidad. El guardián la
+// adjunta al artefacto y no la usa para decidir nada. DRIFT_SEVERITY responde
+// «¿el esquema corresponde a la fuente?»; RELEASE_IMPACT responde «¿esto puede
+// liberarse?», y eso lo decide una persona.
+const policy = a.policy ? readJson(a.policy, 'policy') : null
+const politicaDe = (id) => policy?.objects?.find(o => o.object_id === id) ?? null
 
 if (!Array.isArray(registry?.objects)) fail('registry.objects debe ser un arreglo')
 const rutas = new Set((Array.isArray(files) ? files : files.paths || []).map(f => f.path ?? f))
@@ -158,14 +230,25 @@ const rutas = new Set((Array.isArray(files) ? files : files.paths || []).map(f =
 const objects = registry.objects.map(o => {
   const enArchivo = rutas.has(o.file)
   const enLedger = ledgerTiene(ledger, o.ledger_hint)
-  const crudo = effects[o.id]
-  const enEfecto = crudo === undefined ? null : Number(crudo) > 0
-  const state = clasificar({ enArchivo, enLedger, enEfecto })
+  const { exists, observed } = leerEfecto(effects[o.id])
+  const cmp = exists ? comparar(o.expected, observed)
+                     : { detalle: exists === false ? DETALLE.ABSENT : DETALLE.NOT_CHECKED, diffs: [], razon: null }
+  const state = clasificar({ enArchivo, enLedger, enEfecto: exists, detalle: cmp.detalle })
   return {
     id: o.id, kind: o.kind, relation: o.rel ?? null, name: o.name,
     declared_in: o.file, declared_at_ref: o.file_ref ?? null,
-    sources: { file: enArchivo, ledger: enLedger, effect: enEfecto },
+    sources: {
+      file: enArchivo,
+      ledger: enLedger,
+      effect: { exists, fingerprint_matches: cmp.detalle === DETALLE.PRESENT_AND_MATCHING ? true
+                                          : cmp.detalle === DETALLE.PRESENT_BUT_DIFFERENT ? false : null,
+                detail: cmp.detalle, reason: cmp.razon },
+    },
+    fingerprint_source: o.expected?.source ?? null,
+    diffs: cmp.diffs,
     state, severity: severidad(state, o.file),
+    release_impact: politicaDe(o.id)?.release_impact ?? 'UNASSESSED',
+    release_critical_when: politicaDe(o.id)?.release_critical_when ?? null,
     note: o.note || null,
   }
 })
@@ -175,7 +258,7 @@ const summary = {}
 for (const o of objects) summary[o.state] = (summary[o.state] || 0) + 1
 
 const artifact = {
-  artifact_version: '1.0',
+  artifact_version: '1.1',
   tool: 'schema-drift-guard',
   mode: 'DRY_RUN',
   checked_at: a['checked-at'] || new Date().toISOString(),
@@ -186,14 +269,25 @@ const artifact = {
     ledger_rows: ledger.length,
     registry_objects: registry.objects.length,
     registry_version: registry.registry_version ?? null,
+    fingerprinted_objects: registry.objects.filter(o => o.expected).length,
   },
   objects,
-  drifts: drifts.map(d => ({ id: d.id, state: d.state, severity: d.severity, note: d.note })),
+  drifts: drifts.map(d => ({ id: d.id, state: d.state, severity: d.severity,
+    release_impact: d.release_impact, effect_detail: d.sources.effect.detail,
+    diffs: d.diffs, note: d.note })),
   summary: {
     by_state: summary,
     blocking: drifts.filter(d => d.severity === 'BLOCK').length,
     warning: drifts.filter(d => d.severity === 'WARN').length,
     ok: objects.length - drifts.length,
+    by_effect_detail: objects.reduce((m, o) => {
+      const d = o.sources.effect.detail; m[d] = (m[d] || 0) + 1; return m
+    }, {}),
+    // Separado a propósito de `blocking`: la severidad no decide el release.
+    by_release_impact: objects.reduce((m, o) => {
+      m[o.release_impact] = (m[o.release_impact] || 0) + 1; return m
+    }, {}),
+    policy_version: policy?.policy_version ?? null,
   },
   // Invariantes del propio artefacto. Si alguna es falsa, el artefacto no vale.
   guarantees: {

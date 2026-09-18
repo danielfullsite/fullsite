@@ -69,7 +69,11 @@ casos.forEach(([esperado, sevEsperada], i) => {
 })
 
 // La comprobación que más importa: sin efecto NUNCA hay MATCH.
-const falsoMatch = art.objects.filter(o => o.sources.effect === false && o.state === 'MATCH')
+// v1.1: `sources.effect` pasó de booleano a objeto. Con el acceso viejo esta
+// comprobación se volvía vacía —siempre pasaba— que es la peor forma de fallar:
+// un test verde que no mira nada.
+const efectoAusente = (o) => o.sources.effect?.exists === false
+const falsoMatch = art.objects.filter(o => efectoAusente(o) && o.state === 'MATCH')
 if (falsoMatch.length) { fallos++; console.error(`  ✗ MATCH sin efecto en: ${falsoMatch.map(o => o.id)}`) }
 else console.log('  ✓ ningún MATCH sin efecto comprobado')
 
@@ -78,6 +82,83 @@ if (art.guarantees.ddl_executed !== 0 || art.guarantees.ledger_writes !== 0) {
   fallos++; console.error('  ✗ el artefacto declara escrituras')
 } else console.log('  ✓ el artefacto declara cero escrituras')
 
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BLOQUE 2 · FINGERPRINTS — existir NO es ser equivalente
+//
+// Estos casos existen para que el guardián FALLE si alguien vuelve a tratar
+// `exists` como prueba de conformidad. Los cuatro primeros tienen archivo +
+// ledger + objeto presentes: bajo la lógica v1 serían MATCH. Aquí deben ser
+// MISMATCH, porque la definición no corresponde.
+// ═══════════════════════════════════════════════════════════════════════════
+console.log('\n── fingerprints ──')
+
+const F = 'm/fp.sql'
+const fpCasos = [
+  ['col-tipo-distinto', 'MISMATCH', 'column',
+    { kind: 'column', data_type: 'text', udt_name: 'text', is_nullable: 'YES', column_default: '' },
+    { kind: 'column', data_type: 'integer', udt_name: 'int4', is_nullable: 'YES', column_default: '' }],
+  ['idx-predicado-distinto', 'MISMATCH', 'index',
+    { kind: 'index', unique: true, indexdef: 'CREATE UNIQUE INDEX i ON t USING btree (a, b) WHERE (b IS NOT NULL)' },
+    { kind: 'index', unique: true, indexdef: 'CREATE UNIQUE INDEX i ON t USING btree (a, b) WHERE (b IS NULL)' }],
+  ['fn-body-distinto', 'MISMATCH', 'function',
+    { kind: 'function', args: 'a text', returns: 'jsonb', security_definer: true, search_path: 'public', body_md5: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
+    { kind: 'function', args: 'a text', returns: 'jsonb', security_definer: true, search_path: 'public', body_md5: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' }],
+  ['fn-security-distinta', 'MISMATCH', 'function',
+    { kind: 'function', args: 'a text', returns: 'jsonb', security_definer: true, search_path: 'public' },
+    { kind: 'function', args: 'a text', returns: 'jsonb', security_definer: false, search_path: 'public' }],
+  ['fn-correcta', 'MATCH', 'function',
+    { kind: 'function', args: 'a text', returns: 'jsonb', security_definer: true, search_path: 'pg_catalog, public' },
+    { kind: 'function', args: 'a  text', returns: 'JSONB', security_definer: true, search_path: 'search_path=pg_catalog,public' }],
+  ['fn-introspeccion-incompleta', 'MATCH', 'function',   // existe, sin observed → NOT_CHECKED, no MISMATCH
+    { kind: 'function', args: 'a text', returns: 'jsonb', security_definer: true, search_path: 'public' },
+    null],
+]
+
+const reg2 = { registry_version: 'selftest-fp', objects: [] }
+const eff2 = {}
+fpCasos.forEach(([nombre, _esp, kind, expected, observed], i) => {
+  const id = `f${i}.${nombre}`
+  reg2.objects.push({ id, kind, rel: 't', name: id, file: F, ledger_hint: 'aplicada', expected: { source: 'file', ...expected } })
+  eff2[id] = observed ? { exists: true, observed } : { exists: true }
+})
+
+const q = (n, o) => { const x = join(dir2, n); writeFileSync(x, JSON.stringify(o)); return x }
+const dir2 = mkdtempSync(join(tmpdir(), 'drift-selftest-fp-'))
+const art2 = (() => {
+  const pR2 = q('registry.json', reg2), pF2 = q('files.json', [{ path: F }])
+  const pL2 = q('ledger.json', [{ version: '1', name: 'aplicada' }]), pE2 = q('effects.json', eff2)
+  try {
+    return JSON.parse(execFileSync('node', [new URL('./drift-guard.mjs', import.meta.url).pathname,
+      '--registry', pR2, '--files', pF2, '--ledger', pL2, '--effects', pE2,
+      '--repo-sha', 'selftest', '--db-identity', 'selftest'], { encoding: 'utf8' }))
+  } catch (e) {
+    if (e.status !== 1) { console.error('corrida fp falló:', e.message); process.exit(1) }
+    return JSON.parse(e.stdout)
+  }
+})()
+
+fpCasos.forEach(([nombre, esperado], i) => {
+  const o = art2.objects.find(x => x.id.startsWith(`f${i}.`))
+  if (o?.state === esperado) console.log(`  ✓ ${nombre.padEnd(30)} ${esperado}`)
+  else { fallos++; console.error(`  ✗ ${nombre}: esperaba ${esperado}, obtuvo ${o?.state} (detalle ${o?.sources?.effect?.detail})`) }
+})
+
+// LA COMPROBACIÓN QUE NO SE PUEDE QUITAR: si el guardián aceptara existencia
+// como equivalencia, los cuatro primeros serían MATCH y esto fallaría.
+const falsoPositivo = art2.objects.filter((o, i) => i < 4 && o.state === 'MATCH')
+if (falsoPositivo.length) {
+  fallos++
+  console.error(`  ✗ FALSE_MATCH: el guardián aceptó existencia como equivalencia en ${falsoPositivo.map(o => o.id)}`)
+} else console.log('  ✓ FALSE_MATCH: existencia NO se acepta como equivalencia')
+
+// Un MISMATCH tiene que bloquear, no sólo avisar.
+const noBloquean = art2.objects.filter(o => o.state === 'MISMATCH' && o.severity !== 'BLOCK')
+if (noBloquean.length) { fallos++; console.error(`  ✗ MISMATCH sin BLOCK: ${noBloquean.map(o => o.id)}`) }
+else console.log('  ✓ todo MISMATCH bloquea')
+
 rmSync(dir, { recursive: true, force: true })
-console.log(fallos === 0 ? `\nautoprueba: ${casos.length + 2}/${casos.length + 2} OK` : `\nautoprueba: ${fallos} fallo(s)`)
+rmSync(dir2, { recursive: true, force: true })
+const total = casos.length + 2 + fpCasos.length + 2
+console.log(fallos === 0 ? `\nautoprueba: ${total}/${total} OK` : `\nautoprueba: ${fallos} fallo(s) de ${total}`)
 process.exit(fallos === 0 ? 0 : 1)

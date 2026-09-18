@@ -1,15 +1,16 @@
 {
-  "artifact_version": "1.0",
+  "artifact_version": "1.1",
   "tool": "schema-drift-guard",
   "mode": "DRY_RUN",
-  "checked_at": "2026-09-18T21:05:56Z",
+  "checked_at": "2026-09-18T21:28:18.524Z",
   "repo_sha": "21d66e413663b4e78d244d5c6fcc7c8a521897c5",
   "database_identity": "supabase:qjiomlvudfmzuvqvhwpk/postgres · PostgreSQL 17.6",
   "inputs": {
     "migration_files": 45,
     "ledger_rows": 54,
     "registry_objects": 29,
-    "registry_version": "1.0"
+    "registry_version": "1.1",
+    "fingerprinted_objects": 12
   },
   "objects": [
     {
@@ -22,10 +23,19 @@
       "sources": {
         "file": true,
         "ledger": false,
-        "effect": true
+        "effect": {
+          "exists": true,
+          "fingerprint_matches": true,
+          "detail": "PRESENT_AND_MATCHING",
+          "reason": null
+        }
       },
+      "fingerprint_source": "file",
+      "diffs": [],
       "state": "FILE_AND_EFFECT_NO_LEDGER",
       "severity": "WARN",
+      "release_impact": "DEGRADED",
+      "release_critical_when": "se libera sin registrar la migración en el ledger",
       "note": "P0A"
     },
     {
@@ -38,10 +48,19 @@
       "sources": {
         "file": true,
         "ledger": false,
-        "effect": true
+        "effect": {
+          "exists": true,
+          "fingerprint_matches": true,
+          "detail": "PRESENT_AND_MATCHING",
+          "reason": null
+        }
       },
+      "fingerprint_source": "file",
+      "diffs": [],
       "state": "FILE_AND_EFFECT_NO_LEDGER",
       "severity": "WARN",
+      "release_impact": "DEGRADED",
+      "release_critical_when": "se libera sin registrar la migración en el ledger",
       "note": "P0A"
     },
     {
@@ -54,10 +73,19 @@
       "sources": {
         "file": true,
         "ledger": false,
-        "effect": true
+        "effect": {
+          "exists": true,
+          "fingerprint_matches": true,
+          "detail": "PRESENT_AND_MATCHING",
+          "reason": null
+        }
       },
+      "fingerprint_source": "file",
+      "diffs": [],
       "state": "FILE_AND_EFFECT_NO_LEDGER",
       "severity": "WARN",
+      "release_impact": "DEGRADED",
+      "release_critical_when": "se libera sin registrar la migración en el ledger",
       "note": "P0A"
     },
     {
@@ -70,10 +98,19 @@
       "sources": {
         "file": true,
         "ledger": false,
-        "effect": true
+        "effect": {
+          "exists": true,
+          "fingerprint_matches": true,
+          "detail": "PRESENT_AND_MATCHING",
+          "reason": null
+        }
       },
+      "fingerprint_source": "file",
+      "diffs": [],
       "state": "FILE_AND_EFFECT_NO_LEDGER",
       "severity": "WARN",
+      "release_impact": "DEGRADED",
+      "release_critical_when": "se libera sin registrar la migración en el ledger",
       "note": "único parcial"
     },
     {
@@ -86,10 +123,19 @@
       "sources": {
         "file": true,
         "ledger": false,
-        "effect": true
+        "effect": {
+          "exists": true,
+          "fingerprint_matches": true,
+          "detail": "PRESENT_AND_MATCHING",
+          "reason": null
+        }
       },
+      "fingerprint_source": "file",
+      "diffs": [],
       "state": "FILE_AND_EFFECT_NO_LEDGER",
       "severity": "WARN",
+      "release_impact": "DEGRADED",
+      "release_critical_when": "se libera sin registrar la migración en el ledger",
       "note": "único parcial"
     },
     {
@@ -102,10 +148,19 @@
       "sources": {
         "file": true,
         "ledger": false,
-        "effect": true
+        "effect": {
+          "exists": true,
+          "fingerprint_matches": true,
+          "detail": "PRESENT_AND_MATCHING",
+          "reason": null
+        }
       },
+      "fingerprint_source": "file",
+      "diffs": [],
       "state": "FILE_AND_EFFECT_NO_LEDGER",
       "severity": "WARN",
+      "release_impact": "DEGRADED",
+      "release_critical_when": "se libera sin registrar la migración en el ledger",
       "note": "único parcial"
     },
     {
@@ -118,10 +173,19 @@
       "sources": {
         "file": true,
         "ledger": false,
-        "effect": true
+        "effect": {
+          "exists": true,
+          "fingerprint_matches": true,
+          "detail": "PRESENT_AND_MATCHING",
+          "reason": null
+        }
       },
+      "fingerprint_source": "file",
+      "diffs": [],
       "state": "FILE_AND_EFFECT_NO_LEDGER",
       "severity": "WARN",
+      "release_impact": "UNASSESSED",
+      "release_critical_when": null,
       "note": null
     },
     {
@@ -134,10 +198,19 @@
       "sources": {
         "file": true,
         "ledger": false,
-        "effect": false
+        "effect": {
+          "exists": false,
+          "fingerprint_matches": null,
+          "detail": "ABSENT",
+          "reason": null
+        }
       },
+      "fingerprint_source": null,
+      "diffs": [],
       "state": "FILE_ONLY",
       "severity": "OK",
+      "release_impact": "UNASSESSED",
+      "release_critical_when": null,
       "note": "hermana de pos_scoped_child"
     },
     {
@@ -150,10 +223,19 @@
       "sources": {
         "file": true,
         "ledger": true,
-        "effect": true
+        "effect": {
+          "exists": true,
+          "fingerprint_matches": null,
+          "detail": "NOT_CHECKED",
+          "reason": "el registro no declara fingerprint esperado"
+        }
       },
+      "fingerprint_source": null,
+      "diffs": [],
       "state": "MATCH",
       "severity": "OK",
+      "release_impact": "UNASSESSED",
+      "release_critical_when": null,
       "note": null
     },
     {
@@ -166,10 +248,19 @@
       "sources": {
         "file": true,
         "ledger": true,
-        "effect": true
+        "effect": {
+          "exists": true,
+          "fingerprint_matches": true,
+          "detail": "PRESENT_AND_MATCHING",
+          "reason": null
+        }
       },
+      "fingerprint_source": "file",
+      "diffs": [],
       "state": "MATCH",
       "severity": "OK",
+      "release_impact": "UNASSESSED",
+      "release_critical_when": null,
       "note": null
     },
     {
@@ -182,10 +273,19 @@
       "sources": {
         "file": true,
         "ledger": false,
-        "effect": false
+        "effect": {
+          "exists": false,
+          "fingerprint_matches": null,
+          "detail": "ABSENT",
+          "reason": null
+        }
       },
+      "fingerprint_source": null,
+      "diffs": [],
       "state": "FILE_ONLY",
       "severity": "WARN",
+      "release_impact": "BLOCKER",
+      "release_critical_when": "el alcance incluye más de una sucursal, o cualquier sucursal fuera de America/Monterrey",
       "note": "el código la lee"
     },
     {
@@ -198,10 +298,19 @@
       "sources": {
         "file": true,
         "ledger": false,
-        "effect": false
+        "effect": {
+          "exists": false,
+          "fingerprint_matches": null,
+          "detail": "ABSENT",
+          "reason": null
+        }
       },
+      "fingerprint_source": null,
+      "diffs": [],
       "state": "FILE_ONLY",
       "severity": "WARN",
+      "release_impact": "BLOCKER",
+      "release_critical_when": "el alcance incluye turnos por sucursal",
       "note": null
     },
     {
@@ -214,10 +323,19 @@
       "sources": {
         "file": true,
         "ledger": false,
-        "effect": false
+        "effect": {
+          "exists": false,
+          "fingerprint_matches": null,
+          "detail": "ABSENT",
+          "reason": null
+        }
       },
+      "fingerprint_source": null,
+      "diffs": [],
       "state": "FILE_ONLY",
       "severity": "WARN",
+      "release_impact": "UNASSESSED",
+      "release_critical_when": null,
       "note": null
     },
     {
@@ -230,10 +348,19 @@
       "sources": {
         "file": true,
         "ledger": false,
-        "effect": false
+        "effect": {
+          "exists": false,
+          "fingerprint_matches": null,
+          "detail": "ABSENT",
+          "reason": null
+        }
       },
+      "fingerprint_source": null,
+      "diffs": [],
       "state": "FILE_ONLY",
       "severity": "WARN",
+      "release_impact": "BLOCKER",
+      "release_critical_when": "multi-sucursal con turnos simultáneos",
       "note": null
     },
     {
@@ -246,10 +373,19 @@
       "sources": {
         "file": true,
         "ledger": false,
-        "effect": false
+        "effect": {
+          "exists": false,
+          "fingerprint_matches": null,
+          "detail": "ABSENT",
+          "reason": null
+        }
       },
+      "fingerprint_source": null,
+      "diffs": [],
       "state": "FILE_ONLY",
       "severity": "WARN",
+      "release_impact": "BLOCKER",
+      "release_critical_when": "el alcance incluye apertura o cierre de turno",
       "note": "invariante de turno abierto"
     },
     {
@@ -262,10 +398,19 @@
       "sources": {
         "file": true,
         "ledger": true,
-        "effect": true
+        "effect": {
+          "exists": true,
+          "fingerprint_matches": true,
+          "detail": "PRESENT_AND_MATCHING",
+          "reason": null
+        }
       },
+      "fingerprint_source": "file",
+      "diffs": [],
       "state": "MATCH",
       "severity": "OK",
+      "release_impact": "UNASSESSED",
+      "release_critical_when": null,
       "note": null
     },
     {
@@ -278,10 +423,19 @@
       "sources": {
         "file": true,
         "ledger": true,
-        "effect": true
+        "effect": {
+          "exists": true,
+          "fingerprint_matches": null,
+          "detail": "NOT_CHECKED",
+          "reason": "el registro no declara fingerprint esperado"
+        }
       },
+      "fingerprint_source": null,
+      "diffs": [],
       "state": "MATCH",
       "severity": "OK",
+      "release_impact": "UNASSESSED",
+      "release_critical_when": null,
       "note": null
     },
     {
@@ -294,10 +448,19 @@
       "sources": {
         "file": true,
         "ledger": true,
-        "effect": true
+        "effect": {
+          "exists": true,
+          "fingerprint_matches": true,
+          "detail": "PRESENT_AND_MATCHING",
+          "reason": null
+        }
       },
+      "fingerprint_source": "file",
+      "diffs": [],
       "state": "MATCH",
       "severity": "OK",
+      "release_impact": "UNASSESSED",
+      "release_critical_when": null,
       "note": "único parcial"
     },
     {
@@ -310,10 +473,19 @@
       "sources": {
         "file": true,
         "ledger": true,
-        "effect": true
+        "effect": {
+          "exists": true,
+          "fingerprint_matches": true,
+          "detail": "PRESENT_AND_MATCHING",
+          "reason": null
+        }
       },
+      "fingerprint_source": "file",
+      "diffs": [],
       "state": "MATCH",
       "severity": "OK",
+      "release_impact": "UNASSESSED",
+      "release_critical_when": null,
       "note": null
     },
     {
@@ -326,10 +498,19 @@
       "sources": {
         "file": true,
         "ledger": true,
-        "effect": true
+        "effect": {
+          "exists": true,
+          "fingerprint_matches": null,
+          "detail": "NOT_CHECKED",
+          "reason": "el registro no declara fingerprint esperado"
+        }
       },
+      "fingerprint_source": null,
+      "diffs": [],
       "state": "MATCH",
       "severity": "OK",
+      "release_impact": "UNASSESSED",
+      "release_critical_when": null,
       "note": null
     },
     {
@@ -342,10 +523,19 @@
       "sources": {
         "file": true,
         "ledger": false,
-        "effect": false
+        "effect": {
+          "exists": false,
+          "fingerprint_matches": null,
+          "detail": "ABSENT",
+          "reason": null
+        }
       },
+      "fingerprint_source": null,
+      "diffs": [],
       "state": "FILE_ONLY",
       "severity": "WARN",
+      "release_impact": "DEGRADED",
+      "release_critical_when": "el alcance promete registro de terminales o diagnóstico remoto de flota",
       "note": "está en el ALLOW del proxy"
     },
     {
@@ -358,10 +548,19 @@
       "sources": {
         "file": true,
         "ledger": false,
-        "effect": false
+        "effect": {
+          "exists": false,
+          "fingerprint_matches": null,
+          "detail": "ABSENT",
+          "reason": null
+        }
       },
+      "fingerprint_source": null,
+      "diffs": [],
       "state": "FILE_ONLY",
       "severity": "WARN",
+      "release_impact": "DEGRADED",
+      "release_critical_when": "el alcance incluye enrolamiento de terminal",
       "note": null
     },
     {
@@ -374,10 +573,19 @@
       "sources": {
         "file": true,
         "ledger": false,
-        "effect": false
+        "effect": {
+          "exists": false,
+          "fingerprint_matches": null,
+          "detail": "ABSENT",
+          "reason": null
+        }
       },
+      "fingerprint_source": null,
+      "diffs": [],
       "state": "FILE_ONLY",
       "severity": "OK",
+      "release_impact": "UNASSESSED",
+      "release_critical_when": null,
       "note": null
     },
     {
@@ -390,10 +598,19 @@
       "sources": {
         "file": true,
         "ledger": false,
-        "effect": false
+        "effect": {
+          "exists": false,
+          "fingerprint_matches": null,
+          "detail": "ABSENT",
+          "reason": null
+        }
       },
+      "fingerprint_source": null,
+      "diffs": [],
       "state": "FILE_ONLY",
       "severity": "OK",
+      "release_impact": "UNASSESSED",
+      "release_critical_when": null,
       "note": null
     },
     {
@@ -406,10 +623,19 @@
       "sources": {
         "file": true,
         "ledger": false,
-        "effect": false
+        "effect": {
+          "exists": false,
+          "fingerprint_matches": null,
+          "detail": "ABSENT",
+          "reason": null
+        }
       },
+      "fingerprint_source": null,
+      "diffs": [],
       "state": "FILE_ONLY",
       "severity": "OK",
+      "release_impact": "UNASSESSED",
+      "release_critical_when": null,
       "note": null
     },
     {
@@ -422,10 +648,19 @@
       "sources": {
         "file": true,
         "ledger": false,
-        "effect": false
+        "effect": {
+          "exists": false,
+          "fingerprint_matches": null,
+          "detail": "ABSENT",
+          "reason": null
+        }
       },
+      "fingerprint_source": null,
+      "diffs": [],
       "state": "FILE_ONLY",
       "severity": "OK",
+      "release_impact": "UNASSESSED",
+      "release_critical_when": null,
       "note": null
     },
     {
@@ -438,10 +673,19 @@
       "sources": {
         "file": true,
         "ledger": false,
-        "effect": false
+        "effect": {
+          "exists": false,
+          "fingerprint_matches": null,
+          "detail": "ABSENT",
+          "reason": null
+        }
       },
+      "fingerprint_source": null,
+      "diffs": [],
       "state": "FILE_ONLY",
       "severity": "OK",
+      "release_impact": "UNASSESSED",
+      "release_critical_when": null,
       "note": null
     },
     {
@@ -454,10 +698,19 @@
       "sources": {
         "file": true,
         "ledger": null,
-        "effect": true
+        "effect": {
+          "exists": true,
+          "fingerprint_matches": null,
+          "detail": "NOT_CHECKED",
+          "reason": "el registro no declara fingerprint esperado"
+        }
       },
+      "fingerprint_source": null,
+      "diffs": [],
       "state": "MATCH",
       "severity": "OK",
+      "release_impact": "UNASSESSED",
+      "release_critical_when": null,
       "note": "nace en el baseline; no tiene fila de ledger propia"
     },
     {
@@ -470,10 +723,19 @@
       "sources": {
         "file": true,
         "ledger": null,
-        "effect": true
+        "effect": {
+          "exists": true,
+          "fingerprint_matches": true,
+          "detail": "PRESENT_AND_MATCHING",
+          "reason": null
+        }
       },
+      "fingerprint_source": "file",
+      "diffs": [],
       "state": "MATCH",
       "severity": "OK",
+      "release_impact": "UNASSESSED",
+      "release_critical_when": null,
       "note": "idem"
     }
   ],
@@ -482,84 +744,126 @@
       "id": "col.pos_cash_movements.client_op_id",
       "state": "FILE_AND_EFFECT_NO_LEDGER",
       "severity": "WARN",
+      "release_impact": "DEGRADED",
+      "effect_detail": "PRESENT_AND_MATCHING",
+      "diffs": [],
       "note": "P0A"
     },
     {
       "id": "col.pos_audit_log.client_op_id",
       "state": "FILE_AND_EFFECT_NO_LEDGER",
       "severity": "WARN",
+      "release_impact": "DEGRADED",
+      "effect_detail": "PRESENT_AND_MATCHING",
+      "diffs": [],
       "note": "P0A"
     },
     {
       "id": "col.pos_market_movements.client_op_id",
       "state": "FILE_AND_EFFECT_NO_LEDGER",
       "severity": "WARN",
+      "release_impact": "DEGRADED",
+      "effect_detail": "PRESENT_AND_MATCHING",
+      "diffs": [],
       "note": "P0A"
     },
     {
       "id": "idx.pos_cash_movements_client_op_id",
       "state": "FILE_AND_EFFECT_NO_LEDGER",
       "severity": "WARN",
+      "release_impact": "DEGRADED",
+      "effect_detail": "PRESENT_AND_MATCHING",
+      "diffs": [],
       "note": "único parcial"
     },
     {
       "id": "idx.pos_audit_log_client_op_id",
       "state": "FILE_AND_EFFECT_NO_LEDGER",
       "severity": "WARN",
+      "release_impact": "DEGRADED",
+      "effect_detail": "PRESENT_AND_MATCHING",
+      "diffs": [],
       "note": "único parcial"
     },
     {
       "id": "idx.pos_market_movements_client_op_id",
       "state": "FILE_AND_EFFECT_NO_LEDGER",
       "severity": "WARN",
+      "release_impact": "DEGRADED",
+      "effect_detail": "PRESENT_AND_MATCHING",
+      "diffs": [],
       "note": "único parcial"
     },
     {
       "id": "fn.pos_scoped_child",
       "state": "FILE_AND_EFFECT_NO_LEDGER",
       "severity": "WARN",
+      "release_impact": "UNASSESSED",
+      "effect_detail": "PRESENT_AND_MATCHING",
+      "diffs": [],
       "note": null
     },
     {
       "id": "col.client_locations.timezone",
       "state": "FILE_ONLY",
       "severity": "WARN",
+      "release_impact": "BLOCKER",
+      "effect_detail": "ABSENT",
+      "diffs": [],
       "note": "el código la lee"
     },
     {
       "id": "col.pos_turnos.location_id",
       "state": "FILE_ONLY",
       "severity": "WARN",
+      "release_impact": "BLOCKER",
+      "effect_detail": "ABSENT",
+      "diffs": [],
       "note": null
     },
     {
       "id": "col.pos_turnos.status",
       "state": "FILE_ONLY",
       "severity": "WARN",
+      "release_impact": "UNASSESSED",
+      "effect_detail": "ABSENT",
+      "diffs": [],
       "note": null
     },
     {
       "id": "idx.uq_pos_turnos_activo_por_sucursal",
       "state": "FILE_ONLY",
       "severity": "WARN",
+      "release_impact": "BLOCKER",
+      "effect_detail": "ABSENT",
+      "diffs": [],
       "note": null
     },
     {
       "id": "idx.pos_turnos_uno_abierto_por_restaurante",
       "state": "FILE_ONLY",
       "severity": "WARN",
+      "release_impact": "BLOCKER",
+      "effect_detail": "ABSENT",
+      "diffs": [],
       "note": "invariante de turno abierto"
     },
     {
       "id": "tbl.pos_terminals",
       "state": "FILE_ONLY",
       "severity": "WARN",
+      "release_impact": "DEGRADED",
+      "effect_detail": "ABSENT",
+      "diffs": [],
       "note": "está en el ALLOW del proxy"
     },
     {
       "id": "tbl.pos_terminal_enrollments",
       "state": "FILE_ONLY",
       "severity": "WARN",
+      "release_impact": "DEGRADED",
+      "effect_detail": "ABSENT",
+      "diffs": [],
       "note": null
     }
   ],
@@ -571,7 +875,18 @@
     },
     "blocking": 0,
     "warning": 14,
-    "ok": 15
+    "ok": 15,
+    "by_effect_detail": {
+      "PRESENT_AND_MATCHING": 12,
+      "ABSENT": 13,
+      "NOT_CHECKED": 4
+    },
+    "by_release_impact": {
+      "DEGRADED": 8,
+      "UNASSESSED": 17,
+      "BLOCKER": 4
+    },
+    "policy_version": "1.0"
   },
   "guarantees": {
     "read_only": true,
