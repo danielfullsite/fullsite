@@ -98,7 +98,7 @@ describe('A/H · crear una OC es UNA operación', () => {
   it('una sola petición lleva cabecera y renglones', async () => {
     fetchMock.mockResolvedValue(respuesta(200, { order_id: 'oc-1', total: 58 }))
     await pos.createPurchaseOrderAtomic({
-      supplier: 'Prov', created_by: 'G',
+      supplier: 'Prov',
       lines: [
         { ingredient_id: 'uuid-1', quantity_ordered: 2, unit: 'kg', unit_cost: 10 },
         { ingredient_id: 'uuid-2', quantity_ordered: 3, unit: 'kg', unit_cost: 5 },
@@ -113,7 +113,7 @@ describe('A/H · crear una OC es UNA operación', () => {
 
   it('el tenant NO viaja en el cuerpo: lo resuelve la sesión', async () => {
     fetchMock.mockResolvedValue(respuesta(200, { order_id: 'oc-1', total: 10 }))
-    await pos.createPurchaseOrderAtomic({ supplier: 'P', created_by: 'G',
+    await pos.createPurchaseOrderAtomic({ supplier: 'P',
       lines: [{ ingredient_id: 'uuid-1', quantity_ordered: 1, unit: 'kg', unit_cost: 10 }] })
     const cuerpo = JSON.parse(fetchMock.mock.calls[0][1].body)
     expect(cuerpo.header).not.toHaveProperty('client_id')
@@ -121,7 +121,7 @@ describe('A/H · crear una OC es UNA operación', () => {
 
   it('devuelve el order_id que asignó el servidor', async () => {
     fetchMock.mockResolvedValue(respuesta(200, { order_id: 'oc-servidor', total: 10 }))
-    await expect(pos.createPurchaseOrderAtomic({ supplier: 'P', created_by: 'G',
+    await expect(pos.createPurchaseOrderAtomic({ supplier: 'P',
       lines: [{ ingredient_id: 'u', quantity_ordered: 1, unit: 'kg', unit_cost: 10 }] }))
       .resolves.toMatchObject({ order_id: 'oc-servidor' })
   })
@@ -137,7 +137,7 @@ describe('E/F/G · cuando el servidor rechaza, no hay media orden', () => {
   ] as const) {
     it(`${caso}: se propaga como error`, async () => {
       fetchMock.mockResolvedValue(respuesta(409, { error: err }))
-      await expect(pos.createPurchaseOrderAtomic({ supplier: 'P', created_by: 'G',
+      await expect(pos.createPurchaseOrderAtomic({ supplier: 'P',
         lines: [{ ingredient_id: 'x', quantity_ordered: 1, unit: 'kg', unit_cost: 1 }] }))
         .rejects.toThrow(err)
     })
@@ -145,14 +145,14 @@ describe('E/F/G · cuando el servidor rechaza, no hay media orden', () => {
 
   it('una respuesta sin order_id NO se declara éxito', async () => {
     fetchMock.mockResolvedValue(respuesta(200, { ok: true }))
-    await expect(pos.createPurchaseOrderAtomic({ supplier: 'P', created_by: 'G',
+    await expect(pos.createPurchaseOrderAtomic({ supplier: 'P',
       lines: [{ ingredient_id: 'x', quantity_ordered: 1, unit: 'kg', unit_cost: 1 }] }))
       .rejects.toThrow(/ORDEN_NO_CONFIRMADA/)
   })
 
   it('sin conexión LANZA', async () => {
     fetchMock.mockRejectedValue(new TypeError('Failed to fetch'))
-    await expect(pos.createPurchaseOrderAtomic({ supplier: 'P', created_by: 'G',
+    await expect(pos.createPurchaseOrderAtomic({ supplier: 'P',
       lines: [{ ingredient_id: 'x', quantity_ordered: 1, unit: 'kg', unit_cost: 1 }] }))
       .rejects.toThrow(/ORDEN_NO_CONFIRMADA/)
   })

@@ -3276,10 +3276,12 @@ export async function createIngredient(datos: {
  * la cabecera huérfana si el segundo fallaba. El servidor valida todas las
  * líneas antes de escribir y commitea las dos inserciones juntas.
  *
- * No lleva `client_id`: el tenant sale de la sesión autenticada.
+ * No lleva `client_id` ni `created_by`: el tenant y la procedencia salen de la
+ * sesión autenticada. Tampoco importes: el servidor los calcula desde las líneas
+ * y la tasa configurada del restaurante (`clients.iva_rate`).
  */
 export async function createPurchaseOrderAtomic(orden: {
-  supplier: string; created_by: string; notes?: string; ai_suggested?: boolean
+  supplier: string; notes?: string; ai_suggested?: boolean
   lines: { ingredient_id: string; ingredient_name?: string; quantity_ordered: number; unit: string; unit_cost: number }[]
 }): Promise<{ order_id: string; total: number }> {
   const { lines, ...header } = orden

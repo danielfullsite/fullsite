@@ -1080,7 +1080,6 @@ function ManualOCPanel({ onCreated, showToast }: { onCreated: () => void; showTo
   // Form state
   const [supplier, setSupplier] = useState('')
   const [customSupplier, setCustomSupplier] = useState('')
-  const [createdBy, setCreatedBy] = useState('')
   const [notes, setNotes] = useState('')
   const [items, setItems] = useState<ManualLineItem[]>([
     { id: generateId(), name: '', ingredient_id: '', quantity: 1, unit: 'kg', unit_cost: 0 },
@@ -1170,7 +1169,8 @@ function ManualOCPanel({ onCreated, showToast }: { onCreated: () => void; showTo
 
   // Sin catálogo cargado no se crea nada, y cada renglón necesita un
   // ingrediente REAL — no un nombre que parezca uno.
-  const canSubmit = !!catalogo && !catalogoError && effectiveSupplier && createdBy.trim() &&
+  // `createdBy` desapareció del contrato: la procedencia la pone la sesión.
+  const canSubmit = !!catalogo && !catalogoError && effectiveSupplier &&
     items.every(i => i.ingredient_id && i.quantity > 0 && i.unit_cost > 0)
 
   const handleCreate = async () => {
@@ -1182,7 +1182,6 @@ function ManualOCPanel({ onCreated, showToast }: { onCreated: () => void; showTo
       // dos POST y dejaba la cabecera huérfana cuando el segundo fallaba.
       const r = await createPurchaseOrderAtomic({
         supplier: effectiveSupplier,
-        created_by: createdBy.trim(),
         notes: notes.trim() || undefined,
         ai_suggested: false,
         lines: items.map(item => ({
@@ -1248,16 +1247,6 @@ function ManualOCPanel({ onCreated, showToast }: { onCreated: () => void; showTo
                 className="w-full mt-2 bg-[var(--line)] border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-emerald-500"
               />
             )}
-          </div>
-          <div>
-            <label className="text-sm text-[var(--text-3)] block mb-1">Creada por *</label>
-            <input
-              type="text"
-              value={createdBy}
-              onChange={e => setCreatedBy(e.target.value)}
-              placeholder="Nombre del responsable..."
-              className="w-full bg-[var(--line)] border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-emerald-500"
-            />
           </div>
         </div>
 
@@ -1485,7 +1474,6 @@ function NewOCPanel({ onCreated, showToast }: { onCreated: () => void; showToast
     try {
       await createPurchaseOrderAtomic({
         supplier,
-        created_by: 'Chef (IA)',
         notes: 'Generada por sugerencia de IA',
         ai_suggested: true,
         lines: items.map(i => ({

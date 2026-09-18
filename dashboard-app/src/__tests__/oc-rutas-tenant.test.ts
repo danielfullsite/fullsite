@@ -30,7 +30,8 @@ const peticion = (cuerpo: unknown) => new Request('https://app.fullsite.mx/api/p
 }) as never
 
 const LINEA = { ingredient_id: 'uuid-1', quantity_ordered: 1, unit: 'kg', unit_cost: 10 }
-const HEADER = { supplier: 'Prov', created_by: 'Gerente' }
+// El header limpio ya NO lleva `created_by`: la procedencia la pone la sesión.
+const HEADER = { supplier: 'Prov' }
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -105,6 +106,58 @@ describe('C · /api/pos/ingredientes tampoco acepta el tenant del cuerpo', () =>
     const enviado = JSON.parse(fetchMock.mock.calls[0][1].body)
     expect(enviado).not.toHaveProperty('p_id')
     expect(Object.values(enviado)).not.toContain('harina')
+  })
+})
+
+describe('E · CREATED_BY es procedencia, no entrada del cliente', () => {
+  it('CREATED_BY_FROM_AUTH · el nombre viene de la sesión', async () => {
+    withPOSAuth.mockResolvedValue({ clientId: 'cert-lab', role: 'gerente', staffId: 's1', staffName: 'CERT-GERENTE' })
+    const { POST } = await import('../app/api/pos/purchase-orders/route')
+    await POST(peticion({ header: HEADER, lines: [LINEA] }))
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).p_created_by).toBe('CERT-GERENTE')
+  })
+
+  it('sin nombre en la sesión, cae al id del staff — nunca al cuerpo', async () => {
+    withPOSAuth.mockResolvedValue({ clientId: 'cert-lab', role: 'gerente', staffId: 'staff-42' })
+    const { POST } = await import('../app/api/pos/purchase-orders/route')
+    await POST(peticion({ header: HEADER, lines: [LINEA] }))
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).p_created_by).toBe('staff-42')
+  })
+
+  it('CLIENT_CREATED_BY_REJECTED · afirmar ser otra persona se rechaza', async () => {
+    const { POST } = await import('../app/api/pos/purchase-orders/route')
+    const res = await POST(peticion({ header: { ...HEADER, created_by: 'Otra Persona' }, lines: [LINEA] }))
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toBe('CREATED_BY_NOT_ACCEPTED')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('tampoco se acepta aunque coincida con el actor de la sesión', async () => {
+    const { POST } = await import('../app/api/pos/purchase-orders/route')
+    const res = await POST(peticion({ header: { ...HEADER, created_by: 'CERT-GERENTE' }, lines: [LINEA] }))
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toBe('CREATED_BY_NOT_ACCEPTED')
+  })
+})
+
+describe('D · CLIENT_CANNOT_OVERRIDE_TAX', () => {
+  for (const campo of ['iva', 'total', 'subtotal', 'iva_rate', 'tax_rate']) {
+    it(`header.${campo} → rechazado`, async () => {
+      const { POST } = await import('../app/api/pos/purchase-orders/route')
+      const res = await POST(peticion({ header: { ...HEADER, [campo]: 0.99 }, lines: [LINEA] }))
+      expect(res.status).toBe(400)
+      expect((await res.json()).error).toBe('AMOUNTS_NOT_ACCEPTED')
+      expect(fetchMock).not.toHaveBeenCalled()
+    })
+  }
+
+  it('lo que viaja al servidor no lleva importes ni tasa', async () => {
+    const { POST } = await import('../app/api/pos/purchase-orders/route')
+    await POST(peticion({ header: HEADER, lines: [LINEA] }))
+    const enviado = JSON.parse(fetchMock.mock.calls[0][1].body)
+    for (const campo of ['iva', 'total', 'subtotal', 'iva_rate', 'tax_rate']) {
+      expect(enviado.p_header).not.toHaveProperty(campo)
+    }
   })
 })
 

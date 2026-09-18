@@ -41,13 +41,24 @@ export async function POST(request: NextRequest) {
   }
   // El estado tampoco: una OC nueva nace en borrador y punto.
   if ('status' in header) return Response.json({ error: 'STATUS_NOT_ACCEPTED' }, { status: 400 })
+  // `created_by` es PROCEDENCIA. Quién hizo esto lo sabe la sesión, no el
+  // cuerpo: aceptarlo del cliente permitiría firmar una orden a nombre de otra
+  // persona. Si hiciera falta registrar a un tercero, sería OTRO campo.
+  if ('created_by' in header) return Response.json({ error: 'CREATED_BY_NOT_ACCEPTED' }, { status: 400 })
+  // Los importes y la tasa los calcula el servidor desde las líneas y la
+  // configuración del restaurante. El cliente no declara su propio total.
+  for (const campo of ['iva', 'total', 'subtotal', 'iva_rate', 'tax_rate']) {
+    if (campo in header) return Response.json({ error: 'AMOUNTS_NOT_ACCEPTED' }, { status: 400 })
+  }
+  const actor = auth.staffName?.trim() || auth.staffId
+  if (!actor) return Response.json({ error: 'ACTOR_REQUIRED' }, { status: 403 })
 
   const key = process.env.SUPABASE_SERVICE_KEY
   if (!key) return Response.json({ error: 'PURCHASE_ORDER_UNAVAILABLE' }, { status: 503 })
   try {
     const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/rpc/pos_create_purchase_order`, {
       method: 'POST', headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ p_client_id: auth.clientId, p_header: header, p_lines: lines }),
+      body: JSON.stringify({ p_client_id: auth.clientId, p_created_by: actor, p_header: header, p_lines: lines }),
       redirect: 'error', signal: AbortSignal.timeout(20000),
     })
     const result = await res.json()
@@ -57,7 +68,7 @@ export async function POST(request: NextRequest) {
       const conocidos = ['SCOPE_REQUIRED', 'INVALID_HEADER', 'INVALID_LINES', 'INVALID_LINE',
         'SUPPLIER_REQUIRED', 'CREATED_BY_REQUIRED', 'CLIENT_ID_NOT_ACCEPTED', 'ORDER_ID_TAKEN',
         'INGREDIENT_REQUIRED', 'INGREDIENT_SCOPE_CONFLICT', 'INVALID_QUANTITY', 'INVALID_UNIT_COST',
-        'UNIT_REQUIRED', 'STATUS_NOT_ACCEPTED']
+        'UNIT_REQUIRED', 'STATUS_NOT_ACCEPTED', 'CREATED_BY_NOT_ACCEPTED', 'AMOUNTS_NOT_ACCEPTED']
       const error = conocidos.includes(result?.message) ? result.message : 'PURCHASE_ORDER_UNCONFIRMED'
       return Response.json({ error }, { status: error === 'PURCHASE_ORDER_UNCONFIRMED' ? 503 : 409 })
     }
