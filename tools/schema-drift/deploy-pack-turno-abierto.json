@@ -1,0 +1,117 @@
+{
+  "pack_version": "1.0",
+  "prepared_at": "2026-09-18",
+  "objective": "UNO SOLO: crear idx.pos_turnos_uno_abierto_por_restaurante. Ninguna otra deriva del ledger se repara en esta operación.",
+  "status": "READY_FOR_SHARED_DEPLOYMENT — preparado, NO aplicado",
+  "blocked_on": "Fork en corrida. Esperar instrucción explícita de Daniel con el entorno quieto.",
+
+  "source_of_truth": {
+    "migration_file": "supabase/migrations/20260909030000_un_turno_abierto_por_restaurante.sql",
+    "read_from_ref": "origin/main",
+    "file_sha256": "4b1c202654366e1d4497080c3eb69f0ab97d5229ff422daae1b6a51484865195",
+    "verify_before_applying": "git show origin/main:supabase/migrations/20260909030000_un_turno_abierto_por_restaurante.sql | shasum -a 256",
+    "ddl": [
+      "CREATE UNIQUE INDEX IF NOT EXISTS pos_turnos_uno_abierto_por_restaurante ON public.pos_turnos (client_id) WHERE closed_at IS NULL;",
+      "COMMENT ON INDEX public.pos_turnos_uno_abierto_por_restaurante IS '...';"
+    ],
+    "expected_index_fingerprint": "CREATE UNIQUE INDEX pos_turnos_uno_abierto_por_restaurante ON public.pos_turnos USING btree (client_id) WHERE (closed_at IS NULL)",
+    "fingerprint_verified_on_disposable_db": true,
+    "rollback": "DROP INDEX public.pos_turnos_uno_abierto_por_restaurante;",
+    "rollback_verified": "En base desechable: tras el DROP las columnas y el conteo de índices vuelven idénticos al baseline, y la tabla vuelve a admitir dos turnos abiertos del mismo tenant. El índice se va de verdad.",
+    "ledger_note": "Esta operación NO escribe en supabase_migrations. Tras aplicarla el guardián reportará FILE_AND_EFFECT_NO_LEDGER para este objeto, igual que los otros siete. Reconciliar el ledger es una operación SEPARADA, con su propia autorización."
+  },
+
+  "preflight_query": "select count(*) as open_shifts_total, count(distinct client_id) as tenants_with_open_shift, (select count(*) from (select client_id from pos_turnos where closed_at is null group by client_id having count(*)>1) x) as tenants_with_multiple_open_shifts, (select count(*) from pos_turnos where closed_at is null and (client_id is null or btrim(client_id)='')) as open_shifts_without_tenant from pos_turnos where closed_at is null;",
+  "preflight_gate": "tenants_with_multiple_open_shifts = 0 AND open_shifts_without_tenant = 0. Si alguno es distinto de cero: NO APLICAR. No autocerrar nada: cerrar duplicados con un UPDATE masivo fue lo que produjo los closed_at anteriores al opened_at que la propia migración documenta.",
+  "preflight_last_result": {
+    "checked_at": "2026-09-18",
+    "open_shifts_total": 10,
+    "tenants_with_open_shift": 10,
+    "tenants_with_multiple_open_shifts": 0,
+    "open_shifts_without_tenant": 0,
+    "per_tenant": "amalay=1, boruca=1, carls-jr=1, chickin-demo=1, demo=1, diezmex-demo=1, fullsite-cert-lab-v2=1, scyf-demo=1, tekila-rg=1, test_noreste_grill=1",
+    "verdict": "PASS",
+    "note": "Hay que volver a correrla INMEDIATAMENTE antes de aplicar. Este resultado caduca: cualquier terminal puede abrir un turno entre esta medición y el deploy."
+  },
+
+  "post_deploy_fingerprint_query": "select pg_get_indexdef(i.indexrelid) as def, idx.indisunique, idx.indisvalid from pg_index i join pg_class c on c.oid=i.indexrelid join pg_namespace n on n.oid=c.relnamespace and n.nspname='public' join pg_index idx on idx.indexrelid=c.oid where c.relname='pos_turnos_uno_abierto_por_restaurante';",
+  "post_deploy_gate": "def idéntico a expected_index_fingerprint, indisunique=true, indisvalid=true. Después: volver a correr el guardián y exigir que el objeto pase de FILE_ONLY a FILE_AND_EFFECT_NO_LEDGER con PRESENT_AND_MATCHING.",
+
+  "code_precondition": {
+    "requirement": "openTurno() debe distinguir el conflicto de la falla de red ANTES de aplicar el índice. La propia migración lo exige: sin eso, cambiaríamos dos turnos por un turno fantasma que nunca sincroniza — peor que el defecto original.",
+    "verified_on": "9772f164",
+    "verdict": "CONFLICT_HANDLER_READY = true",
+    "evidence": [
+      "pos-data.ts · openTurno: `if (res.status === 409 || res.status === 422)` se evalúa ANTES del catch genérico",
+      "ante conflicto: `const yaAbierto = await getActiveTurno()` y devuelve `{...yaAbierto, sincronizado: true}` — adopta, no crea",
+      "si no puede leer el turno: `throw new Error('Caja rechazó la apertura y no se pudo leer el turno abierto. Recarga la pantalla.')` — falla visible",
+      "el catch de red re-lanza ese error en vez de abrir local: `if (e.message.startsWith('Caja rechazó la apertura')) throw e`",
+      "la falla de RED genuina sigue abriendo turno local y encolando — regla dura #3 intacta",
+      "prueba dedicada: dashboard-app/src/__tests__/un-turno-abierto-por-restaurante.test.ts, 127 líneas, cubre los cuatro casos y además el guard de Pedro"
+    ],
+    "deployment_order": "CÓDIGO PRIMERO, ÍNDICE DESPUÉS. El candidato con este manejo debe estar desplegado antes de crear el índice."
+  },
+
+  "disposable_db_contract": {
+    "runner": "tools/schema-drift/contrato-turno-abierto.sh",
+    "engine": "PostgreSQL 16.14, clúster propio en directorio temporal, socket unix corto, destruido al salir",
+    "shared_db_writes": 0,
+    "result": "PASS · 14/14",
+    "cases": [
+      "sha256 del archivo de migración coincide con el fijado",
+      "baseline: 11 columnas reales de pos_turnos, 1 índice (el pkey)",
+      "la migración aplica sin error",
+      "el fingerprint del índice creado es idéntico al esperado",
+      "A · primer turno abierto del tenant A → PASS",
+      "B · segundo turno abierto del mismo tenant → violación de unicidad 23505 con el nombre del índice",
+      "C · cerrado el primero, el tenant A abre uno nuevo → PASS",
+      "D · el tenant B abre el suyo en paralelo → PASS",
+      "E · cuatro turnos CERRADOS del mismo tenant conviven: closed_at no nulo no participa de la unicidad",
+      "concurrencia · dos sesiones simultáneas sobre el mismo tenant → exactamente 1 abierto; la segunda bloqueó en el índice y falló",
+      "F · tras DROP INDEX las columnas vuelven idénticas al baseline",
+      "F · tras DROP INDEX el conteo de índices vuelve al baseline",
+      "F · tras el rollback la tabla vuelve a admitir dos abiertos — el índice se fue de verdad"
+    ]
+  },
+
+  "runtime_cert_plan_AFTER_DEPLOY": {
+    "status": "READY — no ejecutado",
+    "tenant": "fullsite-cert-lab-v2 (clase CERT). Nunca amalay.",
+    "contract_reuse": "Se expresa con el vocabulario del arnés: seis clases de observación, PASS sólo si todas son EXPECTED_BEHAVIOR, y el veredicto va a run.json. No se inventa vocabulario.",
+    "steps": [
+      { "id": "R1", "step": "Actor/terminal A abre turno", "oracle": "la base tiene exactamente 1 turno con closed_at is null para el tenant CERT", "fail_class": "PRODUCT_DEFECT si hay 0 o ≥2" },
+      { "id": "R2", "step": "Segundo intento concurrente desde identidad distinta (otra terminal, otro actor, otro id local)", "oracle": "la base sigue con exactamente 1 abierto", "fail_class": "PRODUCT_DEFECT si aparece un segundo" },
+      { "id": "R3", "step": "Leer lo que devolvió el segundo caller", "oracle": "devuelve el turno_id EXISTENTE con sincronizado=true — adopta, no crea", "fail_class": "PRODUCT_DEFECT si devuelve un id nuevo" },
+      { "id": "R4", "step": "Inspeccionar el estado local del segundo caller", "oracle": "no hay turno fantasma: pos_turno_cache apunta al turno adoptado y KEY_ID_PENDIENTE quedó liberado", "fail_class": "PRODUCT_DEFECT si cachea un id propio" },
+      { "id": "R5", "step": "Inspeccionar la cola offline del segundo caller", "oracle": "cero items POST a pos_turnos encolados — un item imposible se reintentaría para siempre contra el índice", "fail_class": "PRODUCT_DEFECT si queda encolado" },
+      { "id": "R6", "step": "Comparar lo que observan A y B", "oracle": "ambos reportan el MISMO turno_id", "fail_class": "PRODUCT_DEFECT si difieren" },
+      { "id": "R7", "step": "Cerrar el turno desde A", "oracle": "closed_at deja de ser nulo; la base tiene 0 abiertos para el tenant CERT", "fail_class": "PRODUCT_DEFECT si sigue abierto" },
+      { "id": "R8", "step": "Abrir de nuevo tras el cierre", "oracle": "se crea un turno NUEVO, con id distinto al anterior, y queda exactamente 1 abierto", "fail_class": "PRODUCT_DEFECT si reusa el id o si el índice lo rechaza" }
+    ],
+    "preconditions": "Las mismas L0 del arnés: sello de build igual a CERTIFICATION_TARGET_SHA, app.clean, coherente, disco, CDP, tenant NO prohibido, SANDBOX autorizado. Y una propia: el índice existe con su fingerprint exacto.",
+    "not_covered": "El camino de Pedro (write_authority='caja') tiene su propio guard TURN_ALREADY_OPEN en operational-domain.js:107 y NO se ejercita aquí: exige instalación con autoridad local encendida."
+  },
+
+  "guardrails_registered_not_fixed": [
+    {
+      "id": "LATENT_CONFIG_HAZARD",
+      "subject": "pos.require_enrolled_terminal",
+      "rule": "NO debe activarse mientras la tabla pos_terminals no exista.",
+      "why": "api/pos/pin/route.ts consulta pos_terminals cuando el flag es true. Sin la tabla, PostgREST devuelve 400, la ruta responde 503 authority_unavailable, y el restaurante se queda sin login de nube. Es una escritura de configuración, sin deploy.",
+      "state_today": "13 tenants sin la llave; amalay con la llave presente en false",
+      "action_taken": "ninguna. No se tocó configuración."
+    },
+    {
+      "id": "SINGLE_OBJECTIVE_DEPLOY",
+      "rule": "Este deploy crea un índice y nada más. Las otras 6 derivas de ledger y los 6 FILE_ONLY pendientes NO se tocan en la misma operación.",
+      "why": "Un deploy con dos objetivos no tiene rollback: si algo sale mal no se sabe cuál de los dos fue."
+    },
+    {
+      "id": "LOCATION_ID_FIRST",
+      "rule": "El día que pos_turnos tenga location_id, este índice debe pasar a (client_id, location_id) ANTES de que exista una segunda sucursal operando.",
+      "why": "Lo dice la propia migración: con location_id agregada y el índice sin cambiar, dos sucursales legítimas chocarían."
+    }
+  ],
+
+  "guarantees": { "shared_db_writes": 0, "amalay_writes": 0, "product_files_modified": 0, "migrations_applied_shared": 0, "config_changed": 0 }
+}
