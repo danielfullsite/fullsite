@@ -154,17 +154,29 @@ class TodaVistaTerminaConSecurityInvoker(unittest.TestCase):
     (`rolbypassrls = true`) y el RLS de las tablas base no aplica."""
 
     def test_toda_vista_queda_con_security_invoker(self):
-        # Se admite que el `create` no lo traiga si alguna migracion se lo pone despues
+        # Se admite que el `create` no lo traiga si alguna migracion se lo pone DESPUES
         # con `alter view ... set (...)`. Asi quedaron ops_daily_desde_pos, _history y
         # _live: nacieron sin la opcion el 2026-08-26 y se las puso una posterior.
-        corpus = "\n".join(c for _, c in _cuerpos())
+        #
+        # "DESPUES" ES LITERAL, Y NO LO ERA. Hasta el 2026-09-18 esta prueba buscaba el
+        # `alter` en TODO el corpus, sin mirar el orden. Con eso, un
+        # `create or replace view ocm_daily` sin la opcion, fechado DESPUES del
+        # `alter` que se la puso, pasaba en verde — y ese es exactamente el camino de la
+        # regresion del 2026-09-09, donde un CREATE OR REPLACE posterior borro los
+        # reloptions y la vista volvio a correr como `postgres` durante seis dias.
+        # Las migraciones llevan prefijo de timestamp, asi que el orden del nombre de
+        # archivo ES el orden de aplicacion.
+        cuerpos = _cuerpos()
         faltantes = []
         for arch, vista, con_create in vistas_declaradas():
             if con_create:
                 continue
-            puesta_despues = re.search(
-                r"alter\s+view\s+(?:public\.)?%s\s+set\s*\([^)]*security_invoker\s*=\s*on"
-                % re.escape(vista), corpus, re.I)
+            puesta_despues = any(
+                re.search(
+                    r"alter\s+view\s+(?:public\.)?%s\s+set\s*\([^)]*security_invoker\s*=\s*on"
+                    % re.escape(vista), cuerpo, re.I)
+                for nombre_posterior, cuerpo in cuerpos
+                if nombre_posterior >= arch)
             if not puesta_despues:
                 faltantes.append(f"{arch}: {vista}")
         self.assertEqual(
