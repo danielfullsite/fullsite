@@ -229,8 +229,26 @@ function emitirRelease(rutaEntrada) {
     unknown_fields: desconocidos,
     // Un artefacto con huecos se emite igual, y los declara. Callarlos sería la
     // única forma de que el artefacto mienta.
-    verdict: desconocidos.length ? 'INCOMPLETE' : (e.verdict ?? 'INCOMPLETE'),
-    verdict_reason: desconocidos.length ? `${desconocidos.length} campo(s) sin evidencia: ${desconocidos.join(', ')}` : (e.verdict_reason ?? ''),
+    evidence_complete: desconocidos.length === 0,
+  }
+  // UN VEREDICTO SIN MOTIVO ES UN ARTEFACTO MUDO.
+  //
+  // La versión anterior devolvía INCOMPLETE con `verdict_reason: ''` en cuanto
+  // todos los campos traían evidencia pero nadie pasaba `verdict`. Quien leyera
+  // el artefacto veía «INCOMPLETE» y ningún porqué — que es justo lo que este
+  // cerebro existe para impedir. El veredicto se deriva ahora, siempre con su
+  // razón, y EVIDENCE_COMPLETE no se confunde con certificado: la certificación
+  // la sigue dando field_cert, no este emisor.
+  const fc = body.field_cert.verdict
+  if (desconocidos.length) {
+    body.verdict = 'INCOMPLETE'
+    body.verdict_reason = `${desconocidos.length} campo(s) sin evidencia: ${desconocidos.join(', ')}`
+  } else if (fc === 'PASS') {
+    body.verdict = e.verdict ?? 'EVIDENCE_COMPLETE'
+    body.verdict_reason = e.verdict_reason || 'todos los campos tienen evidencia y la certificación de campo pasó'
+  } else {
+    body.verdict = e.verdict ?? 'INCOMPLETE'
+    body.verdict_reason = e.verdict_reason || `todos los campos tienen evidencia, pero la certificación de campo está en ${fc}`
   }
   body.observed_sha = e.code_sha ?? null
   body.serving_sha_at_observation = e.serving_sha ?? null

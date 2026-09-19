@@ -1,15 +1,15 @@
 {
   "artifact_kind": "agent-incident-triage-agent",
   "artifact_version": "1.0",
-  "emitted_at": "2026-09-19T06:26:46.511Z",
-  "repo_sha": "418933f4ac8bf74a177487bb5c0aef0a45735d7b",
+  "emitted_at": "2026-09-19T06:11:54.598Z",
+  "repo_sha": "de435f5d786f72cd697a0e777ec7461d2d74348b",
   "database_identity": "supabase:qjiomlvudfmzuvqvhwpk/postgres · PostgreSQL 17.6",
   "agent_id": "INCIDENT_TRIAGE_AGENT",
   "level": "L1",
   "autonomy": "read-only · no writes · no actions",
-  "observed_at": "2026-09-19T06:24:31.218Z",
-  "observed_sha": "418933f4ac8bf74a177487bb5c0aef0a45735d7b",
-  "serving_sha_at_observation": "418933f4ac8bf74a177487bb5c0aef0a45735d7b",
+  "observed_at": "2026-09-19T06:10:14Z",
+  "observed_sha": "de435f5d786f72cd697a0e777ec7461d2d74348b",
+  "serving_sha_at_observation": "de435f5d786f72cd697a0e777ec7461d2d74348b",
   "freshness_policy": {
     "stale_after_min": 1440,
     "sha_sensitive": false
@@ -42,5 +42,5 @@
     "shared_db_writes": 0,
     "product_files_modified": 0
   },
-  "content_sha256": "f2d2bd8d7e09fb49c8b26869986ad44670bb0eb7270a6212e2508a2733533a1c"
+  "content_sha256": "bd5d6c69200a6090a02858c185cfda156e715a1f87e7b81daa625dfae6b3807b"
 }

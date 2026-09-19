@@ -1,36 +1,34 @@
 {
   "artifact_kind": "release-state",
   "artifact_version": "1.0",
-  "emitted_at": "2026-09-19T06:11:54.738Z",
-  "repo_sha": "de435f5d786f72cd697a0e777ec7461d2d74348b",
+  "emitted_at": "2026-09-19T06:26:46.444Z",
+  "repo_sha": "418933f4ac8bf74a177487bb5c0aef0a45735d7b",
   "database_identity": null,
-  "release_id": "rel-20260919-01",
+  "release_id": "rel-20260919-02",
   "what_shipped": {
-    "code_sha": "de435f5d786f72cd697a0e777ec7461d2d74348b",
-    "vercel_deployment_id": "UNKNOWN",
+    "code_sha": "418933f4ac8bf74a177487bb5c0aef0a45735d7b",
+    "vercel_deployment_id": "dpl_7aHncjNL1JzyDsqo9NqfbDr4i7Br",
     "p0a_final_sha": "8d8c20d832a9be1f4bb78edaf917d2dfc3861d85",
     "p0a_still_ancestor": false,
     "migrations_applied": []
   },
   "field_cert": {
-    "verdict": "UNKNOWN"
+    "verdict": "WAITING_PHYSICAL_CONFIRMATION"
   },
   "signal_health": {
-    "artifact": "UNKNOWN"
+    "artifact": "signal-health"
   },
   "agent_activity": {
     "agents_running": 0,
     "actions_executed": 0,
     "highest_level_in_use": "L1"
   },
-  "unknown_fields": [
-    "vercel_deployment_id",
-    "field_cert_verdict"
-  ],
+  "unknown_fields": [],
+  "evidence_complete": true,
   "verdict": "INCOMPLETE",
-  "verdict_reason": "2 campo(s) sin evidencia: vercel_deployment_id, field_cert_verdict",
-  "observed_sha": "de435f5d786f72cd697a0e777ec7461d2d74348b",
-  "serving_sha_at_observation": "de435f5d786f72cd697a0e777ec7461d2d74348b",
+  "verdict_reason": "todos los campos tienen evidencia, pero la certificación de campo está en WAITING_PHYSICAL_CONFIRMATION",
+  "observed_sha": "418933f4ac8bf74a177487bb5c0aef0a45735d7b",
+  "serving_sha_at_observation": "418933f4ac8bf74a177487bb5c0aef0a45735d7b",
   "freshness_policy": {
     "stale_after_min": 60,
     "sha_sensitive": true
@@ -40,5 +38,5 @@
     "shared_db_writes": 0,
     "product_files_modified": 0
   },
-  "content_sha256": "fc5d6a1e9469bcd5955089497131da3e63b03a6d6f9eaedf4982d4a50fe071e2"
+  "content_sha256": "bc14abfb4d8241b14efeef067978623e36100ae1d63ad44bb1597227a31441a3"
 }

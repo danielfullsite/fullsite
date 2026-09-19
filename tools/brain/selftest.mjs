@@ -122,6 +122,23 @@ const r1 = JSON.parse(correr(['release-emit', w('rel.json', { code_sha: 'b'.repe
 t(r1.verdict === 'INCOMPLETE', 'faltan campos → INCOMPLETE, no SHIPPED')
 t(r1.unknown_fields.length >= 2, 'enumera qué campos no tienen evidencia')
 t(r1.what_shipped.vercel_deployment_id === 'UNKNOWN', 'un campo sin evidencia dice UNKNOWN, no se omite')
+t(r1.verdict_reason && r1.verdict_reason.length > 0, 'un INCOMPLETE por huecos dice cuáles')
+t(r1.evidence_complete === false, 'declara explícitamente que la evidencia no está completa')
+
+// UN VEREDICTO MUDO. Con todos los campos presentes el emisor devolvía
+// INCOMPLETE y `verdict_reason: ''`. Quien lo leyera no tenía por qué.
+const relCompleto = {
+  code_sha: 'c'.repeat(40), vercel_deployment_id: 'dpl_x', field_cert_verdict: 'WAITING_PHYSICAL_CONFIRMATION',
+}
+const r2 = JSON.parse(correr(['release-emit', w('rel2.json', relCompleto)]).out)
+t(r2.unknown_fields.length === 0, 'sin huecos no enumera huecos')
+t(r2.evidence_complete === true, 'con todos los campos, evidence_complete = true')
+t(r2.verdict === 'INCOMPLETE', 'evidencia completa NO basta: la certificación de campo sigue pendiente')
+t(/WAITING_PHYSICAL_CONFIRMATION/.test(r2.verdict_reason || ''), 'y el motivo nombra el estado de la certificación')
+const r3 = JSON.parse(correr(['release-emit', w('rel3.json', { ...relCompleto, field_cert_verdict: 'PASS' })]).out)
+t(r3.verdict === 'EVIDENCE_COMPLETE', 'con field_cert PASS el veredicto es EVIDENCE_COMPLETE')
+t(r3.verdict !== 'CERTIFIED' && r3.verdict !== 'PASS', 'el emisor NUNCA certifica: eso lo hace la certificación de campo')
+t((r3.verdict_reason || '').length > 0, 'incluso el veredicto bueno trae su razón')
 
 console.log('\n── índice ──')
 const idx = JSON.parse(correr(['index']).out)

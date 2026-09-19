@@ -1,15 +1,15 @@
 {
   "artifact_kind": "agent-security-config-guardian",
   "artifact_version": "1.0",
-  "emitted_at": "2026-09-19T06:26:46.511Z",
-  "repo_sha": "418933f4ac8bf74a177487bb5c0aef0a45735d7b",
+  "emitted_at": "2026-09-19T06:11:54.597Z",
+  "repo_sha": "de435f5d786f72cd697a0e777ec7461d2d74348b",
   "database_identity": "supabase:qjiomlvudfmzuvqvhwpk/postgres · PostgreSQL 17.6",
   "agent_id": "SECURITY_CONFIG_GUARDIAN",
   "level": "L1",
   "autonomy": "read-only · no writes · no actions",
-  "observed_at": "2026-09-19T06:24:31.218Z",
-  "observed_sha": "418933f4ac8bf74a177487bb5c0aef0a45735d7b",
-  "serving_sha_at_observation": "418933f4ac8bf74a177487bb5c0aef0a45735d7b",
+  "observed_at": "2026-09-19T06:10:14Z",
+  "observed_sha": "de435f5d786f72cd697a0e777ec7461d2d74348b",
+  "serving_sha_at_observation": "de435f5d786f72cd697a0e777ec7461d2d74348b",
   "freshness_policy": {
     "stale_after_min": 720,
     "sha_sensitive": false
@@ -44,5 +44,5 @@
     "shared_db_writes": 0,
     "product_files_modified": 0
   },
-  "content_sha256": "b158af6059e57b33795e2e3f5a6fb454324c29c76f1a49f0f4b5991641048674"
+  "content_sha256": "77b592dd5fcd9fe727c2e9160508b993dd29dfc5527f2f82060f024fef6bd806"
 }

@@ -1,15 +1,15 @@
 {
   "artifact_kind": "agent-cash-and-shift-guardian",
   "artifact_version": "1.0",
-  "emitted_at": "2026-09-19T06:26:46.511Z",
-  "repo_sha": "418933f4ac8bf74a177487bb5c0aef0a45735d7b",
+  "emitted_at": "2026-09-19T06:11:54.597Z",
+  "repo_sha": "de435f5d786f72cd697a0e777ec7461d2d74348b",
   "database_identity": "supabase:qjiomlvudfmzuvqvhwpk/postgres · PostgreSQL 17.6",
   "agent_id": "CASH_AND_SHIFT_GUARDIAN",
   "level": "L1",
   "autonomy": "read-only · no writes · no actions",
-  "observed_at": "2026-09-19T06:24:31.218Z",
-  "observed_sha": "418933f4ac8bf74a177487bb5c0aef0a45735d7b",
-  "serving_sha_at_observation": "418933f4ac8bf74a177487bb5c0aef0a45735d7b",
+  "observed_at": "2026-09-19T06:10:14Z",
+  "observed_sha": "de435f5d786f72cd697a0e777ec7461d2d74348b",
+  "serving_sha_at_observation": "de435f5d786f72cd697a0e777ec7461d2d74348b",
   "freshness_policy": {
     "stale_after_min": 120,
     "sha_sensitive": false
@@ -22,15 +22,15 @@
       "evidence": []
     },
     {
-      "id": "stale_open:boruca:mt3fxom0hwc2",
-      "state": "DEGRADED",
-      "summary": "turno abierto hace 681 h",
-      "evidence": []
-    },
-    {
       "id": "stale_open:carls-jr:27774777",
       "state": "DEGRADED",
       "summary": "turno abierto hace 504 h",
+      "evidence": []
+    },
+    {
+      "id": "stale_open:boruca:mt3fxom0hwc2",
+      "state": "DEGRADED",
+      "summary": "turno abierto hace 681 h",
       "evidence": []
     },
     {
@@ -40,27 +40,9 @@
       "evidence": []
     },
     {
-      "id": "stale_open:scyf-demo:mtklmlvef3rv",
-      "state": "DEGRADED",
-      "summary": "turno abierto hace 393 h",
-      "evidence": []
-    },
-    {
-      "id": "stale_open:diezmex-demo:mtn4evtfmqvp",
-      "state": "DEGRADED",
-      "summary": "turno abierto hace 351 h",
-      "evidence": []
-    },
-    {
       "id": "stale_open:chickin-demo:mtop873lc5am",
       "state": "DEGRADED",
       "summary": "turno abierto hace 324 h",
-      "evidence": []
-    },
-    {
-      "id": "stale_open:amalay:mu1qc5zt6y17",
-      "state": "DEGRADED",
-      "summary": "turno abierto hace 105 h",
       "evidence": []
     },
     {
@@ -70,9 +52,27 @@
       "evidence": []
     },
     {
+      "id": "stale_open:scyf-demo:mtklmlvef3rv",
+      "state": "DEGRADED",
+      "summary": "turno abierto hace 393 h",
+      "evidence": []
+    },
+    {
+      "id": "stale_open:amalay:mu1qc5zt6y17",
+      "state": "DEGRADED",
+      "summary": "turno abierto hace 105 h",
+      "evidence": []
+    },
+    {
       "id": "open_shifts:fullsite-cert-lab-v2",
       "state": "OK",
       "summary": "un turno abierto",
+      "evidence": []
+    },
+    {
+      "id": "stale_open:diezmex-demo:mtn4evtfmqvp",
+      "state": "DEGRADED",
+      "summary": "turno abierto hace 351 h",
       "evidence": []
     },
     {
@@ -99,5 +99,5 @@
     "shared_db_writes": 0,
     "product_files_modified": 0
   },
-  "content_sha256": "7cd714de735d7b2b6e7b2c9d0b6b8bbe523d74c8843801733412a6bc0b5e3119"
+  "content_sha256": "e3a7cdc8c9b9fb8669bfe261423b8d6e1b6111ff8e242a4e232cbe930cccc890"
 }

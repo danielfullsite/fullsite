@@ -1,13 +1,13 @@
 {
   "artifact_kind": "signal-health",
   "artifact_version": "1.0",
-  "emitted_at": "2026-09-19T06:26:46.546Z",
-  "repo_sha": "418933f4ac8bf74a177487bb5c0aef0a45735d7b",
+  "emitted_at": "2026-09-19T06:11:54.632Z",
+  "repo_sha": "de435f5d786f72cd697a0e777ec7461d2d74348b",
   "database_identity": null,
   "principle": "La ausencia de evidencia NO es salud.",
-  "observed_at": "2026-09-19T06:24:31.218Z",
-  "observed_sha": "418933f4ac8bf74a177487bb5c0aef0a45735d7b",
-  "serving_sha_at_observation": "418933f4ac8bf74a177487bb5c0aef0a45735d7b",
+  "observed_at": "2026-09-19T06:10:14Z",
+  "observed_sha": "de435f5d786f72cd697a0e777ec7461d2d74348b",
+  "serving_sha_at_observation": "de435f5d786f72cd697a0e777ec7461d2d74348b",
   "clock": {
     "resolved_from": "observed_at",
     "state": "OK",
@@ -49,17 +49,17 @@
       "signal": "sync_receipts",
       "owner": "SYNC_GUARDIAN",
       "state": "HEALTHY",
-      "reason": "43 min desde la última",
+      "reason": "28 min desde la última",
       "last_seen": "2026-09-19T05:41:53Z",
-      "age_minutes": 43
+      "age_minutes": 28
     },
     {
       "signal": "print_acknowledgements",
       "owner": "KDS_PRINT_GUARDIAN",
       "state": "SILENT",
-      "reason": "23256 min sin señal (umbral 720)",
+      "reason": "23242 min sin señal (umbral 720)",
       "last_seen": "2026-09-03T02:48:24Z",
-      "age_minutes": 23256,
+      "age_minutes": 23242,
       "alert": true
     },
     {
@@ -74,17 +74,17 @@
       "signal": "source_ingestion",
       "owner": "DATA_TRUTH_GUARDIAN",
       "state": "HEALTHY",
-      "reason": "43 min desde la última",
+      "reason": "28 min desde la última",
       "last_seen": "2026-09-19T05:41:52Z",
-      "age_minutes": 43
+      "age_minutes": 28
     },
     {
       "signal": "scheduled_agent_runs",
       "owner": "INCIDENT_TRIAGE_AGENT",
       "state": "HEALTHY",
-      "reason": "324 min desde la última",
-      "last_seen": "2026-09-19T01:00:11Z",
-      "age_minutes": 324
+      "reason": "11 min desde la última",
+      "last_seen": "2026-09-19T05:58:49Z",
+      "age_minutes": 11
     },
     {
       "signal": "backups",
@@ -129,7 +129,7 @@
     },
     {
       "signal": "print_acknowledgements",
-      "reason": "23256 min sin señal (umbral 720)",
+      "reason": "23242 min sin señal (umbral 720)",
       "owner": "KDS_PRINT_GUARDIAN"
     },
     {
@@ -143,5 +143,5 @@
     "shared_db_writes": 0,
     "product_files_modified": 0
   },
-  "content_sha256": "1c482ba76b8e77c8bacae496581ffeb847c69b91af976a4a90e092ec579bdc4a"
+  "content_sha256": "0c502c7a38d8ad300a16238f95570d9d6dbdfb86cfc3dda3a53b4e0aff90a70c"
 }
