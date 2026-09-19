@@ -1,0 +1,558 @@
+{
+  "registry_version": "1.0",
+  "prepared_at": "2026-09-18",
+  "status": "DISEÑO · ningún agente implementado, ninguno corriendo, ninguno autorizado",
+  "default_level": "L0/L1 — ninguno nace por encima",
+  "hard_rules": [
+    "Un agente no es fuente de verdad: lee evidencia determinista y produce interpretaciones.",
+    "Ningún agente sube su propio nivel.",
+    "Toda acción de agente entra al ledger con la misma forma que una humana; cambia actor_type, no el esquema.",
+    "Un agente nunca escala a otro agente: escala a una persona o a un artefacto.",
+    "Sin recibo autoritativo, el resultado es UNCONFIRMED, nunca COMMITTED."
+  ],
+  "never_auto_executable": [
+    "acciones financieras o fiscales",
+    "DDL o borrado en base compartida",
+    "mutación de datos de cliente",
+    "despliegues a producción o configuración que arme un peligro latente"
+  ],
+  "agents": [
+    {
+      "AGENT_ID": "RELEASE_GUARDIAN",
+      "PURPOSE": "Que lo que sirve producción sea un SHA con artefacto de release, y que el tablero no mienta.",
+      "INPUTS": [
+        "Vercel deployments",
+        "git refs",
+        "release-artifact.*.json",
+        "run.json del arnés"
+      ],
+      "AUTHORITATIVE_SOURCES": [
+        "deployment id + SHA servido",
+        "artefacto de release emitido"
+      ],
+      "FREQUENCY": "EVENT_DRIVEN al cambiar el SHA servido · SCHEDULED diario",
+      "STATE_REQUIRED": "último SHA visto por tenant",
+      "DETECTORS": [
+        "SHA servido sin artefacto de release",
+        "artefacto emitido para un SHA que ya no sirve",
+        "P0A_FINAL_SHA dejó de ser ancestro de la línea"
+      ],
+      "OUTPUTS": [
+        "release-state.json"
+      ],
+      "CAN_WRITE": "sólo artefactos propios",
+      "REQUIRES_APPROVAL": "n/a en L0/L1",
+      "AUTO_ACTIONS_ALLOWED": "ninguna",
+      "ESCALATION_POLICY": "WARN diario · CRITICAL si el SHA servido no tiene artefacto",
+      "SILENCE_POLICY": "24 h sin emitir = SILENT_FAILURE",
+      "EVIDENCE_ARTIFACT": "release-state.json",
+      "LEVEL": "L1",
+      "CONSTITUTION": {
+        "ARCHITECTURE_LAYER": "CI",
+        "AUTHORITY": "Vercel + git",
+        "OPERATION_IDENTITY": "deployment_id",
+        "ATOMICITY": "n/a",
+        "RETRY_SEMANTICS": "idempotente (sólo lee)",
+        "OFFLINE_BEHAVIOR": "n/a",
+        "RECEIPT": "artefacto de release",
+        "BYPASS_PATHS": "un deploy manual fuera de git — VISTO en este proyecto",
+        "OBSERVABILITY": "propia",
+        "AI_ROLE": "explica, no actúa"
+      }
+    },
+    {
+      "AGENT_ID": "FLEET_GUARDIAN",
+      "PURPOSE": "Saber qué terminal está viva, con qué build, y cuál se quedó muda.",
+      "INPUTS": [
+        "local_server_heartbeats",
+        "pos_sessions",
+        "Pedro /identity"
+      ],
+      "AUTHORITATIVE_SOURCES": [
+        "local_server_heartbeats"
+      ],
+      "FREQUENCY": "CONDITION_WATCH cada 15 min",
+      "STATE_REQUIRED": "último latido por server_id",
+      "DETECTORS": [
+        "silencio > umbral",
+        "build distinto entre terminales del mismo restaurante",
+        "app.clean=false en producción",
+        "disco bajo"
+      ],
+      "OUTPUTS": [
+        "fleet-state.json"
+      ],
+      "CAN_WRITE": "sólo artefactos propios",
+      "REQUIRES_APPROVAL": "n/a",
+      "AUTO_ACTIONS_ALLOWED": "ninguna",
+      "ESCALATION_POLICY": "CRITICAL ante silencio de una caja en horario de servicio",
+      "SILENCE_POLICY": "la ausencia ES la señal. Cero filas = 'no se sabe', nunca 'sana'",
+      "EVIDENCE_ARTIFACT": "fleet-state.json",
+      "LEVEL": "L0",
+      "BLOCKED_BY": "local_server_heartbeats tiene 0 filas. Sin encender el heartbeat (PR #406) este agente no puede nacer.",
+      "CONSTITUTION": {
+        "ARCHITECTURE_LAYER": "Pedro → nube",
+        "AUTHORITY": "Pedro",
+        "OPERATION_IDENTITY": "server_id",
+        "ATOMICITY": "n/a",
+        "RETRY_SEMANTICS": "merge-duplicates: sólo guarda el último estado, sin serie",
+        "OFFLINE_BEHAVIOR": "no reporta; por eso el silencio es la señal",
+        "RECEIPT": "2xx del POST",
+        "BYPASS_PATHS": "ninguno",
+        "OBSERVABILITY": "la tabla",
+        "AI_ROLE": "observa"
+      }
+    },
+    {
+      "AGENT_ID": "SYNC_GUARDIAN",
+      "PURPOSE": "Que ninguna operación se quede atorada entre la terminal y la nube.",
+      "INPUTS": [
+        "local_server_heartbeats.sync_queue_size",
+        "pos_local_events",
+        "pos_save_operations"
+      ],
+      "AUTHORITATIVE_SOURCES": [
+        "recibos de nube"
+      ],
+      "FREQUENCY": "CONDITION_WATCH cada 15 min · EVENT tras reconexión",
+      "STATE_REQUIRED": "profundidad de cola por terminal, ventana de 24 h",
+      "DETECTORS": [
+        "cola creciente en latidos consecutivos",
+        "operación local sin recibo pasado el umbral",
+        "STALE_WRITE_CONFLICT sin resolver",
+        "reintento con dos efectos"
+      ],
+      "OUTPUTS": [
+        "sync-state.json"
+      ],
+      "CAN_WRITE": "sólo artefactos propios",
+      "REQUIRES_APPROVAL": "L4 para pedir drenado",
+      "AUTO_ACTIONS_ALLOWED": "ninguna",
+      "ESCALATION_POLICY": "CRITICAL si hay dinero sin recibo",
+      "SILENCE_POLICY": "sin latidos no hay medición: NOT_OBSERVED, no OK",
+      "EVIDENCE_ARTIFACT": "sync-state.json",
+      "LEVEL": "L0",
+      "BLOCKED_BY": "pos_local_events = 0 filas y local_server_heartbeats = 0 filas.",
+      "CONSTITUTION": {
+        "ARCHITECTURE_LAYER": "Pedro + nube",
+        "AUTHORITY": "NDJSON local para el hecho, recibo para la nube",
+        "OPERATION_IDENTITY": "client_op_id",
+        "ATOMICITY": "efecto y recibo en una transacción donde existe",
+        "RETRY_SEMANTICS": "at-least-once + efecto idempotente",
+        "OFFLINE_BEHAVIOR": "la cola local es autoritativa",
+        "RECEIPT": "pos_save_operations / pos_caja_business_receipts",
+        "BYPASS_PATHS": "REST directo por el proxy",
+        "OBSERVABILITY": "parcial",
+        "AI_ROLE": "observa y explica"
+      }
+    },
+    {
+      "AGENT_ID": "DATA_TRUTH_GUARDIAN",
+      "PURPOSE": "Que las vistas de negocio y las filas cuadren, y que un cero por falta de captura no se lea como un cero real.",
+      "INPUTS": [
+        "vistas ocm_*",
+        "pos_orders",
+        "pos_cierres",
+        "columnas de cobertura del contrato del analista"
+      ],
+      "AUTHORITATIVE_SOURCES": [
+        "pos_orders"
+      ],
+      "FREQUENCY": "SCHEDULED diario tras el corte",
+      "STATE_REQUIRED": "serie diaria por tenant",
+      "DETECTORS": [
+        "vista sin filas con ventas en pos_orders",
+        "fuente muerta (sin datos > 72 h)",
+        "día de venta con corte pero sin órdenes",
+        "divergencia vista vs tabla > 0.1 %"
+      ],
+      "OUTPUTS": [
+        "data-truth.json"
+      ],
+      "CAN_WRITE": "sólo artefactos propios",
+      "REQUIRES_APPROVAL": "n/a",
+      "AUTO_ACTIONS_ALLOWED": "ninguna",
+      "ESCALATION_POLICY": "WARN diario · CRITICAL si un tenant vivo reporta cero",
+      "SILENCE_POLICY": "24 h sin corrida = SILENT_FAILURE",
+      "EVIDENCE_ARTIFACT": "data-truth.json",
+      "LEVEL": "L1",
+      "CONSTITUTION": {
+        "ARCHITECTURE_LAYER": "Postgres",
+        "AUTHORITY": "pos_orders",
+        "OPERATION_IDENTITY": "n/a",
+        "ATOMICITY": "n/a",
+        "RETRY_SEMANTICS": "idempotente",
+        "OFFLINE_BEHAVIOR": "n/a",
+        "RECEIPT": "n/a",
+        "BYPASS_PATHS": "escritura REST directa a pos_orders",
+        "OBSERVABILITY": "buena",
+        "AI_ROLE": "explica"
+      }
+    },
+    {
+      "AGENT_ID": "SCHEMA_DRIFT_GUARDIAN",
+      "PURPOSE": "Que archivo, ledger y efecto real digan lo mismo.",
+      "INPUTS": [
+        "supabase/migrations/",
+        "schema_migrations",
+        "introspección de Postgres",
+        "registry.json"
+      ],
+      "AUTHORITATIVE_SOURCES": [
+        "introspección — sólo C decide si hay efecto"
+      ],
+      "FREQUENCY": "EVENT tras cada deploy · SCHEDULED diario",
+      "STATE_REQUIRED": "ninguno (sin estado)",
+      "DETECTORS": [
+        "los ocho estados",
+        "PRESENT_BUT_DIFFERENT → MISMATCH",
+        "FILE_ONLY sin PENDIENTE_ = deuda"
+      ],
+      "OUTPUTS": [
+        "drift-report.json"
+      ],
+      "CAN_WRITE": "sólo artefactos propios",
+      "REQUIRES_APPROVAL": "reparar el ledger es humano, techo L3",
+      "AUTO_ACTIONS_ALLOWED": "ninguna",
+      "ESCALATION_POLICY": "BLOCK ante LEDGER_ONLY o MISMATCH · WARN lo demás",
+      "SILENCE_POLICY": "48 h sin corrida = SILENT_FAILURE",
+      "EVIDENCE_ARTIFACT": "drift-report.json",
+      "LEVEL": "L1",
+      "STATUS": "IMPLEMENTADO y congelado en v1.1 — 19/19 autopruebas, corrió en seco",
+      "CONSTITUTION": {
+        "ARCHITECTURE_LAYER": "CI",
+        "AUTHORITY": "Postgres",
+        "OPERATION_IDENTITY": "n/a",
+        "ATOMICITY": "n/a",
+        "RETRY_SEMANTICS": "idempotente",
+        "OFFLINE_BEHAVIOR": "n/a",
+        "RECEIPT": "el artefacto",
+        "BYPASS_PATHS": "DDL aplicado fuera del mecanismo — VISTO: 7 objetos",
+        "OBSERVABILITY": "completa",
+        "AI_ROLE": "observa"
+      }
+    },
+    {
+      "AGENT_ID": "INCIDENT_TRIAGE_AGENT",
+      "PURPOSE": "Clasificar un hallazgo antes de que alguien lo llame defecto.",
+      "INPUTS": [
+        "lab_issues",
+        "run.json",
+        "artefactos de los demás agentes"
+      ],
+      "AUTHORITATIVE_SOURCES": [
+        "las seis clases del arnés"
+      ],
+      "FREQUENCY": "EVENT al aparecer un hallazgo",
+      "STATE_REQUIRED": "incidentes abiertos",
+      "DETECTORS": [
+        "hallazgo estático presentado como defecto",
+        "NOT_OBSERVED tratado como PASS",
+        "incidente sin dueño > 48 h"
+      ],
+      "OUTPUTS": [
+        "incident-state.json"
+      ],
+      "CAN_WRITE": "sólo artefactos propios",
+      "REQUIRES_APPROVAL": "n/a",
+      "AUTO_ACTIONS_ALLOWED": "ninguna",
+      "ESCALATION_POLICY": "según la clase del hallazgo",
+      "SILENCE_POLICY": "no aplica (dirigido por evento)",
+      "EVIDENCE_ARTIFACT": "incident-state.json",
+      "LEVEL": "L1",
+      "CONSTITUTION": {
+        "ARCHITECTURE_LAYER": "CI",
+        "AUTHORITY": "el arnés",
+        "OPERATION_IDENTITY": "incident_id",
+        "ATOMICITY": "n/a",
+        "RETRY_SEMANTICS": "idempotente",
+        "OFFLINE_BEHAVIOR": "n/a",
+        "RECEIPT": "n/a",
+        "BYPASS_PATHS": "UNKNOWN",
+        "OBSERVABILITY": "parcial — dos lugares sin índice común",
+        "AI_ROLE": "clasifica, no juzga"
+      }
+    },
+    {
+      "AGENT_ID": "PURCHASE_GUARDIAN",
+      "PURPOSE": "Que una recepción de orden de compra ocurra una sola vez y deje recibo.",
+      "INPUTS": [
+        "pos_purchase_orders",
+        "pos_inventory_movements",
+        "pos_inventory_movement_operations"
+      ],
+      "AUTHORITATIVE_SOURCES": [
+        "pos_inventory_movement_operations"
+      ],
+      "FREQUENCY": "SCHEDULED diario",
+      "STATE_REQUIRED": "ninguno",
+      "DETECTORS": [
+        "movimiento sin movement_operation_key",
+        "OC recibida por dos terminales",
+        "total recalculado a cero"
+      ],
+      "OUTPUTS": [
+        "purchase-state.json"
+      ],
+      "CAN_WRITE": "sólo artefactos propios",
+      "REQUIRES_APPROVAL": "n/a",
+      "AUTO_ACTIONS_ALLOWED": "ninguna",
+      "ESCALATION_POLICY": "CRITICAL ante doble efecto de inventario",
+      "SILENCE_POLICY": "48 h",
+      "EVIDENCE_ARTIFACT": "purchase-state.json",
+      "LEVEL": "L0",
+      "OWNER_NOTE": "Compras es de Fork. Este agente NO nace hasta que Fork cierre su track.",
+      "CONSTITUTION": {
+        "ARCHITECTURE_LAYER": "Postgres",
+        "AUTHORITY": "pos_record_inventory_movement",
+        "OPERATION_IDENTITY": "movement_operation_key (derivada del hecho)",
+        "ATOMICITY": "advisory lock + FOR UPDATE + recibo",
+        "RETRY_SEMANTICS": "idempotente por llave",
+        "OFFLINE_BEHAVIOR": "cola",
+        "RECEIPT": "pos_inventory_movement_operations (0 filas)",
+        "BYPASS_PATHS": "PATCH REST de gerente a pos_inventory — ABIERTO",
+        "OBSERVABILITY": "parcial",
+        "AI_ROLE": "observa"
+      }
+    },
+    {
+      "AGENT_ID": "CASH_AND_SHIFT_GUARDIAN",
+      "PURPOSE": "Un turno abierto por restaurante, y ningún movimiento de caja sin recibo.",
+      "INPUTS": [
+        "pos_turnos",
+        "pos_cierres",
+        "pos_cash_movements"
+      ],
+      "AUTHORITATIVE_SOURCES": [
+        "pos_turnos"
+      ],
+      "FREQUENCY": "CONDITION_WATCH cada hora",
+      "STATE_REQUIRED": "turnos abiertos por tenant",
+      "DETECTORS": [
+        "más de un turno abierto por tenant",
+        "turno abierto > 24 h",
+        "corte sin turno",
+        "movimiento de caja sin client_op_id",
+        "closed_at anterior a opened_at"
+      ],
+      "OUTPUTS": [
+        "cash-shift-state.json"
+      ],
+      "CAN_WRITE": "sólo artefactos propios",
+      "REQUIRES_APPROVAL": "cerrar un turno es financiero: techo L4, jamás automático",
+      "AUTO_ACTIONS_ALLOWED": "ninguna",
+      "ESCALATION_POLICY": "CRITICAL ante dos turnos abiertos",
+      "SILENCE_POLICY": "12 h",
+      "EVIDENCE_ARTIFACT": "cash-shift-state.json",
+      "LEVEL": "L1",
+      "CONSTITUTION": {
+        "ARCHITECTURE_LAYER": "Postgres",
+        "AUTHORITY": "pos_turnos",
+        "OPERATION_IDENTITY": "client_op_id en caja; el turno usa id de cliente",
+        "ATOMICITY": "ninguna hoy — no hay RPC de recibo para caja",
+        "RETRY_SEMANTICS": "índice único parcial (pendiente de aplicar)",
+        "OFFLINE_BEHAVIOR": "turno local + cola",
+        "RECEIPT": "ninguno para caja",
+        "BYPASS_PATHS": "pos_cash_movements en ALLOW, nivel cajero",
+        "OBSERVABILITY": "buena para turnos",
+        "AI_ROLE": "observa y explica"
+      }
+    },
+    {
+      "AGENT_ID": "KDS_PRINT_GUARDIAN",
+      "PURPOSE": "Que una comanda enviada llegue a la pantalla y al papel.",
+      "INPUTS": [
+        "pos_orders.comanda_batches",
+        "pos_orders.kds_item_status",
+        "pos_print_jobs"
+      ],
+      "AUTHORITATIVE_SOURCES": [
+        "cola durable de Pedro"
+      ],
+      "FREQUENCY": "EVENT ante pico de fallos · SCHEDULED por turno",
+      "STATE_REQUIRED": "trabajos por estado",
+      "DETECTORS": [
+        "ORDER_SENT sin KDS_RECEIVED",
+        "print job sin printed_at pasado el umbral",
+        "trabajos uncertain sin resolver",
+        "pico de fallos de impresión"
+      ],
+      "OUTPUTS": [
+        "kds-print-state.json"
+      ],
+      "CAN_WRITE": "sólo artefactos propios",
+      "REQUIRES_APPROVAL": "reimprimir es un efecto físico: L4",
+      "AUTO_ACTIONS_ALLOWED": "ninguna",
+      "ESCALATION_POLICY": "CRITICAL ante comanda enviada que no llegó",
+      "SILENCE_POLICY": "pos_print_jobs sin escrituras desde 2026-09-04 — ya en silencio",
+      "EVIDENCE_ARTIFACT": "kds-print-state.json",
+      "LEVEL": "L0",
+      "BLOCKED_BY": "no existe ack del KDS. El detector principal no se puede implementar sin cambio de producto.",
+      "CONSTITUTION": {
+        "ARCHITECTURE_LAYER": "Pedro",
+        "AUTHORITY": "cola local",
+        "OPERATION_IDENTITY": "job id",
+        "ATOMICITY": "efecto e intención en la misma transacción durable",
+        "RETRY_SEMANTICS": "nunca reenvío automático de un uncertain",
+        "OFFLINE_BEHAVIOR": "autoritativo en LAN",
+        "RECEIPT": "printed = el spooler aceptó, NO que salió papel",
+        "BYPASS_PATHS": "UNKNOWN",
+        "OBSERVABILITY": "sólo en LAN",
+        "AI_ROLE": "observa"
+      }
+    },
+    {
+      "AGENT_ID": "SOURCE_AUTHORITY_GUARDIAN",
+      "PURPOSE": "Que no haya dos escritores para el mismo efecto.",
+      "INPUTS": [
+        "clients.pos_write_authority",
+        "pos_authority_transitions",
+        "pos-db-policy.ts ALLOW",
+        "catálogo de RPC"
+      ],
+      "AUTHORITATIVE_SOURCES": [
+        "clients.pos_write_authority"
+      ],
+      "FREQUENCY": "SCHEDULED diario · EVENT tras deploy",
+      "STATE_REQUIRED": "autoridad por tenant",
+      "DETECTORS": [
+        "tabla con RPC de contrato Y en ALLOW",
+        "transición de autoridad activa > 10 min",
+        "dos escritores vivos para una sucursal"
+      ],
+      "OUTPUTS": [
+        "authority-state.json"
+      ],
+      "CAN_WRITE": "sólo artefactos propios",
+      "REQUIRES_APPROVAL": "cambiar autoridad exige corte coordinado: techo L2",
+      "AUTO_ACTIONS_ALLOWED": "ninguna",
+      "ESCALATION_POLICY": "WARN por cada camino alternativo abierto",
+      "SILENCE_POLICY": "48 h",
+      "EVIDENCE_ARTIFACT": "authority-state.json",
+      "LEVEL": "L1",
+      "NOTE": "Hoy reportaría al menos 3: pos_orders, pos_inventory y pos_save_operations tienen RPC y siguen en ALLOW.",
+      "CONSTITUTION": {
+        "ARCHITECTURE_LAYER": "API/proxy",
+        "AUTHORITY": "Postgres",
+        "OPERATION_IDENTITY": "n/a",
+        "ATOMICITY": "n/a",
+        "RETRY_SEMANTICS": "idempotente",
+        "OFFLINE_BEHAVIOR": "n/a",
+        "RECEIPT": "n/a",
+        "BYPASS_PATHS": "es justo lo que detecta",
+        "OBSERVABILITY": "completa (lee código y esquema)",
+        "AI_ROLE": "observa"
+      }
+    },
+    {
+      "AGENT_ID": "SECURITY_CONFIG_GUARDIAN",
+      "PURPOSE": "Que ninguna configuración arme un peligro latente.",
+      "INPUTS": [
+        "clients.pos_settings",
+        "feature_flags",
+        "platform_settings",
+        "RLS y grants"
+      ],
+      "AUTHORITATIVE_SOURCES": [
+        "introspección de Postgres"
+      ],
+      "FREQUENCY": "EVENT al cambiar configuración · SCHEDULED diario",
+      "STATE_REQUIRED": "foto anterior de configuración",
+      "DETECTORS": [
+        "pos.require_enrolled_terminal=true sin tabla pos_terminals",
+        "vista expuesta a anon sin security_invoker",
+        "libro de recibos escribible por el proxy",
+        "grant nuevo a anon"
+      ],
+      "OUTPUTS": [
+        "security-config-state.json"
+      ],
+      "CAN_WRITE": "sólo artefactos propios",
+      "REQUIRES_APPROVAL": "NUNCA cambia configuración, en ningún nivel",
+      "AUTO_ACTIONS_ALLOWED": "ninguna",
+      "ESCALATION_POLICY": "CRITICAL inmediato ante un peligro armado",
+      "SILENCE_POLICY": "24 h",
+      "EVIDENCE_ARTIFACT": "security-config-state.json",
+      "LEVEL": "L1",
+      "CONSTITUTION": {
+        "ARCHITECTURE_LAYER": "Postgres + API",
+        "AUTHORITY": "Postgres",
+        "OPERATION_IDENTITY": "n/a",
+        "ATOMICITY": "n/a",
+        "RETRY_SEMANTICS": "idempotente",
+        "OFFLINE_BEHAVIOR": "n/a",
+        "RECEIPT": "n/a",
+        "BYPASS_PATHS": "service key salta RLS",
+        "OBSERVABILITY": "completa",
+        "AI_ROLE": "observa y alerta"
+      }
+    },
+    {
+      "AGENT_ID": "AI_OPERATIONS_ANALYST",
+      "PURPOSE": "Explicar en lenguaje de negocio lo que los once anteriores observaron, citando siempre su artefacto.",
+      "INPUTS": [
+        "todos los artefactos de los demás"
+      ],
+      "AUTHORITATIVE_SOURCES": [
+        "los artefactos, nunca su propia memoria"
+      ],
+      "FREQUENCY": "SCHEDULED diario · bajo demanda",
+      "STATE_REQUIRED": "ninguno",
+      "DETECTORS": [
+        "ninguno propio — no detecta, interpreta"
+      ],
+      "OUTPUTS": [
+        "daily-brief.md (proyección)"
+      ],
+      "CAN_WRITE": "sólo su proyección",
+      "REQUIRES_APPROVAL": "n/a",
+      "AUTO_ACTIONS_ALLOWED": "ninguna",
+      "ESCALATION_POLICY": "no escala: resume",
+      "SILENCE_POLICY": "24 h",
+      "EVIDENCE_ARTIFACT": "daily-brief.md",
+      "LEVEL": "L1",
+      "HARD_RULE": "Toda afirmación rinde su artifact_id. Sin artefacto, dice UNKNOWN. Nunca 'probablemente'.",
+      "CONSTITUTION": {
+        "ARCHITECTURE_LAYER": "CI",
+        "AUTHORITY": "ninguna — es interpretación",
+        "OPERATION_IDENTITY": "n/a",
+        "ATOMICITY": "n/a",
+        "RETRY_SEMANTICS": "idempotente",
+        "OFFLINE_BEHAVIOR": "n/a",
+        "RECEIPT": "n/a",
+        "BYPASS_PATHS": "n/a",
+        "OBSERVABILITY": "n/a",
+        "AI_ROLE": "interpreta; NUNCA es fuente de verdad"
+      }
+    }
+  ],
+  "summary": {
+    "total": 12,
+    "implemented": [
+      "SCHEMA_DRIFT_GUARDIAN"
+    ],
+    "blocked_on_instrumentation": [
+      "FLEET_GUARDIAN",
+      "SYNC_GUARDIAN",
+      "KDS_PRINT_GUARDIAN"
+    ],
+    "blocked_on_fork": [
+      "PURCHASE_GUARDIAN"
+    ],
+    "buildable_today_readonly": [
+      "RELEASE_GUARDIAN",
+      "DATA_TRUTH_GUARDIAN",
+      "SOURCE_AUTHORITY_GUARDIAN",
+      "SECURITY_CONFIG_GUARDIAN",
+      "CASH_AND_SHIFT_GUARDIAN",
+      "INCIDENT_TRIAGE_AGENT",
+      "AI_OPERATIONS_ANALYST"
+    ]
+  },
+  "guarantees": {
+    "agents_running": 0,
+    "actions_executed": 0,
+    "shared_db_writes": 0,
+    "config_changed": 0
+  }
+}

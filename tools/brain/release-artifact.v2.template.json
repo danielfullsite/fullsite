@@ -1,0 +1,153 @@
+{
+  "_template": "PLANTILLA v2 — extiende release-artifact.template.json (v1). La v1 NO se modificó.",
+  "_rules": [
+    "Se EMITE, no se redacta. Todo campo cita su evidencia o queda en UNKNOWN.",
+    "UNKNOWN nunca se promueve a PASS por conveniencia. NOT_OBSERVED tampoco.",
+    "Ningún campo se edita a mano después de emitido. Si algo cambia, se emite otro artefacto.",
+    "Sin secretos, sin PINs, sin datos de cliente, sin payloads. El tenant va por CLASE, no por slug.",
+    "Vocabulario heredado del arnés (CONTRATO-v1.md). No se inventa ninguno."
+  ],
+  "artifact_version": "2.0",
+  "emitted_at": "<ISO8601>",
+  "release_id": "<rel-YYYYMMDD-NN>",
+  "what_shipped": {
+    "code_sha": "<40 hex — el SHA que quedó sirviendo en Vercel>",
+    "vercel_deployment_id": "<id>",
+    "p0a_final_sha": "8d8c20d832a9be1f4bb78edaf917d2dfc3861d85",
+    "p0a_still_ancestor": "<bool — git merge-base --is-ancestor>",
+    "migrations_applied": [
+      {
+        "file": "<ruta>",
+        "file_sha256": "<64 hex>",
+        "objects": [
+          "<id>"
+        ],
+        "fingerprint_verified": "<bool>",
+        "ledger_row_written": false
+      }
+    ]
+  },
+  "capabilities_in_scope": {
+    "apertura_de_turno": "<bool>",
+    "cierre_corte": "<bool>",
+    "caja": "<bool>",
+    "una_sucursal_por_tenant": "<bool>",
+    "multi_sucursal": false,
+    "timezone_por_tenant": "<bool>",
+    "timezone_por_sucursal": false,
+    "terminal_enrollment": "OPT_IN_APAGADO",
+    "fleet_management": false
+  },
+  "evidence": {
+    "fork_cert_run": {
+      "run_json": "<ref>",
+      "verdict": "<PASS|FAIL|PRECONDITION_FAILURE|UNKNOWN>"
+    },
+    "open_shift_preflight": {
+      "executed_at": "<ISO8601 — pegado a la operación, no antes>",
+      "open_shifts_total": "<n>",
+      "tenants_with_multiple_open_shifts": "<n>",
+      "open_shifts_without_tenant": "<n>",
+      "gate": "<PASS|ABORT>"
+    },
+    "open_shift_index_fingerprint": {
+      "expected": "CREATE UNIQUE INDEX pos_turnos_uno_abierto_por_restaurante ON public.pos_turnos USING btree (client_id) WHERE (closed_at IS NULL)",
+      "observed": "<def>",
+      "indisunique": "<bool>",
+      "indisvalid": "<bool>",
+      "matches": "<bool>"
+    },
+    "runtime_cert_R1_R8": {
+      "run_json": "<ref>",
+      "tenant_class": "CERT",
+      "verdict": "<PASS|FAIL|...>",
+      "steps": {
+        "R1": "<clase>",
+        "R2": "<clase>",
+        "R3": "<clase>",
+        "R4": "<clase>",
+        "R5": "<clase>",
+        "R6": "<clase>",
+        "R7": "<clase>",
+        "R8": "<clase>"
+      }
+    },
+    "drift_guardian_after": {
+      "artifact": "<ref a drift-report.json nuevo>",
+      "repo_sha": "<40 hex>",
+      "blocking": "<n>",
+      "warning": "<n>",
+      "ok": "<n>",
+      "unexpected_state_changes": "<lista — vacía es lo esperado>"
+    }
+  },
+  "known_open": {
+    "ledger_drifts_unreconciled": "<n — se esperan al menos 8 tras este release>",
+    "p0a_gate_definitions_missing": 7,
+    "p0a_gate_definitions_filled_by_inference": false,
+    "multi_location_blockers": [
+      "col.pos_turnos.location_id",
+      "idx.uq_pos_turnos_activo_por_sucursal",
+      "col.client_locations.timezone"
+    ],
+    "latent_config_hazards": [
+      "pos.require_enrolled_terminal"
+    ],
+    "unreproduced_static_findings": [
+      "U1 pos_save_operations escribible por el proxy",
+      "U2 PATCH REST a pos_inventory salta el RPC"
+    ]
+  },
+  "invariants": {
+    "amalay_mutation_guard": "<PASS|FAIL>",
+    "amalay_write_readback": "<PASS|UNKNOWN — exige relectura de línea base; una guarda que prohíbe NO es evidencia de que nada cambió>",
+    "shared_db_writes_outside_plan": 0,
+    "config_changed": 0
+  },
+  "rollback": {
+    "open_shift_index": "DROP INDEX public.pos_turnos_uno_abierto_por_restaurante;",
+    "verified_on_disposable_db": true,
+    "code": "<deployment id anterior en Vercel>",
+    "po_migration": "<statement o UNKNOWN>"
+  },
+  "verdict": "<SHIPPED | SHIPPED_DEGRADED | ROLLED_BACK | INCOMPLETE>",
+  "verdict_reason": "<una frase, citando el campo que la sostiene>",
+  "_added_in_v2": [
+    "field_cert",
+    "brain_index",
+    "signal_health",
+    "agent_activity"
+  ],
+  "field_cert": {
+    "cert_session_id": "<id|null>",
+    "artifact": "<ref|null>",
+    "verdict": "<PASS|FAIL|PRECONDITION_FAILURE|INCOMPLETE|NOT_RUN>",
+    "physical_confirmations_pending": "<n>",
+    "not_observable_events": "<n de 16>",
+    "rule": "Un release sin field cert se marca NOT_RUN, nunca se omite el campo."
+  },
+  "brain_index": {
+    "domains_with_artifact": "<n de 16>",
+    "questions_answerable": "<n de 10>",
+    "unknown_domains": [
+      "<lista>"
+    ],
+    "rule": "UNKNOWN se muestra como UNKNOWN."
+  },
+  "signal_health": {
+    "artifact": "<ref a SIGNAL_EXPECTATIONS evaluado>",
+    "healthy": "<n>",
+    "silent": "<n>",
+    "never_seen": "<n>",
+    "not_instrumented": "<n>",
+    "unknown": "<n>",
+    "rule": "La ausencia de evidencia no es salud. Un SILENT bloquea el veredicto SHIPPED."
+  },
+  "agent_activity": {
+    "agents_running": 0,
+    "actions_executed": 0,
+    "actions_requiring_approval": 0,
+    "highest_level_in_use": "L1",
+    "rule": "Ningún agente sube de nivel sin autorización escrita de Daniel."
+  }
+}

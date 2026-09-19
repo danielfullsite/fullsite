@@ -1,0 +1,126 @@
+{
+  "_template": "PLANTILLA — se emite una copia al cerrar el paso 12. No es un artefacto.",
+  "_rules": [
+    "Se EMITE, no se redacta. Todo campo cita su evidencia o queda en UNKNOWN.",
+    "WAITING_PHYSICAL_CONFIRMATION y NOT_OBSERVED NUNCA promueven a PASS.",
+    "Ningún timestamp lo teclea un humano: los pone el emisor.",
+    "Sin secretos, sin PINs, sin nombres de empleado. El tenant va por clase cuando no es CERT.",
+    "Vocabulario heredado de cert/CONTRATO-v1.md. No se inventa ninguna clase."
+  ],
+  "artifact_version": "1.0",
+  "emitted_at": "<ISO8601>",
+  "session": {
+    "cert_session_id": "fcert-<tenant>-<ts>-<6hex>",
+    "mode": "FIELD_CERT",
+    "release_sha": "<40 hex>",
+    "deployment_id": "<vercel>",
+    "tenant_class": "CERT|PROD",
+    "tenant_id": "<slug>",
+    "location_id": "<id|null>",
+    "terminal_id": "<uuid|null>",
+    "actor_id": "<staff_id>",
+    "shift_id": "<turno_id|null>",
+    "started_at": "<ISO8601>",
+    "ended_at": "<ISO8601>",
+    "identity_capture": "AUTOMATIC — ningún campo tecleado"
+  },
+  "preconditions_L0": {
+    "build_sealed": "<bool>",
+    "app_clean": "<bool>",
+    "coherente": "<bool|null>",
+    "pedro_healthy": "<bool>",
+    "tenant_not_forbidden": "<bool>",
+    "satisfied": "<bool>",
+    "rule": "Si satisfied=false el veredicto es PRECONDITION_FAILURE, no FAIL."
+  },
+  "flows": [
+    {
+      "id": "F1",
+      "name": "abrir turno",
+      "state": "<PASS|FAIL|NOT_OBSERVED|WAITING_PHYSICAL_CONFIRMATION|RUNNING|NOT_RUN>",
+      "events": [
+        "<event_id>"
+      ],
+      "physical_checks": [],
+      "suspected_boundary": "<null|texto>"
+    }
+  ],
+  "timeline": [
+    {
+      "event": "SHIFT_OPENED|ORDER_CREATED|ITEM_ADDED|ORDER_SENT|KDS_RECEIVED|PRINT_JOB_CREATED|PRINT_JOB_ACKNOWLEDGED|PAYMENT_RECORDED|CASH_MOVEMENT_CREATED|SHIFT_CLOSED|OFFLINE_ENTERED|COMMAND_QUEUED|RECONNECT_DETECTED|QUEUE_DRAIN_STARTED|QUEUE_DRAINED|CLOUD_RECEIPT_CONFIRMED",
+      "timestamp": "<ISO8601 del servidor>",
+      "cert_session_id": "<id>",
+      "release_sha": "<sha>",
+      "tenant_id": "<slug>",
+      "location_id": "<id|null>",
+      "terminal_id": "<id|null>",
+      "actor_id": "<id|null>",
+      "shift_id": "<id|null>",
+      "order_id": "<id|null>",
+      "client_op_id": "<id|null>",
+      "business_fact_id": "<key|null>",
+      "print_job_id": "<id|null>",
+      "kds_job_id": "<id|null>",
+      "queue_depth_before": "<n|null>",
+      "queue_depth_after": "<n|null>",
+      "online_state": "<ONLINE|OFFLINE|UNKNOWN>",
+      "local_result": "<COMMITTED|REJECTED|null>",
+      "cloud_result": "<COMMITTED|REJECTED|UNCONFIRMED|null>",
+      "latency_ms": "<n|null>",
+      "error_code": "<TRANSPORT|CONTRACT|AUTH|CONFLICT|BUSINESS|null>",
+      "receipt_reference": "<ref|null>",
+      "provenance": {
+        "source": "<tabla o /endpoint>",
+        "build_sha": "<sha|null>",
+        "reliable": "<bool>"
+      }
+    }
+  ],
+  "physical_confirmations": [
+    {
+      "check_id": "PAPER_PRINTED|CASH_DRAWER_OPENED|KDS_VISIBLE|AMOUNT_PRINTED_CORRECTLY",
+      "flow_id": "<F#>",
+      "confirmed": "<true|false|null>",
+      "at": "<ISO8601 del emisor>",
+      "rule": "null = WAITING_PHYSICAL_CONFIRMATION. Nunca se interpreta como aprobado."
+    }
+  ],
+  "not_observable_today": {
+    "events": [
+      "KDS_RECEIVED",
+      "OFFLINE_ENTERED",
+      "COMMAND_QUEUED",
+      "RECONNECT_DETECTED",
+      "QUEUE_DRAIN_STARTED",
+      "QUEUE_DRAINED"
+    ],
+    "why": "Seis de dieciséis. No hay ack de KDS y la cola offline vive dentro de la terminal sin reportar.",
+    "consequence": "Los flujos que dependan de ellos terminan en NOT_OBSERVED, no en FAIL."
+  },
+  "anomalies_detected": [
+    {
+      "type": "duplicate_order|duplicate_cash_effect|ghost_shift|lost_kds_command|lost_print_command|stuck_offline_queue|retry_without_duplicate_effect|local_cloud_divergence|action_without_receipt",
+      "evidence": [
+        "<event_id>"
+      ],
+      "class": "<las seis del arnés>",
+      "confidence": "<0-1, sólo si es interpretación>"
+    }
+  ],
+  "summary_by_class": {
+    "EXPECTED_BEHAVIOR": 0,
+    "PRECONDITION_FAILURE": 0,
+    "ENVIRONMENT_ERROR": 0,
+    "HARNESS_ERROR": 0,
+    "NOT_OBSERVED": 0,
+    "PRODUCT_DEFECT": 0
+  },
+  "verdict": "<PASS|FAIL|PRECONDITION_FAILURE|INCOMPLETE>",
+  "verdict_rule": "PASS sólo si TODAS las observaciones son EXPECTED_BEHAVIOR y toda confirmación física está confirmada. Cualquier PRECONDITION_FAILURE domina. No hay mayoría ni '100 % con reservas'.",
+  "verdict_reason": "<una frase citando el campo que la sostiene>",
+  "invariants": {
+    "amalay_writes": 0,
+    "tenant_forbidden_respected": "<bool>",
+    "manual_timestamps_entered": 0
+  }
+}

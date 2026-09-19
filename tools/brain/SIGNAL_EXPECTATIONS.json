@@ -1,0 +1,140 @@
+{
+  "signals_version": "1.0",
+  "prepared_at": "2026-09-18",
+  "principle": "La ausencia de evidencia NO significa sano. Una señal esperada que deja de llegar es una alerta, no un silencio cómodo.",
+  "states": {
+    "HEALTHY": "la señal llega dentro de su frecuencia esperada",
+    "DEGRADED": "llega, pero fuera de frecuencia",
+    "SILENT": "llegó alguna vez y dejó de llegar — ALERTA",
+    "NEVER_SEEN": "nunca llegó. El emisor existe y no ha producido nada — ALERTA",
+    "NOT_INSTRUMENTED": "no existe emisor. No es una alerta, es trabajo pendiente",
+    "UNKNOWN": "no se auditó. NO es HEALTHY"
+  },
+  "hard_rule": "El vigilante de ausencia vive FUERA del agente que produce la señal. Un agente caído no se alerta a sí mismo.",
+  "signals": [
+    {
+      "EXPECTED_SIGNAL": "fleet_heartbeat",
+      "source": "local_server_heartbeats",
+      "EXPECTED_FREQUENCY": "cada 5 min por terminal",
+      "SILENCE_THRESHOLD": "15 min en horario de servicio",
+      "LAST_SEEN": null,
+      "CURRENT_STATE": "NEVER_SEEN",
+      "evidence": "0 filas desde que la tabla existe (consultado 2026-09-18)",
+      "why_it_matters": "Una flota que no reporta se ve idéntica a una flota sana. Es el caso que da nombre a esta categoría.",
+      "owner": "FLEET_GUARDIAN"
+    },
+    {
+      "EXPECTED_SIGNAL": "pedro_outbox",
+      "source": "pos_local_events",
+      "EXPECTED_FREQUENCY": "continua mientras haya operación",
+      "SILENCE_THRESHOLD": "1 h con turno abierto",
+      "LAST_SEEN": null,
+      "CURRENT_STATE": "NEVER_SEEN",
+      "evidence": "0 filas. El worker existe y jamás subió un evento en producción.",
+      "why_it_matters": "Sin esto la nube no ve nada de lo que pasa dentro de la terminal.",
+      "owner": "SYNC_GUARDIAN"
+    },
+    {
+      "EXPECTED_SIGNAL": "terminal_telemetry",
+      "source": "pos_sessions.last_heartbeat",
+      "EXPECTED_FREQUENCY": "cada 2 min por terminal activa",
+      "SILENCE_THRESHOLD": "5 min (el propio código expira ahí)",
+      "LAST_SEEN": null,
+      "CURRENT_STATE": "NEVER_SEEN",
+      "evidence": "0 filas",
+      "why_it_matters": "Único registro de terminal en la nube. Vacío.",
+      "owner": "FLEET_GUARDIAN"
+    },
+    {
+      "EXPECTED_SIGNAL": "sync_receipts",
+      "source": "pos_save_operations",
+      "EXPECTED_FREQUENCY": "uno por guardado de orden con clave",
+      "SILENCE_THRESHOLD": "24 h con órdenes creadas y cero recibos",
+      "LAST_SEEN": "2026-09-18",
+      "CURRENT_STATE": "HEALTHY",
+      "evidence": "984 filas, viva hoy",
+      "why_it_matters": "Es el único recibo que sí funciona. Su silencio sería grave.",
+      "owner": "SYNC_GUARDIAN"
+    },
+    {
+      "EXPECTED_SIGNAL": "print_acknowledgements",
+      "source": "pos_print_jobs.printed_at",
+      "EXPECTED_FREQUENCY": "uno por comanda enviada",
+      "SILENCE_THRESHOLD": "1 turno con órdenes enviadas y cero trabajos",
+      "LAST_SEEN": "2026-09-04",
+      "CURRENT_STATE": "SILENT",
+      "evidence": "385 filas, ninguna desde el 2026-09-04",
+      "why_it_matters": "Lleva 14 días en silencio y nadie lo notó. 'printed' significa que el spooler aceptó, no que salió papel.",
+      "owner": "KDS_PRINT_GUARDIAN"
+    },
+    {
+      "EXPECTED_SIGNAL": "kds_acknowledgements",
+      "source": null,
+      "EXPECTED_FREQUENCY": "uno por comanda enviada",
+      "SILENCE_THRESHOLD": "n/a",
+      "LAST_SEEN": null,
+      "CURRENT_STATE": "NOT_INSTRUMENTED",
+      "evidence": "No existe el concepto de ack del KDS en ninguna rama (verificado).",
+      "why_it_matters": "Es el hueco que deja F3 del field cert permanentemente en NOT_OBSERVED.",
+      "owner": "KDS_PRINT_GUARDIAN"
+    },
+    {
+      "EXPECTED_SIGNAL": "source_ingestion",
+      "source": "ops_daily / vistas ocm_*",
+      "EXPECTED_FREQUENCY": "diaria tras el corte",
+      "SILENCE_THRESHOLD": "72 h (contempla fin de semana)",
+      "LAST_SEEN": "2026-09-18",
+      "CURRENT_STATE": "HEALTHY",
+      "evidence": "/api/health ya vigila frescura con este umbral",
+      "why_it_matters": "Una fuente muerta con CI en verde ya costó 14 días.",
+      "owner": "DATA_TRUTH_GUARDIAN"
+    },
+    {
+      "EXPECTED_SIGNAL": "scheduled_agent_runs",
+      "source": "agent_runs",
+      "EXPECTED_FREQUENCY": "según cron de cada agente",
+      "SILENCE_THRESHOLD": "6 h (el umbral que /api/health ya usa)",
+      "LAST_SEEN": "2026-09-18",
+      "CURRENT_STATE": "HEALTHY",
+      "evidence": "13 484 filas, la tabla más escrita fuera de pos_orders",
+      "why_it_matters": "Un agente que no deja rastro de haber corrido es indistinguible de uno que no existe. Ya pasó nueve días.",
+      "owner": "INCIDENT_TRIAGE_AGENT"
+    },
+    {
+      "EXPECTED_SIGNAL": "backups",
+      "source": null,
+      "EXPECTED_FREQUENCY": "diaria",
+      "SILENCE_THRESHOLD": "48 h",
+      "LAST_SEEN": null,
+      "CURRENT_STATE": "UNKNOWN",
+      "evidence": "No se auditó. La máquina de trabajo no tiene Time Machine y 122 ramas locales están sin publicar.",
+      "why_it_matters": "La ausencia de respaldo sólo se descubre el día que se necesita.",
+      "owner": "sin asignar"
+    },
+    {
+      "EXPECTED_SIGNAL": "release_artifact_emission",
+      "source": "release-artifact.*.json",
+      "EXPECTED_FREQUENCY": "uno por despliegue a producción",
+      "SILENCE_THRESHOLD": "un despliegue sin artefacto",
+      "LAST_SEEN": null,
+      "CURRENT_STATE": "NEVER_SEEN",
+      "evidence": "La plantilla existe; ningún artefacto emitido.",
+      "why_it_matters": "Sin él, '¿qué SHA está sirviendo AMALAY?' no se puede contestar desde el cerebro.",
+      "owner": "RELEASE_GUARDIAN"
+    }
+  ],
+  "summary": {
+    "total": 10,
+    "HEALTHY": 3,
+    "SILENT": 1,
+    "NEVER_SEEN": 4,
+    "NOT_INSTRUMENTED": 1,
+    "UNKNOWN": 1,
+    "reading": "Tres de diez señales están sanas. Cuatro nunca han llegado pese a tener emisor escrito. Una lleva 14 días muerta sin que nadie lo notara."
+  },
+  "guarantees": {
+    "watchers_running": 0,
+    "alerts_emitted": 0,
+    "shared_db_writes": 0
+  }
+}
