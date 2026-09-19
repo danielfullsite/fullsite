@@ -190,6 +190,34 @@ describe('B · la derivación de ids no puede volver', () => {
     expect((s.match(/createPurchaseOrderAtomic\(/g) || []).length).toBeGreaterThanOrEqual(2)
   })
 
+  it('no queda ningún 1.16 ni «IVA 16%» en el flujo de compras', () => {
+    // Sólo se admiten dentro de comentarios, que explican por qué se fueron.
+    const codigo = pagina().split('\n')
+      .filter(l => !/^\s*(\/\/|\*|\{\/\*)/.test(l) && !/^\s*«/.test(l) && !/^\s*`subtotal/.test(l) && !/^\s*sobre si/.test(l))
+      .join('\n')
+    expect(codigo).not.toMatch(/1\.16/)
+    expect(codigo).not.toMatch(/IVA 16%/)
+    expect(codigo).not.toMatch(/Total recibido \(\+ IVA\)/)
+  })
+
+  it('la UI muestra el MISMO total que se persiste', () => {
+    const s = pagina()
+    // Recepción: el número mostrado y el que se guarda salen de la misma suma.
+    expect(s).toMatch(/const actualIva = 0/)
+    expect(s).toMatch(/const actualTotal = actualSubtotal\b/)
+    expect(s).toMatch(/formatMXN\(receivedTotal\)/)
+    // Panel manual: total = subtotal, sin derivar impuesto.
+    expect(s).toMatch(/const total = subtotal\b/)
+    expect(s).not.toMatch(/const iva = subtotal \* IVA_RATE/)
+  })
+
+  it('la comparación contra el total de la OC usa el total persistible', () => {
+    // Antes comparaba `receivedTotal * 1.16 < receptionPO.total`, o sea una
+    // cifra inflada contra una que no lo estaba: una recepción completa podía
+    // pintarse como si sobrara.
+    expect(pagina()).toMatch(/receivedTotal < receptionPO\.total/)
+  })
+
   it('el alta de ingrediente es una acción aparte y explícita', () => {
     const s = pagina()
     expect(s).toMatch(/Crear nuevo ingrediente/)

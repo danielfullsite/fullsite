@@ -16,7 +16,6 @@ import {
   generateId, formatMXN, logAudit,
   type PurchaseOrder, type PurchaseOrderItem, type Factura, type Ingredient,
 } from '@/lib/pos-data'
-import { IVA_RATE } from '@/lib/pos-constants'
 
 // ─── OC Status Config ───────────────────────────────────────────────────────
 
@@ -194,8 +193,11 @@ export default function ComprasPage() {
 
     // 3. Calculate actual total based on received qty
     const actualSubtotal = receptionItems.reduce((sum, item) => sum + (item.qty_received * item.unit_cost), 0)
-    const actualIva = actualSubtotal * IVA_RATE
-    const actualTotal = actualSubtotal + actualIva
+    // La OC no declara impuesto (PURCHASE_TAX_SEMANTICS = UNKNOWN). Explícito,
+    // para que un cambio futuro en IVA_RATE —que es la tasa de VENTAS— no separe
+    // lo que se muestra de lo que se guarda.
+    const actualIva = 0
+    const actualTotal = actualSubtotal
 
     // 4. Update OC status — revisado. Si falla DESPUÉS del inventario, el
     // movimiento ya quedó aplicado y el reintento no lo duplica.
@@ -800,10 +802,15 @@ export default function ComprasPage() {
                       <span className="text-[var(--text-3)]">Total OC original</span>
                       <span className="text-[var(--text-4)]">{formatMXN(receptionPO.total)}</span>
                     </div>
+                    {/* Este número es EL MISMO que se va a guardar. Antes decía
+                        «(+ IVA)» y multiplicaba por 1.16, mientras lo persistido era
+                        `subtotal * IVA_RATE` con IVA_RATE = 0: la pantalla prometía
+                        un 16% que nunca llegaba a la base, y la comparación contra
+                        el total de la OC se hacía contra una cifra inflada. */}
                     <div className="flex justify-between text-sm mb-2">
-                      <span className="text-[var(--text-3)]">Total recibido (+ IVA)</span>
-                      <span className={`font-semibold ${receivedTotal * 1.16 < receptionPO.total ? 'text-amber-400' : 'text-white'}`}>
-                        {formatMXN(receivedTotal * 1.16)}
+                      <span className="text-[var(--text-3)]">Total recibido</span>
+                      <span className={`font-semibold ${receivedTotal < receptionPO.total ? 'text-amber-400' : 'text-white'}`}>
+                        {formatMXN(receivedTotal)}
                       </span>
                     </div>
                     <div className="flex justify-between text-sm mb-2">
@@ -898,7 +905,9 @@ export default function ComprasPage() {
                   <span className="text-white">{formatMXN(facturaModal.subtotal)}</span>
                 </div>
                 <div className="flex justify-between mb-1">
-                  <span className="text-[var(--text-3)]">IVA 16%</span>
+                  {/* Sin «16%»: este valor viene de la OC, que no declara
+                      impuesto. Afirmar una tasa sobre él sería inventarla. */}
+                  <span className="text-[var(--text-3)]">IVA</span>
                   <span className="text-white">{formatMXN(facturaModal.iva)}</span>
                 </div>
                 <div className="flex justify-between font-bold">
@@ -1162,8 +1171,8 @@ function ManualOCPanel({ onCreated, showToast }: { onCreated: () => void; showTo
   }
 
   const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.unit_cost), 0)
-  const iva = subtotal * IVA_RATE
-  const total = subtotal + iva
+  // Mismo criterio: el total que se muestra es el que el servidor va a guardar.
+  const total = subtotal
 
   const effectiveSupplier = supplier === '__custom__' ? customSupplier.trim() : supplier
 
@@ -1381,9 +1390,12 @@ function ManualOCPanel({ onCreated, showToast }: { onCreated: () => void; showTo
             <span className="text-[var(--text-3)]">Subtotal ({items.filter(i => i.name.trim()).length} items)</span>
             <span className="text-white font-medium">{formatMXN(subtotal)}</span>
           </div>
-          <div className="flex justify-between text-sm mb-2">
-            <span className="text-[var(--text-3)]">IVA 16%</span>
-            <span className="text-white font-medium">{formatMXN(iva)}</span>
+          {/* Una OC no captura el impuesto del proveedor: hoy no existe contrato
+              sobre si `unit_cost` lo incluye. Mostrar «IVA 16%» sobre un cero era
+              prometer un desglose que el producto no tiene. */}
+          <div className="flex justify-between text-xs mb-2">
+            <span className="text-[var(--text-4)]">IVA</span>
+            <span className="text-[var(--text-4)]">no se captura en la OC — va en la factura</span>
           </div>
           <div className="flex justify-between text-lg font-bold pt-2 border-t border-slate-700">
             <span className="text-white">Total</span>
