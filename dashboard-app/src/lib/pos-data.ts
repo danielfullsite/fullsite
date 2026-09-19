@@ -1,4 +1,7 @@
 import { kitchenOrderInScope, readKitchenScope } from './kitchen-read-scope'
+import { nuevaIdentidadDeAccion } from './operation-identity'
+import { recordMovement, confirmarMovimientoInventario } from './inventory'
+import { apiUrl } from './api-base'
 // POS Menu Data — AMALAY real menu (el POS legado)
 //
 // SQL for Supabase (run in SQL Editor):
@@ -681,7 +684,12 @@ export async function openTurno(fondoInicial: number, openedBy: string, openingR
   // al subir crea la MISMA fila, sin duplicar. turno_id en órdenes es TEXT (sin FK),
   // así que las comandas offline sincronizan aunque el turno suba después.
   const queueForSync = async () => {
-    try { const { addToQueue } = await import('@/lib/offline-sync'); addToQueue('pos_turnos', body) } catch {}
+    // 'POST' explícito: abrir turno INSERTA una fila. Dejarlo al valor por
+    // omisión hizo que el renglón viajara sin método, que la migración a
+    // IndexedDB lo convirtiera en PATCH, y que un `PATCH pos_turnos` sin filtro
+    // fuera rechazado para siempre por la guarda. Medido dos veces en AMALAY el
+    // 2026-09-14: la pantalla decía «Turno activo» y la nube no tenía ninguno.
+    try { const { addToQueue } = await import('@/lib/offline-sync'); addToQueue('pos_turnos', body, 'POST') } catch {}
   }
 
   // Offline: abrir turno LOCAL + encolar (el día arranca sin internet).
@@ -2018,8 +2026,21 @@ export interface AuditEvent {
 }
 
 export async function logAudit(event: AuditEvent): Promise<boolean> {
+  // IDENTIDAD PROPIA DEL EVENTO, no de la operación que audita.
+  //
+  // `pos_audit_log.id` es bigint por secuencia y la tabla no tiene clave de
+  // negocio: si la petición llega y la respuesta se pierde, el replay inserta
+  // una fila nueva. `client_op_id` cierra eso, con índice único parcial por
+  // tenant (migración PENDIENTE_20260917200000).
+  //
+  // ALEATORIA a propósito. La bitácora registra OBSERVACIONES, no estado: dos
+  // actores que ven el mismo hecho son dos filas legítimas, y heredar la
+  // identidad de la operación auditada las colapsaría en una. Cuando el evento
+  // pertenece a otra operación, ésa viaja como METADATO —`order_id`, y lo que
+  // el llamador ponga en `details`— nunca como identidad.
   const payload = {
     client_id: event.client_id || _getClientId(),
+    client_op_id: nuevaIdentidadDeAccion(),
     order_id: event.order_id || null,
     action: event.action,
     actor: typeof event.actor === 'string' && event.actor.trim() ? event.actor.trim() : 'POS Offline',
@@ -2649,9 +2670,25 @@ export async function updateInventoryStock(ingredientId: string, newStock: numbe
 // but all POS code still operates on the legacy pos_ingredients model.
 // When the full inventory migration is complete, replace ingredient_id with product_id.
 // See docs/INVENTORY-MIGRATION.md for the migration plan.
+/**
+ * IDENTIDAD DETERMINISTA, no aleatoria.
+ *
+ * Este movimiento NO es un evento propio: pertenece a la operación que lo causa
+ * —hoy, la recepción de una orden de compra—. Si dos terminales procesan la misma
+ * recepción, deben producir la MISMA identidad, o el inventario se descuenta dos
+ * veces. Un UUID aleatorio pasaría el caso «reintento del mismo item» y fallaría
+ * justo ése.
+ *
+ * La base ya tenía la infraestructura y nadie la usaba:
+ *   UNIQUE (client_id, movement_operation_key, movement_operation_line)
+ *     WHERE movement_operation_key IS NOT NULL
+ * Cero referencias a esas columnas en todo `src/` al 2026-09-17. Por eso esta
+ * migración no agrega columna aquí: la identidad ya existe, faltaba llenarla.
+ */
 export async function logInventoryMovement(movement: {
   ingredient_id: string; movement_type: string; quantity: number;
   order_id?: string; actor?: string; notes?: string;
+  movement_operation_key?: string; movement_operation_line?: string;
 }): Promise<boolean> {
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/pos_inventory_movements`, {
@@ -2869,6 +2906,22 @@ export async function upsertMarketStock(
   }
 }
 
+/**
+ * SIN IDENTIDAD TODAVÍA, Y A PROPÓSITO.
+ *
+ * P0A auditó esta función el 2026-09-17 y encontró que **no tiene ningún
+ * llamador** en todo `src/`. La venta de Market no pasa por aquí: se descuenta
+ * server-side con `r1_legacy_sale_deduction`, vía `/api/pos/deduct-market`, que
+ * ya es idempotente por `order_id`.
+ *
+ * Por eso no se le inventa una identidad de línea: no hay evento de venta que
+ * derivar, y un `order_id + menu_item_id + índice de arreglo` sería una clave
+ * posicional frágil para un camino que nadie ejecuta. La columna `client_op_id`
+ * queda creada en la migración; el día que esta función tenga un llamador, la
+ * identidad se decide con el evento real a la vista:
+ *   · si nace de una venta → determinista, derivada de esa venta y su renglón
+ *   · si es ajuste manual  → aleatoria, generada al confirmar la acción
+ */
 export async function logMarketMovement(movement: {
   menu_item_id: string; movement_type: string; quantity: number;
   order_id?: string; actor?: string; notes?: string;
@@ -3129,13 +3182,140 @@ export async function getPurchaseOrders(): Promise<PurchaseOrder[]> {
   return res.json()
 }
 
+/**
+ * UN ERROR NO ES UNA LISTA VACÍA.
+ *
+ * Esto devolvía `[]` ante cualquier fallo, y quien llamaba no podía distinguir
+ * «esta orden no tiene renglones» de «no pude leerlos». La recepción tomaba ese
+ * `[]` como un hecho: marcaba la OC recibida, recalculaba el total a $0.00 y no
+ * tocaba inventario, sin un solo error en pantalla.
+ *
+ * Visto en el laboratorio el 2026-09-18: con el RPC `pos_scoped_child` ausente,
+ * el GET contestaba 503 y la orden quedaba «recibida» por cero pesos.
+ *
+ * Una lista vacía verdadera se conserva como vacía. Un fallo LANZA.
+ */
+/**
+ * Cabeceras para las rutas POS autenticadas.
+ *
+ * No hay un helper compartido en el repo: cada sitio lo arma en línea. Se
+ * replica el patrón canónico de `inventory.ts:100-108` —shift token del POS, o
+ * el JWT del dashboard— en vez de inventar otro contrato o refactorizar los
+ * nueve sitios existentes dentro de este track.
+ */
+function encabezadosPOS(): Record<string, string> {
+  const h: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (typeof window === 'undefined') return h
+  let token: string | null = null
+  try { token = localStorage.getItem('pos_shift_token') } catch { /* ssr/privado */ }
+  if (!token) {
+    try {
+      const host = new URL(SUPABASE_URL).hostname.split('.')[0]
+      const guardado = localStorage.getItem(`sb-${host}-auth-token`)
+      if (guardado) token = JSON.parse(guardado)?.access_token || null
+    } catch { /* sin sesión */ }
+  }
+  if (token && token !== SUPABASE_KEY) h.Authorization = `Bearer ${token}`
+  const cid = _getClientId()
+  if (cid) h['x-fullsite-tenant'] = cid
+  return h
+}
+
+/**
+ * CATÁLOGO ESTRICTO PARA COMPRAS.
+ *
+ * `getIngredients()` devuelve `[]` ante error y tiene nueve llamadores; cambiarla
+ * globalmente arriesga pantallas ajenas a este flujo. Pero comprar contra un
+ * catálogo que no se pudo leer es exactamente cómo nacieron los ingredientes
+ * inventados: si la lista llega vacía por un 503, el formulario invita a teclear
+ * un nombre nuevo y a fabricar su id.
+ *
+ * Aquí un fallo LANZA y un catálogo legítimamente vacío se conserva vacío. Quien
+ * compra usa sólo esta frontera.
+ */
+export async function getIngredientCatalogStrict(signal?: AbortSignal): Promise<Ingredient[]> {
+  let res: Response
+  try {
+    res = await fetch(
+      `${SUPABASE_URL}/rest/v1/pos_ingredients?client_id=eq.${_getClientId()}&active=eq.true&order=name.asc&limit=2000`,
+      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store', signal }
+    )
+  } catch { throw new Error('CATALOGO_ILEGIBLE: sin conexión con el servidor') }
+  if (!res.ok) throw new Error(`CATALOGO_ILEGIBLE: HTTP ${res.status}`)
+  const cuerpo = await res.json().catch(() => null)
+  if (!Array.isArray(cuerpo)) throw new Error('CATALOGO_ILEGIBLE: respuesta inesperada')
+  return cuerpo as Ingredient[]
+}
+
+/**
+ * ALTA DE INGREDIENTE. La identidad la asigna el SERVIDOR.
+ *
+ * Nunca se manda un id: el nombre es un nombre, no una llave primaria. Devuelve
+ * el ingrediente confirmado, y ESE `id` es el que puede entrar a una orden.
+ */
+export async function createIngredient(datos: {
+  name: string; unit: string; cost_per_unit?: number; category?: string; supplier?: string
+}): Promise<Ingredient> {
+  const res = await fetch(apiUrl('/api/pos/ingredientes'), {
+    method: 'POST',
+    headers: encabezadosPOS(),
+    body: JSON.stringify(datos),
+  }).catch(() => null)
+  if (!res) throw new Error('INGREDIENTE_NO_CONFIRMADO: sin conexión')
+  const cuerpo = await res.json().catch(() => null)
+  if (!res.ok || !cuerpo?.id) {
+    throw new Error(typeof cuerpo?.error === 'string' ? cuerpo.error : 'INGREDIENTE_NO_CONFIRMADO')
+  }
+  return cuerpo as Ingredient
+}
+
+/**
+ * CREAR UNA ORDEN DE COMPRA, entera o nada.
+ *
+ * Sustituye a `createPurchaseOrder`, que hacía dos POST independientes y dejaba
+ * la cabecera huérfana si el segundo fallaba. El servidor valida todas las
+ * líneas antes de escribir y commitea las dos inserciones juntas.
+ *
+ * No lleva `client_id` ni `created_by`: el tenant y la procedencia salen de la
+ * sesión autenticada. Tampoco importes: el servidor los deriva de las líneas.
+ *
+ * La OC no declara IVA. No es un olvido: hoy no existe contrato sobre si
+ * `unit_cost` lo incluye —el código calcula 0, la captura de facturas escribe
+ * `iva: 0`, y las pantallas rotulan «+ IVA» sobre cifras que valen cero—. El
+ * impuesto del proveedor pertenece a la factura, que tiene sus propias columnas.
+ */
+export async function createPurchaseOrderAtomic(orden: {
+  supplier: string; notes?: string; ai_suggested?: boolean
+  lines: { ingredient_id: string; ingredient_name?: string; quantity_ordered: number; unit: string; unit_cost: number }[]
+}): Promise<{ order_id: string; total: number }> {
+  const { lines, ...header } = orden
+  const res = await fetch(apiUrl('/api/pos/purchase-orders'), {
+    method: 'POST',
+    headers: encabezadosPOS(),
+    body: JSON.stringify({ header, lines }),
+  }).catch(() => null)
+  if (!res) throw new Error('ORDEN_NO_CONFIRMADA: sin conexión')
+  const cuerpo = await res.json().catch(() => null)
+  if (!res.ok || !cuerpo?.order_id) {
+    throw new Error(typeof cuerpo?.error === 'string' ? cuerpo.error : 'ORDEN_NO_CONFIRMADA')
+  }
+  return cuerpo as { order_id: string; total: number }
+}
+
 export async function getPurchaseOrderItems(orderId: string): Promise<PurchaseOrderItem[]> {
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/pos_purchase_order_items?order_id=eq.${orderId}`,
-    { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
-  )
-  if (!res.ok) return []
-  return res.json()
+  let res: Response
+  try {
+    res = await fetch(
+      `${SUPABASE_URL}/rest/v1/pos_purchase_order_items?order_id=eq.${orderId}`,
+      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
+    )
+  } catch {
+    throw new Error('RENGLONES_ILEGIBLES: sin conexión con el servidor')
+  }
+  if (!res.ok) throw new Error(`RENGLONES_ILEGIBLES: HTTP ${res.status}`)
+  const cuerpo = await res.json().catch(() => null)
+  if (!Array.isArray(cuerpo)) throw new Error('RENGLONES_ILEGIBLES: respuesta inesperada')
+  return cuerpo as PurchaseOrderItem[]
 }
 
 export async function updatePurchaseOrderStatus(
@@ -3157,45 +3337,127 @@ export async function updatePurchaseOrderStatus(
 }
 
 // Receive items at almacén (update quantity_received)
+/**
+ * UNA ESCRITURA QUE NO SE REVISÓ NO ESTÁ CONFIRMADA.
+ *
+ * Antes se disparaban los PATCH sin mirar ni una respuesta y se devolvía `true`
+ * siempre. Con el proxy contestando 503 —caso real del 2026-09-18— ninguna
+ * cantidad se guardaba y la recepción seguía de largo como si todas hubieran
+ * quedado.
+ *
+ * Lanzar a la primera falla deja renglones anteriores ya aplicados, y está bien:
+ * `quantity_received` es un valor ABSOLUTO, no un incremento, así que reintentar
+ * la misma recepción los vuelve a escribir con el mismo valor. Lo que no puede
+ * pasar —y es lo que esto corta— es avanzar al inventario sin tenerlos todos.
+ */
 export async function receiveOrderItems(
   orderId: string, received: { item_id: number; quantity_received: number }[]
 ): Promise<boolean> {
   for (const r of received) {
-    await fetch(
-      `${SUPABASE_URL}/rest/v1/pos_purchase_order_items?id=eq.${r.item_id}`,
-      {
-        method: 'PATCH',
-        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify({ quantity_received: r.quantity_received }),
-      }
-    )
+    let res: Response
+    try {
+      res = await fetch(
+        `${SUPABASE_URL}/rest/v1/pos_purchase_order_items?id=eq.${r.item_id}`,
+        {
+          method: 'PATCH',
+          headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+          body: JSON.stringify({ quantity_received: r.quantity_received }),
+        }
+      )
+    } catch {
+      throw new Error(`CANTIDAD_NO_CONFIRMADA: renglón ${r.item_id}, sin conexión`)
+    }
+    if (!res.ok) throw new Error(`CANTIDAD_NO_CONFIRMADA: renglón ${r.item_id}, HTTP ${res.status}`)
   }
   return true
 }
 
 // Restock inventory when OC is received
+/**
+ * RECEPCIÓN DE ORDEN DE COMPRA — un solo hecho, una sola transacción.
+ *
+ * ── POR QUÉ CAMBIÓ ──────────────────────────────────────────────────────────
+ * La versión anterior hacía, por renglón:
+ *
+ *     leer stock  →  newStock = stock + qty  →  PATCH absoluto  →  POST movimiento
+ *
+ * El movimiento llevaba identidad determinista y un índice único lo protegía,
+ * así que un reintento NO duplicaba el asiento. Pero el PATCH iba ANTES, sin
+ * guarda, y con un valor calculado desde una lectura que el intento anterior ya
+ * había modificado. Medido en el laboratorio de certificación el 2026-09-18 con
+ * S0=100 y Q=5: primera ejecución dejó 105; el reintento de la MISMA recepción
+ * dejó **110**, con **un solo** movimiento en la bitácora.
+ *
+ * O sea: el libro cuadraba y el inventario no. Deduplicar el asiento no
+ * deduplica el efecto — protegía la escritura que no mueve el negocio, y llegaba
+ * después de la que sí.
+ *
+ * ── POR QUÉ ASÍ ─────────────────────────────────────────────────────────────
+ * El contrato transaccional ya existía y nadie lo usaba desde aquí:
+ * `recordMovement()` va por `/api/pos/inventory/movement` a
+ * `pos_record_inventory_movement()`, que aplica recibo, bitácora y stock en UNA
+ * transacción gobernada por la misma `idempotency_key`. Reproducir ese contrato
+ * a mano sería tener dos verdades; se reusa el que ya está probado.
+ *
+ * ── LA IDENTIDAD ES LA RECEPCIÓN, NO EL RENGLÓN ────────────────────────────
+ * Recibir una OC es UN hecho, no N hechos independientes: si llega el camión y
+ * se captura dos veces, no entraron dos camiones. Por eso la llave es de la
+ * orden —`po:<id>`— y todos los renglones viajan como líneas de la misma
+ * operación.
+ *
+ * Y por eso el orden de las líneas se canoniza por `item.id` (que asigna el
+ * servidor al crear el renglón) y no por la posición del arreglo: dos terminales
+ * que carguen la misma OC pueden recorrerla distinto, y dos intents con las
+ * mismas líneas en distinto orden tienen que ser el mismo intent.
+ *
+ * `metadata` sólo lleva datos deterministas. Un timestamp, un id de terminal o
+ * un request_id harían que el mismo hecho se viera distinto en cada intento —
+ * procedencia no es identidad.
+ */
 export async function restockFromPurchaseOrder(
   orderId: string, items: PurchaseOrderItem[], actor: string
 ): Promise<void> {
-  const inventory = await getInventory()
-  const invMap = new Map(inventory.map(i => [i.ingredient_id, i]))
+  const lineas = [...items]
+    // Identidad estable del renglón, asignada por el servidor. Nunca la posición.
+    .sort((a, b) => (Number(a.id) - Number(b.id)) || String(a.id).localeCompare(String(b.id)))
+    .map(item => ({
+      ingredient_id: item.ingredient_id,
+      quantity: item.quantity_received ?? item.quantity_ordered,
+      notes: `OC ${orderId} - ${item.ingredient_name}`,
+    }))
+    // Un renglón recibido en cero no mueve inventario. El contrato rechaza
+    // cantidad 0, y colarlo tumbaría la recepción entera por una línea que no
+    // tenía nada que aplicar.
+    .filter(linea => Number.isFinite(linea.quantity) && linea.quantity !== 0)
 
-  for (const item of items) {
-    const qty = item.quantity_received ?? item.quantity_ordered
-    const inv = invMap.get(item.ingredient_id)
-    if (inv) {
-      const newStock = inv.stock + qty
-      await updateInventoryStock(item.ingredient_id, newStock)
-      await logInventoryMovement({
-        ingredient_id: item.ingredient_id,
-        movement_type: 'restock',
-        quantity: qty,
-        order_id: orderId,
-        actor,
-        notes: `OC ${orderId} - ${item.ingredient_name}`,
-      })
-    }
+  if (!lineas.length) return
+
+  const resultado = await recordMovement({
+    client_id: _getClientId(),
+    movement_type: 'restock',
+    actor,
+    idempotency_key: `po:${orderId}`,
+    lines: lineas,
+    metadata: { source: 'purchase_order_reception', purchase_order_id: orderId },
+  })
+
+  // Sin confirmación del movimiento transaccional, la recepción NO sigue. Antes
+  // continuaba igual y la orden terminaba marcada «recibida» con el inventario
+  // sin tocar: el error se volvía un hecho silencioso.
+  if (!resultado.success) {
+    throw new Error(`INVENTARIO_NO_CONFIRMADO: ${resultado.errors.join(', ') || 'sin detalle'}`)
   }
+
+  // CERRAR EL INTENT DURABLE. `recordMovement` congela la intención antes de
+  // salir a la red para que un recargue a media operación no la pierda, y sólo
+  // el llamador sabe cuándo terminó. Al no cerrarlo, la SIGUIENTE recepción
+  // —legítima, de otra orden— chocaba contra el pendiente y moría con
+  // INVENTORY_PENDING sin llegar a la red.
+  //
+  // Visto en el laboratorio el 2026-09-18: recibida la OC A, la OC B dejó de
+  // aplicar inventario. Lo correcto no era dejar de congelar: era cerrarlo
+  // cuando el recibo ya está confirmado, que es justo aquí.
+  await confirmarMovimientoInventario(_getClientId(), `po:${orderId}`)
 }
 
 // CRUD for Facturas

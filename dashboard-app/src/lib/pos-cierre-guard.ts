@@ -142,6 +142,37 @@ export function evaluarAperturaDeTurno(lectura: LecturaDeCuentas): VeredictoAper
   }
 }
 
+/**
+ * ¿Alcanza lo que contestó Pedro para AFIRMAR que no hay cuentas abiertas?
+ *
+ * Campo, AMALAY, 2026-09-14. Pedro contestó, con credencial y todo:
+ *
+ *     authoritative: true · order_snapshot_complete: FALSE · salon_orders: []
+ *
+ * y en Supabase, ese mismo turno, dos cuentas enviadas por $429.20. El cierre
+ * tomó la lista vacía como verdad porque sólo preguntaba si Pedro CONTESTABA
+ * (`procedencia !== 'sin-pedro'`), no si lo que contestó servía.
+ *
+ * `authoritative` dice quién manda. `order_snapshot_complete` dice si ya terminó
+ * de reconstruir el salón. Para CERRAR hacen falta las dos: una foto a medio
+ * revelar no puede firmar que el salón está vacío. El plano de mesas ya usa ese
+ * mismo `completa` para pintar su aviso ámbar; el cierre lo ignoraba.
+ *
+ * Es la misma regla que `evaluarAperturaDeTurno` aplica al abrir: separar «no
+ * hay» de «no se pudo saber». Ver el incidente del 2026-08-31 anotado arriba.
+ *
+ * La usan los DOS extremos del turno —`TurnoGate` al abrir y `CierreCajaWizard`
+ * al cerrar— porque los dos tenían el mismo agujero: preguntaban si Pedro
+ * contestaba, no si lo que contestó alcanzaba para afirmar que el salón
+ * está vacío.
+ */
+// `completa` es opcional en `LecturaDelSalon`: ausente significa QUE NO SE SABE,
+// y no saber nunca cuenta como completa. De ahí el `=== true` en vez de un
+// truthy — un `undefined` tiene que caer del lado prudente.
+export function pedroPuedeAfirmarElSalon(lectura: { autoritativa: boolean; completa?: boolean }): boolean {
+  return lectura.autoritativa === true && lectura.completa === true
+}
+
 /** Suma de lo que está colgando, para enseñarlo antes de matar nada. */
 export function totalDeCuentas(cuentas: OpenOrder[]): number {
   return cuentas.reduce((acc, c) => acc + (Number(c.total) || 0), 0)

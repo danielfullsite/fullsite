@@ -8,6 +8,10 @@ interface QueuedOrder {
   id: string
   table: string // 'pos_orders'
   data: Record<string, unknown>
+  /** Explícito desde el 2026-09-14: sin él, la migración a IndexedDB adivinaba
+   *  PATCH y producía mutaciones sin filtro que la guarda rechazaba para
+   *  siempre. Ver `abrir-turno-no-es-un-patch.test.ts`. */
+  method?: 'POST' | 'PATCH' | 'DELETE'
   endpoint?: string
   transport?: 'APP_API' | 'SUPABASE_REST'
   timestamp: number
@@ -31,10 +35,26 @@ function saveQueue(queue: QueuedOrder[]) {
   localStorage.setItem(QUEUE_KEY, JSON.stringify(queue))
 }
 
-export function addToQueue(table: string, data: Record<string, unknown>): string {
+/**
+ * Encola una escritura en el buffer de emergencia (localStorage).
+ *
+ * `method` es explícito desde el 2026-09-14. Antes esta función no tenía forma
+ * de expresarlo, el renglón llegaba a IndexedDB sin método, y la migración caía
+ * a su valor por omisión —PATCH— produciendo `PATCH pos_turnos` SIN filtro. La
+ * guarda de mutaciones sin filtro lo rechazaba como TERMINAL_NON_RETRYABLE y el
+ * turno no subía nunca. Ver `abrir-turno-no-es-un-patch.test.ts`.
+ *
+ * El default es POST porque eso es lo único que esta función significó siempre:
+ * insertar una fila.
+ */
+export function addToQueue(
+  table: string,
+  data: Record<string, unknown>,
+  method: 'POST' | 'PATCH' | 'DELETE' = 'POST',
+): string {
   const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
   const queue = getQueue()
-  queue.push({ id, table, data, timestamp: Date.now(), synced: false })
+  queue.push({ id, table, data, method, timestamp: Date.now(), synced: false })
   saveQueue(queue)
   return id
 }

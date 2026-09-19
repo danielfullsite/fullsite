@@ -1,0 +1,34 @@
+name: Flota muda
+
+# Alerta por AUSENCIA de latidos, no por presencia de errores.
+#
+# `local_server_heartbeats` llevaba 0 filas desde que existe y ningún monitor lo
+# notó: todos miran lo que llega. Una flota que no reporta se ve idéntica a una
+# flota sana, y ése es justo el punto ciego que este workflow cubre.
+#
+# Dos veces al día basta: no es un incidente de minutos, es un apagón que puede
+# durar meses. Un aviso que llega cada 15 min deja de leerse.
+
+on:
+  schedule:
+    - cron: '0 15 * * *'   # 09:00 en Monterrey
+    - cron: '0 2 * * *'    # 20:00 en Monterrey, al cierre
+  workflow_dispatch:
+
+jobs:
+  revisar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install requests
+      - name: ¿Alguien está reportando?
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          SUPABASE_AGENT_KEY: ${{ secrets.SUPABASE_AGENT_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID_DANIEL: ${{ secrets.TELEGRAM_CHAT_ID_DANIEL }}
+        run: python .github/scripts/flota_muda.py

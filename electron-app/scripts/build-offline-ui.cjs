@@ -116,6 +116,16 @@ try {
     }
     try { fs.renameSync(staging, output) }
     catch (error) { if (backup) fs.renameSync(backup, output); throw error }
+    // ── EL COMMIT DE LA INTERFAZ, SELLADO AQUÍ Y NO DEDUCIDO ────────────────
+    //
+    // La `revision` del manifiesto es un sha256 del CONTENIDO: identifica el
+    // paquete, pero no dice de qué commit salió, y un hash de contenido no se
+    // puede traducir a un commit sin recompilar y comparar. Por eso el commit
+    // se escribe aquí, en el único momento en que se conoce.
+    //
+    // Va JUNTO al paquete y no DENTRO: el manifiesto ya se calculó sobre los
+    // archivos exportados, y añadir uno invalidaría la verificación.
+    escribirSelloDeInterfaz(output, bundle.manifest.revision)
   } finally { fs.rmSync(staging, { recursive: true, force: true }) }
   console.log(`[offline-ui] Verified ${Object.keys(bundle.manifest.files).length} files, ${bundle.manifest.routes.length} routes`)
   console.log(`[offline-ui] Revision ${bundle.manifest.revision}`)
@@ -168,4 +178,30 @@ function walk(directory, relative = '') {
     const name = relative ? `${relative}/${entry.name}` : entry.name
     return entry.isDirectory() ? walk(directory, name) : [name]
   })
+}
+
+/**
+ * Deja constancia de QUÉ COMMIT produjo este paquete de interfaz.
+ *
+ * `sellar-version.cjs` lo lee inmediatamente después y lo copia a
+ * `build-info.json`, que sí viaja dentro del instalador. Así `/health` puede
+ * contestar «la cáscara y la interfaz salieron del mismo commit» — o demostrar
+ * que no, que es el caso que hoy nadie puede ver desde fuera.
+ */
+function escribirSelloDeInterfaz(destino, revision) {
+  const git = (...args) => {
+    try { return require('node:child_process').execFileSync('git', args, { cwd: repository, encoding: 'utf8' }).trim() }
+    catch { return '' }
+  }
+  const sha = (process.env.FULLSITE_BUILD_SHA || process.env.GITHUB_SHA || git('rev-parse', 'HEAD')).trim()
+  const sello = {
+    git_sha: /^[0-9a-f]{7,40}$/i.test(sha) ? sha.toLowerCase() : null,
+    rama: (process.env.FULLSITE_BUILD_RAMA || process.env.GITHUB_REF_NAME || git('rev-parse', '--abbrev-ref', 'HEAD')).trim() || null,
+    // En CI el commit llega por entorno y no hay árbol sucio que medir.
+    limpio: (process.env.FULLSITE_BUILD_SHA || process.env.GITHUB_SHA) ? true : git('status', '--porcelain') === '',
+    content_revision: revision,
+    built_at: new Date().toISOString(),
+  }
+  fs.writeFileSync(`${destino}.sello.json`, JSON.stringify(sello, null, 2) + '\n')
+  console.log(`[build:ui] sello de interfaz · ${sello.git_sha ? sello.git_sha.slice(0, 12) : 'sin commit'} · contenido ${revision.slice(0, 12)}`)
 }

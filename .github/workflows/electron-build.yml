@@ -119,6 +119,30 @@ jobs:
       - name: Sellar el commit del candidato
         run: npm run sellar
 
+      # EL BOOTSTRAP DE PLATAFORMA, SIN EL CUAL LA TERMINAL NACE MUDA.
+      #
+      # Una caja instalada por .exe no tiene variables de entorno, y la receta de
+      # clonado no escribe credenciales en su config.json. Sin este paso pasaban
+      # DOS cosas a la vez, medidas contra AMALAY el 2026-09-14:
+      #   · `local_server_heartbeats` con cero filas desde que existe — la flota
+      #     no reporta y hay que ir físicamente a diagnosticar.
+      #   · La terminal no se auto-actualiza: el freno de versiones lanza sin
+      #     credencial y el instalador falla CERRADO, así que no instala nunca.
+      #
+      # Es la MISMA llave anon que ya viaja dentro del instalador (Next la inlina
+      # en el ui-bundle). Lo único que cambia es que el proceso principal también
+      # la puede leer. NO se sella nada más: ni service_role, ni contraseñas, ni
+      # el secreto de red local —que cada terminal genera— ni el IPC de la huella.
+      # Vigilado por local-server/tests/bootstrap-sellado-en-build.test.js.
+      #
+      # Sin `--permitir-sin-sellar`: aquí es un release y tiene que ROMPER el
+      # build, no descubrirse tres meses después en una caja.
+      - name: Sellar el bootstrap de plataforma
+        run: npm run sellar:credenciales
+        env:
+          SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+
       - name: Build Windows installer
         run: npx electron-builder --win --x64 --publish never
 

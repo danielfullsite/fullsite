@@ -14,6 +14,7 @@
     "icon.png",
     "local-server/**/*.js",
     "local-server/core/permission-profiles.json",
+    "credenciales-selladas.json",
     "local-server/kds-ui.html",
     "offline-ui/*.js",
     "ui-bundle/**/*",

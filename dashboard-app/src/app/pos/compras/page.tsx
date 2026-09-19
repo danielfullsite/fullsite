@@ -8,12 +8,13 @@ import {
   DollarSign, Calendar, Building2, ClipboardList, AlertTriangle, Download,
 } from 'lucide-react'
 import {
-  getPurchaseOrders, getPurchaseOrderItems, createPurchaseOrder, updatePurchaseOrderStatus,
+  getPurchaseOrders, getPurchaseOrderItems, updatePurchaseOrderStatus,
+  getIngredientCatalogStrict, createIngredient, createPurchaseOrderAtomic,
   receiveOrderItems, restockFromPurchaseOrder,
   getFacturas, createFactura, updateFacturaStatus,
   getSuggestedPurchaseItems, getSuppliers,
   generateId, formatMXN, logAudit,
-  type PurchaseOrder, type PurchaseOrderItem, type Factura,
+  type PurchaseOrder, type PurchaseOrderItem, type Factura, type Ingredient,
 } from '@/lib/pos-data'
 import { IVA_RATE } from '@/lib/pos-constants'
 
@@ -66,7 +67,9 @@ export default function ComprasPage() {
 
   const toggleExpand = async (id: string) => {
     if (expanded === id) { setExpanded(null); return }
-    const items = await getPurchaseOrderItems(id)
+    let items: PurchaseOrderItem[]
+    try { items = await getPurchaseOrderItems(id) }
+    catch { showToast('No se pudieron leer los productos de esta OC'); return }
     setExpandedItems(items)
     setExpanded(id)
   }
@@ -108,9 +111,22 @@ export default function ComprasPage() {
   const [receptionBy, setReceptionBy] = useState('')
   const [receptionNotes, setReceptionNotes] = useState('')
   const [savingReception, setSavingReception] = useState(false)
+  // Un fallo de recepción ya no puede quedarse mudo: vive aquí y se muestra
+  // dentro del modal, que permanece abierto para reintentar.
+  const [receptionError, setReceptionError] = useState<string | null>(null)
 
   const openReception = async (po: PurchaseOrder) => {
-    const items = await getPurchaseOrderItems(po.id)
+    // No se abre un modal listo para confirmar sobre una lista que no se pudo
+    // leer. Antes, un error de lectura entraba como `[]` y la recepción se
+    // confirmaba con cero items, dejando la OC «recibida» por $0.00.
+    let items: PurchaseOrderItem[]
+    try {
+      items = await getPurchaseOrderItems(po.id)
+    } catch (error) {
+      showToast(`No se pudieron leer los productos de la OC ${po.id.slice(0, 8)} — reintenta`)
+      console.error('[compras] recepción no abierta:', error instanceof Error ? error.message : error)
+      return
+    }
     setReceptionItems(items.map(item => ({
       ...item,
       qty_received: item.quantity_ordered, // pre-fill with ordered qty
@@ -119,6 +135,7 @@ export default function ComprasPage() {
     setReceptionPO(po)
     setReceptionBy('')
     setReceptionNotes('')
+    setReceptionError(null)
   }
 
   const updateReceivedQty = (itemId: number, qty: number) => {
@@ -133,9 +150,34 @@ export default function ComprasPage() {
     ))
   }
 
+  /**
+   * CONFIRMAR UNA RECEPCIÓN ES DECLARAR QUE TRES COSAS QUEDARON.
+   *
+   * Antes no se revisaba ninguna: se disparaban los pasos, se mostraba el toast
+   * de éxito y se cerraba el modal pasara lo que pasara. Una orden podía quedar
+   * «recibida» por $0.00 sin inventario y sin un error visible.
+   *
+   * Ahora cada paso se confirma antes del siguiente, y el éxito se declara sólo
+   * al final. Si algo falla, el modal se queda abierto con el error y se puede
+   * reintentar — que es seguro porque las tres escrituras lo toleran:
+   *   · `quantity_received` es absoluto, no incremental
+   *   · el inventario es idempotente por `po:<orderId>` (P0A)
+   *   · el estado de la cabecera es un PATCH idempotente
+   *
+   * Lo que NO se hace es revertir el inventario si la cabecera falla después de
+   * que el movimiento ya se aplicó. Revertir automáticamente un asiento
+   * confirmado inventa una salida de almacén que nadie hizo; el reintento
+   * encuentra el mismo `po:<orderId>` y no vuelve a sumar.
+   */
   const handleConfirmReception = async () => {
     if (!receptionPO || !receptionBy.trim()) return
+    if (!receptionItems.length) {
+      setReceptionError('Esta orden no tiene productos que dar de alta. Revísala antes de recibirla.')
+      return
+    }
     setSavingReception(true)
+    setReceptionError(null)
+    try {
 
     // 1. Update quantity_received for each item
     await receiveOrderItems(
@@ -155,13 +197,15 @@ export default function ComprasPage() {
     const actualIva = actualSubtotal * IVA_RATE
     const actualTotal = actualSubtotal + actualIva
 
-    // 4. Update OC status
-    await updatePurchaseOrderStatus(receptionPO.id, 'recibida', {
+    // 4. Update OC status — revisado. Si falla DESPUÉS del inventario, el
+    // movimiento ya quedó aplicado y el reintento no lo duplica.
+    const cabecera = await updatePurchaseOrderStatus(receptionPO.id, 'recibida', {
       received_by: receptionBy,
       subtotal: actualSubtotal,
       iva: actualIva,
       total: actualTotal,
     })
+    if (!cabecera) throw new Error('ESTADO_NO_CONFIRMADO: la orden no pudo marcarse como recibida')
 
     // 5. Log discrepancies in audit
     const discrepancies = receptionItems.filter(item => item.qty_received !== item.quantity_ordered)
@@ -187,12 +231,24 @@ export default function ComprasPage() {
       reason: discrepancies.length > 0 ? `${discrepancies.length} discrepancia(s) en recepcion` : undefined,
     })
 
-    const itemCount = receptionItems.reduce((s, i) => s + (i.qty_received > 0 ? 1 : 0), 0)
+      const itemCount = receptionItems.reduce((s, i) => s + (i.qty_received > 0 ? 1 : 0), 0)
 
-    setSavingReception(false)
-    setReceptionPO(null)
-    showToast(`Recepcion completa — ${itemCount} items dados de alta en inventario${discrepancies.length > 0 ? `, ${discrepancies.length} discrepancias` : ''}`)
-    fetchData()
+      // Sólo aquí, con los tres pasos confirmados, la recepción es un hecho.
+      setReceptionPO(null)
+      showToast(`Recepcion completa — ${itemCount} items dados de alta en inventario${discrepancies.length > 0 ? `, ${discrepancies.length} discrepancias` : ''}`)
+      fetchData()
+    } catch (error) {
+      const detalle = error instanceof Error ? error.message : String(error)
+      console.error('[compras] recepción no confirmada:', detalle)
+      setReceptionError(
+        detalle.startsWith('CANTIDAD_NO_CONFIRMADA') ? 'No se pudieron guardar las cantidades recibidas. Reintenta.'
+        : detalle.startsWith('INVENTARIO_NO_CONFIRMADO') ? 'El inventario no confirmó el alta. Reintenta la misma recepción: no se duplica.'
+        : detalle.startsWith('ESTADO_NO_CONFIRMADO') ? 'El inventario SÍ quedó aplicado, pero la orden no pudo marcarse como recibida. Reintenta.'
+        : `La recepción no se completó: ${detalle}`
+      )
+    } finally {
+      setSavingReception(false)
+    }
   }
 
   // ─── Create Factura for OC ──────────────────────────────────────────────
@@ -764,6 +820,18 @@ export default function ComprasPage() {
                 )
               })()}
 
+              {receptionItems.length === 0 && (
+                <div className="mt-4 bg-amber-500/10 border border-amber-500/40 rounded-lg px-4 py-3 text-sm text-amber-300">
+                  Esta orden no tiene productos registrados. No se puede recibir: revísala o vuelve a capturarla.
+                </div>
+              )}
+
+              {receptionError && (
+                <div className="mt-4 bg-red-500/10 border border-red-500/50 rounded-lg px-4 py-3 text-sm text-red-300">
+                  {receptionError}
+                </div>
+              )}
+
               {/* Who received */}
               <div className="mt-4">
                 <label className="text-sm text-[var(--text-3)] block mb-1">Recibido por</label>
@@ -795,7 +863,7 @@ export default function ComprasPage() {
               </button>
               <button
                 onClick={handleConfirmReception}
-                disabled={!receptionBy.trim() || savingReception}
+                disabled={!receptionBy.trim() || savingReception || receptionItems.length === 0}
                 className="flex-[2] py-3 rounded-xl bg-amber-600 hover:bg-amber-500 disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-semibold flex items-center justify-center gap-2"
               >
                 <PackageCheck size={18} />
@@ -991,7 +1059,14 @@ export default function ComprasPage() {
 
 interface ManualLineItem {
   id: string
+  /** Texto que la persona escribe o elige. Es un NOMBRE, no una llave. */
   name: string
+  /**
+   * La identidad real del catálogo. Vacía hasta que se selecciona un
+   * ingrediente existente o se da de alta uno nuevo. Nunca se deriva del texto:
+   * derivarla fue justo el defecto (`nombre → slug → id inventado`).
+   */
+  ingredient_id: string
   quantity: number
   unit: string
   unit_cost: number
@@ -1005,23 +1080,74 @@ function ManualOCPanel({ onCreated, showToast }: { onCreated: () => void; showTo
   // Form state
   const [supplier, setSupplier] = useState('')
   const [customSupplier, setCustomSupplier] = useState('')
-  const [createdBy, setCreatedBy] = useState('')
   const [notes, setNotes] = useState('')
   const [items, setItems] = useState<ManualLineItem[]>([
-    { id: generateId(), name: '', quantity: 1, unit: 'kg', unit_cost: 0 },
+    { id: generateId(), name: '', ingredient_id: '', quantity: 1, unit: 'kg', unit_cost: 0 },
   ])
+  // El catálogo del tenant. `null` = todavía no se sabe; un error de carga NO
+  // se disfraza de catálogo vacío, porque un catálogo vacío invita a teclear un
+  // nombre nuevo y ahí nacían los ids inventados.
+  const [catalogo, setCatalogo] = useState<Ingredient[] | null>(null)
+  const [catalogoError, setCatalogoError] = useState<string | null>(null)
+  const [altaPara, setAltaPara] = useState<string | null>(null)   // id de renglón
+  const [creandoIngrediente, setCreandoIngrediente] = useState(false)
+
+  const cargarCatalogo = async () => {
+    setCatalogoError(null)
+    try {
+      setCatalogo(await getIngredientCatalogStrict())
+    } catch (error) {
+      setCatalogo(null)
+      setCatalogoError(error instanceof Error && error.message.startsWith('CATALOGO_ILEGIBLE')
+        ? 'No se pudo cargar el catálogo de insumos. Sin él no se puede crear una orden.'
+        : 'No se pudo cargar el catálogo de insumos.')
+    }
+  }
 
   useEffect(() => {
     (async () => {
       setLoading(true)
       const s = await getSuppliers()
       setSuppliers(s)
+      await cargarCatalogo()
       setLoading(false)
     })()
   }, [])
 
   const addItem = () => {
-    setItems(prev => [...prev, { id: generateId(), name: '', quantity: 1, unit: 'kg', unit_cost: 0 }])
+    setItems(prev => [...prev, { id: generateId(), name: '', ingredient_id: '', quantity: 1, unit: 'kg', unit_cost: 0 }])
+  }
+
+  /** Resolver el texto contra el catálogo. Coincidencia exacta por nombre, sin
+   *  adivinar: o es un ingrediente real, o el renglón queda sin identidad. */
+  const elegirIngrediente = (idRenglon: string, texto: string) => {
+    const encontrado = (catalogo ?? []).find(i => i.name.trim().toLowerCase() === texto.trim().toLowerCase())
+    setItems(prev => prev.map(item => item.id !== idRenglon ? item : {
+      ...item,
+      name: encontrado ? encontrado.name : texto,
+      ingredient_id: encontrado ? encontrado.id : '',
+      unit: encontrado?.unit ?? item.unit,
+      unit_cost: encontrado && !item.unit_cost ? (encontrado.cost_per_unit ?? 0) : item.unit_cost,
+    }))
+  }
+
+  /** Alta explícita. El servidor devuelve el id; ese id es el que se usa. */
+  const crearIngrediente = async (idRenglon: string, nombre: string, unidad: string, costo: number) => {
+    setCreandoIngrediente(true)
+    try {
+      const nuevo = await createIngredient({ name: nombre, unit: unidad, cost_per_unit: costo })
+      setCatalogo(prev => [...(prev ?? []), nuevo].sort((a, b) => a.name.localeCompare(b.name)))
+      setItems(prev => prev.map(item => item.id !== idRenglon ? item : {
+        ...item, name: nuevo.name, ingredient_id: nuevo.id, unit: nuevo.unit,
+      }))
+      setAltaPara(null)
+      showToast(`Insumo «${nuevo.name}» dado de alta`)
+    } catch (error) {
+      const m = error instanceof Error ? error.message : ''
+      showToast(m === 'INGREDIENT_NAME_TAKEN' ? 'Ya existe un insumo con ese nombre'
+        : m === 'MANAGER_REQUIRED' ? 'Se necesita PIN de gerente para dar de alta un insumo'
+        : 'No se pudo dar de alta el insumo — reintenta')
+    } finally { setCreandoIngrediente(false) }
   }
 
   const removeItem = (id: string) => {
@@ -1041,37 +1167,43 @@ function ManualOCPanel({ onCreated, showToast }: { onCreated: () => void; showTo
 
   const effectiveSupplier = supplier === '__custom__' ? customSupplier.trim() : supplier
 
-  const canSubmit = effectiveSupplier && createdBy.trim() && items.every(i => i.name.trim() && i.quantity > 0 && i.unit_cost > 0)
+  // Sin catálogo cargado no se crea nada, y cada renglón necesita un
+  // ingrediente REAL — no un nombre que parezca uno.
+  // `createdBy` desapareció del contrato: la procedencia la pone la sesión.
+  const canSubmit = !!catalogo && !catalogoError && effectiveSupplier &&
+    items.every(i => i.ingredient_id && i.quantity > 0 && i.unit_cost > 0)
 
   const handleCreate = async () => {
     if (!canSubmit) return
     setCreating(true)
-
-    const ocItems = items.map(item => ({
-      ingredient_id: item.name.toLowerCase().replace(/\s+/g, '_').slice(0, 40),
-      ingredient_name: item.name.trim(),
-      quantity_ordered: item.quantity,
-      unit: item.unit,
-      unit_cost: item.unit_cost,
-      total_cost: item.quantity * item.unit_cost,
-    }))
-
-    const ok = await createPurchaseOrder({
-      id: generateId(),
-      supplier: effectiveSupplier,
-      created_by: createdBy.trim(),
-      notes: notes.trim() || undefined,
-      subtotal, iva, total,
-      ai_suggested: false,
-      items: ocItems,
-    })
-
-    setCreating(false)
-    if (ok) {
-      showToast(`OC creada para ${effectiveSupplier} — ${items.length} items`)
+    try {
+      // Una sola operación: el servidor valida todas las líneas antes de
+      // escribir y commitea cabecera y renglones juntos. El flujo anterior hacía
+      // dos POST y dejaba la cabecera huérfana cuando el segundo fallaba.
+      const r = await createPurchaseOrderAtomic({
+        supplier: effectiveSupplier,
+        notes: notes.trim() || undefined,
+        ai_suggested: false,
+        lines: items.map(item => ({
+          ingredient_id: item.ingredient_id,
+          ingredient_name: item.name.trim(),
+          quantity_ordered: item.quantity,
+          unit: item.unit,
+          unit_cost: item.unit_cost,
+        })),
+      })
+      showToast(`OC creada para ${effectiveSupplier} — ${items.length} items · ${formatMXN(r.total)}`)
       onCreated()
-    } else {
-      showToast('Error al crear la orden de compra')
+    } catch (error) {
+      const m = error instanceof Error ? error.message : ''
+      showToast(
+        m === 'INGREDIENT_SCOPE_CONFLICT' ? 'Un insumo de la orden no pertenece a este restaurante'
+        : m === 'MANAGER_REQUIRED' ? 'Se necesita PIN de gerente para crear una orden'
+        : m.startsWith('INVALID') || m.endsWith('_REQUIRED') ? `La orden no se creó: ${m}`
+        : 'La orden no se creó — reintenta. No quedó nada a medias.'
+      )
+    } finally {
+      setCreating(false)
     }
   }
 
@@ -1116,16 +1248,6 @@ function ManualOCPanel({ onCreated, showToast }: { onCreated: () => void; showTo
               />
             )}
           </div>
-          <div>
-            <label className="text-sm text-[var(--text-3)] block mb-1">Creada por *</label>
-            <input
-              type="text"
-              value={createdBy}
-              onChange={e => setCreatedBy(e.target.value)}
-              placeholder="Nombre del responsable..."
-              className="w-full bg-[var(--line)] border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-emerald-500"
-            />
-          </div>
         </div>
 
         {/* Notes */}
@@ -1169,10 +1291,16 @@ function ManualOCPanel({ onCreated, showToast }: { onCreated: () => void; showTo
                 <input
                   type="text"
                   value={item.name}
-                  onChange={e => updateItem(item.id, 'name', e.target.value)}
-                  placeholder="Nombre del producto..."
-                  className="bg-[var(--line)] border border-slate-600 rounded px-3 py-2 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-emerald-500"
+                  onChange={e => elegirIngrediente(item.id, e.target.value)}
+                  placeholder="Busca un insumo del catálogo..."
+                  list={`catalogo-${item.id}`}
+                  className={`bg-[var(--line)] border rounded px-3 py-2 text-white placeholder-slate-500 text-sm focus:outline-none ${
+                    item.ingredient_id ? 'border-slate-600 focus:border-emerald-500' : 'border-amber-600/60 focus:border-amber-500'
+                  }`}
                 />
+                <datalist id={`catalogo-${item.id}`}>
+                  {(catalogo ?? []).map(ing => <option key={ing.id} value={ing.name} />)}
+                </datalist>
                 <input
                   type="number"
                   value={item.quantity || ''}
@@ -1216,6 +1344,32 @@ function ManualOCPanel({ onCreated, showToast }: { onCreated: () => void; showTo
                 >
                   <Trash2 size={14} />
                 </button>
+              </div>
+            ))}
+            {/* Un insumo se da de alta A PROPÓSITO. Antes bastaba con teclear un
+                nombre y el id se inventaba solo — de ahí salían órdenes que
+                referenciaban ingredientes inexistentes. */}
+            {items.filter(i => i.name.trim() && !i.ingredient_id).map(item => (
+              <div key={`alta-${item.id}`} className="px-4 py-3 bg-amber-500/5 border-t border-amber-600/30 flex items-center justify-between gap-3">
+                <span className="text-sm text-amber-300">
+                  «{item.name.trim()}» no está en el catálogo.
+                </span>
+                {altaPara === item.id ? (
+                  <button
+                    onClick={() => crearIngrediente(item.id, item.name.trim(), item.unit, item.unit_cost)}
+                    disabled={creandoIngrediente}
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 rounded-lg text-white text-xs whitespace-nowrap"
+                  >
+                    {creandoIngrediente ? 'Dando de alta...' : `Confirmar alta (${item.unit})`}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setAltaPara(item.id)}
+                    className="px-3 py-1.5 bg-amber-600/30 hover:bg-amber-600/50 border border-amber-500/50 rounded-lg text-amber-200 text-xs whitespace-nowrap flex items-center gap-1.5"
+                  >
+                    <Plus size={13} />Crear nuevo ingrediente
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -1313,24 +1467,28 @@ function NewOCPanel({ onCreated, showToast }: { onCreated: () => void; showToast
         }
       })
 
-    const subtotal = items.reduce((sum, i) => sum + i.total_cost, 0)
-    const iva = subtotal * IVA_RATE
-    const total = subtotal + iva
-
-    const ok = await createPurchaseOrder({
-      id: generateId(),
-      supplier,
-      created_by: 'Chef (IA)',
-      notes: 'Generada por sugerencia de IA',
-      subtotal, iva, total,
-      ai_suggested: true,
-      items,
-    })
-
-    setCreating(false)
-    if (ok) {
+    // Mismo camino transaccional que el panel manual: aquí los ingredient_id ya
+    // vienen del inventario real, pero el riesgo de cabecera huérfana era
+    // idéntico — eran dos POST independientes.
+    setCreating(true)
+    try {
+      await createPurchaseOrderAtomic({
+        supplier,
+        notes: 'Generada por sugerencia de IA',
+        ai_suggested: true,
+        lines: items.map(i => ({
+          ingredient_id: i.ingredient_id, ingredient_name: i.ingredient_name,
+          quantity_ordered: i.quantity_ordered, unit: i.unit, unit_cost: i.unit_cost,
+        })),
+      })
       showToast(`OC creada para ${supplier}`)
       onCreated()
+    } catch (error) {
+      const m = error instanceof Error ? error.message : ''
+      showToast(m === 'INGREDIENT_SCOPE_CONFLICT' ? 'Un insumo sugerido no pertenece a este restaurante'
+        : 'La orden no se creó — reintenta. No quedó nada a medias.')
+    } finally {
+      setCreating(false)
     }
   }
 
