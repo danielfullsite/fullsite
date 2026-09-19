@@ -144,7 +144,7 @@ describe('historial — lo que se rompe sin que se vea', () => {
   })
 
   it('consulta con ventana de día y tope de 200, filtrada por tenant', async () => {
-    const f = vi.fn(async () => responde([]))
+    const f = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(async () => responde([]))
     vi.stubGlobal('fetch', f)
     render(<HistorialPage />)
     await screen.findByTestId('historial-vacio')
@@ -158,7 +158,7 @@ describe('historial — lo que se rompe sin que se vea', () => {
   })
 
   it('cambiar la fecha vuelve a consultar', async () => {
-    const f = vi.fn(async () => responde([]))
+    const f = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(async () => responde([]))
     vi.stubGlobal('fetch', f)
     render(<HistorialPage />)
     await screen.findByTestId('historial-vacio')
