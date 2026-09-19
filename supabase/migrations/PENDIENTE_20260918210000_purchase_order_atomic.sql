@@ -37,8 +37,8 @@ BEGIN
   -- —«lo pidió el chef»— eso es otro campo, no éste.
   IF coalesce(btrim(p_created_by),'') = '' THEN RAISE EXCEPTION 'CREATED_BY_REQUIRED'; END IF;
   IF p_header ? 'created_by' THEN RAISE EXCEPTION 'CREATED_BY_NOT_ACCEPTED'; END IF;
-  -- Los importes tampoco: el servidor los calcula desde las líneas y la tasa
-  -- configurada. Aceptarlos dejaría que el cliente declare su propio total.
+  -- Los importes tampoco: el servidor los deriva de las líneas. Aceptarlos
+  -- dejaría que el cliente declare su propio total.
   IF p_header ?| array['iva','total','subtotal','iva_rate','tax_rate'] THEN
     RAISE EXCEPTION 'AMOUNTS_NOT_ACCEPTED';
   END IF;
@@ -68,19 +68,29 @@ BEGIN
     v_total := v_total + ((v_linea->>'quantity_ordered')::numeric * (v_linea->>'unit_cost')::numeric);
   END LOOP;
 
-  -- ── IMPUESTO: LA CONFIGURACIÓN DEL TENANT, NUNCA EL CUERPO ────────────────
+  -- ── IMPUESTO: LA OC NO LO CALCULA ─────────────────────────────────────────
   --
-  -- La primera versión de esta función traía 16% fijo. Eso era inventar una
-  -- semántica: `pos-constants.ts:5` declara `IVA_RATE = 0` («AMALAY: precios ya
-  -- incluyen IVA»), y la tasa real vive por restaurante en `clients.iva_rate`
-  -- —el mismo contrato que usa `save-order/route.ts:146`—.
+  -- Aquí hubo dos errores míos seguidos. Primero fijé 16%, que inventaba
+  -- impuesto. Después leí `clients.iva_rate`, que parecía la autoridad — y no lo
+  -- es: esa tasa es de VENTAS (la usa `save-order/route.ts:146` para tickets).
+  -- Nada la ata al costo de un proveedor.
   --
-  -- Mismas reglas que allá: una fracción en [0,1]; cualquier otra cosa, o
-  -- ausencia, cuenta como 0. Con 0, `total = subtotal`, que es lo que la página
-  -- de compras calculaba antes de este cambio.
-  SELECT iva_rate INTO v_tasa FROM public.clients WHERE id = p_client_id;
-  IF v_tasa IS NULL OR v_tasa < 0 OR v_tasa > 1 THEN v_tasa := 0; END IF;
-  v_iva := round(v_total * v_tasa, 2);
+  -- Lo que dice el producto sobre una compra, revisado el 2026-09-18:
+  --   · `pos-constants.ts:5`            IVA_RATE = 0 («precios ya incluyen IVA»)
+  --   · compras/page.tsx                iva = subtotal * 0  → total = subtotal
+  --   · facturas-proveedor/page.tsx:108 la captura de una factura REAL escribe
+  --                                     `subtotal = total` e `iva: 0`
+  --   · pero la pantalla rotula «Total recibido (+ IVA)» y «IVA 16%»
+  --
+  -- Los rótulos dicen una cosa y la aritmética otra, y no hay una sola fila
+  -- histórica —0 órdenes, 0 facturas— que desempate. O sea: NO HAY CONTRATO.
+  --
+  -- Con esa duda, una OC no puede declarar impuesto. Se conserva la semántica
+  -- que compras ya tenía —iva 0, total = subtotal— y el IVA del proveedor queda
+  -- donde pertenece: en la factura, que tiene sus propias columnas y su
+  -- `uuid_sat`. Inferirlo de la tasa de ventas sería inventar una cifra fiscal.
+  v_tasa := 0;
+  v_iva := 0;
 
   -- ── ESCRIBIR ──────────────────────────────────────────────────────────────
   INSERT INTO public.pos_purchase_orders (id, client_id, supplier, status, created_by, notes,

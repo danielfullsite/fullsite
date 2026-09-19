@@ -3277,8 +3277,12 @@ export async function createIngredient(datos: {
  * líneas antes de escribir y commitea las dos inserciones juntas.
  *
  * No lleva `client_id` ni `created_by`: el tenant y la procedencia salen de la
- * sesión autenticada. Tampoco importes: el servidor los calcula desde las líneas
- * y la tasa configurada del restaurante (`clients.iva_rate`).
+ * sesión autenticada. Tampoco importes: el servidor los deriva de las líneas.
+ *
+ * La OC no declara IVA. No es un olvido: hoy no existe contrato sobre si
+ * `unit_cost` lo incluye —el código calcula 0, la captura de facturas escribe
+ * `iva: 0`, y las pantallas rotulan «+ IVA» sobre cifras que valen cero—. El
+ * impuesto del proveedor pertenece a la factura, que tiene sus propias columnas.
  */
 export async function createPurchaseOrderAtomic(orden: {
   supplier: string; notes?: string; ai_suggested?: boolean
