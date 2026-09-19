@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   generateRecoveryMessage,
+  generateDinnerCampaignMessage,
   generateWhatsAppLink,
   generateBulkMessages,
   type RecoveryMessage,
@@ -105,6 +106,18 @@ describe('generateRecoveryMessage', () => {
     const a = generateRecoveryMessage(base)
     const b = generateRecoveryMessage({ ...base, restaurantName: 'La Nonna' })
     expect(a).not.toBe(b)
+  })
+})
+
+describe('generateDinnerCampaignMessage', () => {
+  it('includes the dinner offer, menu and reservation CTA', () => {
+    const message = generateDinnerCampaignMessage({
+      clientName: 'Ana', phone: '8112345678', incentive: 'una botella de 375 ml',
+      restaurantName: 'AMALAY', validDays: 'jueves a sábado a partir de las 7:00 p.m.',
+    })
+    expect(message).toContain('próxima cena')
+    expect(message).toContain('focaccias y baguettes')
+    expect(message).toContain('¿Te reservamos una mesa?')
   })
 })
 

@@ -318,21 +318,34 @@ const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 // se drena, NO se envía con anon, la cola se preserva intacta y se pide re-login.
 //
 // Devuelve el access_token fresco, o null si no hay sesión válida (fail closed).
-async function getFreshAccessToken(): Promise<string | null> {
+interface ReplayAuth {
+  token: string
+  type: 'supabase_session' | 'shift_token'
+}
+
+async function getReplayAuth(): Promise<ReplayAuth | null> {
   if (typeof window === 'undefined') return null
   try {
     const { getSupabase } = await import('./supabase')
     const supabase = getSupabase()
     // getSession() refresca el access token usando el refresh token si expiró.
     const { data, error } = await supabase.auth.getSession()
-    if (error || !data?.session?.access_token) return null
-    // Sanity: el token no debe estar expirado tras el refresh.
-    const exp = data.session.expires_at ? data.session.expires_at * 1000 : 0
-    if (exp && exp < Date.now()) return null
-    return data.session.access_token
-  } catch {
-    return null
-  }
+    if (!error && data?.session?.access_token) {
+      // Sanity: el token no debe estar expirado tras el refresh.
+      const exp = data.session.expires_at ? data.session.expires_at * 1000 : 0
+      if (!exp || exp >= Date.now()) {
+        return { token: data.session.access_token, type: 'supabase_session' }
+      }
+    }
+  } catch { /* dedicated POS terminals normally have no Supabase session */ }
+
+  // Dedicated POS terminals authenticate with /api/pos/pin, not Supabase Auth.
+  // Their signed shift token is the canonical credential accepted by withPOSAuth.
+  try {
+    const shiftToken = localStorage.getItem('pos_shift_token')
+    if (shiftToken) return { token: shiftToken, type: 'shift_token' }
+  } catch {}
+  return null
 }
 
 // Señal para la UI: la sesión no pudo renovarse (refresh revocado/ausente) →
@@ -506,8 +519,8 @@ async function _syncAllInner(): Promise<{ synced: number; failed: number }> {
   // sesión válida (refresh token revocado tras días offline, o device sin login),
   // FAIL CLOSED: no drenar, preservar la cola, pedir re-login. Nunca replay con
   // anon (RLS lo rechazaría) ni pérdida de datos.
-  const accessToken = queue.length > 0 ? await getFreshAccessToken() : null
-  if (queue.length > 0 && !accessToken) {
+  const replayAuth = queue.length > 0 ? await getReplayAuth() : null
+  if (queue.length > 0 && !replayAuth) {
     console.warn('[offline-sync] sesión no renovable — replay pospuesto (fail closed), cola preservada')
     emitAuthRequired()
     return { synced: 0, failed: queue.length }
@@ -529,7 +542,7 @@ async function _syncAllInner(): Promise<{ synced: number; failed: number }> {
         if (synced > 0 || failed > 0) {
           await new Promise<void>(r => setTimeout(r, 400))
         }
-        const result = await replayViaAppApi(item, accessToken!)
+        const result = await replayViaAppApi(item, replayAuth!.token)
 
         if (result.ok) {
           await markSynced(item.id)
@@ -562,6 +575,11 @@ async function _syncAllInner(): Promise<{ synced: number; failed: number }> {
           console.error(`[offline-sync] TERMINAL: ${result.detail}`)
           await markConflict(item.id, 'TERMINAL_NON_RETRYABLE', result.detail!)
           failed++
+        } else if (result.detail === 'HTTP 401' || result.detail === 'HTTP 403') {
+          // Token de turno vencido/revocado. No quemar retries: pedir PIN y
+          // conservar la cola intacta para reanudar después de re-autenticar.
+          emitAuthRequired()
+          failed++
         } else {
           // TRANSIENT_RETRYABLE
           console.warn(`[offline-sync] Transient failure for ${item.endpoint}: ${result.detail}`)
@@ -570,17 +588,21 @@ async function _syncAllInner(): Promise<{ synced: number; failed: number }> {
         }
       } else {
         // ── SUPABASE_REST replay: direct PostgREST for non-reconciliation data ──
-        const url = item.endpoint
-          ? `${SUPABASE_URL}/rest/v1/${item.endpoint}`
-          : `${SUPABASE_URL}/rest/v1/${item.table}`
+        const restPath = item.endpoint || item.table
+        // A shift token is not a Supabase JWT. Route it through the authenticated
+        // POS DB proxy, which validates withPOSAuth and enforces the token tenant.
+        const usingShiftToken = replayAuth!.type === 'shift_token'
+        const url = usingShiftToken
+          ? `/api/pos/db?path=${encodeURIComponent(restPath)}`
+          : `${SUPABASE_URL}/rest/v1/${restPath}`
 
         const res = await fetch(url, {
           method: item.method,
           headers: {
-            apikey: SUPABASE_KEY,
+            ...(usingShiftToken ? {} : { apikey: SUPABASE_KEY }),
             // BUG-019: token de sesión fresco (no anon) → RLS tenant-scoped valida
             // que la fila pertenezca al tenant del usuario (WITH CHECK).
-            Authorization: `Bearer ${accessToken}`,
+            Authorization: `Bearer ${replayAuth!.token}`,
             'Content-Type': 'application/json',
             Prefer: 'return=minimal',
           },
@@ -594,6 +616,9 @@ async function _syncAllInner(): Promise<{ synced: number; failed: number }> {
           console.warn(`[offline-sync] 409 on ${item.table} — already exists, marking synced`)
           await markSynced(item.id)
           synced++
+        } else if (res.status === 401 || res.status === 403) {
+          emitAuthRequired()
+          failed++
         } else {
           await incrementRetry(item.id)
           failed++

@@ -15,6 +15,7 @@ from datetime import datetime, timedelta, timezone
 sys.path.insert(0, os.path.dirname(__file__))
 from agent_common import sb_get as _sb_get, log_run as _log_run, create_insight
 from client_config import get_client, get_tz, get_chat_ids
+from agent_daily_source import daily_today, daily_by_dates
 from ops_aggregate import get_current_business_date
 try:
     from audit_log import AuditLogger
@@ -67,47 +68,27 @@ def sb_get(table, params):
 
 # ── Data fetching ───────────────────────────────────────────────────────────
 def get_today_kpis():
-    """Fetch today's data from ops_daily_live (handles fallback internally)."""
-    today_str = get_current_business_date(CLIENT)
-    rows = sb_get("ops_daily_live", {
-        "client_id": f"eq.{CLIENT['id']}",
-        "select": "fecha,ventas_dia,ventas_brutas,descuentos,tickets_count,personas_restaurant,ticket_promedio_restaurant,ventas_por_grupo,meseros,platillos_top",
-        "fecha": f"eq.{today_str}",
-        "limit": "1",
-    })
-    return rows[0] if rows else None
+    """KPIs de HOY. Fuente tenant-aware (OCM para clones, ops_daily_live legacy AMALAY)."""
+    return daily_today(CLIENT, get_current_business_date(CLIENT))
 
 
 def get_comparison_days(today):
-    """Fetch yesterday and same DOW last week."""
+    """Ayer + mismo DOW la semana pasada. Fuente tenant-aware."""
     yesterday = (today - timedelta(days=1)).strftime("%Y-%m-%d")
     last_week = (today - timedelta(weeks=1)).strftime("%Y-%m-%d")
-
+    by_fecha = {r["fecha"]: r for r in daily_by_dates(CLIENT, [yesterday, last_week])}
     results = {}
-    for label, fecha in [("ayer", yesterday), ("semana_pasada", last_week)]:
-        rows = sb_get("ops_daily_history", {"client_id": f"eq.{CLIENT['id']}",
-            "select": "fecha,ventas_dia,ticket_promedio_restaurant,tickets_count,personas_restaurant,ventas_por_grupo",
-            "fecha": f"eq.{fecha}",
-            "limit": "1",
-        })
-        if rows:
-            results[label] = rows[0]
-
+    if yesterday in by_fecha:
+        results["ayer"] = by_fecha[yesterday]
+    if last_week in by_fecha:
+        results["semana_pasada"] = by_fecha[last_week]
     return results
 
 
 def get_historical_same_dow(today, weeks=4):
-    """Fetch same DOW over the last N weeks for average."""
-    results = []
-    for w in range(1, weeks + 1):
-        d = today - timedelta(weeks=w)
-        rows = sb_get("ops_daily_history", {"client_id": f"eq.{CLIENT['id']}",
-            "select": "fecha,ventas_dia,ticket_promedio_restaurant,ventas_por_grupo",
-            "fecha": f"eq.{d.strftime('%Y-%m-%d')}",
-            "limit": "1",
-        })
-        results.extend(rows)
-    return results
+    """Mismo DOW en las últimas N semanas para el promedio. Fuente tenant-aware."""
+    dates = [(today - timedelta(weeks=w)).strftime("%Y-%m-%d") for w in range(1, weeks + 1)]
+    return daily_by_dates(CLIENT, dates)
 
 
 # ── Snapshot curve ──────────────────────────────────────────────────────────

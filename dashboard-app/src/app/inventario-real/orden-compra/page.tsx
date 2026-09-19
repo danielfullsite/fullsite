@@ -434,10 +434,10 @@ export default function OrdenCompraPage() {
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-[1400px] mx-auto">
       <PageHeader
-        title="Ordenes de Compra"
+        title="Órdenes de compra"
         subtitle="Generar pedidos a proveedores"
         action={
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex min-w-max gap-2 sm:min-w-0 sm:flex-wrap">
             <button
               onClick={autoGenerate}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-purple-500/15 text-purple-400 font-semibold text-sm hover:bg-purple-500/25 active:scale-95 transition-all min-h-[44px]"
@@ -471,7 +471,7 @@ export default function OrdenCompraPage() {
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <KPICard
-          label="Bajo minimo"
+          label="Bajo mínimo"
           value={String(kpis.bajoMinimo)}
           icon={AlertTriangle}
           accentClass="kpi-accent-pink"
@@ -492,7 +492,7 @@ export default function OrdenCompraPage() {
           index={2}
         />
         <KPICard
-          label="Lineas en OC"
+          label="Líneas en OC"
           value={String(kpis.lineas)}
           icon={ShoppingCart}
           accentClass="kpi-accent-purple"
@@ -506,7 +506,7 @@ export default function OrdenCompraPage() {
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-3)]" />
           <input
             type="text"
-            placeholder="Buscar por producto, codigo o proveedor..."
+            placeholder="Buscar por producto, código o proveedor..."
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="w-full pl-10 pr-4 py-3 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-1)] text-sm placeholder:text-[var(--text-3)] focus:outline-none focus:ring-2 focus:ring-blue-500/40 min-h-[44px]"
@@ -516,7 +516,7 @@ export default function OrdenCompraPage() {
 
       {/* Empty state */}
       {orderLines.length === 0 && (
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-1)] p-12 text-center">
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-1)] p-6 sm:p-12 text-center">
           {configs.length === 0 ? (
             <>
               <AlertTriangle size={48} className="mx-auto mb-4 text-amber-400 opacity-70" />
@@ -538,7 +538,7 @@ export default function OrdenCompraPage() {
               <p className="text-[var(--text-3)] text-sm mb-6 max-w-md mx-auto">
                 Usa &quot;Auto-generar&quot; para crear órdenes basadas en productos bajo mínimo, o agrega productos manualmente.
               </p>
-              <div className="flex gap-3 justify-center">
+              <div className="flex flex-col gap-3 justify-center sm:flex-row">
                 <button
                   onClick={autoGenerate}
                   className="flex items-center gap-2 px-5 py-3 rounded-xl bg-purple-500/15 text-purple-400 font-semibold text-sm hover:bg-purple-500/25 active:scale-95 transition-all min-h-[48px]"

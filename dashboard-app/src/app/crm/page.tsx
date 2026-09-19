@@ -3,11 +3,12 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   Users, Search, Plus, X, Phone, Mail, Calendar, ChevronRight,
-  Repeat, Tag, Eye, Star, Gift,
+  Repeat, Tag, Eye, Star, Gift, LayoutDashboard, MessageCircle, BarChart3,
 } from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
 import { formatCurrency } from '@/lib/format'
+import { MonthlyCampaignReport, ReactivationView, ReservationsView } from '@/components/crm/ConciergeCRM'
 
 // ─── Types ───────────────────────────────────────────────────────────
 interface PosCustomer {
@@ -73,8 +74,52 @@ function relativeDate(dateStr: string | null): string {
   return `Hace ${Math.floor(days / 365)} anos`
 }
 
-// ─── Main Component ──────────────────────────────────────────────────
+// ─── CRM workspace ───────────────────────────────────────────────────
+type CRMTab = 'reservations' | 'guests' | 'reactivation' | 'results'
+
 export default function CRMPage() {
+  const [tab, setTab] = useState<CRMTab>('reservations')
+  const tabs: Array<{ id: CRMTab; label: string; icon: typeof Users }> = [
+    { id: 'reservations', label: 'Reservas', icon: LayoutDashboard },
+    { id: 'guests', label: 'Huéspedes', icon: Users },
+    { id: 'reactivation', label: 'Reactivación', icon: MessageCircle },
+    { id: 'results', label: 'Resultados', icon: BarChart3 },
+  ]
+
+  return (
+    <div className="mx-auto max-w-7xl">
+      <nav aria-label="Secciones del CRM" className="mb-6 flex w-full gap-1 overflow-x-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-1.5 sm:w-fit">
+        {tabs.map(item => {
+          const Icon = item.icon
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setTab(item.id)}
+              aria-current={tab === item.id ? 'page' : undefined}
+              className={`inline-flex min-w-fit flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition sm:flex-none ${
+                tab === item.id
+                  ? 'bg-[var(--bg)] text-[var(--text-1)] shadow-sm ring-1 ring-[var(--line)]'
+                  : 'text-[var(--text-3)] hover:bg-[var(--surface-2)] hover:text-[var(--text-1)]'
+              }`}
+            >
+              <Icon size={15} />
+              {item.label}
+            </button>
+          )
+        })}
+      </nav>
+
+      {tab === 'reservations' && <ReservationsView />}
+      {tab === 'guests' && <GuestsView />}
+      {tab === 'reactivation' && <ReactivationView />}
+      {tab === 'results' && <MonthlyCampaignReport />}
+    </div>
+  )
+}
+
+// ─── Guest directory ─────────────────────────────────────────────────
+function GuestsView() {
   const [customers, setCustomers] = useState<PosCustomer[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -105,6 +150,8 @@ export default function CRMPage() {
     setLoading(false)
   }, [cid])
 
+  // Data fetching is intentionally triggered on tenant changes.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { loadCustomers() }, [loadCustomers])
 
   // ─── KPIs ───────────────────────────────────────────────────────

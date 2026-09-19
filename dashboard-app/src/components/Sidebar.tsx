@@ -57,6 +57,7 @@ import {
   BookOpen,
   MessageSquare,
   Mic,
+  HeartPulse,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
@@ -187,6 +188,75 @@ const navSections = [
   },
 ]
 
+// Arquitectura de producto por trabajo. Conserva las rutas maduras, pero deja
+// de obligar al operador a entender cómo está construido Fullsite.
+const productNavSections = [
+  {
+    label: 'Ahora',
+    items: [
+      { href: '/ahora', label: 'Pulso y acciones', icon: Activity },
+      { href: '/mission-control', label: 'Salud operacional', icon: HeartPulse },
+    ],
+  },
+  {
+    label: 'Operar',
+    items: [
+      { href: '/pos', label: 'Punto de venta', icon: Monitor },
+      { href: '/pos/mesas', label: 'Mesas', icon: LayoutDashboard },
+      { href: '/kds', label: 'Cocina KDS', icon: UtensilsCrossed },
+      { href: '/caja', label: 'Caja', icon: Banknote },
+      { href: '/cortes', label: 'Cierre y cortes', icon: ClipboardList },
+      { href: '/delivery', label: 'Pedidos y delivery', icon: Bike },
+      { href: '/checador', label: 'Checador', icon: Fingerprint },
+    ],
+  },
+  {
+    label: 'Controlar',
+    items: [
+      { href: '/inventario-real', label: 'Inventario', icon: Package },
+      { href: '/inventario-real/entradas-factura', label: 'Compras con factura', icon: FileText },
+      { href: '/inventario-real/toma-fisica', label: 'Toma física', icon: ClipboardList },
+      { href: '/inventario-real/merma', label: 'Merma', icon: RotateCcw },
+      { href: '/recetas', label: 'Recetas', icon: BookOpen },
+      { href: '/food-cost', label: 'Food cost', icon: PieChart },
+      { href: '/control-efectivo', label: 'Control de efectivo', icon: Coins },
+      { href: '/cancelaciones', label: 'Excepciones', icon: Ban },
+    ],
+  },
+  {
+    label: 'Crecer',
+    items: [
+      { href: '/crm', label: 'Huéspedes', icon: Users },
+      { href: '/lealtad', label: 'Lealtad', icon: Sparkles },
+      { href: '/encuestas', label: 'Encuestas', icon: MessageSquare },
+      { href: '/ecommerce', label: 'Canales digitales', icon: Store },
+    ],
+  },
+  {
+    label: 'Analizar',
+    items: [
+      { href: '/', label: 'Resumen histórico', icon: LayoutDashboard },
+      { href: '/ventas', label: 'Ventas', icon: DollarSign },
+      { href: '/rentabilidad', label: 'Margen y rentabilidad', icon: TrendingUp },
+      { href: '/estado-resultados', label: 'Estado de resultados', icon: FileSpreadsheet },
+      { href: '/meseros', label: 'Equipo', icon: Users },
+      { href: '/tendencias', label: 'Tendencias', icon: TrendingUp },
+      { href: '/reportes', label: 'Todos los reportes', icon: FileBarChart },
+    ],
+  },
+  {
+    label: 'Configurar',
+    items: [
+      { href: '/admin/menu', label: 'Menú', icon: UtensilsCrossed },
+      { href: '/admin/modificadores', label: 'Modificadores', icon: Settings },
+      { href: '/admin/horarios', label: 'Horarios', icon: Calendar },
+      { href: '/admin/promociones', label: 'Promociones', icon: Sparkles },
+      { href: '/admin/formas-pago', label: 'Formas de pago', icon: Banknote },
+      { href: '/admin/usuarios', label: 'Usuarios y permisos', icon: UserCheck },
+    ],
+  },
+]
+
 // Nav de la consola de plataforma (modo Dios) — se usa en /platform/*.
 // Reemplaza el menú operativo del tenant (POS, reportes, inventario) que no aplica aquí.
 const platformNavSections = [
@@ -237,7 +307,11 @@ export default function Sidebar() {
   // En la consola de plataforma (/platform/*) mostramos el nav de plataforma,
   // no el menú operativo del restaurante.
   const isPlatform = pathname.startsWith('/platform')
-  const sections = isPlatform ? platformNavSections : navSections
+  const sections = isPlatform
+    ? platformNavSections
+    : process.env.NEXT_PUBLIC_LEGACY_NAV === '1'
+      ? navSections
+      : productNavSections
 
   // Collapsible sections — auto-expand section containing current page
   const activeSection = sections.findIndex(s => s.items.some(i => pathname === i.href || (i.href !== '/' && pathname.startsWith(i.href + '/'))))
@@ -253,7 +327,7 @@ export default function Sidebar() {
       {/* Logo — with safe-area padding on mobile for iPhone notch */}
       <div className="px-5 py-5 lg:border-b lg:border-[var(--line-soft)]" style={{ paddingTop: 'max(1.25rem, env(safe-area-inset-top, 1.25rem))' }}>
         <div className="flex items-center justify-between">
-          <Link href={isPlatform ? '/platform' : '/'} className="flex items-center gap-2.5 logo-hover min-w-0" onClick={() => setMobileOpen(false)}>
+          <Link href={isPlatform ? '/platform' : '/ahora'} className="flex items-center gap-2.5 logo-hover min-w-0" onClick={() => setMobileOpen(false)}>
             <img src="/fullsite-logo-white-v2.png" alt="Fullsite" width={38} height={38} className="sidebar-logo-white flex-shrink-0" style={{ objectFit: 'contain' }} />
             <img src="/fullsite-logo-black-v2.png" alt="Fullsite" width={38} height={38} className="sidebar-logo-black flex-shrink-0" style={{ objectFit: 'contain' }} />
             <span className="flex flex-col leading-tight min-w-0">

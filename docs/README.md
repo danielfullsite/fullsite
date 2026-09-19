@@ -19,6 +19,7 @@ El modelo: plataforma SaaS multi-tenant, un solo Supabase, particionamiento por 
 
 | Propósito | Doc |
 |---|---|
+| **Antes de decidir/cambiar algo: de dónde sale cada decisión** | [`DECISION-BRAIN.md`](DECISION-BRAIN.md) |
 | Entender la filosofía y restricciones | [`constitution/PRINCIPLES.md`](constitution/PRINCIPLES.md) |
 | Entender cómo está construido | [`architecture/SYSTEM-ARCHITECTURE.md`](architecture/SYSTEM-ARCHITECTURE.md) |
 | Entender el estado actual | [`state/CERTIFICATIONS.md`](state/CERTIFICATIONS.md) + [`state/BUGS.md`](state/BUGS.md) |
@@ -163,6 +164,7 @@ feos/
 ### Platform — Golden Skeleton + plataforma multi-restaurante
 ```
 platform/
+  APRENDIZAJES-AMALAY-A-CLONABLE.md  Reporte de campo 30–31 ago: bugs, evidencia, DevTools y playbook para Cliente #2.
   GOLDEN-SKELETON.md         El Golden Skeleton: 5 preguntas antes de cualquier PR.
   GOLDEN-POS-SKELETON.md     Skeleton completo del POS: scores, debt registry, roadmap A/B/C.
   PAE.md                     Platform Acceptance Environment — Café Nómada. Gate antes de Cliente #2.

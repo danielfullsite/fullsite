@@ -129,6 +129,12 @@ export async function proxy(req: NextRequest) {
     return NextResponse.next()
   }
 
+  // Las paginas del Control Center no usan el rol de un tenant. Sus datos y
+  // acciones se protegen server-side con requirePlatformAdmin(), cuya fuente
+  // de verdad es platform_admins. El shell puede cargar para una sesion valida;
+  // un usuario no administrador recibira 403 de todos los endpoints.
+  if (pathname.startsWith('/platform')) return NextResponse.next()
+
   // Enforcement de rol por página (app_metadata.role lo setea el servidor, no el usuario)
   const role = resolveRole(user?.app_metadata?.role, user?.email)
   if (!canAccessPage(role, pathname)) {

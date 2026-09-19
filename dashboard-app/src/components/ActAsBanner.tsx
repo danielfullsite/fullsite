@@ -18,17 +18,21 @@ export default function ActAsBanner() {
 
   async function exit() {
     setBusy(true)
+    let wasAdmin = false
     try {
-      await fetch('/api/platform/act-as', {
+      const res = await fetch('/api/platform/act-as', {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ exit: true }),
       })
+      wasAdmin = res.ok
     } catch { /* best-effort */ }
     try {
       localStorage.removeItem('fullsite_actas')
       localStorage.removeItem('fullsite_client_id')
     } catch { /* SSR */ }
-    window.location.href = '/platform/tenants'
+    // Un no-admin con flag huérfano no tiene acceso a /platform — mandarlo ahí
+    // era aterrizar en "Acceso denegado". A su home normal.
+    window.location.href = wasAdmin ? '/platform/tenants' : '/'
   }
 
   return (

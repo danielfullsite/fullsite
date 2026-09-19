@@ -466,6 +466,11 @@ body {
 /* Better touch targets on mobile */
 @media (max-width: 768px) { button, a, input, select { min-height: 44px; } }
 
+/* iOS Safari: keep forms at a readable size and prevent focus zoom. */
+@media (max-width: 767px) {
+  input, select, textarea { font-size: 16px; }
+}
+
 /* Safe area iOS */
 .safe-pt { padding-top: env(safe-area-inset-top); }
 .safe-pb { padding-bottom: env(safe-area-inset-bottom); }

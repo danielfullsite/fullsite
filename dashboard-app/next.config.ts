@@ -74,6 +74,9 @@ const nextConfig: NextConfig = isCapacitorOffline
       // Pin Turbopack workspace root to dashboard-app/ so @/ aliases resolve
       // correctly when built from a monorepo root (Vercel, CI).
       turbopack: { root: path.join(__dirname) },
+      experimental: {
+        cpus: 2,
+      },
       async headers() {
         return [
           {

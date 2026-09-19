@@ -489,7 +489,13 @@ export default function MesasPage() {
     if (staffRole === 'cajero' && !ordersByMesa.has(mesaNum)) {
       return // silently ignore — cajero can't open new restaurant tables
     }
-    router.push(`/pos?mesa=${mesaNum}`)
+    const target = `/pos?mesa=${mesaNum}`
+    // Next App Router turns router.push() into an RSC request. The Service Worker
+    // only has a deterministic HTML shell for /pos, so a cold offline RSC request
+    // has no cached variant and returns 503. A document navigation lets the SW
+    // serve the cached /pos HTML with ignoreSearch while sessionStorage survives.
+    if (!navigator.onLine) window.location.assign(target)
+    else router.push(target)
   }
 
   // ─── Mesa Card (shared between views) ─────────────────────────────────────

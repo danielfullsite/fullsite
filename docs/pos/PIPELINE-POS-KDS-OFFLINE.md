@@ -120,6 +120,8 @@ Escondite: config BOM → import limpio por **asistente**. Bloqueado además por
 **También (cosmético, correcto):** en los configs de POS secundario, `local_server_host` debería ser `127.0.0.1` (su propio Pedro), no la IP de la caja — hoy dice `192.168.1.71`. No causa el bug directamente (no se inyecta al renderer), pero confunde y pre-llena mal el asistente.
 
 > ⚠️ **NO aplicado esta noche:** es el path de arranque; requiere prueba física (reiniciar el POS, verificar que conecta al bridge solo). Recipe lista arriba para aplicar+probar el jueves.
+>
+> ✅ **APLICADO 2026-08-19 (Opción A+C, commit `cff0cb20` en `feat/pos-ui-kit` + `backup/pos-ui-kit-20260819`):** `main.js` carga el POS secundario con `?terminal_role=pos`; `preload.js` fija `FULLSITE_BRIDGE_URL=127.0.0.1:7717` + borra `pos_bridge_host` ANTES de montar React (espeja `preload-kds.js`). `did-finish-load` queda como respaldo. **Build x64 portable listo:** `electron-app/dist-pos/Fullsite-POS-1.3.7-x64-portable.zip` (+5 configs). **⚠️ FALTA PRUEBA FÍSICA (miércoles):** desconectar WAN con el POS de Entrada abierto → orden → debe imprimir en caja + salir en KDS. Path offline congelado — si regresa el offline de la caja, revertir. Solo demostrar Entrada offline si pasa la prueba; si no, demo con caja/cocina (probado).
 
 ### 🟢 P3 — limpieza y seguridad
 | # | Tarea | Detalle |

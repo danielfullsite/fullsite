@@ -1,4 +1,83 @@
-# Estado del proyecto — Handoff (2026-08-17)
+# Estado del proyecto — Handoff (2026-08-24)
+
+> **Para retomar:** `cd ~/fullsite && claude`, y de primero: *"lee `docs/HANDOFF-STATE.md`"*.
+
+## Lo primero que hay que hacer al volver
+
+**Extraer las definiciones de las 8 vistas OCM de STAGING** (`jkcnxfbbuyyfhwfjizgw`) vía el MCP
+`supabase-fullsite-staging`, que carga solo al arrancar la sesión en este directorio. Es la
+razón por la que se reinició.
+
+Encargo de Daniel, textual: staging/AMALAY sólo como **fuente read-only** — nada de DDL,
+migraciones ni cambios en producción. Extraer definiciones exactas, dependencias, funciones,
+permisos y propiedades de seguridad. Sanitizar datos sensibles. Versionar una migración
+**idempotente**, agregar validación estructural, probar el clone gate en staging/sandbox.
+Entregable: **PR + diff + prueba de creación desde cero + rollback**. Sin merge ni producción
+sin su autorización.
+
+### Lo que ya se investigó (no repetir)
+
+- Las 8 vistas OCM viven **sólo en staging**, NO en producción — `docs/platform/OCM-REVIEW-2026-08-19.md`
+  lo dice: *"ninguna está desplegada a prod"*. (Una afirmación previa de que estaban en prod
+  y podían perderse era **incorrecta**.)
+- `scripts/clone-test.sql` (el gate de clonabilidad) exige **9 nombres**:
+  `ocm_daily · ocm_orders · ocm_shifts · ocm_cash · ocm_customers · ocm_suppliers ·
+  ocm_order_consumption · ocm_service_kitchen · ocm_customer_journey`
+- Las migraciones `014/015/016` de la rama `feat/pos-ui-kit` definen **otras 4**:
+  `ocm_daily · ocm_waiter_rankings · ocm_menu_groups · ocm_menu_items`
+- **Sólo `ocm_daily` coincide entre ambos conjuntos.** Hay dos generaciones de OCM con
+  nombres distintos → **decisión de contrato pendiente de Daniel**: ¿el gate se alinea a las 9
+  originales, o se reescribe a la superficie nueva?
+
+## Estado al cierre de la sesión del 2026-08-24
+
+### Mergeado a `main` hoy
+| PR | |
+|---|---|
+| #64 | suite completa en verde — 11 tests obsoletos + 1 regresión real (`proxy.ts` sin timeout) |
+| #65 | alta y acceso de empleados restaurados (PIN de 10 díg. vs teclado de 8 + anon key) |
+| #66 | `GET /identity` tiraba ReferenceError + CI para los 192 tests del local server |
+| #67 | el check requerido `test` reporta siempre (quitado el filtro `paths`) |
+
+### CI y protección de rama — NUEVO
+- `main` protegida: check requerido **`test`**, anclado a `app_id 15368` (GitHub Actions) para
+  que un commit status crudo no lo satisfaga. `force push` y borrado de `main`: bloqueados.
+- `enforce_admins: false` **a propósito**, gobernado por `docs/operations/RUNBOOK-HOTFIX.md`.
+- Validado adversarialmente: rama con test roto → `test: fail` → `mergeStateStatus: BLOCKED` →
+  `gh pr merge` rechazado con *"the base branch policy prohibits the merge"*. PR #68 cerrado
+  y rama borrada tras la prueba.
+- Dos workflows verdes en main: `test` (2118 casos) y `local-server` (192 casos).
+
+### PRs abiertos, esperando validación FÍSICA (no mergear sin ella)
+- **#61** — P0-1: un 403 de negocio se confundía con sesión expirada; abortaba el drenado de
+  la cola y desloagueaba al cajero en bucle cada ~20s. Se valida con **el corte de caja**.
+- **#63** — P0-2: offline se perdían los grupos de modificadores OBLIGATORIOS. Se valida
+  tocando **una arrachera con el WiFi apagado** — ¿pide el término?
+- **#62** — de Codex, **superseded por #64**. Su único aporte único es quitar la variable
+  `ventasDia` sin usar. Va a conflictuar; Daniel decide si lo cierra.
+
+### Sin commitear en el working tree (viven sólo en disco)
+- `.claude/settings.json` — guard de comandos Bash (`.claude/hooks/guard-bash.sh`, 29/29 tests).
+  Bloquea truncado de archivos persistentes, `git reset --hard`, `rm -rf ~`, `push --force` e
+  impresión de secretos. **Se activa al reiniciar.**
+- `CLAUDE.md` — protocolo permanente de colaboración agregado como sección nueva (aditivo,
+  0 líneas borradas). Diff mostrado a Daniel; **decisión de commitear pendiente**.
+- `docs/operations/RUNBOOK-HOTFIX.md` — nuevo, sin commitear.
+
+### Pendientes que no necesitan base de datos
+- `KITCHEN_TOKEN_SECRET` — interruptor que apaga la cocina en silencio.
+- KDS `kds_only` sin `client_id` — muestra 0 órdenes.
+- 35 commits **solo-docs** varados en `feat/pos-ui-kit` (riesgo cero, ya desbloqueados por #67).
+
+### El número honesto
+Código ~90% · **certificación ~10%** · punta a punta **~35%**.
+Matriz offline: 23 escenarios, 8 con test automatizado, **0 certificados**.
+Golden Skeleton: 7 items en `PENDING-GATE`, ninguno arrancado.
+7 de los 23 escenarios se pueden correr contra staging sin Daniel; 16 necesitan la caja física.
+
+---
+
+# Handoff anterior (2026-08-17) — histórico
 
 > **Para retomar en una sesión nueva de Claude Code:** `cd ~/fullsite && claude`, y de primero: "lee `docs/HANDOFF-STATE.md`". Esto captura dónde quedó todo. No hace falta reabrir la sesión gigante de 59 MB.
 

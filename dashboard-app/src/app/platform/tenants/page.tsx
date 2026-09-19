@@ -1,9 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Store, Plus, Activity, AlertTriangle, ArrowUpRight, Bot, RefreshCw, X, Sparkles, Circle, Power } from 'lucide-react'
+import { Store, Plus, Activity, AlertTriangle, ArrowUpRight, Bot, RefreshCw, X, Sparkles, Circle, Power, KeyRound } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { ToastProvider, useToast, ConfirmModal } from '@/components/platform/PlatformFeedback'
+import { VERTICAL_PRESETS, VERTICAL_IDS, type VerticalId } from '@/lib/vertical-presets'
 
 // Control Plane: sin anon key. Todo pasa por /api/platform/* (admin-gated + service_role).
 // Fase 4: alta de tenant (POST /api/platform/onboard), activar/desactivar
@@ -24,6 +25,7 @@ function TenantsInner() {
   const [loading, setLoading] = useState(true)
   const [denied, setDenied] = useState(false)
   const [showNew, setShowNew] = useState(false)
+  const [ownerTenant, setOwnerTenant] = useState<Tenant | null>(null)
   const [confirm, setConfirm] = useState<null | { title: string; message?: string; run: () => Promise<void> }>(null)
   const [busy, setBusy] = useState(false)
 
@@ -43,7 +45,9 @@ function TenantsInner() {
         localStorage.setItem('fullsite_actas', t.id)
         localStorage.setItem('fullsite_client_id', t.id)
       } catch { /* SSR */ }
-      window.location.href = '/'
+      // Ir directo al dashboard operativo evita que la entrada canonica `/`
+      // vuelva a resolver al super-admin hacia el Control Center.
+      window.location.href = '/ahora'
     } finally { setBusy(false) }
   }
 
@@ -187,6 +191,12 @@ function TenantsInner() {
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-3">
                           <button
+                            onClick={() => setOwnerTenant(t)}
+                            className="inline-flex items-center gap-1 text-[var(--text-3)] font-semibold text-xs hover:text-[var(--text-1)]"
+                          >
+                            <KeyRound size={13} /> Acceso dueño
+                          </button>
+                          <button
                             onClick={() => setConfirm({
                               title: `${isActive ? 'Desactivar' : 'Activar'} "${t.name}"`,
                               message: isActive
@@ -222,6 +232,7 @@ function TenantsInner() {
       </p>
 
       {showNew && <NewTenantModal onClose={() => setShowNew(false)} onDone={load} toast={toast} tenantCount={tenants.length} />}
+      {ownerTenant && <OwnerAccessModal tenant={ownerTenant} onClose={() => setOwnerTenant(null)} toast={toast} />}
 
       <ConfirmModal
         open={!!confirm}
@@ -239,6 +250,52 @@ function TenantsInner() {
   )
 }
 
+function OwnerAccessModal({ tenant, onClose, toast }: {
+  tenant: Tenant
+  onClose: () => void
+  toast: (k: 'success' | 'error', m: string) => void
+}) {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    try {
+      const res = await fetch('/api/platform/tenant-owner', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientId: tenant.id, email, password }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) { toast('error', json.error || 'No se pudo crear el acceso.'); return }
+      toast('success', `Acceso dueño listo para ${tenant.name}`)
+      onClose()
+    } catch {
+      toast('error', 'Error de red al crear el acceso.')
+    } finally { setBusy(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
+      <form onSubmit={submit} className="w-full max-w-sm rounded-xl border border-[var(--line)] bg-[var(--bg)] shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="px-5 py-4 border-b border-[var(--line)] flex items-center gap-3">
+          <KeyRound size={18} className="text-[var(--accent-bright)]" />
+          <div><div className="font-bold text-[var(--text-1)]">Acceso dueño</div><div className="text-[11px] text-[var(--text-3)]">{tenant.name} · {tenant.id}</div></div>
+          <button type="button" onClick={onClose} className="ml-auto text-[var(--text-3)]"><X size={18} /></button>
+        </div>
+        <div className="p-5 space-y-4">
+          <label className="block"><span className="text-xs text-[var(--text-3)]">Correo del dueño</span><input type="email" required value={email} onChange={e => setEmail(e.target.value)} className="mt-1 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-sm" /></label>
+          <label className="block"><span className="text-xs text-[var(--text-3)]">Contraseña inicial</span><input type="password" required minLength={8} value={password} onChange={e => setPassword(e.target.value)} className="mt-1 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-sm" /></label>
+          <p className="text-[11px] text-[var(--text-4)]">Crea o repara únicamente Auth y la membresía de dueño. No modifica la operación del tenant.</p>
+          <button disabled={busy} className="w-full rounded-lg bg-[var(--accent)] px-4 py-2.5 text-sm font-bold text-[#04120c] disabled:opacity-50">{busy ? 'Guardando…' : 'Crear o reparar acceso'}</button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
 const ACCENT_OPTIONS = ['emerald', 'blue', 'violet', 'amber', 'pink', 'cyan']
 
 function NewTenantModal({ onClose, onDone, toast, tenantCount }: {
@@ -253,6 +310,8 @@ function NewTenantModal({ onClose, onDone, toast, tenantCount }: {
   const [theme, setTheme] = useState<'light' | 'dark'>('light')
   const [logo, setLogo] = useState('')
   const [mesas, setMesas] = useState('10')
+  const [vertical, setVertical] = useState<VerticalId>('casual_dining')
+  const [mesasTouched, setMesasTouched] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [busy, setBusy] = useState(false)
 
@@ -268,7 +327,10 @@ function NewTenantModal({ onClose, onDone, toast, tenantCount }: {
         body: JSON.stringify({
           clientId: slug, email, password, display_name: name,
           accent_color: accent, default_theme: theme,
-          logo_url: logo || undefined, mesas: parseInt(mesas, 10) || 10,
+          logo_url: logo || undefined,
+          // Solo mandar mesas si el operador las editó; si no, manda el default del preset.
+          mesas: mesasTouched ? (parseInt(mesas, 10) || 0) : undefined,
+          vertical,
         }),
       })
       if (res.ok) { toast('success', `Tenant "${slug}" dado de alta`); onDone(); onClose() }
@@ -310,6 +372,19 @@ function NewTenantModal({ onClose, onDone, toast, tenantCount }: {
               <span className="px-3 text-[var(--text-4)] text-sm font-mono border-l border-[var(--line)]">.app.fullsite.mx</span>
             </div>
           </label>
+          <label className="block">
+            <span className="text-xs text-[var(--text-3)]">Tipo de restaurante</span>
+            <select value={vertical}
+              onChange={e => {
+                const v = e.target.value as VerticalId
+                setVertical(v)
+                if (!mesasTouched) setMesas(String(VERTICAL_PRESETS[v].defaultMesas))
+              }}
+              className="mt-1 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2.5 text-[var(--text-1)] outline-none focus:border-[var(--accent-line)] text-sm">
+              {VERTICAL_IDS.map(v => <option key={v} value={v}>{VERTICAL_PRESETS[v].label}</option>)}
+            </select>
+            <span className="mt-1 block text-[11px] text-[var(--text-4)]">{VERTICAL_PRESETS[vertical].description}</span>
+          </label>
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
               <span className="text-xs text-[var(--text-3)]">Email del dueño</span>
@@ -347,7 +422,7 @@ function NewTenantModal({ onClose, onDone, toast, tenantCount }: {
             </label>
             <label className="block">
               <span className="text-xs text-[var(--text-3)]">Mesas</span>
-              <input value={mesas} onChange={e => setMesas(e.target.value.replace(/\D/g, ''))} inputMode="numeric"
+              <input value={mesas} onChange={e => { setMesasTouched(true); setMesas(e.target.value.replace(/\D/g, '')) }} inputMode="numeric"
                 className="mt-1 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2.5 text-[var(--text-1)] outline-none focus:border-[var(--accent-line)] text-sm tabular-nums" />
             </label>
           </div>
@@ -361,7 +436,7 @@ function NewTenantModal({ onClose, onDone, toast, tenantCount }: {
       <ConfirmModal
         open={confirmOpen}
         title={`Dar de alta "${slug}"`}
-        message={`Se creará el usuario dueño, el mapping y el skeleton completo. Es idempotente. Actualmente hay ${tenantCount} tenants.`}
+        message={`Se creará el usuario dueño, el mapping y el skeleton de "${VERTICAL_PRESETS[vertical].label}" (menú semilla, módulos y mesas del tipo). Es idempotente. Actualmente hay ${tenantCount} tenants.`}
         confirmLabel="Crear tenant"
         busy={busy}
         onCancel={() => { if (!busy) setConfirmOpen(false) }}

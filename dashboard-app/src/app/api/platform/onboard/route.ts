@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { requirePlatformAdmin2FA } from '@/lib/platform-auth'
 import { rateLimit, auditLog } from '@/lib/platform-writes'
 import { provisionTenant } from '@/lib/provision-tenant'
+import { isVerticalId } from '@/lib/vertical-presets'
 import { randomUUID } from 'crypto'
 
 // ── Control Plane · POST /api/platform/onboard ───────────────────────────────
@@ -38,15 +39,19 @@ export async function POST(req: NextRequest) {
     default_theme?: 'light' | 'dark'
     logo_url?: string
     mesas?: number
+    vertical?: string
   }
   try {
     body = await req.json()
   } catch {
     return Response.json({ error: 'JSON inválido' }, { status: 400 })
   }
-  const { clientId, email, password, display_name, accent_color, default_theme, logo_url, mesas } = body
+  const { clientId, email, password, display_name, accent_color, default_theme, logo_url, mesas, vertical } = body
   if (!clientId || !email || !password) {
     return Response.json({ error: 'clientId, email y password requeridos' }, { status: 400 })
+  }
+  if (vertical !== undefined && !isVerticalId(vertical)) {
+    return Response.json({ error: `vertical inválido: ${vertical}` }, { status: 400 })
   }
 
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey)
@@ -98,6 +103,7 @@ export async function POST(req: NextRequest) {
       default_theme,
       logo_url,
       mesas,
+      vertical,
     })
 
     const audited = await auditLog(gate.ctx, {

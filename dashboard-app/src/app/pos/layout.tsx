@@ -152,6 +152,22 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
     }
   }, [])
 
+  // The offline queue may outlive the 8h signed shift token. When reconnecting,
+  // request PIN again instead of silently burning retries forever. The queue and
+  // offline PIN cache stay intact; a successful PIN immediately resumes replay.
+  useEffect(() => {
+    const requireSyncAuth = () => {
+      if (!navigator.onLine) return
+      setSessionError('Internet regresó. Ingresa tu PIN para sincronizar las operaciones pendientes.')
+      setUnlocked(false)
+      setStaff(null)
+      sessionStorage.removeItem('pos_staff')
+      sessionStorage.removeItem('pos_last_activity')
+    }
+    window.addEventListener('pos-sync-auth-required', requireSyncAuth)
+    return () => window.removeEventListener('pos-sync-auth-required', requireSyncAuth)
+  }, [])
+
   // ── Modo kiosk para terminal de caja (hardware AMALAY: touch all-in-one) ──
   useEffect(() => {
     // 1. Manifest dedicado: fullscreen + landscape + start_url /pos
@@ -476,6 +492,9 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
               pin_hash: pinHash,
             }))
           } catch { /* ignore */ }
+          // A reconnect may have paused replay waiting for a fresh shift token.
+          // Resume after the token is persisted; syncAll is concurrency-guarded.
+          import('@/lib/pos-offline-db').then(m => m.syncAll()).catch(() => {})
           unlock(member)
           return
         }

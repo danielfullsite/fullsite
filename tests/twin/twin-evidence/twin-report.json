@@ -1,0 +1,2078 @@
+{
+  "generated_at": "2026-08-07T02:16:30.308Z",
+  "label": "accelerated-rehearsal",
+  "mode": "spawn",
+  "phase": "shift",
+  "fixture": {
+    "source": "file",
+    "restaurant_id": "amalay-twin",
+    "warnings": [
+      "rich AMALAY config shape detected — adapted to canonical fixture shape"
+    ]
+  },
+  "config": {
+    "bridge": "127.0.0.1:17917",
+    "data_dir": "/var/folders/z9/7hn1x4dx7_xd8p30crj93mpm0000gn/T/fullsite-twin-JrUix5",
+    "printers": [
+      {
+        "printer_id": "twin-cocina-1",
+        "name": "PRINTER-COCINA-1 (fría, real 192.168.1.21)",
+        "port": 19100,
+        "station_ids": [
+          "cocina"
+        ]
+      },
+      {
+        "printer_id": "twin-cocina-2",
+        "name": "PRINTER-COCINA-2 (caliente, real 192.168.1.40)",
+        "port": 19101,
+        "station_ids": [
+          "cocina"
+        ]
+      },
+      {
+        "printer_id": "twin-barra",
+        "name": "PRINTER-BARRA (real 192.168.1.30)",
+        "port": 19102,
+        "station_ids": [
+          "barra"
+        ]
+      },
+      {
+        "printer_id": "twin-entrada",
+        "name": "PRINTER-ENTRADA (tickets PDV3, real usb TICKET)",
+        "port": 19103,
+        "station_ids": [
+          "tickets-entrada"
+        ]
+      },
+      {
+        "printer_id": "twin-caja",
+        "name": "PRINTER-CAJA (tickets/caja SERVER1, real usb PANADERIA/EC01)",
+        "port": 19104,
+        "station_ids": [
+          "tickets-caja",
+          "caja",
+          "tickets"
+        ]
+      }
+    ],
+    "terminals": [
+      {
+        "terminal_id": "twin-pdv3-0000-0000-000000000001",
+        "alias": "ENTRADA",
+        "ticket_station": "tickets-entrada"
+      },
+      {
+        "terminal_id": "twin-pdv1-0000-0000-000000000003",
+        "alias": "ESCONDITE",
+        "ticket_station": "tickets-caja"
+      },
+      {
+        "terminal_id": "twin-server1-0000-0000-000000000002",
+        "alias": "CAJA",
+        "ticket_station": "tickets-caja"
+      }
+    ],
+    "fp_port": 7718,
+    "staging_port": 19200,
+    "compress": 12,
+    "node": "v24.14.1",
+    "phase_notes": []
+  },
+  "started_at": "2026-08-07T01:55:03.186Z",
+  "duration_s": 1287,
+  "totals": {
+    "commands_generated": 1409,
+    "commands_acked": 1408,
+    "acks_total": 1474,
+    "acks_duplicate": 66,
+    "dedup_probe_sent": 66,
+    "dedup_probe_confirmed": 62,
+    "dedup_probe_violations": 0,
+    "rejects_lock_conflict": 0,
+    "rejects_expected": 1,
+    "rejects_unexpected": 0,
+    "command_retries": 1,
+    "orders_created": 129,
+    "orders_sent_kitchen": 129,
+    "orders_closed": 120,
+    "orders_cancelled": 9,
+    "orders_split": 26,
+    "kds_ready_events": 127,
+    "kds_partial_status_events": 127,
+    "barra_deltas_observed": 0,
+    "print_commands": 385,
+    "print_commands_by_station": {
+      "cocina": 133,
+      "barra": 134,
+      "tickets-entrada": 42,
+      "tickets-caja": 76
+    },
+    "deltas_received": 5523,
+    "snapshots_received": 345,
+    "ws_connects": 345,
+    "ws_disconnects": 441,
+    "network_flaps": 4,
+    "printer_outages": {
+      "twin-cocina-1": 1
+    },
+    "client_kills": 1,
+    "tenant_probes": 2,
+    "tenant_probe_rejected": 2,
+    "tenant_subscribe_blocked": 2,
+    "fp_probes": 12,
+    "error_count": 0
+  },
+  "scenarios": [
+    {
+      "name": "cold-start",
+      "status": "PASS",
+      "detail": "bridge healthy 312ms after spawn; server_id=155758c8-7970-404c-a5a9-0ba3b09ea5b3",
+      "owner_layer": null
+    },
+    {
+      "name": "discovery-identity",
+      "status": "PASS",
+      "detail": "/identity: tenant=amalay-twin, capabilities=[orders,kds,printing,mesa-lock,sync-queue] (mDNS advertised but not independently browsed by the harness)",
+      "owner_layer": null
+    },
+    {
+      "name": "login-pin",
+      "status": "NOT-EXERCISABLE-AT-PROTOCOL-LEVEL",
+      "detail": "protocol.js has no LOGIN/AUTH command — PIN login is enforced in the web app UI (and fingerprint service). At protocol level, identity rides on commands (authorized_by / auth_pin_ok fields), which the fingerprint-4-states scenario proves keep flowing.",
+      "owner_layer": "web app UI + fingerprint service"
+    },
+    {
+      "name": "turno-caja-open",
+      "status": "PASS",
+      "detail": "TURNO_OPENED by Cajero Twin (caja float/fondo amount is a web-app/Supabase concern — the protocol records only the turno event)",
+      "owner_layer": null
+    },
+    {
+      "name": "mesa-lock-unlock-conflict",
+      "status": "PASS",
+      "detail": "lock acked=true, second-terminal lock REJECTed=true, unlock acked=true",
+      "owner_layer": null
+    },
+    {
+      "name": "multi-comensal-order",
+      "status": "PASS",
+      "detail": "4 personas, 8 commands, per-item comensal tags (payload-opaque to the server)",
+      "owner_layer": null
+    },
+    {
+      "name": "cash-payment",
+      "status": "PASS",
+      "detail": "ORDER_CLOSED efectivo $1590",
+      "owner_layer": null
+    },
+    {
+      "name": "multilevel-modifiers",
+      "status": "PASS",
+      "detail": "nested modifier (grupo→opción→sub-opción) persisted opaquely; server performs no modifier validation — pricing/validation owner: web app UI",
+      "owner_layer": null
+    },
+    {
+      "name": "partial-kitchen-send",
+      "status": "PASS",
+      "detail": "round 1: 2 items in comanda batch 1",
+      "owner_layer": null
+    },
+    {
+      "name": "add-after-send",
+      "status": "PASS",
+      "detail": "round 2: +2 items, full list re-sent with batch map (server contract), batch-2 comanda printed",
+      "owner_layer": null
+    },
+    {
+      "name": "print-routing-5-destinations",
+      "status": "PASS",
+      "detail": "raw bytes per destination: cocina:twin-cocina-1=1 cocina:twin-cocina-2=1 barra:twin-barra=1 ticket-entrada:twin-entrada=1 ticket-caja:twin-caja=1 (cocina fans out to 2 devices; ticket goes to the charging terminal's local printer)",
+      "owner_layer": null
+    },
+    {
+      "name": "escondite-ticket-fallback",
+      "status": "PASS",
+      "detail": "ESCONDITE has no local ticket printer (known physical FAIL, PDV1 — represented in fixture). Its RECIBO routed to station \"tickets-caja\" and was captured on [twin-caja] with origin term=ESCONDITE in the bytes (1 job(s))",
+      "owner_layer": null
+    },
+    {
+      "name": "kds-receive-status-changes",
+      "status": "PASS",
+      "detail": "KDS partial maps=6, full maps=6 (two-step KDS_ITEM_STATUS per order)",
+      "owner_layer": null
+    },
+    {
+      "name": "transfer-mesa",
+      "status": "NOT-EXERCISABLE-AT-PROTOCOL-LEVEL",
+      "detail": "no MESA_TRANSFER/ORDER_MOVED command exists in protocol.js. Emulating via ORDER_UPSERTED with a new mesa would permanently leak the origin mesa as ocupada (core/state.js _applyOrderUpserted never frees the previous mesa) — the harness refuses to fake it.",
+      "owner_layer": "web app UI today; needs a Phase-2 protocol event"
+    },
+    {
+      "name": "split-payment",
+      "status": "PASS",
+      "detail": "payments tarjeta+efectivo sum exactly to total $217",
+      "owner_layer": null
+    },
+    {
+      "name": "cancel-with-authorization",
+      "status": "PASS",
+      "detail": "ORDER_CANCELLED with authorized_by=Eduardo E. + authorization_pin_ok recorded. NOTE: the server records but does NOT verify the PIN — authorization enforcement owner: web app UI",
+      "owner_layer": null
+    },
+    {
+      "name": "multi-method-payment-tip",
+      "status": "PASS",
+      "detail": "tarjeta(+12% propina field)+transferencia recorded on ORDER_CLOSED — tip is a payload field the server stores opaquely",
+      "owner_layer": null
+    },
+    {
+      "name": "retiro-deposito",
+      "status": "NOT-EXERCISABLE-AT-PROTOCOL-LEVEL",
+      "detail": "no CASH_MOVEMENT/RETIRO/DEPOSITO command exists in protocol.js — cash-drawer movements live in the web app UI + Supabase today.",
+      "owner_layer": "web app UI + Supabase"
+    },
+    {
+      "name": "corte-x",
+      "status": "NOT-EXERCISABLE-AT-PROTOCOL-LEVEL",
+      "detail": "no CORTE command exists in protocol.js — corte X is computed by the web app from Supabase. Substitute at harness level: the payments-reconciliation invariant proves every recorded ORDER_CLOSED payment set sums to its total (what a corte would aggregate).",
+      "owner_layer": "web app UI + Supabase"
+    },
+    {
+      "name": "corte-z-turno-close",
+      "status": "PASS",
+      "detail": "TURNO_CLOSED recorded (protocol scope). Corte-Z totals/report themselves are computed by the web app from Supabase — see corte-x scenario. Payments-reconciliation invariant is the protocol-level consistency check.",
+      "owner_layer": null
+    },
+    {
+      "name": "fingerprint-4-states",
+      "status": "PASS",
+      "detail": "available(fp ok=true, pin 6/6) | stopped(fp 503/down=true, pin 6/6) | crash(fp err=true, pin 6/6) | timeout-30s(pin during hang 6/6)",
+      "owner_layer": null
+    },
+    {
+      "name": "duplicate-resend-dedup",
+      "status": "PASS",
+      "detail": "probes sent=8, confirmed duplicate:true=8, violations=0",
+      "owner_layer": null
+    },
+    {
+      "name": "concurrent-drains",
+      "status": "PASS",
+      "detail": "4 acked commands × 2 simultaneous drain cycles → 8 ACKs all duplicate:true=true, event-log applications per command=1 (double-drain does not duplicate ACK-applications)",
+      "owner_layer": null
+    },
+    {
+      "name": "dedup-after-restart",
+      "status": "PASS",
+      "detail": "6 pre-crash-ACKed command_ids re-sent AFTER SIGKILL+restart → duplicate:true ACKs=6, non-duplicate ACKs=0, re-applications in event log=0 (processed-commands ledger survived the crash)",
+      "owner_layer": null
+    },
+    {
+      "name": "revoked-staff-offline",
+      "status": "NOT-EXERCISABLE-AT-PROTOCOL-LEVEL",
+      "detail": "protocol.js has no LOGIN/AUTH/staff-sync command — the Bridge never receives the staff roster and cannot enforce revocation. Evidence: commands carrying revoked staff \"Revocado Twin\" (fixture active=false) were ACKed=true and recorded opaquely. Offline revocation enforcement owner: web app UI (pos-manager-auth cached credentials + PIN cache refresh) + Supabase pos_staff. The offline window between revocation in Supabase and the POS cache refresh is a documented product property, not exercisable from this harness.",
+      "owner_layer": "web app UI (pos-manager-auth) + Supabase pos_staff sync"
+    },
+    {
+      "name": "corte-print-outage",
+      "status": "PASS",
+      "detail": "while printer down: job status=retrying attempts=1 (parked-not-lost=true) | self-drain after printer recovery (no restart, 75s window): true",
+      "owner_layer": null
+    },
+    {
+      "name": "wan-loss",
+      "status": "NOT-EXERCISABLE-AT-PROTOCOL-LEVEL",
+      "detail": "spawn-mode twin bridge runs with Supabase disabled — WAN loss is a NO-OP for the Phase-1 command path (LAN-only authority; nothing in the ACK path touches the internet). The only WAN consumer (Supabase poll) is exercised with a REAL socket-level WAN drop in wan-offline-socket-window (staging listener closed → connection refused), LAN WS kept alive throughout.",
+      "owner_layer": "outer orchestrator (external mode) / Phase-2 sync engine"
+    },
+    {
+      "name": "clock-skew",
+      "status": "SIMULATED-PARTIAL",
+      "detail": "harness cannot change OS clock — orchestrator hook emitted (CLOCK-SKEW). Protocol-level note: event ordering is by server-assigned sequence, not wall clock, so skew must not affect log integrity.",
+      "owner_layer": "outer orchestrator / OS"
+    },
+    {
+      "name": "disk-pressure",
+      "status": "SIMULATED-PARTIAL",
+      "detail": "harness does not fill the host disk (would endanger the runner itself) — orchestrator hook emitted (DISK-PRESSURE).",
+      "owner_layer": "outer orchestrator / OS"
+    },
+    {
+      "name": "wan-offline-socket-window",
+      "status": "PASS",
+      "detail": "staging TCP listener CLOSED for 12s (connection refused at socket level, no API-error simulation): 0 polls completed=true, sync-instance /health ok=true, main-bridge LAN WS stayed alive (probe commands ACKed=true); listener reopened for drain — STATE_SYNC resumption verified below",
+      "owner_layer": null
+    },
+    {
+      "name": "sync-inbound-staging",
+      "status": "SIMULATED-PARTIAL",
+      "detail": "normal: 2 STATE_SYNC events, tenant ok=true | state reflects staging orders: true | latency 2s: poll continued (2 polls), bridge healthy=true | error 500: bridge healthy=true (poll errors are non-fatal) | hang 8s (> 6s abort): bridge healthy=true | WAN-drop window 12s: listener closed → completed polls=0 (socket refused), bridge healthy=true, LAN WS commands ACKed during window=true | recovery: STATE_SYNC resumed (2 → 6) — INBOUND poll only; outbound event sync does not exist in Phase 1 (no markSynced caller)",
+      "owner_layer": "Phase-2 sync engine (outbound half)"
+    },
+    {
+      "name": "client-kill-recover",
+      "status": "PASS",
+      "detail": "terminal twin-server1-0000-0000-000000000002 re-subscribed with fresh SNAPSHOT; carried outbox replays with original command_ids (dedup-safe)",
+      "owner_layer": null
+    },
+    {
+      "name": "printer-outage-recover",
+      "status": "PASS",
+      "detail": "outages per printer: {\"twin-cocina-1\":1}; all acked jobs eventually on paper (every expected device)=true",
+      "owner_layer": null
+    },
+    {
+      "name": "bridge-crash-recover",
+      "status": "PASS",
+      "detail": "SIGKILL×2, graceful×1, all recovered with first-ACK",
+      "owner_layer": null
+    }
+  ],
+  "restarts": [
+    {
+      "kind": "initial-quiescent",
+      "server_id": "155758c8-7970-404c-a5a9-0ba3b09ea5b3",
+      "ready_ms": 312,
+      "recovery_ms_first_ack": 552
+    },
+    {
+      "kind": "kill",
+      "server_id": "155758c8-7970-404c-a5a9-0ba3b09ea5b3",
+      "ready_ms": 274,
+      "recovery_ms_first_ack": 883
+    },
+    {
+      "kind": "kill",
+      "server_id": "155758c8-7970-404c-a5a9-0ba3b09ea5b3",
+      "ready_ms": 260,
+      "recovery_ms_first_ack": 1386
+    },
+    {
+      "kind": "graceful",
+      "server_id": "155758c8-7970-404c-a5a9-0ba3b09ea5b3",
+      "ready_ms": 261,
+      "recovery_ms_first_ack": 263
+    },
+    {
+      "kind": "final-flush",
+      "server_id": "155758c8-7970-404c-a5a9-0ba3b09ea5b3",
+      "ready_ms": 262,
+      "recovery_ms_first_ack": null
+    }
+  ],
+  "telemetry": {
+    "memory": {
+      "initial_kb": 58560,
+      "peak_kb": 77088,
+      "final_kb": 59472,
+      "growth_kb_per_hour": -28360.056035020287,
+      "note": null
+    },
+    "event_log_bytes_final": 1049815,
+    "event_log_growth_bytes_per_hour": 3336664.776702392,
+    "data_dir_kb_final": 1636,
+    "outbox_max": 2,
+    "drain_ms": 9799,
+    "command_retries": 1,
+    "duplicates_absorbed": 128,
+    "print": {
+      "twin-cocina-1": {
+        "name": "PRINTER-COCINA-1 (fría, real 192.168.1.21)",
+        "port": 19100,
+        "stations": [
+          "cocina"
+        ],
+        "jobs_captured": 133,
+        "bytes": 24645,
+        "connections": 133,
+        "outages": 1
+      },
+      "twin-cocina-2": {
+        "name": "PRINTER-COCINA-2 (caliente, real 192.168.1.40)",
+        "port": 19101,
+        "stations": [
+          "cocina"
+        ],
+        "jobs_captured": 133,
+        "bytes": 24645,
+        "connections": 133,
+        "outages": 0
+      },
+      "twin-barra": {
+        "name": "PRINTER-BARRA (real 192.168.1.30)",
+        "port": 19102,
+        "stations": [
+          "barra"
+        ],
+        "jobs_captured": 134,
+        "bytes": 24652,
+        "connections": 134,
+        "outages": 0
+      },
+      "twin-entrada": {
+        "name": "PRINTER-ENTRADA (tickets PDV3, real usb TICKET)",
+        "port": 19103,
+        "stations": [
+          "tickets-entrada"
+        ],
+        "jobs_captured": 42,
+        "bytes": 9704,
+        "connections": 42,
+        "outages": 0
+      },
+      "twin-caja": {
+        "name": "PRINTER-CAJA (tickets/caja SERVER1, real usb PANADERIA/EC01)",
+        "port": 19104,
+        "stations": [
+          "tickets-caja",
+          "caja",
+          "tickets"
+        ],
+        "jobs_captured": 76,
+        "bytes": 18275,
+        "connections": 76,
+        "outages": 0
+      }
+    },
+    "sync_queue": {
+      "health_last_value": 1408,
+      "file_truth_unsynced": 1408,
+      "note": "sync_queue_size from /health is NOT trusted (in-memory, misleading across restarts, nothing ever marks events synced in Phase 1) — file count is authoritative"
+    },
+    "per_component_errors": {}
+  },
+  "memory_rss_samples": [
+    {
+      "t_s": 1,
+      "rss_kb": 58560
+    },
+    {
+      "t_s": 16,
+      "rss_kb": 60000
+    },
+    {
+      "t_s": 31,
+      "rss_kb": 51552
+    },
+    {
+      "t_s": 46,
+      "rss_kb": 52576
+    },
+    {
+      "t_s": 61,
+      "rss_kb": 53552
+    },
+    {
+      "t_s": 76,
+      "rss_kb": 51168
+    },
+    {
+      "t_s": 91,
+      "rss_kb": 52144
+    },
+    {
+      "t_s": 106,
+      "rss_kb": 56736
+    },
+    {
+      "t_s": 121,
+      "rss_kb": 55488
+    },
+    {
+      "t_s": 136,
+      "rss_kb": 61504
+    },
+    {
+      "t_s": 151,
+      "rss_kb": 55744
+    },
+    {
+      "t_s": 166,
+      "rss_kb": 57392
+    },
+    {
+      "t_s": 181,
+      "rss_kb": 59568
+    },
+    {
+      "t_s": 196,
+      "rss_kb": 56560
+    },
+    {
+      "t_s": 211,
+      "rss_kb": 57776
+    },
+    {
+      "t_s": 226,
+      "rss_kb": 58736
+    },
+    {
+      "t_s": 241,
+      "rss_kb": 57360
+    },
+    {
+      "t_s": 256,
+      "rss_kb": 59056
+    },
+    {
+      "t_s": 271,
+      "rss_kb": 55520
+    },
+    {
+      "t_s": 286,
+      "rss_kb": 57968
+    },
+    {
+      "t_s": 301,
+      "rss_kb": 58480
+    },
+    {
+      "t_s": 316,
+      "rss_kb": 60336
+    },
+    {
+      "t_s": 331,
+      "rss_kb": 60512
+    },
+    {
+      "t_s": 346,
+      "rss_kb": 61104
+    },
+    {
+      "t_s": 361,
+      "rss_kb": 58624
+    },
+    {
+      "t_s": 376,
+      "rss_kb": 59776
+    },
+    {
+      "t_s": 391,
+      "rss_kb": 57184
+    },
+    {
+      "t_s": 406,
+      "rss_kb": 60176
+    },
+    {
+      "t_s": 421,
+      "rss_kb": 60752
+    },
+    {
+      "t_s": 436,
+      "rss_kb": 60112
+    },
+    {
+      "t_s": 451,
+      "rss_kb": 61056
+    },
+    {
+      "t_s": 466,
+      "rss_kb": 63856
+    },
+    {
+      "t_s": 481,
+      "rss_kb": 62016
+    },
+    {
+      "t_s": 496,
+      "rss_kb": 62016
+    },
+    {
+      "t_s": 511,
+      "rss_kb": 60320
+    },
+    {
+      "t_s": 526,
+      "rss_kb": 63152
+    },
+    {
+      "t_s": 541,
+      "rss_kb": 61248
+    },
+    {
+      "t_s": 556,
+      "rss_kb": 64880
+    },
+    {
+      "t_s": 571,
+      "rss_kb": 66400
+    },
+    {
+      "t_s": 586,
+      "rss_kb": 61536
+    },
+    {
+      "t_s": 601,
+      "rss_kb": 63120
+    },
+    {
+      "t_s": 616,
+      "rss_kb": 61584
+    },
+    {
+      "t_s": 631,
+      "rss_kb": 60496
+    },
+    {
+      "t_s": 646,
+      "rss_kb": 62720
+    },
+    {
+      "t_s": 661,
+      "rss_kb": 61520
+    },
+    {
+      "t_s": 676,
+      "rss_kb": 61600
+    },
+    {
+      "t_s": 691,
+      "rss_kb": 63168
+    },
+    {
+      "t_s": 706,
+      "rss_kb": 64880
+    },
+    {
+      "t_s": 721,
+      "rss_kb": 63872
+    },
+    {
+      "t_s": 736,
+      "rss_kb": 61696
+    },
+    {
+      "t_s": 751,
+      "rss_kb": 60832
+    },
+    {
+      "t_s": 766,
+      "rss_kb": 62016
+    },
+    {
+      "t_s": 781,
+      "rss_kb": 65152
+    },
+    {
+      "t_s": 811,
+      "rss_kb": 77088
+    },
+    {
+      "t_s": 826,
+      "rss_kb": 67952
+    },
+    {
+      "t_s": 841,
+      "rss_kb": 61600
+    },
+    {
+      "t_s": 856,
+      "rss_kb": 64736
+    },
+    {
+      "t_s": 871,
+      "rss_kb": 57808
+    },
+    {
+      "t_s": 886,
+      "rss_kb": 63968
+    },
+    {
+      "t_s": 901,
+      "rss_kb": 61648
+    },
+    {
+      "t_s": 916,
+      "rss_kb": 66864
+    },
+    {
+      "t_s": 931,
+      "rss_kb": 63952
+    },
+    {
+      "t_s": 946,
+      "rss_kb": 68160
+    },
+    {
+      "t_s": 961,
+      "rss_kb": 65184
+    },
+    {
+      "t_s": 976,
+      "rss_kb": 69376
+    },
+    {
+      "t_s": 991,
+      "rss_kb": 62976
+    },
+    {
+      "t_s": 1006,
+      "rss_kb": 66288
+    },
+    {
+      "t_s": 1021,
+      "rss_kb": 65728
+    },
+    {
+      "t_s": 1036,
+      "rss_kb": 65120
+    },
+    {
+      "t_s": 1051,
+      "rss_kb": 62880
+    },
+    {
+      "t_s": 1066,
+      "rss_kb": 57664
+    },
+    {
+      "t_s": 1081,
+      "rss_kb": 40400
+    },
+    {
+      "t_s": 1096,
+      "rss_kb": 39712
+    },
+    {
+      "t_s": 1111,
+      "rss_kb": 42032
+    },
+    {
+      "t_s": 1126,
+      "rss_kb": 39152
+    },
+    {
+      "t_s": 1141,
+      "rss_kb": 34880
+    },
+    {
+      "t_s": 1156,
+      "rss_kb": 35488
+    },
+    {
+      "t_s": 1171,
+      "rss_kb": 42752
+    },
+    {
+      "t_s": 1186,
+      "rss_kb": 26832
+    },
+    {
+      "t_s": 1201,
+      "rss_kb": 38304
+    },
+    {
+      "t_s": 1216,
+      "rss_kb": 41792
+    },
+    {
+      "t_s": 1231,
+      "rss_kb": 39728
+    },
+    {
+      "t_s": 1246,
+      "rss_kb": 42160
+    },
+    {
+      "t_s": 1261,
+      "rss_kb": 37184
+    },
+    {
+      "t_s": 1276,
+      "rss_kb": 43056
+    },
+    {
+      "t_s": 1287,
+      "rss_kb": 59472
+    }
+  ],
+  "file_samples": [
+    {
+      "t_s": 1,
+      "event_log_bytes": null,
+      "data_dir_kb": 4,
+      "outbox_total": 0,
+      "print_queue": null,
+      "health_sync_queue": null
+    },
+    {
+      "t_s": 16,
+      "event_log_bytes": 66522,
+      "data_dir_kb": 108,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 28
+      },
+      "health_sync_queue": 111
+    },
+    {
+      "t_s": 31,
+      "event_log_bytes": 68232,
+      "data_dir_kb": 112,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 28,
+        "retrying": 1
+      },
+      "health_sync_queue": 114
+    },
+    {
+      "t_s": 46,
+      "event_log_bytes": 68232,
+      "data_dir_kb": 112,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 28,
+        "retrying": 1
+      },
+      "health_sync_queue": 114
+    },
+    {
+      "t_s": 61,
+      "event_log_bytes": 68232,
+      "data_dir_kb": 112,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 28,
+        "retrying": 1
+      },
+      "health_sync_queue": 114
+    },
+    {
+      "t_s": 76,
+      "event_log_bytes": 68232,
+      "data_dir_kb": 112,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 29
+      },
+      "health_sync_queue": 114
+    },
+    {
+      "t_s": 91,
+      "event_log_bytes": 68232,
+      "data_dir_kb": 112,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 29
+      },
+      "health_sync_queue": 114
+    },
+    {
+      "t_s": 106,
+      "event_log_bytes": 70542,
+      "data_dir_kb": 176,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 29
+      },
+      "health_sync_queue": 114
+    },
+    {
+      "t_s": 121,
+      "event_log_bytes": 83833,
+      "data_dir_kb": 184,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 35
+      },
+      "health_sync_queue": 136
+    },
+    {
+      "t_s": 136,
+      "event_log_bytes": 90595,
+      "data_dir_kb": 184,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 37
+      },
+      "health_sync_queue": 145
+    },
+    {
+      "t_s": 151,
+      "event_log_bytes": 92015,
+      "data_dir_kb": 184,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 38
+      },
+      "health_sync_queue": 147
+    },
+    {
+      "t_s": 166,
+      "event_log_bytes": 92015,
+      "data_dir_kb": 184,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 38
+      },
+      "health_sync_queue": 147
+    },
+    {
+      "t_s": 181,
+      "event_log_bytes": 102484,
+      "data_dir_kb": 192,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 44
+      },
+      "health_sync_queue": 157
+    },
+    {
+      "t_s": 196,
+      "event_log_bytes": 112121,
+      "data_dir_kb": 200,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 49
+      },
+      "health_sync_queue": 172
+    },
+    {
+      "t_s": 211,
+      "event_log_bytes": 112121,
+      "data_dir_kb": 200,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 49
+      },
+      "health_sync_queue": 172
+    },
+    {
+      "t_s": 226,
+      "event_log_bytes": 117541,
+      "data_dir_kb": 200,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 51
+      },
+      "health_sync_queue": 181
+    },
+    {
+      "t_s": 241,
+      "event_log_bytes": 123515,
+      "data_dir_kb": 204,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 54
+      },
+      "health_sync_queue": 189
+    },
+    {
+      "t_s": 256,
+      "event_log_bytes": 136596,
+      "data_dir_kb": 272,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 58
+      },
+      "health_sync_queue": 201
+    },
+    {
+      "t_s": 271,
+      "event_log_bytes": 146647,
+      "data_dir_kb": 280,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 64
+      },
+      "health_sync_queue": 215
+    },
+    {
+      "t_s": 286,
+      "event_log_bytes": 146647,
+      "data_dir_kb": 280,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 64
+      },
+      "health_sync_queue": 215
+    },
+    {
+      "t_s": 301,
+      "event_log_bytes": 152773,
+      "data_dir_kb": 280,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 66
+      },
+      "health_sync_queue": 220
+    },
+    {
+      "t_s": 316,
+      "event_log_bytes": 178478,
+      "data_dir_kb": 292,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 78
+      },
+      "health_sync_queue": 253
+    },
+    {
+      "t_s": 331,
+      "event_log_bytes": 188959,
+      "data_dir_kb": 300,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 82
+      },
+      "health_sync_queue": 267
+    },
+    {
+      "t_s": 346,
+      "event_log_bytes": 205173,
+      "data_dir_kb": 372,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 90
+      },
+      "health_sync_queue": 288
+    },
+    {
+      "t_s": 361,
+      "event_log_bytes": 210755,
+      "data_dir_kb": 376,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 93
+      },
+      "health_sync_queue": 297
+    },
+    {
+      "t_s": 376,
+      "event_log_bytes": 218389,
+      "data_dir_kb": 380,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 96
+      },
+      "health_sync_queue": 307
+    },
+    {
+      "t_s": 391,
+      "event_log_bytes": 226600,
+      "data_dir_kb": 384,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 101
+      },
+      "health_sync_queue": 319
+    },
+    {
+      "t_s": 406,
+      "event_log_bytes": 240362,
+      "data_dir_kb": 392,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 107
+      },
+      "health_sync_queue": 336
+    },
+    {
+      "t_s": 421,
+      "event_log_bytes": 257401,
+      "data_dir_kb": 404,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 117
+      },
+      "health_sync_queue": 361
+    },
+    {
+      "t_s": 436,
+      "event_log_bytes": 280892,
+      "data_dir_kb": 480,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 129
+      },
+      "health_sync_queue": 392
+    },
+    {
+      "t_s": 451,
+      "event_log_bytes": 316290,
+      "data_dir_kb": 500,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 147
+      },
+      "health_sync_queue": 426
+    },
+    {
+      "t_s": 466,
+      "event_log_bytes": 336326,
+      "data_dir_kb": 576,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 159
+      },
+      "health_sync_queue": 465
+    },
+    {
+      "t_s": 481,
+      "event_log_bytes": 350173,
+      "data_dir_kb": 588,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 167
+      },
+      "health_sync_queue": 484
+    },
+    {
+      "t_s": 496,
+      "event_log_bytes": 350173,
+      "data_dir_kb": 588,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 167
+      },
+      "health_sync_queue": 486
+    },
+    {
+      "t_s": 511,
+      "event_log_bytes": 350173,
+      "data_dir_kb": 588,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 167
+      },
+      "health_sync_queue": 486
+    },
+    {
+      "t_s": 526,
+      "event_log_bytes": 383113,
+      "data_dir_kb": 604,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 184
+      },
+      "health_sync_queue": 527
+    },
+    {
+      "t_s": 541,
+      "event_log_bytes": 398954,
+      "data_dir_kb": 740,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 193
+      },
+      "health_sync_queue": 549
+    },
+    {
+      "t_s": 556,
+      "event_log_bytes": 431931,
+      "data_dir_kb": 752,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 211
+      },
+      "health_sync_queue": 587
+    },
+    {
+      "t_s": 571,
+      "event_log_bytes": 435769,
+      "data_dir_kb": 756,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 213
+      },
+      "health_sync_queue": 597
+    },
+    {
+      "t_s": 586,
+      "event_log_bytes": 443239,
+      "data_dir_kb": 760,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 217
+      },
+      "health_sync_queue": 607
+    },
+    {
+      "t_s": 601,
+      "event_log_bytes": 468347,
+      "data_dir_kb": 832,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 229
+      },
+      "health_sync_queue": 636
+    },
+    {
+      "t_s": 616,
+      "event_log_bytes": 474839,
+      "data_dir_kb": 836,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 232
+      },
+      "health_sync_queue": 648
+    },
+    {
+      "t_s": 631,
+      "event_log_bytes": 488458,
+      "data_dir_kb": 840,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 239
+      },
+      "health_sync_queue": 669
+    },
+    {
+      "t_s": 646,
+      "event_log_bytes": 511596,
+      "data_dir_kb": 848,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 248
+      },
+      "health_sync_queue": 698
+    },
+    {
+      "t_s": 661,
+      "event_log_bytes": 538678,
+      "data_dir_kb": 924,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 265
+      },
+      "health_sync_queue": 732
+    },
+    {
+      "t_s": 676,
+      "event_log_bytes": 573646,
+      "data_dir_kb": 936,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 281
+      },
+      "health_sync_queue": 778
+    },
+    {
+      "t_s": 691,
+      "event_log_bytes": 593632,
+      "data_dir_kb": 944,
+      "outbox_total": 2,
+      "print_queue": {
+        "printed": 290,
+        "retrying": 2
+      },
+      "health_sync_queue": 802
+    },
+    {
+      "t_s": 706,
+      "event_log_bytes": 604344,
+      "data_dir_kb": 1016,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 297,
+        "retrying": 2
+      },
+      "health_sync_queue": 821
+    },
+    {
+      "t_s": 721,
+      "event_log_bytes": 604344,
+      "data_dir_kb": 1016,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 297,
+        "retrying": 2
+      },
+      "health_sync_queue": 821
+    },
+    {
+      "t_s": 736,
+      "event_log_bytes": 621840,
+      "data_dir_kb": 1020,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 308
+      },
+      "health_sync_queue": 846
+    },
+    {
+      "t_s": 751,
+      "event_log_bytes": 648330,
+      "data_dir_kb": 1032,
+      "outbox_total": 2,
+      "print_queue": {
+        "printed": 321
+      },
+      "health_sync_queue": 880
+    },
+    {
+      "t_s": 766,
+      "event_log_bytes": 665825,
+      "data_dir_kb": 1100,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 326
+      },
+      "health_sync_queue": 902
+    },
+    {
+      "t_s": 781,
+      "event_log_bytes": 678848,
+      "data_dir_kb": 1104,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 329
+      },
+      "health_sync_queue": 914
+    },
+    {
+      "t_s": 796,
+      "event_log_bytes": 704332,
+      "data_dir_kb": 1116,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 343
+      },
+      "health_sync_queue": 953
+    },
+    {
+      "t_s": 811,
+      "event_log_bytes": 737810,
+      "data_dir_kb": 1192,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 359
+      },
+      "health_sync_queue": 994
+    },
+    {
+      "t_s": 826,
+      "event_log_bytes": 759053,
+      "data_dir_kb": 1200,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 368
+      },
+      "health_sync_queue": 1025
+    },
+    {
+      "t_s": 841,
+      "event_log_bytes": 760363,
+      "data_dir_kb": 1200,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 369
+      },
+      "health_sync_queue": 1027
+    },
+    {
+      "t_s": 856,
+      "event_log_bytes": 783413,
+      "data_dir_kb": 1272,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 382
+      },
+      "health_sync_queue": 1057
+    },
+    {
+      "t_s": 871,
+      "event_log_bytes": 793234,
+      "data_dir_kb": 1340,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 386
+      },
+      "health_sync_queue": 1068
+    },
+    {
+      "t_s": 886,
+      "event_log_bytes": 812125,
+      "data_dir_kb": 1344,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 393
+      },
+      "health_sync_queue": 1097
+    },
+    {
+      "t_s": 901,
+      "event_log_bytes": 815250,
+      "data_dir_kb": 1348,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 394
+      },
+      "health_sync_queue": 1101
+    },
+    {
+      "t_s": 916,
+      "event_log_bytes": 837384,
+      "data_dir_kb": 1356,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 406
+      },
+      "health_sync_queue": 1131
+    },
+    {
+      "t_s": 931,
+      "event_log_bytes": 838785,
+      "data_dir_kb": 1356,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 407
+      },
+      "health_sync_queue": 1133
+    },
+    {
+      "t_s": 946,
+      "event_log_bytes": 882140,
+      "data_dir_kb": 1440,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 430
+      },
+      "health_sync_queue": 1182
+    },
+    {
+      "t_s": 961,
+      "event_log_bytes": 895920,
+      "data_dir_kb": 1448,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 439
+      },
+      "health_sync_queue": 1203
+    },
+    {
+      "t_s": 976,
+      "event_log_bytes": 901937,
+      "data_dir_kb": 1448,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 441
+      },
+      "health_sync_queue": 1212
+    },
+    {
+      "t_s": 991,
+      "event_log_bytes": 909487,
+      "data_dir_kb": 1452,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 445
+      },
+      "health_sync_queue": 1222
+    },
+    {
+      "t_s": 1006,
+      "event_log_bytes": 921788,
+      "data_dir_kb": 1520,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 452
+      },
+      "health_sync_queue": 1241
+    },
+    {
+      "t_s": 1021,
+      "event_log_bytes": 936255,
+      "data_dir_kb": 1528,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 461
+      },
+      "health_sync_queue": 1258
+    },
+    {
+      "t_s": 1036,
+      "event_log_bytes": 939158,
+      "data_dir_kb": 1528,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 463
+      },
+      "health_sync_queue": 1264
+    },
+    {
+      "t_s": 1051,
+      "event_log_bytes": 947789,
+      "data_dir_kb": 1532,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 467
+      },
+      "health_sync_queue": 1275
+    },
+    {
+      "t_s": 1066,
+      "event_log_bytes": 957964,
+      "data_dir_kb": 1536,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 473
+      },
+      "health_sync_queue": 1287
+    },
+    {
+      "t_s": 1081,
+      "event_log_bytes": 957964,
+      "data_dir_kb": 1536,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 473
+      },
+      "health_sync_queue": 1287
+    },
+    {
+      "t_s": 1096,
+      "event_log_bytes": 962163,
+      "data_dir_kb": 1540,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 475
+      },
+      "health_sync_queue": 1294
+    },
+    {
+      "t_s": 1111,
+      "event_log_bytes": 974944,
+      "data_dir_kb": 1540,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 480
+      },
+      "health_sync_queue": 1306
+    },
+    {
+      "t_s": 1126,
+      "event_log_bytes": 993390,
+      "data_dir_kb": 1612,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 489
+      },
+      "health_sync_queue": 1337
+    },
+    {
+      "t_s": 1141,
+      "event_log_bytes": 993390,
+      "data_dir_kb": 1612,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 489
+      },
+      "health_sync_queue": 1337
+    },
+    {
+      "t_s": 1156,
+      "event_log_bytes": 993390,
+      "data_dir_kb": 1612,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 489
+      },
+      "health_sync_queue": 1337
+    },
+    {
+      "t_s": 1171,
+      "event_log_bytes": 999516,
+      "data_dir_kb": 1616,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 491
+      },
+      "health_sync_queue": 1345
+    },
+    {
+      "t_s": 1186,
+      "event_log_bytes": 1016000,
+      "data_dir_kb": 1620,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 501
+      },
+      "health_sync_queue": 1368
+    },
+    {
+      "t_s": 1201,
+      "event_log_bytes": 1028751,
+      "data_dir_kb": 1628,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 507
+      },
+      "health_sync_queue": 1381
+    },
+    {
+      "t_s": 1216,
+      "event_log_bytes": 1028751,
+      "data_dir_kb": 1628,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 507
+      },
+      "health_sync_queue": 1383
+    },
+    {
+      "t_s": 1231,
+      "event_log_bytes": 1028751,
+      "data_dir_kb": 1628,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 507
+      },
+      "health_sync_queue": 1383
+    },
+    {
+      "t_s": 1246,
+      "event_log_bytes": 1039193,
+      "data_dir_kb": 1632,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 513
+      },
+      "health_sync_queue": 1391
+    },
+    {
+      "t_s": 1261,
+      "event_log_bytes": 1041267,
+      "data_dir_kb": 1632,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 514
+      },
+      "health_sync_queue": 1397
+    },
+    {
+      "t_s": 1276,
+      "event_log_bytes": 1047848,
+      "data_dir_kb": 1636,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 517
+      },
+      "health_sync_queue": 1405
+    },
+    {
+      "t_s": 1287,
+      "event_log_bytes": 1049815,
+      "data_dir_kb": 1636,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 518
+      },
+      "health_sync_queue": 1408
+    }
+  ],
+  "fp_coverage": {
+    "available": {
+      "probed": true,
+      "pin_acks": 6
+    },
+    "stopped": {
+      "probed": true,
+      "pin_acks": 6
+    },
+    "crash": {
+      "probed": true,
+      "pin_acks": 6
+    },
+    "timeout": {
+      "probed": true,
+      "pin_acks": 6
+    }
+  },
+  "errors": [],
+  "verification": {
+    "pass": true,
+    "stop_hits": [],
+    "invariants": [
+      {
+        "name": "event_log_readable",
+        "pass": true,
+        "detail": "1408 events from events.ndjson",
+        "founder_gate": null,
+        "stop_class": null,
+        "informational": false
+      },
+      {
+        "name": "no_corrupt_event_lines",
+        "pass": true,
+        "detail": "all lines parseable",
+        "founder_gate": null,
+        "stop_class": "corruption",
+        "informational": false
+      },
+      {
+        "name": "zero_duplicate_event_ids",
+        "pass": true,
+        "detail": [],
+        "founder_gate": 3,
+        "stop_class": "duplicate",
+        "informational": false
+      },
+      {
+        "name": "zero_duplicate_sequences",
+        "pass": true,
+        "detail": [],
+        "founder_gate": 4,
+        "stop_class": "duplicate",
+        "informational": false
+      },
+      {
+        "name": "sequences_strictly_increasing",
+        "pass": true,
+        "detail": "ok",
+        "founder_gate": 4,
+        "stop_class": "corruption",
+        "informational": false
+      },
+      {
+        "name": "zero_data_loss_acked_commands_persisted",
+        "pass": true,
+        "detail": "1408 acked commands all present",
+        "founder_gate": 1,
+        "stop_class": "data-loss",
+        "informational": false
+      },
+      {
+        "name": "zero_duplicate_command_events",
+        "pass": true,
+        "detail": [],
+        "founder_gate": 2,
+        "stop_class": "duplicate",
+        "informational": false
+      },
+      {
+        "name": "outbox_zero_after_drain",
+        "pass": true,
+        "detail": "all client outboxes drained (0 reconciled as applied-once server-side)",
+        "founder_gate": 5,
+        "stop_class": "unsyncable",
+        "informational": false
+      },
+      {
+        "name": "no_phantom_events",
+        "pass": true,
+        "detail": [],
+        "founder_gate": null,
+        "stop_class": "corruption",
+        "informational": false
+      },
+      {
+        "name": "no_wrong_tenant_events",
+        "pass": true,
+        "detail": [],
+        "founder_gate": 10,
+        "stop_class": "tenant-leak",
+        "informational": false
+      },
+      {
+        "name": "tenant_probes_rejected",
+        "pass": true,
+        "detail": {
+          "probes": 2,
+          "command_rejects": 2,
+          "subscribe_blocks": 2
+        },
+        "founder_gate": 10,
+        "stop_class": null,
+        "informational": false
+      },
+      {
+        "name": "every_order_exactly_one_terminal_event",
+        "pass": true,
+        "detail": "129 orders each closed/cancelled exactly once",
+        "founder_gate": 1,
+        "stop_class": "data-loss",
+        "informational": false
+      },
+      {
+        "name": "payments_reconcile_with_recorded_movements",
+        "pass": true,
+        "detail": "every ORDER_CLOSED: sum(payments)===total===harness ledger (corte-X equivalent — no corte command at protocol level)",
+        "founder_gate": 8,
+        "stop_class": "inconsistent-corte",
+        "informational": false
+      },
+      {
+        "name": "replay_no_exception",
+        "pass": true,
+        "detail": "ok",
+        "founder_gate": 9,
+        "stop_class": "corruption",
+        "informational": false
+      },
+      {
+        "name": "replay_final_no_open_orders",
+        "pass": true,
+        "detail": {
+          "kds_orders": 0,
+          "kds_queue": 0
+        },
+        "founder_gate": 9,
+        "stop_class": null,
+        "informational": false
+      },
+      {
+        "name": "replay_final_all_mesas_free",
+        "pass": true,
+        "detail": [],
+        "founder_gate": 9,
+        "stop_class": null,
+        "informational": false
+      },
+      {
+        "name": "replay_final_turno_closed",
+        "pass": true,
+        "detail": null,
+        "founder_gate": 9,
+        "stop_class": null,
+        "informational": false
+      },
+      {
+        "name": "replay_final_no_locks",
+        "pass": true,
+        "detail": {},
+        "founder_gate": 9,
+        "stop_class": null,
+        "informational": false
+      },
+      {
+        "name": "kds_caught_up_to_last_sequence",
+        "pass": true,
+        "detail": {
+          "kds_max_seq": 1408,
+          "last_event_seq": 1408
+        },
+        "founder_gate": 9,
+        "stop_class": null,
+        "informational": false
+      },
+      {
+        "name": "no_duplicate_processed_command_keys",
+        "pass": true,
+        "detail": [],
+        "founder_gate": 2,
+        "stop_class": "duplicate",
+        "informational": false
+      },
+      {
+        "name": "dedup_exercised",
+        "pass": true,
+        "detail": {
+          "duplicate_acks": 66,
+          "probes_confirmed": 62
+        },
+        "founder_gate": 2,
+        "stop_class": null,
+        "informational": false
+      },
+      {
+        "name": "dedup_no_violations",
+        "pass": true,
+        "detail": {
+          "violations": 0
+        },
+        "founder_gate": 2,
+        "stop_class": "double-applied",
+        "informational": false
+      },
+      {
+        "name": "zero_stuck_print_jobs_file_view",
+        "pass": true,
+        "detail": {
+          "printed": 518,
+          "informational_in_accum": false
+        },
+        "founder_gate": 6,
+        "stop_class": "stuck-print",
+        "informational": false
+      },
+      {
+        "name": "every_acked_print_job_reached_paper",
+        "pass": true,
+        "detail": "385 print jobs all captured as raw bytes on EVERY fixture-mapped device (cocina fan-out ×2; duplicate physical prints after crash-replay: 0 — by design, reprint-on-uncertainty)",
+        "founder_gate": 6,
+        "stop_class": "stuck-print",
+        "informational": false
+      },
+      {
+        "name": "recovery_after_every_restart",
+        "pass": true,
+        "detail": [
+          {
+            "kind": "initial-quiescent",
+            "ready_ms": 312,
+            "first_ack_ms": 552
+          },
+          {
+            "kind": "kill",
+            "ready_ms": 274,
+            "first_ack_ms": 883
+          },
+          {
+            "kind": "kill",
+            "ready_ms": 260,
+            "first_ack_ms": 1386
+          },
+          {
+            "kind": "graceful",
+            "ready_ms": 261,
+            "first_ack_ms": 263
+          },
+          {
+            "kind": "final-flush",
+            "ready_ms": 262,
+            "first_ack_ms": null
+          }
+        ],
+        "founder_gate": 7,
+        "stop_class": null,
+        "informational": false
+      },
+      {
+        "name": "crash_faults_exercised",
+        "pass": true,
+        "detail": {
+          "kills": 2,
+          "graceful": 1
+        },
+        "founder_gate": null,
+        "stop_class": null,
+        "informational": false
+      },
+      {
+        "name": "pin_flow_works_in_all_fp_states",
+        "pass": true,
+        "detail": {
+          "available": {
+            "probed": true,
+            "pin_acks": 6
+          },
+          "stopped": {
+            "probed": true,
+            "pin_acks": 6
+          },
+          "crash": {
+            "probed": true,
+            "pin_acks": 6
+          },
+          "timeout": {
+            "probed": true,
+            "pin_acks": 6
+          }
+        },
+        "founder_gate": 11,
+        "stop_class": null,
+        "informational": false
+      },
+      {
+        "name": "config_persists_across_restarts",
+        "pass": true,
+        "detail": {
+          "server_ids_seen": [
+            "155758c8-7970-404c-a5a9-0ba3b09ea5b3"
+          ],
+          "restarts": 5,
+          "note": "stable server_id across restarts proves the data dir/config survived; a changed server_id would mean a wiped install"
+        },
+        "founder_gate": 12,
+        "stop_class": null,
+        "informational": false
+      },
+      {
+        "name": "printer_routing_survives_restart",
+        "pass": true,
+        "detail": {
+          "stations_after_final_restart": [
+            "barra",
+            "caja",
+            "cocina",
+            "tickets",
+            "tickets-caja",
+            "tickets-entrada"
+          ],
+          "server_id_file_persisted": true,
+          "informational_in_accum": false
+        },
+        "founder_gate": 12,
+        "stop_class": null,
+        "informational": false
+      },
+      {
+        "name": "full_sync_after_wan_return",
+        "pass": null,
+        "founder_gate": 13,
+        "stop_class": null,
+        "detail": "NOT-EXERCISABLE in Phase 1: no outbound sync engine exists (adapters/storage markSynced() has zero production callers; /health.sync_queue_size grows monotonically and is documented-misleading). Inbound Supabase→bridge poll covered by sync-inbound-staging (SIMULATED-PARTIAL). Owner: Phase-2 sync engine."
+      },
+      {
+        "name": "minimum_traffic_generated",
+        "pass": true,
+        "detail": {
+          "orders_created": 129
+        },
+        "founder_gate": null,
+        "stop_class": null,
+        "informational": false
+      },
+      {
+        "name": "all_5_printers_captured_bytes",
+        "pass": true,
+        "detail": {
+          "twin-cocina-1": 133,
+          "twin-cocina-2": 133,
+          "twin-barra": 134,
+          "twin-entrada": 42,
+          "twin-caja": 76
+        },
+        "founder_gate": null,
+        "stop_class": null,
+        "informational": false
+      },
+      {
+        "name": "no_unexpected_rejects",
+        "pass": true,
+        "detail": {
+          "rejects_unexpected": 0
+        },
+        "founder_gate": null,
+        "stop_class": null,
+        "informational": false
+      },
+      {
+        "name": "no_harness_errors",
+        "pass": true,
+        "detail": [],
+        "founder_gate": null,
+        "stop_class": null,
+        "informational": false
+      },
+      {
+        "name": "no_failed_scenarios",
+        "pass": true,
+        "detail": [],
+        "founder_gate": null,
+        "stop_class": null,
+        "informational": false
+      }
+    ],
+    "events_in_log": 1408,
+    "events_source": "events.ndjson",
+    "distinct_order_ids_persisted": 129,
+    "print_queue_final": {
+      "printed": 518
+    },
+    "replay_final_snapshot_summary": {
+      "mesas_total": 31,
+      "occupied": 0,
+      "kds_orders": 0,
+      "turno": null,
+      "locks": 0
+    },
+    "drain_ms": 9799
+  },
+  "exit_code": 0
+}

@@ -1,0 +1,24 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "// nota": "Servidor estatico para la landing fullsite.mx (fullsite-web/). Solo sirve archivos; no compila nada.",
+      "name": "fullsite-web-landing",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "4173", "--directory", "/Users/danielrg/fullsite/fullsite-web"],
+      "port": 4173
+    },
+    {
+      "// nota": "Rama de integración con los cinco arreglos de campo del 2026-09-14. Se invoca el binario PROPIO del worktree y no npx: npx resolvía otro Next y fallaba con \"Can't resolve next/dist/server/app-render/module-loading/instrument-module-getter\". El worktree tiene su propio node_modules (npm ci) porque Turbopack rechaza el enlazado.",
+      "name": "fullsite-integracion",
+      "runtimeExecutable": "/private/tmp/claude-501/-Users-danielrg-fullsite/5da718bd-f5a0-4f70-b4bf-871021defe7a/scratchpad/wt-integracion/dashboard-app/node_modules/.bin/next",
+      "runtimeArgs": [
+        "dev",
+        "--port",
+        "3177",
+        "/private/tmp/claude-501/-Users-danielrg-fullsite/5da718bd-f5a0-4f70-b4bf-871021defe7a/scratchpad/wt-integracion/dashboard-app"
+      ],
+      "port": 3177
+    }
+  ]
+}

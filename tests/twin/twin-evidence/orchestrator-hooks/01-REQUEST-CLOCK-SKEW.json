@@ -1,0 +1,8 @@
+{
+  "hook": "CLOCK-SKEW",
+  "requested_at": "2026-08-07T01:56:18.293Z",
+  "bridge": "127.0.0.1:17917",
+  "phase": "shift",
+  "ack_file": "/Users/danielrg/fullsite/tests/twin/twin-evidence/orchestrator-hooks/CLOCK-SKEW.ack",
+  "instructions": "The harness cannot change the OS clock of the bridge host. To exercise clock skew: shift the bridge host clock ±5 min during traffic, then restore + touch ack_file. Event ordering must stay monotonic by sequence (not wall clock)."
+}

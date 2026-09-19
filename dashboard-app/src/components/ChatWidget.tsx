@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { MessageCircle, X, Send, ArrowLeft, Sparkles } from 'lucide-react'
+import { X, Send, ArrowLeft, Sparkles } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import type { ChatMessage } from '@/lib/types'
 import { getActiveClientSlug } from '@/lib/data'
+import { usePathname } from 'next/navigation'
 
 const quickQuestions = [
   '¿Cómo van las ventas hoy?',
@@ -148,6 +149,7 @@ function renderMarkdown(text: string) {
 
 export default function ChatWidget() {
   const { clientId } = useAuth()
+  const pathname = usePathname()
   const [isOpen, setIsOpen] = useState(false)
   const [messages, setMessages] = useState<(ChatMessage & { timestamp?: Date })[]>([])
   const [input, setInput] = useState('')
@@ -199,6 +201,20 @@ export default function ChatWidget() {
   useEffect(() => {
     if (isOpen) setTimeout(() => inputRef.current?.focus(), 300)
   }, [isOpen])
+
+  // Una sola entrada de copiloto para todo Fullsite. Cualquier superficie puede
+  // abrirlo con contexto sin crear otro chat o agente visible.
+  useEffect(() => {
+    function openCopilot(event: Event) {
+      const detail = (event as CustomEvent<{ prompt?: string; context?: string }>).detail
+      setIsOpen(true)
+      if (detail?.prompt) setTimeout(() => void sendMessage(`[Contexto: ${detail.context || pathname}] ${detail.prompt}`), 0)
+    }
+    window.addEventListener('fullsite:open-copilot', openCopilot)
+    return () => window.removeEventListener('fullsite:open-copilot', openCopilot)
+    // sendMessage intentionally resolves the latest tenant/messages at event time.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname])
 
   async function sendMessage(text: string) {
     if (!text.trim() || isLoading) return
@@ -284,8 +300,9 @@ export default function ChatWidget() {
       <button
         onClick={() => setIsOpen(true)}
         className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-gradient-to-br from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105 flex items-center justify-center"
+        aria-label="Abrir Copiloto Fullsite"
       >
-        <MessageCircle size={22} />
+        <Sparkles size={22} />
       </button>
     )
   }
@@ -309,10 +326,10 @@ export default function ChatWidget() {
               <Sparkles size={16} className="text-white" />
             </div>
             <div className="min-w-0">
-              <h3 className="text-sm font-semibold text-[var(--text-1)] leading-tight">fullsite IA</h3>
+              <h3 className="text-sm font-semibold text-[var(--text-1)] leading-tight">Copiloto Fullsite</h3>
               <div className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                <p className="text-[11px] text-[var(--text-3)]">En linea</p>
+                <p className="text-[11px] text-[var(--text-3)]">Con evidencia y contexto</p>
               </div>
             </div>
           </div>
@@ -347,8 +364,8 @@ export default function ChatWidget() {
               <Sparkles size={28} className="text-emerald-500" />
             </div>
             <div className="text-center">
-              <p className="text-sm font-medium text-[var(--text-1)]">Asistente IA</p>
-              <p className="text-xs text-[var(--text-3)] mt-1 max-w-[240px]">Pregunta sobre ventas, meseros, platillos o tendencias</p>
+              <p className="text-sm font-medium text-[var(--text-1)]">¿Qué necesitas entender o resolver?</p>
+              <p className="text-xs text-[var(--text-3)] mt-1 max-w-[260px]">Estoy viendo {pathname === '/ahora' ? 'el pulso del turno' : 'esta parte de Fullsite'}. Te diré la fuente antes de recomendar cambios.</p>
             </div>
             <div className="flex flex-wrap justify-center gap-2 mt-2 px-2">
               {quickQuestions.map((q) => (

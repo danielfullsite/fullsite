@@ -61,3 +61,15 @@ describe('sw.js structure', () => {
     expect(content).toContain('mp-point')
   })
 })
+
+describe('offline POS navigation', () => {
+  it('opens a mesa with a document navigation when offline (avoids uncached RSC)', async () => {
+    const fs = await import('fs')
+    const path = await import('path')
+    const pagePath = path.resolve(__dirname, '../app/pos/mesas/page.tsx')
+    const content = fs.readFileSync(pagePath, 'utf-8')
+
+    expect(content).toContain("if (!navigator.onLine) window.location.assign(target)")
+    expect(content).toContain('else router.push(target)')
+  })
+})

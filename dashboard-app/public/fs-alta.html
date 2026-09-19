@@ -1,0 +1,1220 @@
+<meta charset="utf-8">
+<title>Alta de restaurante</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════════════════════
+   ALTA DE RESTAURANTE — la plantilla vacía
+   Dar de alta un cliente es llenar un objeto TENANT. Esta pantalla lo guía
+   paso por paso, dice qué falta para poder operar, y al final entrega el
+   objeto listo para pegar. Nada de esto toca código.
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root{
+  color-scheme:dark;
+  --bg:#080b0c; --surface:#0c1012; --surface-2:#11171a; --panel:#131a1d; --raised:#1a2226;
+  --line:#232b2c; --line-soft:#191f20;
+  --text-1:#eef2f0; --text-2:#a8b5b1; --text-3:#6f7d79; --text-4:#4a5553;
+  --accent:#10b981; --accent-bright:#34d399;
+  --accent-soft:rgba(16,185,129,.12); --accent-line:rgba(16,185,129,.28);
+  --info:#38bdf8; --info-soft:rgba(56,189,248,.12); --info-line:rgba(56,189,248,.3);
+  --warn:#f5a524; --warn-soft:rgba(245,165,36,.12); --warn-line:rgba(245,165,36,.3);
+  --crit:#f5455c; --crit-soft:rgba(245,69,92,.12); --crit-ink:#fda4af; --crit-line:rgba(245,69,92,.32);
+  --fs-green:#10B981;
+  --r1:8px; --r2:12px; --r3:16px; --r4:22px;
+  --shadow-1:0 1px 2px rgba(0,0,0,.4);
+  --shadow-2:0 8px 24px rgba(0,0,0,.45);
+  --ease:cubic-bezier(.2,.9,.3,1);
+}
+:root[data-theme="light"]{
+  color-scheme:light;
+  --bg:#eef1ec; --surface:#fff; --surface-2:#f4f7f1; --panel:#fff; --raised:#fff;
+  --line:#dde3dc; --line-soft:#eef1ec;
+  --text-1:#0e1613; --text-2:#3d4a46; --text-3:#6b7873; --text-4:#9aa5a1;
+  --accent:#0ea371; --accent-soft:rgba(16,185,129,.1); --accent-line:rgba(5,120,90,.24);
+  --shadow-1:0 1px 2px rgba(11,60,40,.1); --shadow-2:0 8px 24px rgba(11,60,40,.12);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;margin:0;}
+body{background:var(--bg);color:var(--text-1);
+  font-family:'Public Sans',system-ui,sans-serif;font-size:14px;line-height:1.5;overflow:hidden;}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;}
+input,select{font:inherit;color:inherit;}
+code,.mono{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums;}
+
+#app{height:100dvh;display:grid;grid-template-rows:auto minmax(0,1fr) auto;}
+
+/* ── Barra superior con el progreso ─────────────────────────────────────── */
+#top{display:flex;align-items:center;gap:16px;padding:0 20px;height:58px;
+  background:var(--surface-2);border-bottom:1px solid var(--line);}
+.brand{display:inline-flex;align-items:flex-end;gap:.07em;font-weight:800;
+  letter-spacing:-.045em;font-size:18px;line-height:.9;}
+.brand i{width:.22em;height:.22em;background:var(--fs-green);display:block;margin-bottom:.055em;}
+#top .sep{width:1px;height:22px;background:var(--line);}
+#top h1{margin:0;font-size:13.5px;font-weight:700;color:var(--text-3);}
+#top .sp{flex:1;}
+.icon-btn{width:38px;height:38px;border-radius:var(--r1);display:grid;place-items:center;color:var(--text-2);}
+.icon-btn:hover{background:var(--surface);color:var(--text-1);}
+
+.pasos{display:flex;gap:5px;overflow-x:auto;padding:0 2px;}
+.paso{
+  display:flex;align-items:center;gap:8px;height:36px;padding:0 13px;border-radius:99px;
+  background:var(--surface);border:1px solid var(--line);white-space:nowrap;
+  font-size:12.5px;font-weight:700;color:var(--text-3);transition:.15s var(--ease);
+}
+.paso:active{transform:scale(.96);}
+.paso .n{width:19px;height:19px;border-radius:50%;display:grid;place-items:center;
+  background:var(--line);color:var(--text-3);font-size:10.5px;font-weight:900;
+  font-family:'IBM Plex Mono',monospace;flex-shrink:0;transition:.15s var(--ease);}
+.paso[aria-current="true"]{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent-bright);}
+.paso[aria-current="true"] .n{background:var(--accent);color:#052018;}
+.paso.listo .n{background:var(--accent);color:#052018;}
+.paso.listo{color:var(--text-2);}
+
+/* ── Cuerpo ─────────────────────────────────────────────────────────────── */
+#cuerpo{overflow-y:auto;overscroll-behavior:contain;}
+.wrap{max-width:940px;margin:0 auto;padding:30px 22px 40px;}
+.wrap.ancho{max-width:1180px;}
+h2{margin:0 0 5px;font-size:25px;font-weight:900;letter-spacing:-.04em;}
+.lead{margin:0 0 22px;font-size:14px;color:var(--text-3);max-width:70ch;line-height:1.65;}
+h3{margin:26px 0 11px;font-size:14.5px;font-weight:800;letter-spacing:-.01em;}
+h3 small{display:block;font-size:12px;font-weight:600;color:var(--text-3);margin-top:2px;letter-spacing:0;}
+
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r3);padding:17px;}
+.grid{display:grid;gap:11px;}
+.g2{grid-template-columns:repeat(auto-fit,minmax(260px,1fr));}
+.g3{grid-template-columns:repeat(auto-fit,minmax(190px,1fr));}
+.nota{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 15px;
+  border-radius:0 var(--r2) var(--r2) 0;font-size:13px;line-height:1.6;color:var(--text-2);}
+.nota.warn{border-left-color:var(--warn);background:var(--warn-soft);}
+.nota b{color:var(--text-1);}
+
+/* ── Campos ─────────────────────────────────────────────────────────────── */
+.campo{display:flex;flex-direction:column;gap:6px;}
+.campo label{font-size:11px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--text-3);}
+.campo .ayuda{font-size:11.5px;color:var(--text-4);font-weight:500;line-height:1.5;}
+.campo input,.campo select{
+  height:48px;padding:0 14px;border-radius:var(--r2);background:var(--surface-2);
+  border:1px solid var(--line);font-size:14.5px;font-weight:600;transition:.14s var(--ease);width:100%;
+}
+.campo input:focus,.campo select:focus{outline:0;border-color:var(--accent-line);background:var(--surface);}
+.campo input::placeholder{color:var(--text-4);font-weight:500;}
+.campo.ok input{border-color:var(--accent-line);}
+.campo.mal input{border-color:var(--crit-line);background:var(--crit-soft);}
+.campo .err{font-size:11.5px;color:var(--crit-ink);font-weight:700;}
+
+.opt{height:56px;border-radius:var(--r2);background:var(--surface-2);border:1px solid var(--line);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+  font-weight:800;font-size:13.5px;color:var(--text-2);padding:0 12px;transition:.14s var(--ease);}
+.opt small{font-size:10.5px;font-weight:600;opacity:.65;}
+.opt:active{transform:scale(.96);}
+.opt[aria-selected="true"]{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent-bright);}
+.opts{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;}
+
+.tag{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 9px;border-radius:999px;
+  font-size:10.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;
+  background:var(--surface-2);border:1px solid var(--line);color:var(--text-3);white-space:nowrap;}
+.tag.ok{background:var(--accent-soft);color:var(--accent-bright);border-color:var(--accent-line);}
+.tag.warn{background:var(--warn-soft);color:var(--warn);border-color:var(--warn-line);}
+.tag.bad{background:var(--crit-soft);color:var(--crit-ink);border-color:var(--crit-line);}
+.tag.info{background:var(--info-soft);color:var(--info);border-color:var(--info-line);}
+
+.list{border:1px solid var(--line);border-radius:var(--r3);background:var(--panel);overflow:hidden;}
+.row{display:grid;align-items:center;gap:11px;padding:10px 14px;border-bottom:1px solid var(--line-soft);}
+.row:last-child{border-bottom:0;}
+.row .t1{font-weight:700;font-size:13.5px;}
+.row .t2{font-size:11.5px;color:var(--text-3);font-weight:600;margin-top:1px;}
+.mini{width:32px;height:32px;border-radius:var(--r1);display:grid;place-items:center;
+  background:var(--surface-2);border:1px solid var(--line);color:var(--text-3);flex-shrink:0;}
+.mini:hover{color:var(--crit-ink);border-color:var(--crit-line);}
+
+/* ── Preajustes por tipo de negocio ─────────────────────────────────────── */
+.presets{display:grid;grid-template-columns:repeat(auto-fill,minmax(184px,1fr));gap:11px;}
+.preset{
+  padding:18px 16px;border-radius:var(--r3);background:var(--panel);border:1px solid var(--line);
+  text-align:left;transition:.16s var(--ease);position:relative;overflow:hidden;
+}
+.preset:hover{transform:translateY(-2px);border-color:var(--accent-line);box-shadow:var(--shadow-2);}
+.preset:active{transform:scale(.98);}
+.preset .ic{width:44px;height:44px;border-radius:13px;display:grid;place-items:center;
+  color:#fff;margin-bottom:11px;}
+.preset .nm{font-size:15px;font-weight:900;letter-spacing:-.02em;}
+.preset .ds{font-size:11.5px;color:var(--text-3);font-weight:600;margin-top:3px;line-height:1.5;}
+.preset .qt{margin-top:9px;display:flex;gap:5px;flex-wrap:wrap;}
+.preset[aria-selected="true"]{border-color:var(--accent);background:var(--accent-soft);}
+.preset[aria-selected="true"]::after{content:'✓';position:absolute;top:12px;right:14px;
+  color:var(--accent-bright);font-weight:900;font-size:16px;}
+
+/* ── Salud del alta ─────────────────────────────────────────────────────── */
+.salud{display:grid;gap:7px;}
+.chk{display:flex;align-items:center;gap:10px;padding:10px 13px;border-radius:var(--r2);
+  background:var(--surface-2);border:1px solid var(--line);font-size:13px;font-weight:700;}
+.chk.ok{border-color:var(--accent-line);color:var(--accent-bright);}
+.chk.falta{border-color:var(--warn-line);color:var(--warn);}
+.chk.bad{border-color:var(--crit-line);color:var(--crit-ink);}
+.chk .d{flex:1;font-weight:600;color:var(--text-3);font-size:12px;}
+.barra{height:8px;border-radius:99px;background:var(--line);overflow:hidden;margin:10px 0 4px;}
+.barra span{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-bright));
+  border-radius:99px;transition:width .45s var(--ease);}
+
+pre{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r2);
+  padding:15px 17px;overflow:auto;font-size:11.5px;line-height:1.65;color:var(--text-2);
+  margin:0;max-height:420px;}
+pre .k{color:var(--accent-bright);} pre .s{color:var(--info);} pre .c{color:var(--text-4);}
+
+/* ── Vista previa del punto de venta ────────────────────────────────────── */
+.previa{border:1px solid var(--line);border-radius:var(--r3);overflow:hidden;background:var(--surface);}
+.previa-top{display:flex;align-items:center;gap:10px;padding:9px 13px;background:var(--surface-2);
+  border-bottom:1px solid var(--line);font-size:12px;font-weight:700;}
+.previa-cuerpo{display:grid;grid-template-columns:1fr;gap:8px;padding:13px;}
+.fams{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:5px;}
+.fam{height:52px;border-radius:var(--r2);border:1px solid var(--line);background:var(--surface-2);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  color:var(--text-2);font-size:10px;font-weight:800;overflow:hidden;}
+.fam[aria-selected="true"]{color:#fff;border-color:transparent;}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:6px;}
+.tile{border-radius:var(--r2);padding:9px 7px;min-height:64px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:4px;text-align:center;color:#fff;
+  box-shadow:var(--shadow-1);}
+.tile .nm{font-size:10.5px;font-weight:800;line-height:1.15;}
+.tile .pr{font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;opacity:.9;}
+
+/* ── Banda inferior ─────────────────────────────────────────────────────── */
+#pie{height:76px;display:flex;align-items:center;gap:11px;padding:0 20px;
+  background:var(--surface-2);border-top:1px solid var(--line);}
+.act{height:52px;border-radius:var(--r2);display:inline-flex;align-items:center;justify-content:center;
+  gap:9px;padding:0 22px;font-weight:800;font-size:14.5px;border:1px solid transparent;
+  box-shadow:var(--shadow-1);transition:.14s var(--ease);}
+.act:active{transform:scale(.97);}
+.act[disabled]{opacity:.32;pointer-events:none;box-shadow:none;}
+.act.send{background:linear-gradient(180deg,var(--accent-bright),var(--accent));color:#052018;}
+.act.ghost{background:var(--surface);border-color:var(--line);color:var(--text-1);}
+#pie .sp{flex:1;}
+#pie .est{font-size:12.5px;color:var(--text-3);font-weight:600;}
+
+#avisos{position:fixed;top:68px;left:50%;transform:translateX(-50%);z-index:200;display:grid;gap:7px;pointer-events:none;}
+.aviso{display:flex;align-items:center;gap:10px;padding:12px 18px;border-radius:var(--r2);
+  background:var(--raised);border:1px solid var(--line);box-shadow:var(--shadow-2);
+  font-weight:700;font-size:13.5px;animation:drop .2s var(--ease);}
+@keyframes drop{from{transform:translateY(-10px);opacity:0}to{transform:none;opacity:1}}
+.aviso.ok{border-color:var(--accent-line);color:var(--accent-bright);}
+.aviso.err{border-color:var(--crit-line);color:var(--crit-ink);}
+@keyframes rise{from{transform:translateY(12px);opacity:0}to{transform:none;opacity:1}}
+.wrap > *{animation:rise .25s var(--ease) backwards;}
+
+@media (max-width:820px){
+  #top h1{display:none;} .wrap{padding:22px 14px 30px;}
+  #pie{padding:0 13px;} #pie .est{display:none;}
+}
+/* ── Altas hechas a la medida ──────────────────────────────────────────── */
+.alta-linea{display:flex;gap:8px;margin-top:11px;}
+.alta-linea input{flex:1;min-width:0;height:48px;background:var(--surface-2);
+  border:1px solid var(--line);border-radius:var(--r1);padding:0 13px;color:var(--text-1);
+  font-size:14px;font-weight:600;font-family:inherit;}
+.alta-linea input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);}
+.alta-linea .act{flex-shrink:0;}
+
+.tarjetas{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:11px;margin-top:13px;}
+.tarjeta{background:var(--panel);border:1px solid var(--line);border-radius:var(--r2);padding:13px;}
+.tarjeta .th{display:flex;align-items:center;gap:8px;margin-bottom:11px;}
+.tarjeta .th b{font-size:14px;color:var(--text-1);}
+.tarjeta .th code{font-size:11px;color:var(--text-4);}
+.tarjeta .th .x{margin-left:auto;width:32px;height:32px;border-radius:8px;display:grid;
+  place-items:center;background:var(--crit-soft);border:1px solid var(--crit-line);
+  color:var(--crit);cursor:pointer;}
+.tarjeta .tf{margin-bottom:9px;}
+.tarjeta .tf label{display:block;font-size:10.5px;font-weight:800;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--text-4);margin-bottom:5px;}
+.tarjeta .tf input,.tarjeta .tf select{width:100%;height:40px;background:var(--surface-2);
+  border:1px solid var(--line);border-radius:8px;padding:0 10px;color:var(--text-1);
+  font-size:13px;font-family:inherit;}
+.tarjeta .mini{font-size:11.5px;color:var(--text-3);line-height:1.55;margin:9px 0 0;}
+
+.mini-opts{display:flex;flex-wrap:wrap;gap:5px;}
+.mini-opts button{min-height:34px;padding:0 10px;border-radius:8px;font-size:11.5px;
+  font-weight:700;background:var(--surface-2);border:1px solid var(--line);
+  color:var(--text-3);cursor:pointer;font-family:inherit;transition:.12s var(--ease);}
+.mini-opts button.on{background:var(--info-soft);border-color:var(--info-line);color:var(--info);}
+.mini-opts button:active{transform:scale(.94);}
+.mini-opts.grande button{min-height:48px;padding:0 17px;font-size:13px;font-weight:800;}
+.mini-opts.grande button.on{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent);}
+
+/* ── Vista previa de apariencia ────────────────────────────────────────── */
+.prev-look{background:var(--bg);border:1px solid var(--line);border-radius:var(--r3);
+  padding:15px;margin-top:11px;}
+.pl-tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.pl-tile{border-radius:var(--r2);padding:12px 9px;min-height:78px;display:flex;
+  flex-direction:column;align-items:center;justify-content:center;gap:5px;text-align:center;
+  color:#fff;box-shadow:var(--shadow-1);}
+.pl-tile .nm{font-size:1em;font-weight:800;line-height:1.14;}
+.pl-tile .pr{font-family:'IBM Plex Mono',monospace;font-size:.92em;font-weight:700;opacity:.92;}
+.pl-cuenta{margin-top:12px;background:var(--surface);border:1px solid var(--line);
+  border-radius:var(--r2);overflow:hidden;}
+.pl-row{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;
+  padding:10px 13px;border-bottom:1px solid var(--line-soft);}
+.pl-row .q{font-family:'IBM Plex Mono',monospace;font-weight:800;color:var(--text-1);}
+.pl-row .n{font-weight:600;color:var(--text-1);}
+.pl-row .p{font-family:'IBM Plex Mono',monospace;font-weight:800;color:var(--text-1);}
+.pl-tot{display:flex;align-items:center;justify-content:space-between;padding:11px 13px;
+  background:var(--surface-2);}
+.pl-tot span{font-weight:700;color:var(--text-2);}
+.pl-tot b{font-family:'IBM Plex Mono',monospace;font-size:1.5em;font-weight:900;}
+.pl-act{width:100%;min-height:56px;margin-top:11px;border-radius:var(--r2);border:1px solid;
+  color:#04231a;font-weight:800;font-size:1em;font-family:inherit;cursor:pointer;}
+.pl-act:active{transform:scale(.97);}
+
+/* La barra de pasos creció a 8 y dejó de caber en 1024 px. Un hijo flex no
+   encoge por debajo de su contenido sin min-width:0 — el overflow-x:auto que
+   ya tenía no servía de nada sin esto. Misma causa que el minmax(0,1fr) de la
+   retícula del punto de venta. */
+.pasos{min-width:0;flex:0 1 auto;scrollbar-width:none;}
+.pasos::-webkit-scrollbar{display:none;}
+.paso{flex-shrink:0;}
+@media(max-width:1100px){ #top h1{display:none;} }
+@media(max-width:780px){ .alta-linea{flex-wrap:wrap;} .alta-linea .act{width:100%;} }
+
+/* #cuerpo es un elemento de retícula y los elementos de retícula traen
+   min-width:auto — no encogen por debajo de su contenido. Es la misma causa
+   del punto anterior, en la otra capa: la barra de pasos se arreglaba sola
+   pero el contenedor seguía fijando el ancho del documento. */
+#cuerpo, #top, #pie{min-width:0;}
+#app{overflow-x:clip;}
+
+</style>
+<div id="app">
+  <header id="top">
+    <span class="brand">fullsite<i></i></span>
+    <span class="sep"></span>
+    <h1>Alta de restaurante</h1>
+    <div class="pasos" id="pasos"></div>
+    <span class="sp"></span>
+    <button class="icon-btn" onclick="tema()" id="btn-tema"></button>
+  </header>
+  <div id="cuerpo"></div>
+  <footer id="pie"></footer>
+</div>
+<div id="avisos"></div>
+
+<script>
+const IC = {
+  /* ── Comida y bebida — cubren el catálogo de cualquier restaurante ────── */
+  coffee:'<path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><path d="M6 2v3M10 2v3M14 2v3"/>',
+  cup:'<path d="M5 3h14l-1.5 17a2 2 0 0 1-2 1.8H8.5a2 2 0 0 1-2-1.8Z"/><path d="M6 9h12"/>',
+  tea:'<path d="M4 5h13v7a6.5 6.5 0 0 1-13 0Z"/><path d="M17 7h2a2.5 2.5 0 0 1 0 5h-2"/><path d="M3 21h15"/>',
+  wine:'<path d="M8 22h8M12 15v7"/><path d="M7 3h10l-.6 6a4.4 4.4 0 0 1-8.8 0Z"/>',
+  beer:'<path d="M6 4h11v16H6Z"/><path d="M17 8h2.5a1.5 1.5 0 0 1 1.5 1.5v5A1.5 1.5 0 0 1 19.5 16H17"/><path d="M9.5 8v8M13.5 8v8"/>',
+  bottle:'<path d="M10 2h4v3.5l1.8 2.7A4 4 0 0 1 16.5 10v10a2 2 0 0 1-2 2h-5a2 2 0 0 1-2-2V10a4 4 0 0 1 .7-1.8L10 5.5Z"/><path d="M8 12h8"/>',
+  water:'<path d="M12 2.5S5.5 10 5.5 14.5a6.5 6.5 0 0 0 13 0C18.5 10 12 2.5 12 2.5Z"/>',
+  soda:'<path d="M6 7h12l-1.2 13a2 2 0 0 1-2 1.8h-5.6a2 2 0 0 1-2-1.8Z"/><path d="M9 2.5 7.5 7M15 2.5 16.5 7"/><path d="M7 12h10"/>',
+  smoothie:'<path d="M6 8h12l-1 12.2a2 2 0 0 1-2 1.8H9a2 2 0 0 1-2-1.8Z"/><path d="M12 8V3M12 3l3-1M12 3 9 2"/><circle cx="10" cy="13" r="1"/><circle cx="14" cy="16" r="1"/>',
+  egg:'<path d="M12 2c4 0 7 6.5 7 11a7 7 0 1 1-14 0c0-4.5 3-11 7-11Z"/>',
+  utensils:'<path d="M4 2v8a2 2 0 0 0 4 0V2M6 12v10"/><path d="M14 2c0 4 1 6 3 6s3-2 3-6"/><path d="M17 8v14"/>',
+  croissant:'<path d="M3 14a9 9 0 0 1 18 0c0 1-1 2-2 2l-7-4-7 4c-1 0-2-1-2-2Z"/><path d="M7 16v3M12 12v7M17 16v3"/>',
+  bread:'<path d="M4 10a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4c0 1.2-1 2-2 2v6a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-6c-1 0-2-.8-2-2Z"/>',
+  cake:'<path d="M3 21h18v-7a3 3 0 0 0-3-3H6a3 3 0 0 0-3 3Z"/><path d="M3 15c2 1.5 4 1.5 6 0s4-1.5 6 0 4 1.5 6 0"/><path d="M8 8V6M12 8V4M16 8V6"/>',
+  iceCream:'<path d="M8 10a4 4 0 0 1 8 0"/><path d="M7.5 10h9L12 22Z"/><path d="M6.5 13.5h11M8 17h8"/>',
+  candy:'<circle cx="12" cy="12" r="4.5"/><path d="M7.5 12 3 8.5v7ZM16.5 12 21 8.5v7Z"/>',
+  pizza:'<path d="M12 2 3 20a1.4 1.4 0 0 0 1.8 1.8L22 13Z"/><circle cx="11" cy="11" r="1"/><circle cx="8" cy="16" r="1"/><circle cx="14" cy="14" r="1"/>',
+  pasta:'<path d="M5 8h14v3a7 7 0 0 1-14 0Z"/><path d="M7 8c0-3 1.5-5 5-5s5 2 5 5"/><path d="M3 21h18"/>',
+  burger:'<path d="M3 9a5 5 0 0 1 5-5h8a5 5 0 0 1 5 5Z"/><path d="M3 13h18"/><path d="M3 16h18a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3Z"/>',
+  sandwich:'<path d="M3 8.5 12 4l9 4.5-9 4.5Z"/><path d="M3 12.5 12 17l9-4.5"/><path d="M3 16.5 12 21l9-4.5"/>',
+  taco:'<path d="M2 16a10 10 0 0 1 20 0Z"/><path d="M2 16a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3"/><path d="M8 13c1-1 2-1 3 0M13 12c1-1 2-1 3 0"/>',
+  sushi:'<rect x="3" y="8" width="18" height="9" rx="4"/><circle cx="12" cy="12.5" r="2.5"/><path d="M7 8v9M17 8v9"/>',
+  salad:'<path d="M3 12h18a9 9 0 0 1-18 0Z"/><path d="M6 12c0-3 2-5 4-5M12 12c0-4 2-6 5-6"/><path d="M6 21h12"/>',
+  soup:'<path d="M4 11h16a8 8 0 0 1-16 0Z"/><path d="M8 7c0-1.5 1-2 1-3M12 7c0-1.5 1-2 1-3M16 7c0-1.5 1-2 1-3"/><path d="M3 21h18"/>',
+  noodle:'<path d="M4 10h16v2a8 8 0 0 1-16 0Z"/><path d="M7 10V5M11 10V4M15 10V5"/><path d="M18 15l3-2"/>',
+  rice:'<path d="M4 12h16l-2 8H6Z"/><path d="M7 12c0-3 2-5 5-5s5 2 5 5"/><circle cx="10" cy="16" r=".8"/><circle cx="14" cy="16" r=".8"/>',
+  fish:'<path d="M2 12c4-5 10-6 14-3 2 1.5 3 3 6 3-3 0-4 1.5-6 3-4 3-10 2-14-3Z"/><circle cx="16" cy="11" r=".9"/><path d="M7 9.5c0 2 0 3 0 5"/>',
+  meat:'<path d="M13 3a7 7 0 0 1 7 7c0 4-3 6-6 6-2 0-3 1-3 3a4 4 0 0 1-8 0c0-2 1-3 3-3 3 0 5-2 5-6a7 7 0 0 1 2-7Z"/>',
+  chicken:'<path d="M6 20c-2 0-3-1.5-3-3.5S5 13 7 13c0-4 3-7 7-7a6 6 0 0 1 6 6c0 4-3 7-7 7Z"/><path d="M8 20v2M12 20v2"/>',
+  cheese:'<path d="M3 10 13 4l8 6v8H3Z"/><circle cx="8" cy="14" r="1.2"/><circle cx="15" cy="13" r="1.2"/>',
+  fruit:'<path d="M12 7c-4 0-6 3-6 7a5 5 0 0 0 10 0c0-4-2-7-4-7Z"/><path d="M12 7V3M12 3c2 0 3-1 4-2"/>',
+  cart:'<circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.6 12.4a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.6L21 7H6"/>',
+  star:'<path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.9L12 17.8 5.8 21.1 7 14.2l-5-4.9 6.9-1L12 2Z"/>',
+
+  /* ── Interfaz y operación ─────────────────────────────────────────────── */
+  menu:'<path d="M3 6h18M3 12h18M3 18h18"/>',
+  x:'<path d="M18 6 6 18M6 6l12 12"/>',
+  check:'<path d="M20 6 9 17l-5-5"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
+  minus:'<path d="M5 12h14"/>',
+  left:'<path d="M15 18l-6-6 6-6"/>',
+  right:'<path d="M9 18l6-6-6-6"/>',
+  search:'<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+  grid:'<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+  map:'<path d="m9 4 6 2 5.5-2v14L15 20l-6-2-5.5 2V6Z"/><path d="M9 4v14M15 6v14"/>',
+  table:'<rect x="3" y="7" width="18" height="10" rx="2"/><path d="M7 17v3M17 17v3"/>',
+  users:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/>',
+  user:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>',
+  cash:'<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M6 10v4M18 10v4"/>',
+  card:'<rect x="2" y="5" width="20" height="14" rx="2.5"/><path d="M2 10h20"/>',
+  receipt:'<path d="M6 2h12v20l-3-2-3 2-3-2-3 2Z"/><path d="M9 8h6M9 12h6"/>',
+  printer:'<path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M6 15h12v6H6Z"/>',
+  box:'<path d="m12 2 9 5v10l-9 5-9-5V7Z"/><path d="m3 7 9 5 9-5M12 12v10"/>',
+  trash:'<path d="M3 6h18M8 6V4h8v2M6 6l1 15h10l1-15"/><path d="M10 11v6M14 11v6"/>',
+  history:'<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>',
+  gear:'<circle cx="12" cy="12" r="3"/><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z"/>',
+  chef:'<path d="M6 20h12v-7H6Z"/><path d="M6 13a4 4 0 0 1-1-7.9 4 4 0 0 1 7-2.1 4 4 0 0 1 7 2.1A4 4 0 0 1 18 13"/>',
+  truck:'<path d="M2 6h11v11H2Z"/><path d="M13 9h4l4 4v4h-8Z"/><circle cx="6" cy="18.5" r="1.8"/><circle cx="17" cy="18.5" r="1.8"/>',
+  lock:'<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+  wifi:'<path d="M2 8a17 17 0 0 1 20 0"/><path d="M5 12a12 12 0 0 1 14 0"/><path d="M8.5 15.5a7 7 0 0 1 7 0"/><circle cx="12" cy="19" r="1"/>',
+  wifiOff:'<path d="m2 2 20 20"/><path d="M8.5 15.5a7 7 0 0 1 7 0"/><circle cx="12" cy="19" r="1"/><path d="M5 12a12 12 0 0 1 4-2.6M2 8a17 17 0 0 1 5-3.2"/><path d="M22 8a17 17 0 0 0-8-3.8"/>',
+  alert:'<path d="M12 8v5M12 17h.01"/><circle cx="12" cy="12" r="9"/>',
+  info:'<circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/>',
+  send:'<path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7Z"/>',
+  tag:'<path d="M3 3h8l10 10-8 8L3 11Z"/><circle cx="7.5" cy="7.5" r="1.3"/>',
+  split:'<path d="M16 3h5v5M8 3H3v5"/><path d="M12 22v-8.3a4 4 0 0 0-1.17-2.83L3 3M21 3l-7.83 7.87A4 4 0 0 0 12 13.7v.3"/>',
+  chart:'<path d="M3 3v18h18"/><path d="m7 14 3.5-4 3 2.5L19 7"/>',
+  shield:'<path d="M12 2 4 5.5V11c0 5 3.4 9 8 11 4.6-2 8-6 8-11V5.5Z"/><path d="m9 12 2 2 4-4"/>',
+  huella:'<path d="M2 12C2 6.5 6.5 2 12 2a10 10 0 0 1 8 4"/><path d="M5 19.5C5.5 18 6 15 6 12c0-.7.12-1.37.34-2"/><path d="M17.29 21.02c.12-.6.43-2.3.5-3.02"/><path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4"/><path d="M8.65 22c.21-.66.45-1.32.57-2"/><path d="M14 13.12c0 2.38 0 6.38-1 8.88"/><path d="M2 16h.01"/><path d="M21.8 16c.2-2 .13-5.35 0-6"/><path d="M9 6.8a6 6 0 0 1 9 5.2c0 .47 0 1.17-.02 2"/>',
+  calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  refresh:'<path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/>',
+  eye:'<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
+  moon:'<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
+  type:'<path d="M4 7V4h16v3"/><path d="M9 20h6M12 4v16"/>',
+  layers:'<path d="m12 2 9 5-9 5-9-5Z"/><path d="m3 12 9 5 9-5M3 17l9 5 9-5"/>',
+  bell:'<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M10.3 21a2 2 0 0 0 3.4 0"/>',
+  home:'<path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M9 22V12h6v10"/>',
+  file:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/>',
+  qr:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v3M14 20h3M20 20h1"/>',
+  bag:'<path d="M6 7h12l1 14H5Z"/><path d="M9 7V5a3 3 0 0 1 6 0v2"/>',
+  phone:'<rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M10 18h4"/>',
+  dollar:'<path d="M12 2v20"/><path d="M17 6.5C17 4.6 14.8 3.5 12 3.5S7 4.6 7 6.5s2 2.6 5 3.5 5 1.6 5 3.5-2.2 3-5 3-5-1.1-5-3"/>',
+  merge:'<path d="M8 3v5a4 4 0 0 0 4 4h8"/><path d="M8 21v-5a4 4 0 0 1 4-4"/><path d="M17 9l3 3-3 3"/>',
+  weight:'<path d="M6.5 6h11l2.5 15H4Z"/><circle cx="12" cy="10.5" r="2"/>',
+  scale:'<path d="M12 3v18M7 8h10"/><path d="M4 8 1 15h6ZM20 8l-3 7h6Z"/><path d="M5 21h14"/>',
+};
+
+const ICON_RULES = [
+  [['cafe','café','coffee','espresso','capuchino','latte','americano'], 'coffee', '#a8703a'],
+  [['frappe','frapp','malteada','shake','batido'],                      'smoothie','#8b5a3c'],
+  [['te','té','tea','tisana','infusion','matcha','chai'],               'tea',    '#6d9e5e'],
+  [['jugo','juice','naranja','zumo'],                                   'fruit',  '#f59e0b'],
+  [['smoothie','licuado'],                                              'smoothie','#ec4899'],
+  [['agua','water','soda','refresco','coca','bebida','drink','fresh'],  'soda',   '#3b82f6'],
+  [['vino','wine','copa','botella'],                                    'wine',   '#8b5cf6'],
+  [['cerveza','beer','lager','michelada'],                              'beer',   '#d97706'],
+  [['licor','whisky','tequila','mezcal','ron','vodka','coctel','cóctel','bar'],'bottle','#a855f7'],
+  [['huevo','egg','omelet','benedict','keto','desayuno','breakfast'],   'egg',    '#f59e0b'],
+  [['chilaquil','enchilada','taco','taqueria','taquito','quesadilla'],  'taco',   '#e05a2b'],
+  [['pizza'],                                                           'pizza',  '#dc2626'],
+  [['pasta','spaghetti','lasagna','noodle','ramen','fideo'],            'pasta',  '#ca8a04'],
+  [['sushi','roll','sashimi','nigiri'],                                 'sushi',  '#0891b2'],
+  [['burger','hamburgues'],                                             'burger', '#b45309'],
+  [['panini','sandwich','sándwich','torta','bagel','toast','croque'],   'sandwich','#2e9e5b'],
+  [['sopa','soup','caldo','crema'],                                     'soup',   '#0d9488'],
+  [['ensalada','salad','bowl','verde'],                                 'salad',  '#16a34a'],
+  [['ceviche','pescado','fish','mariscos','salmon','atun','atún'],      'fish',   '#0284c7'],
+  [['pollo','chicken','alitas'],                                        'chicken','#ea580c'],
+  [['carne','meat','arrachera','steak','res','cerdo'],                  'meat',   '#991b1b'],
+  [['arroz','rice'],                                                    'rice',   '#a16207'],
+  [['queso','cheese'],                                                  'cheese', '#eab308'],
+  [['pan','bakery','panader','croissant','concha','bisquet','baguette'],'croissant','#c2410c'],
+  [['postre','dessert','pastel','cake','pay','brownie'],                'cake',   '#ec4899'],
+  [['nieve','helado','ice cream','gelato','paleta'],                    'iceCream','#f472b6'],
+  [['dulce','candy','chocolate','galleta','cookie'],                    'candy',  '#db2777'],
+  [['market','tienda','abarrote','retail','souvenir','regalo'],         'cart',   '#64748b'],
+  [['snack','chips','botana','barra','nuez','semilla'],                 'candy',  '#78716c'],
+  [['suplemento','proteina','proteína','salud','vitamina'],             'scale',  '#0f766e'],
+  [['extra','adicional','modificador','guarnicion','guarnición'],       'plus',   '#525252'],
+  [['especial','special','signature','temporada','evento','promo'],     'star',   '#10b981'],
+  [['kids','niño','infantil'],                                          'candy',  '#f97316'],
+  [['appetizer','entrada','botanas','starter'],                         'salad',  '#65a30d'],
+  [['fruta','fruit'],                                                   'fruit',  '#f43f5e'],
+];
+
+function iconForCategory(name){
+  const n = (name||'').toLowerCase();
+  for(const [keys, icon, color] of ICON_RULES){
+    if(keys.some(k=>n.includes(k))) return {icon, color};
+  }
+  return {icon:'utensils', color:'#2e9e5b'};
+}
+function svg(name, size=20, sw=1.9){
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round">${IC[name]||IC.utensils}</svg>`;
+}
+/* ═══════════════════════════════════════════════════════════════════════════
+   PREAJUSTES — la plantilla no arranca en blanco total
+   ───────────────────────────────────────────────────────────────────────────
+   "Vacía" no significa empezar de cero. Significa un esqueleto correcto listo
+   para llenar: un taquería no necesita inventar sus categorías ni sus
+   modificadores. Se elige el tipo de negocio y se ajusta.
+   ═══════════════════════════════════════════════════════════════════════════ */
+const PRESETS = [
+  {k:'cafe', n:'Cafetería', ic:'coffee', c:'#a8703a',
+   ds:'Café de especialidad, panadería y desayunos',
+   cats:['Café caliente','Café frío','Té e infusiones','Panadería','Desayunos','Postres'],
+   pagos:['efectivo','credito','debito','transfer'],
+   estaciones:['barra','cafe','cocina'], zonas:['Salón','Barra','Terraza'],
+   propinas:[0,.10,.15], mesas:12},
+
+  {k:'restaurante', n:'Restaurante', ic:'utensils', c:'#2e9e5b',
+   ds:'Servicio a mesa con cocina y barra',
+   cats:['Entradas','Sopas y ensaladas','Platos fuertes','Postres','Bebidas','Vinos','Cerveza'],
+   pagos:['efectivo','credito','debito','transfer','cortesia'],
+   estaciones:['cocina','barra'], zonas:['Salón','Terraza','Privado','Barra'],
+   propinas:[0,.10,.15,.20], mesas:24},
+
+  {k:'taqueria', n:'Taquería', ic:'taco', c:'#e05a2b',
+   ds:'Rápido, mucho volumen, para llevar',
+   cats:['Tacos','Quesadillas','Tortas','Bebidas','Extras','Salsas'],
+   pagos:['efectivo','credito','debito'],
+   estaciones:['cocina'], zonas:['Salón','Barra'],
+   propinas:[0,.10], mesas:10},
+
+  {k:'sushi', n:'Sushi', ic:'sushi', c:'#0891b2',
+   ds:'Rollos, barra fría y entrada',
+   cats:['Rollos','Nigiri y sashimi','Entradas','Sopas','Bebidas','Sake y cerveza'],
+   pagos:['efectivo','credito','debito','transfer'],
+   estaciones:['cocina','barra'], zonas:['Salón','Barra','Terraza'],
+   propinas:[0,.10,.15,.20], mesas:16},
+
+  {k:'bar', n:'Bar', ic:'wine', c:'#8b5cf6',
+   ds:'Coctelería, cerveza y botana',
+   cats:['Coctelería','Cerveza','Destilados','Vinos','Botana','Sin alcohol'],
+   pagos:['efectivo','credito','debito','transfer'],
+   estaciones:['barra','cocina'], zonas:['Barra','Salón','Terraza'],
+   propinas:[0,.10,.15,.20], mesas:18},
+
+  {k:'pizzeria', n:'Pizzería', ic:'pizza', c:'#dc2626',
+   ds:'Pizza, pasta y reparto a domicilio',
+   cats:['Pizzas','Pastas','Ensaladas','Entradas','Bebidas','Postres'],
+   pagos:['efectivo','credito','debito','ubereats','rappi','didi'],
+   estaciones:['cocina'], zonas:['Salón','Terraza'],
+   propinas:[0,.10,.15], mesas:14},
+
+  {k:'market', n:'Tienda / Market', ic:'cart', c:'#64748b',
+   ds:'Producto empacado, código de barras y báscula',
+   cats:['Abarrotes','Bebidas','Snacks','Salud','Refrigerados','Regalos'],
+   pagos:['efectivo','credito','debito','transfer'],
+   estaciones:[], zonas:['Mostrador'],
+   propinas:[0], mesas:2},
+
+  {k:'blanco', n:'Desde cero', ic:'file', c:'#4b5563',
+   ds:'Sin nada precargado. Para un negocio que no se parece a ninguno.',
+   cats:[], pagos:['efectivo'], estaciones:['cocina'], zonas:['Salón'],
+   propinas:[0,.10,.15], mesas:0},
+];
+
+const PAGOS_CAT = {
+  efectivo:{n:'Efectivo', ic:'cash', abre_cajon:true},
+  credito:{n:'T. Crédito', ic:'card', terminal:true},
+  debito:{n:'T. Débito', ic:'card', terminal:true},
+  transfer:{n:'Transferencia', ic:'refresh'},
+  ubereats:{n:'Uber Eats', ic:'truck'},
+  rappi:{n:'Rappi', ic:'truck'},
+  didi:{n:'DiDi Food', ic:'truck'},
+  cortesia:{n:'Cortesía', ic:'tag', requiere_autorizacion:true},
+  dolares:{n:'Dólares', ic:'dollar', abre_cajon:true},
+  vale:{n:'Vale', ic:'receipt'},
+};
+const ESTACIONES_CAT = {
+  cocina:{n:'Cocina', ic:'chef'}, barra:{n:'Barra', ic:'wine'},
+  cafe:{n:'Cafetería', ic:'coffee'}, panaderia:{n:'Panadería', ic:'croissant'},
+};
+const ROLES = ['admin','gerente','capitan','cajero','mesero'];
+
+/* ── El objeto que se está construyendo ─────────────────────────────────── */
+const T = {
+  preset:null,
+  restaurant_id:'', nombre:'',
+  moneda:'MXN', tasa:16, impuesto:'IVA',
+  propinas:[0,.10,.15,.20],
+  zonas:[], mesas:[], cats:[], pagos:[], estaciones:[], staff:[],
+  terminal:{id:'caja-01', role:'server_pos', name:'Caja Principal'},
+  // Lo que el cliente inventa: no sale de ningun catalogo nuestro.
+  estacionesPropias:[],   // {id, n, ic, docs:[], respaldo}
+  pagosPropios:[],        // {id, n, ic, tipo, comision, sat, reglas:[]}
+  look:{fuente:'Public Sans', escala:100, tema:'oscuro', acento:'#10B981'},
+};
+let PASO = 0;
+const PASOS = [
+  {k:'tipo',  n:'Tipo de negocio'},
+  {k:'datos', n:'Datos'},
+  {k:'menu',  n:'Menú'},
+  {k:'mesas', n:'Mesas'},
+  {k:'gente', n:'Personal'},
+  {k:'pagos', n:'Cobro'},
+  {k:'look',  n:'Apariencia'},
+  {k:'listo', n:'Revisar'},
+];
+
+/* ── Qué falta para poder operar ────────────────────────────────────────── */
+function salud(){
+  const c = [
+    {k:'id',    ok: /^[a-z0-9-]{2,}$/.test(T.restaurant_id), req:true,
+     n:'Identificador', d:'minúsculas, números y guiones — es el client_id en la base'},
+    {k:'nombre',ok: T.nombre.trim().length >= 2, req:true,
+     n:'Nombre del restaurante', d:'lo que ve el cliente en pantalla y en el ticket'},
+    {k:'cats',  ok: T.cats.length > 0, req:true,
+     n:'Categorías del menú', d:`${T.cats.length} · sin categorías no hay nada que vender`},
+    {k:'pagos', ok: T.pagos.length > 0, req:true,
+     n:'Formas de pago', d:`${T.pagos.length} · al menos una para poder cobrar`},
+    {k:'mesas', ok: T.mesas.length > 0, req:false,
+     n:'Mesas', d:`${T.mesas.length} · un mostrador puede operar sin mesas`},
+    {k:'gente', ok: T.staff.length > 0, req:false,
+     n:'Personal', d:`${T.staff.length} · se puede dar de alta después`},
+    {k:'est',   ok: T.estaciones.length > 0, req:false,
+     n:'Estaciones', d:`${T.estaciones.length} · a dónde va cada comanda`},
+  ];
+  const req = c.filter(x => x.req);
+  return {c, listo: req.every(x => x.ok), pct: Math.round(c.filter(x=>x.ok).length / c.length * 100)};
+}
+
+/* ── Catalogo + lo hecho a la medida, en una sola lista ─────────────────── */
+// El esquema real de impresoras (printer-config-schema.js) dice que los nombres
+// de estacion son texto libre por restaurante. Esta plantilla tiene que poder
+// lo mismo, o estaria prometiendo menos de lo que el sistema da.
+const slug = n => n.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+  .replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40);
+
+function estacionesTodas(){
+  return [...Object.entries(ESTACIONES_CAT).map(([k,e])=>({id:k, n:e.n, ic:e.ic, propia:false})),
+          ...T.estacionesPropias.map(e=>({...e, propia:true}))];
+}
+function pagosTodos(){
+  return [...Object.entries(PAGOS_CAT).map(([k,p])=>({id:k, ...p, propia:false})),
+          ...T.pagosPropios.map(p=>({...p, propia:true}))];
+}
+
+function nuevaEstacion(){
+  const n = (document.getElementById('est-nueva')||{}).value || '';
+  if(!n.trim()) return aviso('warn','Ponle nombre a la estación.');
+  const id = slug(n);
+  if(!id) return aviso('warn','Ese nombre no deja un identificador usable.');
+  if(estacionesTodas().some(e=>e.id===id)) return aviso('warn',`«${n}» ya existe.`);
+  T.estacionesPropias.push({id, n:n.trim(), ic:'chef', docs:['kitchen_ticket'], respaldo:'cocina'});
+  T.estaciones.push(id);
+  pinta(); aviso('ok',`Estación «${n.trim()}» agregada.`);
+}
+function borraEstacion(id){
+  T.estacionesPropias = T.estacionesPropias.filter(e=>e.id!==id);
+  T.estaciones = T.estaciones.filter(k=>k!==id);
+  pinta();
+}
+function nuevoPago(){
+  const n = (document.getElementById('pago-nuevo')||{}).value || '';
+  if(!n.trim()) return aviso('warn','Ponle nombre a la forma de cobro.');
+  const id = slug(n);
+  if(!id) return aviso('warn','Ese nombre no deja un identificador usable.');
+  if(pagosTodos().some(p=>p.id===id)) return aviso('warn',`«${n}» ya existe.`);
+  T.pagosPropios.push({id, n:n.trim(), ic:'receipt', tipo:'vale', comision:0, sat:'', reglas:[]});
+  T.pagos.push(id);
+  pinta(); aviso('ok',`Forma de cobro «${n.trim()}» agregada.`);
+}
+function borraPago(id){
+  T.pagosPropios = T.pagosPropios.filter(p=>p.id!==id);
+  T.pagos = T.pagos.filter(k=>k!==id);
+  pinta();
+}
+function editaEst(id, campo, val){
+  const e = T.estacionesPropias.find(x=>x.id===id); if(!e) return;
+  if(campo==='doc'){ const i=e.docs.indexOf(val); i>=0 ? e.docs.splice(i,1) : e.docs.push(val); }
+  else e[campo]=val;
+  pinta();
+}
+function editaPago(id, campo, val){
+  const p = T.pagosPropios.find(x=>x.id===id); if(!p) return;
+  p[campo]=val; pinta();
+}
+function aplicaLook(){
+  const r = document.documentElement;
+  r.style.setProperty('--escala-demo', T.look.escala+'%');
+}
+
+/* ── Render ─────────────────────────────────────────────────────────────── */
+function pintaPasos(){
+  document.getElementById('pasos').innerHTML = PASOS.map((p,i) =>
+    `<button class="paso ${i < PASO ? 'listo' : ''}" aria-current="${i === PASO}"
+      onclick="irA(${i})"><span class="n">${i < PASO ? '✓' : i+1}</span>${p.n}</button>`).join('');
+}
+function irA(i){ PASO = Math.max(0, Math.min(PASOS.length-1, i)); pinta(); }
+function sig(){ irA(PASO + 1); }
+function ant(){ irA(PASO - 1); }
+
+function pinta(){
+  pintaPasos();
+  const s = salud();
+  document.getElementById('cuerpo').scrollTop = 0;
+  document.getElementById('cuerpo').innerHTML = VISTAS[PASOS[PASO].k]();
+  const ultimo = PASO === PASOS.length - 1;
+  document.getElementById('pie').innerHTML = `
+    <button class="act ghost" onclick="ant()" ${PASO === 0 ? 'disabled' : ''}>
+      ${svg('left',18,2.4)}<span>Atrás</span></button>
+    <span class="sp"></span>
+    <span class="est">${s.listo ? 'Listo para operar' : 'Faltan datos obligatorios'} · ${s.pct}%</span>
+    ${ultimo
+      ? `<button class="act send" onclick="copiarTenant()" ${s.listo ? '' : 'disabled'}>
+          ${svg('check',18,2.4)}<span>Copiar el TENANT</span></button>`
+      : `<button class="act send" onclick="sig()">
+          <span>Siguiente</span>${svg('right',18,2.4)}</button>`}`;
+}
+
+const VISTAS = {
+
+  /* ── 1 · Tipo de negocio ─────────────────────────────────────────────── */
+  tipo(){
+    return `<div class="wrap">
+      <h2>¿Qué tipo de negocio es?</h2>
+      <p class="lead">Esto precarga categorías, estaciones, zonas y formas de pago típicas.
+      Todo se puede cambiar después — es un punto de partida, no una camisa de fuerza.</p>
+      <div class="presets">${PRESETS.map(p => `
+        <button class="preset" aria-selected="${T.preset === p.k}" onclick="elegirPreset('${p.k}')">
+          <span class="ic" style="background:linear-gradient(140deg,${p.c},${p.c}bb)">${svg(p.ic,24)}</span>
+          <div class="nm">${p.n}</div>
+          <div class="ds">${p.ds}</div>
+          <div class="qt">
+            ${p.cats.length ? `<span class="tag">${p.cats.length} categorías</span>` : ''}
+            ${p.mesas ? `<span class="tag">${p.mesas} mesas</span>` : '<span class="tag">sin mesas</span>'}
+          </div>
+        </button>`).join('')}</div>
+      ${T.preset ? `<div class="nota" style="margin-top:20px">
+        <b>${PRESETS.find(p=>p.k===T.preset).n} elegido.</b> Se precargaron
+        ${T.cats.length} categorías, ${T.pagos.length} formas de pago y ${T.zonas.length} zonas.
+        Sigue al paso 2 para poner el nombre.</div>` : ''}
+    </div>`;
+  },
+
+  /* ── 2 · Datos ───────────────────────────────────────────────────────── */
+  datos(){
+    const idOk = /^[a-z0-9-]{2,}$/.test(T.restaurant_id);
+    return `<div class="wrap">
+      <h2>Datos del restaurante</h2>
+      <p class="lead">El identificador es la pieza más importante del alta: es el
+      <code>client_id</code> con el que se filtra <b>todo</b> en la base de datos. No se cambia después.</p>
+
+      <div class="grid g2">
+        <div class="campo ${T.nombre ? 'ok' : ''}">
+          <label>Nombre del restaurante</label>
+          <input id="f-nombre" value="${T.nombre}" placeholder="La Esquina"
+            oninput="T.nombre=this.value; if(!T.restaurant_id) sugerirId(); marcar()">
+          <span class="ayuda">Aparece en el ticket, en la pantalla del cliente y al entrar.</span>
+        </div>
+        <div class="campo ${T.restaurant_id ? (idOk ? 'ok' : 'mal') : ''}">
+          <label>Identificador</label>
+          <input id="f-id" value="${T.restaurant_id}" placeholder="la-esquina"
+            oninput="T.restaurant_id=this.value.toLowerCase().replace(/[^a-z0-9-]/g,'-'); this.value=T.restaurant_id; marcar()">
+          ${T.restaurant_id && !idOk
+            ? '<span class="err">Sólo minúsculas, números y guiones. Mínimo 2 caracteres.</span>'
+            : '<span class="ayuda">Se usa en la base, en las URLs y en el config de cada terminal.</span>'}
+        </div>
+      </div>
+
+      <h3>Impuesto y moneda<small>Lo que se aplica a cada cuenta</small></h3>
+      <div class="grid g3">
+        <div class="campo"><label>Moneda</label>
+          <select onchange="T.moneda=this.value">
+            ${['MXN','USD','EUR','COP','ARS','CLP','PEN'].map(m =>
+              `<option ${T.moneda===m?'selected':''}>${m}</option>`).join('')}</select></div>
+        <div class="campo"><label>Nombre del impuesto</label>
+          <input value="${T.impuesto}" oninput="T.impuesto=this.value" placeholder="IVA"></div>
+        <div class="campo"><label>Tasa %</label>
+          <input type="number" value="${T.tasa}" min="0" max="50" step="0.5"
+            oninput="T.tasa=Number(this.value)||0"></div>
+      </div>
+
+      <h3>Propinas sugeridas<small>Los botones que ve el cajero al cobrar</small></h3>
+      <div class="opts">${[0,5,10,12,15,18,20].map(p => {
+        const v = p/100, on = T.propinas.includes(v);
+        return `<button class="opt" aria-selected="${on}" onclick="togProp(${v})">
+          <span>${p ? p+'%' : 'Sin propina'}</span></button>`;}).join('')}</div>
+
+      <div class="nota warn" style="margin-top:20px">
+        <b>El identificador no se cambia después.</b> Está en el config de cada terminal, en cada
+        renglón de la base y en las URLs de los QR. Elegirlo mal se paga reinstalando.
+      </div>
+    </div>`;
+  },
+
+  /* ── 3 · Menú ────────────────────────────────────────────────────────── */
+  menu(){
+    return `<div class="wrap">
+      <h2>Categorías del menú</h2>
+      <p class="lead">Sólo las categorías: los productos se cargan después desde el dashboard, o se
+      importan del sistema anterior. Cada categoría <b>recibe su icono y su color automáticamente</b>
+      según su nombre — no hay que elegir nada.</p>
+
+      <div class="campo" style="max-width:440px">
+        <label>Agregar categoría</label>
+        <div style="display:flex;gap:8px">
+          <input id="f-cat" placeholder="Tacos al pastor" onkeydown="if(event.key==='Enter')addCat()">
+          <button class="act send" style="height:48px;padding:0 18px" onclick="addCat()">
+            ${svg('plus',18,2.6)}</button>
+        </div>
+        <span class="ayuda">Escribe y pulsa Enter. Prueba con cualquier nombre y mira el icono que le toca.</span>
+      </div>
+
+      ${T.cats.length ? `
+        <h3>${T.cats.length} categorías<small>Toca el nombre para verlo como lo vería el mesero</small></h3>
+        <div class="list">${T.cats.map((c,i) => {
+          const {icon, color} = iconForCategory(c);
+          return `<div class="row" style="grid-template-columns:auto 1fr auto auto">
+            <span class="mini" style="background:${color}22;border-color:${color}66;color:${color}">${svg(icon,17)}</span>
+            <div><div class="t1">${c}</div><div class="t2 mono">icono ${icon}</div></div>
+            <span class="tag" style="background:${color}1e;border-color:${color}55;color:${color}">auto</span>
+            <button class="mini" onclick="delCat(${i})" title="Quitar">${svg('x',15,2.4)}</button></div>`;
+        }).join('')}</div>` : `
+        <div class="nota warn" style="margin-top:18px">
+          Sin categorías no hay nada que vender. Agrega al menos una.</div>`}
+
+      ${T.cats.length ? `<h3>Así lo va a ver el mesero</h3>${previaMenu()}` : ''}
+    </div>`;
+  },
+
+  /* ── 4 · Mesas ───────────────────────────────────────────────────────── */
+  mesas(){
+    return `<div class="wrap">
+      <h2>Mesas y zonas</h2>
+      <p class="lead">Aquí se da de alta cuántas mesas hay y en qué zona. <b>La posición exacta se
+      acomoda después en el editor de plano</b>, dentro del punto de venta y mirando el salón —
+      nadie coloca mesas bien desde una oficina.</p>
+
+      <h3>Zonas</h3>
+      <div class="campo" style="max-width:420px">
+        <div style="display:flex;gap:8px">
+          <input id="f-zona" placeholder="Terraza" onkeydown="if(event.key==='Enter')addZona()">
+          <button class="act send" style="height:48px;padding:0 18px" onclick="addZona()">${svg('plus',18,2.6)}</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:10px">
+        ${T.zonas.map((z,i) => `<span class="tag ok" style="height:32px;padding:0 13px;font-size:12px;
+          text-transform:none;letter-spacing:0">${z}
+          <button onclick="delZona(${i})" style="color:inherit;opacity:.6;margin-left:3px">✕</button></span>`).join('')
+          || '<span style="color:var(--text-4);font-size:13px">Sin zonas todavía</span>'}
+      </div>
+
+      ${T.zonas.length ? `
+        <h3>Agregar mesas<small>Se numeran solas; el número se puede cambiar después</small></h3>
+        <div class="grid g3">
+          <div class="campo"><label>¿Cuántas?</label>
+            <input type="number" id="f-cuantas" value="4" min="1" max="60"></div>
+          <div class="campo"><label>¿En qué zona?</label>
+            <select id="f-enzona">${T.zonas.map(z => `<option>${z}</option>`).join('')}</select></div>
+          <div class="campo"><label>Capacidad</label>
+            <select id="f-cap">${[2,4,6,8].map(c => `<option ${c===4?'selected':''}>${c}</option>`).join('')}</select></div>
+        </div>
+        <button class="act send" style="margin-top:11px" onclick="addMesas()">
+          ${svg('plus',18,2.4)}<span>Agregar mesas</span></button>` : ''}
+
+      ${T.mesas.length ? `
+        <h3>${T.mesas.length} mesas · ${T.mesas.reduce((a,m)=>a+m.cap,0)} lugares</h3>
+        <div class="list">${T.zonas.filter(z => T.mesas.some(m => m.z === z)).map(z => {
+          const ms = T.mesas.filter(m => m.z === z);
+          return `<div class="row" style="grid-template-columns:auto 1fr auto auto">
+            ${svg('map',17)}
+            <div><div class="t1">${z}</div>
+              <div class="t2">${ms.map(m => m.n).join(', ')}</div></div>
+            <span class="tag">${ms.length} mesas · ${ms.reduce((a,m)=>a+m.cap,0)} lugares</span>
+            <button class="mini" onclick="delMesasZona('${z}')">${svg('trash',15,2.2)}</button></div>`;
+        }).join('')}</div>` : ''}
+
+      <div class="nota" style="margin-top:18px">
+        <b>Un mostrador puede operar sin mesas.</b> Si el negocio es de barra o para llevar,
+        deja esto vacío y las órdenes se abren por número de folio.
+      </div>
+    </div>`;
+  },
+
+  /* ── 5 · Personal ────────────────────────────────────────────────────── */
+  gente(){
+    return `<div class="wrap">
+      <h2>Personal</h2>
+      <p class="lead">Quién va a usar el sistema y con qué rol. El rol decide qué ve cada quien:
+      un mesero tiene <b>5 de 57</b> permisos; un administrador, los 57. Se puede dar de alta
+      después desde el dashboard.</p>
+
+      <div class="grid g3" style="align-items:end">
+        <div class="campo"><label>Nombre</label>
+          <input id="f-persona" placeholder="María González" onkeydown="if(event.key==='Enter')addPersona()"></div>
+        <div class="campo"><label>Rol</label>
+          <select id="f-rol">${ROLES.map(r => `<option ${r==='mesero'?'selected':''}>${r}</option>`).join('')}</select></div>
+        <button class="act send" onclick="addPersona()">${svg('plus',18,2.4)}<span>Agregar</span></button>
+      </div>
+
+      ${T.staff.length ? `
+        <h3>${T.staff.length} personas</h3>
+        <div class="list">${T.staff.map((p,i) => `
+          <div class="row" style="grid-template-columns:auto 1fr auto auto">
+            <span class="mini">${p.n.trim()[0].toUpperCase()}</span>
+            <div><div class="t1">${p.n}</div>
+              <div class="t2">${PERM_POR_ROL[p.r] || 0} de 57 permisos</div></div>
+            <span class="tag ${p.r==='admin'||p.r==='gerente'?'info':''}">${p.r}</span>
+            <button class="mini" onclick="delPersona(${i})">${svg('x',15,2.4)}</button></div>`).join('')}</div>
+        ${!T.staff.some(p => p.r === 'admin') ? `
+          <div class="nota warn" style="margin-top:14px">
+            <b>No hay ningún administrador.</b> Sin uno, nadie puede cancelar una orden completa
+            ni configurar la terminal. Agrega al menos uno.</div>` : ''}
+      ` : `<div class="nota" style="margin-top:18px">
+            Se puede dejar vacío y dar de alta al personal después, desde el dashboard.</div>`}
+    </div>`;
+  },
+
+  /* ── 6 · Cobro ───────────────────────────────────────────────────────── */
+  pagos(){
+    return `<div class="wrap">
+      <h2>Cómo cobra</h2>
+      <p class="lead">Las formas de pago que va a aceptar y a dónde van las comandas.
+      Cada forma trae su comportamiento: si abre el cajón, si manda a la terminal bancaria,
+      o si <b>pide autorización de gerente</b>.</p>
+
+      <h3>Formas de pago</h3>
+      <div class="opts">${pagosTodos().map(p => {
+        const on = T.pagos.includes(p.id);
+        return `<button class="opt" aria-selected="${on}" onclick="togPago('${p.id}')">
+          ${svg(p.ic,17)}<span>${p.n}</span>
+          <small>${p.propia ? 'hecha a la medida'
+            : p.abre_cajon ? 'abre cajón' : p.terminal ? 'a la terminal'
+            : p.requiere_autorizacion ? 'pide gerente' : 'registro'}</small></button>`;
+      }).join('')}</div>
+
+      <div class="alta-linea">
+        <input id="pago-nuevo" placeholder="Otra forma de cobro — vales, crédito de casa…"
+          onkeydown="if(event.key==='Enter')nuevoPago()">
+        <button class="act ghost" onclick="nuevoPago()">${svg('plus',17,2.4)}<span>Agregar</span></button>
+      </div>
+
+      ${T.pagosPropios.length ? `<div class="tarjetas">${T.pagosPropios.map(p => `
+        <div class="tarjeta">
+          <div class="th"><b>${p.n}</b>
+            <button class="x" onclick="borraPago('${p.id}')" title="Quitar">${svg('trash',15,2.4)}</button></div>
+          <div class="tf">
+            <label>Tipo</label>
+            <select onchange="editaPago('${p.id}','tipo',this.value)">
+              ${['efectivo','tarjeta','vale','transferencia','credito'].map(t =>
+                `<option value="${t}" ${p.tipo===t?'selected':''}>${t}</option>`).join('')}</select>
+          </div>
+          <div class="tf"><label>Comisión %</label>
+            <input value="${p.comision}" oninput="editaPago('${p.id}','comision',this.value)"></div>
+          <div class="tf"><label>Código SAT</label>
+            <input value="${p.sat}" placeholder="opcional"
+              oninput="editaPago('${p.id}','sat',this.value)"></div>
+          <p class="mini">${p.tipo==='efectivo'
+            ? 'Suma al efectivo: tiene que cuadrar contra el arqueo del cajón.'
+            : 'No suma al efectivo. Se concilia aparte y el arqueo no lo busca.'}</p>
+        </div>`).join('')}</div>` : ''}
+
+      <h3>Estaciones<small>A dónde llega cada comanda cuando el mesero envía</small></h3>
+      <div class="opts">${estacionesTodas().map(e => {
+        const on = T.estaciones.includes(e.id);
+        return `<button class="opt" aria-selected="${on}" onclick="togEst('${e.id}')">
+          ${svg(e.ic,17)}<span>${e.n}</span>
+          ${e.propia ? '<small>hecha a la medida</small>' : ''}</button>`;
+      }).join('')}</div>
+
+      <div class="alta-linea">
+        <input id="est-nueva" placeholder="Otra estación — parrilla, postres, sushi…"
+          onkeydown="if(event.key==='Enter')nuevaEstacion()">
+        <button class="act ghost" onclick="nuevaEstacion()">${svg('plus',17,2.4)}<span>Agregar</span></button>
+      </div>
+      <p class="ayuda" style="font-size:12px;color:var(--text-4);margin-top:7px">
+        El nombre es libre y de ahí sale el identificador. El sistema nunca conoce una
+        impresora por su marca ni por su dirección — sólo por el nombre de la estación.</p>
+
+      ${T.estacionesPropias.length ? `<div class="tarjetas">${T.estacionesPropias.map(e => `
+        <div class="tarjeta">
+          <div class="th"><b>${e.n}</b> <code>${e.id}</code>
+            <button class="x" onclick="borraEstacion('${e.id}')" title="Quitar">${svg('trash',15,2.4)}</button></div>
+          <div class="tf"><label>Imprime</label>
+            <div class="mini-opts">${[['kitchen_ticket','comanda'],['bar_ticket','barra'],
+              ['receipt','ticket'],['pre_ticket','pre cuenta'],['reprint','reimpresión']].map(([k,n]) =>
+              `<button class="${e.docs.includes(k)?'on':''}"
+                onclick="editaEst('${e.id}','doc','${k}')">${n}</button>`).join('')}</div></div>
+          <div class="tf"><label>Respaldo</label>
+            <select onchange="editaEst('${e.id}','respaldo',this.value)">
+              ${['cocina','caja','ninguno'].map(r =>
+                `<option value="${r}" ${e.respaldo===r?'selected':''}>${r}</option>`).join('')}</select></div>
+          <p class="mini">${e.docs.length===0
+            ? 'Sin documentos no recibe nada: está de adorno.'
+            : e.respaldo==='ninguno'
+            ? 'Sin respaldo, si esa impresora no contesta el platillo se queda sin comanda.'
+            : `Si no contesta, el ticket sale en ${e.respaldo} y alguien lo lleva.`}</p>
+        </div>`).join('')}</div>` : ''}
+      ${T.estaciones.length ? `<div class="nota" style="margin-top:14px">
+        <b>Cada estación necesita decir si imprime.</b> Una panadería sin impresora lleva su
+        producción en pantalla; una cocina con impresora recibe la comanda en papel.
+        Eso se configura en cada terminal, no aquí.</div>` : ''}
+
+      <h3>Primera terminal</h3>
+      <div class="grid g3">
+        <div class="campo"><label>Nombre</label>
+          <input value="${T.terminal.name}" oninput="T.terminal.name=this.value"></div>
+        <div class="campo"><label>Tipo</label>
+          <select onchange="T.terminal.role=this.value">
+            ${[['server_pos','Caja principal'],['pos','Terminal de mesero'],
+               ['kds','Pantalla de cocina'],['admin','Administración']].map(([v,n]) =>
+              `<option value="${v}" ${T.terminal.role===v?'selected':''}>${n}</option>`).join('')}</select></div>
+        <div class="campo"><label>Identificador</label>
+          <input value="${T.terminal.id}" oninput="T.terminal.id=this.value"></div>
+      </div>
+      <p class="ayuda" style="font-size:12px;color:var(--text-4);margin-top:8px">
+        El tipo decide qué pantallas existen en esa máquina: una caja no muestra Cocina ni Barra,
+        y una pantalla de cocina no muestra nada más.</p>
+    </div>`;
+  },
+
+  /* ── 7 · Apariencia ──────────────────────────────────────────────────── */
+  look(){
+    const L = T.look;
+    const fuentes = [
+      ['Public Sans','la nuestra — probada a 2 m de distancia'],
+      ['Schibsted Grotesk','más carácter, para marcas con presencia'],
+      ['system-ui','la del equipo — la más rápida en máquinas viejas'],
+    ];
+    return `<div class="wrap">
+      <h2>Cómo se ve</h2>
+      <p class="lead">Esto lo cambia el cliente cuando quiera, desde la caja, sin llamar a nadie.
+      El tamaño de letra no es capricho: en una barra con luz de sol, o con un cajero que ya
+      no ve de cerca, subirlo 20&nbsp;% es la diferencia entre leer y adivinar.</p>
+
+      <h3>Tipografía</h3>
+      <div class="opts">${fuentes.map(([f,d]) =>
+        `<button class="opt" aria-selected="${L.fuente===f}" onclick="T.look.fuente='${f}';pinta()"
+          style="font-family:'${f}',system-ui"><span>${f}</span><small>${d}</small></button>`).join('')}</div>
+      <p class="ayuda" style="font-size:12px;color:var(--text-4);margin-top:7px">
+        Los números y el dinero siempre van en monoespaciada, pase lo que pase con esta
+        elección: una columna de precios que baila se lee mal y se suma peor.</p>
+
+      <h3>Tamaño<small>Se aplica a todo el punto de venta</small></h3>
+      <div class="mini-opts grande">${[85,100,115,130,150].map(e =>
+        `<button class="${L.escala===e?'on':''}" onclick="T.look.escala=${e};pinta()">${e}%</button>`).join('')}</div>
+
+      <h3>Tema</h3>
+      <div class="opts">${[['oscuro','para salón con luz baja'],['claro','para barra con sol directo'],
+        ['auto','sigue la hora del turno']].map(([t,d]) =>
+        `<button class="opt" aria-selected="${L.tema===t}" onclick="T.look.tema='${t}';pinta()">
+          ${svg(t==='claro'?'eye':'moon',17)}<span>${t}</span><small>${d}</small></button>`).join('')}</div>
+
+      <h3>Color de acción<small>El único color que confirma</small></h3>
+      <div class="mini-opts grande">${['#10B981','#3b82f6','#8b5cf6','#e07b39','#ec4899'].map(c =>
+        `<button class="${L.acento===c?'on':''}" onclick="T.look.acento='${c}';pinta()"
+          style="background:${c}22;border-color:${c};color:${c}">${c}</button>`).join('')}</div>
+      <p class="ayuda" style="font-size:12px;color:var(--text-4);margin-top:7px">
+        Se cambia el de acción, nunca los de estado: rojo es pérdida, ámbar es espera y
+        azul es en curso en todos los restaurantes. Reasignarlos rompe la lectura de reojo.</p>
+
+      <h3>Así queda</h3>
+      <div class="prev-look" style="font-family:'${L.fuente}',system-ui;font-size:${L.escala}%">
+        <div class="pl-tiles">
+          ${[['Chilaquiles Verdes',292,'#2e9e5b'],['Café Americano',48,'#a8703a'],
+             ['Copa de vino',170,'#8b5cf6']].map(([n,pr,c]) =>
+            `<div class="pl-tile" style="background:linear-gradient(150deg,${c},${c}cc)">
+              <span class="nm">${n}</span><span class="pr">$${pr}</span></div>`).join('')}
+        </div>
+        <div class="pl-cuenta">
+          <div class="pl-row"><span class="q">2</span><span class="n">Chilaquiles Verdes</span><span class="p">$584</span></div>
+          <div class="pl-row"><span class="q">1</span><span class="n">Café Americano</span><span class="p">$48</span></div>
+          <div class="pl-tot"><span>Total</span><b style="color:${L.acento}">$632</b></div>
+        </div>
+        <button class="pl-act" style="background:${L.acento};border-color:${L.acento}">Enviar a cocina</button>
+      </div>
+      <p class="ayuda" style="font-size:12px;color:var(--text-4);margin-top:9px">
+        ${L.escala >= 130
+          ? 'A este tamaño caben menos productos por pantalla. La retícula se recalcula sola y pagina: nunca aparece una barra de scroll.'
+          : L.escala <= 85
+          ? 'A este tamaño cabe más, pero se pierde legibilidad a distancia. Sólo tiene sentido en pantallas grandes de administración.'
+          : 'Tamaño normal: la retícula acomoda la mayor cantidad de productos sin bajar de 56 px de alto por celda.'}</p>
+    </div>`;
+  },
+
+  /* ── 7 · Revisar ─────────────────────────────────────────────────────── */
+  listo(){
+    const s = salud();
+    return `<div class="wrap ancho">
+      <h2>${s.listo ? 'Listo para operar' : 'Falta algo antes de operar'}</h2>
+      <p class="lead">${s.listo
+        ? 'Este restaurante ya puede vender. Copia el objeto y pégalo donde corresponde.'
+        : 'Lo marcado en ámbar es obligatorio: sin eso el punto de venta no puede abrir.'}</p>
+
+      <div class="barra"><span style="width:${s.pct}%"></span></div>
+      <div style="font-size:12px;color:var(--text-3);font-weight:700;margin-bottom:18px">${s.pct}% completo</div>
+
+      <div class="grid g2" style="align-items:start">
+        <div>
+          <h3 style="margin-top:0">Revisión</h3>
+          <div class="salud">${s.c.map(x => `
+            <div class="chk ${x.ok ? 'ok' : x.req ? 'falta' : ''}">
+              ${svg(x.ok ? 'check' : x.req ? 'alert' : 'info', 17, 2.4)}
+              <span>${x.n}</span><span class="d">${x.d}</span>
+              ${!x.ok && !x.req ? '<span class="tag">opcional</span>' : ''}</div>`).join('')}</div>
+
+          <h3>Así se ve el menú</h3>
+          ${T.cats.length ? previaMenu() : '<div class="nota warn">Sin categorías todavía.</div>'}
+        </div>
+
+        <div>
+          <h3 style="margin-top:0">El objeto TENANT</h3>
+          <pre id="salida">${pintarTenant()}</pre>
+          <div class="nota" style="margin-top:12px">
+            <b>Dónde va esto.</b> En producción, el identificador entra al
+            <code>TerminalConfig</code> de cada máquina, y el resto se carga solo desde la base
+            filtrando por <code>client_id</code>. Este objeto es el <b>contrato</b>: si está
+            completo, el punto de venta arranca sin tocar código.
+          </div>
+        </div>
+      </div>
+    </div>`;
+  },
+};
+
+const PERM_POR_ROL = {admin:57, gerente:46, capitan:23, cajero:16, mesero:5};
+
+/* ── Vista previa del menú, con los iconos que de verdad le tocan ───────── */
+function previaMenu(){
+  const fams = T.cats.slice(0, 8).map(c => ({n:c, ...iconForCategory(c)}));
+  const ejemplos = ['Producto 1','Producto 2','Producto 3','Producto 4','Producto 5','Producto 6'];
+  const col = fams.length ? fams[0].color : '#2e9e5b';
+  return `<div class="previa">
+    <div class="previa-top">
+      <span class="brand" style="font-size:14px">fullsite<i></i></span>
+      <span style="color:var(--text-3)">${T.nombre || 'Tu restaurante'}</span>
+    </div>
+    <div class="previa-cuerpo">
+      <div class="fams">${fams.map((f,i) => `
+        <div class="fam" aria-selected="${i===0}" style="${i===0?`background:${f.color};`:''}">
+          ${svg(f.icon,18)}<span>${f.n.length>13?f.n.slice(0,11)+'…':f.n}</span></div>`).join('')}</div>
+      <div class="tiles">${ejemplos.map((e,i) => `
+        <div class="tile" style="background:linear-gradient(150deg,${col},${col}cc)">
+          <span class="nm">${e}</span><span class="pr">$—</span></div>`).join('')}</div>
+    </div>
+  </div>`;
+}
+
+function pintarTenant(){
+  const o = {
+    restaurant_id: T.restaurant_id || '—',
+    nombre: T.nombre || '—',
+    terminal: T.terminal,
+    moneda: {codigo:T.moneda, simbolo:T.moneda==='MXN'||T.moneda==='USD'?'$':'€', locale:'es-MX'},
+    impuesto: {nombre:T.impuesto, tasa:T.tasa/100, incluido:false},
+    propinas: T.propinas.slice().sort((a,b)=>a-b),
+    zonas: T.zonas,
+    mesas: T.mesas.map(m => ({n:m.n, z:m.z, cap:m.cap, s:'round', x:50, y:50})),
+    // Se resuelve contra la lista efectiva —catalogo + lo hecho a la medida—,
+    // no contra el catalogo fijo: una estacion propia no existe en ESTACIONES_CAT
+    // y buscarla ahi reventaba la exportacion.
+    estaciones: T.estaciones.map(k => {
+      const e = estacionesTodas().find(x => x.id === k) || {n:k, ic:'chef'};
+      const propia = T.estacionesPropias.find(x => x.id === k);
+      return {k, n:e.n, ic:e.ic, imprime:true,
+              documentos: propia ? propia.docs : ['kitchen_ticket'],
+              respaldo: propia ? propia.respaldo : 'cocina'};
+    }),
+    pagos: T.pagos.map(k => {
+      const p = pagosTodos().find(x => x.id === k) || {n:k, ic:'receipt'};
+      const {id, propia, ...resto} = p;
+      return {k, ...resto};
+    }),
+    apariencia: T.look,
+    staff: T.staff,
+    menu: T.cats.map(c => ({n:c, items:[]})),
+  };
+  return JSON.stringify(o, null, 2)
+    .replace(/"([a-z_]+)":/g, '<span class="k">"$1"</span>:')
+    .replace(/: "([^"]*)"/g, ': <span class="s">"$1"</span>');
+}
+
+/* ── Acciones ───────────────────────────────────────────────────────────── */
+function elegirPreset(k){
+  const p = PRESETS.find(x => x.k === k);
+  T.preset = k;
+  T.cats = [...p.cats];
+  T.pagos = [...p.pagos];
+  T.estaciones = [...p.estaciones];
+  T.zonas = [...p.zonas];
+  T.propinas = [...p.propinas];
+  T.mesas = [];
+  if(p.mesas && p.zonas.length){
+    for(let i = 1; i <= p.mesas; i++)
+      T.mesas.push({n:i, z:p.zonas[(i-1) % p.zonas.length], cap:4});
+  }
+  pinta();
+  aviso('ok', `${p.n} · ${p.cats.length} categorías y ${T.mesas.length} mesas precargadas`);
+}
+function sugerirId(){
+  T.restaurant_id = T.nombre.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,28);
+  const el = document.getElementById('f-id'); if(el) el.value = T.restaurant_id;
+}
+function marcar(){
+  const s = salud();
+  const est = document.querySelector('#pie .est');
+  if(est) est.textContent = `${s.listo ? 'Listo para operar' : 'Faltan datos obligatorios'} · ${s.pct}%`;
+}
+function togProp(v){
+  const i = T.propinas.indexOf(v);
+  if(i >= 0) T.propinas.splice(i,1); else T.propinas.push(v);
+  pinta();
+}
+function addCat(){
+  const el = document.getElementById('f-cat'), v = el.value.trim();
+  if(!v) return;
+  if(T.cats.some(c => c.toLowerCase() === v.toLowerCase())){ aviso('err','Esa categoría ya existe'); return; }
+  T.cats.push(v); el.value = ''; pinta();
+  setTimeout(() => { const n = document.getElementById('f-cat'); if(n) n.focus(); }, 40);
+}
+function delCat(i){ T.cats.splice(i,1); pinta(); }
+function addZona(){
+  const el = document.getElementById('f-zona'), v = el.value.trim();
+  if(!v) return;
+  if(T.zonas.includes(v)){ aviso('err','Esa zona ya existe'); return; }
+  T.zonas.push(v); el.value = ''; pinta();
+  setTimeout(() => { const n = document.getElementById('f-zona'); if(n) n.focus(); }, 40);
+}
+function delZona(i){
+  const z = T.zonas[i];
+  T.mesas = T.mesas.filter(m => m.z !== z);
+  T.zonas.splice(i,1); pinta();
+}
+function addMesas(){
+  const q = Number(document.getElementById('f-cuantas').value) || 0;
+  const z = document.getElementById('f-enzona').value;
+  const cap = Number(document.getElementById('f-cap').value) || 4;
+  let n = T.mesas.length ? Math.max(...T.mesas.map(m => m.n)) : 0;
+  for(let i = 0; i < q; i++) T.mesas.push({n: ++n, z, cap});
+  pinta(); aviso('ok', `${q} mesas agregadas a ${z}`);
+}
+function delMesasZona(z){ T.mesas = T.mesas.filter(m => m.z !== z); pinta(); }
+function addPersona(){
+  const el = document.getElementById('f-persona'), v = el.value.trim();
+  if(!v) return;
+  T.staff.push({n:v, r:document.getElementById('f-rol').value});
+  el.value = ''; pinta();
+  setTimeout(() => { const n = document.getElementById('f-persona'); if(n) n.focus(); }, 40);
+}
+function delPersona(i){ T.staff.splice(i,1); pinta(); }
+function togPago(k){
+  const i = T.pagos.indexOf(k);
+  if(i >= 0) T.pagos.splice(i,1); else T.pagos.push(k);
+  pinta();
+}
+function togEst(k){
+  const i = T.estaciones.indexOf(k);
+  if(i >= 0) T.estaciones.splice(i,1); else T.estaciones.push(k);
+  pinta();
+}
+function copiarTenant(){
+  const txt = document.getElementById('salida').textContent;
+  try { navigator.clipboard.writeText(txt); aviso('ok','TENANT copiado al portapapeles'); }
+  catch { aviso('err','No se pudo copiar — selecciona el texto a mano'); }
+}
+function aviso(kind, msg){
+  const el = document.createElement('div');
+  el.className = 'aviso ' + kind;
+  el.innerHTML = svg(kind === 'ok' ? 'check' : 'alert', 16, 2.4) + msg;
+  document.getElementById('avisos').appendChild(el);
+  setTimeout(() => el.remove(), 2600);
+}
+function tema(){
+  const r = document.documentElement;
+  const claro = r.dataset.theme === 'light';
+  if(claro) r.removeAttribute('data-theme'); else r.dataset.theme = 'light';
+  document.getElementById('btn-tema').innerHTML = svg(claro ? 'moon' : 'eye', 18);
+}
+
+document.getElementById('btn-tema').innerHTML = svg('moon', 18);
+pinta();
+
+</script>
+</body></html>

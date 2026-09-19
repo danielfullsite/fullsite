@@ -1,0 +1,2073 @@
+<meta charset="utf-8">
+<title>Sistema Fullsite</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════════════════════
+   SISTEMA FULLSITE — catálogo vivo
+   Todo lo que compone el punto de venta, en una página: tokens, iconos,
+   componentes, reglas y la guía para llevarlo a otro restaurante.
+   Cada pieza es la real, copiada del sistema — no una maqueta de la pieza.
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root{
+  color-scheme:dark;
+  --bg:#080b0c; --surface:#0c1012; --surface-2:#11171a; --panel:#131a1d; --raised:#1a2226;
+  --line:#232b2c; --line-soft:#191f20;
+  --text-1:#eef2f0; --text-2:#a8b5b1; --text-3:#6f7d79; --text-4:#4a5553;
+  --accent:#10b981; --accent-bright:#34d399; --accent-deep:#059669;
+  --accent-soft:rgba(16,185,129,.12); --accent-line:rgba(16,185,129,.28);
+  --info:#38bdf8; --info-soft:rgba(56,189,248,.12); --info-line:rgba(56,189,248,.3);
+  --warn:#f5a524; --warn-soft:rgba(245,165,36,.12); --warn-line:rgba(245,165,36,.3);
+  --crit:#f5455c; --crit-soft:rgba(245,69,92,.12); --crit-ink:#fda4af; --crit-line:rgba(245,69,92,.32);
+  --fs-green:#10B981;
+  --r1:8px; --r2:12px; --r3:16px; --r4:22px;
+  --tap:56px;
+  --shadow-1:0 1px 2px rgba(0,0,0,.4);
+  --shadow-2:0 8px 24px rgba(0,0,0,.45);
+  --shadow-3:0 24px 64px rgba(0,0,0,.6);
+  --ease:cubic-bezier(.2,.9,.3,1);
+}
+:root[data-theme="light"]{
+  color-scheme:light;
+  --bg:#eef1ec; --surface:#fff; --surface-2:#f4f7f1; --panel:#fff; --raised:#fff;
+  --line:#dde3dc; --line-soft:#eef1ec;
+  --text-1:#0e1613; --text-2:#3d4a46; --text-3:#6b7873; --text-4:#9aa5a1;
+  --accent:#0ea371; --accent-bright:#10b981;
+  --accent-soft:rgba(16,185,129,.1); --accent-line:rgba(5,120,90,.24);
+  --shadow-1:0 1px 2px rgba(11,60,40,.1);
+  --shadow-2:0 8px 24px rgba(11,60,40,.12);
+  --shadow-3:0 24px 64px rgba(11,60,40,.18);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html{scroll-behavior:smooth;}
+body{
+  margin:0;background:var(--bg);color:var(--text-1);
+  font-family:'Public Sans',system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.5;
+}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;}
+code,.mono{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums;}
+
+/* ── Estructura del catálogo ─────────────────────────────────────────────── */
+#top{
+  position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:14px;
+  padding:0 22px;height:60px;background:var(--surface-2);border-bottom:1px solid var(--line);
+  backdrop-filter:blur(10px);
+}
+.brand{display:inline-flex;align-items:flex-end;gap:.07em;white-space:nowrap;
+  font-weight:800;letter-spacing:-.045em;font-size:19px;line-height:.9;color:var(--text-1);}
+.brand i{width:.22em;height:.22em;background:var(--fs-green);display:block;flex-shrink:0;margin-bottom:.055em;}
+#top .sep{width:1px;height:24px;background:var(--line);}
+#top h1{margin:0;font-size:14px;font-weight:700;color:var(--text-3);letter-spacing:-.01em;}
+#top .sp{flex:1;}
+.nav-cat{display:flex;gap:4px;overflow-x:auto;}
+.nav-cat a{
+  padding:7px 13px;border-radius:99px;font-size:12.5px;font-weight:700;color:var(--text-3);
+  text-decoration:none;white-space:nowrap;transition:.14s var(--ease);
+}
+.nav-cat a:hover{background:var(--surface);color:var(--text-1);}
+.icon-btn{width:38px;height:38px;border-radius:var(--r1);display:grid;place-items:center;color:var(--text-2);}
+.icon-btn:hover{background:var(--surface);color:var(--text-1);}
+
+main{max-width:1180px;margin:0 auto;padding:34px 22px 100px;}
+section{margin-bottom:58px;scroll-margin-top:80px;}
+section > h2{
+  margin:0 0 6px;font-size:27px;font-weight:900;letter-spacing:-.04em;
+}
+section > .lead{margin:0 0 22px;font-size:14.5px;color:var(--text-3);max-width:72ch;line-height:1.65;}
+h3{margin:30px 0 12px;font-size:16px;font-weight:800;letter-spacing:-.02em;}
+h3 small{display:block;font-size:12.5px;font-weight:600;color:var(--text-3);margin-top:3px;letter-spacing:0;}
+.hr{border:0;border-top:1px solid var(--line);margin:44px 0;}
+
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r3);padding:18px;}
+.grid{display:grid;gap:12px;}
+.g2{grid-template-columns:repeat(auto-fit,minmax(280px,1fr));}
+.g3{grid-template-columns:repeat(auto-fit,minmax(210px,1fr));}
+.nota{
+  border-left:3px solid var(--accent);background:var(--accent-soft);padding:13px 16px;
+  border-radius:0 var(--r2) var(--r2) 0;font-size:13.5px;line-height:1.6;color:var(--text-2);
+}
+.nota.warn{border-left-color:var(--warn);background:var(--warn-soft);}
+.nota.bad{border-left-color:var(--crit);background:var(--crit-soft);}
+.nota b{color:var(--text-1);}
+
+/* ── Iconos ──────────────────────────────────────────────────────────────── */
+.icons{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px;}
+.ico{
+  display:flex;flex-direction:column;align-items:center;gap:8px;padding:15px 8px;
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--r2);
+  color:var(--text-2);transition:.14s var(--ease);position:relative;
+}
+.ico:hover{border-color:var(--accent-line);color:var(--accent-bright);transform:translateY(-2px);}
+.ico span{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--text-4);
+  word-break:break-all;text-align:center;line-height:1.3;}
+.ico:hover span{color:var(--text-2);}
+.ico.copiado{border-color:var(--accent);background:var(--accent-soft);}
+.ico.copiado::after{content:'copiado';position:absolute;top:5px;right:6px;font-size:8.5px;
+  font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--accent-bright);}
+
+/* ── Tokens ──────────────────────────────────────────────────────────────── */
+.tokens{display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:9px;}
+.tok{display:flex;align-items:center;gap:11px;padding:11px 13px;background:var(--panel);
+  border:1px solid var(--line);border-radius:var(--r2);}
+.tok .sw{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);flex-shrink:0;}
+.tok .n{font-family:'IBM Plex Mono',monospace;font-size:11.5px;font-weight:600;}
+.tok .v{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--text-4);margin-top:1px;}
+.escala{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;}
+.escala div{text-align:center;}
+.escala .caja{background:var(--accent-soft);border:1px solid var(--accent-line);border-radius:var(--r1);}
+.escala .lb{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--text-4);margin-top:6px;}
+
+/* ── Muestras de componente ──────────────────────────────────────────────── */
+.demo{
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r3);
+  padding:20px;display:flex;flex-wrap:wrap;gap:11px;align-items:center;
+}
+.demo.col{flex-direction:column;align-items:stretch;}
+.pie{font-size:12px;color:var(--text-4);margin-top:9px;line-height:1.6;}
+.pie code{background:var(--surface-2);padding:1px 6px;border-radius:5px;font-size:11px;color:var(--text-2);}
+
+/* Piezas reales del sistema */
+.act{height:52px;border-radius:var(--r2);display:inline-flex;align-items:center;justify-content:center;
+  gap:9px;padding:0 20px;font-weight:800;font-size:14.5px;border:1px solid transparent;
+  box-shadow:var(--shadow-1);transition:.14s var(--ease);}
+.act:active{transform:scale(.97);}
+.act[disabled]{opacity:.3;pointer-events:none;box-shadow:none;}
+.act.send{background:linear-gradient(180deg,var(--accent-bright),var(--accent));color:#052018;}
+.act.pay{background:linear-gradient(180deg,#5cc9fb,var(--info));color:#062430;}
+.act.ghost{background:var(--surface-2);border-color:var(--line);color:var(--text-1);}
+.act.danger{background:var(--crit-soft);border-color:var(--crit-line);color:var(--crit-ink);}
+.tag{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 9px;border-radius:999px;
+  font-size:10.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;
+  background:var(--surface-2);border:1px solid var(--line);color:var(--text-3);}
+.tag.ok{background:var(--accent-soft);color:var(--accent-bright);border-color:var(--accent-line);}
+.tag.info{background:var(--info-soft);color:var(--info);border-color:var(--info-line);}
+.tag.warn{background:var(--warn-soft);color:var(--warn);border-color:var(--warn-line);}
+.tag.bad{background:var(--crit-soft);color:var(--crit-ink);border-color:var(--crit-line);}
+.pill{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 11px;border-radius:999px;
+  border:1px solid var(--line);background:var(--surface);font-family:'IBM Plex Mono',monospace;
+  font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;}
+.pill.on{background:var(--accent-soft);color:var(--accent-bright);border-color:var(--accent-line);}
+.pill.off{background:var(--crit-soft);color:var(--crit-ink);border-color:var(--crit-line);}
+.pill .dot{width:6px;height:6px;border-radius:50%;background:currentColor;}
+.tile{border-radius:var(--r2);padding:11px 9px;min-height:84px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:5px;text-align:center;color:#fff;
+  box-shadow:var(--shadow-1);transition:.13s var(--ease);position:relative;overflow:hidden;width:140px;}
+.tile:active{transform:scale(.94);filter:brightness(1.15);}
+.tile .nm{font-size:12px;font-weight:800;line-height:1.14;letter-spacing:-.015em;}
+.tile .pr{font-family:'IBM Plex Mono',monospace;font-size:11.5px;font-weight:700;opacity:.92;}
+.tile .badge{position:absolute;top:5px;right:5px;min-width:19px;height:19px;padding:0 5px;
+  border-radius:99px;background:rgba(0,0,0,.42);font-size:10.5px;font-weight:900;
+  display:grid;place-items:center;font-family:'IBM Plex Mono',monospace;}
+.card-stat{background:var(--panel);border:1px solid var(--line);border-radius:var(--r3);padding:14px 16px;min-width:158px;}
+.card-stat .lb{font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--text-3);}
+.card-stat .v{font-size:26px;font-weight:900;letter-spacing:-.035em;margin-top:4px;}
+.card-stat .note{font-size:11.5px;color:var(--text-3);font-weight:600;margin-top:3px;}
+.card-stat.ok .v{color:var(--accent-bright);} .card-stat.bad .v{color:var(--crit-ink);}
+.card-stat.info .v{color:var(--info);} .card-stat.warn .v{color:var(--warn);}
+.opt{height:var(--tap);min-width:104px;border-radius:var(--r2);background:var(--surface-2);
+  border:1px solid var(--line);display:inline-flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:1px;font-weight:800;font-size:13.5px;color:var(--text-2);padding:0 14px;}
+.opt small{font-size:10px;font-weight:600;opacity:.65;font-family:'IBM Plex Mono',monospace;}
+.opt[aria-selected="true"]{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent-bright);}
+.key{height:54px;width:76px;border-radius:var(--r2);background:var(--surface-2);border:1px solid var(--line);
+  font-size:20px;font-weight:700;font-family:'IBM Plex Mono',monospace;display:grid;place-items:center;}
+.row{display:grid;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid var(--line-soft);}
+.row:last-child{border-bottom:0;}
+.row .t1{font-weight:700;font-size:14px;}
+.row .t2{font-size:11.5px;color:var(--text-3);font-weight:600;margin-top:1px;}
+.list{border:1px solid var(--line);border-radius:var(--r3);background:var(--panel);overflow:hidden;}
+kbd{display:inline-grid;place-items:center;min-width:30px;height:23px;padding:0 6px;border-radius:5px;
+  background:var(--surface-2);border:1px solid var(--line);border-bottom-width:2px;
+  font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:var(--text-1);}
+
+/* ── Tablas de referencia ────────────────────────────────────────────────── */
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th{text-align:left;font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--text-3);padding:9px 12px;border-bottom:1px solid var(--line);}
+td{padding:10px 12px;border-bottom:1px solid var(--line-soft);vertical-align:top;color:var(--text-2);}
+tr:last-child td{border-bottom:0;}
+td:first-child{color:var(--text-1);font-weight:700;}
+td code{font-size:11.5px;}
+pre{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r2);
+  padding:15px 17px;overflow-x:auto;font-size:12px;line-height:1.7;color:var(--text-2);margin:0;}
+pre .c{color:var(--text-4);} pre .k{color:var(--accent-bright);} pre .s{color:var(--info);}
+
+@media (max-width:760px){
+  #top{padding:0 14px;gap:10px;} #top h1,.nav-cat{display:none;}
+  main{padding:24px 14px 80px;} section>h2{font-size:22px;}
+}
+/* Por omision, un renglon de dos piezas: etiqueta a la izquierda, dato a la derecha.
+   Los renglones del catalogo original fijan sus columnas en linea, asi que no los toca. */
+.row{grid-template-columns:1fr auto;}
+.row > :last-child{justify-self:end;}
+.row span:first-child{font-size:13px;color:var(--text-2);font-weight:600;line-height:1.35;}
+
+/* ── Piezas de alta ───────────────────────────────────────────────────── */
+.lbl{display:block;font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--text-3);margin:14px 0 6px;}
+.lbl:first-child{margin-top:0;}
+.inp{width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r1);
+  padding:0 12px;height:44px;color:var(--text-1);font-size:14px;font-weight:600;font-family:inherit;
+  transition:.14s var(--ease);}
+.inp:focus{outline:none;border-color:var(--accent);background:var(--surface);
+  box-shadow:0 0 0 3px var(--accent-soft);}
+.inp.mono{font-family:'IBM Plex Mono',monospace;}
+.hint{font-size:12px;color:var(--text-3);line-height:1.65;margin:7px 0 0;}
+
+.seg,.chk{display:flex;flex-wrap:wrap;gap:5px;}
+.seg button,.chk button{min-height:38px;padding:0 13px;border-radius:var(--r1);font-size:12.5px;
+  font-weight:700;background:var(--surface-2);border:1px solid var(--line);color:var(--text-3);
+  transition:.13s var(--ease);font-family:inherit;cursor:pointer;}
+.seg button:active,.chk button:active{transform:scale(.95);}
+.seg button.on{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent);}
+.chk button.on{background:var(--info-soft);border-color:var(--info-line);color:var(--info);}
+.chk button.on::before{content:'✓ ';font-weight:900;}
+
+.stepper{display:inline-flex;align-items:center;border:1px solid var(--line);
+  border-radius:var(--r1);overflow:hidden;background:var(--surface-2);}
+.stepper button{width:44px;height:42px;font-size:19px;font-weight:800;color:var(--text-1);
+  background:none;border:none;cursor:pointer;font-family:inherit;transition:.12s var(--ease);}
+.stepper button:active{background:var(--raised);transform:scale(.9);}
+.stepper span{min-width:46px;text-align:center;font-weight:800;font-size:15px;
+  font-family:'IBM Plex Mono',monospace;color:var(--text-1);}
+
+.prev-lbl{font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--text-4);margin-bottom:7px;display:flex;align-items:center;gap:7px;}
+.prev-lbl::after{content:'';flex:1;height:1px;background:var(--line-soft);}
+.prev{background:var(--bg);border:1px solid var(--line);border-radius:var(--r2);padding:12px;
+  position:relative;overflow:hidden;}
+
+.chips{display:flex;flex-wrap:wrap;gap:6px;}
+.nota.ok{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent);}
+.mono{font-family:'IBM Plex Mono',monospace;}
+
+/* Retícula de muestra dentro de una vista previa */
+.mini-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
+.mini-tile{border-radius:var(--r2);padding:9px 7px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:4px;text-align:center;color:#fff;
+  min-height:64px;box-shadow:var(--shadow-1);position:relative;overflow:hidden;}
+.mini-tile .nm{font-size:11px;font-weight:800;line-height:1.14;}
+.mini-tile .pr{font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:700;opacity:.92;}
+.mini-tile .bdg{position:absolute;top:4px;right:4px;font-size:8px;font-weight:900;
+  background:var(--crit);color:#fff;padding:1px 4px;border-radius:5px;letter-spacing:.04em;}
+
+/* Renglón de cuenta de muestra */
+.cta-row{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:var(--r1);
+  background:var(--surface-2);border:1px solid var(--line);}
+.cta-row .q{font-family:'IBM Plex Mono',monospace;font-weight:800;font-size:13px;
+  color:var(--text-1);min-width:22px;}
+.cta-row .n{flex:1;font-size:13px;font-weight:600;color:var(--text-1);line-height:1.3;}
+.cta-row .p{font-family:'IBM Plex Mono',monospace;font-weight:800;font-size:13px;color:var(--accent);}
+.cta-row small{display:block;font-size:11px;color:var(--text-3);font-weight:500;margin-top:2px;}
+
+/* Plano de muestra */
+.plano{position:relative;height:100%;min-height:250px;background:
+  linear-gradient(var(--line-soft) 1px,transparent 1px),
+  linear-gradient(90deg,var(--line-soft) 1px,transparent 1px);
+  background-size:26px 26px;border-radius:var(--r1);}
+.mesa{position:absolute;display:grid;place-items:center;font-weight:800;font-size:12px;
+  border:2px solid;transition:.16s var(--ease);font-family:'IBM Plex Mono',monospace;}
+.mesa small{display:block;font-size:8.5px;font-weight:700;opacity:.8;font-family:inherit;}
+.mesa.nueva{animation:pulsa 1.6s var(--ease) infinite;}
+@keyframes pulsa{0%,100%{box-shadow:0 0 0 0 var(--accent-soft)}50%{box-shadow:0 0 0 7px transparent}}
+
+/* Esqueleto de carga */
+.sk{background:linear-gradient(90deg,var(--surface-2) 25%,var(--raised) 50%,var(--surface-2) 75%);
+  background-size:200% 100%;animation:sk 1.3s linear infinite;border-radius:6px;}
+@keyframes sk{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+/* Muestras de medida */
+.tap-demo{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;}
+.tap-demo button{border-radius:var(--r1);font-weight:700;font-size:12px;border:1px solid var(--line);
+  background:var(--surface-2);color:var(--text-2);font-family:inherit;}
+.sp-bar{display:flex;align-items:center;gap:10px;margin-bottom:7px;}
+.sp-bar i{display:block;height:13px;background:var(--accent-soft);border:1px solid var(--accent-line);
+  border-radius:3px;}
+.sp-bar code{font-size:11px;color:var(--text-3);min-width:52px;}
+
+@media(max-width:820px){
+  .grid.g2,.grid.g3{grid-template-columns:1fr;}
+  .mini-grid{grid-template-columns:repeat(2,1fr);}
+}
+
+</style>
+<header id="top">
+  <span class="brand">fullsite<i></i></span>
+  <span class="sep"></span>
+  <h1>Sistema de diseño · punto de venta</h1>
+  <span class="sp"></span>
+  <nav class="nav-cat">
+    <a href="#principios">Principios</a>
+    <a href="#color">Color</a>
+    <a href="#tipo">Tipografía</a>
+    <a href="#iconos">Iconos</a>
+    <a href="#piezas">Piezas</a>
+    <a href="#reticula">Retícula</a>
+    <a href="#tenant">Clonar</a>
+    <a href="#port">Portar</a>
+    <a href="#medidas">Medidas</a>
+    <a href="#movimiento">Movimiento</a>
+    <a href="#estados">Estados</a>
+    <a href="#voz">Voz</a>
+    <a href="#altas">Altas</a>
+    <a href="#mesas">Salón</a>
+    <a href="#gente">Permisos</a>
+    <a href="#frontera">Frontera</a>
+    <a href="#personaliza">Personalizar</a>
+  </nav>
+  <button class="icon-btn" onclick="tema()" id="btn-tema"></button>
+</header>
+
+<main>
+
+<!-- ══ PRINCIPIOS ══════════════════════════════════════════════════════ -->
+<section id="principios">
+  <h2>Cuatro reglas</h2>
+  <p class="lead">Todo lo demás sale de aquí. Cuando una decisión de diseño no sea obvia,
+  la respuesta está en alguna de estas cuatro.</p>
+
+  <div class="grid g2">
+    <div class="card">
+      <h3 style="margin-top:0">1 · La pantalla no se lee, se recuerda<small>Memoria muscular antes que claridad</small></h3>
+      <p style="font-size:13.5px;color:var(--text-2);line-height:1.7;margin:0">
+      Un mesero bueno no lee la pantalla: la toca. Si un botón se mueve, tiene que volver a leer,
+      y leer cuesta segundos que en hora pico no existen. Por eso cada elemento tiene una posición
+      fija: las ocho familias del menú, los tres verbos de la banda inferior, el paginador.
+      <b>Nada cambia de lugar según el contenido.</b></p>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0">2 · Cero scroll en operación<small>El scroll destruye la posición</small></h3>
+      <p style="font-size:13.5px;color:var(--text-2);line-height:1.7;margin:0">
+      Sin mouse ni teclado, el scroll es el enemigo: no hay indicador de posición fiable, el pulgar
+      tapa lo que busca, un roce lateral lo mueve solo. Se sustituye por <b>paginación con posición
+      estable</b>. El único scroll permitido es la cuenta, y sólo después de que la densidad ya se
+      comprimió.</p>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0">3 · El estado se ve, no se lee<small>Color e icono antes que texto</small></h3>
+      <p style="font-size:13.5px;color:var(--text-2);line-height:1.7;margin:0">
+      Una mesa ocupada es azul antes de decir "ocupada". Una cuenta pedida trae campana. Un renglón
+      enviado a cocina se atenúa. Quien cruza el salón con una charola reconoce el estado <b>a tres
+      metros y de reojo</b>, sin detenerse a leer.</p>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0">4 · Lo que no puedes hacer no se muestra<small>Ocultar, nunca deshabilitar</small></h3>
+      <p style="font-size:13.5px;color:var(--text-2);line-height:1.7;margin:0">
+      Nada de botones grises ni candados. Un mesero no tiene por qué enterarse de que existe el
+      corte Z. Y son <b>dos filtros, no uno</b>: el rol de la terminal decide qué existe (una caja
+      no muestra Cocina); el rol de la persona decide qué puede.</p>
+    </div>
+  </div>
+
+  <div class="nota" style="margin-top:16px">
+    <b>Objetivo táctil mínimo: 56px.</b> Nunca por debajo, en ningún componente.
+    Un dedo tiene unos 9mm de ancho útil; por debajo de eso se falla, y fallar en hora pico
+    significa un platillo mal capturado.
+  </div>
+</section>
+
+<hr class="hr">
+
+<!-- ══ COLOR ═══════════════════════════════════════════════════════════ -->
+<section id="color">
+  <h2>Color</h2>
+  <p class="lead">El color <b>significa</b>, no decora. Cada uno tiene un trabajo y sólo ese.
+  Cambiar el significado rompe el reconocimiento de un vistazo.</p>
+
+  <h3>Qué dice cada color</h3>
+  <div class="list">
+    <div class="row" style="grid-template-columns:auto 1fr">
+      <span class="tag ok">verde</span>
+      <div><div class="t1">Todo bien · disponible · confirmado</div>
+        <div class="t2">Mesa libre, arqueo cuadrado, enviado a cocina, acción principal</div></div></div>
+    <div class="row" style="grid-template-columns:auto 1fr">
+      <span class="tag info">azul</span>
+      <div><div class="t1">En curso · dinero entrando</div>
+        <div class="t2">Mesa ocupada, cobro, cantidad en la cuenta</div></div></div>
+    <div class="row" style="grid-template-columns:auto 1fr">
+      <span class="tag warn">ámbar</span>
+      <div><div class="t1">Atención · espera · sensible</div>
+        <div class="t2">Cuenta pedida, cola sin subir, descuento aplicado</div></div></div>
+    <div class="row" style="grid-template-columns:auto 1fr">
+      <span class="tag bad">rojo</span>
+      <div><div class="t1">Alto · pérdida · sin conexión</div>
+        <div class="t2">Cancelación, faltante de caja, offline, mesa olvidada</div></div></div>
+  </div>
+
+  <h3>Fondos <small>Profundidad por elevación, no por borde</small></h3>
+  <div class="tokens" id="tok-fondo"></div>
+
+  <h3>Texto <small>Cuatro niveles. Más de cuatro es ruido.</small></h3>
+  <div class="tokens" id="tok-texto"></div>
+
+  <h3>Significado</h3>
+  <div class="tokens" id="tok-sem"></div>
+
+  <div class="nota warn" style="margin-top:16px">
+    <b>El verde de marca no es el verde de estado.</b> <code>--fs-green</code> (#10B981) es el punto
+    del logotipo y <b>no cambia nunca</b>, ni en claro ni en oscuro. <code>--accent</code> sí se
+    ajusta al tema para mantener contraste. Son dos cosas distintas aunque hoy coincidan.
+  </div>
+</section>
+
+<hr class="hr">
+
+<!-- ══ TIPOGRAFÍA ══════════════════════════════════════════════════════ -->
+<section id="tipo">
+  <h2>Tipografía</h2>
+  <p class="lead">Dos familias y una regla: <b>todo número que se compara va en monoespaciada</b>.
+  Un total de $1,240.00 sobre otro de $980.00 tiene que alinear en el punto decimal, o el ojo
+  no puede compararlos de un vistazo.</p>
+
+  <div class="grid g2">
+    <div class="card">
+      <div style="font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--text-3)">Public Sans</div>
+      <div style="font-size:32px;font-weight:900;letter-spacing:-.04em;margin:8px 0 4px">Chilaquiles Verdes</div>
+      <div style="font-size:13px;color:var(--text-3)">Interfaz, nombres, botones. Pesos 600 / 800 / 900.</div>
+    </div>
+    <div class="card">
+      <div style="font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--text-3)">IBM Plex Mono</div>
+      <div class="mono" style="font-size:32px;font-weight:700;letter-spacing:-.03em;margin:8px 0 4px">$1,240.00</div>
+      <div style="font-size:13px;color:var(--text-3)">Dinero, horas, folios, cantidades. Siempre tabular.</div>
+    </div>
+  </div>
+
+  <h3>Escala <small>Cinco tamaños. El total de la cuenta es el elemento más grande de la pantalla.</small></h3>
+  <div class="card">
+    <div style="display:flex;flex-direction:column;gap:11px">
+      <div><span class="mono" style="font-size:30px;font-weight:900;letter-spacing:-.04em">$2,480.50</span>
+        <span style="font-size:11.5px;color:var(--text-4);margin-left:12px">30px / 900 — total de la cuenta</span></div>
+      <div><span style="font-size:22px;font-weight:900;letter-spacing:-.035em">Corte de caja</span>
+        <span style="font-size:11.5px;color:var(--text-4);margin-left:12px">22px / 900 — título de pantalla</span></div>
+      <div><span style="font-size:16px;font-weight:900;letter-spacing:-.03em">Mesa 12</span>
+        <span style="font-size:11.5px;color:var(--text-4);margin-left:12px">16px / 900 — encabezado de bloque</span></div>
+      <div><span style="font-size:14px;font-weight:700">Nombre de un producto</span>
+        <span style="font-size:11.5px;color:var(--text-4);margin-left:12px">14px / 700 — cuerpo</span></div>
+      <div><span style="font-size:11.5px;color:var(--text-3);font-weight:600">mesero · 4 personas · terraza</span>
+        <span style="font-size:11.5px;color:var(--text-4);margin-left:12px">11.5px / 600 — dato secundario</span></div>
+      <div><span style="font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--text-3)">Etiqueta de sección</span>
+        <span style="font-size:11.5px;color:var(--text-4);margin-left:12px">10px / 800 / +.12em — etiqueta</span></div>
+    </div>
+  </div>
+
+  <div class="nota" style="margin-top:14px">
+    <b>Un nombre nunca se trunca: se reduce.</b> El producto más largo del catálogo de AMALAY tiene
+    <b>54 caracteres</b>. Las celdas se dimensionan para que quepa en tres renglones legibles.
+    Ver <code>-webkit-line-clamp:3</code> en la retícula.
+  </div>
+</section>
+
+<hr class="hr">
+
+<!-- ══ ICONOS ══════════════════════════════════════════════════════════ -->
+<section id="iconos">
+  <h2>Iconos</h2>
+  <p class="lead">SVG en línea, <b>sin CDN</b>: un punto de venta que opera sin internet no puede
+  depender de una descarga para dibujar un botón. Todos comparten <code>viewBox 24</code>,
+  <code>stroke currentColor</code> y ningún relleno. Toca uno para copiar su nombre.</p>
+
+  <h3 id="ic-comida">Comida y bebida <small>Cubren el catálogo de cualquier restaurante</small></h3>
+  <div class="icons" id="icons-food"></div>
+
+  <h3 id="ic-ui">Interfaz y operación</h3>
+  <div class="icons" id="icons-ui"></div>
+
+  <h3>Asignación automática <small>Nadie elige el icono de una categoría a mano</small></h3>
+  <p style="font-size:13.5px;color:var(--text-2);max-width:72ch;line-height:1.7">
+  Cada categoría recibe icono y color buscando <b>palabras clave en español e inglés</b>.
+  Un restaurante de tacos o de sushi obtiene los suyos sin tocar una línea. Si nada coincide,
+  cae a <code>utensils</code> — nunca se queda sin icono.</p>
+  <div class="demo col" id="demo-reglas"></div>
+  <p class="pie">Probá cualquier nombre de categoría y mirá qué le tocaría:</p>
+  <div class="demo">
+    <div style="display:flex;gap:9px;flex-wrap:wrap" id="prueba-cats"></div>
+  </div>
+</section>
+
+<hr class="hr">
+
+<!-- ══ PIEZAS ══════════════════════════════════════════════════════════ -->
+<section id="piezas">
+  <h2>Piezas</h2>
+  <p class="lead">Los componentes reales del sistema, en sus estados. Son los mismos que usa el
+  punto de venta — no reproducciones.</p>
+
+  <h3>Botones de acción <small>Tres verbos, siempre en el mismo lugar de la banda inferior</small></h3>
+  <div class="demo">
+    <button class="act send">✓ Enviar</button>
+    <button class="act pay">Cobrar</button>
+    <button class="act ghost">Cuenta</button>
+    <button class="act danger">Anular</button>
+    <button class="act send" disabled>Sin nada que enviar</button>
+  </div>
+  <p class="pie">Altura 52–60px. El de cobrar <b>jamás</b> cambia de esquina.
+  <code>.act.send</code> · <code>.act.pay</code> · <code>.act.ghost</code> · <code>.act.danger</code></p>
+
+  <h3>Tiles de producto <small>El color viene de la categoría, no del producto</small></h3>
+  <div class="demo" id="demo-tiles"></div>
+  <p class="pie">Mínimo 152×92px — lo que necesita un nombre de 54 caracteres.
+  La insignia cuenta cuántos lleva la cuenta.</p>
+
+  <h3>Estado <small>Pastillas y etiquetas</small></h3>
+  <div class="demo">
+    <span class="pill on"><span class="dot"></span>Turno abierto</span>
+    <span class="pill off"><span class="dot"></span>Offline · 3 en cola</span>
+    <span class="pill">10:42 a.m.</span>
+    <span class="tag ok">en nivel</span>
+    <span class="tag info">ocupada</span>
+    <span class="tag warn">bajo mínimo</span>
+    <span class="tag bad">faltante</span>
+    <span class="tag">sin contar</span>
+  </div>
+
+  <h3>Tarjetas de dato <small>Un número grande y el porqué debajo</small></h3>
+  <div class="demo">
+    <div class="card-stat ok"><div class="lb">Venta del turno</div><div class="v mono">$28,450</div>
+      <div class="note">$3,160 por hora</div></div>
+    <div class="card-stat bad"><div class="lb">Diferencia</div><div class="v mono">−$340</div>
+      <div class="note">FALTANTE en caja</div></div>
+    <div class="card-stat info"><div class="lb">En piso</div><div class="v mono">$9,311</div>
+      <div class="note">11 cuentas abiertas</div></div>
+  </div>
+  <p class="pie">El <code>.note</code> no es opcional: un número sin contexto obliga a preguntar.</p>
+
+  <h3>Opciones y teclas <small>Todo lo que se toca mide 56px o más</small></h3>
+  <div class="demo">
+    <button class="opt" aria-selected="true">Efectivo</button>
+    <button class="opt">Tarjeta</button>
+    <button class="opt">15%<small>$372</small></button>
+    <button class="key">7</button>
+    <button class="key">8</button>
+    <button class="key">9</button>
+  </div>
+
+  <h3>Renglones <small>La unidad de toda lista</small></h3>
+  <div class="list" style="max-width:560px">
+    <div class="row" style="grid-template-columns:auto 1fr auto">
+      <span class="tag info">2</span>
+      <div><div class="t1">Chilaquiles Verdes</div><div class="t2">Extra queso · Sin picante</div></div>
+      <span class="mono" style="font-weight:700">$634.00</span></div>
+    <div class="row" style="grid-template-columns:auto 1fr auto">
+      <span class="tag">1</span>
+      <div><div class="t1">Café Americano</div><div class="t2">asiento 2</div></div>
+      <span class="mono" style="font-weight:700">$48.00</span></div>
+  </div>
+
+  <h3>Teclado físico <small>Convive con el de pantalla, no lo reemplaza</small></h3>
+  <div class="demo">
+    <span><kbd>F1</kbd> Venta</span><span><kbd>F2</kbd> Mesas</span>
+    <span><kbd>F3</kbd> Buscar</span><span><kbd>F4</kbd> Enviar</span>
+    <span><kbd>F5</kbd> Cobrar</span><span><kbd>Esc</kbd> Cerrar</span>
+  </div>
+  <p class="pie">Los atajos sólo se muestran <b>si la terminal demostró tener teclado</b>.
+  No se le enseñan atajos a una tablet táctil.</p>
+</section>
+
+<hr class="hr">
+
+<!-- ══ RETÍCULA ════════════════════════════════════════════════════════ -->
+<section id="reticula">
+  <h2>La retícula se calcula sola</h2>
+  <p class="lead">La decisión central del sistema: <b>no se elige una resolución, la pantalla elige
+  la retícula</b>. Se mide el contenedor y se calcula cuántas columnas y filas caben con celdas de
+  ≥152×92px; después se pagina exactamente ese número. Nunca sobra media fila cortada.</p>
+
+  <div class="card">
+    <table>
+      <tr><th>Pantalla</th><th>Retícula</th><th>Por página</th><th>Páginas para 31 productos</th></tr>
+      <tr><td>Tablet 10" horizontal <code>1280×800</code></td><td>4 × 5</td><td>20</td><td>2</td></tr>
+      <tr><td>Tablet 10" vertical <code>800×1280</code></td><td>4 × 6</td><td>24</td><td>2</td></tr>
+      <tr><td>Monitor de caja 15" <code>1366×768</code></td><td>5 × 5</td><td>25</td><td>2</td></tr>
+      <tr><td>Full HD <code>1920×1080</code></td><td>7 × 6</td><td>42</td><td><b>1</b></td></tr>
+      <tr><td>Tablet 8" <code>1024×768</code></td><td>3 × 5</td><td>15</td><td>3</td></tr>
+    </table>
+  </div>
+
+  <div class="nota" style="margin-top:14px">
+    <b>Un refinamiento que importa:</b> si toda la categoría cabe en una página, se usan sólo las
+    filas necesarias y los tiles crecen. Si hay varias páginas, la retícula queda fija — para que
+    un producto <b>no cambie de tamaño al pasar de página</b> y rompa la memoria muscular.
+  </div>
+
+  <h3>La terminal se configura sola <small>Tres señales, en orden de autoridad</small></h3>
+  <div class="card">
+    <table>
+      <tr><th>Terminal</th><th>Decide</th><th>Por qué</th></tr>
+      <tr><td>KDS de cocina</td><td>Extra grande · amplio</td><td>Se lee de lejos, de pie, con las manos ocupadas</td></tr>
+      <tr><td>Monitor de caja 15"</td><td>Normal · denso</td><td>Cabe más sin apretar</td></tr>
+      <tr><td>Tablet chica en mano</td><td>Grande · amplio</td><td>El dedo necesita blanco grande</td></tr>
+      <tr><td>Con ratón</td><td>Chico · denso</td><td>El puntero acierta en blancos chicos</td></tr>
+    </table>
+  </div>
+  <p class="pie">Señales: <code>terminal_role</code> del TerminalConfig → pulgadas estimadas → táctil o no.
+  <b>Lo que el usuario ajusta a mano manda para siempre sobre lo automático.</b></p>
+</section>
+
+<hr class="hr">
+
+<!-- ══ TENANT ══════════════════════════════════════════════════════════ -->
+<section id="tenant">
+  <h2>Clonar a otro restaurante</h2>
+  <p class="lead">Todo lo específico de un restaurante vive en <b>un solo objeto</b> y nada más lo
+  menciona. Clonar es reemplazar ese objeto — ni una línea de código.</p>
+
+  <pre><span class="c">// Identidad — sale del TerminalConfig del Electron</span>
+<span class="k">restaurant_id</span>  <span class="s">'amalay'</span>          <span class="c">// el client_id en la base</span>
+<span class="k">nombre</span>         <span class="s">'AMALAY'</span>          <span class="c">// lo que ve el cliente</span>
+<span class="k">terminal</span>       <span class="s">{ id, role, name, host, port }</span>
+
+<span class="c">// Reglas de negocio</span>
+<span class="k">moneda</span>         <span class="s">{ codigo:'MXN', simbolo:'$', locale:'es-MX' }</span>
+<span class="k">impuesto</span>       <span class="s">{ nombre:'IVA', tasa:0.16 }</span>
+<span class="k">propinas</span>       <span class="s">[0, .10, .15, .20]</span>
+
+<span class="c">// Catálogos — bajan del dashboard</span>
+<span class="k">pagos</span>          <span class="c">18 formas, con abre_cajon / terminal / requiere_autorizacion</span>
+<span class="k">menu</span>           <span class="c">categorías y productos</span>
+<span class="k">familias</span>       <span class="c">agrupan las categorías en pestañas fijas, por palabra clave</span>
+<span class="k">zonas / mesas</span>  <span class="c">plano con coordenadas en % y forma</span>
+<span class="k">staff</span>          <span class="c">personal y su rol</span>
+<span class="k">estaciones</span>     <span class="c">cocina, barra, cafetería… y si cada una imprime</span>
+<span class="k">insumos</span>        <span class="c">para inventario, merma y recetas</span>
+<span class="k">motivos_merma</span>  <span class="c">/ motivos_cancelacion</span>
+<span class="k">modificadores</span>  <span class="c">por tipo de producto, no una lista global</span></pre>
+
+  <h3>Qué NO va en el tenant</h3>
+  <div class="grid g3">
+    <div class="card"><div class="t1" style="font-weight:800;margin-bottom:5px">Los permisos</div>
+      <div style="font-size:12.5px;color:var(--text-3);line-height:1.6">Son 57 y viven en un contrato
+      aparte que Pedro lee en runtime. Iguales para todos los restaurantes.</div></div>
+    <div class="card"><div class="t1" style="font-weight:800;margin-bottom:5px">Los iconos</div>
+      <div style="font-size:12.5px;color:var(--text-3);line-height:1.6">Se asignan por palabra clave.
+      Un restaurante nuevo no elige iconos: los recibe.</div></div>
+    <div class="card"><div class="t1" style="font-weight:800;margin-bottom:5px">Los ajustes de terminal</div>
+      <div style="font-size:12.5px;color:var(--text-3);line-height:1.6">Tamaño de letra, tema e
+      impresoras son de <i>esa máquina</i>. Viven en el navegador, no se sincronizan.</div></div>
+  </div>
+
+  <div class="nota bad" style="margin-top:16px">
+    <b>La regla que hace posible el offline:</b> el catálogo BAJA del dashboard y la operación SUBE
+    del punto de venta. Si el catálogo se consultara en vivo, un corte de red pararía la caja.
+    Como ya está en disco, lo único que falta sin red es <i>subir</i> — y eso puede esperar.
+  </div>
+</section>
+
+<hr class="hr">
+
+<!-- ══ PORTAR ══════════════════════════════════════════════════════════ -->
+<section id="port">
+  <h2>Llevarlo al punto de venta real</h2>
+  <p class="lead">Sí se puede sin romper nada, pero hay que separar lo que es piel de lo que es
+  lógica. <b>Casi todo lo que hace falta ya existe en producción</b>: notas por platillo, tiempos,
+  envíos parciales y cuentas por mesa están implementados. Lo que se porta es el aspecto.</p>
+
+  <h3>Cómo, sin riesgo</h3>
+  <div class="card">
+    <table>
+      <tr><th>Paso</th><th>Qué se toca</th><th>Riesgo</th></tr>
+      <tr><td>1 · Iconos</td><td>Archivo nuevo con los 84 SVG</td><td>Ninguno — no reemplaza nada</td></tr>
+      <tr><td>2 · Tokens</td><td><code>pos-skeleton.css</code> bajo <code>.pos-v2</code></td><td>Ninguno si no se edita <code>globals.css</code></td></tr>
+      <tr><td>3 · Componentes</td><td>Ampliar <code>components/pos/ui/</code></td><td>Bajo — se usan donde se quiera</td></tr>
+      <tr><td>4 · Retícula</td><td>Sustituir el grid del menú</td><td>Medio — cambia el flujo de captura</td></tr>
+    </table>
+  </div>
+
+  <div class="nota warn" style="margin-top:14px">
+    <b>Los tres riesgos reales, nombrados:</b><br>
+    1 · <code>globals.css</code> es compartido con el dashboard: cambiar <code>--accent</code> ahí
+    mueve los dos.<br>
+    2 · <code>.pos-kiosk</code> ya trae reglas globales que pueden chocar.<br>
+    3 · El header usa <code>hidden sm:flex</code>; quitar breakpoints cambia comportamiento, no sólo aspecto.
+  </div>
+
+  <div class="nota" style="margin-top:12px">
+    <b>Por eso: tema conmutable, no reemplazo.</b> Todo bajo una clase raíz <code>.pos-v2</code> con
+    una bandera que la activa sólo en <code>/pos</code>. Si algo se rompe, se quita la clase y vuelve
+    todo — sin tocar <code>globals.css</code> ni <code>pos/page.tsx</code>.
+  </div>
+
+  <h3>Lo que NO hay que portar <small>Ya está en producción</small></h3>
+  <div class="demo" style="gap:8px">
+    <span class="tag ok">notas por platillo</span>
+    <span class="tag ok">tiempos / coursing</span>
+    <span class="tag ok">envíos parciales</span>
+    <span class="tag ok">cuentas por mesa</span>
+    <span class="tag ok">bloqueo tras enviar</span>
+    <span class="tag ok">descuentos 4 modos</span>
+    <span class="tag ok">cancelar con merma</span>
+    <span class="tag ok">57 permisos</span>
+    <span class="tag ok">cola offline</span>
+  </div>
+</section>
+
+<!-- ══ MEDIDAS ═════════════════════════════════════════════════════════ -->
+<section id="medidas">
+  <h2>Medidas</h2>
+  <p class="lead">El estándar es <b>56&nbsp;px</b>, el mismo que fija la sección de principios,
+  y no hay un segundo número. Las medidas no son gusto: salen del dedo, no de la retícula.
+  Debajo está la auditoría de qué tanto lo cumple el sistema hoy — que no es lo mismo que
+  haberlo escrito.</p>
+
+  <div class="grid g2">
+    <div class="card">
+      <h3 style="margin-top:0">Área táctil<small>El mínimo no se negocia</small></h3>
+      <div id="demo-tap" class="demo col"></div>
+      <p class="nota bad" style="margin-top:12px">Un control por debajo de 56&nbsp;px no se
+      aprueba aunque se vea mejor. En una tablet grasosa, 44&nbsp;px falla una de cada seis veces.</p>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">Espacio<small>Escala de 4</small></h3>
+      <div id="demo-space"></div>
+      <p style="font-size:13px;color:var(--text-3);line-height:1.7;margin:10px 0 0">
+      Todo múltiplo de 4. Si una medida no cabe en la escala, la medida está mal,
+      no la escala.</p>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <h3 style="margin-top:0">Qué tanto lo cumple el sistema hoy<small>Medido sobre el código del punto de venta, no estimado</small></h3>
+    <div id="demo-audit"></div>
+    <p class="nota bad" style="margin-top:12px"><b>133 de 180 alturas declaradas quedan por
+    debajo del estándar que este mismo documento fija</b> — el 74&nbsp;%, y dos de ellas en
+    32&nbsp;px. Escribir la regla no la aplica. Se deja a la vista porque un catálogo de diseño
+    que sólo enseña el ideal sirve para vender, no para construir.</p>
+  </div>
+
+  <div class="grid g2" style="margin-top:14px">
+    <div class="card">
+      <h3 style="margin-top:0">Esquinas<small>Cuatro radios, ni uno más</small></h3>
+      <div id="demo-radios" class="demo"></div>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">Elevación<small>La sombra dice qué flota</small></h3>
+      <div id="demo-sombras" class="demo"></div>
+      <p style="font-size:13px;color:var(--text-3);line-height:1.7;margin:10px 0 0">
+      Tres niveles: lo que está pegado, lo que flota y lo que tapa. Un cuarto nivel
+      significa que la jerarquía ya se perdió.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══ MOVIMIENTO ══════════════════════════════════════════════════════ -->
+<section id="movimiento">
+  <h2>Movimiento</h2>
+  <p class="lead">El movimiento confirma que el sistema te oyó. Nada más.
+  No decora, no explica y no hace esperar: si una animación agrega tiempo a una
+  tarea que ya se sabe de memoria, está de sobra.</p>
+
+  <div class="card">
+    <h3 style="margin-top:0">Toca para comparar<small>La misma pieza a cuatro velocidades</small></h3>
+    <div id="demo-mov" class="demo"></div>
+    <p style="font-size:13px;color:var(--text-2);line-height:1.75;margin:14px 0 0">
+    <b style="color:var(--text-1)">130&nbsp;ms</b> es la respuesta al tacto: el tile que se hunde,
+    el botón que reacciona. <b style="color:var(--text-1)">180&nbsp;ms</b> es una hoja que sube.
+    <b style="color:var(--text-1)">240&nbsp;ms</b> ya se nota y sólo se usa cuando algo entra
+    desde fuera de la pantalla. Arriba de eso, el sistema se siente lento aunque no lo esté.</p>
+  </div>
+
+  <div class="grid g2" style="margin-top:14px">
+    <div class="card">
+      <h3 style="margin-top:0">Lo que sí se anima</h3>
+      <div class="list">
+        <div class="row"><span>Hundir al tocar</span><code>transform</code></div>
+        <div class="row"><span>Hoja que sube</span><code>translateY</code></div>
+        <div class="row"><span>Renglón que entra a la cuenta</span><code>opacity + Y</code></div>
+        <div class="row"><span>Aviso que aparece</span><code>opacity</code></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">Lo que nunca</h3>
+      <div class="list">
+        <div class="row"><span>Cambiar de pantalla</span><span class="tag bad">instantáneo</span></div>
+        <div class="row"><span>Pintar la retícula de productos</span><span class="tag bad">instantáneo</span></div>
+        <div class="row"><span>Actualizar un total</span><span class="tag bad">instantáneo</span></div>
+        <div class="row"><span>Rebotes, giros, elásticos</span><span class="tag bad">nunca</span></div>
+      </div>
+      <p class="nota warn" style="margin-top:12px">Un total que se anima es un total
+      que por un momento miente. El dinero no se interpola.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══ ESTADOS ═════════════════════════════════════════════════════════ -->
+<section id="estados">
+  <h2>Los cinco estados</h2>
+  <p class="lead">Toda pantalla del sistema tiene que verse bien en cinco situaciones,
+  no en una. La mayoría de los sistemas sólo diseñan la primera y por eso se sienten
+  frágiles el día que algo falla.</p>
+
+  <div id="demo-estados" class="grid g3"></div>
+
+  <p class="nota" style="margin-top:14px">Regla dura: <b>ningún estado se resuelve con
+  una rueda girando sobre pantalla vacía</b>. Cargando muestra el esqueleto de lo que va
+  a llegar; vacío dice qué hacer para llenarlo; error dice qué pasó y qué botón apretar;
+  sin conexión dice que se sigue trabajando y cuánto falta por subir; sin permiso dice
+  quién sí puede.</p>
+</section>
+
+<!-- ══ VOZ ═════════════════════════════════════════════════════════════ -->
+<section id="voz">
+  <h2>Cómo se escribe</h2>
+  <p class="lead">El texto es parte del diseño. En un punto de venta se lee de reojo,
+  con las manos ocupadas, así que cada palabra de más cuesta un segundo real.</p>
+
+  <table>
+    <tr><th>En vez de</th><th>Se escribe</th><th>Por qué</th></tr>
+    <tr>
+      <td><span class="tag bad">Error 403: Unauthorized</span></td>
+      <td><span class="tag ok">Wayo no puede cancelar. Pide a un gerente.</span></td>
+      <td>Nombra a la persona y dice cuál es la salida</td>
+    </tr>
+    <tr>
+      <td><span class="tag bad">¿Está seguro que desea proceder?</span></td>
+      <td><span class="tag ok">Cancelar 2 platillos ya enviados</span></td>
+      <td>Dice qué va a pasar, no pregunta por sentimientos</td>
+    </tr>
+    <tr>
+      <td><span class="tag bad">Operación exitosa</span></td>
+      <td><span class="tag ok">Mesa 14 · enviado a cocina</span></td>
+      <td>Confirma el hecho concreto, no la categoría del hecho</td>
+    </tr>
+    <tr>
+      <td><span class="tag bad">No hay datos disponibles</span></td>
+      <td><span class="tag ok">Todavía no hay ventas hoy</span></td>
+      <td>«No hay datos» suena a falla; «todavía» no</td>
+    </tr>
+    <tr>
+      <td><span class="tag bad">Sincronizando…</span></td>
+      <td><span class="tag ok">Sin internet · 3 órdenes por subir</span></td>
+      <td>Un número tranquiliza; un gerundio, no</td>
+    </tr>
+  </table>
+
+  <div class="grid g2" style="margin-top:14px">
+    <div class="card">
+      <h3 style="margin-top:0">Reglas</h3>
+      <div class="list">
+        <div class="row"><span>Botones en infinitivo</span><code>Enviar · Cobrar · Cancelar</code></div>
+        <div class="row"><span>Nunca en mayúsculas completas</span><code>Enviar</code></div>
+        <div class="row"><span>El dinero siempre con signo</span><code>$1,240.00</code></div>
+        <div class="row"><span>Fechas legibles, no ISO</span><code>mar 8 sep · 3:32 p.m.</code></div>
+        <div class="row"><span>Sin tecnicismos del sistema</span><code>cuenta, no «orden activa»</code></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">El error se escribe al revés</h3>
+      <p style="font-size:13.5px;color:var(--text-2);line-height:1.75;margin:0 0 12px">
+      Primero la salida, después la causa. Quien lee un error en hora pico no quiere
+      entender: quiere seguir.</p>
+      <div class="nota bad" style="margin-bottom:8px"><b>Mal:</b> La impresora de cocina
+      no respondió al intento de conexión en el puerto 9100.</div>
+      <div class="nota ok"><b>Bien:</b> Manda el ticket otra vez. La impresora de cocina
+      no contestó.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ ALTAS ═══════════════════════════════════════════════════════════ -->
+<section id="altas">
+  <h2>Dar de alta</h2>
+  <p class="lead">Todo el catálogo se da de alta arriba, en el dashboard, y baja al punto
+  de venta. Ninguna de estas pantallas existe en la caja: un mesero no inventa un platillo
+  a media comanda. Lo que sigue es cada alta con sus campos reales y, a la derecha,
+  <b>cómo se ve abajo</b> — que es la única prueba de que un campo sirve para algo.</p>
+
+  <!-- Categoría -->
+  <div class="card" style="margin-bottom:14px">
+    <h3 style="margin-top:0">Categoría<small>Admin → Menú → Grupos</small></h3>
+    <div class="grid g2" style="gap:18px;align-items:start">
+      <div>
+        <label class="lbl">Nombre</label>
+        <input class="inp" id="alta-cat-nom" value="Tacos al Pastor" oninput="pintaAltaCat()">
+        <p class="hint">El icono y el color se eligen solos a partir del nombre. Se pueden
+        cambiar, pero casi nunca hace falta: hay 35 reglas y un respaldo.</p>
+
+        <label class="lbl">Orden en la pantalla</label>
+        <div class="seg" id="alta-cat-ord">
+          <button class="on" onclick="segSel(this)">Alfabético</button>
+          <button onclick="segSel(this)">Más vendido</button>
+          <button onclick="segSel(this)">Manual</button>
+        </div>
+        <p class="hint">Alfabético es el que menos falla: la posición no se mueve de un
+        día para otro, y la memoria muscular depende de eso.</p>
+
+        <label class="lbl">Tipo de modificadores</label>
+        <div class="seg" id="alta-cat-mod">
+          <button onclick="segSel(this);pintaAltaCat()">Ninguno</button>
+          <button onclick="segSel(this);pintaAltaCat()">Café</button>
+          <button onclick="segSel(this);pintaAltaCat()">Bebida</button>
+          <button onclick="segSel(this);pintaAltaCat()">Panadería</button>
+          <button class="on" onclick="segSel(this);pintaAltaCat()">Comida</button>
+        </div>
+        <p class="hint">Esto es lo que impide que un americano pregunte por término de
+        cocción. Los modificadores no son una lista global: cuelgan del tipo de la categoría.</p>
+      </div>
+
+      <div>
+        <div class="prev-lbl">Así baja al punto de venta</div>
+        <div class="prev" id="alta-cat-prev"></div>
+        <div class="prev-lbl" style="margin-top:14px">Y esto es lo que pregunta al tocarlo</div>
+        <div class="prev" id="alta-cat-mods"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Platillo -->
+  <div class="card" style="margin-bottom:14px">
+    <h3 style="margin-top:0">Platillo<small>Admin → Menú → Platillos</small></h3>
+    <div class="grid g2" style="gap:18px;align-items:start">
+      <div>
+        <label class="lbl">Nombre</label>
+        <input class="inp" id="alta-pl-nom" value="Chilaquiles Verdes" oninput="pintaAltaPl()">
+
+        <div class="grid g2" style="gap:12px">
+          <div>
+            <label class="lbl">Precio</label>
+            <input class="inp mono" id="alta-pl-pre" value="292" oninput="pintaAltaPl()">
+          </div>
+          <div>
+            <label class="lbl">Costo de receta</label>
+            <input class="inp mono" id="alta-pl-cos" value="79" oninput="pintaAltaPl()">
+          </div>
+        </div>
+        <div id="alta-pl-fc" class="nota" style="margin:10px 0 0"></div>
+
+        <label class="lbl" style="margin-top:14px">Estado</label>
+        <div class="seg" id="alta-pl-est">
+          <button class="on" onclick="segSel(this);pintaAltaPl()">Disponible</button>
+          <button onclick="segSel(this);pintaAltaPl()">Agotado</button>
+          <button onclick="segSel(this);pintaAltaPl()">En promoción</button>
+        </div>
+        <p class="hint">Agotado es lo único de esta pantalla que también se puede tocar
+        desde la caja: la cocina se entera antes que el administrador. Sube, no baja.</p>
+
+        <label class="lbl">Dónde se imprime</label>
+        <div class="chk" id="alta-pl-imp">
+          <button class="on" onclick="chkSel(this)">Cocina</button>
+          <button onclick="chkSel(this)">Barra</button>
+          <button onclick="chkSel(this)">Panadería</button>
+          <button onclick="chkSel(this)">Sólo ticket</button>
+        </div>
+        <p class="hint">Un producto de mostrador que no lleva preparación va a «sólo ticket»:
+        si no, la cocina recibe comandas de un chicle.</p>
+      </div>
+
+      <div>
+        <div class="prev-lbl">Así baja al punto de venta</div>
+        <div class="prev" id="alta-pl-prev"></div>
+        <div class="prev-lbl" style="margin-top:14px">Y así entra a la cuenta</div>
+        <div class="prev" id="alta-pl-cta"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modificadores -->
+  <div class="card" style="margin-bottom:14px">
+    <h3 style="margin-top:0">Modificadores<small>Admin → Modificadores</small></h3>
+    <p style="font-size:13.5px;color:var(--text-2);line-height:1.75;margin:0 0 14px">
+    Un modificador tiene nombre y un precio extra que puede ser cero. Lo que decide
+    <i>cuáles aparecen</i> no es el platillo, es el tipo de su categoría. Toca un tipo
+    para ver el juego completo.</p>
+    <div class="seg" id="mod-tipos" style="margin-bottom:12px"></div>
+    <div id="mod-juego" class="grid g3"></div>
+    <p class="nota warn" style="margin-top:12px">Los obligatorios se piden antes de que
+    el platillo entre a la cuenta. Un obligatorio sin respuesta no se guarda «pendiente»:
+    se cancela el alta del renglón, porque media comanda es peor que ninguna.</p>
+  </div>
+
+  <!-- Tamaños, horarios, pago, promo -->
+  <div class="grid g2">
+    <div class="card">
+      <h3 style="margin-top:0">Tamaños<small>Admin → Tamaños</small></h3>
+      <div class="list">
+        <div class="row"><span>Nombre</span><code>Grande</code></div>
+        <div class="row"><span>Multiplicador</span><code>1.3</code></div>
+      </div>
+      <p class="hint" style="margin-top:10px">El precio no se captura por tamaño: se
+      multiplica. Así, subir el precio base de 40 productos no obliga a tocar 120 renglones.</p>
+      <div class="prev" id="prev-tam" style="margin-top:10px"></div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0">Horarios<small>Admin → Horarios</small></h3>
+      <div class="list">
+        <div class="row"><span>Nombre</span><code>Desayuno</code></div>
+        <div class="row"><span>Rango</span><code>07:00 – 12:30</code></div>
+        <div class="row"><span>Categorías visibles</span><code>6 de 31</code></div>
+      </div>
+      <p class="hint" style="margin-top:10px">A las 12:31 el menú de desayuno desaparece
+      solo de la caja. Nadie tiene que acordarse, y por eso nadie se equivoca.</p>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0">Formas de pago<small>Admin → Formas de pago</small></h3>
+      <div class="list">
+        <div class="row"><span>Nombre</span><code>Tarjeta de crédito</code></div>
+        <div class="row"><span>Tipo</span><code>tarjeta</code></div>
+        <div class="row"><span>Comisión</span><code>3.5 %</code></div>
+        <div class="row"><span>Código fiscal (SAT)</span><code>04</code></div>
+        <div class="row"><span>Activa</span><span class="pill on">sí</span></div>
+      </div>
+      <p class="hint" style="margin-top:10px">La comisión no se le cobra al cliente: sirve
+      para que el corte y la utilidad real cuadren sin capturar nada a mano.</p>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0">Promociones<small>Admin → Promociones</small></h3>
+      <div class="list">
+        <div class="row"><span>2×1</span><code>margarita-clasica</code></div>
+        <div class="row"><span>Combo</span><code>$199</code></div>
+        <div class="row"><span>Porcentaje</span><code>15 % · bebidas</code></div>
+        <div class="row"><span>Tope de usos</span><code>sin límite</code></div>
+      </div>
+      <p class="hint" style="margin-top:10px">La promoción se ofrece sola cuando la cuenta
+      califica. No se busca en un menú: aparece como una pastilla arriba del total y se
+      aplica de un toque.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══ MESAS ═══════════════════════════════════════════════════════════ -->
+<section id="mesas">
+  <h2>Armar el salón</h2>
+  <p class="lead">El plano no es un dibujo bonito: es el índice con el que un mesero
+  encuentra su mesa sin leer un número. Por eso se arma una vez, con la forma real del
+  local, y después no se vuelve a tocar.</p>
+
+  <div class="grid g2" style="gap:18px;align-items:start">
+    <div class="card">
+      <h3 style="margin-top:0">Agregar una mesa<small>Punto de venta → Plano → Editor</small></h3>
+
+      <label class="lbl">Número</label>
+      <input class="inp mono" id="mesa-num" value="14" oninput="pintaMesa()">
+
+      <label class="lbl">Forma</label>
+      <div class="seg" id="mesa-forma">
+        <button class="on" onclick="segSel(this);pintaMesa()">Cuadrada</button>
+        <button onclick="segSel(this);pintaMesa()">Redonda</button>
+        <button onclick="segSel(this);pintaMesa()">Rectangular</button>
+        <button onclick="segSel(this);pintaMesa()">Barra</button>
+      </div>
+
+      <label class="lbl">Lugares</label>
+      <div class="stepper">
+        <button onclick="mesaCap(-1)">−</button>
+        <span id="mesa-cap" class="mono">4</span>
+        <button onclick="mesaCap(1)">+</button>
+      </div>
+      <p class="hint">Los lugares no son decorativos: alimentan el ticket por persona
+      y la división de cuenta por asiento.</p>
+
+      <label class="lbl">Zona</label>
+      <div class="seg" id="mesa-zona">
+        <button class="on" onclick="segSel(this);pintaMesa()">Salón</button>
+        <button onclick="segSel(this);pintaMesa()">Terraza</button>
+        <button onclick="segSel(this);pintaMesa()">Barra</button>
+        <button onclick="segSel(this);pintaMesa()">Privado</button>
+      </div>
+      <p class="hint">La zona decide a qué impresora y a qué mesero cae la mesa,
+      y permite cerrar la terraza un día de lluvia sin borrar nada.</p>
+
+      <label class="lbl">Acomodo</label>
+      <div class="seg" id="mesa-col">
+        <button onclick="segSel(this);pintaMesa()">Libre</button>
+        <button class="on" onclick="segSel(this);pintaMesa()">Columnas</button>
+      </div>
+      <p class="hint">En columnas, las mesas se alinean solas a una retícula. Un salón
+      de 40 mesas armado a mano nunca queda derecho, y un plano chueco se lee peor
+      que una lista.</p>
+    </div>
+
+    <div>
+      <div class="prev-lbl">El plano, con la mesa que estás armando</div>
+      <div class="prev" id="mesa-prev" style="min-height:280px"></div>
+      <div class="prev-lbl" style="margin-top:14px">Los cuatro estados de una mesa</div>
+      <div class="prev" id="mesa-estados"></div>
+      <p class="hint" style="margin-top:8px">El color dice el estado y el número dice
+      cuánto lleva. Nadie tiene que abrir la mesa para saber si va tarde.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══ GENTE ═══════════════════════════════════════════════════════════ -->
+<section id="gente">
+  <h2>Quién puede qué</h2>
+  <p class="lead">El permiso se resuelve con dos filtros, no con uno. Primero la terminal
+  decide qué <b>existe</b>; después la persona decide qué <b>puede</b>. Un mesero parado
+  en la caja no ve el corte porque su perfil no lo trae; un gerente parado en una terminal
+  de mostrador tampoco, porque esa terminal no tiene caja.</p>
+
+  <div class="grid g2" style="gap:18px;align-items:start">
+    <div class="card">
+      <h3 style="margin-top:0">Los dos filtros<small>Se aplican en ese orden</small></h3>
+      <label class="lbl">Terminal</label>
+      <div class="seg" id="perm-term">
+        <button class="on" onclick="segSel(this);pintaPerm()">Caja</button>
+        <button onclick="segSel(this);pintaPerm()">Mostrador</button>
+        <button onclick="segSel(this);pintaPerm()">Cocina</button>
+        <button onclick="segSel(this);pintaPerm()">Admin</button>
+      </div>
+      <label class="lbl">Persona</label>
+      <div class="seg" id="perm-rol">
+        <button onclick="segSel(this);pintaPerm()">Mesero</button>
+        <button class="on" onclick="segSel(this);pintaPerm()">Cajero</button>
+        <button onclick="segSel(this);pintaPerm()">Gerente</button>
+        <button onclick="segSel(this);pintaPerm()">Dueño</button>
+      </div>
+      <p class="nota" style="margin-top:12px">Con un solo filtro el sistema se rompe de
+      dos maneras: o le enseñas el corte a quien no debe, o se lo escondes al dueño porque
+      se paró en la terminal equivocada.</p>
+    </div>
+
+    <div>
+      <div class="prev-lbl">Lo que esa combinación alcanza a ver</div>
+      <div class="prev" id="perm-prev" style="min-height:250px"></div>
+    </div>
+  </div>
+
+  <div class="grid g2" style="margin-top:14px">
+    <div class="card">
+      <h3 style="margin-top:0">Alta de personal<small>Admin → Usuarios</small></h3>
+      <div class="list">
+        <div class="row"><span>Nombre</span><code>Mariana Salazar</code></div>
+        <div class="row"><span>Perfil</span><code>Cajero</code></div>
+        <div class="row"><span>PIN</span><code>4 dígitos</code></div>
+        <div class="row"><span>Huella</span><span class="pill on">registrada</span></div>
+        <div class="row"><span>Terminales</span><code>Caja 1, Caja 2</code></div>
+      </div>
+      <p class="hint" style="margin-top:10px">La huella no reemplaza al PIN: lo acelera.
+      El PIN siempre queda como respaldo, porque un lector sucio no puede dejar
+      al restaurante sin cobrar.</p>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">Entrada y salida<small>Punto de venta → Checador</small></h3>
+      <p style="font-size:13.5px;color:var(--text-2);line-height:1.75;margin:0 0 12px">
+      El checador es pantalla completa y una sola cosa: poner el dedo. Sin menús, sin
+      historial, sin nada que tocar por equivocación. Quien marca entrada lo hace con
+      las manos mojadas y de pasada.</p>
+      <div class="prev" id="prev-checa"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ FRONTERA ════════════════════════════════════════════════════════ -->
+<section id="frontera">
+  <h2>Qué baja y qué sube</h2>
+  <p class="lead">Ésta es la regla que hace que el sistema funcione sin internet, y es
+  una sola: <b>el catálogo baja, la operación sube</b>. Nada del catálogo se inventa en la
+  caja, y nada de la operación se decide arriba. Mientras eso se respete, un corte de
+  internet no puede perder una venta — sólo retrasar su sincronización.</p>
+
+  <div class="grid g2" style="gap:18px">
+    <div class="card">
+      <h3 style="margin-top:0">Baja del dashboard<small>Se copia al equipo y se lee sin red</small></h3>
+      <div class="list" id="frontera-baja"></div>
+      <p class="hint" style="margin-top:10px">Se descarga al abrir turno y se refresca
+      sola. Si no hay red, se usa la última copia: un menú de ayer vende; un menú vacío, no.</p>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">Sube del punto de venta<small>Se guarda local y se encola</small></h3>
+      <div class="list" id="frontera-sube"></div>
+      <p class="hint" style="margin-top:10px">Cada operación lleva un identificador propio,
+      así que subirla dos veces no la cobra dos veces. Es lo que permite reintentar sin miedo.</p>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <h3 style="margin-top:0">Los cuatro que van en los dos sentidos<small>Y por qué son los difíciles</small></h3>
+    <table>
+      <tr><th>Qué</th><th>Baja</th><th>Sube</th><th>Quién gana si chocan</th></tr>
+      <tr>
+        <td><b>Agotados</b></td>
+        <td>El administrador marca un platillo sin existencia</td>
+        <td>La caja lo marca cuando se acaba en el turno</td>
+        <td><span class="tag warn">La caja</span> — está más cerca del hecho</td>
+      </tr>
+      <tr>
+        <td><b>Existencias</b></td>
+        <td>La compra y el inventario físico fijan el número</td>
+        <td>Cada venta y cada merma lo descuentan</td>
+        <td><span class="tag info">Se suman</span> — nunca se reemplaza</td>
+      </tr>
+      <tr>
+        <td><b>Turno</b></td>
+        <td>El fondo de caja y los montos permitidos</td>
+        <td>La apertura, los movimientos y el corte</td>
+        <td><span class="tag warn">La caja</span> — el corte es un hecho, no una orden</td>
+      </tr>
+      <tr>
+        <td><b>Personal</b></td>
+        <td>Alta, perfil, PIN y huella</td>
+        <td>Entradas, salidas y quién autorizó qué</td>
+        <td><span class="tag ok">No chocan</span> — bajan datos, suben hechos</td>
+      </tr>
+    </table>
+    <p class="nota warn" style="margin-top:12px">La única regla que resuelve los choques:
+    <b>quien estuvo presente gana</b>. Un agotado marcado en la caja a las 2 p.m. vale más
+    que el catálogo de las 6 a.m., porque alguien fue a ver la cámara.</p>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <h3 style="margin-top:0">Lo que nunca se hace desde la caja<small>Y no es por desconfianza</small></h3>
+    <div class="chips" id="frontera-nunca"></div>
+    <p style="font-size:13.5px;color:var(--text-2);line-height:1.75;margin:12px 0 0">
+    No es un tema de permisos: es que estas decisiones necesitan ver el negocio completo,
+    y en una comanda sólo se ve una mesa. Un precio que se cambia en la caja es un precio
+    que nadie puede explicar el día del corte.</p>
+  </div>
+</section>
+
+<!-- ══ PERSONALIZAR ════════════════════════════════════════════════════ -->
+<section id="personaliza">
+  <h2>Lo que el cliente cambia solo</h2>
+  <p class="lead">La pregunta que importa antes de comprar un sistema no es qué trae,
+  sino qué se puede cambiar sin llamar a nadie. Aquí está la lista completa, dividida
+  con honestidad en tres: lo que se cambia solo, lo que necesita a alguien una vez,
+  y lo que de verdad requiere código.</p>
+
+  <div class="grid g3" id="pers-resumen"></div>
+
+  <!-- Estación nueva -->
+  <div class="card" style="margin-top:16px">
+    <h3 style="margin-top:0">Agregar una estación<small>Una parrilla, una barra de café, un área de postres</small></h3>
+    <p style="font-size:13.5px;color:var(--text-2);line-height:1.75;margin:0 0 14px">
+    Una estación es un destino de impresión con nombre propio. No son cuatro fijas:
+    el nombre es texto libre y cada restaurante define los suyos. El sistema nunca
+    conoce una impresora por su marca ni por su dirección — sólo por el nombre de la
+    estación, y esa traducción vive en un archivo de configuración, no en el programa.</p>
+
+    <div class="grid g2" style="gap:18px;align-items:start">
+      <div>
+        <label class="lbl">Nombre de la estación</label>
+        <input class="inp" id="est-nom" value="Parrilla" oninput="pintaEst()">
+        <p class="hint">Texto libre. «Parrilla», «Postres», «Sushi», «Barra 2».
+        Se escribe una vez y aparece como destino en el alta de cada platillo.</p>
+
+        <label class="lbl">Qué documentos imprime</label>
+        <div class="chk" id="est-doc">
+          <button class="on" onclick="chkSel(this);pintaEst()">Comanda de cocina</button>
+          <button onclick="chkSel(this);pintaEst()">Comanda de barra</button>
+          <button onclick="chkSel(this);pintaEst()">Ticket de cobro</button>
+          <button onclick="chkSel(this);pintaEst()">Pre&nbsp;cuenta</button>
+          <button onclick="chkSel(this);pintaEst()">Factura</button>
+          <button onclick="chkSel(this);pintaEst()">Corte</button>
+          <button onclick="chkSel(this);pintaEst()">Reimpresión</button>
+        </div>
+
+        <label class="lbl">Cómo se conecta</label>
+        <div class="seg" id="est-con">
+          <button class="on" onclick="segSel(this);pintaEst()">Red</button>
+          <button onclick="segSel(this);pintaEst()">USB</button>
+          <button onclick="segSel(this);pintaEst()">Windows</button>
+        </div>
+
+        <label class="lbl">Respaldo si no contesta</label>
+        <div class="seg" id="est-resp">
+          <button class="on" onclick="segSel(this);pintaEst()">Cocina</button>
+          <button onclick="segSel(this);pintaEst()">Caja</button>
+          <button onclick="segSel(this);pintaEst()">Ninguno</button>
+        </div>
+        <p class="hint">Una estación sin respaldo puede dejar un platillo sin comanda.
+        Con respaldo, el ticket sale en otro lado y alguien lo lleva a mano — feo,
+        pero la comida se hace.</p>
+      </div>
+      <div>
+        <div class="prev-lbl">La estación, ya dada de alta</div>
+        <div class="prev" id="est-prev" style="min-height:150px"></div>
+        <div class="prev-lbl" style="margin-top:14px">Y dónde aparece a partir de ahora</div>
+        <div class="prev" id="est-donde"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Forma de cobro nueva -->
+  <div class="card" style="margin-top:14px">
+    <h3 style="margin-top:0">Agregar una forma de cobro<small>Vales, transferencia, una terminal nueva, crédito de casa</small></h3>
+    <div class="grid g2" style="gap:18px;align-items:start">
+      <div>
+        <label class="lbl">Nombre</label>
+        <input class="inp" id="pag-nom" value="Vales de despensa" oninput="pintaPago()">
+
+        <label class="lbl">Tipo</label>
+        <div class="seg" id="pag-tipo">
+          <button onclick="segSel(this);pintaPago()">Efectivo</button>
+          <button onclick="segSel(this);pintaPago()">Tarjeta</button>
+          <button class="on" onclick="segSel(this);pintaPago()">Vale</button>
+          <button onclick="segSel(this);pintaPago()">Transferencia</button>
+          <button onclick="segSel(this);pintaPago()">Crédito</button>
+        </div>
+        <p class="hint">El tipo decide tres cosas solas: si suma al efectivo del corte,
+        si abre el cajón, y si el monto tiene que cuadrar contra el arqueo.</p>
+
+        <div class="grid g2" style="gap:12px">
+          <div>
+            <label class="lbl">Comisión</label>
+            <input class="inp mono" id="pag-com" value="0" oninput="pintaPago()">
+          </div>
+          <div>
+            <label class="lbl">Código fiscal</label>
+            <input class="inp mono" id="pag-sat" value="28" oninput="pintaPago()">
+          </div>
+        </div>
+
+        <label class="lbl">Reglas</label>
+        <div class="chk" id="pag-reg">
+          <button onclick="chkSel(this);pintaPago()">Abre el cajón</button>
+          <button class="on" onclick="chkSel(this);pintaPago()">Pide referencia</button>
+          <button onclick="chkSel(this);pintaPago()">Permite propina</button>
+          <button class="on" onclick="chkSel(this);pintaPago()">Sin cambio</button>
+          <button onclick="chkSel(this);pintaPago()">Requiere autorización</button>
+        </div>
+      </div>
+      <div>
+        <div class="prev-lbl">Así aparece en la pantalla de cobro</div>
+        <div class="prev" id="pag-prev" style="min-height:150px"></div>
+        <div class="prev-lbl" style="margin-top:14px">Y así entra al corte</div>
+        <div class="prev" id="pag-corte"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- La tabla honesta -->
+  <div class="card" style="margin-top:14px">
+    <h3 style="margin-top:0">La lista completa, sin adornos<small>Tres columnas, y la tercera también se dice</small></h3>
+    <table id="tabla-pers"></table>
+    <p class="nota" style="margin-top:12px">La tercera columna es corta a propósito, y
+    es la que hay que enseñar primero. Un sistema que dice «todo se puede» y después
+    cobra un desarrollo por cada cambio es el motivo por el que nadie confía en esta
+    industria.</p>
+  </div>
+</section>
+
+
+</main>
+
+<script>
+const IC = {
+  /* ── Comida y bebida — cubren el catálogo de cualquier restaurante ────── */
+  coffee:'<path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><path d="M6 2v3M10 2v3M14 2v3"/>',
+  cup:'<path d="M5 3h14l-1.5 17a2 2 0 0 1-2 1.8H8.5a2 2 0 0 1-2-1.8Z"/><path d="M6 9h12"/>',
+  tea:'<path d="M4 5h13v7a6.5 6.5 0 0 1-13 0Z"/><path d="M17 7h2a2.5 2.5 0 0 1 0 5h-2"/><path d="M3 21h15"/>',
+  wine:'<path d="M8 22h8M12 15v7"/><path d="M7 3h10l-.6 6a4.4 4.4 0 0 1-8.8 0Z"/>',
+  beer:'<path d="M6 4h11v16H6Z"/><path d="M17 8h2.5a1.5 1.5 0 0 1 1.5 1.5v5A1.5 1.5 0 0 1 19.5 16H17"/><path d="M9.5 8v8M13.5 8v8"/>',
+  bottle:'<path d="M10 2h4v3.5l1.8 2.7A4 4 0 0 1 16.5 10v10a2 2 0 0 1-2 2h-5a2 2 0 0 1-2-2V10a4 4 0 0 1 .7-1.8L10 5.5Z"/><path d="M8 12h8"/>',
+  water:'<path d="M12 2.5S5.5 10 5.5 14.5a6.5 6.5 0 0 0 13 0C18.5 10 12 2.5 12 2.5Z"/>',
+  soda:'<path d="M6 7h12l-1.2 13a2 2 0 0 1-2 1.8h-5.6a2 2 0 0 1-2-1.8Z"/><path d="M9 2.5 7.5 7M15 2.5 16.5 7"/><path d="M7 12h10"/>',
+  smoothie:'<path d="M6 8h12l-1 12.2a2 2 0 0 1-2 1.8H9a2 2 0 0 1-2-1.8Z"/><path d="M12 8V3M12 3l3-1M12 3 9 2"/><circle cx="10" cy="13" r="1"/><circle cx="14" cy="16" r="1"/>',
+  egg:'<path d="M12 2c4 0 7 6.5 7 11a7 7 0 1 1-14 0c0-4.5 3-11 7-11Z"/>',
+  utensils:'<path d="M4 2v8a2 2 0 0 0 4 0V2M6 12v10"/><path d="M14 2c0 4 1 6 3 6s3-2 3-6"/><path d="M17 8v14"/>',
+  croissant:'<path d="M3 14a9 9 0 0 1 18 0c0 1-1 2-2 2l-7-4-7 4c-1 0-2-1-2-2Z"/><path d="M7 16v3M12 12v7M17 16v3"/>',
+  bread:'<path d="M4 10a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4c0 1.2-1 2-2 2v6a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-6c-1 0-2-.8-2-2Z"/>',
+  cake:'<path d="M3 21h18v-7a3 3 0 0 0-3-3H6a3 3 0 0 0-3 3Z"/><path d="M3 15c2 1.5 4 1.5 6 0s4-1.5 6 0 4 1.5 6 0"/><path d="M8 8V6M12 8V4M16 8V6"/>',
+  iceCream:'<path d="M8 10a4 4 0 0 1 8 0"/><path d="M7.5 10h9L12 22Z"/><path d="M6.5 13.5h11M8 17h8"/>',
+  candy:'<circle cx="12" cy="12" r="4.5"/><path d="M7.5 12 3 8.5v7ZM16.5 12 21 8.5v7Z"/>',
+  pizza:'<path d="M12 2 3 20a1.4 1.4 0 0 0 1.8 1.8L22 13Z"/><circle cx="11" cy="11" r="1"/><circle cx="8" cy="16" r="1"/><circle cx="14" cy="14" r="1"/>',
+  pasta:'<path d="M5 8h14v3a7 7 0 0 1-14 0Z"/><path d="M7 8c0-3 1.5-5 5-5s5 2 5 5"/><path d="M3 21h18"/>',
+  burger:'<path d="M3 9a5 5 0 0 1 5-5h8a5 5 0 0 1 5 5Z"/><path d="M3 13h18"/><path d="M3 16h18a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3Z"/>',
+  sandwich:'<path d="M3 8.5 12 4l9 4.5-9 4.5Z"/><path d="M3 12.5 12 17l9-4.5"/><path d="M3 16.5 12 21l9-4.5"/>',
+  taco:'<path d="M2 16a10 10 0 0 1 20 0Z"/><path d="M2 16a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3"/><path d="M8 13c1-1 2-1 3 0M13 12c1-1 2-1 3 0"/>',
+  sushi:'<rect x="3" y="8" width="18" height="9" rx="4"/><circle cx="12" cy="12.5" r="2.5"/><path d="M7 8v9M17 8v9"/>',
+  salad:'<path d="M3 12h18a9 9 0 0 1-18 0Z"/><path d="M6 12c0-3 2-5 4-5M12 12c0-4 2-6 5-6"/><path d="M6 21h12"/>',
+  soup:'<path d="M4 11h16a8 8 0 0 1-16 0Z"/><path d="M8 7c0-1.5 1-2 1-3M12 7c0-1.5 1-2 1-3M16 7c0-1.5 1-2 1-3"/><path d="M3 21h18"/>',
+  noodle:'<path d="M4 10h16v2a8 8 0 0 1-16 0Z"/><path d="M7 10V5M11 10V4M15 10V5"/><path d="M18 15l3-2"/>',
+  rice:'<path d="M4 12h16l-2 8H6Z"/><path d="M7 12c0-3 2-5 5-5s5 2 5 5"/><circle cx="10" cy="16" r=".8"/><circle cx="14" cy="16" r=".8"/>',
+  fish:'<path d="M2 12c4-5 10-6 14-3 2 1.5 3 3 6 3-3 0-4 1.5-6 3-4 3-10 2-14-3Z"/><circle cx="16" cy="11" r=".9"/><path d="M7 9.5c0 2 0 3 0 5"/>',
+  meat:'<path d="M13 3a7 7 0 0 1 7 7c0 4-3 6-6 6-2 0-3 1-3 3a4 4 0 0 1-8 0c0-2 1-3 3-3 3 0 5-2 5-6a7 7 0 0 1 2-7Z"/>',
+  chicken:'<path d="M6 20c-2 0-3-1.5-3-3.5S5 13 7 13c0-4 3-7 7-7a6 6 0 0 1 6 6c0 4-3 7-7 7Z"/><path d="M8 20v2M12 20v2"/>',
+  cheese:'<path d="M3 10 13 4l8 6v8H3Z"/><circle cx="8" cy="14" r="1.2"/><circle cx="15" cy="13" r="1.2"/>',
+  fruit:'<path d="M12 7c-4 0-6 3-6 7a5 5 0 0 0 10 0c0-4-2-7-4-7Z"/><path d="M12 7V3M12 3c2 0 3-1 4-2"/>',
+  cart:'<circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.6 12.4a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.6L21 7H6"/>',
+  star:'<path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.9L12 17.8 5.8 21.1 7 14.2l-5-4.9 6.9-1L12 2Z"/>',
+
+  /* ── Interfaz y operación ─────────────────────────────────────────────── */
+  menu:'<path d="M3 6h18M3 12h18M3 18h18"/>',
+  x:'<path d="M18 6 6 18M6 6l12 12"/>',
+  check:'<path d="M20 6 9 17l-5-5"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
+  minus:'<path d="M5 12h14"/>',
+  left:'<path d="M15 18l-6-6 6-6"/>',
+  right:'<path d="M9 18l6-6-6-6"/>',
+  search:'<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+  grid:'<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+  map:'<path d="m9 4 6 2 5.5-2v14L15 20l-6-2-5.5 2V6Z"/><path d="M9 4v14M15 6v14"/>',
+  table:'<rect x="3" y="7" width="18" height="10" rx="2"/><path d="M7 17v3M17 17v3"/>',
+  users:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/>',
+  user:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>',
+  cash:'<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M6 10v4M18 10v4"/>',
+  card:'<rect x="2" y="5" width="20" height="14" rx="2.5"/><path d="M2 10h20"/>',
+  receipt:'<path d="M6 2h12v20l-3-2-3 2-3-2-3 2Z"/><path d="M9 8h6M9 12h6"/>',
+  printer:'<path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M6 15h12v6H6Z"/>',
+  box:'<path d="m12 2 9 5v10l-9 5-9-5V7Z"/><path d="m3 7 9 5 9-5M12 12v10"/>',
+  trash:'<path d="M3 6h18M8 6V4h8v2M6 6l1 15h10l1-15"/><path d="M10 11v6M14 11v6"/>',
+  history:'<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>',
+  gear:'<circle cx="12" cy="12" r="3"/><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z"/>',
+  chef:'<path d="M6 20h12v-7H6Z"/><path d="M6 13a4 4 0 0 1-1-7.9 4 4 0 0 1 7-2.1 4 4 0 0 1 7 2.1A4 4 0 0 1 18 13"/>',
+  truck:'<path d="M2 6h11v11H2Z"/><path d="M13 9h4l4 4v4h-8Z"/><circle cx="6" cy="18.5" r="1.8"/><circle cx="17" cy="18.5" r="1.8"/>',
+  lock:'<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+  wifi:'<path d="M2 8a17 17 0 0 1 20 0"/><path d="M5 12a12 12 0 0 1 14 0"/><path d="M8.5 15.5a7 7 0 0 1 7 0"/><circle cx="12" cy="19" r="1"/>',
+  wifiOff:'<path d="m2 2 20 20"/><path d="M8.5 15.5a7 7 0 0 1 7 0"/><circle cx="12" cy="19" r="1"/><path d="M5 12a12 12 0 0 1 4-2.6M2 8a17 17 0 0 1 5-3.2"/><path d="M22 8a17 17 0 0 0-8-3.8"/>',
+  alert:'<path d="M12 8v5M12 17h.01"/><circle cx="12" cy="12" r="9"/>',
+  info:'<circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/>',
+  send:'<path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7Z"/>',
+  tag:'<path d="M3 3h8l10 10-8 8L3 11Z"/><circle cx="7.5" cy="7.5" r="1.3"/>',
+  split:'<path d="M16 3h5v5M8 3H3v5"/><path d="M12 22v-8.3a4 4 0 0 0-1.17-2.83L3 3M21 3l-7.83 7.87A4 4 0 0 0 12 13.7v.3"/>',
+  chart:'<path d="M3 3v18h18"/><path d="m7 14 3.5-4 3 2.5L19 7"/>',
+  shield:'<path d="M12 2 4 5.5V11c0 5 3.4 9 8 11 4.6-2 8-6 8-11V5.5Z"/><path d="m9 12 2 2 4-4"/>',
+  huella:'<path d="M2 12C2 6.5 6.5 2 12 2a10 10 0 0 1 8 4"/><path d="M5 19.5C5.5 18 6 15 6 12c0-.7.12-1.37.34-2"/><path d="M17.29 21.02c.12-.6.43-2.3.5-3.02"/><path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4"/><path d="M8.65 22c.21-.66.45-1.32.57-2"/><path d="M14 13.12c0 2.38 0 6.38-1 8.88"/><path d="M2 16h.01"/><path d="M21.8 16c.2-2 .13-5.35 0-6"/><path d="M9 6.8a6 6 0 0 1 9 5.2c0 .47 0 1.17-.02 2"/>',
+  calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  refresh:'<path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/>',
+  eye:'<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
+  moon:'<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
+  type:'<path d="M4 7V4h16v3"/><path d="M9 20h6M12 4v16"/>',
+  layers:'<path d="m12 2 9 5-9 5-9-5Z"/><path d="m3 12 9 5 9-5M3 17l9 5 9-5"/>',
+  bell:'<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M10.3 21a2 2 0 0 0 3.4 0"/>',
+  home:'<path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M9 22V12h6v10"/>',
+  file:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/>',
+  qr:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v3M14 20h3M20 20h1"/>',
+  bag:'<path d="M6 7h12l1 14H5Z"/><path d="M9 7V5a3 3 0 0 1 6 0v2"/>',
+  phone:'<rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M10 18h4"/>',
+  dollar:'<path d="M12 2v20"/><path d="M17 6.5C17 4.6 14.8 3.5 12 3.5S7 4.6 7 6.5s2 2.6 5 3.5 5 1.6 5 3.5-2.2 3-5 3-5-1.1-5-3"/>',
+  merge:'<path d="M8 3v5a4 4 0 0 0 4 4h8"/><path d="M8 21v-5a4 4 0 0 1 4-4"/><path d="M17 9l3 3-3 3"/>',
+  weight:'<path d="M6.5 6h11l2.5 15H4Z"/><circle cx="12" cy="10.5" r="2"/>',
+  scale:'<path d="M12 3v18M7 8h10"/><path d="M4 8 1 15h6ZM20 8l-3 7h6Z"/><path d="M5 21h14"/>',
+};
+
+const ICON_RULES = [
+  [['cafe','café','coffee','espresso','capuchino','latte','americano'], 'coffee', '#a8703a'],
+  [['frappe','frapp','malteada','shake','batido'],                      'smoothie','#8b5a3c'],
+  [['te','té','tea','tisana','infusion','matcha','chai'],               'tea',    '#6d9e5e'],
+  [['jugo','juice','naranja','zumo'],                                   'fruit',  '#f59e0b'],
+  [['smoothie','licuado'],                                              'smoothie','#ec4899'],
+  [['agua','water','soda','refresco','coca','bebida','drink','fresh'],  'soda',   '#3b82f6'],
+  [['vino','wine','copa','botella'],                                    'wine',   '#8b5cf6'],
+  [['cerveza','beer','lager','michelada'],                              'beer',   '#d97706'],
+  [['licor','whisky','tequila','mezcal','ron','vodka','coctel','cóctel','bar'],'bottle','#a855f7'],
+  [['huevo','egg','omelet','benedict','keto','desayuno','breakfast'],   'egg',    '#f59e0b'],
+  [['chilaquil','enchilada','taco','taqueria','taquito','quesadilla'],  'taco',   '#e05a2b'],
+  [['pizza'],                                                           'pizza',  '#dc2626'],
+  [['pasta','spaghetti','lasagna','noodle','ramen','fideo'],            'pasta',  '#ca8a04'],
+  [['sushi','roll','sashimi','nigiri'],                                 'sushi',  '#0891b2'],
+  [['burger','hamburgues'],                                             'burger', '#b45309'],
+  [['panini','sandwich','sándwich','torta','bagel','toast','croque'],   'sandwich','#2e9e5b'],
+  [['sopa','soup','caldo','crema'],                                     'soup',   '#0d9488'],
+  [['ensalada','salad','bowl','verde'],                                 'salad',  '#16a34a'],
+  [['ceviche','pescado','fish','mariscos','salmon','atun','atún'],      'fish',   '#0284c7'],
+  [['pollo','chicken','alitas'],                                        'chicken','#ea580c'],
+  [['carne','meat','arrachera','steak','res','cerdo'],                  'meat',   '#991b1b'],
+  [['arroz','rice'],                                                    'rice',   '#a16207'],
+  [['queso','cheese'],                                                  'cheese', '#eab308'],
+  [['pan','bakery','panader','croissant','concha','bisquet','baguette'],'croissant','#c2410c'],
+  [['postre','dessert','pastel','cake','pay','brownie'],                'cake',   '#ec4899'],
+  [['nieve','helado','ice cream','gelato','paleta'],                    'iceCream','#f472b6'],
+  [['dulce','candy','chocolate','galleta','cookie'],                    'candy',  '#db2777'],
+  [['market','tienda','abarrote','retail','souvenir','regalo'],         'cart',   '#64748b'],
+  [['snack','chips','botana','barra','nuez','semilla'],                 'candy',  '#78716c'],
+  [['suplemento','proteina','proteína','salud','vitamina'],             'scale',  '#0f766e'],
+  [['extra','adicional','modificador','guarnicion','guarnición'],       'plus',   '#525252'],
+  [['especial','special','signature','temporada','evento','promo'],     'star',   '#10b981'],
+  [['kids','niño','infantil'],                                          'candy',  '#f97316'],
+  [['appetizer','entrada','botanas','starter'],                         'salad',  '#65a30d'],
+  [['fruta','fruit'],                                                   'fruit',  '#f43f5e'],
+];
+
+function iconForCategory(name){
+  const n = (name||'').toLowerCase();
+  for(const [keys, icon, color] of ICON_RULES){
+    if(keys.some(k=>n.includes(k))) return {icon, color};
+  }
+  return {icon:'utensils', color:'#2e9e5b'};
+}
+function svg(name, size=20, sw=1.9){
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round">${IC[name]||IC.utensils}</svg>`;
+}
+/* ── Render del catálogo ─────────────────────────────────────────────────── */
+const FOOD = ['coffee','cup','tea','wine','beer','bottle','water','soda','smoothie','egg',
+  'utensils','croissant','bread','cake','iceCream','candy','pizza','pasta','burger','sandwich',
+  'taco','sushi','salad','soup','noodle','rice','fish','meat','chicken','cheese','fruit','cart','star'];
+
+function pintaIconos(destino, nombres){
+  document.getElementById(destino).innerHTML = nombres.map(n =>
+    `<button class="ico" onclick="copiar(this,'${n}')" title="Copiar «${n}»">
+      ${svg(n, 26, 1.8)}<span>${n}</span></button>`).join('');
+}
+function copiar(el, n){
+  try { navigator.clipboard.writeText(n); } catch {}
+  document.querySelectorAll('.ico.copiado').forEach(x => x.classList.remove('copiado'));
+  el.classList.add('copiado');
+  clearTimeout(copiar._t);
+  copiar._t = setTimeout(() => el.classList.remove('copiado'), 1400);
+}
+
+/* Tokens, leídos del CSS real — no una lista escrita a mano que pueda derivar */
+function pintaTokens(){
+  const cs = getComputedStyle(document.documentElement);
+  const grupo = (destino, lista) => {
+    document.getElementById(destino).innerHTML = lista.map(([v, desc]) => {
+      const val = cs.getPropertyValue(v).trim();
+      return `<div class="tok">
+        <span class="sw" style="background:${val}"></span>
+        <div style="min-width:0"><div class="n">${v}</div><div class="v">${desc}</div></div></div>`;
+    }).join('');
+  };
+  grupo('tok-fondo', [
+    ['--bg','el fondo de todo'], ['--surface','columna de la cuenta'],
+    ['--surface-2','barras y controles'], ['--panel','tarjetas y listas'],
+    ['--raised','lo que flota encima'], ['--line','bordes'],
+  ]);
+  grupo('tok-texto', [
+    ['--text-1','lo que importa'], ['--text-2','texto normal'],
+    ['--text-3','dato secundario'], ['--text-4','casi invisible'],
+  ]);
+  grupo('tok-sem', [
+    ['--accent','acción y confirmación'], ['--info','en curso, dinero'],
+    ['--warn','atención, espera'], ['--crit','alto, pérdida'],
+    ['--fs-green','punto del logotipo — nunca cambia'],
+  ]);
+}
+
+/* Las reglas de icono, mostradas como lo que son: una tabla legible */
+function pintaReglas(){
+  const muestra = ICON_RULES.slice(0, 14);
+  document.getElementById('demo-reglas').innerHTML = `
+    <table>
+      <tr><th>Si el nombre contiene…</th><th>Icono</th><th>Color</th></tr>
+      ${muestra.map(([keys, ic, col]) => `<tr>
+        <td style="font-weight:600;color:var(--text-2)"><code>${keys.slice(0,5).join('</code> <code>')}</code>${keys.length>5?` <span style="color:var(--text-4)">+${keys.length-5}</span>`:''}</td>
+        <td><span style="display:inline-flex;align-items:center;gap:8px;color:${col}">
+          ${svg(ic,19)}<code style="color:var(--text-3)">${ic}</code></span></td>
+        <td><span class="sw" style="display:inline-block;width:22px;height:22px;border-radius:6px;background:${col};vertical-align:middle"></span>
+          <code style="color:var(--text-4);margin-left:6px">${col}</code></td></tr>`).join('')}
+      <tr><td colspan="3" style="color:var(--text-4);font-style:italic">
+        …y ${ICON_RULES.length - muestra.length} reglas más. Si nada coincide → <code>utensils</code></td></tr>
+    </table>`;
+}
+
+/* Prueba viva: nombres de categoría reales de varios tipos de restaurante */
+function pintaPrueba(){
+  const cats = ['Coffee Hot/Ice','Tacos al Pastor','Sushi Rolls','Pizzas & Pastas',
+    'Bakery','Vinos','Market: Snacks','Smoothies','Hamburguesas','Ramen',
+    'Mariscos','Postres','Cerveza artesanal','Ensaladas'];
+  document.getElementById('prueba-cats').innerHTML = cats.map(c => {
+    const {icon, color} = iconForCategory(c);
+    return `<span class="tag" style="height:36px;padding:0 13px;font-size:12px;text-transform:none;
+      letter-spacing:0;background:${color}1e;border-color:${color}66;color:${color}">
+      ${svg(icon,16)}${c}</span>`;
+  }).join('');
+}
+
+function pintaTiles(){
+  const ej = [
+    ['Chilaquiles Verdes', 292, '#2e9e5b', 2],
+    ['CAFE AMERICANO', 48, '#a8703a', null],
+    ['COPA - LAUS ROSADO', 170, '#8b5cf6', null],
+    ['MUFFIN CREMA CACAHUATE CHOCOLATE', 99, '#c2410c', null],
+  ];
+  document.getElementById('demo-tiles').innerHTML = ej.map(([n,p,c,q]) =>
+    `<button class="tile" style="background:linear-gradient(150deg,${c},${c}cc)">
+      ${q ? `<span class="badge">${q}</span>` : ''}
+      <span class="nm">${n}</span><span class="pr">$${p}</span></button>`).join('');
+}
+
+function tema(){
+  const r = document.documentElement;
+  const claro = r.dataset.theme === 'light';
+  if(claro) r.removeAttribute('data-theme'); else r.dataset.theme = 'light';
+  document.getElementById('btn-tema').innerHTML = svg(claro ? 'moon' : 'eye', 18);
+  pintaTokens();
+}
+
+/* Arranque */
+pintaIconos('icons-food', FOOD);
+pintaIconos('icons-ui', Object.keys(IC).filter(n => !FOOD.includes(n)));
+pintaTokens();
+pintaReglas();
+pintaPrueba();
+pintaTiles();
+document.getElementById('btn-tema').innerHTML = svg('moon', 18);
+
+/* ══ Selectores compartidos ═══════════════════════════════════════════════ */
+function segSel(b){ [...b.parentNode.children].forEach(x=>x.classList.remove('on')); b.classList.add('on'); }
+function chkSel(b){ b.classList.toggle('on'); }
+function segVal(id){ const e=document.querySelector('#'+id+' .on'); return e?e.textContent.trim():''; }
+function chkVals(id){ return [...document.querySelectorAll('#'+id+' .on')].map(e=>e.textContent.trim()); }
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ══ MEDIDAS ══════════════════════════════════════════════════════════════ */
+function pintaMedidas(){
+  document.getElementById('demo-tap').innerHTML = `<div class="tap-demo">
+    ${[[36,'bad','falla'],[44,'bad','falla'],[48,'warn','casi'],[56,'ok','mínimo'],[72,'ok','crítico']].map(([px,t,l])=>
+      `<div style="text-align:center">
+        <button style="width:${px}px;height:${px}px">${px}</button>
+        <div class="tag ${t}" style="margin-top:6px;font-size:9.5px">${l}</div>
+      </div>`).join('')}
+  </div>`;
+
+  document.getElementById('demo-space').innerHTML =
+    [4,8,12,16,24,32].map(n=>`<div class="sp-bar"><code>${n}px</code><i style="width:${n*4}px"></i></div>`).join('') +
+    `<p style="font-size:12px;color:var(--text-4);margin:8px 0 0">4 pega · 8 separa · 12 agrupa · 16 respira · 24 divide · 32 corta</p>`;
+
+  document.getElementById('demo-radios').innerHTML =
+    [['--r1','10px','controles'],['--r2','14px','tarjetas'],['--r3','18px','hojas'],['--r4','24px','pantalla']]
+    .map(([v,px,u])=>`<div style="text-align:center">
+      <div style="width:62px;height:52px;background:var(--surface-2);border:1px solid var(--line);border-radius:var(${v})"></div>
+      <code style="font-size:10.5px;display:block;margin-top:6px;color:var(--text-2)">${px}</code>
+      <span style="font-size:10px;color:var(--text-4)">${u}</span></div>`).join('');
+
+  document.getElementById('demo-sombras').innerHTML =
+    [['--shadow-1','pegado'],['--shadow-2','flota'],['--shadow-3','tapa']]
+    .map(([v,u])=>`<div style="text-align:center">
+      <div style="width:74px;height:52px;background:var(--panel);border-radius:var(--r2);box-shadow:var(${v})"></div>
+      <span style="font-size:10.5px;color:var(--text-3);display:block;margin-top:9px">${u}</span></div>`).join('');
+}
+
+/* Auditoria tactil — conteo real de min-h-[Npx] en app/pos y components/pos
+   del arbol de origin/main. No es una estimacion: es el conteo. */
+const TACTIL = [[32,2],[36,6],[40,6],[42,3],[44,21],[48,71],[52,20],[54,4],
+                [56,22],[60,5],[64,8],[68,2],[72,6],[80,1],[100,1],[140,1],[420,1]];
+function pintaAudit(){
+  const max = Math.max(...TACTIL.map(x=>x[1]));
+  const tot = TACTIL.reduce((a,x)=>a+x[1],0);
+  const bajo = TACTIL.filter(x=>x[0]<56).reduce((a,x)=>a+x[1],0);
+  document.getElementById('demo-audit').innerHTML =
+    `<div style="display:flex;align-items:flex-end;gap:4px;height:130px;padding:0 2px">
+      ${TACTIL.map(([px,n])=>{
+        const malo = px<56;
+        return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;min-width:0" title="${n} controles de ${px}px">
+          <span style="font-size:10px;font-weight:800;font-family:'IBM Plex Mono',monospace;
+                color:${malo?'var(--crit)':'var(--accent)'}">${n}</span>
+          <div style="width:100%;height:${Math.max(3,n/max*86)}px;border-radius:4px 4px 0 0;
+               background:${malo?'var(--crit)':'var(--accent)'};opacity:${malo?.8:1}"></div>
+          <span style="font-size:9px;color:var(--text-4);font-family:'IBM Plex Mono',monospace">${px}</span>
+        </div>`}).join('')}
+     </div>
+     <div style="display:flex;align-items:center;gap:9px;margin-top:12px;flex-wrap:wrap">
+       <span class="tag bad">${bajo} por debajo de 56px</span>
+       <span class="tag ok">${tot-bajo} cumplen</span>
+       <span style="font-size:11.5px;color:var(--text-4)">de ${tot} alturas declaradas · app/pos + components/pos</span>
+     </div>`;
+}
+
+/* ══ MOVIMIENTO ═══════════════════════════════════════════════════════════ */
+function pintaMov(){
+  document.getElementById('demo-mov').innerHTML =
+    [[80,'seco'],[130,'tacto'],[180,'hoja'],[400,'lento']].map(([ms,l])=>
+      `<div style="text-align:center">
+        <button onclick="this.style.transition='transform ${ms}ms var(--ease)';this.style.transform='scale(.86)';
+                 setTimeout(()=>this.style.transform='',${ms})"
+          style="width:88px;height:70px;border-radius:var(--r2);background:var(--accent-soft);
+                 border:1px solid var(--accent-line);color:var(--accent);font-weight:800;
+                 font-size:13px;font-family:'IBM Plex Mono',monospace;cursor:pointer">${ms}</button>
+        <div style="font-size:10.5px;color:var(--text-3);margin-top:7px">${l}</div>
+      </div>`).join('');
+}
+
+/* ══ ESTADOS ══════════════════════════════════════════════════════════════ */
+function pintaEstados(){
+  const cuerpo = {
+    cargando: `<div class="sk" style="height:13px;width:62%"></div>
+               <div class="sk" style="height:13px;width:88%;margin-top:8px"></div>
+               <div class="sk" style="height:13px;width:44%;margin-top:8px"></div>
+               <div class="mini-grid" style="margin-top:11px">
+                 ${[1,2,3].map(()=>'<div class="sk" style="height:62px;border-radius:14px"></div>').join('')}
+               </div>`,
+    vacio: `<div style="text-align:center;padding:16px 6px;color:var(--text-3)">
+              ${svg('cart',30)}
+              <p style="font-size:13px;font-weight:700;color:var(--text-2);margin:10px 0 4px">Todavía no hay ventas hoy</p>
+              <p style="font-size:12px;margin:0 0 12px">La primera comanda aparece aquí.</p>
+              <span class="tag ok">Abrir turno</span></div>`,
+    error: `<div class="nota bad" style="margin:0">
+              <b>Manda el ticket otra vez.</b><br>La impresora de cocina no contestó.</div>
+            <div style="display:flex;gap:7px;margin-top:11px">
+              <span class="tag ok">Reintentar</span><span class="tag">Ver la cola</span></div>`,
+    offline: `<div class="nota warn" style="margin:0">
+                <b>Sin internet.</b><br>Se sigue vendiendo. 3 órdenes esperan para subir.</div>
+              <div style="display:flex;align-items:center;gap:8px;margin-top:11px">
+                <div style="flex:1;height:5px;background:var(--surface-2);border-radius:99px;overflow:hidden">
+                  <div style="width:62%;height:100%;background:var(--warn)"></div></div>
+                <code style="font-size:11px;color:var(--text-3)">5 de 8</code></div>`,
+    permiso: `<div style="text-align:center;padding:14px 6px">
+                ${svg('lock',28)}
+                <p style="font-size:13px;font-weight:700;color:var(--text-2);margin:10px 0 4px">Wayo no puede cancelar</p>
+                <p style="font-size:12px;color:var(--text-3);margin:0 0 12px">Un gerente lo autoriza con su PIN.</p>
+                <span class="tag info">Pedir autorización</span></div>`,
+  };
+  const defs = [
+    ['Cargando','cargando','info','Se pinta el hueco de lo que viene, no una rueda'],
+    ['Vacío','vacio','ok','Dice qué hacer para llenarlo'],
+    ['Error','error','bad','Primero la salida, después la causa'],
+    ['Sin conexión','offline','warn','Un número, no un gerundio'],
+    ['Sin permiso','permiso','info','Dice quién sí puede'],
+  ];
+  document.getElementById('demo-estados').innerHTML = defs.map(([t,k,tag,pie])=>
+    `<div class="card" style="padding:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px">
+        <b style="font-size:13px;color:var(--text-1)">${t}</b><span class="tag ${tag}">${k}</span></div>
+      <div class="prev" style="min-height:130px">${cuerpo[k]}</div>
+      <p style="font-size:11.5px;color:var(--text-4);margin:9px 0 0;line-height:1.55">${pie}</p>
+    </div>`).join('');
+}
+
+/* ══ ALTA DE CATEGORÍA ════════════════════════════════════════════════════ */
+const MOD_POR_TIPO = {
+  'Ninguno':   [],
+  'Café':      [['Leche','entera · deslactosada · almendra · avena',1],['Temperatura','caliente · tibio · frío',0],
+                ['Azúcar','sin · normal · extra · sustituto',0],['Extras','shot extra · crema batida · canela',1]],
+  'Bebida':    [['Hielo','sin · poco · normal · extra',0],['Tamaño','chico · mediano · grande',1],
+                ['Extras','limón · sal en el borde',0]],
+  'Panadería': [['Presentación','entero · rebanado · para llevar',0],['Calentar','sí · no',0],
+                ['Acompañar','mantequilla · mermelada · queso crema',1]],
+  'Comida':    [['Término','poco · medio · tres cuartos · bien cocido',1],['Picante','sin · poco · normal · extra',0],
+                ['Sin ingrediente','sin cebolla · sin cilantro · sin queso',0],['Extras','doble proteína · aguacate · queso',1]],
+};
+function pintaAltaCat(){
+  const nom = document.getElementById('alta-cat-nom').value || 'Sin nombre';
+  const tipo = segVal('alta-cat-mod');
+  const {icon,color} = iconForCategory(nom);
+  document.getElementById('alta-cat-prev').innerHTML =
+    `<div style="display:flex;gap:9px;align-items:center;margin-bottom:11px">
+      <div style="width:56px;height:56px;border-radius:var(--r2);background:${color};display:grid;
+                  place-items:center;color:#fff;box-shadow:var(--shadow-1)">${svg(icon,24)}</div>
+      <div style="min-width:0">
+        <div style="font-size:14px;font-weight:800;color:var(--text-1)">${esc(nom)}</div>
+        <div style="font-size:11.5px;color:var(--text-3);margin-top:2px">icono <code>${icon}</code> · elegido solo</div>
+      </div></div>
+     <div class="mini-grid">
+      ${['Al pastor','Campechano','Bistec'].map(n=>
+        `<div class="mini-tile" style="background:linear-gradient(150deg,${color},${color}cc)">
+          <span class="nm">${n}</span><span class="pr">$32</span></div>`).join('')}
+     </div>`;
+
+  const juego = MOD_POR_TIPO[tipo] || [];
+  document.getElementById('alta-cat-mods').innerHTML = juego.length === 0
+    ? `<p style="font-size:12.5px;color:var(--text-3);margin:0;line-height:1.6">
+        Nada. Se toca el producto y entra directo a la cuenta — que es lo correcto
+        para un refresco o un chicle.</p>`
+    : juego.map(([g,ops,oblig])=>
+       `<div style="margin-bottom:9px">
+         <div style="font-size:11px;font-weight:800;color:var(--text-2);margin-bottom:4px">
+           ${g} ${oblig?'<span class="tag warn" style="font-size:8.5px">obligatorio</span>':''}</div>
+         <div style="font-size:11.5px;color:var(--text-3)">${ops}</div>
+       </div>`).join('');
+}
+
+/* ══ ALTA DE PLATILLO ═════════════════════════════════════════════════════ */
+function pintaAltaPl(){
+  const nom = document.getElementById('alta-pl-nom').value || 'Sin nombre';
+  const pre = +document.getElementById('alta-pl-pre').value || 0;
+  const cos = +document.getElementById('alta-pl-cos').value || 0;
+  const est = segVal('alta-pl-est');
+  const catNom = document.getElementById('alta-cat-nom').value || 'Comida';
+  const {color} = iconForCategory(catNom);
+  const oos = est === 'Agotado', promo = est === 'En promoción';
+
+  const fc = pre > 0 ? (cos/pre*100) : 0;
+  const fcEl = document.getElementById('alta-pl-fc');
+  fcEl.className = 'nota ' + (fc===0?'':fc<=32?'ok':fc<=40?'warn':'bad');
+  fcEl.innerHTML = pre===0 ? 'Captura un precio para ver el costo.'
+    : `Costo de materia prima <b>${fc.toFixed(1)}%</b> · deja <b>$${(pre-cos).toFixed(0)}</b> por plato.
+       ${fc<=32?'Sano.':fc<=40?'Al límite: revisa la receta o el precio.':'Este platillo pierde dinero en cuanto suba un insumo.'}`;
+
+  document.getElementById('alta-pl-prev').innerHTML =
+    `<div class="mini-grid">
+      <div class="mini-tile" style="background:${oos?'var(--surface-2)':`linear-gradient(150deg,${color},${color}cc)`};
+            ${oos?'filter:grayscale(1);opacity:.5':''};${promo?'outline:2px solid var(--accent);outline-offset:2px':''}">
+        ${oos?'<span class="bdg">agotado</span>':''}
+        <span class="nm" style="${oos?'text-decoration:line-through':''}">${esc(nom)}</span>
+        <span class="pr">$${pre}</span></div>
+      ${['Otro','Otro más'].map(n=>`<div class="mini-tile" style="background:linear-gradient(150deg,${color},${color}cc);opacity:.35">
+        <span class="nm">${n}</span><span class="pr">$—</span></div>`).join('')}
+     </div>
+     <p style="font-size:11.5px;color:var(--text-4);margin:9px 0 0;line-height:1.55">
+      ${oos ? 'Agotado se sigue pudiendo tocar: avisa por qué no se puede, en vez de no responder.'
+            : promo ? 'El aro dice que hay promoción sin quitarle lugar al nombre.'
+            : 'El color de la categoría pinta el tile completo — a un metro es lo único que se distingue.'}</p>`;
+
+  const imp = chkVals('alta-pl-imp');
+  document.getElementById('alta-pl-cta').innerHTML =
+    `<div class="cta-row"><span class="q">1</span>
+      <span class="n">${esc(nom)}<small>${imp.length?'→ '+imp.join(' · '):'no se imprime en ningún lado'}</small></span>
+      <span class="p">$${pre}</span></div>
+     ${imp.length===0?'<p class="nota bad" style="margin:9px 0 0">Sin destino, nadie lo prepara. Se cobra y no sale.</p>':''}`;
+}
+
+/* ══ MODIFICADORES ════════════════════════════════════════════════════════ */
+function pintaModTipos(){
+  const tipos = Object.keys(MOD_POR_TIPO);
+  document.getElementById('mod-tipos').innerHTML = tipos.map((t,i)=>
+    `<button class="${i===4?'on':''}" onclick="segSel(this);pintaModJuego()">${t}</button>`).join('');
+  pintaModJuego();
+}
+function pintaModJuego(){
+  const juego = MOD_POR_TIPO[segVal('mod-tipos')] || [];
+  const cont = document.getElementById('mod-juego');
+  if(!juego.length){
+    cont.innerHTML = `<div class="card" style="grid-column:1/-1;padding:16px;text-align:center">
+      <p style="font-size:13px;color:var(--text-3);margin:0;line-height:1.7">
+      Ningún modificador. Un americano no pregunta por término de cocción, y un chicle
+      no pregunta nada.<br>
+      <b style="color:var(--text-2)">Éste es el arreglo</b>: antes, los modificadores eran una
+      lista global y todo lo preguntaban todo.</p></div>`;
+    return;
+  }
+  cont.innerHTML = juego.map(([g,ops,oblig])=>
+    `<div class="card" style="padding:13px">
+      <div style="display:flex;align-items:center;gap:7px;margin-bottom:9px">
+        <b style="font-size:13px;color:var(--text-1)">${g}</b>
+        ${oblig?'<span class="tag warn" style="font-size:9px">obligatorio</span>'
+               :'<span class="tag" style="font-size:9px">opcional</span>'}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:5px">
+        ${ops.split(' · ').map(o=>`<span class="opt" style="font-size:11.5px;padding:5px 9px;
+          border-radius:8px;background:var(--surface-2);border:1px solid var(--line);
+          color:var(--text-2)">${o}</span>`).join('')}</div>
+    </div>`).join('');
+}
+
+/* ══ TAMAÑOS ══════════════════════════════════════════════════════════════ */
+function pintaTam(){
+  document.getElementById('prev-tam').innerHTML =
+    [['Chico',0.8],['Mediano',1],['Grande',1.3]].map(([n,m])=>
+      `<div class="cta-row" style="margin-bottom:5px">
+        <span class="n">${n}<small>base $48 × ${m}</small></span>
+        <span class="p">$${Math.round(48*m)}</span></div>`).join('');
+}
+
+/* ══ MESAS ════════════════════════════════════════════════════════════════ */
+let MESA_CAP = 4;
+function mesaCap(d){ MESA_CAP = Math.max(1, Math.min(20, MESA_CAP+d));
+  document.getElementById('mesa-cap').textContent = MESA_CAP; pintaMesa(); }
+
+const MESAS_FIJAS = [
+  {n:11,x:8,y:8,w:17,h:19,f:'Cuadrada',e:'libre'},
+  {n:12,x:31,y:8,w:17,h:19,f:'Cuadrada',e:'ocupada',t:'42m'},
+  {n:13,x:54,y:8,w:24,h:19,f:'Rectangular',e:'cuenta',t:'1h8'},
+  {n:21,x:8,y:35,w:17,h:19,f:'Redonda',e:'ocupada',t:'12m'},
+  {n:22,x:31,y:35,w:17,h:19,f:'Redonda',e:'libre'},
+  {n:31,x:8,y:64,w:70,h:13,f:'Barra',e:'libre'},
+];
+const EST_MESA = {
+  libre:   ['var(--surface-2)','var(--line)','var(--text-3)'],
+  ocupada: ['var(--info-soft)','var(--info-line)','var(--info)'],
+  cuenta:  ['var(--warn-soft)','var(--warn-line)','var(--warn)'],
+  cerrada: ['var(--accent-soft)','var(--accent-line)','var(--accent)'],
+};
+function formaCSS(f,w,h){
+  if(f==='Redonda') return `width:${w}%;height:${h}%;border-radius:50%`;
+  if(f==='Barra')   return `width:${w}%;height:${h}%;border-radius:7px`;
+  if(f==='Rectangular') return `width:${w}%;height:${h}%;border-radius:8px`;
+  return `width:${w}%;height:${h}%;border-radius:8px`;
+}
+function pintaMesa(){
+  const num = document.getElementById('mesa-num').value || '?';
+  const forma = segVal('mesa-forma'), zona = segVal('mesa-zona'), col = segVal('mesa-col');
+  const w = forma==='Rectangular'?24:forma==='Barra'?70:17, h = forma==='Barra'?13:19;
+  const x = col==='Columnas' ? 54 : 57.5, y = col==='Columnas' ? 35 : 37;
+
+  const pinta = m => {
+    const [bg,bd,ink] = EST_MESA[m.e];
+    return `<div class="mesa ${m.nueva?'nueva':''}" style="${formaCSS(m.f,m.w,m.h)};left:${m.x}%;top:${m.y}%;
+      background:${bg};border-color:${bd};color:${ink}">${m.n}${m.t?`<small>${m.t}</small>`:''}</div>`;
+  };
+  document.getElementById('mesa-prev').innerHTML =
+    `<div class="plano">${MESAS_FIJAS.map(pinta).join('')}
+      ${pinta({n:num,x,y,w,h,f:forma,e:'cerrada',t:MESA_CAP+' lug',nueva:true})}</div>
+     <p style="font-size:11.5px;color:var(--text-4);margin:9px 0 0;line-height:1.55">
+      Mesa <b>${esc(num)}</b> · ${forma.toLowerCase()} · ${MESA_CAP} lugares · ${zona.toLowerCase()}
+      ${col==='Columnas'?' · alineada a la retícula':' · colocada a mano'}</p>`;
+
+  document.getElementById('mesa-estados').innerHTML =
+    `<div style="display:flex;gap:9px;flex-wrap:wrap">
+      ${[['libre','Libre','—'],['ocupada','Ocupada','42m'],['cuenta','Pidió cuenta','1h8'],['cerrada','Por limpiar','2m']]
+        .map(([k,l,t])=>{const [bg,bd,ink]=EST_MESA[k];
+        return `<div style="text-align:center">
+          <div style="width:58px;height:48px;border-radius:8px;background:${bg};border:2px solid ${bd};
+               color:${ink};display:grid;place-items:center;font-weight:800;font-size:12px;
+               font-family:'IBM Plex Mono',monospace">14<small style="display:block;font-size:8.5px;opacity:.8">${t}</small></div>
+          <div style="font-size:10.5px;color:var(--text-3);margin-top:6px">${l}</div></div>`}).join('')}
+     </div>`;
+}
+
+/* ══ PERMISOS ═════════════════════════════════════════════════════════════ */
+const PANTALLAS = [
+  ['Tomar comanda',   ['Caja','Mostrador'],            ['Mesero','Cajero','Gerente','Dueño']],
+  ['Mapa de mesas',   ['Caja','Mostrador'],            ['Mesero','Cajero','Gerente','Dueño']],
+  ['Cobrar',          ['Caja','Mostrador'],            ['Cajero','Gerente','Dueño']],
+  ['Cajón de dinero', ['Caja'],                        ['Cajero','Gerente','Dueño']],
+  ['Corte de caja',   ['Caja','Admin'],                ['Gerente','Dueño']],
+  ['Cancelar enviado',['Caja','Mostrador'],            ['Gerente','Dueño']],
+  ['Descuentos',      ['Caja','Mostrador'],            ['Gerente','Dueño']],
+  ['Inventario y merma',['Caja','Admin'],              ['Gerente','Dueño']],
+  ['Tablero de cocina',['Cocina','Admin'],             ['Mesero','Cajero','Gerente','Dueño']],
+  ['Reportes del día',['Admin'],                       ['Gerente','Dueño']],
+  ['Cambiar precios', ['Admin'],                       ['Dueño']],
+];
+function pintaPerm(){
+  const term = segVal('perm-term'), rol = segVal('perm-rol');
+  let vis=0, porTerm=0, porRol=0;
+  const filas = PANTALLAS.map(([n,terms,roles])=>{
+    const okT = terms.includes(term), okR = roles.includes(rol);
+    if(okT&&okR) vis++; else if(!okT) porTerm++; else porRol++;
+    const [tag,txt] = okT&&okR ? ['ok','se ve'] : !okT ? ['','no existe aquí'] : ['bad','sin permiso'];
+    return `<div class="row" style="${okT&&okR?'':'opacity:.5'}">
+      <span style="${okT&&okR?'':'text-decoration:line-through'}">${n}</span>
+      <span class="tag ${tag}" style="font-size:9.5px">${txt}</span></div>`;
+  }).join('');
+  document.getElementById('perm-prev').innerHTML =
+    `<div style="display:flex;gap:7px;margin-bottom:11px;flex-wrap:wrap">
+      <span class="tag ok">${vis} se ven</span>
+      <span class="tag">${porTerm} no existen en ${term.toLowerCase()}</span>
+      <span class="tag bad">${porRol} sin permiso de ${rol.toLowerCase()}</span></div>
+     <div class="list">${filas}</div>`;
+}
+
+/* ══ CHECADOR ═════════════════════════════════════════════════════════════ */
+function pintaCheca(){
+  document.getElementById('prev-checa').innerHTML =
+    `<div style="text-align:center;padding:14px 0">
+      <div style="width:96px;height:96px;margin:0 auto;border-radius:50%;background:var(--accent-soft);
+           border:2px solid var(--accent-line);display:grid;place-items:center;color:var(--accent)">
+        ${svg('huella',46)}</div>
+      <p style="font-size:14px;font-weight:800;color:var(--text-1);margin:14px 0 3px">Pon tu dedo</p>
+      <p style="font-size:12px;color:var(--text-3);margin:0">o marca tu PIN</p>
+    </div>`;
+}
+
+/* ══ FRONTERA ═════════════════════════════════════════════════════════════ */
+const BAJA = [['Menú y categorías','se lee sin red'],['Precios y tamaños','se lee sin red'],
+  ['Modificadores','se lee sin red'],['Formas de pago','se lee sin red'],
+  ['Personal, PIN y huella','se lee sin red'],['Promociones y horarios','se lee sin red'],
+  ['Plano del salón','se lee sin red'],['Impresoras y estaciones','vive en el equipo']];
+const SUBE = [['Órdenes y renglones','con folio propio'],['Cobros y propinas','con folio propio'],
+  ['Turnos y cortes','con folio propio'],['Movimientos de caja','con folio propio'],
+  ['Cancelaciones y mermas','con folio propio'],['Entradas y salidas','con folio propio'],
+  ['Autorizaciones','con folio propio'],['Impresiones','con folio propio']];
+const NUNCA = ['Cambiar un precio','Dar de alta un platillo','Crear una categoría','Cambiar una receta',
+  'Editar un perfil de permisos','Borrar un turno cerrado','Modificar un corte','Cambiar datos fiscales'];
+function pintaFrontera(){
+  const fila = ([n,d],cls) => `<div class="row"><span>${n}</span><span class="tag ${cls}" style="font-size:9.5px">${d}</span></div>`;
+  document.getElementById('frontera-baja').innerHTML = BAJA.map(x=>fila(x,'info')).join('');
+  document.getElementById('frontera-sube').innerHTML = SUBE.map(x=>fila(x,'ok')).join('');
+  document.getElementById('frontera-nunca').innerHTML = NUNCA.map(n=>`<span class="tag bad">${n}</span>`).join('');
+}
+
+/* ══ PERSONALIZAR ═════════════════════════════════════════════════════════ */
+const PERS = [
+  ['Solo, desde el dashboard', 'ok', [
+    'Platillos, precios y categorías','Modificadores y sus reglas','Tamaños y multiplicadores',
+    'Formas de cobro y comisiones','Promociones y combos','Horarios del menú',
+    'Personal, perfiles y PIN','Plano del salón y mesas','Zonas y capacidades',
+    'Impuestos y datos fiscales','Textos y logo del ticket','Tipo de letra y su tamaño',
+    'Tema claro u oscuro','Idioma y moneda','Recetas y costos','Proveedores e insumos']],
+  ['Una vez, con quien instala', 'warn', [
+    'Agregar una estación nueva','Conectar una impresora','Enlazar una terminal de pago',
+    'Dar de alta otra caja en la red','Lector de huella','Báscula del mostrador',
+    'Cajón de dinero','Pantalla de cocina']],
+  ['De verdad requiere desarrollo', 'bad', [
+    'Un impuesto con reglas nuevas','Integrar un repartidor que no traemos',
+    'Un documento fiscal de otro país','Cambiar cómo se calcula un corte']],
+];
+function pintaPers(){
+  document.getElementById('pers-resumen').innerHTML = PERS.map(([t,cls,items])=>
+    `<div class="card" style="padding:15px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px">
+        <b style="font-size:13px;color:var(--text-1);line-height:1.3">${t}</b>
+        <span class="tag ${cls}">${items.length}</span></div>
+      <div style="display:flex;flex-wrap:wrap;gap:5px">
+        ${items.map(i=>`<span class="tag" style="font-size:10px;text-transform:none;letter-spacing:0">${i}</span>`).join('')}
+      </div></div>`).join('');
+
+  document.getElementById('tabla-pers').innerHTML =
+    `<tr><th>Qué quieres cambiar</th><th>Dónde</th><th>Quién</th><th>Se ve abajo</th></tr>` +
+    [['Subir el precio de un platillo','Admin → Menú','El dueño','al siguiente turno'],
+     ['Agregar una forma de cobro','Admin → Formas de pago','El dueño','al siguiente turno'],
+     ['Agregar una estación','Configuración de la caja','Quien instala','al reiniciar la caja'],
+     ['Marcar algo agotado','Caja o dashboard','Cualquiera con permiso','al instante'],
+     ['Mover una mesa de lugar','Punto de venta → Plano','El gerente','al instante'],
+     ['Cambiar el tipo de letra','Punto de venta → Ajustes','Quien esté en la caja','al instante'],
+     ['Dar de alta a alguien','Admin → Usuarios','El dueño','al siguiente turno'],
+     ['Cambiar el logo del ticket','Admin → Configuración','El dueño','a la siguiente impresión']]
+    .map(([q,d,w,c])=>`<tr><td><b>${q}</b></td><td>${d}</td><td>${w}</td>
+      <td><span class="tag ok" style="font-size:9.5px">${c}</span></td></tr>`).join('');
+}
+
+/* ── Estación ─────────────────────────────────────────────────────────────── */
+function pintaEst(){
+  const nom = document.getElementById('est-nom').value || 'Sin nombre';
+  const docs = chkVals('est-doc'), con = segVal('est-con'), resp = segVal('est-resp');
+  const slug = nom.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+  document.getElementById('est-prev').innerHTML =
+    `<div class="list">
+      <div class="row"><span>Nombre</span><code>${esc(nom)}</code></div>
+      <div class="row"><span>Identificador</span><code>${slug||'—'}</code></div>
+      <div class="row"><span>Conexión</span><code>${con.toLowerCase()}</code></div>
+      <div class="row"><span>Documentos</span><code>${docs.length}</code></div>
+      <div class="row"><span>Respaldo</span><code>${resp.toLowerCase()}</code></div>
+     </div>
+     ${docs.length===0?'<p class="nota bad" style="margin:10px 0 0">Una estación sin documentos no recibe nada. Está de adorno.</p>'
+       :`<p class="nota ok" style="margin:10px 0 0">El identificador se arma solo del nombre. El programa nunca conoce la impresora: sólo el nombre de la estación.</p>`}`;
+
+  document.getElementById('est-donde').innerHTML =
+    `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+      <span class="tag ok">Alta de platillo → «Dónde se imprime»</span>
+      <span class="tag ok">Pantalla de cocina → filtro</span>
+      <span class="tag ok">Prueba de impresión</span>
+      <span class="tag ok">Reimpresión</span></div>
+     <div class="chk" style="pointer-events:none">
+      <button>Cocina</button><button>Barra</button><button>Panadería</button>
+      <button class="on">${esc(nom)}</button></div>`;
+}
+
+/* ── Forma de cobro ───────────────────────────────────────────────────────── */
+function pintaPago(){
+  const nom = document.getElementById('pag-nom').value || 'Sin nombre';
+  const tipo = segVal('pag-tipo'), com = +document.getElementById('pag-com').value || 0;
+  const sat = document.getElementById('pag-sat').value || '—';
+  const reglas = chkVals('pag-reg');
+  const efectivo = tipo === 'Efectivo';
+  const ic = {'Efectivo':'cash','Tarjeta':'card','Vale':'receipt','Transferencia':'refresh','Crédito':'user'}[tipo] || 'card';
+
+  document.getElementById('pag-prev').innerHTML =
+    `<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px">
+      ${['Efectivo','Tarjeta'].map(t=>`<button style="min-height:58px;border-radius:var(--r2);
+        background:var(--surface-2);border:1px solid var(--line);color:var(--text-3);font-weight:700;
+        font-size:12.5px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px">
+        ${svg(t==='Efectivo'?'cash':'card',18)}${t}</button>`).join('')}
+      <button style="min-height:58px;border-radius:var(--r2);background:var(--accent-soft);
+        border:1px solid var(--accent-line);color:var(--accent);font-weight:800;font-size:12.5px;
+        grid-column:1/-1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px">
+        ${svg(ic,18)}${esc(nom)}</button>
+     </div>
+     <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:11px">
+      ${reglas.length?reglas.map(r=>`<span class="tag info" style="font-size:9.5px;text-transform:none;letter-spacing:0">${r}</span>`).join('')
+        :'<span class="tag" style="font-size:9.5px">sin reglas especiales</span>'}</div>`;
+
+  document.getElementById('pag-corte').innerHTML =
+    `<div class="list">
+      <div class="row"><span>Efectivo</span><code>$4,180</code></div>
+      <div class="row"><span>Tarjeta</span><code>$9,240</code></div>
+      <div class="row" style="background:var(--accent-soft);border-radius:8px;padding:6px 8px">
+        <span style="color:var(--accent);font-weight:700">${esc(nom)}</span><code style="color:var(--accent)">$1,350</code></div>
+     </div>
+     <p style="font-size:11.5px;color:var(--text-4);margin:9px 0 0;line-height:1.55">
+      ${efectivo ? 'Suma al efectivo: tiene que cuadrar contra el arqueo del cajón.'
+        : 'No suma al efectivo, así que el arqueo del cajón no lo busca. Se concilia aparte.'}
+      ${com>0?` Comisión del ${com}% — la utilidad ya la descuenta sola.`:''}
+      ${sat!=='—'?` Código fiscal <code>${esc(sat)}</code> para la factura.`:''}</p>`;
+}
+
+/* ══ Arranque de lo nuevo ═════════════════════════════════════════════════ */
+function arrancaAltas(){
+  pintaMedidas(); pintaAudit(); pintaMov(); pintaEstados();
+  pintaAltaCat(); pintaAltaPl(); pintaModTipos(); pintaTam();
+  pintaMesa(); pintaPerm(); pintaCheca();
+  pintaFrontera(); pintaPers(); pintaEst(); pintaPago();
+}
+arrancaAltas();
+
+</script>
+</body></html>

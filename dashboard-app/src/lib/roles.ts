@@ -8,7 +8,7 @@ export type DashboardRole = 'dueño' | 'gerente' | 'capitan' | 'cajero' | 'meser
 
 export const FINANCIAL_PAGES = ['/estado-resultados', '/nomina', '/ingresos', '/proveedores', '/food-cost', '/roi']
 export const AGENT_PAGES = ['/agentes', '/coach', '/chat']
-export const OPERATIONS_PAGES = ['/', '/ventas', '/cortes', '/meseros', '/platillos', '/tendencias', '/propinas', '/inventario', '/auto86', '/ecommerce', '/reportes', '/sucursales']
+export const OPERATIONS_PAGES = ['/', '/ahora', '/ventas', '/cortes', '/meseros', '/platillos', '/tendencias', '/propinas', '/inventario', '/auto86', '/ecommerce', '/reportes', '/sucursales']
 export const POS_PAGES = ['/pos']
 const CAPITAN_PAGES = [...OPERATIONS_PAGES, ...POS_PAGES, '/admin']
 const CAJERO_PAGES = ['/pos', '/cortes', '/propinas', '/ventas']

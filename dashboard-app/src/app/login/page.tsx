@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, Eye, EyeOff } from 'lucide-react'
 import { fetchWithTimeout, isFetchAbort } from '@/lib/fetch-with-timeout'
 
 type CapacitorStatusBar = {
@@ -20,6 +20,7 @@ export default function LoginPage() {
   }, [])
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -58,11 +59,27 @@ export default function LoginPage() {
           token_type: data.token_type,
           user: data.user,
         }))
+        // Una impersonacion de plataforma nunca debe sobrevivir a un login nuevo.
+        // Dejar este valor hacia que otra cuenta heredara el tenant anterior.
+        localStorage.removeItem('fullsite_actas')
+        localStorage.removeItem('fullsite_client_id')
         // Cookie para el middleware server-side (mismo token; expira con él)
         document.cookie = `fs-at=${data.access_token}; path=/; max-age=${data.expires_in || 3600}; secure; samesite=lax`
-        // Super-admin de plataforma → Control Center (no al POS de un tenant)
+        // Super-admin de plataforma → Control Center (no al POS de un tenant).
+        // La tabla platform_admins es la fuente de verdad; app_metadata es solo
+        // un atajo para sesiones antiguas y puede estar ausente/desactualizado.
         const appMeta = (data.user?.app_metadata ?? {}) as Record<string, unknown>
-        if (appMeta.platform_admin === true) {
+        let isPlatformAdmin = appMeta.platform_admin === true
+        if (!isPlatformAdmin) {
+          try {
+            const platformCheck = await fetch('/api/platform/2fa/status', {
+              credentials: 'include',
+              cache: 'no-store',
+            })
+            isPlatformAdmin = platformCheck.ok
+          } catch { /* el login normal sigue funcionando si el control plane no responde */ }
+        }
+        if (isPlatformAdmin) {
           window.location.href = '/platform'
           return
         }
@@ -133,15 +150,26 @@ export default function LoginPage() {
               <label htmlFor="password" className="block text-sm font-medium text-gray-900 mb-1.5">
                 Contraseña
               </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                disabled={loading}
-                className="w-full text-sm bg-white border border-gray-300 rounded-lg px-4 py-3 text-gray-900 autofill:bg-white autofill:shadow-[inset_0_0_0px_1000px_rgb(255,255,255)] autofill:[-webkit-text-fill-color:rgb(17,24,39)] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
-              />
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  disabled={loading}
+                  className="w-full text-sm bg-white border border-gray-300 rounded-lg px-4 py-3 pr-11 text-gray-900 autofill:bg-white autofill:shadow-[inset_0_0_0px_1000px_rgb(255,255,255)] autofill:[-webkit-text-fill-color:rgb(17,24,39)] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(v => !v)}
+                  aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                  tabIndex={-1}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/30 rounded"
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
 
             {error && (

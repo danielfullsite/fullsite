@@ -32,13 +32,15 @@ vi.mock('@/lib/supabase', () => ({
 const dispatched: string[] = []
 const fetchCalls: { url: string; authorization: string | null; apikey: string | null }[] = []
 
+let shiftToken: string | null = null
+
 function stubEnvironment() {
   vi.stubGlobal('window', {
     location: { origin: 'https://pos.local' },
     dispatchEvent: (e: Event) => { dispatched.push(e.type); return true },
   })
   vi.stubGlobal('localStorage', {
-    getItem: (k: string) => (k === 'fullsite_client_id' ? 'tenantA' : null),
+    getItem: (k: string) => k === 'fullsite_client_id' ? 'tenantA' : k === 'pos_shift_token' ? shiftToken : null,
     setItem: () => {},
     removeItem: () => {},
   })
@@ -75,6 +77,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   dispatched.length = 0
   fetchCalls.length = 0
+  shiftToken = null
   // IDB limpio por test.
   vi.stubGlobal('indexedDB', new IDBFactory())
   stubEnvironment()
@@ -167,7 +170,7 @@ describe('BUG-019 — replay offline autenticado (código real)', () => {
     expect(fetchCalls[0].apikey).toBe(ANON)
   })
 
-  it('6. membership revocada (server 401) → item preservado con retry, NO marcado como sincronizado', async () => {
+  it('6. auth rechazada (server 401) → item preservado sin quemar retry y pide re-auth', async () => {
     getSession.mockResolvedValue({
       data: { session: { access_token: 'FRESH_TOKEN', expires_at: Math.floor(Date.now() / 1000) + 3600 } },
       error: null,
@@ -185,7 +188,8 @@ describe('BUG-019 — replay offline autenticado (código real)', () => {
     const pending = await db.getPendingQueue()
     expect(pending).toHaveLength(1)                    // NO se perdió el dato
     expect(pending[0].synced).toBe(false)
-    expect(pending[0].retries).toBe(1)                 // reintentable, no abandonado
+    expect(pending[0].retries).toBe(0)                 // auth no consume el presupuesto de red
+    expect(dispatched).toContain('pos-sync-auth-required')
   })
 
   it('7. replay tiene éxito tras recuperar sesión (re-auth) — la cola preservada se drena', async () => {
@@ -210,5 +214,36 @@ describe('BUG-019 — replay offline autenticado (código real)', () => {
     expect(res.synced).toBe(1)
     expect(fetchCalls.at(-1)?.authorization).toBe('Bearer REAUTH_TOKEN')
     expect(await db.getPendingQueue()).toHaveLength(0)
+  })
+
+  it('8. terminal POS sin sesión Supabase usa shift token para APP_API', async () => {
+    shiftToken = 'SIGNED_SHIFT_TOKEN'
+    getSession.mockResolvedValue({ data: { session: null }, error: null })
+    installFetch(() => ({ ok: true, status: 200, body: { ok: true } }))
+    const db = await loadModule()
+    await db.queueOperation('pos_orders', 'POST', { id: 'o8' }, '/api/pos/save-order', undefined, 'APP_API')
+
+    const res = await db.syncAll()
+    await flush()
+
+    expect(fetchCalls[0].authorization).toBe('Bearer SIGNED_SHIFT_TOKEN')
+    expect(res.synced).toBe(1)
+    expect(await db.getPendingQueue()).toHaveLength(0)
+  })
+
+  it('9. terminal POS rutea SUPABASE_REST por proxy local con shift token', async () => {
+    shiftToken = 'SIGNED_SHIFT_TOKEN'
+    getSession.mockResolvedValue({ data: { session: null }, error: null })
+    installFetch(() => ({ ok: true, status: 200 }))
+    const db = await loadModule()
+    await db.queueOperation('pos_cash_movements', 'POST', { id: 'c9' }, undefined, undefined, 'SUPABASE_REST')
+
+    const res = await db.syncAll()
+    await flush()
+
+    expect(fetchCalls[0].url).toBe('/api/pos/db?path=pos_cash_movements')
+    expect(fetchCalls[0].authorization).toBe('Bearer SIGNED_SHIFT_TOKEN')
+    expect(fetchCalls[0].apikey).toBeNull()
+    expect(res.synced).toBe(1)
   })
 })

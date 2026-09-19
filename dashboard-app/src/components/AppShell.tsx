@@ -30,6 +30,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, [isOfflineBuild, pathname, router, user, role, loading, isPlatformAdmin])
 
+  // La entrada canónica del producto es el pulso operativo. El dashboard
+  // histórico sigue disponible desde Analizar > Resumen histórico.
+  useEffect(() => {
+    if (pathname === '/' && !loading && user && !isOfflineBuild) {
+      let isActingAsTenant = false
+      try { isActingAsTenant = Boolean(localStorage.getItem('fullsite_actas')) } catch { /* SSR */ }
+      router.replace(isPlatformAdmin && !isActingAsTenant ? '/platform' : '/ahora')
+    }
+  }, [pathname, loading, user, isOfflineBuild, isPlatformAdmin, router])
+
   const publicPages = ['/login', '/onboarding', '/seguridad', '/privacidad', '/terminos', '/reservar', '/factura', '/demo-live', '/cocina', '/barra']
   const isPosRoute = pathname.startsWith('/pos')
   const isKdsRoute = pathname.startsWith('/cocina') || pathname.startsWith('/barra') || pathname.startsWith('/kds')
@@ -87,13 +97,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="grid lg:grid-cols-[240px_1fr] min-h-screen lg:h-screen bg-[var(--bg)] overflow-x-hidden lg:overflow-hidden">
       <Sidebar />
-      <main className="min-h-screen lg:h-screen overflow-x-hidden overflow-y-auto lg:pt-0 relative min-w-0" style={{ paddingTop: 'max(3.5rem, calc(env(safe-area-inset-top, 0px) + 3.5rem))' }}>
+      <main className="min-h-screen lg:h-screen overflow-x-hidden overflow-y-auto pt-[calc(env(safe-area-inset-top,0px)+4.25rem)] pb-[calc(env(safe-area-inset-bottom,0px)+4.5rem)] sm:pb-6 lg:pt-0 lg:pb-0 relative min-w-0">
         <ActAsBanner />
         {/* Notification bell — top right */}
         <div className="absolute right-4 lg:right-8 z-30 hidden lg:block" style={{ top: '1.25rem' }}>
           <NotificationBell />
         </div>
-        <div className="p-4 sm:p-6 lg:p-8 max-w-[1400px] mx-auto min-w-0">
+        <div className="p-4 sm:p-6 lg:p-8 max-w-[1400px] mx-auto min-w-0 w-full">
           <PageTransition key={pathname}>
             {children}
           </PageTransition>

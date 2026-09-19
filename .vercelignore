@@ -28,6 +28,15 @@ fullsite-web/
 *.py
 *.sh
 *.asar
+dashboard-app/node_modules/
+dashboard-app/.next/
+dashboard-app/.vercel/
+dashboard-app/out/
+dashboard-app/ios/
+dashboard-app/test-results/
+dashboard-app/playwright-report/
+dashboard-app/coverage/
+dashboard-app/*.tsbuildinfo
 MASTER-INDEX.md
 index.html.backup
 "change the black parts to white.jpg"

@@ -12,6 +12,11 @@ export function generateRecoveryMessage(msg: RecoveryMessage): string {
   return `Hola ${msg.clientName}, te habla el conserje digital de ${msg.restaurantName}. Hace tiempo que no te vemos y nos encantaria regalarte ${msg.incentive} en tu proxima visita. Yo te puedo ayudar con tu reservacion, si te interesa visitarnos, contestame aqui y yo me encargo del resto. Promocion valida de ${msg.validDays}.`
 }
 
+/** Campaign copy approved for turning AMALAY brunch guests into dinner guests. */
+export function generateDinnerCampaignMessage(msg: RecoveryMessage): string {
+  return `Hola ${msg.clientName} 👋 Soy el Concierge Digital de ${msg.restaurantName} y queremos regalarte ${msg.incentive} en tu próxima cena.\n\n🍷✨ Hay noches que merecen una mesa especial.\n\nVen a descubrir las cenas de ${msg.restaurantName} y disfruta nuestro nuevo menú de focaccias y baguettes, además de pizzas, ensaladas y mucho más. ✨\n\nUna linda mesa, nuevos sabores y una noche para disfrutar sin prisa.\n\n📍 ${msg.validDays}.\n\n¿Te reservamos una mesa?`
+}
+
 export function generateWhatsAppLink(phone: string, message: string): string {
   // Clean phone number
   const clean = phone.replace(/[^0-9]/g, '')

@@ -14,14 +14,14 @@ interface PageHeaderProps {
 export default function PageHeader({ title, subtitle, eyebrow, action, exportData, exportName }: PageHeaderProps) {
   const showExport = Array.isArray(exportData) && exportData.length > 0
   return (
-    <div className="mb-6 flex items-end justify-between gap-3">
-      <div className="min-w-0">
+    <div className="mb-6 flex min-w-0 flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="min-w-0 max-w-3xl">
         {eyebrow && (
           <p className="text-[11px] font-semibold text-[var(--accent-ink)] uppercase tracking-widest mb-1">
             {eyebrow}
           </p>
         )}
-        <h2 className="text-xl font-bold tracking-tight text-[var(--text-1)]">
+        <h2 className="text-2xl sm:text-xl font-bold leading-tight tracking-tight text-[var(--text-1)] break-words">
           {title}
         </h2>
         {subtitle && (
@@ -29,7 +29,7 @@ export default function PageHeader({ title, subtitle, eyebrow, action, exportDat
         )}
       </div>
       {(action || showExport) && (
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex w-full min-w-0 items-center gap-2 overflow-x-auto pb-1 sm:w-auto sm:flex-shrink-0 sm:overflow-visible sm:pb-0">
           {action}
           {showExport && <ExportButton rows={exportData!} filename={exportName || 'reporte'} />}
         </div>

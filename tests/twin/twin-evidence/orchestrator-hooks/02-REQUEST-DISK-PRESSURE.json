@@ -1,0 +1,8 @@
+{
+  "hook": "DISK-PRESSURE",
+  "requested_at": "2026-08-07T01:56:18.294Z",
+  "bridge": "127.0.0.1:17917",
+  "phase": "shift",
+  "ack_file": "/Users/danielrg/fullsite/tests/twin/twin-evidence/orchestrator-hooks/DISK-PRESSURE.ack",
+  "instructions": "Fill the bridge host disk to <500MB free during traffic, then free it + touch ack_file. Watch /health and events.ndjson appends."
+}

@@ -1,7 +1,7 @@
 {
   "supervisor_status": "WAITING_FIELD",
-  "pid": 8125,
-  "last_heartbeat": "2026-08-24T21:15:48Z",
+  "pid": 16849,
+  "last_heartbeat": "2026-09-19T16:26:32Z",
   "current_task": null,
   "current_role": null,
   "next_action": "Idle \u2014 waiting for new work or field execution",

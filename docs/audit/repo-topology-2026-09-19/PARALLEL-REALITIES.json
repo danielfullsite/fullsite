@@ -1,0 +1,166 @@
+{
+ "meta": {
+  "generated": "2026-09-19",
+  "audit_baseline_main_sha": "10a1caa76e63caebd0c4bf7efcd9976b30abd8ac",
+  "read_only": true,
+  "nota": "No se resuelve nada aqui. RECOMMENDED_RESOLUTION es propuesta, no accion ejecutada."
+ },
+ "parallel_realities": [
+  {
+   "PARALLEL_REALITY_ID": "PR-01-pos-page-cinco-versiones",
+   "TITULO": "dashboard-app/src/app/pos/page.tsx tiene 5 versiones divergentes vivas",
+   "FILES": ["dashboard-app/src/app/pos/page.tsx"],
+   "BRANCHES": [
+    {"branch": "origin/main", "lineas": 7045, "pr": null, "base_atrasada_commits": 0},
+    {"branch": "barrido3/lentes-restantes", "lineas": 6980, "diff_vs_main": "+44/-109", "pr": 395, "base_atrasada_commits": 20},
+    {"branch": "claude/pos-touch-first", "lineas": 7192, "diff_vs_main": "+482/-335", "pr": 399, "base_atrasada_commits": 20},
+    {"branch": "redesign/pos-tile", "lineas": 7000, "diff_vs_main": "+232/-277", "pr": 408, "base_atrasada_commits": 14},
+    {"branch": "feat/pos-ui-kit", "lineas": 5926, "diff_vs_main": "+417/-1536", "pr": null, "base_atrasada_commits": 666, "solo_local": true},
+    {"branch": "codex/mesero-security-20260912", "pr": 396, "base_atrasada_commits": 20},
+    {"branch": "codex/bug-sweep-20260912", "pr": 397, "base_atrasada_commits": 20},
+    {"branch": "integracion/campo-20260914", "pr": 416, "base_atrasada_commits": 5}
+   ],
+   "MAIN_STATE": "7045 lineas; es la version desplegada en app.fullsite.mx",
+   "RISK": "P0",
+   "RAZON_DEL_RIESGO": "feat/pos-ui-kit borra 1536 lineas sobre una base 666 commits atras de main. Es la rama del checkout principal. Un merge o un push de esa rama revierte trabajo de mes y medio en el archivo mas caliente del producto (POS).",
+   "RECOMMENDED_RESOLUTION": "Decidir UN dueno del archivo. Rebasar los 3 PRs vivos (395/399/408) contra main uno a uno y cerrar los otros. feat/pos-ui-kit: rescatar por cherry-pick lo que valga, nunca mergear completa."
+  },
+  {
+   "PARALLEL_REALITY_ID": "PR-02-cadena-apilada-395-396-397",
+   "TITULO": "Cadena de PRs apilados que no apunta a main",
+   "FILES": ["dashboard-app/src/app/pos/**", "dashboard-app/src/lib/**"],
+   "BRANCHES": [
+    {"branch": "barrido3/lentes-restantes", "pr": 395, "base": "main", "archivos": 28, "diff": "+2157/-67"},
+    {"branch": "codex/mesero-security-20260912", "pr": 396, "base": "barrido3/lentes-restantes", "archivos": 31, "diff": "+444/-652"},
+    {"branch": "codex/bug-sweep-20260912", "pr": 397, "base": "codex/mesero-security-20260912", "archivos": 174, "diff": "+10468/-6486"}
+   ],
+   "MAIN_STATE": "Ninguno de los tres esta en main. Los tres tienen base 20 commits atras.",
+   "RISK": "P1",
+   "RAZON_DEL_RIESGO": "#397 mueve 174 archivos y depende de dos PRs abiertos. Si #395 o #396 se cierran o se rebasan, #397 queda huerfano. Su diff excede por mucho lo que su titulo sugiere ('barrido integral').",
+   "RECOMMENDED_RESOLUTION": "Aterrizar en orden 395 -> 396 -> 397 o romper la cadena en PRs independientes contra main. No mergear #397 aislado."
+  },
+  {
+   "PARALLEL_REALITY_ID": "PR-03-caja-corte-dos-implementaciones",
+   "TITULO": "Caja / corte implementado dos veces con nombres distintos",
+   "FILES": [
+    "main: dashboard-app/src/components/pos/CajonDeCaja.tsx",
+    "main: dashboard-app/src/components/pos/MovimientoDeCaja.tsx",
+    "main: dashboard-app/src/components/pos/ReporteDeCaja.tsx",
+    "main: dashboard-app/src/components/pos/CierreCajaWizard.tsx",
+    "worktree: dashboard-app/src/components/pos/CorteDeCaja.tsx",
+    "worktree: dashboard-app/src/components/pos/MovimientosDeCaja.tsx",
+    "worktree: dashboard-app/src/components/pos/ImpresionDeCaja.tsx",
+    "worktree: dashboard-app/src/lib/caja-reportes.ts",
+    "worktree: dashboard-app/src/lib/caja-reporte-cloud.ts",
+    "worktree: dashboard-app/src/lib/pos-db-proxy.ts",
+    "worktree: electron-app/local-server/core/cash-movements.js",
+    "worktree: electron-app/local-server/core/controlled-print.js"
+   ],
+   "BRANCHES": ["codex/fullsite-product-closure (worktree .codex/worktrees/product-closure-20260905, SIN COMMITEAR)"],
+   "MAIN_STATE": "main tiene su propia implementacion, desplegada. Los archivos del worktree NO existen en ninguna rama (verificado con git log --all -- <ruta>).",
+   "RISK": "P0",
+   "RAZON_DEL_RIESGO": "~30 archivos huerfanos + 37 archivos trackeados modificados, incluidas 2 migraciones PENDIENTE_ (inventory_movement_atomic, pos_identity_and_write_guards). Un git checkout . o un git clean en ese worktree lo borra sin recuperacion.",
+   "RECOMMENDED_RESOLUTION": "Antes que nada: commitear a una rama de rescate y empujarla. Despues decidir cual implementacion gana, por contrato, no por fecha."
+  },
+  {
+   "PARALLEL_REALITY_ID": "PR-04-delivery-kds-dos-ramas",
+   "TITULO": "Lectura de delivery_orders por KDS, dos caminos",
+   "FILES": [
+    "dashboard-app/src/app/api/pos/delivery-orders/route.ts",
+    "dashboard-app/src/app/cocina/page.tsx",
+    "dashboard-app/src/app/pos/cocina/page.tsx",
+    "dashboard-app/src/app/pos/delivery/page.tsx"
+   ],
+   "BRANCHES": [
+    {"branch": "fix/delivery-kds-server-read", "pr": 23, "draft": true, "archivos": 4, "base_atrasada_commits": 836, "divergida_local_vs_remoto": true},
+    {"branch": "fix/delivery-app-server-read", "pr": null, "solo_local": true, "commits_unicos": 103}
+   ],
+   "MAIN_STATE": "No integrado por ninguna de las dos.",
+   "RISK": "P2",
+   "RECOMMENDED_RESOLUTION": "Quedarse con el PR #23 rebasado; la rama local de 103 commits arrastra workflows y ruido de una base de agosto."
+  },
+  {
+   "PARALLEL_REALITY_ID": "PR-05-rappi-seis-realidades",
+   "TITULO": "Integracion Rappi dispersa en al menos seis ramas",
+   "FILES": ["dashboard-app/src/lib/integrations/rappi/**", "dashboard-app/src/app/api/integrations/rappi/**"],
+   "BRANCHES": [
+    {"branch": "codex/rappi-dev-main", "pr": 25, "draft": true, "base_atrasada_commits": 711},
+    {"branch": "codex/rappi-dev-integration", "pr": null, "solo_local": true, "commits_unicos": 146},
+    {"branch": "codex/rappi-kds-bridge-138", "divergida_local_vs_remoto": true},
+    {"branch": "feat/rappi-ping-por-tienda", "pr": 273, "base_atrasada_commits": 286},
+    {"branch": "feat/rappi-self-onboarding-callback", "pr": 178, "base_atrasada_commits": 429},
+    {"branch": "rappi/design-v0.3", "pr": null, "solo_local": true, "commits_unicos": 85},
+    {"branch": "claude/rappi-prod-activation", "pr": null, "base_atrasada_commits": 217},
+    {"branch": "feat/pos-ui-kit", "nota": "contiene commit b5c72c25 'feat(rappi): bridge delivery orders to Electron KDS'"}
+   ],
+   "MAIN_STATE": "Parcial. stash@{1} guarda ademas webhook + ingest de rappi 'restaurado por error'.",
+   "RISK": "P1",
+   "RECOMMENDED_RESOLUTION": "Congelar un contrato Rappi unico y reconstruir desde main; no intentar fusionar seis ramas con bases de 711, 429, 286 y 217 commits de distancia."
+  },
+  {
+   "PARALLEL_REALITY_ID": "PR-06-integracion-campo-duplica-siete-prs",
+   "TITULO": "#416 es un merge de siete PRs que siguen abiertos por separado",
+   "FILES": ["26 archivos; union de #403 #404 #405 #406 #407 #409 #414 #415"],
+   "BRANCHES": [{"branch": "integracion/campo-20260914", "pr": 416, "titulo": "NO MERGEAR — es prueba de integracion"}],
+   "MAIN_STATE": "Ninguno de los ocho esta en main.",
+   "RISK": "P1",
+   "RAZON_DEL_RIESGO": "El PR dice en su propio titulo que no debe mergearse, pero esta abierto, verde y mergeable con un clic. Si entra, los siete PRs individuales quedan en un estado ambiguo (contenido dentro, historia fuera).",
+   "RECOMMENDED_RESOLUTION": "Convertir #416 en draft o cerrarlo en cuanto la prueba de integracion cumpla su proposito. Aterrizar los siete individuales."
+  },
+  {
+   "PARALLEL_REALITY_ID": "PR-07-inventario-tres-nombres",
+   "TITULO": "El mismo fix de inventario con tres nombres de rama",
+   "FILES": ["supabase/migrations/PENDIENTE_20260919060000_inventario_se_crea_al_moverse.sql", "dashboard-app/src/app/api/pos/purchase-orders/route.ts"],
+   "BRANCHES": [
+    {"branch": "fix/inventario-al-moverse", "pr": 426, "estado": "MERGEADO durante esta auditoria; rama remota borrada"},
+    {"branch": "fix/inventario-se-crea-al-moverse", "pr": null, "solo_local": true, "nota": "duplica #425 y #426"},
+    {"branch": "feat/inventario-consumo-teorico", "pr": 387, "local_adelante_commits": 57, "divergida": true}
+   ],
+   "MAIN_STATE": "El fix entro por #426.",
+   "RISK": "P3",
+   "RECOMMENDED_RESOLUTION": "Verificar que fix/inventario-se-crea-al-moverse no tenga nada extra y archivarla."
+  },
+  {
+   "PARALLEL_REALITY_ID": "PR-08-ocm-daily-security-invoker-dos-migraciones",
+   "TITULO": "Dos migraciones distintas para el mismo objetivo",
+   "FILES": [
+    "rama: supabase/migrations/20260914210000_ocm_daily_security_invoker.sql",
+    "main: supabase/migrations/20260915040000_ocm_daily_security_invoker.sql"
+   ],
+   "BRANCHES": ["hotfix/ocm-daily-security-invoker (PR #417, mergeado)", "security/aislamiento-ocm-daily", "guardia/anon-en-migraciones"],
+   "MAIN_STATE": "main tiene la version 20260915040000. El ledger de AMALAY registra 20260915170755 ocm_daily_security_invoker: APLICADA.",
+   "RISK": "P3",
+   "RECOMMENDED_RESOLUTION": "Borrar la variante de la rama al archivarla; documentar cual timestamp es el canonico."
+  },
+  {
+   "PARALLEL_REALITY_ID": "PR-09-dos-apps-electron",
+   "TITULO": "electron-app/ y electron-kds/ coexisten en main",
+   "FILES": ["electron-app/ (171 archivos)", "electron-kds/main.js", "electron-kds/preload.js"],
+   "BRANCHES": ["main", "integracion/electron-1.3.12 (PR #223, draft, base 376 commits atras)", "codex/electron-kds-offline-main", "codex/electron-upgrade-20260912"],
+   "MAIN_STATE": "Ambos directorios existen. Ninguno se despliega por Vercel (excluidos en .vercelignore).",
+   "RISK": "P2",
+   "RAZON_DEL_RIESGO": "El instalador que corre en AMALAY no se deduce del repo: no hay pipeline de despliegue ligado a main para Electron. #223 se titula 'reconciliacion linea instalada x main', lo que confirma que la linea instalada y main divergieron.",
+   "RECOMMENDED_RESOLUTION": "Declarar cual directorio es el producto y cual es legado. Cerrar la reconciliacion de #223 antes de tocar Electron otra vez."
+  },
+  {
+   "PARALLEL_REALITY_ID": "PR-10-ramas-de-agente-identicas",
+   "TITULO": "13 ramas claude/* apuntan al mismo trabajo",
+   "FILES": ["123 archivos identicos, 'installer gap kit', 2026-08-05"],
+   "BRANCHES": ["claude/adoring-hellman-dd5f35", "claude/ecstatic-keller-72d56f", "claude/gracious-pare-9d950b", "claude/keen-lumiere-205b48", "claude/nervous-hertz-f16945", "claude/pensive-shamir-36a90c", "claude/practical-tesla-c3b7a4", "claude/priceless-wilson-6132b7", "claude/serene-blackburn-1277ee", "claude/unruffled-spence-bf89e6", "claude/upbeat-hermann-b655c0", "claude/xenodochial-keller-17d55e", "claude/zen-engelbart-00c4bc"],
+   "MAIN_STATE": "37 commits / 34 parches no presentes en main, identicos entre si.",
+   "RISK": "P3",
+   "RAZON_DEL_RIESGO": "No es riesgo de perdida sino de ruido: cada una tiene un worktree vivo bajo .claude/worktrees/, y varias tienen archivos untracked propios.",
+   "RECOMMENDED_RESOLUTION": "Conservar UNA (la que tenga el worktree limpio), empujarla como respaldo, archivar las otras 12 con sus worktrees."
+  },
+  {
+   "PARALLEL_REALITY_ID": "PR-11-codigo-en-main-cuyo-origen-esta-oculto",
+   "TITULO": "Codigo en produccion cuyo PR de origen no es rastreable desde la rama",
+   "FILES": ["N/A — es un patron, no un archivo"],
+   "BRANCHES": ["449 ramas que no son ancestros de main; 358 con contenido dentro de main"],
+   "MAIN_STATE": "Squash merge activo junto con merge commit y rebase merge. delete_branch_on_merge=false, asi que las ramas sobreviven al merge y se acumulan (330 remotas).",
+   "RISK": "P1",
+   "RAZON_DEL_RIESGO": "Con los tres metodos de merge habilitados, la relacion rama->commit-en-main no es deducible por git. Hay que consultar la API de PRs. Si GitHub deja de estar disponible o el PR se borra, la trazabilidad se pierde.",
+   "RECOMMENDED_RESOLUTION": "Elegir UN metodo de merge (squash) y activar delete_branch_on_merge; exigir el numero de PR en el mensaje de commit (ya se cumple de facto: '(#425)')."
+  }
+ ]
+}

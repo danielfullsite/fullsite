@@ -1,0 +1,1037 @@
+<meta charset="utf-8">
+<title>POS Skeleton</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════════════════════
+   FULLSITE POS · SKELETON
+   Sistema de diseño para terminal táctil sin mouse ni teclado.
+   Ley rectora: la pantalla no se lee, se recuerda. Cero scroll en operación.
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root{
+  color-scheme: dark;
+  /* Superficies — profundidad por elevación, no por borde */
+  --bg:#080b0c; --surface:#0c1012; --surface-2:#11171a; --panel:#131a1d; --raised:#1a2226;
+  --line:#232b2c; --line-soft:#191f20;
+  --text-1:#eef2f0; --text-2:#a8b5b1; --text-3:#6f7d79; --text-4:#4a5553;
+  /* Marca */
+  --accent:#10b981; --accent-bright:#34d399; --accent-deep:#059669;
+  --accent-soft:rgba(16,185,129,.12); --accent-line:rgba(16,185,129,.28);
+  --info:#38bdf8; --info-soft:rgba(56,189,248,.12); --info-line:rgba(56,189,248,.3);
+  --warn:#f5a524; --warn-soft:rgba(245,165,36,.12);
+  --crit:#f5455c; --crit-soft:rgba(245,69,92,.12); --crit-ink:#fda4af;
+  /* Ritmo — escala de 4 */
+  --r1:8px; --r2:12px; --r3:16px; --r4:22px;
+  /* Objetivo táctil mínimo. Nunca por debajo. */
+  --tap:56px;
+  --shadow-1:0 1px 2px rgba(0,0,0,.4);
+  --shadow-2:0 8px 24px rgba(0,0,0,.45);
+  --shadow-3:0 24px 64px rgba(0,0,0,.6);
+  --ease:cubic-bezier(.2,.9,.3,1);
+}
+:root[data-theme="light"]{
+  color-scheme: light;
+  --bg:#eef1ec; --surface:#ffffff; --surface-2:#f4f7f1; --panel:#ffffff; --raised:#ffffff;
+  --line:#dde3dc; --line-soft:#eef1ec;
+  --text-1:#0e1613; --text-2:#3d4a46; --text-3:#6b7873; --text-4:#9aa5a1;
+  --accent:#0ea371; --accent-bright:#10b981;
+  --accent-soft:rgba(16,185,129,.1); --accent-line:rgba(5,120,90,.24);
+  --shadow-1:0 1px 2px rgba(11,60,40,.1);
+  --shadow-2:0 8px 24px rgba(11,60,40,.12);
+  --shadow-3:0 24px 64px rgba(11,60,40,.18);
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{height:100%; margin:0; overflow:hidden;}
+body{
+  background:var(--bg); color:var(--text-1);
+  font-family:'Public Sans',system-ui,-apple-system,sans-serif;
+  font-size:14px; line-height:1.35;
+  /* Sin selección accidental: un dedo que se queda quieto no debe seleccionar texto */
+  -webkit-user-select:none; user-select:none;
+  overscroll-behavior:none;
+}
+button{font:inherit; color:inherit; border:0; background:none; cursor:pointer; touch-action:manipulation;}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace; font-variant-numeric:tabular-nums;}
+.num{font-variant-numeric:tabular-nums; letter-spacing:-.02em;}
+
+/* ── El caparazón: tres bandas fijas, cero scroll ───────────────────────── */
+#app{height:100dvh; display:grid; grid-template-rows:auto minmax(0,1fr) auto; overflow:hidden;}
+
+/* ── BANDA 1 · Estado ────────────────────────────────────────────────────
+   Todo lo que el operador necesita saber sin preguntar, nada más.
+   Nunca colapsa, nunca esconde nada tras un breakpoint.                    */
+#statusbar{
+  height:52px; display:flex; align-items:center; gap:14px; padding:0 14px;
+  background:var(--surface-2); border-bottom:1px solid var(--line); position:relative; z-index:10;
+}
+.brand{font-weight:900; letter-spacing:-.03em; font-size:15px; display:flex; align-items:center; gap:5px;}
+.brand i{width:6px; height:6px; background:var(--accent); display:block; border-radius:1px;}
+.sb-sep{width:1px; height:22px; background:var(--line);}
+.sb-ctx{display:flex; align-items:center; gap:10px; min-width:0;}
+.sb-chip{
+  display:inline-flex; align-items:center; gap:7px; height:36px; padding:0 12px;
+  border-radius:var(--r1); background:var(--surface); border:1px solid var(--line);
+  font-weight:700; font-size:13px; white-space:nowrap; transition:.14s var(--ease);
+}
+.sb-chip:active{transform:scale(.96);}
+.sb-chip b{font-weight:800;}
+.sb-spacer{flex:1;}
+.pill{
+  display:inline-flex; align-items:center; gap:6px; height:28px; padding:0 10px;
+  border-radius:999px; border:1px solid var(--line); background:var(--surface);
+  font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600;
+  letter-spacing:.04em; text-transform:uppercase; white-space:nowrap;
+}
+.pill.on{background:var(--accent-soft); color:var(--accent-bright); border-color:var(--accent-line);}
+.pill.off{background:var(--crit-soft); color:var(--crit-ink); border-color:rgba(245,69,92,.32);}
+.pill.warn{background:var(--warn-soft); color:var(--warn); border-color:rgba(245,165,36,.32);}
+.pill .dot{width:6px; height:6px; border-radius:50%; background:currentColor;}
+.pill.off .dot{animation:breathe 1.6s var(--ease) infinite;}
+@keyframes breathe{0%,100%{opacity:1}50%{opacity:.25}}
+.icon-btn{
+  width:40px; height:40px; border-radius:var(--r1); display:grid; place-items:center;
+  color:var(--text-2); transition:.14s var(--ease);
+}
+.icon-btn:hover{background:var(--surface); color:var(--text-1);}
+.icon-btn:active{transform:scale(.9);}
+
+/* ── BANDA 2 · Trabajo ───────────────────────────────────────────────────
+   Dos columnas. Izquierda: la cuenta. Derecha: el menú. Ambas sin scroll.  */
+#work{display:grid; grid-template-columns:minmax(300px,38%) minmax(0,1fr); overflow:hidden; min-height:0;}
+
+/* ─── Columna izquierda: LA CUENTA ─────────────────────────────────────── */
+#ticket{
+  display:grid; grid-template-rows:auto minmax(0,1fr) auto; overflow:hidden; min-height:0; min-width:0;
+  background:var(--surface); border-right:1px solid var(--line);
+}
+.tk-head{
+  padding:10px 14px; border-bottom:1px solid var(--line-soft);
+  display:flex; align-items:baseline; justify-content:space-between; gap:10px;
+}
+.tk-head .who{font-size:12px; color:var(--text-3); font-weight:600;}
+.tk-head .amt{font-size:26px; font-weight:900; letter-spacing:-.035em; color:var(--accent-bright);}
+
+/* Sillas: pestañas de ancho igual, siempre visibles, nunca con scroll.
+   Si hay más de 6 personas la tira se comprime, no se desborda.            */
+.seats{display:flex; gap:5px; padding:0 12px 9px;}
+.seat{
+  flex:1; min-width:0; height:40px; border-radius:var(--r1);
+  background:var(--surface-2); border:1px solid var(--line);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  font-size:12px; font-weight:800; color:var(--text-2); transition:.14s var(--ease);
+}
+.seat .s-amt{font-size:10px; font-weight:600; opacity:.7; font-family:'IBM Plex Mono',monospace;}
+.seat[aria-selected="true"]{background:var(--info-soft); border-color:var(--info-line); color:var(--info);}
+.seat:active{transform:scale(.94);}
+
+/* La lista de la cuenta. Único lugar donde el scroll está PERMITIDO —
+   y sólo porque una cuenta puede tener 40 renglones legítimos. Pero la
+   densidad se adapta primero: a más renglones, filas más compactas.        */
+.tk-body{overflow-y:auto; overscroll-behavior:contain; padding:0 10px; min-height:0;}
+.tk-body::-webkit-scrollbar{width:10px;}
+.tk-body::-webkit-scrollbar-thumb{background:var(--line); border-radius:99px; border:3px solid var(--surface);}
+.tk-empty{
+  height:100%; min-height:180px; display:flex; flex-direction:column; align-items:center;
+  justify-content:center; gap:12px; color:var(--text-3); text-align:center;
+}
+.tk-empty .ring{
+  width:56px; height:56px; border-radius:var(--r3); display:grid; place-items:center;
+  background:var(--surface-2); border:1px dashed var(--line); color:var(--text-4);
+}
+.group-tag{
+  display:flex; align-items:center; gap:8px; padding:12px 4px 5px;
+  font-size:10px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--text-4);
+}
+.group-tag hr{flex:1; border:0; border-top:1px solid var(--line-soft); margin:0;}
+.line{
+  display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:10px;
+  padding:7px 8px; border-radius:var(--r2); transition:.14s var(--ease);
+}
+.line:active{background:var(--surface-2);}
+.line.sent{opacity:.55;}
+.line .qty{
+  min-width:30px; height:30px; padding:0 7px; border-radius:7px; display:grid; place-items:center;
+  background:var(--info-soft); color:var(--info); font-weight:800; font-size:13px;
+  font-family:'IBM Plex Mono',monospace;
+}
+.line.sent .qty{background:var(--surface-2); color:var(--text-4);}
+.line .nm{font-weight:600; font-size:14px; line-height:1.25; min-width:0;}
+.line .mods{display:block; font-size:11px; color:var(--text-3); margin-top:2px; font-weight:500; line-height:1.2;}
+.line .pr{font-weight:700; font-size:14px; font-family:'IBM Plex Mono',monospace;}
+/* Densidad adaptativa: la cuenta se comprime sola antes de pedir scroll */
+.tk-body[data-density="2"] .line{padding:5px 8px;}
+.tk-body[data-density="2"] .line .nm{font-size:13px;}
+.tk-body[data-density="3"] .line{padding:3px 8px; gap:8px;}
+.tk-body[data-density="3"] .line .nm{font-size:12.5px;}
+.tk-body[data-density="3"] .line .qty{height:26px; min-width:26px; font-size:12px;}
+.tk-body[data-density="3"] .group-tag{padding:8px 4px 3px;}
+
+/* Totales — bloque fijo, siempre en el mismo píxel */
+.tk-foot{border-top:1px solid var(--line); padding:9px 14px 10px; background:var(--surface-2);}
+.tot-row{display:flex; justify-content:space-between; font-size:12px; color:var(--text-3); margin-bottom:3px;}
+.tot-row b{color:var(--text-2); font-weight:600; font-family:'IBM Plex Mono',monospace;}
+.tot-grand{display:flex; align-items:baseline; justify-content:space-between; margin-top:5px;}
+.tot-grand span{font-size:11px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:var(--text-3);}
+.tot-grand b{font-size:32px; font-weight:900; letter-spacing:-.04em; color:var(--text-1);}
+
+/* ─── Columna derecha: EL MENÚ ─────────────────────────────────────────── */
+#menu{display:grid; grid-template-rows:auto auto minmax(0,1fr) auto; overflow:hidden; min-height:0; min-width:0; background:var(--bg);}
+
+/* Nivel 1 — FAMILIAS. Ocho, fijas, en la misma posición toda la vida
+   del restaurante. Aquí nace la memoria muscular.                           */
+.families{grid-row:1; display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0,1fr); gap:6px; padding:10px 12px 0;}
+.fam{
+  height:64px; min-width:0; border-radius:var(--r2); border:1px solid var(--line); background:var(--surface-2);
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+  color:var(--text-2); transition:.16s var(--ease); position:relative; overflow:hidden;
+}
+.fam .lb{font-size:11px; font-weight:800; letter-spacing:-.01em; max-width:100%; overflow:hidden; text-overflow:ellipsis;}
+.fam:active{transform:scale(.95);}
+.fam[aria-selected="true"]{color:#fff; border-color:transparent; box-shadow:var(--shadow-1);}
+.fam[aria-selected="true"]::before{content:''; position:absolute; inset:0; background:var(--fg); opacity:1; z-index:-1;}
+.fam[aria-selected="true"]{background:var(--fg);}
+
+/* Nivel 2 — CATEGORÍAS de la familia. Ancho igual, texto en dos líneas si
+   hace falta. Nunca se trunca un nombre: se reduce la letra.               */
+.cats{grid-row:2; display:flex; gap:5px; padding:8px 12px 0;}
+.cat{
+  flex:1; min-width:0; height:42px; padding:0 8px; border-radius:var(--r1);
+  background:var(--surface-2); border:1px solid var(--line); color:var(--text-2);
+  font-size:12px; font-weight:700; line-height:1.1; transition:.14s var(--ease);
+  display:flex; align-items:center; justify-content:center; text-align:center;
+  overflow:hidden; text-overflow:ellipsis;
+}
+.cat small{display:block; font-size:9.5px; opacity:.6; font-weight:600;}
+.cat[aria-selected="true"]{background:var(--fg); color:#fff; border-color:transparent;}
+.cat:active{transform:scale(.95);}
+
+/* Nivel 3 — LA RETÍCULA. Filas y columnas las decide el tamaño de la
+   pantalla, no yo. Cada celda ≥ 96px. Siempre cabe exacto: nunca sobra
+   media fila cortada, nunca hay scroll.                                    */
+.gridwrap{grid-row:3; padding:8px 12px; min-height:0; min-width:0; overflow:hidden;}
+.grid{
+  height:100%; display:grid; gap:7px;
+  grid-template-columns:repeat(var(--cols),1fr);
+  grid-template-rows:repeat(var(--rows),1fr);
+}
+.tile{
+  border-radius:var(--r2); padding:9px 8px; position:relative; overflow:hidden;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px;
+  text-align:center; color:#fff; background:var(--fg);
+  box-shadow:var(--shadow-1); transition:.13s var(--ease);
+}
+.tile:active{transform:scale(.94); filter:brightness(1.15);}
+.tile .ic{opacity:.85;}
+.tile .nm{
+  font-size:12px; font-weight:800; line-height:1.14; letter-spacing:-.015em;
+  /* Un nombre de 54 caracteres cabe en tres renglones o no cabe. Aquí cabe. */
+  display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;
+}
+.tile .pr{
+  font-family:'IBM Plex Mono',monospace; font-size:11.5px; font-weight:700;
+  opacity:.92; letter-spacing:-.02em;
+}
+.tile .badge{
+  position:absolute; top:5px; right:5px; min-width:19px; height:19px; padding:0 5px;
+  border-radius:99px; background:rgba(0,0,0,.42); backdrop-filter:blur(6px);
+  font-size:10.5px; font-weight:900; display:grid; place-items:center;
+  font-family:'IBM Plex Mono',monospace;
+}
+.tile.out{filter:grayscale(1) brightness(.5); pointer-events:none;}
+.tile.out::after{
+  content:'AGOTADO'; position:absolute; inset:auto 0 8px; font-size:9px;
+  font-weight:900; letter-spacing:.1em;
+}
+.tile.ghost{background:var(--surface-2); border:1px dashed var(--line-soft); box-shadow:none; pointer-events:none;}
+
+/* Paginador — el reemplazo del scroll. El pulgar derecho vive aquí.
+   Posición absolutamente fija: el operador la encuentra sin mirar.         */
+.pager{
+  grid-row:4; height:54px; display:flex; align-items:center; justify-content:center; gap:10px;
+  padding:0 12px 10px;
+}
+.pg-arrow{
+  width:74px; height:44px; border-radius:var(--r1); background:var(--surface-2);
+  border:1px solid var(--line); display:grid; place-items:center; color:var(--text-2);
+  transition:.14s var(--ease);
+}
+.pg-arrow:active{transform:scale(.93); background:var(--raised);}
+.pg-arrow[disabled]{opacity:.22; pointer-events:none;}
+.pg-dots{display:flex; gap:7px; align-items:center; padding:0 6px;}
+.pg-dot{width:9px; height:9px; border-radius:50%; background:var(--line); transition:.2s var(--ease);}
+.pg-dot[aria-current="true"]{background:var(--accent-bright); width:26px; border-radius:99px;}
+.pg-count{
+  font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--text-3);
+  font-weight:600; min-width:74px; text-align:center;
+}
+
+/* ── BANDA 3 · Acción ────────────────────────────────────────────────────
+   Tres verbos. Siempre los mismos, siempre en el mismo lugar, siempre del
+   mismo tamaño. El botón de cobrar jamás se mueve de la esquina derecha.   */
+#actions{
+  height:82px; display:grid; grid-template-columns:auto 1fr 1fr 1.25fr; gap:9px;
+  padding:0 14px; align-items:center; background:var(--surface-2);
+  border-top:1px solid var(--line);
+}
+.act{
+  height:60px; border-radius:var(--r2); display:flex; align-items:center; justify-content:center;
+  gap:9px; font-weight:800; font-size:15px; letter-spacing:-.01em; transition:.14s var(--ease);
+  border:1px solid transparent; box-shadow:var(--shadow-1);
+}
+.act:active{transform:scale(.97);}
+.act[disabled]{opacity:.3; pointer-events:none; box-shadow:none;}
+.act.util{width:60px; background:var(--surface); border-color:var(--line); color:var(--text-2);}
+.act.ghost{background:var(--surface); border-color:var(--line); color:var(--text-1);}
+.act.send{background:linear-gradient(180deg,var(--accent-bright),var(--accent)); color:#052018;}
+.act.pay{background:linear-gradient(180deg,#5cc9fb,var(--info)); color:#062430; font-size:17px;}
+.act .sub{font-size:11px; font-weight:600; opacity:.7; display:block;}
+
+/* ── Hojas a pantalla completa ───────────────────────────────────────────
+   Un modal que se corta es un modal roto. Aquí nada se corta nunca:
+   cada hoja es una rejilla de tres bandas con su propio presupuesto de alto. */
+.sheet{
+  position:fixed; inset:0; z-index:100; background:rgba(4,7,8,.72);
+  backdrop-filter:blur(10px); display:grid; place-items:center; padding:22px;
+  animation:fade .16s var(--ease);
+}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.sheet[hidden]{display:none;}
+.card{
+  width:100%; max-width:820px; max-height:100%; background:var(--panel);
+  border:1px solid var(--line); border-radius:var(--r4); box-shadow:var(--shadow-3);
+  display:grid; grid-template-rows:auto 1fr auto; overflow:hidden;
+  animation:rise .2s var(--ease);
+}
+@keyframes rise{from{transform:translateY(14px) scale(.99); opacity:0}to{transform:none; opacity:1}}
+.card.wide{max-width:1000px;}
+.card-head{
+  padding:16px 20px; border-bottom:1px solid var(--line); display:flex;
+  align-items:center; justify-content:space-between; gap:14px;
+}
+.card-head h2{margin:0; font-size:19px; font-weight:900; letter-spacing:-.03em;}
+.card-head .sub{font-size:12px; color:var(--text-3); font-weight:600; margin-top:2px;}
+.card-body{padding:18px 20px; overflow:hidden; min-height:0; display:flex; flex-direction:column; gap:14px;}
+.card-foot{padding:14px 20px 16px; border-top:1px solid var(--line); display:grid; gap:9px; background:var(--surface-2);}
+
+/* ── Cobro: tres zonas de alto fijo. El cambio SIEMPRE visible. ────────── */
+.pay-grid{display:grid; grid-template-columns:1fr 300px; gap:16px; min-height:0; overflow:hidden;}
+.pay-left{display:flex; flex-direction:column; gap:12px; min-height:0;}
+.due{
+  text-align:center; padding:14px; border-radius:var(--r3);
+  background:var(--surface-2); border:1px solid var(--line);
+}
+.due .lb{font-size:10px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:var(--text-3);}
+.due .v{font-size:44px; font-weight:900; letter-spacing:-.045em; line-height:1.05; margin-top:2px;}
+.row-label{font-size:10px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--text-3); margin-bottom:7px;}
+.opt-row{display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0,1fr); gap:7px;}
+.opt{
+  height:var(--tap); border-radius:var(--r2); background:var(--surface-2); border:1px solid var(--line);
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px;
+  font-weight:800; font-size:14px; color:var(--text-2); transition:.14s var(--ease);
+}
+.opt small{font-size:10px; font-weight:600; opacity:.65; font-family:'IBM Plex Mono',monospace;}
+.opt:active{transform:scale(.95);}
+.opt[aria-selected="true"]{background:var(--accent-soft); border-color:var(--accent-line); color:var(--accent-bright);}
+.opt.big{height:66px; font-size:15px; gap:5px; flex-direction:row;}
+.opt.big[aria-selected="true"]{background:var(--info-soft); border-color:var(--info-line); color:var(--info);}
+/* Teclado numérico — porque no hay teclado físico. Diez teclas de 66px. */
+.keypad{display:grid; grid-template-columns:repeat(3,1fr); gap:7px; align-content:start;}
+.key{
+  height:60px; border-radius:var(--r2); background:var(--surface-2); border:1px solid var(--line);
+  font-size:22px; font-weight:700; font-family:'IBM Plex Mono',monospace;
+  display:grid; place-items:center; transition:.1s var(--ease);
+}
+.key:active{transform:scale(.93); background:var(--raised);}
+.key.wide{grid-column:span 2;}
+.key.fn{font-size:13px; font-weight:800; color:var(--text-3); font-family:'Public Sans',sans-serif;}
+.change{
+  text-align:center; padding:14px; border-radius:var(--r3);
+  background:var(--info-soft); border:1px solid var(--info-line);
+}
+.change .v{font-size:40px; font-weight:900; letter-spacing:-.045em; color:var(--info); line-height:1.05;}
+.change .lb{font-size:10px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:var(--text-3);}
+.change .note{font-size:12px; font-weight:700; color:var(--accent-bright); margin-top:4px;}
+.change.short{background:var(--crit-soft); border-color:rgba(245,69,92,.32);}
+.change.short .v{color:var(--crit-ink);}
+
+/* Mesas — malla. Nunca un input numérico. */
+.tables{display:grid; grid-template-columns:repeat(auto-fill,minmax(92px,1fr)); gap:8px; overflow:hidden;}
+.tbl{
+  aspect-ratio:1.25; border-radius:var(--r2); background:var(--surface-2); border:1px solid var(--line);
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
+  transition:.14s var(--ease);
+}
+.tbl .n{font-size:24px; font-weight:900; letter-spacing:-.04em;}
+.tbl .st{font-size:9.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--text-3);}
+.tbl .am{font-size:10.5px; font-family:'IBM Plex Mono',monospace; font-weight:700;}
+.tbl:active{transform:scale(.94);}
+.tbl[data-st="occ"]{background:var(--info-soft); border-color:var(--info-line); color:var(--info);}
+.tbl[data-st="bill"]{background:var(--warn-soft); border-color:rgba(245,165,36,.3); color:var(--warn);}
+.tbl[data-st="free"]{color:var(--text-2);}
+.tbl[aria-current="true"]{outline:2px solid var(--accent-bright); outline-offset:2px;}
+
+/* Modificadores */
+.mod-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:7px;}
+.mod{
+  height:50px; border-radius:var(--r1); background:var(--surface-2); border:1px solid var(--line);
+  display:flex; align-items:center; justify-content:space-between; padding:0 12px;
+  font-size:13px; font-weight:700; color:var(--text-2); transition:.14s var(--ease);
+}
+.mod:active{transform:scale(.96);}
+.mod[aria-selected="true"]{background:var(--accent-soft); border-color:var(--accent-line); color:var(--accent-bright);}
+.mod .px{font-size:11px; font-family:'IBM Plex Mono',monospace; opacity:.7;}
+.stepper{display:inline-flex; align-items:center; border-radius:var(--r2); background:var(--surface-2); border:1px solid var(--line); overflow:hidden;}
+.stepper button{width:54px; height:54px; display:grid; place-items:center; transition:.1s var(--ease);}
+.stepper button:active{transform:scale(.88);}
+.stepper .v{width:52px; text-align:center; font-size:20px; font-weight:800; font-family:'IBM Plex Mono',monospace;}
+
+/* Aviso — nunca encima de un título. Banda propia, empuja el contenido. */
+#toastwrap{position:fixed; bottom:96px; left:14px; z-index:200; display:grid; gap:7px; pointer-events:none;}
+.toast{
+  display:flex; align-items:center; gap:10px; padding:12px 18px; border-radius:var(--r2);
+  background:var(--raised); border:1px solid var(--line); box-shadow:var(--shadow-2);
+  font-weight:700; font-size:14px; animation:drop .2s var(--ease);
+}
+@keyframes drop{from{transform:translateY(-10px); opacity:0}to{transform:none; opacity:1}}
+.toast.ok{border-color:var(--accent-line); color:var(--accent-bright);}
+.toast.err{border-color:rgba(245,69,92,.35); color:var(--crit-ink);}
+.toast.info{border-color:var(--info-line); color:var(--info);}
+
+/* Gaveta lateral */
+.drawer{position:fixed; inset:0; z-index:90; background:rgba(4,7,8,.6); backdrop-filter:blur(6px); animation:fade .15s var(--ease);}
+.drawer[hidden]{display:none;}
+.drawer-panel{
+  width:320px; height:100%; background:var(--surface-2); border-right:1px solid var(--line);
+  padding:16px; display:flex; flex-direction:column; gap:6px; animation:slide .2s var(--ease); overflow:hidden;
+}
+@keyframes slide{from{transform:translateX(-18px); opacity:.4}to{transform:none; opacity:1}}
+.nav-item{
+  height:52px; border-radius:var(--r2); display:flex; align-items:center; gap:12px; padding:0 14px;
+  font-weight:700; font-size:14px; color:var(--text-2); transition:.13s var(--ease);
+}
+.nav-item:active{transform:scale(.97);}
+.nav-item:hover{background:var(--surface); color:var(--text-1);}
+.nav-sec{font-size:10px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--text-4); padding:14px 14px 6px;}
+
+/* Nota al pie del demo */
+#hint{
+  position:fixed; top:62px; left:50%; transform:translateX(-50%); z-index:50; max-width:268px;
+  background:var(--raised); border:1px solid var(--line); border-radius:var(--r2);
+  padding:11px 13px; font-size:11.5px; color:var(--text-3); line-height:1.45;
+  box-shadow:var(--shadow-2); font-weight:500;
+}
+#hint b{color:var(--accent-bright); font-weight:800;}
+#hint button{position:absolute; top:5px; right:5px; width:24px; height:24px; color:var(--text-4);}
+#hint.gone{opacity:0; pointer-events:none; transition:opacity .4s var(--ease);}
+@media (max-width:900px){
+  #work{grid-template-columns:1fr;}
+  #ticket{display:none;}
+  body[data-mobile="ticket"] #ticket{display:grid;}
+  body[data-mobile="ticket"] #menu{display:none;}
+  .pay-grid{grid-template-columns:1fr;}
+  #hint{display:none;}
+}
+</style>
+
+<div id="app">
+  <!-- ─ BANDA 1 ───────────────────────────────────────────────────────── -->
+  <header id="statusbar">
+    <button class="icon-btn" onclick="UI.drawer(true)" aria-label="Menú">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+    </button>
+    <div class="brand">fullsite<i></i></div>
+    <div class="sb-sep"></div>
+    <div class="sb-ctx">
+      <button class="sb-chip" onclick="UI.sheet('tables')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="10" rx="2"/><path d="M7 17v3M17 17v3"/></svg>
+        Mesa <b id="sb-mesa">12</b>
+      </button>
+      <button class="sb-chip" onclick="UI.people()">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg>
+        <b id="sb-people">4</b>p
+      </button>
+      <button class="sb-chip" onclick="UI.toast('info','Cambio de mesero — pide huella del gerente')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+        <b>Daniel R.</b>
+      </button>
+    </div>
+    <div class="sb-spacer"></div>
+    <span class="pill on" id="pill-kds"><span class="dot"></span>Cocina</span>
+    <button class="pill" id="pill-net" onclick="UI.toggleNet()"><span class="dot"></span><span id="net-label">En línea</span></button>
+    <span class="pill mono" id="clock">—:—</span>
+    <button class="icon-btn" onclick="UI.theme()" aria-label="Tema">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+    </button>
+    <button class="icon-btn" onclick="UI.toast('info','Sesión bloqueada — se pide huella para volver')" aria-label="Bloquear">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+    </button>
+  </header>
+
+  <!-- ─ BANDA 2 ───────────────────────────────────────────────────────── -->
+  <div id="work">
+    <section id="ticket">
+      <div>
+        <div class="tk-head">
+          <div>
+            <div style="font-size:16px;font-weight:900;letter-spacing:-.03em">Mesa <span id="tk-mesa">12</span></div>
+            <div class="who"><span id="tk-people">4</span> personas · Daniel R.</div>
+          </div>
+          <div class="amt num" id="tk-amt">$0.00</div>
+        </div>
+        <div class="seats" id="seats"></div>
+      </div>
+      <div class="tk-body" id="tk-body"></div>
+      <div class="tk-foot">
+        <div class="tot-row"><span>Subtotal</span><b id="t-sub">$0.00</b></div>
+        <div class="tot-row" id="row-disc" hidden><span>Descuento</span><b id="t-disc" style="color:var(--crit-ink)">-$0.00</b></div>
+        <div class="tot-row"><span>IVA 16%</span><b id="t-iva">$0.00</b></div>
+        <div class="tot-grand"><span>Total</span><b class="num" id="t-tot">$0.00</b></div>
+      </div>
+    </section>
+
+    <section id="menu">
+      <nav class="families" id="families"></nav>
+      <nav class="cats" id="cats"></nav>
+      <div class="gridwrap"><div class="grid" id="grid"></div></div>
+      <div class="pager">
+        <button class="pg-arrow" id="pg-prev" onclick="POS.page(-1)" aria-label="Anterior">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <span class="pg-count mono" id="pg-count">—</span>
+        <div class="pg-dots" id="pg-dots"></div>
+        <span class="pg-count mono" id="pg-of">—</span>
+        <button class="pg-arrow" id="pg-next" onclick="POS.page(1)" aria-label="Siguiente">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg>
+        </button>
+      </div>
+    </section>
+  </div>
+
+  <!-- ─ BANDA 3 ───────────────────────────────────────────────────────── -->
+  <footer id="actions">
+    <button class="act util" onclick="UI.sheet('tables')" aria-label="Mesas">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+    </button>
+    <button class="act ghost" id="btn-bill" onclick="POS.preTicket()">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2h12v20l-3-2-3 2-3-2-3 2V2Z"/><path d="M9 8h6M9 12h6"/></svg>
+      Cuenta
+    </button>
+    <button class="act send" id="btn-send" onclick="POS.send()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7Z"/></svg>
+      <span>Enviar<span class="sub" id="send-sub">nada nuevo</span></span>
+    </button>
+    <button class="act pay" id="btn-pay" onclick="UI.sheet('pay')">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="2" y="5" width="20" height="14" rx="2.5"/><path d="M2 10h20"/></svg>
+      <span>Cobrar<span class="sub" id="pay-sub">$0.00</span></span>
+    </button>
+  </footer>
+</div>
+
+<div id="toastwrap"></div>
+
+<!-- ─ Hoja: MESAS ──────────────────────────────────────────────────────── -->
+<div class="sheet" id="sheet-tables" hidden onclick="if(event.target===this)UI.close()">
+  <div class="card wide">
+    <div class="card-head">
+      <div><h2>Mesas</h2><div class="sub">Toca la mesa. Nunca se escribe un número.</div></div>
+      <button class="icon-btn" onclick="UI.close()"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="card-body"><div class="tables" id="tables"></div></div>
+    <div class="card-foot"><button class="act ghost" onclick="UI.close()">Cerrar</button></div>
+  </div>
+</div>
+
+<!-- ─ Hoja: MODIFICADORES ──────────────────────────────────────────────── -->
+<div class="sheet" id="sheet-mod" hidden onclick="if(event.target===this)UI.close()">
+  <div class="card">
+    <div class="card-head">
+      <div><h2 id="mod-name">—</h2><div class="sub" id="mod-price">—</div></div>
+      <button class="icon-btn" onclick="UI.close()"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="card-body">
+      <div style="display:flex;align-items:center;gap:16px">
+        <div class="stepper">
+          <button onclick="MOD.qty(-1)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M5 12h14"/></svg></button>
+          <span class="v" id="mod-qty">1</span>
+          <button onclick="MOD.qty(1)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+        </div>
+        <div style="flex:1">
+          <div class="row-label">Asiento</div>
+          <div class="opt-row" id="mod-seats"></div>
+        </div>
+      </div>
+      <div>
+        <div class="row-label">Preparación</div>
+        <div class="mod-grid" id="mod-opts"></div>
+      </div>
+    </div>
+    <div class="card-foot" style="grid-template-columns:1fr 2fr">
+      <button class="act ghost" onclick="UI.close()">Cancelar</button>
+      <button class="act send" onclick="MOD.confirm()"><span>Agregar <span id="mod-total" class="mono"></span></span></button>
+    </div>
+  </div>
+</div>
+
+<!-- ─ Hoja: COBRO ──────────────────────────────────────────────────────── -->
+<div class="sheet" id="sheet-pay" hidden onclick="if(event.target===this)UI.close()">
+  <div class="card wide">
+    <div class="card-head">
+      <div><h2>Cobrar mesa <span id="pay-mesa">12</span></h2><div class="sub">Todo cabe. Nada se corta. El cambio siempre visible.</div></div>
+      <button class="icon-btn" onclick="UI.close()"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="card-body">
+      <div class="pay-grid">
+        <div class="pay-left">
+          <div class="due"><div class="lb">Total a cobrar</div><div class="v num" id="pay-due">$0.00</div></div>
+          <div>
+            <div class="row-label">Propina</div>
+            <div class="opt-row" id="tips"></div>
+          </div>
+          <div>
+            <div class="row-label">Forma de pago</div>
+            <div class="opt-row" id="methods"></div>
+          </div>
+          <div class="change" id="change-box">
+            <div class="lb" id="change-lb">Cambio a dar</div>
+            <div class="v num" id="change-v">$0.00</div>
+            <div class="note" id="change-note"></div>
+          </div>
+        </div>
+        <div>
+          <div class="row-label">Recibido</div>
+          <div class="due" style="padding:10px;margin-bottom:9px"><div class="v num" id="pay-got" style="font-size:30px">$0</div></div>
+          <div class="keypad" id="keypad"></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-foot" style="grid-template-columns:1fr 2fr">
+      <button class="act ghost" onclick="UI.close()">Cancelar</button>
+      <button class="act pay" onclick="PAY.finish()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+        Cobrar e imprimir
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ─ Gaveta ───────────────────────────────────────────────────────────── -->
+<div class="drawer" id="drawer" hidden onclick="if(event.target===this)UI.drawer(false)">
+  <div class="drawer-panel">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:0 6px 8px">
+      <div class="brand" style="font-size:17px">fullsite<i></i></div>
+      <button class="icon-btn" onclick="UI.drawer(false)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="nav-sec">Piso</div>
+    <div id="nav-floor"></div>
+    <div class="nav-sec">Operación</div>
+    <div id="nav-ops"></div>
+  </div>
+</div>
+
+<div id="hint">
+  <button onclick="this.parentElement.remove()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+  <b>Demo funcional.</b> Menú real de AMALAY. Toca productos, envía a cocina y cobra. Redimensiona la ventana: la retícula se recalcula sola y nunca aparece scroll.
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+   DATOS — menú real de AMALAY (pos_menu_categories / pos_menu_items)
+   Consultado 2026-09-14 vía MCP supabase-amalay (read-only).
+   Las 58 categorías reales se agrupan en 8 familias: ése es el rediseño.
+   ═══════════════════════════════════════════════════════════════════════════ */
+const FAM = [
+  {k:'top',    n:'Top',       c:'#10b981', ic:'star'},
+  {k:'cafe',   n:'Café',      c:'#a8703a', ic:'coffee'},
+  {k:'bebida', n:'Bebidas',   c:'#3b82f6', ic:'cup'},
+  {k:'desay',  n:'Desayuno',  c:'#f59e0b', ic:'egg'},
+  {k:'cocina', n:'Cocina',    c:'#2e9e5b', ic:'utensils'},
+  {k:'pan',    n:'Panadería', c:'#c2410c', ic:'croissant'},
+  {k:'postre', n:'Postre',    c:'#ec4899', ic:'cake'},
+  {k:'barra',  n:'Barra',     c:'#8b5cf6', ic:'wine'},
+  {k:'market', n:'Market',    c:'#64748b', ic:'cart'},
+];
+const CATS = [
+  {f:'cafe',   n:'Coffee Hot/Ice', items:[['MATCHA CEREMONIAL',150],['CHAI LATTE CALIENTE',115],['MATCHA LATTE CALIENTE',115],['CHAI LATTE FRIO',115],['MATCHA LATTE FRIO',115],['TARO',115],['Mocca Latte Frio',108],['MOCCA LATTE FRIO 360 ML',100],['Mocca Latte Caliente',100],['MOCCA LATTE CALIENTE 360 ML',100],['HOT CACAO NUTELLA',95],['CAFE LATTE CALIENTE',85],['RED VELVET LATTE',85],['CAPUCHINO FRIO',85],['LATTE FRIO',85],['CAPUCHINO CALIENTE',85],['VASO CHOCOLATE',80],['COLD BREW',75],['ESPRESSO DOBLE',70],['FLAT WHITE CALIENTE',55],['VASO DE LECHE',50],['AMERICANO DESCAF',48],['CAFE AMERICANO',48],['ESPRESSO 45ML',40],['SERVICIO DE TE',35]]},
+  {f:'cafe',   n:'Frappes', items:[['Frappe Oreo',132],['MANGO PEACH PASSION FRUIT',125],['FRAPPE MATCHA',120],['CHAMOYADA DE MANGO',120],['CHAMOYADA FRUTOS ROJOS',120],['CHAMOYADA MARACUYA',120],['CHAMOYADA PEPINO-LIMON',120],['CHAMOYADA PIÑA-TAMARINDO',120],['FRAPPE CHAI',120],['FRAPPE JAMAICA-MARACUYA',120],['FRAPPE TARO',120],['FRAPUCCINO',120],['FRAPPE FRUTOS ROJOS',110],['FRAPPE MANGO-MARACUYA',110],['FRAPPE FRESA KIWI',110],['FRAPPE FRESA-DURAZNO',95]]},
+  {f:'cafe',   n:'Tea & Tisanas', items:[['TISANA HONEY BEE',75],['TISANA JENGIBRE LIMON',75],['TISANA MORAS DE LA SELVA',75],['TISANA PONCHE DE GUAYABA',75],['TISANA DATIL CITRUS',75],['TISANA FRESA KIWI',75],['TISANA BORA BORA',75],['Te Chai',75],['TE DE MANZANILLA',65],['Te Verde',65],['CHAI MASALA',65],['TE PETALO MIO',65],['TE MENTA INFUSION',65],['TE MATE NEGRO',65]]},
+  {f:'bebida', n:'Jugos', items:[['JUGO BE INMUNE SERVIDO',115],['JUGO DR DETOX SERVIDO',115],['JUGO GREEN ALCHEMIST SERVIDO',115],['JUGO U GLOW SERVIDO',115],['UNICORP - JUGO ALERT 473 ML',115],['UNICORP - JUGO BE INMUNE 473 ML',115],['UNICORP - JUGO DR DETOX 473 ML',115],['UNICORP - JUGO GREEN ALCHEMIST 473 ML',115],['Jugo U Glow',115],['Jugo Dr Detox',115],['Jugo Be Inmune',115],['UNICORP - JUGO JUGO U GLOW 473 ML',115],['JUGO ALERT SERVIDO',115],['JUGO VERDE DE LA CASA',95],['JUGO DE TORONJA',75],['JUGO DE NARANJA NATURAL',75]]},
+  {f:'bebida', n:'Smoothies', items:[['SMOOTHIE MORNING BLAST',219],['SMOOTHIE MANGO-MATCHA',189],['Smoothie Choco-Peanut Butter',175],['SMOOTHIE PINK FLAMINGO',145],['SMOOTHIE TROPICAL COCONUT',139],['SMOOTHIE TROPICAL PINEAPLE MIND BOOST',129]]},
+  {f:'desay',  n:'Eggs & Keto', items:[['MISS BENEDICT KETO-PANELA WALLANDER',382],['KETO PANELA WALLANDER',350],['MISS. BENEDICT',340],['MR. BENEDICT',340],['Half & Half Combo',287],['Egg and Pancake Combo',277],['BENEDICT OMELET',260],['GARDEN OMELET',250],['EGG AND PANCAKE COMBO',250],['COMBO FIT',250],['MACHACADO CON HUEVO',240]]},
+  {f:'desay',  n:'Chilaquiles', items:[['Chilaquiles Verdes',292],['Chilaquiles Rojos',292],['CHILAQUILES LIGHT',200],['CHILAQUILES',195]]},
+  {f:'desay',  n:'Bowls', items:[['ACAI B KIND BOWL',215],['ACAI LOVE BOWL',215],['HOT BANANA NUT OATMEAL BOWL',199],['YOGURT Y GRANOLA BOWL',175],['FRUIT BOWL',150]]},
+  {f:'cocina', n:'Paninis', items:[['COMBO AMALAY',360],['PROSCIUTTO CHESSE PANINI',340],['TURKEY PANINI',296],['CHICKEN PANINI',296],['Caprese Panini',275],['COMBO GRILLED CHEESE SAND. + TOMATO BASIL SOUP',240],['COZY COMBO (SOPA/PANNINI)',240],['VEGAN PANINI',218],['COZY COUPLE (PAN/CAFE)',170]]},
+  {f:'cocina', n:'Pizzas & Pastas', items:[['PIZZA PROSCIUTO',355],['PIZZA TRES QUESOS',290],['PIZZA PEPERONI',285],['PIZZA MARGARITA',255],['Pizza Pepperoni',245],['PASTA MAMAROSA',240],['Pasta Bolognese',232],['PASTA BOLOGESE',220]]},
+  {f:'cocina', n:'Soups & Salads', items:[['FRENCH COMBO',260],['GREEN SALAD',220],['FRENCH ONION SOUP',220],['AMALAY SALAD.',220],['TOMATO BASIL SOUP',150],['1/2 FRENCH ONION SOUP',140],['1/2 TOMATO BASIL SOUP',95]]},
+  {f:'cocina', n:'Ceviche', items:[['CEVICHE DE SALMON',390],['CEVICHE DE ATUN',390],['Ceviche Clasico',320]]},
+  {f:'cocina', n:'Specials', items:[['TAQUITOS AMALAY',290],['TOAST DE ATUN',280],['CROQUE MONSIEUR',270],['ENCHILADAS SUIZAS',255]]},
+  {f:'cocina', n:'Appetizers', items:[['MINI TOAST TOWER',350],['HUMMUS',170],['GUACAMOLE',160],['ENSALADA DE PAPA PARA COMPARTIR',92],['ENSALADA DE PAPA MEDIA PORCIÓN',55]]},
+  {f:'pan',    n:'Bakery', items:[['PIEZA MASA MADRE',150],['BRIOCHE 750G',150],['PAY DE NUEZ',130],['PANQUE DE LIMON',99],['MUFFIN CREMA CACAHUATE CHOCOLATE',99],['CROISSANT ALMENDRA',99],['CINAMMON ROLL BUTTER GLASS',99],['CROISSANT NUTELLA',99],['PANQUE DE NUEZ',99],['MUFFIN VEGANO',77],['CHOCOLATIN',69],['BISQUET TRADICIONAL',60],['BLUEBERRY MUFFIN',55],['CROISSANT CLASICO',55],['CONCHA DE MANTEQUILLA',52],['OREJAS DE DANES',47],['GALLETA CHOCOCHIP',40],['Pan',35],['PAN BAGUETTE',30],['MUFFIN DE ZANAHORIA',30]]},
+  {f:'postre', n:'Ice Cream', items:[['NIEVE DE PAY DE LIMON 130 GR',75],['NIEVE CHOCOLATE CON AVELLANA TOSTADA 130 GR',75],['NIEVE VAINILLA DE PAPANTLA 130 GR',75],['NIEVE MARACUYA - GUANABANA 130 GR',75],['NIEVE FRUTOS ROJOS 130gr',75],['BOLA DE NIEVE POSTRE',40]]},
+  {f:'barra',  n:'Vinos', items:[['BOTELLA - CASA MADERO 3V',1100],['BOTELLA - CASA MADERO 2V',1050],['BOTELLA - MADERO V ROSADO',1050],['BOTELLA - CHIVITE LAS FINCAS ROSADO',990],['BOTELLA - ARROGANT FROG TINTO',990],['BOTELLA - FLOR DE ABA TINTO',850],['BOTELLA - LAUS TINTO BARRICA',800],['BOTELLA - LJ VERDEJO BLANCO',750],['BOTELLA - LAUS ROSADO',750],['COPA - FLOR DE ABA TINTO',185],['COPA - LAUS TINTO BARRICA',180],['COPA - LJ VERDEJO BCO',175],['COPA - LAUS ROSADO',170]]},
+  {f:'barra',  n:'Cerveza', items:[['XX LAGER',60],['HEINEKEN',60],['AMSTEL ULTRA',60]]},
+  {f:'market', n:'Chips AMALAY', items:[['Chips Jalapeño 45g',48],['Chips Sal de Mar 45g',48],['Chips BBQ 45g',48],['Chips Limón 45g',48],['Chips Mix 200g',165]]},
+  {f:'market', n:'Barras & Más', items:[['Barra Amaranto Chocolate',38],['Barra Amaranto Natural',38],['Barra Proteína Vainilla',72],['Barra Keto Coco',68]]},
+];
+// Top: los que cubren el grueso de las órdenes. En producción sale de ocm_menu_items.
+const TOP = ['CAFE AMERICANO','CAPUCHINO CALIENTE','CAFE LATTE CALIENTE','COLD BREW','Chilaquiles Verdes','CHILAQUILES','MR. BENEDICT','MISS. BENEDICT','CHICKEN PANINI','PIZZA PEPERONI','GREEN SALAD','JUGO DE NARANJA NATURAL','CROISSANT CLASICO','Frappe Oreo','MATCHA LATTE FRIO','TOMATO BASIL SOUP','GUACAMOLE','Te Chai','BOLA DE NIEVE POSTRE','XX LAGER'];
+const MODS = [['Sin cebolla',0],['Sin picante',0],['Extra queso',25],['Aguacate',35],['Sin gluten',18],['Para llevar',0],['Bien cocido',0],['Sin sal',0],['Doble carne',60],['Leche de almendra',15],['Sin azúcar',0],['Extra shot',20]];
+const TABLES = [
+  {n:1,st:'occ',am:428},{n:2,st:'free'},{n:3,st:'occ',am:1240},{n:4,st:'bill',am:892},
+  {n:5,st:'free'},{n:6,st:'occ',am:315},{n:7,st:'free'},{n:8,st:'occ',am:2105},
+  {n:9,st:'free'},{n:10,st:'bill',am:640},{n:11,st:'free'},{n:12,st:'occ',am:0},
+  {n:14,st:'free'},{n:15,st:'occ',am:780},{n:16,st:'free'},{n:17,st:'free'},
+  {n:20,st:'occ',am:1560},{n:21,st:'free'},{n:22,st:'free'},{n:23,st:'bill',am:395},
+];
+
+/* ── Iconos: SVG inline. Un POS offline no depende de un CDN. ──────────── */
+const IC = {
+  star:'<path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.9L12 17.8 5.8 21.1 7 14.2l-5-4.9 6.9-1L12 2Z"/>',
+  coffee:'<path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><path d="M6 2v3M10 2v3M14 2v3"/>',
+  cup:'<path d="M5 3h14l-1.5 17a2 2 0 0 1-2 1.8H8.5a2 2 0 0 1-2-1.8Z"/><path d="M6 9h12"/>',
+  egg:'<path d="M12 2c4 0 7 6.5 7 11a7 7 0 1 1-14 0c0-4.5 3-11 7-11Z"/>',
+  utensils:'<path d="M4 2v8a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V2M6 12v10"/><path d="M14 2c0 4 1 6 3 6s3-2 3-6"/><path d="M17 8v14"/>',
+  croissant:'<path d="M3 14a9 9 0 0 1 18 0c0 1-1 2-2 2l-7-4-7 4c-1 0-2-1-2-2Z"/><path d="M7 16v3M12 12v7M17 16v3"/>',
+  cake:'<path d="M3 21h18v-7a3 3 0 0 0-3-3H6a3 3 0 0 0-3 3Z"/><path d="M3 15c2 1.5 4 1.5 6 0s4-1.5 6 0 4 1.5 6 0"/><path d="M8 8V6M12 8V4M16 8V6"/>',
+  wine:'<path d="M8 22h8M12 15v7"/><path d="M7 3h10l-.6 6a4.4 4.4 0 0 1-8.8 0Z"/>',
+  cart:'<circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.6 12.4a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.6L21 7H6"/>',
+};
+const F = n => '$' + Number(n||0).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ESTADO
+   ═══════════════════════════════════════════════════════════════════════════ */
+const S = {
+  fam:'top', cat:0, pg:0, cols:4, rows:3,
+  mesa:12, people:4, seat:1,
+  items:[],           // {id,name,price,qty,mods,seat,sent}
+  online:true, tip:0, method:'efectivo', got:'',
+  tables:JSON.parse(JSON.stringify(TABLES)),
+};
+const catsOf = f => f==='top' ? [{n:'Más vendidos',items:TOP.map(t=>{for(const c of CATS){const h=c.items.find(i=>i[0]===t); if(h)return h;} return null}).filter(Boolean)}] : CATS.filter(c=>c.f===f);
+const famColor = k => (FAM.find(f=>f.k===k)||FAM[0]).c;
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RETÍCULA AUTO-CALCULADA — el corazón del "sin scroll".
+   No elijo la resolución: la resolución elige la retícula. Cada celda ≥ 96px
+   de ancho y ≥ 82px de alto; se toma el entero que quepa y se pagina exacto.
+   ═══════════════════════════════════════════════════════════════════════════ */
+function measure(total){
+  const wrap = document.querySelector('.gridwrap');
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  if(!w || !h) return;
+  // Ancho minimo 152px: es lo que necesita un nombre de 54 caracteres para
+  // caber en tres renglones legibles sin truncarse.
+  S.cols    = Math.max(2, Math.min(7, Math.floor((w + 7) / (152 + 7))));
+  S.rowsMax = Math.max(2, Math.min(6, Math.floor((h + 7) / (92 + 7))));
+  // Si toda la categoria cabe en una pagina, se usan solo las filas necesarias
+  // y los tiles crecen. Si hay varias paginas, la retIcula queda fija para que
+  // un producto no cambie de tamano al pasar de pagina.
+  S.rows = (total != null && total <= S.cols * S.rowsMax)
+    ? Math.max(1, Math.ceil(total / S.cols))
+    : S.rowsMax;
+  const g = document.getElementById('grid');
+  g.style.setProperty('--cols', S.cols);
+  g.style.setProperty('--rows', S.rows);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RENDER
+   ═══════════════════════════════════════════════════════════════════════════ */
+const POS = {
+  families(){
+    document.getElementById('families').innerHTML = FAM.map(f=>`
+      <button class="fam" aria-selected="${S.fam===f.k}" style="--fg:${f.c}" onclick="POS.pickFam('${f.k}')">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${IC[f.ic]}</svg>
+        <span class="lb">${f.n}</span>
+      </button>`).join('');
+  },
+  cats(){
+    const cs = catsOf(S.fam);
+    const el = document.getElementById('cats');
+    el.style.display = cs.length < 2 ? 'none' : 'flex';
+    el.innerHTML = cs.map((c,i)=>`
+      <button class="cat" aria-selected="${S.cat===i}" style="--fg:${famColor(S.fam)}" onclick="POS.pickCat(${i})">
+        <span>${c.n}<small>${c.items.length} items</small></span>
+      </button>`).join('');
+  },
+  grid(){
+    const cs = catsOf(S.fam), cat = cs[S.cat] || cs[0];
+    measure(cat.items.length);
+    const per = S.cols * S.rows;
+    const pages = Math.max(1, Math.ceil(cat.items.length / per));
+    if(S.pg >= pages) S.pg = pages - 1;
+    const slice = cat.items.slice(S.pg*per, S.pg*per + per);
+    const col = famColor(S.fam);
+    const counts = {};
+    S.items.forEach(i=>{ counts[i.name] = (counts[i.name]||0) + i.qty; });
+    let html = slice.map(([n,p])=>`
+      <button class="tile" style="--fg:linear-gradient(150deg,${col},${col}cc)" onclick="MOD.open('${n.replace(/'/g,"\\'")}',${p})">
+        ${counts[n] ? `<span class="badge">${counts[n]}</span>` : ''}
+        <span class="nm">${n}</span>
+        <span class="pr">$${p}</span>
+      </button>`).join('');
+    // Las celdas sobrantes se dibujan vacías: la retícula nunca se deforma.
+    for(let i=slice.length; i<per; i++) html += '<div class="tile ghost"></div>';
+    document.getElementById('grid').innerHTML = html;
+    // Paginador
+    document.getElementById('pg-prev').disabled = S.pg === 0;
+    document.getElementById('pg-next').disabled = S.pg >= pages-1;
+    document.getElementById('pg-count').textContent = `${S.pg*per+1}–${Math.min((S.pg+1)*per, cat.items.length)}`;
+    document.getElementById('pg-of').textContent = `de ${cat.items.length}`;
+    document.getElementById('pg-dots').innerHTML = Array.from({length:Math.min(pages,9)},(_,i)=>
+      `<span class="pg-dot" aria-current="${i===S.pg}"></span>`).join('');
+  },
+  ticket(){
+    const act = S.items;
+    const body = document.getElementById('tk-body');
+    // Densidad adaptativa: comprime antes de pedir scroll.
+    body.dataset.density = act.length > 14 ? '3' : act.length > 8 ? '2' : '1';
+    if(!act.length){
+      body.innerHTML = `<div class="tk-empty">
+        <span class="ring"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${IC.utensils}</svg></span>
+        <div><div style="font-weight:800;color:var(--text-2);font-size:14px">Cuenta vacía</div>
+        <div style="font-size:12px;margin-top:3px">Toca un producto para empezar</div></div></div>`;
+    } else {
+      let html = '';
+      for(let s=1; s<=S.people; s++){
+        const seat = act.filter(i=>i.seat===s);
+        if(!seat.length) continue;
+        const st = seat.reduce((a,i)=>a + i.price*i.qty + i.mods.reduce((b,m)=>b+m[1],0)*i.qty, 0);
+        html += `<div class="group-tag"><span>Asiento ${s}</span><hr><span class="mono">${F(st)}</span></div>`;
+        html += seat.map(i=>{
+          const line = (i.price + i.mods.reduce((a,m)=>a+m[1],0)) * i.qty;
+          return `<div class="line ${i.sent?'sent':''}" onclick="POS.bump('${i.id}')">
+            <span class="qty">${i.qty}</span>
+            <span class="nm">${i.name}${i.mods.length?`<span class="mods">${i.mods.map(m=>m[0]).join(' · ')}</span>`:''}</span>
+            <span class="pr">${F(line)}</span></div>`;
+        }).join('');
+      }
+      body.innerHTML = html;
+    }
+    // Totales
+    const sub = act.reduce((a,i)=>a + (i.price + i.mods.reduce((b,m)=>b+m[1],0)) * i.qty, 0);
+    const iva = sub * .16, tot = sub + iva;
+    document.getElementById('t-sub').textContent = F(sub);
+    document.getElementById('t-iva').textContent = F(iva);
+    document.getElementById('t-tot').textContent = F(tot);
+    document.getElementById('tk-amt').textContent = F(tot);
+    document.getElementById('pay-sub').textContent = F(tot);
+    document.getElementById('tk-mesa').textContent = S.mesa;
+    document.getElementById('sb-mesa').textContent = S.mesa;
+    document.getElementById('tk-people').textContent = S.people;
+    document.getElementById('sb-people').textContent = S.people;
+    const pend = act.filter(i=>!i.sent).length;
+    document.getElementById('send-sub').textContent = pend ? `${pend} renglón${pend>1?'es':''}` : 'nada nuevo';
+    document.getElementById('btn-send').disabled = !pend;
+    document.getElementById('btn-pay').disabled = !act.length;
+    document.getElementById('btn-bill').disabled = !act.length;
+    S.tot = tot;
+    POS.seats();
+  },
+  seats(){
+    document.getElementById('seats').innerHTML = Array.from({length:S.people},(_,i)=>{
+      const s = i+1;
+      const amt = S.items.filter(x=>x.seat===s).reduce((a,x)=>a + (x.price+x.mods.reduce((b,m)=>b+m[1],0))*x.qty, 0);
+      return `<button class="seat" aria-selected="${S.seat===s}" onclick="S.seat=${s};POS.render()">
+        <span>${s}</span>${amt?`<span class="s-amt">${F(amt).replace('.00','')}</span>`:''}</button>`;
+    }).join('');
+  },
+  tables(){
+    document.getElementById('tables').innerHTML = S.tables.map(t=>`
+      <button class="tbl" data-st="${t.st}" aria-current="${t.n===S.mesa}" onclick="POS.pickTable(${t.n})">
+        <span class="n">${t.n}</span>
+        <span class="st">${t.st==='free'?'Libre':t.st==='bill'?'Cuenta':'Ocupada'}</span>
+        ${t.am?`<span class="am">${F(t.am).replace('.00','')}</span>`:''}
+      </button>`).join('');
+  },
+  nav(){
+    const floor = [['Mesas','grid'],['Plano','map'],['Delivery','truck'],['Barra','wine'],['Cocina / KDS','chef']];
+    const ops = [['Corte de caja','cash'],['Turno','clock'],['Inventario','box'],['Merma','trash'],['Historial','history'],['Staff','users'],['Configuración','gear']];
+    const dot = c => `<span style="width:8px;height:8px;border-radius:2px;background:${c};flex-shrink:0"></span>`;
+    document.getElementById('nav-floor').innerHTML = floor.map(([n],i)=>
+      `<button class="nav-item" onclick="UI.drawer(false);UI.toast('info','${n} — no es parte del demo')">${dot(FAM[(i%8)+1].c)}${n}</button>`).join('');
+    document.getElementById('nav-ops').innerHTML = ops.map(([n])=>
+      `<button class="nav-item" onclick="UI.drawer(false);UI.toast('info','${n} — no es parte del demo')">${dot('var(--text-4)')}${n}</button>`).join('');
+  },
+  render(){ POS.families(); POS.cats(); POS.grid(); POS.ticket(); },
+  pickFam(k){ S.fam = k; S.cat = 0; S.pg = 0; POS.render(); },
+  pickCat(i){ S.cat = i; S.pg = 0; POS.cats(); POS.grid(); },
+  page(d){ S.pg = Math.max(0, S.pg + d); POS.grid(); },
+  pickTable(n){
+    S.mesa = n; S.items = []; S.seat = 1; UI.close();
+    POS.render(); UI.toast('ok', `Mesa ${n} abierta`);
+  },
+  bump(id){
+    const i = S.items.find(x=>x.id===id); if(!i) return;
+    if(i.sent){ UI.toast('err','Ya se envió a cocina. Se cancela con autorización.'); return; }
+    i.qty++; POS.ticket(); POS.grid();
+  },
+  send(){
+    const pend = S.items.filter(i=>!i.sent);
+    if(!pend.length) return;
+    pend.forEach(i=>i.sent = true);
+    POS.ticket();
+    UI.toast('ok', S.online
+      ? `${pend.length} a cocina · comanda impresa`
+      : `${pend.length} en cola local · imprime al reconectar`);
+  },
+  preTicket(){ UI.toast('ok','Pre-cuenta impresa · no cierra la mesa'); },
+};
+
+/* ── Modificadores ─────────────────────────────────────────────────────── */
+const MOD = {
+  cur:null, q:1, sel:new Set(), seat:1,
+  open(name, price){
+    MOD.cur = {name, price}; MOD.q = 1; MOD.sel = new Set(); MOD.seat = S.seat;
+    document.getElementById('mod-name').textContent = name;
+    document.getElementById('mod-price').textContent = F(price) + ' c/u';
+    document.getElementById('mod-opts').innerHTML = MODS.map((m,i)=>`
+      <button class="mod" aria-selected="false" onclick="MOD.tog(${i},this)">
+        <span>${m[0]}</span>${m[1]?`<span class="px">+$${m[1]}</span>`:''}</button>`).join('');
+    MOD.seats(); MOD.sync(); UI.sheet('mod');
+  },
+  seats(){
+    document.getElementById('mod-seats').innerHTML = Array.from({length:S.people},(_,i)=>
+      `<button class="opt" aria-selected="${MOD.seat===i+1}" onclick="MOD.seat=${i+1};MOD.seats()">${i+1}</button>`).join('');
+  },
+  tog(i, el){
+    const on = MOD.sel.has(i);
+    on ? MOD.sel.delete(i) : MOD.sel.add(i);
+    el.setAttribute('aria-selected', String(!on)); MOD.sync();
+  },
+  qty(d){ MOD.q = Math.max(1, MOD.q + d); document.getElementById('mod-qty').textContent = MOD.q; MOD.sync(); },
+  sync(){
+    const extra = [...MOD.sel].reduce((a,i)=>a + MODS[i][1], 0);
+    document.getElementById('mod-total').textContent = F((MOD.cur.price + extra) * MOD.q);
+  },
+  confirm(){
+    S.items.push({
+      id: Math.random().toString(36).slice(2),
+      name: MOD.cur.name, price: MOD.cur.price, qty: MOD.q,
+      mods: [...MOD.sel].map(i=>MODS[i]), seat: MOD.seat, sent: false,
+    });
+    UI.close(); POS.ticket(); POS.grid();
+  },
+};
+
+/* ── Cobro ─────────────────────────────────────────────────────────────── */
+const PAY = {
+  open(){
+    const t = S.tot || 0;
+    S.tip = 0; S.method = 'efectivo'; S.got = '';
+    document.getElementById('pay-mesa').textContent = S.mesa;
+    document.getElementById('tips').innerHTML = [0,.10,.15,.20].map(p=>`
+      <button class="opt" aria-selected="${p===0}" onclick="PAY.tip(${p},this)">
+        ${p ? (p*100)+'%' : 'Sin'}<small>${p ? F(t*p).replace('.00','') : '—'}</small></button>`).join('');
+    document.getElementById('methods').innerHTML = [
+      ['efectivo','Efectivo','cash'],['tarjeta','Tarjeta','card'],['mixto','Mixto','split']
+    ].map(([k,n])=>`<button class="opt big" aria-selected="${k==='efectivo'}" onclick="PAY.method('${k}',this)">${n}</button>`).join('');
+    // Teclado: montos de un toque + dígitos. El 80% de los cobros son un tap.
+    document.getElementById('keypad').innerHTML =
+      ['1','2','3','4','5','6','7','8','9'].map(d=>`<button class="key" onclick="PAY.tap('${d}')">${d}</button>`).join('') +
+      `<button class="key fn" onclick="PAY.exact()">Exacto</button>
+       <button class="key" onclick="PAY.tap('0')">0</button>
+       <button class="key fn" onclick="PAY.tap('bs')">←</button>`;
+    PAY.sync();
+  },
+  tip(p, el){
+    S.tip = p;
+    [...el.parentElement.children].forEach(c=>c.setAttribute('aria-selected','false'));
+    el.setAttribute('aria-selected','true'); PAY.sync();
+  },
+  method(k, el){
+    S.method = k;
+    [...el.parentElement.children].forEach(c=>c.setAttribute('aria-selected','false'));
+    el.setAttribute('aria-selected','true'); PAY.sync();
+  },
+  tap(d){
+    if(d==='bs') S.got = S.got.slice(0,-1);
+    else if(S.got.length < 7) S.got += d;
+    PAY.sync();
+  },
+  exact(){ S.got = String(Math.ceil(PAY.due())); PAY.sync(); },
+  due(){ return (S.tot||0) * (1 + S.tip); },
+  sync(){
+    const due = PAY.due(), got = Number(S.got||0), diff = got - due;
+    document.getElementById('pay-due').textContent = F(due);
+    document.getElementById('pay-got').textContent = S.got ? F(got).replace('.00','') : '$0';
+    const box = document.getElementById('change-box');
+    if(S.method === 'tarjeta'){
+      box.className = 'change';
+      document.getElementById('change-lb').textContent = 'Terminal';
+      document.getElementById('change-v').textContent = F(due);
+      document.getElementById('change-note').textContent = 'Enviar a Mercado Pago Point';
+      return;
+    }
+    const short = got > 0 && diff < 0;
+    box.className = 'change' + (short ? ' short' : '');
+    document.getElementById('change-lb').textContent = short ? 'Falta' : 'Cambio a dar';
+    document.getElementById('change-v').textContent = F(Math.abs(got ? diff : 0));
+    document.getElementById('change-note').textContent = got ? `Recibido ${F(got)} · ${S.method}` : '';
+  },
+  finish(){
+    const due = PAY.due(), got = Number(S.got||0);
+    if(S.method === 'efectivo' && got < due){ UI.toast('err','Falta dinero. No se puede cerrar.'); return; }
+    UI.close();
+    const t = S.tables.find(x=>x.n===S.mesa); if(t){ t.st='free'; t.am=0; }
+    S.items = []; S.tip = 0; S.got = '';
+    POS.render(); POS.tables();
+    UI.toast('ok', S.online ? 'Cobrado · ticket impreso · cajón abierto' : 'Cobrado offline · sube al reconectar');
+  },
+};
+
+/* ── UI ────────────────────────────────────────────────────────────────── */
+const UI = {
+  sheet(n){
+    UI.close();
+    if(n==='tables') POS.tables();
+    if(n==='pay') PAY.open();
+    document.getElementById('sheet-'+n).hidden = false;
+  },
+  close(){ document.querySelectorAll('.sheet').forEach(s=>s.hidden = true); },
+  drawer(on){ document.getElementById('drawer').hidden = !on; },
+  toast(kind, msg){
+    const el = document.createElement('div');
+    el.className = 'toast ' + kind;
+    const ic = kind==='ok' ? '<path d="M20 6 9 17l-5-5"/>' : kind==='err' ? '<path d="M12 8v5M12 17h.01"/><circle cx="12" cy="12" r="9"/>' : '<circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/>';
+    el.innerHTML = `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${ic}</svg>${msg}`;
+    document.getElementById('toastwrap').appendChild(el);
+    setTimeout(()=>el.remove(), 2600);
+  },
+  toggleNet(){
+    S.online = !S.online;
+    const p = document.getElementById('pill-net');
+    p.className = 'pill ' + (S.online ? '' : 'off');
+    document.getElementById('net-label').textContent = S.online ? 'En línea' : 'Offline · 3 en cola';
+    document.getElementById('pill-kds').className = 'pill ' + (S.online ? 'on' : 'warn');
+    UI.toast(S.online ? 'ok' : 'info', S.online
+      ? 'Reconectado · cola sincronizada'
+      : 'Sin internet. El POS sigue cobrando e imprimiendo.');
+  },
+  people(){
+    S.people = S.people >= 6 ? 1 : S.people + 1;
+    if(S.seat > S.people) S.seat = 1;
+    S.items.forEach(i=>{ if(i.seat > S.people) i.seat = S.people; });
+    POS.ticket();
+  },
+  theme(){
+    const r = document.documentElement;
+    r.dataset.theme = r.dataset.theme === 'light' ? 'dark' : 'light';
+  },
+};
+
+/* ── Arranque ──────────────────────────────────────────────────────────── */
+function clock(){
+  document.getElementById('clock').textContent =
+    new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
+}
+POS.nav(); POS.render(); clock();
+setInterval(clock, 20000);
+// La retícula se recalcula con la ventana: nunca se corta media fila.
+new ResizeObserver(()=>POS.grid()).observe(document.querySelector('.gridwrap'));
+document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ UI.close(); UI.drawer(false); } });
+const hideHint = ()=>{ const h=document.getElementById('hint'); if(h) h.classList.add('gone'); };
+setTimeout(hideHint, 9000);
+document.addEventListener('pointerdown', hideHint, {once:true});
+</script>

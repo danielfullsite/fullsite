@@ -2,5 +2,9 @@
   "installCommand": "bun install",
   "buildCommand": "bun run build",
   "outputDirectory": ".next",
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "crons": [
+    { "path": "/api/crm/whatsapp/automation/run", "schedule": "*/15 * * * *" },
+    { "path": "/api/crm/whatsapp/monitor", "schedule": "7,22,37,52 * * * *" }
+  ]
 }

@@ -353,14 +353,14 @@ export default function KDSStandalone() {
   if (!mounted) return null
 
   return (
-    <div className="h-screen flex flex-col bg-black text-white select-none overflow-hidden" style={{ fontFamily: 'system-ui, sans-serif' }}>
+    <div className="h-dvh flex flex-col bg-black text-white select-none overflow-hidden pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]" style={{ fontFamily: 'system-ui, sans-serif' }}>
       {/* Top bar */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-slate-800 flex-shrink-0" style={{ background: '#111' }}>
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-2 px-3 py-2 border-b border-slate-800 flex-shrink-0 sm:flex-row sm:items-center sm:justify-between sm:px-4" style={{ background: '#111' }}>
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
           <span className="text-white font-black text-xl tracking-widest uppercase">
             {station.charAt(0).toUpperCase() + station.slice(1)}
           </span>
-          <div className="flex items-center gap-3 text-sm ml-4">
+          <div className="flex items-center gap-3 text-xs sm:ml-4 sm:text-sm">
             <span className="flex items-center gap-1.5 text-slate-400">
               <span className="w-2.5 h-2.5 rounded-full bg-white/40" />
               {orders.filter(o => o.status === 'enviada').length} nueva{orders.filter(o => o.status === 'enviada').length !== 1 ? 's' : ''}
@@ -376,7 +376,7 @@ export default function KDSStandalone() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between gap-3 sm:justify-end">
           {modePill.label && (
             <span className="flex items-center gap-1.5 text-xs text-slate-400">
               <span className={`w-2 h-2 rounded-full flex-shrink-0 ${modePill.dot}`} />
@@ -400,7 +400,7 @@ export default function KDSStandalone() {
       </div>
 
       {/* Orders grid */}
-      <div className="flex-1 overflow-y-auto p-3">
+      <div className="flex-1 overflow-y-auto p-2 sm:p-3 overscroll-contain">
         {filteredOrders.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center text-slate-500">
@@ -412,7 +412,7 @@ export default function KDSStandalone() {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+          <div className="grid grid-cols-1 min-[560px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-3">
             {kdsCards.map(card => {
               const order = card.order
               const mins = elapsed(card.batchCreatedAt)
@@ -553,7 +553,7 @@ export default function KDSStandalone() {
       </div>
 
       {reprintMsg && (
-        <div className={`fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl text-sm font-bold shadow-lg z-50 ${reprintMsg.success ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'}`}>
+        <div className={`fixed bottom-[calc(env(safe-area-inset-bottom)+1rem)] left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl text-sm font-bold shadow-lg z-50 ${reprintMsg.success ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'}`}>
           {reprintMsg.text}
         </div>
       )}
@@ -565,19 +565,19 @@ export default function KDSStandalone() {
 
       {/* Exit confirmation overlay */}
       {showExitConfirm && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-          <div className="bg-slate-800 rounded-2xl p-8 flex flex-col items-center gap-6 shadow-2xl">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 rounded-2xl p-5 sm:p-8 flex flex-col items-center gap-6 shadow-2xl w-full max-w-sm">
             <p className="text-white text-xl font-bold">¿Cerrar el KDS?</p>
-            <div className="flex gap-4">
+            <div className="flex w-full flex-col gap-3 sm:flex-row sm:gap-4">
               <button
                 onClick={() => setShowExitConfirm(false)}
-                className="px-8 py-3 rounded-xl bg-slate-600 hover:bg-slate-500 text-white font-bold text-lg"
+                className="flex-1 px-8 py-3 rounded-xl bg-slate-600 hover:bg-slate-500 text-white font-bold text-lg min-h-[52px]"
               >
                 Cancelar
               </button>
               <button
                 onClick={() => { window.fullsiteApp?.quit() }}
-                className="px-8 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-lg"
+                className="flex-1 px-8 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-lg min-h-[52px]"
               >
                 Cerrar
               </button>

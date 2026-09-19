@@ -88,3 +88,4 @@ electron-app/fullsite-pos-win-*/
 dashboard-app/fullsite-pos-win-*/
 electron-app/fullsite-pos@*
 dashboard-app/ios/App/App.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
+.env*

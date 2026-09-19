@@ -318,42 +318,67 @@ REGLAS:
 - NUNCA uses frases genéricas como "mejorar la experiencia" o "aumentar las ventas"
 - Cada acción DEBE referenciar un dato específico (mesero, monto, porcentaje, reserva)"""
 
+# Groq sólo REDACTA. Los números ya están en data_block, calculados arriba.
+# Si el redactor falla, se manda el briefing en crudo: menos bonito, pero llega.
+# Antes esto era raise_for_status() a secas y un 404 de Groq costaba el briefing
+# COMPLETO — así estuvo muerto del 2026-08-24 al 2026-08-26 sin que nadie se enterara.
 print("[briefing] Calling Groq...")
-groq_resp = requests.post(
-    "https://api.groq.com/openai/v1/chat/completions",
-    headers={
-        "Authorization": f"Bearer {GROQ_API_KEY}",
-        "Content-Type": "application/json",
-    },
-    json={
-        "model": "llama-3.3-70b-versatile",
-        "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user",   "content": f"Genera el Morning Briefing con estos datos:\n\n{data_block}"},
-        ],
-        "temperature": 0.2,
-        "max_tokens":  1200,
-    },
-    timeout=60,
-)
-groq_resp.raise_for_status()
-groq_data  = groq_resp.json()
-briefing   = groq_data["choices"][0]["message"]["content"]
-usage      = groq_data.get("usage", {})
-tokens_in  = usage.get("prompt_tokens", 0)
-tokens_out = usage.get("completion_tokens", 0)
+groq_ok    = False
+tokens_in  = 0
+tokens_out = 0
+briefing   = ""
 
-print(f"[briefing] Groq OK — {tokens_in} in / {tokens_out} out tokens")
-print(f"[briefing] Preview:\n{briefing[:200]}...")
+try:
+    groq_resp = requests.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        headers={
+            "Authorization": f"Bearer {GROQ_API_KEY}",
+            "Content-Type": "application/json",
+        },
+        json={
+            "model": "llama-3.3-70b-versatile",
+            "messages": [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user",   "content": f"Genera el Morning Briefing con estos datos:\n\n{data_block}"},
+            ],
+            "temperature": 0.2,
+            "max_tokens":  1200,
+        },
+        timeout=60,
+    )
+    groq_resp.raise_for_status()
+    groq_data  = groq_resp.json()
+    briefing   = groq_data["choices"][0]["message"]["content"]
+    usage      = groq_data.get("usage", {})
+    tokens_in  = usage.get("prompt_tokens", 0)
+    tokens_out = usage.get("completion_tokens", 0)
+    groq_ok    = True
+    print(f"[briefing] Groq OK — {tokens_in} in / {tokens_out} out tokens")
+    print(f"[briefing] Preview:\n{briefing[:200]}...")
+except Exception as e:
+    # El cuerpo de la respuesta trae el motivo real (p.ej. model_decommissioned);
+    # requests no lo incluye en el texto de la excepción, así que se saca a mano.
+    detalle = ""
+    try:
+        detalle = groq_resp.text[:300]
+    except Exception:
+        pass
+    print(f"[briefing] Groq FALLÓ: {e} | cuerpo: {detalle}", file=sys.stderr)
+    briefing = (
+        f"Briefing {today} (SIN REDACTAR — el redactor falló)\n"
+        f"Motivo: {e}\n\n"
+        f"{data_block}"
+    )
 
 # ── Telegram ──────────────────────────────────────────────────────────────────
 print("[briefing] Sending to Telegram...")
 send_telegram(briefing)
 print("[briefing] Telegram OK")
 
-status    = "success"
+status    = "success" if groq_ok else "warning"
 output_sum = (
-    f"Briefing enviado. {len(reservas_hoy)} reservas hoy, "
+    f"Briefing enviado{'' if groq_ok else ' EN CRUDO (Groq caído)'}. "
+    f"{len(reservas_hoy)} reservas hoy, "
     f"{len(reservas_proximas)} próximas. "
     f"Tokens: {tokens_in}in/{tokens_out}out"
 )

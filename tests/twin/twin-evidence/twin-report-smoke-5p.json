@@ -1,0 +1,1266 @@
+{
+  "generated_at": "2026-08-06T23:04:25.323Z",
+  "label": "accelerated-rehearsal",
+  "mode": "spawn",
+  "phase": "smoke",
+  "fixture": {
+    "source": "file",
+    "restaurant_id": "amalay-twin",
+    "warnings": [
+      "rich AMALAY config shape detected — adapted to canonical fixture shape"
+    ]
+  },
+  "config": {
+    "bridge": "127.0.0.1:17917",
+    "data_dir": "/var/folders/z9/7hn1x4dx7_xd8p30crj93mpm0000gn/T/fullsite-twin-KcT24S",
+    "printers": [
+      {
+        "printer_id": "twin-cocina-1",
+        "name": "PRINTER-COCINA-1 (fría, real 192.168.1.21)",
+        "port": 19100,
+        "station_ids": [
+          "cocina"
+        ]
+      },
+      {
+        "printer_id": "twin-cocina-2",
+        "name": "PRINTER-COCINA-2 (caliente, real 192.168.1.40)",
+        "port": 19101,
+        "station_ids": [
+          "cocina"
+        ]
+      },
+      {
+        "printer_id": "twin-barra",
+        "name": "PRINTER-BARRA (real 192.168.1.30)",
+        "port": 19102,
+        "station_ids": [
+          "barra"
+        ]
+      },
+      {
+        "printer_id": "twin-entrada",
+        "name": "PRINTER-ENTRADA (tickets PDV3, real usb TICKET)",
+        "port": 19103,
+        "station_ids": [
+          "tickets-entrada"
+        ]
+      },
+      {
+        "printer_id": "twin-caja",
+        "name": "PRINTER-CAJA (tickets/caja SERVER1, real usb PANADERIA/EC01)",
+        "port": 19104,
+        "station_ids": [
+          "tickets-caja",
+          "caja",
+          "tickets"
+        ]
+      }
+    ],
+    "terminals": [
+      {
+        "terminal_id": "twin-pdv3-0000-0000-000000000001",
+        "alias": "ENTRADA",
+        "ticket_station": "tickets-entrada"
+      },
+      {
+        "terminal_id": "twin-pdv1-0000-0000-000000000003",
+        "alias": "ESCONDITE",
+        "ticket_station": "tickets-caja"
+      },
+      {
+        "terminal_id": "twin-server1-0000-0000-000000000002",
+        "alias": "CAJA",
+        "ticket_station": "tickets-caja"
+      }
+    ],
+    "fp_port": 7718,
+    "staging_port": 19200,
+    "compress": 6,
+    "node": "v24.14.1",
+    "phase_notes": []
+  },
+  "started_at": "2026-08-06T22:57:56.431Z",
+  "duration_s": 389,
+  "totals": {
+    "commands_generated": 1413,
+    "commands_acked": 1412,
+    "acks_total": 1455,
+    "acks_duplicate": 43,
+    "dedup_probe_sent": 43,
+    "dedup_probe_confirmed": 39,
+    "dedup_probe_violations": 0,
+    "rejects_lock_conflict": 0,
+    "rejects_expected": 1,
+    "rejects_unexpected": 0,
+    "command_retries": 0,
+    "orders_created": 129,
+    "orders_sent_kitchen": 129,
+    "orders_closed": 119,
+    "orders_cancelled": 10,
+    "orders_split": 17,
+    "kds_ready_events": 129,
+    "kds_partial_status_events": 129,
+    "barra_deltas_observed": 0,
+    "print_commands": 385,
+    "print_commands_by_station": {
+      "cocina": 153,
+      "barra": 115,
+      "tickets-entrada": 40,
+      "tickets-caja": 77
+    },
+    "deltas_received": 5443,
+    "snapshots_received": 114,
+    "ws_connects": 114,
+    "ws_disconnects": 243,
+    "network_flaps": 5,
+    "printer_outages": {
+      "twin-cocina-1": 1,
+      "twin-cocina-2": 1,
+      "twin-barra": 1
+    },
+    "client_kills": 1,
+    "tenant_probes": 1,
+    "tenant_probe_rejected": 1,
+    "tenant_subscribe_blocked": 1,
+    "fp_probes": 12,
+    "error_count": 0
+  },
+  "scenarios": [
+    {
+      "name": "cold-start",
+      "status": "PASS",
+      "detail": "bridge healthy 307ms after spawn; server_id=22a321c9-16d1-4be9-8cd0-b71d36c38456",
+      "owner_layer": null
+    },
+    {
+      "name": "discovery-identity",
+      "status": "PASS",
+      "detail": "/identity: tenant=amalay-twin, capabilities=[orders,kds,printing,mesa-lock,sync-queue] (mDNS advertised but not independently browsed by the harness)",
+      "owner_layer": null
+    },
+    {
+      "name": "login-pin",
+      "status": "NOT-EXERCISABLE-AT-PROTOCOL-LEVEL",
+      "detail": "protocol.js has no LOGIN/AUTH command — PIN login is enforced in the web app UI (and fingerprint service). At protocol level, identity rides on commands (authorized_by / auth_pin_ok fields), which the fingerprint-4-states scenario proves keep flowing.",
+      "owner_layer": "web app UI + fingerprint service"
+    },
+    {
+      "name": "turno-caja-open",
+      "status": "PASS",
+      "detail": "TURNO_OPENED by Cajero Twin (caja float/fondo amount is a web-app/Supabase concern — the protocol records only the turno event)",
+      "owner_layer": null
+    },
+    {
+      "name": "mesa-lock-unlock-conflict",
+      "status": "PASS",
+      "detail": "lock acked=true, second-terminal lock REJECTed=true, unlock acked=true",
+      "owner_layer": null
+    },
+    {
+      "name": "multi-comensal-order",
+      "status": "PASS",
+      "detail": "4 personas, 8 commands, per-item comensal tags (payload-opaque to the server)",
+      "owner_layer": null
+    },
+    {
+      "name": "cash-payment",
+      "status": "PASS",
+      "detail": "ORDER_CLOSED efectivo $895",
+      "owner_layer": null
+    },
+    {
+      "name": "multilevel-modifiers",
+      "status": "PASS",
+      "detail": "nested modifier (grupo→opción→sub-opción) persisted opaquely; server performs no modifier validation — pricing/validation owner: web app UI",
+      "owner_layer": null
+    },
+    {
+      "name": "partial-kitchen-send",
+      "status": "PASS",
+      "detail": "round 1: 2 items in comanda batch 1",
+      "owner_layer": null
+    },
+    {
+      "name": "add-after-send",
+      "status": "PASS",
+      "detail": "round 2: +1 items, full list re-sent with batch map (server contract), batch-2 comanda printed",
+      "owner_layer": null
+    },
+    {
+      "name": "print-routing-5-destinations",
+      "status": "PASS",
+      "detail": "raw bytes per destination: cocina:twin-cocina-1=1 cocina:twin-cocina-2=1 barra:twin-barra=1 ticket-entrada:twin-entrada=1 ticket-caja:twin-caja=1 (cocina fans out to 2 devices; ticket goes to the charging terminal's local printer)",
+      "owner_layer": null
+    },
+    {
+      "name": "escondite-ticket-fallback",
+      "status": "PASS",
+      "detail": "ESCONDITE has no local ticket printer (known physical FAIL, PDV1 — represented in fixture). Its RECIBO routed to station \"tickets-caja\" and was captured on [twin-caja] with origin term=ESCONDITE in the bytes (1 job(s))",
+      "owner_layer": null
+    },
+    {
+      "name": "kds-receive-status-changes",
+      "status": "PASS",
+      "detail": "KDS partial maps=6, full maps=6 (two-step KDS_ITEM_STATUS per order)",
+      "owner_layer": null
+    },
+    {
+      "name": "transfer-mesa",
+      "status": "NOT-EXERCISABLE-AT-PROTOCOL-LEVEL",
+      "detail": "no MESA_TRANSFER/ORDER_MOVED command exists in protocol.js. Emulating via ORDER_UPSERTED with a new mesa would permanently leak the origin mesa as ocupada (core/state.js _applyOrderUpserted never frees the previous mesa) — the harness refuses to fake it.",
+      "owner_layer": "web app UI today; needs a Phase-2 protocol event"
+    },
+    {
+      "name": "split-payment",
+      "status": "PASS",
+      "detail": "payments tarjeta+efectivo sum exactly to total $1192",
+      "owner_layer": null
+    },
+    {
+      "name": "cancel-with-authorization",
+      "status": "PASS",
+      "detail": "ORDER_CANCELLED with authorized_by=Eduardo E. + authorization_pin_ok recorded. NOTE: the server records but does NOT verify the PIN — authorization enforcement owner: web app UI",
+      "owner_layer": null
+    },
+    {
+      "name": "multi-method-payment-tip",
+      "status": "PASS",
+      "detail": "tarjeta(+12% propina field)+transferencia recorded on ORDER_CLOSED — tip is a payload field the server stores opaquely",
+      "owner_layer": null
+    },
+    {
+      "name": "retiro-deposito",
+      "status": "NOT-EXERCISABLE-AT-PROTOCOL-LEVEL",
+      "detail": "no CASH_MOVEMENT/RETIRO/DEPOSITO command exists in protocol.js — cash-drawer movements live in the web app UI + Supabase today.",
+      "owner_layer": "web app UI + Supabase"
+    },
+    {
+      "name": "corte-x",
+      "status": "NOT-EXERCISABLE-AT-PROTOCOL-LEVEL",
+      "detail": "no CORTE command exists in protocol.js — corte X is computed by the web app from Supabase. Substitute at harness level: the payments-reconciliation invariant proves every recorded ORDER_CLOSED payment set sums to its total (what a corte would aggregate).",
+      "owner_layer": "web app UI + Supabase"
+    },
+    {
+      "name": "corte-z-turno-close",
+      "status": "PASS",
+      "detail": "TURNO_CLOSED recorded (protocol scope). Corte-Z totals/report themselves are computed by the web app from Supabase — see corte-x scenario. Payments-reconciliation invariant is the protocol-level consistency check.",
+      "owner_layer": null
+    },
+    {
+      "name": "fingerprint-4-states",
+      "status": "PASS",
+      "detail": "available(fp ok=true, pin 6/6) | stopped(fp 503/down=true, pin 6/6) | crash(fp err=true, pin 6/6) | timeout-30s(pin during hang 6/6)",
+      "owner_layer": null
+    },
+    {
+      "name": "duplicate-resend-dedup",
+      "status": "PASS",
+      "detail": "probes sent=8, confirmed duplicate:true=8, violations=0",
+      "owner_layer": null
+    },
+    {
+      "name": "concurrent-drains",
+      "status": "PASS",
+      "detail": "4 acked commands × 2 simultaneous drain cycles → 8 ACKs all duplicate:true=true, event-log applications per command=1 (double-drain does not duplicate ACK-applications)",
+      "owner_layer": null
+    },
+    {
+      "name": "dedup-after-restart",
+      "status": "PASS",
+      "detail": "6 pre-crash-ACKed command_ids re-sent AFTER SIGKILL+restart → duplicate:true ACKs=6, non-duplicate ACKs=0, re-applications in event log=0 (processed-commands ledger survived the crash)",
+      "owner_layer": null
+    },
+    {
+      "name": "revoked-staff-offline",
+      "status": "NOT-EXERCISABLE-AT-PROTOCOL-LEVEL",
+      "detail": "protocol.js has no LOGIN/AUTH/staff-sync command — the Bridge never receives the staff roster and cannot enforce revocation. Evidence: commands carrying revoked staff \"Revocado Twin\" (fixture active=false) were ACKed=true and recorded opaquely. Offline revocation enforcement owner: web app UI (pos-manager-auth cached credentials + PIN cache refresh) + Supabase pos_staff. The offline window between revocation in Supabase and the POS cache refresh is a documented product property, not exercisable from this harness.",
+      "owner_layer": "web app UI (pos-manager-auth) + Supabase pos_staff sync"
+    },
+    {
+      "name": "corte-print-outage",
+      "status": "FAIL",
+      "detail": "while printer down: job status=retrying attempts=1 (parked-not-lost=true) | self-drain after printer recovery (no restart, 75s window): false | pre-restart queue status: retrying | printed on startup replay after graceful restart: true — PRODUCT FINDING: retrying jobs are not re-attempted while the bridge stays up (recovery interval only revives recoverable jobs); job exits only on bridge restart. Not lost, but not self-healing.",
+      "owner_layer": null
+    },
+    {
+      "name": "wan-loss",
+      "status": "NOT-EXERCISABLE-AT-PROTOCOL-LEVEL",
+      "detail": "spawn-mode twin bridge runs with Supabase disabled — WAN loss is a NO-OP for the Phase-1 command path (LAN-only authority; nothing in the ACK path touches the internet). The only WAN consumer (Supabase poll) is exercised with a REAL socket-level WAN drop in wan-offline-socket-window (staging listener closed → connection refused), LAN WS kept alive throughout.",
+      "owner_layer": "outer orchestrator (external mode) / Phase-2 sync engine"
+    },
+    {
+      "name": "clock-skew",
+      "status": "SIMULATED-PARTIAL",
+      "detail": "harness cannot change OS clock — orchestrator hook emitted (CLOCK-SKEW). Protocol-level note: event ordering is by server-assigned sequence, not wall clock, so skew must not affect log integrity.",
+      "owner_layer": "outer orchestrator / OS"
+    },
+    {
+      "name": "disk-pressure",
+      "status": "SIMULATED-PARTIAL",
+      "detail": "harness does not fill the host disk (would endanger the runner itself) — orchestrator hook emitted (DISK-PRESSURE).",
+      "owner_layer": "outer orchestrator / OS"
+    },
+    {
+      "name": "wan-offline-socket-window",
+      "status": "PASS",
+      "detail": "staging TCP listener CLOSED for 12s (connection refused at socket level, no API-error simulation): 0 polls completed=true, sync-instance /health ok=true, main-bridge LAN WS stayed alive (probe commands ACKed=true); listener reopened for drain — STATE_SYNC resumption verified below",
+      "owner_layer": null
+    },
+    {
+      "name": "sync-inbound-staging",
+      "status": "SIMULATED-PARTIAL",
+      "detail": "normal: 2 STATE_SYNC events, tenant ok=true | state reflects staging orders: true | latency 2s: poll continued (2 polls), bridge healthy=true | error 500: bridge healthy=true (poll errors are non-fatal) | hang 8s (> 6s abort): bridge healthy=true | WAN-drop window 12s: listener closed → completed polls=0 (socket refused), bridge healthy=true, LAN WS commands ACKed during window=true | recovery: STATE_SYNC resumed (2 → 6) — INBOUND poll only; outbound event sync does not exist in Phase 1 (no markSynced caller)",
+      "owner_layer": "Phase-2 sync engine (outbound half)"
+    },
+    {
+      "name": "client-kill-recover",
+      "status": "PASS",
+      "detail": "terminal twin-pdv1-0000-0000-000000000003 re-subscribed with fresh SNAPSHOT; carried outbox replays with original command_ids (dedup-safe)",
+      "owner_layer": null
+    },
+    {
+      "name": "printer-outage-recover",
+      "status": "PASS",
+      "detail": "outages per printer: {\"twin-cocina-1\":1,\"twin-cocina-2\":1,\"twin-barra\":1}; all acked jobs eventually on paper (every expected device)=true",
+      "owner_layer": null
+    },
+    {
+      "name": "bridge-crash-recover",
+      "status": "PASS",
+      "detail": "SIGKILL×3, graceful×2, all recovered with first-ACK",
+      "owner_layer": null
+    }
+  ],
+  "restarts": [
+    {
+      "kind": "initial",
+      "server_id": "22a321c9-16d1-4be9-8cd0-b71d36c38456",
+      "ready_ms": 307,
+      "recovery_ms_first_ack": 535
+    },
+    {
+      "kind": "kill",
+      "server_id": "22a321c9-16d1-4be9-8cd0-b71d36c38456",
+      "ready_ms": 267,
+      "recovery_ms_first_ack": 269
+    },
+    {
+      "kind": "graceful",
+      "server_id": "22a321c9-16d1-4be9-8cd0-b71d36c38456",
+      "ready_ms": 263,
+      "recovery_ms_first_ack": 394
+    },
+    {
+      "kind": "kill",
+      "server_id": "22a321c9-16d1-4be9-8cd0-b71d36c38456",
+      "ready_ms": 265,
+      "recovery_ms_first_ack": 266
+    },
+    {
+      "kind": "graceful",
+      "server_id": "22a321c9-16d1-4be9-8cd0-b71d36c38456",
+      "ready_ms": 260,
+      "recovery_ms_first_ack": 262
+    },
+    {
+      "kind": "kill",
+      "server_id": "22a321c9-16d1-4be9-8cd0-b71d36c38456",
+      "ready_ms": 259,
+      "recovery_ms_first_ack": 261
+    },
+    {
+      "kind": "final-flush",
+      "server_id": "22a321c9-16d1-4be9-8cd0-b71d36c38456",
+      "ready_ms": 260,
+      "recovery_ms_first_ack": 4087
+    }
+  ],
+  "telemetry": {
+    "memory": {
+      "initial_kb": 58208,
+      "peak_kb": 62624,
+      "final_kb": 50928,
+      "growth_kb_per_hour": 133432.17110455915,
+      "note": null
+    },
+    "event_log_bytes_final": 1045582,
+    "event_log_growth_bytes_per_hour": 11055099.232787328,
+    "data_dir_kb_final": 1648,
+    "outbox_max": 22,
+    "drain_ms": 9789,
+    "command_retries": 0,
+    "duplicates_absorbed": 82,
+    "print": {
+      "twin-cocina-1": {
+        "name": "PRINTER-COCINA-1 (fría, real 192.168.1.21)",
+        "port": 19100,
+        "stations": [
+          "cocina"
+        ],
+        "jobs_captured": 153,
+        "bytes": 27602,
+        "connections": 153,
+        "outages": 1
+      },
+      "twin-cocina-2": {
+        "name": "PRINTER-COCINA-2 (caliente, real 192.168.1.40)",
+        "port": 19101,
+        "stations": [
+          "cocina"
+        ],
+        "jobs_captured": 153,
+        "bytes": 27602,
+        "connections": 153,
+        "outages": 1
+      },
+      "twin-barra": {
+        "name": "PRINTER-BARRA (real 192.168.1.30)",
+        "port": 19102,
+        "stations": [
+          "barra"
+        ],
+        "jobs_captured": 115,
+        "bytes": 21339,
+        "connections": 115,
+        "outages": 1
+      },
+      "twin-entrada": {
+        "name": "PRINTER-ENTRADA (tickets PDV3, real usb TICKET)",
+        "port": 19103,
+        "stations": [
+          "tickets-entrada"
+        ],
+        "jobs_captured": 40,
+        "bytes": 9538,
+        "connections": 40,
+        "outages": 0
+      },
+      "twin-caja": {
+        "name": "PRINTER-CAJA (tickets/caja SERVER1, real usb PANADERIA/EC01)",
+        "port": 19104,
+        "stations": [
+          "tickets-caja",
+          "caja",
+          "tickets"
+        ],
+        "jobs_captured": 77,
+        "bytes": 17338,
+        "connections": 77,
+        "outages": 0
+      }
+    },
+    "sync_queue": {
+      "health_last_value": 1412,
+      "file_truth_unsynced": 1412,
+      "note": "sync_queue_size from /health is NOT trusted (in-memory, misleading across restarts, nothing ever marks events synced in Phase 1) — file count is authoritative"
+    },
+    "per_component_errors": {}
+  },
+  "memory_rss_samples": [
+    {
+      "t_s": 1,
+      "rss_kb": 58208
+    },
+    {
+      "t_s": 31,
+      "rss_kb": 45792
+    },
+    {
+      "t_s": 46,
+      "rss_kb": 21008
+    },
+    {
+      "t_s": 61,
+      "rss_kb": 22368
+    },
+    {
+      "t_s": 76,
+      "rss_kb": 20736
+    },
+    {
+      "t_s": 91,
+      "rss_kb": 21488
+    },
+    {
+      "t_s": 106,
+      "rss_kb": 48752
+    },
+    {
+      "t_s": 121,
+      "rss_kb": 56448
+    },
+    {
+      "t_s": 136,
+      "rss_kb": 56272
+    },
+    {
+      "t_s": 151,
+      "rss_kb": 57232
+    },
+    {
+      "t_s": 166,
+      "rss_kb": 54800
+    },
+    {
+      "t_s": 181,
+      "rss_kb": 61376
+    },
+    {
+      "t_s": 196,
+      "rss_kb": 57168
+    },
+    {
+      "t_s": 211,
+      "rss_kb": 61088
+    },
+    {
+      "t_s": 226,
+      "rss_kb": 51280
+    },
+    {
+      "t_s": 241,
+      "rss_kb": 55664
+    },
+    {
+      "t_s": 256,
+      "rss_kb": 55088
+    },
+    {
+      "t_s": 271,
+      "rss_kb": 62624
+    },
+    {
+      "t_s": 286,
+      "rss_kb": 59088
+    },
+    {
+      "t_s": 316,
+      "rss_kb": 52640
+    },
+    {
+      "t_s": 331,
+      "rss_kb": 52832
+    },
+    {
+      "t_s": 346,
+      "rss_kb": 50768
+    },
+    {
+      "t_s": 361,
+      "rss_kb": 52448
+    },
+    {
+      "t_s": 376,
+      "rss_kb": 26032
+    },
+    {
+      "t_s": 389,
+      "rss_kb": 50928
+    }
+  ],
+  "file_samples": [
+    {
+      "t_s": 1,
+      "event_log_bytes": null,
+      "data_dir_kb": 4,
+      "outbox_total": 0,
+      "print_queue": null,
+      "health_sync_queue": null
+    },
+    {
+      "t_s": 16,
+      "event_log_bytes": 66723,
+      "data_dir_kb": 112,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 29
+      },
+      "health_sync_queue": 111
+    },
+    {
+      "t_s": 31,
+      "event_log_bytes": 68433,
+      "data_dir_kb": 112,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 29,
+        "retrying": 1
+      },
+      "health_sync_queue": 114
+    },
+    {
+      "t_s": 46,
+      "event_log_bytes": 68433,
+      "data_dir_kb": 112,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 29,
+        "retrying": 1
+      },
+      "health_sync_queue": 114
+    },
+    {
+      "t_s": 61,
+      "event_log_bytes": 68433,
+      "data_dir_kb": 112,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 29,
+        "retrying": 1
+      },
+      "health_sync_queue": 114
+    },
+    {
+      "t_s": 76,
+      "event_log_bytes": 68433,
+      "data_dir_kb": 112,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 29,
+        "retrying": 1
+      },
+      "health_sync_queue": 114
+    },
+    {
+      "t_s": 91,
+      "event_log_bytes": 68433,
+      "data_dir_kb": 112,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 29,
+        "retrying": 1
+      },
+      "health_sync_queue": 114
+    },
+    {
+      "t_s": 106,
+      "event_log_bytes": 84793,
+      "data_dir_kb": 184,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 36
+      },
+      "health_sync_queue": 137
+    },
+    {
+      "t_s": 121,
+      "event_log_bytes": 138944,
+      "data_dir_kb": 280,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 68
+      },
+      "health_sync_queue": 213
+    },
+    {
+      "t_s": 136,
+      "event_log_bytes": 195817,
+      "data_dir_kb": 308,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 92
+      },
+      "health_sync_queue": 282
+    },
+    {
+      "t_s": 151,
+      "event_log_bytes": 244181,
+      "data_dir_kb": 404,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 117
+      },
+      "health_sync_queue": 352
+    },
+    {
+      "t_s": 166,
+      "event_log_bytes": 306205,
+      "data_dir_kb": 504,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 152
+      },
+      "health_sync_queue": 426
+    },
+    {
+      "t_s": 181,
+      "event_log_bytes": 352194,
+      "data_dir_kb": 592,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 169,
+        "retrying": 6
+      },
+      "health_sync_queue": 498
+    },
+    {
+      "t_s": 196,
+      "event_log_bytes": 404188,
+      "data_dir_kb": 744,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 203
+      },
+      "health_sync_queue": 565
+    },
+    {
+      "t_s": 211,
+      "event_log_bytes": 464572,
+      "data_dir_kb": 836,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 234,
+        "retrying": 1
+      },
+      "health_sync_queue": 640
+    },
+    {
+      "t_s": 226,
+      "event_log_bytes": 530128,
+      "data_dir_kb": 924,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 262,
+        "retrying": 6
+      },
+      "health_sync_queue": 719
+    },
+    {
+      "t_s": 241,
+      "event_log_bytes": 569598,
+      "data_dir_kb": 940,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 288
+      },
+      "health_sync_queue": 780
+    },
+    {
+      "t_s": 256,
+      "event_log_bytes": 629336,
+      "data_dir_kb": 1028,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 315,
+        "retrying": 5
+      },
+      "health_sync_queue": 856
+    },
+    {
+      "t_s": 271,
+      "event_log_bytes": 683069,
+      "data_dir_kb": 1120,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 344,
+        "retrying": 7
+      },
+      "health_sync_queue": 931
+    },
+    {
+      "t_s": 286,
+      "event_log_bytes": 750611,
+      "data_dir_kb": 1208,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 377,
+        "retrying": 7
+      },
+      "health_sync_queue": 1016
+    },
+    {
+      "t_s": 301,
+      "event_log_bytes": 778856,
+      "data_dir_kb": 1284,
+      "outbox_total": 22,
+      "print_queue": {
+        "printed": 392,
+        "retrying": 7
+      },
+      "health_sync_queue": 1047
+    },
+    {
+      "t_s": 316,
+      "event_log_bytes": 854873,
+      "data_dir_kb": 1380,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 439
+      },
+      "health_sync_queue": 1155
+    },
+    {
+      "t_s": 331,
+      "event_log_bytes": 915394,
+      "data_dir_kb": 1464,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 468
+      },
+      "health_sync_queue": 1236
+    },
+    {
+      "t_s": 346,
+      "event_log_bytes": 961218,
+      "data_dir_kb": 1548,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 490
+      },
+      "health_sync_queue": 1296
+    },
+    {
+      "t_s": 361,
+      "event_log_bytes": 1010162,
+      "data_dir_kb": 1632,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 518
+      },
+      "health_sync_queue": 1364
+    },
+    {
+      "t_s": 376,
+      "event_log_bytes": 1043700,
+      "data_dir_kb": 1648,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 537
+      },
+      "health_sync_queue": 1407
+    },
+    {
+      "t_s": 389,
+      "event_log_bytes": 1045582,
+      "data_dir_kb": 1648,
+      "outbox_total": 0,
+      "print_queue": {
+        "printed": 538
+      },
+      "health_sync_queue": 1412
+    }
+  ],
+  "fp_coverage": {
+    "available": {
+      "probed": true,
+      "pin_acks": 6
+    },
+    "stopped": {
+      "probed": true,
+      "pin_acks": 6
+    },
+    "crash": {
+      "probed": true,
+      "pin_acks": 6
+    },
+    "timeout": {
+      "probed": true,
+      "pin_acks": 6
+    }
+  },
+  "errors": [],
+  "verification": {
+    "pass": false,
+    "stop_hits": [],
+    "invariants": [
+      {
+        "name": "event_log_readable",
+        "pass": true,
+        "detail": "1412 events from events.ndjson",
+        "founder_gate": null,
+        "stop_class": null,
+        "informational": false
+      },
+      {
+        "name": "no_corrupt_event_lines",
+        "pass": true,
+        "detail": "all lines parseable",
+        "founder_gate": null,
+        "stop_class": "corruption",
+        "informational": false
+      },
+      {
+        "name": "zero_duplicate_event_ids",
+        "pass": true,
+        "detail": [],
+        "founder_gate": 3,
+        "stop_class": "duplicate",
+        "informational": false
+      },
+      {
+        "name": "zero_duplicate_sequences",
+        "pass": true,
+        "detail": [],
+        "founder_gate": 4,
+        "stop_class": "duplicate",
+        "informational": false
+      },
+      {
+        "name": "sequences_strictly_increasing",
+        "pass": true,
+        "detail": "ok",
+        "founder_gate": 4,
+        "stop_class": "corruption",
+        "informational": false
+      },
+      {
+        "name": "zero_data_loss_acked_commands_persisted",
+        "pass": true,
+        "detail": "1412 acked commands all present",
+        "founder_gate": 1,
+        "stop_class": "data-loss",
+        "informational": false
+      },
+      {
+        "name": "zero_duplicate_command_events",
+        "pass": true,
+        "detail": [],
+        "founder_gate": 2,
+        "stop_class": "duplicate",
+        "informational": false
+      },
+      {
+        "name": "outbox_zero_after_drain",
+        "pass": true,
+        "detail": "all client outboxes drained (0 reconciled as applied-once server-side)",
+        "founder_gate": 5,
+        "stop_class": "unsyncable",
+        "informational": false
+      },
+      {
+        "name": "no_phantom_events",
+        "pass": true,
+        "detail": [],
+        "founder_gate": null,
+        "stop_class": "corruption",
+        "informational": false
+      },
+      {
+        "name": "no_wrong_tenant_events",
+        "pass": true,
+        "detail": [],
+        "founder_gate": 10,
+        "stop_class": "tenant-leak",
+        "informational": false
+      },
+      {
+        "name": "tenant_probes_rejected",
+        "pass": true,
+        "detail": {
+          "probes": 1,
+          "command_rejects": 1,
+          "subscribe_blocks": 1
+        },
+        "founder_gate": 10,
+        "stop_class": null,
+        "informational": false
+      },
+      {
+        "name": "every_order_exactly_one_terminal_event",
+        "pass": true,
+        "detail": "129 orders each closed/cancelled exactly once",
+        "founder_gate": 1,
+        "stop_class": "data-loss",
+        "informational": false
+      },
+      {
+        "name": "payments_reconcile_with_recorded_movements",
+        "pass": true,
+        "detail": "every ORDER_CLOSED: sum(payments)===total===harness ledger (corte-X equivalent — no corte command at protocol level)",
+        "founder_gate": 8,
+        "stop_class": "inconsistent-corte",
+        "informational": false
+      },
+      {
+        "name": "replay_no_exception",
+        "pass": true,
+        "detail": "ok",
+        "founder_gate": 9,
+        "stop_class": "corruption",
+        "informational": false
+      },
+      {
+        "name": "replay_final_no_open_orders",
+        "pass": true,
+        "detail": {
+          "kds_orders": 0,
+          "kds_queue": 0
+        },
+        "founder_gate": 9,
+        "stop_class": null,
+        "informational": false
+      },
+      {
+        "name": "replay_final_all_mesas_free",
+        "pass": true,
+        "detail": [],
+        "founder_gate": 9,
+        "stop_class": null,
+        "informational": false
+      },
+      {
+        "name": "replay_final_turno_closed",
+        "pass": true,
+        "detail": null,
+        "founder_gate": 9,
+        "stop_class": null,
+        "informational": false
+      },
+      {
+        "name": "replay_final_no_locks",
+        "pass": true,
+        "detail": {},
+        "founder_gate": 9,
+        "stop_class": null,
+        "informational": false
+      },
+      {
+        "name": "kds_caught_up_to_last_sequence",
+        "pass": true,
+        "detail": {
+          "kds_max_seq": 1412,
+          "last_event_seq": 1412
+        },
+        "founder_gate": 9,
+        "stop_class": null,
+        "informational": false
+      },
+      {
+        "name": "no_duplicate_processed_command_keys",
+        "pass": true,
+        "detail": [],
+        "founder_gate": 2,
+        "stop_class": "duplicate",
+        "informational": false
+      },
+      {
+        "name": "dedup_exercised",
+        "pass": true,
+        "detail": {
+          "duplicate_acks": 43,
+          "probes_confirmed": 39
+        },
+        "founder_gate": 2,
+        "stop_class": null,
+        "informational": false
+      },
+      {
+        "name": "dedup_no_violations",
+        "pass": true,
+        "detail": {
+          "violations": 0
+        },
+        "founder_gate": 2,
+        "stop_class": "double-applied",
+        "informational": false
+      },
+      {
+        "name": "zero_stuck_print_jobs_file_view",
+        "pass": true,
+        "detail": {
+          "printed": 538,
+          "informational_in_accum": false
+        },
+        "founder_gate": 6,
+        "stop_class": "stuck-print",
+        "informational": false
+      },
+      {
+        "name": "every_acked_print_job_reached_paper",
+        "pass": true,
+        "detail": "385 print jobs all captured as raw bytes on EVERY fixture-mapped device (cocina fan-out ×2; duplicate physical prints after crash-replay: 0 — by design, reprint-on-uncertainty)",
+        "founder_gate": 6,
+        "stop_class": "stuck-print",
+        "informational": false
+      },
+      {
+        "name": "recovery_after_every_restart",
+        "pass": true,
+        "detail": [
+          {
+            "kind": "initial",
+            "ready_ms": 307,
+            "first_ack_ms": 535
+          },
+          {
+            "kind": "kill",
+            "ready_ms": 267,
+            "first_ack_ms": 269
+          },
+          {
+            "kind": "graceful",
+            "ready_ms": 263,
+            "first_ack_ms": 394
+          },
+          {
+            "kind": "kill",
+            "ready_ms": 265,
+            "first_ack_ms": 266
+          },
+          {
+            "kind": "graceful",
+            "ready_ms": 260,
+            "first_ack_ms": 262
+          },
+          {
+            "kind": "kill",
+            "ready_ms": 259,
+            "first_ack_ms": 261
+          },
+          {
+            "kind": "final-flush",
+            "ready_ms": 260,
+            "first_ack_ms": 4087
+          }
+        ],
+        "founder_gate": 7,
+        "stop_class": null,
+        "informational": false
+      },
+      {
+        "name": "crash_faults_exercised",
+        "pass": true,
+        "detail": {
+          "kills": 3,
+          "graceful": 2
+        },
+        "founder_gate": null,
+        "stop_class": null,
+        "informational": false
+      },
+      {
+        "name": "pin_flow_works_in_all_fp_states",
+        "pass": true,
+        "detail": {
+          "available": {
+            "probed": true,
+            "pin_acks": 6
+          },
+          "stopped": {
+            "probed": true,
+            "pin_acks": 6
+          },
+          "crash": {
+            "probed": true,
+            "pin_acks": 6
+          },
+          "timeout": {
+            "probed": true,
+            "pin_acks": 6
+          }
+        },
+        "founder_gate": 11,
+        "stop_class": null,
+        "informational": false
+      },
+      {
+        "name": "config_persists_across_restarts",
+        "pass": true,
+        "detail": {
+          "server_ids_seen": [
+            "22a321c9-16d1-4be9-8cd0-b71d36c38456"
+          ],
+          "restarts": 7,
+          "note": "stable server_id across restarts proves the data dir/config survived; a changed server_id would mean a wiped install"
+        },
+        "founder_gate": 12,
+        "stop_class": null,
+        "informational": false
+      },
+      {
+        "name": "printer_routing_survives_restart",
+        "pass": true,
+        "detail": {
+          "stations_after_final_restart": [
+            "barra",
+            "caja",
+            "cocina",
+            "tickets",
+            "tickets-caja",
+            "tickets-entrada"
+          ],
+          "server_id_file_persisted": true,
+          "informational_in_accum": false
+        },
+        "founder_gate": 12,
+        "stop_class": null,
+        "informational": false
+      },
+      {
+        "name": "full_sync_after_wan_return",
+        "pass": null,
+        "founder_gate": 13,
+        "stop_class": null,
+        "detail": "NOT-EXERCISABLE in Phase 1: no outbound sync engine exists (adapters/storage markSynced() has zero production callers; /health.sync_queue_size grows monotonically and is documented-misleading). Inbound Supabase→bridge poll covered by sync-inbound-staging (SIMULATED-PARTIAL). Owner: Phase-2 sync engine."
+      },
+      {
+        "name": "minimum_traffic_generated",
+        "pass": true,
+        "detail": {
+          "orders_created": 129
+        },
+        "founder_gate": null,
+        "stop_class": null,
+        "informational": false
+      },
+      {
+        "name": "all_5_printers_captured_bytes",
+        "pass": true,
+        "detail": {
+          "twin-cocina-1": 153,
+          "twin-cocina-2": 153,
+          "twin-barra": 115,
+          "twin-entrada": 40,
+          "twin-caja": 77
+        },
+        "founder_gate": null,
+        "stop_class": null,
+        "informational": false
+      },
+      {
+        "name": "no_unexpected_rejects",
+        "pass": true,
+        "detail": {
+          "rejects_unexpected": 0
+        },
+        "founder_gate": null,
+        "stop_class": null,
+        "informational": false
+      },
+      {
+        "name": "no_harness_errors",
+        "pass": true,
+        "detail": [],
+        "founder_gate": null,
+        "stop_class": null,
+        "informational": false
+      },
+      {
+        "name": "no_failed_scenarios",
+        "pass": false,
+        "detail": [
+          "corte-print-outage"
+        ],
+        "founder_gate": null,
+        "stop_class": null,
+        "informational": false
+      }
+    ],
+    "events_in_log": 1412,
+    "events_source": "events.ndjson",
+    "distinct_order_ids_persisted": 129,
+    "print_queue_final": {
+      "printed": 538
+    },
+    "replay_final_snapshot_summary": {
+      "mesas_total": 31,
+      "occupied": 0,
+      "kds_orders": 0,
+      "turno": null,
+      "locks": 0
+    },
+    "drain_ms": 9789
+  },
+  "exit_code": 1
+}
