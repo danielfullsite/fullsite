@@ -1,25 +1,54 @@
 'use client'
 
+// Migración visual a las primitivas del rediseño V2 (fase 2).
+//
+// Sólo cambia la PIEL. La consulta (`getAuditLog(200)`), los filtros, el conteo
+// de cabecera, el mapa de acciones, el desglose de `details`, el motivo, el
+// actor, la hora y el aprobador quedan idénticos. Lo que antes eran clases de
+// Tailwind sueltas (`text-emerald-400`, `bg-red-950/20`, `divide-slate-800`)
+// ahora son tonos del sistema — mismo significado, un solo vocabulario.
+//
+// NO se añadió manejo de error a propósito: `getAuditLog` puede rechazar sin
+// red y `fetchData` no tiene try/catch, así que la pantalla se queda en
+// "cargando". Ese defecto es PREVIO y arreglarlo es un cambio de comportamiento,
+// fuera del alcance de esta fase. Queda reportado.
+
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, ShieldCheck, Search, RefreshCw, Clock, User, FileText, Ban, CreditCard, ChefHat, Pencil, Plus, Percent } from 'lucide-react'
 import { getAuditLog, type AuditLogEntry } from '@/lib/pos-data'
+import { List, Row, Pill, type DataTone } from '@/components/pos/ui/PosKit'
 
-const ACTION_CONFIG: Record<string, { icon: typeof ShieldCheck; color: string; label: string }> = {
-  order_created: { icon: Plus, color: 'text-emerald-400', label: 'Orden creada' },
-  order_sent_kitchen: { icon: ChefHat, color: 'text-emerald-400', label: 'Enviada a cocina' },
-  order_closed: { icon: CreditCard, color: 'text-blue-400', label: 'Orden cerrada' },
-  order_cancelled: { icon: Ban, color: 'text-red-400', label: 'Orden anulada' },
-  item_added: { icon: Plus, color: 'text-emerald-400', label: 'Item agregado' },
-  item_modified: { icon: Pencil, color: 'text-amber-400', label: 'Item modificado' },
-  item_cancelled: { icon: Ban, color: 'text-red-400', label: 'Item cancelado' },
-  quantity_changed: { icon: Pencil, color: 'text-[var(--text-3)]', label: 'Cantidad cambiada' },
-  discount_applied: { icon: Percent, color: 'text-amber-400', label: 'Descuento aplicado' },
-  discount_removed: { icon: Percent, color: 'text-[var(--text-3)]', label: 'Descuento removido' },
-  status_changed: { icon: ChefHat, color: 'text-blue-400', label: 'Estado cambiado' },
-  payment_processed: { icon: CreditCard, color: 'text-emerald-400', label: 'Pago procesado' },
-  preticket_printed: { icon: FileText, color: 'text-purple-400', label: 'Pre-cuenta impresa' },
-  kitchen_item_updated: { icon: Pencil, color: 'text-orange-400', label: 'Item actualizado en cocina' },
+const ACTION_CONFIG: Record<string, { icon: typeof ShieldCheck; tone: DataTone; label: string }> = {
+  order_created: { icon: Plus, tone: 'ok', label: 'Orden creada' },
+  order_sent_kitchen: { icon: ChefHat, tone: 'ok', label: 'Enviada a cocina' },
+  order_closed: { icon: CreditCard, tone: 'info', label: 'Orden cerrada' },
+  order_cancelled: { icon: Ban, tone: 'bad', label: 'Orden anulada' },
+  item_added: { icon: Plus, tone: 'ok', label: 'Item agregado' },
+  item_modified: { icon: Pencil, tone: 'warn', label: 'Item modificado' },
+  item_cancelled: { icon: Ban, tone: 'bad', label: 'Item cancelado' },
+  quantity_changed: { icon: Pencil, tone: 'neutral', label: 'Cantidad cambiada' },
+  discount_applied: { icon: Percent, tone: 'warn', label: 'Descuento aplicado' },
+  discount_removed: { icon: Percent, tone: 'neutral', label: 'Descuento removido' },
+  status_changed: { icon: ChefHat, tone: 'info', label: 'Estado cambiado' },
+  payment_processed: { icon: CreditCard, tone: 'ok', label: 'Pago procesado' },
+  preticket_printed: { icon: FileText, tone: 'info', label: 'Pre-cuenta impresa' },
+  kitchen_item_updated: { icon: Pencil, tone: 'warn', label: 'Item actualizado en cocina' },
+}
+
+const TONE_INK: Record<DataTone, string> = {
+  ok: 'var(--accent-bright)',
+  info: 'var(--info)',
+  warn: 'var(--warn)',
+  bad: 'var(--crit-ink)',
+  neutral: 'var(--text-3)',
+}
+const TONE_SOFT: Record<DataTone, string> = {
+  ok: 'var(--accent-soft)',
+  info: 'var(--info-soft)',
+  warn: 'var(--warn-soft)',
+  bad: 'var(--crit-soft)',
+  neutral: 'var(--surface-2)',
 }
 
 function formatTime(dateStr: string): string {
@@ -71,45 +100,68 @@ export default function AuditoriaPage() {
     e.action === 'item_cancelled' || e.action === 'order_cancelled'
   )
 
+  const field = 'rounded-xl border px-3 text-sm focus:outline-none'
+  const fieldStyle = { background: 'var(--surface-2)', borderColor: 'var(--line)', color: 'var(--text-1)', minHeight: 44 }
+
   return (
-    <div className="h-screen flex flex-col text-white bg-[var(--surface)]">
+    <div className="h-screen flex flex-col overflow-hidden" style={{ background: 'var(--bg)', color: 'var(--text-1)' }}>
       {/* Header */}
-      <header className="flex items-center justify-between px-6 py-4 bg-[var(--surface-2)] border-b border-slate-700 flex-shrink-0">
-        <div className="flex items-center gap-4">
-          <Link href="/pos" className="w-10 h-10 rounded-lg bg-[var(--line)] hover:bg-slate-600 flex items-center justify-center transition-colors">
+      <header
+        className="flex items-center justify-between gap-3 px-5 py-3 border-b flex-shrink-0 flex-wrap"
+        style={{ background: 'var(--surface-2)', borderColor: 'var(--line)' }}
+      >
+        <div className="flex items-center gap-3">
+          <Link
+            href="/pos"
+            aria-label="Volver al punto de venta"
+            className="w-11 h-11 rounded-xl border grid place-items-center transition-transform active:scale-95"
+            style={{ background: 'var(--surface)', borderColor: 'var(--line)', color: 'var(--text-2)' }}
+          >
             <ArrowLeft size={20} />
           </Link>
           <div className="flex items-center gap-2">
-            <ShieldCheck size={24} className="text-emerald-400" />
-            <h1 className="text-xl font-bold">Auditoria</h1>
+            <ShieldCheck size={22} style={{ color: 'var(--accent-bright)' }} />
+            <h1 className="text-xl font-black tracking-tight">Auditoria</h1>
           </div>
-          <button onClick={fetchData} className="w-11 h-11 rounded-lg bg-[var(--line)] hover:bg-slate-600 flex items-center justify-center">
-            <RefreshCw size={14} />
+          <button
+            type="button"
+            onClick={fetchData}
+            aria-label="Actualizar"
+            className="w-11 h-11 rounded-xl border grid place-items-center transition-transform active:scale-95"
+            style={{ background: 'var(--surface)', borderColor: 'var(--line)', color: 'var(--text-2)' }}
+          >
+            <RefreshCw size={16} />
           </button>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="text-sm text-[var(--text-3)]">
-            {entries.length} eventos · {alertEntries.length} cancelaciones
-          </div>
+        <div className="flex items-center gap-2">
+          <Pill state="neutral" dot={false}>{entries.length} eventos</Pill>
+          <Pill state={alertEntries.length ? 'warn' : 'neutral'} dot={false}>{alertEntries.length} cancelaciones</Pill>
         </div>
       </header>
 
       {/* Filters */}
-      <div className="flex items-center gap-3 px-6 py-3 bg-[var(--surface-2)]/50 border-b border-slate-700">
-        <div className="relative flex-1 max-w-md">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-3)]" />
+      <div
+        className="flex items-center gap-3 px-5 py-3 border-b flex-shrink-0 flex-wrap"
+        style={{ background: 'var(--surface)', borderColor: 'var(--line)' }}
+      >
+        <div className="relative flex-1 max-w-md min-w-[220px]">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-3)' }} />
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Buscar por mesero, orden, motivo..."
-            className="w-full bg-[var(--line)] border border-slate-600 rounded-lg pl-10 pr-4 py-2.5 text-white placeholder-slate-400 text-sm focus:outline-none focus:border-emerald-500"
+            aria-label="Buscar en la auditoría"
+            className={`w-full pl-10 pr-4 ${field}`}
+            style={fieldStyle}
           />
         </div>
         <select
           value={filterAction}
           onChange={(e) => setFilterAction(e.target.value)}
-          className="bg-[var(--line)] border border-slate-600 rounded-lg px-3 py-2.5 text-white text-sm min-h-[42px]"
+          aria-label="Filtrar por acción"
+          className={field}
+          style={fieldStyle}
         >
           <option value="all">Todas las acciones</option>
           <option value="item_cancelled">Cancelaciones de item</option>
@@ -123,94 +175,99 @@ export default function AuditoriaPage() {
       </div>
 
       {/* Event list */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 min-h-0 p-4">
         {loading ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+          <div className="flex items-center justify-center h-full" data-testid="auditoria-cargando">
+            <div className="w-8 h-8 border-2 rounded-full animate-spin" style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }} />
           </div>
         ) : filtered.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-[var(--text-2)]">
+          <div className="flex items-center justify-center h-full" data-testid="auditoria-vacio" style={{ color: 'var(--text-2)' }}>
             <div className="text-center">
               <ShieldCheck size={48} className="mx-auto mb-3 opacity-50" />
-              <p className="text-xl">Sin eventos registrados</p>
+              <p className="text-xl font-bold">Sin eventos registrados</p>
             </div>
           </div>
         ) : (
-          <div className="divide-y divide-slate-800">
+          <List className="h-full" data-testid="auditoria-lista">
             {filtered.map(entry => {
-              const config = ACTION_CONFIG[entry.action] || { icon: FileText, color: 'text-[var(--text-3)]', label: entry.action }
+              const config = ACTION_CONFIG[entry.action] || { icon: FileText, tone: 'neutral' as DataTone, label: entry.action }
               const Icon = config.icon
               const details = parseDetails(entry.details)
               const isAlert = entry.action === 'item_cancelled' || entry.action === 'order_cancelled'
 
               return (
-                <div
+                <Row
                   key={entry.id}
-                  className={`px-6 py-4 hover:bg-[var(--surface-2)]/50 transition-colors ${isAlert ? 'bg-red-950/20 border-l-2 border-red-500' : ''}`}
+                  data-testid="auditoria-evento"
+                  columns="auto 1fr auto"
+                  tone={isAlert ? 'bad' : undefined}
+                  className="!py-3 items-start"
+                  style={{ alignItems: 'flex-start' }}
                 >
-                  <div className="flex items-start gap-4">
-                    {/* Icon */}
-                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                      isAlert ? 'bg-red-900/40' : 'bg-[var(--surface-2)]'
-                    }`}>
-                      <Icon size={16} className={config.color} />
-                    </div>
-
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className={`font-semibold text-sm ${config.color}`}>{config.label}</span>
-                        {entry.mesa && (
-                          <span className="text-[var(--text-2)] text-xs">Mesa {entry.mesa}</span>
-                        )}
-                        {entry.order_id && (
-                          <span className="text-[var(--text-2)] text-xs font-mono">{entry.order_id.slice(0, 8)}</span>
-                        )}
-                      </div>
-
-                      {/* Details */}
-                      {details && (
-                        <div className="text-[var(--text-3)] text-sm space-y-0.5">
-                          {'item' in details && details.item ? <p>Item: <span className="text-white">{String(details.item)}</span></p> : null}
-                          {'method' in details && details.method ? <p>Metodo: <span className="text-white">{String(details.method)}</span></p> : null}
-                          {'total' in details && details.total != null ? <p>Total: <span className="text-white">${Number(details.total).toFixed(2)}</span></p> : null}
-                          {'amount' in details && details.amount != null ? <p>Monto: <span className="text-white">${Number(details.amount).toFixed(2)}</span></p> : null}
-                          {'from' in details && 'to' in details && typeof details.from !== 'object' ? (
-                            <p>{String(details.from)} → <span className="text-white">{String(details.to)}</span></p>
-                          ) : null}
-                          {'cantidad' in details && details.cantidad != null ? <p>Cantidad: <span className="text-white">{String(details.cantidad)}</span></p> : null}
-                        </div>
-                      )}
-
-                      {/* Reason (for cancellations) */}
-                      {entry.reason && (
-                        <p className="text-red-400 text-sm mt-1">
-                          Motivo: <span className="font-medium">{entry.reason}</span>
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Right side: actor + time + approver */}
-                    <div className="text-right flex-shrink-0">
-                      <div className="flex items-center gap-1.5 justify-end mb-1">
-                        <User size={12} className="text-[var(--text-2)]" />
-                        <span className="text-sm text-white">{entry.actor}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 justify-end">
-                        <Clock size={12} className="text-[var(--text-2)]" />
-                        <span className="text-xs text-[var(--text-2)]">{formatTime(entry.created_at)}</span>
-                      </div>
-                      {entry.approved_by && (
-                        <p className="text-amber-400 text-xs mt-1">
-                          Aprobado: {entry.approved_by}
-                        </p>
-                      )}
-                    </div>
+                  {/* Icon */}
+                  <div
+                    className="w-9 h-9 rounded-xl grid place-items-center flex-shrink-0"
+                    style={{ background: TONE_SOFT[config.tone] }}
+                  >
+                    <Icon size={16} style={{ color: TONE_INK[config.tone] }} />
                   </div>
-                </div>
+
+                  {/* Content */}
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-sm" style={{ color: TONE_INK[config.tone] }}>{config.label}</span>
+                      {entry.mesa ? (
+                        <span className="text-xs font-semibold" style={{ color: 'var(--text-2)' }}>Mesa {entry.mesa}</span>
+                      ) : null}
+                      {entry.order_id ? (
+                        <span className="text-xs font-mono" style={{ color: 'var(--text-3)' }}>{entry.order_id.slice(0, 8)}</span>
+                      ) : null}
+                    </div>
+
+                    {/* Details */}
+                    {details && (
+                      <div className="text-sm space-y-0.5 mt-0.5" style={{ color: 'var(--text-3)' }}>
+                        {'item' in details && details.item ? <p>Item: <span style={{ color: 'var(--text-1)' }}>{String(details.item)}</span></p> : null}
+                        {'method' in details && details.method ? <p>Metodo: <span style={{ color: 'var(--text-1)' }}>{String(details.method)}</span></p> : null}
+                        {'total' in details && details.total != null ? <p>Total: <span style={{ color: 'var(--text-1)' }}>${Number(details.total).toFixed(2)}</span></p> : null}
+                        {'amount' in details && details.amount != null ? <p>Monto: <span style={{ color: 'var(--text-1)' }}>${Number(details.amount).toFixed(2)}</span></p> : null}
+                        {'from' in details && 'to' in details && typeof details.from !== 'object' ? (
+                          <p>{String(details.from)} → <span style={{ color: 'var(--text-1)' }}>{String(details.to)}</span></p>
+                        ) : null}
+                        {'cantidad' in details && details.cantidad != null ? <p>Cantidad: <span style={{ color: 'var(--text-1)' }}>{String(details.cantidad)}</span></p> : null}
+                      </div>
+                    )}
+
+                    {/* Reason (for cancellations) */}
+                    {entry.reason && (
+                      <p className="text-sm mt-1" style={{ color: 'var(--crit-ink)' }}>
+                        Motivo: <span className="font-semibold">{entry.reason}</span>
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Right side: actor + time + approver */}
+                  <div className="text-right flex-shrink-0">
+                    <div className="flex items-center gap-1.5 justify-end">
+                      <User size={12} style={{ color: 'var(--text-3)' }} />
+                      <span className="text-sm font-semibold" style={{ color: 'var(--text-1)' }}>{entry.actor}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 justify-end mt-0.5">
+                      <Clock size={12} style={{ color: 'var(--text-3)' }} />
+                      <span className="text-xs font-mono" style={{ color: 'var(--text-3)' }}>{formatTime(entry.created_at)}</span>
+                    </div>
+                    {/* El nombre del aprobador NO va en un Tag: los Tag son
+                        mayúsculas y un nombre propio no se grita. */}
+                    {entry.approved_by && (
+                      <p className="text-xs mt-1 font-semibold" style={{ color: 'var(--warn)' }}>
+                        Aprobado: {entry.approved_by}
+                      </p>
+                    )}
+                  </div>
+                </Row>
               )
             })}
-          </div>
+          </List>
         )}
       </div>
     </div>

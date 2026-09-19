@@ -1,11 +1,20 @@
 'use client'
 
+// Migración visual a las primitivas del rediseño V2 (fase 2).
+//
+// La consulta con ventana en la zona del restaurante, la deduplicación, el
+// respaldo offline desde IndexedDB, los tres filtros, el desplegable por orden,
+// el desglose de totales y la reimpresión quedan IDÉNTICOS. Lo único que cambia
+// son las clases: de Tailwind suelto (`bg-slate-*`, `text-emerald-400`) a los
+// tonos y primitivas del sistema.
+
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Search, RefreshCw, FileText, ChevronDown, ChevronRight, Printer } from 'lucide-react'
 import { formatMXN, getClientId } from '@/lib/pos-data'
 import { printTicketCSS } from '@/lib/printer'
 import { todayMX, zonedStartOfDayISO } from '@/lib/date-mx'
+import { List, Row, RowText, Tag, Pill, type DataTone } from '@/components/pos/ui/PosKit'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -89,45 +98,74 @@ export default function HistorialPage() {
     return true
   })
 
-  const statusConfig: Record<string, { color: string; label: string }> = {
-    abierta: { color: 'text-[var(--text-3)]', label: 'Abierta' },
-    enviada: { color: 'text-blue-400', label: 'Enviada' },
-    preparando: { color: 'text-amber-400', label: 'Preparando' },
-    lista: { color: 'text-emerald-400', label: 'Lista' },
-    cerrada: { color: 'text-emerald-400', label: 'Cerrada' },
-    cancelada: { color: 'text-red-400', label: 'Cancelada' },
+  const statusConfig: Record<string, { tone: DataTone; label: string }> = {
+    abierta: { tone: 'neutral', label: 'Abierta' },
+    enviada: { tone: 'info', label: 'Enviada' },
+    preparando: { tone: 'warn', label: 'Preparando' },
+    lista: { tone: 'ok', label: 'Lista' },
+    cerrada: { tone: 'ok', label: 'Cerrada' },
+    cancelada: { tone: 'bad', label: 'Cancelada' },
   }
 
+  const field = 'rounded-xl border px-3 text-sm focus:outline-none'
+  const fieldStyle = { background: 'var(--surface-2)', borderColor: 'var(--line)', color: 'var(--text-1)', minHeight: 44 }
+
   return (
-    <div className="h-screen flex flex-col text-white bg-[var(--surface)]">
-      <header className="flex items-center justify-between px-6 py-4 bg-[var(--surface-2)] border-b border-slate-700 flex-shrink-0">
-        <div className="flex items-center gap-4">
-          <Link href="/pos" className="w-10 h-10 rounded-lg bg-[var(--line)] hover:bg-slate-600 flex items-center justify-center">
+    <div className="h-screen flex flex-col overflow-hidden" style={{ background: 'var(--bg)', color: 'var(--text-1)' }}>
+      <header
+        className="flex items-center justify-between gap-3 px-5 py-3 border-b flex-shrink-0 flex-wrap"
+        style={{ background: 'var(--surface-2)', borderColor: 'var(--line)' }}
+      >
+        <div className="flex items-center gap-3">
+          <Link
+            href="/pos"
+            aria-label="Volver al punto de venta"
+            className="w-11 h-11 rounded-xl border grid place-items-center transition-transform active:scale-95"
+            style={{ background: 'var(--surface)', borderColor: 'var(--line)', color: 'var(--text-2)' }}
+          >
             <ArrowLeft size={20} />
           </Link>
           <div className="flex items-center gap-2">
-            <FileText size={24} className="text-[var(--text-3)]" />
-            <h1 className="text-xl font-bold">Historial de ordenes</h1>
+            <FileText size={22} style={{ color: 'var(--text-3)' }} />
+            <h1 className="text-xl font-black tracking-tight">Historial de ordenes</h1>
           </div>
-          <button onClick={fetchOrders} className="w-11 h-11 rounded-lg bg-[var(--line)] hover:bg-slate-600 flex items-center justify-center">
-            <RefreshCw size={14} />
+          <button
+            type="button"
+            onClick={fetchOrders}
+            aria-label="Actualizar"
+            className="w-11 h-11 rounded-xl border grid place-items-center transition-transform active:scale-95"
+            style={{ background: 'var(--surface)', borderColor: 'var(--line)', color: 'var(--text-2)' }}
+          >
+            <RefreshCw size={16} />
           </button>
         </div>
-        <span className="text-[var(--text-3)] text-sm">{filtered.length} ordenes</span>
+        <Pill state="neutral" dot={false}>{filtered.length} ordenes</Pill>
       </header>
 
       {/* Filters */}
-      <div className="flex items-center gap-3 px-6 py-3 bg-[var(--surface-2)]/50 border-b border-slate-700">
-        <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)}
-          className="bg-[var(--line)] border border-slate-600 rounded-lg px-3 py-2 text-white text-sm" />
-        <div className="relative flex-1 max-w-sm">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-3)]" />
-          <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+      <div
+        className="flex items-center gap-3 px-5 py-3 border-b flex-shrink-0 flex-wrap"
+        style={{ background: 'var(--surface)', borderColor: 'var(--line)' }}
+      >
+        <input
+          type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)}
+          aria-label="Fecha"
+          className={field} style={fieldStyle}
+        />
+        <div className="relative flex-1 max-w-sm min-w-[200px]">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-3)' }} />
+          <input
+            type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
             placeholder="Buscar mesero, mesa, orden..."
-            className="w-full bg-[var(--line)] border border-slate-600 rounded-lg pl-9 pr-3 py-2 text-white placeholder-slate-400 text-sm focus:outline-none focus:border-blue-500" />
+            aria-label="Buscar órdenes"
+            className={`w-full pl-9 pr-3 ${field}`} style={fieldStyle}
+          />
         </div>
-        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-          className="bg-[var(--line)] border border-slate-600 rounded-lg px-3 py-2 text-white text-sm">
+        <select
+          value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+          aria-label="Filtrar por estado"
+          className={field} style={fieldStyle}
+        >
           <option value="all">Todos</option>
           <option value="cerrada">Cerradas</option>
           <option value="cancelada">Canceladas</option>
@@ -136,17 +174,17 @@ export default function HistorialPage() {
       </div>
 
       {/* Orders list */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 min-h-0 p-4">
         {loading ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          <div className="flex items-center justify-center h-full" data-testid="historial-cargando">
+            <div className="w-8 h-8 border-2 rounded-full animate-spin" style={{ borderColor: 'var(--info)', borderTopColor: 'transparent' }} />
           </div>
         ) : filtered.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-[var(--text-2)]">
-            <p>Sin ordenes para esta fecha</p>
+          <div className="flex items-center justify-center h-full" data-testid="historial-vacio" style={{ color: 'var(--text-2)' }}>
+            <p className="font-bold">Sin ordenes para esta fecha</p>
           </div>
         ) : (
-          <div className="divide-y divide-slate-800">
+          <List className="h-full" data-testid="historial-lista">
             {filtered.map(order => {
               const config = statusConfig[order.status] || statusConfig.abierta
               const isOpen = expanded === order.id
@@ -154,50 +192,53 @@ export default function HistorialPage() {
 
               return (
                 <div key={order.id}>
-                  <button
+                  <Row
+                    data-testid="historial-orden"
+                    columns="auto 1fr auto"
                     onClick={() => setExpanded(isOpen ? null : order.id)}
-                    className="w-full flex items-center gap-4 px-6 py-3 hover:bg-[var(--surface-2)]/50 text-left"
                   >
-                    <div className="w-7 h-7 rounded bg-[var(--line)] flex items-center justify-center flex-shrink-0">
+                    <span
+                      className="w-7 h-7 rounded-lg grid place-items-center flex-shrink-0"
+                      style={{ background: 'var(--surface-2)', color: 'var(--text-2)' }}
+                    >
                       {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-white font-medium">Mesa {order.mesa}</span>
-                        <span className="text-[var(--text-2)] text-xs">{order.mesero}</span>
-                        <span className={`text-xs font-bold ${config.color}`}>{config.label}</span>
+                    </span>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-sm">Mesa {order.mesa}</span>
+                        <span className="text-xs font-semibold" style={{ color: 'var(--text-2)' }}>{order.mesero}</span>
+                        <Tag tone={config.tone}>{config.label}</Tag>
                       </div>
-                      <p className="text-[var(--text-2)] text-xs">
+                      <p className="text-[11.5px] font-semibold mt-0.5" style={{ color: 'var(--text-3)' }}>
                         {new Date(order.created_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
                         {order.metodo_pago && ` · ${order.metodo_pago}`}
                         {order.personas > 0 && ` · ${order.personas} personas`}
                       </p>
                     </div>
-                    <span className="text-white font-semibold">{formatMXN(order.total)}</span>
-                  </button>
+                    <span className="font-black tabular-nums" style={{ color: 'var(--text-1)' }}>{formatMXN(order.total)}</span>
+                  </Row>
 
                   {isOpen && (
-                    <div className="px-6 pb-3">
-                      <div className="bg-[var(--surface-2)]/60 rounded-xl p-4 ml-11">
+                    <div className="px-4 py-3" data-testid="historial-detalle">
+                      <div className="rounded-xl border p-4 ml-11" style={{ background: 'var(--surface-2)', borderColor: 'var(--line)' }}>
                         <div className="space-y-1.5 mb-3">
                           {items.map((item: { nombre?: string; name?: string; cantidad?: number; quantity?: number; subtotal?: number; modificadores?: string[] }, i: number) => (
-                            <div key={i} className="flex items-center justify-between text-sm">
-                              <span className="text-[var(--text-4)]">
-                                {item.cantidad || item.quantity || 1}x {item.nombre || item.name}
-                                {item.modificadores && item.modificadores.length > 0 && (
-                                  <span className="text-[var(--text-2)] text-xs ml-1">({item.modificadores.join(', ')})</span>
-                                )}
-                              </span>
-                              <span className="text-[var(--text-3)]">{formatMXN(item.subtotal || 0)}</span>
+                            <div key={i} className="flex items-center justify-between gap-3 text-sm">
+                              <RowText
+                                title={`${item.cantidad || item.quantity || 1}x ${item.nombre || item.name}`}
+                                sub={item.modificadores && item.modificadores.length > 0 ? item.modificadores.join(', ') : undefined}
+                              />
+                              <span className="font-mono tabular-nums flex-shrink-0" style={{ color: 'var(--text-3)' }}>{formatMXN(item.subtotal || 0)}</span>
                             </div>
                           ))}
                         </div>
-                        <div className="border-t border-slate-700 pt-2 text-xs text-[var(--text-2)] flex items-center gap-4">
+                        <div className="border-t pt-2.5 text-xs flex items-center gap-4 flex-wrap" style={{ borderColor: 'var(--line)', color: 'var(--text-2)' }}>
                           <span>Sub: {formatMXN(order.subtotal)}</span>
                           <span>IVA: {formatMXN(order.iva)}</span>
-                          {order.descuento > 0 && <span className="text-red-400">Desc: -{formatMXN(order.descuento)}</span>}
-                          <span>ID: {order.id.slice(0, 8)}</span>
+                          {order.descuento > 0 && <span style={{ color: 'var(--crit-ink)' }}>Desc: -{formatMXN(order.descuento)}</span>}
+                          <span className="font-mono">ID: {order.id.slice(0, 8)}</span>
                           <button
+                            type="button"
                             onClick={(e) => {
                               e.stopPropagation()
                               printTicketCSS({
@@ -226,7 +267,8 @@ export default function HistorialPage() {
                                 closedAt: order.closed_at ? new Date(order.closed_at) : undefined,
                               })
                             }}
-                            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500/15 hover:bg-blue-500/25 text-blue-400 text-xs font-medium transition-colors"
+                            className="ml-auto inline-flex items-center gap-1.5 px-3 rounded-lg border text-xs font-bold transition-transform active:scale-95"
+                            style={{ minHeight: 40, background: 'var(--info-soft)', borderColor: 'rgba(56,189,248,.30)', color: 'var(--info)' }}
                           >
                             <Printer size={12} />
                             Reimprimir
@@ -238,7 +280,7 @@ export default function HistorialPage() {
                 </div>
               )
             })}
-          </div>
+          </List>
         )}
       </div>
     </div>
