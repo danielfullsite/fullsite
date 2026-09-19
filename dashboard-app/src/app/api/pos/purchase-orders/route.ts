@@ -50,6 +50,39 @@ export async function POST(request: NextRequest) {
   for (const campo of ['iva', 'total', 'subtotal', 'iva_rate', 'tax_rate']) {
     if (campo in header) return Response.json({ error: 'AMOUNTS_NOT_ACCEPTED' }, { status: 400 })
   }
+  // UN NÚMERO TIENE QUE SER UN NÚMERO.
+  //
+  // En PostgreSQL el tipo `numeric` ordena NaN por ENCIMA de todo número, no
+  // fuera del orden: `NaN <= 0` es FALSE. Así que la guarda de cantidad de
+  // `pos_create_purchase_order` lo dejaba pasar, y el 2026-09-18 una OC enviada
+  // con `quantity_ordered: "NaN"` se guardó con `subtotal = NaN` y
+  // `total = NaN`. La fila se ve normal hasta que alguien suma.
+  //
+  // La RPC ya lo rechaza. Esto lo para una capa antes —sin abrir transacción— y
+  // con un código que dice QUÉ renglón, que es lo que la pantalla necesita para
+  // señalarlo. `Number('')` es 0, por eso la cadena vacía se descarta aparte.
+  const finito = (v: unknown): number | null => {
+    if (typeof v === 'number') return Number.isFinite(v) ? v : null
+    if (typeof v === 'string' && v.trim() !== '') {
+      const n = Number(v)
+      return Number.isFinite(n) ? n : null
+    }
+    return null
+  }
+  for (const [i, cruda] of lines.entries()) {
+    if (!cruda || typeof cruda !== 'object' || Array.isArray(cruda)) {
+      return Response.json({ error: 'INVALID_LINE', renglon: i + 1 }, { status: 400 })
+    }
+    const linea = cruda as Record<string, unknown>
+    const cantidad = finito(linea.quantity_ordered)
+    if (cantidad === null || cantidad <= 0) {
+      return Response.json({ error: 'INVALID_QUANTITY', renglon: i + 1 }, { status: 400 })
+    }
+    const costo = finito(linea.unit_cost)
+    if (costo === null || costo < 0) {
+      return Response.json({ error: 'INVALID_UNIT_COST', renglon: i + 1 }, { status: 400 })
+    }
+  }
   const actor = auth.staffName?.trim() || auth.staffId
   if (!actor) return Response.json({ error: 'ACTOR_REQUIRED' }, { status: 403 })
 
