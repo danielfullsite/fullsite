@@ -3,6 +3,37 @@
 import { leerSalon, requiereCaja } from './pedro-cliente'
 import { CAMPOS_SOLO_DE_GERENTE } from './pos-db-policy'
 import { claveLogicaDeCaja } from './operation-identity'
+import { publishTelemetry } from './events'
+
+// ─── OBSERVACIÓN (no cambia comportamiento) ──────────────────────────────────
+//
+// Cuatro hechos, ninguno inventado: `command_queued`, `reconnect_detected`,
+// `queue_drain_started`, `queue_drain_completed`.
+//
+// `offline_entered` NO es un evento. Se DERIVA: es el primer `command_queued` de
+// una racha contigua. Por eso cada `command_queued` lleva su `streak_id` y su
+// `streak_start`, y por eso NO existe aquí ningún detector global de "estamos
+// offline": `navigator.onLine` dice si hay cable, no si la nube contesta, y ya
+// costó un falso PASS en este proyecto.
+//
+// Todo lo de abajo es fire-and-forget y está envuelto en try/catch. Si la
+// telemetría falla, la venta no se entera.
+
+/** Racha de encolamiento en curso. Se abre al primer encolado y se cierra al reconectar. */
+let rachaActual: { id: string; inicio: string } | null = null
+
+function idRacha(): { id: string; inicio: string } {
+  if (!rachaActual) {
+    rachaActual = { id: `racha-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`, inicio: new Date().toISOString() }
+  }
+  return rachaActual
+}
+
+/** Sólo para pruebas: reinicia el estado de racha entre casos. */
+export function _reiniciarRachaTelemetria(): void { rachaActual = null }
+
+/** ¿Hay una racha abierta? Lo usa el drenado para decidir si hubo reconexión. */
+export function _hayRachaAbierta(): boolean { return rachaActual !== null }
 
 const DB_NAME = 'fullsite_pos'
 const DB_VERSION = 4
@@ -541,10 +572,36 @@ export async function queueOperation(
   return new Promise<string>((resolve, reject) => {
     const tx = db.transaction('sync_queue', 'readwrite')
     tx.objectStore('sync_queue').put(item)
-    tx.oncomplete = () => resolve(id)
+    tx.oncomplete = () => {
+      // EL NEGOCIO PRIMERO. `resolve` va antes que la observación para que la
+      // telemetría no le agregue ni un tick al camino del cobro.
+      resolve(id)
+      // Y la observación DESPUÉS DEL COMMIT, nunca antes: emitirla en `put()`
+      // afirmaría que algo se guardó cuando Chromium todavía puede abortar la
+      // transacción — justo el fallo que este archivo documenta arriba, donde
+      // el POS abría el cajón por un cobro que no existía en ninguna parte.
+      void observarEncolado(id, table, method)
+    }
     tx.onerror = () => reject(tx.error ?? new Error('sync_queue: la transacción falló'))
     tx.onabort = () => reject(tx.error ?? new Error('sync_queue: la transacción se abortó'))
   })
+}
+
+/** Observa un encolado ya commiteado. Nunca lanza, nunca demora al que encoló. */
+async function observarEncolado(id: string, table: string, method: string): Promise<void> {
+  try {
+    const racha = idRacha()
+    let profundidad: number | null = null
+    try { profundidad = (await getPendingQueue()).length } catch { /* la profundidad es opcional */ }
+    publishTelemetry('command_queued', {
+      queue_item_id: id,
+      table,
+      method,
+      queue_depth_after_commit: profundidad,
+      streak_id: racha.id,
+      streak_start: racha.inicio,
+    })
+  } catch { /* la observación jamás afecta lo observado */ }
 }
 
 export function repairReplayData(
@@ -1093,10 +1150,70 @@ export async function syncAll(options: { retryExhausted?: boolean } = {}): Promi
       const reset = await resetSyncQueueRetries()
       if (reset > 0) console.log(`[offline-sync] Reactivated ${reset} transient item(s) for a fresh connectivity cycle`)
     }
-    return await _syncAllInner()
+    const resultado = await _syncAllInner()
+    await observarDrenadoTerminado(resultado)
+    return resultado
   } finally {
     syncAllRunning = false
   }
+}
+
+/**
+ * Profundidad con la que arrancó el drenado en curso.
+ *
+ * La escribe `_syncAllInner` al emitir `queue_drain_started`, y la lee el cierre.
+ * Se comparte por variable en vez de leer la cola dos veces: dos lecturas del
+ * mismo dato en instantes distintos darían `depth_before` distintos en `started`
+ * y en `completed`, y además agregarían una lectura de IndexedDB al camino del
+ * drenado. `SyncResult` no se toca: es un tipo de negocio.
+ */
+let profundidadAlIniciarDrenado: number | null = null
+
+/** Cuántos pendientes hay. Devuelve null si no se pudo leer; nunca lanza. */
+async function profundidadDeCola(): Promise<number | null> {
+  try { return (await getPendingQueue()).length } catch { return null }
+}
+
+/**
+ * Cierra el drenado: profundidades y contadores SIN colapsar.
+ *
+ * `SyncResult` sólo trae `synced` y `failed`, así que `skipped` NO se inventa:
+ * se deriva de lo que quedó sin tocar en esta pasada —items en backoff, o que
+ * el bucle saltó— como `depth_before − synced − failed`. Se publica la fórmula
+ * junto al número para que nadie lo lea como «fallaron».
+ *
+ * Y saltado ≠ fallado ≠ sincronizado: son tres campos distintos, a propósito.
+ */
+async function observarDrenadoTerminado(r: SyncResult): Promise<void> {
+  try {
+    const antes = profundidadAlIniciarDrenado
+    profundidadAlIniciarDrenado = null
+    const despues = await profundidadDeCola()
+    const saltados = antes === null ? null : Math.max(0, antes - r.synced - r.failed)
+    publishTelemetry('queue_drain_completed', {
+      depth_before: antes,
+      depth_after: despues,
+      synced: r.synced,
+      failed: r.failed,
+      skipped: saltados,
+      skipped_formula: 'depth_before - synced - failed',
+      ...(r.blocked ? { blocked: r.blocked } : {}),
+    })
+    // RECONEXIÓN: se declara sólo cuando la nube ACEPTÓ algo. Un `synced > 0` es
+    // prueba de que el mismo camino que sincroniza volvió a servir — que es lo
+    // que pide el contrato. `navigator.onLine` no se consulta en ninguna parte:
+    // dice si hay cable, no si la nube contesta.
+    if (r.synced > 0 && rachaActual) {
+      const racha = rachaActual
+      rachaActual = null
+      publishTelemetry('reconnect_detected', {
+        streak_id: racha.id,
+        streak_start: racha.inicio,
+        synced_on_recovery: r.synced,
+        evidence: 'drain_synced_gt_zero',
+      })
+    }
+  } catch { /* jamás afecta al drenado */ }
 }
 
 /** order_id de un item de la cola (APP_API save-order o REST de pos_orders). */
@@ -1116,6 +1233,16 @@ async function _syncAllInner(): Promise<SyncResult> {
   const queue = await getPendingQueue()
   let synced = 0
   let failed = 0
+
+  // `queue_drain_started` va AQUÍ y no en `syncAll`: el guard ya está tomado
+  // (línea de `syncAllRunning = true`) y todavía no se procesó ningún item, que
+  // es lo que pide el contrato. Además `queue.length` es EXACTAMENTE el conjunto
+  // que este drenado va a recorrer — medirlo con una segunda lectura daría un
+  // número de otro instante.
+  profundidadAlIniciarDrenado = queue.length
+  try {
+    publishTelemetry('queue_drain_started', { depth_before: queue.length })
+  } catch { /* jamás afecta al drenado */ }
 
   // BUG-019 / multi-day offline: refrescar la sesión ANTES de drenar. Si no hay
   // sesión válida (refresh token revocado tras días offline, o device sin login),

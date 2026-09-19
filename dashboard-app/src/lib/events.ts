@@ -159,3 +159,131 @@ export function publishEvent(
     void flushQueue().catch(() => { /* nunca propagar */ })
   } catch { /* shadow mode jamás afecta la venta */ }
 }
+
+// ─── TELEMETRÍA DE OBSERVACIÓN ───────────────────────────────────────────────
+//
+// Canal aparte del shadow mode de arriba, a propósito:
+//
+//   · va a `/api/pos/telemetry`, no a `/rest/v1/events`. Medido el 2026-09-19:
+//     una sesión POS (shift token) que escribe a `/rest/v1/events` termina en
+//     `/api/pos/db` y recibe `403 table not allowed: events`. Por eso `events`
+//     no tiene una sola fila de AMALAY desde el 2026-08-25.
+//   · cola propia (`fullsite_telemetry_queue`). La cola de telemetría y la de
+//     negocio son conceptualmente distintas y no deben compartir estado.
+//   · idempotencia por `event_id`, que en el servidor es parte de la PK
+//     (client_id, event_id).
+//
+// NO ES FUENTE DE VERDAD. Si todo esto falla, la venta no se entera.
+
+const TELEMETRY_QUEUE_KEY = 'fullsite_telemetry_queue'
+const TELEMETRY_QUEUE_MAX = 500
+
+export type TelemetryType = 'command_queued' | 'reconnect_detected' | 'queue_drain_started' | 'queue_drain_completed'
+
+interface TelemetryEvent {
+  event_id: string
+  event_type: TelemetryType
+  observed_at: string
+  terminal_id: string | null
+  payload: Record<string, unknown>
+}
+
+/**
+ * Identidad PROVISIONADA de la terminal, o nada.
+ *
+ * Sólo `FULLSITE_TERMINAL_ID` sirve: lo escribe la inyección de identidad del
+ * shell (`renderer-identity.js:22`, desde `config.terminal_id`). `pos_terminal_id`
+ * NO sirve aunque exista, porque en un navegador lo fabrica `pos-sessions.ts:23`
+ * (`term_<base36>_<random>`) y no hay forma de distinguir uno del otro al leerlo.
+ * `fullsite_device_id` (`POS-XXXX`) tampoco: es `Math.random()`.
+ *
+ * Una terminal desconocida se registra como desconocida.
+ */
+export function getProvisionedTerminalId(): string | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const id = localStorage.getItem('FULLSITE_TERMINAL_ID')
+    return id && id.trim() ? id.trim() : null
+  } catch { return null }
+}
+
+function loadTelemetryQueue(): TelemetryEvent[] {
+  try {
+    const raw = localStorage.getItem(TELEMETRY_QUEUE_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch { return [] }
+}
+
+function saveTelemetryQueue(queue: TelemetryEvent[]): void {
+  try {
+    if (queue.length > TELEMETRY_QUEUE_MAX) queue = queue.slice(queue.length - TELEMETRY_QUEUE_MAX)
+    localStorage.setItem(TELEMETRY_QUEUE_KEY, JSON.stringify(queue))
+  } catch { /* sin localStorage la telemetría se pierde; la venta no */ }
+}
+
+let telemetryFlushing = false
+
+async function sendTelemetry(ev: TelemetryEvent): Promise<boolean> {
+  try {
+    const res = await fetch('/api/pos/telemetry', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(ev),
+    })
+    // 2xx = guardado. 4xx = el evento es inválido y reintentarlo no lo arregla:
+    // se descarta para que un solo evento malo no tape la cola para siempre —
+    // que es exactamente lo que le pasa hoy al canal de `events` con su 403.
+    if (res.ok) return true
+    if (res.status >= 400 && res.status < 500) {
+      console.warn(`[telemetria] evento descartado, HTTP ${res.status}`)
+      return true
+    }
+    return false // 5xx / sin sesión todavía: conservar y reintentar
+  } catch {
+    return false // sin red: se reintenta al reconectar
+  }
+}
+
+/** Drena la cola de telemetría. Nunca lanza. */
+export async function flushTelemetry(): Promise<void> {
+  if (telemetryFlushing || typeof window === 'undefined') return
+  telemetryFlushing = true
+  try {
+    let queue = loadTelemetryQueue()
+    while (queue.length > 0) {
+      const ok = await sendTelemetry(queue[0])
+      if (!ok) return
+      queue = loadTelemetryQueue()
+      queue.shift()
+      saveTelemetryQueue(queue)
+    }
+  } catch { /* jamás propagar */ } finally {
+    telemetryFlushing = false
+  }
+}
+
+/**
+ * Registra una observación. Fire-and-forget: NUNCA lanza, NUNCA bloquea.
+ *
+ * Es seguro llamarla desde `tx.oncomplete` de la cola offline y desde el
+ * drenado: no espera respuesta y se traga cualquier error.
+ */
+export function publishTelemetry(
+  eventType: TelemetryType,
+  payload: Record<string, unknown> = {},
+): void {
+  try {
+    if (typeof window === 'undefined') return
+    const ev: TelemetryEvent = {
+      event_id: crypto.randomUUID(),
+      event_type: eventType,
+      observed_at: new Date().toISOString(),
+      terminal_id: getProvisionedTerminalId(),
+      payload,
+    }
+    const queue = loadTelemetryQueue()
+    queue.push(ev)
+    saveTelemetryQueue(queue)
+    void flushTelemetry()
+  } catch { /* la observación jamás afecta lo observado */ }
+}
