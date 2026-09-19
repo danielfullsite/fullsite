@@ -1,6 +1,11 @@
 import { NextRequest } from 'next/server'
 import { issueShiftToken } from '@/lib/shift-token'
 import { pinGate, pinRecord } from '@/lib/pin-throttle'
+import { isUnrotatedTemplatePin } from '@/lib/provision-tenant'
+
+function rotationRequired() {
+  return Response.json({ code: 'pin_rotation_required', error: 'El dueño debe asignar un PIN nuevo a este usuario desde Equipo antes de ingresar.', recovery_path: '/equipo' }, { status: 401 })
+}
 
 // PIN validation + shift token issuance.
 // On success returns { staff, shiftToken } — the client stores shiftToken
@@ -121,38 +126,11 @@ export async function POST(request: NextRequest) {
       roleFilter = `&role=in.(${allowedRoles.join(',')})`
     }
 
-    /**
-     * La huella IGNORABA el rol pedido — escalada de privilegio.
-     *
-     * Esta rama resolvia y devolvia ANTES de que se calculara `roleFilter`, asi que
-     * `manager: true` y `min_role` no se aplicaban. Y como el endpoint no verifica
-     * ninguna firma WebAuthn —confia en el id que le mandan— bastaba con conocer el
-     * UUID de un gerente para pedir un shiftToken de gerente SIN huella y SIN PIN.
-     * Esos UUID viven en `pos_staff_cache`, en el localStorage de cualquier terminal.
-     *
-     * Encontrado el 2026-08-31 al ir a extender la huella al corte de caja. Montar
-     * esa funcion encima habria llevado el bypass justo a la autorizacion del dinero.
-     *
-     * LO QUE ESTE ARREGLO NO HACE: sigue sin verificarse la firma WebAuthn del lado
-     * del servidor; el id sigue siendo una afirmacion del cliente. Lo que se cierra
-     * es la ESCALADA: una huella solo puede obtener el rol que su propio empleado ya
-     * tiene. La verificacion real exige guardar las llaves publicas en el servidor y
-     * validar la assertion — va aparte, y sigue haciendo falta.
-     */
-    // Fingerprint (WebAuthn) login — look up by staff ID, validate active status + tenant
-    if (fingerprint_id && typeof fingerprint_id === 'string') {
-      const fpRes = await fetch(
-        `${sbUrl}/rest/v1/pos_staff?id=eq.${encodeURIComponent(fingerprint_id)}&active=eq.true&client_id=eq.${encodeURIComponent(clientId)}${roleFilter}&select=id,name,role&limit=1`,
-        { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
-      )
-      if (fpRes.ok) {
-        const rows = await fpRes.json()
-        if (Array.isArray(rows) && rows.length > 0) {
-          return respond({ id: rows[0].id, name: rows[0].name, role: rows[0].role }, clientId, throttleKey)
-        }
-      }
+    // A staff identifier is not a biometric assertion. Keep PIN access available
+    // until a server-side WebAuthn/device verifier can prove this identity.
+    if (fingerprint_id) {
       await pinRecord(throttleKey, false)
-      return Response.json({ error: 'Empleado no encontrado o desactivado' }, { status: 401 })
+      return Response.json({ code: 'FINGERPRINT_VERIFICATION_REQUIRED', error: 'La huella requiere verificación segura. Ingresa con tu PIN.' }, { status: 403 })
     }
 
     // Transitional compatibility: existing staff may still have 4–8 digit
@@ -168,6 +146,10 @@ export async function POST(request: NextRequest) {
     if (res.ok) {
       const rows = await res.json()
       if (Array.isArray(rows) && rows.length > 0) {
+        if (isUnrotatedTemplatePin(clientId, rows[0], pin)) {
+          await pinRecord(throttleKey, false)
+          return rotationRequired()
+        }
         return respond({ id: rows[0].id, name: rows[0].name, role: rows[0].role }, clientId, throttleKey)
       }
     }

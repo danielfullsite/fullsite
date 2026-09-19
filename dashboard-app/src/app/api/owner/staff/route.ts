@@ -23,7 +23,7 @@ import { randomUUID, randomInt } from 'crypto'
 export const dynamic = 'force-dynamic'
 
 const MANAGER_ROLES = new Set(['dueño', 'admin', 'gerente'])
-const ELEVATED_STAFF_ROLES = new Set(['admin', 'gerente'])
+const ELEVATED_STAFF_ROLES = new Set(['admin', 'gerente', 'dueño'])
 const ALLOWED_STAFF_ROLES = new Set(['mesero', 'cajero', 'cocina', 'barra', 'capitan', 'gerente', 'admin'])
 // 4–10 dígitos: 4 = PIN corto que teclea el mesero; hasta 10 para el PIN de
 // respaldo generado por el sistema (ver src/lib/pos-pin.ts). Debe coincidir con
@@ -79,12 +79,15 @@ export async function GET(request: NextRequest) {
 
   const res = await fetch(
     `${SB_URL}/rest/v1/pos_staff?client_id=eq.${encodeURIComponent(auth.clientId)}` +
-    `&select=id,name,pin,role,role_display,active,hourly_rate,weekly_salary&order=name`,
+    `&select=id,name,role,role_display,active,hourly_rate,weekly_salary&order=name`,
     { headers: H, cache: 'no-store' }
   )
   if (!res.ok) return Response.json({ error: `No se pudo leer (${res.status})` }, { status: 502 })
   // callerRole permite a la UI gatear el dropdown de roles (un gerente no ofrece admin/gerente).
-  return Response.json({ staff: await res.json(), callerRole: auth.role })
+  const rows = await res.json()
+  return Response.json({ staff: rows.map((row: Record<string, unknown>) => {
+    const safe = { ...row }; delete safe.pin; return safe
+  }), callerRole: auth.role })
 }
 
 // ── POST — crea un miembro del staff ──────────────────────────────────────────

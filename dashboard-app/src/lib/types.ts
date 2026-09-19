@@ -1,4 +1,5 @@
 export interface WansoftDaily {
+  reporting?: { source: 'caja'; historical_date_fallback: boolean; item_allocation_available: false }
   fecha: string
   ventas_dia: number
   ventas_brutas: number

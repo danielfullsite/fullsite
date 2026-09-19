@@ -50,6 +50,7 @@ import { leerCuenta, requiereCaja, cuentaConfirmada, type LecturaDeCuenta } from
 import { leerCatalogoCaja } from '@/lib/pedro-catalogo'
 import { guardarCuentaEnCaja, enviarCuentaEnCaja, moverCuentaEnCaja, anularCuentaEnCaja, GuardadoAnteriorRecuperado, firmaBorradorParaCaja, type OrdenConfirmada } from '@/lib/pedro-operaciones'
 import CobroDeCaja from '@/components/pos/CobroDeCaja'
+import ImpresionDeCaja from '@/components/pos/ImpresionDeCaja'
 import { reconciliarCuenta, cuentaEditableDe, mismaConfirmacionDeCuenta, type CuentaEditable } from '@/lib/pos-order-reconciliation'
 import { evaluarLiquidacion, cuentasDe, intentoDePago } from '@/lib/liquidacion-de-orden'
 import type { OrderItem, MenuItem, Order } from '@/lib/pos-data'
@@ -2325,6 +2326,7 @@ function POSContent() {
 
   const [lecturaCuentaCaja, setLecturaCuentaCaja] = useState<LecturaDeCuenta | null>(null)
   const [cobroDeCaja, setCobroDeCaja] = useState<OrdenConfirmada | null>(null)
+  const [impresionDeCaja, setImpresionDeCaja] = useState<{ mode: 'precheck' | 'receipt' | 'drawer'; orderId?: string } | null>(null)
   const [avisoCuentaCaja, setAvisoCuentaCaja] = useState<string | null>(null)
   const [ultimaLecturaCaja, setUltimaLecturaCaja] = useState<number | null>(null)
   const [conflictoCuentaCaja, setConflictoCuentaCaja] = useState(false)
@@ -3667,7 +3669,14 @@ function POSContent() {
 
   // Pre-ticket (precuenta — antes de cobrar)
   const handlePreTicket = async () => {
-    if (accionPendienteEnCaja('La impresión de precuenta')) return
+    if (bloqueaLegacyCaja) {
+      if (!escribeEnCaja) { showToast('Caja debe confirmar la cuenta antes de imprimir.'); return }
+      if (!await validarCuentaCaja()) return
+      const remote = cuentaRemotaCaja.current
+      if (!remote || firmaBorradorParaCaja(cuentaActual.current) !== firmaBorradorParaCaja(cuentaEditableDe(remote))) { showToast('Guarda los cambios pendientes antes de imprimir la precuenta.'); return }
+      setImpresionDeCaja({ mode: 'precheck', orderId: String(remote.id ?? remote.order_id) })
+      return
+    }
     if (activeItems.length === 0) return
     const order: Order = {
       id: orderId,
@@ -4450,6 +4459,7 @@ function POSContent() {
 
       {cobroDeCaja && <CobroDeCaja order={cobroDeCaja} onClose={() => { setCobroDeCaja(null); void refrescarCuentaCaja.current() }}
         onChanged={() => { void refrescarCuentaCaja.current() }} />}
+      {impresionDeCaja && <ImpresionDeCaja {...impresionDeCaja} onClose={() => setImpresionDeCaja(null)} />}
       {requiereCaja() && avisoCuentaCaja && (
         <div role="status" className="px-4 py-3 bg-amber-950 text-amber-100 text-sm flex flex-wrap items-center gap-3">
           <span>{avisoCuentaCaja}{ultimaLecturaCaja ? ` Última confirmación: ${new Date(ultimaLecturaCaja).toLocaleTimeString('es-MX')}.` : ''}</span>
@@ -4790,7 +4800,11 @@ function POSContent() {
                 />
               </div>
               <button
-                onClick={() => { if (accionPendienteEnCaja('La apertura manual del cajón')) return; if (!isMobileRestricted) { openCashDrawer(); showToast('Cajón abierto') } }}
+                onClick={() => {
+                  if (escribeEnCaja) { if (!isMobileRestricted) setImpresionDeCaja({ mode: 'drawer' }); return }
+                  if (bloqueaLegacyCaja) { showToast('Caja debe confirmar su estado antes de solicitar el cajón.'); return }
+                  if (!isMobileRestricted) { openCashDrawer(); showToast('Cajón abierto') }
+                }}
                 disabled={isMobileRestricted}
                 className="w-12 min-h-[48px] flex items-center justify-center rounded-lg bg-[var(--surface-2)] hover:bg-[var(--raised)] disabled:opacity-30 text-[var(--text-3)] transition-colors"
                 title={isMobileRestricted ? 'Solo disponible en terminal de caja' : 'Abrir cajón'}
@@ -4798,7 +4812,11 @@ function POSContent() {
                 <Banknote size={18} />
               </button>
               <button
-                onClick={() => { if (!accionPendienteEnCaja('Los retiros y depósitos') && !isMobileRestricted) setShowCashMovement(true) }}
+                onClick={() => {
+                  if (isMobileRestricted) return
+                  if (escribeEnCaja) { router.push('/pos/turno'); return }
+                  if (!accionPendienteEnCaja('Los retiros y depósitos')) setShowCashMovement(true)
+                }}
                 disabled={isMobileRestricted}
                 className="w-12 min-h-[48px] flex items-center justify-center rounded-lg bg-[var(--surface-2)] hover:bg-[var(--raised)] disabled:opacity-30 text-[var(--text-3)] transition-colors"
                 title={isMobileRestricted ? 'Solo disponible en terminal de caja' : 'Retiro / Deposito'}
@@ -4807,7 +4825,8 @@ function POSContent() {
               </button>
               <button
                 onClick={() => {
-                  if (accionPendienteEnCaja('La reimpresión de ticket')) return
+                  if (escribeEnCaja) { setImpresionDeCaja({ mode: 'receipt', orderId }); return }
+                  if (bloqueaLegacyCaja) { showToast('Caja debe confirmar los pagos antes de imprimir un recibo.'); return }
                   const now = Date.now()
                   if (now - lastReprintRef.current < 3000) return
                   lastReprintRef.current = now

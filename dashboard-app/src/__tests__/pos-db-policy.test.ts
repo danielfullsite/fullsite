@@ -91,6 +91,12 @@ describe('redacción de columnas', () => {
     expect('template' in out[0]).toBe(false)
   })
 
+  it('select embebido con alias desde otra tabla tampoco revela PINs', () => {
+    const body = JSON.stringify([{ staff_alias: { name: 'Ana', pin: '1234' }, rows: [{ fingerprint: { template: 'secret' } }] }])
+    const output = JSON.parse(redactResponse('pos_staff_shifts', body, 'application/json'))
+    expect(output).toEqual([{ staff_alias: { name: 'Ana' }, rows: [{ fingerprint: {} }] }])
+  })
+
   it('una tabla sin columnas prohibidas pasa intacta', () => {
     const body = JSON.stringify([{ id: 1, mesa: 5, total: 320 }])
     expect(redactResponse('pos_orders', body, 'application/json')).toBe(body)
@@ -111,47 +117,14 @@ describe('tableOf', () => {
   })
 })
 
-describe('las dos rutas comparten la política — no puede haber una laxa', () => {
+describe('las dos rutas comparten la política', () => {
   const catchAll = readFileSync(join(ROOT, 'app', 'api', 'pos', 'db', '[...path]', 'route.ts'), 'utf8')
   const directa = readFileSync(join(ROOT, 'app', 'api', 'pos', 'db', 'route.ts'), 'utf8')
-
-  it('ninguna define su propia lista blanca', () => {
-    for (const [nombre, src] of [['catch-all', catchAll], ['directa', directa]] as const) {
-      expect(src, `${nombre} define ALLOW local`).not.toMatch(/const ALLOW\s*=\s*new Set/)
-      expect(src, `${nombre} define MANAGER_ONLY local`).not.toMatch(/const MANAGER_ONLY\w*\s*=\s*new Set/)
-    }
-  })
-
-  it('las dos importan la política compartida', () => {
-    expect(catchAll).toContain("from '@/lib/pos-db-policy'")
-    expect(directa).toContain("from '@/lib/pos-db-policy'")
-  })
-
-  it('las dos redactan la respuesta antes de devolverla', () => {
-    expect(catchAll).toContain('redactResponse(')
-    expect(directa).toContain('redactResponse(')
-  })
-
-  it('el catch-all comprueba la lista blanca y el rol', () => {
-    expect(catchAll).toContain('ALLOW.has(')
-    expect(catchAll).toContain('MANAGER_ONLY_WRITE.has(')
-    expect(catchAll).toContain('isManager(')
-  })
-
-  it('ninguna exime a los RPC de sus protecciones', () => {
-    // El agujero del 2026-08-27: el catch-all tenía las SEIS protecciones escritas
-    // como una negación de "¿es RPC?", así que cada una nacía ya saltada para
-    // `/rest/v1/rpc/*`. La condición se eliminó; los RPC se rechazan de entrada.
-    //
-    // Se comparan los archivos SIN comentarios a propósito: la aserción es sobre lo
-    // que el código hace, no sobre lo que la prosa menciona — este mismo archivo y la
-    // cabecera del proxy explican el bug nombrando la condición que se eliminó.
-    const soloCodigo = (src: string) =>
-      src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
-
-    for (const [nombre, src] of [['catch-all', catchAll], ['directa', directa]] as const) {
-      expect(soloCodigo(src), `${nombre} vuelve a eximir a los RPC de una protección`)
-        .not.toMatch(/!\s*isRpc/)
+  it('ambos adaptadores delegan a la misma frontera service-role probada con requests', () => {
+    for (const source of [catchAll, directa]) {
+      expect(source).toContain("from '@/lib/pos-db-proxy'")
+      expect(source).toContain('runPOSDBProxy(')
+      expect(source).not.toContain('SUPABASE_SERVICE_KEY')
     }
   })
 })

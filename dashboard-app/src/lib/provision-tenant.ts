@@ -4,8 +4,8 @@
 // a new tenant. Given a clientId + brand, it clones a FULL tenant skeleton
 // (clients row, default location, menu, payment methods, role placeholders) from the
 // global onboarding template. It is:
-//   - IDEMPOTENT: every write is an UPSERT keyed on a deterministic id
-//     (Prefer: resolution=merge-duplicates). Re-running yields the same tenant.
+//   - RESUMABLE: inserts preserve existing rows, including defaults the tenant
+//     has edited. A new tenant stays inactive until every required step succeeds.
 //   - MULTI-TENANT SAFE: every seeded row carries client_id = clientId. Nothing
 //     global is mutated.
 //   - SERVICE-ROLE ONLY: uses SUPABASE_SERVICE_KEY via PostgREST fetch. NEVER the
@@ -17,6 +17,7 @@
 import { DEFAULT_ONBOARDING_TEMPLATE, type OnboardingTemplate } from './onboarding-template'
 import type { ClientFeatures } from './client-config'
 import { resolveVerticalPreset, type VerticalId } from './vertical-presets'
+import { randomInt } from 'node:crypto'
 
 // Kept in sync with DEFAULT_FEATURES in src/lib/client-config.ts (which is not
 // exported). New tenants get the standard feature set.
@@ -40,6 +41,8 @@ export interface ProvisionInput {
   /** Tipo de restaurante — resuelve un preset de src/lib/vertical-presets.ts
    *  (features + menú semilla + mesas). Ver docs/strategy/BIBLE-SQUARE.md. */
   vertical?: VerticalId
+  /** Platform onboarding activates only after owner and service memberships. */
+  deferActivation?: boolean
 }
 
 export interface ProvisionResult {
@@ -56,9 +59,10 @@ export interface ProvisionResult {
     pos_mutation_authority: number
     pos_item_inventory_policy: number
   }
-  /** PINs de plantilla sembrados en ESTA corrida (vacío si el tenant ya tenía
-   *  staff). El alta los muestra una vez — no vuelven a viajar por la red. */
+  /** Campo legacy: ahora siempre vacío; las plantillas nuevas están inactivas. */
   staffPins: Array<{ role: string; pin: string }>
+  staffSetupRequired: boolean
+  activationPending: boolean
 }
 
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
@@ -76,8 +80,8 @@ function serviceKey(): string {
 /**
  * PIN determinístico de 10 dígitos a partir de una semilla (tenant:rol).
  * FNV-1a doble pasada → 10 dígitos, primer dígito nunca 0. No es secreto
- * criptográfico: es el PIN inicial de plantilla que el dueño debe rotar; su
- * único requisito es longitud 10 y estabilidad entre corridas del provision.
+ * criptográfico. Se conserva sólo para detectar plantillas legacy pendientes
+ * de rotación; el alta nueva nunca usa este valor como credencial.
  */
 export function deterministicPin10(seed: string): string {
   let h1 = 0x811c9dc5, h2 = 0x01000193
@@ -91,6 +95,12 @@ export function deterministicPin10(seed: string): string {
   return first + nine
 }
 
+/** Legacy detection only. This predictable value is never issued by new seeds. */
+export function isUnrotatedTemplatePin(clientId: string, staff: { id: string; name: string; role: string }, pin: unknown): boolean {
+  if (typeof pin !== 'string' || pin !== deterministicPin10(`${clientId}:${staff.role}`)) return false
+  return staff.id === `${clientId}-${pin}` || /\(plantilla\)\s*$/i.test(staff.name)
+}
+
 function headers() {
   const key = serviceKey()
   return {
@@ -98,19 +108,22 @@ function headers() {
     Authorization: `Bearer ${key}`,
     'Content-Type': 'application/json',
     // Idempotent upsert on the table's primary key.
-    Prefer: 'resolution=merge-duplicates,return=minimal',
+    Prefer: 'resolution=ignore-duplicates,return=representation',
   }
 }
 
 /** ¿Cuántas filas tiene `table` para este client? (para siembras idempotentes por conteo). */
-async function countFor(table: string, clientId: string): Promise<number> {
+async function countFor(table: string, clientId: string, extraFilter = ''): Promise<number> {
   const res = await fetch(
-    `${SB_URL}/rest/v1/${table}?client_id=eq.${encodeURIComponent(clientId)}&select=id`,
+    `${SB_URL}/rest/v1/${table}?client_id=eq.${encodeURIComponent(clientId)}&select=id${extraFilter}`,
     { headers: { ...headers(), Prefer: 'count=exact', Range: '0-0' }, cache: 'no-store' }
   )
+  if (!res.ok) throw new Error(`[provision] count ${table} failed (${res.status})`)
   const range = res.headers.get('content-range')
-  if (range) { const total = range.split('/')[1]; return total === '*' ? 0 : parseInt(total, 10) }
-  return 0
+  if (range) { const total = Number(range.split('/')[1]); if (Number.isFinite(total)) return total }
+  const rows = await res.json()
+  if (!Array.isArray(rows)) throw new Error(`[provision] count ${table} invalid response`)
+  return rows.length // Only zero/nonzero is used when exact count is unavailable.
 }
 
 async function insertRows(table: string, rows: Record<string, unknown>[]): Promise<number> {
@@ -122,8 +135,7 @@ async function insertRows(table: string, rows: Record<string, unknown>[]): Promi
     cache: 'no-store',
   })
   if (!res.ok) {
-    const detail = await res.text().catch(() => '')
-    throw new Error(`[provision] insert ${table} failed (${res.status}): ${detail}`)
+    throw new Error(`[provision] insert ${table} failed (${res.status})`)
   }
   return rows.length
 }
@@ -137,10 +149,11 @@ async function upsert(table: string, rows: Record<string, unknown>[]): Promise<n
     cache: 'no-store',
   })
   if (!res.ok) {
-    const detail = await res.text().catch(() => '')
-    throw new Error(`[provision] upsert ${table} failed (${res.status}): ${detail}`)
+    throw new Error(`[provision] upsert ${table} failed (${res.status})`)
   }
-  return rows.length
+  const inserted = await res.json()
+  if (!Array.isArray(inserted)) throw new Error(`[provision] insert ${table} invalid receipt`)
+  return inserted.length
 }
 
 /**
@@ -158,10 +171,30 @@ async function upsertOnConflict(table: string, rows: Record<string, unknown>[], 
     cache: 'no-store',
   })
   if (!res.ok) {
-    const detail = await res.text().catch(() => '')
-    throw new Error(`[provision] upsert ${table} (on_conflict=${conflictCols}) failed (${res.status}): ${detail}`)
+    throw new Error(`[provision] upsert ${table} (on_conflict=${conflictCols}) failed (${res.status})`)
   }
-  return rows.length
+  const inserted = await res.json()
+  if (!Array.isArray(inserted)) throw new Error(`[provision] insert ${table} invalid receipt`)
+  return inserted.length
+}
+
+/** Final gate; cannot reactivate an intentionally disabled existing tenant. */
+export async function activateProvisionedTenant(clientId: string): Promise<void> {
+  const response = await fetch(`${SB_URL}/rest/v1/clients?id=eq.${encodeURIComponent(clientId)}&select=id,active,pos_settings&limit=1`, { headers: headers(), cache: 'no-store' })
+  if (!response.ok) throw new Error('[provision] cannot verify activation')
+  const rows = await response.json()
+  const client = Array.isArray(rows) ? rows[0] : null
+  if (!client) throw new Error('[provision] client missing before activation')
+  if (client.active) return
+  const settings = client.pos_settings || {}
+  if (settings['onboarding.provisioning']?.state !== 'pending') throw new Error('[provision] existing tenant is disabled; explicit activation required')
+  const updated = await fetch(`${SB_URL}/rest/v1/clients?id=eq.${encodeURIComponent(clientId)}&active=eq.false`, {
+    method: 'PATCH', headers: { ...headers(), Prefer: 'return=representation' },
+    body: JSON.stringify({ active: true, pos_settings: { ...settings, 'onboarding.provisioning': { state: 'complete', completed_at: new Date().toISOString() } } }), cache: 'no-store',
+  })
+  if (!updated.ok) throw new Error('[provision] activation failed')
+  const receipt = await updated.json()
+  if (!Array.isArray(receipt) || receipt.length !== 1 || receipt[0].active !== true) throw new Error('[provision] activation not confirmed')
 }
 
 /**
@@ -169,7 +202,7 @@ async function upsertOnConflict(table: string, rows: Record<string, unknown>[], 
  */
 export async function provisionTenant(input: ProvisionInput): Promise<ProvisionResult> {
   const { clientId } = input
-  if (!clientId) throw new Error('[provision] clientId required')
+  if (!/^[a-z0-9_-]{1,40}$/i.test(clientId)) throw new Error('[provision] valid clientId required')
   if (!SB_URL) throw new Error('[provision] NEXT_PUBLIC_SUPABASE_URL not configured')
   if (!serviceKey()) throw new Error('[provision] SUPABASE_SERVICE_KEY not configured')
 
@@ -178,13 +211,12 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
   // ¿El tenant ya existe? Los umbrales día-0 (Lazo 1) solo se siembran en el
   // alta ORIGINAL: un re-provision no debe pisar pos_settings que el tenant o
   // el tuner (Lazo 2) ya ajustaron.
-  let clientExists = false
-  try {
-    const chk = await fetch(`${SB_URL}/rest/v1/clients?id=eq.${encodeURIComponent(clientId)}&select=id&limit=1`,
-      { headers: headers(), cache: 'no-store' })
-    const rows = chk.ok ? await chk.json().catch(() => []) : []
-    clientExists = Array.isArray(rows) && rows.length > 0
-  } catch { /* si no se pudo verificar, tratar como existente = no pisar settings */ clientExists = true }
+  const chk = await fetch(`${SB_URL}/rest/v1/clients?id=eq.${encodeURIComponent(clientId)}&select=id,active,pos_settings&limit=1`,
+    { headers: headers(), cache: 'no-store' })
+  if (!chk.ok) throw new Error('[provision] cannot verify existing tenant')
+  const existingRows = await chk.json()
+  if (!Array.isArray(existingRows)) throw new Error('[provision] invalid existing tenant response')
+  const clientExists = existingRows.length > 0
 
   const tpl = input.template || preset?.template || DEFAULT_ONBOARDING_TEMPLATE
   const displayName = input.display_name || clientId
@@ -202,7 +234,7 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     logo_url: input.logo_url || null,
     iva_rate: 0.16,
     timezone: 'America/Mexico_City',
-    active: true,
+    active: false,
     features: JSON.stringify(features),
     mesas,
     // Tipo de restaurante (vertical preset). Columna `type` ya existe en `clients`.
@@ -210,7 +242,10 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     // Lazo 1 (docs/ai/APRENDIZAJE-AGENTES-DESIGN.md): umbrales de industria del
     // vertical como prior de los agentes — SOLO en el alta original, para no
     // pisar ajustes del tenant/tuner en un re-provision.
-    ...(!clientExists && preset ? { pos_settings: { 'agents.thresholds': { ...preset.thresholds, source: `vertical:${preset.id}`, seeded_at: new Date().toISOString() } } } : {}),
+    pos_settings: {
+      'onboarding.provisioning': { state: 'pending', started_at: new Date().toISOString() },
+      ...(!clientExists && preset ? { 'agents.thresholds': { ...preset.thresholds, source: `vertical:${preset.id}`, seeded_at: new Date().toISOString() } } : {}),
+    },
     data_source: 'fullsite',
     // Requerido por el cálculo de día de negocio (ops_aggregate.get_business_day_config).
     // Sin esto, los agentes de IA crashean para el clon. Default 05:00 (día empieza a las 5am).
@@ -229,6 +264,14 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     address: location.address?.trim() || '',
     active: true,
   }))
+  if (new Set(locationRows.map(location => location.id)).size !== locationRows.length) throw new Error('[provision] duplicate location ids')
+  for (const location of locationRows) {
+    if (!/^[\w-]{1,100}$/.test(location.id)) throw new Error('[provision] invalid location id')
+    const check = await fetch(`${SB_URL}/rest/v1/client_locations?id=eq.${encodeURIComponent(location.id)}&select=id,client_id`, { headers: headers(), cache: 'no-store' })
+    if (!check.ok) throw new Error('[provision] cannot verify location ownership')
+    const found = await check.json()
+    if (!Array.isArray(found) || found.some(row => row.client_id !== clientId)) throw new Error('[provision] location belongs to another tenant')
+  }
   const locationsCount = await upsert('client_locations', locationRows)
 
   // ── 3. menu categories + items ─────────────────────────────────────────────
@@ -269,25 +312,22 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
 
   // ── 5. role placeholders (pos_staff) ───────────────────────────────────────
   // One placeholder staff row per role so the new tenant has a starting role set.
-  // PINs de 10 dígitos (regla 2026-08-29: la huella es el método primario; el
-  // PIN es respaldo y debe ser largo, no un 4 dígitos observable). Deterministas
-  // por tenant+rol para que re-correr el provision dé el mismo resultado, y
-  // sembrados SOLO si el tenant no tiene staff (idempotente por conteo — así un
-  // re-provision de un tenant viejo con PINs de 4 dígitos no duplica filas).
+  // Placeholders do not authenticate: inactive, random unexposed PIN. The owner
+  // must assign a real employee and rotate their PIN before activation. Existing
+  // employees/PINs are preserved, including installations created by older builds.
   let staffCount = 0
   const staffPins: Array<{ role: string; pin: string }> = []
   if ((await countFor('pos_staff', clientId)) === 0) {
     const staffRows = tpl.roles.map((role) => {
-      const pin = deterministicPin10(`${clientId}:${role}`)
-      staffPins.push({ role, pin })
+      const pin = String(randomInt(1_000_000_000, 10_000_000_000))
       return {
-        id: `${clientId}-${pin}`,
+        id: `${clientId}-template-${role}`,
         client_id: clientId,
         name: `${role} (plantilla)`,
         pin,
         role,
         role_display: role,
-        active: true,
+        active: false,
         hourly_rate: 0,
         weekly_salary: 0,
       }
@@ -376,6 +416,9 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     'pos_item_inventory_policy', policyRows, 'client_id,menu_item_id'
   )
 
+  const staffSetupRequired = (await countFor('pos_staff', clientId, '&active=eq.true')) === 0
+  if (!input.deferActivation) await activateProvisionedTenant(clientId)
+
   return {
     clientId,
     created: {
@@ -391,5 +434,7 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
       pos_item_inventory_policy: policyCount,
     },
     staffPins,
+    staffSetupRequired,
+    activationPending: !clientExists || (!existingRows[0].active && existingRows[0].pos_settings?.['onboarding.provisioning']?.state === 'pending'),
   }
 }

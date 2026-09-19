@@ -2,6 +2,8 @@ import type { WansoftDaily } from './types'
 import { supabase } from './supabase'
 import { nowMX, fmtDateMX, zonedStartOfDayISO } from './date-mx'
 import { fetchWithTimeout } from './fetch-with-timeout'
+import { proyectarOrdenReporte, type OrdenParaReporte } from './caja-reporte-cloud'
+import { ReporteCajaNoDisponible } from './caja-reportes'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -133,7 +135,7 @@ export function isFullsitePOS(): boolean {
   return getDataSource() === 'fullsite'
 }
 
-async function sbFetch(table: string, params: string = ''): Promise<unknown[]> {
+async function sbFetch(table: string, params: string = '', requireComplete = false): Promise<unknown[]> {
   const url = `${SUPABASE_URL}/rest/v1/${table}?${params}`
   try {
     const token = await getAuthToken()
@@ -144,16 +146,19 @@ async function sbFetch(table: string, params: string = ''): Promise<unknown[]> {
       },
     }, 10_000)
     if (!res.ok) {
+      if (requireComplete) throw new ReporteCajaNoDisponible('No se pudo consultar el reporte completo en la nube.')
       console.error(`[Fullsite] Supabase error ${res.status} on ${table}:`, await res.text().catch(() => ''))
       return []
     }
     const data = await res.json()
     if (!Array.isArray(data)) {
+      if (requireComplete) throw new ReporteCajaNoDisponible('La nube devolvió un reporte incompleto.')
       console.error(`[Fullsite] Supabase returned non-array for ${table}:`, typeof data)
       return []
     }
     return data
   } catch (err) {
+    if (requireComplete) throw err instanceof ReporteCajaNoDisponible ? err : new ReporteCajaNoDisponible('No se pudo confirmar la conexión para consultar el reporte.')
     console.error(`[Fullsite] Network error fetching ${table}:`, err)
     return []
   }
@@ -227,7 +232,13 @@ function locationFilter(locationId?: string | null): string {
 
 export async function getRecentDays(days: number = 30, clientSlug: string = getActiveClientSlug(), locationId?: string | null): Promise<WansoftDaily[]> {
   // Try pos_orders first for recent data (last 7 days) — this is the live POS data
-  const posRecent = await getDashboardFromPosOrders(Math.min(days, 90), clientSlug, locationId)
+  const posRecent = await getDashboardFromPosOrders(isFullsitePOS() ? days : Math.min(days, 90), clientSlug, locationId).catch(error => {
+    if (isFullsitePOS()) throw error
+    // Before cutover, Wansoft remains the configured source. A failed optional
+    // POS supplement must not take its existing report offline.
+    return [] as WansoftDaily[]
+  })
+  if (isFullsitePOS()) return posRecent.slice(-days)
   // Then get wansoft_daily for historical data
   const data = await sbFetch('wansoft_daily', `select=*&client_slug=eq.${clientSlug}${locationFilter(locationId)}&ventas_dia=gt.0&order=fecha.desc&limit=${days * 2}`) as Record<string, unknown>[]
   const wansoftData = dedupeByFecha(data).slice(0, days).reverse().map(parseRow)
@@ -243,8 +254,12 @@ export async function getRecentDays(days: number = 30, clientSlug: string = getA
 
 export async function getLatestDay(clientSlug: string = getActiveClientSlug(), locationId?: string | null): Promise<WansoftDaily | null> {
   // Try pos_orders first — live POS data takes priority
-  const posData = await getDashboardFromPosOrders(7, clientSlug, locationId)
+  const posData = await getDashboardFromPosOrders(7, clientSlug, locationId).catch(error => {
+    if (isFullsitePOS()) throw error
+    return [] as WansoftDaily[]
+  })
   if (posData.length > 0) return posData[posData.length - 1]
+  if (isFullsitePOS()) return null
   // Fallback to wansoft_daily
   const data = await sbFetch('wansoft_daily', `select=*&client_slug=eq.${clientSlug}${locationFilter(locationId)}&ventas_dia=gt.0&order=fecha.desc&limit=5`) as Record<string, unknown>[]
   const deduped = dedupeByFecha(data)
@@ -259,6 +274,7 @@ export async function getDayData(fecha: string, clientSlug: string = getActiveCl
 }
 
 export async function getMonthlyData(clientSlug: string = getActiveClientSlug(), locationId?: string | null): Promise<WansoftDaily[]> {
+  if (isFullsitePOS()) return getDashboardFromPosOrders(365, clientSlug, locationId)
   const data = await sbFetch('wansoft_daily', `select=*&client_slug=eq.${clientSlug}${locationFilter(locationId)}&ventas_dia=gt.0&order=fecha.asc&limit=1000`) as Record<string, unknown>[]
   const rows = dedupeByFecha(data).map(parseRow)
   if (rows.length > 0) return rows
@@ -307,7 +323,7 @@ export function aggregateMeseros(
 
 // Get data for a date range
 export async function getDateRange(from: string, to: string, clientSlug: string = getActiveClientSlug(), locationId?: string | null): Promise<WansoftDaily[]> {
-  const data = await sbFetch(
+  const data = isFullsitePOS() ? [] : await sbFetch(
     'wansoft_daily',
     `select=*&client_slug=eq.${clientSlug}${locationFilter(locationId)}&fecha=gte.${from}&fecha=lte.${to}&ventas_dia=gt.0&order=fecha.asc`
   ) as Record<string, unknown>[]
@@ -315,8 +331,7 @@ export async function getDateRange(from: string, to: string, clientSlug: string 
   if (rows.length > 0) return rows
   // POS fallback: calculate days in range, fetch, then filter
   const fromDate = new Date(from + 'T00:00:00')
-  const toDate = new Date(to + 'T23:59:59')
-  const days = Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
+  const days = Math.max(1, Math.ceil((Date.now() - fromDate.getTime()) / (1000 * 60 * 60 * 24)) + 1)
   const posData = await getDashboardFromPosOrders(days, clientSlug, locationId)
   return posData.filter(d => d.fecha >= from && d.fecha <= to)
 }
@@ -502,9 +517,20 @@ export async function getDashboardFromPosOrders(days: number = 30, clientId: str
   cutoff.setDate(cutoff.getDate() - days)
   const cutoffStr = fmtDateMX(cutoff)
 
-  const orders = await sbFetch('pos_orders',
-    `select=mesa,mesero,personas,total,subtotal,iva,descuento,propina,metodo_pago,pagos,items,status,created_at&client_id=eq.${clientId}${locationFilter(locationId)}&status=eq.cerrada&created_at=gte.${zonedStartOfDayISO(cutoffStr)}&order=created_at.asc&limit=5000`
-  ) as { mesa: number; mesero: string; personas: number; total: number; subtotal: number; iva: number; descuento: number; propina: number; metodo_pago: string; pagos: { metodo: string; monto: number }[] | null; items: { nombre: string; precio: number; cantidad: number }[] | null; status: string; created_at: string }[]
+  if (!clientId) throw new ReporteCajaNoDisponible('Selecciona el restaurante para consultar sus ventas.')
+  const source: OrdenParaReporte[] = []
+  const since = zonedStartOfDayISO(cutoffStr)
+  // select=* keeps pre-migration/legacy schemas compatible. Filtering by
+  // preparation status would omit both partial and fully paid Caja orders.
+  // updated_at includes a payment received today for an older order.
+  for (let offset = 0; ; offset += 1000) {
+    const page = await sbFetch('pos_orders',
+      `select=*&client_id=eq.${encodeURIComponent(clientId)}${locationFilter(locationId)}&or=(created_at.gte.${since},updated_at.gte.${since})&order=created_at.asc,id.asc&limit=1000&offset=${offset}`, true
+    ) as OrdenParaReporte[]
+    source.push(...page)
+    if (page.length < 1000) break
+  }
+  const orders = source.flatMap(proyectarOrdenReporte).filter(o => fmtDateMX(new Date(o.created_at)) >= cutoffStr)
 
   if (orders.length === 0) return []
 
@@ -547,7 +573,7 @@ export async function getDashboardFromPosOrders(days: number = 30, clientId: str
         const m = (p.metodo || '').toLowerCase()
         pagoMap.set(p.metodo || 'Efectivo', (pagoMap.get(p.metodo || 'Efectivo') || 0) + (p.monto || 0))
         if (/efectivo|cash/.test(m)) efectivo += p.monto || 0
-        else tarjeta += p.monto || 0
+        else if (!o.report_caja || /tarjeta/.test(m)) tarjeta += p.monto || 0
       }
     }
     const pagoMetodos = Array.from(pagoMap.entries())
@@ -601,6 +627,8 @@ export async function getDashboardFromPosOrders(days: number = 30, clientId: str
     const ordenesLlevar = dayOrders.filter(o => o.mesa === 0 || o.mesa >= 900).length
 
     result.push({
+      ...(dayOrders.some(o => o.report_caja) ? { reporting: { source: 'caja' as const,
+        historical_date_fallback: dayOrders.some(o => o.report_date_basis === 'order_legacy'), item_allocation_available: false as const } } : {}),
       fecha,
       ventas_brutas: ventas + descuentos,
       ventas_dia: ventas,

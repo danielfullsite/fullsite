@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo, useCallback } from 'react'
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import {
   ResponsiveContainer,
   AreaChart,
@@ -14,10 +14,11 @@ import { DollarSign, Receipt, Tag, Gift, Store, ShoppingBag, Smartphone, ShieldA
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
 import { Table, type ColumnDef } from '@/components/ui/Table'
-import { getDateRange, aggregatePayments, aggregateGrupos, getWansoftData, getDashboardFromPosOrders } from '@/lib/data'
+import { getDateRange, aggregatePayments, aggregateGrupos, getWansoftData, isFullsitePOS } from '@/lib/data'
 import { fmtDateMX, getActiveTimezone } from '@/lib/date-mx'
 import { formatCurrency, formatPercent, percentChange } from '@/lib/format'
 import type { WansoftDaily } from '@/lib/types'
+import { useAuth } from '@/contexts/AuthContext'
 
 type Preset = 'hoy' | 'ayer' | 'semana' | 'mes' | 'custom'
 
@@ -119,9 +120,12 @@ function TablaControl({
 }
 
 export default function VentasPage() {
+  const { clientId, locationId } = useAuth()
+  const reportRequest = useRef(0)
   const [data, setData] = useState<WansoftDaily[]>([])
   const [prevData, setPrevData] = useState<WansoftDaily[]>([])
   const [loading, setLoading] = useState(true)
+  const [reportError, setReportError] = useState('')
   const [preset, setPreset] = useState<Preset>('mes')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
@@ -138,17 +142,10 @@ export default function VentasPage() {
   }, [preset, customFrom, customTo])
 
   const loadData = useCallback(async () => {
+    const request = ++reportRequest.current
     setLoading(true)
     try {
-      let result = await getDateRange(dates.from, dates.to)
-      // Fallback: if no wansoft_daily data, build from pos_orders
-      if (result.length === 0) {
-        const fromDate = new Date(dates.from + 'T12:00:00')
-        const toDate = new Date(dates.to + 'T12:00:00')
-        const diff = Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
-        result = await getDashboardFromPosOrders(diff)
-      }
-      setData(result)
+      const result = await getDateRange(dates.from, dates.to, clientId || undefined, locationId)
 
       const fromDate = new Date(dates.from + 'T12:00:00')
       const toDate = new Date(dates.to + 'T12:00:00')
@@ -159,30 +156,36 @@ export default function VentasPage() {
       prevFrom.setDate(prevFrom.getDate() - diff + 1)
       const prevResult = await getDateRange(
         fmtDateMX(prevFrom),
-        fmtDateMX(prevTo)
+        fmtDateMX(prevTo), clientId || undefined, locationId
       )
-      setPrevData(prevResult)
 
       // Anti-fraud data
-      const [cancelRes, voidsRes, courtesyRes, discountsRes] = await Promise.all([
-        getWansoftData('cancel_sales'),
-        getWansoftData('voids'),
-        getWansoftData('courtesies'),
-        getWansoftData('discounts_detail'),
+      const [cancelRes, voidsRes, courtesyRes, discountsRes] = isFullsitePOS() ? [null, null, null, null] : await Promise.all([
+        getWansoftData('cancel_sales', clientId || undefined),
+        getWansoftData('voids', clientId || undefined),
+        getWansoftData('courtesies', clientId || undefined),
+        getWansoftData('discounts_detail', clientId || undefined),
       ])
+      if (request !== reportRequest.current) return
+      setData(result); setPrevData(prevResult)
       setCancelaciones(cancelRes?.data as {nombre: string; total: number}[] || [])
       setAnulaciones(voidsRes?.data as {nombre: string; total: number}[] || [])
       setCortesias(courtesyRes?.data as {nombre: string; total: number}[] || [])
       setDescuentosDetalle(discountsRes?.data as {nombre: string; total: number}[] || [])
+      setReportError('')
     } catch (err) {
+      if (request !== reportRequest.current) return
+      setReportError(err instanceof Error ? err.message : 'No se pudieron confirmar las ventas.')
+      setData([]); setPrevData([])
       console.error('Error loading ventas data:', err)
     } finally {
-      setLoading(false)
+      if (request === reportRequest.current) setLoading(false)
     }
-  }, [dates])
+  }, [dates, clientId, locationId])
 
   useEffect(() => {
     loadData()
+    return () => { reportRequest.current++ }
   }, [loadData])
 
   // KPIs
@@ -203,7 +206,7 @@ export default function VentasPage() {
   const paymentTotal = payments.reduce((s, p) => s + p.total, 0)
 
   // Categories
-  const grupos = aggregateGrupos(data)
+  const grupos = data.some(d => d.reporting?.source === 'caja') ? [] : aggregateGrupos(data)
   const topGrupos = grupos.slice(0, 10)
   const grupoMax = topGrupos[0]?.total || 1
 
@@ -262,7 +265,10 @@ export default function VentasPage() {
         )}
       </div>
 
-      {loading ? (
+      {reportError && !loading ? <section role="alert" className="rounded-xl border border-[var(--line)] p-5 text-[var(--text-1)]">
+        <h2 className="font-bold">Ventas no disponibles</h2><p className="my-3">{reportError}</p>
+        <button className="min-h-[48px] rounded-xl border px-4 py-3" onClick={() => void loadData()}>Volver a consultar</button>
+      </section> : loading ? (
         <div className="flex items-center justify-center h-96">
           <div className="text-center">
             <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
@@ -271,6 +277,10 @@ export default function VentasPage() {
         </div>
       ) : (
         <>
+          {data.some(d => d.reporting?.source === 'caja') && <p role="status" className="mb-5 rounded-xl border border-[var(--line)] p-4 text-sm">
+            Cobros de Caja recibidos por la nube. El detalle por platillo no está asignado a los pagos.
+            {data.some(d => d.reporting?.historical_date_fallback) && ' Algunos pagos anteriores usan la fecha de la orden.'}
+          </p>}
           {/* KPI Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
             <KPICard

@@ -5,6 +5,8 @@ export interface TurnoDeCaja { id: string; opened_at: string; opened_by: string;
 export interface CierreDeCaja extends TurnoDeCaja {
   closed_at: string; closed_by: string; cash_sales_cents: number; total_paid_cents: number
   expected_cash_cents: number; counted_cash_cents: number; difference_cents: number; notes?: string
+  tip_cents?: number; cash_tip_cents?: number
+  cash_deposits_cents?: number; cash_withdrawals_cents?: number
 }
 export async function leerTurnosCaja(): Promise<{ turno: TurnoDeCaja | null; cierres: CierreDeCaja[] }> {
   const response = await localNetworkFetch(`${getBridgeUrl()}/state`, { cache: 'no-store', signal: AbortSignal.timeout(2000) })

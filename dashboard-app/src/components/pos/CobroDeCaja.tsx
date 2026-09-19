@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { abrirFinanzasCaja, leerFinanzasCaja, dividirParejoCaja, reservarEfectivoCaja,
+import { abrirFinanzasCaja, leerFinanzasCaja, dividirParejoCaja, reservarPagoCaja, confirmarPagoManualCaja, resolverPagoManualCaja,
   confirmarEfectivoCaja, liberarEfectivoNoRecibido, avisoAntesDeCobrarCaja, centavosDeTexto, pesosDeCentavos,
   type FinanzasDeCaja, type PagoDeCaja } from '@/lib/pedro-finanzas'
 
@@ -23,6 +23,9 @@ export default function CobroDeCaja({ order, onClose, onChanged }: Props) {
   const working = useRef(false)
   const [accountId, setAccountId] = useState('')
   const [amount, setAmount] = useState('')
+  const [tip, setTip] = useState('')
+  const [method, setMethod] = useState<'cash' | 'card' | 'transfer'>('cash')
+  const [manual, setManual] = useState<Record<string, { source?: string; reference?: string; reason?: string }>>({})
   const [received, setReceived] = useState<Record<string, string>>({})
   const [split, setSplit] = useState('2')
   const [notice, setNotice] = useState('')
@@ -59,6 +62,8 @@ export default function CobroDeCaja({ order, onClose, onChanged }: Props) {
   }
   const account = finance?.accounts.find(a => a.account_id === accountId && a.balance_cents > a.reserved_cents) ?? finance?.accounts.find(a => a.balance_cents > a.reserved_cents)
   const pendingPayments = finance?.payments.filter(p => p.status === 'pending' || p.status === 'unknown') ?? []
+  const manualField = (paymentId: string, field: 'source' | 'reference' | 'reason', value: string) =>
+    setManual(previous => ({ ...previous, [paymentId]: { ...previous[paymentId], [field]: value } }))
   const confirm = (payment: PagoDeCaja) => run(async () => {
     const next = await confirmarEfectivoCaja(finance!, payment, centavosDeTexto(received[payment.payment_id] || ''))
     const paid = next.payments.find(p => p.payment_id === payment.payment_id)
@@ -97,6 +102,8 @@ export default function CobroDeCaja({ order, onClose, onChanged }: Props) {
           {[['Total', finance.total_cents], ['Pagado', finance.paid_cents], ['Pendiente', finance.balance_cents]].map(([label, value]) =>
             <div key={label}><dt className="text-sm text-[var(--text-2)]">{label}</dt><dd className="text-xl font-bold">{pesosDeCentavos(Number(value))}</dd></div>)}
         </dl>
+        {(finance.tip_cents ?? 0) > 0 && <p className="mb-4">Propinas registradas: <strong>{pesosDeCentavos(finance.tip_cents ?? 0)}</strong> · separadas del consumo.</p>}
+        {finance.status !== 'settled' && pendingPayments.length === 0 && <p className="mb-4 text-sm text-[var(--text-2)]">Puedes cerrar esta ventana para agregar consumo. Los pagos registrados se conservan; después guarda y envía la nueva ronda.</p>}
         <div className="space-y-2" aria-label="Cuentas compartidas">
           {finance.accounts.map((a, i) => <button key={a.account_id} disabled={disabled || a.balance_cents <= a.reserved_cents}
             className={`flex w-full items-center justify-between gap-3 rounded-xl border p-3 text-left ${account?.account_id === a.account_id ? 'border-blue-500 bg-blue-500/10' : 'border-[var(--line)]'}`}
@@ -112,14 +119,25 @@ export default function CobroDeCaja({ order, onClose, onChanged }: Props) {
         </div>}
         {finance.status === 'settled' ? <p className="my-5 text-lg font-bold text-emerald-700">Cuenta liquidada. Cocina conserva la preparación pendiente.</p> : <>
           {account && <div className="my-5 space-y-3 border-t border-[var(--line)] pt-4">
-            <label className="block">Importe a cobrar en efectivo<input aria-label="Importe a cobrar" className={field} inputMode="decimal" value={amount} placeholder={((account.balance_cents - account.reserved_cents) / 100).toFixed(2)} onChange={e => setAmount(e.target.value)} /></label>
+            <label className="block">Forma de pago<select aria-label="Forma de pago" className={field} value={method} disabled={disabled}
+              onChange={e => setMethod(e.target.value as 'cash' | 'card' | 'transfer')}>
+              <option value="cash">Efectivo</option><option value="card">Tarjeta en terminal independiente</option><option value="transfer">Transferencia verificada</option>
+            </select></label>
+            {method !== 'cash' && <p className="text-sm">Fullsite registra el pago que verificaste fuera del sistema. Este botón no realiza un cargo bancario.</p>}
+            <label className="block">Importe del consumo<input aria-label="Importe a cobrar" className={field} inputMode="decimal" value={amount} placeholder={((account.balance_cents - account.reserved_cents) / 100).toFixed(2)} onChange={e => setAmount(e.target.value)} /></label>
+            <label className="block">Propina de este pago<input aria-label="Propina de este pago" className={field} inputMode="decimal" value={tip} placeholder="0.00" onChange={e => setTip(e.target.value)} /></label>
             <button className={`${button} w-full bg-blue-600 text-white`} disabled={disabled}
-              onClick={() => run(() => reservarEfectivoCaja(finance, account.account_id,
-                centavosDeTexto(amount || ((account.balance_cents - account.reserved_cents) / 100).toFixed(2))), 'Cobro preparado. Confirma cuando hayas recibido el efectivo.')}>Preparar cobro en efectivo</button>
+              onClick={() => run(() => reservarPagoCaja(finance, account.account_id,
+                centavosDeTexto(amount || ((account.balance_cents - account.reserved_cents) / 100).toFixed(2)),
+                { method: method === 'cash' ? 'cash' : 'manual', ...(method !== 'cash' ? { tender: method } : {}), tip_cents: centavosDeTexto(tip || '0') }),
+              'Importe reservado. Revisa el intento y confirma sólo cuando hayas verificado el pago.')}>
+              {method === 'cash' ? 'Preparar cobro en efectivo' : 'Preparar registro de pago externo'}</button>
           </div>}
           {pendingPayments.map(payment => <section key={payment.payment_id} className="my-4 rounded-xl border border-amber-500 p-4">
-            <h3 className="font-bold">Cobro por confirmar · {pesosDeCentavos(payment.amount_cents)}</h3>
+            <h3 className="font-bold">Cobro por confirmar · {pesosDeCentavos(payment.amount_cents + (payment.tip_cents ?? 0))}</h3>
+            <p className="text-sm">Consumo {pesosDeCentavos(payment.amount_cents)} · Propina {pesosDeCentavos(payment.tip_cents ?? 0)}</p>
             <p className="my-2 text-sm">Este importe ya está reservado. Verifica si se recibió el dinero antes de confirmar o liberarlo.</p>
+            {payment.status === 'unknown' && <p className="my-2 font-semibold">Resultado sin confirmar. Un encargado debe conciliar este intento antes de cobrarlo de nuevo.</p>}
             {payment.method === 'cash' && <>
               <label>Efectivo recibido<input aria-label={`Efectivo recibido ${payment.payment_id}`} className={field} inputMode="decimal" value={received[payment.payment_id] ?? ''}
                 onChange={e => setReceived(prev => ({ ...prev, [payment.payment_id]: e.target.value }))} /></label>
@@ -129,12 +147,35 @@ export default function CobroDeCaja({ order, onClose, onChanged }: Props) {
                   onClick={() => run(() => liberarEfectivoNoRecibido(finance, payment), 'Resultado recuperado. Revisa el saldo antes de iniciar otro cobro.')}>No se recibió efectivo</button>
               </div>
             </>}
+            {payment.method === 'manual' && <div className="space-y-3">
+              <p className="font-semibold">{payment.tender === 'card' ? 'Tarjeta en terminal independiente' : 'Transferencia'}</p>
+              <label className="block">Terminal o banco<input aria-label={`Terminal o banco ${payment.payment_id}`} className={field} maxLength={200}
+                value={manual[payment.payment_id]?.source ?? ''} onChange={e => manualField(payment.payment_id, 'source', e.target.value)} /></label>
+              <label className="block">Folio o referencia<input aria-label={`Referencia ${payment.payment_id}`} className={field} maxLength={200}
+                value={manual[payment.payment_id]?.reference ?? ''} onChange={e => manualField(payment.payment_id, 'reference', e.target.value)} /></label>
+              <button className={`${button} w-full bg-emerald-700 text-white`} disabled={disabled}
+                onClick={() => run(async () => {
+                  const next = await confirmarPagoManualCaja(finance, payment, manual[payment.payment_id]?.source ?? '', manual[payment.payment_id]?.reference ?? '')
+                  if (next.payments.find(p => p.payment_id === payment.payment_id)?.status !== 'accepted') throw new Error('Se recuperó otro resultado del intento. Revisa el saldo y vuelve a confirmar la acción correcta.')
+                  return next
+                }, 'Pago externo registrado con la referencia verificada por el operador.')}>Confirmar pago externo verificado</button>
+              <label className="block">Motivo si no puedes confirmar el pago<input aria-label={`Motivo del pago ${payment.payment_id}`} className={field} maxLength={200}
+                value={manual[payment.payment_id]?.reason ?? ''} onChange={e => manualField(payment.payment_id, 'reason', e.target.value)} /></label>
+              <div className="flex flex-wrap gap-2">
+                <button className={`${button} border border-[var(--line)]`} disabled={disabled}
+                  onClick={() => run(() => resolverPagoManualCaja(finance, payment, 'unknown', manual[payment.payment_id]?.reason ?? ''), 'Resultado guardado. El saldo queda reservado hasta la conciliación.')}>No puedo confirmar el resultado</button>
+                <button className={`${button} border border-[var(--line)]`} disabled={disabled}
+                  onClick={() => run(() => resolverPagoManualCaja(finance, payment, 'rejected', manual[payment.payment_id]?.reason ?? ''), 'Revisa el resultado y saldo confirmado antes de iniciar otro cobro.')}>Verifiqué que no se realizó</button>
+              </div>
+            </div>}
           </section>)}
         </>}
         {finance.payments.some(p => p.status === 'accepted') && <div className="mt-5 border-t border-[var(--line)] pt-4">
           <h3 className="font-bold">Pagos confirmados</h3>
           {finance.payments.filter(p => p.status === 'accepted').map(p => <p key={p.payment_id} className="mt-2 text-sm">
-            {pesosDeCentavos(p.amount_cents)} · {p.method === 'cash' ? 'Efectivo' : 'Proveedor'}{p.change_cents ? ` · Cambio ${pesosDeCentavos(p.change_cents)}` : ''}
+            {pesosDeCentavos(p.amount_cents)} · {p.method === 'cash' ? 'Efectivo' : p.method === 'manual' ? p.tender === 'card' ? 'Tarjeta independiente' : 'Transferencia' : 'Proveedor'}
+            {(p.tip_cents ?? 0) > 0 ? ` · Propina ${pesosDeCentavos(p.tip_cents ?? 0)}` : ''}{p.change_cents ? ` · Cambio ${pesosDeCentavos(p.change_cents)}` : ''}
+            {p.evidence?.reference ? ` · Referencia ${p.evidence.reference}` : ''}
           </p>)}
         </div>}
       </>}

@@ -38,7 +38,7 @@ if (packagedBundle && !operationalMode) throw new Error('Packaged service lab re
 const secret = cred.generarSecreto()
 const headers = cred.cabecerasDeCredencial({ secreto: secret, restaurantId: tenant })
 const base = fs.mkdtempSync(path.join(os.tmpdir(), 'fullsite-ui-'))
-const output = path.join(ROOT, packagedBundle ? 'output/closure/ui-paquete-operacion' : operationalMode ? 'output/closure/ui-operacion' : 'output/closure/ui')
+const output = path.join(ROOT, packagedBundle ? 'output/closure/ui-paquete-operacion' : operationalMode ? 'output/closure/ui-operacion' : 'output/closure/ui', String(Date.now()))
 fs.mkdirSync(output, { recursive: true })
 const terminals = []
 const results = []
@@ -308,9 +308,9 @@ async function main() {
   const pos3 = await startTerminal('POS 3', 'pos', ports[2], ports[0], uiOrigin, ports)
   const kds = await startTerminal('Cocina', 'kds', ports[3], ports[0], uiOrigin, ports)
   if (operationalMode) {
-    wan = false
     await require('./recorrido-operacional-ui')({ caja, pos2, pos3, kds, check, expect, assert, until, request,
-      tenant, output, uiOrigin, labPin, restartCaja: () => startTerminal('Caja', 'server_pos', ports[0], ports[0], uiOrigin, ports) })
+      tenant, output, uiOrigin, labPin, initialWan: wan, setWan: value => { wan = value },
+      restartCaja: () => startTerminal('Caja', 'server_pos', ports[0], ports[0], uiOrigin, ports) })
     return
   }
   const orderId = randomUUID()

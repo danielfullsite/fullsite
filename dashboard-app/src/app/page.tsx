@@ -144,6 +144,8 @@ export default function DashboardPage() {
   const [latestDay, setLatestDay] = useState<WansoftDaily | null>(null)
   const [prevDay, setPrevDay] = useState<WansoftDaily | null>(null)
   const [loading, setLoading] = useState(true)
+  const [reportError, setReportError] = useState('')
+  const [reportAttempt, setReportAttempt] = useState(0)
   const [period, setPeriod] = useState<Period>('dia')
   const [selectedDayIdx, setSelectedDayIdx] = useState(0) // 0 = latest, 1 = yesterday, etc.
   const [weekOffset, setWeekOffset] = useState(0) // 0 = current week, 1 = last week, etc.
@@ -185,18 +187,23 @@ export default function DashboardPage() {
   const show = (id: WidgetId) => widgets[id]
 
   useEffect(() => {
+    let alive = true
+    let request = 0
     async function load() {
+      const current = ++request
+      setLoading(true)
+      let timer: ReturnType<typeof setTimeout> | undefined
       try {
-        // Timeout: if data doesn't load in 10s, show empty state instead of infinite spinner
-        const timeoutP = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000))
+        // A timeout is unavailable data, never a confirmed zero-sales day.
+        const timeoutP = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('La consulta de ventas no respondió a tiempo.')), 10000) })
         // Fetch all data in parallel instead of sequentially
         // Ya no se pide agent_runs aquí: alimentaba el widget de status de
         // agentes, que se movió a Herramientas → Agentes IA. Era una consulta a
         // telemetría GLOBAL de la plataforma en cada carga del dashboard de cada
         // restaurante, y ninguno la usaba para decidir nada.
         const [recentRaw, latestRaw] = await Promise.all([
-          Promise.race([getRecentDays(1000, clientId || undefined, locationId), timeoutP]).catch(() => [] as WansoftDaily[]),
-          Promise.race([getLatestDay(clientId || undefined, locationId), timeoutP]).catch(() => null as WansoftDaily | null),
+          Promise.race([getRecentDays(1000, clientId || undefined, locationId), timeoutP]),
+          Promise.race([getLatestDay(clientId || undefined, locationId), timeoutP]),
         ])
         let recent = recentRaw
         let latest = latestRaw
@@ -207,6 +214,8 @@ export default function DashboardPage() {
           latest = recent.length > 0 ? recent[recent.length - 1] : null
         }
 
+        if (!alive || current !== request) return
+        setReportError(''); setPrevDay(null)
         setRecentData(recent)
         setLatestDay(latest)
         if (recent.length >= 2) {
@@ -219,9 +228,13 @@ export default function DashboardPage() {
           }
         }
       } catch (err) {
+        if (!alive || current !== request) return
+        setReportError(err instanceof Error ? err.message : 'No se pudieron confirmar las ventas.')
+        setRecentData([]); setLatestDay(null); setPrevDay(null)
         console.error('Error loading dashboard data:', err)
       } finally {
-        setLoading(false)
+        if (timer) clearTimeout(timer)
+        if (alive && current === request) setLoading(false)
       }
     }
     load()
@@ -231,10 +244,16 @@ export default function DashboardPage() {
     const onFocus = () => load()
     window.addEventListener('focus', onFocus)
     return () => {
+      alive = false
       clearInterval(interval)
       window.removeEventListener('focus', onFocus)
     }
-  }, [clientId, locationId])
+  }, [clientId, locationId, reportAttempt])
+
+  if (reportError && !loading) return <section role="alert" className="rounded-2xl border border-[var(--line)] p-6 text-[var(--text-1)]">
+    <h1 className="text-xl font-bold">Ventas no disponibles</h1><p className="my-3">{reportError}</p>
+    <button className="min-h-[48px] rounded-xl border px-4 py-3" onClick={() => setReportAttempt(n => n + 1)}>Volver a consultar</button>
+  </section>
 
   if (loading) {
     return (
@@ -462,7 +481,7 @@ export default function DashboardPage() {
     ? latestDay.ventas_dia - sameDayLastWeek.ventas_dia
     : null
 
-  const gruposRaw = safeArray<GrupoEntry>(latestDay?.ventas_por_grupo).filter(g => g.total > 0).length > 0
+  const gruposRaw = latestDay?.reporting?.source === 'caja' ? [] : safeArray<GrupoEntry>(latestDay?.ventas_por_grupo).filter(g => g.total > 0).length > 0
     ? safeArray<GrupoEntry>(latestDay?.ventas_por_grupo)
     : findRecentDataForField<GrupoEntry>(recentData, 'ventas_por_grupo')
   const gruposData = gruposRaw.map(g => ({ ...g, nombre: cleanCategoryName(g.nombre) }))
@@ -479,6 +498,10 @@ export default function DashboardPage() {
 
   return (
     <>
+      {recentData.some(d => d.reporting?.source === 'caja') && <p role="status" className="mb-5 rounded-xl border border-[var(--line)] p-4 text-sm">
+        Cobros de Caja recibidos por la nube. El detalle de venta por platillo aún no está asignado a los pagos.
+        {recentData.some(d => d.reporting?.historical_date_fallback) && ' Algunos pagos anteriores usan la fecha de la orden porque no guardaron fecha individual de cobro.'}
+      </p>}
       {locations.length > 1 && (
         <section className="mb-5 rounded-[20px] border border-[var(--line)] bg-[var(--surface)] p-3 sm:p-4" aria-label="Sucursales del grupo">
           <div className="mb-3 flex items-center justify-between gap-3">

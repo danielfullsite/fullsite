@@ -6,6 +6,8 @@ import { Fingerprint, ArrowLeft, Receipt, RefreshCw, Clock, DollarSign, Users, C
 import { formatMXN, getAuditLog, reopenOrder, logAudit, getClientId, verifyManagerPin, verifyManagerHuella, hayHuellasDadasDeAlta, consumeManagerApproval, getActiveTurnoTolerante, getPaymentMethodsFromDB, type AuditLogEntry, type PagoForma, type PaymentMethodDB } from '@/lib/pos-data'
 import { isTiempoItem } from '@/lib/pos-constants'
 import { getActiveTimezone } from '@/lib/date-mx'
+import { leerSalon, requiereCaja } from '@/lib/pedro-cliente'
+import CorteDeCaja from '@/components/pos/CorteDeCaja'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -90,6 +92,23 @@ async function getCashMovementsByDate(dateStr: string): Promise<CashMovement[]> 
 }
 
 export default function CortePage() {
+  const [mode, setMode] = useState<'loading' | 'legacy' | 'caja' | 'error'>('loading')
+  const [attempt, setAttempt] = useState(0)
+  useEffect(() => {
+    let alive = true
+    if (!requiereCaja()) { setMode('legacy'); return }
+    void leerSalon().then(state => {
+      if (alive) setMode(!state.autoritativa ? 'error' : state.writeAuthority === 'caja' ? 'caja' : 'legacy')
+    }).catch(() => { if (alive) setMode('error') })
+    return () => { alive = false }
+  }, [attempt])
+  if (mode === 'caja') return <CorteDeCaja />
+  if (mode === 'legacy') return <CortePageLegacy />
+  return <main className="p-8 text-[var(--text-1)]"><p>{mode === 'error' ? 'Sin conexión confirmada con Caja. El corte no está disponible.' : 'Consultando Caja…'}</p>
+    {mode === 'error' && <button className="mt-4 rounded-xl border p-3" onClick={() => { setMode('loading'); setAttempt(n => n + 1) }}>Volver a consultar</button>}</main>
+}
+
+function CortePageLegacy() {
   const [orders, setOrders] = useState<OrderFromDB[]>([])
   const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([])
   const [loading, setLoading] = useState(true)

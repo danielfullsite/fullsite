@@ -4,7 +4,8 @@ vi.mock('@/lib/local-network-fetch', () => ({ localNetworkFetch: vi.fn() }))
 vi.mock('@/lib/pedro-catalogo', () => ({ leerCatalogoCaja: vi.fn(async () => ({ catalog_revision: 'prepared-catalog' })) }))
 import { localNetworkFetch } from '@/lib/local-network-fetch'
 import { actorDeCaja } from '@/lib/pedro-actor'
-import { anularCuentaEnCaja, enviarCuentaEnCaja, guardarCuentaEnCaja, GuardadoAnteriorRecuperado, firmaBorradorParaCaja, moverCuentaEnCaja, type CuentaParaGuardar, type OrdenConfirmada } from '@/lib/pedro-operaciones'
+import { anularCuentaEnCaja, enviarCuentaEnCaja, guardarCuentaEnCaja, GuardadoAnteriorRecuperado, firmaBorradorParaCaja, moverCuentaEnCaja, ordenDeReciboCaja, type CuentaParaGuardar, type OrdenConfirmada } from '@/lib/pedro-operaciones'
+import { mismaConfirmacionDeCuenta } from '@/lib/pos-order-reconciliation'
 const request = vi.mocked(localNetworkFetch)
 const line = { id: 'line-one', menuItemId: 'coffee', nombre: 'Café', cantidad: 1, precio: 50, subtotal: 50, precioExtra: 0, modificadores: [], modifier_ids: ['hot'], notas: '' }
 const order: OrdenConfirmada = { id: 'order-one', order_revision: 1, total_cents: 5800, turno_id: 'turn-one', items: [line] }
@@ -115,4 +116,18 @@ it('server normalization does not masquerade as a draft edit, while a new item d
   expect(firmaBorradorParaCaja(before)).toBe(firmaBorradorParaCaja(confirmed))
   const changedWhileSending = { ...confirmed, items: [...confirmed.items, { ...line, id: 'second-line' }] }
   expect(firmaBorradorParaCaja(changedWhileSending)).not.toBe(firmaBorradorParaCaja(confirmed))
+})
+
+it('a coupled operational receipt and the following state share the same paid balance and financial revision', async () => {
+  const financial = { order_id: order.id, revision: 5, order_revision: 4, balance_cents: 8700, status: 'open' }
+  const operational = { ...order, order_revision: 4, total_cents: 11600, saldo: 116, payment_status: 'pendiente', _kds_sent: true }
+  request.mockImplementationOnce(async (_url, init) => Response.json({ results: [{ event: { payload: JSON.parse(String(init?.body)) },
+    result: { operational_order: operational, financial_order: financial } }] }))
+  const confirmed = await enviarCuentaEnCaja({ ...order, order_revision: 3 })
+  const { _kds_sent, ...projected } = operational
+  expect(confirmed.saldo).toBe(87)
+  expect(mismaConfirmacionDeCuenta(confirmed, { ...projected, items: JSON.stringify(order.items), saldo: 87, financial_order: financial })).toBe(true)
+  expect(mismaConfirmacionDeCuenta(confirmed, { ...projected, saldo: 87, financial_order: { ...financial, revision: 6 } })).toBe(false)
+  expect(() => ordenDeReciboCaja({ operational_order: operational, financial_order: { ...financial, order_id: 'different' } }, order.id)).toThrow('saldo')
+  expect(() => ordenDeReciboCaja({ operational_order: operational, financial_order: { ...financial, order_revision: 3 } }, order.id)).toThrow('saldo')
 })

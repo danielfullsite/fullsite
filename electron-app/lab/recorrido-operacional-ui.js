@@ -3,7 +3,7 @@ const path = require('node:path')
 
 /** Only screen gestures mutate the service. HTTP reads independently verify the
  * durable result; no helper command creates an order or records a payment. */
-module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert, until, request, output, uiOrigin, labPin, restartCaja }) {
+module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert, until, request, output, uiOrigin, labPin, initialWan, setWan, restartCaja }) {
   const snapshot = async () => (await request(caja, '/state')).json()
   let orderId
   const addCoffee = async terminal => {
@@ -25,7 +25,7 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     await dialog.getByRole('button', { name: 'Confirmar efectivo recibido', exact: true }).click()
     await expect(dialog.getByText('Efectivo registrado en Caja y compartido con las terminales.')).toBeVisible()
   }
-  await check('Sin WAN se abre turno desde el botón de Caja y lo comparten tres terminales', async () => {
+  await check(`${initialWan ? 'Con WAN simulada' : 'Sin WAN'} se abre turno desde el botón de Caja y lo comparten tres terminales`, async () => {
     await expect(caja.page.getByText('No hay turno abierto', { exact: true })).toBeVisible({ timeout: 30000 })
     await caja.page.getByPlaceholder('0.00', { exact: true }).fill('500')
     await caja.page.getByRole('button', { name: /Abrir turno/i }).click()
@@ -42,6 +42,15 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     assert.equal(order.total_cents, 5800)
     assert.equal(state.kds_orders.length, 0, 'Guardar no envía comida')
     await expect(pos3.page.locator('body')).toContainText(/Saldo confirmado en Caja:.*58[.,]00/)
+  })
+  await check('Cortar WAN y recargar POS 3 conserva la misma cuenta y sus productos por LAN', async () => {
+    setWan(false)
+    await pos3.page.reload({ waitUntil: 'domcontentloaded' })
+    await expect(pos3.page.locator('body')).toContainText(/Saldo confirmado en Caja:.*58[.,]00/)
+    const replicated = await (await request(pos3, '/state')).json()
+    assert.equal(replicated.salon_orders[0].id, orderId)
+    const items = replicated.salon_orders[0].items
+    assert.equal((typeof items === 'string' ? JSON.parse(items) : items)[0].cantidad, 1)
   })
   await check('Cobrar una cuenta aún sin enviar no bloquea sus productos pendientes', async () => {
     await openPayment(pos2)
@@ -106,19 +115,45 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
     await expect(pos3.page.locator('body')).toContainText(/Saldo confirmado en Caja:.*87[.,]00/)
     await pos2.page.screenshot({ path: path.join(output, 'cobro-parcial-desde-botones.png'), fullPage: true })
   })
+  await check('Agregar consumo después de un pago parcial conserva el recibo y las cuentas divididas', async () => {
+    await modal(pos2).getByRole('button', { name: 'Cerrar', exact: true }).click()
+    await addCoffee(pos2)
+    await pos2.page.getByRole('button', { name: 'Enviar', exact: true }).click()
+    await until(async () => (await snapshot()).financial_orders[0].total_cents === 17400, 'Nueva ronda y finanzas comprometidas juntas')
+    const finance = (await snapshot()).financial_orders[0]
+    assert.equal(finance.paid_cents, 2900); assert.equal(finance.balance_cents, 14500)
+    assert.deepEqual(finance.accounts.map(a => a.total_cents), [5800, 5800, 5800])
+    assert.equal(finance.payments.length, 1)
+    await expect(pos3.page.locator('body')).toContainText(/Saldo confirmado en Caja:.*145[.,]00/)
+    await openPayment(pos2)
+    await modal(pos2).getByRole('button', { name: /Consumo adicional/ }).click()
+    await modal(pos2).getByLabel('Forma de pago', { exact: true }).selectOption('card')
+    await modal(pos2).getByLabel('Propina de este pago', { exact: true }).fill('5.80')
+    await modal(pos2).getByRole('button', { name: 'Preparar registro de pago externo', exact: true }).click()
+    await modal(pos2).getByRole('textbox', { name: /^Terminal o banco / }).fill('Terminal bancaria de laboratorio')
+    await modal(pos2).getByRole('textbox', { name: /^Referencia / }).fill('LAB-CARD-01')
+    await modal(pos2).getByRole('button', { name: 'Confirmar pago externo verificado', exact: true }).click()
+    await until(async () => (await snapshot()).financial_orders[0].paid_cents === 8700, 'Referencia de tarjeta registrada una vez')
+    await expect(pos3.page.locator('body')).toContainText(/Saldo confirmado en Caja:.*87[.,]00/)
+    const after = (await snapshot()).financial_orders[0]
+    assert.equal(after.tip_cents, 580)
+    assert.equal(after.payments[1].evidence.reference, 'LAB-CARD-01')
+    await pos2.page.screenshot({ path: path.join(output, 'tarjeta-propina-ronda-adicional.png'), fullPage: true })
+  })
   await check('Reiniciar Caja recupera el cobro y se continúa desde otra terminal', async () => {
     const previous = caja
     previous.process.kill('SIGKILL')
     await until(() => previous.process.exitCode !== null || previous.process.signalCode !== null, 'Termina Caja')
     caja = await restartCaja()
     const finance = (await snapshot()).financial_orders[0]
-    assert.equal(finance.paid_cents, 2900); assert.equal(finance.balance_cents, 8700)
+    assert.equal(finance.paid_cents, 8700); assert.equal(finance.balance_cents, 8700)
+    assert.equal(finance.tip_cents, 580)
     await openPayment(pos3)
     await collectCash(pos3, '29')
     await collectCash(pos3, '58')
     await expect(modal(pos3).getByText('Cuenta liquidada. Cocina conserva la preparación pendiente.')).toBeVisible()
     const state = await snapshot()
-    assert.equal(state.financial_orders[0].paid_cents, 11600)
+    assert.equal(state.financial_orders[0].paid_cents, 17400)
     assert.equal(state.salon_orders.length, 0)
     assert.equal(state.kds_orders.length, 1)
   })
@@ -131,24 +166,73 @@ module.exports = async function ({ caja, pos2, pos3, kds, check, expect, assert,
   })
   await check('Cocina prepara y entrega la ronda desde sus botones sin alterar los cobros', async () => {
     const card = kds.page.locator('.card').filter({ hasText: 'Café de laboratorio' })
-    await card.getByRole('button', { name: /Todo listo/ }).click()
-    await card.getByRole('button', { name: 'Entregar ronda', exact: true }).click()
+    while (await card.count()) {
+      const remaining = await card.count()
+      await card.first().getByRole('button', { name: /Todo listo/ }).click()
+      await card.first().getByRole('button', { name: 'Entregar ronda', exact: true }).click()
+      await expect(card).toHaveCount(remaining - 1)
+    }
     await until(async () => (await snapshot()).kds_orders.length === 0, 'Ronda entregada por KDS real')
-    assert.equal((await snapshot()).financial_orders[0].paid_cents, 11600)
+    assert.equal((await snapshot()).financial_orders[0].paid_cents, 17400)
   })
-  await check('El cierre de turno desde la pantalla concilia 500 de fondo y 116 de ventas', async () => {
+  await check('Reiniciar Caja y recargar todos los POS no devuelve consumo pagado y entregado', async () => {
+    const previous = caja; previous.process.kill('SIGKILL')
+    await until(() => previous.process.exitCode !== null || previous.process.signalCode !== null, 'Termina Caja tras entrega')
+    caja = await restartCaja()
+    for (const terminal of [pos2, pos3]) {
+      await terminal.page.goto(`${uiOrigin}/pos?mesa=1`, { waitUntil: 'domcontentloaded' })
+      await expect(terminal.page.getByRole('button', { name: /Bebidas laboratorio/ })).toBeVisible()
+      const state = await (await request(terminal, '/state')).json()
+      assert.equal(state.salon_orders.length, 0)
+      assert.equal(state.kds_orders.length, 0)
+      assert.equal(state.financial_orders[0].paid_cents, 17400)
+      await expect(terminal.page.locator('body')).not.toContainText('Saldo confirmado en Caja:')
+    }
+    await kds.page.reload({ waitUntil: 'domcontentloaded' })
+    await expect(kds.page.locator('.card').filter({ hasText: 'Café de laboratorio' })).toHaveCount(0)
+  })
+  await check('Depósito y retiro con PIN quedan en el corte y no cambian la venta', async () => {
     await caja.page.goto(`${uiOrigin}/pos/turno`, { waitUntil: 'domcontentloaded' })
-    await caja.page.getByLabel('Efectivo contado al cierre', { exact: true }).fill('616')
+    await caja.page.getByText('Depósitos y retiros de efectivo', { exact: true }).click()
+    for (const [type, amount, reason] of [['deposito', '100', 'Fondo de cambio de laboratorio'], ['retiro', '50', 'Resguardo de laboratorio']]) {
+      await caja.page.getByLabel('Tipo de movimiento', { exact: true }).selectOption(type)
+      await caja.page.getByLabel('Importe del movimiento', { exact: true }).fill(amount)
+      await caja.page.getByLabel('Motivo del movimiento', { exact: true }).fill(reason)
+      await caja.page.getByLabel('PIN para movimiento', { exact: true }).fill(labPin)
+      await caja.page.getByRole('button', { name: 'Registrar movimiento verificado', exact: true }).click()
+      await expect(caja.page.getByRole('status')).toContainText(`Movimiento confirmado en Caja. ${type === 'deposito' ? 'Depósito' : 'Retiro'}`)
+    }
+    const state = await snapshot()
+    assert.equal(state.cash_movements.length, 2)
+    assert.equal(state.financial_orders[0].paid_cents, 17400)
+  })
+  await check('Corte X distingue venta de tarjeta, propina y efectivo sin cerrar el turno', async () => {
+    await caja.page.goto(`${uiOrigin}/pos/corte`, { waitUntil: 'domcontentloaded' })
+    await caja.page.getByLabel('PIN de gerente', { exact: true }).fill(labPin)
+    await caja.page.getByRole('button', { name: 'Consultar corte', exact: true }).click()
+    await expect(caja.page.getByRole('heading', { name: 'Corte de Caja', exact: true })).toBeVisible()
+    await expect(caja.page.locator('dt').filter({ hasText: /^Venta cobrada$/ }).locator('..')).toContainText(/174[.,]00/)
+    await expect(caja.page.locator('dt').filter({ hasText: /^Propina recibida$/ }).locator('..')).toContainText(/5[.,]80/)
+    await expect(caja.page.locator('dt').filter({ hasText: /^Efectivo esperado$/ }).locator('..')).toContainText(/666[.,]00/)
+    assert((await snapshot()).turno, 'Consultar X no cierra turno')
+  })
+  await check('El cierre de turno concilia 500 de fondo, 116 de efectivo y tarjeta con propina aparte', async () => {
+    await caja.page.goto(`${uiOrigin}/pos/turno`, { waitUntil: 'domcontentloaded' })
+    await caja.page.getByLabel('Efectivo contado al cierre', { exact: true }).fill('666')
     await caja.page.getByRole('button', { name: 'Confirmar cierre de turno', exact: true }).click()
     await expect(caja.page.getByRole('region', { name: 'Último cierre confirmado' })).toBeVisible()
     const state = await snapshot()
     assert.equal(state.turno, null)
     assert.equal(state.turn_summaries[0].cash_sales_cents, 11600)
-    assert.equal(state.turn_summaries[0].expected_cash_cents, 61600)
+    assert.equal(state.turn_summaries[0].total_paid_cents, 17400)
+    assert.equal(state.turn_summaries[0].tip_cents, 580)
+    assert.equal(state.turn_summaries[0].expected_cash_cents, 66600)
+    assert.equal(state.turn_summaries[0].cash_deposits_cents, 10000)
+    assert.equal(state.turn_summaries[0].cash_withdrawals_cents, 5000)
     assert.equal(state.turn_summaries[0].difference_cents, 0)
     await caja.page.screenshot({ path: path.join(output, 'cierre-turno-desde-pantalla.png'), fullPage: true })
     await caja.page.reload({ waitUntil: 'domcontentloaded' })
-    await expect(caja.page.getByRole('region', { name: 'Último cierre confirmado' })).toContainText(/616[.,]00/)
+    await expect(caja.page.getByRole('region', { name: 'Último cierre confirmado' })).toContainText(/666[.,]00/)
   })
   await check('Ninguna pantalla registra errores JavaScript durante el recorrido de botones', async () => {
     assert.deepEqual([pos2, pos3, kds].flatMap(t => t.errors.map(error => ({ terminal: t.name, error }))), [])

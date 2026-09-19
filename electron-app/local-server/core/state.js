@@ -45,6 +45,8 @@ class RestaurantState {
     this._turno  = null       // { id, opened_by, opened_at } | null
     this._turnIdentities = new Set()
     this._turnSummaries = new Map()
+    this._cashMovements = new Map()
+    this._cashLedgerVersion = 1
     this._lastSupabaseSync = null
     this._orderSnapshotComplete = false
     this._financialOrders = new Map()
@@ -55,8 +57,19 @@ class RestaurantState {
   /** Apply one event to the state. Returns the fields that changed. */
   apply(event) {
     const { type, payload } = event
+    if (type === 'CASH_MOVEMENT' && event.result?.cash_movement) {
+      const movement = JSON.parse(JSON.stringify(event.result.cash_movement))
+      this._cashMovements.set(movement.movement_id, movement)
+      return { changed: ['cash_movements'] }
+    }
     if (['ORDER_SAVE', 'ORDER_SEND', 'ORDER_MOVE', 'ORDER_VOID', 'KITCHEN_SET'].includes(type) && event.result?.operational_order) {
       const order = JSON.parse(JSON.stringify(event.result.operational_order))
+      if (event.result.financial_order) {
+        const financial = JSON.parse(JSON.stringify(event.result.financial_order))
+        this._financialOrders.set(financial.order_id, financial)
+        order.saldo = financial.balance_cents / 100
+        order.payment_status = financial.status === 'settled' ? 'pagada' : 'pendiente'
+      }
       const previous = this._orders.get(order.order_id)
       if (previous?.mesa != null && this._mesas.get(String(previous.mesa))?.order_id === order.order_id) {
         this._mesas.set(String(previous.mesa), { status: 'libre', order_id: null, locked_by: null })
@@ -69,7 +82,7 @@ class RestaurantState {
         this._kds.push({ order_id: order.order_id, mesa: order.mesa, items_sent: order.kitchen_items, sent_at: Date.parse(order.updated_at) })
       }
       this._orderSnapshotComplete = true
-      return { changed: ['orders', 'mesas', 'kds'] }
+      return { changed: ['orders', 'mesas', 'kds', ...(event.result.financial_order ? ['financial_orders'] : [])] }
     }
     if (['TURN_OPEN', 'TURN_CLOSE'].includes(type) && event.result && 'turno' in event.result) {
       this._turno = event.result.turno ? JSON.parse(JSON.stringify(event.result.turno)) : null
@@ -473,6 +486,8 @@ class RestaurantState {
     this._turno = snap.turno ?? null
     this._turnIdentities = new Set(Array.isArray(snap.turn_identities) ? snap.turn_identities : [])
     this._turnSummaries = new Map((Array.isArray(snap.turn_summaries) ? snap.turn_summaries : []).filter(t => t?.id).map(t => [t.id, JSON.parse(JSON.stringify(t))]))
+    this._cashMovements = new Map((Array.isArray(snap.cash_movements) ? snap.cash_movements : []).map(m => [m.movement_id, JSON.parse(JSON.stringify(m))]))
+    this._cashLedgerVersion = snap.cash_ledger_version === 1 && Array.isArray(snap.cash_movements) ? 1 : 0
     this._lastSupabaseSync = snap.last_supabase_sync ?? null
     this._financialOrders = new Map((Array.isArray(snap.financial_orders) ? snap.financial_orders : [])
       .filter(o => o?.order_id).map(o => [o.order_id, JSON.parse(JSON.stringify(o))]))
@@ -518,6 +533,8 @@ class RestaurantState {
       turno:              this._turno,
       turn_identities: [...this._turnIdentities],
       turn_summaries: [...this._turnSummaries.values()].map(t => JSON.parse(JSON.stringify(t))),
+      cash_movements: this.getCashMovements(),
+      cash_ledger_version: this._cashLedgerVersion,
       locks:              Object.fromEntries(this._locks),
       last_supabase_sync: this._lastSupabaseSync,
     }
@@ -527,6 +544,7 @@ class RestaurantState {
   getOrder(id) { const order = this._orders.get(id); return order ? JSON.parse(JSON.stringify(order)) : null }
   getFinancialOrder(id) { const order = this._financialOrders.get(id); return order ? JSON.parse(JSON.stringify(order)) : null }
   getFinancialOrders() { return [...this._financialOrders.values()].map(order => JSON.parse(JSON.stringify(order))) }
+  getCashMovements() { return [...this._cashMovements.values()].map(m => JSON.parse(JSON.stringify(m))) }
   getKdsQueue()    { return [...this._kds] }
   getTurno()       { return this._turno }
   getLock(mesa)    { return this._locks.get(String(mesa)) || null }

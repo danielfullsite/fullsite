@@ -1,9 +1,10 @@
 'use strict'
 // Pure preparation of Caja-owned orders. The handler serializes this with money
 // commands and commits the result before projecting or acknowledging it.
-const COMMANDS = new Set(['ORDER_SAVE', 'ORDER_SEND', 'ORDER_MOVE', 'ORDER_VOID', 'TURN_OPEN', 'TURN_CLOSE', 'KITCHEN_SET'])
+const { OperationalError } = require('./operational-domain-error')
+const { summarizeCash, prepareCashMovement } = require('./cash-movements')
+const COMMANDS = new Set(['ORDER_SAVE', 'ORDER_SEND', 'ORDER_MOVE', 'ORDER_VOID', 'TURN_OPEN', 'TURN_CLOSE', 'CASH_MOVEMENT', 'KITCHEN_SET'])
 const clone = value => JSON.parse(JSON.stringify(value))
-class OperationalError extends Error { constructor(code, message) { super(message); this.code = code } }
 const fail = (code, message) => { throw new OperationalError(code, message) }
 const int = (value, name, min = 0, max = Number.MAX_SAFE_INTEGER) => {
   if (!Number.isSafeInteger(value) || value < min || value > max) fail('INVALID_OPERATIONAL_VALUE', `${name} inválido`)
@@ -98,7 +99,7 @@ function lineFromCatalog(input, catalog, catalogRevision) {
 class OperationalDomain {
   prepare(payload, { state, catalogEnvelope, actor, now = new Date().toISOString() }) {
     const type = payload.command_type
-    const permission = { ORDER_SAVE: 'pos.orders.write', ORDER_SEND: 'pos.orders.send', ORDER_MOVE: 'pos.orders.move', ORDER_VOID: 'pos.orders.cancel', TURN_OPEN: 'pos.turns.open', TURN_CLOSE: 'pos.turns.close', KITCHEN_SET: 'actualizar_estatus_orden' }[type]
+    const permission = { ORDER_SAVE: 'pos.orders.write', ORDER_SEND: 'pos.orders.send', ORDER_MOVE: 'pos.orders.move', ORDER_VOID: 'pos.orders.cancel', TURN_OPEN: 'pos.turns.open', TURN_CLOSE: 'pos.turns.close', CASH_MOVEMENT: 'retiros_programados', KITCHEN_SET: 'actualizar_estatus_orden' }[type]
     if (!permission) fail('UNKNOWN_OPERATIONAL_COMMAND', 'Comando operativo desconocido')
     authorize(actor, permission)
     const turno = state.getTurno()
@@ -109,6 +110,7 @@ class OperationalDomain {
       return { turno: { id: turnoId, opened_by: actor.id, opened_at: now, opening_cash_cents: int(payload.opening_cash_cents ?? 0, 'opening_cash_cents'), authority: 'caja' } }
     }
     if (!turno || turno.id !== turnoId) fail('TURNO_MISMATCH', 'La operación debe pertenecer al turno actual de Caja')
+    if (type === 'CASH_MOVEMENT') return prepareCashMovement(payload, { state, actor, now })
     if (type === 'TURN_CLOSE') {
       const snapshot = state.toSnapshot()
       if (snapshot.salon_orders.length || state.getFinancialOrders().some(o => o.turno_id === turnoId && (o.balance_cents > 0 || o.reserved_cents > 0))) fail('UNSETTLED_FINANCIAL_ACCOUNTS', 'Quedan cuentas abiertas o intentos de pago por resolver')
@@ -118,9 +120,14 @@ class OperationalDomain {
       const sum = rows => rows.reduce((total, payment) => int(total + payment.amount_cents, 'cobros del turno'), 0)
       const cashSales = sum(accepted.filter(p => p.method === 'cash')), totalPaid = sum(accepted)
       const opening = int(turno.opening_cash_cents ?? 0, 'opening_cash_cents')
-      const expected = int(opening + cashSales, 'expected_cash_cents')
+      const totalTips = accepted.reduce((total, p) => int(total + (p.tip_cents ?? 0), 'propinas del turno'), 0)
+      const cashTips = accepted.filter(p => p.method === 'cash').reduce((total, p) => int(total + (p.tip_cents ?? 0), 'propinas en efectivo'), 0)
+      const cash = summarizeCash(turno, state.getFinancialOrders(), state.getCashMovements?.() ?? [])
+      const expected = cash.expected_cash_cents
       return { turno: null, closed_turno: { ...turno, closed_by: actor.id, closed_at: now,
         opening_cash_cents: opening, cash_sales_cents: cashSales, total_paid_cents: totalPaid,
+        tip_cents: totalTips, cash_tip_cents: cashTips,
+        cash_deposits_cents: cash.cash_deposits_cents, cash_withdrawals_cents: cash.cash_withdrawals_cents,
         expected_cash_cents: expected, counted_cash_cents: counted, difference_cents: counted - expected,
         notes: note(payload.notes, 'notes', 1000) } }
     }
@@ -154,7 +161,9 @@ class OperationalDomain {
     if (existing && existing.authority !== 'caja') fail('LEGACY_ORDER_REQUIRES_CUTOVER', 'Esta orden requiere migración de autoridad antes de editarla por LAN')
     if (existing && (existing.turno_id !== turnoId || ['cancelada', 'pagada', 'cerrada'].includes(existing.status) || existing.payment_status === 'pagada')) fail('ORDER_NOT_OPEN', 'La cuenta ya no está abierta en este turno')
     if (expected !== (existing?.order_revision ?? 0)) fail('ORDER_REVISION_CONFLICT', 'La cuenta cambió en otra terminal; recárgala antes de confirmar')
-    if (state.getFinancialOrder(orderId)) fail('FINANCIAL_ORDER_LOCKED', 'Ya hay cuentas de cobro; termina o concilia antes de modificar consumos')
+    const financial = state.getFinancialOrder(orderId)
+    if (financial?.reserved_cents > 0) fail('PAYMENTS_IN_PROGRESS', 'Resuelve los cobros preparados antes de modificar el consumo')
+    if (financial && type === 'ORDER_VOID') fail('FINANCIAL_ORDER_LOCKED', 'La anulación requiere conciliar la cuenta financiera')
     if (existing && existing.created_by !== actor.id && !actor.permissions.includes('ver_todas_cuentas')) fail('PERMISSION_DENIED', 'No tienes permiso para modificar la cuenta de otro empleado')
     if (type !== 'ORDER_SAVE' && !existing) fail('ORDER_NOT_FOUND', 'Guarda la cuenta en Caja antes de continuar')
     let next = existing ? clone(existing) : { id: orderId, order_id: orderId, authority: 'caja', turno_id: turnoId,

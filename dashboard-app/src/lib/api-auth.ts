@@ -150,24 +150,19 @@ export const POS_ROLE_LVL: Record<string, number> = {
 }
 
 /**
- * Grace-mode server-side role gate. Patrón hermano del de cancel-item:
- *  - rol >= minLevel                → { ok:true,  mode:'role:<rol>' }
- *  - rol <  minLevel + <strictEnv>='true' → { ok:false, mode:'blocked' }  (el caller devuelve 403)
- *  - rol <  minLevel + grace (default)    → { ok:true,  mode:'below_role:<rol>' } (el caller audita)
- *
- * Fase 1 (default): NO bloquea, solo audita — no rompe flujos legítimos ni offline.
- * Fase 2: setear el env flag a 'true' cuando el log deje de mostrar 'below_role:*'.
+ * Rol efectivo para acciones administrativas. Un rol insuficiente bloquea antes
+ * del primer efecto. El tercer argumento se conserva por compatibilidad; una
+ * variable de entorno no convierte el rechazo en permiso.
  */
 export function checkPosRole(
   auth: { role?: string | null },
   minLevel: number,
-  strictEnv: string,
+  _strictEnv: string,
 ): { ok: boolean; mode: string } {
   const rol = auth.role ?? ''
   const lvl = POS_ROLE_LVL[rol] ?? 0
   if (lvl >= minLevel) return { ok: true, mode: `role:${rol || 'unknown'}` }
-  if (process.env[strictEnv] === 'true') return { ok: false, mode: 'blocked' }
-  return { ok: true, mode: `below_role:${rol || 'unknown'}` }
+  return { ok: false, mode: 'blocked' }
 }
 
 // BLINDAJE P2-5: se ELIMINÓ el helper legacy getClientId(request) que confiaba en el

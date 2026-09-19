@@ -74,7 +74,34 @@ export const MANAGER_ONLY_WRITE = new Set<string>([
   'pos_staff',
   'pos_terminals',
   'pos_fingerprint_templates',
+  'pos_menu_items', 'pos_menu_categories', 'pos_modifiers', 'pos_modifier_groups',
+  'pos_item_modifier_groups', 'pos_category_modifiers', 'pos_payment_methods',
+  'pos_promotions', 'pos_recipes', 'pos_recipe_lines', 'pos_ingredients',
+  'pos_suppliers', 'pos_purchase_orders', 'pos_purchase_order_items',
+  'pos_sub_recipes', 'pos_sub_recipe_ingredients', 'pos_combos', 'pos_sizes', 'pos_price_types',
 ])
+
+/** Balances y su bitácora sólo se escriben mediante recordMovement server-side. */
+export const DOMAIN_ONLY_WRITE = new Set(['pos_inventory', 'pos_inventory_movements', 'pos_staff'])
+
+export const CHILD_SCOPE: Record<string, { parent: string; key: string }> = {
+  pos_purchase_order_items: { parent: 'pos_purchase_orders', key: 'order_id' },
+  pos_sub_recipe_ingredients: { parent: 'pos_sub_recipes', key: 'sub_recipe_id' },
+}
+
+/** Relaciones que nunca deben enlazar un catálogo a datos de otro restaurante. */
+export const SCOPED_REFERENCES: Record<string, Record<string, string>> = {
+  pos_menu_items: { category_id: 'pos_menu_categories' },
+  pos_item_modifier_groups: { item_id: 'pos_menu_items', menu_item_id: 'pos_menu_items', group_id: 'pos_modifier_groups', modifier_group_id: 'pos_modifier_groups' },
+  pos_category_modifiers: { category_id: 'pos_menu_categories', modifier_group_id: 'pos_modifier_groups' },
+  pos_recipe_lines: { ingredient_id: 'pos_ingredients', recipe_version_id: 'pos_recipe_versions' },
+  pos_sub_recipe_ingredients: { ingredient_id: 'pos_ingredients' },
+  pos_purchase_order_items: { ingredient_id: 'pos_ingredients' },
+  pos_purchase_orders: { supplier_id: 'pos_suppliers' },
+  pos_recipes: { menu_item_id: 'pos_menu_items', ingredient_id: 'pos_ingredients' },
+  pos_staff_shifts: { staff_id: 'pos_staff' },
+  pos_fingerprint_templates: { staff_id: 'pos_staff' },
+}
 
 /**
  * Columnas que NUNCA salen por el proxy, pase lo que pase en el `select`.
@@ -105,8 +132,7 @@ export function tableOf(path: string): string {
  * dejaría al POS sin datos.
  */
 export function redactResponse(table: string, text: string, contentType: string | null): string {
-  const cols = REDACTED_COLUMNS[table]
-  if (!cols || !text) return text
+  if (!text) return text
   if (contentType && !contentType.includes('json')) return text
 
   let data: unknown
@@ -116,13 +142,18 @@ export function redactResponse(table: string, text: string, contentType: string 
     return text
   }
 
-  const strip = (row: unknown): unknown => {
-    if (!row || typeof row !== 'object' || Array.isArray(row)) return row
-    const out = { ...(row as Record<string, unknown>) }
-    for (const c of cols) delete out[c]
-    return out
+  // El select puede embeber pos_staff con alias desde cualquier tabla padre.
+  // El nombre del recurso raíz no basta para proteger ese PIN.
+  const cols = new Set(Object.values(REDACTED_COLUMNS).flat())
+  let changed = false
+  const strip = (row: unknown): void => {
+    if (!row || typeof row !== 'object') return
+    if (Array.isArray(row)) { row.forEach(strip); return }
+    for (const [key, value] of Object.entries(row)) {
+      if (cols.has(key)) { delete (row as Record<string, unknown>)[key]; changed = true }
+      else strip(value)
+    }
   }
-
-  const cleaned = Array.isArray(data) ? data.map(strip) : strip(data)
-  return JSON.stringify(cleaned)
+  strip(data)
+  return changed ? JSON.stringify(data) : text
 }

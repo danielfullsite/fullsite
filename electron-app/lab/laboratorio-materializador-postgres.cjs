@@ -55,7 +55,8 @@ async function main() {
   const handler = new CommandHandler({ eventStore: storage, state, wsHub: { broadcast: async () => {} }, restaurantId: tenant, catalogStore: catalog, localAuthorityEnabled: true })
   const turnoId = randomUUID(), orderId = randomUUID()
   async function command(type, fields) {
-    return handler.handle({ restaurant_id: tenant, payload: { command_type: type, command_id: randomUUID(), turno_id: turnoId, order_id: orderId, ...fields } }, 'synthetic-caja', { actor })
+    return handler.handle({ restaurant_id: tenant, payload: { command_type: type, command_id: randomUUID(), turno_id: turnoId,
+      ...(type !== 'CASH_MOVEMENT' ? { order_id: orderId } : {}), ...fields } }, 'synthetic-caja', { actor })
   }
   await command('TURN_OPEN', { opening_cash_cents: 50000 })
   await command('ORDER_SAVE', { expected_revision: 0, catalog_revision: catalog.read().revision, mesa: 1,
@@ -176,14 +177,108 @@ async function main() {
     assert.equal(row.kitchen_items.length, 1)
     assert.equal(Number(sql(`select sum(monto) from public.pos_payment_attempts where order_id=${quote(orderId)} and estado='aceptado';`)), 116)
   })
+  const manualOrderId = randomUUID(), manualPaymentId = randomUUID()
+  const manualCommand = (type, fields) => command(type, { ...fields, order_id: manualOrderId })
+  const latestArgs = async () => {
+    const all = await storage.readAfter(0)
+    let previous = INITIAL_HASH
+    for (const event of all.slice(0, -1)) previous = historyHash(previous, event)
+    return { p_stream_id: streamId, p_credential: credential, p_previous_history_hash: previous,
+      p_history_hash: historyHash(previous, all.at(-1)), p_event: committedEnvelope(all.at(-1)) }
+  }
+  await check('Independent card payment persists its verified reference and tip separately from sale and cash', async () => {
+    await manualCommand('ORDER_SAVE', { expected_revision: 0, catalog_revision: catalog.read().revision, mesa: 2,
+      items: [{ line_id: 'manual-coffee', product_id: 'coffee', quantity: 2 }] })
+    await manualCommand('ORDER_SEND', { expected_revision: 1 })
+    await manualCommand('FINANCIAL_OPEN', { expected_revision: 0, expected_order_revision: 2, total_cents: 11600, currency: 'MXN' })
+    await manualCommand('FINANCIAL_PAYMENT_START', { expected_revision: 1, payment_id: manualPaymentId,
+      account_id: manualOrderId + ':full', amount_cents: 2900, tip_cents: 290, method: 'manual', tender: 'card' })
+    assert.equal((await worker.flush()).confirmed, 4)
+    await manualCommand('FINANCIAL_PAYMENT_RESULT', { expected_revision: 2, payment_id: manualPaymentId, status: 'accepted',
+      evidence: { kind: 'manual_received', received_by: actor.id, source: 'Synthetic bank terminal', reference: 'CARD-LAB-01', tender: 'card', currency: 'MXN', amount_cents: 3190 } })
+    const original = await latestArgs()
+    const missingTender = structuredClone(original); delete missingTender.p_event.result.financial_order.payments[0].tender
+    assert.match(rpc(missingTender, true), /INVALID_MANUAL_PAYMENT/)
+    const alteredTip = structuredClone(original)
+    const forged = alteredTip.p_event.result.financial_order
+    forged.tip_cents = 300; forged.payments[0].tip_cents = 300; forged.payments[0].evidence.amount_cents = 3200
+    assert.match(rpc(alteredTip, true), /PAYMENT_ID_CONFLICT/)
+    assert.equal((await worker.flush()).confirmed, 1)
+    const row = scalar(`select row_to_json(o) from (select total,saldo,propina,pagos,caja_financial_snapshot,updated_at from public.pos_orders where id=${quote(manualOrderId)}) o;`)
+    assert.equal(row.total, 116); assert.equal(row.saldo, 87); assert.equal(row.propina, 2.9)
+    assert.equal(row.pagos[0].metodo, 'card'); assert.equal(row.pagos[0].monto, 29); assert.equal(row.pagos[0].propina, 2.9)
+    assert.equal(row.caja_financial_snapshot.payments[0].accepted_at, state.getFinancialOrder(manualOrderId).payments[0].accepted_at)
+    assert(Date.parse(row.updated_at) >= Date.parse(row.caja_financial_snapshot.payments[0].accepted_at))
+    assert.equal(JSON.parse(rpc(original)).duplicate, true)
+  })
+  await check('Adding consumption and keeping a partial payment updates operational and financial rows atomically', async () => {
+    await manualCommand('ORDER_SAVE', { expected_revision: 2, catalog_revision: catalog.read().revision, mesa: 2,
+      items: [{ line_id: 'manual-coffee', product_id: 'coffee', quantity: 3 }] })
+    const edit = await latestArgs()
+    const missing = structuredClone(edit); delete missing.p_event.result.financial_order
+    assert.match(rpc(missing, true), /COUPLED_FINANCIAL_RESULT_REQUIRED/)
+    const invalid = structuredClone(edit); invalid.p_event.result.financial_order.balance_cents++
+    assert.match(rpc(invalid, true), /FINANCIAL_SUM_MISMATCH/)
+    assert.equal(Number(sql(`select total from public.pos_orders where id=${quote(manualOrderId)};`)), 116)
+    assert.equal((await worker.flush()).confirmed, 1)
+    let row = scalar(`select row_to_json(o) from (select total,saldo,propina,financial_revision,caja_financial_snapshot from public.pos_orders where id=${quote(manualOrderId)}) o;`)
+    assert.equal(row.total, 174); assert.equal(row.saldo, 145); assert.equal(row.propina, 2.9)
+    assert.equal(row.caja_financial_snapshot.payments.length, 1); assert.equal(row.caja_financial_snapshot.payments[0].payment_id, manualPaymentId)
+    assert.equal(Number(sql(`select total from public.pos_order_accounts where order_id=${quote(manualOrderId)};`)), 174)
+    await manualCommand('ORDER_SEND', { expected_revision: 3 })
+    assert.equal((await worker.flush()).confirmed, 1)
+    row = scalar(`select caja_financial_snapshot from public.pos_orders where id=${quote(manualOrderId)};`)
+    assert.equal(row.order_revision, 4); assert.equal(row.revision, 5)
+    worker = new BusinessOutbox(options)
+    assert.equal((await worker.flush()).confirmed, 0)
+    assert.equal(JSON.parse(rpc(edit)).duplicate, true)
+    assert.equal(Number(sql(`select total from public.pos_orders where id=${quote(manualOrderId)};`)), 174)
+  })
+  await check('Transfer completes consumption plus tips without increasing drawer cash or resurrecting delivered food', async () => {
+    const payment = randomUUID()
+    await manualCommand('FINANCIAL_PAYMENT_START', { expected_revision: 5, payment_id: payment,
+      account_id: manualOrderId + ':full', amount_cents: 14500, tip_cents: 1450, method: 'manual', tender: 'transfer' })
+    assert.equal((await worker.flush()).confirmed, 1)
+    await manualCommand('FINANCIAL_PAYMENT_RESULT', { expected_revision: 6, payment_id: payment, status: 'accepted',
+      evidence: { kind: 'manual_received', received_by: actor.id, source: 'Synthetic transfer bank', reference: 'TRANSFER-LAB-02', tender: 'transfer', currency: 'MXN', amount_cents: 15950 } })
+    const accepted = await latestArgs()
+    const duplicateReference = structuredClone(accepted)
+    const forged = duplicateReference.p_event.result.financial_order.payments.at(-1)
+    forged.tender = 'card'; forged.evidence.tender = 'card'; forged.evidence.source = ' SYNTHETIC BANK TERMINAL '; forged.evidence.reference = 'card-lab-01'
+    assert.match(rpc(duplicateReference, true), /MANUAL_REFERENCE_REUSED/)
+    assert.equal((await worker.flush()).confirmed, 1)
+    assert.equal(Number(sql(`select propina from public.pos_orders where id=${quote(manualOrderId)};`)), 17.4)
+    assert.equal(Number(sql(`select saldo from public.pos_orders where id=${quote(manualOrderId)};`)), 0)
+    const operational = state.getOrder(manualOrderId)
+    await manualCommand('KITCHEN_SET', { expected_kitchen_revision: operational.kitchen_revision,
+      item_ids: operational.kitchen_items.map(item => item.id), status: 'entregada' })
+    assert.equal((await worker.flush()).confirmed, 1)
+    const row = scalar(`select row_to_json(o) from (select payment_status,preparation_status from public.pos_orders where id=${quote(manualOrderId)}) o;`)
+    assert.equal(row.payment_status, 'pagada'); assert.equal(row.preparation_status, 'entregada')
+  })
+  await check('Cash movement commits once with its drawer summary and rejects forged totals atomically', async () => {
+    assert.ok((await command('CASH_MOVEMENT', { movement_id: randomUUID(), type: 'deposito', amount_cents: 10000, reason: 'Synthetic change fund' })).event)
+    assert.equal((await worker.flush()).confirmed, 1)
+    assert.ok((await command('CASH_MOVEMENT', { movement_id: randomUUID(), type: 'retiro', amount_cents: 5000, reason: 'Synthetic safe withdrawal' })).event)
+    const withdrawal = await latestArgs()
+    const invalid = structuredClone(withdrawal); invalid.p_event.result.cash_summary.expected_cash_cents++
+    assert.match(rpc(invalid, true), /CASH_MOVEMENT_SUM_MISMATCH/)
+    assert.equal(Number(sql(`select count(*) from public.pos_cash_movements where caja_stream_id=${quote(streamId)};`)), 1)
+    assert.equal((await worker.flush()).confirmed, 1)
+    assert.equal(JSON.parse(rpc(withdrawal)).duplicate, true)
+    assert.equal(Number(sql(`select count(*) from public.pos_cash_movements where caja_stream_id=${quote(streamId)};`)), 2)
+    assert.match(sql(`update public.pos_cash_movements set amount=1 where caja_stream_id=${quote(streamId)};`, { allowError: true }), /CAJA_WRITE_FENCE/)
+    worker = new BusinessOutbox(options)
+    assert.equal((await worker.flush()).confirmed, 0)
+  })
   await check('Kitchen delivery and counted cash closure persist independently of settlement', async () => {
     const operational = state.getOrder(orderId)
     await command('KITCHEN_SET', { expected_kitchen_revision: operational.kitchen_revision,
       item_ids: operational.kitchen_items.map(item => item.id), status: 'entregada' })
-    await command('TURN_CLOSE', { counted_cash_cents: 61600, notes: 'Synthetic closure' })
+    await command('TURN_CLOSE', { counted_cash_cents: 66600, notes: 'Synthetic closure' })
     assert.equal((await worker.flush()).confirmed, 2)
     const closed = scalar(`select row_to_json(t) from (select fondo_final,efectivo_sistema,diferencia,closed_at from public.pos_turnos where id=${quote(turnoId)}) t;`)
-    assert.equal(closed.fondo_final, 616); assert.equal(closed.efectivo_sistema, 616); assert.equal(closed.diferencia, 0)
+    assert.equal(closed.fondo_final, 666); assert.equal(closed.efectivo_sistema, 666); assert.equal(closed.diferencia, 0)
     assert(closed.closed_at)
     assert.equal(sql(`select preparation_status from public.pos_orders where id=${quote(orderId)};`), 'entregada')
   })

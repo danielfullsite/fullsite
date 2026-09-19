@@ -8,6 +8,7 @@ const { EVENT } = require('../protocol')
 const { FinancialDomain, FinancialError, FINANCIAL_COMMANDS } = require('./financial-domain')
 const { OperationalDomain, OperationalError, OPERATIONAL_COMMANDS, authorizeOperational } = require('./operational-domain')
 const { prepareOrderPrintEffects } = require('./operational-print')
+const { PRINT_COMMANDS, authorizeControlledPrint, authorizePrintScope, prepareControlledPrint } = require('./controlled-print')
 
 // Map from command_type (from client) → eventType (stored in log)
 const COMMAND_TO_EVENT = {
@@ -23,6 +24,7 @@ const COMMAND_TO_EVENT = {
   PRINT_COMMAND:   EVENT.PRINT_COMMAND,
   ...Object.fromEntries([...FINANCIAL_COMMANDS].map(type => [type, EVENT[type]])),
   ...Object.fromEntries([...OPERATIONAL_COMMANDS].map(type => [type, EVENT[type]])),
+  ...Object.fromEntries([...PRINT_COMMANDS].map(type => [type, EVENT[type]])),
 }
 
 class CommandHandler {
@@ -81,10 +83,15 @@ class CommandHandler {
     if (this._localAuthorityEnabled && commandType === 'PRINT_COMMAND') {
       throw new OperationalError('CONTROLLED_PRINT_REQUIRED', 'La impresión en Caja debe provenir de una operación autorizada; no se aceptan bytes del navegador')
     }
+    if (PRINT_COMMANDS.has(commandType)) {
+      if (!this._localAuthorityEnabled) throw new OperationalError('LOCAL_AUTHORITY_DISABLED', 'La autoridad de impresión de Caja no está activada')
+      authorizeControlledPrint(cmdPayload, context.actor)
+      await authorizePrintScope(cmdPayload, this._state, context.actor, this._store)
+    }
     if (OPERATIONAL_COMMANDS.has(commandType)) {
       if (!this._localAuthorityEnabled) throw new OperationalError('LOCAL_AUTHORITY_DISABLED', 'La autoridad de escritura de Caja no está activada en esta instalación')
       // Recheck authorization even for a duplicate; a receipt is not permission.
-      authorizeOperational(context.actor, { ORDER_SAVE: 'pos.orders.write', ORDER_SEND: 'pos.orders.send', ORDER_MOVE: 'pos.orders.move', ORDER_VOID: 'pos.orders.cancel', TURN_OPEN: 'pos.turns.open', TURN_CLOSE: 'pos.turns.close', KITCHEN_SET: 'actualizar_estatus_orden' }[commandType])
+      authorizeOperational(context.actor, { ORDER_SAVE: 'pos.orders.write', ORDER_SEND: 'pos.orders.send', ORDER_MOVE: 'pos.orders.move', ORDER_VOID: 'pos.orders.cancel', TURN_OPEN: 'pos.turns.open', TURN_CLOSE: 'pos.turns.close', CASH_MOVEMENT: 'retiros_programados', KITCHEN_SET: 'actualizar_estatus_orden' }[commandType])
     }
     if (this._localAuthorityEnabled && ['ORDER_UPSERTED', 'KDS_ITEM_STATUS'].includes(commandType)) authorizeOperational(context.actor, 'actualizar_estatus_orden')
 
@@ -92,12 +99,29 @@ class CommandHandler {
       return { error: 'PRINT_COMMAND requires station and data_b64' }
     }
 
-    let operationalResult, operationalCatalog
+    let operationalResult, operationalCatalog, controlledPrint
+    const preparePrint = () => {
+      if (!controlledPrint) {
+        // Historical receipts and drawer requests need confirmed saved state,
+        // not a refreshed sales catalog. Its name is optional ticket metadata.
+        let catalog = null
+        try { catalog = this._catalog?.read() } catch (error) { if (error.code !== 'CATALOG_NOT_READY') throw error }
+        controlledPrint = prepareControlledPrint(cmdPayload, {
+          state: this._state, actor: context.actor, printer: this._printer, store: this._store, catalog,
+        })
+      }
+      return controlledPrint
+    }
     const prepareOperational = () => {
       if (!operationalResult) {
         this._validateCommandState(commandType, cmdPayload, fromClientId)
         operationalCatalog = ['ORDER_SAVE', 'ORDER_MOVE', 'ORDER_SEND'].includes(commandType) ? this._catalog?.read() : null
         operationalResult = new OperationalDomain().prepare(cmdPayload, { state: this._state, actor: context.actor, catalogEnvelope: operationalCatalog })
+        if (['ORDER_SAVE', 'ORDER_SEND', 'ORDER_MOVE'].includes(commandType) && this._state.getFinancialOrder?.(cmdPayload.order_id)) {
+          const finances = new FinancialDomain()
+          finances.hydrate(this._state.getFinancialOrders())
+          operationalResult.financial_order = finances.rebaseOrder(operationalResult.operational_order)
+        }
       }
       return operationalResult
     }
@@ -107,6 +131,7 @@ class CommandHandler {
         eventType: COMMAND_TO_EVENT[commandType],
         buildResult: () => {
           this._validateCommandState(commandType, cmdPayload, fromClientId)
+          if (PRINT_COMMANDS.has(commandType)) return preparePrint().then(prepared => prepared.result)
           if (OPERATIONAL_COMMANDS.has(commandType)) return prepareOperational()
           if (!FINANCIAL_COMMANDS.has(commandType)) return undefined
           if (!this._state.getFinancialOrders || !this._state.getOrder) throw new FinancialError('FINANCIAL_PROJECTION_UNAVAILABLE', 'Financial projection is not ready')
@@ -120,7 +145,8 @@ class CommandHandler {
             cmdPayload.station, Buffer.from(cmdPayload.data_b64, 'base64'), cmdPayload.document_type,
             { commandId, reprint: cmdPayload.reprint === true }
           ) }
-        } : commandType === 'ORDER_SEND' ? () => prepareOrderPrintEffects(prepareOperational(), commandId, operationalCatalog, this._printer) : undefined,
+        } : commandType === 'ORDER_SEND' ? () => prepareOrderPrintEffects(prepareOperational(), commandId, operationalCatalog, this._printer)
+          : PRINT_COMMANDS.has(commandType) ? () => preparePrint().then(prepared => prepared.effects) : undefined,
       }
     )
 
@@ -140,7 +166,7 @@ class CommandHandler {
     return { event, receipt, ...(event.result ? { result: event.result } : {}) }
   }
   requiresActor(commandType) {
-    return FINANCIAL_COMMANDS.has(commandType) || OPERATIONAL_COMMANDS.has(commandType) ||
+    return FINANCIAL_COMMANDS.has(commandType) || OPERATIONAL_COMMANDS.has(commandType) || PRINT_COMMANDS.has(commandType) ||
       this._localAuthorityEnabled && ['ORDER_UPSERTED', 'KDS_ITEM_STATUS'].includes(commandType)
   }
   _authorizeFinancial(type, payload, actor) {
@@ -153,7 +179,7 @@ class CommandHandler {
       if (payment?.method === 'external') permission = 'pos.payments.external_result'
       else if (payment?.status === 'unknown') permission = 'pos.payments.reconcile'
       const attributed = payload.evidence?.received_by ?? payload.evidence?.recorded_by
-      if (payment?.method === 'cash' && attributed !== actor.id) throw new FinancialError('ACTOR_MISMATCH', 'Payment evidence must identify the authenticated employee')
+      if (['cash', 'manual'].includes(payment?.method) && attributed !== actor.id) throw new FinancialError('ACTOR_MISMATCH', 'Payment evidence must identify the authenticated employee')
     }
     if (!actor.permissions.includes(permission)) throw new FinancialError('PERMISSION_DENIED', `Required permission: ${permission}`)
   }

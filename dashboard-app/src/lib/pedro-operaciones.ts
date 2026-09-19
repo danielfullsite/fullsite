@@ -27,6 +27,21 @@ function readOrder(value: unknown, orderId: string): OrdenConfirmada {
   if (!Array.isArray(items)) throw new Error('Caja no confirmó los productos de la cuenta.')
   return { ...o, id: orderId, items }
 }
+/** A coupled save/send receipt must expose the same financial projection as
+ * /state. Otherwise the next read looks like another employee edited the
+ * account, even though it is this terminal's own confirmed operation. */
+export function ordenDeReciboCaja(result: Record<string, unknown>, orderId: string): OrdenConfirmada {
+  const order = readOrder(result.operational_order, orderId)
+  if (result.financial_order !== undefined) {
+    const financial = result.financial_order as Record<string, unknown> | null
+    if (!financial || financial.order_id !== orderId || !Number.isSafeInteger(financial.balance_cents) || Number(financial.balance_cents) < 0 ||
+      !Number.isSafeInteger(financial.revision) || financial.order_revision !== order.order_revision) throw new Error('Caja no confirmó el saldo de la cuenta actualizada.')
+    order.financial_order = financial
+    order.saldo = Number(financial.balance_cents) / 100
+    order.payment_status = financial.status === 'settled' ? 'pagada' : 'pendiente'
+  }
+  return order
+}
 /** Send product identities and intent. Caja owns prices, tax, mandatory options,
  * revisions and delivery batches. No Supabase write follows this receipt. */
 export class GuardadoAnteriorRecuperado extends Error {
@@ -49,7 +64,7 @@ export async function guardarCuentaEnCaja(order: CuentaParaGuardar): Promise<Ord
       ...(item.silla ? { seat: item.silla } : {}) })),
   }
   const receipt = await ejecutarComandoCaja(`save:${order.id}`, 'ORDER_SAVE', request)
-  const confirmed = readOrder(receipt.result.operational_order, order.id)
+  const confirmed = ordenDeReciboCaja(receipt.result, order.id)
   // A retry journal may contain an older save. Recover its receipt, but never
   // treat that as approval to discard or send the operator's newer draft.
   const comparable = (value: Record<string, unknown>) => JSON.stringify(Object.fromEntries(
@@ -61,7 +76,7 @@ export async function enviarCuentaEnCaja(order: OrdenConfirmada): Promise<OrdenC
   const receipt = await ejecutarComandoCaja(`send:${order.id}`, 'ORDER_SEND', {
     order_id: order.id, turno_id: order.turno_id, expected_revision: order.order_revision,
   })
-  const confirmed = readOrder(receipt.result.operational_order, order.id)
+  const confirmed = ordenDeReciboCaja(receipt.result, order.id)
   if (receipt.recovered && receipt.command.expected_revision !== order.order_revision) {
     throw new Error('Recuperamos el envío anterior. Los cambios guardados después siguen pendientes de enviar; revisa y vuelve a confirmar la ronda.')
   }
@@ -76,7 +91,7 @@ export async function moverCuentaEnCaja(order: OrdenConfirmada, mesa: number, pi
   const receipt = await ejecutarComandoCaja(`move:${order.id}`, 'ORDER_MOVE', {
     order_id: order.id, turno_id: order.turno_id, expected_revision: order.order_revision, mesa,
   }, { actor })
-  return readOrder(receipt.result.operational_order, order.id)
+  return ordenDeReciboCaja(receipt.result, order.id)
 }
 export async function anularCuentaEnCaja(order: OrdenConfirmada, reason: string, pin: string): Promise<OrdenConfirmada> {
   if (!reason.trim()) throw new Error('Escribe el motivo de anulación.')
@@ -84,7 +99,7 @@ export async function anularCuentaEnCaja(order: OrdenConfirmada, reason: string,
   const receipt = await ejecutarComandoCaja(`void:${order.id}`, 'ORDER_VOID', {
     order_id: order.id, turno_id: order.turno_id, expected_revision: order.order_revision, reason: reason.trim(),
   }, { actor })
-  const result = readOrder(receipt.result.operational_order, order.id)
+  const result = ordenDeReciboCaja(receipt.result, order.id)
   if (result.status !== 'cancelada') throw new Error('Caja no confirmó la anulación. Conservamos la cuenta.')
   return result
 }

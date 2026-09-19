@@ -8,10 +8,10 @@
 // fs-at → withPOSAuth resuelve el tenant.
 
 import { useState, useEffect } from 'react'
-import { RefreshCw, Pencil, Eye, EyeOff, UserPlus, X, Check, Ban, KeyRound, Copy, Trash2, Shield } from 'lucide-react'
+import { RefreshCw, Pencil, UserPlus, X, Check, Ban, KeyRound, Copy, Trash2, Shield } from 'lucide-react'
 
 interface Staff {
-  id: string; name: string; pin: string; role: string; role_display: string | null
+  id: string; name: string; role: string; role_display: string | null
   active: boolean; hourly_rate: number | null; weekly_salary: number | null
 }
 interface DashUser { user_id: string; email: string; role: string; display_name: string }
@@ -45,7 +45,6 @@ export default function EquipoPage() {
 
   // Personal POS
   const [staff, setStaff] = useState<Staff[]>([])
-  const [revealed, setRevealed] = useState<Set<string>>(new Set())
   const [sForm, setSForm] = useState<StaffForm | null>(null)
   // OP-42 — tras alta rápida, mostrar el PIN una vez para que el gerente lo anote.
   const [justCreated, setJustCreated] = useState<{ name: string; pin: string; generated: boolean } | null>(null)
@@ -191,9 +190,7 @@ export default function EquipoPage() {
                     <td className="px-4 py-3 text-[var(--text-1)] font-medium">{s.name}</td>
                     <td className="px-4 py-3"><span className={`inline-block px-2 py-0.5 rounded-md border text-xs font-medium ${roleTint(s.role)}`}>{ROLE_LABELS[s.role] || s.role}</span></td>
                     <td className="px-4 py-3 font-mono text-[var(--text-2)]">
-                      <button onClick={() => setRevealed(p => { const n = new Set(p); n.has(s.id) ? n.delete(s.id) : n.add(s.id); return n })} className="inline-flex items-center gap-1.5 hover:text-[var(--text-1)]">
-                        {revealed.has(s.id) ? s.pin : '••••'}{revealed.has(s.id) ? <EyeOff size={12} /> : <Eye size={12} />}
-                      </button>
+                      <span title="Asigna un PIN nuevo desde Editar">Privado</span>
                     </td>
                     <td className="px-4 py-3"><span className={`text-xs ${s.active ? 'text-emerald-400' : 'text-[var(--text-3)]'}`}>{s.active ? 'Activo' : 'Inactivo'}</span></td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">
@@ -259,7 +256,7 @@ export default function EquipoPage() {
             <div className="space-y-4">
               <div><label className="block text-xs text-[var(--text-3)] mb-1.5">Nombre</label><input value={sForm.name} onChange={e => setSForm({ ...sForm, name: e.target.value })} className={inputCls} /></div>
               <div className="flex gap-3">
-                <div className="flex-1"><label className="block text-xs text-[var(--text-3)] mb-1.5">PIN {sForm.id ? <span className="text-[var(--text-4)]">(vacío = sin cambio)</span> : <span className="text-[var(--text-4)]">(opcional — vacío = automático)</span>}</label><input value={sForm.pin} onChange={e => setSForm({ ...sForm, pin: e.target.value.replace(/\D/g, '').slice(0, 8) })} inputMode="numeric" placeholder={sForm.id ? '••••' : 'vacío = automático'} className={`${inputCls} font-mono`} /></div>
+                <div className="flex-1"><label className="block text-xs text-[var(--text-3)] mb-1.5">PIN {sForm.id ? <span className="text-[var(--text-4)]">(vacío = sin cambio)</span> : <span className="text-[var(--text-4)]">(opcional — vacío = automático)</span>}</label><input value={sForm.pin} onChange={e => setSForm({ ...sForm, pin: e.target.value.replace(/\D/g, '').slice(0, 10) })} inputMode="numeric" placeholder={sForm.id ? '••••' : 'vacío = automático'} className={`${inputCls} font-mono`} /></div>
                 <div className="flex-1"><label className="block text-xs text-[var(--text-3)] mb-1.5">Rol</label><select value={sForm.role} onChange={e => setSForm({ ...sForm, role: e.target.value })} className={inputCls}>{staffRoleOptions.map(r => <option key={r} value={r}>{ROLE_LABELS[r] || r}</option>)}</select></div>
               </div>
               {error && <div className="px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{error}</div>}

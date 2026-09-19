@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { leerTurnosCaja, cerrarTurnoCaja, type TurnoDeCaja as Turno, type CierreDeCaja } from '@/lib/pedro-turnos'
 import { centavosDeTexto, pesosDeCentavos } from '@/lib/pedro-finanzas'
 import { openTurno } from '@/lib/pos-data'
+import MovimientosDeCaja from './MovimientosDeCaja'
 
 export default function TurnoDeCaja() {
   const [turno, setTurno] = useState<Turno | null>(null)
@@ -52,6 +53,7 @@ export default function TurnoDeCaja() {
       <p className="mt-2">{connected ? turno ? 'Turno abierto y compartido con las terminales.' : 'No hay turno abierto.' : 'Sin conexión confirmada con Caja. La apertura y el cierre están bloqueados.'}</p>
       {error && <p role="alert" className="my-4 rounded-xl bg-red-500/10 p-3 text-red-600">{error}</p>}
       {turno && <p className="my-5">Fondo inicial: <strong>{pesosDeCentavos(turno.opening_cash_cents)}</strong></p>}
+      {turno && <MovimientosDeCaja turnoId={turno.id} connected={connected} />}
       <div className="my-6 rounded-2xl border border-[var(--line)] p-5 space-y-4">
         <label className="block">{turno ? 'Efectivo contado al cierre' : 'Fondo inicial en efectivo'}
           <input aria-label={turno ? 'Efectivo contado al cierre' : 'Fondo inicial en efectivo'} inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)}
@@ -66,7 +68,9 @@ export default function TurnoDeCaja() {
         <p className="my-2 text-sm">{new Date(latest.closed_at).toLocaleString('es-MX')}</p>
         <dl className="space-y-2">{[
           ['Fondo inicial', latest.opening_cash_cents], ['Ventas en efectivo', latest.cash_sales_cents],
-          ['Total cobrado', latest.total_paid_cents], ['Efectivo esperado', latest.expected_cash_cents],
+          ['Ventas cobradas', latest.total_paid_cents], ['Propinas cobradas', latest.tip_cents ?? 0],
+          ['Propinas en efectivo', latest.cash_tip_cents ?? 0], ['Efectivo esperado', latest.expected_cash_cents],
+          ['Depósitos de efectivo', latest.cash_deposits_cents ?? 0], ['Retiros de efectivo', latest.cash_withdrawals_cents ?? 0],
           ['Efectivo contado', latest.counted_cash_cents], ['Diferencia', latest.difference_cents],
         ].map(([label, value]) => <div key={label} className="flex justify-between gap-4"><dt>{label}</dt><dd className="font-semibold">{pesosDeCentavos(Number(value))}</dd></div>)}</dl>
       </section>}

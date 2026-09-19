@@ -1,28 +1,14 @@
 /**
- * Inventory Operations — Single transactional module
- *
- * ALL stock changes MUST go through recordMovement().
- * Direct writes to pos_inventory or pos_ingredients.cost_per_unit
- * are forbidden outside this module.
- *
- * Flow:
- *   1. Validate inputs (no negative qty on entries, no negative costs)
- *   2. Idempotency check (has this exact movement been recorded?)
- *   3. Load current stock + cost for all affected ingredients
- *   4. Detect anomalies (negative stock = halt)
- *   5. Calculate new stock and (for entries) new weighted average cost
- *   6. INSERT into pos_inventory_movements (immutable ledger) with full audit trail
- *   7. PATCH pos_inventory.stock + pos_ingredients.cost_per_unit (materialized state)
- *
- * If step 7 fails, step 6 still exists as a record. The stock can always
- * be reconciled from the ledger: SUM(quantity) GROUP BY ingredient_id.
- *
- * Cost Policy: Weighted Average Cost (Costo Promedio Ponderado)
- *   - stock > 0: new_cost = (stock * cost + qty * purchase_cost) / (stock + qty)
- *   - stock = 0: new_cost = purchase_cost
- *   - purchase_cost = 0: cost unchanged (entry without price)
- *   - stock < 0 (legacy anomaly): movement halted, requires manual fix
+ * Canonical manual inventory boundary. A single authenticated RPC commits the
+ * movement ledger, stock, weighted cost and exact idempotency receipt together.
+ * No REST write fallback. Unknown/lost responses remain unsuccessful until the
+ * same immutable request is retried. Stock is currently tenant-wide; metadata
+ * warehouse/location does not claim separate branch stock.
+ * Contract: docs/architecture/INVENTORY-ATOMIC-2026-09-08.md
  */
+import { inventoryRequestError, isExactInventoryReceipt, isInventoryReceiptAbsent } from './inventory-movement-contract'
+import type { InventoryReceipt } from './inventory-movement-contract'
+import { inventoryActorScope, retainInventoryIntent, releaseInventoryIntent } from './inventory-pending-intent'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -82,9 +68,11 @@ export interface MovementRequest {
   actor: string                    // who did this (user name, system, etc.)
   idempotency_key: string          // unique key to prevent double-submit
   metadata?: Record<string, unknown>  // extra context (warehouse, supplier, etc.)
+  location_id?: string               // validated provenance; stock remains tenant-wide
 }
 
 export interface MovementResult {
+  receipt?: InventoryReceipt
   success: boolean
   movements_created: number
   stock_updates: number
@@ -100,325 +88,63 @@ export interface MovementResult {
   }[]
 }
 
-// ── Internals ─────────────────────────────────────────────────────────
-
-interface InventoryRow {
-  id: number
-  ingredient_id: string
-  stock: number
-}
-
-interface IngredientRow {
-  id: string
-  cost_per_unit: number
-  product_type?: string
-}
-
-const ENTRY_TYPES: MovementType[] = ['entry', 'invoice_entry', 'restock', 'transfer_in']
-
 // ── Core function ─────────────────────────────────────────────────────
 
 export async function recordMovement(req: MovementRequest): Promise<MovementResult> {
-  const result: MovementResult = {
-    success: false,
-    movements_created: 0,
-    stock_updates: 0,
-    cost_updates: 0,
-    errors: [],
-    was_duplicate: false,
-    details: [],
+  const failure = (error: string): MovementResult => ({ success: false, movements_created: 0,
+    stock_updates: 0, cost_updates: 0, errors: [error], was_duplicate: false, details: [] })
+  const invalid = inventoryRequestError(req)
+  if (invalid) return failure(invalid)
+  // Freeze caller intent before awaiting auth/network; undefined optional fields
+  // have the same representation in the request, receipt and retry comparison.
+  let request: MovementRequest = JSON.parse(JSON.stringify(req))
+  let token = getAuthToken()
+  if (token === SUPABASE_KEY && typeof window !== 'undefined') {
+    try { token = localStorage.getItem('pos_shift_token') || token } catch {}
   }
-
-  // ── 0. Validate ──────────────────────────────────────────────────
-
-  if (!req.lines.length) {
-    result.errors.push('No movement lines provided')
-    return result
+  const scope = inventoryActorScope(token, request.client_id)
+  if (!scope) return failure('INVENTORY_AUTH_REQUIRED')
+  let fresh: boolean, sameIntent: boolean
+  try {
+    const pending = await retainInventoryIntent(scope, request)
+    request = pending.request; fresh = pending.fresh; sameIntent = pending.sameIntent
+  } catch (error) {
+    return failure(error instanceof Error ? error.message : 'INVENTORY_DURABLE_STORAGE_REQUIRED')
   }
-
-  const isEntry = ENTRY_TYPES.includes(req.movement_type)
-
-  for (const line of req.lines) {
-    if (!line.ingredient_id) {
-      result.errors.push('Missing ingredient_id in movement line')
-      return result
-    }
-    if (line.quantity === 0) {
-      result.errors.push(`Zero quantity for ${line.ingredient_id}`)
-      return result
-    }
-    // Entries must have positive quantity
-    if (isEntry && line.quantity < 0) {
-      result.errors.push(`Negative quantity on entry for ${line.ingredient_id}. Use 'return' or 'waste' for outflows.`)
-      return result
-    }
-    // No negative costs ever
-    if (line.unit_cost !== undefined && line.unit_cost < 0) {
-      result.errors.push(`Negative unit_cost for ${line.ingredient_id}`)
-      return result
-    }
-  }
-
-  // ── 1. Idempotency check ────────────────────────────────────────
-
-  const dupeCheck = await fetch(
-    `${SUPABASE_URL}/rest/v1/pos_inventory_movements?client_id=eq.${req.client_id}&notes=like.*${encodeURIComponent(req.idempotency_key)}*&limit=1`,
-    { headers: headers() }
-  )
-  if (dupeCheck.ok) {
-    const existing = await dupeCheck.json()
-    if (existing.length > 0) {
-      result.success = true
-      result.was_duplicate = true
-      return result
-    }
-  }
-
-  // ── 2. Load current stock + cost for all affected ingredients ───
-
-  const ingredientIds = [...new Set(req.lines.map(l => l.ingredient_id))]
-  const stockMap = new Map<string, InventoryRow>()
-  const costMap = new Map<string, number>()
-
-  // Load pos_inventory (stock)
-  for (let i = 0; i < ingredientIds.length; i += 50) {
-    const chunk = ingredientIds.slice(i, i + 50)
-    const filter = `ingredient_id=in.(${chunk.join(',')})`
-    const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/pos_inventory?client_id=eq.${req.client_id}&${filter}&select=id,ingredient_id,stock`,
-      { headers: headers() }
-    )
-    if (res.ok) {
-      const rows: InventoryRow[] = await res.json()
-      for (const row of rows) {
-        stockMap.set(row.ingredient_id, { ...row, stock: Number(row.stock) || 0 })
-      }
-    }
-  }
-
-  // Load pos_ingredients (cost + product_type)
-  const productTypeMap = new Map<string, string>()
-  for (let i = 0; i < ingredientIds.length; i += 50) {
-    const chunk = ingredientIds.slice(i, i + 50)
-    const filter = `id=in.(${chunk.join(',')})`
-    const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/pos_ingredients?client_id=eq.${req.client_id}&${filter}&select=id,cost_per_unit,product_type`,
-      { headers: headers() }
-    )
-    if (res.ok) {
-      const rows: IngredientRow[] = await res.json()
-      for (const row of rows) {
-        costMap.set(row.id, Number(row.cost_per_unit) || 0)
-        if (row.product_type) productTypeMap.set(row.id, row.product_type)
-      }
-    }
-  }
-
-  // Check for missing ingredients (no pos_inventory row)
-  const missing = ingredientIds.filter(id => !stockMap.has(id))
-  if (missing.length > 0) {
-    result.errors.push(`No pos_inventory row for: ${missing.join(', ')}`)
-    return result
-  }
-
-  // ── 3. Detect anomalies ─────────────────────────────────────────
-
-  for (const line of req.lines) {
-    const current = stockMap.get(line.ingredient_id)!
-
-    // Block deductions on sub-recipes (canonical product_type check + prefix fallback)
-    if (req.movement_type === 'deduction') {
-      const ptype = productTypeMap.get(line.ingredient_id)
-      const isSubRecipe = ptype === 'subreceta' || ptype === 'sub_recipe' ||
-                          line.ingredient_id.startsWith('sub_')
-      if (isSubRecipe) {
-        result.errors.push(
-          `BLOCKED: ${line.ingredient_id} is a sub-recipe (product_type=${ptype || 'sub_ prefix'}). ` +
-          `Sub-recipes do not carry physical stock.`
-        )
-        return result
-      }
-    }
-
-    if (current.stock < 0) {
-      result.errors.push(
-        `ANOMALY: ${line.ingredient_id} has negative stock (${current.stock}). ` +
-        `Fix via manual adjustment before recording new movements.`
-      )
-      return result
-    }
-  }
-
-  // ── 4. Calculate new stock and cost per line ────────────────────
-
-  interface ComputedLine {
-    ingredient_id: string
-    quantity: number
-    stock_before: number
-    stock_after: number
-    cost_before: number
-    cost_after: number
-    unit_cost: number
-    notes: string
-  }
-
-  const computed: ComputedLine[] = []
-  const underflows: { ingredient_id: string; stock_before: number; attempted: number; would_be: number; floored_to: number }[] = []
-
-  for (const line of req.lines) {
-    const current = stockMap.get(line.ingredient_id)!
-    const stockBefore = current.stock
-    const costBefore = costMap.get(line.ingredient_id) ?? 0
-    const purchaseCost = line.unit_cost ?? 0
-
-    let stockAfter: number
-    let costAfter = costBefore
-
-    if (isEntry) {
-      // Entries: stock goes up
-      stockAfter = stockBefore + line.quantity
-
-      // Weighted average cost calculation
-      if (purchaseCost > 0) {
-        if (stockBefore <= 0) {
-          // Rule 2: stock=0, adopt new cost
-          costAfter = purchaseCost
-        } else {
-          // Rule 1: weighted average
-          costAfter = (stockBefore * costBefore + line.quantity * purchaseCost) / stockAfter
-        }
-      }
-      // Rule 3: purchaseCost=0, cost unchanged (costAfter = costBefore)
-    } else {
-      // Waste, deduction, return, etc.: stock goes down (quantity is negative)
-      const rawAfter = stockBefore + line.quantity
-      stockAfter = Math.max(0, rawAfter)
-
-      // UNDERFLOW_PREVENTED: log when floor to 0 was applied
-      if (rawAfter < 0) {
-        underflows.push({
-          ingredient_id: line.ingredient_id,
-          stock_before: stockBefore,
-          attempted: line.quantity,
-          would_be: rawAfter,
-          floored_to: 0,
-        })
-      }
-    }
-
-    computed.push({
-      ingredient_id: line.ingredient_id,
-      quantity: line.quantity,
-      stock_before: stockBefore,
-      stock_after: stockAfter,
-      cost_before: costBefore,
-      cost_after: costAfter,
-      unit_cost: purchaseCost,
-      notes: line.notes || '',
+  try {
+    const response = await fetch('/api/pos/inventory-movement' + (sameIntent ? '' : '?receipt_only=true'), {
+      method: 'POST', cache: 'no-store',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`,
+        'x-fullsite-tenant': request.client_id, 'x-fullsite-inventory-actor': JSON.parse(scope)[2] },
+      body: JSON.stringify(request), signal: AbortSignal.timeout(20_000),
     })
-  }
-
-  // ── 5. INSERT movements (ledger) with full audit trail ──────────
-
-  const movementRows = computed.map(c => ({
-    client_id: req.client_id,
-    ingredient_id: c.ingredient_id,
-    movement_type: req.movement_type,
-    quantity: c.quantity,
-    actor: req.actor,
-    notes: [
-      c.notes,
-      `stock:${c.stock_before}→${c.stock_after}`,
-      c.unit_cost > 0 ? `cost:${c.cost_before}→${c.cost_after}@${c.unit_cost}` : null,
-      `[key:${req.idempotency_key}]`,
-    ].filter(Boolean).join(' '),
-  }))
-
-  const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/pos_inventory_movements`, {
-    method: 'POST',
-    headers: headers({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
-    body: JSON.stringify(movementRows),
-  })
-
-  if (!insertRes.ok) {
-    const text = await insertRes.text()
-    result.errors.push(`Failed to insert movements: ${insertRes.status} ${text.slice(0, 200)}`)
-    return result
-  }
-
-  result.movements_created = computed.length
-
-  // ── 5b. INSERT underflow alerts if any ──────────────────────────
-
-  if (underflows.length > 0) {
-    const alertRows = underflows.map(u => ({
-      client_id: req.client_id,
-      ingredient_id: u.ingredient_id,
-      movement_type: 'underflow_prevented',
-      quantity: 0,
-      actor: 'system',
-      notes: `UNDERFLOW_PREVENTED: ${req.movement_type} would set stock to ${u.would_be.toFixed(4)} ` +
-             `(before=${u.stock_before} qty=${u.attempted}). Floored to 0. ` +
-             `Original key: ${req.idempotency_key}`,
-    }))
-
-    await fetch(`${SUPABASE_URL}/rest/v1/pos_inventory_movements`, {
-      method: 'POST',
-      headers: headers({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
-      body: JSON.stringify(alertRows),
-    })
-  }
-
-  // ── 6. PATCH stock + cost ───────────────────────────────────────
-
-  for (const c of computed) {
-    const current = stockMap.get(c.ingredient_id)!
-
-    // Update stock
-    const patchRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/pos_inventory?id=eq.${current.id}&client_id=eq.${req.client_id}`,
-      {
-        method: 'PATCH',
-        headers: headers({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
-        body: JSON.stringify({ stock: c.stock_after, updated_at: new Date().toISOString() }),
-      }
-    )
-
-    if (patchRes.ok) {
-      result.stock_updates++
-    } else {
-      result.errors.push(`Stock update failed for ${c.ingredient_id}: ${patchRes.status}`)
+    const receipt: unknown = await response.json()
+    if (!response.ok) {
+      const code = receipt && typeof receipt === 'object' && 'error' in receipt && typeof receipt.error === 'string'
+        ? receipt.error : `INVENTORY_HTTP_${response.status}`
+      const outcome = receipt && typeof receipt === 'object' && 'outcome' in receipt ? receipt.outcome : undefined
+      // A database rejection settles the intent. An auth/validation rejection
+      // settles only a fresh attempt: after ambiguity, that response cannot
+      // prove a previous call did not commit before the token expired.
+      if (sameIntent && (outcome === 'rejected' || (fresh && outcome === 'not_executed'))) await releaseInventoryIntent(scope, request)
+      return failure(code)
     }
-
-    // Update cost (only if it changed)
-    if (isEntry && c.cost_after !== c.cost_before && c.unit_cost > 0) {
-      const costRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/pos_ingredients?id=eq.${c.ingredient_id}&client_id=eq.${req.client_id}`,
-        {
-          method: 'PATCH',
-          headers: headers({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
-          body: JSON.stringify({ cost_per_unit: c.cost_after }),
-        }
-      )
-
-      if (costRes.ok) {
-        result.cost_updates++
-      } else {
-        result.errors.push(`Cost update failed for ${c.ingredient_id}: ${costRes.status}`)
-      }
-    }
-
-    result.details.push({
-      ingredient_id: c.ingredient_id,
-      stock_before: c.stock_before,
-      stock_after: c.stock_after,
-      cost_before: c.cost_before,
-      cost_after: c.cost_after,
-    })
+    // A changed form may discover an already committed original, but must never
+    // execute that old payload or infer cancellation from an absent receipt.
+    if (!sameIntent && isInventoryReceiptAbsent(receipt, request)) return failure('INVENTORY_PENDING_OTHER_OPERATION')
+    if (!isExactInventoryReceipt(receipt, request)) return failure('INVENTORY_RECEIPT_MISMATCH')
+    const verifiedScope = JSON.stringify([receipt.actor.client_id, receipt.actor.auth_type, receipt.actor.id])
+    if (verifiedScope !== scope) return failure('INVENTORY_RECEIPT_MISMATCH')
+    await releaseInventoryIntent(scope, request)
+    if (!sameIntent) return { ...failure('INVENTORY_PREVIOUS_OPERATION_CONFIRMED_REVIEW_CURRENT'), receipt }
+    return { success: true, movements_created: receipt.movements_created,
+      stock_updates: receipt.stock_updates, cost_updates: receipt.cost_updates,
+      errors: [], was_duplicate: receipt.was_duplicate, details: receipt.details, receipt }
+  } catch {
+    // The database may have committed before a response was lost. Never invent
+    // failure compensation or a second key: retry the identical request.
+    return failure(sameIntent ? 'INVENTORY_RESULT_UNKNOWN_RETRY_SAME_KEY' : 'INVENTORY_PENDING_OTHER_OPERATION')
   }
-
-  result.success = result.movements_created > 0
-  return result
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────

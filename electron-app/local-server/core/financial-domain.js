@@ -48,12 +48,12 @@ function canonical(value) {
 const equal = (a, b) => JSON.stringify(canonical(a)) === JSON.stringify(canonical(b))
 
 function summarize(order) {
-  let paid = 0; let reserved = 0
+  let paid = 0; let reserved = 0; let tips = 0; let reservedTips = 0
   for (const account of order.accounts) {
     account.paid_cents = 0; account.reserved_cents = 0
     for (const payment of order.payments.filter(p => p.account_id === account.account_id)) {
-      if (payment.status === 'accepted') account.paid_cents = add(account.paid_cents, payment.amount_cents)
-      if (RESERVING.has(payment.status)) account.reserved_cents = add(account.reserved_cents, payment.amount_cents)
+      if (payment.status === 'accepted') { account.paid_cents = add(account.paid_cents, payment.amount_cents); tips = add(tips, payment.tip_cents ?? 0) }
+      if (RESERVING.has(payment.status)) { account.reserved_cents = add(account.reserved_cents, payment.amount_cents); reservedTips = add(reservedTips, payment.tip_cents ?? 0) }
     }
     account.balance_cents = account.total_cents - account.paid_cents
     if (account.balance_cents < account.reserved_cents) fail('OVERPAYMENT', 'Payments exceed account balance')
@@ -61,6 +61,8 @@ function summarize(order) {
   }
   order.paid_cents = paid
   order.reserved_cents = reserved
+  order.tip_cents = tips
+  order.reserved_tip_cents = reservedTips
   order.balance_cents = order.total_cents - paid
   order.status = order.balance_cents === 0 ? 'settled' : 'open'
   return order
@@ -68,14 +70,24 @@ function summarize(order) {
 
 function requireEvidence(payment, status, evidence, currency) {
   if (!evidence || typeof evidence !== 'object' || Array.isArray(evidence)) fail('PAYMENT_EVIDENCE_REQUIRED', 'Payment outcome requires evidence')
+  const charged = add(payment.amount_cents, payment.tip_cents ?? 0)
   if (payment.method === 'cash') {
     if (status === 'accepted') {
       if (evidence.kind !== 'cash_received') fail('PAYMENT_EVIDENCE_REQUIRED', 'Cash must be explicitly received')
       id(evidence.received_by, 'received_by')
       cents(evidence.received_cents, 'received_cents', false)
-      if (evidence.received_cents < payment.amount_cents) fail('INSUFFICIENT_TENDER', 'Received cash is less than payment amount')
+      if (evidence.received_cents < charged) fail('INSUFFICIENT_TENDER', 'El efectivo recibido debe cubrir consumo y propina')
     } else {
       if (evidence.kind !== 'operator_record') fail('PAYMENT_EVIDENCE_REQUIRED', 'Operator record required')
+      id(evidence.recorded_by, 'recorded_by'); id(evidence.reason, 'reason')
+    }
+  } else if (payment.method === 'manual') {
+    if (status === 'accepted') {
+      if (evidence.kind !== 'manual_received' || evidence.tender !== payment.tender) fail('PAYMENT_EVIDENCE_REQUIRED', 'Confirma el cobro externo realizado y su forma de pago')
+      id(evidence.received_by, 'received_by'); id(evidence.source, 'terminal o banco'); id(evidence.reference, 'referencia del cobro')
+      if (evidence.currency !== currency || evidence.amount_cents !== charged) fail('PAYMENT_EVIDENCE_MISMATCH', 'La referencia debe corresponder al consumo más propina')
+    } else {
+      if (evidence.kind !== 'operator_record') fail('PAYMENT_EVIDENCE_REQUIRED', 'Verifica el resultado externo antes de liberar el importe')
       id(evidence.recorded_by, 'recorded_by'); id(evidence.reason, 'reason')
     }
   } else {
@@ -83,11 +95,13 @@ function requireEvidence(payment, status, evidence, currency) {
       fail('PAYMENT_EVIDENCE_REQUIRED', 'Provider outcome must identify the same provider and status')
     }
     id(evidence.reference, 'provider reference')
-    if (evidence.currency !== currency || evidence.amount_cents !== payment.amount_cents) {
+    if (evidence.currency !== currency || evidence.amount_cents !== charged) {
       fail('PAYMENT_EVIDENCE_MISMATCH', 'Provider outcome amount/currency differs from reserved attempt')
     }
   }
 }
+const manualReference = (payment, turnoId) => JSON.stringify([turnoId, payment.tender,
+  payment.evidence?.source?.trim().toLocaleLowerCase('es-MX'), payment.evidence?.reference?.trim().toLocaleLowerCase('es-MX')])
 
 class FinancialDomain {
   constructor() { this._orders = new Map() }
@@ -102,7 +116,7 @@ class FinancialDomain {
   hydrate(orders) {
     if (!Array.isArray(orders)) fail('INVALID_FINANCIAL_SNAPSHOT', 'Expected financial orders')
     const next = new Map()
-    const paymentIds = new Set(); const providerReferences = new Set()
+    const paymentIds = new Set(); const providerReferences = new Set(); const manualReferences = new Set()
     for (const order of orders) {
       const verified = this._verifySnapshot(order)
       if (next.has(verified.order_id)) fail('INVALID_FINANCIAL_SNAPSHOT', 'Duplicate order')
@@ -113,6 +127,11 @@ class FinancialDomain {
           const reference = JSON.stringify([payment.provider, payment.evidence.reference])
           if (providerReferences.has(reference)) fail('INVALID_FINANCIAL_SNAPSHOT', 'Provider authorization appears in multiple payments')
           providerReferences.add(reference)
+        }
+        if (payment.method === 'manual' && payment.status === 'accepted') {
+          const reference = manualReference(payment, verified.turno_id)
+          if (manualReferences.has(reference)) fail('INVALID_FINANCIAL_SNAPSHOT', 'Manual reference appears in multiple payments')
+          manualReferences.add(reference)
         }
       }
       next.set(verified.order_id, verified)
@@ -128,7 +147,7 @@ class FinancialDomain {
     if (order.currency !== 'MXN' || !Array.isArray(order.accounts) || !order.accounts.length || !Array.isArray(order.payments)) fail('INVALID_FINANCIAL_SNAPSHOT', 'Invalid currency, accounts or payments')
     const ids = new Set(); let total = 0
     for (const account of order.accounts) {
-      id(account.account_id, 'account_id'); cents(account.total_cents, 'account.total_cents', false)
+      id(account.account_id, 'account_id'); cents(account.total_cents, 'account.total_cents')
       if (ids.has(account.account_id)) fail('INVALID_FINANCIAL_SNAPSHOT', 'Duplicate account')
       ids.add(account.account_id); total = add(total, account.total_cents)
     }
@@ -136,7 +155,10 @@ class FinancialDomain {
     const paymentIds = new Set()
     for (const payment of order.payments) {
       id(payment.payment_id, 'payment_id'); cents(payment.amount_cents, 'amount_cents', false)
-      if (!ids.has(payment.account_id) || paymentIds.has(payment.payment_id) || !['pending', 'unknown', 'accepted', 'rejected'].includes(payment.status) || !['cash', 'external'].includes(payment.method)) fail('INVALID_FINANCIAL_SNAPSHOT', 'Invalid payment')
+      cents(payment.tip_cents ?? 0, 'tip_cents'); add(payment.amount_cents, payment.tip_cents ?? 0)
+      if (!ids.has(payment.account_id) || paymentIds.has(payment.payment_id) || !['pending', 'unknown', 'accepted', 'rejected'].includes(payment.status) || !['cash', 'manual', 'external'].includes(payment.method)) fail('INVALID_FINANCIAL_SNAPSHOT', 'Invalid payment')
+      if (payment.method === 'manual' && !['card', 'transfer'].includes(payment.tender)) fail('INVALID_FINANCIAL_SNAPSHOT', 'Invalid manual payment tender')
+      for (const field of ['created_at', 'resolved_at', 'accepted_at']) if (payment[field] !== undefined && (typeof payment[field] !== 'string' || !Number.isFinite(Date.parse(payment[field])))) fail('INVALID_FINANCIAL_SNAPSHOT', 'Invalid payment timestamp')
       paymentIds.add(payment.payment_id)
       if (payment.method === 'external') id(payment.provider, 'provider')
       if (payment.status !== 'pending') requireEvidence(payment, payment.status, payment.evidence, order.currency)
@@ -144,7 +166,38 @@ class FinancialDomain {
     return summarize(order)
   }
 
-  prepare(payload, { order: operationalOrder, turno, actor } = {}) {
+  /** Called only for a catalog-priced operational result, inside the same
+   * durable transaction. Existing receipts/payments remain immutable; only the
+   * unpaid allocation can change. No edit is allowed while money is reserved. */
+  rebaseOrder(operationalOrder) {
+    const existing = this.getOrder(operationalOrder.order_id)
+    if (!existing) return null
+    if (existing.reserved_cents) fail('PAYMENTS_IN_PROGRESS', 'Resuelve los cobros preparados antes de modificar el consumo')
+    if (existing.status === 'settled') fail('ORDER_ALREADY_SETTLED', 'La cuenta ya está pagada; requiere una operación de ajuste')
+    const total = moneyFromOrder(operationalOrder)
+    if (total < existing.paid_cents) fail('ADJUSTMENT_REQUIRES_REFUND', 'El consumo no puede quedar por debajo del dinero recibido')
+    const next = clone(existing), difference = total - next.total_cents
+    if (difference > 0) {
+      if (next.accounts.length === 1) next.accounts[0].total_cents = total
+      else {
+        const addition = next.accounts.find(a => a.additional_consumption === true && a.paid_cents === 0)
+        if (addition) addition.total_cents = add(addition.total_cents, difference)
+        else next.accounts.push({ account_id: id(`${next.order_id}:add:${operationalOrder.order_revision}`, 'account_id'), label: 'Consumo adicional', additional_consumption: true, total_cents: difference })
+      }
+    } else if (difference < 0) {
+      let remaining = -difference
+      for (const account of [...next.accounts].reverse()) {
+        const removed = Math.min(remaining, account.total_cents - account.paid_cents)
+        account.total_cents -= removed; remaining -= removed
+      }
+      if (remaining) fail('ADJUSTMENT_REQUIRES_REFUND', 'El ajuste supera el saldo pendiente')
+    }
+    next.total_cents = total; next.order_revision = operationalOrder.order_revision
+    next.revision = add(next.revision, 1)
+    return this._verifySnapshot(next)
+  }
+
+  prepare(payload, { order: operationalOrder, turno, actor, now = new Date().toISOString() } = {}) {
     const type = payload.command_type
     if (!COMMANDS.has(type)) fail('UNKNOWN_FINANCIAL_COMMAND', 'Unsupported financial command')
     revision(payload.expected_revision)
@@ -180,9 +233,10 @@ class FinancialDomain {
     if (!turno?.id || existing.turno_id !== turno.id) fail('TURNO_MISMATCH', 'Payment belongs to a different shift')
     if (type === 'FINANCIAL_PAYMENT_START') {
       id(payload.payment_id, 'payment_id'); id(payload.account_id, 'account_id'); cents(payload.amount_cents, 'amount_cents', false)
+      cents(payload.tip_cents ?? 0, 'tip_cents'); add(payload.amount_cents, payload.tip_cents ?? 0)
       const repeated = existing.payments.find(p => p.payment_id === payload.payment_id)
       if (repeated) {
-        if (repeated.account_id !== payload.account_id || repeated.amount_cents !== payload.amount_cents || repeated.method !== payload.method || (repeated.provider || null) !== (payload.provider || null)) fail('PAYMENT_ID_REUSED', 'Payment identity has different content')
+        if (repeated.account_id !== payload.account_id || repeated.amount_cents !== payload.amount_cents || (repeated.tip_cents ?? 0) !== (payload.tip_cents ?? 0) || repeated.method !== payload.method || (repeated.tender || null) !== (payload.tender || null) || (repeated.provider || null) !== (payload.provider || null)) fail('PAYMENT_ID_REUSED', 'Payment identity has different content')
         return { financial_order: existing, repeated_payment: true }
       }
       // payment_id is unique across mother orders, not merely inside one account.
@@ -198,6 +252,10 @@ class FinancialDomain {
       if (payload.status === 'accepted' && repeated.method === 'external' && this.getOrders().some(o => o.payments.some(p =>
         p.payment_id !== payload.payment_id && p.status === 'accepted' && p.provider === repeated.provider && p.evidence?.reference === payload.evidence.reference
       ))) fail('PROVIDER_REFERENCE_REUSED', 'This provider authorization already paid another attempt')
+      if (payload.status === 'accepted' && repeated.method === 'manual') {
+        const reference = manualReference({ ...repeated, evidence: payload.evidence }, existing.turno_id)
+        if (this.getOrders().some(o => o.payments.some(p => p.payment_id !== repeated.payment_id && p.method === 'manual' && p.status === 'accepted' && manualReference(p, o.turno_id) === reference))) fail('MANUAL_REFERENCE_REUSED', 'Esa referencia ya está registrada en otra cuenta de este turno')
+      }
     }
     if (revision(payload.expected_revision) !== existing.revision) fail('FINANCIAL_REVISION_CONFLICT', 'Account changed; reload its balance before continuing')
     const next = clone(existing)
@@ -214,12 +272,15 @@ class FinancialDomain {
       })
       if (sum !== next.total_cents) fail('ACCOUNT_TOTAL_MISMATCH', 'Every cent must belong to exactly one account')
     } else if (type === 'FINANCIAL_PAYMENT_START') {
+      requireSentConsumption(operationalOrder)
+      if (operationalOrder.order_revision !== next.order_revision || moneyFromOrder(operationalOrder) !== next.total_cents) fail('ORDER_REVISION_CONFLICT', 'Vuelve a consultar el consumo confirmado antes de cobrar')
       const account = next.accounts.find(a => a.account_id === payload.account_id)
       if (!account) fail('ACCOUNT_NOT_FOUND', 'Account does not belong to this order')
-      if (!['cash', 'external'].includes(payload.method)) fail('INVALID_PAYMENT_METHOD', 'Expected cash or external')
+      if (!['cash', 'manual', 'external'].includes(payload.method)) fail('INVALID_PAYMENT_METHOD', 'Forma de pago inválida')
+      if (payload.method === 'manual' && !['card', 'transfer'].includes(payload.tender)) fail('INVALID_PAYMENT_METHOD', 'Indica tarjeta independiente o transferencia')
       if (payload.method === 'external') id(payload.provider, 'provider')
       if (payload.amount_cents > account.balance_cents - account.reserved_cents) fail('OVERPAYMENT', 'Amount exceeds the unreserved account balance')
-      next.payments.push({ payment_id: payload.payment_id, account_id: payload.account_id, amount_cents: payload.amount_cents, method: payload.method, status: 'pending', ...(actor ? { created_by: actor.id } : {}), ...(payload.method === 'external' ? { provider: payload.provider } : {}) })
+      next.payments.push({ payment_id: payload.payment_id, account_id: payload.account_id, amount_cents: payload.amount_cents, tip_cents: payload.tip_cents ?? 0, method: payload.method, status: 'pending', created_at: now, ...(actor ? { created_by: actor.id } : {}), ...(payload.method === 'manual' ? { tender: payload.tender } : {}), ...(payload.method === 'external' ? { provider: payload.provider } : {}) })
     } else if (type === 'FINANCIAL_PAYMENT_RESULT') {
       id(payload.payment_id, 'payment_id')
       const payment = next.payments.find(p => p.payment_id === payload.payment_id)
@@ -228,14 +289,16 @@ class FinancialDomain {
       if (!RESERVING.has(payment.status)) fail('PAYMENT_FINAL', 'Final payment results cannot be overwritten')
       requireEvidence(payment, payload.status, payload.evidence, next.currency)
       payment.status = payload.status
+      payment.resolved_at = now
+      if (payload.status === 'accepted') payment.accepted_at = now
       if (actor) payment.resolved_by = actor.id
       payment.evidence = clone(payload.evidence)
-      if (payment.method === 'cash' && payload.status === 'accepted') payment.change_cents = payment.evidence.received_cents - payment.amount_cents
+      if (payment.method === 'cash' && payload.status === 'accepted') payment.change_cents = payment.evidence.received_cents - payment.amount_cents - (payment.tip_cents ?? 0)
     }
     next.revision = add(next.revision, 1)
     summarize(next)
     // This durable transition is exclusively financial. It emits no ORDER_CLOSED.
-    if (next.status === 'settled' && !next.settled_at) next.settled_at = new Date().toISOString()
+    if (next.status === 'settled' && !next.settled_at) next.settled_at = now
     return { financial_order: next }
   }
 }
