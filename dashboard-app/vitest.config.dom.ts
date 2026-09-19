@@ -16,13 +16,18 @@ import path from 'path'
  * de que exista `window` — por ejemplo el rescate offline del KDS, que revisa
  * `typeof window === 'undefined'` antes de leer IndexedDB. En el config de node
  * esa rama nunca se ejecuta y la prueba pasaría sin probar nada.
+ *
+ * `.dom.test.tsx` es lo mismo pero con JSX: pruebas de PANTALLA que viven junto
+ * a su página (`src/app/**`) en vez de en `components/ui`. Se agregó para la
+ * fase 2 del rediseño del POS, donde lo que se prueba es que una pantalla
+ * migrada no perdió datos, filtros ni acciones.
  */
 export default defineConfig({
   plugins: [react()],
   test: {
     globals: true,
     environment: 'jsdom',
-    include: ['src/components/ui/**/*.test.tsx', 'src/**/*.dom.test.ts'],
+    include: ['src/components/ui/**/*.test.tsx', 'src/**/*.dom.test.ts', 'src/**/*.dom.test.tsx'],
   },
   resolve: {
     alias: {

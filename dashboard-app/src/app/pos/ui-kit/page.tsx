@@ -3,11 +3,12 @@
 // vivo del sistema de diseño. Abre /pos/ui-kit para ver los componentes reales.
 import React, { useState } from 'react'
 import {
-  Coffee, UtensilsCrossed, CakeSlice, Leaf, Droplet, Send, CreditCard, Split, Receipt,
-  Printer, Users, Clock, WifiOff, Check, Ban,
+  Coffee, UtensilsCrossed, CakeSlice, Leaf, Droplet, Send, CreditCard, Receipt,
+  Printer, Users, Clock, WifiOff, Check, Ban, ChefHat, Percent, Map as MapIcon, Layers,
 } from 'lucide-react'
 import {
   PosButton, CategoryChip, ProductTile, Stepper, StatusPill, QuickAmount, CatKey,
+  Sheet, List, Row, RowText, CardStat, Tag, Pill, ActionBar, Keypad,
 } from '@/components/pos/ui/PosKit'
 
 function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
@@ -33,6 +34,8 @@ const CATS: { key: CatKey; label: string; icon: React.ReactNode }[] = [
 export default function UiKitPreview() {
   const [qty, setQty] = useState(2)
   const [active, setActive] = useState<CatKey>('cafe')
+  const [sheet, setSheet] = useState<null | 'md' | 'wide' | 'full'>(null)
+  const [monto, setMonto] = useState('')
 
   return (
     <div className="pos-kiosk h-dvh flex flex-col overflow-hidden" style={{ background: 'var(--bg)', color: 'var(--text-1)' }}>
@@ -111,6 +114,117 @@ export default function UiKitPreview() {
               <PosButton variant="primary" icon={<Send size={18} />}>Nuevo</PosButton>
             </div>
           </div>
+        </Section>
+
+        {/* ── Fase 1 del rediseño V2 ──────────────────────────────────────── */}
+
+        <Section title="CardStat" hint="Un número por tarjeta. Etiqueta arriba, número grande, nota abajo. El tono pinta el número, no el fondo.">
+          <div className="grid gap-2.5" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))' }}>
+            <CardStat label="Venta del turno" value="$48,210" note="$6,027 por hora" tone="ok" />
+            <CardStat label="Abierto en piso" value="$9,340" note="7 cuentas sin cerrar" tone="info" />
+            <CardStat label="Cancelaciones" value={9} note="aviso a las 4 por persona" tone="bad" />
+            <CardStat label="Ticket promedio" value="$612" />
+          </div>
+        </Section>
+
+        <Section title="Tag y Pill" hint="Tag clasifica un renglón. Pill es el estado de la terminal: mono, mayúsculas, se lee de reojo.">
+          <div className="flex flex-wrap gap-2 mb-4">
+            <Tag tone="ok">en nivel</Tag>
+            <Tag tone="info" icon={<Clock size={11} />}>en cocina</Tag>
+            <Tag tone="warn">por acabarse</Tag>
+            <Tag tone="bad">bajo mínimo</Tag>
+            <Tag>sin contar</Tag>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Pill state="on">Cocina</Pill>
+            <Pill state="on">Turno abierto</Pill>
+            <Pill state="off" pulse>Sin internet</Pill>
+            <Pill state="warn">Subiendo 3…</Pill>
+            <Pill state="neutral" dot={false}>14:32</Pill>
+          </div>
+        </Section>
+
+        <Section title="List + Row + RowText" hint="La lista scrollea, no la página. Un Row con onClick se renderiza como <button>: llega por teclado y lo anuncia un lector.">
+          <List className="max-h-[240px]">
+            <Row columns="auto 1fr auto" onClick={() => {}}>
+              <span className="font-mono text-xs" style={{ color: 'var(--text-3)' }}>14:02</span>
+              <RowText title="Cobro $1,240 · efectivo" sub="Celeste Ivonne · mesa 12" />
+              <Tag tone="ok">pago</Tag>
+            </Row>
+            <Row columns="auto 1fr auto" tone="bad" onClick={() => {}}>
+              <span className="font-mono text-xs" style={{ color: 'var(--text-3)' }}>13:48</span>
+              <RowText title="Cancelado: PIZZA PEPERONI" sub="Jose Reyna · error de cocina" />
+              <Tag tone="bad">cancelado</Tag>
+            </Row>
+            <Row columns="auto 1fr auto" onClick={() => {}}>
+              <span className="font-mono text-xs" style={{ color: 'var(--text-3)' }}>13:31</span>
+              <RowText title="Descuento 15% aplicado" sub="Eduardo" />
+              <Tag tone="warn" icon={<Percent size={11} />}>descuento</Tag>
+            </Row>
+            <Row columns="auto 1fr auto">
+              <span className="font-mono text-xs" style={{ color: 'var(--text-3)' }}>13:05</span>
+              <RowText title="Orden enviada a cocina" sub="Aldo Ruiz · mesa 5 — renglón sin acción" />
+              <Tag tone="info" icon={<ChefHat size={11} />}>envío</Tag>
+            </Row>
+          </List>
+        </Section>
+
+        <Section title="Keypad" hint="3 columnas, teclas de 58px. No guarda estado: emite dígitos y deja las dos funciones a quien lo usa.">
+          <div className="flex gap-4 items-start flex-wrap">
+            <div className="max-w-[220px] flex-1 min-w-[200px]">
+              <Keypad
+                onDigit={(d) => setMonto((v) => (v.length < 7 ? v + d : v))}
+                left={{ label: 'Limpiar', onPress: () => setMonto('') }}
+                right={{ label: '←', onPress: () => setMonto((v) => v.slice(0, -1)) }}
+              />
+            </div>
+            <div className="rounded-2xl border px-5 py-4 text-center min-w-[160px]" style={{ borderColor: 'var(--line)', background: 'var(--surface-2)' }}>
+              <div className="text-[10px] font-extrabold uppercase tracking-[.14em]" style={{ color: 'var(--text-3)' }}>Monto</div>
+              <div className="font-black tabular-nums" style={{ fontSize: 34, letterSpacing: '-.04em' }}>${monto || '0'}</div>
+            </div>
+          </div>
+        </Section>
+
+        <Section title="ActionBar" hint="78px de alto, columnas declaradas. Los verbos conservan su posición entre pantallas: destructivo a la izquierda, principal a la derecha.">
+          <div className="rounded-2xl border overflow-hidden" style={{ borderColor: 'var(--line)' }}>
+            <div className="px-4 py-6 text-center text-xs" style={{ color: 'var(--text-4)', background: 'var(--bg)' }}>
+              (contenido de la pantalla)
+            </div>
+            <ActionBar columns="auto auto 1fr 1fr 1.25fr">
+              <PosButton variant="ghost" ariaLabel="Mesas" icon={<MapIcon size={18} />} />
+              <PosButton variant="ghost" ariaLabel="Acciones de la mesa" icon={<Layers size={18} />} />
+              <PosButton variant="ghost" icon={<Receipt size={18} />}>Cuenta</PosButton>
+              <PosButton variant="primary" icon={<Send size={18} />}>Enviar</PosButton>
+              <PosButton variant="info" icon={<CreditCard size={18} />}>Cobrar</PosButton>
+            </ActionBar>
+          </div>
+        </Section>
+
+        <Section title="Sheet" hint="Envuelve <Dialog>: hereda trampa de foco, ESC por pila y bloqueo de scroll. Sólo le pone la piel del rediseño y sus tres tamaños.">
+          <div className="flex flex-wrap gap-2.5">
+            <PosButton variant="ghost" onClick={() => setSheet('md')}>Abrir md</PosButton>
+            <PosButton variant="ghost" onClick={() => setSheet('wide')}>Abrir wide</PosButton>
+            <PosButton variant="ghost" onClick={() => setSheet('full')}>Abrir full</PosButton>
+          </div>
+          <Sheet
+            open={sheet !== null}
+            onClose={() => setSheet(null)}
+            size={sheet ?? 'md'}
+            title="Acciones de la mesa"
+            subtitle="Mesa 12 · $1,240.00"
+            footer={
+              <div className="grid gap-2.5" style={{ gridTemplateColumns: '1fr 1.6fr' }}>
+                <PosButton variant="ghost" onClick={() => setSheet(null)}>Cancelar</PosButton>
+                <PosButton variant="primary" icon={<Check size={18} />} onClick={() => setSheet(null)}>Confirmar</PosButton>
+              </div>
+            }
+          >
+            <div className="grid gap-2.5" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))' }}>
+              {['Descuento', 'Dividir cuenta', 'Mover de mesa', 'Nota a cocina', 'Reimprimir', 'Anular orden'].map((t) => (
+                <div key={t} className="rounded-xl border grid place-items-center text-sm font-bold" style={{ height: 72, borderColor: 'var(--line)', background: 'var(--surface-2)', color: 'var(--text-2)' }}>{t}</div>
+              ))}
+            </div>
+          </Sheet>
         </Section>
       </div>
     </div>

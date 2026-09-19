@@ -116,8 +116,10 @@ body:has(.pos-service-shell) {
  */
 
 :root {
-  /* Base — DS v2.1 "Servicio": near-black con sesgo frío-verde, superficies escalonadas */
-  --bg: #07090a;
+  /* Base — DS v2.1 "Servicio": near-black con sesgo frío-verde, superficies escalonadas
+   * `--bg` reconciliado con el artifact aprobado del rediseño POS V2 (era #07090a).
+   * Ver docs/pos/REDESIGN-V2-DISCOVERY.md § COMPONENT_REUSE_MAP. */
+  --bg: #080b0c;
   --surface: #0c1012;
   --surface-2: #11171a;
   --panel: #131a1d;
@@ -127,7 +129,8 @@ body:has(.pos-service-shell) {
 
   /* Texto — blanco frío escalonado */
   --text-1: #eef2f0;
-  --text-2: #b4bfbb;
+  /* `--text-2` reconciliado con el artifact aprobado (era #b4bfbb). */
+  --text-2: #a8b5b1;
   --text-3: #7d8985;
   --text-4: #525c58;
 
@@ -136,7 +139,8 @@ body:has(.pos-service-shell) {
   --accent-bright: #34d399;
   --accent-deep: #059669;
   --accent-soft: rgba(16, 185, 129, 0.12);
-  --accent-line: rgba(16, 185, 129, 0.26);
+  /* `--accent-line` reconciliado con el artifact aprobado (era 0.26). */
+  --accent-line: rgba(16, 185, 129, 0.28);
   /* Acento COMO TEXTO — sigue al tenant, legible sobre fondo oscuro */
   --accent-ink: var(--accent-bright);
 
