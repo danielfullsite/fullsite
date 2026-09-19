@@ -1,7 +1,7 @@
 {
   "artifact_kind": "signal-health",
   "artifact_version": "1.0",
-  "emitted_at": "2026-09-19T06:26:46.546Z",
+  "emitted_at": "2026-09-19T06:42:26.274Z",
   "repo_sha": "418933f4ac8bf74a177487bb5c0aef0a45735d7b",
   "database_identity": null,
   "principle": "La ausencia de evidencia NO es salud.",
@@ -82,9 +82,9 @@
       "signal": "scheduled_agent_runs",
       "owner": "INCIDENT_TRIAGE_AGENT",
       "state": "HEALTHY",
-      "reason": "324 min desde la última",
-      "last_seen": "2026-09-19T01:00:11Z",
-      "age_minutes": 324
+      "reason": "26 min desde la última",
+      "last_seen": "2026-09-19T05:58:49Z",
+      "age_minutes": 26
     },
     {
       "signal": "backups",
@@ -143,5 +143,5 @@
     "shared_db_writes": 0,
     "product_files_modified": 0
   },
-  "content_sha256": "1c482ba76b8e77c8bacae496581ffeb847c69b91af976a4a90e092ec579bdc4a"
+  "content_sha256": "a6919b268c097d03272f0fd3a08f9279eff099664421f2337706c396a9091a95"
 }

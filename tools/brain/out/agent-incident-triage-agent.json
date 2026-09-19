@@ -1,7 +1,7 @@
 {
   "artifact_kind": "agent-incident-triage-agent",
   "artifact_version": "1.0",
-  "emitted_at": "2026-09-19T06:26:46.511Z",
+  "emitted_at": "2026-09-19T06:42:26.237Z",
   "repo_sha": "418933f4ac8bf74a177487bb5c0aef0a45735d7b",
   "database_identity": "supabase:qjiomlvudfmzuvqvhwpk/postgres · PostgreSQL 17.6",
   "agent_id": "INCIDENT_TRIAGE_AGENT",
@@ -42,5 +42,5 @@
     "shared_db_writes": 0,
     "product_files_modified": 0
   },
-  "content_sha256": "f2d2bd8d7e09fb49c8b26869986ad44670bb0eb7270a6212e2508a2733533a1c"
+  "content_sha256": "57f5cb712e9e74affa168142b962e10b6e5345e0f126b870187c189a8a13297f"
 }

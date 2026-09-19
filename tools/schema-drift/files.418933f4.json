@@ -1,0 +1,155 @@
+[
+  {
+    "path": "supabase/migrations/00000000000000_baseline_esquema.sql"
+  },
+  {
+    "path": "supabase/migrations/20260731000000_integration_framework.sql"
+  },
+  {
+    "path": "supabase/migrations/20260811010000_platform_admin_lockdown.sql"
+  },
+  {
+    "path": "supabase/migrations/20260811020000_platform_settings_feature_flags.sql"
+  },
+  {
+    "path": "supabase/migrations/20260811030000_platform_audit_log.sql"
+  },
+  {
+    "path": "supabase/migrations/20260826120000_ops_daily_desde_pos.sql"
+  },
+  {
+    "path": "supabase/migrations/20260826130000_agent_results_data_a_objeto.sql"
+  },
+  {
+    "path": "supabase/migrations/20260826140000_wansoft_data_a_objeto_o_arreglo.sql"
+  },
+  {
+    "path": "supabase/migrations/20260826_agent_events_admite_agentes.sql"
+  },
+  {
+    "path": "supabase/migrations/20260826_cerrar_vistas_ocm.sql"
+  },
+  {
+    "path": "supabase/migrations/20260826_ops_daily_fuente_viva.sql"
+  },
+  {
+    "path": "supabase/migrations/20260826_politicas_permisivas.sql"
+  },
+  {
+    "path": "supabase/migrations/20260826_r1_save_order_ambigua.sql"
+  },
+  {
+    "path": "supabase/migrations/20260827120000_pos_terminals_por_sucursal.sql"
+  },
+  {
+    "path": "supabase/migrations/20260827130000_pos_terminal_enrollments.sql"
+  },
+  {
+    "path": "supabase/migrations/20260827150000_pos_turnos_por_sucursal.sql"
+  },
+  {
+    "path": "supabase/migrations/20260829_turnos_por_sucursal.sql"
+  },
+  {
+    "path": "supabase/migrations/20260831010000_secure_agent_results_backup.sql"
+  },
+  {
+    "path": "supabase/migrations/20260831011000_pos_turno_replay_and_numbering.sql"
+  },
+  {
+    "path": "supabase/migrations/20260901180000_folio_por_dia_de_venta.sql"
+  },
+  {
+    "path": "supabase/migrations/20260901200000_client_id_no_vacio.sql"
+  },
+  {
+    "path": "supabase/migrations/20260902040000_pos_yield_studies.sql"
+  },
+  {
+    "path": "supabase/migrations/20260902120000_client_locations_timezone.sql"
+  },
+  {
+    "path": "supabase/migrations/20260909030000_un_turno_abierto_por_restaurante.sql"
+  },
+  {
+    "path": "supabase/migrations/20260909060000_pos_cierres_otros_sistema.sql"
+  },
+  {
+    "path": "supabase/migrations/20260909080000_ops_hourly_ops_personal.sql"
+  },
+  {
+    "path": "supabase/migrations/20260909090000_ops_consumo.sql"
+  },
+  {
+    "path": "supabase/migrations/20260909120000_ops_daily_por_dia_de_venta.sql"
+  },
+  {
+    "path": "supabase/migrations/20260909170000_agent_events_insights_evidence_a_objeto.sql"
+  },
+  {
+    "path": "supabase/migrations/20260910010000_transfer_item_atomico.sql"
+  },
+  {
+    "path": "supabase/migrations/20260910050000_inventory_movement_atomic.sql"
+  },
+  {
+    "path": "supabase/migrations/20260910060000_inventory_cancelled_reconcile.sql"
+  },
+  {
+    "path": "supabase/migrations/20260910070000_merge_y_cobro_conservan_consumo.sql"
+  },
+  {
+    "path": "supabase/migrations/20260910090000_pos_cierres_cola_pendiente.sql"
+  },
+  {
+    "path": "supabase/migrations/20260915040000_ocm_daily_security_invoker.sql"
+  },
+  {
+    "path": "supabase/migrations/20260918210000_tenant_source_authority.sql"
+  },
+  {
+    "path": "supabase/migrations/PENDIENTE_20260904000000_cuentas_divididas_modelo_durable.sql"
+  },
+  {
+    "path": "supabase/migrations/PENDIENTE_20260905010000_caja_business_materializer.sql"
+  },
+  {
+    "path": "supabase/migrations/PENDIENTE_20260910020000_scoped_proxy_upsert.sql"
+  },
+  {
+    "path": "supabase/migrations/PENDIENTE_20260910030000_proxy_child_scope.sql"
+  },
+  {
+    "path": "supabase/migrations/PENDIENTE_20260910040000_una_cuenta_activa_por_mesa.sql"
+  },
+  {
+    "path": "supabase/migrations/PENDIENTE_20260910070000_tenant_provisioning_atomic.sql"
+  },
+  {
+    "path": "supabase/migrations/PENDIENTE_20260910080000_caja_folio_por_turno.sql"
+  },
+  {
+    "path": "supabase/migrations/PENDIENTE_20260911010000_guardas_turnos_y_deducciones.sql"
+  },
+  {
+    "path": "supabase/migrations/PENDIENTE_20260914120000_pos_staff_pin_hash.sql"
+  },
+  {
+    "path": "supabase/migrations/PENDIENTE_20260917200000_append_idempotency.sql"
+  },
+  {
+    "path": "supabase/migrations/PENDIENTE_20260917200000_append_idempotency_ROLLBACK.sql"
+  },
+  {
+    "path": "supabase/migrations/PENDIENTE_20260918210000_purchase_order_atomic.sql"
+  },
+  {
+    "path": "supabase/migrations/PENDIENTE_20260919050000_purchase_numeros_finitos.sql"
+  },
+  {
+    "path": "supabase/migrations/PENDIENTE_20260919060000_inventario_se_crea_al_moverse.sql"
+  },
+  {
+    "path": "supabase/migrations/README-pos-terminals-endurecimiento.md"
+  }
+]

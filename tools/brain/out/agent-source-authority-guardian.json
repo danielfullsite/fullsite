@@ -1,7 +1,7 @@
 {
   "artifact_kind": "agent-source-authority-guardian",
   "artifact_version": "1.0",
-  "emitted_at": "2026-09-19T06:26:46.510Z",
+  "emitted_at": "2026-09-19T06:42:26.235Z",
   "repo_sha": "418933f4ac8bf74a177487bb5c0aef0a45735d7b",
   "database_identity": "supabase:qjiomlvudfmzuvqvhwpk/postgres · PostgreSQL 17.6",
   "agent_id": "SOURCE_AUTHORITY_GUARDIAN",
@@ -83,5 +83,5 @@
     "shared_db_writes": 0,
     "product_files_modified": 0
   },
-  "content_sha256": "c12196e8d0100d4912cafc4a7f000a6a6d8b99ab5f496d93c5596985ae692d3c"
+  "content_sha256": "0129bf53dcaf1f750d11f5acdf2fee3bd112fb9fbbef8ff5b2eb1d87704eeaaa"
 }

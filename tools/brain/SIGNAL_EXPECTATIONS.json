@@ -106,7 +106,11 @@
       "evidence": "13 484 filas, la tabla más escrita fuera de pos_orders",
       "why_it_matters": "Un agente que no deja rastro de haber corrido es indistinguible de uno que no existe. Ya pasó nueve días.",
       "owner": "INCIDENT_TRIAGE_AGENT",
-      "SILENCE_THRESHOLD_MIN": 360
+      "SILENCE_THRESHOLD_MIN": 360,
+      "source_table": "agent_runs",
+      "source_timestamp": "created_at",
+      "source_query": "select max(created_at) from public.agent_runs",
+      "source_note": "Declarado explícito el 2026-09-19 después de observar la tabla equivocada. `agent_runs` (13 624 filas) tiene created_at y es la fuente. `agent_results` es OTRA tabla, sin created_at, cuyo único sello es updated_at; medirla ahí daba 01:00:11 en vez de 05:58:49 y habría hecho ver silenciosos a los agentes durante cinco horas que sí corrieron. Una señal sin su consulta escrita se vuelve a medir mal."
     },
     {
       "EXPECTED_SIGNAL": "backups",

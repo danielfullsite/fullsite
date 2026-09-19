@@ -1,7 +1,7 @@
 {
   "artifact_kind": "agent-cash-and-shift-guardian",
   "artifact_version": "1.0",
-  "emitted_at": "2026-09-19T06:26:46.511Z",
+  "emitted_at": "2026-09-19T06:42:26.236Z",
   "repo_sha": "418933f4ac8bf74a177487bb5c0aef0a45735d7b",
   "database_identity": "supabase:qjiomlvudfmzuvqvhwpk/postgres · PostgreSQL 17.6",
   "agent_id": "CASH_AND_SHIFT_GUARDIAN",
@@ -99,5 +99,5 @@
     "shared_db_writes": 0,
     "product_files_modified": 0
   },
-  "content_sha256": "7cd714de735d7b2b6e7b2c9d0b6b8bbe523d74c8843801733412a6bc0b5e3119"
+  "content_sha256": "4df219737f1441f21d2f6003de7e27dbeb57e3516a4b0f6c33e9a1b7aeccbea7"
 }

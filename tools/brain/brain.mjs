@@ -280,15 +280,33 @@ function indice(filtro, opciones = {}) {
   const ahoraMs = Date.now()
   const arts = todosLosArtefactos()
   const filas = PREGUNTAS.filter(p => !filtro || p.q.toLowerCase().includes(filtro.toLowerCase())).map(p => {
-    const a = arts.find(x => x._kind === p.kind)
-    if (!a) return { question: p.q, state: 'UNKNOWN', answer: 'UNKNOWN', why: `no existe el artefacto ${p.kind}`,
-      artifact: null, as_of: null, integrity: null, freshness: null, coverage: null }
-    const integrity = a._integrity ?? 'NO_VERIFICABLE'
-    const fr = evaluarFrescura(a, { ahoraMs, servingSha })
-    const co = evaluarCobertura(a)
-    const v = veredictoDeRespuesta({ integrity, freshness: fr.state, coverage: co.state })
+    // NO «el primero que aparezca en el directorio».
+    //
+    // Con dos informes del guardián de esquema en la misma carpeta, el índice
+    // contestaba con el que readdir devolvía antes — que resultó ser el bueno
+    // por el orden alfabético del nombre del archivo. Un acierto por accidente
+    // es un fallo que todavía no se ha visto. Se evalúan TODOS los candidatos
+    // del dominio y gana el utilizable más reciente; si ninguno lo es, gana el
+    // más reciente para poder explicar por qué no sirve.
+    const candidatos = arts.filter(x => x._kind === p.kind).map(x => {
+      const integrity = x._integrity ?? 'NO_VERIFICABLE'
+      const fr = evaluarFrescura(x, { ahoraMs, servingSha })
+      const co = evaluarCobertura(x)
+      const v = veredictoDeRespuesta({ integrity, freshness: fr.state, coverage: co.state })
+      return { art: x, integrity, fr, co, v, sello: Date.parse(x.emitted_at ?? x.checked_at ?? '') || 0 }
+    }).sort((x, y) => (Number(y.v.usable) - Number(x.v.usable)) || (y.sello - x.sello))
+    const elegido = candidatos[0]
+    if (!elegido) return { question: p.q, state: 'UNKNOWN', answer: 'UNKNOWN', why: `no existe el artefacto ${p.kind}`,
+      artifact: null, as_of: null, integrity: null, freshness: null, coverage: null,
+      candidates: 0 }
+    const a = elegido.art
+    const integrity = elegido.integrity
+    const fr = elegido.fr
+    const co = elegido.co
+    const v = elegido.v
     return {
       question: p.q,
+      candidates: candidatos.length,
       state: v.state,
       // Una respuesta que no es utilizable NO se publica como dato: se publica
       // el motivo. Publicar el valor «sólo para informar» es cómo un stale se

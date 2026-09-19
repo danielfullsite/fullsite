@@ -113,6 +113,29 @@ const fpCasos = [
   ['fn-introspeccion-incompleta', 'MATCH', 'function',   // existe, sin observed → NOT_CHECKED, no MISMATCH
     { kind: 'function', args: 'a text', returns: 'jsonb', security_definer: true, search_path: 'public' },
     null],
+
+  // ── EL MISMATCH FALSO POR MÉTODO DE HASH ─────────────────────────────────
+  // El 2026-09-19 el guardián marcó cuatro funciones como corruptas. Dos no
+  // habían cambiado: el pin se había calculado colapsando espacios y la
+  // observación no. Comparar dos métodos distintos fabrica corrupción.
+  ['fn-metodo-colapsado-que-empata', 'MATCH', 'function',
+    { kind: 'function', args: 'a text', returns: 'jsonb', security_definer: true, search_path: 'public',
+      body_md5: 'cccccccccccccccccccccccccccccccc', body_md5_method: 'collapsed' },
+    { kind: 'function', args: 'a text', returns: 'jsonb', security_definer: true, search_path: 'public',
+      body_md5: 'dddddddddddddddddddddddddddddddd', body_md5_collapsed: 'cccccccccccccccccccccccccccccccc' }],
+  // Y el caso que importa de verdad: pedir un método que la introspección NO
+  // trajo NO puede producir MISMATCH. Se deja sin comparar y se dice.
+  ['fn-metodo-no-observado', 'MATCH', 'function',
+    { kind: 'function', args: 'a text', returns: 'jsonb', security_definer: true, search_path: 'public',
+      body_md5: 'cccccccccccccccccccccccccccccccc', body_md5_method: 'collapsed' },
+    { kind: 'function', args: 'a text', returns: 'jsonb', security_definer: true, search_path: 'public',
+      body_md5: 'dddddddddddddddddddddddddddddddd' }],
+  // Con el MISMO método y distinto valor, sigue siendo corrupción.
+  ['fn-mismo-metodo-distinto-valor', 'MISMATCH', 'function',
+    { kind: 'function', args: 'a text', returns: 'jsonb', security_definer: true, search_path: 'public',
+      body_md5: 'cccccccccccccccccccccccccccccccc', body_md5_method: 'collapsed' },
+    { kind: 'function', args: 'a text', returns: 'jsonb', security_definer: true, search_path: 'public',
+      body_md5: 'cccccccccccccccccccccccccccccccc', body_md5_collapsed: 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee' }],
 ]
 
 const reg2 = { registry_version: 'selftest-fp', objects: [] }
@@ -157,8 +180,29 @@ const noBloquean = art2.objects.filter(o => o.state === 'MISMATCH' && o.severity
 if (noBloquean.length) { fallos++; console.error(`  ✗ MISMATCH sin BLOCK: ${noBloquean.map(o => o.id)}`) }
 else console.log('  ✓ todo MISMATCH bloquea')
 
+// ── LA FIRMA: dos implementaciones, un solo hash ───────────────────────────
+// `drift-guard.mjs` copia `hashContenido` en vez de importarla, para poder
+// correr en CI sin el cerebro al lado. La copia sólo es segura si esta prueba
+// existe: si alguien toca una y no la otra, un artefacto firmado por el
+// guardián se leería TAMPERED desde el índice.
+const { hashContenido: hashGuard } = await import('./hash.mjs')
+  .catch(() => ({ hashContenido: null }))
+const { hashContenido: hashBrain } = await import('../brain/lib/artifact.mjs')
+  .catch(() => ({ hashContenido: null }))
+if (!hashGuard || !hashBrain) { fallos++; console.error('  ✗ no se pudo importar alguna implementación de hash') }
+else {
+  const muestra = { b: [3, { z: 1, a: 2 }], a: 'x', content_sha256: 'se-ignora' }
+  if (hashGuard(muestra) === hashBrain(muestra)) console.log('  ✓ el guardián y el cerebro firman idéntico')
+  else { fallos++; console.error('  ✗ las dos implementaciones de hashContenido divergen') }
+}
+
+// Y el artefacto emitido tiene que verificar contra su propia firma.
+if (art2.content_sha256 && hashGuard && hashGuard(art2) === art2.content_sha256)
+  console.log('  ✓ el artefacto emitido verifica contra su firma')
+else { fallos++; console.error('  ✗ el artefacto emitido no verifica contra su firma') }
+
 rmSync(dir, { recursive: true, force: true })
 rmSync(dir2, { recursive: true, force: true })
-const total = casos.length + 2 + fpCasos.length + 2
+const total = casos.length + 2 + fpCasos.length + 2 + 2
 console.log(fallos === 0 ? `\nautoprueba: ${total}/${total} OK` : `\nautoprueba: ${fallos} fallo(s) de ${total}`)
 process.exit(fallos === 0 ? 0 : 1)

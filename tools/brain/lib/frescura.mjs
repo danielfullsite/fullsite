@@ -36,7 +36,13 @@ export const POLITICA = {
   'field-cert-artifact':              { stale_after_min: 1440,  sha_sensitive: true },
   'field-cert-session':               { stale_after_min: 720,   sha_sensitive: true },
   'signal-health':                    { stale_after_min: 60,    sha_sensitive: false },
-  'schema-drift-guard':               { stale_after_min: 1440,  sha_sensitive: false },
+  // CORREGIDO 2026-09-19. Decía `false` razonando que el esquema no cambia por
+  // un deploy de front. Cierto, pero el guardián compara contra los ARCHIVOS de
+  // migración, y ésos sí cambian con el commit. Medido: su informe se calculó
+  // desde un checkout al que le faltaban SEIS migraciones de 418933f4, una de
+  // ellas redefiniendo pos_record_inventory_movement, que el registry vigila
+  // con huella. Su respuesta salía CURRENT y no correspondía al SHA servido.
+  'schema-drift-guard':               { stale_after_min: 1440,  sha_sensitive: true },
   'agent-release-guardian':           { stale_after_min: 60,    sha_sensitive: true },
   'agent-cash-and-shift-guardian':    { stale_after_min: 120,   sha_sensitive: false },
   'agent-source-authority-guardian':  { stale_after_min: 1440,  sha_sensitive: true },

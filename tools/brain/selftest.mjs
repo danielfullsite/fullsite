@@ -13,7 +13,7 @@ import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { emitir, leer, hashContenido, revisarFugas, sinEvidencia, ESTADOS } from './lib/artifact.mjs'
 import { evaluarEdad, resolverAhora, TIEMPO } from './lib/tiempo.mjs'
-import { evaluarFrescura, evaluarCobertura, veredictoDeRespuesta, FRESCURA } from './lib/frescura.mjs'
+import { evaluarFrescura, evaluarCobertura, veredictoDeRespuesta, FRESCURA, politicaDe as politicaDeFrescura } from './lib/frescura.mjs'
 import { AGENTES } from './detectors.mjs'
 
 const AQUI = dirname(fileURLToPath(import.meta.url))
@@ -230,6 +230,28 @@ const fila = idxStale.questions.find(q => q.artifact === 'release-state')
 t(fila.state === 'STALE', 'un artefacto de otro SHA se reporta STALE')
 t(fila.answer === 'STALE' && fila.withheld_value, 'el valor obsoleto NO se publica como respuesta: se retiene y se dice por qué')
 rmSync(dirStale, { recursive: true, force: true })
+
+console.log('\n── con dos candidatos del mismo dominio, gana el utilizable ──')
+// El nombre del archivo obsoleto ordena ANTES a propósito: si el índice
+// volviera a «el primero que devuelva readdir», esta prueba lo caza.
+const dirDos = mkdtempSync(join(tmpdir(), 'brain-dos-'))
+const SHA_HOY = 'a'.repeat(40), SHA_AYER = 'b'.repeat(40)
+const releaseCon = (sha, minAtras) => ({ artifact_kind: 'release-state',
+  emitted_at: new Date(Date.now() - minAtras * 60000).toISOString(),
+  serving_sha_at_observation: sha, what_shipped: { code_sha: sha }, findings: [{ state: 'OK' }] })
+writeFileSync(join(dirDos, 'aaa-viejo.json'), JSON.stringify(releaseCon(SHA_AYER, 1)))
+writeFileSync(join(dirDos, 'zzz-actual.json'), JSON.stringify(releaseCon(SHA_HOY, 2)))
+const idxDos = JSON.parse(correr(['index'], { BRAIN_OUT: dirDos, BRAIN_SERVING_SHA: SHA_HOY }).out)
+const fDos = idxDos.questions.find(q => q.artifact === 'release-state')
+t(fDos.candidates === 2, 've los dos candidatos del dominio')
+t(fDos.state === 'CURRENT', 'elige el que SÍ corresponde al SHA servido, no el primero del directorio')
+t(fDos.answer === SHA_HOY, 'y contesta con su valor')
+rmSync(dirDos, { recursive: true, force: true })
+
+// La política que se corrigió el 2026-09-19: el guardián de esquema compara
+// contra archivos de migración, así que su respuesta depende del commit.
+t(politicaDeFrescura('schema-drift-guard').sha_sensitive === true,
+  'schema-drift-guard es sensible al SHA: su fuente FILE es el repo')
 
 rmSync(dir, { recursive: true, force: true })
 console.log(`\nautoprueba: ${ok}/${ok + fail} ${fail ? `· ${fail} fallo(s)` : 'OK'}`)

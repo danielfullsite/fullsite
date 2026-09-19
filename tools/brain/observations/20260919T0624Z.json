@@ -192,7 +192,13 @@
     "sync_receipts": "2026-09-19T05:41:53Z",
     "print_acknowledgements": "2026-09-03T02:48:24Z",
     "source_ingestion": "2026-09-19T05:41:52Z",
-    "scheduled_agent_runs": "2026-09-19T01:00:11Z",
+    "scheduled_agent_runs": "2026-09-19T05:58:49Z",
     "release_artifact_emission": null
+  },
+  "last_seen_sources": {
+    "sync_receipts": "max(pos_save_operations.created_at)",
+    "print_acknowledgements": "max(coalesce(printed_at,updated_at,created_at)) de pos_print_jobs con status impreso",
+    "source_ingestion": "max(pos_orders.created_at)",
+    "scheduled_agent_runs": "max(agent_runs.created_at)  — NO agent_results, que es otra tabla"
   }
 }

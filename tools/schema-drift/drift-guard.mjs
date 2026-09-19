@@ -43,6 +43,7 @@
  */
 
 import { readFileSync, writeFileSync } from 'node:fs'
+import { hashContenido } from './hash.mjs'
 
 // ─── Estados. Exactamente uno por objeto. ───────────────────────────────────
 const S = {
@@ -121,8 +122,37 @@ const CAMPOS = {
   column:   [['data_type', norm], ['udt_name', norm], ['is_nullable', norm], ['column_default', norm]],
   index:    [['unique', v => String(v)], ['indexdef', norm]],
   function: [['args', norm], ['returns', norm], ['security_definer', v => String(v)],
-             ['search_path', normPath], ['body_md5', norm]],
+             ['search_path', normPath]],   // body_md5 se compara aparte: ver abajo
   constraint: [['definition', norm]],
+}
+
+/**
+ * EL HASH DEL CUERPO NECESITA DECIR CÓMO SE CALCULÓ.
+ *
+ * El 2026-09-19 el guardián marcó cuatro funciones como MISMATCH. Dos de ellas
+ * no habían cambiado: la corrida del 18 había pinchado
+ * `md5(regexp_replace(prosrc,'\s+',' ','g'))` y la del 19 observaba
+ * `md5(prosrc)`. Dos formas distintas de medir lo mismo, ninguna declarada, y
+ * el resultado se leía como corrupción del esquema.
+ *
+ * Un hash sin su método no es una huella: es un número. Desde aquí el pin
+ * declara `body_md5_method` y la introspección entrega las dos variantes. Si el
+ * método pedido no viene observado, el campo NO se compara y se dice —
+ * comparar dos métodos distintos sería fabricar un MISMATCH, que es peor que
+ * no comparar.
+ */
+const METODOS_BODY = { prosrc: 'body_md5', collapsed: 'body_md5_collapsed' }
+
+function compararCuerpo(expected, observed) {
+  if (!('body_md5' in expected)) return { diff: null, nota: null }
+  const metodo = expected.body_md5_method ?? 'prosrc'
+  const campo = METODOS_BODY[metodo]
+  if (!campo) return { diff: null, nota: `método de hash desconocido: ${metodo}` }
+  if (!(campo in observed) || observed[campo] === undefined || observed[campo] === null)
+    return { diff: null, nota: `la introspección no trajo ${campo}: el cuerpo no se comparó` }
+  const e = norm(expected.body_md5), o = norm(observed[campo])
+  return e === o ? { diff: null, nota: null }
+                 : { diff: { field: `body_md5(${metodo})`, expected: e, observed: o }, nota: null }
 }
 
 /**
@@ -141,9 +171,15 @@ function comparar(expected, observed) {
     const e = f(expected[campo]), o = f(observed[campo])
     if (e !== o) diffs.push({ field: campo, expected: e, observed: o })
   }
+  let nota = null
+  if ((expected.kind || observed.kind) === 'function') {
+    const c = compararCuerpo(expected, observed)
+    if (c.diff) diffs.push(c.diff)
+    nota = c.nota
+  }
   return diffs.length
-    ? { detalle: DETALLE.PRESENT_BUT_DIFFERENT, diffs, razon: null }
-    : { detalle: DETALLE.PRESENT_AND_MATCHING, diffs: [], razon: null }
+    ? { detalle: DETALLE.PRESENT_BUT_DIFFERENT, diffs, razon: nota }
+    : { detalle: DETALLE.PRESENT_AND_MATCHING, diffs: [], razon: nota }
 }
 
 /** Normaliza la entrada C: acepta el formato v1 (0|1) y el v1.1 ({exists, observed}). */
@@ -298,6 +334,11 @@ const artifact = {
     contains_customer_data: false,
   },
 }
+
+// La firma va al final, sobre el artefacto ya completo, y se excluye a sí
+// misma del hash. Cualquier edición posterior —incluida una bienintencionada,
+// como añadirle un campo para que otro índice lo encuentre— la rompe.
+artifact.content_sha256 = hashContenido(artifact)
 
 const salida = JSON.stringify(artifact, null, 2)
 if (a.out) { writeFileSync(a.out, salida + '\n'); console.error(`artefacto → ${a.out}`) }
