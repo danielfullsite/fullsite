@@ -1,0 +1,211 @@
+{
+  "col.pos_cash_movements.client_op_id": {
+    "exists": true,
+    "observed": {
+      "kind": "column",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": ""
+    }
+  },
+  "col.pos_audit_log.client_op_id": {
+    "exists": true,
+    "observed": {
+      "kind": "column",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": ""
+    }
+  },
+  "col.pos_market_movements.client_op_id": {
+    "exists": true,
+    "observed": {
+      "kind": "column",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": ""
+    }
+  },
+  "idx.pos_cash_movements_client_op_id": {
+    "exists": true,
+    "observed": {
+      "kind": "index",
+      "unique": true,
+      "indexdef": "CREATE UNIQUE INDEX pos_cash_movements_client_op_id ON public.pos_cash_movements USING btree (client_id, client_op_id) WHERE (client_op_id IS NOT NULL)"
+    }
+  },
+  "idx.pos_audit_log_client_op_id": {
+    "exists": true,
+    "observed": {
+      "kind": "index",
+      "unique": true,
+      "indexdef": "CREATE UNIQUE INDEX pos_audit_log_client_op_id ON public.pos_audit_log USING btree (client_id, client_op_id) WHERE (client_op_id IS NOT NULL)"
+    }
+  },
+  "idx.pos_market_movements_client_op_id": {
+    "exists": true,
+    "observed": {
+      "kind": "index",
+      "unique": true,
+      "indexdef": "CREATE UNIQUE INDEX pos_market_movements_client_op_id ON public.pos_market_movements USING btree (client_id, client_op_id) WHERE (client_op_id IS NOT NULL)"
+    }
+  },
+  "fn.pos_scoped_child": {
+    "exists": true,
+    "observed": {
+      "kind": "function",
+      "args": "p_table text, p_client_id text, p_method text, p_id text, p_parent_id text, p_rows jsonb, p_limit integer, p_offset integer",
+      "returns": "jsonb",
+      "security_definer": true,
+      "search_path": "search_path=pg_catalog, public",
+      "body_md5": "3cf2fa8281bb43012510b29ba7deb732",
+      "body_md5_collapsed": "81e58db016869ae97f5790de8f5abec5"
+    }
+  },
+  "fn.pos_scoped_upsert": {
+    "exists": false
+  },
+  "tbl.pos_tenant_provisioning_ready": {
+    "exists": true
+  },
+  "fn.pos_activate_provisioned_tenant": {
+    "exists": true,
+    "observed": {
+      "kind": "function",
+      "args": "p_client_id text, p_owner_user_id uuid, p_service_user_id uuid",
+      "returns": "jsonb",
+      "security_definer": true,
+      "search_path": "search_path=pg_catalog, public",
+      "body_md5": "272ed38477d639e65f09e983bddc065c",
+      "body_md5_collapsed": "0a9eefdae658fff3b06d180139eb747f"
+    }
+  },
+  "col.client_locations.timezone": {
+    "exists": false
+  },
+  "col.pos_turnos.location_id": {
+    "exists": false
+  },
+  "col.pos_turnos.status": {
+    "exists": false
+  },
+  "idx.uq_pos_turnos_activo_por_sucursal": {
+    "exists": false
+  },
+  "idx.pos_turnos_uno_abierto_por_restaurante": {
+    "exists": false
+  },
+  "fn.pos_record_inventory_movement": {
+    "exists": true,
+    "observed": {
+      "kind": "function",
+      "args": "p_client_id text, p_actor text, p_movement_type text, p_lines jsonb, p_idempotency_key text, p_metadata jsonb",
+      "returns": "jsonb",
+      "security_definer": true,
+      "search_path": "search_path=pg_catalog, public",
+      "body_md5": "30aafec9f6ba421e9586adc08f834b0d",
+      "body_md5_collapsed": "1f0e70d199936a603789479809112224"
+    }
+  },
+  "tbl.pos_inventory_movement_operations": {
+    "exists": true
+  },
+  "idx.pos_inventory_movement_operation_line": {
+    "exists": true,
+    "observed": {
+      "kind": "index",
+      "unique": true,
+      "indexdef": "CREATE UNIQUE INDEX pos_inventory_movement_operation_line ON public.pos_inventory_movements USING btree (client_id, movement_operation_key, movement_operation_line) WHERE (movement_operation_key IS NOT NULL)"
+    }
+  },
+  "fn.r1_transfer_item_atomic": {
+    "exists": true,
+    "observed": {
+      "kind": "function",
+      "args": "p_client_id text, p_operation_id text, p_source_order_id text, p_item_id text, p_target_mesa integer, p_actor text",
+      "returns": "jsonb",
+      "security_definer": true,
+      "search_path": "search_path=public",
+      "body_md5": "871024a04f2f98207d0eef6c6030a0a7",
+      "body_md5_collapsed": "a5f8c77a96a3343a70ae0b9829baedb1"
+    }
+  },
+  "tbl.pos_transfer_operations": {
+    "exists": true
+  },
+  "tbl.pos_terminals": {
+    "exists": false
+  },
+  "tbl.pos_terminal_enrollments": {
+    "exists": false
+  },
+  "col.pos_staff.pin_hash": {
+    "exists": false
+  },
+  "tbl.pos_caja_streams": {
+    "exists": false
+  },
+  "tbl.pos_caja_business_receipts": {
+    "exists": false
+  },
+  "fn.apply_pos_caja_event": {
+    "exists": false
+  },
+  "col.pos_orders.caja_stream_id": {
+    "exists": false
+  },
+  "tbl.pos_save_operations": {
+    "exists": true
+  },
+  "fn.r1_save_order_idempotent": {
+    "exists": true,
+    "observed": {
+      "kind": "function",
+      "args": "p_client_id text, p_order_id text, p_save_operation_id text, p_expected_revision bigint, p_mesa integer, p_customer_name text, p_mesero text, p_personas integer, p_status text, p_subtotal numeric, p_iva numeric, p_total numeric, p_descuento numeric, p_propina numeric, p_metodo_pago text, p_pagos jsonb, p_turno_id text, p_notas text, p_items jsonb, p_closed_at timestamp with time zone",
+      "returns": "jsonb",
+      "security_definer": true,
+      "search_path": "search_path=public, extensions",
+      "body_md5": "2d00d1a46fada4ce56e96d11d3c192a5",
+      "body_md5_collapsed": "4031b4b2a6be3c60897d6001c2a67879"
+    }
+  },
+  "fn.pos_numero_finito": {
+    "exists": true,
+    "observed": {
+      "kind": "function",
+      "args": "p_texto text",
+      "returns": "numeric",
+      "security_definer": false,
+      "search_path": "",
+      "body_md5": "63fb07234ca35824782fb7915f95d7d6",
+      "body_md5_collapsed": "b4ef77da1d901c14e010ba1c1b8f981a"
+    }
+  },
+  "fn.pos_create_purchase_order": {
+    "exists": true,
+    "observed": {
+      "kind": "function",
+      "args": "p_client_id text, p_created_by text, p_header jsonb, p_lines jsonb",
+      "returns": "jsonb",
+      "security_definer": true,
+      "search_path": "search_path=pg_catalog, public",
+      "body_md5": "24e9211f7fb5840b4377832ab4054f2e",
+      "body_md5_collapsed": "3013a4e3a20b0883959c6957803e5d05"
+    }
+  },
+  "fn.pos_create_ingredient": {
+    "exists": true,
+    "observed": {
+      "kind": "function",
+      "args": "p_client_id text, p_name text, p_unit text, p_cost numeric, p_category text, p_supplier text",
+      "returns": "jsonb",
+      "security_definer": true,
+      "search_path": "search_path=pg_catalog, public",
+      "body_md5": "c670cb7dd4d93eca07b8c53520693dea",
+      "body_md5_collapsed": "b1aba5f1d9e9942151a177ab8f4fefb2"
+    }
+  }
+}
