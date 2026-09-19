@@ -38,11 +38,25 @@ export const RELEASE_GUARDIAN = {
             [{ sha: obs.serving.code_sha }],
             { why: 'sin artefacto no se puede contestar qué se liberó ni con qué evidencia' }))
     }
+    // ANCESTRÍA ROTA NO ES TRABAJO PERDIDO.
+    //
+    // Un squash merge deja el CONTENIDO en main y descarta los SHAs originales,
+    // así que la ancestría se rompe por diseño. Medido el 2026-09-19: 8d8c20d8
+    // no es ancestro de main, y sin embargo sus PRs se mergearon. Un detector
+    // que gritara ALERT ahí gritaría en cada merge del repo, y a la tercera vez
+    // nadie lo lee. La ancestría sola no distingue «se perdió» de «se aplastó»:
+    // hace falta el registro del PR, que este agente no observa.
     const anc = ciego(obs.p0a_ancestor, 'si P0A_FINAL_SHA sigue siendo ancestro')
     if (anc) f.push(hallazgo('p0a_ancestor', anc.state, anc.reason))
-    else f.push(obs.p0a_ancestor
-      ? hallazgo('p0a_ancestor', ESTADOS.OK, 'P0A_FINAL_SHA sigue siendo ancestro de la línea')
-      : hallazgo('p0a_ancestor', ESTADOS.ALERT, 'P0A_FINAL_SHA dejó de ser ancestro: la línea certificada se rompió'))
+    else if (obs.p0a_ancestor === true)
+      f.push(hallazgo('p0a_ancestor', ESTADOS.OK, 'P0A_FINAL_SHA sigue siendo ancestro de la línea servida'))
+    else if (obs.p0a_merge_record === true)
+      f.push(hallazgo('p0a_ancestor', ESTADOS.OK,
+        'ancestría rota por squash merge, pero el registro del PR confirma que el contenido entró'))
+    else
+      f.push(hallazgo('p0a_ancestor', ESTADOS.UNKNOWN,
+        'P0A_FINAL_SHA no es ancestro del SHA servido y no se observó el registro del PR: no se puede saber si el contenido entró o se perdió',
+        [], { needs: 'registro de merge del PR' }))
     return f
   },
 }

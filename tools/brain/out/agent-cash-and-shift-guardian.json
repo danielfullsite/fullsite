@@ -1,42 +1,48 @@
 {
   "artifact_kind": "agent-cash-and-shift-guardian",
   "artifact_version": "1.0",
-  "emitted_at": "2026-09-19T06:03:23.168Z",
-  "repo_sha": "7ae2745b8461763cedfc547fde16d7230c1f6fd8",
+  "emitted_at": "2026-09-19T06:11:54.597Z",
+  "repo_sha": "de435f5d786f72cd697a0e777ec7461d2d74348b",
   "database_identity": "supabase:qjiomlvudfmzuvqvhwpk/postgres · PostgreSQL 17.6",
   "agent_id": "CASH_AND_SHIFT_GUARDIAN",
   "level": "L1",
   "autonomy": "read-only · no writes · no actions",
-  "observed_at": "2026-09-19T05:59:42Z",
+  "observed_at": "2026-09-19T06:10:14Z",
+  "observed_sha": "de435f5d786f72cd697a0e777ec7461d2d74348b",
+  "serving_sha_at_observation": "de435f5d786f72cd697a0e777ec7461d2d74348b",
+  "freshness_policy": {
+    "stale_after_min": 120,
+    "sha_sensitive": false
+  },
   "findings": [
     {
       "id": "stale_open:test_noreste_grill:mruwozjvrrc7",
       "state": "DEGRADED",
-      "summary": "turno abierto hace 1407 h",
+      "summary": "turno abierto hace 1429 h",
       "evidence": []
     },
     {
       "id": "stale_open:carls-jr:27774777",
       "state": "DEGRADED",
-      "summary": "turno abierto hace 481 h",
+      "summary": "turno abierto hace 504 h",
       "evidence": []
     },
     {
       "id": "stale_open:boruca:mt3fxom0hwc2",
       "state": "DEGRADED",
-      "summary": "turno abierto hace 659 h",
+      "summary": "turno abierto hace 681 h",
       "evidence": []
     },
     {
       "id": "stale_open:tekila-rg:mtexpe26z78p",
       "state": "DEGRADED",
-      "summary": "turno abierto hace 466 h",
+      "summary": "turno abierto hace 488 h",
       "evidence": []
     },
     {
       "id": "stale_open:chickin-demo:mtop873lc5am",
       "state": "DEGRADED",
-      "summary": "turno abierto hace 302 h",
+      "summary": "turno abierto hace 324 h",
       "evidence": []
     },
     {
@@ -48,13 +54,13 @@
     {
       "id": "stale_open:scyf-demo:mtklmlvef3rv",
       "state": "DEGRADED",
-      "summary": "turno abierto hace 371 h",
+      "summary": "turno abierto hace 393 h",
       "evidence": []
     },
     {
       "id": "stale_open:amalay:mu1qc5zt6y17",
       "state": "DEGRADED",
-      "summary": "turno abierto hace 83 h",
+      "summary": "turno abierto hace 105 h",
       "evidence": []
     },
     {
@@ -66,7 +72,7 @@
     {
       "id": "stale_open:diezmex-demo:mtn4evtfmqvp",
       "state": "DEGRADED",
-      "summary": "turno abierto hace 328 h",
+      "summary": "turno abierto hace 351 h",
       "evidence": []
     },
     {
@@ -93,5 +99,5 @@
     "shared_db_writes": 0,
     "product_files_modified": 0
   },
-  "content_sha256": "b9c72ddde432f856d8500d0a85b36f6e247b56f82b26a821bb427a5c1c8e3a8e"
+  "content_sha256": "e3a7cdc8c9b9fb8669bfe261423b8d6e1b6111ff8e242a4e232cbe930cccc890"
 }

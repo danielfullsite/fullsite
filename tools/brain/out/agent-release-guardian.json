@@ -1,35 +1,47 @@
 {
   "artifact_kind": "agent-release-guardian",
   "artifact_version": "1.0",
-  "emitted_at": "2026-09-19T06:03:23.166Z",
-  "repo_sha": "7ae2745b8461763cedfc547fde16d7230c1f6fd8",
+  "emitted_at": "2026-09-19T06:11:54.590Z",
+  "repo_sha": "de435f5d786f72cd697a0e777ec7461d2d74348b",
   "database_identity": "supabase:qjiomlvudfmzuvqvhwpk/postgres · PostgreSQL 17.6",
   "agent_id": "RELEASE_GUARDIAN",
   "level": "L1",
   "autonomy": "read-only · no writes · no actions",
-  "observed_at": "2026-09-19T05:59:42Z",
+  "observed_at": "2026-09-19T06:10:14Z",
+  "observed_sha": "de435f5d786f72cd697a0e777ec7461d2d74348b",
+  "serving_sha_at_observation": "de435f5d786f72cd697a0e777ec7461d2d74348b",
+  "freshness_policy": {
+    "stale_after_min": 60,
+    "sha_sensitive": true
+  },
   "findings": [
     {
       "id": "serving_sha",
-      "state": "UNKNOWN",
-      "summary": "no se observó qué SHA está sirviendo",
-      "evidence": []
+      "state": "ALERT",
+      "summary": "el SHA servido NO tiene artefacto de release",
+      "evidence": [
+        {
+          "sha": "de435f5d786f72cd697a0e777ec7461d2d74348b"
+        }
+      ],
+      "why": "sin artefacto no se puede contestar qué se liberó ni con qué evidencia"
     },
     {
       "id": "p0a_ancestor",
-      "state": "OK",
-      "summary": "P0A_FINAL_SHA sigue siendo ancestro de la línea",
-      "evidence": []
+      "state": "UNKNOWN",
+      "summary": "P0A_FINAL_SHA no es ancestro del SHA servido y no se observó el registro del PR: no se puede saber si el contenido entró o se perdió",
+      "evidence": [],
+      "needs": "registro de merge del PR"
     }
   ],
   "summary": {
-    "UNKNOWN": 1,
-    "OK": 1
+    "ALERT": 1,
+    "UNKNOWN": 1
   },
   "guarantees": {
     "read_only": true,
     "shared_db_writes": 0,
     "product_files_modified": 0
   },
-  "content_sha256": "e5e833de53070a29f1ff49e9bc455fa873fc8d793a2ce6d7357a42fdd89dd673"
+  "content_sha256": "ef6061865d1292cc7f8c1ae38af5a6db57b849f714b9024009e70dbbd1ff4a79"
 }

@@ -1,18 +1,24 @@
 {
   "artifact_kind": "agent-data-truth-guardian",
   "artifact_version": "1.0",
-  "emitted_at": "2026-09-19T06:03:23.167Z",
-  "repo_sha": "7ae2745b8461763cedfc547fde16d7230c1f6fd8",
+  "emitted_at": "2026-09-19T06:11:54.597Z",
+  "repo_sha": "de435f5d786f72cd697a0e777ec7461d2d74348b",
   "database_identity": "supabase:qjiomlvudfmzuvqvhwpk/postgres · PostgreSQL 17.6",
   "agent_id": "DATA_TRUTH_GUARDIAN",
   "level": "L1",
   "autonomy": "read-only · no writes · no actions",
-  "observed_at": "2026-09-19T05:59:42Z",
+  "observed_at": "2026-09-19T06:10:14Z",
+  "observed_sha": "de435f5d786f72cd697a0e777ec7461d2d74348b",
+  "serving_sha_at_observation": "de435f5d786f72cd697a0e777ec7461d2d74348b",
+  "freshness_policy": {
+    "stale_after_min": 1440,
+    "sha_sensitive": false
+  },
   "findings": [
     {
       "id": "freshness:amalay",
       "state": "DEGRADED",
-      "summary": "sin órdenes desde hace 81 h",
+      "summary": "sin órdenes desde hace 103 h",
       "evidence": [
         {
           "tenant": "amalay",
@@ -23,7 +29,7 @@
     {
       "id": "freshness:boruca",
       "state": "DEGRADED",
-      "summary": "sin órdenes desde hace 671 h",
+      "summary": "sin órdenes desde hace 693 h",
       "evidence": [
         {
           "tenant": "boruca",
@@ -34,7 +40,7 @@
     {
       "id": "freshness:carls-jr",
       "state": "DEGRADED",
-      "summary": "sin órdenes desde hace 467 h",
+      "summary": "sin órdenes desde hace 489 h",
       "evidence": [
         {
           "tenant": "carls-jr",
@@ -45,7 +51,7 @@
     {
       "id": "freshness:chickin-demo",
       "state": "DEGRADED",
-      "summary": "sin órdenes desde hace 365 h",
+      "summary": "sin órdenes desde hace 387 h",
       "evidence": [
         {
           "tenant": "chickin-demo",
@@ -56,7 +62,7 @@
     {
       "id": "freshness:coffee-shop",
       "state": "DEGRADED",
-      "summary": "sin órdenes desde hace 1350 h",
+      "summary": "sin órdenes desde hace 1372 h",
       "evidence": [
         {
           "tenant": "coffee-shop",
@@ -67,13 +73,13 @@
     {
       "id": "freshness:demo",
       "state": "OK",
-      "summary": "última orden hace -22 h",
+      "summary": "última orden hace 0 h",
       "evidence": []
     },
     {
       "id": "freshness:diezmex-demo",
       "state": "DEGRADED",
-      "summary": "sin órdenes desde hace 328 h",
+      "summary": "sin órdenes desde hace 350 h",
       "evidence": [
         {
           "tenant": "diezmex-demo",
@@ -84,19 +90,19 @@
     {
       "id": "freshness:fullsite-cert-lab-v2",
       "state": "OK",
-      "summary": "última orden hace 14 h",
+      "summary": "última orden hace 36 h",
       "evidence": []
     },
     {
       "id": "freshness:lab-resto",
       "state": "OK",
-      "summary": "última orden hace -19 h",
+      "summary": "última orden hace 3 h",
       "evidence": []
     },
     {
       "id": "freshness:scyf-demo",
       "state": "DEGRADED",
-      "summary": "sin órdenes desde hace 371 h",
+      "summary": "sin órdenes desde hace 393 h",
       "evidence": [
         {
           "tenant": "scyf-demo",
@@ -107,7 +113,7 @@
     {
       "id": "freshness:tekila-rg",
       "state": "DEGRADED",
-      "summary": "sin órdenes desde hace 466 h",
+      "summary": "sin órdenes desde hace 489 h",
       "evidence": [
         {
           "tenant": "tekila-rg",
@@ -125,5 +131,5 @@
     "shared_db_writes": 0,
     "product_files_modified": 0
   },
-  "content_sha256": "033345419c0feaf11a513163f99723d15be9144a2e82b465711fdd73e9fe2458"
+  "content_sha256": "9c07f3f89b4742a0a3e8387ff8484d49200b95a30854dd72e76c40c758e66122"
 }

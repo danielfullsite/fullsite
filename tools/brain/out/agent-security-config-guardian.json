@@ -1,13 +1,19 @@
 {
   "artifact_kind": "agent-security-config-guardian",
   "artifact_version": "1.0",
-  "emitted_at": "2026-09-19T06:03:23.168Z",
-  "repo_sha": "7ae2745b8461763cedfc547fde16d7230c1f6fd8",
+  "emitted_at": "2026-09-19T06:11:54.597Z",
+  "repo_sha": "de435f5d786f72cd697a0e777ec7461d2d74348b",
   "database_identity": "supabase:qjiomlvudfmzuvqvhwpk/postgres · PostgreSQL 17.6",
   "agent_id": "SECURITY_CONFIG_GUARDIAN",
   "level": "L1",
   "autonomy": "read-only · no writes · no actions",
-  "observed_at": "2026-09-19T05:59:42Z",
+  "observed_at": "2026-09-19T06:10:14Z",
+  "observed_sha": "de435f5d786f72cd697a0e777ec7461d2d74348b",
+  "serving_sha_at_observation": "de435f5d786f72cd697a0e777ec7461d2d74348b",
+  "freshness_policy": {
+    "stale_after_min": 720,
+    "sha_sensitive": false
+  },
   "findings": [
     {
       "id": "enrolled_terminal_trap:amalay",
@@ -38,5 +44,5 @@
     "shared_db_writes": 0,
     "product_files_modified": 0
   },
-  "content_sha256": "21f809d81826a01239e20080304cc1980487709f92e1bd51c768e7823d2e5f9d"
+  "content_sha256": "77b592dd5fcd9fe727c2e9160508b993dd29dfc5527f2f82060f024fef6bd806"
 }

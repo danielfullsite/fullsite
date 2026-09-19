@@ -22,7 +22,9 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { emitir, leerTodos, ESTADOS, edadMin } from './lib/artifact.mjs'
+import { emitir, leerTodos, ESTADOS } from './lib/artifact.mjs'
+import { resolverAhora, evaluarEdad, TIEMPO } from './lib/tiempo.mjs'
+import { evaluarFrescura, evaluarCobertura, veredictoDeRespuesta, politicaDe, FRESCURA } from './lib/frescura.mjs'
 import { AGENTES } from './detectors.mjs'
 
 const AQUI = dirname(fileURLToPath(import.meta.url))
@@ -65,6 +67,11 @@ function correrAgentes(rutaObs) {
       body: {
         agent_id: id, level: agente.level, autonomy: 'read-only · no writes · no actions',
         observed_at: obs.observed_at ?? null,
+        // Contra qué mundo se observó. Sin esto, un artefacto íntegro puede
+        // contestar por un SHA que ya nadie sirve — que fue el defecto.
+        observed_sha: obs.repo_sha ?? null,
+        serving_sha_at_observation: obs.serving_sha ?? null,
+        freshness_policy: politicaDe(`agent-${id.toLowerCase().replace(/_/g, '-')}`),
         findings,
         summary: contar(findings),
       },
@@ -90,29 +97,47 @@ const contar = (f) => f.reduce((m, x) => { m[x.state] = (m[x.state] || 0) + 1; r
 function correrAusencia(rutaObs, rutaSenales) {
   const obs = leerJson(rutaObs)
   const spec = leerJson(rutaSenales)
-  const ahora = obs.now_ms || Date.now()
+  // `observed_at` manda; `now_ms` sólo vale si coincide. Cuando discrepan se
+  // marca CLOCK_SKEW en vez de elegir uno en silencio: elegir en silencio es
+  // cómo una observación con 22 h de desfase produjo señales «sanas».
+  const ahora = resolverAhora(obs)
+  const relojSospechoso = ahora.state !== TIEMPO.OK
   const evaluadas = spec.signals.map(s => {
     const visto = (obs.last_seen || {})[s.EXPECTED_SIGNAL]
     const umbralMin = s.SILENCE_THRESHOLD_MIN ?? null
+    const base = { signal: s.EXPECTED_SIGNAL, owner: s.owner }
     if (s.CURRENT_STATE === 'NOT_INSTRUMENTED')
-      return { signal: s.EXPECTED_SIGNAL, state: 'NOT_INSTRUMENTED', reason: 'no existe emisor', last_seen: null, owner: s.owner }
+      return { ...base, state: 'NOT_INSTRUMENTED', reason: 'no existe emisor', last_seen: null, age_minutes: null }
     if (visto === undefined)
-      return { signal: s.EXPECTED_SIGNAL, state: ESTADOS.UNKNOWN, reason: 'no se observó esta señal en esta corrida', last_seen: null, owner: s.owner }
+      return { ...base, state: ESTADOS.UNKNOWN, reason: 'no se observó esta señal en esta corrida', last_seen: null, age_minutes: null }
     if (visto === null)
-      return { signal: s.EXPECTED_SIGNAL, state: 'NEVER_SEEN', reason: 'el emisor existe y nunca produjo nada', last_seen: null, owner: s.owner, alert: true }
-    const edad = edadMin(visto, ahora)
-    if (edad === null)
-      return { signal: s.EXPECTED_SIGNAL, state: ESTADOS.UNKNOWN, reason: 'fecha ilegible', last_seen: visto, owner: s.owner }
-    if (umbralMin !== null && edad > umbralMin)
-      return { signal: s.EXPECTED_SIGNAL, state: 'SILENT', reason: `${edad} min sin señal (umbral ${umbralMin})`, last_seen: visto, owner: s.owner, alert: true }
-    return { signal: s.EXPECTED_SIGNAL, state: 'HEALTHY', reason: `${edad} min desde la última`, last_seen: visto, owner: s.owner }
+      return { ...base, state: 'NEVER_SEEN', reason: 'el emisor existe y nunca produjo nada', last_seen: null, age_minutes: null, alert: true }
+    const edad = evaluarEdad({ desde: visto, hasta: ahora.ms })
+    if (edad.state === TIEMPO.UNREADABLE || edad.state === TIEMPO.UNIT_MISMATCH)
+      return { ...base, state: ESTADOS.UNKNOWN, reason: edad.hint ?? 'fecha ilegible', last_seen: visto, age_minutes: null }
+    // Una señal del futuro NUNCA es salud: la observación no es creíble.
+    if (edad.state === TIEMPO.CLOCK_SKEW)
+      return { ...base, state: 'CLOCK_SKEW', reason: edad.hint, last_seen: visto, age_minutes: null, alert: true }
+    if (relojSospechoso)
+      return { ...base, state: 'CLOCK_SKEW', reason: ahora.hint, last_seen: visto, age_minutes: edad.minutes, alert: true }
+    if (umbralMin !== null && edad.minutes > umbralMin)
+      return { ...base, state: 'SILENT', reason: `${edad.minutes} min sin señal (umbral ${umbralMin})`, last_seen: visto, age_minutes: edad.minutes, alert: true }
+    return { ...base, state: 'HEALTHY', reason: `${edad.minutes} min desde la última`, last_seen: visto, age_minutes: edad.minutes,
+      ...(edad.state === TIEMPO.CLOCK_SKEW_TOLERATED ? { note: edad.hint } : {}) }
   })
+  // INVARIANTE del artefacto: ninguna edad publicada puede ser negativa.
+  const negativas = evaluadas.filter(e => typeof e.age_minutes === 'number' && e.age_minutes < 0)
+  if (negativas.length) throw new Error(`invariante rota: edad negativa en ${negativas.map(n => n.signal).join(', ')}`)
   const alertas = evaluadas.filter(e => e.alert)
   return emitir({
     kind: 'signal-health', repoSha: obs.repo_sha ?? null, outDir: OUT,
     body: {
       principle: 'La ausencia de evidencia NO es salud.',
       observed_at: obs.observed_at ?? null,
+      observed_sha: obs.repo_sha ?? null,
+      serving_sha_at_observation: obs.serving_sha ?? null,
+      clock: { resolved_from: ahora.source ?? null, state: ahora.state, hint: ahora.hint ?? null },
+      freshness_policy: politicaDe('signal-health'),
       signals: evaluadas,
       summary: evaluadas.reduce((m, e) => { m[e.state] = (m[e.state] || 0) + 1; return m }, {}),
       alerts: alertas.map(a => ({ signal: a.signal, reason: a.reason, owner: a.owner })),
@@ -143,6 +168,9 @@ function fieldCert(accion, rutaIdent) {
           actor_id: id.actor_id ?? null, shift_id: null,
         },
         identity_capture: 'AUTOMATIC — ningún campo tecleado',
+        observed_sha: id.release_sha ?? null,
+        serving_sha_at_observation: id.serving_sha ?? null,
+        freshness_policy: politicaDe('field-cert-session'),
         identity_incomplete: faltantes,
         preconditions_L0: id.preconditions_L0 ?? { satisfied: null, reason: 'no se evaluaron' },
         // Una sesión con identidad incompleta NO se bloquea: se marca. Bloquear
@@ -204,6 +232,9 @@ function emitirRelease(rutaEntrada) {
     verdict: desconocidos.length ? 'INCOMPLETE' : (e.verdict ?? 'INCOMPLETE'),
     verdict_reason: desconocidos.length ? `${desconocidos.length} campo(s) sin evidencia: ${desconocidos.join(', ')}` : (e.verdict_reason ?? ''),
   }
+  body.observed_sha = e.code_sha ?? null
+  body.serving_sha_at_observation = e.serving_sha ?? null
+  body.freshness_policy = politicaDe('release-state')
   return emitir({ kind: 'release-state', repoSha: e.code_sha ?? null, outDir: OUT, body })
 }
 
@@ -218,18 +249,49 @@ const PREGUNTAS = [
   { q: '¿Hay configuración peligrosa?', kind: 'agent-security-config-guardian', pick: a => a.findings.filter(f => f.state !== 'OK').map(f => f.id).join(', ') || 'ninguna' },
   { q: '¿Cuál es la salud de datos?', kind: 'agent-data-truth-guardian', pick: a => a.findings.filter(f => f.state !== 'OK').map(f => f.id).join(', ') || 'todos frescos' },
 ]
-function indice(filtro) {
+/**
+ * El índice NO devuelve «el artefacto más reciente que existe».
+ *
+ * Ésa fue la regla equivocada: garantiza que siempre haya respuesta, y una
+ * respuesta siempre disponible es peor que un «no se sabe». Se resuelve por
+ * dominio + fecha + destino + SHA servido, y se evalúan las TRES preguntas
+ * —integridad, frescura, cobertura— antes de llamar CURRENT a nada.
+ */
+function indice(filtro, opciones = {}) {
+  const servingSha = opciones.servingSha ?? process.env.BRAIN_SERVING_SHA ?? null
+  const ahoraMs = Date.now()
   const arts = todosLosArtefactos()
   const filas = PREGUNTAS.filter(p => !filtro || p.q.toLowerCase().includes(filtro.toLowerCase())).map(p => {
     const a = arts.find(x => x._kind === p.kind)
-    if (!a) return { question: p.q, answer: 'UNKNOWN', why: `no existe el artefacto ${p.kind}`, artifact: null, as_of: null, integrity: null }
-    // Un artefacto de otra herramienta puede fechar con otro nombre. Si no hay
-    // fecha legible se dice así: una respuesta sin fecha no se puede juzgar.
-    const asOf = a.emitted_at ?? a.checked_at ?? null
-    return { question: p.q, answer: String(p.pick(a) ?? 'UNKNOWN'), artifact: p.kind,
-      as_of: asOf ?? 'SIN_FECHA', integrity: a._integrity ?? 'NO_VERIFICABLE' }
+    if (!a) return { question: p.q, state: 'UNKNOWN', answer: 'UNKNOWN', why: `no existe el artefacto ${p.kind}`,
+      artifact: null, as_of: null, integrity: null, freshness: null, coverage: null }
+    const integrity = a._integrity ?? 'NO_VERIFICABLE'
+    const fr = evaluarFrescura(a, { ahoraMs, servingSha })
+    const co = evaluarCobertura(a)
+    const v = veredictoDeRespuesta({ integrity, freshness: fr.state, coverage: co.state })
+    return {
+      question: p.q,
+      state: v.state,
+      // Una respuesta que no es utilizable NO se publica como dato: se publica
+      // el motivo. Publicar el valor «sólo para informar» es cómo un stale se
+      // cuela en una decisión.
+      answer: v.usable ? String(p.pick(a) ?? 'UNKNOWN') : v.state,
+      why: v.usable ? null : `${v.why} — ${fr.reason}`,
+      artifact: p.kind, as_of: a.emitted_at ?? a.checked_at ?? 'SIN_FECHA',
+      age_minutes: fr.age_minutes,
+      integrity, freshness: fr.state, coverage: co.state,
+      stale_after_min: fr.policy.stale_after_min, sha_sensitive: fr.policy.sha_sensitive,
+      ...(v.usable ? {} : { withheld_value: String(p.pick(a) ?? 'UNKNOWN') }),
+    }
   })
-  return { questions: filas, answerable: filas.filter(f => f.answer !== 'UNKNOWN').length, total: filas.length }
+  return {
+    serving_sha: servingSha ?? 'UNKNOWN',
+    questions: filas,
+    current: filas.filter(f => f.state === 'CURRENT').length,
+    stale: filas.filter(f => f.state === 'STALE').length,
+    unknown: filas.filter(f => f.state === 'UNKNOWN' || f.state === FRESCURA.UNKNOWN).length,
+    total: filas.length,
+  }
 }
 
 // ─── main ───────────────────────────────────────────────────────────────────
@@ -240,6 +302,6 @@ if (cmd === 'agents') r = { emitted: correrAgentes(arg(3) || fallar('falta obs.j
 else if (cmd === 'absence') r = correrAusencia(arg(3) || fallar('falta obs.json'), arg(4) || fallar('falta señales'))
 else if (cmd === 'field-cert') r = fieldCert(arg(3), arg(4))
 else if (cmd === 'release-emit') r = emitirRelease(arg(3) || fallar('falta entrada.json'))
-else if (cmd === 'index') r = indice(arg(3))
+else if (cmd === 'index') r = indice(arg(3), { servingSha: process.env.BRAIN_SERVING_SHA || null })
 else fallar(`subcomando desconocido: ${cmd}`)
 console.log(JSON.stringify(r, null, 2))

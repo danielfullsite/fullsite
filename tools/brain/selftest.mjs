@@ -12,6 +12,8 @@ import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { emitir, leer, hashContenido, revisarFugas, sinEvidencia, ESTADOS } from './lib/artifact.mjs'
+import { evaluarEdad, resolverAhora, TIEMPO } from './lib/tiempo.mjs'
+import { evaluarFrescura, evaluarCobertura, veredictoDeRespuesta, FRESCURA } from './lib/frescura.mjs'
 import { AGENTES } from './detectors.mjs'
 
 const AQUI = dirname(fileURLToPath(import.meta.url))
@@ -125,6 +127,92 @@ console.log('\n── índice ──')
 const idx = JSON.parse(correr(['index']).out)
 t(idx.questions.every(q => q.answer === 'UNKNOWN' ? q.why : true), 'toda respuesta UNKNOWN explica por qué')
 t(idx.questions.every(q => q.answer === 'UNKNOWN' || q.as_of), 'toda respuesta con dato lleva su fecha')
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TIEMPO — el defecto del -1302 y su familia
+// ═══════════════════════════════════════════════════════════════════════════
+console.log('\n── tiempo: edad, unidades y desfase de reloj ──')
+const BASE = Date.parse('2026-09-19T06:00:00Z')
+const en = (min) => new Date(BASE + min * 60000).toISOString()
+
+t(evaluarEdad({ desde: en(0), hasta: BASE }).minutes === 0, 'mismo instante → 0')
+t(evaluarEdad({ desde: en(-18), hasta: BASE }).minutes === 18, '18 min de antigüedad → 18')
+t(evaluarEdad({ desde: en(-120), hasta: BASE }).minutes === 120, '2 h de antigüedad → 120')
+
+const fut2 = evaluarEdad({ desde: en(2), hasta: BASE })
+t(fut2.minutes === 0 && fut2.state === TIEMPO.CLOCK_SKEW_TOLERATED, '+2 min al futuro dentro de tolerancia → 0 y CLOCK_SKEW_TOLERATED')
+const fut60 = evaluarEdad({ desde: en(60), hasta: BASE })
+t(fut60.state === TIEMPO.CLOCK_SKEW && fut60.minutes === null, '+1 h al futuro → CLOCK_SKEW, sin número')
+
+t(evaluarEdad({ desde: Math.floor(BASE / 1000), hasta: BASE }).state === TIEMPO.UNIT_MISMATCH,
+  'epoch en segundos donde se esperan ms → UNIT_MISMATCH, no una fecha de 1970')
+t(evaluarEdad({ desde: 'no es fecha', hasta: BASE }).state === TIEMPO.UNREADABLE, 'fecha ilegible → UNREADABLE')
+
+// EL BUG EXACTO, con sus números reales.
+const skew = resolverAhora({ observed_at: '2026-09-19T05:59:42Z', now_ms: 1789718382736 })
+t(skew.state === TIEMPO.CLOCK_SKEW, 'observed_at y now_ms con 22 h de desfase → CLOCK_SKEW')
+t(skew.source === 'observed_at', 'ante el desacuerdo manda observed_at, no now_ms')
+const reproducido = evaluarEdad({ desde: '2026-09-19T05:41:53Z', hasta: skew.ms })
+t(reproducido.minutes === 18, 'con el reloj resuelto bien, la edad del bug pasa de -1302 a 18 min')
+
+// LA INVARIANTE. Fuerza bruta sobre el rango completo.
+let negativa = null
+for (let m = -500; m <= 500; m += 7) {
+  const r = evaluarEdad({ desde: en(m), hasta: BASE })
+  if (typeof r.minutes === 'number' && r.minutes < 0) { negativa = m; break }
+}
+t(negativa === null, 'INVARIANTE age_minutes >= 0 en todo el rango', negativa !== null ? `falló en ${negativa} min` : '')
+t(resolverAhora({ observed_at: '2026-09-19T06:00:00Z', now_ms: BASE }).state === TIEMPO.OK,
+  'observed_at y now_ms coherentes → OK')
+
+console.log('\n── el vigilante nunca declara sano un reloj roto ──')
+const obsSkew = w('obs-skew.json', { observed_at: '2026-09-19T05:59:42Z', now_ms: 1789718382736,
+  last_seen: { viva: '2026-09-19T05:41:53Z' } })
+const sigSkew = w('sig-skew.json', { signals: [{ EXPECTED_SIGNAL: 'viva', SILENCE_THRESHOLD_MIN: 60, CURRENT_STATE: 'HEALTHY', owner: 'x' }] })
+const rSkew = JSON.parse(correr(['absence', obsSkew, sigSkew]).out)
+t(rSkew.signals[0].state === 'CLOCK_SKEW', 'con relojes en desacuerdo la señal es CLOCK_SKEW, jamás HEALTHY')
+t(rSkew.signals.every(s => s.age_minutes === null || s.age_minutes >= 0), 'ninguna edad publicada es negativa')
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FRESCURA — íntegro no es vigente
+// ═══════════════════════════════════════════════════════════════════════════
+console.log('\n── frescura: integridad ≠ vigencia ──')
+const ahoraMs = Date.now()
+const artSha = (sha, minAtras = 1) => ({ _kind: 'release-state', emitted_at: new Date(ahoraMs - minAtras * 60000).toISOString(),
+  serving_sha_at_observation: sha, findings: [{ state: 'OK' }] })
+
+t(evaluarFrescura(artSha('aaa'), { ahoraMs, servingSha: 'aaa' }).state === FRESCURA.CURRENT,
+  'observado sobre el SHA que sirve → CURRENT')
+t(evaluarFrescura(artSha('aaa'), { ahoraMs, servingSha: 'bbb' }).state === FRESCURA.STALE,
+  'observado sobre otro SHA → STALE, aunque el artefacto esté íntegro')
+t(evaluarFrescura(artSha('aaa'), { ahoraMs, servingSha: null }).state === FRESCURA.UNKNOWN,
+  'sin saber qué SHA sirve producción → UNKNOWN_CURRENT_STATE, nunca CURRENT')
+t(evaluarFrescura(artSha('aaa', 999), { ahoraMs, servingSha: 'aaa' }).state === FRESCURA.STALE,
+  'dentro del SHA correcto pero fuera de su ventana → STALE')
+t(evaluarFrescura({ _kind: 'signal-health', emitted_at: new Date(ahoraMs - 5 * 60000).toISOString(), findings: [] },
+  { ahoraMs, servingSha: null }).state === FRESCURA.CURRENT,
+  'un dominio no sensible al SHA no necesita conocerlo')
+
+t(evaluarCobertura({ findings: [{ state: 'UNKNOWN' }, { state: 'UNKNOWN' }] }).state === 'INSUFFICIENT',
+  'si nada pudo observarse la cobertura es INSUFFICIENT')
+t(evaluarCobertura({ findings: [{ state: 'OK' }, { state: 'UNKNOWN' }] }).state === 'PARTIAL', 'cobertura a medias → PARTIAL')
+t(veredictoDeRespuesta({ integrity: 'OK', freshness: FRESCURA.STALE, coverage: 'COMPLETE' }).usable === false,
+  'una respuesta STALE no es utilizable aunque el artefacto esté íntegro')
+t(veredictoDeRespuesta({ integrity: 'TAMPERED', freshness: FRESCURA.CURRENT, coverage: 'COMPLETE' }).usable === false,
+  'una respuesta alterada no es utilizable aunque esté fresca')
+t(veredictoDeRespuesta({ integrity: 'OK', freshness: FRESCURA.CURRENT, coverage: 'COMPLETE' }).state === 'CURRENT',
+  'sólo con las tres pasa se llama CURRENT')
+
+console.log('\n── el índice no publica un valor que no puede sostener ──')
+const dirStale = mkdtempSync(join(tmpdir(), 'brain-stale-'))
+writeFileSync(join(dirStale, 'release-state.json'), JSON.stringify(
+  { artifact_kind: 'release-state', emitted_at: new Date().toISOString(),
+    serving_sha_at_observation: 'viejo'.padEnd(40, '0'), what_shipped: { code_sha: 'viejo'.padEnd(40, '0') }, findings: [{ state: 'OK' }] }))
+const idxStale = JSON.parse(correr(['index'], { BRAIN_OUT: dirStale, BRAIN_SERVING_SHA: 'nuevo'.padEnd(40, '0') }).out)
+const fila = idxStale.questions.find(q => q.artifact === 'release-state')
+t(fila.state === 'STALE', 'un artefacto de otro SHA se reporta STALE')
+t(fila.answer === 'STALE' && fila.withheld_value, 'el valor obsoleto NO se publica como respuesta: se retiene y se dice por qué')
+rmSync(dirStale, { recursive: true, force: true })
 
 rmSync(dir, { recursive: true, force: true })
 console.log(`\nautoprueba: ${ok}/${ok + fail} ${fail ? `· ${fail} fallo(s)` : 'OK'}`)

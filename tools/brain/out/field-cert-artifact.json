@@ -1,15 +1,15 @@
 {
   "artifact_kind": "field-cert-artifact",
   "artifact_version": "1.0",
-  "emitted_at": "2026-09-19T06:02:07.353Z",
-  "repo_sha": "7ae2745b8461763cedfc547fde16d7230c1f6fd8",
+  "emitted_at": "2026-09-19T06:11:54.702Z",
+  "repo_sha": "de435f5d786f72cd697a0e777ec7461d2d74348b",
   "database_identity": null,
-  "cert_session_id": "fcert-fullsite-cert-lab-v2-20260919T060041Z-b6a098",
+  "cert_session_id": "fcert-fullsite-cert-lab-v2-20260919T061154Z-4bba8e",
   "mode": "FIELD_CERT",
-  "started_at": "2026-09-19T06:00:41.405Z",
-  "ended_at": "2026-09-19T06:02:07.324Z",
+  "started_at": "2026-09-19T06:11:54.668Z",
+  "ended_at": "2026-09-19T06:11:54.701Z",
   "identity": {
-    "release_sha": "7ae2745b8461763cedfc547fde16d7230c1f6fd8",
+    "release_sha": "de435f5d786f72cd697a0e777ec7461d2d74348b",
     "deployment_id": null,
     "tenant_class": "CERT",
     "tenant_id": "fullsite-cert-lab-v2",
@@ -19,12 +19,17 @@
     "shift_id": null
   },
   "identity_capture": "AUTOMATIC — ningún campo tecleado",
+  "observed_sha": "de435f5d786f72cd697a0e777ec7461d2d74348b",
+  "serving_sha_at_observation": "de435f5d786f72cd697a0e777ec7461d2d74348b",
+  "freshness_policy": {
+    "stale_after_min": 720,
+    "sha_sensitive": true
+  },
   "identity_incomplete": [
     "terminal_id",
     "actor_id"
   ],
   "preconditions_L0": {
-    "build_sealed": null,
     "satisfied": null,
     "reason": "no se evaluaron: no hay Pedro en esta sesión"
   },
@@ -56,5 +61,5 @@
     "shared_db_writes": 0,
     "product_files_modified": 0
   },
-  "content_sha256": "32d4b70d038f568c64cca502e349c05d5300036fe99dff750661adefcf913771"
+  "content_sha256": "b3ed3fda7629a406d36e7aa6c43c7c1860f2275903cea774bb6a109516d61d38"
 }

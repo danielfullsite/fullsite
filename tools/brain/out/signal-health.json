@@ -1,85 +1,106 @@
 {
   "artifact_kind": "signal-health",
   "artifact_version": "1.0",
-  "emitted_at": "2026-09-19T06:03:23.215Z",
-  "repo_sha": "7ae2745b8461763cedfc547fde16d7230c1f6fd8",
+  "emitted_at": "2026-09-19T06:11:54.632Z",
+  "repo_sha": "de435f5d786f72cd697a0e777ec7461d2d74348b",
   "database_identity": null,
   "principle": "La ausencia de evidencia NO es salud.",
-  "observed_at": "2026-09-19T05:59:42Z",
+  "observed_at": "2026-09-19T06:10:14Z",
+  "observed_sha": "de435f5d786f72cd697a0e777ec7461d2d74348b",
+  "serving_sha_at_observation": "de435f5d786f72cd697a0e777ec7461d2d74348b",
+  "clock": {
+    "resolved_from": "observed_at",
+    "state": "OK",
+    "hint": null
+  },
+  "freshness_policy": {
+    "stale_after_min": 60,
+    "sha_sensitive": false
+  },
   "signals": [
     {
       "signal": "fleet_heartbeat",
+      "owner": "FLEET_GUARDIAN",
       "state": "NEVER_SEEN",
       "reason": "el emisor existe y nunca produjo nada",
       "last_seen": null,
-      "owner": "FLEET_GUARDIAN",
+      "age_minutes": null,
       "alert": true
     },
     {
       "signal": "pedro_outbox",
+      "owner": "SYNC_GUARDIAN",
       "state": "NEVER_SEEN",
       "reason": "el emisor existe y nunca produjo nada",
       "last_seen": null,
-      "owner": "SYNC_GUARDIAN",
+      "age_minutes": null,
       "alert": true
     },
     {
       "signal": "terminal_telemetry",
+      "owner": "FLEET_GUARDIAN",
       "state": "NEVER_SEEN",
       "reason": "el emisor existe y nunca produjo nada",
       "last_seen": null,
-      "owner": "FLEET_GUARDIAN",
+      "age_minutes": null,
       "alert": true
     },
     {
       "signal": "sync_receipts",
+      "owner": "SYNC_GUARDIAN",
       "state": "HEALTHY",
-      "reason": "-1302 min desde la última",
+      "reason": "28 min desde la última",
       "last_seen": "2026-09-19T05:41:53Z",
-      "owner": "SYNC_GUARDIAN"
+      "age_minutes": 28
     },
     {
       "signal": "print_acknowledgements",
-      "state": "SILENT",
-      "reason": "21911 min sin señal (umbral 720)",
-      "last_seen": "2026-09-03T02:48:24Z",
       "owner": "KDS_PRINT_GUARDIAN",
+      "state": "SILENT",
+      "reason": "23242 min sin señal (umbral 720)",
+      "last_seen": "2026-09-03T02:48:24Z",
+      "age_minutes": 23242,
       "alert": true
     },
     {
       "signal": "kds_acknowledgements",
+      "owner": "KDS_PRINT_GUARDIAN",
       "state": "NOT_INSTRUMENTED",
       "reason": "no existe emisor",
       "last_seen": null,
-      "owner": "KDS_PRINT_GUARDIAN"
+      "age_minutes": null
     },
     {
       "signal": "source_ingestion",
+      "owner": "DATA_TRUTH_GUARDIAN",
       "state": "HEALTHY",
-      "reason": "-1302 min desde la última",
+      "reason": "28 min desde la última",
       "last_seen": "2026-09-19T05:41:52Z",
-      "owner": "DATA_TRUTH_GUARDIAN"
+      "age_minutes": 28
     },
     {
       "signal": "scheduled_agent_runs",
+      "owner": "INCIDENT_TRIAGE_AGENT",
       "state": "HEALTHY",
-      "reason": "-1319 min desde la última",
+      "reason": "11 min desde la última",
       "last_seen": "2026-09-19T05:58:49Z",
-      "owner": "INCIDENT_TRIAGE_AGENT"
+      "age_minutes": 11
     },
     {
       "signal": "backups",
+      "owner": "sin asignar",
       "state": "UNKNOWN",
       "reason": "no se observó esta señal en esta corrida",
       "last_seen": null,
-      "owner": "sin asignar"
+      "age_minutes": null
     },
     {
       "signal": "release_artifact_emission",
+      "owner": "RELEASE_GUARDIAN",
       "state": "NEVER_SEEN",
       "reason": "el emisor existe y nunca produjo nada",
       "last_seen": null,
-      "owner": "RELEASE_GUARDIAN",
+      "age_minutes": null,
       "alert": true
     }
   ],
@@ -108,7 +129,7 @@
     },
     {
       "signal": "print_acknowledgements",
-      "reason": "21911 min sin señal (umbral 720)",
+      "reason": "23242 min sin señal (umbral 720)",
       "owner": "KDS_PRINT_GUARDIAN"
     },
     {
@@ -122,5 +143,5 @@
     "shared_db_writes": 0,
     "product_files_modified": 0
   },
-  "content_sha256": "c28bb6799eac30caf7250142a46be542526afa28fb427ff33c46c83e32eeaf97"
+  "content_sha256": "0c502c7a38d8ad300a16238f95570d9d6dbdfb86cfc3dda3a53b4e0aff90a70c"
 }
