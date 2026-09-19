@@ -1,0 +1,97 @@
+{
+  "artifact_kind": "agent-cash-and-shift-guardian",
+  "artifact_version": "1.0",
+  "emitted_at": "2026-09-19T06:03:23.168Z",
+  "repo_sha": "7ae2745b8461763cedfc547fde16d7230c1f6fd8",
+  "database_identity": "supabase:qjiomlvudfmzuvqvhwpk/postgres · PostgreSQL 17.6",
+  "agent_id": "CASH_AND_SHIFT_GUARDIAN",
+  "level": "L1",
+  "autonomy": "read-only · no writes · no actions",
+  "observed_at": "2026-09-19T05:59:42Z",
+  "findings": [
+    {
+      "id": "stale_open:test_noreste_grill:mruwozjvrrc7",
+      "state": "DEGRADED",
+      "summary": "turno abierto hace 1407 h",
+      "evidence": []
+    },
+    {
+      "id": "stale_open:carls-jr:27774777",
+      "state": "DEGRADED",
+      "summary": "turno abierto hace 481 h",
+      "evidence": []
+    },
+    {
+      "id": "stale_open:boruca:mt3fxom0hwc2",
+      "state": "DEGRADED",
+      "summary": "turno abierto hace 659 h",
+      "evidence": []
+    },
+    {
+      "id": "stale_open:tekila-rg:mtexpe26z78p",
+      "state": "DEGRADED",
+      "summary": "turno abierto hace 466 h",
+      "evidence": []
+    },
+    {
+      "id": "stale_open:chickin-demo:mtop873lc5am",
+      "state": "DEGRADED",
+      "summary": "turno abierto hace 302 h",
+      "evidence": []
+    },
+    {
+      "id": "open_shifts:demo",
+      "state": "OK",
+      "summary": "un turno abierto",
+      "evidence": []
+    },
+    {
+      "id": "stale_open:scyf-demo:mtklmlvef3rv",
+      "state": "DEGRADED",
+      "summary": "turno abierto hace 371 h",
+      "evidence": []
+    },
+    {
+      "id": "stale_open:amalay:mu1qc5zt6y17",
+      "state": "DEGRADED",
+      "summary": "turno abierto hace 83 h",
+      "evidence": []
+    },
+    {
+      "id": "open_shifts:fullsite-cert-lab-v2",
+      "state": "OK",
+      "summary": "un turno abierto",
+      "evidence": []
+    },
+    {
+      "id": "stale_open:diezmex-demo:mtn4evtfmqvp",
+      "state": "DEGRADED",
+      "summary": "turno abierto hace 328 h",
+      "evidence": []
+    },
+    {
+      "id": "open_shift_invariant",
+      "state": "ALERT",
+      "summary": "no existe el índice: nada impide dos turnos abiertos",
+      "evidence": [],
+      "blocker": "CURRENT_RELEASE"
+    },
+    {
+      "id": "cash_identity",
+      "state": "OK",
+      "summary": "todo movimiento de caja lleva client_op_id",
+      "evidence": []
+    }
+  ],
+  "summary": {
+    "DEGRADED": 8,
+    "OK": 3,
+    "ALERT": 1
+  },
+  "guarantees": {
+    "read_only": true,
+    "shared_db_writes": 0,
+    "product_files_modified": 0
+  },
+  "content_sha256": "b9c72ddde432f856d8500d0a85b36f6e247b56f82b26a821bb427a5c1c8e3a8e"
+}

@@ -1,0 +1,191 @@
+{
+  "observed_at": "2026-09-19T05:59:42Z",
+  "now_ms": 1789718382736,
+  "repo_sha": "7ae2745b8461763cedfc547fde16d7230c1f6fd8",
+  "database_identity": "supabase:qjiomlvudfmzuvqvhwpk/postgres · PostgreSQL 17.6",
+  "RELEASE_GUARDIAN": {
+    "serving": null,
+    "p0a_ancestor": true
+  },
+  "DATA_TRUTH_GUARDIAN": {
+    "now_ms": 1789718382736,
+    "tenant_freshness": [
+      {
+        "tenant": "amalay",
+        "last_order_at": "2026-09-14T23:02:39Z"
+      },
+      {
+        "tenant": "boruca",
+        "last_order_at": "2026-08-21T08:51:53Z"
+      },
+      {
+        "tenant": "carls-jr",
+        "last_order_at": "2026-08-29T21:04:36Z"
+      },
+      {
+        "tenant": "chickin-demo",
+        "last_order_at": "2026-09-03T03:06:19Z"
+      },
+      {
+        "tenant": "coffee-shop",
+        "last_order_at": "2026-07-24T02:00:00Z"
+      },
+      {
+        "tenant": "demo",
+        "last_order_at": "2026-09-19T05:41:52Z"
+      },
+      {
+        "tenant": "diezmex-demo",
+        "last_order_at": "2026-09-04T16:23:07Z"
+      },
+      {
+        "tenant": "fullsite-cert-lab-v2",
+        "last_order_at": "2026-09-17T18:23:48Z"
+      },
+      {
+        "tenant": "lab-resto",
+        "last_order_at": "2026-09-19T03:29:15Z"
+      },
+      {
+        "tenant": "scyf-demo",
+        "last_order_at": "2026-09-02T21:21:59Z"
+      },
+      {
+        "tenant": "tekila-rg",
+        "last_order_at": "2026-08-29T21:38:28Z"
+      }
+    ]
+  },
+  "SOURCE_AUTHORITY_GUARDIAN": {
+    "contract_tables": [
+      {
+        "table": "pos_orders",
+        "rpc": "r1_save_order_idempotent",
+        "in_proxy_allow": true,
+        "min_role": "cualquiera"
+      },
+      {
+        "table": "pos_inventory_movements",
+        "rpc": "pos_record_inventory_movement",
+        "in_proxy_allow": true,
+        "min_role": "gerente"
+      },
+      {
+        "table": "pos_inventory",
+        "rpc": "pos_record_inventory_movement",
+        "in_proxy_allow": true,
+        "min_role": "gerente"
+      },
+      {
+        "table": "pos_save_operations",
+        "rpc": "(libro de recibos)",
+        "in_proxy_allow": true,
+        "min_role": "cualquiera"
+      },
+      {
+        "table": "pos_transfer_operations",
+        "rpc": "r1_transfer_item_atomic",
+        "in_proxy_allow": false
+      }
+    ]
+  },
+  "SECURITY_CONFIG_GUARDIAN": {
+    "pos_terminals_exists": false,
+    "enrolled_terminal_flag": [
+      {
+        "tenant": "amalay",
+        "value": false
+      }
+    ],
+    "receipt_ledger_writable": true
+  },
+  "CASH_AND_SHIFT_GUARDIAN": {
+    "now_ms": 1789718382736,
+    "open_shift_index_exists": false,
+    "cash_movements_without_op_id": 0,
+    "open_shifts": [
+      {
+        "tenant": "test_noreste_grill",
+        "id": "mruwozjvrrc7",
+        "opened_at": "2026-07-21T17:07:12Z"
+      },
+      {
+        "tenant": "carls-jr",
+        "id": "27774777",
+        "opened_at": "2026-08-29T06:32:33Z"
+      },
+      {
+        "tenant": "boruca",
+        "id": "mt3fxom0hwc2",
+        "opened_at": "2026-08-21T21:07:42Z"
+      },
+      {
+        "tenant": "tekila-rg",
+        "id": "mtexpe26z78p",
+        "opened_at": "2026-08-29T22:10:36Z"
+      },
+      {
+        "tenant": "chickin-demo",
+        "id": "mtop873lc5am",
+        "opened_at": "2026-09-05T18:10:58Z"
+      },
+      {
+        "tenant": "demo",
+        "id": "mu71przzqfgz",
+        "opened_at": "2026-09-18T14:20:25Z"
+      },
+      {
+        "tenant": "scyf-demo",
+        "id": "mtklmlvef3rv",
+        "opened_at": "2026-09-02T21:19:08Z"
+      },
+      {
+        "tenant": "amalay",
+        "id": "mu1qc5zt6y17",
+        "opened_at": "2026-09-14T21:03:04Z"
+      },
+      {
+        "tenant": "fullsite-cert-lab-v2",
+        "id": "mu7am43be7pf",
+        "opened_at": "2026-09-18T18:29:31Z"
+      },
+      {
+        "tenant": "diezmex-demo",
+        "id": "mtn4evtfmqvp",
+        "opened_at": "2026-09-04T15:40:32Z"
+      }
+    ]
+  },
+  "INCIDENT_TRIAGE_AGENT": {
+    "findings": [
+      {
+        "id": "U1",
+        "class": "NOT_OBSERVED",
+        "treated_as": "OPEN",
+        "reproduced": false
+      },
+      {
+        "id": "U2",
+        "class": "NOT_OBSERVED",
+        "treated_as": "OPEN",
+        "reproduced": false
+      },
+      {
+        "id": "D-01",
+        "class": "ENVIRONMENT_ERROR",
+        "treated_as": "OPEN",
+        "reproduced": true
+      }
+    ]
+  },
+  "last_seen": {
+    "fleet_heartbeat": null,
+    "pedro_outbox": null,
+    "terminal_telemetry": null,
+    "sync_receipts": "2026-09-19T05:41:53Z",
+    "print_acknowledgements": "2026-09-03T02:48:24Z",
+    "source_ingestion": "2026-09-19T05:41:52Z",
+    "scheduled_agent_runs": "2026-09-19T05:58:49Z",
+    "release_artifact_emission": null
+  }
+}

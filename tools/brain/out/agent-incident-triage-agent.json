@@ -1,0 +1,40 @@
+{
+  "artifact_kind": "agent-incident-triage-agent",
+  "artifact_version": "1.0",
+  "emitted_at": "2026-09-19T06:03:23.168Z",
+  "repo_sha": "7ae2745b8461763cedfc547fde16d7230c1f6fd8",
+  "database_identity": "supabase:qjiomlvudfmzuvqvhwpk/postgres · PostgreSQL 17.6",
+  "agent_id": "INCIDENT_TRIAGE_AGENT",
+  "level": "L1",
+  "autonomy": "read-only · no writes · no actions",
+  "observed_at": "2026-09-19T05:59:42Z",
+  "findings": [
+    {
+      "id": "triage:U1",
+      "state": "OK",
+      "summary": "clasificado NOT_OBSERVED",
+      "evidence": []
+    },
+    {
+      "id": "triage:U2",
+      "state": "OK",
+      "summary": "clasificado NOT_OBSERVED",
+      "evidence": []
+    },
+    {
+      "id": "triage:D-01",
+      "state": "OK",
+      "summary": "clasificado ENVIRONMENT_ERROR",
+      "evidence": []
+    }
+  ],
+  "summary": {
+    "OK": 3
+  },
+  "guarantees": {
+    "read_only": true,
+    "shared_db_writes": 0,
+    "product_files_modified": 0
+  },
+  "content_sha256": "e38ebbe63af9825f033e3f5dab01e9998d487987ebee130e86cb2014c75999e5"
+}

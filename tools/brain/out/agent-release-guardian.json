@@ -1,0 +1,35 @@
+{
+  "artifact_kind": "agent-release-guardian",
+  "artifact_version": "1.0",
+  "emitted_at": "2026-09-19T06:03:23.166Z",
+  "repo_sha": "7ae2745b8461763cedfc547fde16d7230c1f6fd8",
+  "database_identity": "supabase:qjiomlvudfmzuvqvhwpk/postgres · PostgreSQL 17.6",
+  "agent_id": "RELEASE_GUARDIAN",
+  "level": "L1",
+  "autonomy": "read-only · no writes · no actions",
+  "observed_at": "2026-09-19T05:59:42Z",
+  "findings": [
+    {
+      "id": "serving_sha",
+      "state": "UNKNOWN",
+      "summary": "no se observó qué SHA está sirviendo",
+      "evidence": []
+    },
+    {
+      "id": "p0a_ancestor",
+      "state": "OK",
+      "summary": "P0A_FINAL_SHA sigue siendo ancestro de la línea",
+      "evidence": []
+    }
+  ],
+  "summary": {
+    "UNKNOWN": 1,
+    "OK": 1
+  },
+  "guarantees": {
+    "read_only": true,
+    "shared_db_writes": 0,
+    "product_files_modified": 0
+  },
+  "content_sha256": "e5e833de53070a29f1ff49e9bc455fa873fc8d793a2ce6d7357a42fdd89dd673"
+}

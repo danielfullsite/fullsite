@@ -1,0 +1,59 @@
+{
+  "artifact_kind": "agent-ai-operations-analyst",
+  "artifact_version": "1.0",
+  "emitted_at": "2026-09-19T06:03:23.169Z",
+  "repo_sha": "7ae2745b8461763cedfc547fde16d7230c1f6fd8",
+  "database_identity": null,
+  "agent_id": "AI_OPERATIONS_ANALYST",
+  "level": "L1",
+  "autonomy": "read-only · interpreta, no es fuente de verdad",
+  "findings": [
+    {
+      "id": "brief",
+      "state": "ALERT",
+      "summary": "6 alerta(s) · 1 sin evidencia, de 6 artefactos",
+      "evidence": [
+        {
+          "artifact": "agent-source-authority-guardian",
+          "id": "bypass:pos_orders",
+          "summary": "tiene RPC de contrato (r1_save_order_idempotent) y sigue expuesta por el proxy"
+        },
+        {
+          "artifact": "agent-source-authority-guardian",
+          "id": "bypass:pos_inventory_movements",
+          "summary": "tiene RPC de contrato (pos_record_inventory_movement) y sigue expuesta por el proxy"
+        },
+        {
+          "artifact": "agent-source-authority-guardian",
+          "id": "bypass:pos_inventory",
+          "summary": "tiene RPC de contrato (pos_record_inventory_movement) y sigue expuesta por el proxy"
+        },
+        {
+          "artifact": "agent-source-authority-guardian",
+          "id": "bypass:pos_save_operations",
+          "summary": "tiene RPC de contrato ((libro de recibos)) y sigue expuesta por el proxy"
+        },
+        {
+          "artifact": "agent-security-config-guardian",
+          "id": "receipt_ledger",
+          "summary": "pos_save_operations es escribible por el proxy con cualquier rol"
+        },
+        {
+          "artifact": "agent-cash-and-shift-guardian",
+          "id": "open_shift_invariant",
+          "summary": "no existe el índice: nada impide dos turnos abiertos"
+        }
+      ],
+      "rule": "toda afirmación cita su artefacto; sin artefacto, UNKNOWN"
+    }
+  ],
+  "summary": {
+    "ALERT": 1
+  },
+  "guarantees": {
+    "read_only": true,
+    "shared_db_writes": 0,
+    "product_files_modified": 0
+  },
+  "content_sha256": "dc7b59d0cf2f726c6754aaa687fe929d7f5a24028e216c856341b0df789d8fd0"
+}

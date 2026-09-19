@@ -1,0 +1,81 @@
+{
+  "artifact_kind": "agent-source-authority-guardian",
+  "artifact_version": "1.0",
+  "emitted_at": "2026-09-19T06:03:23.168Z",
+  "repo_sha": "7ae2745b8461763cedfc547fde16d7230c1f6fd8",
+  "database_identity": "supabase:qjiomlvudfmzuvqvhwpk/postgres · PostgreSQL 17.6",
+  "agent_id": "SOURCE_AUTHORITY_GUARDIAN",
+  "level": "L1",
+  "autonomy": "read-only · no writes · no actions",
+  "observed_at": "2026-09-19T05:59:42Z",
+  "findings": [
+    {
+      "id": "bypass:pos_orders",
+      "state": "ALERT",
+      "summary": "tiene RPC de contrato (r1_save_order_idempotent) y sigue expuesta por el proxy",
+      "evidence": [
+        {
+          "table": "pos_orders",
+          "rpc": "r1_save_order_idempotent",
+          "min_role": "cualquiera"
+        }
+      ],
+      "invariant": "INV-07"
+    },
+    {
+      "id": "bypass:pos_inventory_movements",
+      "state": "ALERT",
+      "summary": "tiene RPC de contrato (pos_record_inventory_movement) y sigue expuesta por el proxy",
+      "evidence": [
+        {
+          "table": "pos_inventory_movements",
+          "rpc": "pos_record_inventory_movement",
+          "min_role": "gerente"
+        }
+      ],
+      "invariant": "INV-07"
+    },
+    {
+      "id": "bypass:pos_inventory",
+      "state": "ALERT",
+      "summary": "tiene RPC de contrato (pos_record_inventory_movement) y sigue expuesta por el proxy",
+      "evidence": [
+        {
+          "table": "pos_inventory",
+          "rpc": "pos_record_inventory_movement",
+          "min_role": "gerente"
+        }
+      ],
+      "invariant": "INV-07"
+    },
+    {
+      "id": "bypass:pos_save_operations",
+      "state": "ALERT",
+      "summary": "tiene RPC de contrato ((libro de recibos)) y sigue expuesta por el proxy",
+      "evidence": [
+        {
+          "table": "pos_save_operations",
+          "rpc": "(libro de recibos)",
+          "min_role": "cualquiera"
+        }
+      ],
+      "invariant": "INV-07"
+    },
+    {
+      "id": "bypass:pos_transfer_operations",
+      "state": "OK",
+      "summary": "sólo se escribe por r1_transfer_item_atomic",
+      "evidence": []
+    }
+  ],
+  "summary": {
+    "ALERT": 4,
+    "OK": 1
+  },
+  "guarantees": {
+    "read_only": true,
+    "shared_db_writes": 0,
+    "product_files_modified": 0
+  },
+  "content_sha256": "c84b655932b50da3480ccf10a9569780ba23d2f03e7d668178d04a6147559bf8"
+}

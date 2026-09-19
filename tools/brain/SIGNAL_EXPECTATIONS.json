@@ -21,7 +21,8 @@
       "CURRENT_STATE": "NEVER_SEEN",
       "evidence": "0 filas desde que la tabla existe (consultado 2026-09-18)",
       "why_it_matters": "Una flota que no reporta se ve idéntica a una flota sana. Es el caso que da nombre a esta categoría.",
-      "owner": "FLEET_GUARDIAN"
+      "owner": "FLEET_GUARDIAN",
+      "SILENCE_THRESHOLD_MIN": 15
     },
     {
       "EXPECTED_SIGNAL": "pedro_outbox",
@@ -32,7 +33,8 @@
       "CURRENT_STATE": "NEVER_SEEN",
       "evidence": "0 filas. El worker existe y jamás subió un evento en producción.",
       "why_it_matters": "Sin esto la nube no ve nada de lo que pasa dentro de la terminal.",
-      "owner": "SYNC_GUARDIAN"
+      "owner": "SYNC_GUARDIAN",
+      "SILENCE_THRESHOLD_MIN": 60
     },
     {
       "EXPECTED_SIGNAL": "terminal_telemetry",
@@ -43,7 +45,8 @@
       "CURRENT_STATE": "NEVER_SEEN",
       "evidence": "0 filas",
       "why_it_matters": "Único registro de terminal en la nube. Vacío.",
-      "owner": "FLEET_GUARDIAN"
+      "owner": "FLEET_GUARDIAN",
+      "SILENCE_THRESHOLD_MIN": 5
     },
     {
       "EXPECTED_SIGNAL": "sync_receipts",
@@ -54,7 +57,8 @@
       "CURRENT_STATE": "HEALTHY",
       "evidence": "984 filas, viva hoy",
       "why_it_matters": "Es el único recibo que sí funciona. Su silencio sería grave.",
-      "owner": "SYNC_GUARDIAN"
+      "owner": "SYNC_GUARDIAN",
+      "SILENCE_THRESHOLD_MIN": 1440
     },
     {
       "EXPECTED_SIGNAL": "print_acknowledgements",
@@ -65,7 +69,8 @@
       "CURRENT_STATE": "SILENT",
       "evidence": "385 filas, ninguna desde el 2026-09-04",
       "why_it_matters": "Lleva 14 días en silencio y nadie lo notó. 'printed' significa que el spooler aceptó, no que salió papel.",
-      "owner": "KDS_PRINT_GUARDIAN"
+      "owner": "KDS_PRINT_GUARDIAN",
+      "SILENCE_THRESHOLD_MIN": 720
     },
     {
       "EXPECTED_SIGNAL": "kds_acknowledgements",
@@ -76,7 +81,8 @@
       "CURRENT_STATE": "NOT_INSTRUMENTED",
       "evidence": "No existe el concepto de ack del KDS en ninguna rama (verificado).",
       "why_it_matters": "Es el hueco que deja F3 del field cert permanentemente en NOT_OBSERVED.",
-      "owner": "KDS_PRINT_GUARDIAN"
+      "owner": "KDS_PRINT_GUARDIAN",
+      "SILENCE_THRESHOLD_MIN": null
     },
     {
       "EXPECTED_SIGNAL": "source_ingestion",
@@ -87,7 +93,8 @@
       "CURRENT_STATE": "HEALTHY",
       "evidence": "/api/health ya vigila frescura con este umbral",
       "why_it_matters": "Una fuente muerta con CI en verde ya costó 14 días.",
-      "owner": "DATA_TRUTH_GUARDIAN"
+      "owner": "DATA_TRUTH_GUARDIAN",
+      "SILENCE_THRESHOLD_MIN": 4320
     },
     {
       "EXPECTED_SIGNAL": "scheduled_agent_runs",
@@ -98,7 +105,8 @@
       "CURRENT_STATE": "HEALTHY",
       "evidence": "13 484 filas, la tabla más escrita fuera de pos_orders",
       "why_it_matters": "Un agente que no deja rastro de haber corrido es indistinguible de uno que no existe. Ya pasó nueve días.",
-      "owner": "INCIDENT_TRIAGE_AGENT"
+      "owner": "INCIDENT_TRIAGE_AGENT",
+      "SILENCE_THRESHOLD_MIN": 360
     },
     {
       "EXPECTED_SIGNAL": "backups",
@@ -109,7 +117,8 @@
       "CURRENT_STATE": "UNKNOWN",
       "evidence": "No se auditó. La máquina de trabajo no tiene Time Machine y 122 ramas locales están sin publicar.",
       "why_it_matters": "La ausencia de respaldo sólo se descubre el día que se necesita.",
-      "owner": "sin asignar"
+      "owner": "sin asignar",
+      "SILENCE_THRESHOLD_MIN": 2880
     },
     {
       "EXPECTED_SIGNAL": "release_artifact_emission",
@@ -120,7 +129,8 @@
       "CURRENT_STATE": "NEVER_SEEN",
       "evidence": "La plantilla existe; ningún artefacto emitido.",
       "why_it_matters": "Sin él, '¿qué SHA está sirviendo AMALAY?' no se puede contestar desde el cerebro.",
-      "owner": "RELEASE_GUARDIAN"
+      "owner": "RELEASE_GUARDIAN",
+      "SILENCE_THRESHOLD_MIN": null
     }
   ],
   "summary": {
@@ -136,5 +146,6 @@
     "watchers_running": 0,
     "alerts_emitted": 0,
     "shared_db_writes": 0
-  }
+  },
+  "_note_v1_1": "Se añadió SILENCE_THRESHOLD_MIN (minutos) para que el vigilante pueda evaluarlo. Los umbrales en prosa se conservan."
 }

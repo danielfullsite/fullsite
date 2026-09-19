@@ -1,0 +1,38 @@
+{
+  "artifact_kind": "release-state",
+  "artifact_version": "1.0",
+  "emitted_at": "2026-09-19T06:00:55.757Z",
+  "repo_sha": "7ae2745b8461763cedfc547fde16d7230c1f6fd8",
+  "database_identity": null,
+  "release_id": "rel-20260919-01",
+  "what_shipped": {
+    "code_sha": "7ae2745b8461763cedfc547fde16d7230c1f6fd8",
+    "vercel_deployment_id": "UNKNOWN",
+    "p0a_final_sha": "8d8c20d832a9be1f4bb78edaf917d2dfc3861d85",
+    "p0a_still_ancestor": true,
+    "migrations_applied": []
+  },
+  "field_cert": {
+    "verdict": "UNKNOWN"
+  },
+  "signal_health": {
+    "artifact": "UNKNOWN"
+  },
+  "agent_activity": {
+    "agents_running": 0,
+    "actions_executed": 0,
+    "highest_level_in_use": "L1"
+  },
+  "unknown_fields": [
+    "vercel_deployment_id",
+    "field_cert_verdict"
+  ],
+  "verdict": "INCOMPLETE",
+  "verdict_reason": "2 campo(s) sin evidencia: vercel_deployment_id, field_cert_verdict",
+  "guarantees": {
+    "read_only": true,
+    "shared_db_writes": 0,
+    "product_files_modified": 0
+  },
+  "content_sha256": "653845d99fa8e279c7f93002992b73efd5eaae4a7ee564d3410210cf05fa1475"
+}

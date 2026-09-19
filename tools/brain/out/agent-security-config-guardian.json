@@ -1,0 +1,42 @@
+{
+  "artifact_kind": "agent-security-config-guardian",
+  "artifact_version": "1.0",
+  "emitted_at": "2026-09-19T06:03:23.168Z",
+  "repo_sha": "7ae2745b8461763cedfc547fde16d7230c1f6fd8",
+  "database_identity": "supabase:qjiomlvudfmzuvqvhwpk/postgres · PostgreSQL 17.6",
+  "agent_id": "SECURITY_CONFIG_GUARDIAN",
+  "level": "L1",
+  "autonomy": "read-only · no writes · no actions",
+  "observed_at": "2026-09-19T05:59:42Z",
+  "findings": [
+    {
+      "id": "enrolled_terminal_trap:amalay",
+      "state": "DEGRADED",
+      "summary": "trampa armada: el flag existe apagado y su tabla no existe",
+      "evidence": [
+        {
+          "tenant": "amalay",
+          "value": false
+        }
+      ],
+      "rule": "ningún agente, en ningún nivel, cambia esta configuración"
+    },
+    {
+      "id": "receipt_ledger",
+      "state": "ALERT",
+      "summary": "pos_save_operations es escribible por el proxy con cualquier rol",
+      "evidence": [],
+      "note": "hallazgo estático, sin reproducir en runtime"
+    }
+  ],
+  "summary": {
+    "DEGRADED": 1,
+    "ALERT": 1
+  },
+  "guarantees": {
+    "read_only": true,
+    "shared_db_writes": 0,
+    "product_files_modified": 0
+  },
+  "content_sha256": "21f809d81826a01239e20080304cc1980487709f92e1bd51c768e7823d2e5f9d"
+}

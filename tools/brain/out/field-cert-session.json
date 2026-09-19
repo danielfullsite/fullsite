@@ -1,0 +1,47 @@
+{
+  "artifact_kind": "field-cert-session",
+  "artifact_version": "1.0",
+  "emitted_at": "2026-09-19T06:00:41.416Z",
+  "repo_sha": "7ae2745b8461763cedfc547fde16d7230c1f6fd8",
+  "database_identity": null,
+  "cert_session_id": "fcert-fullsite-cert-lab-v2-20260919T060041Z-b6a098",
+  "mode": "FIELD_CERT",
+  "started_at": "2026-09-19T06:00:41.405Z",
+  "ended_at": null,
+  "identity": {
+    "release_sha": "7ae2745b8461763cedfc547fde16d7230c1f6fd8",
+    "deployment_id": null,
+    "tenant_class": "CERT",
+    "tenant_id": "fullsite-cert-lab-v2",
+    "location_id": null,
+    "terminal_id": null,
+    "actor_id": null,
+    "shift_id": null
+  },
+  "identity_capture": "AUTOMATIC — ningún campo tecleado",
+  "identity_incomplete": [
+    "terminal_id",
+    "actor_id"
+  ],
+  "preconditions_L0": {
+    "build_sealed": null,
+    "satisfied": null,
+    "reason": "no se evaluaron: no hay Pedro en esta sesión"
+  },
+  "state": "OPEN_WITH_GAPS",
+  "physical_confirmations": [],
+  "not_observable_today": [
+    "KDS_RECEIVED",
+    "OFFLINE_ENTERED",
+    "COMMAND_QUEUED",
+    "RECONNECT_DETECTED",
+    "QUEUE_DRAIN_STARTED",
+    "QUEUE_DRAINED"
+  ],
+  "guarantees": {
+    "read_only": true,
+    "shared_db_writes": 0,
+    "product_files_modified": 0
+  },
+  "content_sha256": "48e81cbfbefbd61151663c437067d09029895640f0f266bf0c405010742fe290"
+}

@@ -1,0 +1,126 @@
+{
+  "artifact_kind": "signal-health",
+  "artifact_version": "1.0",
+  "emitted_at": "2026-09-19T06:03:23.215Z",
+  "repo_sha": "7ae2745b8461763cedfc547fde16d7230c1f6fd8",
+  "database_identity": null,
+  "principle": "La ausencia de evidencia NO es salud.",
+  "observed_at": "2026-09-19T05:59:42Z",
+  "signals": [
+    {
+      "signal": "fleet_heartbeat",
+      "state": "NEVER_SEEN",
+      "reason": "el emisor existe y nunca produjo nada",
+      "last_seen": null,
+      "owner": "FLEET_GUARDIAN",
+      "alert": true
+    },
+    {
+      "signal": "pedro_outbox",
+      "state": "NEVER_SEEN",
+      "reason": "el emisor existe y nunca produjo nada",
+      "last_seen": null,
+      "owner": "SYNC_GUARDIAN",
+      "alert": true
+    },
+    {
+      "signal": "terminal_telemetry",
+      "state": "NEVER_SEEN",
+      "reason": "el emisor existe y nunca produjo nada",
+      "last_seen": null,
+      "owner": "FLEET_GUARDIAN",
+      "alert": true
+    },
+    {
+      "signal": "sync_receipts",
+      "state": "HEALTHY",
+      "reason": "-1302 min desde la última",
+      "last_seen": "2026-09-19T05:41:53Z",
+      "owner": "SYNC_GUARDIAN"
+    },
+    {
+      "signal": "print_acknowledgements",
+      "state": "SILENT",
+      "reason": "21911 min sin señal (umbral 720)",
+      "last_seen": "2026-09-03T02:48:24Z",
+      "owner": "KDS_PRINT_GUARDIAN",
+      "alert": true
+    },
+    {
+      "signal": "kds_acknowledgements",
+      "state": "NOT_INSTRUMENTED",
+      "reason": "no existe emisor",
+      "last_seen": null,
+      "owner": "KDS_PRINT_GUARDIAN"
+    },
+    {
+      "signal": "source_ingestion",
+      "state": "HEALTHY",
+      "reason": "-1302 min desde la última",
+      "last_seen": "2026-09-19T05:41:52Z",
+      "owner": "DATA_TRUTH_GUARDIAN"
+    },
+    {
+      "signal": "scheduled_agent_runs",
+      "state": "HEALTHY",
+      "reason": "-1319 min desde la última",
+      "last_seen": "2026-09-19T05:58:49Z",
+      "owner": "INCIDENT_TRIAGE_AGENT"
+    },
+    {
+      "signal": "backups",
+      "state": "UNKNOWN",
+      "reason": "no se observó esta señal en esta corrida",
+      "last_seen": null,
+      "owner": "sin asignar"
+    },
+    {
+      "signal": "release_artifact_emission",
+      "state": "NEVER_SEEN",
+      "reason": "el emisor existe y nunca produjo nada",
+      "last_seen": null,
+      "owner": "RELEASE_GUARDIAN",
+      "alert": true
+    }
+  ],
+  "summary": {
+    "NEVER_SEEN": 4,
+    "HEALTHY": 3,
+    "SILENT": 1,
+    "NOT_INSTRUMENTED": 1,
+    "UNKNOWN": 1
+  },
+  "alerts": [
+    {
+      "signal": "fleet_heartbeat",
+      "reason": "el emisor existe y nunca produjo nada",
+      "owner": "FLEET_GUARDIAN"
+    },
+    {
+      "signal": "pedro_outbox",
+      "reason": "el emisor existe y nunca produjo nada",
+      "owner": "SYNC_GUARDIAN"
+    },
+    {
+      "signal": "terminal_telemetry",
+      "reason": "el emisor existe y nunca produjo nada",
+      "owner": "FLEET_GUARDIAN"
+    },
+    {
+      "signal": "print_acknowledgements",
+      "reason": "21911 min sin señal (umbral 720)",
+      "owner": "KDS_PRINT_GUARDIAN"
+    },
+    {
+      "signal": "release_artifact_emission",
+      "reason": "el emisor existe y nunca produjo nada",
+      "owner": "RELEASE_GUARDIAN"
+    }
+  ],
+  "guarantees": {
+    "read_only": true,
+    "shared_db_writes": 0,
+    "product_files_modified": 0
+  },
+  "content_sha256": "c28bb6799eac30caf7250142a46be542526afa28fb427ff33c46c83e32eeaf97"
+}
