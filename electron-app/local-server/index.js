@@ -29,6 +29,10 @@ const { CoreEventStore }    = require('./core/event-store')
 const { identidadDeBuild } = require('./core/identidad-de-build')
 const { identidadDeTerminal } = require('./core/identidad-de-terminal')
 const { turnReport } = require('./core/turn-report')
+const {
+  createFingerprintIpcRequestAuth,
+  verifyFingerprintIpcResponse,
+} = require('./core/fingerprint-ipc-secret')
 const { RestaurantState }   = require('./core/state')
 const { WsHub }             = require('./core/ws-hub')
 const { CommandHandler }    = require('./core/command-handler')
@@ -353,7 +357,59 @@ const LECTURAS_REENVIADAS = ['/reports/turn', '/state', '/events', '/print/uncer
 
 // Keep identity and routing configuration explicit so every cloned terminal can
 // discover the caja without relying on process-global or customer-specific state.
-function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority = null, catalogStore = null, authorityReason = null, catalogReason = null, getBusinessSyncStatus = () => ({ configured: false }), getEnlaceStatus = () => null, printer, version, serverId, restaurantId, config = {}, instanceName = '', branchId = config.branchId || config.locationId || null, posServerIp: posServerIpFijo = config.posServerIp || null, cajaActual = null, port = 7717, posServerPort = config.posServerPort || null }) {
+/**
+ * Habla con el servicio de huella (7718) FIRMANDO cada peticion con HMAC.
+ *
+ * Por que existe: el binario instalado en la Caja desde el 2026-09-13 exige
+ * firma en toda ruta y responde 401 sin ella. El proxy anterior reenviaba en
+ * crudo, asi que con ese binario la huella queda muerta — que es exactamente
+ * el defecto que se arreglo a mano en campo. Ver AMALAY-DEFECT-LINEAGE.md D-01.
+ *
+ * Tambien verifica la firma de la RESPUESTA: sin eso, cualquier proceso local
+ * que gane el puerto 7718 podria suplantar al lector.
+ */
+function requestFingerprintService({ method, path, ipcSecret, body = '', hostname = '127.0.0.1', port = 7718 }) {
+  return new Promise((resolve, reject) => {
+    let auth
+    try { auth = createFingerprintIpcRequestAuth({ secret: ipcSecret, method, path, body }) }
+    catch (error) { reject(error); return }
+    const request = http.request({
+      hostname, port, method, path, timeout: 90000,
+      headers: auth.headers,
+    }, response => {
+      const chunks = []
+      let bytes = 0
+      response.on('data', chunk => {
+        bytes += chunk.length
+        if (bytes > 1024 * 1024) {
+          request.destroy(Object.assign(new Error('Respuesta de huella demasiado grande'), { code: 'FINGERPRINT_RESPONSE_TOO_LARGE' }))
+          return
+        }
+        chunks.push(chunk)
+      })
+      response.on('end', () => {
+        const statusCode = response.statusCode || 502
+        const responseBody = Buffer.concat(chunks).toString('utf8')
+        try {
+          verifyFingerprintIpcResponse({
+            secret: ipcSecret, context: auth.context, statusCode,
+            body: responseBody, headers: response.headers,
+          })
+        } catch (error) { reject(error); return }
+        resolve({
+          statusCode,
+          contentType: response.headers['content-type'] || 'application/json',
+          body: responseBody,
+        })
+      })
+    })
+    request.on('error', reject)
+    request.setTimeout(90000, () => request.destroy(Object.assign(new Error('Fingerprint timeout'), { code: 'FINGERPRINT_TIMEOUT' })))
+    request.end(body)
+  })
+}
+
+function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority = null, catalogStore = null, authorityReason = null, catalogReason = null, getBusinessSyncStatus = () => ({ configured: false }), getEnlaceStatus = () => null, printer, version, serverId, restaurantId, config = {}, instanceName = '', branchId = config.branchId || config.locationId || null, posServerIp: posServerIpFijo = config.posServerIp || null, cajaActual = null, port = 7717, posServerPort = config.posServerPort || null, fingerprintIpcSecret = null, fingerprintRequest = requestFingerprintService }) {
   // Puerto de la CAJA al reenviar. Antes se usaba `port` — el puerto PROPIO del
   // secundario — lo que acopla ambos al 7717: dos Pedros en una misma maquina
   // (pruebas, demos) o una terminal en puerto distinto rompian el forward.
@@ -828,20 +884,43 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority 
     if (url?.startsWith('/fp')) {
       const fpPath = url.slice(3) || '/'
       const fpQuery = req.url?.includes('?') ? req.url.slice(req.url.indexOf('?')) : ''
-      const fpUrl = `http://127.0.0.1:7718${fpPath}${fpQuery}`
+      // El secreto lo prepara Electron al arrancar (main.js) y lo baja hasta
+      // aqui. Sin el NO se reenvia nada: el servicio nuevo rechazaria la
+      // peticion con 401 y el usuario veria «lector no disponible» sin saber
+      // por que. Falla cerrado y lo dice.
+      if (!fingerprintIpcSecret) {
+        json(res, 503, { ok: false, error: 'Canal seguro con el lector no preparado', code: 'FINGERPRINT_IPC_NOT_READY' })
+        return
+      }
       try {
-        const fpReq = require('http').request(fpUrl, { method: req.method, timeout: 90000 }, fpRes => {
-          res.writeHead(fpRes.statusCode, {
-            'Content-Type': fpRes.headers['content-type'] || 'application/json',
-            'Access-Control-Allow-Origin': '*',
-          })
-          fpRes.pipe(res)
+        // Se junta el cuerpo antes de firmar: la firma cubre metodo, ruta y
+        // cuerpo, asi que no se puede ir canalizando mientras se calcula.
+        const chunks = []
+        let bytes = 0
+        for await (const chunk of req) {
+          bytes += chunk.length
+          if (bytes > 1024 * 1024) {
+            json(res, 413, { ok: false, error: 'Cuerpo demasiado grande para el lector' })
+            return
+          }
+          chunks.push(chunk)
+        }
+        const upstream = await fingerprintRequest({
+          method: req.method,
+          path: `${fpPath}${fpQuery}`,
+          ipcSecret: fingerprintIpcSecret,
+          body: Buffer.concat(chunks).toString('utf8'),
         })
-        fpReq.on('error', () => json(res, 503, { ok: false, error: 'Fingerprint service not running' }))
-        fpReq.setTimeout(90000, () => { fpReq.destroy(); json(res, 504, { ok: false, error: 'Fingerprint timeout' }) })
-        req.pipe(fpReq)
+        res.writeHead(upstream.statusCode, {
+          'Content-Type': upstream.contentType,
+          'Access-Control-Allow-Origin': '*',
+        })
+        res.end(upstream.body)
       } catch (e) {
-        json(res, 503, { ok: false, error: e.message })
+        // Un fallo de firma no es lo mismo que un servicio caido, y conviene
+        // distinguirlos en el log: el primero significa binario desparejado.
+        const code = e?.code === 'FINGERPRINT_TIMEOUT' ? 504 : 503
+        json(res, code, { ok: false, error: e?.message || 'Fingerprint service not running', code: e?.code })
       }
       return
     }
@@ -858,7 +937,7 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority 
  *             printersConfig, printerConfigPath, queueFilePath, clientId }
  * @returns {{ httpServer, close }}
  */
-async function startLocalServer({ dataDir, port = 7717, config = {}, businessSync = null }) {
+async function startLocalServer({ dataDir, port = 7717, config = {}, businessSync = null, fingerprintIpcSecret = null }) {
   let _businessOutbox = null
   let businessSyncIssue = businessSync ? 'BUSINESS_SYNC_NOT_STARTED' : 'BUSINESS_SYNC_NOT_CONFIGURED'
   // CFG-02: refuse to start if restaurant identity is missing or invalid.
@@ -1035,6 +1114,9 @@ async function startLocalServer({ dataDir, port = 7717, config = {}, businessSyn
     serverId,
     restaurantId,
     config,
+    // Lo prepara Electron (main.js) porque es quien conoce la ruta de userData.
+    // Si viene null, /fp falla cerrado y lo dice; no se reenvia sin firmar.
+    fingerprintIpcSecret,
     instanceName,
     branchId: config.branchId || config.locationId || null,
     posServerIp: config.posServerIp || null,

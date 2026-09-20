@@ -264,6 +264,21 @@ async function startLocalServer() {
 
   const { startLocalServer: start } = require('./local-server');
   const dataDir = app.getPath('userData');
+
+  // ── Canal firmado con el lector de huella ────────────────────────────────
+  // Se prepara ANTES de abrir el servidor: el proxy /fp falla cerrado sin el, y
+  // es mejor que falle desde el arranque y lo diga, a que falle a media comida.
+  // El secreto queda en <userData>/fingerprint/, 0600 y con ACL del usuario de
+  // Windows. El servicio en C# lo lee de esa misma ruta: es un contrato entre
+  // dos procesos, no una constante.
+  try {
+    fingerprintIpcSecret = prepareFingerprintIpcSecret({
+      directory: resolveFingerprintIpcDirectory({ userDataDirectory: dataDir }),
+    });
+  } catch (e) {
+    console.error('[fingerprint] No se pudo preparar el secreto IPC; las rutas de huella fallaran cerradas:', e.message);
+    fingerprintIpcSecret = null;
+  }
   const printersResult = loadPrinters();
   const printerConfigPath = getPrinterConfigPath();
   const queueFilePath = path.join(dataDir, 'print-queue.json');
@@ -322,7 +337,8 @@ async function startLocalServer() {
   try {
     localServer = await start({ dataDir, port: LOCAL_SERVER_PORT, config: cfg,
       // Dedicated cloud credential stays in main, outside renderer identity.
-      businessSync: appConfig.business_sync || null });
+      businessSync: appConfig.business_sync || null,
+      fingerprintIpcSecret });
     // Incluye el secreto que Caja acaba de generar/persistir, no sólo config.json.
     appConfig.lan_secret = localServer.lanSecret || null;
     console.log('[main] Local server started.');
@@ -671,8 +687,24 @@ function registerProvisioningIpc() {
 // must be in C:\fullsite\ on each terminal.
 
 const { spawn } = require('child_process');
+const {
+  prepareFingerprintIpcSecret,
+  resolveFingerprintIpcDirectory,
+  createFingerprintIpcRequestAuth,
+} = require('./local-server/core/fingerprint-ipc-secret');
 let fingerprintProcess = null;
 let fingerprintRestartCount = 0;
+// El secreto del canal con el lector. Vive aqui porque quien conoce la ruta de
+// `userData` es Electron, no Pedro: si no se prepara aqui, el archivo no existe
+// y el servicio arranca y muere con «FATAL: falta el fingerprint-ipc-secret».
+let fingerprintIpcSecret = null;
+
+/** SHA-256 de un archivo, o null si no se puede leer. Identidad, no confianza. */
+function fingerprintFileHash(file) {
+  try {
+    return require('crypto').createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+  } catch { return null; }
+}
 
 function startFingerprintService() {
   const fpExe = 'C:\\fullsite\\fingerprint-service.exe';
@@ -712,10 +744,34 @@ function startFingerprintService() {
     return;
   }
 
+  // Identidad del binario ANTES de usarlo. No decide nada por si sola: sirve
+  // para que el ledger de campo pueda decir QUE exe corrio, que es justo lo que
+  // faltaba cuando dos «1.3.8» resultaron ser binarios distintos.
+  console.log(`[fingerprint] exe sha256=${(fingerprintFileHash(fpExe) || 'ILEGIBLE').slice(0, 16)} dll sha256=${(fingerprintFileHash(fpDll) || 'ILEGIBLE').slice(0, 16)}`);
+
   // Check if already running on port 7718
-  const testReq = http.get('http://127.0.0.1:7718/health', (res) => {
+  //
+  // El sondeo va FIRMADO. El servicio instalado en campo desde el 2026-09-13
+  // responde 401 a lo no firmado, asi que un GET en crudo daba «no disponible»
+  // aunque el lector estuviera perfecto — y entonces se arrancaba un segundo
+  // proceso sobre un puerto ya ocupado. Ver AMALAY-DEFECT-LINEAGE.md D-01.
+  let healthHeaders = {};
+  try {
+    if (fingerprintIpcSecret) {
+      healthHeaders = createFingerprintIpcRequestAuth({
+        secret: fingerprintIpcSecret, method: 'GET', path: '/health', body: '',
+      }).headers;
+    }
+  } catch (e) {
+    console.warn('[fingerprint] No se pudo firmar el sondeo de salud:', e.message);
+  }
+  const testReq = http.get({ hostname: '127.0.0.1', port: 7718, path: '/health', headers: healthHeaders }, (res) => {
     if (res.statusCode === 200) {
       console.log('[fingerprint] Service already running on port 7718');
+    } else if (res.statusCode === 401) {
+      // Alguien escucha en 7718 y no comparte nuestro secreto: o es un binario
+      // viejo, o es otro proceso. Arrancar otro encima no arregla ninguno.
+      console.error('[fingerprint] 7718 responde 401: el servicio no comparte el secreto de esta instalacion. NO se arranca otro encima.');
     }
   });
   testReq.on('error', () => {
