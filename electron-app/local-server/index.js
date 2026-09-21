@@ -1378,4 +1378,8 @@ async function startLocalServer({ dataDir, port = 7717, config = {}, businessSyn
 
 // buildHttpRouter se exporta para poder probar las rutas sin levantar el servidor
 // completo (mDNS + heartbeat + polling quedarían corriendo y colgarían el test).
-module.exports = { startLocalServer, buildHttpRouter, deliveryStation, deliveryOrderCommand, buildDeliveryTicket }
+// `requestFingerprintService` se exporta para que las pruebas puedan ejercer la
+// FIRMA de verdad contra un servicio falso en un puerto efímero. Sin esto habría
+// que inyectar un doble y la prueba ya no verificaría el HMAC, que es lo único
+// que este cambio aporta.
+module.exports = { startLocalServer, buildHttpRouter, requestFingerprintService, deliveryStation, deliveryOrderCommand, buildDeliveryTicket }
