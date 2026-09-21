@@ -1,0 +1,30 @@
+# Dependencias externas del servicio de huella — identidad esperada
+#
+# POR QUÉ EXISTE ESTE ARCHIVO
+#
+# `DPUruNet.dll` es del SDK propietario de DigitalPersona (U.are.U). NO se puede
+# commitear: no tenemos derecho a redistribuirlo. Por eso `electron-app/fingerprint/`
+# está vacío a propósito.
+#
+# Pero «no está en el repo» no puede significar «cualquier DLL vale». Un binario
+# que habla con un lector biométrico y firma identidades de empleados es
+# exactamente lo que no se acepta a ciegas. Este archivo es el contrato: el DLL
+# vive fuera, y su identidad se comprueba contra esta lista ANTES de compilar o
+# empaquetar. Si no coincide, se para.
+#
+# PROCEDENCIA DE LOS HASHES
+#
+# Medidos en la Caja de AMALAY (SERVER1) el 2026-09-13, y vueltos a confirmar en
+# la captura de campo del 2026-09-20:
+#   · `~/Desktop/EXTRACCION-AMALAY.zip` → HASHES.txt
+#   · `AMALAY-FIELD-CHECK-LIVE-2026-09-20.md` → SERVER1-030
+# Es el DLL que de hecho opera el lector en producción, no uno de catálogo.
+#
+# CÓMO AGREGAR UNA VERSIÓN NUEVA
+#
+# Sólo con el DLL en la mano, su hash medido y una razón escrita. Añadir una línea
+# aquí amplía lo que el sistema acepta: no es un trámite.
+#
+# formato:  <archivo>  <sha256 en minúsculas>  <procedencia>
+
+DPUruNet.dll  3962ae19baa55938ec87544ebc19bd06b94f713f396f0e08732af13d7c97d909  AMALAY/SERVER1 2026-09-13, reconfirmado 2026-09-20 (SERVER1-030)

@@ -777,10 +777,23 @@ function startFingerprintService() {
   testReq.on('error', () => {
     // Not running, start it
     console.log('[fingerprint] Starting fingerprint-service.exe...');
+    // QUIÉN MANDA SOBRE userData ES ELECTRON, Y HAY QUE DECÍRSELO.
+    //
+    // El servicio busca el secreto en FULLSITE_USER_DATA_DIR y, si no viene, cae
+    // a %APPDATA%\fullsite-pos y a %APPDATA%\Fullsite POS. En la Caja de AMALAY
+    // el respaldo acierta por coincidencia —el productName casa con la carpeta—,
+    // no por contrato: basta renombrar el producto, o un build portable con otro
+    // userData, para que el servicio no encuentre el secreto y muera con
+    // «FATAL: falta el fingerprint-ipc-secret» sin que nadie entienda por qué.
+    //
+    // Se pasa el DIRECTORIO, nunca el secreto. El .cs acepta también
+    // FULLSITE_FINGERPRINT_IPC_SECRET, y no se usa a propósito: el valor quedaría
+    // visible en el entorno del proceso para cualquiera que liste procesos.
     fingerprintProcess = spawn(fpExe, [], {
       cwd: 'C:\\fullsite',
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
+      env: { ...process.env, FULLSITE_USER_DATA_DIR: app.getPath('userData') },
     });
 
     fingerprintProcess.stdout.on('data', (data) => {

@@ -90,11 +90,46 @@ describe('El código para construir el servicio viaja con la rama', () => {
   })
 
   test('está el script que lo compila sin Visual Studio', () => {
+    // El .bat sigue siendo la puerta —es el nombre que cita
+    // PROCEDIMIENTO-INSTALACION-AMALAY.md— pero desde el 2026-09-20 delega en un
+    // .ps1: el hasheo con Get-FileHash es nativo, mientras parsear certutil en
+    // batch falla en silencio. Este guardián vigila el CONTRATO, no el archivo:
+    // exige que la cadena entera esté completa, así que un .bat que no llame a
+    // nada tampoco lo satisface.
     const bat = path.join(PB, 'build-fingerprint.bat')
     assert.ok(fs.existsSync(bat), 'falta build-fingerprint.bat')
-    const texto = fs.readFileSync(bat, 'utf8')
+    const textoBat = fs.readFileSync(bat, 'utf8')
+    assert.match(textoBat, /build-fingerprint\.ps1/, 'el .bat debe invocar al script que compila')
+
+    const ps1 = path.join(PB, 'build-fingerprint.ps1')
+    assert.ok(fs.existsSync(ps1), 'falta build-fingerprint.ps1')
+    const texto = textoBat + '\n' + fs.readFileSync(ps1, 'utf8')
     assert.match(texto, /csc\.exe/, 'debe usar el compilador que ya trae Windows')
     assert.match(texto, /DPUruNet\.dll/, 'debe avisar si falta el DLL del SDK')
+  })
+
+  test('el build no acepta un DPUruNet.dll cualquiera', () => {
+    // El DLL no se commitea por licencia, pero «no está en el repo» no puede
+    // significar «cualquiera vale»: habla con el lector y devuelve identidades de
+    // empleados. La identidad esperada vive fuera del script, para poder auditarla.
+    const lista = path.join(PB, 'dependencias-esperadas.txt')
+    assert.ok(fs.existsSync(lista), 'falta dependencias-esperadas.txt')
+    assert.match(fs.readFileSync(lista, 'utf8'), /DPUruNet\.dll\s+[a-f0-9]{64}/,
+      'debe declarar el SHA-256 autorizado del DLL')
+
+    const ps1 = fs.readFileSync(path.join(PB, 'build-fingerprint.ps1'), 'utf8')
+    assert.match(ps1, /dependencias-esperadas\.txt/, 'el build debe leer la lista')
+    assert.match(ps1, /Get-FileHash/, 'el build debe hashear el DLL, no confiar en el nombre')
+  })
+
+  test('el build deja un manifiesto que identifica el artefacto', () => {
+    // Es lo que faltó en AMALAY: dos KDS «1.3.8» con binarios distintos. Sin
+    // manifiesto no se puede decir después qué se instaló exactamente.
+    const ps1 = fs.readFileSync(path.join(PB, 'build-fingerprint.ps1'), 'utf8')
+    for (const campo of ['output_exe_sha256', 'dpurunet_dll_sha256', 'source_cs_sha256',
+                         'source_git_sha', 'toolchain_csc', 'platform_target']) {
+      assert.match(ps1, new RegExp(campo), `el manifiesto debe registrar ${campo}`)
+    }
   })
 
   test('el procedimiento de instalación advierte que el build de CI sale sin huella', () => {
