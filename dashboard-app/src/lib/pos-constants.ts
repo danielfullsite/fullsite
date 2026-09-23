@@ -1,13 +1,37 @@
 // Shared POS constants — single source of truth
 
-// Default IVA rate — AMALAY: precios ya incluyen IVA (= 0)
-// For dynamic IVA per client, use getIvaRate() instead of IVA_RATE directly
+// Tasa por omisión. Se queda en 0 a propósito: sin configuración cargada es
+// preferible no inventar un impuesto que cobrar uno que no toca.
+// Para la tasa real del restaurante, usar getIvaRate(), nunca IVA_RATE directo.
 export const IVA_RATE = 0
 
-// Dynamic IVA — set from client config at POS startup
+// Tasa dinámica — se fija desde la configuración del cliente al arrancar el POS.
 let _dynamicIvaRate: number | null = null
 export function setIvaRate(rate: number) { _dynamicIvaRate = rate }
 export function getIvaRate(): number { return _dynamicIvaRate ?? IVA_RATE }
+
+// ─── ¿El precio de la carta YA trae el impuesto? ────────────────────────────
+//
+// En México la carta con IVA incluido es lo normal, pero no es universal, así
+// que el modo se DECLARA por restaurante; no se adivina.
+//
+// Esta distinción existía y se perdió. El comentario original de este archivo
+// decía «AMALAY: precios ya incluyen IVA (= 0)» y lo resolvía poniendo la tasa
+// en CERO. Ése es el atajo equivocado: el total queda bien y el ticket declara
+// cero impuesto sobre una venta que sí lo causa — con RFC de por medio, peor que
+// el problema. Después la tasa se volvió dinámica desde `clients.iva_rate`
+// (AMALAY: 0.16) y la suposición se quedó sin dueño: el POS pasó a SUMAR 16%
+// encima de precios que ya lo traían.
+//
+// Medido el 2026-09-14 contra Wansoft, que es donde AMALAY cobra hoy: en 22 de
+// 25 platillos con nombre coincidente, lo que paga el cliente ES el precio de la
+// carta (mediana 1.000, ninguno en 1.16).
+//
+// Por omisión `false` = el comportamiento de hoy. Nadie cambia de facturación
+// por accidente: hay que encenderlo a propósito, por restaurante.
+let _preciosIncluyenIva = false
+export function setPreciosIncluyenIva(incluido: boolean) { _preciosIncluyenIva = !!incluido }
+export function preciosIncluyenIva(): boolean { return _preciosIncluyenIva }
 
 // 10s: en LAN la cocina recibe órdenes en tiempo real por el bridge (Pedro); este
 // poll a /api/pos/kitchen es el fallback CLOUD. A 2s cada pantalla generaba ~20k
