@@ -128,7 +128,8 @@ def main():
                 print(f"[lab-watchdog] no pude guardar issue: {e}", file=sys.stderr)
 
         n = len(seen)
-        criticos = sum(1 for (_o, _k, s, _d) in {(*x[:3],) for x in all_issues} if s == "critical")
+        # `x[:3]` ya recorta el detalle: la tupla que llega aquí es (order_id, kind, severity).
+        criticos = sum(1 for (_o, _k, s) in {(*x[:3],) for x in all_issues} if s == "critical")
         dur = int((time.time() - start) * 1000)
         summary = f"Revisó {len(orders)} órdenes · {n} problemas ({criticos} críticos)"
         print(f"[lab-watchdog] {summary}")
