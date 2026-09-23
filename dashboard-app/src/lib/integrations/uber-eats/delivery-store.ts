@@ -12,6 +12,7 @@
 import { uberFetch } from './oauth'
 import { withRetry } from '../retry'
 import { auditLog } from '../audit-logger'
+import { normalizeStoreOpen, rawStoreStatus, type UberStatusShape } from './store-status'
 
 export async function listDeliveryStores(
   correlationId: string,
@@ -63,7 +64,9 @@ export async function getDeliveryStore(
 export async function getDeliveryStoreStatus(
   storeId: string,
   correlationId: string
-): Promise<{ ok: boolean; is_open?: boolean; status?: string; error?: string }> {
+): Promise<{ ok: boolean; is_open?: boolean | null; status?: string; error?: string }> {
+  // is_open puede ser null: Uber mando un enum que no reconocemos. Aplastarlo a
+  // false es como este bug vivio meses sin que nadie lo viera.
   const t0 = Date.now()
   try {
     const r = await withRetry(
@@ -75,9 +78,10 @@ export async function getDeliveryStoreStatus(
       await auditLog({ provider: 'ubereats', correlation_id: correlationId, action: 'delivery.store.get_status', request: { store_id: storeId }, response: { error: err }, status_code: r.status, duration_ms: Date.now() - t0 })
       return { ok: false, error: err }
     }
-    const data = (await r.json()) as { is_open?: boolean; status?: string; store_status?: string }
-    const isOpen = data.is_open !== undefined ? data.is_open : (data.store_status ?? data.status) === 'ACTIVE'
-    const statusStr = data.store_status ?? data.status
+    const data = (await r.json()) as UberStatusShape
+    // Uber responde ONLINE/PAUSED aqui, no ACTIVE. Ver lib/.../store-status.ts.
+    const isOpen = normalizeStoreOpen(data)
+    const statusStr = rawStoreStatus(data)
     await auditLog({ provider: 'ubereats', correlation_id: correlationId, action: 'delivery.store.get_status', request: { store_id: storeId }, response: { is_open: isOpen, status: statusStr }, status_code: r.status, duration_ms: Date.now() - t0 })
     return { ok: true, is_open: isOpen, status: statusStr }
   } catch (e) {

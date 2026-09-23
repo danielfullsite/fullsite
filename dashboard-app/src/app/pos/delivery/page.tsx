@@ -14,6 +14,13 @@ import {
 import { formatMXN, logAudit, getClientId } from '@/lib/pos-data'
 import { CANCEL_REASON_LABELS, UBER_CANCEL_REASONS } from '@/lib/integrations/uber-eats/reasons'
 import type { UberCancelReason } from '@/lib/integrations/uber-eats/reasons'
+import {
+  detectarCancelacionesExternas, mensajeCancelacion, sonarAlerta,
+  type CancelacionExterna,
+} from '@/lib/integrations/delivery-cancel-alert'
+
+/** Alertas de cancelacion sin reconocer. Sobreviven a una recarga del POS. */
+const CANCEL_ALERTS_KEY = 'delivery_cancel_alerts'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
@@ -86,13 +93,39 @@ export default function DeliveryPage() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<PlatformFilter>('todas')
   const [actorName, setActorName] = useState('Caja')
+  // Cancelaciones que hizo la PLATAFORMA. Sobreviven a una recarga: el estado de React
+  // se pierde con un F5, y una alerta que se borra sola no es persistente aunque uno la
+  // llame asi. Ver lib/integrations/delivery-cancel-alert.ts.
+  const [cancelAlerts, setCancelAlerts] = useState<CancelacionExterna[]>([])
+  const [patchError, setPatchError] = useState<string | null>(null)
+  const prevOrdersRef = useRef<DeliveryOrder[]>([])
+  const cancelledHereRef = useRef<Set<string>>(new Set())
+  const alertedRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
     try {
       const saved = sessionStorage.getItem('pos_staff')
       if (saved) setActorName(JSON.parse(saved).name || 'Caja')
     } catch { /* */ }
+    // Alertas que quedaron sin reconocer antes de la recarga.
+    try {
+      const raw = localStorage.getItem(CANCEL_ALERTS_KEY)
+      const guardadas = raw ? JSON.parse(raw) : null
+      if (Array.isArray(guardadas) && guardadas.length) {
+        setCancelAlerts(guardadas as CancelacionExterna[])
+        for (const c of guardadas as CancelacionExterna[]) alertedRef.current.add(c.id)
+      }
+    } catch { /* */ }
   }, [])
+
+  // Se persisten en cada cambio: si el POS se recarga o se reinicia con una alerta sin
+  // reconocer, tiene que seguir ahi. Eso es lo que Uber pidio y lo que la cocina necesita.
+  useEffect(() => {
+    try {
+      if (cancelAlerts.length) localStorage.setItem(CANCEL_ALERTS_KEY, JSON.stringify(cancelAlerts))
+      else localStorage.removeItem(CANCEL_ALERTS_KEY)
+    } catch { /* */ }
+  }, [cancelAlerts])
 
   const fetchingRef = useRef(false)
   const fetchOrders = useCallback(async () => {
@@ -107,7 +140,25 @@ export default function DeliveryPage() {
       if (res.ok) {
         const data: DeliveryOrder[] = await res.json()
         // Filter out test/invalid orders
-        setOrders(data.filter(o => o.customer_name && !o.customer_name.startsWith('TEST') && o.total > 0))
+        const visibles = data.filter(o => o.customer_name && !o.customer_name.startsWith('TEST') && o.total > 0)
+
+        // La alerta va aislada: un fallo suyo NO puede impedir que la lista se
+        // actualice. Todo esto vive dentro del catch de red de arriba, asi que sin
+        // este try un throw aqui dejaria la pantalla congelada con datos viejos.
+        try {
+          const nuevas = detectarCancelacionesExternas(
+            prevOrdersRef.current, visibles, cancelledHereRef.current, alertedRef.current,
+          )
+          if (nuevas.length) {
+            nuevas.forEach(c => alertedRef.current.add(c.id))
+            setCancelAlerts(prev => [...prev, ...nuevas])
+            if (nuevas.some(c => c.cocinaEnCurso)) sonarAlerta()
+          }
+        } catch (e) {
+          console.warn('[delivery] alerta de cancelacion fallo:', e)
+        }
+        prevOrdersRef.current = visibles
+        setOrders(visibles)
       }
     } catch { /* sin red */ } finally {
       fetchingRef.current = false
@@ -151,11 +202,21 @@ export default function DeliveryPage() {
     }
   }, [orders])
 
-  const patchOrder = async (id: string, body: Record<string, unknown>) => {
-    await fetch(`${SUPABASE_URL}/rest/v1/delivery_orders?id=eq.${id}`, {
-      method: 'PATCH', headers: SB_HEADERS, body: JSON.stringify(body),
-    })
+  /** Devuelve si el PATCH realmente se aplico. Antes no se miraba `res.ok`: un fallo
+   *  del servidor se veia identico a un exito y el operador creia haber cambiado algo. */
+  const patchOrder = async (id: string, body: Record<string, unknown>): Promise<boolean> => {
+    let ok = false
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/delivery_orders?id=eq.${id}`, {
+        method: 'PATCH', headers: SB_HEADERS, body: JSON.stringify(body),
+      })
+      ok = res.ok
+      if (!ok) console.warn('[delivery] PATCH fallo:', res.status, await res.text().catch(() => ''))
+    } catch (e) {
+      console.warn('[delivery] PATCH sin red:', e)
+    }
     fetchOrders()
+    return ok
   }
 
   const handleStatusChange = async (order: DeliveryOrder, newStatus: 'preparando' | 'lista') => {
@@ -176,7 +237,16 @@ export default function DeliveryPage() {
   }
 
   const handleCancel = async (order: DeliveryOrder, reason: UberCancelReason) => {
-    await patchOrder(order.id, { status: 'cancelada', updated_at: new Date().toISOString() })
+    const aplicado = await patchOrder(order.id, { status: 'cancelada', updated_at: new Date().toISOString() })
+    if (!aplicado) {
+      // El PATCH no se aplico: la orden sigue viva. Marcarla como "cancelada aqui"
+      // seria mentirle al detector — si mas tarde la plataforma la cancela de verdad,
+      // nos habriamos callado el aviso para siempre.
+      setPatchError(`No se pudo cancelar la orden de ${order.customer_name || 'la plataforma'}. Sigue activa — intenta de nuevo.`)
+      return
+    }
+    // Solo ahora: el operador ya sabe, no debe alarmarse por su propia accion.
+    cancelledHereRef.current.add(order.id)
     if (order.platform === 'ubereats' && order.platform_order_id) {
       fetch('/api/integrations/uber-eats/order', {
         method: 'POST',
@@ -189,6 +259,53 @@ export default function DeliveryPage() {
 
   return (
     <div className="h-dvh flex flex-col overflow-hidden" style={{ background: '#0a0a0f' }}>
+      {/* El cambio no se aplico en el servidor. Sin esto, un PATCH fallido se veia
+          igual que uno exitoso y el operador creia haber cancelado algo que sigue vivo. */}
+      {patchError && (
+        <div className="shrink-0 bg-amber-500 text-black px-4 py-3 flex items-center gap-3" role="alert">
+          <XCircle size={20} className="shrink-0" />
+          <p className="flex-1 font-bold text-sm">{patchError}</p>
+          <button
+            onClick={() => setPatchError(null)}
+            className="shrink-0 px-4 py-2 rounded-lg bg-black/80 text-white font-bold text-sm min-h-[44px]"
+          >
+            Cerrar
+          </button>
+        </div>
+      )}
+      {/* Cancelaciones de la plataforma. Persisten en localStorage hasta que alguien
+          las reconoce — sobreviven una recarga. Uber pregunto explicitamente como se
+          le avisa al operador cuando ellos cancelan; antes la orden solo desaparecia. */}
+      {cancelAlerts.length > 0 && (
+        <div className="shrink-0 bg-red-600 text-white" role="alert" aria-live="assertive">
+          {cancelAlerts.map(c => (
+            <div key={c.id} className="flex items-center gap-3 px-4 py-3 border-b border-red-500/40 last:border-0">
+              <Ban size={22} className="shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="font-black text-sm leading-tight">{mensajeCancelacion(c)}</p>
+                <p className="text-white/80 text-xs mt-0.5">
+                  {formatMXN(c.total)}
+                  {c.platform_order_id && ` · ${c.platform_order_id}`}
+                  {` · estaba en «${c.estadoPrevio}»`}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  logAudit({
+                    action: 'delivery_cancel_alert_ack',
+                    actor: actorName,
+                    details: { delivery_id: c.id, platform: c.platform, estado_previo: c.estadoPrevio, cocina_en_curso: c.cocinaEnCurso },
+                  })
+                  setCancelAlerts(prev => prev.filter(x => x.id !== c.id))
+                }}
+                className="shrink-0 px-4 py-2 rounded-lg bg-white text-red-700 font-black text-sm min-h-[44px]"
+              >
+                Enterado
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
       {/* Header */}
       <div className="flex-shrink-0 z-20 bg-[#12121a] border-b border-white/10 px-4 py-3 flex items-center gap-3">
         <Link href="/pos" className="w-11 h-11 rounded-lg bg-white/10 flex items-center justify-center text-white">
