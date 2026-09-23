@@ -42,7 +42,7 @@ import {
   updateOrderStatus,
   getPOSAuthHeaders,
 } from '@/lib/pos-data'
-import { getIvaRate, TIEMPO_ITEM_ID, isTiempoItem, getStationForItem, setCategoryNameCache, _categoryNameCache, isNoPrintStation, getCancellationReasons, getDiscountCatalog, hasKdsStation } from '@/lib/pos-constants'
+import { getIvaRate, preciosIncluyenIva, TIEMPO_ITEM_ID, isTiempoItem, getStationForItem, setCategoryNameCache, _categoryNameCache, isNoPrintStation, getCancellationReasons, getDiscountCatalog, hasKdsStation } from '@/lib/pos-constants'
 import { calcSplitParejo, calcSplitItems } from '@/lib/pos-calculations'
 import { publishEvent, getDeviceId } from '@/lib/events'
 import { apiUrl } from '@/lib/api-base'
@@ -1896,8 +1896,9 @@ function POSContent() {
       if (!navigator.onLine && !requiereCaja()) return
       if (requiereCaja()) {
         const catalog = await leerCatalogoCaja()
-        const { setIvaRate } = await import('@/lib/pos-constants')
+        const { setIvaRate, setPreciosIncluyenIva } = await import('@/lib/pos-constants')
         setIvaRate(catalog.config.iva_rate)
+        setPreciosIncluyenIva(catalog.config.precios_incluyen_iva === true)
       }
 
       // A working LAN keeps navigator.onLine=true during a WAN outage. Recipe
@@ -2604,9 +2605,13 @@ function POSContent() {
     if (!requiereCaja()) return true
     try {
       const catalog = await leerCatalogoCaja()
-      if (catalog.config.iva_rate !== getIvaRate()) {
-        const { setIvaRate } = await import('@/lib/pos-constants')
+      // Cambió la tasa O el modo: las dos cosas mueven el total de la cuenta, así
+      // que las dos tienen que frenar el cobro y pedir que se revise.
+      if (catalog.config.iva_rate !== getIvaRate()
+          || (catalog.config.precios_incluyen_iva === true) !== preciosIncluyenIva()) {
+        const { setIvaRate, setPreciosIncluyenIva } = await import('@/lib/pos-constants')
         setIvaRate(catalog.config.iva_rate)
+        setPreciosIncluyenIva(catalog.config.precios_incluyen_iva === true)
         setAvisoCuentaCaja('La configuración de la cuenta cambió. Revisa el total y vuelve a confirmar.')
         return false
       }
