@@ -1,6 +1,11 @@
 # PCI-DSS Self-Assessment Questionnaire A (SAQ-A)
 
-**Fullsite Technologies S.A. de C.V.**
+> ⚠️ **NO CANONICO.** Este archivo quedo duplicado: existe `11-pci-dss-saq-a.md` en esta misma
+> carpeta, con contenido distinto, y **ese es el que vale** (es el indexado en el README).
+> Dos autoevaluaciones distintas del mismo estandar, en la misma carpeta, es exactamente lo que
+> un auditor encuentra y pregunta. Se conserva por historial; no usarlo como evidencia.
+
+**Fullsite Technologies, S.A.S.** (RFC FTE260611PI8)
 Fecha: 2026-05-25
 Tipo de SAQ: A — Card-not-present merchants, all cardholder data functions fully outsourced
 
