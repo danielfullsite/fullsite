@@ -57,7 +57,56 @@ async function asegurarSesion(page: Page, pin: string) {
   if (await enPantallaPin(page)) await loginConPin(page, pin)
 }
 
+/**
+ * Turno del DÍA ANTERIOR sin cerrar (status 'stale'): el TurnoGate lo bloquea
+ * todo con "Ir a realizar Corte Z" y el mapa nunca pinta — así moría FASE 3.
+ * Es basura de una corrida previa que murió a medias (abrió turno y no lo cerró).
+ * Lo resolvemos como lo haría un gerente: Corte Z real (flujo del producto), para
+ * que la suite no dependa de limpieza manual del tenant demo. Idempotente: si no
+ * hay gate stale, no hace nada.
+ */
+async function cerrarTurnoStaleSiHaceFalta(page: Page, pin: string) {
+  const corteZ = page.getByRole('button', { name: /Ir a realizar Corte Z/i })
+  if (!(await corteZ.isVisible({ timeout: 3_000 }).catch(() => false))) return
+
+  await corteZ.click()
+  await page.waitForTimeout(2_500)
+  if (await enPantallaPin(page)) await loginConPin(page, pin)
+  await page.waitForTimeout(1_500)
+
+  // Rama escalación: si el turno viejo dejó cuentas abiertas, el wizard pide
+  // PIN + motivo y ofrece cancelarlas en lote (mismo patrón que las huérfanas).
+  if (await page.getByText(/Autorización de gerente requerida/i).isVisible({ timeout: 3_000 }).catch(() => false)) {
+    await page.locator('input[placeholder="PIN"]').first().fill(pin).catch(() => {})
+    await page.locator('textarea').first().fill('Cierre de turno stale del dia anterior (limpieza E2E).').catch(() => {})
+    await page.getByRole('button', { name: /Cancelar las .* cuentas y continuar/i }).click().catch(() => {})
+    await page.waitForTimeout(4_000)
+  }
+
+  // Paso 1 del wizard: efectivo contado → Siguiente.
+  const cash = page.locator('input[inputmode="decimal"]').first()
+  if (await cash.isVisible({ timeout: 5_000 }).catch(() => false)) {
+    await cash.fill('0')
+    await page.getByRole('button', { name: /Siguiente/i }).click().catch(() => {})
+    await page.waitForTimeout(1_500)
+  }
+
+  // Paso 2: PIN de gerente para aprobar → Cerrar turno.
+  const pinAprob = page.locator('input[placeholder="PIN"]').first()
+  if (await pinAprob.isVisible({ timeout: 5_000 }).catch(() => false)) {
+    await pinAprob.fill(pin)
+    await page.getByRole('button', { name: /Cerrar turno/i }).click().catch(() => {})
+    await page.waitForTimeout(6_000)
+  }
+
+  // Volver al mapa ya sin el gate stale.
+  await page.goto('/pos/mesas', { waitUntil: 'domcontentloaded' }).catch(() => {})
+  await page.waitForTimeout(2_000)
+}
+
 async function abrirTurnoSiHaceFalta(page: Page) {
+  // Turno stale del día anterior bloquea ANTES que cualquier otro gate — resolverlo primero.
+  await cerrarTurnoStaleSiHaceFalta(page, PIN_GERENTE)
   // Cuentas huérfanas de corridas anteriores: la regla de Eduardo bloquea antes
   // del gate — se cancelan en lote desde aquí mismo (flujo real del producto).
   const huerfanas = page.getByRole('button', { name: /Cancelar .* y abrir turno/i })
