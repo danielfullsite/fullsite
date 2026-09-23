@@ -904,29 +904,34 @@ export default function MesasPage() {
     </div>
   )
 
+  // UN SOLO AVISO, Y QUE DIGA LA CAUSA CORRECTA.
+  //
+  // Aquí había DOS banners pintando el MISMO hecho: los dos nacen de
+  // `salon.completa === false` y los dos escribían «La caja todavía no confirmó
+  // todas las cuentas». Uno encima del otro se comían ~150 px de los 632 útiles
+  // que tiene una caja a 1024×768 — el espacio donde van las mesas. Medido en
+  // AMALAY el 2026-09-13 y reproducido en una terminal limpia el 14.
+  //
+  // Y el segundo además mentía cuando no había caja: `planoNoVerificado` sólo
+  // mira `completa`, así que sin conexión seguía diciendo «no confirmó las
+  // cuentas» cuando la causa real es que no hay con quién confirmar.
+  // `avisoDeProcedencia` (pedro-cliente.ts:157) sí distingue las dos, así que
+  // manda él y el otro queda de respaldo.
+  //
+  // El detalle —la consecuencia para quien opera— se conserva: es lo único que
+  // le dice al mesero qué hacer con ese aviso.
+  const tituloDelAviso = (procedenciaSalon && avisoDeProcedencia(procedenciaSalon)) || planoNoVerificado
+
   return (
     <div className="h-screen flex flex-col text-[var(--text-1)]" style={{ background:"var(--bg)" }}>
-      {/* Se perdió la caja. Este Pedro contestó con SU estado, que sólo conoce lo
-          que pasó en ESTA terminal — no el salón. Se dice, en vez de pintarlo como
-          si fuera la verdad: con tres cajas, lo que falta son justo las mesas de
-          las otras dos. */}
-      {procedenciaSalon && avisoDeProcedencia(procedenciaSalon) && (
-        <div className="flex items-center gap-2 px-4 lg:px-6 py-2 bg-amber-500/15 border-b border-amber-500/30 text-amber-200 text-sm flex-shrink-0">
-          <AlertTriangle size={16} className="flex-shrink-0" />
-          <span><strong>{avisoDeProcedencia(procedenciaSalon)}.</strong> Confirma en la caja antes de sentar.</span>
-          <button onClick={fetchData} className="ml-auto underline underline-offset-2 hover:no-underline">
-            Reintentar
-          </button>
-        </div>
-      )}
-      {/* El plano no pudo confirmarse contra el servidor. Se avisa en vez de pintar
-          mesas libres en silencio: una mesa que se ve libre sin poder verificarlo es
-          como se sienta gente encima de una cuenta abierta. */}
-      {planoNoVerificado && (
+      {/* El plano no pudo confirmarse contra la caja. Se avisa en vez de pintar
+          mesas libres en silencio: una mesa que se ve libre sin poder verificarlo
+          es como se sienta gente encima de una cuenta abierta. */}
+      {tituloDelAviso && (
         <div className="flex items-center gap-2 px-4 lg:px-6 py-2 bg-amber-500/15 border-b border-amber-500/30 text-amber-200 text-sm flex-shrink-0">
           <AlertTriangle size={16} className="flex-shrink-0" />
           <span>
-            <strong>{planoNoVerificado}.</strong> El plano puede no reflejar las cuentas
+            <strong>{tituloDelAviso}.</strong> El plano puede no reflejar las cuentas
             abiertas — confirma en la caja antes de sentar.
           </span>
           <button onClick={fetchData} className="ml-auto underline underline-offset-2 hover:no-underline">
