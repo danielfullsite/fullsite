@@ -168,6 +168,64 @@ describe('V-A18 — GET /api/platform/staff no entrega PIN', () => {
   })
 })
 
+describe('V-A18 / revisión H-5 — /api/backup no exporta el PIN', () => {
+  function stubBackup() {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      const u = String(url)
+      if (u.includes('/auth/v1/user')) return new Response(JSON.stringify({ id: 'u-1', email: 'dueno@fixture.test' }), { status: 200 })
+      if (u.includes('/rest/v1/client_users')) return new Response(JSON.stringify([{ client_id: 'tenant-a' }]), { status: 200 })
+      if (u.includes('/rest/v1/pos_staff')) return new Response(JSON.stringify(FILAS['tenant-a']), { status: 200 })
+      return new Response('[]', { status: 200 })
+    }))
+  }
+  const pedir = async (qs: string) => {
+    process.env.BACKUP_ADMIN_EMAILS = 'dueno@fixture.test'
+    const { GET } = await import('@/app/api/backup/route')
+    return GET(new NextRequest(`https://app.fixture.test/api/backup?client_id=tenant-a${qs}`, { headers: { authorization: 'Bearer jwt-fixture' } }))
+  }
+
+  it('JSON de una tabla: pos_staff sin pin ni pin_hash, con el resto de columnas', async () => {
+    stubBackup()
+    const res = await pedir('&table=pos_staff')
+    expect(res.status).toBe(200)
+    const j = await res.json()
+    expect(sinLlavePin(j)).toBe(true)
+    expect(j.data[0]).toHaveProperty('name', 'Ana')
+  })
+
+  it('CSV de pos_staff: sin columna pin ni valores de PIN', async () => {
+    stubBackup()
+    const texto = await (await pedir('&table=pos_staff&format=csv')).text()
+    const cabecera = texto.split('\n')[0].split(',')
+    expect(cabecera).not.toContain('pin')
+    expect(cabecera).not.toContain('pin_hash')
+    for (const r of FILAS['tenant-a']) expect(texto).not.toContain(String(r.pin))
+  })
+
+  it('respaldo completo: pos_staff sin pin', async () => {
+    stubBackup()
+    const j = JSON.parse(await (await pedir('')).text())
+    expect(sinLlavePin(j.data.pos_staff)).toBe(true)
+    expect(j.counts.pos_staff).toBe(FILAS['tenant-a'].length)
+  })
+})
+
+describe('V-A18 / revisión H-4 — migración PENDIENTE que quita pin a authenticated', () => {
+  const leer = () => readFileSync(new URL('../../../supabase/migrations/PENDIENTE_20260924060000_pos_staff_pin_fuera_de_authenticated.sql', import.meta.url), 'utf8')
+    .split('\n').filter(l => !l.trim().startsWith('--')).join('\n')
+  it('revoca SELECT/INSERT/UPDATE de tabla y otorga columnas sin pin', () => {
+    const codigo = leer()
+    expect(codigo).toMatch(/revoke select, insert, update on table public\.pos_staff from authenticated/)
+    const cols = [...codigo.matchAll(/grant (select|update) \(([^)]*)\)/g)].map(m => [m[1], m[2].split(',').map(c => c.trim())] as const)
+    expect(cols.map(c => c[0]).sort()).toEqual(['select', 'update'])
+    for (const [, lista] of cols) { expect(lista).not.toContain('pin'); expect(lista).not.toContain('pin_hash') }
+    // Las columnas que leen las pantallas vivas (configuracion, exportar, fetchMeseros) siguen
+    const sel = cols.find(c => c[0] === 'select')![1]
+    for (const c of ['id', 'name', 'role', 'active', 'client_id']) expect(sel).toContain(c)
+  })
+  it('no toca service_role', () => { expect(leer()).not.toMatch(/service_role/) })
+})
+
 describe('V-A18 — las pantallas no comparan ni muestran PINs recibidos', () => {
   const posStaff = readFileSync(new URL('../app/pos/staff/page.tsx', import.meta.url), 'utf8')
   const platformStaff = readFileSync(new URL('../app/platform/staff/page.tsx', import.meta.url), 'utf8')

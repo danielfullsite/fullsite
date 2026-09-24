@@ -131,6 +131,13 @@ describe('V-C07 — la llave maestra nunca sale al navegador', () => {
     expect(res.status).toBe(502)
   })
 
+  it('access_token que CONTIENE la llave maestra → 502 (revisión H-8)', async () => {
+    stubFetch({ grant: () => new Response(JSON.stringify({ access_token: `x.${FAKE_MASTER}.y`, expires_in: 30 }), { status: 200 }) })
+    const { res, texto } = await llamar({ authorization: `Bearer ${await tokenDe('gerente')}` })
+    expect(res.status).toBe(502)
+    expect(texto).not.toContain(FAKE_MASTER)
+  })
+
   it('bandera apagada (default) → 410 deepgram_token_disabled, sin tocar Deepgram', async () => {
     delete process.env.DEEPGRAM_TOKEN_ENABLED
     stubFetch()

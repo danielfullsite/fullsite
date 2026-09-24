@@ -73,6 +73,65 @@ describe('scan-secrets — reglas (ejemplos sintéticos)', () => {
     expect(reglas("const T = '" + '123456789' + ':' + 'A'.repeat(2) + 'b1C2d3E4f5G6h7I8j9K0l1M2n3O4p5Q6r' + "'")).toContain('telegram-bot-token')
   })
 
+  // Revisión adversarial PR3 (H-3): 28 formas que el escáner anterior NO detectaba.
+  // Valores inventados; se arman concatenando para que este archivo no los contenga enteros.
+  describe('formas de la revisión PR3 (H-3), todas deben detectarse', () => {
+    const pw = 'Zk8m' + 'Q2vX9p'
+    const casos: Array<[string, string, string]> = [
+      ['yaml sin comillas password', 'cfg.yml', 'pass' + 'word: ' + pw],
+      ['yaml sin comillas pass', 'cfg.yml', '  pass: ' + pw],
+      ['.env minúsculas', '.env.example', 'db_pass' + 'word=' + pw],
+      ['PASS= a secas', 'x.sh', 'PASS=' + pw],
+      ['MYSQL_PWD=', 'x.sh', 'export MYSQL_' + 'PWD=' + pw],
+      ['mysql -p', 'x.sh', 'mysql -uroot -p' + pw + ' db'],
+      ['SQL PASSWORD', 'x.sql', "CREATE ROLE app LOGIN PASS" + "WORD '" + pw + "';"],
+      ['SQL crypt()', 'x.sql', "update auth.users set encrypted_pass" + "word = crypt('" + pw + "', gen_salt('bf'));"],
+      ['HTML value', 'x.html', '<input type="pass' + 'word" value="' + pw + '">'],
+      ['MAYÚSCULAS+dígitos', 'x.ts', '{ "pass' + 'word": "' + 'AAAAAA' + '9999" }'],
+      ['contiene "here"', 'x.ts', "pass" + "word: 'Sp" + "here2026!'"],
+      ['contiene "todo"', 'x.py', 'pass' + 'word = "To' + 'dos2026$"'],
+      ['contiene "test"', 'x.py', 'pass' + 'word = "Contest' + '2026!"'],
+      ['contiene "prueba"', 'x.md', 'Contraseña: `Mipru' + 'eba2026!`'],
+      ['contiene "sample"', 'x.ts', "const pass" + "word = 'Xsample' + '9!'".replace("' + '", '')],
+      ['hex40 en const', 'x.ts', "const k = '" + 'a1b2c3d4e5'.repeat(4) + "'"],
+      ['hex40 tras Token', 'x.ts', "headers: { Authorization: 'Token " + 'a1b2c3d4e5'.repeat(4) + "' }"],
+      ['sb_secret_', 'x.ts', "const s = 'sb_" + "secret_" + 'AbCdEf0123456789xyz' + "'"],
+      ['APP_USR- (Mercado Pago)', 'x.ts', "token = 'APP_" + "USR-1234567890123456-092312-abcdef0123456789-12345678'"],
+      ['re_ (Resend)', 'x.ts', "key = 're_" + "AbCd1234_EfGh5678IjKl9012MnOp'"],
+      ['ghp_', 'x.sh', 'GH=ghp' + '_' + 'A'.repeat(20) + 'b'.repeat(16)],
+      ['AKIA', 'x.env', 'AWS=AKIA' + 'ABCDEFGHIJ012345'],
+      ['SHIFT_TOKEN_SECRET=', '.env', 'SHIFT_TOKEN_' + 'SECRET=' + pw + 'aa11'],
+      ['POS_PIN_PEPPER=', '.env', 'POS_PIN_' + 'PEPPER=' + pw + 'bb22'],
+      ['KITCHEN_TOKEN_SECRET=', 'x.md', 'KITCHEN_TOKEN_' + 'SECRET=' + pw + 'cc33'],
+      ['valor en la línea siguiente', 'x.py', 'pass' + 'word = (\n    "' + pw + '"\n)'],
+      ['argparse default=', 'x.py', 'parser.add_argument("--pass' + 'word", default="' + pw + '", help="x")'],
+      ['env_opt con respaldo', 'x.py', 'p = env_opt("VANTARA_OWNER_' + 'PASS", "' + pw + '")'],
+      ['login(…, "…")', 'x.py', 'tok = login(auth, anon, email, "' + pw + '")'],
+      ['--owner-pass', 'x.md', '  --owner-' + 'pass    "' + pw + '"'],
+      ['correo / `clave`', 'x.md', '**Usuario demo:** `owner@vantara.sandbox` / `' + pw + '`'],
+      ['tabla correo | clave', 'x.md', '| `owner@vantara.sandbox` | `' + pw + '` | VANTARA | dueño |'],
+    ]
+    for (const [nombre, archivo, texto] of casos) {
+      it(nombre, () => { expect((scanText(archivo, texto) as Hallazgo[]).length, nombre).toBeGreaterThan(0) })
+    }
+  })
+
+  it('NO marca referencias, marcadores ni formas de código', () => {
+    const neg: Array<[string, string]> = [
+      ['x.py', 'parser.add_argument("--pass' + 'word", default=os.environ.get("ONBOARD_OWNER_PASSWORD"))'],
+      ['x.py', 'vantara_pass = env_or_die("VANTARA_OWNER_' + 'PASS")'],
+      ['x.md', '| `owner@vantara.sandbox` | `***REDACTED***` (gestor de secretos) |'],
+      ['x.ts', "const base = '" + '6d6a31fc'.repeat(5) + "'"],
+      ['x.html', '<input type="pass' + 'word" placeholder="sk-ant-api03-..." autocomplete="off">'],
+      ['x.ts', "const SB_KEY = 'sb_" + "publishable_AbCdEf0123456789xyzAbCdEf0123'"],
+      ['x.sh', 'SHIFT_TOKEN_' + 'SECRET=${SHIFT_TOKEN_SECRET}'],
+      ['x.md', 'Estado: PASS · T-01 PASS'],
+      ['x.ts', "tipo: 'contrase" + "ña' : 'número'"],
+      ['x.ts', 'const payload = { pass' + 'word: args.password, email }'],
+    ]
+    for (const [archivo, texto] of neg) expect((scanText(archivo, texto) as Hallazgo[]).map(h => `${archivo} ${h.rule}`), texto.slice(0, 30)).toEqual([])
+  })
+
   it('NO confunde texto de UI ni tipos de input con contraseñas', () => {
     expect(reglas("aria-label={show ? 'Ocultar contrase" + "ña' : 'Mostrar contrase" + "ña'}")).toEqual([])
     expect(reglas("type={x ? 'pass" + "word' : 'number'}")).toEqual([])
@@ -115,7 +174,26 @@ describe('scan-secrets — guardián sobre el repo', () => {
       '.github/scripts/onboard_client.py': 'password-literal',
       'fullsite.html': 'telegram-bot-token',
       'agents/wansoft/.env.example': 'telegram-bot-token',
+      // Revisión PR3 (H-1/H-2): formas que el escáner anterior dejaba pasar
+      'docs/playbooks/DEPLOY-SANDBOX.md': 'credential-pair',
+      'docs/platform/CLONEABILITY-REPORT-v1.md': 'credential-context',
+      'docs/archive/RUNBOOK-generic-old.md': 'credential-pair',
+      'docs/constitution/ENGINEERING-AXIOMS.md': 'secret-assignment',
+      'docs/archive/bibles/FULLSITE-DASHBOARD-GAP-ANALYSIS.md': 'secret-assignment',
     }
+    // Además, líneas exactas que deben verse en la base (archivo:línea regla)
+    const lineas = [
+      '.github/scripts/onboard_client.py:185 credential-context',
+      'scripts/sql/sandbox/tests/isolation_test.py:125 credential-context',
+      'scripts/sql/sandbox/tests/isolation_test.py:127 credential-context',
+      'scripts/sql/sandbox/tests/isolation_test.py:284 credential-context',
+      'scripts/sql/sandbox/tests/isolation_test.py:312 credential-context',
+      'docs/playbooks/DEPLOY-SANDBOX.md:6 credential-pair',
+      'docs/playbooks/DEPLOY-SANDBOX.md:184 credential-pair',
+      'docs/playbooks/DEPLOY-SANDBOX.md:219 credential-pair',
+      'docs/playbooks/DEPLOY-SANDBOX.md:220 credential-pair',
+      'docs/platform/CLONEABILITY-REPORT-v1.md:115 credential-context',
+    ]
     const archivos = Object.keys(esperado)
     let textos: string[]
     try {
@@ -123,11 +201,19 @@ describe('scan-secrets — guardián sobre el repo', () => {
     } catch { return }
     const r = new Set(archivos.flatMap((f, i) => (scanText(f, textos[i]) as Hallazgo[]).map(h => `${h.file} ${h.rule}`)))
     for (const f of archivos) expect(r.has(`${f} ${esperado[f]}`), `${f} ${esperado[f]}`).toBe(true)
+    const extra = [...new Set(lineas.map(x => x.split(':')[0]))]
+    const porLinea = new Set(extra.flatMap(f => {
+      const t = execFileSync('git', ['show', `${base}:${f}`], { cwd: repoRoot(), encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
+      return (scanText(f, t) as Hallazgo[]).map(h => `${h.file}:${h.line} ${h.rule}`)
+    }))
+    for (const x of lineas) expect(porLinea.has(x), x).toBe(true)
   })
 
   it('la allowlist y la deuda conocida están comentadas y acotadas', () => {
     for (const a of PATH_ALLOWLIST as Array<{ why: string }>) expect(a.why.length).toBeGreaterThan(3)
-    // La deuda nunca incluye dashboard-app/: lo del dashboard se arregla, no se excluye.
-    for (const d of KNOWN_DEBT as Array<{ file: string }>) expect(d.file.startsWith('dashboard-app/')).toBe(false)
+    // La deuda del dashboard se limita a la clave XOR del vault (P0-4, requiere rediseño):
+    // cualquier otra entrada nueva bajo dashboard-app/ hace fallar esta prueba.
+    const permitidas = new Set(['dashboard-app/src/app/admin/vault/page.tsx', 'dashboard-app/src/app/internal/vault/page.tsx'])
+    for (const d of KNOWN_DEBT as Array<{ file: string }>) if (d.file.startsWith('dashboard-app/')) expect(permitidas.has(d.file), d.file).toBe(true)
   })
 })

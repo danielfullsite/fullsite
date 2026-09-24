@@ -89,7 +89,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'deepgram_grant_failed' }, { status: 502, headers: noStore })
   }
 
-  if (typeof grant?.access_token !== 'string' || !grant.access_token || grant.access_token === masterKey) {
+  if (typeof grant?.access_token !== 'string' || !grant.access_token || grant.access_token.includes(masterKey)) {
+    // (revisión H-8: `includes`, no `===`: si el proveedor repitiera la llave dentro del token)
     return NextResponse.json({ error: 'deepgram_grant_failed' }, { status: 502, headers: noStore })
   }
   const expiresIn = typeof grant.expires_in === 'number' && grant.expires_in > 0

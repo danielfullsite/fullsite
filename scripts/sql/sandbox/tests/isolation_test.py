@@ -122,9 +122,9 @@ def main():
     svc_key  = env_or_die("SANDBOX_SERVICE_KEY")
 
     vantara_email = env_opt("VANTARA_OWNER_EMAIL", "owner@vantara.sandbox")
-    vantara_pass  = env_opt("VANTARA_OWNER_PASS",  "Vantara2026!")
+    vantara_pass  = env_or_die("VANTARA_OWNER_PASS")   # gestor de secretos; sin respaldo literal
     nomada_email  = env_opt("NOMADA_OWNER_EMAIL",  "test@nomada.sandbox")
-    nomada_pass   = env_opt("NOMADA_OWNER_PASS",   "Nomada2026!")
+    nomada_pass   = env_or_die("NOMADA_OWNER_PASS")    # gestor de secretos; sin respaldo literal
 
     if AMALAY_PROJECT_REF in url:
         print(f"ERROR: URL apunta a AMALAY producción. Abortando.", file=sys.stderr)
@@ -271,17 +271,18 @@ def main():
     section("8. Orphan user (no client_users row) is blocked")
     # Create a temporary user with no client_users row
     svc_create_h = {**svc_h, "Content-Type": "application/json"}
-    orphan_email = "orphan-test@sandbox.invalid"
+    orphan_email = f"orphan-test-{os.urandom(4).hex()}@sandbox.invalid"
+    orphan_pass = os.urandom(12).hex()   # aleatoria por corrida; la MISMA para crear y entrar
     s_create, r_create = http_post(
         f"{auth}/admin/users",
-        {"email": orphan_email, "password": os.urandom(12).hex(), "email_confirm": True},
+        {"email": orphan_email, "password": orphan_pass, "email_confirm": True},
         svc_create_h,
     )
     orphan_token = None
     if s_create in (200, 201) and isinstance(r_create, dict):
         orphan_id = r_create.get("id")
         # Login as orphan
-        orphan_token = login(auth, anon_key, orphan_email, "Orphan2026!")
+        orphan_token = login(auth, anon_key, orphan_email, orphan_pass)
         check("Orphan user can login (auth layer)", orphan_token is not None)
 
         if orphan_token:
@@ -309,7 +310,7 @@ def main():
                 pass
     elif s_create == 422 and "already" in str(r_create).lower():
         # Orphan from a previous run — try to login
-        orphan_token = login(auth, anon_key, orphan_email, "Orphan2026!")
+        orphan_token = login(auth, anon_key, orphan_email, orphan_pass)
         if orphan_token:
             s_orphan, r_orphan = authed_get(rest, "pos_menu_items?select=id&limit=10",
                                             orphan_token, anon_key)

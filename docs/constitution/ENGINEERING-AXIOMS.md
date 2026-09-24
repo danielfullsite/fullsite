@@ -74,7 +74,7 @@ Logging a movement without updating state is worse than not logging: it creates 
 
 A constant buried in a file is a decision someone made once and forgot. If a value will ever need to change per client, per environment, or per policy, it belongs in configuration. If it's a true invariant of the system, name it explicitly with a comment explaining why. Silent constants are silent assumptions.
 
-*Origin: `DEFAULT_HOURLY_RATE = $62.50`, `LABOR_COST_PCT = 0.25`, `VAULT_KEY = 'fullsite_vault_2026'`, RFC hardcodeado en pólizas — all found during dashboard audit.*
+*Origin: `DEFAULT_HOURLY_RATE = $62.50`, `LABOR_COST_PCT = 0.25`, `VAULT_KEY = '***REDACTED***'`, RFC hardcodeado en pólizas — all found during dashboard audit.*
 
 ---
 
