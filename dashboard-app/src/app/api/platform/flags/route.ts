@@ -32,10 +32,26 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: 'key (string) y enabled (boolean) requeridos' }, { status: 400 })
   }
 
+  // F-04 (contención 2026-09-23): sin rollout en el body se CONSERVA el actual.
+  // Antes `rollout ?? {}` convertía una cohorte en "todos" (el copiloto manda
+  // sólo {key, enabled}). Flag nuevo sin rollout → {} como siempre. Si no se
+  // puede leer la fila actual, no se escribe (falla cerrado).
+  let effectiveRollout: Rollout = rollout ?? {}
+  if (rollout === undefined || rollout === null) {
+    const cur = await platformServiceFetch(`feature_flags?key=eq.${encodeURIComponent(key)}&select=rollout`, {
+      headers: { Accept: 'application/json' },
+    }).catch(() => null)
+    const curRows = cur && cur.ok ? await cur.json().catch(() => null) : null
+    if (!Array.isArray(curRows)) {
+      return Response.json({ error: 'No se pudo leer el rollout actual; el flag no se modificó' }, { status: 502 })
+    }
+    effectiveRollout = (curRows[0]?.rollout as Rollout | null | undefined) ?? {}
+  }
+
   const row: Record<string, unknown> = {
     key,
     enabled,
-    rollout: rollout ?? {},
+    rollout: effectiveRollout,
     updated_by: gate.ctx.email,
     updated_at: new Date().toISOString(),
   }
@@ -52,14 +68,14 @@ export async function POST(req: NextRequest) {
   }
 
   // Scope tenant si el rollout está acotado a client_ids; si no, global.
-  const isCohort = Array.isArray(rollout?.client_ids) && rollout!.client_ids!.length > 0
+  const isCohort = Array.isArray(effectiveRollout.client_ids) && effectiveRollout.client_ids.length > 0
   const scope: 'global' | 'tenant' = isCohort ? 'tenant' : 'global'
-  const affected = isCohort ? rollout!.client_ids!.length : await clientsCount()
+  const affected = isCohort ? effectiveRollout.client_ids!.length : await clientsCount()
 
   const audited = await auditLog(gate.ctx, {
     action: 'flag.update',
     scope,
-    detail: { key, enabled, rollout: rollout ?? {} },
+    detail: { key, enabled, rollout: effectiveRollout, rollout_conservado: rollout === undefined || rollout === null },
     affected_count: affected,
   })
 
