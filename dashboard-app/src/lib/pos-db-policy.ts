@@ -94,7 +94,7 @@ export const SCOPED_BY_OWN_ID = new Set<string>(['clients'])
  */
 export const SOLO_LECTURA = new Set<string>([
   'clients',
-  // 2026-09-25 (P0 pos_staff): el proxy corre con service_role y sólo pedía «gerente» para
+  // 2026-09-24 (P0 pos_staff): el proxy corre con service_role y sólo pedía «gerente» para
   // escribir aquí. Eso dejaba a un shift token de gerente reescribir PIN y ROL de cualquiera
   // —admin incluido— sin la jerarquía de `canAssignRole` ni la auditoría de la API. Ningún
   // cliente escribe pos_staff por este camino (verificado con rg: el POS lo LEE en
@@ -170,7 +170,7 @@ export const NIVEL_MINIMO_DE_ESCRITURA: Record<string, number> = {
 export function puedeEscribirEn(table: string, role: string | null | undefined): boolean {
   // SOLO_LECTURA vive AQUÍ y no sólo en db/route.ts: el proxy por ruta
   // (db/[...path]/route.ts) nunca la consultaba, así que `pos_staff` seguía escribible
-  // por ese camino aunque la lista dijera lo contrario (hallado 2026-09-25).
+  // por ese camino aunque la lista dijera lo contrario (hallado 2026-09-24).
   if (SOLO_LECTURA.has(table)) return false
   if (MANAGER_ONLY_WRITE.has(table)) return isManager(role)
   const minimo = NIVEL_MINIMO_DE_ESCRITURA[table]

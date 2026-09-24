@@ -1,5 +1,5 @@
 /**
- * P0 pos_staff (2026-09-25) — la FORMA de las migraciones 20260925010000 (endurecimiento) y
+ * P0 pos_staff (2026-09-24) — la FORMA de las migraciones 20260925010000 (endurecimiento) y
  * 20260925020000 (TRUNCATE), y los contratos que las atan al código.
  *
  * No corre SQL. Las migraciones se ejecutaron de verdad contra un Postgres 16 desechable con
@@ -113,7 +113,7 @@ describe('contratos que atan la base al código', () => {
   })
 
   it('las columnas que lee el navegador directo están TODAS en el grant de authenticated', () => {
-    // Inventario 2026-09-25: pos-data.ts:1493 (name), pos/configuracion y admin/exportar
+    // Inventario 2026-09-24: pos-data.ts:1493 (name), pos/configuracion y admin/exportar
     // (id,name,role,active). Si alguien agrega una columna aquí sin otorgarla, 42501 en prod.
     const grant = /grant select \(([^)]+)\) on table public\.pos_staff to authenticated;/.exec(end)![1]
     const otorgadas = new Set(grant.split(',').map(s => s.trim()))

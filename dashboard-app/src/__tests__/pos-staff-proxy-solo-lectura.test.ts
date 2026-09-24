@@ -1,4 +1,4 @@
-// P0 pos_staff (2026-09-25) — el proxy del kiosco corre con service_role (se salta RLS y
+// P0 pos_staff (2026-09-24) — el proxy del kiosco corre con service_role (se salta RLS y
 // los grants que endurece la migración 20260925010000). Antes de hoy un shift token de
 // GERENTE podía, por cualquiera de las dos rutas del proxy,
 //

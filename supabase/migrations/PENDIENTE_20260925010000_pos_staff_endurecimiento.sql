@@ -48,7 +48,7 @@
 --   · No cambia `private.user_has_client_access` (eso es PR5).
 --   · No revoca TRUNCATE en otras tablas: eso es PENDIENTE_20260925020000.
 --
--- ── COMPATIBILIDAD (inventario del 2026-09-25 sobre 733fbf45) ─────────────────────────────
+-- ── COMPATIBILIDAD (inventario del 2026-09-24 sobre 733fbf45) ─────────────────────────────
 --   Lectores directos del navegador (siguen funcionando: sólo piden columnas otorgadas):
 --     src/lib/pos-data.ts:1493 (fetchMeseros)          select=name
 --     src/app/pos/configuracion/page.tsx:255            select=id,name,role,active
