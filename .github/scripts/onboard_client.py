@@ -110,7 +110,7 @@ def create_user(args):
         },
         json={
             "email": args.email,
-            "password": args.password or "fullsite2026",
+            "password": args.password or sys.exit("Falta --password (no hay contraseña por defecto)"),
             "email_confirm": True,
             "user_metadata": {
                 "client_id": args.id,

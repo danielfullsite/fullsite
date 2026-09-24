@@ -21,9 +21,9 @@ Uso:
 
     # Credenciales de los dos tenants (deben existir en Auth):
     export VANTARA_OWNER_EMAIL="owner@vantara.sandbox"
-    export VANTARA_OWNER_PASS="Vantara2026!"
+    export VANTARA_OWNER_PASS="***REDACTED***"
     export NOMADA_OWNER_EMAIL="test@nomada.sandbox"
-    export NOMADA_OWNER_PASS="Nomada2026!"
+    export NOMADA_OWNER_PASS="***REDACTED***"
 
     python3 scripts/sql/sandbox/tests/isolation_test.py
 
@@ -274,7 +274,7 @@ def main():
     orphan_email = "orphan-test@sandbox.invalid"
     s_create, r_create = http_post(
         f"{auth}/admin/users",
-        {"email": orphan_email, "password": "Orphan2026!", "email_confirm": True},
+        {"email": orphan_email, "password": os.urandom(12).hex(), "email_confirm": True},
         svc_create_h,
     )
     orphan_token = None

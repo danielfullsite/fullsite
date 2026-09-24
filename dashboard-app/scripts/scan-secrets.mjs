@@ -13,6 +13,11 @@
  * Reglas:
  *   password-grant-literal  literal de contraseña a ≤15 líneas de `grant_type=password`
  *   password-const-literal  constante *PASSWORD / *PASS asignada a un literal
+ *   password-literal        password/passwd/pwd/contraseña = literal (código y .md; en .md
+ *                           también "Password: valor" sin comillas)
+ *                           y valores por defecto (`args.password or "x"`, `pass || 'x'`)
+ *   telegram-bot-token      token de bot de Telegram (id numérico : ≥30 caracteres)
+ *   credential-pair         esquema://usuario:contraseña@host y curl -u usuario:contraseña
  *   jwt                     token JWT de 3 segmentos (eyJ….eyJ….firma), salvo rol `anon`
  *   live-api-key            sk_live_/pk_live_/rk_live_, sk-… (OpenAI/Anthropic), gsk_… (Groq)
  *   env-secret-assignment   SUPABASE_SERVICE_KEY / SUPABASE_SERVICE_ROLE_KEY / DEEPGRAM_API_KEY /
@@ -47,17 +52,28 @@ export const PATH_ALLOWLIST = [
   { re: /(^|\/)(package-lock\.json|pnpm-lock\.yaml|yarn\.lock)$/, why: 'lockfile' },
 ]
 
-// Deuda conocida FUERA de la frontera del PR de contención (se reporta, no se esconde):
-// el guardián no la ignora en silencio — la lista completa sale en el informe
-// PR3-SECRET_AND_PIN_CONTAINMENT.md §11. Cada entrada es archivo+regla exactos.
-export const KNOWN_DEBT = [
-  // Cuenta del proyecto SANDBOX (vantara), no de producción. Fuera de la frontera de PR3
-  // (scripts/sql/**). Pendiente: leer de variable de entorno y rotar en el sandbox.
-  { file: 'scripts/sql/sandbox/smoke_test.py', rule: 'password-grant-literal' },
-  { file: 'scripts/sql/sandbox/tests/isolation_test.py', rule: 'password-const-literal' },
+// Deuda conocida (se reporta, no se esconde). Cada entrada es archivo+regla exactos.
+// Fixtures de prueba con valores INVENTADOS que el escáner no puede distinguir por forma.
+// Archivo+regla exactos, cada uno con su razón.
+export const FIXTURE_ALLOWLIST = [
+  // La prueba verifica que el redactor de integraciones oculta `request.nested.password`;
+  // el valor es inventado para esa prueba.
+  { file: 'dashboard-app/src/__tests__/integrations/category-a.test.ts', rule: 'password-literal', why: 'fixture del redactor' },
 ]
 
-const PLACEHOLDER_RE = /(sentinel|no-debe|service[_-]?key|fixture|fake|dummy|example|mock|synthetic|placeholder|redacted|\*\*\*|changeme|change[-_]?me|your[-_]|<|test|xxx|todo|here|replace|sample|ejemplo|fals[oa]|prueba)/i
+// Vacía desde 2026-09-23: las cuentas de sandbox, Wansoft y demo se retiraron del árbol.
+// Si algo entra aquí, debe decir por qué y quedar en el informe; preferir arreglar.
+export const KNOWN_DEBT = [
+]
+
+const PLACEHOLDER_RE = /(sentinel|no-debe|service[_-]?key|fixture|fake|dummy|example|mock|synthetic|placeholder|redacted|\*\*\*|changeme|change[-_]?me|your[-_]|^tu[-_]|<|test|xxx|todo|here|replace|sample|ejemplo|fals[oa]|prueba)/i
+
+const INPUT_TYPES = new Set(['text', 'number', 'password', 'email', 'tel', 'hidden', 'current-password', 'new-password', 'numeric'])
+
+/** Referencia a variable/expresión, no un valor: $VAR, ${x}, process.env.X, {{ }}, %s … */
+function isCodeRef(v) {
+  return /^(\$|\{|%|process\.env|os\.environ|env\.|getenv|import\.meta)/.test(v) || /\$\{|\{\{/.test(v) || /^[A-Z][A-Z0-9_]{3,}$/.test(v)
+}
 
 function isPlaceholder(v) {
   if (!v) return true
@@ -73,6 +89,20 @@ const RULES = {
   grant: /grant_type=password/,
   pwLiteral: /\bpass(?:word|wd)?["']?\s*[:=]\s*(["'`])((?:(?!\1)[^$\\]){6,})\1/gi,
   pwConst: /\b[A-Z][A-Z0-9_]*PASS(?:WORD|WD)?\b["']?\s*[:=]\s*(["'`])((?:(?!\1)[^$\\]){6,})\1/g,
+  // password / passwd / pwd / contraseña seguido de un literal entre comillas o backticks
+  // (código .ts/.js/.py y también documentación .md: `Password: \`valor\``).
+  pwAny: /\b(?:password|passwd|pwd|contrase(?:ñ|n)a)\b["'*]*\s*[:=]\s*\**\s*(["'`])((?:(?!\1)[^\\\n]){4,})\1/gi,
+  // Markdown/texto: "Password: valor" sin comillas, con valor que parece contraseña
+  // (≥6, sin espacios, con letra y dígito o símbolo).
+  pwMdPlain: /\b(?:password|contrase(?:ñ|n)a)\b\**\s*:\s*\**\s*([^\s`'"|<>()]{6,})/gi,
+  // Pares usuario:contraseña: userinfo en URL (esquema://user:pass@host) y curl -u user:pass.
+  credPair: /(?:[a-z][a-z0-9+.-]*:\/\/[^\s:/@"'`]+:([^\s@/"'`]{4,})@|\s-u\s+["']?[^\s:"']+:([^\s"']{4,}))/gi,
+  // Estilo variable de entorno sin comillas: SA_PASSWORD=valor (docker -e, .env, shell).
+  envPass: /\b[A-Z][A-Z0-9_]*PASS(?:WORD|WD)?=([^\s'"`$]{4,})/g,
+  // Valor por defecto literal: args.password or "x" / password || 'x' / pass ?? 'x'
+  pwDefault: /\b\w*(?:password|passwd|pwd|pass)\w*\s*(?:\bor\b|\|\||\?\?)\s*(["'`])((?:(?!\1)[^\\\n]){4,})\1/gi,
+  // Token de bot de Telegram: id numérico + ':AA' + 33 caracteres
+  telegram: /\b\d{6,12}:[A-Za-z0-9_-]{30,}\b/,
   quoted: /(["'`])((?:(?!\1)[^\\\n]){4,64})\1/g,
 }
 
@@ -126,8 +156,45 @@ export function scanText(file, text, opts = {}) {
     }
 
     for (const m of l.matchAll(RULES.pwConst)) {
-      if (isPlaceholder(m[2])) continue
+      // EXPECTED_PASS = "✅ PASS (esperado)": etiqueta con espacios, no contraseña.
+      // …ni solo MAYÚSCULAS/símbolos (EXPECTED_PASS = "PASS_ESPERADO"): etiqueta, no secreto.
+      if (/\s/.test(m[2]) || /^[^a-z0-9]+$/.test(m[2]) || isPlaceholder(m[2])) continue
       hit(i, 'password-const-literal')
+    }
+
+    for (const m of l.matchAll(RULES.pwAny)) {
+      // `type={x ? 'password' : 'number'}`: el "valor" es un tipo de <input>, no un secreto.
+      if (INPUT_TYPES.has(m[2].toLowerCase())) continue
+      // Texto de UI ("Mostrar contraseña' : 'Ocultar…"): una contraseña no lleva espacios.
+      if (/\s/.test(m[2])) continue
+      if (isPlaceholder(m[2]) || isCodeRef(m[2])) continue
+      hit(i, 'password-literal')
+    }
+
+    if (/\.(md|mdx|txt)$/i.test(file)) {
+      for (const m of l.matchAll(RULES.pwMdPlain)) {
+        const v = m[1].replace(/[.,;:*]+$/, '')
+        if (v.length < 6 || isPlaceholder(v) || isCodeRef(v)) continue
+        if (!(/[A-Za-z]/.test(v) && /[0-9!@#$%^&*?_~+=-]/.test(v))) continue
+        hit(i, 'password-literal')
+      }
+    }
+
+    for (const m of l.matchAll(RULES.pwDefault)) {
+      if (/\s/.test(m[2]) || isPlaceholder(m[2]) || isCodeRef(m[2])) continue
+      hit(i, 'password-literal')
+    }
+    if (RULES.telegram.test(l)) hit(i, 'telegram-bot-token')
+
+    for (const m of l.matchAll(RULES.envPass)) {
+      if (isPlaceholder(m[1]) || isCodeRef(m[1])) continue
+      hit(i, 'password-literal')
+    }
+
+    for (const m of l.matchAll(RULES.credPair)) {
+      const v = m[1] ?? m[2]
+      if (!v || isPlaceholder(v) || isCodeRef(v)) continue
+      hit(i, 'credential-pair')
     }
 
     if (leaked.size) {
@@ -157,27 +224,35 @@ export function scanRepo(root = repoRoot(), opts = {}) {
   ].filter(Boolean)
   const findings = []
   let scanned = 0, skipped = 0
+  // Cada omisión queda contada por motivo (y con ruta) para poder justificarla.
+  const skippedBy = { allowlist: [], missing: [], notFile: [], tooLarge: [], binary: [] }
+  const skip = (why, f) => { skipped++; skippedBy[why].push(f) }
   for (const f of trackedFiles(root)) {
-    if (PATH_ALLOWLIST.some(a => a.re.test(f))) { skipped++; continue }
+    if (PATH_ALLOWLIST.some(a => a.re.test(f))) { skip('allowlist', f); continue }
     const abs = path.join(root, f)
     let st
-    try { st = statSync(abs) } catch { skipped++; continue } // borrado en el working tree
-    if (!st.isFile() || st.size > 5 * 1024 * 1024) { skipped++; continue }
+    try { st = statSync(abs) } catch { skip('missing', f); continue } // borrado en el working tree
+    if (!st.isFile()) { skip('notFile', f); continue } // symlink a dir / submódulo
+    if (st.size > 5 * 1024 * 1024) { skip('tooLarge', f); continue }
     const buf = readFileSync(abs)
-    if (buf.subarray(0, 8000).includes(0)) { skipped++; continue } // binario
+    if (buf.subarray(0, 8000).includes(0)) { skip('binary', f); continue } // binario (imágenes, fuentes, pdf…)
     scanned++
     for (const h of scanText(f, buf.toString('utf8'), { leakedHashes })) {
-      if (KNOWN_DEBT.some(d => d.file === h.file && d.rule === h.rule)) continue
+      if ([...KNOWN_DEBT, ...FIXTURE_ALLOWLIST].some(d => d.file === h.file && d.rule === h.rule)) continue
       findings.push(h)
     }
   }
-  return { findings, scanned, skipped }
+  return { findings, scanned, skipped, skippedBy }
 }
 
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 if (isMain) {
-  const { findings, scanned, skipped } = scanRepo()
+  const { findings, scanned, skipped, skippedBy } = scanRepo()
   for (const f of findings) console.log(`${f.file}:${f.line}  ${f.rule}`)
+  if (process.argv.includes('--skipped')) {
+    for (const [why, list] of Object.entries(skippedBy)) for (const f of list) console.log(`omitido(${why})  ${f}`)
+  }
+  console.log(`omitidos por motivo: ${Object.entries(skippedBy).map(([k, v]) => `${k}=${v.length}`).join(' ')}`)
   console.log(`\nscan-secrets: ${findings.length} hallazgo(s) en ${scanned} archivos (${skipped} omitidos). Valores NO impresos.`)
   process.exit(findings.length ? 1 : 0)
 }

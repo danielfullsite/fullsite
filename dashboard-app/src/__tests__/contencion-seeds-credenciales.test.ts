@@ -8,6 +8,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 vi.mock('../../seeds/_lib/supabase.ts', () => ({ getAdminClient: () => { throw new Error('no usar en pruebas') } }))
 
 const ENV = ['SEED_DEMO_EMAIL', 'SEED_DEMO_PASSWORD'] as const
+// Ruta en variable: seeds/** está fuera del tsconfig (usa imports con '.ts'); así tsc no
+// arrastra el árbol de seeds al programa y vitest lo resuelve igual en tiempo de ejecución.
+const GET_SESSION: string = '../../seeds/_lib/get-session.ts'
 
 beforeEach(() => {
   vi.resetModules()
@@ -22,7 +25,7 @@ describe('seeds — credenciales del usuario demo desde el entorno', () => {
     const f = vi.fn()
     vi.stubGlobal('fetch', f)
     process.env.SEED_DEMO_EMAIL = 'demo@fixture.test'
-    const { getDemoSession } = await import('../../seeds/_lib/get-session.ts')
+    const { getDemoSession } = await import(GET_SESSION)
     await expect(getDemoSession()).rejects.toThrow(/SEED_DEMO_PASSWORD/)
     expect(f).not.toHaveBeenCalled()
   })
@@ -30,7 +33,7 @@ describe('seeds — credenciales del usuario demo desde el entorno', () => {
   it('sin SEED_DEMO_EMAIL → error claro', async () => {
     vi.stubGlobal('fetch', vi.fn())
     process.env.SEED_DEMO_PASSWORD = 'contrasena-falsa-de-prueba'
-    const { requireDemoCredentials } = await import('../../seeds/_lib/get-session.ts')
+    const { requireDemoCredentials } = await import(GET_SESSION)
     expect(() => requireDemoCredentials()).toThrow(/SEED_DEMO_EMAIL/)
   })
 
@@ -39,7 +42,7 @@ describe('seeds — credenciales del usuario demo desde el entorno', () => {
     vi.stubGlobal('fetch', f)
     process.env.SEED_DEMO_EMAIL = 'demo@fixture.test'
     process.env.SEED_DEMO_PASSWORD = 'contrasena-falsa-de-prueba'
-    const { getDemoSession } = await import('../../seeds/_lib/get-session.ts')
+    const { getDemoSession } = await import(GET_SESSION)
     await getDemoSession()
     const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit]
     expect(url).toContain('grant_type=password')
