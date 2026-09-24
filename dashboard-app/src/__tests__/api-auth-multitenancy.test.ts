@@ -24,7 +24,11 @@ function reqWith(headers: Record<string, string> = {}): NextRequest {
   })
 }
 
-function mockMemberships(rows: Array<{ client_id: string; role: string }>) {
+// F-05 (2026-09-23): una membresía act-as sólo vale con created_at vigente
+// (ACTAS_TTL_MINUTES, default 60). Los fixtures act-as la traen fresca.
+const RECIEN = () => new Date().toISOString()
+
+function mockMemberships(rows: Array<{ client_id: string; role: string; created_at?: string }>) {
   vi.stubGlobal('fetch', vi.fn(async (url: RequestInfo | URL) => {
     const u = String(url)
     if (u.includes('/auth/v1/user')) {
@@ -44,7 +48,7 @@ describe('withPOSAuth — resolución de tenant multi-membresía (fuga 2026-08-3
   it('honra x-fullsite-tenant cuando HAY membresía para ese tenant', async () => {
     mockMemberships([
       { client_id: 'amalay', role: 'dueño' },
-      { client_id: 'tekila-rg', role: 'platform_actas' },
+      { client_id: 'tekila-rg', role: 'platform_actas', created_at: RECIEN() },
     ])
     const auth = await withPOSAuth(reqWith({ 'x-fullsite-tenant': 'tekila-rg' }))
     expect(auth?.clientId).toBe('tekila-rg')
@@ -76,7 +80,7 @@ describe('withPOSAuth — resolución de tenant multi-membresía (fuga 2026-08-3
     // (endpoint gated); debe operar con acceso de dueño, no rebotar en /owner/*.
     mockMemberships([
       { client_id: 'amalay', role: 'dueño' },
-      { client_id: 'tekila-rg', role: 'platform_actas' },
+      { client_id: 'tekila-rg', role: 'platform_actas', created_at: RECIEN() },
     ])
     const auth = await withPOSAuth(reqWith({ 'x-fullsite-tenant': 'tekila-rg' }))
     expect(auth?.clientId).toBe('tekila-rg')
