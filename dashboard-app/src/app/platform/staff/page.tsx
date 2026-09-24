@@ -3,10 +3,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Users, Loader2, Save, Check, AlertTriangle, Eye, EyeOff } from 'lucide-react'
 
-// Control Plane · Personal & PINs. El super-admin ve/edita los PINs del staff de
-// cualquier tenant (via service_role, gateado). Los PINs no se muestran por default.
+// Control Plane · Personal & PINs. El super-admin ve el staff de cualquier tenant y puede
+// ASIGNAR un PIN nuevo (via service_role, gateado). V-A18 (2026-09-23): la API ya no
+// devuelve el PIN actual — la fila muestra «PIN asignado» y el campo es solo para uno nuevo.
 interface Tenant { id: string; name: string }
-interface Staff { id: string; name: string; pin: string; role: string; role_display?: string; active: boolean }
+interface Staff { id: string; name: string; role: string; role_display?: string; active: boolean; newPin?: string }
 
 export default function StaffPage() {
   const [tenants, setTenants] = useState<Tenant[]>([])
@@ -43,7 +44,7 @@ export default function StaffPage() {
 
   useEffect(() => { if (clientId) loadStaff(clientId) }, [clientId, loadStaff])
 
-  function setField(id: string, field: 'pin' | 'name', value: string) {
+  function setField(id: string, field: 'newPin' | 'name', value: string) {
     setStaff(s => s.map(r => r.id === id ? { ...r, [field]: value } : r))
   }
 
@@ -53,10 +54,14 @@ export default function StaffPage() {
       const res = await fetch('/api/platform/staff', {
         method: 'PATCH', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ client_id: clientId, id: row.id, pin: row.pin, name: row.name, active: row.active }),
+        // El PIN solo viaja si se tecleó uno nuevo; vacío = sin cambio.
+        body: JSON.stringify({ client_id: clientId, id: row.id, name: row.name, active: row.active, ...(row.newPin ? { pin: row.newPin } : {}) }),
       })
       const j = await res.json().catch(() => ({}))
-      if (res.ok) { setSaved(row.id); setTimeout(() => setSaved(null), 1500) }
+      if (res.ok) {
+        setStaff(s => s.map(r => r.id === row.id ? { ...r, newPin: '' } : r))
+        setSaved(row.id); setTimeout(() => setSaved(null), 1500)
+      }
       else alert(j.error || 'No se pudo guardar')
     } finally { setSaving(null) }
   }
@@ -76,7 +81,7 @@ export default function StaffPage() {
         <span className="w-10 h-10 rounded-xl grid place-items-center bg-[var(--accent)]/15 text-[var(--accent-bright)]"><Users size={20} /></span>
         <div className="flex-1">
           <h1 className="text-xl font-bold text-[var(--text-1)]">Personal &amp; PINs</h1>
-          <p className="text-xs text-[var(--text-4)]">Ver y cambiar los PINs del staff de cualquier cliente</p>
+          <p className="text-xs text-[var(--text-4)]">Ver el staff y asignar PINs nuevos en cualquier cliente</p>
         </div>
       </div>
 
@@ -87,7 +92,7 @@ export default function StaffPage() {
         </select>
         <button onClick={() => setShowPins(v => !v)}
           className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-xs text-[var(--text-2)] hover:text-[var(--text-1)]">
-          {showPins ? <><EyeOff size={14} /> Ocultar PINs</> : <><Eye size={14} /> Mostrar PINs</>}
+          {showPins ? <><EyeOff size={14} /> Ocultar PIN nuevo</> : <><Eye size={14} /> Mostrar PIN nuevo</>}
         </button>
       </div>
 
@@ -104,8 +109,9 @@ export default function StaffPage() {
               <input value={row.name} onChange={e => setField(row.id, 'name', e.target.value)}
                 className="flex-1 min-w-[140px] bg-transparent text-sm font-medium text-[var(--text-1)] outline-none border-b border-transparent focus:border-[var(--line)]" />
               <span className="text-[11px] text-[var(--text-4)] w-24 truncate">{row.role_display || row.role}</span>
-              <input value={row.pin} onChange={e => setField(row.id, 'pin', e.target.value.replace(/\D/g, ''))}
-                type={showPins ? 'text' : 'password'} inputMode="numeric" maxLength={10} placeholder="PIN"
+              <span className="text-[11px] text-[var(--text-4)]">PIN asignado</span>
+              <input value={row.newPin ?? ''} onChange={e => setField(row.id, 'newPin', e.target.value.replace(/\D/g, ''))}
+                type={showPins ? 'text' : 'password'} inputMode="numeric" maxLength={10} placeholder="Nuevo PIN" aria-label="Nuevo PIN (vacío = sin cambio)"
                 className="w-20 rounded-md border border-[var(--line)] bg-[var(--surface-2)] px-2 py-1.5 text-center text-sm font-mono tracking-widest text-[var(--text-1)] outline-none focus:border-[var(--accent)]" />
               <button onClick={() => save(row)} disabled={saving === row.id}
                 className="inline-flex items-center gap-1.5 rounded-md bg-[var(--accent)] px-3 py-1.5 text-xs font-semibold text-[#04130d] disabled:opacity-50">
