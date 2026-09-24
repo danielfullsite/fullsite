@@ -17,6 +17,7 @@ END="$MIG/PENDIENTE_20260925010000_pos_staff_endurecimiento.sql"
 END_RB="$MIG/PENDIENTE_20260925010000_pos_staff_endurecimiento_ROLLBACK.sql"
 TRU="$MIG/PENDIENTE_20260925020000_revocar_truncate_anon_authenticated.sql"
 TRU_RB="$MIG/PENDIENTE_20260925020000_revocar_truncate_anon_authenticated_ROLLBACK.sql"
+F1="$MIG/PENDIENTE_20260914120000_pos_staff_pin_hash.sql"
 PR5="${1:-}"
 
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/pos-staff-pg.XXXXXX")"
@@ -71,6 +72,20 @@ DUE=00000000-0000-0000-0000-0000000000a4
 ACT_OK=00000000-0000-0000-0000-0000000000b5
 ACT_VIEJO=00000000-0000-0000-0000-0000000000b6
 ACT_FUT=00000000-0000-0000-0000-0000000000b7
+
+# Con F1 (pin_hash) presente: la columna nueva NO la alcanza nadie del navegador, la doble
+# escritura del servidor se audita como pin_reset y el CHECK de F1 sigue mordiendo.
+casos_f1() {  # $1 = etiqueta
+  local m="$1"
+  caso "[$m] miembro básico: lee pin_hash"                                 authenticated $VIEW "select count(*) from (select pin_hash from pos_staff) s" E:42501
+  caso "[$m] dueño del dashboard: lee pin_hash / pin_hash_v"               authenticated $DUE  "select count(*) from (select pin_hash, pin_hash_v from pos_staff) s" E:42501
+  caso "[$m] miembro básico: usa pin_hash como oráculo"                    authenticated $VIEW "select count(*) from pos_staff where pin_hash is not null" E:42501
+  caso "[$m] anon: lee pin_hash"                                           anon - "select count(*) from (select pin_hash from pos_staff) s" E:42501
+  caso "[$m] miembro básico: escribe pin_hash"                             authenticated $VIEW "with u as (update pos_staff set pin_hash = repeat('a', 64), pin_hash_v = 1 where id = 'a-gerente' returning 1) select count(*) from u" E:42501
+  caso "[$m] servidor: doble escritura pin+pin_hash → auditada como pin_reset" service_role - "update pos_staff set pin = '4777', pin_hash = repeat('a', 64), pin_hash_v = 1 where id = 'a-mesero'; select action || ':' || (changed_fields ? 'pin_hash')::text from pos_staff_audit where origen = 'db_trigger' order by id desc limit 1" V:pin_reset:true
+  caso "[$m] servidor: hash sin versión (fila a medias) → CHECK de F1"   service_role - "update pos_staff set pin_hash = repeat('b', 64) where id = 'a-mesero'" E:23514
+  caso "[$m] lectura legítima sigue con F1: miembro lee id,name,role,active" authenticated $VIEW "select count(*) from (select id, name, role, active from pos_staff) s" N:2
+}
 
 matriz_navegador() {  # $1 = "vulnerable" | "endurecido"
   local m="$1" e_pin e_rol e_ins e_del e_trunc e_nom e_sueldo e_anon
@@ -194,6 +209,10 @@ caso "lectura legítima sigue: miembro lee nombres"                 authenticate
 aplicar "$TRU_RB" && echo "  rollback aplicado"
 foto >"$TMP/foto_tru_rb.txt"
 igual "rollback TRUNCATE: estado previo exacto" "$TMP/foto_pre_tru.txt" "$TMP/foto_tru_rb.txt"
+
+echo "-- 10. F1 (pin_hash) DESPUÉS del endurecimiento"
+aplicar "$F1" && echo "  F1 aplicada" || { FAIL=$((FAIL+1)); echo "  FAIL  F1 no aplicó sobre el estado endurecido"; cat "$TMP/aplicar.log"; }
+casos_f1 "endurecido+F1"
 parar "$TMP/datos1"
 
 echo; echo "== S2 · esquema de producción → endurecimiento DIRECTO (sin PR3): autosuficiente =="
@@ -203,6 +222,20 @@ foto >"$TMP/foto_s2.txt"
 igual "estado final sin PR3 = estado final con PR3" "$TMP/foto_end.txt" "$TMP/foto_s2.txt"
 matriz_navegador endurecido
 parar "$TMP/datos2"
+
+echo; echo "== S3 · orden del plan: producción → PR3 → F1 → endurecimiento → TRUNCATE =="
+arrancar "$TMP/datos3"
+aplicar "$AQUI/00_esquema_produccion.sql" && aplicar "$AQUI/01_datos_sinteticos.sql" || { echo "SETUP S3 FALLÓ"; exit 1; }
+for m in "$PR3" "$F1" "$END" "$TRU"; do
+  if aplicar "$m"; then echo "  aplicada: $(basename "$m")"; else FAIL=$((FAIL+1)); echo "  FAIL  no aplicó: $(basename "$m")"; cat "$TMP/aplicar.log"; fi
+done
+matriz_navegador endurecido
+casos_f1 "plan"
+echo "  rollback en orden inverso: TRUNCATE → endurecimiento"
+aplicar "$TRU_RB" && aplicar "$END_RB" && echo "  rollbacks aplicados" || { FAIL=$((FAIL+1)); echo "  FAIL  rollback en orden inverso"; cat "$TMP/aplicar.log"; }
+caso "[plan→rollback] PR3 sigue cerrando pin_hash (la columna nació sin grant)" authenticated $VIEW "select count(*) from (select pin_hash from pos_staff) s" E:42501
+caso "[plan→rollback] estado PR3: miembro vuelve a poder desactivar"           authenticated $VIEW "with u as (update pos_staff set active = false where id = 'a-gerente' returning 1) select count(*) from u" N:1
+parar "$TMP/datos3"
 
 echo; echo "=== RESULTADO: $PASS PASS · $FAIL FAIL · $OMIT OMITIDO"
 cp "$TMP"/foto_*.txt "${FOTOS_DIR:-$TMP}/" 2>/dev/null || true
