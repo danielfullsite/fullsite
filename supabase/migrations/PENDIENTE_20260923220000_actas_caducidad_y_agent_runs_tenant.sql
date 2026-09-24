@@ -20,7 +20,22 @@
 --
 -- Cuerpo copiado de 00000000000000_baseline_esquema.sql:117-131; lo único nuevo
 -- es la condición sobre cu.role / cu.created_at. CREATE OR REPLACE FUNCTION
--- conserva los GRANT existentes de la función.
+-- conserva los GRANT existentes de la función y su dueño.
+--
+-- ── TRANSACCIÓN (P-00, 2026-09-24) ─────────────────────────────────────────────
+-- Todo el archivo es UNA transacción: la función y la columna entran juntas o no
+-- entra nada. Si cualquier sentencia falla (sintaxis, permisos, lock_timeout por un
+-- agente escribiendo en agent_runs), Postgres aborta la transacción y el COMMIT final
+-- se convierte en ROLLBACK: no quedan cambios parciales. Aplicar con
+-- `psql -v ON_ERROR_STOP=1 -f <archivo>` (o el runner de migraciones) para que el
+-- cliente se detenga en el primer error. lock_timeout corto: si algo tiene tomada
+-- agent_runs o la función, falla en 3 s en vez de bloquear a todo el dashboard.
+-- Rollback: PENDIENTE_20260923220000_actas_caducidad_y_agent_runs_tenant_ROLLBACK.sql
+
+BEGIN;
+
+SET LOCAL lock_timeout = '3s';
+SET LOCAL statement_timeout = '30s';
 
 CREATE OR REPLACE FUNCTION "private"."user_has_client_access"("target_client_id" "text") RETURNS boolean
     LANGUAGE "sql" STABLE SECURITY DEFINER
@@ -81,9 +96,13 @@ CREATE INDEX IF NOT EXISTS "idx_agent_runs_client_created"
 -- UPDATE public.agent_runs SET output_summary = 'respuesta sin datos (contenido en chat_logs)'
 --  WHERE agent_id = 'chat-feedback' AND output_summary LIKE 'Q: %';
 
+COMMIT;
+
 -- ── ROLLBACK ──────────────────────────────────────────────────────────────────
--- Parte 1: re-ejecutar la definición de baseline_esquema.sql:117-131.
--- Parte 2:
+-- Archivo ejecutable: PENDIENTE_20260923220000_actas_caducidad_y_agent_runs_tenant_ROLLBACK.sql
+-- (Parte 1 = definición exacta de baseline_esquema.sql:117-131; Parte 2 = quitar
+-- índice y columna). Si ya se aplicó el paso d) en su propia migración, revertir
+-- primero esa política:
 --   DROP POLICY IF EXISTS "agent_runs_tenant_read" ON "public"."agent_runs";
 --   CREATE POLICY "agent_runs_read" ON "public"."agent_runs" FOR SELECT TO "authenticated" USING (true);
 --   DROP INDEX IF EXISTS "public"."idx_agent_runs_client_created";
