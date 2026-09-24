@@ -71,7 +71,10 @@ function actasVigente(createdAt: string | null | undefined, now = Date.now()): b
 // Lecturas en act-as que SÍ se auditan (H3 de la revisión): datos sensibles y de
 // bajo volumen. El resto de los GET no se audita para no agregar una escritura por
 // cada lectura del dashboard; ese riesgo está documentado en el informe PR5.
-const ACTAS_GET_AUDITADAS = ['/api/labor', '/api/owner/', '/api/pos/db', '/api/backup', '/api/factura']
+// También los GET que ESCRIBEN (verificación de integración 2026-09-24): el OAuth
+// de Uber (initiate/callback, PR2) y /api/deepgram-token (si se enciende).
+const ACTAS_GET_AUDITADAS = ['/api/labor', '/api/owner/', '/api/pos/db', '/api/backup', '/api/factura',
+  '/api/integrations/uber-eats/auth/', '/api/deepgram-token']
 
 function requiereAuditoriaActas(request: NextRequest): boolean {
   if (request.method !== 'GET' && request.method !== 'HEAD') return true

@@ -571,6 +571,26 @@ describe('H3/H4/H5/H8 · act-as endurecido', () => {
     expect((await GET(req('/api/labor', { token: 'jwt-admin2', tenant: 'tenant-b' }))).status).toBe(401)
   })
 
+  it('GET que escriben en act-as (OAuth Uber initiate/callback, deepgram-token) → actas.request con actor real; auditoría caída → null (401)', async () => {
+    addActas('jwt-admin2', 'tenant-b', minutesAgo(5))
+    const rutas = ['/api/integrations/uber-eats/auth/initiate', '/api/integrations/uber-eats/auth/callback?code=c&state=s', '/api/deepgram-token']
+    for (const r of rutas) {
+      expect(await withPOSAuth(req(r, { token: 'jwt-admin2', tenant: 'tenant-b' })), r).not.toBeNull()
+    }
+    const regs = auditRows().filter(x => x.action === 'actas.request')
+    expect(regs).toHaveLength(3)
+    for (const x of regs) {
+      expect(x.actor_user_id).toBe(U('jwt-admin2'))
+      expect(x.target_tenant).toBe('tenant-b')
+      expect(JSON.stringify(x.detail)).toContain('"method":"GET"')
+    }
+    expect(JSON.stringify(regs.map(x => x.detail))).toContain('/api/integrations/uber-eats/auth/callback')
+    fail.audit = true
+    for (const r of rutas) {
+      expect(await withPOSAuth(req(r, { token: 'jwt-admin2', tenant: 'tenant-b' })), r).toBeNull()
+    }
+  })
+
   it('control: GET no sensible en act-as no audita', async () => {
     addActas('jwt-admin2', 'tenant-b', minutesAgo(5))
     expect(await withPOSAuth(req('/api/agents/feedback', { token: 'jwt-admin2', tenant: 'tenant-b' }))).not.toBeNull()
