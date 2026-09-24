@@ -116,6 +116,31 @@ describe('scan-secrets — reglas (ejemplos sintéticos)', () => {
     }
   })
 
+  // Re-revisión PR3: N-1 (PEM) y P3 baratos; N-4 (clave XOR en el cliente)
+  describe('formas de la re-revisión (N-1, P3, N-4)', () => {
+    const b = '-----BEGIN'
+    const casos: Array<[string, string, string]> = [
+      ['PEM en .pem', 'k.pem', b + ' PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASC\n-----END PRIVATE KEY-----'],
+      ['PEM RSA en template TS', 'x.ts', 'const k = `' + b + ' RSA PRIVATE KEY-----\nMIIEow...`'],
+      ['PEM en JSON de cuenta de servicio', 'sa.json', '{"private_key": "' + b + ' PRIVATE KEY-----\\nMIIE\\n-----END PRIVATE KEY-----\\n"}'],
+      ['Bearer hex40', 'x.ts', "headers: { Authorization: 'Bearer " + 'a1b2c3d4e5'.repeat(4) + "' }"],
+      ['curl apikey', 'x.sh', 'curl -H "api' + 'key: ' + 'a1b2c3d4e5'.repeat(4) + '" https://x'],
+      ['clientSecret camelCase', 'x.ts', "const client" + "Secret = 'Zk8mQ2vX9p4t'"],
+      ['Slack xoxb', 'x.ts', "const t = 'xox" + "b-123456789012-ABCDEFabcdef'"],
+      ['Google AIza', 'x.ts', "const g = 'AI" + "za" + 'A'.repeat(20) + 'b1c2d3e4f5g6h7i8j9k' + "'"],
+      ['Stripe sk_test_', 'x.ts', "const s = 'sk_" + "test_" + 'A1b2C3d4E5f6G7h8' + "'"],
+      ['clave XOR en el cliente', 'p.html', "const key = 'zq" + "-clave-xor-2026'\nr += String.fromCharCode(d.charCodeAt(i) ^ key.charCodeAt(i % key.length))"],
+    ]
+    for (const [nombre, archivo, texto] of casos) {
+      it(nombre, () => { expect((scanText(archivo, texto) as Hallazgo[]).length, nombre).toBeGreaterThan(0) })
+    }
+    it('NO marca Bearer con variable/JWT ni una clave sin XOR', () => {
+      expect(reglas('headers: { Authorization: `Bearer ${token}` }')).toEqual([])
+      expect(reglas("const key = 'orden-por-fecha-2026'")).toEqual([])
+      expect(reglas("fetch(u, { headers: { Authorization: 'Bearer sb_" + "publishable_AbCdEf0123456789xyzAbCdEf0123' } })")).toEqual([])
+    })
+  })
+
   it('NO marca referencias, marcadores ni formas de código', () => {
     const neg: Array<[string, string]> = [
       ['x.py', 'parser.add_argument("--pass' + 'word", default=os.environ.get("ONBOARD_OWNER_PASSWORD"))'],
@@ -213,7 +238,7 @@ describe('scan-secrets — guardián sobre el repo', () => {
     for (const a of PATH_ALLOWLIST as Array<{ why: string }>) expect(a.why.length).toBeGreaterThan(3)
     // La deuda del dashboard se limita a la clave XOR del vault (P0-4, requiere rediseño):
     // cualquier otra entrada nueva bajo dashboard-app/ hace fallar esta prueba.
-    const permitidas = new Set(['dashboard-app/src/app/admin/vault/page.tsx', 'dashboard-app/src/app/internal/vault/page.tsx'])
+    const permitidas = new Set(['dashboard-app/src/app/admin/vault/page.tsx', 'dashboard-app/src/app/internal/vault/page.tsx', 'dashboard-app/public/panel.html'])
     for (const d of KNOWN_DEBT as Array<{ file: string }>) if (d.file.startsWith('dashboard-app/')) expect(permitidas.has(d.file), d.file).toBe(true)
   })
 })

@@ -219,6 +219,9 @@ describe('V-A18 / revisión H-4 — migración PENDIENTE que quita pin a authent
     const cols = [...codigo.matchAll(/grant (select|update) \(([^)]*)\)/g)].map(m => [m[1], m[2].split(',').map(c => c.trim())] as const)
     expect(cols.map(c => c[0]).sort()).toEqual(['select', 'update'])
     for (const [, lista] of cols) { expect(lista).not.toContain('pin'); expect(lista).not.toContain('pin_hash') }
+    // Re-revisión N-2: sin UPDATE de role/role_display (escalada a admin por PostgREST)
+    const upd = cols.find(c => c[0] === 'update')![1]
+    expect(upd).not.toContain('role'); expect(upd).not.toContain('role_display')
     // Las columnas que leen las pantallas vivas (configuracion, exportar, fetchMeseros) siguen
     const sel = cols.find(c => c[0] === 'select')![1]
     for (const c of ['id', 'name', 'role', 'active', 'client_id']) expect(sel).toContain(c)

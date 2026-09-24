@@ -21,7 +21,10 @@
 -- revocar el privilegio de tabla y otorgar la lista de columnas. Para `authenticated`:
 --   · SELECT: todas las columnas MENOS pin (y pin_hash/pin_hash_v si ya existen: no se
 --     otorgan, así que quedan fuera automáticamente).
---   · UPDATE: solo name, role, role_display, active, hourly_rate, weekly_salary.
+--   · UPDATE: solo name, active, hourly_rate, weekly_salary. NI `role` NI `role_display`
+--     (re-revisión PR3, N-2): con UPDATE(role) cualquier usuario del dashboard ascendía a
+--     `admin` una fila cuyo PIN conoce (la suya) y entraba al POS como admin. Los cambios de
+--     rol van por /api/owner/staff (service_role, con jerarquía canAssignRole).
 --   · INSERT: revocado. Crear personal es escribir un PIN; el único camino es la API
 --     (/api/owner/staff, service_role, con jerarquía de roles y pinTaken).
 --   · DELETE: sin cambio (no toca el PIN).
@@ -43,9 +46,12 @@
 --     src/lib/backup.ts (createBackup, select=* sobre pos_staff): código muerto — ningún
 --       archivo lo importa salvo su prueba (formatBytes). `select=*` con privilegios por
 --       columna da 42501. Si se revive: usar /api/backup (ya excluye pin) o select explícito.
---     src/app/admin/onboarding/page.tsx:63 (POST pos_staff con pin): wizard retirado
---       (/onboarding redirige a /platform/tenants); ya fallaba por RLS de clients.
---     public/sw.js:41 cachea /rest/v1/pos_staff: tras esto las respuestas ya no traen pin.
+--     src/app/admin/onboarding/page.tsx:63 (POST pos_staff con pin): wizard viejo; el que
+--       redirige es src/app/onboarding/page.tsx, pero admin/onboarding sigue alcanzable por URL
+--       (nada lo enlaza). Su POST ya fallaba por RLS de clients y ahora también por privilegio.
+--     public/sw.js:41 cachea /rest/v1/pos_staff: las respuestas YA cacheadas (con pin, si alguna
+--       vez se pidió) no se invalidan con esta migración → subir la versión de la caché del SW
+--       al desplegar (re-revisión N-3).
 --   Otros roles NO tocados aquí (anotado, fuera de alcance):
 --     anon: SELECT de tabla sin política RLS → 0 filas (ver nota 2 de
 --       PENDIENTE_20260914120000_pos_staff_pin_hash.sql; mobile-app/LoginScreen ya está muerto).
@@ -71,7 +77,7 @@ revoke select, insert, update on table public.pos_staff from authenticated;
 grant select (id, client_id, name, role, role_display, active, created_at, hourly_rate, weekly_salary)
   on table public.pos_staff to authenticated;
 
-grant update (name, role, role_display, active, hourly_rate, weekly_salary)
+grant update (name, active, hourly_rate, weekly_salary)
   on table public.pos_staff to authenticated;
 
 commit;

@@ -22,9 +22,14 @@
  *   live-api-key            sk_live_/pk_live_/rk_live_, sk-… (OpenAI/Anthropic), gsk_… (Groq)
  *   env-secret-assignment   SUPABASE_SERVICE_KEY / SUPABASE_SERVICE_ROLE_KEY / DEEPGRAM_API_KEY /
  *                           FACTURAMA_* asignadas a un valor literal (no process.env, no ${{ secrets }})
- *   provider-key            sb_secret_, APP_USR-, re_…_…, ghp_/gho_/…, github_pat_, AKIA…
+ *   provider-key            sb_secret_, APP_USR-, re_…_…, ghp_/gho_/…, github_pat_, AKIA…,
+ *                           xox[abprs]- (Slack), AIza… (Google), sk_test_ (Stripe)
+ *   private-key             -----BEGIN … PRIVATE KEY----- (PEM)
+ *   bearer-or-apikey        `Bearer <≥32>` o `apikey: <≥32>` literal (no JWT: eso es la regla jwt)
+ *   xor-key                 `const key = '…'` en un archivo que cifra con `^ x.charCodeAt` (cliente)
  *   hex-key                 hex de 40 entre comillas o tras `Token ` (Deepgram), salvo contexto git
- *   secret-assignment       *_SECRET / *_PEPPER / *_TOKEN / *_API_KEY / *_KEY / *pass* / *pwd* = valor
+ *   secret-assignment       clientSecret/dbPassword (camelCase) = literal;
+ *                           *_SECRET / *_PEPPER / *_TOKEN / *_API_KEY / *_KEY / *pass* / *pwd* = valor
  *                           con forma de secreto (mayúsculas o minúsculas, .env/YAML/shell/código)
  *   credential-context      línea con pass/pwd/contraseña/credential/login(/secret/pepper y un
  *                           literal (o valor sin comillas tras : o =) con forma de contraseña; y la
@@ -80,6 +85,11 @@ export const KNOWN_DEBT = [
   // Pendiente en el informe PR3 §11. El valor se retiró de la documentación.
   { file: 'dashboard-app/src/app/admin/vault/page.tsx', rule: 'secret-assignment' },
   { file: 'dashboard-app/src/app/internal/vault/page.tsx', rule: 'secret-assignment' },
+  { file: 'dashboard-app/src/app/admin/vault/page.tsx', rule: 'xor-key' },
+  { file: 'dashboard-app/src/app/internal/vault/page.tsx', rule: 'xor-key' },
+  // Re-revisión N-4: la MISMA clave XOR en el panel estático (HTML servido al navegador). Mismo
+  // motivo: ya viaja en el cliente; quitarla sin migrar deja ilegible el vault. Rediseño server-side.
+  { file: 'dashboard-app/public/panel.html', rule: 'xor-key' },
 ]
 
 // Marcadores de "no es un valor real". Revisión PR3 (H-3): antes eran subcadenas y dejaban
@@ -158,6 +168,17 @@ const RULES = {
   pwDefault: /\b\w*(?:password|passwd|pwd|pass)\w*\s*(?:\bor\b|\|\||\?\?)\s*(["'`])((?:(?!\1)[^\\\n]){4,})\1/gi,
   // Token de bot de Telegram: id numérico + ':AA' + 33 caracteres
   telegram: /\b\d{6,12}:[A-Za-z0-9_-]{30,}\b/,
+  // Re-revisión N-1: llaves privadas PEM (archivo .pem, template TS, JSON de cuenta de servicio)
+  pemKey: /-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----/,
+  // P3 baratos: Bearer/apikey con valor largo literal, Slack xox*, Google AIza, Stripe sk_test_
+  bearer: /\bBearer\s+([A-Za-z0-9._~+\/=-]{32,})/g,
+  apikeyHdr: /\bapi[-_]?key["']?\s*[:=]\s*["']?([A-Za-z0-9._-]{32,})/gi,
+  morePrefixes: /\b(?:xox[abprs]-[A-Za-z0-9-]{10,}|AIza[0-9A-Za-z_-]{35}|sk_test_[A-Za-z0-9]{16,})/,
+  // camelCase: clientSecret / dbPassword / appPepper = '…'
+  camelSecret: /\b([a-z][A-Za-z0-9]*(?:Secret|Password|Passwd|Pepper))\b["']?\s*[:=]\s*(["'`])([^"'`\s]{8,128})\2/g,
+  // Re-revisión N-4: clave de cifrado XOR en el cliente (`const key = '…'` + `^ key.charCodeAt`)
+  xorUse: /\^\s*\w+\.charCodeAt|charCodeAt\([^)]*\)\s*\^/,
+  xorKey: /\b(?:const|let|var)\s+(\w*[Kk][Ee][Yy]\w*)\s*=\s*["']([^"']{8,})["']/,
   // Proveedores (revisión H-3): Supabase sb_secret_, Mercado Pago APP_USR-, Resend re_, GitHub, AWS.
   providerKey: /\b(?:sb_secret_[A-Za-z0-9_-]{16,}|APP_USR-\d{6,}-[A-Za-z0-9-]{10,}|re_[A-Za-z0-9]{6,}_[A-Za-z0-9]{12,}|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|AKIA[0-9A-Z]{16})\b/,
   // Llave hex de 40 (Deepgram) entre comillas o tras `Token `; no si la línea habla de commits/hashes.
@@ -209,6 +230,7 @@ export function scanText(file, text, opts = {}) {
   const seen = new Set()
   const hit = (i, rule, shape) => { const k = `${i}:${rule}`; if (seen.has(k)) return; seen.add(k); out.push(shape ? { file, line: i + 1, rule, shape } : { file, line: i + 1, rule }) }
 
+  const xorFile = RULES.xorUse.test(text)
   const grantLines = []
   lines.forEach((l, i) => { if (RULES.grant.test(l)) grantLines.push(i) })
 
@@ -282,7 +304,19 @@ export function scanText(file, text, opts = {}) {
     }
 
     // ── Reglas de la revisión PR3 (H-3) ──────────────────────────────────────────
-    if (RULES.providerKey.test(l)) hit(i, 'provider-key')
+    if (RULES.providerKey.test(l) || RULES.morePrefixes.test(l)) hit(i, 'provider-key')
+    if (RULES.pemKey.test(l)) hit(i, 'private-key')
+    for (const re of [RULES.bearer, RULES.apikeyHdr]) {
+      for (const m of l.matchAll(re)) {
+        const v = m[1]
+        // JWT → regla jwt (anon es publicable); sb_publishable_ también es pública por diseño
+        if (v.startsWith('eyJ') || v.startsWith('sb_publishable_') || isCodeRef(v) || isPlaceholder(v) || /\$\{|\.\.\./.test(v)) continue
+        if (!/\d/.test(v) || !/[A-Za-z]/.test(v)) continue
+        hit(i, 'bearer-or-apikey')
+      }
+    }
+    for (const m of l.matchAll(RULES.camelSecret)) if (pwShape(m[3])) hit(i, 'secret-assignment')
+    if (xorFile) { const m = l.match(RULES.xorKey); if (m && !isCodeRef(m[2]) && !isPlaceholder(m[2])) hit(i, 'xor-key') }
     if (RULES.hex40.test(l) && !RULES.hex40Ctx.test(l) && (!DOC_EXT.test(file) || /Token\s+[0-9a-f]{40}/.test(l))) hit(i, 'hex-key')
 
     for (const m of l.matchAll(RULES.secretAssign)) {
