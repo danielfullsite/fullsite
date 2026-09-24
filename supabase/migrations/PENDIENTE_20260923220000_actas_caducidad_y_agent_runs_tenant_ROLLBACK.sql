@@ -47,6 +47,14 @@ $$;
 -- revierte, ni siquiera la función) y la decisión queda en manos de una persona:
 -- respaldar la columna, o revertir solo la Parte 1 ejecutando únicamente el
 -- CREATE OR REPLACE FUNCTION de arriba dentro de su propia transacción.
+--
+-- El LOCK va ANTES de la guarda (re-revisión P-00, N1b): sin él, una escritura de
+-- client_id aún sin COMMIT es invisible para la guarda, el DROP espera su lock y la
+-- borra al terminar. Con ACCESS EXCLUSIVE tomado primero, la guarda ve todo lo
+-- confirmado y nadie puede escribir entre la guarda y el DROP. Si hay una escritura
+-- en curso, lock_timeout (3s) aborta el rollback completo.
+LOCK TABLE "public"."agent_runs" IN ACCESS EXCLUSIVE MODE;
+
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM "public"."agent_runs" WHERE "client_id" IS NOT NULL) THEN
