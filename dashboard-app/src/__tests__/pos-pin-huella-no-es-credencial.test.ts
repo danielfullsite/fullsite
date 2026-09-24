@@ -7,8 +7,8 @@
 // para obtener un token de gerente firmado, sin huella y sin PIN.
 //
 // CONTRATO NUEVO (contención): un id NO es prueba de identidad. Si llega `fingerprint_id`, con
-// o sin PIN, la respuesta es 401 `biometria_no_verificada`, cuenta como intento fallido y no se
-// emite token. Sólo un PIN válido del restaurante del body, activo, que cumpla min_role/manager,
+// o sin PIN, la respuesta es 401 `biometria_no_verificada` y no se emite token (no cuenta en el
+// throttle: revisión N-1). Sólo un PIN válido del restaurante del body, activo, que cumpla min_role/manager,
 // emite token. La huella vuelve únicamente con WebAuthn verificado en servidor.
 //
 // Todos los ids, PINs y tenants son inventados. `fetch` está simulado: nada sale a la red.
@@ -104,13 +104,15 @@ describe('F-01 · un fingerprint_id NO es credencial', () => {
     expect(json.error).toBe('La huella no está disponible por seguridad; entra con tu PIN')
   })
 
-  it('(b) id conocido sin PIN → 401, sin consultar pos_staff por id y registrando el fallo', async () => {
+  // Revisión N-1: el rechazo por huella NO cuenta en el throttle compartido por IP
+  // (bloqueaba el PIN de todo el restaurante). Ver pos-auth-revision-adversarial-pr1.test.ts.
+  it('(b) id conocido sin PIN → 401, sin consultar pos_staff por id y sin gastar el throttle', async () => {
     const { status, json } = await post({ client_id: 'tenant-a', fingerprint_id: 'a-gerente' })
     expect(status).toBe(401)
     expect(json.shiftToken).toBeUndefined()
     expect(json.code).toBe('biometria_no_verificada')
     expect(consultasDeStaff().some((u) => u.includes('id=eq.a-gerente')), 'el id no se usa para buscar al empleado').toBe(false)
-    expect(throttle).toEqual([{ key: 'tenant-a:10.0.0.9', ok: false }])
+    expect(throttle).toEqual([])
   })
 
   it('fingerprint_id junto con un PIN válido tampoco emite token (el cliente viejo mandaba pin="___fingerprint___")', async () => {

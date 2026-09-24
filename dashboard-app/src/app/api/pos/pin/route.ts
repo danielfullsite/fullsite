@@ -74,9 +74,14 @@ export async function POST(request: NextRequest) {
      * suplantación seguía abierta.
      *
      * Contención: si llega `fingerprint_id` (con o sin PIN) se rechaza con 401
-     * `biometria_no_verificada`, cuenta en el throttle y no se consulta a nadie. No se
-     * "degrada" a validar el PIN que venga al lado: el cliente viejo mandaba
-     * `pin: '___fingerprint___'` y un cliente mezclado no es un cliente honesto.
+     * `biometria_no_verificada` y no se consulta a nadie. No se "degrada" a validar el
+     * PIN que venga al lado: el cliente viejo mandaba `pin: '___fingerprint___'` y un
+     * cliente mezclado no es un cliente honesto.
+     *
+     * NO cuenta en el throttle (revisión adversarial N-1). La llave es (restaurante, IP)
+     * y todas las terminales comparten IP pública: 8 toques de huella en terminales sin
+     * F5 bloqueaban el PIN del gerente para todo el restaurante. Esta respuesta no
+     * consulta nada y es idéntica para cualquier id, así que no hay nada que adivinar.
      *
      * La biometría vuelve SOLO con verificación en servidor: llave pública WebAuthn
      * guardada por empleado (alta hecha con sesión de gerente), challenge de un solo uso
@@ -84,7 +89,6 @@ export async function POST(request: NextRequest) {
      * origin, contador, userVerification). Nunca más aceptar un id como prueba.
      */
     if (fingerprint_id !== undefined && fingerprint_id !== null) {
-      await pinRecord(throttleKey, false)
       return Response.json(
         { error: 'La huella no está disponible por seguridad; entra con tu PIN', code: 'biometria_no_verificada' },
         { status: 401 }
