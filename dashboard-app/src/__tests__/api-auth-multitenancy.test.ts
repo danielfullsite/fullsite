@@ -42,7 +42,9 @@ function mockMemberships(rows: Array<{ client_id: string; role: string; created_
 }
 
 describe('withPOSAuth — resolución de tenant multi-membresía (fuga 2026-08-30)', () => {
-  beforeEach(() => vi.restoreAllMocks())
+  // /api/owner/* en act-as es lectura sensible: se audita con service_role
+  // (revisión PR5, H3). Sin llave la auditoría falla y el act-as cierra.
+  beforeEach(() => { vi.restoreAllMocks(); process.env.SUPABASE_SERVICE_KEY = 'svc-fixture' })
   afterEach(() => vi.unstubAllGlobals())
 
   it('honra x-fullsite-tenant cuando HAY membresía para ese tenant', async () => {

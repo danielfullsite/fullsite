@@ -32,24 +32,52 @@ export async function getSessionUserId(request: NextRequest): Promise<string | n
 // Una membresía 'platform_actas' eleva a dueño SÓLO si:
 //   · el request nombra ese tenant EXPLÍCITAMENTE (x-fullsite-tenant), y
 //   · tiene menos de ACTAS_TTL_MINUTES (default 60) según client_users.created_at
-//     (sin created_at legible → vencida: falla cerrado).
-// Cada request NO-GET resuelto por act-as se registra en platform_audit_log con el
-// actor real; si ese registro falla, el request se rechaza (null → 401).
+//     (sin created_at legible, o en el futuro → vencida: falla cerrado; TTL con
+//     tope duro de 240 min).
+// Cada request NO-GET resuelto por act-as, y los GET de rutas sensibles
+// (ACTAS_GET_AUDITADAS), se registran en platform_audit_log con el actor real; si
+// ese registro falla, el request se rechaza (null → 401).
 // Límite conocido: esto vive en el servidor. Las lecturas directas del navegador a
 // PostgREST pasan por RLS (private.user_has_client_access), que sin la migración
 // PENDIENTE_20260923220000_actas_caducidad_y_agent_runs_tenant.sql sigue viendo el
 // tenant hasta el exit o la revocación.
 const ACTAS_ROLE = 'platform_actas'
 
+// Tope duro: ni una variable mal puesta (p. ej. 1e12) apaga la caducidad.
+const ACTAS_TTL_MAX_MIN = 240
+// Tolerancia de reloj entre Postgres (created_at = now()) y el servidor: una fila
+// recién creada puede llegar unos ms "en el futuro". Más allá de esto → vencida.
+const ACTAS_SKEW_MS = 60_000
+
 function actasTtlMs(): number {
   const n = Number(process.env.ACTAS_TTL_MINUTES)
-  return (Number.isFinite(n) && n > 0 ? n : 60) * 60_000
+  return Math.min(Number.isFinite(n) && n > 0 ? n : 60, ACTAS_TTL_MAX_MIN) * 60_000
+}
+
+/** ¿La membresía sigue valiendo? Las reales siempre; las act-as sólo dentro del TTL.
+ *  Exportada para los lectores directos de client_users (p. ej. /api/backup). */
+export function membresiaVigente(row: { role?: string | null; created_at?: string | null }, now = Date.now()): boolean {
+  if (row.role !== ACTAS_ROLE) return true
+  return actasVigente(row.created_at, now)
 }
 
 function actasVigente(createdAt: string | null | undefined, now = Date.now()): boolean {
   const t = createdAt ? Date.parse(createdAt) : NaN
   if (!Number.isFinite(t)) return false
+  if (t > now + ACTAS_SKEW_MS) return false // fecha en el futuro: dato manipulado o reloj roto
   return now - t < actasTtlMs()
+}
+
+// Lecturas en act-as que SÍ se auditan (H3 de la revisión): datos sensibles y de
+// bajo volumen. El resto de los GET no se audita para no agregar una escritura por
+// cada lectura del dashboard; ese riesgo está documentado en el informe PR5.
+const ACTAS_GET_AUDITADAS = ['/api/labor', '/api/owner/', '/api/pos/db', '/api/backup', '/api/factura']
+
+function requiereAuditoriaActas(request: NextRequest): boolean {
+  if (request.method !== 'GET' && request.method !== 'HEAD') return true
+  let path = ''
+  try { path = (request.nextUrl ?? new URL(request.url)).pathname } catch { return true }
+  return ACTAS_GET_AUDITADAS.some(p => path === p.replace(/\/$/, '') || path.startsWith(p.endsWith('/') ? p : p + '/'))
 }
 
 async function auditarActas(
@@ -60,7 +88,12 @@ async function auditarActas(
   const svc = process.env.SUPABASE_SERVICE_KEY
   if (!svc) return false // platform_audit_log sólo acepta service_role: sin llave no hay auditoría
   let path = ''
-  try { path = request.nextUrl?.pathname ?? new URL(request.url).pathname } catch { path = '' }
+  let query = ''
+  try {
+    const u = request.nextUrl ?? new URL(request.url)
+    path = u.pathname
+    query = u.search.slice(0, 500) // en /api/pos/db la tabla va en ?path=
+  } catch { path = '' }
   try {
     const res = await fetch(`${SB_URL}/rest/v1/platform_audit_log`, {
       method: 'POST',
@@ -71,7 +104,7 @@ async function auditarActas(
         action: 'actas.request',
         scope: 'tenant',
         target_tenant: clientId,
-        detail: { method: request.method, path },
+        detail: { method: request.method, path, query },
       }]),
       cache: 'no-store',
     })
@@ -177,8 +210,8 @@ export async function withPOSAuth(request: NextRequest): Promise<POSAuthContext 
       membership = reales.length === 1 ? reales[0] : undefined
       if (!membership) return null // multi-membresía sin header → jamás adivinar
     }
-    if (membership.role === ACTAS_ROLE && request.method !== 'GET' && request.method !== 'HEAD') {
-      // Escritura en act-as: sin registro de auditoría con el actor real, no pasa.
+    if (membership.role === ACTAS_ROLE && requiereAuditoriaActas(request)) {
+      // Escritura (o lectura sensible) en act-as: sin registro con el actor real, no pasa.
       if (!(await auditarActas(user, membership.client_id, request))) return null
     }
     // Una membresía 'platform_actas' SOLO la crea /api/platform/act-as, que está

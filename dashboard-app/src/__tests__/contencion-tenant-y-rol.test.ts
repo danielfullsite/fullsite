@@ -20,6 +20,7 @@ vi.hoisted(() => {
   process.env.SUPABASE_SERVICE_KEY = 'svc-fixture'
   process.env.SHIFT_TOKEN_SECRET = 'fixture-secret-0123456789abcdef0123456789abcdef'
   process.env.MP_ACCESS_TOKEN = 'mp-fixture'
+  process.env.BACKUP_ADMIN_EMAILS = 'admin@fixture.test,admin2@fixture.test'
 })
 
 import { issueShiftToken } from '@/lib/shift-token'
@@ -128,6 +129,10 @@ function seed() {
       { key: 'beta-global', enabled: true, rollout: {} },
     ],
     platform_audit_log: [],
+    pos_staff: [
+      { id: 'st-1', client_id: 'tenant-a', name: 'Mesero Uno', role: 'mesero', pin: '1111', hourly_rate: 55, weekly_salary: 2640 },
+      { id: 'st-2', client_id: 'tenant-a', name: 'Gerente Dos', role: 'gerente', pin: '2222', hourly_rate: 120, weekly_salary: 5760 },
+    ],
     agent_runs: [{ id: 1, agent_id: 'anomaly-detector', status: 'ok', output_summary: 'ok', created_at: minutesAgo(5) }],
   }
 }
@@ -462,5 +467,158 @@ describe('V-C03 parcial · refund de /api/mp-point exige gerente o superior', ()
     expect((await r.json()).success).toBe(true)
     const p = await mp(await shift('cajero'), { action: 'payment', deviceId: 'dev-fixture', amount: 100 })
     expect(p.status).toBe(200)
+  })
+})
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Revisión adversarial PR5-REVIEW.md (H1–H8)
+// ═════════════════════════════════════════════════════════════════════════════
+describe('H1 · F-09 por el proxy genérico: sueldos sólo para gerencia', () => {
+  const viaDb = async (token: string, path: string) => {
+    const { GET } = await import('@/app/api/pos/db/route')
+    return GET(req(`/api/pos/db?path=${encodeURIComponent(path)}`, { token }))
+  }
+  const viaCatchAll = async (token: string, qs: string) => {
+    const { GET } = await import('@/app/api/pos/db/[...path]/route')
+    return GET(req(`/api/pos/db/rest/v1/pos_staff?${qs}`, { token }), { params: Promise.resolve({ path: ['rest', 'v1', 'pos_staff'] }) })
+  }
+  const sinSueldo = (t: string) => !/hourly_rate|weekly_salary/.test(t)
+
+  it('mesero, cajero y capitán: select=* sin columnas de sueldo (ni PIN) en ambos proxies', async () => {
+    for (const role of ['mesero', 'cajero', 'capitan']) {
+      const tok = await shift(role)
+      const a = await viaDb(tok, 'pos_staff?select=*')
+      expect(a.status, role).toBe(200)
+      const ta = await a.text()
+      expect(sinSueldo(ta), `${role}: ${ta}`).toBe(true)
+      expect(ta).toContain('Mesero Uno')
+      expect(ta).not.toContain('"pin"')
+      const b = await viaCatchAll(tok, 'select=*')
+      expect(sinSueldo(await b.text()), role).toBe(true)
+    }
+  })
+
+  it('mesero: pedir, filtrar u ordenar por sueldo → 403', async () => {
+    const tok = await shift('mesero')
+    for (const p of ['pos_staff?select=name,hourly_rate,weekly_salary', 'pos_staff?select=name&hourly_rate=gt.100', 'pos_staff?select=name&order=weekly_salary.desc']) {
+      expect((await viaDb(tok, p)).status, p).toBe(403)
+    }
+    expect((await viaCatchAll(tok, 'select=name&hourly_rate=gt.100')).status).toBe(403)
+  })
+
+  it('control: gerente ve sueldos y puede filtrarlos', async () => {
+    const tok = await shift('gerente')
+    const a = await viaDb(tok, 'pos_staff?select=*')
+    expect(await a.text()).toContain('hourly_rate')
+    expect((await viaDb(tok, 'pos_staff?select=name,hourly_rate&hourly_rate=gt.0')).status).toBe(200)
+    expect(await (await viaCatchAll(tok, 'select=*')).text()).toContain('weekly_salary')
+  })
+
+  it('la política falla cerrado: sin rol conocido redacta sueldos', async () => {
+    const { redactResponse, consultaProxyValida } = await import('@/lib/pos-db-policy')
+    const raw = JSON.stringify([{ name: 'x', hourly_rate: 1, weekly_salary: 2, pin: '1' }])
+    expect(redactResponse('pos_staff', raw, 'application/json')).toBe(JSON.stringify([{ name: 'x' }]))
+    expect(redactResponse('pos_staff', raw, 'application/json', 'gerente')).toBe(JSON.stringify([{ name: 'x', hourly_rate: 1, weekly_salary: 2 }]))
+    expect(consultaProxyValida('pos_staff', new URLSearchParams('select=hourly_rate'))).toBe(false)
+    expect(consultaProxyValida('pos_staff', new URLSearchParams('select=hourly_rate'), 'dueño')).toBe(true)
+  })
+})
+
+describe('H3/H4/H5/H8 · act-as endurecido', () => {
+  const addActas = (userTok: string, tenant: string, created_at: string) =>
+    (db.client_users as Row[]).push({ user_id: U(userTok), client_id: tenant, role: 'platform_actas', created_at })
+
+  it('enter con la auditoría caída → 503 y NO queda membresía', async () => {
+    fail.audit = true
+    const { POST } = await import('@/app/api/platform/act-as/route')
+    const res = await POST(req('/api/platform/act-as', { cookie: 'jwt-admin2', body: { client_id: 'tenant-b' } }))
+    expect(res.status).toBe(503)
+    expect((db.client_users as Row[]).some(r => r.role === 'platform_actas')).toBe(false)
+  })
+
+  it('re-entrar renueva la ventana y queda auditado', async () => {
+    addActas('jwt-admin2', 'tenant-b', minutesAgo(55))
+    const { POST } = await import('@/app/api/platform/act-as/route')
+    expect((await POST(req('/api/platform/act-as', { cookie: 'jwt-admin2', body: { client_id: 'tenant-b' } }))).status).toBe(200)
+    const filas = (db.client_users as Row[]).filter(r => r.role === 'platform_actas')
+    expect(filas).toHaveLength(1)
+    expect(Date.now() - Date.parse(String(filas[0].created_at))).toBeLessThan(5_000)
+    expect(auditRows().filter(r => r.action === 'actas.enter')).toHaveLength(1)
+  })
+
+  it('created_at en el futuro → vencida', async () => {
+    addActas('jwt-admin2', 'tenant-b', new Date(Date.now() + 10 * 60_000).toISOString())
+    expect(await withPOSAuth(req('/x', { token: 'jwt-admin2', tenant: 'tenant-b' }))).toBeNull()
+  })
+
+  it('ACTAS_TTL_MINUTES tiene tope duro de 240 min', async () => {
+    process.env.ACTAS_TTL_MINUTES = '1e12'
+    addActas('jwt-admin2', 'tenant-b', minutesAgo(300))
+    expect(await withPOSAuth(req('/x', { token: 'jwt-admin2', tenant: 'tenant-b' }))).toBeNull()
+    ;(db.client_users as Row[]).pop()
+    addActas('jwt-admin2', 'tenant-b', minutesAgo(200))
+    expect(await withPOSAuth(req('/x', { token: 'jwt-admin2', tenant: 'tenant-b' }))).not.toBeNull()
+  })
+
+  it('GET sensible en act-as (/api/labor, /api/owner/*, /api/pos/db) se audita con su query; si falla la auditoría → 401', async () => {
+    addActas('jwt-admin2', 'tenant-b', minutesAgo(5))
+    const { GET } = await import('@/app/api/labor/route')
+    expect((await GET(req('/api/labor?days=7', { token: 'jwt-admin2', tenant: 'tenant-b' }))).status).toBe(200)
+    const a = auditRows().find(r => r.action === 'actas.request')!
+    expect(JSON.stringify(a.detail)).toContain('/api/labor')
+    expect(JSON.stringify(a.detail)).toContain('days=7')
+    fail.audit = true
+    expect((await GET(req('/api/labor', { token: 'jwt-admin2', tenant: 'tenant-b' }))).status).toBe(401)
+  })
+
+  it('control: GET no sensible en act-as no audita', async () => {
+    addActas('jwt-admin2', 'tenant-b', minutesAgo(5))
+    expect(await withPOSAuth(req('/api/agents/feedback', { token: 'jwt-admin2', tenant: 'tenant-b' }))).not.toBeNull()
+    expect(auditRows()).toHaveLength(0)
+  })
+
+  it('/api/backup respeta la caducidad de act-as; la membresía real sigue funcionando', async () => {
+    const { GET } = await import('@/app/api/backup/route')
+    const bk = (tok: string, cid: string) => GET(req(`/api/backup?client_id=${cid}&table=pos_staff`, { token: tok }))
+    addActas('jwt-admin2', 'tenant-b', minutesAgo(90))
+    expect((await bk('jwt-admin2', 'tenant-b')).status).toBe(403)
+    ;(db.client_users as Row[]).pop()
+    addActas('jwt-admin2', 'tenant-b', minutesAgo(5))
+    expect((await bk('jwt-admin2', 'tenant-b')).status).toBe(200)
+    expect((await bk('jwt-admin', 'tenant-a')).status).toBe(200)
+  })
+})
+
+describe('H6 · flags: rollout explícito validado', () => {
+  const flag = (k: string) => (db.feature_flags as Row[]).find(r => r.key === k)!
+  const post = async (body: unknown) => {
+    const { POST } = await import('@/app/api/platform/flags/route')
+    return POST(req('/api/platform/flags', { cookie: 'jwt-admin', body }))
+  }
+
+  it('rollout {} explícito → 400 sin cambios; client_ids no-arreglo → 400', async () => {
+    expect((await post({ key: 'beta-cohorte', enabled: true, rollout: {} })).status).toBe(400)
+    expect((await post({ key: 'beta-cohorte', enabled: true, rollout: { client_ids: 'tenant-b' } })).status).toBe(400)
+    expect(flag('beta-cohorte')).toMatchObject({ enabled: false, rollout: { client_ids: ['tenant-a'] } })
+  })
+
+  it('global exige forma explícita: {mode:"all"} o {cohort:"all"}', async () => {
+    expect((await post({ key: 'beta-cohorte', enabled: true, rollout: { mode: 'all' } })).status).toBe(200)
+    expect(flag('beta-cohorte').rollout).toEqual({ cohort: 'all' })
+    expect((await post({ key: 'beta-global', enabled: true, rollout: { cohort: 'all' } })).status).toBe(200)
+  })
+
+  it('cohorte vacía se audita como tenant con 0 afectados', async () => {
+    expect((await post({ key: 'beta-cohorte', enabled: true, rollout: { client_ids: [] } })).status).toBe(200)
+    const a = auditRows().find(r => r.action === 'flag.update')!
+    expect(a.scope).toBe('tenant')
+    expect(a.affected_count).toBe(0)
+  })
+
+  it('la pantalla /platform/flags: el toggle no manda rollout (se conserva) y "todos" manda {cohort:"all"}', async () => {
+    const { readFileSync } = await import('node:fs')
+    const src = readFileSync('src/app/platform/flags/page.tsx', 'utf8')
+    expect(src).toMatch(/postFlag\(next,[^\n]*\{ rollout: false \}\)/)
+    expect(src).toContain("{ cohort: 'all' }")
   })
 })

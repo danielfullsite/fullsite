@@ -14,7 +14,9 @@
 -- sin esta parte el admin sigue viendo el tenant hasta el exit o la revocación.
 --
 -- Mantener el intervalo igual a ACTAS_TTL_MINUTES (si se cambia la variable en
--- Vercel, cambiar también el '60 minutes' de abajo).
+-- Vercel, cambiar también el '60 minutes' de abajo; el servidor la topa en 240).
+-- Igual que en el servidor, una fila con created_at en el futuro (más de 1 min)
+-- no cuenta.
 --
 -- Cuerpo copiado de 00000000000000_baseline_esquema.sql:117-131; lo único nuevo
 -- es la condición sobre cu.role / cu.created_at. CREATE OR REPLACE FUNCTION
@@ -32,7 +34,8 @@ CREATE OR REPLACE FUNCTION "private"."user_has_client_access"("target_client_id"
       SELECT 1 FROM public.client_users cu
       WHERE cu.user_id = auth.uid() AND cu.client_id = target_client_id
         AND (cu.role IS DISTINCT FROM 'platform_actas'
-             OR cu.created_at > now() - interval '60 minutes')
+             OR (cu.created_at > now() - interval '60 minutes'
+                 AND cu.created_at <= now() + interval '1 minute'))
     )
   END;
 $$;
@@ -56,17 +59,20 @@ $$;
 --      escribe "<clientId>: N hallazgo(s)" en output_summary); el resto queda NULL
 --      = sólo visible para service_role / admin de plataforma;
 --   d) recién entonces, la política por tenant.
--- Si se aplica todo junto, la telemetría desaparece para los roles de restaurante
--- (falla cerrado), no se filtra.
+-- En este archivo sólo quedan ACTIVOS a) (aditivo) y la Parte 1. d) y la
+-- limpieza de datos están comentados: nada destructivo corre al aplicarlo.
 
 ALTER TABLE "public"."agent_runs" ADD COLUMN IF NOT EXISTS "client_id" "text";
 CREATE INDEX IF NOT EXISTS "idx_agent_runs_client_created"
   ON "public"."agent_runs" USING "btree" ("client_id", "created_at" DESC);
 
-DROP POLICY IF EXISTS "agent_runs_read" ON "public"."agent_runs";
-CREATE POLICY "agent_runs_tenant_read" ON "public"."agent_runs"
-  FOR SELECT TO "authenticated"
-  USING ("client_id" IS NOT NULL AND "private"."user_has_client_access"("client_id"));
+-- Paso d) — COMENTADO A PROPÓSITO (revisión PR5, H2): reemplaza la política
+-- vigente y no debe entrar al aplicar este archivo; sólo cuando b) y c) estén
+-- hechos, como migración aparte y con su propio rollback (abajo).
+-- DROP POLICY IF EXISTS "agent_runs_read" ON "public"."agent_runs";
+-- CREATE POLICY "agent_runs_tenant_read" ON "public"."agent_runs"
+--   FOR SELECT TO "authenticated"
+--   USING ("client_id" IS NOT NULL AND "private"."user_has_client_access"("client_id"));
 
 -- Limpieza de contenido ya escrito (contenido de chat en telemetría global).
 -- Se deja COMENTADO a propósito: es borrado de datos y necesita autorización y

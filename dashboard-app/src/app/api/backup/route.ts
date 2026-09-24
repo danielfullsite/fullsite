@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server'
+import { membresiaVigente } from '@/lib/api-auth'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 // BUG-019: el backup lee tablas tenant con RLS (pos_orders, pos_staff, pos_audit_log…).
@@ -39,12 +40,14 @@ async function isAuthorized(request: NextRequest): Promise<string | null> {
 async function userHasClientAccess(userId: string, clientId: string): Promise<boolean> {
   try {
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/client_users?user_id=eq.${encodeURIComponent(userId)}&client_id=eq.${encodeURIComponent(clientId)}&select=client_id&limit=1`,
+      `${SUPABASE_URL}/rest/v1/client_users?user_id=eq.${encodeURIComponent(userId)}&client_id=eq.${encodeURIComponent(clientId)}&select=client_id,role,created_at&limit=10`,
       { headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` } }
     )
     if (!res.ok) return false
     const rows = await res.json()
-    return Array.isArray(rows) && rows.length > 0
+    // F-05 (revisión PR5, H8): una membresía act-as vencida no da acceso al backup
+    // (que incluye pos_staff con sueldos). Misma regla que withPOSAuth.
+    return Array.isArray(rows) && rows.some(r => membresiaVigente(r))
   } catch {
     return false
   }

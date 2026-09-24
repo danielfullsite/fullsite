@@ -126,6 +126,7 @@ export async function describeAction(tool: string, input: Record<string, unknown
     if (!Array.isArray(rows)) return `${verbo} — no se pudo leer su alcance actual (se conservará sin cambios)`
     if (rows.length === 0) return `${verbo} — flag nuevo: aplicará a todos los tenants`
     const ro = (rows[0]?.rollout || {}) as { client_ids?: string[]; percentage?: number }
+    if (Array.isArray(ro.client_ids) && ro.client_ids.length === 0) return `${verbo} — su cohorte actual está vacía: ningún tenant`
     if (Array.isArray(ro.client_ids) && ro.client_ids.length > 0) {
       return `${verbo} — sólo su cohorte actual: ${ro.client_ids.length} tenant(s) (${ro.client_ids.join(', ')})`
     }

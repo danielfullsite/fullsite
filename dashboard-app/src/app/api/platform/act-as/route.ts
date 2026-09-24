@@ -122,6 +122,15 @@ export async function POST(req: NextRequest) {
   const memRows = memChk.ok ? await memChk.json().catch(() => []) : []
   const alreadyMember = Array.isArray(memRows) && memRows.length > 0
 
+  // H4 (revisión PR5): entrar (o renovar la ventana al re-entrar) SIN rastro no se
+  // permite. La auditoría va ANTES de crear la membresía: si falla → 503 y no se
+  // crea nada (la impersonación previa ya se limpió arriba: falla cerrado). Si la
+  // inserción falla después, el registro queda como intento de entrada.
+  const audited = await auditLog(gate.ctx, { action: 'actas.enter', scope: 'tenant', target_tenant: target, detail: { renovacion_o_entrada: true, ya_miembro: alreadyMember } })
+  if (!audited) {
+    return Response.json({ error: 'No se pudo auditar la entrada; no se entró al tenant' }, { status: 503 })
+  }
+
   if (!alreadyMember) {
     const ins = await platformServiceFetch('client_users', {
       method: 'POST',
@@ -134,6 +143,5 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  await auditLog(gate.ctx, { action: 'actas.enter', scope: 'tenant', target_tenant: target })
   return Response.json({ ok: true, client_id: target, display_name: display })
 }
