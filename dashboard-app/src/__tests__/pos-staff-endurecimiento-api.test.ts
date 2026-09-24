@@ -1,4 +1,4 @@
-// P0 pos_staff (2026-09-25) — la API es la ÚNICA puerta de escritura, así que se prueba
+// P0 pos_staff (2026-09-24) — la API es la ÚNICA puerta de escritura, así que se prueba
 // como puerta: con sesión de dashboard (rol de client_users) y con shift token (rol de
 // pos_staff), dos restaurantes, y contando QUÉ llega a salir hacia PostgREST.
 //

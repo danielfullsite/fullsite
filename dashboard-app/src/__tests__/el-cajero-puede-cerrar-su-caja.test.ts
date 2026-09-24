@@ -67,7 +67,7 @@ describe('lo que NO se abrio', () => {
       expect(puedeEscribirEn(t, 'cajero'), t).toBe(false)
       expect(puedeEscribirEn(t, 'gerente'), t).toBe(true)
     }
-    // pos_staff se APRETÓ el 2026-09-25: ni el gerente la escribe por el proxy (toda alta y
+    // pos_staff se APRETÓ el 2026-09-24: ni el gerente la escribe por el proxy (toda alta y
     // cambio de PIN/rol va por /api/owner/staff, con jerarquía y auditoría).
     expect(puedeEscribirEn('pos_staff', 'cajero')).toBe(false)
     expect(puedeEscribirEn('pos_staff', 'gerente')).toBe(false)

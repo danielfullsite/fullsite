@@ -15,7 +15,7 @@ for (const mode of ['query','path']) describe(`scoped SQL ${mode}`, () => {
     const route = await import('@/app/api/pos/db/[...path]/route')
     return route[method](req, { params: Promise.resolve({ path: ['rest','v1',table] }) })
   }
-  // 2026-09-25: el caso usaba pos_staff, que ahora es de SOLO LECTURA en el proxy (P0
+  // 2026-09-24: el caso usaba pos_staff, que ahora es de SOLO LECTURA en el proxy (P0
   // pos_staff; ningún cliente la escribe por aquí — toda alta va por /api/owner/staff).
   // El contrato que se prueba (upsert atómico acotado + recibo redactado) se conserva con
   // otra tabla de identidad que tiene columna redactada.

@@ -20,14 +20,14 @@ import { esPimientaNoConfigurada, HTTP_AUTORIDAD_NO_DISPONIBLE } from '@/lib/pos
  *    un gerente solo gestiona roles ≤ capitan.
  *  - PIN: 4–10 dígitos, único en el tenant (activo o no). Nunca se loguea en claro
  *    (auditoría registra solo los campos cambiados) y el GET NUNCA lo devuelve (V-A18).
- *  - Nadie se cambia a sí mismo el rol ni se desactiva (2026-09-25): con shift token el
+ *  - Nadie se cambia a sí mismo el rol ni se desactiva (2026-09-24): con shift token el
  *    rol sale de `pos_staff.role`, así que editarlo sería autorizarse con un dato propio.
  *  - PIN con hash (F2, PLAN-PIN-HASH.md): `columnasDePin` escribe pin_hash junto al pin
  *    cuando POS_PIN_DUAL_WRITE=on; sin pimienta → 503 authority_unavailable, nunca pin solo.
  *  - Restablecer PIN: PATCH { id, reset_pin: true } → el servidor genera uno libre y lo
  *    devuelve UNA vez. Auditoría: created, role_changed, pin_reset, deactivated,
  *    reactivated, updated (la base además audita por trigger, ver migración 20260925010000).
- *  - Desde 2026-09-25 el navegador NO puede escribir pos_staff por PostgREST ni por el proxy
+ *  - Desde 2026-09-24 el navegador NO puede escribir pos_staff por PostgREST ni por el proxy
  *    del kiosco (/api/pos/db): esta ruta es la única puerta para el dashboard y el POS.
  */
 
