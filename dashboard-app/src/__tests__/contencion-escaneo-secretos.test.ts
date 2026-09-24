@@ -12,6 +12,17 @@ import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { scanText, scanRepo, repoRoot, jwtRole, KNOWN_DEBT, PATH_ALLOWLIST } from '../../scripts/scan-secrets.mjs'
 
+// Commit base de la contención. ¿Está en este clon? Solo esta pregunta decide omitir.
+const BASE = '6d6a31fcabfc189ab8fd05fb0f6c0936fcbe916d'
+const BASE_DISPONIBLE = (() => {
+  try {
+    execFileSync('git', ['cat-file', '-e', `${BASE}^{commit}`], { cwd: repoRoot(), stdio: 'ignore' })
+    return true
+  } catch {
+    return false
+  }
+})()
+
 type Hallazgo = { file: string; line: number; rule: string }
 const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url')
 const jwtCon = (role: string) => [b64({ alg: 'HS256', typ: 'JWT' }), b64({ role, iss: 'supabase', ref: 'proyectoficticio' }), 'f'.repeat(43)].join('.')
@@ -180,10 +191,13 @@ describe('scan-secrets — guardián sobre el repo', () => {
     expect(findings.map(f => `${f.file}:${f.line} ${f.rule}`)).toEqual([])
   }, 60_000)
 
-  it('el guardián SÍ ve la fuga original (6d6a31fc), si ese commit está disponible', () => {
-    // Un guardián no vale hasta verlo fallar: se escanea el contenido del commit base.
-    // En un clon superficial (CI) el commit puede no existir → se omite sin fallar.
-    const base = '6d6a31fcabfc189ab8fd05fb0f6c0936fcbe916d'
+  // Un guardián no vale hasta verlo fallar: se escanea el contenido del commit base.
+  // En un clon superficial (CI) el commit puede no existir. Ese caso —y SOLO ese— se
+  // declara OMITIDO (skipIf, visible en el reporte), no aprobado. Si el commit existe,
+  // cualquier error de `git show` o del escaneo hace FALLAR la prueba (antes un
+  // `catch { return }` convertía cualquier error en PASS silencioso; P-00, 2026-09-24).
+  it.skipIf(!BASE_DISPONIBLE)('el guardián SÍ ve la fuga original (6d6a31fc)', () => {
+    const base = BASE
     // archivo → regla que DEBE dispararse sobre su versión en la base (cuentas reales:
     // demo, sandbox, Wansoft; bot de Telegram; SA de SQL Server en docs de Wansoft).
     const esperado: Record<string, string> = {
@@ -220,10 +234,9 @@ describe('scan-secrets — guardián sobre el repo', () => {
       'docs/platform/CLONEABILITY-REPORT-v1.md:115 credential-context',
     ]
     const archivos = Object.keys(esperado)
-    let textos: string[]
-    try {
-      textos = archivos.map(f => execFileSync('git', ['show', `${base}:${f}`], { cwd: repoRoot(), encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 32 * 1024 * 1024 }))
-    } catch { return }
+    // Sin try/catch: con el commit presente, un archivo que no exista en la base o un
+    // git que falle es un error real del guardián y debe verse como FALLA.
+    const textos = archivos.map(f => execFileSync('git', ['show', `${base}:${f}`], { cwd: repoRoot(), encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 32 * 1024 * 1024 }))
     const r = new Set(archivos.flatMap((f, i) => (scanText(f, textos[i]) as Hallazgo[]).map(h => `${h.file} ${h.rule}`)))
     for (const f of archivos) expect(r.has(`${f} ${esperado[f]}`), `${f} ${esperado[f]}`).toBe(true)
     const extra = [...new Set(lineas.map(x => x.split(':')[0]))]
@@ -232,7 +245,11 @@ describe('scan-secrets — guardián sobre el repo', () => {
       return (scanText(f, t) as Hallazgo[]).map(h => `${h.file}:${h.line} ${h.rule}`)
     }))
     for (const x of lineas) expect(porLinea.has(x), x).toBe(true)
-  })
+    // Timeout explícito: ~0.6 s medido sin carga (21 `git show` + escaneo). El default
+    // de 5 s se rebasó una vez con la máquina saturada (INTEGRATION-vitest-run1-loaded.log).
+    // 30 s ≈ 50× lo normal: absorbe la carga sin volverse infinito. Si se excede, la
+    // prueba FALLA — el timeout nunca aprueba nada.
+  }, 30_000)
 
   it('la allowlist y la deuda conocida están comentadas y acotadas', () => {
     for (const a of PATH_ALLOWLIST as Array<{ why: string }>) expect(a.why.length).toBeGreaterThan(3)
