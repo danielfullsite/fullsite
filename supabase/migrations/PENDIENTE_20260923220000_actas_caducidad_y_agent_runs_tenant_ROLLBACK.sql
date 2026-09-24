@@ -5,8 +5,10 @@
 --          supabase/migrations/00000000000000_baseline_esquema.sql:117-131 (texto
 --          idéntico). CREATE OR REPLACE conserva dueño y GRANT de la función, igual
 --          que al aplicar la migración.
--- Parte 2: quita el índice y la columna agent_runs.client_id. Se pierden los
---          client_id que se hayan escrito después de aplicar la migración.
+-- Parte 2: quita el índice y la columna agent_runs.client_id, SOLO si la columna no
+--          tiene ningún valor no nulo. Si tiene datos (escritos después de aplicar, o
+--          porque la columna ya existía antes), el rollback se detiene completo sin
+--          borrar nada (ver la guarda más abajo).
 --
 -- Todo en UNA transacción, con DDL estricto (sin IF EXISTS): si la columna o el
 -- índice no están, o si algo depende de la columna (p. ej. la política del paso d)
@@ -36,6 +38,22 @@ CREATE OR REPLACE FUNCTION "private"."user_has_client_access"("target_client_id"
       WHERE cu.user_id = auth.uid() AND cu.client_id = target_client_id
     )
   END;
+$$;
+
+-- Guarda contra pérdida de datos (revisión P-00, N1): la migración usa
+-- ADD COLUMN IF NOT EXISTS, así que si la columna YA existía antes (o si alguien
+-- ya empezó a escribir client_id), borrarla destruiría datos que no son de esta
+-- migración. Si hay CUALQUIER valor no nulo, el rollback FALLA completo (nada se
+-- revierte, ni siquiera la función) y la decisión queda en manos de una persona:
+-- respaldar la columna, o revertir solo la Parte 1 ejecutando únicamente el
+-- CREATE OR REPLACE FUNCTION de arriba dentro de su propia transacción.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM "public"."agent_runs" WHERE "client_id" IS NOT NULL) THEN
+    RAISE EXCEPTION 'rollback detenido: agent_runs.client_id tiene valores; respaldar o revertir solo la Parte 1'
+      USING ERRCODE = 'object_in_use';
+  END IF;
+END
 $$;
 
 DROP INDEX "public"."idx_agent_runs_client_created";
