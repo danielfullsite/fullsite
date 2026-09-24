@@ -9,18 +9,28 @@
 // que este archivo no contenga él mismo un patrón detectable por otros escáneres.
 import { describe, it, expect } from 'vitest'
 import { createHash } from 'node:crypto'
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { scanText, scanRepo, repoRoot, jwtRole, KNOWN_DEBT, PATH_ALLOWLIST } from '../../scripts/scan-secrets.mjs'
 
 // Commit base de la contención. ¿Está en este clon? Solo esta pregunta decide omitir.
+//
+// `git cat-file -e <sha>` (SIN `^{commit}`) distingue los tres casos por su código:
+//   0   → el objeto está                         → se corre la prueba
+//   1   → el objeto no está (clon superficial)   → se OMITE (skipIf, visible)
+//   otro (128 = error fatal de git; null = git no instalado) → se LANZA: el archivo
+//        entero falla. Con `^{commit}` el «no está» también daba 128, así que un error
+//        de git se confundía con «falta el commit» y omitía el guardián con la suite en
+//        verde (revisión P-00, N2). repoRoot() también lanza si git no funciona.
 const BASE = '6d6a31fcabfc189ab8fd05fb0f6c0936fcbe916d'
 const BASE_DISPONIBLE = (() => {
-  try {
-    execFileSync('git', ['cat-file', '-e', `${BASE}^{commit}`], { cwd: repoRoot(), stdio: 'ignore' })
+  const r = spawnSync('git', ['cat-file', '-e', BASE], { cwd: repoRoot(), stdio: 'ignore' })
+  if (r.status === 0) {
+    const tipo = execFileSync('git', ['cat-file', '-t', BASE], { cwd: repoRoot(), encoding: 'utf8' }).trim()
+    if (tipo !== 'commit') throw new Error(`el objeto base existe pero es «${tipo}», no un commit`)
     return true
-  } catch {
-    return false
   }
+  if (r.status === 1) return false
+  throw new Error(`git cat-file falló (status ${r.status}${r.error ? `, ${r.error.message}` : ''}): no se puede decidir si omitir el guardián`)
 })()
 
 type Hallazgo = { file: string; line: number; rule: string }
