@@ -1157,7 +1157,10 @@ ${dailyContext}`
       }
     }
 
-    // Hermes feedback: log if response contains "no tengo" for improvement
+    // Hermes feedback: log if response contains "no tengo" for improvement.
+    // F-06 (contención 2026-09-23): agent_runs no tiene columna de tenant y la lee
+    // cualquier usuario autenticado → aquí SÓLO metadatos, jamás pregunta/respuesta.
+    // El contenido completo queda en chat_logs (abajo), que sí lleva client_id.
     if (text.toLowerCase().includes('no tengo') || text.toLowerCase().includes('no cuento')) {
       try {
         await fetch(`${sbUrl}/rest/v1/agent_runs`, {
@@ -1167,7 +1170,7 @@ ${dailyContext}`
             agent_id: 'chat-feedback',
             trigger_type: 'auto',
             status: 'no_data',
-            output_summary: `Q: ${message.slice(0, 200)} | A: ${text.slice(0, 200)}`,
+            output_summary: 'respuesta sin datos (contenido en chat_logs)',
             tentacle: 'hermes',
           }),
         })
