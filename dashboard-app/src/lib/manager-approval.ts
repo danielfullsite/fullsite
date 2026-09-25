@@ -61,12 +61,21 @@ export async function verifyManagerApproval(opts: {
     if (p && p.cid === opts.clientId && (ROLE_LVL[p.rol] || 0) >= minLevel) mode = 'online:' + p.rol
   }
   if (!mode) {
+    // MODO ESTRICTO = SÓLO PRUEBA DEL SERVIDOR (revisión adversarial de PR1, N-4).
+    // Con POS_APPROVAL_STRICT=true, cualquier aprobación que no sea un token firmado
+    // de gerente+ del mismo restaurante se rechaza — incluida `offline_approved`, que
+    // es una afirmación del cliente. EFECTO EN CAMPO, explícito: las cancelaciones y
+    // reaperturas aprobadas SIN internet no se aceptan en modo estricto; al drenar la
+    // cola reciben 403 y pos-offline-db las marca TERMINAL_NON_RETRYABLE (ver el bloque
+    // de arriba). Por eso la bandera se prende sólo cuando exista la prueba firmada por
+    // dispositivo, o en un restaurante que acepte operar esas acciones sólo con red.
+    // Sin la bandera todo sigue como hoy: se acepta y se audita con el rol real.
+    if (process.env.POS_APPROVAL_STRICT === 'true') return { ok: false, mode: 'blocked', solicitanteNivel }
     if (opts.offlineApproved === true) {
       // El rol va PEGADO al modo, no en un campo aparte, para que ningún consumidor
       // pueda leer el modo y olvidarse de mirar quién fue.
       mode = `offline_device_trust:${opts.solicitanteRol || 'desconocido'}`
     }
-    else if (process.env.POS_APPROVAL_STRICT === 'true') return { ok: false, mode: 'blocked', solicitanteNivel }
     else mode = 'legacy_no_approval'
   }
   return { ok: true, mode, solicitanteNivel }

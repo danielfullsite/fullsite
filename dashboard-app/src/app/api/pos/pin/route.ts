@@ -61,6 +61,40 @@ export async function POST(request: NextRequest) {
         { status: 429, headers: gate.retryAfter ? { 'Retry-After': String(gate.retryAfter) } : undefined }
       )
     }
+
+    /**
+     * UN ID NO ES UNA HUELLA — F-01 (P0), auditoría 2026-09-23.
+     *
+     * Hasta aquí existía una rama que emitía shiftToken a partir de `fingerprint_id`: el
+     * UUID del empleado que el lector local decía haber reconocido. El servidor nunca
+     * verificó ninguna firma, así que el id era una afirmación del cliente — y los UUID
+     * viven en `pos_fingerprint_staff` / `pos_staff_cache` de cualquier terminal y en
+     * GET /api/pos/staff. Conocer el de un gerente bastaba para un token de gerente sin
+     * huella y sin PIN. El arreglo del 2026-08-31 cerró la escalada de rol; la
+     * suplantación seguía abierta.
+     *
+     * Contención: si llega `fingerprint_id` (con o sin PIN) se rechaza con 401
+     * `biometria_no_verificada` y no se consulta a nadie. No se "degrada" a validar el
+     * PIN que venga al lado: el cliente viejo mandaba `pin: '___fingerprint___'` y un
+     * cliente mezclado no es un cliente honesto.
+     *
+     * NO cuenta en el throttle (revisión adversarial N-1). La llave es (restaurante, IP)
+     * y todas las terminales comparten IP pública: 8 toques de huella en terminales sin
+     * F5 bloqueaban el PIN del gerente para todo el restaurante. Esta respuesta no
+     * consulta nada y es idéntica para cualquier id, así que no hay nada que adivinar.
+     *
+     * La biometría vuelve SOLO con verificación en servidor: llave pública WebAuthn
+     * guardada por empleado (alta hecha con sesión de gerente), challenge de un solo uso
+     * emitido por este servidor y consumido al verificar la assertion (firma, rpId,
+     * origin, contador, userVerification). Nunca más aceptar un id como prueba.
+     */
+    if (fingerprint_id !== undefined && fingerprint_id !== null) {
+      return Response.json(
+        { error: 'La huella no está disponible por seguridad; entra con tu PIN', code: 'biometria_no_verificada' },
+        { status: 401 }
+      )
+    }
+
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
     // BUG-019: pos_staff is now tenant-scoped RLS with NO anon access, so the PIN
     // lookup must run server-side with the service_role key (bypasses RLS). The
@@ -112,8 +146,16 @@ export async function POST(request: NextRequest) {
     // Role hierarchy filter
     const ROLE_HIERARCHY: Record<string, number> = { mesero: 1, cajero: 2, capitan: 3, gerente: 4, admin: 5 }
     const effectiveMinRole = min_role || (manager === true ? 'gerente' : null)
+    // Un rol mínimo que no reconocemos NO es "sin filtro": antes caía de largo y
+    // cualquier PIN activo pasaba por aprobación de un rol inventado. Falla cerrado,
+    // sin contar intento (no es un PIN adivinado, es una petición mal formada).
+    // `Object.hasOwn`, no `ROLE_HIERARCHY[x]`: 'constructor' o '__proto__' son "verdaderos"
+    // por herencia y no son roles.
+    if (effectiveMinRole && !(typeof effectiveMinRole === 'string' && Object.hasOwn(ROLE_HIERARCHY, effectiveMinRole))) {
+      return Response.json({ error: 'Rol requerido no válido', code: 'rol_no_valido' }, { status: 401 })
+    }
     let roleFilter = ''
-    if (effectiveMinRole && ROLE_HIERARCHY[effectiveMinRole]) {
+    if (effectiveMinRole) {
       const minLevel = ROLE_HIERARCHY[effectiveMinRole]
       const allowedRoles = Object.entries(ROLE_HIERARCHY)
         .filter(([, level]) => level >= minLevel)
@@ -121,39 +163,9 @@ export async function POST(request: NextRequest) {
       roleFilter = `&role=in.(${allowedRoles.join(',')})`
     }
 
-    /**
-     * La huella IGNORABA el rol pedido — escalada de privilegio.
-     *
-     * Esta rama resolvia y devolvia ANTES de que se calculara `roleFilter`, asi que
-     * `manager: true` y `min_role` no se aplicaban. Y como el endpoint no verifica
-     * ninguna firma WebAuthn —confia en el id que le mandan— bastaba con conocer el
-     * UUID de un gerente para pedir un shiftToken de gerente SIN huella y SIN PIN.
-     * Esos UUID viven en `pos_staff_cache`, en el localStorage de cualquier terminal.
-     *
-     * Encontrado el 2026-08-31 al ir a extender la huella al corte de caja. Montar
-     * esa funcion encima habria llevado el bypass justo a la autorizacion del dinero.
-     *
-     * LO QUE ESTE ARREGLO NO HACE: sigue sin verificarse la firma WebAuthn del lado
-     * del servidor; el id sigue siendo una afirmacion del cliente. Lo que se cierra
-     * es la ESCALADA: una huella solo puede obtener el rol que su propio empleado ya
-     * tiene. La verificacion real exige guardar las llaves publicas en el servidor y
-     * validar la assertion — va aparte, y sigue haciendo falta.
-     */
-    // Fingerprint (WebAuthn) login — look up by staff ID, validate active status + tenant
-    if (fingerprint_id && typeof fingerprint_id === 'string') {
-      const fpRes = await fetch(
-        `${sbUrl}/rest/v1/pos_staff?id=eq.${encodeURIComponent(fingerprint_id)}&active=eq.true&client_id=eq.${encodeURIComponent(clientId)}${roleFilter}&select=id,name,role&limit=1`,
-        { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
-      )
-      if (fpRes.ok) {
-        const rows = await fpRes.json()
-        if (Array.isArray(rows) && rows.length > 0) {
-          return respond({ id: rows[0].id, name: rows[0].name, role: rows[0].role }, clientId, throttleKey)
-        }
-      }
-      await pinRecord(throttleKey, false)
-      return Response.json({ error: 'Empleado no encontrado o desactivado' }, { status: 401 })
-    }
+    // La rama de huella (`fingerprint_id` → pos_staff?id=eq.…) se quitó el 2026-09-23:
+    // ver "UN ID NO ES UNA HUELLA" arriba. Su historia (escalada de rol cerrada el
+    // 2026-08-31, suplantación que seguía abierta) está en huella-escalada-de-rol.test.ts.
 
     // Transitional compatibility: existing staff may still have 4–8 digit
     // PINs while each person is migrated to a unique 10-digit emergency PIN.
