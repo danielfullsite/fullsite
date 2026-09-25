@@ -17,7 +17,9 @@ const ok = (cond, msg) => { if (!cond) fallos.push(msg); console.log(`${cond ? '
 
 const arrancar = (dir, port) => {
   fs.mkdirSync(dir, { recursive: true })
-  return startLocalServer({ dataDir: dir, port,
+  // Con protector: el archivo dañado se intenta MIGRAR y la autoridad no se puede construir
+  // (que es lo que esta prueba quiere ver degradar). Sin protector se borraría sin más.
+  return startLocalServer({ dataDir: dir, port, protector: require('../core/protector-so').protectorDePrueba('degradado'),
     config: { restaurantId: R, instanceName: `pedro-${port}`, supabaseUrl: '', supabaseKey: '', printersConfig: null, lanSecret: SECRETO } })
 }
 const pedir = (port, ruta, init = {}) => fetch(`http://127.0.0.1:${port}${ruta}`, {

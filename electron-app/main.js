@@ -320,9 +320,16 @@ async function startLocalServer() {
   };
 
   try {
+    // Protector del SO para el almacén offline de la Caja (protector-so.js). En una Caja
+    // empaquetada SIEMPRE es safeStorage (DPAPI/Keychain); sin protección real la Caja no
+    // guarda credenciales offline. El de laboratorio sólo existe sin empaquetar.
+    const { safeStorage } = require('electron');
+    const { protectorParaLaCaja } = require('./local-server/core/protector-so');
+    const protector = protectorParaLaCaja({ safeStorage, empaquetada: app.isPackaged });
+    console.log(`[main] Protector de credenciales offline: ${protector.nombre}${protector.available ? '' : ' (offline sin credenciales)'}`);
     localServer = await start({ dataDir, port: LOCAL_SERVER_PORT, config: cfg,
       // Dedicated cloud credential stays in main, outside renderer identity.
-      businessSync: appConfig.business_sync || null });
+      businessSync: appConfig.business_sync || null, protector });
     // Incluye el secreto que Caja acaba de generar/persistir, no sólo config.json.
     appConfig.lan_secret = localServer.lanSecret || null;
     console.log('[main] Local server started.');

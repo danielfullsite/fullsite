@@ -97,7 +97,7 @@ const managerPinsAllowedFor = (clientId: string) => envTenantAllows('MANAGER_PIN
 export async function POST(request: NextRequest) {
   try {
     const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
-    const { pin, client_id, manager, fingerprint_id, min_role, device_id } = await request.json()
+    const { pin, client_id, manager, fingerprint_id, min_role, device_id, aprobacion } = await request.json()
     if (typeof client_id !== 'string' || !/^[a-z0-9_-]{1,40}$/i.test(client_id)) {
       return Response.json({ error: 'client_id requerido' }, { status: 400 })
     }
@@ -109,7 +109,10 @@ export async function POST(request: NextRequest) {
     // terminal que se dijo ser (una aprobación no viaja a otra terminal), y le da a las
     // aprobaciones su propio presupuesto de intentos por terminal.
     const terminalId = terminalIdValido(device_id) ? device_id : undefined
-    const esAprobacion = manager === true || (min_role !== undefined && min_role !== null)
+    // `aprobacion: true` sin rol: la pide la Caja (actor-authority.js), que revisa el rol mínimo
+    // ella misma. Si aquí se filtrara por rol, el 401 de «no alcanza» le borraría a la Caja la
+    // credencial de un empleado válido. Los consumidores del token revisan el rol igual.
+    const esAprobacion = manager === true || aprobacion === true || (min_role !== undefined && min_role !== null)
     const llaves = [throttleKey]
     if (esAprobacion) llaves.push(`aprob:${clientId}:${terminalId ?? 'sin-terminal'}`)
     let gate = { allowed: true } as Awaited<ReturnType<typeof pinGate>>
@@ -237,7 +240,7 @@ export async function POST(request: NextRequest) {
 
     const ctx: Contexto = {
       terminalId, aprobacion: esAprobacion, llaves,
-      auditar: esAprobacion ? auditorDeAprobacion(sbUrl, sbKey, clientId, terminalId, String(effectiveMinRole)) : undefined,
+      auditar: esAprobacion ? auditorDeAprobacion(sbUrl, sbKey, clientId, terminalId, String(effectiveMinRole ?? 'caja')) : undefined,
     }
 
     const res = await fetch(

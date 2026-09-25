@@ -2,11 +2,36 @@
 // Caja validates PINs against the configured HTTPS authority, then keeps a
 // bounded verifier for prepared users/devices. Browser staff/role caches never
 // authorize commands. Tokens are not written to the event log or snapshots.
+//
+// ── ALMACÉN SELLADO POR EL SO (bloque POS, 2026-09-24) ─────────────────────────
+//
+// Hasta hoy la llave HMAC vivía en `actor-signing-key` (texto) y los verificadores en
+// `actor-credentials.json` (JSON plano), en la misma carpeta. El índice de cada credencial
+// era HMAC(llave, 'pin:' + pin): con los dos archivos, 10^4 HMACs daban el PIN de cada
+// persona preparada, sin pasar por scrypt y sin tocar la aplicación.
+//
+// Ahora:
+//   · La llave y los datos se guardan SELLADOS por el protector del SO (protector-so.js:
+//     DPAPI / Keychain vía safeStorage). Copiados a otra máquina no abren.
+//   · Sin protector real la Caja NO guarda credenciales offline: valida con la nube y nada
+//     más. Los archivos planos viejos se borran. Falla cerrado; nunca texto plano.
+//   · Índice v2 = HMAC(llave, 'pin:v2:<restaurante>:<pin>').
+//   · Migración: los datos planos existentes pasan SELLADOS como `legacy` con su llave
+//     vieja (también sellada) y siguen sirviendo hasta que venzan (≤ 7 días) o hasta que esa
+//     persona entre con red y se re-prepare en v2. Los archivos planos se borran al migrar.
+//   · Revocación DURABLE: un 401 de la nube sobre una credencial conocida la borra y anota
+//     `revocados[staff]`, que también invalida la entrada legacy y las sesiones emitidas. Y
+//     después de cada entrada con red se sincroniza el roster (/api/pos/staff-roster): quien
+//     ya no está activo se borra y quien cambió de rol queda con el rol nuevo.
+//   · Recibos de aprobación offline (recibo-offline.js) con una llave por terminal que la
+//     nube deriva y entrega a una sesión de gerente (/api/pos/terminal-receipt-key).
 const fs = require('node:fs')
 const path = require('node:path')
 const crypto = require('node:crypto')
 const { replaceFile } = require('../adapters/storage/durable-file')
 const permissionContract = require('./permission-profiles.json')
+const { PROTECTOR_NO_DISPONIBLE } = require('./protector-so')
+const { firmarRecibo } = require('./recibo-offline')
 
 const LEVEL = { mesero: 1, cajero: 2, capitan: 3, gerente: 4, admin: 5 }
 const normalizedRole = role => permissionContract.aliases[role] || role
@@ -22,6 +47,10 @@ const equal = (a, b) => { const x = Buffer.from(a || ''), y = Buffer.from(b || '
 const VENTANA_INTENTOS_MS      = 10 * 60000
 const INTENTOS_POR_TERMINAL    = 10
 const INTENTOS_POR_INSTALACION = 30
+const ARCHIVO_SELLADO = 'actor-credentials.sealed'
+const LLAVE_SELLADA = 'actor-signing-key.sealed'
+const ARCHIVO_PLANO_VIEJO = 'actor-credentials.json'
+const LLAVE_PLANA_VIEJA = 'actor-signing-key'
 function permissionsFor(role) {
   const profile = permissionContract.profiles[normalizedRole(role)]
   if (!profile) return []
@@ -54,7 +83,7 @@ function permissionsFor(role) {
 }
 
 class ActorAuthority {
-  constructor({ directory, restaurantId, branchId, cloudOrigin = 'https://app.fullsite.mx', fetchImpl = fetch, now = Date.now, credentialTtlMs = 7 * 86400000, cloudTimeoutMs = 5000 }) {
+  constructor({ directory, restaurantId, branchId, cloudOrigin = 'https://app.fullsite.mx', fetchImpl = fetch, now = Date.now, credentialTtlMs = 7 * 86400000, cloudTimeoutMs = 5000, protector = PROTECTOR_NO_DISPONIBLE, terminalId = null }) {
     this.restaurantId = restaurantId; this.branchId = branchId || null; this.now = now; this.fetch = fetchImpl
     const origin = new URL(cloudOrigin)
     if (origin.protocol !== 'https:') throw new Error('La autoridad de PIN requiere HTTPS')
@@ -67,32 +96,74 @@ class ActorAuthority {
     // internet. El plazo lo acota el reenvío de las terminales secundarias.
     if (!Number.isSafeInteger(cloudTimeoutMs) || cloudTimeoutMs <= 0 || cloudTimeoutMs > 15000) throw new Error('Plazo de la autoridad inválido')
     this.cloudTimeoutMs = cloudTimeoutMs
+    this.protector = protector || PROTECTOR_NO_DISPONIBLE
+    this.protegido = this.protector.available === true
+    this.terminalId = /^[\w-]{1,64}$/.test(terminalId || '') ? terminalId : null
     fs.mkdirSync(directory, { recursive: true })
-    const keyPath = path.join(directory, 'actor-signing-key')
-    if (!fs.existsSync(keyPath)) replaceFile(keyPath, crypto.randomBytes(32).toString('hex'))
-    this.key = fs.readFileSync(keyPath, 'utf8').trim()
-    if (!/^[a-f0-9]{64}$/.test(this.key)) throw new Error('Clave de autoridad inválida')
-    this.file = path.join(directory, 'actor-credentials.json')
-    this.data = { credentials: {}, failures: {}, denied_devices: {}, last_seen: 0 }
-    if (fs.existsSync(this.file)) {
-      this.data = JSON.parse(fs.readFileSync(this.file, 'utf8'))
-      // Formato anterior: una lista plana sin terminal. No se puede repartir
-      // entre terminales, así que se descarta. Son marcas de diez minutos como
-      // mucho, y sólo ocurre una vez, al actualizar.
-      if (Array.isArray(this.data.failures)) this.data.failures = {}
-      if (this.data.restaurant_id !== restaurantId || this.data.location_id !== this.branchId ||
-        !this.data.credentials || !this.data.failures || typeof this.data.failures !== 'object' ||
-        !this.data.denied_devices || !Number.isFinite(this.data.last_seen)) {
-        throw new Error('Credenciales dañadas o pertenecientes a otra instalación')
+    this.file = path.join(directory, ARCHIVO_SELLADO)
+    this.keyFile = path.join(directory, LLAVE_SELLADA)
+    const planoViejo = path.join(directory, ARCHIVO_PLANO_VIEJO)
+    const llavePlanaVieja = path.join(directory, LLAVE_PLANA_VIEJA)
+    this.data = this._vacio()
+
+    if (!this.protegido) {
+      // Sin protección real no hay almacén offline. Lo viejo en texto plano se BORRA: es
+      // exactamente lo que no debe existir en disco.
+      this.key = crypto.randomBytes(32).toString('hex')
+      for (const f of [planoViejo, llavePlanaVieja]) { try { fs.rmSync(f, { force: true }) } catch { /* ignore */ } }
+    } else {
+      if (fs.existsSync(this.keyFile)) this.key = this._abrir(this.keyFile).trim()
+      else { this.key = crypto.randomBytes(32).toString('hex'); replaceFile(this.keyFile, this.protector.seal(this.key)) }
+      if (!/^[a-f0-9]{64}$/.test(this.key)) throw new Error('Clave de autoridad inválida')
+      if (fs.existsSync(this.file)) this.data = this._validar(JSON.parse(this._abrir(this.file)))
+      else if (fs.existsSync(planoViejo)) {
+        // Migración única: lo plano entra SELLADO como legacy, con su llave vieja.
+        const viejo = this._validar(JSON.parse(fs.readFileSync(planoViejo, 'utf8')))
+        const llaveVieja = fs.existsSync(llavePlanaVieja) ? fs.readFileSync(llavePlanaVieja, 'utf8').trim() : ''
+        this.data = { ...this._vacio(), failures: viejo.failures, denied_devices: viejo.denied_devices, last_seen: viejo.last_seen }
+        if (/^[a-f0-9]{64}$/.test(llaveVieja) && Object.keys(viejo.credentials).length) {
+          this.data.legacy = { key: llaveVieja, credentials: viejo.credentials }
+        }
+        this._persist()
       }
+      // Tras sellar, lo plano no se queda en disco.
+      for (const f of [planoViejo, llavePlanaVieja]) { try { fs.rmSync(f, { force: true }) } catch { /* ignore */ } }
     }
     this._queue = Promise.resolve()
+    this._fondo = Promise.resolve()
     this._faulted = false
+  }
+  /** Serializa una mutación con los logins (mismo candado). */
+  _enCola(fn) {
+    const r = this._queue.then(fn)
+    this._queue = r.catch(() => {})
+    return r
+  }
+  _vacio() {
+    return { credentials: {}, failures: {}, denied_devices: {}, last_seen: 0, revocados: {} }
+  }
+  _abrir(archivo) {
+    try { return this.protector.unseal(fs.readFileSync(archivo)) }
+    catch { throw new Error('Credenciales dañadas o pertenecientes a otra instalación') }
+  }
+  _validar(data) {
+    // Formato anterior: una lista plana sin terminal. No se puede repartir
+    // entre terminales, así que se descarta. Son marcas de diez minutos como
+    // mucho, y sólo ocurre una vez, al actualizar.
+    if (Array.isArray(data.failures)) data.failures = {}
+    if (!data.revocados || typeof data.revocados !== 'object') data.revocados = {}
+    if (data.restaurant_id !== this.restaurantId || data.location_id !== this.branchId ||
+      !data.credentials || !data.failures || typeof data.failures !== 'object' ||
+      !data.denied_devices || !Number.isFinite(data.last_seen)) {
+      throw new Error('Credenciales dañadas o pertenecientes a otra instalación')
+    }
+    return data
   }
   _persist() {
     this.data.restaurant_id = this.restaurantId; this.data.location_id = this.branchId
     this.data.last_seen = Math.max(this.data.last_seen || 0, this.now())
-    try { replaceFile(this.file, JSON.stringify(this.data)) }
+    if (!this.protegido) return // sólo memoria: nada que se pueda robar del disco
+    try { replaceFile(this.file, this.protector.seal(JSON.stringify(this.data))) }
     catch (error) { this._faulted = true; throw fail('No se pudo guardar la autorización en Caja', 503, 'ACTOR_STORAGE_UNAVAILABLE') }
   }
   // ── Presupuesto de intentos ────────────────────────────────────────────────
@@ -119,24 +190,57 @@ class ActorAuthority {
     if (!Number.isFinite(now) || now + 60000 < this.data.last_seen) throw fail('Reloj de Caja retrocedió; verificar hora antes de autorizar', 503, 'ACTOR_CLOCK_INVALID')
     return now
   }
-  _index(pin) { return crypto.createHmac('sha256', this.key).update('pin:' + pin).digest('hex') }
+  _index(pin) { return crypto.createHmac('sha256', this.key).update('pin:v2:' + this.restaurantId + ':' + pin).digest('hex') }
+  _legacyIndex(pin) { return this.data.legacy ? crypto.createHmac('sha256', this.data.legacy.key).update('pin:' + pin).digest('hex') : null }
   _sign(payload) { return crypto.createHmac('sha256', this.key).update(payload).digest('base64url') }
+  /** Todas las credenciales vivas en memoria, v2 y legacy. */
+  _todas() {
+    return [...Object.values(this.data.credentials), ...Object.values(this.data.legacy?.credentials || {})]
+  }
+  /** ¿Esta credencial fue revocada DESPUÉS de prepararse? Las legacy no traen fecha: cualquier revocación las mata. */
+  _revocada(credential) {
+    const r = this.data.revocados[credential.staff.id]
+    return Number.isFinite(r) && r >= (credential.prepared_at || 0)
+  }
+  /** Borra toda credencial (v2 y legacy) de una persona. */
+  _olvidarPersona(staffId) {
+    for (const [i, c] of Object.entries(this.data.credentials)) if (c.staff.id === staffId) delete this.data.credentials[i]
+    if (this.data.legacy) {
+      for (const [i, c] of Object.entries(this.data.legacy.credentials)) if (c.staff.id === staffId) delete this.data.legacy.credentials[i]
+      if (!Object.keys(this.data.legacy.credentials).length) delete this.data.legacy
+    }
+  }
   status() {
     const now = this._time()
-    const credentials = Object.values(this.data.credentials).filter(c => c.expires_at > now)
+    const credentials = this._todas().filter(c => c.expires_at > now && !this._revocada(c))
     return { prepared_users: credentials.length, roles: [...new Set(credentials.map(c => c.staff.role))],
       expires_at: credentials.length ? Math.min(...credentials.map(c => c.expires_at)) : null,
       ready: credentials.length > 0, max_validity_ms: this.ttl,
-      policy: 'Cada usuario y terminal deben validar PIN con internet antes del corte WAN' }
+      offline_protegido: this.protegido, protector: this.protector.nombre || null,
+      recibos_offline: !!this.data.recibos,
+      policy: this.protegido
+        ? 'Cada usuario y terminal deben validar PIN con internet antes del corte WAN'
+        : 'Sin protección del sistema operativo: esta Caja no guarda credenciales offline' }
   }
+  /** Espera a que terminen las tareas de fondo (roster, llave de recibos). Para pruebas y apagado. */
+  async idle() { await this._fondo; await this._queue }
   login(input) {
     // Includes throttle, network validation and durable write. Concurrent PINs
     // cannot all observe the same attempt budget or overwrite revocations.
     const result = this._queue.then(() => this._login(input))
     this._queue = result.catch(() => {})
-    return result
+    return result.then(r => {
+      const { _fondo, ...publico } = r
+      // Las consultas de fondo corren FUERA de la cola (una nube lenta no debe demorar el
+      // siguiente PIN); sólo aplicar su resultado pasa por la cola.
+      if (_fondo?.length) {
+        const corriendo = Promise.all(_fondo.map(t => t().catch(() => {})))
+        this._fondo = Promise.all([this._fondo, corriendo])
+      }
+      return publico
+    })
   }
-  async _login({ pin, deviceId, restaurantId, minRole }) {
+  async _login({ pin, deviceId, restaurantId, minRole, aprobacion = false }) {
     const now = this._time()
     if (restaurantId !== this.restaurantId || !/^[\w-]{1,64}$/.test(deviceId || '')) throw fail('Scope de acceso inválido', 403, 'ACTOR_SCOPE_INVALID')
     if (!/^\d{4,10}$/.test(pin || '')) throw fail('PIN inválido', 400, 'INVALID_PIN')
@@ -149,11 +253,16 @@ class ActorAuthority {
       throw fail('Demasiados intentos en el restaurante; espera diez minutos', 429, 'PIN_RATE_LIMITED')
     }
     const index = this._index(pin)
-    let credential = this.data.credentials[index], offline = false, shiftToken
+    const legacyIndex = this._legacyIndex(pin)
+    let credential = this.data.credentials[index] || (legacyIndex ? this.data.legacy.credentials[legacyIndex] : undefined)
+    let offline = false, shiftToken, approvalToken
     try {
       const response = await this.fetch(this.cloudOrigin + '/api/pos/pin', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, redirect: 'error',
-        body: JSON.stringify({ pin, client_id: this.restaurantId, device_id: deviceId }),
+        // `aprobacion` pide a la nube un token de APROBACIÓN (15 min, jti, terminal) sin
+        // filtrar por rol: el rol mínimo se revisa aquí abajo. Filtrar en la nube haría que
+        // el 401 de «no alcanza el rol» borrara la credencial de alguien que sí es válido.
+        body: JSON.stringify({ pin, client_id: this.restaurantId, device_id: deviceId, ...(aprobacion ? { aprobacion: true } : {}) }),
         signal: AbortSignal.timeout(this.cloudTimeoutMs),
       })
       // Un 429 NO es un veredicto sobre este PIN: la nube limita por IP pública,
@@ -165,9 +274,15 @@ class ActorAuthority {
       if ([400, 401, 403].includes(response.status)) {
         const rejection = await response.json().catch(() => ({}))
         if (rejection.code === 'terminal_not_enrolled') this.data.denied_devices[deviceId] = true
-        // A device rejection is not an employee revocation. A firm
-        // invalid PIN does revoke its cached verifier and every issued session.
-        else if (response.status === 401) delete this.data.credentials[index]
+        // A device rejection is not an employee revocation. A firm invalid PIN does
+        // revoke its cached verifier and every issued session — y ahora DURABLE: si la
+        // credencial era de alguien conocido, esa persona queda anotada en `revocados`,
+        // lo que mata también su entrada legacy (otro PIN viejo) y sus sesiones.
+        else if (response.status === 401) {
+          if (credential) { this.data.revocados[credential.staff.id] = now; this._olvidarPersona(credential.staff.id) }
+          delete this.data.credentials[index]
+          if (legacyIndex && this.data.legacy) delete this.data.legacy.credentials[legacyIndex]
+        }
         throw fail(rejection.code === 'terminal_not_enrolled' ? 'Terminal no autorizada' : 'PIN rechazado por la autoridad', response.status, rejection.code || 'PIN_REJECTED')
       }
       if (!response.ok) throw new Error('Autoridad no disponible')
@@ -175,20 +290,28 @@ class ActorAuthority {
       const staff = data.staff
       if (typeof staff?.id !== 'string' || !staff.id || typeof staff.name !== 'string' || !LEVEL[normalizedRole(staff.role)]) throw fail('Respuesta de autoridad inválida', 502, 'AUTHORITY_RESPONSE_INVALID')
       shiftToken = typeof data.shiftToken === 'string' ? data.shiftToken : undefined
-      const unchanged = credential && credential.staff.id === staff.id && credential.staff.role === staff.role
+      approvalToken = typeof data.approvalToken === 'string' ? data.approvalToken : undefined
+      const unchanged = credential && credential.staff.id === staff.id && credential.staff.role === staff.role && credential.prepared_at
       const salt = unchanged ? credential.salt : crypto.randomBytes(16).toString('hex')
       credential = { staff: { id: staff.id, name: staff.name, role: staff.role }, salt,
-        hash: crypto.scryptSync(pin, salt, 32).toString('hex'), expires_at: now + this.ttl,
+        hash: crypto.scryptSync(pin, salt, 32).toString('hex'), expires_at: now + this.ttl, prepared_at: now,
         revision: unchanged ? credential.revision : crypto.randomUUID(),
         devices: { ...(unchanged ? credential.devices : {}), [deviceId]: now + this.ttl } }
-      for (const [oldIndex, old] of Object.entries(this.data.credentials)) if (old.staff.id === staff.id) delete this.data.credentials[oldIndex]
+      // La nube acaba de confirmar a esta persona: si estaba revocada, deja de estarlo.
+      delete this.data.revocados[staff.id]
+      this._olvidarPersona(staff.id)
+      // Sin protector se guarda SÓLO en memoria (para verificar las sesiones de este
+      // arranque); `_persist` no escribe nada y el camino offline está cerrado.
       this.data.credentials[index] = credential
       delete this.data.denied_devices[deviceId]
     } catch (error) {
       if (error.status) { this._anotarFallo(deviceId, now); this._persist(); throw error }
       offline = true
+      if (!this.protegido) {
+        throw fail('Esta Caja no tiene protección del sistema operativo para guardar credenciales; sin internet no puede validar PINs', 503, 'OFFLINE_SIN_PROTECCION')
+      }
       if (this.data.denied_devices[deviceId]) throw fail('Terminal revocada; requiere autorización con internet', 403, 'terminal_not_enrolled')
-      if (!credential || credential.expires_at <= now || !(credential.devices?.[deviceId] > now) || !equal(crypto.scryptSync(pin, credential.salt, 32).toString('hex'), credential.hash)) {
+      if (!credential || this._revocada(credential) || credential.expires_at <= now || !(credential.devices?.[deviceId] > now) || !equal(crypto.scryptSync(pin, credential.salt, 32).toString('hex'), credential.hash)) {
         this._anotarFallo(deviceId, now); this._persist()
         throw fail('Usuario o terminal sin preparar, o credencial vencida; valida PIN con internet', 401, 'OFFLINE_USER_NOT_PREPARED')
       }
@@ -200,8 +323,71 @@ class ActorAuthority {
     if (minRole && LEVEL[normalizedRole(credential.staff.role)] < LEVEL[normalizedRole(minRole)]) throw fail('Este usuario no tiene el permiso solicitado', 403, 'PERMISSION_DENIED')
     const expiresAt = Math.min(now + 8 * 3600000, credential.expires_at)
     const payload = Buffer.from(JSON.stringify({ restaurant_id: this.restaurantId, location_id: this.branchId,
-      device_id: deviceId, actor_id: credential.staff.id, revision: credential.revision, expires_at: expiresAt })).toString('base64url')
-    return { staff: credential.staff, actor_token: payload + '.' + this._sign(payload), expires_at: expiresAt, offline, ...(shiftToken ? { shiftToken } : {}) }
+      device_id: deviceId, actor_id: credential.staff.id, revision: credential.revision, iat: now, expires_at: expiresAt })).toString('base64url')
+    let recibo
+    if (aprobacion && offline && this.data.recibos) {
+      recibo = firmarRecibo(this.data.recibos.key, { cid: this.restaurantId, tid: this.data.recibos.tid, req: deviceId,
+        sub: credential.staff.id, nam: credential.staff.name, rol: credential.staff.role, kid: this.data.recibos.kid, now })
+    }
+    const fondo = []
+    if (!offline && shiftToken) {
+      fondo.push(() => this._sincronizarRoster(shiftToken))
+      if (this.protegido && this.terminalId && LEVEL[normalizedRole(credential.staff.role)] >= LEVEL.gerente) {
+        fondo.push(() => this._obtenerLlaveDeRecibos(shiftToken))
+      }
+    }
+    return { staff: credential.staff, actor_token: payload + '.' + this._sign(payload), expires_at: expiresAt, offline,
+      ...(shiftToken ? { shiftToken } : {}), ...(approvalToken ? { approvalToken } : {}), ...(recibo ? { recibo } : {}), _fondo: fondo }
+  }
+  /**
+   * Roster: quién sigue activo y con qué rol. Sin esto, un empleado dado de baja seguía
+   * entrando offline con su credencial preparada hasta 7 días, mientras no tecleara su PIN
+   * con red (que es lo que dispara el 401). Best-effort: si la nube no contesta, no pasa
+   * nada; cuando contesta, lo que decide es durable.
+   */
+  async _sincronizarRoster(shiftToken) {
+    const r = await this.fetch(this.cloudOrigin + '/api/pos/staff-roster', {
+      method: 'GET', headers: { Authorization: `Bearer ${shiftToken}` }, redirect: 'error',
+      signal: AbortSignal.timeout(this.cloudTimeoutMs),
+    })
+    if (!r.ok) return
+    const cuerpo = await r.json().catch(() => null)
+    if (!cuerpo || cuerpo.client_id !== this.restaurantId || !Array.isArray(cuerpo.staff)) return
+    await this._enCola(() => this._aplicarRoster(cuerpo))
+  }
+  _aplicarRoster(cuerpo) {
+    const now = this._time()
+    const activos = new Map()
+    for (const s of cuerpo.staff) if (typeof s?.id === 'string' && LEVEL[normalizedRole(s.role)]) activos.set(s.id, s.role)
+    let cambio = false
+    for (const c of this._todas()) {
+      if (!activos.has(c.staff.id)) {
+        this.data.revocados[c.staff.id] = now; this._olvidarPersona(c.staff.id); cambio = true
+      } else if (activos.get(c.staff.id) !== c.staff.role) {
+        // Cambió de rol: el rol nuevo manda y las sesiones emitidas con el viejo mueren.
+        c.staff.role = activos.get(c.staff.id); c.revision = crypto.randomUUID(); cambio = true
+      }
+    }
+    this.data.roster_as_of = now
+    void cambio
+    this._persist()
+  }
+  /** Llave de recibos offline para ESTA terminal. Sólo con sesión de gerente y almacén sellado. */
+  async _obtenerLlaveDeRecibos(shiftToken) {
+    if (!this.protegido || !this.terminalId) return
+    const r = await this.fetch(this.cloudOrigin + '/api/pos/terminal-receipt-key', {
+      method: 'POST', redirect: 'error',
+      headers: { Authorization: `Bearer ${shiftToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ device_id: this.terminalId }),
+      signal: AbortSignal.timeout(this.cloudTimeoutMs),
+    })
+    if (!r.ok) return
+    const cuerpo = await r.json().catch(() => null)
+    if (!cuerpo || !/^[a-f0-9]{64}$/.test(cuerpo.key || '') || typeof cuerpo.kid !== 'string' || cuerpo.device_id !== this.terminalId) return
+    await this._enCola(() => {
+      this.data.recibos = { kid: cuerpo.kid, key: cuerpo.key, tid: this.terminalId, recibido_at: this._time() }
+      this._persist()
+    })
   }
   verify(token, deviceId) {
     const now = this._time()
@@ -211,8 +397,9 @@ class ActorAuthority {
     let claims
     try { claims = JSON.parse(Buffer.from(payload, 'base64url').toString()) } catch { throw fail('Sesión de usuario inválida') }
     if (claims.restaurant_id !== this.restaurantId || claims.location_id !== this.branchId || claims.device_id !== deviceId || !(claims.expires_at > now)) throw fail('Sesión vencida o de otra instalación/terminal')
-    const credential = Object.values(this.data.credentials).find(c => c.staff.id === claims.actor_id && c.revision === claims.revision && c.expires_at > now)
-    if (!credential || !(credential.devices?.[deviceId] > now) || this.data.denied_devices[deviceId]) throw fail('Usuario o terminal revocado o vencido')
+    const credential = this._todas().find(c => c.staff.id === claims.actor_id && c.revision === claims.revision && c.expires_at > now)
+    const revocadoDespues = Number.isFinite(this.data.revocados[claims.actor_id]) && this.data.revocados[claims.actor_id] >= (claims.iat || 0)
+    if (!credential || revocadoDespues || !(credential.devices?.[deviceId] > now) || this.data.denied_devices[deviceId]) throw fail('Usuario o terminal revocado o vencido')
     return { ...credential.staff, permissions: permissionsFor(credential.staff.role), device_id: deviceId, expires_at: claims.expires_at }
   }
 }

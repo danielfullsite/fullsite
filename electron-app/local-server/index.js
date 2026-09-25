@@ -682,8 +682,11 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority 
       try {
         const body = await parseBody(req)
         if (credLan.verificarScope(body, { restaurantId, branchId })) { json(res, 403, { error: 'Scope de otra instalación' }); return }
+        // `aprobacion`: la pide una pantalla de autorización de gerente. Con red devuelve el
+        // token de APROBACIÓN de la nube; sin red, un recibo firmado por esta Caja
+        // (recibo-offline.js) si ya tiene la llave de su terminal.
         const result = await actorAuthority.login({ pin: body.pin, restaurantId,
-          deviceId: req.headers['x-fullsite-terminal'], minRole: body.min_role })
+          deviceId: req.headers['x-fullsite-terminal'], minRole: body.min_role, aprobacion: body.aprobacion === true })
         // Server-issued token only, held for acquisition, never persisted.
         if (!result.offline && result.shiftToken && catalogStore) {
           void catalogStore.refresh(result.shiftToken).catch(() => {})
@@ -858,7 +861,7 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, actorAuthority 
  *             printersConfig, printerConfigPath, queueFilePath, clientId }
  * @returns {{ httpServer, close }}
  */
-async function startLocalServer({ dataDir, port = 7717, config = {}, businessSync = null }) {
+async function startLocalServer({ dataDir, port = 7717, config = {}, businessSync = null, protector = undefined }) {
   let _businessOutbox = null
   let businessSyncIssue = businessSync ? 'BUSINESS_SYNC_NOT_STARTED' : 'BUSINESS_SYNC_NOT_CONFIGURED'
   // CFG-02: refuse to start if restaurant identity is missing or invalid.
@@ -967,6 +970,9 @@ async function startLocalServer({ dataDir, port = 7717, config = {}, businessSyn
     : construirODegradar('Autoridad de PIN', () => new ActorAuthority({
       directory: require('path').join(dataDir, 'actor-authority'), restaurantId,
       branchId: config.branchId || config.locationId || null,
+      // Sin protector del SO (p. ej. Pedro fuera de Electron) la autoridad valida con la
+      // nube y no guarda credenciales offline. main.js pasa el de safeStorage.
+      protector, terminalId: config.terminalId || null,
     }))
   const catalogo = config.posServerIp
     ? { instancia: null, motivo: 'Esta terminal lee el catálogo de la Caja' }

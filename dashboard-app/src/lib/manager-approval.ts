@@ -1,4 +1,5 @@
 import { verifyApprovalCredential } from '@/lib/shift-token'
+import { esRecibo, verificarRecibo } from '@/lib/recibo-offline'
 
 // ─── Aprobación de gerente server-side (anti-fraude) ─────────────────────────
 // Para operaciones sensibles (cancelar, reabrir cuenta, descuento). Antes se confiaba
@@ -111,6 +112,23 @@ export async function verificarTokenDeAprobacion(token: unknown, opts: {
   operacion?: string
 }): Promise<VeredictoDeToken> {
   if (typeof token !== 'string' || !token) return { ok: false, error: 'SIN_TOKEN' }
+  // Recibo de aprobación OFFLINE firmado por la Caja (recibo-offline.ts). Es una PRUEBA
+  // verificable, así que cuenta como aprobación del servidor aun en POS_APPROVAL_STRICT.
+  // Un recibo que no verifica (firma, tenant, rol, vigencia, raíz ausente) vale lo mismo que
+  // un token inválido: el consumidor decide con sus banderas de rollout.
+  if (esRecibo(token)) {
+    const r = verificarRecibo(token, { clientId: opts.clientId, minLevel: opts.minLevel, terminalSolicitante: opts.terminalSolicitante })
+    if (!r.ok) return { ok: false, error: r.error === 'TERMINAL_DISTINTA' ? 'TERMINAL_DISTINTA' : 'TOKEN_INVALIDO' }
+    const marcasR: string[] = []
+    const uso = await registrarUsoDeAprobacion(`recibo:${r.claims.non}`, opts.clientId, opts.operacion || `recibo:${r.claims.non}`)
+    if (uso === 'reusado') return { ok: false, error: 'APROBACION_REUSADA' }
+    if (uso === 'sin-registro') {
+      if (aprobacionV2Estricta()) return { ok: false, error: 'APROBACION_NO_REGISTRADA' }
+      marcasR.push('sin_registro')
+    }
+    if (uso === 'mismo') marcasR.push('reintento')
+    return { ok: true, mode: ['offline_recibo:' + r.claims.rol, ...marcasR].join(':'), actor: r.claims.nam || r.claims.sub, rol: r.claims.rol }
+  }
   const p = await verifyApprovalCredential(token)
   if (!p || p.cid !== opts.clientId || (ROLE_LVL[p.rol] || 0) < opts.minLevel) return { ok: false, error: 'TOKEN_INVALIDO' }
   const estricta = aprobacionV2Estricta()

@@ -116,24 +116,27 @@ describe('cableado — que layout.tsx use la clasificación', () => {
       .not.toContain("veredicto === 'pin-rechazado'")
   })
 
-  it('el respaldo offline sigue siendo lo que se consulta al caer', async () => {
+  // B-2 (bloque POS, 2026-09-24): el respaldo offline del NAVEGADOR se retiró — guardaba
+  // verificadores de PIN en localStorage. Al caer, el navegador sin Caja ya no juzga el PIN
+  // con nada local (las terminales Electron entran por la Caja, con su almacén sellado). Lo
+  // que esta prueba cuidaba —que caer no cuente como PIN incorrecto— sigue abajo.
+  it('al caer, el navegador sin Caja NO consulta ningún verificador local', async () => {
     const src = await leerLayout()
-    const lanza = src.indexOf("throw new Error('autoridad-no-disponible')")
-    const consulta = src.indexOf('estadoCredencialesOffline()')
-    expect(lanza, 'debe lanzar con ese motivo exacto').toBeGreaterThan(-1)
-    expect(consulta, 'y el catch debe seguir consultando el almacén').toBeGreaterThan(lanza)
+    expect(src.indexOf("throw new Error('autoridad-no-disponible')"), 'debe lanzar con ese motivo exacto').toBeGreaterThan(-1)
+    expect(src).not.toMatch(/estadoCredencialesOffline\(|verifyPinOffline\(|provisionManagerCredential\(/)
+    expect(src).not.toMatch(/localStorage\.(getItem|setItem)\('pos_staff_cache'/)
   })
 
   it('con la autoridad caída el mensaje NO dice "sin conexión" — la terminal sí tiene red', async () => {
     const src = await leerLayout()
     expect(src, 'el operador necesita saber que no es su PIN ni su cable')
       .toMatch(/servidor no pudo confirmar tu PIN/i)
-    // Y ese mensaje debe ganarle a los otros dos: llegamos al respaldo porque la NUBE
-    // contestó mal, no porque falte red ni porque venciera el TTL.
+    // Y ese mensaje debe ganarle al de «sin conexión»: llegamos aquí porque la NUBE contestó
+    // mal, no porque falte red.
     const i = src.indexOf('if (autoridadNoDisponible) {')
-    const vencida = src.indexOf("estado === 'todas-vencidas'", i)
+    const sinRed = src.indexOf('Sin conexión.', i)
     expect(i, 'la causa real debe evaluarse primero').toBeGreaterThan(-1)
-    expect(vencida, 'y las otras dos después').toBeGreaterThan(i)
+    expect(sinRed, 'y la falta de red después').toBeGreaterThan(i)
   })
 
   it('un intento nuevo borra el aviso del anterior — no dos diagnósticos a la vez', async () => {

@@ -3,6 +3,7 @@ import { nuevaIdentidadDeAccion } from './operation-identity'
 import { recordMovement, confirmarMovimientoInventario } from './inventory'
 import { apiUrl } from './api-base'
 import { clasificarRespuestaDePin, TIMEOUT_AUTORIDAD_PIN_MS } from './veredicto-de-la-autoridad'
+import { purgarCredencialesOfflineDelNavegador } from './credenciales-offline-navegador'
 // POS Menu Data — AMALAY real menu (el POS legado)
 //
 // SQL for Supabase (run in SQL Editor):
@@ -2161,38 +2162,14 @@ export async function getAuditLogForOrder(orderId: string): Promise<AuditLogEntr
 // Uses btoa(pin) as a deterministic, non-reversible-enough obfuscation for cache keying.
 // (Not cryptographic — purpose is to avoid storing raw PINs, not to resist an attacker
 //  with full localStorage access; that threat is out of scope for an in-person POS.)
-async function _pinCacheKey(pin: string): Promise<string> {
-  // Hash NO reversible (SHA-256 con sal de la app) — antes era btoa() reversible,
-  // lo que dejaba recuperar el PIN del gerente leyendo localStorage. Ya no.
-  try {
-    const data = new TextEncoder().encode(`fs-pin-v2:${pin}`)
-    const buf = await crypto.subtle.digest('SHA-256', data)
-    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
-  } catch {
-    return `len:${pin.length}` // fallback improbable; nunca guarda el PIN crudo
-  }
-}
+// B-2 (bloque POS, 2026-09-24): aquí vivían `_pinCacheKey` (SHA-256 de 'fs-pin-v2:'+pin como
+// índice de `pos_manager_pin_cache`) y `_managerFromStaffCache` (SHA-256 de pin:id en
+// `pos_staff_cache`). Eran verificadores de un PIN de 4 dígitos en localStorage: una copia del
+// perfil bastaba para sacarlos fuera de la aplicación. Se retiraron; ver
+// credenciales-offline-navegador.ts. Sin red, las aprobaciones las firma la Caja.
 
-// Fallback offline de auth de gerente: si el usuario LOGUEADO es admin/gerente,
-// su propio PIN lo autoriza validando contra pos_staff_cache (mismo hash que el
-// login: SHA-256 de `${pin}:${id}`, valido 8h). Cubre "el dueño/manager opera la
-// terminal" durante un corte de internet, sin depender de una verificacion online
-// reciente (la cache de 30min quedaba vacia -> "PIN invalido" offline).
-const _ROLE_LVL: Record<string, number> = { mesero: 1, cajero: 2, capitan: 3, gerente: 4, admin: 5 }
-async function _managerFromStaffCache(pin: string, minLevel = 4): Promise<{ name: string; role: string } | null> {
-  try {
-    if (typeof localStorage === 'undefined') return null
-    const raw = localStorage.getItem('pos_staff_cache')
-    if (!raw) return null
-    const s = JSON.parse(raw)
-    if (!s || Array.isArray(s) || !s.pin_hash || !(s.exp > Date.now())) return null
-    if ((_ROLE_LVL[s.role] || 0) < minLevel) return null
-    const data = new TextEncoder().encode(`${pin}:${s.id}`)
-    const buf = await crypto.subtle.digest('SHA-256', data)
-    const h = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
-    return h === s.pin_hash ? { name: s.name as string, role: s.role as string } : null
-  } catch { return null }
-}
+// Lo que haya quedado de versiones anteriores se borra al cargar este módulo en el navegador.
+if (typeof window !== 'undefined') purgarCredencialesOfflineDelNavegador()
 
 // Aprobación de gerente SERVER-VERIFICABLE: cuando el PIN se valida online, /api/pos/pin
 // emite un shiftToken firmado del gerente. Lo guardamos aquí un instante para que la ruta
@@ -2320,42 +2297,36 @@ function _avisarFallo(motivo: MotivoAprobacionFallida): void {
   try { window.dispatchEvent(new CustomEvent('fullsite:aprobacion-fallida', { detail: { motivo } })) } catch { /* ignore */ }
 }
 
-/** ¿Hay alguna credencial local con la que juzgar un PIN de este nivel? */
-function _hayCredencialLocalUtilizable(minLevel: number, now = Date.now()): boolean {
-  try {
-    const cached = JSON.parse(localStorage.getItem('pos_manager_pin_cache') || '{}') as Record<string, { role?: string; cached_at?: number }>
-    if (Object.values(cached).some(e => now - (e.cached_at || 0) < 30 * 60 * 1000 && (_ROLE_LVL[String(e.role)] || 0) >= minLevel)) return true
-  } catch { /* ignore */ }
-  try {
-    const s = JSON.parse(localStorage.getItem('pos_staff_cache') || 'null')
-    if (s && !Array.isArray(s) && s.pin_hash && s.exp > now && (_ROLE_LVL[s.role] || 0) >= minLevel) return true
-  } catch { /* ignore */ }
-  return false
-}
-
-async function _aprobacionLocal(pin: string, minLevel: number): Promise<{ name: string; role: string } | null> {
-  try {
-    const cached = JSON.parse(localStorage.getItem('pos_manager_pin_cache') || '{}')
-    const entry = cached[await _pinCacheKey(pin)]
-    // El rol cacheado tiene que cumplir el mínimo pedido: un PIN de capitán validado para
-    // transferir no vale para un permiso de gerente (barrido 2026-09-10, LENTE-6).
-    if (entry?.name && Date.now() - (entry.cached_at || 0) < 30 * 60 * 1000 && (_ROLE_LVL[entry.role] || 0) >= minLevel) {
-      return { name: entry.name as string, role: (entry.role as string) || 'gerente' }
-    }
-  } catch { /* ignore */ }
-  // El propio PIN del usuario logueado, si alcanza el nivel (pos_staff_cache, 8 h).
-  return _managerFromStaffCache(pin, minLevel)
-}
-
 async function _aprobarConAutoridad(pin: string, pedido: { minRole?: string }): Promise<AprobacionOk | AprobacionFallida> {
   if (!pin) return { ok: false, motivo: 'pin-rechazado' }
   if (bloqueoDeAprobacionRestante() > 0) return { ok: false, motivo: 'bloqueado-local' }
-  const minLevel = pedido.minRole ? (_ROLE_LVL[pedido.minRole] || 99) : 4
 
+  // Terminal con Caja (Electron): la Caja es la autoridad. Con red valida en la nube y trae el
+  // token de APROBACIÓN; sin red valida contra su almacén SELLADO por el SO y firma un recibo
+  // verificable. Nada del navegador juzga el PIN.
+  if (requiereCaja()) {
+    try {
+      const { aprobarConPinEnCaja } = await import('./pedro-actor')
+      const r = await aprobarConPinEnCaja(pin, pedido.minRole || 'gerente')
+      _limpiarIntentos()
+      _ultimoMotivoAprobacion = null
+      return { ok: true, name: r.staff.name, role: r.staff.role, approvalToken: r.approvalToken || r.recibo, modo: r.offline ? 'offline' : 'online' }
+    } catch (e) {
+      const { status, code } = (e || {}) as { status?: number; code?: string }
+      if (status === 401 || code === 'PERMISSION_DENIED') { _anotarRechazo(); return { ok: false, motivo: 'pin-rechazado' } }
+      if (status === 429) return { ok: false, motivo: 'bloqueado-local' }
+      if (code === 'terminal_not_enrolled') return { ok: false, motivo: 'terminal-no-enrolada' }
+      if (status === 400) return { ok: false, motivo: 'pin-rechazado' }
+      // 503 (sin protección del SO, autoridad caída), sin respuesta de la Caja, timeout.
+      return { ok: false, motivo: 'autoridad-no-disponible' }
+    }
+  }
+
+  // Navegador sin Caja: sólo la nube. Sin red no hay aprobación — el navegador no guarda
+  // verificadores de PIN (B-2).
   let res: Response | null = null
   try {
     if (typeof navigator !== 'undefined' && navigator.onLine === false) throw new Error('offline')
-    const { apiUrl } = await import('./api-base')
     const { getTerminalId } = await import('./pos-sessions')
     res = await fetch(apiUrl('/api/pos/pin'), {
       method: 'POST',
@@ -2372,29 +2343,14 @@ async function _aprobarConAutoridad(pin: string, pedido: { minRole?: string }): 
     const cuerpo = await res.json().catch(() => null) as { staff?: { name?: string; role?: string }; shiftToken?: string; approvalToken?: string; code?: string } | null
     const veredicto = clasificarRespuestaDePin(res.status, cuerpo?.code)
     if (veredicto === 'aceptado' && cuerpo?.staff?.name) {
-      const role = cuerpo.staff.role || pedido.minRole || 'gerente'
-      try {
-        const cached = JSON.parse(localStorage.getItem('pos_manager_pin_cache') || '{}')
-        cached[await _pinCacheKey(pin)] = { name: cuerpo.staff.name, role, cached_at: Date.now() }
-        localStorage.setItem('pos_manager_pin_cache', JSON.stringify(cached))
-      } catch { /* ignore */ }
       _limpiarIntentos()
       _ultimoMotivoAprobacion = null
-      // El token de APROBACIÓN (15 min, jti, terminal) si el servidor lo emite; el shiftToken
-      // sólo para servidores viejos.
-      return { ok: true, name: cuerpo.staff.name, role, approvalToken: cuerpo.approvalToken || cuerpo.shiftToken, modo: 'online' }
+      return { ok: true, name: cuerpo.staff.name, role: cuerpo.staff.role || pedido.minRole || 'gerente', approvalToken: cuerpo.approvalToken || cuerpo.shiftToken, modo: 'online' }
     }
     if (veredicto === 'pin-rechazado') { _anotarRechazo(); return { ok: false, motivo: 'pin-rechazado' } }
     if (veredicto === 'sin-tenant') return { ok: false, motivo: 'sin-tenant' }
     if (veredicto === 'terminal-no-enrolada') return { ok: false, motivo: 'terminal-no-enrolada' }
-    // autoridad-no-disponible, o un 2xx sin empleado: cae al respaldo local.
   }
-
-  const local = await _aprobacionLocal(pin, minLevel)
-  if (local) { _limpiarIntentos(); _ultimoMotivoAprobacion = null; return { ok: true, ...local, modo: 'offline' } }
-  // Había con qué juzgar y no coincidió: es un rechazo real y cuenta. Si no había nada,
-  // no se puede decir que el PIN esté mal.
-  if (_hayCredencialLocalUtilizable(minLevel)) { _anotarRechazo(); return { ok: false, motivo: 'pin-rechazado' } }
   return { ok: false, motivo: 'autoridad-no-disponible' }
 }
 

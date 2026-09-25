@@ -29,6 +29,13 @@ const electronBinary = require(path.join(ELECTRON_APP, 'node_modules/electron'))
 const { CURRENT_CONFIG_VERSION } = require('../local-server/config-schema')
 const cred = require('../local-server/core/credencial-lan')
 const { ActorAuthority } = require('../local-server/core/actor-authority')
+// Protector de LABORATORIO (bloque POS, 2026-09-24): el almacén offline de la Caja va sellado
+// por el SO. El laboratorio prepara credenciales desde Node y luego las lee Pedro dentro de
+// Electron, así que los dos usan el protector de prueba con el mismo secreto. main.js sólo lo
+// acepta con la app SIN empaquetar y FULLSITE_LAB_PROTECTOR=prueba.
+const { protectorDePrueba } = require('../local-server/core/protector-so')
+const LAB_PROTECTOR_SECRETO = 'laboratorio-no-es-proteccion'
+const labProtector = protectorDePrueba(LAB_PROTECTOR_SECRETO)
 const { CatalogStore } = require('../local-server/core/catalog-store')
 const WebSocket = require(path.join(ELECTRON_APP, 'node_modules/ws'))
 
@@ -366,6 +373,7 @@ require(${JSON.stringify(path.join(ELECTRON_APP, 'main.js'))});\n`)
   }
   const app = await _electron.launch({ executablePath: electronBinary, args: [entry],
     env: cleanEnv({ FULLSITE_DEV: '1', FULLSITE_USER_DATA_DIR: userData, FULLSITE_LOCAL_SERVER_PORT: String(port),
+      FULLSITE_LAB_PROTECTOR: 'prueba', FULLSITE_LAB_PROTECTOR_SECRETO: LAB_PROTECTOR_SECRETO,
       FULLSITE_LAB_NUBE: nube.origin,
       ...(packagedBundle ? { FULLSITE_UI_BUNDLE_DIR: packagedBundle } : {}),
       // Arranque inerte del mismo origen: instalar interceptores antes del JS de
@@ -464,7 +472,7 @@ async function main() {
   // Prepare real signed sessions in the synthetic Caja profile before it boots.
   // Only the HTTPS PIN provider response is a fixture; token verification in
   // the running servers and the financial transport are real.
-  const actors = new ActorAuthority({ directory: path.join(base, 'Caja', 'actor-authority'), restaurantId: tenant,
+  const actors = new ActorAuthority({ directory: path.join(base, 'Caja', 'actor-authority'), restaurantId: tenant, protector: labProtector,
     fetchImpl: async () => Response.json({ staff }) })
   for (const name of ['Caja', 'POS 2', 'POS 3', 'Cocina']) {
     const terminalId = randomUUID()

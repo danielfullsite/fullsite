@@ -16,6 +16,13 @@ const { expect } = require(path.join(ROOT, 'dashboard-app/node_modules/@playwrig
 const electronBinary = require('../node_modules/electron')
 const { CURRENT_CONFIG_VERSION } = require('../local-server/config-schema')
 const { ActorAuthority } = require('../local-server/core/actor-authority')
+// Protector de LABORATORIO (bloque POS, 2026-09-24): el almacén offline de la Caja va sellado
+// por el SO. El laboratorio prepara credenciales desde Node y luego las lee Pedro dentro de
+// Electron, así que los dos usan el protector de prueba con el mismo secreto. main.js sólo lo
+// acepta con la app SIN empaquetar y FULLSITE_LAB_PROTECTOR=prueba.
+const { protectorDePrueba } = require('../local-server/core/protector-so')
+const LAB_PROTECTOR_SECRETO = 'laboratorio-no-es-proteccion'
+const labProtector = protectorDePrueba(LAB_PROTECTOR_SECRETO)
 const { CatalogStore } = require('../local-server/core/catalog-store')
 const { verifyPackage, ORIGIN } = require('../offline-ui/package-store')
 const cred = require('../local-server/core/credencial-lan')
@@ -69,6 +76,7 @@ require(${JSON.stringify(path.join(ROOT, 'electron-app/main.js'))});
 `)
   const app = await _electron.launch({ executablePath: electronBinary, args: [bootstrap], timeout: 60000,
     env: cleanEnv({ FULLSITE_DEV: '1', FULLSITE_USER_DATA_DIR: terminal.directory,
+      FULLSITE_LAB_PROTECTOR: 'prueba', FULLSITE_LAB_PROTECTOR_SECRETO: LAB_PROTECTOR_SECRETO,
       FULLSITE_LOCAL_SERVER_PORT: String(terminal.port), FULLSITE_UI_BUNDLE_DIR: bundlePath }),
   })
   active.add(app)
@@ -114,7 +122,7 @@ async function main() {
       pos_server_port: index ? ports[0] : null, lan_secret: secret, instance_name: terminal.name,
     }))
   }
-  const authority = new ActorAuthority({ directory: path.join(terminals[0].directory, 'actor-authority'), restaurantId: tenant,
+  const authority = new ActorAuthority({ directory: path.join(terminals[0].directory, 'actor-authority'), restaurantId: tenant, protector: labProtector,
     fetchImpl: async () => Response.json({ staff }) })
   for (const terminal of terminals) await authority.login({ pin, deviceId: terminal.terminalId, restaurantId: tenant })
   const catalog = new CatalogStore({ directory: path.join(terminals[0].directory, 'catalog'), restaurantId: tenant,

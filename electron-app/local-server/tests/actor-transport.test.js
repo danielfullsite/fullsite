@@ -21,6 +21,7 @@ test('PIN and payments forwarded through a secondary retain verified employee/de
   const secret = cred.generarSecreto()
   let online = true
   const actorAuthority = new ActorAuthority({ directory: path.join(directory, 'actors'), restaurantId, branchId,
+    protector: require('../core/protector-so').protectorDePrueba('actor-transport'),
     fetchImpl: async (_url, init) => {
       if (!online) throw new TypeError('offline')
       const { pin, device_id, client_id } = JSON.parse(init.body)

@@ -25,7 +25,7 @@ function montar() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fs-nube-'))
   const estado = { modo: 'ok', plazos: [] }
   const crear = (opciones = {}) => new ActorAuthority({
-    directory: dir, restaurantId: RESTAURANTE, ...opciones,
+    directory: dir, restaurantId: RESTAURANTE, protector: require('../core/protector-so').protectorDePrueba('nube-lenta'), ...opciones,
     fetchImpl: async (url, init) => {
       // El plazo real que el código le da a la nube, leído de la señal de aborto.
       estado.plazos.push(init?.signal)
