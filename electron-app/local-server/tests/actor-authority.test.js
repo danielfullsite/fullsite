@@ -5,13 +5,17 @@ const fs = require('node:fs')
 const path = require('node:path')
 const os = require('node:os')
 const { ActorAuthority, permissionsFor } = require('../core/actor-authority')
+// Desde 2026-09-24 el almacén offline existe SÓLO sellado por un protector; sin protector la
+// Caja no guarda credenciales (actor-authority-sellado.test.js lo prueba). Aquí, el de prueba.
+const { protectorDePrueba } = require('../core/protector-so')
+const protector = protectorDePrueba('actor-authority-test')
 let directory, now, mode, calls
 beforeEach(() => { directory = fs.mkdtempSync(path.join(os.tmpdir(), 'fullsite-actor-')); now = Date.now(); mode = 'online'; calls = [] })
 afterEach(() => fs.rmSync(directory, { recursive: true, force: true }))
 const employee = { id: 'employee', name: 'Cajero de prueba', role: 'cajero' }
 const login = { pin: '5678901234', deviceId: 'POS-A', restaurantId: 'lab' }
 function authority(options = {}) {
-  return new ActorAuthority({ directory, restaurantId: 'lab', branchId: 'branch-A', now: () => now,
+  return new ActorAuthority({ directory, restaurantId: 'lab', branchId: 'branch-A', now: () => now, protector,
     fetchImpl: async (url, init) => {
       calls.push({ url, init })
       if (mode === 'offline') throw new TypeError('Failed to fetch')
@@ -31,8 +35,13 @@ test('prepared PIN survives restart/WAN outage with server-derived role and no p
   assert.equal(a.verify(online.actor_token, 'POS-A').id, employee.id)
   assert.equal(calls[0].url, 'https://app.fullsite.mx/api/pos/pin')
   assert.equal(calls[0].init.redirect, 'error')
-  assert(!fs.readFileSync(path.join(directory, 'actor-credentials.json'), 'utf8').includes(login.pin))
-  assert(!fs.readFileSync(path.join(directory, 'actor-credentials.json'), 'utf8').includes(online.actor_token))
+  // Abierto con el protector (lo único que puede abrirlo) sigue sin PIN ni tokens; y los
+  // bytes sellados tampoco los contienen.
+  const sellado = fs.readFileSync(path.join(directory, 'actor-credentials.sealed'))
+  const abierto = protector.unseal(sellado)
+  assert(!abierto.includes(login.pin) && !sellado.includes(login.pin))
+  assert(!abierto.includes(online.actor_token))
+  assert(!fs.existsSync(path.join(directory, 'actor-credentials.json')), 'nada en texto plano')
   mode = 'offline'
   const b = authority()
   const offline = await b.login(login)

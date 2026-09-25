@@ -17,6 +17,7 @@ const path = require('node:path')
 const { ActorAuthority } = require('../core/actor-authority')
 
 const RESTAURANTE = 'lab-presupuesto'
+const PROTECTOR = require('../core/protector-so').protectorDePrueba('presupuesto')
 const CAJA = 'POS-CAJA', ENTRADA = 'POS-ENTRADA', ESCONDITE = 'POS-ESCONDITE'
 const PERSONA = { id: '00000000-0000-4000-8000-000000000001', name: 'Cajera', role: 'gerente' }
 
@@ -27,7 +28,7 @@ function montar() {
   const estado = { modo: 'ok', llamadas: 0 }
   let reloj = 1_700_000_000_000
   const crear = () => new ActorAuthority({
-    directory: dir, restaurantId: RESTAURANTE, now: () => reloj,
+    directory: dir, restaurantId: RESTAURANTE, now: () => reloj, protector: PROTECTOR,
     fetchImpl: async () => {
       estado.llamadas++
       if (estado.modo === 'caida') throw new TypeError('fetch failed')
@@ -123,10 +124,12 @@ describe('presupuesto de intentos de PIN', () => {
       await caja.login({ pin: '4321', deviceId: CAJA, restaurantId: RESTAURANTE })
 
       // Formato anterior: lista plana de marcas de tiempo, sin terminal.
+      // El almacén va sellado desde 2026-09-24: se abre y se vuelve a sellar con el mismo
+      // protector para simular el formato viejo por dentro.
       const archivo = caja.file
-      const guardado = JSON.parse(fs.readFileSync(archivo, 'utf8'))
+      const guardado = JSON.parse(PROTECTOR.unseal(fs.readFileSync(archivo)))
       guardado.failures = [Date.now(), Date.now()]
-      fs.writeFileSync(archivo, JSON.stringify(guardado))
+      fs.writeFileSync(archivo, PROTECTOR.seal(JSON.stringify(guardado)))
 
       const despues = crear()
       assert.equal((await despues.login({ pin: '4321', deviceId: CAJA, restaurantId: RESTAURANTE })).staff.id, PERSONA.id,
