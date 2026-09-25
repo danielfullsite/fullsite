@@ -91,6 +91,41 @@ test('E1 · el bloqueo ESCALA: cada reincidencia duplica la espera', async () =>
   assert.equal((await entrar(a, PIN_G)).offline, true)
 })
 
+// Segunda revisión adversarial (2026-09-25): el olvido de reincidencias se contaba desde el
+// INICIO del último bloqueo; al llegar al tope de 24 h, vencerlo ya cumplía el olvido y la
+// escalada volvía a 10 min. Atacante paciente sin red, en la terminal del gerente, durante
+// toda la vigencia de la credencial (7 días), reiniciando Pedro de vez en cuando.
+test('E1c · la escalada no se reinicia al tope: intentos offline acotados en 7 días', async () => {
+  let a = crear(); await entrar(a, PIN_G); await a.idle()
+  nube.modo = 'caida'
+  const fin = now + 7 * 86400000 - 60000
+  let intentos = 0, p = 0
+  while (now < fin) {
+    try { await entrar(a, String(1000 + (p++ % 3000))); intentos++ } catch (e) {
+      if (e.status === 429) {
+        const b = [a.data.bloqueos[CAJA], a.data.bloqueos['*']].filter(x => x && x.hasta > now)[0]
+        now = b.hasta + 1; continue
+      }
+      intentos++
+    }
+    if (intentos % 50 === 0) a = crear()
+  }
+  // 8 escalones (10 min … 21 h 20 min) + bloqueos de 24 h hasta completar 7 días ≈ 13 × 10.
+  assert(intentos <= 150, `intentos offline en 7 días: ${intentos}`)
+})
+
+test('E1c · tras 24 h SIN bloqueo el historial sí se olvida', async () => {
+  const a = crear(); await entrar(a, PIN_G); await a.idle()
+  nube.modo = 'caida'
+  const agotar = async () => { for (let i = 0; i < 10; i++) await entrar(a, String(5000 + i)).catch(() => {}) }
+  await agotar(); now += 10 * 60000 + 1000
+  await agotar(); now += 20 * 60000 + 1000
+  now += 24 * 3600000 + 1000
+  await agotar()
+  now += 10 * 60000 + 1000
+  assert.equal((await entrar(a, PIN_G)).offline, true, 'vuelve a 10 min')
+})
+
 test('E1b · rotar la terminal declarada tampoco da intentos sin fin (bloqueo de instalación)', async () => {
   const a = crear(); await entrar(a, PIN_G); await a.idle()
   nube.modo = 'caida'

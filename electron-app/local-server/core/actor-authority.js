@@ -205,7 +205,12 @@ class ActorAuthority {
   }
   _bloquear(ambito, now) {
     const b = this.data.bloqueos[ambito] || { strikes: 0, hasta: 0, ultimo: 0 }
-    if (now - (b.ultimo || 0) > OLVIDO_BLOQUEOS_MS) b.strikes = 0
+    // El historial se olvida tras 24 h SIN ESTAR BLOQUEADO — contado desde que venció el último
+    // bloqueo, no desde que empezó. Contado desde el inicio, un bloqueo de tope (24 h) ya
+    // cumplía el olvido al vencer y la siguiente reincidencia volvía a 10 min: la escalada se
+    // reiniciaba en ciclos (segunda revisión adversarial: 260 intentos offline en 7 días contra
+    // la terminal del gerente, en vez de ~130).
+    if (now - Math.max(b.hasta || 0, b.ultimo || 0) > OLVIDO_BLOQUEOS_MS) b.strikes = 0
     b.strikes += 1
     b.hasta = now + Math.min(BLOQUEO_BASE_MS * 2 ** (b.strikes - 1), BLOQUEO_TOPE_MS)
     b.ultimo = now
