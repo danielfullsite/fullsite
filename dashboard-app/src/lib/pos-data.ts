@@ -2,6 +2,7 @@ import { kitchenOrderInScope, readKitchenScope } from './kitchen-read-scope'
 import { nuevaIdentidadDeAccion } from './operation-identity'
 import { recordMovement, confirmarMovimientoInventario } from './inventory'
 import { apiUrl } from './api-base'
+import { clasificarRespuestaDePin, TIMEOUT_AUTORIDAD_PIN_MS } from './veredicto-de-la-autoridad'
 // POS Menu Data — AMALAY real menu (el POS legado)
 //
 // SQL for Supabase (run in SQL Editor):
@@ -2237,93 +2238,180 @@ export async function hayHuellasDadasDeAlta(): Promise<boolean> {
   return false
 }
 
-// Validación server-side de PIN de gerente (cancelaciones, descuentos, cortes).
-// Antes venía de NEXT_PUBLIC_MANAGER_PINS (expuesto en el bundle) — ahora valida
-// contra /api/pos/pin con manager=true (pos_staff admin/gerente + env server-only).
-// Cachea éxitos en localStorage para fallback offline.
-export async function verifyManagerPin(pin: string): Promise<string | null> {
-  if (!pin) return null
+// ─── APROBACIÓN DE GERENTE: UNA SOLA RUTINA (bloque POS, 2026-09-24) ───────────
+//
+// Antes eran tres copias (verifyManagerPin, …WithRole, verifyPinWithMinRole) con la misma
+// forma y los mismos huecos:
+//   · sin timeout: con la LAN degradada, 30–90 s congelados antes del respaldo local;
+//   · sin terminal: el servidor no sabía desde dónde se aprobaba, así que la aprobación no
+//     podía amarrarse a la pantalla donde se tecleó el PIN;
+//   · sin límite local de intentos: el único candado era el throttle del servidor, que sin
+//     red no existe — y el respaldo offline aceptaba intentos sin fin;
+//   · sin distinguir por qué falló: la pantalla decía «PIN incorrecto» también cuando la
+//     nube no contestó.
+// Las tres firmas públicas se conservan (17 pantallas las llaman); ahora delegan aquí.
+
+export type MotivoAprobacionFallida =
+  | 'pin-rechazado'
+  | 'autoridad-no-disponible'
+  | 'sin-tenant'
+  | 'terminal-no-enrolada'
+  | 'bloqueado-local'
+
+type AprobacionOk = { ok: true; name: string; role: string; approvalToken?: string; modo: 'online' | 'offline' }
+type AprobacionFallida = { ok: false; motivo: MotivoAprobacionFallida }
+
+/** Límite local de intentos de aprobación, por terminal. Sólo un rechazo REAL cuenta. */
+const APROB_INTENTOS_KEY = 'pos_aprob_intentos'
+const APROB_MAX_FALLOS = 5
+const APROB_BLOQUEO_BASE_MS = 60_000
+const APROB_BLOQUEO_TOPE_MS = 15 * 60_000
+
+type EstadoIntentos = { fails: number; until: number; strikes: number }
+
+function _leerIntentos(): EstadoIntentos {
   try {
-    const { apiUrl } = await import('./api-base')
-    const res = await fetch(apiUrl('/api/pos/pin'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pin, client_id: _getClientId(), manager: true }),
-    })
-    if (res.ok) {
-      const { staff, shiftToken } = await res.json()
-      if (staff?.name) {
-        try {
-          const cached = JSON.parse(localStorage.getItem('pos_manager_pin_cache') || '{}')
-          cached[await _pinCacheKey(pin)] = { name: staff.name, role: staff.role || 'gerente', cached_at: Date.now() }
-          localStorage.setItem('pos_manager_pin_cache', JSON.stringify(cached))
-        } catch { /* ignore */ }
-        // Token firmado del gerente = aprobación server-verificable para la ruta.
-        if (shiftToken) _lastManagerApproval = { token: shiftToken as string, name: staff.name as string, at: Date.now() }
-        return staff.name as string
-      }
-      return null
-    }
-    if (res.status === 401 || res.status === 400) return null
-  } catch { /* offline → fallback al cache */ }
-  // Fallback offline: PINs validados en los últimos 30 min (re-verificación frecuente
-  // = menos ventana de robo si alguien opera la terminal de otro).
+    const raw = JSON.parse(localStorage.getItem(APROB_INTENTOS_KEY) || 'null')
+    if (raw && typeof raw.fails === 'number' && typeof raw.until === 'number' && typeof raw.strikes === 'number') return raw
+  } catch { /* ignore */ }
+  return { fails: 0, until: 0, strikes: 0 }
+}
+
+function _guardarIntentos(e: EstadoIntentos): void {
+  try { localStorage.setItem(APROB_INTENTOS_KEY, JSON.stringify(e)) } catch { /* ignore */ }
+}
+
+/** Milisegundos que le quedan al bloqueo local de aprobaciones (0 = libre). */
+export function bloqueoDeAprobacionRestante(now = Date.now()): number {
+  const e = _leerIntentos()
+  return e.until > now ? e.until - now : 0
+}
+
+function _anotarRechazo(now = Date.now()): void {
+  const e = _leerIntentos()
+  e.fails += 1
+  if (e.fails >= APROB_MAX_FALLOS) {
+    e.strikes += 1
+    e.until = now + Math.min(APROB_BLOQUEO_BASE_MS * 2 ** (e.strikes - 1), APROB_BLOQUEO_TOPE_MS)
+    e.fails = 0
+  }
+  _guardarIntentos(e)
+}
+
+function _limpiarIntentos(): void {
+  const e = _leerIntentos()
+  // Un éxito limpia los fallos, NO el historial de bloqueos: quien bloqueó y luego acertó
+  // no recupera el escalón inicial para seguir probando.
+  if (e.fails !== 0 || e.until !== 0) _guardarIntentos({ fails: 0, until: 0, strikes: e.strikes })
+}
+
+let _ultimoMotivoAprobacion: MotivoAprobacionFallida | null = null
+/** Por qué falló la última aprobación. null = no falló. Para que una pantalla diga lo correcto. */
+export function motivoUltimaAprobacionFallida(): MotivoAprobacionFallida | null {
+  return _ultimoMotivoAprobacion
+}
+
+function _avisarFallo(motivo: MotivoAprobacionFallida): void {
+  _ultimoMotivoAprobacion = motivo
+  // Las 17 pantallas dicen «PIN incorrecto» cuando reciben null. Para no tocar las 17, el
+  // motivo real viaja en un evento que muestra un aviso global (AvisoAprobacion en el
+  // layout del POS). El rechazo real no se anuncia aparte: ahí «PIN incorrecto» es verdad.
+  if (motivo === 'pin-rechazado') return
+  try { window.dispatchEvent(new CustomEvent('fullsite:aprobacion-fallida', { detail: { motivo } })) } catch { /* ignore */ }
+}
+
+/** ¿Hay alguna credencial local con la que juzgar un PIN de este nivel? */
+function _hayCredencialLocalUtilizable(minLevel: number, now = Date.now()): boolean {
+  try {
+    const cached = JSON.parse(localStorage.getItem('pos_manager_pin_cache') || '{}') as Record<string, { role?: string; cached_at?: number }>
+    if (Object.values(cached).some(e => now - (e.cached_at || 0) < 30 * 60 * 1000 && (_ROLE_LVL[String(e.role)] || 0) >= minLevel)) return true
+  } catch { /* ignore */ }
+  try {
+    const s = JSON.parse(localStorage.getItem('pos_staff_cache') || 'null')
+    if (s && !Array.isArray(s) && s.pin_hash && s.exp > now && (_ROLE_LVL[s.role] || 0) >= minLevel) return true
+  } catch { /* ignore */ }
+  return false
+}
+
+async function _aprobacionLocal(pin: string, minLevel: number): Promise<{ name: string; role: string } | null> {
   try {
     const cached = JSON.parse(localStorage.getItem('pos_manager_pin_cache') || '{}')
     const entry = cached[await _pinCacheKey(pin)]
-    // La cache guarda TODO PIN validado online, incluido el de un capitan que
-    // autorizo una transferencia (min_role capitan). Sin revisar el rol, ese
-    // capitan autorizaba anulaciones y descuentos de gerente durante 30 min sin
-    // red (barrido 2026-09-10, offline-queue LENTE-6). Online el servidor lo
-    // rechaza; offline se aplica la misma regla.
-    if (entry?.name && Date.now() - (entry.cached_at || 0) < 30 * 60 * 1000 && (_ROLE_LVL[entry.role] || 0) >= 4) {
-      return entry.name as string
+    // El rol cacheado tiene que cumplir el mínimo pedido: un PIN de capitán validado para
+    // transferir no vale para un permiso de gerente (barrido 2026-09-10, LENTE-6).
+    if (entry?.name && Date.now() - (entry.cached_at || 0) < 30 * 60 * 1000 && (_ROLE_LVL[entry.role] || 0) >= minLevel) {
+      return { name: entry.name as string, role: (entry.role as string) || 'gerente' }
     }
   } catch { /* ignore */ }
-  // Fallback offline #2: el propio PIN del admin/gerente logueado (pos_staff_cache, 8h)
-  const fromStaff = await _managerFromStaffCache(pin)
-  if (fromStaff) return fromStaff.name
-  return null
+  // El propio PIN del usuario logueado, si alcanza el nivel (pos_staff_cache, 8 h).
+  return _managerFromStaffCache(pin, minLevel)
+}
+
+async function _aprobarConAutoridad(pin: string, pedido: { minRole?: string }): Promise<AprobacionOk | AprobacionFallida> {
+  if (!pin) return { ok: false, motivo: 'pin-rechazado' }
+  if (bloqueoDeAprobacionRestante() > 0) return { ok: false, motivo: 'bloqueado-local' }
+  const minLevel = pedido.minRole ? (_ROLE_LVL[pedido.minRole] || 99) : 4
+
+  let res: Response | null = null
+  try {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) throw new Error('offline')
+    const { apiUrl } = await import('./api-base')
+    const { getTerminalId } = await import('./pos-sessions')
+    res = await fetch(apiUrl('/api/pos/pin'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pin, client_id: _getClientId(), device_id: getTerminalId(),
+        ...(pedido.minRole ? { min_role: pedido.minRole } : { manager: true }),
+      }),
+      signal: AbortSignal.timeout(TIMEOUT_AUTORIDAD_PIN_MS),
+    })
+  } catch { res = null } // sin red, timeout o fetch que lanzó: no es veredicto
+
+  if (res) {
+    const cuerpo = await res.json().catch(() => null) as { staff?: { name?: string; role?: string }; shiftToken?: string; approvalToken?: string; code?: string } | null
+    const veredicto = clasificarRespuestaDePin(res.status, cuerpo?.code)
+    if (veredicto === 'aceptado' && cuerpo?.staff?.name) {
+      const role = cuerpo.staff.role || pedido.minRole || 'gerente'
+      try {
+        const cached = JSON.parse(localStorage.getItem('pos_manager_pin_cache') || '{}')
+        cached[await _pinCacheKey(pin)] = { name: cuerpo.staff.name, role, cached_at: Date.now() }
+        localStorage.setItem('pos_manager_pin_cache', JSON.stringify(cached))
+      } catch { /* ignore */ }
+      _limpiarIntentos()
+      _ultimoMotivoAprobacion = null
+      // El token de APROBACIÓN (15 min, jti, terminal) si el servidor lo emite; el shiftToken
+      // sólo para servidores viejos.
+      return { ok: true, name: cuerpo.staff.name, role, approvalToken: cuerpo.approvalToken || cuerpo.shiftToken, modo: 'online' }
+    }
+    if (veredicto === 'pin-rechazado') { _anotarRechazo(); return { ok: false, motivo: 'pin-rechazado' } }
+    if (veredicto === 'sin-tenant') return { ok: false, motivo: 'sin-tenant' }
+    if (veredicto === 'terminal-no-enrolada') return { ok: false, motivo: 'terminal-no-enrolada' }
+    // autoridad-no-disponible, o un 2xx sin empleado: cae al respaldo local.
+  }
+
+  const local = await _aprobacionLocal(pin, minLevel)
+  if (local) { _limpiarIntentos(); _ultimoMotivoAprobacion = null; return { ok: true, ...local, modo: 'offline' } }
+  // Había con qué juzgar y no coincidió: es un rechazo real y cuenta. Si no había nada,
+  // no se puede decir que el PIN esté mal.
+  if (_hayCredencialLocalUtilizable(minLevel)) { _anotarRechazo(); return { ok: false, motivo: 'pin-rechazado' } }
+  return { ok: false, motivo: 'autoridad-no-disponible' }
+}
+
+// Validación server-side de PIN de gerente (cancelaciones, descuentos, cortes).
+export async function verifyManagerPin(pin: string): Promise<string | null> {
+  const r = await _aprobarConAutoridad(pin, {})
+  if (!r.ok) { _avisarFallo(r.motivo); return null }
+  // Token firmado = aprobación server-verificable para la ruta que la consume.
+  if (r.approvalToken) _lastManagerApproval = { token: r.approvalToken, name: r.name, at: Date.now() }
+  return r.name
 }
 
 /** Like verifyManagerPin but also returns the role — used for permission checks */
 export async function verifyManagerPinWithRole(pin: string): Promise<{ name: string; role: string } | null> {
-  if (!pin) return null
-  try {
-    const { apiUrl } = await import('./api-base')
-    const res = await fetch(apiUrl('/api/pos/pin'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pin, client_id: _getClientId(), manager: true }),
-    })
-    if (res.ok) {
-      const { staff } = await res.json()
-      if (staff?.name) {
-        const role = staff.role || 'gerente'
-        try {
-          const cached = JSON.parse(localStorage.getItem('pos_manager_pin_cache') || '{}')
-          cached[await _pinCacheKey(pin)] = { name: staff.name, role, cached_at: Date.now() }
-          localStorage.setItem('pos_manager_pin_cache', JSON.stringify(cached))
-        } catch { /* ignore */ }
-        return { name: staff.name, role }
-      }
-      return null
-    }
-    if (res.status === 401 || res.status === 400) return null
-  } catch { /* offline → fallback al cache */ }
-  // Fallback offline (máx 8 horas — un turno)
-  try {
-    const cached = JSON.parse(localStorage.getItem('pos_manager_pin_cache') || '{}')
-    const entry = cached[await _pinCacheKey(pin)]
-    // Mismo candado que en verifyManagerPin: solo gerente+ desde la cache.
-    if (entry?.name && Date.now() - (entry.cached_at || 0) < 30 * 60 * 1000 && (_ROLE_LVL[entry.role] || 0) >= 4) {
-      return { name: entry.name, role: entry.role || 'gerente' }
-    }
-  } catch { /* ignore */ }
-  // Fallback offline #2: el propio PIN del admin/gerente logueado (pos_staff_cache, 8h)
-  const fromStaff = await _managerFromStaffCache(pin)
-  if (fromStaff) return fromStaff
-  return null
+  const r = await _aprobarConAutoridad(pin, {})
+  if (!r.ok) { _avisarFallo(r.motivo); return null }
+  return { name: r.name, role: r.role }
 }
 
 /**
@@ -2336,42 +2424,9 @@ export async function verifyManagerPinWithRole(pin: string): Promise<{ name: str
  *   verifyPinWithMinRole(pin, 'admin')    → accepts admin only
  */
 export async function verifyPinWithMinRole(pin: string, minRole: string): Promise<{ name: string; role: string; approvalToken?: string } | null> {
-  if (!pin) return null
-  try {
-    const { apiUrl } = await import('./api-base')
-    const res = await fetch(apiUrl('/api/pos/pin'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pin, client_id: _getClientId(), min_role: minRole }),
-    })
-    if (res.ok) {
-      const { staff, shiftToken } = await res.json()
-      if (staff?.name) {
-        const role = staff.role || minRole
-        try {
-          const cached = JSON.parse(localStorage.getItem('pos_manager_pin_cache') || '{}')
-          cached[await _pinCacheKey(pin)] = { name: staff.name, role, cached_at: Date.now() }
-          localStorage.setItem('pos_manager_pin_cache', JSON.stringify(cached))
-        } catch { /* ignore */ }
-        return { name: staff.name, role, approvalToken: shiftToken }
-      }
-      return null
-    }
-    if (res.status === 401 || res.status === 400) return null
-  } catch { /* offline → fallback */ }
-  try {
-    const cached = JSON.parse(localStorage.getItem('pos_manager_pin_cache') || '{}')
-    const entry = cached[await _pinCacheKey(pin)]
-    // El rol cacheado tiene que cumplir el minimo pedido; un PIN de capitan
-    // validado para transferir no vale para un permiso de gerente.
-    if (entry?.name && Date.now() - (entry.cached_at || 0) < 30 * 60 * 1000 && (_ROLE_LVL[entry.role] || 0) >= (_ROLE_LVL[minRole] || 99)) {
-      return { name: entry.name, role: entry.role || minRole }
-    }
-  } catch { /* ignore */ }
-  // Fallback offline #2: el propio PIN del usuario logueado si cumple el min_role (pos_staff_cache, 8h)
-  const fromStaff = await _managerFromStaffCache(pin, _ROLE_LVL[minRole] || 99)
-  if (fromStaff) return fromStaff
-  return null
+  const r = await _aprobarConAutoridad(pin, { minRole })
+  if (!r.ok) { _avisarFallo(r.motivo); return null }
+  return { name: r.name, role: r.role, approvalToken: r.approvalToken }
 }
 
 // ─── INVENTORY & RECIPES ────────────────────────────────────────────────────

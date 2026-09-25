@@ -16,7 +16,8 @@ import { inventoryPolicyService } from '@/lib/inventory-policy'
 import { getFingerprintUrl } from '@/lib/fingerprint-url'
 import { localNetworkFetch } from '@/lib/local-network-fetch'
 import { provisionManagerCredential, verifyPinOffline, estadoCredencialesOffline } from '@/lib/pos-manager-auth'
-import { clasificarRespuestaDePin } from '@/lib/veredicto-de-la-autoridad'
+import { clasificarRespuestaDePin, TIMEOUT_AUTORIDAD_PIN_MS } from '@/lib/veredicto-de-la-autoridad'
+import AvisoAprobacion from '@/components/pos/AvisoAprobacion'
 import { usePosOffline } from '@/hooks/usePosOffline'
 import { POSLockContext } from './pos-lock-context'
 import { requiereCaja } from '@/lib/pedro-cliente'
@@ -519,7 +520,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pin, client_id: _cid(), device_id: getTerminalId() }),
-        signal: AbortSignal.timeout(4000),
+        signal: AbortSignal.timeout(TIMEOUT_AUTORIDAD_PIN_MS),
       })
       // Quién juzga qué: sólo un 401 habla del PIN. Todo lo demás habla del servidor,
       // de la terminal o de la red. La regla vive en veredicto-de-la-autoridad.ts con su
@@ -800,6 +801,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
             <a href="/pos/staff" className="font-bold underline underline-offset-2 hover:text-amber-200">Ir a Personal</a>
           </div>
         )}
+        <AvisoAprobacion />
         <ImpresionesPendientesDeCaja />
         <AperturasPendientesDeCaja />
         <TurnoGate staff={staff!}>
