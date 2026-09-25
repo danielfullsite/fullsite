@@ -476,7 +476,7 @@ Excel/, FormatoImpresion_MR6/, RespaldosSQL/, WebApi/
 **Restaurar el .bak de marzo 2026 en SQL Server** (puede ser Docker en tu Mac).
 
 ```bash
-docker run -e 'ACCEPT_EULA=Y' -e 'SA_PASSWORD=Str0ngP@ss!' \
+docker run -e 'ACCEPT_EULA=Y' -e 'SA_PASSWORD=***REDACTED***' \
   -p 1433:1433 \
   -v /Users/danielrg/Desktop/WANSOFT:/backup \
   mcr.microsoft.com/mssql/server:2017-latest

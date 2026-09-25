@@ -621,7 +621,7 @@ Todos leen de `agent_results` con su `agent_id` específico. Todos **OPERATIVA**
 ### /admin/vault/page.tsx — Bóveda de Credenciales
 **Status: OPERATIVA** ⚠️ RIESGO DE SEGURIDAD
 - Almacena credentials de delivery, POS, banco, WiFi, social, APIs
-- **RIESGO:** Cifrado XOR+Base64 con key hardcodeada `'fullsite_vault_2026'` en código cliente
+- **RIESGO:** Cifrado XOR+Base64 con key hardcodeada `'***REDACTED***'` en código cliente
 - 10 categorías, toggle show/hide contraseña
 - **Falta:** update de credencial (solo CRD), audit log de acceso, cifrado real (AES-256)
 
@@ -915,7 +915,7 @@ El dashboard contiene 24+ páginas bajo `/pos/` que extienden el POS hacia funci
 ## Riesgos Críticos Identificados
 
 ### Seguridad
-1. **Vault encryption es XOR+Base64** con key hardcodeada en código cliente (`'fullsite_vault_2026'`). Cualquiera con acceso al source puede descifrar todas las credenciales. Requiere AES-256 server-side.
+1. **Vault encryption es XOR+Base64** con key hardcodeada en código cliente (`'***REDACTED***'`). Cualquiera con acceso al source puede descifrar todas las credenciales. Requiere AES-256 server-side.
 2. **Webhook Uber Eats sin verificación de firma HMAC** — cualquier request POST al endpoint puede inyectar órdenes falsas.
 3. **Usuarios del portal almacenados como JSONB** en `wansoft_data`, no en tabla auth propia con RLS granular.
 

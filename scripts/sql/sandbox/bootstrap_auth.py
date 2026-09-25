@@ -25,14 +25,14 @@ AMALAY_PROJECT_REF = "qjiomlvudfmzuvqvhwpk"
 USERS = [
     {
         "email": "owner@vantara.sandbox",
-        "password": "Vantara2026!",          # change before real demo
+        "password": os.environ.get("VANTARA_OWNER_PASS") or sys.exit("Falta VANTARA_OWNER_PASS (gestor de secretos)"),          # change before real demo
         "client_id": "vantara",
         "role": "dueño",
         "display": "VANTARA owner",
     },
     {
         "email": "test@nomada.sandbox",
-        "password": "Nomada2026!",
+        "password": os.environ.get("NOMADA_OWNER_PASS") or sys.exit("Falta NOMADA_OWNER_PASS (gestor de secretos)"),
         "client_id": "nomada-mini",
         "role": "dueño",
         "display": "NÓMADA-MINI owner (isolation test)",

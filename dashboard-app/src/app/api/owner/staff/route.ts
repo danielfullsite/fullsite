@@ -16,8 +16,8 @@ import { randomUUID, randomInt } from 'crypto'
  *  - Gate: solo roles manager (dueño/admin/gerente) pueden gestionar equipo.
  *  - Escalación: solo dueño/admin puede crear/editar staff con rol admin|gerente;
  *    un gerente solo gestiona roles ≤ capitan.
- *  - PIN: 4–10 dígitos, único entre staff ACTIVO del mismo tenant. Nunca se loguea
- *    en claro (auditoría registra solo los campos cambiados, no el valor).
+ *  - PIN: 4–10 dígitos, único en el tenant (activo o no). Nunca se loguea en claro
+ *    (auditoría registra solo los campos cambiados) y el GET NUNCA lo devuelve (V-A18).
  */
 
 export const dynamic = 'force-dynamic'
@@ -43,6 +43,15 @@ function canAssignRole(callerRole: string, staffRole: string): boolean {
   if (callerRole === 'dueño' || callerRole === 'admin') return true
   // gerente: no puede tocar roles elevados
   return !ELEVATED_STAFF_ROLES.has(staffRole)
+}
+
+// Columnas que SÍ pueden salir al navegador. Allowlist (no denylist): aunque la BD
+// devolviera columnas de más (pin, pin_hash, lo que se agregue mañana), se proyecta aquí.
+const STAFF_PUBLIC_COLUMNS = ['id', 'name', 'role', 'role_display', 'active', 'hourly_rate', 'weekly_salary'] as const
+
+function publicStaff(rows: unknown): Array<Record<string, unknown>> {
+  if (!Array.isArray(rows)) return []
+  return rows.map(r => Object.fromEntries(STAFF_PUBLIC_COLUMNS.map(k => [k, (r as Record<string, unknown>)?.[k] ?? null])))
 }
 
 async function pinTaken(H: Record<string, string>, clientId: string, pin: string, exceptId?: string): Promise<boolean> {
@@ -77,14 +86,18 @@ export async function GET(request: NextRequest) {
   const H = svc()
   if (!H) return Response.json({ error: 'SERVER_CONFIG_ERROR' }, { status: 500 })
 
+  // V-A18 (2026-09-23): el PIN NO sale al navegador — ni en claro ni como hash. Antes se
+  // seleccionaba `pin` y /pos/staff comparaba unicidad en el cliente; la unicidad la decide
+  // el servidor (pinTaken en POST/PATCH + índice único unique_pin_per_client).
   const res = await fetch(
     `${SB_URL}/rest/v1/pos_staff?client_id=eq.${encodeURIComponent(auth.clientId)}` +
-    `&select=id,name,pin,role,role_display,active,hourly_rate,weekly_salary&order=name`,
+    `&select=${STAFF_PUBLIC_COLUMNS.join(',')}&order=name`,
     { headers: H, cache: 'no-store' }
   )
   if (!res.ok) return Response.json({ error: `No se pudo leer (${res.status})` }, { status: 502 })
+  const rows = await res.json().catch(() => [])
   // callerRole permite a la UI gatear el dropdown de roles (un gerente no ofrece admin/gerente).
-  return Response.json({ staff: await res.json(), callerRole: auth.role })
+  return Response.json({ staff: publicStaff(rows), callerRole: auth.role })
 }
 
 // ── POST — crea un miembro del staff ──────────────────────────────────────────
@@ -134,8 +147,8 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: `No se pudo crear (${res.status})`, detail: detail.slice(0, 200) }, { status: 502 })
   }
   await audit(H, auth.clientId, id, 'created', ['name', 'pin', 'role'], auth.staffName || auth.role)
-  // Devolvemos el PIN (el gerente ya ve todos los PINs en la tabla) para mostrarlo
-  // una vez, sobre todo cuando fue autogenerado.
+  // Devolvemos el PIN SOLO de la fila recién creada, para mostrarlo una vez (sobre todo
+  // cuando fue autogenerado). El GET ya no lo expone: quien lo pierda, lo cambia (PATCH).
   return Response.json({ ok: true, id, pin, pinGenerated })
 }
 

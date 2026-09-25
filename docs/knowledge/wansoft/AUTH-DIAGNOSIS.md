@@ -57,9 +57,9 @@ El flujo de login ahora requiere:
 
 ### Credenciales
 
-- Username cambió de `D.Ramonfaur` a `DA.RAMONFAUR`
-- Password: `03Soccer2003!!` (sin cambio)
-- Supabase `clients.wansoft_user` todavía tiene el valor viejo `D.Ramonfaur` → **hay que actualizarlo**
+- Username cambió de `***REDACTED***` a `***REDACTED***`
+- Password: `***REDACTED***` (en el gestor de secretos / secret `WANSOFT_PASS`) (sin cambio)
+- Supabase `clients.wansoft_user` todavía tiene el valor viejo `***REDACTED***` → **hay que actualizarlo**
 - Pero actualizar las credenciales NO resuelve el problema — Turnstile bloquea antes de que el servidor verifique las credenciales
 
 ---

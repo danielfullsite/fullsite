@@ -112,7 +112,7 @@ python3 scripts/sql/sandbox/onboard_client.py \
   --supabase-url  https://<ref>.supabase.co \
   --service-key   <service-key> \
   --owner-email   owner@vantara.sandbox \
-  --owner-pass    "ChangeMe123!"
+  --owner-pass    "$OWNER_PASS"   # del gestor de secretos; nunca literal
 ```
 
 **Pasos que automatiza:**

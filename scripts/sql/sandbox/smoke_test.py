@@ -177,7 +177,7 @@ def main():
     # Test login as VANTARA owner
     s, r = http_post(
         f"{auth}/token?grant_type=password",
-        {"email": "owner@vantara.sandbox", "password": "Vantara2026!"},
+        {"email": "owner@vantara.sandbox", "password": os.environ.get("VANTARA_OWNER_PASS") or sys.exit("Falta VANTARA_OWNER_PASS (gestor de secretos)")},
         {"apikey": anon_key, "Content-Type": "application/json"},
     )
     check("login owner@vantara.sandbox", s == 200 and isinstance(r, dict) and "access_token" in r,

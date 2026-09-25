@@ -10,7 +10,7 @@ Usage:
     --type "Cocina Española" \
     --mesas 20 \
     --email "ricardo@atope.mx" \
-    --password "temp123456"
+    --password "$ONBOARD_OWNER_PASSWORD"   # del gestor de secretos; nunca literal
 
 Creates:
   1. Client record in `clients` table
@@ -110,7 +110,7 @@ def create_user(args):
         },
         json={
             "email": args.email,
-            "password": args.password or "fullsite2026",
+            "password": args.password or sys.exit("Falta --password (no hay contraseña por defecto)"),
             "email_confirm": True,
             "user_metadata": {
                 "client_id": args.id,
@@ -182,13 +182,17 @@ def main():
     parser.add_argument("--type", default="Casual Dining", help="Restaurant type")
     parser.add_argument("--mesas", type=int, default=16, help="Number of tables")
     parser.add_argument("--email", help="Admin email for login")
-    parser.add_argument("--password", default="fullsite2026", help="Initial password")
+    parser.add_argument("--password", default=os.environ.get("ONBOARD_OWNER_PASSWORD"),
+                        help="Contraseña inicial del admin (o ONBOARD_OWNER_PASSWORD). Sin valor por defecto.")
     parser.add_argument("--meseros", help="Comma-separated mesero names")
     parser.add_argument("--wansoft-user", help="Wansoft username (if they have Wansoft)")
     parser.add_argument("--wansoft-pass", help="Wansoft password")
     parser.add_argument("--wansoft-subsidiary", help="Wansoft subsidiary ID")
 
     args = parser.parse_args()
+    # Contención 2026-09-23: antes había una contraseña por defecto conocida; ahora es obligatoria.
+    if not args.password:
+        sys.exit("Falta --password (o ONBOARD_OWNER_PASSWORD): no hay contraseña por defecto")
 
     if not SUPABASE_URL or not SUPABASE_KEY:
         print("ERROR: Set SUPABASE_URL and SUPABASE_SERVICE_KEY environment variables")

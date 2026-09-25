@@ -1,7 +1,11 @@
 // Service Worker — Fullsite POS offline-first
 // Caches app shell, static assets, and API responses for true offline operation
 
-const CACHE_VERSION = 'v48'
+// v49 (contención PR3, 2026-09-24): /rest/v1/pos_staff está en API_CACHE_PATTERNS.
+// Al aplicar la migración PENDIENTE_…_pos_staff_pin_fuera_de_authenticated, las
+// respuestas ya cacheadas en las terminales (con `pin`, si alguna vez se pidió) no se
+// invalidan solas: el bump hace que `activate` borre los caches v48 y anteriores.
+const CACHE_VERSION = 'v49'
 const STATIC_CACHE = `fullsite-static-${CACHE_VERSION}`
 const DYNAMIC_CACHE = `fullsite-dynamic-${CACHE_VERSION}`
 const API_CACHE = `fullsite-api-${CACHE_VERSION}`
