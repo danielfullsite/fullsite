@@ -63,7 +63,11 @@ describe('presupuesto de intentos de PIN', () => {
     } finally { limpiar() }
   })
 
-  test('entrar bien limpia el presupuesto de esa terminal', async () => {
+  // CONTRATO CAMBIADO el 2026-09-24 (revisión adversarial E1). Antes esta prueba afirmaba que
+  // entrar bien devolvía los diez intentos — y eso era el ataque: un mesero intercalaba su PIN
+  // cada 9 intentos y recorría los 10^4 PINs sin red. Ahora el éxito NO limpia: los fallos
+  // vencen con el tiempo (diez minutos).
+  test('entrar bien NO limpia el presupuesto de esa terminal (revisión adversarial E1)', async () => {
     const { crear, estado, limpiar } = montar()
     try {
       const caja = crear()
@@ -73,13 +77,11 @@ describe('presupuesto de intentos de PIN', () => {
       estado.modo = 'ok'
       await caja.login({ pin: '4321', deviceId: CAJA, restaurantId: RESTAURANTE })
 
-      // Tras entrar bien, la terminal vuelve a tener sus diez intentos: los
-      // errores de quien tecleó mal antes ya no cuentan contra quien se identificó.
+      // Los nueve fallos siguen contando: el décimo bloquea, aunque en medio alguien entró bien.
       estado.modo = 'rechaza'
-      for (let i = 0; i < 9; i++) {
-        assert.equal(await codigo(caja.login({ pin: String(5000 + i), deviceId: CAJA, restaurantId: RESTAURANTE })), 'PIN_REJECTED',
-          `intento ${i + 1} tras un acceso correcto no debería estar frenado`)
-      }
+      assert.equal(await codigo(caja.login({ pin: '5000', deviceId: CAJA, restaurantId: RESTAURANTE })), 'PIN_REJECTED')
+      assert.equal(await codigo(caja.login({ pin: '5001', deviceId: CAJA, restaurantId: RESTAURANTE })), 'PIN_RATE_LIMITED',
+        'intercalar un PIN válido ya no reinicia el presupuesto')
     } finally { limpiar() }
   })
 
