@@ -1,5 +1,6 @@
 import { verifyApprovalCredential } from '@/lib/shift-token'
-import { esRecibo, verificarRecibo } from '@/lib/recibo-offline'
+import { esRecibo, verificarRecibo, verificarReciboContraLaBase } from '@/lib/recibo-offline'
+import { createHash } from 'crypto'
 
 // ─── Aprobación de gerente server-side (anti-fraude) ─────────────────────────
 // Para operaciones sensibles (cancelar, reabrir cuenta, descuento). Antes se confiaba
@@ -64,7 +65,17 @@ const ROLE_LVL: Record<string, number> = { mesero: 1, cajero: 2, capitan: 3, ger
 //      shiftToken viejo), `tid` en ambos lados, y que el registro de uso haya funcionado.
 //      Sin la bandera, lo viejo se acepta y queda marcado en el modo para la bitácora.
 
-type UsoDeAprobacion = 'nuevo' | 'mismo' | 'reusado' | 'sin-registro'
+type UsoDeAprobacion = 'nuevo' | 'mismo' | 'reusado' | 'sin-registro' | 'invalido'
+
+/**
+ * Operación canónica para el registro de uso (revisión adversarial V1b, 2026-09-24). La tabla
+ * acepta hasta 300 caracteres; una operación más larga (el cliente elige `operation_id`) hacía
+ * fallar el INSERT con 400 y eso se leía como «sin registro» → reuso ilimitado fuera del modo
+ * estricto. Ahora lo largo o raro se resume con SHA-256: siempre cabe, siempre es la misma.
+ */
+export function operacionCanonica(op: string): string {
+  return /^[\w.:|-]{1,200}$/.test(op) ? op : 'sha256:' + createHash('sha256').update(op).digest('hex')
+}
 
 /**
  * Registra el primer uso de un `jti`. Idempotente por operación.
@@ -77,13 +88,17 @@ export async function registrarUsoDeAprobacion(jti: string, clientId: string, op
   if (!url || !key) return 'sin-registro'
   const H = { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }
   try {
+    operacion = operacionCanonica(operacion)
     const ins = await fetch(`${url}/rest/v1/pos_aprobaciones_usadas`, {
       method: 'POST', headers: { ...H, Prefer: 'return=minimal' },
       body: JSON.stringify({ jti, client_id: clientId, operacion }),
       signal: AbortSignal.timeout(3000),
     })
     if (ins.ok) return 'nuevo'
-    if (ins.status !== 409) return 'sin-registro'
+    // Un 4xx que no es «ya existe» es una petición que la base rechazó (CHECK, formato): no
+    // es una base caída, y aceptarlo como «sin registro» es justo el hueco V1b.
+    // 404 = la tabla no existe (migración sin aplicar): eso sí es «sin registro».
+    if (ins.status !== 409) return ins.status >= 400 && ins.status < 500 && ins.status !== 404 ? 'invalido' : 'sin-registro'
     const prev = await fetch(`${url}/rest/v1/pos_aprobaciones_usadas?jti=eq.${encodeURIComponent(jti)}&select=client_id,operacion&limit=1`,
       { headers: H, cache: 'no-store', signal: AbortSignal.timeout(3000) })
     if (!prev.ok) return 'sin-registro'
@@ -97,7 +112,12 @@ export async function registrarUsoDeAprobacion(jti: string, clientId: string, op
 
 export type VeredictoDeToken =
   | { ok: true; mode: string; actor: string; rol: string }
-  | { ok: false; error: 'SIN_TOKEN' | 'TOKEN_INVALIDO' | 'TERMINAL_DISTINTA' | 'APROBACION_REUSADA' | 'APROBACION_NO_REGISTRADA' | 'APROBACION_V1_NO_ADMITIDA' }
+  | { ok: false; error: 'SIN_TOKEN' | 'TOKEN_INVALIDO' | 'TERMINAL_DISTINTA' | 'APROBACION_REUSADA' | 'APROBACION_NO_REGISTRADA' | 'APROBACION_V1_NO_ADMITIDA' | 'APROBACION_INVALIDA' | 'AUTORIDAD_NO_DISPONIBLE' }
+
+/** Qué status HTTP le corresponde a un error de aprobación. 503 = reintentable (la cola lo reintenta). */
+export function statusDeErrorDeAprobacion(error: string | undefined): number {
+  return error === 'AUTORIDAD_NO_DISPONIBLE' ? 503 : 403
+}
 
 export function aprobacionV2Estricta(): boolean {
   return process.env.POS_APROBACION_V2_ESTRICTA === 'true'
@@ -119,15 +139,21 @@ export async function verificarTokenDeAprobacion(token: unknown, opts: {
   if (esRecibo(token)) {
     const r = verificarRecibo(token, { clientId: opts.clientId, minLevel: opts.minLevel, terminalSolicitante: opts.terminalSolicitante })
     if (!r.ok) return { ok: false, error: r.error === 'TERMINAL_DISTINTA' ? 'TERMINAL_DISTINTA' : 'TOKEN_INVALIDO' }
+    // Revisión adversarial V2: el rol y el nombre del recibo los escribe quien firma. Lo que
+    // autoriza sale de la BASE: la terminal sigue enrolada y activa (revocación de la llave),
+    // y quien aprobó sigue activo con un rol que alcanza.
+    const enBase = await verificarReciboContraLaBase(r.claims, opts.clientId, opts.minLevel)
+    if (!enBase.ok) return { ok: false, error: enBase.error }
     const marcasR: string[] = []
     const uso = await registrarUsoDeAprobacion(`recibo:${r.claims.non}`, opts.clientId, opts.operacion || `recibo:${r.claims.non}`)
     if (uso === 'reusado') return { ok: false, error: 'APROBACION_REUSADA' }
+    if (uso === 'invalido') return { ok: false, error: 'APROBACION_INVALIDA' }
     if (uso === 'sin-registro') {
       if (aprobacionV2Estricta()) return { ok: false, error: 'APROBACION_NO_REGISTRADA' }
       marcasR.push('sin_registro')
     }
     if (uso === 'mismo') marcasR.push('reintento')
-    return { ok: true, mode: ['offline_recibo:' + r.claims.rol, ...marcasR].join(':'), actor: r.claims.nam || r.claims.sub, rol: r.claims.rol }
+    return { ok: true, mode: ['offline_recibo:' + enBase.rol, ...marcasR].join(':'), actor: enBase.nombre, rol: enBase.rol }
   }
   const p = await verifyApprovalCredential(token)
   if (!p || p.cid !== opts.clientId || (ROLE_LVL[p.rol] || 0) < opts.minLevel) return { ok: false, error: 'TOKEN_INVALIDO' }
@@ -145,6 +171,7 @@ export async function verificarTokenDeAprobacion(token: unknown, opts: {
   if (p.pur === 'aprobacion' && p.jti) {
     const uso = await registrarUsoDeAprobacion(p.jti, opts.clientId, opts.operacion || `jti:${p.jti}`)
     if (uso === 'reusado') return { ok: false, error: 'APROBACION_REUSADA' }
+    if (uso === 'invalido') return { ok: false, error: 'APROBACION_INVALIDA' }
     if (uso === 'sin-registro') {
       if (estricta) return { ok: false, error: 'APROBACION_NO_REGISTRADA' }
       marcas.push('sin_registro')

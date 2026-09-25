@@ -95,9 +95,19 @@ describe('B · el recibo en la verificación central', () => {
         const jti = decodeURIComponent(new URL(url).searchParams.get('jti')!.slice(3))
         return Response.json(usos.has(jti) ? [usos.get(jti)] : [])
       }
+      // Revisión adversarial V2 (PR 05): el recibo se contrasta con la BASE — terminal enrolada
+      // y activa, aprobador activo y su rol real.
+      if (url.includes('/pos_terminals?')) return Response.json(terminalActiva ? [{ device_id: 'POS-CAJA' }] : [])
+      if (url.includes('/pos_staff?')) {
+        const id = decodeURIComponent(new URL(url).searchParams.get('id')!.slice(3))
+        return Response.json(personal[id] ? [personal[id]] : [])
+      }
       return Response.json([])
     }))
   })
+  let terminalActiva = true
+  let personal: Record<string, { name: string; role: string }> = {}
+  beforeEach(() => { terminalActiva = true; personal = { g1: { name: 'Gerente', role: 'gerente' } } })
   const base = { clientId: 'tenant-a', minLevel: 4, solicitanteRol: 'mesero', terminalSolicitante: 'POS-ENTRADA' }
 
   it('recibo válido → aprobación offline_recibo, registrada como `recibo:<nonce>`', async () => {
@@ -132,7 +142,8 @@ describe('C · /api/pos/terminal-receipt-key', () => {
   let exigeEnrolada = false
   let enroladas: string[] = []
   beforeEach(() => {
-    bitacora = []; exigeEnrolada = false; enroladas = []
+    // Desde el PR 05 la terminal debe estar enrolada SIEMPRE (no sólo si el tenant lo exige).
+    bitacora = []; exigeEnrolada = false; enroladas = ['POS-CAJA']
     vi.stubGlobal('fetch', vi.fn(async (u: string, init?: RequestInit) => {
       const url = String(u)
       if (url.includes('/clients?')) return Response.json([{ pos_settings: exigeEnrolada ? { 'pos.require_enrolled_terminal': true } : {} }])
@@ -165,10 +176,16 @@ describe('C · /api/pos/terminal-receipt-key', () => {
   it('device_id mal formado → 400', async () => {
     expect((await pedir('gerente', { device_id: 'a b' })).status).toBe(400)
   })
-  it('restaurante que exige terminales enroladas: sólo la enrolada', async () => {
-    exigeEnrolada = true; enroladas = ['POS-CAJA']
+  it('sólo la terminal ENROLADA, siempre (no sólo si el tenant lo exige)', async () => {
     expect((await pedir('gerente', { device_id: 'POS-CAJA' })).status).toBe(200)
-    expect((await pedir('gerente', { device_id: 'POS-EXTRA' })).json).toMatchObject({ code: 'terminal_not_enrolled' })
+    enroladas = []
+    expect((await pedir('gerente', { device_id: 'POS-CAJA' })).json).toMatchObject({ code: 'terminal_not_enrolled' })
+    void exigeEnrolada
+  })
+  it('V2 · sólo la terminal de la SESIÓN: pedir la de otra (o una inventada) → 403', async () => {
+    enroladas = ['POS-CAJA', 'POS-EXTRA']
+    expect((await pedir('gerente', { device_id: 'POS-EXTRA' })).status).toBe(403)
+    expect((await pedir('gerente', { device_id: 'TERMINAL-INVENTADA' })).status).toBe(403)
   })
   it('sin raíz configurada → 503 (no inventa llaves)', async () => {
     delete process.env.OFFLINE_RECEIPT_ROOT
@@ -194,7 +211,9 @@ describe('D · /api/pos/staff-roster', () => {
     const r = await GET(new NextRequest('https://app.test/api/pos/staff-roster?client_id=tenant-b', { headers: { authorization: `Bearer ${t}` } }))
     const j = await r.json()
     expect(j.client_id).toBe('tenant-a')
-    expect(j.staff).toEqual([{ id: 'g1', role: 'gerente' }, { id: 'm1', role: 'mesero' }])
+    expect(j.staff.map((s: { id: string; role: string }) => ({ id: s.id, role: s.role }))).toEqual([{ id: 'g1', role: 'gerente' }, { id: 'm1', role: 'mesero' }])
+    // E5: la revisión de credencial viaja (HMAC con subllave), nunca el PIN ni el hash.
+    expect(j.staff[0].cred_rev).toMatch(/^[0-9a-f]{32}$/)
     expect(urls[0]).toContain('client_id=eq.tenant-a')
     expect(urls[0]).toContain('active=eq.true')
     expect(JSON.stringify(j)).not.toMatch(/4102|"NO"/)

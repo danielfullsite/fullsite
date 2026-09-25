@@ -113,14 +113,16 @@ describe('B · /api/pos/pin emite aprobación amarrada, con presupuesto y bitác
   }
   beforeEach(() => { throttle.bloqueadas.clear(); throttle.llamadas = []; stub() })
 
-  it('aprobación: approvalToken con tid; shiftToken sólo fuera del modo estricto', async () => {
+  // Revisión adversarial V3 (PR 05): una aprobación NUNCA entrega sesión, esté o no el modo
+  // estricto — antes, fuera de él, también devolvía el shiftToken de 8 h del gerente.
+  it('aprobación: approvalToken con tid y NUNCA shiftToken', async () => {
     const { json } = await post({ client_id: 'tenant-a', pin: '4102', manager: true, device_id: 'POS-A' })
     expect(decode(json.approvalToken)).toMatchObject({ pur: 'aprobacion', tid: 'POS-A', cid: 'tenant-a' })
-    expect(json.shiftToken).toBeTruthy()
+    expect(json.shiftToken, 'una aprobación no entrega sesión de gerente').toBeUndefined()
     vi.stubEnv('POS_APROBACION_V2_ESTRICTA', 'true')
     const estricto = await post({ client_id: 'tenant-a', pin: '4102', manager: true, device_id: 'POS-A' })
     expect(estricto.json.approvalToken).toBeTruthy()
-    expect(estricto.json.shiftToken, 'una aprobación ya no entrega sesión de gerente').toBeUndefined()
+    expect(estricto.json.shiftToken).toBeUndefined()
   })
 
   it('login normal: sin approvalToken, y la sesión queda amarrada a la terminal', async () => {

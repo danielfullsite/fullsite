@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { withPOSAuth, unauthorized } from '@/lib/api-auth'
+import { revisionDeCredencial } from '@/lib/revision-de-credencial'
 
 /**
  * Roster activo del restaurante, para la REVOCACIÓN offline de la Caja (bloque POS, 2026-09-24).
@@ -9,10 +10,17 @@ import { withPOSAuth, unauthorized } from '@/lib/api-auth'
  * 401 que la borraba). Ahora, después de cada entrada con red, la Caja pide este roster y
  * borra —de forma durable— a quien ya no aparece, y aplica los cambios de rol.
  *
- * Sólo ids y roles: ni nombres, ni PIN, ni hash. El tenant sale del token (withPOSAuth), nunca
- * del query. Si la base no contesta: 503 — la Caja no toca nada con un roster que no leyó.
+ * Revisión adversarial (E5, E6): cada persona trae `cred_rev` (revision-de-credencial.ts) para
+ * que un cambio de PIN también llegue; y el roster tiene que venir COMPLETO — si la base tiene
+ * más filas de las que devolvió (tope de PostgREST), 503: un roster parcial borraría a gente
+ * válida.
+ *
+ * Nunca sale un PIN ni un hash. El tenant sale del token (withPOSAuth), nunca del query. Si la
+ * base no contesta: 503 — la Caja no toca nada con un roster que no leyó.
  */
 export const dynamic = 'force-dynamic'
+
+const MAXIMO = 5000
 
 export async function GET(request: NextRequest) {
   const auth = await withPOSAuth(request)
@@ -22,15 +30,21 @@ export async function GET(request: NextRequest) {
   if (!url || !key) return Response.json({ error: 'SERVER_CONFIG_ERROR' }, { status: 503 })
   try {
     const r = await fetch(
-      `${url}/rest/v1/pos_staff?client_id=eq.${encodeURIComponent(auth.clientId)}&active=eq.true&select=id,role&order=id`,
-      { headers: { apikey: key, Authorization: `Bearer ${key}` }, cache: 'no-store', signal: AbortSignal.timeout(4000) },
+      `${url}/rest/v1/pos_staff?client_id=eq.${encodeURIComponent(auth.clientId)}&active=eq.true&select=id,role,pin,pin_hash&order=id`,
+      { headers: { apikey: key, Authorization: `Bearer ${key}`, Prefer: 'count=exact', Range: `0-${MAXIMO - 1}` },
+        cache: 'no-store', signal: AbortSignal.timeout(4000) },
     )
     if (!r.ok) return Response.json({ error: 'ROSTER_UNAVAILABLE' }, { status: 503 })
     const filas = await r.json().catch(() => null)
     if (!Array.isArray(filas)) return Response.json({ error: 'ROSTER_UNAVAILABLE' }, { status: 503 })
+    const total = Number((r.headers.get('content-range') || '').split('/')[1])
+    if (Number.isFinite(total) && total > filas.length) return Response.json({ error: 'ROSTER_INCOMPLETO' }, { status: 503 })
     const staff = filas
       .filter(f => typeof f?.id === 'string' && typeof f?.role === 'string')
-      .map(f => ({ id: f.id as string, role: f.role as string }))
+      .map(f => {
+        const cred_rev = revisionDeCredencial(f.id, f.pin, f.pin_hash)
+        return { id: f.id as string, role: f.role as string, ...(cred_rev ? { cred_rev } : {}) }
+      })
     return Response.json({ client_id: auth.clientId, staff, as_of: Date.now() })
   } catch {
     return Response.json({ error: 'ROSTER_UNAVAILABLE' }, { status: 503 })

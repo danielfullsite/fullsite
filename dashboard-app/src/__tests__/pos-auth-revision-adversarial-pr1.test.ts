@@ -82,7 +82,9 @@ describe('N-1 · la huella no gasta el presupuesto de intentos del restaurante',
     }
     const ok = await POST(pinReq({ client_id: 'tenant-a', pin: '2222', manager: true }))
     expect(ok.status).toBe(200)
-    expect(typeof (await ok.json()).shiftToken).toBe('string')
+    // Desde el bloque POS (revisión adversarial V3) una aprobación trae SU token (15 min, jti,
+    // terminal) y ya no una sesión de 8 h del gerente.
+    expect(typeof (await ok.json()).approvalToken).toBe('string')
   })
 
   it('CONTROL: los PINs incorrectos SÍ siguen contando y bloquean (429)', async () => {
@@ -203,7 +205,12 @@ describe('N-4 · offline_approved deja de ser prueba en modo estricto', () => {
     vi.stubEnv('POS_APPROVAL_STRICT', 'true')
     const llamadas: string[] = []
     const base = globalThis.fetch
-    vi.stubGlobal('fetch', async (u: string, init?: RequestInit) => { llamadas.push(`${init?.method || 'GET'} ${u}`); return base(u, init) })
+    vi.stubGlobal('fetch', async (u: string, init?: RequestInit) => {
+      llamadas.push(`${init?.method || 'GET'} ${u}`)
+      // reopen-order lee la cuenta antes de verificar (la aprobación se amarra a su cierre).
+      if ((init?.method || 'GET') === 'GET' && u.includes('/pos_orders?')) return Response.json([{ status: 'pagada', closed_at: '2026-09-24T00:00:00Z' }])
+      return base(u, init)
+    })
     const token = await tokenDe('a-mesero', 'mesero')
     const { POST } = await import('@/app/api/pos/reopen-order/route')
     const r = await POST(reqConToken('http://x/api/pos/reopen-order', token, { order_id: 'o-1', offline_approved: true, manager: 'Gerente A' }))

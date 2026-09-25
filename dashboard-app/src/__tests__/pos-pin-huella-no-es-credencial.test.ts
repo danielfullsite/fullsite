@@ -174,23 +174,25 @@ describe('Sólo un PIN válido del restaurante emite token', () => {
     expect(status).toBe(200)
     // (3) La respuesta del login sólo trae {staff:{id,name,role}, shiftToken}: nada de PIN,
     // plantilla de huella ni llaves, aunque la base los hubiera devuelto.
-    // Desde 2026-09-24 una petición de APROBACIÓN (manager:true) trae además su propio
-    // `approvalToken` (15 min, jti, terminal). El shiftToken sigue viajando mientras no esté
-    // POS_APROBACION_V2_ESTRICTA. Nada de PIN ni plantillas: lo cuida `crudo` abajo.
-    expect(Object.keys(json).sort()).toEqual(['approvalToken', 'shiftToken', 'staff'])
+    // Desde el bloque POS una petición de APROBACIÓN (manager:true) trae su propio
+    // `approvalToken` (15 min, jti, terminal) y NO una sesión (revisión adversarial V3), más la
+    // revisión de credencial `cred_rev` (HMAC con subllave del servidor, E5). Nada de PIN ni
+    // plantillas: lo cuida `crudo` abajo.
+    expect(Object.keys(json).sort()).toEqual(['approvalToken', 'cred_rev', 'staff'])
     expect(json.staff).toEqual({ id: 'a-gerente', name: 'Gerente A', role: 'gerente' })
     const crudo = JSON.stringify(json)
     for (const secreto of ['2222', 'TPL-A-GERENTE', 'fixture-service', 'fixture-secret']) {
       expect(crudo).not.toContain(secreto)
     }
-    const p = decode(json.shiftToken)
+    const p = decode(json.approvalToken)
     expect(p.cid).toBe('tenant-a')
     expect(p.rol).toBe('gerente')
     expect(p.sub).toBe('a-gerente')
-    expect(p.exp - p.iat).toBe(8 * 60 * 60 * 1000)
+    expect(p.exp - p.iat).toBe(15 * 60 * 1000)
     expect(p.iat).toBeGreaterThanOrEqual(antes)
-    const { verifyShiftToken } = await import('@/lib/shift-token')
-    expect(await verifyShiftToken(json.shiftToken)).toMatchObject({ cid: 'tenant-a', rol: 'gerente' })
+    const { verifyShiftToken, verifyApprovalCredential } = await import('@/lib/shift-token')
+    expect(await verifyShiftToken(json.approvalToken), 'no sirve como sesión').toBeNull()
+    expect(await verifyApprovalCredential(json.approvalToken)).toMatchObject({ cid: 'tenant-a', rol: 'gerente' })
     // Una aprobación (manager:true) tiene además su presupuesto por terminal (2026-09-24);
     // sin device_id cae en la llave `sin-terminal`. El éxito limpia las dos.
     expect(throttle).toEqual([{ key: 'tenant-a:10.0.0.9', ok: true }, { key: 'aprob:tenant-a:sin-terminal', ok: true }])
