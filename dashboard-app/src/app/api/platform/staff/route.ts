@@ -1,6 +1,8 @@
 import { NextRequest } from 'next/server'
 import { requirePlatformAdmin2FA, platformServiceFetch } from '@/lib/platform-auth'
 import { auditLog } from '@/lib/platform-writes'
+import { columnasDePin } from '@/lib/pos-staff-pin-write'
+import { esPimientaNoConfigurada, HTTP_AUTORIDAD_NO_DISPONIBLE } from '@/lib/pos-pin-hash'
 
 // Control Plane · GET/PATCH /api/platform/staff — ver/editar el personal de cualquier
 // tenant. Via service_role (cross-tenant), gateado por platform admin.
@@ -47,7 +49,14 @@ export async function PATCH(req: NextRequest) {
   const changes: Record<string, unknown> = {}
   if (typeof body.pin === 'string') {
     if (!PIN_RE.test(body.pin)) return Response.json({ error: 'PIN debe ser 4–10 dígitos' }, { status: 400 })
-    changes.pin = body.pin
+    // F2 (PLAN-PIN-HASH.md): con POS_PIN_DUAL_WRITE=on también escribe pin_hash/pin_hash_v.
+    // Sin pimienta, 503 — nunca un pin nuevo con un hash viejo al lado.
+    try { Object.assign(changes, await columnasDePin(client_id, body.pin)) } catch (e) {
+      if (esPimientaNoConfigurada(e)) {
+        return Response.json({ error: 'No se pudo asegurar el PIN — configuración del servidor incompleta', code: HTTP_AUTORIDAD_NO_DISPONIBLE.code }, { status: HTTP_AUTORIDAD_NO_DISPONIBLE.status })
+      }
+      throw e
+    }
   }
   if (typeof body.name === 'string' && body.name.trim()) changes.name = body.name.trim()
   if (typeof body.active === 'boolean') changes.active = body.active
@@ -73,7 +82,8 @@ export async function PATCH(req: NextRequest) {
     action: 'staff.update',
     scope: 'tenant',
     target_tenant: client_id,
-    detail: { id, campos: Object.keys(changes) }, // no logueamos el PIN en claro
+    // Sólo NOMBRES de campo, y pin_hash* se reporta como 'pin': es el mismo cambio.
+    detail: { id, campos: Object.keys(changes).filter(k => !k.startsWith('pin_hash')) },
   })
   return Response.json({ ok: true })
 }

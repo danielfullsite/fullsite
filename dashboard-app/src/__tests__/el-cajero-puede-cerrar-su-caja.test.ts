@@ -63,10 +63,14 @@ describe('lo que NO se abrio', () => {
   it('las tablas de IDENTIDAD siguen pidiendo gerente', () => {
     // Dan de alta identidad: sin esto, cualquiera con shift token se reescribe el PIN
     // del gerente. Nada de esto se relajo.
-    for (const t of ['pos_staff', 'pos_terminals', 'pos_fingerprint_templates']) {
+    for (const t of ['pos_terminals', 'pos_fingerprint_templates']) {
       expect(puedeEscribirEn(t, 'cajero'), t).toBe(false)
       expect(puedeEscribirEn(t, 'gerente'), t).toBe(true)
     }
+    // pos_staff se APRETÓ el 2026-09-24: ni el gerente la escribe por el proxy (toda alta y
+    // cambio de PIN/rol va por /api/owner/staff, con jerarquía y auditoría).
+    expect(puedeEscribirEn('pos_staff', 'cajero')).toBe(false)
+    expect(puedeEscribirEn('pos_staff', 'gerente')).toBe(false)
   })
 
   it('y los precios del menu tambien', () => {

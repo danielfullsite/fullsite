@@ -7,6 +7,7 @@ import { randomInt, randomUUID } from 'node:crypto'
 import { DEFAULT_ONBOARDING_TEMPLATE, type OnboardingTemplate } from './onboarding-template'
 import type { ClientFeatures } from './client-config'
 import { resolveVerticalPreset, type VerticalId, type SeedCombo } from './vertical-presets'
+import { columnasDePin } from './pos-staff-pin-write'
 
 // Kept in sync with DEFAULT_FEATURES in src/lib/client-config.ts (which is not
 // exported). New tenants get the standard feature set.
@@ -238,21 +239,24 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
   let staffCount = 0
   const staffPins: Array<{ role: string; pin: string }> = []
   if ((await countFor('pos_staff', clientId)) === 0) {
-    const staffRows = tpl.roles.map((role) => {
+    // F2 (PLAN-PIN-HASH.md): `columnasDePin` agrega pin_hash/pin_hash_v con
+    // POS_PIN_DUAL_WRITE=on. Sin pimienta LANZA y el aprovisionamiento se detiene
+    // antes de sembrar personal: nunca siembra un PIN sin su hash con el interruptor puesto.
+    const staffRows = await Promise.all(tpl.roles.map(async (role) => {
       const pin = randomPin10()
       staffPins.push({ role, pin })
       return {
         id: `${clientId}-staff-${role}`,
         client_id: clientId,
         name: `${role} (plantilla)`,
-        pin,
+        ...(await columnasDePin(clientId, pin)),
         role,
         role_display: role,
         active: false,
         hourly_rate: 0,
         weekly_salary: 0,
       }
-    })
+    }))
     const inserted = await insertMissing('pos_staff', staffRows)
     staffCount = inserted.length
     // Only inserted inactive placeholders return their credential; a racing

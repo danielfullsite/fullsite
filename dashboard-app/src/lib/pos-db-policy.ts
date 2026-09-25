@@ -92,7 +92,15 @@ export const SCOPED_BY_OWN_ID = new Set<string>(['clients'])
  * del restaurante se edita desde el dashboard con sesión de usuario, jamás con
  * un shift token.
  */
-export const SOLO_LECTURA = new Set<string>(['clients'])
+export const SOLO_LECTURA = new Set<string>([
+  'clients',
+  // 2026-09-24 (P0 pos_staff): el proxy corre con service_role y sólo pedía «gerente» para
+  // escribir aquí. Eso dejaba a un shift token de gerente reescribir PIN y ROL de cualquiera
+  // —admin incluido— sin la jerarquía de `canAssignRole` ni la auditoría de la API. Ningún
+  // cliente escribe pos_staff por este camino (verificado con rg: el POS lo LEE en
+  // pos-data.ts:1493 y pos/configuracion; toda alta/edición va por /api/owner/staff).
+  'pos_staff',
+])
 
 /**
  * Escribir en estas exige rol de gerente.
@@ -160,6 +168,10 @@ export const NIVEL_MINIMO_DE_ESCRITURA: Record<string, number> = {
 
 /** ¿Este rol alcanza para escribir en esta tabla? */
 export function puedeEscribirEn(table: string, role: string | null | undefined): boolean {
+  // SOLO_LECTURA vive AQUÍ y no sólo en db/route.ts: el proxy por ruta
+  // (db/[...path]/route.ts) nunca la consultaba, así que `pos_staff` seguía escribible
+  // por ese camino aunque la lista dijera lo contrario (hallado 2026-09-24).
+  if (SOLO_LECTURA.has(table)) return false
   if (MANAGER_ONLY_WRITE.has(table)) return isManager(role)
   const minimo = NIVEL_MINIMO_DE_ESCRITURA[table]
   if (minimo === undefined) return true
@@ -270,7 +282,10 @@ export function camposProhibidos(table: string, role: string | null | undefined,
  * select=* y los recibos de escritura de las rutas fijas.
  */
 export const REDACTED_COLUMNS: Record<string, readonly string[]> = {
-  pos_staff: ['pin'],
+  // pin_hash/pin_hash_v los crea F1 (PENDIENTE_20260914120000). Se redactan DESDE ANTES de
+  // que existan: si este código llegara después de la migración, un `select=*` del kiosco
+  // entregaría el hash y el SW lo guardaría en su caché de /api/pos/db.
+  pos_staff: ['pin', 'pin_hash', 'pin_hash_v'],
   pos_fingerprint_templates: ['template', 'template_data'],
 }
 

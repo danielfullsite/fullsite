@@ -2,6 +2,8 @@ import { NextRequest } from 'next/server'
 import { withPOSAuth, unauthorized } from '@/lib/api-auth'
 import { sameOriginOnly } from '@/lib/api-guard'
 import { randomUUID, randomInt } from 'crypto'
+import { columnasDePin } from '@/lib/pos-staff-pin-write'
+import { esPimientaNoConfigurada, HTTP_AUTORIDAD_NO_DISPONIBLE } from '@/lib/pos-pin-hash'
 
 /**
  * A2a — Gestión de staff POS + PINs desde el DASHBOARD del dueño.
@@ -18,6 +20,15 @@ import { randomUUID, randomInt } from 'crypto'
  *    un gerente solo gestiona roles ≤ capitan.
  *  - PIN: 4–10 dígitos, único en el tenant (activo o no). Nunca se loguea en claro
  *    (auditoría registra solo los campos cambiados) y el GET NUNCA lo devuelve (V-A18).
+ *  - Nadie se cambia a sí mismo el rol ni se desactiva (2026-09-24): con shift token el
+ *    rol sale de `pos_staff.role`, así que editarlo sería autorizarse con un dato propio.
+ *  - PIN con hash (F2, PLAN-PIN-HASH.md): `columnasDePin` escribe pin_hash junto al pin
+ *    cuando POS_PIN_DUAL_WRITE=on; sin pimienta → 503 authority_unavailable, nunca pin solo.
+ *  - Restablecer PIN: PATCH { id, reset_pin: true } → el servidor genera uno libre y lo
+ *    devuelve UNA vez. Auditoría: created, role_changed, pin_reset, deactivated,
+ *    reactivated, updated (la base además audita por trigger, ver migración 20260925010000).
+ *  - Desde 2026-09-24 el navegador NO puede escribir pos_staff por PostgREST ni por el proxy
+ *    del kiosco (/api/pos/db): esta ruta es la única puerta para el dashboard y el POS.
  */
 
 export const dynamic = 'force-dynamic'
@@ -66,6 +77,31 @@ async function pinTaken(H: Record<string, string>, clientId: string, pin: string
   if (!res.ok) return false
   const rows: { id: string }[] = await res.json()
   return rows.some(r => r.id !== exceptId)
+}
+
+/** PIN de 4 dígitos que nadie del tenant (activo o no) tiene. null si no hubo suerte. */
+async function generarPinLibre(H: Record<string, string>, clientId: string, exceptId?: string): Promise<string | null> {
+  for (let i = 0; i < 40; i++) {
+    const cand = String(randomInt(0, 10000)).padStart(4, '0')
+    if (!(await pinTaken(H, clientId, cand, exceptId))) return cand
+  }
+  return null
+}
+
+/** Pimienta ausente con doble escritura encendida: la nube no puede juzgar PINs ahora. */
+function autoridadNoDisponible(): Response {
+  return Response.json(
+    { error: 'No se pudo asegurar el PIN — la configuración del servidor está incompleta', code: HTTP_AUTORIDAD_NO_DISPONIBLE.code },
+    { status: HTTP_AUTORIDAD_NO_DISPONIBLE.status },
+  )
+}
+
+/** Acción de auditoría para un PATCH, por prioridad de riesgo. */
+function accionDeAuditoria(fields: string[], active?: unknown): string {
+  if (fields.includes('role')) return 'role_changed'
+  if (fields.includes('pin')) return 'pin_reset'
+  if (fields.length === 1 && fields[0] === 'active') return active ? 'reactivated' : 'deactivated'
+  return 'updated'
 }
 
 async function audit(H: Record<string, string>, clientId: string, staffId: string, action: string, fields: string[], by: string) {
@@ -122,19 +158,22 @@ export async function POST(request: NextRequest) {
   // Si lo teclea, se valida y se checa colisión como siempre.
   let pinGenerated = false
   if (!pin) {
-    for (let i = 0; i < 40 && !pinGenerated; i++) {
-      const cand = String(randomInt(0, 10000)).padStart(4, '0')
-      if (!(await pinTaken(H, auth.clientId, cand))) { pin = cand; pinGenerated = true }
-    }
-    if (!pinGenerated) return Response.json({ error: 'No se pudo generar un PIN libre — especifícalo manualmente' }, { status: 409 })
+    const libre = await generarPinLibre(H, auth.clientId)
+    if (!libre) return Response.json({ error: 'No se pudo generar un PIN libre — especifícalo manualmente' }, { status: 409 })
+    pin = libre; pinGenerated = true
   } else {
     if (!PIN_RE.test(pin)) return Response.json({ error: 'PIN debe ser 4–10 dígitos' }, { status: 400 })
     if (await pinTaken(H, auth.clientId, pin)) return Response.json({ error: 'Ese PIN ya está en uso' }, { status: 409 })
   }
 
+  let pinCols
+  try { pinCols = await columnasDePin(auth.clientId, pin) } catch (e) {
+    if (esPimientaNoConfigurada(e)) return autoridadNoDisponible()
+    throw e
+  }
   const id = `${auth.clientId}-${randomUUID()}`
   const row = {
-    id, client_id: auth.clientId, name, pin, role, role_display: role, active: true,
+    id, client_id: auth.clientId, name, ...pinCols, role, role_display: role, active: true,
     hourly_rate: Number(body?.hourly_rate) || 0, weekly_salary: Number(body?.weekly_salary) || 0,
   }
   const res = await fetch(`${SB_URL}/rest/v1/pos_staff`, {
@@ -175,14 +214,34 @@ export async function PATCH(request: NextRequest) {
   if (cur.length === 0) return Response.json({ error: 'Staff no encontrado' }, { status: 404 })
   // No puedes editar a alguien de rol elevado si tú no eres dueño/admin.
   if (!canAssignRole(auth.role, cur[0].role)) return Response.json({ error: 'No puedes editar ese rol' }, { status: 403 })
+  // Uno mismo no se cambia el rol ni se apaga: con shift token el rol ES pos_staff.role, así
+  // que editarlo sería autorizarse con un dato propio. Lo hace otro gerente o el dueño.
+  const esUnoMismo = auth.authType === 'shift_token' && auth.staffId === id
+  if (esUnoMismo && (typeof body.role === 'string' || typeof body.active === 'boolean')) {
+    return Response.json({ error: 'No puedes cambiar tu propio rol ni desactivarte' }, { status: 403 })
+  }
 
   const changes: Record<string, unknown> = {}
   const fields: string[] = []
+  let pinNuevo: string | null = null
   if (typeof body.name === 'string' && body.name.trim()) { changes.name = body.name.trim(); fields.push('name') }
-  if (typeof body.pin === 'string') {
+  if (body.reset_pin === true && typeof body.pin === 'string') {
+    return Response.json({ error: 'Usa pin o reset_pin, no ambos' }, { status: 400 })
+  }
+  if (body.reset_pin === true) {
+    pinNuevo = await generarPinLibre(H, auth.clientId, id)
+    if (!pinNuevo) return Response.json({ error: 'No se pudo generar un PIN libre — especifícalo manualmente' }, { status: 409 })
+  } else if (typeof body.pin === 'string') {
     if (!PIN_RE.test(body.pin)) return Response.json({ error: 'PIN debe ser 4–10 dígitos' }, { status: 400 })
     if (await pinTaken(H, auth.clientId, body.pin, id)) return Response.json({ error: 'Ese PIN ya está en uso' }, { status: 409 })
-    changes.pin = body.pin; fields.push('pin')
+    pinNuevo = body.pin
+  }
+  if (pinNuevo) {
+    try { Object.assign(changes, await columnasDePin(auth.clientId, pinNuevo)) } catch (e) {
+      if (esPimientaNoConfigurada(e)) return autoridadNoDisponible()
+      throw e
+    }
+    fields.push('pin')
   }
   if (typeof body.role === 'string') {
     if (!ALLOWED_STAFF_ROLES.has(body.role)) return Response.json({ error: 'Rol inválido' }, { status: 400 })
@@ -199,10 +258,12 @@ export async function PATCH(request: NextRequest) {
     { method: 'PATCH', headers: { ...H, Prefer: 'return=minimal' }, body: JSON.stringify(changes) }
   )
   if (!res.ok) {
+    if (res.status === 409) return Response.json({ error: 'Ese PIN ya está en uso' }, { status: 409 })
     const detail = await res.text().catch(() => '')
     return Response.json({ error: `No se pudo actualizar (${res.status})`, detail: detail.slice(0, 200) }, { status: 502 })
   }
-  const action = ('active' in changes && fields.length === 1) ? (changes.active ? 'reactivated' : 'deactivated') : 'updated'
-  await audit(H, auth.clientId, id, action, fields, auth.staffName || auth.role)
-  return Response.json({ ok: true })
+  await audit(H, auth.clientId, id, accionDeAuditoria(fields, changes.active), fields, auth.staffName || auth.role)
+  // El PIN restablecido se devuelve UNA vez, igual que en el alta. Un PIN tecleado por el
+  // gerente no se devuelve: ya lo tiene.
+  return Response.json(body.reset_pin === true ? { ok: true, pin: pinNuevo } : { ok: true })
 }
