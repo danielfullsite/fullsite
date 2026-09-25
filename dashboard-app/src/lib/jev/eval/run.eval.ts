@@ -46,6 +46,23 @@ it('corrida de comparación Jev vs reglas', { timeout: 600_000 }, async () => {
     return fetch(url, init)
   }
   const jev = createJevAdapter({ enabled: live && process.env.JEV_SHADOW_ENABLED === '1', fetchImpl: guardedFetch, timeoutMs: JEV_DEFAULT_TIMEOUT_MS })
+  let accountBlocker: string | null = null
+  const blockedByAccount = {
+    async evaluate() {
+      return {
+        status: 'blocked' as const,
+        decision: null,
+        distribution: null,
+        block_reason: 'http_error' as const,
+        detail: accountBlocker,
+        latency_ms: null,
+        input_tokens: null,
+        cost_usd: null,
+        provider: null,
+        model: JEV_MODEL_ID,
+      }
+    },
+  }
 
   const results: CaseResult[] = []
   const seen = new Set<string>() // idempotencia: case_id + modelo
@@ -53,7 +70,13 @@ it('corrida de comparación Jev vs reglas', { timeout: 600_000 }, async () => {
     const key = `${c.case_id}|${JEV_MODEL_ID}`
     if (seen.has(key)) continue
     seen.add(key)
-    const rec = await evaluateDecision(c.input, { jev, audit })
+    const rec = await evaluateDecision(c.input, { jev: accountBlocker ? blockedByAccount : jev, audit })
+    if (
+      rec.jev.block_reason === 'http_error' &&
+      rec.jev.detail?.includes('customer_verification_required')
+    ) {
+      accountBlocker = rec.jev.detail
+    }
     spent += rec.jev.cost_usd ?? 0
     results.push({ case_id: c.case_id, expected: c.expected, hard: !!c.hard, rec })
   }
@@ -77,6 +100,7 @@ it('corrida de comparación Jev vs reglas', { timeout: 600_000 }, async () => {
       timeout_ms: JEV_DEFAULT_TIMEOUT_MS,
       price_per_input_token_usd: JEV_PRICE_PER_INPUT_TOKEN_USD,
       network_calls: networkCalls,
+      account_blocker: accountBlocker,
       payloads_sent: sentStates.length,
       hostile_inputs: hostile.length,
       hostile_reached_network: hostileReachedNetwork,

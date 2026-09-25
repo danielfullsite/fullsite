@@ -9,6 +9,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
+    "test:jev": "vitest run src/__tests__/jev --reporter=verbose",
+    "eval:jev": "vitest run --config vitest.jev-eval.config.ts --reporter=verbose",
     "test:ui": "vitest run --config vitest.config.dom.ts",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
