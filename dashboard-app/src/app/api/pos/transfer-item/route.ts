@@ -19,8 +19,10 @@ export async function POST(request: NextRequest) {
   // terminal y un solo uso por operación (el reintento de la MISMA transferencia vale).
   const approval = await verificarTokenDeAprobacion(approval_token, {
     clientId: auth.clientId, minLevel: 3, terminalSolicitante: auth.terminalId,
-    // La operación incluye cuenta y platillo (revisión adversarial V1).
-    operacion: `transfer:${source_order_id}:${item_id}:${operation_id}`,
+    // La operación incluye cuenta y platillo (revisión adversarial V1) y la mesa destino
+    // (segunda revisión, H4: la RPC ya rechaza reusar operation_id con otro intent; esto lo
+    // cierra también en la aprobación, sin depender de ella).
+    operacion: `transfer:${source_order_id}:${item_id}:${target_mesa}:${operation_id}`,
   })
   if (!approval.ok) {
     return Response.json({ ok: false, error: 'SUPERVISOR_APPROVAL_REQUIRED', detail: approval.error },
