@@ -20,6 +20,8 @@ TRU_RB="$MIG/PENDIENTE_20260925020000_revocar_truncate_anon_authenticated_ROLLBA
 F1="$MIG/PENDIENTE_20260914120000_pos_staff_pin_hash.sql"
 APROB="$MIG/PENDIENTE_20260925030000_pos_aprobaciones_usadas.sql"
 APROB_RB="$MIG/PENDIENTE_20260925030000_pos_aprobaciones_usadas_ROLLBACK.sql"
+F5="$MIG/PENDIENTE_20260925040000_pos_staff_pin_sin_texto_plano.sql"
+F5_RB="$MIG/PENDIENTE_20260925040000_pos_staff_pin_sin_texto_plano_ROLLBACK.sql"
 PR5="${1:-}"
 
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/pos-staff-pg.XXXXXX")"
@@ -247,6 +249,21 @@ caso "aprobaciones: el mismo jti otra vez → 23505 (PostgREST 409)"   service_r
 caso "aprobaciones: jti demasiado corto se rechaza"                   service_role - "insert into pos_aprobaciones_usadas (jti, client_id, operacion) values ('corto', 'tenant-a', 'op'); select 'x'" E:23514
 aplicar "$APROB" && echo "  reaplicada (idempotente)" || { FAIL=$((FAIL+1)); echo "  FAIL  no es idempotente"; }
 aplicar "$APROB_RB" && caso "aprobaciones: rollback borra la tabla" postgres - "select count(*) from pg_class where relname = 'pos_aprobaciones_usadas'" N:0
+
+echo "-- 12. F5: el PIN en claro deja de ser obligatorio (sobre F1)"
+caso "F5 antes de aplicar: pin NULL todavía se rechaza"               service_role - "update pos_staff set pin = null where id = 'a-mesero'" E:23502
+aplicar "$F5" && echo "  F5 aplicada" || { FAIL=$((FAIL+1)); echo "  FAIL  F5 no aplicó"; cat "$TMP/aplicar.log"; }
+caso "F5: sin texto plano pero con hash → aceptado"                  service_role - "with u as (update pos_staff set pin = null, pin_hash = repeat('c', 64), pin_hash_v = 1 where id = 'a-mesero' returning 1) select count(*) from u" N:1
+caso "F5: sin NINGUNA credencial → CHECK"                             service_role - "update pos_staff set pin = null, pin_hash = null, pin_hash_v = null where id = 'a-mesero'" E:23514
+caso "F5: un PIN en claro mal formado sigue rechazándose"            service_role - "update pos_staff set pin = '12' where id = 'a-mesero'" E:23514
+caso "F5: el navegador sigue sin poder escribir"                      authenticated $DUE "with u as (update pos_staff set pin = null where id = 'a-mesero' returning 1) select count(*) from u" E:42501
+aplicar "$F5" && echo "  F5 reaplicada (idempotente)" || { FAIL=$((FAIL+1)); echo "  FAIL  F5 no es idempotente"; }
+# Rollback: con una fila sin PIN en claro debe FALLAR entero (falla cerrado); sin ella, pasar.
+$PSQL -c "update pos_staff set pin = null, pin_hash = repeat('d', 64), pin_hash_v = 1 where id = 'a-gerente'" >/dev/null 2>&1
+if aplicar "$F5_RB"; then FAIL=$((FAIL+1)); echo "  FAIL  el rollback de F5 pasó con una fila sin PIN en claro"; else PASS=$((PASS+1)); echo "  PASS  rollback de F5 con filas sin PIN en claro → falla entero (no inventa PINs)"; fi
+caso "F5: tras el rollback fallido, el CHECK sigue en su lugar"      postgres - "select count(*) from pg_constraint where conname = 'pos_staff_alguna_credencial_chk'" N:1
+$PSQL -c "update pos_staff set pin = '4102' where id = 'a-gerente'" >/dev/null 2>&1
+aplicar "$F5_RB" && caso "F5: rollback con todos los PIN presentes → pin vuelve a NOT NULL" postgres - "select is_nullable from information_schema.columns where table_name = 'pos_staff' and column_name = 'pin'" V:NO
 parar "$TMP/datos1"
 
 echo; echo "== S2 · esquema de producción → endurecimiento DIRECTO (sin PR3): autosuficiente =="

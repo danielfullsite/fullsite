@@ -24,15 +24,31 @@
  *
  * Una vez corrido F3, el interruptor NO se apaga: apagarlo reabre el mismo desfase.
  */
-import { hashPinParaBD, VERSION_DE_PIMIENTA } from './pos-pin-hash'
+import { hashPinParaBD, VERSION_DE_PIMIENTA, PimientaNoConfigurada } from './pos-pin-hash'
+import { modoAutoridadPin } from './pos-pin-authority'
 
+/**
+ * ¿Se escribe el hash? Con la doble escritura encendida (F2) o con la autoridad YA en hash
+ * (F4): en F4 un PIN nuevo sin hash sería una persona que no puede entrar, así que no se
+ * depende de que alguien recuerde dejar prendida la otra bandera.
+ */
 export function dobleEscrituraDePinActiva(): boolean {
-  return (process.env.POS_PIN_DUAL_WRITE ?? '').trim() === 'on'
+  return (process.env.POS_PIN_DUAL_WRITE ?? '').trim() === 'on' || modoAutoridadPin() === 'hash'
+}
+
+/**
+ * F5: ¿se deja de escribir el PIN en claro? Sólo con POS_PIN_WRITE_PLAIN=off, la autoridad
+ * en hash y la migración PENDIENTE_20260925040000 aplicada (`pin` admite NULL). Si la bandera
+ * está apagada sin la autoridad en hash, es una configuración incoherente: falla cerrado
+ * (lanza PimientaNoConfigurada → 503) en vez de escribir filas sin credencial utilizable.
+ */
+export function escrituraDePinEnClaroApagada(): boolean {
+  return (process.env.POS_PIN_WRITE_PLAIN ?? '').trim() === 'off'
 }
 
 export type ColumnasDePin =
   | { pin: string }
-  | { pin: string; pin_hash: string; pin_hash_v: number }
+  | { pin: string | null; pin_hash: string; pin_hash_v: number }
 
 /**
  * Las columnas a escribir para asignar `pin` a una persona de `clientId`.
@@ -41,7 +57,13 @@ export type ColumnasDePin =
  * @throws {Error} PIN o client_id con formato inválido (quien llama valida antes y da 400).
  */
 export async function columnasDePin(clientId: string, pin: string): Promise<ColumnasDePin> {
+  const sinClaro = escrituraDePinEnClaroApagada()
+  if (sinClaro && modoAutoridadPin() !== 'hash') {
+    throw new PimientaNoConfigurada('POS_PIN_WRITE_PLAIN', 'está en off sin POS_PIN_AUTHORITY=hash')
+  }
   if (!dobleEscrituraDePinActiva()) return { pin }
   const pin_hash = await hashPinParaBD(clientId, pin)
-  return { pin, pin_hash, pin_hash_v: VERSION_DE_PIMIENTA }
+  // F5: el PIN en claro se ESCRIBE como null (no se omite): al cambiar el PIN de alguien, el
+  // viejo en claro no se queda en la fila.
+  return { pin: sinClaro ? null : pin, pin_hash, pin_hash_v: VERSION_DE_PIMIENTA }
 }

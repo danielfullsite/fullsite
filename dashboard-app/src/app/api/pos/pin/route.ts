@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { issueShiftToken, issueApprovalToken } from '@/lib/shift-token'
 import { terminalIdValido } from '@/lib/terminal-id'
+import { buscarPorPin, fallbacksDeEntornoPermitidos } from '@/lib/pos-pin-authority'
 import { pinGate, pinRecord } from '@/lib/pin-throttle'
 
 // PIN validation + shift token issuance.
@@ -243,15 +244,14 @@ export async function POST(request: NextRequest) {
       auditar: esAprobacion ? auditorDeAprobacion(sbUrl, sbKey, clientId, terminalId, String(effectiveMinRole ?? 'caja')) : undefined,
     }
 
-    const res = await fetch(
-      `${sbUrl}/rest/v1/pos_staff?pin=eq.${encodeURIComponent(pin)}&active=eq.true&client_id=eq.${encodeURIComponent(clientId)}${roleFilter}&select=id,name,role&limit=1`,
-      { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
-    )
-    if (res.ok) {
-      const rows = await res.json()
-      if (Array.isArray(rows) && rows.length > 0) {
-        return respond({ id: rows[0].id, name: rows[0].name, role: rows[0].role }, clientId, ctx)
-      }
+    // F4: la búsqueda vive en pos-pin-authority.ts (POS_PIN_AUTHORITY=plain|hash). En hash
+    // nunca se consulta `pin`; sin pimienta o con el backfill incompleto → 503, no 401.
+    const busqueda = await buscarPorPin<{ id: string; name: string; role: string }>({
+      sbUrl, sbKey, clientId, pin, filtro: `&active=eq.true${roleFilter}`, select: 'id,name,role',
+    })
+    if (busqueda.tipo === 'encontrado') {
+      const f = busqueda.fila
+      return respond({ id: f.id, name: f.name, role: f.role }, clientId, ctx)
     }
 
     // ── Fallbacks de emergencia por variable de entorno ─────────────────────
@@ -265,7 +265,8 @@ export async function POST(request: NextRequest) {
     // Ahora cada fallback declara A QUE restaurante pertenece y falla CERRADO:
     // sin su variable de tenant no aplica a nadie. Un despliegue nuevo nace sin
     // llave maestra, en vez de nacer con una.
-    if (fallbackAllowedFor(clientId)) {
+    // PINs de emergencia en CLARO en una variable: sólo mientras la autoridad sea `plain`.
+    if (fallbacksDeEntornoPermitidos() && fallbackAllowedFor(clientId)) {
       const fallback = (process.env.POS_FALLBACK_PIN ?? '').trim()
       if (fallback && pin === fallback) {
         return respond({ id: 'admin', name: 'Admin', role: 'admin' }, clientId, ctx)
@@ -273,7 +274,7 @@ export async function POST(request: NextRequest) {
     }
 
     // MANAGER_PINS — formato "pin:Nombre,pin:Nombre"
-    if (manager === true && managerPinsAllowedFor(clientId)) {
+    if (fallbacksDeEntornoPermitidos() && manager === true && managerPinsAllowedFor(clientId)) {
       const raw = process.env.MANAGER_PINS || ''
       for (const entry of raw.split(',')) {
         const [p, name] = entry.split(':')
@@ -283,7 +284,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (!res.ok) return Response.json({ error: 'No se pudo verificar al empleado', code: 'authority_unavailable' }, { status: 503 })
+    if (busqueda.tipo === 'no-disponible') return Response.json({ error: 'No se pudo verificar al empleado', code: 'authority_unavailable' }, { status: 503 })
     for (const k of llaves) await pinRecord(k, false)
     if (ctx.auditar) await ctx.auditar({ resultado: 'rechazado' })
     return Response.json({ error: 'PIN incorrecto' }, { status: 401 })

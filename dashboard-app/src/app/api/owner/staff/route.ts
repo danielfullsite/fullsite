@@ -3,6 +3,7 @@ import { withPOSAuth, unauthorized } from '@/lib/api-auth'
 import { sameOriginOnly } from '@/lib/api-guard'
 import { randomUUID, randomInt } from 'crypto'
 import { columnasDePin } from '@/lib/pos-staff-pin-write'
+import { buscarPorPin } from '@/lib/pos-pin-authority'
 import { esPimientaNoConfigurada, HTTP_AUTORIDAD_NO_DISPONIBLE } from '@/lib/pos-pin-hash'
 
 /**
@@ -65,28 +66,37 @@ function publicStaff(rows: unknown): Array<Record<string, unknown>> {
   return rows.map(r => Object.fromEntries(STAFF_PUBLIC_COLUMNS.map(k => [k, (r as Record<string, unknown>)?.[k] ?? null])))
 }
 
-async function pinTaken(H: Record<string, string>, clientId: string, pin: string, exceptId?: string): Promise<boolean> {
-  const cid = encodeURIComponent(clientId)
-  // OJO: NO filtrar por active. El índice único de BD es `unique_pin_per_client
-  // UNIQUE (pin, client_id)` — abarca staff INACTIVO también. Si filtráramos active,
-  // un PIN de un mesero desactivado se vería "libre" aquí pero el INSERT chocaría con
-  // el índice → 502 opaco (y el autogen podría lazar sin salida). Chequear contra TODO
-  // el tenant para coincidir con la constraint.
-  const url = `${SB_URL}/rest/v1/pos_staff?client_id=eq.${cid}&pin=eq.${encodeURIComponent(pin)}&select=id`
-  const res = await fetch(url, { headers: H, cache: 'no-store' })
-  if (!res.ok) return false
-  const rows: { id: string }[] = await res.json()
-  return rows.some(r => r.id !== exceptId)
+/**
+ * ¿Otra persona del tenant ya tiene este PIN? `null` = no se pudo saber (base caída, sin
+ * pimienta en modo hash): quien llama responde 503. Antes, una base caída se leía como «libre».
+ *
+ * OJO: NO filtrar por active. El índice único (`unique_pin_per_client`, y en F1
+ * `pos_staff_pin_hash_unico`) abarca staff INACTIVO también. Si filtráramos active, un PIN de
+ * un mesero desactivado se vería "libre" aquí pero el INSERT chocaría con el índice.
+ * F4: busca por pin_hash con POS_PIN_AUTHORITY=hash (pos-pin-authority.ts).
+ */
+async function pinTaken(H: Record<string, string>, clientId: string, pin: string, exceptId?: string): Promise<boolean | null> {
+  void H
+  const b = await buscarPorPin<{ id: string }>({
+    sbUrl: SB_URL, sbKey: process.env.SUPABASE_SERVICE_KEY || '', clientId, pin,
+    filtro: exceptId ? `&id=neq.${encodeURIComponent(exceptId)}` : '', select: 'id',
+  })
+  if (b.tipo === 'no-disponible') return null
+  return b.tipo === 'encontrado'
 }
 
-/** PIN de 4 dígitos que nadie del tenant (activo o no) tiene. null si no hubo suerte. */
+/** PIN de 4 dígitos que nadie del tenant (activo o no) tiene. null si no hubo suerte; lanza si no se puede saber. */
 async function generarPinLibre(H: Record<string, string>, clientId: string, exceptId?: string): Promise<string | null> {
   for (let i = 0; i < 40; i++) {
     const cand = String(randomInt(0, 10000)).padStart(4, '0')
-    if (!(await pinTaken(H, clientId, cand, exceptId))) return cand
+    const tomado = await pinTaken(H, clientId, cand, exceptId)
+    if (tomado === null) throw new AutoridadNoDisponible()
+    if (!tomado) return cand
   }
   return null
 }
+
+class AutoridadNoDisponible extends Error {}
 
 /** Pimienta ausente con doble escritura encendida: la nube no puede juzgar PINs ahora. */
 function autoridadNoDisponible(): Response {
@@ -158,12 +168,15 @@ export async function POST(request: NextRequest) {
   // Si lo teclea, se valida y se checa colisión como siempre.
   let pinGenerated = false
   if (!pin) {
-    const libre = await generarPinLibre(H, auth.clientId)
+    let libre: string | null
+    try { libre = await generarPinLibre(H, auth.clientId) } catch (e) { if (e instanceof AutoridadNoDisponible) return autoridadNoDisponible(); throw e }
     if (!libre) return Response.json({ error: 'No se pudo generar un PIN libre — especifícalo manualmente' }, { status: 409 })
     pin = libre; pinGenerated = true
   } else {
     if (!PIN_RE.test(pin)) return Response.json({ error: 'PIN debe ser 4–10 dígitos' }, { status: 400 })
-    if (await pinTaken(H, auth.clientId, pin)) return Response.json({ error: 'Ese PIN ya está en uso' }, { status: 409 })
+    const tomado = await pinTaken(H, auth.clientId, pin)
+    if (tomado === null) return autoridadNoDisponible()
+    if (tomado) return Response.json({ error: 'Ese PIN ya está en uso' }, { status: 409 })
   }
 
   let pinCols
@@ -229,11 +242,13 @@ export async function PATCH(request: NextRequest) {
     return Response.json({ error: 'Usa pin o reset_pin, no ambos' }, { status: 400 })
   }
   if (body.reset_pin === true) {
-    pinNuevo = await generarPinLibre(H, auth.clientId, id)
+    try { pinNuevo = await generarPinLibre(H, auth.clientId, id) } catch (e) { if (e instanceof AutoridadNoDisponible) return autoridadNoDisponible(); throw e }
     if (!pinNuevo) return Response.json({ error: 'No se pudo generar un PIN libre — especifícalo manualmente' }, { status: 409 })
   } else if (typeof body.pin === 'string') {
     if (!PIN_RE.test(body.pin)) return Response.json({ error: 'PIN debe ser 4–10 dígitos' }, { status: 400 })
-    if (await pinTaken(H, auth.clientId, body.pin, id)) return Response.json({ error: 'Ese PIN ya está en uso' }, { status: 409 })
+    const tomado = await pinTaken(H, auth.clientId, body.pin, id)
+    if (tomado === null) return autoridadNoDisponible()
+    if (tomado) return Response.json({ error: 'Ese PIN ya está en uso' }, { status: 409 })
     pinNuevo = body.pin
   }
   if (pinNuevo) {
