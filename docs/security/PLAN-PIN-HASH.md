@@ -578,6 +578,21 @@ equivocado. Y una consecuencia para este plan: es el amplificador del riesgo R1.
 es prerrequisito de F4**, y va en su propio PR —un P0 por rama, CLAUDE.md §7— antes de que
 empiece la migración.
 
+> **Estado de C6, 2026-09-24:** el login por PIN quedó **arreglado el 2026-09-14** con
+> `2ed3c1d5` (#410, `veredicto-de-la-autoridad.ts`). Este documento seguía diciendo que estaba
+> abierto. El barrido del patrón sobre las demás superficies que preguntan a `/api/pos/pin`
+> encontró tres restos, cerrados en la rama `fix/pos-login-c6-autoridad-caida`:
+> (1) el login por **huella** caía al mapa local ante cualquier no-2xx, **incluido el 401 de
+> empleado desactivado**, así que un empleado dado de baja entraba con red;
+> (2) la rama de huella del **servidor** respondía 401, y cobraba un intento, cuando no podía
+> leer `pos_staff`;
+> (3) las **aprobaciones de gerente** no tenían timeout.
+> Prueba: `c6-huella-y-aprobacion-de-gerente.test.ts`.
+> **Fuera de alcance, registrado:** `verifyManagerPin*` no manda `device_id`. En un tenant con
+> `pos.require_enrolled_terminal` todo lo que respondan es 403 y viven del caché. Tampoco se
+> quita la entrada de `pos_fingerprint_staff` ante un 401 (es caché offline, B-2).
+> Sigue pendiente la validación física (T-24).
+
 **C5 — El espacio de 4 dígitos sigue siendo el techo.**
 40 PIN ocupados de 10,000: un intento a ciegas le pega a **alguien** el 0.4 % de las veces.
 La defensa es `pin-throttle.ts`, por *(tenant, IP)*. Es

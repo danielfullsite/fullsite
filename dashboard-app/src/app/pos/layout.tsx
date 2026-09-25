@@ -17,7 +17,7 @@ import { getFingerprintUrl } from '@/lib/fingerprint-url'
 import { localNetworkFetch } from '@/lib/local-network-fetch'
 import { decidirHuella, modoDeAutoridadRecordado } from '@/lib/modo-autoridad'
 import { provisionManagerCredential, verifyPinOffline, estadoCredencialesOffline } from '@/lib/pos-manager-auth'
-import { clasificarRespuestaDePin } from '@/lib/veredicto-de-la-autoridad'
+import { clasificarRespuestaDePin, decidirHuellaTrasAutoridad, TIMEOUT_AUTORIDAD_PIN_MS } from '@/lib/veredicto-de-la-autoridad'
 import { usePosOffline } from '@/hooks/usePosOffline'
 import { POSLockContext } from './pos-lock-context'
 import { requiereCaja } from '@/lib/pedro-cliente'
@@ -426,27 +426,47 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ pin: '___fingerprint___', client_id: _cid(), fingerprint_id: data.staffId, device_id: getTerminalId() }),
-              signal: AbortSignal.timeout(4000),
+              signal: AbortSignal.timeout(TIMEOUT_AUTORIDAD_PIN_MS),
             })
           } catch { staffRes = null }
         }
 
-        // Try API first (validates active status), fall back to local cache
+        // C6, cuarta superficie: antes CUALQUIER no-2xx caía al mapa local, incluido el 401
+        // con el que el servidor dice «empleado desactivado». Con red, un empleado dado de
+        // baja entraba con su huella desde el caché. Ahora sólo cae al respaldo lo que NO es
+        // veredicto: sin respuesta, timeout, 429, 5xx. La regla vive en
+        // veredicto-de-la-autoridad.ts, junto a la del PIN.
         let member: StaffMember | null = null
-        if (staffRes?.ok) {
+        let cuerpoHuella: { staff?: StaffMember; code?: string; device_id?: string } | null = null
+        if (staffRes) {
+          try { cuerpoHuella = await staffRes.json() } catch { cuerpoHuella = null }
+        }
+        const decision = decidirHuellaTrasAutoridad(staffRes ? staffRes.status : null, cuerpoHuella?.code, !!cuerpoHuella?.staff?.id)
+        if (decision === 'rechazar') {
+          setSessionError('Huella reconocida, pero el servidor dice que este empleado no está activo. Pide a un gerente que lo revise.')
+          setBiometricChecking(false)
+          return
+        }
+        if (decision === 'terminal-no-enrolada') {
+          setNotEnrolled(cuerpoHuella?.device_id || getTerminalId())
+          setBiometricChecking(false)
+          return
+        }
+        if (decision === 'sin-tenant') {
+          setSinTenant(true)
+          setBiometricChecking(false)
+          return
+        }
+        if (decision === 'entrar-con-servidor' && cuerpoHuella?.staff) {
+          member = cuerpoHuella.staff
+          // Refresh offline cache so it survives a future storage-cleared offline session
           try {
-            const staffData = await staffRes.json()
-            if (staffData.staff) {
-              member = staffData.staff
-              // Refresh offline cache so it survives a future storage-cleared offline session
-              try {
-                const fpMap = JSON.parse(localStorage.getItem('pos_fingerprint_staff') || '{}')
-                fpMap[data.staffId] = member
-                localStorage.setItem('pos_fingerprint_staff', JSON.stringify(fpMap))
-              } catch {}
-            }
+            const fpMap = JSON.parse(localStorage.getItem('pos_fingerprint_staff') || '{}')
+            fpMap[data.staffId] = member
+            localStorage.setItem('pos_fingerprint_staff', JSON.stringify(fpMap))
           } catch {}
         }
+        // 'usar-respaldo-local': sin veredicto de la nube — el mapa local, como siempre.
         if (!member) {
           try {
             const fpMap = JSON.parse(localStorage.getItem('pos_fingerprint_staff') || '{}')

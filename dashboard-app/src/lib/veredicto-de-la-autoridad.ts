@@ -78,3 +78,45 @@ export function clasificarRespuestaDePin(status: number, codigo?: string): Vered
 export function cuentaComoIntentoFallido(veredicto: VeredictoDeLaAutoridad): boolean {
   return veredicto === 'pin-rechazado'
 }
+
+/**
+ * Cuánto espera el navegador a `/api/pos/pin` antes de tratarlo como autoridad que no contestó.
+ *
+ * El login por PIN ya usaba 4 s (`pos/layout.tsx`). Las aprobaciones de gerente
+ * (`verifyManagerPin*` en pos-data.ts) no tenían tope: con la LAN degradada el navegador espera
+ * 30–90 s antes de rendirse, y el respaldo local sólo corre DESPUÉS. Un timeout no es un
+ * veredicto sobre el PIN — es el mismo caso que un 5xx, y cae al mismo respaldo.
+ */
+export const TIMEOUT_AUTORIDAD_PIN_MS = 4000
+
+/**
+ * Qué hace el login por HUELLA con la respuesta de la autoridad (C6, la cuarta superficie).
+ *
+ * El defecto que cierra es el INVERSO del de 2ed3c1d5: el login por huella caía al mapa local
+ * (`pos_fingerprint_staff`) ante CUALQUIER respuesta no-2xx — incluido el 401 con el que el
+ * servidor dice «este empleado no existe o está desactivado». Así, con la red arriba, un
+ * empleado dado de baja seguía entrando con su huella desde el caché. Un rechazo real se
+ * trataba como caída.
+ *
+ * `status === null` significa que no hubo respuesta: sin red, timeout o fetch que lanzó.
+ * `hayEmpleado` dice si un 2xx trajo de verdad a la persona.
+ */
+export type DecisionDeHuella =
+  | 'entrar-con-servidor'
+  | 'rechazar'
+  | 'terminal-no-enrolada'
+  | 'sin-tenant'
+  | 'usar-respaldo-local'
+
+export function decidirHuellaTrasAutoridad(status: number | null, codigo?: string, hayEmpleado = false): DecisionDeHuella {
+  if (status === null) return 'usar-respaldo-local'
+  const veredicto = clasificarRespuestaDePin(status, codigo)
+  switch (veredicto) {
+    // Un 2xx sin empleado no es una negación: la nube contestó algo que no entendemos.
+    case 'aceptado': return hayEmpleado ? 'entrar-con-servidor' : 'usar-respaldo-local'
+    case 'pin-rechazado': return 'rechazar'
+    case 'terminal-no-enrolada': return 'terminal-no-enrolada'
+    case 'sin-tenant': return 'sin-tenant'
+    case 'autoridad-no-disponible': return 'usar-respaldo-local'
+  }
+}

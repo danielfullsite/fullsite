@@ -145,11 +145,15 @@ export async function POST(request: NextRequest) {
         `${sbUrl}/rest/v1/pos_staff?id=eq.${encodeURIComponent(fingerprint_id)}&active=eq.true&client_id=eq.${encodeURIComponent(clientId)}${roleFilter}&select=id,name,role&limit=1`,
         { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
       )
-      if (fpRes.ok) {
-        const rows = await fpRes.json()
-        if (Array.isArray(rows) && rows.length > 0) {
-          return respond({ id: rows[0].id, name: rows[0].name, role: rows[0].role }, clientId, throttleKey)
-        }
+      // No poder LEER el personal no es un veredicto sobre el empleado. La rama del PIN ya lo
+      // distinguía (503 authority_unavailable, más abajo); ésta respondía 401 y además cobraba
+      // un intento del throttle. Ese 401 falso es justo lo que el login por huella del
+      // navegador (C6) trata ahora como rechazo definitivo, así que tiene que ser verdad.
+      if (!fpRes.ok) return Response.json({ error: 'No se pudo verificar al empleado', code: 'authority_unavailable' }, { status: 503 })
+      const rows = await fpRes.json().catch(() => null)
+      if (!Array.isArray(rows)) return Response.json({ error: 'No se pudo verificar al empleado', code: 'authority_unavailable' }, { status: 503 })
+      if (rows.length > 0) {
+        return respond({ id: rows[0].id, name: rows[0].name, role: rows[0].role }, clientId, throttleKey)
       }
       await pinRecord(throttleKey, false)
       return Response.json({ error: 'Empleado no encontrado o desactivado' }, { status: 401 })

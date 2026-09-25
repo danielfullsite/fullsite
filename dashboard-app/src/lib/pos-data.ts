@@ -2,6 +2,7 @@ import { kitchenOrderInScope, readKitchenScope } from './kitchen-read-scope'
 import { nuevaIdentidadDeAccion } from './operation-identity'
 import { recordMovement, confirmarMovimientoInventario } from './inventory'
 import { apiUrl } from './api-base'
+import { TIMEOUT_AUTORIDAD_PIN_MS } from './veredicto-de-la-autoridad'
 // POS Menu Data — AMALAY real menu (el POS legado)
 //
 // SQL for Supabase (run in SQL Editor):
@@ -2261,6 +2262,7 @@ export async function verifyManagerHuella(minRole = 'gerente'): Promise<{ name: 
       headers: { 'Content-Type': 'application/json' },
       // `min_role` es lo que el servidor ignoraba en la rama de huella hasta hoy.
       body: JSON.stringify({ fingerprint_id: staffId, client_id: _getClientId(), min_role: minRole }),
+      signal: AbortSignal.timeout(TIMEOUT_AUTORIDAD_PIN_MS),
     })
     if (!res.ok) return null
     const { staff, shiftToken } = await res.json()
@@ -2297,6 +2299,8 @@ export async function verifyManagerPin(pin: string): Promise<string | null> {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pin, client_id: _getClientId(), manager: true }),
+      // Sin tope, una LAN degradada congela la pantalla 30–90 s antes del respaldo local.
+      signal: AbortSignal.timeout(TIMEOUT_AUTORIDAD_PIN_MS),
     })
     if (res.ok) {
       const { staff, shiftToken } = await res.json()
@@ -2343,6 +2347,8 @@ export async function verifyManagerPinWithRole(pin: string): Promise<{ name: str
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pin, client_id: _getClientId(), manager: true }),
+      // Sin tope, una LAN degradada congela la pantalla 30–90 s antes del respaldo local.
+      signal: AbortSignal.timeout(TIMEOUT_AUTORIDAD_PIN_MS),
     })
     if (res.ok) {
       const { staff } = await res.json()
@@ -2391,6 +2397,7 @@ export async function verifyPinWithMinRole(pin: string, minRole: string): Promis
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pin, client_id: _getClientId(), min_role: minRole }),
+      signal: AbortSignal.timeout(TIMEOUT_AUTORIDAD_PIN_MS),
     })
     if (res.ok) {
       const { staff, shiftToken } = await res.json()
