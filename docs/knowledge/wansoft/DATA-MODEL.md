@@ -295,7 +295,7 @@ mesas de evento o terminales moviles que se agregan al vuelo.
 > Para el modelo completo (tablas, columnas, relaciones, datos reales),
 > restaurar el .bak en Docker:
 >
-> docker run -e 'ACCEPT_EULA=Y' -e 'SA_PASSWORD=Str0ngP@ss!' \
+> docker run -e 'ACCEPT_EULA=Y' -e 'SA_PASSWORD=***REDACTED***' \
 >   -p 1433:1433 -v ~/Desktop/WANSOFT:/backup \
 >   mcr.microsoft.com/mssql/server:2017-latest
 >

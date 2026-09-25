@@ -62,6 +62,14 @@ const BACKUP_TABLES = [
   'pos_audit_log',
 ]
 
+// Columnas que NUNCA salen en un respaldo (revisión PR3 H-5, 2026-09-23). El PIN es una
+// credencial: un respaldo en JSON/CSV circula por correo, discos y USB. Efecto en una
+// restauración: el personal vuelve SIN PIN y hay que reasignarlos (/equipo o /pos/staff);
+// no existe hoy un mecanismo de respaldo cifrado de PINs que se pueda reutilizar.
+const EXCLUDED_COLUMNS: Record<string, string[]> = {
+  pos_staff: ['pin', 'pin_hash'],
+}
+
 async function fetchTable(table: string, clientId: string): Promise<unknown[]> {
   // Service key bypassa RLS → el filtro client_id es OBLIGATORIO para no volcar
   // todos los tenants. Todas las BACKUP_TABLES tienen columna client_id.
@@ -74,8 +82,15 @@ async function fetchTable(table: string, clientId: string): Promise<unknown[]> {
       },
     }
   )
-  if (res.ok) return await res.json()
-  return []
+  if (!res.ok) return []
+  const rows = await res.json()
+  const drop = EXCLUDED_COLUMNS[table]
+  if (!drop || !Array.isArray(rows)) return rows
+  return rows.map((r: Record<string, unknown>) => {
+    const copy = { ...r }
+    for (const c of drop) delete copy[c]
+    return copy
+  })
 }
 
 export async function GET(request: NextRequest) {

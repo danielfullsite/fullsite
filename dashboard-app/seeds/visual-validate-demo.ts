@@ -98,11 +98,12 @@ async function main() {
   }
 
   // Get Supabase session for injection
-  console.log('\n  → Obteniendo sesión Supabase para demo@fullsite.mx...')
+  console.log('\n  → Obteniendo sesión Supabase para el usuario demo (SEED_DEMO_EMAIL)...')
   let sessionData: { session: Record<string, unknown>; projectRef: string }
   try {
     sessionData = await getDemoSession()
-    console.log(`  → Sesión OK — access_token=${String(sessionData.session.access_token).slice(0, 20)}...`)
+    // Sin imprimir el token (ni un prefijo): los logs de seeds se pegan en chats y PRs.
+    console.log('  → Sesión OK')
   } catch (err: unknown) {
     console.error(`  ✗ No se pudo obtener sesión: ${err instanceof Error ? err.message : String(err)}`)
     process.exit(1)

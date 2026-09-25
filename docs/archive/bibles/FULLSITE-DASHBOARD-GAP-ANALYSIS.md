@@ -223,7 +223,7 @@ Wansoft es un sistema de reportes de cierre de día + configuración de POS. Ful
 | P0-1 | **Barcode scanning no actualiza stock** — escaneos se logean pero pos_inventory_products.stock no cambia | inventario-real/barcode | Código auditado: escribe a wansoft_data pero no a pos_inventory | Bajo (1-2h) |
 | P0-2 | **Transferencias no cierran loop en DB** — movimientos registrados pero stock origen/destino no actualiza | inventario-real/transferencias | Código: sbPost a wansoft_data, sin UPDATE pos_inventory | Bajo (1-2h) |
 | P0-3 | **Devoluciones no ajustan balance** — devuelves pero el stock no sube | inventario-real/devoluciones | Código: guarda registro, no llama recordMovement | Bajo (1h) |
-| P0-4 | **Vault cifrado con XOR weak** — key hardcodeada en cliente, cualquier atacante descifra credenciales | admin/vault | VAULT_KEY = 'fullsite_vault_2026' en código fuente | Medio (4-8h: migrar a AES-256 server-side) |
+| P0-4 | **Vault cifrado con XOR weak** — key hardcodeada en cliente, cualquier atacante descifra credenciales | admin/vault | VAULT_KEY = '***REDACTED***' en código fuente | Medio (4-8h: migrar a AES-256 server-side) |
 | P0-5 | **Webhook Uber Eats sin HMAC** — cualquier POST puede inyectar órdenes falsas | api/webhook/ubereats | TODO comment en código: "verify signature" | Bajo (1h: agregar HMAC check) |
 | P0-6 | **pos/staff CRUD incompleto** — no se puede gestionar staff desde dashboard | pos/staff | Archivo cortado en ~100 líneas | Medio (4-8h: completar CRUD) |
 | P0-7 | **Flujo CFDI solicitud→emisión no automatizado** — QR promete factura pero no hay pipeline automático | factura → api/factura/timbrar | UI de /factura no dispara timbrado, hay que ir a /facturas manualmente | Alto (8-16h: pipeline completo) |
