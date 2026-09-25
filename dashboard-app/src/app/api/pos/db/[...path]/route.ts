@@ -110,7 +110,7 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ path: string[] 
 
   // Query params del request original + forzar client_id salvo en inserts.
   const params = new URLSearchParams(req.nextUrl.search)
-  if (!consultaProxyValida(table, params)) return forbidden('consulta no permitida')
+  if (!consultaProxyValida(table, params, auth.role)) return forbidden('consulta no permitida')
   if (req.method !== 'POST' && !NO_CID.has(table)) {
     params.set('client_id', `eq.${clientId}`)
   }
@@ -141,8 +141,8 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ path: string[] 
     const r = scoped || await fetch(target, { method: req.method, headers: fwd, body, redirect: 'error' })
     const raw2 = await r.text()
     const ct = r.headers.get('content-type')
-    // El PIN nunca sale por aquí, sin importar qué pidió el `select`.
-    const text = redactResponse(table, raw2, ct)
+    // El PIN nunca sale por aquí, sin importar qué pidió el `select`; la nómina sólo a gerencia.
+    const text = redactResponse(table, raw2, ct, auth.role)
     // 204/205/304 no admiten body — Response() truena con string aunque sea "".
     const bodyless = r.status === 204 || r.status === 205 || r.status === 304
     const res = new NextResponse(bodyless ? null : text, { status: r.status })

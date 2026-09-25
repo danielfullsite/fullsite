@@ -10,6 +10,13 @@ export const FINANCIAL_PAGES = ['/estado-resultados', '/nomina', '/ingresos', '/
 export const AGENT_PAGES = ['/agentes', '/coach', '/chat']
 export const OPERATIONS_PAGES = ['/', '/ventas', '/cortes', '/meseros', '/platillos', '/tendencias', '/propinas', '/inventario', '/auto86', '/ecommerce', '/reportes', '/sucursales']
 export const POS_PAGES = ['/pos']
+// F-06 (contención 2026-09-23): telemetría de agentes de TODOS los restaurantes
+// (agent_runs no tiene columna de tenant). Sólo admin de plataforma, verificado en
+// servidor (proxy.ts → is_platform_admin). Ningún rol de restaurante entra, ni dueño.
+export const PLATFORM_ONLY_PAGES = ['/mission-control', '/roi']
+export function isPlatformOnlyPage(path: string): boolean {
+  return PLATFORM_ONLY_PAGES.some(p => path === p || path.startsWith(p + '/'))
+}
 const CAPITAN_PAGES = [...OPERATIONS_PAGES, ...POS_PAGES, '/admin']
 const CAJERO_PAGES = ['/pos', '/cortes', '/propinas', '/ventas']
 
