@@ -61,6 +61,11 @@ function baseFalsa(o: { terminales?: string[]; personal?: Record<string, { name:
     }
     if (u.includes('/pos_orders') && m === 'GET') return Response.json([JSON.parse(JSON.stringify(orden))])
     if (u.includes('/pos_orders') && m === 'PATCH') {
+      // Filtros condicionales como PostgREST: si no coinciden, 0 filas.
+      const q = new URL(u).searchParams
+      const cierre = q.get('closed_at'), rev = q.get('order_revision')
+      if (cierre && decodeURIComponent(cierre.slice(3)) !== orden.closed_at) return Response.json([])
+      if (rev && rev !== (orden.order_revision == null ? 'is.null' : `eq.${orden.order_revision}`)) return Response.json([])
       const p = JSON.parse(String(init!.body)); parches.push(p)
       Object.assign(orden, p, p.items ? { items: JSON.parse(p.items) } : {})
       return Response.json([JSON.parse(JSON.stringify(orden))])
@@ -131,6 +136,66 @@ describe('V1 · una aprobación autoriza UN objeto', () => {
     // Se re-cierra (por menos) y se intenta reabrir con la MISMA aprobación.
     db.orden.closed_at = '2026-09-24T02:00:00Z'; db.orden.status = 'pagada'
     expect((await ruta('reopen-order', mesero, { order_id: 'O1', approval_token: aprob })).status).toBe(403)
+  })
+
+  // Segunda revisión adversarial (H2): save-order acepta el `closed_at` del cliente. Re-cerrar
+  // con el MISMO valor hacía que el token se viera como reintento («mismo») y reabriera otra
+  // vez. Cada guardado sube `order_revision` (r1_save_order), y la operación ahora lo incluye.
+  it('H2 · re-cerrar con el MISMO closed_at no deja reusar la aprobación', async () => {
+    const db = baseFalsa(); vi.stubGlobal('fetch', db.fetchFalso)
+    const { mesero, aprob } = await tokens()
+    const cierre = '2026-09-24T01:00:00+00:00'
+    db.orden.closed_at = cierre; db.orden.status = 'pagada'
+    expect((await ruta('reopen-order', mesero, { order_id: 'O1', approval_token: aprob })).status).toBe(200)
+    // El cliente re-cierra por menos y FIJA el mismo closed_at; la base sube la revisión.
+    db.orden.closed_at = cierre; db.orden.status = 'pagada'; db.orden.order_revision = 2
+    const r = await ruta('reopen-order', mesero, { order_id: 'O1', approval_token: aprob })
+    expect(r.status).toBe(403)
+    expect(r.body.detail).toBe('APROBACION_REUSADA')
+    expect(db.orden.closed_at).toBe(cierre)
+  })
+
+  it('H2 · si la cuenta cambia entre la lectura y la reapertura, no se reabre (409)', async () => {
+    const db = baseFalsa()
+    db.orden.closed_at = '2026-09-24T01:00:00Z'; db.orden.status = 'pagada'
+    let leida = false
+    vi.stubGlobal('fetch', vi.fn(async (u: string, init?: RequestInit) => {
+      const r = await db.fetchFalso(u, init)
+      // Justo después de leer la orden, otra terminal la guarda (sube la revisión).
+      if (!leida && u.includes('/pos_orders') && (init?.method || 'GET') === 'GET') { leida = true; db.orden.order_revision = 5 }
+      return r
+    }))
+    const { mesero, aprob } = await tokens()
+    const r = await ruta('reopen-order', mesero, { order_id: 'O1', approval_token: aprob })
+    expect(r.status).toBe(409)
+    expect(r.body.error).toBe('ORDER_CHANGED')
+    expect(db.orden.status).toBe('pagada')
+  })
+
+  it('H2 · reintento legítimo de la MISMA reapertura (falló el PATCH) sigue valiendo', async () => {
+    const db = baseFalsa()
+    db.orden.closed_at = '2026-09-24T01:00:00Z'; db.orden.status = 'pagada'
+    let falla = true
+    vi.stubGlobal('fetch', vi.fn(async (u: string, init?: RequestInit) => {
+      if (falla && u.includes('/pos_orders') && init?.method === 'PATCH') { falla = false; return new Response('{}', { status: 500 }) }
+      return db.fetchFalso(u, init)
+    }))
+    const { mesero, aprob } = await tokens()
+    expect((await ruta('reopen-order', mesero, { order_id: 'O1', approval_token: aprob })).status).toBe(502)
+    expect((await ruta('reopen-order', mesero, { order_id: 'O1', approval_token: aprob })).status).toBe(200)
+    expect(db.orden.closed_at).toBeNull()
+  })
+
+  it('H4 · transferir: el mismo token y operation_id hacia OTRA mesa es reuso', async () => {
+    const { verificarTokenDeAprobacion } = await import('@/lib/manager-approval')
+    const db = baseFalsa(); vi.stubGlobal('fetch', db.fetchFalso)
+    const { aprob } = await tokens()
+    const op = (mesa: number) => ({ clientId: 'tenant-a', minLevel: 3, terminalSolicitante: 'POS-M', operacion: `transfer:O1:i1:${mesa}:OP-9` })
+    expect(await verificarTokenDeAprobacion(aprob, op(4))).toMatchObject({ ok: true })
+    expect(await verificarTokenDeAprobacion(aprob, op(4))).toMatchObject({ ok: true })
+    expect(await verificarTokenDeAprobacion(aprob, op(7))).toMatchObject({ ok: false, error: 'APROBACION_REUSADA' })
+    const src = (await import('fs')).readFileSync(path.resolve(__dirname, '../app/api/pos/transfer-item/route.ts'), 'utf8')
+    expect(src).toContain('operacion: `transfer:${source_order_id}:${item_id}:${target_mesa}:${operation_id}`')
   })
 
   it('reabrir una cuenta ya abierta es idempotente y no consume la aprobación', async () => {
