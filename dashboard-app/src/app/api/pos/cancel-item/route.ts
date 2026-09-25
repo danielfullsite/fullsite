@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { withPOSAuth, unauthorized } from '@/lib/api-auth'
-import { verifyShiftToken } from '@/lib/shift-token'
+import { verificarTokenDeAprobacion } from '@/lib/manager-approval'
 import { prepararCancelacionItem } from '@/lib/cancelacion-item'
 import { reconciliarInventarioConfirmado } from '@/lib/inventory-reconcile-server'
 
@@ -50,8 +50,15 @@ export async function POST(request: NextRequest) {
     //     audita como device-trust, para no romper la operación offline en país 40% efectivo.
     let approvalMode = ''
     if (typeof approval_token === 'string' && approval_token) {
-      const p = await verifyShiftToken(approval_token)
-      if (p && p.cid === clientId && (ROLE_LVL[p.rol] || 0) >= 4) approvalMode = 'online:' + p.rol
+      // Verificación central (manager-approval.ts): tenant, rol, TERMINAL y un solo uso por
+      // operación. Un token presente que falla por terminal o replay se rechaza aquí — no
+      // cae al camino offline de abajo, que lo convertiría en una aprobación aceptada.
+      const v = await verificarTokenDeAprobacion(approval_token, {
+        clientId, minLevel: 4, terminalSolicitante: auth.terminalId,
+        operacion: typeof operation_id === 'string' && operation_id ? `cancel:${operation_id}` : `cancel:${order_id}:${item_id}`,
+      })
+      if (v.ok) approvalMode = v.mode
+      else if (v.error !== 'TOKEN_INVALIDO') return Response.json({ ok: false, error: v.error }, { status: 403 })
     }
     if (!approvalMode) {
       // Modo estricto = sólo prueba del servidor (revisión N-4 de PR1; misma regla que

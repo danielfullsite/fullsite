@@ -16,7 +16,24 @@ export interface ShiftTokenPayload {
   nam: string   // staffName
   iat: number   // issued at (unix ms)
   exp: number   // expires at (unix ms)
+  /** Terminal que pidió el token (device_id). Ausente en tokens emitidos antes del 2026-09-24. */
+  tid?: string
+  /** Propósito. Ausente = sesión de turno. 'aprobacion' = token de aprobación de gerente. */
+  pur?: 'aprobacion'
+  /** Identificador único, sólo en tokens de aprobación: permite registrar su uso. */
+  jti?: string
 }
+
+/**
+ * Vida de un token de APROBACIÓN. Corta a propósito: antes la aprobación era el shiftToken
+ * del gerente (8 h), así que una aprobación capturada autorizaba cancelaciones toda la noche.
+ * No es de 2 min porque la resolución de conflictos (pos-offline-db.ts) guarda el token en la
+ * cola y lo reproduce al drenar, que puede tardar unos minutos.
+ */
+export const APROBACION_TTL_MS = 15 * 60 * 1000
+
+import { terminalIdValido } from './terminal-id'
+export { terminalIdValido }
 
 async function getKey(): Promise<CryptoKey> {
   const secret = process.env.SHIFT_TOKEN_SECRET
@@ -32,13 +49,20 @@ async function getKey(): Promise<CryptoKey> {
   )
 }
 
+async function firmar(payload: ShiftTokenPayload): Promise<string> {
+  const key = await getKey()
+  const data = new TextEncoder().encode(JSON.stringify(payload))
+  const sig = await crypto.subtle.sign(ALGORITHM.name, key, data)
+  return `${Buffer.from(data).toString('base64url')}.${Buffer.from(sig).toString('base64url')}`
+}
+
 export async function issueShiftToken(
   staffId: string,
   clientId: string,
   role: string,
-  staffName: string
+  staffName: string,
+  terminalId?: string,
 ): Promise<string> {
-  const key = await getKey()
   const now = Date.now()
   const payload: ShiftTokenPayload = {
     sub: staffId,
@@ -48,12 +72,33 @@ export async function issueShiftToken(
     iat: now,
     exp: now + TTL_MS,
   }
-  const data = new TextEncoder().encode(JSON.stringify(payload))
-  const sig = await crypto.subtle.sign(ALGORITHM.name, key, data)
-  return `${Buffer.from(data).toString('base64url')}.${Buffer.from(sig).toString('base64url')}`
+  if (terminalIdValido(terminalId)) payload.tid = terminalId
+  return firmar(payload)
 }
 
-export async function verifyShiftToken(token: string): Promise<ShiftTokenPayload | null> {
+/**
+ * Token de APROBACIÓN de gerente: distinto del de sesión, corto, con `jti` y amarrado a la
+ * terminal donde se tecleó el PIN. `verifyShiftToken` lo RECHAZA como sesión — sin eso, una
+ * aprobación de 15 min serviría de login.
+ */
+export async function issueApprovalToken(
+  staffId: string,
+  clientId: string,
+  role: string,
+  staffName: string,
+  terminalId?: string,
+): Promise<string> {
+  const now = Date.now()
+  const payload: ShiftTokenPayload = {
+    sub: staffId, cid: clientId, rol: role, nam: staffName, iat: now,
+    exp: now + APROBACION_TTL_MS, pur: 'aprobacion', jti: crypto.randomUUID(),
+  }
+  if (terminalIdValido(terminalId)) payload.tid = terminalId
+  return firmar(payload)
+}
+
+/** Verifica firma y vigencia, sin mirar el propósito. Uso interno. */
+async function verificarFirma(token: string): Promise<ShiftTokenPayload | null> {
   try {
     const dot = token.indexOf('.')
     if (dot < 0) return null
@@ -75,4 +120,24 @@ export async function verifyShiftToken(token: string): Promise<ShiftTokenPayload
   } catch {
     return null
   }
+}
+
+/** Token de SESIÓN de turno. Un token de aprobación no es sesión: se rechaza. */
+export async function verifyShiftToken(token: string): Promise<ShiftTokenPayload | null> {
+  const p = await verificarFirma(token)
+  if (!p || p.pur !== undefined) return null
+  return p
+}
+
+/**
+ * Token presentado como APROBACIÓN. Acepta el de aprobación y, por compatibilidad con
+ * clientes que aún mandan el shiftToken del gerente, el de sesión. Quien consume decide si
+ * el de sesión todavía vale (ver manager-approval.ts, POS_APROBACION_V2_ESTRICTA).
+ */
+export async function verifyApprovalCredential(token: string): Promise<ShiftTokenPayload | null> {
+  const p = await verificarFirma(token)
+  if (!p) return null
+  if (p.pur !== undefined && p.pur !== 'aprobacion') return null
+  if (p.pur === 'aprobacion' && !p.jti) return null
+  return p
 }

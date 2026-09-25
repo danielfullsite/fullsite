@@ -133,8 +133,11 @@ describe('el POS adopta la revision que provoco', () => {
 
 describe('lo que la puerta auditada exige y la otra no exigia', () => {
   it('aprobacion de gerente verificada server-side', () => {
-    expect(rutaLimpia).toMatch(/verifyShiftToken\(approval_token\)/)
-    expect(rutaLimpia).toMatch(/ROLE_LVL\[p\.rol\] \|\| 0\) >= 4/)
+    // 2026-09-24: la verificación se centralizó en manager-approval.ts
+    // (verificarTokenDeAprobacion: tenant, rol, terminal y un solo uso por operación).
+    // El contrato que esta prueba cuida —gerente+ verificado en el servidor— sigue igual.
+    expect(rutaLimpia).toMatch(/verificarTokenDeAprobacion\(approval_token/)
+    expect(rutaLimpia).toMatch(/minLevel: 4/)
   })
 
   it('el actor sale del token, no del cuerpo', () => {

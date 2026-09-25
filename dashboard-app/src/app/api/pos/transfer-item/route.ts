@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { withPOSAuth, unauthorized } from '@/lib/api-auth'
-import { verifyShiftToken } from '@/lib/shift-token'
+import { verificarTokenDeAprobacion } from '@/lib/manager-approval'
 
 /** Both accounts and the replay receipt commit in one database transaction.
  * No fallback to separate PATCHes: a missing migration is an unavailable
@@ -15,9 +15,13 @@ export async function POST(request: NextRequest) {
     || !Number.isSafeInteger(target_mesa) || target_mesa < 1) {
     return Response.json({ ok: false, error: 'MISSING_PARAMS' }, { status: 400 })
   }
-  const approval = typeof approval_token === 'string' ? await verifyShiftToken(approval_token) : null
-  if (!approval || approval.cid !== auth.clientId || !['capitan', 'gerente', 'admin', 'dueño'].includes(approval.rol)) {
-    return Response.json({ ok: false, error: 'SUPERVISOR_APPROVAL_REQUIRED' }, { status: 403 })
+  // Capitán o más (nivel 3). Misma verificación central que cancelar: tenant, rol,
+  // terminal y un solo uso por operación (el reintento de la MISMA transferencia vale).
+  const approval = await verificarTokenDeAprobacion(approval_token, {
+    clientId: auth.clientId, minLevel: 3, terminalSolicitante: auth.terminalId, operacion: `transfer:${operation_id}`,
+  })
+  if (!approval.ok) {
+    return Response.json({ ok: false, error: 'SUPERVISOR_APPROVAL_REQUIRED', detail: approval.error }, { status: 403 })
   }
   const key = process.env.SUPABASE_SERVICE_KEY
   if (!key) return Response.json({ ok: false, error: 'TRANSFER_UNAVAILABLE' }, { status: 503 })
@@ -26,7 +30,7 @@ export async function POST(request: NextRequest) {
       method: 'POST', headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ p_client_id: auth.clientId, p_operation_id: operation_id,
         p_source_order_id: source_order_id, p_item_id: item_id, p_target_mesa: target_mesa,
-        p_actor: approval.nam || approval.sub }),
+        p_actor: approval.actor }),
     })
     const result = await res.json()
     if (!res.ok) {

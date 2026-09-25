@@ -78,3 +78,13 @@ export function clasificarRespuestaDePin(status: number, codigo?: string): Vered
 export function cuentaComoIntentoFallido(veredicto: VeredictoDeLaAutoridad): boolean {
   return veredicto === 'pin-rechazado'
 }
+
+/**
+ * Cuánto espera el navegador a `/api/pos/pin` antes de tratarlo como autoridad que no contestó.
+ *
+ * El login por PIN ya usaba 4 s (`pos/layout.tsx`). Las aprobaciones de gerente
+ * (`pos-data.ts`) no tenían tope: con la LAN degradada el navegador espera 30–90 s antes de
+ * rendirse, y el respaldo local sólo corre DESPUÉS. Un timeout no es un veredicto sobre el
+ * PIN — es el mismo caso que un 5xx, y cae al mismo respaldo.
+ */
+export const TIMEOUT_AUTORIDAD_PIN_MS = 4000

@@ -5,7 +5,13 @@ import { NextRequest } from 'next/server'
 const auth = vi.hoisted(() => ({ clientId: 'tenant-lab', role: 'mesero' }))
 const approval = vi.hoisted(() => ({ cid: 'tenant-lab', rol: 'gerente', nam: 'Ana', sub: 'supervisor' }))
 vi.mock('@/lib/api-auth', () => ({ withPOSAuth: async () => auth, unauthorized: () => new Response(null, { status: 401 }) }))
-vi.mock('@/lib/shift-token', () => ({ verifyShiftToken: async (token: string) => token === 'signed-lab' ? approval : null }))
+// 2026-09-24: transfer-item verifica con verificarTokenDeAprobacion (manager-approval.ts),
+// que lee el token con verifyApprovalCredential. El token del fixture no trae `pur` ni `tid`:
+// es la forma vieja (shiftToken), que fuera del modo estricto v2 se sigue aceptando.
+vi.mock('@/lib/shift-token', () => ({
+  verifyShiftToken: async (token: string) => token === 'signed-lab' ? approval : null,
+  verifyApprovalCredential: async (token: string) => token === 'signed-lab' ? approval : null,
+}))
 import { POST } from '@/app/api/pos/transfer-item/route'
 const request = (extra = {}) => new NextRequest('http://localhost/api/pos/transfer-item', { method: 'POST',
   body: JSON.stringify({ source_order_id: 'src', item_id: 'i1', target_mesa: 7, operation_id: 'stable-op', approval_token: 'signed-lab', ...extra }) })

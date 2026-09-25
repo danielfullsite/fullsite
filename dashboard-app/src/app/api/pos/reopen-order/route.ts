@@ -24,6 +24,7 @@ export async function POST(request: NextRequest) {
 
   const appr = await verifyManagerApproval({
     approvalToken: approval_token, offlineApproved: offline_approved, clientId, minLevel: 4,
+    terminalSolicitante: auth.terminalId, operacion: `reopen:${order_id}`,
     // El rol sale del shift token FIRMADO, no del cuerpo. Con esto la bitácora
     // distingue a un gerente aprobando en su terminal de un mesero que se autoaprobó.
     solicitanteRol: auth.role,

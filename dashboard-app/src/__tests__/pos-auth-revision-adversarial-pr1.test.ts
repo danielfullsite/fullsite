@@ -167,7 +167,10 @@ describe('N-4 · offline_approved deja de ser prueba en modo estricto', () => {
     const { verifyManagerApproval } = await import('@/lib/manager-approval')
     const approvalToken = await tokenDe('a-gerente', 'gerente')
     const r = await verifyManagerApproval({ approvalToken, clientId: 'tenant-a', solicitanteRol: 'mesero' })
-    expect(r).toMatchObject({ ok: true, mode: 'online:gerente' })
+    // Desde 2026-09-24 el modo lleva marcas (`:v1`, `:sin_terminal`) cuando la aprobación es
+    // de la forma vieja; sigue siendo una aprobación ONLINE aceptada, que es lo que se prueba.
+    expect(r.ok).toBe(true)
+    expect(r.mode.startsWith('online:gerente')).toBe(true)
   })
 
   it('STRICT=true: token de gerente de OTRO restaurante → rechazado', async () => {

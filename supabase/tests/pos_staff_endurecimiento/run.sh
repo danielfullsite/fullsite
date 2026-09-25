@@ -18,6 +18,8 @@ END_RB="$MIG/PENDIENTE_20260925010000_pos_staff_endurecimiento_ROLLBACK.sql"
 TRU="$MIG/PENDIENTE_20260925020000_revocar_truncate_anon_authenticated.sql"
 TRU_RB="$MIG/PENDIENTE_20260925020000_revocar_truncate_anon_authenticated_ROLLBACK.sql"
 F1="$MIG/PENDIENTE_20260914120000_pos_staff_pin_hash.sql"
+APROB="$MIG/PENDIENTE_20260925030000_pos_aprobaciones_usadas.sql"
+APROB_RB="$MIG/PENDIENTE_20260925030000_pos_aprobaciones_usadas_ROLLBACK.sql"
 PR5="${1:-}"
 
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/pos-staff-pg.XXXXXX")"
@@ -235,6 +237,16 @@ caso "[rollback TRUNCATE] authenticated recupera TRUNCATE (ruta no vista)" authe
 echo "-- 10. F1 (pin_hash) DESPUÉS del endurecimiento"
 aplicar "$F1" && echo "  F1 aplicada" || { FAIL=$((FAIL+1)); echo "  FAIL  F1 no aplicó sobre el estado endurecido"; cat "$TMP/aplicar.log"; }
 casos_f1 "endurecido+F1"
+
+echo "-- 11. Registro de uso de aprobaciones (pos_aprobaciones_usadas)"
+aplicar "$APROB" && echo "  aplicada" || { FAIL=$((FAIL+1)); echo "  FAIL  no aplicó"; cat "$TMP/aplicar.log"; }
+caso "aprobaciones: anon no inserta"                                  anon - "insert into pos_aprobaciones_usadas (jti, client_id, operacion) values ('jti-sintetico-1', 'tenant-a', 'op'); select 'x'" E:42501
+caso "aprobaciones: miembro con sesión no inserta ni lee"             authenticated $DUE "select count(*) from pos_aprobaciones_usadas" E:42501
+caso "aprobaciones: servidor registra el primer uso"                  service_role - "with i as (insert into pos_aprobaciones_usadas (jti, client_id, operacion) values ('jti-sintetico-1', 'tenant-a', 'op') returning 1) select count(*) from i" N:1
+caso "aprobaciones: el mismo jti otra vez → 23505 (PostgREST 409)"   service_role - "insert into pos_aprobaciones_usadas (jti, client_id, operacion) values ('jti-sintetico-2', 'tenant-a', 'op'); insert into pos_aprobaciones_usadas (jti, client_id, operacion) values ('jti-sintetico-2', 'tenant-a', 'otra'); select 'x'" E:23505
+caso "aprobaciones: jti demasiado corto se rechaza"                   service_role - "insert into pos_aprobaciones_usadas (jti, client_id, operacion) values ('corto', 'tenant-a', 'op'); select 'x'" E:23514
+aplicar "$APROB" && echo "  reaplicada (idempotente)" || { FAIL=$((FAIL+1)); echo "  FAIL  no es idempotente"; }
+aplicar "$APROB_RB" && caso "aprobaciones: rollback borra la tabla" postgres - "select count(*) from pg_class where relname = 'pos_aprobaciones_usadas'" N:0
 parar "$TMP/datos1"
 
 echo; echo "== S2 · esquema de producción → endurecimiento DIRECTO (sin PR3): autosuficiente =="
