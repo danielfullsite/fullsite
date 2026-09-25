@@ -326,17 +326,17 @@ describe('D · pos-data: timeout, terminal, límite local y motivo', () => {
     expect(pd.motivoUltimaAprobacionFallida()).toBe('autoridad-no-disponible')
   })
 
-  it('sin red CON credencial local: el PIN equivocado sí cuenta (no hay bypass)', async () => {
+  // B-2 (PR 03): el navegador ya no guarda PINs de gerente validados. Sin red y sin Caja, no
+  // hay aprobación — aunque el mismo PIN haya entrado con red hace un minuto.
+  it('sin red y SIN Caja: no hay aprobación local, ni siquiera de un PIN validado antes', async () => {
     const pd = await import('@/lib/pos-data')
     servidor({ status: 200, body: { staff: { name: 'G', role: 'gerente' } } })
-    await pd.verifyManagerPin('4102')
-    servidor('sin-red')
     expect(await pd.verifyManagerPin('4102')).toBe('G')
-    for (let i = 0; i < 5; i++) expect(await pd.verifyManagerPin('0000')).toBeNull()
-    expect(pd.motivoUltimaAprobacionFallida()).toBe('pin-rechazado')
-    expect(pd.bloqueoDeAprobacionRestante()).toBeGreaterThan(0)
-    // Bloqueado: ni el PIN correcto entra hasta que pase el tiempo.
+    expect(store.has('pos_manager_pin_cache'), 'no se guarda nada con qué juzgar offline').toBe(false)
+    servidor('sin-red')
     expect(await pd.verifyManagerPin('4102')).toBeNull()
+    expect(pd.motivoUltimaAprobacionFallida()).toBe('autoridad-no-disponible')
+    expect(pd.bloqueoDeAprobacionRestante(), 'y no cuenta como intento').toBe(0)
   })
 
   it('401 no usa el caché aunque el PIN esté cacheado', async () => {

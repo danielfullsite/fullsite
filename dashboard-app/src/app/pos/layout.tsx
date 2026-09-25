@@ -15,21 +15,12 @@ import { initStationRouting, initNoPrintStations, initCancellationReasons, initD
 import { inventoryPolicyService } from '@/lib/inventory-policy'
 import { getFingerprintUrl } from '@/lib/fingerprint-url'
 import { localNetworkFetch } from '@/lib/local-network-fetch'
-import { provisionManagerCredential, verifyPinOffline, estadoCredencialesOffline } from '@/lib/pos-manager-auth'
 import { clasificarRespuestaDePin, TIMEOUT_AUTORIDAD_PIN_MS } from '@/lib/veredicto-de-la-autoridad'
 import AvisoAprobacion from '@/components/pos/AvisoAprobacion'
 import { usePosOffline } from '@/hooks/usePosOffline'
 import { POSLockContext } from './pos-lock-context'
 import { requiereCaja } from '@/lib/pedro-cliente'
 import { actorDeCaja, cerrarActorDeCaja, ingresarConPinEnCaja } from '@/lib/pedro-actor'
-
-async function hashPin(pin: string, staffId: string): Promise<string> {
-  try {
-    const data = new TextEncoder().encode(`${pin}:${staffId}`)
-    const buf = await crypto.subtle.digest('SHA-256', data)
-    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
-  } catch { return '' }
-}
 
 
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -574,118 +565,39 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
               }
               await m.warmActiveOrdersCache(_cid())
             }).catch(() => {})
-            const pinHash = await hashPin(pin, member.id)
-            localStorage.setItem('pos_staff_cache', JSON.stringify({
-              id: member.id, name: member.name, role: member.role,
-              exp: Date.now() + 28_800_000,
-              pin_hash: pinHash,
-            }))
-            // pos_staff_cache guarda UNA sola credencial y se sobrescribe en cada login,
-            // así que offline sólo podía entrar la última persona que se logueó con red.
-            // En una terminal que comparten meseros, cajero y gerente eso falla el primer
-            // turno. pos-manager-auth ya tenía el almacén multi-credencial con PBKDF2,
-            // salt por dispositivo, revocación y bitácora — sólo no estaba conectado.
-            // Se provisiona aquí, sin tocar nada de lo de arriba. Si falla, el camino
-            // validado en campo sigue funcionando igual.
-            provisionManagerCredential(pin, member.id, member.name, member.role).catch(() => {})
+            // B-2 (bloque POS, 2026-09-24): el navegador YA NO guarda verificadores de PIN.
+            // Aquí se escribían `pos_staff_cache` (SHA-256 de pin:id) y, vía pos-manager-auth,
+            // PBKDF2 con la sal en el mismo localStorage: con una copia del perfil, los 10^4
+            // PINs se revientan en segundos, fuera de la aplicación. El modo sin conexión vive
+            // en la Caja, sellado por el SO (actor-authority.js). Ver credenciales-offline-navegador.ts.
           } catch { /* ignore */ }
           unlock(member)
           return
         }
       }
     } catch {
-      // Sin red (modo offline) — check server-issued shift token session
-      try {
-        const staffJson = localStorage.getItem('pos_staff_cache')
-        if (staffJson) {
-          const entry = JSON.parse(staffJson)
-          // Guard: only accept the auth-object shape. A stale array (legacy bug where
-          // fetchMeseros shared this key) must never be treated as a valid session.
-          if (entry && !Array.isArray(entry) && entry.exp > Date.now()) {
-            // Verify PIN hash — obligatorio (ver abajo: sin hash ya no se entra).
-            //
-            // Si NO coincide, ya no se falla aquí: este caché guarda a UNA sola persona
-            // (la última que se logueó con red), así que un PIN distinto puede ser
-            // perfectamente válido y pertenecer a otro empleado de la misma terminal.
-            // Se deja pasar al almacén multi-credencial de abajo, que sí tiene a todos.
-            // El PIN correcto de la persona cacheada sigue entrando por aquí, idéntico.
-            //
-            // Una entrada SIN pin_hash ya no pasa de largo (F-01, 2026-09-23). Antes
-            // cualquier PIN de 4+ dígitos abría el POS con la identidad del caché, así que
-            // un `pos_staff_cache` copiado o escrito a mano era una credencial sin PIN.
-            // Las entradas sin hash eran de antes del hasheo y el caché vence a las 8 h:
-            // no queda ninguna legítima. Cae al almacén multi-credencial, que exige PIN.
-            let coincideCacheSimple = false
-            if (typeof entry.pin_hash === 'string' && entry.pin_hash) {
-              const hash = await hashPin(pin, entry.id)
-              coincideCacheSimple = hash === entry.pin_hash
-            }
-            if (!coincideCacheSimple) throw new Error('pin-no-es-de-la-persona-cacheada')
-            // Offline: bypass checkActiveSession (network-dependent) — restore session directly
-            const member: StaffMember = { id: entry.id, name: entry.name, role: entry.role }
-            setStaff(member)
-            setUnlocked(true)
-            setAttempts(0)
-            sessionStorage.setItem('pos_staff', JSON.stringify(member))
-            sessionStorage.setItem('pos_last_activity', Date.now().toString())
-            setChecking(false)
-            return
-          }
-        }
-      } catch { /* ignore */ }
-
-      // Almacén multi-credencial (pos-manager-auth): tiene a TODOS los que se han
-      // logueado con red en esta terminal, no sólo al último. Cubre los dos casos que
-      // el caché simple no puede: otro empleado teclea su PIN, o el caché simple ya
-      // venció. Verifica con PBKDF2 + salt del dispositivo, respeta revocación y deja
-      // bitácora que se sincroniza al reconectar.
-      try {
-        const offline = await verifyPinOffline(pin, 'pos_login')
-        if (offline) {
-          // El id viene de la credencial que acaba de coincidir, no de `pos_staff_cache`.
-          // Ese caché guarda a UNA sola persona, así que buscar el id por nombre ahí
-          // devolvía `''` para el segundo empleado — y un id vacío viaja a la sesión y
-          // a pos_attendance. Era justo el caso que este almacén existe para cubrir.
-          const member: StaffMember = { id: offline.staff_id, name: offline.name, role: offline.role }
-          setStaff(member)
-          setUnlocked(true)
-          setAttempts(0)
-          sessionStorage.setItem('pos_staff', JSON.stringify(member))
-          sessionStorage.setItem('pos_last_activity', Date.now().toString())
-          setChecking(false)
-          return
-        }
-      } catch { /* almacén no disponible — cae al mensaje de abajo */ }
-
-      // Camino de falla sin red. Son TRES casos, no dos, y lo que decide es si se
-      // cuenta el intento — porque contar de más bloquea la terminal a los 5 intentos.
+      // B-2 (bloque POS, 2026-09-24): un navegador SIN Caja no tiene modo sin conexión.
       //
-      // El de en medio es el que muerde: un restaurante que abre pasadas las 16 h del
-      // TTL tiene credenciales guardadas y ninguna válida. Tratarlo como PIN incorrecto
-      // bloquearía al gerente tecleando bien, justo el día que abre sin internet.
-      const estado = estadoCredencialesOffline()
-      if (estado !== 'utilizable') {
-        // El orden importa: si llegamos aquí porque la NUBE contestó mal, ésa es la causa
-        // real y gana sobre las otras dos. Decir "conéctate una vez" a quien ya está
-        // conectado, o "sin conexión" a quien tiene internet, manda a buscar el problema
-        // al lugar equivocado — y en un restaurante eso son treinta minutos mirando el módem.
-        //
-        // Va por `sessionError` y no por un cuarto booleano a propósito: este componente
-        // arrastra un `rules-of-hooks` de nacimiento (hay un return temprano antes de TODOS
-        // sus hooks), así que cada useState nuevo suma un error de lint al archivo. El
-        // mensaje se ve igual — mismo recuadro ámbar — sin empeorar el baseline.
-        if (autoridadNoDisponible) {
-          setSessionError('El servidor no pudo confirmar tu PIN ahora mismo. No es tu PIN ni tu internet — espera un momento e intenta de nuevo.')
-        } else if (estado === 'todas-vencidas') setSesionVencida(true)
-        else setNetworkError(true)
-        setPin('')
-        setTimeout(() => { setNetworkError(false); setSesionVencida(false) }, 4000)
-        setChecking(false)
-        return
+      // Antes, aquí se juzgaba el PIN contra `pos_staff_cache` y `pos_manager_credentials_v2`
+      // en localStorage — verificadores de un PIN de 4 dígitos que cualquiera con una copia
+      // del perfil revienta fuera de la aplicación. Un navegador no tiene protección del
+      // sistema operativo para guardarlos, así que no los guarda. Las terminales Electron
+      // entran por la Caja (arriba, `requiereCaja()`), que sí los guarda sellados.
+      //
+      // Nunca se cuenta como intento: no hubo nadie que juzgara el PIN.
+      //
+      // Va por `sessionError` y no por un booleano nuevo a propósito: este componente
+      // arrastra un `rules-of-hooks` de nacimiento y cada useState nuevo suma un error de lint.
+      if (autoridadNoDisponible) {
+        setSessionError('El servidor no pudo confirmar tu PIN ahora mismo. No es tu PIN ni tu internet — espera un momento e intenta de nuevo.')
+      } else {
+        setNetworkError(true)
+        setSessionError('Sin conexión. Esta terminal no guarda credenciales para entrar sin internet: conéctala o entra desde una terminal con Caja.')
       }
-      // `utilizable`: había con qué juzgar y ninguna credencial coincidió. El PIN está
-      // mal de verdad, así que cae al contador de abajo — que es lo que #133 se saltó,
-      // dejando intentos infinitos sin red (comparado contra cd3bdb1e^).
+      setPin('')
+      setTimeout(() => { setNetworkError(false); setSesionVencida(false) }, 4000)
+      setChecking(false)
+      return
     }
 
     const newAttempts = attempts + 1

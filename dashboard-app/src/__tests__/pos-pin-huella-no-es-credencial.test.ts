@@ -311,47 +311,25 @@ describe('Copiar la caché offline a otra terminal no permite entrar sin PIN', (
     }
   }
 
-  async function authEn(t: ReturnType<typeof terminal>) {
+  // B-2 (bloque POS, 2026-09-24): `pos-manager-auth` y `pos_staff_cache` se RETIRARON del
+  // navegador — eran verificadores de PIN en localStorage, así que «copiar la caché» ya no
+  // tiene nada que copiar. Lo que se prueba ahora es que no quede nada y que no vuelva.
+  it('los almacenes de verificadores del navegador se purgan al cargar pos-data', async () => {
+    const a = terminal()
+    for (const k of ['pos_staff_cache', 'pos_manager_credentials_v2', 'pos_pin_device_salt', 'pos_manager_pin_cache']) a.m.set(k, 'x')
+    a.m.set('pos_shift_token', 'sesion')
     vi.resetModules()
-    vi.stubGlobal('localStorage', t.ls)
-    return await import('@/lib/pos-manager-auth')
-  }
-
-  it('almacén multi-credencial copiado completo (credenciales + sal): sin el PIN correcto no entra nadie', async () => {
-    const a = terminal()
-    const authA = await authEn(a)
-    await authA.provisionManagerCredential('2468', 'a-gerente', 'Gerente A', 'gerente')
-    // Nada de lo guardado es el PIN en claro.
-    for (const v of a.m.values()) expect(v).not.toContain('2468')
-
-    const b = terminal()
-    for (const [k, v] of a.m) b.m.set(k, v)
-    const authB = await authEn(b)
-    for (const intento of ['', '0000', '1111', 'a-gerente', '___fingerprint___']) {
-      expect(await authB.verifyPinOffline(intento), `intento "${intento}"`).toBeNull()
-    }
-    // Control: con el PIN real sí — la caché offline existe para eso y sigue funcionando.
-    expect(await authB.verifyPinOffline('2468')).toMatchObject({ staff_id: 'a-gerente' })
+    vi.stubGlobal('localStorage', a.ls)
+    vi.stubGlobal('window', { localStorage: a.ls })
+    await import('@/lib/pos-data')
+    expect([...a.m.keys()]).toEqual(['pos_shift_token'])
   })
 
-  it('credenciales copiadas SIN la sal del dispositivo no sirven ni con el PIN correcto', async () => {
-    const a = terminal()
-    const authA = await authEn(a)
-    await authA.provisionManagerCredential('2468', 'a-gerente', 'Gerente A', 'gerente')
-
-    const b = terminal()
-    b.m.set('pos_manager_credentials_v2', a.m.get('pos_manager_credentials_v2')!)
-    const authB = await authEn(b)
-    expect(await authB.verifyPinOffline('2468')).toBeNull()
-  })
-
-  it('pos_staff_cache sin pin_hash ya NO deja entrar con cualquier PIN (layout.tsx)', () => {
+  it('el login ya no lee ni escribe verificadores locales (layout.tsx)', () => {
     const fuente = readFileSync(join(process.cwd(), 'src/app/pos/layout.tsx'), 'utf8')
-    const rama = fuente.slice(fuente.indexOf("localStorage.getItem('pos_staff_cache')"))
-    const bloque = rama.slice(0, rama.indexOf('setUnlocked(true)'))
-    expect(bloque).toContain('let coincideCacheSimple = false')
-    expect(bloque).toMatch(/typeof entry\.pin_hash === 'string' && entry\.pin_hash/)
-    expect(bloque).not.toContain('let coincideCacheSimple = true')
+    expect(fuente).not.toContain("from '@/lib/pos-manager-auth'")
+    expect(fuente).not.toMatch(/localStorage\.(getItem|setItem)\('pos_staff_cache'/)
+    expect(fuente).not.toContain('coincideCacheSimple')
   })
 
   it('el mapa pos_fingerprint_staff ya no abre el POS: el botón de huella no desbloquea', () => {
