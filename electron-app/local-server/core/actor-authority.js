@@ -47,6 +47,18 @@ const equal = (a, b) => { const x = Buffer.from(a || ''), y = Buffer.from(b || '
 const VENTANA_INTENTOS_MS      = 10 * 60000
 const INTENTOS_POR_TERMINAL    = 10
 const INTENTOS_POR_INSTALACION = 30
+// Revisión adversarial E1 (2026-09-24): el bloqueo ESCALA y un éxito ya no borra los fallos.
+// Antes, entrar con el propio PIN limpiaba el presupuesto de la terminal (y con él el de la
+// instalación), así que un mesero intercalaba su PIN cada 9 intentos y recorría los 10^4 PINs
+// sin red: encontró el del gerente en 4102 intentos sin un solo 429. Ahora: al agotar el
+// presupuesto, bloqueo de 10 min que se duplica en cada reincidencia (tope 24 h); los fallos
+// sólo vencen con el tiempo; el historial de bloqueos se olvida tras 24 h sin bloquear.
+const BLOQUEO_BASE_MS   = 10 * 60000
+const BLOQUEO_TOPE_MS   = 24 * 3600000
+const OLVIDO_BLOQUEOS_MS = 24 * 3600000
+// Revisión adversarial E7: con el reloj dudoso sólo se re-ancla si la nube contesta y su hora
+// cuadra con la local.
+const TOLERANCIA_RELOJ_MS = 5 * 60000
 const ARCHIVO_SELLADO = 'actor-credentials.sealed'
 const LLAVE_SELLADA = 'actor-signing-key.sealed'
 const ARCHIVO_PLANO_VIEJO = 'actor-credentials.json'
@@ -140,7 +152,7 @@ class ActorAuthority {
     return r
   }
   _vacio() {
-    return { credentials: {}, failures: {}, denied_devices: {}, last_seen: 0, revocados: {} }
+    return { credentials: {}, failures: {}, denied_devices: {}, last_seen: 0, revocados: {}, bloqueos: {} }
   }
   _abrir(archivo) {
     try { return this.protector.unseal(fs.readFileSync(archivo)) }
@@ -152,6 +164,7 @@ class ActorAuthority {
     // mucho, y sólo ocurre una vez, al actualizar.
     if (Array.isArray(data.failures)) data.failures = {}
     if (!data.revocados || typeof data.revocados !== 'object') data.revocados = {}
+    if (!data.bloqueos || typeof data.bloqueos !== 'object') data.bloqueos = {}
     if (data.restaurant_id !== this.restaurantId || data.location_id !== this.branchId ||
       !data.credentials || !data.failures || typeof data.failures !== 'object' ||
       !data.denied_devices || !Number.isFinite(data.last_seen)) {
@@ -161,7 +174,9 @@ class ActorAuthority {
   }
   _persist() {
     this.data.restaurant_id = this.restaurantId; this.data.location_id = this.branchId
-    this.data.last_seen = Math.max(this.data.last_seen || 0, this.now())
+    // Re-anclado (E7): tras confirmar la hora con la nube, `last_seen` puede BAJAR.
+    this.data.last_seen = this._reanclar ? this.now() : Math.max(this.data.last_seen || 0, this.now())
+    this._reanclar = false
     if (!this.protegido) return // sólo memoria: nada que se pueda robar del disco
     try { replaceFile(this.file, this.protector.seal(JSON.stringify(this.data))) }
     catch (error) { this._faulted = true; throw fail('No se pudo guardar la autorización en Caja', 503, 'ACTOR_STORAGE_UNAVAILABLE') }
@@ -183,12 +198,34 @@ class ActorAuthority {
   _anotarFallo(deviceId, now) {
     if (!Array.isArray(this.data.failures[deviceId])) this.data.failures[deviceId] = []
     this.data.failures[deviceId].push(now)
+    // Al agotar un presupuesto se BLOQUEA (escalando) y se vacía ese contador: el bloqueo, no
+    // el contador, es lo que frena.
+    if (this._fallosDe(deviceId, now).length >= INTENTOS_POR_TERMINAL) { this._bloquear(deviceId, now); delete this.data.failures[deviceId] }
+    if (this._fallosDeLaInstalacion(now) >= INTENTOS_POR_INSTALACION) { this._bloquear('*', now); this.data.failures = {} }
+  }
+  _bloquear(ambito, now) {
+    const b = this.data.bloqueos[ambito] || { strikes: 0, hasta: 0, ultimo: 0 }
+    if (now - (b.ultimo || 0) > OLVIDO_BLOQUEOS_MS) b.strikes = 0
+    b.strikes += 1
+    b.hasta = now + Math.min(BLOQUEO_BASE_MS * 2 ** (b.strikes - 1), BLOQUEO_TOPE_MS)
+    b.ultimo = now
+    this.data.bloqueos[ambito] = b
+  }
+  _bloqueado(ambito, now) {
+    const b = this.data.bloqueos[ambito]
+    return !!b && b.hasta > now
   }
   _time() {
+    const { now, dudoso } = this._reloj()
+    if (dudoso) throw fail('Reloj de Caja retrocedió; verificar hora antes de autorizar', 503, 'ACTOR_CLOCK_INVALID')
+    return now
+  }
+  /** Como `_time`, pero no lanza por reloj: dice si está dudoso (E7). */
+  _reloj() {
     if (this._faulted) throw fail('Reinicia y verifica el almacenamiento de Caja antes de autorizar', 503, 'ACTOR_STORAGE_UNAVAILABLE')
     const now = this.now()
-    if (!Number.isFinite(now) || now + 60000 < this.data.last_seen) throw fail('Reloj de Caja retrocedió; verificar hora antes de autorizar', 503, 'ACTOR_CLOCK_INVALID')
-    return now
+    if (!Number.isFinite(now)) throw fail('Reloj de Caja inválido', 503, 'ACTOR_CLOCK_INVALID')
+    return { now, dudoso: now + 60000 < this.data.last_seen }
   }
   _index(pin) { return crypto.createHmac('sha256', this.key).update('pin:v2:' + this.restaurantId + ':' + pin).digest('hex') }
   _legacyIndex(pin) { return this.data.legacy ? crypto.createHmac('sha256', this.data.legacy.key).update('pin:' + pin).digest('hex') : null }
@@ -241,16 +278,15 @@ class ActorAuthority {
     })
   }
   async _login({ pin, deviceId, restaurantId, minRole, aprobacion = false }) {
-    const now = this._time()
+    const { now, dudoso: relojDudoso } = this._reloj()
     if (restaurantId !== this.restaurantId || !/^[\w-]{1,64}$/.test(deviceId || '')) throw fail('Scope de acceso inválido', 403, 'ACTOR_SCOPE_INVALID')
     if (!/^\d{4,10}$/.test(pin || '')) throw fail('PIN inválido', 400, 'INVALID_PIN')
     if (minRole && !LEVEL[normalizedRole(minRole)]) throw fail('Permiso solicitado inválido', 400, 'INVALID_ROLE')
-    const vivosEnLaInstalacion = this._fallosDeLaInstalacion(now)
-    if (this._fallosDe(deviceId, now).length >= INTENTOS_POR_TERMINAL) {
-      throw fail('Demasiados intentos en esta terminal; espera diez minutos', 429, 'PIN_RATE_LIMITED')
+    if (this._bloqueado(deviceId, now)) {
+      throw fail('Demasiados intentos en esta terminal; espera antes de volver a intentar', 429, 'PIN_RATE_LIMITED')
     }
-    if (vivosEnLaInstalacion >= INTENTOS_POR_INSTALACION) {
-      throw fail('Demasiados intentos en el restaurante; espera diez minutos', 429, 'PIN_RATE_LIMITED')
+    if (this._bloqueado('*', now)) {
+      throw fail('Demasiados intentos en el restaurante; espera antes de volver a intentar', 429, 'PIN_RATE_LIMITED')
     }
     const index = this._index(pin)
     const legacyIndex = this._legacyIndex(pin)
@@ -291,10 +327,21 @@ class ActorAuthority {
       if (typeof staff?.id !== 'string' || !staff.id || typeof staff.name !== 'string' || !LEVEL[normalizedRole(staff.role)]) throw fail('Respuesta de autoridad inválida', 502, 'AUTHORITY_RESPONSE_INVALID')
       shiftToken = typeof data.shiftToken === 'string' ? data.shiftToken : undefined
       approvalToken = typeof data.approvalToken === 'string' ? data.approvalToken : undefined
+      if (relojDudoso) {
+        // E7: el reloj local quedó por detrás de `last_seen`. Con la nube confirmando la hora,
+        // se re-ancla; si la nube no la da o no cuadra, no se autoriza nada.
+        const horaNube = Date.parse(response.headers?.get?.('date') || '')
+        if (!Number.isFinite(horaNube) || Math.abs(horaNube - now) > TOLERANCIA_RELOJ_MS) {
+          throw fail('Reloj de Caja no coincide con la hora de la nube; corrige la hora', 503, 'ACTOR_CLOCK_INVALID')
+        }
+        this._reanclar = true
+      }
       const unchanged = credential && credential.staff.id === staff.id && credential.staff.role === staff.role && credential.prepared_at
       const salt = unchanged ? credential.salt : crypto.randomBytes(16).toString('hex')
       credential = { staff: { id: staff.id, name: staff.name, role: staff.role }, salt,
         hash: crypto.scryptSync(pin, salt, 32).toString('hex'), expires_at: now + this.ttl, prepared_at: now,
+        // Revisión de credencial de la nube (E5): cambia cuando cambia el PIN.
+        ...(typeof data.cred_rev === 'string' ? { cred_rev: data.cred_rev } : {}),
         revision: unchanged ? credential.revision : crypto.randomUUID(),
         devices: { ...(unchanged ? credential.devices : {}), [deviceId]: now + this.ttl } }
       // La nube acaba de confirmar a esta persona: si estaba revocada, deja de estarlo.
@@ -305,8 +352,10 @@ class ActorAuthority {
       this.data.credentials[index] = credential
       delete this.data.denied_devices[deviceId]
     } catch (error) {
+      if (error.code === 'ACTOR_CLOCK_INVALID') throw error
       if (error.status) { this._anotarFallo(deviceId, now); this._persist(); throw error }
       offline = true
+      if (relojDudoso) throw fail('Reloj de Caja retrocedió; sin internet no se puede verificar la hora', 503, 'ACTOR_CLOCK_INVALID')
       if (!this.protegido) {
         throw fail('Esta Caja no tiene protección del sistema operativo para guardar credenciales; sin internet no puede validar PINs', 503, 'OFFLINE_SIN_PROTECCION')
       }
@@ -316,28 +365,37 @@ class ActorAuthority {
         throw fail('Usuario o terminal sin preparar, o credencial vencida; valida PIN con internet', 401, 'OFFLINE_USER_NOT_PREPARED')
       }
     }
-    // Entrar bien limpia el presupuesto de ESTA terminal: si no, los errores de
-    // quien tecleó mal antes seguían contando contra quien ya se identificó.
-    delete this.data.failures[deviceId]
+    // Entrar bien YA NO limpia el presupuesto (revisión adversarial E1): intercalar el propio
+    // PIN reiniciaba el contador y permitía recorrer los 10^4 PINs sin red. Los fallos vencen
+    // solos a los 10 minutos.
     this._persist()
     if (minRole && LEVEL[normalizedRole(credential.staff.role)] < LEVEL[normalizedRole(minRole)]) throw fail('Este usuario no tiene el permiso solicitado', 403, 'PERMISSION_DENIED')
+    if (aprobacion) {
+      // Revisión adversarial E4: una APROBACIÓN no es un login. Antes devolvía también el
+      // actor_token (sesión de 8 h con los permisos del gerente) y el shiftToken de la nube: la
+      // terminal del mesero se quedaba con una sesión de gerente. Ahora sólo quién aprobó y la
+      // prueba de la aprobación (token de la nube con red; recibo firmado sin red).
+      let recibo
+      if (offline && this.data.recibos) {
+        recibo = firmarRecibo(this.data.recibos.key, { cid: this.restaurantId, tid: this.data.recibos.tid, req: deviceId,
+          sub: credential.staff.id, nam: credential.staff.name, rol: credential.staff.role, kid: this.data.recibos.kid, now })
+      }
+      return { staff: credential.staff, offline, ...(approvalToken ? { approvalToken } : {}), ...(recibo ? { recibo } : {}), _fondo: [] }
+    }
     const expiresAt = Math.min(now + 8 * 3600000, credential.expires_at)
     const payload = Buffer.from(JSON.stringify({ restaurant_id: this.restaurantId, location_id: this.branchId,
       device_id: deviceId, actor_id: credential.staff.id, revision: credential.revision, iat: now, expires_at: expiresAt })).toString('base64url')
-    let recibo
-    if (aprobacion && offline && this.data.recibos) {
-      recibo = firmarRecibo(this.data.recibos.key, { cid: this.restaurantId, tid: this.data.recibos.tid, req: deviceId,
-        sub: credential.staff.id, nam: credential.staff.name, rol: credential.staff.role, kid: this.data.recibos.kid, now })
-    }
     const fondo = []
     if (!offline && shiftToken) {
       fondo.push(() => this._sincronizarRoster(shiftToken))
-      if (this.protegido && this.terminalId && LEVEL[normalizedRole(credential.staff.role)] >= LEVEL.gerente) {
+      // La llave de recibos es de ESTA terminal (V2): sólo con la sesión de un gerente que
+      // entró EN la Caja — el servidor exige que el token se haya emitido para esa terminal.
+      if (this.protegido && this.terminalId && deviceId === this.terminalId && LEVEL[normalizedRole(credential.staff.role)] >= LEVEL.gerente) {
         fondo.push(() => this._obtenerLlaveDeRecibos(shiftToken))
       }
     }
     return { staff: credential.staff, actor_token: payload + '.' + this._sign(payload), expires_at: expiresAt, offline,
-      ...(shiftToken ? { shiftToken } : {}), ...(approvalToken ? { approvalToken } : {}), ...(recibo ? { recibo } : {}), _fondo: fondo }
+      ...(shiftToken ? { shiftToken } : {}), _fondo: fondo }
   }
   /**
    * Roster: quién sigue activo y con qué rol. Sin esto, un empleado dado de baja seguía
@@ -357,19 +415,29 @@ class ActorAuthority {
   }
   _aplicarRoster(cuerpo) {
     const now = this._time()
+    // E3: un roster VIEJO que llega tarde no manda. Sólo se aplica uno más nuevo que el último.
+    if (!Number.isFinite(cuerpo.as_of) || cuerpo.as_of <= (this.data.roster_as_of_srv || 0)) return
+    // E6: un roster vacío no es «todos fueron dados de baja»; es un error. No se aplica.
+    if (!cuerpo.staff.length) return
     const activos = new Map()
-    for (const s of cuerpo.staff) if (typeof s?.id === 'string' && LEVEL[normalizedRole(s.role)]) activos.set(s.id, s.role)
-    let cambio = false
+    for (const s of cuerpo.staff) if (typeof s?.id === 'string' && LEVEL[normalizedRole(s.role)]) activos.set(s.id, s)
+    const personas = new Map(this._todas().map(c => [c.staff.id, c]))
+    const aBorrar = [...personas.keys()].filter(id => {
+      const r = activos.get(id), c = personas.get(id)
+      return !r || (typeof r.cred_rev === 'string' && typeof c.cred_rev === 'string' && r.cred_rev !== c.cred_rev)
+    })
+    // E6: borrar a la mayoría de un golpe (≥ 4 personas preparadas) se trata como roster roto.
+    if (personas.size >= 4 && aBorrar.length * 2 > personas.size) return
+    for (const id of aBorrar) { this.data.revocados[id] = now; this._olvidarPersona(id) }
     for (const c of this._todas()) {
-      if (!activos.has(c.staff.id)) {
-        this.data.revocados[c.staff.id] = now; this._olvidarPersona(c.staff.id); cambio = true
-      } else if (activos.get(c.staff.id) !== c.staff.role) {
-        // Cambió de rol: el rol nuevo manda y las sesiones emitidas con el viejo mueren.
-        c.staff.role = activos.get(c.staff.id); c.revision = crypto.randomUUID(); cambio = true
+      const r = activos.get(c.staff.id)
+      // E3: el roster sólo BAJA roles. Subir un rol lo decide la nube en un login con PIN.
+      if (r && LEVEL[normalizedRole(r.role)] < LEVEL[normalizedRole(c.staff.role)]) {
+        c.staff.role = r.role; c.revision = crypto.randomUUID()
       }
     }
     this.data.roster_as_of = now
-    void cambio
+    this.data.roster_as_of_srv = cuerpo.as_of
     this._persist()
   }
   /** Llave de recibos offline para ESTA terminal. Sólo con sesión de gerente y almacén sellado. */

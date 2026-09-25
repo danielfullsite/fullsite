@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { withPOSAuth, unauthorized } from '@/lib/api-auth'
-import { verificarTokenDeAprobacion } from '@/lib/manager-approval'
+import { verificarTokenDeAprobacion, statusDeErrorDeAprobacion } from '@/lib/manager-approval'
 import { prepararCancelacionItem } from '@/lib/cancelacion-item'
 import { reconciliarInventarioConfirmado } from '@/lib/inventory-reconcile-server'
 
@@ -55,10 +55,13 @@ export async function POST(request: NextRequest) {
       // cae al camino offline de abajo, que lo convertiría en una aprobación aceptada.
       const v = await verificarTokenDeAprobacion(approval_token, {
         clientId, minLevel: 4, terminalSolicitante: auth.terminalId,
-        operacion: typeof operation_id === 'string' && operation_id ? `cancel:${operation_id}` : `cancel:${order_id}:${item_id}`,
+        // Revisión adversarial V1: la operación era sólo `operation_id`, que elige el cliente:
+        // repetirlo con otro `item_id` cancelaba N platillos con una aprobación. Ahora incluye
+        // la cuenta y el platillo — reintentar ESTE platillo vale; otro, es reuso.
+        operacion: `cancel:${order_id}:${item_id}:${typeof operation_id === 'string' ? operation_id : ''}`,
       })
       if (v.ok) approvalMode = v.mode
-      else if (v.error !== 'TOKEN_INVALIDO') return Response.json({ ok: false, error: v.error }, { status: 403 })
+      else if (v.error !== 'TOKEN_INVALIDO') return Response.json({ ok: false, error: v.error }, { status: statusDeErrorDeAprobacion(v.error) })
     }
     if (!approvalMode) {
       // Modo estricto = sólo prueba del servidor (revisión N-4 de PR1; misma regla que

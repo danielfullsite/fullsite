@@ -33,6 +33,7 @@ beforeEach(() => {
     staff: { [PIN_G]: GERENTE, [PIN_M]: MESERO },
     roster: null, // null = responde con todos los de `staff`
     rosterCid: R,
+    asOf: 1_000, // la nube sella cada roster con su hora; la Caja sólo aplica uno más nuevo
     llave: 'ab'.repeat(32),
   }
 })
@@ -49,7 +50,8 @@ function fetchFalso(url, init = {}) {
   }
   if (url.endsWith('/api/pos/staff-roster')) {
     const lista = nube.roster ?? Object.values(nube.staff).map(s => ({ id: s.id, role: s.role }))
-    return Promise.resolve(Response.json({ client_id: nube.rosterCid, staff: lista }))
+    nube.asOf += 1
+    return Promise.resolve(Response.json({ client_id: nube.rosterCid, staff: lista, as_of: nube.asOf }))
   }
   if (url.endsWith('/api/pos/terminal-receipt-key')) {
     const b = JSON.parse(init.body)
@@ -282,7 +284,9 @@ test('LLAVE DE RECIBOS: la obtiene una sesión de gerente, sellada; un mesero no
 
 test('RECIBO offline: firmado con la llave de la terminal, con aprobador, rol y terminal que pidió', async () => {
   const a = crear()
-  // La credencial es de la TERMINAL donde se preparó: el gerente se prepara en la Entrada.
+  // La llave de recibos sólo se obtiene con un gerente que entra EN la Caja (V2); la credencial
+  // es de la TERMINAL donde se preparó, así que el gerente se prepara también en la Entrada.
+  await entrar(a, PIN_G, CAJA); await a.idle()
   await entrar(a, PIN_G, ENTRADA); await a.idle()
   nube.modo = 'caida'
   const r = await entrar(crear(), PIN_G, ENTRADA, { aprobacion: true, minRole: 'gerente' })

@@ -18,10 +18,13 @@ export async function POST(request: NextRequest) {
   // Capitán o más (nivel 3). Misma verificación central que cancelar: tenant, rol,
   // terminal y un solo uso por operación (el reintento de la MISMA transferencia vale).
   const approval = await verificarTokenDeAprobacion(approval_token, {
-    clientId: auth.clientId, minLevel: 3, terminalSolicitante: auth.terminalId, operacion: `transfer:${operation_id}`,
+    clientId: auth.clientId, minLevel: 3, terminalSolicitante: auth.terminalId,
+    // La operación incluye cuenta y platillo (revisión adversarial V1).
+    operacion: `transfer:${source_order_id}:${item_id}:${operation_id}`,
   })
   if (!approval.ok) {
-    return Response.json({ ok: false, error: 'SUPERVISOR_APPROVAL_REQUIRED', detail: approval.error }, { status: 403 })
+    return Response.json({ ok: false, error: 'SUPERVISOR_APPROVAL_REQUIRED', detail: approval.error },
+      { status: approval.error === 'AUTORIDAD_NO_DISPONIBLE' ? 503 : 403 })
   }
   const key = process.env.SUPABASE_SERVICE_KEY
   if (!key) return Response.json({ ok: false, error: 'TRANSFER_UNAVAILABLE' }, { status: 503 })

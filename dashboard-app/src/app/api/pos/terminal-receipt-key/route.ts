@@ -28,6 +28,12 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}))
   const deviceId = body?.device_id
   if (!terminalIdValido(deviceId)) return Response.json({ error: 'device_id inválido' }, { status: 400 })
+  // Revisión adversarial V2: la llave sólo para la terminal a la que se emitió la SESIÓN (el
+  // `tid` del shift token). Antes cualquier gerente pedía la de cualquier `device_id`, incluso
+  // inventado. La Caja la pide con el token de un gerente que entró EN la Caja.
+  if (auth.authType !== 'shift_token' || auth.terminalId !== deviceId) {
+    return Response.json({ error: 'La llave sólo se entrega a la terminal de la sesión' }, { status: 403 })
+  }
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_KEY
@@ -39,7 +45,8 @@ export async function POST(request: NextRequest) {
     if (!cfg.ok) return Response.json({ error: 'authority_unavailable' }, { status: 503 })
     const filas = await cfg.json().catch(() => null)
     if (!Array.isArray(filas) || filas.length !== 1) return Response.json({ error: 'authority_unavailable' }, { status: 503 })
-    if (filas[0]?.pos_settings?.['pos.require_enrolled_terminal'] === true) {
+    // Siempre: una terminal que no está enrolada no firma recibos (y desenrolarla los revoca).
+    {
       const t = await fetch(`${url}/rest/v1/pos_terminals?client_id=eq.${encodeURIComponent(auth.clientId)}&device_id=eq.${encodeURIComponent(deviceId)}&active=eq.true&select=device_id&limit=1`,
         { headers: H, cache: 'no-store', signal: AbortSignal.timeout(4000) })
       if (!t.ok) return Response.json({ error: 'authority_unavailable' }, { status: 503 })

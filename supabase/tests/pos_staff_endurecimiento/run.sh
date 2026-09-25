@@ -73,6 +73,9 @@ out = []
 for linea in open(sys.argv[1]):
     k, _, v = linea.rstrip('\n').partition('=')
     items = [x for x in v.split(',') if x and x != 'anon' and 'anon:' not in x]
+    # Tampoco vuelve TRUNCATE de authenticated en pos_staff ni en su bitácora.
+    if k in ('acl_tabla_pos_staff', 'acl_pos_staff_audit'):
+        items = [x for x in items if x != 'authenticated:TRUNCATE']
     out.append(k + '=' + ','.join(items))
 open(sys.argv[2], 'w').write('\n'.join(out) + '\n')
 PY
@@ -190,6 +193,7 @@ sin_anon "$TMP/foto_rb.txt" "$TMP/foto_rb_sin_anon.txt"
 igual "rollback = estado PR3 sin anon (excepto columna aditiva pos_staff_audit.origen, documentada)" "$TMP/foto_pr3_sin_anon.txt" "$TMP/foto_rb_sin_anon.txt" '^columna_origen='
 caso "[rollback] anon NO recupera TRUNCATE de pos_staff"          anon - "truncate pos_staff; select 'truncado'" E:42501
 caso "[rollback] anon NO recupera lectura de pos_staff"           anon - "select count(*) from (select id from pos_staff) s" E:42501
+caso "[rollback] un miembro NO recupera TRUNCATE de pos_staff"    authenticated $VIEW "truncate pos_staff; select 'truncado'" E:42501
 caso "[rollback] miembro básico vuelve a poder desactivar (estado PR3)" authenticated $VIEW "with u as (update pos_staff set active = true where id = 'a-mesero' returning 1) select count(*) from u" N:1
 
 echo "-- 6. Reaplicar dos veces → mismo estado endurecido"

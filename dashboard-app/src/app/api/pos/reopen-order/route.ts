@@ -22,19 +22,33 @@ export async function POST(request: NextRequest) {
     return Response.json({ ok: false, error: 'MISSING_ORDER_ID' }, { status: 400 })
   }
 
-  const appr = await verifyManagerApproval({
-    approvalToken: approval_token, offlineApproved: offline_approved, clientId, minLevel: 4,
-    terminalSolicitante: auth.terminalId, operacion: `reopen:${order_id}`,
-    // El rol sale del shift token FIRMADO, no del cuerpo. Con esto la bitácora
-    // distingue a un gerente aprobando en su terminal de un mesero que se autoaprobó.
-    solicitanteRol: auth.role,
-  })
-  if (!appr.ok) return Response.json({ ok: false, error: 'MANAGER_APPROVAL_REQUIRED' }, { status: 403 })
-
   const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
   const sbKey = process.env.SUPABASE_SERVICE_KEY
   if (!sbKey) return Response.json({ ok: false, error: 'SERVER_CONFIG_ERROR' }, { status: 500 })
   const H = { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json' }
+
+  // Revisión adversarial V1: con `reopen:<orden>` el mismo token reabría la MISMA cuenta
+  // cuantas veces se quisiera (reabrir, re-cerrar por menos, reabrir…). La aprobación ahora se
+  // amarra al CIERRE concreto (`closed_at`): reabrir otro cierre de la misma cuenta es reuso.
+  // Una cuenta ya abierta no se «reabre»: respuesta idempotente, sin consumir la aprobación.
+  const lectura = await fetch(
+    `${sbUrl}/rest/v1/pos_orders?id=eq.${encodeURIComponent(order_id)}&client_id=eq.${encodeURIComponent(clientId)}&select=status,closed_at&limit=1`,
+    { headers: H, cache: 'no-store' })
+  if (!lectura.ok) return Response.json({ ok: false, error: 'READ_FAILED' }, { status: 503 })
+  const filas = await lectura.json().catch(() => null)
+  if (!Array.isArray(filas)) return Response.json({ ok: false, error: 'READ_FAILED' }, { status: 503 })
+  if (filas.length === 0) return Response.json({ ok: false, error: 'ORDER_NOT_FOUND' }, { status: 404 })
+  if (!filas[0].closed_at) return Response.json({ ok: true, already_open: true })
+
+  const appr = await verifyManagerApproval({
+    approvalToken: approval_token, offlineApproved: offline_approved, clientId, minLevel: 4,
+    terminalSolicitante: auth.terminalId, operacion: `reopen:${order_id}:${filas[0].closed_at}`,
+    // El rol sale del shift token FIRMADO, no del cuerpo. Con esto la bitácora
+    // distingue a un gerente aprobando en su terminal de un mesero que se autoaprobó.
+    solicitanteRol: auth.role,
+  })
+  if (!appr.ok) return Response.json({ ok: false, error: 'MANAGER_APPROVAL_REQUIRED', detail: appr.error },
+    { status: appr.error === 'AUTORIDAD_NO_DISPONIBLE' ? 503 : 403 })
 
   const res = await fetch(
     `${sbUrl}/rest/v1/pos_orders?id=eq.${encodeURIComponent(order_id)}&client_id=eq.${encodeURIComponent(clientId)}`,

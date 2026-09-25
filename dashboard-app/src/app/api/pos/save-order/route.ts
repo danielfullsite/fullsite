@@ -394,7 +394,7 @@ export async function POST(request: NextRequest) {
         clientId,
         minLevel: 4,
         terminalSolicitante: auth.terminalId,
-        operacion: `conflict:${String(body.save_operation_id || order_id)}`,
+        operacion: `conflict:${order_id}:${String(body.save_operation_id || '')}`,
       })
       // Conflict rebases overwrite a newer server revision. Unlike the gradual
       // rollout used by legacy sensitive actions, this path is strict from day one:

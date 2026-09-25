@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { issueShiftToken, issueApprovalToken } from '@/lib/shift-token'
 import { terminalIdValido } from '@/lib/terminal-id'
 import { buscarPorPin, fallbacksDeEntornoPermitidos } from '@/lib/pos-pin-authority'
+import { revisionDeCredencial } from '@/lib/revision-de-credencial'
 import { pinGate, pinRecord } from '@/lib/pin-throttle'
 
 // PIN validation + shift token issuance.
@@ -23,7 +24,7 @@ import { pinGate, pinRecord } from '@/lib/pin-throttle'
  * del gerente en la terminal de un mesero le dejaba a esa terminal una sesión de gerente
  * para toda la noche.
  */
-interface Contexto { terminalId?: string; aprobacion: boolean; llaves: string[]; auditar?: (r: ResultadoAuditoria) => Promise<void> }
+interface Contexto { terminalId?: string; aprobacion: boolean; llaves: string[]; auditar?: (r: ResultadoAuditoria) => Promise<void>; credRev?: string }
 type ResultadoAuditoria = { resultado: 'aprobado' | 'rechazado'; staff?: { id: string; name: string; role: string } }
 
 async function respond(staff: { id: string; name: string; role: string }, clientId: string, ctx: Contexto) {
@@ -31,9 +32,12 @@ async function respond(staff: { id: string; name: string; role: string }, client
   const tid = terminalIdValido(ctx.terminalId) ? ctx.terminalId : undefined
   let shiftToken: string | undefined
   let approvalToken: string | undefined
-  // Compatibilidad: clientes con el bundle viejo usan el shiftToken como aprobación.
-  // En modo estricto v2 una aprobación ya no entrega sesión.
-  if (!ctx.aprobacion || process.env.POS_APROBACION_V2_ESTRICTA !== 'true') {
+  // Una aprobación NUNCA entrega sesión (revisión adversarial V3/E4). Antes, fuera del modo
+  // estricto v2, también devolvía el shiftToken del gerente (8 h): la terminal del mesero —o
+  // la Caja reenviándolo— quedaba con una sesión de gerente que, entre otras cosas, pedía la
+  // llave de recibos. Los clientes viejos que usaban ese token como aprobación caen al camino
+  // sin aprobación (gracia auditada) hasta recargar.
+  if (!ctx.aprobacion) {
     try {
       shiftToken = await issueShiftToken(staff.id, clientId, staff.role, staff.name, tid)
     } catch (e) {
@@ -49,7 +53,8 @@ async function respond(staff: { id: string; name: string; role: string }, client
     }
   }
   if (ctx.auditar) await ctx.auditar({ resultado: 'aprobado', staff })
-  return Response.json({ staff, shiftToken, approvalToken })
+  const cred_rev = ctx.credRev
+  return Response.json({ staff, shiftToken, approvalToken, ...(cred_rev ? { cred_rev } : {}) })
 }
 
 /**
@@ -246,11 +251,14 @@ export async function POST(request: NextRequest) {
 
     // F4: la búsqueda vive en pos-pin-authority.ts (POS_PIN_AUTHORITY=plain|hash). En hash
     // nunca se consulta `pin`; sin pimienta o con el backfill incompleto → 503, no 401.
-    const busqueda = await buscarPorPin<{ id: string; name: string; role: string }>({
-      sbUrl, sbKey, clientId, pin, filtro: `&active=eq.true${roleFilter}`, select: 'id,name,role',
+    const busqueda = await buscarPorPin<{ id: string; name: string; role: string; pin: string | null; pin_hash: string | null }>({
+      sbUrl, sbKey, clientId, pin, filtro: `&active=eq.true${roleFilter}`, select: 'id,name,role,pin,pin_hash',
     })
     if (busqueda.tipo === 'encontrado') {
       const f = busqueda.fila
+      // Revisión de la credencial (revisión adversarial E5): la Caja la guarda y la compara con
+      // el roster; si el PIN cambia, la credencial offline vieja muere. Nunca sale pin ni hash.
+      ctx.credRev = revisionDeCredencial(f.id, f.pin, f.pin_hash) ?? undefined
       return respond({ id: f.id, name: f.name, role: f.role }, clientId, ctx)
     }
 

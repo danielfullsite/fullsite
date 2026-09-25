@@ -23,6 +23,8 @@ export interface ClaimsDeRecibo {
   v: 1; kid: string; cid: string; tid: string; req: string; sub: string; nam?: string; rol: string; iat: number; exp: number; non: string
 }
 
+const VIGENCIA_MAXIMA_MS = 7 * 86400000
+
 export function esRecibo(token: unknown): token is string {
   return typeof token === 'string' && token.startsWith(PREFIJO + '.')
 }
@@ -61,7 +63,43 @@ export function verificarRecibo(token: string, opts: { clientId: string; minLeve
   if (c.cid !== opts.clientId || (ROLE_LVL[c.rol] || 0) < opts.minLevel) return { ok: false, error: 'RECIBO_INVALIDO' }
   const now = opts.now ?? Date.now()
   if (c.exp <= now || c.iat > now + 5 * 60_000) return { ok: false, error: 'RECIBO_VENCIDO' }
+  // Revisión adversarial V2: quien tiene la llave puede firmar cualquier `exp`. La vigencia la
+  // fija el servidor, no el recibo: nunca más de 7 días (+1 min de reloj) desde `iat`.
+  if (c.exp - c.iat > VIGENCIA_MAXIMA_MS + 60_000 || now - c.iat > VIGENCIA_MAXIMA_MS + 60_000) return { ok: false, error: 'RECIBO_VENCIDO' }
   // La aprobación se dio frente a UNA terminal (`req`): no se usa desde otra.
   if (c.req && opts.terminalSolicitante && c.req !== opts.terminalSolicitante) return { ok: false, error: 'TERMINAL_DISTINTA' }
   return { ok: true, claims: c }
+}
+
+/**
+ * Lo que la firma NO puede probar, se pregunta a la base (revisión adversarial V2):
+ *   · la terminal que firmó (`tid`) sigue ENROLADA y activa en pos_terminals — desenrolarla
+ *     revoca su llave, aunque la llave sea derivada;
+ *   · quien aprobó (`sub`) sigue ACTIVO en pos_staff, y su rol DE LA BASE alcanza el mínimo.
+ *     El `rol` y el `nam` del recibo los escribe quien firma: no autorizan nada.
+ * Base caída → AUTORIDAD_NO_DISPONIBLE (503, la cola reintenta), nunca «válido».
+ */
+export async function verificarReciboContraLaBase(c: ClaimsDeRecibo, clientId: string, minLevel: number): Promise<
+  { ok: true; rol: string; nombre: string } | { ok: false; error: 'TOKEN_INVALIDO' | 'AUTORIDAD_NO_DISPONIBLE' }> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_KEY
+  if (!url || !key) return { ok: false, error: 'AUTORIDAD_NO_DISPONIBLE' }
+  const H = { apikey: key, Authorization: `Bearer ${key}` }
+  try {
+    const [t, s] = await Promise.all([
+      fetch(`${url}/rest/v1/pos_terminals?client_id=eq.${encodeURIComponent(clientId)}&device_id=eq.${encodeURIComponent(c.tid)}&active=eq.true&select=device_id&limit=1`,
+        { headers: H, cache: 'no-store', signal: AbortSignal.timeout(4000) }),
+      fetch(`${url}/rest/v1/pos_staff?client_id=eq.${encodeURIComponent(clientId)}&id=eq.${encodeURIComponent(c.sub)}&active=eq.true&select=name,role&limit=1`,
+        { headers: H, cache: 'no-store', signal: AbortSignal.timeout(4000) }),
+    ])
+    if (!t.ok || !s.ok) return { ok: false, error: 'AUTORIDAD_NO_DISPONIBLE' }
+    const [tf, sf] = [await t.json().catch(() => null), await s.json().catch(() => null)]
+    if (!Array.isArray(tf) || !Array.isArray(sf)) return { ok: false, error: 'AUTORIDAD_NO_DISPONIBLE' }
+    if (tf.length !== 1 || sf.length !== 1) return { ok: false, error: 'TOKEN_INVALIDO' }
+    const rol = String(sf[0].role)
+    if ((ROLE_LVL[rol] || 0) < minLevel) return { ok: false, error: 'TOKEN_INVALIDO' }
+    return { ok: true, rol, nombre: String(sf[0].name || c.sub) }
+  } catch {
+    return { ok: false, error: 'AUTORIDAD_NO_DISPONIBLE' }
+  }
 }
