@@ -375,6 +375,22 @@ Luego:
 **Reversible:** el código sí; el `pin` de quien se haya dado de alta entre F5 y el revert
 queda en `null` y esa persona necesita reset.
 
+> **Estado 2026-09-24 (bloque POS, PR 04) — F4 y F5 IMPLEMENTADOS detrás de banderas, sin desplegar.**
+>
+> - `dashboard-app/src/lib/pos-pin-authority.ts`: la única búsqueda por PIN. `POS_PIN_AUTHORITY`
+>   = `plain` (default) | `hash`; otro valor → 503. En `hash` busca por `pin_hash` + `pin_hash_v`
+>   y **nunca** por `pin`; sin pimienta, con el backfill incompleto (alguien activo sin hash o
+>   con otra versión) o con la base caída → **503, nunca 401** (la Caja lee un 401 como
+>   revocación). Los tres lectores (V1 `/api/pos/pin`, V2 time-clock, V3 `pinTaken`) la usan.
+> - En `hash`, `POS_FALLBACK_PIN` y `MANAGER_PINS` (texto plano en variables) dejan de decidir.
+> - Escritores: en `hash` escriben el hash aunque falte `POS_PIN_DUAL_WRITE`.
+> - F5: `PENDIENTE_20260925040000_pos_staff_pin_sin_texto_plano.sql` (+ rollback que falla
+>   entero si ya hay filas sin PIN en claro) y `POS_PIN_WRITE_PLAIN=off` (sólo con `hash`).
+> - C6 (prerrequisito) quedó en #410 para el login y en el bloque POS PR 02 para las
+>   aprobaciones. **Falta:** T-24 en campo sobre el mismo commit e instalador.
+> - F6 (borrar la columna) **no se preparó**: es destructivo e irreversible; va con su propia
+>   autorización y respaldo.
+
 ### F6 — Borrar la columna. Punto de no retorno.
 
 Mínimo **14 días** de F4+F5 estables, y respaldo verificado antes.

@@ -261,7 +261,12 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     staffCount = inserted.length
     // Only inserted inactive placeholders return their credential; a racing
     // retry must not present a freshly generated PIN that was never stored.
-    staffPins.splice(0, staffPins.length, ...inserted.map(row => ({role:String(row.role),pin:String(row.pin)})))
+    // El PIN se toma del que se GENERÓ, por id, no del recibo: con F5 (POS_PIN_WRITE_PLAIN=off)
+    // la columna `pin` vuelve null y aquí se mostraba el texto "null" como PIN.
+    const generadoPorId = new Map(staffRows.map(r => [r.id, staffPins.find(p => p.role === r.role)?.pin]))
+    staffPins.splice(0, staffPins.length, ...inserted
+      .filter(row => typeof generadoPorId.get(String(row.id)) === 'string')
+      .map(row => ({ role: String(row.role), pin: generadoPorId.get(String(row.id)) as string })))
   }
 
   // ── 5b. combos semilla (pos_combos) ────────────────────────────────────────

@@ -104,3 +104,15 @@ it('foreign location is rejected before freezing plan and can be corrected',asyn
  await provisionTenant({clientId:'fixture',locations:[{name:'Corrected'}]})
  expect(db.tables.clients[0].provisioning_plan.locations[0].name).toBe('Corrected')
 })
+// F5 (bloque POS, 2026-09-24): con POS_PIN_WRITE_PLAIN=off la fila guarda `pin: null` y el
+// hash. Los PINs que se muestran UNA vez al dar de alta salen de los generados, no del
+// recibo — antes se mostraba el texto "null".
+it('F5: sin PIN en claro en la base, el alta sigue mostrando los PINs reales una vez', async () => {
+ vi.stubEnv('POS_PIN_AUTHORITY', 'hash'); vi.stubEnv('POS_PIN_WRITE_PLAIN', 'off'); vi.stubEnv('POS_PIN_PEPPER', '6e'.repeat(32))
+ const db = backend(); vi.stubGlobal('fetch', db.request); const { provisionTenant } = await import('@/lib/provision-tenant')
+ const r = await provisionTenant({ clientId: 'fixture', mesas: 2 })
+ expect(r.staffPins.length).toBeGreaterThan(0)
+ expect(r.staffPins.every(p => /^[1-9][0-9]{9}$/.test(p.pin))).toBe(true)
+ expect(db.tables.pos_staff.every(f => f.pin === null && /^[0-9a-f]{64}$/.test(f.pin_hash) && f.pin_hash_v === 1)).toBe(true)
+ expect(JSON.stringify(db.tables.pos_staff)).not.toMatch(new RegExp(r.staffPins.map(p => p.pin).join('|')))
+})

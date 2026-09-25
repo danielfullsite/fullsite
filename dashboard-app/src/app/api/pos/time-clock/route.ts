@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { withPOSAuth, unauthorized } from '@/lib/api-auth'
 import { pinGate, pinRecord } from '@/lib/pin-throttle'
+import { buscarPorPin } from '@/lib/pos-pin-authority'
 
 // Checador · POST registra entrada/salida por PIN; GET lista recientes.
 // clientId SIEMPRE se resuelve del server (withPOSAuth). Escribe con service_role
@@ -58,17 +59,18 @@ export async function POST(req: NextRequest) {
   }
 
   // 1. Identificar al empleado por PIN dentro del tenant.
-  const sr = await svc(`pos_staff?client_id=eq.${encodeURIComponent(clientId)}&pin=eq.${encodeURIComponent(pin)}&active=eq.true&select=id,name&limit=1`)
-  if (!sr.ok) return Response.json({ error: 'No se pudo verificar el PIN' }, { status: 503 })
-  let staff: unknown = null
-  try { staff = await sr.json() } catch { staff = null }
-  if (!Array.isArray(staff) || staff.length === 0) {
+  // F4: misma búsqueda que /api/pos/pin (pos-pin-authority.ts).
+  const busqueda = /^\d{4,10}$/.test(pin)
+    ? await buscarPorPin<{ id: string; name: string }>({ sbUrl: SB_URL, sbKey: SERVICE, clientId, pin, filtro: '&active=eq.true', select: 'id,name' })
+    : { tipo: 'no-encontrado' as const }
+  if (busqueda.tipo === 'no-disponible') return Response.json({ error: 'No se pudo verificar el PIN' }, { status: 503 })
+  if (busqueda.tipo === 'no-encontrado') {
     // Respuesta genérica: ni nombre ni pista de si el PIN existe en otro lado.
     await pinRecord(throttleKey, false)
     return Response.json({ error: 'PIN incorrecto' }, { status: 401 })
   }
   await pinRecord(throttleKey, true)
-  const { id: staffId, name: staffName } = staff[0] as { id: string; name: string }
+  const { id: staffId, name: staffName } = busqueda.fila
 
   // 2. Determinar tipo: alterna según el último registro del empleado.
   const lr = await svc(`pos_time_clock?client_id=eq.${encodeURIComponent(clientId)}&staff_id=eq.${encodeURIComponent(staffId)}&select=type&order=ts.desc&limit=1`)
