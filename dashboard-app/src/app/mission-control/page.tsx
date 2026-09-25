@@ -228,9 +228,12 @@ export default function MissionControlPage() {
   const load = useCallback(async () => {
     try {
       // agent_results se auto-aísla por tenant en getDeepTable (cada cliente ve solo
-      // sus insights). agent_runs es telemetría operativa global (sin datos de negocio).
+      // sus insights). agent_runs es telemetría de TODOS los restaurantes (sin
+      // columna de tenant): F-06 → sólo por la ruta de servidor gateada por admin
+      // de plataforma, nunca directo a PostgREST con el JWT del usuario.
       const [runsData, resultsData] = await Promise.all([
-        getDeepTable('agent_runs', 200),
+        fetch('/mission-control/telemetria', { method: 'POST', credentials: 'include', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ limit: 200 }) })
+          .then(async r => { if (!r.ok) throw new Error(`telemetria ${r.status}`); return (await r.json()).runs ?? [] }),
         getDeepTable('agent_results', 100),
       ])
       setRuns(runsData as unknown as AgentRun[])

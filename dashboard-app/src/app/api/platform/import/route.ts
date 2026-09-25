@@ -18,6 +18,41 @@ const num = (v: string) => { const n = Number(String(v).replace(/[^0-9.\-]/g, ''
 const int = (v: string, d = 0) => { const n = parseInt(String(v), 10); return isFinite(n) ? n : d }
 const bool = (v: string, d = true) => { const s = String(v).trim().toLowerCase(); if (['true', '1', 'si', 'sí', 'activo', 'yes'].includes(s)) return true; if (['false', '0', 'no', 'inactivo'].includes(s)) return false; return d }
 
+// F-03 (contención 2026-09-23): el id del CSV se conservaba tal cual y el upsert
+// es on_conflict=id con service_role → una fila exportada de otro restaurante
+// REESCRIBÍA la suya (le cambiaba el client_id). Ahora:
+//   1) Sólo se acepta un id externo si ya trae el prefijo del tenant destino
+//      (`${client}-…`) y un charset seguro; si no, se regenera con el patrón del
+//      dataset (el mismo que se usaba para filas sin id).
+//   2) Antes de escribir se consulta si algún id del lote existe con OTRO
+//      client_id (cubre prefijos ambiguos como "tenant" vs "tenant-b" y datos
+//      legados). Si hay uno solo: 409 para todo el lote, sin escribir nada.
+//   3) Si esa consulta falla, no se escribe (502): falla cerrado.
+const SAFE_ID_RE = /^[A-Za-z0-9_.:-]{1,120}$/
+function externalId(client: string, raw: string | undefined): string | null {
+  const id = (raw || '').trim()
+  if (!id || !SAFE_ID_RE.test(id)) return null
+  return id.toLowerCase().startsWith(`${client.toLowerCase()}-`) ? id : null
+}
+
+async function idsDeOtroTenant(table: string, client: string, ids: string[]): Promise<{ ok: boolean; conflictos: { id: string; client_id: string }[] }> {
+  const conflictos: { id: string; client_id: string }[] = []
+  const unicos = Array.from(new Set(ids))
+  for (let i = 0; i < unicos.length; i += 100) {
+    const lote = unicos.slice(i, i + 100).map(id => `"${id}"`).join(',')
+    const res = await platformServiceFetch(`${table}?select=id,client_id&id=in.(${encodeURIComponent(lote)})`, {
+      headers: { Accept: 'application/json' },
+    }).catch(() => null)
+    if (!res || !res.ok) return { ok: false, conflictos }
+    const rows = await res.json().catch(() => null)
+    if (!Array.isArray(rows)) return { ok: false, conflictos }
+    for (const r of rows as { id: string; client_id: string | null }[]) {
+      if (r.client_id !== client) conflictos.push({ id: r.id, client_id: r.client_id ?? '' })
+    }
+  }
+  return { ok: true, conflictos }
+}
+
 interface Spec {
   table: string
   onConflict: string
@@ -31,7 +66,7 @@ const SPECS: Record<string, Spec> = {
       const price = num(r.price ?? r.precio)
       if (!name) return { row: null, error: 'falta name/nombre' }
       if (isNaN(price)) return { row: null, error: `price inválido ("${r.price ?? r.precio ?? ''}")` }
-      const id = (r.id || '').trim() || `${client}-${slug(name)}`
+      const id = externalId(client, r.id) || `${client}-${slug(name)}`
       return { row: { id, client_id: client, name, price, category_id: (r.category_id || null) || null, active: bool(r.active ?? r.activo, true), sort_order: int(r.sort_order ?? r.orden, 0) }, error: null }
     },
   },
@@ -40,7 +75,7 @@ const SPECS: Record<string, Spec> = {
     build: (client, r) => {
       const name = (r.name || r.nombre || '').trim()
       if (!name) return { row: null, error: 'falta name/nombre' }
-      const id = (r.id || '').trim() || `${client}-${slug(name)}`
+      const id = externalId(client, r.id) || `${client}-${slug(name)}`
       return { row: { id, client_id: client, name, color: r.color || null, sort_order: int(r.sort_order ?? r.orden, 0), active: bool(r.active ?? r.activo, true) }, error: null }
     },
   },
@@ -49,7 +84,7 @@ const SPECS: Record<string, Spec> = {
     build: (client, r) => {
       const name = (r.name || r.nombre || '').trim()
       if (!name) return { row: null, error: 'falta name/nombre' }
-      const id = (r.id || '').trim() || `${client}-pm-${slug(name)}`
+      const id = externalId(client, r.id) || `${client}-pm-${slug(name)}`
       return { row: { id, client_id: client, name, type: (r.type || r.tipo || 'other'), commission_pct: isNaN(num(r.commission_pct)) ? 0 : num(r.commission_pct), active: bool(r.active ?? r.activo, true) }, error: null }
     },
   },
@@ -76,11 +111,25 @@ export async function POST(req: NextRequest) {
     else if (row) valid.push(row)
   })
 
+  // F-03: ningún id del lote puede pertenecer a otro restaurante.
+  const own = valid.length > 0
+    ? await idsDeOtroTenant(spec.table, client_id, valid.map(v => String(v.id)))
+    : { ok: true, conflictos: [] }
+  if (!own.ok) {
+    return Response.json({ error: 'No se pudo verificar la propiedad de los ids; no se importó nada' }, { status: 502 })
+  }
+
   if (mode !== 'commit') {
-    return Response.json({ total: rows.length, validas: valid.length, errores: errors.slice(0, 50), preview: valid.slice(0, 5) })
+    return Response.json({ total: rows.length, validas: valid.length, errores: errors.slice(0, 50), preview: valid.slice(0, 5), conflictos: own.conflictos.slice(0, 50) })
   }
 
   // commit
+  if (own.conflictos.length > 0) {
+    return Response.json({
+      error: 'Hay ids que pertenecen a otro restaurante; no se importó nada',
+      conflictos: own.conflictos.slice(0, 50),
+    }, { status: 409 })
+  }
   const limited = rateLimit(gate.ctx)
   if (limited) return limited
   if (valid.length === 0) return Response.json({ error: 'no hay filas válidas para importar' }, { status: 400 })

@@ -47,11 +47,13 @@ function FlagsInner() {
 
   const tenantCount = clients.length
 
-  async function postFlag(row: FlagRow, successMsg: string) {
+  // El toggle NO manda rollout (el API conserva el actual); sólo "Guardar rollout"
+  // lo manda, y siempre explícito ({cohort:'all'} o {client_ids}). El API rechaza `{}`.
+  async function postFlag(row: FlagRow, successMsg: string, opts: { rollout: boolean } = { rollout: true }) {
     const res = await fetch('/api/platform/flags', {
       method: 'POST', credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key: row.key, enabled: row.enabled, rollout: row.rollout, description: row.description }),
+      body: JSON.stringify({ key: row.key, enabled: row.enabled, ...(opts.rollout ? { rollout: row.rollout } : {}), description: row.description }),
     })
     if (res.ok) { toast('success', successMsg); await load() }
     else if (res.status === 429) toast('error', 'Límite de escrituras excedido. Espera un momento.')
@@ -65,7 +67,7 @@ function FlagsInner() {
     setConfirm({
       title: `${next.enabled ? 'Activar' : 'Desactivar'} "${row.key}"`,
       affected,
-      run: async () => { await postFlag(next, `Flag "${row.key}" ${next.enabled ? 'activado' : 'desactivado'}`) },
+      run: async () => { await postFlag(next, `Flag "${row.key}" ${next.enabled ? 'activado' : 'desactivado'}`, { rollout: false }) },
     })
   }
 

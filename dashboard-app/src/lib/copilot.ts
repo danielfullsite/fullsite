@@ -96,14 +96,45 @@ export const ACTION_TOOLS: Record<string, ActionDef> = {
   },
   toggle_flag: {
     endpoint: '/api/platform/flags',
+    // F-04: NUNCA manda rollout → /api/platform/flags conserva la cohorte actual.
     buildBody: i => ({ key: i.key, enabled: i.enabled }),
-    summary: i => `${i.enabled ? 'Prender' : 'Apagar'} el flag "${i.key}" (global)`,
+    summary: i => `${i.enabled ? 'Prender' : 'Apagar'} el flag "${i.key}" (conserva su alcance actual)`,
   },
   set_tenant_active: {
     endpoint: '/api/platform/tenant-toggle',
     buildBody: i => ({ clientId: i.client_id, active: i.active }),
     summary: i => `${i.active ? 'Activar' : 'Desactivar'} el tenant "${i.client_id}"`,
   },
+}
+
+/**
+ * Texto de confirmación de una acción. Para toggle_flag lee el rollout ACTUAL y
+ * dice el alcance real (cohorte, porcentaje o todos) — F-04: antes decía "(global)"
+ * aunque el flag estuviera acotado a una cohorte.
+ */
+export async function describeAction(tool: string, input: Record<string, unknown>): Promise<string> {
+  const def = ACTION_TOOLS[tool]
+  if (!def) return ''
+  const base = def.summary(input)
+  if (tool !== 'toggle_flag') return base
+  const verbo = `${input.enabled ? 'Prender' : 'Apagar'} el flag "${input.key}"`
+  try {
+    const r = await platformServiceFetch(`feature_flags?key=eq.${encodeURIComponent(String(input.key || ''))}&select=rollout`, {
+      headers: { Accept: 'application/json' },
+    })
+    const rows = r.ok ? await r.json() : null
+    if (!Array.isArray(rows)) return `${verbo} — no se pudo leer su alcance actual (se conservará sin cambios)`
+    if (rows.length === 0) return `${verbo} — flag nuevo: aplicará a todos los tenants`
+    const ro = (rows[0]?.rollout || {}) as { client_ids?: string[]; percentage?: number }
+    if (Array.isArray(ro.client_ids) && ro.client_ids.length === 0) return `${verbo} — su cohorte actual está vacía: ningún tenant`
+    if (Array.isArray(ro.client_ids) && ro.client_ids.length > 0) {
+      return `${verbo} — sólo su cohorte actual: ${ro.client_ids.length} tenant(s) (${ro.client_ids.join(', ')})`
+    }
+    if (typeof ro.percentage === 'number') return `${verbo} — su rollout actual: ${ro.percentage}% de los tenants`
+    return `${verbo} — alcance actual: todos los tenants`
+  } catch {
+    return `${verbo} — no se pudo leer su alcance actual (se conservará sin cambios)`
+  }
 }
 
 // ── Esquemas de tools para Anthropic ─────────────────────────────────────────
@@ -113,7 +144,7 @@ const TOOL_SCHEMAS = [
   { name: 'get_tenant_sales', description: 'Ventas de un tenant en los últimos N días (ventas totales, tickets, ticket promedio).', input_schema: { type: 'object', properties: { client_id: { type: 'string' }, days: { type: 'number', description: 'default 7' } }, required: ['client_id'] } },
   { name: 'get_agents_status', description: 'Detecciones recientes de los agentes IA y agentes con error en 24h. Opcional: filtra por tenant.', input_schema: { type: 'object', properties: { client_id: { type: 'string' } } } },
   { name: 'create_tenant', description: 'ACCIÓN: da de alta un tenant nuevo (usuario dueño + skeleton completo). Requiere confirmación del humano.', input_schema: { type: 'object', properties: { client_id: { type: 'string', description: 'slug corto, minúsculas/guiones' }, display_name: { type: 'string' }, email: { type: 'string' }, password: { type: 'string', description: 'mín 6 chars' }, mesas: { type: 'number' } }, required: ['client_id', 'email', 'password'] } },
-  { name: 'toggle_flag', description: 'ACCIÓN: prende/apaga un feature flag global. Requiere confirmación.', input_schema: { type: 'object', properties: { key: { type: 'string' }, enabled: { type: 'boolean' } }, required: ['key', 'enabled'] } },
+  { name: 'toggle_flag', description: 'ACCIÓN: prende/apaga un feature flag conservando su alcance actual (cohorte o todos). Requiere confirmación.', input_schema: { type: 'object', properties: { key: { type: 'string' }, enabled: { type: 'boolean' } }, required: ['key', 'enabled'] } },
   { name: 'set_tenant_active', description: 'ACCIÓN: activa/desactiva un tenant. Requiere confirmación.', input_schema: { type: 'object', properties: { client_id: { type: 'string' }, active: { type: 'boolean' } }, required: ['client_id', 'active'] } },
 ]
 
@@ -163,8 +194,7 @@ Reglas:
     // ¿Alguna acción? → detener y pedir confirmación.
     const action = toolUses.find(t => t.name && ACTION_TOOLS[t.name])
     if (action) {
-      const def = ACTION_TOOLS[action.name!]
-      return { text: textOut, pendingAction: { tool: action.name!, input: action.input || {}, summary: def.summary(action.input || {}) } }
+      return { text: textOut, pendingAction: { tool: action.name!, input: action.input || {}, summary: await describeAction(action.name!, action.input || {}) } }
     }
 
     // Ejecutar tools de lectura y devolver resultados.
