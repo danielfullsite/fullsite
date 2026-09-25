@@ -1,0 +1,26 @@
+JEV DECISION LAYER — FASE 0 (shadow) — 2026-09-25T20:05:08.763Z
+ESTADO: JEV_DECISION_LAYER_BLOCKED
+Contrato jev-decision/0.1.0 · modelo typesafe-ai/jev · corrida VIVA
+
+Casos: 43 · llamadas a Jev OK: 0 · llamadas de red: 43
+Bloqueos de Jev: http_error=41, timeout=2
+Latencia Jev ms: p50=n/a p95=n/a max=n/a
+Costo: USD 0.00000000 · tokens de entrada: 0 · tope USD 1
+
+Por caso de uso (precisión vs oráculo; Brier: menor es mejor)
+caso                      n  reglas  jev    hard(r/j)  brier(r/j)     acuerdo  veredicto
+alert_priority            12   0.833    n/a   1/0 de 3      0.271/n/a      n/a   BLOCKED
+incident_classification   10   0.900    n/a   2/0 de 3      0.142/n/a      n/a   BLOCKED
+agent_routing              8   0.875    n/a   0/0 de 1      0.231/n/a      n/a   BLOCKED
+task_done                  7   1.000    n/a   1/0 de 1      0.032/n/a      n/a   BLOCKED
+contradiction_check        6   0.833    n/a   0/0 de 1      0.265/n/a      n/a   BLOCKED
+
+Entradas hostiles: 14 · llegaron a la red: 0 · todas bloqueadas como se esperaba: true
+Auditoría: 57 registros · cadena íntegra: true · jev-shadow-2026-09-25T20-04-54-615Z.audit.jsonl
+
+Limitaciones:
+- Fixtures sintéticos escritos por el mismo autor que las reglas: la precisión de reglas está inflada; ver casos hard.
+- Tamaño de muestra chico (43 casos); el plan pide 2,000 para decidir. Esta corrida valida la tubería, no la calidad de Jev.
+- typesafe-ai/jev no es un nombre versionado; sólo se detecta cambio de id reportado, no de pesos.
+- Proveedor sin ZDR (has_zdr=false); por eso sólo se envían fixtures sintéticos.
+- El costo es estimado con el precio del catálogo × usage.inputTokens reportado por el gateway.
