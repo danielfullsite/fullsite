@@ -135,6 +135,8 @@ export interface POSAuthContext {
   staffName: string
   role: string
   authType: 'shift_token' | 'supabase_session'
+  /** Terminal del shift token (`tid`). Sólo en tokens emitidos desde 2026-09-24 con device_id. */
+  terminalId?: string
 }
 
 /**
@@ -168,6 +170,7 @@ export async function withPOSAuth(request: NextRequest): Promise<POSAuthContext 
       staffName: shift.nam,
       role: shift.rol,
       authType: 'shift_token',
+      terminalId: shift.tid,
     }
   }
 

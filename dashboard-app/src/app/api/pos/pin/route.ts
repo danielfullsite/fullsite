@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
-import { issueShiftToken } from '@/lib/shift-token'
+import { issueShiftToken, issueApprovalToken } from '@/lib/shift-token'
+import { terminalIdValido } from '@/lib/terminal-id'
 import { pinGate, pinRecord } from '@/lib/pin-throttle'
 
 // PIN validation + shift token issuance.
@@ -12,16 +13,66 @@ import { pinGate, pinRecord } from '@/lib/pin-throttle'
 // ip:pin), so trying many different PINs from one source shares one budget and
 // trips a lockout — 10k-PIN enumeration becomes infeasible.
 
-async function respond(staff: { id: string; name: string; role: string }, clientId: string, key: string) {
-  await pinRecord(key, true) // success clears the throttle for this source
+/**
+ * Contexto de la petición que `respond` necesita además del empleado.
+ *
+ * `aprobacion`: la pidió una pantalla de autorización (manager / min_role), no un login.
+ * Desde 2026-09-24 una aprobación recibe su PROPIO token (`approvalToken`: 15 min, `jti`,
+ * amarrado a la terminal) en vez del shiftToken de 8 h del gerente. Antes, teclear el PIN
+ * del gerente en la terminal de un mesero le dejaba a esa terminal una sesión de gerente
+ * para toda la noche.
+ */
+interface Contexto { terminalId?: string; aprobacion: boolean; llaves: string[]; auditar?: (r: ResultadoAuditoria) => Promise<void> }
+type ResultadoAuditoria = { resultado: 'aprobado' | 'rechazado'; staff?: { id: string; name: string; role: string } }
+
+async function respond(staff: { id: string; name: string; role: string }, clientId: string, ctx: Contexto) {
+  for (const k of ctx.llaves) await pinRecord(k, true) // success clears the throttle for this source
+  const tid = terminalIdValido(ctx.terminalId) ? ctx.terminalId : undefined
   let shiftToken: string | undefined
-  try {
-    shiftToken = await issueShiftToken(staff.id, clientId, staff.role, staff.name)
-  } catch (e) {
-    // SHIFT_TOKEN_SECRET not configured — log and continue without token (degrades to legacy flow)
-    console.error('[pin] issueShiftToken failed (SHIFT_TOKEN_SECRET missing?):', e)
+  let approvalToken: string | undefined
+  // Compatibilidad: clientes con el bundle viejo usan el shiftToken como aprobación.
+  // En modo estricto v2 una aprobación ya no entrega sesión.
+  if (!ctx.aprobacion || process.env.POS_APROBACION_V2_ESTRICTA !== 'true') {
+    try {
+      shiftToken = await issueShiftToken(staff.id, clientId, staff.role, staff.name, tid)
+    } catch (e) {
+      // SHIFT_TOKEN_SECRET not configured — log and continue without token (degrades to legacy flow)
+      console.error('[pin] issueShiftToken failed (SHIFT_TOKEN_SECRET missing?):', e)
+    }
   }
-  return Response.json({ staff, shiftToken })
+  if (ctx.aprobacion) {
+    try {
+      approvalToken = await issueApprovalToken(staff.id, clientId, staff.role, staff.name, tid)
+    } catch (e) {
+      console.error('[pin] issueApprovalToken failed:', e)
+    }
+  }
+  if (ctx.auditar) await ctx.auditar({ resultado: 'aprobado', staff })
+  return Response.json({ staff, shiftToken, approvalToken })
+}
+
+/**
+ * Bitácora de cada intento de APROBACIÓN de gerente (no de cada login: ése ya queda en
+ * pos_sessions/asistencia). Nunca guarda el PIN. No bloquea: si la bitácora no responde en
+ * 2 s la aprobación sigue — el candado de la aprobación es el PIN y el throttle, no el log.
+ */
+function auditorDeAprobacion(sbUrl: string, sbKey: string, clientId: string, terminalId: string | undefined, minRole: string) {
+  return async (r: ResultadoAuditoria) => {
+    try {
+      await fetch(`${sbUrl}/rest/v1/pos_audit_log`, {
+        method: 'POST',
+        headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({
+          client_id: clientId,
+          action: 'aprobacion_pin',
+          actor: r.staff?.name || 'desconocido',
+          approved_by: r.resultado === 'aprobado' ? r.staff?.id ?? null : null,
+          details: { resultado: r.resultado, terminal_id: terminalId ?? null, min_role: minRole, rol: r.staff?.role ?? null },
+        }),
+        signal: AbortSignal.timeout(2000),
+      })
+    } catch { /* bitácora best-effort */ }
+  }
 }
 
 /**
@@ -54,7 +105,18 @@ export async function POST(request: NextRequest) {
     // Brute-force gate — one budget per (tenant, source), NOT per PIN, so
     // enumerating many PINs from one source trips the lockout.
     const throttleKey = `${clientId}:${ip}`
-    const gate = await pinGate(throttleKey)
+    // Terminal declarada. Se valida el formato, no la posesión: amarra los tokens a la
+    // terminal que se dijo ser (una aprobación no viaja a otra terminal), y le da a las
+    // aprobaciones su propio presupuesto de intentos por terminal.
+    const terminalId = terminalIdValido(device_id) ? device_id : undefined
+    const esAprobacion = manager === true || (min_role !== undefined && min_role !== null)
+    const llaves = [throttleKey]
+    if (esAprobacion) llaves.push(`aprob:${clientId}:${terminalId ?? 'sin-terminal'}`)
+    let gate = { allowed: true } as Awaited<ReturnType<typeof pinGate>>
+    for (const k of llaves) {
+      const g = await pinGate(k)
+      if (!g.allowed) { gate = g; break }
+    }
     if (!gate.allowed) {
       return Response.json(
         { error: 'Terminal bloqueada por intentos fallidos. Espera unos minutos.' },
@@ -173,6 +235,11 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'PIN inválido' }, { status: 400 })
     }
 
+    const ctx: Contexto = {
+      terminalId, aprobacion: esAprobacion, llaves,
+      auditar: esAprobacion ? auditorDeAprobacion(sbUrl, sbKey, clientId, terminalId, String(effectiveMinRole)) : undefined,
+    }
+
     const res = await fetch(
       `${sbUrl}/rest/v1/pos_staff?pin=eq.${encodeURIComponent(pin)}&active=eq.true&client_id=eq.${encodeURIComponent(clientId)}${roleFilter}&select=id,name,role&limit=1`,
       { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
@@ -180,7 +247,7 @@ export async function POST(request: NextRequest) {
     if (res.ok) {
       const rows = await res.json()
       if (Array.isArray(rows) && rows.length > 0) {
-        return respond({ id: rows[0].id, name: rows[0].name, role: rows[0].role }, clientId, throttleKey)
+        return respond({ id: rows[0].id, name: rows[0].name, role: rows[0].role }, clientId, ctx)
       }
     }
 
@@ -198,7 +265,7 @@ export async function POST(request: NextRequest) {
     if (fallbackAllowedFor(clientId)) {
       const fallback = (process.env.POS_FALLBACK_PIN ?? '').trim()
       if (fallback && pin === fallback) {
-        return respond({ id: 'admin', name: 'Admin', role: 'admin' }, clientId, throttleKey)
+        return respond({ id: 'admin', name: 'Admin', role: 'admin' }, clientId, ctx)
       }
     }
 
@@ -208,13 +275,14 @@ export async function POST(request: NextRequest) {
       for (const entry of raw.split(',')) {
         const [p, name] = entry.split(':')
         if (p && name && p.trim() === pin) {
-          return respond({ id: 'manager', name: name.trim(), role: 'gerente' }, clientId, throttleKey)
+          return respond({ id: 'manager', name: name.trim(), role: 'gerente' }, clientId, ctx)
         }
       }
     }
 
     if (!res.ok) return Response.json({ error: 'No se pudo verificar al empleado', code: 'authority_unavailable' }, { status: 503 })
-    await pinRecord(throttleKey, false)
+    for (const k of llaves) await pinRecord(k, false)
+    if (ctx.auditar) await ctx.auditar({ resultado: 'rechazado' })
     return Response.json({ error: 'PIN incorrecto' }, { status: 401 })
   } catch {
     return Response.json({ error: 'Error interno' }, { status: 500 })

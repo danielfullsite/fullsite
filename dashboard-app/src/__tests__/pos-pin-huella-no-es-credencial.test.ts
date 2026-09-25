@@ -174,7 +174,10 @@ describe('Sólo un PIN válido del restaurante emite token', () => {
     expect(status).toBe(200)
     // (3) La respuesta del login sólo trae {staff:{id,name,role}, shiftToken}: nada de PIN,
     // plantilla de huella ni llaves, aunque la base los hubiera devuelto.
-    expect(Object.keys(json).sort()).toEqual(['shiftToken', 'staff'])
+    // Desde 2026-09-24 una petición de APROBACIÓN (manager:true) trae además su propio
+    // `approvalToken` (15 min, jti, terminal). El shiftToken sigue viajando mientras no esté
+    // POS_APROBACION_V2_ESTRICTA. Nada de PIN ni plantillas: lo cuida `crudo` abajo.
+    expect(Object.keys(json).sort()).toEqual(['approvalToken', 'shiftToken', 'staff'])
     expect(json.staff).toEqual({ id: 'a-gerente', name: 'Gerente A', role: 'gerente' })
     const crudo = JSON.stringify(json)
     for (const secreto of ['2222', 'TPL-A-GERENTE', 'fixture-service', 'fixture-secret']) {
@@ -188,7 +191,9 @@ describe('Sólo un PIN válido del restaurante emite token', () => {
     expect(p.iat).toBeGreaterThanOrEqual(antes)
     const { verifyShiftToken } = await import('@/lib/shift-token')
     expect(await verifyShiftToken(json.shiftToken)).toMatchObject({ cid: 'tenant-a', rol: 'gerente' })
-    expect(throttle).toEqual([{ key: 'tenant-a:10.0.0.9', ok: true }])
+    // Una aprobación (manager:true) tiene además su presupuesto por terminal (2026-09-24);
+    // sin device_id cae en la llave `sin-terminal`. El éxito limpia las dos.
+    expect(throttle).toEqual([{ key: 'tenant-a:10.0.0.9', ok: true }, { key: 'aprob:tenant-a:sin-terminal', ok: true }])
   })
 
   it('el rol del token sale de pos_staff, nunca del body', async () => {
