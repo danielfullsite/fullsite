@@ -63,6 +63,21 @@ SQL
   else FAIL=$((FAIL+1)); printf '  FAIL  %-78s esperado=%s obtenido=%s\n' "$desc" "$esperado" "$obtenido"; fi
 }
 omitir() { OMIT=$((OMIT+1)); printf '  OMITIDO %-76s %s\n' "$1" "$2"; }
+# Copia de una foto SIN los privilegios de anon. Los rollbacks no reabren anon (el guardián
+# test_migraciones_no_exponen_a_anon.py lo prohíbe y ningún lector legítimo lo usa), así que
+# «rollback exacto» se compara contra el estado previo menos anon.
+sin_anon() {
+  python3 - "$1" "$2" <<'PY'
+import sys
+out = []
+for linea in open(sys.argv[1]):
+    k, _, v = linea.rstrip('\n').partition('=')
+    items = [x for x in v.split(',') if x and x != 'anon' and 'anon:' not in x]
+    out.append(k + '=' + ','.join(items))
+open(sys.argv[2], 'w').write('\n'.join(out) + '\n')
+PY
+}
+
 igual() {  # igual <desc> <archivoA> <archivoB> [lineas a excluir regex]
   local excl="${4:-^$}"
   if diff <(grep -vE "$excl" "$2") <(grep -vE "$excl" "$3") >/dev/null; then PASS=$((PASS+1)); echo "  PASS  $1"
@@ -170,7 +185,11 @@ caso "falla cerrado: si la auditoría falla, la escritura no ocurre" postgres - 
 echo "-- 5. Rollback del endurecimiento → estado PR3 exacto"
 aplicar "$END_RB" && echo "  rollback aplicado" || { echo "  ROLLBACK FALLÓ"; cat "$TMP/aplicar.log"; }
 foto >"$TMP/foto_rb.txt"
-igual "rollback = estado PR3 (excepto columna aditiva pos_staff_audit.origen, documentada)" "$TMP/foto_pr3.txt" "$TMP/foto_rb.txt" '^columna_origen='
+sin_anon "$TMP/foto_pr3.txt" "$TMP/foto_pr3_sin_anon.txt"
+sin_anon "$TMP/foto_rb.txt" "$TMP/foto_rb_sin_anon.txt"
+igual "rollback = estado PR3 sin anon (excepto columna aditiva pos_staff_audit.origen, documentada)" "$TMP/foto_pr3_sin_anon.txt" "$TMP/foto_rb_sin_anon.txt" '^columna_origen='
+caso "[rollback] anon NO recupera TRUNCATE de pos_staff"          anon - "truncate pos_staff; select 'truncado'" E:42501
+caso "[rollback] anon NO recupera lectura de pos_staff"           anon - "select count(*) from (select id from pos_staff) s" E:42501
 caso "[rollback] miembro básico vuelve a poder desactivar (estado PR3)" authenticated $VIEW "with u as (update pos_staff set active = true where id = 'a-mesero' returning 1) select count(*) from u" N:1
 
 echo "-- 6. Reaplicar dos veces → mismo estado endurecido"
@@ -212,7 +231,10 @@ caso "tabla NUEVA ya no nace con TRUNCATE para anon/authenticated" postgres - "c
 caso "lectura legítima sigue: miembro lee nombres"                 authenticated $VIEW "select count(*) from (select id, name from pos_staff) s" N:2
 aplicar "$TRU_RB" && echo "  rollback aplicado"
 foto >"$TMP/foto_tru_rb.txt"
-igual "rollback TRUNCATE: estado previo exacto" "$TMP/foto_pre_tru.txt" "$TMP/foto_tru_rb.txt"
+sin_anon "$TMP/foto_pre_tru.txt" "$TMP/foto_pre_tru_sin_anon.txt"
+igual "rollback TRUNCATE: estado previo exacto sin anon" "$TMP/foto_pre_tru_sin_anon.txt" "$TMP/foto_tru_rb.txt"
+caso "[rollback TRUNCATE] anon sigue sin TRUNCATE en tablas de negocio" anon - "truncate ventas_sinteticas; select 'truncado'" E:42501
+caso "[rollback TRUNCATE] authenticated recupera TRUNCATE (ruta no vista)" authenticated $VIEW "truncate ventas_sinteticas; select 'truncado'" V:truncado
 
 echo "-- 10. F1 (pin_hash) DESPUÉS del endurecimiento"
 aplicar "$F1" && echo "  F1 aplicada" || { FAIL=$((FAIL+1)); echo "  FAIL  F1 no aplicó sobre el estado endurecido"; cat "$TMP/aplicar.log"; }
