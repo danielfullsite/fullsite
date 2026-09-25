@@ -2207,82 +2207,34 @@ export function consumeManagerApproval(name: string): string | null {
 }
 
 /**
- * Autorizacion de gerente POR HUELLA — misma exigencia de rol que el PIN.
+ * Autorizacion de gerente POR HUELLA — SUSPENDIDA (F-01, auditoría 2026-09-23).
  *
- * Pedido por Daniel el 2026-08-31: "para ingresar pin en corte de caja tmb deberia
- * de ser con huella" y "tambien para cierre de caja".
+ * Pedida por Daniel el 2026-08-31 para el corte y el cierre de caja. Mandaba a
+ * /api/pos/pin el `fingerprint_id` (el UUID del empleado que el navegador sacaba de
+ * `pos_biometric_credentials`) y el servidor emitía un shiftToken de gerente sin
+ * verificar ninguna firma: el id era una afirmación del cliente, y quien conociera el
+ * UUID de un gerente obtenía su token sin huella y sin PIN. El 2026-08-31 se cerró la
+ * escalada de rol; la suplantación seguía abierta.
  *
- * Reutiliza el mismo endpoint y el mismo `manager: true` que `verifyManagerPin`, asi
- * que el servidor aplica la jerarquia de roles y emite el mismo shiftToken. Antes eso
- * NO pasaba: la rama de huella de /api/pos/pin devolvia antes de calcular el filtro
- * de rol, y cualquier empleado obtenia token de gerente. Se tapo primero, aparte,
- * porque montar esta funcion encima habria llevado el bypass a la caja.
+ * El servidor ya no acepta `fingerprint_id` (401 `biometria_no_verificada`), así que
+ * esto deja de mandarlo: devuelve null sin tocar la red y la pantalla ofrece el PIN,
+ * que es el camino que ya existía. `hayHuellasDadasDeAlta` responde false para que el
+ * corte y el cierre no muestren un botón que no puede funcionar.
  *
- * FACTOR DE SEGURIDAD, con honestidad: el servidor sigue SIN verificar la firma
- * WebAuthn — el id es una afirmacion del cliente. En la practica esto no es peor que
- * el PIN de 4 digitos que hoy se teclea a la vista de todos (el de AMALAY es 1234, y
- * un PIN observable se copia; una huella exige presencia fisica). Pero tampoco es una
- * garantia criptografica, y hasta que se verifique la assertion en el servidor la
- * huella NO debe ser el unico factor para mover dinero.
+ * Vuelve SOLO con WebAuthn verificado en servidor: llave pública por empleado guardada
+ * en el servidor y challenge de un solo uso emitido y consumido por él.
  *
- * Devuelve null si no hay huellas dadas de alta, si el usuario cancela, o si el
- * empleado no alcanza el rol. Nunca lanza: la pantalla debe poder ofrecer el PIN.
+ * Firma conservada a propósito: corte/page.tsx y CierreCajaWizard.tsx la siguen
+ * llamando y no forman parte de esta contención.
  */
 export async function verifyManagerHuella(minRole = 'gerente'): Promise<{ name: string; role: string } | null> {
-  if (typeof window === 'undefined' || !window.PublicKeyCredential) return null
-  try {
-    const stored = JSON.parse(localStorage.getItem('pos_biometric_credentials') || '{}')
-    const credIds = Object.keys(stored)
-    if (credIds.length === 0) return null
-
-    const challenge = new Uint8Array(32)
-    crypto.getRandomValues(challenge)
-    const assertion = await navigator.credentials.get({
-      publicKey: {
-        challenge,
-        rpId: window.location.hostname,
-        allowCredentials: credIds.map(id => ({
-          id: Uint8Array.from(atob(id), c => c.charCodeAt(0)),
-          type: 'public-key' as const,
-        })),
-        userVerification: 'required',
-        timeout: 30_000,
-      },
-    })
-    if (!assertion) return null
-
-    const credId = btoa(String.fromCharCode(...new Uint8Array((assertion as PublicKeyCredential).rawId)))
-    const staffId = (stored[credId] as { id?: string } | undefined)?.id
-    if (!staffId) return null
-
-    const { apiUrl } = await import('./api-base')
-    const res = await fetch(apiUrl('/api/pos/pin'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      // `min_role` es lo que el servidor ignoraba en la rama de huella hasta hoy.
-      body: JSON.stringify({ fingerprint_id: staffId, client_id: _getClientId(), min_role: minRole }),
-    })
-    if (!res.ok) return null
-    const { staff, shiftToken } = await res.json()
-    if (!staff?.name) return null
-    if (shiftToken) _lastManagerApproval = { token: shiftToken as string, name: staff.name as string, at: Date.now() }
-    return { name: staff.name as string, role: (staff.role as string) || minRole }
-  } catch {
-    // Huella cancelada, no reconocida, o sin red. La pantalla ofrece el PIN.
-    return null
-  }
+  void minRole
+  return null
 }
 
-/** ¿Vale la pena ofrecer el boton de huella en esta terminal? */
+/** ¿Vale la pena ofrecer el boton de huella en esta terminal? No, mientras la huella esté suspendida (ver arriba). */
 export async function hayHuellasDadasDeAlta(): Promise<boolean> {
-  if (typeof window === 'undefined' || !window.PublicKeyCredential) return false
-  try {
-    const stored = JSON.parse(localStorage.getItem('pos_biometric_credentials') || '{}')
-    if (Object.keys(stored).length === 0) return false
-    return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
-  } catch {
-    return false
-  }
+  return false
 }
 
 // Validación server-side de PIN de gerente (cancelaciones, descuentos, cortes).

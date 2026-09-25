@@ -13,9 +13,16 @@
 // Montar la huella del corte de caja encima de esto habria llevado el bypass justo
 // a la autorizacion del dinero, que es el riesgo #1 documentado del negocio.
 //
-// LO QUE ESTA PRUEBA NO CUBRE: la firma WebAuthn sigue sin verificarse en el
-// servidor. Se fija la ESCALADA (una huella solo obtiene el rol de su propio
+// LO QUE ESTA PRUEBA NO CUBRIA: la firma WebAuthn seguia sin verificarse en el
+// servidor. Se fijo la ESCALADA (una huella solo obtiene el rol de su propio
 // empleado), no la suplantacion.
+//
+// ACTUALIZADO 2026-09-23 (F-01, auditoria dashboard): la suplantacion se cierra
+// quitando la rama. Un `fingerprint_id` ya no emite token con NINGUN rol — ni el
+// de gerente pedido ni el propio del empleado — y el servidor ni consulta pos_staff.
+// Las pruebas de abajo pasan de "la huella respeta el rol" a "la huella no es
+// credencial"; lo que protegian (nadie sube de rol por huella) queda cubierto de
+// sobra. El detalle vive en pos-pin-huella-no-es-credencial.test.ts.
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
@@ -49,33 +56,26 @@ beforeEach(() => {
 })
 
 describe('La huella no puede pedir mas rol del que tiene el empleado', () => {
-  it('REGRESION: con manager:true, la consulta de huella LLEVA filtro de rol', async () => {
-    // El corazon del bug: antes esta consulta salia sin `role=in.(...)`, asi que la
-    // base devolvia al mesero y el endpoint le emitia token igual.
+  it('REGRESION: con manager:true, un fingerprint_id de gerente NO obtiene token ni consulta pos_staff', async () => {
     stubFetch([{ id: 'u1', name: 'Ana', role: 'gerente' }])
     const { POST } = await import('@/app/api/pos/pin/route')
-    await POST(req({ fingerprint_id: 'u1', client_id: 'amalay', manager: true }))
+    const res = await POST(req({ fingerprint_id: 'u1', client_id: 'amalay', manager: true }))
 
-    const q = consultaDeStaff()
-    expect(q, 'debe consultarse pos_staff').toContain('id=eq.u1')
-    expect(q, 'la consulta de huella debe filtrar por rol').toContain('role=in.')
-    expect(q).toContain('gerente')
-    expect(q, 'un mesero no puede colarse como gerente').not.toContain('mesero')
+    expect(res.status).toBe(401)
+    expect((await res.json()).shiftToken).toBeUndefined()
+    expect(consultaDeStaff(), 'el id no se usa para buscar al empleado').toBe('')
   })
 
-  it('min_role tambien se aplica a la huella, no solo al PIN', async () => {
+  it('min_role con huella tampoco emite token', async () => {
     stubFetch([{ id: 'u2', name: 'Beto', role: 'capitan' }])
     const { POST } = await import('@/app/api/pos/pin/route')
-    await POST(req({ fingerprint_id: 'u2', client_id: 'amalay', min_role: 'capitan' }))
+    const res = await POST(req({ fingerprint_id: 'u2', client_id: 'amalay', min_role: 'capitan' }))
 
-    const q = consultaDeStaff()
-    expect(q).toContain('role=in.')
-    expect(q).toContain('capitan')
-    expect(q, 'por debajo de capitan no entra').not.toContain('mesero')
+    expect(res.status).toBe(401)
+    expect(consultaDeStaff()).toBe('')
   })
 
   it('un mesero pidiendo rol de gerente NO recibe token', async () => {
-    // Con el filtro puesto, la base no devuelve fila: el endpoint responde 401.
     stubFetch([])
     const { POST } = await import('@/app/api/pos/pin/route')
     const res = await POST(req({ fingerprint_id: 'mesero-1', client_id: 'amalay', manager: true }))
@@ -85,25 +85,28 @@ describe('La huella no puede pedir mas rol del que tiene el empleado', () => {
     expect(body.shiftToken).toBeUndefined()
   })
 
-  it('sin rol pedido, la huella sigue funcionando para entrar al POS', async () => {
-    // Importante que esto NO se rompa: es el login normal por huella, que si debe
-    // aceptar a cualquier empleado activo.
+  it('CONTRATO NUEVO: sin rol pedido, la huella tampoco entra al POS — hay que usar PIN', async () => {
+    // Antes esto devolvia 200 con el rol del propio empleado. Era justo la
+    // suplantacion: conocer el UUID bastaba.
     stubFetch([{ id: 'u3', name: 'Caro', role: 'mesero' }])
     const { POST } = await import('@/app/api/pos/pin/route')
     const res = await POST(req({ fingerprint_id: 'u3', client_id: 'amalay' }))
 
-    expect(res.status).toBe(200)
-    const q = consultaDeStaff()
-    expect(q, 'sin min_role no se filtra por rol').not.toContain('role=in.')
+    expect(res.status).toBe(401)
+    const body = await res.json()
+    expect(body.code).toBe('biometria_no_verificada')
+    expect(body.shiftToken).toBeUndefined()
   })
 
-  it('la huella sigue exigiendo empleado ACTIVO y del MISMO tenant', async () => {
+  it('el PIN sigue exigiendo empleado ACTIVO, del MISMO tenant y con el rol pedido', async () => {
     stubFetch([{ id: 'u4', name: 'Dani', role: 'gerente' }])
     const { POST } = await import('@/app/api/pos/pin/route')
-    await POST(req({ fingerprint_id: 'u4', client_id: 'amalay', manager: true }))
+    await POST(req({ pin: '2468', client_id: 'amalay', manager: true }))
 
     const q = consultaDeStaff()
     expect(q).toContain('active=eq.true')
     expect(q).toContain('client_id=eq.amalay')
+    expect(q).toContain('role=in.')
+    expect(q, 'un mesero no puede colarse como gerente').not.toContain('mesero')
   })
 })
