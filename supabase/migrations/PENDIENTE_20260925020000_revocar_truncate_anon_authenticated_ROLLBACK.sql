@@ -14,6 +14,11 @@
 --   where c.relnamespace = 'public'::regnamespace and c.relkind in ('r','p')
 --     and a.privilege_type = 'TRUNCATE' and pg_get_userbyid(a.grantee) in ('anon','authenticated');
 
+-- `anon` NO recupera TRUNCATE (ni en tablas existentes ni en futuras): nadie legítimo lo usa
+-- (Q-T1..Q-T3 sobre el catálogo vivo, 2026-09-24) y el guardián de CI prohíbe cualquier GRANT a
+-- anon. Este rollback sólo devuelve TRUNCATE a `authenticated`, para el caso de que aparezca
+-- una ruta legítima que no se vio.
+
 begin;
 
 set local lock_timeout = '3s';
@@ -30,12 +35,12 @@ begin
       and c.relkind in ('r', 'p')
       and c.relname not in ('pos_staff', 'pos_staff_audit')
   loop
-    execute format('grant truncate on table public.%I to anon, authenticated', t.relname);
+    execute format('grant truncate on table public.%I to authenticated', t.relname);
   end loop;
 end
 $$;
 
 alter default privileges for role postgres in schema public
-  grant truncate on tables to anon, authenticated;
+  grant truncate on tables to authenticated;
 
 commit;

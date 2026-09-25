@@ -8,7 +8,14 @@
 -- cabecera de ese archivo). No se ofrece un atajo directo al baseline a propósito: el baseline
 -- deja leer y reescribir PINs a cualquier miembro.
 --
--- Qué NO revierte:
+-- Qué NO revierte, a propósito:
+--   · Los privilegios de `anon` (SELECT/TRUNCATE/TRIGGER/REFERENCES/MAINTAIN en pos_staff y
+--     pos_staff_audit, secuencia). Ningún lector legítimo los usa —anon leía 0 filas por RLS y
+--     TRUNCATE vaciaba la tabla— y el guardián de CI (test_migraciones_no_exponen_a_anon.py)
+--     prohíbe, con razón, cualquier GRANT a anon, también en un rollback. Revertir este
+--     endurecimiento no puede reabrir el TRUNCATE público.
+--
+-- Además:
 --   · La columna pos_staff_audit.origen se conserva (aditiva; las filas que el trigger escribió
 --     siguen siendo evidencia y conservan su origen).
 --   · Las filas de auditoría escritas mientras estuvo activo el trigger no se borran.
@@ -41,7 +48,6 @@ create policy pos_staff_del on public.pos_staff for delete to authenticated
 revoke all on table public.pos_staff from anon, authenticated;
 revoke select (id, client_id, name, role, role_display, active, created_at)
   on table public.pos_staff from authenticated;
-grant select, references, trigger, truncate on table public.pos_staff to anon;
 grant delete, references, trigger, truncate on table public.pos_staff to authenticated;
 grant select (id, client_id, name, role, role_display, active, created_at, hourly_rate, weekly_salary)
   on table public.pos_staff to authenticated;
@@ -50,16 +56,14 @@ grant update (name, active, hourly_rate, weekly_salary)
 
 -- Privilegios de pos_staff_audit = baseline
 revoke all on table public.pos_staff_audit from anon, authenticated;
-grant references, trigger, truncate on table public.pos_staff_audit to anon;
 grant all on table public.pos_staff_audit to authenticated;
-grant all on sequence public.pos_staff_audit_id_seq to anon, authenticated;
+grant all on sequence public.pos_staff_audit_id_seq to authenticated;
 
 -- MAINTAIN existe desde PostgreSQL 17 (producción lo tiene en la ACL). En 16 no existe.
 do $$
 begin
   if current_setting('server_version_num')::int >= 170000 then
-    execute 'grant maintain on table public.pos_staff to anon, authenticated';
-    execute 'grant maintain on table public.pos_staff_audit to anon';
+    execute 'grant maintain on table public.pos_staff to authenticated';
   end if;
 end
 $$;
