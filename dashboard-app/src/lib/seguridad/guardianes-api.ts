@@ -25,6 +25,12 @@ export const GUARDIANES_DE_SESION = [
   'requireAuth',
   'getSessionUserId',
   'verifyShiftToken',
+  // Estar en esta lista significa que la ruta LLAMA a un guardián. No significa que el
+  // guardián pueda negar. `verifyKitchenToken` estuvo aquí meses mientras devolvía `true`
+  // por falta de secreto, y el barrido daba verde con `/api/pos/kitchen` sirviendo la
+  // operación de cualquier restaurante a quien adivinara el slug (reproducido en
+  // producción el 2026-08-26). Se arregló invirtiendo el default a fallar cerrado.
+  // Al agregar un guardián aquí, prueba también que DENIEGA sin credencial.
   'verifyKitchenToken',
   'isPlatformAdmin',
   'requirePlatformAdmin',

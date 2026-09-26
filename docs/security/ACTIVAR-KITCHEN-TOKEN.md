@@ -1,10 +1,14 @@
 # Activar el token de cocina — procedimiento
 
-> 🔴 **Hueco abierto en producción.** Encontrado el 2026-08-26 barriendo todas las rutas API.
-> El mecanismo que lo cierra **ya está construido de los dos lados**; sólo está apagado.
+> 🟠 **El código ya falla cerrado. Falta desplegarlo, y el orden importa.**
 >
-> No se activa sin provisionar primero las pantallas: encenderlo a ciegas deja la cocina sin
-> comandas.
+> Encontrado el 2026-08-26 barriendo las rutas API, y **reproducido en producción el mismo
+> día**. El mecanismo estaba construido de los dos lados pero era opt-in: sin secreto
+> autorizaba a todos, y el secreto nunca se puso.
+>
+> Ese default ya se invirtió (`verifyKitchenToken` devuelve `false` sin secreto). Con eso,
+> **desplegar sin haber provisionado las pantallas deja la cocina sin comandas.** El orden de
+> abajo no es una recomendación.
 
 ## Qué está pasando
 
@@ -13,20 +17,35 @@ diseño — una pantalla en la cocina no teclea contraseñas. Se gatea por `clie
 slug adivinable.
 
 `lib/kitchen-token.ts` existe justamente para cerrar eso: ata la lectura a
-`HMAC(kitchen:<client_id>, KITCHEN_TOKEN_SECRET)`. Pero es **opt-in**, y falla ABIERTO:
+`HMAC(kitchen:<client_id>, KITCHEN_TOKEN_SECRET)`. Era **opt-in**, y fallaba ABIERTO:
 
 ```ts
-export function kitchenTokenEnabled(): boolean {
-  return SECRET.length >= 16          // sin secreto → deshabilitado
-}
+// ANTES — el bug
 export function verifyKitchenToken(clientId, token) {
   const expected = signKitchenToken(clientId)
-  if (!expected) return true          // ← deshabilitado = autoriza a todos
+  if (!expected) return true          // ← sin secreto = autoriza a todos
+  ...
+}
+
+// AHORA
+export function verifyKitchenToken(clientId, token) {
+  const expected = signKitchenToken(clientId)
+  if (!expected) return false         // ← sin secreto = no autoriza a nadie
   ...
 }
 ```
 
-**`KITCHEN_TOKEN_SECRET` no está configurada en producción.**
+**`KITCHEN_TOKEN_SECRET` sigue sin estar configurada en producción.** Mientras no se ponga,
+el endpoint deniega todo — que es lo correcto, pero también significa que las pantallas no
+funcionan hasta terminar el procedimiento.
+
+### Por qué nadie lo vio en meses
+
+`verifyKitchenToken` **ya estaba registrado** en `GUARDIANES_DE_SESION`
+(`lib/seguridad/guardianes-api.ts`), así que el barrido de rutas contaba `/api/pos/kitchen`
+como protegida y daba verde. El barrido comprueba que la ruta **llame** a un guardián, no que
+el guardián **pueda negar**. Un guardián que autoriza a todos se ve idéntico a uno que
+funciona.
 
 ### Demostrado en vivo (2026-08-26)
 
@@ -60,32 +79,52 @@ En una cocina eso no es un error de log: es que dejan de salir los platillos.
 1. **Generar el secreto** (≥16 caracteres; 32 bytes aleatorios está bien) y guardarlo en el
    gestor de contraseñas.
 
-2. **Calcular el token de cada tenant.** Es determinista, no hay que guardarlo en BD:
+2. **Calcular el token de cada tenant.** Es determinista, no se guarda en BD:
    ```
    token = base64url( HMAC-SHA256( clave = SECRET, mensaje = "kitchen:<client_id>" ) )
    ```
-   Hay un helper: `signKitchenToken(clientId)` en `lib/kitchen-token.ts`.
+   Hay un script que lo imprime listo para pegar:
+   ```bash
+   KITCHEN_TOKEN_SECRET='...' node scripts/token-cocina.mjs amalay demo lab-resto
+   ```
+   El secreto va por variable de entorno, no como argumento: los argumentos quedan en el
+   historial del shell y en la lista de procesos.
 
-3. **Provisionar cada pantalla ANTES de encender el secreto.** En cada KDS, desde la consola:
+3. **Provisionar cada pantalla, con el código viejo todavía en producción.** En cada KDS,
+   desde la consola:
    ```js
    localStorage.setItem('pos_kitchen_token', '<token de ese tenant>')
    ```
-   Con el secreto aún apagado el token se ignora, así que se puede provisionar sin prisa y sin
-   riesgo.
+   Mientras el secreto no exista en Vercel, el código viejo ignora el token — así que este
+   paso se puede hacer sin prisa y sin romper nada. **Es la única ventana segura.**
 
-4. **Recién entonces**, poner `KITCHEN_TOKEN_SECRET` en Vercel y redesplegar.
+4. **Poner `KITCHEN_TOKEN_SECRET` en Vercel.** Desde aquí las pantallas sin provisionar ya
+   reciben `401`.
 
-5. **Verificar las dos direcciones:**
+5. **Mergear el PR que hace fallar cerrado y redesplegar.**
+
+   > Si se invierte el orden de 3 y 4/5, todas las pantallas se quedan sin comandas al mismo
+   > tiempo. No hay degradación parcial: o tienen token o no lo tienen.
+
+6. **Verificar las dos direcciones:**
    - Una pantalla provisionada sigue recibiendo comandas.
-   - `curl` sin token a `?client_id=<otro tenant>` devuelve **401**.
+   - Sin token, `?client_id=<otro tenant>` devuelve **401** (antes devolvía `200`).
+   - Con el token de un tenant, pedir OTRO tenant devuelve **401**.
 
-## Pendiente aparte: que falle CERRADO
+## Qué queda cubierto y qué no
 
-Aun después de activarlo, el diseño sigue siendo opt-in: si algún día el secreto se borra o se
-despliega un entorno sin él, el endpoint vuelve a servir abierto **sin avisar**.
+**Cubierto.** Ya no se puede enumerar entre restaurantes con un slug, y un despliegue sin la
+variable deniega en vez de abrir. El caso "se borró el secreto" ahora se nota en dos segundos
+en vez de filtrar en silencio: `route.ts` distingue en el log *falta la variable* de *token
+inválido*, porque en operación se ven igual —la pantalla dice "sin comandas"— pero se
+arreglan distinto.
 
-Es el mismo antipatrón que tenía `POS_FALLBACK_PIN` antes del 2026-08-26. Una vez provisionadas
-las pantallas, conviene invertirlo: sin secreto, **denegar** en vez de autorizar.
+**No cubierto.** El token vive en `localStorage` de cada pantalla y se provisiona a mano.
+Quien tenga acceso físico o remoto a una pantalla puede leerlo, y sirve para ese tenant hasta
+que se rote el secreto (lo cual obliga a re-provisionar todas las pantallas de todos los
+tenants a la vez). Es aceptable para un dispositivo dentro del restaurante; deja de serlo si
+alguna vez hay una pantalla fuera del local.
 
-No se cambia hoy porque hacerlo antes de provisionar tiene exactamente el efecto que este
-documento trata de evitar.
+La versión que quita ese pendiente es que la pantalla obtenga su token de una sesión real la
+primera vez que se configura, en vez de que alguien la teclee. No se hace en este PR porque
+cambia el flujo de alta del KDS y esto es un P0 de seguridad.
