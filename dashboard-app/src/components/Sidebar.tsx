@@ -59,6 +59,7 @@ import {
   BookOpen,
   MessageSquare,
   Gauge,
+  BrainCircuit,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
@@ -199,6 +200,7 @@ const platformNavSections = [
       { href: '/platform', label: 'Métricas', icon: LayoutDashboard },
       { href: '/platform/copiloto', label: 'Copiloto', icon: Sparkles },
       { href: '/platform/recomendaciones', label: 'Recomendaciones', icon: Lightbulb },
+      { href: '/platform/jev', label: 'JEV', icon: BrainCircuit },
       { href: '/platform/tenants', label: 'Tenants', icon: Store },
       { href: '/platform/config', label: 'Config restaurante', icon: Sliders },
       { href: '/platform/terminales', label: 'Provisionar terminal', icon: MonitorSmartphone },
