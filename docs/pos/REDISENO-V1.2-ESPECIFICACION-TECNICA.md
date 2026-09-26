@@ -7,6 +7,16 @@
 
 **Estado:** especificación. **Nada está implementado.** No se tocó código, datos, P19, P17, pagos ni KDS. En el vocabulario de CLAUDE.md §10, todo lo que describe es «propuesto».
 
+**Decisiones de Daniel, 2026-09-26** (detalle en §10.3):
+
+| Decisión | Qué dice |
+|---|---|
+| Q2 | Se mantiene Schibsted Grotesk, con disponibilidad offline verificada |
+| Q3 | Pendiente de inventario físico de PDV1, PDV3 y SERVER1. **No se supone DPR, pantalla táctil ni escala** |
+| Q8 | **No autorizada.** No se escriben componentes dentro de `/pos`, ni se implementa o publica nada, hasta que P19 GUI/CDP complete el tramo de edición |
+
+La rama sigue aislada y sin push.
+
 ---
 
 ## 0. Resultado
@@ -30,7 +40,7 @@
      - en modo Caja ya manda `ORDER_SEND` (`page.tsx:3422` → `guardarOperacionCaja` → `enviarCuentaEnCaja` `:2677` → `pedro-operaciones.ts:77`).
    - FRESH certifica un solo `ORDER_SEND` y **cero** `ORDER_SENT`.
    - Consecuencia: el rediseño **no puede conectarse a ningún handler hasta que FRESH esté en Git y en `main`**, además de que P19 pase GUI/CDP (§7).
-4. **Hoy sólo cabe la fase F0:** esta especificación, las decisiones de Daniel y el diseño de la batería de pruebas. Aun el código aislado (primitivas en `/pos/ui-kit`) pide autorización explícita, porque `DO_NOT_TOUCH_BEFORE_FIELD_CERT.md:6` dice «ningún rediseño ni refactor previo» (§9).
+4. **Hoy sólo cabe la fase F0, y sólo en papel:** esta especificación y el diseño de la batería de pruebas. Daniel **no autorizó** código (Q8, 2026-09-26): nada dentro de `/pos`, ni siquiera primitivas aisladas en `/pos/ui-kit`, hasta que P19 GUI/CDP complete el tramo de edición (condición E0, §7.3). Coincide con `DO_NOT_TOUCH_BEFORE_FIELD_CERT.md:6`, «ningún rediseño ni refactor previo».
 5. **Ocho puntos donde la v1.2 contradice el sistema real.** Hay que adaptar el diseño, no copiarlo (§10.1):
    - modificadores sin obligatorios;
    - Cortesía, Influencer y Mercadotecnia como formas de pago que cierran sin autorización (en el sistema real la cortesía es un descuento con PIN o huella);
@@ -114,6 +124,19 @@ Es el mismo alcance visual que aprobó la decisión (`REDISENO-V1.2-INTEGRATION-
 | Otras 22 vistas (turno, corte, inventario, facturación, delivery…) | Fuera de este plan. Cada una requiere su propio inventario de cero pérdida |
 | Cocina y Barra | Fuera por instrucción |
 
+### 2.1 No copiar del artefacto v1.2
+
+Son seis comportamientos del prototipo que **no pasan a Fullsite**, aunque se vean bien en las capturas. Cada fila dice qué hace la v1.2, qué hace el sistema, la regla que manda y la prueba que la vigila.
+
+| # | Tema | Qué hace la v1.2 (no copiar) | Qué hace el sistema | Regla para la integración | Se verifica con |
+|---|---|---|---|---|---|
+| NC-1 | **Cortesía** | Cortesía, Influencer y Mercadotecnia son **formas de pago** (:1815-1834). `PAY.finish` sólo avisa «se pediría huella» y **cierra la cuenta igual** (:3112-3118, :3137) | No existen como formas de pago: `PaymentMethodDB` = `{id, name, type, commission_pct}`, sin campo de autorización (`pos-data.ts:400-407`). La cortesía es un modo de `DiscountModal`, con PIN o huella de gerente (`page.tsx:749-1066`) | El rediseño **no crea formas de pago**. La cortesía sólo existe dentro del flujo de descuento autorizado, vestido tal cual. La UI nunca decide si algo está autorizado | T-03, T-10 |
+| NC-2 | **Reintentos de cobro** | `SYNC.reintentar` regresa los errores a pendiente y vuelve a drenar (:3752). Los conflictos salen de `Math.random() < .14` (:3744). La pantalla etiqueta un «Cobro mesa 44 · Efectivo» en conflicto como «se reintenta solo» (captura `09-sync-conflicto`) | La idempotencia depende de `save_operation_id`. Una petición legacy sin él **no** es idempotente (`api/pos/save-order/route.ts:17-20`, `82`). `operationLock` impide el doble envío (`page.tsx:2878`, `3957`). En FRESH, un cobro incierto es `uncertain` en el journal P17 (REPORTADO) | **La UI nunca genera un segundo intento de cobro.** «Reintentar» sólo pide al dueño de la cola que drene la **misma** operación con el **mismo** id. Un cobro incierto es un diálogo bloqueante sin botón de reintento (§5.4-6). Ningún cobro se etiqueta «se reintenta solo» salvo si su clase es `TRANSIENT_RETRYABLE` (§5.6) | T-10 (doble clic = 1 petición), T-12, T-13 |
+| NC-3 | **Modificadores obligatorios** | Todo es opcional (:3042). Los modificadores son constantes escritas en el código por tipo de producto (`MOD_SETS` :3165, `MOD_QUITAR` :3181) | Los grupos vienen del catálogo, con `required`, `min_selections` y `max_selections` (`pedro-catalogo.ts:12-16`). Confirmar queda bloqueado mientras falten obligatorios (`page.tsx:311-331`, `400`, `648`, `721`) | Los grupos y sus reglas **salen del catálogo, nunca de constantes de la UI**. Aplican M-01 a M-06 (§5.5). Un obligatorio sin elegir bloquea «Agregar» y dice por qué | T-11 |
+| NC-4 | **Precios autoritativos** | La vista calcula subtotal, descuento, IVA y total (:2690-2694). Calcula el cobro como `tot × (1 + tip)` (:3096). Los precios salen de datos semilla y de `MOD_SETS` (:3165) | La Caja es dueña del catálogo completo (`pedro-catalogo.ts:21-22`). El servidor compara el precio cobrado contra el del menú, **el único dato que el POS no dicta** (`save-order/route.ts:252-259`). Hoy los totales se calculan en `page.tsx:3343-3372`; en FRESH, P19 tiene una proyección de precios propia (`fresh-draft-price-projection.ts`, REPORTADO) | Los componentes `v2` **reciben montos ya calculados** por el dueño del estado. **Nunca calculan, redondean ni editan** precios, impuestos, propinas ni totales. No hay campo de precio en `v2` fuera de los flujos autorizados que ya existen. La tasa sale de `iva_rate` (L-02) | T-12 (mismo payload en `v1` y `v2`), T-16 (`iva_rate` 0 y 0.16) |
+| NC-5 | **Mínimo táctil de 48 px** | Controles de 24 px (`.tag` :499, usada como botón), 28 (`.pill` :444), 38 (`.seg` :512) y 40 (`.seat` :536, `.icon-btn` :454). La densidad compacta renglones con más de 8 o 14 (:2662) | `.pos-kiosk` fija `min-height: 48px` en button, input y select (`globals.css:58-64`) | **≥48 px de alto en todo control y ≥48 px de ancho en los de sólo icono.** La densidad no baja un renglón accionable de 48 px: si no caben, hay scroll sin filas a medias (V-13). El tamaño **físico** depende del DPR y del tamaño de pantalla, pendientes de Q3; hasta entonces se mide en px CSS y no se aprueba nada | V-14 |
+| NC-6 | **Flujo durable P19** | Cuentas y cola viven en memoria (`CUENTAS`, `SYNC.cola`), aunque los comentarios dicen `localStorage 'pos_order_<mesa>'` más IndexedDB (:3220, :3723): justo el almacenamiento que P19 retira. Los ids se generan con `Math.random` (:3053, :3718). Lee `fs-theme` y `fs-scale` de `localStorage` sin `try` (:2248-2249) y los escribe ahí (:2610, :2617). Deshacer es una pila local de 10 s que recrea renglones (:6369-6397) | P19 muda `pos_order_*` y los borradores a un owner durable en main, atado a restaurante, terminal, turno, mesa, generación y revisión (`FULLSITE-FRESH-UI-CHROMIUM-P16-P20-LINT-PROMPT.md`, sección P19). Hoy en `main` esos borradores están en `localStorage` (`page.tsx:1763-2733`). Codex Mac le pidió a Windows que el rediseño no use `localStorage` para pedidos, no genere ids y no reemplace a los owners P16–P20 (historia de Codex, 09-24; REPORTADO) | Los componentes `v2` **no leen ni escriben storage, no generan ids y no guardan estado de la orden**. Editar, mover de mesa, deshacer y enviar son **acciones del owner**. Si el owner no expone «deshacer», `v2` no lo inventa. Nada se conecta antes de E0 y E1 (§7.3) | T-12, T-14, T-15, T-18 |
+
 ---
 
 ## 3. Mapa pantalla → componente → estado (actual → v1.2)
@@ -176,7 +199,7 @@ Hay una segunda razón, medida aquí: `feature_flags` **no está** en la lista `
 | Qué controla | Sólo marcado y CSS. Mismos handlers, hooks, permisos y llamadas. **Invariante:** con el mismo guion, `v1` y `v2` producen la misma secuencia de red y de comandos (T-12). Por eso **nada de este rediseño agrega sondas de red** (§5.1) |
 | Forma del código | Patrón #408: cada componente tiene dos ramas, y con `v1` devuelve exactamente el marcado actual, comprobado con un diff normalizado. CSS en `pos-v2.css`. `globals.css` no cambia (5 tests leen su texto) |
 | Tokens | Se mapean a los nombres existentes (`--bg`, `--surface*`, `--line*`, `--text-*`, `--accent*`, `--info/warn/crit*`). **Un detalle:** `pos/layout.tsx:854-864` fija esas variables **en línea** sobre `.pos-kiosk`, y una regla de hoja de estilos no le gana al estilo en línea del mismo elemento. `data-ui="v2"` va en un **contenedor descendiente**: las propiedades personalizadas redefinidas ahí aplican a todo su subárbol, sin tocar `layout.tsx`. Se reutiliza el guardián de tokens de `redesign/pos-ds-v2` (`6b7b7bc6`) |
-| Tipografía | La canónica, Public Sans + Schibsted Grotesk + IBM Plex Mono, por `next/font` y autohospedada. La CSP de Electron sólo admite `font-src 'self' data:` (`offline-ui/protocol.js:12`). Ver la decisión Q2 |
+| Tipografía (Q2, decidida) | **Se mantiene Schibsted Grotesk**, con Public Sans e IBM Plex Mono, **y su disponibilidad offline tiene que verificarse, no suponerse.** Lo que hay hoy:<br>1. Las tres familias salen de `next/font/google` (`app/layout.tsx:2`, `22-49`). Se descargan **al compilar** y se sirven desde el propio origen, bajo `/_next/static/media`. La compilación necesita red; la ejecución no.<br>2. **Hoy el POS no usa Schibsted:** `--font-display` sólo existe bajo `[data-ds="v3"]` (`globals.css:710-711`), y `/pos` no lleva ese atributo porque AppShell lo omite (`AppShell.tsx:60-62`). `v2` define `--font-display: var(--font-schibsted), …` dentro de su contenedor (`pos-v2.css`), sin tocar `globals.css`.<br>3. **Electron:** el paquete offline copia la exportación estática (`build-offline-ui.cjs:102-109`), que debe incluir los `.woff2`. La CSP sólo admite `font-src 'self' data:` (`offline-ui/protocol.js:12`).<br>4. **Navegador:** el Service Worker enumera `/_next/static/` al instalarse y cachea `woff2` (`public/sw.js:122-131`, `215`).<br>Verificación: V-16 y T-20 |
 | Tema | No se porta `fs-theme` de la v1.2. En `main`, `tenant-theme` y `ThemeToggle` no se usan en `app/pos` (`git grep` → 0). El owner durable del tema (P16) existe sólo en FRESH; `v2` lo consume cuando llegue (D6) |
 | Multi-tenant | La bandera es por terminal. El despliegue por restaurante se hace aprovisionando sus terminales. No se escribe `amalay` en ninguna parte (T-16) |
 | Instalador | En Electron la UI viaja en el paquete instalado (`REDESIGN-INSTALL-IMPACT.md` §3-§5). `v2` requiere un instalador que traiga las dos pieles. Después se enciende por configuración y reinicio. Ver la decisión Q5 |
@@ -363,9 +386,10 @@ Cada estado tiene seis entradas: cómo lo muestra la v1.2, cómo es hoy, la **es
 
 | Condición | Valor | Por qué |
 |---|---|---|
-| Viewports | Las tres resoluciones, con `deviceScaleFactor` 1 **y 2**. Sólo para el inventario de cero pérdida (T-03), además, 390×844 con user agent móvil y tacto | La v1.2 sólo midió DPR 1 (V12:183). Sin el viewport móvil no se ven las ramas de `isMobileDevice` (`page.tsx:2794`) ni el ticket bajo 900 px |
-| Entrada | `hasTouch: true` **y** ratón | La v1.2 se midió sin pantalla táctil, así que `ADAPTA` eligió `sm` (0.95) en las tres (`reporte-v1.2.txt`). Nunca se vio a escala de terminal táctil |
-| Zoom del POS | El de la terminal real. **Pendiente Q3:** resolución, DPR y si PDV1, PDV3 y SERVER1 son táctiles | Medir a otra escala certifica otro producto |
+| Viewports | Las tres resoluciones en px CSS. Sólo para el inventario de cero pérdida (T-03), además, un viewport móvil con user agent móvil | Sin el viewport móvil no se ven las ramas de `isMobileDevice` (`page.tsx:2794`) ni el ticket bajo 900 px |
+| **DPR, pantalla táctil y escala** | **PENDIENTE (Q3): inventario físico de PDV1, PDV3 y SERVER1. No se suponen.** Hasta tenerlo, toda corrida es **DIAGNÓSTICO**: registra con qué parámetros corrió y no se usa para aprobar ningún criterio | La v1.2 se midió con DPR 1 (V12:183) y sin pantalla táctil, así que `ADAPTA` eligió `sm` (0.95) en las tres (`reporte-v1.2.txt`). Eso es una configuración de laboratorio, no la de una terminal |
+| Umbrales que dependen de Q3 | V-11 (cuántas formas de pago se ven), V-14 (tamaño **físico** de 48 px), V-17 (celdas y columnas de la retícula) y V-19 (capturas de referencia) | Se fijan con el inventario, no antes |
+| Registro del inventario | Por terminal: modelo, resolución nativa, escala del sistema operativo, `window.devicePixelRatio` y `innerWidth`×`innerHeight` en el Electron real, si es táctil, tamaño físico de la pantalla y distancia de uso | Es lo que hace falta para convertir 48 px CSS en milímetros bajo el dedo |
 | Red | Bloqueada salvo el origen de la app y los mocks; 0 peticiones externas | CSP de Electron |
 | Datos | Fixture determinista en un tenant de pruebas (no AMALAY de producción, CLAUDE.md §13), más un segundo tenant (T-16) | — |
 | Reloj | Fijo (`page.clock`) | Capturas deterministas |
@@ -387,12 +411,12 @@ Cada estado tiene seis entradas: cómo lo muestra la v1.2, cómo es hoy, la **es
 | V-08 ✚ | Nombres de producto y de modificador, y montos, sin «…» ni recorte | `scrollWidth ≤ clientWidth` y `scrollHeight ≤ clientHeight` en `[data-texto-critico]`; sin `text-overflow: ellipsis` computado | 0 |
 | V-09 ✚ | Píldoras con texto, color y `aria-label` coherentes con la señal | Tabla de verdad de las combinaciones **alcanzables** de Red (2) × Caja (3) × Cocina (3). Las imposibles se listan en F0 con su porqué | 100 % de las alcanzables |
 | V-10 ✔ | Cobro: cada forma **visible** completa y sin cortar; **todas** las del catálogo alcanzables con ≤1 toque adicional («Más formas»); orden del catálogo; «Cobrar» completo | bbox contra contenedor (V12:121-131), con los catálogos de 8, 18 y 24 formas | 100 % |
-| V-11 ✚ | Cobro: la hoja completa, sin scroll interno, en las tres resoluciones | `scrollHeight` de la hoja | 0 px. El **número de formas visibles** por resolución se fija en F0 midiendo a la escala real (Q3). El umbral de 18 de la v1.2 no vale: se midió a 0.95 y DPR 1 |
+| V-11 ✚ | Cobro: la hoja completa, sin scroll interno, en las tres resoluciones | `scrollHeight` de la hoja | 0 px. El **número de formas visibles** por resolución queda **sin fijar hasta el inventario físico (Q3)**; no se supone escala. El umbral de 18 de la v1.2 no vale: se midió a 0.95 y DPR 1 |
 | V-12 ✚ | Ningún estado vacío visible mientras está en curso **la petición que alimenta esa vista** (los sondeos de fondo, como el de 3 s de Mesas, no cuentan) | `route` con retraso sobre esa petición; `[data-estado="vacio"]` | 0 |
 | V-13 ✔ | Listas con scroll sin filas a medias; la última se ve entera | barrido de `overflowY` (V12:138-163) | 0 filas cortadas |
 | V-14 ✚ | Objetivos táctiles | bbox del **área que recibe el toque**: `button`, `[role=button]`, `a`, `select`, inputs visibles; en inputs `sr-only` (`page.tsx:538-543`) se mide su `label` visible | **Alto ≥48 px** en todo control (el piso vigente de `.pos-kiosk` sólo fija `min-height: 48px` en button, input y select, `globals.css:58-64`), y **ancho ≥48 px** en controles sólo de icono (regla nueva de este plan). La v1.2 no lo cumple: `.tag` 24 px, `.pill` 28, `.seg` 38, `.seat` e `.icon-btn` 40. **La densidad de la v1.2 no puede bajar un renglón del ticket de 48 px:** si no caben, hay scroll sin filas a medias (V-13) |
 | V-15 ✚ | Contraste | WCAG sobre los colores computados en el navegador, más axe `color-contrast` | ≥4.5:1 en texto normal; ≥3:1 en texto grande y bordes de controles. Cálculo previo **sin medir en navegador** (INFERENCIA): `--text-4` sobre `--bg` 2.55:1; blanco sobre ámbar 2.15:1. El texto del mosaico se elige por contraste contra el color de categoría del tenant |
-| V-16 ✚ | Tipografía | `document.fonts.check` de las 3 familias servidas desde `'self'`; montos con `tabular-nums` | 3/3; 0 violaciones de CSP |
+| V-16 ✚ | Tipografía **offline** (Q2) | Con la red bloqueada por completo (Electron desde su paquete; navegador desde el SW tras una visita previa):<br>- `document.fonts.check` de Public Sans, **Schibsted Grotesk 500** e IBM Plex Mono;<br>- `getComputedStyle` de los títulos y cifras grandes de `v2` resuelve a Schibsted;<br>- en la red, las fuentes salen sólo de `'self'` | 3/3 cargadas; **0 peticiones** a `fonts.googleapis.com` o `fonts.gstatic.com`; 0 violaciones de CSP; montos con `tabular-nums` |
 | V-17 ✚ | Retícula de productos sin scroll | celdas ≥152×92 (:2322) y paginador visible | 0 scroll |
 | V-18 ✚ | Cero pérdida | T-03 | 0 elementos de `v1` ausentes sin excepción firmada |
 | V-19 ✚ | Captura estable | `toHaveScreenshot` | `maxDiffPixelRatio` 0.002 contra la línea base aprobada |
@@ -425,7 +449,7 @@ Cada estado tiene seis entradas: cómo lo muestra la v1.2, cómo es hoy, la **es
 | E22 | Error de catálogo |
 | E23 | Modo Caja contra modo web, en venta y en cobro |
 
-La matriz completa: 23 estados × 3 resoluciones × 2 variantes × 2 DPR.
+La matriz completa: 23 estados × 3 resoluciones × 2 variantes. **Los parámetros de dispositivo (DPR, pantalla táctil, escala) se agregan cuando exista el inventario Q3.**
 
 ---
 
@@ -481,20 +505,22 @@ Todas se cumplen sobre el **mismo fingerprint y commit**.
 
 | ID | Condición | Qué la prueba |
 |---|---|---|
+| **E0** | **Decisión de Daniel (Q8, 2026-09-26):** no se escriben componentes dentro de `/pos`, ni se implementa o publica nada, **hasta que P19 GUI/CDP complete el tramo de edición**. **Interpretación de este documento, por confirmar con Daniel:** el tramo va de la admisión a crear el editor, editar, guardar y enviar la orden desde la GUI real. Qué cuenta como «completo» lo dice el manifiesto P19, no este documento. Hoy no se cumple: la admisión es `scoped_pass` y el GUI/CDP reanudado está `blocked` con 0 ejecuciones de GUI (§7.1). Cumplir E0 **no** autoriza código por sí solo: hay que volver a pedir la autorización | Manifiesto P19 importado en `main` con el tramo de edición en PASS, más la autorización escrita de Daniel |
 | E1 | **P19 GUI/CDP pasa:** `integral_gui` + `kds_replay` + `two_restarts` en PASS. POS → `ORDER_SEND` → KDS en Electron real, con reload, crash del renderer, cierre normal, dos reinicios, exactamente un `ORDER_SEND` y cero `ORDER_SENT` | Manifiesto nuevo importado (E7) |
 | E2 | FRESH (P16–P19 y el refactor de lint/UI) está en `main` por PR con CI verde, con una tabla fingerprint ↔ commit, y **la suite GUI/CDP de E1 se volvió a correr sobre ese commit de `main`**. Que existan los archivos no basta | PR fusionado más el manifiesto de la corrida sobre el commit |
 | E3 | Los hooks de estado, persistencia, efectos y comandos ya están extraídos de `pos/page.tsx`. La v1.2 se conecta a esos hooks, no al archivo de 7,045 líneas. El lint en 0/0 es la evidencia que usa FRESH; aquí importa como prueba del refactor, no como seguridad | Hooks presentes; `npx eslint src/app/pos/page.tsx` en 0/0 |
-| E4 | `renderer_secret_audit` en PASS **y repetido con `ui_version=v2`**, con criterio de **cero secretos nuevos frente a `v1`**. «Cero secretos» a secas ya falla hoy: el preload escribe `FULLSITE_LAN_SECRET` en `localStorage` en las dos variantes (`renderer-identity.js:24`, `preload.js:6-10`; §12) | Auditoría en las dos variantes y diff |
+| E4 | `renderer_secret_audit` en PASS **y repetido con `ui_version=v2`**, con criterio de **cero secretos nuevos frente a `v1`**. «Cero secretos» a secas ya falla hoy: el preload escribe `FULLSITE_LAN_SECRET` en `localStorage` en las dos variantes (`renderer-identity.js:24`, `preload.js:6-10`; riesgo de cierre RC-2, §12.1) | Auditoría en las dos variantes y diff |
 | E5 | Se levanta el HOLD de la UI operativa (`uiPolicy` deja de ser `hold`). Es una decisión humana | Registro de la decisión (E7) |
 | E6 | `ack_concurrency_closure`, `abrupt_recovery`, `complete_netlogs` e `integral_regression` en PASS. Son justo los estados en vuelo e inciertos que pinta F2 | Manifiesto (E7) |
-| E7 | **El importador acepta un resultado positivo.** Hoy `platform-evidence.ts` sólo admite `blocked` o `scoped_pass` con `uiPolicy: 'hold'`, y rechaza cualquier cambio en la lista de pendientes. Hace falta un contrato nuevo y versionado para registrar E1, E5 y E6 | Contrato nuevo en `main`, con pruebas |
+| E7 | **El importador acepta un resultado positivo.** Hoy `platform-evidence.ts` sólo admite `blocked` o `scoped_pass` con `uiPolicy: 'hold'`, y rechaza cualquier cambio en la lista de pendientes. Hace falta un contrato nuevo y versionado para registrar E0, E1, E5 y E6 | Contrato nuevo en `main`, con pruebas |
 
 **Qué condiciones exige cada fase (§9):**
 
 | Fase | Condiciones |
 |---|---|
-| F0 | Ninguna: no conecta nada |
-| F1 | E1, E2, E3 y E7. Sólo en perfiles sintéticos de laboratorio, sin estados en vuelo |
+| F0 (papel) | Ninguna. No escribe código |
+| F0b (código aislado sin handlers) | E0 más una autorización nueva de Daniel |
+| F1 | E0, E1, E2, E3 y E7. Sólo en perfiles sintéticos de laboratorio, sin estados en vuelo |
 | F2 y F3 | Además, E4, E5 y E6 |
 | F4 | Además, `physical_validation` sobre el mismo instalador y commit |
 
@@ -516,11 +542,16 @@ Todas se cumplen sobre el **mismo fingerprint y commit**.
 | D10 | Llegar a una terminal Electron | Instalador que traiga las dos pieles **y** el transporte de `FULLSITE_UI_VERSION` en `identityForUrl`, que cambia `main.js` (`REDESIGN-INSTALL-IMPACT.md` §5) | `ui_version` por terminal | Decisión Q5 |
 | D11 | Mesas (fila 5) | **P16** (`pos_mesero` `mesas/page.tsx:275`) y cachés LS (P18) | Las preferencias del owner P16 | Piel con fixture |
 
-### 7.5 Lo que es ortogonal hoy
+La columna «Qué se puede hacer antes» describe **F0b**: sólo después de E0 y con autorización explícita de Daniel. **Hoy no se hace nada de esa columna.**
 
-Tokens y CSS con alcance acotado, y componentes presentacionales **sin handlers ni storage**, vistos en `/pos/ui-kit` con fixtures, además de sus pruebas geométricas y de accesibilidad.
+### 7.5 Lo que sería ortogonal y sigue sin autorizarse
 
-Coincide con lo que la decisión llama capa de presentación (`REDISENO-V1.2-INTEGRATION-PLAN.md:6-8`). Aun así, pide autorización explícita por el congelamiento de `DO_NOT_TOUCH_BEFORE_FIELD_CERT.md:6` (Q8).
+Lo técnicamente ortogonal es:
+- tokens y CSS con alcance acotado;
+- componentes presentacionales **sin handlers ni storage**, vistos en `/pos/ui-kit` con fixtures;
+- sus pruebas geométricas y de accesibilidad.
+
+Coincide con lo que la decisión llama capa de presentación (`REDISENO-V1.2-INTEGRATION-PLAN.md:6-8`). **Que sea ortogonal no lo autoriza.** Daniel lo negó el 2026-09-26 (Q8) hasta que se cumpla E0, en línea con `DO_NOT_TOUCH_BEFORE_FIELD_CERT.md:6`. Hoy sólo se permite trabajo en papel: este documento, el diseño de las pruebas y la plantilla del inventario Q3.
 
 ---
 
@@ -533,7 +564,7 @@ Ninguna existe hoy:
 
 | ID | Prueba | Cómo | Pasa si |
 |---|---|---|---|
-| T-01 | Batería geométrica | Playwright 1.60 (ya fijado) con V-01 a V-17 sobre E01–E23 × 3 resoluciones × DPR 1/2 × táctil/ratón × `v1`/`v2` | 0 fallas |
+| T-01 | Batería geométrica | Playwright 1.60 (ya fijado) con V-01 a V-17 sobre E01–E23 × 3 resoluciones × `v1`/`v2`. Los parámetros de dispositivo salen del inventario Q3; mientras no exista, la corrida queda etiquetada DIAGNÓSTICO | 0 fallas, **con los parámetros del inventario** |
 | T-02 | Regresión visual | `toHaveScreenshot`, con máscara en reloj y fechas. Línea base `v1` aprobada por Daniel; `v2` aprobada por escena | V-19 |
 | T-03 | **Inventario de cero pérdida** | Por estado, en `v1` y `v2`: árbol accesible (rol + nombre), textos de datos y controles. Luego un diff. Corre en las tres resoluciones **y** en un viewport móvil de 390×844 (§6.1), en modo web y en modo Caja, y con roles mesero, cajero y gerente | 0 elementos de `v1` ausentes en `v2` salvo en `docs/pos/rediseno-v12-excepciones.md`, firmado por Daniel |
 | T-04 | axe-core | `@axe-core/playwright` como devDependency nueva, fijada; etiquetas `wcag2a`, `wcag2aa`, `wcag21aa` en E01–E23 | 0 `serious`/`critical` |
@@ -553,7 +584,7 @@ Ninguna existe hoy:
 | T-17 | Pruebas existentes | Tests que leen el texto fuente (≥9 de `page.tsx`, 8 de `pos/layout.tsx`, 6 de `mesas`, 5 de `globals.css`) y el lab de CI `lab-multi-terminal.yml:141` | Verdes con `v1`. Antes de correr el lab con `v2`, migrar sus selectores de clase (`span.font-extrabold`, `button.bg-emerald-600`, `div.fixed.inset-0`, color `rgb(16,185,129)` de los puntos del PIN) a roles o `data-testid`, en un PR sólo de pruebas |
 | T-18 | Secretos en el renderer | DOM, globals y storage con `v1` y con `v2`, y luego un diff | 0 secretos, PIN o tokens **nuevos** en `v2` frente a `v1` (E4). Lo que ya existe en `v1`, como `FULLSITE_LAN_SECRET`, se reporta aparte (§12) |
 | T-19 | Movimiento reducido | `prefers-reduced-motion: reduce` | `document.getAnimations()` con iteraciones infinitas = 0 (la v1.2 declara 9: :452, :703, :989, :1007, :1013, :1050, :1139, :1146, :1180) |
-| T-20 | Paquete Electron | `build-offline-ui.cjs` con `v2`; CSP | 0 violaciones de CSP; las fuentes vienen de `'self'` |
+| T-20 | Paquete Electron y fuentes offline (Q2) | `build-offline-ui.cjs` con `v2`: listar los `.woff2` de la exportación (`out/_next/static/media`) y comprobar que están las tres familias. Arrancar Electron **sin red** y medir V-16. En navegador: primera visita con red, luego offline, recargar y medir V-16 desde el SW | Las 3 familias dentro del paquete; V-16 en PASS en Electron y en navegador sin red; 0 violaciones de CSP |
 | T-21 | Validación física | En las terminales reales, mismo instalador y commit (CLAUDE.md §8 y §10) | Registro aparte del laboratorio. No se sustituye |
 | T-22 | Revisión adversarial | Otra persona o agente intenta romper F2 (cobro) y F3 (sincronización) | Hallazgos resueltos o aceptados por escrito |
 
@@ -565,8 +596,9 @@ Un PR por fase y por tema (CLAUDE.md §7). Nada se enciende en tenants productiv
 
 | Fase | Qué | Entra cuando | Sale cuando |
 |---|---|---|---|
-| **F0 · ahora** | (a) Este documento. (b) Las decisiones de §10.3. (c) **Con autorización (Q8):** primitivas `v2` sin handlers en `/pos/ui-kit` con fixtures; T-01, T-03, T-04 y T-05 contra el ui-kit; el diseño de `FULLSITE_UI_VERSION` en `identityForUrl`, sin cablear; la tabla de combinaciones alcanzables de V-09 | Ya | Especificación aprobada; batería corriendo contra el ui-kit; línea base de inventario `v1` tomada del `main` actual (se retoma después de E2) |
-| **F1 · piel sin estado** | Caparazón, retícula, mesas, banda sin estados en vuelo y piel de modificadores, conectados a los hooks del refactor FRESH. `v2` sólo en perfiles sintéticos de laboratorio | E1, E2, E3, E7 (§7.3) | T-01 a T-05, T-11, T-12, T-14, T-15b, T-16 y T-17 en verde |
+| **F0 · ahora, sólo papel** | (a) Este documento. (b) Las decisiones de §10.3. (c) El diseño escrito de las pruebas T-01 a T-22 y de la tabla de combinaciones alcanzables de V-09. (d) La plantilla del inventario físico Q3 (§6.1). **Sin código** (Q8 negada) | Ya | Especificación aprobada; inventario Q3 levantado en sitio |
+| **F0b · código aislado** | Primitivas `v2` sin handlers ni storage en `/pos/ui-kit`, con fixtures; T-01, T-03, T-04 y T-05 contra el ui-kit; el diseño de `FULLSITE_UI_VERSION` en `identityForUrl`, sin cablear | **E0** y una autorización nueva de Daniel | Batería corriendo contra el ui-kit; línea base de inventario `v1` (se retoma después de E2) |
+| **F1 · piel sin estado** | Caparazón, retícula, mesas, banda sin estados en vuelo y piel de modificadores, conectados a los hooks del refactor FRESH. `v2` sólo en perfiles sintéticos de laboratorio | F0b; E1, E2, E3, E7 (§7.3); inventario Q3 | T-01 a T-05, T-11, T-12, T-14, T-15b, T-16 y T-17 en verde **con los parámetros del inventario** |
 | **F2 · dinero y envío** | Ticket, Cobro en los dos modos, estados en vuelo e inciertos, contrato de avisos | F1, E4, E5, E6 | Además, T-06 a T-10, T-15, T-18 y T-22 |
 | **F3 · lo demás** | Sincronización (sólo lectura), bloqueo/PIN (después del bloque de seguridad), hojas genéricas, reemplazo de `window.alert` donde no cambie el flujo | F2; bloque de seguridad POS en `main` | T-13 y T-19 en verde |
 | **F4 · activación** | Instalador con las dos pieles (Q5); `ui_version=v2` en una terminal de laboratorio; validación física; después **una** terminal real por decisión de Daniel, con R0 ensayado | F3 | T-20 y T-21 registrados. Sólo entonces cabe decir «validado en campo» |
@@ -584,9 +616,9 @@ Un PR por fase y por tema (CLAUDE.md §7). Nada se enciende en tenants productiv
 | 3 | «Con conflicto: se reintenta solo», cobros incluidos (:3744-3752; captura `09-sync-conflicto`) | 409 exige decisión; un cobro incierto nunca se repite | §5.6-1 y §5.6-2 |
 | 4 | Aviso offline fijo, «sigue cobrando e imprimiendo» | Depende de Caja, de la impresora y de la forma de pago | §5.1 |
 | 5 | PIN de 4 dígitos, demo 1234 (:1812) | 10 dígitos en `47f32325` (fuera de `main`) | F3, después del bloque de seguridad |
-| 6 | Public Sans + Plex Mono, sin Schibsted (38 `@font-face`, :4-346) | Tipografía canónica con Schibsted para display (memoria `tipografia-canonica-fullsite`, verificada el 2026-08-28) | Q2 |
-| 7 | Tacto de 24–40 px; contraste estimado de 2.15–2.55:1 | Alto mínimo de 48 px (`.pos-kiosk`); WCAG AA | V-14 y V-15 |
-| 8 | Medida sólo en `sm` (0.95), sin pantalla táctil, DPR 1 | Terminales táctiles | §6.1 y Q3 |
+| 6 | Public Sans + Plex Mono, sin Schibsted (38 `@font-face`, :4-346) | Tipografía canónica con Schibsted para display (memoria `tipografia-canonica-fullsite`, verificada el 2026-08-28) | **Decidido (Q2): se mantiene Schibsted**, con disponibilidad offline verificada (V-16, T-20) |
+| 7 | Tacto de 24–40 px; contraste estimado de 2.15–2.55:1 | Alto mínimo de 48 px (`.pos-kiosk`); WCAG AA | NC-5, V-14 y V-15 |
+| 8 | Medida sólo en `sm` (0.95), sin pantalla táctil, DPR 1 | Las terminales reales **no están inventariadas**: DPR, pantalla táctil y escala desconocidos | §6.1. **Q3 pendiente de inventario físico; no se supone nada** |
 
 **Tres más, del propio artefacto:**
 - La escena `05-offline` de la batería es **circular**: el arnés inyecta el aviso global que después verifica (V12:241).
@@ -599,23 +631,21 @@ Un PR por fase y por tema (CLAUDE.md §7). Nada se enciende en tenants productiv
 |---|---|---|---|
 | `REDISENO-V1.2-INTEGRATION-PLAN.md:25-26` | «La bandera … se evalúa en el renderer; no llega a main/preload» | La **decide** main al arrancar (`version-de-interfaz.js`, ya en `main`). **Viaja por el preload** (`identityForUrl`), y el renderer sólo **lee** el valor congelado | El código ya decidió así, con razones escritas. Evaluarla en el renderer la volvería relectura, que es justo lo que el módulo prohíbe. El preload es el único canal que no se relee ni depende de red (§4.1) |
 | `REDESIGN-V2-DISCOVERY.md` §FEATURE_FLAG_STRATEGY (rama `redesign/pos-ds-v2`) | Por tenant en `pos_settings`, por terminal en `localStorage` | `ui_version` en `config.json` | Una versión previa de este mismo documento proponía `pos_settings`. Se descartó al encontrar `version-de-interfaz.js` |
-| Batería v1.2 | «Fuentes OK» | V-16 exige las 3 familias canónicas | Q2 |
+| Batería v1.2 | «Fuentes OK» | V-16 exige las 3 familias canónicas, offline | Q2 |
 
 ### 10.3 Decisiones de Daniel
 
-Cada una lleva recomendación.
-
-| # | Pregunta | Recomendación |
+| # | Pregunta | Estado |
 |---|---|---|
-| Q1 | ¿La referencia es la v1.2 o la v1.2.1? | La v1.2, más el orden de cola de la v1.2.1 (sólo afecta a F3) |
-| Q2 | La v1.2 no tiene Schibsted Grotesk. ¿Se conserva la tipografía canónica? | Sí, conservarla; es decisión tuya del 2026-08-28 |
-| Q3 | ¿Qué resolución, DPR y pantalla táctil tienen PDV1, PDV3 y SERVER1? En disco no aparecen; la memoria de topología (`project-amalay-deployment-state`) no las trae | Dato de campo: responder o medirlo en la próxima visita |
-| Q4 | ¿El POS en navegador (sin Electron) puede ver `v2` en producción? | No. `v2` sólo en Electron y en previews |
-| Q5 | ¿Un paquete con las dos pieles o dos paquetes? ¿El instalador de hoy lleva `v2`? | Un paquete con las dos pieles y `v1` por omisión; **no** incluirlo en el instalador de hoy (misma recomendación que `REDESIGN-INSTALL-IMPACT.md:102-105`). Aclarar qué sella `sellar-version.cjs:82` (`ui_version` de compilación) contra `config.json` (de terminal) |
-| Q6 | ¿Qué pasa con #408 y `redesign/pos-ds-v2`? | Reutilizar sus componentes y el guardián de tokens como base de F0/F1; cerrarlos cuando F1 los supere. Parten del `page.tsx` previo a FRESH y no deben fusionarse tal cual |
-| Q7 | Excepciones a la regla de cero pérdida (p. ej. sustituir `window.alert`) | Lista explícita y firmada (T-03) |
-| Q8 | ¿Se autoriza el código de F0-c (primitivas sin handlers en `/pos/ui-kit`) pese a `DO_NOT_TOUCH_BEFORE_FIELD_CERT.md:6`? | Sí, porque no toca POS en operación. Pero es decisión tuya: el documento dice «ningún rediseño» |
-| Q9 | Tres cambios de **comportamiento** que la v1.2 sugiere y que no caben bajo `ui_version`: (a) una sonda WAN real en lugar de `navigator.onLine`; (b) la salud de Pedro en la pantalla de venta; (c) deshabilitar formas con terminal externa sin WAN, lo que requiere distinguirlas en `pos_payment_methods`. ¿Se hacen? | Sí a (a) y (b), en PRs propios fuera del rediseño y después de P19, con prueba de que no cambian el camino de órdenes. (c) necesita primero el dato en el catálogo: decisión de producto |
+| Q1 | ¿La referencia es la v1.2 o la v1.2.1? | Abierta. Recomendación: la v1.2, más el orden de cola de la v1.2.1 (sólo afecta a F3) |
+| Q2 | La v1.2 no tiene Schibsted Grotesk. ¿Se conserva la tipografía canónica? | **Decidida el 2026-09-26: sí, se mantiene Schibsted Grotesk con disponibilidad offline verificada.** Aplica en §4.1 (Tipografía), V-16 y T-20 |
+| Q3 | ¿Qué resolución, DPR y pantalla táctil tienen PDV1, PDV3 y SERVER1? | **Pendiente de inventario físico (2026-09-26). No se supone DPR, pantalla táctil ni escala.** Los criterios que dependen de esto quedan sin umbral (§6.1), y toda corrida hasta entonces es DIAGNÓSTICO |
+| Q4 | ¿El POS en navegador (sin Electron) puede ver `v2` en producción? | Abierta. Recomendación: no; `v2` sólo en Electron y en previews |
+| Q5 | ¿Un paquete con las dos pieles o dos paquetes? ¿El instalador de hoy lleva `v2`? | Abierta. Recomendación: un paquete con las dos pieles y `v1` por omisión; **no** incluirlo en el instalador de hoy (igual que `REDESIGN-INSTALL-IMPACT.md:102-105`). Aclarar qué sella `sellar-version.cjs:82` (`ui_version` de compilación) contra `config.json` (de terminal) |
+| Q6 | ¿Qué pasa con #408 y `redesign/pos-ds-v2`? | Abierta. Recomendación: reutilizar sus componentes y el guardián de tokens como base de F0b/F1, y cerrarlos cuando F1 los supere. Parten del `page.tsx` previo a FRESH y no deben fusionarse tal cual |
+| Q7 | Excepciones a la regla de cero pérdida (p. ej. sustituir `window.alert`) | Abierta. Recomendación: lista explícita y firmada (T-03) |
+| Q8 | ¿Se autoriza código aislado (primitivas sin handlers en `/pos/ui-kit`)? | **Negada el 2026-09-26.** Ningún componente dentro de `/pos`, ni implementación ni publicación, hasta que P19 GUI/CDP complete el tramo de edición (E0). Después de E0 se vuelve a pedir |
+| Q9 | Tres cambios de **comportamiento** que la v1.2 sugiere y que no caben bajo `ui_version`: (a) una sonda WAN real en lugar de `navigator.onLine`; (b) la salud de Pedro en la pantalla de venta; (c) deshabilitar formas con terminal externa sin WAN, lo que requiere distinguirlas en `pos_payment_methods`. ¿Se hacen? | Abierta. Recomendación: sí a (a) y (b), en PRs propios fuera del rediseño y después de P19, con prueba de que no cambian el camino de órdenes. (c) necesita primero el dato en el catálogo: decisión de producto |
 
 ### 10.4 Riesgos
 
@@ -627,7 +657,7 @@ Cada una lleva recomendación.
 | Que la bandera cambie la navegación (ya pasó en #408 con `?v2=1`) | Hash sólo en preview; en Electron, `config.json` |
 | Que `v2` mueva el timing de los efectos (la causa raíz de P19 del 26-sep fue un efecto del renderer con el turno en `null`) | Componentes sin efectos; T-12 y T-14 con `v2` |
 | Lab de CI atado a clases Tailwind | T-17: migrar selectores antes de `v2` |
-| `playwright.config.multiterminal.ts:17` apunta a `https://app.fullsite.mx` por omisión | Las pruebas de este plan exigen `E2E_BASE_URL` explícito y fallan si falta |
+| Que las pruebas de este plan escriban en producción | Exigen `E2E_BASE_URL` explícito y fallan si falta; nunca heredan el valor por omisión de `playwright.config.multiterminal.ts`. El riesgo general va aparte: RC-3 (§12) |
 | Contraste de colores de categoría definidos por el tenant | Color de texto calculado (V-15) |
 
 ---
@@ -658,26 +688,60 @@ Cada una lleva recomendación.
 | FRESH no está en `main`; su base es `418933f4` y no hay cambios de POS después | `git cat-file -e`; `git merge-base --is-ancestor`; `git log 418933f4..origin/main -- <POS>` | HECHO. La base declarada viene de `FULLSITE-1.4.1-LAB-IMPLEMENTATION.json` (REPORTADO) |
 | P16, P17 y P18 en PASS; P19 abierto; P20 sin implementar; horas y fingerprints | historia de Codex (copias pegadas desde Windows) | REPORTADO |
 | Admisión P19 `scoped_pass` con 9 pendientes | contrato en `aee90ec9` | HECHO (el contrato); el resultado es REPORTADO |
-| Piso táctil de 48 px en el POS | `globals.css:58-64` | HECHO |
+| Alto mínimo de 48 px en button, input y select del POS (no hay ancho mínimo) | `globals.css:58-64` | HECHO |
+| Hoy el POS no usa Schibsted: `--font-display` sólo existe bajo `[data-ds="v3"]` | `globals.css:710-711`; `AppShell.tsx:60-62` | HECHO |
+| Las fuentes de `next/font/google` quedan en `/_next/static/media`; el paquete offline copia la exportación; el SW cachea `woff2` | `app/layout.tsx:2`; `build-offline-ui.cjs:102-109`; `public/sw.js:122-131`, `215` | HECHO estático; offline en runtime **NO VERIFICADO** (T-20) |
+| El servidor compara el precio cobrado contra el del menú | `api/pos/save-order/route.ts:252-259` | HECHO |
+| El renderer usa `FULLSITE_LAN_SECRET` para autenticarse con Pedro | `local-network-fetch.ts:110-112` | HECHO |
+| DPR, pantalla táctil y escala de PDV1, PDV3 y SERVER1 | — | **DESCONOCIDO** (Q3, inventario físico) |
 | Contraste de 2.55:1 y 2.15:1 | Cálculo WCAG de un subagente sobre los tokens de la v1.2 | INFERENCIA (no medido en navegador) |
 | El camino MP Point es inalcanzable (`mp_access_token` se lee en `page.tsx:6566` y nadie lo escribe en `src/`) | `grep setItem` en `dashboard-app/src` | HECHO estático; en runtime NO VERIFICADO (§12) |
 
 ---
 
-## 12. Fuera de alcance, pero hay que decirlo
+## 12. Riesgos de cierre separados y otros hallazgos
 
-1. **PostHog en `/pos`.**
-   - El apagado del autocapture fue en el proyecto de PostHog el 2026-09-25 (memoria `project_p0_containment_phase_a_20260925`, fechada).
-   - El código de `main` sigue con `autocapture: true` para todas las rutas (`lib/posthog.ts:7-12`, `app/layout.tsx:101`).
-   - La corrección `f6c4e553` («PostHog nunca en POS, KDS, checador ni Electron») está en `cierre/10-posthog-fuera-del-pos` y **no** en `main`.
-   - Un teclado de PIN rediseñado heredaría el mismo riesgo si alguien reactiva el proyecto.
-2. **REPORTADO, no verificado por mí:** según la historia de Codex, Codex Mac aplicó la migración JEV directo en el Supabase de producción y configuró variables en Vercel Production. Si es así, choca con CLAUDE.md §13 y §2.
-3. **Llaves de MP incoherentes.** La configuración guarda `mp_point_config` (`lib/mercadopago.ts:47-60`) y el botón Tarjeta lee `mp_access_token` / `mp_device_id` (`page.tsx:6566-6567`). Hallazgo estático; hay que reproducirlo antes de tratarlo como defecto.
-4. **`playwright.config.multiterminal.ts:17` apunta a producción por omisión.**
-5. **Código importado sin usar en `page.tsx`**: `InventoryAlerts`, `SmartCashCalculator` y funciones de MP (`157-159`, `199`, `201`). Hallazgo estático.
-6. **`FULLSITE_LAN_SECRET` en `localStorage` del renderer.** `renderer-identity.js:24` lo incluye en la identidad y el preload lo escribe (`preload.js:6-10`) en cada terminal Electron, con `v1` y con `v2`. Afecta `renderer_secret_audit` de P19 más que al rediseño. Es un hecho estático; no sé si FRESH ya lo cambió en Windows.
-7. **Comentario obsoleto:** `identidad-de-terminal.js:108-110` dice que `/health` está «detrás de la credencial de red local», pero `credencial-lan.js:54` lo declara ruta abierta.
-8. **`cfg.uiVersion` sin consumidor** (`main.js:291`): se resuelve y se pasa al servidor local, pero nada lo usa.
+### 12.1 Riesgos de cierre separados (no son del rediseño)
+
+Estos tres riesgos **existen hoy en `main` con `v1`**, sin relación con la v1.2. Se registran por separado: cada uno lleva su propio PR, su propia prueba y su propio dueño de decisión, y **ninguno entra en la rama del rediseño**. Nada de esto se ejecutó; sólo se documenta. Verificado contra `origin/main` @ `ecc89364` el 2026-09-26.
+
+#### RC-1 · PostHog con autocapture en `/pos`
+
+| Campo | Contenido |
+|---|---|
+| Evidencia | `lib/posthog.ts:7-12`: `autocapture: true`, `capture_pageview: true`. `app/layout.tsx:101`: `<PosthogInit />` en el layout raíz, que envuelve también `/pos`. AppShell no lo excluye (`AppShell.tsx:60-62` sólo cambia el contenedor) |
+| Estado | **Abierto en código.** La corrección `f6c4e553` («PostHog nunca en POS, KDS, checador ni Electron») está en `cierre/10-posthog-fuera-del-pos` (también en `candidata/dashboard-security-20260925` y otras ramas `cierre/*`) y **no** en `main` (`git merge-base --is-ancestor` → no). Mitigado **del lado del proyecto**: autocapture apagado el 2026-09-25 19:48 UTC, según la memoria `project_p0_containment_phase_a_20260925`, que tiene fecha pero **no la verifiqué hoy** |
+| Impacto | Esa memoria midió 1,968 toques de un solo dígito en `/pos` antes del apagado, la cota superior de toques de PIN. Si alguien reactiva autocapture o la grabación de sesión en el proyecto, el código vuelve a capturar el teclado del PIN sin ningún cambio de código |
+| Acción propuesta | Revisar y fusionar `f6c4e553` por su propio PR, más una prueba guardiana: en rutas `/pos*`, `/kds`, checador y bajo Electron, `posthog.__loaded === false` y 0 peticiones a `*.posthog.com`. Aparte: el runbook de rotación de PIN (R1) quedó disparado según la misma memoria; la decisión de rotar es tuya |
+| Relación con v1.2 | Ninguna de código. El candado `v2` (F3) no debe llegar a una terminal mientras RC-1 siga abierto en código |
+
+#### RC-2 · `FULLSITE_LAN_SECRET` en `localStorage` del renderer
+
+| Campo | Contenido |
+|---|---|
+| Evidencia | `renderer-identity.js:24` incluye `FULLSITE_LAN_SECRET` en la identidad. El preload la escribe en `localStorage` antes de cualquier script (`preload.js:6-10`). El renderer la lee **a propósito** para autenticarse con Pedro: cabecera `x-fullsite-lan` (`local-network-fetch.ts:110-112`). `pedro-cliente.ts:28` también usa su presencia para decidir `requiereCaja()` |
+| Estado | **Abierto, por diseño actual**, en toda terminal Electron, con `v1` y con `v2`. No sé si FRESH lo cambió en Windows (P18 clasifica los stores de Chromium; P19 tiene pendiente `renderer_secret_audit`) |
+| Impacto | Cualquier script que corra en el origen del renderer puede leer la credencial LAN y llamar a las rutas protegidas de Pedro desde esa terminal: un script de terceros cargado en la página (ver RC-1) o una inyección. Además hace imposible una auditoría de «cero secretos en storage» (E4 se redactó como diferencia `v2` − `v1` por esta razón) |
+| Acción propuesta | Decisión de diseño aparte: que la credencial no se persista en storage del renderer. Opciones: que main agregue la cabecera a las peticiones hacia `127.0.0.1:7717` (`session.webRequest.onBeforeSendHeaders`), o exponerla por `contextBridge` sin escribirla. Toca Electron y la autenticación de Pedro, así que requiere instalador y va coordinado con P18 y P19. Prueba: la auditoría del renderer sin la clave en `localStorage`, y Pedro sigue aceptando al POS legítimo y rechazando sin credencial |
+| Relación con v1.2 | Ninguna de código. Condiciona cómo se redacta E4 |
+
+#### RC-3 · Playwright multiterminal con producción por omisión
+
+| Campo | Contenido |
+|---|---|
+| Evidencia | `dashboard-app/playwright.config.multiterminal.ts:17`: `baseURL: process.env.E2E_BASE_URL \|\| 'https://app.fullsite.mx'`. Su propio comentario (`:14-16`) dice que usa producción real porque `/api/pos/pin` exige una llave de servicio que sólo vive en Vercel, y que «escribe únicamente en el tenant demo (chickin-demo)» |
+| Estado | **Abierto, por diseño.** No lo corre ningún workflow: en `.github/workflows` sólo aparece `lab-multi-terminal.yml:141`, que corre el laboratorio `.cjs`, no esta configuración. El riesgo está en la corrida manual |
+| Impacto | `npx playwright test -c playwright.config.multiterminal.ts` sin `E2E_BASE_URL` **escribe en producción** con las credenciales que use la prueba. Choca con CLAUDE.md §13 («no usar credenciales de producción para pruebas»). El único límite es una convención (tenant demo), no una guarda |
+| Acción propuesta | Fallar cerrado: exigir `E2E_BASE_URL` explícito y, si apunta a producción, además `E2E_ALLOW_PRODUCTION=1` y una lista blanca de tenants comprobada antes de la primera escritura. Buscar el mismo patrón en las demás configuraciones. El subagente de inventario reportó otro caso, `tests/pos-e2e.spec.ts`, que escribe en producción detrás de una bandera; **no lo verifiqué** |
+| Relación con v1.2 | Ninguna de código. Las pruebas de este plan nunca heredan ese valor por omisión (§10.4) |
+
+### 12.2 Otros hallazgos, fuera de alcance
+
+1. **REPORTADO, no verificado por mí:** según la historia de Codex, Codex Mac aplicó la migración JEV directo en el Supabase de producción y configuró variables en Vercel Production. Si es así, choca con CLAUDE.md §13 y §2.
+2. **Llaves de MP incoherentes.** La configuración guarda `mp_point_config` (`lib/mercadopago.ts:47-60`) y el botón Tarjeta lee `mp_access_token` / `mp_device_id` (`page.tsx:6566-6567`). Hallazgo estático; hay que reproducirlo antes de tratarlo como defecto.
+3. **Código importado sin usar en `page.tsx`**: `InventoryAlerts`, `SmartCashCalculator` y funciones de MP (`157-159`, `199`, `201`). Hallazgo estático.
+4. **Comentario obsoleto:** `identidad-de-terminal.js:108-110` dice que `/health` está «detrás de la credencial de red local», pero `credencial-lan.js:54` lo declara ruta abierta.
+5. **`cfg.uiVersion` sin consumidor** (`main.js:291`): se resuelve y se pasa al servidor local, pero nada lo usa.
 
 ---
 
@@ -694,7 +758,7 @@ El 2026-09-26 un agente independiente intentó refutar la primera versión: veri
 | Faltaban 4 pendientes para los estados en vuelo | E6 |
 | El alcance de «`main` manda `ORDER_SENT`» estaba mal | §0.3, §5.1 y D9: web `ORDER_SENT`, Caja `ORDER_SEND` |
 | `requiere_autorizacion` no existe; las sondas nuevas rompen la invariante | §5.1, §5.4 y Q9 |
-| «0 secretos» ya falla en `v1` | E4 y T-18 como diferencia `v2` − `v1`; §12.6 |
+| «0 secretos» ya falla en `v1` | E4 y T-18 como diferencia `v2` − `v1`; riesgo de cierre RC-2 (§12.1) |
 | Cita equivocada del piso táctil; inputs `sr-only` | V-14 |
 | V-10 contradecía a V-11 | Los dos reescritos |
 | Los tokens en línea le ganan a la hoja de estilos | `data-ui` en un contenedor descendiente |
