@@ -272,6 +272,10 @@ export function camposProhibidos(table: string, role: string | null | undefined,
 export const REDACTED_COLUMNS: Record<string, readonly string[]> = {
   pos_staff: ['pin'],
   pos_fingerprint_templates: ['template', 'template_data'],
+  // P0 2026-09-26: `client-config.ts` pide `clients` con select=* por este proxy (service_role),
+  // así que cualquier shift token recibía la cuenta de Wansoft del restaurante y el Service
+  // Worker la guardaba. Ningún código del POS ni de Electron las lee.
+  clients: ['wansoft_user', 'wansoft_pass', 'wansoft_cookies'],
 }
 
 export function isManager(role: string | undefined | null): boolean {
