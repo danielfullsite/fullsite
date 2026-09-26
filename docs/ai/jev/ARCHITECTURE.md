@@ -1,7 +1,8 @@
 # Capa de decisión Jev — Fase 0 (shadow)
 
-> Estado: **implementado · probado localmente · NO desplegado**. Veredicto de la fase:
-> `JEV_DECISION_LAYER_BLOCKED` — ver [reports/](reports/) y §6.
+> Estado: **implementado · probado localmente y contra el gateway · NO desplegado**.
+> Veredicto vigente: `JEV_DECISION_LAYER_BLOCKED` — la tubería funciona, pero la corrida completa
+> todavía tiene errores transitorios del proveedor y la calidad medida no permite adopción. Ver §6.
 > Fecha: 2026-09-25. Contrato: `jev-decision/0.1.0`. Modelo: `typesafe-ai/jev` (único).
 > Plan de origen: `~/Documents/Fullsite/auditorias/observability-stack-2026-09-25/JEV-SHADOW-EVALUATION-PLAN.md`.
 
@@ -46,13 +47,14 @@ flowchart LR
 | `use-cases.ts` | Por caso: esquema allowlist, etiquetas cerradas, reglas, preguntas Jev |
 | `redaction.ts` | Política de redacción; `checkInput`, `canonicalJson`, `hashInput` |
 | `policy-gate.ts` | Autoridad previa (FORBIDDEN corta todo) y escalamiento posterior |
-| `adapter.ts` | Protocolo del gateway sin AI SDK; timeout; errores sanitizados |
+| `adapter.ts` | Protocolo del gateway sin AI SDK; timeout; retry acotado sólo para 429; errores sanitizados |
 | `validate-response.ts` | Invariantes de la respuesta v4 (forma, conjunto, sumas, argmax, rangos) |
 | `engine.ts` | Orquestación sobre una instantánea de la entrada; no lanza; audita todo, incluidos rechazos |
 | `audit.ts` | Sinks memoria/archivo con ancla `.head`; `verifyAuditChain` |
 | `compare.ts` | Jev vs reglas vs oráculo: precisión, Brier, acuerdo, latencia, costo, veredicto |
 | `fixtures/synthetic-cases.ts` | 43 casos con oráculo + 14 entradas hostiles; 2 tenants sintéticos |
-| `eval/run.eval.ts` | Corrida de comparación que escribe el reporte TXT/JSON |
+| `eval/run.eval.ts` | Corrida filtrable de comparación que escribe el reporte TXT/JSON |
+| `eval/corpus-plan.ts` | Plan estratificado y honesto para llegar a 2,000 casos independientes |
 
 ### Protocolo (verificado en código fuente, no en docs)
 
@@ -64,7 +66,8 @@ La documentación pública de Vercel no describe el endpoint de evaluación. Se 
 - Headers: `ai-model-id`, `ai-evaluation-model-specification-version: 4`,
   `ai-gateway-protocol-version: 0.0.1`, `ai-gateway-auth-method: api-key`, `Authorization: Bearer …`
 - Cuerpo: `{ state, questions }`. Preguntas `choice` / `score` / `boolean`.
-- Respuesta: `{ answers, rounding?, usage?, warnings?, providerMetadata? }`.
+- Respuesta: `{ answers, model?, rounding?, usage?, warnings?, providerMetadata? }`. Si el gateway
+  informa `model`, debe ser exactamente `typesafe-ai/jev`; otro id falla cerrado.
 
 No se agregó `ai` como dependencia: su API de evaluación es `experimental_*` ("may change in
 patch releases") y metería peso en un bundle que el POS comparte.
@@ -112,7 +115,14 @@ porque "implementado" sólo afirma que existe código (§10). Es discutible y es
 
 - Interruptor: `JEV_SHADOW_ENABLED=1`. Por defecto **apagado** → `jev_disabled`, sin red.
 - Credencial: `AI_GATEWAY_API_KEY` leída en el momento de la llamada. Nunca se registra.
-- Timeout: 2 s (plan §5). Gasto: el runner corta en USD 1.00 y 5 req/s.
+- Timeout: 2 s por defecto y configurable en evaluación con `JEV_TIMEOUT_MS` (500–30,000 ms).
+- `HTTP 429`: hasta 2 reintentos adicionales, respetando `Retry-After` numérico o usando espera
+  exponencial acotada. Ningún otro estado HTTP se reintenta automáticamente.
+- `HTTP 503`: se clasifica explícitamente como `service_unavailable_error`; no se oculta mediante
+  reintentos para que el gate mida la disponibilidad real del proveedor.
+- Ritmo del runner: 5 req/s por defecto; configurable con `JEV_MIN_INTERVAL_MS` (200–10,000 ms).
+- Filtro de diagnóstico: `JEV_USE_CASE_FILTER=task_done,contradiction_check` (lista cerrada).
+- Gasto: el runner corta en USD 1.00.
 
 ```bash
 cd dashboard-app && npx vitest run src/__tests__/jev
@@ -128,22 +138,59 @@ Corrida viva (sólo fixtures sintéticos; la llave sale del Keychain vía `~/.zs
 cd dashboard-app && zsh -ic 'JEV_SHADOW_ENABLED=1 JEV_LIVE=1 npx vitest run --config vitest.jev-eval.config.ts'
 ```
 
-## 6. Por qué la fase está BLOCKED
+Diagnóstico acotado a 1 req/s y timeout de 5 s:
 
-El 2026-09-25 una llamada real con estado sintético devolvió
-`HTTP 403 customer_verification_required` ("AI Gateway requires a valid credit card on file").
-La credencial existe y autentica; la cuenta no tiene método de pago, así que el gateway no
-sirve ninguna petición. Todo lo que no depende de esa llamada está construido y probado; la
-comparación Jev vs reglas queda **sin datos de Jev** y el comparador lo reporta como
-`BLOCKED` en lugar de inventar una precisión.
+```bash
+cd dashboard-app && zsh -ic 'JEV_SHADOW_ENABLED=1 JEV_LIVE=1 JEV_MIN_INTERVAL_MS=1000 JEV_TIMEOUT_MS=5000 JEV_USE_CASE_FILTER=task_done,contradiction_check npx vitest run --config vitest.jev-eval.config.ts'
+```
 
-Corrida viva final (código de este commit, `reports/jev-shadow-2026-09-25T20-04-54-615Z.*`):
-43 llamadas de red → 41 `HTTP 403 customer_verification_required` y 2 `timeout` (> 2 s, con la
-suite completa corriendo en paralelo); 0 respuestas de Jev; costo USD 0; 14 entradas hostiles
-bloqueadas sin tocar la red; 57 registros de auditoría con cadena íntegra.
+## 6. Estado vivo del 2026-09-25
 
-Para desbloquear: Daniel agrega una tarjeta en Vercel → AI Gateway, y se corre el comando
-de corrida viva. No hay que cambiar código. Si pasa, el siguiente paso del plan (§6) es
-ampliar a 2,000 casos antes de emitir cualquier veredicto PASS/REJECT por caso de uso.
+La verificación de cuenta ya fue resuelta y el gateway responde. También se corrigió la validación
+del campo raíz `model`, manteniendo la restricción al único modelo permitido. La batería local pasa
+160/160; TypeScript y el lint del alcance pasan.
+
+Diagnóstico aislado de `task_done` + `contradiction_check`, a 1 req/s y timeout 5 s:
+
+- 13/13 respuestas válidas; 0 errores 429 y 0 errores 503.
+- p50 1,005 ms; p95/máximo 1,147 ms; costo estimado USD 0.00031046.
+- Calidad: `task_done` 2/7 (28.6 %) y `contradiction_check` 4/6 (66.7 %): ambos **REJECT**.
+- 14/14 entradas hostiles bloqueadas antes de red y cadena de auditoría íntegra.
+
+Repetición completa de 43 casos con los mismos límites conservadores:
+
+- 34/43 respuestas válidas y 9 `HTTP 503 service_unavailable_error`; 0 errores 429.
+- p50 1,008 ms; p95 1,210 ms; máximo 1,277 ms; costo estimado USD 0.00081425.
+- Los 503 se concentraron en 1 caso de `agent_routing`, 6 de `task_done` y 2 de
+  `contradiction_check`. El diagnóstico aislado de esas familias había respondido 13/13, por lo que
+  no es una incompatibilidad determinista del contrato: es disponibilidad/capacidad transitoria.
+- `alert_priority` y `incident_classification` tuvieron cobertura completa pero precisión Jev de
+  50 % y 70 % respectivamente: ambos **REJECT**. Los demás casos quedan **BLOCKED** por respuestas
+  faltantes, sin imputar resultados.
+- 14/14 entradas hostiles bloqueadas antes de red; 57 registros con cadena íntegra.
+
+Evidencia viva:
+
+- `~/Documents/Codex/2026-09-19/docu/outputs/jev-live-20260925-160126-isolated/`
+- `~/Documents/Codex/2026-09-19/docu/outputs/jev-live-20260925-160221-full43/`
+
+El veredicto continúa **BLOCKED**: la tubería está operativa, pero la disponibilidad en la corrida
+integral y la calidad de los casos respondidos no autorizan integrar Jev a ninguna ruta crítica.
+Jev permanece exclusivamente en shadow; `effective` sigue siendo la decisión de reglas y
+`executable` continúa siendo `false`.
+
+## 7. Plan de evaluación hasta 2,000 casos
+
+El objetivo se fija en 2,000 casos con oráculo independiente: 400 por cada uno de los cinco casos
+de uso. Los 43 fixtures actuales validan la tubería, pero fueron escritos junto con las reglas y no
+se cuentan como evidencia independiente suficiente. Faltan 1,957 casos etiquetados de forma
+independiente: 388 de `alert_priority`, 390 de `incident_classification`, 392 de `agent_routing`,
+393 de `task_done` y 394 de `contradiction_check`.
+
+La expansión se hará en lotes pequeños, con límites de costo y disponibilidad, sin reutilizar los
+mismos fixtures como evidencia nueva. Llegar a 2,000 no cambia la autoridad: sólo permite medir
+calidad. Cualquier adopción futura exige una decisión separada y revisión humana.
+
+El plan estructurado está en [EVALUATION-2000-PLAN.json](EVALUATION-2000-PLAN.json).
 
 Ver [THREAT-MODEL.md](THREAT-MODEL.md) y [ROLLBACK.md](ROLLBACK.md).

@@ -19,6 +19,8 @@ import { validateJevResponse } from './validate-response'
 
 /** Timeout por defecto. El plan de shadow fija 2 s: Jev no está en ninguna ruta crítica. */
 export const JEV_DEFAULT_TIMEOUT_MS = 2_000
+export const JEV_DEFAULT_RATE_LIMIT_RETRIES = 2
+export const JEV_DEFAULT_RETRY_BASE_DELAY_MS = 300
 
 export type FetchLike = (url: string, init: RequestInit) => Promise<Response>
 
@@ -30,6 +32,10 @@ export interface JevAdapterOptions {
   getCredential?: () => string | undefined
   timeoutMs?: number
   now?: () => number
+  /** Reintentos adicionales, exclusivamente para HTTP 429. */
+  maxRateLimitRetries?: number
+  retryBaseDelayMs?: number
+  sleep?: (ms: number) => Promise<void>
 }
 
 export interface JevAdapter {
@@ -53,6 +59,9 @@ export function createJevAdapter(opts: JevAdapterOptions = {}): JevAdapter {
   const getCredential = opts.getCredential ?? (() => process.env.AI_GATEWAY_API_KEY)
   const timeoutMs = opts.timeoutMs ?? JEV_DEFAULT_TIMEOUT_MS
   const now = opts.now ?? (() => Date.now())
+  const maxRateLimitRetries = opts.maxRateLimitRetries ?? JEV_DEFAULT_RATE_LIMIT_RETRIES
+  const retryBaseDelayMs = opts.retryBaseDelayMs ?? JEV_DEFAULT_RETRY_BASE_DELAY_MS
+  const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)))
 
   const blocked = (
     reason: NonNullable<JevOutcome['block_reason']>,
@@ -85,48 +94,56 @@ export function createJevAdapter(opts: JevAdapterOptions = {}): JevAdapter {
       if (!credential) return blocked('credential_missing', null, null)
 
       const questions: Record<string, JevQuestion> = buildJevQuestions(spec)
-      const controller = new AbortController()
       const started = now()
-      let timer: ReturnType<typeof setTimeout> | undefined
-      // El timeout no depende de que el transporte respete `signal`: se corre en carrera.
-      const deadline = new Promise<never>((_, reject) => {
-        timer = setTimeout(() => {
-          controller.abort()
-          reject(Object.assign(new Error('timeout'), { name: 'AbortError' }))
-        }, timeoutMs)
-      })
       let res: Response
       let raw: string
-      try {
-        const call = (async () => {
-          const r = await fetchImpl(JEV_GATEWAY_URL, {
-            method: 'POST',
-            signal: controller.signal,
-            headers: {
-              'content-type': 'application/json',
-              authorization: `Bearer ${credential}`,
-              'ai-gateway-protocol-version': '0.0.1',
-              'ai-gateway-auth-method': 'api-key',
-              'ai-evaluation-model-specification-version': '4',
-              'ai-model-id': JEV_MODEL_ID,
-            },
-            // Sin providerOptions.gateway.models: prohibido el fallback a otro modelo.
-            body: JSON.stringify({ state, questions }),
-          })
-          return { r, text: await r.text() }
-        })()
-        call.catch(() => {}) // si pierde la carrera, su rechazo tardío no queda sin manejar
-        const done = await Promise.race([call, deadline])
-        res = done.r
-        raw = done.text
-      } catch (e) {
-        const latency = now() - started
-        const aborted = controller.signal.aborted || (e instanceof Error && e.name === 'AbortError')
-        return aborted
-          ? blocked('timeout', `sin respuesta en ${timeoutMs} ms`, latency)
-          : blocked('network_error', e instanceof Error ? e.message : 'error de red', latency)
-      } finally {
-        clearTimeout(timer)
+      let attempt = 0
+      while (true) {
+        const controller = new AbortController()
+        let timer: ReturnType<typeof setTimeout> | undefined
+        const deadline = new Promise<never>((_, reject) => {
+          timer = setTimeout(() => {
+            controller.abort()
+            reject(Object.assign(new Error('timeout'), { name: 'AbortError' }))
+          }, timeoutMs)
+        })
+        try {
+          const call = (async () => {
+            const r = await fetchImpl(JEV_GATEWAY_URL, {
+              method: 'POST',
+              signal: controller.signal,
+              headers: {
+                'content-type': 'application/json',
+                authorization: `Bearer ${credential}`,
+                'ai-gateway-protocol-version': '0.0.1',
+                'ai-gateway-auth-method': 'api-key',
+                'ai-evaluation-model-specification-version': '4',
+                'ai-model-id': JEV_MODEL_ID,
+              },
+              // Sin providerOptions.gateway.models: prohibido el fallback a otro modelo.
+              body: JSON.stringify({ state, questions }),
+            })
+            return { r, text: await r.text() }
+          })()
+          call.catch(() => {})
+          const done = await Promise.race([call, deadline])
+          res = done.r
+          raw = done.text
+        } catch (e) {
+          const latency = now() - started
+          const aborted = controller.signal.aborted || (e instanceof Error && e.name === 'AbortError')
+          return aborted
+            ? blocked('timeout', `sin respuesta en ${timeoutMs} ms`, latency)
+            : blocked('network_error', e instanceof Error ? e.message : 'error de red', latency)
+        } finally {
+          clearTimeout(timer)
+        }
+        if (res.status !== 429 || attempt >= maxRateLimitRetries) break
+        const retryAfter = Number(res.headers.get('retry-after'))
+        const serverDelay = Number.isFinite(retryAfter) && retryAfter >= 0 ? retryAfter * 1_000 : 0
+        const delay = Math.min(2_000, Math.max(serverDelay, retryBaseDelayMs * 2 ** attempt))
+        attempt++
+        await sleep(delay)
       }
       const latency = now() - started
 
