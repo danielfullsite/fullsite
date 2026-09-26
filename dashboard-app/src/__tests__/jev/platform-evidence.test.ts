@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createJevAdapter } from '@/lib/jev/adapter'
 import { createMemoryAuditSink } from '@/lib/jev/audit'
 import { evaluateDecision } from '@/lib/jev/engine'
-import { parseP19AdmissionExport, parseP19GateExport, parseTaskDoneEvidence, taskDoneInput } from '@/lib/jev/platform-evidence'
+import { parseP19AdmissionExport, parseP19GateExport, parseP19GuiResumedExport, parseTaskDoneEvidence, taskDoneInput } from '@/lib/jev/platform-evidence'
 
 const valid = {
   source_ref: 'fresh-p19-pos-kds-integral-20260926',
@@ -79,5 +79,20 @@ describe('evidencia JEV del control plane', () => {
 
   it('rechaza el diagnóstico si se abre UI, se autoriza producción o se borra un pendiente', () => {
     expect(parseP19AdmissionExport({ schemaVersion: 1, gate: 'fresh_p19_editor_admission_diagnostic', uiPolicy: 'open' }, 'e'.repeat(64)).ok).toBe(false)
+  })
+
+  it('importa el preflight mDNS como bloqueo del fixture y mantiene sus límites', () => {
+    const manifest = {
+      schemaVersion: 1, gate: 'fresh_p19_gui_cdp_synthetic_resumed', status: 'tested_locally', gateResult: 'blocked', review: 'human_review_required', uiPolicy: 'hold', productionAuthorized: false, operationAuthorized: false,
+      evidenceManifestSha256: 'f'.repeat(64),
+      counts: { nodeExecuted: 22, nodePassed: 21, nodeFailed: 1, nodeOmitted: 0, electronExecuted: 0, guiExecuted: 0, buildExecuted: 1, buildPassed: 1, externalLiveOmitted: 6, notExecutedBlocks: 11 },
+      blocker: 'synthetic_fixture_network_isolation',
+      pending: ['harness_preflight', 'integral_gui', 'replay_restarts', 'concurrency_recovery', 'chromium_network_audit', 'renderer_secret_audit', 'integral_regression'],
+      finalCandidateCertifiedTests: null,
+    } as const
+    const parsed = parseP19GuiResumedExport(manifest, '1'.repeat(64))
+    expect(parsed.ok).toBe(true)
+    if (!parsed.ok) return
+    expect(parsed.input.state).toMatchObject({ tests: { passed: 21, failed: 1, skipped: 17 }, limitations: { open_count: 7, any_blocks_claimed_status: true } })
   })
 })

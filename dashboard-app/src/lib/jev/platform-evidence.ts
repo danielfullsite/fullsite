@@ -91,6 +91,34 @@ export interface P19AdmissionExport {
   finalCandidateCertifiedTests: null
 }
 
+/** Preflight reanudado: bloqueo del arnés, no un resultado del runtime FRESH. */
+export interface P19GuiResumedExport {
+  schemaVersion: 1
+  gate: 'fresh_p19_gui_cdp_synthetic_resumed'
+  status: 'tested_locally'
+  gateResult: 'blocked'
+  review: 'human_review_required'
+  uiPolicy: 'hold'
+  productionAuthorized: false
+  operationAuthorized: false
+  evidenceManifestSha256: string
+  counts: {
+    nodeExecuted: number
+    nodePassed: number
+    nodeFailed: number
+    nodeOmitted: number
+    electronExecuted: 0
+    guiExecuted: 0
+    buildExecuted: 1
+    buildPassed: 1
+    externalLiveOmitted: number
+    notExecutedBlocks: 11
+  }
+  blocker: 'synthetic_fixture_network_isolation'
+  pending: readonly ['harness_preflight', 'integral_gui', 'replay_restarts', 'concurrency_recovery', 'chromium_network_audit', 'renderer_secret_audit', 'integral_regression']
+  finalCandidateCertifiedTests: null
+}
+
 interface ExecutionCounts {
   executions: number
   successfulExecutions: number
@@ -255,6 +283,37 @@ export function parseP19AdmissionExport(raw: unknown, sourceSha256: unknown): { 
   return checkInput(input).ok
     ? { ok: true, source_ref: 'fresh-p19-editor-admission-diagnostic-20260926', source_sha256: sourceSha256, input }
     : { ok: false, error: 'El diagnóstico no pudo convertirse a evidencia segura.' }
+}
+
+/** Importa el bloqueo de mDNS sin atribuirlo al producto ni contar la build como prueba. */
+export function parseP19GuiResumedExport(raw: unknown, sourceSha256: unknown): { ok: true; source_ref: string; source_sha256: string; input: DecisionInput } | { ok: false; error: string } {
+  if (!isRecord(raw) || typeof sourceSha256 !== 'string' || !SHA256_RE.test(sourceSha256)) return { ok: false, error: 'Manifiesto o hash inválido.' }
+  const manifest = raw as Partial<P19GuiResumedExport>
+  if (manifest.schemaVersion !== 1 || manifest.gate !== 'fresh_p19_gui_cdp_synthetic_resumed' || manifest.status !== 'tested_locally' || manifest.gateResult !== 'blocked' || manifest.review !== 'human_review_required' || manifest.uiPolicy !== 'hold' || manifest.productionAuthorized !== false || manifest.operationAuthorized !== false || manifest.blocker !== 'synthetic_fixture_network_isolation' || manifest.finalCandidateCertifiedTests !== null) {
+    return { ok: false, error: 'El preflight reanudado no conserva sus límites obligatorios.' }
+  }
+  if (typeof manifest.evidenceManifestSha256 !== 'string' || !SHA256_RE.test(manifest.evidenceManifestSha256) || !isRecord(manifest.counts) || !Array.isArray(manifest.pending)) return { ok: false, error: 'Integridad o conteos del preflight inválidos.' }
+  const counts = manifest.counts as P19GuiResumedExport['counts']
+  const countKeys = ['nodeExecuted', 'nodePassed', 'nodeFailed', 'nodeOmitted', 'electronExecuted', 'guiExecuted', 'buildExecuted', 'buildPassed', 'externalLiveOmitted', 'notExecutedBlocks'] as const
+  if (!countKeys.every((key) => nonNegativeInt(counts[key])) || counts.nodePassed + counts.nodeFailed + counts.nodeOmitted !== counts.nodeExecuted || counts.electronExecuted !== 0 || counts.guiExecuted !== 0 || counts.buildExecuted !== 1 || counts.buildPassed !== 1 || counts.notExecutedBlocks !== 11) {
+    return { ok: false, error: 'Conteos del preflight inconsistentes.' }
+  }
+  const pending = ['harness_preflight', 'integral_gui', 'replay_restarts', 'concurrency_recovery', 'chromium_network_audit', 'renderer_secret_audit', 'integral_regression'] as const
+  if (manifest.pending.length !== pending.length || !pending.every((value, index) => manifest.pending?.[index] === value)) return { ok: false, error: 'Los gates pendientes del preflight fueron alterados.' }
+  const input: DecisionInput = {
+    contract_version: JEV_CONTRACT_VERSION,
+    use_case: 'contradiction_check',
+    tenant_ref: `t_${sourceSha256.slice(0, 32)}`,
+    effect_domains: ['operational'],
+    state: {
+      report: { claimed_status: 'tested_locally', claimed_tests_passed: counts.nodePassed, claimed_tests_failed: counts.nodeFailed, claims_no_limitations: false },
+      tests: { passed: counts.nodePassed, failed: counts.nodeFailed, skipped: counts.nodeOmitted + counts.externalLiveOmitted + counts.notExecutedBlocks },
+      limitations: { open_count: pending.length, any_blocks_claimed_status: true },
+    },
+  }
+  return checkInput(input).ok
+    ? { ok: true, source_ref: 'fresh-p19-gui-cdp-synthetic-resumed-20260926', source_sha256: sourceSha256, input }
+    : { ok: false, error: 'El preflight no pudo convertirse a evidencia segura.' }
 }
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
