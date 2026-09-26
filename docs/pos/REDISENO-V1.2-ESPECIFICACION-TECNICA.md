@@ -1,7 +1,7 @@
 # Rediseño POS v1.2: especificación técnica de integración
 
 **Fecha:** 2026-09-26.
-**Base:** `origin/main` @ `aee90ec9`. Rama aislada `docs/pos-v1.2-plan-integracion`; sólo agrega este archivo.
+**Base:** `origin/main` @ `ecc89364`. Las líneas de código citadas se leyeron en `aee90ec9`; los dos commits posteriores no tocan esos archivos salvo `platform-evidence.ts`, cuyo estado nuevo está en §7.1. Rama aislada `docs/pos-v1.2-plan-integracion`; sólo agrega este archivo.
 
 **Qué es.** La especificación técnica que desarrolla la decisión ya escrita en [`REDISENO-V1.2-INTEGRATION-PLAN.md`](REDISENO-V1.2-INTEGRATION-PLAN.md) (`157db1b9`). **No la reemplaza.** Donde este documento difiere de ella, lo marca como propuesta en §10.
 
@@ -441,6 +441,20 @@ La matriz completa: 23 estados × 3 resoluciones × 2 variantes × 2 DPR.
 | P20 | Sin implementar | historia de Codex | REPORTADO |
 | Lint `pos/page.tsx` | 38 errores / 36 avisos en `main` (medido por #408 contra `main` de su fecha); 37/36 en FRESH | PR #408; historia de Codex | HECHO / REPORTADO |
 | `uiPolicy` | `hold`. En Windows hay una barrera `FRESH_DRAFT_ACTION_BINDINGS_INCOMPLETE`; en `main` sólo es un invariante del importador (`platform-evidence.ts`) | idem | REPORTADO / HECHO |
+
+**Último estado en `main` (`2a1b8494`, 2026-09-26):**
+- El GUI/CDP sintético reanudado (`fresh_p19_gui_cdp_synthetic_resumed`) sigue **`blocked`**.
+- El bloqueo es del **arnés**, no del producto: `blocker: 'synthetic_fixture_network_isolation'` (mDNS).
+- Hubo 0 ejecuciones de Electron y de GUI; sólo corrió 1 build.
+- Pendientes: `harness_preflight`, `integral_gui`, `replay_restarts`, `concurrency_recovery`, `chromium_network_audit`, `renderer_secret_audit` e `integral_regression`.
+- **Los nombres de los pendientes cambian de un manifiesto a otro**, así que las condiciones de §7.3 se leen por significado. La correspondencia está en la tabla de abajo.
+
+| Condición | Manifiesto de admisión (`aee90ec9`) | Manifiesto reanudado (`2a1b8494`) |
+|---|---|---|
+| Antes de E1 | — | `harness_preflight` |
+| E1 | `integral_gui`, `kds_replay`, `two_restarts` | `integral_gui`, `replay_restarts` |
+| E4 | `renderer_secret_audit` | `renderer_secret_audit` |
+| E6 | `ack_concurrency_closure`, `abrupt_recovery`, `complete_netlogs`, `integral_regression` | `concurrency_recovery`, `chromium_network_audit`, `integral_regression` |
 
 **Pendientes de P19 que declara el manifiesto de admisión** (`aee90ec9`):
 - `integral_gui`
