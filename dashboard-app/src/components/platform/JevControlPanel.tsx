@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Check, CircleAlert, FilePlus2, LoaderCircle, Play, RefreshCw, ShieldCheck, X } from 'lucide-react'
+import { Check, CircleAlert, ClipboardCheck, FilePlus2, LoaderCircle, Play, RefreshCw, ShieldCheck, X } from 'lucide-react'
 
 type Evidence = { id: string; source_ref: string; source_sha256: string; decision_input: { use_case?: string; state?: Record<string, unknown> } }
 type Decision = { id: string; evidence_id: string; recommendation: Record<string, unknown> }
@@ -21,6 +21,24 @@ const checks = [
 
 function booleanOrNull(value: string | boolean): boolean | null { return value === 'yes' ? true : value === 'no' ? false : null }
 function asRecord(value: unknown): Record<string, unknown> { return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {} }
+function nonNegative(value: unknown): number | null { return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null }
+
+function gateSnapshot(evidence: Evidence[]) {
+  const latest = evidence.find((item) => item.decision_input?.use_case === 'contradiction_check')
+  if (!latest) return null
+  const state = asRecord(latest.decision_input.state)
+  const report = asRecord(state.report)
+  const tests = asRecord(state.tests)
+  const limitations = asRecord(state.limitations)
+  return {
+    source: latest.source_ref,
+    passed: nonNegative(tests.passed),
+    failed: nonNegative(tests.failed),
+    skipped: nonNegative(tests.skipped),
+    pending: nonNegative(limitations.open_count),
+    claimedStatus: typeof report.claimed_status === 'string' ? report.claimed_status : 'sin declarar',
+  }
+}
 
 export default function JevControlPanel() {
   const [data, setData] = useState<Snapshot>({ ready: false, evidence: [], decisions: [], reviews: [] })
@@ -51,6 +69,7 @@ export default function JevControlPanel() {
   }, [])
 
   const reviews = useMemo(() => new Map(data.reviews.map((review) => [review.decision_id, review])), [data.reviews])
+  const latestGate = useMemo(() => gateSnapshot(data.evidence), [data.evidence])
   const set = (key: string, value: string | boolean) => setForm((prior) => ({ ...prior, [key]: value }))
 
   async function send(path: string, body: unknown, key: string, success: string) {
@@ -94,6 +113,14 @@ export default function JevControlPanel() {
       <aside className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-6"><h2 className="font-semibold text-[var(--text-1)]">Cómo se controla</h2><ol className="mt-4 space-y-3 text-sm text-[var(--text-3)]"><li>1. Registra un paquete ya revisado.</li><li>2. Pide una opinión tipada de JEV.</li><li>3. Acepta o rechaza el veredicto como humano.</li></ol></aside>
     </section>
 
+    <section className="overflow-hidden rounded-2xl border border-violet-400/20 bg-[var(--surface)]">
+      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[var(--line)] px-6 py-5">
+        <div className="flex gap-3"><span className="grid h-9 w-9 place-items-center rounded-xl bg-violet-400/10 text-violet-300"><ClipboardCheck size={18} /></span><div><h2 className="font-semibold text-[var(--text-1)]">Estado del gate en seguimiento</h2><p className="mt-1 text-sm text-[var(--text-3)]">Lectura del último manifiesto tipado; no reemplaza el reporte ni certifica el producto.</p></div></div>
+        <span className="rounded-full border border-amber-400/25 bg-amber-400/10 px-3 py-1 text-xs font-semibold text-amber-300">P19 · HOLD</span>
+      </div>
+      {!data.ready ? <Empty text="Se habilita al aplicar la migración de evidencia." /> : !latestGate ? <Empty text="Todavía no se ha importado un manifiesto P19 compatible." /> : <div className="grid divide-y divide-[var(--line)] md:grid-cols-4 md:divide-x md:divide-y-0"><GateMetric label="Estado declarado" value={latestGate.claimedStatus} detail={latestGate.source} /><GateMetric label="Pruebas dirigidas" value={latestGate.passed === null ? '—' : String(latestGate.passed)} detail="No son certificación final" /><GateMetric label="Resultados no aprobados" value={latestGate.failed === null ? '—' : String(latestGate.failed)} detail={`${latestGate.skipped ?? 0} externos omitidos`} warning /><GateMetric label="Gates todavía abiertos" value={latestGate.pending === null ? '—' : String(latestGate.pending)} detail="GUI, reinicios, NetLogs y validación física" warning /></div>}
+    </section>
+
     <section className="rounded-2xl border border-[var(--line)] bg-[var(--surface)]">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--line)] px-5 py-4"><div><h2 className="font-semibold text-[var(--text-1)]">Fuentes aprobadas</h2><p className="mt-1 text-sm text-[var(--text-3)]">Sólo hash y hechos tipados; no se suben reportes crudos.</p></div><div className="flex flex-wrap gap-2"><button onClick={() => void load()} className="inline-flex items-center gap-2 rounded-lg border border-[var(--line)] px-3 py-2 text-sm text-[var(--text-2)]"><RefreshCw size={15} className={loading ? 'animate-spin' : ''} />Actualizar</button><button onClick={() => setShowP19Import((value) => !value)} className="inline-flex items-center gap-2 rounded-lg border border-violet-400/30 px-3 py-2 text-sm font-semibold text-violet-300">Importar FRESH P19</button><button onClick={() => setShowForm((value) => !value)} className="inline-flex items-center gap-2 rounded-lg bg-[var(--accent)] px-3 py-2 text-sm font-semibold text-white"><FilePlus2 size={15} />Registrar fuente</button></div></div>
       {showP19Import && <form onSubmit={importP19} className="grid gap-3 border-b border-violet-400/20 bg-violet-400/5 p-5"><p className="text-sm text-[var(--text-2)]">Pega sólo el manifiesto JSON redactado de FRESH P19. El servidor exige estado <b>blocked</b>, UI <b>hold</b>, sin autorización de producción y todos los gates pendientes.</p><Field label="SHA-256 del manifiesto exportado"><input required value={p19Hash} onChange={(e) => setP19Hash(e.target.value)} placeholder="dc717fc…" /></Field><Field label="Manifiesto FRESH P19"><textarea required value={p19Manifest} onChange={(e) => setP19Manifest(e.target.value)} className="min-h-40 font-mono text-xs" placeholder="{ ... }" /></Field><div className="flex justify-end"><button disabled={busy === 'import-p19'} className="inline-flex items-center gap-2 rounded-lg bg-violet-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">{busy === 'import-p19' && <LoaderCircle size={15} className="animate-spin" />}Importar sin alterar límites</button></div></form>}
@@ -114,6 +141,7 @@ export default function JevControlPanel() {
 }
 
 function Metric({ label, value, detail, accent = false }: { label: string; value: number; detail: string; accent?: boolean }) { return <div className="p-5"><p className="text-sm text-[var(--text-3)]">{label}</p><p className={`mt-2 text-3xl font-semibold ${accent ? 'text-emerald-300' : 'text-[var(--text-1)]'}`}>{value}</p><p className="mt-2 text-xs text-[var(--text-4)]">{detail}</p></div> }
+function GateMetric({ label, value, detail, warning = false }: { label: string; value: string; detail: string; warning?: boolean }) { return <div className="min-w-0 p-5"><p className="text-sm text-[var(--text-3)]">{label}</p><p className={`mt-2 truncate text-xl font-semibold ${warning ? 'text-amber-300' : 'text-[var(--text-1)]'}`}>{value}</p><p className="mt-2 text-xs leading-5 text-[var(--text-4)]">{detail}</p></div> }
 function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="grid gap-1.5 text-xs font-medium text-[var(--text-3)]">{label}{children}</label> }
 function Empty({ text }: { text: string }) { return <div className="px-5 py-10 text-center text-sm text-[var(--text-3)]">{text}</div> }
 function Loading() { return <div className="flex justify-center px-5 py-10"><LoaderCircle size={22} className="animate-spin text-violet-300" /></div> }
