@@ -1,6 +1,6 @@
 import { fetchWithTimeout } from '@/lib/fetch-with-timeout'
 import { NextResponse, type NextRequest } from 'next/server'
-import { canAccessPage, resolveRole } from '@/lib/roles'
+import { canAccessPage, isPlatformOnlyPage, resolveRole } from '@/lib/roles'
 
 // Páginas sin sesión — debe coincidir con publicPages de AppShell.tsx
 const PUBLIC_PAGES = ['/login', '/seguridad', '/privacidad', '/terminos', '/reservar', '/factura', '/demo-live']
@@ -83,6 +83,26 @@ function checkRate(ip: string, pathname: string): { ok: boolean; remaining: numb
   return { ok: true, remaining: RATE_LIMIT - entry.count }
 }
 
+// F-06 (contención 2026-09-23): /mission-control y /roi muestran telemetría de
+// TODOS los restaurantes. Sólo admin de plataforma, verificado aquí contra
+// is_platform_admin (callable sólo con service_role). Falla cerrado: sin llave,
+// sin usuario, error o timeout → no es admin.
+async function esAdminDePlataforma(supabaseUrl: string, user: { id?: string; email?: string } | null): Promise<boolean> {
+  const svc = process.env.SUPABASE_SERVICE_KEY
+  if (!svc || !user?.id) return false
+  try {
+    const res = await fetchWithTimeout(`${supabaseUrl}/rest/v1/rpc/is_platform_admin`, {
+      method: 'POST',
+      headers: { apikey: svc, Authorization: `Bearer ${svc}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_email: user.email || '', p_user_id: user.id }),
+    }, 4_000)
+    if (!res.ok) return false
+    return (await res.json()) === true
+  } catch {
+    return false
+  }
+}
+
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
 
@@ -123,10 +143,14 @@ export async function proxy(req: NextRequest) {
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  if (!supabaseUrl || !anonKey) return NextResponse.next() // mal configurado: no bloquear
+  const soloPlataforma = isPlatformOnlyPage(pathname)
+  if (!supabaseUrl || !anonKey) {
+    // mal configurado: no bloquear el dashboard, pero una página de plataforma falla cerrado
+    return soloPlataforma ? NextResponse.redirect(new URL('/', req.url)) : NextResponse.next()
+  }
 
   // Validar el token contra Supabase Auth (server-side, no falsificable)
-  let user: { email?: string; app_metadata?: { role?: string } } | null = null
+  let user: { id?: string; email?: string; app_metadata?: { role?: string } } | null = null
   try {
     // REGRESIÓN (2026-08-14, 8ee5315e): este fetch quedó SIN acotar al mover la
     // lógica entre middleware.ts y proxy.ts. a59a6b11 (PR #21) lo había acotado.
@@ -151,13 +175,20 @@ export async function proxy(req: NextRequest) {
     }
     user = await res.json()
   } catch {
-    // Supabase caído: dejar pasar — el cliente igual no podrá leer datos sin red
-    return NextResponse.next()
+    // Supabase caído: dejar pasar — el cliente igual no podrá leer datos sin red.
+    // Excepción: página de plataforma → falla cerrado.
+    return soloPlataforma ? NextResponse.redirect(new URL('/', req.url)) : NextResponse.next()
   }
 
   // Enforcement de rol por página (app_metadata.role lo setea el servidor, no el usuario)
   const role = resolveRole(user?.app_metadata?.role, user?.email)
   if (!canAccessPage(role, pathname)) {
+    const fallback = canAccessPage(role, '/') ? '/' : '/pos'
+    return NextResponse.redirect(new URL(fallback, req.url))
+  }
+
+  // Páginas de plataforma: ningún rol de restaurante (ni dueño) entra.
+  if (soloPlataforma && !(await esAdminDePlataforma(supabaseUrl, user))) {
     const fallback = canAccessPage(role, '/') ? '/' : '/pos'
     return NextResponse.redirect(new URL(fallback, req.url))
   }

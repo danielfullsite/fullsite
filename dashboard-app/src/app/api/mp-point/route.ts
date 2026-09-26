@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { withPOSAuth, unauthorized } from '@/lib/api-auth'
+import { isManager } from '@/lib/pos-db-policy'
 
 // MP Point Smart API proxy.
 // Auth: requires valid POS shift token or Supabase session (withPOSAuth).
@@ -127,6 +128,13 @@ export async function POST(request: NextRequest) {
 
     // Refund a payment (Point Smart only)
     if (action === 'refund') {
+      // V-C03 parcial (contención 2026-09-23): devolver dinero es de gerencia; antes
+      // cualquier shift token (mesero, cajero) reembolsaba. PENDIENTE fuera de este
+      // cambio: MP_ACCESS_TOKEN sigue siendo global (no por tenant) y no se valida
+      // que paymentId pertenezca a una orden del tenant (credentials_vault, P0-H F2).
+      if (!isManager(auth.role)) {
+        return Response.json({ error: 'MANAGER_REQUIRED' }, { status: 403 })
+      }
       if (!paymentId) {
         return Response.json({ error: 'paymentId requerido' }, { status: 400 })
       }

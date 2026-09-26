@@ -5,6 +5,7 @@
 // Ver src/lib/labor.ts para el contrato y el cálculo puro.
 
 import { withPOSAuth } from '@/lib/api-auth'
+import { isManager } from '@/lib/pos-db-policy'
 import { isOperationalRole, type LaborDay, type LaborEmployee, type LaborPayload } from '@/lib/labor'
 import { NextRequest } from 'next/server'
 
@@ -16,6 +17,9 @@ const HOURS_PER_WEEK = 48 // jornada MX de referencia para derivar $/hora desde 
 export async function GET(request: NextRequest) {
   const auth = await withPOSAuth(request)
   if (!auth) return Response.json({ error: 'No autorizado' }, { status: 401 })
+  // F-09 (contención 2026-09-23): sueldos = gerencia. Cualquier shift token
+  // (mesero incluido) los leía. Misma lista que el resto de rutas de gerencia.
+  if (!isManager(auth.role)) return Response.json({ error: 'MANAGER_REQUIRED' }, { status: 403 })
   try {
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
     const sbKey = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!

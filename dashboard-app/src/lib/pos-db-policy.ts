@@ -274,6 +274,26 @@ export const REDACTED_COLUMNS: Record<string, readonly string[]> = {
   pos_fingerprint_templates: ['template', 'template_data'],
 }
 
+/**
+ * Columnas de NÓMINA: sólo gerencia (isManager) las ve, filtra u ordena por el proxy.
+ *
+ * F-09 por otro camino (revisión PR5, 2026-09-23): /api/labor ya exigía gerente,
+ * pero `GET /api/pos/db?path=pos_staff?select=*` le devolvía a un mesero el sueldo
+ * de todo el personal. Ningún flujo del POS lee estas columnas (equipo va por
+ * /api/owner/staff y mano-de-obra por /api/labor). Sin rol conocido → se ocultan
+ * (falla cerrado). `tips_total`/`propinas` NO son nómina: el cajero las opera.
+ */
+export const MANAGER_ONLY_COLUMNS: Record<string, readonly string[]> = {
+  pos_staff: ['hourly_rate', 'weekly_salary'],
+}
+
+/** Columnas que el rol NO puede ver: secretos siempre + nómina si no es gerencia. */
+function columnasOcultas(table: string, role?: string | null): readonly string[] {
+  const base = REDACTED_COLUMNS[table] || []
+  const nomina = isManager(role) ? [] : (MANAGER_ONLY_COLUMNS[table] || [])
+  return nomina.length ? [...base, ...nomina] : base
+}
+
 export function isManager(role: string | undefined | null): boolean {
   return role === 'admin' || role === 'gerente' || role === 'dueño'
 }
@@ -291,9 +311,9 @@ export function tableOf(path: string): string {
  * PostgREST puede devolver CSV, un conteo o un cuerpo vacío, y romperlos aquí
  * dejaría al POS sin datos.
  */
-export function redactResponse(table: string, text: string, contentType: string | null): string {
-  const cols = REDACTED_COLUMNS[table]
-  if (!cols || !text) return text
+export function redactResponse(table: string, text: string, contentType: string | null, role?: string | null): string {
+  const cols = columnasOcultas(table, role)
+  if (!cols.length || !text) return text
   if (contentType && !contentType.includes('json')) return text
 
   let data: unknown
@@ -348,10 +368,10 @@ export function prepararCuerpoProxy(table: string, role: string | null | undefin
  * domain endpoint with its own field and relationship authorization. Existing
  * POS callers use flat selections; identity secrets cannot be renamed around
  * response redaction or tested through filters/counts. */
-export function consultaProxyValida(table: string, params: URLSearchParams): boolean {
+export function consultaProxyValida(table: string, params: URLSearchParams, role?: string | null): boolean {
   if (params.getAll('select').length > 1) return false
   const select = params.get('select')
   if (select !== null && !/^(?:\*|[a-z_][a-z0-9_]*)(?:,(?:\*|[a-z_][a-z0-9_]*))*$/i.test(select)) return false
-  const secrets = REDACTED_COLUMNS[table] || []
+  const secrets = columnasOcultas(table, role)
   return !secrets.some(column => new RegExp(`\\b${column}\\b`, 'i').test(Array.from(params.entries()).flat().join(' ')))
 }

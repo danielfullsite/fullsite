@@ -61,7 +61,7 @@ async function handle(request: NextRequest, method: string) {
 
   // Tenant scope: fuerza client_id del token en el query (reads y writes).
   const params = new URLSearchParams(path.includes('?') ? path.slice(path.indexOf('?') + 1) : '')
-  if (!consultaProxyValida(table, params)) return NextResponse.json({ error: 'consulta no permitida' }, { status: 403 })
+  if (!consultaProxyValida(table, params, auth.role)) return NextResponse.json({ error: 'consulta no permitida' }, { status: 403 })
   // El acotamiento por tenant NO es opcional: sin él, el proxy corre con
   // service_role y se salta RLS. `clients` no tiene columna client_id — su llave
   // ES el restaurante — así que se acota por `id`. Si alguna vez se cae en el
@@ -92,8 +92,8 @@ async function handle(request: NextRequest, method: string) {
   const res = scoped || await fetch(`${SB_URL}/rest/v1/${target}`, { method, headers, body, cache: 'no-store', redirect: 'error' })
   const rawOut = await res.text()
   const ct = res.headers.get('content-type')
-  // El PIN nunca sale por el proxy, pida lo que pida el `select`.
-  const text = redactResponse(table, rawOut, ct)
+  // El PIN nunca sale por el proxy, pida lo que pida el `select`; la nómina sólo a gerencia.
+  const text = redactResponse(table, rawOut, ct, auth.role)
   // 204/205/304 no admiten body — Response() truena con string aunque sea "".
   const bodyless = res.status === 204 || res.status === 205 || res.status === 304
   const out = new NextResponse(bodyless ? null : text, { status: res.status })

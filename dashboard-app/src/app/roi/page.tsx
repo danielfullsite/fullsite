@@ -34,7 +34,9 @@ export default function ROIPage() {
     try {
       const [agentResults, agentRuns, salesData] = await Promise.all([
         getDeepTable('agent_results', 100),
-        getDeepTable('agent_runs', 500),
+        // F-06: agent_runs (todos los restaurantes) sólo vía servidor, admin de plataforma.
+        fetch('/mission-control/telemetria', { method: 'POST', credentials: 'include', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ limit: 500 }) })
+          .then(async r => { if (!r.ok) throw new Error(`telemetria ${r.status}`); return ((await r.json()).runs ?? []) as Record<string, unknown>[] }),
         getRecentDays(30),
       ])
 
@@ -242,7 +244,7 @@ export default function ROIPage() {
             </p>
           </div>
           <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] p-4">
-            {/* `totalRuns` sale de getDeepTable('agent_runs', 500): con 500 o
+            {/* `totalRuns` sale de /mission-control/telemetria (limit 500): con 500 o
                 más corridas SIEMPRE dice "500", que es el límite de la consulta,
                 no un conteo. Y agent_runs es GLOBAL — cuenta las corridas de
                 todos los restaurantes. Se marca hasta que la tabla tenga

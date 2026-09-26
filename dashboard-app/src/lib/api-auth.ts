@@ -6,8 +6,8 @@ const SB_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 // ── Supabase session auth ─────────────────────────────────────────────────────
 
-/** Validate a Supabase access token. Returns user id or null. */
-export async function getSessionUserId(request: NextRequest): Promise<string | null> {
+/** Validate a Supabase access token. Returns {id,email} or null. */
+async function getSessionUser(request: NextRequest): Promise<{ id: string; email: string } | null> {
   const bearer = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
   const token = request.cookies.get('fs-at')?.value || bearer
   if (!token) return null
@@ -17,9 +17,103 @@ export async function getSessionUserId(request: NextRequest): Promise<string | n
     })
     if (!res.ok) return null
     const user = await res.json()
-    return user?.id || null
+    return user?.id ? { id: user.id, email: user.email || '' } : null
   } catch {
     return null
+  }
+}
+
+/** Validate a Supabase access token. Returns user id or null. */
+export async function getSessionUserId(request: NextRequest): Promise<string | null> {
+  return (await getSessionUser(request))?.id || null
+}
+
+// ── Act-as (F-05, contención 2026-09-23) ──────────────────────────────────────
+// Una membresía 'platform_actas' eleva a dueño SÓLO si:
+//   · el request nombra ese tenant EXPLÍCITAMENTE (x-fullsite-tenant), y
+//   · tiene menos de ACTAS_TTL_MINUTES (default 60) según client_users.created_at
+//     (sin created_at legible, o en el futuro → vencida: falla cerrado; TTL con
+//     tope duro de 240 min).
+// Cada request NO-GET resuelto por act-as, y los GET de rutas sensibles
+// (ACTAS_GET_AUDITADAS), se registran en platform_audit_log con el actor real; si
+// ese registro falla, el request se rechaza (null → 401).
+// Límite conocido: esto vive en el servidor. Las lecturas directas del navegador a
+// PostgREST pasan por RLS (private.user_has_client_access), que sin la migración
+// PENDIENTE_20260923220000_actas_caducidad_y_agent_runs_tenant.sql sigue viendo el
+// tenant hasta el exit o la revocación.
+const ACTAS_ROLE = 'platform_actas'
+
+// Tope duro: ni una variable mal puesta (p. ej. 1e12) apaga la caducidad.
+const ACTAS_TTL_MAX_MIN = 240
+// Tolerancia de reloj entre Postgres (created_at = now()) y el servidor: una fila
+// recién creada puede llegar unos ms "en el futuro". Más allá de esto → vencida.
+const ACTAS_SKEW_MS = 60_000
+
+function actasTtlMs(): number {
+  const n = Number(process.env.ACTAS_TTL_MINUTES)
+  return Math.min(Number.isFinite(n) && n > 0 ? n : 60, ACTAS_TTL_MAX_MIN) * 60_000
+}
+
+/** ¿La membresía sigue valiendo? Las reales siempre; las act-as sólo dentro del TTL.
+ *  Exportada para los lectores directos de client_users (p. ej. /api/backup). */
+export function membresiaVigente(row: { role?: string | null; created_at?: string | null }, now = Date.now()): boolean {
+  if (row.role !== ACTAS_ROLE) return true
+  return actasVigente(row.created_at, now)
+}
+
+function actasVigente(createdAt: string | null | undefined, now = Date.now()): boolean {
+  const t = createdAt ? Date.parse(createdAt) : NaN
+  if (!Number.isFinite(t)) return false
+  if (t > now + ACTAS_SKEW_MS) return false // fecha en el futuro: dato manipulado o reloj roto
+  return now - t < actasTtlMs()
+}
+
+// Lecturas en act-as que SÍ se auditan (H3 de la revisión): datos sensibles y de
+// bajo volumen. El resto de los GET no se audita para no agregar una escritura por
+// cada lectura del dashboard; ese riesgo está documentado en el informe PR5.
+// También los GET que ESCRIBEN (verificación de integración 2026-09-24): el OAuth
+// de Uber (initiate/callback, PR2) y /api/deepgram-token (si se enciende).
+const ACTAS_GET_AUDITADAS = ['/api/labor', '/api/owner/', '/api/pos/db', '/api/backup', '/api/factura',
+  '/api/integrations/uber-eats/auth/', '/api/deepgram-token']
+
+function requiereAuditoriaActas(request: NextRequest): boolean {
+  if (request.method !== 'GET' && request.method !== 'HEAD') return true
+  let path = ''
+  try { path = (request.nextUrl ?? new URL(request.url)).pathname } catch { return true }
+  return ACTAS_GET_AUDITADAS.some(p => path === p.replace(/\/$/, '') || path.startsWith(p.endsWith('/') ? p : p + '/'))
+}
+
+async function auditarActas(
+  user: { id: string; email: string },
+  clientId: string,
+  request: NextRequest,
+): Promise<boolean> {
+  const svc = process.env.SUPABASE_SERVICE_KEY
+  if (!svc) return false // platform_audit_log sólo acepta service_role: sin llave no hay auditoría
+  let path = ''
+  let query = ''
+  try {
+    const u = request.nextUrl ?? new URL(request.url)
+    path = u.pathname
+    query = u.search.slice(0, 500) // en /api/pos/db la tabla va en ?path=
+  } catch { path = '' }
+  try {
+    const res = await fetch(`${SB_URL}/rest/v1/platform_audit_log`, {
+      method: 'POST',
+      headers: { apikey: svc, Authorization: `Bearer ${svc}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify([{
+        actor_email: user.email || `user:${user.id}`,
+        actor_user_id: user.id,
+        action: 'actas.request',
+        scope: 'tenant',
+        target_tenant: clientId,
+        detail: { method: request.method, path, query },
+      }]),
+      cache: 'no-store',
+    })
+    return res.ok
+  } catch {
+    return false
   }
 }
 
@@ -78,8 +172,9 @@ export async function withPOSAuth(request: NextRequest): Promise<POSAuthContext 
   }
 
   // Fall back to Supabase session (dashboard users: dueño/gerente/capitan)
-  const userId = await getSessionUserId(request)
-  if (!userId) return null
+  const user = await getSessionUser(request)
+  if (!user) return null
+  const userId = user.id
 
   // Resolve clientId from client_users — not from user_metadata (user-writable)
   //
@@ -97,22 +192,30 @@ export async function withPOSAuth(request: NextRequest): Promise<POSAuthContext 
   const sbKey = process.env.SUPABASE_SERVICE_KEY || SB_ANON
   try {
     const res = await fetch(
-      `${SB_URL}/rest/v1/client_users?user_id=eq.${encodeURIComponent(userId)}&select=client_id,role&order=client_id.asc&limit=50`,
+      `${SB_URL}/rest/v1/client_users?user_id=eq.${encodeURIComponent(userId)}&select=client_id,role,created_at&order=client_id.asc&limit=50`,
       { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
     )
     if (!res.ok) return null
-    const rows = await res.json() as Array<{ client_id: string; role: string }>
-    if (!Array.isArray(rows) || rows.length === 0) return null
+    const all = await res.json() as Array<{ client_id: string; role: string; created_at?: string | null }>
+    if (!Array.isArray(all) || all.length === 0) return null
+    // F-05: una membresía act-as vencida no existe para efectos de autorización.
+    const rows = all.filter(r => r.role !== ACTAS_ROLE || actasVigente(r.created_at))
 
     const hint = request.headers.get('x-fullsite-tenant')?.toLowerCase().trim()
     let membership: { client_id: string; role: string } | undefined
     if (hint) {
-      membership = rows.find(r => r.client_id === hint)
+      // Una membresía real gana sobre una act-as para el mismo tenant.
+      membership = rows.find(r => r.client_id === hint && r.role !== ACTAS_ROLE) ?? rows.find(r => r.client_id === hint)
       if (!membership) return null // pidió un tenant del que NO es miembro → fuera
     } else {
-      const reales = rows.filter(r => r.role !== 'platform_actas')
-      membership = reales.length === 1 ? reales[0] : (rows.length === 1 ? rows[0] : undefined)
+      // Sin tenant explícito, act-as NUNCA se usa (F-05: act-as exige tenant destino).
+      const reales = rows.filter(r => r.role !== ACTAS_ROLE)
+      membership = reales.length === 1 ? reales[0] : undefined
       if (!membership) return null // multi-membresía sin header → jamás adivinar
+    }
+    if (membership.role === ACTAS_ROLE && requiereAuditoriaActas(request)) {
+      // Escritura (o lectura sensible) en act-as: sin registro con el actor real, no pasa.
+      if (!(await auditarActas(user, membership.client_id, request))) return null
     }
     // Una membresía 'platform_actas' SOLO la crea /api/platform/act-as, que está
     // gateado por requirePlatformAdmin(+2FA). Es decir: su existencia PRUEBA que
