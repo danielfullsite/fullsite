@@ -12,6 +12,13 @@ import { FAKE_CREDENTIAL, jsonResponse, mockFetch, mockJev } from './helpers'
 const SRC = join(__dirname, '..', '..')
 // Cubre `from '…'`, `import '…'`, `import('…')` y `require('…')` (hallazgo L4 de la revisión adversarial).
 const IMPORTS_JEV = /(?:from\s+|import\s*\(\s*|require\s*\(\s*|import\s+)['"](?:@\/lib\/jev|[./]+(?:lib\/)?jev)(?:\/|['"])/
+// Única frontera adicional: handlers server-only del panel de control, protegidos por
+// requirePlatformAdmin2FA. Ni páginas, ni componentes, ni POS/KDS pueden importar Jev.
+const SERVER_CONTROL_PLANE = new Set([
+  'app/api/platform/jev/route.ts',
+  'app/api/platform/jev/evaluate/route.ts',
+  'app/api/platform/jev/review/route.ts',
+])
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
@@ -33,13 +40,12 @@ function walkNoModules(dir: string, out: string[] = []): string[] {
 }
 
 describe('aislamiento: POS y KDS funcionan sin Jev', () => {
-  // Guardián: el único consumidor permitido de lib/jev es lib/jev mismo y sus pruebas.
-  // Si alguien la importa desde una ruta, un componente o el POS, esta prueba falla y
-  // obliga a decidir a propósito (y a revisar el threat model).
+  // Guardián: el único consumidor permitido es lib/jev, sus pruebas y tres handlers
+  // server-only del control plane. Si la importa una página, componente o POS, falla.
   it('nadie fuera de lib/jev y __tests__/jev importa la capa', () => {
     const offenders = walk(SRC)
       .map((f) => relative(SRC, f))
-      .filter((f) => !f.startsWith('lib/jev/') && !f.startsWith('__tests__/jev/'))
+      .filter((f) => !f.startsWith('lib/jev/') && !f.startsWith('__tests__/jev/') && !SERVER_CONTROL_PLANE.has(f))
       .filter((f) => IMPORTS_JEV.test(readFileSync(join(SRC, f), 'utf8')))
     expect(offenders).toEqual([])
   })
