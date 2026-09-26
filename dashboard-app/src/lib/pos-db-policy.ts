@@ -330,9 +330,10 @@ export function tableOf(path: string): string {
 /**
  * Quita las columnas prohibidas del JSON de respuesta.
  *
- * Devuelve el texto tal cual si no hay nada que redactar o si no es JSON —
- * PostgREST puede devolver CSV, un conteo o un cuerpo vacío, y romperlos aquí
- * dejaría al POS sin datos.
+ * Devuelve el texto tal cual si la tabla no tiene nada que ocultar, o si está vacío (un
+ * 204, un conteo en Content-Range). Revisión 9: si la tabla SÍ oculta columnas y el cuerpo
+ * no es JSON, no sale — un CSV de pos_staff llevaría el PIN y uno de clients se saltaría la
+ * lista blanca. No rompe al POS: ningún proxy reenvía `Accept`, así que PostgREST contesta JSON.
  */
 export function redactResponse(table: string, text: string, contentType: string | null): string {
   const cols = REDACTED_COLUMNS[table] || []
