@@ -6,7 +6,8 @@ import { Check, CircleAlert, ClipboardCheck, FilePlus2, LoaderCircle, Play, Refr
 type Evidence = { id: string; source_ref: string; source_sha256: string; decision_input: { use_case?: string; state?: Record<string, unknown> } }
 type Decision = { id: string; evidence_id: string; recommendation: Record<string, unknown> }
 type Review = { decision_id: string; disposition: 'accepted' | 'rejected' }
-type Snapshot = { ready: boolean; evidence: Evidence[]; decisions: Decision[]; reviews: Review[] }
+type SystemContext = { version: string; domains: { id: string; label: string; boundary: string }[] }
+type Snapshot = { ready: boolean; evidence: Evidence[]; decisions: Decision[]; reviews: Review[]; system_context: SystemContext | null }
 type Form = Record<string, string | boolean>
 
 const initial: Form = {
@@ -41,7 +42,7 @@ function gateSnapshot(evidence: Evidence[]) {
 }
 
 export default function JevControlPanel() {
-  const [data, setData] = useState<Snapshot>({ ready: false, evidence: [], decisions: [], reviews: [] })
+  const [data, setData] = useState<Snapshot>({ ready: false, evidence: [], decisions: [], reviews: [], system_context: null })
   const [form, setForm] = useState<Form>(initial)
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -57,7 +58,12 @@ export default function JevControlPanel() {
       const res = await fetch('/api/platform/jev', { credentials: 'include' })
       if (!res.ok) throw new Error('No se pudo consultar JEV.')
       const next = await res.json() as Partial<Snapshot>
-      setData({ ready: next.ready === true, evidence: Array.isArray(next.evidence) ? next.evidence : [], decisions: Array.isArray(next.decisions) ? next.decisions : [], reviews: Array.isArray(next.reviews) ? next.reviews : [] })
+      const systemContext = asRecord(next.system_context)
+      const domains = Array.isArray(systemContext.domains) ? systemContext.domains.filter((domain): domain is { id: string; label: string; boundary: string } => {
+        const item = asRecord(domain)
+        return typeof item.id === 'string' && typeof item.label === 'string' && typeof item.boundary === 'string'
+      }) : []
+      setData({ ready: next.ready === true, evidence: Array.isArray(next.evidence) ? next.evidence : [], decisions: Array.isArray(next.decisions) ? next.decisions : [], reviews: Array.isArray(next.reviews) ? next.reviews : [], system_context: typeof systemContext.version === 'string' ? { version: systemContext.version, domains } : null })
     } catch { setNotice('No se pudo cargar JEV. Reintenta o verifica tu sesión de administrador.') }
     finally { setLoading(false) }
   }
@@ -119,6 +125,11 @@ export default function JevControlPanel() {
         <span className="rounded-full border border-amber-400/25 bg-amber-400/10 px-3 py-1 text-xs font-semibold text-amber-300">P19 · HOLD</span>
       </div>
       {!data.ready ? <Empty text="Se habilita al aplicar la migración de evidencia." /> : !latestGate ? <Empty text="Todavía no se ha importado un manifiesto P19 compatible." /> : <div className="grid divide-y divide-[var(--line)] md:grid-cols-4 md:divide-x md:divide-y-0"><GateMetric label="Estado declarado" value={latestGate.claimedStatus} detail={latestGate.source} /><GateMetric label="Pruebas dirigidas" value={latestGate.passed === null ? '—' : String(latestGate.passed)} detail="No son certificación final" /><GateMetric label="Resultados no aprobados" value={latestGate.failed === null ? '—' : String(latestGate.failed)} detail={`${latestGate.skipped ?? 0} externos omitidos`} warning /><GateMetric label="Gates todavía abiertos" value={latestGate.pending === null ? '—' : String(latestGate.pending)} detail="GUI, reinicios, NetLogs y validación física" warning /></div>}
+    </section>
+
+    <section className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-6">
+      <div className="flex flex-wrap items-end justify-between gap-3"><div><h2 className="font-semibold text-[var(--text-1)]">Mapa de conocimiento</h2><p className="mt-1 text-sm text-[var(--text-3)]">Contexto estable que acompaña cada evaluación; no concede acceso al sistema.</p></div><span className="font-mono text-xs text-[var(--text-4)]">{data.system_context?.version ?? 'cargando'}</span></div>
+      {data.system_context ? <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{data.system_context.domains.map((domain) => <div key={domain.id} className="rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-4"><p className="font-medium text-[var(--text-1)]">{domain.label}</p><p className="mt-2 text-xs leading-5 text-[var(--text-3)]">{domain.boundary}</p></div>)}</div> : <p className="mt-5 text-sm text-[var(--text-3)]">El mapa se carga sólo desde la sesión administrativa.</p>}
     </section>
 
     <section className="rounded-2xl border border-[var(--line)] bg-[var(--surface)]">

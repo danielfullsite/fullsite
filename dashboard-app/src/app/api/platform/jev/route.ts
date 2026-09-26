@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { requirePlatformAdmin2FA, platformServiceFetch } from '@/lib/platform-auth'
 import { auditLog, rateLimit } from '@/lib/platform-writes'
 import { isRecord, parseP19GateExport, parseTaskDoneEvidence } from '@/lib/jev/platform-evidence'
+import { JEV_SYSTEM_CONTEXT_VERSION, JEV_SYSTEM_DOMAINS } from '@/lib/jev/system-context'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,6 +25,10 @@ export async function GET(req: NextRequest) {
       evidence: Array.isArray(payloads[0]) ? payloads[0] : [],
       decisions: Array.isArray(payloads[1]) ? payloads[1] : [],
       reviews: Array.isArray(payloads[2]) ? payloads[2] : [],
+      system_context: {
+        version: JEV_SYSTEM_CONTEXT_VERSION,
+        domains: JEV_SYSTEM_DOMAINS.map(({ id, label, boundary }) => ({ id, label, boundary })),
+      },
     })
   } catch {
     return Response.json({ ready: false, evidence: [], decisions: [], reviews: [] })

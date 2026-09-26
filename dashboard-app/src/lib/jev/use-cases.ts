@@ -8,6 +8,7 @@
  */
 import type { Authority, Decision, RiskLevel, StateValue, UseCase } from './contract'
 import { RISK_LEVELS } from './contract'
+import { JEV_SYSTEM_CONTEXT } from './system-context'
 
 export type FieldSpec =
   | { kind: 'enum'; values: readonly string[] }
@@ -52,7 +53,9 @@ const RISK_CRITERIA: string[] = [
 
 export function buildJevQuestions(spec: UseCaseSpec): Record<string, JevQuestion> {
   return {
-    [Q_DECISION]: { type: 'choice', instructions: spec.decisionInstructions, criteria: { ...spec.labels } },
+    // Contexto fijo y revisado: ayuda a clasificar dentro de Fullsite sin dar a
+    // Jev lectura del repositorio, estado vivo o datos de restaurantes.
+    [Q_DECISION]: { type: 'choice', instructions: `${spec.decisionInstructions}\n\nSystem context:\n${JEV_SYSTEM_CONTEXT}`, criteria: { ...spec.labels } },
     [Q_RISK]: { type: 'score', instructions: 'Operational risk of this situation for a restaurant.', criteria: [...RISK_CRITERIA] },
     [Q_REVIEW]: {
       type: 'boolean',
