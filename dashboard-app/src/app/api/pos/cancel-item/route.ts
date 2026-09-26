@@ -55,6 +55,13 @@ export async function POST(request: NextRequest) {
     }
     if (!approvalMode) {
       if (offline_approved === true) {
+        // `offline_approved` sigue siendo una afirmación del renderer. En el rollout
+        // normal se conserva para no perder operaciones offline ya encoladas; cuando
+        // se activa el gate específico de cancelación, no puede brincar el gate sólo
+        // por estar en esta rama.
+        if (process.env.CANCEL_APPROVAL_STRICT === 'true') {
+          return Response.json({ ok: false, error: 'MANAGER_APPROVAL_REQUIRED' }, { status: 403 })
+        }
         // El rol viene del shift token FIRMADO, no del cuerpo. Sin esto,
         // `offline_device_trust` de un mesero que se autoaprobó y de un gerente
         // aprobando en la terminal del mesero se veían IDÉNTICOS en la bitácora.
@@ -68,7 +75,9 @@ export async function POST(request: NextRequest) {
         //   • Fase 1 (default): GRACE — permite pero audita como 'legacy_no_approval'.
         //     Cero riesgo al desplegar; empieza a detectar el vector.
         //   • Fase 2: setear CANCEL_APPROVAL_STRICT=true en el env → 403 (bloquea el POST
-        //     forjado). Se activa cuando el log deje de mostrar 'legacy_no_approval'.
+        //     forjado, incluso si declara offline_approved). Se activa cuando el log
+        //     deje de mostrar 'legacy_no_approval' y las terminales tengan el flujo
+        //     de aprobación durable provisionado.
         if (process.env.CANCEL_APPROVAL_STRICT === 'true') {
           return Response.json({ ok: false, error: 'MANAGER_APPROVAL_REQUIRED' }, { status: 403 })
         }

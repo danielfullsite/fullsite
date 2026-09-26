@@ -62,3 +62,15 @@ it('el conflicto de OCC no devuelve una fila ni una revisión inventadas', async
   expect(result.order).toBeUndefined()
   expect(result.revision).toBeUndefined()
 })
+
+it('CANCEL_APPROVAL_STRICT no permite que offline_approved salte la aprobación', async () => {
+  vi.stubEnv('CANCEL_APPROVAL_STRICT', 'true')
+  const fetchMock = vi.fn()
+  vi.stubGlobal('fetch', fetchMock)
+  const response = await POST(new Request('http://test/api/pos/cancel-item', {
+    method: 'POST', body: JSON.stringify({ order_id: 'order', item_id: 'cancel', offline_approved: true }),
+  }) as unknown as Parameters<typeof POST>[0])
+  expect(response.status).toBe(403)
+  expect(await response.json()).toMatchObject({ ok: false, error: 'MANAGER_APPROVAL_REQUIRED' })
+  expect(fetchMock).not.toHaveBeenCalled()
+})
