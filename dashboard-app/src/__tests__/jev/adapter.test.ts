@@ -143,6 +143,18 @@ describe('adaptador Jev — respuesta válida', () => {
     const out = await adapter(fetchImpl).evaluate(state, spec)
     expect(out.provider).toBe('digitalocean')
   })
+
+  it('acepta el modelo de nivel superior sólo cuando es exactamente Jev', async () => {
+    const { fetchImpl } = mockFetch(() => jsonResponse(200, { ...validAnswers(criteria, 'P0'), model: JEV_MODEL_ID }))
+    const out = await adapter(fetchImpl).evaluate(state, spec)
+    expect(out.status).toBe('ok')
+  })
+
+  it('bloquea un modelo de nivel superior distinto', async () => {
+    const { fetchImpl } = mockFetch(() => jsonResponse(200, { ...validAnswers(criteria, 'P0'), model: 'otro/modelo' }))
+    const out = await adapter(fetchImpl).evaluate(state, spec)
+    expect(out).toMatchObject({ status: 'blocked', block_reason: 'model_mismatch', decision: null })
+  })
 })
 
 describe('adaptador Jev — respuestas inválidas', () => {
