@@ -32,6 +32,39 @@ export interface TaskDoneEvidenceDraft {
   branch_aligned_with_main: boolean | null
 }
 
+/** Export estable de la Caja Windows. Sólo este resumen cerrado puede importarse. */
+export interface P19GateExport {
+  schemaVersion: 1
+  gate: 'fresh_p19_pos_kds_integral'
+  status: 'tested_locally'
+  gateResult: 'blocked'
+  review: 'human_review_required'
+  uiPolicy: 'hold'
+  productionAuthorized: false
+  operationAuthorized: false
+  sourceEvidenceManifestSha256: string
+  counts: {
+    directedNode: ExecutionCounts
+    directedElectronNode: ExecutionCounts
+    uniqueTests: null
+    finalCandidateCertifiedTests: null
+    nativeRecoveryCases: number
+    nativeRecoveryObservedSuccessful: number
+    secondRoundStages: number
+    secondRoundStagesObservedSuccessful: number
+    externalLiveOmitted: number
+  }
+  pending: Record<'guiCdp' | 'visualReplay' | 'twoGuiRestarts' | 'chromiumNetLogs' | 'rendererSecretAudit' | 'integralRegressionBuild' | 'physicalValidation', 'pending'>
+  qualification: 'historical_observations_not_final_candidate_certification'
+}
+
+interface ExecutionCounts {
+  executions: number
+  successfulExecutions: number
+  unsuccessfulExecutions: number
+  explicitlyTimedOutExecutions: number
+}
+
 export interface StoredJevEvidence {
   id: string
   source_ref: string
@@ -108,6 +141,52 @@ export function parseTaskDoneEvidence(raw: unknown): { ok: true; value: TaskDone
   const input = taskDoneInput(draft)
   const validation = checkInput(input)
   return validation.ok ? { ok: true, value: draft, input } : { ok: false, error: 'El paquete no cumple el contrato de redacción.' }
+}
+
+function executionCounts(value: unknown): value is ExecutionCounts {
+  if (!isRecord(value)) return false
+  const fields = ['executions', 'successfulExecutions', 'unsuccessfulExecutions', 'explicitlyTimedOutExecutions'] as const
+  if (!fields.every((key) => nonNegativeInt(value[key]))) return false
+  const counts = value as unknown as ExecutionCounts
+  return counts.successfulExecutions + counts.unsuccessfulExecutions === counts.executions && counts.explicitlyTimedOutExecutions <= counts.unsuccessfulExecutions
+}
+
+/**
+ * Convierte el manifiesto P19 Windows a contradiction_check. Sus fallos/timeouts
+ * no se maquillan como PASS: las reglas devolverán contradicción y revisión humana.
+ */
+export function parseP19GateExport(raw: unknown, sourceSha256: unknown): { ok: true; source_ref: string; source_sha256: string; input: DecisionInput } | { ok: false; error: string } {
+  if (!isRecord(raw) || typeof sourceSha256 !== 'string' || !SHA256_RE.test(sourceSha256)) return { ok: false, error: 'Manifiesto o hash inválido.' }
+  const manifest = raw as Partial<P19GateExport>
+  if (manifest.schemaVersion !== 1 || manifest.gate !== 'fresh_p19_pos_kds_integral' || manifest.status !== 'tested_locally' || manifest.gateResult !== 'blocked' || manifest.review !== 'human_review_required' || manifest.uiPolicy !== 'hold' || manifest.productionAuthorized !== false || manifest.operationAuthorized !== false || manifest.qualification !== 'historical_observations_not_final_candidate_certification') {
+    return { ok: false, error: 'El manifiesto P19 no conserva sus límites obligatorios.' }
+  }
+  if (typeof manifest.sourceEvidenceManifestSha256 !== 'string' || !SHA256_RE.test(manifest.sourceEvidenceManifestSha256) || !isRecord(manifest.counts)) return { ok: false, error: 'Integridad o conteos P19 inválidos.' }
+  const counts = manifest.counts as P19GateExport['counts']
+  if (!executionCounts(counts.directedNode) || !executionCounts(counts.directedElectronNode) || counts.uniqueTests !== null || counts.finalCandidateCertifiedTests !== null || !['nativeRecoveryCases', 'nativeRecoveryObservedSuccessful', 'secondRoundStages', 'secondRoundStagesObservedSuccessful', 'externalLiveOmitted'].every((key) => nonNegativeInt(counts[key as keyof typeof counts])) || counts.nativeRecoveryObservedSuccessful > counts.nativeRecoveryCases || counts.secondRoundStagesObservedSuccessful > counts.secondRoundStages) {
+    return { ok: false, error: 'Conteos P19 inconsistentes.' }
+  }
+  const pendingKeys: (keyof P19GateExport['pending'])[] = ['guiCdp', 'visualReplay', 'twoGuiRestarts', 'chromiumNetLogs', 'rendererSecretAudit', 'integralRegressionBuild', 'physicalValidation']
+  if (!isRecord(manifest.pending) || !pendingKeys.every((key) => manifest.pending?.[key] === 'pending')) return { ok: false, error: 'Los gates pendientes fueron alterados.' }
+  // No sumamos recovery/stages como pruebas únicas: el manifiesto declara que el
+  // total único es desconocido. Sólo contamos las ejecuciones dirigidas explícitas.
+  const passed = counts.directedNode.successfulExecutions + counts.directedElectronNode.successfulExecutions
+  const failed = counts.directedNode.unsuccessfulExecutions + counts.directedElectronNode.unsuccessfulExecutions
+  const input: DecisionInput = {
+    contract_version: JEV_CONTRACT_VERSION,
+    use_case: 'contradiction_check',
+    // Scope sintético estable del paquete, no representa un restaurante ni un tenant real.
+    tenant_ref: `t_${sourceSha256.slice(0, 32)}`,
+    effect_domains: ['operational'],
+    state: {
+      report: { claimed_status: 'tested_locally', claimed_tests_passed: passed, claimed_tests_failed: failed, claims_no_limitations: false },
+      tests: { passed, failed, skipped: counts.externalLiveOmitted },
+      limitations: { open_count: pendingKeys.length, any_blocks_claimed_status: false },
+    },
+  }
+  return checkInput(input).ok
+    ? { ok: true, source_ref: 'fresh-p19-pos-kds-integral-20260926', source_sha256: sourceSha256, input }
+    : { ok: false, error: 'El manifiesto no pudo convertirse a evidencia segura.' }
 }
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
