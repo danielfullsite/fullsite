@@ -52,6 +52,25 @@ for (const proxy of ['query', 'path']) describe(`identidad y catálogo por ${pro
     expect((await patch('pos_customers', { id: 'cliente-nuevo', client_id: 'otro', name: 'Ana' }, 'POST')).status).toBe(200)
     expect(writes[0].body).toMatchObject({ id: 'cliente-nuevo', client_id: 'tenant-lab' })
   })
+  it('clients se lee por el id del tenant, nunca por client_id', async () => {
+    const url = proxy === 'query'
+      ? 'http://localhost/api/pos/db?path=clients%3Fselect%3Did%2Ctimezone'
+      : 'http://localhost/api/pos/db/rest/v1/clients?select=id,timezone'
+    const req = new NextRequest(url)
+    let response: Response
+    if (proxy === 'query') {
+      const route = await import('@/app/api/pos/db/route')
+      response = await route.GET(req)
+    } else {
+      const route = await import('@/app/api/pos/db/[...path]/route')
+      response = await route.GET(req, { params: Promise.resolve({ path: ['rest', 'v1', 'clients'] }) })
+    }
+    expect(response.status).toBe(200)
+    expect(writes).toHaveLength(1)
+    const scoped = new URL(writes[0].url).searchParams
+    expect(scoped.get('id')).toBe('eq.tenant-lab')
+    expect(scoped.get('client_id')).toBeNull()
+  })
   it.each(['pos_modifiers', 'pos_sizes', 'pos_price_types', 'pos_combos', 'pos_inventory', 'pos_ingredients', 'pos_recipes'])('mesero no altera %s', async table => {
     expect((await patch(table, { price: 1, stock: 999 })).status).toBe(403)
     expect(writes).toHaveLength(0)

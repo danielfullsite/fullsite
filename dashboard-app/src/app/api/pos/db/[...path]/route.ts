@@ -9,10 +9,11 @@
 // ${SUPABASE_URL}/rest/v1/* → /api/pos/db/rest/v1/* con el shift token.
 //
 // Seguridad:
-//  - Solo /rest/v1/pos_* (tablas del POS). **Los RPC se rechazan** — ver abajo.
-//  - GET/PATCH/DELETE: inyecta client_id=eq.<tokenClientId> (PostgREST hace AND) →
-//    una fila de otro tenant nunca matchea, aunque filtren por id.
-//  - POST: fuerza client_id=<tokenClientId> en cada fila del body.
+//  - Solo /rest/v1/pos_* y `clients` (configuración propia). **Los RPC se rechazan** — ver abajo.
+//  - GET/PATCH/DELETE: inyecta client_id=eq.<tokenClientId>; `clients` se acota
+//    por id=eq.<tokenClientId> porque no tiene client_id. PostgREST hace AND →
+//    una fila de otro tenant nunca matchea.
+//  - POST: fuerza client_id=<tokenClientId> en cada fila del body (clients es solo lectura).
 //
 // POR QUÉ LOS RPC SE RECHAZAN
 //
@@ -50,7 +51,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withPOSAuth, unauthorized } from '@/lib/api-auth'
 import { scopedProxyRequest } from '@/lib/pos-db-scoped'
-import { ALLOW, NO_CID, puedeEscribirEn, MANAGER_ONLY_DELETE, prepararCuerpoProxy, isManager, redactResponse, tableOf, consultaProxyValida } from '@/lib/pos-db-policy'
+import { ALLOW, NO_CID, SCOPED_BY_OWN_ID, puedeEscribirEn, MANAGER_ONLY_DELETE, prepararCuerpoProxy, isManager, redactResponse, tableOf, consultaProxyValida } from '@/lib/pos-db-policy'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -68,6 +69,7 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ path: string[] 
   const rel = (path || []).join('/')
   if (!rel.startsWith('rest/v1/')) return forbidden('solo /rest/v1/*')
   const resource = rel.slice('rest/v1/'.length)
+  const resourceName = resource.split('?')[0]
 
   // ── Los RPC no pasan ──────────────────────────────────────────────────
   // Va ANTES que todo lo demás a propósito. Cuando la condición era `!isRpc`
@@ -89,7 +91,10 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ path: string[] 
     return forbidden('este proxy no expone RPC — usa la ruta de API correspondiente')
   }
 
-  if (!resource.startsWith('pos_')) return forbidden('solo tablas pos_*')
+  // `clients` es la única tabla no-pos_ permitida: aporta la configuración del
+  // restaurante y siempre queda acotada por su propio `id` más abajo. Cualquier
+  // otro recurso sigue rechazado antes de tocar el proxy con service_role.
+  if (!resourceName.startsWith('pos_') && resourceName !== 'clients') return forbidden('solo tablas pos_* o clients')
 
   // ── Autorización por tabla ────────────────────────────────────────────
   // Hasta hoy aquí no había nada: bastaba que la tabla empezara con `pos_`.
@@ -108,11 +113,15 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ path: string[] 
     return forbidden('borrar requiere rol de gerente; cancela la orden en su lugar')
   }
 
-  // Query params del request original + forzar client_id salvo en inserts.
+  // Query params del request original + scope del tenant salvo en inserts.
+  // `clients` es la excepción: su clave de tenant es `id`, no `client_id`.
+  // Mantener este contrato igual al proxy de query evita que Electron lea una
+  // configuración vacía y caiga en defaults que no corresponden al restaurante.
   const params = new URLSearchParams(req.nextUrl.search)
   if (!consultaProxyValida(table, params)) return forbidden('consulta no permitida')
-  if (req.method !== 'POST' && !NO_CID.has(table)) {
-    params.set('client_id', `eq.${clientId}`)
+  if (req.method !== 'POST') {
+    if (SCOPED_BY_OWN_ID.has(table)) params.set('id', `eq.${clientId}`)
+    else if (!NO_CID.has(table)) params.set('client_id', `eq.${clientId}`)
   }
   const qs = params.toString()
   const target = `${SUPABASE_URL}/rest/v1/${table}${qs ? `?${qs}` : ''}`
