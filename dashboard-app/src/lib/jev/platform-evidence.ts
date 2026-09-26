@@ -58,6 +58,39 @@ export interface P19GateExport {
   qualification: 'historical_observations_not_final_candidate_certification'
 }
 
+/**
+ * Diagnóstico de admisión del editor, exportado después del primer gate GUI.
+ * Es deliberadamente distinto del gate integral: un `scoped_pass` no puede
+ * convertirse por esta ruta en una certificación P19 completa.
+ */
+export interface P19AdmissionExport {
+  schemaVersion: 1
+  gate: 'fresh_p19_editor_admission_diagnostic'
+  status: 'tested_locally'
+  gateResult: 'scoped_pass'
+  review: 'human_review_required'
+  uiPolicy: 'hold'
+  productionAuthorized: false
+  operationAuthorized: false
+  evidenceManifestSha256: string
+  counts: {
+    nodeExecuted: number
+    nodePassed: number
+    nodeFailed: number
+    nodeOmitted: number
+    electronExecuted: number
+    electronPassed: number
+    electronFailed: number
+    electronOmitted: number
+    guiFinalExecuted: number
+    guiFinalPassed: number
+    guiDiagnosticFailed: number
+    externalLiveOmitted: number
+  }
+  pending: readonly ['integral_gui', 'kds_replay', 'two_restarts', 'ack_concurrency_closure', 'abrupt_recovery', 'complete_netlogs', 'renderer_secret_audit', 'integral_regression', 'physical_validation']
+  finalCandidateCertifiedTests: null
+}
+
 interface ExecutionCounts {
   executions: number
   successfulExecutions: number
@@ -187,6 +220,41 @@ export function parseP19GateExport(raw: unknown, sourceSha256: unknown): { ok: t
   return checkInput(input).ok
     ? { ok: true, source_ref: 'fresh-p19-pos-kds-integral-20260926', source_sha256: sourceSha256, input }
     : { ok: false, error: 'El manifiesto no pudo convertirse a evidencia segura.' }
+}
+
+/** Importa únicamente la forma cerrada del diagnóstico de admisión P19. */
+export function parseP19AdmissionExport(raw: unknown, sourceSha256: unknown): { ok: true; source_ref: string; source_sha256: string; input: DecisionInput } | { ok: false; error: string } {
+  if (!isRecord(raw) || typeof sourceSha256 !== 'string' || !SHA256_RE.test(sourceSha256)) return { ok: false, error: 'Manifiesto o hash inválido.' }
+  const manifest = raw as Partial<P19AdmissionExport>
+  if (manifest.schemaVersion !== 1 || manifest.gate !== 'fresh_p19_editor_admission_diagnostic' || manifest.status !== 'tested_locally' || manifest.gateResult !== 'scoped_pass' || manifest.review !== 'human_review_required' || manifest.uiPolicy !== 'hold' || manifest.productionAuthorized !== false || manifest.operationAuthorized !== false || manifest.finalCandidateCertifiedTests !== null) {
+    return { ok: false, error: 'El diagnóstico de admisión no conserva sus límites obligatorios.' }
+  }
+  if (typeof manifest.evidenceManifestSha256 !== 'string' || !SHA256_RE.test(manifest.evidenceManifestSha256) || !isRecord(manifest.counts) || !Array.isArray(manifest.pending)) return { ok: false, error: 'Integridad o conteos de admisión inválidos.' }
+  const counts = manifest.counts as P19AdmissionExport['counts']
+  const countKeys = ['nodeExecuted', 'nodePassed', 'nodeFailed', 'nodeOmitted', 'electronExecuted', 'electronPassed', 'electronFailed', 'electronOmitted', 'guiFinalExecuted', 'guiFinalPassed', 'guiDiagnosticFailed', 'externalLiveOmitted'] as const
+  if (!countKeys.every((key) => nonNegativeInt(counts[key])) || counts.nodePassed + counts.nodeFailed + counts.nodeOmitted !== counts.nodeExecuted || counts.electronPassed + counts.electronFailed + counts.electronOmitted !== counts.electronExecuted || counts.guiFinalPassed > counts.guiFinalExecuted) {
+    return { ok: false, error: 'Conteos de admisión inconsistentes.' }
+  }
+  const pending = ['integral_gui', 'kds_replay', 'two_restarts', 'ack_concurrency_closure', 'abrupt_recovery', 'complete_netlogs', 'renderer_secret_audit', 'integral_regression', 'physical_validation'] as const
+  if (manifest.pending.length !== pending.length || !pending.every((value, index) => manifest.pending?.[index] === value)) return { ok: false, error: 'Los gates pendientes de admisión fueron alterados.' }
+  // Los dos fallos de diagnóstico son históricos y no pertenecen a la ejecución
+  // final; se mantienen en el manifiesto pero no se presentan como fallo final.
+  const passed = counts.nodePassed + counts.electronPassed + counts.guiFinalPassed
+  const failed = counts.nodeFailed + counts.electronFailed
+  const input: DecisionInput = {
+    contract_version: JEV_CONTRACT_VERSION,
+    use_case: 'contradiction_check',
+    tenant_ref: `t_${sourceSha256.slice(0, 32)}`,
+    effect_domains: ['operational'],
+    state: {
+      report: { claimed_status: 'tested_locally', claimed_tests_passed: passed, claimed_tests_failed: failed, claims_no_limitations: false },
+      tests: { passed, failed, skipped: counts.nodeOmitted + counts.electronOmitted + counts.externalLiveOmitted },
+      limitations: { open_count: pending.length, any_blocks_claimed_status: false },
+    },
+  }
+  return checkInput(input).ok
+    ? { ok: true, source_ref: 'fresh-p19-editor-admission-diagnostic-20260926', source_sha256: sourceSha256, input }
+    : { ok: false, error: 'El diagnóstico no pudo convertirse a evidencia segura.' }
 }
 
 export function isRecord(value: unknown): value is Record<string, unknown> {

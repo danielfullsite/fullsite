@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createJevAdapter } from '@/lib/jev/adapter'
 import { createMemoryAuditSink } from '@/lib/jev/audit'
 import { evaluateDecision } from '@/lib/jev/engine'
-import { parseP19GateExport, parseTaskDoneEvidence, taskDoneInput } from '@/lib/jev/platform-evidence'
+import { parseP19AdmissionExport, parseP19GateExport, parseTaskDoneEvidence, taskDoneInput } from '@/lib/jev/platform-evidence'
 
 const valid = {
   source_ref: 'fresh-p19-pos-kds-integral-20260926',
@@ -60,5 +60,24 @@ describe('evidencia JEV del control plane', () => {
 
   it('rechaza P19 si alguien intenta cambiar HOLD o borrar sus pendientes', () => {
     expect(parseP19GateExport({ schemaVersion: 1, gate: 'fresh_p19_pos_kds_integral', uiPolicy: 'open' }, 'c'.repeat(64)).ok).toBe(false)
+  })
+
+  it('importa el diagnóstico de admisión como alcance limitado, no como P19 integral', () => {
+    const manifest = {
+      schemaVersion: 1, gate: 'fresh_p19_editor_admission_diagnostic', status: 'tested_locally', gateResult: 'scoped_pass', review: 'human_review_required', uiPolicy: 'hold', productionAuthorized: false, operationAuthorized: false,
+      evidenceManifestSha256: 'd'.repeat(64),
+      counts: { nodeExecuted: 16, nodePassed: 16, nodeFailed: 0, nodeOmitted: 0, electronExecuted: 16, electronPassed: 16, electronFailed: 0, electronOmitted: 0, guiFinalExecuted: 1, guiFinalPassed: 1, guiDiagnosticFailed: 2, externalLiveOmitted: 6 },
+      pending: ['integral_gui', 'kds_replay', 'two_restarts', 'ack_concurrency_closure', 'abrupt_recovery', 'complete_netlogs', 'renderer_secret_audit', 'integral_regression', 'physical_validation'],
+      finalCandidateCertifiedTests: null,
+    } as const
+    const parsed = parseP19AdmissionExport(manifest, 'e'.repeat(64))
+    expect(parsed.ok).toBe(true)
+    if (!parsed.ok) return
+    expect(parsed.source_ref).toBe('fresh-p19-editor-admission-diagnostic-20260926')
+    expect(parsed.input.state).toMatchObject({ tests: { passed: 33, failed: 0, skipped: 6 }, limitations: { open_count: 9 } })
+  })
+
+  it('rechaza el diagnóstico si se abre UI, se autoriza producción o se borra un pendiente', () => {
+    expect(parseP19AdmissionExport({ schemaVersion: 1, gate: 'fresh_p19_editor_admission_diagnostic', uiPolicy: 'open' }, 'e'.repeat(64)).ok).toBe(false)
   })
 })

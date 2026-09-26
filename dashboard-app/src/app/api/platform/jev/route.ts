@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { requirePlatformAdmin2FA, platformServiceFetch } from '@/lib/platform-auth'
 import { auditLog, rateLimit } from '@/lib/platform-writes'
-import { isRecord, parseP19GateExport, parseTaskDoneEvidence } from '@/lib/jev/platform-evidence'
+import { isRecord, parseP19AdmissionExport, parseP19GateExport, parseTaskDoneEvidence } from '@/lib/jev/platform-evidence'
 import { JEV_SYSTEM_CONTEXT_VERSION, JEV_SYSTEM_DOMAINS } from '@/lib/jev/system-context'
 
 export const dynamic = 'force-dynamic'
@@ -47,7 +47,9 @@ export async function POST(req: NextRequest) {
   try { raw = await req.json() } catch { return Response.json({ error: 'JSON inválido.' }, { status: 400 }) }
   const parsed = isRecord(raw) && 'p19_manifest' in raw
     ? parseP19GateExport(raw.p19_manifest, raw.source_sha256)
-    : parseTaskDoneEvidence(raw)
+    : isRecord(raw) && 'p19_admission_manifest' in raw
+      ? parseP19AdmissionExport(raw.p19_admission_manifest, raw.source_sha256)
+      : parseTaskDoneEvidence(raw)
   if (!parsed.ok) return Response.json({ error: parsed.error }, { status: 400 })
   const sourceRef = 'value' in parsed ? parsed.value.source_ref : parsed.source_ref
   const sourceSha256 = 'value' in parsed ? parsed.value.source_sha256 : parsed.source_sha256
@@ -66,7 +68,7 @@ export async function POST(req: NextRequest) {
   const rows: unknown = await res.json()
   const evidence = Array.isArray(rows) && isRecord(rows[0]) ? rows[0] : null
   await auditLog(gate.ctx, {
-    action: isRecord(raw) && 'p19_manifest' in raw ? 'jev.evidence.import_p19' : 'jev.evidence.register', scope: 'global',
+    action: isRecord(raw) && 'p19_manifest' in raw ? 'jev.evidence.import_p19' : isRecord(raw) && 'p19_admission_manifest' in raw ? 'jev.evidence.import_p19_admission' : 'jev.evidence.register', scope: 'global',
     detail: { source_ref: sourceRef, source_sha256: sourceSha256, input_hash_only: true },
   })
   return Response.json({ evidence }, { status: 201 })
