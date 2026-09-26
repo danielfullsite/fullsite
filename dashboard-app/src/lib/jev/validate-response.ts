@@ -26,7 +26,7 @@ export interface JevWireResult {
 
 export type ValidationOutcome = { ok: true; value: JevWireResult } | { ok: false; error: string }
 
-const TOP_KEYS = new Set(['answers', 'rounding', 'usage', 'warnings', 'providerMetadata'])
+const TOP_KEYS = new Set(['answers', 'rounding', 'usage', 'warnings', 'providerMetadata', 'model'])
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 const isProb = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1
@@ -74,11 +74,13 @@ export function validateJevResponse(body: unknown, questions: Record<string, Jev
   const fail = (error: string): ValidationOutcome => ({ ok: false, error })
   if (!isObj(body)) return fail('cuerpo no es objeto')
   for (const k of Object.keys(body)) if (!TOP_KEYS.has(k)) return fail(`clave inesperada '${k}'`)
-  const { answers, rounding, usage, warnings } = body
+  const { answers, rounding, usage, warnings, model } = body
   if (!isObj(answers)) return fail('answers ausente')
   if (!sameKeys(Object.keys(answers), Object.keys(questions))) return fail('answers no corresponde 1:1 con las preguntas')
   if (rounding !== undefined && !isObj(rounding)) return fail('rounding inválido')
   if (warnings !== undefined && !Array.isArray(warnings)) return fail('warnings inválido')
+  if (model !== undefined && (typeof model !== 'string' || model.length === 0 || model.length > 120))
+    return fail('model inválido')
   // `rounding` viene del modelo y ensancha tolerancias: sólo se acepta si es entero en [0,10].
   // Un valor negativo o fraccionario desactivaría las invariantes de suma y argmax.
   const decimals = (k: 'probabilityDecimals' | 'scoreDecimals'): number | undefined | 'bad' => {
@@ -156,13 +158,16 @@ export function validateJevResponse(body: unknown, questions: Record<string, Jev
           ['gateway', 'provider'],
         ]).find((x): x is string => typeof x === 'string' && x.length > 0) ?? null)?.slice(0, 80) ?? null,
       // Cualquier valor (incluso no-string o muy largo) cuenta: el adaptador exige que TODOS sean Jev.
-      reportedModels: pickAll(meta, [
+      reportedModels: [
+        ...(model === undefined ? [] : [model]),
+        ...pickAll(meta, [
         ['gateway', 'routing', 'resolvedModel'],
         ['gateway', 'routing', 'resolvedModelId'],
         ['gateway', 'routing', 'originalModelId'],
         ['gateway', 'modelId'],
         ['gateway', 'model'],
-      ]).map((x) => (typeof x === 'string' ? x : JSON.stringify(x) ?? String(x))),
+        ]).map((x) => (typeof x === 'string' ? x : JSON.stringify(x) ?? String(x))),
+      ],
     },
   }
 }

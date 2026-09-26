@@ -87,8 +87,39 @@ describe('adaptador Jev — timeout y red', () => {
 
   it.each([401, 429, 500, 502, 503])('HTTP %i: bloquea', async (status) => {
     const { fetchImpl } = mockFetch(() => jsonResponse(status, 'upstream error'))
-    const out = await adapter(fetchImpl).evaluate(state, spec)
+    const out = await adapter(fetchImpl, { maxRateLimitRetries: 0 }).evaluate(state, spec)
     expect(out.block_reason).toBe('http_error')
+  })
+
+  it('HTTP 429: espera y reintenta de forma acotada hasta obtener respuesta válida', async () => {
+    let attempt = 0
+    const sleeps: number[] = []
+    const { fetchImpl, calls } = mockFetch(() => {
+      attempt++
+      return attempt < 3
+        ? new Response(JSON.stringify({ error: { type: 'rate_limit_exceeded' } }), {
+            status: 429,
+            headers: { 'content-type': 'application/json', 'retry-after': '0.01' },
+          })
+        : jsonResponse(200, { ...validAnswers(criteria, 'P0'), model: JEV_MODEL_ID })
+    })
+    const out = await adapter(fetchImpl, {
+      maxRateLimitRetries: 2,
+      retryBaseDelayMs: 1,
+      sleep: async (ms) => { sleeps.push(ms) },
+    }).evaluate(state, spec)
+    expect(out.status).toBe('ok')
+    expect(calls).toHaveLength(3)
+    expect(sleeps).toEqual([10, 10])
+  })
+
+  it('HTTP 503 no se reintenta: se diagnostica separado de rate limit', async () => {
+    const sleeps: number[] = []
+    const { fetchImpl, calls } = mockFetch(() => jsonResponse(503, { error: { type: 'service_unavailable_error' } }))
+    const out = await adapter(fetchImpl, { sleep: async (ms) => { sleeps.push(ms) } }).evaluate(state, spec)
+    expect(out).toMatchObject({ block_reason: 'http_error', detail: 'HTTP 503 service_unavailable_error' })
+    expect(calls).toHaveLength(1)
+    expect(sleeps).toEqual([])
   })
 })
 
@@ -137,6 +168,18 @@ describe('adaptador Jev — respuesta válida', () => {
     expect(out.decision).toBeNull()
   })
 
+  it('acepta el modelo correcto reportado en la raíz por el protocolo vivo', async () => {
+    const { fetchImpl } = mockFetch(() => jsonResponse(200, { ...validAnswers(criteria, 'P0'), model: JEV_MODEL_ID }))
+    const out = await adapter(fetchImpl).evaluate(state, spec)
+    expect(out.status).toBe('ok')
+  })
+
+  it('rechaza sustitución de modelo reportada en la raíz', async () => {
+    const { fetchImpl } = mockFetch(() => jsonResponse(200, { ...validAnswers(criteria, 'P0'), model: 'otro/modelo' }))
+    const out = await adapter(fetchImpl).evaluate(state, spec)
+    expect(out.block_reason).toBe('model_mismatch')
+  })
+
   it('registra el proveedor si el gateway lo reporta', async () => {
     const meta = { gateway: { routing: { resolvedModel: JEV_MODEL_ID, finalProvider: 'digitalocean' } } }
     const { fetchImpl } = mockFetch(() => jsonResponse(200, validAnswers(criteria, 'P0', 0.9, { meta })))
@@ -151,6 +194,7 @@ describe('adaptador Jev — respuestas inválidas', () => {
     ['no JSON', () => '<html>oops</html>'],
     ['arreglo', () => []],
     ['clave inesperada', () => ({ ...base(), text: 'P3 please' })],
+    ['model raíz con tipo inválido', () => ({ ...base(), model: { id: JEV_MODEL_ID } })],
     ['falta una respuesta', () => { const b = base(); delete b.answers.risk; return b }],
     ['respuesta de más', () => { const b = base(); b.answers.extra = { type: 'boolean', probability: 1 }; return b }],
     ['choice fuera del conjunto', () => { const b = base(); b.answers.decision.choice = 'P9'; return b }],

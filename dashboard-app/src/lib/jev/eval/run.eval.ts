@@ -17,15 +17,41 @@ import { JEV_DEFAULT_TIMEOUT_MS, createJevAdapter } from '../adapter'
 import { createFileAuditSink, verifyAuditChain } from '../audit'
 import type { CaseResult, ComparisonReport } from '../compare'
 import { compare } from '../compare'
-import { JEV_MODEL_ID, JEV_PRICE_PER_INPUT_TOKEN_USD } from '../contract'
+import { JEV_MODEL_ID, JEV_PRICE_PER_INPUT_TOKEN_USD, USE_CASES } from '../contract'
+import type { UseCase } from '../contract'
 import { evaluateDecision } from '../engine'
 import { HOSTILE_INPUTS, SYNTHETIC_CASES } from '../fixtures/synthetic-cases'
+import { JEV_EVALUATION_TARGET_CASES } from './corpus-plan'
 
 const SPEND_CAP_USD = 1.0
-const MIN_INTERVAL_MS = 200 // 5 req/s
+const DEFAULT_MIN_INTERVAL_MS = 200 // 5 req/s
+
+function boundedInteger(name: string, fallback: number, min: number, max: number): number {
+  const raw = process.env[name]
+  if (raw === undefined || raw === '') return fallback
+  const parsed = Number(raw)
+  if (!Number.isSafeInteger(parsed) || parsed < min || parsed > max) {
+    throw new Error(`${name} debe ser un entero entre ${min} y ${max}`)
+  }
+  return parsed
+}
+
+function selectedUseCases(): readonly UseCase[] {
+  const raw = process.env.JEV_USE_CASE_FILTER?.trim()
+  if (!raw) return USE_CASES
+  const selected = [...new Set(raw.split(',').map((value) => value.trim()).filter(Boolean))]
+  const invalid = selected.filter((value) => !USE_CASES.includes(value as UseCase))
+  if (invalid.length > 0) throw new Error(`JEV_USE_CASE_FILTER contiene casos desconocidos: ${invalid.join(', ')}`)
+  if (selected.length === 0) throw new Error('JEV_USE_CASE_FILTER no puede quedar vacío')
+  return selected as UseCase[]
+}
 
 it('corrida de comparación Jev vs reglas', { timeout: 600_000 }, async () => {
   const live = process.env.JEV_LIVE === '1'
+  const minIntervalMs = boundedInteger('JEV_MIN_INTERVAL_MS', DEFAULT_MIN_INTERVAL_MS, 200, 10_000)
+  const timeoutMs = boundedInteger('JEV_TIMEOUT_MS', JEV_DEFAULT_TIMEOUT_MS, 500, 30_000)
+  const useCases = selectedUseCases()
+  const selectedCases = SYNTHETIC_CASES.filter((c) => useCases.includes(c.input.use_case))
   const outDir = resolve(process.env.JEV_REPORT_DIR ?? join(__dirname, '..', '..', '..', '..', '..', 'docs', 'ai', 'jev', 'reports'))
   mkdirSync(outDir, { recursive: true })
   const stamp = new Date().toISOString().replace(/[:.]/g, '-')
@@ -38,14 +64,14 @@ it('corrida de comparación Jev vs reglas', { timeout: 600_000 }, async () => {
   const sentStates: string[] = []
   const guardedFetch: FetchLike = async (url, init) => {
     if (spent >= SPEND_CAP_USD) throw new Error('tope de gasto alcanzado')
-    const wait = last + MIN_INTERVAL_MS - Date.now()
+    const wait = last + minIntervalMs - Date.now()
     if (wait > 0) await new Promise((r) => setTimeout(r, wait))
     last = Date.now()
     networkCalls++
     sentStates.push(JSON.stringify((JSON.parse(String(init.body)) as { state: unknown }).state))
     return fetch(url, init)
   }
-  const jev = createJevAdapter({ enabled: live && process.env.JEV_SHADOW_ENABLED === '1', fetchImpl: guardedFetch, timeoutMs: JEV_DEFAULT_TIMEOUT_MS })
+  const jev = createJevAdapter({ enabled: live && process.env.JEV_SHADOW_ENABLED === '1', fetchImpl: guardedFetch, timeoutMs })
   let accountBlocker: string | null = null
   const blockedByAccount = {
     async evaluate() {
@@ -66,7 +92,7 @@ it('corrida de comparación Jev vs reglas', { timeout: 600_000 }, async () => {
 
   const results: CaseResult[] = []
   const seen = new Set<string>() // idempotencia: case_id + modelo
-  for (const c of SYNTHETIC_CASES) {
+  for (const c of selectedCases) {
     const key = `${c.case_id}|${JEV_MODEL_ID}`
     if (seen.has(key)) continue
     seen.add(key)
@@ -95,9 +121,14 @@ it('corrida de comparación Jev vs reglas', { timeout: 600_000 }, async () => {
     ...report,
     run: {
       live,
+      shadow_only: true,
+      executable: false,
+      selected_use_cases: useCases,
+      selected_case_ids: selectedCases.map((c) => c.case_id),
       spend_cap_usd: SPEND_CAP_USD,
-      rate_limit_rps: 1000 / MIN_INTERVAL_MS,
-      timeout_ms: JEV_DEFAULT_TIMEOUT_MS,
+      min_interval_ms: minIntervalMs,
+      rate_limit_rps: 1000 / minIntervalMs,
+      timeout_ms: timeoutMs,
       price_per_input_token_usd: JEV_PRICE_PER_INPUT_TOKEN_USD,
       network_calls: networkCalls,
       account_blocker: accountBlocker,
@@ -108,6 +139,9 @@ it('corrida de comparación Jev vs reglas', { timeout: 600_000 }, async () => {
       audit_file: `${base}.audit.jsonl`.slice(outDir.length + 1),
       audit_records: audit.readAll().length,
       audit_chain_ok: chain.ok,
+      evaluation_target_cases: JEV_EVALUATION_TARGET_CASES,
+      authored_cases_total: SYNTHETIC_CASES.length,
+      remaining_independent_cases: JEV_EVALUATION_TARGET_CASES - SYNTHETIC_CASES.length,
     },
     hostile,
     per_case: results.map((r) => ({

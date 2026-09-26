@@ -1,0 +1,50 @@
+{
+  "contract": "jev-evaluation-corpus-plan/1.0.0",
+  "created_at": "2026-09-25",
+  "model": "typesafe-ai/jev",
+  "target": 2000,
+  "authored_pipeline_fixtures": 43,
+  "independently_labeled_required": 1957,
+  "shadow_only": true,
+  "live_execution": false,
+  "authority_change_authorized": false,
+  "allocation": [
+    {
+      "use_case": "alert_priority",
+      "target": 400,
+      "authored_pipeline_fixtures": 12,
+      "independently_labeled_required": 388
+    },
+    {
+      "use_case": "incident_classification",
+      "target": 400,
+      "authored_pipeline_fixtures": 10,
+      "independently_labeled_required": 390
+    },
+    {
+      "use_case": "agent_routing",
+      "target": 400,
+      "authored_pipeline_fixtures": 8,
+      "independently_labeled_required": 392
+    },
+    {
+      "use_case": "task_done",
+      "target": 400,
+      "authored_pipeline_fixtures": 7,
+      "independently_labeled_required": 393
+    },
+    {
+      "use_case": "contradiction_check",
+      "target": 400,
+      "authored_pipeline_fixtures": 6,
+      "independently_labeled_required": 394
+    }
+  ],
+  "requirements": [
+    "Use an oracle labeled independently from the deterministic rules and adapter implementation.",
+    "Do not count duplicated or paraphrased pipeline fixtures as new independent evidence.",
+    "Run bounded batches with explicit cost, rate, timeout and provider-availability reporting.",
+    "Keep Jev shadow-only, non-executable and outside POS, KDS and production routes.",
+    "Require a separate human decision before any future authority or production change."
+  ]
+}
