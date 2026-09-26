@@ -278,6 +278,45 @@ export const REDACTED_COLUMNS: Record<string, readonly string[]> = {
   clients: ['wansoft_user', 'wansoft_pass', 'wansoft_cookies'],
 }
 
+/**
+ * Lista BLANCA de columnas por tabla (revisión independiente 9, P2). `clients` trae de todo —
+ * credenciales de Wansoft, correos del dueño, el plan de aprovisionamiento, datos fiscales— y con
+ * lista negra cualquier columna secreta que se agregue mañana saldría por omisión. El POS sólo
+ * necesita lo mismo que el catálogo de la Caja: `CONFIG_FIELDS` de pos-menu-catalog.ts (una prueba
+ * exige que coincidan). Sólo aplica a terminales: el dashboard va directo con el JWT del usuario.
+ * La respuesta se recorta a estas columnas y se rechaza (403) toda consulta que nombre otra.
+ */
+export const COLUMNAS_PERMITIDAS: Record<string, readonly string[]> = {
+  clients: ['id', 'display_name', 'plan', 'city', 'timezone', 'type', 'default_theme', 'accent_color',
+    'mesas', 'meseros', 'features', 'iva_rate', 'data_source', 'logo_url', 'menu_categories', 'bebida_groups',
+    'address', 'phone', 'rfc', 'receipt_footer', 'social_media', 'razon_social', 'pos_settings'],
+}
+
+const PARAMS_SIN_COLUMNA = new Set(['limit', 'offset'])
+const PARAMS_LOGICOS = new Set(['or', 'and', 'not.or', 'not.and'])
+
+/** Columnas que nombra una consulta de PostgREST, o null si no se puede analizar (falla cerrado). */
+export function columnasNombradas(params: URLSearchParams): string[] | null {
+  const salida: string[] = []
+  const lista = (v: string) => v.split(',').map(s => s.trim()).filter(Boolean)
+  for (const [k, v] of params.entries()) {
+    if (PARAMS_SIN_COLUMNA.has(k)) continue
+    if (k === 'select') { for (const c of lista(v)) if (c !== '*') salida.push(c); continue }
+    if (k === 'order') { for (const c of lista(v)) salida.push(c.split('.')[0]); continue }
+    if (k === 'columns' || k === 'on_conflict') { salida.push(...lista(v)); continue }
+    if (PARAMS_LOGICOS.has(k)) {
+      // `col.op.valor` dentro de (…). `and(`/`or(` anidados van seguidos de `(`, no de `.`.
+      // Una coma dentro de un valor entre comillas produce nombres de más: se rechaza de más, no de menos.
+      for (const m of v.matchAll(/(?:^|[(,])\s*(?:not\.)?([A-Za-z_]\w*)\s*(?=\.|->)/g)) salida.push(m[1])
+      continue
+    }
+    const m = /^([A-Za-z_]\w*)(?:->>?.*)?$/.exec(k)
+    if (!m) return null
+    salida.push(m[1])
+  }
+  return salida
+}
+
 export function isManager(role: string | undefined | null): boolean {
   return role === 'admin' || role === 'gerente' || role === 'dueño'
 }
@@ -296,20 +335,26 @@ export function tableOf(path: string): string {
  * dejaría al POS sin datos.
  */
 export function redactResponse(table: string, text: string, contentType: string | null): string {
-  const cols = REDACTED_COLUMNS[table]
-  if (!cols || !text) return text
-  if (contentType && !contentType.includes('json')) return text
+  const cols = REDACTED_COLUMNS[table] || []
+  const permitidas = COLUMNAS_PERMITIDAS[table]
+  if ((!cols.length && !permitidas) || !text) return text
+  // Tabla con columnas ocultas: lo que no sea JSON no sale (revisión 9, P3). Hoy ningún proxy
+  // reenvía `Accept`, así que PostgREST siempre contesta JSON; esto es defensa en profundidad.
+  if (contentType && !contentType.includes('json')) return ''
 
   let data: unknown
   try {
     data = JSON.parse(text)
   } catch {
-    return text
+    return ''
   }
 
   const strip = (row: unknown): unknown => {
     if (!row || typeof row !== 'object' || Array.isArray(row)) return row
-    const out = { ...(row as Record<string, unknown>) }
+    const fila = row as Record<string, unknown>
+    const out: Record<string, unknown> = permitidas
+      ? Object.fromEntries(permitidas.filter(c => Object.prototype.hasOwnProperty.call(fila, c)).map(c => [c, fila[c]]))
+      : { ...fila }
     for (const c of cols) delete out[c]
     return out
   }
@@ -357,5 +402,10 @@ export function consultaProxyValida(table: string, params: URLSearchParams): boo
   const select = params.get('select')
   if (select !== null && !/^(?:\*|[a-z_][a-z0-9_]*)(?:,(?:\*|[a-z_][a-z0-9_]*))*$/i.test(select)) return false
   const secrets = REDACTED_COLUMNS[table] || []
+  const permitidas = COLUMNAS_PERMITIDAS[table]
+  if (permitidas) {
+    const nombradas = columnasNombradas(params)
+    if (!nombradas || nombradas.some(c => !permitidas.includes(c))) return false
+  }
   return !secrets.some(column => new RegExp(`\\b${column}\\b`, 'i').test(Array.from(params.entries()).flat().join(' ')))
 }

@@ -17,6 +17,11 @@ const [USUARIO, CLAVE, COOKIE] = ['usuario', 'clave', 'cookie'].map(s => ['centi
 const FILA = {
   id: 'tenant-lab', display_name: 'Lab', timezone: 'America/Monterrey', iva_rate: '0.16', mesas: 12,
   wansoft_subsidiary_id: '17', wansoft_user: USUARIO, wansoft_pass: CLAVE, wansoft_cookies: { sesion: COOKIE },
+  // Revisión 9 (P2): nada de esto lo necesita una terminal, y una columna secreta futura tampoco debe salir.
+  report_recipients: ['dueno@lab.test'], business_context: 'contexto', telegram_chat_ids: ['1'],
+  provisioning_plan: { version: 1 }, provisioning_state: 'complete', support_email: 'soporte@lab.test',
+  regimen_fiscal: '601', codigo_postal: '64000', domicilio_fiscal: { calle: 'x' }, staff_supervisors: ['Ana'],
+  columna_futura_secreta: 'no-debe-salir', pos_settings: { 'kds.stations': [] }, features: {}, rfc: 'XAXX010101000',
 }
 let pedidos: string[]
 beforeEach(() => {
@@ -46,7 +51,24 @@ for (const proxy of ['query', 'path'] as const) describe(`clients por el proxy $
     const texto = await r.text()
     for (const x of [USUARIO, CLAVE, COOKIE, 'wansoft_user', 'wansoft_pass', 'wansoft_cookies']) expect(texto, x).not.toContain(x)
     const [fila] = JSON.parse(texto)
-    expect(fila).toMatchObject({ id: 'tenant-lab', timezone: 'America/Monterrey', iva_rate: '0.16', mesas: 12, wansoft_subsidiary_id: '17' })
+    expect(fila).toMatchObject({ id: 'tenant-lab', timezone: 'America/Monterrey', iva_rate: '0.16', mesas: 12 })
+    // Lista BLANCA: sólo sale lo que usa el POS (CONFIG_FIELDS del catálogo de la Caja).
+    const { COLUMNAS_PERMITIDAS } = await import('@/lib/pos-db-policy')
+    for (const k of Object.keys(fila)) expect(COLUMNAS_PERMITIDAS.clients, k).toContain(k)
+    for (const k of ['report_recipients', 'business_context', 'telegram_chat_ids', 'provisioning_plan', 'provisioning_state',
+      'support_email', 'regimen_fiscal', 'domicilio_fiscal', 'staff_supervisors', 'columna_futura_secreta', 'wansoft_subsidiary_id'])
+      expect(fila, k).not.toHaveProperty(k)
+  })
+
+  it.each(['select=id,mesas', 'select=pos_settings', 'id=eq.tenant-lab&limit=1', 'select=id,timezone&order=id.asc', 'or=(id.eq.tenant-lab,display_name.eq.Lab)'])(
+    'lo que usa el POS sigue pasando: %s', async consulta => {
+      expect((await get(consulta)).status).toBe(200)
+    })
+
+  it('una respuesta que no es JSON no sale', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(`id,wansoft_pass\ntenant-lab,${CLAVE}`, { headers: { 'content-type': 'text/csv' } })))
+    const texto = await (await get('select=id')).text()
+    expect(texto).not.toContain(CLAVE)
   })
 
   it.each([
@@ -56,9 +78,19 @@ for (const proxy of ['query', 'path'] as const) describe(`clients por el proxy $
     'wansoft_pass=eq.x',
     'or=(wansoft_pass.like.a*,id.eq.x)',
     'order=wansoft_user.asc',
-  ])('rechaza nombrar una credencial: %s', async consulta => {
+    // Revisión 9 (P2): cualquier columna fuera de la lista blanca, en cualquier parte de la consulta.
+    'select=report_recipients', 'select=id,provisioning_plan', 'provisioning_state=eq.complete',
+    'or=(provisioning_plan.is.null,id.eq.x)', 'and=(id.eq.x,or(business_context.like.*a*))', 'order=support_email.desc',
+    'columna_futura_secreta=eq.x', 'pos_settings->>clave=eq.x&regimen_fiscal=eq.601', 'select=id&%24x=1',
+  ])('rechaza nombrar una columna fuera de la lista: %s', async consulta => {
     const r = await get(consulta)
     expect(r.status).toBe(403)
     expect(pedidos).toHaveLength(0)
   })
+})
+
+it('la lista blanca de clients es exactamente CONFIG_FIELDS del catálogo de la Caja', async () => {
+  const { COLUMNAS_PERMITIDAS } = await import('@/lib/pos-db-policy')
+  const { CONFIG_FIELDS } = await import('@/lib/pos-menu-catalog')
+  expect([...COLUMNAS_PERMITIDAS.clients].sort()).toEqual([...CONFIG_FIELDS].sort())
 })
