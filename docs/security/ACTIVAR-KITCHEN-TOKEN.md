@@ -79,6 +79,43 @@ En una cocina eso no es un error de log: es que dejan de salir los platillos.
    - Una pantalla provisionada sigue recibiendo comandas.
    - `curl` sin token a `?client_id=<otro tenant>` devuelve **401**.
 
+## Plan de enrolamiento controlado
+
+Este plan convierte el procedimiento en una operación verificable. No se debe
+inventar ni registrar el secreto, los tokens, IDs de equipos o nombres de
+restaurantes en tickets, JEV, Git o evidencia pública.
+
+### Fase A — preparación (sin activar seguridad)
+
+1. Crear un inventario privado de pantallas KDS: tenant opaco, sucursal,
+   responsable presente y versión instalada.
+2. Generar el secreto en el gestor de secretos aprobado; dos responsables
+   verifican que no se copie a repositorios ni logs.
+3. Calcular el token por pantalla dentro de una sesión segura y provisionarlo
+   localmente mientras el endpoint aún está abierto.
+4. Verificar, pantalla por pantalla, que conserva la lectura normal antes de
+   pasar a la siguiente. Registrar únicamente un resultado de enrolamiento,
+   nunca el token.
+
+### Fase B — activación con observación
+
+1. Confirmar que el inventario no tiene pantallas pendientes.
+2. Configurar `KITCHEN_TOKEN_SECRET` sólo en producción y crear un despliegue
+   identificable.
+3. Probar una pantalla enrolada y una solicitud sin token contra un tenant de
+   prueba. La primera debe funcionar y la segunda debe recibir `401`.
+4. Observar las cocinas durante el turno acordado; no cambiar P19 ni el diseño
+   POS durante esta ventana.
+
+### Fase C — recuperación y cierre
+
+- Si una pantalla no recibe comandas, se restaura el despliegue previo y se
+  deja la pantalla fuera del siguiente intento hasta reenrolarla.
+- No se borra el secreto ni se cambia a modo abierto como reacción rápida: se
+  documenta la causa y se sigue el rollback de despliegue.
+- Una vez que todas las pantallas operen con token, se abre una tarea separada
+  para volver el endpoint fail-closed cuando falte el secreto.
+
 ## Pendiente aparte: que falle CERRADO
 
 Aun después de activarlo, el diseño sigue siendo opt-in: si algún día el secreto se borra o se
