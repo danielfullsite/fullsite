@@ -17,9 +17,13 @@ permissions:
 jobs:
   claude:
     runs-on: ubuntu-latest
+    # Seguridad (2026-09-26, revisión independiente 9): el repo es público y cualquiera puede comentar.
+    # Sólo quien ya tiene escritura dispara el job — control propio, no sólo el de la acción de terceros.
     if: |
-      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
-      (github.event_name == 'issues' && contains(github.event.issue.body, '@claude')) ||
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude') &&
+       contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)) ||
+      (github.event_name == 'issues' && contains(github.event.issue.body, '@claude') &&
+       contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association)) ||
       (github.event_name == 'pull_request' &&
        github.event.pull_request.head.repo.full_name == github.repository &&
        contains(github.event.pull_request.body, '@claude'))
@@ -60,32 +64,30 @@ jobs:
             After committing and pushing your changes, your job is done.
             Do NOT try to create PRs or run gh commands — the workflow handles that automatically after you finish.
 
-      - name: Auto-create PR and enable auto-merge
+      - name: Crear el PR de la rama de ESTE issue y pedir auto-merge (espera la CI)
         if: github.event_name == 'issue_comment' || github.event_name == 'issues'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          REPO: ${{ github.repository }}
         run: |
-          BRANCH=$(git ls-remote --heads origin 'claude/*' | sort -t'/' -k3 -r | head -1 | awk '{print $2}' | sed 's|refs/heads/||')
+          set -euo pipefail
+          # Antes se tomaba la `claude/*` ÚLTIMA EN ORDEN ALFABÉTICO (sort -k3 -r), que podía ser trabajo
+          # en curso de otra sesión (hay ramas claude/* de Claude Code), y se hacía merge directo, sin
+          # esperar la CI. Ahora: sólo la rama que la acción crea para este issue, y --auto.
+          case "$ISSUE_NUMBER" in ''|*[!0-9]*) echo "::error::número de issue inválido"; exit 1 ;; esac
+          BRANCH=$(git ls-remote --heads origin "claude/issue-${ISSUE_NUMBER}-*" | awk '{print $2}' | sed 's|refs/heads/||' | sort | tail -1)
           if [ -z "$BRANCH" ]; then
-            echo "No claude/* branch found, skipping PR creation"
+            echo "Sin rama claude/issue-${ISSUE_NUMBER}-*: no se crea PR"
             exit 0
           fi
-          echo "Found branch: $BRANCH"
-          EXISTING_PR=$(gh pr list --repo ${{ github.repository }} --head "$BRANCH" --json number --jq '.[0].number' 2>/dev/null || echo "")
-          if [ -n "$EXISTING_PR" ]; then
-            echo "PR #$EXISTING_PR already exists for $BRANCH"
-          else
-            PR_URL=$(gh pr create \
-              --repo ${{ github.repository }} \
-              --head "$BRANCH" \
-              --base main \
-              --title "$(git log origin/$BRANCH --not origin/main --pretty=format:'%s' | head -1)" \
-              --body "Automated PR from Claude Code Action — branch \`$BRANCH\`")
-            echo "Created PR: $PR_URL"
-            EXISTING_PR=$(echo "$PR_URL" | grep -o '[0-9]*$')
+          echo "Rama: $BRANCH"
+          EXISTING_PR=$(gh pr list --repo "$REPO" --head "$BRANCH" --json number --jq '.[0].number' 2>/dev/null || true)
+          if [ -z "$EXISTING_PR" ]; then
+            gh pr create --repo "$REPO" --head "$BRANCH" --base main \
+              --title "Claude: issue #${ISSUE_NUMBER}" \
+              --body "PR automático de la rama \`$BRANCH\` (issue #${ISSUE_NUMBER}). Se integra sólo con los checks requeridos de main en verde."
           fi
-          gh pr merge $EXISTING_PR \
-            --repo ${{ github.repository }} \
-            --squash --delete-branch \
-            && echo "Merged PR #$EXISTING_PR via squash" \
-            || echo "Merge could not be completed (may already be merged)"
+          # Sin merge directo: auto-merge espera los checks requeridos de main (hoy `test`).
+          gh pr merge "$BRANCH" --repo "$REPO" --auto --squash \
+            || echo "::notice::auto-merge no disponible; el PR queda abierto para revisión humana"
