@@ -7,15 +7,18 @@
 
 **Estado:** especificación. **Nada está implementado.** No se tocó código, datos, P19, P17, pagos ni KDS. En el vocabulario de CLAUDE.md §10, todo lo que describe es «propuesto».
 
-**Decisiones de Daniel, 2026-09-26** (detalle en §10.3):
+**Decisiones de Daniel** (detalle en §10.3 y §7.3):
 
-| Decisión | Qué dice |
-|---|---|
-| Q2 | Se mantiene Schibsted Grotesk, con disponibilidad offline verificada |
-| Q3 | Pendiente de inventario físico de PDV1, PDV3 y SERVER1. **No se supone DPR, pantalla táctil ni escala** |
-| Q8 | **No autorizada.** No se escriben componentes dentro de `/pos`, ni se implementa o publica nada, hasta que P19 GUI/CDP complete el tramo de edición |
+| Fecha | Decisión | Qué dice |
+|---|---|---|
+| 2026-09-26 | Q2 | Se mantiene Schibsted Grotesk, con disponibilidad offline verificada |
+| 2026-09-26 | Q3 | Pendiente de inventario físico de PDV1, PDV3 y SERVER1. **No se supone DPR, pantalla táctil ni escala** |
+| 2026-09-26 | Q8 | **No autorizada.** No se escriben componentes dentro de `/pos`, ni se implementa o publica nada, hasta que P19 GUI/CDP complete el tramo de edición (E0) |
+| 2026-09-27 | E0 | «Tramo de edición» = **GUI sintética real hasta login → turno → borrador → acción válida → Guardar con recibo durable** |
+| 2026-09-27 | E1 | `ORDER_SEND` → KDS **no** es prerrequisito de F0b (aislado y sin handlers), pero **sí es prerrequisito absoluto** para habilitar `ui_version: v2` en una Caja o para cualquier rollout |
+| 2026-09-27 | RC | RC-1, RC-2 y RC-3 siguen como riesgos **independientes** del rediseño |
 
-La rama sigue aislada y sin push.
+La rama sigue aislada y sin push. No se implementa código.
 
 ---
 
@@ -40,7 +43,7 @@ La rama sigue aislada y sin push.
      - en modo Caja ya manda `ORDER_SEND` (`page.tsx:3422` → `guardarOperacionCaja` → `enviarCuentaEnCaja` `:2677` → `pedro-operaciones.ts:77`).
    - FRESH certifica un solo `ORDER_SEND` y **cero** `ORDER_SENT`.
    - Consecuencia: el rediseño **no puede conectarse a ningún handler hasta que FRESH esté en Git y en `main`**, además de que P19 pase GUI/CDP (§7).
-4. **Hoy sólo cabe la fase F0, y sólo en papel:** esta especificación y el diseño de la batería de pruebas. Daniel **no autorizó** código (Q8, 2026-09-26): nada dentro de `/pos`, ni siquiera primitivas aisladas en `/pos/ui-kit`, hasta que P19 GUI/CDP complete el tramo de edición (condición E0, §7.3). Coincide con `DO_NOT_TOUCH_BEFORE_FIELD_CERT.md:6`, «ningún rediseño ni refactor previo».
+4. **Hoy sólo cabe la fase F0, y sólo en papel:** esta especificación y el diseño de la batería de pruebas. Daniel **no autorizó** código (Q8, 2026-09-26): nada dentro de `/pos`, ni siquiera primitivas aisladas en `/pos/ui-kit`, hasta que P19 GUI/CDP complete el tramo de edición: GUI sintética real hasta login → turno → borrador → acción válida → Guardar con recibo durable (condición E0, §7.3). Coincide con `DO_NOT_TOUCH_BEFORE_FIELD_CERT.md:6`, «ningún rediseño ni refactor previo». **Habilitar `v2` en una Caja o hacer cualquier rollout exige además `ORDER_SEND` → KDS en PASS (E1), sin excepción.**
 5. **Ocho puntos donde la v1.2 contradice el sistema real.** Hay que adaptar el diseño, no copiarlo (§10.1):
    - modificadores sin obligatorios;
    - Cortesía, Influencer y Mercadotecnia como formas de pago que cierran sin autorización (en el sistema real la cortesía es un descuento con PIN o huella);
@@ -212,6 +215,8 @@ Hay una segunda razón, medida aquí: `feature_flags` **no está** en la lista `
 | R1 | R0 en todas las terminales del restaurante | Un restaurante | No (LAN o in situ) | Un reinicio por terminal | En `/health` de cada una, el campo **`identidad.ui.version`** (`identidad-de-terminal.js:68`) = `v1`. No confundir con `build.ui_version` (`identidad-de-build.js:40`), que dice con qué se compiló, no qué se sirve |
 | R2 | Revertir el PR del rediseño | Código | Sí | Un deploy más un instalador en Electron | Hash del paquete de UI igual al anterior (`identidad-de-build.js`: `ui_revision`); procedimiento en `docs/pos/ROLLBACK-INSTALADOR.md` |
 | R-prev | `#ui=v1` en preview o lab | Una sesión | No | Inmediato | `data-ui="v1"` |
+
+**Antes de poner `ui_version: v2` en cualquier Caja: E1 (`ORDER_SEND` → KDS) en PASS, sin excepción** (§7.3). Además:
 
 **Prueba de rollback obligatoria antes de encender `v2` en cualquier terminal** (CLAUDE.md §10.7):
 1. Dejar preparados una mesa con renglones sin enviar, un envío en cola sin red y un cobro en efectivo en cola.
@@ -475,8 +480,8 @@ La matriz completa: 23 estados × 3 resoluciones × 2 variantes. **Los parámetr
 
 | Condición | Manifiesto de admisión (`aee90ec9`) | Manifiesto reanudado (`2a1b8494`) |
 |---|---|---|
-| Antes de E1 | — | `harness_preflight` |
-| E1 | `integral_gui`, `kds_replay`, `two_restarts` | `integral_gui`, `replay_restarts` |
+| E0 (tramo de edición) | Admisión: login → turno → `EDITOR_CREATE` 1/1 (REPORTADO) | `harness_preflight` y la parte de `integral_gui` que va hasta Guardar con recibo durable. **Los manifiestos no separan edición de envío.** El que cierre E0 tiene que declarar ese tramo por separado, o E0 no se puede demostrar (ver E7) |
+| E1 (envío) | `integral_gui`, `kds_replay`, `two_restarts` | `integral_gui`, `replay_restarts` |
 | E4 | `renderer_secret_audit` | `renderer_secret_audit` |
 | E6 | `ack_concurrency_closure`, `abrupt_recovery`, `complete_netlogs`, `integral_regression` | `concurrency_recovery`, `chromium_network_audit`, `integral_regression` |
 
@@ -505,26 +510,27 @@ Todas se cumplen sobre el **mismo fingerprint y commit**.
 
 | ID | Condición | Qué la prueba |
 |---|---|---|
-| **E0** | **Decisión de Daniel (Q8, 2026-09-26):** no se escriben componentes dentro de `/pos`, ni se implementa o publica nada, **hasta que P19 GUI/CDP complete el tramo de edición**. **Interpretación de este documento, por confirmar con Daniel:** el tramo va de la admisión a crear el editor, editar, guardar y enviar la orden desde la GUI real. Qué cuenta como «completo» lo dice el manifiesto P19, no este documento. Hoy no se cumple: la admisión es `scoped_pass` y el GUI/CDP reanudado está `blocked` con 0 ejecuciones de GUI (§7.1). Cumplir E0 **no** autoriza código por sí solo: hay que volver a pedir la autorización | Manifiesto P19 importado en `main` con el tramo de edición en PASS, más la autorización escrita de Daniel |
-| E1 | **P19 GUI/CDP pasa:** `integral_gui` + `kds_replay` + `two_restarts` en PASS. POS → `ORDER_SEND` → KDS en Electron real, con reload, crash del renderer, cierre normal, dos reinicios, exactamente un `ORDER_SEND` y cero `ORDER_SENT` | Manifiesto nuevo importado (E7) |
+| **E0** | **El tramo de edición de P19 GUI/CDP está completo.** Definición de Daniel (2026-09-27): **GUI sintética real** (Electron con perfil sintético, manejada por CDP) que recorre, en la misma corrida:<br>1. **login**;<br>2. **turno**;<br>3. **borrador**: el owner P19 lo crea (`EDITOR_CREATE` sin `FRESH_DRAFT_UNAVAILABLE`);<br>4. **acción válida**: una edición que el owner acepta;<br>5. **Guardar con recibo durable**: el owner devuelve el recibo del guardado y la UI sólo limpia lo pendiente después de ese recibo (contrato P17).<br>**No incluye `ORDER_SEND` → KDS**: eso es E1. Deriva de Q8 (2026-09-26): sin E0 no se escriben componentes dentro de `/pos`, ni se implementa o publica nada. **Hoy no se cumple:** según la historia de Codex (REPORTADO), el diagnóstico de admisión pasó 1/1 de login → turno → `EDITOR_CREATE`, y el GUI/CDP reanudado está `blocked` con 0 ejecuciones de GUI (§7.1). Faltan en GUI real la acción válida y Guardar con recibo durable. Cumplir E0 **no** autoriza código por sí solo: la autorización se vuelve a pedir | Manifiesto P19 importado en `main` (requiere E7) con los cinco pasos en PASS en una sola corrida de GUI sintética real, y el recibo durable identificado en la evidencia. Más la autorización escrita de Daniel |
+| E1 | **P19 GUI/CDP pasa el envío:** `integral_gui` + `kds_replay` + `two_restarts` en PASS. POS → `ORDER_SEND` → KDS en Electron real, con reload, crash del renderer, cierre normal, dos reinicios, exactamente un `ORDER_SEND` y cero `ORDER_SENT`. **Prerrequisito absoluto (Daniel, 2026-09-27) para habilitar `ui_version: v2` en cualquier Caja y para cualquier rollout, sin excepción.** **No** es prerrequisito de F0b (código aislado sin handlers) | Manifiesto nuevo importado (E7) |
 | E2 | FRESH (P16–P19 y el refactor de lint/UI) está en `main` por PR con CI verde, con una tabla fingerprint ↔ commit, y **la suite GUI/CDP de E1 se volvió a correr sobre ese commit de `main`**. Que existan los archivos no basta | PR fusionado más el manifiesto de la corrida sobre el commit |
 | E3 | Los hooks de estado, persistencia, efectos y comandos ya están extraídos de `pos/page.tsx`. La v1.2 se conecta a esos hooks, no al archivo de 7,045 líneas. El lint en 0/0 es la evidencia que usa FRESH; aquí importa como prueba del refactor, no como seguridad | Hooks presentes; `npx eslint src/app/pos/page.tsx` en 0/0 |
 | E4 | `renderer_secret_audit` en PASS **y repetido con `ui_version=v2`**, con criterio de **cero secretos nuevos frente a `v1`**. «Cero secretos» a secas ya falla hoy: el preload escribe `FULLSITE_LAN_SECRET` en `localStorage` en las dos variantes (`renderer-identity.js:24`, `preload.js:6-10`; riesgo de cierre RC-2, §12.1) | Auditoría en las dos variantes y diff |
 | E5 | Se levanta el HOLD de la UI operativa (`uiPolicy` deja de ser `hold`). Es una decisión humana | Registro de la decisión (E7) |
 | E6 | `ack_concurrency_closure`, `abrupt_recovery`, `complete_netlogs` e `integral_regression` en PASS. Son justo los estados en vuelo e inciertos que pinta F2 | Manifiesto (E7) |
-| E7 | **El importador acepta un resultado positivo.** Hoy `platform-evidence.ts` sólo admite `blocked` o `scoped_pass` con `uiPolicy: 'hold'`, y rechaza cualquier cambio en la lista de pendientes. Hace falta un contrato nuevo y versionado para registrar E0, E1, E5 y E6 | Contrato nuevo en `main`, con pruebas |
+| E7 | **El importador acepta un resultado positivo.** Hoy `platform-evidence.ts` sólo admite `blocked` o `scoped_pass` con `uiPolicy: 'hold'`, y rechaza cualquier cambio en la lista de pendientes. Hace falta un contrato nuevo y versionado para registrar E0, E1, E5 y E6, que **declare el tramo de edición (E0) por separado del envío (E1)**: los manifiestos actuales no los distinguen | Contrato nuevo en `main`, con pruebas |
 
 **Qué condiciones exige cada fase (§9):**
 
 | Fase | Condiciones |
 |---|---|
 | F0 (papel) | Ninguna. No escribe código |
-| F0b (código aislado sin handlers) | E0 más una autorización nueva de Daniel |
+| F0b (código aislado, sin handlers ni storage, en `/pos/ui-kit`) | E0 más una autorización nueva de Daniel. **No requiere E1** (`ORDER_SEND` → KDS) |
 | F1 | E0, E1, E2, E3 y E7. Sólo en perfiles sintéticos de laboratorio, sin estados en vuelo |
 | F2 y F3 | Además, E4, E5 y E6 |
-| F4 | Además, `physical_validation` sobre el mismo instalador y commit |
+| **Habilitar `ui_version: v2` en una Caja, o cualquier rollout** | **E1 sin excepción**, sobre el mismo commit e instalador que se va a habilitar. Además, todo lo de F2 y F3, la prueba de rollback de §4.2 y `physical_validation`. Vale también para una sola Caja «de prueba» dentro de un restaurante: una Caja es producción |
+| F4 | La fila anterior completa |
 
-`physical_validation` **no** es condición para fusionar código detrás de `v1`. Sí lo es para encender `v2` en una terminal real.
+`physical_validation` **no** es condición para fusionar código detrás de `v1`. Sí lo es, junto con E1, para encender `v2` en una terminal real.
 
 ### 7.4 Lista de dependencias por superficie
 
@@ -597,11 +603,11 @@ Un PR por fase y por tema (CLAUDE.md §7). Nada se enciende en tenants productiv
 | Fase | Qué | Entra cuando | Sale cuando |
 |---|---|---|---|
 | **F0 · ahora, sólo papel** | (a) Este documento. (b) Las decisiones de §10.3. (c) El diseño escrito de las pruebas T-01 a T-22 y de la tabla de combinaciones alcanzables de V-09. (d) La plantilla del inventario físico Q3 (§6.1). **Sin código** (Q8 negada) | Ya | Especificación aprobada; inventario Q3 levantado en sitio |
-| **F0b · código aislado** | Primitivas `v2` sin handlers ni storage en `/pos/ui-kit`, con fixtures; T-01, T-03, T-04 y T-05 contra el ui-kit; el diseño de `FULLSITE_UI_VERSION` en `identityForUrl`, sin cablear | **E0** y una autorización nueva de Daniel | Batería corriendo contra el ui-kit; línea base de inventario `v1` (se retoma después de E2) |
+| **F0b · código aislado** | Primitivas `v2` sin handlers ni storage en `/pos/ui-kit`, con fixtures; T-01, T-03, T-04 y T-05 contra el ui-kit; el diseño de `FULLSITE_UI_VERSION` en `identityForUrl`, sin cablear | **E0** (tramo de edición completo) y una autorización nueva de Daniel. No requiere E1 | Batería corriendo contra el ui-kit; línea base de inventario `v1` (se retoma después de E2) |
 | **F1 · piel sin estado** | Caparazón, retícula, mesas, banda sin estados en vuelo y piel de modificadores, conectados a los hooks del refactor FRESH. `v2` sólo en perfiles sintéticos de laboratorio | F0b; E1, E2, E3, E7 (§7.3); inventario Q3 | T-01 a T-05, T-11, T-12, T-14, T-15b, T-16 y T-17 en verde **con los parámetros del inventario** |
 | **F2 · dinero y envío** | Ticket, Cobro en los dos modos, estados en vuelo e inciertos, contrato de avisos | F1, E4, E5, E6 | Además, T-06 a T-10, T-15, T-18 y T-22 |
 | **F3 · lo demás** | Sincronización (sólo lectura), bloqueo/PIN (después del bloque de seguridad), hojas genéricas, reemplazo de `window.alert` donde no cambie el flujo | F2; bloque de seguridad POS en `main` | T-13 y T-19 en verde |
-| **F4 · activación** | Instalador con las dos pieles (Q5); `ui_version=v2` en una terminal de laboratorio; validación física; después **una** terminal real por decisión de Daniel, con R0 ensayado | F3 | T-20 y T-21 registrados. Sólo entonces cabe decir «validado en campo» |
+| **F4 · activación** | Instalador con las dos pieles (Q5); `ui_version=v2` en una terminal de laboratorio; validación física; después **una** Caja real por decisión de Daniel, con R0 ensayado | F3 y **E1 en PASS sin excepción** sobre el mismo commit e instalador (§7.3, fila «Habilitar `ui_version: v2`») | T-14, T-20 y T-21 registrados. Sólo entonces cabe decir «validado en campo» |
 
 ---
 
@@ -644,7 +650,7 @@ Un PR por fase y por tema (CLAUDE.md §7). Nada se enciende en tenants productiv
 | Q5 | ¿Un paquete con las dos pieles o dos paquetes? ¿El instalador de hoy lleva `v2`? | Abierta. Recomendación: un paquete con las dos pieles y `v1` por omisión; **no** incluirlo en el instalador de hoy (igual que `REDESIGN-INSTALL-IMPACT.md:102-105`). Aclarar qué sella `sellar-version.cjs:82` (`ui_version` de compilación) contra `config.json` (de terminal) |
 | Q6 | ¿Qué pasa con #408 y `redesign/pos-ds-v2`? | Abierta. Recomendación: reutilizar sus componentes y el guardián de tokens como base de F0b/F1, y cerrarlos cuando F1 los supere. Parten del `page.tsx` previo a FRESH y no deben fusionarse tal cual |
 | Q7 | Excepciones a la regla de cero pérdida (p. ej. sustituir `window.alert`) | Abierta. Recomendación: lista explícita y firmada (T-03) |
-| Q8 | ¿Se autoriza código aislado (primitivas sin handlers en `/pos/ui-kit`)? | **Negada el 2026-09-26.** Ningún componente dentro de `/pos`, ni implementación ni publicación, hasta que P19 GUI/CDP complete el tramo de edición (E0). Después de E0 se vuelve a pedir |
+| Q8 | ¿Se autoriza código aislado (primitivas sin handlers en `/pos/ui-kit`)? | **Negada el 2026-09-26.** Ningún componente dentro de `/pos`, ni implementación ni publicación, hasta que P19 GUI/CDP complete el tramo de edición (E0). **E0 quedó definido el 2026-09-27:** GUI sintética real hasta login → turno → borrador → acción válida → Guardar con recibo durable. Después de E0 se vuelve a pedir. F0b no requiere `ORDER_SEND` → KDS; habilitar `v2` en una Caja o cualquier rollout sí, sin excepción (E1) |
 | Q9 | Tres cambios de **comportamiento** que la v1.2 sugiere y que no caben bajo `ui_version`: (a) una sonda WAN real en lugar de `navigator.onLine`; (b) la salud de Pedro en la pantalla de venta; (c) deshabilitar formas con terminal externa sin WAN, lo que requiere distinguirlas en `pos_payment_methods`. ¿Se hacen? | Abierta. Recomendación: sí a (a) y (b), en PRs propios fuera del rediseño y después de P19, con prueba de que no cambian el camino de órdenes. (c) necesita primero el dato en el catálogo: decisión de producto |
 
 ### 10.4 Riesgos
@@ -713,7 +719,7 @@ Estos tres riesgos **existen hoy en `main` con `v1`**, sin relación con la v1.2
 | Estado | **Abierto en código.** La corrección `f6c4e553` («PostHog nunca en POS, KDS, checador ni Electron») está en `cierre/10-posthog-fuera-del-pos` (también en `candidata/dashboard-security-20260925` y otras ramas `cierre/*`) y **no** en `main` (`git merge-base --is-ancestor` → no). Mitigado **del lado del proyecto**: autocapture apagado el 2026-09-25 19:48 UTC, según la memoria `project_p0_containment_phase_a_20260925`, que tiene fecha pero **no la verifiqué hoy** |
 | Impacto | Esa memoria midió 1,968 toques de un solo dígito en `/pos` antes del apagado, la cota superior de toques de PIN. Si alguien reactiva autocapture o la grabación de sesión en el proyecto, el código vuelve a capturar el teclado del PIN sin ningún cambio de código |
 | Acción propuesta | Revisar y fusionar `f6c4e553` por su propio PR, más una prueba guardiana: en rutas `/pos*`, `/kds`, checador y bajo Electron, `posthog.__loaded === false` y 0 peticiones a `*.posthog.com`. Aparte: el runbook de rotación de PIN (R1) quedó disparado según la misma memoria; la decisión de rotar es tuya |
-| Relación con v1.2 | Ninguna de código. El candado `v2` (F3) no debe llegar a una terminal mientras RC-1 siga abierto en código |
+| Relación con v1.2 | **Ninguna. Riesgo independiente:** no bloquea al rediseño ni depende de él, y se cierra por su propio PR. El riesgo es el mismo con `v1` que con `v2` |
 
 #### RC-2 · `FULLSITE_LAN_SECRET` en `localStorage` del renderer
 
@@ -723,7 +729,7 @@ Estos tres riesgos **existen hoy en `main` con `v1`**, sin relación con la v1.2
 | Estado | **Abierto, por diseño actual**, en toda terminal Electron, con `v1` y con `v2`. No sé si FRESH lo cambió en Windows (P18 clasifica los stores de Chromium; P19 tiene pendiente `renderer_secret_audit`) |
 | Impacto | Cualquier script que corra en el origen del renderer puede leer la credencial LAN y llamar a las rutas protegidas de Pedro desde esa terminal: un script de terceros cargado en la página (ver RC-1) o una inyección. Además hace imposible una auditoría de «cero secretos en storage» (E4 se redactó como diferencia `v2` − `v1` por esta razón) |
 | Acción propuesta | Decisión de diseño aparte: que la credencial no se persista en storage del renderer. Opciones: que main agregue la cabecera a las peticiones hacia `127.0.0.1:7717` (`session.webRequest.onBeforeSendHeaders`), o exponerla por `contextBridge` sin escribirla. Toca Electron y la autenticación de Pedro, así que requiere instalador y va coordinado con P18 y P19. Prueba: la auditoría del renderer sin la clave en `localStorage`, y Pedro sigue aceptando al POS legítimo y rechazando sin credencial |
-| Relación con v1.2 | Ninguna de código. Condiciona cómo se redacta E4 |
+| Relación con v1.2 | **Ninguna. Riesgo independiente:** no bloquea al rediseño ni depende de él. Sólo explica por qué E4 se mide como diferencia `v2` − `v1` y no como «cero secretos» |
 
 #### RC-3 · Playwright multiterminal con producción por omisión
 
@@ -733,7 +739,7 @@ Estos tres riesgos **existen hoy en `main` con `v1`**, sin relación con la v1.2
 | Estado | **Abierto, por diseño.** No lo corre ningún workflow: en `.github/workflows` sólo aparece `lab-multi-terminal.yml:141`, que corre el laboratorio `.cjs`, no esta configuración. El riesgo está en la corrida manual |
 | Impacto | `npx playwright test -c playwright.config.multiterminal.ts` sin `E2E_BASE_URL` **escribe en producción** con las credenciales que use la prueba. Choca con CLAUDE.md §13 («no usar credenciales de producción para pruebas»). El único límite es una convención (tenant demo), no una guarda |
 | Acción propuesta | Fallar cerrado: exigir `E2E_BASE_URL` explícito y, si apunta a producción, además `E2E_ALLOW_PRODUCTION=1` y una lista blanca de tenants comprobada antes de la primera escritura. Buscar el mismo patrón en las demás configuraciones. El subagente de inventario reportó otro caso, `tests/pos-e2e.spec.ts`, que escribe en producción detrás de una bandera; **no lo verifiqué** |
-| Relación con v1.2 | Ninguna de código. Las pruebas de este plan nunca heredan ese valor por omisión (§10.4) |
+| Relación con v1.2 | **Ninguna. Riesgo independiente:** no bloquea al rediseño ni depende de él. Las pruebas de este plan tampoco heredan ese valor por omisión (§10.4) |
 
 ### 12.2 Otros hallazgos, fuera de alcance
 
