@@ -7,15 +7,16 @@
  * sobrevive a esa validación. Un planificador que siempre devuelve planes inválidos pasaría
  * las 36 y no serviría para nada.
  *
- * Se salta sola sin GROQ_API_KEY, así que CI la ignora. Para correrla:
- *   GROQ_API_KEY=... npx vitest run src/__tests__/analyst-planner-live.test.ts
+ * No corre sólo porque exista una llave: requiere opt-in explícito. Para correrla:
+ *   RUN_LIVE_AI_TESTS=1 GROQ_API_KEY=... npx vitest run src/__tests__/analyst-planner-live.test.ts
  */
 
 import { describe, it, expect } from 'vitest'
 import { groqChat } from '@/lib/groq'
 import { promptDePlaneacion, extraerJSON, validarPlan } from '@/lib/analyst/plan'
 
-const HAY_LLAVE = Boolean(process.env.GROQ_API_KEY || process.env.GROQ)
+const EJECUTAR_LIVE = process.env.RUN_LIVE_AI_TESTS === '1'
+const HAY_LLAVE = EJECUTAR_LIVE && Boolean(process.env.GROQ_API_KEY || process.env.GROQ)
 const HOY = '2026-09-09'
 
 async function planear(pregunta: string) {
