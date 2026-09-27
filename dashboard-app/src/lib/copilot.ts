@@ -44,18 +44,18 @@ async function toolTenantSales(input: Record<string, unknown>): Promise<unknown>
   const clientId = String(input.client_id || '')
   const days = Math.min(90, Math.max(1, num(input.days) || 7))
   if (!clientId) return { error: 'client_id requerido' }
-  // 1) wansoft_daily (histórico por client_slug)
-  const w = await sf(`wansoft_daily?client_slug=eq.${encodeURIComponent(clientId)}&select=fecha,ventas_dia,tickets_count&order=fecha.desc&limit=${days}`) as Record<string, unknown>[]
-  if (w.length > 0) {
-    const ventas = w.reduce((s, r) => s + num(r.ventas_dia), 0)
-    const tickets = w.reduce((s, r) => s + num(r.tickets_count), 0)
-    return { fuente: 'wansoft_daily', dias: w.length, ventas_total: Math.round(ventas), tickets, ticket_promedio: tickets ? Math.round(ventas / tickets) : 0, desde: w[w.length - 1]?.fecha, hasta: w[0]?.fecha }
-  }
-  // 2) pos_orders (POS Fullsite)
+  // FULLSITE PRIMERO: 1) POS de Fullsite; 2) sólo si no hay ventas en el POS, el
+  // histórico importado (wansoft_daily).
   const since = new Date(Date.now() - days * 86400000).toISOString()
-  const o = await sf(`pos_orders?client_id=eq.${encodeURIComponent(clientId)}&status=eq.pagada&closed_at=gte.${since}&select=total,closed_at`) as Record<string, unknown>[]
-  const ventas = o.reduce((s, r) => s + num(r.total), 0)
-  return { fuente: 'pos_orders', dias: days, ordenes: o.length, ventas_total: Math.round(ventas), ticket_promedio: o.length ? Math.round(ventas / o.length) : 0 }
+  const o = await sf(`pos_orders?client_id=eq.${encodeURIComponent(clientId)}&status=in.(cerrada,pagada,cobrada,entregada)&created_at=gte.${since}&select=total&limit=100000`) as Record<string, unknown>[]
+  if (o.length > 0) {
+    const ventas = o.reduce((s, r) => s + num(r.total), 0)
+    return { fuente: 'pos_orders', dias: days, ordenes: o.length, ventas_total: Math.round(ventas), ticket_promedio: Math.round(ventas / o.length) }
+  }
+  const w = await sf(`wansoft_daily?client_slug=eq.${encodeURIComponent(clientId)}&select=fecha,ventas_dia,tickets_count&order=fecha.desc&limit=${days}`) as Record<string, unknown>[]
+  const ventas = w.reduce((s, r) => s + num(r.ventas_dia), 0)
+  const tickets = w.reduce((s, r) => s + num(r.tickets_count), 0)
+  return { fuente: w.length ? 'historico_importado' : 'sin_ventas', dias: w.length, ventas_total: Math.round(ventas), tickets, ticket_promedio: tickets ? Math.round(ventas / tickets) : 0, desde: w[w.length - 1]?.fecha, hasta: w[0]?.fecha }
 }
 
 async function toolAgentsStatus(input: Record<string, unknown>): Promise<unknown> {

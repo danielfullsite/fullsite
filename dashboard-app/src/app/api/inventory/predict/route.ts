@@ -1,8 +1,9 @@
 // Inventory prediction — estimates ingredient consumption from historical sales patterns
-// Cross-references wansoft_daily ventas_por_grupo with pos_recipes ingredientes
+// Cross-references ventas_por_grupo (POS de Fullsite primero) with pos_recipes ingredientes
 // and compares against current stock in pos_inventory_products
 
 import { NextRequest } from 'next/server'
+import { ventasFullsitePrimero } from '@/lib/pos-daily'
 import { withPOSAuth } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
@@ -32,13 +33,14 @@ export async function GET(request: NextRequest) {
 
     const cid = encodeURIComponent(auth.clientId)
     const [dailyRes, recipesRes, inventoryRes, menuRes] = await Promise.all([
-      fetch(`${sbUrl}/rest/v1/wansoft_daily?client_slug=eq.${cid}&fecha=gte.${since}&select=fecha,ventas_por_grupo&order=fecha.asc`, opts),
+      ventasFullsitePrimero(sbUrl, headers, auth.clientId, 30, 'fecha,ventas_por_grupo'),
       fetch(`${sbUrl}/rest/v1/pos_recipes?client_id=eq.${cid}&select=nombre,precio_venta,ingredientes,category`, opts),
       fetch(`${sbUrl}/rest/v1/pos_inventory_products?client_id=eq.${cid}&active=eq.true&select=name,unit,cost_per_unit,stock,reorder_point,category`, opts),
       fetch(`${sbUrl}/rest/v1/pos_menu_items?client_id=eq.${cid}&select=name,price,category_id`, opts),
     ])
 
-    const daily: DailyRow[] = dailyRes.ok ? await dailyRes.json() : []
+    // FULLSITE PRIMERO (ventas_por_grupo real desde el POS; histórico sólo hasta su último día).
+    const daily = (dailyRes.dias as unknown as DailyRow[]).slice().sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)))
     const recipes: Recipe[] = recipesRes.ok ? await recipesRes.json() : []
     const inventory: InventoryProduct[] = inventoryRes.ok ? await inventoryRes.json() : []
     const menuItems: { name: string; price: number; category_id: string }[] = menuRes.ok ? await menuRes.json() : []

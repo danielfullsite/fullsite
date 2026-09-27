@@ -40,8 +40,13 @@ const MADRUGADA = {
 /** La misma orden pero sin dia_venta (fila anterior al backfill). */
 const SIN_DIA_VENTA = { ...MADRUGADA, dia_venta: null }
 
+// Estas pruebas cubren el agregado en JS (respaldo). El agregado en Postgres
+// (rpc/fs_ventas_diarias) se simula ausente (404) para forzar ese camino; su propia
+// prueba está al final del archivo.
 function stub(filas: unknown[]) {
-  vi.stubGlobal('fetch', async () => ({ ok: true, json: async () => filas }) as unknown as Response)
+  vi.stubGlobal('fetch', async (u: string) => (String(u).includes('/rpc/')
+    ? { ok: false, status: 404, json: async () => ({}) }
+    : { ok: true, json: async () => filas }) as unknown as Response)
 }
 
 beforeEach(() => vi.unstubAllGlobals())
@@ -106,10 +111,37 @@ describe('La consulta pide la columna', () => {
     // los fallos del 2026-08-31.
     let url = ''
     vi.stubGlobal('fetch', async (u: string) => {
+      if (String(u).includes('/rpc/')) return { ok: false, status: 404, json: async () => ({}) } as unknown as Response
       url = String(u)
       return { ok: true, json: async () => [] } as unknown as Response
     })
     await buildDailyConEstado(SB, H, 'amalay', 14)
     expect(url).toContain('dia_venta')
+  })
+})
+
+describe('El agregado en Postgres (fs_ventas_diarias) es el camino principal', () => {
+  it('si el RPC responde, se usa tal cual y NO se bajan órdenes crudas', async () => {
+    const urls: string[] = []
+    vi.stubGlobal('fetch', async (u: string) => {
+      urls.push(String(u))
+      return { ok: true, json: async () => [{
+        fecha: '2026-09-01', ventas_dia: '800.00', ventas_brutas: '700', descuentos: '0', propinas_total: '40',
+        tickets_count: 2, personas_restaurant: 4, efectivo: '800', tarjeta: '0',
+        meseros: [{ nombre: 'Ana', total: 800 }], pago_metodos: [{ nombre: 'efectivo', total: 800 }],
+        platillos_top: [], ventas_por_grupo: [{ nombre: 'Bebidas', total: 300 }],
+      }] } as unknown as Response
+    })
+    const r = await buildDailyConEstado(SB, H, 'amalay', 14)
+    expect(urls).toHaveLength(1)
+    expect(urls[0]).toContain('/rpc/fs_ventas_diarias')
+    expect(r.dias[0]).toMatchObject({ fecha: '2026-09-01', ventas_dia: 800, ticket_promedio_restaurant: 200, propinas_total: 40 })
+    expect(r.dias[0].ventas_por_grupo).toEqual([{ nombre: 'Bebidas', total: 300 }])
+  })
+
+  it('un 500 del RPC es un FALLO, no "no hubo ventas"', async () => {
+    vi.stubGlobal('fetch', async () => ({ ok: false, status: 500, json: async () => ({}) }) as unknown as Response)
+    const r = await buildDailyConEstado(SB, H, 'amalay', 14)
+    expect(r.determinado).toBe(false)
   })
 })

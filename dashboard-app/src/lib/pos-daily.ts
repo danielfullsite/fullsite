@@ -93,6 +93,77 @@ export async function buildDailyConEstado(
   }
 }
 
+/** Fila de fs_ventas_diarias → shape de wansoft_daily que consumen chat/coach/voz. */
+function filaDesdeRpc(r: Record<string, unknown>): Record<string, unknown> {
+  const n = (v: unknown) => Math.round(Number(v) || 0)
+  const personas = n(r.personas_restaurant)
+  const ventas = n(r.ventas_dia)
+  const pagos = parseJsonbArr(r.pago_metodos)
+  return {
+    fecha: String(r.fecha),
+    ventas_dia: ventas,
+    ventas_brutas: n(r.ventas_brutas),
+    descuentos: n(r.descuentos),
+    propinas_total: n(r.propinas_total),
+    tickets_count: n(r.tickets_count),
+    personas_restaurant: personas,
+    ticket_promedio_restaurant: personas > 0 ? Math.round(ventas / personas) : 0,
+    efectivo: n(r.efectivo),
+    tarjeta: n(r.tarjeta),
+    meseros: parseJsonbArr(r.meseros),
+    ventas_por_grupo: parseJsonbArr(r.ventas_por_grupo),
+    pago_metodos: pagos,
+    'pago_métodos': pagos,
+    platillos_top: parseJsonbArr(r.platillos_top),
+  }
+}
+
+export type FuenteVentas = 'fullsite' | 'historico' | 'fullsite+historico' | 'ninguna'
+
+/**
+ * LECTOR ÚNICO "FULLSITE PRIMERO" para el servidor (chat, coach, voz, agentes, reportes).
+ *
+ * El POS de Fullsite es la fuente principal. El histórico importado (wansoft_daily)
+ * sólo cuenta hasta su último día; todo lo posterior sale de pos_orders. Un tenant
+ * sin histórico importado usa sólo Fullsite. Devuelve filas fecha DESC.
+ *
+ * `determinado=false` = no se pudo leer (no es lo mismo que "no hubo ventas").
+ */
+export async function ventasFullsitePrimero(
+  sbUrl: string,
+  sbHeaders: Record<string, string>,
+  clientId: string,
+  days: number,
+  selectHistorico = '*',
+): Promise<{ dias: Record<string, unknown>[]; fuente: FuenteVentas; ultimoHistorico: string; determinado: boolean; motivo?: string }> {
+  if (!clientId) return { dias: [], fuente: 'ninguna', ultimoHistorico: '', determinado: true }
+  // Un fallo al leer el histórico NO es "no hay histórico": se registra y se dice.
+  const leerHistorico = async (): Promise<{ filas: Record<string, unknown>[]; fallo?: string }> => {
+    try {
+      const r = await fetch(`${sbUrl}/rest/v1/wansoft_daily?select=${selectHistorico}&client_slug=eq.${encodeURIComponent(clientId)}&ventas_dia=gt.0&order=fecha.desc&limit=${days}`,
+        { headers: sbHeaders, cache: 'no-store' })
+      if (!r.ok) return { filas: [], fallo: `histórico HTTP ${r.status}` }
+      const j = await r.json()
+      return { filas: Array.isArray(j) ? j : [] }
+    } catch {
+      return { filas: [], fallo: 'histórico sin conexión' }
+    }
+  }
+  const [hist, pos] = await Promise.all([leerHistorico(), buildDailyConEstado(sbUrl, sbHeaders, clientId, days)])
+  const historico = hist.filas
+  const ultimoHistorico = historico.length ? String(historico[0].fecha || '') : ''
+  const nuevos = pos.dias.filter(d => String(d.fecha || '') > ultimoHistorico)
+  const dias = [...nuevos, ...historico]
+    .sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)))
+    .slice(0, days)
+  const fuente: FuenteVentas = nuevos.length && historico.length ? 'fullsite+historico'
+    : nuevos.length ? 'fullsite' : historico.length ? 'historico' : 'ninguna'
+  // Determinado = al menos una fuente se leyó bien. Si una falló, se dice en `motivo`.
+  const determinado = pos.determinado || (!hist.fallo && historico.length > 0)
+  const motivos = [pos.determinado ? '' : pos.motivo, hist.fallo || ''].filter(Boolean)
+  return { dias, fuente, ultimoHistorico, determinado, motivo: motivos.length ? motivos.join('; ') : undefined }
+}
+
 /**
  * Agrega el pos_orders vivo de un tenant a filas diarias tipo wansoft_daily.
  * @param sbUrl     NEXT_PUBLIC_SUPABASE_URL
@@ -110,6 +181,29 @@ async function leerDiasOLanzar(
   if (!clientId) return []
   const sinceDate = new Date(Date.now() - (days + 1) * 86400000 - MX_OFFSET_MS)
     .toISOString().slice(0, 10)
+
+  // 1) Agregado en Postgres (fs_ventas_diarias): completo, sin tope de órdenes y con
+  //    ventas_por_grupo real. Sólo lo puede llamar la service key; con otra llave (o si
+  //    la función aún no existe) devuelve 401/403/404 y se usa el método de abajo.
+  const hasta = new Date(Date.now() + 86400000).toISOString().slice(0, 10)
+  try {
+    const rpc = await fetch(`${sbUrl}/rest/v1/rpc/fs_ventas_diarias`, {
+      method: 'POST',
+      headers: { ...sbHeaders, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_client_id: clientId, p_desde: sinceDate, p_hasta: hasta }),
+      cache: 'no-store',
+    })
+    if (rpc.ok) {
+      const rows = await rpc.json() as Record<string, unknown>[]
+      return rows.map(filaDesdeRpc)
+    }
+    if (![401, 403, 404].includes(rpc.status)) throw new LecturaDiariaFallida(`HTTP ${rpc.status}`)
+  } catch (e) {
+    if (e instanceof LecturaDiariaFallida) throw e
+    // red caída en el RPC → se intenta el método de abajo, que reporta su propio error
+  }
+
+  // 2) Respaldo: órdenes crudas sumadas en JS (tope de 8,000 órdenes).
   const url = `${sbUrl}/rest/v1/pos_orders?client_id=eq.${encodeURIComponent(clientId)}`
     + `&status=in.(cerrada,pagada,cobrada,entregada)&created_at=gte.${sinceDate}T00:00:00`
     + `&select=created_at,dia_venta,total,subtotal,descuento,propina,mesero,metodo_pago,personas,items`

@@ -43,13 +43,27 @@ function historia(n: number, ventasPorDia = 10_000): Dia[] {
   return out // orden desc, como lo devuelve la query real
 }
 
-/** sbGet falso: devuelve la historia y los KPIs que le pasemos. */
-function fakeSbGet(dias: Dia[], kpis: Record<string, unknown> | null) {
-  return async <T>(table: string): Promise<T[]> => {
-    if (table === 'wansoft_daily') return dias as unknown as T[]
-    if (table === 'wansoft_kpis') return (kpis ? [kpis] : []) as unknown as T[]
-    return [] as T[]
-  }
+/** Fecha de hoy en hora de México, como la arma el agente. */
+function hoyMX(): string {
+  const d = nowMX()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/**
+ * Dependencias falsas del agente: `sbGet` (no se usa para ventas) y el lector de ventas
+ * inyectable. Los "KPIs de hoy" del fixture se vuelven la fila de hoy del POS, y
+ * `ordenes_abiertas` las órdenes abiertas — igual que lectorFullsite en producción.
+ */
+function fakeDeps(dias: Dia[], kpis: Record<string, unknown> | null) {
+  const sbGet = async <T>(): Promise<T[]> => [] as T[]
+  const lector = async () => ({
+    dias: [
+      ...(kpis ? [{ fecha: hoyMX(), ...kpis }] : []),
+      ...dias,
+    ] as Record<string, unknown>[],
+    abiertas: Number(kpis?.ordenes_abiertas) || 0,
+  })
+  return [sbGet, lector] as const
 }
 
 const find = (evs: AgentEvent[], type: string) => evs.find(e => e.type === type)
@@ -58,7 +72,7 @@ const find = (evs: AgentEvent[], type: string) => evs.find(e => e.type === type)
 
 describe('Agentes — un agente sin datos lo DICE, no se calla', () => {
   it('fuente vacía → emite fuente_sin_datos en vez de devolver []', async () => {
-    const evs = await runFinanceAgent('amalay', fakeSbGet([], null))
+    const evs = await runFinanceAgent('amalay', ...fakeDeps([], null))
     expect(evs.length).toBeGreaterThan(0)
     const e = find(evs, 'fuente_sin_datos')
     expect(e).toBeDefined()
@@ -66,12 +80,12 @@ describe('Agentes — un agente sin datos lo DICE, no se calla', () => {
   })
 
   it('el hallazgo dice explícitamente que su silencio NO significa que todo esté bien', async () => {
-    const evs = await runFinanceAgent('amalay', fakeSbGet([], null))
+    const evs = await runFinanceAgent('amalay', ...fakeDeps([], null))
     expect(find(evs, 'fuente_sin_datos')!.explanation).toMatch(/NO significa que las ventas estén bien/i)
   })
 
   it('reporta cuántos días tiene y cuántos necesita — números, no adjetivos', async () => {
-    const evs = await runFinanceAgent('amalay', fakeSbGet(historia(3), null))
+    const evs = await runFinanceAgent('amalay', ...fakeDeps(historia(3), null))
     const ev = find(evs, 'fuente_sin_datos')!
     expect(ev.evidence.dias_disponibles).toBe(3)
     expect(ev.evidence.dias_requeridos).toBe(7)
@@ -86,23 +100,23 @@ describe('Agentes — un agente sin datos lo DICE, no se calla', () => {
     const d = nowMX(); d.setDate(d.getDate() - 41)
     const fecha = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     const dias = [{ fecha, ventas_dia: 5000, tickets_count: 50, ticket_promedio_restaurant: 100 }]
-    const ev = find(await runFinanceAgent('amalay', fakeSbGet(dias, null)), 'fuente_sin_datos')!
+    const ev = find(await runFinanceAgent('amalay', ...fakeDeps(dias, null)), 'fuente_sin_datos')!
     expect(ev.evidence.dias_sin_datos).toBe(41)
     expect(ev.evidence.fecha_mas_reciente).toBe(dias[0].fecha)
   })
 
   it('no inventa un valor económico cuando el problema es que no hay datos', async () => {
-    const ev = find(await runFinanceAgent('amalay', fakeSbGet([], null)), 'fuente_sin_datos')!
+    const ev = find(await runFinanceAgent('amalay', ...fakeDeps([], null)), 'fuente_sin_datos')!
     expect(ev.estimated_value).toBeNull()
   })
 
   it('confidence = 1: que no haya filas es un hecho, no una inferencia', async () => {
-    const ev = find(await runFinanceAgent('amalay', fakeSbGet([], null)), 'fuente_sin_datos')!
+    const ev = find(await runFinanceAgent('amalay', ...fakeDeps([], null)), 'fuente_sin_datos')!
     expect(ev.confidence).toBe(1)
   })
 
   it('con historia suficiente NO emite fuente_sin_datos — no es ruido permanente', async () => {
-    const evs = await runFinanceAgent('amalay', fakeSbGet(historia(28), { ventas_dia: 10_000, tickets_count: 100, ticket_promedio_restaurant: 100, ordenes_abiertas: 0 }))
+    const evs = await runFinanceAgent('amalay', ...fakeDeps(historia(28), { ventas_dia: 10_000, tickets_count: 100, ticket_promedio_restaurant: 100, ordenes_abiertas: 0 }))
     expect(find(evs, 'fuente_sin_datos')).toBeUndefined()
   })
 })
@@ -114,7 +128,7 @@ describe('Agentes — los números reportados se pueden recalcular a mano', () =
     // 28 días planos a 10,000. Cualquier promedio del mismo DOW es 10,000 exacto.
     const dias = historia(28, 10_000)
     // Hoy vendió la mitad ⇒ la brecha es exactamente -50%.
-    const evs = await runFinanceAgent('amalay', fakeSbGet(dias, {
+    const evs = await runFinanceAgent('amalay', ...fakeDeps(dias, {
       ventas_dia: 5_000, tickets_count: 50, ticket_promedio_restaurant: 100, ordenes_abiertas: 0,
     }))
 
@@ -132,7 +146,7 @@ describe('Agentes — los números reportados se pueden recalcular a mano', () =
   })
 
   it('todo estimated_value es no-negativo — un "valor en juego" negativo no significa nada', async () => {
-    const evs = await runFinanceAgent('amalay', fakeSbGet(historia(28, 10_000), {
+    const evs = await runFinanceAgent('amalay', ...fakeDeps(historia(28, 10_000), {
       ventas_dia: 3_000, tickets_count: 30, ticket_promedio_restaurant: 100, ordenes_abiertas: 0,
     }))
     for (const e of evs) {
@@ -141,7 +155,7 @@ describe('Agentes — los números reportados se pueden recalcular a mano', () =
   })
 
   it('confidence siempre en [0,1] — fuera de rango no es una probabilidad', async () => {
-    const evs = await runFinanceAgent('amalay', fakeSbGet(historia(28, 10_000), {
+    const evs = await runFinanceAgent('amalay', ...fakeDeps(historia(28, 10_000), {
       ventas_dia: 3_000, tickets_count: 30, ticket_promedio_restaurant: 100, ordenes_abiertas: 0,
     }))
     expect(evs.length).toBeGreaterThan(0)
@@ -152,7 +166,7 @@ describe('Agentes — los números reportados se pueden recalcular a mano', () =
   })
 
   it('todo hallazgo va marcado con el client_id que se le pidió analizar', async () => {
-    const evs = await runFinanceAgent('nomada', fakeSbGet(historia(28, 10_000), {
+    const evs = await runFinanceAgent('nomada', ...fakeDeps(historia(28, 10_000), {
       ventas_dia: 3_000, tickets_count: 30, ticket_promedio_restaurant: 100, ordenes_abiertas: 0,
     }))
     expect(evs.length).toBeGreaterThan(0)
@@ -160,7 +174,7 @@ describe('Agentes — los números reportados se pueden recalcular a mano', () =
   })
 
   it('ningún hallazgo sale sin explicación ni acción sugerida', async () => {
-    const evs = await runFinanceAgent('amalay', fakeSbGet(historia(28, 10_000), {
+    const evs = await runFinanceAgent('amalay', ...fakeDeps(historia(28, 10_000), {
       ventas_dia: 3_000, tickets_count: 30, ticket_promedio_restaurant: 100, ordenes_abiertas: 0,
     }))
     for (const e of evs) {
@@ -170,7 +184,7 @@ describe('Agentes — los números reportados se pueden recalcular a mano', () =
   })
 
   it('sin KPIs de hoy no inventa la comparación del día', async () => {
-    const evs = await runFinanceAgent('amalay', fakeSbGet(historia(28, 10_000), null))
+    const evs = await runFinanceAgent('amalay', ...fakeDeps(historia(28, 10_000), null))
     // Puede emitir hallazgos de tendencia, pero ninguno que afirme las ventas de HOY.
     for (const e of evs) {
       expect(e.evidence.ventas_hoy ?? null).toBeNull()

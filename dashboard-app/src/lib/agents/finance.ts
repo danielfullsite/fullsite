@@ -10,6 +10,7 @@
  * No filtrar por cliente — son exclusivas de AMALAY.
  */
 import type { AgentEvent } from './types'
+import { ventasFullsitePrimero } from '@/lib/pos-daily'
 import { getActiveTimezone } from '@/lib/date-mx'
 
 interface WansoftDay {
@@ -48,9 +49,37 @@ function todayStr(): string {
 
 const DOW_NAMES = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
 
+/** Lo que el agente necesita leer: días de venta (DESC, incluye hoy si hay) y órdenes abiertas. */
+export interface LecturaFinanzas { dias: Record<string, unknown>[]; abiertas: number }
+export type LectorFinanzas = (clientId: string) => Promise<LecturaFinanzas>
+
+/**
+ * FULLSITE PRIMERO y SIEMPRE POR RESTAURANTE. Antes el agente leía wansoft_daily/
+ * wansoft_kpis SIN filtro de cliente (tablas "globales de AMALAY"), por eso sólo podía
+ * correr para el dueño del histórico de Wansoft — y llevaba desde el 2026-07-20 ciego
+ * porque esa fuente murió. Ahora: días = ventasFullsitePrimero (POS de Fullsite; el
+ * histórico importado sólo cubre hasta su último día, filtrado por client_slug) y
+ * órdenes abiertas del POS. Inyectable para pruebas.
+ */
+export async function lectorFullsite(
+  clientId: string,
+  sbGet: <T>(table: string, query: string) => Promise<T[]>,
+): Promise<LecturaFinanzas> {
+  const SB_URL = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/$/, '')
+  const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+  const H = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }
+  const [lectura, abiertas] = await Promise.all([
+    ventasFullsitePrimero(SB_URL, H, clientId, 35, 'fecha,ventas_dia,tickets_count,ticket_promedio_restaurant'),
+    sbGet<{ id: string }>('pos_orders', `client_id=eq.${encodeURIComponent(clientId)}&status=eq.abierta&select=id&limit=500`)
+      .catch(() => [] as { id: string }[]),
+  ])
+  return { dias: lectura.dias, abiertas: abiertas.length }
+}
+
 export async function runFinanceAgent(
   clientId: string,
   sbGet: <T>(table: string, query: string) => Promise<T[]>,
+  leer: LectorFinanzas = id => lectorFullsite(id, sbGet),
 ): Promise<AgentEvent[]> {
   const events: AgentEvent[] = []
   const now = Date.now()
@@ -58,17 +87,24 @@ export async function runFinanceAgent(
   const todayDOW = dayOfWeek(today)
   const cutoff28 = new Date(now - 28 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
 
-  // wansoft_daily y wansoft_kpis no tienen client_id — son tablas globales de AMALAY
-  const [history, kpisArr] = await Promise.all([
-    sbGet<WansoftDay>(
-      'wansoft_daily',
-      `fecha=gte.${cutoff28}&fecha=neq.${today}&ventas_dia=gt.0&select=fecha,ventas_dia,tickets_count,ticket_promedio_restaurant&order=fecha.desc&limit=60`,
-    ).catch(() => [] as WansoftDay[]),
-    sbGet<WansoftKpis>(
-      'wansoft_kpis',
-      `select=ventas_dia,tickets_count,ticket_promedio_restaurant,ordenes_abiertas&limit=1`,
-    ).catch(() => [] as WansoftKpis[]),
-  ])
+  const lectura = await leer(clientId).catch(() => ({ dias: [] as Record<string, unknown>[], abiertas: 0 }))
+  const aDia = (r: Record<string, unknown>): WansoftDay => ({
+    fecha: String(r.fecha),
+    ventas_dia: Number(r.ventas_dia) || 0,
+    tickets_count: Number(r.tickets_count) || 0,
+    ticket_promedio_restaurant: Number(r.ticket_promedio_restaurant) || 0,
+  })
+  const history: WansoftDay[] = lectura.dias.map(aDia)
+    .filter(d => d.fecha >= cutoff28 && d.fecha !== today && (d.ventas_dia ?? 0) > 0)
+  const hoy = lectura.dias.map(aDia).find(d => d.fecha === today)
+  // Última venta aunque esté FUERA de la ventana de 28 días: es lo que permite decir
+  // "llevo N días sin datos" en vez de sólo "no hay datos".
+  const ultimaConVentas = lectura.dias.map(aDia)
+    .filter(d => d.fecha !== today && (d.ventas_dia ?? 0) > 0)
+    .sort((a, b) => b.fecha.localeCompare(a.fecha))[0]?.fecha ?? null
+  const kpisArr: WansoftKpis[] = hoy
+    ? [{ ...hoy, ordenes_abiertas: lectura.abiertas }]
+    : []
 
   const kpis = kpisArr[0] ?? null
 
@@ -87,7 +123,7 @@ export async function runFinanceAgent(
   // Ahora emite un hallazgo que dice que no puede opinar y desde cuándo. Vale como
   // detector de fuente muerta para cualquier restaurante, no sólo para éste.
   if (history.length < 7) {
-    const ultima = history[0]?.fecha ?? null
+    const ultima = history[0]?.fecha ?? ultimaConVentas
     const diasSinDatos = ultima
       ? Math.floor((Date.parse(`${today}T12:00:00`) - Date.parse(`${ultima}T12:00:00`)) / 86_400_000)
       : null
@@ -112,9 +148,9 @@ export async function runFinanceAgent(
         ventana_dias: 28,
         fecha_mas_reciente: ultima,
         dias_sin_datos: diasSinDatos,
-        fuente: 'wansoft_daily',
+        fuente: 'POS de Fullsite (histórico importado sólo hasta su último día)',
       },
-      suggested_action: 'Revisar el pipeline que alimenta la fuente histórica. Sin eso, el agente de finanzas queda ciego.',
+      suggested_action: 'Revisar que el restaurante esté cobrando con el POS de Fullsite. Sin ventas registradas, el agente de finanzas queda ciego.',
       confidence: 1, // No es una inferencia: o hay filas o no las hay.
       status: 'new',
       estimated_value: null, // No hay nada que cuantificar: el problema es la ausencia de datos.
