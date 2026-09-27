@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { createServiceClient } from '@/lib/supabase'
-import { leerDayparts, preguntaDeFranjas, ventasPorFranja, contextoFranjas } from '@/lib/dayparts'
+import { leerConfigDayparts, preguntaDeFranjas, ventasPorFranja, contextoFranjas } from '@/lib/dayparts'
 import { crearRpc, intencion, contextoFrescura, contextoProducto, contextoReceta, contextoInsumo } from '@/lib/chat-nativo'
 import { buildDailyFromOrders, buildDailyConEstado } from '@/lib/pos-daily'
 import { createServerClient } from '@supabase/ssr'
@@ -657,13 +657,7 @@ export async function POST(request: NextRequest) {
     // sólo comida, y por sucursal. La IA recibe el resultado ya hecho.
     let franjasContext = ''
     try {
-      const cliRes = await fetch(
-        `${sbUrl}/rest/v1/clients?id=eq.${encodeURIComponent(client_id || '')}&select=sales_dayparts,business_day_start_local`,
-        { headers: sbHeaders, cache: 'no-store' }
-      )
-      const cli = cliRes.ok ? ((await cliRes.json().catch(() => []))[0] || {}) : {}
-      const inicioDia = cli.business_day_start_local ? String(cli.business_day_start_local).slice(0, 5) : '05:00'
-      const { config: franjasCfg, esDefault: franjasDefault } = leerDayparts(cli.sales_dayparts, inicioDia)
+      const { config: franjasCfg, esDefault: franjasDefault, inicioDia } = await leerConfigDayparts(sbUrl, sbKey, client_id || '')
       if (preguntaDeFranjas(q, franjasCfg)) {
         const qn = q.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
         const diasAtras = qn.includes('hoy') ? 0 : qn.includes('ayer') ? 1 : /semana/.test(qn) ? 6 : wantsYear ? 364 : 29

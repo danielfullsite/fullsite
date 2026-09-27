@@ -136,6 +136,28 @@ export function describirFranja(f: Franja): string {
   return `${h(f.inicio)}–${f.fin ? h(f.fin) : 'cierre'}`
 }
 
+/**
+ * Config de franjas del restaurante. Filtra por la PK del tenant (clients.id = slug):
+ * sólo lee la fila del restaurante que ya validó la ruta que llama.
+ */
+export async function leerConfigDayparts(sbUrl: string, sbKey: string, clientId: string): Promise<{
+  config: DaypartsConfig; esDefault: boolean; inicioDia: string; timezone: string | null
+}> {
+  let row: { sales_dayparts?: unknown; business_day_start_local?: string | null; timezone?: string | null } = {}
+  if (clientId) {
+    try {
+      const res = await fetch(
+        `${sbUrl}/rest/v1/clients?id=eq.${encodeURIComponent(clientId)}&select=sales_dayparts,business_day_start_local,timezone`,
+        { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
+      )
+      row = res.ok ? ((await res.json().catch(() => []))[0] || {}) : {}
+    } catch { /* cae al default */ }
+  }
+  const inicioDia = row.business_day_start_local ? String(row.business_day_start_local).slice(0, 5) : '05:00'
+  const { config, esDefault } = leerDayparts(row.sales_dayparts, inicioDia)
+  return { config, esDefault, inicioDia, timezone: row.timezone ?? null }
+}
+
 // ── Agregado (fila que devuelve ventas_por_franja) ─────────────────────────────
 
 export interface FilaFranja {

@@ -225,6 +225,22 @@ function locationFilter(locationId?: string | null): string {
   return locationId ? `&location_id=eq.${locationId}` : ''
 }
 
+/**
+ * FUENTE PRINCIPAL = POS DE FULLSITE. El histórico importado (wansoft_daily) sólo
+ * cubre hasta su último día; todo lo posterior sale de pos_orders. Así un restaurante
+ * cuyo conector legacy se cayó (o que ya opera en Fullsite) nunca se queda "congelado"
+ * en el último día importado.
+ */
+function continuarConPos(historico: WansoftDaily[], pos: WansoftDaily[]): WansoftDaily[] {
+  const ultimo = historico.reduce((m, d) => (d.fecha > m ? d.fecha : m), '')
+  return [...historico, ...pos.filter(d => d.fecha > ultimo)].sort((a, b) => a.fecha.localeCompare(b.fecha))
+}
+
+/** Días hacia atrás desde hoy hasta `fecha` (el lector de POS mide desde hoy). */
+function diasDesde(fecha: string): number {
+  return Math.max(0, Math.ceil((Date.now() - new Date(fecha + 'T00:00:00').getTime()) / 86400000)) + 1
+}
+
 export async function getRecentDays(days: number = 30, clientSlug: string = getActiveClientSlug(), locationId?: string | null): Promise<WansoftDaily[]> {
   // Try pos_orders first for recent data (last 7 days) — this is the live POS data
   let posError: unknown
@@ -259,15 +275,20 @@ export async function getLatestDay(clientSlug: string = getActiveClientSlug(), l
 export async function getDayData(fecha: string, clientSlug: string = getActiveClientSlug(), locationId?: string | null): Promise<WansoftDaily | null> {
   const data = await sbFetch('wansoft_daily', `select=*&client_slug=eq.${clientSlug}${locationFilter(locationId)}&fecha=eq.${fecha}&ventas_dia=gt.0&order=ventas_dia.desc&limit=5`) as Record<string, unknown>[]
   const deduped = dedupeByFecha(data)
-  return deduped.length > 0 ? parseRow(deduped[0]) : null
+  if (deduped.length > 0) return parseRow(deduped[0])
+  // Sin histórico importado para ese día → el POS de Fullsite.
+  const pos = await getDashboardFromPosOrders(diasDesde(fecha), clientSlug, locationId).catch(() => [])
+  return pos.find(d => d.fecha === fecha) ?? null
 }
 
 export async function getMonthlyData(clientSlug: string = getActiveClientSlug(), locationId?: string | null): Promise<WansoftDaily[]> {
   const data = await sbFetch('wansoft_daily', `select=*&client_slug=eq.${clientSlug}${locationFilter(locationId)}&ventas_dia=gt.0&order=fecha.asc&limit=1000`) as Record<string, unknown>[]
   const rows = dedupeByFecha(data).map(parseRow)
-  if (rows.length > 0) return rows
-  // POS fallback
-  return getDashboardFromPosOrders(365, clientSlug, locationId)
+  const pos = await getDashboardFromPosOrders(365, clientSlug, locationId).catch(error => {
+    if (rows.length === 0) throw error
+    return [] as WansoftDaily[]
+  })
+  return continuarConPos(rows, pos)
 }
 
 export async function getWaiterCategories(days: number = 7, clientSlug: string = getActiveClientSlug()) {
@@ -316,14 +337,16 @@ export async function getDateRange(from: string, to: string, clientSlug: string 
     `select=*&client_slug=eq.${clientSlug}${locationFilter(locationId)}&fecha=gte.${from}&fecha=lte.${to}&ventas_dia=gt.0&order=fecha.asc`
   ) as Record<string, unknown>[]
   const rows = dedupeByFecha(data).map(parseRow)
-  if (rows.length > 0) return rows
-  // POS fallback: calculate days in range, fetch, then filter
-  const fromDate = new Date(from + 'T00:00:00')
+  // Si el histórico ya cubre hasta `to`, no hace falta el POS.
+  const ultimo = rows.reduce((m, d) => (d.fecha > m ? d.fecha : m), '')
+  if (rows.length > 0 && ultimo >= to) return rows
   // POS reader takes a lookback from today, not the requested interval length.
   // A historical week must not accidentally read only the last seven days.
-  const days = Math.max(0, Math.ceil((Date.now() - fromDate.getTime()) / (1000 * 60 * 60 * 24))) + 1
-  const posData = await getDashboardFromPosOrders(days, clientSlug, locationId)
-  return posData.filter(d => d.fecha >= from && d.fecha <= to)
+  const posData = await getDashboardFromPosOrders(diasDesde(from), clientSlug, locationId).catch(error => {
+    if (rows.length === 0) throw error
+    return [] as WansoftDaily[]
+  })
+  return continuarConPos(rows, posData.filter(d => d.fecha >= from && d.fecha <= to))
 }
 
 // Aggregate payment methods across days

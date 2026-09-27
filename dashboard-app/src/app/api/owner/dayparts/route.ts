@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { withPOSAuth, unauthorized } from '@/lib/api-auth'
 import { sameOriginOnly } from '@/lib/api-guard'
-import { leerDayparts, validarDayparts, ventasPorFranja } from '@/lib/dayparts'
+import { leerConfigDayparts, validarDayparts, ventasPorFranja } from '@/lib/dayparts'
 
 /**
  * Horarios de venta del restaurante (brunch/lunch/dinner… los que use su operación).
@@ -21,23 +21,10 @@ function H() {
   return { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' }
 }
 
-async function leerCliente(clientId: string) {
-  const res = await fetch(
-    `${SB_URL}/rest/v1/clients?id=eq.${encodeURIComponent(clientId)}&select=sales_dayparts,business_day_start_local,timezone`,
-    { headers: H(), cache: 'no-store' }
-  )
-  const rows = res.ok ? await res.json().catch(() => []) : []
-  return (rows[0] || {}) as { sales_dayparts?: unknown; business_day_start_local?: string | null; timezone?: string | null }
-}
-
-const hhmm = (t?: string | null) => (t ? String(t).slice(0, 5) : '05:00')
-
 export async function GET(req: NextRequest) {
   const auth = await withPOSAuth(req)
   if (!auth) return unauthorized()
-  const c = await leerCliente(auth.clientId)
-  const inicioDia = hhmm(c.business_day_start_local)
-  const { config, esDefault } = leerDayparts(c.sales_dayparts, inicioDia)
+  const { config, esDefault, inicioDia, timezone } = await leerConfigDayparts(SB_URL, SB_KEY, auth.clientId)
 
   // ?resumen=1 → % por franja de los últimos N días (vista previa en la pantalla).
   let resumen = null
@@ -47,7 +34,7 @@ export async function GET(req: NextRequest) {
     const hasta = hoy.toISOString().slice(0, 10)
     const desde = new Date(hoy.getTime() - (dias - 1) * 864e5).toISOString().slice(0, 10)
     const [filas, locsRes] = await Promise.all([
-      ventasPorFranja({ sbUrl: SB_URL, sbKey: SB_KEY, clientId: auth.clientId, desde, hasta, config, tz: c.timezone || undefined, inicioDia }),
+      ventasPorFranja({ sbUrl: SB_URL, sbKey: SB_KEY, clientId: auth.clientId, desde, hasta, config, tz: timezone || undefined, inicioDia }),
       fetch(`${SB_URL}/rest/v1/client_locations?client_id=eq.${encodeURIComponent(auth.clientId)}&select=id,name`, { headers: H(), cache: 'no-store' }),
     ])
     const sucursales = locsRes.ok ? await locsRes.json().catch(() => []) : []
@@ -64,8 +51,8 @@ export async function POST(req: NextRequest) {
   if (!MANAGER_ROLES.has(auth.role)) return Response.json({ error: 'Requiere rol dueño' }, { status: 403 })
 
   const body = await req.json().catch(() => ({}))
-  const c = await leerCliente(auth.clientId)
-  const v = validarDayparts(body, hhmm(c.business_day_start_local))
+  const { inicioDia } = await leerConfigDayparts(SB_URL, SB_KEY, auth.clientId)
+  const v = validarDayparts(body, inicioDia)
   if (!v.ok) return Response.json({ error: v.error }, { status: 400 })
 
   const res = await fetch(`${SB_URL}/rest/v1/clients?id=eq.${encodeURIComponent(auth.clientId)}`, {
