@@ -32,6 +32,23 @@ evidencia.
 | Rediseño POS v1.2 | Especificación lista; código bloqueado | El artefacto visual fue comparado; existen reglas de no copiar para pagos, reintentos, modificadores, precios y autoridad durable. | E0: GUI sintética real completa hasta Guardar con recibo durable. Para activar v2 además se exige ORDER_SEND → KDS y validación física. |
 | Preparación AMALAY | Preparar, no operar | Catálogo, roles, estaciones, impresión, KDS y reversión pueden inventariarse sin activar el candidato. | Perfil físico actual confirmado y checklist T-24 listo para el mismo commit candidato. |
 
+## Actualización de evidencia — protocolo nativo y contención
+
+- **P19 / broker DPAPI:** la revisión de protocolo no autorizó integración. El
+  modelo sintético pasó 71/71 controles por motor y DPAPI aislado comparó
+  131/131 entradas, pero esas pruebas no demuestran la propiedad del proceso
+  auxiliar ni que una respuesta autenticada sea honesta. El gate siguiente debe
+  refutar explícitamente helper comprometido, reutilización de PID/canal y
+  replay, con propiedad Windows y autenticación mutua por operación.
+- **Alcance de agrupación:** 74 verificaciones permanecen lecturas frescas;
+  sólo 57 son candidatas a agruparse y todavía requieren equivalencia de entrada
+  demostrada. No se elimina ninguna verificación por una medición sintética.
+- **Contención web separada:** los PRs `#442` y `#443` permanecen en borrador.
+  `#442` limita la respuesta de configuración de terminal a una allowlist y
+  prueba el scope de tenant en ambos proxies; `#443` restringe el disparador y
+  el camino de merge del workflow Claude. Ninguno implica merge, despliegue ni
+  cambio de configuración de producción.
+
 ## Ruta crítica: P19
 
 1. **Gate de confianza DPAPI por operación.** La revisión de protocolo confirmó
