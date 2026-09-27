@@ -120,10 +120,14 @@ describe('redacción de columnas', () => {
     expect(redactResponse('pos_orders', body, 'application/json')).toBe(body)
   })
 
-  it('no rompe un cuerpo que no es JSON (PostgREST también devuelve CSV y vacíos)', () => {
-    expect(redactResponse('pos_staff', 'id,name\n1,Pedro', 'text/csv')).toBe('id,name\n1,Pedro')
+  it('vacío pasa; lo que no es JSON de una tabla con columnas ocultas NO sale (revisión 9)', () => {
+    // Antes el CSV pasaba tal cual: `id,pin` de pos_staff habría llevado el PIN. Hoy ningún proxy
+    // reenvía Accept (PostgREST contesta JSON), así que fallar cerrado no deja al POS sin datos.
+    expect(redactResponse('pos_staff', 'id,pin\n1,4102', 'text/csv')).toBe('')
     expect(redactResponse('pos_staff', '', 'application/json')).toBe('')
-    expect(redactResponse('pos_staff', 'no-es-json', 'application/json')).toBe('no-es-json')
+    expect(redactResponse('pos_staff', 'no-es-json', 'application/json')).toBe('')
+    // Una tabla sin columnas ocultas no cambia.
+    expect(redactResponse('pos_orders', 'id,total\n1,10', 'text/csv')).toBe('id,total\n1,10')
   })
 })
 

@@ -1,6 +1,7 @@
 // The current menu schema is tenant-wide. Do not invent branch-specific prices.
 import { POS_SETTING_KEYS } from './settings'
-const CONFIG_FIELDS = ['id', 'display_name', 'plan', 'city', 'timezone', 'type', 'default_theme', 'accent_color',
+// También es la lista BLANCA de `clients` en el proxy del POS (pos-db-policy.ts): una prueba exige que coincidan.
+export const CONFIG_FIELDS = ['id', 'display_name', 'plan', 'city', 'timezone', 'type', 'default_theme', 'accent_color',
   'mesas', 'meseros', 'features', 'iva_rate', 'data_source', 'logo_url', 'menu_categories', 'bebida_groups',
   'address', 'phone', 'rfc', 'receipt_footer', 'social_media', 'razon_social', 'pos_settings']
 type Row = Record<string, any> // PostgREST boundary; validated before Caja persists it.
