@@ -1,3 +1,5 @@
+import { CONFIG_FIELDS } from './pos-menu-catalog'
+
 /**
  * Política compartida de los proxies `/api/pos/db`.
  *
@@ -287,9 +289,7 @@ export const REDACTED_COLUMNS: Record<string, readonly string[]> = {
  * La respuesta se recorta a estas columnas y se rechaza (403) toda consulta que nombre otra.
  */
 export const COLUMNAS_PERMITIDAS: Record<string, readonly string[]> = {
-  clients: ['id', 'display_name', 'plan', 'city', 'timezone', 'type', 'default_theme', 'accent_color',
-    'mesas', 'meseros', 'features', 'iva_rate', 'data_source', 'logo_url', 'menu_categories', 'bebida_groups',
-    'address', 'phone', 'rfc', 'receipt_footer', 'social_media', 'razon_social', 'pos_settings'],
+  clients: CONFIG_FIELDS,
 }
 
 const PARAMS_SIN_COLUMNA = new Set(['limit', 'offset'])
