@@ -190,6 +190,26 @@ def _extract_hour(raw: str) -> int | None:
     return hour if 0 <= hour <= 23 else None
 
 
+def _extract_hhmm(raw: str) -> str | None:
+    """HH:MM (24 h) exacto de un FECHA de Wansoft. Mismo parseo que _extract_hour,
+    pero conservando los minutos: los horarios de venta del restaurante se definen
+    al minuto (p. ej. brunch hasta 13:00, lunch desde 13:01)."""
+    if not raw:
+        return None
+    m = re.search(r"(\d{1,2}):(\d{2})", raw)
+    if not m:
+        return None
+    hour, minute = int(m.group(1)), int(m.group(2))
+    low = raw.lower().replace(" ", "").replace(".", "")
+    if "pm" in low and hour < 12:
+        hour += 12
+    elif "am" in low and hour == 12:
+        hour = 0
+    if not (0 <= hour <= 23 and 0 <= minute <= 59):
+        return None
+    return f"{hour:02d}:{minute:02d}"
+
+
 def parse_sale_detail(txt: str) -> list[dict]:
     """Parse pipe-delimited TXT into list of sale line items.
     Includes discount/courtesy columns for fraud detection."""
@@ -257,6 +277,7 @@ def parse_sale_detail(txt: str) -> list[dict]:
 
         item = {
             "hora": _extract_hour(safe_col(IDX_FECHA)),
+            "hhmm": _extract_hhmm(safe_col(IDX_FECHA)),
             "orden": safe_col(IDX_ORDEN),
             "mesero": safe_col(IDX_MESERO),
             "grupo": safe_col(IDX_GRUPO),
@@ -501,6 +522,104 @@ def save_to_supabase(waiter_cats: dict, items: list[dict], target_date: str):
         print(f"[scraper] Supabase error: {e}")
 
 
+def build_order_times(items: list[dict], target_date: str, location_id: str | None) -> list[dict]:
+    """Una fila por orden para wansoft_order_times: hora de apertura (el renglón más
+    temprano), total, y cuánto fue comida vs bebida (BEBIDA_GROUPS del cliente).
+    Con esto el Chat IA y /configuracion/horarios-venta reparten la venta por franja."""
+    ordenes: dict = {}
+    for it in items:
+        orden = (it.get("orden") or "").strip()
+        if not orden or not it.get("hhmm"):
+            continue
+        o = ordenes.setdefault(orden, {"hora": it["hhmm"], "total": 0.0, "bebida": 0.0, "personas": 0})
+        if it["hhmm"] < o["hora"]:
+            o["hora"] = it["hhmm"]
+        total = float(it.get("total") or 0)
+        o["total"] += total
+        if (it.get("grupo") or "").strip().upper() in {g.upper() for g in BEBIDA_GROUPS}:
+            o["bebida"] += total
+        o["personas"] = max(o["personas"], int(it.get("personas") or 0))
+    rows = []
+    for orden, o in ordenes.items():
+        rows.append({
+            "client_id": CLIENT["id"],
+            "location_id": location_id,
+            "fecha": target_date,
+            "orden": orden,
+            "hora": o["hora"],
+            "total": round(o["total"], 2),
+            "total_comida": round(o["total"] - o["bebida"], 2),
+            "total_bebida": round(o["bebida"], 2),
+            "personas": o["personas"] or None,
+            "updated_at": datetime.now(MX_TZ).isoformat(),
+        })
+    return rows
+
+
+def default_location_id() -> str | None:
+    """Wansoft exporta una subsidiaria por login: si el cliente tiene UNA sucursal
+    activa, las órdenes son de esa. Con varias, se deja null (no adivinamos)."""
+    try:
+        from client_config import get_locations
+        locs = get_locations(CLIENT)
+        return locs[0]["id"] if len(locs) == 1 else None
+    except Exception:
+        return None
+
+
+def save_order_times(rows: list[dict]) -> int:
+    """Upsert por (client_id, fecha, orden). Idempotente: re-correr un día no duplica."""
+    sb_url = os.environ.get("SUPABASE_URL", "").rstrip("/")
+    sb_key = os.environ.get("SUPABASE_SERVICE_KEY", "")
+    if not sb_url or not sb_key or not rows:
+        return 0
+    headers = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}",
+               "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates,return=minimal"}
+    saved = 0
+    for i in range(0, len(rows), 500):
+        chunk = rows[i:i + 500]
+        r = requests.post(f"{sb_url}/rest/v1/wansoft_order_times?on_conflict=client_id,fecha,orden",
+                          headers=headers, json=chunk, timeout=30)
+        if r.status_code in (200, 201, 204):
+            saved += len(chunk)
+        else:
+            print(f"[order_times] Supabase {r.status_code}: {r.text[:200]}")
+    return saved
+
+
+def download_day(target_date: str) -> str | None:
+    txt = download_sale_detail(target_date)
+    if not txt:
+        print(f"[scraper] {target_date}: HTTP falló, intento con Playwright...")
+        txt = download_via_playwright(target_date)
+    return txt
+
+
+def backfill(desde: str, hasta: str):
+    """Recupera la hora por orden de días pasados. Sólo escribe wansoft_order_times:
+    no manda Telegram ni toca wansoft_waiter_categories."""
+    d = datetime.strptime(desde, "%Y-%m-%d").date()
+    fin = datetime.strptime(hasta, "%Y-%m-%d").date()
+    loc = default_location_id()
+    total_dias, total_ordenes, fallidos = 0, 0, []
+    while d <= fin:
+        fecha = d.isoformat()
+        txt = download_day(fecha)
+        if not txt:
+            fallidos.append(fecha)
+        else:
+            rows = build_order_times(parse_sale_detail(txt), fecha, loc)
+            n = save_order_times(rows)
+            total_ordenes += n
+            print(f"[backfill] {fecha}: {n} órdenes")
+        total_dias += 1
+        d += timedelta(days=1)
+        time.sleep(1.5)  # no martillar Wansoft
+    print(f"[backfill] {total_dias} días, {total_ordenes} órdenes guardadas. Fallidos: {fallidos or 'ninguno'}")
+    if fallidos and len(fallidos) == total_dias:
+        sys.exit(1)
+
+
 def send_telegram(msg: str):
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
     chat_ids = get_chat_ids(CLIENT, "ticket_detail")
@@ -519,8 +638,16 @@ def send_telegram(msg: str):
 
 
 def main():
+    # Modo recuperación: BACKFILL_FROM / BACKFILL_TO (YYYY-MM-DD, inclusivo).
+    if os.environ.get("BACKFILL_FROM"):
+        desde = os.environ["BACKFILL_FROM"]
+        hasta = os.environ.get("BACKFILL_TO") or datetime.now(MX_TZ).strftime("%Y-%m-%d")
+        print(f"[backfill] Hora por orden de {desde} a {hasta}")
+        backfill(desde, hasta)
+        return
+
     now_mx = datetime.now(MX_TZ)
-    target_date = now_mx.strftime("%Y-%m-%d")
+    target_date = os.environ.get("TARGET_DATE") or now_mx.strftime("%Y-%m-%d")
 
     print(f"[scraper] Downloading sale detail for {target_date}...")
 
@@ -553,6 +680,8 @@ def main():
 
     send_telegram(msg)
     save_to_supabase(waiter_cats, items, target_date)
+    n = save_order_times(build_order_times(items, target_date, default_location_id()))
+    print(f"[scraper] {n} órdenes con hora guardadas (wansoft_order_times)")
     print("[scraper] Done")
 
 

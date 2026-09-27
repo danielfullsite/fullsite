@@ -12,6 +12,14 @@ on:
         description: 'Client ID'
         required: false
         default: 'amalay'
+      backfill_from:
+        description: 'Recuperar hora por orden DESDE (YYYY-MM-DD). Vacío = corrida normal de hoy.'
+        required: false
+        default: ''
+      backfill_to:
+        description: 'Recuperar HASTA (YYYY-MM-DD, inclusivo). Vacío = hoy.'
+        required: false
+        default: ''
 
 env:
   CLIENT_ID: ${{ github.event.inputs.client_id || 'amalay' }}
@@ -20,6 +28,8 @@ env:
   SUPABASE_AGENT_KEY: ${{ secrets.SUPABASE_AGENT_KEY }}
   TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
   TRIGGER_TYPE: ${{ github.event_name }}
+  BACKFILL_FROM: ${{ github.event.inputs.backfill_from || '' }}
+  BACKFILL_TO: ${{ github.event.inputs.backfill_to || '' }}
 
 jobs:
   scrape:

@@ -60,6 +60,7 @@ import {
   MessageSquare,
   Gauge,
   BrainCircuit,
+  Clock,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
@@ -83,6 +84,7 @@ const navSections = [
       { href: '/equipo', label: 'Equipo', icon: Users },
       { href: '/platillos', label: 'Platillos', icon: UtensilsCrossed },
       { href: '/tendencias', label: 'Tendencias', icon: TrendingUp },
+      { href: '/configuracion/horarios-venta', label: 'Horarios de venta', icon: Clock },
       { href: '/propinas', label: 'Propinas', icon: HandCoins },
     ],
   },

@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { createServiceClient } from '@/lib/supabase'
+import { leerDayparts, preguntaDeFranjas, ventasPorFranja, contextoFranjas } from '@/lib/dayparts'
 import { buildDailyFromOrders, buildDailyConEstado } from '@/lib/pos-daily'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
@@ -88,6 +89,13 @@ function parseJsonb(val: unknown): unknown[] {
     if (typeof parsed === 'string') parsed = JSON.parse(parsed)
     return Array.isArray(parsed) ? parsed : []
   } catch { return [] }
+}
+
+/** 'YYYY-MM-DD' menos n días (aritmética en UTC a mediodía: sin brincos de horario). */
+function restarDias(ymd: string, n: number): string {
+  const d = new Date(`${ymd}T12:00:00Z`)
+  d.setUTCDate(d.getUTCDate() - n)
+  return d.toISOString().slice(0, 10)
 }
 
 export async function POST(request: NextRequest) {
@@ -625,6 +633,33 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // ── VENTA POR HORARIO (brunch / lunch / merienda / dinner…) ───────────────
+    // Cada restaurante define sus franjas en /configuracion/horarios-venta. El % se
+    // calcula en Postgres (ventas_por_franja) con la hora real de cada orden, total y
+    // sólo comida, y por sucursal. La IA recibe el resultado ya hecho.
+    let franjasContext = ''
+    try {
+      const cliRes = await fetch(
+        `${sbUrl}/rest/v1/clients?id=eq.${encodeURIComponent(client_id || '')}&select=sales_dayparts,business_day_start_local`,
+        { headers: sbHeaders, cache: 'no-store' }
+      )
+      const cli = cliRes.ok ? ((await cliRes.json().catch(() => []))[0] || {}) : {}
+      const inicioDia = cli.business_day_start_local ? String(cli.business_day_start_local).slice(0, 5) : '05:00'
+      const { config: franjasCfg, esDefault: franjasDefault } = leerDayparts(cli.sales_dayparts, inicioDia)
+      if (preguntaDeFranjas(q, franjasCfg)) {
+        const qn = q.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        const diasAtras = qn.includes('hoy') ? 0 : qn.includes('ayer') ? 1 : /semana/.test(qn) ? 6 : wantsYear ? 364 : 29
+        const hasta = qn.includes('ayer') ? restarDias(todayStr, 1) : todayStr
+        const desde = restarDias(todayStr, diasAtras)
+        const filas = await ventasPorFranja({ sbUrl, sbKey, clientId: client_id || '', desde, hasta, config: franjasCfg, tz: zona, inicioDia })
+        if (filas) {
+          const nombres = new Map<string, string>()
+          for (const l of (sucursalesRaw || []) as { id?: string; name?: string }[]) if (l.id && l.name) nombres.set(l.id, l.name)
+          franjasContext = contextoFranjas({ filas, config: franjasCfg, esDefault: franjasDefault, desde, hasta, nombreSucursal: id => nombres.get(id) || id })
+        }
+      }
+    } catch { /* franjas opcionales: sin ellas el chat sigue funcionando */ }
+
     let marketContext = ''
     if (wantsMarket && Array.isArray(marketStockRaw) && marketStockRaw.length > 0) {
       const agotados = marketStockRaw.filter((m: Record<string, unknown>) => Number(m.stock) <= 0)
@@ -985,6 +1020,7 @@ CÓMO INTERPRETAR (lee la intención, no las palabras):
 - "año pasado" / "vs 2025" / "crecimiento" / "yoy" → usar COMPARATIVO AÑO ANTERIOR. Dar % cambio por mes + ticket promedio.
 - "qué le dirías a Monica/dueño/gerente" → dar resumen ejecutivo con 3 puntos + acciones
 - "hoy" sin datos de hoy → Di "aún no hay datos de hoy (el scraper no ha corrido). El último día registrado es [fecha]:" y da los datos de ese día. NO inventes números para hoy.
+- "brunch" / "lunch" / "dinner" / "merienda" / "desayuno" / "cena" / "horario" / "% de mi venta de comida por horario" → usa VENTA POR HORARIO. Da el % de cada franja (de la venta total y, si preguntan por comida, de la venta de COMIDA), el ticket por franja y, si hay varias sucursales, compáralas. Si los horarios son GENÉRICOS dilo y manda a configurarlos. [Ver horarios →](/configuracion/horarios-venta)
 - "hora pico" → si hay VENTAS POR HORA en los datos, usarlas. Si no, decir "no tengo desglose por hora, revísalo en el dashboard"
 - "propinas" → NO hay datos de propinas en el sistema. Di: "las propinas no llegan al sistema — revísalas en el corte de caja físico". NO inventes montos.
 - "inventario" / "stock" / "market" → buscar en INVENTARIO MARKET si hay datos. Dar stock actual, items con bajo stock, últimos movimientos. Si preguntan por ingredientes de cocina, decir que se revisa en /pos/inventario.
@@ -1016,6 +1052,7 @@ Rutas disponibles:
 - Meseros ranking/rendimiento → [Ver meseros →](/meseros)
 - Platillos más vendidos → [Ver platillos →](/platillos)
 - Tendencias/comparativos → [Ver tendencias →](/tendencias)
+- Venta por horario (brunch/lunch/dinner) → [Ver horarios →](/configuracion/horarios-venta)
 - Propinas → [Ver propinas →](/propinas)
 - Food cost/margen/recetas → [Ver food cost →](/food-cost)
 - Recetas/ingredientes → [Ver recetas →](/recetas)
@@ -1115,6 +1152,7 @@ Brecha: Julio vende 2.4x más. Christopher necesita coaching en H&H y postres.
 Si lo hacen = +$5,000-6,000 hoy. Hazlo ahora.
 
 ${sucursalesContext}
+${franjasContext}
 ${waiterContext}
 ${foodCostContext}
 ${reservasContext}
