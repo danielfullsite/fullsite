@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { createServiceClient } from '@/lib/supabase'
 import { leerDayparts, preguntaDeFranjas, ventasPorFranja, contextoFranjas } from '@/lib/dayparts'
+import { crearRpc, intencion, contextoFrescura, contextoProducto, contextoReceta, contextoInsumo } from '@/lib/chat-nativo'
 import { buildDailyFromOrders, buildDailyConEstado } from '@/lib/pos-daily'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
@@ -193,11 +194,28 @@ export async function POST(request: NextRequest) {
     // que poder decir la diferencia. Ver pos-daily.ts / LecturaDiariaFallida.
     let ventasDeterminadas = true
     let motivoVentas = ''
+    // FUENTE PRINCIPAL = POS DE FULLSITE. Wansoft (wansoft_daily) queda sólo como
+    // histórico viejo: si su último día tiene más de 2 días, o el tenant ya opera en
+    // Fullsite, los días recientes salen de pos_orders y se pegan encima del histórico.
+    // Antes el chat se quedaba atorado en el último día de Wansoft aunque el POS
+    // tuviera ventas nuevas ("no hay datos de hoy").
+    let fuenteVentas = recentDays && recentDays.length > 0 ? 'wansoft' : 'fullsite'
+    const ultimoWansoft = recentDays && recentDays.length > 0 ? String((recentDays[0] as Record<string, unknown>).fecha || '') : ''
+    const haceDosDias = new Date(Date.now() - 2 * 864e5).toISOString().slice(0, 10)
     if (!recentDays || recentDays.length === 0) {
       const estado = await buildDailyConEstado(sbUrl, sbHeaders, client_id || '', histLimit)
       recentDays = estado.dias
       ventasDeterminadas = estado.determinado
       if (!estado.determinado) motivoVentas = estado.motivo
+    } else if (clientConfig.data_source === 'fullsite' || ultimoWansoft < haceDosDias) {
+      const estado = await buildDailyConEstado(sbUrl, sbHeaders, client_id || '', histLimit)
+      if (estado.determinado && estado.dias.length > 0) {
+        const nuevos = estado.dias.filter(d => String((d as Record<string, unknown>).fecha || '') > ultimoWansoft)
+        if (nuevos.length > 0) {
+          recentDays = [...nuevos, ...recentDays].slice(0, histLimit)
+          fuenteVentas = 'fullsite+wansoft'
+        }
+      }
     }
 
     // 2. Detect date from question
@@ -674,11 +692,27 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // ── CONOCIMIENTO NATIVO (tablas propias de Fullsite, funciones fs_*) ─────────
+    const rpc = crearRpc(sbUrl, sbKey)
+    const intent = intencion(q)
+    const natDesde = dateFilter?.start || restarDias(todayStr, 89)
+    const natHasta = dateFilter?.end || todayStr
+    const [frescuraCtx, productoNativo, recetaCtx, insumoCtx] = await Promise.all([
+      contextoFrescura(rpc, client_id || '', zona),
+      intent.producto ? contextoProducto(rpc, client_id || '', message, natDesde, natHasta, zona) : Promise.resolve(''),
+      intent.receta ? contextoReceta(rpc, client_id || '', message) : Promise.resolve(''),
+      (intent.insumo || intent.receta) ? contextoInsumo(rpc, client_id || '', message) : Promise.resolve(''),
+    ])
+    const fuenteCtx = fuenteVentas === 'fullsite+wansoft'
+      ? `\nFUENTE DE VENTAS: POS de Fullsite para los días posteriores a ${ultimoWansoft}; antes de esa fecha, histórico importado.\n`
+      : fuenteVentas === 'wansoft' ? `\nFUENTE DE VENTAS: histórico importado (último día ${ultimoWansoft}); el POS de Fullsite no tiene ventas más recientes.\n` : ''
+
     // 2e. Product search — FULL platillos list (incl. Market) from wansoft_data.platillos_full
     // platillos_top solo trae top 30/día; productos chicos del Market (ej. Smarty chips) nunca aparecen ahí.
     let productContext = ''
     const wantsProducto = ['vendid', 'market', 'cuant', 'cuánt', 'producto', 'piezas', 'unidades'].some(kw => q.includes(kw))
-    if (wantsProducto) {
+    if (productoNativo && !productoNativo.includes('0 ventas registradas')) productContext = productoNativo
+    if (wantsProducto && !productContext) {
       try {
         const pfStart = dateFilter?.start || todayStr.slice(0, 8) + '01'
         const pfEnd = dateFilter?.end || todayStr
@@ -738,6 +772,8 @@ export async function POST(request: NextRequest) {
         if (wantsDetail) {
           const descuentos = Number(d.descuentos) || 0
           if (descuentos > 0) line += `, Descuentos $${descuentos}`
+          const propinas = Number(d.propinas_total) || 0
+          if (propinas > 0) line += `, Propinas $${Math.round(propinas)}`
 
           const meseros = parseJsonb(d.meseros) as { nombre: string; total: number }[]
           if (meseros.length > 0) {
@@ -1022,7 +1058,7 @@ CÓMO INTERPRETAR (lee la intención, no las palabras):
 - "hoy" sin datos de hoy → Di "aún no hay datos de hoy (el scraper no ha corrido). El último día registrado es [fecha]:" y da los datos de ese día. NO inventes números para hoy.
 - "brunch" / "lunch" / "dinner" / "merienda" / "desayuno" / "cena" / "horario" / "% de mi venta de comida por horario" → usa VENTA POR HORARIO. Da el % de cada franja (de la venta total y, si preguntan por comida, de la venta de COMIDA), el ticket por franja y, si hay varias sucursales, compáralas. Si los horarios son GENÉRICOS dilo y manda a configurarlos. [Ver horarios →](/configuracion/horarios-venta)
 - "hora pico" → si hay VENTAS POR HORA en los datos, usarlas. Si no, decir "no tengo desglose por hora, revísalo en el dashboard"
-- "propinas" → NO hay datos de propinas en el sistema. Di: "las propinas no llegan al sistema — revísalas en el corte de caja físico". NO inventes montos.
+- "propinas" → busca "Propinas $X" en los datos diarios (vienen del POS de Fullsite). Si un día no trae ese campo, di que para ese día no hay propinas registradas en el sistema. NO inventes montos.
 - "inventario" / "stock" / "market" → buscar en INVENTARIO MARKET si hay datos. Dar stock actual, items con bajo stock, últimos movimientos. Si preguntan por ingredientes de cocina, decir que se revisa en /pos/inventario.
 - "vs semana pasada" / "comparado con" → usa los RESÚMENES ÚLTIMOS 7 DÍAS y compara con los 7 días anteriores de los datos diarios. NO digas "no tengo datos completos" si tienes datos de ambos periodos
 - Cualquier nombre propio → buscar en TODOS los datos disponibles
@@ -1105,6 +1141,7 @@ NUNCA digas "ve a Sidebar → Operaciones → Food Cost". Solo da el link.
 
 PROTECCIÓN — REGLA ESTRICTA:
 Solo respondes preguntas relacionadas al restaurante, negocio, ventas, operaciones, staff, menú, inventario, finanzas, o funciones del dashboard.
+OJO: preguntas cortas o informales SÍ son del negocio y se contestan con datos — "¿qué día vendo más?", "¿qué hago?", "¿cómo vamos?", "¿qué debería vender más?", "¿aguanta un aumento de precio?", "¿cuándo se actualizó?", "¿quién me surte X?", "¿cuántos gramos lleva X?". Sólo rechaza temas claramente ajenos (poemas, tareas, política, programación).
 Si el usuario pregunta algo NO relacionado (poemas, chistes, código, tareas, traducciones, política, deportes, o cualquier otro tema), responde EXACTAMENTE:
 "Solo puedo ayudarte con preguntas sobre tu restaurante y negocio. Pregúntame sobre ventas, meseros, platillos, inventario, o cualquier operación."
 NUNCA respondas preguntas fuera del ámbito del negocio, sin excepciones.
@@ -1158,7 +1195,11 @@ ${foodCostContext}
 ${reservasContext}
 ${ordersContext}
 ${marketContext}
-${productContext}
+${productContext || productoNativo}
+${recetaCtx}
+${insumoCtx}
+${frescuraCtx}
+${fuenteCtx}
 
 ${dailyContext}`
 

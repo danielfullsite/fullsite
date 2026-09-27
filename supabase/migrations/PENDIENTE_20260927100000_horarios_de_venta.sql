@@ -117,7 +117,7 @@ pos as (
   from pos_orders o, hay_ws
   where not hay_ws.v
     and o.client_id = p_client_id
-    and o.status = 'cerrada'
+    and o.status in ('cerrada', 'pagada', 'cobrada', 'entregada')
     and o.created_at >= ((p_desde::timestamp + p_inicio_dia) at time zone p_tz)
     and o.created_at <  (((p_hasta + 1)::timestamp + p_inicio_dia) at time zone p_tz)
 ),
