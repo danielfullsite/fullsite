@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { prepararCancelacionItem } from '@/lib/cancelacion-item'
 vi.mock('@/lib/api-auth', () => ({ withPOSAuth: async () => ({ clientId: 'lab', staffId: 'cashier' }), unauthorized: vi.fn() }))
 vi.mock('@/lib/shift-token', () => ({ verifyShiftToken: vi.fn() }))
@@ -6,7 +6,16 @@ import { POST } from '@/app/api/pos/cancel-item/route'
 const order = () => ({ id: 'order', order_revision: 4, updated_at: '2026-09-10T00:00:00Z',
   status: 'enviada', items: [{ id: 'cancel', subtotal: 50 }, { id: 'keep', subtotal: 100 }],
   subtotal: 150, descuento: 15, iva: 10.8, total: 145.8, saldo: 145.8, pagos: [] })
-afterEach(() => vi.unstubAllGlobals())
+// Estas banderas cambian el contrato de autorización. La prueba no puede depender
+// de que otro archivo haya dejado el proceso en GRACE o en modo estricto.
+beforeEach(() => {
+  vi.stubEnv('CANCEL_APPROVAL_STRICT', '')
+  vi.stubEnv('POS_APPROVAL_STRICT', '')
+})
+afterEach(() => {
+  vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
+})
 describe('cancelación con importes canónicos', () => {
   it('persiste la disposición explícita sin devolver ingredientes preparados', () => {
     // undefined → retain_consumption (antes 'pending', que bloqueaba la orden entera).
