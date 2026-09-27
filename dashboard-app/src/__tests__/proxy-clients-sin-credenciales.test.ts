@@ -65,6 +65,14 @@ for (const proxy of ['query', 'path'] as const) describe(`clients por el proxy $
       expect((await get(consulta)).status).toBe(200)
     })
 
+  it('el proxy reemplaza el id pedido por el tenant autenticado', async () => {
+    expect((await get('id=eq.otro-tenant&select=id')).status).toBe(200)
+    expect(pedidos).toHaveLength(1)
+    const upstream = new URL(pedidos[0])
+    expect(upstream.searchParams.get('id')).toBe('eq.tenant-lab')
+    expect(upstream.searchParams.has('client_id')).toBe(false)
+  })
+
   it('una respuesta que no es JSON no sale', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(`id,wansoft_pass\ntenant-lab,${CLAVE}`, { headers: { 'content-type': 'text/csv' } })))
     const texto = await (await get('select=id')).text()
