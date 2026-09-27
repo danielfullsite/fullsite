@@ -81,6 +81,9 @@ Windows real, estaciones/impresoras, KDS, caída y retorno de red, reinicio,
 operación incierta y rollback. El piloto inicia con una Caja, un turno y un
 alcance explícitamente limitado; cada expansión requiere evidencia adicional.
 
+El procedimiento redactado, sus condiciones de entrada y el formato de
+evidencia están en [Preparación de piloto controlado — Amalay](AMALAY-PILOT-READINESS-2026-09-27.md).
+
 ## Definición de avance
 
 | Estado | Significado |
