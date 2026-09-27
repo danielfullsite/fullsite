@@ -9,6 +9,7 @@ type Review = { decision_id: string; disposition: 'accepted' | 'rejected' }
 type SystemContext = { version: string; domains: { id: string; label: string; boundary: string }[] }
 type Snapshot = { ready: boolean; evidence: Evidence[]; decisions: Decision[]; reviews: Review[]; system_context: SystemContext | null }
 type Form = Record<string, string | boolean>
+type EvaluationResponse = { error?: string; decision?: { recommendation?: Record<string, unknown> } }
 
 const initial: Form = {
   source_ref: '', source_sha256: '', tenant_ref: '', claimed_status: 'tested_locally', tests_passed: '0', tests_failed: '0',
@@ -23,6 +24,21 @@ const checks = [
 function booleanOrNull(value: string | boolean): boolean | null { return value === 'yes' ? true : value === 'no' ? false : null }
 function asRecord(value: unknown): Record<string, unknown> { return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {} }
 function nonNegative(value: unknown): number | null { return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null }
+
+function evaluationNotice(result: EvaluationResponse): string {
+  const recommendation = asRecord(result.decision?.recommendation)
+  const jev = asRecord(recommendation.jev)
+  if (jev.status !== 'blocked') return 'Veredicto registrado; todavía requiere revisión humana.'
+  const reason = typeof jev.block_reason === 'string' ? jev.block_reason : 'sin detalle'
+  return `JEV no emitió opinión (${reason}). Se conserva la regla local y no se ejecutó ningún cambio.`
+}
+
+function evaluationLabel(recommendation: Record<string, unknown>): string {
+  const jev = asRecord(recommendation.jev)
+  if (jev.status !== 'blocked') return String(jev.status || '—')
+  const reason = typeof jev.block_reason === 'string' ? jev.block_reason : 'sin detalle'
+  return `sin opinión: ${reason}`
+}
 
 function gateSnapshot(evidence: Evidence[]) {
   const latest = evidence.find((item) => item.decision_input?.use_case === 'contradiction_check')
@@ -89,6 +105,21 @@ export default function JevControlPanel() {
     finally { setBusy(null) }
   }
 
+  async function evaluateEvidence(evidenceId: string) {
+    const key = `eval:${evidenceId}`
+    setBusy(key); setNotice(null)
+    try {
+      const res = await fetch('/api/platform/jev/evaluate', {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ evidence_id: evidenceId }),
+      })
+      const result = await res.json() as EvaluationResponse
+      if (!res.ok) throw new Error(result.error || 'La evaluación no se pudo completar.')
+      setNotice(evaluationNotice(result))
+      await load()
+    } catch (error) { setNotice(error instanceof Error ? error.message : 'La evaluación no se pudo completar.') }
+    finally { setBusy(null) }
+  }
+
   function saveEvidence(event: React.FormEvent) {
     event.preventDefault()
     const payload = {
@@ -149,10 +180,10 @@ export default function JevControlPanel() {
         <div className="col-span-full grid gap-3 md:grid-cols-3">{checks.map(([key, label]) => <Field key={key} label={label}><select value={String(form[key])} onChange={(e) => set(key, e.target.value)}><option value="pending">Pendiente</option><option value="yes">Sí</option><option value="no">No</option></select></Field>)}</div>
         <div className="col-span-full flex justify-end"><button disabled={busy === 'register'} className="inline-flex items-center gap-2 rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">{busy === 'register' && <LoaderCircle size={15} className="animate-spin" />}Guardar evidencia</button></div>
       </form>}
-      {loading ? <Loading /> : !data.ready ? <Empty text="La migración de evidencia no está aplicada todavía. Esta pantalla no inventa fuentes ni veredictos." /> : data.evidence.length === 0 ? <Empty text="Aún no hay una fuente registrada." /> : <div className="divide-y divide-[var(--line)]">{data.evidence.map((item) => <div key={item.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center"><div className="min-w-0 flex-1"><p className="font-mono text-sm font-medium text-[var(--text-1)]">{item.source_ref}</p><p className="mt-1 truncate font-mono text-xs text-[var(--text-4)]">{item.source_sha256}</p></div><span className="text-xs text-[var(--text-3)]">{String(item.decision_input?.use_case || '—')}</span><button disabled={busy === `eval:${item.id}`} onClick={() => void send('/api/platform/jev/evaluate', { evidence_id: item.id }, `eval:${item.id}`, 'Veredicto registrado; todavía requiere revisión humana.')} className="inline-flex items-center justify-center gap-2 rounded-lg border border-violet-400/30 px-3 py-2 text-sm font-semibold text-violet-300 disabled:opacity-50"><Play size={14} />Pedir veredicto</button></div>)}</div>}
+      {loading ? <Loading /> : !data.ready ? <Empty text="La migración de evidencia no está aplicada todavía. Esta pantalla no inventa fuentes ni veredictos." /> : data.evidence.length === 0 ? <Empty text="Aún no hay una fuente registrada." /> : <div className="divide-y divide-[var(--line)]">{data.evidence.map((item) => <div key={item.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center"><div className="min-w-0 flex-1"><p className="font-mono text-sm font-medium text-[var(--text-1)]">{item.source_ref}</p><p className="mt-1 truncate font-mono text-xs text-[var(--text-4)]">{item.source_sha256}</p></div><span className="text-xs text-[var(--text-3)]">{String(item.decision_input?.use_case || '—')}</span><button disabled={busy === `eval:${item.id}`} onClick={() => void evaluateEvidence(item.id)} className="inline-flex items-center justify-center gap-2 rounded-lg border border-violet-400/30 px-3 py-2 text-sm font-semibold text-violet-300 disabled:opacity-50"><Play size={14} />Pedir veredicto</button></div>)}</div>}
     </section>
 
-    <section className="rounded-2xl border border-[var(--line)] bg-[var(--surface)]"><div className="border-b border-[var(--line)] px-5 py-4"><h2 className="font-semibold text-[var(--text-1)]">Bandeja de veredictos</h2><p className="mt-1 text-sm text-[var(--text-3)]">Aceptar o rechazar sólo deja constancia. No ejecuta un cambio.</p></div>{loading ? <Loading /> : data.decisions.length === 0 ? <Empty text="No hay veredictos guardados." /> : <div className="divide-y divide-[var(--line)]">{data.decisions.map((decision) => { const rec = asRecord(decision.recommendation); const rules = asRecord(rec.rules); const jev = asRecord(rec.jev); const review = reviews.get(decision.id); return <div key={decision.id} className="grid gap-4 px-5 py-5 lg:grid-cols-[1fr_auto]"><div><div className="flex flex-wrap gap-2"><span className="rounded-full bg-violet-400/10 px-2.5 py-1 text-xs font-semibold text-violet-300">{String(rules.label || 'sin decisión')}</span><span className="text-xs text-[var(--text-3)]">Autoridad: {String(rec.authority || '—')}</span><span className="text-xs text-[var(--text-4)]">JEV: {String(jev.status || '—')}</span></div><p className="mt-3 text-sm text-[var(--text-2)]">La decisión efectiva sigue siendo la regla local. Ejecutable: no.</p><p className="mt-1 font-mono text-xs text-[var(--text-4)]">{String(rec.input_hash || '')}</p></div><div className="flex gap-2 lg:justify-end">{review ? <span className="inline-flex items-center gap-1 rounded-lg border border-[var(--line)] px-3 py-2 text-sm text-[var(--text-3)]">{review.disposition === 'accepted' ? <Check size={14} className="text-emerald-300" /> : <X size={14} className="text-red-300" />}{review.disposition === 'accepted' ? 'Aceptado' : 'Rechazado'}</span> : <><button onClick={() => void send('/api/platform/jev/review', { decision_id: decision.id, disposition: 'accepted' }, `review:${decision.id}`, 'Revisión humana aceptada; no se ejecutó ningún cambio.')} className="rounded-lg border border-emerald-400/30 px-3 py-2 text-sm font-semibold text-emerald-300">Aceptar</button><button onClick={() => void send('/api/platform/jev/review', { decision_id: decision.id, disposition: 'rejected' }, `review:${decision.id}`, 'Revisión humana rechazada; no se ejecutó ningún cambio.')} className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm text-[var(--text-3)]">Rechazar</button></>}</div></div> })}</div>}</section>
+    <section className="rounded-2xl border border-[var(--line)] bg-[var(--surface)]"><div className="border-b border-[var(--line)] px-5 py-4"><h2 className="font-semibold text-[var(--text-1)]">Bandeja de veredictos</h2><p className="mt-1 text-sm text-[var(--text-3)]">Aceptar o rechazar sólo deja constancia. No ejecuta un cambio.</p></div>{loading ? <Loading /> : data.decisions.length === 0 ? <Empty text="No hay veredictos guardados." /> : <div className="divide-y divide-[var(--line)]">{data.decisions.map((decision) => { const rec = asRecord(decision.recommendation); const rules = asRecord(rec.rules); const review = reviews.get(decision.id); return <div key={decision.id} className="grid gap-4 px-5 py-5 lg:grid-cols-[1fr_auto]"><div><div className="flex flex-wrap gap-2"><span className="rounded-full bg-violet-400/10 px-2.5 py-1 text-xs font-semibold text-violet-300">{String(rules.label || 'sin decisión')}</span><span className="text-xs text-[var(--text-3)]">Autoridad: {String(rec.authority || '—')}</span><span className="text-xs text-[var(--text-4)]">JEV: {evaluationLabel(rec)}</span></div><p className="mt-3 text-sm text-[var(--text-2)]">La decisión efectiva sigue siendo la regla local. Ejecutable: no.</p><p className="mt-1 font-mono text-xs text-[var(--text-4)]">{String(rec.input_hash || '')}</p></div><div className="flex gap-2 lg:justify-end">{review ? <span className="inline-flex items-center gap-1 rounded-lg border border-[var(--line)] px-3 py-2 text-sm text-[var(--text-3)]">{review.disposition === 'accepted' ? <Check size={14} className="text-emerald-300" /> : <X size={14} className="text-red-300" />}{review.disposition === 'accepted' ? 'Aceptado' : 'Rechazado'}</span> : <><button onClick={() => void send('/api/platform/jev/review', { decision_id: decision.id, disposition: 'accepted' }, `review:${decision.id}`, 'Revisión humana aceptada; no se ejecutó ningún cambio.')} className="rounded-lg border border-emerald-400/30 px-3 py-2 text-sm font-semibold text-emerald-300">Aceptar</button><button onClick={() => void send('/api/platform/jev/review', { decision_id: decision.id, disposition: 'rejected' }, `review:${decision.id}`, 'Revisión humana rechazada; no se ejecutó ningún cambio.')} className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm text-[var(--text-3)]">Rechazar</button></>}</div></div> })}</div>}</section>
     <div className="flex gap-3 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-4 text-sm leading-6 text-[var(--text-3)]"><ShieldCheck size={18} className="mt-0.5 shrink-0 text-emerald-300" />La llave de AI Gateway sólo se lee en el servidor durante una evaluación. No se muestra, no se almacena aquí y no llega al navegador.</div>
   </div>
 }
