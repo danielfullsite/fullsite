@@ -9,6 +9,7 @@
 > [`audit/FULLSITE-CIERRE-PUNTA-A-PUNTA-2026-09-04.md`](audit/FULLSITE-CIERRE-PUNTA-A-PUNTA-2026-09-04.md)
 > (auditoría de cierre) y [`state/OPEN-ITEMS.md`](state/OPEN-ITEMS.md) (índice de pendientes).
 > [`PLAN-AHORA.md`](PLAN-AHORA.md) conserva el plan general de agosto como contexto.
+> Para la coordinación vigente del piloto y los gates posteriores: [`release/CLOSURE-TRACKER-2026-09-27.md`](release/CLOSURE-TRACKER-2026-09-27.md). No sustituye evidencia primaria ni certificaciones.
 
 ---
 
