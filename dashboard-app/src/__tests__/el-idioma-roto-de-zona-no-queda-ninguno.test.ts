@@ -124,7 +124,15 @@ describe('los agentes toman la zona del tenant', () => {
   it.each(['operations', 'finance', 'staff', 'fraud'])('agents/%s.ts', (nombre) => {
     const src = sinComentarios(
       readFileSync(join(RAIZ, 'lib', 'agents', `${nombre}.ts`), 'utf8'))
-    expect(src).toMatch(/getActiveTimezone\(\)/)
+    // Dos formas válidas: la zona activa, o el contexto del día de venta que lee
+    // `clients.timezone` del propio restaurante (lib/agents/dia-negocio.ts).
+    expect(src).toMatch(/getActiveTimezone\(\)|leerContextoDia\(/)
     expect(src).not.toMatch(/timeZone: 'America\/Monterrey'/)
+  })
+
+  it('dia-negocio.ts lee la zona de clients.timezone del restaurante', () => {
+    const src = sinComentarios(readFileSync(join(RAIZ, 'lib', 'agents', 'dia-negocio.ts'), 'utf8'))
+    expect(src).toMatch(/select=timezone,business_day_start_local/)
+    expect(src).not.toMatch(/America\/Monterrey/)
   })
 })

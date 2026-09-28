@@ -69,6 +69,33 @@ export async function sbPatch(table: string, query: string, data: Record<string,
   }
 }
 
+/**
+ * Sujeto de un hallazgo: de QUIÉN o de QUÉ habla. Se lee de la evidencia que cada agente
+ * ya emite — `sujeto` explícito, `mesero`, `insumo` u `order_id`. Los hallazgos agregados
+ * (una lista de mesas o de insumos) no tienen sujeto: su lista cambia entre corridas y
+ * usarla como llave repetiría el mismo aviso cada media hora.
+ */
+export function sujetoDeHallazgo(evidence: Record<string, unknown> | null | undefined): string {
+  const ev = evidence ?? {}
+  for (const k of ['sujeto', 'mesero', 'insumo', 'order_id'] as const) {
+    const v = ev[k]
+    if (typeof v === 'string' && v.trim()) return `${k}=${v.trim().toLowerCase()}`
+    if (typeof v === 'number') return `${k}=${v}`
+  }
+  return ''
+}
+
+/** Marca para notificar los hallazgos críticos (ver runAgent). */
+export function marcarNotificacion(e: AgentEvent): AgentEvent {
+  if (e.severity !== 'critical') return e
+  return { ...e, notify: true, evidence: { ...e.evidence, notificar: { pendiente: true, motivo: 'critical' } } }
+}
+
+/** Llave de dedupe: tipo, severidad y sujeto. */
+export function llaveDedupe(e: { type: string; severity: string; evidence?: Record<string, unknown> | null }): string {
+  return `${e.type}:${e.severity}:${sujetoDeHallazgo(e.evidence)}`
+}
+
 /** Run a single agent, store its events, return the result. */
 /**
  * Deja constancia de la corrida en `agent_runs`.
@@ -196,12 +223,16 @@ export async function runAgent(
     // para ellos no cambia nada.
     const dedupeWindow = new Date(Date.now() - 30 * 60 * 1000).toISOString()
     const ahora = new Date().toISOString()
-    const existingRaw = await sbGet<{ type: string; severity: string; expires_at: string | null; created_at: string }>(
+    type Existente = { type: string; severity: string; evidence: Record<string, unknown> | null; expires_at: string | null; created_at: string }
+    const existingRaw = await sbGet<Existente>(
       'agent_events',
       `client_id=eq.${encodeURIComponent(clientId)}&agent_id=eq.${agentId}&status=eq.new` +
-        `&or=(expires_at.gte.${ahora},created_at.gte.${dedupeWindow})&select=type,severity,expires_at,created_at`,
-    ).catch(() => [] as { type: string; severity: string; expires_at: string | null; created_at: string }[])
-    const existingTypes = new Set(existingRaw.map(r => `${r.type}:${r.severity}`))
+        `&or=(expires_at.gte.${ahora},created_at.gte.${dedupeWindow})&select=type,severity,evidence,expires_at,created_at`,
+    ).catch(() => [] as Existente[])
+    // La llave incluye el SUJETO del hallazgo (mesero, insumo, orden). Con sólo
+    // `type:severity`, la alerta de fraude de un segundo mesero se tragaba 12 horas
+    // porque ya había una `cancel_concentration:warning` abierta — de OTRO mesero.
+    const existingTypes = new Set(existingRaw.map(r => llaveDedupe(r)))
 
     // ── Aprendizaje: el veredicto humano pondera el hallazgo ──────────────────
     //
@@ -223,10 +254,16 @@ export async function runAgent(
 
     const learned = applyLearning(events, tallyVerdicts(verdictRows))
     learningSummary = { downgraded: learned.downgraded, suppressed: learned.suppressed }
-    events = learned.events
+    // Crítico = se avisa. No hay todavía un canal de entrega desde el dashboard (el push
+    // web guarda suscripciones pero no tiene emisor en servidor, y no hay tabla de
+    // notificaciones), así que se marca en el propio hallazgo para que el emisor, cuando
+    // exista, sepa qué mandar. Va dentro de `evidence` porque `agent_events` no tiene
+    // columna para esto: un campo desconocido haría fallar el INSERT y perder el hallazgo.
+    // Se marca DESPUÉS del aprendizaje: lo que el historial suprimió no se avisa.
+    events = learned.events.map(marcarNotificacion)
 
     // Insert new events
-    const toInsert = events.filter(e => !existingTypes.has(`${e.type}:${e.severity}`))
+    const toInsert = events.filter(e => !existingTypes.has(llaveDedupe(e)))
     await Promise.allSettled(
       toInsert.map(event =>
         sbInsert('agent_events', {

@@ -136,8 +136,12 @@ Reglas:
 - Fecha de hoy: ${today}.`
 
   // Anthropic content puede ser string o bloques; empezamos con los turnos de la UI (texto).
+  // Sólo 'user'/'assistant' con texto: el tipo no se valida en runtime y el cuerpo lo
+  // manda el navegador; un 'system' ahí sería un intento de reescribir las reglas.
   const messages: { role: 'user' | 'assistant'; content: unknown }[] =
-    uiMessages.slice(-20).map(m => ({ role: m.role, content: m.content }))
+    (Array.isArray(uiMessages) ? uiMessages : [])
+      .filter(m => !!m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+      .slice(-20).map(m => ({ role: m.role, content: m.content }))
 
   for (let step = 0; step < 8; step++) {
     const res = await fetch(ANTHROPIC_URL, {

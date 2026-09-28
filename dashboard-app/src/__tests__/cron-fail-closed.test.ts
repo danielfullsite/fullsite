@@ -20,12 +20,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const agentesCorrieron = vi.fn()
+const listaDeTenants = vi.fn(async (_tabla?: string, _query?: string) => [{ id: 'amalay' }] as Array<{ id: string }>)
 
 vi.mock('@/lib/agents/engine', () => ({
   runAllAgents: (...args: unknown[]) => {
     agentesCorrieron(...args)
     return Promise.resolve([])
   },
+  sbGet: (tabla: string, query: string) => listaDeTenants(tabla, query),
 }))
 
 function req(auth?: string) {
@@ -39,6 +41,8 @@ const SECRETO = 'cron-secreto-de-pruebas-0123456789'
 beforeEach(() => {
   vi.resetModules()
   agentesCorrieron.mockClear()
+  listaDeTenants.mockReset()
+  listaDeTenants.mockResolvedValue([{ id: 'amalay' }])
   process.env.NEXT_PUBLIC_DEFAULT_CLIENT_ID = 'amalay'
 })
 
@@ -98,5 +102,46 @@ describe('/api/agents/cron falla cerrado', () => {
     // `agent_runs`. Sin él no se puede distinguir lo que corre solo de lo que alguien
     // disparó a mano desde la página, que es la mitad del valor de tener bitácora.
     expect(agentesCorrieron).toHaveBeenCalledWith('amalay', 'cron')
+  })
+})
+
+describe('/api/agents/cron corre para todos los restaurantes activos', () => {
+  it('lee clients activos y corre los agentes de cada uno', async () => {
+    process.env.CRON_SECRET = SECRETO
+    listaDeTenants.mockResolvedValue([{ id: 'amalay' }, { id: 'boruca' }, { id: 'nomada' }, { id: 'lab-resto' }])
+    const { GET } = await import('@/app/api/agents/cron/route')
+
+    const res = await GET(req(`Bearer ${SECRETO}`))
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(String(listaDeTenants.mock.calls[0]?.[0])).toBe('clients')
+    expect(String(listaDeTenants.mock.calls[0]?.[1])).toContain('active=is.true')
+    expect(agentesCorrieron.mock.calls.map(c => c[0]).sort()).toEqual(['amalay', 'boruca', 'lab-resto', 'nomada'])
+    for (const c of agentesCorrieron.mock.calls) expect(c[1]).toBe('cron')
+    expect(body.tenants).toBe(4)
+  })
+
+  it('si la lista de restaurantes falla, NO lo toma como "no hay nadie": corre el default y reporta el error', async () => {
+    process.env.CRON_SECRET = SECRETO
+    listaDeTenants.mockRejectedValue(new Error('sbGet clients: 500'))
+    const { GET } = await import('@/app/api/agents/cron/route')
+
+    const res = await GET(req(`Bearer ${SECRETO}`))
+    const body = await res.json()
+
+    expect(agentesCorrieron).toHaveBeenCalledWith('amalay', 'cron')
+    expect(body.ok).toBe(false)
+    expect(body.error_tenants).toContain('500')
+  })
+
+  it('sin restaurantes activos responde 200 con 0 — no inventa uno', async () => {
+    process.env.CRON_SECRET = SECRETO
+    listaDeTenants.mockResolvedValue([])
+    const { GET } = await import('@/app/api/agents/cron/route')
+
+    const res = await GET(req(`Bearer ${SECRETO}`))
+    expect(res.status).toBe(200)
+    expect(agentesCorrieron).not.toHaveBeenCalled()
   })
 })

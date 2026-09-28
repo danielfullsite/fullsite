@@ -5,13 +5,14 @@ import { MessageCircle, X, Send, ArrowLeft, Sparkles } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import type { ChatMessage } from '@/lib/types'
 import { getActiveClientSlug } from '@/lib/data'
+import { hrefInternoSeguro } from '@/lib/chat-context'
 
 const quickQuestions = [
   '¿Cómo van las ventas hoy?',
   '¿Quién es mi mejor mesero?',
   '¿Qué día vendo más?',
   '¿Cómo subo el ticket promedio?',
-  '¿Cuántos chilaquiles vendimos?',
+  '¿Cuál es mi platillo más vendido?',
   '¿Cómo vamos vs la semana pasada?',
 ]
 
@@ -128,7 +129,12 @@ function renderMarkdown(text: string) {
   return linkParts.map((part, i) => {
     const linkMatch = part.match(/\[([^\]]+)\]\(([^)]+)\)/)
     if (linkMatch) {
-      const [, label, href] = linkMatch
+      const [, label, rawHref] = linkMatch
+      // El href sale de la respuesta del MODELO (y el modelo lee texto de la base):
+      // sólo rutas internas relativas. Un "javascript:", "data:", "//otro.sitio" o
+      // "https://…" se muestra como texto plano, sin link.
+      const href = hrefInternoSeguro(rawHref)
+      if (!href) return <span key={i}>{label}</span>
       return (
         <a key={i} href={href} className="text-emerald-400 hover:text-emerald-300 underline font-medium"
           onClick={(e) => { e.preventDefault(); window.location.href = href }}>

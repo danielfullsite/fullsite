@@ -109,12 +109,19 @@ describe.each(RUTAS)('/api/%s toma la zona del tenant', (_n, partes) => {
     expect(src).not.toMatch(/getTimezoneOffset\(\) \* 60 \* 1000/)
   })
 
-  it('lee clientConfig.timezone con respaldo', () => {
-    expect(src).toMatch(/timezone \|\| 'America\/Mexico_City'/)
+  it('lee la zona del tenant con respaldo (vía el contexto de DÍA DE VENTA)', () => {
+    // chat: zonaDelTenant(...) → contextoDia; voz: leerContextoDia (lee clients.timezone
+    // y business_day_start_local, con los defaults del producto).
+    expect(src).toMatch(/contextoDia\(Date\.now\(\), zonaDelTenant\(|leerContextoDia\(auth\.clientId/)
+    expect(src).toMatch(/const zona = dia\.tz/)
+    const ctx = leer('lib', 'chat-context.ts')
+    expect(ctx).toMatch(/cfg\?\.timezone[\s\S]{0,60}\|\| ZONA_POR_DEFECTO/)
+    expect(ctx).toMatch(/ZONA_POR_DEFECTO = 'America\/Mexico_City'/)
   })
 
-  it('la fecha de hoy sale de la zona', () => {
-    expect(src).toMatch(/hoyEnZona\(zona\)/)
+  it('la fecha de hoy es el DÍA DE VENTA en la zona del tenant', () => {
+    expect(src).toMatch(/const todayStr = dia\.hoy/)
+    expect(src).not.toMatch(/hoyEnZona\(zona\)/)
   })
 
   it('ayer y la semana pasan por sumarDias', () => {
@@ -123,7 +130,10 @@ describe.each(RUTAS)('/api/%s toma la zona del tenant', (_n, partes) => {
   })
 
   it('el prefijo del mes sale de la fecha ya formateada, no de un toISOString', () => {
-    expect(src).toMatch(/todayStr\.slice\(0, 7\)/)
+    // Los resúmenes (mes actual/anterior) se calculan en resumenesPrecalculados con
+    // la fecha de hoy YA en la zona del tenant.
+    expect(src).toMatch(/resumenesPrecalculados\(recentDays, todayStr[,)]/)
+    expect(leer('lib', 'chat-context.ts')).toMatch(/const mes = hoy\.slice\(0, 7\)/)
     expect(src).not.toMatch(/mxNowChat|mxNowV/)
   })
 })
@@ -131,8 +141,10 @@ describe.each(RUTAS)('/api/%s toma la zona del tenant', (_n, partes) => {
 describe('/api/coach dice el dia correcto', () => {
   const src = leer('app', 'api', 'coach', 'route.ts')
 
-  it('el dia de la semana sale de la zona del tenant', () => {
-    expect(src).toMatch(/new Intl\.DateTimeFormat\('es-MX', \{ timeZone: zona, weekday: 'long' \}\)/)
+  it('el dia de hoy es el DÍA DE VENTA en la zona del tenant', () => {
+    expect(src).toMatch(/leerContextoDia\(client_id, sbGet\)/)
+    expect(src).toMatch(/const zona = dia\.tz/)
+    expect(src).toMatch(/const hoy = dia\.hoy/)
   })
 
   it('y ya no de un instante corrido a mano', () => {
@@ -140,11 +152,13 @@ describe('/api/coach dice el dia correcto', () => {
     expect(src).not.toMatch(/dayNames\[mxNow\.getDay\(\)\]/)
   })
 
-  it('pero `dayNames` se conserva para el indice que SI era correcto', () => {
-    // `todayDOW` sale de la fecha del DATO (`fecha + 'T12:00:00'`, mediodia, lejos de
-    // cualquier frontera), no del reloj. Ese uso nunca estuvo mal.
-    expect(src).toMatch(/dayNames\[todayDOW\]/)
-    expect(src).toMatch(/const todayDate = new Date\(today\.fecha \+ 'T12:00:00'\)/)
+  it('"hoy" ya no es la última fila: el último día con datos se compara contra HOY del tenant', () => {
+    // Antes `days[0]` se presentaba como "hoy" aunque fuera de hace semanas. El día de
+    // la semana del DATO sigue saliendo de la fecha del dato (mediodía UTC, en
+    // ultimoDiaVsMismoDia → diaDeLaSemana), que nunca estuvo mal.
+    expect(src).toMatch(/ultimoDiaVsMismoDia\(days, hoy\)/)
+    expect(src).not.toMatch(/const today = days\[0\]/)
+    expect(leer('lib', 'chat-context.ts')).toMatch(/new Date\(`\$\{ymd\}T12:00:00Z`\)\.getUTCDay\(\)/)
   })
 })
 

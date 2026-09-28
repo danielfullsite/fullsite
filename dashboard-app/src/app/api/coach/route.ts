@@ -2,6 +2,11 @@ import { NextRequest } from 'next/server'
 import { ventasFullsitePrimero } from '@/lib/pos-daily'
 import { requireTenant } from '@/lib/api-auth'
 import { esDuenoDelHistoricoWansoft } from '@/lib/wansoft-legacy'
+import { leerContextoDia } from '@/lib/agents/dia-negocio'
+import {
+  contextoFuentesFallidas, datoTexto, envolverDatos, ETIQUETAS_NO_MESERO, resumenesPrecalculados,
+  ultimoDiaVsMismoDia,
+} from '@/lib/chat-context'
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,19 +32,47 @@ export async function POST(request: NextRequest) {
 
     // 90 días, FULLSITE PRIMERO: el POS de Fullsite manda; el histórico importado sólo
     // cubre hasta su último día. Ver ventasFullsitePrimero (lib/pos-daily.ts).
-    const { dias: days } = await ventasFullsitePrimero(sbUrl, headers, client_id, 90,
-      'fecha,ventas_dia,ventas_brutas,descuentos,tickets_count,personas_restaurant,ticket_promedio_restaurant,meseros,ventas_por_grupo,propinas_total,pago_métodos')
+    //
+    // `determinado=false` = NO SE PUDO LEER (≠ "no hubo ventas"): no se generan
+    // insights sobre un vacío falso; se devuelve el motivo para que la UI lo diga.
+    //
+    // En paralelo: el DÍA DE VENTA en curso (zona + inicio de día del tenant, misma
+    // definición que pos_orders.dia_venta). Si esa lectura falla se usan los defaults
+    // del producto (es configuración, no dato de ventas).
+    const sbGet = async <T,>(table: string, query: string): Promise<T[]> => {
+      const r = await fetch(`${sbUrl}/rest/v1/${table}?${query}`, { headers, cache: 'no-store' })
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      return r.json()
+    }
+    const [ventas, dia] = await Promise.all([
+      ventasFullsitePrimero(sbUrl, headers, client_id, 90,
+        'fecha,ventas_dia,ventas_brutas,descuentos,tickets_count,personas_restaurant,ticket_promedio_restaurant,meseros,ventas_por_grupo,propinas_total,pago_métodos'),
+      leerContextoDia(client_id, sbGet),
+    ])
+    const days = ventas.dias
+    if (!ventas.determinado) {
+      return Response.json({ insights: [], sin_datos: 'lectura_fallida', motivo: ventas.motivo || 'no se pudieron leer las ventas' })
+    }
+    const fuentesFallidas: string[] = []
+    if (ventas.motivo) fuentesFallidas.push(`parte de las ventas (${ventas.motivo})`)
 
     if (days.length < 2) {
-      return Response.json({ insights: [] })
+      return Response.json({ insights: [], sin_datos: 'sin_cobertura' })
     }
 
     // wansoft_waiter_categories NO tiene columna de cliente: sólo un restaurante puede
     // ser dueño de esas filas. El guardián impide que otro vea sus meseros. Se pregunta
     // por la propiedad y no por el nombre; falla cerrado. Ver src/lib/wansoft-legacy.ts.
-    const waiterRows = (await esDuenoDelHistoricoWansoft(client_id))
-      ? await fetch(`${sbUrl}/rest/v1/wansoft_waiter_categories?select=fecha,data&order=fecha.desc&limit=7`, { headers, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => [])
-      : []
+    // Un fallo de lectura NO es "no hay rankings": se anota y se le dice al modelo.
+    let waiterRows: Array<{ fecha: string; data: unknown }> = []
+    if (await esDuenoDelHistoricoWansoft(client_id)) {
+      try {
+        const r = await fetch(`${sbUrl}/rest/v1/wansoft_waiter_categories?select=fecha,data&order=fecha.desc&limit=7`, { headers, cache: 'no-store' })
+        const j: unknown = r.ok ? await r.json() : undefined
+        if (Array.isArray(j)) waiterRows = j
+        else fuentesFallidas.push('rankings de meseros por categoría')
+      } catch { fuentesFallidas.push('rankings de meseros por categoría') }
+    }
 
     // Build waiter rankings text
     let waiterText = ''
@@ -71,29 +104,30 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      const excludeNames = ['oscar ricardo', 'rodrigo chávez', 'rodrigo chavez', 'aplicaciones',
-        'mesero evento', 'fany elizabeth', 'ericka tamara', 'frida vianney', 'jorge antonio']
+      // Sólo etiquetas genéricas del POS legacy (antes: nombres reales de un restaurante).
+      const excludeNames = ETIQUETAS_NO_MESERO
 
       const meseroList = Object.keys(aggKPIs).filter(name =>
         !excludeNames.some(ex => name.toLowerCase().includes(ex))
       )
 
-      const lines: string[] = ['RANKINGS ÚLTIMOS 7 DÍAS:']
+      const fechasW = waiterRows.map(r => String(r.fecha)).filter(Boolean).sort()
+      const lines: string[] = [`RANKINGS POR CATEGORÍA (datos del ${fechasW[0] || '?'} al ${fechasW[fechasW.length - 1] || '?'}; di esas fechas):`]
       lines.push('H&H por mesero:')
       for (const m of meseroList) {
         const hh = aggCats[m]?.['H&H']
-        lines.push(`  ${m}: ${hh ? hh.qty : 0} pzas ($${hh ? Math.round(hh.total) : 0})`)
+        lines.push(`  ${datoTexto(m, 60)}: ${hh ? hh.qty : 0} pzas ($${hh ? Math.round(hh.total) : 0})`)
       }
       lines.push('Postres por mesero:')
       for (const m of meseroList) {
         const p = aggCats[m]?.['Postres']
-        if (p && p.qty > 0) lines.push(`  ${m}: ${p.qty} pzas ($${Math.round(p.total)})`)
+        if (p && p.qty > 0) lines.push(`  ${datoTexto(m, 60)}: ${p.qty} pzas ($${Math.round(p.total)})`)
       }
       lines.push('Bebidas/persona por mesero:')
       for (const m of meseroList) {
         const k = aggKPIs[m]
         const bp = k.personas > 0 ? (k.bebidas / k.personas).toFixed(2) : '0'
-        lines.push(`  ${m}: ${bp}`)
+        lines.push(`  ${datoTexto(m, 60)}: ${bp}`)
       }
       waiterText = lines.join('\n')
     }
@@ -102,7 +136,7 @@ export async function POST(request: NextRequest) {
     const dailySummary = days.slice(0, 30).map((d: Record<string, unknown>) => {
       const meseros = Array.isArray(d.meseros) ? d.meseros : (typeof d.meseros === 'string' ? JSON.parse(d.meseros as string) : [])
       const topM = meseros.sort((a: { total: number }, b: { total: number }) => b.total - a.total).slice(0, 5)
-        .map((m: { nombre: string; total: number }) => `${m.nombre}:$${Math.round(m.total)}`).join(', ')
+        .map((m: { nombre: string; total: number }) => `${datoTexto(m.nombre, 60)}:$${Math.round(Number(m.total) || 0)}`).join(', ')
       const tk = Number(d.tickets_count) || 0
       const pr = Number(d.personas_restaurant) || 0
       const tpO = tk > 0 ? Math.round(Number(d.ventas_dia) / tk) : 0
@@ -110,67 +144,30 @@ export async function POST(request: NextRequest) {
       return `${d.fecha}: Ventas $${d.ventas_dia}, ${tk} tickets, ${pr} personas, PromOrden $${tpO}, PromPersona $${tpP}, Propinas $${Math.round(Number(d.propinas_total) || 0)} | Meseros: ${topM}`
     }).join('\n')
 
-    // `dayNames` se conserva: lo usa `todayDOW`, que sale de la FECHA DEL DATO
-    // (`fecha + 'T12:00:00'`, mediodia, lejos de cualquier frontera de dia) y no del
-    // reloj. Ese indice siempre fue correcto; el defecto estaba en el otro uso, el que
-    // sacaba el dia de `mxNow.getDay()` con el -6 clavado.
-    const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
-
-    // Compute same-DOW averages for today
-    const today = days[0]
-    const todayDate = new Date(today.fecha + 'T12:00:00')
-    const todayDOW = todayDate.getDay()
-    const sameDOW = days.filter((d: Record<string, unknown>) => {
-      const dt = new Date((d.fecha as string) + 'T12:00:00')
-      return dt.getDay() === todayDOW && d.fecha !== today.fecha
-    }).slice(0, 4)
-
-    const avgVentas = sameDOW.length > 0 ? sameDOW.reduce((s: number, d: Record<string, unknown>) => s + Number(d.ventas_dia), 0) / sameDOW.length : 0
-    const avgTP = sameDOW.length > 0 ? sameDOW.reduce((s: number, d: Record<string, unknown>) => {
-      const v = Number(d.ventas_dia || 0); const t = Number(d.tickets_count || 0)
-      return s + (t > 0 ? v / t : 0)
-    }, 0) / sameDOW.length : 0
-    const avgTickets = sameDOW.length > 0 ? sameDOW.reduce((s: number, d: Record<string, unknown>) => s + Number(d.tickets_count || 0), 0) / sameDOW.length : 0
-
-    // Week totals
-    const thisWeek = days.slice(0, 7)
-    const prevWeek = days.slice(7, 14)
-    const sumField = (arr: Record<string, unknown>[], key: string) => arr.reduce((s, d) => s + Number(d[key] || 0), 0)
-    const weekVentas = sumField(thisWeek, 'ventas_dia')
-    const prevWeekVentas = sumField(prevWeek, 'ventas_dia')
-    const weekTP = sumField(thisWeek, 'personas_restaurant') > 0
-      ? weekVentas / sumField(thisWeek, 'personas_restaurant') : 0
-    const prevWeekTP = sumField(prevWeek, 'personas_restaurant') > 0
-      ? prevWeekVentas / sumField(prevWeek, 'personas_restaurant') : 0
-
-    // Load client config for AI persona (y para la zona horaria, abajo)
+    // Load client config for AI persona (y para la zona horaria)
     const { fetchClientConfig } = await import('@/lib/client-config')
     const clientConfig = await fetchClientConfig(client_id || '')
 
-    // EL DIA DE LA SEMANA SALE DE LA ZONA DEL TENANT, NO DE UN -6 CLAVADO.
-    //
-    // Antes: `new Date(now.getTime() - 6h + now.getTimezoneOffset()*60000).getDay()`
-    // con un arreglo de nombres. Dos cosas mal: el -6 vale solo para el centro de
-    // Mexico --Tijuana es -7/-8 y ademas conserva horario de verano-- y
-    // `getTimezoneOffset()` es la zona DEL PROCESO, asi que la cuenta salia bien
-    // unicamente porque Vercel corre en UTC.
-    //
-    // El coach le dice al dueno "hoy es sabado y llevas X". Decirle el dia equivocado
-    // a la hora de la cena tira la credibilidad de todo lo demas que diga.
-    const zona = clientConfig.timezone || 'America/Mexico_City'
-    const diaDeLaSemana = (() => {
-      const d = new Intl.DateTimeFormat('es-MX', { timeZone: zona, weekday: 'long' })
-        .format(new Date())
-      return d.charAt(0).toUpperCase() + d.slice(1)
-    })()
-    const restaurantName = clientConfig.display_name || client_id || 'el restaurante'
+    // "HOY" SALE DEL RELOJ EN LA ZONA DEL TENANT, NO DE LA ÚLTIMA FILA. Antes el coach
+    // tomaba `days[0]` como "hoy": si la última venta registrada era de hace tres
+    // semanas, le decía al dueño "hoy llevas $X" con la cifra de hace tres semanas.
+    // Ahora el último día con datos se etiqueta con su fecha real y su atraso, y las
+    // comparaciones (vs mismo día de la semana, semana vs anterior) van YA CALCULADAS.
+    // "Hoy" = día de venta en curso (a las 00:30 sigue siendo el día anterior).
+    const zona = dia.tz
+    const hoy = dia.hoy
+    const ultimo = ultimoDiaVsMismoDia(days, hoy)!
+    // Si se llenó el tope de 90 filas, lo anterior NO se leyó (≠ sin cobertura).
+    const resumenes = resumenesPrecalculados(days, hoy, { ventanaDesde: days.length >= 90 ? String(days[days.length - 1].fecha) : undefined })
+    const restaurantName = datoTexto(clientConfig.display_name || client_id || 'el restaurante', 80)
 
     const systemPrompt = `Eres el COACH OPERATIVO de ${restaurantName}. Tu trabajo es observar los datos del restaurante y dar consejos accionables al dueño. NO eres un chatbot — eres un socio que piensa 24/7 en cómo mejorar el negocio.
 
 TU PERSONALIDAD:
 - Directo, sin rodeos. Como un socio que te dice las cosas de frente.
-- Positivo cuando hay logros: "Brayan mejoró 15% — lo que le dijiste funcionó."
-- Firme cuando algo va mal: "El aguacate se te está yendo. $1,200 más que la semana pasada."
+- Positivo cuando hay logros: "<Mesero A> mejoró <cambio % del contexto> — lo que le dijiste funcionó."
+- Firme cuando algo va mal: "<categoría> va <cambio del contexto> vs <periodo del contexto>."
+  (Los <...> son marcadores: se reemplazan con valores y fechas del bloque de datos, nunca se copian.)
 - Siempre termina con una ACCIÓN CONCRETA que el dueño puede hacer HOY.
 
 GENERA EXACTAMENTE 3 INSIGHTS en formato JSON array. Cada insight debe tener:
@@ -180,22 +177,24 @@ GENERA EXACTAMENTE 3 INSIGHTS en formato JSON array. Cada insight debe tener:
 - "priority": "high" | "medium" | "low"
 - "metric": número clave del insight (ej: "-18%", "$1,200", "3 días")
 
-CONTEXTO HOY (${diaDeLaSemana} ${today.fecha}):
-- Ventas hoy: $${today.ventas_dia} (promedio ${dayNames[todayDOW]}: $${Math.round(avgVentas)}, ${avgVentas > 0 ? ((Number(today.ventas_dia) / avgVentas - 1) * 100).toFixed(0) + '%' : 'sin data'})
-- Tickets hoy: ${today.tickets_count} (promedio: ${Math.round(avgTickets)})
-- TP hoy: $${Number(today.tickets_count) > 0 ? Math.round(Number(today.ventas_dia) / Number(today.tickets_count)) : 0} (promedio: $${Math.round(avgTP)})
-- Ventas semana: $${Math.round(weekVentas)} (semana pasada: $${Math.round(prevWeekVentas)}, ${prevWeekVentas > 0 ? ((weekVentas / prevWeekVentas - 1) * 100).toFixed(0) + '%' : ''})
-- TP semana: $${Math.round(weekTP)} (semana pasada: $${Math.round(prevWeekTP)})
+DÍA DE VENTA EN CURSO ("hoy"): ${hoy} (zona ${zona}; el día de venta empieza a las ${dia.inicio.slice(0, 5)}).
 
+${envolverDatos(`${ultimo.texto}
+
+${resumenes}
+${contextoFuentesFallidas(fuentesFallidas)}
 ${waiterText}
 
-DATOS DIARIOS (30 días):
-${dailySummary}
+DATOS DIARIOS (${Math.min(days.length, 30)} días con ventas más recientes, del ${String(days[Math.min(days.length, 30) - 1].fecha)} al ${String(days[0].fecha)}):
+${dailySummary}`)}
 
 REGLAS:
-- EXCLUYE de rankings: Oscar Ricardo, Rodrigo Chávez, APLICACIONES, MESERO EVENTO, Fany Elizabeth, Ericka Tamara, Frida Vianney, Jorge Antonio. (Héctor Enrique SÍ es mesero desde 2026-06.)
+- APLICACIONES y MESERO EVENTO no son personas: exclúyelos de rankings.
 - Montos en MXN con $ sin decimales
-- No inventes datos. Si no hay suficiente data para un insight, usa lo que tengas.
+- No inventes datos ni hagas aritmética: usa SOLO cifras y porcentajes que YA estén en el bloque de datos. Si un cálculo no está, no lo hagas.
+- Cada cifra va con su fecha real. Si el último día con datos NO es hoy, dilo en el insight (no digas "hoy llevas").
+- "SIN COBERTURA" no es $0: no digas que se vendió cero; di que no hay ventas registradas desde <fecha>.
+- Si una fuente "no se pudo leer", no concluyas nada de ella.
 - El insight "daily" debe ser algo que el dueño pueda actuar HOY.
 - El insight "weekly" debe ser una tendencia o patrón de la semana.
 - El insight "alert" debe ser algo que necesita atención (puede ser positivo o negativo).
@@ -225,15 +224,23 @@ Responde SOLO con el JSON array, sin markdown ni texto adicional.`
 
     return Response.json({
       insights,
+      // `fecha` es el ÚLTIMO DÍA CON DATOS (no necesariamente hoy): `esHoy`/`atrasoDias` lo dicen.
       today: {
-        fecha: today.fecha,
-        ventas: Number(today.ventas_dia),
-        tickets: Number(today.tickets_count || 0),
-        tp: Number(today.tickets_count) > 0 ? Math.round(Number(today.ventas_dia) / Number(today.tickets_count)) : 0,
-        avgVentas: Math.round(avgVentas),
-        avgTP: Math.round(avgTP),
-        weekVentas: Math.round(weekVentas),
-        prevWeekVentas: Math.round(prevWeekVentas),
+        // `parcial` = hoy va en curso: sus cifras NO se comparan con días completos.
+        fecha: ultimo.fecha,
+        esHoy: ultimo.esHoy,
+        parcial: ultimo.parcial,
+        atrasoDias: ultimo.atraso,
+        ventas: ultimo.ventas,
+        tickets: ultimo.tickets,
+        tp: ultimo.tickets > 0 ? Math.round(ultimo.ventas / ultimo.tickets) : 0,
+        // Comparación del ÚLTIMO DÍA COMPLETO contra el promedio de su mismo día de la semana.
+        comparado: ultimo.comparado ? {
+          fecha: ultimo.comparado.fecha,
+          ventas: ultimo.comparado.ventas,
+          avgVentas: Math.round(ultimo.comparado.promedioMismoDia),
+          avgTP: Math.round(ultimo.comparado.tpPromedioMismoDia),
+        } : null,
       },
     })
   } catch (error) {

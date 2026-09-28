@@ -16,25 +16,27 @@
 // filas y el agente de finanzas devolvía vacío en cada corrida, leyéndose como "sin hallazgos".
 
 import { describe, it, expect } from 'vitest'
-import { runFinanceAgent } from '@/lib/agents/finance'
+import { runFinanceAgent, type CorteMismaHora } from '@/lib/agents/finance'
 import type { AgentEvent } from '@/lib/agents/types'
-import { nowMX } from '@/lib/date-mx'
+import { contextoDia, type ContextoDia } from '@/lib/agents/dia-negocio'
+import { sumarDias } from '@/lib/date-mx'
 
 // ─── Fixture ──────────────────────────────────────────────────────────────────
 
 interface Dia { fecha: string; ventas_dia: number; tickets_count: number; ticket_promedio_restaurant: number }
 
+// El agente arma su "hoy" como DÍA DE VENTA (zona del restaurante + inicio 05:00), igual
+// que `pos_orders.dia_venta`. El fixture usa el mismo contexto, fijo para toda la prueba:
+// antes se armaba con la fecha de calendario, y entre las 00:00 y las 05:00 de Monterrey
+// fixture y agente caían en días distintos.
+const CTX: ContextoDia = contextoDia(Date.now())
+
 /** Genera `n` días consecutivos hacia atrás desde hoy, con ventas fijas. */
 function historia(n: number, ventasPorDia = 10_000): Dia[] {
   const out: Dia[] = []
   for (let i = 1; i <= n; i++) {
-    // nowMX y no new Date(): el agente arma su "hoy" en hora de Mexico
-    // (finance.ts todayStr). Con UTC los dias se corren uno entre las 18:00 y
-    // las 24:00 de Monterrey, y eso mueve el dia-de-la-semana que el agente compara.
-    const d = nowMX()
-    d.setDate(d.getDate() - i)
     out.push({
-      fecha: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
+      fecha: sumarDias(CTX.hoy, -i, CTX.tz),
       ventas_dia: ventasPorDia,
       tickets_count: 100,
       ticket_promedio_restaurant: ventasPorDia / 100,
@@ -43,18 +45,23 @@ function historia(n: number, ventasPorDia = 10_000): Dia[] {
   return out // orden desc, como lo devuelve la query real
 }
 
-/** Fecha de hoy en hora de México, como la arma el agente. */
+/** Fecha de hoy (día de venta), como la arma el agente. */
 function hoyMX(): string {
-  const d = nowMX()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  return CTX.hoy
 }
 
 /**
- * Dependencias falsas del agente: `sbGet` (no se usa para ventas) y el lector de ventas
- * inyectable. Los "KPIs de hoy" del fixture se vuelven la fila de hoy del POS, y
- * `ordenes_abiertas` las órdenes abiertas — igual que lectorFullsite en producción.
+ * Dependencias falsas del agente: `sbGet` (no se usa para ventas), el lector de ventas
+ * por día y el lector de ventas A LA MISMA HORA. Por defecto el corte a la misma hora
+ * reporta, para cada fecha, lo mismo que su total diario (fixture plano) y para hoy las
+ * ventas de los KPIs — o sea que "a esta hora" y "el día" coinciden en el fixture.
+ * `corte: null` simula días sin hora (histórico importado).
  */
-function fakeDeps(dias: Dia[], kpis: Record<string, unknown> | null) {
+function fakeDeps(
+  dias: Dia[],
+  kpis: Record<string, unknown> | null,
+  corte?: ((fechas: string[]) => CorteMismaHora) | null,
+) {
   const sbGet = async <T>(): Promise<T[]> => [] as T[]
   const lector = async () => ({
     dias: [
@@ -63,7 +70,14 @@ function fakeDeps(dias: Dia[], kpis: Record<string, unknown> | null) {
     ] as Record<string, unknown>[],
     abiertas: Number(kpis?.ordenes_abiertas) || 0,
   })
-  return [sbGet, lector] as const
+  const porFecha = new Map(dias.map(d => [d.fecha, d.ventas_dia]))
+  const lectorCorte = async (_id: string, fechas: string[]): Promise<CorteMismaHora> =>
+    corte === null
+      ? { hoy: kpis ? Number(kpis.ventas_dia) : null, dias: fechas.map(fecha => ({ fecha, ventas: null })) }
+      : corte
+        ? corte(fechas)
+        : { hoy: kpis ? Number(kpis.ventas_dia) : null, dias: fechas.map(fecha => ({ fecha, ventas: porFecha.get(fecha) ?? null })) }
+  return [sbGet, lector, lectorCorte, CTX] as const
 }
 
 const find = (evs: AgentEvent[], type: string) => evs.find(e => e.type === type)
@@ -97,8 +111,7 @@ describe('Agentes — un agente sin datos lo DICE, no se calla', () => {
     // Con new Date() + toISOString() se construia en UTC, y entre las 18:00 y las
     // 24:00 de Monterrey (00:00-06:00 UTC) las dos bases caen en dias distintos:
     // el agente restaba contra el dia MX y salia 40 donde el test pedia 41.
-    const d = nowMX(); d.setDate(d.getDate() - 41)
-    const fecha = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    const fecha = sumarDias(CTX.hoy, -41, CTX.tz)
     const dias = [{ fecha, ventas_dia: 5000, tickets_count: 50, ticket_promedio_restaurant: 100 }]
     const ev = find(await runFinanceAgent('amalay', ...fakeDeps(dias, null)), 'fuente_sin_datos')!
     expect(ev.evidence.dias_sin_datos).toBe(41)
