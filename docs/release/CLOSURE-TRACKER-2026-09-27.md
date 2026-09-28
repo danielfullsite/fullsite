@@ -71,6 +71,12 @@ evidencia.
   57 no pueden convertirse en caché o agrupación sin evidencia nueva. El
   inventario también advierte que el límite de 45 s observado pertenece al
   arnés; el deadline global de `main` aún debe demostrarse.
+- **Matriz histórica invalidada como oráculo de equivalencia:** una revisión
+  adversarial documental encontró 12 ordinales cuyo tipo en la antigua
+  `EXACT-INPUT-MATRIX` no coincide con el inventario histórico `open/seal`.
+  Esas filas no pueden respaldar agrupación ni igualdad de inputs. La revisión
+  no compiló ni cargó el binding LAB actual, por lo que tampoco constituye una
+  evaluación o revocación de su matriz sintética en Electron `main`.
 - **Alcance de agrupación:** 74 verificaciones permanecen lecturas frescas;
   sólo 57 son candidatas a agruparse y todavía requieren equivalencia de entrada
   demostrada. No se elimina ninguna verificación por una medición sintética.
@@ -83,20 +89,23 @@ evidencia.
 
 ## Ruta crítica: P19
 
-1. **Revisión del contrato de autoridad real.** Mapear y refutar el vínculo
+1. **Retirar la matriz antigua como evidencia de equivalencia.** Conservarla
+   como evidencia histórica defectuosa, pero impedir que sus 12 ordinales se
+   usen como oráculo en cualquier gate futuro.
+2. **Revisión del contrato de autoridad real.** Mapear y refutar el vínculo
    entre actor, terminal, turno, draft, revisión, frame, CAS, fencing,
    correlación, journal y el binding LAB. No cambiar producto ni autorizar
    integración en esta revisión.
-2. **Integración aislada, sólo si esa revisión pasa.** Comparar antes/después
+3. **Integración aislada, sólo si esa revisión pasa.** Comparar antes/después
    contra el mismo perfil sintético. Mantener autenticación, ACL, fencing,
    CAS, journals y timeout de 45 s.
-3. **Gate GUI integral.** `login → turno → borrador → producto → Guardar con
+4. **Gate GUI integral.** `login → turno → borrador → producto → Guardar con
    recibo durable → ORDER_SEND → KDS`, incluyendo ACK incierto, replay,
    competencia, dos reinicios y recuperación abrupta.
-4. **Evidencia de red y renderer.** NetLogs completos y auditoría de secretos
+5. **Evidencia de red y renderer.** NetLogs completos y auditoría de secretos
    del renderer para el candidato exacto. Los tests externos omitidos no se
    cuentan como PASS.
-5. **Regresión y paquete candidato.** Sólo tras los anteriores, antes de
+6. **Regresión y paquete candidato.** Sólo tras los anteriores, antes de
    programar T-24.
 
 ## Carril de seguridad, en paralelo
