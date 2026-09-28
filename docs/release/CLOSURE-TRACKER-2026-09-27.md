@@ -25,8 +25,8 @@ evidencia.
 
 | Carril | Estado | Última evidencia conocida | Siguiente condición de salida |
 | --- | --- | --- | --- |
-| P19 POS/KDS Windows | `HOLD` | La admisión y una acción de producto sintéticas llegaron a un recibo durable. El clic de Guardar llega a main, pero `businessSave` tarda aproximadamente 62 s y excede el límite de 45 s. | Evaluar un binding asíncrono LAB dentro de Electron `main`, con alcance estricto y plazo fail-closed; sólo después considerar integración. |
-| Optimización nativa P19 | Broker nativo descartado, no integrado | Toolchain aislado y smoke real en Electron `main` pasaron para Electron 33.4.11 x64/ABI 130. El addon upstream cargado es síncrono y permisivo; no está aprobado. | Construir y evaluar un binding LAB asíncrono, con contrato estricto, deadline y rechazo de resultados tardíos. Mantener las 74 verificaciones frescas y no agrupar las 57 candidatas sin equivalencia demostrada. |
+| P19 POS/KDS Windows | `HOLD` | La admisión y una acción de producto sintéticas llegaron a un recibo durable. El clic de Guardar llega a main, pero `businessSave` tarda aproximadamente 62 s y excede el límite de 45 s. Un binding LAB asíncrono pasó su matriz sintética. | Revisar el contrato entre autoridades P19 reales y el binding LAB antes de autorizar una integración aislada. |
+| Optimización nativa P19 | Broker nativo descartado; binding LAB sintético prometedor | Electron `main` real ejecutó 164 casos sintéticos: 131 comparaciones individuales y deadline 45 s → `UNKNOWN/HOLD` con resultado tardío descartado. | Contrastar el contrato de entradas con actor/frame/CAS/fencing/journals reales. Mantener las 74 verificaciones frescas y no agrupar las 57 candidatas sin equivalencia demostrada. |
 | Seguridad del piloto | Candidata pendiente de revisión humana | Hardening y planes de rollback existen en ramas candidatas; no equivalen a activación. | Revisión independiente, entrega protegida y acciones de dueño; después rotación de credenciales/PINs conforme al plan aprobado. |
 | JEV | Sombra degradada | Corrida viva sólo con 43 fixtures sintéticos: 0 decisiones; el gateway respondió `no_providers_available` y un timeout. Las 14 entradas hostiles fueron rechazadas antes de red. | Corregir capacidad/configuración del gateway en un gate separado. JEV no bloquea P19 ni toma decisiones de release. |
 | Rediseño POS v1.2 | Especificación lista; código bloqueado | El artefacto visual fue comparado; existen reglas de no copiar para pagos, reintentos, modificadores, precios y autoridad durable. | E0: GUI sintética real completa hasta Guardar con recibo durable. Para activar v2 además se exige ORDER_SEND → KDS y validación física. |
@@ -56,6 +56,13 @@ evidencia.
   ventanas ni llamadas P19. Su implementación es síncrona y con scope
   permisivo, por lo que queda explícitamente desautorizada para integración;
   sólo valida la cadena de compilación y carga LAB.
+- **Binding asíncrono LAB:** la evaluación en Electron `main` 33.4.11 x64 pasó
+  164 casos sintéticos, conservó las 131 comparaciones individuales y alcanzó
+  `UNKNOWN/HOLD` a los 45.005 s con una finalización tardía descartada. El
+  event loop siguió responsivo y un corte/reapertura de marcador no reintentó.
+  No acredita `businessSave`, GUI ni recuperación de journals: actor, frame,
+  CAS, fencing y autoridad siguen siendo fixtures sintéticos y el addon está
+  sin firma, LAB-only.
 - **Inventario nominal DPAPI:** ya se reconstruyeron 131 invocaciones reales
   de la traza histórica (`124 open`, `7 seal`; `2/72/37/19/1` por fase), con
   IDs y sellos de traza. Las 74/57 son una división documental por posible
@@ -76,12 +83,11 @@ evidencia.
 
 ## Ruta crítica: P19
 
-1. **Gate asíncrono Node-API dentro de Electron `main`.** El broker queda
-   fuera del candidato: construir y evaluar un binding LAB auditable, con
-   semántica DPAPI exacta, scope estricto y deadline fail-closed. El proceso
-   que conserva la autoridad debe conservar autenticación, ACL, fencing, CAS
-   y todas las lecturas de frontera.
-2. **Integración aislada, sólo si ese gate pasa.** Comparar antes/después
+1. **Revisión del contrato de autoridad real.** Mapear y refutar el vínculo
+   entre actor, terminal, turno, draft, revisión, frame, CAS, fencing,
+   correlación, journal y el binding LAB. No cambiar producto ni autorizar
+   integración en esta revisión.
+2. **Integración aislada, sólo si esa revisión pasa.** Comparar antes/después
    contra el mismo perfil sintético. Mantener autenticación, ACL, fencing,
    CAS, journals y timeout de 45 s.
 3. **Gate GUI integral.** `login → turno → borrador → producto → Guardar con
