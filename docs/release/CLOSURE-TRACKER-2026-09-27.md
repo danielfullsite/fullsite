@@ -30,6 +30,7 @@ evidencia.
 | Seguridad del piloto | Candidata pendiente de revisión humana | Hardening y planes de rollback existen en ramas candidatas; no equivalen a activación. | Revisión independiente, entrega protegida y acciones de dueño; después rotación de credenciales/PINs conforme al plan aprobado. |
 | JEV | Sombra degradada | Corrida viva sólo con 43 fixtures sintéticos: 0 decisiones; el gateway respondió `no_providers_available` y un timeout. Las 14 entradas hostiles fueron rechazadas antes de red. | Corregir capacidad/configuración del gateway en un gate separado. JEV no bloquea P19 ni toma decisiones de release. |
 | Rediseño POS v1.2 | Especificación lista; código bloqueado | El artefacto visual fue comparado; existen reglas de no copiar para pagos, reintentos, modificadores, precios y autoridad durable. | E0: GUI sintética real completa hasta Guardar con recibo durable. Para activar v2 además se exige ORDER_SEND → KDS y validación física. |
+| Hardware de Caja | Pipeline preparado; estación física pendiente | La Caja Windows de laboratorio permite certificar software y simulaciones, pero no touch, impresión, cajón, escáner, red ni energía reales. | Completar A0–A4 en Windows; después B0–B5/T-24 con una estación representativa del mismo candidato. |
 | Preparación AMALAY | Preparar, no operar | Catálogo, roles, estaciones, impresión, KDS y reversión pueden inventariarse sin activar el candidato. | Perfil físico actual confirmado y checklist T-24 listo para el mismo commit candidato. |
 
 ## Actualización de evidencia — protocolo nativo y contención
@@ -149,6 +150,8 @@ alcance explícitamente limitado; cada expansión requiere evidencia adicional.
 
 El procedimiento redactado, sus condiciones de entrada y el formato de
 evidencia están en [Preparación de piloto controlado — Amalay](AMALAY-PILOT-READINESS-2026-09-27.md).
+La división entre validación Windows disponible ahora y validación física de
+la estación representativa está en [Pipeline de certificación de hardware](HARDWARE-CERTIFICATION-PIPELINE-2026-09-28.md).
 
 ## Definición de avance
 
