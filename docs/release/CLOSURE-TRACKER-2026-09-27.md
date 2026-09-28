@@ -25,8 +25,8 @@ evidencia.
 
 | Carril | Estado | Última evidencia conocida | Siguiente condición de salida |
 | --- | --- | --- | --- |
-| P19 POS/KDS Windows | `HOLD` | La admisión y una acción de producto sintéticas llegaron a un recibo durable. El clic de Guardar llega a main, pero `businessSave` tarda aproximadamente 62 s y excede el límite de 45 s. Un binding LAB asíncrono pasó su matriz sintética. | Revisar el contrato entre autoridades P19 reales y el binding LAB antes de autorizar una integración aislada. |
-| Optimización nativa P19 | Broker nativo descartado; binding LAB sintético prometedor | Electron `main` real ejecutó 164 casos sintéticos: 131 comparaciones individuales y deadline 45 s → `UNKNOWN/HOLD` con resultado tardío descartado. | Contrastar el contrato de entradas con actor/frame/CAS/fencing/journals reales. Mantener las 74 verificaciones frescas y no agrupar las 57 candidatas sin equivalencia demostrada. |
+| P19 POS/KDS Windows | `HOLD` | La admisión y una acción de producto sintéticas llegaron a un recibo durable. El clic de Guardar llega a main, pero `businessSave` tarda aproximadamente 62 s y excede el límite de 45 s. Un binding LAB asíncrono pasó su matriz sintética. | Definir el contrato de capacidad de ancla durable real y la suspensión bajo propiedad antes de autorizar una integración aislada. |
+| Optimización nativa P19 | Broker nativo descartado; binding LAB sintético prometedor | Electron `main` real ejecutó 164 casos sintéticos: 131 comparaciones individuales y deadline 45 s → `UNKNOWN/HOLD` con resultado tardío descartado. La revisión de 14 fronteras confirma que el binding no conoce el ancla real. | Diseñar la entrada/salida de capacidad de `main` para actor/frame/CAS/fencing/journals, con leases/guards e invalidación real. Mantener las 74 verificaciones frescas y no agrupar las 57 candidatas sin equivalencia demostrada. |
 | Seguridad del piloto | Candidata pendiente de revisión humana | Hardening y planes de rollback existen en ramas candidatas; no equivalen a activación. | Revisión independiente, entrega protegida y acciones de dueño; después rotación de credenciales/PINs conforme al plan aprobado. |
 | JEV | Sombra degradada | Corrida viva sólo con 43 fixtures sintéticos: 0 decisiones; el gateway respondió `no_providers_available` y un timeout. Las 14 entradas hostiles fueron rechazadas antes de red. | Corregir capacidad/configuración del gateway en un gate separado. JEV no bloquea P19 ni toma decisiones de release. |
 | Rediseño POS v1.2 | Especificación lista; código bloqueado | El artefacto visual fue comparado; existen reglas de no copiar para pagos, reintentos, modificadores, precios y autoridad durable. | E0: GUI sintética real completa hasta Guardar con recibo durable. Para activar v2 además se exige ORDER_SEND → KDS y validación física. |
@@ -77,6 +77,14 @@ evidencia.
   Esas filas no pueden respaldar agrupación ni igualdad de inputs. La revisión
   no compiló ni cargó el binding LAB actual, por lo que tampoco constituye una
   evaluación o revocación de su matriz sintética en Electron `main`.
+- **Contrato de autoridad real pendiente:** la revisión estática de 14
+  fronteras confirma que las 131 llamadas deben seguir frescas y que el addon
+  LAB sólo procesa material generado sintéticamente. Antes de un adaptador se
+  debe definir una capacidad emitida por `main` sobre el ancla durable real,
+  su entrada/salida, identidad, lease/guard, suspensión, invalidación y
+  recuperación bajo ACK incierto. No se localizaron los artefactos del
+  inventario por el identificador exacto solicitado, por lo que no se infiere
+  una equivalencia a partir de nombres o ordinales.
 - **Alcance de agrupación:** 74 verificaciones permanecen lecturas frescas;
   sólo 57 son candidatas a agruparse y todavía requieren equivalencia de entrada
   demostrada. No se elimina ninguna verificación por una medición sintética.
@@ -92,11 +100,11 @@ evidencia.
 1. **Retirar la matriz antigua como evidencia de equivalencia.** Conservarla
    como evidencia histórica defectuosa, pero impedir que sus 12 ordinales se
    usen como oráculo en cualquier gate futuro.
-2. **Revisión del contrato de autoridad real.** Mapear y refutar el vínculo
-   entre actor, terminal, turno, draft, revisión, frame, CAS, fencing,
-   correlación, journal y el binding LAB. No cambiar producto ni autorizar
-   integración en esta revisión.
-3. **Integración aislada, sólo si esa revisión pasa.** Comparar antes/después
+2. **Contrato de capacidad de ancla durable real.** Diseñar y refutar la
+   capacidad emitida por `main`: identidad, tuple de entrada/salida,
+   lease/guard, suspensión, invalidación, ACK incierto y recuperación. Sin
+   adaptador ni cambio de producto.
+3. **Integración aislada, sólo si el contrato pasa.** Comparar antes/después
    contra el mismo perfil sintético. Mantener autenticación, ACL, fencing,
    CAS, journals y timeout de 45 s.
 4. **Gate GUI integral.** `login → turno → borrador → producto → Guardar con
