@@ -51,6 +51,14 @@ evidencia.
   ni instaló nada. La adquisición debe ser explícita, de laboratorio y fijada
   por hashes antes de repetir el gate; no se debe sustituir por Electron Node,
   un helper externo ni el broker descartado.
+- **Inventario nominal DPAPI:** ya se reconstruyeron 131 invocaciones reales
+  de la traza histórica (`124 open`, `7 seal`; `2/72/37/19/1` por fase), con
+  IDs y sellos de traza. Las 74/57 son una división documental por posible
+  costo de arranque: las 131 conservan verificación individual, no hay
+  igualdad exacta histórica de inputs y no hay deduplicación autorizada. Las
+  57 no pueden convertirse en caché o agrupación sin evidencia nueva. El
+  inventario también advierte que el límite de 45 s observado pertenece al
+  arnés; el deadline global de `main` aún debe demostrarse.
 - **Alcance de agrupación:** 74 verificaciones permanecen lecturas frescas;
   sólo 57 son candidatas a agruparse y todavía requieren equivalencia de entrada
   demostrada. No se elimina ninguna verificación por una medición sintética.
