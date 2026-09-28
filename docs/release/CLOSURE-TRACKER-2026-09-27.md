@@ -25,8 +25,8 @@ evidencia.
 
 | Carril | Estado | Última evidencia conocida | Siguiente condición de salida |
 | --- | --- | --- | --- |
-| P19 POS/KDS Windows | `HOLD` | La admisión y una acción de producto sintéticas llegaron a un recibo durable. El clic de Guardar llega a main, pero `businessSave` tarda aproximadamente 62 s y excede el límite de 45 s. | Demostrar una raíz de confianza Windows para el auxiliar DPAPI por operación; sólo después integrar y medir el guardado real. |
-| Optimización nativa P19 | Revisión de protocolo bloqueada, no integrada | DPAPI real comparó 131/131 entradas; el modelo sintético pasó sus controles. Aun así, un auxiliar comprometido puede autenticar resultados falsos y la propiedad OS no está demostrada. | Gate nativo de confianza: propiedad main-side, autenticación mutua, Job Object, canal por operación y respuesta maliciosa autenticada. Mantener las 74 verificaciones que no son agrupables. |
+| P19 POS/KDS Windows | `HOLD` | La admisión y una acción de producto sintéticas llegaron a un recibo durable. El clic de Guardar llega a main, pero `businessSave` tarda aproximadamente 62 s y excede el límite de 45 s. | Medir DPAPI dentro de `main` confiable en un gate aislado; sólo después integrar y medir el guardado real. |
+| Optimización nativa P19 | Broker nativo descartado, no integrado | El gate de confianza confirmó que Job, SID, sesión, ruta/hash y MAC válidos no impiden que el helper devuelva un resultado falso. | Evaluar la verificación DPAPI en `main` sin auxiliar. Mantener las 74 verificaciones frescas y no agrupar las 57 candidatas sin equivalencia demostrada. |
 | Seguridad del piloto | Candidata pendiente de revisión humana | Hardening y planes de rollback existen en ramas candidatas; no equivalen a activación. | Revisión independiente, entrega protegida y acciones de dueño; después rotación de credenciales/PINs conforme al plan aprobado. |
 | JEV | Sombra degradada | Corrida viva sólo con 43 fixtures sintéticos: 0 decisiones; el gateway respondió `no_providers_available` y un timeout. Las 14 entradas hostiles fueron rechazadas antes de red. | Corregir capacidad/configuración del gateway en un gate separado. JEV no bloquea P19 ni toma decisiones de release. |
 | Rediseño POS v1.2 | Especificación lista; código bloqueado | El artefacto visual fue comparado; existen reglas de no copiar para pagos, reintentos, modificadores, precios y autoridad durable. | E0: GUI sintética real completa hasta Guardar con recibo durable. Para activar v2 además se exige ORDER_SEND → KDS y validación física. |
@@ -34,16 +34,16 @@ evidencia.
 
 ## Actualización de evidencia — protocolo nativo y contención
 
-- **P19 / broker DPAPI:** la revisión de protocolo no autorizó integración. El
-  modelo sintético pasó 71/71 controles por motor y DPAPI aislado comparó
-  131/131 entradas, pero esas pruebas no demuestran la propiedad del proceso
-  auxiliar ni que una respuesta autenticada sea honesta. El gate siguiente debe
-  refutar explícitamente helper comprometido, reutilización de PID/canal y
-  replay, con propiedad Windows y autenticación mutua por operación.
+- **P19 / broker DPAPI:** el gate de confianza lo descartó como arquitectura de
+  producto. Con identidad, Job, SID, sesión, hash y MAC válidos, un helper pudo
+  emitir una respuesta falsa; `main` la detectó sólo al repetir DPAPI por su
+  cuenta. El fallo de handle de ancestro también quedó conservado. El siguiente
+  gate evalúa DPAPI dentro de `main` confiable, no intenta endurecer el broker.
 - **Alcance de agrupación:** 74 verificaciones permanecen lecturas frescas;
   sólo 57 son candidatas a agruparse y todavía requieren equivalencia de entrada
   demostrada. No se elimina ninguna verificación por una medición sintética.
-- **Contención web separada:** los PRs `#442` y `#443` permanecen en borrador.
+- **Contención web separada:** los PRs `#442` y `#443` están listos para
+  revisión humana con CI verde.
   `#442` limita la respuesta de configuración de terminal a una allowlist y
   prueba el scope de tenant en ambos proxies; `#443` restringe el disparador y
   el camino de merge del workflow Claude. Ninguno implica merge, despliegue ni
@@ -51,13 +51,10 @@ evidencia.
 
 ## Ruta crítica: P19
 
-1. **Gate de confianza DPAPI por operación.** La revisión de protocolo confirmó
-   que un MAC propio no atesta ejecución honesta. Antes de integrar, Windows
-   debe demostrar propiedad main-owned, identidad de proceso y cierre del
-   auxiliar al cambiar actor, terminal, turno, frame, revisión, correlación o
-   proceso. No se permite caché entre operaciones ni se omite una lectura de
-   frontera.
-2. **Integración aislada, sólo si la revisión pasa.** Comparar antes/después
+1. **Gate DPAPI in-process dentro de `main`.** El broker queda fuera del
+   candidato: el proceso que conserva la autoridad ejecuta DPAPI y conserva
+   autenticación, ACL, fencing, CAS y todas las lecturas de frontera.
+2. **Integración aislada, sólo si ese gate pasa.** Comparar antes/después
    contra el mismo perfil sintético. Mantener autenticación, ACL, fencing,
    CAS, journals y timeout de 45 s.
 3. **Gate GUI integral.** `login → turno → borrador → producto → Guardar con
