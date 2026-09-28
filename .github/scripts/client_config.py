@@ -15,6 +15,18 @@ _sb_headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"
 _cache = {}
 
 
+class WansoftLegacyRetired(RuntimeError):
+    """Raised before a retired Wansoft client can make an external request."""
+
+
+def reject_retired_wansoft_access() -> None:
+    """Fail closed: archive imports never need Wansoft credentials or cookies."""
+    raise WansoftLegacyRetired(
+        "Wansoft external access is retired. Use a reviewed historical "
+        "archive import instead of scraping or querying Wansoft."
+    )
+
+
 def get_client(client_id: str = None) -> dict:
     """Fetch and cache client config from Supabase."""
     if client_id is None:
@@ -100,6 +112,7 @@ def is_market(name: str, client: dict) -> bool:
 
 def get_wansoft_creds(client: dict) -> tuple[str, str, str]:
     """Return (subsidiary_id, user, password) for Wansoft login."""
+    reject_retired_wansoft_access()
     return (
         client.get("wansoft_subsidiary_id", ""),
         client.get("wansoft_user", ""),

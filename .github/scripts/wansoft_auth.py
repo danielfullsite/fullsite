@@ -38,6 +38,16 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
 SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
 WANSOFT_URL = "https://www.wansoft.net/Wansoft.Web"
 
+
+class WansoftLegacyRetired(RuntimeError):
+    """Raised before cookie relay can contact the retired legacy service."""
+
+
+def reject_retired_wansoft_access() -> None:
+    raise WansoftLegacyRetired(
+        "Wansoft cookie relay is retired; use a reviewed historical archive import."
+    )
+
 _sb_headers = {
     "apikey": SUPABASE_KEY,
     "Authorization": f"Bearer {SUPABASE_KEY}",
@@ -51,6 +61,7 @@ class WansoftAuthExpired(Exception):
 
 def _load_cookies(client_id: str = "amalay") -> dict:
     """Load stored cookies from Supabase clients table."""
+    reject_retired_wansoft_access()
     r = requests.get(
         f"{SUPABASE_URL}/rest/v1/clients",
         headers=_sb_headers,
@@ -106,6 +117,7 @@ def _validate(session: requests.Session, attempts: int = 3) -> bool:
     Una respuesta 200 que NO es JSON = página de login = cookie REALMENTE
     expirada → falla rápido, sin reintentar.
     """
+    reject_retired_wansoft_access()
     from datetime import datetime as _dt
     import time as _time
 
@@ -216,6 +228,7 @@ def store_cookies(
 
     Call this after a manual login to Chrome.
     """
+    reject_retired_wansoft_access()
     cookies = {
         "aspxauth": aspxauth,
         "session_id": session_id,
