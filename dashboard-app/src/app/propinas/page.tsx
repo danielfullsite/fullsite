@@ -7,7 +7,7 @@ import { HandCoins, Users, TrendingUp, CreditCard } from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
 import EmptyState from '@/components/EmptyState'
-import { getRecentDays, aggregatePayments, getLatestDeep, getWansoftData, getDashboardFromPosOrders } from '@/lib/data'
+import { getRecentDays, aggregatePayments, getLatestDeep, getWansoftData } from '@/lib/data'
 import { formatCurrency } from '@/lib/format'
 import type { WansoftDaily } from '@/lib/types'
 
@@ -25,14 +25,33 @@ export default function PropinasPage() {
       getLatestDeep('wansoft_tips'),
       getWansoftData('tips_raw'),
     ]).then(async ([d, tips, tipsRaw]) => {
-      // Fallback: if no wansoft_daily data, build from pos_orders
-      let recentResult = d
-      if (recentResult.length === 0) {
-        recentResult = await getDashboardFromPosOrders(30)
-      }
+      // getRecentDays ya es Fullsite primero (POS + histórico importado hasta su último día).
+      const recentResult = d
       setData(recentResult)
-      // Prefer tips_raw (real data from deep scraper) over wansoft_tips (often zeros)
-      if (tipsRaw && Array.isArray(tipsRaw.data) && tipsRaw.data.length > 0) {
+      // FULLSITE PRIMERO: propinas reales por mesero desde el POS (cada orden trae
+      // mesero + propina). El histórico importado (tips_raw / wansoft_tips) sólo se usa
+      // si el POS no tiene propinas en el periodo.
+      const pos = new Map<string, { ventas: number; tickets: Set<string>; propinas: number }>()
+      for (const day of recentResult) {
+        for (const p of (day.propinas_meseros || []) as { nombre?: string; total?: number }[]) {
+          if (!p?.nombre) continue
+          const m = pos.get(p.nombre) || { ventas: 0, tickets: new Set<string>(), propinas: 0 }
+          m.propinas += Number(p.total) || 0
+          m.tickets.add(day.fecha)
+          pos.set(p.nombre, m)
+        }
+        for (const v of (day.meseros || []) as { nombre?: string; total?: number }[]) {
+          const m = v?.nombre ? pos.get(v.nombre) : undefined
+          if (m) m.ventas += Number(v.total) || 0
+        }
+      }
+      const posTips = [...pos.entries()].filter(([, m]) => m.propinas > 0).map(([mesero, m]) => ({
+        mesero, ventas: m.ventas, tickets: m.tickets.size, propinas: m.propinas,
+        propina_promedio: m.tickets.size ? m.propinas / m.tickets.size : 0,
+      }))
+      if (posTips.length > 0) {
+        setRealTips(posTips)
+      } else if (tipsRaw && Array.isArray(tipsRaw.data) && tipsRaw.data.length > 0) {
         setRealTips(tipsRaw.data as typeof realTips)
       } else if (tips && Array.isArray(tips.data) && tips.data.length > 0) {
         setRealTips(tips.data as typeof realTips)

@@ -205,7 +205,8 @@ async function leerDiasOLanzar(
 
   // 2) Respaldo: órdenes crudas sumadas en JS (tope de 8,000 órdenes).
   const url = `${sbUrl}/rest/v1/pos_orders?client_id=eq.${encodeURIComponent(clientId)}`
-    + `&status=in.(cerrada,pagada,cobrada,entregada)&created_at=gte.${sinceDate}T00:00:00`
+    // Regla única de venta (= lib/data.ts y fs_es_venta): pagada, o cerrada sin payment_status.
+    + `&or=(payment_status.eq.pagada,and(payment_status.is.null,status.eq.cerrada))&created_at=gte.${sinceDate}T00:00:00`
     + `&select=created_at,dia_venta,total,subtotal,descuento,propina,mesero,metodo_pago,personas,items`
     + `&order=created_at.desc&limit=8000`
   let orders: Record<string, unknown>[] = []

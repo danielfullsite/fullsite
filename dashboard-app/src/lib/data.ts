@@ -291,7 +291,68 @@ export async function getMonthlyData(clientSlug: string = getActiveClientSlug(),
   return continuarConPos(rows, pos)
 }
 
+/**
+ * Llama una función fs_* de Postgres con la sesión del usuario. Las fs_* que se abren
+ * al navegador validan adentro que el usuario pertenezca al restaurante (fs_puede_leer).
+ * Devuelve null si la llamada FALLÓ (no es lo mismo que "no hay datos").
+ */
+async function sbRpc(fn: string, args: Record<string, unknown>): Promise<Record<string, unknown>[] | null> {
+  try {
+    const token = await getAuthToken()
+    if (!token || token === SUPABASE_KEY) return null
+    const res = await fetchWithTimeout(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(args),
+    }, 10_000)
+    if (!res.ok) return null
+    const body = await res.json()
+    return Array.isArray(body) ? body : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Asistencia / horas por día desde el checador y los turnos de Fullsite (fs_asistencia).
+ * Shape del legacy wansoft_labor: [{ fecha, data: [{empleado, entrada, salida, horas}] }].
+ * null = la lectura falló.
+ */
+export async function getAsistencia(days: number = 30, clientSlug: string = getActiveClientSlug()) {
+  const hoy = nowMX()
+  const desde = new Date(hoy); desde.setDate(desde.getDate() - days)
+  const rows = await sbRpc('fs_asistencia', { p_client_id: clientSlug, p_desde: fmtDateMX(desde), p_hasta: fmtDateMX(hoy) })
+  return rows ? rows.map(r => ({ fecha: String(r.fecha), data: Array.isArray(r.labor) ? r.labor : [] })) : null
+}
+
+/**
+ * Costo de ventas TEÓRICO por mes (fs_costo_de_ventas): platillos vendidos en el POS ×
+ * costo de su ficha técnica. `venta_con_receta` = venta de platillos que sí tienen ficha;
+ * el % de food cost se calcula sobre esa venta. null = la lectura falló.
+ */
+export interface CostoDeVentasMes { mes: string; venta_platillos: number; venta_con_receta: number; costo_teorico: number }
+export async function getCostoDeVentas(meses: number = 12, clientSlug: string = getActiveClientSlug()): Promise<CostoDeVentasMes[] | null> {
+  const hoy = nowMX()
+  const desde = new Date(hoy.getFullYear(), hoy.getMonth() - (meses - 1), 1)
+  const rows = await sbRpc('fs_costo_de_ventas', { p_client_id: clientSlug, p_desde: fmtDateMX(desde), p_hasta: fmtDateMX(hoy) })
+  return rows ? rows.map(r => ({
+    mes: String(r.mes),
+    venta_platillos: Number(r.venta_platillos) || 0,
+    venta_con_receta: Number(r.venta_con_receta) || 0,
+    costo_teorico: Number(r.costo_teorico) || 0,
+  })) : null
+}
+
+/**
+ * KPIs por mesero (H&H, pan, postres, 2da bebida, grupos, platillos). FULLSITE PRIMERO:
+ * se calculan del POS con fs_meseros_categorias (por restaurante). La tabla legacy
+ * wansoft_waiter_categories sólo se consulta si el POS no tiene datos.
+ */
 export async function getWaiterCategories(days: number = 7, clientSlug: string = getActiveClientSlug()) {
+  const hoy = nowMX()
+  const desde = new Date(hoy); desde.setDate(desde.getDate() - days)
+  const pos = await sbRpc('fs_meseros_categorias', { p_client_id: clientSlug, p_desde: fmtDateMX(desde), p_hasta: fmtDateMX(hoy) })
+  if (pos && pos.length > 0) return pos
   return sbFetch('wansoft_waiter_categories', `select=*&client_slug=eq.${clientSlug}&order=fecha.desc&limit=${days}`)
 }
 

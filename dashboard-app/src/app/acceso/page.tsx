@@ -5,7 +5,7 @@ import { Clock, Users, LogIn, LogOut } from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
 import EmptyState from '@/components/EmptyState'
-import { getActiveClientSlug as _cid } from '@/lib/data'
+import { getActiveClientSlug as _cid, getAsistencia } from '@/lib/data'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -28,7 +28,16 @@ export default function AccesoPage() {
     async function load() {
       const headers = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
       try {
-        // Get latest labor data
+        // FULLSITE PRIMERO: checador y turnos del POS (fs_asistencia), último día con marcas.
+        const asistencia = await getAsistencia(7)
+        const ultimo = (asistencia || []).find(r => r.data.length > 0)
+        if (ultimo) {
+          setData(ultimo.data as LaborEntry[])
+          setFecha(ultimo.fecha)
+          setLoading(false)
+          return
+        }
+        // Histórico importado (sólo si Fullsite no tiene marcas).
         const laborRes = await fetch(
           `${SUPABASE_URL}/rest/v1/wansoft_labor?client_id=eq.${_cid()}&order=fecha.desc&limit=1&select=fecha,data`,
           { headers }

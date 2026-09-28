@@ -47,7 +47,7 @@ async function toolTenantSales(input: Record<string, unknown>): Promise<unknown>
   // FULLSITE PRIMERO: 1) POS de Fullsite; 2) sólo si no hay ventas en el POS, el
   // histórico importado (wansoft_daily).
   const since = new Date(Date.now() - days * 86400000).toISOString()
-  const o = await sf(`pos_orders?client_id=eq.${encodeURIComponent(clientId)}&status=in.(cerrada,pagada,cobrada,entregada)&created_at=gte.${since}&select=total&limit=100000`) as Record<string, unknown>[]
+  const o = await sf(`pos_orders?client_id=eq.${encodeURIComponent(clientId)}&or=(payment_status.eq.pagada,and(payment_status.is.null,status.eq.cerrada))&created_at=gte.${since}&select=total&limit=100000`) as Record<string, unknown>[]
   if (o.length > 0) {
     const ventas = o.reduce((s, r) => s + num(r.total), 0)
     return { fuente: 'pos_orders', dias: days, ordenes: o.length, ventas_total: Math.round(ventas), ticket_promedio: Math.round(ventas / o.length) }

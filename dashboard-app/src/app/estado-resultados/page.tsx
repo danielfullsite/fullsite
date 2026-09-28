@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { DollarSign, TrendingDown, TrendingUp, Calculator, FileText } from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
-import { getMonthlyData, getLatestDeep } from '@/lib/data'
+import { getMonthlyData, getLatestDeep, getCostoDeVentas } from '@/lib/data'
 import { formatCurrency } from '@/lib/format'
 import type { WansoftDaily } from '@/lib/types'
 
@@ -38,6 +38,8 @@ export default function EstadoResultadosPage() {
   const [foodCostPct, setFoodCostPct] = useState<number | null>(null)
   const [foodCostFecha, setFoodCostFecha] = useState<string | null>(null)
   const [foodCostItems, setFoodCostItems] = useState<FoodCostItem[]>([])
+  const [pctPorMes, setPctPorMes] = useState<Record<string, number>>({})
+  const [fuenteFoodCost, setFuenteFoodCost] = useState<'fullsite' | 'legacy' | null>(null)
   const [pnlData, setPnlData] = useState<PnlData | null>(null)
   const [pnlPeriodo, setPnlPeriodo] = useState<string | null>(null)
   const [periodoView, setPeriodoView] = useState<'mes' | 'trimestre' | 'semestre' | 'año'>('mes')
@@ -48,11 +50,23 @@ export default function EstadoResultadosPage() {
       getMonthlyData(),
       getLatestDeep('wansoft_food_cost'),
       getLatestDeep('wansoft_pnl'),
-    ]).then(([monthly, foodCost, pnl]) => {
+      getCostoDeVentas(12),
+    ]).then(([monthly, foodCost, pnl, costoFs]) => {
       setData(monthly)
 
-      // Process food cost data
-      if (foodCost && Array.isArray(foodCost.data)) {
+      // FULLSITE PRIMERO: costo teórico = platillos vendidos en el POS × su ficha técnica.
+      const conReceta = (costoFs || []).filter(m => m.venta_con_receta > 0)
+      if (conReceta.length > 0) {
+        const venta = conReceta.reduce((s, m) => s + m.venta_con_receta, 0)
+        const costo = conReceta.reduce((s, m) => s + m.costo_teorico, 0)
+        const ventaTotal = conReceta.reduce((s, m) => s + m.venta_platillos, 0)
+        setFoodCostPct(costo / venta)
+        setPctPorMes(Object.fromEntries(conReceta.map(m => [m.mes, m.costo_teorico / m.venta_con_receta])))
+        setFuenteFoodCost('fullsite')
+        setFoodCostFecha(`fichas técnicas de Fullsite, cubren el ${ventaTotal > 0 ? Math.round((venta / ventaTotal) * 100) : 0}% de la venta de platillos`)
+      } else if (foodCost && Array.isArray(foodCost.data)) {
+        // Legacy (snapshot de Wansoft) sólo si Fullsite no tiene fichas con venta.
+        setFuenteFoodCost('legacy')
         const items = foodCost.data as FoodCostItem[]
         setFoodCostItems(items)
         setFoodCostFecha(foodCost.fecha)
@@ -106,7 +120,8 @@ export default function EstadoResultadosPage() {
 
     return Object.entries(map)
       .map(([mes, vals]): MonthlyPL => {
-        const costoEstimado = vals.netas * effectiveFoodCostPct
+        const pct = periodoView === 'mes' && pctPorMes[mes] != null ? pctPorMes[mes] : effectiveFoodCostPct
+        const costoEstimado = vals.netas * pct
         const margenBruto = vals.netas - costoEstimado
         const margenPct = vals.netas > 0 ? (margenBruto / vals.netas) * 100 : 0
         return {
@@ -121,7 +136,7 @@ export default function EstadoResultadosPage() {
         }
       })
       .sort((a, b) => b.mes.localeCompare(a.mes))
-  }, [data, effectiveFoodCostPct, periodoView])
+  }, [data, effectiveFoodCostPct, periodoView, pctPorMes])
 
   // KPIs show the most recent period (first row of table)
   const currentPeriod = monthlyPL[0]
@@ -202,7 +217,7 @@ export default function EstadoResultadosPage() {
               </p>
               <p className="text-xs text-emerald-600 mt-1">
                 El costo de alimentos se calcula con datos reales ({(effectiveFoodCostPct * 100).toFixed(1)}% promedio).
-                {foodCostFecha && ` Ultima actualizacion: ${foodCostFecha}.`}
+                {foodCostFecha && (fuenteFoodCost === 'fullsite' ? ` Fuente: ${foodCostFecha}.` : ` Ultima actualizacion: ${foodCostFecha}.`)}
                 {' '}Para labor cost, conecta el modulo de nomina.
               </p>
             </div>
