@@ -6,7 +6,9 @@ import { POST } from '@/app/api/pos/cancel-item/route'
 const order = () => ({ id: 'order', order_revision: 4, updated_at: '2026-09-10T00:00:00Z',
   status: 'enviada', items: [{ id: 'cancel', subtotal: 50 }, { id: 'keep', subtotal: 100 }],
   subtotal: 150, descuento: 15, iva: 10.8, total: 145.8, saldo: 145.8, pagos: [] })
-afterEach(() => vi.unstubAllGlobals())
+// unstubAllEnvs: la prueba de CANCEL_APPROVAL_STRICT deja el env en 'true'; en orden
+// aleatorio (CI) contaminaba a las de OCC con un 403.
+afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs() })
 describe('cancelación con importes canónicos', () => {
   it('persiste la disposición explícita sin devolver ingredientes preparados', () => {
     // undefined → retain_consumption (antes 'pending', que bloqueaba la orden entera).
