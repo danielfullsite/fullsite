@@ -25,8 +25,8 @@ evidencia.
 
 | Carril | Estado | Última evidencia conocida | Siguiente condición de salida |
 | --- | --- | --- | --- |
-| P19 POS/KDS Windows | `HOLD` | La admisión y una acción de producto sintéticas llegaron a un recibo durable. El clic de Guardar llega a main, pero `businessSave` tarda aproximadamente 62 s y excede el límite de 45 s. | Evaluar un binding Node-API dentro de Electron `main`, con plazo fail-closed; sólo después integrar y medir el guardado real. |
-| Optimización nativa P19 | Broker nativo descartado, no integrado | Un proceso nativo de prueba ejecutó 131 comparaciones DPAPI en 117.7 ms sin broker, pero no fue Electron `main` ni probó cancelación real. | Evaluar un binding DPAPI auditable dentro de Electron `main`. Mantener las 74 verificaciones frescas y no agrupar las 57 candidatas sin equivalencia demostrada. |
+| P19 POS/KDS Windows | `HOLD` | La admisión y una acción de producto sintéticas llegaron a un recibo durable. El clic de Guardar llega a main, pero `businessSave` tarda aproximadamente 62 s y excede el límite de 45 s. | Proveer fuente Node-API auditable y toolchain/SDK compatibles, fijados por hash, antes de evaluar Electron `main` con plazo fail-closed. |
+| Optimización nativa P19 | Broker nativo descartado, no integrado | Un proceso nativo de prueba ejecutó 131 comparaciones DPAPI en 117.7 ms sin broker. El gate Electron `main` no inició: no hay addon, compilador ni SDK local inspeccionado. | Habilitar un entorno de laboratorio reproducible y luego evaluar el binding DPAPI dentro de Electron `main`. Mantener las 74 verificaciones frescas y no agrupar las 57 candidatas sin equivalencia demostrada. |
 | Seguridad del piloto | Candidata pendiente de revisión humana | Hardening y planes de rollback existen en ramas candidatas; no equivalen a activación. | Revisión independiente, entrega protegida y acciones de dueño; después rotación de credenciales/PINs conforme al plan aprobado. |
 | JEV | Sombra degradada | Corrida viva sólo con 43 fixtures sintéticos: 0 decisiones; el gateway respondió `no_providers_available` y un timeout. Las 14 entradas hostiles fueron rechazadas antes de red. | Corregir capacidad/configuración del gateway en un gate separado. JEV no bloquea P19 ni toma decisiones de release. |
 | Rediseño POS v1.2 | Especificación lista; código bloqueado | El artefacto visual fue comparado; existen reglas de no copiar para pagos, reintentos, modificadores, precios y autoridad durable. | E0: GUI sintética real completa hasta Guardar con recibo durable. Para activar v2 además se exige ORDER_SEND → KDS y validación física. |
@@ -45,6 +45,12 @@ evidencia.
   una integración: falta seleccionar y ejecutar un binding compatible con
   Electron `main` y demostrar que una operación que excede el plazo de 45 s
   termina en `UNKNOWN/HOLD`, sin publicación ni aceptación tardía.
+- **Prerequisito del binding:** el gate de Electron `main` no inició y no
+  produjo resultados reutilizables: la máquina no resolvió fuente de addon
+  DPAPI, compilador ni SDK/cabeceras en las ubicaciones revisadas. No descargó
+  ni instaló nada. La adquisición debe ser explícita, de laboratorio y fijada
+  por hashes antes de repetir el gate; no se debe sustituir por Electron Node,
+  un helper externo ni el broker descartado.
 - **Alcance de agrupación:** 74 verificaciones permanecen lecturas frescas;
   sólo 57 son candidatas a agruparse y todavía requieren equivalencia de entrada
   demostrada. No se elimina ninguna verificación por una medición sintética.
@@ -57,20 +63,23 @@ evidencia.
 
 ## Ruta crítica: P19
 
-1. **Gate Node-API dentro de Electron `main`.** El broker queda fuera del
+1. **Preparar el entorno Node-API de laboratorio.** Resolver fuente auditable
+   de addon y toolchain/SDK compatibles, con origen, versión y hashes
+   registrados; no instalar ni descargar de manera implícita.
+2. **Gate Node-API dentro de Electron `main`.** El broker queda fuera del
    candidato: evaluar un binding auditable con semántica DPAPI exacta y un
    deadline fail-closed. El proceso que conserva la autoridad debe conservar
    autenticación, ACL, fencing, CAS y todas las lecturas de frontera.
-2. **Integración aislada, sólo si ese gate pasa.** Comparar antes/después
+3. **Integración aislada, sólo si ese gate pasa.** Comparar antes/después
    contra el mismo perfil sintético. Mantener autenticación, ACL, fencing,
    CAS, journals y timeout de 45 s.
-3. **Gate GUI integral.** `login → turno → borrador → producto → Guardar con
+4. **Gate GUI integral.** `login → turno → borrador → producto → Guardar con
    recibo durable → ORDER_SEND → KDS`, incluyendo ACK incierto, replay,
    competencia, dos reinicios y recuperación abrupta.
-4. **Evidencia de red y renderer.** NetLogs completos y auditoría de secretos
+5. **Evidencia de red y renderer.** NetLogs completos y auditoría de secretos
    del renderer para el candidato exacto. Los tests externos omitidos no se
    cuentan como PASS.
-5. **Regresión y paquete candidato.** Sólo tras los anteriores, antes de
+6. **Regresión y paquete candidato.** Sólo tras los anteriores, antes de
    programar T-24.
 
 ## Carril de seguridad, en paralelo
@@ -119,8 +128,9 @@ evidencia están en [Preparación de piloto controlado — Amalay](AMALAY-PILOT-
 
 ## Próxima acción por dueño
 
-- **Windows / Codex:** evaluar el binding Node-API DPAPI en Electron `main` y
-  su deadline fail-closed antes de cambiar código de producto.
+- **Windows / Codex:** preparar el entorno Node-API de laboratorio de forma
+  verificable y luego evaluar el binding DPAPI en Electron `main` y su
+  deadline fail-closed antes de cambiar código de producto.
 - **Mac / coordinación:** mantener este tracker, preparar el manifiesto de
   candidato y separar ramas, documentación y artefactos generados.
 - **Revisión humana independiente:** evaluar los cambios de seguridad y, más
