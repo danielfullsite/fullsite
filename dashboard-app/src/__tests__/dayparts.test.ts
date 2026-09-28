@@ -108,6 +108,23 @@ describe('contextoFranjas', () => {
     expect(txt).toContain('VALLE:')
   })
 
+  it('con pocas órdenes (ej. 10 de prueba, todas de noche) advierte que la muestra no alcanza', () => {
+    const txt = contextoFranjas({
+      filas: [{ ...fila('a', 'dinner', 6108, 5000, 10), dias: 4 }],
+      config: cfg, esDefault: false, desde: '2026-08-28', hasta: '2026-09-27', nombreSucursal: id => id,
+    })
+    expect(txt).toContain('Cobertura: 10 órdenes con hora en 4 de 31 días')
+    expect(txt).toContain('MUESTRA INSUFICIENTE')
+  })
+
+  it('con volumen y días completos no mete el aviso', () => {
+    const txt = contextoFranjas({
+      filas: [fila('a', 'brunch', 60000, 40000, 300), fila('a', 'dinner', 40000, 30000, 200)],
+      config: cfg, esDefault: false, desde: '2026-08-28', hasta: '2026-09-27', nombreSucursal: id => id,
+    })
+    expect(txt).not.toContain('MUESTRA INSUFICIENTE')
+  })
+
   it('sin datos no inventa porcentajes', () => {
     const txt = contextoFranjas({ filas: [], config: cfg, esDefault: true, desde: 'a', hasta: 'b', nombreSucursal: id => id })
     expect(txt).toContain('no inventes porcentajes')

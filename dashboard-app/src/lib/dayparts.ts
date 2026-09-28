@@ -34,6 +34,8 @@ export const DAYPARTS_DEFAULT: DaypartsConfig = {
 }
 
 export const MAX_FRANJAS = 8
+/** Debajo de esto, el % por franja se marca como no representativo. */
+export const MIN_ORDENES_REPRESENTATIVO = 100
 const RE_HORA = /^([01]\d|2[0-3]):[0-5]\d$/
 
 export function aMinutos(hhmm: string): number {
@@ -255,6 +257,16 @@ export function contextoFranjas(opts: {
     return t
   }
 
+  // Cobertura: con pocas órdenes o pocos días con hora, un % engaña (ej. 10 órdenes
+  // de prueba de noche = "100% dinner"). Se le dice a la IA que lo advierta.
+  const totalOrdenes = filas.reduce((s, r) => s + r.ordenes, 0)
+  const diasConHora = Math.max(...filas.map(r => r.dias || 0))
+  const rango = Math.round((Date.parse(hasta) - Date.parse(desde)) / 86_400_000) + 1
+  const diasPeriodo = Number.isFinite(rango) && rango > 0 ? rango : null
+  out += `Cobertura: ${totalOrdenes} órdenes con hora en ${diasConHora}${diasPeriodo ? ` de ${diasPeriodo}` : ''} días del periodo.\n`
+  if (totalOrdenes < MIN_ORDENES_REPRESENTATIVO || (diasPeriodo !== null && diasConHora < diasPeriodo * 0.5)) {
+    out += `⚠ MUESTRA INSUFICIENTE: estos % NO representan la operación. Dilo primero y claro (cuántas órdenes y días hay), da los números sólo como referencia y explica que se vuelven confiables cuando las ventas se cobren en el POS de Fullsite.\n`
+  }
   out += 'TODO EL NEGOCIO:\n' + bloque(filas, '  ')
   const sucursales = [...new Set(filas.map(f => f.location_id))]
   if (sucursales.length > 1) {
