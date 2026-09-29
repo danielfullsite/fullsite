@@ -11,6 +11,8 @@
  * orden y se clasifica al consultar; cambiar un horario recalcula todo el histórico.
  */
 
+import { datoTexto } from '@/lib/chat-context'
+
 export interface Franja {
   key: string
   nombre: string
@@ -231,7 +233,9 @@ export function contextoFranjas(opts: {
 }): string {
   const { filas, config, esDefault, desde, hasta } = opts
   const encabezado = `VENTA POR HORARIO (del ${desde} al ${hasta}, ya calculado — NO lo recalcules):`
-  const horarios = config.franjas.map(f => `${f.nombre} ${describirFranja(f)}`).join(' · ')
+  // Nombres de franja y de sucursal los escribe el restaurante: van al prompt como DATO
+  // (limpios y acotados), no como texto libre que pueda abrir una sección nueva.
+  const horarios = config.franjas.map(f => `${datoTexto(f.nombre, 40)} ${describirFranja(f)}`).join(' · ')
   let out = `\n${encabezado}\nHorarios ${esDefault ? 'GENÉRICOS (el restaurante aún no configura los suyos — sugiérele hacerlo en [Horarios de venta →](/configuracion/horarios-venta))' : 'configurados por el restaurante'}: ${horarios}\n`
 
   if (filas.length === 0) {
@@ -239,7 +243,7 @@ export function contextoFranjas(opts: {
   }
 
   const orden = [...config.franjas.map(f => f.key), '__fuera__']
-  const nombre = (k: string) => config.franjas.find(f => f.key === k)?.nombre ?? 'Fuera de horario'
+  const nombre = (k: string) => datoTexto(config.franjas.find(f => f.key === k)?.nombre ?? 'Fuera de horario', 40)
 
   const bloque = (rows: FilaFranja[], sangria: string) => {
     const tot = rows.reduce((s, r) => s + r.venta, 0)
@@ -272,12 +276,12 @@ export function contextoFranjas(opts: {
   if (sucursales.length > 1) {
     out += `POR SUCURSAL (${sucursales.length}):\n`
     for (const id of sucursales) {
-      out += `  ${opts.nombreSucursal(id)}:\n` + bloque(filas.filter(f => f.location_id === id), '    ')
+      out += `  ${datoTexto(opts.nombreSucursal(id), 60)}:\n` + bloque(filas.filter(f => f.location_id === id), '    ')
     }
     out += 'Para comparar sucursales usa estos %: di cuál depende más de cada franja y dónde hay oportunidad.\n'
   }
   const fuentes = [...new Set(filas.map(f => f.fuente).filter(Boolean))].join(', ')
-  if (fuentes) out += `(Fuente de horas: ${fuentes}. La hora de una orden es cuando se abrió.)\n`
+  if (fuentes) out += `(Fuente de horas: ${datoTexto(fuentes, 120)}. La hora de una orden es cuando se abrió.)\n`
   return out
 }
 

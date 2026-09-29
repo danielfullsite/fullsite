@@ -21,6 +21,9 @@ export interface AgentEvent {
   outcome?: Outcome | null
   created_at?: string
   expires_at?: string | null
+  // true en hallazgos críticos: hay que avisar. Se persiste como
+  // evidence.notificar = { pendiente: true } (agent_events no tiene columna propia).
+  notify?: boolean
 }
 
 export interface AgentMetrics {

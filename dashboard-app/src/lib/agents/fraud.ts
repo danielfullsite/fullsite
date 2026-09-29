@@ -11,6 +11,7 @@
  */
 import type { AgentEvent } from './types'
 import { getActiveTimezone } from '@/lib/date-mx'
+import { esVenta, leerPaginado } from './dia-negocio'
 
 interface PosOrder {
   id: string
@@ -20,6 +21,7 @@ interface PosOrder {
   subtotal: number
   descuento: number
   status: string
+  payment_status?: string | null
   created_at: string
 }
 
@@ -49,21 +51,75 @@ export async function runFraudAgent(
   const now = Date.now()
   const cutoff = new Date(now - 24 * 60 * 60 * 1000).toISOString()
 
-  const orders = await sbGet<PosOrder>(
+  // Antes: `limit=500` SIN `order` → 500 filas cualesquiera de las últimas 24h. En un día
+  // con más órdenes, "cancelaciones por mesero" se medía sobre una muestra arbitraria.
+  // Ahora se pagina en orden estable y, si aun así se llega al tope, se DICE.
+  const { filas: orders, truncado } = await leerPaginado<PosOrder>(
+    sbGet,
     'pos_orders',
-    `client_id=eq.${encodeURIComponent(clientId)}&created_at=gte.${cutoff}&select=id,mesa,mesero,total,subtotal,descuento,status,created_at&limit=500`,
+    `client_id=eq.${encodeURIComponent(clientId)}&created_at=gte.${cutoff}` +
+      `&select=id,mesa,mesero,total,subtotal,descuento,status,payment_status,created_at&order=created_at.desc,id.desc`,
   )
 
   if (orders.length === 0) return events
 
+  if (truncado) {
+    events.push({
+      client_id: clientId,
+      agent_id: 'fraud',
+      type: 'fraud_lectura_incompleta',
+      severity: 'info',
+      title: `Anti-fraude analizó sólo las ${orders.length.toLocaleString('es-MX')} órdenes más recientes de 24 h`,
+      explanation: 'El volumen de las últimas 24 horas superó el tope de lectura. Los conteos por mesero de abajo son un piso, no el total: puede haber más cancelaciones o descuentos de los que se reportan.',
+      evidence: { ordenes_leidas: orders.length, desde: cutoff },
+      suggested_action: 'Para una revisión completa, usa el reporte de cancelaciones y descuentos del día en el POS.',
+      confidence: 1,
+      status: 'new',
+      estimated_value: null,
+      expires_at: new Date(now + 12 * 60 * 60 * 1000).toISOString(),
+    })
+  }
+
+  const conMesero = (o: PosOrder) => !!(o.mesero ?? '').trim()
   const cancelled   = orders.filter(o => o.status === 'cancelada')
-  const closed      = orders.filter(o => ['cerrada', 'pagada', 'lista'].includes(o.status))
+  // Regla única de venta: 'lista' es una cuenta sin cobrar, no una venta con descuento aplicado.
+  const closed      = orders.filter(esVenta)
   const withDiscount = closed.filter(o => (o.descuento || 0) > 0)
+
+  // ── 0. Calidad de datos: movimientos sin mesero ──────────────────────────
+  // Antes se agrupaban bajo una "persona" llamada "Desconocido", que podía salir como
+  // sospechoso de concentración. No es una persona: es un hueco en el dato. Se reporta
+  // aparte y NO participa en las alertas de concentración.
+  const cancelSinMesero = cancelled.filter(o => !conMesero(o))
+  const descSinMesero = withDiscount.filter(o => !conMesero(o))
+  if (cancelSinMesero.length >= CANCEL_THRESHOLD_WARNING || descSinMesero.length >= 4) {
+    const montoDesc = descSinMesero.reduce((s, o) => s + (o.descuento || 0), 0)
+    events.push({
+      client_id: clientId,
+      agent_id: 'fraud',
+      type: 'mesero_faltante',
+      severity: 'info',
+      title: `${cancelSinMesero.length} cancelaciones y ${descSinMesero.length} descuentos sin mesero registrado (24 h)`,
+      explanation: 'Estas órdenes no tienen mesero asignado, así que no se pueden atribuir a nadie ni entran en las alertas de concentración. Si son muchas, el control anti-fraude pierde visibilidad.',
+      evidence: {
+        sujeto: 'sin_mesero',
+        cancelaciones: cancelSinMesero.length,
+        descuentos: descSinMesero.length,
+        monto_descuentos: Math.round(montoDesc),
+        orders: [...cancelSinMesero, ...descSinMesero].slice(0, 20).map(o => ({ id: o.id, mesa: o.mesa, status: o.status, total: o.total })),
+      },
+      suggested_action: 'Revisa por qué el POS permite cancelar o descontar sin mesero (terminal compartida, usuario genérico) y exige mesero en esas operaciones.',
+      confidence: 1,
+      status: 'new',
+      estimated_value: null,
+      expires_at: new Date(now + 12 * 60 * 60 * 1000).toISOString(),
+    })
+  }
 
   // ── 1. Concentración de cancelaciones por mesero ─────────────────────────
   if (cancelled.length >= CANCEL_THRESHOLD_WARNING) {
-    const byMesero = cancelled.reduce<Record<string, PosOrder[]>>((m, o) => {
-      const n = o.mesero ?? 'Desconocido'; m[n] = [...(m[n] ?? []), o]; return m
+    const byMesero = cancelled.filter(conMesero).reduce<Record<string, PosOrder[]>>((m, o) => {
+      const n = o.mesero!.trim(); m[n] = [...(m[n] ?? []), o]; return m
     }, {})
 
     const suspects = Object.entries(byMesero)
@@ -104,8 +160,8 @@ export async function runFraudAgent(
   // ── 2. Concentración de descuentos ───────────────────────────────────────
   if (withDiscount.length >= 4) {
     const totalDiscounts = withDiscount.reduce((s, o) => s + (o.descuento || 0), 0)
-    const byMesero = withDiscount.reduce<Record<string, { count: number; amount: number }>>((m, o) => {
-      const n = o.mesero ?? 'Desconocido'
+    const byMesero = withDiscount.filter(conMesero).reduce<Record<string, { count: number; amount: number }>>((m, o) => {
+      const n = o.mesero!.trim()
       m[n] = { count: (m[n]?.count ?? 0) + 1, amount: (m[n]?.amount ?? 0) + (o.descuento || 0) }
       return m
     }, {})
@@ -151,7 +207,7 @@ export async function runFraudAgent(
         type: 'large_discounts',
         severity: 'warning',
         title: `${largeDiscounts.length} órdenes con descuento mayor al ${DISCOUNT_PCT_THRESHOLD}% del subtotal`,
-        explanation: `Descuentos inusualmente altos: ${largeDiscounts.map(o => `${o.mesero} mesa ${o.mesa ?? '?'} ($${(o.descuento || 0).toFixed(0)})`).slice(0, 3).join(', ')}.`,
+        explanation: `Descuentos inusualmente altos: ${largeDiscounts.map(o => `${(o.mesero ?? '').trim() || 'sin mesero'} mesa ${o.mesa ?? '?'} ($${(o.descuento || 0).toFixed(0)})`).slice(0, 3).join(', ')}.`,
         evidence: {
           orders: largeDiscounts.map(o => ({
             id: o.id,

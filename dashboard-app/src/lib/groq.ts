@@ -134,6 +134,72 @@ export async function groqChat(options: ChatOptions): Promise<string> {
   throw new Error('Servicio temporalmente no disponible. Intenta en unos minutos.')
 }
 
+// ─── Tool calling (formato OpenAI) ───────────────────────────────────────
+
+export interface LlamadaHerramienta {
+  id: string
+  type: 'function'
+  function: { name: string; arguments: string }
+}
+
+export type MensajeConHerramientas =
+  | { role: 'system' | 'user'; content: string }
+  | { role: 'assistant'; content: string | null; tool_calls?: LlamadaHerramienta[] }
+  | { role: 'tool'; tool_call_id: string; content: string }
+
+export interface DefinicionHerramienta {
+  type: 'function'
+  function: { name: string; description: string; parameters: Record<string, unknown> }
+}
+
+export interface OpcionesHerramientas {
+  messages: MensajeConHerramientas[]
+  tools: DefinicionHerramienta[]
+  /** 'none' = contestar ya, sin pedir más herramientas. */
+  toolChoice?: 'auto' | 'none'
+  maxTokens?: number
+  temperature?: number
+  timeoutMs: number
+}
+
+/**
+ * Una vuelta del modelo con herramientas (Groq, OpenAI-compatible). SIN reintentos ni
+ * respaldo: quien llama maneja el presupuesto de tiempo y cae a `groqChat` si esto
+ * lanza (sin llave, HTTP no-OK, 429, timeout o respuesta sin mensaje).
+ */
+export async function groqConHerramientas(o: OpcionesHerramientas): Promise<{ content: string; tool_calls: LlamadaHerramienta[] }> {
+  const key = getGroqKey()
+  if (!key) throw new Error('GROQ_API_KEY not configured')
+  const res = await fetch(GROQ_URL, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: GROQ_MODEL,
+      messages: o.messages,
+      tools: o.tools,
+      tool_choice: o.toolChoice ?? 'auto',
+      max_tokens: o.maxTokens || 2000,
+      temperature: o.temperature ?? 0.2,
+    }),
+    signal: AbortSignal.timeout(Math.max(1000, o.timeoutMs)),
+  })
+  if (!res.ok) {
+    const err = await res.text().catch(() => '')
+    throw new Error(`Groq tools error ${res.status}: ${err.slice(0, 200)}`)
+  }
+  const data = await res.json()
+  const msg = data?.choices?.[0]?.message
+  if (!msg || typeof msg !== 'object') throw new Error('Groq tools: respuesta sin mensaje')
+  const calls = Array.isArray(msg.tool_calls)
+    ? (msg.tool_calls as unknown[]).filter((c): c is LlamadaHerramienta =>
+      !!c && typeof c === 'object'
+      && typeof (c as LlamadaHerramienta).id === 'string'
+      && typeof (c as LlamadaHerramienta).function?.name === 'string')
+      .map(c => ({ id: c.id, type: 'function' as const, function: { name: c.function.name, arguments: String(c.function.arguments ?? '') } }))
+    : []
+  return { content: typeof msg.content === 'string' ? msg.content : '', tool_calls: calls }
+}
+
 // ─── Streaming (Groq only, no fallback needed for streaming) ─────────────
 
 export async function groqStream(options: ChatOptions): Promise<ReadableStream<Uint8Array>> {

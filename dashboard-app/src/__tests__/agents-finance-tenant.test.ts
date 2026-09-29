@@ -36,6 +36,8 @@ describe('finance lee sólo del propio restaurante', () => {
     for (const { url, body } of llamadas) {
       const filtrada =
         url.includes('client_id=eq.boruca') ||
+        // La configuración del propio restaurante (zona e inicio del día de venta).
+        url.includes('/clients?id=eq.boruca&') ||
         url.includes('client_slug=eq.boruca') ||
         body.includes('"p_client_id":"boruca"')
       expect(filtrada, `consulta sin filtro de restaurante: ${url} ${body}`).toBe(true)

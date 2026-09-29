@@ -5,6 +5,8 @@ import { User, Sparkles, ArrowUp } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import type { ChatMessage } from '@/lib/types'
 import { getActiveClientSlug } from '@/lib/data'
+import GraficaChat from '@/components/chat/GraficaChat'
+import { separarGraficas } from '@/lib/grafica-spec'
 
 const suggestionCards = [
   {
@@ -204,7 +206,11 @@ export default function ChatPage() {
                         : 'bg-[var(--surface)] text-[var(--text-1)] border border-[var(--line-soft)] shadow-sm rounded-bl-md'
                     }`}
                   >
-                    <div className="whitespace-pre-wrap">{msg.content}</div>
+                    {msg.role === 'assistant'
+                      ? separarGraficas(msg.content).map((parte, j) => parte.tipo === 'texto'
+                        ? <div key={j} className="whitespace-pre-wrap">{parte.texto}</div>
+                        : <GraficaChat key={`${j}-${parte.spec.id}`} spec={parte.spec} />)
+                      : <div className="whitespace-pre-wrap">{msg.content}</div>}
                   </div>
                   {msg.timestamp && (
                     <span className={`text-xs text-[var(--text-3)] mt-1 px-1 ${msg.role === 'user' ? 'text-right' : ''}`}>
