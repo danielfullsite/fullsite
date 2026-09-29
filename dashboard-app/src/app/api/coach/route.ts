@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { buildDailyFromOrders } from '@/lib/pos-daily'
+import { ventasFullsitePrimero } from '@/lib/pos-daily'
 import { requireTenant } from '@/lib/api-auth'
 import { esDuenoDelHistoricoWansoft } from '@/lib/wansoft-legacy'
 
@@ -20,20 +20,15 @@ export async function POST(request: NextRequest) {
     const client_id = ctx.clientId
 
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    // Service key server-side: el tenant ya lo validó `ctx`. Necesaria para el agregado
+    // fs_ventas_diarias (con anon cae al método lento con tope de órdenes).
+    const sbKey = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     const headers = { apikey: sbKey, Authorization: `Bearer ${sbKey}` }
 
-    // Fetch 90 days of daily data — SCOPED al tenant (antes leía todos los clientes).
-    const dailyRes = await fetch(
-      `${sbUrl}/rest/v1/wansoft_daily?select=fecha,ventas_dia,ventas_brutas,descuentos,tickets_count,personas_restaurant,ticket_promedio_restaurant,meseros,ventas_por_grupo,propinas_total,pago_métodos&client_slug=eq.${encodeURIComponent(client_id)}&ventas_dia=gt.0&order=fecha.desc&limit=90`,
-      { headers, cache: 'no-store' }
-    )
-    let days = dailyRes.ok ? await dailyRes.json() : []
-
-    // OCM Fase 3: tenant clonado sin histórico wansoft_daily → coach lee su pos_orders vivo.
-    if (!days || days.length < 2) {
-      days = await buildDailyFromOrders(sbUrl, headers, client_id, 90)
-    }
+    // 90 días, FULLSITE PRIMERO: el POS de Fullsite manda; el histórico importado sólo
+    // cubre hasta su último día. Ver ventasFullsitePrimero (lib/pos-daily.ts).
+    const { dias: days } = await ventasFullsitePrimero(sbUrl, headers, client_id, 90,
+      'fecha,ventas_dia,ventas_brutas,descuentos,tickets_count,personas_restaurant,ticket_promedio_restaurant,meseros,ventas_por_grupo,propinas_total,pago_métodos')
 
     if (days.length < 2) {
       return Response.json({ insights: [] })

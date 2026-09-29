@@ -4,7 +4,7 @@ import { useReportUnavailable } from '@/lib/report-status'
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { Users, Clock, DollarSign, TrendingUp, Calendar, AlertTriangle, ChevronDown, Download, Wallet, Receipt, UserCheck, Timer } from 'lucide-react'
-import { getRecentDays, getLatestDeep, getWansoftData, getWansoftDataRange, getDateRange, aggregateMeseros, getDashboardFromPosOrders } from '@/lib/data'
+import { getRecentDays, getLatestDeep, getWansoftData, getWansoftDataRange, getDateRange, aggregateMeseros, getAsistencia } from '@/lib/data'
 import { formatCurrency, formatNumber } from '@/lib/format'
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
@@ -124,6 +124,7 @@ export default function NominaPage() {
         shiftsRow,
         laborRange,
         hoursRange,
+        asistencia,
       ] = await Promise.all([
         getDateRange(from, to),
         getLatestDeep('wansoft_labor'),
@@ -133,29 +134,55 @@ export default function NominaPage() {
         getWansoftData('shifts'),
         getWansoftDataRange('labor', days),
         getWansoftDataRange('hours_worked', days),
+        getAsistencia(days),
       ])
 
-      let finalDailyData = dailyRows.length > 0 ? dailyRows : await getRecentDays(days)
-      if (finalDailyData.length === 0) {
-        finalDailyData = await getDashboardFromPosOrders(days)
-      }
+      // getDateRange / getRecentDays ya son Fullsite primero (POS + histórico hasta su último día).
+      const finalDailyData = dailyRows.length > 0 ? dailyRows : await getRecentDays(days)
       setDailyData(finalDailyData)
 
-      if (laborRow?.data && Array.isArray(laborRow.data)) {
+      // FULLSITE PRIMERO: asistencia del checador y turnos del POS (fs_asistencia).
+      // El histórico importado (wansoft_labor / hours_worked) sólo si Fullsite no tiene nada.
+      const asistenciaFs = (asistencia || []).filter(r => r.data.length > 0) as { fecha: string; data: LaborEntry[] }[]
+      if (asistenciaFs.length > 0) {
+        setLaborHistory(asistenciaFs)
+        setLaborEntries(asistenciaFs[0].data)
+        setFecha(asistenciaFs[0].fecha)
+      } else if (laborRow?.data && Array.isArray(laborRow.data)) {
         setLaborEntries(laborRow.data)
         setFecha(laborRow.fecha || '')
       }
 
-      // Labor history from multiple days
-      if (laborRange && laborRange.length > 0) {
+      // Labor history from multiple days (histórico importado)
+      if (asistenciaFs.length === 0 && laborRange && laborRange.length > 0) {
         setLaborHistory(laborRange.map(r => ({
           fecha: r.fecha,
           data: Array.isArray(r.data) ? r.data as LaborEntry[] : [],
         })).filter(r => r.data.length > 0))
       }
 
-      // Tips: prefer tips_raw over wansoft_tips
-      if (tipsRawRow?.data && Array.isArray(tipsRawRow.data) && tipsRawRow.data.length > 0) {
+      // Propinas: FULLSITE PRIMERO — reales por mesero desde el POS (propinas_meseros).
+      const porMesero = new Map<string, { ventas: number; dias: Set<string>; propinas: number }>()
+      for (const day of finalDailyData) {
+        for (const p of (day.propinas_meseros || []) as { nombre?: string; total?: number }[]) {
+          if (!p?.nombre) continue
+          const m = porMesero.get(p.nombre) || { ventas: 0, dias: new Set<string>(), propinas: 0 }
+          m.propinas += Number(p.total) || 0
+          m.dias.add(day.fecha)
+          porMesero.set(p.nombre, m)
+        }
+        for (const v of (day.meseros || []) as { nombre?: string; total?: number }[]) {
+          const m = v?.nombre ? porMesero.get(v.nombre) : undefined
+          if (m) m.ventas += Number(v.total) || 0
+        }
+      }
+      const tipsPos: TipEntry[] = [...porMesero.entries()].filter(([, m]) => m.propinas > 0).map(([mesero, m]) => ({
+        mesero, ventas: m.ventas, tickets: m.dias.size, propinas: m.propinas,
+        propina_promedio: m.dias.size ? m.propinas / m.dias.size : 0,
+      }))
+      if (tipsPos.length > 0) {
+        setTips(tipsPos)
+      } else if (tipsRawRow?.data && Array.isArray(tipsRawRow.data) && tipsRawRow.data.length > 0) {
         setTips(tipsRawRow.data as TipEntry[])
       } else if (tipsRow?.data && Array.isArray(tipsRow.data)) {
         setTips(tipsRow.data as TipEntry[])

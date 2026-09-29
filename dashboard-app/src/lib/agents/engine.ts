@@ -8,7 +8,6 @@ import { runInventoryAgent } from './inventory'
 import { runFraudAgent } from './fraud'
 import { runStaffAgent } from './staff'
 import { runFinanceAgent } from './finance'
-import { esDuenoDelHistoricoWansoft } from '@/lib/wansoft-legacy'
 import { applyLearning, tallyVerdicts, verdictsQuery } from './learning'
 
 const SB_URL = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/$/, '')
@@ -144,22 +143,8 @@ export async function runAgent(
   // un restaurante que migre desde Wansoft mañana tiene su agente de finanzas sin
   // tocar código. `esDuenoDelHistoricoWansoft` falla CERRADO — si la consulta truena,
   // devuelve false y el agente no corre.
-  if (agentId === 'finance' && !(await esDuenoDelHistoricoWansoft(clientId))) {
-    const durationMs = Date.now() - start
-    // Se registra como 'skipped', no 'error': no falló nada, este restaurante simplemente
-    // no es dueño del histórico. Contarlo como error dispararía alertas todos los días.
-    await logAgentRun({
-      agentId, clientId, triggerType, status: 'skipped', durationMs, eventsCount: 0,
-      skipReason: 'no es dueño del histórico de Wansoft',
-    })
-    return {
-      agent_id: agentId,
-      events: [],
-      ran_at: new Date().toISOString(),
-      duration_ms: durationMs,
-      error: 'finance no disponible para este restaurante',
-    }
-  }
+  // (Guardián retirado 2026-09-27: finance ya lee sólo datos del propio restaurante
+  //  desde el POS de Fullsite — ver lib/agents/finance.ts — así que corre para todos.)
 
   try {
     switch (agentId) {
@@ -312,13 +297,13 @@ export async function runAgent(
  * `/api/agents/run` lo saltaba llamando a `runAgent` directo con el `agent_id`
  * del cuerpo de la petición.
  */
-/** Run all agents concurrently (finance solo para el dueño del histórico de Wansoft). */
+/** Run all agents concurrently. */
 export async function runAllAgents(clientId: string, triggerType = 'manual'): Promise<AgentResult[]> {
   const agentIds: AgentId[] = ['operations', 'inventory', 'fraud', 'staff']
   // Antes: `clientId === 'amalay'`. Ahora se pregunta por la propiedad, no por el
   // nombre — así el día que otro restaurante migre desde Wansoft, su agente de
   // finanzas corre sin tocar código. Ver src/lib/wansoft-legacy.ts.
-  if (await esDuenoDelHistoricoWansoft(clientId)) agentIds.push('finance')
+  agentIds.push('finance') // lee sólo del propio restaurante (POS de Fullsite)
   return Promise.all(agentIds.map(id => runAgent(id, clientId, triggerType)))
 }
 

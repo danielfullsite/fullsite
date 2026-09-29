@@ -1,105 +1,75 @@
-// Regresión: el agente de finanzas sólo puede correr para el tenant dueño de
-// las tablas legacy.
+// El agente de finanzas corre para CUALQUIER restaurante y sólo lee SUS datos.
 //
-// Qué estaba roto (hasta 2026-08-26): `wansoft_daily` y `wansoft_kpis` no tienen
-// client_id — son tablas globales de AMALAY. El guardián que impedía correr
-// `finance` para otro restaurante vivía SOLO en `runAllAgents`.
+// Historia: hasta 2026-09-27 leía `wansoft_daily`/`wansoft_kpis` SIN filtro de
+// cliente (tablas "globales de AMALAY"). Por eso existía un guardián que sólo lo
+// dejaba correr para el dueño del histórico de Wansoft — sin él, otro restaurante
+// recibía "tus ventas están abajo del promedio" con los números de AMALAY (bug del
+// 2026-08-26). Y aun así llevaba desde el 2026-07-20 ciego: esa fuente murió.
 //
-// Pero /api/agents/run acepta `agent_id` del cuerpo y llama a `runAgent`
-// DIRECTO. Un usuario de otro restaurante pedía { agent_id: 'finance' } y
-// recibía análisis calculados con las ventas de AMALAY, guardados como eventos
-// propios. No era sólo una fuga: era información equivocada presentada como suya
-// — "tus ventas de hoy están abajo del promedio", con los números de otro.
-//
-// La propiedad que fija este archivo: el guardián está en `runAgent`, o sea en
-// la función que corre el agente, no en la que casualmente la llamaba.
+// Ahora lee del POS de Fullsite vía `ventasFullsitePrimero` (histórico importado sólo
+// hasta su último día, filtrado por client_slug). La protección se movió al DATO:
+// cada consulta lleva el restaurante. Este archivo fija esa propiedad.
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-const finanzasCorrio = vi.fn()
+type Llamada = { url: string; body: string }
+let llamadas: Llamada[] = []
 
-vi.mock('@/lib/agents/finance', () => ({
-  runFinanceAgent: (...args: unknown[]) => {
-    finanzasCorrio(...args)
-    return Promise.resolve([])
-  },
-}))
-vi.mock('@/lib/agents/operations', () => ({ runOperationsAgent: async () => [] }))
-vi.mock('@/lib/agents/inventory', () => ({ runInventoryAgent: async () => [] }))
-vi.mock('@/lib/agents/fraud', () => ({ runFraudAgent: async () => [] }))
-vi.mock('@/lib/agents/staff', () => ({ runStaffAgent: async () => [] }))
-
-// El guardián dejó de preguntar `clientId === 'amalay'` y ahora pregunta si el
-// restaurante es dueño del histórico de Wansoft — `clients.wansoft_subsidiary_id`.
-// Misma protección, pero configurable: otro restaurante que migre desde Wansoft
-// funciona sin tocar código. Ver src/lib/wansoft-legacy.ts.
-//
-// Por eso el stub de fetch ya no puede devolver [] para todo: tiene que contestar esa
-// consulta. Aquí amalay es el dueño; cualquier otro no lo es.
-const SUBSIDIARIA_POR_TENANT: Record<string, string | null> = { amalay: '4821' }
-
-beforeEach(async () => {
-  finanzasCorrio.mockClear()
-  // El helper cachea la respuesta 5 minutos por tenant. Sin limpiar, el resultado de un
-  // caso se filtra al siguiente y el archivo pasa por el orden en que corren, no porque
-  // el guardián funcione. Un verde así es peor que un rojo.
-  ;(await import('@/lib/wansoft-legacy'))._limpiarCacheWansoft()
-  vi.stubGlobal('fetch', async (url: string) => {
-    const u = String(url)
-    if (u.includes('/clients?') && u.includes('wansoft_subsidiary_id')) {
-      const slug = decodeURIComponent(u.match(/id=eq\.([^&]+)/)?.[1] ?? '')
-      const sub = SUBSIDIARIA_POR_TENANT[slug] ?? null
-      return { ok: true, json: async () => [{ wansoft_subsidiary_id: sub }], text: async () => '' } as unknown as Response
-    }
-    return { ok: true, json: async () => [], text: async () => '' } as unknown as Response
-  })
-  process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://staging.supabase.co'
+beforeEach(() => {
+  llamadas = []
+  process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://sb.test'
   process.env.SUPABASE_SERVICE_KEY = 'SERVICE'
+  vi.stubGlobal('fetch', vi.fn(async (url: unknown, init?: RequestInit) => {
+    llamadas.push({ url: String(url), body: String(init?.body ?? '') })
+    return new Response('[]', { status: 200 })
+  }))
 })
+afterEach(() => { vi.unstubAllGlobals() })
 
-describe('finance sólo corre para el dueño de las tablas legacy', () => {
-  it('EL BUG: runAgent("finance") con otro restaurante NO ejecuta el agente', async () => {
-    const { runAgent } = await import('@/lib/agents/engine')
+describe('finance lee sólo del propio restaurante', () => {
+  it('toda consulta del agente va filtrada por el restaurante que lo corre', async () => {
+    const { runFinanceAgent } = await import('@/lib/agents/finance')
+    const { sbGet } = await import('@/lib/agents/engine')
+    await runFinanceAgent('boruca', sbGet)
 
-    const res = await runAgent('finance', 'boruca')
-
-    expect(finanzasCorrio).not.toHaveBeenCalled()
-    expect(res.events).toEqual([])
-    expect(res.error).toBeDefined()
+    expect(llamadas.length).toBeGreaterThan(0)
+    for (const { url, body } of llamadas) {
+      const filtrada =
+        url.includes('client_id=eq.boruca') ||
+        url.includes('client_slug=eq.boruca') ||
+        body.includes('"p_client_id":"boruca"')
+      expect(filtrada, `consulta sin filtro de restaurante: ${url} ${body}`).toBe(true)
+    }
   })
 
-  it('para AMALAY sí lo ejecuta', async () => {
-    const { runAgent } = await import('@/lib/agents/engine')
+  it('ya no toca las tablas globales wansoft_kpis ni wansoft_daily sin cliente', async () => {
+    const { runFinanceAgent } = await import('@/lib/agents/finance')
+    const { sbGet } = await import('@/lib/agents/engine')
+    await runFinanceAgent('amalay', sbGet)
 
-    await runAgent('finance', 'amalay')
-
-    expect(finanzasCorrio).toHaveBeenCalledTimes(1)
-    expect(finanzasCorrio.mock.calls[0][0]).toBe('amalay')
+    expect(llamadas.some(l => l.url.includes('/wansoft_kpis'))).toBe(false)
+    for (const l of llamadas.filter(l => l.url.includes('/wansoft_daily'))) {
+      expect(l.url).toContain('client_slug=eq.amalay')
+    }
   })
 
-  it('los demas agentes sí corren para cualquier restaurante', async () => {
-    const { runAgent } = await import('@/lib/agents/engine')
-
-    const res = await runAgent('operations', 'boruca')
-
-    expect(res.error).toBeUndefined()
+  it('sin ventas no se calla: emite "fuente sin datos" en vez de devolver vacío', async () => {
+    const { runFinanceAgent } = await import('@/lib/agents/finance')
+    const { sbGet } = await import('@/lib/agents/engine')
+    const eventos = await runFinanceAgent('boruca', sbGet)
+    expect(eventos.some(e => e.type === 'fuente_sin_datos' && e.client_id === 'boruca')).toBe(true)
   })
 
-  it('runAllAgents tampoco lo incluye para otro restaurante', async () => {
+  it('runAllAgents incluye finance para cualquier restaurante', async () => {
+    vi.resetModules()
+    vi.doMock('@/lib/agents/operations', () => ({ runOperationsAgent: async () => [] }))
+    vi.doMock('@/lib/agents/inventory', () => ({ runInventoryAgent: async () => [] }))
+    vi.doMock('@/lib/agents/fraud', () => ({ runFraudAgent: async () => [] }))
+    vi.doMock('@/lib/agents/staff', () => ({ runStaffAgent: async () => [] }))
+    vi.doMock('@/lib/agents/finance', () => ({ runFinanceAgent: async () => [] }))
     const { runAllAgents } = await import('@/lib/agents/engine')
-
     const resultados = await runAllAgents('boruca')
-
-    expect(finanzasCorrio).not.toHaveBeenCalled()
-    expect(resultados.map(r => r.agent_id)).not.toContain('finance')
-  })
-
-  it('runAllAgents sí lo incluye para AMALAY', async () => {
-    const { runAllAgents } = await import('@/lib/agents/engine')
-
-    const resultados = await runAllAgents('amalay')
-
     expect(resultados.map(r => r.agent_id)).toContain('finance')
-    expect(finanzasCorrio).toHaveBeenCalledTimes(1)
+    vi.doUnmock('@/lib/agents/finance')
   })
 })

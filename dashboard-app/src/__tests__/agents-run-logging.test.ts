@@ -23,11 +23,9 @@ vi.mock('@/lib/agents/inventory', () => ({ runInventoryAgent: vi.fn().mockResolv
 vi.mock('@/lib/agents/fraud', () => ({ runFraudAgent: vi.fn().mockResolvedValue([]) }))
 vi.mock('@/lib/agents/staff', () => ({ runStaffAgent: vi.fn().mockResolvedValue([]) }))
 vi.mock('@/lib/agents/finance', () => ({ runFinanceAgent: vi.fn().mockResolvedValue([]) }))
-vi.mock('@/lib/wansoft-legacy', () => ({ esDuenoDelHistoricoWansoft: vi.fn() }))
 
 import { runAgent } from '@/lib/agents/engine'
 import { runOperationsAgent } from '@/lib/agents/operations'
-import { esDuenoDelHistoricoWansoft } from '@/lib/wansoft-legacy'
 
 /** Captura los INSERT a Supabase sin salir a la red. */
 function stubSupabase() {
@@ -47,7 +45,6 @@ beforeEach(() => {
   inserts.length = 0
   process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://sb.test'
   process.env.SUPABASE_SERVICE_KEY = 'k'
-  vi.mocked(esDuenoDelHistoricoWansoft).mockResolvedValue(true)
   stubSupabase()
 })
 afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks() })
@@ -77,13 +74,11 @@ describe('Agentes — toda corrida deja constancia en agent_runs', () => {
     expect(r.skip_reason).toBeTruthy()   // ← la diferencia que faltaba
   })
 
-  it('no aplica al tenant → status skipped, no error: no debe disparar alertas diarias', async () => {
-    vi.mocked(esDuenoDelHistoricoWansoft).mockResolvedValue(false)
+  it('finance ya no se salta a ningún restaurante: lee sólo sus datos del POS de Fullsite', async () => {
     await runAgent('finance', 'nomada', 'cron')
     const r = corrida()!
-    expect(r.status).toBe('skipped')
-    expect(r.status).not.toBe('error')
-    expect(String(r.skip_reason)).toMatch(/histórico/i)
+    expect(r.status).toBe('ok')
+    expect(String(r.agent_id)).toMatch(/finance/)
   })
 
   it('el agente truena → status error con el mensaje, no silencio', async () => {

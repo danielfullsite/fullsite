@@ -225,6 +225,22 @@ function locationFilter(locationId?: string | null): string {
   return locationId ? `&location_id=eq.${locationId}` : ''
 }
 
+/**
+ * FUENTE PRINCIPAL = POS DE FULLSITE. El histórico importado (wansoft_daily) sólo
+ * cubre hasta su último día; todo lo posterior sale de pos_orders. Así un restaurante
+ * cuyo conector legacy se cayó (o que ya opera en Fullsite) nunca se queda "congelado"
+ * en el último día importado.
+ */
+function continuarConPos(historico: WansoftDaily[], pos: WansoftDaily[]): WansoftDaily[] {
+  const ultimo = historico.reduce((m, d) => (d.fecha > m ? d.fecha : m), '')
+  return [...historico, ...pos.filter(d => d.fecha > ultimo)].sort((a, b) => a.fecha.localeCompare(b.fecha))
+}
+
+/** Días hacia atrás desde hoy hasta `fecha` (el lector de POS mide desde hoy). */
+function diasDesde(fecha: string): number {
+  return Math.max(0, Math.ceil((Date.now() - new Date(fecha + 'T00:00:00').getTime()) / 86400000)) + 1
+}
+
 export async function getRecentDays(days: number = 30, clientSlug: string = getActiveClientSlug(), locationId?: string | null): Promise<WansoftDaily[]> {
   // Try pos_orders first for recent data (last 7 days) — this is the live POS data
   let posError: unknown
@@ -259,18 +275,84 @@ export async function getLatestDay(clientSlug: string = getActiveClientSlug(), l
 export async function getDayData(fecha: string, clientSlug: string = getActiveClientSlug(), locationId?: string | null): Promise<WansoftDaily | null> {
   const data = await sbFetch('wansoft_daily', `select=*&client_slug=eq.${clientSlug}${locationFilter(locationId)}&fecha=eq.${fecha}&ventas_dia=gt.0&order=ventas_dia.desc&limit=5`) as Record<string, unknown>[]
   const deduped = dedupeByFecha(data)
-  return deduped.length > 0 ? parseRow(deduped[0]) : null
+  if (deduped.length > 0) return parseRow(deduped[0])
+  // Sin histórico importado para ese día → el POS de Fullsite.
+  const pos = await getDashboardFromPosOrders(diasDesde(fecha), clientSlug, locationId).catch(() => [])
+  return pos.find(d => d.fecha === fecha) ?? null
 }
 
 export async function getMonthlyData(clientSlug: string = getActiveClientSlug(), locationId?: string | null): Promise<WansoftDaily[]> {
   const data = await sbFetch('wansoft_daily', `select=*&client_slug=eq.${clientSlug}${locationFilter(locationId)}&ventas_dia=gt.0&order=fecha.asc&limit=1000`) as Record<string, unknown>[]
   const rows = dedupeByFecha(data).map(parseRow)
-  if (rows.length > 0) return rows
-  // POS fallback
-  return getDashboardFromPosOrders(365, clientSlug, locationId)
+  const pos = await getDashboardFromPosOrders(365, clientSlug, locationId).catch(error => {
+    if (rows.length === 0) throw error
+    return [] as WansoftDaily[]
+  })
+  return continuarConPos(rows, pos)
 }
 
+/**
+ * Llama una función fs_* de Postgres con la sesión del usuario. Las fs_* que se abren
+ * al navegador validan adentro que el usuario pertenezca al restaurante (fs_puede_leer).
+ * Devuelve null si la llamada FALLÓ (no es lo mismo que "no hay datos").
+ */
+async function sbRpc(fn: string, args: Record<string, unknown>): Promise<Record<string, unknown>[] | null> {
+  try {
+    const token = await getAuthToken()
+    if (!token || token === SUPABASE_KEY) return null
+    const res = await fetchWithTimeout(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(args),
+    }, 10_000)
+    if (!res.ok) return null
+    const body = await res.json()
+    return Array.isArray(body) ? body : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Asistencia / horas por día desde el checador y los turnos de Fullsite (fs_asistencia).
+ * Shape del legacy wansoft_labor: [{ fecha, data: [{empleado, entrada, salida, horas}] }].
+ * null = la lectura falló.
+ */
+export async function getAsistencia(days: number = 30, clientSlug: string = getActiveClientSlug()) {
+  const hoy = nowMX()
+  const desde = new Date(hoy); desde.setDate(desde.getDate() - days)
+  const rows = await sbRpc('fs_asistencia', { p_client_id: clientSlug, p_desde: fmtDateMX(desde), p_hasta: fmtDateMX(hoy) })
+  return rows ? rows.map(r => ({ fecha: String(r.fecha), data: Array.isArray(r.labor) ? r.labor : [] })) : null
+}
+
+/**
+ * Costo de ventas TEÓRICO por mes (fs_costo_de_ventas): platillos vendidos en el POS ×
+ * costo de su ficha técnica. `venta_con_receta` = venta de platillos que sí tienen ficha;
+ * el % de food cost se calcula sobre esa venta. null = la lectura falló.
+ */
+export interface CostoDeVentasMes { mes: string; venta_platillos: number; venta_con_receta: number; costo_teorico: number }
+export async function getCostoDeVentas(meses: number = 12, clientSlug: string = getActiveClientSlug()): Promise<CostoDeVentasMes[] | null> {
+  const hoy = nowMX()
+  const desde = new Date(hoy.getFullYear(), hoy.getMonth() - (meses - 1), 1)
+  const rows = await sbRpc('fs_costo_de_ventas', { p_client_id: clientSlug, p_desde: fmtDateMX(desde), p_hasta: fmtDateMX(hoy) })
+  return rows ? rows.map(r => ({
+    mes: String(r.mes),
+    venta_platillos: Number(r.venta_platillos) || 0,
+    venta_con_receta: Number(r.venta_con_receta) || 0,
+    costo_teorico: Number(r.costo_teorico) || 0,
+  })) : null
+}
+
+/**
+ * KPIs por mesero (H&H, pan, postres, 2da bebida, grupos, platillos). FULLSITE PRIMERO:
+ * se calculan del POS con fs_meseros_categorias (por restaurante). La tabla legacy
+ * wansoft_waiter_categories sólo se consulta si el POS no tiene datos.
+ */
 export async function getWaiterCategories(days: number = 7, clientSlug: string = getActiveClientSlug()) {
+  const hoy = nowMX()
+  const desde = new Date(hoy); desde.setDate(desde.getDate() - days)
+  const pos = await sbRpc('fs_meseros_categorias', { p_client_id: clientSlug, p_desde: fmtDateMX(desde), p_hasta: fmtDateMX(hoy) })
+  if (pos && pos.length > 0) return pos
   return sbFetch('wansoft_waiter_categories', `select=*&client_slug=eq.${clientSlug}&order=fecha.desc&limit=${days}`)
 }
 
@@ -316,14 +398,16 @@ export async function getDateRange(from: string, to: string, clientSlug: string 
     `select=*&client_slug=eq.${clientSlug}${locationFilter(locationId)}&fecha=gte.${from}&fecha=lte.${to}&ventas_dia=gt.0&order=fecha.asc`
   ) as Record<string, unknown>[]
   const rows = dedupeByFecha(data).map(parseRow)
-  if (rows.length > 0) return rows
-  // POS fallback: calculate days in range, fetch, then filter
-  const fromDate = new Date(from + 'T00:00:00')
+  // Si el histórico ya cubre hasta `to`, no hace falta el POS.
+  const ultimo = rows.reduce((m, d) => (d.fecha > m ? d.fecha : m), '')
+  if (rows.length > 0 && ultimo >= to) return rows
   // POS reader takes a lookback from today, not the requested interval length.
   // A historical week must not accidentally read only the last seven days.
-  const days = Math.max(0, Math.ceil((Date.now() - fromDate.getTime()) / (1000 * 60 * 60 * 24))) + 1
-  const posData = await getDashboardFromPosOrders(days, clientSlug, locationId)
-  return posData.filter(d => d.fecha >= from && d.fecha <= to)
+  const posData = await getDashboardFromPosOrders(diasDesde(from), clientSlug, locationId).catch(error => {
+    if (rows.length === 0) throw error
+    return [] as WansoftDaily[]
+  })
+  return continuarConPos(rows, posData.filter(d => d.fecha >= from && d.fecha <= to))
 }
 
 // Aggregate payment methods across days

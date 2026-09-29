@@ -184,6 +184,45 @@ export default function FoodCostPage() {
         const api = apiRes.ok ? await apiRes.json() : null
         if (api && Array.isArray(api.yieldStudies)) setYieldStudies(api.yieldStudies)
 
+        // -------------------------------------------------------
+        // SOURCE 0 (principal): fichas técnicas de FULLSITE (fs_food_cost) — recetas
+        // versionadas del POS con insumos costeados. Las fuentes de abajo (Wansoft,
+        // Excel de costeo) sólo se usan si el restaurante aún no tiene fichas.
+        // -------------------------------------------------------
+        {
+          const fs: Array<{ platillo: string; precio: number | string; costo: number | string; ingredientes: RecipeIngredient[] | null; lineas: number; lineas_sin_costo: number; lineas_corregidas: number }> =
+            Array.isArray(api?.fsFoodCost) ? api.fsFoodCost : []
+          const conCosto = fs.filter(r => Number(r.costo) > 0 && Number(r.precio) > 0)
+          if (conCosto.length > 0) {
+            const costItems: CostItem[] = conCosto.map(r => {
+              const precio = Number(r.precio) || 0
+              const costo = Math.round((Number(r.costo) || 0) * 100) / 100
+              const ings = Array.isArray(r.ingredientes) ? r.ingredientes : []
+              const top = [...ings].sort((a, b) => (Number(b.total) || 0) - (Number(a.total) || 0))[0]
+              return {
+                platillo: r.platillo,
+                ingredientes: ings.length,
+                ingredientesList: ings,
+                costo,
+                precio,
+                margen_pct: precio > 0 ? Math.round((1 - costo / precio) * 1000) / 10 : 0,
+                matched: true,
+                market: false,
+                // Costo mayor al precio = casi siempre un error de captura en la ficha o el catálogo.
+                sospechoso: costo > precio && top ? { ingrediente: String(top.nombre || ''), costo: Number(top.total) || 0, pct: costo > 0 ? Math.round(((Number(top.total) || 0) / costo) * 100) : 0 } : undefined,
+              }
+            })
+            const huecos = conCosto.reduce((s, r) => s + (r.lineas_sin_costo || 0), 0)
+            const corregidas = conCosto.reduce((s, r) => s + (r.lineas_corregidas || 0), 0)
+            setItems(costItems.sort((a, b) => a.margen_pct - b.margen_pct))
+            setSource(`${costItems.length} fichas técnicas de Fullsite`
+              + (huecos ? ` · ${huecos} ingredientes sin costo` : '')
+              + (corregidas ? ` · ${corregidas} con unidad corregida (revisa tu catálogo)` : ''))
+            setLoading(false)
+            return
+          }
+        }
+
         if (api && Array.isArray(api.recipes) && api.recipes.length > 0) {
           const recipes: Array<{
             saucer_id: string

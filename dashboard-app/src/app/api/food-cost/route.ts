@@ -16,6 +16,12 @@ export async function GET(request: NextRequest) {
     const opts = { headers, cache: 'no-store' as const }
     const clientId = auth.clientId
 
+    // FULLSITE PRIMERO: food cost desde las fichas técnicas de Fullsite (fs_food_cost).
+    // Las fuentes legacy (wansoft_recipes / costeo Excel) quedan sólo como respaldo.
+    const fsFoodCostP = fetch(`${sbUrl}/rest/v1/rpc/fs_food_cost`, {
+      method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_client_id: clientId }), cache: 'no-store',
+    })
     const [recipesRes, menuRes, posRecipesRes, menuConfigRes, costeoRes, modsRes, invRes, yieldRes] = await Promise.all([
       fetch(`${sbUrl}/rest/v1/wansoft_recipes?client_id=eq.${clientId}&select=saucer_id,saucer_name,budget_cost,ingredients`, opts),
       fetch(`${sbUrl}/rest/v1/pos_menu_items?client_id=eq.${clientId}&select=name,price,category_id`, opts),
@@ -27,7 +33,10 @@ export async function GET(request: NextRequest) {
       fetch(`${sbUrl}/rest/v1/pos_yield_studies?client_id=eq.${clientId}&select=slug,label,unit_label,inputs,outputs&order=created_at.asc`, opts),
     ])
 
+    const fsRes = await fsFoodCostP.catch(() => null)
     return Response.json({
+      // null = la lectura falló (distinto de "no hay fichas técnicas").
+      fsFoodCost: fsRes && fsRes.ok ? await fsRes.json() : null,
       recipes: recipesRes.ok ? await recipesRes.json() : [],
       menuItems: menuRes.ok ? await menuRes.json() : [],
       posRecipes: posRecipesRes.ok ? await posRecipesRes.json() : [],

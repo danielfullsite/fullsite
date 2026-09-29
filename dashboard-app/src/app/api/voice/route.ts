@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { withPOSAuth } from '@/lib/api-auth'
 import { hoyEnZona, sumarDias } from '@/lib/date-mx'
-import { buildDailyFromOrders } from '@/lib/pos-daily'
+import { ventasFullsitePrimero, buildDailyFromOrders } from '@/lib/pos-daily'
 import { esDuenoDelHistoricoWansoft } from '@/lib/wansoft-legacy'
 
 // Simple rate limiting — max 15 requests per minute per IP
@@ -58,16 +58,9 @@ export async function POST(request: NextRequest) {
     const selectCols = wantsDetail
       ? 'fecha,ventas_dia,ventas_brutas,descuentos,tickets_count,personas_restaurant,ticket_promedio_restaurant,efectivo,tarjeta,meseros,ventas_por_grupo,pago_métodos,platillos_top'
       : 'fecha,ventas_dia,tickets_count,personas_restaurant,ticket_promedio_restaurant,efectivo,tarjeta'
-    const dailyRes = await fetch(
-      `${sbUrl}/rest/v1/wansoft_daily?select=${selectCols}&client_slug=eq.${encodeURIComponent(auth.clientId)}&ventas_dia=gt.0&order=fecha.desc&limit=${histLimit}`,
-      { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
-    )
-    let recentDays = dailyRes.ok ? await dailyRes.json() : []
-
-    // OCM Fase 3: tenant clonado sin histórico wansoft_daily → voz lee su pos_orders vivo.
-    if (!recentDays || recentDays.length === 0) {
-      recentDays = await buildDailyFromOrders(sbUrl, { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, auth.clientId, histLimit)
-    }
+    // FULLSITE PRIMERO: el POS de Fullsite manda; el histórico importado sólo cubre
+    // hasta su último día. Ver ventasFullsitePrimero (lib/pos-daily.ts).
+    const { dias: recentDays } = await ventasFullsitePrimero(sbUrl, { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, auth.clientId, histLimit, selectCols)
 
     // 2. Detect date from question
     //
@@ -408,8 +401,8 @@ DATOS DIARIOS (ultimos ${recentDays.length} dias).\n${lines.join('\n')}`
               for (const row of recentDays) {
                 const m = (row.fecha as string).slice(0, 7)
                 if (!currMonthly[m]) currMonthly[m] = { ventas: 0, tickets: 0, dias: 0 }
-                currMonthly[m].ventas += row.ventas_dia || 0
-                currMonthly[m].tickets += row.tickets_count || 0
+                currMonthly[m].ventas += Number(row.ventas_dia) || 0
+                currMonthly[m].tickets += Number(row.tickets_count) || 0
                 currMonthly[m].dias += 1
               }
               const yoyLines = [`\nCOMPARATIVO AÑO ANTERIOR (${currentYear} vs ${prevYear}):`]
