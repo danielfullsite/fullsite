@@ -18,10 +18,19 @@ import { contextoDia, type ContextoDia } from '@/lib/agents/dia-negocio'
 import { desdeEventos, type EventoAgente } from '@/lib/atencion'
 import { esModoVoz, instruccionModoVoz } from '@/lib/voz/instruccion-voz'
 import {
-  aplicarGraficas, anexarGrafica, compactarGraficasEnHistorial, construirCatalogo, elegirGraficaPorPregunta,
-  lineasCatalogoParaPrompt, MAX_GRAFICAS_POR_RESPUESTA, type FuenteVentasChat,
+  aplicarGraficas, anexarGrafica, claveConsulta, compactarGraficasEnHistorial, construirCatalogo, elegirGraficaPorPregunta,
+  graficaDeConsulta, lineasCatalogoParaPrompt, MAX_GRAFICAS_POR_RESPUESTA, type FuenteVentasChat,
 } from '@/lib/graficas-chat'
 import type { FilaFranja, DaypartsConfig } from '@/lib/dayparts'
+import type { GraficaSpec } from '@/lib/grafica-spec'
+import {
+  bloqueMapa, credencialesLectura, datosHastaDeTablas, ejecutarConsulta, leerMapa, pistasDelMapa, responderConHerramientas,
+  mensajesDeRespaldo, MAX_CONSULTAS, type ConsultaHecha, type ResultadoCiclo,
+} from '@/lib/ia-lectura'
+import { Evidencia, garantizarNumeros, mensajeReparacion } from '@/lib/verificador-numeros'
+
+// Ciclo de consultas (hasta ~20 s) + lecturas: más que el default de algunas cuentas.
+export const maxDuration = 60
 
 /**
  * Alias "nombre en el POS → nombre en el costeo" por tenant. Son datos del menú de un
@@ -161,6 +170,18 @@ export async function POST(request: NextRequest) {
     if (auth instanceof Response) return auth
     const client_id = auth.clientId
     const userId = auth.staffId
+    // Lectura universal (ia_mapa / ia_consulta): con el JWT del usuario si la sesión es
+    // de Supabase — así la consulta nunca ve más que él (RLS + timeouts de su rol). Con
+    // token de turno del POS (no es JWT de Supabase) va la service key; las funciones
+    // filtran igual por el client_id que decide ESTE servidor.
+    const credLectura = credencialesLectura({
+      sbUrl: process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      anonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+      serviceKey: process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+      authType: auth.authType,
+      // Mismo orden que getSessionUserId (el token que se validó): cookie fs-at, luego Bearer.
+      tokenUsuario: request.cookies.get('fs-at')?.value || request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') || null,
+    })
 
     // Rate limiting por usuario
     if (!checkRateLimit(userId, enVoz ? 30 : 20)) {
@@ -344,8 +365,12 @@ export async function POST(request: NextRequest) {
 
     // La frescura del POS va en el MISMO lote paralelo (antes se esperaba sola, después).
     const rpc = crearRpc(sbUrl, sbKey)
-    const [[recentDaysRaw, waiterRowsRaw, fcRowsRaw, reservasRaw, ordersRaw, recipesRaw, insumosRaw, sucursalesRaw, ordenesPorSucursalRaw, marketStockRaw, alertasRaw, hoyVsSemanaRaw], frescura] =
-      await Promise.all([Promise.all(fetches), leerFrescura(rpc, client_id || '', zona, cfgDayparts.inicioDia)])
+    // El MAPA DE DATOS (ia_mapa) también va en este lote: no suma latencia.
+    const [[recentDaysRaw, waiterRowsRaw, fcRowsRaw, reservasRaw, ordersRaw, recipesRaw, insumosRaw, sucursalesRaw, ordenesPorSucursalRaw, marketStockRaw, alertasRaw, hoyVsSemanaRaw], frescura, mapa] =
+      await Promise.all([Promise.all(fetches), leerFrescura(rpc, client_id || '', zona, cfgDayparts.inicioDia), leerMapa(credLectura, client_id)])
+    // FALLA ≠ VACÍO: un mapa que no se pudo leer se reporta como fuente fallida.
+    if (!mapa.ok) fuentesFallidas.push('mapa de datos (consulta libre)')
+    const hayConsultaLibre = mapa.ok && mapa.tablas.length > 0
 
     // OCM Fase 3: si el tenant no tiene histórico en wansoft_daily (todo cliente clonado
     // del esqueleton), sintetizamos las filas diarias desde su pos_orders vivo. Mismo shape
@@ -1075,6 +1100,55 @@ export async function POST(request: NextRequest) {
 
     const fuentesFallidasCtx = contextoFuentesFallidas(fuentesFallidas)
 
+    // ── LECTURA UNIVERSAL: mapa de tablas + herramienta consultar_datos ─────────
+    // El mapa va DENTRO del bloque de datos (nombres y comentarios son texto de la base).
+    const mapaCtx = bloqueMapa(mapa, message)
+    const siNoEsta = hayConsultaLibre
+      ? 'si la cifra NO está en el contexto, CONSÚLTALA con consultar_datos; si tampoco se puede, di "no lo tengo" y da lo más cercano que SÍ esté, con su fecha.'
+      : 'si la cifra que te piden NO está en el contexto, di "no lo tengo calculado" y da lo más cercano que SÍ esté, con su fecha.'
+    const reglasConsulta = hayConsultaLibre ? `
+REGLA #2 — CONSULTA LIBRE (herramienta consultar_datos):
+Además de los bloques precalculados tienes el MAPA DE DATOS (dentro del bloque de datos, al final): las tablas de este restaurante con sus columnas y fechas.
+1. RUTA RÁPIDA: si un bloque precalculado ya contesta la pregunta, contesta con él SIN consultar.
+2. Usa consultar_datos para lo demás: cruzar secciones (p. ej. ventas contra asistencia o gastos), tablas que no vienen precalculadas, periodos a la medida, conteos o rankings específicos. Máximo ${MAX_CONSULTAS} consultas por respuesta: pide lo justo y agrega en SQL (GROUP BY, LIMIT).
+3. SQL de Postgres de sólo lectura (una sentencia SELECT/WITH) con los nombres EXACTOS de tablas y columnas del mapa, sin esquema y sin filtrar por client_id (ya viene filtrado). Funciones permitidas: agregados, fecha/hora (date_trunc, extract, to_char, now), texto, jsonb (jsonb_array_elements, ->, ->>), ventanas y es_venta(status, payment_status).
+4. Sumas, promedios, conteos y porcentajes se hacen EN SQL; nunca los calcules tú.
+5. Si la consulta regresa error, corrígela con el mensaje; si no puedes, di que no pudiste consultarlo.
+6. Nombra las columnas por su unidad: dinero con total/venta/importe/ticket/precio (p. ej. "as venta_total"), porcentajes con pct (p. ej. "as pct_bebidas", ya multiplicado por 100). Así se verifican tus cifras.
+${pistasDelMapa(mapa.ok ? mapa.tablas : [])}
+
+HONESTIDAD CON CONSULTAS:
+- Todo número de tu respuesta sale de un bloque precalculado o del resultado de una consulta. Cero cuentas mentales.
+- Di el rango de fechas que cubren los datos que usaste.
+- Si usaste histórico importado, dilo.
+- Si el dato no está (la tabla no existe en el mapa, o 0 filas), dilo: "no tengo registros de <tema> para <periodo>". Si el periodo cae fuera de las fechas del mapa, es SIN COBERTURA, no $0.
+- No muestres SQL ni nombres de tablas o columnas al usuario, salvo que lo pida explícitamente.${enVoz
+  ? '\n- Modo voz: NUNCA menciones nombres de tablas, columnas ni SQL; habla del tema ("tus ventas", "la asistencia").'
+  : '\n- Gráfica de una consulta: si el resultado trae "grafica", puedes poner ese marcador (<!--grafica:consulta-N-->) en su propia línea. Si no lo trae, esa consulta no se puede graficar. Nunca escribas sus datos.'}
+` : ''
+
+    // Bloque de datos del prompt: además de ir al modelo, es EVIDENCIA del verificador de
+    // números (lo que el modelo puede citar). Las reglas del prompt NO son evidencia.
+    const bloqueDatos = `MESEROS ACTIVOS: ${activeMeserosStr}
+${fuentesFallidasCtx}
+${sucursalesContext}
+${franjasContext}
+${alertasCtx}
+${waiterContext}
+${foodCostContext}
+${reservasContext}
+${ordersContext}
+${marketContext}
+${productContext || productoNativo}
+${recetaCtx}
+${insumoCtx}
+${frescuraCtx}
+${fuenteCtx}
+${hoyVsSemanaCtx}
+
+${dailyContext}
+${mapaCtx}`
+
     // 4. System prompt — Unified sharp copilot (same as Telegram)
     //
     // Los EJEMPLOS usan marcadores (<Mesero A>, <$X>) y no nombres ni cifras reales:
@@ -1107,12 +1181,12 @@ ${lineasGraficas || '(ninguna gráfica disponible con los datos de esta consulta
 2. PROHIBIDO escribir JSON, bloques <!--chart ... chart--> o listas de valores "para graficar": se descartan.
 3. Pon el marcador cuando pidan "gráfica", "muéstrame", "tendencia" o una comparación que se entienda mejor viéndola. Tu texto da la conclusión en 1-2 líneas con cifras del contexto; la gráfica muestra el detalle.
 PERO si preguntan "cuánto cuesta HACER un platillo" o "cuánto cuesta un ingrediente" = eso SÍ es del restaurante, contesta normal con datos de RECETAS.
-
+${reglasConsulta}
 REGLAS CRÍTICAS:
 1. SIEMPRE da números EXACTOS de los datos que tienes. Si los datos dicen "<Mesero A>:$12533" → responde "$12,533".
 2. BUSCA A FONDO antes de decir que no tienes un dato. Revisa: Meseros, Grupos, Platillos, Pagos, Resúmenes, Rankings, Desglose por día.
 3. USA LOS RESÚMENES PRE-CALCULADOS (mes, últimos 7 días completos vs los 7 anteriores, hoy vs semana pasada a la misma hora, pronóstico, ventas por mes, ventas por hora). Ya están calculados. HOY es un día EN CURSO: nunca compares su total parcial contra días completos.
-4. NO HAGAS ARITMÉTICA: no sumes, restes, promedies ni saques porcentajes tú. Si la cifra que te piden NO está en el contexto, di "no lo tengo calculado" y da lo más cercano que SÍ esté, con su fecha.
+4. NO HAGAS ARITMÉTICA: no sumes, restes, promedies ni saques porcentajes tú; ${siNoEsta}
 5. FECHAS REALES SIEMPRE: cada cifra que des va con su fecha o periodo real. Si el dato es de otro día que el que preguntaron, dilo ("el último día con datos es <fecha>: ..."). Puedes contestar sobre cualquier fecha pasada que esté en los datos (historial completo), siempre con su fecha.
 6. SIN COBERTURA ≠ CERO: si el contexto dice "SIN COBERTURA" o "no hay ventas registradas" para un periodo, NUNCA digas "$0", "no se vendió" ni "no abrieron": di "no tengo ventas registradas para <periodo>; la última venta registrada es <fecha>".
 7. FALLO ≠ VACÍO: si una fuente aparece en "FUENTES QUE NO SE PUDIERON LEER" o dice "NO PUDE LEER", di que no pudiste consultarla; no digas que no hay registros.
@@ -1160,7 +1234,7 @@ CÓMO INTERPRETAR (lee la intención, no las palabras):
 - "propinas" → "Propinas $X" en datos diarios. Si un día no trae ese campo, di que para ese día no hay propinas registradas. NO inventes montos.
 - "inventario" / "stock" / "market" → INVENTARIO MARKET si hay datos. Si preguntan por ingredientes de cocina, di que se revisa en /pos/inventario.
 - "vs semana pasada" / "comparado con" → ÚLTIMOS 7 DÍAS COMPLETOS vs LOS 7 ANTERIORES (ya calculado, con fechas y días con datos; hoy va aparte porque está en curso). Si dice SIN COBERTURA, NO COMPARABLE o cobertura desigual, dilo.
-- Si algo NO está en el contexto (ninguna sección lo trae calculado), di "no lo tengo calculado" en vez de calcularlo.
+- Si algo NO está en el contexto (ninguna sección lo trae calculado): ${hayConsultaLibre ? 'consúltalo con consultar_datos; si no se puede, di "no lo tengo"' : 'di "no lo tengo calculado"'} en vez de calcularlo.
 - Cualquier nombre propio → buscar en TODOS los datos disponibles
 
 FECHA DE HOY: ${fechaLargaEnZona(zona)}, ${horaEnZona(zona)} (zona ${zona}). DÍA DE VENTA EN CURSO: ${todayStr} (el día de venta empieza a las ${dia.inicio.slice(0, 5)}; antes de esa hora sigue siendo el día anterior). "Hoy" = ${todayStr}. Úsalo para ubicar "ayer", "la semana pasada", "mañana", etc.
@@ -1260,49 +1334,138 @@ Sugerencia: <acción concreta>. (Sin prometer un monto que no esté calculado.)
 2. <segunda oportunidad según los datos>
 3. <tercera>
 ${enVoz ? `\n${instruccionModoVoz()}\n` : ''}
-${envolverDatos(`MESEROS ACTIVOS: ${activeMeserosStr}
-${fuentesFallidasCtx}
-${sucursalesContext}
-${franjasContext}
-${alertasCtx}
-${waiterContext}
-${foodCostContext}
-${reservasContext}
-${ordersContext}
-${marketContext}
-${productContext || productoNativo}
-${recetaCtx}
-${insumoCtx}
-${frescuraCtx}
-${fuenteCtx}
-${hoyVsSemanaCtx}
-
-${dailyContext}`)}`
+${envolverDatos(bloqueDatos)}`
 
     // Groq — free, with retry on rate limit
-    const { groqChat } = await import('@/lib/groq')
-    const text = await groqChat({
-      messages: [
-        { role: 'system', content: systemPrompt },
-        // Sólo 'user' y 'assistant' del historial del cliente: un 'system' (o 'tool')
-        // en el cuerpo de la petición es un intento de reescribir las reglas.
-        // Las gráficas del historial vuelven compactadas a su marcador (el JSON gastaba
-        // el tope de caracteres y enseñaba al modelo a copiar datos).
-        ...historialSeguro(compactarGraficasEnHistorial(history), 8),
-        { role: 'user', content: message.slice(0, 4000) },
-      ],
-      maxTokens: 4000,
+    const groq = await import('@/lib/groq')
+    const mensajes: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
+      { role: 'system', content: systemPrompt },
+      // Sólo 'user' y 'assistant' del historial del cliente: un 'system' (o 'tool')
+      // en el cuerpo de la petición es un intento de reescribir las reglas.
+      // Las gráficas del historial vuelven compactadas a su marcador (el JSON gastaba
+      // el tope de caracteres y enseñaba al modelo a copiar datos).
+      ...historialSeguro(compactarGraficasEnHistorial(history), 8),
+      { role: 'user', content: message.slice(0, 4000) },
+    ]
+
+    // Gráfica de cada consulta (armada en el servidor con SUS filas; se calcula una vez).
+    const specsConsulta = new Map<number, GraficaSpec | null>()
+    const specDeConsulta = (c: ConsultaHecha): GraficaSpec | null => {
+      if (!specsConsulta.has(c.n)) {
+        specsConsulta.set(c.n, c.resultado.ok
+          ? graficaDeConsulta(
+            { paraQue: c.paraQue, sql: c.sql, filas: c.resultado.filas, truncado: c.resultado.truncado },
+            { datosHastaRespaldo: mapa.ok ? datosHastaDeTablas(c.sql, mapa.tablas) : undefined },
+          )
+          : null)
+      }
+      return specsConsulta.get(c.n) ?? null
+    }
+
+    let text: string
+    let ciclo: ResultadoCiclo | null = null
+    if (hayConsultaLibre) {
+      // Ciclo de consultas: máx. 4, ~20 s. p_client_id = el tenant AUTENTICADO, nunca
+      // algo que venga del usuario o del modelo.
+      ciclo = await responderConHerramientas({
+        mensajes,
+        modelo: o => groq.groqConHerramientas({ ...o, maxTokens: 4000 }),
+        consultar: (sql, ms) => ejecutarConsulta(credLectura, client_id, sql, ms),
+        respaldo: m => groq.groqChat({ messages: m, maxTokens: 4000 }),
+        marcadorGrafica: enVoz ? undefined : c => (specDeConsulta(c) ? `<!--grafica:${claveConsulta(c.n)}-->` : null),
+      })
+      text = ciclo.texto
+    } else {
+      text = await groq.groqChat({ messages: mensajes, maxTokens: 4000 })
+    }
+    // Observabilidad: conteos, tiempos y errores; NUNCA filas ni SQL (no hay nivel debug en el repo).
+    console.log(`[chat] lectura universal ${JSON.stringify({
+      auth: credLectura.modo,
+      mapa: mapa.ok ? mapa.tablas.length : `fallo: ${mapa.motivo}`,
+      consultas: ciclo?.consultas.length ?? 0,
+      ms_consultas: ciclo?.msConsultas ?? 0,
+      llamadas_modelo: ciclo?.llamadasModelo ?? 1,
+      agotado: ciclo?.agotado ?? null,
+      respaldo: ciclo?.respaldo ?? false,
+      errores: ciclo?.errores ?? [],
+    })}`)
+
+    // ── VERIFICADOR DE NÚMEROS ──────────────────────────────────────────────────
+    // Garantía: ningún número sin rastro en los datos llega al dueño (texto y voz). Se
+    // verifica el texto del modelo ANTES de insertar gráficas (sus specs las arma el
+    // servidor con filas reales). Evidencia = bloque de datos + celdas de las consultas +
+    // pregunta del usuario. Una ronda de reparación; lo que quede, "[sin verificar]".
+    // Lo que escribió el usuario (pregunta, historial) y el nombre del restaurante sólo
+    // respaldan CONTEOS: su "$15,000" o su "20%" nunca respaldan un monto o un % de la respuesta.
+    const evidencia = new Evidencia().agregarTexto(bloqueDatos)
+      .agregarTexto(message, { soloConteos: true }).agregarTexto(restaurantName, { soloConteos: true })
+    for (const h of Array.isArray(history) ? history as { role?: unknown; content?: unknown }[] : []) {
+      // Sólo lo que escribió el usuario: una respuesta previa del asistente en el cuerpo de
+      // la petición la manda el cliente y no se puede usar para "lavar" cifras.
+      if (h && h.role === 'user' && typeof h.content === 'string') evidencia.agregarTexto(h.content.slice(0, 4000), { soloConteos: true })
+    }
+    const evidenciaDeConsultas = (cs: ConsultaHecha[]) => cs.filter(c => c.resultado.ok).flatMap(c => c.resultado.ok ? [c.resultado.filas, c.resultado.n] : [])
+    for (const x of evidenciaDeConsultas(ciclo?.consultas || [])) evidencia.agregarValor(x)
+    const garantia = await garantizarNumeros({
+      texto: text,
+      evidencia,
+      reparar: async (original, sinRastro) => {
+        const previos = ciclo?.consultas || []
+        const msgsRep = [
+          ...mensajesDeRespaldo(mensajes, previos),
+          { role: 'assistant' as const, content: original },
+          { role: 'user' as const, content: mensajeReparacion(sinRastro, hayConsultaLibre) },
+        ]
+        if (hayConsultaLibre) {
+          const rep = await responderConHerramientas({
+            mensajes: msgsRep,
+            modelo: o => groq.groqConHerramientas({ ...o, maxTokens: 4000 }),
+            consultar: (sql, ms) => ejecutarConsulta(credLectura, client_id, sql, ms),
+            respaldo: m => groq.groqChat({ messages: m, maxTokens: 4000 }),
+            presupuestoMs: 12_000,
+            maxConsultas: 2,
+          })
+          return { texto: rep.texto, evidenciaExtra: evidenciaDeConsultas(rep.consultas) }
+        }
+        return { texto: await groq.groqChat({ messages: msgsRep, maxTokens: 4000 }) }
+      },
     })
+    text = garantia.texto
+    // Conteos, nunca valores.
+    console.log(`[chat] verificador ${JSON.stringify({
+      afirmaciones: garantia.afirmaciones,
+      sin_rastro: garantia.sinRastroInicial,
+      reparado: garantia.reparado,
+      marcados: garantia.marcados,
+      ms_reparacion: garantia.msReparacion,
+      voz: enVoz,
+    })}`)
+
+    // Gráficas de consultas → al catálogo como `consulta-N` (sólo formas válidas).
+    // Siguen el MISMO camino que las demás (aplicarGraficas): el modelo sólo elige.
+    if (ciclo && !enVoz) {
+      for (const c of ciclo.consultas) {
+        const spec = specDeConsulta(c)
+        if (spec) catalogoGraficas.set(claveConsulta(c.n), spec)
+      }
+    }
 
     // Gráficas: los marcadores <!--grafica:ID--> se sustituyen por el spec del servidor;
     // un <!--chart escrito por el modelo (datos no verificados) se descarta. En voz no
     // hay gráficas: la respuesta se escucha, y el modelo ofrece "el detalle en pantalla".
     let graficas = aplicarGraficas(text, catalogoGraficas, { sinGraficas: enVoz })
-    // Auto-inyectado: pidieron gráfica y el modelo no marcó ninguna → la más adecuada.
+    // Auto-inyectado: pidieron gráfica y el modelo no marcó ninguna → la de la última
+    // consulta graficable de esta respuesta; si no hay, la más adecuada del catálogo.
     if (quiereGrafica && !enVoz && graficas.usadas.length === 0) {
-      const id = elegirGraficaPorPregunta(message, catalogoGraficas)
-      const spec = id ? catalogoGraficas.get(id) : undefined
-      if (spec) graficas = anexarGrafica(graficas, spec)
+      const deConsulta = [...(ciclo?.consultas || [])].reverse().find(c => catalogoGraficas.has(claveConsulta(c.n)))
+      if (deConsulta) {
+        const clave = claveConsulta(deConsulta.n)
+        graficas = anexarGrafica(graficas, catalogoGraficas.get(clave)!, clave)
+      } else {
+        const id = elegirGraficaPorPregunta(message, catalogoGraficas)
+        const spec = id ? catalogoGraficas.get(id) : undefined
+        if (spec) graficas = anexarGrafica(graficas, spec)
+      }
     }
     const finalText = graficas.texto
 

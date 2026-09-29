@@ -71,7 +71,8 @@ describe('bandera modo', () => {
     expect(i).toMatch(/markdown/)
     expect(i).toMatch(/links/)
     expect(i).toMatch(/emojis/)
-    expect(i).toMatch(/doce mil quinientos pesos/)
+    expect(i).toMatch(/CON DÍGITOS/)
+    expect(i).toMatch(/doce mil quinientos pesos/) // lo dice la app (texto-hablado), no el modelo
     expect(i).toContain('¿Quieres el detalle en pantalla?')
     // No afloja la honestidad de datos.
     expect(i).toMatch(/si no tienes el dato/i)

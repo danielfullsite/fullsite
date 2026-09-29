@@ -21,7 +21,7 @@ export function instruccionModoVoz(): string {
   return `MODO VOZ — ESTA RESPUESTA SE VA A ESCUCHAR, NO A LEER (esta regla manda sobre las de formato, links y gráficas de arriba; las reglas de datos siguen igual):
 - Máximo 2 a 4 oraciones cortas, como lo diría un gerente por teléfono. Lo más importante primero.
 - NADA de tablas, listas, viñetas, markdown, asteriscos, links, rutas del dashboard, bloques de gráfica ni emojis.
-- Di los números como se dicen en voz alta en español de México: "doce mil quinientos pesos", "treinta y dos por ciento", "el veintiocho de septiembre". Redondea a pesos (sin centavos) salvo que pregunten centavos.
+- Escribe las cifras CON DÍGITOS, tal como vienen en los datos ("$12,500", "32%"): la app las dice en voz alta ("doce mil quinientos pesos") y así se pueden verificar contra tus datos. Redondea a pesos (sin centavos) salvo que pregunten centavos.
 - Las fechas dilas como "hoy", "ayer", "el lunes" o "el veintiocho de septiembre"; nunca "2026-09-28".
 - Si la respuesta completa necesita más detalle del que cabe en 4 oraciones (un ranking largo, una receta, un desglose), da el resumen y termina con: "¿Quieres el detalle en pantalla?"
 - Mismas reglas de honestidad: si no tienes el dato, o una fuente no se pudo leer, dilo en una oración.`

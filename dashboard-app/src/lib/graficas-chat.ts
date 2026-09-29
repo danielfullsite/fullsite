@@ -17,6 +17,9 @@
 //      cuyo caso se usa la del servidor).
 //   4. `elegirGraficaPorPregunta` es el auto-inyectado: si el usuario pidió gráfica y
 //      el modelo no marcó ninguna, se elige la más adecuada del catálogo.
+//   5. `graficaDeConsulta`: con las filas que devolvió `ia_consulta` en ESTA respuesta
+//      (lectura universal, lib/ia-lectura.ts) el servidor arma un spec `consulta` que
+//      entra al catálogo como `consulta-N`; mismo camino (aplicarGraficas) que las demás.
 //
 // Funciones puras: sin fetch. El render vive en components/chat/GraficaChat.tsx y el
 // formato compartido en lib/grafica-spec.ts.
@@ -25,8 +28,8 @@ import { datoTexto, diasEntre, sumarDiasCalendario, ETIQUETAS_NO_MESERO } from '
 import type { DaypartsConfig, FilaFranja } from '@/lib/dayparts'
 import { MIN_ORDENES_REPRESENTATIVO } from '@/lib/dayparts'
 import {
-  bloqueDeSpec, RE_BLOQUE_CHART, RE_MARCADOR, VERSION_SPEC,
-  type FilaGrafica, type GraficaSpec, type IdGrafica,
+  bloqueDeSpec, RE_BLOQUE_CHART, RE_MARCADOR, validarSpec, VERSION_SPEC,
+  type EjeX, type FilaGrafica, type GraficaSpec, type IdGrafica, type SerieGrafica, type TipoGrafica, type UnidadGrafica,
 } from '@/lib/grafica-spec'
 
 export const MAX_GRAFICAS_POR_RESPUESTA = 2
@@ -496,6 +499,152 @@ export function graficaVentasPorHora(e: EntradaCatalogo): GraficaSpec | null {
   })
 }
 
+// ── Gráfica desde el resultado de una consulta (ia_consulta) ────────────────
+//
+// El modelo NO escribe los datos: pide `<!--grafica:consulta-N-->` y el servidor
+// arma el spec con las filas que devolvió la base para la consulta N de esta
+// respuesta. Sólo formas simples y honestas: UNA columna etiqueta (fecha, mes,
+// hora o texto) + 1–3 columnas numéricas con la misma unidad, 2–60 filas,
+// etiquetas únicas. Cualquier otra forma → sin gráfica (el texto sigue).
+
+export const MAX_FILAS_GRAFICA_CONSULTA = 60
+const MAX_SERIES_CONSULTA = 3
+
+export interface ConsultaParaGrafica {
+  /** Para qué se hizo la consulta (lo escribe el modelo; va como título, saneado). */
+  paraQue: string
+  /** SQL de la consulta: sólo se usa para detectar el rango de fechas. */
+  sql: string
+  filas: unknown[]
+  truncado?: boolean
+}
+
+const RE_DIA = /^(\d{4}-\d{2}-\d{2})(?:[T ]00:00(?::00(?:\.0+)?)?(?:Z|[+-]\d{2}(?::?\d{2})?)?)?$/
+const RE_MES = /^\d{4}-\d{2}$/
+const RE_HORA = /^\d{1,2}:\d{2}$/
+const RE_FECHA_HORA = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/
+
+/** Unidad por el NOMBRE de la columna. Sin pista clara → número simple (nunca pesos por default). */
+export function unidadDeColumna(col: string): UnidadGrafica {
+  const c = col.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+  if (/(^|_)(pct|porc|porcentaje|percent|participacion)|_pct$|pct_/.test(c)) return 'pct'
+  if (/(^|_)(ordenes|orders|n_ordenes|num_ordenes|tickets)$|^tickets_count$/.test(c)) return 'ordenes'
+  if (/(^|_)(cantidad|piezas|pzas|unidades|qty)($|_)/.test(c)) return 'piezas'
+  if (/venta|total|monto|importe|precio|costo|ingreso|propina|ticket|pesos|mxn|descuento|subtotal|gasto|pago|cobrado|efectivo|tarjeta/.test(c)) return 'MXN'
+  return 'numero'
+}
+
+/** Rango de fechas detectable: de las etiquetas, o de las fechas literales del SQL. */
+function rangoDeConsulta(etiquetas: string[] | null, sql: string): { desde: string; hasta: string } | null {
+  const fechas = etiquetas && etiquetas.length > 0
+    ? [...etiquetas].sort()
+    : [...new Set((sql.match(/\b20\d{2}-\d{2}-\d{2}\b/g) || []))].sort()
+  if (fechas.length === 0) return null
+  return { desde: fechas[0], hasta: fechas[fechas.length - 1] }
+}
+
+/**
+ * Spec de gráfica para el resultado de una consulta, o null si la forma no aplica.
+ * Se valida con `validarSpec` antes de salir: si el cliente no lo dibujaría, no sale.
+ * `datosHastaRespaldo`: última fecha de las tablas consultadas (del mapa), para el pie
+ * cuando el resultado no trae fechas.
+ */
+export function graficaDeConsulta(c: ConsultaParaGrafica, opts: { datosHastaRespaldo?: string } = {}): GraficaSpec | null {
+  const filasRaw = c.filas
+  if (!Array.isArray(filasRaw) || filasRaw.length < 2 || filasRaw.length > MAX_FILAS_GRAFICA_CONSULTA) return null
+  if (!filasRaw.every(f => f && typeof f === 'object' && !Array.isArray(f))) return null
+  const filas = filasRaw as Record<string, unknown>[]
+  const columnas = [...new Set(filas.flatMap(f => Object.keys(f)))]
+  if (columnas.length < 2 || columnas.length > 1 + MAX_SERIES_CONSULTA) return null
+
+  // Clasificar cada columna: numérica (sólo number finito o null) o texto (sólo string).
+  const numericas: string[] = []
+  const textos: string[] = []
+  for (const col of columnas) {
+    const vals = filas.map(f => f[col]).filter(v => v !== null && v !== undefined)
+    if (vals.length === 0) return null
+    if (vals.every(v => typeof v === 'number' && Number.isFinite(v))) numericas.push(col)
+    else if (vals.every(v => typeof v === 'string')) textos.push(col)
+    else return null
+  }
+  if (textos.length !== 1 || numericas.length < 1 || numericas.length > MAX_SERIES_CONSULTA) return null
+  const colX = textos[0]
+
+  // Etiquetas: presentes, únicas; tipo de eje por su forma.
+  const crudas = filas.map(f => f[colX])
+  if (crudas.some(v => typeof v !== 'string' || !v.trim())) return null
+  const etiquetasCrudas = crudas as string[]
+  let ejeX: EjeX = 'categoria'
+  let xs: string[]
+  if (etiquetasCrudas.every(v => RE_DIA.test(v.trim()))) {
+    ejeX = 'fecha'
+    xs = etiquetasCrudas.map(v => v.trim().slice(0, 10))
+  } else if (etiquetasCrudas.every(v => RE_MES.test(v.trim()))) {
+    ejeX = 'mes'
+    xs = etiquetasCrudas.map(v => v.trim())
+  } else if (etiquetasCrudas.every(v => RE_FECHA_HORA.test(v.trim()))) {
+    return null // fecha con hora: ambiguo como etiqueta (que la consulta agrupe por día u hora)
+  } else if (etiquetasCrudas.every(v => RE_HORA.test(v.trim()))) {
+    ejeX = 'hora'
+    xs = etiquetasCrudas.map(v => v.trim().padStart(5, '0'))
+  } else {
+    xs = etiquetasCrudas.map(v => datoTexto(v, 60))
+    if (xs.some(x => !x)) return null
+  }
+  if (new Set(xs).size !== xs.length) return null
+
+  // Series: un solo eje Y → sólo columnas con la misma unidad que la primera.
+  const unidad = unidadDeColumna(numericas[0])
+  const cols = numericas.filter(col => unidadDeColumna(col) === unidad)
+  const series: SerieGrafica[] = cols.map(col => ({
+    clave: `s${cols.indexOf(col)}`,
+    nombre: datoTexto(col.replace(/_/g, ' '), 40) || 'valor',
+    rol: 'principal',
+  }))
+  let filasG: FilaGrafica[] = filas.map((f, i) => {
+    const v: Record<string, number | null> = {}
+    cols.forEach((col, j) => { const x = f[col]; v[`s${j}`] = typeof x === 'number' && Number.isFinite(x) ? r2(x) : null })
+    return { x: xs[i], v }
+  })
+  if (filasG.every(f => Object.values(f.v).every(v => v === null))) return null
+
+  const temporal = ejeX !== 'categoria'
+  let tipo: TipoGrafica
+  if (temporal) {
+    filasG = [...filasG].sort((a, b) => a.x.localeCompare(b.x))
+    const muchos = filasG.length > 12
+    tipo = series.length === 1 ? (muchos && ejeX !== 'hora' ? 'linea' : 'barra') : (muchos ? 'linea' : 'barra_agrupada')
+  } else {
+    // Texto: ranking ordenado de mayor a menor (sin dato al final).
+    const k = series[0].clave
+    filasG = [...filasG].sort((a, b) => (b.v[k] ?? -Infinity) - (a.v[k] ?? -Infinity))
+    tipo = series.length === 1 ? 'ranking' : 'barra_agrupada'
+  }
+
+  const rango = rangoDeConsulta(ejeX === 'fecha' ? filasG.map(f => f.x) : null, String(c.sql || ''))
+  const rangoTxt = rango ? (rango.desde === rango.hasta ? rango.desde : `${rango.desde} a ${rango.hasta}`) : ''
+  const huecos = filasG.filter(f => Object.values(f.v).every(v => v === null)).length
+  const avisos = [
+    c.truncado ? 'El resultado venía recortado (tope de filas): puede faltar información.' : '',
+    cols.length < numericas.length ? 'Se omitieron columnas con otra unidad (un solo eje).' : '',
+  ].filter(Boolean).join(' ')
+
+  const spec = base('consulta', {
+    tipo,
+    titulo: datoTexto(c.paraQue, 120) || 'Consulta a tus datos',
+    rango: rangoTxt || 'periodo según la consulta',
+    unidad,
+    ejeX,
+    series,
+    filas: filasG,
+    fuente: rangoTxt ? `consulta a tus datos · ${rangoTxt}` : 'consulta a tus datos',
+    datosHasta: rango?.hasta || datoTexto(opts.datosHastaRespaldo, 40) || 'sin fecha en el resultado',
+    ...(huecos > 0 ? { huecos } : {}),
+    ...(avisos ? { aviso: avisos } : {}),
+  })
+  return validarSpec(spec)
+}
+
 // ── Catálogo ────────────────────────────────────────────────────────────────
 
 const BUILDERS: [IdGrafica, (e: EntradaCatalogo) => GraficaSpec | null][] = [
@@ -510,7 +659,15 @@ const BUILDERS: [IdGrafica, (e: EntradaCatalogo) => GraficaSpec | null][] = [
   ['ventas_por_hora', graficaVentasPorHora],
 ]
 
-export type CatalogoGraficas = Map<IdGrafica, GraficaSpec>
+/**
+ * Clave de una gráfica en el catálogo de ESTA respuesta: un id fijo, o
+ * `consulta-N` para la gráfica armada con el resultado N de `consultar_datos`.
+ */
+export type ClaveGrafica = IdGrafica | `consulta-${number}`
+
+export type CatalogoGraficas = Map<ClaveGrafica, GraficaSpec>
+
+export const claveConsulta = (n: number): ClaveGrafica => `consulta-${n}`
 
 /** Sólo las gráficas cuyo dato existe. Un builder que falla no tumba el chat. */
 export function construirCatalogo(e: EntradaCatalogo): CatalogoGraficas {
@@ -525,6 +682,7 @@ export function construirCatalogo(e: EntradaCatalogo): CatalogoGraficas {
 }
 
 const DESCRIPCION: Record<IdGrafica, string> = {
+  consulta: 'resultado de una consulta a tus datos',
   ventas_diarias_30d: 'ventas por día (tendencia, huecos = sin datos)',
   ventas_por_mes: 'ventas por mes',
   hoy_vs_semana_pasada: 'hoy vs el mismo día de la semana pasada, acumulado por hora',
@@ -539,7 +697,8 @@ const DESCRIPCION: Record<IdGrafica, string> = {
 /** Líneas para el prompt: una por gráfica disponible, con su rango real. */
 export function lineasCatalogoParaPrompt(cat: CatalogoGraficas): string {
   if (cat.size === 0) return ''
-  return [...cat.values()].map(s => `- ${s.id}: ${DESCRIPCION[s.id]} — ${s.rango}`).join('\n')
+  return [...cat.entries()].filter(([k]) => !k.startsWith('consulta-'))
+    .map(([, s]) => `- ${s.id}: ${DESCRIPCION[s.id]} — ${s.rango}`).join('\n')
 }
 
 /**
@@ -560,7 +719,8 @@ export function elegirGraficaPorPregunta(q: string, cat: CatalogoGraficas): IdGr
   ]
   for (const [re, id] of reglas) if (re.test(n) && cat.has(id)) return id
   if (cat.has('ventas_diarias_30d')) return 'ventas_diarias_30d'
-  return cat.keys().next().value ?? null
+  for (const k of cat.keys()) if (!k.startsWith('consulta-')) return k as IdGrafica
+  return null
 }
 
 // ── Sustitución de marcadores ───────────────────────────────────────────────
@@ -573,16 +733,16 @@ function valoresDe(s: GraficaSpec): number[] | null {
   return vals.map(v => Math.round(v))
 }
 
-/** Un bloque viejo `{type,data:[{label,value}]}` cuyos valores son EXACTAMENTE los de una gráfica del servidor. */
-function specQueCoincide(json: string, cat: CatalogoGraficas): GraficaSpec | null {
+/** Un bloque viejo `{type,data:[{label,value}]}` cuyos valores son EXACTAMENTE los de una gráfica del servidor (devuelve su clave). */
+function specQueCoincide(json: string, cat: CatalogoGraficas): ClaveGrafica | null {
   let data: unknown
   try { data = (JSON.parse(json) as { data?: unknown })?.data } catch { return null }
   if (!Array.isArray(data) || data.length < 2) return null
   const vals = data.map(d => (d && typeof d === 'object' ? Number((d as { value?: unknown }).value) : NaN))
   if (vals.some(v => !Number.isFinite(v))) return null
-  for (const s of cat.values()) {
+  for (const [k, s] of cat) {
     const sv = valoresDe(s)
-    if (sv && sv.length === vals.length && sv.every((v, i) => Math.abs(v - Math.round(vals[i])) <= 1)) return s
+    if (sv && sv.length === vals.length && sv.every((v, i) => Math.abs(v - Math.round(vals[i])) <= 1)) return k
   }
   return null
 }
@@ -592,8 +752,8 @@ export interface ResultadoGraficas {
   texto: string
   /** Mismo texto con marcadores compactos (para logs). */
   textoCompacto: string
-  /** IDs que quedaron en la respuesta, en orden. */
-  usadas: IdGrafica[]
+  /** Claves del catálogo que quedaron en la respuesta, en orden. */
+  usadas: ClaveGrafica[]
   /** Bloques `<!--chart` escritos por el modelo que se descartaron. */
   descartadas: number
 }
@@ -640,8 +800,8 @@ export function quitarComentarios(t: string): { texto: string; quitados: number 
  */
 export function aplicarGraficas(texto: string, cat: CatalogoGraficas, opts: { sinGraficas?: boolean } = {}): ResultadoGraficas {
   const n = nonce()
-  const reservadas: IdGrafica[] = []
-  const reservar = (id: IdGrafica) => {
+  const reservadas: ClaveGrafica[] = []
+  const reservar = (id: ClaveGrafica) => {
     if (opts.sinGraficas || !cat.has(id)) return ''
     reservadas.push(id)
     return `\u0000${n}:${reservadas.length - 1}\u0000`
@@ -650,19 +810,19 @@ export function aplicarGraficas(texto: string, cat: CatalogoGraficas, opts: { si
   // 1a) Bloques viejos que coinciden con el servidor → reserva. Los demás se quedan
   //     para el paso 2, que los quita.
   t = t.replace(RE_BLOQUE_CHART, (m, json: string) => {
-    const s = opts.sinGraficas ? null : specQueCoincide(String(json).trim(), cat)
-    if (!s) return m
-    return reservar(s.id)
+    const k = opts.sinGraficas ? null : specQueCoincide(String(json).trim(), cat)
+    if (!k) return m
+    return reservar(k)
   })
   // 1b) Marcadores → reserva (ID desconocido → nada).
-  t = t.replace(RE_MARCADOR, (_m, idRaw: string) => reservar(idRaw.toLowerCase() as IdGrafica))
+  t = t.replace(RE_MARCADOR, (_m, idRaw: string) => reservar(idRaw.toLowerCase() as ClaveGrafica))
   // 2) Fuera todo comentario del modelo.
   const limpio = quitarComentarios(t)
   t = limpio.texto
   const descartadas = limpio.quitados
 
   // 3) Reservas sobrevivientes → bloques del servidor.
-  const usadas: IdGrafica[] = []
+  const usadas: ClaveGrafica[] = []
   const rePh = new RegExp(`\u0000${n}:(\\d+)\u0000`, 'g')
   const partes: { final: string; compacto: string }[] = []
   let ultimo = 0
@@ -687,12 +847,12 @@ export function aplicarGraficas(texto: string, cat: CatalogoGraficas, opts: { si
 }
 
 /** Agrega al final la gráfica elegida (auto-inyectado). */
-export function anexarGrafica(r: ResultadoGraficas, s: GraficaSpec): ResultadoGraficas {
+export function anexarGrafica(r: ResultadoGraficas, s: GraficaSpec, clave: ClaveGrafica = s.id): ResultadoGraficas {
   return {
     ...r,
     texto: `${r.texto}\n\n${bloqueDeSpec(s)}`,
-    textoCompacto: `${r.textoCompacto}\n\n<!--grafica:${s.id}-->`,
-    usadas: [...r.usadas, s.id],
+    textoCompacto: `${r.textoCompacto}\n\n<!--grafica:${clave}-->`,
+    usadas: [...r.usadas, clave],
   }
 }
 

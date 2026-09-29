@@ -25,6 +25,10 @@ export const IDS_GRAFICA = [
   'meseros',
   'metodos_pago',
   'ventas_por_hora',
+  // Gráfica armada por el servidor con las filas de una consulta a los datos
+  // (ia_consulta) hecha en ESTA respuesta. El modelo la pide con
+  // `<!--grafica:consulta-N-->`; nunca escribe sus valores.
+  'consulta',
 ] as const
 export type IdGrafica = typeof IDS_GRAFICA[number]
 
@@ -38,7 +42,7 @@ export type IdGrafica = typeof IDS_GRAFICA[number]
  * - dona:          parte-del-todo con ≤5 partes
  */
 export type TipoGrafica = 'barra' | 'barra_agrupada' | 'linea' | 'area' | 'comparacion' | 'barra_apilada' | 'ranking' | 'dona'
-export type UnidadGrafica = 'MXN' | 'ordenes' | 'pct' | 'piezas'
+export type UnidadGrafica = 'MXN' | 'ordenes' | 'pct' | 'piezas' | 'numero'
 export type EjeX = 'fecha' | 'mes' | 'hora' | 'categoria'
 
 export interface SerieGrafica {
@@ -80,7 +84,7 @@ export interface GraficaSpec {
 }
 
 const TIPOS: TipoGrafica[] = ['barra', 'barra_agrupada', 'linea', 'area', 'comparacion', 'barra_apilada', 'ranking', 'dona']
-const UNIDADES: UnidadGrafica[] = ['MXN', 'ordenes', 'pct', 'piezas']
+const UNIDADES: UnidadGrafica[] = ['MXN', 'ordenes', 'pct', 'piezas', 'numero']
 const EJES: EjeX[] = ['fecha', 'mes', 'hora', 'categoria']
 const MAX_FILAS = 120
 
@@ -143,8 +147,8 @@ export function validarSpec(raw: unknown): GraficaSpec | null {
 
 /** Cualquier bloque `<!--chart … chart-->` (formato nuevo o el viejo del modelo). */
 export const RE_BLOQUE_CHART = /<!--\s*chart\s*([\s\S]*?)\s*chart\s*-->/g
-/** Marcador que escribe el modelo: `<!--grafica:ID-->`. */
-export const RE_MARCADOR = /<!--\s*grafica\s*:\s*([a-z0-9_]{1,60})\s*-->/gi
+/** Marcador que escribe el modelo: `<!--grafica:ID-->` (o `<!--grafica:consulta-N-->`). */
+export const RE_MARCADOR = /<!--\s*grafica\s*:\s*([a-z0-9_-]{1,60})\s*-->/gi
 
 export function bloqueDeSpec(spec: GraficaSpec): string {
   // `-->` dentro del JSON cerraría el comentario: se escapa (JSON sigue siendo válido).
@@ -230,6 +234,7 @@ export function valorCompleto(n: number | null, unidad: UnidadGrafica): string {
   if (n === null) return 'sin datos'
   if (unidad === 'MXN') return mxnCompleto(n)
   if (unidad === 'pct') return `${n.toLocaleString('es-MX', { maximumFractionDigits: 1 })}%`
+  if (unidad === 'numero') return n.toLocaleString('es-MX', { maximumFractionDigits: 2 })
   const u = unidad === 'ordenes' ? 'órdenes' : 'pzas'
   return `${Math.round(n).toLocaleString('es-MX')} ${u}`
 }
@@ -237,6 +242,7 @@ export function valorCompleto(n: number | null, unidad: UnidadGrafica): string {
 export function valorCorto(n: number, unidad: UnidadGrafica): string {
   if (unidad === 'MXN') return mxnCorto(n)
   if (unidad === 'pct') return `${Math.round(n)}%`
+  if (unidad === 'numero' && Math.abs(n) < 10 && !Number.isInteger(n)) return (Math.round(n * 10) / 10).toLocaleString('es-MX')
   return n >= 1000 ? `${(Math.round(n / 100) / 10).toLocaleString('es-MX')}k` : Math.round(n).toLocaleString('es-MX')
 }
 
